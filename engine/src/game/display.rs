@@ -910,6 +910,29 @@ pub fn stage_to_display(
     }
 }
 
+/// Add every printed heart in `hearts` to the per-colour totals. A colour with
+/// no slot index (a colour the board does not track) is skipped.
+fn add_hearts(totals: &mut [u8], hearts: &crate::card::HeartMap) {
+    for (color, count) in hearts {
+        if let Some(idx) = heart_color_index(color) {
+            totals[idx] = totals[idx].saturating_add(*count);
+        }
+    }
+}
+
+/// Add signed per-colour heart modifiers to the totals, saturating at 0 and
+/// 255 so a bad modifier cannot wrap the display.
+fn add_modified_hearts(
+    totals: &mut [u8],
+    modifiers: &HashMap<crate::card::HeartColor, i32>,
+) {
+    for (color, modifier) in modifiers {
+        if let Some(idx) = heart_color_index(color) {
+            totals[idx] = crate::constants::saturate_u8(totals[idx] as i32 + *modifier);
+        }
+    }
+}
+
 pub fn player_to_display(
     player: &Player,
     card_db: &CardDatabase,
@@ -984,11 +1007,7 @@ pub fn player_to_display(
                         total_hearts[idx] += total;
                     }
                 } else {
-                    for (color, count) in &base_heart.hearts {
-                        if let Some(idx) = heart_color_index(color) {
-                            total_hearts[idx] += count;
-                        }
-                    }
+                    add_hearts(&mut total_hearts, &base_heart.hearts);
                 }
             }
         }
@@ -996,15 +1015,11 @@ pub fn player_to_display(
 
     // Add heart modifiers from stage cards
     for &card_id in &player.stage.stage {
-        if card_id != -1 {
-            if let Some(card_heart_modifiers) = heart_modifiers.get(&card_id) {
-                for (color, modifier) in card_heart_modifiers {
-                    if let Some(index) = heart_color_index(color) {
-                        total_hearts[index] =
-                            crate::constants::saturate_u8(total_hearts[index] as i32 + modifier);
-                    }
-                }
-            }
+        if card_id == -1 {
+            continue;
+        }
+        if let Some(card_heart_modifiers) = heart_modifiers.get(&card_id) {
+            add_modified_hearts(&mut total_hearts, card_heart_modifiers);
         }
     }
 
@@ -1013,11 +1028,7 @@ pub fn player_to_display(
     for &cid in &player.live_card_zone.cards {
         if let Some(card) = card_db.get_card(cid) {
             if let Some(ref need) = card.need_heart {
-                for (color, count) in &need.hearts {
-                    if let Some(idx) = heart_color_index(color) {
-                        live_need_hearts[idx] += count;
-                    }
-                }
+                add_hearts(&mut live_need_hearts, &need.hearts);
             }
         }
     }
@@ -1025,12 +1036,7 @@ pub fn player_to_display(
     // Apply need_heart_modifiers to live_need_hearts
     for (&cid, colors) in need_heart_modifiers {
         if player.live_card_zone.cards.contains(&cid) {
-            for (color, &val) in colors {
-                if let Some(idx) = heart_color_index(color) {
-                    live_need_hearts[idx] =
-                        crate::constants::saturate_u8(live_need_hearts[idx] as i32 + val);
-                }
-            }
+            add_modified_hearts(&mut live_need_hearts, colors);
         }
     }
 
@@ -1038,26 +1044,18 @@ pub fn player_to_display(
     let mut selected_need_hearts = vec![0u8; 8];
     if let Some(selected) = live_card_selection {
         for &idx in selected {
-            if idx < player.hand.cards.len() {
-                let cid = player.hand.cards[idx];
-                if let Some(card) = card_db.get_card(cid) {
-                    if let Some(ref need) = card.need_heart {
-                        for (color, count) in &need.hearts {
-                            if let Some(ci) = heart_color_index(color) {
-                                selected_need_hearts[ci] += count;
-                            }
-                        }
-                    }
+            if idx >= player.hand.cards.len() {
+                continue;
+            }
+            let cid = player.hand.cards[idx];
+            if let Some(card) = card_db.get_card(cid) {
+                if let Some(ref need) = card.need_heart {
+                    add_hearts(&mut selected_need_hearts, &need.hearts);
                 }
-                // Apply need_heart_modifiers to selected hand card
-                if let Some(colors) = need_heart_modifiers.get(&cid) {
-                    for (color, &val) in colors {
-                        if let Some(ci) = heart_color_index(color) {
-                            selected_need_hearts[ci] =
-                                crate::constants::saturate_u8(selected_need_hearts[ci] as i32 + val);
-                        }
-                    }
-                }
+            }
+            // Apply need_heart_modifiers to selected hand card
+            if let Some(colors) = need_heart_modifiers.get(&cid) {
+                add_modified_hearts(&mut selected_need_hearts, colors);
             }
         }
     }

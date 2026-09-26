@@ -10,6 +10,162 @@ use alloc::{
 };
 use smallvec::SmallVec;
 
+/// What a 「〜Nにつき」 requirement multiplies its base value by.
+///
+/// `max` means the requirement is a ceiling rather than an increment, so each
+/// qualifying unit is worth 1 instead of the stated value.
+fn per_unit_base(max: bool, value: u8) -> u8 {
+    if max {
+        1
+    } else {
+        value
+    }
+}
+
+/// How many units a 「〜Nにつき」 requirement counts, after the per-unit divisor
+/// and the optional repeat cap.
+fn capped_units(total: u8, per_unit_count: u8, repeat_limit: Option<u8>) -> u8 {
+    let units = total / per_unit_count.max(1);
+    match repeat_limit {
+        Some(cap) => units.min(cap),
+        None => units,
+    }
+}
+
+/// The zone a per-unit requirement counts cards in. Anything unrecognised means
+/// the stage, which is where members live.
+fn per_unit_source_cards(player: &crate::player::Player, location: Option<&str>) -> Vec<i16> {
+    match location {
+        Some("success_live_zone") | Some("success_live_card_zone") => {
+            player.success_live_card_zone.cards.to_vec()
+        }
+        Some("live_card_zone") | Some("live_zone") => player.live_card_zone.cards.to_vec(),
+        _ => player
+            .stage
+            .stage
+            .iter()
+            .filter(|&&id| id != -1)
+            .copied()
+            .collect(),
+    }
+}
+
+/// Which cards count as one unit toward a 「〜1人につき」 requirement.
+///
+/// The criteria are cumulative and each is optional, which is why they are
+/// gathered once into a value instead of being re-tested at each filter site.
+struct PerUnitFilter<'a> {
+    /// The activating card never counts against itself.
+    exclude_self: bool,
+    group: Option<&'a str>,
+    /// Duplicate-named members count once (「名前の異なる『X』のメンバー1人につき」).
+    distinct_names: bool,
+    /// `appeared_or_moved_this_turn` requires the card to have moved or appeared.
+    timing_condition: Option<&'a str>,
+    /// Members whose ENTIRE printed heart set is in this list do not count.
+    exclude_heart_colors: &'a [String],
+}
+
+impl PerUnitFilter<'_> {
+    /// Does `card_id` count as one unit? `seen_names` carries the
+    /// already-counted names across calls for the distinct-names rule.
+    fn accepts(
+        &self,
+        gs: &GameState,
+        card_db: &CardDatabase,
+        card_id: i16,
+        seen_names: &mut crate::HashSet<String>,
+    ) -> bool {
+        if self.exclude_self && gs.activating_card == Some(card_id) {
+            return false;
+        }
+        if let Some(g) = self.group {
+            if !util::card_matches_group_str(card_db, card_id, Some(g)) {
+                return false;
+            }
+        }
+        if self.distinct_names && !Self::claim_distinct_name(card_db, card_id, seen_names) {
+            return false;
+        }
+        if self.timing_condition == Some("appeared_or_moved_this_turn")
+            && !gs.has_card_moved_this_turn(card_id)
+            && !gs.has_card_appeared_this_turn(card_id)
+        {
+            return false;
+        }
+        self.exclude_heart_colors.is_empty()
+            || !Self::heart_set_all_excluded(card_db, card_id, self.exclude_heart_colors)
+    }
+
+    /// Claim `card_id`'s name, so a duplicate-named member is counted once.
+    fn claim_distinct_name(
+        card_db: &CardDatabase,
+        card_id: i16,
+        seen_names: &mut crate::HashSet<String>,
+    ) -> bool {
+        let Some(card) = card_db.get_card(card_id) else {
+            return false;
+        };
+        let names = card_db.get_card_names(card_id);
+        let key = if names.is_empty() {
+            CardDatabase::normalize_name(&card.name)
+        } else {
+            names.iter().cloned().collect::<Vec<_>>().join("|")
+        };
+        seen_names.insert(key)
+    }
+
+    /// A member whose every printed heart is excluded does not count, so a
+    /// member with one surviving colour still does.
+    fn heart_set_all_excluded(
+        card_db: &CardDatabase,
+        card_id: i16,
+        excluded: &[String],
+    ) -> bool {
+        card_db
+            .get_card(card_id)
+            .and_then(|card| card.base_heart.as_ref())
+            .map_or(false, |base| {
+                base.hearts
+                    .keys()
+                    .all(|hc| excluded.iter().any(|exc| &hc.to_string() == exc))
+            })
+    }
+}
+
+/// A 「元のスコアがN以上」 qualifier on a required-heart modification.
+struct OriginalScoreFilter<'a> {
+    enabled: bool,
+    count: Option<u8>,
+    operator: Option<&'a str>,
+}
+
+impl OriginalScoreFilter<'_> {
+    /// Does `card_id` clear the original-score threshold? A card with no score,
+    /// or a threshold the text did not fully state, is not filtered out.
+    fn accepts(&self, db: &CardDatabase, card_id: i16) -> bool {
+        if !self.enabled {
+            return true;
+        }
+        let (Some(score), Some(threshold), Some(op)) = (
+            db.get_card(card_id).and_then(|c| c.score),
+            self.count,
+            self.operator,
+        ) else {
+            return true;
+        };
+        match op {
+            ">=" => score >= threshold,
+            "<=" => score <= threshold,
+            ">" => score > threshold,
+            "<" => score < threshold,
+            "==" => score == threshold,
+            "!=" => score != threshold,
+            _ => true,
+        }
+    }
+}
+
 impl AbilityResolver {
     pub fn execute_modify_score(
         &mut self,
@@ -432,11 +588,21 @@ impl AbilityResolver {
         if per_unit {
             let card_db = &gs.card_database;
             let player = gs.resolve_target_player(target);
+            // The unit criteria, resolved once. Both per-unit branches below
+            // accept the same set of cards; only how much each is worth differs.
+            let unit_filter = PerUnitFilter {
+                exclude_self,
+                group: group_name,
+                distinct_names: is_distinct_names,
+                timing_condition,
+                exclude_heart_colors,
+            };
 
             if !per_unit_heart_colors.is_empty() {
                 // Count total heart icon count of specified colors across matching members.
                 // Used for patterns like "そのメンバーが持つheart03 2つにつき" (count heart03 on card).
                 let mut total_hearts = 0u8;
+                let mut seen_names = crate::HashSet::default();
                 let stage_ids: Vec<i16> = player
                     .stage
                     .stage
@@ -445,15 +611,8 @@ impl AbilityResolver {
                     .copied()
                     .collect();
                 for &card_id in &stage_ids {
-                    if exclude_self {
-                        if gs.activating_card == Some(card_id) {
-                            continue;
-                        }
-                    }
-                    if let Some(g) = group_name {
-                        if !util::card_matches_group_str(card_db, card_id, Some(g)) {
-                            continue;
-                        }
+                    if !unit_filter.accepts(gs, card_db, card_id, &mut seen_names) {
+                        continue;
                     }
                     if let Some(card) = card_db.get_card(card_id) {
                         if let Some(ref base) = card.base_heart {
@@ -465,93 +624,18 @@ impl AbilityResolver {
                         }
                     }
                 }
-                let per_unit_base = if max { 1 } else { value };
-                let mut units = total_hearts / per_unit_count.max(1);
-                if let Some(cap) = repeat_limit {
-                    units = units.min(cap);
-                }
-                value = per_unit_base * units;
+                value = per_unit_base(max, value) * capped_units(total_hearts, per_unit_count, repeat_limit);
             } else {
                 // Default per-unit: count cards in the specified location.
-                let cards: Vec<i16> = match location {
-                    Some("success_live_zone") | Some("success_live_card_zone") => {
-                        player.success_live_card_zone.cards.to_vec()
-                    }
-                    Some("live_card_zone") | Some("live_zone") => {
-                        player.live_card_zone.cards.to_vec()
-                    }
-                    _ => player
-                        .stage
-                        .stage
-                        .iter()
-                        .filter(|&&id| id != -1)
-                        .copied()
-                        .collect(),
-                };
-                let activating_id = gs.activating_card;
-                let mut count = 0u8;
-                let mut seen_names: crate::HashSet<String> = crate::HashSet::default();
-                for &card_id in &cards {
-                    if exclude_self {
-                        if activating_id == Some(card_id) {
-                            continue;
-                        }
-                    }
-                    if let Some(g) = group_name {
-                        if !util::card_matches_group_str(card_db, card_id, Some(g)) {
-                            continue;
-                        }
-                    }
-                    // distinct="card_name": duplicate-named members count as ONE unit
-                    // (e.g. "名前の異なる『CatChu!』のメンバー1人につき")
-                    if is_distinct_names {
-                        match card_db.get_card(card_id) {
-                            Some(card) => {
-                                let names = card_db.get_card_names(card_id);
-                                let key = if names.is_empty() {
-                                    CardDatabase::normalize_name(&card.name)
-                                } else {
-                                    names.iter().cloned().collect::<Vec<_>>().join("|")
-                                };
-                                if !seen_names.insert(key) {
-                                    continue;
-                                }
-                            }
-                            None => continue,
-                        }
-                    }
-                    if let Some(tc) = timing_condition {
-                        if tc == "appeared_or_moved_this_turn" {
-                            let moved = gs.has_card_moved_this_turn(card_id);
-                            let appeared = gs.has_card_appeared_this_turn(card_id);
-                            if !moved && !appeared {
-                                continue;
-                            }
-                        }
-                    }
-                    if !exclude_heart_colors.is_empty() {
-                        let card = card_db.get_card(card_id);
-                        if let Some(card) = card {
-                            let all_excluded = card.base_heart.as_ref().map_or(false, |base| {
-                                base.hearts.keys().all(|hc| {
-                                    exclude_heart_colors
-                                        .iter()
-                                        .any(|exc| &hc.to_string() == exc)
-                                })
-                            });
-                            if all_excluded {
-                                continue;
-                            }
-                        }
-                    }
-                    count += 1;
-                }
-                let per_unit_base = if max { 1 } else { value };
-                let mut units = count / per_unit_count.max(1);
-                if let Some(cap) = repeat_limit {
-                    units = units.min(cap);
-                }
-                value = per_unit_base * units;
+                let cards = per_unit_source_cards(player, location);
+                let mut seen_names = crate::HashSet::default();
+                let count = cards
+                    .iter()
+                    .filter(|&&card_id| {
+                        unit_filter.accepts(gs, card_db, card_id, &mut seen_names)
+                    })
+                    .count() as u8;
+                value = per_unit_base(max, value) * capped_units(count, per_unit_count, repeat_limit);
             }
         }
         let card_ids: Vec<i16> = {
@@ -580,6 +664,11 @@ impl AbilityResolver {
             }
         };
         let db = &gs.card_database;
+        let original_score_filter = OriginalScoreFilter {
+            enabled: original_value.unwrap_or(false),
+            count: original_count,
+            operator: original_operator,
+        };
         let card_ids: Vec<i16> = card_ids
             .into_iter()
             .filter(|&card_id| {
@@ -598,32 +687,7 @@ impl AbilityResolver {
                         return false;
                     }
                 }
-                // Filter by original score when original_value is set
-                if original_value.unwrap_or(false) {
-                    let card = db.get_card(card_id);
-                    match (
-                        card.and_then(|c| c.score),
-                        original_count,
-                        original_operator,
-                    ) {
-                        (Some(score), Some(threshold), Some(op)) => {
-                            let met = match op {
-                                ">=" => score >= threshold,
-                                "<=" => score <= threshold,
-                                ">" => score > threshold,
-                                "<" => score < threshold,
-                                "==" => score == threshold,
-                                "!=" => score != threshold,
-                                _ => true,
-                            };
-                            if !met {
-                                return false;
-                            }
-                        }
-                        _ => {}
-                    }
-                }
-                true
+                original_score_filter.accepts(db, card_id)
             })
             .collect();
         log::debug!(

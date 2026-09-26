@@ -68,6 +68,29 @@ impl<'a> MoveSourceContext<'a> {
     }
 }
 
+/// The 「デッキの上からN番目に置く」 position a selection must land at, if any.
+///
+/// A position only means anything when the cards are going onto the deck top,
+/// so a stated position with any other destination is ignored. `stashed` is the
+/// fallback for when the effect context is already gone by answer time.
+fn numeric_deck_position(
+    select_action: Option<&AbilityEffect>,
+    current: Option<&AbilityEffect>,
+    stashed: Option<usize>,
+    destination: &str,
+) -> Option<usize> {
+    if !matches!(Zone::from_str(destination), Some(Zone::DeckTop | Zone::Deck)) {
+        return None;
+    }
+    select_action
+        .and_then(|sa| sa.position_any())
+        .or_else(|| current.and_then(|c| c.position_any()))
+        .and_then(|pi| pi.get_position())
+        .and_then(|s| s.parse::<usize>().ok())
+        .or(stashed)
+        .filter(|&n| n > 0)
+}
+
 impl AbilityResolver {
     fn resolve_cost_limit_reference(
         &self,
@@ -981,17 +1004,14 @@ impl AbilityResolver {
             return Err("Self hand cost card is not in hand or waitroom".to_string());
         }
 
+        // An empty energy zone fizzles silently — an effect like
+        // "エネルギー1枚をエネルギーデッキに置く" must not abort the enclosing
+        // 「その後」 sequential — and so does an empty success zone. Only a
+        // live-card zone reports the shortage.
         let insufficient_behavior = match src_zone {
-            Some(Zone::Energy) => {
-                // A move_cards EFFECT (e.g. "エネルギー1枚をエネルギーデッキに置く")
-                // fizzles silently when the energy zone is empty, and the
-                // enclosing sequential ("その後") continues with later steps.
-                util::InsufficientBehavior::Silent
-            }
             Some(Zone::LiveCardZone) => util::InsufficientBehavior::Error(
                 "Not enough cards in live card zone".to_string(),
             ),
-            Some(Zone::SuccessLiveZone) => util::InsufficientBehavior::Silent,
             _ => util::InsufficientBehavior::Silent,
         };
 
@@ -1009,54 +1029,60 @@ impl AbilityResolver {
             _ => false,
         };
 
+        // Which optional filters are meaningful depends on the SOURCE zone: a
+        // live-card-zone move is always a live card, an energy-zone move
+        // carries no group or cost filter at all, and only hand/discard moves
+        // can be narrowed by name fragments or total cost. Naming them is what
+        // makes the twelve-argument filter constructor below readable.
+        let from_hand_or_discard =
+            matches!(src_zone, Some(Zone::Hand) | Some(Zone::Discard));
+        let from_energy = src_zone == Some(Zone::Energy);
+        let is_live_zone_move = src_zone == Some(Zone::LiveCardZone)
+            || (src_zone == Some(Zone::SuccessLiveZone) && c.card_type_filter.is_some());
         let has_effect_groups = effect
             .group_names_any()
             .as_ref()
-            .map_or(false, |g| !g.is_empty());
-        let filter_group_name = if has_effect_groups { None } else { c.group_name };
+            .is_some_and(|g| !g.is_empty());
+        let card_type = if is_live_zone_move {
+            Some("live_card")
+        } else if src_zone == Some(Zone::SuccessLiveZone) {
+            None
+        } else {
+            c.card_type_filter
+        };
+        let group = if has_effect_groups || from_energy {
+            None
+        } else {
+            c.group_name
+        };
+        let cost_limit = if from_energy { None } else { c.cost_limit };
+        let cost_limit_operator = match src_zone {
+            Some(Zone::Discard) => effect.cost_limit_operator_any().map(Operator::as_str),
+            _ => None,
+        };
+        let name_fragments = if from_hand_or_discard {
+            c.name_fragments
+        } else {
+            None
+        };
+        let cost_total = if from_hand_or_discard { c.cost_total } else { None };
+        let cost_total_operator = if from_hand_or_discard {
+            c.cost_total_operator
+        } else {
+            None
+        };
+
         let mut filter = util::filter_from_parts_full(
-            if src_zone == Some(Zone::LiveCardZone)
-                || (src_zone == Some(Zone::SuccessLiveZone) && c.card_type_filter.is_some())
-            {
-                Some("live_card")
-            } else if src_zone == Some(Zone::SuccessLiveZone) {
-                None
-            } else {
-                c.card_type_filter
-            },
-            if src_zone == Some(Zone::Energy) {
-                None
-            } else {
-                filter_group_name
-            },
-            if src_zone == Some(Zone::Energy) {
-                None
-            } else {
-                c.cost_limit
-            },
-            if src_zone == Some(Zone::Discard) {
-                effect.cost_limit_operator_any().map(Operator::as_str)
-            } else {
-                None
-            },
+            card_type,
+            group,
+            cost_limit,
+            cost_limit_operator,
             c.character_filter,
-            if matches!(src_zone, Some(Zone::Hand) | Some(Zone::Discard)) {
-                c.name_fragments
-            } else {
-                None
-            },
+            name_fragments,
             None,
             None,
-            if matches!(src_zone, Some(Zone::Hand) | Some(Zone::Discard)) {
-                c.cost_total
-            } else {
-                None
-            },
-            if matches!(src_zone, Some(Zone::Hand) | Some(Zone::Discard)) {
-                c.cost_total_operator
-            } else {
-                None
-            },
+            cost_total,
+            cost_total_operator,
             effect.exclude_characters_any(),
         );
         filter.need_heart_total = effect.need_heart_total_any();
@@ -2934,18 +2960,12 @@ if util::distinct_should_dedupe(distinct) {
         // The stash is consumed unconditionally so a stale value can never
         // leak into an unrelated later selection.
         let stashed_deck_pos = self.looked_at_deck_position.take();
-        let numeric_deck_pos: Option<usize> = select_action
-            .as_ref()
-            .and_then(|sa| sa.position_any())
-            .or_else(|| current.and_then(|c| c.position_any()))
-            .and_then(|pi| pi.get_position())
-            .and_then(|s| s.parse::<usize>().ok())
-            .or(stashed_deck_pos)
-            .filter(|&n| n > 0)
-            .filter(|_| {
-                Zone::from_str(&destination) == Some(Zone::DeckTop)
-                    || Zone::from_str(&destination) == Some(Zone::Deck)
-            });
+        let numeric_deck_pos = numeric_deck_position(
+            select_action.as_deref(),
+            current,
+            stashed_deck_pos,
+            &destination,
+        );
         if let Some(n) = numeric_deck_pos {
             for &card_id in &selected_cards {
                 let idx = (n - 1).min(player.main_deck.cards.len());
