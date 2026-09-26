@@ -1,6 +1,6 @@
 {
   "generated_by": "cards/test_inventory.py",
-  "generated_at": "2026-09-26T17:19:05.771002+00:00",
+  "generated_at": "2026-09-26T17:46:13.659388+00:00",
   "stats": {
     "total_cards": 2526,
     "cards_with_abilities": 1565,
@@ -8,7 +8,7 @@
     "unique_abilities": 936
   },
   "n_files": 899,
-  "n_tests": 3631,
+  "n_tests": 3632,
   "total_cards": 771,
   "covered_cards": 771,
   "abilities_on_covered": 936,
@@ -558,7 +558,7 @@
       "rows": []
     }
   },
-  "n_test_fns_parsed": 3631,
+  "n_test_fns_parsed": 3632,
   "abilities": [
     {
       "idx": 0,
@@ -15893,17 +15893,19 @@
         "engine/tests/test_modules/effects/state/per_card/emma_place_energy_under_self_then_activate_two_test.rs"
       ],
       "covering_tests": [
+        "emma_bp5_q215_all_energy_already_active_activates_nothing",
         "emma_bp5_q215_no_energy_cost_fails_gracefully",
         "emma_bp5_q215_only_wait_energy_available",
         "emma_bp5_q215_wait_energy_placed_then_activate"
       ],
-      "covering_test_count": 3,
+      "covering_test_count": 4,
       "direct_tests": [
+        "emma_bp5_q215_all_energy_already_active_activates_nothing",
         "emma_bp5_q215_no_energy_cost_fails_gracefully",
         "emma_bp5_q215_only_wait_energy_available",
         "emma_bp5_q215_wait_energy_placed_then_activate"
       ],
-      "direct_test_count": 3,
+      "direct_test_count": 4,
       "is_null": false,
       "use_limit": 1,
       "watches_abilities": false,
