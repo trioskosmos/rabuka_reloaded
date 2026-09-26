@@ -489,6 +489,12 @@ Q_STAGE_LITERAL_RE = re.compile(
     r"(?:stage\.stage|under_cards\s*\[[^\]]*\])\s*(?:\.assign\()?\s*=\s*\[([^\]]*)\]"
 )
 Q_SLOT_IDENT_RE = re.compile(r"\b([A-Za-z_][A-Za-z0-9_]*)\b")
+# `const LIKE_A_TREASURE: &str = "PL!N-bp7-031-L";` — a file-level name bound
+# to a card number. Test bodies use the name, not the literal, so direct
+# attribution has to follow the binding.
+Q_CONST_CARD_BIND_RE = re.compile(
+    r"\bconst\s+([A-Z][A-Z0-9_]*)\s*:\s*&str\s*=\s*\"([^\"]+)\""
+)
 # Rust keywords and the obvious non-card tokens, so `= [a, b, -1]` does not read
 # `a` twice because of an intervening operator or a cast.
 _NOT_A_CARD_SLOT = {
@@ -1418,6 +1424,29 @@ def build_inventory():
     n_tests = sum(len(fns) for _, _, _, fns in files)
 
     rows = []
+    # per-file test-name -> body, plus the file's `const NAME: &str = "CARD"`
+    # bindings, so a card number can be attributed to the tests that actually
+    # drive it rather than to every test in a file that mentions it somewhere.
+    # A file typically binds its card to a const and the test bodies then use
+    # the const NAME, so resolving bindings is what keeps "direct" honest —
+    # without it, a well-written file reads as zero coverage.
+    fn_bodies = {}
+    const_binds = {}
+    for _p, rel, text, _fns in files:
+        # Unescape on the way in: a file may write the card as
+        # "PL!N-bp7-011-R＋" or as "PL!N-bp7-011-R＋" — same card, and the
+        # alias has to compare equal to the inventory's card number.
+        binds = {
+            m.group(1): Q_RUST_ESCAPE_RE.sub(
+                lambda mm: chr(int(mm.group(1), 16)), m.group(2)
+            )
+            for m in Q_CONST_CARD_BIND_RE.finditer(text)
+        }
+        const_binds[rel] = binds
+        try:
+            fn_bodies[rel] = {n: b for n, b, _l in split_test_fns(text)}
+        except Exception:
+            fn_bodies[rel] = {}
     # mechanic counters
     trigger_counts = defaultdict(lambda: [0, 0])
     action_counts = defaultdict(lambda: [0, 0])
@@ -1446,6 +1475,7 @@ def build_inventory():
         covered_rels = []
         covering_texts = []
         covering_fns = []
+        direct_fns = []
         covers_override = None
         for p, rel, text, fns in files:
             # check @covers override first
@@ -1468,6 +1498,21 @@ def build_inventory():
                 covered_rels.append(rel)
                 covering_texts.append(text)
                 covering_fns.extend(fns)
+                # Tests that reach this ability's card from their OWN body —
+                # by literal or through a const bound to it in this file. A test
+                # in a covering file that never reaches the card is co-located,
+                # not evidence.
+                binds = const_binds.get(rel, {})
+                aliases = {
+                    a for a, card in binds.items() if card in cards or card == base
+                }
+                for name, body in fn_bodies.get(rel, {}).items():
+                    if any(c in body for c in cards) or base in body:
+                        direct_fns.append(name)
+                    elif any(
+                        re.search(r"\b" + re.escape(a) + r"\b", body) for a in aliases
+                    ):
+                        direct_fns.append(name)
 
         covered = bool(covered_rels) or covers_override is not None
         depth, flags = infer_ability_depth(covering_texts, covered_rels, covering_fns)
@@ -1481,6 +1526,7 @@ def build_inventory():
         # dedup
         covered_rels = sorted(set(covered_rels))
         covering_fns = sorted(set(covering_fns))
+        direct_fns = sorted(set(direct_fns))
 
         # counters
         for t in triggers:
@@ -1534,6 +1580,8 @@ def build_inventory():
             "covering_files": covered_rels,
             "covering_tests": covering_fns[:30],
             "covering_test_count": len(covering_fns),
+            "direct_tests": direct_fns[:30],
+            "direct_test_count": len(direct_fns),
             "cost": u.get("cost"),
             "effect": eff,
         })
@@ -1725,7 +1773,7 @@ def render_coverage(inv):
         safe = r["full_text"].replace("|", "/").replace("\n", " ")
         return (
             f"| `{r['base']}` | {r['condition']} | {r['depth']} | "
-            f"{r['covering_test_count']} | {safe[:110]} |"
+            f"{r['direct_test_count']}/{r['covering_test_count']} | {safe[:110]} |"
         )
 
     jidou_rows = [r for r in rows if "自動" in r["trigger_list"]]
@@ -1737,6 +1785,8 @@ def render_coverage(inv):
     w("")
     w("自動 abilities rarely act alone — they chain off other abilities, off effect *causes*, or share a card with other abilities. These lists group every 自動 by interaction shape; `Depth`/`Tests` say how well the **interaction** is exercised.")
     w("")
+    w("`Tests` is `direct/in file`: how many test functions name this card in their own body, out of how many sit in a file that mentions it. A card is only as covered as the tests that actually drive it — the second number is co-location, which is navigation, not evidence.")
+    w("")
     w(f"### A. Jidou watching other abilities resolve (`能力が解決`)  ({len(watchers)})")
     w("")
     w("Highest-risk category: requires a full live phase with another ability resolving on the same stage.")
@@ -1744,7 +1794,7 @@ def render_coverage(inv):
     if watchers:
         w("| Card | Condition | Depth | Tests | Text |")
         w("|---|---|---|---|---|")
-        for r in sorted(watchers, key=lambda r: (r["covering_test_count"], r["idx"])):
+        for r in sorted(watchers, key=lambda r: (r["direct_test_count"], r["idx"])):
             w(_ability_row(r))
     else:
         w("_None._")
@@ -1754,24 +1804,27 @@ def render_coverage(inv):
     if effect_cause:
         w("| Card | Condition | Depth | Tests | Text |")
         w("|---|---|---|---|---|")
-        for r in sorted(effect_cause, key=lambda r: (r["covering_test_count"], r["idx"])):
+        for r in sorted(effect_cause, key=lambda r: (r["direct_test_count"], r["idx"])):
             w(_ability_row(r))
     else:
         w("_None._")
     w("")
     w(f"### C. Cards pairing a jidou with another ability  ({len(multi)})")
     w("")
-    w("`#partners` lists the other abilities on the same card (inventory idx:trigger) — combo behavior needs a test driving BOTH, not each in isolation.")
+    w("`#partners` lists the other abilities on the same card (inventory idx:trigger) — combo behavior needs a test driving BOTH, not each in isolation. Sorted by DIRECT tests, so the thinnest are at the top rather than buried.")
     w("")
     if multi:
         w("| Card | Partners | Depth | Tests |")
         w("|---|---|---|---|")
-        for r in sorted(multi, key=lambda r: (r["covering_test_count"], r["idx"])):
+        for r in sorted(multi, key=lambda r: (r["direct_test_count"], r["idx"])):
             partners = ", ".join(
                 f"#{j}:{(rows[j]['trigger_list'][0] if rows[j]['trigger_list'] else '?')}"
                 for j in r["jidou_partners"][:4]
             )
-            w(f"| `{r['base']}` | {partners} | {r['depth']} | {r['covering_test_count']} |")
+            w(
+                f"| `{r['base']}` | {partners} | {r['depth']} | "
+                f"{r['direct_test_count']}/{r['covering_test_count']} |"
+            )
     else:
         w("_None._")
     w("")
@@ -2044,6 +2097,8 @@ def main():
             "covering_files": r["covering_files"],
             "covering_tests": r["covering_tests"],
             "covering_test_count": r["covering_test_count"],
+            "direct_tests": r["direct_tests"],
+            "direct_test_count": r["direct_test_count"],
             "is_null": r["is_null"],
             "use_limit": r["use_limit"],
             "watches_abilities": r["watches_abilities"],
