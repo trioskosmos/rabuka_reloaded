@@ -557,22 +557,51 @@ mod tests {
     }
 
     /// The D2b trade-off, priced. Against an opponent who is NOT one
-    /// placement from winning, a life we are more likely than not to FAIL
-    /// burns more future placements than it can win, so the search prefers a
+    /// placement from winning, a life we are very likely to FAIL burns more
+    /// future placements than it can make here, so the search prefers a
     /// junk-only set. v7 could not express this and got it wrong in both
     /// directions (measured -1pp for the "desperation life").
+    ///
+    /// The comparison is against the empty candidate, never against a bare
+    /// zero: setting nothing still has the hand filter's value, so "fold" means
+    /// "lose to junk", not "gain nothing".
+    ///
+    /// Uncontested, a life worth `p` gains `p * PLACEMENT_CREDIT` and forfeits
+    /// `(1 - p) * p * PLACEMENT_CREDIT`, so against a junk-only set the break
+    /// even is `p^2 / 3 == filter_value` - the price `candidate_value` charges.
+    /// That is the calibrated middle ground between the two measured extremes
+    /// documented on it: the full-credit price folds anything below 50%, the
+    /// projected price folds 44% of checks.
     ///
     /// Paired with `v8_model::match_point_makes_a_thin_check_worth_taking`:
     /// at opponent match point the same thin life IS right, because folding
     /// there hands them the game. One objective, both answers.
     #[test]
     fn a_thin_life_can_be_worth_less_than_a_junk_set() {
-        // Uncontested: 45% chance of a free placement, 55% chance of burning
-        // the life. 0.45/3 gained against 0.55/3 forfeited is a net loss.
-        let thin = candidate_value(outcome(0.45, 0.45, 0.15), 0.45, 1, 0.0);
         let junk_only = candidate_value(outcome(0.0, 0.0, 0.0), 0.0, 0, 0.02);
-        assert!(thin < 0.0);
-        assert!(junk_only > thin);
+        assert!(junk_only > 0.0);
+        // p = 0.20: 0.20/3 gained against 0.80 * 0.20/3 forfeited. Below break
+        // even, so the argmax sets junk and keeps the life for another check.
+        let thin = candidate_value(outcome(0.20, 0.20, 0.20 * PLACEMENT_CREDIT), 0.20, 1, 0.0);
+        assert!(thin < junk_only);
+        // p = 0.45 on the same board: the placement this life can make here
+        // outweighs the one it forfeits, and it is committed. A thin life is
+        // not junk; only a hopeless one is.
+        let thicker = candidate_value(
+            outcome(0.45, 0.45, 0.45 * PLACEMENT_CREDIT),
+            0.45,
+            1,
+            0.0,
+        );
+        assert!(thicker > junk_only);
+        // The life is still charged for its own failure, monotonically.
+        let certain = candidate_value(
+            outcome(0.95, 0.95, 0.95 * PLACEMENT_CREDIT),
+            0.95,
+            1,
+            0.0,
+        );
+        assert!(certain > thicker);
     }
 
     /// A reliable life is always worth taking, and the hand filter is pure
