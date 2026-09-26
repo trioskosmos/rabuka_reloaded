@@ -35,7 +35,6 @@ pub const PAY_SKIP_TARGET: &str = "pay_optional_cost:skip_optional_cost";
 /// point for both ask sites: the end-of-loop ask in
 /// `execute_sequential_effect` (compound.rs) and the one-at-a-time repeat
 /// feeder in `resume_pending_actions` (choice.rs).
-#[allow(dead_code)]
 pub fn repeat_prompt_choice() -> Choice {
     Choice::SelectTarget {
         target: PAY_SKIP_TARGET.to_string(),
