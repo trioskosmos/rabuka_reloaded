@@ -50,6 +50,46 @@ impl core::fmt::Display for ModifierEntry {
     }
 }
 
+/// Apply a card's need-heart modifiers to its per-colour requirement table.
+///
+/// This is the single definition of that rule. It lives here because
+/// `ModifierEntry` lives here, and because the two places that need it are
+/// three files apart: the live-success heart check
+/// (`game_state::should_trigger_live_success`) and the live-log needs
+/// (`turn::live::build_card_needs`). They had it written out twice.
+///
+/// Two details carry the meaning (Q115/Q127), and both are easy to lose:
+///
+///   - Order: set-to-X applies FIRST, then additive stacks on top. The other
+///     order makes 「必要ハートを2以下にする」 followed by 「-1」 come out as 2
+///     instead of 1.
+///   - The set applies PER COLOUR, not to the whole table. A set modifier on
+///     one colour must leave the other colours' requirements alone, which is
+///     exactly what replacing the whole table would do.
+///
+/// `need` is indexed by `HeartColor::index()`. An out-of-range colour is
+/// ignored rather than wrapping, so a malformed modifier cannot corrupt an
+/// unrelated colour.
+pub fn apply_need_heart_modifiers(
+    need: &mut [u8; 8],
+    color_mods: &HashMap<crate::card::HeartColor, ModifierEntry>,
+) {
+    for (color, me) in color_mods {
+        if me.set != 0 {
+            if let Some(slot) = need.get_mut(color.index()) {
+                *slot = crate::constants::saturate_u8(me.set as i32);
+            }
+        }
+    }
+    for (color, me) in color_mods {
+        if me.additive != 0 {
+            if let Some(slot) = need.get_mut(color.index()) {
+                *slot = crate::constants::saturate_u8(*slot as i32 + me.additive as i32);
+            }
+        }
+    }
+}
+
 impl ModifierEntry {
     pub fn total(&self) -> i32 {
         // set (absolute override) is the base; additive deltas stack on top.

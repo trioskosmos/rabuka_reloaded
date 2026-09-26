@@ -2775,30 +2775,33 @@ impl GameState {
         for card_id in &player.live_card_zone.cards {
             if let Some(card) = self.card_database.get_card(*card_id) {
                 if let Some(ref need_heart) = card.need_heart {
-                    let effective_need = {
-                        // Q115/Q127: Start from base requirements for every color.
-                        // A set modifier on one color does NOT erase other colors.
-                        let mut hearts = need_heart.hearts.clone();
-                        if let Some(color_mods) = self.mods.need_heart_modifiers.get(card_id) {
-                            // Apply set overrides per-color first.
-                            for (color, me) in color_mods {
-                                if me.set != 0 {
-                                    hearts.insert(*color, me.set as u8);
-                                }
-                            }
-                            // Then apply additive modifiers.
-                            for (color, me) in color_mods {
-                                if me.additive != 0 {
-                                    *hearts.entry_or_default(*color) =
-                                        crate::constants::saturate_u8(
-                                            hearts.get(color).copied().unwrap_or(0) as i32
-                                                + me.additive as i32,
-                                        );
-                                }
-                            }
+                    // Q115/Q127: start from the base requirements for every
+                    // colour, then apply this card's need-heart modifiers.
+                    let mut per_colour = [0u8; 8];
+                    for (color, count) in &need_heart.hearts {
+                        if let Some(slot) = per_colour.get_mut(color.index()) {
+                            *slot = *count;
                         }
-                        crate::card::BaseHeart { hearts }
+                    }
+                    if let Some(color_mods) = self.mods.need_heart_modifiers.get(card_id) {
+                        crate::core::game_modifiers::apply_need_heart_modifiers(
+                            &mut per_colour,
+                            color_mods,
+                        );
+                    }
+                    // Back to a HeartMap for check_heart_requirement. A colour
+                    // at zero is dropped: it can never fail a >= check, and
+                    // check_heart_requirement short-circuits on an empty table.
+                    let mut effective_need = crate::card::BaseHeart {
+                        hearts: crate::card::HeartMap::new(),
                     };
+                    for (idx, &n) in per_colour.iter().enumerate() {
+                        if n != 0 {
+                            effective_need
+                                .hearts
+                                .insert(crate::card::HeartColor::from_index(idx), n);
+                        }
+                    }
                     if crate::card::check_heart_requirement(&effective_need, &stage_hearts) {
                         return true;
                     }

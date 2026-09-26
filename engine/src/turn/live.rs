@@ -2199,22 +2199,10 @@ impl super::TurnEngine {
                         need[color.index()] = *count;
                     }
                     if let Some(card_mods) = need_heart_modifiers.get(&lc_id) {
-                        // Q115/Q127: Set-to-X applies first (per-color), then additive stacks.
-                        // A set modifier on one color does NOT erase other colors' requirements.
-                        for (color, me) in card_mods {
-                            if me.set != 0 {
-                                let idx = color.index();
-                                need[idx] = u8::try_from(me.set).unwrap();
-                            }
-                        }
-                        for (color, me) in card_mods {
-                            if me.additive != 0 {
-                                let idx = color.index();
-                                let current = need[idx] as i32;
-                                need[idx] =
-                                    crate::constants::saturate_u8(current + me.additive as i32);
-                            }
-                        }
+                        crate::core::game_modifiers::apply_need_heart_modifiers(
+                            &mut need,
+                            card_mods,
+                        );
                     }
                 }
                 needs.push(CardNeed {
