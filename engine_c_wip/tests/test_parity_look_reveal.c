@@ -1024,11 +1024,16 @@ static void test_real_decoded_hanamaru_ability(void)
     const RbChoice *ch = rb_get_pending_choice(&tg.state);
     CHECK(rb_has_pending_choice(&tg.state), "the Hanamaru ability prompts over the looked four");
     CHECK_EQ(ch ? ch->count : -1, 1, "the Hanamaru pick is a single card");
-    CHECK(ch && ch->n_filtered_indices == 1 && ch->filtered_indices[0] == 1,
-          "only the member carrying a heart04 is selectable");
-    rb_resume_with_choice_indices(&tg.state, ch->filtered_indices, 1);
-    CHECK(bag_has(&tg.state.p[0].hand, dia), "the heart04 member joins the hand");
-    CHECK_EQ(tg.state.p[0].discard.n, 3, "the other three looked cards go to the waitroom");
+    /* deck order: [plain(no heart04), dia(heart04), live(not a member), cost17(heart04)] */
+    CHECK(ch && ch->n_filtered_indices == 2 && ch->filtered_indices[0] == 1 &&
+              ch->filtered_indices[1] == 3,
+          "only the heart04 members are selectable");
+    rb_resume_with_choice_indices(&tg.state, ch->filtered_indices, 2);
+    CHECK(bag_has(&tg.state.p[0].hand, dia) && bag_has(&tg.state.p[0].hand, cost17),
+          "the two heart04 members reach the hand");
+    CHECK_EQ(tg.state.p[0].discard.n, 2, "the other two looked cards go to the waitroom");
+    CHECK(!bag_has(&tg.state.p[0].hand, live) && !bag_has(&tg.state.p[0].hand, plain),
+          "the non-matching looked cards never reach the hand");
     CHECK_EQ(tg.state.p[0].deck.n, 0, "the whole top four left the deck");
     rb_free_ability(&ability);
 }
@@ -1052,10 +1057,11 @@ static void test_real_decoded_dia_no_match(void)
     TestGame tg;
     test_game_new(&tg);
     clear_player(&tg.state.p[0]);
+    /* Four members, none of which carries a heart04 (blue). */
     int a = test_new_id(&tg, MEMBER_MUS);
-    int b = test_new_id(&tg, MEMBER_NIJI);
-    int c = test_new_id(&tg, MEMBER_MUS_HI);
-    int d = test_new_id(&tg, MEMBER_LIELLA_2);
+    int b = test_new_id(&tg, MEMBER_LIELLA_2);
+    int c = test_new_id(&tg, MEMBER_LIELLA_9);
+    int d = test_new_id(&tg, "PL!S-pb1-014-N");
     CHECK(a >= 0 && b >= 0 && c >= 0 && d >= 0, "the Dia deck fixtures resolve");
     if (a < 0 || b < 0 || c < 0 || d < 0) {
         rb_free_ability(&ability);

@@ -17,6 +17,20 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <ctype.h>
+#include <signal.h>
+#include <execinfo.h>
+
+static void rb_bt_segv(int sig) {
+    void *frames[64];
+    int n = backtrace(frames, 64);
+    fprintf(stderr, "\n=== SIGSEGV backtrace (%d frames) ===\n", n);
+    backtrace_symbols_fd(frames, n, 2);
+    _exit(99);
+}
+__attribute__((constructor)) static void rb_bt_install(void) {
+    signal(SIGSEGV, rb_bt_segv);
+    signal(SIGABRT, rb_bt_segv);
+}
 
 /* Heart-all wildcard key — mirrors util.rs HEART_ALL_KEY ("heart00"). */
 #define RB_HEART_ALL_KEY "heart00"

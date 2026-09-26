@@ -749,6 +749,13 @@ int main(void)
     test_simultaneous_ordering_choice();
     test_use_accounting();
 
+    if (getenv("PAR_DUMP")) {
+        const char *nos[] = { DIVE, AOI, KANAMUNE, FUYUMI, DANCING, HAZUKI_REN,
+                              RIN_ACT, FILLER, MU_MEMBER };
+        for (unsigned i = 0; i < sizeof(nos)/sizeof(nos[0]); i++)
+            fprintf(stderr, "[FIXTURE] %s -> %d\n", nos[i], rb_find_card_by_no(nos[i]));
+    }
+
     printf("\n%d checks, %d failures\n", checks, failures);
     if (failures == 0) printf("ALL AUTO-ABILITY PARITY CHECKS PASSED\n");
     return failures ? 1 : 0;
