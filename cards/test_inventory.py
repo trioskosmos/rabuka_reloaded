@@ -1432,6 +1432,7 @@ def build_inventory():
     # without it, a well-written file reads as zero coverage.
     fn_bodies = {}
     const_binds = {}
+    helper_bodies = {}
     for _p, rel, text, _fns in files:
         # Unescape on the way in: a file may write the card as
         # "PL!N-bp7-011-R＋" or as "PL!N-bp7-011-R＋" — same card, and the
@@ -1445,8 +1446,16 @@ def build_inventory():
         const_binds[rel] = binds
         try:
             fn_bodies[rel] = {n: b for n, b, _l in split_test_fns(text)}
+            # A test often reaches the card through a fixture helper
+            # (`fn trigger_kosuzu_live_start()` stages it) and never names it
+            # itself. Those tests ARE direct coverage, so a helper that touches
+            # the card makes every test that calls it direct.
+            helper_bodies[rel] = {
+                n: b for n, b, _l, is_test in split_rust_fns(text, False) if not is_test
+            }
         except Exception:
             fn_bodies[rel] = {}
+            helper_bodies[rel] = {}
     # mechanic counters
     trigger_counts = defaultdict(lambda: [0, 0])
     action_counts = defaultdict(lambda: [0, 0])
@@ -1498,20 +1507,27 @@ def build_inventory():
                 covered_rels.append(rel)
                 covering_texts.append(text)
                 covering_fns.extend(fns)
-                # Tests that reach this ability's card from their OWN body —
-                # by literal or through a const bound to it in this file. A test
-                # in a covering file that never reaches the card is co-located,
-                # not evidence.
+                # Tests that reach this ability's card from their OWN body, from
+                # a const bound to it in this file, or through a fixture
+                # helper that touches it. A test in a covering file that reaches
+                # the card by none of those is co-located, not evidence.
                 binds = const_binds.get(rel, {})
                 aliases = {
                     a for a, card in binds.items() if card in cards or card == base
                 }
+                helpers = {
+                    h
+                    for h, hb in helper_bodies.get(rel, {}).items()
+                    if any(c in hb for c in cards) or base in hb
+                }
                 for name, body in fn_bodies.get(rel, {}).items():
                     if any(c in body for c in cards) or base in body:
                         direct_fns.append(name)
-                    elif any(
-                        re.search(r"\b" + re.escape(a) + r"\b", body) for a in aliases
-                    ):
+                        continue
+                    if any(re.search(r"\b" + re.escape(a) + r"\b", body) for a in aliases):
+                        direct_fns.append(name)
+                        continue
+                    if any(re.search(r"\b" + re.escape(h) + r"\b", body) for h in helpers):
                         direct_fns.append(name)
 
         covered = bool(covered_rels) or covers_override is not None

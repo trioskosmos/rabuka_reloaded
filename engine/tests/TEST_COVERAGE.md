@@ -145,8 +145,8 @@ Highest-risk category: requires a full live phase with another ability resolving
 
 | Card | Condition | Depth | Tests | Text |
 |---|---|---|---|---|
-| `PL!-bp6-020` | group_condition | L2+choice | 4/17 | {{jidou.png/自動}}{{turn1.png/ターン1回}}自分のステージのセンターエリアにいる『μ's』のメンバーの{{live_start.png/ライブ開始時}}能力が解決したとき、そのメンバーをポジショ |
-| `PL!-bp6-020` | compound | L2+choice | 4/17 | {{jidou.png/自動}}{{turn1.png/ターン1回}}自分のステージのセンターエリアにいる『μ's』のメンバーの{{live_success.png/ライブ成功時}}能力が解決したとき、そのメンバーがこの |
+| `PL!-bp6-020` | group_condition | L2+choice | 13/17 | {{jidou.png/自動}}{{turn1.png/ターン1回}}自分のステージのセンターエリアにいる『μ's』のメンバーの{{live_start.png/ライブ開始時}}能力が解決したとき、そのメンバーをポジショ |
+| `PL!-bp6-020` | compound | L2+choice | 13/17 | {{jidou.png/自動}}{{turn1.png/ターン1回}}自分のステージのセンターエリアにいる『μ's』のメンバーの{{live_success.png/ライブ成功時}}能力が解決したとき、そのメンバーがこの |
 | `PL!N-bp5-030` | compound | L2+choice | 17/23 | {{jidou.png/自動}}自分のステージにいるメンバーの{{live_start.png/ライブ開始時}}能力が解決するたび、そのメンバーが{{icon_all.png/ハート}}を持たない場合、ライブ終了時まで、 |
 | `PL!N-bp5-030` | location_condition | L2+choice | 17/23 | {{jidou.png/自動}}自分のステージにいるメンバーの{{live_success.png/ライブ成功時}}能力が解決するたび、カードを1枚引く。 |
 
@@ -157,9 +157,9 @@ Highest-risk category: requires a full live phase with another ability resolving
 | `PL!SP-sd2-012` | movement:area_move | L1+choice | 2/13 | {{jidou.png/自動}}{{turn1.png/ターン1回}}このメンバーがエリアを移動したとき、ライブ終了時まで、{{heart_02.png/heart02}}を得る。 (対戦相手のカードの効果でも発動する。 |
 | `PL!SP-sd2-022` | movement:area_move | L1+choice | 2/13 | {{jidou.png/自動}}{{turn1.png/ターン1回}}このメンバーがエリアを移動したとき、ライブ終了時まで、{{heart_03.png/heart03}}を得る。 (対戦相手のカードの効果でも発動する。 |
 | `PL!SP-bp7-016` | movement:energy_placed | L2+choice | 3/6 | {{jidou.png/自動}}{{turn1.png/ターン1回}}自分のカードの効果によって、自分のエネルギー置き場にエネルギーが置かれたとき、ライブ終了時まで、{{icon_blade.png/ブレード}}を得る。 |
-| `PL!SP-pb1-006` | or_condition | L2+choice | 4/33 | {{jidou.png/自動}}このメンバーが登場か、エリアを移動するたび、ライブ終了時まで、{{icon_blade.png/ブレード}}{{icon_blade.png/ブレード}}を得る。 (対戦相手のカードの効果 |
 | `PL!SP-pb1-020` | movement:area_move | L2+choice | 4/17 | {{jidou.png/自動}}このメンバーがエリアを移動するたび、カードを1枚引く。 (対戦相手のカードの効果でも発動する。) |
-| `PL!SP-bp4-016` | comparison_condition | L2+choice | 4/14 | {{jidou.png/自動}}カードの効果によって自分のエネルギー置き場にエネルギーカードが置かれるたび、ライブ終了時まで、{{heart_06.png/heart06}}を得る。(相手のカードの効果でも発動する。) |
+| `PL!SP-pb1-006` | or_condition | L2+choice | 7/33 | {{jidou.png/自動}}このメンバーが登場か、エリアを移動するたび、ライブ終了時まで、{{icon_blade.png/ブレード}}{{icon_blade.png/ブレード}}を得る。 (対戦相手のカードの効果 |
+| `PL!SP-bp4-016` | comparison_condition | L2+choice | 7/14 | {{jidou.png/自動}}カードの効果によって自分のエネルギー置き場にエネルギーカードが置かれるたび、ライブ終了時まで、{{heart_06.png/heart06}}を得る。(相手のカードの効果でも発動する。) |
 | `PL!SP-sd2-011` | movement:area_move | L2+choice | 7/18 | {{jidou.png/自動}}{{turn1.png/ターン1回}}このメンバーがエリアを移動したとき、ライブ終了時まで、{{icon_blade.png/ブレード}}を得る。 (対戦相手のカードの効果でも発動する。) |
 | `PL!SP-sd2-002` | movement:area_move | L2+choice | 11/16 | {{jidou.png/自動}}{{turn1.png/ターン1回}}このメンバーがエリアを移動したとき、ライブ終了時まで、{{heart_06.png/heart06}}を得る。 (対戦相手のカードの効果でも発動する。 |
 | `PL!-pb1-015` | state_change_condition | L2+choice | 14/14 | {{jidou.png/自動}}{{turn1.png/ターン1回}}自分のカードの効果によって、相手のステージにいるアクティブ状態のコスト4以下のメンバーがウェイト状態になったとき、カードを1枚引く。 |
@@ -176,30 +176,30 @@ Highest-risk category: requires a full live phase with another ability resolving
 | `PL!N-pb1-012` | #407:ライブ成功時 | L2+choice | 3/19 |
 | `PL!N-bp7-031` | #902:ライブ成功時 | L2+choice | 3/13 |
 | `PL!N-sd2-010` | #928:登場 | L2+choice | 3/28 |
-| `PL!S-bp2-007` | #36:ライブ開始時 | L2+choice | 4/24 |
-| `PL!SP-pb2-011` | #493:ライブ開始時 | L2+choice | 4/21 |
-| `PL!-bp6-020` | #796:自動 | L2+choice | 4/17 |
-| `PL!-bp6-020` | #795:自動 | L2+choice | 4/17 |
 | `PL!HS-pb1-001` | #433:ライブ開始時 | L2+choice | 5/33 |
-| `PL!N-bp3-005` | #64:ライブ開始時 | L2+choice | 6/21 |
-| `PL!-bp5-004` | #91:起動 | L2+choice | 6/10 |
 | `PL!HS-pb1-009` | #446:ライブ開始時 | L2+choice | 6/10 |
-| `PL!SP-pb2-006` | #485:常時 | L2+choice | 6/35 |
+| `PL!SP-pb2-011` | #493:ライブ開始時 | L2+choice | 6/21 |
+| `PL!S-bp2-007` | #36:ライブ開始時 | L2+choice | 7/24 |
+| `PL!SP-pb2-006` | #485:常時 | L2+choice | 8/35 |
+| `PL!-bp5-004` | #91:起動 | L2+choice | 9/10 |
+| `PL!N-bp3-005` | #64:ライブ開始時 | L2+choice | 10/21 |
 | `PL!S-bp5-111` | #118:起動 | L2+choice | 10/31 |
 | `PL!SP-sd2-002` | #475:起動 | L2+choice | 11/16 |
-| `PL!SP-bp7-001` | #526:常時 | L2+choice | 11/15 |
+| `PL!-bp6-020` | #796:自動 | L2+choice | 13/17 |
+| `PL!-bp6-020` | #795:自動 | L2+choice | 13/17 |
 | `PL!N-bp7-011` | #153:常時, #154:ライブ成功時 | L2+choice | 14/30 |
 | `PL!-pb1-015` | #353:ライブ開始時 | L2+choice | 14/14 |
-| `PL!HS-bp5-003` | #117:ライブ開始時 | L2+choice | 15/60 |
-| `PL!HS-pb1-003` | #436:登場 | L2+choice | 17/61 |
+| `PL!SP-bp7-001` | #526:常時 | L2+choice | 14/15 |
+| `PL!HS-bp5-003` | #117:ライブ開始時 | L2+choice | 16/60 |
 | `PL!N-bp5-030` | #720:自動 | L2+choice | 17/23 |
 | `PL!N-bp5-030` | #719:自動 | L2+choice | 17/23 |
 | `PL!SP-bp5-005` | #110:起動 | L2+choice | 18/18 |
+| `PL!HS-pb1-003` | #436:登場 | L2+choice | 22/61 |
 | `PL!SP-bp7-005` | #159:自動 | L2+choice | 25/40 |
 | `PL!SP-bp7-005` | #158:自動 | L2+choice | 25/40 |
 | `PL!N-bp4-026` | #676:自動 | L2+choice | 31/39 |
 | `PL!N-bp4-026` | #675:自動 | L2+choice | 31/39 |
-| `PL!S-bp6-002` | #127:ライブ開始時 | L2+choice | 32/51 |
+| `PL!S-bp6-002` | #127:ライブ開始時 | L2+choice | 44/51 |
 
 ## Specific-requirement abilities — thin coverage
 
