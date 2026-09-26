@@ -577,6 +577,27 @@ def _count_inequality_only(body):
     return "%d inequality assertion(s) on a count, vs %s" % (len(hits), kind)
 
 
+# A card built inline inside the bracket — `game.id("PL!S-sd1-001-SD")` — is ONE
+# slot. Tokenising the call would read `PL`, `S`, `sd1` and `SD` as four
+# identifiers and report each twice, which is noise rather than a duplicate.
+# Each inline card is collapsed to a placeholder that is unique per occurrence,
+# so two different inline cards in one literal stay distinct.
+Q_INLINE_CARD_RE = re.compile(
+    r"[A-Za-z_][A-Za-z0-9_]*\.(?:id|new_id)\(\s*\"[^\"]*\"\s*\)"
+)
+
+
+def _collapse_inline_cards(fragment):
+    seen = {}
+
+    def sub(_m):
+        key = f"__inline_card_{len(seen)}"
+        seen[key] = True
+        return key
+
+    return Q_INLINE_CARD_RE.sub(sub, fragment)
+
+
 def _duplicate_stage_ids(body):
     """Yield (identifier, slot_count) for a card staged in more than one slot.
 
@@ -587,7 +608,8 @@ def _duplicate_stage_ids(body):
     """
     for m in Q_STAGE_LITERAL_RE.finditer(body):
         counts = {}
-        for name in Q_SLOT_IDENT_RE.findall(m.group(1)):
+        fragment = _collapse_inline_cards(m.group(1))
+        for name in Q_SLOT_IDENT_RE.findall(fragment):
             if name in _NOT_A_CARD_SLOT or name.isdigit():
                 continue
             counts[name] = counts.get(name, 0) + 1

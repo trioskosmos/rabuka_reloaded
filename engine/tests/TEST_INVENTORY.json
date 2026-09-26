@@ -1,6 +1,6 @@
 {
   "generated_by": "cards/test_inventory.py",
-  "generated_at": "2026-09-26T16:45:02.120462+00:00",
+  "generated_at": "2026-09-26T16:58:42.938521+00:00",
   "stats": {
     "total_cards": 2526,
     "cards_with_abilities": 1565,
@@ -546,63 +546,8 @@
       "rows": []
     },
     "duplicate_stage_id": {
-      "count": 9,
-      "rows": [
-        {
-          "file": "engine/tests/test_modules/effects/gain/hearts/live_start/live_start_discard_shuffle_group_members_heart01_test.rs",
-          "test": "cooking_condition_checks_discard_not_stage",
-          "line": 196,
-          "detail": "filler in 2 slots"
-        },
-        {
-          "file": "engine/tests/test_modules/integration/full_round/real_card_phase_walkthrough_and_ability_suite_test.rs",
-          "test": "lovepeace_q150_self_hearts_greater_than_opponent_score_plus_1",
-          "line": 2480,
-          "detail": "PL in 2 slots"
-        },
-        {
-          "file": "engine/tests/test_modules/integration/full_round/real_card_phase_walkthrough_and_ability_suite_test.rs",
-          "test": "lovepeace_q150_self_hearts_greater_than_opponent_score_plus_1",
-          "line": 2480,
-          "detail": "PR in 2 slots"
-        },
-        {
-          "file": "engine/tests/test_modules/integration/full_round/real_card_phase_walkthrough_and_ability_suite_test.rs",
-          "test": "lovepeace_q150_self_hearts_greater_than_opponent_score_plus_1",
-          "line": 2480,
-          "detail": "id in 2 slots"
-        },
-        {
-          "file": "engine/tests/test_modules/jidou/yell/live_success_from_yell_reveal/live_success_no_blade_heart_or_two_excess_hearts_scores_four_test.rs",
-          "test": "miracle_wave_q182_excess_heart_score_4",
-          "line": 26,
-          "detail": "PL in 2 slots"
-        },
-        {
-          "file": "engine/tests/test_modules/jidou/yell/live_success_from_yell_reveal/live_success_no_blade_heart_or_two_excess_hearts_scores_four_test.rs",
-          "test": "miracle_wave_q182_excess_heart_score_4",
-          "line": 26,
-          "detail": "S in 2 slots"
-        },
-        {
-          "file": "engine/tests/test_modules/jidou/yell/live_success_from_yell_reveal/live_success_no_blade_heart_or_two_excess_hearts_scores_four_test.rs",
-          "test": "miracle_wave_q182_excess_heart_score_4",
-          "line": 26,
-          "detail": "SD in 2 slots"
-        },
-        {
-          "file": "engine/tests/test_modules/jidou/yell/live_success_from_yell_reveal/live_success_no_blade_heart_or_two_excess_hearts_scores_four_test.rs",
-          "test": "miracle_wave_q182_excess_heart_score_4",
-          "line": 26,
-          "detail": "id in 2 slots"
-        },
-        {
-          "file": "engine/tests/test_modules/jidou/yell/live_success_from_yell_reveal/live_success_no_blade_heart_or_two_excess_hearts_scores_four_test.rs",
-          "test": "miracle_wave_q182_excess_heart_score_4",
-          "line": 26,
-          "detail": "sd1 in 2 slots"
-        }
-      ]
+      "count": 0,
+      "rows": []
     },
     "count_inequality_only": {
       "count": 0,

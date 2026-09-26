@@ -93,21 +93,11 @@ _confusable card numbers (bp2 vs pb2) staged in one file with NO card-identity p
 
 None.
 
-## duplicate_stage_id (9)
+## duplicate_stage_id (0)
 
 _the same card INSTANCE in two stage slots (`stage.stage = [filler, y, filler]`) — not a legal board; anything that counts members or dedupes by name measures a board that cannot occur, so use a second `new_id`_
 
-| file | test | line | detail |
-| --- | --- | --- | --- |
-| `engine/tests/test_modules/effects/gain/hearts/live_start/live_start_discard_shuffle_group_members_heart01_test.rs` | `cooking_condition_checks_discard_not_stage` | 196 | filler in 2 slots |
-| `engine/tests/test_modules/integration/full_round/real_card_phase_walkthrough_and_ability_suite_test.rs` | `lovepeace_q150_self_hearts_greater_than_opponent_score_plus_1` | 2480 | PL in 2 slots |
-| `engine/tests/test_modules/integration/full_round/real_card_phase_walkthrough_and_ability_suite_test.rs` | `lovepeace_q150_self_hearts_greater_than_opponent_score_plus_1` | 2480 | PR in 2 slots |
-| `engine/tests/test_modules/integration/full_round/real_card_phase_walkthrough_and_ability_suite_test.rs` | `lovepeace_q150_self_hearts_greater_than_opponent_score_plus_1` | 2480 | id in 2 slots |
-| `engine/tests/test_modules/jidou/yell/live_success_from_yell_reveal/live_success_no_blade_heart_or_two_excess_hearts_scores_four_test.rs` | `miracle_wave_q182_excess_heart_score_4` | 26 | PL in 2 slots |
-| `engine/tests/test_modules/jidou/yell/live_success_from_yell_reveal/live_success_no_blade_heart_or_two_excess_hearts_scores_four_test.rs` | `miracle_wave_q182_excess_heart_score_4` | 26 | S in 2 slots |
-| `engine/tests/test_modules/jidou/yell/live_success_from_yell_reveal/live_success_no_blade_heart_or_two_excess_hearts_scores_four_test.rs` | `miracle_wave_q182_excess_heart_score_4` | 26 | SD in 2 slots |
-| `engine/tests/test_modules/jidou/yell/live_success_from_yell_reveal/live_success_no_blade_heart_or_two_excess_hearts_scores_four_test.rs` | `miracle_wave_q182_excess_heart_score_4` | 26 | id in 2 slots |
-| `engine/tests/test_modules/jidou/yell/live_success_from_yell_reveal/live_success_no_blade_heart_or_two_excess_hearts_scores_four_test.rs` | `miracle_wave_q182_excess_heart_score_4` | 26 | sd1 in 2 slots |
+None.
 
 ## count_inequality_only (0)
 
