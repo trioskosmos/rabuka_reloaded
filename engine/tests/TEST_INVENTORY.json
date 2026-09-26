@@ -1,14 +1,14 @@
 {
   "generated_by": "cards/test_inventory.py",
-  "generated_at": "2026-09-26T23:03:21.328459+00:00",
+  "generated_at": "2026-09-26T23:11:01.547813+00:00",
   "stats": {
     "total_cards": 2526,
     "cards_with_abilities": 1565,
     "total_abilities": 2011,
     "unique_abilities": 936
   },
-  "n_files": 915,
-  "n_tests": 3703,
+  "n_files": 916,
+  "n_tests": 3705,
   "total_cards": 771,
   "covered_cards": 771,
   "abilities_on_covered": 936,
@@ -309,8 +309,8 @@
     ]
   },
   "depth_counts": {
-    "L2+choice": 789,
-    "L1+choice": 71,
+    "L2+choice": 792,
+    "L1+choice": 68,
     "L2": 76
   },
   "qa_rulings": {
@@ -647,7 +647,7 @@
       "rows": []
     }
   },
-  "n_test_fns_parsed": 3703,
+  "n_test_fns_parsed": 3705,
   "abilities": [
     {
       "idx": 0,
@@ -2435,6 +2435,7 @@
       "has_choice": true,
       "has_negative": true,
       "covering_files": [
+        "engine/tests/test_modules/effects/deploy/orientation_bound_and_printed_blade_filter_test.rs",
         "engine/tests/test_modules/effects/gain/hearts/color_choice/success_zone_color_count_chosen_heart_test.rs",
         "engine/tests/test_modules/effects/gain/hearts/live_start/live_start_chosen_heart_per_success_card_test.rs",
         "engine/tests/test_modules/effects/recover/to_hand/recovers_two_cost_two_members_to_hand_pl_hs_bp2_002_r_plus_test.rs",
@@ -2449,6 +2450,8 @@
         "baad_cage_cost_limit_two_hasunosora_members_grants_score",
         "baad_cage_counts_two_physical_instances_of_same_hasunosora_member",
         "baad_cage_three_members_score_still_one",
+        "izumi_judges_the_printed_blade_count_not_a_modified_one",
+        "izumi_waits_every_member_on_both_stages_whose_printed_blades_are_three_or_fewer",
         "live_card_own_live_success_no_trigger",
         "live_start_another_member",
         "live_start_chosen_heart_scales_with_success_zone_card_count",
@@ -2468,10 +2471,12 @@
         "test_three_live_starts_each_order_possible",
         "two_members_both_get_all_heart"
       ],
-      "covering_test_count": 26,
+      "covering_test_count": 28,
       "direct_tests": [
         "all_heart_expires_at_live_end",
         "already_has_all_heart_no_double_grant",
+        "izumi_judges_the_printed_blade_count_not_a_modified_one",
+        "izumi_waits_every_member_on_both_stages_whose_printed_blades_are_three_or_fewer",
         "live_card_own_live_success_no_trigger",
         "live_start_another_member",
         "live_start_chosen_heart_scales_with_success_zone_card_count",
@@ -2490,7 +2495,7 @@
         "test_three_live_starts_each_order_possible",
         "two_members_both_get_all_heart"
       ],
-      "direct_test_count": 19,
+      "direct_test_count": 21,
       "is_null": false,
       "use_limit": null,
       "watches_abilities": false,
@@ -23108,20 +23113,23 @@
       ],
       "base": "PL!S-bp3-010",
       "covered": true,
-      "depth": "L1+choice",
+      "depth": "L2+choice",
       "has_assert": true,
       "has_choice": true,
-      "has_negative": false,
+      "has_negative": true,
       "covering_files": [
+        "engine/tests/test_modules/effects/deploy/orientation_bound_and_printed_blade_filter_test.rs",
         "engine/tests/test_modules/effects/state/per_card/debut_optional_single_member_activation_test.rs"
       ],
       "covering_tests": [
         "debut_activates_only_selected_own_member_chika_bp3_010",
         "debut_activates_only_selected_own_member_riko_bp3_011",
         "debut_declined_activation_preserves_waited_members_chika_bp3_010",
-        "debut_declined_activation_preserves_waited_members_riko_bp3_011"
+        "debut_declined_activation_preserves_waited_members_riko_bp3_011",
+        "izumi_judges_the_printed_blade_count_not_a_modified_one",
+        "izumi_waits_every_member_on_both_stages_whose_printed_blades_are_three_or_fewer"
       ],
-      "covering_test_count": 4,
+      "covering_test_count": 6,
       "direct_tests": [
         "debut_activates_only_selected_own_member_chika_bp3_010",
         "debut_activates_only_selected_own_member_riko_bp3_011",
@@ -29630,11 +29638,12 @@
       ],
       "base": "PL!HS-pb1-008",
       "covered": true,
-      "depth": "L1+choice",
+      "depth": "L2+choice",
       "has_assert": true,
       "has_choice": true,
-      "has_negative": false,
+      "has_negative": true,
       "covering_files": [
+        "engine/tests/test_modules/effects/deploy/orientation_bound_and_printed_blade_filter_test.rs",
         "engine/tests/test_modules/effects/restriction/opponent_active_phase_lock_targeting_test.rs",
         "engine/tests/test_modules/effects/state/wait_activation/debut_low_blade_wait_immunity_test.rs"
       ],
@@ -29642,16 +29651,20 @@
         "active_phase_lock_excludes_owners_members_from_simulated_activation_block",
         "active_phase_lock_owned_by_first_player_targets_second_player",
         "active_phase_lock_owned_by_second_player_targets_first_player",
-        "debut_all_low_blade_members_wait_respects_opponent_effect_immunity"
+        "debut_all_low_blade_members_wait_respects_opponent_effect_immunity",
+        "izumi_judges_the_printed_blade_count_not_a_modified_one",
+        "izumi_waits_every_member_on_both_stages_whose_printed_blades_are_three_or_fewer"
       ],
-      "covering_test_count": 4,
+      "covering_test_count": 6,
       "direct_tests": [
         "active_phase_lock_excludes_owners_members_from_simulated_activation_block",
         "active_phase_lock_owned_by_first_player_targets_second_player",
         "active_phase_lock_owned_by_second_player_targets_first_player",
-        "debut_all_low_blade_members_wait_respects_opponent_effect_immunity"
+        "debut_all_low_blade_members_wait_respects_opponent_effect_immunity",
+        "izumi_judges_the_printed_blade_count_not_a_modified_one",
+        "izumi_waits_every_member_on_both_stages_whose_printed_blades_are_three_or_fewer"
       ],
-      "direct_test_count": 4,
+      "direct_test_count": 6,
       "is_null": false,
       "use_limit": null,
       "watches_abilities": false,
@@ -29674,11 +29687,12 @@
       ],
       "base": "PL!HS-pb1-008",
       "covered": true,
-      "depth": "L1+choice",
+      "depth": "L2+choice",
       "has_assert": true,
       "has_choice": true,
-      "has_negative": false,
+      "has_negative": true,
       "covering_files": [
+        "engine/tests/test_modules/effects/deploy/orientation_bound_and_printed_blade_filter_test.rs",
         "engine/tests/test_modules/effects/restriction/opponent_active_phase_lock_targeting_test.rs",
         "engine/tests/test_modules/effects/state/wait_activation/debut_low_blade_wait_immunity_test.rs"
       ],
@@ -29686,16 +29700,20 @@
         "active_phase_lock_excludes_owners_members_from_simulated_activation_block",
         "active_phase_lock_owned_by_first_player_targets_second_player",
         "active_phase_lock_owned_by_second_player_targets_first_player",
-        "debut_all_low_blade_members_wait_respects_opponent_effect_immunity"
+        "debut_all_low_blade_members_wait_respects_opponent_effect_immunity",
+        "izumi_judges_the_printed_blade_count_not_a_modified_one",
+        "izumi_waits_every_member_on_both_stages_whose_printed_blades_are_three_or_fewer"
       ],
-      "covering_test_count": 4,
+      "covering_test_count": 6,
       "direct_tests": [
         "active_phase_lock_excludes_owners_members_from_simulated_activation_block",
         "active_phase_lock_owned_by_first_player_targets_second_player",
         "active_phase_lock_owned_by_second_player_targets_first_player",
-        "debut_all_low_blade_members_wait_respects_opponent_effect_immunity"
+        "debut_all_low_blade_members_wait_respects_opponent_effect_immunity",
+        "izumi_judges_the_printed_blade_count_not_a_modified_one",
+        "izumi_waits_every_member_on_both_stages_whose_printed_blades_are_three_or_fewer"
       ],
-      "direct_test_count": 4,
+      "direct_test_count": 6,
       "is_null": false,
       "use_limit": null,
       "watches_abilities": false,
@@ -34843,6 +34861,7 @@
         "engine/tests/test_modules/effects/deck_order/restore/both_waitrooms_member_restore_threshold_q242_test.rs",
         "engine/tests/test_modules/effects/deck_order/restore/recover_and_order_opponent_bottom_test.rs",
         "engine/tests/test_modules/effects/deploy/optional_energy_deploy_two_total_cost_four_test.rs",
+        "engine/tests/test_modules/effects/deploy/orientation_bound_and_printed_blade_filter_test.rs",
         "engine/tests/test_modules/effects/draw/chains/baton_source_cost_gated_draw_discard_test.rs",
         "engine/tests/test_modules/effects/draw/chains/card_ability_test.rs",
         "engine/tests/test_modules/effects/draw/chains/draw_then_bottom_hand_card_test.rs",
@@ -34936,7 +34955,7 @@
         "audit_allocations_match_filled",
         "audit_both_players_fail_no_winner"
       ],
-      "covering_test_count": 485,
+      "covering_test_count": 487,
       "direct_tests": [
         "all_same_group_no_effect",
         "audit_additive_modifier_can_cause_failure",
@@ -34969,7 +34988,7 @@
         "deploy_two_cost2_ok",
         "dia_keeps_one_on_bottom_rest_to_waitroom"
       ],
-      "direct_test_count": 175,
+      "direct_test_count": 176,
       "is_null": false,
       "use_limit": null,
       "watches_abilities": false,
@@ -35012,6 +35031,7 @@
         "engine/tests/test_modules/effects/deck_order/restore/both_waitrooms_member_restore_threshold_q242_test.rs",
         "engine/tests/test_modules/effects/deck_order/restore/recover_and_order_opponent_bottom_test.rs",
         "engine/tests/test_modules/effects/deploy/optional_energy_deploy_two_total_cost_four_test.rs",
+        "engine/tests/test_modules/effects/deploy/orientation_bound_and_printed_blade_filter_test.rs",
         "engine/tests/test_modules/effects/draw/chains/baton_source_cost_gated_draw_discard_test.rs",
         "engine/tests/test_modules/effects/draw/chains/card_ability_test.rs",
         "engine/tests/test_modules/effects/draw/chains/draw_then_bottom_hand_card_test.rs",
@@ -35105,7 +35125,7 @@
         "audit_allocations_match_filled",
         "audit_both_players_fail_no_winner"
       ],
-      "covering_test_count": 485,
+      "covering_test_count": 487,
       "direct_tests": [
         "all_same_group_no_effect",
         "audit_additive_modifier_can_cause_failure",
@@ -35138,7 +35158,7 @@
         "deploy_two_cost2_ok",
         "dia_keeps_one_on_bottom_rest_to_waitroom"
       ],
-      "direct_test_count": 175,
+      "direct_test_count": 176,
       "is_null": false,
       "use_limit": null,
       "watches_abilities": false,
@@ -35925,6 +35945,7 @@
       "has_negative": true,
       "covering_files": [
         "engine/tests/test_modules/characterization/pipeline_characterization_test.rs",
+        "engine/tests/test_modules/effects/deploy/orientation_bound_and_printed_blade_filter_test.rs",
         "engine/tests/test_modules/effects/state/wait_activation/live_start_wait_filters_pl_n_bp5_004_r_pl_sp_pr_021_pr_test.rs",
         "engine/tests/test_modules/integration/full_round/real_card_phase_walkthrough_and_ability_suite_test.rs",
         "engine/tests/test_modules/rules/phases/performance_pipeline_test.rs"
@@ -35961,15 +35982,16 @@
         "hanamaru_score_icon_filter",
         "hareruya_q64_waitroom_only_five_distinct_liella_condition_met"
       ],
-      "covering_test_count": 78,
+      "covering_test_count": 80,
       "direct_tests": [
         "heart_pipeline_three_entries_agree_with_copy_multiplier_override",
+        "izumi_waits_every_member_on_both_stages_whose_printed_blades_are_three_or_fewer",
         "lovepeace_q149_total_hearts_sum_of_base_hearts",
         "lovepeace_q150_self_hearts_greater_than_opponent_score_plus_1",
         "performance_pipeline_blade_yell_heart_score",
         "pl_n_bp5_004_r_wait_original_four_blades_excludes_modified_four"
       ],
-      "direct_test_count": 5,
+      "direct_test_count": 6,
       "is_null": false,
       "use_limit": 1,
       "watches_abilities": false,

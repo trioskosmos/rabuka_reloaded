@@ -9,6 +9,7 @@ pub mod n_pb1_015_shizuku_test;
 pub mod n_pb1_017_miyashita_test;
 pub mod optional_energy_deploy_two_total_cost_four_test;
 pub mod optional_two_energy_named_member_deploy_q199_q200_test;
+pub mod orientation_bound_and_printed_blade_filter_test;
 pub mod paid_energy_same_name_debut_chain_q200_q201_q202_test;
 pub mod pl_sp_sd1_002_test;
 pub mod s_bp3_006_cost_ref_test;
