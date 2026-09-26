@@ -9,6 +9,10 @@ typedef struct {
     int structural;
 } ExecutorEntry;
 
+/* `structural` is the C dispatcher's own "this handler owns its children" flag
+ * (consumed by rb_execute_effect_ex's generic pre-order child walk, engine.c).
+ * It is deliberately NOT the same set as the verdict-suppression set below —
+ * the two were conflated here until the Rust structural list was ported. */
 static const ExecutorEntry executor_table[] = {
     {"draw_card", 0}, {"draw", 0}, {"draw_until_count", 0},
     {"move_cards", 0}, {"discard_card", 0}, {"gain_resource", 0},
@@ -36,7 +40,25 @@ static const ExecutorEntry executor_table[] = {
     {"conditional_on_result", 1}, {"conditional_on_optional", 1},
     {"conditional_optional", 1}, {"compound_action", 1},
     {"opponent_action", 1}, {"action_by", 1}, {"sequential_cost", 1},
-    {"choice_condition", 1}, {"energy_condition", 1}, {"do_nothing", 0}
+    {"choice_condition", 1}, {"energy_condition", 1}, {"do_nothing", 0},
+    /* engine/src/ability/enums.rs:314 ModifyCost => "modify_cost" and
+     * enums.rs:352 ReduceLiveCardSetLimit => "reduce_live_card_set_limit".
+     * Both were missing from this table even though the dispatch branches below
+     * already existed, so the branches were unreachable from
+     * rb_execute_effect_ex (which consults rb_executor_has_executor) and from
+     * rb_execute_effect_via_registry. 21 compiled effects use modify_cost and
+     * 2 use reduce_live_card_set_limit (tools/audit_actions.c). */
+    {"modify_cost", 0}, {"reduce_live_card_set_limit", 0}
+};
+
+/* engine/src/ability/effects/executor.rs:10-18 — push_effect_verdict's
+ * `matches!` structural set, verbatim. Only these six suppress the verdict
+ * log entry. Note `choice` IS in the Rust set and `conditional_optional`
+ * is NOT; the previous reuse of rb_executor_is_structural got both backwards
+ * and additionally suppressed the verdict for six actions Rust logs. */
+static const char *const verdict_structural[] = {
+    "compound_action", "sequential", "choice", "conditional_alternative",
+    "conditional_on_result", "conditional_on_optional"
 };
 
 static const ExecutorEntry *find_executor(const char *action)
@@ -68,12 +90,27 @@ static const char *effect_extra(const AbilityEffect *effect, const char *key)
     return NULL;
 }
 
+/* engine/src/ability/effects/executor.rs:10-18 */
+static int verdict_is_structural(const char *action)
+{
+    if (!action) return 0;
+    for (size_t i = 0; i < sizeof(verdict_structural) / sizeof(verdict_structural[0]); i++)
+        if (strcmp(verdict_structural[i], action) == 0) return 1;
+    return 0;
+}
+
+/* engine/src/ability/effects/executor.rs:9-40 */
 static void push_effect_verdict(const AbilityEffect *effect)
 {
-    if (!effect || rb_executor_is_structural(effect->action)) return;
+    if (!effect || verdict_is_structural(effect->action)) return;
     char details[128];
+    /* Rust: effect.count.or(effect.value_any()) — count first, then the
+     * `value` extra; an absent value yields the bare action label. */
+    const char *value_text = effect->count >= 0 ? NULL : effect_extra(effect, "value");
     if (effect->count >= 0)
         snprintf(details, sizeof(details), "%s %d", effect->action, effect->count);
+    else if (value_text && *value_text)
+        snprintf(details, sizeof(details), "%s %s", effect->action, value_text);
     else
         snprintf(details, sizeof(details), "%s", effect->action);
     rb_log_push_verdict_effect(effect->text ? effect->text : "",
@@ -247,6 +284,12 @@ int rb_executor_execute(GameState *g, int actor, AbilityEffect *effect, int host
         rb_effect_energy_placement(g, actor, effect);
     } else if (strcmp(action, "energy_state_change") == 0) {
         rb_effect_energy_state_change(g, actor, effect);
+    } else if (strcmp(action, "activation_cost") == 0) {
+        /* engine/src/ability/effects/executor.rs:175-178. The table already
+         * claimed activation_cost, so the branch was missing and the effect
+         * silently resolved to nothing instead of reaching
+         * state.rs::execute_activation_cost. */
+        rb_effect_activation_cost(g, actor, effect, host_cid);
     } else if (strcmp(action, "sequential") == 0) {
         rb_compound_sequential(g, actor, effect, host_cid);
     } else if (strcmp(action, "conditional_alternative") == 0) {
@@ -286,10 +329,16 @@ int rb_executor_execute(GameState *g, int actor, AbilityEffect *effect, int host
                strcmp(action, "do_nothing") == 0) {
         result = 1;
     } else {
+        /* Unsupported fallback. Rust's match is exhaustive over ActionType, so
+         * this arm only fires for a string that never decoded as an action.
+         * Mirror Rust's "no state change" outcome rather than reporting
+         * success; the verdict is still logged below. */
         result = 0;
     }
 
-    if (result) push_effect_verdict(effect);
+    /* engine/src/ability/effects/executor.rs:191 — the verdict is pushed
+     * unconditionally after the match, including on the Err arms. */
+    push_effect_verdict(effect);
     return result;
 }
 

@@ -76,6 +76,7 @@ static int run_full_turn(TestGame *tg) {
         } else if (strcmp(choice, "SelectAutoAbility") == 0) {
             rb_resume_with_choice(&tg->state, 0);
         } else if (choice[0] == 0) {
+            fprintf(stderr, "PROBE loop i=%d phase=%d turn=%d\n", i, tg->state.phase, tg->state.turn);
             test_pass(tg);
         } else {
             fprintf(stderr, "FAIL: unexpected prompt during performance turn (expected looked_at SelectCard or none), got %s\n", choice);

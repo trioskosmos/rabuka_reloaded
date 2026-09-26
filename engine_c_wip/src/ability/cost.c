@@ -20,6 +20,8 @@ static int s_conditional_choice;
 /* forward: alloc.c owns the effect-tree clone/free pair */
 AbilityEffect *rb_effect_deep_clone(const AbilityEffect *src);
 void rb_effect_free(AbilityEffect *e);
+/* forward: bag helpers are defined at the bottom of this file */
+static void bag_push(RbBag *b, int c);
 
 /* ── effect-field helpers (mirrors AbilityEffect::*_any() getters) ── */
 static const char *eff_extra(const AbilityEffect *e, const char *k) {
@@ -37,6 +39,23 @@ static int eff_int(const AbilityEffect *e, const char *k, int dflt) {
     const char *v = eff_extra(e, k);
     if (!v || !*v) return dflt;
     return atoi(v);
+}
+/* ── energy_count_any() ──
+   The Rust decoder folds BOTH wire keys "energy_count" and "energy" onto the
+   single field `energy_count` (engine/src/ability/effect_decoder_gen.rs:164
+   and :226). The C extras table keeps the raw wire key, so both spellings
+   have to be consulted: 桜坂しずく PL!N-pb1-003-R and 園田海未 PL!-bp5-004-R＋
+   ship `energy`, and reading only "energy_count" silently paid 0 energy. */
+int rb_cost_energy_count_any(const AbilityEffect *e) {
+    if (!e) return -1;
+    const char *v = eff_extra(e, "energy_count");
+    if (!v || !*v) v = eff_extra(e, "energy");
+    if (!v || !*v) return -1;
+    return atoi(v);
+}
+static int eff_energy_count(const AbilityEffect *e, int dflt) {
+    int n = rb_cost_energy_count_any(e);
+    return n < 0 ? dflt : n;
 }
 
 /* ── action-type predicates ── */
@@ -84,6 +103,18 @@ static int has_skip_prompt(const AbilityEffect *cost) {
         const char *sc = eff_extra(cost, "self_cost");
         return sc && !strcmp(sc, "true");
     }
+    return 0;
+}
+
+/* ── effect_uses_selected_cards ──
+   Mirrors engine/src/ability/cost/handlers.rs:16-27: true when the effect
+   reads the selected-cards zone, directly or through its sequential
+   children. Determines whether a cost reveal must populate selected_cards. */
+static int effect_uses_selected_cards(const AbilityEffect *e) {
+    if (!e) return 0;
+    if (e->source && !strcmp(e->source, "selected_cards")) return 1;
+    for (int i = 0; i < e->n_child; i++)
+        if (effect_uses_selected_cards(e->child[i])) return 1;
     return 0;
 }
 
@@ -363,6 +394,13 @@ static int pay_cost_move_cards(GameState *g, int actor, const AbilityEffect *cos
     int same_unit = eff_bool(cost, "same_unit_name", 0);
     int is_from_hand = !strcmp(source, "hand") && !same_unit;
     int is_all = eff_bool(cost, "all", 0);
+    /* 「このカードを手札から控え室に置く」 — a mandatory, fixed-count
+       self-discard. Rust handlers.rs:776-780 computes exactly this and
+       handlers.rs:800-820 then SKIPS the hand-selection offer for it, so no
+       prompt is opened and the activating card itself is paid
+       (engine/src/ability/move_cards.rs:958-982). */
+    int hand_self_cost = is_from_hand && eff_bool(cost, "self_cost", 0) &&
+                         !optional && !is_any_number;
     int is_activation = 0;
 
     /* Determine is_activation from current queue entry */
@@ -427,8 +465,9 @@ static int pay_cost_move_cards(GameState *g, int actor, const AbilityEffect *cos
         return 1;
     }
 
-    /* From hand with filtering */
-    if (is_from_hand) {
+    /* From hand with filtering. A mandatory self-discard never reaches here
+       (handlers.rs:800-812) — it is paid directly below. */
+    if (is_from_hand && !hand_self_cost) {
         int is_same_group_name = eff_extra(cost, "group_reference") &&
                                   !strcmp(eff_extra(cost, "group_reference"), "same_group_name");
         int matching_indices[RB_MAX_HAND];
@@ -547,6 +586,39 @@ static int pay_cost_move_cards(GameState *g, int actor, const AbilityEffect *cos
             strncpy(pending->filter_group, group_names_cost, sizeof(pending->filter_group) - 1);
         g->queue.has_pending = 1;
         g->queue.pending.route = RB_ROUTE_SELECT_CARDS;
+        return 1;
+    }
+
+    /* 「このカードを手札から控え室に置く」 — pay the activating card itself.
+       Mirrors engine/src/ability/move_cards.rs:958-982: remove the activating
+       card from hand (or, if it already left hand, from the waitroom). Rust
+       reports an error when it is in neither, so the C port refuses too. */
+    if (hand_self_cost) {
+        int card_id = g->activating_card;
+        if (card_id < 0) return 0;
+        RbBag *from = NULL;
+        for (int i = 0; i < P->hand.n; i++)
+            if (P->hand.cards[i] == card_id) { from = &P->hand; break; }
+        if (!from)
+            for (int i = 0; i < P->discard.n; i++)
+                if (P->discard.cards[i] == card_id) { from = &P->discard; break; }
+        if (!from) return 0;
+        int pos = 0;
+        while (pos < from->n && from->cards[pos] != card_id) pos++;
+        for (int i = pos; i + 1 < from->n; i++) from->cards[i] = from->cards[i + 1];
+        from->n--;
+        const char *dst = cost->destination ? cost->destination : "discard";
+        if (!strcmp(dst, "discard") || !strcmp(dst, "waitroom"))
+            bag_push(&P->discard, card_id);
+        else if (!strcmp(dst, "energy_deck"))
+            bag_push(&P->energy_deck, card_id);
+        else if (!strcmp(dst, "energy"))
+            bag_push(&P->energy, card_id);
+        else if (!strcmp(dst, "hand"))
+            bag_push(&P->hand, card_id);
+        else if (!strcmp(dst, "deck"))
+            bag_push(&P->deck, card_id);
+        g->mods.last_cost_discard_count = 1;
         return 1;
     }
 
@@ -753,7 +825,7 @@ static int pay_cost_inner(GameState *g, int actor, const AbilityEffect *cost) {
 
     /* PayEnergy */
     if (cost_is_energy(cost)) {
-        int energy = eff_int(cost, "energy_count", 0);
+        int energy = eff_energy_count(cost, 0);
         const char *target = cost->target ? cost->target : "self";
         int optional = cost->is_optional;
         int any_number = eff_bool(cost, "any_number", 0);
@@ -858,6 +930,7 @@ static int pay_cost_inner(GameState *g, int actor, const AbilityEffect *cost) {
         RbPlayer *P = &g->p[tpl];
         int card_ids[RB_MAX_HAND];
         int n_ids = 0;
+        int optional = eff_bool(cost, "optional", 0);
 
         if (!strcmp(source, "hand")) {
             const char *cost_values = eff_extra(cost, "cost_values");
@@ -881,9 +954,15 @@ static int pay_cost_inner(GameState *g, int actor, const AbilityEffect *cost) {
                 if (match && has_cost_values) {
                     Card c;
                     if (rb_decode_card_by_index((uint32_t)cid, &c)) {
+                        /* Rust handlers.rs:1214-1218 compares the card's
+                           `cost`, falling back to `score` only when the card
+                           carries no cost (`.cost.or(.score)`). Matching either
+                           field independently would let a cheap member with a
+                           matching printed score satisfy 「コストが10か20」. */
+                        int face = c.cost ? (int)c.cost : rb_card_get_score(&c);
                         int found = 0;
                         for (int v = 0; v < nvals; v++)
-                            if (c.cost == vals[v] || rb_card_get_score(&c) == vals[v]) { found = 1; break; }
+                            if (face == vals[v]) { found = 1; break; }
                         if (!found) match = 0;
                         rb_free_card(&c);
                     } else match = 0;
@@ -906,9 +985,20 @@ static int pay_cost_inner(GameState *g, int actor, const AbilityEffect *cost) {
         int has_explicit_count = cost->count > 0;
         int explicit_count = cost->count > 0 ? cost->count : 1;
 
-        if (has_explicit_count && n_ids <= explicit_count) {
+        /* handlers.rs:1260-1283 — a mandatory reveal cost whose eligible set is
+           exactly `explicit_count` wide reveals without opening a choice. */
+        if (!optional && has_explicit_count && n_ids == explicit_count) {
+            int effect_uses_selected =
+                (rb_entry_effect(g) && effect_uses_selected_cards(rb_entry_effect(g)));
             for (int i = 0; i < n_ids; i++) {
-                /* push_revealed_card / push_revealed_cost_card equivalents */
+                if (g->n_revealed < RB_MAX_REVEALED_CARDS)
+                    g->revealed_cards[g->n_revealed++] = card_ids[i];
+            }
+            if (effect_uses_selected) {
+                g->n_selected_cards = 0;
+                for (int i = 0; i < n_ids && i < RB_MAX_ZONE; i++)
+                    g->selected_cards[i] = card_ids[i];
+                g->n_selected_cards = n_ids < RB_MAX_ZONE ? n_ids : RB_MAX_ZONE;
             }
             return 1;
         }
@@ -1229,7 +1319,10 @@ static int cr_reduction_matches(const AbilityEffect *e, int card_id, const Card 
 
 static int cr_per_unit_reduction(const AbilityEffect *e, const GameState *g,
                                  int actor, int hand_count) {
-    const char *pul  = cr_eff_extra(e, "per_unit_type");
+    /* Rust util.rs:156-158: per_unit_location_any().or(location_any())
+       — NOT per_unit_type, which names the grouping unit (枚 / group_name /
+       unit) and is never a zone. */
+    const char *pul  = cr_eff_extra(e, "per_unit_location");
     const char *loc  = cr_eff_extra(e, "location");
     const char *zone = pul ? pul : (loc ? loc : "hand");
     int raw_count;
@@ -1253,6 +1346,16 @@ static int cr_per_unit_reduction(const AbilityEffect *e, const GameState *g,
     return (effective / per_unit_count) * value;
 }
 
+/* cond_get_state — mirror of Condition::get_state(): the literal string of the
+   `state` field, or NULL when the condition carries none. */
+static const char *cond_get_state(const Condition *c) {
+    if (!c) return NULL;
+    for (uint32_t i = 0; i < c->n_fields; i++)
+        if (c->fields[i].key && !strcmp(c->fields[i].key, "state"))
+            return c->fields[i].v.tag == RB_TAG_STR ? c->fields[i].v.s : NULL;
+    return NULL;
+}
+
 static int cr_scan_one_effect(const AbilityEffect *eff, int target_id,
                               const Card *target_card, const GameState *g,
                               int actor, int hand_count, int hand_guard) {
@@ -1269,6 +1372,34 @@ static int cr_scan_one_effect(const AbilityEffect *eff, int target_id,
                 eff->condition->fields[i].v.s &&
                 !strcmp(eff->condition->fields[i].v.s, "hand"))
                 return -1;
+        }
+    }
+    /* util.rs:359-375 — a wait-gated aura only applies while at least one of
+       the player's own stage members matching group_names is in the wait
+       state. Dropping this branch made wait-gated cost auras permanent. */
+    {
+        const char *st = cond_get_state(eff->condition);
+        if (st && !strcmp(st, "wait")) {
+            const char *groups = cr_eff_extra(eff, "group_names");
+            const RbPlayer *St = &g->p[actor];
+            int met = 0;
+            for (int s = 0; s < RB_STAGE_SIZE; s++) {
+                int id = St->stage[s];
+                if (id == RB_EMPTY_SLOT) continue;
+                const char *ori = rb_mods_get_orientation((RbMods *)&g->mods, id);
+                if (!ori || strcmp(ori, "wait") != 0) continue;
+                if (groups && *groups) {
+                    char buf[16][64];
+                    int n = split_csv(groups, buf, 16);
+                    int any = 0;
+                    for (int k = 0; k < n; k++)
+                        if (rb_card_matches_group_str(id, buf[k])) { any = 1; break; }
+                    if (!any) continue;
+                }
+                met = 1;
+                break;
+            }
+            if (!met) return -1;
         }
     }
     const char *gn = cr_eff_extra(eff, "group_names");

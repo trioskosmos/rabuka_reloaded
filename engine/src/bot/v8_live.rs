@@ -587,11 +587,11 @@ mod tests {
     /// there hands them the game. One objective, both answers.
     #[test]
     fn a_thin_life_can_be_worth_less_than_a_junk_set() {
-        let junk_only = candidate_value(outcome(0.0, 0.0, 0.0), 0.0, 0, 0.02);
+        let junk_only = candidate_value(outcome(0.0, 0.0, 0.0), 0.0, 0.02);
         assert!(junk_only > 0.0);
         // p = 0.20: 0.20/3 gained against 0.80 * 0.20/3 forfeited. Below break
         // even, so the argmax sets junk and keeps the life for another check.
-        let thin = candidate_value(outcome(0.20, 0.20, 0.20 * PLACEMENT_CREDIT), 0.20, 1, 0.0);
+        let thin = candidate_value(outcome(0.20, 0.20, 0.20 * PLACEMENT_CREDIT), 0.20, 0.0);
         assert!(thin < junk_only);
         // p = 0.45 on the same board: the placement this life can make here
         // outweighs the one it forfeits, and it is committed. A thin life is
@@ -599,7 +599,6 @@ mod tests {
         let thicker = candidate_value(
             outcome(0.45, 0.45, 0.45 * PLACEMENT_CREDIT),
             0.45,
-            1,
             0.0,
         );
         assert!(thicker > junk_only);
@@ -607,7 +606,6 @@ mod tests {
         let certain = candidate_value(
             outcome(0.95, 0.95, 0.95 * PLACEMENT_CREDIT),
             0.95,
-            1,
             0.0,
         );
         assert!(certain > thicker);
@@ -618,8 +616,8 @@ mod tests {
     /// replacement (8.3.4).
     #[test]
     fn a_reliable_life_plus_hand_filter_beats_folding() {
-        let play = candidate_value(outcome(0.95, 0.95, 0.32), 0.95, 1, 0.02);
-        let fold = candidate_value(outcome(0.0, 0.0, 0.0), 0.0, 0, 0.06);
+        let play = candidate_value(outcome(0.95, 0.95, 0.32), 0.95, 0.02);
+        let fold = candidate_value(outcome(0.0, 0.0, 0.0), 0.0, 0.06);
         assert!(play > fold);
     }
 

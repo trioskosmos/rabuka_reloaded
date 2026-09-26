@@ -64,6 +64,19 @@ extern int rb_card_fires_on_opponent_effects(int card_id);
 extern int rb_card_energy_cost_total(int card_id);
 extern int rb_card_has_optional_payment(int card_id);
 extern int rb_card_effective_energy_cost_total(int card_id, int groups_on_stage);
+extern const char *rb_card_group_name(int card_id);
+extern const char *rb_card_series_to_group(const char *series);
+extern int rb_heartmap_len(const Card *c, int from, int len);
+extern int rb_heartmap_is_empty(const Card *c, int from, int len);
+extern int rb_heartmap_values_sum(const Card *c, int from, int len);
+extern int rb_heartmap_get(const Card *c, int from, int len, int color, int *out);
+extern int rb_heartmap_contains_key(const Card *c, int from, int len, int color);
+extern int rb_heartmap_key_at(const Card *c, int from, int len, int i);
+extern int rb_heartmap_value_at(const Card *c, int from, int len, int i);
+extern int rb_heartmap_insert(Card *c, int from, int *len, int color, int val);
+extern void rb_heartmap_remove(Card *c, int from, int *len, int color);
+extern void rb_heartmap_clear(Card *c, int from, int *len);
+extern int rb_heartmap_entry_or_default(Card *c, int from, int *len, int color);
 
 /* ── card.rs:637 normalize_card_no — uppercase, fullwidth → halfwidth ── */
 static void test_normalize_card_no(void)
@@ -73,7 +86,15 @@ static void test_normalize_card_no(void)
     CHECK_STR(out, "PL!SP-BP2-006-R+", "normalize_card_no uppercases ascii lowercase");
 
     rb_card_normalize_no("ＰＬ！ＳＰ-006-Ｒ＋", out, sizeof(out));
-    CHECK_STR(out, "PL!SP-006-R+", "normalize_card_no folds fullwidth lowercase and ＋／！");
+    CHECK_STR(out, "ＰＬ!ＳＰ-006-Ｒ+",
+              "normalize_card_no folds only the fullwidth LOWERCASE range and ＋／！");
+    /* card.rs:641-674 matches 'a'..='z' and 'ａ'..='ｚ' (U+FF41..U+FF5A) only;
+       fullwidth UPPERCASE (U+FF21..U+FF3A) falls through to the `_` arm and
+       is copied verbatim. */
+    rb_card_normalize_no("ａｂｃ", out, sizeof(out));
+    CHECK_STR(out, "ABC", "normalize_card_no maps fullwidth lowercase ａｂｃ to ABC");
+    rb_card_normalize_no("ＡＢＣ", out, sizeof(out));
+    CHECK_STR(out, "ＡＢＣ", "normalize_card_no leaves fullwidth uppercase ＡＢＣ alone");
 
     rb_card_normalize_no("a＊b＃c", out, sizeof(out));
     CHECK_STR(out, "A*B#C", "normalize_card_no folds fullwidth ＊ and ＃");
@@ -352,16 +373,36 @@ static void test_heart_map_predicates(void)
     memset(&c, 0, sizeof(c));
     CHECK(rb_decode_card_by_index((uint32_t)member, &c), "the heart-map fixture decodes");
 
-    int sum = 0;
-    for (int i = 0; i < c.n_hearts; i++) sum += c.heart_count[i];
-    CHECK_EQ(rb_card_total_hearts(&c), sum,
-             "total_hearts sums every printed base heart");
+    /* card.rs:4194 total_hearts = base_heart sum, or need_heart sum when the
+       card prints no base hearts. Blade hearts are never counted. */
+    int base_sum = rb_heartmap_values_sum(&c, 0, c.num_base);
+    int blade_sum = rb_heartmap_values_sum(&c, c.num_base, c.num_blade);
+    int need_sum = rb_heartmap_values_sum(&c, c.num_base + c.num_blade, c.num_need);
+    int rust_total = c.num_base > 0 ? base_sum : need_sum;
+    CHECK_EQ(rb_card_total_hearts(&c), rust_total,
+             "total_hearts is the base-heart sum and excludes blade hearts");
+    CHECK(blade_sum > 0, "the heart-map fixture really does print a blade heart");
 
-    /* Blade hearts occupy the slice after the base hearts. */
-    int blade_total = 0;
-    for (int i = c.num_base; i < c.num_base + c.num_blade && i < c.n_hearts; i++)
-        blade_total += c.heart_count[i];
+    /* HeartMap accessors (card.rs:170-223) over the base / blade sections. */
+    CHECK_EQ(rb_heartmap_len(&c, 0, c.num_base), c.num_base,
+             "HeartMap::len counts every printed base heart");
+    CHECK_EQ(rb_heartmap_is_empty(&c, 0, 0), 1, "HeartMap::is_empty is true for a zero-length slice");
+    CHECK_EQ(rb_heartmap_is_empty(&c, 0, c.num_base), 0, "a card with base hearts is not empty");
+    for (int i = 0; i < rb_heartmap_len(&c, 0, c.num_base); i++) {
+        int color = rb_heartmap_key_at(&c, 0, c.num_base, i);
+        int value = rb_heartmap_value_at(&c, 0, c.num_base, i);
+        int got = -1;
+        CHECK(rb_heartmap_contains_key(&c, 0, c.num_base, color) &&
+                  rb_heartmap_get(&c, 0, c.num_base, color, &got) && got == value,
+              "keys/values agree with get/contains_key for every base heart");
+    }
+    CHECK_EQ(rb_heartmap_get(&c, 0, c.num_base, 0x7E, &base_sum), 0,
+             "HeartMap::get misses a color the card does not print");
+    CHECK(!rb_heartmap_contains_key(&c, 0, c.num_base, 0x7E),
+          "HeartMap::contains_key misses a color the card does not print");
 
+    /* Blade hearts occupy the slice right after the base hearts. */
+    int blade_total = blade_sum;
     CHECK_EQ(rb_card_has_blade_heart_strict(&c), blade_total > 0 ? 1 : 0,
              "has_blade_heart_strict tracks the printed blade heart");
     CHECK_EQ(rb_card_has_blade_heart(&c),
@@ -371,11 +412,54 @@ static void test_heart_map_predicates(void)
              (c.has_special && c.special_color == (uint8_t)RB_HEART_SCORE) ? 1 : 0,
              "has_score_icon is true only for a printed score special heart");
     CHECK_EQ(rb_card_has_all_blade(&c),
-             (blade_total > 0 || c.has_special) ? rb_card_has_all_blade(&c) : 0,
-             "has_all_blade is false for a card with no blade heart at all");
+             rb_heartmap_contains_key(&c, c.num_base, c.num_blade, RB_HEART_ALL) ? 1 : 0,
+             "has_all_blade is exactly contains_key(All) in the blade heart map");
     CHECK_EQ(rb_card_has_blade_heart(NULL), 0, "has_blade_heart tolerates a null card");
     CHECK_EQ(rb_card_has_score_icon(NULL), 0, "has_score_icon tolerates a null card");
     CHECK_EQ(rb_card_has_all_blade(NULL), 0, "has_all_blade tolerates a null card");
+
+    /* Mutators (insert / remove / clear / entry_or_default). The map owns its
+       length, so each mutator reports the new length back. A decoded Card packs
+       base|blade|need contiguously, so a map can only grow at the tail; build a
+       tail map to exercise insert the way HeartMap::insert would. */
+    Card m;
+    memset(&m, 0, sizeof(m));
+    m.heart_color[0] = RB_HEART_PINK;  m.heart_count[0] = 2;
+    m.heart_color[1] = RB_HEART_BLUE;  m.heart_count[1] = 1;
+    m.n_hearts = 2;
+    m.num_base = 2;
+    int mlen = 2;
+    CHECK_EQ(rb_heartmap_len(&m, 0, mlen), 2, "a two-entry map reports len 2");
+    CHECK(rb_heartmap_insert(&m, 0, &mlen, 0x7E, 3),
+          "HeartMap::insert pushes a new key onto a tail map");
+    CHECK_EQ(mlen, 3, "insert grows the map by one key");
+    CHECK_EQ(rb_heartmap_len(&m, 0, mlen), 3, "the grown map reports its new length");
+    int got = 0;
+    CHECK(rb_heartmap_get(&m, 0, mlen, 0x7E, &got) && got == 3,
+          "the inserted key reads back with its value");
+    CHECK(rb_heartmap_insert(&m, 0, &mlen, 0x7E, 5), "HeartMap::insert replaces an existing key");
+    CHECK(rb_heartmap_get(&m, 0, mlen, 0x7E, &got) && got == 5, "the replaced value is visible");
+    CHECK_EQ(mlen, 3, "replacing does not grow the map");
+    CHECK_EQ(rb_heartmap_values_sum(&m, 0, mlen), 8, "values_sum tracks the mutations");
+    CHECK_EQ(rb_heartmap_entry_or_default(&m, 0, &mlen, 0x7D), 0,
+             "entry_or_default yields 0 for an absent color");
+    CHECK(rb_heartmap_contains_key(&m, 0, mlen, 0x7D),
+          "entry_or_default inserts a 0-count entry, which is then present");
+    CHECK_EQ(rb_heartmap_get(&m, 0, mlen, 0x7D, &got) && got, 1,
+             "the entry_or_default key reads back as 0");
+    rb_heartmap_remove(&m, 0, &mlen, 0x7E);
+    CHECK(!rb_heartmap_contains_key(&m, 0, mlen, 0x7E), "HeartMap::remove drops the key");
+    CHECK_EQ(mlen, 2, "remove shrinks the map by one key");
+    CHECK(rb_heartmap_contains_key(&m, 0, mlen, RB_HEART_PINK) &&
+              rb_heartmap_contains_key(&m, 0, mlen, RB_HEART_BLUE) &&
+              rb_heartmap_contains_key(&m, 0, mlen, 0x7D),
+          "remove retains every other key");
+    rb_heartmap_clear(&m, 0, &mlen);
+    CHECK(rb_heartmap_is_empty(&m, 0, mlen), "HeartMap::clear empties the map");
+    CHECK_EQ(mlen, 0, "clear leaves the map at length 0");
+    CHECK_EQ(rb_heartmap_len(NULL, 0, 2), 0, "HeartMap::len is zero for a null card");
+    CHECK_EQ(rb_heartmap_values_sum(NULL, 0, 2), 0, "values_sum is zero for a null card");
+    CHECK_EQ(rb_heartmap_key_at(&m, 0, 0, 0), -1, "keys() of an empty map has no entry 0");
     rb_free_card(&c);
 
     /* A live card falls back to its need_heart (cost hearts) for total_hearts. */
@@ -384,17 +468,69 @@ static void test_heart_map_predicates(void)
         Card l;
         memset(&l, 0, sizeof(l));
         if (rb_decode_card_by_index((uint32_t)live, &l)) {
-            int need_sum = 0;
-            for (int i = 0; i < l.num_need; i++) need_sum += l.heart_count[i];
+            int l_need = rb_heartmap_values_sum(&l, l.num_base + l.num_blade, l.num_need);
+            int l_blade = rb_heartmap_values_sum(&l, l.num_base, l.num_blade);
             if (l.num_base == 0 && l.num_need > 0) {
-                CHECK_EQ(rb_card_total_hearts(&l), need_sum,
-                         "a live card with no base hearts totals its need hearts");
+                CHECK_EQ(rb_card_total_hearts(&l), l_need,
+                         "a live card with no base hearts totals its need hearts only");
             } else {
                 CHECK(rb_card_total_hearts(&l) >= 0, "a live card reports a total heart count");
             }
+            (void)l_blade;
             rb_free_card(&l);
         }
     }
+}
+
+/* ── card_binary.rs:153-174 / card.rs:796 group derivation ── */
+static void test_card_group_derivation(void)
+{
+    struct { const char *series; const char *group; } cases[] = {
+        { "ラブライブ！", "μ's" },
+        { "ラブライブ！サンシャイン!!", "Aqours" },
+        { "ラブライブ！虹ヶ咲学園スクールアイドル同好会", "虹ヶ咲" },
+        { "ラブライブ！スーパースター!!", "Liella!" },
+        { "蓮ノ空女学院スクールアイドルクラブ", "蓮ノ空" },
+        { "ラブライブ！蓮ノ空女学院スクールアイドルクラブ", "蓮ノ空" },
+    };
+    int bad = 0;
+    for (size_t i = 0; i < sizeof(cases) / sizeof(cases[0]); i++) {
+        checks++;
+        const char *got = rb_card_series_to_group(cases[i].series);
+        if (!got || strcmp(got, cases[i].group) != 0) {
+            fprintf(stderr, "FAIL: series_to_group(%s) -> \"%s\" expected \"%s\"\n",
+                    cases[i].series, got ? got : "(null)", cases[i].group);
+            failures++;
+            bad++;
+        }
+    }
+    if (!bad) printf("ok: every mapped series resolves to its canonical group name\n");
+
+    /* Every card in the corpus must expose a group derived from its series. */
+    int empty_group = 0, mu_s = 0, nijigasaki = 0, other = 0;
+    for (uint32_t i = 0; i < rb_num_cards(); i++) {
+        const char *g = rb_card_group_name((int)i);
+        if (!g || !*g) { empty_group++; continue; }
+        if (!strcmp(g, "μ's")) mu_s++;
+        else if (!strcmp(g, "虹ヶ咲")) nijigasaki++;
+        else other++;
+    }
+    CHECK(mu_s > 0 && nijigasaki > 0,
+          "the corpus resolves to more than one derived group");
+    printf("info: derived groups — μ's=%d 虹ヶ咲=%d other=%d empty=%d\n",
+           mu_s, nijigasaki, other, empty_group);
+
+    /* The series→group path must agree with the stored group string when the
+       blob actually carries one; cards.bin carries none, so every card must
+       come from the series mapping. */
+    int consistent = 1;
+    for (uint32_t i = 0; i < rb_num_cards() && consistent; i++) {
+        const char *g = rb_card_group_name((int)i);
+        const char *stored = rb_card_string(
+            (uint16_t)(rb_card_record(i)[6] | (rb_card_record(i)[7] << 8)));
+        if (stored && *stored) { consistent = g == stored || !strcmp(g, stored); }
+    }
+    CHECK(consistent, "a stored group string, when present, wins over the series mapping");
 }
 
 /* ── card.rs:854 has_trigger, :863 triggerless_text ── */
@@ -417,20 +553,33 @@ static void test_ability_lookup(void)
     CHECK_EQ(rb_decode_card_ability((uint32_t)card, n, &ab) && n < 0, 0,
              "an out-of-range ability index does not decode");
 
-    /* Every kind reported by has_trigger must also parse out of the same text. */
-    for (int kind = 0; kind < RB_TK_COUNT; kind++) {
-        if (!rb_card_has_trigger(card, kind)) continue;
-        RbTriggerKind parsed;
-        char triggers[256];
-        memset(&triggers, 0, sizeof(triggers));
-        Ability a2;
-        memset(&a2, 0, sizeof(a2));
-        if (rb_decode_card_ability((uint32_t)card, 0, &a2) && a2.triggers)
-            snprintf(triggers, sizeof(triggers), "%s", a2.triggers);
-        rb_free_ability(&a2);
-        int matched = triggers[0] ? rb_parse_triggers(triggers, &parsed, 1) : 0;
-        CHECK(matched == 0 || parsed == (RbTriggerKind)kind,
-              "has_trigger agrees with parse_triggers for every declared kind");
+    /* rb_card_has_trigger scans EVERY ability of the card, so the comparison
+       must aggregate the trigger text of all of them (card.rs:854-858 uses
+       `.any(|k| k == kind)` over parse_triggers' full output). */
+    {
+        char triggers[1024];
+        triggers[0] = 0;
+        for (int i = 0; i < n; i++) {
+            Ability probe;
+            memset(&probe, 0, sizeof(probe));
+            if (rb_decode_card_ability((uint32_t)card, i, &probe) && probe.triggers) {
+                size_t used = strlen(triggers);
+                snprintf(triggers + used, sizeof(triggers) - used, "%s%s",
+                         used ? "," : "", probe.triggers);
+            }
+            rb_free_ability(&probe);
+        }
+        RbTriggerKind parsed[RB_TK_COUNT];
+        memset(parsed, 0, sizeof(parsed));
+        int n_parsed = triggers[0] ? rb_parse_triggers(triggers, parsed, RB_TK_COUNT) : 0;
+        int mismatch = 0;
+        for (int kind = 0; kind < RB_TK_COUNT; kind++) {
+            int listed = 0;
+            for (int k = 0; k < n_parsed; k++)
+                if (parsed[k] == (RbTriggerKind)kind) listed = 1;
+            if (rb_card_has_trigger(card, kind) != listed) mismatch = 1;
+        }
+        CHECK(!mismatch, "has_trigger agrees with parse_triggers for every kind");
     }
 
     char text[512];
@@ -496,9 +645,9 @@ static void test_card_cost_queries(void)
         Ability ab;
         memset(&ab, 0, sizeof(ab));
         if (rb_decode_card_ability(i, 0, &ab)) {
-            int found_optional = ab.cost && ab.cost->is_optional;
-            for (int k = 0; k < ab.cost ? ab.cost->n_child : 0 && !found_optional; k++)
-                if (ab.cost->child[k]->is_optional) found_optional = 1;
+            int found_optional = (ab.cost && ab.cost->is_optional) ? 1 : 0;
+            for (int k = 0; ab.cost && k < ab.cost->n_child && !found_optional; k++)
+                if (ab.cost->child[k] && ab.cost->child[k]->is_optional) found_optional = 1;
             CHECK(found_optional,
                   "has_optional_payment agrees with an optional payment in the cost tree");
         }
@@ -545,11 +694,19 @@ static void test_card_query_shapes(void)
     }
     rb_free_card(&c);
 
-    /* group filter — the member fixture is μ's, the Liella! live is not. */
-    if (member >= 0 && live >= 0) {
-        CHECK(rb_card_matches_group_str(member, "μ's"), "group filter accepts the member's own group");
-        CHECK(!rb_card_matches_group_str(live, "μ's") || !rb_card_matches_group_str(live, "Liella!"),
-              "group filter discriminates between two real groups");
+    /* Group filter (card.rs CardFilter::matches). The μ's member must be
+       accepted by the μ's filter and rejected by the Liella! filter. */
+    if (member >= 0) {
+        CHECK(rb_card_matches_group_str(member, "μ's"),
+              "group filter accepts the member's own group");
+        CHECK(!rb_card_matches_group_str(member, "Liella!"),
+              "group filter rejects a group the member does not belong to");
+    }
+    if (live >= 0) {
+        CHECK(!rb_card_matches_group_str(live, "μ's"),
+              "group filter rejects a group the live card does not belong to");
+        CHECK(rb_card_matches_group_str(live, "虹ヶ咲"),
+              "group filter accepts the live card's own group");
     }
 
     const char *all[1] = { "heart00" };
@@ -595,6 +752,7 @@ int main(void)
     test_get_card_round_trip();
     test_get_card_names();
     test_card_type_predicates();
+    test_card_group_derivation();
     test_heart_map_predicates();
     test_ability_lookup();
     test_card_cost_queries();

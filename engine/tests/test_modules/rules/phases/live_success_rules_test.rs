@@ -531,17 +531,12 @@ fn daydream_mermaid_q191_niji_in_success_pick_both() {
         game.state.player2.main_deck.cards.push(h05);
     }
 
-    // LEFT AS A PASS COUNT, deliberately. Converting this one to named phases
-    // was tried (LiveVictoryDetermination, then Active) and the expected
-    // alternative no longer appeared: this test's fixture reveals the live by
-    // pushing into the zone and then walks past several phases before inspecting
-    // the re-prompt, so the right target phase depends on details of the walk
-    // that are not yet established. A guess that reads plausibly and turns the
-    // suite red is worse than the honest pass count, so it stays and the audit
-    // keeps flagging it.
-    for _ in 0..5 {
-        game.pass();
-    }
+    // Into the live card set BY NAME. The 5-pass walk that used to be here
+    // meant "roughly at the live"; this fixture then pushes the live into the
+    // zone by hand and inspects a re-prompt, so standing in the right window
+    // matters. The two passes after the zone push stay a pass count — see the
+    // note below, they are part of the same unresolved question.
+    game.advance_to_phase(rabuka_engine::game_state::Phase::LiveCardSetFirstAttacker);
     // Manually set the live card
     game.state.player1.live_card_zone.cards.push(live);
     game.pass();

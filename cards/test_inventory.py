@@ -432,6 +432,12 @@ Q_SCAN_RE = re.compile(
     r"|pass_phase|\.pass\(\)|perform_live|ability_verdicts|drain_auto_ability_choices"
     r"|process_current_ability|set_live_card|set_energy_card|recalculate_constants"
     r"|advance_phase|ConditionContext|evaluate_condition|TurnEngine::"
+    # `advance_to_phase` steps the REAL turn through its phases, so it drives
+    # the engine exactly as `pass_phase` does. Without it a test that replaced
+    # its blind `for _ in 0..N { pass() }` walk with a named target (the
+    # blind_phase_stepping fix) was misfiled as `no_drive` — a false positive
+    # created by doing the thing this audit asks for.
+    r"|advance_to_phase|pass_into_phase_capturing_energy"
 )
 Q_SETUP_RE = re.compile(
     r"stage\.stage|energy_zone|energy_deck|main_deck|hand\.cards|waitroom\.cards|live_card_zone"

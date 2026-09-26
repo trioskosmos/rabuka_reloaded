@@ -91,6 +91,12 @@ static int look_bool(const AbilityEffect *effect, const char *key)
     return value && (!strcmp(value, "true") || !strcmp(value, "1"));
 }
 
+/* Defined further down (they need the look_* filter helpers); forward-declared
+   so the earlier executors can reuse them. */
+static int look_filter_matches(GameState *g, const AbilityEffect *effect, int cid);
+static int look_select_matches(GameState *g, const AbilityEffect *select, int cid);
+static void look_discard_unmatched(GameState *g, int owner, AbilityEffect *parent);
+
 static int look_target_player(const GameState *g, int actor, const AbilityEffect *effect)
 {
     int who = actor;
@@ -121,6 +127,39 @@ static int look_take_bottom(RbBag *bag)
 static void look_append(LookPool *pool, int cid)
 {
     if (pool->n < MAX_LOOKED) pool->cards[pool->n++] = cid;
+}
+
+/* Split a comma-separated wire list ("heart04,heart05" / "Aqours,Liella!")
+   into tokens. Mirrors how the Rust CardFilter reads its Vec<String> fields. */
+static int look_split_list(const char *value, const char **out, int max, char *buffer, size_t cap)
+{
+    int n = 0;
+    if (!value || !*value || !out || max <= 0) return 0;
+    snprintf(buffer, cap, "%s", value);
+    char *token = strtok(buffer, ",");
+    while (token && n < max) {
+        out[n++] = token;
+        token = strtok(NULL, ",");
+    }
+    return n;
+}
+
+/* look.rs::filter_select_candidates (look.rs:443-465) — the card-type plus
+   heart-colour gate shared by the looked_at arms of reveal and select.
+   An absent/empty filter accepts everything. */
+static int look_reveal_candidate_ok(const AbilityEffect *effect, int cid, const char *card_type)
+{
+    if (card_type && *card_type && !rb_card_matches_type(cid, card_type)) return 0;
+    const char *heart = look_extra(effect, "heart_colors");
+    if (!heart) heart = look_extra(effect, "heart_color");
+    if (!heart || !*heart) return 1;
+    const char *colors[8];
+    char buffer[192];
+    int n_colors = look_split_list(heart, colors, 8, buffer, sizeof(buffer));
+    if (n_colors <= 0) return 1;
+    int require_all = look_bool(effect, "require_all_heart_colors");
+    return require_all ? rb_card_matches_all_heart_colors(cid, colors, n_colors)
+                       : rb_card_matches_heart_colors(cid, colors, n_colors);
 }
 
 static void look_record_revealed(GameState *g, const int *cards, int n)
@@ -196,13 +235,49 @@ void rb_effect_select_cards(GameState *g, int actor, AbilityEffect *e){
     const char *ctype=NULL;
     for(int i=0;i<e->n_extra;i++) if(e->extra_k[i] && !strcmp(e->extra_k[i],"card_type")) ctype=e->extra_v[i];
     int cnt=e->count>=0?e->count:1;
+    /* Heart-color selection (C-port prompt shape: "pick a heart colour", not a
+       card pick). Rust's execute_select_cards has no such branch, so the
+       looked_at matching / clamping below deliberately does not apply here. */
+    int has_heart_color = 0;
+    for (int i = 0; i < e->n_extra; i++)
+        if (e->extra_k[i] && (!strcmp(e->extra_k[i], "heart_color") ||
+                              !strcmp(e->extra_k[i], "heart_colors")))
+            has_heart_color = 1;
+    if (!has_heart_color) {
+        /* look.rs:753-820 — keep every looked-at card, but restrict the
+           selectable indices to those passing the filter, and clamp the
+           offered count to the matching count. */
+        int matching[MAX_LOOKED];
+        int n_matching = 0;
+        for (int i = 0; i < lp->n; i++)
+            if (look_select_matches(g, e, lp->cards[i])) matching[n_matching++] = i;
+        if (n_matching == 0) {
+            /* look.rs:804-812 — nothing matched: discard the pool, offer
+               nothing, and return. */
+            look_discard_unmatched(g, who, NULL);
+            return;
+        }
+        int any_number = look_bool(e, "any_number");
+        if (any_number) cnt = n_matching;
+        else if (cnt > n_matching) cnt = n_matching;
+        if (cnt <= 0) return;
+        rb_emit_choice(g, actor, RB_CHOICE_SELECT_CARD, zone, ctype, cnt,
+                       e->is_optional?1:0, NULL);
+        rb_queue_pause_for_choice(g, &g->queue.pending);
+        g->queue.pending.n_filtered_indices = n_matching;
+        for (int i = 0; i < n_matching; i++)
+            g->queue.pending.filtered_indices[i] = matching[i];
+        g->queue.resume_mode = 2; g->queue.resume_eff = e; g->queue.resume_is_select = 1;
+        g->queue.resume_actor = actor;
+        g->queue.resume_host = g->queue.resume_host >= 0 ? g->queue.resume_host : actor;
+        return;
+    }
     rb_emit_choice(g, actor, RB_CHOICE_SELECT_CARD, zone, ctype, cnt, e->is_optional?1:0, NULL);
     rb_queue_pause_for_choice(g, &g->queue.pending);
     /* SelectionContext filter (ability/choice.rs): narrow the valid pool to a
         group and/or heart color so a host UI / test picks a legal card. */
     g->queue.pending.filter_group[0] = 0;
     g->queue.pending.filter_heart = -1;
-    int has_heart_color = 0;
     for(int i=0;i<e->n_extra;i++){
         if(e->extra_k[i] && !strcmp(e->extra_k[i],"group_names") && e->extra_v[i])
             strncpy(g->queue.pending.filter_group, e->extra_v[i], sizeof(g->queue.pending.filter_group)-1);
@@ -216,9 +291,6 @@ void rb_effect_select_cards(GameState *g, int actor, AbilityEffect *e){
             else if(!strcmp(hc,"all")) col=7;
             g->queue.pending.filter_heart = col;
         }
-        if (e->extra_k[i] && (!strcmp(e->extra_k[i], "heart_color") ||
-                              !strcmp(e->extra_k[i], "heart_colors")))
-            has_heart_color = 1;
     }
     /* snapshot the filter so rb_look_resume can validate after the pending choice is cleared */
     strncpy(g->queue.resume_filter_group, g->queue.pending.filter_group, sizeof(g->queue.resume_filter_group)-1);
@@ -229,29 +301,24 @@ void rb_effect_select_cards(GameState *g, int actor, AbilityEffect *e){
         Route it through the default resume branch (mode 0) so the parent's later
         siblings (the gain) run after the choice resolves — NOT the card-select
         look/keep path (mode 2). */
-    if (has_heart_color) {
-        g->queue.selected_heart_color = -1;
-        for (int i = 0; i < e->n_extra; i++) {
-            if (e->extra_k[i] && (!strcmp(e->extra_k[i], "heart_color") ||
-                                  !strcmp(e->extra_k[i], "heart_colors")) && e->extra_v[i]) {
-                int col = -1;
-                if (!strcmp(e->extra_v[i], "pink") || !strcmp(e->extra_v[i], "heart00")) col = 0;
-                else if (!strcmp(e->extra_v[i], "red") || !strcmp(e->extra_v[i], "heart01")) col = 1;
-                else if (!strcmp(e->extra_v[i], "yellow") || !strcmp(e->extra_v[i], "heart02")) col = 2;
-                else if (!strcmp(e->extra_v[i], "green") || !strcmp(e->extra_v[i], "heart03")) col = 3;
-                else if (!strcmp(e->extra_v[i], "blue") || !strcmp(e->extra_v[i], "heart04")) col = 4;
-                else if (!strcmp(e->extra_v[i], "purple") || !strcmp(e->extra_v[i], "heart05")) col = 5;
-                else if (!strcmp(e->extra_v[i], "orange") || !strcmp(e->extra_v[i], "heart06")) col = 6;
-                else if (!strcmp(e->extra_v[i], "all") || !strcmp(e->extra_v[i], "heart07") || !strcmp(e->extra_v[i], "b_all")) col = 7;
-                if (col >= 0) g->queue.selected_heart_color = col;
-            }
+    g->queue.selected_heart_color = -1;
+    for (int i = 0; i < e->n_extra; i++) {
+        if (e->extra_k[i] && (!strcmp(e->extra_k[i], "heart_color") ||
+                              !strcmp(e->extra_k[i], "heart_colors")) && e->extra_v[i]) {
+            int col = -1;
+            if (!strcmp(e->extra_v[i], "pink") || !strcmp(e->extra_v[i], "heart00")) col = 0;
+            else if (!strcmp(e->extra_v[i], "red") || !strcmp(e->extra_v[i], "heart01")) col = 1;
+            else if (!strcmp(e->extra_v[i], "yellow") || !strcmp(e->extra_v[i], "heart02")) col = 2;
+            else if (!strcmp(e->extra_v[i], "green") || !strcmp(e->extra_v[i], "heart03")) col = 3;
+            else if (!strcmp(e->extra_v[i], "blue") || !strcmp(e->extra_v[i], "heart04")) col = 4;
+            else if (!strcmp(e->extra_v[i], "purple") || !strcmp(e->extra_v[i], "heart05")) col = 5;
+            else if (!strcmp(e->extra_v[i], "orange") || !strcmp(e->extra_v[i], "heart06")) col = 6;
+            else if (!strcmp(e->extra_v[i], "all") || !strcmp(e->extra_v[i], "heart07") || !strcmp(e->extra_v[i], "b_all")) col = 7;
+            if (col >= 0) g->queue.selected_heart_color = col;
         }
-        g->queue.resume_mode = 0; g->queue.resume_is_select = 0;
-        g->queue.resume_eff = e; g->queue.resume_actor = actor; g->queue.resume_host = g->queue.resume_host >= 0 ? g->queue.resume_host : actor;
-    } else {
-        g->queue.resume_mode = 2; g->queue.resume_eff = e; g->queue.resume_is_select = 1;
-        g->queue.resume_actor = actor; g->queue.resume_host = g->queue.resume_host >= 0 ? g->queue.resume_host : actor;
     }
+    g->queue.resume_mode = 0; g->queue.resume_is_select = 0;
+    g->queue.resume_eff = e; g->queue.resume_actor = actor; g->queue.resume_host = g->queue.resume_host >= 0 ? g->queue.resume_host : actor;
 }
 
 /* Called when host resumes SELECT_CARD — move chosen card to destination.
@@ -568,8 +635,11 @@ void rb_effect_reveal(GameState *g, int actor, AbilityEffect *e) {
     if (count < 0) count = 0;
     RbPlayer *player = &g->p[who];
     const char *source = e->source && *e->source ? e->source : "hand";
+    const char *card_type = e->card_type_field[0] ? e->card_type_field
+                                                  : look_extra(e, "card_type");
     int any_number = look_bool(e, "any_number");
     int is_max = look_bool(e, "max");
+    int blind = look_bool(e, "blind");
     int is_optional = e->is_optional ? 1 : 0;
     int available = 0;
     if (!strcmp(source, "hand")) available = player->hand.n;
@@ -577,12 +647,37 @@ void rb_effect_reveal(GameState *g, int actor, AbilityEffect *e) {
     else if (!strcmp(source, "deck") || !strcmp(source, "deck_top")) available = player->deck.n;
     if ((!strcmp(source, "hand") || !strcmp(source, "looked_at")) && available > 0 &&
         (is_max || is_optional || count == 0 || count < available)) {
-        const char *card_type = e->card_type_field[0] ? e->card_type_field : look_extra(e, "card_type");
+        /* look.rs::offer_reveal_choice (look.rs:222-277) */
         rb_emit_choice(g, actor, RB_CHOICE_SELECT_CARD, source, card_type,
                        any_number ? available : count,
                        any_number || is_optional || is_max, NULL);
     g->queue.resume_look_owner = who;
     rb_queue_pause_for_choice(g, &g->queue.pending);
+        g->queue.pending.is_reveal = 1;
+        g->queue.pending.blind = blind;
+        snprintf(g->queue.pending.target_player_id,
+                 sizeof(g->queue.pending.target_player_id), "p%d", who + 1);
+        const char *cost_limit = look_extra(e, "cost_limit");
+        if (cost_limit) {
+            g->queue.pending.cost_limit = atoi(cost_limit);
+            const char *op = look_extra(e, "cost_limit_operator");
+            if (!op) op = look_extra(e, "operation");
+            if (op) snprintf(g->queue.pending.cost_limit_op,
+                             sizeof(g->queue.pending.cost_limit_op), "%s", op);
+        }
+        const char *group = look_extra(e, "group_names");
+        if (group) snprintf(g->queue.pending.filter_group,
+                            sizeof(g->queue.pending.filter_group), "%s", group);
+        const char *characters = look_extra(e, "characters");
+        if (characters) {
+            const char *names[8];
+            char buffer[256];
+            g->queue.pending.n_characters =
+                look_split_list(characters, names, 8, buffer, sizeof(buffer));
+            for (int i = 0; i < g->queue.pending.n_characters && i < 16; i++)
+                snprintf(g->queue.pending.characters[i],
+                         sizeof(g->queue.pending.characters[i]), "%s", names[i]);
+        }
         g->queue.resume_mode = 0;
         g->queue.resume_eff = e;
         g->queue.resume_is_select = 0;
@@ -596,15 +691,21 @@ void rb_effect_reveal(GameState *g, int actor, AbilityEffect *e) {
         for (int i = 0; i < player->hand.n && n_cards < RB_MAX_ZONE; i++)
             card_ids[n_cards++] = player->hand.cards[i];
     } else if (!strcmp(source, "deck") || !strcmp(source, "deck_top")) {
+        /* Peek only — the cards stay on the deck for the conditional
+           move_cards to consume (look.rs:356-362). */
         int take = count < player->deck.n ? count : player->deck.n;
         for (int i = 0; i < take && n_cards < RB_MAX_ZONE; i++)
             card_ids[n_cards++] = player->deck.cards[i];
     } else if (!strcmp(source, "looked_at")) {
+        /* look.rs:364-370 — the looked_at arm runs the type/heart filter. */
         LookPool *pool = &g_look[who];
         for (int i = 0; i < pool->n && n_cards < RB_MAX_ZONE; i++)
-            card_ids[n_cards++] = pool->cards[i];
+            if (look_reveal_candidate_ok(e, pool->cards[i], card_type))
+                card_ids[n_cards++] = pool->cards[i];
     }
-    if (!look_bool(e, "blind")) look_record_revealed(g, card_ids, n_cards);
+    /* look.rs:375-379 — `blind` only decorates the prompt; the revealed pool
+       is recorded either way. */
+    look_record_revealed(g, card_ids, n_cards);
 }
 
 /* -- execute_select -- */
@@ -613,6 +714,8 @@ void rb_effect_select(GameState *g, int actor, AbilityEffect *e) {
     if (e->target && !strcmp(e->target, "opponent")) who = actor ^ 1;
     RbPlayer *P = &g->p[who];
     const char *source = e->source ? e->source : "hand";
+    const char *card_type = e->card_type_field[0] ? e->card_type_field
+                                                  : look_extra(e, "card_type");
     int count = e->count >= 0 ? e->count : 1;
     int is_optional = e->is_optional ? 1 : 0;
     int card_ids[RB_MAX_ZONE];
@@ -639,14 +742,26 @@ void rb_effect_select(GameState *g, int actor, AbilityEffect *e) {
         for (int i = 0; i < g->n_selected_cards && n_cards < RB_MAX_ZONE; i++)
             card_ids[n_cards++] = g->selected_cards[i];
     }
+    /* look.rs:609-636 — the candidate list is narrowed by the card-type and
+       heart-colour filter before it becomes the looked-at pool. */
+    int filtered[RB_MAX_ZONE];
+    int n_filtered = 0;
+    for (int i = 0; i < n_cards; i++)
+        if (look_reveal_candidate_ok(e, card_ids[i], card_type))
+            filtered[n_filtered++] = card_ids[i];
     LookPool *lp = &g_look[who];
     lp->n = 0; lp->from_deck = 0; lp->owner = who;
-    for (int i = 0; i < n_cards && lp->n < MAX_LOOKED; i++)
-        lp->cards[lp->n++] = card_ids[i];
+    for (int i = 0; i < n_filtered && lp->n < MAX_LOOKED; i++)
+        lp->cards[lp->n++] = filtered[i];
+    /* look.rs::clamp_select_count (look.rs:471-483) — an empty pool, a zero
+       count, or a distinct shortfall offers nothing at all (Q118). */
     if (count == 0 || lp->n == 0) return;
+    if (e->distinct_flag && lp->n < count) return;
     if (count > lp->n) count = lp->n;
     rb_emit_choice(g, actor, RB_CHOICE_SELECT_CARD, source, NULL, count, is_optional, NULL);
     rb_queue_pause_for_choice(g, &g->queue.pending);
+    g->queue.pending.n_filtered_indices = lp->n;
+    for (int i = 0; i < lp->n; i++) g->queue.pending.filtered_indices[i] = i;
     g->queue.resume_mode = 2; g->queue.resume_eff = e;
     g->queue.resume_is_select = 1;
     g->queue.resume_actor = actor; g->queue.resume_host = g->queue.resume_host >= 0 ? g->queue.resume_host : actor;

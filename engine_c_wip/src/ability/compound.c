@@ -19,6 +19,10 @@
 
 /* ── Forward helpers from other subsystems ── */
 int rb_ability_debug_enabled(void);
+/* cost.c owns energy_count_any(): the Rust decoder folds both wire keys
+   "energy_count" and "energy" onto one field
+   (engine/src/ability/effect_decoder_gen.rs:164 and :226). */
+int rb_cost_energy_count_any(const AbilityEffect *e);
 
 /* extra_kv reader (mirrors effect.*_any() / compound field lookups) */
 static const char *eff_extra(const AbilityEffect *e, const char *key) {
@@ -499,8 +503,8 @@ int rb_compound_conditional_on_optional(GameState *g, int actor, const AbilityEf
     /* Q92: if optional pay_energy and insufficient active energy, skip choice and run conditional directly */
     if(optional_action && conditional_action && optional_action->action && !strcmp(optional_action->action,"pay_energy")){
         int need = optional_action->count>=0? optional_action->count : 0;
-        const char *ec = eff_extra(optional_action,"energy_count");
-        if(ec) need = atoi(ec);
+        int ec = rb_cost_energy_count_any(optional_action);
+        if (ec >= 0) need = ec;
         if(need>0){
             int active = g->p[actor].energy_active;
             /* active_count mirrors energy_zone.active_count() */

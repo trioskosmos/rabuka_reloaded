@@ -525,15 +525,16 @@ fn chisato_natsumi_blade_bonus_expires_at_live_end() {
         "bonus active right after the baton debut"
     );
 
-    // Run a full live: set a live card, pass through both live-card-set
-    // phases and the performances into victory determination.
+    // Run a full live: both live-card-set phases, both performances, into the
+    // victory determination. Named targets — the bonus this asserts expires at
+    // ライブ終了時, and "3 passes after setting" is not that moment.
     game.add_to_hand(live);
-    for _ in 0..4 {
-        game.pass();
-    }
+    game.advance_to_phase(rabuka_engine::game_state::Phase::LiveCardSetFirstAttacker);
     game.set_live_card(live);
-    for _ in 0..3 {
-        game.pass();
+    game.advance_to_phase(rabuka_engine::game_state::Phase::LiveVictoryDetermination);
+    game.advance_to_phase(rabuka_engine::game_state::Phase::Active);
+    while game.has_pending_choice() {
+        game.select_indices(&[]);
     }
 
     assert_eq!(

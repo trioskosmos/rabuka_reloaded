@@ -12,13 +12,11 @@ _test never asserts (smoke at best — cannot pin behavior)_
 
 None.
 
-## no_drive (1)
+## no_drive (0)
 
 _trigger-context test that mutates state and asserts but never drives the engine (no scan/activate/play/fire): vacuous negatives/positives_
 
-| file | test | line | detail |
-| --- | --- | --- | --- |
-| `engine/tests/test_modules/integration/pvp_room_test.rs` | `both_players_multiple_live_start_abilities_get_correct_choice_routing` | 204 |  |
+None.
 
 ## synthetic_only (0)
 
@@ -56,17 +54,11 @@ _prompts answered by ORDINAL position (if step <= 2 { select 2 cards }) instead 
 
 None.
 
-## blind_phase_stepping (5)
+## blind_phase_stepping (0)
 
 _a fixed `for _ in 0..N { pass() }` walk through the turn — a phase gaining or losing a step silently shifts the window the test thinks it is standing in; step to the phase by name instead_
 
-| file | test | line | detail |
-| --- | --- | --- | --- |
-| `engine/tests/test_modules/rules/baton/baton_touch_protected_zone_restrictions_test.rs` | `opponent_baton_touch_unaffected_by_protected_card` | 156 |  |
-| `engine/tests/test_modules/rules/baton/double_baton_touch_blade_grant_per_liella_moved_test.rs` | `chisato_natsumi_blade_bonus_expires_at_live_end` | 486 |  |
-| `engine/tests/test_modules/rules/conditions/rule_9_9_layering_test.rs` | `heart_override_additive_stacks_in_both_stage_heart_calcs` | 91 |  |
-| `engine/tests/test_modules/rules/phases/draw_phase_single_draw_no_unwanted_discards_test.rs` | `test_draw_phase_no_unwanted_discards` | 5 |  |
-| `engine/tests/test_modules/rules/phases/live_success_rules_test.rs` | `daydream_mermaid_q191_niji_in_success_pick_both` | 501 |  |
+None.
 
 ## similar_cards (20)
 

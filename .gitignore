@@ -159,6 +159,9 @@ ll_dbg.txt
 # engine_c_wip build outputs and transpiler scratch logs
 engine_c_wip/rb_engine.exe
 engine_c_wip/rb_engine_*.exe
+# Scratch probe binaries built while porting; regenerate, never commit.
+engine_c_wip/*.exe
+engine_c_wip/tests/probe_tmp.c
 engine_c_wip/*.txt
 engine_c_wip/err*.txt
 engine_c_wip/out*.txt

@@ -1585,14 +1585,8 @@ int rb_resolver_filter_discard_by_budget(RbAbilityResolver *self, GameState *g, 
    sub_choice handling. Mirrors Rust branching exactly. */
 void rb_resolver_handle_discard_selection(RbAbilityResolver *self, GameState *g, const char *selected) {
     if (!g) { rb_resolver_clear_choice_state_and_resume(self); return; }
-    fprintf(stderr, "[DISCARD_RESULT] selected=%s count=%d reprompt=%d allow_skip=%d eff=%s efftext=%s desc=%s cur=%d started=%d host=%d\n",
-            selected ? selected : "skip", g->queue.pending.count, g->queue.choice_reprompt_pending,
-            g->queue.pending.allow_skip,
-            (g->queue.resume_eff && g->queue.resume_eff->action) ? g->queue.resume_eff->action : "-",
-            (g->queue.resume_eff && g->queue.resume_eff->text) ? g->queue.resume_eff->text : "-",
-            g->queue.pending.description, g->queue.cur,
-            (g->queue.cur >= 0 && g->queue.cur < g->queue.n_entries) ? g->queue.entries[g->queue.cur].effect_started : -1,
-            g->queue.resume_host);
+    fprintf(stderr, "[DISCARD_RESULT] selected=%s count=%d reprompt=%d\n",
+            selected ? selected : "skip", g->queue.pending.count, g->queue.choice_reprompt_pending);
     int actor = g->queue.actor;
     int sel_idx = selected ? atoi(selected) : -1;
     int is_skip = (sel_idx < 0);
@@ -2615,6 +2609,30 @@ static int rb_resume_with_choice_indices_internal(GameState *g, const int *selec
             rb_resolver_continue_siblings(g, actor, host, cont, cont_from);
             return 1;
         }
+        /* Faithful port of Rust dispatch_choice_result
+           (engine/src/ability/choice/result_handlers.rs:204-226):
+             (SelectCard{count:0, allow_skip:true}, Skip) => handle_any_number_skip
+             (SelectCard{..} | SelectTarget{..}, Skip)       => handle_general_skip
+             (SelectCard{..}, CardSelected{..})              => handle_select_card
+           A Skip on a SelectCard therefore NEVER reaches handle_select_card /
+           handle_discard_selection: handle_general_skip (result_handlers.rs:78-86)
+           takes the pending actions, clears the choice state and resumes execution.
+           Without this, a skip on a MANDATORY (allow_skip=false) discard-zone
+           SelectCard re-entered handle_discard_selection, whose "an empty pick
+           must re-offer" branch (choice.rs:2346-2371) rebuilt the same pending
+           choice forever, so rb_resume_with_choice(state, -1) never converged. */
+        if (was_skip && kind == RB_CHOICE_SELECT_CARD &&
+            !(saved_pending.count == 0 && saved_pending.allow_skip)) {
+            rb_queue_take_pending_actions(g);
+            rb_resolver_clear_choice_state(&self);
+            rb_resolver_resume_execution(&self);
+            goto choice_resume_tail;
+        }
+        if (was_skip && kind == RB_CHOICE_SELECT_CARD) {
+            /* handle_any_number_skip (result_handlers.rs:67-72) */
+            rb_resolver_clear_choice_state_and_resume(&self);
+            goto choice_resume_tail;
+        }
         switch (kind) {
         case RB_CHOICE_SELECT_CARD: {
             g->queue.pending = saved_pending;
@@ -2720,6 +2738,7 @@ static int rb_resume_with_choice_indices_internal(GameState *g, const int *selec
             break;
         }
     }
+choice_resume_tail:
     /* continue resolving any queued trigger/auto abilities. The mode switch above
         set state = RB_QUEUE_RESOLVING, which makes rb_drain_ability_queue a no-op
         (re-entrancy guard). Normalize the state so this top-level drain actually

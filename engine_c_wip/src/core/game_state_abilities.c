@@ -54,6 +54,28 @@ uint64_t rb_opp_cause_key(uint32_t num_key, int moved_card_id, uint16_t seq) {
 /* Mirror abilities.rs::opponent_id */
 int rb_opponent_id(int pl) { return pl ? 0 : 1; }
 
+/* Defined in src/core/zones.c / src/core/card.c; declared locally because
+   include/rabuka.h does not export them (same pattern as
+   rb_card_fires_on_opponent_effects below). */
+extern int rb_check_effect_position(const char *effect_pos, int card_position);
+extern const char *rb_effect_position_any(const AbilityEffect *e);
+extern int rb_card_fires_on_opponent_effects(int card_id);
+
+/* Resolve a card_no string to its interned string index. The player-zone
+   lookups (`rb_search_player_zones_for_card` / `rb_find_card_by_number_for_player`)
+   compare `Card.card_no_idx`, so a textual card number must be interned first.
+   Mirrors Rust's `card_no.as_str()` comparisons in abilities.rs:1074. */
+static int rb_intern_card_no(const char *card_no) {
+    if (!card_no) return -1;
+    int tmpl = rb_find_card_by_no(card_no);
+    if (tmpl < 0) return -1;
+    Card c;
+    if (!rb_decode_card_by_index((uint32_t)tmpl, &c)) return -1;
+    int idx = (int)c.card_no_idx;
+    rb_free_card(&c);
+    return idx;
+}
+
 /* ── Constant-modifier application ─────────────────────────────────── */
 
 static void apply_constant_node(RbMods *m, int cid, const AbilityEffect *e) {
@@ -397,6 +419,37 @@ static const char *rb_cond_get_str(const Condition *c, const char *key) {
     return NULL;
 }
 
+/* Integer-valued condition field (wire tag I64), with a fallback for the
+   string-encoded numbers some conditions carry. `def` is returned when the
+   field is absent. Mirrors Rust's `Condition::get_count() -> Option<u8>`. */
+static int rb_cond_get_int(const Condition *c, const char *key, int def) {
+    if (!c) return def;
+    for (uint32_t i = 0; i < c->n_fields; i++) {
+        if (!c->fields[i].key || strcmp(c->fields[i].key, key)) continue;
+        if (c->fields[i].v.tag == RB_TAG_I64) return (int)c->fields[i].v.i;
+        if (c->fields[i].v.tag == RB_TAG_STR && c->fields[i].v.s)
+            return atoi(c->fields[i].v.s);
+    }
+    return def;
+}
+
+/* Boolean-valued condition field (wire tag TRUE, or the string "true").
+   Mirrors Rust's `Condition::get_self_target() -> Option<bool>`, which the
+   TAS movement gate (abilities.rs:614) and §9.7.2.1 (abilities.rs:941) read. */
+static int rb_cond_get_bool(const Condition *c, const char *key, int def) {
+    if (!c) return def;
+    for (uint32_t i = 0; i < c->n_fields; i++) {
+        if (!c->fields[i].key || strcmp(c->fields[i].key, key)) continue;
+        const CondValue *v = &c->fields[i].v;
+        if (v->tag == RB_TAG_TRUE) return 1;
+        if (v->tag == RB_TAG_FALSE) return 0;
+        if (v->tag == RB_TAG_I64) return v->i != 0;
+        if (v->tag == RB_TAG_STR && v->s)
+            return !strcmp(v->s, "true") || !strcmp(v->s, "yes") || !strcmp(v->s, "1");
+    }
+    return def;
+}
+
 static int rb_condition_tree_has_text(const Condition *c, const char *needle) {
     if (!c || !needle) return 0;
     const char *t = rb_cond_get_str(c, "text");
@@ -530,25 +583,42 @@ int rb_queue_yell_auto_abilities(GameState *g, int pl) {
     return queued;
 }
 
-/* Mirror abilities.rs::condition_tree_group_names — first non-empty group filter. */
-static const char *rb_condition_tree_group_names(const Condition *c) {
-    if (!c) return NULL;
-    const char *g = rb_cond_get_str(c, "group_names");
-    if (g && g[0]) return g;
+/* Mirror abilities.rs::condition_tree_group_names — first non-empty group
+   filter. `group_names` arrives on the wire as an ARRAY of strings, so the
+   scalar `rb_cond_get_str` never sees it; collect the members instead. */
+#define RB_MAX_GROUP_NAMES 8
+static int rb_condition_tree_group_names(const Condition *c, const char **out, int max) {
+    if (!c || !out || max <= 0) return 0;
+    for (uint32_t i = 0; i < c->n_fields; i++) {
+        const CondField *f = &c->fields[i];
+        if (!f->key || strcmp(f->key, "group_names")) continue;
+        if (f->v.tag == RB_TAG_STR && f->v.s && f->v.s[0]) {
+            if (max > 0) { out[0] = f->v.s; return 1; }
+            return 0;
+        }
+        if (f->v.tag == RB_TAG_ARRAY) {
+            int n = 0;
+            for (uint32_t j = 0; j < f->v.arr_n && n < max; j++)
+                if (f->v.arr[j].tag == RB_TAG_STR && f->v.arr[j].s && f->v.arr[j].s[0])
+                    out[n++] = f->v.arr[j].s;
+            if (n > 0) return n;
+        }
+    }
     for (uint32_t i = 0; i < c->n_fields; i++) {
         const CondValue *dv = &c->fields[i].v;
         if (dv->tag == RB_TAG_OBJVAR && dv->cond) {
-            const char *rg = rb_condition_tree_group_names(dv->cond);
-            if (rg) return rg;
+            int n = rb_condition_tree_group_names(dv->cond, out, max);
+            if (n) return n;
         }
-        if (dv->tag == RB_TAG_ARRAY)
+        if (dv->tag == RB_TAG_ARRAY) {
             for (uint32_t j = 0; j < dv->arr_n; j++)
                 if (dv->arr[j].tag == RB_TAG_OBJVAR && dv->arr[j].cond) {
-                    const char *rg = rb_condition_tree_group_names(dv->arr[j].cond);
-                    if (rg) return rg;
+                    int n = rb_condition_tree_group_names(dv->arr[j].cond, out, max);
+                    if (n) return n;
                 }
+        }
     }
-    return NULL;
+    return 0;
 }
 
 static int rb_effect_is_ability_resolution_watcher(const AbilityEffect *e) {
@@ -566,30 +636,30 @@ static int rb_effect_is_ability_resolution_watcher(const AbilityEffect *e) {
 static int rb_trigger_instance_count(const int *moved_cards, int n_moved,
                                      const AbilityEffect *effect,
                                      const GameState *g) {
+    (void)g;
+    if (!effect) return 1;
     const Condition *condition = effect->condition;
     if (!condition) return 1;
     if (condition->variant != RB_COND_LOCATION) return 1;
     const char *src = rb_cond_get_str(condition, "source");
     if (!src || strcmp(src, "preceding_moved") != 0) return 1;
+    const char *ct = rb_cond_get_str(condition, "card_type");
+    const char *hc = rb_cond_get_str(condition, "heart_colors");
     int matching = 0;
     for (int i = 0; i < n_moved; i++) {
         int cid = moved_cards[i];
         if (cid < 0) continue;
-        const char *ct = rb_cond_get_str(condition, "card_type");
         if (ct && !rb_card_matches_type(cid, ct)) continue;
-        const char *hc = rb_cond_get_str(condition, "heart_colors");
         if (hc && hc[0] && !rb_card_matches_heart_colors(cid, (const char **)&hc, 1)) continue;
         matching++;
     }
     if (matching <= 1) return matching;
-    const char *ct = rb_cond_get_str(condition, "text");
-    if (ct && (strstr(ct, "すべて") || strstr(ct, "全て") || strstr(ct, "全部"))) return 1;
-    if (ct && (strstr(ct, "1枚以上") || strstr(ct, "1つ以上"))) return 1;
-    if (rb_cond_get_str(condition, "count") && !strcmp(rb_cond_get_str(condition, "operator"), ">=")) return 1;
-    int self_target = 0;
-    const char *st = rb_cond_get_str(condition, "self_target");
-    if (st && !strcmp(st, "true")) self_target = 1;
-    if (self_target) return 1;
+    /* abilities.rs:938 -- "count == 1 && operator >=" is a batch pattern. */
+    int count = rb_cond_get_int(condition, "count", -1);
+    const char *op = rb_cond_get_str(condition, "operator");
+    if (count == 1 && op && !strcmp(op, ">=")) return 1;
+    /* abilities.rs:941-942 */
+    if (rb_cond_get_bool(condition, "self_target", 0)) return 1;
     return matching;
 }
 
@@ -971,6 +1041,23 @@ static void rb_build_ability_queue_entry(GameState *g, int card_id, int ability_
 
 /* ── Trigger auto ability (string-keyed) ────────────────────────────── */
 
+/* Mirror abilities.rs:1083-1085 --
+       let requested_text = ability_id
+           .strip_prefix(card_no.as_str())
+           .and_then(|suffix| suffix.strip_prefix('_'));
+   i.e. the key matches when ability_id is exactly "<card_no>_<full_text>".
+   Comparing the suffix directly avoids the fixed-buffer truncation a
+   snprintf-built "<card_no>_<full_text>" would suffer for long ability text. */
+static int par_ability_id_matches(const char *ability_id, const char *card_no,
+                                  const char *full_text)
+{
+    if (!ability_id || !card_no || !full_text) return 0;
+    size_t n = strlen(card_no);
+    if (strncmp(ability_id, card_no, n) != 0) return 0;
+    if (ability_id[n] != '_') return 0;
+    return strcmp(ability_id + n + 1, full_text) == 0;
+}
+
 void rb_trigger_auto_ability(GameState *g, const char *ability_id,
                              const char *trigger_type, int player_id,
                              const char *source_card_no,
@@ -978,23 +1065,36 @@ void rb_trigger_auto_ability(GameState *g, const char *ability_id,
                              const int *trigger_moved_cards, int n_moved,
                              int triggering_member_id) {
     if (!g || !ability_id) return;
+    /* abilities.rs:1074 -- the entire body lives inside
+       `if let Some(ref card_no) = source_card_id`. With no source card number
+       there is nothing to strip the ability_id prefix from, so Rust enqueues
+       nothing at all. Mirror that instead of scanning with an empty card_no. */
+    if (!source_card_no) return;
+    const char *card_no = source_card_no;
     int cid = explicit_card_id;
-    if (cid < 0 && source_card_no) {
+    if (cid < 0) {
+        /* abilities.rs:1078 -- resolve the instance through the player's zones
+           using the SOURCE card number (not a zero index). */
+        int no_idx = rb_intern_card_no(card_no);
+        if (no_idx < 0) return;
         int found = -1;
-        if (rb_find_card_by_number_for_player(g, player_id, 0, &found) > 0)
+        if (rb_find_card_by_number_for_player(g, player_id, no_idx, &found) > 0)
             cid = found;
     }
     if (cid < 0) return;
-    const char *card_no = source_card_no ? source_card_no : "";
     const char *pid_str = (player_id == 0) ? "p1" : "p2";
     int nab = rb_card_num_abilities((uint32_t)cid);
     for (int a = 0; a < nab; a++) {
         Ability ab;
         if (!rb_decode_card_ability((uint32_t)cid, a, &ab)) continue;
-        if (!rb_ability_matches_trigger(&ab, "自動")) { rb_free_ability(&ab); continue; }
-        char expected_id[256];
-        snprintf(expected_id, sizeof(expected_id), "%s_%s", card_no, ab.full_text ? ab.full_text : "");
-        if (strcmp(expected_id, ability_id) == 0) {
+        /* abilities.rs:1088-1090 -- the ability must carry the requested
+           trigger AND the card must not be invalidated for it. */
+        if (!rb_ability_matches_trigger(&ab, trigger_type ? trigger_type : "自動") ||
+            rb_ability_is_invalidated(g, cid, trigger_type ? trigger_type : "自動")) {
+            rb_free_ability(&ab);
+            continue;
+        }
+        if (par_ability_id_matches(ability_id, card_no, ab.full_text)) {
             rb_build_ability_queue_entry(g, cid, a, card_no, pid_str,
                                         trigger_type, trigger_moved_cards, n_moved, triggering_member_id);
             rb_free_ability(&ab);
@@ -1008,12 +1108,13 @@ void rb_trigger_auto_ability(GameState *g, const char *ability_id,
         for (int gidx = 0; gidx < ng; gidx++) {
             const Ability *gab = rb_card_gained_ability_internal(g, (uint32_t)cid, gidx);
             if (!gab) continue;
-            if (!rb_ability_matches_trigger(gab, "自動")) continue;
-            char expected_id[256];
+            /* abilities.rs:1140-1144 -- gained abilities honour both the
+               trigger match and the invalidation gate. */
+            if (!rb_ability_matches_trigger(gab, trigger_type ? trigger_type : "自動")) continue;
+            if (rb_ability_is_invalidated(g, cid, trigger_type ? trigger_type : "自動")) continue;
+            char expected_id[1024];
             snprintf(expected_id, sizeof(expected_id), "%s_gained_%d", card_no, gidx);
-            if (strcmp(expected_id, ability_id) == 0) {
-                Ability ab_copy = *gab;
-                int idx = g->queue.n_entries;
+            if (strcmp(expected_id, ability_id) == 0) {                int idx = g->queue.n_entries;
                 if (idx < RB_QUEUE_DEPTH) {
                     RbQueueEntry *e = &g->queue.entries[idx];
                     memset(e, 0, sizeof(*e));
@@ -1043,6 +1144,11 @@ void rb_trigger_auto_ability_by_index(GameState *g, int trigger_type,
                                       const int *trigger_moved_cards, int n_moved,
                                       int triggering_member_id) {
     if (!g || explicit_card_id < 0) return;
+    /* abilities.rs:1206 -- an invalidated card never enqueues. */
+    {
+        const char *tt = rb_trigger_kind_to_token(trigger_type);
+        if (rb_ability_is_invalidated(g, explicit_card_id, tt)) return;
+    }
     int nab = rb_card_num_abilities((uint32_t)explicit_card_id);
     if (ability_index < 0 || ability_index >= nab) return;
     Ability ab;
@@ -1060,7 +1166,7 @@ void rb_trigger_auto_ability_by_index(GameState *g, int trigger_type,
 static int queue_zone_abilities(GameState *g, int actor, const int *ids, int n,
                                 const char *trigger, const int *moved_cards, int n_moved,
                                 int position_change, int energy_placed,
-                                int check_discard_guard) {
+                                int check_discard_guard, int is_stage) {
     int queued = 0;
     const char *pid = (actor == 0) ? "player1" : "player2";
     for (int i = 0; i < n; i++) {
@@ -1070,6 +1176,16 @@ static int queue_zone_abilities(GameState *g, int actor, const int *ids, int n,
         for (int a = 0; a < nab; a++) {
             Ability ab;
             if (!rb_decode_card_ability((uint32_t)cid, a, &ab)) continue;
+            /* abilities.rs:471-479 -- the stage scan gates every ability on the
+               card's activation position ("position" on the effect, e.g. a
+               centre-only watcher). `is_stage` mirrors the fact that Rust only
+               performs this check in the stage loop (live/moved scans have no
+               card position). */
+            if (is_stage && ab.effect &&
+                !rb_check_effect_position(rb_effect_position_any(ab.effect), i)) {
+                rb_free_ability(&ab);
+                continue;
+            }
             if (!rb_ability_matches_trigger(&ab, trigger) ||
                 rb_ability_is_invalidated(g, cid, trigger)) {
                 rb_free_ability(&ab);
@@ -1122,16 +1238,16 @@ static int queue_zone_abilities(GameState *g, int actor, const int *ids, int n,
                     }
                 }
             }
-            /* Movement gate: "moved" self_target + single-location requires card in moved_cards */
+            /* Movement gate: "moved" self_target + single-location requires card in
+               moved_cards (abilities.rs:612-622). `self_target` is a wire BOOLEAN,
+               not a string, so it must be read as one. */
             if (ab.effect && ab.effect->condition) {
                 const char *mov = rb_cond_get_str(ab.effect->condition, "movement");
-                int self_target = 0;
-                const char *st = rb_cond_get_str(ab.effect->condition, "self_target");
-                if (st && !strcmp(st, "true")) self_target = 1;
-                if (mov && !strcmp(mov, "moved") && self_target) {
+                if (mov && !strcmp(mov, "moved") &&
+                    rb_cond_get_bool(ab.effect->condition, "self_target", 0)) {
                     int in_batch = 0;
                     for (int m = 0; m < n_moved; m++)
-                        if (moved_cards[m] == cid) { in_batch = 1; break; }
+                        if (moved_cards && moved_cards[m] == cid) { in_batch = 1; break; }
                     if (!in_batch) { rb_free_ability(&ab); continue; }
                 }
             }
@@ -1146,10 +1262,21 @@ static int queue_zone_abilities(GameState *g, int actor, const int *ids, int n,
                 int cap = (int)(sizeof(g->batch_triggered_keys)/sizeof(g->batch_triggered_keys[0]));
                 if (g->n_batch_triggered_keys < cap)
                     g->batch_triggered_keys[g->n_batch_triggered_keys++] = key;
-                rb_build_ability_queue_entry(g, cid, a, "", pid, trigger,
-                                            moved_cards, n_moved, -1);
+                /* abilities.rs:594-598 + :676-678 -- §9.7.2.1: a
+                   `preceding_moved` card_count condition creates one standby
+                   entry PER matching moved card; every other shape creates a
+                   single entry. */
+                int mult = ab.effect
+                    ? rb_trigger_instance_count(moved_cards, n_moved, ab.effect, g)
+                    : 1;
+                if (mult < 0) mult = 0;
+                for (int rep = 0; rep < mult; rep++) {
+                    if (g->queue.n_entries >= RB_QUEUE_DEPTH) break;
+                    rb_build_ability_queue_entry(g, cid, a, "", pid, trigger,
+                                                moved_cards, n_moved, -1);
+                    queued++;
+                }
                 rb_record_use(&g->queue, cid, a, g->turn);
-                queued++;
             }
             rb_free_ability(&ab);
         }
@@ -1242,8 +1369,7 @@ void rb_fire_opponent_cause_watchers_for_move(GameState *g, int moved_card_id,
                     && ab.effect->extra_v[k] && !strcmp(ab.effect->extra_v[k], "true"))
                     fires_opp = 1;
             extern int rb_card_fires_on_opponent_effects(int card_id);
-            if (!fires_opp && rb_card_fires_on_opponent_effects(watcher_id))
-                fires_opp = 1;
+            if (!fires_opp && rb_card_fires_on_opponent_effects(watcher_id))                fires_opp = 1;
             if (!fires_opp) { rb_free_ability(&ab); continue; }
             if (!ab.effect->condition) { rb_free_ability(&ab); continue; }
             int passes = rb_eval_condition_for_host(g, owner, watcher_id, ab.effect->condition);
@@ -1292,9 +1418,18 @@ void rb_trigger_each_time_for_member(GameState *g, int pl,
             if (!tt || strcmp(tt, "each_time") != 0) { rb_free_ability(&ab); continue; }
             const char *watch_text = ab.effect->condition ? rb_cond_get_str(ab.effect->condition, "text") : ab.effect->text;
             if (!watch_text || !strstr(watch_text, trigger_substring)) { rb_free_ability(&ab); continue; }
-            const char *groups = rb_condition_tree_group_names(ab.effect->condition);
-            if (groups && groups[0]) {
-                int member_matches = rb_card_matches_group_str(member_card_id, groups);
+            /* abilities.rs:1393-1400 -- the triggering member must satisfy the
+               watcher's GROUP filter; Rust accepts ANY of the listed groups. */
+            const char *groups[RB_MAX_GROUP_NAMES];
+            int n_groups = rb_condition_tree_group_names(ab.effect->condition,
+                                                         groups, RB_MAX_GROUP_NAMES);
+            if (n_groups > 0) {
+                int member_matches = 0;
+                for (int gi = 0; gi < n_groups; gi++)
+                    if (rb_card_matches_group_str(member_card_id, groups[gi])) {
+                        member_matches = 1;
+                        break;
+                    }
                 if (!member_matches) { rb_free_ability(&ab); continue; }
             }
             rb_build_ability_queue_entry(g, cid, a, "", (pl == 0) ? "p1" : "p2", "自動", NULL, 0, member_card_id);
@@ -1315,15 +1450,15 @@ int rb_trigger_auto_abilities_for_player_with_event(GameState *g, int pl,
     const RbPlayer *P = &g->p[pl];
     int queued = 0;
     queued += queue_zone_abilities(g, pl, P->stage, RB_STAGE_SIZE, "自動",
-                                   moved_cards, n_moved, position_change, energy_placed, 1);
+                                   moved_cards, n_moved, position_change, energy_placed, 1, 1);
     queued += queue_zone_abilities(g, pl, P->success.cards, P->success.n, "自動",
-                                   moved_cards, n_moved, position_change, energy_placed, 0);
+                                   moved_cards, n_moved, position_change, energy_placed, 0, 0);
     queued += queue_zone_abilities(g, pl, P->live.cards, P->live.n, "自動",
-                                   moved_cards, n_moved, position_change, energy_placed, 0);
+                                   moved_cards, n_moved, position_change, energy_placed, 0, 0);
     queued += queue_zone_abilities(g, pl, P->hand.cards, P->hand.n, "自動",
-                                   moved_cards, n_moved, position_change, energy_placed, 0);
+                                   moved_cards, n_moved, position_change, energy_placed, 0, 0);
     queued += queue_zone_abilities(g, pl, P->energy.cards, P->energy.n, "自動",
-                                   moved_cards, n_moved, position_change, energy_placed, 0);
+                                   moved_cards, n_moved, position_change, energy_placed, 0, 0);
     queued += queue_moved_cards_abilities(g, moved_cards, n_moved, "自動",
                                           (pl == 0) ? "p1" : "p2",
                                           position_change, energy_placed);
@@ -1464,6 +1599,83 @@ static int rb_process_current_ability(GameState *g) {
     return 1;
 }
 
+/* ── Rule 9.5.3.2 ordering prompt ───────────────────────────────────── */
+
+/* Defined in src/ability/ability_queue.c; not exported by include/rabuka.h. */
+extern int  rb_queue_is_entry_available(const GameState *g, int idx);
+extern const char *rb_queue_entry_player_id(const GameState *g, int index);
+extern void rb_queue_pause_for_auto_ability_choice(GameState *g, const RbChoice *choice);
+
+/* abilities.rs:1473-1527 -- collect the queue indices that are (a) still
+   available and (b) owned by `pl`, up to `pre_len`. */
+static int par_available_for(const GameState *g, int pl, int pre_len,
+                             int *out, int max)
+{
+    const char *pid = (pl == 0) ? "p1" : "p2";
+    int n = 0;
+    for (int i = 0; i < pre_len && i < g->queue.n_entries && n < max; i++) {
+        if (!rb_queue_is_entry_available(g, i)) continue;
+        const char *owner = rb_queue_entry_player_id(g, i);
+        if (!owner) continue;
+        if (strcmp(owner, pid) != 0) continue;
+        out[n++] = i;
+    }
+    return n;
+}
+
+/* Stable-compact the player's available entries to the front of the queue so
+   the flat RbChoice resume path (rb_resolver_handle_auto_ability_selection,
+   which swaps `cur + option`) addresses real slots. Rust carries an explicit
+   `queue_index` per SelectAutoAbility option; the C choice record has no
+   option list, so compaction reproduces the same addressing. */
+static void par_compact_available(GameState *g, int pl, int *avail, int n_avail)
+{
+    if (n_avail < 2) return;
+    RbQueueEntry picked[RB_QUEUE_DEPTH];
+    for (int i = 0; i < n_avail; i++) picked[i] = g->queue.entries[avail[i]];
+    int taken[RB_QUEUE_DEPTH];
+    for (int i = 0; i < RB_QUEUE_DEPTH; i++) taken[i] = 0;
+    for (int i = 0; i < n_avail; i++) taken[avail[i]] = 1;
+    /* Park the non-offered entries at the tail, preserving their order. */
+    RbQueueEntry rest[RB_QUEUE_DEPTH];
+    int n_rest = 0;
+    for (int i = 0; i < g->queue.n_entries && n_rest < RB_QUEUE_DEPTH; i++)
+        if (!taken[i]) rest[n_rest++] = g->queue.entries[i];
+    for (int i = 0; i < n_avail; i++) g->queue.entries[i] = picked[i];
+    for (int i = 0; i < n_rest; i++) g->queue.entries[n_avail + i] = rest[i];
+}
+
+/* abilities.rs:1494-1527 -- when a second standby ability is available for
+   the same player, Rule 9.5.3.2 requires the player to pick the resolution
+   order. Returns 1 when the prompt was raised. */
+static int par_prompt_auto_ability_order(GameState *g, int pl, int pre_len)
+{
+    int avail[RB_QUEUE_DEPTH];
+    int n = par_available_for(g, pl, pre_len, avail, RB_QUEUE_DEPTH);
+    if (n < 2) return 0;
+    par_compact_available(g, pl, avail, n);
+    RbChoice ch;
+    memset(&ch, 0, sizeof(ch));
+    ch.kind = RB_CHOICE_SELECT_AUTO_ABILITY;
+    ch.count = n;
+    ch.actor = pl;
+    snprintf(ch.target, sizeof(ch.target), "%s", (pl == 0) ? "p1" : "p2");
+    snprintf(ch.zone, sizeof(ch.zone), "ability_queue");
+    snprintf(ch.card_type, sizeof(ch.card_type), "auto_ability");
+    /* abilities.rs:1519 */
+    snprintf(ch.description, sizeof(ch.description),
+             "複数の自動能力が同時に発動しました。使用する順番を選択してください。");
+    snprintf(ch.description_en, sizeof(ch.description_en),
+             "Multiple auto abilities triggered simultaneously. "
+             "Choose the order to use them.");
+    snprintf(ch.description_ja, sizeof(ch.description_ja),
+             "複数の自動能力が同時に発動しました。使用する順番を選択してください。");
+    ch.route = RB_ROUTE_NONE;
+    g->queue.cur = 0;
+    rb_queue_pause_for_auto_ability_choice(g, &ch);
+    return 1;
+}
+
 int rb_process_player_abilities(GameState *g, int pl) {
     if (!g) return 0;
     if (g->queue.has_pending) return 0;
@@ -1471,12 +1683,37 @@ int rb_process_player_abilities(GameState *g, int pl) {
     g->queue.actor = pl;
     g->queue.state = RB_QUEUE_RESOLVING;
 
-    while (g->queue.cur < g->queue.n_entries) {
-        if (rb_process_current_ability(g)) processed++;
+    /* abilities.rs:1458-1610 -- resolve the player's standby abilities, taking
+       the first available entry each pass so entries queued by the current
+       resolution are drained depth-first (the `pre_len` cutoff is implicit:
+       every available entry is considered, oldest first). The guard mirrors
+       Rust's PCA drain/reprocess limits and keeps a misbehaving effect from
+       spinning here forever. */
+    for (int guard = 0; guard < 200; guard++) {
+        int pre_len = g->queue.n_entries;
+        int avail[RB_QUEUE_DEPTH];
+        int n_avail = par_available_for(g, pl, pre_len, avail, RB_QUEUE_DEPTH);
+        if (n_avail == 0) break;
+        if (n_avail > 1) {
+            if (par_prompt_auto_ability_order(g, pl, pre_len)) {
+                g->queue.state = RB_QUEUE_AWAITING_CHOICE;
+                return processed;
+            }
+            n_avail = par_available_for(g, pl, pre_len, avail, RB_QUEUE_DEPTH);
+            if (n_avail == 0) break;
+        }
+        int idx = avail[0];
+        g->queue.cur = (uint8_t)idx;
+        g->queue.state = RB_QUEUE_IDLE;
+        rb_process_current_ability(g);
         if (g->queue.has_pending) {
             g->queue.state = RB_QUEUE_AWAITING_CHOICE;
             break;
         }
+        /* Rust's resolve_ability -> ability_queue.complete_current() marks the
+           standby entry done; without it the next pass would re-resolve it. */
+        if (idx >= 0 && idx < g->queue.n_entries) g->queue.entries[idx].completed = 1;
+        processed++;
     }
 
     if (!g->queue.has_pending) {
@@ -1698,27 +1935,27 @@ int rb_queue_trigger_abilities(GameState *g, int pl, const char *trigger) {
                                   g->recently_moved, g->n_recently_moved,
                                   g->position_change_occurred_this_turn,
                                   g->last_energy_placed_by_effect,
-                                  1);
+                                  1, 1);
     total += queue_zone_abilities(g, pl, P->success.cards, P->success.n, trigger,
                                   g->recently_moved, g->n_recently_moved,
                                   g->position_change_occurred_this_turn,
                                   g->last_energy_placed_by_effect,
-                                  0);
+                                  0, 0);
     total += queue_zone_abilities(g, pl, P->live.cards, P->live.n, trigger,
                                   g->recently_moved, g->n_recently_moved,
                                   g->position_change_occurred_this_turn,
                                   g->last_energy_placed_by_effect,
-                                  0);
+                                  0, 0);
     total += queue_zone_abilities(g, pl, P->hand.cards, P->hand.n, trigger,
                                   g->recently_moved, g->n_recently_moved,
                                   g->position_change_occurred_this_turn,
                                   g->last_energy_placed_by_effect,
-                                  0);
+                                  0, 0);
     total += queue_zone_abilities(g, pl, P->energy.cards, P->energy.n, trigger,
                                   g->recently_moved, g->n_recently_moved,
                                   g->position_change_occurred_this_turn,
                                   g->last_energy_placed_by_effect,
-                                  0);
+                                  0, 0);
     total += queue_moved_cards_abilities(g, g->recently_moved, g->n_recently_moved,
                                          trigger, (pl == 0) ? "p1" : "p2",
                                          g->position_change_occurred_this_turn,

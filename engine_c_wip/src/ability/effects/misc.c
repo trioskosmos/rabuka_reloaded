@@ -46,6 +46,38 @@ static int extra_int(const AbilityEffect *e, const char *k, int dflt){
     return atoi(v);
 }
 
+/* Split a decoded `heart_colors` array extra into parsed HeartColor values.
+   The decoder serializes an ARRAY of strings as CSV and quotes any element
+   that contains a comma/quote (see decode_extra_value in vm.c), so strip
+   those quotes here. Returns the number of entries written to `out`. */
+static int split_heart_colors(const char *csv, int *out, int max){
+    if(!csv || !*csv || max<=0) return 0;
+    char buf[256];
+    size_t len = strlen(csv);
+    if(len >= sizeof buf) len = sizeof buf - 1;
+    memcpy(buf, csv, len);
+    buf[len] = 0;
+    int n = 0;
+    char *p = buf;
+    while(*p && n < max){
+        while(*p==',' || *p==' ' || *p=='\t') p++;
+        if(!*p) break;
+        int quoted = (*p=='"');
+        if(quoted) p++;
+        char tok[64];
+        int ti = 0;
+        while(*p && ti < (int)sizeof tok - 1){
+            if(quoted && *p=='"'){ p++; break; }
+            if(!quoted && *p==',') break;
+            if(!quoted && (*p==' ' || *p=='\t')){ p++; continue; }
+            tok[ti++] = *p++;
+        }
+        tok[ti] = 0;
+        if(ti) out[n++] = (int)rb_parse_heart_color(tok);
+    }
+    return n;
+}
+
 #define RB_RES_OTHER 0
 #define RB_RES_BLADE 1
 #define RB_RES_HEART  2
@@ -328,8 +360,19 @@ static void resolve_gain_resource_targets(GameState *g, int who,
     if(g->queue.selected_heart_color >= 0)
         out->heart_color = g->queue.selected_heart_color;
     else {
+        /* Rust resolve_gain_resource_targets (misc.rs:1811-1814) resolves the
+           color as single_fixed_heart (the answer to a preceding heart-color
+           choice) -> effect.heart_color -> first entry of effect.heart_colors.
+           The last rung was missing, so an effect carrying only a
+           multi-element `heart_colors` array fell through to the wildcard. */
         const char *hc = eff_extra(e,"heart_color");
-        if(hc) out->heart_color = (int)rb_parse_heart_color(hc);
+        if(hc){
+            out->heart_color = (int)rb_parse_heart_color(hc);
+        } else {
+            int first[8];
+            if(split_heart_colors(eff_extra(e,"heart_colors"), first, 8) > 0)
+                out->heart_color = first[0];
+        }
     }
 
     /* heart targets */
@@ -584,14 +627,22 @@ static int h_gain_resource(GameState *g, int actor, const AbilityEffect *e){
     int who  = misc_target_player(actor,e);
     RbPlayer *P=&g->p[who];
 
-    if(kind==RB_RES_OTHER){
-        int n = e->count>0 ? e->count : 1;
-        P->energy.n += n;
-        if(P->energy.n > RB_ENERGY_CAP) P->energy.n = RB_ENERGY_CAP;
-        P->energy_active += n;
-        if(P->energy_active > RB_ENERGY_CAP) P->energy_active = RB_ENERGY_CAP;
-        return 1;
-    }
+    /* ResourceKind::Other — Rust misc.rs:25-40 classifies every resource that
+       is not "blade"/"heart" as Other, and the two appliers that follow bail
+       out immediately for it (`if kind != ResourceKind::Blade` at
+       misc.rs:1004, `if kind != ResourceKind::Heart` at misc.rs:1059). An
+       effect with no/unknown `resource` therefore grants NOTHING and only
+       writes its rule-log line. This used to be an invented branch that
+       credited `count` ENERGY to the target player, which silently
+       mis-granted energy whenever the decoder failed to supply `resource`
+       (it granted it for any unrecognised resource string too). Keep the
+       no-op, but make it loud instead of silent. */
+    if(kind==RB_RES_OTHER)
+        fprintf(stderr,
+            "[GAIN_RESOURCE] NO-OP: gain_resource with resource=%s (count=%d) "
+            "matches no resource kind; Rust grants nothing "
+            "(misc.rs:648,1004,1059)\n",
+            res ? res : "<absent>", e->count);
 
     int count       = extra_int(e,"resource_icon_count", e->count>0 ? e->count : 1);
     int per_unit    = (e->per_unit>0) || extra_true(e,"per_unit");
@@ -639,8 +690,31 @@ static int h_gain_resource(GameState *g, int actor, const AbilityEffect *e){
 
     int final_count    = t.final_count;
     int blades_to_add  = is_negative ? -final_count : final_count;
-    int colors[1]      = { t.heart_color>=0 ? t.heart_color : RB_HEART_ALL };
-    int counts[1]      = { final_count };
+
+    /* Heart distribution. Rust misc.rs:932-946: for a plain `resource=heart`
+       grant that names a fixed set of colors and has enough hearts to cover
+       them, the count is split across every listed color
+       (`heart_gain_per_entry`) instead of being piled onto a single one.
+       `heart_selection` and every other shape keep the single-color
+       `vec![(heart_color_val, final_count)]` fallback. */
+    int colors[8];
+    int counts[8];
+    int n_dist = 1;
+    colors[0] = t.heart_color>=0 ? t.heart_color : RB_HEART_ALL;
+    counts[0] = final_count;
+    {
+        int fixed[8];
+        int n_fixed = 0;
+        if(res && !strcmp(res,"heart") && !extra_true(e,"heart_selection"))
+            n_fixed = split_heart_colors(eff_extra(e,"heart_colors"), fixed, 8);
+        if(n_fixed > 0 && final_count >= n_fixed){
+            int per = rb_heart_gain_per_entry(final_count, n_fixed);
+            if(per > 0){
+                for(int i=0;i<n_fixed;i++){ colors[i]=fixed[i]; counts[i]=per; }
+                n_dist = n_fixed;
+            }
+        }
+    }
 
     /* is_self_target: activating card only */
     if(is_self_target && activating>=0){
@@ -651,7 +725,7 @@ static int h_gain_resource(GameState *g, int actor, const AbilityEffect *e){
             grant_blade(g,activating,blades_to_add);
             push_temporary_effect(g,activating,dur,blades_to_add,NULL);
         } else {
-            apply_heart_to_card(g,activating,colors,counts,1,is_negative,dur);
+            apply_heart_to_card(g,activating,colors,counts,n_dist,is_negative,dur);
         }
         g->queue.selected_heart_color=-1;
         rule_log_activated(g,activating,"[[log_gain_resource]]");
@@ -685,7 +759,7 @@ static int h_gain_resource(GameState *g, int actor, const AbilityEffect *e){
             t.n_blade, final_count, blades_to_add, is_all);
 
     apply_heart_resource(g,e,kind,who,t.heart,t.n_heart,activating,is_self_target,
-                         is_all,dur,is_negative,colors,counts,1,final_count);
+                         is_all,dur,is_negative,colors,counts,n_dist,final_count);
 
     g->queue.selected_heart_color=-1;
     if(dur==RB_TEMP_PERM) rb_recalc_constants(g);
@@ -911,10 +985,14 @@ static int h_choose_target_player(GameState *g, int actor, const AbilityEffect *
 
 /* ─────────────────────── h_custom (execute_custom) ──────────────────────────── */
 static int h_custom(GameState *g, int actor, const AbilityEffect *e){
-    /* 1) Deck reordering: placement_order=any_order → route as move_cards */
+    /* 1) Deck reordering: placement_order=any_order → route as move_cards
+       (Rust custom.rs:23-34 tests `placement_order_any() ==
+       Some(PlacementOrder::AnyOrder)`, i.e. an exact string match. The
+       `extra_true(e,"placement_order")` disjunct that used to sit here fired
+       on ANY "true"/"1" value and is not a Rust branch.) */
     (void)actor;
-    if(extra_true(e,"placement_order") ||
-       (eff_extra(e,"placement_order") && !strcmp(eff_extra(e,"placement_order"),"any_order"))){
+    if(eff_extra(e,"placement_order") &&
+       !strcmp(eff_extra(e,"placement_order"),"any_order")){
         AbilityEffect routed;
         memset(&routed,0,sizeof routed);
         routed.action = "move_cards";

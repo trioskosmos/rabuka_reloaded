@@ -24,8 +24,25 @@ fn test_draw_phase_no_unwanted_discards() {
     let p2_deck_before = game.state.player2.main_deck.cards.len();
     let p2_discard_before = game.state.player2.waitroom.cards.len();
 
-    for _ in 0..4 {
-        game.pass();
+    // P2's Draw phase BY NAME, then one step out of it. The draw happens on the
+    // Draw → Main transition, so stopping ON Draw measures nothing — and
+    // "4 passes" only happened to be that transition today. Two facts now:
+    // the deck is untouched on ARRIVAL at Draw, and exactly one card leaves on
+    // the way out.
+    game.advance_to_phase(rabuka_engine::game_state::Phase::Draw);
+    assert_eq!(
+        game.state.current_phase,
+        rabuka_engine::game_state::Phase::Draw,
+        "the draw must be measured at the Draw phase, not an arbitrary pass"
+    );
+    assert_eq!(
+        game.state.player2.main_deck.cards.len(),
+        p2_deck_before,
+        "no card leaves the deck BEFORE the draw phase"
+    );
+    game.pass();
+    while game.has_pending_choice() {
+        game.select_indices(&[]);
     }
 
     let p2_deck_after = game.state.player2.main_deck.cards.len();

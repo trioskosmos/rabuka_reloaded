@@ -102,13 +102,13 @@ fn heart_override_additive_stacks_in_both_stage_heart_calcs() {
     game.state.player1.hand.cards.push(filler); // live card for set_live_card
     fill_decks(&mut game, filler);
 
-    // Advance into the live phase so Kasumi's LS fires and prompts.
-    for _ in 0..5 {
-        game.pass();
-    }
+    // Into the ライブ開始時 window BY NAME and stop on arrival: the
+    // SelectHeartColor prompt below is raised there, and `advance_to_phase`
+    // answers prompts raised between steps internally — so a target one phase
+    // further would eat the prompt this test is about.
+    game.advance_to_phase(rabuka_engine::game_state::Phase::LiveCardSetFirstAttacker);
     game.set_live_card(filler);
-    game.pass();
-    game.pass();
+    game.advance_to_phase(rabuka_engine::game_state::Phase::FirstAttackerPerformance);
 
     // Her Live Start asks which heart type (heart01 / heart03 / heart04).
     assert!(

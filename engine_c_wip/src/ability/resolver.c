@@ -214,12 +214,6 @@ void rb_resolver_store_condition_verdict(GameState *g, int actor, const char *co
 /* ── resolver.rs::store_pending_choice (dedup + snapshot_requested) ── */
 void rb_resolver_store_pending_choice(GameState *g) {
     if (!g) return;
-    fprintf(stderr, "[STORE_PC] zone=%s target=%s count=%d allow_skip=%d kind=%d desc=%s eff=%s efftext=%s cardtype=%s host=%d actor=%d\n",
-            g->queue.pending.zone, g->queue.pending.target, g->queue.pending.count,
-            g->queue.pending.allow_skip, g->queue.pending.kind, g->queue.pending.description,
-            (g->queue.resume_eff && g->queue.resume_eff->action) ? g->queue.resume_eff->action : "-",
-            (g->queue.resume_eff && g->queue.resume_eff->text) ? g->queue.resume_eff->text : "-",
-            g->queue.pending.card_type, g->queue.resume_host, g->queue.actor);
     g->queue.has_pending = 1;
     g->queue.snapshot_requested = 1;
     g->queue.state = RB_QUEUE_AWAITING_CHOICE;

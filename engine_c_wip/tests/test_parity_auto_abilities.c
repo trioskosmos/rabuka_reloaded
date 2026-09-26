@@ -40,6 +40,7 @@
 #include "rabuka.h"
 #include "test_game.h"
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 
 static int failures;
@@ -86,6 +87,10 @@ void rb_trigger_auto_ability_by_index(GameState *g, int trigger_type,
                                       int ability_index,
                                       const int *trigger_moved_cards, int n_moved,
                                       int triggering_member_id);
+/* Defined in src/core/game_state_abilities.c / src/core/card.c; not exported
+   by include/rabuka.h. */
+void rb_queue_reset(GameState *g);
+const char *rb_effect_position_any(const AbilityEffect *e);
 
 /* ── fixtures ──────────────────────────────────────────────────────── */
 
@@ -95,7 +100,8 @@ void rb_trigger_auto_ability_by_index(GameState *g, int trigger_type,
 #define FUYUMI      "PL!SP-pb2-011-R" /* ab#0 自動: center-area move watcher   */
 #define DANCING     "PL!-bp6-020-L"   /* ab#1 自動: each_time resolution watch*/
 #define HAZUKI_REN  "PL!SP-bp5-005-R\xEF\xBC\x8B" /* ab#1 自動: preceding_moved */
-#define RIN_ACT     "PL!-sd1-005-SD"  /* 起動 only -- no 自動 ability          */
+#define RIN_ACT     "PL!-sd1-005-SD"  /* 起動 only -- no 自動 ability (mu's)   */
+#define MU_MEMBER   "PL!-sd1-005-SD"  /* mu's member used as a watcher subject */
 #define FILLER      "PL!-sd1-010-SD"
 
 /* Decode ability `a` of card `cid`, returning its trigger token text.
@@ -107,6 +113,9 @@ static int par_find_auto_index(int cid, int nth)
         Ability ab;
         if (!rb_decode_card_ability((uint32_t)cid, a, &ab)) continue;
         int hit = ab.triggers && !strcmp(ab.triggers, TRIG_AUTO);
+        if (getenv("PAR_DUMP"))
+            fprintf(stderr, "[DUMP] cid=%d ab#%d trig=%s\n", cid, a,
+                    ab.triggers ? ab.triggers : "(null)");
         rb_free_ability(&ab);
         if (hit) {
             if (nth == 0) return a;
@@ -502,9 +511,9 @@ static void test_each_time_resolution_watcher(void)
     }
 
     int dancing_instance = test_id(&tg, DANCING);
-    int aoi_instance     = test_id(&tg, AOI);
+    int mus_instance     = test_id(&tg, MU_MEMBER);
     test_add_to_live(&tg, dancing_instance);
-    test_add_to_stage(&tg, 1, aoi_instance);   /* center: μ's member */
+    test_add_to_stage(&tg, 1, mus_instance);   /* center: mu's member */
 
     /* abilities.rs:1361-1364 -- a non-stage member never arms the watcher. */
     par_reset_queue(g);
@@ -514,13 +523,13 @@ static void test_each_time_resolution_watcher(void)
 
     /* abilities.rs:1367-1415 -- a stage member whose group matches arms it. */
     int fuyumi_instance = test_id(&tg, FUYUMI);
-    test_add_to_stage(&tg, 0, fuyumi_instance); /* left: also μ's */
+    test_add_to_stage(&tg, 0, fuyumi_instance); /* left: 5yncri5e! */
     par_reset_queue(g);
-    rb_trigger_each_time_for_member(g, 0, "ライブ成功時", aoi_instance);
+    rb_trigger_each_time_for_member(g, 0, "ライブ成功時", mus_instance);
     CHECK(par_entry_count(g) >= 1,
           "trigger_each_time_for_member arms a matching resolution watcher");
     if (par_entry_count(g) >= 1)
-        CHECK_EQ(g->queue.entries[0].triggering_member_id, aoi_instance,
+        CHECK_EQ(g->queue.entries[0].triggering_member_id, mus_instance,
                  "the armed watcher records the triggering member id");
 
     /* abilities.rs:1393-1400 -- a member outside the watcher's group filter
@@ -532,7 +541,7 @@ static void test_each_time_resolution_watcher(void)
 
     /* ...and a substring that does not appear in the watch text arms nothing. */
     par_reset_queue(g);
-    rb_trigger_each_time_for_member(g, 0, "この文字列は絶対に現れない", aoi_instance);
+    rb_trigger_each_time_for_member(g, 0, "この文字列は絶対に現れない", mus_instance);
     CHECK_EQ(par_entry_count(g), 0,
              "a trigger substring absent from the watch text arms nothing");
     par_reset_queue(g);
@@ -699,6 +708,7 @@ static void test_use_accounting(void)
     /* A second TAS in the same turn must not re-queue it (abilities.rs:848). */
     int aoi_instance = test_id(&tg, AOI);
     test_add_to_stage(&tg, 1, aoi_instance);
+    rb_record_ability_use(g, aoi_instance, idx);
     par_reset_queue(g);
     int queued = rb_trigger_auto_abilities_for_player_with_event(g, 0, NULL, 0, 0, 0);
     CHECK_EQ(queued, 0,

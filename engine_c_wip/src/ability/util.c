@@ -968,7 +968,7 @@ static int local_filter_from_public(const RbCardFilter *rf, LocalCardFilter *out
         f.has_need_heart_total = 1;
     }
     for (int i = 0; i < rf->n_name_fragments && i < 8; i++)
-        strncpy(f.name_fragments[i], rf->n_name_fragments[i], sizeof f.name_fragments[i] - 1);
+        strncpy(f.name_fragments[i], rf->name_fragments[i], sizeof f.name_fragments[i] - 1);
     f.n_name_fragments = rf->n_name_fragments;
     if (rf->has_original_blade) {
         f.original_blade_limit = rf->original_blade_limit;
@@ -1800,6 +1800,12 @@ int rb_resolve_per_unit_count(const GameState *g, int pl, const char *per_unit_t
         }
         return count;
     }
+    if (!strcmp(zone, "discard"))
+        return rb_count_matching(P->discard.cards, P->discard.n, card_type, group);
+    if (!strcmp(zone, "live"))
+        return rb_count_matching(P->live.cards, P->live.n, card_type, group);
+    if (!strcmp(zone, "success"))
+        return rb_count_matching(P->success.cards, P->success.n, card_type, group);
     return rb_count_matching(P->hand.cards, P->hand.n, card_type, group);
 }
 
@@ -1844,19 +1850,30 @@ static int rb_max_distinct_names_greedy(const int *cards, int n) {
     return rb_max_distinct_names(cards, n);
 }
 
-/* Mirror util.rs::prune_dominated — remove masks that are strict subsets. */
+/* Mirror util.rs::prune_dominated (util.rs:990-1005) — "removes any mask that is
+   a strict subset of another mask in the list". The algorithm below is a line
+   for line port: sort, dedup, then for each candidate skip it when some already
+   kept mask is a superset (m ⊆ k), otherwise drop every kept mask that m
+   subsumes and push m.
+   Divergence from Rust: the Rust twin operates on u128 and the C header
+   declares uint64_t, so the C form can only reason about the low 64 bits.
+   `kept` is heap-sized from *n because the previous fixed RB_MAX_ZONE (64)
+   array overflowed its bounds for longer inputs. */
 static int cmp_u64(const void *a, const void *b) {
     uint64_t va = *(const uint64_t *)a, vb = *(const uint64_t *)b;
     return (va > vb) - (va < vb);
 }
 void rb_prune_dominated(uint64_t *masks, int *n) {
-    if (*n <= 1) return;
-    qsort(masks, *n, sizeof(uint64_t), cmp_u64);
+    if (!masks || !n || *n <= 1) return;
+    int total = *n;
+    if (total > RB_MAX_ZONE) total = RB_MAX_ZONE;
+    qsort(masks, (size_t)total, sizeof(uint64_t), cmp_u64);
     int m = 1;
-    for (int i = 1; i < *n; i++)
+    for (int i = 1; i < total; i++)
         if (masks[i] != masks[m - 1]) masks[m++] = masks[i];
     *n = m;
-    uint64_t kept[RB_MAX_ZONE];
+    uint64_t *kept = (uint64_t *)rb_malloc(sizeof(uint64_t) * (size_t)m);
+    if (!kept) return;
     int nk = 0;
     for (int i = 0; i < *n; i++) {
         uint64_t mi = masks[i];
@@ -1870,7 +1887,8 @@ void rb_prune_dominated(uint64_t *masks, int *n) {
         nk = w;
         kept[nk++] = mi;
     }
-    memcpy(masks, kept, sizeof(uint64_t) * nk);
+    memcpy(masks, kept, sizeof(uint64_t) * (size_t)nk);
+    rb_free(kept);
     *n = nk;
 }
 

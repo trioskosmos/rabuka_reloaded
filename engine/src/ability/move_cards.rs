@@ -1674,16 +1674,17 @@ gs.set_recently_moved_batch(moved.clone().into(), Some("under_member"));
             || Zone::from_str(source) == Some(Zone::Hand)
             || (Zone::from_str(source) == Some(Zone::LookedAt)
                 && effect.all_any().unwrap_or(false));
-        // The deck-order prompt needs a multi-card take; logging the full gate
-        // for every single-card move produced ~3.5k lines to find ~12 real
-        // prompts. Keep the diagnostic for the case that can actually prompt.
-        if taken.len() > 1 {
+        // This line answers one question: "does this move reach the deck-order
+        // prompt?". Log it only when the source/destination pair can, i.e. a
+        // multi-card take out of an eligible zone into the deck. Logging it for
+        // every move printed ~3.5k lines to find 12 real prompts, and 215 of
+        // the survivors were `eligible_source=false deck_dest=false`, which the
+        // reader has to re-derive to discard.
+        if taken.len() > 1 && is_eligible_source && is_deck_dest {
             log::debug!(
-                "[ORDER_CHECK] source={} destination={} eligible_source={} deck_dest={} placement={:?} taken_len={}",
+                "[ORDER_CHECK] source={} destination={} placement={:?} taken_len={}",
                 source,
                 destination,
-                is_eligible_source,
-                is_deck_dest,
                 effect.placement_order_any(),
                 taken.len()
             );
@@ -1938,20 +1939,22 @@ gs.set_recently_moved_batch(moved.clone().into(), Some("under_member"));
         if vacated_stage_area.is_none() {
             vacated_stage_area = baton_arrival_area;
         }
-        // Only the baton-touch path is interesting here; logging every move
-        // printed an all-default line ~3.3k times per suite. Gate on the case
-        // that can actually carry an arrival/vacated area.
-        if baton_arrival_area.is_some() || vacated_stage_area.is_some() {
+        // Only the baton-touch path is interesting here. `vacated_stage_area` is
+        // Some on essentially every move (measured 893/893), so gating on it
+        // logged every move; the baton condition itself is true on 3. Gate on
+        // that, and on a resolved arrival area, which is the actual signal.
+        let baton_condition = effect
+            .condition
+            .as_ref()
+            .and_then(|condition| condition.get_baton_touch_trigger())
+            .unwrap_or(false);
+        if baton_condition || baton_arrival_area.is_some() {
             log::debug!(
                 "[BATON_UNDER] destination={} source={} self_target={} baton_condition={} arriving={:?} arrival_area={:?} vacated={:?}",
                 destination,
                 source,
                 effect.is_self_target(),
-                effect
-                    .condition
-                    .as_ref()
-                    .and_then(|condition| condition.get_baton_touch_trigger())
-                    .unwrap_or(false),
+                baton_condition,
                 gs.baton_touch_arriving_card_id,
                 baton_arrival_area,
                 vacated_stage_area,

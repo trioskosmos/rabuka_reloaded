@@ -178,10 +178,35 @@ fn opponent_baton_touch_unaffected_by_protected_card() {
     }
     game.state.player2.energy_zone.add_active(10);
 
-    // Advance past player1's main phase to player2's main phase
-    for _ in 0..3 {
-        game.pass();
+    // Get to P2's Main. This is a SEAT condition, not a phase:
+    // `advance_to_phase(Main)` from P1's Main is a no-op (we are already
+    // there), which is exactly why the old 3-pass walk was quietly landing
+    // somewhere else — it never reached P2's turn at all, and the test passed
+    // because the action is executed directly rather than through the turn.
+    for _ in 0..20 {
+        if game.state.current_phase == rabuka_engine::game_state::Phase::Main
+            && game.state.active_player().id == game.state.player2.id
+        {
+            break;
+        }
+        if !game.has_pending_choice() {
+            game.pass();
+        }
+        while game.has_pending_choice() {
+            game.select_indices(&[]);
+        }
     }
+    // Premise, asserted rather than assumed: the baton touch below is P2's.
+    assert_eq!(
+        game.state.current_phase,
+        rabuka_engine::game_state::Phase::Main,
+        "P2's Main must be reached before the opponent baton touch"
+    );
+    assert_eq!(
+        game.state.active_player().id,
+        game.state.player2.id,
+        "it must be P2's turn — player1's protected card is what is under test"
+    );
 
     // Player2's turn — baton touch filler on their Left
     let result = TurnEngine::execute_main_phase_action(

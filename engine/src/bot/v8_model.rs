@@ -610,7 +610,7 @@ pub fn largest_clearable(supply: i32) -> i32 {
 }
 
 /// Total heart supply on our board, buff-aware, in hearts (not per-colour).
-fn supply_hearts(gs: &GameState, me: u8, db: &CardDatabase) -> i32 {
+pub fn supply_hearts(gs: &GameState, me: u8, db: &CardDatabase) -> i32 {
     stats_pipeline::stage_hearts(
         &gs.seat_player(me).stage.stage,
         db,

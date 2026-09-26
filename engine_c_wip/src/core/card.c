@@ -221,20 +221,40 @@ int rb_card_equivalent_rarity(const char *rarity, char *out, size_t out_sz) {
     return 1;
 }
 
+/* ── map_series_to_group (card.rs:796) — the canonical group for a series.
+    Returns a string literal, so the pointer is stable for the process
+    lifetime (Rust returns Box<str> built from the same literals). ── */
+const char *rb_card_series_to_group(const char *series) {
+    if (!series) return "";
+    if (!strcmp(series, "ラブライブ！")) return "μ's";
+    if (!strcmp(series, "ラブライブ！サンシャイン!!")) return "Aqours";
+    if (!strcmp(series, "ラブライブ！虹ヶ咲学園スクールアイドル同好会")) return "虹ヶ咲";
+    if (!strcmp(series, "ラブライブ！スーパースター!!")) return "Liella!";
+    if (!strcmp(series, "蓮ノ空女学院スクールアイドルクラブ")
+     || !strcmp(series, "ラブライブ！蓮ノ空女学院スクールアイドルクラブ")) return "蓮ノ空";
+    return "";
+}
+
 void rb_map_series_to_group(const char *series, char *out, size_t out_sz) {
     if (!out || !out_sz) return;
-    const char *group = "";
-    if (series) {
-        if (!strcmp(series, "ラブライブ！")) group = "μ's";
-        else if (!strcmp(series, "ラブライブ！サンシャイン!!")) group = "Aqours";
-        else if (!strcmp(series, "ラブライブ！虹ヶ咲学園スクールアイドル同好会")) group = "虹ヶ咲";
-        else if (!strcmp(series, "ラブライブ！スーパースター!!")) group = "Liella!";
-        else if (!strcmp(series, "蓮ノ空女学院スクールアイドルクラブ")
-              || !strcmp(series, "ラブライブ！蓮ノ空女学院スクールアイドルクラブ")) group = "蓮ノ空";
-    }
+    const char *group = rb_card_series_to_group(series);
     size_t len = strlen(group);
     if (len >= out_sz) { out[0] = 0; return; }
     memcpy(out, group, len + 1);
+}
+
+/* ── Card::group (card_binary.rs:153-174). The blob stores an explicit group
+    string; cards.bin leaves it empty for every record, so the group is derived
+    from the series exactly as Card::deserialize does. Callers that want the
+    group must use this instead of rb_card_string(card->group_idx): the raw
+    index resolves to "" and every group predicate then matches every card. ── */
+const char *rb_card_group_name(int card_id) {
+    if (card_id < 0) return "";
+    const unsigned char *r = rb_card_record((uint32_t)card_id);
+    if (!r || rb_card_record_len((uint32_t)card_id) < 25) return "";
+    const char *group = rb_card_string(le16p(r + 6));
+    if (group && *group) return group;
+    return rb_card_series_to_group(rb_card_string(le16p(r + 4)));
 }
 
 void rb_card_normalize_name(const char *src, char *out, size_t out_sz) {
@@ -1076,4 +1096,116 @@ int rb_card_effective_energy_cost_total(int card_id, int groups_on_stage) {
     int total = effect_energy_total(ab.cost, groups_on_stage);
     rb_free_ability(&ab);
     return total;
+}
+
+/* ── HeartMap (card.rs:170-223) over a Card's heart slice.
+    A Card stores base | blade | need | special back to back in
+    heart_color[]/heart_count[], so a HeartMap is the half-open slice
+    [from, from+len) of one section. The mutators take `int *len` because in
+    Rust the map owns its length: insert pushes, remove retains (shrinking),
+    and clear empties. Iteration order is insertion order, i.e. blob order. ── */
+
+static int card_slice_ok(const Card *c, int from, int len) {
+    return c && from >= 0 && len >= 0 && from + len <= c->n_hearts;
+}
+
+int rb_heartmap_len(const Card *c, int from, int len) {
+    return card_slice_ok(c, from, len) ? len : 0;
+}
+
+int rb_heartmap_is_empty(const Card *c, int from, int len) {
+    return rb_heartmap_len(c, from, len) == 0;
+}
+
+int rb_heartmap_values_sum(const Card *c, int from, int len) {
+    if (!card_slice_ok(c, from, len)) return 0;
+    int sum = 0;
+    for (int i = 0; i < len; i++) sum += c->heart_count[from + i];
+    return sum;
+}
+
+int rb_heartmap_get(const Card *c, int from, int len, int color, int *out) {
+    if (!card_slice_ok(c, from, len)) return 0;
+    for (int i = 0; i < len; i++) {
+        if (c->heart_color[from + i] == (uint8_t)color) {
+            if (out) *out = c->heart_count[from + i];
+            return 1;
+        }
+    }
+    return 0;
+}
+
+int rb_heartmap_contains_key(const Card *c, int from, int len, int color) {
+    return rb_heartmap_get(c, from, len, color, NULL);
+}
+
+/* keys()/values() indexed over the entries in insertion order. */
+int rb_heartmap_key_at(const Card *c, int from, int len, int i) {
+    if (!card_slice_ok(c, from, len) || i < 0 || i >= len) return -1;
+    return c->heart_color[from + i];
+}
+
+int rb_heartmap_value_at(const Card *c, int from, int len, int i) {
+    if (!card_slice_ok(c, from, len) || i < 0 || i >= len) return -1;
+    return c->heart_count[from + i];
+}
+
+/* insert(): replace the value when the color is present, otherwise push the
+   new key and grow the map. A push only fits when the slice is the tail of
+   the stored array and there is spare capacity. */
+int rb_heartmap_insert(Card *c, int from, int *len, int color, int val) {
+    if (!c || !len || *len < 0 || val < 0 || val > 255) return 0;
+    if (from < 0 || from + *len > c->n_hearts) return 0;
+    for (int i = 0; i < *len; i++) {
+        if (c->heart_color[from + i] == (uint8_t)color) {
+            c->heart_count[from + i] = (uint8_t)val;
+            return 1;
+        }
+    }
+    if (from + *len != c->n_hearts || c->n_hearts >= RB_MAX_HEARTS) return 0;
+    c->heart_color[c->n_hearts] = (uint8_t)color;
+    c->heart_count[c->n_hearts] = (uint8_t)val;
+    c->n_hearts++;
+    (*len)++;
+    return 1;
+}
+
+/* remove(): retain every entry whose color differs, shrinking the map. */
+void rb_heartmap_remove(Card *c, int from, int *len, int color) {
+    if (!c || !len || *len < 0 || from < 0 || from + *len > c->n_hearts) return;
+    int w = from;
+    for (int i = 0; i < *len; i++) {
+        int idx = from + i;
+        if (c->heart_color[idx] == (uint8_t)color) continue;
+        if (w != idx) {
+            c->heart_color[w] = c->heart_color[idx];
+            c->heart_count[w] = c->heart_count[idx];
+        }
+        w++;
+    }
+    int old = *len;
+    for (int i = w; i < from + old; i++) {
+        c->heart_color[i] = 0;
+        c->heart_count[i] = 0;
+    }
+    *len = w - from;
+}
+
+/* clear(): drop every entry; the map is empty afterwards. */
+void rb_heartmap_clear(Card *c, int from, int *len) {
+    if (!c || !len || *len < 0 || from < 0 || from + *len > c->n_hearts) return;
+    for (int i = from; i < from + *len; i++) {
+        c->heart_color[i] = 0;
+        c->heart_count[i] = 0;
+    }
+    *len = 0;
+}
+
+/* entry_or_default(): the current value for the color, inserting a 0 entry
+   when absent. Returns the value the caller would mutate. */
+int rb_heartmap_entry_or_default(Card *c, int from, int *len, int color) {
+    int value = 0;
+    if (rb_heartmap_get(c, from, len ? *len : 0, color, &value)) return value;
+    rb_heartmap_insert(c, from, len, color, 0);
+    return 0;
 }
