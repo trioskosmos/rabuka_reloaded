@@ -96,9 +96,11 @@ fn tang_keke_discard_member_without_blade_heart_choose_any_number() {
     // Select the heart06 option — verify heart06 was gained on the target member
     game.select_option(0);
 
-    assert!(
-        game.state.player1.energy_zone.cards.len() > energy_before,
-        "Energy should be placed from energy deck (selected first)"
+    assert_eq!(
+        game.state.player1.energy_zone.cards.len() - energy_before,
+        1,
+        "Exactly one energy placed from the energy deck (the option selected \
+         first); a band of > here would pass if the engine placed it twice"
     );
     assert!(
         game.state.player1.waitroom.cards.contains(&liella_no_bh),

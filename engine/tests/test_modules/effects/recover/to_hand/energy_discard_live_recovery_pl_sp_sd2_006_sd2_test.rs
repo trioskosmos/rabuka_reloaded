@@ -147,18 +147,35 @@ fn pl_sp_sd2_006_sd2_no_liella_live_terminates_without_gain() {
         }
         drain(&mut game);
     }
+    // A band on purpose, not a missing pin: the test allows either "offered
+    // then fizzled" or "never offered at all" (see the comment above the
+    // loop), and pinning to 1 would forbid the second. What must be exact is
+    // what the ability did, below.
     assert!(
         activations <= 1,
-        "must not loop without a valid target"
+        "must not loop without a valid target (activated {} times)",
+        activations
     );
     assert!(
         !game.state.player1.hand.cards.contains(&other_live),
         "non-Liella live must not be recovered"
     );
-    assert!(
-        game.state.player1.hand.cards.len() <= hand_before,
-        "no net gain without a valid target (hand {} -> {})",
+    // The ability DOES activate, and its mandatory cost is a hand discard — so
+    // the hand loses exactly the one card it paid with and gains nothing. A band
+    // of <= here would pass whether the cost was paid once or never.
+    assert_eq!(
+        game.state.player1.hand.cards.len() + 1,
         hand_before,
-        game.state.player1.hand.cards.len()
+        "The mandatory discard cost is paid exactly once: the hand ends one \
+         card shorter and gains nothing back"
+    );
+    assert!(
+        game.state.player1.waitroom.cards.iter().any(|&id| {
+            game.state
+                .card_database
+                .get_card(id)
+                .is_some_and(|c| c.card_no == FILLER)
+        }),
+        "The card that paid the cost is in the waitroom"
     );
 }
