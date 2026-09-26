@@ -1968,17 +1968,10 @@ async fn debug_redo(data: web::Data<AppState>, req: actix_web::HttpRequest) -> i
     HttpResponse::Ok().json(serde_json::json!({"success": true}))
 }
 
+/// GET /api/debug/snapshot and /api/debug/dump_state — the full display
+/// snapshot. Two URLs, one handler: the two names are used interchangeably by
+/// the web UI and the replay tools, and they were byte-identical.
 async fn debug_snapshot(
-    data: web::Data<AppState>,
-    http_req: actix_web::HttpRequest,
-) -> impl Responder {
-    let gs_arc = resolve_game_state_arc(&data, &http_req);
-    let game_state = lock_state!(gs_arc, read);
-    let display = crate::display::game_state_to_display(&game_state);
-    HttpResponse::Ok().json(serde_json::json!({"success": true, "state": display}))
-}
-
-async fn debug_dump_state(
     data: web::Data<AppState>,
     http_req: actix_web::HttpRequest,
 ) -> impl Responder {
@@ -3651,8 +3644,8 @@ pub async fn run_web_server_with_ngrok(ngrok_authtoken: Option<String>) -> std::
             .route("/api/exec", web::post().to(exec_code))
             .route("/api/debug/rewind", web::post().to(debug_rewind))
             .route("/api/debug/redo", web::post().to(debug_redo))
-            .route("/api/debug/snapshot", web::get().to(debug_snapshot))
-            .route("/api/debug/dump_state", web::get().to(debug_dump_state))
+    .route("/api/debug/snapshot", web::get().to(debug_snapshot))
+    .route("/api/debug/dump_state", web::get().to(debug_snapshot))
             .route("/api/debug/frames", web::get().to(debug_frames))
             .route("/api/debug/dump_frames", web::get().to(debug_dump_frames))
             .route("/api/debug/conditions", web::get().to(debug_conditions))

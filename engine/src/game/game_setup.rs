@@ -629,6 +629,11 @@ pub fn test_ai_vs_ai(
     Ok(count)
 }
 
+/// Build an Action, blanking the description when action display is off.
+///
+/// The display switch is applied here rather than at each construction site, so
+/// a new action cannot forget it and leak a description into a menu that is
+/// supposed to show none.
 fn make_action(action_type: ActionType, description: impl Into<String>) -> Action {
     Action {
         description: if action_display_enabled() {
@@ -649,15 +654,8 @@ fn make_action_params(
     params: ActionParameters,
 ) -> Action {
     Action {
-        description: if action_display_enabled() {
-            description.into()
-        } else {
-            String::new()
-        },
-        description_ja: None,
-        action_type,
         parameters: Some(params),
-        selected: None,
+        ..make_action(action_type, description)
     }
 }
 

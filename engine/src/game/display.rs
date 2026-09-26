@@ -923,37 +923,67 @@ fn add_modified_hearts(
     }
 }
 
+/// The game-wide collections every player's display reads.
+///
+/// `player_to_display` took nineteen parameters, of which sixteen are the same
+/// tables for both seats. Re-listing them at each of the two call sites is how
+/// they fall out of step; here they are named once.
+///
+/// Note the two kinds of modifier map are deliberately distinct: the
+/// `*_modifiers` totals are additive **plus** set (what a stat is actually
+/// worth, used for the score maths), while the `*_set` maps are the set
+/// portion alone (what the card badge should show, without a +/-).
+pub struct SharedDisplay<'a> {
+    pub card_db: &'a CardDatabase,
+    // Combined modifier totals (additive + set) — for stat computations.
+    pub blade_modifiers: &'a HashMap<i16, i32>,
+    pub score_modifiers: &'a HashMap<i16, i32>,
+    pub heart_modifiers: &'a HashMap<i16, HashMap<crate::card::HeartColor, i32>>,
+    // The "set" portion of each ModifierEntry (absolute overrides), extracted
+    // so card badges can display them without a +/-. See the CardDisplay doc
+    // for the full additive-vs-set breakdown.
+    pub blade_set: &'a HashMap<i16, i32>,
+    pub score_set: &'a HashMap<i16, i32>,
+    pub heart_set: &'a HashMap<i16, HashMap<crate::card::HeartColor, i32>>,
+    pub orientation_modifiers: &'a HashMap<i16, crate::core::game_modifiers::CardOrientation>,
+    pub gained_abilities: &'a HashMap<i16, Vec<String>>,
+    pub need_heart_modifiers: &'a HashMap<i16, HashMap<crate::card::HeartColor, i32>>,
+    pub prohibition_effects: &'a [String],
+    pub cannot_activate_members: &'a [String],
+    pub heart_color_multiplier: &'a HashMap<i16, crate::card::HeartColor>,
+    // Cost modifier totals (additive + set) and the set portion.
+    pub cost_modifiers: &'a HashMap<i16, i32>,
+    pub cost_set: &'a HashMap<i16, i32>,
+    /// Gained-ability trigger texticon badges, from gained_card_abilities.
+    /// Each entry is a trigger type name; the frontend renders a texticon.
+    /// `gain_ability` without this would leave no icon on the card.
+    pub bonus_triggers: &'a HashMap<i16, Vec<String>>,
+}
+
 pub fn player_to_display(
     player: &Player,
-    card_db: &CardDatabase,
-    // Combined modifier totals (additive + set) — used for score/stat computations
-    blade_modifiers: &HashMap<i16, i32>,
-    score_modifiers: &HashMap<i16, i32>,
-    heart_modifiers: &HashMap<i16, HashMap<crate::card::HeartColor, i32>>,
-    // ── Set/override maps ──────────────────────────────────────────
-    // These hold the "set" portion of ModifierEntry (absolute overrides).
-    // Extracted separately so card badges can display them without +/-.
-    // See CardDisplay doc for the full additive-vs-set breakdown.
-    blade_set: &HashMap<i16, i32>,
-    score_set: &HashMap<i16, i32>,
-    heart_set: &HashMap<i16, HashMap<crate::card::HeartColor, i32>>,
-    orientation_modifiers: &HashMap<i16, crate::core::game_modifiers::CardOrientation>,
-    gained_abilities: &HashMap<i16, Vec<String>>,
-    need_heart_modifiers: &HashMap<i16, HashMap<crate::card::HeartColor, i32>>,
-    prohibition_effects: &[String],
-    cannot_activate_members: &[String],
+    shared: &SharedDisplay<'_>,
     mulligan_selection: Option<&[usize]>,
     live_card_selection: Option<&[usize]>,
-    heart_color_multiplier: &HashMap<i16, crate::card::HeartColor>,
-    // Cost modifier totals (additive + set)
-    cost_modifiers: &HashMap<i16, i32>,
-    cost_set: &HashMap<i16, i32>,
-    // ── Gained ability trigger texticon badges ─────────────────────
-    // Populated from gained_card_abilities in game_state_to_display.
-    // Each entry is a trigger type name → frontend renders texticon.
-    // gain_ability without this would leave no icon on the card.
-    bonus_triggers: &HashMap<i16, Vec<String>>,
 ) -> PlayerDisplay {
+    let SharedDisplay {
+        card_db,
+        blade_modifiers,
+        score_modifiers,
+        heart_modifiers,
+        blade_set,
+        score_set,
+        heart_set,
+        orientation_modifiers,
+        gained_abilities,
+        need_heart_modifiers,
+        prohibition_effects,
+        cannot_activate_members,
+        heart_color_multiplier,
+        cost_modifiers,
+        cost_set,
+        bonus_triggers,
+    } = *shared;
     let energy_cards: Vec<(i16, Option<Orientation>)> = player
         .energy_zone
         .cards
@@ -1703,47 +1733,36 @@ pub fn game_state_to_display(game_state: &GameState) -> GameStateDisplay {
         .map(|&i| i as usize)
         .collect();
 
+    // The tables both seats read, named once.
+    let shared = SharedDisplay {
+        card_db: &game_state.card_database,
+        blade_modifiers: &blade_flat,
+        score_modifiers: &score_flat,
+        heart_modifiers: &heart_flat,
+        blade_set: &blade_set_flat,
+        score_set: &score_set_flat,
+        heart_set: &heart_set_flat,
+        orientation_modifiers: &game_state.mods.orientation_modifiers,
+        gained_abilities: &game_state.gained_abilities,
+        need_heart_modifiers: &need_heart_flat,
+        prohibition_effects: &game_state.prohibition_effects,
+        cannot_activate_members: &game_state.cannot_activate_members,
+        heart_color_multiplier: &game_state.mods.heart_color_multiplier,
+        cost_modifiers: &cost_flat,
+        cost_set: &cost_set_flat,
+        bonus_triggers: &bonus_triggers,
+    };
     let player1 = player_to_display(
         &game_state.player1,
-        &game_state.card_database,
-        &blade_flat,
-        &score_flat,
-        &heart_flat,
-        &blade_set_flat,
-        &score_set_flat,
-        &heart_set_flat,
-        &game_state.mods.orientation_modifiers,
-        &game_state.gained_abilities,
-        &need_heart_flat,
-        &game_state.prohibition_effects,
-        &game_state.cannot_activate_members,
+        &shared,
         p1_mulligan,
         p1_live_selection,
-        &game_state.mods.heart_color_multiplier,
-        &cost_flat,
-        &cost_set_flat,
-        &bonus_triggers,
     );
     let player2 = player_to_display(
         &game_state.player2,
-        &game_state.card_database,
-        &blade_flat,
-        &score_flat,
-        &heart_flat,
-        &blade_set_flat,
-        &score_set_flat,
-        &heart_set_flat,
-        &game_state.mods.orientation_modifiers,
-        &game_state.gained_abilities,
-        &need_heart_flat,
-        &game_state.prohibition_effects,
-        &game_state.cannot_activate_members,
+        &shared,
         p2_mulligan,
         p2_live_selection,
-        &game_state.mods.heart_color_multiplier,
-        &cost_flat,
-        &cost_set_flat,
-        &bonus_triggers,
     );
 
     GameStateDisplay {
