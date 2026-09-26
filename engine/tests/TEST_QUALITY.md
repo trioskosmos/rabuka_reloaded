@@ -36,20 +36,11 @@ _every assertion is a bare is_err()/is_none() — some guard fired, but nothing 
 
 None.
 
-## assert_only_counts (8)
+## assert_only_counts (0)
 
 _every assertion is about a count/size (len/count/>=1) — '3 options were offered' can hold while the 3 are the wrong 3_
 
-| file | test | line | detail |
-| --- | --- | --- | --- |
-| `engine/tests/test_modules/integration/full_round/live_each_time_victory_road_through_real_live_rounds_test.rs` | `live_card_own_live_success_no_trigger` | 894 |  |
-| `engine/tests/test_modules/integration/full_round/live_each_time_victory_road_through_real_live_rounds_test.rs` | `live_success_each_time_draws_card` | 427 |  |
-| `engine/tests/test_modules/integration/full_round/live_each_time_victory_road_through_real_live_rounds_test.rs` | `test_live_success_each_time_drains_after_success` | 842 |  |
-| `engine/tests/test_modules/integration/parser_e2e/parser_issues_e2e_part2_test.rs` | `issue3_ayumu_compound_both_conditions_met` | 170 |  |
-| `engine/tests/test_modules/integration/parser_e2e/parser_issues_e2e_part3_test.rs` | `issue13_mia_three_conditional_blade_checks` | 770 |  |
-| `engine/tests/test_modules/integration/parser_e2e/parser_issues_e2e_test.rs` | `issue5_solitude_rain_heart_color_scoring` | 321 |  |
-| `engine/tests/test_modules/jidou/leaves_stage/self_stage_to_waitroom_recovery_and_group_baton_replacement_test.rs` | `self_stage_to_waitroom_optional_discard_grants_member_heart05_and_blade` | 151 |  |
-| `engine/tests/test_modules/rules/trigger_paths/debut_watcher_baton_and_hand_activation_q196_q197_q198_test.rs` | `cost10_baton_replacement_does_not_draw_from_departed_watcher_q197` | 114 |  |
+None.
 
 ## placeholder (0)
 

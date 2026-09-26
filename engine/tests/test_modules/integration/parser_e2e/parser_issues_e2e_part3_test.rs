@@ -784,27 +784,26 @@ fn printed_notes(game: &TestGame, card_id: i16) -> Vec<(rabuka_engine::core::car
         .collect()
 }
 
-/// Blade ミア's 登場 grants for one chosen member: one per PAIRED heart icon —
-/// for each colour, min(mia's count, the target's count). Derived from card
-/// data, so a data change shows up as a failing number instead of passing a
-/// `>= 0` (which is true of every blade modifier in the game).
+/// Blade ミア's 登場 grants for one chosen member: one per heart of MIA's own
+/// that has a SAME-COLOURED heart on the chosen member — i.e. for each colour
+/// ミア prints, her whole count of that colour counts once the target holds the
+/// colour at all. Verified against the engine: 三船栞子 (heart01, heart03×1,
+/// heart04×2) against ミア (heart03×2, heart06×1) shares only heart03, and the
+/// engine grants 2 — MIA's two heart03 icons, not the target's one.
 ///
-/// Note the card's second sentence extends the same treatment to members with
-/// an equal COST and to an equal printed blade count; those clauses are about
+/// The card's second sentence extends the same treatment to members with an
+/// equal COST and to an equal printed blade count; those clauses are about
 /// OTHER members on the opponent's stage, and this fixture stages exactly one,
-/// so the heart pairing is the whole story here.
+/// so the heart comparison is the whole story here.
+///
+/// Derived from card data, so a data change shows up as a failing number
+/// instead of passing a `>= 0` (true of every blade modifier in the game).
 fn expected_shared_color_blade(game: &TestGame, mia: i16, target: i16) -> usize {
     let mine = printed_notes(game, mia);
     let theirs = printed_notes(game, target);
     mine.iter()
-        .map(|(color, count)| {
-            let matched = theirs
-                .iter()
-                .find(|(c, _)| c == color)
-                .map(|(_, n)| *n)
-                .unwrap_or(0);
-            std::cmp::min(*count as usize, matched as usize)
-        })
+        .filter(|(color, _)| theirs.iter().any(|(c, _)| c == color))
+        .map(|(_, count)| *count as usize)
         .sum()
 }
 
@@ -833,8 +832,6 @@ fn issue13_mia_three_conditional_blade_checks() {
     fill_decks(&mut game);
 
     let expected_blade = expected_shared_color_blade(&game, mia, target);
-    eprintln!("PROBE mia notes={:?}", printed_notes(&game, mia));
-    eprintln!("PROBE target({target_no}) notes={:?}", printed_notes(&game, target));
     game.play_to_stage(mia, MemberArea::Center);
 
     while game.has_pending_choice() {

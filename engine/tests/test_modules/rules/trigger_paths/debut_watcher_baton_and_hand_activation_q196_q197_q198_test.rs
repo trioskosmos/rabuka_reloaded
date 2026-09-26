@@ -133,6 +133,7 @@ fn cost10_baton_replacement_does_not_draw_from_departed_watcher_q197() {
 
     // Count hand before baton touch
     let hand_before = game.state.player1.hand.cards.len();
+    let deck_before = game.state.player1.main_deck.cards.len();
 
     // Baton-touch: play cost10 to same area
     game.play_to_stage(cost10, MemberArea::Center);
@@ -142,10 +143,28 @@ fn cost10_baton_replacement_does_not_draw_from_departed_watcher_q197() {
         game.select_indices(&[]);
     }
 
-    // Hand should decrease (cost10 played, no draw from auto)
+    // The play must have happened — otherwise an empty hand would "prove"
+    // nothing about the watcher.
     assert!(
-        game.state.player1.hand.cards.len() < hand_before,
-        "Hand should decrease — auto should NOT fire on baton touch"
+        game.state.player1.stage.stage.contains(&cost10),
+        "Q197: the cost10 member did arrive on stage (baton touch happened)"
+    );
+    assert!(
+        game.state.player1.waitroom.cards.contains(&miya),
+        "Q197: the watcher 宮下愛 left the stage to the waitroom"
+    );
+    // Exact, not "<": hand is [cost10] here (宮下愛 is already on stage) → the
+    // baton-touch consumes it → []. The 起動 would draw 1 and refill the hand,
+    // so 0 vs 1 is exactly the difference between "did not fire" and "fired".
+    assert_eq!(
+        game.state.player1.hand.cards.len(),
+        hand_before - 1,
+        "Q197: the departed watcher's 起動 must not draw"
+    );
+    assert_eq!(
+        game.state.player1.main_deck.cards.len(),
+        deck_before,
+        "Q197: no card was drawn from the deck"
     );
 }
 
