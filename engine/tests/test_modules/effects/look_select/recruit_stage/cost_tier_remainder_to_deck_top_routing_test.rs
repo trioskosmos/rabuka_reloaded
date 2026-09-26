@@ -110,7 +110,6 @@ fn issue12_proof_look_and_select_cost_30plus() {
         .state
         .mods
         .get_need_heart_modifier(proof, HeartColor::Heart00);
-    eprintln!("[12b] heart00 mod: {}", h00);
     // Card says: "30以上の場合、さらに必要ハートをheart0x2減らす"
     assert_eq!(h00, -2, "12b: cost >= 30 -> heart00 -2, got {}", h00);
 }

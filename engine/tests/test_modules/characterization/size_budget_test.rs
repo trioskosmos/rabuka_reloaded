@@ -22,7 +22,6 @@ use rabuka_engine::core::types::*;
 /// Sizes are pointer-width dependent; dev build = default features, 64-bit.
 #[test]
 fn hot_struct_size_budget() {
-    println!("=== HOT STRUCT SIZES (default features, 64-bit) ===");
     let _ = size_of::<GameModifiers>();
 
     // Reference sizes are informational landmarks, not ceilings.
@@ -52,15 +51,7 @@ fn hot_struct_size_budget() {
 
     for &(name, actual, reference) in &rows {
         if actual > reference {
-            println!(
-                "  {:<24} {:>5} B (reference {} — GREW by {} B; intentional? bump the reference)",
-                name,
-                actual,
-                reference,
-                actual - reference
-            );
         } else {
-            println!("  {:<24} {:>5} B (reference {})", name, actual, reference);
         }
     }
 

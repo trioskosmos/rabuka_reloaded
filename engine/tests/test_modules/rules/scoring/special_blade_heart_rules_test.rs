@@ -82,14 +82,6 @@ fn perform_live(
         let pending = game.pending_choice_type();
         // Permanent-ish trace: log phase transitions and pending prompts only.
         if phase != prev_phase || pending.is_some() {
-            eprintln!(
-                "[PERFORM_LIVE] phase={} pending={:?} p1_hand={} p1_deck={} p1_wait={}",
-                phase,
-                pending,
-                game.state.player1.hand.len(),
-                game.state.player1.main_deck.cards.len(),
-                game.state.player1.waitroom.cards.len()
-            );
             prev_phase = phase.clone();
         }
         if let Some(_choice) = game.state.get_pending_choice() {
@@ -126,7 +118,6 @@ fn accept_discard(game: &mut TestGame) {
         game.get_pending_choice()
     {
         let count = *count;
-        eprintln!("[DIA] accepting discard of {} revealed cards", count);
         game.select_indices(&(0..count).collect::<Vec<_>>());
     } else {
         panic!(
@@ -204,11 +195,6 @@ fn solitude_rain_revealed_by_yell_draws_one_card() {
         skip_choices,
     );
 
-    eprintln!(
-        "[RESULT] treated_hand={} control_hand={}",
-        treated_hand,
-        control.state.player1.hand.len()
-    );
     assert_eq!(
         treated_hand,
         control.state.player1.hand.len() + 1,
@@ -259,11 +245,6 @@ fn failed_live_still_resolves_yell_draw_icons() {
         skip_choices,
     );
 
-    eprintln!(
-        "[RESULT] failed-live hand={} control hand={}",
-        game.state.player1.hand.len(),
-        control.state.player1.hand.len()
-    );
     assert_eq!(
         game.state.player1.hand.len(),
         control.state.player1.hand.len() + 1,
@@ -298,11 +279,6 @@ fn yell_draw_refreshes_deck_when_empty() {
     // must refresh the 3 waitroom cards and draw one of them.
     perform_live(&mut game, live, Some(vec![fill, sr]), skip_choices);
 
-    eprintln!(
-        "[RESULT] deck={} waitroom={}",
-        game.state.player1.main_deck.cards.len(),
-        game.state.player1.waitroom.cards.len()
-    );
     assert_eq!(
         game.state.player1.main_deck.cards.len(),
         2,
@@ -365,11 +341,6 @@ fn re_yell_revealed_draw_icon_draws() {
     // Control: identical board, plain filler instead of Solitude Rain.
     let control = dia_game(&[FILLER, FILLER, FILLER, FILLER, FILLER]);
 
-    eprintln!(
-        "[RESULT] re-yell treated_hand={} control_hand={}",
-        treated_hand,
-        control.state.player1.hand.len()
-    );
     assert_eq!(
         treated_hand,
         control.state.player1.hand.len() + 1,
@@ -481,11 +452,6 @@ fn score_icon_revealed_by_yell_adds_to_cheer_and_score() {
         skip_choices,
     );
 
-    eprintln!(
-        "[RESULT] cheer={} total_score={}",
-        game.state.player1_cheer_blade_heart_count,
-        last_p1_snap(&game).total_score
-    );
     assert_eq!(
         game.state.player1_cheer_blade_heart_count, 1,
         "the yell-revealed score icon must count once (rule 8.4.2.1)"
@@ -523,11 +489,6 @@ fn live_zone_special_icons_do_not_apply() {
     let live = dash_in_zone;
     perform_live(&mut game, live, None, skip_choices);
 
-    eprintln!(
-        "[RESULT] cheer={} total_score={}",
-        game.state.player1_cheer_blade_heart_count,
-        last_p1_snap(&game).total_score
-    );
     assert_eq!(
         game.state.player1_cheer_blade_heart_count, 0,
         "an in-zone score icon must NOT count toward the cheer total"

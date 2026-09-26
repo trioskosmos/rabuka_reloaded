@@ -55,15 +55,6 @@ fn live_start_optional_energy_gains_chosen_heart() {
     game.set_live_card(live_card);
 
     let before = heart_mods(&game, shizuku);
-    eprintln!(
-        "[BEFORE] total: 01={} 02={} 03={} 04={} 05={} 06={}",
-        before[0],
-        before[1],
-        before[2],
-        1 + before[3],
-        3 + before[4],
-        before[5]
-    );
 
     game.pass();
     game.pass();
@@ -87,15 +78,6 @@ fn live_start_optional_energy_gains_chosen_heart() {
     game.select_option(3);
 
     let after = heart_mods(&game, shizuku);
-    eprintln!(
-        "[AFTER]  total: 01={} 02={} 03={} 04={} 05={} 06={}",
-        after[0],
-        after[1],
-        after[2],
-        1 + after[3],
-        3 + after[4],
-        after[5]
-    );
 
     assert_eq!(after[3], 1, "heart04 should have +1 modifier");
     assert_eq!(after[4], 0, "heart05 should have 0 modifier");

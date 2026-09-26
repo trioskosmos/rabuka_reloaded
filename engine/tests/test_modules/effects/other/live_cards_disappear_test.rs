@@ -58,7 +58,6 @@ fn live_cards_stuck_in_live_zone_instead_of_discard() {
     game.state.player2.stage.stage = [-1, -1, -1];
 
     let total_before = count_all_cards(&game);
-    eprintln!("total cards before: {}", total_before);
 
     advance_to_live_card_set(&mut game);
     game.set_live_card(live1);
@@ -66,15 +65,6 @@ fn live_cards_stuck_in_live_zone_instead_of_discard() {
     game.set_live_card(live3);
 
     let total_after_set = count_all_cards(&game);
-    eprintln!(
-        "total after set: {} hand:{} live:{} wait:{} deck:{} res:{}",
-        total_after_set,
-        game.state.player1.hand.cards.len(),
-        game.state.player1.live_card_zone.cards.len(),
-        game.state.player1.waitroom.cards.len(),
-        game.state.player1.main_deck.cards.len(),
-        game.state.resolution_zone.cards.len()
-    );
 
     assert_eq!(game.state.player1.live_card_zone.cards.len(), 3);
     assert!(game.state.player1.waitroom.cards.is_empty());
@@ -82,12 +72,9 @@ fn live_cards_stuck_in_live_zone_instead_of_discard() {
     game.pass();
     game.pass();
 
-    eprintln!("phase: {:?}", game.state.current_phase);
-
     let mut safety = 20;
     while game.has_pending_choice() && safety > 0 {
         let ct = game.pending_choice_type().unwrap_or_default();
-        eprintln!("choice: {}", ct);
         if ct == "SelectAutoAbility" {
             game.select_indices(&[]);
         } else if ct == "SelectLiveSuccess" {
@@ -123,17 +110,6 @@ fn live_cards_stuck_in_live_zone_instead_of_discard() {
     }
 
     let total_after = count_all_cards(&game);
-    eprintln!(
-        "total after: {} hand:{} live:{} wait:{} deck:{} succ:{} res:{} rev:{}",
-        total_after,
-        game.state.player1.hand.cards.len(),
-        game.state.player1.live_card_zone.cards.len(),
-        game.state.player1.waitroom.cards.len(),
-        game.state.player1.main_deck.cards.len(),
-        game.state.player1.success_live_card_zone.cards.len(),
-        game.state.resolution_zone.cards.len(),
-        game.state.revealed_cards.len()
-    );
 
     assert_eq!(
         total_before,

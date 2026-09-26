@@ -219,11 +219,6 @@ fn dazzling_q187_exclude_selected_liella_other_pickable() {
             .map_or(0, rabuka_engine::core::game_modifiers::ModifierEntry::total)
             > 0
     };
-    eprintln!(
-        "[DAZZLING] kanon blade: {:?}, liella blade: {:?}",
-        game.state.mods.blade_modifiers.get(&kanon),
-        game.state.mods.blade_modifiers.get(&liella)
-    );
     // Both selected members should have blade
     let kanon_blade = game.state.mods.get_blade_modifier(kanon);
     let liella_blade = game.state.mods.get_blade_modifier(liella);

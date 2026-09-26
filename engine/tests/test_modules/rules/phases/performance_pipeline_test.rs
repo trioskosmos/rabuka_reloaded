@@ -116,22 +116,6 @@ fn performance_pipeline_blade_yell_heart_score() {
     // Base hearts: h01=5, h03=5, h06=3 (13). Yell adds h03 via b_heart03.
     // With 7 blades and all cheer cards, 7 yell cards × heart03=1 = 7 heart03.
     // Total: h01=5, h03=12, h06=3 = 20. Should satisfy 15.
-    eprintln!(
-        "DEBUG: lives={:?} total_hearts={:?} yell={:?} member={:?}",
-        perf.lives
-            .iter()
-            .map(|l| (l.passed, &l.required, &l.filled))
-            .collect::<Vec<_>>(),
-        perf.total_hearts,
-        perf.yell_cards
-            .iter()
-            .map(|y| &y.blade_hearts)
-            .collect::<Vec<_>>(),
-        perf.member_contributions
-            .iter()
-            .map(|m| &m.base_hearts)
-            .collect::<Vec<_>>(),
-    );
     assert!(
         perf.lives.iter().any(|l| l.passed),
         "P1: at least one live card should pass heart check"

@@ -54,8 +54,6 @@ fn matching_group_discard_look_four_increases_hand() {
     let hand_after = game.state.player1.hand.cards.len();
     let deck_after = game.state.player1.main_deck.cards.len();
     let discard_after = game.state.player1.waitroom.cards.len();
-    eprintln!("[KOTORI] hand: {}->{}, deck: {}->{}, discard: {}->{}",
-        hand_before, hand_after, deck_before, deck_after, discard_before, discard_after);
     assert!(
         hand_after > hand_before,
         "Should have gained cards from look_and_select: before={}, after={}",

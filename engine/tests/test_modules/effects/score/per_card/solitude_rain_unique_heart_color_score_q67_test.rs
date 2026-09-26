@@ -48,7 +48,6 @@ fn solitude_q67_hasetsu_member_with_heart01_score_plus_1() {
     }
 
     let score_mod = game.state.mods.get_score_modifier(solitude);
-    eprintln!("[SOLITUDE] score_mod with heart01 member: {}", score_mod);
     // hasetsu has heart01, heart02, heart04 → 3 unique colors → +3
     assert_eq!(
         score_mod, 3,
@@ -90,6 +89,5 @@ fn solitude_q67_non_hasetsu_member_no_score() {
     }
 
     let score_mod = game.state.mods.get_score_modifier(solitude);
-    eprintln!("[SOLITUDE] score_mod with non-虹ヶ咲: {}", score_mod);
     assert_eq!(score_mod, 0, "Non-虹ヶ咲 should not contribute score");
 }

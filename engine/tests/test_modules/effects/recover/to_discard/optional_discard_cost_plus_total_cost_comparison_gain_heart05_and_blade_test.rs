@@ -84,20 +84,9 @@ fn kosuzu_bp6_condition_met_gains_heart05_and_blade() {
 
     game.print_trace();
 
-    eprintln!(
-        "[DEBUG] blade_modifiers: {:?}",
-        game.state.mods.blade_modifiers
-    );
-    eprintln!(
-        "[DEBUG] heart_modifiers: {:?}",
-        game.state.mods.heart_modifiers
-    );
-    eprintln!("[DEBUG] kosuzu={}", kosuzu);
     for (k, v) in &game.state.mods.blade_modifiers {
-        eprintln!("  blade mod: card={} val={}", k, v);
     }
     for (k, v) in &game.state.mods.heart_modifiers {
-        eprintln!("  heart mod: card={} val={:?}", k, v);
     }
 
     // 蓮ノ空 total (36) > opponent (4) → should gain blade + heart05

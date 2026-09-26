@@ -22,7 +22,6 @@ fn pl_s_bp7_010_n_accept_bottom_card_to_fourth_from_top() {
     if !game.has_pending_choice() {
         panic!("expected the optional move-to-4th choice");
     }
-    eprintln!("[CHIKA] choice: {}", game.pending_choice_summary());
     match game.pending_choice_type().as_deref() {
         Some("SelectTarget") => game.select_option(1),
         Some("SelectCard") => game.select_indices(&[0]),

@@ -45,14 +45,7 @@ fn kidou_card_play_to_stage_not_softlocked() {
         .iter()
         .any(|a| a.action_type == game_setup::ActionType::PlayMemberToStage);
 
-    eprintln!("Actions after playing kidou card to stage:");
     for (i, a) in actions.iter().enumerate() {
-        eprintln!(
-            "  [{}] {:?} {}",
-            i,
-            a.action_type,
-            a.description.lines().next().unwrap_or("")
-        );
     }
 
     assert!(has_pass, "Should have PASS action");

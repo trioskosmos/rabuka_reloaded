@@ -53,7 +53,6 @@ fn debut_mill_two_live_fourth_q226_position_clamps_to_bottom() {
     // Actually: initial 4, discards top 2 → deck=2. Places live at 4th from top → clamped to index 2 → deck[2] = live
     // But deck has 2 cards (indices 0,1). Clamping to index 2 means at the end → deck=3
     let deck = &game.state.player1.main_deck.cards;
-    eprintln!("[RINA] deck final: {:?}", deck);
     assert_eq!(deck.len(), 3, "Deck = 2 remaining + 1 placed = 3");
     // The last card should be the live card (placed at clamped bottom position)
     assert_eq!(deck[2], live, "Live card is at bottom of deck");

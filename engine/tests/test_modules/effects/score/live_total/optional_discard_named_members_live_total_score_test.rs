@@ -266,24 +266,6 @@ fn joint_live_start_hand_copy_counts_as_named_card() {
     trigger_live_start_ability(&mut game, joint_on_stage);
     handle_optional_cost(&mut game, &[0, 1]);
 
-    eprintln!(
-        "[SELF_DISCARD] hand={:?} wait={:?}",
-        game.state
-            .player1
-            .hand
-            .cards
-            .iter()
-            .map(|&id| game.name(id))
-            .collect::<Vec<_>>(),
-        game.state
-            .player1
-            .waitroom
-            .cards
-            .iter()
-            .map(|&id| game.name(id))
-            .collect::<Vec<_>>(),
-    );
-
     assert_eq!(
         game.state.player1.hand.cards.len(),
         hand_before - 2,

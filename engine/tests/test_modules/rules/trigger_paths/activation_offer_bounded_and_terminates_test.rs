@@ -20,7 +20,6 @@ fn count_sayaka_offers(game: &TestGame, sayaka: i16) -> usize {
         })
         .collect();
     for a in &acts {
-        println!("DBG cost_struct={:?}", a.parameters.as_ref().map(|p| p.base_cost));
     }
     acts.len()
 }
@@ -49,7 +48,6 @@ fn sayaka_activation_charges_energy_and_terminates() {
     if let Some(card) = game.state.card_database.get_card(game.id("PL!-bp5-004-R＋")) {
         for (idx, ar) in card.abilities.iter().enumerate() {
             let ab = ar.resolve();
-            println!("DBG umi ability[{idx}] cost={:?}", ab.cost);
         }
     }
     for step in 0..20 {
@@ -83,7 +81,6 @@ fn sayaka_activation_charges_energy_and_terminates() {
     }
 
     for l in &log {
-        println!("{}", l);
     }
     assert!(
         activations <= 5,

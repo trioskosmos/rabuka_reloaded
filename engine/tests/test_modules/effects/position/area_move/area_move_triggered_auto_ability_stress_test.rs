@@ -29,24 +29,7 @@ fn energy_p2(g: &TestGame) -> u8 {
 
 fn dbg(g: &TestGame) {
     let s1 = &g.state.player1.stage.stage;
-    eprintln!(
-        "  P1 stage: [{},{},{}] e={} ph={:?} tp={:?} t={}",
-        s1[0],
-        s1[1],
-        s1[2],
-        energy_p1(g),
-        g.state.current_phase,
-        g.state.current_turn_phase,
-        g.state.turn_number
-    );
     let s2 = &g.state.player2.stage.stage;
-    eprintln!(
-        "  P2 stage: [{},{},{}] e={}",
-        s2[0],
-        s2[1],
-        s2[2],
-        energy_p2(g)
-    );
 }
 
 fn drain(game: &mut TestGame, _label: &str) {
@@ -83,7 +66,6 @@ fn drain(game: &mut TestGame, _label: &str) {
 }
 
 fn activate_and_drain(game: &mut TestGame, card: i16, label: &str) {
-    eprintln!("--- {}: activate {}", label, card);
     dbg(game);
     game.activate_ability(card);
     drain(game, label);

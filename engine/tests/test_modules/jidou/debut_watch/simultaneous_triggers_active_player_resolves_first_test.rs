@@ -68,7 +68,6 @@ fn baton_touch_activates_energy() {
     game.add_to_stage(MemberArea::Center, hanafu);
 
     let e_before = active_energy(&game);
-    eprintln!("Energy before baton touch: {}", e_before);
 
     game.state.player1.hand.cards.push(replacer);
     game.play_to_stage(replacer, MemberArea::Center);
@@ -76,12 +75,6 @@ fn baton_touch_activates_energy() {
 
     let e_after = active_energy(&game);
     // 花帆 cost=9, replacer cost=10, net cost=1. Ability +2. Net: -1+2=+1
-    eprintln!(
-        "Energy after: {} (expected {} = {} + 1)",
-        e_after,
-        e_before + 1,
-        e_before
-    );
     assert_eq!(
         e_after,
         e_before,
@@ -114,7 +107,6 @@ fn edelnote_appearance_waits_opponent() {
     drain_all(&mut game);
 
     let opp_wait = game.state.mods.get_orientation_modifier(opp_member);
-    eprintln!("Opponent wait state: {:?}", opp_wait);
     assert_eq!(
         opp_wait,
         Some("wait"),
@@ -146,16 +138,13 @@ fn q84_both_triggers_in_baton_touch_resolve_ordered() {
     game.state.player2.stage.stage = [opp_member, -1, -1];
 
     let e_before = active_energy(&game);
-    eprintln!("Energy before: {}", e_before);
 
     game.state.player1.hand.cards.push(edelnote);
     game.play_to_stage(edelnote, MemberArea::Center);
     drain_all(&mut game);
 
     let e_after = active_energy(&game);
-    eprintln!("Energy after: {}", e_after);
     let opp_wait = game.state.mods.get_orientation_modifier(opp_member);
-    eprintln!("Opponent wait state: {:?}", opp_wait);
 
     // 花帆 requires cost >=10 蓮ノ空 — edelnote is cost 4, not triggered → no energy activation
     assert_eq!(

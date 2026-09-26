@@ -76,12 +76,6 @@ fn live_success_both_sides_draw_discard_advances_turn() {
         if !game.has_pending_choice() {
             game.pass();
         }
-        eprintln!(
-            "[loop] phase={:?} tphase={:?} pending={}",
-            game.state.current_phase,
-            game.state.current_turn_phase,
-            game.pending_choice_summary()
-        );
         if game
             .state
             .current_phase

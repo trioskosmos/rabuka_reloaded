@@ -21,10 +21,6 @@ fn answer_optional(game: &mut TestGame, accept: bool) -> bool {
             }
         }
         _ => {
-            eprintln!(
-                "[answer_optional] unmatched prompt: {}",
-                game.pending_choice_summary()
-            );
             false
         }
     }

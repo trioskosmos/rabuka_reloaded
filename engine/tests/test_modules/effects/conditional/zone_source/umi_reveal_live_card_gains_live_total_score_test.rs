@@ -45,8 +45,6 @@ fn q176_activate_creates_blind_reveal_choice_opponent_controls_pick() {
             );
             // picker=opponent means OPPONENT makes the choice, so choice_player_id should be p2
             let entry = game.state.ability_queue.current_entry().expect("Queue entry");
-            eprintln!("DEBUG Q176: entry.player_id={:?} choice_player_id={:?}", 
-                entry.player_id, entry.choice_player_id);
             assert_eq!(
                 entry.choice_player_id.as_deref(),
                 Some("p2"),

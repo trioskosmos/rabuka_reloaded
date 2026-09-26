@@ -59,7 +59,6 @@ fn dream_believers_one_hasetsu_plus_other_pass() {
     );
 
     let mod_val = game.state.mods.get_score_modifier(dream);
-    eprintln!("[DREAM] 1 hasetsu + 1 other: mod={}", mod_val);
     // Should be 1 (2 members, 1 is 蓮ノ空, distinct names)
     assert_eq!(mod_val, 1, "Condition passes with 1 蓮ノ空 + 1 non-蓮ノ空");
 }
@@ -125,7 +124,6 @@ fn dream_believers_q212_multiname_no_match() {
     );
 
     let mod_val = game.state.mods.get_score_modifier(dream);
-    eprintln!("[DREAM] rurino + multi: mod={} (expected 0)", mod_val);
     // Q212: condition should NOT apply
     assert_eq!(mod_val, 0, "Q212: multi-name card breaks condition");
 }

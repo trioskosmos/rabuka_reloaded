@@ -106,74 +106,9 @@ fn setup_game_with_deck_top(deck_top: &[&str]) -> (TestGame, i16, i16) {
 /// helper so the test body reads as behaviour, not as a debugging session, and
 /// so the next failure in this area prints the same thing.
 fn dump_live_diagnostics(game: &mut TestGame, sumire: i16, wien: i16) {
-    eprintln!("rule_log: {:?}", game.state.rule_log);
-    eprintln!(
-        "revealed: {:?}",
-        game.state
-            .revealed_cards
-            .iter()
-            .map(|id| game.name(*id))
-            .collect::<Vec<_>>()
-    );
     for &id in &game.state.revealed_cards {
         let card = game.db.get_card(id).unwrap();
-        eprintln!(
-            "revealed id {} {} has_blade_heart={} blade_heart={:?} blade={}",
-            id,
-            card.card_no,
-            card.has_blade_heart(),
-            card.blade_heart,
-            card.blade
-        );
     }
-    eprintln!("yell_occurred: {}", game.state.yell_occurred);
-    eprintln!(
-        "live_zone: {:?}",
-        game.state
-            .player1
-            .live_card_zone
-            .cards
-            .iter()
-            .map(|id| game.name(*id))
-            .collect::<Vec<_>>()
-    );
-    eprintln!(
-        "stage: {:?}",
-        game.state
-            .player1
-            .stage
-            .stage
-            .iter()
-            .map(|id| {
-                if *id == -1 {
-                    "empty".to_string()
-                } else {
-                    game.name(*id)
-                }
-            })
-            .collect::<Vec<_>>()
-    );
-    eprintln!("deck len: {}", game.state.player1.main_deck.cards.len());
-    eprintln!("phase: {}", game.state.current_phase);
-    eprintln!(
-        "player1 wait: {:?}",
-        game.state
-            .player1
-            .waitroom
-            .cards
-            .iter()
-            .map(|id| game.name(*id))
-            .collect::<Vec<_>>()
-    );
-    eprintln!(
-        "mods heart06 sumire: {} heart03 wien: {}",
-        heart06(game, sumire),
-        heart03(game, wien)
-    );
-    eprintln!(
-        "{}",
-        crate::helpers::ability_verdicts(game, "p1")
-    );
 }
 
 /// Real live yell with 3 no-blade cards → both Sumire and Wien gain.

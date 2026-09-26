@@ -108,7 +108,6 @@ fn emotion_one_in_success_zone() {
     assert_eq!(h00, 3, "1 EMOTION in success → +3 heart00 mod");
 
     let adjustments = snapshot_adjustments(&game);
-    eprintln!("[TEST ADJ] {:?}", adjustments);
     let heart_adj = adjustments.iter().find(|(_, _, c)| *c == 0);
     assert!(
         heart_adj.is_some(),

@@ -48,10 +48,6 @@ fn get_setsuna_heart_contribution(
 
     let snapshot = game.state.performance_snapshots.first();
     if let Some(snap) = snapshot {
-        eprintln!(
-            "Performance snapshot has {} member contributions",
-            snap.member_contributions.len()
-        );
         if let Some(mc) = snap
             .member_contributions
             .iter()
@@ -71,10 +67,8 @@ fn get_setsuna_heart_contribution(
                 base[HeartColor::Heart06.index()] + bonus[HeartColor::Heart06.index()],
             );
         } else {
-            eprintln!("Setsuna not found in contributions");
         }
     } else {
-        eprintln!("No performance snapshot available");
     }
     (0, 0, 0, 0, 0, 0, 0)
 }
@@ -110,10 +104,6 @@ fn setsuna_pb1_verify_card_metadata() {
     assert!(
         constant_ability.effect.is_some(),
         "Ability should have an effect"
-    );
-    eprintln!(
-        "Card verified: {} with ability triggers: {:?}",
-        setsuna, constant_ability.triggers
     );
 }
 
@@ -192,12 +182,6 @@ fn setsuna_pb1_constant_missing_heart_types_no_gain() {
     advance_to_live_card_set(&mut game);
     game.set_live_card(live_card);
 
-    eprintln!(
-        "Before advance_to_live_start: phase={}, snapshots={}",
-        game.state.current_phase,
-        game.state.performance_snapshots.len()
-    );
-
     advance_to_live_start(&mut game);
     game.pass(); // FirstAttackerPerformance → SecondAttackerPerformance (creates snapshot)
 
@@ -205,11 +189,6 @@ fn setsuna_pb1_constant_missing_heart_types_no_gain() {
         let contrib = get_setsuna_heart_contribution(&game, setsuna);
         (contrib.0, contrib.1, contrib.2, contrib.5)
     };
-
-    eprintln!(
-        "Test result: total={}, h01={}, h02={}, h05={}",
-        total, h01, h02, h05
-    );
 
     assert_eq!(
         total, 5,
@@ -273,8 +252,6 @@ fn setsuna_pb1_p_plus_variant_constant_heart_ability() {
 
     let (total, _, _, _, _, _, _) = get_setsuna_heart_contribution(&game, setsuna_p_plus);
 
-    eprintln!("P+ variant hearts: {}", total);
-
     assert_eq!(
         total, 6,
         "Setsuna P+ should get +1 ALL heart (got {})",
@@ -323,12 +300,10 @@ fn setsuna_pb1_constant_heart_persists_during_live() {
     game.pass(); // FirstAttackerPerformance → SecondAttackerPerformance (creates snapshot)
 
     let (total_1, _, _, _, _, _, _) = get_setsuna_heart_contribution(&game, setsuna);
-    eprintln!("First snapshot total: {}", total_1);
 
     game.pass();
 
     let (total_2, _, _, _, _, _, _) = get_setsuna_heart_contribution(&game, setsuna);
-    eprintln!("Second snapshot total: {}", total_2);
 
     assert_eq!(
         total_1, 6,
@@ -379,8 +354,6 @@ fn setsuna_pb1_constant_partial_heart_types_various_combos() {
     game.pass(); // FirstAttackerPerformance → SecondAttackerPerformance (creates snapshot)
 
     let (total, _, _, _, _, _, _) = get_setsuna_heart_contribution(&game, setsuna);
-
-    eprintln!("Partial heart types test: total={}", total);
 
     // This live card has heart02, heart04, heart05 (3 types, missing 1, 3, 6)
     // Condition should NOT trigger (needs all 6)

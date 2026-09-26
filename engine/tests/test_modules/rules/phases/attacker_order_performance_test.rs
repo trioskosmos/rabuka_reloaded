@@ -85,13 +85,6 @@ fn p2_first_attacker_performance_finalizes_p2_snapshot() {
         .rev()
         .find(|s| s.player_id == "p2")
         .expect("P2 should have a performance snapshot");
-    eprintln!(
-        "[P2_FIRST] success={} total={} lives={:?} cheer={}",
-        p2_snap.success,
-        p2_snap.total_score,
-        p2_snap.lives.iter().map(|l| l.passed).collect::<Vec<_>>(),
-        game.state.player2_cheer_blade_heart_count
-    );
 
     assert_eq!(p2_snap.lives.len(), 1, "P2's live must be judged (pre-fix this was 0)");
     assert!(

@@ -886,7 +886,6 @@ fn issue10_dream_with_you_high_blade_plus_1_score() {
 
     // With 3+4+5 = 12 blade on stage, condition should be met
     let score = game.state.mods.get_score_modifier(dream);
-    eprintln!("[10] score_mod: {}", score);
     assert_eq!(
         score, 1,
         "10: >= 10 blade on stage -> +1 score, got {}",
@@ -960,7 +959,6 @@ fn issue11_fanfare_15plus_cards_gives_blade() {
     }
 
     let blade = game.state.mods.get_blade_modifier(himeno);
-    eprintln!("[11a] himeno blade: {}", blade);
     assert_eq!(
         blade, 3,
         "11a: 15+ miracluck moved -> 3 blade, got {}",

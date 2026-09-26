@@ -53,10 +53,6 @@ fn mute_kibiriver_normal_flow() {
         rabuka_engine::card::HeartColor::Heart06,
     ] {
         let val = game.state.mods.get_heart_modifier(kasumi, *color);
-        eprintln!(
-            "[TEST_CHECK] card={} color={:?} modifier={}",
-            kasumi, color, val
-        );
     }
 
     // PL!N-bp5-002-R has heart03=3, heart04=1, heart05=1, heart06=1 in base_heart

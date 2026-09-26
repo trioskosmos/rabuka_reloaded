@@ -53,13 +53,11 @@ fn ladybug_q114_both_members_on_stage_reduces_hearts() {
     // Verify the engine processed without error and reduced hearts.
     // The exact reduction is visible in game state need_heart_modifiers.
     let heart_mods = &game.state.mods.need_heart_modifiers;
-    eprintln!("[LADYBUG] need_heart_modifiers: {:?}", heart_mods);
     let reduction: i32 = heart_mods
         .get(&ladybug)
         .and_then(|m| m.get(&rabuka_engine::card::HeartColor::Heart00))
         .map_or(0, rabuka_engine::core::game_modifiers::ModifierEntry::total);
     let all_mods = heart_mods.get(&ladybug);
-    eprintln!("[LADYBUG] all mods for ladybug: {:?}", all_mods);
     assert_eq!(
         reduction, -3,
         "Q114: Ladybug should reduce heart0 requirement by 3"

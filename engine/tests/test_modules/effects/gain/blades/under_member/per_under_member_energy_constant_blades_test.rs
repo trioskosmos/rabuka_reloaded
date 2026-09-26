@@ -19,16 +19,7 @@ fn constant_blades_equal_under_member_energy_count() {
 
     // Verify the card has abilities
     let abilities: Vec<_> = card.unwrap().resolved_abilities().collect();
-    eprintln!("[DEBUG] Mia has {} abilities", abilities.len());
     for a in &abilities {
-        eprintln!(
-            "  trigger={:?} effect.action={:?} per_unit={:?} location={:?} card_type={:?}",
-            a.triggers,
-            a.effect.as_ref().map(|e| &e.action),
-            a.effect.as_ref().and_then(|e| e.per_unit_any()),
-            a.effect.as_ref().and_then(|e| e.location_any()),
-            a.effect.as_ref().and_then(|e| e.card_type_any())
-        );
     }
 
     game.state.recalculate_constants();

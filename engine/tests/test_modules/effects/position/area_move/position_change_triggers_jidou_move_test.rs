@@ -43,10 +43,8 @@ fn position_change_swap_triggers_jidou_energy_draw() {
 
     // Play 千砂都 to left, きな子 to right
     let r1 = game.try_play_to_stage(chisato, rabuka_engine::zones::MemberArea::LeftSide);
-    eprintln!("[PLAY1] chisato→left: {:?}", r1);
     r1.expect("play chisato to left failed");
     let r2 = game.try_play_to_stage(kinako, rabuka_engine::zones::MemberArea::RightSide);
-    eprintln!("[PLAY2] kinako→right: {:?}", r2);
     r2.expect("play kinako to right failed");
 
     // Sanity: stage layout before swap
@@ -67,7 +65,6 @@ fn position_change_swap_triggers_jidou_energy_draw() {
     // generated ChoicePosition actions and select it.
     let actions = game.generated_actions();
     let descriptions: Vec<&str> = actions.iter().map(|a| a.description.as_str()).collect();
-    eprintln!("[POSITION_OPTIONS] {:?}", descriptions);
 
     let left_idx = actions
         .iter()

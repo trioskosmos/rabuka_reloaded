@@ -2676,7 +2676,6 @@ fn hareruya_q64_waitroom_only_five_distinct_liella_condition_met() {
     for ab in card.resolved_abilities() {
         if let Some(ref ef) = ab.effect {
             if let Some(ref cond) = ef.condition {
-                eprintln!("[DEBUG] condition: {:?}", cond);
             }
         }
     }

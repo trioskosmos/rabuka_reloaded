@@ -218,25 +218,14 @@ fn miraclerition_correct_positions_gains_score() {
     let megumi = game.id("PL!HS-bp1-015-N"); // center (藤島慈)
 
     // Debug: check stage setup before live start
-    eprintln!("[DEBUG] stage={:?}", game.state.player1.stage.stage);
     // Check card names
     for &cid in &[osawa, himeno, megumi] {
         let name = db.get_card(cid).map(|c| c.name.clone());
-        eprintln!("[DEBUG] cid={} name={:?}", cid, name);
     }
 
     let card_id = setup_miraclerition(&mut game, [himeno, megumi, osawa]);
 
-    eprintln!(
-        "[DEBUG] after setup: stage={:?}",
-        game.state.player1.stage.stage
-    );
-    eprintln!("[DEBUG] queue_idle={}", game.state.ability_queue.is_idle());
-    eprintln!("[DEBUG] pending_choice={}", game.has_pending_choice());
-    eprintln!("[DEBUG] modifiers={:?}", game.state.mods.score_modifiers);
-
     let score = game.state.mods.get_score_modifier(card_id);
-    eprintln!("[DEBUG] score={}", score);
     assert_eq!(
         score, 2,
         "Score should be +2 when all characters are at correct positions"

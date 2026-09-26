@@ -52,11 +52,6 @@ fn optional_unit_discard_draw_cost_gain_live_start_modify_cost_only_applies_to_d
     let sayaka_mod = game.state.mods.get_cost_modifier(sayaka);
     let non_doll_mod = game.state.mods.get_cost_modifier(non_doll);
 
-    eprintln!(
-        "cost mods: doll={} sayaka={} non_doll={}",
-        doll_mod, sayaka_mod, non_doll_mod
-    );
-
     assert_eq!(doll_mod, 5, "DOLLCHESTRA member should get +5 cost");
     assert_eq!(
         sayaka_mod, 5,

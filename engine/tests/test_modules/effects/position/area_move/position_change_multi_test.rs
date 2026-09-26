@@ -662,7 +662,6 @@ fn formation_change_destination_excludes_already_claimed_area() {
     // First member's destination choice.
     assert!(game.has_pending_choice(), "first destination choice");
     let first_opts = pending_target_options(&game);
-    eprintln!("[FORMATION] first options={:?}", first_opts);
     assert_eq!(first_opts.len(), 3, "first member sees all 3 areas");
 
     // Claim RIGHT for the first member.
@@ -672,7 +671,6 @@ fn formation_change_destination_excludes_already_claimed_area() {
     // Second member's destination choice: RIGHT must now be excluded.
     assert!(game.has_pending_choice(), "second destination choice");
     let second_opts = pending_target_options(&game);
-    eprintln!("[FORMATION] second options={:?}", second_opts);
     assert!(
         !second_opts.contains(&"right".to_string()),
         "collision rule: an area claimed by the first member must not be \
@@ -694,7 +692,6 @@ fn formation_change_destination_excludes_already_claimed_area() {
     }
 
     let st = game.state.player1.stage.stage;
-    eprintln!("[FORMATION] final stage={:?}", st);
     assert_eq!(
         st[2], liella_a,
         "first member moved to the RIGHT area it claimed"

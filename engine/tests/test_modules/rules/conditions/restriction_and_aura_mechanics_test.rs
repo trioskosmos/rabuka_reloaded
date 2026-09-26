@@ -344,7 +344,6 @@ fn sumire_bpb4004_double_baton_removes_both_and_clamps_cost() {
     rabuka_engine::game_setup::execute_action(&mut game.state, &chosen).expect("resolve");
     while game.has_pending_choice() {
         let c = game.pending_choice_summary();
-        eprintln!("[SUMIRE_CHOICE] {}", c);
         match game.pending_choice_type().as_deref() {
             Some("SelectTarget") => game.select_option(1),
             Some("SelectCard") => game.select_indices(&[0]),

@@ -123,7 +123,6 @@ fn eternalize_love_full_live_flow_heart00_reduction() {
         .state
         .mods
         .get_need_heart_modifier(live, rabuka_engine::card::HeartColor::Heart00);
-    println!("LIVE PHASE: need_heart modifier for heart00 = {}", modifier);
 
     // Advance through performance phases
     // FirstAttackerPerformance → SecondAttackerPerformance
@@ -145,10 +144,6 @@ fn eternalize_love_full_live_flow_heart00_reduction() {
         .state
         .mods
         .get_need_heart_modifier(live, rabuka_engine::card::HeartColor::Heart00);
-    println!(
-        "AFTER LIVE: need_heart modifier for heart00 = {}",
-        modifier_after
-    );
 
     // After live end: modifier is -3 (correct single application).
     // Before the dedup fix this was -6 due to double-counting in snapshot restore.

@@ -51,10 +51,6 @@ fn live_start_three_distinct_group_members_add_six_score() {
         score_mod, 6,
         "3 distinct 蓮ノ空 members should give +6 score mod (2 each)"
     );
-    eprintln!(
-        "[LINK] Score mod with 3 distinct 蓮ノ空 members: {} ✓",
-        score_mod
-    );
 }
 
 /// LiveStart with 1 蓮ノ空 member → +2 score.
@@ -85,7 +81,6 @@ fn live_start_one_group_member_adds_two_score() {
     let score_mod = game.state.mods.get_score_modifier(live_card_id);
 
     assert_eq!(score_mod, 2, "1 蓮ノ空 member should give +2 score mod");
-    eprintln!("[LINK] Score mod with 1 member: {} ✓", score_mod);
 }
 
 /// LiveStart with 0 蓮ノ空 members → +0 score added on top of base score 0.

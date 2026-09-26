@@ -58,7 +58,6 @@ fn resolve_and_count_position_changes(game: &mut TestGame) -> (bool, usize) {
                 if count == 1 {
                     first_found = true;
                 } else {
-                    eprintln!("[TEST] Position change choice #{} appeared", count);
                 }
                 // Resolve: select first available destination, or skip if possible
                 let actions = game.generated_actions();
@@ -73,7 +72,6 @@ fn resolve_and_count_position_changes(game: &mut TestGame) -> (bool, usize) {
                 game.select_option(0);
             }
             _ => {
-                eprintln!("[TEST] Other choice type: {:?}", choice);
                 break;
             }
         }
@@ -147,10 +145,6 @@ fn live_start_unit_swap_two_mirakura_one_position_change() {
                 if target == "position|destination" =>
             {
                 extra_position_changes += 1;
-                eprintln!(
-                    "[TEST] BUG: Extra position change #{}",
-                    extra_position_changes
-                );
                 // Skip or resolve
                 let actions = game.generated_actions();
                 if actions.is_empty() {

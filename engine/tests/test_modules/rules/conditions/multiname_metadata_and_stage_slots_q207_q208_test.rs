@@ -78,12 +78,4 @@ fn q208_multiname_and_single_occupy_two_slots_with_distinct_name_substrings() {
 
     // The multi-name can be referenced as 澁谷かのん or 日野下花帆
     // to differentiate from the single 上原歩夢
-    eprintln!(
-        "[KOTORI] Multi: {} | Single: {}",
-        card.name,
-        game.db
-            .get_card(single_ayumu)
-            .map(|c| c.name.as_ref())
-            .unwrap_or("?")
-    );
 }

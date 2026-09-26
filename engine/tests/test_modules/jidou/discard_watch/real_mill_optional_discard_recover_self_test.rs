@@ -112,10 +112,6 @@ fn real_deck_top_mill_offers_discard_and_recovers_self() {
 
     // Report the real movement the engine recorded.
     for mv in game.state.turn_movements.iter() {
-        eprintln!(
-            "[MV] card={} src={:?} dst={:?}",
-            mv.moved_card_id, mv.source_zone, mv.dest_zone
-        );
     }
 
     assert!(

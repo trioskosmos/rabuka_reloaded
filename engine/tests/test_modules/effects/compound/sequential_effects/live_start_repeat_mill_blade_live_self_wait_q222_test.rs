@@ -240,10 +240,6 @@ fn live_start_repeat_mill_blade_initial_plus_four_repeats_mills_five_lives() {
     game.select_option(1);
     game.drain_auto_ability_choices();
     // iter 4 (max)
-    eprintln!(
-        "[TEST_DEBUG] before final select_option pending={:?}",
-        game.state.get_pending_choice()
-    );
     game.select_option(1);
     game.drain_auto_ability_choices();
     // after iter 4, no more repeat prompt → done

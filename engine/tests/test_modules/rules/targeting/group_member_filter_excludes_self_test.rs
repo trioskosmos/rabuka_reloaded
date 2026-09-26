@@ -27,7 +27,6 @@ fn group_member_filter_excludes_activating_member() {
         game.state.card_database.get_card(riko).is_some(),
         "Riko card should exist in DB"
     );
-    println!("Stage: {:?}", stage_data);
 
     // Test the filter that should be used by the ability
     let filter = rabuka_engine::ability::util::filter_from_parts_full(
@@ -44,36 +43,15 @@ fn group_member_filter_excludes_activating_member() {
         None, // exclude_characters
     );
 
-    println!("Testing filter with exclude_self={}", yoshiko);
-
     for (i, &card_id) in stage_data.iter().enumerate() {
         if card_id != -1 {
             let matches = filter.matches(&card_db, card_id, true);
-            println!(
-                "Stage[{}]: {} (id: {}) matches: {}",
-                i,
-                card_db
-                    .get_card(card_id)
-                    .map(|c| &c.name)
-                    .map_or("Unknown", |v| v),
-                card_id,
-                matches
-            );
         }
     }
 
     // Get matching indices
     let matching_indices =
         rabuka_engine::ability::util::matching_indices(&stage_data, &card_db, &filter, true);
-
-    println!("Matching indices: {:?}", matching_indices);
-    println!(
-        "Cards that would be moved: {:?}",
-        matching_indices
-            .iter()
-            .map(|&i| stage_data[i])
-            .collect::<Vec<_>>()
-    );
 
     // Stage: [Chika (Aqours), Yoshiko (Aqours, excluded), Riko (Aqours)]
     // Filter: member_card, Aqours, exclude_self=yoshiko

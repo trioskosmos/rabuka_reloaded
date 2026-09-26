@@ -55,10 +55,6 @@ fn hanamusubi_q213_member_card_moved_before_live_start() {
 
     // After phase transitions, the member card should be in waitroom
     let after_waitroom = game.state.player1.waitroom.cards.len();
-    eprintln!(
-        "[HANAMUSUBI] waitroom: before={} after={}",
-        before_waitroom, after_waitroom
-    );
     // The member was moved to waitroom (at least 1 card added)
     assert!(
         after_waitroom >= before_waitroom,

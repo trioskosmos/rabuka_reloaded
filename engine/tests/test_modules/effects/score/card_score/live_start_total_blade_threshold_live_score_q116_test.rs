@@ -80,7 +80,6 @@ fn dream_with_you_blade_6_no_score() {
     }
 
     let mod_val = game.state.mods.get_score_modifier(dream);
-    eprintln!("[DREAM] score_mod={}", mod_val);
     assert_eq!(mod_val, 0, "Blade <10 → no score");
 }
 
