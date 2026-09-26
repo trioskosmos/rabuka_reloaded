@@ -6,6 +6,7 @@ use alloc::{
     vec::Vec,
 };
 use crate::ability::enums::Zone;
+use crate::card::Condition;
 use crate::core::types::{AbilityTrigger, Duration, Phase, ReplacementEffect, TurnPhase};
 use crate::player::Player;
 use crate::HashMap;
@@ -442,6 +443,134 @@ impl GameState {
     /// Core TAS implementation that takes an explicit TriggerEvent.
     /// Callers should construct and pass the event so the scan has
     /// accurate context about what triggered it.
+    /// Can this condition never be satisfied by a card that is on stage?
+    ///
+    /// A 「〜が自分の控え室にある場合」 trigger belongs to a card in the
+    /// discard, so a staged card carrying one would fire it permanently
+    /// prematurely. `preceding_moved` watchers are exempt: they track OTHER
+    /// cards reaching the discard, not this card being in it.
+    fn is_stale_discard_condition(condition: &Condition, card_is_in_discard: bool) -> bool {
+        if condition.get_source() == Some("preceding_moved") || card_is_in_discard {
+            return false;
+        }
+        let location = condition
+            .get_location()
+            .or_else(|| {
+                condition
+                    .get_trigger_event()
+                    .and_then(|t| t.location.as_deref())
+            })
+            .unwrap_or("");
+        Zone::from_str(location) == Some(Zone::Discard)
+            && (condition.get_card_type().as_deref() == Some("member_card")
+                || condition.get_target() == Some("self"))
+    }
+
+    /// Claim `num_key` for this movement batch. False when the ability must not
+    /// run again here.
+    ///
+    /// Two guards live here because the stage and live-card scans both need
+    /// them and they must not drift: the just-completed ability re-fires only
+    /// on a FRESH batch, and nothing already triggered in THIS batch may
+    /// re-enqueue.
+    fn claim_batch_slot(
+        triggered: &mut SmallVec<[u32; 16]>,
+        num_key: u32,
+        skip_key: Option<u32>,
+        same_batch_as_completed: bool,
+    ) -> bool {
+        if skip_key == Some(num_key) && same_batch_as_completed {
+            return false;
+        }
+        if triggered.contains(&num_key) {
+            return false;
+        }
+        triggered.push(num_key);
+        true
+    }
+
+    /// Is this marker-carrying watcher already armed by the movement hook?
+    ///
+    /// A 「対戦相手のカードの効果でも発動する。」 watcher on an AREA MOVE is
+    /// enqueued by push_movement_event, and only when the move was caused by
+    /// the other player. Attribute via the watcher's own turn-scoped move
+    /// record, which is stable across rescan passes unlike the batch sets.
+    /// Energy-placement watchers have no such record; the generic path below
+    /// handles both causes for them.
+    fn hooked_by_foreign_cause(
+        &self,
+        ability: &crate::card::Ability,
+        card_id: i16,
+        player_id: &str,
+        card_name: &str,
+    ) -> bool {
+        if !ability
+            .effect
+            .as_ref()
+            .is_some_and(|e| e.fires_on_opponent_effects())
+        {
+            return false;
+        }
+        let Some(rec) = self
+            .turn_area_movements
+            .iter()
+            .rev()
+            .find(|m| m.moved_card_id == card_id)
+        else {
+            return false;
+        };
+        if rec.cause_player_id == player_id {
+            return false;
+        }
+        log::debug!(
+            "[TRIGGER_SCOPE] {} last move caused by {} (hook owns foreign-cause firings)",
+            card_name,
+            rec.cause_player_id
+        );
+        true
+    }
+
+    /// Evaluate an event-based condition NOW rather than at resolution time, so
+    /// an auto ability whose trigger has not happened is never queued. Returns
+    /// whether the ability may proceed.
+    ///
+    /// `card_id` stands in as the activating card for the duration of the
+    /// check, because the condition is written from the trigger's point of view.
+    ///
+    /// Only the stage scan calls this. The live-card scan has the same four
+    /// lines inline: evaluating a condition borrows `&mut self`, which the card
+    /// borrow it is nested inside forbids, and only the stage site has the
+    /// debug log — so sharing them was a false economy.
+    fn prefilter_event_condition(
+        &mut self,
+        condition: &Condition,
+        card_id: i16,
+        moved_cards: &[i16],
+    ) -> bool {
+        if !Self::condition_is_event_based(condition) {
+            return true;
+        }
+        let saved_activating = self.activating_card;
+        self.activating_card = Some(card_id);
+        let ctx = crate::ability::condition::ConditionContext::with_moved_cards(
+            self,
+            moved_cards,
+        );
+        let passes = ctx.evaluate_condition(condition);
+        self.activating_card = saved_activating;
+        passes
+    }
+
+    /// A 「置かれた」 trigger is about a card that was JUST placed, so it
+    /// requires the card to be among this event's moves rather than merely
+    /// standing on the field.
+    fn requires_this_move(cond: &Condition, card_id: i16, moved_cards: &[i16]) -> bool {
+        cond.get_self_target().unwrap_or(false)
+            && cond.get_movement() == Some("moved")
+            && cond.get_locations().is_none_or(|l| l.len() < 2)
+            && !moved_cards.contains(&card_id)
+    }
+
     pub fn trigger_auto_abilities_for_player_with_event(
         &mut self,
         player_id: &str,
@@ -454,13 +583,21 @@ impl GameState {
         let just_completed_batch_matches =
             self.just_completed_batch_matches(&event.moved_cards);
         {
-            let player = if player_id_clone == self.player1.id {
+            // Copy the two id lists instead of borrowing the player. Both scans
+            // need `&mut self` to evaluate conditions under a temporary
+            // activating card, and a borrow of self.player1 held across the loop
+            // body would forbid that.
+            let scanning_player = if player_id_clone == self.player1.id {
                 &self.player1
             } else {
                 &self.player2
             };
+            let stage_ids: SmallVec<[i16; 3]> =
+                scanning_player.stage.stage.iter().copied().collect();
+            let live_ids: SmallVec<[i16; 8]> =
+                scanning_player.live_card_zone.cards.iter().copied().collect();
             // Scan stage cards for AUTO abilities
-            for (stage_idx, &card_id) in player.stage.stage.iter().enumerate() {
+            for (stage_idx, &card_id) in stage_ids.iter().enumerate() {
                 let card_position = crate::ability::util::pos_to_area(stage_idx);
                 if card_id == -1 {
                     continue;
@@ -506,48 +643,27 @@ impl GameState {
                                     );
                                 }
                                 if let Some(ref condition) = effect.condition {
-                                    // Guard: skip discard-location abilities when the
-                                    // card is on stage (prevents premature triggering
-                                    // of "this card is in discard" abilities).
-                                    // BUT: skip this guard for "preceding_moved"
-                                    // watchers -- those track OTHER cards moving to
-                                    // discard, not the card itself being in discard.
-                                    let cond_location = condition
-                                        .get_location()
-                                        .or_else(|| {
-                                            condition
-                                                .get_trigger_event()
-                                                .and_then(|t| t.location.as_deref())
-                                        })
-                                        .unwrap_or("");
-                                    if condition.get_source() != Some("preceding_moved")
-                                        && Zone::from_str(cond_location) == Some(Zone::Discard)
-                                        && (condition.get_card_type().as_deref()
-                                            == Some("member_card")
-                                            || condition.get_target() == Some("self"))
-                                    {
-                                        let in_discard =
-                                            self.player1.waitroom.cards.contains(&card_id)
-                                                || self.player2.waitroom.cards.contains(&card_id);
-                                        if !in_discard {
-                                            continue;
-                                        }
+                                    // A 「自分の控え室にある」 condition can never be
+                                    // satisfied by a card that is on stage, so such an
+                                    // auto ability is skipped rather than queued and
+                                    // rejected later.
+                                    let in_discard = self.player1.waitroom.cards.contains(&card_id)
+                                        || self.player2.waitroom.cards.contains(&card_id);
+                                    if Self::is_stale_discard_condition(condition, in_discard) {
+                                        continue;
                                     }
-                                }
-                                // Pre-filter: evaluate conditions during scanning
-                                // to prevent queuing auto abilities whose trigger
-                                // event hasn't occurred.  Only pre-filter event-
-                                // based condition types:
-                                //   - movement ("moved" / "moves")
-                                //   - appearance
-                                //   - card_count (all variants)
-                                // Other types (state, position, group, comparison,
-                                // state_change) depend on game state or events
-                                // that may change between TAS and ability
-                                // resolution, so they are deferred.
-                                if let Some(ref condition) = effect.condition {
-                                    let can_prefilter = Self::condition_is_event_based(condition);
-                                    if can_prefilter {
+                                    // Pre-filter: evaluate conditions during scanning
+                                    // to prevent queuing auto abilities whose trigger
+                                    // event hasn't occurred.  Only pre-filter event-
+                                    // based condition types:
+                                    //   - movement ("moved" / "moves")
+                                    //   - appearance
+                                    //   - card_count (all variants)
+                                    // Other types (state, position, group, comparison,
+                                    // state_change) depend on game state or events
+                                    // that may change between TAS and ability
+                                    // resolution, so they are deferred.
+                                    if Self::condition_is_event_based(condition) {
                                         let saved_activating = self.activating_card;
                                         self.activating_card = Some(card_id);
                                         let ctx = crate::ability::condition::ConditionContext::with_moved_cards(self, &event.moved_cards);
@@ -577,15 +693,15 @@ impl GameState {
                                     // prevent re-triggering on stale comparisons
                                     // like "energy_zone >= 0" during phase-based
                                     // energy placement).
-                                    if effect.trigger_type_any().as_deref() == Some("each_time") {
-                                        if matches!(
+                                    if effect.trigger_type_any().as_deref() == Some("each_time")
+                                        && matches!(
                                             condition.as_ref(),
                                             crate::card::Condition::Comparison { .. }
-                                        ) && condition.get_location() == Some("energy_zone")
-                                            && !self.last_energy_placed_by_effect()
-                                        {
-                                            continue;
-                                        }
+                                        )
+                                        && condition.get_location() == Some("energy_zone")
+                                        && !self.last_energy_placed_by_effect()
+                                    {
+                                        continue;
                                     }
                                 }
                                 // §9.7.2.1: Compute trigger multiplicity before
@@ -606,19 +722,15 @@ impl GameState {
                             {
                                 continue;
                             }
-                            // Movement gate for "was placed" (置かれぁE triggers:
-                            // self_target + single-location + movement:"moved" requires
-                            // the card to be in event.moved_cards (recently placed).
-                            if let Some(ref eff) = ability.effect {
-                                if let Some(ref cond) = eff.condition {
-                                    if cond.get_self_target().unwrap_or(false)
-                                        && cond.get_movement() == Some("moved")
-                                        && cond.get_locations().is_none_or(|l| l.len() < 2)
-                                        && !event.moved_cards.contains(&card_id)
-                                    {
-                                        continue;
-                                    }
-                                }
+                            // Movement gate for "was placed" (置かれた) triggers:
+                            // self_target + single-location + movement:"moved"
+                            // requires the card to be in this event's moves.
+                            if ability.effect.as_ref().is_some_and(|eff| {
+                                eff.condition
+                                    .as_ref()
+                                    .is_some_and(|c| Self::requires_this_move(c, card_id, &event.moved_cards))
+                            }) {
+                                continue;
                             }
                             // Re-scan guard: skip re-enqueueing the exact auto
                             // ability that just completed (numeric key).
@@ -632,42 +744,25 @@ impl GameState {
                             // batch sets. (Energy-placement watchers have no
                             // such record; the generic path handles both
                             // causes for them.)
-                            if ability
-                                .effect
-                                .as_ref()
-                                .is_some_and(|e| e.fires_on_opponent_effects())
-                            {
-                                if let Some(rec) = self
-                                    .turn_area_movements
-                                    .iter()
-                                    .rev()
-                                    .find(|m| m.moved_card_id == card_id)
-                                {
-                                    if rec.cause_player_id != player_id_clone {
-                                        log::debug!(
-                                            "[TRIGGER_SCOPE] {} last move caused by {} \
-                                             (hook owns foreign-cause firings)",
-                                            card.name,
-                                            rec.cause_player_id
-                                        );
-                                        continue;
-                                    }
-                                }
+                            if self.hooked_by_foreign_cause(
+                                &ability,
+                                card_id,
+                                &player_id_clone,
+                                card.name.as_ref(),
+                            ) {
+                                continue;
                             }
                             // Re-scan guard: skip the just-completed ability only
                             // on the SAME movement batch it resolved on (stale
                             // re-scan). A fresh batch may re-fire it (turn2+).
-                            if skip_this_card_auto_key == Some(num_key)
-                                && just_completed_batch_matches
-                            {
+                            if !Self::claim_batch_slot(
+                                &mut self.this_batch_triggered_ability_ids,
+                                num_key,
+                                skip_this_card_auto_key,
+                                just_completed_batch_matches,
+                            ) {
                                 continue;
                             }
-                            // Batch-scoped guard: prevent re-enqueue of any ability
-                            // already triggered during this movement batch.
-                            if self.this_batch_triggered_ability_ids.contains(&num_key) {
-                                continue;
-                            }
-                            self.this_batch_triggered_ability_ids.push(num_key);
                             // §9.7.2.1: Multi-trigger -- N trigger instances -- N
                             // standby entries.  All entries share the same
                             // trigger_moved_cards (full batch) because each
@@ -681,7 +776,7 @@ impl GameState {
                 }
             }
             // Also scan live cards for AUTO abilities
-            for &card_id in &player.live_card_zone.cards {
+            for &card_id in &live_ids {
                 if let Some(card) = self.card_database.get_card(card_id) {
                     for (ability_idx, ar) in card.abilities.iter().enumerate() {
                         let ability = ar.resolve();
@@ -702,7 +797,11 @@ impl GameState {
                             }
                             if let Some(ref effect) = ability.effect {
                                 // Live card scan -- uses the same event-based
-                                // condition check as stage cards.
+                                // condition check as the stage loop, without its
+                                // debug log. Deliberately NOT shared with the
+                                // stage site: evaluating a condition needs
+                                // `&mut self`, which the surrounding card borrow
+                                // forbids, so it has to be inlined at each site.
                                 if let Some(ref condition) = effect.condition {
                                     if Self::condition_is_event_based(condition) {
                                         let saved_activating = self.activating_card;
@@ -713,38 +812,33 @@ impl GameState {
                                         if !passes {
                                             continue;
                                         }
-                                    } else if condition.get_self_target().unwrap_or(false) {
-                                        if let Some(locs) = condition.get_locations() {
-                                            if locs.len() == 2 {
-                                                continue;
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-                            // Same movement gate for live cards:
-                            if let Some(ref eff) = ability.effect {
-                                if let Some(ref cond) = eff.condition {
-                                    if cond.get_self_target().unwrap_or(false)
-                                        && cond.get_movement() == Some("moved")
-                                        && cond.get_locations().is_none_or(|l| l.len() < 2)
-                                        && !event.moved_cards.contains(&card_id)
+                                    } else if condition.get_self_target().unwrap_or(false)
+                                        && condition
+                                            .get_locations()
+                                            .is_some_and(|locs| locs.len() == 2)
                                     {
                                         continue;
                                     }
                                 }
                             }
+                            // Same movement gate for live cards:
+                            if ability.effect.as_ref().is_some_and(|eff| {
+                                eff.condition.as_ref().is_some_and(|c| {
+                                    Self::requires_this_move(c, card_id, &event.moved_cards)
+                                })
+                            }) {
+                                continue;
+                            }
                             let num_key = ((card_id as u32) << 16) | (ability_idx as u32);
                             // Same batch-scoped re-scan guard as the stage loop.
-                            if skip_this_card_auto_key == Some(num_key)
-                                && just_completed_batch_matches
-                            {
+                            if !Self::claim_batch_slot(
+                                &mut self.this_batch_triggered_ability_ids,
+                                num_key,
+                                skip_this_card_auto_key,
+                                just_completed_batch_matches,
+                            ) {
                                 continue;
                             }
-                            if self.this_batch_triggered_ability_ids.contains(&num_key) {
-                                continue;
-                            }
-                            self.this_batch_triggered_ability_ids.push(num_key);
                             abilities_to_trigger.push((card_id, ability_idx, card_id));
                         }
                     }
@@ -1071,102 +1165,171 @@ impl GameState {
         trigger_moved_cards: Option<SmallVec<[i16; 4]>>,
         triggering_member_id: Option<i16>,
     ) {
-        if let Some(ref card_no) = source_card_id {
-            let card_id = if let Some(cid) = explicit_card_id {
-                Some(cid)
-            } else {
-                self.find_card_by_number_for_player(card_no, &player_id).1
-            };
-            if let Some(cid) = card_id {
-                if let Some(card) = self.card_database.get_card(cid) {
-                    // Check original abilities
-                    let requested_text = ability_id
-                        .strip_prefix(card_no.as_str())
-                        .and_then(|suffix| suffix.strip_prefix('_'));
-                    for (ability_index, ability) in card.abilities.iter().enumerate() {
-                        let resolved_ability = ability.resolve();
-                        if Self::ability_matches_trigger(&resolved_ability, &trigger_type)
-                            && requested_text == Some(resolved_ability.full_text.as_str())
-                            && !self.is_ability_invalidated(cid, &trigger_type)
-                        {
-                            let entry = self.build_ability_queue_entry(
-                                card_no.clone(),
-                                ability_index,
-                                ability.to_arc(),
-                                card_id,
-                                player_id.clone(),
-                                trigger_type,
-                                trigger_moved_cards.clone(),
-                                triggering_member_id,
-                            );
-                            // Snapshot batch_movements and energy flags at enqueue
-                            // time so the "moves" and energy conditions can check
-                            // what triggered the ability even after
-                            // clear_effect_tracking clears the global lists.
-                            let mut entry = entry;
-                            entry.snapshot_movements = self.batch_movements.clone();
-                            if crate::ability::debug::ABILITY_DEBUG
-                                .load(core::sync::atomic::Ordering::Relaxed)
-                            {
-                                log::debug!(
-                                    "[ABILITY_QUEUE] enqueue owner={} card={} id={:?} ability={} trigger={:?}",
-                                    entry.player_id,
-                                    entry.card_no,
-                                    entry.card_id,
-                                    entry.ability_index,
-                                    entry.trigger_type
-                                );
-                            }
-                            self.push_debug_note_fmt(format_args!(
-                                "queue+ {} card={} trigger={:?}",
-                                ability_id,
-                                entry.card_no,
-                                entry.trigger_type
-                            ));
-                            self.ability_queue.enqueue(entry);
-                            return;
-                        }
-                    }
-                    // Check gained card abilities (ability_id format: "card_no_gained_{idx}")
-                    if ability_id.contains("_gained_") {
-                        let cid = card_id.or(explicit_card_id);
-                        if let Some(card_id_val) = cid {
-                            if let Some(gained_list) = self.gained_card_abilities.get(&card_id_val)
-                            {
-                                // Extract the gained index from ability_id
-                                if let Some(idx_str) = ability_id.rsplit('_').next() {
-                                    if let Ok(gidx) = idx_str.parse::<usize>() {
-                                        if let Some(gained_ability) = gained_list.get(gidx) {
-                                            if Self::ability_matches_trigger(
-                                                gained_ability,
-                                                &trigger_type,
-                                            )
-                                                && !self.is_ability_invalidated(card_id_val, &trigger_type)
-                                            {
-                                                let entry = self.build_ability_queue_entry(
-                                                    card_no.clone(),
-                                                    crate::ability::types::GAINED_ABILITY_INDEX_BASE + gidx,
-                                                    crate::Arc::new(gained_ability.clone()),
-                                                    Some(card_id_val),
-                                                    player_id.clone(),
-                                                    trigger_type,
-                                                    trigger_moved_cards.clone(),
-                                                    triggering_member_id,
-                                                );
-                                                let mut entry = entry;
-                                                entry.snapshot_movements =
-                                                    self.batch_movements.clone();
-                                                self.ability_queue.enqueue(entry);
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
+        // Resolve the card once, then try the ability printed on it and finally
+        // the abilities it gained. Written as early returns rather than a nest
+        // of if-lets so the three steps read in order. Each step searches with
+        // `&self` and enqueues with `&mut self`, so the card borrow ends before
+        // anything is queued.
+        let Some(card_no) = source_card_id else {
+            return;
+        };
+        let card_id =
+            explicit_card_id.or_else(|| self.find_card_by_number_for_player(&card_no, &player_id).1);
+        let Some(cid) = card_id else {
+            return;
+        };
+        let Some(card) = self.card_database.get_card(cid) else {
+            return;
+        };
+
+        if let Some((ability_index, ability)) = self.find_printed_ability(
+            &ability_id,
+            &card_no,
+            card,
+            cid,
+            &trigger_type,
+        ) {
+            self.enqueue_printed_ability(
+                &ability_id,
+                &card_no,
+                cid,
+                ability_index,
+                ability,
+                &player_id,
+                &trigger_type,
+                &trigger_moved_cards,
+                triggering_member_id,
+            );
+            return;
+        }
+        self.enqueue_gained_ability(
+            &ability_id,
+            &card_no,
+            cid,
+            &player_id,
+            &trigger_type,
+            &trigger_moved_cards,
+            triggering_member_id,
+        );
+    }
+
+    /// The printed ability `ability_id` names, if `card` has it and the trigger
+    /// is live on it. `ability_id` is `{card_no}_{text}`, so the text after the
+    /// card number is what distinguishes two abilities on the same card.
+    fn find_printed_ability(
+        &self,
+        ability_id: &str,
+        card_no: &str,
+        card: &crate::card::Card,
+        cid: i16,
+        trigger_type: &AbilityTrigger,
+    ) -> Option<(usize, crate::Arc<crate::card::Ability>)> {
+        let requested_text = ability_id
+            .strip_prefix(card_no)
+            .and_then(|suffix| suffix.strip_prefix('_'));
+        for (ability_index, ability) in card.abilities.iter().enumerate() {
+            let resolved_ability = ability.resolve();
+            if Self::ability_matches_trigger(&resolved_ability, trigger_type)
+                && requested_text == Some(resolved_ability.full_text.as_str())
+                && !self.is_ability_invalidated(cid, trigger_type)
+            {
+                return Some((ability_index, ability.to_arc()));
             }
         }
+        None
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    fn enqueue_printed_ability(
+        &mut self,
+        ability_id: &str,
+        card_no: &str,
+        cid: i16,
+        ability_index: usize,
+        ability: crate::Arc<crate::card::Ability>,
+        player_id: &str,
+        trigger_type: &AbilityTrigger,
+        trigger_moved_cards: &Option<SmallVec<[i16; 4]>>,
+        triggering_member_id: Option<i16>,
+    ) {
+        let entry = self.build_ability_queue_entry(
+            card_no.to_string(),
+            ability_index,
+            ability,
+            Some(cid),
+            player_id.to_string(),
+            trigger_type.clone(),
+            trigger_moved_cards.clone(),
+            triggering_member_id,
+        );
+        self.push_debug_note_fmt(format_args!(
+            "queue+ {} card={} trigger={:?}",
+            ability_id, entry.card_no, entry.trigger_type
+        ));
+        // Snapshot batch_movements and energy flags at enqueue time so the
+        // "moves" and energy conditions can check what triggered the ability
+        // even after clear_effect_tracking clears the global lists.
+        let mut entry = entry;
+        entry.snapshot_movements = self.batch_movements.clone();
+        if crate::ability::debug::ABILITY_DEBUG.load(core::sync::atomic::Ordering::Relaxed) {
+            log::debug!(
+                "[ABILITY_QUEUE] enqueue owner={} card={} id={:?} ability={} trigger={:?}",
+                entry.player_id,
+                entry.card_no,
+                entry.card_id,
+                entry.ability_index,
+                entry.trigger_type
+            );
+        }
+        self.ability_queue.enqueue(entry);
+    }
+
+    /// Enqueue a gained ability `ability_id` names (`{card_no}_gained_{idx}`),
+    /// if this card has it and the trigger is live.
+    #[allow(clippy::too_many_arguments)]
+    fn enqueue_gained_ability(
+        &mut self,
+        ability_id: &str,
+        card_no: &str,
+        cid: i16,
+        player_id: &str,
+        trigger_type: &AbilityTrigger,
+        trigger_moved_cards: &Option<SmallVec<[i16; 4]>>,
+        triggering_member_id: Option<i16>,
+    ) {
+        if !ability_id.contains("_gained_") {
+            return;
+        }
+        // The gained index is the last underscore-separated field.
+        let Some(idx_str) = ability_id.rsplit('_').next() else {
+            return;
+        };
+        let Ok(gidx) = idx_str.parse::<usize>() else {
+            return;
+        };
+        // Search before mutating: the gained list is borrowed from self.
+        let matched = self.gained_card_abilities.get(&cid).and_then(|list| {
+            let ability = list.get(gidx)?;
+            (Self::ability_matches_trigger(ability, trigger_type)
+                && !self.is_ability_invalidated(cid, trigger_type))
+            .then(|| crate::Arc::new(ability.clone()))
+        });
+        let Some(ability) = matched else {
+            return;
+        };
+        let entry = self.build_ability_queue_entry(
+            card_no.to_string(),
+            crate::ability::types::GAINED_ABILITY_INDEX_BASE + gidx,
+            ability,
+            Some(cid),
+            player_id.to_string(),
+            trigger_type.clone(),
+            trigger_moved_cards.clone(),
+            triggering_member_id,
+        );
+        let mut entry = entry;
+        entry.snapshot_movements = self.batch_movements.clone();
+        self.ability_queue.enqueue(entry);
     }
 
     /// Hot-path version of trigger_auto_ability that takes a numeric ability index

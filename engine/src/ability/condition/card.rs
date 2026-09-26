@@ -210,31 +210,36 @@ impl<'a> ConditionContext<'a> {
         let target = condition.get_target().unwrap_or("self");
         let player = self.resolve_condition_player(target);
         let player_id = player.id.as_str();
-        if self.game_state.get_baton_touch_count(player_id) == 0 {
+        let count = self.game_state.get_baton_touch_count(player_id);
+        if count == 0 {
             return false;
         }
-        if let Some(min_count) = condition.get_min_baton_touch_count() {
-            if self.game_state.get_baton_touch_count(player_id) < min_count {
+        if condition
+            .get_min_baton_touch_count()
+            .is_some_and(|min| count < min)
+        {
+            return false;
+        }
+        let card_db = &self.game_state.card_database;
+
+        // A group qualifier describes the member that was replaced, so a
+        // condition with no observed replacement cannot satisfy it.
+        if let Some(groups) = condition.get_group_names().filter(|g| !g.is_empty()) {
+            let Some(replaced_id) = self.game_state.baton_touch_replaced_member_id else {
+                return false;
+            };
+            if !groups.iter().any(|g| {
+                crate::ability::util::card_matches_group_str(card_db, replaced_id, Some(g))
+            }) {
                 return false;
             }
         }
-        let card_db = &self.game_state.card_database;
-        if let Some(ref groups) = condition.get_group_names() {
-            if !groups.is_empty() {
-                if let Some(replaced_id) = self.game_state.baton_touch_replaced_member_id {
-                    let group_ok = groups.iter().any(|g| {
-                        crate::ability::util::card_matches_group_str(card_db, replaced_id, Some(g))
-                    });
-                    if !group_ok {
-                        return false;
-                    }
-                } else {
-                    return false;
-                }
-            }
-        }
+
+        // The source qualifier names a member that must be sitting in some
+        // waitroom — a baton touch always leaves the replaced card there.
         if let Some(src) = condition.get_baton_touch_source() {
-            if !self
+            let normalized = crate::card::CardDatabase::normalize_name(src);
+            let in_any_waitroom = self
                 .game_state
                 .player1
                 .waitroom
@@ -243,24 +248,26 @@ impl<'a> ConditionContext<'a> {
                 .chain(self.game_state.player2.waitroom.cards.iter())
                 .any(|&id| {
                     card_db.get_card(id).is_some_and(|c| {
-                        crate::card::CardDatabase::normalize_name(&c.name)
-                            .contains(&crate::card::CardDatabase::normalize_name(src))
+                        crate::card::CardDatabase::normalize_name(&c.name).contains(&normalized)
                     })
-                })
-            {
+                });
+            if !in_any_waitroom {
                 return false;
             }
         }
+
+        // Cost comparison is between the replaced member's cost and the
+        // activating card's. Absent either value there is nothing to compare.
         if condition.get_comparison_type() == Some("cost") {
-            if let Some(replaced) = self.game_state.baton_touch_replaced_member_cost {
-                if let Some(act) = self.game_state.activating_card {
-                    if let Some(c) = card_db.get_card(act) {
-                        if let Some(cc) = c.cost {
-                            if !compare_counts(condition.get_operator(), replaced, cc) {
-                                return false;
-                            }
-                        }
-                    }
+            let replaced_cost = self.game_state.baton_touch_replaced_member_cost;
+            let activating_cost = self
+                .game_state
+                .activating_card
+                .and_then(|act| card_db.get_card(act))
+                .and_then(|c| c.cost);
+            if let (Some(replaced), Some(cost)) = (replaced_cost, activating_cost) {
+                if !compare_counts(condition.get_operator(), replaced, cost) {
+                    return false;
                 }
             }
         }
@@ -1929,26 +1936,23 @@ impl<'a> ConditionContext<'a> {
                     continue;
                 }
             }
-            if let Some(card) = card_db.get_card(cid) {
-                if !is_blade {
-                    if let Some(ref bh) = card.base_heart {
-                        for color in bh.hearts.keys() {
-                            if required_colors.contains(color) {
-                                present.insert(*color);
-                            }
-                        }
-                    }
-                }
-                if is_blade {
-                    if let Some(ref bld) = card.blade_heart {
-                        for color in bld.hearts.keys() {
-                            if required_colors.contains(color) {
-                                present.insert(*color);
-                            }
-                        }
-                    }
-                }
-            }
+            let Some(card) = card_db.get_card(cid) else {
+                continue;
+            };
+            // A blade condition counts the printed blade heart; a plain one
+            // counts the base heart. Exactly one of the two is ever read.
+            let printed: Vec<HeartColor> = if is_blade {
+                card.blade_heart
+                    .iter()
+                    .flat_map(|b| b.hearts.keys().copied())
+                    .collect()
+            } else {
+                card.base_heart
+                    .iter()
+                    .flat_map(|b| b.hearts.keys().copied())
+                    .collect()
+            };
+            present.extend(printed.into_iter().filter(|c| required_colors.contains(c)));
         }
         present.len()
     }
