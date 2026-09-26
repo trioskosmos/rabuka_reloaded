@@ -7335,6 +7335,44 @@ def _try_cost_set_from_reference(text):
     return result
 
 
+# Context a shorthand secondary condition cannot state for itself and has to
+# borrow from the main one: a clause like 「2枚以上いる場合」 names no zone, no
+# group and no position, so without this the engine would evaluate it against
+# the whole board.
+#
+# The 「両方」 form additionally borrows the main condition's allowed `values`;
+# the 「N枚以上」 form does not. The two tuples are listed separately and in
+# this order deliberately — they are the insertion order of keys in the
+# emitted JSON, so normalising them would change the generated file.
+_ALT_INHERITED_KEYS = (
+    "location",
+    "group_names",
+    "target",
+    "position",
+    "distinct",
+    "card_type",
+)
+_ALT_INHERITED_KEYS_WITH_VALUES = (
+    "location",
+    "group_names",
+    "target",
+    "position",
+    "values",
+    "distinct",
+    "card_type",
+)
+
+
+def _inherit_condition_context(result, alt_cond, keys=_ALT_INHERITED_KEYS):
+    """Let a shorthand secondary condition borrow context from the main one."""
+    main_cond = result.get("condition")
+    if not main_cond:
+        return
+    for key in keys:
+        if key in main_cond and key not in alt_cond:
+            alt_cond[key] = main_cond[key]
+
+
 def _try_conditional_alternative(text):
     """代わりに — conditional alternative effects."""
     if ALTERNATIVE_MARKER not in text:
@@ -7392,18 +7430,9 @@ def _try_conditional_alternative(text):
             sec_text = "それらが両方ある場合"
             alt_cond = parse_condition(sec_text)
             if alt_cond and alt_cond.get("type") != "custom":
-                if "condition" in result:
-                    for key in (
-                        "location",
-                        "group_names",
-                        "target",
-                        "position",
-                        "values",
-                        "distinct",
-                        "card_type",
-                    ):
-                        if key in result["condition"] and key not in alt_cond:
-                            alt_cond[key] = result["condition"][key]
+                _inherit_condition_context(
+                    result, alt_cond, _ALT_INHERITED_KEYS_WITH_VALUES
+                )
                 result["alternative_condition"] = alt_cond
             at = at.replace(sec_text, "").strip().strip("、").strip()
         secondary_m = re.search(r"([^、。]*\d+)枚以上[いあ]る場合", at)
@@ -7413,17 +7442,7 @@ def _try_conditional_alternative(text):
             if alt_cond and alt_cond.get("type") != "custom":
                 # Inherit location/group/position context from the main condition
                 # since the secondary text ("2枚以上ある場合") omits the zone/group
-                if "condition" in result:
-                    for key in (
-                        "location",
-                        "group_names",
-                        "target",
-                        "position",
-                        "distinct",
-                        "card_type",
-                    ):
-                        if key in result["condition"] and key not in alt_cond:
-                            alt_cond[key] = result["condition"][key]
+                _inherit_condition_context(result, alt_cond)
                 result["alternative_condition"] = alt_cond
             at = at.replace(sec_text, "").strip().strip("、").strip()
         result["primary_effect"] = parse_action(at)
@@ -7932,6 +7951,44 @@ def _add_heart_color_threshold(d, text):
             d["heart_color_count"] = count
 
 
+# 「{{icon.png|…}}能力を持つ」 — the trigger icon an ability-filter clause pins
+# the filter to. The two forms differ: the positive one wants the icon's FILE
+# name, the negative ones the text label printed beside it.
+_ABILITY_ICON_NAME_RE = re.compile(r"\{\{(\w+)\.png\|")
+_ABILITY_ICON_LABEL_RE = re.compile(r"\{\{([^}]+?)\.png\|([^}]+?)\}\}能力")
+_ABILITY_ICON_LABEL_ALL_RE = re.compile(r"\{\{([^}]+?)\.png\|([^}]+?)\}\}能力も")
+
+
+def _apply_ability_filter(d, text):
+    """Read an 「…能力を持つ / 能力を持たない」 ability filter out of the text.
+
+    The filter names a kind of ability and, when a trigger icon pins it, which
+    trigger types that kind is allowed to have. 「能力も持たない」 lists several
+    icons, so its filter is satisfied by any of them; an unadorned
+    「能力を持たない」 is a plain no-ability filter with no trigger restriction.
+    """
+    if "能力を持つ" in text and "能力を持たない" not in text:
+        d["ability_filter"] = "has_ability"
+        icon = _ABILITY_ICON_NAME_RE.search(text)
+        if icon:
+            d["ability_filter_triggers"] = [icon.group(1)]
+        return
+    if "能力を持たない" not in text and "能力も持たない" not in text:
+        return
+    labelled = _ABILITY_ICON_LABEL_RE.search(text)
+    if labelled:
+        d["ability_filter"] = "no_ability_type"
+        d["ability_filter_triggers"] = [labelled.group(2)]
+        return
+    if "能力も" in text:
+        d["ability_filter"] = "no_ability_type"
+        triggers = [label for _, label in _ABILITY_ICON_LABEL_ALL_RE.findall(text)]
+        if triggers:
+            d["ability_filter_triggers"] = triggers
+        return
+    d["ability_filter"] = "no_ability"
+
+
 def _enrich_from_text(d, text):
     """Add common fields (count, max, card_type, heart_colors, optional, group_names, cost_limit) from text."""
     c = extract_count(text)
@@ -7968,25 +8025,7 @@ def _enrich_from_text(d, text):
         d["cost_from_revealed"] = True
         if "以下" in text and "cost_limit_operator" not in d:
             d["cost_limit_operator"] = "<="
-
-    # Extract ability filters (e.g. "{{live_start.png|ライブ開始時}}能力を持つ")
-    if "能力を持つ" in text and "能力を持たない" not in text:
-        d["ability_filter"] = "has_ability"
-        trig_match = re.search(r"\{\{(\w+)\.png\|", text)
-        if trig_match:
-            d["ability_filter_triggers"] = [trig_match.group(1)]
-    elif "能力を持たない" in text or "能力も持たない" in text:
-        trig_match = re.search(r"\{\{([^}]+?)\.png\|([^}]+?)\}\}能力", text)
-        if trig_match:
-            d["ability_filter"] = "no_ability_type"
-            d["ability_filter_triggers"] = [trig_match.group(2)]
-        elif "能力も" in text:
-            d["ability_filter"] = "no_ability_type"
-            triggers = re.findall(r"\{\{([^}]+?)\.png\|([^}]+?)\}\}能力も", text)
-            if triggers:
-                d["ability_filter_triggers"] = [t[1] for t in triggers]
-        else:
-            d["ability_filter"] = "no_ability"
+    _apply_ability_filter(d, text)
 
 
 def _apply_or_select_criteria(result, select_text):
@@ -8832,6 +8871,66 @@ def _try_implicit_sequential(text):
     return None
 
 
+def _split_select_and_energy_payment(fa, fp, restate_text):
+    """Split a leading 「select, pay E」 pair into a select plus a payment step.
+
+    「ライブカードを1枚選び、そのカードのスコアに等しい数のEを支払ってもよい」
+    reaches the engine as one clause, but it has to run as two steps.
+
+    `restate_text` mirrors an existing asymmetry and must be passed in rather
+    than decided here: when the clause carried its own condition the re-parsed
+    select is given an explicit `text`, and when it did not, it is not.
+    """
+    if fa.get("action") != "select" or ENERGY_ICON not in fp:
+        return fa, None
+    if "支払う" not in fp and "支払って" not in fp:
+        return fa, None
+    segments = fp.split("、")
+    if len(segments) < 2 or "選び" not in segments[0] or ENERGY_ICON not in segments[1]:
+        return fa, None
+    payment = parse_action(segments[1])
+    if payment.get("action") != "pay_energy":
+        # Not a payment after all — keep the select unsplit.
+        return fa, None
+    select_text = segments[0] + "、"
+    select = parse_action(select_text)
+    if restate_text:
+        select["text"] = select_text
+    return select, payment
+
+
+# 「…を選び、デッキの一番上に置いてもよい」 — the select clause names where the
+# chosen card goes, so the engine needs an explicit move between the select and
+# the followup. Each row is (phrase, destination, placement_order or None).
+# First match wins.
+_SELECT_STATED_DESTINATIONS = (
+    ("デッキの一番上", "deck_top", None),
+    ("デッキの下", "deck_bottom", "any_order"),
+)
+
+
+def _select_move_step(fa, fp):
+    """The move step a select-with-stated-destination needs, or None."""
+    if fa.get("action") != "select" or ("置く" not in fp and "置いて" not in fp):
+        return None
+    for phrase, destination, placement_order in _SELECT_STATED_DESTINATIONS:
+        if phrase in fp:
+            fa["destination"] = destination
+            if placement_order:
+                fa.setdefault("placement_order", placement_order)
+            break
+    if not fa.get("destination"):
+        return None
+    return {
+        "action": "move_cards",
+        "source": "selected_cards",
+        "destination": fa.pop("destination"),
+        "count": 0,
+        "all": True,
+        "target": fa.get("target", "self"),
+    }
+
+
 def _try_conditional_sequential(text):
     """そうした場合 — conditional sequential actions."""
     if CONDITIONAL_SEQUENTIAL_MARKER not in text:
@@ -8862,31 +8961,7 @@ def _try_conditional_sequential(text):
     # before the conditional follow-up. E.g.:
     # "ライブカードを1枚選び、そのカードのスコアに等しい数のEを支払ってもよい。そうした場合、..."
     # Split into select + pay_energy(dynamic) + conditional_move
-    middle_pay = None
-    if (
-        fa.get("action") == "select"
-        and ENERGY_ICON in fp
-        and ("支払う" in fp or "支払って" in fp)
-    ):
-        # Split the first part on "、" to separate select from energy payment
-        fp_segments = fp.split("、")
-        if (
-            len(fp_segments) >= 2
-            and "選び" in fp_segments[0]
-            and ENERGY_ICON in fp_segments[1]
-        ):
-            select_text = fp_segments[0] + "、"
-            pay_text = fp_segments[1]
-            # Re-parse select part (trimmed to exclude energy payment)
-            if fc and fat:
-                fa = parse_action(select_text)
-                fa["text"] = select_text
-            else:
-                fa = parse_action(select_text)
-            # Parse energy payment as a separate action
-            middle_pay = parse_action(pay_text)
-            if middle_pay.get("action") != "pay_energy":
-                middle_pay = None  # fallback: don't split
+    fa, middle_pay = _split_select_and_energy_payment(fa, fp, bool(fc and fat))
 
     # Process second part — use parse_effect to handle sequential sub-actions
     clean = sp.replace(CONDITIONAL_SEQUENTIAL_MARKER, "").strip().lstrip("、")
@@ -8932,22 +9007,7 @@ def _try_conditional_sequential(text):
     # For select actions with an explicit destination in the first-part text
     # (e.g. "選び、デッキの一番上に置いてもよい"), insert a move_cards step
     # between the select and the followup so the selected card actually moves.
-    move_step = None
-    if fa.get("action") == "select" and ("置く" in fp or "置いて" in fp):
-        if "デッキの一番上" in fp:
-            fa["destination"] = "deck_top"
-        elif "デッキの下" in fp:
-            fa["destination"] = "deck_bottom"
-            fa.setdefault("placement_order", "any_order")
-        if fa.get("destination"):
-            move_step = {
-                "action": "move_cards",
-                "source": "selected_cards",
-                "destination": fa.pop("destination"),
-                "count": 0,
-                "all": True,
-                "target": fa.get("target", "self"),
-            }
+    move_step = _select_move_step(fa, fp)
 
     # NOTE: Returning `conditional_on_optional` would be semantically cleaner
     # (optional_action = do X, conditional_action = if done, do Y), but the
@@ -10801,26 +10861,21 @@ def _walk_extract_heart_colors(d, d_text, ctx_text):
                     if _propagation_allowed("heart_colors", d, {"text": ctx_text}):
                         search_text = ctx_text
         hc = _normalize_heart_ids(search_text)
-        if hc or "heart_00" in search_text:
-            if not hc:
-                hc = ["heart00"]
+        if not hc and "heart_00" in search_text:
+            hc = ["heart00"]
         if hc:
             d["heart_colors"] = hc
     # For modify_required_hearts, set value = per-color count (not total).
     # The icon sequence {heart02×3, heart03×3, ...} means 3 per color, not 12 total.
-    # When all colors have the same count, value = that per-color count.
     if d.get("action") == "modify_required_hearts" and "value" not in d:
         search_val = d_text or ""
         if not re.search(HEART_HAS_REF, search_val) and ctx_text:
             search_val = ctx_text
         target_colors = d.get("heart_colors", [])
         color_counts = _count_heart_refs(search_val, target_colors or None)
-        if color_counts:
-            counts = list(color_counts.values())
-            if len(set(counts)) == 1:
-                d["value"] = counts[0]
-            else:
-                d["value"] = min(counts)
+        per_color = _uniform_count(color_counts)
+        if per_color is not None:
+            d["value"] = per_color
 
     # Detect possession pattern (を持つ) in gain_resource heart effects:
     # when the text says "member POSSESSING heartXX", the heart_colors
