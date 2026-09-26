@@ -74,8 +74,24 @@ fn kosuzu_bp6_condition_met_gains_heart05_and_blade() {
         game.has_pending_choice(),
         "Should prompt for optional discard cost"
     );
-    // Pay: discard 1 card from hand
+    // Pay: discard 1 card from hand.
+    //
+    // The hand is sampled either side of this because the test is named for the
+    // PAID path while every assertion in it is about what the ability GRANTED.
+    // Nothing here checked that a card was actually discarded, so the test passes
+    // identically whether `select_indices(&[0])` pays the cost or takes the skip
+    // the prompt also offers (`allow_skip=true`) — it can read as the pay branch
+    // while running the skip one. Stating the hand delta is what makes the branch
+    // this test claims to cover actually the branch it runs.
+    let hand_before_cost = game.state.player1.hand.cards.len();
     game.select_indices(&[0]);
+    assert_eq!(
+        game.state.player1.hand.cards.len(),
+        hand_before_cost - 1,
+        "paying 「手札を1枚控え室に置いてもよい」 must discard exactly one card from \
+         hand. If this is unchanged, the prompt answered as SKIP and everything \
+         asserted below describes the declined branch under the name of the paid one."
+    );
 
     // Resolve any remaining choices
     while game.has_pending_choice() {
@@ -176,8 +192,17 @@ fn kosuzu_bp6_condition_not_met_no_heart05_no_blade() {
         game.has_pending_choice(),
         "Should prompt for optional discard cost"
     );
-    // Pay the cost
+    // Pay the cost, and state that it was paid — see the note in the first test.
+    let hand_before_cost = game.state.player1.hand.cards.len();
     game.select_indices(&[0]);
+    assert_eq!(
+        game.state.player1.hand.cards.len(),
+        hand_before_cost - 1,
+        "paying the optional discard must remove exactly one card from hand. This \
+         test is the DECLINED-condition case, so the cost is still paid before the \
+         condition is found unmet — and nothing else here would notice if it were \
+         not."
+    );
 
     while game.has_pending_choice() {
         game.select_indices(&[]);
