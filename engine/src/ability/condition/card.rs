@@ -330,6 +330,33 @@ impl<'a> ConditionContext<'a> {
         }
     }
 
+    /// The cards in `ids` that satisfy the condition's card-type and group
+    /// filters, paired with their card.
+    ///
+    /// Three arms of `check_aggregate_total` need exactly this eligibility, and
+    /// a change to what counts as eligible then has one place to change rather
+    /// than three. An empty `card_type` and an absent group mean "no filter",
+    /// which is why the two tests are written as disjunctions rather than as
+    /// option checks.
+    fn eligible_cards<'s>(
+        &'s self,
+        ids: &[i16],
+        card_type: &str,
+        group_name: Option<&str>,
+    ) -> Vec<(i16, &'s crate::card::Card)> {
+        let card_db = &self.game_state.card_database;
+        ids.iter()
+            .copied()
+            .filter(|&cid| {
+                card_type.is_empty() || util::card_matches_type(card_db, cid, Some(card_type))
+            })
+            .filter(|&cid| {
+                group_name.is_none() || util::card_matches_group_str(card_db, cid, group_name)
+            })
+            .filter_map(|cid| card_db.get_card(cid).map(|card| (cid, card)))
+            .collect()
+    }
+
     pub(crate) fn check_aggregate_total(
         &self,
         condition: &Condition,
@@ -351,21 +378,16 @@ impl<'a> ConditionContext<'a> {
                 .and_then(|gn| gn.first().map(|s| s.as_str()));
             match Zone::from_str(location) {
                 Some(Zone::Stage) => {
-                    let total_heart: u8 = player
+                    let occupied: Vec<i16> = player
                         .stage
                         .stage
                         .iter()
-                        .filter(|&&cid| cid != -1)
-                        .filter(|&&cid| {
-                            card_type.is_empty()
-                                || util::card_matches_type(card_db, cid, Some(card_type))
-                        })
-                        .filter(|&&cid| {
-                            group_name.is_none()
-                                || util::card_matches_group_str(card_db, cid, group_name)
-                        })
-                        .map(|&cid| (cid, card_db.get_card(cid)))
-                        .filter_map(|(cid, card)| card.map(|c| (cid, c)))
+                        .copied()
+                        .filter(|&cid| cid != -1)
+                        .collect();
+                    let total_heart: u8 = self
+                        .eligible_cards(&occupied, card_type, group_name)
+                        .into_iter()
                         .map(|(cid, card)| {
                             let base: u8 = card
                                 .base_heart
@@ -406,17 +428,9 @@ impl<'a> ConditionContext<'a> {
                     cards.extend(player.success_live_card_zone.cards.iter().copied());
                     // If an operator is set (e.g. >=), sum all heart colors and compare
                     if let Some(op) = condition.get_operator() {
-                        let total_need: u8 = cards
-                            .iter()
-                            .filter(|&&cid| {
-                                card_type.is_empty()
-                                    || util::card_matches_type(card_db, cid, Some(card_type))
-                            })
-                            .filter(|&&cid| {
-                                group_name.is_none()
-                                    || util::card_matches_group_str(card_db, cid, group_name)
-                            })
-                            .filter_map(|&cid| card_db.get_card(cid).map(|card| (cid, card)))
+                        let total_need: u8 = self
+                            .eligible_cards(&cards, card_type, group_name)
+                            .into_iter()
                             .map(|(cid, card)| {
                                 card.need_heart
                                     .as_ref()
@@ -452,17 +466,9 @@ impl<'a> ConditionContext<'a> {
                         let threshold = condition.get_count().unwrap_or(1) as u8;
                         let all_ok = hc.iter().all(|color_str| {
                             let color = crate::card::parse_heart_color(color_str);
-                            let total: u8 = cards
-                                .iter()
-                                .filter(|&&cid| {
-                                    card_type.is_empty()
-                                        || util::card_matches_type(card_db, cid, Some(card_type))
-                                })
-                                .filter(|&&cid| {
-                                    group_name.is_none()
-                                        || util::card_matches_group_str(card_db, cid, group_name)
-                                })
-                                .filter_map(|&cid| card_db.get_card(cid).map(|card| (cid, card)))
+                            let total: u8 = self
+                                .eligible_cards(&cards, card_type, group_name)
+                                .into_iter()
                                 .map(|(cid, card)| {
                                     let base = card
                                         .need_heart
