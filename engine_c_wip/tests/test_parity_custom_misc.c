@@ -62,21 +62,6 @@ static int heart_of(TestGame *tg, int card_id, int color)
     return rb_mods_get_heart(&tg->state.mods, card_id, color);
 }
 
-/* Group string printed on a real card record (card position ②). */
-static void card_group(int card_id, char *buf, size_t cap)
-{
-    buf[0] = 0;
-    Card c;
-    memset(&c, 0, sizeof c);
-    if (!rb_decode_card_by_index((uint32_t)card_id, &c)) return;
-    const char *g = c.group_idx ? rb_card_string(c.group_idx) : NULL;
-    if (g) {
-        strncpy(buf, g, cap - 1);
-        buf[cap - 1] = 0;
-    }
-    rb_free_card(&c);
-}
-
 /* Base (printed) heart colors of a card, as C HeartColor values. */
 static int card_base_hearts(int card_id, int *out, int max)
 {

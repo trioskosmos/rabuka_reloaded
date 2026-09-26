@@ -1,4 +1,4 @@
-/* cost.c — complete translation of engine/src/ability/cost.rs
+﻿/* cost.c — complete translation of engine/src/ability/cost.rs
    Mirrors pay_deferred_costs, validate_cost, pay_cost, pay_cost_inner,
    handle_optional_cost_payment, handle_pay_cost_all_discard,
    get_change_state_candidates, has_skip_prompt, pay_cost_move_cards,
@@ -1331,6 +1331,17 @@ static int cr_reduction_matches(const AbilityEffect *e, int card_id, const Card 
     return 1;
 }
 
+/* cr_per_unit — mirror of per_unit_any(). The wire encodes `per_unit` as a
+   BOOL (engine/src/ability/effect_decoder_gen.rs:89), and the C decoder only
+   copies I64-tagged values into the struct field, so the decoded truth lives in
+   the extras table. Both are consulted. */
+static int cr_per_unit(const AbilityEffect *e) {
+    if (!e) return 0;
+    if (e->per_unit) return 1;
+    const char *v = cr_eff_extra(e, "per_unit");
+    return v && !strcmp(v, "true");
+}
+
 static int cr_per_unit_reduction(const AbilityEffect *e, const GameState *g,
                                  int actor, int hand_count) {
     /* Rust util.rs:156-158: per_unit_location_any().or(location_any())
@@ -1427,7 +1438,7 @@ static int cr_scan_one_effect(const AbilityEffect *eff, int target_id,
     if (af && !strcmp(af, "no_ability") &&
         rb_card_num_abilities((uint32_t)target_id) > 0)
         return -1;
-    if (eff->per_unit) return cr_per_unit_reduction(eff, g, actor, hand_count);
+    if (cr_per_unit(eff)) return cr_per_unit_reduction(eff, g, actor, hand_count);
     return cr_eff_int(eff, "value", 1);
 }
 
@@ -1446,7 +1457,7 @@ static int cr_calc_reduction(const GameState *g, int actor, int card_id,
         if (ab.effect) {
             const AbilityEffect *mc = cr_find_modify_cost(ab.effect, "subtract", "hand");
             if (mc && cr_reduction_matches(mc, card_id, card)) {
-                if (mc->per_unit)
+                if (cr_per_unit(mc))
                     cost_reduction = cr_per_unit_reduction(mc, g, actor, hand_count);
                 else {
                     int v = cr_eff_int(mc, "value", 1);

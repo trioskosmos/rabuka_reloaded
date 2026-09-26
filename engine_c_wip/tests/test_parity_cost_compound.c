@@ -468,9 +468,9 @@ static void test_change_state_cost_gate(void) {
 
     /* 1 candidate for a cost of 1 → Rust handlers.rs:923-932 waits every
        candidate directly, with no selection choice. */
-    test_add_to_stage(&tg, 1, a);
-    test_add_to_stage(&tg, 2, b);
+    tg.state.p[0].stage[1] = RB_EMPTY_SLOT;
     rb_mods_set_orientation(&tg.state.mods, b, "wait");
+    test_clear_mods_for_card(&tg, a);
     CHECK_EQ(rb_pay_cost(&tg.state, 0, cost), 1,
              "a wait cost covering every candidate pays without a choice");
     CHECK(!test_has_pending_choice(&tg),

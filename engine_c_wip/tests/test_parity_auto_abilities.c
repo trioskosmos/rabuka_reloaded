@@ -1,4 +1,4 @@
-﻿/* Parity suite: auto-ability (jidou) queuing + firing.
+/* Parity suite: auto-ability (jidou) queuing + firing.
  *
  * Rust sources mirrored here:
  *   engine/src/core/game_state/abilities.rs
@@ -23,7 +23,7 @@
  *   engine/tests/helpers/mod.rs:114   fire_trigger (string-keyed trigger shim)
  *   engine/tests/helpers/choices.rs:268  drain_auto_ability_choices
  *   engine/tests/test_modules/support/baton_swap_auto_helpers.rs:14
- *   engine/tests/test_modules/characterization/* (auto-ability shapes)
+ *   engine/tests/test_modules/characterization (auto-ability shapes)
  *
  * All Japanese literals are hex escapes so the file is pure ASCII.
  *
@@ -639,42 +639,13 @@ static void test_each_time_resolution_watcher(void)
     test_add_to_stage(&tg, 0, other_instance);
     rb_queue_reset(g);
     rb_trigger_each_time_for_member(g, 0, LIVE_SUCCESS, other_instance);
-    if (getenv("PAR_DUMP")) {
-        for (int probe = 0; probe < 2; probe++) {
-            int cid = probe ? other_instance : mu_instance;
-            Card pc;
-            if (rb_decode_card_by_index((uint32_t)cid, &pc)) {
-                fprintf(stderr, "[CARD] cid=%d name='%s' group='%s' unit='%s' "
-                                "series='%s' (idx %u/%u/%u)\n", cid,
-                        pc.name ? pc.name : "", rb_card_string(pc.group_idx),
-                        rb_card_string(pc.unit_idx), rb_card_string(pc.series_idx),
-                        pc.group_idx, pc.unit_idx, pc.series_idx);
-                rb_free_card(&pc);
-            }
-        }
-        Ability d0;
-        if (rb_decode_card_ability((uint32_t)dancing, 0, &d0) && d0.effect &&
-            d0.effect->condition) {
-            const char *gn = par_cond_str(d0.effect->condition, "group_names");
-            (void)gn;
-            for (uint32_t i = 0; i < d0.effect->condition->n_fields; i++)
-                if (d0.effect->condition->fields[i].key &&
-                    !strcmp(d0.effect->condition->fields[i].key, "group_names") &&
-                    d0.effect->condition->fields[i].v.tag == RB_TAG_ARRAY)
-                    for (uint32_t j = 0; j < d0.effect->condition->fields[i].v.arr_n; j++)
-                        fprintf(stderr, "[GRP] filter='%s' mu=%d other=%d\n",
-                                d0.effect->condition->fields[i].v.arr[j].s,
-                                rb_card_matches_group_str(mu_instance,
-                                    d0.effect->condition->fields[i].v.arr[j].s),
-                                rb_card_matches_group_str(other_instance,
-                                    d0.effect->condition->fields[i].v.arr[j].s));
-        }
-        rb_free_ability(&d0);
-        for (int i = 0; i < par_entry_count(g); i++)
-            fprintf(stderr, "[GRP] queued[%d] card=%d ab=%d member=%d\n", i,
-                    g->queue.entries[i].card_id, g->queue.entries[i].ability_idx,
-                    g->queue.entries[i].triggering_member_id);
-    }
+    /* BLOCKED OUTSIDE game_state_abilities.c: rb_card_matches_group_str
+       (src/ability/util.c) returns true for EVERY card because the compiled
+       Card.group_idx is 0 (empty string) and the matcher runs
+       strstr(group_name, g) with g == "", which is always non-NULL. The group
+       filter plumbing itself is correct; this stays red until util.c drops
+       that term. See engine/src/ability/util.rs::card_matches_group_str,
+       which has no such raw-substring test. */
     CHECK_EQ(par_entry_count(g), 0,
              "a member outside the watcher group filter does not arm it");
 
@@ -747,9 +718,6 @@ static void test_preceding_moved_multiplicity(void)
 
     Ability ab;
     CHECK(rb_decode_card_ability((uint32_t)ren, idx, &ab), "Ren jidou decodes");
-    const char *src = (ab.effect && ab.effect->condition)
-        ? NULL : NULL;
-    (void)src;
     rb_free_ability(&ab);
 
     test_add_to_stage(&tg, 1, test_id(&tg, HAZUKI_REN));
@@ -906,7 +874,6 @@ int main(void)
                 par_dump_ability(cid, a);
         }
     }
-
     printf("\n%d checks, %d failures\n", checks, failures);
     if (failures == 0) printf("ALL AUTO-ABILITY PARITY CHECKS PASSED\n");
     return failures ? 1 : 0;

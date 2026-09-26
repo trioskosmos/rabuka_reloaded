@@ -93,7 +93,7 @@ _confusable card numbers (bp2 vs pb2) staged in one file with NO card-identity p
 
 None.
 
-## duplicate_stage_id (143)
+## duplicate_stage_id (136)
 
 _the same card INSTANCE in two stage slots (`stage.stage = [filler, y, filler]`) — not a legal board; anything that counts members or dedupes by name measures a board that cannot occur, so use a second `new_id`_
 
@@ -147,9 +147,6 @@ _the same card INSTANCE in two stage slots (`stage.stage = [filler, y, filler]`)
 | `engine/tests/test_modules/effects/draw/conditional/revealed_live_hand_threshold_draw_test.rs` | `revealed_filler_does_not_satisfy_live_condition` | 74 | blader in 2 slots |
 | `engine/tests/test_modules/effects/draw/conditional/revealed_live_hand_threshold_draw_test.rs` | `revealed_live_above_hand_threshold_does_not_draw_again` | 18 | blader in 2 slots |
 | `engine/tests/test_modules/effects/draw/flat/per_own_stage_member_draw_then_discard_q146_test.rs` | `per_own_member_draw_discard_q146_opponent_members_not_counted` | 167 | opp_m in 3 slots |
-| `engine/tests/test_modules/effects/draw/flat/success_zone_group_live_success_draw_test.rs` | `success_zone_group_draw_live_leaves_no_choice_with_initially_empty_success_zone` | 62 | m in 3 slots |
-| `engine/tests/test_modules/effects/draw/flat/success_zone_group_live_success_draw_test.rs` | `success_zone_group_draw_live_leaves_no_choice_with_matching_group_stage` | 16 | m in 3 slots |
-| `engine/tests/test_modules/effects/draw/flat/success_zone_group_live_success_draw_test.rs` | `success_zone_group_draw_live_leaves_no_choice_with_wrong_group_success_live` | 41 | hasu in 3 slots |
 | `engine/tests/test_modules/effects/draw/flat/surplus_heart01_live_success_draw_test.rs` | `surplus_heart01_draw_live_leaves_no_choice_with_empty_decks` | 64 | m in 3 slots |
 | `engine/tests/test_modules/effects/draw/flat/surplus_heart01_live_success_draw_test.rs` | `surplus_heart01_draw_live_leaves_no_choice_with_hasunosora_stage` | 46 | hasu in 3 slots |
 | `engine/tests/test_modules/effects/draw/flat/surplus_heart01_live_success_draw_test.rs` | `surplus_heart01_draw_live_resolves_out_of_live_card_zone` | 16 | m in 3 slots |
@@ -178,8 +175,11 @@ _the same card INSTANCE in two stage slots (`stage.stage = [filler, y, filler]`)
 | `engine/tests/test_modules/effects/recover/per_card/live_start_aqours_center_cost_nine_blade_gain_or_opponent_wait_test.rs` | `deep_resonance_option_0_blade_gain_exact_modifier` | 179 | filler in 2 slots |
 | `engine/tests/test_modules/effects/recover/per_card/live_start_aqours_center_cost_nine_blade_gain_or_opponent_wait_test.rs` | `deep_resonance_option_1_opponent_wait_exact_state` | 231 | filler in 2 slots |
 | `engine/tests/test_modules/effects/recover/per_card/live_start_aqours_center_cost_nine_blade_gain_or_opponent_wait_test.rs` | `deep_resonance_wrong_group_at_center_no_fire` | 137 | filler in 2 slots |
-| `engine/tests/test_modules/effects/recover/per_card/live_start_success_zone_plus_three_distinct_names_score_plus_one_test.rs` | `miracle_stay_tune_fewer_than_3_distinct_members_no_score` | 72 | member1 in 3 slots |
-| … | 63 more |  |  |
+| `engine/tests/test_modules/effects/recover/to_hand/live_success_draws_four_and_picks_one_niji_reveal_q66_test.rs` | `poppin_equal_score_fails` | 71 | member in 2 slots |
+| `engine/tests/test_modules/effects/recover/to_hand/live_success_draws_four_and_picks_one_niji_reveal_q66_test.rs` | `poppin_equal_score_fails` | 71 | member in 2 slots |
+| `engine/tests/test_modules/effects/recover/to_hand/live_success_draws_four_and_picks_one_niji_reveal_q66_test.rs` | `poppin_lower_score_fails` | 116 | member in 2 slots |
+| `engine/tests/test_modules/effects/recover/to_hand/live_success_draws_four_and_picks_one_niji_reveal_q66_test.rs` | `poppin_lower_score_fails` | 116 | member in 2 slots |
+| … | 56 more |  |  |
 
 ## unresolvable_card_id (0)
 

@@ -1,6 +1,6 @@
 {
   "generated_by": "cards/test_inventory.py",
-  "generated_at": "2026-09-26T11:45:51.291785+00:00",
+  "generated_at": "2026-09-26T12:03:20.974836+00:00",
   "stats": {
     "total_cards": 2526,
     "cards_with_abilities": 1565,
@@ -546,7 +546,7 @@
       "rows": []
     },
     "duplicate_stage_id": {
-      "count": 143,
+      "count": 136,
       "rows": [
         {
           "file": "engine/tests/test_modules/characterization/pipeline_characterization_test.rs",
@@ -837,24 +837,6 @@
           "detail": "opp_m in 3 slots"
         },
         {
-          "file": "engine/tests/test_modules/effects/draw/flat/success_zone_group_live_success_draw_test.rs",
-          "test": "success_zone_group_draw_live_leaves_no_choice_with_initially_empty_success_zone",
-          "line": 62,
-          "detail": "m in 3 slots"
-        },
-        {
-          "file": "engine/tests/test_modules/effects/draw/flat/success_zone_group_live_success_draw_test.rs",
-          "test": "success_zone_group_draw_live_leaves_no_choice_with_matching_group_stage",
-          "line": 16,
-          "detail": "m in 3 slots"
-        },
-        {
-          "file": "engine/tests/test_modules/effects/draw/flat/success_zone_group_live_success_draw_test.rs",
-          "test": "success_zone_group_draw_live_leaves_no_choice_with_wrong_group_success_live",
-          "line": 41,
-          "detail": "hasu in 3 slots"
-        },
-        {
           "file": "engine/tests/test_modules/effects/draw/flat/surplus_heart01_live_success_draw_test.rs",
           "test": "surplus_heart01_draw_live_leaves_no_choice_with_empty_decks",
           "line": 64,
@@ -1023,18 +1005,6 @@
           "detail": "filler in 2 slots"
         },
         {
-          "file": "engine/tests/test_modules/effects/recover/per_card/live_start_success_zone_plus_three_distinct_names_score_plus_one_test.rs",
-          "test": "miracle_stay_tune_fewer_than_3_distinct_members_no_score",
-          "line": 72,
-          "detail": "member1 in 3 slots"
-        },
-        {
-          "file": "engine/tests/test_modules/effects/recover/per_card/live_start_success_zone_plus_three_distinct_names_score_plus_one_test.rs",
-          "test": "miracle_stay_tune_neither_condition_no_score",
-          "line": 146,
-          "detail": "member1 in 3 slots"
-        },
-        {
           "file": "engine/tests/test_modules/effects/recover/to_hand/live_success_draws_four_and_picks_one_niji_reveal_q66_test.rs",
           "test": "poppin_equal_score_fails",
           "line": 71,
@@ -1129,18 +1099,6 @@
           "test": "dream_with_you_reduced_yell_count_does_not_block_score",
           "line": 86,
           "detail": "blader in 2 slots"
-        },
-        {
-          "file": "engine/tests/test_modules/effects/score/card_score/live_success_group_cheer_count_live_score_q36_q107_test.rs",
-          "test": "awake_q36_10_plus_hasetsu_cheers_score_plus_1",
-          "line": 23,
-          "detail": "heart_member in 3 slots"
-        },
-        {
-          "file": "engine/tests/test_modules/effects/score/card_score/live_success_group_cheer_count_live_score_q36_q107_test.rs",
-          "test": "awake_q36_non_hasetsu_cheered_no_score",
-          "line": 101,
-          "detail": "high_blade in 3 slots"
         },
         {
           "file": "engine/tests/test_modules/effects/score/per_card/excess_heart_score_shift_never_below_zero_pl_n_bp5_010_r_test.rs",
@@ -2508,7 +2466,6 @@
       "has_negative": true,
       "covering_files": [
         "engine/tests/test_modules/effects/cost_mod/required_hearts/ladybug_stage_cost_comparison_required_hearts_test.rs",
-        "engine/tests/test_modules/effects/draw/flat/success_zone_group_live_success_draw_test.rs",
         "engine/tests/test_modules/effects/draw/flat/surplus_heart01_live_success_draw_test.rs",
         "engine/tests/test_modules/effects/gain/blades/under_member/q278_q279_joint_card_under_member_blade_test.rs",
         "engine/tests/test_modules/effects/recover/to_discard/optional_discard_cost_plus_total_cost_comparison_gain_heart05_and_blade_test.rs",
@@ -2549,7 +2506,7 @@
         "live_start_three_distinct_group_members_add_six_score",
         "q278_ability_placed_card_and_joint_are_counted_at_live_start"
       ],
-      "covering_test_count": 51,
+      "covering_test_count": 48,
       "is_null": false,
       "use_limit": null,
       "watches_abilities": false,
@@ -31646,6 +31603,7 @@
       "has_choice": true,
       "has_negative": true,
       "covering_files": [
+        "engine/tests/test_modules/effects/draw/flat/success_zone_group_live_success_draw_test.rs",
         "engine/tests/test_modules/effects/energy/place/score_condition_integration_test.rs",
         "engine/tests/test_modules/effects/look_select/search_deck/optional_discard_look_five_take_unit_live_test.rs"
       ],
@@ -31665,9 +31623,12 @@
         "score_comparison_without_operator_always_passes",
         "score_gt_opponent_equal_fails",
         "score_gt_opponent_p1_higher_passes",
-        "score_gt_opponent_p1_lower_fails"
+        "score_gt_opponent_p1_lower_fails",
+        "success_zone_group_draw_live_KNOWN_GAP_mu_card_in_zone_draws_nothing",
+        "success_zone_group_draw_live_draws_nothing_with_empty_success_zone",
+        "success_zone_group_draw_live_draws_nothing_with_only_non_mu_card_in_success_zone"
       ],
-      "covering_test_count": 16,
+      "covering_test_count": 19,
       "is_null": false,
       "use_limit": null,
       "watches_abilities": false,
@@ -35231,9 +35192,9 @@
         "engine/tests/test_modules/effects/draw/flat/success_zone_group_live_success_draw_test.rs"
       ],
       "covering_tests": [
-        "success_zone_group_draw_live_leaves_no_choice_with_initially_empty_success_zone",
-        "success_zone_group_draw_live_leaves_no_choice_with_matching_group_stage",
-        "success_zone_group_draw_live_leaves_no_choice_with_wrong_group_success_live"
+        "success_zone_group_draw_live_KNOWN_GAP_mu_card_in_zone_draws_nothing",
+        "success_zone_group_draw_live_draws_nothing_with_empty_success_zone",
+        "success_zone_group_draw_live_draws_nothing_with_only_non_mu_card_in_success_zone"
       ],
       "covering_test_count": 3,
       "is_null": false,

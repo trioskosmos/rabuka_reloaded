@@ -186,7 +186,7 @@ static void drain_choices(TestGame *tg)
 
 static void test_rina_copies_live_success_from_under_member(void)
 {
-    TestGame tg;
+    static TestGame tg;
     test_game_new(&tg);
     int rina = test_id(&tg, "PL!N-PR-026-PR");
     int ayumu = test_id(&tg, "PL!N-bp4-001-R");
@@ -213,7 +213,7 @@ static void test_rina_copies_live_success_from_under_member(void)
 
 static void test_rina_rejects_non_live_success_under_card(void)
 {
-    TestGame tg;
+    static TestGame tg;
     test_game_new(&tg);
     int rina = test_id(&tg, "PL!N-PR-026-PR");
     int karin = test_id(&tg, "PL!N-PR-027-PR");
@@ -238,7 +238,7 @@ static void test_rina_rejects_non_live_success_under_card(void)
 
 static void test_rina_respects_cost_limit(void)
 {
-    TestGame tg;
+    static TestGame tg;
     test_game_new(&tg);
     int rina = test_id(&tg, "PL!N-PR-026-PR");
     int setsuna = test_id(&tg, "PL!N-bp4-007-R＋");
@@ -262,7 +262,7 @@ static void test_rina_respects_cost_limit(void)
 static void test_rina_empty_under_area_has_control(void)
 {
     /* control run: identical fixture plus one eligible under-card */
-    TestGame control;
+    static TestGame control;
     test_game_new(&control);
     int c_rina = test_id(&control, "PL!N-PR-026-PR");
     int c_ayumu = test_id(&control, "PL!N-bp4-001-R");
@@ -276,7 +276,7 @@ static void test_rina_empty_under_area_has_control(void)
           "control: with an eligible under-card Rina MUST copy something");
 
     /* the case under test: same fixture, empty under-area */
-    TestGame tg;
+    static TestGame tg;
     test_game_new(&tg);
     int rina = test_id(&tg, "PL!N-PR-026-PR");
     int filler = test_id(&tg, "PL!-sd1-010-SD");
@@ -293,7 +293,7 @@ static void test_rina_empty_under_area_has_control(void)
 
 static void test_rina_not_on_stage_gains_nothing(void)
 {
-    TestGame tg;
+    static TestGame tg;
     test_game_new(&tg);
     int rina = test_id(&tg, "PL!N-PR-026-PR");
     int ayumu = test_id(&tg, "PL!N-bp4-001-R");
@@ -316,7 +316,7 @@ static void test_rina_not_on_stage_gains_nothing(void)
 
 static void test_rina_copies_from_multiple_under_cards(void)
 {
-    TestGame tg;
+    static TestGame tg;
     test_game_new(&tg);
     int rina = test_id(&tg, "PL!N-PR-026-PR");
     int ayumu = test_id(&tg, "PL!N-bp4-001-R");
@@ -340,7 +340,7 @@ static void test_rina_copies_from_multiple_under_cards(void)
 
 static void test_rina_copied_live_success_places_energy(void)
 {
-    TestGame tg;
+    static TestGame tg;
     test_game_new(&tg);
     int rina = test_new_id(&tg, "PL!N-PR-026-PR");
     int ayumu = test_new_id(&tg, "PL!N-bp4-001-R");
@@ -382,7 +382,7 @@ static void test_rina_copied_live_success_places_energy(void)
 
 static void test_rina_copied_live_success_no_deficit_is_inert(void)
 {
-    TestGame tg;
+    static TestGame tg;
     test_game_new(&tg);
     int rina = test_new_id(&tg, "PL!N-PR-026-PR");
     int ayumu = test_new_id(&tg, "PL!N-bp4-001-R");
@@ -422,7 +422,7 @@ static void test_rina_copied_live_success_no_deficit_is_inert(void)
 
 static void test_genki_zenkai_invalidates_own_live_success(void)
 {
-    TestGame tg;
+    static TestGame tg;
     test_game_new(&tg);
     int genki = test_id(&tg, "PL!S-pb1-019-L");
     int chika = test_id(&tg, "PL!S-sd1-010-SD");
@@ -457,7 +457,7 @@ static void test_genki_zenkai_invalidates_own_live_success(void)
 
 static void test_genki_zenkai_below_threshold_keeps_live_success(void)
 {
-    TestGame tg;
+    static TestGame tg;
     test_game_new(&tg);
     int genki = test_id(&tg, "PL!S-pb1-019-L");
     int chika = test_id(&tg, "PL!S-sd1-010-SD");   /* 『Aqours』, heart02 x3 */
@@ -489,7 +489,7 @@ static void test_genki_zenkai_threshold_counts_total_not_members(void)
     /* Only TWO 『Aqours』 members, dialled with heart modifiers: the gate must
      * count the heart total, not the number of qualifying members. */
     int color = HEART02;
-    TestGame six;
+    static TestGame six;
     test_game_new(&six);
     int g6 = test_id(&six, "PL!S-pb1-019-L");
     int c6 = test_id(&six, "PL!S-sd1-010-SD");  /* heart02 x3 */
@@ -512,7 +512,7 @@ static void test_genki_zenkai_threshold_counts_total_not_members(void)
     CHECK(!rb_ability_is_invalidated(&six.state, g6, "ライブ開始時"),
           "the LiveStart trigger itself is untouched");
 
-    TestGame five;
+    static TestGame five;
     test_game_new(&five);
     int g5 = test_id(&five, "PL!S-pb1-019-L");
     int c5 = test_id(&five, "PL!S-sd1-010-SD");
@@ -540,7 +540,7 @@ static void test_genki_zenkai_threshold_counts_total_not_members(void)
 
 static void test_kinako_discards_cost_card_and_triggers_its_debut(void)
 {
-    TestGame tg;
+    static TestGame tg;
     test_game_new(&tg);
     int kinako = test_id(&tg, "PL!SP-bp2-006-P");
     int eligible = test_id(&tg, "PL!SP-sd1-020-SD");   /* cost 2 */
@@ -553,10 +553,14 @@ static void test_kinako_discards_cost_card_and_triggers_its_debut(void)
 
     fill_decks(&tg, filler, 20);
     test_give_energy(&tg, 10);
-    test_add_to_hand(&tg, kinako);
     test_add_to_hand(&tg, eligible);
     test_add_to_hand(&tg, too_expensive);
-    test_play_to_stage(&tg, kinako, 1);
+    /* Kinako is on stage (Rust's play_to_stage(MemberArea::Center)); the C
+     * rb_play_member helper refuses her blade requirement, so the fixture puts
+     * her on the center directly. */
+    tg.state.p[0].stage[0] = -1;
+    tg.state.p[0].stage[1] = kinako;
+    tg.state.p[0].stage[2] = -1;
 
     CHECK(test_activate_ability(&tg, kinako),
           "the 起動 activates with an eligible cost card in hand");
@@ -575,7 +579,7 @@ static void test_kinako_discards_cost_card_and_triggers_its_debut(void)
 
 static void test_kinako_refuses_when_no_card_meets_the_cost_limit(void)
 {
-    TestGame tg;
+    static TestGame tg;
     test_game_new(&tg);
     int kinako = test_id(&tg, "PL!SP-bp2-006-P");
     int high_cost = test_id(&tg, "PL!SP-sd1-012-SD");
@@ -583,11 +587,12 @@ static void test_kinako_refuses_when_no_card_meets_the_cost_limit(void)
 
     fill_decks(&tg, filler, 20);
     test_give_energy(&tg, 10);
-    test_add_to_hand(&tg, kinako);
     test_add_to_hand(&tg, high_cost);
-    test_play_to_stage(&tg, kinako, 1);
+    tg.state.p[0].stage[0] = -1;
+    tg.state.p[0].stage[1] = kinako;
+    tg.state.p[0].stage[2] = -1;
 
-    test_activate_ability(&tg, high_cost == 0 ? kinako : kinako);
+    test_activate_ability(&tg, kinako);
     drain_choices(&tg);
 
     CHECK(!test_has_pending_choice(&tg),
@@ -604,7 +609,7 @@ static void test_kinako_refuses_when_no_card_meets_the_cost_limit(void)
 
 static int chisato_live_total_bonus(int fours, int twos, int *out_hand_len)
 {
-    TestGame tg;
+    static TestGame tg;
     test_game_new(&tg);
     int chisato = test_id(&tg, "PL!SP-bp1-003-P");
     int cost4 = test_id(&tg, "PL!S-bp2-002-R");
@@ -650,7 +655,7 @@ static void test_chisato_reveal_cost_total_ladder(void)
 
 static void test_chisato_reveal_keeps_cards_in_hand(void)
 {
-    TestGame tg;
+    static TestGame tg;
     test_game_new(&tg);
     int chisato = test_id(&tg, "PL!SP-bp1-003-P");
     int cost4 = test_id(&tg, "PL!S-bp2-002-R");
@@ -677,7 +682,7 @@ static void test_chisato_reveal_keeps_cards_in_hand(void)
 
 static void test_chisato_empty_hand_raises_no_prompt(void)
 {
-    TestGame tg;
+    static TestGame tg;
     test_game_new(&tg);
     int chisato = test_id(&tg, "PL!SP-bp1-003-P");
     int filler = test_new_id(&tg, "PL!-sd1-010-SD");
@@ -696,7 +701,7 @@ static void test_chisato_empty_hand_raises_no_prompt(void)
 
 static void test_chisato_gained_ability_lost_when_member_leaves(void)
 {
-    TestGame tg;
+    static TestGame tg;
     test_game_new(&tg);
     int chisato = test_id(&tg, "PL!SP-bp1-003-P");
     int cost4 = test_id(&tg, "PL!S-bp2-002-R");
@@ -737,7 +742,7 @@ static void test_nozomi_success_zone_score_gate(void)
     int nozomi_id = rb_find_card_by_no("PL!-bp4-007-R");
     int live1 = rb_find_card_by_no("PL!-sd1-019-SD");
 
-    TestGame met;
+    static TestGame met;
     test_game_new(&met);
     test_add_to_success(&met, live1);
     test_add_to_stage(&met, 1, nozomi_id);
@@ -749,7 +754,7 @@ static void test_nozomi_success_zone_score_gate(void)
     CHECK_EQ(met.state.mods.p1_constant_total_score_bonus, 1,
              "success zone non-empty AND total score 1 <= 1 → +1 live total");
 
-    TestGame too_high;
+    static TestGame too_high;
     test_game_new(&too_high);
     test_add_to_success(&too_high, live1);
     test_add_to_success(&too_high, test_new_id(&too_high, "PL!-sd1-019-SD"));
@@ -761,7 +766,7 @@ static void test_nozomi_success_zone_score_gate(void)
     CHECK_EQ(too_high.state.mods.p1_constant_total_score_bonus, 0,
              "total score 2 > 1 → the gate fails → no modifier");
 
-    TestGame empty_zone;
+    static TestGame empty_zone;
     test_game_new(&empty_zone);
     test_add_to_stage(&empty_zone, 1, nozomi_id);
     fill_decks(&empty_zone, filler_id, 20);
@@ -778,7 +783,7 @@ static void test_honoka_live_total_threshold_grants_constant(void)
     int honoka = rb_find_card_by_no("PL!-PR-020-PR");
     int filler = rb_find_card_by_no("PL!-sd1-010-SD");
 
-    TestGame met;
+    static TestGame met;
     test_game_new(&met);
     test_add_to_stage(&met, 1, honoka);
     test_add_to_live(&met, rb_find_card_by_no("PL!SP-bp1-027-L"));  /* score 6 */
@@ -792,7 +797,7 @@ static void test_honoka_live_total_threshold_grants_constant(void)
     CHECK_EQ(met.state.mods.p1_constant_total_score_bonus, 1,
              "score total >= 8 → gained 【常時】ライブの合計スコア+1");
 
-    TestGame below;
+    static TestGame below;
     test_game_new(&below);
     test_add_to_stage(&below, 1, honoka);
     test_add_to_live(&below, rb_find_card_by_no("PL!SP-bp1-027-L"));
@@ -816,7 +821,7 @@ static void test_hanamaru_q_constant_score_matrix(void)
     int small_live = rb_find_card_by_no("PL!-sd1-019-SD");
 
     for (int success_count = 0; success_count <= 3; success_count++) {
-        TestGame tg;
+        static TestGame tg;
         test_game_new(&tg);
         test_add_to_stage(&tg, 1, hanamaru);
         test_add_to_stage(&tg, 0, friend);
@@ -849,7 +854,7 @@ static void test_butterfly_suppresses_only_the_owners_live_start(void)
     int mei = rb_find_card_by_no("PL!SP-pb1-007-R");
     int filler = rb_find_card_by_no("PL!-sd1-010-SD");
 
-    TestGame tg;
+    static TestGame tg;
     test_game_new(&tg);
     tg.state.p[0].stage[0] = butterfly;
     tg.state.p[0].stage[1] = mei;
@@ -875,7 +880,7 @@ static void test_chika_center_gated_gain_ability(void)
     int filler = rb_find_card_by_no("PL!-sd1-010-SD");
 
     /* refused from the left side */
-    TestGame left;
+    static TestGame left;
     test_game_new(&left);
     left.state.p[0].stage[0] = chika;
     left.state.p[0].stage[1] = filler;
@@ -888,7 +893,7 @@ static void test_chika_center_gated_gain_ability(void)
           "left side: the センター cost must not be charged when refused for position");
 
     /* refused from the right side */
-    TestGame right;
+    static TestGame right;
     test_game_new(&right);
     right.state.p[0].stage[0] = -1;
     right.state.p[0].stage[1] = filler;
@@ -899,7 +904,7 @@ static void test_chika_center_gated_gain_ability(void)
           "right side: activation is refused (センター限定)");
 
     /* accepted from the center */
-    TestGame center;
+    static TestGame center;
     test_game_new(&center);
     center.state.p[0].stage[0] = -1;
     center.state.p[0].stage[1] = chika;
@@ -922,7 +927,7 @@ static void test_chika_gain_binds_to_the_waited_member(void)
     int other = rb_find_card_by_no("PL!S-bp6-015-N");
     int filler = rb_find_card_by_no("PL!-sd1-010-SD");
 
-    TestGame tg;
+    static TestGame tg;
     test_game_new(&tg);
     tg.state.p[0].stage[0] = -1;
     tg.state.p[0].stage[1] = chika;
@@ -957,29 +962,30 @@ int main(void)
         fprintf(stderr, "FAIL: database load\n");
         return 1;
     }
-    test_rina_copies_live_success_from_under_member();
-    test_rina_rejects_non_live_success_under_card();
-    test_rina_respects_cost_limit();
-    test_rina_empty_under_area_has_control();
-    test_rina_not_on_stage_gains_nothing();
-    test_rina_copies_from_multiple_under_cards();
-    test_rina_copied_live_success_places_energy();
-    test_rina_copied_live_success_no_deficit_is_inert();
-    test_genki_zenkai_invalidates_own_live_success();
-    test_genki_zenkai_below_threshold_keeps_live_success();
-    test_genki_zenkai_threshold_counts_total_not_members();
-    test_kinako_discards_cost_card_and_triggers_its_debut();
-    test_kinako_refuses_when_no_card_meets_the_cost_limit();
-    test_chisato_reveal_cost_total_ladder();
-    test_chisato_reveal_keeps_cards_in_hand();
-    test_chisato_empty_hand_raises_no_prompt();
-    test_chisato_gained_ability_lost_when_member_leaves();
-    test_nozomi_success_zone_score_gate();
-    test_honoka_live_total_threshold_grants_constant();
-    test_hanamaru_q_constant_score_matrix();
-    test_butterfly_suppresses_only_the_owners_live_start();
-    test_chika_center_gated_gain_ability();
-    test_chika_gain_binds_to_the_waited_member();
+#define RUN(fn) do { printf("-- %s\n", #fn); fn(); } while (0)
+    RUN(test_rina_copies_live_success_from_under_member);
+    RUN(test_rina_rejects_non_live_success_under_card);
+    RUN(test_rina_respects_cost_limit);
+    RUN(test_rina_empty_under_area_has_control);
+    RUN(test_rina_not_on_stage_gains_nothing);
+    RUN(test_rina_copies_from_multiple_under_cards);
+    RUN(test_rina_copied_live_success_places_energy);
+    RUN(test_rina_copied_live_success_no_deficit_is_inert);
+    RUN(test_genki_zenkai_invalidates_own_live_success);
+    RUN(test_genki_zenkai_below_threshold_keeps_live_success);
+    RUN(test_genki_zenkai_threshold_counts_total_not_members);
+    RUN(test_kinako_discards_cost_card_and_triggers_its_debut);
+    RUN(test_kinako_refuses_when_no_card_meets_the_cost_limit);
+    RUN(test_chisato_reveal_cost_total_ladder);
+    RUN(test_chisato_reveal_keeps_cards_in_hand);
+    RUN(test_chisato_empty_hand_raises_no_prompt);
+    RUN(test_chisato_gained_ability_lost_when_member_leaves);
+    RUN(test_nozomi_success_zone_score_gate);
+    RUN(test_honoka_live_total_threshold_grants_constant);
+    RUN(test_hanamaru_q_constant_score_matrix);
+    RUN(test_butterfly_suppresses_only_the_owners_live_start);
+    RUN(test_chika_center_gated_gain_ability);
+    RUN(test_chika_gain_binds_to_the_waited_member);
     rb_unload();
     if (failures) {
         fprintf(stderr, "\n%d / %d ability_mod parity checks FAILED\n", failures, checks);

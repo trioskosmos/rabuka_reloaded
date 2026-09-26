@@ -11,7 +11,7 @@ typedef struct {
 
 /* `structural` is the C dispatcher's own "this handler owns its children" flag
  * (consumed by rb_execute_effect_ex's generic pre-order child walk, engine.c).
- * It is deliberately NOT the same set as the verdict-suppression set below ?
+ * It is deliberately NOT the same set as the verdict-suppression set below —
  * the two were conflated here until the Rust structural list was ported. */
 static const ExecutorEntry executor_table[] = {
     {"draw_card", 0}, {"draw", 0}, {"draw_until_count", 0},
@@ -51,7 +51,7 @@ static const ExecutorEntry executor_table[] = {
     {"modify_cost", 0}, {"reduce_live_card_set_limit", 0}
 };
 
-/* engine/src/ability/effects/executor.rs:10-18 ? push_effect_verdict's
+/* engine/src/ability/effects/executor.rs:10-18 — push_effect_verdict's
  * `matches!` structural set, verbatim. Only these six suppress the verdict
  * log entry. Note `choice` IS in the Rust set and `conditional_optional`
  * is NOT; the previous reuse of rb_executor_is_structural got both backwards
@@ -104,7 +104,7 @@ static void push_effect_verdict(const AbilityEffect *effect)
 {
     if (!effect || verdict_is_structural(effect->action)) return;
     char details[128];
-    /* Rust: effect.count.or(effect.value_any()) ? count first, then the
+    /* Rust: effect.count.or(effect.value_any()) — count first, then the
      * `value` extra; an absent value yields the bare action label. */
     const char *value_text = effect->count >= 0 ? NULL : effect_extra(effect, "value");
     if (effect->count >= 0)
@@ -336,7 +336,7 @@ int rb_executor_execute(GameState *g, int actor, AbilityEffect *effect, int host
         result = 0;
     }
 
-    /* engine/src/ability/effects/executor.rs:191 ? the verdict is pushed
+    /* engine/src/ability/effects/executor.rs:191 — the verdict is pushed
      * unconditionally after the match, including on the Err arms. */
     push_effect_verdict(effect);
     return result;

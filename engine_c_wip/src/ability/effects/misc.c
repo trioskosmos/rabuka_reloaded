@@ -745,8 +745,6 @@ static int h_gain_resource(GameState *g, int actor, const AbilityEffect *e){
 
     apply_blade_resource(g,e,kind,who,t.blade,t.n_blade,activating,is_all,dur,
                           final_count,blades_to_add);
-    fprintf(stderr, "DEBUG [GAIN_RESOURCE] applied blade: targets=%d final=%d blades=%d is_all=%d\n",
-            t.n_blade, final_count, blades_to_add, is_all);
 
     apply_heart_resource(g,e,kind,who,t.heart,t.n_heart,activating,is_self_target,
                          is_all,dur,is_negative,colors,counts,n_dist,final_count);

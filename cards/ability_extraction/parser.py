@@ -5539,6 +5539,46 @@ def _enrich_heart_content(cond, text):
 # including card type inference, resource inference, and default filling.
 #
 
+# --- card-type vocabulary (ONE definition) -------------------------------
+# Which Japanese phrase means which card type. Every card-type scan in the
+# parser — `_infer_card_type`, `_fill_or_card_types`, the move_cards or/and
+# expansion, the 『group』の<type> group scan — reads this table, so the
+# recognised set can never drift between them.
+CARD_TYPE_KEYWORDS = (
+    ("live_card", "ライブカード"),
+    ("member_card", "メンバーカード"),
+    ("energy_card", "エネルギーカード"),
+)
+
+# Reverse lookup: card type id -> its Japanese phrase.
+CARD_TYPE_PHRASE = {card_type: phrase for card_type, phrase in CARD_TYPE_KEYWORDS}
+
+# The three phrases as one alternation, for building the "two card types
+# joined by X" patterns below.
+_CARD_TYPE_ALT = "|".join(phrase for _, phrase in CARD_TYPE_KEYWORDS)
+
+# 「AかB」 is an either-or choice; 「AとB」 is a both-at-once requirement.
+# Each is matched on the raw text to decide whether a list of card types is
+# being expressed at all; `_card_types_in` then pulls the actual list out.
+_OR_CARD_TYPE_PAIR_RE = re.compile(rf"({_CARD_TYPE_ALT}).*か.*({_CARD_TYPE_ALT})")
+_AND_CARD_TYPE_PAIR_RE = re.compile(rf"({_CARD_TYPE_ALT}).*と.*({_CARD_TYPE_ALT})")
+
+# 『group』のメンバーカード — which group a typed card count refers to.
+_TYPED_GROUP_RE = re.compile(rf"『([^』]+)』の({_CARD_TYPE_ALT})")
+
+
+def _card_types_in(text, in_text_order=False):
+    """The card types named by `text`, from CARD_TYPE_KEYWORDS.
+
+    `in_text_order` returns them in the order the phrases appear in the text
+    (what 「AとB」 means); otherwise they come back in table order (what the
+    either-or lists have always used).
+    """
+    found = [(phrase, card_type) for card_type, phrase in CARD_TYPE_KEYWORDS if phrase in text]
+    if in_text_order:
+        found.sort(key=lambda pair: text.index(pair[0]))
+    return [card_type for _, card_type in found]
+
 
 def _infer_card_type(text, action=None):
     """Infer card_type from text context."""
@@ -5928,81 +5968,65 @@ def _fill_defaults_move_cards(action, text, action_text, _cached_source, _cached
     if (not has_source and not has_dest) or zone_only_dest:
         action["action"] = "custom"
         return "custom"
-    card_type_kws = [
-        ("live_card", "ライブカード"),
-        ("member_card", "メンバーカード"),
-        ("energy_card", "エネルギーカード"),
-    ]
-    if action.get("card_type") and re.search(
-        r"(ライブカード|メンバーカード|エネルギーカード).*か.*(ライブカード|メンバーカード|エネルギーカード)",
-        text,
-    ):
-        or_types = [t for t, kw in card_type_kws if kw in text]
-        if len(or_types) >= 2:
-            action["or_card_types"] = or_types
-            action.pop("card_type", None)
-    if action.get("card_type") and re.search(
-        r"(ライブカード|メンバーカード|エネルギーカード).*と.*(ライブカード|メンバーカード|エネルギーカード)",
-        text,
-    ):
-        and_types = [
-            t
-            for kw, t in sorted(
-                [(kw, t) for t, kw in card_type_kws if kw in text],
-                key=lambda x: text.index(x[0]),
-            )
-        ]
-        if (
-            len(and_types) >= 2
-            and action.get("source")
-            and action.get("destination")
-        ):
-            sub_actions = []
-            typed_groups = {
-                dict((kw, ct) for ct, kw in card_type_kws)[kw]: group
-                for group, kw in re.findall(
-                    r"『([^』]+)』の(メンバーカード|ライブカード|エネルギーカード)",
-                    text,
-                )
-            }
-            for ct in and_types:
-                sub_text = action.get("text", "")
-                if ct in typed_groups:
-                    kw = next(kw for card_type, kw in card_type_kws if card_type == ct)
-                    sub_text = re.search(
-                        rf"『{re.escape(typed_groups[ct])}』の{kw}\d*枚?",
-                        text,
-                    ).group(0)
-                sub = {
-                    "text": sub_text,
-                    "action": "move_cards",
-                    "source": action["source"],
-                    "destination": action["destination"],
-                    "card_type": ct,
-                    "count": action.get("count", 1),
-                    "max": True,
-                    "target": action.get("target", "self"),
-                }
-                if ct in typed_groups:
-                    sub["group_names"] = [typed_groups[ct]]
-                if action.get("optional") is not None:
-                    sub["optional"] = action["optional"]
-                sub_actions.append(sub)
-            action["action"] = "sequential"
-            action["actions"] = sub_actions
-            action.pop("card_type", None)
-            action.pop("multiple_targets", None)
+    _expand_typed_card_move(action, text)
     return action.get("action")
 
 
-# Shared (type-keyword) table for the two or_card_types blocks in
-# `_fill_defaults` (か-pair scan and のどちらか scan). ONE definition so
-# the keyword set cannot drift between them.
-_OR_CARD_TYPE_KEYWORDS = [
-    ("live_card", "ライブカード"),
-    ("member_card", "メンバーカード"),
-    ("energy_card", "エネルギーカード"),
-]
+def _expand_typed_card_move(action, text):
+    """Split a move that names two card types into one move per type.
+
+    「AかB」 becomes a single move with `or_card_types`; 「AとB」 becomes a
+    sequential of one fully-typed move per type. Both only apply when the move
+    already has a single inferred card_type, so an explicit card_type from an
+    earlier rule is never overwritten.
+    """
+    if not action.get("card_type"):
+        return
+    if _OR_CARD_TYPE_PAIR_RE.search(text):
+        or_types = _card_types_in(text)
+        if len(or_types) >= 2:
+            action["or_card_types"] = or_types
+            action.pop("card_type", None)
+        return
+    if not _AND_CARD_TYPE_PAIR_RE.search(text):
+        return
+    and_types = _card_types_in(text, in_text_order=True)
+    if len(and_types) < 2 or not action.get("source") or not action.get("destination"):
+        return
+    # 『group』のメンバーカード — each type may name its own group.
+    typed_groups = {
+        CARD_TYPE_PHRASE[phrase]: group
+        for group, phrase in _TYPED_GROUP_RE.findall(text)
+    }
+    sub_actions = []
+    for card_type in and_types:
+        group = typed_groups.get(card_type)
+        sub_text = action.get("text", "")
+        if group:
+            phrase = CARD_TYPE_PHRASE[card_type]
+            sub_text = re.search(
+                rf"『{re.escape(group)}』の{phrase}\d*枚?", text
+            ).group(0)
+        sub = {
+            "text": sub_text,
+            "action": "move_cards",
+            "source": action["source"],
+            "destination": action["destination"],
+            "card_type": card_type,
+            "count": action.get("count", 1),
+            "max": True,
+            "target": action.get("target", "self"),
+        }
+        if group:
+            sub["group_names"] = [group]
+        if action.get("optional") is not None:
+            sub["optional"] = action["optional"]
+        sub_actions.append(sub)
+    action["action"] = "sequential"
+    action["actions"] = sub_actions
+    action.pop("card_type", None)
+    action.pop("multiple_targets", None)
+
 
 # Ordered operation phrases for modify_required_hearts: first match wins.
 # Same order as the legacy if-chain (減らす-family before 増やす-family
@@ -6177,10 +6201,10 @@ def _fill_select_target(action, text):
 
 def _fill_or_card_types(action, text, pop_card_type):
     or_types = []
-    for t, kw in _OR_CARD_TYPE_KEYWORDS:
-        if kw in text:
-            or_types.append(t)
-            if t == "member_card" and pop_card_type:
+    for card_type, phrase in CARD_TYPE_KEYWORDS:
+        if phrase in text:
+            or_types.append(card_type)
+            if card_type == "member_card" and pop_card_type:
                 cl = extract_cost_limit(text)
                 if cl:
                     action["cost_limit"] = cl
@@ -6272,10 +6296,7 @@ def _fill_defaults(action, text, _cached_source=_UNSET, _cached_dest=_UNSET):
                 action["cost_limit_operator"] = extract_operator(text) or "="
     # OR card types for ALL action types (not just move_cards/select)
     if a not in ("move_cards", "select") and "or_card_types" not in action:
-        if re.search(
-            r"(ライブカード|メンバーカード|エネルギーカード).*か.*(ライブカード|メンバーカード|エネルギーカード)",
-            text,
-        ):
+        if _OR_CARD_TYPE_PAIR_RE.search(text):
             _fill_or_card_types(action, text, pop_card_type=False)
     a = _fill_defaults_count_and_refine(action, text, action_text, a)
 

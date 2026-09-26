@@ -9,7 +9,7 @@ exit /b
 param(
     [int]$IntervalMinutes = 8,
     [string]$WindowTitle = "",
-    [string]$Message = "continue what you are doing, continue reorganising tests, fixing bad tests with bad assertions/fake gameplay, adding stronger tests for abilities, scanning repo for other issues and things that should be rewritten. keep analysing and looking for new issues. do not stop. if you think you are done you are not there is more to do."
+    [string]$Message = "continue what you are doing. do not stop. if you think you are done you are not there is more to do, find and do it"
 )
 
 Add-Type -AssemblyName System.Windows.Forms
