@@ -327,6 +327,16 @@ pub fn push_cond_verdict(
     });
 }
 
+/// Append a position clause to a description, or leave the description alone
+/// when the condition said nothing about position.
+fn with_position(base: String, position_str: &str) -> String {
+    if position_str.is_empty() {
+        base
+    } else {
+        format!("{} {}", base, position_str)
+    }
+}
+
 impl<'a> ConditionContext<'a> {
     /// True when the gated ability's owner (`self_player`) is the active player.
     /// Unknown owner (`None`) passes — preserves the legacy `unwrap_or(true)`.
@@ -949,30 +959,19 @@ impl<'a> ConditionContext<'a> {
                         let subject = &chars[0];
                         let norm_sub = crate::card::CardDatabase::normalize_name(subject);
                         let norm_ref = crate::card::CardDatabase::normalize_name(ref_char);
-                        let sub_cost = stage_ids
-                            .iter()
-                            .filter_map(|&cid| {
-                                let card = self.game_state.card_database.get_card(cid)?;
-                                let n = crate::card::CardDatabase::normalize_name(&card.name);
-                                if n.contains(&norm_sub) {
-                                    card.cost
-                                } else {
-                                    None
-                                }
-                            })
-                            .next();
-                        let ref_cost = stage_ids
-                            .iter()
-                            .filter_map(|&cid| {
-                                let card = self.game_state.card_database.get_card(cid)?;
-                                let n = crate::card::CardDatabase::normalize_name(&card.name);
-                                if n.contains(&norm_ref) {
-                                    card.cost
-                                } else {
-                                    None
-                                }
-                            })
-                            .next();
+                        let cost_of_named = |want: &String| {
+                            stage_ids
+                                .iter()
+                                .filter_map(|&cid| {
+                                    let card = self.game_state.card_database.get_card(cid)?;
+                                    let n =
+                                        crate::card::CardDatabase::normalize_name(&card.name);
+                                    n.contains(want).then_some(card.cost).flatten()
+                                })
+                                .next()
+                        };
+                        let sub_cost = cost_of_named(&norm_sub);
+                        let ref_cost = cost_of_named(&norm_ref);
                         let op = condition
                             .get_cost_reference_operator()
                             .map(|o| o.as_str())
@@ -990,45 +989,21 @@ impl<'a> ConditionContext<'a> {
                             }
                             (None, None) => format!("{}も{}も不在", subject, ref_char),
                         };
-                        if position_str.is_empty() {
-                            cost_part
-                        } else {
-                            format!("{} {}", cost_part, position_str)
-                        }
-                    } else {
-                        let names: Vec<String> = stage_ids
-                            .iter()
-                            .filter_map(|&cid| {
-                                self.game_state
-                                    .card_database
-                                    .get_card(cid)
-                                    .map(|c| c.name.to_string())
-                            })
-                            .collect();
-                        let base = format!("在籍=[{}]", names.join(", "));
-                        if position_str.is_empty() {
-                            base
-                        } else {
-                            format!("{} {}", base, position_str)
-                        }
-                    }
-                } else {
-                    let names: Vec<String> = stage_ids
-                        .iter()
-                        .filter_map(|&cid| {
-                            self.game_state
-                                .card_database
-                                .get_card(cid)
-                                .map(|c| c.name.to_string())
-                        })
-                        .collect();
-                    let base = format!("在籍=[{}]", names.join(", "));
-                    if position_str.is_empty() {
-                        base
-                    } else {
-                        format!("{} {}", base, position_str)
+                        return with_position(cost_part, &position_str);
                     }
                 }
+                // No cost reference, or no characters named: the roster itself is
+                // the description. Both branches are the same text.
+                let names: Vec<String> = stage_ids
+                    .iter()
+                    .filter_map(|&cid| {
+                        self.game_state
+                            .card_database
+                            .get_card(cid)
+                            .map(|c| c.name.to_string())
+                    })
+                    .collect();
+                with_position(format!("在籍=[{}]", names.join(", ")), &position_str)
             }
             Some(Zone::Hand) => format!("手札={}枚", player.hand.cards.len()),
             Some(Zone::Discard) => format!("控え室={}枚", player.waitroom.cards.len()),

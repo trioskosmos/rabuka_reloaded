@@ -1353,6 +1353,25 @@ let source = cost.source_str().unwrap_or("");
         result
     }
 
+    /// Run an accepted optional move-cost and mark the cost paid.
+    ///
+    /// Optionality is stripped before the move runs: left in place, the move
+    /// would re-enter this same gate and ask the player again.
+    fn accept_optional_move_cost(
+        &mut self,
+        gs: &mut GameState,
+        cost: &crate::card::AbilityCost,
+    ) -> Result<(), String> {
+        let mut committed = cost.clone();
+        committed.set_optional(Some(false));
+        self.pay_cost_move_cards(gs, &committed)?;
+        if let Some(entry) = gs.ability_queue.current_entry_mut() {
+            entry.cost_paid = true;
+            entry.optional_cost_result = Some(true);
+        }
+        Ok(())
+    }
+
     pub fn handle_optional_cost_payment(
         &mut self,
         gs: &mut GameState,
@@ -1532,36 +1551,19 @@ let source = cost.source_str().unwrap_or("");
                     }
                 }
             }
-            // Optional stage-move costs (「メンバーを控え室に置いてもよい：…」):
-            // the player accepted — actually execute the move now, with
-            // optionality stripped so it doesn't loop back to the gate.
-            if cost.action == ActionType::MoveCards
-                && Zone::from_str(cost.source_str().unwrap_or("")) == Some(Zone::Stage)
-            {
-                let mut c = cost.clone();
-                c.set_optional(Some(false));
-                self.pay_cost_move_cards(gs, &c)?;
-                if let Some(entry) = gs.ability_queue.current_entry_mut() {
-                    entry.cost_paid = true;
-                    entry.optional_cost_result = Some(true);
+            // Optional move costs. Both shapes are the same work with a
+            // different source: 「メンバーを控え室に置いてもよい：…」 and
+            // 「エネルギー置き場にあるエネルギー1枚をエネルギーデッキに置いても
+            // よい：…」. The player accepted, so run the move now with
+            // optionality stripped, or it loops back to this gate.
+            if cost.action == ActionType::MoveCards {
+                let source = Zone::from_str(cost.source_str().unwrap_or(""));
+                let from_stage = source == Some(Zone::Stage);
+                let energy_to_deck =
+                    source == Some(Zone::Energy) && cost.destination_any() == Some("energy_deck");
+                if from_stage || energy_to_deck {
+                    return self.accept_optional_move_cost(gs, &cost);
                 }
-                return Ok(());
-            }
-            // Optional energy-zone→energy-deck costs (「エネルギー置き場にある
-            // エネルギー1枚をエネルギーデッキに置いてもよい：…」): same pattern —
-            // execute the move now with optionality stripped.
-            if cost.action == ActionType::MoveCards
-                && Zone::from_str(cost.source_str().unwrap_or("")) == Some(Zone::Energy)
-                && cost.destination_any() == Some("energy_deck")
-            {
-                let mut c = cost.clone();
-                c.set_optional(Some(false));
-                self.pay_cost_move_cards(gs, &c)?;
-                if let Some(entry) = gs.ability_queue.current_entry_mut() {
-                    entry.cost_paid = true;
-                    entry.optional_cost_result = Some(true);
-                }
-                return Ok(());
             }
             // Handle sequential_cost sub-costs — pay each after user confirmed
             if let Some(ref costs) = cost.compound.actions {

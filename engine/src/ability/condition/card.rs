@@ -1028,6 +1028,23 @@ impl<'a> ConditionContext<'a> {
         ))
     }
 
+    /// The total effective cost of a set of cards, saturating at 255.
+    ///
+    /// "Effective" means after the constant cost modifiers: a comparison the
+    /// card text writes is about what the card actually costs in this state.
+    fn total_effective_cost(&self, ids: &[i16]) -> u8 {
+        let card_db = &self.game_state.card_database;
+        ids.iter()
+            .map(|&id| {
+                let base = card_db.get_card(id).and_then(|c| c.cost).unwrap_or(0);
+                crate::constants::saturate_u8(crate::constants::effective_stat(
+                    base,
+                    self.game_state.mods.get_cost_modifier(id),
+                ))
+            })
+            .sum()
+    }
+
     /// Stage members eligible as "others" for greater-than-all comparisons:
     /// non-empty slots matching `card_type`, minus `exclude_id`, optionally
     /// including the opponent's stage. Shared by the heart and blade variants.
@@ -3839,20 +3856,7 @@ impl<'a> ConditionContext<'a> {
             && self.game_state.revealed_cards.is_empty()
             && !self.moved_cards.is_empty()
         {
-            let card_db = &self.game_state.card_database;
-            let total: u8 = self
-                .moved_cards
-                .iter()
-                .filter_map(|&id| {
-                    let base = card_db.get_card(id).and_then(|c| c.cost).unwrap_or(0);
-                    Some(crate::constants::saturate_u8(
-                        crate::constants::effective_stat(
-                            base,
-                            self.game_state.mods.get_cost_modifier(id),
-                        ),
-                    ))
-                })
-                .sum();
+            let total = self.total_effective_cost(&self.moved_cards);
             if total > 0 {
                 return total;
             }
@@ -3861,22 +3865,7 @@ impl<'a> ConditionContext<'a> {
         // explicit comparison_type (e.g. "選んだ数以下の場合" in Kosuzu).
         // Use the cost of revealed cards when available.
         if location.is_empty() && !self.game_state.revealed_cards.is_empty() {
-            let card_db = &self.game_state.card_database;
-            let total: u8 = self
-                .game_state
-                .revealed_cards
-                .iter()
-                .filter_map(|&id| {
-                    let base = card_db.get_card(id).and_then(|c| c.cost).unwrap_or(0);
-                    Some(crate::constants::saturate_u8(
-                        crate::constants::effective_stat(
-                            base,
-                            self.game_state.mods.get_cost_modifier(id),
-                        ),
-                    ))
-                })
-                .sum();
-            return total;
+            return self.total_effective_cost(&self.game_state.revealed_cards);
         }
         let player = self.resolve_condition_player(target);
         // Character-name zone count: when a comparison condition specifies
