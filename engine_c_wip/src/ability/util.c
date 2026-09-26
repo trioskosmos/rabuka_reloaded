@@ -1171,7 +1171,11 @@ int rb_count_distinct_member_name_units(const int *cards, int n) {
     return count;
 }
 
-/* Mirror util.rs::filter_distinct — return indices into cards, deduped by name. */
+/* Mirror util.rs::filter_distinct — return indices into cards, deduplicated by
+   the normalized name of the card each index points at. Rust filters the INDEX
+   list and then dedupes it, so two positions holding equal-name cards collapse
+   to the first position; the C port used to round-trip through ids, which
+   returned the first index of every distinct id. */
 int rb_filter_distinct(const int *cards, int n, const char *card_type,
                        const char *group, RbDistinctType distinct,
                        int *out_idx, int max) {
@@ -1180,27 +1184,47 @@ int rb_filter_distinct(const int *cards, int n, const char *card_type,
     if (card_type) strncpy(f.card_type, card_type, sizeof f.card_type - 1);
     if (group)     strncpy(f.group, group, sizeof f.group - 1);
     f.has_filter = (card_type && card_type[0]) || (group && group[0]);
-    if (!rb_distinct_should_dedupe(distinct))
-        return rb_matching_indices_filter(&f, cards, n, out_idx, max);
-    int matching[RB_MAX_ZONE];
-    int mn = rb_matching_indices_filter(&f, cards, n, matching, RB_MAX_ZONE);
-    int ids[RB_MAX_ZONE];
-    for (int i = 0; i < mn; i++) ids[i] = cards[matching[i]];
-    int deduped_ids[RB_MAX_ZONE];
-    int dn = rb_apply_distinct_filter(ids, mn, distinct, deduped_ids, RB_MAX_ZONE);
-    int m = 0;
+    int idxs[RB_MAX_ZONE];
+    int mn = rb_matching_indices_filter(&f, cards, n, idxs, RB_MAX_ZONE);
+    if (!rb_distinct_should_dedupe(distinct)) {
+        int m = 0;
+        for (int i = 0; i < mn && m < max; i++) out_idx[m++] = idxs[i];
+        return m;
+    }
+    /* dedupe_by_normalized_name over the index list (util.rs:1871-1886). */
+    char seen[RB_MAX_ZONE][256];
+    int  nseen = 0;
+    int  m = 0;
     for (int i = 0; i < mn && m < max; i++) {
-        for (int d = 0; d < dn; d++) {
-            if (cards[matching[i]] == deduped_ids[d]) {
-                out_idx[m++] = matching[i];
-                break;
+        int cid = cards[idxs[i]];
+        Card c;
+        int keep;
+        if (rb_decode_card_by_index((uint32_t)cid, &c)) {
+            if (c.name) {
+                char nm[256];
+                rb_norm_ws(c.name, nm, sizeof nm);
+                int dup = 0;
+                for (int s = 0; s < nseen; s++)
+                    if (!strcmp(seen[s], nm)) { dup = 1; break; }
+                if (!dup && nseen < RB_MAX_ZONE) {
+                    strncpy(seen[nseen], nm, 255); seen[nseen][255] = 0; nseen++;
+                }
+                keep = !dup;
+            } else {
+                keep = 1;
             }
+            rb_free_card(&c);
+        } else {
+            keep = 1; /* card missing from the database is kept (util.rs:1880-1882) */
         }
+        if (keep) out_idx[m++] = idxs[i];
     }
     return m;
 }
 
-/* Mirror util.rs::count_matching_distinct. */
+/* Mirror util.rs::count_matching_distinct. The CardName variant is joint-aware
+   (Q278/Q279): a multi-name card contributes one unit only when it introduces a
+   name not already present as a single-name card. */
 int rb_count_matching_distinct(const int *cards, int n, const char *card_type,
                                const char *group, RbDistinctType distinct) {
     RbCardFilter f;
@@ -1214,6 +1238,8 @@ int rb_count_matching_distinct(const int *cards, int n, const char *card_type,
     int mn = rb_matching_indices_filter(&f, cards, n, matching, RB_MAX_ZONE);
     int ids[RB_MAX_ZONE];
     for (int i = 0; i < mn; i++) ids[i] = cards[matching[i]];
+    if (distinct == RB_DISTINCT_CARDNAME)
+        return rb_count_distinct_member_name_units(ids, mn);
     int deduped[RB_MAX_ZONE];
     return rb_apply_distinct_filter(ids, mn, distinct, deduped, RB_MAX_ZONE);
 }
@@ -1230,57 +1256,70 @@ int rb_build_candidate_pool(const GameState *g, int pl, const RbCardFilter *f,
     return rb_matching_ids(f, ids, n, out, max);
 }
 
-/* Mirror util.rs::matching_ids_filtered — matching ids with distinct,
-   target_count truncation, and exclusion by id. */
+/* Mirror util.rs::matching_ids_filtered. Rust order (util.rs:1766-1803):
+   1. push exclude_ids into the filter (rejects by exact card id),
+   2. matching_ids,
+   3. when `distinct` is set, dedupe by name and THEN additionally drop
+      results whose name matches an excluded card's name,
+   4. truncate to target_count.
+   The C port previously applied the name exclusion before the dedupe and never
+   rejected by id. */
 int rb_matching_ids_filtered(const RbCardFilter *f, const int *cards, int n,
                              RbDistinctType distinct, const int *exclude_ids,
                              int n_exclude, int target_count, int *out, int max) {
     if (!cards || !out) return 0;
-    RbCardFilter ff = *f;
-    /* Apply exclude_ids as a post-filter */
-    int m = rb_matching_ids(&ff, cards, n, out, max);
-    if (n_exclude > 0 && distinct != RB_DISTINCT_NONE) {
-        /* Also exclude cards whose names match excluded cards */
-        char excl_names[RB_MAX_ZONE][256];
-        int n_excl_names = 0;
-        for (int e = 0; e < n_exclude && n_excl_names < RB_MAX_ZONE; e++) {
-            Card c;
-            if (rb_decode_card_by_index((uint32_t)exclude_ids[e], &c)) {
-                if (c.name) {
-                    rb_norm_ws(c.name, excl_names[n_excl_names], 256);
-                    n_excl_names++;
-                }
-                rb_free_card(&c);
-            }
+    int m = rb_matching_ids(f, cards, n, out, max);
+    /* 1. exclude_cards: exact-id rejection (util.rs:1167-1174). */
+    if (n_exclude > 0) {
+        int w = 0;
+        for (int i = 0; i < m; i++) {
+            int dropped = 0;
+            for (int e = 0; e < n_exclude; e++)
+                if (out[i] == exclude_ids[e]) { dropped = 1; break; }
+            if (!dropped) out[w++] = out[i];
         }
-        if (n_excl_names > 0) {
-            int w = 0;
-            for (int i = 0; i < m; i++) {
-                Card c;
-                if (rb_decode_card_by_index((uint32_t)out[i], &c)) {
-                    if (c.name) {
-                        char nm[256];
-                        rb_norm_ws(c.name, nm, sizeof nm);
-                        int excl = 0;
-                        for (int s = 0; s < n_excl_names; s++)
-                            if (!strcmp(nm, excl_names[s])) { excl = 1; break; }
-                        if (!excl) out[w++] = out[i];
-                    } else {
-                        out[w++] = out[i];
-                    }
-                    rb_free_card(&c);
-                } else {
-                    out[w++] = out[i];
-                }
-            }
-            m = w;
-        }
+        m = w;
     }
     if (rb_distinct_should_dedupe(distinct)) {
+        /* 2. dedupe by name. */
         int deduped[RB_MAX_ZONE];
         int dn = rb_apply_distinct_filter(out, m, distinct, deduped, RB_MAX_ZONE);
-        for (int i = 0; i < dn && i < max; i++) out[i] = deduped[i];
+        if (dn > max) dn = max;
+        memcpy(out, deduped, sizeof(int) * (size_t)dn);
         m = dn;
+        /* 3. additionally exclude by excluded card NAME. */
+        if (n_exclude > 0) {
+            char excl_names[RB_MAX_ZONE][256];
+            int n_excl_names = 0;
+            for (int e = 0; e < n_exclude && n_excl_names < RB_MAX_ZONE; e++) {
+                Card c;
+                if (rb_decode_card_by_index((uint32_t)exclude_ids[e], &c)) {
+                    if (c.name) {
+                        rb_norm_ws(c.name, excl_names[n_excl_names], 256);
+                        n_excl_names++;
+                    }
+                    rb_free_card(&c);
+                }
+            }
+            if (n_excl_names > 0) {
+                int w = 0;
+                for (int i = 0; i < m; i++) {
+                    Card c;
+                    int drop = 0;
+                    if (rb_decode_card_by_index((uint32_t)out[i], &c)) {
+                        if (c.name) {
+                            char nm[256];
+                            rb_norm_ws(c.name, nm, sizeof nm);
+                            for (int s = 0; s < n_excl_names; s++)
+                                if (!strcmp(nm, excl_names[s])) { drop = 1; break; }
+                        }
+                        rb_free_card(&c);
+                    }
+                    if (!drop) out[w++] = out[i];
+                }
+                m = w;
+            }
+        }
     }
     if (target_count > 0 && m > target_count) m = target_count;
     return m;
@@ -1314,14 +1353,7 @@ int rb_get_selection_indices_filter(const int *cards, int n, const RbCardFilter 
                                      int self_target_only, int activating_card,
                                      int *out_idx, int max) {
     if (!cards || !out_idx) return 0;
-    int ids[RB_MAX_ZONE];
-    int m = rb_matching_ids(filter, cards, n, ids, RB_MAX_ZONE);
-    int r = 0;
-    for (int d = 0; d < m && r < max; d++) {
-        for (int i = 0; i < n; i++) {
-            if (cards[i] == ids[d]) { out_idx[r++] = i; break; }
-        }
-    }
+    int r = rb_matching_indices_filter(filter, cards, n, out_idx, max);
     if (self_target_only && activating_card >= 0) {
         int w = 0;
         for (int i = 0; i < r; i++)
@@ -1699,14 +1731,61 @@ int rb_calculate_per_unit_multiplier(const GameState *g, int pl, const char *per
     return 1;
 }
 
-/* Mirror util.rs::resolve_per_unit_count. */
+/* Mirror util.rs::resolve_per_unit_count.
+   Zone selection (util.rs:2346-2364): note that the bare 「枚」 unit resolves to
+   the HAND unless the filter is restricted to member cards, in which case it
+   resolves to the under-member zone. The C port sent 「枚」 straight to
+   under_member, which inverted the count for the common 「1枚につき」 gains. */
 int rb_resolve_per_unit_count(const GameState *g, int pl, const char *per_unit_type,
                               const char *card_type, const char *group,
                               const char *state_filter, int host_card_id) {
     if (!per_unit_type) return 1;
     const RbPlayer *P = &g->p[pl];
+    const char *zone;
+    int under_member_zone = 0;
     if (!strcmp(per_unit_type, "stage") || !strcmp(per_unit_type, "member") ||
         !strcmp(per_unit_type, "人") || !strcmp(per_unit_type, "members")) {
+        zone = "stage";
+    } else if (!strcmp(per_unit_type, "hand") || !strcmp(per_unit_type, "card")) {
+        zone = "hand";
+    } else if (!strcmp(per_unit_type, "under_member")) {
+        zone = "under_member";
+        under_member_zone = 1;
+    } else if (!strcmp(per_unit_type, "枚")) {
+        under_member_zone = (card_type && !strcmp(card_type, "member_card"));
+        zone = under_member_zone ? "under_member" : "hand";
+    } else if (!strcmp(per_unit_type, "discard") || !strcmp(per_unit_type, "waitroom")) {
+        zone = "discard";
+    } else if (!strcmp(per_unit_type, "live_card_zone") || !strcmp(per_unit_type, "live")) {
+        zone = "live";
+    } else if (!strcmp(per_unit_type, "success_live_zone") ||
+               !strcmp(per_unit_type, "success_live_card_zone")) {
+        zone = "success";
+    } else {
+        return 1;
+    }
+    if (under_member_zone) {
+        /* util.rs:2365-2386 — 「このメンバーの下に置かれているカード」 is scoped to
+           the HOST member (whose ability this is), not to every member. Only
+           when the host is unknown does the count widen to all under-cards. */
+        int ids[RB_MAX_ZONE];
+        int n = 0;
+        int area = -1;
+        if (host_card_id >= 0) {
+            for (int s = 0; s < RB_STAGE_SIZE; s++)
+                if (P->stage[s] == host_card_id) { area = s; break; }
+        }
+        if (area >= 0) {
+            for (int k = 0; k < P->under_cards[area].n; k++)
+                ids[n++] = P->under_cards[area].cards[k];
+        } else {
+            for (int s = 0; s < RB_STAGE_SIZE; s++)
+                for (int k = 0; k < P->under_cards[s].n && n < RB_MAX_ZONE; k++)
+                    ids[n++] = P->under_cards[s].cards[k];
+        }
+        return rb_count_matching(ids, n, card_type, group);
+    }
+    if (!strcmp(zone, "stage")) {
         int count = 0;
         for (int i = 0; i < RB_STAGE_SIZE; i++) {
             int cid = P->stage[i];
@@ -1721,25 +1800,7 @@ int rb_resolve_per_unit_count(const GameState *g, int pl, const char *per_unit_t
         }
         return count;
     }
-    if (!strcmp(per_unit_type, "hand") || !strcmp(per_unit_type, "card")) {
-        return rb_count_matching(P->hand.cards, P->hand.n, card_type, group);
-    }
-    if (!strcmp(per_unit_type, "under_member") || !strcmp(per_unit_type, "枚")) {
-        int n = 0;
-        for (int s = 0; s < RB_STAGE_SIZE; s++)
-            n += rb_count_matching(P->under_cards[s].cards, P->under_cards[s].n, card_type, group);
-        return n;
-    }
-    if (!strcmp(per_unit_type, "discard")) {
-        return rb_count_matching(P->discard.cards, P->discard.n, card_type, group);
-    }
-    if (!strcmp(per_unit_type, "live_card_zone")) {
-        return rb_count_matching(P->live.cards, P->live.n, card_type, group);
-    }
-    if (!strcmp(per_unit_type, "success_live_zone") || !strcmp(per_unit_type, "success_live_card_zone")) {
-        return rb_count_matching(P->success.cards, P->success.n, card_type, group);
-    }
-    return rb_calculate_per_unit_multiplier(g, pl, per_unit_type, state_filter);
+    return rb_count_matching(P->hand.cards, P->hand.n, card_type, group);
 }
 
 /* Mirror util.rs::resolve_discard_per_unit_count. */
