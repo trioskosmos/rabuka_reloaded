@@ -271,11 +271,15 @@ DURATION_PREFIX_MAP = {
 #
 # HEART_ICON       matches a rendered icon, capturing nothing
 # HEART_ICON_ID    matches a rendered icon, capturing the colour number
-# HEART_ID         matches a bare id anywhere, capturing the colour number
+# HEART_ICON_PAIR  matches a rendered icon, capturing both halves of the name
+# HEART_REF        the `heart_NN` id on its own, capturing the colour number
+# HEART_HAS_REF    the same, capturing nothing (a presence test)
+# HEART_LABEL      the `|heartNN}` label half of a rendered icon
 HEART_ICON = r"\{\{heart_?\d+\.png\|heart\d+\}\}"
 HEART_ICON_ID = r"\{\{heart_?(\d+)\.png\|heart\d+\}\}"
-HEART_ID = r"heart_?(\d+)"
-# The label half of a rendered icon: the `|heart03}` that names the colour.
+HEART_ICON_PAIR = r"\{\{heart_(\d+)\.png\|heart(\d+)\}\}"
+HEART_REF = r"heart_(\d+)"
+HEART_HAS_REF = r"heart_\d+"
 HEART_LABEL = r"\|(heart\d+)\}"
 
 
@@ -289,9 +293,23 @@ def _heart_count(text):
     return len(_heart_icons(text))
 
 
+def _heart_id_list(text):
+    """Every heart colour named by a rendered icon, in order, duplicates kept."""
+    return [f"heart{n.zfill(2)}" for n in re.findall(HEART_ICON_ID, text)]
+
+
 def _heart_ids(text):
-    """The distinct heart colours `text` names, as sorted `heartNN` ids."""
-    return sorted({f"heart{n.zfill(2)}" for n in re.findall(HEART_ICON_ID, text)})
+    """The distinct heart colours `text` names, sorted."""
+    return sorted(set(_heart_id_list(text)))
+
+
+def _heart_ids_in_order(text):
+    """The distinct heart colours `text` names, in first-appearance order.
+
+    Conditions want this (the order reads as the order the clause lists them);
+    effect patches want it too, because the engine treats the list positionally.
+    """
+    return list(dict.fromkeys(_heart_id_list(text)))
 
 
 def _heart_ids_gained(text):
@@ -313,6 +331,21 @@ def _heart_label_counts(text):
     counts = {}
     for label in re.findall(HEART_LABEL, text):
         counts[label] = counts.get(label, 0) + 1
+    return counts
+
+
+def _heart_ref_ids(text, unique=False):
+    """Heart colours from the `heart_NN` ids written in `text`, as `heartNN`."""
+    ids = [f"heart{n.zfill(2)}" for n in re.findall(HEART_REF, text)]
+    return list(dict.fromkeys(ids)) if unique else ids
+
+
+def _count_heart_refs(text, allowed=None):
+    """Per-colour counts of the `heart_NN` ids in `text`, optionally filtered."""
+    counts = {}
+    for heart_id in _heart_ref_ids(text):
+        if allowed is None or heart_id in allowed:
+            counts[heart_id] = counts.get(heart_id, 0) + 1
     return counts
 
 
@@ -5006,7 +5039,7 @@ def _extract_heart_resource(condition, text):
     hc = extract_count(text)
     if hc:
         condition["count"] = hc
-        if re.search(r"heart_\d+.*?heart_\d+", text):
+        if re.search(rf"{HEART_HAS_REF}.*?{HEART_HAS_REF}", text):
             hts = []
             for i in range(1, 7):
                 if f"heart_0{i}" in text:
@@ -5587,9 +5620,7 @@ def _enrich_or_location(cond, text):
 
 def _enrich_heart_content(cond, text):
     """Detect 必要ハートに含まれるheartXXがN and add heart_colors + count + group_names."""
-    hc_m = re.search(
-        r"必要ハートに含まれる\{\{heart_(\d+)\.png\|heart\d+\}\}が(\d+)", text
-    )
+    hc_m = re.search(rf"必要ハートに含まれる{HEART_ICON_ID}が(\d+)", text)
     if hc_m:
         heart_color = f"heart{hc_m.group(1).zfill(2)}"
         heart_count = int(hc_m.group(2))
@@ -6578,11 +6609,9 @@ def _per_unit_filters(result, text, per_text):
     # Pattern: "{{heart_01.png|heart01}}と{{heart_06.png|heart06}}以外の色のハートを持つ"
     if "以外" in per_text:
         before_igai = per_text.split("以外")[0]
-        hc_ids = re.findall(r"heart_(\d+)", before_igai)
-        if hc_ids:
-            result["exclude_heart_colors"] = [
-                f"heart{m.zfill(2)}" for m in dict.fromkeys(hc_ids)
-            ]
+        excluded = _heart_ref_ids(before_igai, unique=True)
+        if excluded:
+            result["exclude_heart_colors"] = excluded
     # Extract included groups only (groups NOT followed by 以外)
     remaining_per_text = re.sub(r"『[^』]+』以外", "", per_text)
     gm = re.search(r"『([^』]+)』", remaining_per_text)
@@ -7257,7 +7286,7 @@ def _try_character_specific(text):
         for eff in effects:
             char_acts = []
             resources_text = eff["resources"]
-            heart_m = re.search(r"heart_(\d+)", resources_text)
+            heart_m = re.search(HEART_REF, resources_text)
             blade_count = resources_text.count("icon_blade.png")
             heart_color = f"heart{heart_m.group(1)}" if heart_m else None
             if blade_count > 0:
@@ -7725,10 +7754,7 @@ def _add_heart_color_threshold(d, text):
     Stores as heart_color_count on the dict."""
     if "heart_color_count" in d or "heart_colors" not in d:
         return
-    m = re.search(
-        r"\{\{heart_(\d+)\.png\|heart\d+\}\}を(\d+)(?:個)?以上",
-        text,
-    )
+    m = re.search(rf"{HEART_ICON_ID}を(\d+)(?:個)?以上", text)
     if m:
         count = int(m.group(2))
         if count > 0:
@@ -9518,7 +9544,7 @@ def _set_global_modifier_fields(text, result):
         result["target"] = "opponent" if "相手の" in raw_target else raw_target
     if "すべて" in text:
         result["all"] = True
-    heart_match = re.search(r"\{\{heart_(\d+)\.png\|heart\d+\}\}", text)
+    heart_match = re.search(HEART_ICON_ID, text)
     if heart_match:
         result["heart_colors"] = [f"heart{heart_match.group(1).zfill(2)}"]
     value_match = re.search(r"(\d+)つ多", text)
@@ -9762,7 +9788,7 @@ def _try_heart_choice(text):
         operation = "increase"
     raw_options = re.split(r"か[、，]?", options_text)
     options = []
-    icon_pat = r"\{\{heart_(\d+)\.png\|heart\d+\}\}"
+    icon_pat = HEART_ICON_ID
     for ro in raw_options:
         ro = ro.strip().rstrip("、，").strip()
         if not ro:
@@ -10569,7 +10595,7 @@ def _walk_extract_heart_colors(d, d_text, ctx_text):
             # should not inherit aggregate heart_colors from parent context.
             # Heart color is only inherited from context when the schema allows
             # it for this action type (never for blanket/all moves or gains).
-            if not re.search(r"heart_\d+", search_text) and ctx_text:
+            if not re.search(HEART_HAS_REF, search_text) and ctx_text:
                 if not d.get("heart_color"):
                     if _propagation_allowed("heart_colors", d, {"text": ctx_text}):
                         search_text = ctx_text
@@ -10584,10 +10610,10 @@ def _walk_extract_heart_colors(d, d_text, ctx_text):
     # When all colors have the same count, value = that per-color count.
     if d.get("action") == "modify_required_hearts" and "value" not in d:
         search_val = d_text or ""
-        if not re.search(r"heart_\d+", search_val) and ctx_text:
+        if not re.search(HEART_HAS_REF, search_val) and ctx_text:
             search_val = ctx_text
         target_colors = d.get("heart_colors", [])
-        color_counts = _count_heart_ids(search_val, target_colors or None)
+        color_counts = _count_heart_refs(search_val, target_colors or None)
         if color_counts:
             counts = list(color_counts.values())
             if len(set(counts)) == 1:
@@ -10610,7 +10636,7 @@ def _walk_extract_heart_colors(d, d_text, ctx_text):
         possess_pos = d_text_local.find("を持つ")
         if possess_pos >= 0:
             before = d_text_local[:possess_pos]
-            if re.search(r"\{\{heart_\d+\.png\|heart\d+\}\}", before):
+            if re.search(HEART_ICON, before):
                 d["filter_targets_by_heart_colors"] = True
 
     # Extract heart_colors from the node's own text for look_and_select select_actions.
@@ -11863,11 +11889,9 @@ def _fix_condition_enrichment(eff, t):
                 cond["aggregate"] = "total"
                 changed = True
             if not cond.get("heart_colors"):
-                hm = re.findall(
-                    r"{{heart_(\d+)\.png\|heart\d+}}", cond.get("text", "") or ct
-                )
-                if hm:
-                    cond["heart_colors"] = sorted(set(f"heart{m.zfill(2)}" for m in hm))
+                found = _heart_ids(cond.get("text", "") or ct)
+                if found:
+                    cond["heart_colors"] = found
                     changed = True
             ct2 = cond.get("text", "") or ct
             if not cond.get("count"):
@@ -12801,13 +12825,7 @@ def _enrich_effect_type(effect, triggerless=""):
     to patch a parser gap: heart_colors not propagated to conditions."""
     if effect is None:
         return
-    heart_colors = []
-    seen = set()
-    for m in re.findall(r"{{heart_(\d+)\.png\|heart\d+}}", triggerless):
-        h = f"heart{m.zfill(2)}"
-        if h not in seen:
-            seen.add(h)
-            heart_colors.append(h)
+    heart_colors = _heart_ids_in_order(triggerless)
     # Never patch heart_colors onto a gain_resource effect. Heart-gain colors
     # must come from the parser's multiset logic (one token per granted heart);
     # the full-text heart icons here belong to a CONDITION/requirement clause
@@ -13375,7 +13393,7 @@ def _validate_semantic(abilities):
         # ─── Heart content (required heart N in card filter) ───
         (
             "heart_content",
-            r"必要ハートに含まれる\{\{heart_\d+\.png\|heart\d+\}\}が\d+",
+            rf"必要ハートに含まれる{HEART_ICON}が\d+",
             lambda e, eff: _json_has_field(eff, "heart_colors")
             and _json_has_field(eff, "count"),
             "Heart content pattern but missing heart_colors or count",

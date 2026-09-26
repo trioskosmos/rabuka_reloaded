@@ -101,6 +101,14 @@ fn initiative_weight() -> f64 {
 /// placement is 1/3 of a game (1.2.1.1 / 8.4.7) and a score band is worth
 /// nothing on its own. `V8_DEV_CEILING` re-weights it; `V8_NO_DEV_CEILING`
 /// restores the pre-fix leaf so the fix can be re-measured.
+/// Default 0, measured OFF.
+///
+/// This was the first fix attempted, on the theory that v8's leaf was a
+/// cost-curve proxy. It is the wrong proxy - cost only stands in for the
+/// hearts and blades a check actually reads - and it was superseded by
+/// `band_progress`. It is retained only as an ablation handle because
+/// `score_ceiling` is a real, separately useful quantity, and removing the
+/// function would remove the ability to test that claim again.
 fn dev_ceiling_weight() -> f64 {
     if std::env::var_os("V8_NO_DEV_CEILING").is_some() {
         return 0.0;
@@ -109,7 +117,7 @@ fn dev_ceiling_weight() -> f64 {
         .ok()
         .and_then(|v| v.parse().ok())
         .filter(|w: &f64| w.is_finite() && *w >= 0.0)
-        .unwrap_or(PLACEMENT_CREDIT)
+        .unwrap_or(0.0)
 }
 
 /// Weight on the continuous band-progress term, the Main phase's development
@@ -230,81 +238,6 @@ fn horizon_weight() -> f64 {
         .unwrap_or(0.0)
 }
 
-/// Weight on the `passable_count` term — v7's proven `60 * Δpassable` signal,
-/// carried over because v8's leaf was measurably missing it.
-///
-/// `P(place)` is a MAX over the lives in hand and saturates at 1.0 the moment
-/// any one life becomes passable, so past that point it cannot see further
-/// board development at all — the leaf tied at the top in 81.8% of decisions.
-/// A COUNT is not a max: it climbs 0 -> 1 -> 2 -> 3 as the board grows, so it
-/// keeps discriminating in exactly the region the placement term has gone
-/// flat. v7 weighted it at 60.0 against a 25.0 ammo term, i.e. it dominated
-/// v7's eval, and v7's Main is the best-measured Main phase in the project.
-///
-/// Unit is "reachable lives", so it is comparable to `PLACEMENT_CREDIT` by
-/// construction: one reachable life is worth at most one placement.
-///
-/// `V8_PASSABLE` re-weights it; `V8_NO_PASSABLE` removes it.
-fn passable_weight() -> f64 {
-    if std::env::var_os("V8_NO_PASSABLE").is_some() {
-        return 0.0;
-    }
-    std::env::var("V8_PASSABLE")
-        .ok()
-        .and_then(|v| v.parse().ok())
-        .filter(|w: &f64| w.is_finite() && *w >= 0.0)
-        .unwrap_or(PLACEMENT_CREDIT)
-}
-
-/// v7's proven development evaluation, ported into v8's placement units.
-///
-/// v7's Main is the best-measured Main phase in this project - with v7's live
-/// set it wins 49.3% against v8's own Main at 44.2% - and the ablation says
-/// the difference is entirely in the Main phase. Its evaluation is four terms
-/// over the board:
-///
-/// ```text
-/// 8.0 * stage_cost  +  3.0 * hearts  +  6.0 * blades  +  60.0 * passable
-/// ```
-///
-/// v8's leaf has none of the first three in a linear form: it prices a
-/// saturating `P(place)`, a band-quantised ceiling, and a count. Measured
-/// attempts to substitute quantised or probabilistic versions of these signals
-/// (`score_ceiling`, `passable_count`, a two-horizon leaf) each moved win rate
-/// by less than the noise floor. The linear terms are what v7 actually uses
-/// and they are the finest-grained thing available.
-///
-/// The unit conversion is stated rather than tuned, and it comes from the one
-/// quantity both evaluations agree on: what one life in hand is worth. v7
-/// charges `25.0 * ammo`, v8 charges `PLACEMENT_CREDIT * ammo` (= 1/3), so
-/// one v7 unit is 75 v8 units. That makes the v7 weights
-/// 8.0/75 = 0.107 cost, 3.0/75 = 0.040 hearts, 6.0/75 = 0.080 blades.
-/// No free parameter is introduced.
-///
-/// Being a level rather than a delta is fine here: the search compares
-/// absolute leaf values across sibling actions, so any action-independent
-/// constant cancels.
-///
-/// `V8_V7_DEV` scales the whole block; `V8_NO_V7_DEV` removes it.
-fn v7_development_level(gs: &GameState, me: u8, db: &CardDatabase) -> f64 {
-    let hearts = v8_model::supply_hearts(gs, me, db);
-    let blades = v8_model::active_blades(gs, me, db);
-    let cost = v8_model::stage_cost(gs, me, db);
-    // v7's weights, divided by 75.
-    (8.0 * f64::from(cost) + 3.0 * f64::from(hearts) + 6.0 * f64::from(blades)) / 75.0
-}
-
-fn v7_dev_weight() -> f64 {
-    if std::env::var_os("V8_NO_V7_DEV").is_some() {
-        return 0.0;
-    }
-    std::env::var("V8_V7_DEV")
-        .ok()
-        .and_then(|v| v.parse().ok())
-        .filter(|w: &f64| w.is_finite() && *w >= 0.0)
-        .unwrap_or(1.0)
-}
-
 /// Expected placement advantage of a position, in placement units.
 ///
 /// ```text
@@ -346,15 +279,12 @@ fn leaf_value(gs: &GameState, me: u8, db: &CardDatabase, opp: &OppModel) -> f64 
         0.0
     };
     let ceiling = v8_model::score_ceiling(gs, me, db) as f64;
-    let passable = v8_model::passable_count(gs, me, db, 0.55);
     SCALE
         * ((our_now - their_now)
             + horizon_weight() * (our_later - their_later)
             + PLACEMENT_CREDIT * (ammo + initiative)
             + dev_ceiling_weight() * ceiling
-            + dev_band_weight() * v8_model::band_progress(gs, me, db)
-            + passable_weight() * passable
-            + v7_dev_weight() * v7_development_level(gs, me, db))
+            + dev_band_weight() * v8_model::band_progress(gs, me, db))
 }
 
 /// Baton detection from the generated action's own destination data. The

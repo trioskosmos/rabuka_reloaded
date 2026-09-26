@@ -11,54 +11,20 @@ from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional, Tuple, Callable
 
 # Precompiled regex patterns for performance
-DIGIT_PATTERN = re.compile(r"(\d+)")
 COUNT_PATTERN = re.compile(r"(\d+)枚")
 PEOPLE_PATTERN = re.compile(r"(\d+)人")
 COUNTER_PATTERN = re.compile(r"(\d+)つ")  # Generic counter (e.g., "3つ")
 ITEM_PATTERN = re.compile(r"(\d+)個")  # Item counter (e.g., "4個")
 GROUP_PATTERN = re.compile(r"『(.+?)』")
 QUOTED_NAME_PATTERN = re.compile(r"「(.+?)」")
-COST_PATTERN = re.compile(r"コスト(\d+)")
 HEART_PATTERN = re.compile(r"{{heart_(\d+)\.png\|heart\d+}}")
 BLADE_PATTERN = re.compile(r"{{icon_blade\.png\|ブレード}}")
 ALL_ICON_PATTERN = re.compile(r"\{\{icon_all\.png\|ハート\}\}")
 
 
-def extract_int(pattern, text, default=None):
-    """Extract an integer from text using a pattern or regex."""
-    if isinstance(pattern, str):
-        match = re.search(pattern, text)
-    else:
-        match = pattern.search(text)
-    if match:
-        return int(match.group(1))
-    return default
-
-
-def extract_group_name(text):
-    """Extract group name from text (e.g., 『虹ヶ咲』 -> 虹ヶ咲)."""
-    match = GROUP_PATTERN.search(text)
-    if match:
-        return match.group(1)
-    return None
-
-
-def extract_quoted_name(text):
-    """Extract quoted name from text (e.g., 「上原歩夢」 -> 上原歩夢)."""
-    match = QUOTED_NAME_PATTERN.search(text)
-    if match:
-        return match.group(1)
-    return None
-
-
 def strip_suffix_period(text):
     """Remove trailing period from text."""
     return text.rstrip("。")
-
-
-def strip_prefix_period(text):
-    """Remove leading period from text."""
-    return text.lstrip("。")
 
 
 def normalize_whitespace(text):
@@ -73,14 +39,6 @@ def normalize_fullwidth_digits(text):
     halfwidth = "0123456789+--"
     translation = str.maketrans(fullwidth, halfwidth)
     return text.translate(translation)
-
-
-def normalize_text(text):
-    """Apply all normalization steps to text."""
-    text = normalize_whitespace(text)
-    text = normalize_fullwidth_digits(text)
-    text = strip_suffix_period(text)
-    return text
 
 
 def extract_count(text):
