@@ -2502,6 +2502,31 @@ ACTION_CONSTRAINT_PATTERNS = (
 )
 
 
+def _split_period_before_per_unit(text):
+    """「…。〜につき…」 — two sentences, so two actions.
+
+    A period before the first 「につき」 means the per-unit clause belongs to a
+    LATER sentence, so the two are split rather than parsed as one clause.
+
+    When the first action counts from the discard (a baton touch replaced the
+    member and put it in the waitroom) and a later action has a per-unit type
+    that came from generic keyword matching ("メンバー" → "member"), the later
+    one inherits the discard type: both sentences describe the same cards.
+    Returns None when the text is a single clause.
+    """
+    first_period = text.find("。")
+    first_perunit = text.find(PER_UNIT_MARKER)
+    if not (0 <= first_period < first_perunit):
+        return None
+    parts = [part.strip().rstrip("。") for part in text.split("。") if part.strip()]
+    actions = [parse_action(part) for part in parts]
+    if actions and actions[0].get("per_unit_type") == "discard":
+        for sub in actions[1:]:
+            if sub.get("per_unit") and sub.get("per_unit_type") in ("member", "枚"):
+                sub["per_unit_type"] = "discard"
+    return {"text": text, "action": "sequential", "actions": actions}
+
+
 def parse_action(text: str) -> Dict[str, Any]:
     """Parse an action text."""
     # (The "カードを1枚引いてもよい" optional-draw phrase is handled by the
@@ -2510,28 +2535,13 @@ def parse_action(text: str) -> Dict[str, Any]:
     # Strip parenthetical notes first (before any other processing)
     text = strip_parenthetical(text)
 
-    # If text has "。" before the first "につき", the per-unit reference
-    # belongs to a later sentence. Split into sequential first so the
-    # earlier sentence (e.g. draw effect) isn't consumed by the per-unit match.
+    # A period before the first 「につき」 means the per-unit reference belongs to
+    # a later sentence: split into a sequential so the earlier sentence (e.g. a
+    # draw effect) is not consumed by the per-unit match.
     if "。" in text and PER_UNIT_MARKER in text:
-        first_period = text.find("。")
-        first_perunit = text.find("につき")
-        if 0 <= first_period < first_perunit:
-            parts = [t.strip().rstrip("。") for t in text.split("。") if t.strip()]
-            actions = [parse_action(p) for p in parts]
-            # When the first action counts from discard (e.g. "replaced by baton touch
-            # → placed in waitroom"), and a subsequent action has a per-unit type that
-            # came from generic keyword matching ("メンバー" → "member"), inherit the
-            # discard type. Both sentences refer to the same set of cards.
-            if actions and actions[0].get("per_unit_type") in ("discard",):
-                proto_type = actions[0]["per_unit_type"]
-                for sub in actions[1:]:
-                    if sub.get("per_unit") and sub.get("per_unit_type") in (
-                        "member",
-                        "枚",
-                    ):
-                        sub["per_unit_type"] = proto_type
-            return {"text": text, "action": "sequential", "actions": actions}
+        sequential = _split_period_before_per_unit(text)
+        if sequential:
+            return sequential
 
     per_unit_info = None
     if PER_UNIT_MARKER in text:
