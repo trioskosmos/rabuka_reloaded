@@ -1,14 +1,14 @@
 {
   "generated_by": "cards/test_inventory.py",
-  "generated_at": "2026-09-26T22:38:08.363721+00:00",
+  "generated_at": "2026-09-26T22:53:17.918739+00:00",
   "stats": {
     "total_cards": 2526,
     "cards_with_abilities": 1565,
     "total_abilities": 2011,
     "unique_abilities": 936
   },
-  "n_files": 913,
-  "n_tests": 3700,
+  "n_files": 914,
+  "n_tests": 3702,
   "total_cards": 771,
   "covered_cards": 771,
   "abilities_on_covered": 936,
@@ -647,7 +647,7 @@
       "rows": []
     }
   },
-  "n_test_fns_parsed": 3700,
+  "n_test_fns_parsed": 3702,
   "abilities": [
     {
       "idx": 0,
@@ -23152,14 +23152,17 @@
       "has_negative": false,
       "covering_files": [
         "engine/tests/test_modules/effects/deck_order/restore/waited_opponent_nijigasaki_topdeck_pl_n_bp4_004_r_plus_test.rs",
-        "engine/tests/test_modules/effects/gain/hearts/color_choice/paid_heart_color_choice_test.rs"
+        "engine/tests/test_modules/effects/gain/hearts/color_choice/paid_heart_color_choice_test.rs",
+        "engine/tests/test_modules/effects/look_select/heart_colour_choice_and_optional_banking_test.rs"
       ],
       "covering_tests": [
+        "hanao_accepting_the_banking_sends_the_card_to_the_waitroom",
+        "hanao_declining_the_banking_returns_the_looked_card_to_the_deck",
         "kasumi_n_bp3_002_live_start_discard_cost_grants_chosen_heart_only_to_other_nijigasaki",
         "nico_bp3_009_activation_self_wait_cost_grants_only_chosen_heart",
         "pl_n_bp4_004_r_plus_live_start_waited_opponents_recover_nijigasaki_member_to_deck_top"
       ],
-      "covering_test_count": 3,
+      "covering_test_count": 5,
       "direct_tests": [
         "kasumi_n_bp3_002_live_start_discard_cost_grants_chosen_heart_only_to_other_nijigasaki",
         "pl_n_bp4_004_r_plus_live_start_waited_opponents_recover_nijigasaki_member_to_deck_top"
@@ -51827,19 +51830,24 @@
       "has_choice": true,
       "has_negative": false,
       "covering_files": [
+        "engine/tests/test_modules/effects/look_select/heart_colour_choice_and_optional_banking_test.rs",
         "engine/tests/test_modules/effects/look_select/look_and_filter/look_at_deck_top_optional_discard_test.rs"
       ],
       "covering_tests": [
+        "hanao_accepting_the_banking_sends_the_card_to_the_waitroom",
+        "hanao_declining_the_banking_returns_the_looked_card_to_the_deck",
         "live_success_discard_4_from_deck_unconditionally",
         "looked_at_discard_player_discards",
         "looked_at_discard_player_skips"
       ],
-      "covering_test_count": 3,
+      "covering_test_count": 5,
       "direct_tests": [
+        "hanao_accepting_the_banking_sends_the_card_to_the_waitroom",
+        "hanao_declining_the_banking_returns_the_looked_card_to_the_deck",
         "looked_at_discard_player_discards",
         "looked_at_discard_player_skips"
       ],
-      "direct_test_count": 2,
+      "direct_test_count": 4,
       "is_null": false,
       "use_limit": null,
       "watches_abilities": false,
@@ -56323,12 +56331,15 @@
       "has_choice": true,
       "has_negative": false,
       "covering_files": [
-        "engine/tests/test_modules/effects/gain/hearts/color_choice/paid_discard_color_choice_heart_test.rs"
+        "engine/tests/test_modules/effects/gain/hearts/color_choice/paid_discard_color_choice_heart_test.rs",
+        "engine/tests/test_modules/effects/look_select/heart_colour_choice_and_optional_banking_test.rs"
       ],
       "covering_tests": [
+        "hanao_accepting_the_banking_sends_the_card_to_the_waitroom",
+        "hanao_declining_the_banking_returns_the_looked_card_to_the_deck",
         "pl_n_sd2_005_sd2_paid_discard_grants_exactly_two_hearts_of_one_color"
       ],
-      "covering_test_count": 1,
+      "covering_test_count": 3,
       "direct_tests": [
         "pl_n_sd2_005_sd2_paid_discard_grants_exactly_two_hearts_of_one_color"
       ],
