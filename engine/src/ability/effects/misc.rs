@@ -195,6 +195,30 @@ impl AbilityResolver {
         }
     }
 
+    /// The distinct heart colours among cards that recently reached the
+    /// discard. Member cards carry their colours in `base_heart`; `need_heart`
+    /// exists only on live cards and would miss every member.
+    fn distinct_discarded_colors(
+        card_db: &crate::card::CardDatabase,
+        moved: Option<&SmallVec<[i16; 4]>>,
+    ) -> SmallVec<[crate::card::HeartColor; 8]> {
+        let mut distinct_colors: SmallVec<[crate::card::HeartColor; 8]> = SmallVec::new();
+        let Some(moved) = moved else {
+            return distinct_colors;
+        };
+        for &cid in moved {
+            let Some(bh) = card_db.get_card(cid).and_then(|c| c.base_heart.as_ref()) else {
+                continue;
+            };
+            for &(color, amt) in &bh.hearts {
+                if amt > 0 && !distinct_colors.contains(&color) {
+                    distinct_colors.push(color);
+                }
+            }
+        }
+        distinct_colors
+    }
+
     pub(crate) fn handle_bp6_pattern(
         &self,
         gs: &mut GameState,
@@ -203,90 +227,74 @@ impl AbilityResolver {
         // bp6 pattern: "gain 1 heart per distinct color among discarded cards"
         // Detected by: resource=heart, per_unit=true, per_unit_type="discard", multiple_targets=true
         // For each distinct heart color present among recently_moved_cards, grant 1 heart of that color.
-        if effect.resource_any().as_deref() == Some("heart")
+        let is_bp6 = effect.resource_any().as_deref() == Some("heart")
             && effect.per_unit_any().unwrap_or(false)
             && Zone::from_str(effect.per_unit_type_any().as_deref().unwrap_or(""))
                 == Some(Zone::Discard)
-            && effect.multiple_targets_any().unwrap_or(false)
-        {
-            let card_db = self.card_db();
-            let duration = effect.duration_any().clone();
-            let is_temporary = duration.is_some() && duration.as_deref() != Some("permanent");
-            let target = effect.target_name().to_string();
-            let activating_card_id = gs.activating_card;
-
-            // Collect distinct heart colors from all recently discarded cards.
-            // Member cards carry their heart colors in base_heart, not need_heart.
-            let recently_moved = gs.recently_moved_cards.clone();
-            let mut distinct_colors: SmallVec<[crate::card::HeartColor; 8]> = SmallVec::new();
-            if let Some(ref moved) = recently_moved {
-                for &cid in moved {
-                    if let Some(card) = card_db.get_card(cid) {
-                        // Use base_heart for member cards (need_heart is only on live cards)
-                        if let Some(ref bh) = card.base_heart {
-                            for &(color, amt) in &bh.hearts {
-                                if amt > 0 && !distinct_colors.contains(&color) {
-                                    distinct_colors.push(color);
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-
-            log::debug!(
-                "[BP6_HEART] distinct colors from {} discarded cards: {:?}",
-                recently_moved.as_ref().map(|v| v.len()).unwrap_or(0),
-                distinct_colors
-            );
-
-            if let Some(card_id) = activating_card_id {
-                for color in &distinct_colors {
-                    gs.mods.add_heart_modifier_with_trace(
-                        card_id,
-                        *color,
-                        1,
-                        &mut gs.ability_applications,
-                        gs.activating_card.unwrap_or(-1),
-                        &effect.text,
-                    );
-                    gs.record_ability_application(
-                        card_id,
-                        effect.text.to_string(),
-                        "heart_bonus",
-                        card_id,
-                        Some(color.index() as u8),
-                        1,
-                    );
-                }
-                if is_temporary && !distinct_colors.is_empty() {
-                    let color_names: Vec<String> = distinct_colors
-                        .iter()
-                        .map(|c| format!("{:?}", c).to_lowercase())
-                        .collect();
-                    let items: Vec<crate::core::types::CardEffectItem> = distinct_colors
-                        .iter()
-                        .map(|color| crate::core::types::CardEffectItem {
-                            card_id,
-                            amount: 1,
-                            color: Some(color.to_string()),
-                        })
-                        .collect();
-                    let effect_data = Some(crate::core::types::EffectData::MultiCard { items });
-                    util::push_temporary_effect(
-                        gs,
-                        "gain_heart",
-                        duration.as_deref(),
-                        &target,
-                        &format!("Gain 1 heart of each color: {}", color_names.join(", ")),
-                        effect_data,
-                    );
-                }
-            }
-            return Ok(true);
+            && effect.multiple_targets_any().unwrap_or(false);
+        if !is_bp6 {
+            return Ok(false);
         }
 
-        Ok(false)
+        let card_db = self.card_db();
+        let duration = effect.duration_any().clone();
+        let is_temporary = duration.is_some() && duration.as_deref() != Some("permanent");
+        let target = effect.target_name().to_string();
+        let activating_card_id = gs.activating_card;
+
+        let recently_moved = gs.recently_moved_cards.clone();
+        let distinct_colors = Self::distinct_discarded_colors(&card_db, recently_moved.as_ref());
+
+        log::debug!(
+            "[BP6_HEART] distinct colors from {} discarded cards: {:?}",
+            recently_moved.as_ref().map(|v| v.len()).unwrap_or(0),
+            distinct_colors
+        );
+
+        let Some(card_id) = activating_card_id else {
+            return Ok(true);
+        };
+        for color in &distinct_colors {
+            gs.mods.add_heart_modifier_with_trace(
+                card_id,
+                *color,
+                1,
+                &mut gs.ability_applications,
+                gs.activating_card.unwrap_or(-1),
+                &effect.text,
+            );
+            gs.record_ability_application(
+                card_id,
+                effect.text.to_string(),
+                "heart_bonus",
+                card_id,
+                Some(color.index() as u8),
+                1,
+            );
+        }
+        if is_temporary && !distinct_colors.is_empty() {
+            let color_names: Vec<String> = distinct_colors
+                .iter()
+                .map(|c| format!("{:?}", c).to_lowercase())
+                .collect();
+            let items: Vec<crate::core::types::CardEffectItem> = distinct_colors
+                .iter()
+                .map(|color| crate::core::types::CardEffectItem {
+                    card_id,
+                    amount: 1,
+                    color: Some(color.to_string()),
+                })
+                .collect();
+            util::push_temporary_effect(
+                gs,
+                "gain_heart",
+                duration.as_deref(),
+                &target,
+                &format!("Gain 1 heart of each color: {}", color_names.join(", ")),
+                Some(crate::core::types::EffectData::MultiCard { items }),
+            );
+        }
+        Ok(true)
     }
 
     pub(crate) fn execute_gain_surplus_heart(
@@ -471,32 +479,36 @@ impl AbilityResolver {
         effect: &AbilityEffect,
     ) -> Result<(), String> {
         let target_str = effect.target_name().to_string();
-        let player = gs.resolve_target_player_mut(&target_str);
         let card_db = self.card_db();
-        let target_ids: Vec<i16> = player
-            .stage
-            .stage
-            .iter()
-            .cloned()
-            .filter(|&tid| {
-                tid != -1
-                    && crate::ability::util::card_matches_characters(
-                        &card_db,
-                        tid,
-                        effect.characters_any().map(|v| &**v),
-                    )
-            })
-            .collect();
-        let _ = player;
-        if crate::ability::debug::ABILITY_DEBUG.load(core::sync::atomic::Ordering::Relaxed) {
-            if crate::ability::debug::ABILITY_DEBUG.load(core::sync::atomic::Ordering::Relaxed) { log::debug!("[GR_SELECTED_CARD] entering branch. selected_cards={:?} target_ids={:?} gs.activating={:?}",
-                self.selected_cards, target_ids, gs.activating_card); }
+        // Read the debug flag once: it is a relaxed atomic load and this path
+        // reads it on every traced mutation below.
+        let debug =
+            crate::ability::debug::ABILITY_DEBUG.load(core::sync::atomic::Ordering::Relaxed);
+        let target_ids: Vec<i16> = {
+            let target_str = effect.target_name().to_string();
+            let player = gs.resolve_target_player_mut(&target_str);
+            player
+                .stage
+                .stage
+                .iter()
+                .cloned()
+                .filter(|&tid| {
+                    tid != -1
+                        && crate::ability::util::card_matches_characters(
+                            &card_db,
+                            tid,
+                            effect.characters_any().map(|v| &**v),
+                        )
+                })
+                .collect()
+        };
+        if debug {
+            log::debug!("[GR_SELECTED_CARD] entering branch. selected_cards={:?} target_ids={:?} gs.activating={:?}",
+                self.selected_cards, target_ids, gs.activating_card);
         }
         if let Some(&selected_id) = self.selected_cards.first() {
             if let Some(selected_card) = card_db.get_card(selected_id) {
-                if crate::ability::debug::ABILITY_DEBUG
-                    .load(core::sync::atomic::Ordering::Relaxed)
-                {
+                if debug {
                     log::debug!("[GR_SELECTED_BH] selected_id={} has_base_heart={} hearts_count={}",
                         selected_id,
                         selected_card.base_heart.is_some(),
@@ -507,11 +519,9 @@ impl AbilityResolver {
                             .unwrap_or(0));
                 }
                 if let Some(ref base_heart) = selected_card.base_heart {
-                    for &(color, _) in &base_heart.hearts {
-                        for &target_id in &target_ids {
-                            if crate::ability::debug::ABILITY_DEBUG
-                                .load(core::sync::atomic::Ordering::Relaxed)
-                            {
+                    for &target_id in &target_ids {
+                        for &color in base_heart.hearts.keys() {
+                            if debug {
                                 log::debug!("[GR_APPLY] target={} color={:?} before={}",
                                     target_id,
                                     color,
@@ -525,9 +535,7 @@ impl AbilityResolver {
                                 target_id,
                                 &effect.text,
                             );
-                            if crate::ability::debug::ABILITY_DEBUG
-                                .load(core::sync::atomic::Ordering::Relaxed)
-                            {
+                            if debug {
                                 log::debug!("[GR_APPLY] target={} color={:?} after={}",
                                     target_id,
                                     color,
@@ -1138,45 +1146,20 @@ impl AbilityResolver {
         }
         let mut effect_data: Option<crate::core::types::EffectData> = None;
         if heart_targets.is_empty() {
-            if effect.position_any().is_some() {
-                if let Some(pos_info) = effect.position_any().as_ref() {
-                    if let Some(p) = pos_info.get_position() {
-                        if let Some(stage_idx) = util::stage_position_index(p) {
-                            let player = gs.resolve_target_player_mut(&effect.target_name());
-                            let card_id = player.stage.stage[stage_idx];
-                            if card_id != -1 {
-                                self.apply_heart_to_card(
-                                    gs,
-                                    card_id,
-                                    heart_distribution,
-                                    is_negative,
-                                    is_temporary,
-                                    &mut effect_data,
-                                    heart_color_str,
-                                    heart_to_add,
-                                    &effect.text,
-                                );
-                            }
-                        }
-                    }
-                }
-            } else if effect.target_count_any().is_none()
-                && (effect.exclude_self_any().is_none()
-                    || effect.target_player() == Some(TargetPlayer::Self_))
+            if let Some(card_id) =
+                Self::implicit_heart_target(gs, effect, is_self_target, activating_card_id)
             {
-                if let Some(card_id) = activating_card_id {
-                    self.apply_heart_to_card(
-                        gs,
-                        card_id,
-                        heart_distribution,
-                        is_negative,
-                        is_temporary,
-                        &mut effect_data,
-                        heart_color_str,
-                        heart_to_add,
-                        &effect.text,
-                    );
-                }
+                self.apply_heart_to_card(
+                    gs,
+                    card_id,
+                    heart_distribution,
+                    is_negative,
+                    is_temporary,
+                    &mut effect_data,
+                    heart_color_str,
+                    heart_to_add,
+                    &effect.text,
+                );
             }
         } else if is_self_target
             || (effect.target_name_player() == Some(TargetPlayer::Self_)
@@ -1264,6 +1247,48 @@ impl AbilityResolver {
             }
         }
         effect_data
+    }
+
+    /// The single card a heart gain applies to when the effect resolved to no
+    /// explicit target list.
+    ///
+    /// A stated position names the stage slot and always wins — if that slot is
+    /// empty, the effect applies to nothing rather than quietly falling back to
+    /// the activating card. Otherwise an unqualified self target means the
+    /// activating card: either a no-count effect that does not exclude self, or
+    /// an explicit `self_target` with no source, card type, group or
+    /// all-selections qualifier to widen it.
+    fn implicit_heart_target(
+        gs: &mut GameState,
+        effect: &AbilityEffect,
+        is_self_target: bool,
+        activating_card_id: Option<i16>,
+    ) -> Option<i16> {
+        if effect.position_any().is_some() {
+            let pos = effect
+                .position_any()
+                .as_ref()
+                .and_then(|p| p.get_position())?;
+            let stage_idx = util::stage_position_index(pos)?;
+            let card_id = gs.resolve_target_player_mut(&effect.target_name()).stage.stage
+                [stage_idx];
+            return (card_id != -1).then_some(card_id);
+        }
+        let unqualified_self = effect.target_count_any().is_none()
+            && (effect.exclude_self_any().is_none()
+                || effect.target_player() == Some(TargetPlayer::Self_));
+        let broadly_self = is_self_target
+            && effect.target_name_player() == Some(TargetPlayer::Self_)
+            && activating_card_id.is_some()
+            && effect.source_any().is_none()
+            && effect.card_type_any().is_none()
+            && !effect.target_from_selection_any().unwrap_or(false)
+            && !effect.multiple_targets_any().unwrap_or(false)
+            && effect.group_names_any().map_or(true, |g| g.is_empty())
+            && !effect.all_any().unwrap_or(false);
+        (unqualified_self || broadly_self)
+            .then_some(activating_card_id)
+            .flatten()
     }
 
     /// When target_count is set and there are more eligible stage members

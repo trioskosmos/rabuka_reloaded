@@ -87,6 +87,37 @@ impl super::resolver::AbilityResolver {
 
     /// Resumes executing sequential commands parked on the current queue entry.
     /// If another choice interrupts execution, the remaining actions are safely parked back.
+    /// Re-queue the rest of the original batch after a sub-action created its
+    /// own choice, or the remaining actions are lost.
+    ///
+    /// Any remaining action carrying the SAME condition type as the action that
+    /// just ran has its condition stripped. Re-evaluating that condition later
+    /// would test stale game state — `revealed_cards` mutated by the very
+    /// select_cards that just happened — and wrongly reject the action.
+    fn requeue_remaining_after_choice(
+        &mut self,
+        gs: &mut GameState,
+        effect: &AbilityEffect,
+        remaining: &[AbilityEffect],
+    ) {
+        let mut queued = gs.ability_queue.take_pending_actions();
+        let mut tail: Vec<AbilityEffect> = remaining.to_vec();
+        if let Some(cond) = effect.condition.as_ref() {
+            let disc = core::mem::discriminant(cond.as_ref());
+            for action in &mut tail {
+                if action
+                    .condition
+                    .as_ref()
+                    .is_some_and(|other| core::mem::discriminant(other.as_ref()) == disc)
+                {
+                    action.condition = None;
+                }
+            }
+        }
+        queued.extend(tail);
+        gs.ability_queue.set_pending_actions(queued);
+    }
+
     pub fn resume_pending_actions(&mut self, gs: &mut GameState) -> Result<(), String> {
         let pending = gs.ability_queue.take_pending_actions();
         for (idx, effect) in pending.iter().enumerate() {
@@ -96,28 +127,8 @@ impl super::resolver::AbilityResolver {
                 if let Some(entry) = gs.ability_queue.current_entry_mut() {
                     entry.effect_started = true;
                 }
-                // Merge remaining actions from the original batch so they
-                // aren't lost when a sub-action creates its own pending_choice.
                 if idx + 1 < pending.len() {
-                    let mut existing = gs.ability_queue.take_pending_actions();
-                    let mut remaining: Vec<AbilityEffect> = pending[idx + 1..].to_vec();
-                    // If the current effect had a condition type and it passed
-                    // (the action ran to completion and created a choice), strip
-                    // the same condition type from remaining actions. This prevents
-                    // re-evaluation against stale game state (e.g. revealed_cards
-                    // mutated by select_cards filtering).
-                    if let Some(ref cond) = effect.condition {
-                        let disc = core::mem::discriminant(cond.as_ref());
-                        for a in &mut remaining {
-                            if let Some(ref a_cond) = a.condition {
-                                if core::mem::discriminant(a_cond.as_ref()) == disc {
-                                    a.condition = None;
-                                }
-                            }
-                        }
-                    }
-                    existing.extend(remaining);
-                    gs.ability_queue.set_pending_actions(existing);
+                    self.requeue_remaining_after_choice(gs, effect, &pending[idx + 1..]);
                 }
                 return Ok(());
             }
