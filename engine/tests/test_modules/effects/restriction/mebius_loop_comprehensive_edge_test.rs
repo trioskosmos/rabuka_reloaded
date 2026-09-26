@@ -123,28 +123,31 @@ fn mebius_restriction_expires_next_live() {
     game.pass();
     // First tied live blocked
     assert!(!game.state.player1.success_live_card_zone.cards.contains(&mebius_p1));
-    // Now start a second live in next turn: give new lives that should not be blocked
-    // Advance to next turn's live phase
-    // Simplest: directly give a new live to p1 and set it, expecting it to reach success zone since restriction cleared at live_end
+    // Now start a second live in the NEXT turn: the restriction from the first
+    // tied live must have expired at live_end. Step to the next turn's live card
+    // set BY NAME. The old shape was a 5-pass walk followed by
+    // `if phase.contains("LiveCardSet")`, so half of this test could quietly
+    // skip itself and still pass.
     let next_live = game.id("PL!S-bp2-024-L");
     game.state.player1.hand.cards.push(next_live);
-    // Need to get to live card set phase of next turn
-    for _ in 0..5 { game.pass(); }
-    // May be in Main phase again; set next live if possible
-    if game.state.current_phase.to_string().contains("LiveCardSet") {
-        game.set_live_card(next_live);
-        for _ in 0..3 { game.pass(); }
-        while game.has_pending_choice() { game.select_indices(&[0]); }
-        game.pass();
-        // The next live should be able to place (not blocked by previous tie)
-        // We check that success zone is not universally blocked: at least next_live OR mebius could be there
-        // Since we are in a new live, the previous block should have expired, so next_live should be placeable if it succeeds
-        // This is a smoke test that the restriction does not persist beyond live_end
-        assert_eq!(game.state.player1.success_live_card_zone.cards.len(), 0, "restriction should have expired - success zone empty after live_end");
-    } else {
-        // If not in live phase, at least verify waitrooms still contain first mebius and success zones are still empty for first
-        assert!(game.state.player1.waitroom.cards.contains(&mebius_p1));
+    game.advance_to_phase(rabuka_engine::game_state::Phase::LiveCardSetFirstAttacker);
+    game.set_live_card(next_live);
+    game.advance_to_phase(rabuka_engine::game_state::Phase::Active);
+    while game.has_pending_choice() {
+        game.select_indices(&[0]);
     }
+    // The symptom of a live still under the old restriction is being STUCK in
+    // the live zone: the second live must have been resolved either way.
+    assert!(
+        !game.state.player1.live_card_zone.cards.contains(&next_live),
+        "the second live must not stay stuck in the live zone — the tie \
+         restriction expired at live_end"
+    );
+    assert_eq!(
+        game.state.player1.success_live_card_zone.cards.len(),
+        0,
+        "restriction should have expired - success zone empty after live_end"
+    );
 }
 
 // Both lives fail but totals equal (0-0): restriction should still fire and block placement (which is already nothing, but should not panic)
@@ -165,10 +168,14 @@ fn mebius_tie_when_both_fail_still_restricts() {
     }
     advance_to_live(&mut game);
     game.set_live_card(mebius_p1);
-    game.pass();
+    game.advance_to_phase(rabuka_engine::game_state::Phase::LiveCardSetSecondAttacker);
     game.set_live_card(fail_live_p2);
-    for _ in 0..3 { game.pass(); }
-    while game.has_pending_choice() { game.select_indices(&[]); }
+    // Into the performance window BY NAME: the tie this test measures is
+    // decided at the victory determination, not "3 passes after setting".
+    game.advance_to_phase(rabuka_engine::game_state::Phase::FirstAttackerPerformance);
+    while game.has_pending_choice() {
+        game.select_indices(&[]);
+    }
     advance_victory(&mut game);
     while game.has_pending_choice() { game.select_indices(&[0]); }
     game.pass();

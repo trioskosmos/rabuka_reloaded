@@ -1,6 +1,6 @@
 {
   "generated_by": "cards/test_inventory.py",
-  "generated_at": "2026-09-26T11:02:40.387724+00:00",
+  "generated_at": "2026-09-26T11:11:16.700687+00:00",
   "stats": {
     "total_cards": 2526,
     "cards_with_abilities": 1565,
@@ -413,74 +413,8 @@
       "rows": []
     },
     "blind_phase_stepping": {
-      "count": 23,
+      "count": 12,
       "rows": [
-        {
-          "file": "engine/tests/test_modules/effects/compound/sequential_effects/debut_draws_one_and_cannot_live_this_turn_q68_test.rs",
-          "test": "tote_mari_q68_can_still_set_live_card",
-          "line": 47,
-          "detail": ""
-        },
-        {
-          "file": "engine/tests/test_modules/effects/compound/sequential_effects/live_success_mill_five_distinct_live_recovery_setup_test.rs",
-          "test": "live_success_mill_distinct_live_recovery_three_same_name_copies_resolves",
-          "line": 3,
-          "detail": ""
-        },
-        {
-          "file": "engine/tests/test_modules/effects/compound/sequential_effects/live_success_mill_five_distinct_live_recovery_setup_test.rs",
-          "test": "live_success_mill_distinct_live_recovery_two_same_name_copies_resolves",
-          "line": 33,
-          "detail": ""
-        },
-        {
-          "file": "engine/tests/test_modules/effects/cost_mod/required_hearts/required_hearts_stacking_and_hostile_edges_test.rs",
-          "test": "pl_s_bp7_020_l_reduction_honored_at_performance_end_to_end",
-          "line": 168,
-          "detail": ""
-        },
-        {
-          "file": "engine/tests/test_modules/effects/deploy/eternalize_love_test.rs",
-          "test": "eternalize_love_full_live_flow_heart00_reduction",
-          "line": 91,
-          "detail": ""
-        },
-        {
-          "file": "engine/tests/test_modules/effects/gain/blades/under_member/q278_q279_joint_card_under_member_blade_test.rs",
-          "test": "q278_ability_placed_card_and_joint_are_counted_at_live_start",
-          "line": 160,
-          "detail": ""
-        },
-        {
-          "file": "engine/tests/test_modules/effects/gain/hearts/per_card/rurino_debut_activate_wait_member_add_live_card_test.rs",
-          "test": "rurino_bp5_live_start_gains_heart_from_discarded_group",
-          "line": 177,
-          "detail": ""
-        },
-        {
-          "file": "engine/tests/test_modules/effects/recover/per_card/live_success_per_wait_member_score_and_yell_reveal_to_deck_bottom_test.rs",
-          "test": "live_success_yell_reveal_live_to_deck_bottom",
-          "line": 72,
-          "detail": ""
-        },
-        {
-          "file": "engine/tests/test_modules/effects/restriction/mebius_loop_comprehensive_edge_test.rs",
-          "test": "mebius_restriction_expires_next_live",
-          "line": 100,
-          "detail": ""
-        },
-        {
-          "file": "engine/tests/test_modules/effects/restriction/mebius_loop_comprehensive_edge_test.rs",
-          "test": "mebius_tie_when_both_fail_still_restricts",
-          "line": 151,
-          "detail": ""
-        },
-        {
-          "file": "engine/tests/test_modules/effects/score/per_card/excess_heart_score_shift_never_below_zero_pl_n_bp5_010_r_test.rs",
-          "test": "mifune_q231_excess_heart_2_score_cancels_to_0_all_rarities",
-          "line": 57,
-          "detail": ""
-        },
         {
           "file": "engine/tests/test_modules/integration/pvp_room_test.rs",
           "test": "both_players_multiple_live_start_abilities_get_correct_choice_routing",

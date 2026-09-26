@@ -78,9 +78,10 @@ fn mifune_q231_excess_heart_2_score_cancels_to_0_all_rarities() {
 
         advance_to_live_set(&mut game);
         game.set_live_card(mifune);
-        for _ in 0..5 {
-            game.pass();
-        }
+        // The ライブ開始時 window BY NAME: the +1/−1 score modifiers this test
+        // checks are applied there, and "5 passes after setting" only happens
+        // to be that window today.
+        game.advance_to_phase(rabuka_engine::game_state::Phase::FirstAttackerPerformance);
         while game.has_pending_choice() {
             game.select_indices(&[]);
         }

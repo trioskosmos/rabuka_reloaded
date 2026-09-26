@@ -181,12 +181,14 @@ fn q278_ability_placed_card_and_joint_are_counted_at_live_start() {
     game.give_energy(3);
     let live = game.id("PL!-sd1-020-SD");
     game.state.player1.hand.cards.push(live);
-    for _ in 0..5 {
-        game.pass();
-    }
+    game.advance_to_phase(rabuka_engine::game_state::Phase::LiveCardSetFirstAttacker);
     game.set_live_card(live);
-    game.pass();
-    game.pass();
+    // The ライブ開始時 window, by name: the assertion below is about what the
+    // live START counted, and "two passes after setting" is not that window.
+    game.advance_to_phase(rabuka_engine::game_state::Phase::FirstAttackerPerformance);
+    while game.has_pending_choice() {
+        game.select_indices(&[]);
+    }
 
     assert_eq!(game.state.mods.get_heart_copy(shizuku), Some(ayumu));
     assert_eq!(

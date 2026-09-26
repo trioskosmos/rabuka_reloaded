@@ -1305,12 +1305,17 @@ impl super::TurnEngine {
     ) -> Result<Box<crate::ability::resolver::AbilityResolver>, String> {
         match game_state.ability_queue.take_resolver() {
             Some(mut r) => {
-                let selected = r.selected_cards.clone();
-                log::debug!(
-                    "[RWC] took resolver: moved_cards={:?} selected={:?}",
-                    r.moved_cards,
-                    selected
-                );
+                // Only log a take that actually carried a take. Resuming with
+                // nothing moved and nothing selected is the common path and
+                // printed an all-empty line ~1.9k times per suite, burying the
+                // ~600 resumes that had state worth inspecting.
+                if !r.moved_cards.is_empty() || !r.selected_cards.is_empty() {
+                    log::debug!(
+                        "[RWC] took resolver: moved_cards={:?} selected={:?}",
+                        r.moved_cards,
+                        r.selected_cards
+                    );
+                }
                 r.sub_choice_created = false;
                 Ok(r)
             }

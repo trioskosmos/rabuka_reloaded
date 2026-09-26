@@ -71,10 +71,9 @@ fn tote_mari_q68_can_still_set_live_card() {
         game.select_indices(&[]);
     }
 
-    // Now advance to live phase
-    for _ in 0..5 {
-        game.pass();
-    }
+    // Now advance to live phase — by NAME. A 5-pass walk means "roughly the
+    // live", and Q68 is precisely about which phase this turn can still reach.
+    game.advance_to_phase(rabuka_engine::game_state::Phase::LiveCardSetFirstAttacker);
 
     // Live card set phase: try to set a live card
     // According to Q68, this should be allowed despite cannot_live

@@ -196,17 +196,15 @@ fn rurino_bp5_live_start_gains_heart_from_discarded_group() {
     // Energy for live card cost
     game.give_energy(10);
 
-    for _ in 0..5 {
-        game.pass();
-    }
+    game.advance_to_phase(rabuka_engine::game_state::Phase::LiveCardSetFirstAttacker);
     // Set hand explicitly to avoid draw-phase card index interference
     game.state.player1.hand.cards.clear();
     game.state.player1.hand.cards.push(cost_card);
     game.state.player1.hand.cards.push(live_card);
     game.set_live_card(live_card);
-    // Advance to trigger LiveStart abilities
-    game.pass();
-    game.pass();
+    // Advance to the ライブ開始時 window BY NAME — the prompt this test answers
+    // is raised there, and "two passes after setting" is not that window.
+    game.advance_to_phase(rabuka_engine::game_state::Phase::FirstAttackerPerformance);
 
     // LiveStart triggers — optional cost: select 1 card from hand to discard (or skip).
     // The cost handler directly creates SelectCard zone=hand (not SelectTarget).

@@ -173,6 +173,10 @@ engine_c_wip/toolchains/
 
 # engine_c_wip generated test artifacts
 engine_c_wip/tests/test_ported_generated.c
+# Captured stdout/stderr of a C test run (_<suite>.err / .out). One of these
+# is ~1MB of build noise; they are run output, never fixtures.
+engine_c_wip/tests/_*.err
+engine_c_wip/tests/_*.out
 
 # Genesis build artifacts
 platforms/genesis/c/obj/

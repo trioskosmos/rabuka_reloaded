@@ -54,23 +54,12 @@ _prompts answered by ORDINAL position (if step <= 2 { select 2 cards }) instead 
 
 None.
 
-## blind_phase_stepping (23)
+## blind_phase_stepping (12)
 
 _a fixed `for _ in 0..N { pass() }` walk through the turn — a phase gaining or losing a step silently shifts the window the test thinks it is standing in; step to the phase by name instead_
 
 | file | test | line | detail |
 | --- | --- | --- | --- |
-| `engine/tests/test_modules/effects/compound/sequential_effects/debut_draws_one_and_cannot_live_this_turn_q68_test.rs` | `tote_mari_q68_can_still_set_live_card` | 47 |  |
-| `engine/tests/test_modules/effects/compound/sequential_effects/live_success_mill_five_distinct_live_recovery_setup_test.rs` | `live_success_mill_distinct_live_recovery_three_same_name_copies_resolves` | 3 |  |
-| `engine/tests/test_modules/effects/compound/sequential_effects/live_success_mill_five_distinct_live_recovery_setup_test.rs` | `live_success_mill_distinct_live_recovery_two_same_name_copies_resolves` | 33 |  |
-| `engine/tests/test_modules/effects/cost_mod/required_hearts/required_hearts_stacking_and_hostile_edges_test.rs` | `pl_s_bp7_020_l_reduction_honored_at_performance_end_to_end` | 168 |  |
-| `engine/tests/test_modules/effects/deploy/eternalize_love_test.rs` | `eternalize_love_full_live_flow_heart00_reduction` | 91 |  |
-| `engine/tests/test_modules/effects/gain/blades/under_member/q278_q279_joint_card_under_member_blade_test.rs` | `q278_ability_placed_card_and_joint_are_counted_at_live_start` | 160 |  |
-| `engine/tests/test_modules/effects/gain/hearts/per_card/rurino_debut_activate_wait_member_add_live_card_test.rs` | `rurino_bp5_live_start_gains_heart_from_discarded_group` | 177 |  |
-| `engine/tests/test_modules/effects/recover/per_card/live_success_per_wait_member_score_and_yell_reveal_to_deck_bottom_test.rs` | `live_success_yell_reveal_live_to_deck_bottom` | 72 |  |
-| `engine/tests/test_modules/effects/restriction/mebius_loop_comprehensive_edge_test.rs` | `mebius_restriction_expires_next_live` | 100 |  |
-| `engine/tests/test_modules/effects/restriction/mebius_loop_comprehensive_edge_test.rs` | `mebius_tie_when_both_fail_still_restricts` | 151 |  |
-| `engine/tests/test_modules/effects/score/per_card/excess_heart_score_shift_never_below_zero_pl_n_bp5_010_r_test.rs` | `mifune_q231_excess_heart_2_score_cancels_to_0_all_rarities` | 57 |  |
 | `engine/tests/test_modules/integration/pvp_room_test.rs` | `both_players_multiple_live_start_abilities_get_correct_choice_routing` | 204 |  |
 | `engine/tests/test_modules/jidou/movement/ability_chain_combo/ability_chain_combo_test.rs` | `special_color_no_score_when_moved_liella_left_center` | 300 |  |
 | `engine/tests/test_modules/jidou/movement/ability_chain_combo/ability_chain_combo_test.rs` | `special_color_set_blades_and_score_twin_in_one_live` | 232 |  |

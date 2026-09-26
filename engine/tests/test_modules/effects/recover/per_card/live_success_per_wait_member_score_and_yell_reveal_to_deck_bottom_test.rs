@@ -89,10 +89,13 @@ fn live_success_yell_reveal_live_to_deck_bottom() {
         game.state.player1.main_deck.cards.push(filler);
         game.state.player2.main_deck.cards.push(filler);
     }
-    for _ in 0..5 { game.pass(); }
+    game.advance_to_phase(rabuka_engine::game_state::Phase::LiveCardSetFirstAttacker);
     game.set_live_card(live);
-    // Advance through performance to LiveSuccess
-    for _ in 0..5 { game.pass(); }
+    // Through both performances to the victory determination, BY NAME: the
+    // performance snapshot this test reads (yell_cards, score) is recorded
+    // there, and arriving only at FirstAttackerPerformance leaves the snapshot
+    // list empty — which is how the old 5-pass walk was silently load-bearing.
+    game.advance_to_phase(rabuka_engine::game_state::Phase::LiveVictoryDetermination);
 
     assert!(!game.state.performance_snapshots.is_empty(), "Live should have a performance snapshot");
     let snap = &game.state.performance_snapshots[0];

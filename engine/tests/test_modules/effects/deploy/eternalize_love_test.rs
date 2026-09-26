@@ -103,20 +103,13 @@ fn eternalize_love_full_live_flow_heart00_reduction() {
 
     fill_decks(&mut game, filler);
 
-    // Advance to LiveCardSet phase
-    fn advance_to_live_card_set_p1(game: &mut TestGame) {
-        for _ in 0..5 {
-            game.pass();
-        }
-    }
-    fn advance_to_live_start(game: &mut TestGame) {
-        game.pass();
-        game.pass();
-    }
-
-    advance_to_live_card_set_p1(&mut game);
+    // Advance by NAME. The two local helpers this used to define
+    // (`advance_to_live_card_set_p1` = 5 passes, `advance_to_live_start` = 2)
+    // hid which window the test was standing in; a phase that gains or loses a
+    // step would have moved the test with no failure to notice.
+    game.advance_to_phase(rabuka_engine::game_state::Phase::LiveCardSetFirstAttacker);
     game.set_live_card(live);
-    advance_to_live_start(&mut game);
+    game.advance_to_phase(rabuka_engine::game_state::Phase::FirstAttackerPerformance);
 
     // Handle any pending choices from LiveStart
     while game.has_pending_choice() {

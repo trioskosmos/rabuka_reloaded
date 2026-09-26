@@ -184,13 +184,9 @@ fn pl_s_bp7_020_l_reduction_honored_at_performance_end_to_end() {
         game.state.player2.main_deck.cards.push(filler);
     }
 
-    for _ in 0..5 {
-        game.pass();
-    }
+    game.advance_to_phase(rabuka_engine::game_state::Phase::LiveCardSetFirstAttacker);
     game.set_live_card(hpt);
-    for _ in 0..2 {
-        game.pass();
-    }
+    game.advance_to_phase(rabuka_engine::game_state::Phase::FirstAttackerPerformance);
     while game.has_pending_choice() {
         game.select_indices(&[]);
     }
@@ -201,11 +197,11 @@ fn pl_s_bp7_020_l_reduction_honored_at_performance_end_to_end() {
         "real LiveStart fired both abilities → heart0 −2"
     );
 
-    for _ in 0..7 {
-        game.pass();
-        while game.has_pending_choice() {
-            game.select_indices(&[]);
-        }
+    // "Run the live to its end" said by name, so the snapshot below is read at
+    // the performance close rather than seven steps after wherever we started.
+    game.advance_to_phase(rabuka_engine::game_state::Phase::Active);
+    while game.has_pending_choice() {
+        game.select_indices(&[]);
     }
 
     let snap = game

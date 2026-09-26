@@ -181,11 +181,18 @@ impl TestGame {
         state.current_phase = Phase::Main;
         state.current_turn_phase = TurnPhase::FirstAttackerNormal;
         state.turn_number = 1;
-        let quiet = std::env::var("RABUKA_QUIET").as_deref() == Ok("1");
-        if !quiet {
-            rabuka_engine::ability::debug::set_debug(true);
-        }
-        let debug_enabled = !quiet || std::env::var("RABUKA_DEBUG").is_ok();
+        // The ability trace is a TEST ASSERTION SUBSTRATE, not a debug luxury:
+        // tests search the trace for the ability/verdict they are asserting on
+        // and report "not_found" without it. So it is always on.
+        //
+        // There used to be an `RABUKA_QUIET=1` switch here. It never worked:
+        // it turned the trace off for 13 tests that read the trace, and the
+        // `!quiet || RABUKA_DEBUG.is_ok()` guard left the debug-gated
+        // `log::debug!` calls and the rule-log flush armed anyway, so it did not
+        // even produce a quiet run. Removed rather than left as a trap. To get
+        // a quiet full-suite run, leave RUST_LOG unset (see AGENTS.md).
+        let debug_enabled = true;
+        rabuka_engine::ability::debug::set_debug(true);
 
         let game = TestGame {
             db: state.card_database.clone(),

@@ -64,7 +64,6 @@ mod inner {
     use std::sync::Mutex;
 
     static ABILITY_LOG_BUFFER: Mutex<Vec<String>> = Mutex::new(Vec::new());
-    static COVERAGE_LOG: Mutex<Vec<(String, String)>> = Mutex::new(Vec::new());
 
     pub struct AbDebug {
         pub indent: usize,
@@ -115,7 +114,13 @@ mod inner {
             card_id: &str,
             ability: &Ability,
         ) {
-            self.p("ABILITY", format_args!("\"{}\" ({})", card_name, card_id));
+            // Name the card by its PRINTED number as well as the internal id:
+            // an id alone cannot be checked against cards/cards.json, which is
+            // the first thing you want when a verdict is about the wrong card.
+            self.p(
+                "ABILITY",
+                format_args!("\"{}\" [{}] ({})", card_name, card_no, card_id),
+            );
             self.indent += 1;
             let trigger_str = ability.triggers.as_deref().unwrap_or("none");
             let limit_str = ability
@@ -125,11 +130,6 @@ mod inner {
             self.p("TRIGGER", format_args!("{} {}", trigger_str, limit_str));
             if !ability.full_text.is_empty() {
                 self.p("TEXT", &ability.full_text);
-            }
-            if super::ABILITY_DEBUG.load(Ordering::Relaxed) && !ability.full_text.is_empty() {
-                if let Ok(mut cov) = COVERAGE_LOG.lock() {
-                    cov.push((card_no.to_string(), ability.full_text.clone()));
-                }
             }
         }
 

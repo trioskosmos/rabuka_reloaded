@@ -16,15 +16,15 @@ fn live_success_mill_distinct_live_recovery_three_same_name_copies_resolves() {
     for _ in 0..10 { game.state.player1.main_deck.cards.push(filler); game.state.player2.main_deck.cards.push(filler); }
     let live = game.id("PL!-sd1-019-SD");
     game.state.player1.hand.cards.push(live);
-    for _ in 0..5 { game.pass(); }
+    game.advance_to_phase(rabuka_engine::game_state::Phase::LiveCardSetFirstAttacker);
     game.set_live_card(live);
-    for _ in 0..7 {
-        game.pass();
-        if let Some(choice) = game.state.get_pending_choice() {
-            match choice {
-                rabuka_engine::ability::types::Choice::SelectCard { .. } => game.select_indices(&[]),
-                _ => game.select_indices(&[]),
-            }
+    // "Run the live out" said by name: the old 7-pass walk meant "about seven
+    // steps", which is a different moment every time a phase changes length.
+    game.advance_to_phase(rabuka_engine::game_state::Phase::Active);
+    if let Some(choice) = game.state.get_pending_choice() {
+        match choice {
+            rabuka_engine::ability::types::Choice::SelectCard { .. } => game.select_indices(&[]),
+            _ => game.select_indices(&[]),
         }
     }
     assert!(!game.has_pending_choice());
@@ -44,15 +44,13 @@ fn live_success_mill_distinct_live_recovery_two_same_name_copies_resolves() {
     for _ in 0..10 { game.state.player1.main_deck.cards.push(filler); }
     let live = game.id("PL!-sd1-019-SD");
     game.state.player1.hand.cards.push(live);
-    for _ in 0..5 { game.pass(); }
+    game.advance_to_phase(rabuka_engine::game_state::Phase::LiveCardSetFirstAttacker);
     game.set_live_card(live);
-    for _ in 0..7 {
-        game.pass();
-        if let Some(choice) = game.state.get_pending_choice() {
-            match choice {
-                rabuka_engine::ability::types::Choice::SelectCard { .. } => game.select_indices(&[]),
-                _ => game.select_indices(&[]),
-            }
+    game.advance_to_phase(rabuka_engine::game_state::Phase::Active);
+    if let Some(choice) = game.state.get_pending_choice() {
+        match choice {
+            rabuka_engine::ability::types::Choice::SelectCard { .. } => game.select_indices(&[]),
+            _ => game.select_indices(&[]),
         }
     }
     assert!(!game.has_pending_choice());
