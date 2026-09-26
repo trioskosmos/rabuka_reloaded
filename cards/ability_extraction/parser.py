@@ -1674,21 +1674,32 @@ def _handle_required_hearts(t, a):
 
 
 def _set_state_change_action(text, action, state_change=None):
+    """A state change: ウェイト / レスト / アクティブ, and what it applies to.
+
+    The card type is the interesting part, because the clause decides it in a
+    fixed order and two of the branches overlap:
+      - 「このメンバー」: this member, and unless the clause says 以外, exactly
+        this one (target self, count 1) rather than "any member"
+      - 「エネルギー」 with no メンバー: an energy card
+      - 「メンバー」 plus a state word: any member in that state
+    """
     if state_change is not None:
-        action['state_change'] = state_change
+        action["state_change"] = state_change
     target = extract_target(text)
     if target:
-        action['target'] = target
-    if 'このメンバー' in text:
-        action['card_type'] = 'member_card'
-        if 'このメンバー以外' not in text:
-            action.update({'target': 'self', 'self_target': True, 'count': 1})
-    elif 'エネルギー' in text and 'メンバー' not in text:
-        action['card_type'] = 'energy_card'
-    elif 'メンバー' in text and any((state in text for state in ('ウェイト', 'レスト', 'アクティブ'))):
-        action['card_type'] = 'member_card'
-    if 'してもよい' in text:
-        action['optional'] = True
+        action["target"] = target
+    if "このメンバー" in text:
+        action["card_type"] = "member_card"
+        if "このメンバー以外" not in text:
+            action.update({"target": "self", "self_target": True, "count": 1})
+    elif "エネルギー" in text and "メンバー" not in text:
+        action["card_type"] = "energy_card"
+    elif "メンバー" in text and any(
+        state in text for state in ("ウェイト", "レスト", "アクティブ")
+    ):
+        action["card_type"] = "member_card"
+    if "してもよい" in text:
+        action["optional"] = True
     return action
 
 def _nearest_invalidation_trigger(text):
@@ -1704,191 +1715,172 @@ def _nearest_invalidation_trigger(text):
     positions = [(position, trigger) for position, trigger in positions if position >= 0]
     return max(positions)[1] if positions else None
 
+# The colour words a 「［緑ハート］」 clause can use, in the order the printed
+# text uses them. heart00 is the "no colour named" fallback.
+HEART_COLOR_BY_JP = {
+    "緑": "heart01",
+    "赤": "heart02",
+    "青": "heart03",
+    "黄": "heart04",
+    "紫": "heart05",
+    "白": "heart06",
+}
+
+# 「［緑ハート］」 — the bracketed colour name of a heart-selection clause.
+_BRACKET_HEART_RE = re.compile(r"［([^］]+)ハート］")
+
+# 「N枚になるまで」 — a draw-until clause.
+_DRAW_UNTIL_RE = re.compile(r"(\d+)枚になるまで")
+
+
 def _set_heart_selection_resource(t, a):
-    m = re.search('［([^］]+)ハート］', t)
-    color_map = {'緑': 'heart01', '赤': 'heart02', '青': 'heart03', '黄': 'heart04', '紫': 'heart05', '白': 'heart06'}
-    selected = ''
-    if m is not None:
-        selected = m.group(1)
-    a.update({'resource': 'heart', 'heart_selection': True, 'heart_colors': [color_map.get(selected, 'heart00')]})
+    """「［緑ハート］」 — gain hearts of one named colour, chosen by the player.
+
+    An unrecognised colour word falls back to heart00 rather than failing, so a
+    clause the parser has not seen still produces a usable action.
+    """
+    m = _BRACKET_HEART_RE.search(t)
+    selected = m.group(1) if m is not None else ""
+    a["resource"] = "heart"
+    a["heart_selection"] = True
+    a["heart_colors"] = [HEART_COLOR_BY_JP.get(selected, "heart00")]
+    return a
+
+
 def _set_action_000(t, a):
- return a.update(
-    {
-       'target': (
-           'deck'
-           if 'デッキ' in t
-           else 'energy_deck'
-          )
-      },
- )
+    """Target a deck: the main deck, else the energy deck."""
+    a["target"] = "deck" if "デッキ" in t else "energy_deck"
+    return a
+
 
 def _set_action_002(t, a):
- return a.update(
-    {
-       'optional': extract_optional(t),
-       'multiple_targets': True
-      },
- )
+    """An optional, multi-target action."""
+    a["optional"] = extract_optional(t)
+    a["multiple_targets"] = True
+    return a
+
 
 def _set_action_003(t, a):
- return (
-   a.update(
-       {
-           'energy': t.count('{{icon_energy.png|E}}'),
-           'optional': (
-                'もよい' in t or 'してもよい' in t
-               )
-          },
-   ) or None
-  )
+    """Pay energy, optionally — the count is the number of energy icons."""
+    a["energy"] = t.count(ENERGY_ICON)
+    a["optional"] = "もよい" in t or "してもよい" in t
+    return a
+
 
 def _set_action_004(t, a):
- return a.update(
-    {
-       'energy_count': (
-           a.get('count') or 1
-          )
-      },
- )
+    """The energy count, defaulting to the action's own count."""
+    a["energy_count"] = a.get("count") or 1
+    return a
+
 
 def _set_action_005(t, a):
- return a.update(
-    {
-       'target_member': 'this_member'
-      },
- )
+    """The target is whichever member this ability is on."""
+    a["target_member"] = "this_member"
+    return a
+
 
 def _set_action_006(t, a):
- return a.update(
-    {
-       'self_target': True,
-       'card_type': (
-           'member_card'
-           if 'メンバー' in t
-           else 'card'
-          )
-      },
- )
+    """Self-targeted; member_card when the clause says so, else any card."""
+    a["self_target"] = True
+    a["card_type"] = "member_card" if "メンバー" in t else "card"
+    return a
+
 
 def _set_action_007(t, a):
- return a.update(
-    {
-       'under_self': True
-      },
- )
+    """Target whatever is under the activating member."""
+    a["under_self"] = True
+    return a
+
 
 def _set_action_008(t, a):
- return a.update(
-    {
-       'source': 'deck',
-       'destination': 'hand',
-       'target_count': int(re.search('(\\d+)枚になるまで', t).group(1))
-      },
- )
+    """Draw from the deck into hand, until the hand holds N cards."""
+    a["source"] = "deck"
+    a["destination"] = "hand"
+    a["target_count"] = int(_DRAW_UNTIL_RE.search(t).group(1))
+    return a
+
 
 def _set_action_009(t, a):
- return a.update(
-    {
-       'target_count': int(re.search('(\\d+)枚になるまで', t).group(1))
-      },
- )
+    """Draw until the hand holds N cards."""
+    a["target_count"] = int(_DRAW_UNTIL_RE.search(t).group(1))
+    return a
+
 
 def _set_action_010(t, a):
- return a.update(
-    {
-       'count': 1,
-       'optional': True,
-       'source': 'deck',
-       'destination': 'hand'
-      },
- )
+    """Optionally draw one card from the deck into hand."""
+    a["count"] = 1
+    a["optional"] = True
+    a["source"] = "deck"
+    a["destination"] = "hand"
+    return a
+
 
 def _set_action_011(t, a):
- return a.update(
-    {
-       'source': 'hand',
-       'destination': 'discard'
-      },
- )
+    """Discard one card from hand."""
+    a["source"] = "hand"
+    a["destination"] = "discard"
+    return a
+
 
 def _set_action_012(t, a):
- return a.update(
-    {
-       'source': 'deck',
-       'destination': 'hand'
-      },
- )
+    """Look at / take from the deck into hand."""
+    a["source"] = "deck"
+    a["destination"] = "hand"
+    return a
+
+
+def _restriction_target(t):
+    """Which player a restriction clause names.
+
+    「自分と相手」 and 「お互い」 both contain 自分 AND 相手, so the both-case has to
+    be tested first. Three rules resolve this independently and two of them had
+    it last, so a 「自分と相手が〜できない」 clause resolved to a single player.
+    """
+    if "自分と相手" in t or "お互い" in t:
+        return "both"
+    if "相手" in t:
+        return "opponent"
+    if "自分" in t:
+        return "self"
+    return None
+
 
 def _set_action_013(t, a):
- return a.update(
-    {
-       'source': 'deck',
-       'destination': 'hand',
-       'optional': True
-      },
- )
+    """Optionally take a card from the deck into hand."""
+    a["source"] = "deck"
+    a["destination"] = "hand"
+    a["optional"] = True
+    return a
+
 
 def _set_action_014(t, a):
- return _handle_cost_modification(t, a)
+    """Cost modification — see _handle_cost_modification for the field rules."""
+    return _handle_cost_modification(t, a)
+
 
 def _set_action_017(t, a):
- return _set_state_change_action(t, a, 'active')
+    """Send this member to the active state."""
+    return _set_state_change_action(t, a, "active")
+
 
 def _set_action_019(t, a):
- return a.update(
-    {
-       'activation_type': 'pay_to_activate'
-      },
- )
+    """Pay to activate, rather than activating for free."""
+    a["activation_type"] = "pay_to_activate"
+    return a
 
 def _set_action_020(t, a):
- return a.update(
-    {
-       'restriction_type': 'cannot_live',
-       'target': (
-           'self'
-           if '自分' in t
-           else (
-                'both'
-                if (
-                      '自分と相手' in t or 'お互い' in t
-                     )
-                else (
-                      'opponent'
-                      if '相手' in t
-                      else None
-                     )
-               )
-          )
-      },
- )
+    """Restriction: cannot become a live card."""
+    a["restriction_type"] = "cannot_live"
+    a["target"] = _restriction_target(t)
+    return a
+
 
 def _set_action_021(t, a):
- return a.update(
-    {
-       'restriction_type': 'cannot_activate',
-       'target': (
-           'opponent'
-           if '相手' in t
-           else (
-                'both'
-                if (
-                      '自分と相手' in t or 'お互い' in t
-                     )
-                else (
-                      'self'
-                      if '自分' in t
-                      else None
-                     )
-               )
-          ),
-       'phase': (
-           'active_phase'
-           if 'アクティブフェイズ' in t
-           else None
-          )
-      },
- )
+    """Restriction: cannot activate, optionally in one phase."""
+    a["restriction_type"] = "cannot_activate"
+    a["target"] = _restriction_target(t)
+    a["phase"] = "active_phase" if "アクティブフェイズ" in t else None
+    return a
 
 def _set_action_023(t, a):
     """Restriction: cannot be sent to the wait state.
@@ -1904,6 +1896,10 @@ def _set_action_023(t, a):
     a["restriction_type"] = (
         "cannot_wait_by_effect" if "効果によっては" in t else "cannot_wait"
     )
+    # This rule tests 「相手の」, not 「相手」 — a bare 相手 is the OPPONENT'S,
+    # whereas 「相手のカード」 names the card the restriction is written on. The
+    # other two restriction rules do use the bare form; the difference is real
+    # and they share only the both/self fallback.
     if "自分と相手" in t or "お互い" in t:
         a["target"] = "both"
     elif "相手の" in t:
@@ -1930,21 +1926,6 @@ def _set_action_026(t, a):
     a["destination"] = _extract_place_restriction_destination(t)
     return a
 
-def _set_action_025(t, a):
- return a.update(
-    {
-       'restriction_type': 'cannot_place',
-       'destination': _extract_place_restriction_destination(t)
-      },
- )
-
-def _set_action_026(t, a):
- return a.update(
-    {
-       'restriction_type': 'cannot_place',
-       'destination': _extract_place_restriction_destination(t)
-      },
- )
 
 def _set_action_030(t, a):
     """Position change: move the member to the front.
@@ -1995,6 +1976,12 @@ def _set_action_039(t, a):
     return a
 
 def _set_action_040(t, a):
+    """「余剰ハートBake失去」 — lose a resource, as a negative gain.
+
+    Which resource comes from the clause, and the count from the icons: blades
+    first, then heart icons (which also record their colours), and only if
+    neither is present does a bare 「N枚/個/つ」 supply the number.
+    """
     if "余剰ハート" in t or "余分ハート" in t or "それら" in t:
         a["resource"] = "surplus_heart"
     elif "ブレード" in t:
@@ -2059,77 +2046,61 @@ def _set_action_041(t, a):
     return a
 
 def _set_action_042(t, a):
- return (
-   (
-      a.update(
-           {
-                'source': 'deck_top'
-               },
-      )
-      if 'デッキの上' in t
-      else None
-     ),
-   _handle_dynamic_count(t, a),
-   a.update(
-       {
-           'action': 'look_at'
-          },
-   )
-  )
+    """Look at the top of the deck.
+
+    「デッキの上」 fixes the source; the look itself may still be a dynamic
+    count, which is applied before the action is named.
+    """
+    if "デッキの上" in t:
+        a["source"] = "deck_top"
+    _handle_dynamic_count(t, a)
+    a["action"] = "look_at"
+    return a
+
 
 def _set_action_043(t, a):
- return a.update(
-    {
-       'source': (
-           a.get('source') or 'hand'
-          ),
-       **(
-           {
-                'blind': True
-               }
-           if '見ないで' in t
-           else {}
-          ),
-       **(
-           {
-                'picker': extract_picker(t)
-               }
-           if extract_picker(t)
-           else {}
-          )
-      },
- )
+    """Reveal a card from hand, or from an opponent's hand.
+
+    The source defaults to hand, and the two optional clauses are independent:
+    「見ないで」 is a blind reveal (no picker) and 「～に選んでもらう」 names one.
+    """
+    a["source"] = a.get("source") or "hand"
+    if "見ないで" in t:
+        a["blind"] = True
+    picker = extract_picker(t)
+    if picker:
+        a["picker"] = picker
+    return a
+
 
 def _set_action_046(t, a):
- return (
-   a.update(
-       {
-           'heart_colors': extract_heart_colors_from_text(t)
-          },
-   )
-   if (
-      not a.get('source') and not a.get('card_type') and '{{heart_' in t
-     )
-   else None
-  )
+    """Heart colours, but only when nothing else already says what is targeted.
+
+    A clause that names a source or a card type is about THAT, so a heart icon
+    in it belongs to the other clause and must not become a filter here.
+    """
+    if a.get("source") or a.get("card_type") or "{{heart_" not in t:
+        return None
+    a["heart_colors"] = extract_heart_colors_from_text(t)
+    return a
+
 
 def _set_action_050(t, a):
- return a.update(
-    {
-       'target_trigger': _nearest_invalidation_trigger(t)
-      },
- )
+    """Invalidate the nearest trigger mentioned in the text."""
+    a["target_trigger"] = _nearest_invalidation_trigger(t)
+    return a
+
 
 def _set_action_051(t, a):
- return a.update(
-    {
-       'suppressed_trigger': (
-           m.group(1)
-           if (m := re.search('\\{\\{(\\w+)\\.png\\|', t[:t.find('能力')]))
-           else None
-          )
-      },
- )
+    """Suppress the ability whose trigger icon precedes 「能力」 in the text.
+
+    The icon is whatever appears first before that word — reading the slice
+    rather than the whole clause is what keeps a later icon from being picked up.
+    """
+    cut = t.find("能力")
+    m = re.search(r"\{\{(\w+)\.png\|", t[:cut]) if cut >= 0 else None
+    a["suppressed_trigger"] = m.group(1) if m else None
+    return a
 
 def _set_heart_type(t, a, allow_selected=False):
     """The heart type a 「ハート○に変える」 clause names.
@@ -2174,85 +2145,96 @@ def _set_action_060(t, a):
     return _set_heart_type(t, a, allow_selected=True)
 
 def _set_action_062(t, a):
- return _handle_cost_modification(t, a)
+    """Cost modification — see _handle_cost_modification for the field rules."""
+    return _handle_cost_modification(t, a)
+
 
 def _set_action_063(t, a):
- return (
-   a.update(
-       {
-           'max_repeats': int(m.group(1))
-          },
-   )
-   if (m := re.search('(\\d+)回', t)) is not None
-   else None
-  )
+    """「N回」 — a use limit of N per turn."""
+    m = re.search(r"(\d+)回", t)
+    if m is not None:
+        a["max_repeats"] = int(m.group(1))
+    return a
+
 
 def _set_action_069(t, a):
- return (a.update({'operation': 'set'}), a.update({'value': int(m.group(1))}) if (m := re.search('(\\d+).*(になる|なった|なっている)', t)) else None)[-1]
+    """「Nになる/なった」 — set a value to N."""
+    a["operation"] = "set"
+    m = re.search(r"(\d+).*(になる|なった|なっている)", t)
+    if m:
+        a["value"] = int(m.group(1))
+    return a
+
 
 def _set_action_070(t, a):
- return (_set_score_op(t, a), a)[-1]
+    """Score operation — see _set_score_op for the field rules."""
+    return _set_score_op(t, a)
+
 
 def _set_action_071(t, a):
- return a.update(
-    (
-       {
-           'destination': 'deck_top',
-           'placement_order': 'any_order'
-          }
-       if '好きな順番で' in t
-       else {
-           'destination': 'deck_top'
-          }
-      ),
- )
+    """Place on top of the deck; 「好きな順番で」 also makes the order free."""
+    a["destination"] = "deck_top"
+    if "好きな順番で" in t:
+        a["placement_order"] = "any_order"
+    return a
+
+
+# 「{{icon.png|label}}能力」 — any {{...}} icon markup.
+_ICON_MARKUP_RE = re.compile(r"\{\{([^}]+)\}\}")
+
+
+def _trigger_filter_labels(t):
+    """The text label of the icon naming which ability triggers, or [].
+
+    The label is the LAST `|`-separated field, because the clause is written
+    with the icon file first and the printed text second
+    (`{{icon.png|このカード}}能力`). The icon named is the one between 「持つ」
+    and 「能力」.
+    """
+    if "持つ" not in t:
+        return []
+    between = t.split("持つ", 1)[1].split("能力", 1)[0]
+    m = _ICON_MARKUP_RE.search(between)
+    return [m.group(1).split("|")[-1]] if m else []
+
 
 def _set_action_073(t, a):
- return a.update(
-    {
-       'source_location': 'under_member',
-       'trigger_filter': [m.group(1).split('|')[-1] for m in [re.search('\\{\\{([^}]+)\\}\\}', t.split('持つ')[1].split('能力')[0])] if m],
-       'all': True
-      },
- )
+    """Trigger on the ability of whatever sits under the member."""
+    a["source_location"] = "under_member"
+    a["trigger_filter"] = _trigger_filter_labels(t)
+    a["all"] = True
+    return a
+
 
 def _set_action_074(t, a):
- return (
-   a.update(
-       {
-           'ability_gain': _strip_icon_annotations(t).replace('を失う', '').replace('を得る', '').replace('をえる', '')
-          },
-   )
-   if a.get('ability_gain') is None
-   else None
-  )
+    """Which ability is gained, read from the clause, unless already known."""
+    if a.get("ability_gain") is None:
+        a["ability_gain"] = (
+            _strip_icon_annotations(t)
+            .replace("を失う", "")
+            .replace("を得る", "")
+            .replace("をえる", "")
+        )
+    return a
+
 
 def _set_action_079(t, a):
- return a.update(
-    {
-       'identities': (
-           _quoted_group_names(t) or None
-          ),
-       'all_regions': True
-      },
- )
+    """Named identities, matched against any group, from any region."""
+    a["identities"] = _quoted_group_names(t) or None
+    a["all_regions"] = True
+    return a
+
 
 def _set_action_080(t, a):
- return a.update(
-    {
-       'count': (
-           extract_count(t) or 1
-          )
-      },
- )
+    """A count, defaulting to 1 when the clause does not state one."""
+    a["count"] = extract_count(t) or 1
+    return a
+
 
 def _set_action_081(t, a):
- return a.update(
-    {
-       'condition_text': t
-      },
- )
-
+    """Keep the whole clause as the condition text."""
+    a["condition_text"] = t
+    return a
 
 _ACTION_RULES: List[ActionRule] = [
     ActionRule(name='action_000_shuffle', condition=lambda t: _has_shuffle(t), action='shuffle', setter=_set_action_000, priority=0, order=0),
