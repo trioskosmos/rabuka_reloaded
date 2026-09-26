@@ -299,16 +299,25 @@ fn collect_junk(gs: &GameState, me: u8, db: &CardDatabase, lives: &[Life], ctx: 
 ///    `(1 - p) * p` is the stationary price: a life is worth committing exactly
 ///    in proportion to the placement it can make here, and the term cancels to
 ///    zero only when the life can never pass, which is when folding is right.
+///
+///    The price is charged ONCE PER ZONE, not once per life. 8.3.15 -> 8.3.16
+///    makes the check all-or-nothing: a failed check discards the entire live
+///    set, so the lives in a zone are not independent risks and multiplying by
+///    `lives` charged the same failure two or three times over. Measured: at
+///    p = 0.5 with three lives the penalty was 0.25 against the 0.167
+///    placement it was protecting, so a strictly positive-expectation zone
+///    scored negative and v8 folded 6.3% of checks - against v7's 0.3%, and
+///    against the guide's D2b finding that folding burns a whole live phase for
+///    nothing.
 /// 3. `+ filter_value` - what the spare-slot hand filter buys. Each card set
 ///    as junk is discarded before the check and draws a replacement (8.3.4), so
 ///    the slot is worth a draw minus whatever that card was worth in hand.
 pub(crate) fn candidate_value(
     outcome: CheckOutcome,
     p_pass: f64,
-    lives: usize,
     filter_value: f64,
 ) -> f64 {
-    let burned = (1.0 - p_pass) * p_pass * PLACEMENT_CREDIT * lives as f64;
+    let burned = (1.0 - p_pass) * p_pass * PLACEMENT_CREDIT;
     outcome.value - burned + filter_value
 }
 
@@ -388,7 +397,7 @@ fn enumerate_candidates(
             .iter()
             .map(|j| draw_credit - j.keep_value)
             .sum();
-        let value = candidate_value(outcome, p_pass, chosen.len(), filter_value);
+        let value = candidate_value(outcome, p_pass, filter_value);
         out.push(Candidate {
             lives: chosen.iter().map(|life| life.index).collect(),
             junk: filler.iter().map(|j| j.index).collect(),

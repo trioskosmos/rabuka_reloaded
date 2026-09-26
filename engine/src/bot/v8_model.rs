@@ -919,6 +919,51 @@ pub fn forward_supply(
     (hearts, blades.max(0))
 }
 
+/// How many in-hand lives the current board can actually satisfy.
+///
+/// This is v7's `60 * Δpassable` term, and it is the one signal v8's leaf was
+/// missing. `P(place)` is a MAX over the lives in hand, so once any single life
+/// is passable the term saturates at 1.0 and every further board improvement
+/// is invisible - which is why v8's leaf tied at the top in 81.8% of decisions.
+/// A COUNT is not a max: it rises 0 -> 1 -> 2 -> 3 as the board grows, so it
+/// keeps discriminating in exactly the region where `P(place)` has gone flat.
+///
+/// The threshold is deliberately not a coin flip. §3.2 pools every member's
+/// hearts (active AND wait) and the yell adds `Binomial(flips, density)`, so
+/// `confidence` is the fraction of the flip budget we require before calling a
+/// life reachable. 0.55 sits above the mean on purpose: a life that needs more
+/// flips than we can expect fails about half the time, and counting it as
+/// reachable would price a coin flip as board development.
+pub fn passable_count(
+    gs: &GameState,
+    me: u8,
+    db: &CardDatabase,
+    confidence: f64,
+) -> f64 {
+    let p = gs.seat_player(me);
+    // `heart_pool_inner` is the guides' own pool: every member's hearts, active
+    // AND wait (3.2), plus `Binomial(flips, density)` scaled by `confidence`
+    // per printed colour. `alloc` is the engine's own wildcard allocator, so
+    // "can this life be satisfied" is asked the same way the check will ask it.
+    let pool = super::strategy_v4::heart_pool_inner(gs, me, db, confidence);
+
+    let mut count = 0.0f64;
+    for &cid in p.hand.cards.iter() {
+        let Some(card) = db.get_card(cid) else { continue };
+        if card.card_type != CardType::Live {
+            continue;
+        }
+        let need = life_need(gs, cid);
+        if has_unpassable_icon(&need) {
+            continue;
+        }
+        if super::strategy_v4::alloc(&pool, &need).is_some() {
+            count += 1.0;
+        }
+    }
+    count
+}
+
 // -- Cheap pass estimate for Main-phase ranking ---------------------------
 
 /// `P(need satisfied)` given a deterministic board, the number of active

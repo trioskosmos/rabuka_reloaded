@@ -785,8 +785,14 @@ static int local_filter_matches(const LocalCardFilter *f, int card_id) {
         if (!rb_compare_counts(f->blade_op[0] ? f->blade_op : NULL, blade, f->blade_limit)) return 0;
     }
     if (f->has_characters) {
-        if (!rb_card_matches_characters(card_id, (const char **)(intptr_t)(intptr_t)(const char **)f->characters, 1))
-            return 0;
+        /* Rust (util.rs:1474-1476): a single `characters` list, matched with
+           card_matches_characters (name contains the normalized character).
+           RbCardFilter::characters is one name string, so wrap it as a
+           one-element list. The previous code cast the char[256] buffer to a
+           `const char **` and dereferenced it as a pointer. */
+        const char *names[1];
+        names[0] = f->characters;
+        if (!rb_card_matches_characters(card_id, names, 1)) return 0;
     }
     if (f->has_exclude_characters) {
         /* Passes only if it does NOT match the excluded characters */
@@ -936,15 +942,13 @@ static int card_filter_matches_card(const LocalCardFilter *f, int card_id) {
 
 /* ── matching_ids / matching_indices (ported) ──────────────────────────── */
 
-/* Mirror util.rs::matching_ids — return card IDs matching the filter. */
-int rb_matching_ids(const RbCardFilter *rf, const int *cards, int n, int *out, int max) {
-    if (!cards || !rf || !rf->has_filter) {
-        int m = 0;
-        for (int i = 0; i < n && m < max; i++) out[m++] = cards[i];
-        return m;
-    }
+/* Copy the public RbCardFilter into the local mirror. Returns 0 when the
+   filter has nothing set, in which case every card matches (Rust: an
+   all-None CardFilter rejects nothing). */
+static int local_filter_from_public(const RbCardFilter *rf, LocalCardFilter *out) {
     LocalCardFilter f;
     memset(&f, 0, sizeof f);
+    if (!rf) return 0;
     if (rf->card_type[0])    strncpy(f.card_type, rf->card_type, sizeof f.card_type - 1);
     if (rf->group[0])        { strncpy(f.group, rf->group, sizeof f.group - 1); f.has_group = 1; }
     if (rf->has_cost_limit)  { f.cost_limit = rf->cost_limit;
@@ -964,7 +968,7 @@ int rb_matching_ids(const RbCardFilter *rf, const int *cards, int n, int *out, i
         f.has_need_heart_total = 1;
     }
     for (int i = 0; i < rf->n_name_fragments && i < 8; i++)
-        strncpy(f.name_fragments[i], rf->name_fragments[i], sizeof f.name_fragments[i] - 1);
+        strncpy(f.name_fragments[i], rf->n_name_fragments[i], sizeof f.name_fragments[i] - 1);
     f.n_name_fragments = rf->n_name_fragments;
     if (rf->has_original_blade) {
         f.original_blade_limit = rf->original_blade_limit;
@@ -988,27 +992,44 @@ int rb_matching_ids(const RbCardFilter *rf, const int *cards, int n, int *out, i
     f.has_blade_limit = rf->has_blade_limit;
     f.blade_limit = rf->blade_limit;
     if (rf->blade_op[0]) strncpy(f.blade_op, rf->blade_op, sizeof f.blade_op - 1);
+    f.distinct = rf->distinct;
+    *out = f;
+    return 1;
+}
 
+/* Mirror util.rs::matching_indices — return indices into cards where the
+   filter matches. Rust enumerates `cards` and filters in place, so duplicate
+   ids at different positions each produce their own index; the C port used to
+   round-trip through matching_ids and map values back, which collapsed
+   [A, B, A] into [0, 0]. */
+int rb_matching_indices_filter(const RbCardFilter *rf, const int *cards, int n, int *out_idx, int max) {
+    if (!cards || !out_idx) return 0;
+    LocalCardFilter f;
+    if (!local_filter_from_public(rf, &f)) {
+        int r = 0;
+        for (int i = 0; i < n && r < max; i++) out_idx[r++] = i;
+        return r;
+    }
+    int r = 0;
+    for (int i = 0; i < n && r < max; i++)
+        if (card_filter_matches(&f, cards[i], 1)) out_idx[r++] = i;
+    return r;
+}
+
+/* Mirror util.rs::matching_ids — return card IDs matching the filter. */
+int rb_matching_ids(const RbCardFilter *rf, const int *cards, int n, int *out, int max) {
+    if (!cards || !out) return 0;
+    LocalCardFilter f;
+    if (!rf || !rf->has_filter || !local_filter_from_public(rf, &f)) {
+        int m = 0;
+        for (int i = 0; i < n && m < max; i++) out[m++] = cards[i];
+        return m;
+    }
     int m = 0;
     for (int i = 0; i < n && m < max; i++) {
         if (card_filter_matches(&f, cards[i], 1)) out[m++] = cards[i];
     }
     return m;
-}
-
-/* Mirror util.rs::matching_indices — return indices into cards where filter matches. */
-int rb_matching_indices_filter(const RbCardFilter *f, const int *cards, int n, int *out_idx, int max) {
-    if (!cards || !out_idx) return 0;
-    int ids[RB_MAX_ZONE];
-    int m = rb_matching_ids(f, cards, n, ids, RB_MAX_ZONE);
-    int r = 0;
-    /* Map surviving ids back to original indices */
-    for (int d = 0; d < m && r < max; d++) {
-        for (int i = 0; i < n; i++) {
-            if (cards[i] == ids[d]) { out_idx[r++] = i; break; }
-        }
-    }
-    return r;
 }
 
 /* Mirror util.rs::count_matching — count cards matching the filter. */

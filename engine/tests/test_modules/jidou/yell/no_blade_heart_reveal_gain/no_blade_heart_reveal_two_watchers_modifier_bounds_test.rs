@@ -1,10 +1,18 @@
 use crate::helpers::*;
 use rabuka_engine::card::HeartColor;
 
+/// Into the live card set, then on to the ライブ開始時 window — both named.
+/// The old shape was two 5-pass walks with a `contains("LiveCardSet")` assert
+/// between them, so a phase that gained a step would have moved the test
+/// without failing the assert that was supposed to catch it.
 fn advance_to_live(game: &mut TestGame) {
-    for _ in 0..5 { game.pass(); }
-    assert!(game.state.current_phase.to_string().contains("LiveCardSet"));
-    for _ in 0..5 { game.pass(); }
+    game.advance_to_phase(rabuka_engine::game_state::Phase::LiveCardSetFirstAttacker);
+    assert_eq!(
+        game.state.current_phase,
+        rabuka_engine::game_state::Phase::LiveCardSetFirstAttacker,
+        "the helper promises the live card set, by name"
+    );
+    game.advance_to_phase(rabuka_engine::game_state::Phase::FirstAttackerPerformance);
 }
 
 #[test]
@@ -21,7 +29,10 @@ fn yell_two_no_blade_heart_watchers_have_zero_or_one_heart_modifier() {
     game.state.player1.hand.cards.push(filler);
     advance_to_live(&mut game);
     game.set_live_card(filler);
-    for _ in 0..5 { game.pass(); }
+    game.advance_to_phase(rabuka_engine::game_state::Phase::LiveVictoryDetermination);
+    while game.has_pending_choice() {
+        game.select_indices(&[]);
+    }
     // Both should have triggered (each has its own heart color)
     // At least one should have heart
     let h_sumire = game.state.mods.get_heart_modifier(sumire, HeartColor::Heart06);

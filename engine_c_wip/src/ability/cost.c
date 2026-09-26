@@ -268,6 +268,29 @@ int execute_place_energy_under_member_non_optional(GameState *g, int actor, cons
     return rb_effect_place_energy_under_member_non_optional(g, actor, e);
 }
 
+/* ── cost_zone_cards ──
+   Mirror util::count_in_zone's zone coverage. Returns the card array for the
+   four source zones validate_cost cares about, or NULL for every other zone
+   (Rust handlers.rs:209-214 returns Ok(()) for anything that is not
+   Hand/Stage/Waitroom/Energy — e.g. a deck-sourced cost is never validated). */
+static const int *cost_zone_cards(const RbPlayer *P, const char *src, int *n) {
+    *n = 0;
+    if (!src || !*src) return NULL;
+    if (!strcmp(src, "hand"))          { *n = P->hand.n;          return P->hand.cards; }
+    if (!strcmp(src, "waitroom") ||
+        !strcmp(src, "discard"))       { *n = P->discard.n;       return P->discard.cards; }
+    if (!strcmp(src, "energy"))        { *n = P->energy.n;        return P->energy.cards; }
+    if (!strcmp(src, "stage")) {
+        static int stage_ids[RB_STAGE_SIZE];
+        int k = 0;
+        for (int i = 0; i < RB_STAGE_SIZE; i++)
+            if (P->stage[i] != RB_EMPTY_SLOT) stage_ids[k++] = P->stage[i];
+        *n = k;
+        return stage_ids;
+    }
+    return NULL;
+}
+
 /* ── validate_cost ── */
 static int validate_cost(const GameState *g, int actor, const AbilityEffect *cost) {
     if (!cost) return 1;
@@ -280,21 +303,29 @@ static int validate_cost(const GameState *g, int actor, const AbilityEffect *cos
     if (cost_is_move_cards(cost)) {
         const char *src = cost->source ? cost->source : "";
         int count = cost->count > 0 ? cost->count : 1;
-        const RbPlayer *P = &g->p[actor];
-        int available = 0;
-        if (!strcmp(src, "hand")) available = P->hand.n;
-        else if (!strcmp(src, "stage")) {
-            for (int i = 0; i < RB_STAGE_SIZE; i++)
-                if (P->stage[i] != RB_EMPTY_SLOT) available++;
-        } else if (!strcmp(src, "deck") || !strcmp(src, "deck_top")) available = P->deck.n;
-        else if (!strcmp(src, "waitroom") || !strcmp(src, "discard")) available = P->discard.n;
-        else if (!strcmp(src, "energy")) available = P->energy.n;
+        const char *target = cost->target ? cost->target : "self";
+        int tp = rb_resolve_target_player(g, target);
+        int tpl = (tp >= 0) ? tp : actor;
+        int n_cards = 0;
+        const int *cards = cost_zone_cards(&g->p[tpl], src, &n_cards);
+        /* Unknown / unvalidated source zone: Rust returns Ok(()) immediately. */
+        if (!cards) return 1;
+        /* Filter-aware: 「『Liella!』のカードを1枚」 is unpayable when the hand
+           holds cards but none match the cost filter (handlers.rs:215-222). */
+        RbCardFilter f;
+        rb_effect_filter_subset(cost, &f);
+        int available = rb_count_matching_filter(&f, cards, n_cards);
+        /* Rule 9.4.2.3 / Q56: costs must be paid in full. */
         if (available < count) return 0;
         return 1;
     }
     if (cost_is_energy_condition(cost)) {
         int count = cost->count > 0 ? cost->count : 1;
-        const RbPlayer *P = &g->p[actor];
+        /* Rust handlers.rs:232-237 resolves the energy condition against
+           "self" explicitly, not against the ability's target. */
+        int tp = rb_resolve_target_player(g, "self");
+        int tpl = (tp >= 0) ? tp : 0;
+        const RbPlayer *P = &g->p[tpl];
         if ((int)P->energy.n < count) return 0;
         return 1;
     }

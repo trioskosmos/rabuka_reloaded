@@ -1,6 +1,6 @@
 {
   "generated_by": "cards/test_inventory.py",
-  "generated_at": "2026-09-26T11:12:25.111893+00:00",
+  "generated_at": "2026-09-26T11:24:29.007189+00:00",
   "stats": {
     "total_cards": 2526,
     "cards_with_abilities": 1565,
@@ -385,8 +385,15 @@
       "rows": []
     },
     "no_drive": {
-      "count": 0,
-      "rows": []
+      "count": 1,
+      "rows": [
+        {
+          "file": "engine/tests/test_modules/integration/pvp_room_test.rs",
+          "test": "both_players_multiple_live_start_abilities_get_correct_choice_routing",
+          "line": 204,
+          "detail": ""
+        }
+      ]
     },
     "synthetic_only": {
       "count": 0,
@@ -413,50 +420,8 @@
       "rows": []
     },
     "blind_phase_stepping": {
-      "count": 12,
+      "count": 5,
       "rows": [
-        {
-          "file": "engine/tests/test_modules/integration/pvp_room_test.rs",
-          "test": "both_players_multiple_live_start_abilities_get_correct_choice_routing",
-          "line": 204,
-          "detail": ""
-        },
-        {
-          "file": "engine/tests/test_modules/jidou/movement/ability_chain_combo/ability_chain_combo_test.rs",
-          "test": "special_color_no_score_when_moved_liella_left_center",
-          "line": 300,
-          "detail": ""
-        },
-        {
-          "file": "engine/tests/test_modules/jidou/movement/ability_chain_combo/ability_chain_combo_test.rs",
-          "test": "special_color_set_blades_and_score_twin_in_one_live",
-          "line": 232,
-          "detail": ""
-        },
-        {
-          "file": "engine/tests/test_modules/jidou/movement/self_area_move_watch/area_move_timing_and_movement_state_conditions_test.rs",
-          "test": "fuyumari_p2_play_to_stage_triggers_appearance",
-          "line": 544,
-          "detail": ""
-        },
-        {
-          "file": "engine/tests/test_modules/jidou/yell/discard_revealed_then_re_yell/blade_heart_two_or_fewer_discard_all_and_re_yell_test.rs",
-          "test": "with_dia_mixed_deck_both_trigger",
-          "line": 290,
-          "detail": ""
-        },
-        {
-          "file": "engine/tests/test_modules/jidou/yell/discard_revealed_then_re_yell/blade_heart_two_or_fewer_discard_all_and_re_yell_test.rs",
-          "test": "with_dia_only_dia_triggers",
-          "line": 241,
-          "detail": ""
-        },
-        {
-          "file": "engine/tests/test_modules/jidou/yell/no_blade_heart_reveal_gain/no_blade_heart_reveal_two_watchers_modifier_bounds_test.rs",
-          "test": "yell_two_no_blade_heart_watchers_have_zero_or_one_heart_modifier",
-          "line": 10,
-          "detail": ""
-        },
         {
           "file": "engine/tests/test_modules/rules/baton/baton_touch_protected_zone_restrictions_test.rs",
           "test": "opponent_baton_touch_unaffected_by_protected_card",

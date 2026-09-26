@@ -313,12 +313,9 @@ fn special_color_no_score_when_moved_liella_left_center() {
         game.state.player2.main_deck.cards.push(filler);
     }
 
-    for _ in 0..5 {
-        game.pass();
-    }
+    game.advance_to_phase(rabuka_engine::game_state::Phase::LiveCardSetFirstAttacker);
     game.set_live_card(special);
-    game.pass();
-    game.pass();
+    game.advance_to_phase(rabuka_engine::game_state::Phase::FirstAttackerPerformance);
     while game.has_pending_choice() {
         game.drain_choices_strict(&["SelectCard", "SelectAutoAbility"], &[0]);
     }

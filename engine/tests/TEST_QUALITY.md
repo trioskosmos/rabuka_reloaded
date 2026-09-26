@@ -12,11 +12,13 @@ _test never asserts (smoke at best — cannot pin behavior)_
 
 None.
 
-## no_drive (0)
+## no_drive (1)
 
 _trigger-context test that mutates state and asserts but never drives the engine (no scan/activate/play/fire): vacuous negatives/positives_
 
-None.
+| file | test | line | detail |
+| --- | --- | --- | --- |
+| `engine/tests/test_modules/integration/pvp_room_test.rs` | `both_players_multiple_live_start_abilities_get_correct_choice_routing` | 204 |  |
 
 ## synthetic_only (0)
 
@@ -54,19 +56,12 @@ _prompts answered by ORDINAL position (if step <= 2 { select 2 cards }) instead 
 
 None.
 
-## blind_phase_stepping (12)
+## blind_phase_stepping (5)
 
 _a fixed `for _ in 0..N { pass() }` walk through the turn — a phase gaining or losing a step silently shifts the window the test thinks it is standing in; step to the phase by name instead_
 
 | file | test | line | detail |
 | --- | --- | --- | --- |
-| `engine/tests/test_modules/integration/pvp_room_test.rs` | `both_players_multiple_live_start_abilities_get_correct_choice_routing` | 204 |  |
-| `engine/tests/test_modules/jidou/movement/ability_chain_combo/ability_chain_combo_test.rs` | `special_color_no_score_when_moved_liella_left_center` | 300 |  |
-| `engine/tests/test_modules/jidou/movement/ability_chain_combo/ability_chain_combo_test.rs` | `special_color_set_blades_and_score_twin_in_one_live` | 232 |  |
-| `engine/tests/test_modules/jidou/movement/self_area_move_watch/area_move_timing_and_movement_state_conditions_test.rs` | `fuyumari_p2_play_to_stage_triggers_appearance` | 544 |  |
-| `engine/tests/test_modules/jidou/yell/discard_revealed_then_re_yell/blade_heart_two_or_fewer_discard_all_and_re_yell_test.rs` | `with_dia_mixed_deck_both_trigger` | 290 |  |
-| `engine/tests/test_modules/jidou/yell/discard_revealed_then_re_yell/blade_heart_two_or_fewer_discard_all_and_re_yell_test.rs` | `with_dia_only_dia_triggers` | 241 |  |
-| `engine/tests/test_modules/jidou/yell/no_blade_heart_reveal_gain/no_blade_heart_reveal_two_watchers_modifier_bounds_test.rs` | `yell_two_no_blade_heart_watchers_have_zero_or_one_heart_modifier` | 10 |  |
 | `engine/tests/test_modules/rules/baton/baton_touch_protected_zone_restrictions_test.rs` | `opponent_baton_touch_unaffected_by_protected_card` | 156 |  |
 | `engine/tests/test_modules/rules/baton/double_baton_touch_blade_grant_per_liella_moved_test.rs` | `chisato_natsumi_blade_bonus_expires_at_live_end` | 486 |  |
 | `engine/tests/test_modules/rules/conditions/rule_9_9_layering_test.rs` | `heart_override_additive_stacks_in_both_stage_heart_calcs` | 91 |  |

@@ -230,6 +230,32 @@ fn horizon_weight() -> f64 {
         .unwrap_or(0.0)
 }
 
+/// Weight on the `passable_count` term — v7's proven `60 * Δpassable` signal,
+/// carried over because v8's leaf was measurably missing it.
+///
+/// `P(place)` is a MAX over the lives in hand and saturates at 1.0 the moment
+/// any one life becomes passable, so past that point it cannot see further
+/// board development at all — the leaf tied at the top in 81.8% of decisions.
+/// A COUNT is not a max: it climbs 0 -> 1 -> 2 -> 3 as the board grows, so it
+/// keeps discriminating in exactly the region the placement term has gone
+/// flat. v7 weighted it at 60.0 against a 25.0 ammo term, i.e. it dominated
+/// v7's eval, and v7's Main is the best-measured Main phase in the project.
+///
+/// Unit is "reachable lives", so it is comparable to `PLACEMENT_CREDIT` by
+/// construction: one reachable life is worth at most one placement.
+///
+/// `V8_PASSABLE` re-weights it; `V8_NO_PASSABLE` removes it.
+fn passable_weight() -> f64 {
+    if std::env::var_os("V8_NO_PASSABLE").is_some() {
+        return 0.0;
+    }
+    std::env::var("V8_PASSABLE")
+        .ok()
+        .and_then(|v| v.parse().ok())
+        .filter(|w: &f64| w.is_finite() && *w >= 0.0)
+        .unwrap_or(PLACEMENT_CREDIT)
+}
+
 /// Expected placement advantage of a position, in placement units.
 ///
 /// ```text
@@ -271,12 +297,14 @@ fn leaf_value(gs: &GameState, me: u8, db: &CardDatabase, opp: &OppModel) -> f64 
         0.0
     };
     let ceiling = v8_model::score_ceiling(gs, me, db) as f64;
+    let passable = v8_model::passable_count(gs, me, db, 0.55);
     SCALE
         * ((our_now - their_now)
             + horizon_weight() * (our_later - their_later)
             + PLACEMENT_CREDIT * (ammo + initiative)
             + dev_ceiling_weight() * ceiling
-            + dev_band_weight() * v8_model::band_progress(gs, me, db))
+            + dev_band_weight() * v8_model::band_progress(gs, me, db)
+            + passable_weight() * passable)
 }
 
 /// Baton detection from the generated action's own destination data. The

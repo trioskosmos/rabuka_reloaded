@@ -227,14 +227,18 @@ static void run_yell_case(const char *const *yell_no, int n_yell, int yell_bonus
 
     advance_to_live_card_set_p1(&tg);
     CHECK(set_live_card(&tg, live), "yell fixture live enters the live card set");
+    fprintf(stderr,"PROBE after set_live shc=%d\n", tg.state.queue.selected_heart_color);
     test_pass(&tg);
+    fprintf(stderr,"PROBE after pass1 shc=%d\n", tg.state.queue.selected_heart_color);
     set_yell_top(&tg, yell_no, n_yell);
     test_pass(&tg);
+    fprintf(stderr,"PROBE after pass2 shc=%d\n", tg.state.queue.selected_heart_color);
     CHECK_EQ(test_get_heart_modifier(&tg, sumire, RB_HEART_ORANGE), 0,
              "yell condition does not fire before a yell");
     CHECK_EQ(test_get_heart_modifier(&tg, wien, RB_HEART_GREEN), 0,
              "yell condition does not fire before a yell for Wien");
     run_full_turn(&tg);
+    fprintf(stderr,"PROBE after full_turn shc=%d\n", tg.state.queue.selected_heart_color);
 
     CHECK_EQ(test_get_heart_modifier(&tg, sumire, RB_HEART_ORANGE), expected,
              "Sumire heart06 matches the yell contents");

@@ -320,6 +320,11 @@ static void resolve_gain_resource_targets(GameState *g, int who,
     }
 
     /* heart color */
+    if(g->yell_occurred)
+        fprintf(stderr,"DBGX2 sel_heart_color=%d raw=%s parsed=%d\n",
+                g->queue.selected_heart_color,
+                eff_extra(e,"heart_color")?eff_extra(e,"heart_color"):"-",
+                eff_extra(e,"heart_color")?(int)rb_parse_heart_color(eff_extra(e,"heart_color")):-99);
     if(g->queue.selected_heart_color >= 0)
         out->heart_color = g->queue.selected_heart_color;
     else {
@@ -568,6 +573,13 @@ static int h_gain_resource(GameState *g, int actor, const AbilityEffect *e){
         return 1;
     }
 
+    if(g->yell_occurred){
+        fprintf(stderr,"DBGX res=%s count=%d target=%s self_target_field=%s n_extra=%d\n",
+                res?res:"-", e->count, e->target?e->target:"-",
+                e->self_target_field[0]?e->self_target_field:"-", e->n_extra);
+        for(int i=0;i<e->n_extra;i++)
+            fprintf(stderr,"DBGX extra[%d] %s = %s\n",i,e->extra_k[i],e->extra_v[i]);
+    }
     int kind = resource_kind(res);
     int who  = misc_target_player(actor,e);
     RbPlayer *P=&g->p[who];
@@ -611,6 +623,10 @@ static int h_gain_resource(GameState *g, int actor, const AbilityEffect *e){
     resolve_gain_resource_targets(g,who,e,kind,count,per_unit,per_unit_type,
                                   is_all,is_self_target,exclude_self_id,
                                   activating,&t);
+    if(g->yell_occurred){
+        fprintf(stderr,"DBGX activating=%d n_heart=%d heart[0]=%d final=%d hcolor=%d\n",
+                activating,t.n_heart,t.n_heart>0?t.heart[0]:-1,t.final_count,t.heart_color);
+    }
 
     /* Store picked ids when target_count/distinct is set. */
     if(tc>=0 || distinct){

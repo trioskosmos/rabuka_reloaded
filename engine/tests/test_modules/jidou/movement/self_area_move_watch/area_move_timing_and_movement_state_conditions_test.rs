@@ -567,12 +567,14 @@ fn fuyumari_p2_play_to_stage_triggers_appearance() {
     }
     game.state.player2.energy_zone.add_active(15);
 
-    // Navigate to P2 Main: P1 plays live → skip through
-    for _ in 0..5 {
-        game.pass();
-    }
+    // Navigate to P2 Main: P1 plays live → skip through. The first walk is a
+    // named target. The second is NOT a blind count and stays a loop: what this
+    // test needs is P2's Main, which is a SEAT condition, not a phase — the
+    // live above can hand the turn over at a different point depending on
+    // whether P2 sets a live card, so `advance_to_phase(Main)` lands on P1's
+    // Main and the seat assertion fails. The loop breaks on the seat.
+    game.advance_to_phase(rabuka_engine::game_state::Phase::LiveCardSetFirstAttacker);
     game.set_live_card(p1_live);
-    // Pass through everything until P2 Main
     for _ in 0..40 {
         game.pass();
         while game.has_pending_choice() {
@@ -585,6 +587,11 @@ fn fuyumari_p2_play_to_stage_triggers_appearance() {
             break;
         }
     }
+    assert_eq!(
+        game.state.current_phase,
+        rabuka_engine::game_state::Phase::Main,
+        "P2's Main must be reached for the 登場 below to be P2's turn"
+    );
 
     game.play_to_stage(fuyumari, MemberArea::LeftSide);
     while game.has_pending_choice() {

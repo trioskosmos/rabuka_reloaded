@@ -36,12 +36,15 @@ static int rb_dc_opponent_player(const struct GameState *g, int self_pl)
     return 1 - self_pl;
 }
 
-/* Determine the effective owner player from owner_card. Mirrors Rust:
-   let own_is_p1 = match owner_card {
-       Some(cid) => self.player1.stage.stage.contains(&cid),
-       None => true
-   };
-   If owner_card < 0 we fall back to owner_on_p1. */
+/* Determine the effective owner player from owner_card. Mirrors Rust
+   (engine/src/ability/dynamic_count.rs:76-79):
+       let own_is_p1 = match owner_card {
+           Some(cid) => self.player1.stage.stage.contains(&cid),
+           None => true,
+       };
+   i.e. the owner is whichever player's stage holds the activating card; with
+   no owner card the owner is the acting player (player1 in the default C
+   model), which is what owner_on_p1 == 0 expresses. */
 static int rb_dc_owner_from_card(const struct GameState *g, int owner_card, int owner_on_p1)
 {
     if (owner_card >= 0) {
@@ -127,7 +130,7 @@ int rb_resolve_dynamic_count(const struct GameState *g, int owner, int host_cid,
         int n = P->energy.n - threshold;
         count = n < 0 ? 0 : n;
     } else if (!strcmp(reference_text, "success_pile_count_difference")) {
-        int own_pl   = rb_dc_owner_from_card(g, owner_on_p1 ? -1 : owner, owner_on_p1);
+        int own_pl   = rb_dc_owner_from_card(g, host_cid, owner_on_p1);
         int other_pl = 1 - own_pl;
         const RbPlayer *own   = &g->p[own_pl];
         const RbPlayer *other = &g->p[other_pl];
@@ -177,22 +180,24 @@ int rb_resolve_dynamic_count(const struct GameState *g, int owner, int host_cid,
         int diff = threshold - P->discard.n;
         count = diff < 0 ? 0 : diff;
     } else if (!strcmp(reference_text, "energy_cards_under_this_member")) {
+        /* Rust (dynamic_count.rs:136-144): the activating card's stage
+           *index* is used, and when the card is not on the stage the index
+           falls back to 1 (center) — it does NOT widen to every member. */
         int self_pl = rb_dc_self_player(g);
         const RbPlayer *P = &g->p[self_pl];
+        int area = -1;
         if (host_cid >= 0) {
-            for (int a = 0; a < RB_STAGE_SIZE; a++) {
-                if (P->stage[a] == host_cid) {
-                    count = P->under_cards[a].n;
-                    break;
-                }
-            }
-        } else {
             for (int a = 0; a < RB_STAGE_SIZE; a++)
-                count += P->under_cards[a].n;
+                if (P->stage[a] == host_cid) { area = a; break; }
         }
+        if (area < 0) area = 1;
+        if (area >= 0 && area < RB_STAGE_SIZE)
+            count = P->under_cards[area].n;
     } else {
+        /* Rust (dynamic_count.rs:145-148): an unknown reference falls through
+           to count_type, where "revealed_cards" is the only non-zero arm. */
         if (count_type && !strcmp(count_type, "revealed_cards"))
-            count = 0;
+            count = rb_revealed_count(g, owner);
         else
             count = 0;
     }
@@ -254,25 +259,53 @@ int rb_effect_count(const struct GameState *g, int actor, int host_cid, const Ab
     const char *per_unit = dc_extra(e, "per_unit");
     if (per_unit && !strcmp(per_unit, "true")) {
         const char *loc = dc_extra(e, "location");
-        int units = 1;
-        if (loc) {
+        if (!loc) loc = dc_extra(e, "per_unit_type");
+        /* Rust resolves the per-unit multiplier through
+           util.rs::resolve_per_unit_count, which counts the zone through the
+           effect's CardFilter (card_type / group) rather than counting the
+           raw zone length. Mirror that; the raw length is the unfiltered case. */
+        const char *ct  = dc_extra(e, "card_type");
+        const char *grp = dc_extra(e, "group");
+        int units = 0;
+        if (!loc || !strcmp(loc, "hand")) {
+            units = rb_count_matching(g->p[actor].hand.cards, g->p[actor].hand.n, ct, grp);
+        } else if (!strcmp(loc, "stage") || !strcmp(loc, "member") ||
+                   !strcmp(loc, "members") || !strcmp(loc, "人")) {
+            int ids[RB_MAX_ZONE];
+            int n = 0;
+            for (int s = 0; s < RB_STAGE_SIZE; s++)
+                if (g->p[actor].stage[s] != RB_EMPTY_SLOT && n < RB_MAX_ZONE)
+                    ids[n++] = g->p[actor].stage[s];
+            units = rb_count_matching(ids, n, ct, grp);
+        } else if (!strcmp(loc, "success_live_zone") || !strcmp(loc, "success") ||
+                   !strcmp(loc, "live") || !strcmp(loc, "success_zone") ||
+                   !strcmp(loc, "live_card_zone") || !strcmp(loc, "success_live_card_zone")) {
+            int pl = (host_cid >= 0) ? rb_owner_of_card((GameState *)g, host_cid) : actor;
+            if (pl < 0) pl = actor;
+            int ids[RB_MAX_ZONE];
+            int n = 0;
             if (!strcmp(loc, "success_live_zone") || !strcmp(loc, "success") ||
-                !strcmp(loc, "live")) {
-                int pl = (host_cid >= 0) ? rb_owner_of_card((GameState *)g, host_cid) : actor;
-                if (pl < 0) pl = actor;
-                units = g->p[pl].live.n;
-            } else if (!strcmp(loc, "hand")) {
-                units = g->p[actor].hand.n;
-            } else if (!strcmp(loc, "stage")) {
-                int c = 0;
-                for (int s = 0; s < RB_STAGE_SIZE; s++)
-                    if (g->p[actor].stage[s] != RB_EMPTY_SLOT) c++;
-                units = c;
-            } else if (!strcmp(loc, "deck")) {
-                units = g->p[actor].deck.n;
-            } else if (!strcmp(loc, "success_zone")) {
-                units = g->p[actor].success.n;
-            }
+                !strcmp(loc, "success_zone") || !strcmp(loc, "success_live_card_zone"))
+                for (int k = 0; k < g->p[pl].success.n; k++) ids[n++] = g->p[pl].success.cards[k];
+            else
+                for (int k = 0; k < g->p[pl].live.n; k++) ids[n++] = g->p[pl].live.cards[k];
+            units = rb_count_matching(ids, n, ct, grp);
+        } else if (!strcmp(loc, "energy") || !strcmp(loc, "energy_zone")) {
+            units = rb_count_matching(g->p[actor].energy.cards, g->p[actor].energy.n, ct, grp);
+        } else if (!strcmp(loc, "under_member") || !strcmp(loc, "under") ||
+                   !strcmp(loc, "下")) {
+            int ids[RB_MAX_ZONE];
+            int n = 0;
+            for (int s = 0; s < RB_STAGE_SIZE; s++)
+                for (int k = 0; k < g->p[actor].under_cards[s].n && n < RB_MAX_ZONE; k++)
+                    ids[n++] = g->p[actor].under_cards[s].cards[k];
+            units = rb_count_matching(ids, n, ct, grp);
+        } else if (!strcmp(loc, "deck")) {
+            /* No per-unit counter in Rust covers the main deck; keep the raw
+               length so the count does not silently collapse to 1. */
+            units = g->p[actor].deck.n;
+        } else {
+            units = 1;
         }
         if (units < 0) units = 0;
         int base = dynamic_count >= 0 ? dynamic_count : (e->count >= 0 ? e->count : 1);

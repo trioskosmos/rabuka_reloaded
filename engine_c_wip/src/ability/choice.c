@@ -1585,8 +1585,14 @@ int rb_resolver_filter_discard_by_budget(RbAbilityResolver *self, GameState *g, 
    sub_choice handling. Mirrors Rust branching exactly. */
 void rb_resolver_handle_discard_selection(RbAbilityResolver *self, GameState *g, const char *selected) {
     if (!g) { rb_resolver_clear_choice_state_and_resume(self); return; }
-    fprintf(stderr, "[DISCARD_RESULT] selected=%s count=%d reprompt=%d\n",
-            selected ? selected : "skip", g->queue.pending.count, g->queue.choice_reprompt_pending);
+    fprintf(stderr, "[DISCARD_RESULT] selected=%s count=%d reprompt=%d allow_skip=%d eff=%s efftext=%s desc=%s cur=%d started=%d host=%d\n",
+            selected ? selected : "skip", g->queue.pending.count, g->queue.choice_reprompt_pending,
+            g->queue.pending.allow_skip,
+            (g->queue.resume_eff && g->queue.resume_eff->action) ? g->queue.resume_eff->action : "-",
+            (g->queue.resume_eff && g->queue.resume_eff->text) ? g->queue.resume_eff->text : "-",
+            g->queue.pending.description, g->queue.cur,
+            (g->queue.cur >= 0 && g->queue.cur < g->queue.n_entries) ? g->queue.entries[g->queue.cur].effect_started : -1,
+            g->queue.resume_host);
     int actor = g->queue.actor;
     int sel_idx = selected ? atoi(selected) : -1;
     int is_skip = (sel_idx < 0);

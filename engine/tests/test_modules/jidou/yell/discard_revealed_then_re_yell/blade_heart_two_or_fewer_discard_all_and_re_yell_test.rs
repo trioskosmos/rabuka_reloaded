@@ -251,13 +251,12 @@ fn with_dia_only_dia_triggers() {
     game.state.player1.hand.cards.push(daisuki);
     fill_decks(&mut game);
     game.give_energy(15);
-    for _ in 0..5 {
-        game.pass();
-    }
+    game.advance_to_phase(rabuka_engine::game_state::Phase::LiveCardSetFirstAttacker);
     game.set_live_card(daisuki);
-    game.pass();
-    game.pass();
-    game.pass();
+    // Into the yell window BY NAME, and stop there: the SelectAutoAbility this
+    // test answers is raised ON ARRIVAL, and a target that walks one phase
+    // further would answer that prompt internally.
+    game.advance_to_phase(rabuka_engine::game_state::Phase::SecondAttackerPerformance);
 
     assert_eq!(game.state.initial_yell_revealed_cards.len(), 5);
     assert!(game.has_pending_choice(), "SelectAutoAbility");
@@ -313,13 +312,11 @@ fn with_dia_mixed_deck_both_trigger() {
             .push(game.id("PL!-sd1-010-SD"));
     }
     game.give_energy(15);
-    for _ in 0..5 {
-        game.pass();
-    }
+    game.advance_to_phase(rabuka_engine::game_state::Phase::LiveCardSetFirstAttacker);
     game.set_live_card(daisuki);
-    game.pass();
-    game.pass();
-    game.pass();
+    // Into the yell window BY NAME, and stop on arrival — see the note in
+    // with_dia_only_dia_triggers: the prompt under test is raised there.
+    game.advance_to_phase(rabuka_engine::game_state::Phase::SecondAttackerPerformance);
 
     assert!(game.has_pending_choice(), "SelectAutoAbility");
     game.select_option(0);
