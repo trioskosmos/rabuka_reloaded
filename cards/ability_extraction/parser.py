@@ -851,6 +851,65 @@ _PHASE_MAP = {
 }
 
 
+# A segment that is nothing but a duration phrase (「ライブ終了時まで、」) is not
+# an effect of its own — it states the duration of the one that follows it.
+#
+# This is DURATION_PREFIX_MAP without the two turn-scoped 「〜終了時まで」 phrases,
+# which are never written as a standalone segment. Listed separately because
+# the two sets are genuinely different; the assert keeps them from drifting.
+_STANDALONE_DURATION_SEGMENTS = (
+    "ライブ終了時まで",
+    "ライブ終了まで",
+    "このターンの間",
+    "このライブの間",
+)
+assert set(_STANDALONE_DURATION_SEGMENTS) <= set(DURATION_PREFIX_MAP)
+_DURATION_ONLY_SEGMENT_RE = re.compile(
+    r"^(" + "|".join(re.escape(p) for p in _STANDALONE_DURATION_SEGMENTS) + r")[、，]?$"
+)
+
+
+def _fold_standalone_duration(parts):
+    """Prepend each stranded duration segment to the part that follows it."""
+    folded = []
+    stash = None
+    for part in parts:
+        m = _DURATION_ONLY_SEGMENT_RE.match(part)
+        if m:
+            stash = m.group(1)
+            continue
+        if stash:
+            part = stash + part
+            stash = None
+        folded.append(part)
+    return folded
+
+
+def _is_real_condition(cond):
+    """Did a condition actually parse, or did it fall through to `custom`?
+
+    `custom` is the parser's "I did not understand this" result, so every caller
+    that wants a usable condition tests against it. One place says so, instead
+    of each call site re-deriving it.
+    """
+    return bool(cond) and cond.get("type") != "custom"
+
+
+def _is_real_action(action):
+    """Did an action actually parse, or did it fall through to `custom`?"""
+    return bool(action) and action.get("action") != "custom"
+
+
+def _parsed_to_something(action):
+    """As _is_real_action, but a node with no `action` key at all counts as
+    `custom` rather than as a real action.
+
+    The two spellings disagree only for that missing key; the surrounding code
+    picked one of them, so keep whichever it assumed.
+    """
+    return action.get("action", "custom") != "custom"
+
+
 def _phase_target_of(text):
     """Whose phase `text` names: "self" for 自分の, "opponent" for 相手の.
 
@@ -1286,7 +1345,7 @@ def parse_effect(text: str) -> Dict[str, Any]:
             if "起動できる" in note or "発動する" in note:
                 if "センター" in note or "サイド" in note or "エリアにいる場合" in note:
                     cond_parsed = parse_condition(note)
-                    if cond_parsed and cond_parsed.get("type") != "custom":
+                    if _is_real_condition(cond_parsed):
                         extra_activation_cond = cond_parsed
                 positions = []
                 if "センターエリア" in note:
@@ -6672,7 +6731,7 @@ def _per_unit_gate(result, per_text):
     cond_part, remaining = split_condition_action(per_text)
     if cond_part and remaining:
         parsed_cond = parse_condition(cond_part)
-        if parsed_cond and parsed_cond.get("type") != "custom":
+        if _is_real_condition(parsed_cond):
             result["condition"] = parsed_cond
             per_text = remaining  # Use remaining for per-unit extraction
     # Also check for とき、/時、pattern not inside ライブ終了時まで
@@ -6686,7 +6745,7 @@ def _per_unit_gate(result, per_text):
                     remaining = per_text[t_pos + len(mark) :].strip()
                     if cond_text and remaining:
                         cond = parse_condition(cond_text)
-                        if cond and cond.get("type") != "custom":
+                        if _is_real_condition(cond):
                             result["condition"] = cond
                         per_text = remaining
                     break
@@ -6698,7 +6757,7 @@ def _per_unit_gate(result, per_text):
             remaining = per_text[t_pos + 2 :].strip()
             if cond_text and remaining:
                 cond = parse_condition(cond_text)
-                if cond and cond.get("type") != "custom":
+                if _is_real_condition(cond):
                     result["condition"] = cond
                 per_text = remaining
 
@@ -6981,7 +7040,7 @@ def _per_unit_comma_chain(result, action_text):
     actions = []
     for part in parts:
         parsed = parse_action(part)
-        if parsed.get("action") != "custom":
+        if _is_real_action(parsed):
             _propagate(result, parsed)
             actions.append(parsed)
     return actions if len(actions) >= 2 else None
@@ -7041,7 +7100,7 @@ def _per_unit_sono_ato(result, text, action_text):
                 for part in head_text.split("。")
                 if part.strip()
             )
-            if parsed.get("action") != "custom" or parsed.get("actions")
+            if _is_real_action(parsed) or parsed.get("actions")
         ]
         for step in steps:
             _propagate(result, step, skip_existing=True)
@@ -7267,7 +7326,7 @@ def _try_energy_ahead_alternative(text):
     }
     if ct:
         cond = parse_condition(ct)
-        if cond and cond.get("type") != "custom":
+        if _is_real_condition(cond):
             result["condition"] = cond
     return result
 
@@ -7419,7 +7478,7 @@ def _try_conditional_alternative(text):
                 alt["destination"] = "success_live_zone"
         else:
             cond = parse_condition(ct)
-            if cond and cond.get("type") != "custom":
+            if _is_real_condition(cond):
                 result["condition"] = cond
     if at:
         # Check for secondary condition in action text (e.g. "2枚以上いる場合")
@@ -7429,7 +7488,7 @@ def _try_conditional_alternative(text):
         if "両方" in at:
             sec_text = "それらが両方ある場合"
             alt_cond = parse_condition(sec_text)
-            if alt_cond and alt_cond.get("type") != "custom":
+            if _is_real_condition(alt_cond):
                 _inherit_condition_context(
                     result, alt_cond, _ALT_INHERITED_KEYS_WITH_VALUES
                 )
@@ -7439,7 +7498,7 @@ def _try_conditional_alternative(text):
         if secondary_m:
             sec_text = secondary_m.group(0)
             alt_cond = parse_condition(sec_text)
-            if alt_cond and alt_cond.get("type") != "custom":
+            if _is_real_condition(alt_cond):
                 # Inherit location/group/position context from the main condition
                 # since the secondary text ("2枚以上ある場合") omits the zone/group
                 _inherit_condition_context(result, alt_cond)
@@ -7535,7 +7594,7 @@ def _try_activation_suffix(text):
     result = {"text": text}
     result.update(action)
     cond_parsed = parse_condition(m.group(1).strip() + "場合")
-    if cond_parsed.get("type") != "custom":
+    if _is_real_condition(cond_parsed):
         result["activation_condition_parsed"] = cond_parsed
     return result
 
@@ -7684,7 +7743,7 @@ def _finish_each_time(text, trigger_text, sub):
             trigger_cond = or_cond
     if trigger_cond is None:
         trigger_cond = parse_condition(trigger_text)
-    if trigger_cond and trigger_cond.get("type") != "custom":
+    if _is_real_condition(trigger_cond):
         if (
             trigger_cond.get("type") == "card_count_condition"
             and trigger_cond.get("location") in ("discard",)
@@ -8439,13 +8498,13 @@ def _look_action_for(result, text):
         return
     cond_text, action_text = split_condition_action(prefix.group(1).strip())
     cond = parse_condition(cond_text) if cond_text else None
-    if cond and cond.get("type") != "custom":
+    if _is_real_condition(cond):
         result["condition"] = cond
         zone = cond.get("location")
         if zone and zone not in _LOOK_SOURCE_EXCLUDED_ZONES:
             if action_text:
                 parsed = parse_action(action_text)
-                if parsed.get("action") != "custom":
+                if _is_real_action(parsed):
                     parsed.setdefault("source", zone)
                     result["look_action"] = parsed
             else:
@@ -8455,7 +8514,7 @@ def _look_action_for(result, text):
                 result["look_action"] = look
     if "look_action" not in result and action_text:
         parsed = parse_action(action_text)
-        if parsed.get("action") != "custom":
+        if _is_real_action(parsed):
             result["look_action"] = parsed
 
 
@@ -8774,7 +8833,7 @@ def _try_compound_select(text):
     # Check if the action is gain_resource
     action_text = text.split("は、")[-1].strip() if "は、" in text else text
     gain = parse_action(action_text)
-    if gain.get("action") != "custom":
+    if _is_real_action(gain):
         actions.append(gain)
     result = {"text": text, "action": "sequential", "actions": actions}
     if dur:
@@ -8796,46 +8855,14 @@ def _try_implicit_sequential(text):
     # Prefer 。as separator when present (sentence boundaries).
     # _split_sentences_nesting handles 「」/（）/{{}} natively — no \x00 tricks.
     if "。" in text:
-        parts = _split_sentences_nesting(text)
         # Drop segments that are only parenthetical notes
         # (e.g. （対戦相手のカードの効果でも発動する）) so they don't become do_nothing.
-        parts = [p for p in parts if strip_parenthetical(p)]
-        # Also filter duration prefix fragments that are just "ライブ終了時まで、"
-        # but remember the duration to apply to the next action.
-        filt = []
-        stash = None
-        for p in parts:
-            dm = re.match(
-                r"^(ライブ終了時まで|ライブ終了まで|このターンの間|このライブの間)[、，]?$",
-                p,
-            )
-            if dm:
-                stash = dm.group(1)  # remember, will prepend to next action
-                continue
-            if stash:
-                p = stash + p
-                stash = None
-            filt.append(p)
-        parts = filt
-
+        parts = [p for p in _split_sentences_nesting(text) if strip_parenthetical(p)]
     else:
-        pending_duration = None
         parts = [p for p in text.split("、") if p.strip()]
-        filt = []
-        stash = None
-        for p in parts:
-            dm = re.match(
-                r"^(ライブ終了時まで|ライブ終了まで|このターンの間|このライブの間)[、，]?$",
-                p,
-            )
-            if dm:
-                stash = dm.group(1)
-                continue
-            if stash:
-                p = stash + p
-                stash = None
-            filt.append(p)
-        parts = filt
+    # A duration phrase stranded as its own segment is not an effect; it states
+    # the duration of the one that follows it.
+    parts = _fold_standalone_duration(parts)
     # Merge fragments ending with conjunction particle "と" with the next fragment
     # e.g. "これによりアクティブにしたメンバーと" + "このメンバーは" → single fragment
     # Replace the comma with a space to prevent re-splitting by parse_effect.
@@ -8860,11 +8887,7 @@ def _try_implicit_sequential(text):
         elif cp.endswith("その後。"):
             cp = cp[: -len("その後。")].strip()
         a = parse_effect(cp)
-        if (
-            a
-            and a.get("action", "custom") != "custom"
-            and a.get("action") != "do_nothing"
-        ):
+        if _parsed_to_something(a) and a.get("action") != "do_nothing":
             actions.append(a)
     if len(actions) >= 2:
         return {"text": text, "action": "sequential", "actions": actions}
@@ -9117,7 +9140,7 @@ def _try_choice(text):
         # tiered-choice evaluation reads.
         cond = parse_condition(cond_mod)
         cond = _resolve_preceding_moved_condition(cond, cond_mod)
-        if cond.get("type") != "custom":
+        if _is_real_condition(cond):
             result["choice_condition"] = cond
 
     options = []
@@ -9159,7 +9182,7 @@ def _try_choice(text):
             # The before text includes stuff like "1つを選ぶ。" prefix.
             alt_cond = parse_condition(before)
             alt_cond = _resolve_preceding_moved_condition(alt_cond, before)
-            if alt_cond.get("type") != "custom":
+            if _is_real_condition(alt_cond):
                 result["alternative_condition"] = alt_cond
             # Count becomes 1 by default (pick exactly one).
             # If the alternative is "1つ以上" (one or more), use any_number.
@@ -9233,7 +9256,7 @@ def _try_period_conditional(text):
     actions = []
     for p in parts[:cond_start]:
         fa = parse_effect(p)
-        if fa.get("action", "custom") != "custom":
+        if _parsed_to_something(fa):
             actions.append(fa)
     # Each conditional segment: "条件、action"
     for p in parts[cond_start:]:
@@ -9424,7 +9447,7 @@ def _try_ability_activation(text):
                     actions.append(result)
                 else:
                     pa = parse_action(p)
-                    if pa.get("action") != "custom":
+                    if _is_real_action(pa):
                         actions.append(pa)
             if len(actions) >= 2:
                 return {"text": text, "action": "sequential", "actions": actions}
@@ -9710,7 +9733,7 @@ def _try_unless_effect(text):
         if aa.get("card_type") == "energy_card" and aa.get("destination") in ("deck", "energy_deck"):
             aa["source"] = "energy_zone"
             aa["destination"] = "energy_deck"
-        if aa.get("action") != "custom":
+        if _is_real_action(aa):
             return make_conditional_on_optional(
                 text, fa, aa, negation=True
             )
@@ -10089,7 +10112,7 @@ def _try_heart_choice(text):
     if not options:
         return None
     result = {"text": text, "action": "choice", "options": options}
-    if cond and cond.get("type") != "custom":
+    if _is_real_condition(cond):
         result["condition"] = cond
     result["count"] = count
     if optional:
@@ -11780,7 +11803,7 @@ def _enrich_gain_abilities(effect):
         if "gained_effect" not in node:
             clean_gain = re.sub(r"【[^】]+】", "", node["ability_gain"]).strip()
             gained = parse_effect(clean_gain)
-            if gained and gained.get("action") and gained.get("action") != "custom":
+            if gained and gained.get("action") and _is_real_action(gained):
                 node["gained_effect"] = gained
 
 
@@ -12924,7 +12947,7 @@ def _merge_parenthetical(target, parenthetical):
                     }
                 else:
                     cond_parsed = parse_condition(note)
-                if cond_parsed and cond_parsed.get("type") != "custom":
+                if _is_real_condition(cond_parsed):
                     target["activation_condition_parsed"] = cond_parsed
             # Detect all mentioned positions
             positions = detect_note_positions(note)
