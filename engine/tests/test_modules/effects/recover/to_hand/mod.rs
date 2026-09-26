@@ -39,3 +39,4 @@ pub mod success_zone_revealed_members_pl_s_bp5_019_l_test;
 pub mod three_5yncri5e_live_pl_sp_bp7_019_n_test;
 pub mod tied_score_reveals_pl_hs_cl1_012_cl_test;
 pub mod total_energy_gated_live_recovery_test;
+pub mod unit_group_recovery_excludes_same_series_test;
