@@ -2336,6 +2336,34 @@ def _blade_icon_is_target_filter(text: str) -> bool:
     return bool(re.search(r"{{icon_blade\.png\|ブレード}}[^得]*持つ", gain_head))
 
 
+def _per_unit_effect(text, info):
+    """What the per-unit clause grants, and for how long.
+
+    A 「〜につき」 clause can introduce one of three things — a blade, a heart, or
+    a draw — and all three take the same duration, so the duration is read once
+    here instead of in each branch.
+    """
+    gains_blade = "ブレードを得る" in text or "選んだブレード" in text
+    gains_heart = bool(re.search(r"ハート.*得る", text)) or "選んだハート" in text
+    if gains_blade:
+        info["action"] = "gain_resource"
+        info["resource"] = "blade"
+        icon_count = text.count(BLADE_ICON)
+        if icon_count > 0:
+            info["count"] = icon_count
+            info["resource_icon_count"] = icon_count
+    elif gains_heart:
+        info["action"] = "gain_resource"
+        info["resource"] = "heart"
+    elif "引く" in text:
+        info["action"] = "draw_card"
+    else:
+        return False
+    if "ライブ終了時まで" in text:
+        info["duration"] = "live_end"
+    return True
+
+
 def _extract_per_unit_info_from_text(text):
     """Extract per-unit info from text. Returns (per_unit_info_dict or None, cleaned_text)."""
     per_unit_match = re.search(r"(.*?)につき", text)
@@ -2377,24 +2405,7 @@ def _extract_per_unit_info_from_text(text):
         info["negation"] = True
     elif "ブレードハートを持つ" in per_unit_text:
         info["card_property"] = "has_blade_heart"
-    if "ブレードを得る" in text or "選んだブレード" in text:
-        info["action"] = "gain_resource"
-        info["resource"] = "blade"
-        icon_count = text.count(BLADE_ICON)
-        if icon_count > 0:
-            info["count"] = icon_count
-            info["resource_icon_count"] = icon_count
-        if "ライブ終了時まで" in text:
-            info["duration"] = "live_end"
-    elif bool(re.search(r"ハート.*得る", text)) or "選んだハート" in text:
-        info["action"] = "gain_resource"
-        info["resource"] = "heart"
-        if "ライブ終了時まで" in text:
-            info["duration"] = "live_end"
-    elif "引く" in text:
-        info["action"] = "draw_card"
-        if "ライブ終了時まで" in text:
-            info["duration"] = "live_end"
+    _per_unit_effect(text, info)
     cleaned = text.replace(per_unit_match.group(0), "").strip()
     return info, cleaned
 
@@ -10931,10 +10942,40 @@ def _walk_propagate_all_and_targets(d, d_ctx):
                             sub["multiple_targets"] = True
 
 
+def _bind_condition_to_moved_count(cond, prev_count):
+    """Point a 「すべて/全部」 condition at the cards the previous step moved.
+
+    「すべて」 means ALL of them, so the comparison becomes exact: count = how
+    many moved, operator "=", source "preceding_moved". A card-count condition
+    that already carries a real number or a non-default operator is left alone —
+    the clause is then about something other than the moved set. A group
+    condition has no count of its own, so it converts into one.
+    """
+    if cond.get("type") == "card_count_condition":
+        if cond.get("count", 1) != 1 or cond.get("operator", ">=") != ">=":
+            return
+    elif cond.get("type") == "group_condition":
+        cond["type"] = "card_count_condition"
+    else:
+        return
+    cond["count"] = prev_count
+    cond["operator"] = "="
+    cond["source"] = "preceding_moved"
+
+
 def _walk_propagate_sequential_links(d):
-    # Propagate count/source from move_cards to subsequent conditions
-    # "すべて"/"全部": "If ALL moved cards match" → count=N, operator="="
-    # "それらの中に": "If any among moved cards match" → source="preceding_moved"
+    """Link a sequential's conditions to the step before them.
+
+    Two phrasings, two different conditions:
+      「すべて」/「全部」  "if ALL moved cards match" → exact count over the moved
+                          set, so a group condition converts into a count one
+      「それらの中に」/「これにより」  "if any among moved cards match" → source
+                          only, keeping the count the condition already had
+
+    Plus a trailing rule: a bare 「2枚ある場合」 with no filter of its own
+    inherits the fields of the preceding_moved condition, because it is talking
+    about the same cards.
+    """
     if d.get("action") == "sequential" and "actions" in d:
         acts = d["actions"]
         prev_cost_limit = None
@@ -10963,16 +11004,7 @@ def _walk_propagate_sequential_links(d):
             if (
                 "すべて" in cond_text or "全部" in cond_text
             ) and prev_count is not None:
-                if cond.get("type") == "card_count_condition":
-                    if cond.get("count", 1) == 1 and cond.get("operator", ">=") == ">=":
-                        cond["count"] = prev_count
-                        cond["operator"] = "="
-                        cond["source"] = "preceding_moved"
-                elif cond.get("type") == "group_condition":
-                    cond["type"] = "card_count_condition"
-                    cond["count"] = prev_count
-                    cond["operator"] = "="
-                    cond["source"] = "preceding_moved"
+                _bind_condition_to_moved_count(cond, prev_count)
             if (
                 "それらの中に" in cond_text or "これにより" in cond_text
             ) and prev_count is not None:
