@@ -3588,60 +3588,114 @@ impl<'a> ConditionContext<'a> {
         }
     }
 
+    /// The cards a PRECEDING sequential step moved.
+    ///
+    /// Prefers this entry's own `moved_cards`, then the entry-time snapshot,
+    /// then the global record. The fallback order matters for cross-player
+    /// watchers (「対戦相手のカードの効果でも発動する。」): the enqueuing player's
+    /// batch loop clears the global lists before the other seat's queue
+    /// resolves, so for those the snapshot is the only surviving evidence.
+    fn moved_card_pool(&self) -> SmallVec<[i16; 8]> {
+        if !self.moved_cards.is_empty() {
+            return self.moved_cards.iter().copied().collect();
+        }
+        let enqueued = self.game_state.entry_trigger_moved_cards();
+        let global = self.game_state.recently_moved_cards.clone();
+        match (&enqueued, &global) {
+            (Some(ev), None) if !ev.is_empty() => ev.iter().copied().collect(),
+            _ => global.map_or_else(SmallVec::new, |g| g.iter().copied().collect()),
+        }
+    }
+
+    /// The count for 「それがスコアN以上の『X』のライブカードの場合」 where 「それ」 is
+    /// what the preceding step moved or selected, not a zone.
+    ///
+    /// EVERY matching card must clear the threshold, so the count is the minimum
+    /// over the matches. No match at all yields 0, which fails the comparison —
+    /// "no card qualified" is not the same as "the threshold was met".
+    fn count_for_preceding_moved_score(&self, condition: &Condition) -> u8 {
+        let card_db = &self.game_state.card_database;
+        let pool = self.moved_card_pool();
+        let mut matched_min: Option<u8> = None;
+        for &id in &pool {
+            if id == -1 {
+                continue;
+            }
+            if let Some(ref groups) = condition.get_group_names() {
+                if !groups.is_empty()
+                    && !groups
+                        .iter()
+                        .any(|g| util::card_matches_group_str(card_db, id, Some(g)))
+                {
+                    continue;
+                }
+            }
+            if let Some(ref ct) = condition.get_card_type() {
+                if !util::card_matches_type(card_db, id, Some(ct)) {
+                    continue;
+                }
+            }
+            let s = card_db.get_card(id).and_then(|c| c.score).unwrap_or(0);
+            matched_min = Some(matched_min.map_or(s, |m: u8| m.min(s)));
+        }
+        log::debug!(
+            "[SCORE_PRECEDING_MOVED] pool={:?} min={:?}",
+            pool,
+            matched_min
+        );
+        matched_min.unwrap_or(0)
+    }
+
+    /// Hearts of one colour on the stage, restricted to a named slot.
+    ///
+    /// A named position counts only the card in that slot, and an EMPTY slot
+    /// counts 0 rather than falling through to the whole stage — "the centre
+    /// has no card" must not read as "the stage totals N". Anything else (no
+    /// position, or a name that is not a slot) counts every member, which is
+    /// what the printed clause 「ステージの」 means.
+    fn heart_count_at_or_all(
+        player: &crate::player::Player,
+        card_db: &crate::card::CardDatabase,
+        color: crate::card::HeartColor,
+        position: Option<&str>,
+    ) -> u8 {
+        let of = |cid: i16| {
+            card_db
+                .get_card(cid)
+                .and_then(|c| c.base_heart.as_ref())
+                .map(|bh| bh.hearts.get(&color).copied().unwrap_or(0))
+                .unwrap_or(0)
+        };
+        match position.and_then(util::stage_position_index) {
+            Some(idx) => {
+                let cid = player.stage.stage[idx];
+                if cid == -1 {
+                    0
+                } else {
+                    of(cid)
+                }
+            }
+            None => player
+                .stage
+                .stage
+                .iter()
+                .filter(|&&id| id != -1)
+                .map(|&id| of(id))
+                .sum(),
+        }
+    }
+
     pub(crate) fn get_count_for_condition(&self, condition: &Condition) -> u8 {
         let location = condition.get_location().unwrap_or("");
         let target = condition.get_target().unwrap_or("self");
         let comparison_type = condition.get_comparison_type();
         let resource_type = condition.get_resource_type();
         if comparison_type == Some("score") {
-            // "それがスコア6以上の『Aqours』のライブカードの場合" — 「それ」
-            // refers to the card(s) moved/selected by the PRECEDING sequential
-            // step, not to any zone. Every referenced card matching the group/
-            // type filters must satisfy the score threshold (min over the set;
-            // no match at all → fail).
             if condition.get_location().is_none()
                 && (condition.get_source() == Some("preceding_moved")
                     || condition.get_source() == Some("previous_moved_cards"))
             {
-                let card_db = &self.game_state.card_database;
-                let pool: SmallVec<[i16; 8]> = if self.moved_cards.is_empty() {
-                    let enqueued = self.game_state.entry_trigger_moved_cards();
-                    let global = self.game_state.recently_moved_cards.clone();
-                    match (&enqueued, &global) {
-                        (Some(ev), None) if !ev.is_empty() => ev.iter().copied().collect(),
-                        _ => global.map_or_else(SmallVec::new, |g| g.iter().copied().collect()),
-                    }
-                } else {
-                    self.moved_cards.iter().copied().collect()
-                };
-                let mut matched_min: Option<u8> = None;
-                for &id in &pool {
-                    if id == -1 {
-                        continue;
-                    }
-                    if let Some(ref groups) = condition.get_group_names() {
-                        if !groups.is_empty()
-                            && !groups
-                                .iter()
-                                .any(|g| util::card_matches_group_str(card_db, id, Some(g)))
-                        {
-                            continue;
-                        }
-                    }
-                    if let Some(ref ct) = condition.get_card_type() {
-                        if !util::card_matches_type(card_db, id, Some(ct)) {
-                            continue;
-                        }
-                    }
-                    let s = card_db.get_card(id).and_then(|c| c.score).unwrap_or(0);
-                    matched_min = Some(matched_min.map_or(s, |m: u8| m.min(s)));
-                }
-                log::debug!(
-                    "[SCORE_PRECEDING_MOVED] pool={:?} min={:?}",
-                    pool,
-                    matched_min
-                );
-                return matched_min.unwrap_or(0);
+                return self.count_for_preceding_moved_score(condition);
             }
             return self.get_count_for_target(condition, target);
         }
@@ -3760,44 +3814,8 @@ impl<'a> ConditionContext<'a> {
                 let color = crate::card::parse_heart_color(&clean);
                 let player = self.resolve_condition_player(target);
                 let card_db = &self.game_state.card_database;
-                let sum_all = || -> u8 {
-                    player
-                        .stage
-                        .stage
-                        .iter()
-                        .filter(|&&id| id != -1)
-                        .map(|&id| {
-                            card_db
-                                .get_card(id)
-                                .and_then(|c| c.base_heart.as_ref())
-                                .map(|bh| bh.hearts.get(&color).copied().unwrap_or(0))
-                                .unwrap_or(0)
-                        })
-                        .sum()
-                };
-                let count = if let Some(ref pos) = condition.get_position() {
-                    if let Some(p) = pos.get_position() {
-                        if let Some(idx) = util::stage_position_index(p) {
-                            let cid = player.stage.stage[idx];
-                            if cid != -1 {
-                                card_db
-                                    .get_card(cid)
-                                    .and_then(|c| c.base_heart.as_ref())
-                                    .map(|bh| bh.hearts.get(&color).copied().unwrap_or(0))
-                                    .unwrap_or(0)
-                            } else {
-                                0
-                            }
-                        } else {
-                            sum_all()
-                        }
-                    } else {
-                        sum_all()
-                    }
-                } else {
-                    sum_all()
-                };
-                return count;
+                let position = condition.get_position().and_then(|p| p.get_position());
+                return Self::heart_count_at_or_all(player, card_db, color, position);
             }
         }
         if resource_type == Some("surplus_heart") {
