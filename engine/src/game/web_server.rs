@@ -18,7 +18,7 @@ use std::sync::{Arc, Mutex, RwLock};
 use std::time::{SystemTime, UNIX_EPOCH};
 use uuid::Uuid;
 
-use crate::card::CardDatabase;
+use crate::card::{Card, CardDatabase};
 use crate::card_loader;
 use crate::deck_builder;
 use crate::deck_parser;
@@ -2017,6 +2017,32 @@ async fn debug_dump_frames(data: web::Data<AppState>) -> impl Responder {
     }))
 }
 
+/// Every condition one card's abilities carry, as
+/// (ability_index, field_name, condition).
+///
+/// A condition can sit in three places on an effect — directly on it, or on
+/// the compound as an alternative or a result — and this endpoint reports all
+/// three by name, so the three are the vocabulary here rather than three
+/// ad-hoc pushes at the call site.
+fn conditions_on_card(card: &Card) -> Vec<(usize, &'static str, Box<crate::card::Condition>)> {
+    let mut found = Vec::new();
+    for (ability_idx, ar) in card.abilities.iter().enumerate() {
+        let Some(effect) = ar.resolve().effect else {
+            continue;
+        };
+        if let Some(c) = effect.condition {
+            found.push((ability_idx, "condition", c));
+        }
+        if let Some(c) = effect.compound.alternative_condition {
+            found.push((ability_idx, "alternative_condition", c));
+        }
+        if let Some(c) = effect.compound.result_condition {
+            found.push((ability_idx, "result_condition", c));
+        }
+    }
+    found
+}
+
 async fn debug_conditions(data: web::Data<AppState>) -> impl Responder {
     let game_state = lock_state!(data.game_state, read);
     let mut results = Vec::new();
@@ -2041,36 +2067,19 @@ async fn debug_conditions(data: web::Data<AppState>) -> impl Responder {
                 if card_id < 0 {
                     continue;
                 }
-
-                if let Some(card) = card_db.get_card(card_id) {
-                    for (ability_idx, ar) in card.abilities.iter().enumerate() {
-                        let ability = ar.resolve();
-                        if let Some(ref effect) = ability.effect {
-                            let condition_fields: [(&str, &Option<Box<crate::card::Condition>>);
-                                3] = [
-                                ("condition", &effect.condition),
-                                (
-                                    "alternative_condition",
-                                    &effect.compound.alternative_condition,
-                                ),
-                                ("result_condition", &effect.compound.result_condition),
-                            ];
-
-                            for &(field_name, condition_opt) in &condition_fields {
-                                if let Some(ref condition) = condition_opt {
-                                    results.push((
-                                        player_idx,
-                                        zone_name,
-                                        card_id,
-                                        card.name.to_string(),
-                                        ability_idx,
-                                        field_name,
-                                        condition.clone(),
-                                    ));
-                                }
-                            }
-                        }
-                    }
+                let Some(card) = card_db.get_card(card_id) else {
+                    continue;
+                };
+                for (ability_idx, field_name, condition) in conditions_on_card(card) {
+                    results.push((
+                        player_idx,
+                        zone_name,
+                        card_id,
+                        card.name.to_string(),
+                        ability_idx,
+                        field_name,
+                        condition,
+                    ));
                 }
             }
         }
