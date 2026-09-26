@@ -437,8 +437,11 @@ static void test_genki_zenkai_invalidates_own_live_success(void)
     test_recalc(&tg);
 
     const int stage_ids[3] = { chika, ruby, yoshiko };
-    CHECK_EQ(heart02_total(&tg, stage_ids, 3), 6,
-             "setup: the three 『Aqours』 members hold exactly 6 heart02");
+    /* The three 『Aqours』 members print heart02 x3 each in the current card
+     * data (9 total), comfortably over the 合計6 threshold the printed text
+     * requires. Pin the real number so a data drift is visible. */
+    CHECK_EQ(heart02_total(&tg, stage_ids, 3), 9,
+             "setup: the three 『Aqours』 members hold 9 heart02, over the 合計6 threshold");
 
     test_add_to_live(&tg, genki);
     CHECK(fire_trigger(&tg, genki, "ライブ開始時", RB_TSTR_LIVE_START),
@@ -457,19 +460,20 @@ static void test_genki_zenkai_below_threshold_keeps_live_success(void)
     TestGame tg;
     test_game_new(&tg);
     int genki = test_id(&tg, "PL!S-pb1-019-L");
-    int chika = test_id(&tg, "PL!S-sd1-010-SD");
-    int ruby = test_id(&tg, "PL!S-pb1-018-N");
+    int chika = test_id(&tg, "PL!S-sd1-010-SD");   /* 『Aqours』, heart02 x3 */
+    int riko = test_id(&tg, "PL!S-bp2-011-N");     /* 『Aqours』, heart02 x1 */
+    int dia = test_id(&tg, "PL!S-bp2-013-N");      /* 『Aqours』, heart02 x1 */
     int filler = test_id(&tg, "PL!-sd1-010-SD");
 
     test_add_to_stage(&tg, 0, chika);
-    test_add_to_stage(&tg, 1, ruby);
-    test_add_to_stage(&tg, 2, filler);       /* not 『Aqours』 — not counted */
+    test_add_to_stage(&tg, 1, riko);
+    test_add_to_stage(&tg, 2, dia);
     fill_decks(&tg, filler, 30);
     test_recalc(&tg);
 
-    const int stage_ids[2] = { chika, ruby };
-    CHECK_EQ(heart02_total(&tg, stage_ids, 2), 4,
-             "setup: the 『Aqours』 heart02 total stays below the threshold");
+    const int stage_ids[3] = { chika, riko, dia };
+    CHECK_EQ(heart02_total(&tg, stage_ids, 3), 5,
+             "setup: the 『Aqours』 heart02 total stays one short of the threshold");
 
     test_add_to_live(&tg, genki);
     CHECK(fire_trigger(&tg, genki, "ライブ開始時", RB_TSTR_LIVE_START),
@@ -482,14 +486,14 @@ static void test_genki_zenkai_below_threshold_keeps_live_success(void)
 
 static void test_genki_zenkai_threshold_counts_total_not_members(void)
 {
-    /* heart02 modifiers rather than a third member: the gate must count the
-     * heart total, not the number of qualifying members. */
+    /* Only TWO 『Aqours』 members, dialled with heart modifiers: the gate must
+     * count the heart total, not the number of qualifying members. */
     int color = HEART02;
     TestGame six;
     test_game_new(&six);
     int g6 = test_id(&six, "PL!S-pb1-019-L");
-    int c6 = test_id(&six, "PL!S-sd1-010-SD");
-    int r6 = test_id(&six, "PL!S-pb1-018-N");
+    int c6 = test_id(&six, "PL!S-sd1-010-SD");  /* heart02 x3 */
+    int r6 = test_id(&six, "PL!S-bp2-011-N");    /* heart02 x1 */
     int f6 = test_id(&six, "PL!-sd1-010-SD");
     test_add_to_stage(&six, 0, c6);
     test_add_to_stage(&six, 1, r6);
@@ -512,7 +516,7 @@ static void test_genki_zenkai_threshold_counts_total_not_members(void)
     test_game_new(&five);
     int g5 = test_id(&five, "PL!S-pb1-019-L");
     int c5 = test_id(&five, "PL!S-sd1-010-SD");
-    int r5 = test_id(&five, "PL!S-pb1-018-N");
+    int r5 = test_id(&five, "PL!S-bp2-011-N");
     int f5 = test_id(&five, "PL!-sd1-010-SD");
     test_add_to_stage(&five, 0, c5);
     test_add_to_stage(&five, 1, r5);

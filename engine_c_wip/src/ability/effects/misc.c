@@ -351,20 +351,22 @@ static void resolve_gain_resource_targets(GameState *g, int who,
             out->blade[out->n_blade++]=cand[i];
     }
 
-    /* heart color */
-    if(g->yell_occurred)
-        fprintf(stderr,"DBGX2 sel_heart_color=%d raw=%s parsed=%d\n",
-                g->queue.selected_heart_color,
-                eff_extra(e,"heart_color")?eff_extra(e,"heart_color"):"-",
-                eff_extra(e,"heart_color")?(int)rb_parse_heart_color(eff_extra(e,"heart_color")):-99);
-    if(g->queue.selected_heart_color >= 0)
-        out->heart_color = g->queue.selected_heart_color;
-    else {
-        /* Rust resolve_gain_resource_targets (misc.rs:1811-1814) resolves the
-           color as single_fixed_heart (the answer to a preceding heart-color
-           choice) -> effect.heart_color -> first entry of effect.heart_colors.
-           The last rung was missing, so an effect carrying only a
-           multi-element `heart_colors` array fell through to the wildcard. */
+    /* heart color — Rust resolve_gain_resource_targets (misc.rs:1811-1814):
+         heart_color_inner = single_fixed_heart
+             .or(effect.heart_color_any())
+             .or(effect.heart_colors_any().first())
+       where `single_fixed_heart` is the answer to a preceding heart-color
+       choice. The C port parks that answer in `queue.selected_heart_color`,
+       whose "unset" sentinel is -1 — but a caller that memsets the state
+       without running rb_queue_init() leaves it at 0, and 0 is a legal color
+       (Heart00 / colorless), so `>= 0` alone cannot mean "a choice answered".
+       Testing it first therefore turned EVERY fixed-colour heart grant into a
+       wildcard grant. Resolve what the effect itself declares, and fall back to
+       the queued answer only for effects that declare no colour of their own —
+       which is exactly the shape a heart-colour choice feeds. When nothing is
+       declared at all, `queue.selected_heart_color` keeps Rust's unspecified
+       default (misc.rs:927 parses HEART_ALL_KEY = "heart00" = index 0). */
+    {
         const char *hc = eff_extra(e,"heart_color");
         if(hc){
             out->heart_color = (int)rb_parse_heart_color(hc);
@@ -372,6 +374,8 @@ static void resolve_gain_resource_targets(GameState *g, int who,
             int first[8];
             if(split_heart_colors(eff_extra(e,"heart_colors"), first, 8) > 0)
                 out->heart_color = first[0];
+            else if(g->queue.selected_heart_color >= 0)
+                out->heart_color = g->queue.selected_heart_color;
         }
     }
 
@@ -616,13 +620,6 @@ static int h_gain_resource(GameState *g, int actor, const AbilityEffect *e){
         return 1;
     }
 
-    if(g->yell_occurred){
-        fprintf(stderr,"DBGX res=%s count=%d target=%s self_target_field=%s n_extra=%d\n",
-                res?res:"-", e->count, e->target?e->target:"-",
-                e->self_target_field[0]?e->self_target_field:"-", e->n_extra);
-        for(int i=0;i<e->n_extra;i++)
-            fprintf(stderr,"DBGX extra[%d] %s = %s\n",i,e->extra_k[i],e->extra_v[i]);
-    }
     int kind = resource_kind(res);
     int who  = misc_target_player(actor,e);
     RbPlayer *P=&g->p[who];
@@ -662,9 +659,6 @@ static int h_gain_resource(GameState *g, int actor, const AbilityEffect *e){
               || (!e->source && is_member_ct && player_target && !is_self_target
                   && !eff_extra(e,"exclude_self") && tc<0)
               || (is_member_ct && player_target && tc<0 && !distinct);
-    fprintf(stderr, "DEBUG [GAIN_RESOURCE] kind=%d is_all=%d per_unit=%d tc=%d distinct=%d group=%s ctype=%s who=%d actor=%d\n",
-        kind, is_all, per_unit, tc, distinct, eff_extra(e,"group_names")?eff_extra(e,"group_names"):"none",
-        ctype?ctype:"none", who, actor);
 
     if(try_create_target_selection_choice(g,actor,e,kind,who,is_self_target,
                                           per_unit,exclude_self_id))
@@ -674,10 +668,6 @@ static int h_gain_resource(GameState *g, int actor, const AbilityEffect *e){
     resolve_gain_resource_targets(g,who,e,kind,count,per_unit,per_unit_type,
                                   is_all,is_self_target,exclude_self_id,
                                   activating,&t);
-    if(g->yell_occurred){
-        fprintf(stderr,"DBGX activating=%d n_heart=%d heart[0]=%d final=%d hcolor=%d\n",
-                activating,t.n_heart,t.n_heart>0?t.heart[0]:-1,t.final_count,t.heart_color);
-    }
 
     /* Store picked ids when target_count/distinct is set. */
     if(tc>=0 || distinct){
@@ -993,12 +983,25 @@ static int h_custom(GameState *g, int actor, const AbilityEffect *e){
     (void)actor;
     if(eff_extra(e,"placement_order") &&
        !strcmp(eff_extra(e,"placement_order"),"any_order")){
+        /* Rust custom.rs:24-33 clones the WHOLE effect
+           (`let mut routed = effect.clone()`) and only then rewrites
+           action/source/destination. Building a near-empty struct here lost
+           `count` (and the selection filters), so the routed move_cards ran
+           with count=0 and moved nothing. Carry the fields the routed
+           move_cards actually reads; the extras array is shared exactly as
+           the previous hand-copy shared it. */
         AbilityEffect routed;
         memset(&routed,0,sizeof routed);
         routed.action = "move_cards";
         routed.source      = e->source      ? e->source      : (char *)"looked_at";
         routed.destination = e->destination ? e->destination : (char *)"deck_top";
-        routed.is_optional = e->is_optional;
+        routed.count         = e->count;
+        routed.target        = e->target;
+        routed.is_optional   = e->is_optional;
+        routed.distinct_flag = e->distinct_flag;
+        routed.per_unit      = e->per_unit;
+        memcpy(routed.card_type_field, e->card_type_field, sizeof routed.card_type_field);
+        memcpy(routed.self_target_field, e->self_target_field, sizeof routed.self_target_field);
         for(int i=0;i<e->n_extra && i<RB_MAX_EXTRA;i++){
             routed.extra_k[i]=e->extra_k[i];
             routed.extra_v[i]=e->extra_v[i];

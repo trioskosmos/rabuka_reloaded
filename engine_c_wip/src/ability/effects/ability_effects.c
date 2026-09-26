@@ -14,6 +14,20 @@ static const char *effect_extra(const AbilityEffect *effect, const char *key)
     return NULL;
 }
 
+/* `self_target` reaches the effect through ONE of two decoder routes: the
+   string-tagged wire key is copied into `self_target_field` (vm.c), while the
+   bool-tagged wire key falls through to the generic extras table as the string
+   "true". Rust's `AbilityEffect::is_self_target` sees both, so read both —
+   mirroring score.c, which already accepts either form. */
+static int effect_is_self_target(const AbilityEffect *effect)
+{
+    if (!effect) return 0;
+    if (effect->self_target_field[0] && !strcmp(effect->self_target_field, "true"))
+        return 1;
+    const char *v = effect_extra(effect, "self_target");
+    return v && (!strcmp(v, "true") || !strcmp(v, "1"));
+}
+
 static void translated_log(GameState *g, int actor, const char *text)
 {
     if (!g) return;
@@ -27,6 +41,7 @@ int rb_translated_execute_gain_ability_effect(GameState *g, int actor,
 {
     if (!g || !effect) return 0;
     if (effect->source && strcmp(effect->source, "stage") == 0 &&
+        effect->card_type_field[0] && !strcmp(effect->card_type_field, "member_card") &&
         g->n_selected_cards == 0) {
         const char *group = effect_extra(effect, "group_names");
         if (group && *group) {
@@ -146,6 +161,10 @@ int rb_translated_execute_activate_ability(GameState *g, int actor,
     }
     int selected[RB_MAX_RECENTLY_MOVED];
     int selected_count = 0;
+    /* Rust (ability_effects.rs:153-165): only "previous_selected" fans out over
+     * the selected cards and only "cost_card" contributes a single card; any
+     * other source_card contributes NONE (the `_ => None` arm), so the trigger
+     * branch below is entered with an empty card list and fires nothing. */
     if (source_card && !strcmp(source_card, "previous_selected")) {
         selected_count = g->n_selected_cards;
         if (selected_count > RB_MAX_RECENTLY_MOVED)
@@ -154,9 +173,6 @@ int rb_translated_execute_activate_ability(GameState *g, int actor,
     } else if (source_card && !strcmp(source_card, "cost_card") &&
                g->n_recently_moved > 0) {
         selected[0] = g->recently_moved[g->n_recently_moved - 1];
-        selected_count = 1;
-    } else if (host_cid >= 0) {
-        selected[0] = host_cid;
         selected_count = 1;
     }
 
@@ -175,8 +191,12 @@ int rb_translated_execute_invalidate_ability(GameState *g, int actor,
     if (!g || !effect) return 0;
     const char *trigger = effect_extra(effect, "target_trigger");
     if (!trigger || !*trigger) return 0;
+    /* Rust (ability_effects.rs:242-251) runs the duration code through
+     * util::parse_duration and REFUSES an unsupported one; an absent duration
+     * code means Duration::Permanent. */
     const char *duration = effect_extra(effect, "duration");
-    if (!duration) duration = "permanent";
+    if (duration && *duration && !rb_parse_duration(duration)) return 0;
+    if (!duration || !*duration) duration = "permanent";
     const char *target = effect->target ? effect->target : "self";
     int target_player = rb_resolve_target_player(g, target);
     if (target_player < 0 || target_player > 1) target_player = actor;
@@ -185,7 +205,7 @@ int rb_translated_execute_invalidate_ability(GameState *g, int actor,
                             : effect_extra(effect, "card_type");
     const char *group = effect_extra(effect, "group_names");
 
-    if (effect->self_target_field[0] && !strcmp(effect->self_target_field, "true")) {
+    if (effect_is_self_target(effect)) {
         int card_id = g->activating_card;
         return rb_try_add_ability_invalidation(g, card_id, trigger, duration);
     }

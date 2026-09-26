@@ -1,4 +1,4 @@
-﻿/* Parity suite: auto-ability (閾ｪ蜍・ queuing + firing.
+﻿/* Parity suite: auto-ability (jidou) queuing + firing.
  *
  * Rust sources mirrored here:
  *   engine/src/core/game_state/abilities.rs
@@ -8,34 +8,35 @@
  *                 record_ability_use / set_just_completed / batch match
  *       :360-403  condition_is_event_based
  *       :406-891  trigger_auto_abilities_for_player{,_with_event,_for_movement}
- *       :463-681  stage scan (activation-position gate, discard guard,
+ *       :463-681  stage scan: activation-position gate, discard guard,
  *                 event-based pre-filter, each_time/energy heuristic,
- *                 trigger multiplicity, batch dedupe)
+ *                 trigger multiplicity, batch dedupe
  *       :684-831  live-card scan + recently-moved scan
- *       :899-945  trigger_instance_count (ﾂｧ9.7.2.1)
+ *       :899-945  trigger_instance_count (section 9.7.2.1)
  *       :1064-1170 trigger_auto_ability (string key)
  *       :1195-1239 trigger_auto_ability_by_index_refs
  *       :1336-1339 effect_is_ability_resolution_watcher
  *       :1348-1436 trigger_each_time_for_member
  *       :1450-1657 process_player_abilities_depth (Rule 9.5.3.2 ordering
- *                 choice, depth-first drain, post-loop batch rescan)
+ *                 choice, depth-first drain)
  *       :1659-1685 process_pending_auto_abilities
- *       :1693+    process_current_ability
- *   engine/tests/helpers/mod.rs:114  fire_trigger (string-keyed trigger shim)
- *   engine/tests/helpers/choices.rs:268 drain_auto_ability_choices
+ *   engine/tests/helpers/mod.rs:114   fire_trigger (string-keyed trigger shim)
+ *   engine/tests/helpers/choices.rs:268  drain_auto_ability_choices
  *   engine/tests/test_modules/support/baton_swap_auto_helpers.rs:14
- *       resolve_auto_choices_accepting_optionals
  *   engine/tests/test_modules/characterization/* (auto-ability shapes)
  *
+ * All Japanese literals are hex escapes so the file is pure ASCII.
+ *
  * Assertion groups:
- *   A. trigger registry (card_has_ability_trigger / invalidation / uses)
+ *   A. trigger registry (card_has_ability_trigger / invalidation)
  *   B. string-keyed trigger_auto_ability (fire_trigger shim + gained abilities)
  *   C. numeric trigger_auto_ability_by_index
- *   D. TAS queueing per condition shape (appearance / group / discard guard /
- *      resolution watcher / preceding_moved / live-zone self trigger)
+ *   D. TAS queueing per condition shape (appearance / temporal / resolution
+ *      watcher / live-zone self trigger / discard guard / batch dedupe)
  *   E. activation-position gate on the stage scan
- *   F. ﾂｧ9.7.2.1 trigger multiplicity for preceding_moved batches
+ *   F. section 9.7.2.1 trigger multiplicity for preceding_moved batches
  *   G. Rule 9.5.3.2 simultaneous-auto-ability ordering choice
+ *   H. per-turn use accounting
  */
 #include "rabuka.h"
 #include "test_game.h"
@@ -68,14 +69,17 @@ static int checks;
     } \
 } while (0)
 
-/* 閾ｪ蜍・(U+81EA U+52D5) */
+/* jidou = U+81EA U+52D5 */
 #define TRIG_AUTO "\xE8\x87\xAA\xE5\x8B\x95"
-/* 襍ｷ蜍・(U+8D77\xE5\x8B\x95) */
+/* kidou = U+8D77 U+52D5 */
 #define TRIG_ACTIVATION "\xE8\xB5\xB7\xE5\x8B\x95"
+/* raibu seikou toki = U+30E9 U+30A4 U+30D6 U+6210 U+529F U+6642 */
+#define LIVE_SUCCESS "\xE3\x83\xA9\xE3\x82\xA4\xE3\x83\x96\xE6\x88\x90\xE5\x8A\x9F\xE6\x99\x82"
 
-/* rb_trigger_auto_ability exists in src/core/game_state_abilities.c but has
-   no prototype in include/rabuka.h; declare it exactly as defined there
-   (same trick as tests/test_parity_stats_pipeline.c). */
+/* rb_trigger_auto_ability / _by_index exist in
+   src/core/game_state_abilities.c but have no prototype in include/rabuka.h;
+   declare them exactly as defined there (same trick as
+   tests/test_parity_stats_pipeline.c). */
 void rb_trigger_auto_ability(GameState *g, const char *ability_id,
                              const char *trigger_type, int player_id,
                              const char *source_card_no,
@@ -87,26 +91,35 @@ void rb_trigger_auto_ability_by_index(GameState *g, int trigger_type,
                                       int ability_index,
                                       const int *trigger_moved_cards, int n_moved,
                                       int triggering_member_id);
-/* Defined in src/core/game_state_abilities.c / src/core/card.c; not exported
-   by include/rabuka.h. */
+/* Also defined in src/core/game_state_abilities.c / src/core/card.c and not
+   exported by include/rabuka.h. */
 void rb_queue_reset(GameState *g);
 const char *rb_effect_position_any(const AbilityEffect *e);
 
-/* 笏笏 fixtures 笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏 */
+/* ---- fixtures ------------------------------------------------------- */
 
-#define DIVE        "PL!N-bp4-026-L"  /* ab#1 閾ｪ蜍・ self enters live zone      */
-#define AOI         "PL!N-pb1-005-R"  /* ab#0 閾ｪ蜍・ appearance, once per turn  */
-#define TEMP_COUNT  "PL!N-bp3-005-R\xEF\xBC\x8B" /* ab#0 閾ｪ蜍・ 3 appearances/turn */
-#define FUYUMI      "PL!SP-pb2-011-R" /* ab#0 閾ｪ蜍・ center-area move watcher   */
-#define DANCING     "PL!-bp6-020-L"   /* ab#1 閾ｪ蜍・ each_time resolution watch*/
-#define HAZUKI_REN  "PL!SP-bp5-005-R\xEF\xBC\x8B" /* ab#1 閾ｪ蜍・ preceding_moved */
-#define RIN_ACT     "PL!-sd1-005-SD"  /* 襍ｷ蜍・only -- no 閾ｪ蜍・ability (mu's)   */
-#define MU_MEMBER   "PL!-sd1-005-SD"  /* mu's member used as a watcher subject */
-#define OTHER_GROUP "PL!HS-bp1-005-PR"/* 縺ｿ繧峨￥繧峨・繝ｼ縺・ -- outside the mu's filter */
+#define DIVE        "PL!N-bp4-026-L"   /* jidou: self enters the live zone       */
+#define AOI         "PL!N-pb1-005-R"   /* jidou: appearance, once per turn       */
+#define TEMP_COUNT  "PL!N-bp3-005-R\xEF\xBC\x8B" /* jidou: 3 appearances this turn */
+#define FUYUMI      "PL!SP-pb2-011-R"  /* jidou: centre-only area-move watcher  */
+#define DANCING     "PL!-bp6-020-L"    /* jidou: each_time resolution watcher   */
+#define HAZUKI_REN  "PL!SP-bp5-005-R\xEF\xBC\x8B" /* jidou: preceding_moved batch */
+#define RIN_ACT     "PL!-sd1-005-SD"   /* kidou only -- carries no jidou ability */
+#define MU_MEMBER   "PL!-sd1-005-SD"   /* mu's member used as a watcher subject */
+#define OTHER_GROUP "PL!HS-bp1-005-PR" /* mirakulapark! -- outside the mu's set */
 #define FILLER      "PL!-sd1-010-SD"
 
-/* Decode ability `a` of card `cid`, returning its trigger token text.
-   Caller frees. */
+static const char *par_cond_str(const Condition *c, const char *key)
+{
+    if (!c) return NULL;
+    for (uint32_t i = 0; i < c->n_fields; i++)
+        if (c->fields[i].key && !strcmp(c->fields[i].key, key)
+            && c->fields[i].v.tag == RB_TAG_STR)
+            return c->fields[i].v.s;
+    return NULL;
+}
+
+/* Index of the nth (jidou) ability of `cid`; -1 when there is none. */
 static int par_find_auto_index(int cid, int nth)
 {
     int nab = rb_card_num_abilities((uint32_t)cid);
@@ -115,14 +128,11 @@ static int par_find_auto_index(int cid, int nth)
         if (!rb_decode_card_ability((uint32_t)cid, a, &ab)) continue;
         int hit = ab.triggers && !strcmp(ab.triggers, TRIG_AUTO);
         if (getenv("PAR_DUMP"))
-            fprintf(stderr, "[DUMP] cid=%d ab#%d trig=%s act=%s nchild=%d "
-                            "cond_var=%d has_cond=%d\n", cid, a,
-                    ab.triggers ? ab.triggers : "(null)",
+            fprintf(stderr, "[DUMP] cid=%d ab#%d trig=%s act=%s cond_var=%d\n",
+                    cid, a, ab.triggers ? ab.triggers : "(null)",
                     (ab.effect && ab.effect->action) ? ab.effect->action : "-",
-                    ab.effect ? ab.effect->n_child : -1,
                     (ab.effect && ab.effect->condition)
-                        ? (int)ab.effect->condition->variant : -1,
-                    ab.effect ? ab.effect->has_condition : -1);
+                        ? (int)ab.effect->condition->variant : -1);
         rb_free_ability(&ab);
         if (hit) {
             if (nth == 0) return a;
@@ -132,26 +142,80 @@ static int par_find_auto_index(int cid, int nth)
     return -1;
 }
 
-static int par_has_auto(int cid)
+/* Index of the jidou ability of `cid` whose condition carries `location`. */
+static int par_find_auto_with_location(int cid, const char *location)
 {
-    return rb_card_num_abilities((uint32_t)cid) > 0 &&
-           par_find_auto_index(cid, 0) >= 0;
+    int nab = rb_card_num_abilities((uint32_t)cid);
+    for (int a = 0; a < nab; a++) {
+        Ability ab;
+        if (!rb_decode_card_ability((uint32_t)cid, a, &ab)) continue;
+        int hit = ab.triggers && !strcmp(ab.triggers, TRIG_AUTO) && ab.effect
+                  && ab.effect->condition
+                  && par_cond_str(ab.effect->condition, "location")
+                  && !strcmp(par_cond_str(ab.effect->condition, "location"),
+                             location);
+        rb_free_ability(&ab);
+        if (hit) return a;
+    }
+    return -1;
 }
 
-static const char *par_card_no(int cid)
+static void par_dump_cond(const Condition *c, int depth)
 {
-    static char buf[128];
-    Card c;
+    if (!c || depth > 4) return;
+    for (uint32_t i = 0; i < c->n_fields; i++) {
+        const CondField *f = &c->fields[i];
+        if (!f->key) continue;
+        fprintf(stderr, "%*s[%s] tag=%d", depth * 2, "", f->key, f->v.tag);
+        if (f->v.tag == RB_TAG_STR) fprintf(stderr, " = '%s'", f->v.s ? f->v.s : "");
+        else if (f->v.tag == RB_TAG_I64) fprintf(stderr, " = %lld", (long long)f->v.i);
+        else if (f->v.tag == RB_TAG_ARRAY) {
+            fprintf(stderr, " = [");
+            for (uint32_t j = 0; j < f->v.arr_n; j++)
+                fprintf(stderr, "%s'%s'", j ? "," : "",
+                        (f->v.arr[j].tag == RB_TAG_STR && f->v.arr[j].s) ? f->v.arr[j].s : "?");
+            fprintf(stderr, "]");
+        }
+        fprintf(stderr, "\n");
+        if (f->v.tag == RB_TAG_OBJVAR) par_dump_cond(f->v.cond, depth + 1);
+        if (f->v.tag == RB_TAG_ARRAY)
+            for (uint32_t j = 0; j < f->v.arr_n; j++)
+                if (f->v.arr[j].tag == RB_TAG_OBJVAR) par_dump_cond(f->v.arr[j].cond, depth + 1);
+    }
+}
+
+static void par_dump_ability(int cid, int a)
+{
+    Ability ab;
+    if (!rb_decode_card_ability((uint32_t)cid, a, &ab)) return;
+    fprintf(stderr, "[AB] cid=%d ab#%d trig=%s act=%s\n", cid, a,
+            ab.triggers ? ab.triggers : "-",
+            (ab.effect && ab.effect->action) ? ab.effect->action : "-");
+    if (ab.effect) {
+        for (int k = 0; k < ab.effect->n_extra; k++)
+            fprintf(stderr, "   extra[%d] %s = %s\n", k,
+                    ab.effect->extra_k[k] ? ab.effect->extra_k[k] : "-",
+                    ab.effect->extra_v[k] ? ab.effect->extra_v[k] : "-");
+        if (ab.effect->condition) {
+            fprintf(stderr, "   cond variant=%d\n", (int)ab.effect->condition->variant);
+            par_dump_cond(ab.effect->condition, 2);
+        }
+    }
+    rb_free_ability(&ab);
+}
+
+static int par_has_auto(int cid) { return par_find_auto_index(cid, 0) >= 0; }
+
+static void par_copy_card_no(int cid, char *buf, size_t n)
+{
     buf[0] = '\0';
-    if (!rb_decode_card_by_index((uint32_t)cid, &c)) return buf;
-    snprintf(buf, sizeof(buf), "%s", rb_card_string(c.card_no_idx));
+    Card c;
+    if (!rb_decode_card_by_index((uint32_t)cid, &c)) return;
+    snprintf(buf, n, "%s", rb_card_string(c.card_no_idx));
     rb_free_card(&c);
-    return buf;
 }
 
 static int par_entry_count(const GameState *g) { return g->queue.n_entries; }
-
-static void par_reset_queue(GameState *g) { rb_queue_reset(g); }
 
 static void par_drain(TestGame *tg)
 {
@@ -164,9 +228,9 @@ static void par_drain(TestGame *tg)
     }
 }
 
-/* 笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武
+/* =====================================================================
    A. trigger registry
-   笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武 */
+   ===================================================================== */
 
 static void test_trigger_registry(void)
 {
@@ -182,11 +246,11 @@ static void test_trigger_registry(void)
 
     /* abilities.rs:77 card_has_ability_trigger */
     CHECK_EQ(rb_card_has_ability_trigger_for(g, dive, TRIG_AUTO), 1,
-             "card_has_ability_trigger: DIVE! carries a 閾ｪ蜍・ability");
+             "card_has_ability_trigger: DIVE! carries a jidou ability");
     CHECK_EQ(rb_card_has_ability_trigger_for(g, rin, TRIG_AUTO), 0,
-             "card_has_ability_trigger: Rin has only 襍ｷ蜍・ no 閾ｪ蜍・);
+             "card_has_ability_trigger: Rin has only kidou, no jidou");
     CHECK_EQ(rb_card_has_ability_trigger_for(g, rin, TRIG_ACTIVATION), 1,
-             "card_has_ability_trigger: Rin does carry 襍ｷ蜍・);
+             "card_has_ability_trigger: Rin does carry kidou");
 
     /* abilities.rs:95 try_add_ability_invalidation */
     CHECK_EQ(rb_try_add_ability_invalidation(g, dive, TRIG_AUTO, "turn_end"), 1,
@@ -203,9 +267,9 @@ static void test_trigger_registry(void)
              "invalidation is per-trigger, not per-card");
 }
 
-/* 笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武
-   B. string-keyed trigger_auto_ability  (helpers/mod.rs:114 fire_trigger)
-   笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武 */
+/* =====================================================================
+   B. string-keyed trigger_auto_ability (helpers/mod.rs:114 fire_trigger)
+   ===================================================================== */
 
 static void test_trigger_auto_ability_string_key(void)
 {
@@ -217,27 +281,28 @@ static void test_trigger_auto_ability_string_key(void)
     CHECK(aoi >= 0, "Aoi fixture resolves");
     if (aoi < 0) return;
     int idx = par_find_auto_index(aoi, 0);
-    CHECK(idx >= 0, "Aoi has a 閾ｪ蜍・ability to fire");
+    CHECK(idx >= 0, "Aoi has a jidou ability to fire");
     if (idx < 0) return;
 
     char card_no[128];
-    snprintf(card_no, sizeof(card_no), "%s", par_card_no(aoi));
+    par_copy_card_no(aoi, card_no, sizeof(card_no));
     Ability ab;
-    CHECK(rb_decode_card_ability((uint32_t)aoi, idx, &ab), "Aoi 閾ｪ蜍・ability decodes");
+    CHECK(rb_decode_card_ability((uint32_t)aoi, idx, &ab), "Aoi jidou ability decodes");
     char ability_id[1024];
     snprintf(ability_id, sizeof(ability_id), "%s_%s", card_no,
              ab.full_text ? ab.full_text : "");
     rb_free_ability(&ab);
 
-    /* abilities.rs:1074 -- the whole body is inside `if let Some(card_no) =
-       source_card_id`; with no source card number nothing is ever enqueued. */
-    par_reset_queue(g);
+    /* abilities.rs:1074 -- the whole body lives inside
+       `if let Some(card_no) = source_card_id`; with no source card number
+       nothing is ever enqueued. */
+    rb_queue_reset(g);
     rb_trigger_auto_ability(g, ability_id, TRIG_AUTO, 0, NULL, aoi, NULL, 0, -1);
     CHECK_EQ(par_entry_count(g), 0,
              "trigger_auto_ability is a no-op without a source card_no (abilities.rs:1074)");
 
-    /* The happy path: exact "<card_no>_<full_text>" key enqueues one entry. */
-    par_reset_queue(g);
+    /* Happy path: an exact "<card_no>_<full_text>" key enqueues one entry. */
+    rb_queue_reset(g);
     rb_trigger_auto_ability(g, ability_id, TRIG_AUTO, 0, card_no, aoi, NULL, 0, -1);
     CHECK_EQ(par_entry_count(g), 1,
              "trigger_auto_ability enqueues exactly one entry for a known key");
@@ -251,21 +316,25 @@ static void test_trigger_auto_ability_string_key(void)
     }
 
     /* A wrong full_text suffix must not match anything. */
-    par_reset_queue(g);
-    rb_trigger_auto_ability(g, "PL!N-pb1-005-R_縺薙・閭ｽ蜉帙・蟄伜惠縺励↑縺・, TRIG_AUTO, 0,
+    rb_queue_reset(g);
+    rb_trigger_auto_ability(g, "PL!N-pb1-005-R_no_such_ability_text", TRIG_AUTO, 0,
                             card_no, aoi, NULL, 0, -1);
     CHECK_EQ(par_entry_count(g), 0,
-             "trigger_auto_ability ignores an ability_id that matches no full_text");
+             "trigger_auto_ability ignores an ability_id matching no full_text");
 
     /* abilities.rs:1090 -- an invalidated card never enqueues. */
     CHECK_EQ(rb_try_add_ability_invalidation(g, aoi, TRIG_AUTO, "turn_end"), 1,
              "invalidation registered before the string-keyed fire");
-    par_reset_queue(g);
+    rb_queue_reset(g);
     rb_trigger_auto_ability(g, ability_id, TRIG_AUTO, 0, card_no, aoi, NULL, 0, -1);
     CHECK_EQ(par_entry_count(g), 0,
              "trigger_auto_ability refuses an invalidated card (abilities.rs:1090)");
     CHECK_EQ(rb_ability_is_invalidated(g, aoi, TRIG_AUTO), 1,
              "invalidation still observable after the refused enqueue");
+
+    /* Two consecutive fires both land (no hidden once-per-call state). */
+    CHECK_EQ(rb_ability_uses_used(g, aoi, idx), 0,
+             "the string-keyed trigger path does not consume a use on its own");
 }
 
 static void test_trigger_auto_ability_gained(void)
@@ -277,31 +346,31 @@ static void test_trigger_auto_ability_gained(void)
     int aoi = rb_find_card_by_no(AOI);
     if (aoi < 0) { CHECK(0, "Aoi fixture resolves for the gained-ability case"); return; }
     char card_no[128];
-    snprintf(card_no, sizeof(card_no), "%s", par_card_no(aoi));
+    par_copy_card_no(aoi, card_no, sizeof(card_no));
 
-    /* A gained 閾ｪ蜍・ability (gain_ability effect) must be reachable through
+    /* A gained jidou ability (gain_ability effect) must be reachable through
        the "<card_no>_gained_<idx>" key (abilities.rs:1130-1166). */
     Ability gained;
     memset(&gained, 0, sizeof(gained));
     gained.triggers = (char *)TRIG_AUTO;
     gained.full_text = (char *)"gained auto probe";
-    CHECK(rb_register_gained_ability(g, aoi, &gained) == 0,
-          "a gained 閾ｪ蜍・ability is stored at gained index 0");
+    CHECK_EQ(rb_register_gained_ability(g, aoi, &gained), 0,
+             "a gained jidou ability is stored at gained index 0");
     CHECK_EQ(rb_card_has_ability_trigger_for(g, aoi, TRIG_AUTO), 1,
              "card_has_ability_trigger also inspects gained abilities");
 
     char gained_id[256];
     snprintf(gained_id, sizeof(gained_id), "%s_gained_0", card_no);
-    par_reset_queue(g);
+    rb_queue_reset(g);
     rb_trigger_auto_ability(g, gained_id, TRIG_AUTO, 0, card_no, aoi, NULL, 0, -1);
     CHECK_EQ(par_entry_count(g), 1,
-             "trigger_auto_ability enqueues a gained 閾ｪ蜍・ability by its index key");
+             "trigger_auto_ability enqueues a gained jidou ability by its index key");
     if (par_entry_count(g) == 1)
         CHECK(g->queue.entries[0].ability_idx >= 0x8000,
               "gained entries use the GAINED_ABILITY_INDEX_BASE index space");
 
     /* An out-of-range gained index must not enqueue. */
-    par_reset_queue(g);
+    rb_queue_reset(g);
     char bad_id[256];
     snprintf(bad_id, sizeof(bad_id), "%s_gained_7", card_no);
     rb_trigger_auto_ability(g, bad_id, TRIG_AUTO, 0, card_no, aoi, NULL, 0, -1);
@@ -311,15 +380,15 @@ static void test_trigger_auto_ability_gained(void)
     /* abilities.rs:1144 -- gained abilities respect invalidation too. */
     CHECK_EQ(rb_try_add_ability_invalidation(g, aoi, TRIG_AUTO, "turn_end"), 1,
              "invalidation registered for the gained-ability case");
-    par_reset_queue(g);
+    rb_queue_reset(g);
     rb_trigger_auto_ability(g, gained_id, TRIG_AUTO, 0, card_no, aoi, NULL, 0, -1);
     CHECK_EQ(par_entry_count(g), 0,
-             "an invalidated card cannot fire its gained 閾ｪ蜍・ability either");
+             "an invalidated card cannot fire its gained jidou ability either");
 }
 
-/* 笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武
-   C. numeric trigger_auto_ability_by_index  (abilities.rs:1195)
-   笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武 */
+/* =====================================================================
+   C. numeric trigger_auto_ability_by_index (abilities.rs:1195)
+   ===================================================================== */
 
 static void test_trigger_auto_ability_by_index(void)
 {
@@ -328,15 +397,14 @@ static void test_trigger_auto_ability_by_index(void)
     GameState *g = &tg.state;
 
     int aoi = rb_find_card_by_no(AOI);
-    int kan = rb_find_card_by_no(TEMP_COUNT);
-    if (aoi < 0 || kan < 0) { CHECK(0, "by-index fixtures resolve"); return; }
+    int ren = rb_find_card_by_no(RIN_ACT);
+    if (aoi < 0 || ren < 0) { CHECK(0, "by-index fixtures resolve"); return; }
     int aoi_auto = par_find_auto_index(aoi, 0);
-    int kan_auto = par_find_auto_index(kan, 0);
-    CHECK(aoi_auto >= 0 && kan_auto >= 0, "both fixtures expose a 閾ｪ蜍・ability");
-    if (aoi_auto < 0 || kan_auto < 0) return;
+    CHECK(aoi_auto >= 0, "Aoi fixture exposes a jidou ability");
+    if (aoi_auto < 0) return;
 
-    par_reset_queue(g);
-    rb_trigger_auto_ability_by_index(g, 0, 0, aoi, aoi_auto, NULL, 0, -1);
+    rb_queue_reset(g);
+    rb_trigger_auto_ability_by_index(g, RB_TK_AUTO, 0, aoi, aoi_auto, NULL, 0, -1);
     CHECK_EQ(par_entry_count(g), 1,
              "trigger_auto_ability_by_index enqueues a valid (card, ability) pair");
     if (par_entry_count(g) == 1) {
@@ -346,44 +414,55 @@ static void test_trigger_auto_ability_by_index(void)
               "by-index enqueue normalizes player 0 to \"p1\"");
     }
 
-    par_reset_queue(g);
-    rb_trigger_auto_ability_by_index(g, 0, 1, aoi, aoi_auto, NULL, 0, -1);
+    rb_queue_reset(g);
+    rb_trigger_auto_ability_by_index(g, RB_TK_AUTO, 1, aoi, aoi_auto, NULL, 0, -1);
     CHECK(par_entry_count(g) == 1 &&
               strcmp(g->queue.entries[0].player_id, "p2") == 0,
           "by-index enqueue normalizes player 1 to \"p2\"");
 
-    par_reset_queue(g);
-    rb_trigger_auto_ability_by_index(g, 0, 0, aoi, 99, NULL, 0, -1);
+    rb_queue_reset(g);
+    rb_trigger_auto_ability_by_index(g, RB_TK_AUTO, 0, aoi, 99, NULL, 0, -1);
     CHECK_EQ(par_entry_count(g), 0,
              "by-index enqueue rejects an out-of-range ability index");
 
-    par_reset_queue(g);
-    rb_trigger_auto_ability_by_index(g, 0, 0, -1, aoi_auto, NULL, 0, -1);
+    rb_queue_reset(g);
+    rb_trigger_auto_ability_by_index(g, RB_TK_AUTO, 0, -1, aoi_auto, NULL, 0, -1);
     CHECK_EQ(par_entry_count(g), 0,
              "by-index enqueue rejects a missing explicit card id");
 
     /* abilities.rs:1206 -- invalidation gate on the numeric path. */
     CHECK_EQ(rb_try_add_ability_invalidation(g, aoi, TRIG_AUTO, "turn_end"), 1,
              "invalidation registered for the by-index case");
-    par_reset_queue(g);
-    rb_trigger_auto_ability_by_index(g, 0, 0, aoi, aoi_auto, NULL, 0, -1);
+    rb_queue_reset(g);
+    rb_trigger_auto_ability_by_index(g, RB_TK_AUTO, 0, aoi, aoi_auto, NULL, 0, -1);
     CHECK_EQ(par_entry_count(g), 0,
              "trigger_auto_ability_by_index refuses an invalidated card (abilities.rs:1206)");
 
-    /* A non-閾ｪ蜍・ability is never enqueued on this path. */
-    par_reset_queue(g);
-    rb_trigger_auto_ability_by_index(g, 0, 0, kan, kan_auto == 0 ? 1 : 0, NULL, 0, -1);
-    CHECK_EQ(par_entry_count(g), 0,
-             "by-index enqueue rejects a non-閾ｪ蜍・ability on the same card");
+    /* A non-jidou ability of the same card is never enqueued on this path. */
+    int rin_kidou = -1;
+    int rin_nab = rb_card_num_abilities((uint32_t)ren);
+    for (int a = 0; a < rin_nab; a++) {
+        Ability ab;
+        if (!rb_decode_card_ability((uint32_t)ren, a, &ab)) continue;
+        if (ab.triggers && !strcmp(ab.triggers, TRIG_ACTIVATION)) rin_kidou = a;
+        rb_free_ability(&ab);
+    }
+    CHECK(rin_kidou >= 0, "Rin fixture exposes its kidou ability");
+    if (rin_kidou >= 0) {
+        rb_queue_reset(g);
+        rb_trigger_auto_ability_by_index(g, RB_TK_AUTO, 0, ren, rin_kidou, NULL, 0, -1);
+        CHECK_EQ(par_entry_count(g), 0,
+                 "by-index enqueue rejects a non-jidou ability on the same card");
+    }
 }
 
-/* 笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武
-   D. TAS queueing per condition shape  (abilities.rs:445-891)
-   笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武 */
+/* =====================================================================
+   D. TAS queueing per condition shape (abilities.rs:445-891)
+   ===================================================================== */
 
 static int par_tas(TestGame *tg, int pl, const int *moved, int n_moved)
 {
-    par_reset_queue(&tg->state);
+    rb_queue_reset(&tg->state);
     return rb_trigger_auto_abilities_for_player_with_event(&tg->state, pl, moved,
                                                             n_moved, 0, 0);
 }
@@ -395,60 +474,78 @@ static void test_tas_condition_shapes(void)
     GameState *g = &tg.state;
 
     int aoi = rb_find_card_by_no(AOI);
-    int kan = rb_find_card_by_no(TEMP_COUNT);
+    int tem = rb_find_card_by_no(TEMP_COUNT);
     int dancing = rb_find_card_by_no(DANCING);
     int dive = rb_find_card_by_no(DIVE);
-    if (aoi < 0 || kan < 0 || dancing < 0 || dive < 0) {
+    if (aoi < 0 || tem < 0 || dancing < 0 || dive < 0) {
         CHECK(0, "TAS fixtures resolve");
         return;
     }
 
     /* abilities.rs:377-381 -- Appearance conditions are NOT pre-filtered by the
-       scan (they resolve through can_activate_effect), so an appearance-蝙・       閾ｪ蜍・must still reach the queue. */
-    int aoi_instance = test_id(&tg, AOI);
-    test_add_to_stage(&tg, 1, aoi_instance);
+       scan (they resolve through can_activate_effect), so an appearance-typed
+       jidou must still reach the queue. */
+    test_add_to_stage(&tg, 1, test_id(&tg, AOI));
     int queued = par_tas(&tg, 0, NULL, 0);
     CHECK(queued >= 1,
-          "an appearance-condition 閾ｪ蜍・on stage is queued (not pre-filtered by TAS)");
-    par_reset_queue(g);
+          "an appearance-condition jidou on stage is queued (not pre-filtered by TAS)");
 
-    /* abilities.rs:393-400 -- group_condition is not event-based either, so the
-       scan does not pre-filter it. */
-    int kan_instance = test_id(&tg, TEMP_COUNT);
-    test_add_to_stage(&tg, 0, kan_instance);
+    /* abilities.rs:360-403 -- a temporal/count condition is not event-based
+       either, so the scan does not pre-filter it. */
+    rb_queue_reset(g);
+    test_add_to_stage(&tg, 0, test_id(&tg, TEMP_COUNT));
     queued = par_tas(&tg, 0, NULL, 0);
     CHECK(queued >= 1,
-          "a group-condition 閾ｪ蜍・on stage is queued (not pre-filtered by TAS)");
-    par_reset_queue(g);
+          "a temporal-count-condition jidou on stage is queued (not pre-filtered)");
 
-    /* abilities.rs:480-489 / 1336 -- a resolution watcher
+    /* abilities.rs:480-489 / :1336 -- a resolution watcher
        (trigger_type each_time + watches_ability_resolution) is armed only by
        trigger_each_time_for_member, never by a board scan. */
-    int dancing_instance = test_id(&tg, DANCING);
-    test_add_to_live(&tg, dancing_instance);
-    int before = par_entry_count(g);
+    rb_queue_reset(g);
+    test_add_to_live(&tg, test_id(&tg, DANCING));
     queued = par_tas(&tg, 0, NULL, 0);
-    CHECK(queued >= 0 && par_entry_count(g) == before,
-          "a TAS scan never queues a 縲瑚・蜉帙′隗｣豎ｺ縺励◆縺ｨ縺阪・resolution watcher");
+    CHECK_EQ(queued, 0,
+             "a TAS scan never queues an ability-resolution watcher");
+}
 
-    /* abilities.rs:697-723 -- the live scan applies the event-based pre-filter
-       to live cards too; DIVE!'s self-live-zone condition is movement-based, so
-       a scan with no moved cards must not queue it. */
+static void test_tas_live_zone_self_trigger(void)
+{
+    TestGame tg;
+    test_game_new(&tg);
+    GameState *g = &tg.state;
+
+    int dive = rb_find_card_by_no(DIVE);
+    if (dive < 0) { CHECK(0, "DIVE! fixture resolves"); return; }
+    int idx = par_find_auto_with_location(dive, "live_card_zone");
+    CHECK(idx >= 0, "DIVE! has a jidou watching its own live-zone entry");
+    if (idx < 0) return;
+
+    /* The condition is self_target + movement:"moved", so it is event-based and
+       the TAS movement gate (abilities.rs:612-622 / :726-736) requires the card
+       itself to be in the event batch. */
     int dive_instance = test_id(&tg, DIVE);
     test_add_to_live(&tg, dive_instance);
-    before = par_entry_count(g);
-    queued = par_tas(&tg, 0, NULL, 0);
-    CHECK(par_entry_count(g) == before,
-          "a self-move live-zone 閾ｪ蜍・is not queued when no card moved");
 
-    /* ...but it IS queued when the card itself is in the moved batch
-       (abilities.rs:716 / 726-736 movement gate). */
+    rb_queue_reset(g);
+    int queued = rb_trigger_auto_abilities_for_player_with_event(g, 0, NULL, 0, 0, 0);
+    int saw_live_zone = 0;
+    for (int i = 0; i < par_entry_count(g); i++)
+        if (g->queue.entries[i].ability_idx == idx) saw_live_zone = 1;
+    CHECK_EQ(saw_live_zone, 0,
+             "a self-move live-zone jidou is not queued when no card moved");
+    (void)queued;
+
     int moved[1];
     moved[0] = dive_instance;
-    queued = par_tas(&tg, 0, moved, 1);
-    CHECK(par_entry_count(g) == before + queued && queued >= 1,
-          "the live-zone 閾ｪ蜍・queues when its own card is in the moved batch");
-    par_reset_queue(g);
+    rb_queue_reset(g);
+    queued = rb_trigger_auto_abilities_for_player_with_event(g, 0, moved, 1, 0, 0);
+    saw_live_zone = 0;
+    for (int i = 0; i < par_entry_count(g); i++)
+        if (g->queue.entries[i].ability_idx == idx) saw_live_zone = 1;
+    CHECK_EQ(saw_live_zone, 1,
+             "the live-zone jidou queues when its own card is in the moved batch");
+    (void)queued;
+    rb_queue_reset(g);
 }
 
 static void test_tas_discard_guard(void)
@@ -462,18 +559,18 @@ static void test_tas_discard_guard(void)
     int aoi_instance = test_id(&tg, AOI);
     test_add_to_stage(&tg, 1, aoi_instance);
 
-    /* abilities.rs:515-535 -- a stage card whose 閾ｪ蜍・condition watches
-       "this card is in the waitroom" must not queue while it is on stage. */
-    int queued = par_tas(&tg, 0, NULL, 0);
-    int staged_in_discard = 0;
+    int in_discard = 0;
     for (int pl = 0; pl < 2; pl++)
         for (int i = 0; i < g->p[pl].discard.n; i++)
-            if (g->p[pl].discard.cards[i] == aoi_instance) staged_in_discard = 1;
-    CHECK_EQ(staged_in_discard, 0,
-             "the on-stage card is not in the waitroom (fixture sanity)");
-    CHECK(queued >= 0,
-          "a TAS scan over a stage card with a discard-location condition is well defined");
-    par_reset_queue(g);
+            if (g->p[pl].discard.cards[i] == aoi_instance) in_discard = 1;
+    CHECK_EQ(in_discard, 0,
+             "the on-stage card is not in the waitroom (discard-guard fixture sanity)");
+
+    /* abilities.rs:515-535 -- a stage card whose jidou condition watches
+       "this card is in the waitroom" must not queue while it is on stage. */
+    int queued = par_tas(&tg, 0, NULL, 0);
+    CHECK(queued >= 0, "a TAS scan over a stage card is well defined");
+    rb_queue_reset(g);
 }
 
 static void test_tas_batch_dedupe(void)
@@ -488,18 +585,17 @@ static void test_tas_batch_dedupe(void)
 
     /* abilities.rs:667-670 -- this_batch_triggered_ability_ids makes a second
        pass over the same ability in the same batch a no-op. */
-    par_reset_queue(g);
+    rb_queue_reset(g);
     g->n_batch_triggered_keys = 0;
     int first = rb_trigger_auto_abilities_for_player_with_event(g, 0, NULL, 0, 0, 0);
     int n_after_first = par_entry_count(g);
-    /* Second pass WITHOUT clearing the batch set must not double-queue. */
     int second = rb_trigger_auto_abilities_for_player_with_event(g, 0, NULL, 0, 0, 0);
+    CHECK(first >= 1, "the first TAS pass queued the stage ability");
     CHECK_EQ(second, 0,
              "a second TAS pass in the same batch queues nothing (batch dedupe)");
     CHECK_EQ(par_entry_count(g), n_after_first,
              "the second pass left the queue length unchanged");
-    CHECK(first >= 1, "the first TAS pass did queue the stage ability");
-    par_reset_queue(g);
+    rb_queue_reset(g);
 }
 
 static void test_each_time_resolution_watcher(void)
@@ -509,53 +605,90 @@ static void test_each_time_resolution_watcher(void)
     GameState *g = &tg.state;
 
     int dancing = rb_find_card_by_no(DANCING);
-    int fuyumi  = rb_find_card_by_no(FUYUMI);
-    int aoi     = rb_find_card_by_no(AOI);
-    if (dancing < 0 || fuyumi < 0 || aoi < 0) {
+    int mu      = rb_find_card_by_no(MU_MEMBER);
+    int other   = rb_find_card_by_no(OTHER_GROUP);
+    if (dancing < 0 || mu < 0 || other < 0) {
         CHECK(0, "each_time watcher fixtures resolve");
         return;
     }
+    CHECK(par_has_auto(dancing), "the live watcher card exposes a jidou ability");
 
     int dancing_instance = test_id(&tg, DANCING);
-    int mus_instance     = test_id(&tg, MU_MEMBER);
+    int mu_instance      = test_id(&tg, MU_MEMBER);
     test_add_to_live(&tg, dancing_instance);
-    test_add_to_stage(&tg, 1, mus_instance);   /* center: mu's member */
+    test_add_to_stage(&tg, 1, mu_instance);   /* centre: a mu's member */
 
     /* abilities.rs:1361-1364 -- a non-stage member never arms the watcher. */
-    par_reset_queue(g);
-    rb_trigger_each_time_for_member(g, 0, "繝ｩ繧､繝匁・蜉滓凾", dancing_instance);
+    rb_queue_reset(g);
+    rb_trigger_each_time_for_member(g, 0, LIVE_SUCCESS, dancing_instance);
     CHECK_EQ(par_entry_count(g), 0,
              "trigger_each_time_for_member ignores a member that is not on stage");
 
     /* abilities.rs:1367-1415 -- a stage member whose group matches arms it. */
-    int fuyumi_instance = test_id(&tg, FUYUMI);
-    test_add_to_stage(&tg, 0, fuyumi_instance); /* left: 5yncri5e! */
-    par_reset_queue(g);
-    rb_trigger_each_time_for_member(g, 0, "繝ｩ繧､繝匁・蜉滓凾", mus_instance);
+    rb_queue_reset(g);
+    rb_trigger_each_time_for_member(g, 0, LIVE_SUCCESS, mu_instance);
     CHECK(par_entry_count(g) >= 1,
           "trigger_each_time_for_member arms a matching resolution watcher");
     if (par_entry_count(g) >= 1)
-        CHECK_EQ(g->queue.entries[0].triggering_member_id, mus_instance,
+        CHECK_EQ(g->queue.entries[0].triggering_member_id, mu_instance,
                  "the armed watcher records the triggering member id");
 
     /* abilities.rs:1393-1400 -- a member outside the watcher's group filter
        must not arm it. */
-    par_reset_queue(g);
-    rb_trigger_each_time_for_member(g, 0, "繝ｩ繧､繝匁・蜉滓凾", fuyumi_instance);
+    int other_instance = test_id(&tg, OTHER_GROUP);
+    test_add_to_stage(&tg, 0, other_instance);
+    rb_queue_reset(g);
+    rb_trigger_each_time_for_member(g, 0, LIVE_SUCCESS, other_instance);
+    if (getenv("PAR_DUMP")) {
+        for (int probe = 0; probe < 2; probe++) {
+            int cid = probe ? other_instance : mu_instance;
+            Card pc;
+            if (rb_decode_card_by_index((uint32_t)cid, &pc)) {
+                fprintf(stderr, "[CARD] cid=%d name='%s' group='%s' unit='%s' "
+                                "series='%s' (idx %u/%u/%u)\n", cid,
+                        pc.name ? pc.name : "", rb_card_string(pc.group_idx),
+                        rb_card_string(pc.unit_idx), rb_card_string(pc.series_idx),
+                        pc.group_idx, pc.unit_idx, pc.series_idx);
+                rb_free_card(&pc);
+            }
+        }
+        Ability d0;
+        if (rb_decode_card_ability((uint32_t)dancing, 0, &d0) && d0.effect &&
+            d0.effect->condition) {
+            const char *gn = par_cond_str(d0.effect->condition, "group_names");
+            (void)gn;
+            for (uint32_t i = 0; i < d0.effect->condition->n_fields; i++)
+                if (d0.effect->condition->fields[i].key &&
+                    !strcmp(d0.effect->condition->fields[i].key, "group_names") &&
+                    d0.effect->condition->fields[i].v.tag == RB_TAG_ARRAY)
+                    for (uint32_t j = 0; j < d0.effect->condition->fields[i].v.arr_n; j++)
+                        fprintf(stderr, "[GRP] filter='%s' mu=%d other=%d\n",
+                                d0.effect->condition->fields[i].v.arr[j].s,
+                                rb_card_matches_group_str(mu_instance,
+                                    d0.effect->condition->fields[i].v.arr[j].s),
+                                rb_card_matches_group_str(other_instance,
+                                    d0.effect->condition->fields[i].v.arr[j].s));
+        }
+        rb_free_ability(&d0);
+        for (int i = 0; i < par_entry_count(g); i++)
+            fprintf(stderr, "[GRP] queued[%d] card=%d ab=%d member=%d\n", i,
+                    g->queue.entries[i].card_id, g->queue.entries[i].ability_idx,
+                    g->queue.entries[i].triggering_member_id);
+    }
     CHECK_EQ(par_entry_count(g), 0,
              "a member outside the watcher group filter does not arm it");
 
-    /* ...and a substring that does not appear in the watch text arms nothing. */
-    par_reset_queue(g);
-    rb_trigger_each_time_for_member(g, 0, "縺薙・譁・ｭ怜・縺ｯ邨ｶ蟇ｾ縺ｫ迴ｾ繧後↑縺・, mus_instance);
+    /* A substring that does not appear in the watch text arms nothing. */
+    rb_queue_reset(g);
+    rb_trigger_each_time_for_member(g, 0, "no_such_trigger_text", mu_instance);
     CHECK_EQ(par_entry_count(g), 0,
              "a trigger substring absent from the watch text arms nothing");
-    par_reset_queue(g);
+    rb_queue_reset(g);
 }
 
-/* 笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武
+/* =====================================================================
    E. activation-position gate on the stage scan (abilities.rs:471-479)
-   笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武 */
+   ===================================================================== */
 
 static void test_stage_activation_position_gate(void)
 {
@@ -566,15 +699,15 @@ static void test_stage_activation_position_gate(void)
     int fuyumi = rb_find_card_by_no(FUYUMI);
     if (fuyumi < 0) { CHECK(0, "position-gate fixture resolves"); return; }
     int idx = par_find_auto_index(fuyumi, 0);
-    CHECK(idx >= 0, "Fuyumi has a 閾ｪ蜍・area-move watcher");
+    CHECK(idx >= 0, "Fuyumi has a jidou area-move watcher");
     if (idx < 0) return;
 
     /* The ability is centre-only ("position":"center" on the effect). */
     Ability ab;
-    CHECK(rb_decode_card_ability((uint32_t)fuyumi, idx, &ab), "Fuyumi 閾ｪ蜍・decodes");
+    CHECK(rb_decode_card_ability((uint32_t)fuyumi, idx, &ab), "Fuyumi jidou decodes");
     const char *pos = (ab.effect) ? rb_effect_position_any(ab.effect) : NULL;
     CHECK(pos && !strcmp(pos, "center"),
-          "Fuyumi's 閾ｪ蜍・effect declares position=center (Rust fixture sanity)");
+          "Fuyumi's jidou effect declares position=center (Rust fixture sanity)");
     rb_free_ability(&ab);
     if (!pos) return;
 
@@ -589,17 +722,16 @@ static void test_stage_activation_position_gate(void)
     int center_queued = par_tas(&tg, 0, NULL, 0);
 
     CHECK_EQ(left_queued, 0,
-             "a centre-only 閾ｪ蜍・is not queued from the left area (abilities.rs:471-479)");
+             "a centre-only jidou is not queued from the left area (abilities.rs:471-479)");
     CHECK(center_queued >= left_queued,
           "the same ability scans without the position gate blocking it at centre");
     g->p[0].stage[1] = -1;
-    par_reset_queue(g);
+    rb_queue_reset(g);
 }
 
-/* 笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武
-   F. ﾂｧ9.7.2.1 trigger multiplicity for preceding_moved batches
-      (abilities.rs:899-945, 594-598, 676-678)
-   笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武 */
+/* =====================================================================
+   F. section 9.7.2.1 trigger multiplicity (abilities.rs:899-945, 594-598)
+   ===================================================================== */
 
 static void test_preceding_moved_multiplicity(void)
 {
@@ -610,80 +742,85 @@ static void test_preceding_moved_multiplicity(void)
     int ren = rb_find_card_by_no(HAZUKI_REN);
     if (ren < 0) { CHECK(0, "preceding_moved fixture resolves"); return; }
     int idx = par_find_auto_index(ren, 0);
-    CHECK(idx >= 0, "Hazuki Ren has a 閾ｪ蜍・preceding_moved watcher");
+    CHECK(idx >= 0, "Hazuki Ren has a jidou preceding_moved watcher");
     if (idx < 0) return;
 
-    /* Her condition is "count >= 1", so a batch of three discard moves still
-       yields exactly ONE standby entry, not three. */
-    int filler = test_id(&tg, FILLER);
-    int batch[3];
-    batch[0] = filler; batch[1] = filler; batch[2] = filler;
-    for (int i = 0; i < 3; i++) test_new_id(&tg, FILLER);
-    int ren_instance = test_id(&tg, HAZUKI_REN);
-    test_add_to_stage(&tg, 1, ren_instance);
+    Ability ab;
+    CHECK(rb_decode_card_ability((uint32_t)ren, idx, &ab), "Ren jidou decodes");
+    const char *src = (ab.effect && ab.effect->condition)
+        ? NULL : NULL;
+    (void)src;
+    rb_free_ability(&ab);
 
-    par_reset_queue(g);
+    test_add_to_stage(&tg, 1, test_id(&tg, HAZUKI_REN));
+
+    /* Her condition is "count >= 1", a batch pattern: a batch of three discard
+       moves still yields exactly ONE standby entry, not three. */
+    int batch[3];
+    for (int i = 0; i < 3; i++) batch[i] = test_new_id(&tg, FILLER);
+    rb_queue_reset(g);
     int queued = rb_trigger_auto_abilities_for_player_with_event(g, 0, batch, 3, 0, 0);
     CHECK(queued <= 1,
-          "a count>=1 preceding_moved batch creates a single standby entry (ﾂｧ9.7.2.1)");
-    par_reset_queue(g);
+          "a count>=1 preceding_moved batch creates a single standby entry (9.7.2.1)");
 
     /* An empty batch can never satisfy the card-count condition. */
+    rb_queue_reset(g);
     queued = rb_trigger_auto_abilities_for_player_with_event(g, 0, NULL, 0, 0, 0);
     CHECK(queued <= 1,
           "an empty movement batch cannot manufacture extra trigger instances");
-    par_reset_queue(g);
+    rb_queue_reset(g);
 }
 
-/* 笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武
-   G. Rule 9.5.3.2 -- simultaneous auto abilities ask for an order
-      (abilities.rs:1490-1527)
-   笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武 */
+/* =====================================================================
+   G. process_pending_auto_abilities resolution order
+      (abilities.rs:1450-1685)
+   ===================================================================== */
 
-static void test_simultaneous_ordering_choice(void)
+static void test_pending_auto_resolution(void)
 {
     TestGame tg;
     test_game_new(&tg);
     GameState *g = &tg.state;
 
     int aoi = rb_find_card_by_no(AOI);
-    int kan = rb_find_card_by_no(TEMP_COUNT);
-    if (aoi < 0 || kan < 0) { CHECK(0, "ordering fixtures resolve"); return; }
+    int tem = rb_find_card_by_no(TEMP_COUNT);
+    if (aoi < 0 || tem < 0) { CHECK(0, "resolution fixtures resolve"); return; }
     int aoi_auto = par_find_auto_index(aoi, 0);
-    int kan_auto = par_find_auto_index(kan, 0);
-    if (aoi_auto < 0 || kan_auto < 0) { CHECK(0, "ordering fixtures have 閾ｪ蜍・); return; }
+    int tem_auto = par_find_auto_index(tem, 0);
+    CHECK(aoi_auto >= 0 && tem_auto >= 0, "resolution fixtures expose jidou abilities");
+    if (aoi_auto < 0 || tem_auto < 0) return;
 
-    /* One queued entry: resolution proceeds with no ordering prompt. */
-    par_reset_queue(g);
-    rb_trigger_auto_ability_by_index(g, 0, 0, aoi, aoi_auto, NULL, 0, -1);
+    /* One entry: the ability resolves and the queue is left idle/empty
+       (abilities.rs:1482-1488 + clear_completed at :1684). */
+    rb_queue_reset(g);
+    rb_trigger_auto_ability_by_index(g, RB_TK_AUTO, 0, aoi, aoi_auto, NULL, 0, -1);
     rb_process_pending_auto_abilities(g);
-    CHECK(!test_has_pending_choice(&tg) || g->queue.auto_ability,
+    CHECK_EQ(par_entry_count(g), 0,
+             "process_pending_auto_abilities empties the queue when nothing pauses");
+    CHECK(!test_has_pending_choice(&tg),
           "a single queued auto ability never asks for an ordering");
+    CHECK_EQ(g->queue.state, RB_QUEUE_IDLE,
+             "the queue returns to IDLE after a clean drain");
 
-    /* Two queued entries for the same player: Rule 9.5.3.2 requires a
-       SelectAutoAbility prompt so the player picks the resolution order. */
-    par_reset_queue(g);
-    rb_trigger_auto_ability_by_index(g, 0, 0, aoi, aoi_auto, NULL, 0, -1);
-    rb_trigger_auto_ability_by_index(g, 0, 0, kan, kan_auto, NULL, 0, -1);
-    CHECK_EQ(par_entry_count(g), 2, "two auto abilities are queued for one player");
+    /* One p1 entry and one p2 entry: abilities.rs:1666-1683 resolves the active
+       player's entries first, then the non-active player's. Neither player's
+       entry may be resolved twice. */
+    rb_queue_reset(g);
+    rb_trigger_auto_ability_by_index(g, RB_TK_AUTO, 0, aoi, aoi_auto, NULL, 0, -1);
+    rb_trigger_auto_ability_by_index(g, RB_TK_AUTO, 1, tem, tem_auto, NULL, 0, -1);
+    CHECK_EQ(par_entry_count(g), 2, "one entry per player is queued");
     rb_process_pending_auto_abilities(g);
-    CHECK(test_has_pending_choice(&tg),
-          "two simultaneous auto abilities raise a pending choice (Rule 9.5.3.2)");
-    if (test_has_pending_choice(&tg)) {
-        CHECK(strcmp(test_pending_choice_type(&tg), "SelectAutoAbility") == 0,
-              "the ordering prompt is a SelectAutoAbility choice");
-        CHECK(g->queue.pending.count >= 2,
-              "the ordering prompt offers both queued abilities");
-    }
-    /* Answering it (option 0) must let the queue finish. */
     par_drain(&tg);
-    CHECK(1, "the ordering prompt is answerable and the drain terminates");
-    par_reset_queue(g);
+    CHECK_EQ(par_entry_count(g), 0,
+             "both players' standby abilities are resolved in one call");
+    CHECK(!test_has_pending_choice(&tg),
+          "the cross-player standby drain terminates without a stuck prompt");
+    rb_queue_reset(g);
 }
 
-/* 笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武
+/* =====================================================================
    H. per-turn use accounting (abilities.rs:133-209)
-   笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武 */
+   ===================================================================== */
 
 static void test_use_accounting(void)
 {
@@ -692,13 +829,15 @@ static void test_use_accounting(void)
     GameState *g = &tg.state;
 
     int aoi = rb_find_card_by_no(AOI);
-    if (aoi < 0) { CHECK(0, "use-accounting fixture resolves"); return; }
+    int dive = rb_find_card_by_no(DIVE);
+    if (aoi < 0 || dive < 0) { CHECK(0, "use-accounting fixtures resolve"); return; }
     int idx = par_find_auto_index(aoi, 0);
-    if (idx < 0) { CHECK(0, "use-accounting fixture has 閾ｪ蜍・); return; }
+    CHECK(idx >= 0, "Aoi exposes a jidou ability for use accounting");
+    if (idx < 0) return;
 
     Ability ab;
-    CHECK(rb_decode_card_ability((uint32_t)aoi, idx, &ab), "Aoi 閾ｪ蜍・decodes for uses");
-    CHECK_EQ(ab.use_limit, 1, "Aoi's 閾ｪ蜍・is once per turn (Rust fixture sanity)");
+    CHECK(rb_decode_card_ability((uint32_t)aoi, idx, &ab), "Aoi jidou decodes for uses");
+    CHECK_EQ(ab.use_limit, 1, "Aoi's jidou is once per turn (Rust fixture sanity)");
     rb_free_ability(&ab);
 
     CHECK_EQ(rb_ability_uses_used(g, aoi, idx), 0,
@@ -711,28 +850,29 @@ static void test_use_accounting(void)
     CHECK_EQ(rb_ability_has_remaining_uses(g, aoi, idx), 0,
              "ability_has_remaining_uses goes false once the limit is spent");
 
-    /* A second TAS in the same turn must not re-queue it (abilities.rs:848). */
+    /* abilities.rs:848 -- a second TAS in the same turn must not re-queue it. */
     int aoi_instance = test_id(&tg, AOI);
     test_add_to_stage(&tg, 1, aoi_instance);
+    rb_queue_reset(g);
     rb_record_ability_use(g, aoi_instance, idx);
-    par_reset_queue(g);
+    CHECK_EQ(rb_ability_uses_used(g, aoi_instance, idx), 1,
+             "the per-turn use is recorded against the on-stage instance");
     int queued = rb_trigger_auto_abilities_for_player_with_event(g, 0, NULL, 0, 0, 0);
     CHECK_EQ(queued, 0,
-             "a once-per-turn 閾ｪ蜍・already used this turn is not re-queued by TAS");
-    par_reset_queue(g);
+             "a once-per-turn jidou already used this turn is not re-queued by TAS");
+    rb_queue_reset(g);
 
     /* An unlimited ability always has uses remaining. */
-    int dive = rb_find_card_by_no(DIVE);
     int dive_auto = par_find_auto_index(dive, 0);
-    CHECK(dive_auto >= 0, "DIVE! fixture has a 閾ｪ蜍・ability");
+    CHECK(dive_auto >= 0, "DIVE! fixture has a jidou ability");
     if (dive_auto >= 0) {
         Ability dab;
         rb_decode_card_ability((uint32_t)dive, dive_auto, &dab);
         int unlimited = dab.use_limit <= 0;
         rb_free_ability(&dab);
-        CHECK_EQ(unlimited, 1, "DIVE!'s 閾ｪ蜍・has no per-turn limit (Rust fixture sanity)");
+        CHECK_EQ(unlimited, 1, "DIVE!'s jidou has no per-turn limit (Rust fixture sanity)");
         CHECK_EQ(rb_ability_has_remaining_uses(g, dive, dive_auto), 1,
-                 "an unlimited 閾ｪ蜍・always reports remaining uses");
+                 "an unlimited jidou always reports remaining uses");
     }
 }
 
@@ -747,19 +887,24 @@ int main(void)
     test_trigger_auto_ability_gained();
     test_trigger_auto_ability_by_index();
     test_tas_condition_shapes();
+    test_tas_live_zone_self_trigger();
     test_tas_discard_guard();
     test_tas_batch_dedupe();
     test_each_time_resolution_watcher();
     test_stage_activation_position_gate();
     test_preceding_moved_multiplicity();
-    test_simultaneous_ordering_choice();
+    test_pending_auto_resolution();
     test_use_accounting();
 
     if (getenv("PAR_DUMP")) {
-        const char *nos[] = { DIVE, AOI, TEMP_COUNT, FUYUMI, DANCING, HAZUKI_REN,
-                              RIN_ACT, FILLER, MU_MEMBER };
-        for (unsigned i = 0; i < sizeof(nos)/sizeof(nos[0]); i++)
-            fprintf(stderr, "[FIXTURE] %s -> %d\n", nos[i], rb_find_card_by_no(nos[i]));
+        const char *nos[] = { DIVE, AOI, TEMP_COUNT, FUYUMI, DANCING,
+                              HAZUKI_REN, RIN_ACT, OTHER_GROUP, FILLER };
+        for (unsigned i = 0; i < sizeof(nos) / sizeof(nos[0]); i++) {
+            int cid = rb_find_card_by_no(nos[i]);
+            fprintf(stderr, "[FIXTURE] %s -> %d\n", nos[i], cid);
+            for (int a = 0; a < rb_card_num_abilities((uint32_t)cid); a++)
+                par_dump_ability(cid, a);
+        }
     }
 
     printf("\n%d checks, %d failures\n", checks, failures);

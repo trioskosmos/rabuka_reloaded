@@ -1,6 +1,6 @@
 {
   "generated_by": "cards/test_inventory.py",
-  "generated_at": "2026-09-26T11:38:57.346743+00:00",
+  "generated_at": "2026-09-26T11:45:51.291785+00:00",
   "stats": {
     "total_cards": 2526,
     "cards_with_abilities": 1565,
@@ -544,6 +544,869 @@
     "unpinned_similar_cards": {
       "count": 0,
       "rows": []
+    },
+    "duplicate_stage_id": {
+      "count": 143,
+      "rows": [
+        {
+          "file": "engine/tests/test_modules/characterization/pipeline_characterization_test.rs",
+          "test": "s9_check_timing_cascade_smoke",
+          "line": 214,
+          "detail": "m in 2 slots"
+        },
+        {
+          "file": "engine/tests/test_modules/characterization/zero_tested_action_types_test.rs",
+          "test": "vitamin_summer_live_success_hand_condition",
+          "line": 341,
+          "detail": "nico in 2 slots"
+        },
+        {
+          "file": "engine/tests/test_modules/effects/compound/cost_and_effect/center_wait_discard_other_group_cost_plus_two_same_area_deploy_edges_test.rs",
+          "test": "center_other_member_cost_plus_two_deploy_only_non_aqours_on_stage",
+          "line": 93,
+          "detail": "filler in 2 slots"
+        },
+        {
+          "file": "engine/tests/test_modules/effects/compound/cost_and_effect/discard_live_recovery_score_energy_cost_q214_test.rs",
+          "test": "discard_then_live_recovery_pays_score_energy_or_declines_q214",
+          "line": 5,
+          "detail": "filler in 2 slots"
+        },
+        {
+          "file": "engine/tests/test_modules/effects/compound/cost_and_effect/discard_live_recovery_score_energy_cost_q214_test.rs",
+          "test": "discard_then_live_recovery_pays_score_energy_or_declines_q214",
+          "line": 5,
+          "detail": "filler in 2 slots"
+        },
+        {
+          "file": "engine/tests/test_modules/effects/compound/cost_and_effect/discard_live_recovery_score_energy_cost_q214_test.rs",
+          "test": "discard_then_live_recovery_pays_score_energy_or_declines_q214",
+          "line": 5,
+          "detail": "filler in 2 slots"
+        },
+        {
+          "file": "engine/tests/test_modules/effects/compound/cost_and_effect/discard_live_recovery_score_energy_cost_q214_test.rs",
+          "test": "discard_then_live_recovery_pays_score_energy_or_declines_q214",
+          "line": 5,
+          "detail": "filler in 2 slots"
+        },
+        {
+          "file": "engine/tests/test_modules/effects/compound/cost_and_effect/discard_score_energy_live_recovery_edges_test.rs",
+          "test": "discard_score_energy_live_recovery_no_live_in_discard_no_selection",
+          "line": 14,
+          "detail": "filler in 2 slots"
+        },
+        {
+          "file": "engine/tests/test_modules/effects/compound/cost_and_effect/discard_score_energy_live_recovery_edges_test.rs",
+          "test": "discard_score_energy_live_recovery_p_and_ar_variants_work",
+          "line": 86,
+          "detail": "filler in 2 slots"
+        },
+        {
+          "file": "engine/tests/test_modules/effects/compound/cost_and_effect/discard_score_energy_live_recovery_edges_test.rs",
+          "test": "discard_score_energy_live_recovery_turn_limit_blocks_second_activation",
+          "line": 43,
+          "detail": "filler in 2 slots"
+        },
+        {
+          "file": "engine/tests/test_modules/effects/compound/cost_and_effect/hand_only_self_discard_draw_group_blade_q196_test.rs",
+          "test": "hand_only_self_discard_draw_q196_draw_after_discard_cost",
+          "line": 11,
+          "detail": "filler in 2 slots"
+        },
+        {
+          "file": "engine/tests/test_modules/effects/compound/cost_and_effect/live_start_keep_or_discard_live_then_reveal_to_gain_blade_and_score_test.rs",
+          "test": "three_members_keep_one",
+          "line": 140,
+          "detail": "niji_member in 3 slots"
+        },
+        {
+          "file": "engine/tests/test_modules/effects/compound/cost_and_effect/live_start_keep_or_discard_live_then_reveal_to_gain_blade_and_score_test.rs",
+          "test": "three_members_skip_all",
+          "line": 180,
+          "detail": "niji_member in 3 slots"
+        },
+        {
+          "file": "engine/tests/test_modules/effects/compound/cost_and_effect/live_start_keep_or_discard_live_then_reveal_to_gain_blade_and_score_test.rs",
+          "test": "three_members_skip_reveal_live_gets_boost",
+          "line": 341,
+          "detail": "niji_member in 3 slots"
+        },
+        {
+          "file": "engine/tests/test_modules/effects/compound/cost_and_effect/live_start_optional_unit_position_change_heart_blade_test.rs",
+          "test": "live_start_unit_swap_no_valid_destinations_skips",
+          "line": 314,
+          "detail": "filler in 2 slots"
+        },
+        {
+          "file": "engine/tests/test_modules/effects/compound/per_card/place_energy_under_member_activate_and_live_success_q239_pl_n_bp5_012_test.rs",
+          "test": "ranju_activate_then_live_success_uses_accumulated_under",
+          "line": 514,
+          "detail": "member in 2 slots"
+        },
+        {
+          "file": "engine/tests/test_modules/effects/compound/per_card/place_energy_under_member_activate_and_live_success_q239_pl_n_bp5_012_test.rs",
+          "test": "ranju_live_success_condition_not_met_no_move",
+          "line": 374,
+          "detail": "member in 2 slots"
+        },
+        {
+          "file": "engine/tests/test_modules/effects/compound/per_card/place_energy_under_member_activate_and_live_success_q239_pl_n_bp5_012_test.rs",
+          "test": "ranju_live_success_condition_not_met_when_scores_tied",
+          "line": 416,
+          "detail": "member in 2 slots"
+        },
+        {
+          "file": "engine/tests/test_modules/effects/compound/per_card/place_energy_under_member_activate_and_live_success_q239_pl_n_bp5_012_test.rs",
+          "test": "ranju_live_success_condition_not_met_when_scores_tied",
+          "line": 416,
+          "detail": "member in 3 slots"
+        },
+        {
+          "file": "engine/tests/test_modules/effects/compound/per_card/place_energy_under_member_activate_and_live_success_q239_pl_n_bp5_012_test.rs",
+          "test": "ranju_live_success_energy_deck_empty_does_nothing",
+          "line": 486,
+          "detail": "member in 2 slots"
+        },
+        {
+          "file": "engine/tests/test_modules/effects/compound/per_card/place_energy_under_member_activate_and_live_success_q239_pl_n_bp5_012_test.rs",
+          "test": "ranju_live_success_places_under_plus_one_from_energy_deck",
+          "line": 251,
+          "detail": "member in 2 slots"
+        },
+        {
+          "file": "engine/tests/test_modules/effects/compound/per_card/place_energy_under_member_activate_and_live_success_q239_pl_n_bp5_012_test.rs",
+          "test": "ranju_live_success_q239_zero_under_places_one",
+          "line": 300,
+          "detail": "member in 2 slots"
+        },
+        {
+          "file": "engine/tests/test_modules/effects/compound/per_card/place_energy_under_member_activate_and_live_success_q239_pl_n_bp5_012_test.rs",
+          "test": "ranju_live_success_scales_with_more_under",
+          "line": 454,
+          "detail": "member in 2 slots"
+        },
+        {
+          "file": "engine/tests/test_modules/effects/compound/per_card/place_energy_under_member_activate_and_live_success_q239_pl_n_bp5_012_test.rs",
+          "test": "ranju_q239_zero_under_places_one_for_all_rarities",
+          "line": 336,
+          "detail": "member in 2 slots"
+        },
+        {
+          "file": "engine/tests/test_modules/effects/compound/sequential_effects/live_start_own_discard_two_member_bottomdeck_hearts_q164_test.rs",
+          "test": "live_start_bottomdeck_two_members_q164_uses_own_discard_only",
+          "line": 12,
+          "detail": "filler in 2 slots"
+        },
+        {
+          "file": "engine/tests/test_modules/effects/conditional/per_card/kanon_debut_invalidate_recovers_discard_card_test.rs",
+          "test": "kanon_live_start_invalidation_expires_at_live_end",
+          "line": 114,
+          "detail": "filler in 2 slots"
+        },
+        {
+          "file": "engine/tests/test_modules/effects/conditional/state_gated/deployed_member_blade_heart_wait_test.rs",
+          "test": "konata_bp4_q188_placed_in_wait_no_trigger",
+          "line": 179,
+          "detail": "filler in 2 slots"
+        },
+        {
+          "file": "engine/tests/test_modules/effects/cost_mod/activation_discount/distinct_group_activation_discount_q228_test.rs",
+          "test": "distinct_group_activation_discount_q228_one_group_cost_three_not_offered_at_two_energy",
+          "line": 67,
+          "detail": "filler in 2 slots"
+        },
+        {
+          "file": "engine/tests/test_modules/effects/cost_mod/activation_discount/hand_card_count_play_cost_reduction_test.rs",
+          "test": "on_stage_card_does_not_reduce_other_cards_cost",
+          "line": 96,
+          "detail": "filler in 2 slots"
+        },
+        {
+          "file": "engine/tests/test_modules/effects/cost_mod/activation_discount/hand_card_count_play_cost_reduction_test.rs",
+          "test": "on_stage_card_ignores_hand_for_other_card_cost",
+          "line": 130,
+          "detail": "filler in 2 slots"
+        },
+        {
+          "file": "engine/tests/test_modules/effects/cost_mod/required_hearts/hanamusubi_required_hearts_exclude_self_test.rs",
+          "test": "hanamusubi_alone_no_reduction",
+          "line": 46,
+          "detail": "filler in 3 slots"
+        },
+        {
+          "file": "engine/tests/test_modules/effects/cost_mod/required_hearts/hanamusubi_required_hearts_exclude_self_test.rs",
+          "test": "hanamusubi_reduces_only_heart04_not_heart0",
+          "line": 212,
+          "detail": "filler in 3 slots"
+        },
+        {
+          "file": "engine/tests/test_modules/effects/cost_mod/required_hearts/hanamusubi_required_hearts_exclude_self_test.rs",
+          "test": "hanamusubi_with_non_renosora_no_reduction",
+          "line": 174,
+          "detail": "filler in 3 slots"
+        },
+        {
+          "file": "engine/tests/test_modules/effects/cost_mod/required_hearts/hanamusubi_required_hearts_exclude_self_test.rs",
+          "test": "hanamusubi_with_one_other_renosora_reduces_2",
+          "line": 82,
+          "detail": "filler in 3 slots"
+        },
+        {
+          "file": "engine/tests/test_modules/effects/cost_mod/required_hearts/hanamusubi_required_hearts_exclude_self_test.rs",
+          "test": "hanamusubi_with_two_other_renosora_reduces_4",
+          "line": 132,
+          "detail": "filler in 3 slots"
+        },
+        {
+          "file": "engine/tests/test_modules/effects/cost_mod/required_hearts/hanamusubi_required_hearts_exclude_self_test.rs",
+          "test": "one_hanamusubi_one_filler_no_reduction",
+          "line": 377,
+          "detail": "filler in 3 slots"
+        },
+        {
+          "file": "engine/tests/test_modules/effects/cost_mod/required_hearts/hanamusubi_required_hearts_exclude_self_test.rs",
+          "test": "one_hanamusubi_two_fillers_no_reduction",
+          "line": 411,
+          "detail": "filler in 3 slots"
+        },
+        {
+          "file": "engine/tests/test_modules/effects/cost_mod/required_hearts/hanamusubi_required_hearts_exclude_self_test.rs",
+          "test": "three_hanamusubi_each_reduces_4",
+          "line": 299,
+          "detail": "filler in 3 slots"
+        },
+        {
+          "file": "engine/tests/test_modules/effects/cost_mod/required_hearts/hanamusubi_required_hearts_exclude_self_test.rs",
+          "test": "two_hanamusubi_each_reduces_2",
+          "line": 258,
+          "detail": "filler in 3 slots"
+        },
+        {
+          "file": "engine/tests/test_modules/effects/cost_mod/required_hearts/hanamusubi_required_hearts_exclude_self_test.rs",
+          "test": "two_hanamusubi_one_filler_each_reduces_2",
+          "line": 338,
+          "detail": "filler in 3 slots"
+        },
+        {
+          "file": "engine/tests/test_modules/effects/cost_mod/required_hearts/rina_debut_opponent_live_card_heart_increase_test.rs",
+          "test": "rina_bp5n_heart02_ge5_increases_opponent_need_heart00",
+          "line": 42,
+          "detail": "h02_member in 2 slots"
+        },
+        {
+          "file": "engine/tests/test_modules/effects/deploy/eternalize_love_test.rs",
+          "test": "eternalize_love_full_live_flow_heart00_reduction",
+          "line": 91,
+          "detail": "member in 2 slots"
+        },
+        {
+          "file": "engine/tests/test_modules/effects/deploy/eternalize_love_test.rs",
+          "test": "eternalize_love_two_same_name_reduces_by_3_not_6",
+          "line": 38,
+          "detail": "member in 2 slots"
+        },
+        {
+          "file": "engine/tests/test_modules/effects/deploy/optional_energy_deploy_two_total_cost_four_test.rs",
+          "test": "deploy_stage_full_graceful",
+          "line": 458,
+          "detail": "filler_m in 3 slots"
+        },
+        {
+          "file": "engine/tests/test_modules/effects/draw/chains/card_ability_test.rs",
+          "test": "hanayo_no_mus_member_skips_cost_prompt",
+          "line": 777,
+          "detail": "non_mus in 3 slots"
+        },
+        {
+          "file": "engine/tests/test_modules/effects/draw/conditional/revealed_live_hand_threshold_draw_test.rs",
+          "test": "revealed_filler_does_not_satisfy_live_condition",
+          "line": 74,
+          "detail": "blader in 2 slots"
+        },
+        {
+          "file": "engine/tests/test_modules/effects/draw/conditional/revealed_live_hand_threshold_draw_test.rs",
+          "test": "revealed_live_above_hand_threshold_does_not_draw_again",
+          "line": 18,
+          "detail": "blader in 2 slots"
+        },
+        {
+          "file": "engine/tests/test_modules/effects/draw/flat/per_own_stage_member_draw_then_discard_q146_test.rs",
+          "test": "per_own_member_draw_discard_q146_opponent_members_not_counted",
+          "line": 167,
+          "detail": "opp_m in 3 slots"
+        },
+        {
+          "file": "engine/tests/test_modules/effects/draw/flat/success_zone_group_live_success_draw_test.rs",
+          "test": "success_zone_group_draw_live_leaves_no_choice_with_initially_empty_success_zone",
+          "line": 62,
+          "detail": "m in 3 slots"
+        },
+        {
+          "file": "engine/tests/test_modules/effects/draw/flat/success_zone_group_live_success_draw_test.rs",
+          "test": "success_zone_group_draw_live_leaves_no_choice_with_matching_group_stage",
+          "line": 16,
+          "detail": "m in 3 slots"
+        },
+        {
+          "file": "engine/tests/test_modules/effects/draw/flat/success_zone_group_live_success_draw_test.rs",
+          "test": "success_zone_group_draw_live_leaves_no_choice_with_wrong_group_success_live",
+          "line": 41,
+          "detail": "hasu in 3 slots"
+        },
+        {
+          "file": "engine/tests/test_modules/effects/draw/flat/surplus_heart01_live_success_draw_test.rs",
+          "test": "surplus_heart01_draw_live_leaves_no_choice_with_empty_decks",
+          "line": 64,
+          "detail": "m in 3 slots"
+        },
+        {
+          "file": "engine/tests/test_modules/effects/draw/flat/surplus_heart01_live_success_draw_test.rs",
+          "test": "surplus_heart01_draw_live_leaves_no_choice_with_hasunosora_stage",
+          "line": 46,
+          "detail": "hasu in 3 slots"
+        },
+        {
+          "file": "engine/tests/test_modules/effects/draw/flat/surplus_heart01_live_success_draw_test.rs",
+          "test": "surplus_heart01_draw_live_resolves_out_of_live_card_zone",
+          "line": 16,
+          "detail": "m in 3 slots"
+        },
+        {
+          "file": "engine/tests/test_modules/effects/energy/place/score_condition_integration_test.rs",
+          "test": "hasunosora_group_mixed_stage_passes",
+          "line": 389,
+          "detail": "filler in 2 slots"
+        },
+        {
+          "file": "engine/tests/test_modules/effects/energy/under_member/pl_bp6_003_test.rs",
+          "test": "kotori_no_empty_slot_keeps_under",
+          "line": 577,
+          "detail": "filler in 2 slots"
+        },
+        {
+          "file": "engine/tests/test_modules/effects/gain/blades/live_start/live_start_center_liella_set_blade_three_test.rs",
+          "test": "liella_at_right_side_excluded_by_position",
+          "line": 91,
+          "detail": "filler in 2 slots"
+        },
+        {
+          "file": "engine/tests/test_modules/effects/gain/blades/per_card/per_unit_discard_count_regression_test.rs",
+          "test": "test_per_unit_discard_bug_fix",
+          "line": 6,
+          "detail": "filler in 2 slots"
+        },
+        {
+          "file": "engine/tests/test_modules/effects/gain/blades/per_card/q46_kanako_all_heart_timing_test.rs",
+          "test": "q46_kanako_condition_less_than_3_live_cards_no_gain",
+          "line": 46,
+          "detail": "filler in 2 slots"
+        },
+        {
+          "file": "engine/tests/test_modules/effects/gain/blades/per_card/q46_kanako_all_heart_timing_test.rs",
+          "test": "q46_kanako_constant_grants_blades_when_condition_met",
+          "line": 14,
+          "detail": "filler in 2 slots"
+        },
+        {
+          "file": "engine/tests/test_modules/effects/gain/blades/per_card/q46_kanako_all_heart_timing_test.rs",
+          "test": "q46_kanako_leaves_stage_blade_removed",
+          "line": 140,
+          "detail": "filler in 2 slots"
+        },
+        {
+          "file": "engine/tests/test_modules/effects/gain/blades/per_card/q46_kanako_all_heart_timing_test.rs",
+          "test": "q46_kanako_leaves_stage_blade_removed",
+          "line": 140,
+          "detail": "filler in 2 slots"
+        },
+        {
+          "file": "engine/tests/test_modules/effects/gain/blades/per_card/q46_kanako_all_heart_timing_test.rs",
+          "test": "q46_kanako_no_nijigasaki_live_card_no_gain",
+          "line": 72,
+          "detail": "filler in 2 slots"
+        },
+        {
+          "file": "engine/tests/test_modules/effects/gain/blades/per_card/q46_kanako_all_heart_timing_test.rs",
+          "test": "q46_kanako_not_on_stage_no_constant",
+          "line": 106,
+          "detail": "filler in 2 slots"
+        },
+        {
+          "file": "engine/tests/test_modules/effects/gain/blades/per_card/q46_kanako_all_heart_timing_test.rs",
+          "test": "q46_live_card_removed_condition_fails_blade_removed",
+          "line": 180,
+          "detail": "filler in 2 slots"
+        },
+        {
+          "file": "engine/tests/test_modules/effects/gain/hearts/live_start/live_start_discard_shuffle_group_members_heart01_test.rs",
+          "test": "cooking_condition_checks_discard_not_stage",
+          "line": 196,
+          "detail": "filler in 2 slots"
+        },
+        {
+          "file": "engine/tests/test_modules/effects/gain/hearts/live_start/live_start_equal_success_counts_heart02_test.rs",
+          "test": "landing_action_yeah_surplus_heart_applies_score_bonus",
+          "line": 318,
+          "detail": "provider in 3 slots"
+        },
+        {
+          "file": "engine/tests/test_modules/effects/gain/hearts/live_start/live_start_equal_success_counts_heart02_test.rs",
+          "test": "landing_action_yeah_surplus_heart_ge_3_true",
+          "line": 280,
+          "detail": "provider in 3 slots"
+        },
+        {
+          "file": "engine/tests/test_modules/effects/look_select/pin_top/per_group_member_look_pin_reveal_score_test.rs",
+          "test": "look_per_group_member_discards_remainder_without_score_for_member_reveal",
+          "line": 4,
+          "detail": "n in 3 slots"
+        },
+        {
+          "file": "engine/tests/test_modules/effects/look_select/recruit_stage/cost_tier_remainder_to_deck_top_routing_test.rs",
+          "test": "proof_cost_below_20_no_effect",
+          "line": 122,
+          "detail": "filler in 2 slots"
+        },
+        {
+          "file": "engine/tests/test_modules/effects/look_select/reorder_top/cheer_mode_look_three_return_one_from_hand_test.rs",
+          "test": "q276_control_normal_live_does_go_to_success_zone",
+          "line": 168,
+          "detail": "member in 3 slots"
+        },
+        {
+          "file": "engine/tests/test_modules/effects/look_select/reveal/debut_look_liella_cost4_hand_or_debut_test.rs",
+          "test": "kanon_stage_full_falls_back_to_hand",
+          "line": 237,
+          "detail": "filler in 3 slots"
+        },
+        {
+          "file": "engine/tests/test_modules/effects/recover/per_card/live_start_aqours_center_cost_nine_blade_gain_or_opponent_wait_test.rs",
+          "test": "deep_resonance_aqours_center_cost9_fires",
+          "line": 58,
+          "detail": "filler in 2 slots"
+        },
+        {
+          "file": "engine/tests/test_modules/effects/recover/per_card/live_start_aqours_center_cost_nine_blade_gain_or_opponent_wait_test.rs",
+          "test": "deep_resonance_aqours_cost13_at_left_no_fire",
+          "line": 157,
+          "detail": "filler in 2 slots"
+        },
+        {
+          "file": "engine/tests/test_modules/effects/recover/per_card/live_start_aqours_center_cost_nine_blade_gain_or_opponent_wait_test.rs",
+          "test": "deep_resonance_aqours_cost4_below_threshold_no_fire",
+          "line": 117,
+          "detail": "filler in 2 slots"
+        },
+        {
+          "file": "engine/tests/test_modules/effects/recover/per_card/live_start_aqours_center_cost_nine_blade_gain_or_opponent_wait_test.rs",
+          "test": "deep_resonance_empty_center_no_fire",
+          "line": 102,
+          "detail": "filler in 2 slots"
+        },
+        {
+          "file": "engine/tests/test_modules/effects/recover/per_card/live_start_aqours_center_cost_nine_blade_gain_or_opponent_wait_test.rs",
+          "test": "deep_resonance_option_0_blade_gain_exact_modifier",
+          "line": 179,
+          "detail": "filler in 2 slots"
+        },
+        {
+          "file": "engine/tests/test_modules/effects/recover/per_card/live_start_aqours_center_cost_nine_blade_gain_or_opponent_wait_test.rs",
+          "test": "deep_resonance_option_1_opponent_wait_exact_state",
+          "line": 231,
+          "detail": "filler in 2 slots"
+        },
+        {
+          "file": "engine/tests/test_modules/effects/recover/per_card/live_start_aqours_center_cost_nine_blade_gain_or_opponent_wait_test.rs",
+          "test": "deep_resonance_wrong_group_at_center_no_fire",
+          "line": 137,
+          "detail": "filler in 2 slots"
+        },
+        {
+          "file": "engine/tests/test_modules/effects/recover/per_card/live_start_success_zone_plus_three_distinct_names_score_plus_one_test.rs",
+          "test": "miracle_stay_tune_fewer_than_3_distinct_members_no_score",
+          "line": 72,
+          "detail": "member1 in 3 slots"
+        },
+        {
+          "file": "engine/tests/test_modules/effects/recover/per_card/live_start_success_zone_plus_three_distinct_names_score_plus_one_test.rs",
+          "test": "miracle_stay_tune_neither_condition_no_score",
+          "line": 146,
+          "detail": "member1 in 3 slots"
+        },
+        {
+          "file": "engine/tests/test_modules/effects/recover/to_hand/live_success_draws_four_and_picks_one_niji_reveal_q66_test.rs",
+          "test": "poppin_equal_score_fails",
+          "line": 71,
+          "detail": "member in 2 slots"
+        },
+        {
+          "file": "engine/tests/test_modules/effects/recover/to_hand/live_success_draws_four_and_picks_one_niji_reveal_q66_test.rs",
+          "test": "poppin_equal_score_fails",
+          "line": 71,
+          "detail": "member in 2 slots"
+        },
+        {
+          "file": "engine/tests/test_modules/effects/recover/to_hand/live_success_draws_four_and_picks_one_niji_reveal_q66_test.rs",
+          "test": "poppin_lower_score_fails",
+          "line": 116,
+          "detail": "member in 2 slots"
+        },
+        {
+          "file": "engine/tests/test_modules/effects/recover/to_hand/live_success_draws_four_and_picks_one_niji_reveal_q66_test.rs",
+          "test": "poppin_lower_score_fails",
+          "line": 116,
+          "detail": "member in 2 slots"
+        },
+        {
+          "file": "engine/tests/test_modules/effects/recover/to_hand/live_success_draws_four_and_picks_one_niji_reveal_q66_test.rs",
+          "test": "poppin_mixed_revealed_picks_niji_only",
+          "line": 302,
+          "detail": "member in 2 slots"
+        },
+        {
+          "file": "engine/tests/test_modules/effects/recover/to_hand/live_success_draws_four_and_picks_one_niji_reveal_q66_test.rs",
+          "test": "poppin_mixed_revealed_picks_niji_only",
+          "line": 302,
+          "detail": "member in 2 slots"
+        },
+        {
+          "file": "engine/tests/test_modules/effects/recover/to_hand/live_success_draws_four_and_picks_one_niji_reveal_q66_test.rs",
+          "test": "poppin_multiple_cards_lower_total_fails",
+          "line": 159,
+          "detail": "member in 2 slots"
+        },
+        {
+          "file": "engine/tests/test_modules/effects/recover/to_hand/live_success_draws_four_and_picks_one_niji_reveal_q66_test.rs",
+          "test": "poppin_multiple_cards_lower_total_fails",
+          "line": 159,
+          "detail": "member in 2 slots"
+        },
+        {
+          "file": "engine/tests/test_modules/effects/recover/to_hand/live_success_draws_four_and_picks_one_niji_reveal_q66_test.rs",
+          "test": "poppin_multiple_niji_revealed_picks_one",
+          "line": 211,
+          "detail": "member in 2 slots"
+        },
+        {
+          "file": "engine/tests/test_modules/effects/recover/to_hand/live_success_draws_four_and_picks_one_niji_reveal_q66_test.rs",
+          "test": "poppin_multiple_niji_revealed_picks_one",
+          "line": 211,
+          "detail": "member in 2 slots"
+        },
+        {
+          "file": "engine/tests/test_modules/effects/recover/to_hand/live_success_draws_four_and_picks_one_niji_reveal_q66_test.rs",
+          "test": "poppin_no_niji_revealed_effect_fails",
+          "line": 264,
+          "detail": "member in 2 slots"
+        },
+        {
+          "file": "engine/tests/test_modules/effects/recover/to_hand/live_success_draws_four_and_picks_one_niji_reveal_q66_test.rs",
+          "test": "poppin_no_niji_revealed_effect_fails",
+          "line": 264,
+          "detail": "member in 2 slots"
+        },
+        {
+          "file": "engine/tests/test_modules/effects/recover/to_hand/live_success_draws_four_and_picks_one_niji_reveal_q66_test.rs",
+          "test": "poppin_q66_has_cards_beats_no_cards",
+          "line": 26,
+          "detail": "member in 2 slots"
+        },
+        {
+          "file": "engine/tests/test_modules/effects/recover/to_hand/live_success_draws_four_and_picks_one_niji_reveal_q66_test.rs",
+          "test": "poppin_q66_has_cards_beats_no_cards",
+          "line": 26,
+          "detail": "member in 2 slots"
+        },
+        {
+          "file": "engine/tests/test_modules/effects/score/card_score/live_start_total_blade_threshold_live_score_q116_test.rs",
+          "test": "dream_with_you_blade_10_score_plus_1",
+          "line": 11,
+          "detail": "blader in 2 slots"
+        },
+        {
+          "file": "engine/tests/test_modules/effects/score/card_score/live_start_total_blade_threshold_live_score_q116_test.rs",
+          "test": "dream_with_you_reduced_yell_count_does_not_block_score",
+          "line": 86,
+          "detail": "blader in 2 slots"
+        },
+        {
+          "file": "engine/tests/test_modules/effects/score/card_score/live_success_group_cheer_count_live_score_q36_q107_test.rs",
+          "test": "awake_q36_10_plus_hasetsu_cheers_score_plus_1",
+          "line": 23,
+          "detail": "heart_member in 3 slots"
+        },
+        {
+          "file": "engine/tests/test_modules/effects/score/card_score/live_success_group_cheer_count_live_score_q36_q107_test.rs",
+          "test": "awake_q36_non_hasetsu_cheered_no_score",
+          "line": 101,
+          "detail": "high_blade in 3 slots"
+        },
+        {
+          "file": "engine/tests/test_modules/effects/score/per_card/excess_heart_score_shift_never_below_zero_pl_n_bp5_010_r_test.rs",
+          "test": "mifune_q231_excess_heart_2_score_cancels_to_0",
+          "line": 11,
+          "detail": "filler_n in 3 slots"
+        },
+        {
+          "file": "engine/tests/test_modules/effects/score/per_card/excess_heart_score_shift_never_below_zero_pl_n_bp5_010_r_test.rs",
+          "test": "mifune_q231_excess_heart_2_score_cancels_to_0_all_rarities",
+          "line": 57,
+          "detail": "filler_n in 3 slots"
+        },
+        {
+          "file": "engine/tests/test_modules/effects/score/per_card/neutral_live_success_test.rs",
+          "test": "q261_live_fails_no_trigger",
+          "line": 296,
+          "detail": "filler in 3 slots"
+        },
+        {
+          "file": "engine/tests/test_modules/effects/score/per_card/shizuku_aggregate_score_comparison_draw_test.rs",
+          "test": "shizuku_higher_score_draws_card",
+          "line": 58,
+          "detail": "member in 2 slots"
+        },
+        {
+          "file": "engine/tests/test_modules/effects/score/per_card/shizuku_aggregate_score_comparison_draw_test.rs",
+          "test": "shizuku_p2_no_live_card_p1_wins_and_draws",
+          "line": 108,
+          "detail": "member in 2 slots"
+        },
+        {
+          "file": "engine/tests/test_modules/effects/score/per_card/shizuku_aggregate_score_comparison_draw_test.rs",
+          "test": "shizuku_p_rarity_same_as_r",
+          "line": 132,
+          "detail": "member in 2 slots"
+        },
+        {
+          "file": "engine/tests/test_modules/effects/score/per_card/shizuku_aggregate_score_comparison_draw_test.rs",
+          "test": "shizuku_tied_score_no_draw",
+          "line": 82,
+          "detail": "member in 2 slots"
+        },
+        {
+          "file": "engine/tests/test_modules/effects/score/per_card/shizuku_aggregate_score_comparison_draw_test.rs",
+          "test": "shizuku_tied_score_no_draw",
+          "line": 82,
+          "detail": "member in 3 slots"
+        },
+        {
+          "file": "engine/tests/test_modules/effects/score/per_card/solitude_rain_unique_heart_color_score_q67_test.rs",
+          "test": "solitude_q67_hasetsu_member_with_heart01_score_plus_1",
+          "line": 13,
+          "detail": "filler in 2 slots"
+        },
+        {
+          "file": "engine/tests/test_modules/effects/score/per_card/solitude_rain_unique_heart_color_score_q67_test.rs",
+          "test": "solitude_q67_non_hasetsu_member_no_score",
+          "line": 59,
+          "detail": "filler in 2 slots"
+        },
+        {
+          "file": "engine/tests/test_modules/effects/score/per_card/takaramono_live_success_no_excess_heart_score_test.rs",
+          "test": "takaramono_no_excess_heart_score_plus_1",
+          "line": 27,
+          "detail": "member in 3 slots"
+        },
+        {
+          "file": "engine/tests/test_modules/integration/full_round/real_card_phase_walkthrough_and_ability_suite_test.rs",
+          "test": "lovepeace_q150_self_hearts_greater_than_opponent_score_plus_1",
+          "line": 2473,
+          "detail": "PL in 2 slots"
+        },
+        {
+          "file": "engine/tests/test_modules/integration/full_round/real_card_phase_walkthrough_and_ability_suite_test.rs",
+          "test": "lovepeace_q150_self_hearts_greater_than_opponent_score_plus_1",
+          "line": 2473,
+          "detail": "PR in 2 slots"
+        },
+        {
+          "file": "engine/tests/test_modules/integration/full_round/real_card_phase_walkthrough_and_ability_suite_test.rs",
+          "test": "lovepeace_q150_self_hearts_greater_than_opponent_score_plus_1",
+          "line": 2473,
+          "detail": "id in 2 slots"
+        },
+        {
+          "file": "engine/tests/test_modules/integration/full_round/real_card_phase_walkthrough_and_ability_suite_test.rs",
+          "test": "nico_full_stage_then_prompt_path",
+          "line": 2000,
+          "detail": "filler in 2 slots"
+        },
+        {
+          "file": "engine/tests/test_modules/integration/full_round/real_card_phase_walkthrough_and_ability_suite_test.rs",
+          "test": "nico_prompt_path_direct_placement_wait_state",
+          "line": 1889,
+          "detail": "filler in 2 slots"
+        },
+        {
+          "file": "engine/tests/test_modules/integration/full_round/real_card_phase_walkthrough_and_ability_suite_test.rs",
+          "test": "nico_prompt_path_direct_placement_wait_state",
+          "line": 1889,
+          "detail": "filler2 in 2 slots"
+        },
+        {
+          "file": "engine/tests/test_modules/integration/full_round/real_card_phase_walkthrough_and_ability_suite_test.rs",
+          "test": "nico_requires_empty_area",
+          "line": 1439,
+          "detail": "filler in 2 slots"
+        },
+        {
+          "file": "engine/tests/test_modules/integration/parser_e2e/parser_issues_e2e_test.rs",
+          "test": "issue11_fanfare_15plus_cards_gives_blade",
+          "line": 934,
+          "detail": "filler in 2 slots"
+        },
+        {
+          "file": "engine/tests/test_modules/integration/parser_e2e/parser_issues_e2e_test.rs",
+          "test": "issue11_fanfare_few_cards_no_blade",
+          "line": 969,
+          "detail": "filler in 2 slots"
+        },
+        {
+          "file": "engine/tests/test_modules/integration/parser_e2e/parser_issues_e2e_test.rs",
+          "test": "issue5_solitude_rain_heart_color_scoring",
+          "line": 339,
+          "detail": "filler in 2 slots"
+        },
+        {
+          "file": "engine/tests/test_modules/jidou/discard_watch/live_start_heart_requirement_reduction_counts_live_slot_cards_only_test.rs",
+          "test": "hanamusubi_q213_member_card_moved_before_live_start",
+          "line": 14,
+          "detail": "filler in 2 slots"
+        },
+        {
+          "file": "engine/tests/test_modules/jidou/yell/live_success_from_yell_reveal/live_success_no_blade_heart_or_two_excess_hearts_scores_four_test.rs",
+          "test": "miracle_wave_q182_excess_heart_score_4",
+          "line": 26,
+          "detail": "PL in 2 slots"
+        },
+        {
+          "file": "engine/tests/test_modules/jidou/yell/live_success_from_yell_reveal/live_success_no_blade_heart_or_two_excess_hearts_scores_four_test.rs",
+          "test": "miracle_wave_q182_excess_heart_score_4",
+          "line": 26,
+          "detail": "S in 2 slots"
+        },
+        {
+          "file": "engine/tests/test_modules/jidou/yell/live_success_from_yell_reveal/live_success_no_blade_heart_or_two_excess_hearts_scores_four_test.rs",
+          "test": "miracle_wave_q182_excess_heart_score_4",
+          "line": 26,
+          "detail": "SD in 2 slots"
+        },
+        {
+          "file": "engine/tests/test_modules/jidou/yell/live_success_from_yell_reveal/live_success_no_blade_heart_or_two_excess_hearts_scores_four_test.rs",
+          "test": "miracle_wave_q182_excess_heart_score_4",
+          "line": 26,
+          "detail": "id in 2 slots"
+        },
+        {
+          "file": "engine/tests/test_modules/jidou/yell/live_success_from_yell_reveal/live_success_no_blade_heart_or_two_excess_hearts_scores_four_test.rs",
+          "test": "miracle_wave_q182_excess_heart_score_4",
+          "line": 26,
+          "detail": "sd1 in 2 slots"
+        },
+        {
+          "file": "engine/tests/test_modules/rules/baton/double_baton_touch_draw_deploy_q193_q194_test.rs",
+          "test": "sumire_no_liella_on_stage_plays_normally",
+          "line": 366,
+          "detail": "filler in 2 slots"
+        },
+        {
+          "file": "engine/tests/test_modules/rules/conditions/condition_evaluation_test.rs",
+          "test": "blade_goes_to_stage_member_not_live_card",
+          "line": 231,
+          "detail": "filler in 2 slots"
+        },
+        {
+          "file": "engine/tests/test_modules/rules/conditions/condition_evaluation_test.rs",
+          "test": "opponent_cost_self_higher_scores_in_snapshot",
+          "line": 68,
+          "detail": "filler in 2 slots"
+        },
+        {
+          "file": "engine/tests/test_modules/rules/conditions/condition_evaluation_test.rs",
+          "test": "opponent_cost_self_higher_scores_in_snapshot",
+          "line": 68,
+          "detail": "filler in 2 slots"
+        },
+        {
+          "file": "engine/tests/test_modules/rules/conditions/condition_evaluation_test.rs",
+          "test": "opponent_cost_self_lower_no_score_in_snapshot",
+          "line": 102,
+          "detail": "filler in 2 slots"
+        },
+        {
+          "file": "engine/tests/test_modules/rules/conditions/condition_evaluation_test.rs",
+          "test": "opponent_cost_self_lower_no_score_in_snapshot",
+          "line": 102,
+          "detail": "filler in 3 slots"
+        },
+        {
+          "file": "engine/tests/test_modules/rules/conditions/q38_live_card_zone_test.rs",
+          "test": "eutopia_q38_score_condition_checks_live_card_count",
+          "line": 17,
+          "detail": "filler in 2 slots"
+        },
+        {
+          "file": "engine/tests/test_modules/rules/conditions/q38_live_card_zone_test.rs",
+          "test": "eutopia_q38_three_live_cards_score_plus_2",
+          "line": 55,
+          "detail": "filler in 2 slots"
+        },
+        {
+          "file": "engine/tests/test_modules/rules/phases/live_success_rules_test.rs",
+          "test": "both_players_have_live_cards",
+          "line": 150,
+          "detail": "member in 3 slots"
+        },
+        {
+          "file": "engine/tests/test_modules/rules/phases/live_success_rules_test.rs",
+          "test": "both_players_have_live_cards",
+          "line": 150,
+          "detail": "member in 3 slots"
+        },
+        {
+          "file": "engine/tests/test_modules/rules/phases/live_success_rules_test.rs",
+          "test": "both_players_live_score_compared",
+          "line": 65,
+          "detail": "member in 3 slots"
+        },
+        {
+          "file": "engine/tests/test_modules/rules/phases/live_success_rules_test.rs",
+          "test": "both_players_live_score_compared",
+          "line": 65,
+          "detail": "member in 3 slots"
+        },
+        {
+          "file": "engine/tests/test_modules/rules/phases/live_success_rules_test.rs",
+          "test": "one_player_live_auto_higher_score",
+          "line": 193,
+          "detail": "member in 3 slots"
+        },
+        {
+          "file": "engine/tests/test_modules/rules/phases/live_success_rules_test.rs",
+          "test": "q147_empty_need_heart_live_succeeds",
+          "line": 103,
+          "detail": "member in 3 slots"
+        },
+        {
+          "file": "engine/tests/test_modules/rules/phases/performance_pipeline_test.rs",
+          "test": "heart00_passes_check_fails_when_insufficient",
+          "line": 226,
+          "detail": "member in 2 slots"
+        },
+        {
+          "file": "engine/tests/test_modules/rules/phases/performance_pipeline_test.rs",
+          "test": "heart00_passes_check_succeeds_when_sufficient",
+          "line": 298,
+          "detail": "member in 2 slots"
+        },
+        {
+          "file": "engine/tests/test_modules/rules/phases/performance_pipeline_test.rs",
+          "test": "live_card_base_score_stored_correctly",
+          "line": 356,
+          "detail": "member in 2 slots"
+        }
+      ]
     },
     "unresolvable_card_id": {
       "count": 0,

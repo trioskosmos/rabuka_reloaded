@@ -483,6 +483,55 @@ Q_TRIVIAL_ASSERT_RE = re.compile(
 # `*count > 1` filters, which are the good kind.
 Q_LOOP_COUNTER_RE = re.compile(r"\b(\w+)\s*\+=\s*\d+\b")
 
+# A stage/zone literal being built by assignment. `stage.stage = [a, b, -1]`,
+# `stage.stage.assign([a, b, -1])`, and `under_cards[1] = [a, a]` all count.
+Q_STAGE_LITERAL_RE = re.compile(
+    r"(?:stage\.stage|under_cards\s*\[[^\]]*\])\s*(?:\.assign\()?\s*=\s*\[([^\]]*)\]"
+)
+Q_SLOT_IDENT_RE = re.compile(r"\b([A-Za-z_][A-Za-z0-9_]*)\b")
+# Rust keywords and the obvious non-card tokens, so `= [a, b, -1]` does not read
+# `a` twice because of an intervening operator or a cast.
+_NOT_A_CARD_SLOT = {
+    "-1",
+    "vec",
+    "Vec",
+    "stage",
+    "stage_card_ids",
+    "stage_card",
+    "stage_cards",
+    "self",
+    "game",
+    "gs",
+    "state",
+    "as",
+    "i16",
+    "u8",
+    "usize",
+    "true",
+    "false",
+    "None",
+    "Some",
+}
+
+
+def _duplicate_stage_ids(body):
+    """Yield (identifier, slot_count) for a card staged in more than one slot.
+
+    Only literal stage assignments are read, so a loop that fills the board with
+    `game.new_id(...)` — which is the correct way to get three copies — is never
+    reported. That keeps the false-positive rate at zero for well-formed
+    fixtures; a row here means one id is literally repeated in the list.
+    """
+    for m in Q_STAGE_LITERAL_RE.finditer(body):
+        counts = {}
+        for name in Q_SLOT_IDENT_RE.findall(m.group(1)):
+            if name in _NOT_A_CARD_SLOT or name.isdigit():
+                continue
+            counts[name] = counts.get(name, 0) + 1
+        for name, n in sorted(counts.items()):
+            if n > 1:
+                yield name, n
+
 
 def _has_ordinal_drain(body):
     """Does a loop counter drive WHICH prompt gets answered?
@@ -922,6 +971,7 @@ def audit_test_quality(files):
         "blind_phase_stepping": [],
         "similar_cards": [],
         "unpinned_similar_cards": [],
+        "duplicate_stage_id": [],
     }
     support = support_profiles_by_module(files)
     for _p, rel, text, _fns in files:
@@ -1026,6 +1076,17 @@ def audit_test_quality(files):
                 smells["prompt_ordinal_drain"].append((rel, name, line, ""))
             if Q_BLIND_PHASE_RE.search(body) and not Q_PHASE_PIN_RE.search(body):
                 smells["blind_phase_stepping"].append((rel, name, line, ""))
+            # The same card INSTANCE in two stage slots is not a legal board:
+            # `stage.stage = [filler, yoshiko, filler]` is one card standing in
+            # for two. Any effect that counts members, or dedupes by name or id,
+            # then measures something no real board produces. Report-only — most
+            # rows are padding a test does not count on, so the review prompt is
+            # "does this assertion depend on the count?", not "rewrite 141
+            # fixtures". `-1` (an empty slot) is not a duplicate.
+            for dup_name, dup_slots in _duplicate_stage_ids(body):
+                smells["duplicate_stage_id"].append(
+                    (rel, name, line, "%s in %d slots" % (dup_name, dup_slots))
+                )
             for cn in Q_CARD_NO_RE.findall(body):
                 if cn.startswith("PL!"):
                     file_groups.setdefault(card_group_key(cn), set()).add(cn)
@@ -1061,7 +1122,6 @@ def audit_test_quality(files):
     n_fns = sum(len(split_test_fns(text)) for _p, _rel, text, _fns in files)
     return smells, n_fns
 
-
 SMELL_DOCS = {
     "no_assert": "test never asserts (smoke at best — cannot pin behavior)",
     "no_drive": "trigger-context test that mutates state and asserts but never drives the engine (no scan/activate/play/fire): vacuous negatives/positives",
@@ -1072,6 +1132,7 @@ SMELL_DOCS = {
     "placeholder": "#[ignore], assert!(true), todo!() or unimplemented!() left in a test",
     "similar_cards": "confusable card numbers (bp2 vs pb2) staged in one file AND the file pins card identity (assert_card_identity / compares card_no), so a transposition would fail loudly",
     "unpinned_similar_cards": "confusable card numbers (bp2 vs pb2) staged in one file with NO card-identity pin — a transposed print would pass silently; add assert_card_identity to close it",
+    "duplicate_stage_id": "the same card INSTANCE in two stage slots (`stage.stage = [filler, y, filler]`) — not a legal board; anything that counts members or dedupes by name measures a board that cannot occur, so use a second `new_id`",
     "unresolvable_card_id": "a game.id(\"…\") literal that is not a card number in the database — get_card_id's lenient fallback silently substitutes a DIFFERENT PRINT of the same card, so the test stages the wrong card and passes",
     "prompt_ordinal_drain": "prompts answered by ORDINAL position (if step <= 2 { select 2 cards }) instead of by the prompt's own identity — adding or removing one prompt upstream silently changes which prompt gets the answer",
     "blind_phase_stepping": "a fixed `for _ in 0..N { pass() }` walk through the turn — a phase gaining or losing a step silently shifts the window the test thinks it is standing in; step to the phase by name instead",

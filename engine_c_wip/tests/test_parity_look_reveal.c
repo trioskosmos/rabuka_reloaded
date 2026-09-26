@@ -77,10 +77,9 @@ static int pool_get(int pl, int *out, int max)
     return rb_looked_at_pool(pl, out, max);
 }
 
-/* ═══════════════════════════════════════════════════════════════════════
-   1. look_at — counts and source zones
+/* ══════════════════════════════════════════════════════════════════════╁E   1. look_at  Ecounts and source zones
    (Rust: look.rs::execute_look_at / fetch_look_pool / look_at_with_refresh)
-   ═══════════════════════════════════════════════════════════════════════ */
+   ══════════════════════════════════════════════════════════════════════╁E*/
 static void test_look_at_counts_and_zones(void)
 {
     TestGame tg;
@@ -114,7 +113,7 @@ static void test_look_at_counts_and_zones(void)
     CHECK_EQ(pool_get(0, pool, 8), 3, "look_at with all=true takes the whole zone");
     rb_resume_with_choice(&tg.state, -1);
 
-    /* hand source peeks — it must not remove the card from the hand */
+    /* hand source peeks  Eit must not remove the card from the hand */
     test_add_to_hand(&tg, a);
     test_add_to_hand(&tg, b);
     e.count = 2;
@@ -146,7 +145,7 @@ static void test_look_at_counts_and_zones(void)
     rb_resume_with_choice(&tg.state, -1);
 }
 
-/* Q85 / rule 10.2.2.2 — look N from a short deck draws, refreshes, draws the rest. */
+/* Q85 / rule 10.2.2.2  Elook N from a short deck draws, refreshes, draws the rest. */
 static void test_look_at_short_deck_refresh(void)
 {
     TestGame tg;
@@ -171,9 +170,8 @@ static void test_look_at_short_deck_refresh(void)
     rb_resume_with_choice(&tg.state, -1);
 }
 
-/* ═══════════════════════════════════════════════════════════════════════
-   2. reveal — offer_reveal_choice / reveal_available (look.rs:205-400)
-   ═══════════════════════════════════════════════════════════════════════ */
+/* ══════════════════════════════════════════════════════════════════════╁E   2. reveal  Eoffer_reveal_choice / reveal_available (look.rs:205-400)
+   ══════════════════════════════════════════════════════════════════════╁E*/
 static void test_reveal_hand_offer_and_metadata(void)
 {
     TestGame tg;
@@ -239,7 +237,7 @@ static void test_reveal_hand_automatic_when_count_covers_all(void)
     CHECK_EQ(tg.state.p[0].hand.n, 2, "reveal never removes cards from the source zone");
 }
 
-/* look.rs:377-379 — `blind` only decorates the prompt; the revealed pool is
+/* look.rs:377-379  E`blind` only decorates the prompt; the revealed pool is
    still recorded on the automatic path. */
 static void test_reveal_blind_still_records(void)
 {
@@ -261,7 +259,7 @@ static void test_reveal_blind_still_records(void)
     CHECK_EQ(tg.state.n_revealed, 2, "a blind reveal still records the revealed pool");
 }
 
-/* look.rs:353-373 — the deck arm of reveal is a PEEK, the card stays until a
+/* look.rs:353-373  Ethe deck arm of reveal is a PEEK, the card stays until a
    conditional move_cards consumes it. */
 static void test_reveal_deck_is_a_peek(void)
 {
@@ -287,7 +285,7 @@ static void test_reveal_deck_is_a_peek(void)
     CHECK_EQ(tg.state.p[0].deck.n, 3, "reveal from the deck does not drain it");
 }
 
-/* look.rs:364-370 + 443-465 — the looked_at arm filters by card type and
+/* look.rs:364-370 + 443-465  Ethe looked_at arm filters by card type and
    heart colours before revealing. */
 static void test_reveal_looked_at_filters_candidates(void)
 {
@@ -317,9 +315,8 @@ static void test_reveal_looked_at_filters_candidates(void)
           "non-matching looked_at cards are not revealed");
 }
 
-/* ═══════════════════════════════════════════════════════════════════════
-   3. reveal_per_group (look.rs:1136-1197)
-   ═══════════════════════════════════════════════════════════════════════ */
+/* ══════════════════════════════════════════════════════════════════════╁E   3. reveal_per_group (look.rs:1136-1197)
+   ══════════════════════════════════════════════════════════════════════╁E*/
 static void test_reveal_per_group_sources(void)
 {
     TestGame tg;
@@ -378,9 +375,8 @@ static void test_reveal_per_group_sources(void)
     CHECK_EQ(tg.state.n_revealed, 0, "reveal_per_group ignores unsupported sources");
 }
 
-/* ═══════════════════════════════════════════════════════════════════════
-   4. reveal_until (look.rs:1201-1367)
-   ═══════════════════════════════════════════════════════════════════════ */
+/* ══════════════════════════════════════════════════════════════════════╁E   4. reveal_until (look.rs:1201-1367)
+   ══════════════════════════════════════════════════════════════════════╁E*/
 static void test_reveal_until_live_card(void)
 {
     TestGame tg;
@@ -451,7 +447,7 @@ static void test_reveal_until_chosen_card_type(void)
     CHECK(pool[0] == live && pool[1] == m1, "the pool is the draw order up to the match");
 }
 
-/* look.rs:1326-1367 — execute_reveal_until_target moves the matched card to
+/* look.rs:1326-1367  Eexecute_reveal_until_target moves the matched card to
    the FRONT of the looked-at pool and applies the member_card cost gate. */
 static void test_reveal_until_target_cost_gate(void)
 {
@@ -500,9 +496,8 @@ static void test_reveal_until_target_no_match_clears_pool(void)
     CHECK_EQ(tg.state.n_revealed, 2, "the failed search still records what it revealed");
 }
 
-/* ═══════════════════════════════════════════════════════════════════════
-   5. select from a zone (look.rs:405-483 execute_select)
-   ═══════════════════════════════════════════════════════════════════════ */
+/* ══════════════════════════════════════════════════════════════════════╁E   5. select from a zone (look.rs:405-483 execute_select)
+   ══════════════════════════════════════════════════════════════════════╁E*/
 static void test_select_offers_filtered_pool(void)
 {
     TestGame tg;
@@ -589,9 +584,8 @@ static void test_select_looked_at_and_stage(void)
     rb_resume_with_choice(&tg.state, -1);
 }
 
-/* ═══════════════════════════════════════════════════════════════════════
-   6. select_cards as an independent sequential step (look.rs:681-901)
-   ═══════════════════════════════════════════════════════════════════════ */
+/* ══════════════════════════════════════════════════════════════════════╁E   6. select_cards as an independent sequential step (look.rs:681-901)
+   ══════════════════════════════════════════════════════════════════════╁E*/
 static void test_select_cards_from_looked_at(void)
 {
     TestGame tg;
@@ -657,7 +651,7 @@ static void test_select_cards_filters_and_clamps(void)
     CHECK(!bag_has(&tg.state.p[0].hand, l1), "the live card cannot be selected");
 }
 
-/* look.rs:804-812 — nothing matches: the whole looked-at pool is discarded and
+/* look.rs:804-812  Enothing matches: the whole looked-at pool is discarded and
    no impossible prompt is offered. */
 static void test_select_cards_unmatched_discards_pool(void)
 {
@@ -685,9 +679,8 @@ static void test_select_cards_unmatched_discards_pool(void)
     CHECK_EQ(pool_get(0, pool, 8), 0, "the unmatched pool is emptied");
 }
 
-/* ═══════════════════════════════════════════════════════════════════════
-   7. look_and_select (look.rs:16-203)
-   ═══════════════════════════════════════════════════════════════════════ */
+/* ══════════════════════════════════════════════════════════════════════╁E   7. look_and_select (look.rs:16-203)
+   ══════════════════════════════════════════════════════════════════════╁E*/
 static void test_look_and_select_options_are_or(void)
 {
     TestGame tg;
@@ -771,7 +764,8 @@ static void test_look_and_select_heart_color_filter(void)
     CHECK(ch && ch->n_filtered_indices == 1 && ch->filtered_indices[0] == 1,
           "only the heart-colour match is selectable from the looked-at set");
     CHECK_EQ(ch ? ch->count : -1, 1, "the offered count follows the matching cards");
-    rb_resume_with_choice_indices(&tg.state, ch->filtered_indices, 1);
+    int one[1] = {0};
+    rb_resume_with_choice_indices(&tg.state, one, 1);
     CHECK(bag_has(&tg.state.p[0].hand, blue), "the heart-colour match reaches the hand");
     CHECK_EQ(tg.state.p[0].discard.n, 2, "the non-matching remainder is discarded");
 }
@@ -808,7 +802,8 @@ static void test_look_and_select_cost_limit_filter(void)
     const RbChoice *ch = rb_get_pending_choice(&tg.state);
     CHECK(ch && ch->n_filtered_indices == 1 && ch->filtered_indices[0] == 1,
           "the cost gate removes the over-priced looked-at card");
-    rb_resume_with_choice_indices(&tg.state, ch->filtered_indices, 1);
+    int one[1] = {0};
+    rb_resume_with_choice_indices(&tg.state, one, 1);
     CHECK(bag_has(&tg.state.p[0].hand, cheap), "the in-budget card is taken");
     CHECK_EQ(tg.state.p[0].discard.n, 1, "the over-priced card is discarded");
     CHECK(bag_has(&tg.state.p[0].discard, costly), "the over-priced card is the discarded one");
@@ -904,7 +899,7 @@ static void test_look_and_select_unmatched_path(void)
     CHECK_EQ(tg.state.p[0].score, 5, "the followup action still runs on the unmatched path");
 }
 
-/* look.rs:176-203 — a look_action that is not look_at runs as a nested effect. */
+/* look.rs:176-203  Ea look_action that is not look_at runs as a nested effect. */
 static void test_look_and_select_nested_look_action(void)
 {
     TestGame tg;
@@ -942,7 +937,7 @@ static void test_look_and_select_nested_look_action(void)
     rb_resume_with_choice_indices(&tg.state, NULL, 0);
 }
 
-/* Remainder routing — keep_shuffle_under finalisation. */
+/* Remainder routing  Ekeep_shuffle_under finalisation. */
 static void test_look_and_select_remainder_routes(void)
 {
     TestGame tg;
@@ -978,12 +973,8 @@ static void test_look_and_select_remainder_routes(void)
           "remainder_destination=deck_bottom returns the rest under the deck");
 }
 
-/* ═══════════════════════════════════════════════════════════════════════
-   8. Real decoded ability: 国木田花丸 PL!S-bp5-007-R
-   ライブ成功時：自分のデッキの上から4枚を見る。その中から、
-   ハートがハート04のメンバーカードを1枚選び、手札に加え、
-   残りを控え室に置く。
-   ═══════════════════════════════════════════════════════════════════════ */
+/* ══════════════════════════════════════════════════════════════════════╁E   8. Real decoded ability: 国木田花丸 PL!S-bp5-007-R
+   ライブ�E功時�E��E刁E�EチE��キの上かめE枚を見る。その中から、E   ハ�Eトがハ�EチE4のメンバ�Eカードを1枚選び、手札に�?え、E   残りを控え室に置く、E   ══════════════════════════════════════════════════════════════════════╁E*/
 static void test_real_decoded_hanamaru_ability(void)
 {
     int id = rb_find_card_by_no("PL!S-bp5-007-R");
@@ -1029,19 +1020,19 @@ static void test_real_decoded_hanamaru_ability(void)
     CHECK(ch && ch->n_filtered_indices == 2 && ch->filtered_indices[0] == 1 &&
               ch->filtered_indices[1] == 3,
           "only the heart04 members are selectable");
-    rb_resume_with_choice_indices(&tg.state, ch->filtered_indices, 2);
-    CHECK(bag_has(&tg.state.p[0].hand, dia) && bag_has(&tg.state.p[0].hand, cost17),
-          "the two heart04 members reach the hand");
-    CHECK_EQ(tg.state.p[0].discard.n, 2, "the other two looked cards go to the waitroom");
-    CHECK(!bag_has(&tg.state.p[0].hand, live) && !bag_has(&tg.state.p[0].hand, plain),
-          "the non-matching looked cards never reach the hand");
+    int pick[1] = {0};
+    rb_resume_with_choice_indices(&tg.state, pick, 1);
+    CHECK(bag_has(&tg.state.p[0].hand, dia), "the chosen heart04 member reaches the hand");
+    CHECK_EQ(tg.state.p[0].discard.n, 3, "the other three looked cards go to the waitroom");
+    CHECK(!bag_has(&tg.state.p[0].hand, live) && !bag_has(&tg.state.p[0].hand, plain) &&
+              !bag_has(&tg.state.p[0].hand, cost17),
+          "the non-picked looked cards never reach the hand");
     CHECK_EQ(tg.state.p[0].deck.n, 0, "the whole top four left the deck");
     rb_free_ability(&ability);
 }
 
-/* ═══════════════════════════════════════════════════════════════════════
-   9. Real decoded ability with no match: 黒澤ダイヤ PL!S-pb1-013-N
-   ═══════════════════════════════════════════════════════════════════════ */
+/* ══════════════════════════════════════════════════════════════════════╁E   9. Real decoded ability with no match: 黒澤ダイヤ PL!S-pb1-013-N
+   ══════════════════════════════════════════════════════════════════════╁E*/
 static void test_real_decoded_dia_no_match(void)
 {
     int id = rb_find_card_by_no("PL!S-pb1-013-N");
@@ -1081,7 +1072,7 @@ static void test_real_decoded_dia_no_match(void)
     rb_free_ability(&ability);
 }
 
-/* ═══════════════════════════════════════════════════════════════════════ */
+/* ══════════════════════════════════════════════════════════════════════╁E*/
 int main(void)
 {
     if (rb_load("src") != 0) {

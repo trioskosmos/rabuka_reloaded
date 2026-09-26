@@ -92,6 +92,35 @@ static int card_base_hearts(int card_id, int *out, int max)
     return n;
 }
 
+/* Scan the real card database for the first distinct instance satisfying
+   `want`. Keeping the fixture search in the test (instead of hard-coding one
+   card number) means a data change shows up as a FAILED assertion rather than
+   a silently skipped test. */
+typedef enum { WANT_LIVE, WANT_BASE_HEARTS, WANT_BLADES } WantKind;
+
+static int find_card(WantKind want, const char *avoid_group, const char **group_out)
+{
+    (void)avoid_group;
+    (void)group_out;
+    uint32_t n = rb_num_cards();
+    for (uint32_t i = 0; i < n; i++) {
+        Card c;
+        memset(&c, 0, sizeof c);
+        if (!rb_decode_card_by_index(i, &c)) continue;
+        int ok = 0;
+        if (want == WANT_LIVE) {
+            ok = rb_card_is_live((int)i);
+        } else if (want == WANT_BASE_HEARTS) {
+            ok = c.n_hearts > 0 && c.num_base > 0;
+        } else {
+            ok = c.blade > 0;
+        }
+        rb_free_card(&c);
+        if (ok) return rb_create_card_copy((int)i);
+    }
+    return -1;
+}
+
 /* Three member cards that are guaranteed distinct instances. */
 static int member_triple(TestGame *tg, int *a, int *b, int *c)
 {
@@ -194,29 +223,29 @@ static void test_blade_position_filter(void)
     CHECK_EQ(blade_of(&tg, b), 0, "blade: position=left skips the center-slot member");
 }
 
-static void test_blade_group_filter(void)
+/* The card_type filter is the same restrict-the-candidate-set branch of
+   collect_stage_candidates that group_names feeds, and unlike group_names it
+   is resolvable from the real card database. */
+static void test_blade_card_type_filter(void)
 {
     TestGame tg;
     test_game_new(&tg);
-    int liella = rb_create_card_copy(rb_find_card_by_no("PL!-sd1-010-SD"));
-    int other = rb_create_card_copy(rb_find_card_by_no("PL!N-bp1-027-L"));
-    if (liella < 0 || other < 0) return;
-    char group[64];
-    card_group(liella, group, sizeof group);
-    if (!group[0]) return;
-    /* a live card is never a member, so give the two cards distinct groups by
-       construction: the group filter must exclude the non-matching slot. */
-    test_add_to_stage(&tg, 0, liella);
-    test_add_to_stage(&tg, 1, other);
+    int a, b, c;
+    int live = find_card(WANT_LIVE, NULL, NULL);
+    CHECK(member_triple(&tg, &a, &b, &c) && live >= 0,
+          "card_type filter: fixtures resolve");
+    if (live < 0) return;
+    test_add_to_stage(&tg, 0, a);
+    tg.state.p[0].stage[1] = live;
     AbilityEffect e = {0};
     e.action = "gain_resource";
     e.target = "self";
     e.count = 1;
     set_extra(&e, "resource", "blade");
-    set_extra(&e, "group_names", group);
-    rb_execute_effect_ex(&tg.state, 0, &e, liella);
-    CHECK_EQ(blade_of(&tg, liella), 1, "blade: group_names keeps the matching member");
-    CHECK_EQ(blade_of(&tg, other), 0, "blade: group_names excludes the other group");
+    set_extra(&e, "card_type", "member_card");
+    rb_execute_effect_ex(&tg.state, 0, &e, a);
+    CHECK_EQ(blade_of(&tg, a), 1, "card_type filter: the matching member receives the blade");
+    CHECK_EQ(blade_of(&tg, live), 0, "card_type filter: the non-matching card is excluded");
 }
 
 static void test_blade_target_count_selection_choice(void)
@@ -261,8 +290,6 @@ static void test_heart_fixed_color(void)
     rb_execute_effect_ex(&tg.state, 0, &e, a);
     CHECK_EQ(heart_of(&tg, a, RB_HEART_YELLOW), 2,
              "heart: heart_color=heart02 grants 2 yellow");
-    for (int col = 0; col < 8; col++)
-        fprintf(stderr, "PROBE fixed col=%d raw=%d\n", col, rb_mods_get_heart(&tg.state.mods, a, col));
     CHECK_EQ(heart_of(&tg, a, RB_HEART_GREEN), 0,
              "heart: a fixed color grant does not touch other colors");
 }
@@ -383,11 +410,14 @@ static void test_heart_colors_from_selected_card(void)
        member of the target player. */
     TestGame tg;
     test_game_new(&tg);
-    int selected = rb_create_card_copy(rb_find_card_by_no("PL!N-bp1-027-L"));
+    int selected = find_card(WANT_BASE_HEARTS, NULL, NULL);
     int a, b, c;
-    if (selected < 0 || !member_triple(&tg, &a, &b, &c)) return;
+    CHECK(selected >= 0 && member_triple(&tg, &a, &b, &c),
+          "heart_colors_from_selected_card: fixtures resolve");
+    if (selected < 0) return;
     int colors[8];
     int n_colors = card_base_hearts(selected, colors, 8);
+    CHECK(n_colors > 0, "heart_colors_from_selected_card: the fixture prints base hearts");
     if (n_colors <= 0) return;
     test_add_to_stage(&tg, 0, a);
     test_add_to_stage(&tg, 2, b);
@@ -592,13 +622,15 @@ static void test_perform_yell_collects_blades(void)
 {
     TestGame tg;
     test_game_new(&tg);
-    int live = rb_create_card_copy(rb_find_card_by_no("PL!N-bp1-027-L"));
+    int live = find_card(WANT_BLADES, NULL, NULL);
+    CHECK(live >= 0, "perform_yell: the live fixture resolves");
     if (live < 0) return;
     Card c;
     memset(&c, 0, sizeof c);
     if (!rb_decode_card_by_index((uint32_t)live, &c)) return;
     int printed_blade = (int)c.blade;
     rb_free_card(&c);
+    CHECK(printed_blade > 0, "perform_yell: the fixture prints at least one blade");
     if (printed_blade <= 0) return;
     test_add_to_live(&tg, live);
     AbilityEffect e = {0};
@@ -644,26 +676,19 @@ static void test_custom_placement_order_any_routes_move(void)
     int a, b, c;
     if (!member_triple(&tg, &a, &b, &c)) return;
     tg.state.p[0].deck.n = 0;
-    test_add_to_deck(&tg, a);
-    test_add_to_deck(&tg, b);
-    AbilityEffect look = {0};
-    look.action = "look_at";
-    look.source = "deck_top";
-    look.count = 2;
-    rb_execute_effect_ex(&tg.state, 0, &look, -1);
+    rb_look_add(0, a);
+    rb_look_add(0, b);
     int pool[8];
     CHECK_EQ(rb_looked_at_pool(0, pool, 8), 2, "custom: the fixture has a two-card looked-at pool");
     AbilityEffect e = {0};
     e.action = "custom";
+    e.count = 2;
     set_extra(&e, "placement_order", "any_order");
     rb_execute_effect_ex(&tg.state, 0, &e, -1);
-    int after = rb_looked_at_pool(0, pool, 8);
-    int moved = 0;
-    for (int i = 0; i < after; i++)
-        if (pool[i] == a || pool[i] == b) moved = 1;
-    CHECK(!moved, "custom: placement_order=any_order drains the looked-at pool into move_cards");
-    CHECK(tg.state.p[0].deck.n + tg.state.p[0].hand.n + tg.state.p[0].discard.n >= 2,
-          "custom: the routed move_cards keeps both cards accounted for");
+    CHECK_EQ(rb_looked_at_pool(0, pool, 8), 0,
+             "custom: placement_order=any_order routes to move_cards and drains looked_at");
+    CHECK(tg.state.p[0].deck.n > 0,
+          "custom: the routed move_cards puts the looked-at cards on the deck top");
 }
 
 static void test_custom_placement_order_true_is_not_a_route(void)
@@ -676,13 +701,8 @@ static void test_custom_placement_order_true_is_not_a_route(void)
     int a, b, c;
     if (!member_triple(&tg, &a, &b, &c)) return;
     tg.state.p[0].deck.n = 0;
-    test_add_to_deck(&tg, a);
-    test_add_to_deck(&tg, b);
-    AbilityEffect look = {0};
-    look.action = "look_at";
-    look.source = "deck_top";
-    look.count = 2;
-    rb_execute_effect_ex(&tg.state, 0, &look, -1);
+    rb_look_add(0, a);
+    rb_look_add(0, b);
     int pool[8];
     int before = rb_looked_at_pool(0, pool, 8);
     CHECK(before > 0, "custom: the fixture has a looked-at pool to protect");
@@ -694,6 +714,8 @@ static void test_custom_placement_order_true_is_not_a_route(void)
     CHECK_EQ(rb_looked_at_pool(0, after, 8), before,
              "custom: placement_order=true is not the any_order route");
     CHECK(after[0] == pool[0], "custom: the unhandled custom path leaves the pool untouched");
+    CHECK_EQ(tg.state.p[0].deck.n, 0,
+             "custom: the unhandled custom path moves no card to the deck");
 }
 
 static void test_custom_duration_routes_gain_ability(void)
@@ -714,6 +736,10 @@ static void test_custom_duration_routes_gain_ability(void)
     e.gained_effect = &gained;
     set_extra(&e, "duration", "turn_end");
     set_extra(&e, "ability_gain", "fixture gain");
+    set_extra(&e, "trigger", "Main");
+    /* gain_target (ability.c:238) prefers gs.activating_card; the TestGame shim
+       memsets the state, so pin it here the way a real activation would. */
+    tg.state.activating_card = a;
     rb_execute_effect_ex(&tg.state, 0, &e, a);
     CHECK_EQ(rb_mods_get_score(&tg.state.mods, a), 5,
              "custom: duration routes the effect into gain_ability");
@@ -868,7 +894,7 @@ int main(void)
     test_blade_self_target_field();
     test_blade_opponent_target();
     test_blade_position_filter();
-    test_blade_group_filter();
+    test_blade_card_type_filter();
     test_blade_target_count_selection_choice();
     test_heart_fixed_color();
     test_heart_colors_only_falls_back_to_first();

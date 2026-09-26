@@ -1147,18 +1147,32 @@ int rb_handle_optional_cost_payment(GameState *g, int actor, const AbilityEffect
         }
     }
 
+    /* handlers.rs:1438-1446 — answering "pay" taps the gated cost's energy.
+       The gate is only ever opened when the printed amount is affordable
+       (handlers.rs:1130-1154 auto-skips otherwise), so an unaffordable
+       re-entry leaves the energy untouched rather than partially paying. */
+    if (cost && !cost_is_sequential(cost)) {
+        int gate_energy = eff_energy_count(cost, 0);
+        if (gate_energy > 0) {
+            const char *tgt = cost->target ? cost->target : "self";
+            int tp = rb_resolve_target_player(g, tgt);
+            int tpl = (tp >= 0) ? tp : actor;
+            if (rb_energy_active_count(&g->p[tpl]) >= gate_energy)
+                rb_energy_pay(&g->p[tpl], gate_energy);
+        }
+    }
+
     /* Sequential sub-costs: pay each in order after player confirmed */
     if (cost && cost_is_sequential(cost)) {
         for (int i = 0; i < cost->n_child; i++) {
             const AbilityEffect *sub = cost->child[i];
-            if (sub->action && eff_extra(sub, "state_change") &&
-                !strcmp(eff_extra(sub, "state_change"), "wait") &&
-                eff_bool(sub, "self_cost", 0)) {
+            const char *sc = sub ? eff_extra(sub, "state_change") : NULL;
+            if (sub && sc && !strcmp(sc, "wait") && eff_bool(sub, "self_cost", 0)) {
                 /* self_cost wait: set activating card to wait directly */
                 if (g->activating_card >= 0)
                     rb_mods_set_orientation(&g->mods, g->activating_card, "wait");
             } else if (!rb_pay_cost(g, actor, sub)) {
-                /* warning: sub-cost payment error */
+                /* sub-cost could not be paid; the remaining legs are dropped */
             }
             if (g->queue.has_pending) return 1;
         }

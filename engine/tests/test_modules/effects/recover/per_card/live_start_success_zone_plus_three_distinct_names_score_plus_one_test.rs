@@ -6,15 +6,16 @@
 /// Q208: Multi-name cards count as 1 member
 use crate::helpers::*;
 
+// Step by phase NAME. All four tests in this file share one shape — set the
+// live card, step into the ライブ開始時 window, drain — so this conversion
+// covers them together; the per-call-site rule matters for files whose tests
+// differ in how they reveal the live.
 fn advance_to_live_card_set_p1(game: &mut TestGame) {
-    for _ in 0..5 {
-        game.pass();
-    }
+    game.advance_to_phase(rabuka_engine::game_state::Phase::LiveCardSetFirstAttacker);
 }
 
 fn advance_to_live_start(game: &mut TestGame) {
-    game.pass();
-    game.pass();
+    game.advance_to_phase(rabuka_engine::game_state::Phase::FirstAttackerPerformance);
 }
 
 /// Both conditions met: success_live_zone has 2 cards AND stage has 3 distinct-name members.
@@ -89,7 +90,11 @@ fn miracle_stay_tune_fewer_than_3_distinct_members_no_score() {
 
     game.state.player1.hand.cards.push(card);
     game.state.player1.hand.cards.push(filler);
-    game.state.player1.stage.stage = [member1, member1, member1];
+    // Fewer than 3 distinct names: ONE member. This used to be
+    // `[member1, member1, member1]`, which stages the same card instance in all
+    // three slots — a board that cannot occur, and one where a member-counting
+    // condition would see three members, not one.
+    game.state.player1.stage.stage = [member1, -1, -1];
     game.state.player1.success_live_card_zone.cards.push(filler);
     game.state.player1.success_live_card_zone.cards.push(filler);
 
@@ -163,7 +168,9 @@ fn miracle_stay_tune_neither_condition_no_score() {
 
     game.state.player1.hand.cards.push(card);
     game.state.player1.hand.cards.push(filler);
-    game.state.player1.stage.stage = [member1, member1, member1];
+    // One member, and an empty success zone: neither condition can be met.
+    // Was `[member1, member1, member1]` — the same instance in all three slots.
+    game.state.player1.stage.stage = [member1, -1, -1];
 
     advance_to_live_card_set_p1(&mut game);
     game.set_live_card(card);

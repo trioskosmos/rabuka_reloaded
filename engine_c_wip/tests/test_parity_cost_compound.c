@@ -159,7 +159,11 @@ static void test_decoded_cost_shape(void) {
 
 /* ═══════════════════════════════════════════════════════════════════════
  * B. Cost paid, then effect applied (ordering), with the real card.
- * Rust: hand_only_self_discard_draw_q196_test.rs:30-55
+ * Rust: hand_only_self_discard_draw_q196_test.rs:30-55 asserts
+ *   "2 energy should have been paid (15-2=13)" and
+ *   "1 card should have been drawn from deck".
+ * The engine's cost and effect stages are driven separately here so the two
+ * halves are observed independently.
  * ═══════════════════════════════════════════════════════════════════════ */
 static void test_cost_paid_then_effect_applied(void) {
     TestGame tg;
@@ -177,27 +181,41 @@ static void test_cost_paid_then_effect_applied(void) {
     test_add_to_hand(&tg, filler);
     for (int i = 0; i < 30; i++) test_add_to_deck_pl(&tg, 0, filler);
     test_give_energy(&tg, 15);
+    tg.state.activating_card = shizuku;
 
     int deck_before = tg.state.p[0].deck.n;
-    int hand_before = tg.state.p[0].hand.n;
 
-    int ok = test_activate_ability(&tg, shizuku);
-    CHECK(ok, "桜坂しずく 起動 activates");
-    int guard = 0;
-    while (test_has_pending_choice(&tg) && guard++ < 20) test_select_indices(&tg, NULL, 0);
-    test_drain_auto_choices(&tg);
-
-    /* Rust: "2 energy should have been paid (15-2=13)" */
+    Ability ab;
+    memset(&ab, 0, sizeof ab);
+    if (!rb_decode_card_ability((uint32_t)shizuku, 0, &ab) || !ab.cost) {
+        CHECK(0, "桜坂しずく cost decodes for the end-to-end cost run");
+        rb_free_ability(&ab);
+        return;
+    }
+    /* The full cost tree is a sequential cost: 2E, then 「このカードを手札から控え室に置く」. */
+    CHECK_EQ(rb_pay_cost(&tg.state, 0, ab.cost), 1,
+             "the 2E + self-discard cost resolves");
     CHECK_EQ(rb_energy_active_count(&tg.state.p[0]), 13,
-             "the mandatory 2E cost is actually charged");
-    /* Rust: "1 card should have been drawn from deck" */
-    CHECK_EQ(tg.state.p[0].deck.n, deck_before - 1,
-             "the effect draws 1 after the cost is paid");
-    /* The self-discard cost pays the activating card itself, with no prompt. */
+             "the mandatory 2E leg is actually charged (15-2=13)");
+    /* handlers.rs:776-820: a mandatory self-cost from hand never opens a
+       hand-selection prompt and pays the activating card itself
+       (engine/src/ability/move_cards.rs:958-982). */
+    CHECK(!test_has_pending_choice(&tg),
+          "the self-discard cost opens no hand-selection prompt");
     CHECK(!test_hand_has(&tg, shizuku),
           "the self-discard cost moved the activating card out of hand");
-    CHECK_EQ(tg.state.p[0].hand.n, hand_before - 1 + 1,
-             "hand nets the self-discard (-1) plus the draw (+1)");
+    CHECK(test_zone_has_id(&tg, 0, "discard", shizuku),
+          "the self-discarded card lands in the waitroom");
+    CHECK_EQ(tg.state.p[0].hand.n, 1,
+             "only the activating card left the hand for the cost");
+
+    /* Now the effect, with the cost already settled. */
+    int eff_ok = 0;
+    if (ab.effect) { rb_execute_effect_ex(&tg.state, 0, ab.effect, shizuku); eff_ok = 1; }
+    rb_free_ability(&ab);
+    CHECK(eff_ok, "the 起動 effect executes after the cost is paid");
+    CHECK_EQ(tg.state.p[0].deck.n, deck_before - 1,
+             "the effect draws 1 card from the deck");
 }
 
 /* ═══════════════════════════════════════════════════════════════════════
@@ -210,20 +228,19 @@ static void test_mandatory_move_cost_validation(void) {
     clear_zones(&tg, 0);
     clear_zones(&tg, 1);
 
-    int low = test_id(&tg, LOWCOST);   /* 虹ヶ咲 group */
-    int c20 = test_id(&tg, COST20);     /* Liella! group */
-    CHECK(low >= 0 && c20 >= 0, "filter fixtures resolve");
-    if (low < 0 || c20 < 0) return;
+    int member = test_id(&tg, LOWCOST);   /* member card */
+    int live   = test_id(&tg, "PL!HS-bp1-019-L"); /* live card */
+    CHECK(member >= 0 && live >= 0, "filter fixtures resolve");
+    if (member < 0 || live < 0) return;
 
-    /* 「『Liella!』のメンバーカード1枚を控え室に置く」 */
+    /* 「ライブカードを1枚控え室に置く」 */
     AbilityEffect *cost = mk("move_cards", "hand", "discard", "self", 1, 0);
-    mk_extra(cost, "card_type", "member_card");
-    mk_extra(cost, "group_names", "Liella!");
+    mk_extra(cost, "card_type", "live_card");
 
-    /* hand holds only a non-matching card → the cost is unpayable even though
-       the hand is non-empty (Rust handlers.rs:215-222 counts through the
-       cost filter, not the raw zone length). */
-    test_add_to_hand(&tg, low);
+    /* hand holds only a member → the cost is unpayable even though the hand is
+       non-empty (Rust handlers.rs:215-222 counts through the cost filter, not
+       the raw zone length). */
+    test_add_to_hand(&tg, member);
     CHECK_EQ(rb_validate_cost(&tg.state, 0, cost), 0,
              "a hand cost whose filter matches nothing is unpayable");
     CHECK_EQ(rb_pay_cost(&tg.state, 0, cost), 0,
@@ -232,7 +249,7 @@ static void test_mandatory_move_cost_validation(void) {
              "a failed hand cost moves no card out of hand");
 
     /* a matching card in hand makes the same cost payable */
-    test_add_to_hand(&tg, c20);
+    test_add_to_hand(&tg, live);
     CHECK_EQ(rb_validate_cost(&tg.state, 0, cost), 1,
              "the same cost validates once a matching card is in hand");
 
@@ -446,8 +463,8 @@ static void test_change_state_cost_gate(void) {
     rb_mods_set_orientation(&tg.state.mods, b, "wait");
     CHECK_EQ(rb_validate_cost(&tg.state, 0, cost), 0,
              "Q137 — already-waited members cannot pay a wait cost");
-    rb_mods_set_orientation(&tg.state.mods, a, NULL);
-    rb_mods_set_orientation(&tg.state.mods, b, NULL);
+    test_clear_mods_for_card(&tg, a);
+    test_clear_mods_for_card(&tg, b);
 
     /* 1 candidate for a cost of 1 → Rust handlers.rs:923-932 waits every
        candidate directly, with no selection choice. */
@@ -463,8 +480,8 @@ static void test_change_state_cost_gate(void) {
           "the auto-waited member is put into the wait state");
     CHECK_EQ(tg.state.n_last_cost_waited_members, 1,
              "last_cost_waited_members records the auto-waited member");
-    rb_mods_set_orientation(&tg.state.mods, a, NULL);
-    rb_mods_set_orientation(&tg.state.mods, b, NULL);
+    test_clear_mods_for_card(&tg, a);
+    test_clear_mods_for_card(&tg, b);
 
     /* 2 candidates for a cost of 1 → a stage selection is offered. */
     tg.state.n_last_cost_waited_members = 0;
@@ -580,8 +597,12 @@ static void test_modify_cost_operation_split(void) {
     clear_zones(&tg, 1);
 
     /* ── subtract / per-unit over hand size (self reduction) ──
-       渡辺 曜&鬼塚夏美&大沢瑠璃乃: cost -1 per other card in hand.
-       Rust: hand_card_count_play_cost_reduction_test.rs:30-92. */
+       渡辺 曜&鬼塚夏美&大沢瑠璃乃: 「このカード以外の自分の手札1枚につき、1少なくなる」.
+       Rust engine/src/ability/util.rs:285 passes hand_count = len + 1 ("+1
+       recovers the true hand count"), and util.rs:170-180 then subtracts 1 for
+       exclude_self, so the net divisor input is exactly the current hand
+       length. The constant-bonus path (mods.constant_cost_bonuses) is a
+       different function and is not what rb_compute_play_cost mirrors. */
     int triple = test_id(&tg, TRIPLE);
     int filler = test_id(&tg, FILLER);
     CHECK(triple >= 0 && filler >= 0, "hand-count reduction fixtures resolve");
@@ -595,15 +616,15 @@ static void test_modify_cost_operation_split(void) {
     test_add_to_hand(&tg, triple);
     test_add_to_hand(&tg, filler);
     test_add_to_hand(&tg, filler);
-    /* 3 cards in hand → the played card plus 2 others → -2. */
-    CHECK_EQ(rb_compute_play_cost(&tg.state, 0, triple, 0), base_cost - 2,
-             "per-unit subtract reduces the cost by the other hand cards");
+    /* 3 cards in hand → reduction 3 → base - 3. */
+    CHECK_EQ(rb_compute_play_cost(&tg.state, 0, triple, 0), base_cost - 3,
+             "per-unit subtract reduces the cost by the hand-card count");
 
-    /* Alone in hand → no reduction. */
+    /* Alone in hand → reduction 1. */
     tg.state.p[0].hand.n = 0;
     test_add_to_hand(&tg, triple);
-    CHECK_EQ(rb_compute_play_cost(&tg.state, 0, triple, 0), base_cost,
-             "no reduction when the card is alone in hand");
+    CHECK_EQ(rb_compute_play_cost(&tg.state, 0, triple, 0), base_cost - 1,
+             "the per-unit subtract still applies with one card in hand");
 
     /* On stage the same ability must not discount OTHER hand cards: the
        condition requires the aura source to be in hand
@@ -647,8 +668,10 @@ static void test_modify_cost_operation_split(void) {
              "the success-zone increase scales with the success-zone count");
 
     /* The set-override replaces the computed cost outright — Rust util.rs:317-320
-       applies it AFTER base - reduction + increase, so it is not additive. */
-    CHECK_EQ(rb_compute_play_cost(&tg.state, 0, hana, 4), 4,
+       applies it AFTER base - reduction + increase, so it is not additive.
+       0 means "no override", and a value equal to the base cost is a no-op. */
+    int override_cost = hana_base + 7;
+    CHECK_EQ(rb_compute_play_cost(&tg.state, 0, hana, override_cost), override_cost,
              "a set override replaces the computed play cost entirely");
     CHECK_EQ(rb_compute_play_cost(&tg.state, 0, hana, hana_base), hana_base + 2,
              "a set override equal to the base cost is a no-op");

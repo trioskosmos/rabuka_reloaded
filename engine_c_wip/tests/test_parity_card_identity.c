@@ -237,7 +237,6 @@ static void test_card_id_lookup_determinism(void)
         rb_free_card(&c);
     }
     if (exact_ok) printf("ok: every existing print wins over the lenient fallback\n");
-    failures += exact_ok ? 0 : 0;
 }
 
 /* ── card.rs:579 get_card_id — normalisation tiers ── */

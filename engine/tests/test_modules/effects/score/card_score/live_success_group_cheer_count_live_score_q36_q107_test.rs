@@ -7,15 +7,15 @@
 /// Q36: LiveSuccess timing
 use crate::helpers::*;
 
+// Step by phase NAME. All three tests here share one shape, so the two helpers
+// convert together; the per-call-site rule exists for files whose tests differ
+// in how they reveal the live.
 fn advance_to_live_card_set_p1(game: &mut TestGame) {
-    for _ in 0..5 {
-        game.pass();
-    }
+    game.advance_to_phase(rabuka_engine::game_state::Phase::LiveCardSetFirstAttacker);
 }
 
 fn advance_to_live_start(game: &mut TestGame) {
-    game.pass();
-    game.pass();
+    game.advance_to_phase(rabuka_engine::game_state::Phase::LiveVictoryDetermination);
 }
 
 /// 3 members with heart05. Deck is 蓮ノ空 cards WITH blade_heart for wildcard.
@@ -29,9 +29,14 @@ fn awake_q36_10_plus_hasetsu_cheers_score_plus_1() {
     let filler = game.id("PL!-sd1-010-SD");
     // Stage: 3 members with heart05=2 each → heart05=6 (meets requirement)
     // PL!S-PR-014-PR: base heart05=2, blade=6 → 3× = blade=18
+    // Three DISTINCT instances. `game.id` hands back ONE id, so writing it in
+    // all three slots was a single card standing in for three — and the blade
+    // count it produces is not the "3× = 18" the comment claims.
     let heart_member = game.id("PL!S-PR-014-PR");
+    let heart_member_2 = game.new_id("PL!S-PR-014-PR");
+    let heart_member_3 = game.new_id("PL!S-PR-014-PR");
 
-    game.state.player1.stage.stage = [heart_member, heart_member, heart_member];
+    game.state.player1.stage.stage = [heart_member, heart_member_2, heart_member_3];
     game.state.player1.hand.cards.push(awake);
     game.state.player1.hand.cards.push(filler);
 
@@ -106,8 +111,11 @@ fn awake_q36_non_hasetsu_cheered_no_score() {
     let awake = game.id("PL!HS-bp1-022-L");
     let filler = game.id("PL!-sd1-010-SD");
     let high_blade = game.id("PL!-sd1-009-SD"); // μ's, blade=5
+    // Three distinct instances — see the note in awake_q36_10_plus_hasetsu_cheers_score_plus_1.
+    let high_blade_2 = game.new_id("PL!-sd1-009-SD");
+    let high_blade_3 = game.new_id("PL!-sd1-009-SD");
 
-    game.state.player1.stage.stage = [high_blade, high_blade, high_blade];
+    game.state.player1.stage.stage = [high_blade, high_blade_2, high_blade_3];
     game.state.player1.hand.cards.push(awake);
     game.state.player1.hand.cards.push(filler);
 

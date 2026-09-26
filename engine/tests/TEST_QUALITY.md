@@ -93,6 +93,94 @@ _confusable card numbers (bp2 vs pb2) staged in one file with NO card-identity p
 
 None.
 
+## duplicate_stage_id (143)
+
+_the same card INSTANCE in two stage slots (`stage.stage = [filler, y, filler]`) — not a legal board; anything that counts members or dedupes by name measures a board that cannot occur, so use a second `new_id`_
+
+| file | test | line | detail |
+| --- | --- | --- | --- |
+| `engine/tests/test_modules/characterization/pipeline_characterization_test.rs` | `s9_check_timing_cascade_smoke` | 214 | m in 2 slots |
+| `engine/tests/test_modules/characterization/zero_tested_action_types_test.rs` | `vitamin_summer_live_success_hand_condition` | 341 | nico in 2 slots |
+| `engine/tests/test_modules/effects/compound/cost_and_effect/center_wait_discard_other_group_cost_plus_two_same_area_deploy_edges_test.rs` | `center_other_member_cost_plus_two_deploy_only_non_aqours_on_stage` | 93 | filler in 2 slots |
+| `engine/tests/test_modules/effects/compound/cost_and_effect/discard_live_recovery_score_energy_cost_q214_test.rs` | `discard_then_live_recovery_pays_score_energy_or_declines_q214` | 5 | filler in 2 slots |
+| `engine/tests/test_modules/effects/compound/cost_and_effect/discard_live_recovery_score_energy_cost_q214_test.rs` | `discard_then_live_recovery_pays_score_energy_or_declines_q214` | 5 | filler in 2 slots |
+| `engine/tests/test_modules/effects/compound/cost_and_effect/discard_live_recovery_score_energy_cost_q214_test.rs` | `discard_then_live_recovery_pays_score_energy_or_declines_q214` | 5 | filler in 2 slots |
+| `engine/tests/test_modules/effects/compound/cost_and_effect/discard_live_recovery_score_energy_cost_q214_test.rs` | `discard_then_live_recovery_pays_score_energy_or_declines_q214` | 5 | filler in 2 slots |
+| `engine/tests/test_modules/effects/compound/cost_and_effect/discard_score_energy_live_recovery_edges_test.rs` | `discard_score_energy_live_recovery_no_live_in_discard_no_selection` | 14 | filler in 2 slots |
+| `engine/tests/test_modules/effects/compound/cost_and_effect/discard_score_energy_live_recovery_edges_test.rs` | `discard_score_energy_live_recovery_p_and_ar_variants_work` | 86 | filler in 2 slots |
+| `engine/tests/test_modules/effects/compound/cost_and_effect/discard_score_energy_live_recovery_edges_test.rs` | `discard_score_energy_live_recovery_turn_limit_blocks_second_activation` | 43 | filler in 2 slots |
+| `engine/tests/test_modules/effects/compound/cost_and_effect/hand_only_self_discard_draw_group_blade_q196_test.rs` | `hand_only_self_discard_draw_q196_draw_after_discard_cost` | 11 | filler in 2 slots |
+| `engine/tests/test_modules/effects/compound/cost_and_effect/live_start_keep_or_discard_live_then_reveal_to_gain_blade_and_score_test.rs` | `three_members_keep_one` | 140 | niji_member in 3 slots |
+| `engine/tests/test_modules/effects/compound/cost_and_effect/live_start_keep_or_discard_live_then_reveal_to_gain_blade_and_score_test.rs` | `three_members_skip_all` | 180 | niji_member in 3 slots |
+| `engine/tests/test_modules/effects/compound/cost_and_effect/live_start_keep_or_discard_live_then_reveal_to_gain_blade_and_score_test.rs` | `three_members_skip_reveal_live_gets_boost` | 341 | niji_member in 3 slots |
+| `engine/tests/test_modules/effects/compound/cost_and_effect/live_start_optional_unit_position_change_heart_blade_test.rs` | `live_start_unit_swap_no_valid_destinations_skips` | 314 | filler in 2 slots |
+| `engine/tests/test_modules/effects/compound/per_card/place_energy_under_member_activate_and_live_success_q239_pl_n_bp5_012_test.rs` | `ranju_activate_then_live_success_uses_accumulated_under` | 514 | member in 2 slots |
+| `engine/tests/test_modules/effects/compound/per_card/place_energy_under_member_activate_and_live_success_q239_pl_n_bp5_012_test.rs` | `ranju_live_success_condition_not_met_no_move` | 374 | member in 2 slots |
+| `engine/tests/test_modules/effects/compound/per_card/place_energy_under_member_activate_and_live_success_q239_pl_n_bp5_012_test.rs` | `ranju_live_success_condition_not_met_when_scores_tied` | 416 | member in 2 slots |
+| `engine/tests/test_modules/effects/compound/per_card/place_energy_under_member_activate_and_live_success_q239_pl_n_bp5_012_test.rs` | `ranju_live_success_condition_not_met_when_scores_tied` | 416 | member in 3 slots |
+| `engine/tests/test_modules/effects/compound/per_card/place_energy_under_member_activate_and_live_success_q239_pl_n_bp5_012_test.rs` | `ranju_live_success_energy_deck_empty_does_nothing` | 486 | member in 2 slots |
+| `engine/tests/test_modules/effects/compound/per_card/place_energy_under_member_activate_and_live_success_q239_pl_n_bp5_012_test.rs` | `ranju_live_success_places_under_plus_one_from_energy_deck` | 251 | member in 2 slots |
+| `engine/tests/test_modules/effects/compound/per_card/place_energy_under_member_activate_and_live_success_q239_pl_n_bp5_012_test.rs` | `ranju_live_success_q239_zero_under_places_one` | 300 | member in 2 slots |
+| `engine/tests/test_modules/effects/compound/per_card/place_energy_under_member_activate_and_live_success_q239_pl_n_bp5_012_test.rs` | `ranju_live_success_scales_with_more_under` | 454 | member in 2 slots |
+| `engine/tests/test_modules/effects/compound/per_card/place_energy_under_member_activate_and_live_success_q239_pl_n_bp5_012_test.rs` | `ranju_q239_zero_under_places_one_for_all_rarities` | 336 | member in 2 slots |
+| `engine/tests/test_modules/effects/compound/sequential_effects/live_start_own_discard_two_member_bottomdeck_hearts_q164_test.rs` | `live_start_bottomdeck_two_members_q164_uses_own_discard_only` | 12 | filler in 2 slots |
+| `engine/tests/test_modules/effects/conditional/per_card/kanon_debut_invalidate_recovers_discard_card_test.rs` | `kanon_live_start_invalidation_expires_at_live_end` | 114 | filler in 2 slots |
+| `engine/tests/test_modules/effects/conditional/state_gated/deployed_member_blade_heart_wait_test.rs` | `konata_bp4_q188_placed_in_wait_no_trigger` | 179 | filler in 2 slots |
+| `engine/tests/test_modules/effects/cost_mod/activation_discount/distinct_group_activation_discount_q228_test.rs` | `distinct_group_activation_discount_q228_one_group_cost_three_not_offered_at_two_energy` | 67 | filler in 2 slots |
+| `engine/tests/test_modules/effects/cost_mod/activation_discount/hand_card_count_play_cost_reduction_test.rs` | `on_stage_card_does_not_reduce_other_cards_cost` | 96 | filler in 2 slots |
+| `engine/tests/test_modules/effects/cost_mod/activation_discount/hand_card_count_play_cost_reduction_test.rs` | `on_stage_card_ignores_hand_for_other_card_cost` | 130 | filler in 2 slots |
+| `engine/tests/test_modules/effects/cost_mod/required_hearts/hanamusubi_required_hearts_exclude_self_test.rs` | `hanamusubi_alone_no_reduction` | 46 | filler in 3 slots |
+| `engine/tests/test_modules/effects/cost_mod/required_hearts/hanamusubi_required_hearts_exclude_self_test.rs` | `hanamusubi_reduces_only_heart04_not_heart0` | 212 | filler in 3 slots |
+| `engine/tests/test_modules/effects/cost_mod/required_hearts/hanamusubi_required_hearts_exclude_self_test.rs` | `hanamusubi_with_non_renosora_no_reduction` | 174 | filler in 3 slots |
+| `engine/tests/test_modules/effects/cost_mod/required_hearts/hanamusubi_required_hearts_exclude_self_test.rs` | `hanamusubi_with_one_other_renosora_reduces_2` | 82 | filler in 3 slots |
+| `engine/tests/test_modules/effects/cost_mod/required_hearts/hanamusubi_required_hearts_exclude_self_test.rs` | `hanamusubi_with_two_other_renosora_reduces_4` | 132 | filler in 3 slots |
+| `engine/tests/test_modules/effects/cost_mod/required_hearts/hanamusubi_required_hearts_exclude_self_test.rs` | `one_hanamusubi_one_filler_no_reduction` | 377 | filler in 3 slots |
+| `engine/tests/test_modules/effects/cost_mod/required_hearts/hanamusubi_required_hearts_exclude_self_test.rs` | `one_hanamusubi_two_fillers_no_reduction` | 411 | filler in 3 slots |
+| `engine/tests/test_modules/effects/cost_mod/required_hearts/hanamusubi_required_hearts_exclude_self_test.rs` | `three_hanamusubi_each_reduces_4` | 299 | filler in 3 slots |
+| `engine/tests/test_modules/effects/cost_mod/required_hearts/hanamusubi_required_hearts_exclude_self_test.rs` | `two_hanamusubi_each_reduces_2` | 258 | filler in 3 slots |
+| `engine/tests/test_modules/effects/cost_mod/required_hearts/hanamusubi_required_hearts_exclude_self_test.rs` | `two_hanamusubi_one_filler_each_reduces_2` | 338 | filler in 3 slots |
+| `engine/tests/test_modules/effects/cost_mod/required_hearts/rina_debut_opponent_live_card_heart_increase_test.rs` | `rina_bp5n_heart02_ge5_increases_opponent_need_heart00` | 42 | h02_member in 2 slots |
+| `engine/tests/test_modules/effects/deploy/eternalize_love_test.rs` | `eternalize_love_full_live_flow_heart00_reduction` | 91 | member in 2 slots |
+| `engine/tests/test_modules/effects/deploy/eternalize_love_test.rs` | `eternalize_love_two_same_name_reduces_by_3_not_6` | 38 | member in 2 slots |
+| `engine/tests/test_modules/effects/deploy/optional_energy_deploy_two_total_cost_four_test.rs` | `deploy_stage_full_graceful` | 458 | filler_m in 3 slots |
+| `engine/tests/test_modules/effects/draw/chains/card_ability_test.rs` | `hanayo_no_mus_member_skips_cost_prompt` | 777 | non_mus in 3 slots |
+| `engine/tests/test_modules/effects/draw/conditional/revealed_live_hand_threshold_draw_test.rs` | `revealed_filler_does_not_satisfy_live_condition` | 74 | blader in 2 slots |
+| `engine/tests/test_modules/effects/draw/conditional/revealed_live_hand_threshold_draw_test.rs` | `revealed_live_above_hand_threshold_does_not_draw_again` | 18 | blader in 2 slots |
+| `engine/tests/test_modules/effects/draw/flat/per_own_stage_member_draw_then_discard_q146_test.rs` | `per_own_member_draw_discard_q146_opponent_members_not_counted` | 167 | opp_m in 3 slots |
+| `engine/tests/test_modules/effects/draw/flat/success_zone_group_live_success_draw_test.rs` | `success_zone_group_draw_live_leaves_no_choice_with_initially_empty_success_zone` | 62 | m in 3 slots |
+| `engine/tests/test_modules/effects/draw/flat/success_zone_group_live_success_draw_test.rs` | `success_zone_group_draw_live_leaves_no_choice_with_matching_group_stage` | 16 | m in 3 slots |
+| `engine/tests/test_modules/effects/draw/flat/success_zone_group_live_success_draw_test.rs` | `success_zone_group_draw_live_leaves_no_choice_with_wrong_group_success_live` | 41 | hasu in 3 slots |
+| `engine/tests/test_modules/effects/draw/flat/surplus_heart01_live_success_draw_test.rs` | `surplus_heart01_draw_live_leaves_no_choice_with_empty_decks` | 64 | m in 3 slots |
+| `engine/tests/test_modules/effects/draw/flat/surplus_heart01_live_success_draw_test.rs` | `surplus_heart01_draw_live_leaves_no_choice_with_hasunosora_stage` | 46 | hasu in 3 slots |
+| `engine/tests/test_modules/effects/draw/flat/surplus_heart01_live_success_draw_test.rs` | `surplus_heart01_draw_live_resolves_out_of_live_card_zone` | 16 | m in 3 slots |
+| `engine/tests/test_modules/effects/energy/place/score_condition_integration_test.rs` | `hasunosora_group_mixed_stage_passes` | 389 | filler in 2 slots |
+| `engine/tests/test_modules/effects/energy/under_member/pl_bp6_003_test.rs` | `kotori_no_empty_slot_keeps_under` | 577 | filler in 2 slots |
+| `engine/tests/test_modules/effects/gain/blades/live_start/live_start_center_liella_set_blade_three_test.rs` | `liella_at_right_side_excluded_by_position` | 91 | filler in 2 slots |
+| `engine/tests/test_modules/effects/gain/blades/per_card/per_unit_discard_count_regression_test.rs` | `test_per_unit_discard_bug_fix` | 6 | filler in 2 slots |
+| `engine/tests/test_modules/effects/gain/blades/per_card/q46_kanako_all_heart_timing_test.rs` | `q46_kanako_condition_less_than_3_live_cards_no_gain` | 46 | filler in 2 slots |
+| `engine/tests/test_modules/effects/gain/blades/per_card/q46_kanako_all_heart_timing_test.rs` | `q46_kanako_constant_grants_blades_when_condition_met` | 14 | filler in 2 slots |
+| `engine/tests/test_modules/effects/gain/blades/per_card/q46_kanako_all_heart_timing_test.rs` | `q46_kanako_leaves_stage_blade_removed` | 140 | filler in 2 slots |
+| `engine/tests/test_modules/effects/gain/blades/per_card/q46_kanako_all_heart_timing_test.rs` | `q46_kanako_leaves_stage_blade_removed` | 140 | filler in 2 slots |
+| `engine/tests/test_modules/effects/gain/blades/per_card/q46_kanako_all_heart_timing_test.rs` | `q46_kanako_no_nijigasaki_live_card_no_gain` | 72 | filler in 2 slots |
+| `engine/tests/test_modules/effects/gain/blades/per_card/q46_kanako_all_heart_timing_test.rs` | `q46_kanako_not_on_stage_no_constant` | 106 | filler in 2 slots |
+| `engine/tests/test_modules/effects/gain/blades/per_card/q46_kanako_all_heart_timing_test.rs` | `q46_live_card_removed_condition_fails_blade_removed` | 180 | filler in 2 slots |
+| `engine/tests/test_modules/effects/gain/hearts/live_start/live_start_discard_shuffle_group_members_heart01_test.rs` | `cooking_condition_checks_discard_not_stage` | 196 | filler in 2 slots |
+| `engine/tests/test_modules/effects/gain/hearts/live_start/live_start_equal_success_counts_heart02_test.rs` | `landing_action_yeah_surplus_heart_applies_score_bonus` | 318 | provider in 3 slots |
+| `engine/tests/test_modules/effects/gain/hearts/live_start/live_start_equal_success_counts_heart02_test.rs` | `landing_action_yeah_surplus_heart_ge_3_true` | 280 | provider in 3 slots |
+| `engine/tests/test_modules/effects/look_select/pin_top/per_group_member_look_pin_reveal_score_test.rs` | `look_per_group_member_discards_remainder_without_score_for_member_reveal` | 4 | n in 3 slots |
+| `engine/tests/test_modules/effects/look_select/recruit_stage/cost_tier_remainder_to_deck_top_routing_test.rs` | `proof_cost_below_20_no_effect` | 122 | filler in 2 slots |
+| `engine/tests/test_modules/effects/look_select/reorder_top/cheer_mode_look_three_return_one_from_hand_test.rs` | `q276_control_normal_live_does_go_to_success_zone` | 168 | member in 3 slots |
+| `engine/tests/test_modules/effects/look_select/reveal/debut_look_liella_cost4_hand_or_debut_test.rs` | `kanon_stage_full_falls_back_to_hand` | 237 | filler in 3 slots |
+| `engine/tests/test_modules/effects/recover/per_card/live_start_aqours_center_cost_nine_blade_gain_or_opponent_wait_test.rs` | `deep_resonance_aqours_center_cost9_fires` | 58 | filler in 2 slots |
+| `engine/tests/test_modules/effects/recover/per_card/live_start_aqours_center_cost_nine_blade_gain_or_opponent_wait_test.rs` | `deep_resonance_aqours_cost13_at_left_no_fire` | 157 | filler in 2 slots |
+| `engine/tests/test_modules/effects/recover/per_card/live_start_aqours_center_cost_nine_blade_gain_or_opponent_wait_test.rs` | `deep_resonance_aqours_cost4_below_threshold_no_fire` | 117 | filler in 2 slots |
+| `engine/tests/test_modules/effects/recover/per_card/live_start_aqours_center_cost_nine_blade_gain_or_opponent_wait_test.rs` | `deep_resonance_empty_center_no_fire` | 102 | filler in 2 slots |
+| `engine/tests/test_modules/effects/recover/per_card/live_start_aqours_center_cost_nine_blade_gain_or_opponent_wait_test.rs` | `deep_resonance_option_0_blade_gain_exact_modifier` | 179 | filler in 2 slots |
+| `engine/tests/test_modules/effects/recover/per_card/live_start_aqours_center_cost_nine_blade_gain_or_opponent_wait_test.rs` | `deep_resonance_option_1_opponent_wait_exact_state` | 231 | filler in 2 slots |
+| `engine/tests/test_modules/effects/recover/per_card/live_start_aqours_center_cost_nine_blade_gain_or_opponent_wait_test.rs` | `deep_resonance_wrong_group_at_center_no_fire` | 137 | filler in 2 slots |
+| `engine/tests/test_modules/effects/recover/per_card/live_start_success_zone_plus_three_distinct_names_score_plus_one_test.rs` | `miracle_stay_tune_fewer_than_3_distinct_members_no_score` | 72 | member1 in 3 slots |
+| … | 63 more |  |  |
+
 ## unresolvable_card_id (0)
 
 _a game.id("…") literal that is not a card number in the database — get_card_id's lenient fallback silently substitutes a DIFFERENT PRINT of the same card, so the test stages the wrong card and passes_

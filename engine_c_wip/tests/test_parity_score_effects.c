@@ -229,35 +229,46 @@ static void test_operation_split(void)
         rb_execute_modify_score(&tg.state, 0, e);
         CHECK_EQ(score_of(&tg, live), 2, "operation=add accumulates across two resolutions");
     }
-    {   /* set overwrites */
+    {   /* set writes the set component only, so it is idempotent
+           (game_modifiers.rs:384 set_score_modifier assigns, it does not add) */
         TestGame tg; test_game_new(&tg); bare_board(&tg);
         test_add_to_live(&tg, live);
         tg.state.activating_card = live;
-        rb_execute_modify_score(&tg.state, 0, e);
-        rb_execute_modify_score(&tg.state, 0, e);
-        CHECK_EQ(score_of(&tg, live), 2, "set-up leaves a +2 modifier before the set op");
         SynthEffect s; synth(&s, NULL, 0);
         synth_set(&s, 0, "operation", "set");
         synth_set(&s, 1, "value", "4");
         rb_execute_modify_score(&tg.state, 0, &s.e);
+        CHECK_EQ(score_of(&tg, live), 4, "operation=set writes the score modifier to 4");
+        rb_execute_modify_score(&tg.state, 0, &s.e);
         CHECK_EQ(score_of(&tg, live), 4,
-                 "operation=set replaces the accumulated modifier (2 -> 4)");
+                 "operation=set is idempotent: a second set leaves 4 (an add would give 8)");
     }
-    {   /* set must SET even for a self-target (the old C port special-cased
-           self_target to add, producing 2+4=6) */
+    {   /* set coexists with the additive component (ModifierEntry::total = set+add) */
         TestGame tg; test_game_new(&tg); bare_board(&tg);
         test_add_to_live(&tg, live);
         tg.state.activating_card = live;
         rb_execute_modify_score(&tg.state, 0, e);
-        rb_execute_modify_score(&tg.state, 0, e);
-        CHECK_EQ(score_of(&tg, live), 2, "self_target add accumulates to +2");
+        CHECK_EQ(score_of(&tg, live), 1, "add +1 before the set op");
+        SynthEffect s; synth(&s, NULL, 0);
+        synth_set(&s, 0, "operation", "set");
+        synth_set(&s, 1, "value", "4");
+        rb_execute_modify_score(&tg.state, 0, &s.e);
+        CHECK_EQ(score_of(&tg, live), 5,
+                 "score modifier total = set(4) + additive(1) = 5, matching ModifierEntry::total");
+    }
+    {   /* set must SET even for a self-target: the old C port routed self_target
+           through rb_mods_add_score, so a second set would reach 8. */
+        TestGame tg; test_game_new(&tg); bare_board(&tg);
+        test_add_to_live(&tg, live);
+        tg.state.activating_card = live;
         SynthEffect s; synth(&s, NULL, 0);
         synth_set(&s, 0, "operation", "set");
         synth_set(&s, 1, "value", "4");
         synth_set(&s, 2, "self_target", "true");
         rb_execute_modify_score(&tg.state, 0, &s.e);
+        rb_execute_modify_score(&tg.state, 0, &s.e);
         CHECK_EQ(score_of(&tg, live), 4,
-                 "self_target with operation=set SETS to 4 instead of adding (was 6)");
+                 "self_target with operation=set SETS both times (4, not 8)");
     }
     {   /* remove subtracts */
         TestGame tg; test_game_new(&tg); bare_board(&tg);
@@ -938,15 +949,15 @@ static void test_conditional_activation(void)
         CHECK_EQ(rb_eval_condition_for_host(&tg.state, 0, nonfic, e->condition), 0,
                  "center cost 4 < opponent center cost 11 -> condition fails");
     }
-    {   /* P1 center is not Liella! -> fails even with a higher cost */
+    {   /* P1 center is not Liella! (Rust: nonfiction_cost_p1_non_liella_center_no_score) */
         TestGame tg; test_game_new(&tg); bare_board(&tg);
         test_add_to_live(&tg, nonfic);
         test_add_to_hand(&tg, filler);
         tg.state.activating_card = nonfic;
-        tg.state.p[0].stage[1] = test_new_id(&tg, "PL!N-sd1-002-SD"); /* cost 9, 虹ヶ咲 */
+        tg.state.p[0].stage[1] = filler;      /* Printemps, not Liella! */
         tg.state.p[1].stage[1] = filler;
         CHECK_EQ(rb_eval_condition_for_host(&tg.state, 0, nonfic, e->condition), 0,
-                 "a non-Liella! center member fails the group half of the condition");
+                 "P1 center not Liella! and costs tie -> condition fails, no score");
     }
     rb_free_ability(&ab);
 

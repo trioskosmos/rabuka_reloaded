@@ -477,10 +477,19 @@ static int rb_condition_is_event_based(const Condition *c) {
             return !(loc && !strcmp(loc, "revealed_cards"));
         }
         case RB_COND_COMPOUND:
+            /* Rust recurses through `Condition::get_conditions()`, which yields
+               the children of a compound / or_condition regardless of whether
+               the wire nests them as direct fields or inside a `conditions`
+               array. Both shapes must be walked or a compound whose only
+               event-based child sits in the array escapes the pre-filter. */
             for (uint32_t i = 0; i < c->n_fields; i++) {
                 const CondValue *dv = &c->fields[i].v;
-                if (dv->tag == RB_TAG_OBJVAR && dv->cond && rb_condition_is_event_based(dv->cond))
-                    return 1;
+                if (dv->tag == RB_TAG_OBJVAR && dv->cond &&
+                    rb_condition_is_event_based(dv->cond)) return 1;
+                if (dv->tag == RB_TAG_ARRAY)
+                    for (uint32_t j = 0; j < dv->arr_n; j++)
+                        if (dv->arr[j].tag == RB_TAG_OBJVAR && dv->arr[j].cond &&
+                            rb_condition_is_event_based(dv->arr[j].cond)) return 1;
             }
             return 0;
         default: return 0;
@@ -1604,9 +1613,8 @@ static int rb_process_current_ability(GameState *g) {
 /* Defined in src/ability/ability_queue.c; not exported by include/rabuka.h. */
 extern int  rb_queue_is_entry_available(const GameState *g, int idx);
 extern const char *rb_queue_entry_player_id(const GameState *g, int index);
-extern void rb_queue_pause_for_auto_ability_choice(GameState *g, const RbChoice *choice);
 
-/* abilities.rs:1473-1527 -- collect the queue indices that are (a) still
+/* abilities.rs:1473-1476 -- collect the queue indices that are (a) still
    available and (b) owned by `pl`, up to `pre_len`. */
 static int par_available_for(const GameState *g, int pl, int pre_len,
                              int *out, int max)
@@ -1623,59 +1631,6 @@ static int par_available_for(const GameState *g, int pl, int pre_len,
     return n;
 }
 
-/* Stable-compact the player's available entries to the front of the queue so
-   the flat RbChoice resume path (rb_resolver_handle_auto_ability_selection,
-   which swaps `cur + option`) addresses real slots. Rust carries an explicit
-   `queue_index` per SelectAutoAbility option; the C choice record has no
-   option list, so compaction reproduces the same addressing. */
-static void par_compact_available(GameState *g, int pl, int *avail, int n_avail)
-{
-    if (n_avail < 2) return;
-    RbQueueEntry picked[RB_QUEUE_DEPTH];
-    for (int i = 0; i < n_avail; i++) picked[i] = g->queue.entries[avail[i]];
-    int taken[RB_QUEUE_DEPTH];
-    for (int i = 0; i < RB_QUEUE_DEPTH; i++) taken[i] = 0;
-    for (int i = 0; i < n_avail; i++) taken[avail[i]] = 1;
-    /* Park the non-offered entries at the tail, preserving their order. */
-    RbQueueEntry rest[RB_QUEUE_DEPTH];
-    int n_rest = 0;
-    for (int i = 0; i < g->queue.n_entries && n_rest < RB_QUEUE_DEPTH; i++)
-        if (!taken[i]) rest[n_rest++] = g->queue.entries[i];
-    for (int i = 0; i < n_avail; i++) g->queue.entries[i] = picked[i];
-    for (int i = 0; i < n_rest; i++) g->queue.entries[n_avail + i] = rest[i];
-}
-
-/* abilities.rs:1494-1527 -- when a second standby ability is available for
-   the same player, Rule 9.5.3.2 requires the player to pick the resolution
-   order. Returns 1 when the prompt was raised. */
-static int par_prompt_auto_ability_order(GameState *g, int pl, int pre_len)
-{
-    int avail[RB_QUEUE_DEPTH];
-    int n = par_available_for(g, pl, pre_len, avail, RB_QUEUE_DEPTH);
-    if (n < 2) return 0;
-    par_compact_available(g, pl, avail, n);
-    RbChoice ch;
-    memset(&ch, 0, sizeof(ch));
-    ch.kind = RB_CHOICE_SELECT_AUTO_ABILITY;
-    ch.count = n;
-    ch.actor = pl;
-    snprintf(ch.target, sizeof(ch.target), "%s", (pl == 0) ? "p1" : "p2");
-    snprintf(ch.zone, sizeof(ch.zone), "ability_queue");
-    snprintf(ch.card_type, sizeof(ch.card_type), "auto_ability");
-    /* abilities.rs:1519 */
-    snprintf(ch.description, sizeof(ch.description),
-             "複数の自動能力が同時に発動しました。使用する順番を選択してください。");
-    snprintf(ch.description_en, sizeof(ch.description_en),
-             "Multiple auto abilities triggered simultaneously. "
-             "Choose the order to use them.");
-    snprintf(ch.description_ja, sizeof(ch.description_ja),
-             "複数の自動能力が同時に発動しました。使用する順番を選択してください。");
-    ch.route = RB_ROUTE_NONE;
-    g->queue.cur = 0;
-    rb_queue_pause_for_auto_ability_choice(g, &ch);
-    return 1;
-}
-
 int rb_process_player_abilities(GameState *g, int pl) {
     if (!g) return 0;
     if (g->queue.has_pending) return 0;
@@ -1683,25 +1638,24 @@ int rb_process_player_abilities(GameState *g, int pl) {
     g->queue.actor = pl;
     g->queue.state = RB_QUEUE_RESOLVING;
 
-    /* abilities.rs:1458-1610 -- resolve the player's standby abilities, taking
-       the first available entry each pass so entries queued by the current
-       resolution are drained depth-first (the `pre_len` cutoff is implicit:
-       every available entry is considered, oldest first). The guard mirrors
-       Rust's PCA drain/reprocess limits and keeps a misbehaving effect from
-       spinning here forever. */
+    /* abilities.rs:1458-1610 -- resolve the player's standby abilities one at
+       a time, always taking the oldest still-available entry so that entries
+       queued by the current resolution are drained depth-first. The per-pass
+       guard mirrors Rust's PCA drain/reprocess limits and keeps a misbehaving
+       effect from spinning here forever.
+       NOTE: Rust's Rule 9.5.3.2 branch (abilities.rs:1494-1527) pauses with
+       Choice::SelectAutoAbility when two entries are available at once. That
+       arm is deliberately NOT reproduced here: the C resume path
+       (rb_resolver_handle_auto_ability_selection, src/ability/choice.c) only
+       swaps the chosen entry and re-enters rb_process_pending_auto_abilities,
+       whereas Rust resolves the promoted entry FIRST
+       (engine/src/turn/actions/mod.rs:1240-1246). Emitting the prompt from
+       this file without that counterpart re-prompts forever. */
     for (int guard = 0; guard < 200; guard++) {
         int pre_len = g->queue.n_entries;
         int avail[RB_QUEUE_DEPTH];
         int n_avail = par_available_for(g, pl, pre_len, avail, RB_QUEUE_DEPTH);
         if (n_avail == 0) break;
-        if (n_avail > 1) {
-            if (par_prompt_auto_ability_order(g, pl, pre_len)) {
-                g->queue.state = RB_QUEUE_AWAITING_CHOICE;
-                return processed;
-            }
-            n_avail = par_available_for(g, pl, pre_len, avail, RB_QUEUE_DEPTH);
-            if (n_avail == 0) break;
-        }
         int idx = avail[0];
         g->queue.cur = (uint8_t)idx;
         g->queue.state = RB_QUEUE_IDLE;
@@ -1711,7 +1665,9 @@ int rb_process_player_abilities(GameState *g, int pl) {
             break;
         }
         /* Rust's resolve_ability -> ability_queue.complete_current() marks the
-           standby entry done; without it the next pass would re-resolve it. */
+           standby entry done; without it the next pass would re-resolve it and
+           the owner's other entries would be resolved twice (once per player
+           pass in process_pending_auto_abilities). */
         if (idx >= 0 && idx < g->queue.n_entries) g->queue.entries[idx].completed = 1;
         processed++;
     }
