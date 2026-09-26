@@ -37,9 +37,15 @@ fn success_zone_stage_cost_ability_deploy_spends_at_least_base_plus_one() {
     // Verify energy was consumed: active_energy_count decreased
     // Base + 1 should be consumed
     let expected_cost = base_cost + 1;
-    assert!(
-        game.state.player1.energy_zone.active_count()
-            <= ((base_cost as u8) + 5) - expected_cost as u8,
-        "Should consume base + 1 energy (success_live_zone card increases cost)"
+    // Exact, not "<=": the old assertion was `active <= given - (base+1)`,
+    // which a play that cost base+4, or one that cost nothing while some other
+    // effect drained the zone, would both satisfy. The number spent is the
+    // whole point of the card, so it is asserted as a number.
+    assert_eq!(
+        game.state.player1.energy_zone.active_count(),
+        ((base_cost as u8) + 5) - expected_cost as u8,
+        "exactly base + 1 energy consumed — one success_live_zone card means \
+         cost +1 (base {})",
+        base_cost
     );
 }

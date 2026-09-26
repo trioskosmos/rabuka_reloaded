@@ -109,10 +109,14 @@ fn q273_fired_debut_ability_cost_is_paid() {
         saw_hana_cost,
         "Q273: the fired 登場 ability's cost (discard 1) must be offered and paid"
     );
-    // 花丸's 登場 effect resolved: a top-3 card was added to hand (deck shrank).
-    assert!(
-        game.state.player1.main_deck.cards.len() < deck_before,
-        "Q273: after paying the cost, the 登場 effect resolved (a card was added to hand)"
+    // 花丸's 登場 effect resolved: it looks at the top 3 and takes one, so ALL
+    // THREE leave the deck — one to hand, two to the waitroom. "deck shrank"
+    // would have passed for either a 1-card or a 3-card outcome, and for a
+    // shrink caused by the cost's discard instead of the look.
+    assert_eq!(
+        game.state.player1.main_deck.cards.len(),
+        deck_before - 3,
+        "Q273: the whole looked-at set leaves the deck — 1 to hand, 2 discarded"
     );
 }
 
