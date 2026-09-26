@@ -662,24 +662,92 @@ pub fn card_to_display(
 /// Restriction / Prohibition actions affect game rules but are tracked
 /// in prohibition_effects internally, not as card texticons.
 ///
+/// One card's effective figures, pulled out of the modifier tables.
+///
+/// Modifiers live in a dozen parallel maps keyed by card id. Passing them as a
+/// dozen positional arguments meant a reader had to know that argument six was
+/// `score_additive` and argument seven `heart_additive`; passing this instead
+/// means the call site says `mods.of(id)` and the lookup lives in one place.
+///
+/// The heart maps and trigger list are owned rather than borrowed because a
+/// card absent from a table yields an empty map, and a borrow of that
+/// temporary would not outlive the call.
+pub struct CardFigures {
+    /// Additive modifiers (accumulated via `add_*` / `+=`) — shown with a
+    /// +/- prefix.
+    pub blade: i32,
+    pub score: i32,
+    pub heart: HashMap<crate::card::HeartColor, i32>,
+    pub cost: i32,
+    /// Absolute set/override modifiers (set via `set_*`) — shown without a
+    /// +/- prefix. A non-zero value replaces the printed figure outright
+    /// rather than adjusting it.
+    pub blade_set: i32,
+    pub score_set: i32,
+    pub heart_set: HashMap<crate::card::HeartColor, i32>,
+    pub cost_set: i32,
+    /// 「ハートをXに変える」 — the whole heart set becomes this colour.
+    pub heart_transform: Option<crate::card::HeartColor>,
+    /// Trigger texticon badges for gained abilities (e.g. "jyouji").
+    pub bonus_triggers: Vec<String>,
+}
+
+/// The per-card modifier tables the display layer reads.
+pub struct DisplayModifiers<'a> {
+    pub blade_additive: &'a HashMap<i16, i32>,
+    pub blade_set: &'a HashMap<i16, i32>,
+    pub score_additive: &'a HashMap<i16, i32>,
+    pub score_set: &'a HashMap<i16, i32>,
+    pub heart_additive: &'a HashMap<i16, HashMap<crate::card::HeartColor, i32>>,
+    pub heart_set: &'a HashMap<i16, HashMap<crate::card::HeartColor, i32>>,
+    pub heart_color_multiplier: &'a HashMap<i16, crate::card::HeartColor>,
+    pub cost_additive: &'a HashMap<i16, i32>,
+    pub cost_set: &'a HashMap<i16, i32>,
+    pub bonus_triggers: &'a HashMap<i16, Vec<String>>,
+}
+
+impl DisplayModifiers<'_> {
+    /// The figures for `card_id`. A card absent from every table gets zeros,
+    /// which is exactly what having no modifiers means.
+    fn of(&self, card_id: i16) -> CardFigures {
+        CardFigures {
+            blade: self.blade_additive.get(&card_id).copied().unwrap_or(0),
+            score: self.score_additive.get(&card_id).copied().unwrap_or(0),
+            heart: self.heart_additive.get(&card_id).cloned().unwrap_or_default(),
+            cost: self.cost_additive.get(&card_id).copied().unwrap_or(0),
+            blade_set: self.blade_set.get(&card_id).copied().unwrap_or(0),
+            score_set: self.score_set.get(&card_id).copied().unwrap_or(0),
+            heart_set: self.heart_set.get(&card_id).cloned().unwrap_or_default(),
+            cost_set: self.cost_set.get(&card_id).copied().unwrap_or(0),
+            heart_transform: self.heart_color_multiplier.get(&card_id).copied(),
+            bonus_triggers: self
+                .bonus_triggers
+                .get(&card_id)
+                .cloned()
+                .unwrap_or_default(),
+        }
+    }
+}
+
 pub fn card_to_display_full(
     card_id: i16,
     card_db: &CardDatabase,
     orientation: Option<Orientation>,
-    // Additive modifiers (accumulated via add_* / +=) — shown with +/- prefix
-    blade_additive: i32,
-    score_additive: i32,
-    heart_additive: &HashMap<crate::card::HeartColor, i32>,
-    // Absolute set/override modifiers (set via set_*) — shown without +/- prefix
-    blade_set: i32,
-    score_set: i32,
-    heart_set: &HashMap<crate::card::HeartColor, i32>,
-    cost_additive: i32,
-    cost_set: i32,
-    heart_transform: Option<crate::card::HeartColor>,
-    // Trigger texticon badges for gained abilities (e.g. "jyouji", "live_success")
-    bonus_triggers: &[String],
+    figures: &CardFigures,
 ) -> Option<CardDisplay> {
+    let CardFigures {
+        blade: blade_additive,
+        score: score_additive,
+        cost: cost_additive,
+        blade_set,
+        score_set,
+        cost_set,
+        heart_transform,
+        ref bonus_triggers,
+        ..
+    } = *figures;
+    let heart_additive = &figures.heart;
+    let heart_set = &figures.heart_set;
     card_db.get_card(card_id).map(|card| {
         let base_heart = card.base_heart.as_ref().map(|bh| {
             bh.hearts
@@ -689,14 +757,14 @@ pub fn card_to_display_full(
         });
         // Additive hearts (shown with +/-)
         let mut bonus_hearts = vec![0i32; 8];
-        for (color, &val) in heart_additive {
+        for (color, val) in heart_additive {
             if let Some(idx) = heart_color_index(color) {
                 bonus_hearts[idx] += val;
             }
         }
         // Set/override hearts (shown without +/-)
         let mut set_hearts = vec![0i32; 8];
-        for (color, &val) in heart_set {
+        for (color, val) in heart_set {
             if let Some(idx) = heart_color_index(color) {
                 set_hearts[idx] += val;
             }
@@ -765,39 +833,12 @@ pub fn zone_to_display(card_ids: &[i16], card_db: &CardDatabase) -> ZoneDisplay 
 pub fn zone_to_display_full(
     card_ids: &[i16],
     card_db: &CardDatabase,
-    blade_additive: &HashMap<i16, i32>,
-    blade_set: &HashMap<i16, i32>,
-    score_additive: &HashMap<i16, i32>,
-    score_set: &HashMap<i16, i32>,
-    heart_additive: &HashMap<i16, HashMap<crate::card::HeartColor, i32>>,
-    heart_set: &HashMap<i16, HashMap<crate::card::HeartColor, i32>>,
-    heart_color_multiplier: &HashMap<i16, crate::card::HeartColor>,
-    cost_additive: &HashMap<i16, i32>,
-    cost_set: &HashMap<i16, i32>,
-    bonus_triggers: &HashMap<i16, Vec<String>>,
+    mods: &DisplayModifiers<'_>,
 ) -> ZoneDisplay {
     ZoneDisplay {
         cards: card_ids
             .iter()
-            .filter_map(|&id| {
-                card_to_display_full(
-                    id,
-                    card_db,
-                    None,
-                    blade_additive.get(&id).copied().unwrap_or(0),
-                    score_additive.get(&id).copied().unwrap_or(0),
-                    &heart_additive.get(&id).cloned().unwrap_or_default(),
-                    blade_set.get(&id).copied().unwrap_or(0),
-                    score_set.get(&id).copied().unwrap_or(0),
-                    &heart_set.get(&id).cloned().unwrap_or_default(),
-                    cost_additive.get(&id).copied().unwrap_or(0),
-                    cost_set.get(&id).copied().unwrap_or(0),
-                    heart_color_multiplier.get(&id).copied(),
-                    bonus_triggers
-                        .get(&id)
-                        .map_or(&[] as &[String], |v| v.as_slice()),
-                )
-            })
+            .filter_map(|&id| card_to_display_full(id, card_db, None, &mods.of(id)))
             .collect(),
     }
 }
@@ -817,96 +858,45 @@ pub fn stage_to_display(
     cost_set: &HashMap<i16, i32>,
     bonus_triggers: &HashMap<i16, Vec<String>>,
 ) -> StageDisplay {
-    let blade_add = |cid: i16| blade_additive.get(&cid).copied().unwrap_or(0);
-    let blade_set_fn = |cid: i16| blade_set.get(&cid).copied().unwrap_or(0);
-    let score_add = |cid: i16| score_additive.get(&cid).copied().unwrap_or(0);
-    let score_set_fn = |cid: i16| score_set.get(&cid).copied().unwrap_or(0);
-    let heart_add = |cid: i16| heart_additive.get(&cid).cloned().unwrap_or_default();
-    let heart_set_fn = |cid: i16| heart_set.get(&cid).cloned().unwrap_or_default();
-    let heart_xform = |cid: i16| heart_color_multiplier.get(&cid).copied();
-    let cost_add = |cid: i16| cost_additive.get(&cid).copied().unwrap_or(0);
-    let cost_set_fn = |cid: i16| cost_set.get(&cid).copied().unwrap_or(0);
-    let triggers_fn = |cid: i16| {
-        bonus_triggers
-            .get(&cid)
-            .map_or(&[] as &[String], |v| v.as_slice())
-    };
-    let orientation = |cid: i16| {
+    let orientation_of = |cid: i16| {
         orientation_modifiers.get(&cid).map(|o| match o {
             crate::core::game_modifiers::CardOrientation::Wait => Orientation::Wait,
             _ => Orientation::Active,
         })
     };
+    let mods = DisplayModifiers {
+        blade_additive,
+        blade_set,
+        score_additive,
+        score_set,
+        heart_additive,
+        heart_set,
+        heart_color_multiplier,
+        cost_additive,
+        cost_set,
+        bonus_triggers,
+    };
+    // The three stage slots differ only in their index.
+    let slot = |idx: usize| {
+        let cid = stage.stage[idx];
+        if cid == -1 {
+            return None;
+        }
+        card_to_display_full(cid, card_db, orientation_of(cid), &mods.of(cid))
+    };
+    let under = |idx: usize| -> Vec<CardDisplay> {
+        stage.under_cards[idx]
+            .iter()
+            .filter_map(|&id| card_to_display(id, card_db, None, 0))
+            .collect()
+    };
     StageDisplay {
-        left_side: if stage.stage[0] != -1 {
-            card_to_display_full(
-                stage.stage[0],
-                card_db,
-                orientation(stage.stage[0]),
-                blade_add(stage.stage[0]),
-                score_add(stage.stage[0]),
-                &heart_add(stage.stage[0]),
-                blade_set_fn(stage.stage[0]),
-                score_set_fn(stage.stage[0]),
-                &heart_set_fn(stage.stage[0]),
-                cost_add(stage.stage[0]),
-                cost_set_fn(stage.stage[0]),
-                heart_xform(stage.stage[0]),
-                triggers_fn(stage.stage[0]),
-            )
-        } else {
-            None
-        },
-        center: if stage.stage[1] != -1 {
-            card_to_display_full(
-                stage.stage[1],
-                card_db,
-                orientation(stage.stage[1]),
-                blade_add(stage.stage[1]),
-                score_add(stage.stage[1]),
-                &heart_add(stage.stage[1]),
-                blade_set_fn(stage.stage[1]),
-                score_set_fn(stage.stage[1]),
-                &heart_set_fn(stage.stage[1]),
-                cost_add(stage.stage[1]),
-                cost_set_fn(stage.stage[1]),
-                heart_xform(stage.stage[1]),
-                triggers_fn(stage.stage[1]),
-            )
-        } else {
-            None
-        },
-        right_side: if stage.stage[2] != -1 {
-            card_to_display_full(
-                stage.stage[2],
-                card_db,
-                orientation(stage.stage[2]),
-                blade_add(stage.stage[2]),
-                score_add(stage.stage[2]),
-                &heart_add(stage.stage[2]),
-                blade_set_fn(stage.stage[2]),
-                score_set_fn(stage.stage[2]),
-                &heart_set_fn(stage.stage[2]),
-                cost_add(stage.stage[2]),
-                cost_set_fn(stage.stage[2]),
-                heart_xform(stage.stage[2]),
-                triggers_fn(stage.stage[2]),
-            )
-        } else {
-            None
-        },
-        left_under: stage.under_cards[0]
-            .iter()
-            .filter_map(|&id| card_to_display(id, card_db, None, 0))
-            .collect(),
-        center_under: stage.under_cards[1]
-            .iter()
-            .filter_map(|&id| card_to_display(id, card_db, None, 0))
-            .collect(),
-        right_under: stage.under_cards[2]
-            .iter()
-            .filter_map(|&id| card_to_display(id, card_db, None, 0))
-            .collect(),
+        left_side: slot(0),
+        center: slot(1),
+        right_side: slot(2),
+        left_under: under(0),
+        center_under: under(1),
+        right_under: under(2),
     }
 }
 
@@ -1179,22 +1169,24 @@ pub fn player_to_display(
         0
     };
 
+    // The modifier tables, bound once. Every zone below reads the same set, so
+    // naming it here beats re-listing all ten at each of the four call sites.
+    let mods = DisplayModifiers {
+        blade_additive: &blade_additive,
+        blade_set,
+        score_additive: &score_additive,
+        score_set,
+        heart_additive: &heart_additive,
+        heart_set,
+        heart_color_multiplier,
+        cost_additive: &cost_additive,
+        cost_set,
+        bonus_triggers,
+    };
+
     PlayerDisplay {
         energy: energy_display,
-        hand: zone_to_display_full(
-            &player.hand.cards,
-            card_db,
-            &blade_additive,
-            blade_set,
-            &score_additive,
-            score_set,
-            &heart_additive,
-            heart_set,
-            heart_color_multiplier,
-            &cost_additive,
-            cost_set,
-            bonus_triggers,
-        ),
+        hand: zone_to_display_full(&player.hand.cards, card_db, &mods),
         stage: stage_to_display(
             &player.stage,
             card_db,
@@ -1210,33 +1202,11 @@ pub fn player_to_display(
             cost_set,
             bonus_triggers,
         ),
-        live_zone: zone_to_display_full(
-            &player.live_card_zone.cards,
-            card_db,
-            &blade_additive,
-            blade_set,
-            &score_additive,
-            score_set,
-            &heart_additive,
-            heart_set,
-            heart_color_multiplier,
-            &cost_additive,
-            cost_set,
-            bonus_triggers,
-        ),
+        live_zone: zone_to_display_full(&player.live_card_zone.cards, card_db, &mods),
         success_live_card_zone: zone_to_display_full(
             &player.success_live_card_zone.cards,
             card_db,
-            &blade_additive,
-            blade_set,
-            &score_additive,
-            score_set,
-            &heart_additive,
-            heart_set,
-            heart_color_multiplier,
-            &cost_additive,
-            cost_set,
-            bonus_triggers,
+            &mods,
         ),
         waitroom: waitroom_display.clone(),
         discard: waitroom_display,
