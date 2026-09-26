@@ -246,13 +246,12 @@ fn special_color_set_blades_and_score_twin_in_one_live() {
         game.state.player2.main_deck.cards.push(filler);
     }
 
-    // Live Start: ab#0 sets center Liella!'s blades.
-    for _ in 0..5 {
-        game.pass();
-    }
+    // Live Start: ab#0 sets center Liella!'s blades. Step to the ライブ開始時
+    // window BY NAME — the blade it sets lives exactly until the live ends, so
+    // "two passes after setting" is the wrong place to read it.
+    game.advance_to_phase(rabuka_engine::game_state::Phase::LiveCardSetFirstAttacker);
     game.set_live_card(special);
-    game.pass();
-    game.pass();
+    game.advance_to_phase(rabuka_engine::game_state::Phase::FirstAttackerPerformance);
     while game.has_pending_choice() {
         game.drain_choices_strict(&["SelectCard", "SelectAutoAbility"], &[0]);
     }

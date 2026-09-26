@@ -224,11 +224,12 @@ fn both_players_multiple_live_start_abilities_get_correct_choice_routing() {
 
     fill_both_decks(&mut game, filler);
 
-    // Advance through turns to reach FirstAttackerPerformance (triggers LiveStart)
-    // 7 passes: Main → Active → Energy → Draw → Main → LiveCardSetFirst → LiveCardSetSecond → FirstAttackerPerformance
-    for _ in 0..7 {
-        game.pass();
-    }
+    // Into the ライブ開始時 window BY NAME. The old 7-pass walk encoded the
+    // whole phase list in a comment ("Main → Active → Energy → Draw → Main →
+    // LiveCardSetFirst → LiveCardSetSecond → FirstAttackerPerformance"), which
+    // is exactly the knowledge a named target removes: a phase that gains or
+    // loses a step would have moved this test with no failure to notice.
+    game.advance_to_phase(rabuka_engine::game_state::Phase::FirstAttackerPerformance);
 
     // After LiveCardSetSecondAttacker → FirstAttackerPerformance transition,
     // LiveStart abilities for both players are triggered and processed.
