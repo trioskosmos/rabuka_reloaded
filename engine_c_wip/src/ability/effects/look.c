@@ -267,6 +267,18 @@ void rb_effect_select_cards(GameState *g, int actor, AbilityEffect *e){
         g->queue.pending.n_filtered_indices = n_matching;
         for (int i = 0; i < n_matching; i++)
             g->queue.pending.filtered_indices[i] = matching[i];
+        /* Snapshot the SelectionContext so rb_look_resume can re-validate the
+           pick after the pending choice is cleared. Without this the resume
+           would inherit a stale resume_filter_heart (0 = heart00) and reject
+           every card. */
+        g->queue.pending.filter_group[0] = 0;
+        g->queue.pending.filter_heart = -1;
+        const char *grp = look_extra(e, "group_names");
+        if (grp) snprintf(g->queue.pending.filter_group,
+                          sizeof(g->queue.pending.filter_group), "%s", grp);
+        strncpy(g->queue.resume_filter_group, g->queue.pending.filter_group,
+                sizeof(g->queue.resume_filter_group)-1);
+        g->queue.resume_filter_heart = g->queue.pending.filter_heart;
         g->queue.resume_mode = 2; g->queue.resume_eff = e; g->queue.resume_is_select = 1;
         g->queue.resume_actor = actor;
         g->queue.resume_host = g->queue.resume_host >= 0 ? g->queue.resume_host : actor;
@@ -762,6 +774,18 @@ void rb_effect_select(GameState *g, int actor, AbilityEffect *e) {
     rb_queue_pause_for_choice(g, &g->queue.pending);
     g->queue.pending.n_filtered_indices = lp->n;
     for (int i = 0; i < lp->n; i++) g->queue.pending.filtered_indices[i] = i;
+    /* Snapshot the SelectionContext so rb_look_resume re-validates the pick
+       against this effect's own filter rather than whatever the previous
+       choice left behind (a stale resume_filter_heart of 0 reads as
+       "heart00 only" and rejects every card). */
+    g->queue.pending.filter_group[0] = 0;
+    g->queue.pending.filter_heart = -1;
+    const char *grp = look_extra(e, "group_names");
+    if (grp) snprintf(g->queue.pending.filter_group,
+                      sizeof(g->queue.pending.filter_group), "%s", grp);
+    strncpy(g->queue.resume_filter_group, g->queue.pending.filter_group,
+            sizeof(g->queue.resume_filter_group)-1);
+    g->queue.resume_filter_heart = g->queue.pending.filter_heart;
     g->queue.resume_mode = 2; g->queue.resume_eff = e;
     g->queue.resume_is_select = 1;
     g->queue.resume_actor = actor; g->queue.resume_host = g->queue.resume_host >= 0 ? g->queue.resume_host : actor;

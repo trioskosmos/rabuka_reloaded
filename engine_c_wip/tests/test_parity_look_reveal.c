@@ -107,11 +107,11 @@ static void test_look_at_counts_and_zones(void)
     CHECK_EQ(tg.state.p[0].deck.n, 1, "look_at from deck drains the looked cards");
     rb_resume_with_choice(&tg.state, -1);
 
-    /* `all` takes the whole zone regardless of count */
+    /* `all` takes the whole zone regardless of count (look.rs:1023-1029) */
     e.count = 1;
     fx_set(&e, 0, "all", "true");
     rb_execute_effect_ex(&tg.state, 0, &e, -1);
-    CHECK_EQ(pool_get(0, pool, 8), 1, "look_at with all=true takes the remaining deck");
+    CHECK_EQ(pool_get(0, pool, 8), 3, "look_at with all=true takes the whole zone");
     rb_resume_with_choice(&tg.state, -1);
 
     /* hand source peeks — it must not remove the card from the hand */

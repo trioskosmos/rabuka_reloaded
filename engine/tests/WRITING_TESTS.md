@@ -143,6 +143,14 @@ assert_eq!(game.pending_choice_type().as_deref(), Some("SelectTarget"));
 game.select_option(0);
 ```
 
+**Target the phase the prompt is raised IN — one phase further eats it.** The
+`[0]` drain applies to every step *before* the target, so a target chosen too far
+along answers the prompt under test on the way and the test then fails at the line
+that inspects it, with a message about the wrong thing. A re-yell test whose subject
+is the yell's `SelectAutoAbility` must stop at `SecondAttackerPerformance`; the same
+test targeting `LiveVictoryDetermination` gets `assertion failed: has_pending_choice`.
+When a walk and `advance_to_phase` disagree, the target is wrong, not the helper.
+
 **Do not convert a walker shared by many tests in one go.** In
 `rules/phases/live_success_rules_test.rs` the three shared helpers looked like a
 one-edit win for 16 tests and broke 5: several tests reveal a live by pushing into
@@ -601,6 +609,79 @@ someone fixes it, at which point it gets rewritten to the real rule. Never leave
 red test, and never weaken an assertion to match a defect — `TEST_QUALITY.md`'s
 sections are review prompts, not gates, so a queued row is the right place to
 record "not done yet".
+
+### 17. A ライブ成功時 test whose live never succeeded
+
+The nastiest failure mode in this suite, because every assertion in the test still
+passes. Three separate things have to be true, and each one fails *quietly*:
+
+**1. The live card must be in the zone exactly once.** `set_live_card` moves the
+card out of hand into `live_card_zone`. Pushing it there as well — or pushing it
+there instead of putting it in hand — leaves the live judging a second copy of
+itself that has no stage hearts, and the heart requirement is checked for *every*
+card in the zone, so the live fails no matter how good the board is. The tell is
+in the debug log: two `lives[...]` entries, the second with `filled=0`.
+
+```rust
+// ❌ both of these, in either order
+game.state.player1.live_card_zone.cards.push(victory);
+game.add_to_hand(victory);
+game.set_live_card(victory);   // …now there are two
+// ✅
+game.add_to_hand(victory);
+game.set_live_card(victory);
+```
+
+**2. The yell re-computes the stage hearts, so `set_stage_hearts` does not
+survive it.** Heart icons are rebuilt from the members' *printed* hearts plus
+modifiers when the yell happens. A fixture that sets `stage_hearts` and then
+yells is measuring the recomputed value, and any colour the members do not print
+is simply missing. Two ways to cover the gap:
+
+- put cards on the deck whose `blade_heart` colour is the one you need — a yelled
+  card's blade colour becomes a heart of that colour (this is also the only way to
+  make a *large* requirement satisfiable);
+- grant All hearts through `heart_modifiers` — `icon_all` covers every coloured
+  deficit, but only ONE icon per coloured slot plus the heart0 bucket, so it does
+  not substitute for a board that must print 13 icons.
+
+For a card that needs more icons than three members can print, cancelling the
+**colourless** (heart0) requirement with `add_need_heart_modifier(id, Heart00, -n)`
+keeps the coloured icons enforced and makes the live reachable. Note `set = 0` is
+ignored by the reader (`if me.set != 0`), so use the additive form with a negative
+delta.
+
+**3. The success zone fills on the `LiveVictoryDetermination → Active`
+transition.** At the victory determination the ライブ成功時 abilities have already
+resolved, but the live card has not moved to `success_live_card_zone` yet, so a
+precondition assert there is a false negative. Same for `duration=live_end`
+modifiers: they are still live at the determination and gone on the next `Active`.
+
+**And the counter that lies.** With the live failing, the deck still shrinks — the
+yell discards the cards it did not reveal, and the next turn's draw takes one. So:
+
+```rust
+// ❌ passes with a live that never succeeded, and with no LiveSuccess at all
+assert!(game.state.player1.main_deck.cards.len() < deck_before, "LiveSuccess drew");
+```
+
+Assert the success first, then the exact count, then *which* cards moved:
+
+```rust
+assert!(game.state.player1.success_live_card_zone.cards.contains(&victory),
+        "precondition: the live must SUCCEED before its ライブ成功時 draws mean anything");
+assert_eq!(game.state.player1.main_deck.cards.len(), deck_before - 3,
+           "exactly 2 (member) + 1 (each_time)");
+let hand = &game.state.player1.hand.cards;
+assert!(hand.contains(&m1) && hand.contains(&m2) && hand.contains(&m3),
+        "the three distinct markers reached hand — 'the deck shrank' cannot say which");
+```
+
+Put the markers on the deck *after* the yell (nothing else can take them then), and
+remember the member's own LiveStart/debut draws: 鬼塚夏美's ライブ成功時 is
+「カードを2枚引き、手札を1枚控え室に置く」, and the discard is a **non-skippable**
+`SelectCard` — a drain that answers every prompt with an empty selection panics on
+a live that actually succeeds.
 
 ---
 
