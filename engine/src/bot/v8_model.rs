@@ -1,4 +1,4 @@
-﻿//! V8 shared decision model.
+//! V8 shared decision model.
 //!
 //! Every v8 decision is an argmax over ONE model. There are no per-branch
 //! magic constants, no role gates, no stance floors and no hand-tuned weight
@@ -43,7 +43,7 @@ use super::strategy_common::{acc_add, Acc};
 ///
 /// Tunable because the decision this feeds is a TAIL probability. At 192
 /// samples a `p_pass` of 0.05 carries a standard error of about 0.016, which
-/// is the same order as the differences between competing portfolios — so the
+/// is the same order as the differences between competing portfolios ? so the
 /// argmax is partly reading sampling noise. The guide is explicit that hits are
 /// a distribution and that mean-sized portfolios fail about half the time
 /// (section 4, "DERIVED QUANTITIES"), which is exactly the regime where a
@@ -566,24 +566,6 @@ pub fn expected_yell_score(gs: &GameState, me: u8, db: &CardDatabase, blades: i3
 
 // -- The guides' continuous development-to-score currency ------------------
 
-/// Our own blade-heart density: the chance that one yell flip yields a blade
-/// heart. Derived from our own decklist, which section 9 of
-/// docs/BOT_STRATEGY.md calls fair information.
-pub fn own_density(gs: &GameState, me: u8, db: &CardDatabase) -> f64 {
-    let deck = &gs.seat_player(me).main_deck.cards;
-    if deck.is_empty() {
-        return 0.0;
-    }
-    let blade_hearts = deck
-        .iter()
-        .filter(|&&cid| {
-            db.get_card(cid)
-                .is_some_and(|c| c.blade_heart.is_some())
-        })
-        .count();
-    blade_hearts as f64 / deck.len() as f64
-}
-
 /// The largest score band our supply can clear, per the guides' own formula
 /// (docs/BOT_STRATEGY.md section 4, "DERIVED QUANTITIES"):
 ///
@@ -682,18 +664,6 @@ pub fn band_progress_for(supply: i32) -> f64 {
     let hi = SCORE_MEDIAN[b + 1];
     let span = f64::from(hi - lo).max(1.0);
     f64::from(band) + f64::from(supply - lo) / span
-}
-
-/// The guides' own bridge from development to comparison score, continuous.
-///
-/// `hearts(t) + E[hits]` where `hits ~ Binomial(active blades, own density)` —
-/// section 4's "DERIVED QUANTITIES", which the guide calls "the real
-/// scoreboard". It is monotone in BOTH hearts and blades, which is what the
-/// Main phase needs, and unlike `P(place)` it has a gradient before any life
-/// in hand becomes passable.
-pub fn heart_equivalent_supply(gs: &GameState, me: u8, db: &CardDatabase) -> f64 {
-    let (blades, density) = super::strategy_v4::flip_stats(gs, me, db);
-    (supply_hearts(gs, me, db) as f64) + blades as f64 * density
 }
 
 // -- Forward development model (the guides' cost curve) -------------------
@@ -805,7 +775,7 @@ pub fn reachable_ceiling(gs: &GameState, me: u8, turns: u8, db: &CardDatabase) -
 }
 
 /// Board supply after `turns` more of OUR Main phases, as (hearts, active
-/// blades) — the two quantities that decide a check (section 3.2).
+/// blades) ? the two quantities that decide a check (section 3.2).
 ///
 /// This is the same forward walk as [`reachable_ceiling`] but accumulating the
 /// check inputs instead of stage cost, and it is what makes the Main phase's
@@ -815,7 +785,7 @@ pub fn reachable_ceiling(gs: &GameState, me: u8, turns: u8, db: &CardDatabase) -
 /// - Draw phase `+1` card (7.6) from our own remaining deck, in deck order,
 ///   which is fair information under section 9.
 /// - One deploy, preferring a baton into the CHEAPEST occupied slot (9.6.2.3.2)
-///   because that leaves the expensive member in place as the next discount —
+///   because that leaves the expensive member in place as the next discount ?
 ///   this is the guides' 4 -> 9 -> 13 ladder. Otherwise a free slot.
 /// - Among affordable candidates the largest cost wins, which is the energy
 ///   doctrine in section 4 ("higher-cost members are simply better").
@@ -937,51 +907,6 @@ pub fn forward_supply(
         };
     }
     (hearts, blades.max(0))
-}
-
-/// How many in-hand lives the current board can actually satisfy.
-///
-/// This is v7's `60 * Δpassable` term, and it is the one signal v8's leaf was
-/// missing. `P(place)` is a MAX over the lives in hand, so once any single life
-/// is passable the term saturates at 1.0 and every further board improvement
-/// is invisible - which is why v8's leaf tied at the top in 81.8% of decisions.
-/// A COUNT is not a max: it rises 0 -> 1 -> 2 -> 3 as the board grows, so it
-/// keeps discriminating in exactly the region where `P(place)` has gone flat.
-///
-/// The threshold is deliberately not a coin flip. §3.2 pools every member's
-/// hearts (active AND wait) and the yell adds `Binomial(flips, density)`, so
-/// `confidence` is the fraction of the flip budget we require before calling a
-/// life reachable. 0.55 sits above the mean on purpose: a life that needs more
-/// flips than we can expect fails about half the time, and counting it as
-/// reachable would price a coin flip as board development.
-pub fn passable_count(
-    gs: &GameState,
-    me: u8,
-    db: &CardDatabase,
-    confidence: f64,
-) -> f64 {
-    let p = gs.seat_player(me);
-    // `heart_pool_inner` is the guides' own pool: every member's hearts, active
-    // AND wait (3.2), plus `Binomial(flips, density)` scaled by `confidence`
-    // per printed colour. `alloc` is the engine's own wildcard allocator, so
-    // "can this life be satisfied" is asked the same way the check will ask it.
-    let pool = super::strategy_v4::heart_pool_inner(gs, me, db, confidence);
-
-    let mut count = 0.0f64;
-    for &cid in p.hand.cards.iter() {
-        let Some(card) = db.get_card(cid) else { continue };
-        if card.card_type != CardType::Live {
-            continue;
-        }
-        let need = life_need(gs, cid);
-        if has_unpassable_icon(&need) {
-            continue;
-        }
-        if super::strategy_v4::alloc(&pool, &need).is_some() {
-            count += 1.0;
-        }
-    }
-    count
 }
 
 // -- Cheap pass estimate for Main-phase ranking ---------------------------

@@ -124,11 +124,29 @@ fn butterfly_wing_q260_control_live_start_resolves() {
         game.select_indices(&[]);
     }
 
-    // Energy should have increased since LiveStart abilities resolved
-    assert!(
-        game.state.player1.energy_zone.active_count() >= 2,
-        "Control: LiveStart abilities resolved → energy should have been activated (got {})",
-        game.state.player1.energy_zone.active_count()
+    // Energy should have increased since LiveStart abilities resolved.
+    //
+    // The old comment here claimed "2 Meis × 2 energy = 4 activated", but the
+    // zone is seeded with TWO energy cards, so 4 was never reachable and
+    // ">= 2" was silently satisfied by a single LiveStart. The sharp claim this
+    // test can actually make is that the zone is fully activated, and the
+    // suppressed twin above pins the 0. (Seed more energy to make the per-Mei
+    // multiplication observable; `set_active_count(0)` leaves 2 in the zone.)
+    assert_eq!(
+        game.state.player1.energy_zone.active_count() as usize,
+        game.state.player1.energy_zone.cards.len(),
+        "Control: LiveStart resolved → every energy card in the zone is active"
+    );
+    assert_eq!(
+        game.state.player1.energy_zone.active_count(),
+        2,
+        "and the zone really did hold exactly 2, so the comparison above is not \
+         vacuous"
+    );
+    assert_eq!(
+        game.state.player1.energy_zone.cards.len(),
+        2,
+        "…and the zone held exactly those two energy cards"
     );
 }
 

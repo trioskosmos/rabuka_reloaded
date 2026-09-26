@@ -52,10 +52,6 @@ def detect_note_positions(note: str) -> List[str]:
     return sorted(found)
 
 
-def format_positions(positions: List[str]) -> str:
-    return ",".join(positions)
-
-
 def set_cross_position_fields(target, text):
     if "position" in target:
         return False

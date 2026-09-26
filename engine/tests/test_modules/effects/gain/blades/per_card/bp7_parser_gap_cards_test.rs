@@ -127,13 +127,19 @@ fn wien_activation_moves_energy_zone_to_energy_deck() {
 
     run_activate_drain(&mut game, wien);
 
-    assert!(
-        game.state.player1.energy_zone.active_count() < zone_before,
-        "one energy card must leave the energy zone"
+    // Exact, not "<": the effect places ONE card, and the sibling
+    // `wien_empty_energy_zone_step1_fizzles` already pins the zero case with
+    // assert_eq — so the pair brackets the behaviour instead of describing a
+    // band that a 3-card regression would satisfy.
+    assert_eq!(
+        game.state.player1.energy_zone.active_count(),
+        zone_before - 1,
+        "exactly one energy card left the energy zone"
     );
-    assert!(
-        game.state.player1.energy_deck.cards.len() > deck_before,
-        "the energy card must be placed into the energy deck"
+    assert_eq!(
+        game.state.player1.energy_deck.cards.len(),
+        deck_before + 1,
+        "the same card was placed into the energy deck"
     );
     assert!(
         game.state.player1.hand.cards.contains(&recover),

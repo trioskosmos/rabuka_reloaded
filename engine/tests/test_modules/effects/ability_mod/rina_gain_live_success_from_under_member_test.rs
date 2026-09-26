@@ -320,15 +320,21 @@ fn rina_copies_from_multiple_under_cards() {
     game.pass();
     game.pass();
 
-    let gained = game.state.gained_abilities.get(&rina);
-    assert!(gained.is_some(), "Rina should have gained abilities");
-    if let Some(list) = gained {
-        assert!(
-            list.len() >= 2,
-            "Should copy from both under-cards, got {} entries",
-            list.len()
-        );
-    }
+    // The gained entry must EXIST before its length means anything: the old
+    // `if let Some(list)` had no else, so a run that copied nothing skipped the
+    // only assertion and the test passed.
+    let gained = game
+        .state
+        .gained_abilities
+        .get(&rina)
+        .expect("Rina must have gained abilities from her under-cards");
+    // Exactly one per under-card, from the two cards placed under her.
+    assert_eq!(
+        gained.len(),
+        2,
+        "one ability copied per under-card, got {:?}",
+        gained
+    );
 }
 
 fn setup_rina_live_success(game: &mut TestGame, p1_energy: usize, p2_energy: usize) -> (i16, i16) {

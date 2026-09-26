@@ -1,6 +1,6 @@
 {
   "generated_by": "cards/test_inventory.py",
-  "generated_at": "2026-09-26T12:20:37.377204+00:00",
+  "generated_at": "2026-09-26T12:33:32.767057+00:00",
   "stats": {
     "total_cards": 2526,
     "cards_with_abilities": 1565,
@@ -1363,6 +1363,155 @@
           "test": "live_card_base_score_stored_correctly",
           "line": 356,
           "detail": "member in 2 slots"
+        }
+      ]
+    },
+    "count_inequality_only": {
+      "count": 24,
+      "rows": [
+        {
+          "file": "engine/tests/test_modules/characterization/corpus_smoke_test.rs",
+          "test": "every_card_executes_without_panicking",
+          "line": 84,
+          "detail": "1 inequality assertion(s) on a count, vs threshold"
+        },
+        {
+          "file": "engine/tests/test_modules/effects/choice/per_card/daydream_mermaid_live_success_energy_or_recover_choice_test.rs",
+          "test": "daydream_mermaid_choice_appears_and_selects_energy",
+          "line": 41,
+          "detail": "1 inequality assertion(s) on a count, vs baseline"
+        },
+        {
+          "file": "engine/tests/test_modules/effects/choice/per_card/daydream_mermaid_live_success_energy_or_recover_choice_test.rs",
+          "test": "daydream_mermaid_choice_selects_recover",
+          "line": 86,
+          "detail": "1 inequality assertion(s) on a count, vs baseline"
+        },
+        {
+          "file": "engine/tests/test_modules/effects/choice/per_card/tang_keke_energy_or_heart06_choice_test.rs",
+          "test": "tang_keke_discard_member_with_blade_heart_choose_one",
+          "line": 42,
+          "detail": "1 inequality assertion(s) on a count, vs baseline"
+        },
+        {
+          "file": "engine/tests/test_modules/effects/choice/per_card/tang_keke_energy_or_heart06_choice_test.rs",
+          "test": "tang_keke_discard_member_without_blade_heart_choose_any_number",
+          "line": 66,
+          "detail": "1 inequality assertion(s) on a count, vs baseline"
+        },
+        {
+          "file": "engine/tests/test_modules/effects/choice/per_card/tang_keke_energy_or_heart06_choice_test.rs",
+          "test": "tang_keke_discard_non_member_liella_card_choose_one",
+          "line": 112,
+          "detail": "1 inequality assertion(s) on a count, vs baseline"
+        },
+        {
+          "file": "engine/tests/test_modules/effects/compound/per_card/debut_blade_lifecycle_and_cost17_aqours_placement_edges_test.rs",
+          "test": "mari_cost_17_aqours_vs_muse",
+          "line": 84,
+          "detail": "1 inequality assertion(s) on a count, vs threshold"
+        },
+        {
+          "file": "engine/tests/test_modules/effects/cost_mod/per_card/success_zone_stage_cost_deploy_energy_test.rs",
+          "test": "success_zone_stage_cost_ability_deploy_spends_at_least_base_plus_one",
+          "line": 8,
+          "detail": "1 inequality assertion(s) on a count, vs baseline"
+        },
+        {
+          "file": "engine/tests/test_modules/effects/gain/blades/per_card/bp7_parser_gap_cards_test.rs",
+          "test": "kanon_selects_each_group_to_deck_bottom_and_draws",
+          "line": 223,
+          "detail": "1 inequality assertion(s) on a count, vs baseline"
+        },
+        {
+          "file": "engine/tests/test_modules/effects/gain/blades/per_card/kanon_debut_one_per_group_deck_bottom_edge_test.rs",
+          "test": "kanon_select_three_any_order_and_draw",
+          "line": 25,
+          "detail": "1 inequality assertion(s) on a count, vs baseline"
+        },
+        {
+          "file": "engine/tests/test_modules/effects/gain/blades/per_card/q273_fired_debut_ability_cost_paid_test.rs",
+          "test": "q273_fired_debut_ability_cost_is_paid",
+          "line": 85,
+          "detail": "1 inequality assertion(s) on a count, vs baseline"
+        },
+        {
+          "file": "engine/tests/test_modules/effects/gain/blades/per_card/ren_baton_touch_group_check_test.rs",
+          "test": "ren_baton_touch_from_liella_places_energy",
+          "line": 21,
+          "detail": "1 inequality assertion(s) on a count, vs baseline"
+        },
+        {
+          "file": "engine/tests/test_modules/effects/gain/hearts/constants/ten_energy_constant_heart06_threshold_boundary_test.rs",
+          "test": "pl_sp_bp5_016_n_energy_at_least_ten_grants_heart06",
+          "line": 22,
+          "detail": "1 inequality assertion(s) on a count, vs threshold"
+        },
+        {
+          "file": "engine/tests/test_modules/effects/look_select/per_card/live_success_under_member_count_score_test.rs",
+          "test": "burn_wait_state_verification",
+          "line": 141,
+          "detail": "1 inequality assertion(s) on a count, vs threshold"
+        },
+        {
+          "file": "engine/tests/test_modules/effects/look_select/reveal/sequential_cost_look_five_take_cost9_member_test.rs",
+          "test": "eli_bp5_look_select_optional_skip_keeps_hand",
+          "line": 149,
+          "detail": "1 inequality assertion(s) on a count, vs threshold"
+        },
+        {
+          "file": "engine/tests/test_modules/effects/look_select/reveal/sequential_cost_look_five_take_cost9_member_test.rs",
+          "test": "eli_bp5_no_eligible_look_discards_all",
+          "line": 122,
+          "detail": "2 inequality assertion(s) on a count, vs baseline+threshold"
+        },
+        {
+          "file": "engine/tests/test_modules/effects/look_select/reveal/sequential_cost_look_five_take_group_member_test.rs",
+          "test": "izumi_bp5_look_no_eligible_auto_discards",
+          "line": 143,
+          "detail": "1 inequality assertion(s) on a count, vs baseline"
+        },
+        {
+          "file": "engine/tests/test_modules/effects/position/area_move/formation_change_test.rs",
+          "test": "all_three_move_counts",
+          "line": 35,
+          "detail": "1 inequality assertion(s) on a count, vs baseline"
+        },
+        {
+          "file": "engine/tests/test_modules/effects/position/area_move/formation_change_test.rs",
+          "test": "one_moves_two_stay",
+          "line": 89,
+          "detail": "1 inequality assertion(s) on a count, vs baseline"
+        },
+        {
+          "file": "engine/tests/test_modules/effects/recover/to_hand/energy_discard_live_recovery_pl_sp_sd2_006_sd2_test.rs",
+          "test": "pl_sp_sd2_006_sd2_no_liella_live_terminates_without_gain",
+          "line": 126,
+          "detail": "1 inequality assertion(s) on a count, vs baseline"
+        },
+        {
+          "file": "engine/tests/test_modules/effects/recover/to_hand/live_success_draws_four_and_picks_one_niji_reveal_q66_test.rs",
+          "test": "poppin_no_niji_revealed_effect_fails",
+          "line": 264,
+          "detail": "1 inequality assertion(s) on a count, vs baseline"
+        },
+        {
+          "file": "engine/tests/test_modules/effects/score/per_card/mute_kibiriver_revealed_card_heart_gain_test.rs",
+          "test": "mute_kibiriver_multiple_kasumi_in_revealed_select_one",
+          "line": 154,
+          "detail": "1 inequality assertion(s) on a count, vs threshold"
+        },
+        {
+          "file": "engine/tests/test_modules/jidou/yell/discard_revealed_then_re_yell/blade_heart_two_or_fewer_discard_all_and_re_yell_test.rs",
+          "test": "discard_accept_then_re_yells",
+          "line": 122,
+          "detail": "1 inequality assertion(s) on a count, vs baseline"
+        },
+        {
+          "file": "engine/tests/test_modules/rules/trigger_paths/jidou_paired_ability_combination_test.rs",
+          "test": "jidou_paired_with_other_ability_both_fire",
+          "line": 52,
+          "detail": "1 inequality assertion(s) on a count, vs baseline"
         }
       ]
     },

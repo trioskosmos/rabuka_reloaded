@@ -514,6 +514,69 @@ _NOT_A_CARD_SLOT = {
 }
 
 
+Q_COUNT_OP = r"\.(?:len|count|active_count)\s*\(\s*\)"
+# A count expression compared with < or > (not <=/>=, which pin a bound) against
+# another expression. `x.len() > 3` and `y.len() < before` both qualify.
+Q_COUNT_INEQ_RE = re.compile(
+    r"(?:%s\s*(?:<=|>=|<|>)|(?:<=|>=|<|>)\s*[\w.]*%s)" % (Q_COUNT_OP, Q_COUNT_OP)
+)
+
+
+def _assert_conditions(body):
+    """Yield the condition text of every `assert!(...)`, paren-balanced.
+
+    A regex cannot do this: `assert!(a.len() > f(b))` has a `)` inside the call,
+    and stopping at the first one truncates the condition so badly that the count
+    comparison goes missing. Nested asserts inside closures and helpers are
+    included, which is what we want — the question is what the WHOLE test proves.
+    """
+    for m in re.finditer(r"assert!\s*\(", body):
+        i = m.end() - 1
+        depth = 0
+        j = i
+        while j < len(body):
+            ch = body[j]
+            if ch == "(":
+                depth += 1
+            elif ch == ")":
+                depth -= 1
+                if depth == 0:
+                    break
+            j += 1
+        yield body[i + 1 : j]
+
+
+def _count_inequality_only(body):
+    """Describe a test that pins its outcome with loose count inequalities.
+
+    The rule: no assert_eq/assert_ne anywhere (so the test states no value at
+    all), and at least one `assert!` that compares a COUNT against another
+    expression with `<` or `>`. Asserts that are not count comparisons
+    (`has_pending_choice()`, a zone `contains`) are counted as supporting
+    evidence and do not disqualify the test.
+
+    `<=` and `>=` against a measured baseline are bands too, so they qualify;
+    what the returned string separates is the weaker form — a LITERAL threshold,
+    where "at least 5" is true for 5, 6 and 50 and there is no measurement at
+    all behind it.
+    """
+    hits = []
+    for cond in _assert_conditions(body):
+        cond = cond.strip()
+        # `assert!(is_ok() || x.len() <= 2)` is a disjunction, not a band on a
+        # count: the MD forbids that shape outright, and it is not this section.
+        if "==" in cond or "||" in cond:
+            continue
+        if not Q_COUNT_INEQ_RE.search(cond):
+            continue
+        hits.append("threshold" if re.search(r"[<>]=?\s*\d", cond) else "baseline")
+    if not hits:
+        return ""
+    kinds = set(hits)
+    kind = "threshold" if kinds == {"threshold"} else "baseline+threshold" if len(kinds) > 1 else "baseline"
+    return "%d inequality assertion(s) on a count, vs %s" % (len(hits), kind)
+
+
 def _duplicate_stage_ids(body):
     """Yield (identifier, slot_count) for a card staged in more than one slot.
 
@@ -972,6 +1035,7 @@ def audit_test_quality(files):
         "similar_cards": [],
         "unpinned_similar_cards": [],
         "duplicate_stage_id": [],
+        "count_inequality_only": [],
     }
     support = support_profiles_by_module(files)
     for _p, rel, text, _fns in files:
@@ -1064,8 +1128,7 @@ def audit_test_quality(files):
             # but nothing says WHICH one, so a regression that trips a
             # different guard still passes.
             if has_assert and _only_negative_asserts(body):
-                smells["assert_only_negative"].append((rel, name, line, ""))
-            # Every assertion is about a count/size, never a specific value
+                smells["assert_only_negative"].append((rel, name, line, ""))            # Every assertion is about a count/size, never a specific value
             # tied to the card under test: "3 options were offered" can hold
             # while the 3 are the wrong 3.
             if has_assert and _only_count_asserts(body):
@@ -1087,6 +1150,15 @@ def audit_test_quality(files):
                 smells["duplicate_stage_id"].append(
                     (rel, name, line, "%s in %d slots" % (dup_name, dup_slots))
                 )
+            # Every assertion is an INEQUALITY on a count, and the test contains
+            # no assert_eq at all. `assert!(deck.len() < before)` holds for a
+            # whole band of values: the draw could be 1 card or 9, or the deck
+            # could be shrinking for an unrelated reason (the yell discards, the
+            # next turn draws). A threshold against a literal is weaker still.
+            if has_assert and "assert_eq!" not in body and "assert_ne!" not in body:
+                band = _count_inequality_only(body)
+                if band:
+                    smells["count_inequality_only"].append((rel, name, line, band))
             for cn in Q_CARD_NO_RE.findall(body):
                 if cn.startswith("PL!"):
                     file_groups.setdefault(card_group_key(cn), set()).add(cn)
@@ -1133,6 +1205,7 @@ SMELL_DOCS = {
     "similar_cards": "confusable card numbers (bp2 vs pb2) staged in one file AND the file pins card identity (assert_card_identity / compares card_no), so a transposition would fail loudly",
     "unpinned_similar_cards": "confusable card numbers (bp2 vs pb2) staged in one file with NO card-identity pin — a transposed print would pass silently; add assert_card_identity to close it",
     "duplicate_stage_id": "the same card INSTANCE in two stage slots (`stage.stage = [filler, y, filler]`) — not a legal board; anything that counts members or dedupes by name measures a board that cannot occur, so use a second `new_id`",
+    "count_inequality_only": "every assertion is an INEQUALITY on a count and there is no assert_eq anywhere — a band, not a value, so 1 card and 9 both pass; pin the number the card prints",
     "unresolvable_card_id": "a game.id(\"…\") literal that is not a card number in the database — get_card_id's lenient fallback silently substitutes a DIFFERENT PRINT of the same card, so the test stages the wrong card and passes",
     "prompt_ordinal_drain": "prompts answered by ORDINAL position (if step <= 2 { select 2 cards }) instead of by the prompt's own identity — adding or removing one prompt upstream silently changes which prompt gets the answer",
     "blind_phase_stepping": "a fixed `for _ in 0..N { pass() }` walk through the turn — a phase gaining or losing a step silently shifts the window the test thinks it is standing in; step to the phase by name instead",

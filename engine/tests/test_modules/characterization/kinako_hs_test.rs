@@ -13,13 +13,19 @@ fn kinako_hs_q81_multiname_has_individual_names_in_card_db() {
     let multi = game.id("LL-bp1-001-R\u{ff0b}");
     let card = game.db.get_card(multi).expect("Multi-name card in DB");
     let name = &card.name;
-    eprintln!("[KINAKO] multi card name: {}", name);
     // The name should contain '&' separating individual names
     assert!(
         name.contains('&'),
         "Multi-name card should have '&' in name"
     );
     let parts: Vec<&str> = name.split('&').collect();
-    eprintln!("[KINAKO] individual names: {:?}", parts);
-    assert!(parts.len() >= 3, "Should have 3+ individual names");
+    // Exact, not ">= 3": the card is 園田海未&東條希&東雲好花, so the split is
+    // three names. "3 or more" would survive a parser that glued a fourth
+    // character on, which is the failure Q81 is about.
+    assert_eq!(
+        parts.len(),
+        3,
+        "the multi-name card carries exactly three individual names, got {:?}",
+        parts
+    );
 }

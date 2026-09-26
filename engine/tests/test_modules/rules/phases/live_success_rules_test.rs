@@ -308,9 +308,11 @@ fn no_live_card_no_yell_no_success() {
     advance_to_live_start(&mut game);
     game.drain_choices_strict(&["SelectCard", "SelectAutoAbility"], &[]);
     advance_to_live_victory(&mut game);
-    assert!(
-        game.state.player1.main_deck.cards.len() >= 45,
-        "Q32: Deck should not lose >5 cards from yell (no live card set)"
+    assert_eq!(
+        game.state.player1.main_deck.cards.len(),
+        50,
+        "Q32: with no live card set there is no yell and no LiveSuccess, so the \
+         deck is untouched — '>= 45' also passed while up to 5 cards vanished"
     );
     assert!(
         game.state.player1.success_live_card_zone.cards.is_empty()

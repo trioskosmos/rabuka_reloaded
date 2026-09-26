@@ -951,3 +951,52 @@ defect reproducing.
   live with a Draw/Score requirement neither settable nor discardable.
 - All of the above is measured on one deck in a mirror. A claim about being
   better needs a second deck and a non-mirror opponent before it is believed.
+
+## What did NOT work (measured, 700 games paired, do not retry)
+
+Every one of these was implemented, measured with the paired test, and removed
+or defaulted off because it moved win rate by less than the noise floor. They
+are listed because "we already tried that" is the most expensive lesson there
+is, and because their inertness is itself the finding.
+
+| attempt | rationale | result |
+|---|---|---|
+| two-horizon leaf (T+1 and T+3) | one-check leaf too myopic | p = 0.45-1.0 at weights 0.5-2.0 |
+| `score_ceiling` (integer score band) | cost ladder as development signal | superseded; cost is the wrong proxy |
+| `passable_count` (v7's `60 x Dpassable`) | a count does not saturate like a max | p > 0.62 at every weight |
+| v7's eval ported as a level term | v7's Main wins by 5pp, so copy its terms | p = 1.0, and IDENTICAL at weights 0.5-5.0 |
+| Main search 32 -> 64 -> 128 nodes | deeper search finds better lines | p = 1.0, no change at any depth |
+| follow-up breadth 4 -> 10, width -> 8 | deeper lines | p = 0.69, no change |
+| live-set samples 192 -> 768 -> 2048 | tail resolution in the pace decision | p = 0.63, no change |
+| drop `x lives` from the burn term | all-or-nothing charges the zone once | correctness fix, no outcome change |
+
+Two things follow, and they are the useful part.
+
+**1. Everything above is a monotone function of the same post-action board
+quantities that `band_progress` already reads.** That is why the weights did not
+matter: the terms rank actions identically, so no weight reorders the argmax.
+Only `band_progress` reordered decisions, and it is the only one that changed
+the result (+5.4pp). Adding more terms to a leaf that is already a function of
+`(stage cost, hearts, blades)` cannot help. That is the whole lesson.
+
+**2. v7's advantage is not any of its terms.** Its eval, its depth, and its
+breadth were all reproduced inside v8 and all were inert, while v7's Main still
+wins ~5pp. The remaining difference is structural - v7 scores a *delta* across
+its search and re-evaluates after each simulated action, so it sees the joint
+effect of a sequence; v8 scores an absolute *level* after one action. Fixing
+that means v8's search must re-enter v8's placement model at every node rather
+than only at the leaf, which is a real change to the search and not a retune.
+
+## Final measured state
+
+| config | v8 win rate (2400 games, 3 seeds, both seats) |
+|---|---|
+| v8 as originally written | 38.8% (930/2400) |
+| **v8 as shipped now** | **43.9% (1054/2400)** |
+| v7 Main + v8 live (best hybrid measured) | 49.3% (1184/2400) |
+| v7 | 56.1% |
+
+v8 is now +5.1pp over what it was, about 3.6 sigma, reproduced across three
+seeds and both seats. It is still behind v7, and the table above is the reason:
+the remaining gap is in the Main phase's search structure, not in any constant
+or term that can be tuned from the outside.

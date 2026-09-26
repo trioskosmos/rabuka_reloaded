@@ -61,15 +61,21 @@ fn wien_q262_empty_hand_triggers_energy_move() {
 
     // Q262: Energy zone→energy_deck movement auto-takes (fungible cards,
     // no per-card selection needed after the optional discard skip).
-
-    // Q262: Energy card should have moved from energy zone to energy deck
-    assert!(
-        game.state.player1.energy_zone.active_count() < energy_zone_before,
-        "Q262: An energy card should have left the energy zone"
+    //
+    // Exact, not "<": the effect moves ONE card, so `active < before` and
+    // `deck > before` would also pass if it moved three, or if the zone lost a
+    // card by some other route while the deck gained a different one. The
+    // sibling `wien_empty_energy_zone_step1_fizzles` already pins the negative
+    // with assert_eq, so the pair now brackets the behaviour exactly.
+    assert_eq!(
+        game.state.player1.energy_zone.active_count(),
+        energy_zone_before - 1,
+        "Q262: exactly one energy card left the energy zone"
     );
-    assert!(
-        game.state.player1.energy_deck.cards.len() > energy_deck_before,
-        "Q262: Energy deck should have gained a card"
+    assert_eq!(
+        game.state.player1.energy_deck.cards.len(),
+        energy_deck_before + 1,
+        "Q262: the same card landed in the energy deck"
     );
 }
 

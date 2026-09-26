@@ -17,9 +17,32 @@ COUNTER_PATTERN = re.compile(r"(\d+)つ")  # Generic counter (e.g., "3つ")
 ITEM_PATTERN = re.compile(r"(\d+)個")  # Item counter (e.g., "4個")
 GROUP_PATTERN = re.compile(r"『(.+?)』")
 QUOTED_NAME_PATTERN = re.compile(r"「(.+?)」")
-HEART_PATTERN = re.compile(r"{{heart_(\d+)\.png\|heart\d+}}")
 BLADE_PATTERN = re.compile(r"{{icon_blade\.png\|ブレード}}")
-ALL_ICON_PATTERN = re.compile(r"\{\{icon_all\.png\|ハート\}\}")
+
+# ======================================================================
+# HEART ICON VOCABULARY (one definition, used by every heart scan)
+# ======================================================================
+# A heart colour reaches the parser in three renderings:
+#   {{heart_03.png|heart03}}   card-data form (underscore before the id)
+#   {{heart03.png|heart03}}    icon form
+#   heart_03                   the bare card-data id
+# These patterns are the only place any of that is spelled, so a rendering
+# change is a one-line edit rather than a sweep through two dozen ad-hoc
+# regexes. They live here rather than in parser.py because the shared
+# helpers below need them too.
+#
+# HEART_ICON       matches a rendered icon, capturing nothing
+# HEART_ICON_ID    matches a rendered icon, capturing the colour number
+# HEART_ICON_PAIR  matches a rendered icon, capturing both halves of the name
+# HEART_REF        the `heart_NN` id on its own, capturing the colour number
+# HEART_HAS_REF    the same, capturing nothing (a presence test)
+# HEART_LABEL      the `|heartNN}` label half of a rendered icon
+HEART_ICON = r"\{\{heart_?\d+\.png\|heart\d+\}\}"
+HEART_ICON_ID = r"\{\{heart_?(\d+)\.png\|heart\d+\}\}"
+HEART_ICON_PAIR = r"\{\{heart_(\d+)\.png\|heart(\d+)\}\}"
+HEART_REF = r"heart_(\d+)"
+HEART_HAS_REF = r"heart_\d+"
+HEART_LABEL = r"\|(heart\d+)\}"
 
 
 def strip_suffix_period(text):
@@ -355,35 +378,6 @@ SUBUNITS = {
 KNOWN_UNITS = MAIN_GROUPS | SUBUNITS
 
 
-def detect_group_type(group_name):
-    """Detect whether a group name is a unit or character.
-    Returns 'unit' if it's a known unit name, 'character' otherwise."""
-    # Normalize the group name for comparison
-    normalized = group_name.strip()
-
-    # Check against known units
-    if normalized in KNOWN_UNITS:
-        return "unit"
-
-    # Check for common unit patterns
-    # Units often have special characters like !, ', or are in English
-    if "!" in normalized or "'" in normalized:
-        return "unit"
-
-    # Japanese katakana/hiragana names are typically characters
-    # Units are usually in English or have special formatting
-    # This is a heuristic - may need refinement
-    if any(
-        c in normalized
-        for c in "アイウエオカキクケコサシスセソタチツテトナニヌネノハヒフヘホマミムメモヤユヨラリルレロワヲン"
-    ):
-        # If it's mostly katakana and not a known unit, it's likely a character
-        return "character"
-
-    # Default to character if unknown
-    return "character"
-
-
 def extract_all_groups(text):
     """Extract all group names from text (『...』 and mixed 『...」 patterns)."""
     matches = GROUP_PATTERN.findall(text)
@@ -597,8 +591,14 @@ _CARD_TYPE_LONGEST_FIRST: List[Tuple[str, str]] = sorted(
 )
 
 # ============== PRE-COMPILED REGEXES ==============
+_ALL_KW_RE = re.compile(r"すべての|全ての|全部の|全て|全員|全体|カードをすべて")
 _SHUFFLE_RE = re.compile(r"シャッフル")
 _OPTIONAL_RE = re.compile(r"もよい|てもよい")
+
+
+def check_original_value(text):
+    """Check if text contains 'original value' pattern (元々持つ or bare 元々)."""
+    return "元々持つ" in text or "元々" in text
 
 
 def detect_require_all_hearts(text: str) -> bool:
@@ -612,11 +612,6 @@ def detect_require_all_hearts(text: str) -> bool:
         ):
             return False
     return True
-
-
-def extract_position(text: str) -> Optional[str]:
-    """Extract position (center/left_side/right_side) from text."""
-    return extract_by_pattern(text, list(POSITION_KEYWORDS.items()))
 
 
 def extract_cost_limit(text: str) -> Optional[int]:
@@ -927,17 +922,6 @@ class PriorityRegistry:
 
     def __repr__(self):
         return f"PriorityRegistry({self._name}, {len(self._handlers)} handlers)"
-
-
-def action_rule(registry: PriorityRegistry, priority: int, name: str = ""):
-    """Decorator to register a handler in a PriorityRegistry."""
-
-    def decorator(func):
-        func_name = name or func.__name__
-        registry.register(priority, func_name, func)
-        return func
-
-    return decorator
 
 
 def _accepts_two_positional(f: Callable) -> bool:

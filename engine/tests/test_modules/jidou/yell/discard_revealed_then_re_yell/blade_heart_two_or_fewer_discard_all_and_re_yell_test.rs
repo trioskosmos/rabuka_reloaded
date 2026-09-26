@@ -64,7 +64,7 @@ fn condition_5_revealed_all_blade_heart_no_trigger() {
     fill_decks(&mut game);
     game.give_energy(15);
     advance_to_p1_performance(&mut game, daisuki);
-    assert!(game.state.initial_yell_revealed_cards.len() >= 5);
+    assert_eq!(game.state.initial_yell_revealed_cards.len(), 5);
     assert!(!game.has_pending_choice());
     assert!(!game.state.re_yell_occurred);
 }
