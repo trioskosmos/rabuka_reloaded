@@ -83,6 +83,26 @@ fn himena_bp6006_baton_only_with_murasakipark() {
         res.is_err(),
         "non-みらくらぱーく！ baton partner must be blocked"
     );
+    // The block must be total. The allowed-partner sibling test proves the same
+    // play is otherwise legal, so these are what pin "nothing happened".
+    assert_eq!(
+        game.state.player1.stage.stage[0],
+        himena,
+        "the restricted member must still occupy the area"
+    );
+    assert!(
+        !game.state.player1.waitroom.cards.contains(&himena),
+        "a blocked baton touch must not put the member in the waitroom"
+    );
+    assert!(
+        game.state.player1.hand.cards.contains(&outsider),
+        "the arriving outsider must still be in hand"
+    );
+    assert_eq!(
+        game.state.baton_touch_count_p1, 0,
+        "a blocked baton touch must not be counted"
+    );
+    game.assert_energy_untouched_after_refusal(6, "blocked non-みらくらぱーく！ baton");
 }
 
 // ====================================================================
@@ -338,22 +358,16 @@ fn sumire_bpb4004_double_baton_removes_both_and_clamps_cost() {
             .map(|c| c.name.to_string())
             .unwrap_or_default()
     };
-    eprintln!("[SUMIRE_TRACE] last 25 debug_trace entries:");
-    for entry in game.state.debug_trace.iter().rev().take(25).rev() {
-        eprintln!("  [TRACE] {}", entry);
-    }
-    eprintln!("[SUMIRE_TRACE] last 20 rule_log entries:");
-    for entry in game.state.rule_log.iter().rev().take(20).rev() {
-        eprintln!("  [RULE] {}", entry);
-    }
-    eprintln!(
-        "[SUMIRE_DBG] stage_names={:?} waitroom_names={:?} hand_names={:?} energy={}",
+
+    assert!(
+        !game.state.player1.stage.stage.contains(&big_a)
+            && !game.state.player1.stage.stage.contains(&big_b),
+        "both occupants removed (stage now {:?}, waitroom {:?})",
         game.state
             .player1
             .stage
             .stage
             .iter()
-            .filter(|&&c| c != -1)
             .map(|&c| name_of(c))
             .collect::<Vec<_>>(),
         game.state
@@ -362,21 +376,7 @@ fn sumire_bpb4004_double_baton_removes_both_and_clamps_cost() {
             .cards
             .iter()
             .map(|&c| name_of(c))
-            .collect::<Vec<_>>(),
-        game.state
-            .player1
-            .hand
-            .cards
-            .iter()
-            .map(|&c| name_of(c))
-            .collect::<Vec<_>>(),
-        game.state.player1.energy_zone.active_count()
-    );
-
-    assert!(
-        !game.state.player1.stage.stage.contains(&big_a)
-            && !game.state.player1.stage.stage.contains(&big_b),
-        "both occupants removed"
+            .collect::<Vec<_>>()
     );
     assert!(
         game.state.player1.waitroom.cards.contains(&big_a)

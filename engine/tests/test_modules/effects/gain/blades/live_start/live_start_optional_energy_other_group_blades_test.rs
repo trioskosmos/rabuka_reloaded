@@ -30,6 +30,8 @@ fn live_start_pay_energy_grants_blade_to_other_group_member() {
 
     let self_member = game.id("PL!N-sd1-001-SD");
     let other_niji = game.new_id("PL!N-bp4-007-R\u{ff0b}");
+    game.assert_card_identity(self_member, "PL!N-sd1-001-SD");
+    game.assert_card_identity(other_niji, "PL!N-bp4-007-R\u{ff0b}");
     game.state.player1.stage.stage = [self_member, other_niji, -1];
     let fid2 = game.id_ref("PL!-sd1-010-SD");
     fill_both_main_decks(&mut game, fid2);
@@ -41,9 +43,16 @@ fn live_start_pay_energy_grants_blade_to_other_group_member() {
         pay_optional_costs_selecting_last_hand_card(&mut game);
     }
 
-    let other_blade = game.state.mods.get_blade_modifier(other_niji);
-    assert!(
-        other_blade >= 1,
-        "other 虹ヶ咲 member should receive the blade boost"
+    // 自分のステージにいるほかの『虹ヶ咲』のメンバーはブレードを得る — exactly one
+    // blade, on the OTHER member only.
+    assert_eq!(
+        game.state.mods.get_blade_modifier(other_niji),
+        1,
+        "ほかの『虹ヶ咲』のメンバー gains exactly one blade"
+    );
+    assert_eq!(
+        game.state.mods.get_blade_modifier(self_member),
+        0,
+        "ほかの — the source herself must NOT be included"
     );
 }

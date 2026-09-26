@@ -168,6 +168,16 @@ fn ginko_hs_debut_window_rests_cost_le9_member() {
     let gin = game.id("PL!HS-bp6-004-R");
     let cheap = game.id("PL!-sd1-010-SD"); // cost 4 — eligible
     let huge = game.id("PL!HS-bp5-004-R"); // cost 15 — gate blocks
+    // The whole test is a COST gate (コスト9以下), and PL!HS-bp6-004-R /
+    // PL!HS-bp5-004-R are one bp number apart and BOTH print 百生 吟子 (costs
+    // 13 and 15). Pin the prints AND the costs the gate reads, so neither a
+    // transposition nor a stale cost can make the negative pass for free.
+    game.assert_card_identity(gin, "PL!HS-bp6-004-R");
+    game.assert_card_cost(gin, 13);
+    game.assert_card_identity(huge, "PL!HS-bp5-004-R");
+    game.assert_card_cost(huge, 15);
+    game.assert_same_card_name(gin, huge, "two 吟子 printings");
+    game.assert_card_cost(cheap, 4);
     let filler = game.id("PL!-sd1-010-SD");
 
     game.state.player2.stage.stage = [cheap, huge, -1];

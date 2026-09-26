@@ -87,6 +87,73 @@ CHOICE_RE = re.compile(r"(has_pending_choice|pending_choice_type|select_indices|
 # Condition types encoding specific, rule-heavy requirements. Abilities with one
 # of these (or a use_limit) need explicit positive AND negative choice-level
 # tests, so they are surfaced separately from plain L0/L1 coverage.
+# Actions that can raise a SelectCard / SelectTarget prompt. An ability built
+# only from the rest resolves on its own and can never reach "L2+choice", so
+# calling it thin for lacking choice depth is a false positive that keeps
+# pointing review at already-complete tests. Wrappers (sequential /
+# conditional_on_result) recurse into their compound actions.
+CHOICE_CAPABLE_ACTIONS = {
+    "move_cards",            # pick cards out of a zone
+    "select_cards",
+    "select",
+    "select_number",
+    "choice",
+    "look_and_select",
+    "position_change",
+    "activate_ability",      # pick whose ability to fire
+    "conditional_on_optional",
+    "conditional_alternative",
+    "choose_target_player",
+    "play_baton_touch",      # pick the arrival target
+    "place_energy_under_member",
+    "invalidate_ability",
+    "repeat_procedure",
+}
+
+CHOICE_CAPABLE_WRAPPERS = {"sequential", "conditional_on_result", "repeat_procedure"}
+
+# Zones whose contents the player cannot see, so "put 1 card from here" is the
+# top card, not a choice. PL!SP-bp4-010-R's エネルギーカードを1枚…置く out of the
+# energy deck resolves without a prompt for exactly this reason, and treating
+# it as choice-capable kept a complete four-test file on the thin list.
+HIDDEN_ZONES = {
+    "energy_deck",
+    "main_deck",
+    "deck_top",
+    "deck_bottom",
+    "opponent_hand",
+    "enemy_hand",
+    "opponent_main_deck",
+    "opponent_deck",
+}
+
+
+def _action_can_prompt(action, effect):
+    if action == "move_cards":
+        return effect.get("source") not in HIDDEN_ZONES
+    return action in CHOICE_CAPABLE_ACTIONS
+
+
+def effect_can_prompt(effect):
+    """True if resolving `effect` can raise a choice for the player.
+
+    Used to separate "this ability is under-tested" from "this ability has no
+    prompt to exercise", so the thin-coverage list only names real gaps.
+    """
+    if not isinstance(effect, dict):
+        return False
+    action = effect.get("action")
+    if _action_can_prompt(action, effect):
+        return True
+    if action in CHOICE_CAPABLE_WRAPPERS:
+        return any(
+            effect_can_prompt(sub) for sub in (effect.get("compound") or {}).get(
+                "actions", []
+            )
+        )
+    return False
+
+
 SPECIAL_CONDITION_TYPES = {
     "ability_filter_condition",        # watches other ABILITIES resolving
     "all_cost_comparison_condition",
@@ -379,6 +446,180 @@ Q_PEND_RE = re.compile(r"has_pending_choice")
 Q_IDENT_RE = re.compile(
     r"pending_choice_type|pending_choice_summary|select_choice_option|answer_choice|drain_choices_strict"
 )
+# A card-identity pin: the test compares the resolved instance's printed
+# card_no, so a transposed bp2/pb2 (or SEC/P) card number would fail loudly.
+Q_CARD_PIN_RE = re.compile(r"assert_card_identity|card_no")
+
+# assert!(x) / assert_eq!(x, y) — the units an assertion of interest is counted in.
+Q_ASSERT_CALL_RE = re.compile(r"assert(?:_eq|_ne|_ability)?!\s*\(")
+# A negative-only assertion: is_err(), is_none(), !ok, result.is_err(), etc.
+Q_NEGATIVE_ASSERT_RE = re.compile(
+    r"is_err\(\)|is_none\(\)|!ok\b|\bok\(\)\s*==\s*false|assert_ne!\s*\(\s*None"
+)
+# A count-only assertion: comparing .len(), a count, or ">= 1" and nothing else.
+Q_COUNT_ASSERT_RE = re.compile(
+    r"\.len\(\)\s*[=!<>]=?|\bcount\b\s*[=!<>]=?|>\s*=\s*1\b|>\s*=\s*0\b"
+)
+Q_PLACEHOLDER_RE = re.compile(
+    r"#\[ignore|assert!\s*\(\s*true\s*\)|assert!\s*\(\s*1\s*==\s*1\s*\)|todo!\s*\(|"
+    r"unimplemented!\s*\(|panic!\s*\(\s*\"TODO"
+)
+# An assertion that cannot fail. `assert!(true)` used to satisfy Q_ASSERT_RE and
+# hide behind no_assert=0 — the suite carried nine of them, in files whose own
+# comments admitted they existed only to raise the L0 coverage number.
+Q_TRIVIAL_ASSERT_RE = re.compile(
+    r"^\s*(?:true|false|1\s*==\s*1|0\s*==\s*0)\s*[,)]?"
+)
+# Prompts answered by ORDINAL position rather than by the prompt's own identity.
+# The signal is a loop counter compared to a literal, so both halves are
+# required: the name must be incremented somewhere in the same body AND
+# compared against a number. Matching the comparison alone fired on ordinary
+# `*count > 1` filters, which are the good kind.
+Q_LOOP_COUNTER_RE = re.compile(r"\b(\w+)\s*\+=\s*\d+\b")
+
+
+def _has_ordinal_drain(body):
+    """Does a loop counter drive WHICH prompt gets answered?
+
+    The comparison direction is what separates the two uses. `if step <= 2` and
+    `if step == 1` pick an answer by position — that is the smell. `if iter > 20`
+    is a runaway guard on a `while` and answers nothing by position, so it is
+    not counted.
+    """
+    counters = {m.group(1) for m in Q_LOOP_COUNTER_RE.finditer(body)}
+    counters &= {"step", "i", "idx", "n", "iter", "k", "round", "attempt", "pass_no"}
+    for name in counters:
+        if re.search(r"\b" + re.escape(name) + r"\s*(?:==|<=|<)\s*\d+\b", body):
+            return True
+    return False
+# A fixed-length walk through the turn. A blind `for _ in 0..3 { pass() }` works
+# right up until a phase gains or loses a step, and then the test is standing in
+# a different window than it thinks — with no failure to notice it. A test that
+# ASSERTS where it ended up is not in that position, so those are exempt.
+Q_BLIND_PHASE_RE = re.compile(
+    r"for\s+_\s+in\s+0\.\.[0-9]+\s*\{\s*(?:[A-Za-z_][\w.]*\.)?pass\(\)\s*;\s*\}"
+)
+Q_PHASE_PIN_RE = re.compile(
+    r"advance_to_phase|pass_into_phase_capturing_energy|assert_eq!\s*\(\s*[^,]*"
+    r"current_phase|assert!\s*\([^)]*current_phase"
+)
+
+
+def _assert_calls(body):
+    """The source of each assertion in `body`, so a test can be classified by
+    what it actually checks rather than by the words around it."""
+    out = []
+    for m in Q_ASSERT_CALL_RE.finditer(body):
+        depth = 0
+        start = m.end() - 1
+        for i in range(start, len(body)):
+            c = body[i]
+            if c == "(":
+                depth += 1
+            elif c == ")":
+                depth -= 1
+                if depth == 0:
+                    out.append(body[start + 1 : i])
+                    break
+        else:
+            out.append(body[start:])
+    return out
+
+
+def _strip_rust_strings(body):
+    """Blank out string literals so an assertion MESSAGE cannot classify it.
+
+    `assert_eq!(x, 3, "own=0, opponent>=1 -> 3 blades")` is a specific-value
+    assertion, but the `>=1` in the message made the count detector claim the
+    test only checks counts. Messages describe the rule; only the compared
+    operands say what the test pins.
+    """
+    out = []
+    i = 0
+    n = len(body)
+    while i < n:
+        c = body[i]
+        if c == '"':
+            # raw string: r"..." / r#"..."#
+            raw = 0
+            j = i
+            while j > 0 and (body[j - 1].isalnum() or body[j - 1] == "_") and raw < 1:
+                raw += 1
+                j -= 1
+            if raw:
+                hashes = 0
+                while i + 1 + hashes < n and body[i + 1 + hashes] == "#":
+                    hashes += 1
+                if i + 1 + hashes < n and body[i + 1 + hashes] == '"':
+                    close = '"' + "#" * hashes
+                    end = body.find(close, i + 2 + hashes)
+                    end = n if end == -1 else end + len(close)
+                    out.append(" " * (end - i))
+                    i = end
+                    continue
+            i += 1
+            while i < n:
+                if body[i] == "\\":
+                    i += 2
+                    continue
+                if body[i] == '"':
+                    i += 1
+                    break
+                i += 1
+            out.append('""')
+            continue
+        out.append(c)
+        i += 1
+    return "".join(out)
+
+
+def _only_negative_asserts(body):
+    """True when every assertion in `body` is a bare is_err()/is_none().
+
+    Credit flows through helpers here, the same way it does for `no_assert`:
+    a test whose own assertion is `is_err()` but which also calls a helper that
+    asserts something concrete is not "only negative". Without that, moving an
+    assertion into a helper (the natural refactor) silently re-appears the test
+    in this list.
+    """
+    return _only_asserts_of_kind(body, Q_NEGATIVE_ASSERT_RE)
+
+
+def _only_count_asserts(body):
+    return _only_asserts_of_kind(body, Q_COUNT_ASSERT_RE)
+
+
+def _only_asserts_of_kind(body, pattern):
+    """Do all of `body`'s assertions — own and inherited via helpers — match
+    `pattern`? A test with no assertions at all is not "only" anything.
+
+    String literals are removed first: an assertion's failure message routinely
+    quotes the rule ("opponent>=1"), and counting that as the assertion's shape
+    misfiles specific-value tests as count-only.
+    """
+    body = _strip_rust_strings(body)
+    calls = list(_assert_calls(body))
+    if not calls:
+        return False
+    if not all(pattern.search(c) for c in calls):
+        return False
+    # Everything the test says itself is of that kind. It also counts as "only"
+    # when every helper it leans on for evidence says the same kind of thing.
+    for name, helper_calls in HELPER_ASSERT_CALLS.items():
+        if re.search(r"\b" + re.escape(name) + r"\s*\(", body):
+            for call in helper_calls:
+                if not pattern.search(call):
+                    return False
+            for call in SUPPORT_ASSERT_CALLS.get(name, []):
+                if not pattern.search(call):
+                    return False
+    return True
+
+
+# Filled per test file by audit_test_quality: helper name -> its assert sources.
+HELPER_ASSERT_CALLS = {}
+# Same, for the shared test_modules/support fixtures.
+SUPPORT_ASSERT_CALLS = {}
 Q_OUTCOME_RE = re.compile(
     r"get_blade_modifier|get_heart_modifier|get_orientation_modifier|get_score_modifier"
     r"|blade_modifiers|heart_modifiers|orientation_modifiers|need_heart|success_zone"
@@ -409,6 +650,38 @@ def strip_rust_line_comments(text):
     return re.sub(r"//[^\n]*", "", text)
 
 
+Q_FN_ATTR_RE = re.compile(r"#\s*\[[^\]\n]*\][ \t]*(?:\r?\n|$)")
+
+
+def is_test_fn(text, fn_start):
+    """True when `fn` at fn_start is directly annotated #[test].
+
+    Walks backwards over whitespace and other attribute lines only. A
+    fixed-length lookback used to answer this, which mistook a helper
+    following a short test fn for a test (the previous #[test] was still
+    inside the window) and so denied that helper assert/drive/identity
+    credit — faking no_assert/no_drive/pendency_only rows.
+    """
+    i = fn_start
+    window = max(0, fn_start - 2000)
+    while True:
+        j = i
+        while j > window and text[j - 1] in " \t\r\n":
+            j -= 1
+        if j == window:
+            return False
+        m = None
+        for m in Q_FN_ATTR_RE.finditer(text, window, j):
+            pass
+        if not m or m.end() != j:
+            return False
+        if m.group(0).lstrip().startswith("#["):
+            attr = m.group(0)
+            if re.match(r"#\s*\[\s*test\s*\]", attr):
+                return True
+        i = m.start()
+
+
 def split_rust_fns(text, tests_only):
     """Split Rust source into (name, code-only body, start_line, is_test).
 
@@ -424,11 +697,9 @@ def split_rust_fns(text, tests_only):
     )
     for m in re.finditer(pat, text, re.MULTILINE):
         name = m.group(1)
-        # With tests_only the pattern itself implies #[test]; otherwise look
-        # back for the attribute (the match starts at `fn`, after it).
-        is_test = tests_only or bool(
-            re.search(r"#\[test\]", text[max(0, m.start() - 160) : m.start()])
-        )
+        # With tests_only the pattern itself implies #[test]; otherwise ask
+        # is_test_fn whether the attribute is directly attached.
+        is_test = tests_only or is_test_fn(text, m.start())
         if tests_only and not is_test:
             continue
         i = text.find("{", m.end())
@@ -490,6 +761,143 @@ def card_group_key(card_no):
     return Q_SET_SEG_RE.sub("-SET-", card_no)
 
 
+def helper_profiles(text):
+    """{profile: {fn_name}} for the non-#[test] fns in one Rust source.
+
+    Profiles: assert / scan / ident / outcome. Closure over calls means a
+    wrapper inherits whatever its callees already earn.
+    """
+    bodies = {
+        name: body
+        for name, body, _line, is_test in split_rust_fns(text, False)
+        if not is_test
+    }
+    credited = {
+        "assert": {n for n, b in bodies.items() if Q_ASSERT_RE.search(b)},
+        "scan": {n for n, b in bodies.items() if Q_SCAN_RE.search(b)},
+        "ident": {n for n, b in bodies.items() if Q_IDENT_RE.search(b)},
+        "outcome": {
+            n
+            for n, b in bodies.items()
+            if Q_OUTCOME_RE.search(b) or Q_OUTCOME_MOD_RE.search(b)
+        },
+    }
+
+    def _close(names):
+        changed = True
+        while changed:
+            changed = False
+            for n, b in bodies.items():
+                if n in names:
+                    continue
+                if any(re.search(r"\b" + c + r"\s*\(", b) for c in names):
+                    names.add(n)
+                    changed = True
+        return names
+
+    return {k: _close(set(v)) for k, v in credited.items()}, bodies
+
+
+SUPPORT_RE = re.compile(
+    r"use\s+crate::test_modules::support::(\w+)::\s*\*\s*;"
+)
+
+
+def support_profiles_by_module(files):
+    """{module_name: {profile: {fn_name}}} for test_modules/support/*.
+
+    These are the shared driving fixtures (play_to_stage, activate, drain).
+    A test that hands the whole gameplay turn to one of them is driving the
+    engine, so crediting them keeps no_drive honest.
+    """
+    out = {}
+    for p, rel, text, _fns in files:
+        rel = rel.replace("\\", "/")
+        if "/test_modules/support/" not in rel or rel.endswith("/support/mod.rs"):
+            continue
+        mod = p.stem
+        prof, bodies = helper_profiles(text)
+        out[mod] = prof
+        for name, hbody in bodies.items():
+            SUPPORT_ASSERT_CALLS.setdefault(name, []).extend(
+                _assert_calls(hbody)
+            )
+    return out
+
+
+# A `game.id("…")` / `id_ref("…")` literal that is not a card number in the
+# database. `get_card_id` is deliberately lenient: an unknown number falls back
+# to "any print of this base", so a typo resolves to a DIFFERENT PRINT of the
+# same card and the test stages the wrong card without failing. `PL!SP-bp2-006-R`
+# (no such rarity) silently became `PL!SP-bp2-006-P`, whose printed text lacks
+# the 常時 the test was checking — a "known engine gap" that was really a typo.
+Q_ID_LITERAL_RE = re.compile(r'\b(?:id|id_ref)\(\s*"([^"]+)"')
+
+
+def _card_numbers():
+    """Every card_no in cards/cards.json, or an empty set if it cannot be read.
+
+    Loaded lazily and defensively: this list only powers the
+    `unresolvable_card_id` smell, and a tool that refuses to run because the
+    catalogue moved would be worse than one that reports nothing.
+    """
+    path = ROOT / "cards" / "cards.json"
+    try:
+        with open(path, encoding="utf-8") as f:
+            data = json.load(f)
+    except (OSError, ValueError):
+        return set()
+    if isinstance(data, dict) and isinstance(data.get("cards"), dict):
+        return set(data["cards"].keys())
+    if isinstance(data, dict):
+        return {k for k, v in data.items() if isinstance(v, dict) and "card_no" in v}
+    return set()
+
+
+def unresolvable_card_literals(files, card_numbers):
+    """[(rel, line, literal)] for id literals absent from the card database.
+
+    `card_numbers` is the set of normalised card_no keys. Mirrors the two
+    normalisations `CardDatabase::normalize_card_no` performs (fullwidth→ASCII,
+    lowercase→uppercase) so a ＋/＋ difference is not reported.
+    """
+    keys = {_normalise_card_no(k) for k in card_numbers}
+    out = []
+    for _p, rel, text, _fns in files:
+        for m in Q_ID_LITERAL_RE.finditer(text):
+            s = m.group(1)
+            if not re.match(r"^[A-Za-z0-9!#\-_+]{6,}$", s):
+                continue  # not a card-number shape (a zone name, an option id)
+            if s.startswith(("LL-", "BD-", "EN-")):
+                continue
+            if s in keys or _normalise_card_no(s) in keys:
+                continue
+            out.append(
+                (rel, text[: m.start()].count("\n") + 1, s)
+            )
+    return out
+
+
+def _normalise_card_no(s):
+    out = []
+    for ch in s:
+        o = ord(ch)
+        if 0xFF41 <= o <= 0xFF5A:  # fullwidth A-Z
+            out.append(chr(o - 0xFEE0))
+        elif "a" <= ch <= "z":
+            out.append(ch.upper())
+        elif ch == "＋":  # fullwidth plus
+            out.append("+")
+        else:
+            out.append(ch)
+    return "".join(out)
+
+
+# Does this test exercise the gameplay engine at all? Used to scope no_drive:
+# a card-database / bytecode / modifier-table test has nothing to drive.
+Q_GAMEPLAY_RE = re.compile(r"TestGame|\bgame\.|player1|player2|main_deck|\.state\.")
+
+
 def audit_test_quality(files):
     """Run smell detectors over collect_test_files() output.
 
@@ -501,51 +909,36 @@ def audit_test_quality(files):
         "no_drive": [],
         "synthetic_only": [],
         "pendency_only": [],
+        "assert_only_negative": [],
+        "assert_only_counts": [],
+        "placeholder": [],
+        "prompt_ordinal_drain": [],
+        "blind_phase_stepping": [],
         "similar_cards": [],
+        "unpinned_similar_cards": [],
     }
+    support = support_profiles_by_module(files)
     for _p, rel, text, _fns in files:
         fns = split_test_fns(text)
         # Helper profiles: a test calling a helper that asserts/drives gets
         # credit (e.g. check_heart_reduction asserts, play_three drives).
         # Helpers are file-local non-#[test] fns.
-        helper_assert = set()
-        helper_scan = set()
-        helper_ident = set()
-        helper_outcome = set()
-        helper_bodies = {}
-        for hname, hbody, _hline, is_test in split_rust_fns(text, False):
-            if is_test:
+        local, local_bodies = helper_profiles(text)
+        helper_assert = set(local["assert"])
+        helper_scan = set(local["scan"])
+        helper_ident = set(local["ident"])
+        helper_outcome = set(local["outcome"])
+        # Shared fixtures under test_modules/support/: a test that starves the
+        # turn to one of them (replace_member_by_baton_touch -> play_to_stage)
+        # really did drive the engine.
+        for mod in SUPPORT_RE.findall(text):
+            prof = support.get(mod)
+            if not prof:
                 continue
-            helper_bodies[hname] = hbody
-            if Q_ASSERT_RE.search(hbody):
-                helper_assert.add(hname)
-            if Q_SCAN_RE.search(hbody):
-                helper_scan.add(hname)
-            if Q_IDENT_RE.search(hbody):
-                helper_ident.add(hname)
-            if Q_OUTCOME_RE.search(hbody) or Q_OUTCOME_MOD_RE.search(hbody):
-                helper_outcome.add(hname)
-        # Transitive closure: a helper calling a credited helper inherits the
-        # credit (e.g. setup_and_trigger_live_start -> advance_to_live_start).
-        def _close(credited):
-            changed = True
-            while changed:
-                changed = False
-                for hname, hbody in helper_bodies.items():
-                    if hname in credited:
-                        continue
-                    if any(
-                        re.search(r"\b" + c + r"\s*\(", hbody)
-                        for c in credited
-                    ):
-                        credited.add(hname)
-                        changed = True
-            return credited
-
-        helper_assert = _close(set(helper_assert))
-        helper_scan = _close(set(helper_scan))
-        helper_ident = _close(set(helper_ident))
-        helper_outcome = _close(set(helper_outcome))
+            helper_assert |= prof["assert"]
+            helper_scan |= prof["scan"]
+            helper_ident |= prof["ident"]
+            helper_outcome |= prof["outcome"]
 
         def _calls(names):
             return (
@@ -558,14 +951,28 @@ def audit_test_quality(files):
         helper_scan_re = _calls(helper_scan)
         helper_ident_re = _calls(helper_ident)
         helper_outcome_re = _calls(helper_outcome)
+        # Per-file view of what each helper actually asserts, so
+        # assert_only_negative / assert_only_counts can see evidence a test
+        # delegated to a helper.
+        HELPER_ASSERT_CALLS.clear()
+        for hname, hbody in local_bodies.items():
+            HELPER_ASSERT_CALLS[hname] = _assert_calls(hbody)
         file_groups = {}
         for name, body, line in fns:
-            has_assert = bool(Q_ASSERT_RE.search(body)) or bool(
-                helper_assert_re and helper_assert_re.search(body)
-            )
+            has_assert = any(
+                not Q_TRIVIAL_ASSERT_RE.search(call) for call in _assert_calls(body)
+            ) or bool(helper_assert_re and helper_assert_re.search(body))
             if not has_assert:
                 smells["no_assert"].append((rel, name, line, ""))
             driven = bool(Q_SCAN_RE.search(body)) or bool(
+                helper_scan_re and helper_scan_re.search(body)
+            )
+            # `no_drive` asks "did a gameplay test set up state without ever
+            # driving the engine?". A test that never builds a TestGame at all
+            # — a card-database lookup, a bytecode decode, a modifier-table
+            # unit check — is not a gameplay test, so the question does not
+            # apply to it and it must not be listed.
+            is_gameplay = bool(Q_GAMEPLAY_RE.search(body)) or bool(
                 helper_scan_re and helper_scan_re.search(body)
             )
             if (
@@ -574,6 +981,7 @@ def audit_test_quality(files):
                 and not driven
                 and Q_TRIGGER_CTX_RE.search(body)
                 and not Q_PARSE_AUDIT_RE.search(body)
+                and is_gameplay
             ):
                 smells["no_drive"].append((rel, name, line, ""))
             # synthetic_only: hand-pushed trigger events are weak evidence only
@@ -596,6 +1004,22 @@ def audit_test_quality(files):
                 and Q_TRIGGER_CTX_RE.search(body)
             ):
                 smells["pendency_only"].append((rel, name, line, ""))
+            # Every assertion is a bare is_err()/is_none(): a real guard fired,
+            # but nothing says WHICH one, so a regression that trips a
+            # different guard still passes.
+            if has_assert and _only_negative_asserts(body):
+                smells["assert_only_negative"].append((rel, name, line, ""))
+            # Every assertion is about a count/size, never a specific value
+            # tied to the card under test: "3 options were offered" can hold
+            # while the 3 are the wrong 3.
+            if has_assert and _only_count_asserts(body):
+                smells["assert_only_counts"].append((rel, name, line, ""))
+            if Q_PLACEHOLDER_RE.search(body):
+                smells["placeholder"].append((rel, name, line, ""))
+            if _has_ordinal_drain(body):
+                smells["prompt_ordinal_drain"].append((rel, name, line, ""))
+            if Q_BLIND_PHASE_RE.search(body) and not Q_PHASE_PIN_RE.search(body):
+                smells["blind_phase_stepping"].append((rel, name, line, ""))
             for cn in Q_CARD_NO_RE.findall(body):
                 if cn.startswith("PL!"):
                     file_groups.setdefault(card_group_key(cn), set()).add(cn)
@@ -611,7 +1035,21 @@ def audit_test_quality(files):
                         file_groups.setdefault(card_group_key(cn), set()).add(cn)
         for _key, nos in file_groups.items():
             if len(nos) > 1:
-                smells["similar_cards"].append((rel, "<file>", 1, ", ".join(sorted(nos))))
+                detail = ", ".join(sorted(nos))
+                # A file that transposes confusable card numbers is only as
+                # trustworthy as its ability to notice a mis-staged card. Files
+                # that pin identity (assert_card_identity, or compare card_no)
+                # have that guard; the rest go to their own list so the review
+                # prompt is "add the pin", not "reread all 29".
+                pinned = bool(Q_CARD_PIN_RE.search(text))
+                if not pinned:
+                    for mod, prof in support.items():
+                        for names in prof.values():
+                            if Q_CARD_PIN_RE.search("|".join(sorted(names))):
+                                pinned = True
+                smells["similar_cards" if pinned else "unpinned_similar_cards"].append(
+                    (rel, "<file>", 1, detail)
+                )
     for rows in smells.values():
         rows.sort()
     n_fns = sum(len(split_test_fns(text)) for _p, _rel, text, _fns in files)
@@ -623,7 +1061,14 @@ SMELL_DOCS = {
     "no_drive": "trigger-context test that mutates state and asserts but never drives the engine (no scan/activate/play/fire): vacuous negatives/positives",
     "synthetic_only": "trigger event hand-pushed with no real ability resolution in the same fn (weaker trigger evidence)",
     "pendency_only": "has_pending_choice asserted without choice identity (pending_choice_type/summary/answer) or outcome asserts",
-    "similar_cards": "confusable card numbers (bp2 vs pb2) staged in one file — human review for wrong-card staging",
+    "assert_only_negative": "every assertion is a bare is_err()/is_none() — some guard fired, but nothing says which, so a regression tripping a different guard still passes",
+    "assert_only_counts": "every assertion is about a count/size (len/count/>=1) — '3 options were offered' can hold while the 3 are the wrong 3",
+    "placeholder": "#[ignore], assert!(true), todo!() or unimplemented!() left in a test",
+    "similar_cards": "confusable card numbers (bp2 vs pb2) staged in one file AND the file pins card identity (assert_card_identity / compares card_no), so a transposition would fail loudly",
+    "unpinned_similar_cards": "confusable card numbers (bp2 vs pb2) staged in one file with NO card-identity pin — a transposed print would pass silently; add assert_card_identity to close it",
+    "unresolvable_card_id": "a game.id(\"…\") literal that is not a card number in the database — get_card_id's lenient fallback silently substitutes a DIFFERENT PRINT of the same card, so the test stages the wrong card and passes",
+    "prompt_ordinal_drain": "prompts answered by ORDINAL position (if step <= 2 { select 2 cards }) instead of by the prompt's own identity — adding or removing one prompt upstream silently changes which prompt gets the answer",
+    "blind_phase_stepping": "a fixed `for _ in 0..N { pass() }` walk through the turn — a phase gaining or losing a step silently shifts the window the test thinks it is standing in; step to the phase by name instead",
 }
 
 
@@ -916,6 +1361,7 @@ def build_inventory():
             "is_null": bool(u.get("is_null")),
             "use_limit": u.get("use_limit"),
             "watches_abilities": watches_abilities,
+            "can_prompt": effect_can_prompt(u.get("effect")),
             "effect_cause": effect_cause,
             "jidou_partners": [],  # filled after the loop
             "covered": covered,
@@ -947,8 +1393,17 @@ def build_inventory():
             r["jidou_partners"] = sorted(idxs_by_base[r["base"]] - {r["idx"]})
 
     def _is_thin(r):
-        """Thin coverage: no choice-level exercise or exercised by <= 1 test fn."""
-        return ("choice" not in r["depth"]) or r["covering_test_count"] <= 1
+        """Thin coverage: no choice-level exercise, or exercised by <= 1 test fn.
+
+        An ability that resolves without ever raising a prompt cannot reach
+        "L2+choice" no matter how good its tests are, so for those the choice
+        half of the test is skipped — only a single-fn coverage still counts.
+        Without this the list never empties and keeps re-flagging complete
+        tests (it was doing exactly that to PL!SP-bp4-010-R's four-test file).
+        """
+        if r["covering_test_count"] <= 1:
+            return True
+        return "choice" not in r["depth"] and r["can_prompt"]
 
     specific_thin = sorted(
         r["idx"] for r in rows
@@ -982,6 +1437,15 @@ def build_inventory():
         "all_src_len": len(all_src),
     }
     quality_smells, n_test_fns_parsed = audit_test_quality(files)
+    # A `game.id("…")` literal that names no card at all. get_card_id's lenient
+    # fallback turns such a typo into a DIFFERENT PRINT of the same card, so the
+    # test stages the wrong card and passes.
+    quality_smells["unresolvable_card_id"] = [
+        (rel, "<literal>", line, lit)
+        for rel, line, lit in unresolvable_card_literals(
+            files, _card_numbers()
+        )
+    ]
     ret = dict(
         ret,
         quality={k: len(v) for k, v in quality_smells.items()},
@@ -1163,8 +1627,10 @@ def render_coverage(inv):
     w(
         f"{specific_total} abilities carry a rare condition type (state/position/energy/highest-cost/"
         "blade-compare/ability-filter), a use_limit, or watch other abilities resolve. Listed below are "
-        "the ones with **thin** coverage (no choice-level exercise, or exercised by ≤1 test fn) — these "
-        "are today's highest-value new-test targets now that the L0 gap list is empty."
+        "the ones with **thin** coverage — either no choice-level exercise, or exercised by ≤1 test fn. "
+        "An ability that resolves without ever raising a prompt is exempt from the choice half of that "
+        "test (it could never reach `L2+choice`), so a fully-tested self-resolving effect does not appear "
+        "here."
     )
     w("")
     if specific_thin_rows:

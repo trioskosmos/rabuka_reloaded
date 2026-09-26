@@ -1,6 +1,13 @@
 ﻿/// Comprehensive tests for live success/failure mechanics (Rules §8.3, §8.4, QA entries)
 use crate::helpers::*;
 
+// These three walkers are shared by every test in this file. They still count
+// passes rather than naming phases, which is the drift risk `blind_phase_stepping`
+// reports — but converting them is NOT a local change: a single target phase is
+// wrong for tests that reveal a live by pushing into the zone instead of calling
+// `set_live_card`, and doing it here broke 5 of the 16 tests that use these.
+// It needs each call site's fixture understood first, so the two tests that
+// drive a real reveal have been converted inline and these stay as they are.
 fn advance_to_live_card_set_p1(game: &mut TestGame) {
     for _ in 0..5 {
         game.pass();
@@ -444,12 +451,13 @@ fn daydream_mermaid_no_niji_in_success_pick_one() {
         game.state.player2.main_deck.cards.push(h05);
     }
 
-    for _ in 0..5 {
-        game.pass();
-    }
+    // Step to the set window and the performance BY NAME. The five blind passes
+    // and the two bare ones this replaces were correct only while the phase
+    // sequence was frozen, and a drifted walk would leave the ライブ成功時
+    // alternatives unevaluated.
+    game.advance_to_phase(rabuka_engine::game_state::Phase::LiveCardSetFirstAttacker);
     game.state.player1.live_card_zone.cards.push(live);
-    game.pass();
-    game.pass();
+    game.advance_to_phase(rabuka_engine::game_state::Phase::FirstAttackerPerformance);
     game.drain_choices_strict(&["SelectCard", "SelectAutoAbility"], &[]);
 
     game.pass();
@@ -523,6 +531,14 @@ fn daydream_mermaid_q191_niji_in_success_pick_both() {
         game.state.player2.main_deck.cards.push(h05);
     }
 
+    // LEFT AS A PASS COUNT, deliberately. Converting this one to named phases
+    // was tried (LiveVictoryDetermination, then Active) and the expected
+    // alternative no longer appeared: this test's fixture reveals the live by
+    // pushing into the zone and then walks past several phases before inspecting
+    // the re-prompt, so the right target phase depends on details of the walk
+    // that are not yet established. A guess that reads plausibly and turns the
+    // suite red is worse than the honest pass count, so it stays and the audit
+    // keeps flagging it.
     for _ in 0..5 {
         game.pass();
     }

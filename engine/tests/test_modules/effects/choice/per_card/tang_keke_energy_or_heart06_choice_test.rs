@@ -151,11 +151,37 @@ fn tang_keke_use_limit_blocks_second_activation() {
     pay_discard_cost(&mut game);
     let _ = select_energy_option(&mut game);
 
+    // The first use must actually be recorded, otherwise a broken first
+    // activation would make this pass for the wrong reason.
+    assert!(
+        game.state
+            .turn_limited_abilities_used
+            .contains_key(&(keke, 0, game.state.turn_number)),
+        "the first activation must have recorded its use, else the second \
+         refusal proves nothing about the limit"
+    );
+    let energy_cards_before = game.state.player1.energy_zone.cards.len();
+
     // Second activation should be blocked by use_limit
     let result = game.try_activate_ability(keke);
     assert!(
         result.is_err(),
         "Second activation should fail: use_limit reached"
+    );
+    // The refusal must cost nothing: no second discard prompt, no energy, and
+    // the use-limit table untouched by the refused attempt.
+    assert!(
+        !game.has_pending_choice(),
+        "a use-limit refusal must not open the discard cost prompt"
+    );
+    assert_eq!(
+        game.state.player1.energy_zone.cards.len(),
+        energy_cards_before,
+        "a refused activation must not place another energy card"
+    );
+    assert!(
+        game.state.player1.hand.cards.contains(&liella_with_bh),
+        "the cost was paid only once; the second copy is still in hand"
     );
 }
 

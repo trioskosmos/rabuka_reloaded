@@ -34,15 +34,16 @@ fn live_start_gains_one_blade_per_hand_pair() {
         game.state.player2.main_deck.cards.push(filler);
     }
 
-    // Advance to LiveStart
-    for _ in 0..5 {
-        game.pass();
-    }
+    // Advance to LiveStart BY NAME. The five blind passes plus the two
+    // commented ones this replaces were correct only while the phase sequence
+    // was frozen; a phase gaining or losing a step would move resolution off
+    // ライブ開始時 and the blade count would change for the wrong reason.
+    game.advance_to_phase(rabuka_engine::game_state::Phase::LiveCardSetFirstAttacker);
     assert!(game.state.current_phase.to_string().contains("LiveCardSet"));
 
     game.set_live_card(live_card);
-    game.pass(); // LiveCardSetP2
-    game.pass(); // FirstAttackerPerformance (LiveStart fires here)
+    // Second-attacker set window, then the performance phase where ライブ開始時 fires.
+    game.advance_to_phase(rabuka_engine::game_state::Phase::FirstAttackerPerformance);
 
     // LiveStart fired: per_unit(hand, 2) → 6 hand cards ÷ 2 = 3 blade
     let blade_mod = game.state.mods.get_blade_modifier(natsumi);
@@ -76,12 +77,11 @@ fn hand_pair_blade_snapshot_q109_blade_snapshot_hand_change_no_effect() {
         game.state.player2.main_deck.cards.push(filler);
     }
 
-    for _ in 0..5 {
-        game.pass();
-    }
+    // LiveCardSetFirstAttacker, by name — see the sibling test.
+    game.advance_to_phase(rabuka_engine::game_state::Phase::LiveCardSetFirstAttacker);
     game.set_live_card(live_card);
-    game.pass(); // LiveCardSetP2
-    game.pass(); // FirstAttackerPerformance (LiveStart fires)
+    game.advance_to_phase(rabuka_engine::game_state::Phase::FirstAttackerPerformance);
+    // LiveStart fires
 
     let blade_before = game.state.mods.get_blade_modifier(natsumi);
     assert_eq!(blade_before, 3, "6 hand → 3 blade at resolution");
@@ -120,12 +120,9 @@ fn hand_pair_blade_snapshot_q109_blade_unchanged_after_discard() {
         game.state.player2.main_deck.cards.push(filler);
     }
 
-    for _ in 0..5 {
-        game.pass();
-    }
+    game.advance_to_phase(rabuka_engine::game_state::Phase::LiveCardSetFirstAttacker);
     game.set_live_card(live_card);
-    game.pass();
-    game.pass();
+    game.advance_to_phase(rabuka_engine::game_state::Phase::FirstAttackerPerformance);
 
     let blade_before = game.state.mods.get_blade_modifier(natsumi);
     assert_eq!(blade_before, 3, "6 hand → 3 blade");
@@ -161,12 +158,9 @@ fn hand_pair_blade_snapshot_q109_live_only_initial_hand_gives_zero_blades() {
         game.state.player2.main_deck.cards.push(filler);
     }
 
-    for _ in 0..5 {
-        game.pass();
-    }
+    game.advance_to_phase(rabuka_engine::game_state::Phase::LiveCardSetFirstAttacker);
     game.set_live_card(live_card);
-    game.pass();
-    game.pass();
+    game.advance_to_phase(rabuka_engine::game_state::Phase::FirstAttackerPerformance);
 
     let blade = game.state.mods.get_blade_modifier(natsumi);
     assert_eq!(blade, 0, "Q109: 0 hand at resolution → 0 blade");
@@ -196,12 +190,9 @@ fn hand_pair_blade_snapshot_q109_odd_hand_floor_division() {
         game.state.player2.main_deck.cards.push(filler);
     }
 
-    for _ in 0..5 {
-        game.pass();
-    }
+    game.advance_to_phase(rabuka_engine::game_state::Phase::LiveCardSetFirstAttacker);
     game.set_live_card(live_card);
-    game.pass();
-    game.pass();
+    game.advance_to_phase(rabuka_engine::game_state::Phase::FirstAttackerPerformance);
 
     let blade = game.state.mods.get_blade_modifier(natsumi);
     assert_eq!(blade, 2, "Q109: 5 hand → 5/2 = 2 blade (floor division)");

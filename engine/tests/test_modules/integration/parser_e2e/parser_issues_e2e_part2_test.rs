@@ -16,14 +16,20 @@ fn issue2_kanan_discard_1_gain_1() {
     let db = load_real_database();
     let mut game = TestGame::new(db);
     let kanan = game.id("PL!S-bp5-003-R");
-    let aqours_live = game.id("PL!S-bp3-019-L");
     let no_blade = game.id("PL!-sd1-011-SD"); // no blade heart, cost 4
 
-    // Kanan in hand, no-blade card in hand, Aqours live in discard
+    // Kanan in hand, no-blade card in hand, Aqours lives in discard.
+    // Two SEPARATE instances: the effect recovers one live per discarded card,
+    // so a single id present twice would let a "recover 2" bug pass by handing
+    // the same physical card out twice.
+    let aqours_live_1 = game.id("PL!S-bp3-019-L");
+    let aqours_live_2 = game.new_id("PL!S-bp3-019-L");
+    game.assert_same_card_name(aqours_live_1, aqours_live_2, "two copies of one live print");
+    assert_ne!(aqours_live_1, aqours_live_2, "two separate card instances");
     game.add_to_hand(kanan);
     game.add_to_hand(no_blade);
-    game.add_to_discard(aqours_live);
-    game.add_to_discard(aqours_live);
+    game.add_to_discard(aqours_live_1);
+    game.add_to_discard(aqours_live_2);
     game.give_energy(13);
 
     // Play Kanan to stage → debut triggers → cost choice → effect resolves
@@ -31,8 +37,6 @@ fn issue2_kanan_discard_1_gain_1() {
 
     let mut iter = 0;
     while game.has_pending_choice() {
-        let ct = game.pending_choice_type();
-        eprintln!("[TEST_DEBUG] iter={} pending_choice_type={:?}", iter, ct);
         if game.pending_choice_type().as_deref() == Some("SelectAutoAbility") {
             game.select_indices(&[]);
         } else {
@@ -43,17 +47,29 @@ fn issue2_kanan_discard_1_gain_1() {
             panic!("infinite loop");
         }
     }
-    eprintln!("[TEST_DEBUG] loop ended, iter={}", iter);
 
-    // Verify we gained the Aqours live card in hand
-    let has_live = game
+    // 1 discarded → その枚数の『Aqours』のライブカード = exactly 1 gained, and
+    // it must be a real card, not the same id twice.
+    let lives_in_hand: Vec<i16> = game
         .state
         .player1
         .hand
         .cards
         .iter()
-        .any(|&cid| game.db.get_card(cid).is_some_and(|c| c.is_live()));
-    assert!(has_live, "2a: gained Aqours live card in hand");
+        .copied()
+        .filter(|&cid| game.db.get_card(cid).is_some_and(|c| c.is_live()))
+        .collect();
+    assert_eq!(
+        lives_in_hand.len(),
+        1,
+        "2枚まで控え室に置いた枚数に等しい数のライブカードを得る — discarding 1 \
+         must gain exactly 1 live card, got {lives_in_hand:?}"
+    );
+    assert!(
+        game.state.player1.hand.cards.contains(&aqours_live_1)
+            || game.state.player1.hand.cards.contains(&aqours_live_2),
+        "the gained live must be one of the waitroom's, not a fresh card"
+    );
 }
 
 #[test]

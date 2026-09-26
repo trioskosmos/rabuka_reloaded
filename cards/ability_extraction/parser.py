@@ -5324,12 +5324,24 @@ def _infer_aggregate_total_type(condition, text):
         condition["type"] = "comparison_condition"
         condition["comparison_type"] = "cost"
         condition["operator"] = "="
-        # Extract the number from "合計がN" or "合計が、N"
-        cm = re.search(r"合計が、?(\d+)", text)
+        # Extract the number from "合計がN" or "合計が、N", remembering any
+        # quantifier that follows it.
+        cm = re.search(r"合計が、?(\d+)\s*(以上|以下|未満|超|未満)?", text)
+        quantifier = None
         if cm:
             condition["count"] = int(cm.group(1))
-        # Also set cost_total for easier downstream access
-        if "コスト" in text and condition.get("count"):
+            quantifier = cm.group(2)
+        # cost_total mirrors count for the EXACT-total shape ("合計が8の場合"),
+        # not only the ones that spell out コスト. Follow-up branches of a
+        # multi-reward sequential drop the noun and say only "合計が8の場合" /
+        # "合計が25の場合" (PL!N-bp3-009-R＋ ライブ開始時); the engine reads the
+        # threshold from cost_total, so gating it on "コスト" left those
+        # branches permanently false — the card printed three rewards and only
+        # the first could fire.
+        # A quantifier is deliberately excluded: "必要ハート…合計が12以上" is a
+        # lower bound on a heart sum, not a cost total, and giving it a
+        # cost_total would make the engine compare zone costs against 12.
+        if condition.get("count") and quantifier is None:
             condition["cost_total"] = condition["count"]
     else:
         condition["type"] = "score_threshold_condition"

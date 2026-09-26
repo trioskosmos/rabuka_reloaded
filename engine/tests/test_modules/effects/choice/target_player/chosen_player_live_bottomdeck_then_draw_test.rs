@@ -35,9 +35,9 @@ fn chosen_player_live_bottomdeck_draw_choose_self_moves_own_live_and_draws() {
     );
     g.drain_auto_ability_choices();
     // waitroom should no longer contain a live (the one we put)
-    assert!(!g.state.player1.waitroom.cards.iter().any(|&cid| g.db.get_card(cid).map_or(false, |c| c.is_live())), "live moved from discard");
+    assert!(!g.state.player1.waitroom.cards.iter().any(|&cid| g.db.get_card(cid).is_some_and(|c| c.is_live())), "live moved from discard");
     let last = g.state.player1.main_deck.cards.last().copied();
-    assert!(last.is_some_and(|id| g.db.get_card(id).map_or(false, |c| c.is_live())), "deck bottom should be a live, got {:?}", last.map(|id| g.db.get_card(id).map(|c| c.card_no.clone())));
+    assert!(last.is_some_and(|id| g.db.get_card(id).is_some_and(|c| c.is_live())), "deck bottom should be a live, got {:?}", last.map(|id| g.db.get_card(id).map(|c| c.card_no.clone())));
     assert_eq!(g.state.player1.hand.cards.len(), hand_before + 1, "drew 1");
     assert!(g.state.player1.energy_zone.active_count() == 0, "paid 1E");
 }
@@ -58,9 +58,9 @@ fn chosen_player_live_bottomdeck_draw_choose_opponent_moves_opponent_live() {
         "single-candidate live selection should auto-resolve without prompting"
     );
     g.drain_auto_ability_choices();
-    assert!(!g.state.player2.waitroom.cards.iter().any(|&cid| g.db.get_card(cid).map_or(false, |c| c.is_live())), "opp live moved");
+    assert!(!g.state.player2.waitroom.cards.iter().any(|&cid| g.db.get_card(cid).is_some_and(|c| c.is_live())), "opp live moved");
     let last = g.state.player2.main_deck.cards.last().copied();
-    assert!(last.is_some_and(|id| g.db.get_card(id).map_or(false, |c| c.is_live())), "opp deck bottom should be live");
+    assert!(last.is_some_and(|id| g.db.get_card(id).is_some_and(|c| c.is_live())), "opp deck bottom should be live");
     assert_eq!(g.state.player1.hand.cards.len(), p1_hand_before + 1, "self draws even when targeting opponent");
 }
 

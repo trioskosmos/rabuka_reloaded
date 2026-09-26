@@ -36,6 +36,34 @@ fn test_cannot_baton_touch_restriction_blocks_action() {
         result.is_err(),
         "Baton touch should be rejected for member with cannot_baton_touch restriction"
     );
+    // The rejection must be total. The positive control
+    // (test_baton_touch_succeeds_without_restriction) proves the same play is
+    // otherwise legal, so these invariants are what pin "nothing happened":
+    // このメンバーはバトンタッチで控え室に置かれない.
+    game.assert_card_identity(you, "LL-bp2-001-R\u{ff0b}");
+    assert_eq!(
+        game.state.player1.stage.stage,
+        [you, -1, -1],
+        "the protected member must still be on its area"
+    );
+    assert!(
+        !game.state.player1.waitroom.cards.contains(&you),
+        "このメンバーはバトンタッチで控え室に置かれない — the protected member must \
+         not have been moved to the waitroom"
+    );
+    assert!(
+        game.state.player1.hand.cards.contains(&filler_member),
+        "the arriving member must still be in hand"
+    );
+    assert_eq!(
+        game.state.baton_touch_count_p1, 0,
+        "a rejected baton touch must not be counted"
+    );
+    assert!(
+        !game.has_pending_choice(),
+        "a rejected baton touch must not open a prompt"
+    );
+    game.assert_energy_untouched_after_refusal(5, "rejected baton touch");
 }
 
 /// Positive control: the SAME baton-touch play against a member WITHOUT the

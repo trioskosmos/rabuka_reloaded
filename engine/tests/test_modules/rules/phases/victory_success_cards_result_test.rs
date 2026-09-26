@@ -13,7 +13,10 @@ use rabuka_engine::game_state::GameResult;
 use rabuka_engine::turn::TurnEngine;
 
 fn success_lives(game: &mut TestGame, count: usize) -> Vec<i16> {
-    let live = game.id("PL!-sd1-019-SD");
+    // Pin the print once: every 成功ライブカード置き場 entry here is the same
+    // card, and the win rule counts CARDS, not distinct cards.
+    let probe = game.id("PL!-sd1-019-SD");
+    game.assert_card_identity(probe, "PL!-sd1-019-SD");
     (0..count).map(|_| game.new_id("PL!-sd1-019-SD")).collect()
 }
 

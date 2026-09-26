@@ -76,4 +76,20 @@ fn shizuku_insufficient_energy_no_pay() {
     game.state.player1.stage.stage = [-1, -1, -1];
     let res = game.try_play_to_stage(shizuku, MemberArea::Center);
     assert!(res.is_err(), "should fail to play with only 1 energy, need 13");
+    // The refusal must be "cannot afford", not some unrelated failure: the 1
+    // energy is still unspent and neither card left the hand.
+    game.assert_energy_untouched_after_refusal(1, "insufficient energy to play 静月");
+    assert!(
+        game.state.player1.hand.cards.contains(&shizuku),
+        "a refused play leaves the card in hand"
+    );
+    assert!(
+        game.state.player1.hand.cards.contains(&shizuku_hand),
+        "a refused play must not move the target out of hand either"
+    );
+    assert_eq!(
+        game.state.player1.stage.stage,
+        [-1, -1, -1],
+        "a refused play must leave the stage empty"
+    );
 }

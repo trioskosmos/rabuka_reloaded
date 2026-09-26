@@ -1,6 +1,7 @@
 ﻿use crate::helpers::*;
 use rabuka_engine::card::HeartColor;
 use rabuka_engine::core::types::AbilityTrigger;
+use rabuka_engine::game_state::Phase;
 use rabuka_engine::zones::MemberArea;
 
 fn advance_to_live_card_set_p1(game: &mut TestGame) {
@@ -29,6 +30,31 @@ fn give_opponent_energy_cards(game: &mut TestGame, count: usize) {
     for _ in 0..count.max(1) {
         game.state.player2.energy_deck.cards.push(energy);
     }
+}
+
+/// Pass into `target` and return both players' active energy counts as they
+/// were on the last step BEFORE entering it. Snapshotting early (e.g. right
+/// after the live card is set) charges any intervening Energy-phase top-up to
+/// whatever fired inside `target`.
+fn pass_into_phase_capturing_energy(game: &mut TestGame, target: Phase) -> (i32, i32) {
+    let mut last = (0i32, 0i32);
+    for _ in 0..16 {
+        if game.state.current_phase == target {
+            return last;
+        }
+        last = (
+            game.state.player1.energy_zone.active_count() as i32,
+            game.state.player2.energy_zone.active_count() as i32,
+        );
+        game.pass();
+        while game.has_pending_choice() {
+            game.select_indices(&[]);
+        }
+    }
+    panic!(
+        "the turn never reached {:?} within 16 passes (stuck at {:?})",
+        target, game.state.current_phase
+    );
 }
 
 /// Boundary: heart02 total of exactly 6 across TWO Aqours members invalidates
@@ -208,8 +234,9 @@ fn butterfly_suppresses_own_live_start_but_still_scores_on_live_success() {
     );
 }
 
-/// The suppression is owner-scoped: the activating player's LiveStart is
-/// suppressed, and an identically-named member on the opponent's stage is not.
+/// The suppression is owner-scoped: 自分のステージにいるメンバー — the
+/// activating player's LiveStart is suppressed, and an identically-named member
+/// on the opponent's stage still resolves through a real live performance.
 #[test]
 fn butterfly_suppresses_only_the_owners_live_start_members() {
     use rabuka_engine::turn::TurnEngine as Scanner;
@@ -221,10 +248,21 @@ fn butterfly_suppresses_only_the_owners_live_start_members() {
     let mei_p1 = game.id("PL!SP-pb1-007-R");
     let mei_p2 = game.new_id("PL!SP-pb1-007-R");
     assert_ne!(mei_p1, mei_p2);
+    let energy = game.id("LL-E-001-SD");
 
     game.state.player1.stage.stage = [butterfly, mei_p1, -1];
     game.state.player2.stage.stage = [mei_p2, -1, -1];
+    // Both players need activatable energy so "did the LiveStart fire?" is
+    // readable from the energy zone instead of a boolean. 米女メイ activates 2
+    // cards it finds WAITED, so each side needs inactive cards in the zone.
+    for _ in 0..6 {
+        game.state.player1.energy_zone.cards.push(energy);
+        game.state.player2.energy_zone.cards.push(energy);
+    }
+    game.state.player1.energy_zone.set_active_count(0);
+    game.state.player2.energy_zone.set_active_count(0);
 
+    // Precondition: the scanner sees the suppressor on p1's side only.
     assert!(
         Scanner::is_trigger_suppressed(&game.state, "p1", "live_start"),
         "own stage holds the suppressor, so the owner's LiveStart is suppressed"
@@ -236,5 +274,69 @@ fn butterfly_suppresses_only_the_owners_live_start_members() {
     assert!(
         !Scanner::is_trigger_suppressed(&game.state, "p1", "live_success"),
         "only the LiveStart trigger is suppressed; LiveSuccess is untouched"
+    );
+
+    fill_both_decks(&mut game, mei_p1);
+    advance_to_live_card_set_p1(&mut game);
+    game.state.player1.hand.cards.push(butterfly);
+    game.set_live_card(butterfly);
+
+    // The second attacker's ライブ開始時 is only scanned when that player holds
+    // a live card (triggers.rs guards a live-less second attacker), and the
+    // harness only drives p1's actions, so p2's live is placed directly —
+    // the established idiom for a second attacker's reveal.
+    let opp_live = game.id("PL!-sd1-019-SD");
+    game.state.player2.live_card_zone.cards.push(opp_live);
+
+    // The Active phases already spent part of each energy zone. Re-seat both
+    // counters so most of each zone is active and at least 2 cards are waited:
+    // エネルギーを2枚アクティブにする can then only move the counter if it really
+    // fires, and a suppressed one has to leave it alone. The energy decks stay
+    // empty so no Energy phase can refill the zone inside the live window.
+    for zone in [
+        &mut game.state.player1.energy_zone,
+        &mut game.state.player2.energy_zone,
+    ] {
+        zone.set_active_count(4);
+    }
+    assert!(
+        game.state.player1.energy_zone.cards.len()
+            - game.state.player1.energy_zone.active_count() as usize
+            >= 2,
+        "p1 must keep waited energy so 2枚アクティブ has something to activate"
+    );
+    assert!(
+        game.state.player2.energy_zone.cards.len()
+            - game.state.player2.energy_zone.active_count() as usize
+            >= 2,
+        "p2 must keep waited energy so 2枚アクティブ has something to activate"
+    );
+    assert!(game.state.player1.energy_deck.cards.is_empty());
+    assert!(game.state.player2.energy_deck.cards.is_empty());
+
+    // Both performers' ライブ開始時 are scanned in the same phase
+    // (phases.rs: trigger_live_start_abilities for first and second attacker),
+    // so the whole comparison happens on entry to FirstAttackerPerformance.
+    // The baseline is taken on the last step INTO that phase, because a phase
+    // earlier in the window may still top up an energy zone and would otherwise
+    // be charged to the LiveStart.
+    let (p1_before, p2_before) =
+        pass_into_phase_capturing_energy(&mut game, Phase::FirstAttackerPerformance);
+    let p1_after = game.state.player1.energy_zone.active_count() as i32;
+    let p2_after = game.state.player2.energy_zone.active_count() as i32;
+
+    assert_eq!(
+        p1_after - p1_before,
+        0,
+        "米女メイ on the owner's stage must have its LiveStart suppressed: \
+         エネルギーを2枚アクティブにする must NOT apply to the suppressor owner"
+    );
+    assert_eq!(
+        p2_after - p2_before,
+        2,
+        "the same printed LiveStart on the OPPONENT's stage must still resolve: \
+         エネルギーを2枚アクティブにする (p2 active {} before, {} after)",
+        p2_before,
+        p2_after
     );
 }

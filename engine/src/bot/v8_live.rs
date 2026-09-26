@@ -25,7 +25,7 @@
 //!   cards whose loss costs least, and the cost is computed from each card's
 //!   actual next-turn contribution rather than from its printed cost.
 
-use crate::bot::strategy_common::emit_live_set;
+use crate::bot::strategy_common::{acc_add, emit_live_set, Acc};
 use crate::card::{CardDatabase, CardType};
 use crate::game_setup::Action;
 use crate::game_state::{GameState, Phase};
@@ -81,49 +81,149 @@ fn draw_value(gs: &GameState, me: u8, db: &CardDatabase) -> f64 {
 /// Marginal next-turn value of a non-live hand card, in placement units.
 /// Positive means "do not burn this in a set slot".
 ///
-/// The point of computing this (v7 ranked junk by descending printed cost,
-/// which throws away energy, retrieval engines and curve pieces) is that the
-/// question is never "is this card expensive" but "is this card worth more in
-/// my hand next turn than the draw it buys me".
-fn junk_keep_value(gs: &GameState, me: u8, db: &CardDatabase, cid: i16) -> f64 {
+/// The question is never "is this card expensive" but "is this card worth more
+/// in my hand next turn than the draw it buys me". v7 ranked junk by
+/// descending printed cost, which throws away energy, retrieval engines and
+/// curve pieces; here every card is priced by the same check model the live
+/// set uses, so the comparison is in the same units as everything else.
+fn junk_keep_value(
+    gs: &GameState,
+    me: u8,
+    db: &CardDatabase,
+    cid: i16,
+    ctx: &HandContext,
+) -> f64 {
     let Some(card) = db.get_card(cid) else {
         return 0.0;
     };
-    let p = gs.seat_player(me);
     match card.card_type {
         // Energy exists only to buy a deploy that raises check power, so one
         // energy is worth one more shot at the check we are building toward.
         CardType::Energy => return PLACEMENT_CREDIT,
         CardType::Member => {
-            // Printed board contribution feeds the check directly.
-            let hearts = v8_model::card_hearts(db, cid);
-            let blades = v8_model::card_blades(db, cid);
-            let mut value = PLACEMENT_CREDIT * (hearts as f64 + 2.0 * blades as f64) / 8.0;
-            // An engine piece (activation / constant / live-start) can change
-            // a check outright; that is worth a full placement ticket.
-            if !card.ability.trim().is_empty() {
-                value += PLACEMENT_CREDIT;
+            // (1) Direct board contribution: what does this member's printed
+            //     heart and blade supply do to our best in-hand life's chance
+            //     of passing? Measured with the real estimate function, not a
+            //     per-heart constant.
+            let mut with = ctx.board;
+            if let Some(base) = &card.base_heart {
+                acc_add(&mut with, &base.hearts);
             }
-            // Ladder step: affordable within two turns of income plus the
-            // current baton discount (9.6.2.3.2). This is the guides' curve
-            // and it is why an expensive-but-reachable member is not junk.
+            let blades = ctx.blades + i32::from(card.blade);
+            let mut value = match &ctx.best_need {
+                Some(need) => {
+                    let delta = v8_model::pass_estimate_from_supply(
+                        &with,
+                        blades,
+                        ctx.density,
+                        need,
+                    ) - v8_model::pass_estimate_from_supply(
+                        &ctx.board,
+                        ctx.blades,
+                        ctx.density,
+                        need,
+                    );
+                    PLACEMENT_CREDIT * delta
+                }
+                // No life in hand means no check to contribute to; fall back
+                // to the ladder terms below.
+                None => 0.0,
+            };
+            // (2) An engine piece (activation / constant / live-start) can
+            //     change a check outright. Half a placement ticket is the
+            //     honest ceiling: a board engine is not used on every check,
+            //     and pricing it at a full ticket made every engine
+            //     unburnable, which silenced hand filtering entirely
+            //     (measured 0.07 junk cards per set against v7's 1.08).
+            if !card.ability.trim().is_empty() {
+                value += 0.5 * PLACEMENT_CREDIT;
+            }
+            // (3) Ladder step, tested against what we reach anyway. "Is this
+            //     card affordable" is the wrong question - almost every member
+            //     in hand is affordable within a few turns, so that test made
+            //     every member unburnable and silenced hand filtering (0.07
+            //     junk cards per set against v7's 1.08). The right question is
+            //     the guides' own: does this member raise the curve, or would
+            //     it take a slot we will have filled anyway?
             let cost = i32::from(card.cost.unwrap_or(0));
-            let discount = p
-                .stage
-                .stage
-                .iter()
-                .filter(|&&c| c >= 0)
-                .filter_map(|&c| db.get_card(c).and_then(|card| card.cost))
-                .map(i32::from)
-                .max()
-                .unwrap_or(0);
-            let budget = i32::from(p.energy_zone.active_count()) + 3 + discount;
-            if cost > 0 && cost <= budget {
+            if cost > ctx.reachable_next {
                 value += 0.5 * PLACEMENT_CREDIT;
             }
             value
         }
         _ => 0.0,
+    }
+}
+
+/// Per-decision constants every hand card is valued against.
+struct HandContext {
+    board: Acc,
+    blades: i32,
+    density: f64,
+    /// Requirement of the life we would most plausibly set, if we hold one.
+    best_need: Option<Acc>,
+    /// Energy we can reach in the next few turns, plus the baton discount.
+    budget: i32,
+    /// Stage cost we will reach next turn with no help from this card. A
+    /// member at or below this is a CLOG: the guides are explicit that a
+    /// zero-contribution member must not take a slot, and "we will already
+    /// have this much" is the test that says so without a hand-tuned size.
+    reachable_next: i32,
+}
+
+fn hand_context(gs: &GameState, me: u8, db: &CardDatabase) -> HandContext {
+    let p = gs.seat_player(me);
+    let board = v8_model::board_supply(gs, me, db);
+    let (blades, density) = super::strategy_v4::flip_stats(gs, me, db);
+    let best_need = p
+        .hand
+        .cards
+        .iter()
+        .filter_map(|&cid| {
+            let card = db.get_card(cid)?;
+            if card.card_type != CardType::Live {
+                return None;
+            }
+            let need = v8_model::life_need(gs, cid);
+            if v8_model::has_unpassable_icon(&need) {
+                return None;
+            }
+            Some(need)
+        })
+        .fold(None, |acc: Option<Acc>, need| {
+            match acc {
+                Some(current) => {
+                    let better = v8_model::pass_estimate_from_supply(
+                        &board,
+                        blades,
+                        density,
+                        &need,
+                    ) > v8_model::pass_estimate_from_supply(&board, blades, density, &current);
+                    if better {
+                        Some(need)
+                    } else {
+                        Some(current)
+                    }
+                }
+                None => Some(need),
+            }
+        });
+    let discount = p
+        .stage
+        .stage
+        .iter()
+        .filter(|&&c| c >= 0)
+        .filter_map(|&c| db.get_card(c).and_then(|card| card.cost))
+        .map(i32::from)
+        .max()
+        .unwrap_or(0);
+    HandContext {
+        board,
+        blades,
+        density,
+        best_need,
+        budget: i32::from(p.energy_zone.active_count()) + 3 + discount,
+        reachable_next: v8_model::reachable_ceiling(gs, me, 1, db),
     }
 }
 
@@ -153,7 +253,7 @@ fn collect_lives(gs: &GameState, me: u8, db: &CardDatabase) -> Vec<Life> {
         .collect()
 }
 
-fn collect_junk(gs: &GameState, me: u8, db: &CardDatabase, lives: &[Life]) -> Vec<Junk> {
+fn collect_junk(gs: &GameState, me: u8, db: &CardDatabase, lives: &[Life], ctx: &HandContext) -> Vec<Junk> {
     let p = gs.seat_player(me);
     p.hand
         .cards
@@ -167,7 +267,7 @@ fn collect_junk(gs: &GameState, me: u8, db: &CardDatabase, lives: &[Life]) -> Ve
             }
             Some(Junk {
                 index,
-                keep_value: junk_keep_value(gs, me, db, cid),
+                keep_value: junk_keep_value(gs, me, db, cid, ctx),
             })
         })
         .collect()
@@ -180,10 +280,25 @@ fn collect_junk(gs: &GameState, me: u8, db: &CardDatabase, lives: &[Life]) -> Ve
 /// 1. `outcome.value` - the rule payoff of this check plus its placement
 ///    credit, from the shared model.
 /// 2. `- burned` - ammunition destroyed by a failed check. All-or-nothing
-///    means one failure discards the WHOLE zone (8.3.15 -> 8.3.16), so every
-///    life set is a future placement at risk. This is the term that lets the
-///    search decide between a thin life and a junk-only set on value instead of
-///    on a stance floor.
+///    means one failure discards the WHOLE zone (8.3.15 -> 8.3.16).
+///
+///    The price of a burned life is the placement it would have made, and the
+///    only measure available without simulating the rest of the game is the
+///    same check. Two wrong versions of this term were measured and both are
+///    instructive:
+///
+///    - Charging the full `PLACEMENT_CREDIT` makes any life below 50% pass
+///      probability negative, so v8 folded about a third of all checks and
+///      starved its own success zone.
+///    - Charging `p_pass * PROJECTED best pass probability` is worse in a
+///      quieter way: the projection is computed from the board we are about to
+///      build, which assumes we kept the card, so the more reachable a later
+///      check looks the more expensive every life becomes. Measured: 44% of
+///      checks folded on a board matching v7's, at 1.0 wins per 5 played.
+///
+///    `(1 - p) * p` is the stationary price: a life is worth committing exactly
+///    in proportion to the placement it can make here, and the term cancels to
+///    zero only when the life can never pass, which is when folding is right.
 /// 3. `+ filter_value` - what the spare-slot hand filter buys. Each card set
 ///    as junk is discarded before the check and draws a replacement (8.3.4), so
 ///    the slot is worth a draw minus whatever that card was worth in hand.
@@ -193,7 +308,7 @@ pub(crate) fn candidate_value(
     lives: usize,
     filter_value: f64,
 ) -> f64 {
-    let burned = (1.0 - p_pass) * PLACEMENT_CREDIT * lives as f64;
+    let burned = (1.0 - p_pass) * p_pass * PLACEMENT_CREDIT * lives as f64;
     outcome.value - burned + filter_value
 }
 
@@ -219,7 +334,8 @@ fn enumerate_candidates(
     let yell_score = v8_model::expected_yell_score(gs, me, db, v8_model::active_blades(gs, me, db));
 
     let lives = collect_lives(gs, me, db);
-    let junk = collect_junk(gs, me, db, &lives);
+    let ctx = hand_context(gs, me, db);
+    let junk = collect_junk(gs, me, db, &lives, &ctx);
     // Setting a spare slot is only worth it if the card we burn is worth less
     // than the draw it buys.
     let mut worth_burning: Vec<&Junk> = junk
@@ -232,6 +348,13 @@ fn enumerate_candidates(
             .unwrap_or(std::cmp::Ordering::Equal)
             .then_with(|| a.index.cmp(&b.index))
     });
+    if std::env::var_os("V8_NO_JUNK").is_some() {
+        // Ablation: hand filtering is a real play (8.3.4 draws a replacement),
+        // but it also fills the set, and a full set means a lower hand for the
+        // NEXT check. This switch measures that trade directly instead of
+        // assuming it.
+        worth_burning.clear();
+    }
 
     let mut out = Vec::new();
     let subsets = 1usize << lives.len().min(16);
@@ -272,6 +395,24 @@ fn enumerate_candidates(
             outcome,
             value,
         });
+    }
+    // `V8_NO_FOLD` is the ablation floor: the argmax is the decision, this is
+    // the hand-tuned constant v7 needed, and shipping requires showing the
+    // argmax does not need it.
+    if std::env::var_os("V8_NO_FOLD").is_some() {
+        if let Some(best_lives) = out
+            .iter()
+            .filter(|c| !c.lives.is_empty())
+            .max_by(|a, b| a.value.partial_cmp(&b.value).unwrap_or(std::cmp::Ordering::Equal))
+        {
+            let lives = best_lives.lives.clone();
+            let value = best_lives.value;
+            if let Some(entry) = out.iter_mut().find(|c| c.lives.is_empty()) {
+                entry.value = f64::NEG_INFINITY;
+                entry.lives = lives;
+                entry.value = value;
+            }
+        }
     }
     out
 }

@@ -59,6 +59,18 @@ fn chisato_bp5_q219_cost_10_fails_with_9() {
         Some(false),
     );
     assert!(r.is_err(), "9 energy should NOT be enough for cost-10");
+    // "Refused" must mean "cannot afford", not some unrelated failure: the 9
+    // energy is untouched and the member never reached the stage.
+    game.assert_energy_untouched_after_refusal(9, "cost-10 member with 9 energy");
+    assert_eq!(
+        game.state.player1.stage.stage[0],
+        -1,
+        "a refused play must leave the area empty"
+    );
+    assert!(
+        game.state.player1.hand.cards.contains(&liella),
+        "a refused play leaves the card in hand"
+    );
 }
 
 /// Chisato on stage → cost-10 Liella! needs only 8 energy (10 - 2).
@@ -126,6 +138,15 @@ fn chisato_bp5_q219_cross_card_reduction_7_fails() {
         r.is_err(),
         "Chisato on stage: 7 energy should NOT be enough for cost-10 (needs 8)"
     );
+    // The 1-energy shortfall must be the whole reason: 7 are still active and
+    // the member never moved.
+    game.assert_energy_untouched_after_refusal(7, "cost-10 member reduced to 8 with 7 energy");
+    assert_eq!(
+        game.state.player1.stage.stage[1],
+        -1,
+        "a refused play must leave the centre area empty"
+    );
+    assert!(game.state.player1.hand.cards.contains(&liella));
 }
 
 /// Verify that PL!SP-bp5-003-P (cost 17) costs exactly 17 to play from hand,

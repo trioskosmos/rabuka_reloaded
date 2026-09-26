@@ -62,14 +62,25 @@ mod bytecode_validation {
     #[test]
     fn bytecode_every_ability_decodes() {
         let json_abilities = load_json_abilities();
+        // Count the successes explicitly instead of relying on the loop body
+        // never being reached: catch_unwind swallows a panic into Err, and a
+        // future edit that swallowed it silently would turn this test into a
+        // no-op. The final assert_eq is the real statement.
+        let mut decoded = 0usize;
         for i in 0..json_abilities.len() {
             let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| get_ability(i)));
             match result {
-                Ok(Ok(_)) => {}
-                Ok(Err(e)) => panic!("Bytecode ability {} decode error: {e}", i),
+                Ok(Ok(_)) => decoded += 1,
+                Ok(Err(e)) => panic!("Bytecode ability {} decode error: {}", i, e),
                 Err(e) => panic!("Bytecode ability {} panicked: {:?}", i, e),
             }
         }
+        assert_eq!(
+            decoded,
+            json_abilities.len(),
+            "every JSON ability must decode: {decoded} of {}",
+            json_abilities.len()
+        );
     }
 
     /// Audit item C1: no ability may decode through an UNRECORDED silent

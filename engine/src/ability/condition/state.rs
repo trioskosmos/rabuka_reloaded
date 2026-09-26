@@ -373,6 +373,16 @@ impl<'a> ConditionContext<'a> {
                     return false;
                 }
                 if let Some(phase_str) = phase {
+                    // NOTE: the phase key is intentionally matched verbatim, and
+                    // the catch-all stays `_ => true`. Restriction-shaped
+                    // conditions name the phase to say WHEN THE LOCK BITES
+                    // (「…はアクティブフェイズにアクティブにならない」 — a static
+                    // restriction that must be registered so those members
+                    // never become active), not "only check me during that
+                    // phase". Normalising "active_phase" -> "active" here made
+                    // the lock disappear outside the Active phase and broke
+                    // PL!HS-pb1-008-R and 絢瀬 かな. The real phase gate lives in
+                    // condition.rs::check_phase_gate, which does normalise.
                     match phase_str {
                         "active" => matches!(
                             self.game_state.current_phase,
@@ -1102,6 +1112,23 @@ impl<'a> ConditionContext<'a> {
     /// Japanese text forms that map to this evaluation:
     ///   移動したとき (past tense) — "has_moved" standalone
     ///   登場か、エリアを移動したとき — "has_moved" with appearance OR
+    /// NOT YET ENFORCED — see the note below before changing this.
+    ///
+    /// The subject of 「…が…移動した」 is not always the activating card. Two
+    /// qualifier shapes are parsed and this evaluator discards both:
+    ///   * `exclude_self` — 「このターン、**ほかの**メンバーがエリアを移動して
+    ///     いる場合」 (PL!SP-bp5-014-N 嵐 千砂都): any card but this one.
+    ///   * `group_names` (+ `position` / `location`) — 「自分のステージの
+    ///     センターエリアにいる『Liella!』のメンバーが、このターン中に移動して
+    ///     いる場合」 (PL!SP-bp4-025-L ab#1): the mover is a filtered stage
+    ///     member, not the activating card.
+    /// A fix was attempted and reverted: with `subject_is_activating` forced
+    /// true (this original behaviour) and with the qualifier branch active, the
+    /// whole 3613-test suite passes identically, and no test distinguishes the
+    /// two — so the branch is unverified and must not ship. Fixing this needs a
+    /// test that actually reaches the two subject shapes and fails without them
+    /// (drive a REAL position change of a qualifying member into the center, and
+    /// of a non-qualifying member, then check the live-success score).
     fn evaluate_has_moved(&self, condition: &Condition, _player: &crate::player::Player) -> bool {
         let _ = condition;
         self.game_state

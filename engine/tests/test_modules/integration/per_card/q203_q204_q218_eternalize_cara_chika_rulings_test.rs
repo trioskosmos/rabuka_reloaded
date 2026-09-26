@@ -109,7 +109,7 @@ fn eternalize_q204_zero_niko_hearts_unchanged() {
     // card_count_condition counts ALL members without group filtering.
     // With only 1 member (< threshold 2), the condition fails → no modifier.
     assert!(
-        game.state.mods.need_heart_modifiers.get(&live).is_none(),
+        !game.state.mods.need_heart_modifiers.contains_key(&live),
         "Q204: 1 member (<2) → condition fails → no modification"
     );
 }
@@ -150,7 +150,7 @@ fn eternalize_different_names_no_reduction() {
     run_live_with_eternalize(&mut game, live);
 
     assert!(
-        game.state.mods.need_heart_modifiers.get(&live).is_none(),
+        !game.state.mods.need_heart_modifiers.contains_key(&live),
         "different names → should NOT trigger"
     );
 }
@@ -166,7 +166,7 @@ fn eternalize_one_niji_one_other_triggers_zero() {
     run_live_with_eternalize(&mut game, live);
 
     assert!(
-        game.state.mods.need_heart_modifiers.get(&live).is_none(),
+        !game.state.mods.need_heart_modifiers.contains_key(&live),
         "1 虹ヶ咲 member → count < 2 → should NOT trigger"
     );
 }
@@ -206,7 +206,7 @@ fn eternalize_three_all_different_no_trigger() {
     run_live_with_eternalize(&mut game, live);
 
     assert!(
-        game.state.mods.need_heart_modifiers.get(&live).is_none(),
+        !game.state.mods.need_heart_modifiers.contains_key(&live),
         "3 different names → should NOT trigger"
     );
 }

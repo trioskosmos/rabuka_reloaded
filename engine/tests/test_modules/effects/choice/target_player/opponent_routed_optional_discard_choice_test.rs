@@ -396,14 +396,18 @@ fn kowareyasuki_opponent_loses_surplus_hearts_score_up() {
         "Should be in LiveCardSet phase"
     );
 
+    // Walk the live by PHASE NAME, not by a fixed number of passes. The old
+    // five bare `pass()` calls each carried a comment naming the phase they
+    // landed on, so a phase gaining or losing a step would leave the comments
+    // lying and the test standing in a different window with nothing to notice.
+    game.advance_to_phase(rabuka_engine::game_state::Phase::LiveCardSetFirstAttacker);
     game.set_live_card(koware);
-
-    // Advance through live phases
-    game.pass(); // LiveCardSetP2
-    game.pass(); // LiveStart
-    game.pass(); // FirstAttackerPerformance
-    game.pass(); // SecondAttackerPerformance
-    game.pass(); // LiveVictoryDetermination
+    game.advance_to_phase(rabuka_engine::game_state::Phase::LiveVictoryDetermination);
+    assert_eq!(
+        game.state.current_phase,
+        rabuka_engine::game_state::Phase::LiveVictoryDetermination,
+        "ライブ成功時 resolves during the live's own resolution"
+    );
 
     // LiveSuccess phase — ability fires
     while game.has_pending_choice() {
@@ -453,11 +457,16 @@ fn kowareyasuki_opponent_loses_2plus_hearts_gets_score_bonus() {
     }
     game.set_live_card(koware);
 
-    // Advance through all live phases up to SecondAttackerPerformance
-    game.pass(); // LiveCardSetSecondAttacker
-    game.pass(); // LiveStart → FirstAttackerPerformance
-    game.pass(); // FirstAttackerPerformance (P1 snapshot) → SecondAttackerPerformance
-    game.pass(); // SecondAttackerPerformance (P2 snapshot) → LiveVictoryDetermination
+    // Step to the point where BOTH performance snapshots exist, by name. The
+    // four bare passes this replaces each named the phase it expected; a phase
+    // gaining a step would leave the snapshot injection below applied to the
+    // wrong turn, silently.
+    game.advance_to_phase(rabuka_engine::game_state::Phase::LiveVictoryDetermination);
+    assert_eq!(
+        game.state.performance_snapshots.len(),
+        2,
+        "both performers' snapshots must exist before surplus is injected"
+    );
 
     // P2's performance snapshot has 0 total_hearts because their live_card_zone
     // is empty (no cards in hand to set). Manually inject surplus so the
@@ -515,10 +524,13 @@ fn kowareyasuki_opponent_loses_exactly_2_gets_bonus() {
         game.pass();
     }
     game.set_live_card(koware);
-    game.pass();
-    game.pass();
-    game.pass();
-    game.pass();
+    // Both snapshots, by name — the four bare passes this replaces could drift.
+    game.advance_to_phase(rabuka_engine::game_state::Phase::LiveVictoryDetermination);
+    assert_eq!(
+        game.state.performance_snapshots.len(),
+        2,
+        "both performers' snapshots must exist before surplus is injected"
+    );
 
     for snap in &mut game.state.performance_snapshots {
         if snap.player_id == "p2" {
@@ -572,10 +584,13 @@ fn kowareyasuki_opponent_loses_1_no_bonus() {
         game.pass();
     }
     game.set_live_card(koware);
-    game.pass();
-    game.pass();
-    game.pass();
-    game.pass();
+    // Both snapshots, by name — the four bare passes this replaces could drift.
+    game.advance_to_phase(rabuka_engine::game_state::Phase::LiveVictoryDetermination);
+    assert_eq!(
+        game.state.performance_snapshots.len(),
+        2,
+        "both performers' snapshots must exist before surplus is injected"
+    );
 
     for snap in &mut game.state.performance_snapshots {
         if snap.player_id == "p2" {

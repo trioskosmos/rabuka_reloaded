@@ -89,6 +89,10 @@ fn maki_debut_skip_cost_no_effect() {
 
     game.play_to_stage(maki, MemberArea::Center);
 
+    // Her PLAY cost is already spent by now, so the baseline for "the optional
+    // EE was declined" is what is left after that, not the 11 handed out.
+    let energy_after_play = game.state.player1.energy_zone.active_count() as i16;
+
     // ab#1 is pre-filtered out (no state change yet). ab#0 auto-resolves.
 
     // Skip the optional cost (card_id != Some(1) → "skip_optional_cost")
@@ -103,6 +107,21 @@ fn maki_debut_skip_cost_no_effect() {
         orientation.is_none() || orientation == Some(&CardOrientation::Active),
         "Maki should remain active when cost is skipped"
     );
+    // The refusal must be "the optional cost was declined", not "the debut did
+    // nothing at all". The energy is the tell: ab#0 pays EE to wait one
+    // opponent member, so a declined payment must leave all 11 active, and the
+    // opponent must be untouched.
+    assert_eq!(
+        game.state.player2.stage.stage[0],
+        p2_member,
+        "the opponent's member must still be on their stage"
+    );
+    assert_eq!(
+        game.state.mods.orientation_modifiers.get(&p2_member),
+        None,
+        "declining EE must wait NO opponent member — ab#0's whole effect is the cost"
+    );
+    game.assert_energy_untouched_after_refusal(energy_after_play, "declined optional EE on 牧 完");
 }
 
 /// ab#1 draws when opponent member with cost ≤4 is waited.

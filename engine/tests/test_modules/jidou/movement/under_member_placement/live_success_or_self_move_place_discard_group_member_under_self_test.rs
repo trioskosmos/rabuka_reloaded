@@ -66,7 +66,13 @@ fn discard_group_member_placed_under_self_on_position_change() {
     let liella = game.id("PL!SP-sd1-020-SD");
     let filler = game.id("PL!-sd1-010-SD");
     let pos_changer = game.id("PL!SP-bp5-006-R");
-
+    // kinako (PL!SP-pb2-006-R) and pos_changer (PL!SP-bp5-006-R) are two
+    // printings of 桜小路きな子, one bp number apart. The discard-placement
+    // effect is 起動, so the two cards must really be distinct instances.
+    game.assert_card_identity(kinako, "PL!SP-pb2-006-R");
+    game.assert_card_identity(pos_changer, "PL!SP-bp5-006-R");
+    game.assert_same_card_name(kinako, pos_changer, "two きな子 printings");
+    assert_ne!(kinako, pos_changer, "two separate card instances");
     game.add_to_hand(kinako);
     game.add_to_hand(pos_changer);
     game.add_to_discard(liella);

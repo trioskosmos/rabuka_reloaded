@@ -269,6 +269,136 @@ impl TestGame {
         );
     }
 
+    /// Pin that `card_id` really is the print named `card_no`.
+    ///
+    /// The `similar_cards` audit exists because bp2/pb2, bp7/pb2 and SEC/P
+    /// suffixes are transposed often enough that a silently mis-staged card
+    /// passes a test that otherwise asserts everything. Comparing the printed
+    /// card_no is the only check that notices. `card_no` is an ArcStr, so this
+    /// goes through `to_string()` rather than the unstable `as_str` inherent.
+    pub fn assert_card_identity(&self, card_id: i16, card_no: &str) {
+        let actual = self
+            .db
+            .get_card(card_id)
+            .unwrap_or_else(|| panic!("card id {card_id} is not in the database"))
+            .card_no
+            .to_string();
+        assert_eq!(
+            actual, card_no,
+            "card id {card_id} is '{}', not the expected print '{}'",
+            actual, card_no
+        );
+    }
+
+    /// Pin that two instances share one printed card name ( supplementing it).
+    ///
+    /// 「カード名の異なる」 conditions are routinely tested by staging two copies
+    /// vs. two different prints. Staging `PL!SP-bp1-013-PR` where
+    /// `PL!SP-pb1-013-PR` was meant flips such a test from "distinct" to
+    /// "duplicate" with no other assertion noticing.
+    pub fn assert_same_card_name(&self, a: i16, b: i16, ctx: &str) {
+        let an = self.card_name_of(a);
+        let bn = self.card_name_of(b);
+        assert_eq!(
+            an, bn,
+            "{}: expected the same card name on both instances, got '{}' and '{}'",
+            ctx, an, bn
+        );
+    }
+
+    /// Pin that two instances are different printed cards (not just different
+    /// physical copies of one print) — the counterweight to
+    /// [`Self::assert_same_card_name`] for 「カード名の異なる」 conditions.
+    pub fn assert_distinct_card_names(&self, a: i16, b: i16, ctx: &str) {
+        let an = self.card_name_of(a);
+        let bn = self.card_name_of(b);
+        assert_ne!(
+            an, bn,
+            "{}: expected two DIFFERENT card names, but both instances are '{}'",
+            ctx, an
+        );
+    }
+
+    fn card_name_of(&self, card_id: i16) -> String {
+        self.db
+            .get_card(card_id)
+            .unwrap_or_else(|| panic!("card id {card_id} is not in the database"))
+            .name
+            .to_string()
+    }
+
+    /// Pin a card's printed cost.
+    ///
+    /// A transposed bp number very often lands on ANOTHER PRINTING OF THE SAME
+    /// CHARACTER (PL!SP-pb2-006-R / PL!SP-pb1-006-R / PL!SP-bp5-006-R are all
+    /// 桜小路きな子, printed at costs 2 / 9 / 11). Name-based assertions cannot
+    /// see that, but cost-limited plays, 「コストN以下」 filters and energy
+    /// budgets can, so cost-sensitive fixtures pin it explicitly.
+    pub fn assert_card_cost(&self, card_id: i16, expected: i32) {
+        let (no, actual) = self
+            .db
+            .get_card(card_id)
+            .map(|c| (c.card_no.to_string(), c.cost))
+            .unwrap_or_else(|| panic!("card id {card_id} is not in the database"));
+        assert_eq!(
+            actual.map(|c| c as i32),
+            Some(expected),
+            "card {no} (id {card_id}) should print cost {expected}, got {actual:?}"
+        );
+    }
+
+    /// Pin a card's printed score.
+    ///
+    /// The companion to [`Self::assert_card_cost`] for the many 「スコアN以下」 /
+    /// 「スコアN以上」 filters (live-card recovers, ライブ成功時 scoring). An
+    /// auto-aimed single-candidate select resolves with no prompt, so the score
+    /// is frequently the only thing that decides whether a fixture is eligible
+    /// at all.
+    pub fn assert_card_score(&self, card_id: i16, expected: i32) {
+        let (no, actual) = self
+            .db
+            .get_card(card_id)
+            .map(|c| (c.card_no.to_string(), c.score))
+            .unwrap_or_else(|| panic!("card id {card_id} is not in the database"));
+        assert_eq!(
+            actual.map(|s| s as i32),
+            Some(expected),
+            "card {no} (id {card_id}) should print score {expected}, got {actual:?}"
+        );
+    }
+
+    /// A refused activation/play must leave no trace of the attempt.
+    ///
+    /// `assert!(result.is_err())` alone cannot distinguish "refused for the
+    /// printed reason" (not enough energy, wrong area, use-limit spent) from
+    /// "refused for some unrelated reason", so a regression that trips a
+    /// different guard would still pass. These pin the two invariants that
+    /// separate them: the energy the attempt would have paid is still there,
+    /// and the ターン1回 / use-limit counter did not advance.
+    pub fn assert_energy_untouched_after_refusal(&self, before: i16, ctx: &str) {
+        assert_eq!(
+            self.state.player1.energy_zone.active_count() as i16,
+            before,
+            "{}: a refused action must not spend energy",
+            ctx
+        );
+    }
+
+    /// Assert `card_id`'s `ability_index` slot is NOT recorded in this turn's
+    /// use-limit table — i.e. the refusal did not consume the ターンN回 use.
+    pub fn assert_use_not_recorded(&self, card_id: i16, ability_index: usize, ctx: &str) {
+        let turn = self.state.turn_number;
+        assert!(
+            !self
+                .state
+                .turn_limited_abilities_used
+                .contains_key(&(card_id, ability_index, turn)),
+            "{}: a refused action must not record a use-limit spend (looked up \
+             (card={card_id}, ab#{ability_index}, turn={turn}))",
+            ctx
+        );
+    }
+
     pub fn assert_pending_choice_type(&self, expected: &str, msg: &str) {
         self.trace_check(
             "pending".into(),

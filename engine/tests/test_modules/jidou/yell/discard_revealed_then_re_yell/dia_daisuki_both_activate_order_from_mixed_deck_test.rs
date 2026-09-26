@@ -85,13 +85,16 @@ fn mixed_deck_dia_first_then_daisuki() {
             .push(game.id("PL!-sd1-010-SD"));
     }
     game.give_energy(15);
-    for _ in 0..5 {
-        game.pass();
-    }
+    // Step to the set window and the yell window BY NAME: the five blind passes
+    // and the three bare ones this replaces were correct only while the phase
+    // sequence was frozen, and a drifted walk would leave the expected
+    // SelectAutoAbility simply absent.
+    game.advance_to_phase(rabuka_engine::game_state::Phase::LiveCardSetFirstAttacker);
     game.set_live_card(daisuki);
-    game.pass();
-    game.pass();
-    game.pass();
+    // The yell happens as the live is performed, so step to the second
+    // attacker's window rather than the first: the first attacker's phase is
+    // reached before the yell prompt exists.
+    game.advance_to_phase(rabuka_engine::game_state::Phase::SecondAttackerPerformance);
 
     assert!(game.has_pending_choice(), "SelectAutoAbility");
     game.select_option(0);
@@ -138,13 +141,10 @@ fn mixed_deck_daisuki_first_then_dia() {
             .push(game.id("PL!-sd1-010-SD"));
     }
     game.give_energy(15);
-    for _ in 0..5 {
-        game.pass();
-    }
+    // By name, as in the sibling test: the set window, then the yell window.
+    game.advance_to_phase(rabuka_engine::game_state::Phase::LiveCardSetFirstAttacker);
     game.set_live_card(daisuki);
-    game.pass();
-    game.pass();
-    game.pass();
+    game.advance_to_phase(rabuka_engine::game_state::Phase::SecondAttackerPerformance);
 
     assert!(game.has_pending_choice(), "SelectAutoAbility");
     game.select_option(1);

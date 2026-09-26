@@ -140,11 +140,35 @@ fn mari_insufficient_energy_blocked() {
     let mut g = TestGame::new(db);
     let mari = g.id("PL!S-bp6-008-R");
     let yoshiko = g.id("PL!S-bp6-006-R");
+    g.assert_card_identity(mari, "PL!S-bp6-008-R");
+    g.assert_card_identity(yoshiko, "PL!S-bp6-006-R");
     g.state.player1.stage.stage = [mari, -1, -1];
     g.state.player1.waitroom.cards.push(yoshiko);
     g.give_energy(1); // only 1, need 2
     let res = g.try_activate_ability(mari);
     assert!(res.is_err(), "should be blocked with 1 energy, got {:?}", res);
+    // The refusal must be "cannot afford", and it must have changed nothing:
+    // the 1 energy is unspent, 愛莉 stayed on stage rather than being waited,
+    // and 佳代子 is still in the waitroom to be recovered.
+    g.assert_energy_untouched_after_refusal(1, "愛莉 with 1 of the 2 energy needed");
+    assert_eq!(
+        g.state.player1.stage.stage,
+        [mari, -1, -1],
+        "a refused 起動 must leave her where she is"
+    );
+    assert!(
+        g.state.mods.get_orientation_modifier(mari) != Some("wait"),
+        "a refused 起動 must not wait her as its cost"
+    );
+    assert!(
+        g.state.player1.waitroom.cards.contains(&yoshiko),
+        "佳代子 stays in the waitroom — the cost was never paid, so nothing was \
+         recovered"
+    );
+    assert!(
+        !g.has_pending_choice(),
+        "a refused activation must not open a prompt"
+    );
 }
 
 // Mari with no Aqours target in waitroom: prompt with 0 selectable, skip should not crash and not place

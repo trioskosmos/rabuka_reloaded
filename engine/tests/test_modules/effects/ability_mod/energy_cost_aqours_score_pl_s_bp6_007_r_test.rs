@@ -10,7 +10,15 @@ fn pl_s_bp6_007_r_energy_cost_grants_aqours_constant_score_abilities() {
     let mut game = TestGame::new(db);
     let hanamaru = game.id("PL!S-bp6-007-R");
     game.add_to_stage(MemberArea::Center, hanamaru);
-    let aqours_friend = game.id("PL!S-pb1-007-R");
+    let aqours_friend = game.id("PL!S-pb1-010-PR");
+    // PL!S-bp6-007-R and PL!S-pb1-007-R are one letter apart AND both print
+    // 国木田花丸 — the identity pin added here caught that the old fixture was
+    // staging a second copy of 花丸, so "up to TWO 『Aqours』 members" was being
+    // read off two copies of one character. 高海千歌 is a genuinely different
+    // 『Aqours』 member, which is what the printed claim needs.
+    game.assert_card_identity(hanamaru, "PL!S-bp6-007-R");
+    game.assert_card_identity(aqours_friend, "PL!S-pb1-010-PR");
+    game.assert_distinct_card_names(hanamaru, aqours_friend, "花丸 and her Aqours friend");
     game.add_to_stage(MemberArea::LeftSide, aqours_friend);
     let outsider = game.id(FILLER);
     game.add_to_stage(MemberArea::RightSide, outsider);
@@ -47,7 +55,8 @@ fn pl_s_bp6_007_r_energy_cost_grants_aqours_constant_score_abilities() {
     );
     assert_eq!(
         game.state.mods.p1_constant_total_score_bonus, 2,
-        "up to TWO 『Aqours』 members each gain ライブの合計スコア+1 (μ's member excluded)"
+        "up to TWO 『Aqours』 members each gain ライブの合計スコア+1 (the \
+         non-『Aqours』 member on the right is not counted)"
     );
 }
 

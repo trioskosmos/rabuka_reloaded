@@ -37,13 +37,24 @@
 //! composition (blade-heart density, live count) is fair information per
 //! docs/BOT_STRATEGY.md §9.
 //!
-//! Experiment switches (each isolates ONE doctrine component, per the
-//! validation protocol in docs/BOT_STRATEGY.md):
-//! - `V8_NO_INITIATIVE` / `V8_INITIATIVE_WEIGHT` — the turn-order term.
-//! - `V8_NODES` (default 96), `V8_FOLLOWUP` (default 6) — search budget.
-//! - `V8_MULLIGAN_V4` — fall back to the inherited v4 mulligan.
-//! - `V8_DEBUG` — decision table on stderr (UNTRACED runs only; logging
-//!   perturbs allocation layout and changes outcomes, §8.4).
+//! Experiment switches. Each isolates ONE doctrine component, per the
+//! validation protocol in docs/BOT_STRATEGY.md: never change two at once, and
+//! never believe a result without an interval.
+//!
+//! - `V8_NO_INITIATIVE` / `V8_INITIATIVE_WEIGHT` - the turn-order term.
+//! - `V8_NODES` (default 96), `V8_FOLLOWUP` (default 6) - search budget.
+//!   `V8_NODES=1` collapses the Main phase to the one-ply leaf.
+//! - `V8_MULLIGAN_V4` - fall back to the inherited v4 mulligan.
+//! - `V8_MAIN_V7` - delegate the Main phase to v7, keeping v8's live set.
+//!   Isolates "is the new Main phase helping or hurting".
+//! - `V8_LIVE_V7` - delegate the live set to v7, keeping v8's Main phase.
+//!   Isolates the live-set decision, which is where the placement rate lives.
+//! - `V8_NO_FOLD` - never choose an empty live zone while holding a life.
+//!   The floor v7 needed as a hand-tuned constant; if v8 only needs this to
+//!   keep up with v7, the outcome model is not doing its job and should not
+//!   ship.
+//! - `V8_DEBUG` - decision table on stderr (UNTRACED runs only; logging
+//!   perturbs allocation layout and changes outcomes, section 8.4).
 
 use crate::bot::strategy_common::{acc_add, emit_mulligan, Acc};
 use crate::card::{CardDatabase, CardType};
@@ -54,9 +65,16 @@ use super::v8_model::{self, PLACEMENT_CREDIT};
 
 const SCALE: f64 = 1000.0;
 
+fn flag(name: &str) -> bool {
+    std::env::var_os(name).is_some()
+}
+
 // ── Main phase ───────────────────────────────────────────────────────────
 
 pub fn choose_action_v8_entry(gs: &GameState, actions: &[Action], me: u8) -> Action {
+    if flag("V8_MAIN_V7") {
+        return crate::bot::strategy_v7::choose_action_v7(gs, actions, me);
+    }
     super::v8_main::choose_action_v8(gs, actions, me)
 }
 
@@ -67,6 +85,9 @@ pub fn score_actions_v8(gs: &GameState, actions: &[Action], me: u8) -> Vec<(f64,
 // ── Live set ─────────────────────────────────────────────────────────────
 
 pub fn choose_live_set_v8_entry(gs: &GameState, actions: &[Action], db: &CardDatabase) -> Action {
+    if flag("V8_LIVE_V7") {
+        return crate::bot::strategy_v7::choose_live_set_v7(gs, actions, db);
+    }
     super::v8_live::choose_live_set_v8(gs, actions, db)
 }
 
@@ -79,6 +100,11 @@ struct Opening {
     stage: [i32; 3],
     budget: i32,
     hand: Vec<i16>,
+    /// Cards the mulligan redraws into hand, in resolution order. They are
+    /// part of the hand BEFORE turn 1, which is the whole point: without them
+    /// a replacement can only ever look like a loss, and the search degenerates
+    /// into "keep every card".
+    redraw: Vec<i16>,
     deck: Vec<i16>,
     deck_cursor: usize,
     lives_kept: usize,
@@ -92,13 +118,14 @@ impl Opening {
             stage: [0; 3],
             budget: me_energy,
             hand: Vec::new(),
+            redraw: Vec::new(),
             deck: Vec::new(),
             deck_cursor: 0,
             lives_kept: 0,
         }
     }
 
-    fn add_kept(&mut self, db: &CardDatabase, cid: i16) {
+    fn add_card(&mut self, db: &CardDatabase, cid: i16) {
         let Some(card) = db.get_card(cid) else {
             return;
         };
@@ -211,13 +238,20 @@ fn opening_place(
         .fold(0.0f64, f64::max)
 }
 
-/// Forward value of one kept hand, in the same placement units the Main phase
+/// Forward value of one opening, in the same placement units the Main phase
 /// uses, so the opening and the play that follows it are measured the same way.
+///
+/// `discarded` matters as much as `keep`: a replacement puts a card from our
+/// own deck into the hand before turn 1. Modelling a replacement as a pure loss
+/// - which the first draft did - makes "keep every card" the argmax of every
+/// search, and v8 replaced 1.24 cards against v4's 2.00. Our own deck is fair
+/// information (section 9), so the redraw is taken from its top in order.
 fn opening_value(
     db: &CardDatabase,
     gs: &GameState,
     me: u8,
     keep: &[i16],
+    discarded: &[i16],
     energy: i32,
     density: f64,
 ) -> f64 {
@@ -226,9 +260,15 @@ fn opening_value(
     // order the guides' curve wants (best affordable first).
     opening.deck = gs.seat_player(me).main_deck.cards.to_vec();
     for &cid in keep {
-        opening.add_kept(db, cid);
+        opening.add_card(db, cid);
     }
-    let lives: Vec<(i32, Acc)> = keep
+    for (n, &cid) in discarded.iter().enumerate() {
+        if let Some(drawn) = opening.deck.get(n).copied() {
+            opening.redraw.push(drawn);
+            opening.add_card(db, drawn);
+        }
+    }
+    let mut lives: Vec<(i32, Acc)> = keep
         .iter()
         .filter_map(|&cid| {
             let card = db.get_card(cid)?;
@@ -242,6 +282,17 @@ fn opening_value(
             Some((score, need))
         })
         .collect();
+    // A redrawn life is ammunition too, and it has to be scored as one.
+    for &cid in &opening.redraw {
+        if let Some(card) = db.get_card(cid) {
+            if card.card_type == CardType::Live {
+                let need = v8_model::life_need(gs, cid);
+                if !v8_model::has_unpassable_icon(&need) {
+                    lives.push((v8_model::printed_score(db, cid), need));
+                }
+            }
+        }
+    }
 
     // Five snapshots: the opening board plus one per Main phase of T1..T4.
     let mut snapshots: Vec<f64> = Vec::with_capacity(5);
@@ -301,7 +352,8 @@ pub fn choose_mulligan_v8(gs: &GameState, actions: &[Action], db: &CardDatabase)
             .filter(|(i, _)| !discard.contains(i))
             .map(|(_, &cid)| cid)
             .collect();
-        let value = opening_value(db, gs, me, &keep, energy, density);
+        let discarded: Vec<i16> = discard.iter().map(|&i| hand[i]).collect();
+        let value = opening_value(db, gs, me, &keep, &discarded, energy, density);
         // Ties prefer keeping more cards: a replacement is only worth it if the
         // redraw is strictly better, which is the discipline the rejected v7
         // reachable-mulligan experiment lacked.

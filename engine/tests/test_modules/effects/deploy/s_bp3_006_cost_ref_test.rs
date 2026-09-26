@@ -118,7 +118,24 @@ fn yoshi_not_center_cannot_activate() {
     game.state.player1.hand.cards.push(game.id("PL!-sd1-010-SD"));
     game.give_energy(20);
     let res = game.try_activate_ability(yoshi);
-    assert!(res.is_err() || !game.has_pending_choice(), "not center should not be activatable");
+    // STRICT: the ability is centre-only, so a non-centre activation must be
+    // REFUSED. The old assertion was `is_err() || !has_pending_choice()`, a
+    // disjunction that also passes when the ability succeeded and resolved
+    // silently — and the invariants below sat behind `if res.is_err()`, so a
+    // success asserted nothing at all.
+    assert!(
+        res.is_err(),
+        "not center should not be activatable, got {:?}",
+        res
+    );
+    // A refused activation must cost nothing: the 20 energy is unspent and the
+    // ターン1回 use is not recorded.
+    game.assert_energy_untouched_after_refusal(20, "吉 outside the centre area");
+    game.assert_use_not_recorded(yoshi, 0, "refused outside the centre area");
+    assert!(
+        !game.has_pending_choice(),
+        "a refused activation must not open a prompt"
+    );
 }
 
 #[test]
@@ -156,4 +173,15 @@ fn yoshi_turn1_blocks_second() {
     game.drain_choices_strict(&["SelectCard", "SelectAutoAbility"], &[]);
     let res2 = game.try_activate_ability(yoshi);
     assert!(res2.is_err(), "turn1 should block second");
+    // The refusal must be the ターン1回 limit, not a broken first activation:
+    // the first use IS recorded (proving the ability worked at all) and the
+    // second attempt did not touch the energy.
+    assert!(
+        game.state
+            .turn_limited_abilities_used
+            .contains_key(&(yoshi, 0, game.state.turn_number)),
+        "the FIRST activation must have recorded its ターン1回 use, otherwise \
+         this test would pass for the wrong reason"
+    );
+    game.assert_energy_untouched_after_refusal(20, "second 起動 refused by ターン1回");
 }

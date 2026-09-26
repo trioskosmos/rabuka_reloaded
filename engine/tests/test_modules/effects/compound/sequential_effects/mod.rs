@@ -13,6 +13,7 @@ pub mod debut_unit_discard_any_draw_count_plus_one_test;
 pub mod deficit_mill_live_topdeck_pl_n_pr_032_pr_test;
 pub mod group_baton_both_hands_keep_three_bottomdeck_draw_three_test;
 pub mod live_start_bottom_one_mill_live_heart_source_test;
+pub mod live_start_cost_total_8_and_25_branches_test;
 pub mod live_start_draw_opponent_cost_nine_wait_test;
 pub mod live_start_own_discard_two_member_bottomdeck_hearts_q164_test;
 pub mod live_start_repeat_mill_blade_live_self_wait_q222_test;

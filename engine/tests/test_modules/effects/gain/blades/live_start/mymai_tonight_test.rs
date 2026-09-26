@@ -40,6 +40,10 @@ fn mymai_tonight_with_aqours_live_gains_blade() {
     let db = load_real_database();
     let mut game = TestGame::new(db);
     let aqours_live = game.id("PL!S-bp5-023-L");
+    // PL!S-bp2-023-L (MY舞☆TONIGHT, the subject) and PL!S-bp5-023-L (Awaken the
+    // power) are one bp number apart. The claim is "an 『Aqours』 live card
+    // OTHER THAN MY舞☆TONIGHT", which a transposition would silently void.
+    game.assert_card_identity(aqours_live, "PL!S-bp5-023-L");
     let (_, member_a) = setup_mymai_only(&mut game);
     game.state.player1.hand.cards.push(aqours_live);
     game.set_live_card(aqours_live);

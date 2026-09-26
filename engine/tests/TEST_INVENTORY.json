@@ -1,14 +1,14 @@
 {
   "generated_by": "cards/test_inventory.py",
-  "generated_at": "2026-09-25T18:50:52.296889+00:00",
+  "generated_at": "2026-09-26T07:07:58.571906+00:00",
   "stats": {
     "total_cards": 2526,
     "cards_with_abilities": 1565,
     "total_abilities": 2011,
     "unique_abilities": 936
   },
-  "n_files": 897,
-  "n_tests": 3613,
+  "n_files": 898,
+  "n_tests": 3625,
   "total_cards": 771,
   "covered_cards": 771,
   "abilities_on_covered": 936,
@@ -309,9 +309,9 @@
     ]
   },
   "depth_counts": {
-    "L2+choice": 761,
+    "L2+choice": 762,
     "L1+choice": 76,
-    "L2": 70,
+    "L2": 69,
     "L1": 29
   },
   "qa_rulings": {
@@ -377,114 +377,211 @@
   },
   "specific_requirements": {
     "total": 141,
-    "thin_idxs": [
-      380,
-      562
-    ]
+    "thin_idxs": []
   },
   "quality": {
     "no_assert": {
-      "count": 2,
+      "count": 0,
+      "rows": []
+    },
+    "no_drive": {
+      "count": 0,
+      "rows": []
+    },
+    "synthetic_only": {
+      "count": 0,
+      "rows": []
+    },
+    "pendency_only": {
+      "count": 0,
+      "rows": []
+    },
+    "assert_only_negative": {
+      "count": 19,
       "rows": [
         {
-          "file": "engine/tests/test_modules/effects/score/live_total/chika_bp3_001_wait_self_activation_live_total_score_test.rs",
-          "test": "wait_member_total_score_expires_at_live_end_even_without_setting_live",
-          "line": 110,
+          "file": "engine/tests/test_modules/characterization/bytecode_validation_test.rs",
+          "test": "empty_slice_returns_default_ability",
+          "line": 281,
           "detail": ""
         },
         {
-          "file": "engine/tests/test_modules/effects/score/live_total/chika_bp3_001_wait_self_activation_live_total_score_test.rs",
-          "test": "wait_member_total_score_persists_through_victory_and_expires_after_live",
-          "line": 105,
+          "file": "engine/tests/test_modules/characterization/bytecode_validation_test.rs",
+          "test": "malformed_bytecode_returns_error",
+          "line": 273,
+          "detail": ""
+        },
+        {
+          "file": "engine/tests/test_modules/effects/ability_mod/full_distinct_group_stage_grants_yell_live_score_test.rs",
+          "test": "duplicate_names_fails_condition",
+          "line": 166,
+          "detail": ""
+        },
+        {
+          "file": "engine/tests/test_modules/effects/ability_mod/full_distinct_group_stage_grants_yell_live_score_test.rs",
+          "test": "empty_area_fails_condition",
+          "line": 146,
+          "detail": ""
+        },
+        {
+          "file": "engine/tests/test_modules/effects/ability_mod/full_distinct_group_stage_grants_yell_live_score_test.rs",
+          "test": "non_aqours_member_fails_condition",
+          "line": 188,
+          "detail": ""
+        },
+        {
+          "file": "engine/tests/test_modules/effects/ability_mod/rina_gain_live_success_from_under_member_test.rs",
+          "test": "rina_no_under_cards",
+          "line": 154,
+          "detail": ""
+        },
+        {
+          "file": "engine/tests/test_modules/effects/ability_mod/rina_gain_live_success_from_under_member_test.rs",
+          "test": "rina_not_on_stage",
+          "line": 177,
+          "detail": ""
+        },
+        {
+          "file": "engine/tests/test_modules/effects/compound/cost_and_effect/center_wait_discard_other_group_cost_plus_two_same_area_deploy_edges_test.rs",
+          "test": "center_other_member_cost_plus_two_deploy_not_at_center_activation_blocked",
+          "line": 20,
+          "detail": ""
+        },
+        {
+          "file": "engine/tests/test_modules/effects/compound/cost_and_effect/discard_cost_reveal_five_conditional_mus_search_pl_bp6_006_test.rs",
+          "test": "maki_bp6_use_limit_turn1_enforces",
+          "line": 418,
+          "detail": ""
+        },
+        {
+          "file": "engine/tests/test_modules/effects/compound/cost_and_effect/hand_only_self_discard_draw_group_blade_q196_test.rs",
+          "test": "hand_only_self_discard_draw_q196_needs_hand_activation",
+          "line": 58,
+          "detail": ""
+        },
+        {
+          "file": "engine/tests/test_modules/effects/compound/sequential_effects/baton_touch_place_liella_under_then_activate_copied_ability_pl_sp_pb2_005_test.rs",
+          "test": "hazuki_non_liella_under_no_abilities_gained",
+          "line": 177,
+          "detail": ""
+        },
+        {
+          "file": "engine/tests/test_modules/effects/conditional/zone_source/umi_reveal_live_card_gains_live_total_score_test.rs",
+          "test": "q176_use_limit_blocks_second_activation_same_turn",
+          "line": 107,
+          "detail": ""
+        },
+        {
+          "file": "engine/tests/test_modules/effects/cost_mod/activation_discount/play_time_three_named_member_discard_cost_ten_test.rs",
+          "test": "play_time_named_discard_waitroom_fodder_cannot_enable_ten_energy_play",
+          "line": 170,
+          "detail": ""
+        },
+        {
+          "file": "engine/tests/test_modules/effects/deploy/under_energy_cost_waited_empty_area_deploy_q268_test.rs",
+          "test": "under_energy_cost_waited_deploy_q268_turn_limit_blocks_second_activation",
+          "line": 237,
+          "detail": ""
+        },
+        {
+          "file": "engine/tests/test_modules/effects/energy/under_member/energy_under_original_blade_limit_opponent_wait_test.rs",
+          "test": "energy_under_original_blade_limit_negative_modifier_does_not_make_printed_blade_eligible",
+          "line": 238,
+          "detail": ""
+        },
+        {
+          "file": "engine/tests/test_modules/effects/energy/under_member/energy_under_original_blade_limit_opponent_wait_test.rs",
+          "test": "energy_under_original_blade_limit_opponent_over_limit_not_waited",
+          "line": 165,
+          "detail": ""
+        },
+        {
+          "file": "engine/tests/test_modules/effects/look_select/search_deck/reveal_from_deck_until_chosen_type_found_test.rs",
+          "test": "reveal_until_chosen_type_center_requirement_left_side_fails",
+          "line": 222,
+          "detail": ""
+        },
+        {
+          "file": "engine/tests/test_modules/effects/recover/to_hand/live_success_recover_different_group_name_to_hand_ll_bp5_002_l_test.rs",
+          "test": "all_same_group_no_effect",
+          "line": 135,
+          "detail": ""
+        },
+        {
+          "file": "engine/tests/test_modules/effects/recover/to_hand/live_success_recover_different_group_name_to_hand_ll_bp5_002_l_test.rs",
+          "test": "two_distinct_groups_no_effect",
+          "line": 106,
           "detail": ""
         }
       ]
     },
-    "no_drive": {
-      "count": 16,
+    "assert_only_counts": {
+      "count": 14,
       "rows": [
         {
-          "file": "engine/tests/test_modules/effects/ability_mod/live_success_invalidation_and_live_start_suppression_test.rs",
-          "test": "butterfly_suppresses_only_the_owners_live_start_members",
-          "line": 213,
+          "file": "engine/tests/test_modules/effects/choice/per_card/energy_or_recycle_live_pl_n_pb1_010_r_test.rs",
+          "test": "pl_n_pb1_010_r_energy_option_leaves_active_energy",
+          "line": 20,
           "detail": ""
         },
         {
-          "file": "engine/tests/test_modules/effects/deck_order/restore/live_start_optional_two_member_bottomdeck_test.rs",
-          "test": "live_start_optional_two_member_bottomdeck_shrinks_waitroom",
-          "line": 4,
+          "file": "engine/tests/test_modules/effects/deck_order/restore/both_waitrooms_member_restore_threshold_q242_test.rs",
+          "test": "debut_both_waitrooms_member_restore_shrinks_own_waitroom",
+          "line": 15,
           "detail": ""
         },
         {
-          "file": "engine/tests/test_modules/effects/look_select/look_and_filter/all_or_any_three_heart_member_filter_look_test.rs",
-          "test": "all_three_heart_match_enters_hand_without_nonmatching_filler",
-          "line": 231,
-          "detail": ""
-        },
-        {
-          "file": "engine/tests/test_modules/effects/look_select/look_and_filter/all_or_any_three_heart_member_filter_look_test.rs",
-          "test": "all_three_required_hearts_member_is_added_to_hand",
-          "line": 23,
-          "detail": ""
-        },
-        {
-          "file": "engine/tests/test_modules/effects/look_select/look_and_filter/all_or_any_three_heart_member_filter_look_test.rs",
-          "test": "no_all_three_heart_match_discards_both_looked_at_members",
-          "line": 164,
-          "detail": ""
-        },
-        {
-          "file": "engine/tests/test_modules/effects/look_select/look_and_filter/all_or_any_three_heart_member_filter_look_test.rs",
-          "test": "one_of_three_required_hearts_member_is_discarded",
-          "line": 137,
-          "detail": ""
-        },
-        {
-          "file": "engine/tests/test_modules/effects/look_select/look_and_filter/all_or_any_three_heart_member_filter_look_test.rs",
-          "test": "two_of_three_required_hearts_member_is_discarded",
-          "line": 109,
-          "detail": ""
-        },
-        {
-          "file": "engine/tests/test_modules/effects/look_select/pin_top/per_group_member_look_pin_reveal_score_test.rs",
-          "test": "look_per_group_member_discards_remainder_without_score_for_member_reveal",
-          "line": 4,
-          "detail": ""
-        },
-        {
-          "file": "engine/tests/test_modules/jidou/debut_watch/baton_touch_arrival_self_or_other_draws_one_twice_per_turn_test.rs",
-          "test": "setsuna_self_baton_arrival_draws_one",
-          "line": 45,
-          "detail": ""
-        },
-        {
-          "file": "engine/tests/test_modules/jidou/debut_watch/other_member_baton_arrival_draws_one_test.rs",
-          "test": "other_member_baton_arrival_draws_one_card",
-          "line": 5,
-          "detail": ""
-        },
-        {
-          "file": "engine/tests/test_modules/jidou/leaves_stage/self_stage_to_waitroom_recovery_and_group_baton_replacement_test.rs",
-          "test": "group_baton_replacement_places_energy_under_arriving_member",
-          "line": 175,
-          "detail": ""
-        },
-        {
-          "file": "engine/tests/test_modules/jidou/leaves_stage/self_stage_to_waitroom_recovery_and_group_baton_replacement_test.rs",
-          "test": "other_member_stage_to_waitroom_does_not_trigger_self_live_recovery",
-          "line": 43,
-          "detail": ""
-        },
-        {
-          "file": "engine/tests/test_modules/jidou/leaves_stage/self_stage_to_waitroom_recovery_and_group_baton_replacement_test.rs",
-          "test": "self_stage_to_waitroom_draw_two_discard_one_leaves_one_card_in_hand",
+          "file": "engine/tests/test_modules/effects/position/area_move/debut_selected_member_fixed_center_test.rs",
+          "test": "fixed_center_choice_offers_self_and_other_stage_members",
           "line": 68,
           "detail": ""
         },
         {
-          "file": "engine/tests/test_modules/jidou/leaves_stage/self_stage_to_waitroom_recovery_and_group_baton_replacement_test.rs",
-          "test": "self_stage_to_waitroom_look_five_adds_live_to_hand",
-          "line": 128,
+          "file": "engine/tests/test_modules/effects/state/per_card/sd2_nijigasaki_abilities_gap_test.rs",
+          "test": "setsuna_debut_gains_heart05",
+          "line": 319,
+          "detail": ""
+        },
+        {
+          "file": "engine/tests/test_modules/effects/state/wait_activation/sp_bp5_choice_energy_test.rs",
+          "test": "sp_bp5_choice_energy_pay_and_draw",
+          "line": 16,
+          "detail": ""
+        },
+        {
+          "file": "engine/tests/test_modules/integration/full_round/live_each_time_victory_road_through_real_live_rounds_test.rs",
+          "test": "live_card_own_live_success_no_trigger",
+          "line": 894,
+          "detail": ""
+        },
+        {
+          "file": "engine/tests/test_modules/integration/full_round/live_each_time_victory_road_through_real_live_rounds_test.rs",
+          "test": "live_success_each_time_draws_card",
+          "line": 427,
+          "detail": ""
+        },
+        {
+          "file": "engine/tests/test_modules/integration/full_round/live_each_time_victory_road_through_real_live_rounds_test.rs",
+          "test": "test_live_success_each_time_drains_after_success",
+          "line": 842,
+          "detail": ""
+        },
+        {
+          "file": "engine/tests/test_modules/integration/parser_e2e/parser_issues_e2e_part2_test.rs",
+          "test": "issue3_ayumu_compound_both_conditions_met",
+          "line": 170,
+          "detail": ""
+        },
+        {
+          "file": "engine/tests/test_modules/integration/parser_e2e/parser_issues_e2e_part3_test.rs",
+          "test": "issue13_mia_three_conditional_blade_checks",
+          "line": 770,
+          "detail": ""
+        },
+        {
+          "file": "engine/tests/test_modules/integration/parser_e2e/parser_issues_e2e_test.rs",
+          "test": "issue5_solitude_rain_heart_color_scoring",
+          "line": 321,
           "detail": ""
         },
         {
@@ -494,49 +591,221 @@
           "detail": ""
         },
         {
-          "file": "engine/tests/test_modules/jidou/leaves_stage/self_stage_to_waitroom_recovery_and_group_baton_replacement_test.rs",
-          "test": "self_stage_to_waitroom_recovers_group_live",
-          "line": 21,
+          "file": "engine/tests/test_modules/jidou/leaves_stage/self_wait_cost_then_choose_mirakura_member_gains_blade_test.rs",
+          "test": "hs_cl1_choice_among_multiple_mirakura",
+          "line": 105,
+          "detail": ""
+        },
+        {
+          "file": "engine/tests/test_modules/rules/trigger_paths/debut_watcher_baton_and_hand_activation_q196_q197_q198_test.rs",
+          "test": "cost10_baton_replacement_does_not_draw_from_departed_watcher_q197",
+          "line": 114,
           "detail": ""
         }
       ]
     },
-    "synthetic_only": {
+    "placeholder": {
       "count": 0,
       "rows": []
     },
-    "pendency_only": {
-      "count": 2,
+    "prompt_ordinal_drain": {
+      "count": 0,
+      "rows": []
+    },
+    "blind_phase_stepping": {
+      "count": 31,
       "rows": [
         {
-          "file": "engine/tests/test_modules/effects/compound/cost_and_effect/discard_two_self_and_other_group_debut_retrigger_test.rs",
-          "test": "discard_two_debut_retrigger_offers_count_two_selection",
+          "file": "engine/tests/test_modules/characterization/logging_test.rs",
+          "test": "real_choice_flow_emits_offered_and_resolved",
+          "line": 271,
+          "detail": ""
+        },
+        {
+          "file": "engine/tests/test_modules/characterization/performance_snapshot_audit_test.rs",
+          "test": "audit_both_players_fail_no_winner",
+          "line": 488,
+          "detail": ""
+        },
+        {
+          "file": "engine/tests/test_modules/characterization/performance_snapshot_audit_test.rs",
+          "test": "audit_p1_passes_p2_fails_p1_wins",
+          "line": 690,
+          "detail": ""
+        },
+        {
+          "file": "engine/tests/test_modules/characterization/pipeline_characterization_test.rs",
+          "test": "s9_check_timing_cascade_smoke",
+          "line": 214,
+          "detail": ""
+        },
+        {
+          "file": "engine/tests/test_modules/effects/ability_mod/chisato_bp5_test.rs",
+          "test": "chisato_promo_ab1_live_start",
+          "line": 234,
+          "detail": ""
+        },
+        {
+          "file": "engine/tests/test_modules/effects/compound/cost_and_effect/discard_cost_reveal_five_conditional_mus_search_pl_bp6_006_test.rs",
+          "test": "maki_bp6_blade_expires_at_live_end",
+          "line": 222,
+          "detail": ""
+        },
+        {
+          "file": "engine/tests/test_modules/effects/compound/cost_and_effect/live_start_optional_unit_discard_draw_unit_cost_gain_test.rs",
+          "test": "optional_unit_discard_draw_cost_gain_skip_cost_no_cost_modifier",
+          "line": 68,
+          "detail": ""
+        },
+        {
+          "file": "engine/tests/test_modules/effects/compound/cost_and_effect/wait_self_bottom_mill_aqours_unwait_blades_pl_s_bp7_011_n_test.rs",
+          "test": "riko_blade_expires_at_live_end",
+          "line": 158,
+          "detail": ""
+        },
+        {
+          "file": "engine/tests/test_modules/effects/compound/sequential_effects/debut_draws_one_and_cannot_live_this_turn_q68_test.rs",
+          "test": "tote_mari_q68_can_still_set_live_card",
           "line": 47,
           "detail": ""
         },
         {
-          "file": "engine/tests/test_modules/jidou/leaves_stage/optional_any_player_position_change_q238_test.rs",
-          "test": "leaves_stage_repositions_opponent_member_for_all_rarities_q238",
-          "line": 84,
+          "file": "engine/tests/test_modules/effects/compound/sequential_effects/live_success_mill_five_distinct_live_recovery_setup_test.rs",
+          "test": "live_success_mill_distinct_live_recovery_three_same_name_copies_resolves",
+          "line": 3,
+          "detail": ""
+        },
+        {
+          "file": "engine/tests/test_modules/effects/compound/sequential_effects/live_success_mill_five_distinct_live_recovery_setup_test.rs",
+          "test": "live_success_mill_distinct_live_recovery_two_same_name_copies_resolves",
+          "line": 33,
+          "detail": ""
+        },
+        {
+          "file": "engine/tests/test_modules/effects/cost_mod/required_hearts/required_hearts_stacking_and_hostile_edges_test.rs",
+          "test": "pl_s_bp7_020_l_reduction_honored_at_performance_end_to_end",
+          "line": 168,
+          "detail": ""
+        },
+        {
+          "file": "engine/tests/test_modules/effects/deploy/eternalize_love_test.rs",
+          "test": "eternalize_love_full_live_flow_heart00_reduction",
+          "line": 91,
+          "detail": ""
+        },
+        {
+          "file": "engine/tests/test_modules/effects/gain/blades/under_member/q278_q279_joint_card_under_member_blade_test.rs",
+          "test": "q278_ability_placed_card_and_joint_are_counted_at_live_start",
+          "line": 160,
+          "detail": ""
+        },
+        {
+          "file": "engine/tests/test_modules/effects/gain/hearts/per_card/rurino_debut_activate_wait_member_add_live_card_test.rs",
+          "test": "rurino_bp5_live_start_gains_heart_from_discarded_group",
+          "line": 177,
+          "detail": ""
+        },
+        {
+          "file": "engine/tests/test_modules/effects/recover/per_card/live_success_per_wait_member_score_and_yell_reveal_to_deck_bottom_test.rs",
+          "test": "live_success_yell_reveal_live_to_deck_bottom",
+          "line": 72,
+          "detail": ""
+        },
+        {
+          "file": "engine/tests/test_modules/effects/restriction/mebius_loop_comprehensive_edge_test.rs",
+          "test": "mebius_restriction_expires_next_live",
+          "line": 100,
+          "detail": ""
+        },
+        {
+          "file": "engine/tests/test_modules/effects/restriction/mebius_loop_comprehensive_edge_test.rs",
+          "test": "mebius_tie_when_both_fail_still_restricts",
+          "line": 151,
+          "detail": ""
+        },
+        {
+          "file": "engine/tests/test_modules/effects/score/per_card/excess_heart_score_shift_never_below_zero_pl_n_bp5_010_r_test.rs",
+          "test": "mifune_q231_excess_heart_2_score_cancels_to_0_all_rarities",
+          "line": 57,
+          "detail": ""
+        },
+        {
+          "file": "engine/tests/test_modules/integration/pvp_room_test.rs",
+          "test": "both_players_multiple_live_start_abilities_get_correct_choice_routing",
+          "line": 204,
+          "detail": ""
+        },
+        {
+          "file": "engine/tests/test_modules/jidou/movement/ability_chain_combo/ability_chain_combo_test.rs",
+          "test": "special_color_no_score_when_moved_liella_left_center",
+          "line": 300,
+          "detail": ""
+        },
+        {
+          "file": "engine/tests/test_modules/jidou/movement/ability_chain_combo/ability_chain_combo_test.rs",
+          "test": "special_color_set_blades_and_score_twin_in_one_live",
+          "line": 232,
+          "detail": ""
+        },
+        {
+          "file": "engine/tests/test_modules/jidou/movement/self_area_move_watch/area_move_timing_and_movement_state_conditions_test.rs",
+          "test": "fuyumari_p2_play_to_stage_triggers_appearance",
+          "line": 544,
+          "detail": ""
+        },
+        {
+          "file": "engine/tests/test_modules/jidou/yell/discard_revealed_then_re_yell/blade_heart_two_or_fewer_discard_all_and_re_yell_test.rs",
+          "test": "with_dia_mixed_deck_both_trigger",
+          "line": 290,
+          "detail": ""
+        },
+        {
+          "file": "engine/tests/test_modules/jidou/yell/discard_revealed_then_re_yell/blade_heart_two_or_fewer_discard_all_and_re_yell_test.rs",
+          "test": "with_dia_only_dia_triggers",
+          "line": 241,
+          "detail": ""
+        },
+        {
+          "file": "engine/tests/test_modules/jidou/yell/no_blade_heart_reveal_gain/no_blade_heart_reveal_two_watchers_modifier_bounds_test.rs",
+          "test": "yell_two_no_blade_heart_watchers_have_zero_or_one_heart_modifier",
+          "line": 10,
+          "detail": ""
+        },
+        {
+          "file": "engine/tests/test_modules/rules/baton/baton_touch_protected_zone_restrictions_test.rs",
+          "test": "opponent_baton_touch_unaffected_by_protected_card",
+          "line": 156,
+          "detail": ""
+        },
+        {
+          "file": "engine/tests/test_modules/rules/baton/double_baton_touch_blade_grant_per_liella_moved_test.rs",
+          "test": "chisato_natsumi_blade_bonus_expires_at_live_end",
+          "line": 486,
+          "detail": ""
+        },
+        {
+          "file": "engine/tests/test_modules/rules/conditions/rule_9_9_layering_test.rs",
+          "test": "heart_override_additive_stacks_in_both_stage_heart_calcs",
+          "line": 91,
+          "detail": ""
+        },
+        {
+          "file": "engine/tests/test_modules/rules/phases/draw_phase_single_draw_no_unwanted_discards_test.rs",
+          "test": "test_draw_phase_no_unwanted_discards",
+          "line": 5,
+          "detail": ""
+        },
+        {
+          "file": "engine/tests/test_modules/rules/phases/live_success_rules_test.rs",
+          "test": "daydream_mermaid_q191_niji_in_success_pick_both",
+          "line": 501,
           "detail": ""
         }
       ]
     },
     "similar_cards": {
-      "count": 29,
+      "count": 20,
       "rows": [
-        {
-          "file": "engine/tests/test_modules/characterization/bp7_character_name_condition_test.rs",
-          "test": "<file>",
-          "line": 1,
-          "detail": "PL!S-bp3-003-R＋, PL!S-bp7-003-R＋"
-        },
-        {
-          "file": "engine/tests/test_modules/effects/ability_mod/energy_cost_aqours_score_pl_s_bp6_007_r_test.rs",
-          "test": "<file>",
-          "line": 1,
-          "detail": "PL!S-bp6-007-R, PL!S-pb1-007-R"
-        },
         {
           "file": "engine/tests/test_modules/effects/compound/per_card/position_change_draw_and_rotation_multi_card_fixes_test.rs",
           "test": "<file>",
@@ -598,34 +867,10 @@
           "detail": "PL!SP-bp1-012-N, PL!SP-bp4-012-N"
         },
         {
-          "file": "engine/tests/test_modules/effects/look_select/reveal/sequential_cost_look_five_take_cost9_member_test.rs",
-          "test": "<file>",
-          "line": 1,
-          "detail": "PL!-bp3-002-R, PL!-bp5-002-R"
-        },
-        {
-          "file": "engine/tests/test_modules/effects/position/area_move/position_change_multi_test.rs",
-          "test": "<file>",
-          "line": 1,
-          "detail": "PL!HS-bp2-006-R, PL!HS-pb1-006-R"
-        },
-        {
-          "file": "engine/tests/test_modules/effects/position/area_move/position_change_non_optional_test.rs",
-          "test": "<file>",
-          "line": 1,
-          "detail": "PL!HS-bp2-006-R, PL!HS-pb1-006-R"
-        },
-        {
           "file": "engine/tests/test_modules/effects/recover/per_card/live_start_aqours_center_cost_nine_blade_gain_or_opponent_wait_test.rs",
           "test": "<file>",
           "line": 1,
           "detail": "PL!S-bp2-001-R, PL!S-pb1-001-R"
-        },
-        {
-          "file": "engine/tests/test_modules/effects/score/card_score/live_start_two_distinct_group_members_live_score_test.rs",
-          "test": "<file>",
-          "line": 1,
-          "detail": "PL!SP-bp1-013-PR, PL!SP-pb1-013-PR"
         },
         {
           "file": "engine/tests/test_modules/effects/score/card_score/success_count_revealed_score_live_pl_sp_bp5_023_l_test.rs",
@@ -658,19 +903,7 @@
           "detail": "PL!HS-bp5-004-R, PL!HS-bp6-004-R"
         },
         {
-          "file": "engine/tests/test_modules/jidou/movement/ability_chain_combo/ability_chain_combo_test.rs",
-          "test": "<file>",
-          "line": 1,
-          "detail": "PL!SP-pb1-006-R, PL!SP-pb2-006-R"
-        },
-        {
           "file": "engine/tests/test_modules/jidou/movement/self_area_move_watch/appearance_and_repeated_swaps_stack_blades_test.rs",
-          "test": "<file>",
-          "line": 1,
-          "detail": "PL!SP-bp5-006-R, PL!SP-pb1-006-R"
-        },
-        {
-          "file": "engine/tests/test_modules/jidou/movement/self_area_move_watch/debut_or_self_area_move_gain_two_blades_q94_q171_test.rs",
           "test": "<file>",
           "line": 1,
           "detail": "PL!SP-bp5-006-R, PL!SP-pb1-006-R"
@@ -680,12 +913,6 @@
           "test": "<file>",
           "line": 1,
           "detail": "PL!SP-bp5-006-R, PL!SP-pb2-006-R"
-        },
-        {
-          "file": "engine/tests/test_modules/jidou/movement/under_member_placement/under_member_counted_for_both_players_test.rs",
-          "test": "<file>",
-          "line": 1,
-          "detail": "PL!SP-pb1-006-R, PL!SP-pb2-006-R"
         },
         {
           "file": "engine/tests/test_modules/rules/conditions/restriction_and_aura_mechanics_test.rs",
@@ -700,9 +927,17 @@
           "detail": "PL!S-bp2-019-L, PL!S-bp3-019-L"
         }
       ]
+    },
+    "unpinned_similar_cards": {
+      "count": 0,
+      "rows": []
+    },
+    "unresolvable_card_id": {
+      "count": 0,
+      "rows": []
     }
   },
-  "n_test_fns_parsed": 3613,
+  "n_test_fns_parsed": 3625,
   "abilities": [
     {
       "idx": 0,
@@ -760,6 +995,7 @@
         "engine/tests/test_modules/characterization/strict_engine_bug_expected_fail_test.rs",
         "engine/tests/test_modules/effects/choice/per_card/conditional_choice_options_execution_test.rs",
         "engine/tests/test_modules/effects/compound/cost_and_effect/discard_cost_reveal_five_conditional_mus_search_pl_bp6_006_test.rs",
+        "engine/tests/test_modules/effects/compound/cost_and_effect/discard_two_self_and_other_group_debut_retrigger_test.rs",
         "engine/tests/test_modules/effects/compound/cost_and_effect/live_start_discard_reactivate_other_member_both_heart04_test.rs",
         "engine/tests/test_modules/effects/compound/cost_and_effect/self_discard_same_name_same_area_deploy_energy_under_q157_q184_test.rs",
         "engine/tests/test_modules/effects/compound/sequential_effects/baton_touch_place_liella_under_then_activate_copied_ability_pl_sp_pb2_005_test.rs",
@@ -839,7 +1075,7 @@
         "both_sides_cost13_still_only_two_blades",
         "bouken_gain_ability_draws_on_live_success"
       ],
-      "covering_test_count": 397,
+      "covering_test_count": 400,
       "is_null": false,
       "use_limit": null,
       "watches_abilities": false,
@@ -894,6 +1130,9 @@
       "has_negative": true,
       "covering_files": [
         "engine/tests/test_modules/characterization/zero_tested_action_types_test.rs",
+        "engine/tests/test_modules/effects/ability_mod/reveal_hand_cost_total_grants_score_resolution_test.rs",
+        "engine/tests/test_modules/effects/compound/cost_and_effect/discard_two_self_and_other_group_debut_retrigger_test.rs",
+        "engine/tests/test_modules/effects/compound/sequential_effects/live_start_cost_total_8_and_25_branches_test.rs",
         "engine/tests/test_modules/effects/compound/sequential_effects/live_start_own_discard_two_member_bottomdeck_hearts_q164_test.rs",
         "engine/tests/test_modules/effects/conditional/per_card/hanamaru_debut_result_character_deploy_test.rs",
         "engine/tests/test_modules/effects/conditional/state_gated/deployed_member_blade_heart_wait_test.rs",
@@ -978,7 +1217,7 @@
         "baton_leaves_stage_lone_arriver_still_offers_position_change_q238",
         "baton_leaves_stage_offers_arriver_position_change_q238"
       ],
-      "covering_test_count": 349,
+      "covering_test_count": 361,
       "is_null": false,
       "use_limit": null,
       "watches_abilities": false,
@@ -1028,10 +1267,10 @@
       "covering_files": [
         "engine/tests/test_modules/characterization/strict_engine_bug_expected_fail_test.rs",
         "engine/tests/test_modules/characterization/zero_tested_action_types_test.rs",
-        "engine/tests/test_modules/effects/ability_mod/reveal_hand_cost_total_grants_score_resolution_test.rs",
         "engine/tests/test_modules/effects/compound/condition_and_effect/debut_opponent_optional_live_discard_or_total_score_edges_test.rs",
         "engine/tests/test_modules/effects/compound/condition_and_effect/live_start_boosted_miraku_draws_and_reduces_need_heart_pl_hs_pb1_029_l_test.rs",
         "engine/tests/test_modules/effects/compound/cost_and_effect/center_wait_discard_other_group_cost_plus_two_same_area_deploy_test.rs",
+        "engine/tests/test_modules/effects/compound/sequential_effects/live_start_cost_total_8_and_25_branches_test.rs",
         "engine/tests/test_modules/effects/conditional/per_card/chika_debut_result_character_condition_test.rs",
         "engine/tests/test_modules/effects/conditional/state_gated/center_highest_cost_constant_heart_edges_test.rs",
         "engine/tests/test_modules/effects/cost_mod/activation_discount/per_unit_member_cost_reduction_q249_test.rs",
@@ -1045,6 +1284,7 @@
         "engine/tests/test_modules/effects/gain/hearts/constants/center_highest_cost_constant_heart03_edges_test.rs",
         "engine/tests/test_modules/effects/gain/hearts/constants/center_highest_cost_constant_heart03_test.rs",
         "engine/tests/test_modules/effects/gain/hearts/per_card/hasunosora_live_start_waitroom_ten_heart04_gain_test.rs",
+        "engine/tests/test_modules/effects/gain/hearts/per_card/sumire_highest_center_cost_gains_heart03_test.rs",
         "engine/tests/test_modules/effects/look_select/look_and_filter/look_count_from_total_live_score_test.rs",
         "engine/tests/test_modules/effects/look_select/per_card/live_success_cost_gated_recovered_member_test.rs",
         "engine/tests/test_modules/effects/look_select/per_card/live_success_under_member_count_score_test.rs",
@@ -1097,7 +1337,7 @@
         "bella_q174_no_member_on_stage_ability_does_not_fire",
         "burn_multiple_under_all_moved_and_scores"
       ],
-      "covering_test_count": 311,
+      "covering_test_count": 312,
       "is_null": false,
       "use_limit": null,
       "watches_abilities": false,
@@ -1191,7 +1431,7 @@
         "edelnote_single_member",
         "edelnote_three_members_two_same_name"
       ],
-      "covering_test_count": 150,
+      "covering_test_count": 151,
       "is_null": false,
       "use_limit": null,
       "watches_abilities": false,
@@ -2781,13 +3021,14 @@
         "chisato_q129_cost_reduction_affects_threshold",
         "chisato_q78_ability_lost_on_leave",
         "chisato_reveal_creates_choice",
+        "reveal_hand_cost_total_10_grants_live_total_score",
+        "reveal_hand_cost_total_12_is_exact_not_a_minimum",
+        "reveal_hand_cost_total_20_grants_live_total_score",
+        "reveal_hand_cost_total_8_off_ladder_grants_nothing",
         "reveal_hand_cost_total_empty_hand_no_cost_total",
-        "reveal_hand_cost_total_nonmatching_total_finishes_choices",
-        "reveal_hand_cost_total_turn1_blocks_second",
-        "reveal_hand_cost_total_two_aqours_cost_four_members_resolves",
-        "reveal_hand_cost_total_two_nijigasaki_cost_four_members_resolves"
+        "reveal_hand_cost_total_turn1_blocks_second"
       ],
-      "covering_test_count": 10,
+      "covering_test_count": 11,
       "is_null": false,
       "use_limit": 1,
       "watches_abilities": false,
@@ -2883,6 +3124,7 @@
         "cost13_on_self_triggers",
         "cost9_alone_does_not_meet_cost13_condition",
         "distinct_names_gain_when_all_different",
+        "distinct_names_no_gain_when_an_area_is_empty",
         "distinct_names_no_gain_when_same_name",
         "duplicate_names_fails_distinct_condition",
         "empty_area_fails_all_areas_condition",
@@ -2895,10 +3137,9 @@
         "live_start_grants_all_heart",
         "live_success_each_time_draws_card",
         "live_victory_p1_wins_with_global_bonus_p2_without",
-        "member_without_live_start_no_trigger",
-        "missing_hasunosora_member_fails_condition"
+        "member_without_live_start_no_trigger"
       ],
-      "covering_test_count": 39,
+      "covering_test_count": 40,
       "is_null": false,
       "use_limit": null,
       "watches_abilities": false,
@@ -2951,6 +3192,7 @@
         "cost13_on_self_triggers",
         "cost9_alone_does_not_meet_cost13_condition",
         "distinct_names_gain_when_all_different",
+        "distinct_names_no_gain_when_an_area_is_empty",
         "distinct_names_no_gain_when_same_name",
         "duplicate_names_fails_distinct_condition",
         "empty_area_fails_all_areas_condition",
@@ -2963,10 +3205,9 @@
         "live_start_grants_all_heart",
         "live_success_each_time_draws_card",
         "live_victory_p1_wins_with_global_bonus_p2_without",
-        "member_without_live_start_no_trigger",
-        "missing_hasunosora_member_fails_condition"
+        "member_without_live_start_no_trigger"
       ],
-      "covering_test_count": 39,
+      "covering_test_count": 40,
       "is_null": false,
       "use_limit": 1,
       "watches_abilities": false,
@@ -3002,6 +3243,7 @@
       ],
       "covering_tests": [
         "distinct_names_gain_when_all_different",
+        "distinct_names_no_gain_when_an_area_is_empty",
         "distinct_names_no_gain_when_same_name",
         "eutopia_q38_score_condition_checks_live_card_count",
         "eutopia_q38_three_live_cards_score_plus_2",
@@ -3011,7 +3253,7 @@
         "proof_cost_below_20_no_effect",
         "rainbow_q38_member_on_stage_per_live_card_blade"
       ],
-      "covering_test_count": 9,
+      "covering_test_count": 10,
       "is_null": false,
       "use_limit": 1,
       "watches_abilities": false,
@@ -3047,6 +3289,7 @@
       ],
       "covering_tests": [
         "distinct_names_gain_when_all_different",
+        "distinct_names_no_gain_when_an_area_is_empty",
         "distinct_names_no_gain_when_same_name",
         "eutopia_q38_score_condition_checks_live_card_count",
         "eutopia_q38_three_live_cards_score_plus_2",
@@ -3056,7 +3299,7 @@
         "proof_cost_below_20_no_effect",
         "rainbow_q38_member_on_stage_per_live_card_blade"
       ],
-      "covering_test_count": 9,
+      "covering_test_count": 10,
       "is_null": false,
       "use_limit": null,
       "watches_abilities": false,
@@ -3150,9 +3393,9 @@
         "engine/tests/test_modules/effects/look_select/look_and_filter/look_seven_select_three_heart_member_test.rs"
       ],
       "covering_tests": [
-        "all_three_heart_match_enters_hand_without_nonmatching_filler",
         "all_three_required_hearts_member_is_added_to_hand",
-        "no_all_three_heart_match_discards_both_looked_at_members",
+        "declining_the_look_discards_both_looked_at_cards_and_leaves_the_hand_empty",
+        "no_all_three_heart_match_offers_no_prompt_and_sends_both_looked_at_members_to_waitroom",
         "one_of_three_required_hearts_member_is_discarded",
         "optional_discard_any_of_three_heart_search_accepts_one_matching_color",
         "two_matching_copies_select_exact_physical_instance",
@@ -3521,9 +3764,11 @@
       "has_choice": true,
       "has_negative": true,
       "covering_files": [
+        "engine/tests/test_modules/characterization/card_id_lookup_determinism_test.rs",
         "engine/tests/test_modules/effects/ability_mod/chisato_bp5_test.rs",
         "engine/tests/test_modules/effects/ability_mod/discard_low_cost_group_member_trigger_debut_q108_q240_test.rs",
         "engine/tests/test_modules/effects/compound/cost_and_effect/baton_touch_self_to_waitroom_recovers_liella_member_pl_sp_pb2_006_test.rs",
+        "engine/tests/test_modules/effects/conditional/zone_source/under_card_and_success_live_conditions_test.rs",
         "engine/tests/test_modules/effects/draw/flat/miyashita_ai_pb1_test.rs",
         "engine/tests/test_modules/effects/look_select/search_deck/reveal_from_deck_until_chosen_type_found_test.rs",
         "engine/tests/test_modules/rules/conditions/condition_evaluation_test.rs"
@@ -3531,6 +3776,8 @@
       "covering_tests": [
         "blade_goes_to_stage_member_not_live_card",
         "both_players_get_own_live_start_effects",
+        "card_id_exact_and_equivalent_prints_are_not_shadowed",
+        "card_id_unknown_rarity_fallback_is_deterministic",
         "chisato_bp5_q219_cost_10_fails_with_9",
         "chisato_bp5_q219_cost_10_needs_10_energy",
         "chisato_bp5_q219_cross_card_reduction_7_fails",
@@ -3543,6 +3790,9 @@
         "discard_low_cost_group_member_trigger_debut_center_gate_fails_for_all_kinako_rarities_q240",
         "discard_low_cost_group_member_trigger_debut_center_gate_fails_in_waitroom_q108_q240",
         "discard_low_cost_group_member_trigger_debut_non_center_cost_card_reaches_waitroom_q240",
+        "genki_invalidate_isolated_to_self",
+        "kaleidoscore_optional_branches",
+        "keke_under_cost_per_unit",
         "kinako_baton_touch_does_not_recover_a_non_liella_member",
         "kinako_baton_touch_recovers_the_displaced_liella_member",
         "kinako_normal_debut_does_not_recover_a_hand_card",
@@ -3552,15 +3802,10 @@
         "miyashita_ai_q197_baton_touch_replaced_does_not_trigger",
         "opponent_cost_self_higher_scores_in_snapshot",
         "opponent_cost_self_lower_no_score_in_snapshot",
-        "reveal_until_chosen_type_center_requirement_left_side_fails",
-        "reveal_until_chosen_type_q166_live_card_skips_members",
-        "reveal_until_chosen_type_q166_member_skips_live_fillers",
-        "reveal_until_chosen_type_q166_no_member_in_deck_refresh",
-        "reveal_until_chosen_type_q166_target_first_card",
-        "reveal_until_chosen_type_q166_target_last_card",
-        "reveal_until_chosen_type_q166_two_matches_only_one_added"
+        "ranju_under_plus_one_places_correctly",
+        "reveal_until_chosen_type_center_requirement_left_side_fails"
       ],
-      "covering_test_count": 33,
+      "covering_test_count": 40,
       "is_null": false,
       "use_limit": null,
       "watches_abilities": false,
@@ -3590,9 +3835,11 @@
       "has_choice": true,
       "has_negative": true,
       "covering_files": [
+        "engine/tests/test_modules/characterization/card_id_lookup_determinism_test.rs",
         "engine/tests/test_modules/effects/ability_mod/chisato_bp5_test.rs",
         "engine/tests/test_modules/effects/ability_mod/discard_low_cost_group_member_trigger_debut_q108_q240_test.rs",
         "engine/tests/test_modules/effects/compound/cost_and_effect/baton_touch_self_to_waitroom_recovers_liella_member_pl_sp_pb2_006_test.rs",
+        "engine/tests/test_modules/effects/conditional/zone_source/under_card_and_success_live_conditions_test.rs",
         "engine/tests/test_modules/effects/draw/flat/miyashita_ai_pb1_test.rs",
         "engine/tests/test_modules/effects/look_select/search_deck/reveal_from_deck_until_chosen_type_found_test.rs",
         "engine/tests/test_modules/rules/conditions/condition_evaluation_test.rs"
@@ -3600,6 +3847,8 @@
       "covering_tests": [
         "blade_goes_to_stage_member_not_live_card",
         "both_players_get_own_live_start_effects",
+        "card_id_exact_and_equivalent_prints_are_not_shadowed",
+        "card_id_unknown_rarity_fallback_is_deterministic",
         "chisato_bp5_q219_cost_10_fails_with_9",
         "chisato_bp5_q219_cost_10_needs_10_energy",
         "chisato_bp5_q219_cross_card_reduction_7_fails",
@@ -3612,6 +3861,9 @@
         "discard_low_cost_group_member_trigger_debut_center_gate_fails_for_all_kinako_rarities_q240",
         "discard_low_cost_group_member_trigger_debut_center_gate_fails_in_waitroom_q108_q240",
         "discard_low_cost_group_member_trigger_debut_non_center_cost_card_reaches_waitroom_q240",
+        "genki_invalidate_isolated_to_self",
+        "kaleidoscore_optional_branches",
+        "keke_under_cost_per_unit",
         "kinako_baton_touch_does_not_recover_a_non_liella_member",
         "kinako_baton_touch_recovers_the_displaced_liella_member",
         "kinako_normal_debut_does_not_recover_a_hand_card",
@@ -3621,15 +3873,10 @@
         "miyashita_ai_q197_baton_touch_replaced_does_not_trigger",
         "opponent_cost_self_higher_scores_in_snapshot",
         "opponent_cost_self_lower_no_score_in_snapshot",
-        "reveal_until_chosen_type_center_requirement_left_side_fails",
-        "reveal_until_chosen_type_q166_live_card_skips_members",
-        "reveal_until_chosen_type_q166_member_skips_live_fillers",
-        "reveal_until_chosen_type_q166_no_member_in_deck_refresh",
-        "reveal_until_chosen_type_q166_target_first_card",
-        "reveal_until_chosen_type_q166_target_last_card",
-        "reveal_until_chosen_type_q166_two_matches_only_one_added"
+        "ranju_under_plus_one_places_correctly",
+        "reveal_until_chosen_type_center_requirement_left_side_fails"
       ],
-      "covering_test_count": 33,
+      "covering_test_count": 40,
       "is_null": false,
       "use_limit": 1,
       "watches_abilities": false,
@@ -4964,8 +5211,8 @@
       "has_choice": true,
       "has_negative": true,
       "covering_files": [
+        "engine/tests/test_modules/effects/compound/sequential_effects/live_start_cost_total_8_and_25_branches_test.rs",
         "engine/tests/test_modules/effects/compound/sequential_effects/live_start_own_discard_two_member_bottomdeck_hearts_q164_test.rs",
-        "engine/tests/test_modules/effects/deck_order/restore/live_start_optional_two_member_bottomdeck_test.rs",
         "engine/tests/test_modules/integration/parser_e2e/parser_issues_e2e_test.rs",
         "engine/tests/test_modules/jidou/leaves_stage/baton_touch_nijigasaki_partner_cost_gate_energizes_and_draws_test.rs"
       ],
@@ -4998,10 +5245,10 @@
         "issue9_izumi_debut_draw_2_discard_1",
         "issue9_izumi_debut_empty_hand",
         "live_start_bottomdeck_two_members_q164_uses_own_discard_only",
-        "live_start_optional_two_member_bottomdeck_shrinks_waitroom",
-        "niji_bp5_partner_cost10_noblade_energizes_2"
+        "live_start_cost_total_25_gains_live_total_score_until_live_end",
+        "live_start_cost_total_6_draws_and_grants_neither_reward"
       ],
-      "covering_test_count": 34,
+      "covering_test_count": 37,
       "is_null": false,
       "use_limit": null,
       "watches_abilities": false,
@@ -8994,7 +9241,8 @@
         "chika_adds_non_matching_member_gets_no_blades",
         "chika_adds_riko_gets_2_blades",
         "chika_adds_yo_gets_2_blades",
-        "discard_two_debut_retrigger_offers_count_two_selection",
+        "discard_two_cost_is_a_hand_select_of_two_and_moves_two_cards",
+        "discard_two_debut_retrigger_activates_both_chosen_debut_abilities",
         "q273_fired_debut_ability_cost_is_paid",
         "q273_watanabe_own_debut_fires",
         "watanabe_aqours_host_with_energy_under_gains_nothing",
@@ -9007,7 +9255,7 @@
         "watanabe_self_no_under_gains_nothing",
         "watanabe_two_hosts_with_members_under_both_gain"
       ],
-      "covering_test_count": 16,
+      "covering_test_count": 17,
       "is_null": false,
       "use_limit": null,
       "watches_abilities": false,
@@ -9048,7 +9296,8 @@
         "chika_adds_non_matching_member_gets_no_blades",
         "chika_adds_riko_gets_2_blades",
         "chika_adds_yo_gets_2_blades",
-        "discard_two_debut_retrigger_offers_count_two_selection",
+        "discard_two_cost_is_a_hand_select_of_two_and_moves_two_cards",
+        "discard_two_debut_retrigger_activates_both_chosen_debut_abilities",
         "q273_fired_debut_ability_cost_is_paid",
         "q273_watanabe_own_debut_fires",
         "watanabe_aqours_host_with_energy_under_gains_nothing",
@@ -9061,7 +9310,7 @@
         "watanabe_self_no_under_gains_nothing",
         "watanabe_two_hosts_with_members_under_both_gain"
       ],
-      "covering_test_count": 16,
+      "covering_test_count": 17,
       "is_null": false,
       "use_limit": null,
       "watches_abilities": false,
@@ -9102,7 +9351,8 @@
         "chika_adds_non_matching_member_gets_no_blades",
         "chika_adds_riko_gets_2_blades",
         "chika_adds_yo_gets_2_blades",
-        "discard_two_debut_retrigger_offers_count_two_selection",
+        "discard_two_cost_is_a_hand_select_of_two_and_moves_two_cards",
+        "discard_two_debut_retrigger_activates_both_chosen_debut_abilities",
         "q273_fired_debut_ability_cost_is_paid",
         "q273_watanabe_own_debut_fires",
         "watanabe_aqours_host_with_energy_under_gains_nothing",
@@ -9115,7 +9365,7 @@
         "watanabe_self_no_under_gains_nothing",
         "watanabe_two_hosts_with_members_under_both_gain"
       ],
-      "covering_test_count": 16,
+      "covering_test_count": 17,
       "is_null": false,
       "use_limit": 1,
       "watches_abilities": false,
@@ -9149,7 +9399,8 @@
         "engine/tests/test_modules/effects/conditional/per_card/hanamaru_debut_result_character_deploy_test.rs"
       ],
       "covering_tests": [
-        "discard_two_debut_retrigger_offers_count_two_selection",
+        "discard_two_cost_is_a_hand_select_of_two_and_moves_two_cards",
+        "discard_two_debut_retrigger_activates_both_chosen_debut_abilities",
         "hanamaru_both_matching_one_deploys",
         "hanamaru_deploy_to_left_when_right_full",
         "hanamaru_multiple_valid_forces_selection",
@@ -9158,7 +9409,7 @@
         "hanamaru_non_matching_no_deploy",
         "hanamaru_single_matching_auto_adds_to_hand"
       ],
-      "covering_test_count": 8,
+      "covering_test_count": 9,
       "is_null": false,
       "use_limit": null,
       "watches_abilities": false,
@@ -9192,7 +9443,8 @@
         "engine/tests/test_modules/effects/conditional/per_card/hanamaru_debut_result_character_deploy_test.rs"
       ],
       "covering_tests": [
-        "discard_two_debut_retrigger_offers_count_two_selection",
+        "discard_two_cost_is_a_hand_select_of_two_and_moves_two_cards",
+        "discard_two_debut_retrigger_activates_both_chosen_debut_abilities",
         "hanamaru_both_matching_one_deploys",
         "hanamaru_deploy_to_left_when_right_full",
         "hanamaru_multiple_valid_forces_selection",
@@ -9201,7 +9453,7 @@
         "hanamaru_non_matching_no_deploy",
         "hanamaru_single_matching_auto_adds_to_hand"
       ],
-      "covering_test_count": 8,
+      "covering_test_count": 9,
       "is_null": false,
       "use_limit": null,
       "watches_abilities": false,
@@ -10854,6 +11106,7 @@
       "has_choice": true,
       "has_negative": true,
       "covering_files": [
+        "engine/tests/test_modules/effects/conditional/zone_source/under_card_and_success_live_conditions_test.rs",
         "engine/tests/test_modules/effects/gain/blades/constants/center_five_blades_constant_test.rs",
         "engine/tests/test_modules/effects/gain/blades/per_card/bp7_parser_gap_cards_test.rs",
         "engine/tests/test_modules/effects/gain/blades/per_card/hazuki_activate_discard_per_liella_member_blade_test.rs",
@@ -10881,9 +11134,11 @@
         "chisato_natsumi_double_baton_no_blade_heart",
         "chisato_natsumi_normal_debut_without_baton_touch_fires_nothing",
         "chisato_natsumi_q265_double_baton_both_no_blade_heart",
+        "genki_invalidate_isolated_to_self",
         "hazuki_activate_no_liella_discarded_gain_0_blade",
         "hazuki_activate_not_enough_deck_no_blade",
         "hazuki_activate_two_liella_discarded_gain_2_blade",
+        "kaleidoscore_optional_branches",
         "kanon_decline_optional_no_draw",
         "kanon_empty_discard_no_placement_no_draw",
         "kanon_missing_group_places_present_but_no_draw",
@@ -10892,13 +11147,11 @@
         "kanon_select_three_any_order_and_draw",
         "kanon_selects_each_group_to_deck_bottom_and_draws",
         "kanon_skip_placement_no_draw",
+        "keke_under_cost_per_unit",
         "pl_n_sd2_012_sd2_paid_discard_looks_three_takes_nijigasaki_card",
-        "pl_sp_pb1_015_n_paid_discard_looks_five_takes_catchu_card",
-        "pl_sp_pb1_016_n_paid_discard_looks_five_takes_kaleidoscore_card",
-        "q233_declined_optional_energy_allows_second_trigger_same_turn",
-        "q266_cost_b0_waits_nothing_incl_blade0"
+        "pl_sp_pb1_015_n_paid_discard_looks_five_takes_catchu_card"
       ],
-      "covering_test_count": 55,
+      "covering_test_count": 60,
       "is_null": false,
       "use_limit": null,
       "watches_abilities": false,
@@ -11287,11 +11540,13 @@
       "covering_files": [
         "engine/tests/test_modules/characterization/strict_engine_bug_expected_fail_test.rs",
         "engine/tests/test_modules/effects/compound/condition_and_effect/live_start_boosted_miraku_draws_and_reduces_need_heart_pl_hs_pb1_029_l_test.rs",
+        "engine/tests/test_modules/effects/compound/sequential_effects/live_start_cost_total_8_and_25_branches_test.rs",
         "engine/tests/test_modules/effects/conditional/state_gated/center_highest_cost_constant_heart_edges_test.rs",
         "engine/tests/test_modules/effects/cost_mod/activation_discount/per_unit_member_cost_reduction_q249_test.rs",
         "engine/tests/test_modules/effects/gain/hearts/constants/center_highest_cost_constant_heart03_edges_test.rs",
         "engine/tests/test_modules/effects/gain/hearts/constants/center_highest_cost_constant_heart03_test.rs",
         "engine/tests/test_modules/effects/gain/hearts/per_card/hasunosora_live_start_waitroom_ten_heart04_gain_test.rs",
+        "engine/tests/test_modules/effects/gain/hearts/per_card/sumire_highest_center_cost_gains_heart03_test.rs",
         "engine/tests/test_modules/effects/look_select/per_card/live_success_cost_gated_recovered_member_test.rs",
         "engine/tests/test_modules/jidou/debut_watch/simultaneous_triggers_active_player_resolves_first_test.rs"
       ],
@@ -11301,6 +11556,7 @@
         "baton_touch_activates_energy",
         "center_cost_below_left_grants_no_heart",
         "center_equal_cost_no_heart",
+        "center_has_highest_cost_gains_heart03",
         "center_highest_among_three_different_costs",
         "center_highest_between_two_members_grants_heart03",
         "center_highest_cost_gains_heart",
@@ -11324,10 +11580,9 @@
         "hs_bp6_032_live_success_cost_above_four_no_prompt",
         "hs_bp6_032_live_success_cost_four_recovers_revealed_member",
         "hs_cl1_009_live_success_cost_ten_no_prompt_or_recovery",
-        "hs_cl1_009_live_success_hasunosora_cost_four_recovers_revealed_member",
-        "hs_cl1_009_live_success_hasunosora_cost_nine_recovers_revealed_member"
+        "hs_cl1_009_live_success_hasunosora_cost_four_recovers_revealed_member"
       ],
-      "covering_test_count": 69,
+      "covering_test_count": 75,
       "is_null": false,
       "use_limit": null,
       "watches_abilities": false,
@@ -11504,7 +11759,6 @@
         "engine/tests/test_modules/effects/recover/to_hand/energy_discard_live_recovery_pl_sp_sd2_006_sd2_test.rs",
         "engine/tests/test_modules/effects/recover/to_hand/pay_two_energy_recovers_score_three_live_to_hand_test.rs",
         "engine/tests/test_modules/effects/recover/to_hand/reveal_live_name_fragment_recovers_matching_live_q236_q237_test.rs",
-        "engine/tests/test_modules/effects/restriction/mebius_loop_comprehensive_edge_test.rs",
         "engine/tests/test_modules/effects/score/card_score/distinct_waitroom_lives_pl_n_bp4_028_l_test.rs",
         "engine/tests/test_modules/effects/score/per_card/aurora_flower_set_card_identity_group_match_test.rs",
         "engine/tests/test_modules/jidou/yell/discard_revealed_then_re_yell/yell_discard_liella_live_grants_two_extra_yells_test.rs",
@@ -11549,7 +11803,7 @@
         "butterfly_wing_to_butterfly_no_match",
         "candidate_pool_distinct_filter"
       ],
-      "covering_test_count": 235,
+      "covering_test_count": 231,
       "is_null": true,
       "use_limit": null,
       "watches_abilities": false,
@@ -11740,7 +11994,7 @@
         "emma_only_one_member_milled_no_heart04",
         "emma_three_distinct_colors_gains_heart04",
         "emma_two_distinct_colors_gains_heart04",
-        "live_start_optional_discard_gains_at_least_one_self_blade",
+        "live_start_optional_discard_gains_exactly_one_self_blade",
         "live_start_optional_discard_moves_one_hand_card_and_gains_two_self_blades",
         "q271_ab0_niji_member_gains_blade",
         "q271_ab0_non_niji_member_no_blade",
@@ -13256,6 +13510,7 @@
       "has_choice": true,
       "has_negative": true,
       "covering_files": [
+        "engine/tests/helpers/assertions.rs",
         "engine/tests/test_modules/effects/compound/sequential_effects/deficit_mill_live_topdeck_pl_n_pr_032_pr_test.rs",
         "engine/tests/test_modules/effects/draw/conditional/area_moved_pl_sp_sd2_003_sd2_test.rs",
         "engine/tests/test_modules/effects/gain/blades/live_start/live_start_center_liella_set_blade_three_test.rs",
@@ -13956,6 +14211,7 @@
         "sunny_branch1_1_member_triggers_draw",
         "sunny_branch1_discard_is_not_restricted_to_mus_q210",
         "sunny_branch1_no_members_does_nothing",
+        "sunny_branch1_one_member_draws_for_p1",
         "sunny_branch2_one_member_skips_b2",
         "sunny_branch2_targets_only_owners_mus_members",
         "sunny_branch2_two_mus_grants_heart",
@@ -13965,7 +14221,7 @@
         "sunny_q210_joint_card_counts_as_one_member",
         "sunny_q211_joint_card_targetable_for_mus_heart"
       ],
-      "covering_test_count": 21,
+      "covering_test_count": 22,
       "is_null": false,
       "use_limit": null,
       "watches_abilities": false,
@@ -14051,6 +14307,7 @@
         "engine/tests/test_modules/characterization/performance_snapshot_audit_test.rs",
         "engine/tests/test_modules/effects/ability_mod/chisato_bp5_test.rs",
         "engine/tests/test_modules/effects/ability_mod/energy_cost_aqours_score_pl_s_bp6_007_r_test.rs",
+        "engine/tests/test_modules/effects/ability_mod/live_success_invalidation_and_live_start_suppression_test.rs",
         "engine/tests/test_modules/effects/ability_mod/live_total_threshold_pl_pr_020_pr_test.rs",
         "engine/tests/test_modules/effects/ability_mod/nonempty_success_zone_score_at_most_one_grants_total_score_test.rs",
         "engine/tests/test_modules/effects/choice/per_card/conditional_choice_options_execution_test.rs",
@@ -14074,6 +14331,7 @@
         "engine/tests/test_modules/effects/compound/sequential_effects/debut_two_distinct_live_cards_opponent_picks_one_q118_test.rs",
         "engine/tests/test_modules/effects/compound/sequential_effects/debut_two_distinct_live_cards_opponent_picks_one_to_hand_q118_test.rs",
         "engine/tests/test_modules/effects/compound/sequential_effects/deficit_mill_live_topdeck_pl_n_pr_032_pr_test.rs",
+        "engine/tests/test_modules/effects/compound/sequential_effects/live_start_cost_total_8_and_25_branches_test.rs",
         "engine/tests/test_modules/effects/compound/sequential_effects/live_start_repeat_mill_blade_live_self_wait_q222_test.rs",
         "engine/tests/test_modules/effects/compound/sequential_effects/live_success_mill_five_distinct_live_recovery_setup_test.rs",
         "engine/tests/test_modules/effects/compound/sequential_effects/mus_live_recovery_success_score_energy_pl_pr_017_pr_test.rs",
@@ -14123,6 +14381,7 @@
         "engine/tests/test_modules/effects/mill/all_members_blades_pl_hs_bp5_013_n_test.rs",
         "engine/tests/test_modules/effects/mill/bottom_member_tiers_pl_s_bp7_021_l_test.rs",
         "engine/tests/test_modules/effects/mill/debut_mill_and_all_member_draw_test.rs",
+        "engine/tests/test_modules/effects/recover/per_card/live_start_member_count_branches_draw_discard_heart_and_score_test.rs",
         "engine/tests/test_modules/effects/recover/per_card/live_start_success_zone_plus_three_distinct_names_score_plus_one_test.rs",
         "engine/tests/test_modules/effects/recover/to_discard/live_start_discard_two_from_unit_with_two_or_more_cards_gain_heart04_and_blade_test.rs",
         "engine/tests/test_modules/effects/recover/to_hand/discard_two_recover_heart06_threshold_live_test.rs",
@@ -14198,7 +14457,7 @@
         "ayumu_no_wait_with_non_nijigasaki_ally",
         "ayumu_q62_and_name_has_individual_names"
       ],
-      "covering_test_count": 780,
+      "covering_test_count": 801,
       "is_null": false,
       "use_limit": null,
       "watches_abilities": false,
@@ -14990,7 +15249,7 @@
         "joint_live_start_hand_copy_counts_as_named_card",
         "joint_live_start_no_named_skips_gracefully"
       ],
-      "covering_test_count": 88,
+      "covering_test_count": 89,
       "is_null": false,
       "use_limit": null,
       "watches_abilities": false,
@@ -15093,7 +15352,7 @@
         "debut_both_waitrooms_member_restore_shrinks_own_waitroom",
         "exactly_twenty_restored_members_meet_recovery_and_blade_threshold_q242",
         "kanon_invalidate_liella_live_start",
-        "live_start_optional_discard_gains_at_least_one_self_blade",
+        "live_start_optional_discard_gains_exactly_one_self_blade",
         "live_start_optional_discard_moves_one_hand_card_and_gains_two_self_blades",
         "natsumi_sunshine_pay_any_energy_for_score",
         "nineteen_restored_members_grant_neither_recovery_nor_blades_q242",
@@ -15593,6 +15852,7 @@
         "discard_self_same_area_group_deploy_q63_ability_debut_no_cost_payment",
         "discard_self_same_area_group_deploy_q80_debut_to_vacated_area_same_turn",
         "distinct_names_gain_when_all_different",
+        "distinct_names_no_gain_when_an_area_is_empty",
         "distinct_names_no_gain_when_same_name",
         "duplicate_names_fails_distinct_condition",
         "empty_area_fails_all_areas_condition",
@@ -15600,10 +15860,9 @@
         "kanan_mill_then_debut_exact_cost_plus_two_same_area",
         "kanan_no_matching_cost_only_the_mill_happens",
         "kinako_hand_cost_minus_two_while_liella_moved",
-        "kinako_hand_cost_normal_when_liella_did_not_move",
-        "kinako_non_liella_movement_gives_no_discount"
+        "kinako_hand_cost_normal_when_liella_did_not_move"
       ],
-      "covering_test_count": 66,
+      "covering_test_count": 67,
       "is_null": false,
       "use_limit": null,
       "watches_abilities": false,
@@ -15883,10 +16142,10 @@
         "live_start_optional_two_energy_skip_preserves_energy",
         "live_success_optional_three_energy_pay_draws_one",
         "live_success_optional_three_energy_skip_no_draw",
-        "one_energy_live_success_draw_member_in_live_zone_shrinks_deck",
-        "one_energy_live_success_draw_skip_leaves_no_pending_choice",
-        "one_energy_live_success_draw_without_granted_energy_does_not_increase_active_energy",
-        "three_energy_live_success_draw_member_in_live_zone_shrinks_deck"
+        "one_energy_live_success_declined_spends_nothing_and_draws_nothing",
+        "one_energy_live_success_draw_pays_one_and_draws_one",
+        "one_energy_live_success_with_zero_energy_neither_pays_nor_draws",
+        "three_energy_live_success_draw_pays_three_and_draws_one"
       ],
       "covering_test_count": 9,
       "is_null": false,
@@ -15926,10 +16185,10 @@
         "live_start_optional_two_energy_skip_preserves_energy",
         "live_success_optional_three_energy_pay_draws_one",
         "live_success_optional_three_energy_skip_no_draw",
-        "one_energy_live_success_draw_member_in_live_zone_shrinks_deck",
-        "one_energy_live_success_draw_skip_leaves_no_pending_choice",
-        "one_energy_live_success_draw_without_granted_energy_does_not_increase_active_energy",
-        "three_energy_live_success_draw_member_in_live_zone_shrinks_deck"
+        "one_energy_live_success_declined_spends_nothing_and_draws_nothing",
+        "one_energy_live_success_draw_pays_one_and_draws_one",
+        "one_energy_live_success_with_zero_energy_neither_pays_nor_draws",
+        "three_energy_live_success_draw_pays_three_and_draws_one"
       ],
       "covering_test_count": 9,
       "is_null": false,
@@ -16027,6 +16286,8 @@
       "has_choice": true,
       "has_negative": true,
       "covering_files": [
+        "engine/tests/helpers/assertions.rs",
+        "engine/tests/test_modules/effects/position/area_move/position_change_non_optional_test.rs",
         "engine/tests/test_modules/jidou/movement/ability_chain_combo/ability_chain_combo_test.rs",
         "engine/tests/test_modules/jidou/movement/self_area_move_watch/appearance_and_repeated_swaps_stack_blades_test.rs",
         "engine/tests/test_modules/jidou/movement/self_area_move_watch/debut_or_self_area_move_gain_two_blades_q94_q171_test.rs",
@@ -16040,13 +16301,22 @@
         "debut_blades_persist_until_live_victory_then_expire_without_performing",
         "debut_grants_two_blades_until_live_end",
         "debut_then_effect_swap_stacks_two_blade_grants",
+        "exclude_position_and_exclude_self_combine_correctly",
+        "exclude_position_center_not_offered",
+        "formation_change_still_offers_all_positions",
         "fuyumari_self_and_opponent_heart03",
         "kanon_self_and_opponent_heart02",
         "koko_opponent_effect_triggers",
         "koko_self_effect_triggers",
         "koko_turn1_blocks_second",
         "natsume_self_and_opponent_draw",
+        "non_optional_pc_excludes_self_from_center",
+        "non_optional_pc_excludes_self_from_left",
+        "non_optional_pc_excludes_self_from_right",
+        "non_optional_pc_executes_move_correctly",
+        "non_optional_pc_with_all_positions_excluded_fizzles",
         "opponent_drag_without_parenthetical_keeps_on_stage_low_blade_target_active",
+        "optional_pc_excludes_self_but_can_skip",
         "own_position_change_rests_on_stage_low_blade_opponent",
         "pb2006_jidou_once_per_turn_no_second_placement",
         "pb2006_jidou_placement_feeds_constant_cost_up",
@@ -16055,12 +16325,9 @@
         "s1_bp7_005_opponent_caused_placement_does_not_fire",
         "s2_bp4_016_energy_placed_by_opponent_fires",
         "s2_pb1_006_opponent_drag_arms_per_move",
-        "s2_pb1_006_own_debut_fires",
-        "special_color_no_score_when_moved_liella_left_center",
-        "special_color_set_blades_and_score_twin_in_one_live",
-        "tomari_self_and_opponent_blade"
+        "s2_pb1_006_own_debut_fires"
       ],
-      "covering_test_count": 24,
+      "covering_test_count": 33,
       "is_null": false,
       "use_limit": null,
       "watches_abilities": false,
@@ -16564,7 +16831,7 @@
         "issue8_honoka_live_score_2",
         "issue8_honoka_live_score_dynamic"
       ],
-      "covering_test_count": 120,
+      "covering_test_count": 121,
       "is_null": false,
       "use_limit": null,
       "watches_abilities": false,
@@ -16992,13 +17259,14 @@
         "engine/tests/test_modules/effects/gain/hearts/constants/center_highest_cost_constant_heart03_edges_test.rs",
         "engine/tests/test_modules/effects/gain/hearts/constants/center_highest_cost_constant_heart03_test.rs",
         "engine/tests/test_modules/effects/gain/hearts/constants/center_highest_cost_constant_heart_empty_and_single_member_test.rs",
-        "engine/tests/test_modules/effects/gain/hearts/per_card/liella_baton_energy_comprehensive_edge_test.rs"
+        "engine/tests/test_modules/effects/gain/hearts/per_card/sumire_highest_center_cost_gains_heart03_test.rs"
       ],
       "covering_tests": [
         "all_equal_cost_no_heart",
         "all_three_equal_cost_grants_no_heart",
         "center_cost_below_left_grants_no_heart",
         "center_equal_cost_no_heart",
+        "center_has_highest_cost_gains_heart03",
         "center_highest_among_three_different_costs",
         "center_highest_between_two_members_grants_heart03",
         "center_highest_cost_gains_heart",
@@ -17016,17 +17284,16 @@
         "empty_center_with_two_side_members_grants_no_heart",
         "empty_stage_leaves_source_without_heart03_bonus_pl_sp_bp2_004",
         "left_exceeds_center_without_self_on_stage_no_heart",
-        "liella_baton_with_energy7_places_two_wait",
-        "liella_baton_without_liella_no_energy_place",
-        "liella_energy10_blade_threshold",
         "lone_member_without_center_grants_no_heart",
         "lone_self_at_center_is_highest_grants_heart03",
         "no_members_on_stage_grants_no_heart",
         "p_print_center_highest_with_left_self_grants_heart03",
         "p_print_tied_center_cost_grants_no_heart",
-        "p_print_tied_center_cost_left_self_grants_no_heart"
+        "p_print_tied_center_cost_left_self_grants_no_heart",
+        "right_cost_above_center_grants_no_heart",
+        "self_at_right_with_center_highest_grants_heart03"
       ],
-      "covering_test_count": 55,
+      "covering_test_count": 54,
       "is_null": false,
       "use_limit": null,
       "watches_abilities": false,
@@ -17157,6 +17424,7 @@
       "covering_files": [
         "engine/tests/test_modules/effects/compound/sequential_effects/debut_two_distinct_live_cards_opponent_picks_one_q118_test.rs",
         "engine/tests/test_modules/effects/compound/sequential_effects/debut_two_distinct_live_cards_opponent_picks_one_to_hand_q118_test.rs",
+        "engine/tests/test_modules/jidou/movement/ability_chain_combo/ability_chain_combo_test.rs",
         "engine/tests/test_modules/rules/baton/baton_touch_test.rs"
       ],
       "covering_tests": [
@@ -17173,7 +17441,12 @@
         "fuyumari_q118_opponent_picks_second_card",
         "fuyumari_q118_three_distinct_cards_opponent_picks_middle",
         "opponent_baton_touch_discard_does_not_trigger",
+        "pb2006_jidou_once_per_turn_no_second_placement",
+        "pb2006_jidou_placement_feeds_constant_cost_up",
+        "pb2011_own_live_start_reposition_triggers_own_three_choice",
         "q134_baton_touch_waited_occupant_and_arriver_orientation",
+        "special_color_no_score_when_moved_liella_left_center",
+        "special_color_set_blades_and_score_twin_in_one_live",
         "toubatsu_draw_option_draws_one",
         "toubatsu_duplicate_names_in_discard_opponent_only_sees_correct_cards",
         "toubatsu_q118_1_live_card_fails",
@@ -17184,7 +17457,7 @@
         "toubatsu_unrelated_debut_no_trigger",
         "toubatsu_wait_option_waits_opponent_member"
       ],
-      "covering_test_count": 23,
+      "covering_test_count": 28,
       "is_null": false,
       "use_limit": null,
       "watches_abilities": false,
@@ -17288,7 +17561,7 @@
         "hs_bp2_001_insufficient_energy_no_recover",
         "hs_bp2_001_no_eligible_live_no_recover",
         "hs_bp2_001_pay_2e_recovers_score3_live",
-        "hs_bp2_001_skip_no_recover",
+        "hs_bp2_001_recover_is_mandatory_once_the_cost_is_paid",
         "hs_bp2_001_turn1_blocks_second",
         "mebius_blocks_both_success_zones_on_tied_live",
         "mebius_does_not_fire_on_untied_scores",
@@ -17824,6 +18097,7 @@
       "has_choice": true,
       "has_negative": true,
       "covering_files": [
+        "engine/tests/test_modules/characterization/card_id_lookup_determinism_test.rs",
         "engine/tests/test_modules/effects/compound/per_card/live_start_selected_heart_replaces_original_heart_pl_n_bp3_014_n_test.rs",
         "engine/tests/test_modules/effects/draw/flat/b9_more_test.rs",
         "engine/tests/test_modules/effects/recover/to_hand/live_success_recover_different_group_name_to_hand_ll_bp5_002_l_test.rs",
@@ -17843,6 +18117,8 @@
         "ab1_two_multiname_discards_moves_one",
         "ab1_two_multiname_stage_blocks_more_groups",
         "all_same_group_no_effect",
+        "card_id_exact_and_equivalent_prints_are_not_shadowed",
+        "card_id_unknown_rarity_fallback_is_deterministic",
         "center_empty_no_effect",
         "cutie_panther_live_start_reduce_hearts",
         "kaguya_live_success_cheer_recover",
@@ -17857,11 +18133,9 @@
         "mijuku_dreamer_no_refresh_no_bonus",
         "mijuku_dreamer_refresh_via_mill_gets_bonus",
         "multi_name_card_single_slot_one_group_not_three",
-        "q225_joint_card_counts_as_one_member",
-        "q225_joint_cards_can_supply_distinct_groups",
-        "three_distinct_groups_center_gets_all_hearts"
+        "q225_joint_card_counts_as_one_member"
       ],
-      "covering_test_count": 40,
+      "covering_test_count": 42,
       "is_null": false,
       "use_limit": null,
       "watches_abilities": false,
@@ -17889,6 +18163,7 @@
       "has_choice": true,
       "has_negative": true,
       "covering_files": [
+        "engine/tests/test_modules/characterization/card_id_lookup_determinism_test.rs",
         "engine/tests/test_modules/effects/compound/per_card/live_start_selected_heart_replaces_original_heart_pl_n_bp3_014_n_test.rs",
         "engine/tests/test_modules/effects/draw/flat/b9_more_test.rs",
         "engine/tests/test_modules/effects/recover/to_hand/live_success_recover_different_group_name_to_hand_ll_bp5_002_l_test.rs",
@@ -17908,6 +18183,8 @@
         "ab1_two_multiname_discards_moves_one",
         "ab1_two_multiname_stage_blocks_more_groups",
         "all_same_group_no_effect",
+        "card_id_exact_and_equivalent_prints_are_not_shadowed",
+        "card_id_unknown_rarity_fallback_is_deterministic",
         "center_empty_no_effect",
         "cutie_panther_live_start_reduce_hearts",
         "kaguya_live_success_cheer_recover",
@@ -17922,11 +18199,9 @@
         "mijuku_dreamer_no_refresh_no_bonus",
         "mijuku_dreamer_refresh_via_mill_gets_bonus",
         "multi_name_card_single_slot_one_group_not_three",
-        "q225_joint_card_counts_as_one_member",
-        "q225_joint_cards_can_supply_distinct_groups",
-        "three_distinct_groups_center_gets_all_hearts"
+        "q225_joint_card_counts_as_one_member"
       ],
-      "covering_test_count": 40,
+      "covering_test_count": 42,
       "is_null": false,
       "use_limit": null,
       "watches_abilities": false,
@@ -18577,7 +18852,7 @@
       "covering_tests": [
         "hanamaru_bp3_016_success_zone_cost_increase_constant_parsed",
         "maki_sd1_006_success_zone_restriction_parsed",
-        "you_bp3_005_live_success_draw_if_fewer_revealed"
+        "you_bp3_005_live_success_trigger_is_evaluated_and_records_a_verdict"
       ],
       "covering_test_count": 3,
       "is_null": false,
@@ -20941,9 +21216,9 @@
       ],
       "base": "PL!SP-bp4-010",
       "covered": true,
-      "depth": "L2",
+      "depth": "L2+choice",
       "has_assert": true,
-      "has_choice": false,
+      "has_choice": true,
       "has_negative": true,
       "covering_files": [
         "engine/tests/test_modules/effects/energy/place/self_wait_places_waited_energy_margarete_bp4_010_r_test.rs"
@@ -20952,9 +21227,10 @@
         "margarete_bp4_010_r_activation_waits_self_and_places_waited_energy",
         "margarete_bp4_010_r_already_wait_refused",
         "margarete_bp4_010_r_empty_energy_deck_still_waits_self_without_placing_energy",
+        "margarete_bp4_010_r_energy_deck_pick_is_the_top_card_without_a_prompt",
         "margarete_bp4_010_r_no_energy_refused_without_waiting_self"
       ],
-      "covering_test_count": 4,
+      "covering_test_count": 5,
       "is_null": false,
       "use_limit": 1,
       "watches_abilities": false,
@@ -23742,6 +24018,7 @@
       "has_choice": true,
       "has_negative": true,
       "covering_files": [
+        "engine/tests/test_modules/characterization/card_id_lookup_determinism_test.rs",
         "engine/tests/test_modules/effects/compound/sequential_effects/debut_unit_discard_any_draw_count_plus_one_test.rs",
         "engine/tests/test_modules/effects/draw/chains/card_ability_test.rs",
         "engine/tests/test_modules/jidou/discard_watch/hand_discard_batch_heart_blade_q241_test.rs",
@@ -23751,8 +24028,10 @@
       "covering_tests": [
         "bp5_111_activation_chain_waits_low_blade_opponent",
         "bp5_111_chain_neg_empty_opponent_stage",
-        "debut_unit_discard_two_draw_three_preserves_total_hand_count",
-        "debut_unit_discard_zero_draw_one_preserves_total_hand_count",
+        "card_id_exact_and_equivalent_prints_are_not_shadowed",
+        "card_id_unknown_rarity_fallback_is_deterministic",
+        "debut_unit_discard_two_draw_three_moves_the_exact_cards",
+        "debut_unit_discard_zero_draw_one",
         "fu_pb1_debut_heart06_member_auto_gains_heart06",
         "fu_pb1_debut_no_heart06_member_no_effect",
         "fu_pb1_debut_two_heart06_members_prompts_choice",
@@ -23776,11 +24055,9 @@
         "mia_bp5_distinct_names_2_names_no_effect",
         "mia_bp5_distinct_names_3_names_returns_1",
         "mia_bp5_distinct_names_all_same_name_no_effect",
-        "mirakura_discard_then_draws_count_plus_one",
-        "n_bp3_005_constant_grant_and_counting_auto_combo",
-        "n_bp3_005_two_debuts_auto_silent_but_constant_grants"
+        "mirakura_discard_then_draws_count_plus_one"
       ],
-      "covering_test_count": 59,
+      "covering_test_count": 61,
       "is_null": false,
       "use_limit": null,
       "watches_abilities": false,
@@ -23808,6 +24085,7 @@
       "has_choice": true,
       "has_negative": true,
       "covering_files": [
+        "engine/tests/test_modules/characterization/card_id_lookup_determinism_test.rs",
         "engine/tests/test_modules/effects/compound/sequential_effects/debut_unit_discard_any_draw_count_plus_one_test.rs",
         "engine/tests/test_modules/effects/draw/chains/card_ability_test.rs",
         "engine/tests/test_modules/jidou/discard_watch/hand_discard_batch_heart_blade_q241_test.rs",
@@ -23817,8 +24095,10 @@
       "covering_tests": [
         "bp5_111_activation_chain_waits_low_blade_opponent",
         "bp5_111_chain_neg_empty_opponent_stage",
-        "debut_unit_discard_two_draw_three_preserves_total_hand_count",
-        "debut_unit_discard_zero_draw_one_preserves_total_hand_count",
+        "card_id_exact_and_equivalent_prints_are_not_shadowed",
+        "card_id_unknown_rarity_fallback_is_deterministic",
+        "debut_unit_discard_two_draw_three_moves_the_exact_cards",
+        "debut_unit_discard_zero_draw_one",
         "fu_pb1_debut_heart06_member_auto_gains_heart06",
         "fu_pb1_debut_no_heart06_member_no_effect",
         "fu_pb1_debut_two_heart06_members_prompts_choice",
@@ -23842,11 +24122,9 @@
         "mia_bp5_distinct_names_2_names_no_effect",
         "mia_bp5_distinct_names_3_names_returns_1",
         "mia_bp5_distinct_names_all_same_name_no_effect",
-        "mirakura_discard_then_draws_count_plus_one",
-        "n_bp3_005_constant_grant_and_counting_auto_combo",
-        "n_bp3_005_two_debuts_auto_silent_but_constant_grants"
+        "mirakura_discard_then_draws_count_plus_one"
       ],
-      "covering_test_count": 59,
+      "covering_test_count": 61,
       "is_null": false,
       "use_limit": 2,
       "watches_abilities": false,
@@ -24927,9 +25205,9 @@
         "engine/tests/test_modules/effects/look_select/look_and_filter/all_or_any_three_heart_member_filter_look_test.rs"
       ],
       "covering_tests": [
-        "all_three_heart_match_enters_hand_without_nonmatching_filler",
         "all_three_required_hearts_member_is_added_to_hand",
-        "no_all_three_heart_match_discards_both_looked_at_members",
+        "declining_the_look_discards_both_looked_at_cards_and_leaves_the_hand_empty",
+        "no_all_three_heart_match_offers_no_prompt_and_sends_both_looked_at_members_to_waitroom",
         "one_of_three_required_hearts_member_is_discarded",
         "optional_discard_any_of_three_heart_search_accepts_one_matching_color",
         "two_matching_copies_select_exact_physical_instance",
@@ -25910,18 +26188,33 @@
       "has_choice": true,
       "has_negative": true,
       "covering_files": [
+        "engine/tests/helpers/assertions.rs",
         "engine/tests/test_modules/characterization/strict_engine_bug_expected_fail_test.rs",
         "engine/tests/test_modules/effects/conditional/zone_source/under_card_and_success_live_conditions_test.rs",
+        "engine/tests/test_modules/effects/position/area_move/position_change_non_optional_test.rs",
         "engine/tests/test_modules/jidou/movement/ability_chain_combo/ability_chain_combo_test.rs",
+        "engine/tests/test_modules/jidou/movement/self_area_move_watch/debut_or_self_area_move_gain_two_blades_q94_q171_test.rs",
         "engine/tests/test_modules/jidou/movement/under_member_placement/live_success_or_self_move_place_discard_group_member_under_self_test.rs",
         "engine/tests/test_modules/jidou/movement/under_member_placement/under_member_counted_for_both_players_test.rs"
       ],
       "covering_tests": [
+        "debut_blades_persist_until_live_victory_then_expire_without_performing",
+        "debut_grants_two_blades_until_live_end",
+        "debut_then_effect_swap_stacks_two_blade_grants",
         "discard_group_member_placed_under_self_on_live_success",
         "discard_group_member_placed_under_self_on_position_change",
+        "exclude_position_and_exclude_self_combine_correctly",
+        "exclude_position_center_not_offered",
+        "formation_change_still_offers_all_positions",
         "genki_invalidate_isolated_to_self",
         "kaleidoscore_optional_branches",
         "keke_under_cost_per_unit",
+        "non_optional_pc_excludes_self_from_center",
+        "non_optional_pc_excludes_self_from_left",
+        "non_optional_pc_excludes_self_from_right",
+        "non_optional_pc_executes_move_correctly",
+        "non_optional_pc_with_all_positions_excluded_fizzles",
+        "optional_pc_excludes_self_but_can_skip",
         "pb2006_jidou_once_per_turn_no_second_placement",
         "pb2006_jidou_placement_feeds_constant_cost_up",
         "pb2011_own_live_start_reposition_triggers_own_three_choice",
@@ -25934,14 +26227,9 @@
         "strict_keke_1_liella_cost_plus1",
         "strict_keke_2_liella_cost_plus2",
         "strict_pb1007_cost_0_with_3_success",
-        "strict_pb1007_cost_1_with_2_success",
-        "strict_pb1007_cost_2_with_1_success",
-        "strict_pr045_cost4_should_not_draw",
-        "strict_pr045_cost6_should_not_draw",
-        "strict_pr045_cost8_should_not_draw",
-        "umi_conditional_alternative_0_1_2"
+        "strict_pb1007_cost_1_with_2_success"
       ],
-      "covering_test_count": 23,
+      "covering_test_count": 35,
       "is_null": false,
       "use_limit": null,
       "watches_abilities": false,
@@ -25969,18 +26257,33 @@
       "has_choice": true,
       "has_negative": true,
       "covering_files": [
+        "engine/tests/helpers/assertions.rs",
         "engine/tests/test_modules/characterization/strict_engine_bug_expected_fail_test.rs",
         "engine/tests/test_modules/effects/conditional/zone_source/under_card_and_success_live_conditions_test.rs",
+        "engine/tests/test_modules/effects/position/area_move/position_change_non_optional_test.rs",
         "engine/tests/test_modules/jidou/movement/ability_chain_combo/ability_chain_combo_test.rs",
+        "engine/tests/test_modules/jidou/movement/self_area_move_watch/debut_or_self_area_move_gain_two_blades_q94_q171_test.rs",
         "engine/tests/test_modules/jidou/movement/under_member_placement/live_success_or_self_move_place_discard_group_member_under_self_test.rs",
         "engine/tests/test_modules/jidou/movement/under_member_placement/under_member_counted_for_both_players_test.rs"
       ],
       "covering_tests": [
+        "debut_blades_persist_until_live_victory_then_expire_without_performing",
+        "debut_grants_two_blades_until_live_end",
+        "debut_then_effect_swap_stacks_two_blade_grants",
         "discard_group_member_placed_under_self_on_live_success",
         "discard_group_member_placed_under_self_on_position_change",
+        "exclude_position_and_exclude_self_combine_correctly",
+        "exclude_position_center_not_offered",
+        "formation_change_still_offers_all_positions",
         "genki_invalidate_isolated_to_self",
         "kaleidoscore_optional_branches",
         "keke_under_cost_per_unit",
+        "non_optional_pc_excludes_self_from_center",
+        "non_optional_pc_excludes_self_from_left",
+        "non_optional_pc_excludes_self_from_right",
+        "non_optional_pc_executes_move_correctly",
+        "non_optional_pc_with_all_positions_excluded_fizzles",
+        "optional_pc_excludes_self_but_can_skip",
         "pb2006_jidou_once_per_turn_no_second_placement",
         "pb2006_jidou_placement_feeds_constant_cost_up",
         "pb2011_own_live_start_reposition_triggers_own_three_choice",
@@ -25993,14 +26296,9 @@
         "strict_keke_1_liella_cost_plus1",
         "strict_keke_2_liella_cost_plus2",
         "strict_pb1007_cost_0_with_3_success",
-        "strict_pb1007_cost_1_with_2_success",
-        "strict_pb1007_cost_2_with_1_success",
-        "strict_pr045_cost4_should_not_draw",
-        "strict_pr045_cost6_should_not_draw",
-        "strict_pr045_cost8_should_not_draw",
-        "umi_conditional_alternative_0_1_2"
+        "strict_pb1007_cost_1_with_2_success"
       ],
-      "covering_test_count": 23,
+      "covering_test_count": 35,
       "is_null": false,
       "use_limit": 1,
       "watches_abilities": false,
@@ -28402,7 +28700,6 @@
         "engine/tests/test_modules/effects/cost_mod/required_hearts/modify_required_hearts_exclude_heart_test.rs",
         "engine/tests/test_modules/effects/cost_mod/required_hearts/wonder_zone_center_heart03_required_hearts_test.rs",
         "engine/tests/test_modules/effects/deck_order/restore/both_waitrooms_member_restore_threshold_q242_test.rs",
-        "engine/tests/test_modules/effects/deck_order/restore/live_start_optional_two_member_bottomdeck_test.rs",
         "engine/tests/test_modules/effects/deck_order/restore/recover_and_order_opponent_bottom_test.rs",
         "engine/tests/test_modules/effects/deploy/optional_energy_deploy_two_total_cost_four_test.rs",
         "engine/tests/test_modules/effects/draw/chains/baton_source_cost_gated_draw_discard_test.rs",
@@ -28534,7 +28831,6 @@
         "engine/tests/test_modules/effects/cost_mod/required_hearts/modify_required_hearts_exclude_heart_test.rs",
         "engine/tests/test_modules/effects/cost_mod/required_hearts/wonder_zone_center_heart03_required_hearts_test.rs",
         "engine/tests/test_modules/effects/deck_order/restore/both_waitrooms_member_restore_threshold_q242_test.rs",
-        "engine/tests/test_modules/effects/deck_order/restore/live_start_optional_two_member_bottomdeck_test.rs",
         "engine/tests/test_modules/effects/deck_order/restore/recover_and_order_opponent_bottom_test.rs",
         "engine/tests/test_modules/effects/deploy/optional_energy_deploy_two_total_cost_four_test.rs",
         "engine/tests/test_modules/effects/draw/chains/baton_source_cost_gated_draw_discard_test.rs",
@@ -28913,7 +29209,7 @@
         "maki_q256_selects_exact_success_card",
         "maki_q256_uses_only_the_cost_revealed_card"
       ],
-      "covering_test_count": 76,
+      "covering_test_count": 77,
       "is_null": false,
       "use_limit": null,
       "watches_abilities": false,
@@ -29014,6 +29310,7 @@
       "covering_files": [
         "engine/tests/test_modules/characterization/candidate_pool_builder_test.rs",
         "engine/tests/test_modules/characterization/pipeline_characterization_test.rs",
+        "engine/tests/test_modules/effects/compound/sequential_effects/live_start_cost_total_8_and_25_branches_test.rs",
         "engine/tests/test_modules/effects/deploy/optional_energy_deploy_two_total_cost_four_test.rs",
         "engine/tests/test_modules/effects/draw/flat/b9_more_test.rs",
         "engine/tests/test_modules/effects/gain/blades/constants/ruby_front_area_cost_gated_blade_loss_test.rs",
@@ -29061,7 +29358,7 @@
         "issue17_suzu_cost_bonus_condition_met",
         "issue17_suzu_cost_bonus_condition_not_met"
       ],
-      "covering_test_count": 115,
+      "covering_test_count": 119,
       "is_null": false,
       "use_limit": 1,
       "watches_abilities": false,
@@ -29089,6 +29386,7 @@
       "has_negative": true,
       "covering_files": [
         "engine/tests/test_modules/characterization/zero_tested_action_types_test.rs",
+        "engine/tests/test_modules/effects/compound/sequential_effects/live_start_cost_total_8_and_25_branches_test.rs",
         "engine/tests/test_modules/effects/conditional/state_gated/center_highest_cost_constant_heart_edges_test.rs",
         "engine/tests/test_modules/effects/recover/to_discard/optional_discard_cost_plus_total_cost_comparison_gain_heart05_and_blade_test.rs",
         "engine/tests/test_modules/effects/score/card_score/live_success_group_cheer_count_live_score_q36_q107_test.rs",
@@ -29127,7 +29425,7 @@
         "issue16_hanamaru_opponent_higher_cost_no_blade",
         "issue17_suzu_cost_bonus_condition_met"
       ],
-      "covering_test_count": 64,
+      "covering_test_count": 68,
       "is_null": false,
       "use_limit": null,
       "watches_abilities": false,
@@ -31161,7 +31459,6 @@
         "ai_screeam_p2_owned_live_gives_blade_to_all_members",
         "ai_screeam_p2_owned_live_routes_answer_and_discard_choices",
         "ai_screeam_soreigai_all_members_on_both_sides_gain_blade",
-        "all_three_heart_match_enters_hand_without_nonmatching_filler",
         "all_three_required_hearts_member_is_added_to_hand",
         "aspire_liella_and_non_liella_moved_only_liella_gains_blade",
         "aspire_moved_liella_gains_blade_unmoved_and_non_liella_do_not",
@@ -31174,7 +31471,8 @@
         "ayumu_q62_and_name_has_individual_names",
         "bella_positive_surplus_heart04_ability_fires",
         "bella_q174_no_heart04_surplus_ability_does_not_fire",
-        "bella_q174_no_member_on_stage_ability_does_not_fire"
+        "bella_q174_no_member_on_stage_ability_does_not_fire",
+        "catchu_basic_two_distinct_activate_2"
       ],
       "covering_test_count": 300,
       "is_null": false,
@@ -32132,9 +32430,10 @@
         "debut_main_phase_no_live_cards_in_discard_still_reduces_limit",
         "debut_main_phase_pay_energy_moves_live_card_and_reduces_limit",
         "debut_main_phase_skip_energy_no_effect",
+        "debut_outside_main_phase_fires_nothing",
         "limit_reduction_affects_live_card_set_count"
       ],
-      "covering_test_count": 5,
+      "covering_test_count": 6,
       "is_null": false,
       "use_limit": null,
       "watches_abilities": false,
@@ -32757,18 +33056,19 @@
         "genki_5_heart02_keeps_live_success_and_it_resolves",
         "genki_exactly_6_heart02_across_two_members_invalidates_live_success",
         "genki_invalidate_isolated_to_self",
+        "genki_live_success_effect_fired_directly_places_waited_energy",
         "genki_zenkai_invalidates_own_live_success",
         "genki_zenkai_live_success_fires_when_condition_not_met",
         "kaleidoscore_optional_branches",
         "keke_under_cost_per_unit",
-        "live_start_with_added_group_heart02_preserves_live_and_modifier",
-        "live_start_without_added_group_heart02_preserves_live",
+        "live_start_below_six_group_heart02_keeps_live_success",
+        "live_start_with_six_group_heart02_invalidates_live_success",
+        "live_success_places_one_waited_energy_card_for_the_opponent",
         "no_set_live_reaches_live_card_set_without_pending_choice",
-        "opponent_waited_energy_live_leaves_live_zone_after_phases",
         "ranju_under_plus_one_places_correctly",
         "umi_conditional_alternative_0_1_2"
       ],
-      "covering_test_count": 15,
+      "covering_test_count": 16,
       "is_null": false,
       "use_limit": null,
       "watches_abilities": false,
@@ -32807,18 +33107,19 @@
         "genki_5_heart02_keeps_live_success_and_it_resolves",
         "genki_exactly_6_heart02_across_two_members_invalidates_live_success",
         "genki_invalidate_isolated_to_self",
+        "genki_live_success_effect_fired_directly_places_waited_energy",
         "genki_zenkai_invalidates_own_live_success",
         "genki_zenkai_live_success_fires_when_condition_not_met",
         "kaleidoscore_optional_branches",
         "keke_under_cost_per_unit",
-        "live_start_with_added_group_heart02_preserves_live_and_modifier",
-        "live_start_without_added_group_heart02_preserves_live",
+        "live_start_below_six_group_heart02_keeps_live_success",
+        "live_start_with_six_group_heart02_invalidates_live_success",
+        "live_success_places_one_waited_energy_card_for_the_opponent",
         "no_set_live_reaches_live_card_set_without_pending_choice",
-        "opponent_waited_energy_live_leaves_live_zone_after_phases",
         "ranju_under_plus_one_places_correctly",
         "umi_conditional_alternative_0_1_2"
       ],
-      "covering_test_count": 15,
+      "covering_test_count": 16,
       "is_null": false,
       "use_limit": null,
       "watches_abilities": false,
@@ -33397,7 +33698,7 @@
         "play_time_named_discard_waitroom_fodder_cannot_enable_ten_energy_play",
         "play_time_named_discard_with_extra_unrelated_cards_still_offers_choice",
         "success_zone_stage_cost_ability_deploy_spends_at_least_base_plus_one",
-        "you_bp3_005_live_success_draw_if_fewer_revealed"
+        "you_bp3_005_live_success_trigger_is_evaluated_and_records_a_verdict"
       ],
       "covering_test_count": 23,
       "is_null": false,
@@ -34108,6 +34409,7 @@
         "sunny_branch1_1_member_triggers_draw",
         "sunny_branch1_discard_is_not_restricted_to_mus_q210",
         "sunny_branch1_no_members_does_nothing",
+        "sunny_branch1_one_member_draws_for_p1",
         "sunny_branch2_one_member_skips_b2",
         "sunny_branch2_targets_only_owners_mus_members",
         "sunny_branch2_two_mus_grants_heart",
@@ -34130,10 +34432,9 @@
         "test_bp6_live_start_same_color_deduplicates",
         "test_bp6_live_start_skip_gains_no_heart",
         "test_bp6_live_start_two_distinct_colors_gain_two_hearts",
-        "test_joint_card_has_all_three_name_identities",
-        "test_multi_name_card_matches_any_constituent_in_characters_filter"
+        "test_joint_card_has_all_three_name_identities"
       ],
-      "covering_test_count": 30,
+      "covering_test_count": 31,
       "is_null": false,
       "use_limit": 1,
       "watches_abilities": false,
@@ -34171,6 +34472,7 @@
         "sunny_branch1_1_member_triggers_draw",
         "sunny_branch1_discard_is_not_restricted_to_mus_q210",
         "sunny_branch1_no_members_does_nothing",
+        "sunny_branch1_one_member_draws_for_p1",
         "sunny_branch2_one_member_skips_b2",
         "sunny_branch2_targets_only_owners_mus_members",
         "sunny_branch2_two_mus_grants_heart",
@@ -34193,10 +34495,9 @@
         "test_bp6_live_start_same_color_deduplicates",
         "test_bp6_live_start_skip_gains_no_heart",
         "test_bp6_live_start_two_distinct_colors_gain_two_hearts",
-        "test_joint_card_has_all_three_name_identities",
-        "test_multi_name_card_matches_any_constituent_in_characters_filter"
+        "test_joint_card_has_all_three_name_identities"
       ],
-      "covering_test_count": 30,
+      "covering_test_count": 31,
       "is_null": false,
       "use_limit": null,
       "watches_abilities": false,
@@ -36168,6 +36469,7 @@
         "sunny_branch1_1_member_triggers_draw",
         "sunny_branch1_discard_is_not_restricted_to_mus_q210",
         "sunny_branch1_no_members_does_nothing",
+        "sunny_branch1_one_member_draws_for_p1",
         "sunny_branch2_one_member_skips_b2",
         "sunny_branch2_targets_only_owners_mus_members",
         "sunny_branch2_two_mus_grants_heart",
@@ -36177,7 +36479,7 @@
         "sunny_q210_joint_card_counts_as_one_member",
         "sunny_q211_joint_card_targetable_for_mus_heart"
       ],
-      "covering_test_count": 11,
+      "covering_test_count": 12,
       "is_null": false,
       "use_limit": null,
       "watches_abilities": false,
@@ -37297,16 +37599,16 @@
         "daydream_mermaid_q191_niji_in_success_pick_both",
         "live_fails_with_insufficient_hearts",
         "no_live_card_no_yell_no_success",
-        "one_energy_live_success_draw_member_in_live_zone_shrinks_deck",
-        "one_energy_live_success_draw_skip_leaves_no_pending_choice",
-        "one_energy_live_success_draw_without_granted_energy_does_not_increase_active_energy",
+        "one_energy_live_success_declined_spends_nothing_and_draws_nothing",
+        "one_energy_live_success_draw_pays_one_and_draws_one",
+        "one_energy_live_success_with_zero_energy_neither_pays_nor_draws",
         "one_player_live_auto_higher_score",
         "q147_empty_need_heart_live_succeeds",
         "q259_live_success_remains_after_constant_heart_source_is_lost",
         "rule_victory_stops_the_rest_of_check_timing",
         "shared_pool_depletion_all_fail",
         "shared_pool_four_hearts_satisfy_one_live",
-        "three_energy_live_success_draw_member_in_live_zone_shrinks_deck",
+        "three_energy_live_success_draw_pays_three_and_draws_one",
         "three_live_cards_any_fails_all_fail",
         "two_live_cards_choose_second",
         "winner_takes_one_to_success_zone"
@@ -37540,6 +37842,7 @@
         "discard_self_same_area_group_deploy_q63_ability_debut_no_cost_payment",
         "discard_self_same_area_group_deploy_q80_debut_to_vacated_area_same_turn",
         "distinct_names_gain_when_all_different",
+        "distinct_names_no_gain_when_an_area_is_empty",
         "distinct_names_no_gain_when_same_name",
         "duplicate_names_fails_distinct_condition",
         "empty_area_fails_all_areas_condition",
@@ -37547,10 +37850,9 @@
         "kanan_mill_then_debut_exact_cost_plus_two_same_area",
         "kanan_no_matching_cost_only_the_mill_happens",
         "kinako_hand_cost_minus_two_while_liella_moved",
-        "kinako_hand_cost_normal_when_liella_did_not_move",
-        "kinako_non_liella_movement_gives_no_discount"
+        "kinako_hand_cost_normal_when_liella_did_not_move"
       ],
-      "covering_test_count": 66,
+      "covering_test_count": 67,
       "is_null": false,
       "use_limit": null,
       "watches_abilities": false,
@@ -37805,7 +38107,7 @@
         "hs_bp2_001_insufficient_energy_no_recover",
         "hs_bp2_001_no_eligible_live_no_recover",
         "hs_bp2_001_pay_2e_recovers_score3_live",
-        "hs_bp2_001_skip_no_recover",
+        "hs_bp2_001_recover_is_mandatory_once_the_cost_is_paid",
         "hs_bp2_001_turn1_blocks_second",
         "one_hanamusubi_one_filler_no_reduction",
         "one_hanamusubi_two_fillers_no_reduction",
@@ -38396,12 +38698,17 @@
       "has_choice": true,
       "has_negative": true,
       "covering_files": [
+        "engine/tests/test_modules/characterization/pipeline_characterization_test.rs",
         "engine/tests/test_modules/effects/compound/cost_and_effect/optional_wait_energy_opponent_draw_pl_sp_bp5_027_l_test.rs",
         "engine/tests/test_modules/integration/multi_card/round5_seat_relative_live_success_and_live_start_cross_player_test.rs"
       ],
       "covering_tests": [
+        "blade_pipeline_unified_set_plus_additive",
+        "cross_seat_mirror_sp_bp5_027_and_s_bp7_025",
         "ginko_accept_places_then_rests_blade_gate_member",
         "ginko_decline_moves_and_rests_nothing",
+        "heart_pipeline_ordering_copy_multiplier_override_additive_agrees",
+        "heart_pipeline_three_entries_agree_with_copy_multiplier_override",
         "hot_passion_empty_energy_deck_no_prompt_no_draw",
         "hot_passion_pl_sp_bp5_027_l_accept_waited_energy_opponent_draws",
         "hot_passion_pl_sp_bp5_027_l_decline_no_energy_or_opponent_draw",
@@ -38414,9 +38721,13 @@
         "p2_owned_copy_no_bonus_when_p1_not_strictly_ahead",
         "p2_owned_ginko_targets_p1_board_from_p2_seat",
         "p2_owned_rina_mills_both_decks_from_p2_seat",
+        "q39_q34_q33_q31_q29_basic_pins",
+        "replacement_two_on_one_event_choose_order",
+        "s9_check_timing_cascade_smoke",
+        "timestamp_singleton_set_cards_pinned",
         "waited_energy_still_counts_for_comparison"
       ],
-      "covering_test_count": 15,
+      "covering_test_count": 23,
       "is_null": false,
       "use_limit": null,
       "watches_abilities": false,
@@ -39280,7 +39591,6 @@
       ],
       "covering_tests": [
         "all_areas_aqours_diff_names_gains_ability",
-        "all_three_heart_match_enters_hand_without_nonmatching_filler",
         "all_three_required_hearts_member_is_added_to_hand",
         "aquarium_live_success_aqours_hearts_score_plus_one",
         "aquarium_live_success_non_aqours_hearts_do_not_score",
@@ -39308,9 +39618,10 @@
         "debut_look_three_decline_discards_all_looked_cards",
         "debut_look_three_no_group_card_discards_all_without_pick",
         "debut_look_three_reveals_group_member_and_discards_other_cards",
+        "declining_the_look_discards_both_looked_at_cards_and_leaves_the_hand_empty",
         "dia_then_azuna_share_opponent_waitroom_and_preserve_selection_order"
       ],
-      "covering_test_count": 278,
+      "covering_test_count": 279,
       "is_null": false,
       "use_limit": 1,
       "watches_abilities": false,
@@ -44405,13 +44716,22 @@
       "has_choice": true,
       "has_negative": false,
       "covering_files": [
+        "engine/tests/test_modules/characterization/pipeline_characterization_test.rs",
         "engine/tests/test_modules/effects/choice/per_card/wait_or_draw_pl_s_bp7_025_l_test.rs"
       ],
       "covering_tests": [
+        "blade_pipeline_unified_set_plus_additive",
+        "cross_seat_mirror_sp_bp5_027_and_s_bp7_025",
+        "heart_pipeline_ordering_copy_multiplier_override_additive_agrees",
+        "heart_pipeline_three_entries_agree_with_copy_multiplier_override",
         "pl_s_bp7_025_l_choose_draw_leaves_opponent_unmodified",
-        "pl_s_bp7_025_l_choose_wait_sets_delayed_activation_blocks"
+        "pl_s_bp7_025_l_choose_wait_sets_delayed_activation_blocks",
+        "q39_q34_q33_q31_q29_basic_pins",
+        "replacement_two_on_one_event_choose_order",
+        "s9_check_timing_cascade_smoke",
+        "timestamp_singleton_set_cards_pinned"
       ],
-      "covering_test_count": 2,
+      "covering_test_count": 10,
       "is_null": false,
       "use_limit": null,
       "watches_abilities": false,

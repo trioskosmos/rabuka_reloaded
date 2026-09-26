@@ -15,6 +15,7 @@ fn wien_constant_increases_opponent_live_cards_hearts() {
     let mut game = TestGame::new(db.clone());
 
     let wien = game.id("PL!SP-bp2-010-P");
+    game.assert_card_identity(wien, "PL!SP-bp2-010-P");
     let opponent_live = game.id("PL!-sd1-019-SD");
 
     game.state.player1.stage.stage = [-1, wien, -1];
@@ -26,10 +27,11 @@ fn wien_constant_increases_opponent_live_cards_hearts() {
         .state
         .mods
         .get_need_heart_modifier(opponent_live, HeartColor::Heart00);
-    assert!(
-        heart00_mod >= 1,
-        "Wien constant: opponent live card should have +1 heart00, got {}",
-        heart00_mod
+    // 必要ハートがheart00多くなる — EXACTLY +1 per Wien. `>= 1` also passes a
+    // double grant, which is the shape a re-run of the constant would take.
+    assert_eq!(
+        heart00_mod, 1,
+        "Wien constant: opponent live card gets exactly +1 heart00, got {heart00_mod}"
     );
 }
 
@@ -79,6 +81,12 @@ fn wien_constant_applies_to_all_opponent_live_cards() {
     let live1 = game.id("PL!-sd1-019-SD");
     let live2 = game.id("PL!-sd1-020-SD");
     let live3 = game.id("PL!-sd1-021-SD");
+    game.assert_card_identity(wien, "PL!SP-bp2-010-P");
+    // Three DIFFERENT live prints, so "all of them get it" cannot pass by
+    // matching the same card twice.
+    game.assert_distinct_card_names(live1, live2, "the three opponent lives");
+    game.assert_distinct_card_names(live1, live3, "the three opponent lives");
+    game.assert_distinct_card_names(live2, live3, "the three opponent lives");
 
     game.state.player1.stage.stage = [-1, wien, -1];
     game.state.player2.live_card_zone.cards = vec![live1, live2, live3].into();
@@ -90,11 +98,10 @@ fn wien_constant_applies_to_all_opponent_live_cards() {
             .state
             .mods
             .get_need_heart_modifier(card, HeartColor::Heart00);
-        assert!(
-            mod_val >= 1,
-            "Opponent live card {} should have +1 heart00, got {}",
-            i,
-            mod_val
+        // EXACTLY +1 each: すべてのライブカード — every one, and once each.
+        assert_eq!(
+            mod_val, 1,
+            "Opponent live card {i} should have exactly +1 heart00, got {mod_val}"
         );
     }
 }

@@ -23,6 +23,23 @@
 ///      specific placed card, not any discard card)
 use crate::helpers::*;
 
+/// 松浦果南 — the 果南 of the printed 「松浦果南」か「黒澤ダイヤ」 test.
+/// PL!S-bp7-003-R＋ and PL!S-bp3-003-R＋ are one letter apart, and both are
+/// 松浦果南, so a transposition would still pass a bare hand/waitroom
+/// assertion while quietly testing the wrong print.
+fn kanan_id(game: &mut TestGame) -> i16 {
+    let id = game.id("PL!S-bp7-003-R＋");
+    game.assert_card_identity(id, "PL!S-bp7-003-R＋");
+    id
+}
+
+/// The OTHER 果南 print used by the "don't grab the pre-existing match" test.
+fn other_kanan_id(game: &mut TestGame) -> i16 {
+    let id = game.id("PL!S-bp3-003-R＋");
+    game.assert_card_identity(id, "PL!S-bp3-003-R＋");
+    id
+}
+
 fn advance_to_live_card_set_p1(game: &mut TestGame) {
     game.pass();
     game.pass();
@@ -105,7 +122,7 @@ fn mari_bottom_kanan_added_to_hand() {
     let db = load_real_database();
     let mut game = TestGame::new(db.clone());
 
-    let kanan = game.id("PL!S-bp7-003-R＋"); // 松浦果南
+    let kanan = kanan_id(&mut game); // 松浦果南
     let bottom = setup_mari(&mut game, kanan);
     accept_optional_discard(&mut game);
 
@@ -182,7 +199,7 @@ fn mari_skip_optional_discard_moves_nothing() {
     let db = load_real_database();
     let mut game = TestGame::new(db.clone());
 
-    let kanan = game.id("PL!S-bp7-003-R＋"); // 松浦果南 (would match if discarded)
+    let kanan = kanan_id(&mut game); // 松浦果南 (would match if discarded)
     let bottom = setup_mari(&mut game, kanan);
 
     // Decline the optional discard: ["No","Yes"] → option 0.
@@ -223,7 +240,16 @@ fn mari_does_not_grab_other_discard_match() {
     let mut game = TestGame::new(db.clone());
 
     let suimire = game.id("PL!SP-bp7-004-R"); // 平安名すみれ (placed, non-matching)
-    let other_kanan = game.id("PL!S-bp3-003-R＋"); // 松浦果南 already in discard
+    let other_kanan = other_kanan_id(&mut game); // 松浦果南 already in discard
+    // The point of this edge case is that the follow-up targets the card just
+    // placed, not any matching card. That only means something if the card
+    // already in the discard really is a DIFFERENT 果南 from the named print.
+    let named_kanan = kanan_id(&mut game);
+    game.assert_same_card_name(other_kanan, named_kanan, "two 果南 prints");
+    assert_ne!(
+        other_kanan, named_kanan,
+        "the two 果南 must be separate card instances"
+    );
 
     let bottom = setup_mari_with_waitroom(&mut game, suimire, other_kanan);
     accept_optional_discard(&mut game);

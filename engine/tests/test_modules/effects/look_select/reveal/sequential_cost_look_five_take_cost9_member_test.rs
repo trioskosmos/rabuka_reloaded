@@ -1,15 +1,35 @@
 /// Tests for PL!-bp5-002-R (Ayase Eli) — sequential_cost with wait + optional discard
 use crate::helpers::*;
 
+/// The subject (PL!-bp5-002-R, cost 4) and the cost-9 look target
+/// (PL!-bp3-002-R) are both 絢瀬絵里 — the same character printed twice — and
+/// they are one bp number apart. The whole effect is 「コスト9以上のμのメンバー」,
+/// so a transposition would swap a cost-9 eligible card for a cost-4 ineligible
+/// one. Pin both prints and both costs.
+fn eli_id(game: &mut TestGame) -> i16 {
+    let id = game.id("PL!-bp5-002-R");
+    game.assert_card_identity(id, "PL!-bp5-002-R");
+    game.assert_card_cost(id, 4);
+    id
+}
+
+fn cost9_mu_member_id(game: &mut TestGame) -> i16 {
+    let id = game.id("PL!-bp3-002-R");
+    game.assert_card_identity(id, "PL!-bp3-002-R");
+    game.assert_card_cost(id, 9);
+    id
+}
+
 /// Sequential cost: put to wait (optional), discard 1 (optional) → look at 5 from deck,
 /// select cost≥9 μ's member to hand, discard rest.
 #[test]
 fn eli_bp5_sequential_wait_then_discard_works() {
     let db = load_real_database();
     let mut game = TestGame::new(db);
-    let eli = game.id("PL!-bp5-002-R");
+    let eli = eli_id(&mut game);
     let filler = game.id("PL!-sd1-010-SD");
-    let mus_high_cost = game.id("PL!-bp3-002-R"); // Eli, cost 9, μ's member
+    let mus_high_cost = cost9_mu_member_id(&mut game); // Eli, cost 9, μ's member
+    game.assert_same_card_name(mus_high_cost, eli, "both prints are 絢瀬絵里");
 
     game.state.player1.hand.cards.push(eli);
     game.state.player1.hand.cards.push(filler);
@@ -68,9 +88,9 @@ fn eli_bp5_sequential_wait_then_discard_works() {
 fn eli_bp5_skip_costs_skips_look_entirely() {
     let db = load_real_database();
     let mut game = TestGame::new(db);
-    let eli = game.id("PL!-bp5-002-R");
+    let eli = eli_id(&mut game);
     let filler = game.id("PL!-sd1-010-SD");
-    let mus_high = game.id("PL!-bp3-002-R");
+    let mus_high = cost9_mu_member_id(&mut game);
     game.state.player1.hand.cards.push(eli);
     game.state.player1.hand.cards.push(filler);
     game.give_energy(9);
@@ -103,7 +123,7 @@ fn eli_bp5_skip_costs_skips_look_entirely() {
 fn eli_bp5_no_eligible_look_discards_all() {
     let db = load_real_database();
     let mut game = TestGame::new(db);
-    let eli = game.id("PL!-bp5-002-R");
+    let eli = eli_id(&mut game);
     let filler = game.id("PL!-sd1-010-SD"); // filler is not μ's cost 9, so no eligible
     game.state.player1.hand.cards.push(eli);
     game.state.player1.hand.cards.push(filler);
@@ -130,9 +150,9 @@ fn eli_bp5_no_eligible_look_discards_all() {
 fn eli_bp5_look_select_optional_skip_keeps_hand() {
     let db = load_real_database();
     let mut game = TestGame::new(db);
-    let eli = game.id("PL!-bp5-002-R");
+    let eli = eli_id(&mut game);
     let filler = game.id("PL!-sd1-010-SD");
-    let mus_high = game.id("PL!-bp3-002-R");
+    let mus_high = cost9_mu_member_id(&mut game);
     game.state.player1.hand.cards.push(eli);
     game.state.player1.hand.cards.push(filler);
     game.give_energy(9);

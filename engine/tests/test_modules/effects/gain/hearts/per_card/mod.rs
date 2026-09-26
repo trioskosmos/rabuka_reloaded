@@ -2,7 +2,7 @@
 // Regenerated from the directory listing at compile time.
 pub mod hasunosora_live_start_waitroom_ten_heart04_gain_test;
 pub mod izumi_debut_other_heart06_member_gain_test;
-pub mod liella_baton_energy_comprehensive_edge_test;
 pub mod q127_heart_set_plus_global_test;
 pub mod rurino_debut_activate_wait_member_add_live_card_test;
 pub mod subunit_stage_count_gated_debut_heart_test;
+pub mod sumire_highest_center_cost_gains_heart03_test;

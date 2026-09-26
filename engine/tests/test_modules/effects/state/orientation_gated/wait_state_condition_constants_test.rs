@@ -38,10 +38,11 @@ fn erena_in_wait_gains_heart05() {
         .state
         .mods
         .get_heart_modifier(erena, HeartColor::Heart05);
-    assert!(
-        hc >= 1,
-        "Erena should have heart05 when in wait state, got {}",
-        hc
+    // 「このメンバーがウェイト状態であるかぎり、heart05を得る」 — one heart, and
+    // `>= 1` would also pass a double grant from two 常時 resolutions.
+    assert_eq!(
+        hc, 1,
+        "Erena in wait gains exactly one heart05, got {hc}"
     );
 }
 

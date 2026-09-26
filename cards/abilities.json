@@ -1,9 +1,9 @@
 {
   "schema": "extracted_abilities.v1",
-  "generated_at": "2026-09-25T19:24:43.528151",
+  "generated_at": "2026-09-26T13:08:46.816989",
   "generated_by": "cards/ability_extraction/extract_card_abilities.py",
   "source_file": "cards/cards.json",
-  "engine_commit": "ad74a65c",
+  "engine_commit": "fc889414",
   "parser_version": "1.0",
   "input_hash": null,
   "statistics": {
@@ -2978,7 +2978,8 @@
               "type": "comparison_condition",
               "comparison_type": "cost",
               "operator": "=",
-              "count": 8
+              "count": 8,
+              "cost_total": 8
             },
             "action": "gain_resource",
             "resource": "heart",
@@ -2994,7 +2995,8 @@
               "type": "comparison_condition",
               "comparison_type": "cost",
               "operator": "=",
-              "count": 25
+              "count": 25,
+              "cost_total": 25
             },
             "action": "gain_ability",
             "ability_gain_trigger": "常時",

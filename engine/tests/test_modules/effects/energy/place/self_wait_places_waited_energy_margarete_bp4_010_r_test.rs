@@ -91,6 +91,74 @@ fn margarete_bp4_010_r_empty_energy_deck_still_waits_self_without_placing_energy
     );
 }
 
+/// 1枚 out of the energy DECK is the deck's top card, not a choice.
+///
+/// The other four tests can't see this: their energy decks hold a single
+/// identical card, so "the one card that moved" proves nothing about WHICH
+/// card was taken. Two different energy cards can. This pins the rule that
+/// matters — your energy deck is face-down, so 1枚 resolves without a prompt
+/// and takes the top card — and would fail loudly if that ever turned into a
+/// prompt (or silently started taking a random card).
+#[test]
+fn margarete_bp4_010_r_energy_deck_pick_is_the_top_card_without_a_prompt() {
+    let db = load_real_database();
+    let mut game = TestGame::new(db);
+    let filler = game.new_id("PL!-sd1-010-SD");
+    fill_decks(&mut game, filler);
+
+    let me = game.id("PL!SP-bp4-010-R");
+    game.state.player1.stage.stage[1] = me;
+    game.give_energy(5);
+
+    // Two genuinely different energy cards in the energy DECK, in a known order.
+    let top = game.id("LL-E-001-SD");
+    let below = game.id("PL!-sd1-023-P");
+    game.assert_card_identity(top, "LL-E-001-SD");
+    game.assert_card_identity(below, "PL!-sd1-023-P");
+    game.state.player1.energy_deck.cards.clear();
+    game.state.player1.energy_deck.cards.push(top);
+    game.state.player1.energy_deck.cards.push(below);
+    let deck_before = game.state.player1.energy_deck.cards.len();
+
+    game.activate_ability(me);
+
+    assert!(
+        !game.has_pending_choice(),
+        "the energy deck is face-down: 1枚 is the top card, so there is no \
+         choice to make (a prompt here would mean a hidden zone became \
+         player-choosable)"
+    );
+    assert_eq!(
+        game.state.player1.energy_deck.cards.len(),
+        deck_before - 1,
+        "exactly one energy card left the deck"
+    );
+    let placed = *game
+        .state
+        .player1
+        .energy_zone
+        .cards
+        .last()
+        .expect("an energy card was placed into the zone");
+    assert_eq!(
+        placed, top,
+        "the card that entered the energy zone must be the deck's TOP card"
+    );
+    assert_ne!(
+        placed, below,
+        "the deeper energy card must not be the one taken"
+    );
+    assert_eq!(
+        game.state.mods.get_orientation_modifier(placed),
+        Some("wait"),
+        "the placed energy enters waited"
+    );
+    assert!(
+        game.state.player1.energy_deck.cards.contains(&below),
+        "the card below the top stayed in the energy deck"
+    );
+}
+
 /// Edge: already-wait Wien → wait-self cost unpayable → not offered, refused.
 /// This is THE self_cost threading trap: upfront validation must resolve
 /// "self" to the activating card (not gs.activating_card=None).

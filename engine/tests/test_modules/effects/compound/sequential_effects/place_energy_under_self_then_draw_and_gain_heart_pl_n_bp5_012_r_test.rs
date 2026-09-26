@@ -154,16 +154,15 @@ fn rin_activate_across_turns() {
     game.state.player2.hand.cards.push(live_card);
     game.state.player2.hand.cards.push(filler);
 
-    for _ in 0..5 {
-        game.pass();
-    } // P2 Active→Energy→Draw→Main, then LiveCardSet
+    // Walk the live by PHASE NAME. The five bare passes and the three commented
+    // ones this replaces each asserted a position by comment only; a phase
+    // gaining or losing a step would leave the comments lying and the test
+    // standing in a different window with nothing to notice.
+    game.advance_to_phase(rabuka_engine::game_state::Phase::LiveCardSetFirstAttacker);
     game.set_live_card(live_card);
-    game.pass(); // P2's LiveCardSet turn
-    game.set_live_card(live_card);
-    game.pass(); // → FirstAttackerPerformance
-    game.pass(); // → SecondAttackerPerformance
-    game.pass(); // → LiveVictoryDetermination (triggers LiveSuccess → choice)
-                 // Handle LiveSuccess under_member selection (select any available cards)
+    game.advance_to_phase(rabuka_engine::game_state::Phase::FirstAttackerPerformance);
+    game.advance_to_phase(rabuka_engine::game_state::Phase::LiveVictoryDetermination);
+    // Handle LiveSuccess under_member selection (select any available cards)
     while game.has_pending_choice() {
         game.select_indices(&[0]);
     }
@@ -213,12 +212,9 @@ fn rin_live_success_ability_triggers() {
         game.state.player2.main_deck.cards.push(filler);
     }
 
-    for _ in 0..5 {
-        game.pass();
-    }
+    game.advance_to_phase(rabuka_engine::game_state::Phase::LiveCardSetFirstAttacker);
     game.set_live_card(live_card);
-    game.pass();
-    game.pass();
+    game.advance_to_phase(rabuka_engine::game_state::Phase::FirstAttackerPerformance);
 
     game.state.player2.hand.cards.push(live_card);
     game.state.player2.hand.cards.push(filler);
@@ -232,9 +228,15 @@ fn rin_live_success_ability_triggers() {
     let energy_before = game.state.player1.energy_zone.cards.len();
     let active_before = game.state.player1.energy_zone.active_count();
 
-    game.pass();
-    game.pass();
-    game.pass();
+    // The ライブ成功時 scan runs as the live resolves; stepping to the next turn's
+    // Active phase is what guarantees every live phase has been traversed, by
+    // name, rather than by guessing how many passes that took.
+    game.advance_to_phase(rabuka_engine::game_state::Phase::Active);
+    assert_eq!(
+        game.state.current_phase,
+        rabuka_engine::game_state::Phase::Active,
+        "the whole live window must have been traversed"
+    );
     while game.has_pending_choice() {
         game.select_indices(&[]);
     }
@@ -257,9 +259,9 @@ fn rin_live_success_ability_triggers() {
         "LiveSuccess resolution must record success or failure"
     );
 
-    // If the condition was met (higher live score), the energy deck placement
-    // must have happened: (0 under + 1) = exactly 1 card added to the energy
-    // zone in WAIT state — the active count must be untouched.
+    // Whichever way the trigger resolved, the effect must match the verdict.
+    // Both branches are asserted: guarding the outcome behind `if success` meant
+    // a failing trigger checked nothing at all, and the test still passed.
     let success = game.state.rule_log.iter().any(|l| {
         l.contains("鐘 嵐珠")
             && l.contains("trigger_live_success")
@@ -271,10 +273,16 @@ fn rin_live_success_ability_triggers() {
             energy_before + 1,
             "success places exactly under_count(0)+1 energy cards"
         );
+    } else {
         assert_eq!(
-            game.state.player1.energy_zone.active_count(),
-            active_before,
-            "placed energy is in wait state: active count unchanged"
+            game.state.player1.energy_zone.cards.len(),
+            energy_before,
+            "a resolved-but-failed LiveSuccess must place NO energy card"
         );
     }
+    assert_eq!(
+        game.state.player1.energy_zone.active_count(),
+        active_before,
+        "placed energy is in wait state: active count unchanged either way"
+    );
 }

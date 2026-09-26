@@ -11,6 +11,12 @@ fn note_mermaid_two_distinct_kaleidoscore_members_score() {
     // Two different KALEIDOSCORE characters.
     let ren = game.id("PL!SP-bp1-013-PR");
     let wien = game.id("PL!SP-PR-017-PR");
+    // Card identity: 名前の異なる is the whole condition under test, and
+    // PL!SP-bp1-013-PR / PL!SP-pb1-013-PR differ only by one transposed
+    // letter, so a typo here would turn "distinct" into "duplicate".
+    game.assert_card_identity(ren, "PL!SP-bp1-013-PR");
+    game.assert_card_identity(wien, "PL!SP-PR-017-PR");
+    game.assert_distinct_card_names(ren, wien, "two different KALEIDOSCORE members");
     game.state.player1.stage.stage[0] = ren;
     game.state.player1.stage.stage[1] = wien;
 
@@ -32,7 +38,11 @@ fn note_mermaid_duplicate_kaleidoscore_names_no_score() {
 
     // Two copies of the SAME character -> not "名前の異なる".
     let ren1 = game.id("PL!SP-bp1-013-PR");
-    let ren2 = game.new_id("PL!SP-pb1-013-PR");
+    let ren2 = game.new_id("PL!SP-bp1-013-PR");
+    game.assert_card_identity(ren1, "PL!SP-bp1-013-PR");
+    game.assert_card_identity(ren2, "PL!SP-bp1-013-PR");
+    game.assert_same_card_name(ren1, ren2, "two copies of the same print");
+    assert_ne!(ren1, ren2, "the two instances must be distinct copies");
     game.state.player1.stage.stage[0] = ren1;
     game.state.player1.stage.stage[1] = ren2;
 

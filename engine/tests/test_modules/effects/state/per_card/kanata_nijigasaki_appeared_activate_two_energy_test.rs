@@ -187,9 +187,28 @@ fn use_limit_blocks_both_abilities() {
     activate_and_drain(&mut game, konata); // ab#1
     activate_and_drain(&mut game, konata); // ab#0
 
+    let active_before_third = game.state.player1.energy_zone.active_count() as i16;
     let result = game.try_activate_ability(konata);
     assert!(
         result.is_err(),
         "Third activation should fail: both abilities at use_limit"
+    );
+    // The refusal must be the use_limit, not a broken first or second
+    // activation: both slots are recorded, and the refused attempt changed
+    // nothing.
+    let turn = game.state.turn_number;
+    for ab in [0usize, 1usize] {
+        assert!(
+            game.state
+                .turn_limited_abilities_used
+                .contains_key(&(konata, ab, turn)),
+            "ab#{ab}'s use must be recorded, else the third refusal proves \
+             nothing about the limit (looked up (card={konata}, ab#{ab}, turn={turn}))"
+        );
+    }
+    game.assert_energy_untouched_after_refusal(active_before_third, "third 起動 at use_limit");
+    assert!(
+        !game.has_pending_choice(),
+        "a use-limit refusal must not open a prompt"
     );
 }

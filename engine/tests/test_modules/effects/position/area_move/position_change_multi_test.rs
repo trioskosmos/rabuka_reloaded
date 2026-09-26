@@ -6,13 +6,30 @@
 /// Cost: 15, Blade: 4
 use crate::helpers::*;
 
+/// 藤島 慈 PL!HS-bp2-006-R (登場 それぞれポジションチェンジ).
+/// The card number is one letter from PL!HS-pb1-006-R (安養寺姫芽, a different
+/// card with a completely different ability), so every use pins the print.
+fn chii_id(game: &mut TestGame) -> i16 {
+    let id = game.id("PL!HS-bp2-006-R");
+    game.assert_card_identity(id, "PL!HS-bp2-006-R");
+    id
+}
+
+/// 安養寺姫芽 PL!HS-pb1-006-R (ライブ開始時 グループ指定のポジションチェンジ).
+/// Sibling-transposition guard against 藤島 慈 above.
+fn himeno_id(game: &mut TestGame) -> i16 {
+    let id = game.id("PL!HS-pb1-006-R");
+    game.assert_card_identity(id, "PL!HS-pb1-006-R");
+    id
+}
+
 /// 3 members on stage (2 existing + 慈), 3 sequential choices, all moved.
 #[test]
 fn position_change_three_members_all_move() {
     let db = load_real_database();
     let mut game = TestGame::new(db.clone());
 
-    let chii = game.id("PL!HS-bp2-006-R");
+    let chii = chii_id(&mut game);
     let a = game.new_id("PL!-sd1-013-SD");
     let b = game.new_id("PL!-sd1-013-SD");
 
@@ -51,7 +68,7 @@ fn position_change_two_members() {
     let db = load_real_database();
     let mut game = TestGame::new(db.clone());
 
-    let chii = game.id("PL!HS-bp2-006-R");
+    let chii = chii_id(&mut game);
     let a = game.new_id("PL!-sd1-013-SD");
     let b = game.new_id("PL!-sd1-013-SD");
 
@@ -85,7 +102,7 @@ fn position_change_one_member() {
     let db = load_real_database();
     let mut game = TestGame::new(db.clone());
 
-    let chii = game.id("PL!HS-bp2-006-R");
+    let chii = chii_id(&mut game);
     let a = game.new_id("PL!-sd1-013-SD");
 
     game.state.player1.stage.stage = [a, -1, -1];
@@ -112,7 +129,7 @@ fn position_change_no_other_members() {
     let db = load_real_database();
     let mut game = TestGame::new(db.clone());
 
-    let chii = game.id("PL!HS-bp2-006-R");
+    let chii = chii_id(&mut game);
 
     game.state.player1.stage.stage = [-1, -1, -1];
     game.state.player1.hand.cards.push(chii);
@@ -170,7 +187,7 @@ fn position_change_with_swap() {
     let db = load_real_database();
     let mut game = TestGame::new(db.clone());
 
-    let chii = game.id("PL!HS-bp2-006-R");
+    let chii = chii_id(&mut game);
     let a = game.new_id("PL!-sd1-013-SD");
     let b = game.new_id("PL!-sd1-013-SD");
 
@@ -210,7 +227,7 @@ fn position_change_skip_optional() {
     let db = load_real_database();
     let mut game = TestGame::new(db.clone());
 
-    let chii = game.id("PL!HS-bp2-006-R");
+    let chii = chii_id(&mut game);
     let a = game.new_id("PL!-sd1-013-SD");
     let b = game.new_id("PL!-sd1-013-SD");
 
@@ -249,7 +266,7 @@ fn position_change_filters_by_group_names() {
     let db = load_real_database();
     let mut game = TestGame::new(db.clone());
 
-    let himeno = game.id("PL!HS-pb1-006-R");
+    let himeno = himeno_id(&mut game);
     let member_same = game.id("PL!HS-sd1-014-SD"); // みらくらぱーく！ member
     let member_other = game.id("PL!-sd1-010-SD"); // non-group filler
 
@@ -336,7 +353,7 @@ fn position_change_group_names_excludes_self() {
     let db = load_real_database();
     let mut game = TestGame::new(db.clone());
 
-    let himeno = game.id("PL!HS-pb1-006-R");
+    let himeno = himeno_id(&mut game);
     let member_same_a = game.id("PL!HS-sd1-014-SD"); // みらくらぱーく！ member (cost 9)
     let member_same_b = game.id("PL!HS-sd1-006-SD"); // みらくらぱーく！ member (cost 15)
 
@@ -414,7 +431,7 @@ fn position_change_skip_when_no_valid_destinations() {
     let db = load_real_database();
     let mut game = TestGame::new(db.clone());
 
-    let himeno = game.id("PL!HS-pb1-006-R");
+    let himeno = himeno_id(&mut game);
     let member_other = game.id("PL!-sd1-010-SD"); // non-group filler
 
     // Stage has only non-group members
@@ -477,7 +494,7 @@ fn position_change_tracks_card_movement() {
     let db = load_real_database();
     let mut game = TestGame::new(db.clone());
 
-    let chii = game.id("PL!HS-bp2-006-R");
+    let chii = chii_id(&mut game);
     let a = game.new_id("PL!-sd1-013-SD");
     let b = game.new_id("PL!-sd1-013-SD");
 

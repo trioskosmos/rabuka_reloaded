@@ -47,6 +47,13 @@ fn appearance_and_three_swaps_stack_eight_blades() {
 
     let kinako_watcher = game.id("PL!SP-pb1-006-R");
     let kinako_mover = game.id("PL!SP-bp5-006-R");
+    // These are two PRINTINGS OF THE SAME CHARACTER (both 桜小路きな子) — the
+    // watcher uses the 自動 debut/move ability, the mover the 起動 swap, and
+    // the stack only reads as "+2 per event" if the two really are two cards.
+    game.assert_card_identity(kinako_watcher, "PL!SP-pb1-006-R");
+    game.assert_card_identity(kinako_mover, "PL!SP-bp5-006-R");
+    game.assert_same_card_name(kinako_watcher, kinako_mover, "two きな子 printings");
+    assert_ne!(kinako_watcher, kinako_mover, "two separate card instances");
     fill_deck_and_energy(&mut game);
 
     // Place both directly, but trigger appearance for watcher

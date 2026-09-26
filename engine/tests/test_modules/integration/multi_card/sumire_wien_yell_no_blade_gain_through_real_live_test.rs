@@ -102,6 +102,80 @@ fn setup_game_with_deck_top(deck_top: &[&str]) -> (TestGame, i16, i16) {
     (game, sumire, wien)
 }
 
+/// Dump the state that explains a failed live-yell expectation. Kept as one
+/// helper so the test body reads as behaviour, not as a debugging session, and
+/// so the next failure in this area prints the same thing.
+fn dump_live_diagnostics(game: &mut TestGame, sumire: i16, wien: i16) {
+    eprintln!("rule_log: {:?}", game.state.rule_log);
+    eprintln!(
+        "revealed: {:?}",
+        game.state
+            .revealed_cards
+            .iter()
+            .map(|id| game.name(*id))
+            .collect::<Vec<_>>()
+    );
+    for &id in &game.state.revealed_cards {
+        let card = game.db.get_card(id).unwrap();
+        eprintln!(
+            "revealed id {} {} has_blade_heart={} blade_heart={:?} blade={}",
+            id,
+            card.card_no,
+            card.has_blade_heart(),
+            card.blade_heart,
+            card.blade
+        );
+    }
+    eprintln!("yell_occurred: {}", game.state.yell_occurred);
+    eprintln!(
+        "live_zone: {:?}",
+        game.state
+            .player1
+            .live_card_zone
+            .cards
+            .iter()
+            .map(|id| game.name(*id))
+            .collect::<Vec<_>>()
+    );
+    eprintln!(
+        "stage: {:?}",
+        game.state
+            .player1
+            .stage
+            .stage
+            .iter()
+            .map(|id| {
+                if *id == -1 {
+                    "empty".to_string()
+                } else {
+                    game.name(*id)
+                }
+            })
+            .collect::<Vec<_>>()
+    );
+    eprintln!("deck len: {}", game.state.player1.main_deck.cards.len());
+    eprintln!("phase: {}", game.state.current_phase);
+    eprintln!(
+        "player1 wait: {:?}",
+        game.state
+            .player1
+            .waitroom
+            .cards
+            .iter()
+            .map(|id| game.name(*id))
+            .collect::<Vec<_>>()
+    );
+    eprintln!(
+        "mods heart06 sumire: {} heart03 wien: {}",
+        heart06(game, sumire),
+        heart03(game, wien)
+    );
+    eprintln!(
+        "{}",
+        crate::helpers::ability_verdicts(game, "p1")
+    );
+}
+
 /// Real live yell with 3 no-blade cards → both Sumire and Wien gain.
 #[test]
 fn yell_proper_no_blade_gains_via_live() {
@@ -114,9 +188,15 @@ fn yell_proper_no_blade_gains_via_live() {
         &game.state.mods.orientation_modifiers,
         false,
     );
-    eprintln!("pre-live total_blade={} stage={:?}", tb, game.state.player1.stage.stage);
-    eprintln!("pre-live hearts stage available: {:?}", game.state.player1.stage.get_available_hearts(&game.db, &game.state.mods.heart_override, &game.state.mods.heart_modifiers, &game.state.mods.heart_color_multiplier, &game.state.mods.heart_copy));
-    eprintln!("live need: {:?}", game.db.get_card(live).unwrap().need_heart);
+    // The whole test is "3 no-blade cards → yell reveals exactly 3", so the
+    // reveal count IS the total blade count. Pin it instead of printing it.
+    assert_eq!(
+        tb, 3,
+        "setup guard: total_blade must be 3 so the yell reveals 3 cards \
+         (stage {:?}, live need {:?})",
+        game.state.player1.stage.stage,
+        game.db.get_card(live).map(|c| c.need_heart.clone())
+    );
     set_live_via_phase(&mut game, live);
 
     // After performance, yell occurred and autos resolved.
@@ -124,22 +204,8 @@ fn yell_proper_no_blade_gains_via_live() {
     while game.has_pending_choice() {
         game.select_indices(&[]);
     }
-    // Debug verdicts on failure
     if heart06(&game, sumire) != 1 || heart03(&game, wien) != 1 {
-        eprintln!("rule_log: {:?}", game.state.rule_log);
-        eprintln!("revealed: {:?}", game.state.revealed_cards.iter().map(|id| game.name(*id)).collect::<Vec<_>>());
-        for &id in &game.state.revealed_cards {
-            let card = game.db.get_card(id).unwrap();
-            eprintln!("revealed id {} {} has_blade_heart={} blade_heart={:?} blade={}", id, card.card_no, card.has_blade_heart(), card.blade_heart, card.blade);
-        }
-        eprintln!("yell_occurred: {}", game.state.yell_occurred);
-        eprintln!("live_zone: {:?}", game.state.player1.live_card_zone.cards.iter().map(|id| game.name(*id)).collect::<Vec<_>>());
-        eprintln!("stage: {:?}", game.state.player1.stage.stage.iter().map(|id| if *id==-1 {"empty".to_string()} else {game.name(*id)}).collect::<Vec<_>>());
-        eprintln!("deck len: {}", game.state.player1.main_deck.cards.len());
-        eprintln!("phase: {}", game.state.current_phase);
-        eprintln!("player1 wait: {:?}", game.state.player1.waitroom.cards.iter().map(|id| game.name(*id)).collect::<Vec<_>>());
-        eprintln!("mods heart06 sumire: {} heart03 wien: {}", heart06(&game, sumire), heart03(&game, wien));
-        eprintln!("{}", crate::helpers::ability_verdicts(&mut game, "p1"));
+        dump_live_diagnostics(&mut game, sumire, wien);
     }
     // One more pass to reach LiveVictoryDetermination / cleanup if needed
     // Blade heart absence should have triggered both autos (Turn1)

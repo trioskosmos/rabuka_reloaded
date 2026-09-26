@@ -66,5 +66,15 @@ fn miyashita_insufficient_energy_cannot_play() {
     for _ in 0..5 { game.state.player1.main_deck.cards.push(filler); }
     game.state.player1.stage.stage = [-1, -1, -1];
     let res = game.try_play_to_stage(miya, MemberArea::Center);
-    assert!(res.is_err());
+    assert!(res.is_err(), "cannot afford 宮下 after her cost reduction");
+    game.assert_energy_untouched_after_refusal(1, "insufficient energy to play 宮下");
+    assert!(
+        game.state.player1.hand.cards.contains(&miya),
+        "a refused play leaves the card in hand"
+    );
+    assert_eq!(
+        game.state.player1.stage.stage,
+        [-1, -1, -1],
+        "a refused play must leave the stage empty"
+    );
 }

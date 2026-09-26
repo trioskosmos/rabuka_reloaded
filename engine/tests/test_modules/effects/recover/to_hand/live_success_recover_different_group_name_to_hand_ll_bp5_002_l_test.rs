@@ -182,9 +182,36 @@ fn center_empty_no_effect() {
         game.select_indices(&[]);
     }
 
-    assert!(
-        game.state.mods.heart_modifiers.get(&(-1)).is_none(),
-        "Empty center should not get hearts"
+    // "Empty center → no effect" means NOBODY gained a heart, not that the
+    // sentinel id -1 has no modifier. The old assertion keyed on -1, which is
+    // never a modifier key and so passed whatever the engine did — it would
+    // have passed with the effect firing.
+    for &cid in game.state.player1.stage.stage.iter() {
+        if cid == -1 {
+            continue;
+        }
+        let hearts: Vec<HeartColor> = vec![
+            HeartColor::Heart00,
+            HeartColor::Heart01,
+            HeartColor::Heart02,
+            HeartColor::Heart03,
+            HeartColor::Heart04,
+            HeartColor::Heart05,
+            HeartColor::Heart06,
+        ];
+        let gained: Vec<HeartColor> = hearts
+            .into_iter()
+            .filter(|h| game.state.mods.get_heart_modifier(cid, *h) != 0)
+            .collect();
+        assert!(
+            gained.is_empty(),
+            "Empty center should not get hearts, but card {cid} gained {gained:?}"
+        );
+    }
+    assert_eq!(
+        game.state.player1.stage.stage[1],
+        -1,
+        "setup guard: the center area really is empty"
     );
 }
 
@@ -209,10 +236,26 @@ fn multi_name_card_single_slot_one_group_not_three() {
         game.select_indices(&[]);
     }
 
-    // Q105: one multi-name card = one group → 3-group condition fails
+    // Q105: one multi-name card = one group → 3-group condition fails.
+    // `is_none()` on a HashMap entry only proves no ENTRY exists; a zero-valued
+    // entry for every heart would pass it while the effect had fired. Check the
+    // granted amount instead.
+    let gained: Vec<HeartColor> = [
+        HeartColor::Heart00,
+        HeartColor::Heart01,
+        HeartColor::Heart02,
+        HeartColor::Heart03,
+        HeartColor::Heart04,
+        HeartColor::Heart05,
+        HeartColor::Heart06,
+    ]
+    .into_iter()
+    .filter(|h| game.state.mods.get_heart_modifier(multi, *h) != 0)
+    .collect();
     assert!(
-        game.state.mods.heart_modifiers.get(&multi).is_none(),
-        "Single multi-name card (1 group) should NOT satisfy 3-group condition"
+        gained.is_empty(),
+        "Single multi-name card (1 group) should NOT satisfy 3-group condition, \
+         but the center member gained {gained:?}"
     );
 }
 

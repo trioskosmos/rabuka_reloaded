@@ -124,6 +124,12 @@ fn distortion_three_distinct_catchu_reduces_and_scores() {
         "PL!SP-bp1-015-N", // 平安名すみれ
         "PL!SP-bp1-018-N", // 米女メイ
     ]);
+    // 名前の異なる is what makes per-unit=3, and these numbers are one letter
+    // apart from the bp2/bp4 prints of the same characters.
+    let names: Vec<i16> = game.state.player1.stage.stage[..3].to_vec();
+    game.assert_distinct_card_names(names[0], names[1], "CatChu per-unit 3");
+    game.assert_distinct_card_names(names[0], names[2], "CatChu per-unit 3");
+    game.assert_distinct_card_names(names[1], names[2], "CatChu per-unit 3");
     let before_h00 = need_heart(&game, live, HeartColor::Heart00);
     let before_h02 = need_heart(&game, live, HeartColor::Heart02);
     assert_eq!(before_h00, 9, "base heart00=9");
@@ -175,6 +181,16 @@ fn distortion_duplicate_names_dedupe() {
         "PL!SP-bp1-012-N", // kanon
         "PL!SP-bp4-012-N", // kanon again (different card, same name)
     ]);
+    // The dedupe only means something because these are two DIFFERENT prints
+    // that SHARE a name. Same print twice would pass for the wrong reason, and
+    // a transposed bp1/bp4 would make them different names instead.
+    game.assert_card_identity(game.state.player1.stage.stage[0], "PL!SP-bp1-012-N");
+    game.assert_card_identity(game.state.player1.stage.stage[1], "PL!SP-bp4-012-N");
+    game.assert_same_card_name(
+        game.state.player1.stage.stage[0],
+        game.state.player1.stage.stage[1],
+        "two prints of kanon",
+    );
     advance_to_live_card_set_p1(&mut game);
     advance_to_live_start(&mut game);
     while game.has_pending_choice() {

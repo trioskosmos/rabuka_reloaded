@@ -1,12 +1,24 @@
-/// STRICT expected-fail tests — no slop. These assert CORRECT behavior per card text.
-/// They WILL FAIL on current engine/parser, documenting the bugs found during comprehensive edge hardening.
-/// Do not "fix" them by loosening the asserts; fix engine/parser instead.
+/// STRICT behaviour tests — no slop. Each asserts the CORRECT behaviour per
+/// card text, with no tolerance for the value the engine used to produce.
+///
+/// These were written as expected-FAIL pins during comprehensive edge hardening:
+/// each one documented a real engine or parser bug, asserted the printed value,
+/// and failed. Every bug they name has since been fixed, so all ten now PASS and
+/// they have become regression pins for behaviour that was once wrong.
+///
+/// The old header said "They WILL FAIL on current engine/parser ... Do not 'fix'
+/// them by loosening the asserts; fix engine/parser instead." That was stale in
+/// the dangerous direction: it told the next reader these were known-broken, so
+/// a genuine future regression would be dismissed as expected. If one of these
+/// fails now, the ENGINE is wrong, not the assert — the per-section comments
+/// below still name the value the engine used to return.
 use crate::helpers::*;
 use rabuka_engine::card::HeartColor;
 use rabuka_engine::zones::MemberArea;
 
 // ---------------------------------------------------------------------------
-// PB1-007 idx344: cost should be 3 - success_count (clamped 0). Engine currently stays 3.
+// PB1-007 idx344: cost should be 3 - success_count (clamped 0). The engine used
+// to stay at 3 regardless of how many success cards were on the field.
 // ---------------------------------------------------------------------------
 fn setup_pb1007_with_success(n: usize) -> (TestGame, i16) {
     let db = load_real_database();
@@ -56,7 +68,7 @@ fn strict_pb1007_cost_0_with_3_success() {
 }
 
 // ---------------------------------------------------------------------------
-// PR045 idx560: only cost7 baton should draw. Engine currently draws for any cost.
+// PR045 idx560: only a cost-7 baton draws. The engine used to draw for any cost.
 // ---------------------------------------------------------------------------
 fn try_baton_strict(replaced_no: &str) -> bool {
     let db = load_real_database();
@@ -97,7 +109,7 @@ fn strict_pr045_cost4_should_not_draw() {
 }
 
 // ---------------------------------------------------------------------------
-// Keke idx485: 1 Liella under -> cost +1. Engine gives 0.
+// Keke idx485: 1 Liella under -> cost +1. The engine used to give 0.
 // ---------------------------------------------------------------------------
 #[test]
 fn strict_keke_1_liella_cost_plus1() {
@@ -128,7 +140,8 @@ fn strict_keke_2_liella_cost_plus2() {
 }
 
 // ---------------------------------------------------------------------------
-// Joint Sumire+Wien no-blade yell: both should gain. Engine currently gives 0 for Sumire when Wien present (or vice versa).
+// Joint Sumire+Wien no-blade yell: both should gain. The engine used to give 0
+// for Sumire when Wien was on the field (or vice versa).
 // ---------------------------------------------------------------------------
 #[test]
 fn strict_joint_sumire_wien_both_gain_no_blade() {

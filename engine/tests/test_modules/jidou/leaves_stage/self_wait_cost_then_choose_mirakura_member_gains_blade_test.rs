@@ -54,6 +54,22 @@ fn hs_cl1_turn_limit_blocks_second() {
         None,
     )
     .unwrap();
+    // The first activation must really have happened, or a second refusal
+    // proves nothing about the ターン1回 limit.
+    let turn = game.state.turn_number;
+    assert!(
+        game.state
+            .turn_limited_abilities_used
+            .contains_key(&(card, 0, turn)),
+        "the first activation must record its ターン1回 use (card={card}, \
+         ab#0, turn={turn})"
+    );
+    let blade_after_first = game.state.mods.get_blade_modifier(card);
+    let wait_after_first: Option<String> = game
+        .state
+        .mods
+        .get_orientation_modifier(card)
+        .map(|m| m.to_string());
     // Second same turn should be blocked
     let res = TurnEngine::execute_main_phase_action(
         &mut game.state,
@@ -64,6 +80,26 @@ fn hs_cl1_turn_limit_blocks_second() {
         None,
     );
     assert!(res.is_err(), "ターン1回 should block second activation, got {:?}", res);
+    // A refused attempt must leave the card exactly as the first one left it:
+    // no second wait, no second blade, no dangling prompt.
+    let wait_now: Option<String> = game
+        .state
+        .mods
+        .get_orientation_modifier(card)
+        .map(|m| m.to_string());
+    assert_eq!(
+        wait_now, wait_after_first,
+        "a ターン1回 refusal must not wait the member a second time"
+    );
+    assert_eq!(
+        game.state.mods.get_blade_modifier(card),
+        blade_after_first,
+        "a ターン1回 refusal must not grant a second blade"
+    );
+    assert!(
+        !game.has_pending_choice(),
+        "a ターン1回 refusal must not open a prompt"
+    );
 }
 
 #[test]

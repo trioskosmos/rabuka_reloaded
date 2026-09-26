@@ -3,7 +3,6 @@
 pub mod aqours_bottom_pl_s_bp7_019_l_test;
 pub mod both_waitrooms_member_restore_threshold_q242_test;
 pub mod clean_members_energy_pl_n_bp7_008_r_test;
-pub mod live_start_optional_two_member_bottomdeck_test;
 pub mod live_start_two_cards_optional_group_live_topdeck_gain_hearts_test;
 pub mod optional_waitroom_to_deck_top_test;
 pub mod recover_and_order_opponent_bottom_test;

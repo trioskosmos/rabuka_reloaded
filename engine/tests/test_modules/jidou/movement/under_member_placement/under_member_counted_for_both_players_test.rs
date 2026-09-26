@@ -23,7 +23,13 @@ fn pb2_kinako_under_member_both_players() {
     // P1
     let p1_kinako = game.id("PL!SP-pb2-006-R");
     let p1_chisato = game.id("PL!SP-pb2-025-N");
-    let p1_liella = game.id("PL!SP-pb1-006-R");
+    // PL!SP-pb1-006-R — the obvious pick for "a Liella! member" — also prints
+    // 桜小路きな子, i.e. a second copy of the member doing the tucking. 嵐 千砂都
+    // is a genuinely different 『Liella!』 member. Pins catch any regression.
+    let p1_liella = game.id("PL!SP-pb1-014-N");
+    game.assert_card_identity(p1_kinako, "PL!SP-pb2-006-R");
+    game.assert_card_identity(p1_liella, "PL!SP-pb1-014-N");
+    game.assert_distinct_card_names(p1_kinako, p1_liella, "きな子 and the member under her");
 
     game.state.player1.stage.stage[0] = p1_kinako;
     game.state.player1.waitroom.cards.push(p1_liella);
@@ -50,7 +56,9 @@ fn pb2_kinako_under_member_both_players() {
     // P2's turn
     let p2_kinako = game.id("PL!SP-pb2-006-R");
     let p2_chisato = game.id("PL!SP-pb2-025-N");
-    let p2_liella = game.id("PL!SP-pb1-006-R");
+    let p2_liella = game.id("PL!SP-pb1-014-N");
+    game.assert_card_identity(p2_kinako, "PL!SP-pb2-006-R");
+    game.assert_card_identity(p2_liella, "PL!SP-pb1-014-N");
 
     game.state.player2.stage.stage[0] = p2_kinako;
     game.state.player2.waitroom.cards.push(p2_liella);

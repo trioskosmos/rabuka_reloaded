@@ -86,6 +86,14 @@ fn aoku_haruka_live_start_scores_with_aurora_in_discard() {
     let aurora = game.id("PL!HS-bp5-018-L");
     let holiday = game.id("PL!HS-bp1-021-L"); // Holiday∞Holiday (スリーズブーケ live)
     let kagayaku = game.id("PL!HS-bp2-021-L"); // 眩耀夜行 (スリーズブーケ live)
+    // The premise is "2 static スリーズブーケ live cards + AURORA FLOWER = 3",
+    // so both live prints must be real and be two DIFFERENT cards — they are
+    // one letter apart (bp1-021 vs bp2-021) and both are スリーズブーケ, which
+    // is exactly the shape a transposition would hide.
+    game.assert_card_identity(aurora, "PL!HS-bp5-018-L");
+    game.assert_card_identity(holiday, "PL!HS-bp1-021-L");
+    game.assert_card_identity(kagayaku, "PL!HS-bp2-021-L");
+    game.assert_distinct_card_names(holiday, kagayaku, "the two static スリーズブーケ lives");
     let filler = game.id("PL!-sd1-010-SD");
 
     game.state.player1.hand.cards.push(aoku);

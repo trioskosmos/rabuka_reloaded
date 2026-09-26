@@ -52,9 +52,15 @@ fn setup_bellas(game: &mut TestGame, keep_second: bool) -> i16 {
     bella1
 }
 
-/// Pass+drain through the live phase into the first normal-phase passes
-/// after the rollover — that is where the placement(s) land. Stops once
-/// `want` energies are observed (or the window closes).
+/// Pass+drain until `want` energies have been placed, and fail loudly if the
+/// window never arrives.
+///
+/// The loop used to `break` only when the count was reached AND the phase was
+/// `FirstAttackerNormal` — a condition that never held, because the placements
+/// land while the turn phase is still `Live`. So it always ran out of its 14
+/// iterations and fell through silently, leaving the caller's count assertion to
+/// be the only thing standing between a pass and a real failure. The phase check
+/// is gone for that reason; the count is the actual condition.
 fn drive_past_placement(game: &mut TestGame, want: usize) {
     for _ in 0..14 {
         if !game.has_pending_choice() {
@@ -64,14 +70,17 @@ fn drive_past_placement(game: &mut TestGame, want: usize) {
             continue;
         }
         drain_auto_prompts(game);
-        // Placements land in the first post-rollover window.
-        if game.state.player1.energy_zone.cards.len() >= want
-            && game.state.current_turn_phase
-                == rabuka_engine::game_state::TurnPhase::FirstAttackerNormal
-        {
-            break;
+        if game.state.player1.energy_zone.cards.len() >= want {
+            return;
         }
     }
+    panic!(
+        "the placement window was never reached: zone has {} of the {} expected \
+         energies, phase is {:?}",
+        game.state.player1.energy_zone.cards.len(),
+        want,
+        game.state.current_turn_phase
+    );
 }
 
 #[test]
@@ -80,9 +89,8 @@ fn bella_q173_two_lives_succeed_both_trigger_waited_placement() {
     let mut game = TestGame::new(db);
     setup_bellas(&mut game, true);
 
-    for _ in 0..5 {
-        game.pass();
-    }
+    // Step to the live-card-set window BY NAME rather than by a fixed pass count.
+    game.advance_to_phase(rabuka_engine::game_state::Phase::LiveCardSetFirstAttacker);
     // BOTH lives are set back-to-back in P1's own LiveCardSet window
     // (both Bellas sit in P1's hand).
     let h0 = game.state.player1.hand.cards[0];
@@ -117,9 +125,8 @@ fn bella_q173_single_life_places_single_waited_energy() {
     let mut game = TestGame::new(db);
     setup_bellas(&mut game, false); // ONE life → ONE trigger
 
-    for _ in 0..5 {
-        game.pass();
-    }
+    // Step to the live-card-set window BY NAME rather than by a fixed pass count.
+    game.advance_to_phase(rabuka_engine::game_state::Phase::LiveCardSetFirstAttacker);
     game.set_live_card(game.state.player1.hand.cards[0]);
     drive_past_placement(&mut game, 1);
 

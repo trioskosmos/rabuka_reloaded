@@ -16,10 +16,31 @@
 ///
 /// - PL!-bp4-005-R＋ (星空凛 ab#2): ライブ開始時 ...このメンバーはセンターエリア以外にポジションチェンジする。
 ///   → position_change with exclude_position=center AND exclude_self=true
-///
-/// - PL!HS-bp2-006-R (藤島慈 ab#0): 登場 自分のステージにいるメンバーを、それぞれ好きなエリアに移動させてもよい。
 ///   → formation change (multiple_targets) — NOT affected by exclude_self
 use crate::helpers::*;
+
+/// 桜小路きな子 PL!SP-bp5-006-R. Pinned because PL!SP-pb1-006-R and
+/// PL!SP-pb2-006-R are two MORE printings of the same character (costs 9 and 2).
+fn kinako_id(game: &mut TestGame) -> i16 {
+    let id = game.id("PL!SP-bp5-006-R");
+    game.assert_card_identity(id, "PL!SP-bp5-006-R");
+    id
+}
+
+/// 藤島慈 PL!HS-bp2-006-R ab#0 (登場 それぞれ好きなエリアに移動) — one letter from
+/// PL!HS-pb1-006-R (安養寺姫芽), a different card.
+fn chii_id(game: &mut TestGame) -> i16 {
+    let id = game.id("PL!HS-bp2-006-R");
+    game.assert_card_identity(id, "PL!HS-bp2-006-R");
+    id
+}
+
+/// 安養寺姫芽 PL!HS-pb1-006-R.
+fn himeno_id(game: &mut TestGame) -> i16 {
+    let id = game.id("PL!HS-pb1-006-R");
+    game.assert_card_identity(id, "PL!HS-pb1-006-R");
+    id
+}
 
 fn fill_deck_and_energy(game: &mut TestGame) {
     let filler = game.id("PL!-sd1-010-SD");
@@ -56,7 +77,7 @@ fn non_optional_pc_excludes_self_from_center() {
     let db = load_real_database();
     let mut game = TestGame::new(db);
 
-    let kinako = game.id("PL!SP-bp5-006-R");
+    let kinako = kinako_id(&mut game);
     fill_deck_and_energy(&mut game);
 
     // Place きな子 at center
@@ -95,7 +116,7 @@ fn non_optional_pc_excludes_self_from_left() {
     let db = load_real_database();
     let mut game = TestGame::new(db);
 
-    let kinako = game.id("PL!SP-bp5-006-R");
+    let kinako = kinako_id(&mut game);
     fill_deck_and_energy(&mut game);
 
     // Place きな子 at left
@@ -134,7 +155,7 @@ fn non_optional_pc_excludes_self_from_right() {
     let db = load_real_database();
     let mut game = TestGame::new(db);
 
-    let kinako = game.id("PL!SP-bp5-006-R");
+    let kinako = kinako_id(&mut game);
     fill_deck_and_energy(&mut game);
 
     // Place きな子 at right
@@ -176,7 +197,7 @@ fn non_optional_pc_executes_move_correctly() {
     let db = load_real_database();
     let mut game = TestGame::new(db);
 
-    let kinako = game.id("PL!SP-bp5-006-R");
+    let kinako = kinako_id(&mut game);
     let filler = game.id("PL!-sd1-010-SD");
     fill_deck_and_energy(&mut game);
 
@@ -233,14 +254,13 @@ fn exclude_position_center_not_offered() {
     game.state.player1.stage.stage = [filler, rin, -1];
     game.add_to_hand(rin); // for live card set
 
-    // Advance through phases to LiveStart
-    for _ in 0..5 {
-        game.pass();
-    }
+    // Advance to LiveStart BY NAME. The five blind passes plus the two commented
+    // ones this replaces were correct only while the phase sequence was frozen.
+    game.advance_to_phase(rabuka_engine::game_state::Phase::LiveCardSetFirstAttacker);
     // Now at LiveCardSetFirstAttacker — set a live card
     game.set_live_card(rin);
-    game.pass(); // LiveCardSetP2
-    game.pass(); // LiveStart — triggers fire
+    // Second-attacker set window, then the phase where ライブ開始時 triggers fire.
+    game.advance_to_phase(rabuka_engine::game_state::Phase::FirstAttackerPerformance);
 
     // Drain auto ability choices until the position change choice appears
     let mut found_position_choice = false;
@@ -323,12 +343,9 @@ fn exclude_position_and_exclude_self_combine_correctly() {
     game.add_to_hand(rin);
 
     // Advance to LiveStart
-    for _ in 0..5 {
-        game.pass();
-    }
+    game.advance_to_phase(rabuka_engine::game_state::Phase::LiveCardSetFirstAttacker);
     game.set_live_card(rin);
-    game.pass();
-    game.pass();
+    game.advance_to_phase(rabuka_engine::game_state::Phase::FirstAttackerPerformance);
 
     let mut found_position_choice = false;
     let mut positions: Vec<String> = Vec::new();
@@ -402,7 +419,7 @@ fn non_optional_pc_with_all_positions_excluded_fizzles() {
     let db = load_real_database();
     let mut game = TestGame::new(db);
 
-    let kinako = game.id("PL!SP-bp5-006-R");
+    let kinako = kinako_id(&mut game);
     fill_deck_and_energy(&mut game);
 
     // Only きな子 on stage
@@ -447,7 +464,7 @@ fn formation_change_still_offers_all_positions() {
     let db = load_real_database();
     let mut game = TestGame::new(db);
 
-    let chii = game.id("PL!HS-bp2-006-R");
+    let chii = chii_id(&mut game);
     let filler = game.new_id("PL!-sd1-013-SD");
 
     game.state.player1.stage.stage = [filler, -1, -1];
@@ -495,7 +512,7 @@ fn optional_pc_excludes_self_but_can_skip() {
     // Use 安養寺姫芽 which has an optional position_change with group filter
     // "自分のステージにいる他の『みらくらぱーく！』のメンバーがいるエリアにポジションチェンジしてもよい"
     // This has exclude_self=true AND group_names=[みらくらぱーく！] AND optional=true
-    let himeno = game.id("PL!HS-pb1-006-R");
+    let himeno = himeno_id(&mut game);
     let filler = game.id("PL!-sd1-010-SD");
 
     // Fill deck for phase transitions
@@ -510,12 +527,9 @@ fn optional_pc_excludes_self_but_can_skip() {
     game.add_to_hand(himeno);
 
     // Advance to LiveStart to trigger 姫芽's ability
-    for _ in 0..5 {
-        game.pass();
-    }
+    game.advance_to_phase(rabuka_engine::game_state::Phase::LiveCardSetFirstAttacker);
     game.set_live_card(himeno);
-    game.pass();
-    game.pass();
+    game.advance_to_phase(rabuka_engine::game_state::Phase::FirstAttackerPerformance);
 
     // Drain auto ability choices until optional position choice or skip
     let mut found_choice = false;

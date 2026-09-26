@@ -468,3 +468,13 @@ fn liella_blade_4_with_existing_modifier() {
         "Liella! blade=4 + existing +1: set_blade(3) → modifier=4 (set=3, additive=1)"
     );
 }
+
+// ab#1 (ライブ成功時 スコアを＋１する) is gated by a has_moved condition with
+// three filters — 自分の / センターエリア / 『Liella!』 — that
+// ConditionContext::evaluate_has_moved discards (it only asks "did the
+// activating card move at all"; see the note on that function). Writing tests
+// here by driving `position_change_events` directly does NOT discriminate: the
+// activating card is this live, which never moves, so the gate fails in every
+// arrangement and the assertions pass with the defect in place. A real test has
+// to route the trigger through a real position change of a qualifying member.
+// Left undone on purpose rather than shipping tests that pass either way.

@@ -1,38 +1,87 @@
 use crate::helpers::*;
 use crate::test_modules::support::ability_trigger_and_deck_setup::*;
+use rabuka_engine::ability::types::Choice;
+use rabuka_engine::zones::MemberArea;
 
-fn setup_all_three_heart_search_and_resolve_debut(game: &mut TestGame, top_cards: Vec<i16>) -> bool {
+/// 渡辺 曜 bp6-005-R: 登場 look at the top 2 cards of your deck, then you MAY
+/// reveal 1 member carrying heart02 + heart04 + heart05 into hand; the rest go
+/// to the waitroom. Plays the card for real so the debut comes from an actual
+/// play, and empties the hand first so the outcomes below are exact.
+fn play_watanabe_looking_at(game: &mut TestGame, top_cards: &[i16]) {
     let you = game.id("PL!S-bp6-005-R");
     let filler = game.id("PL!-sd1-010-SD");
-    // Place card on stage directly, then fill deck
-    game.state.player1.stage.stage = [-1, you, -1];
+    game.state.player1.stage.stage = [-1, -1, -1];
+    game.state.player1.hand.cards.clear();
+    game.state.player1.waitroom.cards.clear();
     game.state.player1.main_deck.cards.clear();
     for cid in top_cards {
-        game.state.player1.main_deck.cards.push(cid);
+        game.state.player1.main_deck.cards.push(*cid);
     }
     while game.state.player1.main_deck.cards.len() < 40 {
         game.state.player1.main_deck.cards.push(filler);
     }
     game.give_energy(5);
-    // trigger() drains all choices; return whether the look_and_select was offered.
-    // When 0 of the top cards match the filter, the engine auto-discards without
-    // prompting (look.rs matching_count==0 early return) — callers decide if that's legal.
-    trigger_printed_ability_and_resolve_choices(game, you, "登場")
+    game.add_to_hand(you);
+    game.play_to_stage(you, MemberArea::Center);
+}
+
+/// The offer 渡辺 曜 must present, reduced to the fields her text pins: the two
+/// looked-at cards, at most 1 take, and only cards carrying all three required
+/// hearts selectable.
+fn assert_looked_at_offer(game: &TestGame, expected_filtered: &[usize]) {
+    match game.get_pending_choice() {
+        Choice::SelectCard {
+            zone,
+            count,
+            allow_skip,
+            filtered_indices,
+            target_player_id,
+            ..
+        } => {
+            assert_eq!(zone, "looked_at", "the look must select from the revealed cards");
+            assert_eq!(*count, 1, "…1枚公開して手札に加えてもよい");
+            assert!(*allow_skip, "手札に加えて「もよい」 → declining must be legal");
+            assert_eq!(
+                filtered_indices.as_deref(),
+                Some(expected_filtered),
+                "only members with heart02+heart04+heart05 may be selectable"
+            );
+            assert_eq!(
+                target_player_id, &None,
+                "the look is the active player's own deck"
+            );
+        }
+        other => panic!("expected looked-at SelectCard, got {other:?}"),
+    }
 }
 
 #[test]
 fn all_three_required_hearts_member_is_added_to_hand() {
-    // Cards with ALL three hearts (heart02, heart04, heart05) should be selectable
     let db = load_real_database();
     let mut g = TestGame::new(db);
-    let qualifying = g.id("PL!S-sd1-001-SD"); // has heart02, heart04, heart05
-    let filler = g.id("PL!-sd1-010-SD"); // has heart01, heart03 — no match
+    let qualifying = g.id("PL!S-sd1-001-SD"); // heart02, heart04, heart05 — all three
+    let filler = g.id("PL!-sd1-010-SD"); // heart01, heart03 — no match
 
-    setup_all_three_heart_search_and_resolve_debut(&mut g, vec![qualifying, filler]);
-    decline_pending_choices_with_limit(&mut g, 20);
-    assert!(
-        g.state.player1.hand.cards.contains(&qualifying),
-        "Qualifying card (all 3 hearts) should be in hand"
+    play_watanabe_looking_at(&mut g, &[qualifying, filler]);
+    assert_looked_at_offer(&g, &[0]);
+
+    g.select_indices(&[0]);
+
+    assert!(!g.has_pending_choice());
+    assert_eq!(
+        g.state.player1.hand.cards.as_slice(),
+        &[qualifying],
+        "the all-three-hearts member is the only card that may enter the hand"
+    );
+    assert_eq!(
+        g.state.player1.waitroom.cards.as_slice(),
+        &[filler],
+        "残りを控え室に置く — the non-matching looked-at card goes to the waitroom"
+    );
+    assert_eq!(
+        g.state.player1.main_deck.cards.len(),
+        38,
+        "exactly the two looked-at cards leave the deck"
     );
 }
 
@@ -108,85 +157,86 @@ fn two_matching_copies_select_exact_physical_instance() {
 
 #[test]
 fn two_of_three_required_hearts_member_is_discarded() {
-    // Cards with only 2 of the 3 required hearts should NOT be selectable.
-    // Mix a qualifying card in so the prompt IS offered, then verify only the
-    // qualifying one is selectable — this tests the filter, not the auto-skip path.
+    // A member with only heart02+heart04 is not selectable; mixing in a fully
+    // qualifying member keeps the prompt offered, so this pins the FILTER
+    // rather than the no-match auto-skip path.
     let db = load_real_database();
     let mut g = TestGame::new(db);
     let qualifying = g.id("PL!S-sd1-001-SD"); // heart02+04+05 — matches
     let two_hearts = g.id("PL!S-PR-015-PR"); // heart02+04 only — missing heart05
-    let filler = g.id("PL!-sd1-010-SD");
 
-    let offered = setup_all_three_heart_search_and_resolve_debut(&mut g, vec![qualifying, two_hearts, filler]);
-    assert!(offered, "qualifying present → look_and_select must be offered");
-    decline_pending_choices_with_limit(&mut g, 20);
-    assert!(
-        g.state.player1.hand.cards.contains(&qualifying),
-        "qualifying (all 3 hearts) should be selectable"
+    play_watanabe_looking_at(&mut g, &[qualifying, two_hearts]);
+    assert_looked_at_offer(&g, &[0]);
+
+    g.select_indices(&[0]);
+
+    assert!(!g.has_pending_choice());
+    assert_eq!(
+        g.state.player1.hand.cards.as_slice(),
+        &[qualifying],
+        "the qualifying member enters the hand"
     );
-    assert!(
-        !g.state.player1.hand.cards.contains(&two_hearts),
-        "Card with only heart02+heart04 should NOT be selectable (missing heart05)"
+    assert_eq!(
+        g.state.player1.waitroom.cards.as_slice(),
+        &[two_hearts],
+        "残りを控え室に置く — the two-hearts card was never selectable"
     );
-    assert!(
-        g.state.player1.waitroom.cards.contains(&two_hearts),
-        "Rejected two-hearts card must be discarded to waitroom (残りを控え室に置く)"
-    );
+    assert_eq!(g.state.player1.main_deck.cards.len(), 38);
 }
 
 #[test]
 fn one_of_three_required_hearts_member_is_discarded() {
-    // Card with only heart02 (not heart04, heart05) should be rejected.
-    // Mix a qualifying card so prompt is offered; verify filter rejects 1-heart card.
+    // heart02+heart06 only: missing heart04 and heart05, so unselectable.
     let db = load_real_database();
     let mut g = TestGame::new(db);
     let qualifying = g.id("PL!S-sd1-001-SD"); // all 3 hearts
-    let blade_card = g.id("PL!SP-sd1-001-SD"); // has heart02, heart06 only
-    let filler = g.id("PL!-sd1-010-SD");
+    let blade_card = g.id("PL!SP-sd1-001-SD"); // heart02, heart06 only
 
-    let offered = setup_all_three_heart_search_and_resolve_debut(&mut g, vec![qualifying, blade_card, filler]);
-    assert!(offered, "qualifying present → look_and_select must be offered");
-    decline_pending_choices_with_limit(&mut g, 20);
-    assert!(
-        g.state.player1.hand.cards.contains(&qualifying),
-        "qualifying should be selectable"
+    play_watanabe_looking_at(&mut g, &[qualifying, blade_card]);
+    assert_looked_at_offer(&g, &[0]);
+
+    g.select_indices(&[0]);
+
+    assert!(!g.has_pending_choice());
+    assert_eq!(
+        g.state.player1.hand.cards.as_slice(),
+        &[qualifying],
+        "only the qualifying member enters the hand"
     );
-    assert!(
-        !g.state.player1.hand.cards.contains(&blade_card),
-        "Card with only heart02+heart06 should NOT be selectable (missing heart04, heart05)"
+    assert_eq!(
+        g.state.player1.waitroom.cards.as_slice(),
+        &[blade_card],
+        "残りを控え室に置く — the one-heart card was never selectable"
     );
-    assert!(
-        g.state.player1.waitroom.cards.contains(&blade_card),
-        "Rejected one-heart card must be discarded to waitroom"
-    );
+    assert_eq!(g.state.player1.main_deck.cards.len(), 38);
 }
 
 #[test]
-fn no_all_three_heart_match_discards_both_looked_at_members() {
-    // If neither top card matches, the ability may still resolve (optional = true)
+fn no_all_three_heart_match_offers_no_prompt_and_sends_both_looked_at_members_to_waitroom() {
+    // With nothing matching, 渡辺 曜 has no card to offer: no choice is raised
+    // and both looked-at cards are discarded. partial = heart02+heart05,
+    // other = heart04+heart05, so neither has all three.
     let db = load_real_database();
     let mut g = TestGame::new(db);
-    // Use a PR card with heart02+heart05 (missing heart04) as the only candidate
-    let partial = g.id("PL!S-PR-017-PR"); // heart02, heart05 only — missing heart04
-    let other = g.id("PL!S-bp2-015-PR"); // heart04, heart05 only — missing heart02
+    let partial = g.id("PL!S-PR-017-PR"); // heart02, heart05 — missing heart04
+    let other = g.id("PL!S-bp2-015-PR"); // heart04, heart05 — missing heart02
 
-    setup_all_three_heart_search_and_resolve_debut(&mut g, vec![partial, other]);
-    decline_pending_choices_with_limit(&mut g, 20);
-    // Neither card should be in hand (none has all 3 hearts)
+    play_watanabe_looking_at(&mut g, &[partial, other]);
+
     assert!(
-        !g.state.player1.hand.cards.contains(&partial),
-        "Partial heart card should NOT be in hand"
+        !g.has_pending_choice(),
+        "an unmatchable look must not ask the player to choose"
     );
     assert!(
-        !g.state.player1.hand.cards.contains(&other),
-        "Other partial heart card should NOT be in hand"
+        g.state.player1.hand.cards.is_empty(),
+        "no looked-at card qualifies, so the hand stays empty"
     );
-    // Both must have been discarded to waitroom (残りを控え室に置く)
-    assert!(
-        g.state.player1.waitroom.cards.contains(&partial)
-            && g.state.player1.waitroom.cards.contains(&other),
-        "Both non-matching looked-at cards must go to waitroom"
+    assert_eq!(
+        g.state.player1.waitroom.cards.as_slice(),
+        &[partial, other],
+        "残りを控え室に置く in looked-at order"
     );
+    assert_eq!(g.state.player1.main_deck.cards.len(), 38);
 }
 
 #[test]
@@ -229,21 +279,28 @@ fn optional_discard_any_of_three_heart_search_accepts_one_matching_color() {
 }
 
 #[test]
-fn all_three_heart_match_enters_hand_without_nonmatching_filler() {
-    // Qualifying card goes to hand, non-qualifying filler goes to waitroom
+fn declining_the_look_discards_both_looked_at_cards_and_leaves_the_hand_empty() {
+    // 手札に加えて「もよい」: taking is optional, and 残りを控え室に置く is not.
+    // Declining must therefore still cost the two looked-at cards.
     let db = load_real_database();
     let mut g = TestGame::new(db);
     let qualifying = g.id("PL!S-sd1-001-SD"); // has all 3 hearts
     let filler = g.id("PL!-sd1-010-SD"); // heart01, heart03 — no match
 
-    setup_all_three_heart_search_and_resolve_debut(&mut g, vec![qualifying, filler]);
-    decline_pending_choices_with_limit(&mut g, 20);
+    play_watanabe_looking_at(&mut g, &[qualifying, filler]);
+    assert_looked_at_offer(&g, &[0]);
+
+    g.select_indices(&[]);
+
+    assert!(!g.has_pending_choice());
     assert!(
-        g.state.player1.hand.cards.contains(&qualifying),
-        "Qualifying card should be in hand"
+        g.state.player1.hand.cards.is_empty(),
+        "declining the optional take must put nothing in the hand"
     );
-    assert!(
-        !g.state.player1.hand.cards.contains(&filler),
-        "Non-qualifying filler should NOT be in hand"
+    assert_eq!(
+        g.state.player1.waitroom.cards.as_slice(),
+        &[qualifying, filler],
+        "残りを控え室に置く applies even when the take is declined"
     );
+    assert_eq!(g.state.player1.main_deck.cards.len(), 38);
 }

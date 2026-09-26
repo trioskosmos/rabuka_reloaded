@@ -19,5 +19,15 @@ fn one_waited_opponent_member_grants_heart06() {
         .state
         .mods
         .get_heart_modifier(member, HeartColor::Heart06);
-    assert!(h06 >= 1, "one waited opponent → >= +1 heart06");
+    // 「ウェイト状態のメンバー1人につき」 — one member, one heart06. `>= 1` would
+    // also pass if the modifier were granted per ZONE, or double-counted.
+    assert_eq!(
+        h06, 1,
+        "one waited opponent member → exactly +1 heart06, got {h06}"
+    );
+    assert_eq!(
+        game.state.player1.stage.stage[1],
+        member,
+        "setup guard: the 常時 source is in play"
+    );
 }

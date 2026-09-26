@@ -79,15 +79,14 @@ fn opponent_cost_self_higher_scores_in_snapshot() {
     game.state.player2.stage.stage = [filler, game.id("PL!-sd1-010-SD"), filler];
     fill_both_decks(&mut game, filler);
 
-    for _ in 0..5 {
-        game.pass();
-    }
+    // Step to the live window BY NAME. The five blind passes plus the four bare
+    // ones this replaces were correct only while the phase sequence was frozen:
+    // a phase gaining or losing a step would move the snapshot out from under
+    // the assertion with nothing to notice.
+    game.advance_to_phase(rabuka_engine::game_state::Phase::LiveCardSetFirstAttacker);
     game.set_live_card(nonfiction);
-    game.pass();
-    game.pass();
+    game.advance_to_phase(rabuka_engine::game_state::Phase::LiveVictoryDetermination);
     drain_auto_choices(&mut game);
-    game.pass();
-    game.pass();
 
     assert!(
         game.state.performance_snapshots.iter().any(|snap| snap
@@ -114,15 +113,14 @@ fn opponent_cost_self_lower_no_score_in_snapshot() {
     game.state.player2.stage.stage = [filler, opp_center, filler];
     fill_both_decks(&mut game, filler);
 
-    for _ in 0..5 {
-        game.pass();
-    }
+    // Step to the live window BY NAME. The five blind passes plus the four bare
+    // ones this replaces were correct only while the phase sequence was frozen:
+    // a phase gaining or losing a step would move the snapshot out from under
+    // the assertion with nothing to notice.
+    game.advance_to_phase(rabuka_engine::game_state::Phase::LiveCardSetFirstAttacker);
     game.set_live_card(nonfiction);
-    game.pass();
-    game.pass();
+    game.advance_to_phase(rabuka_engine::game_state::Phase::LiveVictoryDetermination);
     drain_auto_choices(&mut game);
-    game.pass();
-    game.pass();
 
     assert!(
         !game.state.performance_snapshots.iter().any(|snap| snap
@@ -162,15 +160,14 @@ fn left_side_heart_meets_threshold_gains_blade() {
     let center_blade_before = game.state.mods.get_blade_modifier(center_high);
     let right_blade_before = game.state.mods.get_blade_modifier(right_high);
 
-    for _ in 0..5 {
-        game.pass();
-    }
+    // Step to the live window BY NAME. The five blind passes plus the four bare
+    // ones this replaces were correct only while the phase sequence was frozen:
+    // a phase gaining or losing a step would move the snapshot out from under
+    // the assertion with nothing to notice.
+    game.advance_to_phase(rabuka_engine::game_state::Phase::LiveCardSetFirstAttacker);
     game.set_live_card(nonfiction);
-    game.pass();
-    game.pass();
+    game.advance_to_phase(rabuka_engine::game_state::Phase::LiveVictoryDetermination);
     drain_auto_choices(&mut game);
-    game.pass();
-    game.pass();
 
     assert_eq!(
         game.state.mods.get_blade_modifier(left_high) - left_blade_before,
@@ -211,15 +208,14 @@ fn left_side_heart_below_ignores_center_high() {
 
     let blade_before = game.state.mods.get_blade_modifier(left_low);
 
-    for _ in 0..5 {
-        game.pass();
-    }
+    // Step to the live window BY NAME. The five blind passes plus the four bare
+    // ones this replaces were correct only while the phase sequence was frozen:
+    // a phase gaining or losing a step would move the snapshot out from under
+    // the assertion with nothing to notice.
+    game.advance_to_phase(rabuka_engine::game_state::Phase::LiveCardSetFirstAttacker);
     game.set_live_card(nonfiction);
-    game.pass();
-    game.pass();
+    game.advance_to_phase(rabuka_engine::game_state::Phase::LiveVictoryDetermination);
     drain_auto_choices(&mut game);
-    game.pass();
-    game.pass();
 
     assert_eq!(
         game.state.mods.get_blade_modifier(left_low),
@@ -250,15 +246,14 @@ fn blade_goes_to_stage_member_not_live_card() {
     let live_blade_before = game.state.mods.get_blade_modifier(nonfiction);
     let member_blade_before = game.state.mods.get_blade_modifier(left_high);
 
-    for _ in 0..5 {
-        game.pass();
-    }
+    // Step to the live window BY NAME. The five blind passes plus the four bare
+    // ones this replaces were correct only while the phase sequence was frozen:
+    // a phase gaining or losing a step would move the snapshot out from under
+    // the assertion with nothing to notice.
+    game.advance_to_phase(rabuka_engine::game_state::Phase::LiveCardSetFirstAttacker);
     game.set_live_card(nonfiction);
-    game.pass();
-    game.pass();
+    game.advance_to_phase(rabuka_engine::game_state::Phase::LiveVictoryDetermination);
     drain_auto_choices(&mut game);
-    game.pass();
-    game.pass();
 
     assert_eq!(
         game.state.mods.get_blade_modifier(nonfiction),
@@ -300,19 +295,15 @@ fn both_players_get_own_live_start_effects() {
     let p1_blade_before = game.state.mods.get_blade_modifier(p_left);
     let p2_blade_before = game.state.mods.get_blade_modifier(p2_left);
 
-    for _ in 0..5 {
-        game.pass();
-    }
+    // Both reveals, stepping by name: p1's set window, then p2's.
+    game.advance_to_phase(rabuka_engine::game_state::Phase::LiveCardSetFirstAttacker);
     game.set_live_card(p1_card);
-    game.pass();
+    game.advance_to_phase(rabuka_engine::game_state::Phase::LiveCardSetSecondAttacker);
     game.set_live_card(p2_card);
-    game.pass();
-    drain_auto_choices(&mut game);
-    game.pass();
-    drain_auto_choices(&mut game);
-    game.pass();
-    drain_auto_choices(&mut game);
-    game.pass();
+    game.advance_to_phase(rabuka_engine::game_state::Phase::LiveVictoryDetermination);
+    while game.has_pending_choice() {
+        game.select_indices(&[0]);
+    }
     drain_auto_choices(&mut game);
 
     // Both players got their own blade effect (not cross-consumed)

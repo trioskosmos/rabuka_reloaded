@@ -94,7 +94,7 @@ fn own_move_or_energy_draw_heart02_energy_phase_no_trigger() {
 
     let before_hand = game.state.player1.hand.cards.len();
     let player_id = game.state.player1.id.clone();
-    let _ = rabuka_engine::turn::TurnEngine::trigger_auto_abilities_for_player(
+    rabuka_engine::turn::TurnEngine::trigger_auto_abilities_for_player(
         &mut game.state,
         &player_id,
     );
@@ -196,11 +196,11 @@ fn own_move_or_energy_draw_heart02_other_card_move_does_not_trigger() {
 
     let before_hand = game.state.player1.hand.cards.len();
     let player_id = game.state.player1.id.clone();
-    let _ = rabuka_engine::turn::TurnEngine::trigger_auto_abilities_for_player(
+    rabuka_engine::turn::TurnEngine::trigger_auto_abilities_for_player(
         &mut game.state,
         &player_id,
     );
-    game.state.process_pending_auto_abilities(&player_id);
+
 
     // Since a different card moved, Sumire's "this member" check should NOT trigger.
     assert_eq!(
@@ -608,11 +608,11 @@ fn own_move_or_energy_draw_heart02_opponent_effect_move_no_trigger() {
     game.state.batch_movements.clear();
 
     let player_id = game.state.player1.id.clone();
-    let _ = rabuka_engine::turn::TurnEngine::trigger_auto_abilities_for_player(
+    rabuka_engine::turn::TurnEngine::trigger_auto_abilities_for_player(
         &mut game.state,
         &player_id,
     );
-    game.state.process_pending_auto_abilities(&player_id);
+
 
     assert_eq!(
         heart02_mod(&game, sumire),

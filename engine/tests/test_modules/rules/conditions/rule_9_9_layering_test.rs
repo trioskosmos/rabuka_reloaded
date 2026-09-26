@@ -39,12 +39,12 @@ fn blade_set_then_additive_stacks_through_real_cards() {
     }
 
     // Step 1: Special Color's Live Start sets blades to 3.
-    for _ in 0..5 {
-        game.pass();
-    }
+    // Step to the set window and the performance BY NAME: both walks below were
+    // fixed pass counts, so a phase gaining or losing a step would have moved the
+    // Live Start out of reach and the set modifier would simply never appear.
+    game.advance_to_phase(rabuka_engine::game_state::Phase::LiveCardSetFirstAttacker);
     game.set_live_card(special);
-    game.pass();
-    game.pass();
+    game.advance_to_phase(rabuka_engine::game_state::Phase::FirstAttackerPerformance);
     while game.has_pending_choice() {
         game.drain_choices_strict(&["SelectCard", "SelectAutoAbility"], &[0]);
     }

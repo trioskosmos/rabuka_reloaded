@@ -22,6 +22,14 @@ fn pl_sp_bp5_023_l_live_success_two_success_cards_and_revealed_score_live_grant_
         .revealed_cards
         .push(game.new_id("PL!SP-bp1-023-L"));
 
+    // PL!SP-bp1-023-L and the live's own PL!SP-bp5-023-L differ only by a
+    // transposed bp number, so pin both before relying on either.
+    game.assert_card_identity(live, "PL!SP-bp5-023-L");
+    game.assert_card_identity(
+        game.state.revealed_cards[0],
+        "PL!SP-bp1-023-L",
+    );
+
     fire_trigger(&mut game, live, AbilityTrigger::LiveSuccess, "ライブ成功時");
 
     assert_eq!(

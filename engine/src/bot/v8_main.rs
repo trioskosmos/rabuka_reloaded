@@ -87,49 +87,6 @@ fn initiative_weight() -> f64 {
         .unwrap_or(0.5)
 }
 
-/// The best member we could put on stage next turn. Used only to project the
-/// leaf one turn forward; the real deploy is chosen by the depth-2 search, so
-/// this is a smooth estimate of "how good could next turn be", not a
-/// commitment.
-struct Projection {
-    hearts: Acc,
-    blades: i32,
-}
-
-fn project_one_turn(gs: &GameState, me: u8, db: &CardDatabase) -> Projection {
-    let p = gs.seat_player(me);
-    // Next turn's budget: this phase's energy plus the guaranteed +1 from the
-    // coming Energy phase (7.5), plus the current baton discount
-    // (9.6.2.3.2) when the stage already has a member to send.
-    let discount = p
-        .stage
-        .stage
-        .iter()
-        .filter(|&&c| c >= 0)
-        .filter_map(|&c| db.get_card(c).and_then(|card| card.cost))
-        .map(i32::from)
-        .max()
-        .unwrap_or(0);
-    let budget = i32::from(p.energy_zone.active_count()) + 1 + discount;
-    let best = p
-        .hand
-        .cards
-        .iter()
-        .filter_map(|&cid| db.get_card(cid))
-        .filter(|card| card.card_type == crate::card::CardType::Member)
-        .filter(|card| i32::from(card.cost.unwrap_or(0)) <= budget)
-        .max_by_key(|card| card.cost.unwrap_or(0));
-    let mut hearts = [0i32; 11];
-    let mut blades = 0;
-    if let Some(card) = best {
-        if let Some(base) = &card.base_heart {
-            acc_add(&mut hearts, &base.hearts);
-        }
-        blades = i32::from(card.blade);
-    }
-    Projection { hearts, blades }
-}
-
 /// `P(we place a card at the next check)` and `P(they place)`, given a board
 /// supply and an active-blade count.
 fn placement_pair(
@@ -172,45 +129,48 @@ fn placement_pair(
         // No life in hand: we place nothing and they place whenever they pass.
         return (0.0, opp.pass_prob);
     };
-    let (_we_c, they_c, _) = opp.contested_masses(our_score, 1, my_success);
+    let (we_c, they_c, _) = opp.contested_masses(our_score, 1, my_success);
     let contested = p_pass * opp.pass_prob;
     let opp_place = opp.pass_prob * (1.0 - p_pass) + contested * they_c;
     (our_place.min(1.0), opp_place.min(1.0))
 }
 
 /// Expected placement advantage of a position, in placement units.
+///
+/// The leaf is deliberately the NEXT CHECK and nothing further:
+///
+/// ```text
+/// leaf = w * (P(we place) - P(they place)) + w * PLACEMENT_CREDIT * (lives in hand + initiative)
+/// ```
+///
+/// The first draft also carried a one-turn-forward development term. It is
+/// gone, and the reason matters. A forward projection adds "our best
+/// affordable member" to the projected board, and it does that whether or not
+/// we already played that member this phase - so deploying now and passing
+/// both project onto the same ceiling, the leaf comes out EXACTLY equal, and
+/// the tie falls to list order, where `Pass` is index 0. Measured, that was a
+/// 60% pass rate, a stage cost of 0.8 at T1 against the guide's 4, and a
+/// 1.3-heart average board. The whole game was played a turn behind.
+///
+/// The two regimes are what the guide actually describes, so v8 now uses two
+/// mechanisms instead of one blurred one:
+///
+/// - where a check is live, this leaf decides, in placement units;
+/// - where no check is live yet, [`TieKey`] decides, and `TieKey`'s first
+///   component is the guides' own development metric (section 1: T1=4, T2=9,
+///   T3=13). No conversion constant between "stage cost" and "hearts" is
+///   needed, because none is invented.
 fn leaf_value(gs: &GameState, me: u8, db: &CardDatabase, opp: &OppModel) -> f64 {
     let supply = v8_model::board_supply(gs, me, db);
     let (blades, density) = super::strategy_v4::flip_stats(gs, me, db);
-    let (our_now, their_now) = placement_pair(gs, me, db, opp, &supply, blades, density);
-
-    // One turn forward, after the best development we could make. This is the
-    // trajectory term: it prices an action whose payoff lands on the NEXT
-    // check rather than this one, which is exactly the "investment" deploy
-    // class v7's one-ply eval could not see (its D2 residual).
-    let projection = project_one_turn(gs, me, db);
-    let mut projected = supply;
-    for i in 0..11 {
-        projected[i] += projection.hearts[i];
-    }
-    let (our_next, _) = placement_pair(
-        gs,
-        me,
-        db,
-        opp,
-        &projected,
-        blades + projection.blades,
-        density,
-    );
-
+    let (our_place, their_place) = placement_pair(gs, me, db, opp, &supply, blades, density);
     let ammo = v8_model::lives_in_hand(gs.seat_player(me), db) as f64;
     let initiative = if gs.seat_player(me).is_first_attacker {
         initiative_weight()
     } else {
         0.0
     };
-
-    SCALE * ((our_now - their_now) + (our_next - our_now) + PLACEMENT_CREDIT * (ammo + initiative))
+    SCALE * ((our_place - their_place) + PLACEMENT_CREDIT * (ammo + initiative))
 }
 
 /// Baton detection from the generated action's own destination data. The
@@ -254,15 +214,35 @@ pub(crate) fn is_baton(gs: &GameState, me: u8, action: &Action) -> bool {
         != -1
 }
 
-/// Tie-break key: a higher forward ceiling is better, and a baton ladder step
-/// beats an equivalent fresh play (the guides' 4→9→13). The only place v8
-/// expresses a preference beyond the model, and it exists so a free
-/// development step is never discarded on a rounding tie.
-fn development_key(gs: &GameState, me: u8, db: &CardDatabase, action: &Action) -> (i32, u8) {
-    (
-        v8_model::reachable_ceiling(gs, me, 2, db),
-        u8::from(is_baton(gs, me, action)),
-    )
+/// Tie-break key, in the guides' own units.
+///
+/// 1. `cost_now` - the current board's total printed stage cost. This is the
+///    guide's development metric (section 1: T1 about 4, T2 about 9, T3 about
+///    13) and it is what decides the game while no check is live. Because it
+///    is measured on the state the action PRODUCES, deploying a member beats
+///    passing, and a member that contributes nothing - a clog - does not, which
+///    is the anti-clog rule with no separate case for it.
+/// 2. `ceiling` - the forward reachable cost after two more of our Main
+///    phases, so a step that unlocks the 4 -> 9 baton ladder is preferred over
+///    an equivalent one that does not.
+/// 3. `baton` - a swap is the guides' preferred upgrade (9.6.2.3.2) at equal
+///    cost and ceiling.
+///
+/// The arena's `ScoreFn` type only carries `(f64, String)`, so the key is kept
+/// here and flattened into the note for debug output.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
+struct TieKey {
+    cost_now: i32,
+    ceiling: i32,
+    baton: u8,
+}
+
+fn tie_key(sim: &GameState, me: u8, db: &CardDatabase, action: &Action) -> TieKey {
+    TieKey {
+        cost_now: v8_model::stage_cost(sim, me, db),
+        ceiling: v8_model::reachable_ceiling(sim, me, 2, db),
+        baton: u8::from(is_baton(sim, me, action)),
+    }
 }
 
 struct Search<'a> {
@@ -322,7 +302,32 @@ impl Search<'_> {
     }
 }
 
-pub fn score_actions_v8(gs: &GameState, actions: &[Action], me: u8) -> Vec<(f64, String)> {
+/// One action's evaluation.
+#[derive(Clone, Debug)]
+pub(crate) struct ActionScore {
+    pub value: f64,
+    pub tie: TieKey,
+    pub note: String,
+}
+
+impl ActionScore {
+    fn rejected(note: &str) -> Self {
+        Self {
+            value: f64::NEG_INFINITY,
+            tie: TieKey {
+                cost_now: i32::MIN,
+                ceiling: i32::MIN,
+                baton: 0,
+            },
+            note: note.into(),
+        }
+    }
+}
+
+/// Evaluate every offered action. Used by the entry point and by the arena's
+/// decision trace; the `ScoreFn` wrapper below flattens it to the tuple form
+/// the harness expects.
+pub(crate) fn evaluate_actions(gs: &GameState, actions: &[Action], me: u8) -> Vec<ActionScore> {
     let db = &gs.card_database;
     let pending = gs.has_pending_choice();
     let opp = OppModel::build(gs, me, db);
@@ -337,22 +342,27 @@ pub fn score_actions_v8(gs: &GameState, actions: &[Action], me: u8) -> Vec<(f64,
     let mut scores = Vec::with_capacity(actions.len());
     for action in actions {
         if action.parameters.as_ref().and_then(|p| p.disabled) == Some(true) {
-            scores.push((f64::NEG_INFINITY, "disabled".into()));
+            scores.push(ActionScore::rejected("disabled"));
             continue;
         }
         // `Pass` is scored by the SAME leaf on the SAME state, so it can only
-        // win when ending the phase really is the best play. v7 needed two
-        // special cases here (a −0.05 Pass tax that exploded draws, and a
-        // baton tie-break that was a bug fix); neither exists in v8.
+        // win on the tiebreak, which means it wins when ending the phase
+        // really is the best play. v7 needed two special cases here (a -0.05
+        // Pass tax that exploded draws, and a baton tie-break that was a bug
+        // fix); neither exists in v8.
         if action.action_type == ActionType::Pass && !pending {
             let value = search.leaf(gs);
-            scores.push((value, "end-main".into()));
+            scores.push(ActionScore {
+                value,
+                tie: tie_key(gs, me, db, action),
+                note: "end-main".into(),
+            });
             continue;
         }
         let _guard = RngGuard::new();
         let mut sim = gs.clone();
         if game_setup::execute_action(&mut sim, action).is_err() {
-            scores.push((f64::NEG_INFINITY, "execution-error".into()));
+            scores.push(ActionScore::rejected("execution-error"));
             continue;
         }
         game_setup::settle_single_player_state(&mut sim);
@@ -376,53 +386,67 @@ pub fn score_actions_v8(gs: &GameState, actions: &[Action], me: u8) -> Vec<(f64,
         } else {
             search.with_followup(&sim)
         };
-        let baton = is_baton(gs, me, action);
-        scores.push((
+        let nodes = search.nodes;
+        let tie = tie_key(&sim, me, db, action);
+        scores.push(ActionScore {
             value,
-            format!("leaf={value:.1} nodes={} baton={baton}", search.nodes),
-        ));
+            tie,
+            note: format!(
+                "leaf={value:.1} nodes={nodes} baton={} cost={} ceil={}",
+                tie.baton == 1,
+                tie.cost_now,
+                tie.ceiling
+            ),
+        });
     }
 
     if std::env::var_os("V8_DEBUG").is_some() {
-        for (i, (value, note)) in scores.iter().enumerate() {
+        for (i, score) in scores.iter().enumerate() {
             eprintln!(
                 "V8M t{} me{} idx{} act={:?} value={:.2} note={}",
                 gs.turn_number,
                 me,
                 i,
                 actions[i].action_type,
-                value,
-                note
+                score.value,
+                score.note
             );
         }
     }
     scores
 }
 
-/// Index selection: strict improvement, then the development tiebreak. An
-/// action that ties the leaf exactly is taken only when it actually develops
-/// the board, so a zero-contribution member still loses to `Pass`.
-fn pick_best(gs: &GameState, me: u8, actions: &[Action], scores: &[(f64, String)]) -> usize {
-    let db = &gs.card_database;
+pub fn score_actions_v8(gs: &GameState, actions: &[Action], me: u8) -> Vec<(f64, String)> {
+    evaluate_actions(gs, actions, me)
+        .into_iter()
+        .map(|score| (score.value, score.note))
+        .collect()
+}
+
+/// Index selection, as a total order so ties are never resolved by list
+/// position:
+///
+/// 1. strictly higher leaf value wins;
+/// 2. on an exact tie, the higher development key wins (a free ladder step is
+///    never thrown away on a rounding tie);
+/// 3. on an exact tie in both, the earlier action wins, which keeps `Pass`
+///    over a zero-contribution member - the anti-clog rule, with no special
+///    case in the value function.
+fn pick_best(scores: &[ActionScore]) -> usize {
     let mut best = 0usize;
-    for i in 0..scores.len() {
-        let (value, _) = &scores[i];
-        if !value.is_finite() {
+    for i in 1..scores.len() {
+        if !scores[i].value.is_finite() {
             continue;
         }
-        let (current, _) = &scores[best];
-        if *value > *current + 1e-9 {
+        if !scores[best].value.is_finite() {
             best = i;
-        } else if (*value - *current).abs() <= 1e-9
-            && actions[i].action_type != ActionType::Pass
-            && actions[best].action_type == ActionType::Pass
-        {
-            // Only a Pass can be displaced on a tie, and only by development.
-            if development_key(gs, me, db, &actions[i])
-                > development_key(gs, me, db, &actions[best])
-            {
-                best = i;
-            }
+            continue;
+        }
+        let (value, incumbent) = (scores[i].value, scores[best].value);
+        if value > incumbent + 1e-9 {
+            best = i;
+        } else if (value - incumbent).abs() <= 1e-9 && scores[i].tie > scores[best].tie {
+            best = i;
         }
     }
     best
@@ -432,8 +456,8 @@ pub fn choose_action_v8(gs: &GameState, actions: &[Action], me: u8) -> Action {
     if actions.len() == 1 {
         return actions[0].clone();
     }
-    let scores = score_actions_v8(gs, actions, me);
-    let best = pick_best(gs, me, actions, &scores);
+    let scores = evaluate_actions(gs, actions, me);
+    let best = pick_best(&scores);
     let chosen = actions.get(best).cloned().unwrap_or(Action {
         action_type: ActionType::Pass,
         description: "pass".into(),
@@ -447,8 +471,8 @@ pub fn choose_action_v8(gs: &GameState, actions: &[Action], me: u8) -> Action {
         me,
         chosen.action_type,
         chosen.parameters,
-        scores.get(best).map(|(s, _)| *s).unwrap_or(f64::NEG_INFINITY),
-        scores.get(best).map(|(_, n)| n.as_str()).unwrap_or(""),
+        scores.get(best).map(|s| s.value).unwrap_or(f64::NEG_INFINITY),
+        scores.get(best).map(|s| s.note.as_str()).unwrap_or(""),
     );
     chosen
 }

@@ -37,7 +37,7 @@ fn set_active(game: &mut TestGame, p1_active: bool) {
 }
 
 fn is_waited(game: &TestGame, id: i16) -> bool {
-    game.state.mods.get_orientation_modifier(id).as_deref() == Some("wait")
+    game.state.mods.get_orientation_modifier(id) == Some("wait")
 }
 
 /// Player2 plays セラス, whose 自動 fires when the EdelNote セラス appears on p2's own

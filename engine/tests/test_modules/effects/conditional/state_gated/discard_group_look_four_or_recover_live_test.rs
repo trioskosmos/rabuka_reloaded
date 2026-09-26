@@ -42,7 +42,7 @@ fn matching_group_discard_look_four_increases_hand() {
         let choice = game.get_pending_choice();
         match &choice {
             rabuka_engine::ability::types::Choice::SelectCard { count, zone, .. } if *count > 1 && zone == "revealed_cards" => {
-                let indices: Vec<usize> = (0..*count as usize).collect();
+                let indices: Vec<usize> = (0..*count).collect();
                 game.select_indices(&indices);
             }
             _ => {
@@ -89,7 +89,7 @@ fn nonmatching_group_discard_recovers_live_to_hand() {
         let choice = game.get_pending_choice();
         match &choice {
             rabuka_engine::ability::types::Choice::SelectCard { count, zone, .. } if *count > 1 && zone == "revealed_cards" => {
-                let indices: Vec<usize> = (0..*count as usize).collect();
+                let indices: Vec<usize> = (0..*count).collect();
                 game.select_indices(&indices);
             }
             _ => {

@@ -237,6 +237,67 @@ fn debut_main_phase_multiple_live_cards_in_discard_select_one() {
     );
 }
 
+/// 自分のメインフェイズの場合 — the gate the file's header names but nothing
+/// tested. Every other test here plays her in the Main phase, so the temporal
+/// gate could have been unconditionally true and the whole file would still be
+/// green. Drive the printed 登場 with the phase set to Active and assert that
+/// NOTHING happens: no prompt, no live card moved, no limit reduction.
+#[test]
+fn debut_outside_main_phase_fires_nothing() {
+    use rabuka_engine::core::types::AbilityTrigger;
+    use rabuka_engine::game_state::Phase;
+
+    let (mut game, member, live) = setup();
+    // Put her on stage directly: a legal Main-phase play always lands in Main,
+    // so the only way to reach another phase with the 登場 pending is to stage
+    // her and fire the trigger there.
+    game.state.player1.stage.stage = [-1, member, -1];
+
+    assert_eq!(
+        game.state.current_phase,
+        Phase::Main,
+        "setup guard: TestGame starts in the Main phase"
+    );
+    game.state.current_phase = Phase::Active;
+    assert_eq!(
+        game.state.current_phase,
+        Phase::Active,
+        "the フェイズ gate must be evaluated against Active, not Main"
+    );
+
+    fire_trigger(&mut game, member, AbilityTrigger::Debut, "登場");
+    while game.has_pending_choice() {
+        game.select_indices(&[]);
+    }
+
+    assert!(
+        !game.has_pending_choice(),
+        "激活していない: outside the メインフェイズ no cost prompt may appear"
+    );
+    assert!(
+        game.state.player1.waitroom.cards.contains(&live),
+        "the live card must stay in the waitroom outside her own Main phase"
+    );
+    assert!(
+        !game.state.player1.live_card_zone.cards.contains(&live),
+        "nothing may be placed face-up in the live card zone"
+    );
+    assert_eq!(
+        game.state.player1.live_card_set_limit_reduction, 0,
+        "…Unless the next live-card-set limit is reduced must not happen either"
+    );
+
+    // The positive control in the same state: flip to Main and the very same
+    // trigger does offer the cost. Without this, the negative above would also
+    // pass if her 登場 were simply never wired up.
+    game.state.current_phase = Phase::Main;
+    fire_trigger(&mut game, member, AbilityTrigger::Debut, "登場");
+    assert!(
+        game.has_pending_choice(),
+        "in her own Main phase the same 登場 must offer the EE cost"
+    );
+}
+
 /// ライブカードセット上限の減少が正しいことを確認:
 /// 元々の上限は3。能力使用後は2になる。
 #[test]

@@ -53,10 +53,16 @@ fn pl_hs_bp5_021_l_three_mirakura_members_grant_score_bonus() {
         game.select_indices(&[0]);
     }
     let score_mod = game.state.mods.get_score_modifier(live_card);
-    assert!(
-        score_mod >= 1,
-        "Score should be +1 with 3 みらくらぱーく！ members (got {})",
-        score_mod
+    // 3人ならスコアを＋１する — exactly +1. `>= 1` also passes if the grant were
+    // made per member, which is the shape this threshold exists to exclude.
+    assert_eq!(
+        score_mod, 1,
+        "exactly +1 with 3 みらくらぱーく！ members (got {score_mod})"
+    );
+    assert_eq!(
+        game.state.player1.stage.stage,
+        [mirakura, mirakura_b, mirakura_c],
+        "setup guard: three DISTINCT みらくらぱーく！ instances are on stage"
     );
 }
 

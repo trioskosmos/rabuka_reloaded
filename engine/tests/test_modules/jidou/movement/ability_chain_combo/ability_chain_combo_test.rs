@@ -15,6 +15,28 @@ use rabuka_engine::core::types::AbilityTrigger;
 use rabuka_engine::turn::TurnEngine;
 use rabuka_engine::types::PositionChangeEvent;
 
+/// 桜小路きな子 PL!SP-pb2-006-R. Pinning the print matters because the file also
+/// uses PL!SP-pb1-006-R as an ordinary 『Liella!』 member — a pb1/pb2
+/// transposition would swap the ability under test for its own fodder card.
+fn kinako_id(game: &mut TestGame) -> i16 {
+    let id = game.id("PL!SP-pb2-006-R");
+    game.assert_card_identity(id, "PL!SP-pb2-006-R");
+    id
+}
+
+/// A plain 『Liella!』 member to tuck under her.
+///
+/// This was `PL!SP-pb1-006-R`, which turns out to be a SECOND COPY OF
+/// 桜小路きな子 herself — the pin added here caught it. Her 常時 counts 『Liella!』
+/// members under her, so a second copy happens to count, but the test was
+/// reading as "some other Liella! member" while staging the subject again.
+/// 嵐 千砂都 is a genuinely different Liella! member.
+fn liella_fodder_id(game: &mut TestGame) -> i16 {
+    let id = game.id("PL!SP-pb1-014-N");
+    game.assert_card_identity(id, "PL!SP-pb1-014-N");
+    id
+}
+
 /// Manually move a member between stage slots (toubatsu_q263 idiom) so
 /// movement watchers arm exactly like a real reposition would.
 fn manually_move(game: &mut TestGame, cid: i16, from: usize, to: usize) {
@@ -45,8 +67,9 @@ fn pb2006_jidou_placement_feeds_constant_cost_up() {
     let db = load_real_database();
     let mut game = TestGame::new(db);
 
-    let kinako = game.id("PL!SP-pb2-006-R");
-    let liella_member = game.id("PL!SP-pb1-006-R"); // 『Liella!』 member card
+    let kinako = kinako_id(&mut game);
+    let liella_member = liella_fodder_id(&mut game); // 『Liella!』 member card
+    game.assert_distinct_card_names(kinako, liella_member, "きな子 and the member under her");
     let filler = game.new_id("PL!-sd1-010-SD");
     fill_decks(&mut game, filler);
 
@@ -98,9 +121,10 @@ fn pb2006_jidou_once_per_turn_no_second_placement() {
     let db = load_real_database();
     let mut game = TestGame::new(db);
 
-    let kinako = game.id("PL!SP-pb2-006-R");
-    let liella_a = game.id("PL!SP-pb1-006-R");
-    let liella_b = game.id("PL!SP-pb1-006-R");
+    let kinako = kinako_id(&mut game);
+    let liella_a = liella_fodder_id(&mut game);
+    let liella_b = game.new_id("PL!SP-pb1-014-N");
+    game.assert_same_card_name(liella_a, liella_b, "two copies of the same fodder member");
     let filler = game.new_id("PL!-sd1-010-SD");
     fill_decks(&mut game, filler);
 
@@ -140,6 +164,9 @@ fn pb2011_own_live_start_reposition_triggers_own_three_choice() {
     let mut game = TestGame::new(db);
 
     let toubatsu = game.id("PL!SP-pb2-011-R");
+    // PL!SP-bp2-011-R is a different character; the LS reposition + jidou chain
+    // only exists on 鬼塚冬毬.
+    game.assert_card_identity(toubatsu, "PL!SP-pb2-011-R");
     let filler = game.id("PL!-sd1-010-SD");
     for _ in 0..20 {
         game.state.player1.main_deck.cards.push(filler);

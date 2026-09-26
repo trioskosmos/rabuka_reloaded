@@ -64,6 +64,27 @@ fn rina_only_copies_live_success_not_constant() {
     // Asaka Karin (PL!N-PR-027-PR): 虹ヶ咲 member, cost=4, has 常時 ability (not live_success)
     let karin = game.id("PL!N-PR-027-PR");
     let filler = game.id("PL!-sd1-010-SD");
+    game.assert_card_identity(rina, "PL!N-PR-026-PR");
+    game.assert_card_identity(karin, "PL!N-PR-027-PR");
+    // The whole point is that this card's ability is a 常時, not a ライブ成功時.
+    // Assert the reason rather than trusting the comment: if Karin ever printed a
+    // LiveSuccess ability this test would keep passing for the wrong reason.
+    let karin_triggers: Vec<String> = game
+        .db
+        .get_card(karin)
+        .unwrap()
+        .resolved_abilities()
+        .filter_map(|a| a.triggers.as_ref().map(|t| t.to_string()))
+        .collect();
+    assert!(
+        karin_triggers.iter().any(|t| t.contains("常時")),
+        "the under-card must carry a 常時, got {karin_triggers:?}"
+    );
+    assert!(
+        !karin_triggers.iter().any(|t| t.contains("ライブ成功時")),
+        "the under-card must NOT carry a ライブ成功時 for this test to mean \
+         anything, got {karin_triggers:?}"
+    );
 
     game.state.player1.stage.stage = [rina, filler, -1];
     game.state.player1.stage.under_cards[0].push(karin);
@@ -74,6 +95,7 @@ fn rina_only_copies_live_success_not_constant() {
     game.pass();
     game.pass();
 
+    // Nothing is gained, and the gain table has no half-populated entry for her.
     let gained = game.state.gained_abilities.get(&rina);
     assert!(
         gained.is_none() || gained.unwrap().is_empty(),
@@ -92,6 +114,25 @@ fn rina_respects_cost_limit() {
     // but cost 13 > 9 → filtered out
     let setsuna = game.id("PL!N-bp4-007-R+");
     let filler = game.id("PL!-sd1-010-SD");
+    game.assert_card_identity(rina, "PL!N-PR-026-PR");
+    game.assert_card_identity(setsuna, "PL!N-bp4-007-R＋");
+    // Pin BOTH halves of the filter's premise: the card really is over the cost
+    // ceiling, and it really does print the ライブ成功時 that is being filtered.
+    // Without these the test only proves "nothing was gained", which stays true
+    // if the fixture drifts to a card that was never eligible.
+    game.assert_card_cost(setsuna, 13);
+    let setsuna_triggers: Vec<String> = game
+        .db
+        .get_card(setsuna)
+        .unwrap()
+        .resolved_abilities()
+        .filter_map(|a| a.triggers.as_ref().map(|t| t.to_string()))
+        .collect();
+    assert!(
+        setsuna_triggers.iter().any(|t| t.contains("ライブ成功時")),
+        "the over-cost card must still print a ライブ成功時, otherwise this is not \
+         a cost-filter test, got {setsuna_triggers:?}"
+    );
 
     game.state.player1.stage.stage = [rina, filler, -1];
     game.state.player1.stage.under_cards[0].push(setsuna);
@@ -227,7 +268,7 @@ fn rina_copied_live_success_ability_places_energy_from_energy_deck() {
     let mut game = TestGame::new(db);
     let (rina, energy) = setup_rina_live_success(&mut game, 0, 1);
 
-    assert!(game.state.gained_card_abilities.get(&rina).is_some());
+    assert!(game.state.gained_card_abilities.contains_key(&rina));
     TurnEngine::trigger_live_success_abilities(&mut game.state, "p1");
     game.state.process_pending_auto_abilities("p1");
 
@@ -242,7 +283,7 @@ fn rina_copied_live_success_ability_does_nothing_without_energy_deficit() {
     let mut game = TestGame::new(db);
     let (rina, energy) = setup_rina_live_success(&mut game, 1, 0);
 
-    assert!(game.state.gained_card_abilities.get(&rina).is_some());
+    assert!(game.state.gained_card_abilities.contains_key(&rina));
     TurnEngine::trigger_live_success_abilities(&mut game.state, "p1");
     game.state.process_pending_auto_abilities("p1");
 

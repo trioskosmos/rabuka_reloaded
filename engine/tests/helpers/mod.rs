@@ -441,6 +441,52 @@ impl TestGame {
         self.run_main_action(Some("A pass".to_string()), &ActionType::Pass, None, None, None)
             .expect("pass failed");
     }
+
+    /// Step the turn until `target` is the current phase.
+    ///
+    /// Prefer this over `for _ in 0..3 { game.pass() }`. A blind count works
+    /// only while the phase sequence is frozen: the moment a phase gains or
+    /// loses a step, the test is standing in a different window than it thinks,
+    /// and the first thing that "breaks" is the test's own setup rather than the
+    /// engine. Panics instead of spinning when the phase is never reached.
+    ///
+    /// Targets worth knowing (each established by driving a real live):
+    ///   * `LiveCardSetFirstAttacker` / `LiveCardSetSecondAttacker` — where
+    ///     `set_live_card` belongs, for the first and second attacker.
+    ///   * `FirstAttackerPerformance` — where ライブ開始時 is scanned.
+    ///   * `SecondAttackerPerformance` — where the YELL happens; the yell prompt
+    ///     does not exist yet in the first attacker's phase, so a test waiting for
+    ///     a SelectAutoAbility from a yell must step to this one or later.
+    ///   * `LiveVictoryDetermination` — after both performances, with the
+    ///     snapshots recorded.
+    ///   * `Active` — one full turn later; the reliable way to be sure EVERY
+    ///     live phase was traversed when the thing under test is ライブ成功時,
+    ///     which resolves as the live closes. `LiveVictoryDetermination` is too
+    ///     early for it.
+    pub fn advance_to_phase(&mut self, target: rabuka_engine::game_state::Phase) {
+        for _ in 0..16 {
+            if self.state.current_phase == target {
+                return;
+            }
+            self.pass();
+            if self.state.current_phase == target {
+                // Arrived: hand any prompt raised by this step to the CALLER.
+                // The phase you are stepping into is often the one whose window
+                // raises the prompt (a ライブ開始時 position change, say), and
+                // draining it here would consume the very choice the test came
+                // to inspect. An empty answer is not an option either — a
+                // non-skippable prompt rejects it.
+                return;
+            }
+            while self.has_pending_choice() {
+                self.select_indices(&[0]);
+            }
+        }
+        panic!(
+            "the turn never reached {:?} within 16 passes (stuck at {:?})",
+            target, self.state.current_phase
+        );
+    }
 }
 
 pub fn fill_decks(game: &mut TestGame, filler: i16) {

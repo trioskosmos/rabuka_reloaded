@@ -40,9 +40,10 @@ fn opponent_has_2_wait_members_gains_heart06() {
         .state
         .mods
         .get_heart_modifier(izumi, HeartColor::Heart06);
-    assert!(
-        heart_mod >= 1,
-        "heart06 should be applied, got {}",
+    assert_eq!(
+        heart_mod, 1,
+        "相手のステージにウェイト状態のメンバーが2人以上いるかぎり、heart06を得る \
+         — exactly one heart06, got {}",
         heart_mod
     );
 }
@@ -169,10 +170,25 @@ fn opponent_has_2_wait_and_1_active_condition_met() {
         .state
         .mods
         .get_heart_modifier(izumi, HeartColor::Heart06);
-    assert!(
-        heart_mod >= 1,
-        "heart06 should apply with 2 wait (1 active irrelevant), got {}",
-        heart_mod
+    // 「2人以上いるかぎり、heart06を得る」 — a THRESHOLD, not a per-member count:
+    // exactly one heart06 however many members are waited. `>= 1` would pass a
+    // per-member grant, which is the wrong reading of 2人以上.
+    assert_eq!(
+        heart_mod, 1,
+        "heart06 applies once with 2 wait members (1 active irrelevant), got {heart_mod}"
+    );
+
+    // …and it really is a threshold: a third waited member must not add another.
+    game.state
+        .mods
+        .add_orientation_modifier(opp_member3, "wait");
+    game.state.recalculate_constants();
+    assert_eq!(
+        game.state
+            .mods
+            .get_heart_modifier(izumi, HeartColor::Heart06),
+        1,
+        "2人以上 is a floor, not a multiplier: 3 waited members still give 1 heart06"
     );
 }
 

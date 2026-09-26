@@ -20,19 +20,17 @@ fn cutie_panther_live_start_reduce_hearts() {
         game.state.player1.main_deck.cards.push(filler);
         game.state.player2.main_deck.cards.push(filler);
     }
-    for _ in 0..5 {
-        game.pass();
-    }
+    game.advance_to_phase(rabuka_engine::game_state::Phase::LiveCardSetFirstAttacker);
     game.set_live_card(cutie);
     // Set wait AFTER the active phase, which would otherwise stand the member.
     game.state
         .mods
         .add_orientation_modifier(opp, "wait");
-    for _ in 0..5 {
-        game.pass();
-        while game.has_pending_choice() {
-            game.select_indices(&[]);
-        }
+    // Step to the performance phase BY NAME: the ライブ開始時 scan happens there,
+    // and a fixed pass count would silently walk past it if a phase changed.
+    game.advance_to_phase(rabuka_engine::game_state::Phase::FirstAttackerPerformance);
+    while game.has_pending_choice() {
+        game.select_indices(&[]);
     }
     use rabuka_engine::card::HeartColor;
     assert_eq!(
@@ -88,18 +86,15 @@ fn kaguya_live_success_cheer_recover() {
         game.state.player2.main_deck.cards.push(filler);
     }
 
-    // Advance to live card set phase
-    for _ in 0..5 {
-        game.pass();
-    }
+    // Advance to the live card set phase BY NAME, then through the performance
+    // to the point where ライブ成功時 resolves. The five blind passes after the
+    // set were correct only while the phase sequence was frozen.
+    game.advance_to_phase(rabuka_engine::game_state::Phase::LiveCardSetFirstAttacker);
     game.set_live_card(kaguya);
-
-    // Advance through remaining phases to live performance
-    game.pass();
-    game.pass();
-    game.pass();
-    game.pass();
-    game.pass();
+    // ライブ成功時 resolves as the live closes; stepping to the next turn's
+    // Active phase is what guarantees every live phase was traversed, by name,
+    // rather than by guessing how many passes that took.
+    game.advance_to_phase(rabuka_engine::game_state::Phase::Active);
 
     // After live performance, cheer-revealed cards should be in revealed_cards
     // If the member was cheer-revealed, the ability should add it to hand

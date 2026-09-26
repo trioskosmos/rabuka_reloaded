@@ -6,13 +6,23 @@
 /// Q171: "Until live end" effects expire at LiveVictoryDetermination end.
 use crate::helpers::*;
 
+/// 桜小路きな子 PL!SP-pb1-006-R (cost 9 — the energy budget below depends on it).
+/// Pinned because PL!SP-bp5-006-R and PL!SP-pb2-006-R are two more printings
+/// of the same character, at costs 11 and 2.
+fn kinako_q94_id(game: &mut TestGame) -> i16 {
+    let id = game.id("PL!SP-pb1-006-R");
+    game.assert_card_identity(id, "PL!SP-pb1-006-R");
+    game.assert_card_cost(id, 9);
+    id
+}
+
 /// Q94: Debut triggers the auto ability, granting 2 blade.
 #[test]
 fn debut_grants_two_blades_until_live_end() {
     let db = load_real_database();
     let mut game = TestGame::new(db);
 
-    let kinako = game.id("PL!SP-pb1-006-R");
+    let kinako = kinako_q94_id(&mut game);
     let filler = game.id("PL!-sd1-010-SD");
 
     game.state.player1.hand.cards.push(kinako);
@@ -35,7 +45,7 @@ fn debut_blades_persist_until_live_victory_then_expire_without_performing() {
 
     let db = load_real_database();
     let mut game = TestGame::new(db);
-    let member = game.id("PL!SP-pb1-006-R");
+    let member = kinako_q94_id(&mut game);
     let filler = game.id("PL!-sd1-010-SD");
     fill_decks(&mut game, filler);
     game.add_to_hand(member);
@@ -76,8 +86,13 @@ fn debut_then_effect_swap_stacks_two_blade_grants() {
     let db = load_real_database();
     let mut game = TestGame::new(db);
 
-    let kinako_q94 = game.id("PL!SP-pb1-006-R"); // 自動: debut/move → +2 blade
+    let kinako_q94 = kinako_q94_id(&mut game); // 自動: debut/move → +2 blade
     let kinako_swap = game.id("PL!SP-bp5-006-R"); // 起動: swap positions
+    // Two printings of the same character, deliberately: the auto watcher and
+    // the 起動 swapper are different cards on stage.
+    game.assert_card_identity(kinako_swap, "PL!SP-bp5-006-R");
+    game.assert_same_card_name(kinako_q94, kinako_swap, "two きな子 printings");
+    assert_ne!(kinako_q94, kinako_swap, "two separate card instances");
     let filler = game.id("PL!-sd1-010-SD");
 
     game.add_to_hand(kinako_q94);

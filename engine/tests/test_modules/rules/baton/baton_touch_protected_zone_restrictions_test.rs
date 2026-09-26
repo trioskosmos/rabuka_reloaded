@@ -82,6 +82,27 @@ fn double_baton_to_protected_zone_rejected() {
         result.is_err(),
         "Double baton should be rejected when one target has cannot_baton_touch"
     );
+    // A double baton has two targets, so "rejected" has to mean NEITHER was
+    // touched: the unprotected Center member is the one that would have moved
+    // legitimately, and a partial application is exactly the bug this pins.
+    assert_eq!(
+        game.state.player1.stage.stage,
+        [protected, filler, -1],
+        "a rejected double baton must leave BOTH areas untouched"
+    );
+    assert!(
+        !game.state.player1.waitroom.cards.contains(&protected)
+            && !game.state.player1.waitroom.cards.contains(&filler),
+        "neither target may be put into the waitroom"
+    );
+    assert!(
+        game.state.player1.hand.cards.contains(&sumire),
+        "the arriving member must still be in hand"
+    );
+    assert_eq!(
+        game.state.baton_touch_count_p1, 0,
+        "a rejected double baton must not be counted (0 of 2 recorded)"
+    );
 }
 
 /// Double baton succeeds when NEITHER of the two target areas

@@ -14,12 +14,17 @@ fn skip_optional_card_and_target_choices(game: &mut TestGame) {
     }
 }
 
+/// 大沢瑠璃乃 PL!HS-PR-018-PR: ライブ開始時 E 支払ってもよい: ブレード×2.
+/// This test DECLINES the optional E (skip_optional… answers option 0), so the
+/// printed two blades must NOT appear. It previously asserted only
+/// `blade >= 0`, which no state could ever violate.
 #[test]
-fn live_start_optional_energy_two_blade_flow_keeps_modifier_nonnegative() {
+fn live_start_declined_optional_energy_gains_no_blade() {
     let db = load_real_database();
     let mut game = TestGame::new(db);
 
     let member = game.id("PL!HS-PR-018-PR");
+    game.assert_card_identity(member, "PL!HS-PR-018-PR");
     let fid = game.id_ref("PL!-sd1-010-SD");
     game.state.player1.stage.stage = [-1, member, -1];
     fill_both_main_decks(&mut game, fid);
@@ -32,12 +37,23 @@ fn live_start_optional_energy_two_blade_flow_keeps_modifier_nonnegative() {
         skip_optional_card_and_target_choices(&mut game);
     }
 
-    // The ability is optional — if it prompted, pay and check blade.
-    // If no prompt appeared (no valid candidates), skip this assertion.
-    let blade = game.state.mods.get_blade_modifier(member);
-    assert!(
-        blade >= 0,
-        "blade modifier should be non-negative"
+    assert_eq!(
+        game.state.mods.get_blade_modifier(member),
+        0,
+        "declining E 支払ってもよい must grant no blade at all"
+    );
+}
+
+/// The positive twin: paying the E grants exactly the printed two blades.
+#[test]
+fn live_start_paid_optional_energy_gains_exactly_two_blade() {
+    let db = load_real_database();
+    let mut game = TestGame::new(db);
+    let member = stage_self_and_advance_paying_optional_costs(&mut game, "PL!HS-PR-018-PR");
+    assert_eq!(
+        game.state.mods.get_blade_modifier(member),
+        2,
+        "ブレードブレードを得る — exactly two blades"
     );
 }
 
@@ -86,11 +102,18 @@ fn advance_live_paying_optional_costs(game: &mut TestGame) {
     }
 }
 
+/// 上原歩夢 PL!N-bp1-001-R: ライブ開始時 E 支払ってもよい: ブレード×1.
+/// Was `assert!(blade >= 1)` — "at least one" cannot tell one blade from a
+/// double-counted or stacked grant, which is the failure this gate exists for.
 #[test]
-fn live_start_pay_one_energy_gains_at_least_one_self_blade() {
+fn live_start_pay_one_energy_gains_exactly_one_self_blade() {
     let db = load_real_database();
     let mut game = TestGame::new(db);
     let member = stage_self_and_advance_paying_optional_costs(&mut game, "PL!N-bp1-001-R");
+    game.assert_card_identity(member, "PL!N-bp1-001-R");
     let blade = game.state.mods.get_blade_modifier(member);
-    assert!(blade >= 1, "pay 1E → at least +1 blade");
+    assert_eq!(
+        blade, 1,
+        "pay 1E → exactly one ブレード, not merely at least one"
+    );
 }

@@ -24,11 +24,13 @@ fn fill_both_main_decks(game: &mut TestGame, filler: i16) {
 }
 
 #[test]
-fn live_start_optional_discard_gains_at_least_one_self_blade() {
+fn live_start_optional_discard_gains_exactly_one_self_blade() {
     let db = load_real_database();
     let mut game = TestGame::new(db);
 
+    // 宮下 愛: ライブ開始時 手札を1枚控え室に置いてもよい：ブレードを得る (×1)
     let member = game.id("PL!N-bp1-005-R");
+    game.assert_card_identity(member, "PL!N-bp1-005-R");
     let fid = game.id_ref("PL!-sd1-010-SD");
     game.state.player1.stage.stage = [-1, member, -1];
     fill_both_main_decks(&mut game, fid);
@@ -37,14 +39,29 @@ fn live_start_optional_discard_gains_at_least_one_self_blade() {
     let hf = game.new_id("PL!-sd1-010-SD");
     game.add_to_hand(hf);
     game.give_energy(15);
+    let waitroom_before = game.state.player1.waitroom.cards.len();
 
+    // No live card is revealed in this fixture, so the ライブ開始時 window is
+    // reached by walking the turn rather than by name — the number of passes is
+    // what this setup needs, and the drain after each pass is what lets the
+    // optional cost be paid. Converting this to `advance_to_phase` would need a
+    // live in the zone, which changes the fixture.
     for _ in 0..7 {
         game.pass();
         pay_optional_costs_selecting_last_hand_card(&mut game);
     }
 
-    let blade = game.state.mods.get_blade_modifier(member);
-    assert!(blade >= 1, "optional discard paid → at least +1 blade");
+    // ブレード1枚 — exactly one, and the printed cost must have been paid.
+    assert_eq!(
+        game.state.mods.get_blade_modifier(member),
+        1,
+        "optional discard paid → exactly +1 blade"
+    );
+    assert_eq!(
+        game.state.player1.waitroom.cards.len(),
+        waitroom_before + 1,
+        "手札を1枚控え室に置く — the cost must actually have been paid"
+    );
 }
 
 #[test]

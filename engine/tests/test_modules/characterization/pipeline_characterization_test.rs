@@ -140,32 +140,40 @@ fn timestamp_singleton_set_cards_pinned() {
 #[test]
 fn cross_seat_mirror_sp_bp5_027_and_s_bp7_025() {
     let db = load_real_database();
-    // These are planned mirror rows per TEST_HARDENING_PLAN §5 ledger.
-    // If the exact prints aren't in this build, pin the mechanism instead:
-    // two distinct cards can occupy opposite seats and stage presence is seat-relative.
     let mut game = TestGame::new(db.clone());
-    let try_a = db.get_card_by_no("SP-bp5-027-L").or_else(|| db.get_card_by_no("SP-bp5-027")).map(|_| game.id("SP-bp5-027-L"));
-    let try_b = db.get_card_by_no("S-bp7-025-L").or_else(|| db.get_card_by_no("S-bp7-025")).map(|_| game.id("S-bp7-025-L"));
-    if let (Some(a), Some(b)) = (try_a, try_b) {
-        assert_ne!(a, b, "SP-bp5-027-L and S-bp7-025-L must be distinct cards");
-        game.state.player1.stage.stage = [a, -1, -1];
-        game.state.player2.stage.stage = [b, -1, -1];
-        assert!(game.state.player1.stage.stage.contains(&a));
-        assert!(game.state.player2.stage.stage.contains(&b));
-        let ca = db.get_card(a).unwrap();
-        let cb = db.get_card(b).unwrap();
-        assert!(!ca.abilities.is_empty() || ca.ability.len()>0, "SP-bp5-027-L should have ability");
-        assert!(!cb.abilities.is_empty() || cb.ability.len()>0, "S-bp7-025-L should have ability");
-    } else {
-        // Fallback pin: cross-seat mirror mechanism — stage presence is seat-relative
-        let a = game.id("PL!-sd1-010-SD");
-        let b = game.new_id("PL!-sd1-010-SD");
-        game.state.player1.stage.stage = [a, -1, -1];
-        game.state.player2.stage.stage = [b, -1, -1];
-        assert!(game.state.player1.stage.stage.contains(&a));
-        assert!(game.state.player2.stage.stage.contains(&b));
-        assert_ne!(a, b);
-    }
+    // HOT PASSION!! PL!SP-bp5-027-L and Guilty Night, Guilty Kiss!
+    // PL!S-bp7-025-L — two distinct lives, one per seat.
+    //
+    // This test previously asked for "SP-bp5-027-L" and "S-bp7-025-L" with no
+    // `PL!` prefix, so `get_card_by_no` never matched, the `if let` never
+    // entered, and the whole test asserted nothing while passing. The fallback
+    // branch was doing the real work, on two copies of the same filler.
+    let a = game.id("PL!SP-bp5-027-L");
+    let b = game.id("PL!S-bp7-025-L");
+    game.assert_card_identity(a, "PL!SP-bp5-027-L");
+    game.assert_card_identity(b, "PL!S-bp7-025-L");
+    assert_ne!(a, b, "the two seats hold two DIFFERENT lives");
+    game.assert_distinct_card_names(a, b, "the two cross-seat mirror lives");
+
+    game.state.player1.stage.stage = [a, -1, -1];
+    game.state.player2.stage.stage = [b, -1, -1];
+    assert_eq!(game.state.player1.stage.stage[0], a, "seat 1 holds the first");
+    assert_eq!(game.state.player2.stage.stage[0], b, "seat 2 holds the second");
+
+    // Stage presence is seat-relative: neither card leaked across.
+    assert!(
+        !game.state.player2.stage.stage.contains(&a),
+        "seat 2 must not hold seat 1's live"
+    );
+    assert!(
+        !game.state.player1.stage.stage.contains(&b),
+        "seat 1 must not hold seat 2's live"
+    );
+
+    let ca = db.get_card(a).unwrap();
+    let cb = db.get_card(b).unwrap();
+    assert!(!ca.abilities.is_empty() || ca.ability.len() > 0, "HOT PASSION!! should have ability");
+    assert!(!cb.abilities.is_empty() || cb.ability.len() > 0, "Guilty Night, Guilty Kiss! should have ability");
 }
 
 // D: Q39/Q34/Q33/Q31/Q29 rulings still unpinned — at least pin that related cards exist and basic rules hold

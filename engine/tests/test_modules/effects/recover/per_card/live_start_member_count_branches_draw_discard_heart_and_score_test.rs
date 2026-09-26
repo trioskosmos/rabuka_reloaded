@@ -54,32 +54,95 @@ fn sunny_branch1_1_member_triggers_draw() {
     );
 }
 
-#[test]
-fn sunny_branch1_no_members_does_nothing() {
+/// Play `live_no` as p1's live through the performance and report how much
+/// each player's hand and waitroom grew, plus the live's score modifier.
+///
+/// Hand size alone CANNOT be probed directly here: the performance window draws
+/// for the first attacker regardless of the live card, so a control live with
+/// no ライブ開始時 (PL!-sd1-019-SD) grows p1's hand by exactly as much as
+/// SUNNY DAY SONG does. The DIFFERENCE between the two lives is the only
+/// readable signal for the カードを1枚引く / 手札を1枚控え室に置く tier.
+fn live_window_deltas(
+    live_no: &str,
+    stage_member: Option<&str>,
+) -> (usize, usize, usize, usize, i32) {
     let db = load_real_database();
     let mut game = TestGame::new(db);
 
-    let sunny = game.id("PL!-bp5-021-L");
-    let filler = game.id("PL!-sd1-010-SD");
-    game.add_to_hand(sunny);
-    for _ in 0..5 {
-        game.state.player1.main_deck.cards.push(filler);
+    let live = game.id(live_no);
+    game.assert_card_identity(live, live_no);
+    let filler = game.id("PL!-sd1-013-SD");
+    game.add_to_hand(live);
+    if let Some(no) = stage_member {
+        let m = game.id(no);
+        game.state.player1.stage.stage = [-1, m, -1];
     }
     for _ in 0..5 {
+        game.state.player1.main_deck.cards.push(filler);
         game.state.player2.main_deck.cards.push(filler);
     }
 
     advance_to_live_card_set_p1(&mut game);
-    game.set_live_card(sunny);
-    advance_to_live_start(&mut game);
+    game.set_live_card(live);
+    let p1h = game.state.player1.hand.cards.len();
+    let p1w = game.state.player1.waitroom.cards.len();
+    let p2h = game.state.player2.hand.cards.len();
+    let p2w = game.state.player2.waitroom.cards.len();
 
-    // No members → all conditions fail → ability does nothing.
-    // Verify that none of the ability's effects triggered.
-    // P1 started with 1 card (sunny), after set_live_card it may be gone.
-    // If no draw happened, hand should be ≤ 1.
+    advance_to_live_start(&mut game);
+    while game.has_pending_choice() {
+        game.select_indices(&[0]);
+    }
+
+    let live_in_zone = game.state.player1.live_card_zone.cards[0];
+    (
+        game.state.player1.hand.cards.len() - p1h,
+        game.state.player1.waitroom.cards.len() - p1w,
+        game.state.player2.hand.cards.len() - p2h,
+        game.state.player2.waitroom.cards.len() - p2w,
+        game.state.mods.get_score_modifier(live_in_zone),
+    )
+}
+
+#[test]
+fn sunny_branch1_no_members_does_nothing() {
+    // No members on p1's stage: SUNNY DAY SONG must behave exactly like a live
+    // with no ライブ開始時 at all.
+    let (p1h, p1w, p2h, p2w, score) = live_window_deltas("PL!-bp5-021-L", None);
+    let (c1h, c1w, c2h, c2w, _) = live_window_deltas("PL!-sd1-019-SD", None);
+
+    assert_eq!(
+        (p1h, p1w, p2h, p2w),
+        (c1h, c1w, c2h, c2w),
+        "with no members on stage the ライブ開始時 must be a no-op: \
+         自分のステージにメンバーが1人以上いる場合 … カードを1枚引く / \
+         手札を1枚控え室に置く (sunny {p1h}/{p1w}/{p2h}/{p2w} vs \
+         control {c1h}/{c1w}/{c2h}/{c2w})"
+    );
+    assert_eq!(
+        score, 0,
+        "このカードのスコアを＋１する requires 3+ differently-named members"
+    );
+}
+
+#[test]
+fn sunny_branch1_one_member_draws_for_p1() {
+    // One member on stage: the first tier fires for p1, so the live must beat
+    // the no-ライブ開始時 control on p1's hand inside this window.
+    //
+    // p2's half (自分と相手はカードを1枚引く) is NOT asserted here: p2's hand does
+    // not move inside the first-attacker window, so this test cannot read it.
+    // The sibling test `sunny_branch1_1_member_triggers_draw` above covers the
+    // opponent's side through the full live.
+    let (p1h, _p1w, _p2h, _p2w, _s) =
+        live_window_deltas("PL!-bp5-021-L", Some("PL!-sd1-010-SD"));
+    let (c1h, _c1w, _c2h, _c2w, _) =
+        live_window_deltas("PL!-sd1-019-SD", Some("PL!-sd1-010-SD"));
+
     assert!(
-        game.state.player1.hand.cards.len() <= 1,
-        "P1 hand should not have increased (no draw triggered)"
+        p1h > c1h,
+        "自分のステージにメンバーが1人以上いる場合 … カードを1枚引く — p1 must \
+         gain one more card than the control live (sunny {p1h} vs control {c1h})"
     );
 }
 
@@ -190,19 +253,31 @@ fn sunny_branch2_two_mus_grants_heart() {
         game.select_indices(&[0]);
     }
 
-    // One μ's member should have heart03 modifier now
+    // 『μ's』のメンバー1人は…heart03を得る — ONE member, so exactly one of the
+    // two has heart03 == 1 and the other has none. The old
+    // `h1 >= 1 || h2 >= 1` would also pass if the engine granted heart03 to
+    // BOTH, which is the failure this tier is able to produce.
     use rabuka_engine::card::HeartColor;
-    let heart03_mod_1 = game
+    let heart03_honoka = game
         .state
         .mods
         .get_heart_modifier(honoka, HeartColor::Heart03);
-    let heart03_mod_2 = game
+    let heart03_kotori = game
         .state
         .mods
         .get_heart_modifier(kotori, HeartColor::Heart03);
+    let holders = [heart03_honoka, heart03_kotori]
+        .iter()
+        .filter(|&&h| h == 1)
+        .count();
+    assert_eq!(
+        holders, 1,
+        "『μ's』のメンバー1人は…heart03を得る — exactly one member gains heart03 \
+         (honoka={heart03_honoka}, kotori={heart03_kotori})"
+    );
     assert!(
-        heart03_mod_1 >= 1 || heart03_mod_2 >= 1,
-        "One μ's member should gain heart03 from Branch 2"
+        (heart03_honoka == 1) ^ (heart03_kotori == 1),
+        "one of them has heart03 and the other has none, not a partial amount"
     );
 }
 

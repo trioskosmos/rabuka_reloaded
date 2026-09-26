@@ -6,37 +6,17 @@ Fn-level static signals over `engine/tests/**/*.rs`. Coverage counts (TEST_COVER
 answer “does it fire”; this answers “would the test notice if the trigger were wrong”.
 Report-only: rows are review prompts, not failures.
 
-## no_assert (2)
+## no_assert (0)
 
 _test never asserts (smoke at best — cannot pin behavior)_
 
-| file | test | line | detail |
-| --- | --- | --- | --- |
-| `engine/tests/test_modules/effects/score/live_total/chika_bp3_001_wait_self_activation_live_total_score_test.rs` | `wait_member_total_score_expires_at_live_end_even_without_setting_live` | 110 |  |
-| `engine/tests/test_modules/effects/score/live_total/chika_bp3_001_wait_self_activation_live_total_score_test.rs` | `wait_member_total_score_persists_through_victory_and_expires_after_live` | 105 |  |
+None.
 
-## no_drive (16)
+## no_drive (0)
 
 _trigger-context test that mutates state and asserts but never drives the engine (no scan/activate/play/fire): vacuous negatives/positives_
 
-| file | test | line | detail |
-| --- | --- | --- | --- |
-| `engine/tests/test_modules/effects/ability_mod/live_success_invalidation_and_live_start_suppression_test.rs` | `butterfly_suppresses_only_the_owners_live_start_members` | 213 |  |
-| `engine/tests/test_modules/effects/deck_order/restore/live_start_optional_two_member_bottomdeck_test.rs` | `live_start_optional_two_member_bottomdeck_shrinks_waitroom` | 4 |  |
-| `engine/tests/test_modules/effects/look_select/look_and_filter/all_or_any_three_heart_member_filter_look_test.rs` | `all_three_heart_match_enters_hand_without_nonmatching_filler` | 231 |  |
-| `engine/tests/test_modules/effects/look_select/look_and_filter/all_or_any_three_heart_member_filter_look_test.rs` | `all_three_required_hearts_member_is_added_to_hand` | 23 |  |
-| `engine/tests/test_modules/effects/look_select/look_and_filter/all_or_any_three_heart_member_filter_look_test.rs` | `no_all_three_heart_match_discards_both_looked_at_members` | 164 |  |
-| `engine/tests/test_modules/effects/look_select/look_and_filter/all_or_any_three_heart_member_filter_look_test.rs` | `one_of_three_required_hearts_member_is_discarded` | 137 |  |
-| `engine/tests/test_modules/effects/look_select/look_and_filter/all_or_any_three_heart_member_filter_look_test.rs` | `two_of_three_required_hearts_member_is_discarded` | 109 |  |
-| `engine/tests/test_modules/effects/look_select/pin_top/per_group_member_look_pin_reveal_score_test.rs` | `look_per_group_member_discards_remainder_without_score_for_member_reveal` | 4 |  |
-| `engine/tests/test_modules/jidou/debut_watch/baton_touch_arrival_self_or_other_draws_one_twice_per_turn_test.rs` | `setsuna_self_baton_arrival_draws_one` | 45 |  |
-| `engine/tests/test_modules/jidou/debut_watch/other_member_baton_arrival_draws_one_test.rs` | `other_member_baton_arrival_draws_one_card` | 5 |  |
-| `engine/tests/test_modules/jidou/leaves_stage/self_stage_to_waitroom_recovery_and_group_baton_replacement_test.rs` | `group_baton_replacement_places_energy_under_arriving_member` | 175 |  |
-| `engine/tests/test_modules/jidou/leaves_stage/self_stage_to_waitroom_recovery_and_group_baton_replacement_test.rs` | `other_member_stage_to_waitroom_does_not_trigger_self_live_recovery` | 43 |  |
-| `engine/tests/test_modules/jidou/leaves_stage/self_stage_to_waitroom_recovery_and_group_baton_replacement_test.rs` | `self_stage_to_waitroom_draw_two_discard_one_leaves_one_card_in_hand` | 68 |  |
-| `engine/tests/test_modules/jidou/leaves_stage/self_stage_to_waitroom_recovery_and_group_baton_replacement_test.rs` | `self_stage_to_waitroom_look_five_adds_live_to_hand` | 128 |  |
-| `engine/tests/test_modules/jidou/leaves_stage/self_stage_to_waitroom_recovery_and_group_baton_replacement_test.rs` | `self_stage_to_waitroom_optional_discard_grants_member_heart05_and_blade` | 151 |  |
-| `engine/tests/test_modules/jidou/leaves_stage/self_stage_to_waitroom_recovery_and_group_baton_replacement_test.rs` | `self_stage_to_waitroom_recovers_group_live` | 21 |  |
+None.
 
 ## synthetic_only (0)
 
@@ -44,23 +24,115 @@ _trigger event hand-pushed with no real ability resolution in the same fn (weake
 
 None.
 
-## pendency_only (2)
+## pendency_only (0)
 
 _has_pending_choice asserted without choice identity (pending_choice_type/summary/answer) or outcome asserts_
 
-| file | test | line | detail |
-| --- | --- | --- | --- |
-| `engine/tests/test_modules/effects/compound/cost_and_effect/discard_two_self_and_other_group_debut_retrigger_test.rs` | `discard_two_debut_retrigger_offers_count_two_selection` | 47 |  |
-| `engine/tests/test_modules/jidou/leaves_stage/optional_any_player_position_change_q238_test.rs` | `leaves_stage_repositions_opponent_member_for_all_rarities_q238` | 84 |  |
+None.
 
-## similar_cards (29)
+## assert_only_negative (19)
 
-_confusable card numbers (bp2 vs pb2) staged in one file — human review for wrong-card staging_
+_every assertion is a bare is_err()/is_none() — some guard fired, but nothing says which, so a regression tripping a different guard still passes_
 
 | file | test | line | detail |
 | --- | --- | --- | --- |
-| `engine/tests/test_modules/characterization/bp7_character_name_condition_test.rs` | `<file>` | 1 | PL!S-bp3-003-R＋, PL!S-bp7-003-R＋ |
-| `engine/tests/test_modules/effects/ability_mod/energy_cost_aqours_score_pl_s_bp6_007_r_test.rs` | `<file>` | 1 | PL!S-bp6-007-R, PL!S-pb1-007-R |
+| `engine/tests/test_modules/characterization/bytecode_validation_test.rs` | `empty_slice_returns_default_ability` | 281 |  |
+| `engine/tests/test_modules/characterization/bytecode_validation_test.rs` | `malformed_bytecode_returns_error` | 273 |  |
+| `engine/tests/test_modules/effects/ability_mod/full_distinct_group_stage_grants_yell_live_score_test.rs` | `duplicate_names_fails_condition` | 166 |  |
+| `engine/tests/test_modules/effects/ability_mod/full_distinct_group_stage_grants_yell_live_score_test.rs` | `empty_area_fails_condition` | 146 |  |
+| `engine/tests/test_modules/effects/ability_mod/full_distinct_group_stage_grants_yell_live_score_test.rs` | `non_aqours_member_fails_condition` | 188 |  |
+| `engine/tests/test_modules/effects/ability_mod/rina_gain_live_success_from_under_member_test.rs` | `rina_no_under_cards` | 154 |  |
+| `engine/tests/test_modules/effects/ability_mod/rina_gain_live_success_from_under_member_test.rs` | `rina_not_on_stage` | 177 |  |
+| `engine/tests/test_modules/effects/compound/cost_and_effect/center_wait_discard_other_group_cost_plus_two_same_area_deploy_edges_test.rs` | `center_other_member_cost_plus_two_deploy_not_at_center_activation_blocked` | 20 |  |
+| `engine/tests/test_modules/effects/compound/cost_and_effect/discard_cost_reveal_five_conditional_mus_search_pl_bp6_006_test.rs` | `maki_bp6_use_limit_turn1_enforces` | 418 |  |
+| `engine/tests/test_modules/effects/compound/cost_and_effect/hand_only_self_discard_draw_group_blade_q196_test.rs` | `hand_only_self_discard_draw_q196_needs_hand_activation` | 58 |  |
+| `engine/tests/test_modules/effects/compound/sequential_effects/baton_touch_place_liella_under_then_activate_copied_ability_pl_sp_pb2_005_test.rs` | `hazuki_non_liella_under_no_abilities_gained` | 177 |  |
+| `engine/tests/test_modules/effects/conditional/zone_source/umi_reveal_live_card_gains_live_total_score_test.rs` | `q176_use_limit_blocks_second_activation_same_turn` | 107 |  |
+| `engine/tests/test_modules/effects/cost_mod/activation_discount/play_time_three_named_member_discard_cost_ten_test.rs` | `play_time_named_discard_waitroom_fodder_cannot_enable_ten_energy_play` | 170 |  |
+| `engine/tests/test_modules/effects/deploy/under_energy_cost_waited_empty_area_deploy_q268_test.rs` | `under_energy_cost_waited_deploy_q268_turn_limit_blocks_second_activation` | 237 |  |
+| `engine/tests/test_modules/effects/energy/under_member/energy_under_original_blade_limit_opponent_wait_test.rs` | `energy_under_original_blade_limit_negative_modifier_does_not_make_printed_blade_eligible` | 238 |  |
+| `engine/tests/test_modules/effects/energy/under_member/energy_under_original_blade_limit_opponent_wait_test.rs` | `energy_under_original_blade_limit_opponent_over_limit_not_waited` | 165 |  |
+| `engine/tests/test_modules/effects/look_select/search_deck/reveal_from_deck_until_chosen_type_found_test.rs` | `reveal_until_chosen_type_center_requirement_left_side_fails` | 222 |  |
+| `engine/tests/test_modules/effects/recover/to_hand/live_success_recover_different_group_name_to_hand_ll_bp5_002_l_test.rs` | `all_same_group_no_effect` | 135 |  |
+| `engine/tests/test_modules/effects/recover/to_hand/live_success_recover_different_group_name_to_hand_ll_bp5_002_l_test.rs` | `two_distinct_groups_no_effect` | 106 |  |
+
+## assert_only_counts (14)
+
+_every assertion is about a count/size (len/count/>=1) — '3 options were offered' can hold while the 3 are the wrong 3_
+
+| file | test | line | detail |
+| --- | --- | --- | --- |
+| `engine/tests/test_modules/effects/choice/per_card/energy_or_recycle_live_pl_n_pb1_010_r_test.rs` | `pl_n_pb1_010_r_energy_option_leaves_active_energy` | 20 |  |
+| `engine/tests/test_modules/effects/deck_order/restore/both_waitrooms_member_restore_threshold_q242_test.rs` | `debut_both_waitrooms_member_restore_shrinks_own_waitroom` | 15 |  |
+| `engine/tests/test_modules/effects/position/area_move/debut_selected_member_fixed_center_test.rs` | `fixed_center_choice_offers_self_and_other_stage_members` | 68 |  |
+| `engine/tests/test_modules/effects/state/per_card/sd2_nijigasaki_abilities_gap_test.rs` | `setsuna_debut_gains_heart05` | 319 |  |
+| `engine/tests/test_modules/effects/state/wait_activation/sp_bp5_choice_energy_test.rs` | `sp_bp5_choice_energy_pay_and_draw` | 16 |  |
+| `engine/tests/test_modules/integration/full_round/live_each_time_victory_road_through_real_live_rounds_test.rs` | `live_card_own_live_success_no_trigger` | 894 |  |
+| `engine/tests/test_modules/integration/full_round/live_each_time_victory_road_through_real_live_rounds_test.rs` | `live_success_each_time_draws_card` | 427 |  |
+| `engine/tests/test_modules/integration/full_round/live_each_time_victory_road_through_real_live_rounds_test.rs` | `test_live_success_each_time_drains_after_success` | 842 |  |
+| `engine/tests/test_modules/integration/parser_e2e/parser_issues_e2e_part2_test.rs` | `issue3_ayumu_compound_both_conditions_met` | 170 |  |
+| `engine/tests/test_modules/integration/parser_e2e/parser_issues_e2e_part3_test.rs` | `issue13_mia_three_conditional_blade_checks` | 770 |  |
+| `engine/tests/test_modules/integration/parser_e2e/parser_issues_e2e_test.rs` | `issue5_solitude_rain_heart_color_scoring` | 321 |  |
+| `engine/tests/test_modules/jidou/leaves_stage/self_stage_to_waitroom_recovery_and_group_baton_replacement_test.rs` | `self_stage_to_waitroom_optional_discard_grants_member_heart05_and_blade` | 151 |  |
+| `engine/tests/test_modules/jidou/leaves_stage/self_wait_cost_then_choose_mirakura_member_gains_blade_test.rs` | `hs_cl1_choice_among_multiple_mirakura` | 105 |  |
+| `engine/tests/test_modules/rules/trigger_paths/debut_watcher_baton_and_hand_activation_q196_q197_q198_test.rs` | `cost10_baton_replacement_does_not_draw_from_departed_watcher_q197` | 114 |  |
+
+## placeholder (0)
+
+_#[ignore], assert!(true), todo!() or unimplemented!() left in a test_
+
+None.
+
+## prompt_ordinal_drain (0)
+
+_prompts answered by ORDINAL position (if step <= 2 { select 2 cards }) instead of by the prompt's own identity — adding or removing one prompt upstream silently changes which prompt gets the answer_
+
+None.
+
+## blind_phase_stepping (31)
+
+_a fixed `for _ in 0..N { pass() }` walk through the turn — a phase gaining or losing a step silently shifts the window the test thinks it is standing in; step to the phase by name instead_
+
+| file | test | line | detail |
+| --- | --- | --- | --- |
+| `engine/tests/test_modules/characterization/logging_test.rs` | `real_choice_flow_emits_offered_and_resolved` | 271 |  |
+| `engine/tests/test_modules/characterization/performance_snapshot_audit_test.rs` | `audit_both_players_fail_no_winner` | 488 |  |
+| `engine/tests/test_modules/characterization/performance_snapshot_audit_test.rs` | `audit_p1_passes_p2_fails_p1_wins` | 690 |  |
+| `engine/tests/test_modules/characterization/pipeline_characterization_test.rs` | `s9_check_timing_cascade_smoke` | 214 |  |
+| `engine/tests/test_modules/effects/ability_mod/chisato_bp5_test.rs` | `chisato_promo_ab1_live_start` | 234 |  |
+| `engine/tests/test_modules/effects/compound/cost_and_effect/discard_cost_reveal_five_conditional_mus_search_pl_bp6_006_test.rs` | `maki_bp6_blade_expires_at_live_end` | 222 |  |
+| `engine/tests/test_modules/effects/compound/cost_and_effect/live_start_optional_unit_discard_draw_unit_cost_gain_test.rs` | `optional_unit_discard_draw_cost_gain_skip_cost_no_cost_modifier` | 68 |  |
+| `engine/tests/test_modules/effects/compound/cost_and_effect/wait_self_bottom_mill_aqours_unwait_blades_pl_s_bp7_011_n_test.rs` | `riko_blade_expires_at_live_end` | 158 |  |
+| `engine/tests/test_modules/effects/compound/sequential_effects/debut_draws_one_and_cannot_live_this_turn_q68_test.rs` | `tote_mari_q68_can_still_set_live_card` | 47 |  |
+| `engine/tests/test_modules/effects/compound/sequential_effects/live_success_mill_five_distinct_live_recovery_setup_test.rs` | `live_success_mill_distinct_live_recovery_three_same_name_copies_resolves` | 3 |  |
+| `engine/tests/test_modules/effects/compound/sequential_effects/live_success_mill_five_distinct_live_recovery_setup_test.rs` | `live_success_mill_distinct_live_recovery_two_same_name_copies_resolves` | 33 |  |
+| `engine/tests/test_modules/effects/cost_mod/required_hearts/required_hearts_stacking_and_hostile_edges_test.rs` | `pl_s_bp7_020_l_reduction_honored_at_performance_end_to_end` | 168 |  |
+| `engine/tests/test_modules/effects/deploy/eternalize_love_test.rs` | `eternalize_love_full_live_flow_heart00_reduction` | 91 |  |
+| `engine/tests/test_modules/effects/gain/blades/under_member/q278_q279_joint_card_under_member_blade_test.rs` | `q278_ability_placed_card_and_joint_are_counted_at_live_start` | 160 |  |
+| `engine/tests/test_modules/effects/gain/hearts/per_card/rurino_debut_activate_wait_member_add_live_card_test.rs` | `rurino_bp5_live_start_gains_heart_from_discarded_group` | 177 |  |
+| `engine/tests/test_modules/effects/recover/per_card/live_success_per_wait_member_score_and_yell_reveal_to_deck_bottom_test.rs` | `live_success_yell_reveal_live_to_deck_bottom` | 72 |  |
+| `engine/tests/test_modules/effects/restriction/mebius_loop_comprehensive_edge_test.rs` | `mebius_restriction_expires_next_live` | 100 |  |
+| `engine/tests/test_modules/effects/restriction/mebius_loop_comprehensive_edge_test.rs` | `mebius_tie_when_both_fail_still_restricts` | 151 |  |
+| `engine/tests/test_modules/effects/score/per_card/excess_heart_score_shift_never_below_zero_pl_n_bp5_010_r_test.rs` | `mifune_q231_excess_heart_2_score_cancels_to_0_all_rarities` | 57 |  |
+| `engine/tests/test_modules/integration/pvp_room_test.rs` | `both_players_multiple_live_start_abilities_get_correct_choice_routing` | 204 |  |
+| `engine/tests/test_modules/jidou/movement/ability_chain_combo/ability_chain_combo_test.rs` | `special_color_no_score_when_moved_liella_left_center` | 300 |  |
+| `engine/tests/test_modules/jidou/movement/ability_chain_combo/ability_chain_combo_test.rs` | `special_color_set_blades_and_score_twin_in_one_live` | 232 |  |
+| `engine/tests/test_modules/jidou/movement/self_area_move_watch/area_move_timing_and_movement_state_conditions_test.rs` | `fuyumari_p2_play_to_stage_triggers_appearance` | 544 |  |
+| `engine/tests/test_modules/jidou/yell/discard_revealed_then_re_yell/blade_heart_two_or_fewer_discard_all_and_re_yell_test.rs` | `with_dia_mixed_deck_both_trigger` | 290 |  |
+| `engine/tests/test_modules/jidou/yell/discard_revealed_then_re_yell/blade_heart_two_or_fewer_discard_all_and_re_yell_test.rs` | `with_dia_only_dia_triggers` | 241 |  |
+| `engine/tests/test_modules/jidou/yell/no_blade_heart_reveal_gain/no_blade_heart_reveal_two_watchers_modifier_bounds_test.rs` | `yell_two_no_blade_heart_watchers_have_zero_or_one_heart_modifier` | 10 |  |
+| `engine/tests/test_modules/rules/baton/baton_touch_protected_zone_restrictions_test.rs` | `opponent_baton_touch_unaffected_by_protected_card` | 156 |  |
+| `engine/tests/test_modules/rules/baton/double_baton_touch_blade_grant_per_liella_moved_test.rs` | `chisato_natsumi_blade_bonus_expires_at_live_end` | 486 |  |
+| `engine/tests/test_modules/rules/conditions/rule_9_9_layering_test.rs` | `heart_override_additive_stacks_in_both_stage_heart_calcs` | 91 |  |
+| `engine/tests/test_modules/rules/phases/draw_phase_single_draw_no_unwanted_discards_test.rs` | `test_draw_phase_no_unwanted_discards` | 5 |  |
+| `engine/tests/test_modules/rules/phases/live_success_rules_test.rs` | `daydream_mermaid_q191_niji_in_success_pick_both` | 501 |  |
+
+## similar_cards (20)
+
+_confusable card numbers (bp2 vs pb2) staged in one file AND the file pins card identity (assert_card_identity / compares card_no), so a transposition would fail loudly_
+
+| file | test | line | detail |
+| --- | --- | --- | --- |
 | `engine/tests/test_modules/effects/compound/per_card/position_change_draw_and_rotation_multi_card_fixes_test.rs` | `<file>` | 1 | PL!SP-bp2-008-R, PL!SP-pb1-008-R |
 | `engine/tests/test_modules/effects/compound/sequential_effects/debut_two_distinct_live_cards_opponent_picks_one_q118_test.rs` | `<file>` | 1 | PL!SP-bp2-011-R, PL!SP-pb2-011-R |
 | `engine/tests/test_modules/effects/cost_mod/activation_discount/play_time_three_named_member_discard_cost_ten_test.rs` | `<file>` | 1 | PL!S-bp2-016-N, PL!S-bp3-016-N, PL!S-bp7-016-N |
@@ -71,20 +143,25 @@ _confusable card numbers (bp2 vs pb2) staged in one file — human review for wr
 | `engine/tests/test_modules/effects/live_start/dazzling_game_test.rs` | `<file>` | 1 | PL!S-PR-015-PR, PL!S-bp2-015-PR |
 | `engine/tests/test_modules/effects/look_select/look_and_filter/all_or_any_three_heart_member_filter_look_test.rs` | `<file>` | 1 | PL!S-PR-015-PR, PL!S-bp2-015-PR |
 | `engine/tests/test_modules/effects/look_select/per_card/live_success_distortion_heart_requirement_test.rs` | `<file>` | 1 | PL!SP-bp1-012-N, PL!SP-bp4-012-N |
-| `engine/tests/test_modules/effects/look_select/reveal/sequential_cost_look_five_take_cost9_member_test.rs` | `<file>` | 1 | PL!-bp3-002-R, PL!-bp5-002-R |
-| `engine/tests/test_modules/effects/position/area_move/position_change_multi_test.rs` | `<file>` | 1 | PL!HS-bp2-006-R, PL!HS-pb1-006-R |
-| `engine/tests/test_modules/effects/position/area_move/position_change_non_optional_test.rs` | `<file>` | 1 | PL!HS-bp2-006-R, PL!HS-pb1-006-R |
 | `engine/tests/test_modules/effects/recover/per_card/live_start_aqours_center_cost_nine_blade_gain_or_opponent_wait_test.rs` | `<file>` | 1 | PL!S-bp2-001-R, PL!S-pb1-001-R |
-| `engine/tests/test_modules/effects/score/card_score/live_start_two_distinct_group_members_live_score_test.rs` | `<file>` | 1 | PL!SP-bp1-013-PR, PL!SP-pb1-013-PR |
 | `engine/tests/test_modules/effects/score/card_score/success_count_revealed_score_live_pl_sp_bp5_023_l_test.rs` | `<file>` | 1 | PL!SP-bp1-023-L, PL!SP-bp5-023-L |
 | `engine/tests/test_modules/effects/score/per_card/aurora_flower_set_card_identity_group_match_test.rs` | `<file>` | 1 | PL!HS-bp1-021-L, PL!HS-bp2-021-L |
 | `engine/tests/test_modules/effects/state/per_card/either_or_state_change_test.rs` | `<file>` | 1 | PL!N-bp4-008-R, PL!N-pb1-008-R |
 | `engine/tests/test_modules/integration/full_round/real_card_phase_walkthrough_and_ability_suite_test.rs` | `<file>` | 1 | PL!S-bp2-009-R, PL!S-bp5-009-R |
 | `engine/tests/test_modules/integration/per_card/live_end_expiry_rollover_and_dual_trigger_window_gates_test.rs` | `<file>` | 1 | PL!HS-bp5-004-R, PL!HS-bp6-004-R |
-| `engine/tests/test_modules/jidou/movement/ability_chain_combo/ability_chain_combo_test.rs` | `<file>` | 1 | PL!SP-pb1-006-R, PL!SP-pb2-006-R |
 | `engine/tests/test_modules/jidou/movement/self_area_move_watch/appearance_and_repeated_swaps_stack_blades_test.rs` | `<file>` | 1 | PL!SP-bp5-006-R, PL!SP-pb1-006-R |
-| `engine/tests/test_modules/jidou/movement/self_area_move_watch/debut_or_self_area_move_gain_two_blades_q94_q171_test.rs` | `<file>` | 1 | PL!SP-bp5-006-R, PL!SP-pb1-006-R |
 | `engine/tests/test_modules/jidou/movement/under_member_placement/live_success_or_self_move_place_discard_group_member_under_self_test.rs` | `<file>` | 1 | PL!SP-bp5-006-R, PL!SP-pb2-006-R |
-| `engine/tests/test_modules/jidou/movement/under_member_placement/under_member_counted_for_both_players_test.rs` | `<file>` | 1 | PL!SP-pb1-006-R, PL!SP-pb2-006-R |
 | `engine/tests/test_modules/rules/conditions/restriction_and_aura_mechanics_test.rs` | `<file>` | 1 | PL!S-bp5-009-R, PL!S-bp7-009-R |
 | `engine/tests/test_modules/rules/trigger_paths/retrieval_placement_blade_ability_chain_test.rs` | `<file>` | 1 | PL!S-bp2-019-L, PL!S-bp3-019-L |
+
+## unpinned_similar_cards (0)
+
+_confusable card numbers (bp2 vs pb2) staged in one file with NO card-identity pin — a transposed print would pass silently; add assert_card_identity to close it_
+
+None.
+
+## unresolvable_card_id (0)
+
+_a game.id("…") literal that is not a card number in the database — get_card_id's lenient fallback silently substitutes a DIFFERENT PRINT of the same card, so the test stages the wrong card and passes_
+
+None.

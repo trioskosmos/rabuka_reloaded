@@ -1,4 +1,8 @@
-/// PL!SP-bp2-011-R (鬼塚冬毬) Q118
+/// PL!SP-pb2-011-R (鬼塚冬毬) Q118
+///
+/// Note: PL!SP-bp2-011-R is ALSO 鬼塚冬毬 (cost 11 vs this one's 13). The
+/// header used to name the bp2 printing while every test drove pb2, which is
+/// the exact bp-transposition this file's fixtures guard against.
 ///
 /// {{toujyou.png|登場}}自分の控え室にある、カード名の異なるライブカードを2枚選ぶ。
 /// 選択した場合、相手はそのカードのうち1枚を選ぶ。相手に選ばれたカードを
@@ -10,6 +14,14 @@
 use crate::helpers::*;
 use rabuka_engine::ability::types::Choice;
 use rabuka_engine::zones::MemberArea;
+
+/// 鬼塚冬毬 — the subject of every test here. Pinned because PL!SP-bp2-011-R is
+/// another printing of the same character at a different cost.
+fn toubatsu_id(game: &mut TestGame) -> i16 {
+    let id = game.id("PL!SP-pb2-011-R");
+    game.assert_card_identity(id, "PL!SP-pb2-011-R");
+    id
+}
 
 /// Assert the pending prompt is Toubatsu's jidou 3-option (blades / wait /
 /// draw). Returns after asserting identity; the caller takes an option.
@@ -50,7 +62,7 @@ fn trigger_toubatsu_with_opponent_member() -> (TestGame, i16, i16) {
     let db = load_real_database();
     let mut game = TestGame::new(db);
 
-    let toubatsu = game.id("PL!SP-pb2-011-R");
+    let toubatsu = toubatsu_id(&mut game);
     let filler = game.id("PL!-sd1-010-SD");
     for _ in 0..20 {
         game.state.player1.main_deck.cards.push(filler);
@@ -131,6 +143,10 @@ fn toubatsu_q118_2_distinct_live_cards_works() {
     let toubatsu = game.id("PL!SP-bp2-011-R");
     let live_a = game.id("PL!-sd1-019-SD"); // START:DASH!!
     let live_b = game.id("PL!N-sd1-028-SD"); // Dream with You (different name)
+    // Q118 hinges on カード名の異なる — two live cards that really are different.
+    game.assert_card_identity(live_a, "PL!-sd1-019-SD");
+    game.assert_card_identity(live_b, "PL!N-sd1-028-SD");
+    game.assert_distinct_card_names(live_a, live_b, "the 2 distinct live cards");
     let filler = game.id("PL!-sd1-010-SD");
 
     game.add_to_hand(toubatsu);
@@ -305,7 +321,7 @@ fn toubatsu_q263_center_to_area_move_triggers_auto() {
     let db = load_real_database();
     let mut game = TestGame::new(db);
 
-    let toubatsu = game.id("PL!SP-pb2-011-R");
+    let toubatsu = toubatsu_id(&mut game);
     let filler = game.id("PL!-sd1-010-SD");
     for _ in 0..20 {
         game.state.player1.main_deck.cards.push(filler);
@@ -411,7 +427,7 @@ fn toubatsu_unrelated_debut_no_trigger() {
     let db = load_real_database();
     let mut game = TestGame::new(db);
 
-    let toubatsu = game.id("PL!SP-pb2-011-R");
+    let toubatsu = toubatsu_id(&mut game);
     game.state.player1.stage.stage = [-1, toubatsu, -1];
     game.state
         .player1

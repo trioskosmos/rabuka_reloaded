@@ -598,10 +598,21 @@ impl CardDatabase {
                     return Some(id);
                 }
             }
-            for (k, &id) in &self.normalized_no_to_id {
-                if k.starts_with(&format!("{}-", base)) {
-                    return Some(id);
-                }
+            // "Any rarity of this base" fallback. The lowest key wins, NOT the
+            // first one HashMap iteration happens to yield: HashMap order is
+            // randomised per process, so taking the first match made
+            // get_card_id non-deterministic — the same card_no could resolve to
+            // a different print on different runs, and nothing in the engine or
+            // the test suite may depend on which print that is.
+            let prefix = format!("{}-", base);
+            if let Some(id) = self
+                .normalized_no_to_id
+                .iter()
+                .filter(|(k, _)| k.starts_with(&prefix))
+                .min_by(|a, b| a.0.cmp(b.0))
+                .map(|(_, &id)| id)
+            {
+                return Some(id);
             }
         }
         // 4. Strip trailing rarity suffixes and retry normalized (legacy)
@@ -610,13 +621,14 @@ impl CardDatabase {
                 return Some(id);
             }
         }
-        // 5. Contains fallback (last resort)
-        for (k, &id) in &self.card_no_to_id {
-            if k.contains(&normalized) || k.contains(&normalized.replace('+', "＋")) {
-                return Some(id);
-            }
-        }
-        None
+        // 5. Contains fallback (last resort). Same determinism rule as step 3:
+        // lowest matching key, not the first HashMap iteration yields.
+        let narrow = normalized.replace('+', "＋");
+        self.card_no_to_id
+            .iter()
+            .filter(|(k, _)| k.contains(&normalized) || k.contains(&narrow))
+            .min_by(|a, b| a.0.cmp(b.0))
+            .map(|(_, &id)| id)
     }
 
     /// Normalize card_no for lookup: uppercase, fullwidth → halfwidth.

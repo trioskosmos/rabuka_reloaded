@@ -41,11 +41,13 @@ fn tie_with_two_card_live_zones_allows_selection() {
     game.state.player1.hand.cards.push(p1_a);
     game.state.player2.hand.cards.push(p2_a);
 
-    for _ in 0..5 {
-        game.pass();
-    }
+    // Reach the live-card-set window BY NAME. The five blind passes this
+    // replaces were correct only while the phase sequence was frozen; a phase
+    // gaining or losing a step would leave the test setting a live card in the
+    // wrong window, with nothing to notice.
+    game.advance_to_phase(rabuka_engine::game_state::Phase::LiveCardSetFirstAttacker);
     game.set_live_card(p1_a);
-    game.pass(); // → second attacker's LiveCardSet
+    game.advance_to_phase(rabuka_engine::game_state::Phase::LiveCardSetSecondAttacker);
     game.set_live_card(p2_a);
 
     // …and acquires a SECOND live card mid-phase (as if by an effect; direct
@@ -126,9 +128,7 @@ fn tie_at_two_successes_blocks_third_placement() {
     game.state.player1.hand.cards.push(p1_live);
     game.state.player2.hand.cards.push(p2_live);
 
-    for _ in 0..5 {
-        game.pass();
-    }
+    game.advance_to_phase(rabuka_engine::game_state::Phase::LiveCardSetFirstAttacker);
     game.set_live_card(p1_live);
     game.pass();
     game.set_live_card(p2_live);
@@ -199,9 +199,7 @@ fn solo_winner_third_success_ends_before_live_reentry() {
     game.state.player2.hand.cards.push(p2_live_a);
     game.state.player2.hand.cards.push(p2_live_b);
 
-    for _ in 0..5 {
-        game.pass();
-    }
+    game.advance_to_phase(rabuka_engine::game_state::Phase::LiveCardSetFirstAttacker);
     game.set_live_card(p1_live);
     game.pass();
     game.set_live_card(p2_live_a);

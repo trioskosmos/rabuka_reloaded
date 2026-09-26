@@ -51,7 +51,19 @@ fn sp_bp5_leftside_cost_fails_in_right_side() {
     let f = game.id("PL!-sd1-010-SD");
 
     game.state.player1.stage.stage = [f, -1, card];
+    let stage_before = game.player().stage.stage.clone();
     let result = game.try_activate_ability(card);
 
     assert!(result.is_err(), "Should fail when not on left side");
+    // Same invariants the center case pins: the refusal must be a refusal to
+    // activate, not a partially-resolved effect.
+    assert!(game.player().stage.stage == stage_before, "Stage unchanged");
+    assert!(
+        game.state.mods.get_orientation_modifier(card) != Some("wait"),
+        "左サイド is required, so the member must NOT be waited from the right side"
+    );
+    assert!(
+        !game.has_pending_choice(),
+        "a refused activation must not open the draw/discard prompt"
+    );
 }

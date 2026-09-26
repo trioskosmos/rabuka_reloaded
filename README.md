@@ -186,7 +186,7 @@ cargo bench                         # Criterion benchmarks
 - **Dreamcast port** — **SOLVED** via the wasm→C pipeline (was: no LLVM backend for SH-4). `platforms/dc/build_dc.bat` builds engine→wasm→C→SH-4 ELF→bootable .cdi. Same pipeline unlocks Saturn/Jaguar later.
 - **Exit code 1** — commands return exit code 1 even on success (breaks CI)
 - **Wii GX FIFO** — `GX FIFO error 0x69` during system font rendering; currently falls back to printf console CLI
-- **Clippy warnings** — unused imports/variables in ~10 test files, missing `Default` impls for `CardDatabase` and `GameModifiers`
+- **Clippy warnings** — the test target is now free of unused imports/variables (was ~10 files); what remains there is style (doc-list indentation, `map_or`/`Option` idioms, redundant same-type casts). `CardDatabase` / `GameModifiers` still lack `Default` impls, and the lib target carries ~1.6k warnings
 
 ## Documentation
 

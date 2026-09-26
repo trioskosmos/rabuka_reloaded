@@ -102,6 +102,8 @@ fn scenario_oracle() {
 
     let path = match std::env::var("RABUKA_SCENARIO") {
         Ok(p) => p,
+        // Normal runs are a no-op: the scenario harness is opt-in, and there is
+        // nothing to check without a scenario file.
         Err(_) => return,
     };
     let out_path =
@@ -275,4 +277,20 @@ fn scenario_oracle() {
         }
     }
     std::fs::write(&out_path, out.join("\n") + "\n").expect("write oracle output");
+    // Self-check the oracle output rather than trusting the write: a scenario
+    // with no `expect` lines, or a CHECK line for every other expect, would
+    // otherwise be compared against the C runner as an empty-but-valid file.
+    let written = std::fs::read_to_string(&out_path).expect("re-read oracle output");
+    let check_lines = written.lines().filter(|l| l.starts_with("CHECK ")).count();
+    assert_eq!(
+        check_lines, n,
+        "the oracle must emit one CHECK line per `expect`: got {check_lines} for {n} expects"
+    );
+    assert_eq!(
+        n,
+        text.lines()
+            .filter(|l| l.trim().starts_with("expect "))
+            .count(),
+        "every `expect` in the scenario must have been evaluated"
+    );
 }
