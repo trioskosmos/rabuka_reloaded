@@ -259,6 +259,76 @@ DURATION_PREFIX_MAP = {
 }
 
 # ======================================================================
+# HEART ICON VOCABULARY (one definition, used by every heart scan)
+# ======================================================================
+# A heart colour reaches the parser in three renderings:
+#   {{heart_03.png|heart03}}   card-data form (underscore before the id)
+#   {{heart03.png|heart03}}    icon form
+#   heart03                    the bare id
+# These three patterns plus the helpers below are the only place any of that
+# is spelled, so a rendering change is a one-line edit rather than a sweep
+# through two dozen ad-hoc regexes.
+#
+# HEART_ICON       matches a rendered icon, capturing nothing
+# HEART_ICON_ID    matches a rendered icon, capturing the colour number
+# HEART_ID         matches a bare id anywhere, capturing the colour number
+HEART_ICON = r"\{\{heart_?\d+\.png\|heart\d+\}\}"
+HEART_ICON_ID = r"\{\{heart_?(\d+)\.png\|heart\d+\}\}"
+HEART_ID = r"heart_?(\d+)"
+# The label half of a rendered icon: the `|heart03}` that names the colour.
+HEART_LABEL = r"\|(heart\d+)\}"
+
+
+def _heart_icons(text):
+    """Every rendered heart icon in `text`, in order of appearance."""
+    return re.findall(HEART_ICON, text)
+
+
+def _heart_count(text):
+    """How many heart icons `text` renders."""
+    return len(_heart_icons(text))
+
+
+def _heart_ids(text):
+    """The distinct heart colours `text` names, as sorted `heartNN` ids."""
+    return sorted({f"heart{n.zfill(2)}" for n in re.findall(HEART_ICON_ID, text)})
+
+
+def _heart_ids_gained(text):
+    """The heart colours `text` grants, in order, duplicates kept.
+
+    「{{heart_03.png|heart03}}を得る」 grants a heart, so the icon is one the
+    player receives; 「{{heart_03.png|heart03}}を持つ」 merely requires one and
+    is a condition, not a count. Only the former is a gain.
+    """
+    return [
+        f"heart{m.group(1).zfill(2)}"
+        for m in re.finditer(HEART_ICON_ID, text)
+        if "持つ" not in text[m.end() : m.end() + 12]
+    ]
+
+
+def _heart_label_counts(text):
+    """How many times each heart colour label appears in `text`, in order."""
+    counts = {}
+    for label in re.findall(HEART_LABEL, text):
+        counts[label] = counts.get(label, 0) + 1
+    return counts
+
+
+def _uniform_count(counts):
+    """The single value every colour agrees on, or the smallest if they differ.
+
+    Required-heart clauses are written with the same number per colour, so the
+    usual answer is "they all agree"; `min` keeps a malformed clause from
+    over-granting when they do not.
+    """
+    if not counts:
+        return None
+    values = list(counts.values())
+    return values[0] if len(set(values)) == 1 else min(values)
+
+# ======================================================================
 # TEXT EXTRACTION & UTILITY HELPERS
 # ======================================================================
 
@@ -531,10 +601,7 @@ def extract_cost_modification(text: str) -> Optional[Dict[str, Any]]:
 
 def extract_heart_colors_from_text(text: str) -> list:
     """Extract heart color list from {{heart_XX.png|heartXX}} icon patterns."""
-    hm = re.findall(r"\{\{heart_(\d+)\.png\|heart\d+\}\}", text)
-    if hm:
-        return sorted(set(f"heart{m.zfill(2)}" for m in hm))
-    return []
+    return _heart_ids(text)
 
 
 def detect_duration_code(text: str) -> Optional[str]:
@@ -1429,16 +1496,10 @@ def _set_score_op(t, a):
 
 
 def _handle_required_hearts(t, a):
-    raw = [m.group(1) for m in re.finditer(r"\|(heart\d{2})}", t)]
-    seen = {}
-    for c in raw:
-        seen[c] = seen.get(c, 0) + 1
-    # Ensure equal count across all colors (sanity check; report if not)
-    counts = list(seen.values())
-    if counts and len(set(counts)) == 1:
-        per_color = counts[0]
-    else:
-        per_color = counts[0] if counts else 1
+    raw = re.findall(HEART_LABEL, t)
+    # Every colour is normally written the same number of times; a clause that
+    # disagrees falls back to the smallest count so it cannot over-grant.
+    per_color = _uniform_count(_heart_label_counts(t)) or 1
     colors = list(dict.fromkeys(raw))
     a.update(
         {
@@ -1783,7 +1844,7 @@ def _set_action_040(t, a):
     else:
         a["resource"] = "heart"
     blade_count = len(re.findall(r"\{\{icon_blade\.png\|ブレード\}\}", t))
-    heart_count = len(re.findall(r"\{\{heart_\d+\.png\|heart\d+\}\}", t))
+    heart_count = _heart_count(t)
     if blade_count:
         a["count"] = blade_count
     elif heart_count:
@@ -2265,11 +2326,7 @@ def _check_heart_blade_split_from_text(text, action):
     ):
         return None
     blade_count = text.count("{{icon_blade.png|ブレード}}")
-    heart_colors = [
-        f"heart{m.group(1).zfill(2)}"
-        for m in re.finditer(r"{{heart_(\d+)\.png\|heart\d+}}", text)
-        if "持つ" not in text[m.end() : m.end() + 12]
-    ]
+    heart_colors = _heart_ids_gained(text)
     actions = []
     if blade_count:
         actions.append({"action": "gain_resource", "resource": "blade", "count": blade_count})
@@ -2308,6 +2365,22 @@ def _check_heart_blade_split_from_text(text, action):
     result = {"text": text, "action": "sequential", "actions": actions}
     _fill_defaults(result, text)
     return result
+
+
+# ======================================================================
+# ACTION PARSER
+# ======================================================================
+
+# Effect constraints (最小/最大/N未満にはならない/N以上にはならない) for
+# parse_action. Keyed by the phrase that selects the rule; the pattern pulls
+# out the bound. First match wins, so a more specific phrase listed earlier
+# wins over a later one.
+ACTION_CONSTRAINT_PATTERNS = (
+    ("最小", "min", r"最小(\d+)"),
+    ("最大", "max", r"最大(\d+)"),
+    ("未満にはならない", "min", r"(\d+)未満にはならない"),
+    ("以上にはならない", "max", r"(\d+)以上にはならない"),
+)
 
 
 def parse_action(text: str) -> Dict[str, Any]:
@@ -2350,14 +2423,11 @@ def parse_action(text: str) -> Dict[str, Any]:
     action: Dict[str, Any] = {"text": text}
     if dur_code:
         action["duration"] = dur_code
-    # Also check for duration keywords embedded in text.
-    # Table-driven: first matching keyword wins (same order as the legacy
-    # if-chain — longer, more specific phrases must precede shorter ones).
+    # Also check for duration keywords embedded in text (as opposed to
+    # stripped as a prefix by _strip_duration_prefix above). Same vocabulary:
+    # DURATION_PREFIX_MAP is the one place a duration phrase is spelled.
     if "duration" not in action:
-        for _dur_phrase, _dur_code in (
-            ("ライブ終了時まで", "live_end"),
-            ("このターンの間", "this_turn"),
-        ):
+        for _dur_phrase, _dur_code in DURATION_PREFIX_MAP.items():
             if _dur_phrase in text:
                 action["duration"] = _dur_code
                 break
@@ -2381,13 +2451,7 @@ def parse_action(text: str) -> Dict[str, Any]:
 
     # Extract effect constraints (最小/最大/N未満にはならない/N以上にはならない)
     constraint_text = normalize_fullwidth_digits(text)
-    constraint_patterns = {
-        "最小": ("min", r"最小(\d+)"),
-        "最大": ("max", r"最大(\d+)"),
-        "未満にはならない": ("min", r"(\d+)未満にはならない"),
-        "以上にはならない": ("max", r"(\d+)以上にはならない"),
-    }
-    for keyword, (constraint_type, pattern) in constraint_patterns.items():
+    for keyword, constraint_type, pattern in ACTION_CONSTRAINT_PATTERNS:
         if keyword in constraint_text:
             constraint_match = re.search(pattern, constraint_text)
             if constraint_match:
@@ -3092,12 +3156,10 @@ def _enrich_card_count_condition(result, text):
         result["cost_limit"] = cl_op[0]
         result["cost_limit_operator"] = cl_op[1]
     # Heart colors
-    if "{{heart_" in text:
-        hm = re.findall(r"{{heart_(\d+)\.png\|heart\d+}}", text)
-        if hm:
-            colors = sorted(set(f"heart{m.zfill(2)}" for m in hm))
-            if not result.get("check_self"):
-                result["heart_colors"] = colors
+    colors = _heart_ids(text)
+    if colors:
+        if not result.get("check_self"):
+            result["heart_colors"] = colors
     elif "heart_colors" in result:
         del result["heart_colors"]
     # Heart source: blade (ブレードハート) vs base (default)
@@ -4597,40 +4659,82 @@ def make_conditional_on_optional(
     return node
 
 
+# --- the shared shape of every 「〜もよい。そうしたとき、〜」 offer ----------
+_OPTIONAL_CONSEQUENCE_MARKER = "そうしたとき"
+
+
+def _split_optional_offer(text):
+    """Split 「<optional clause>そうしたとき、<consequence>」.
+
+    Returns (optional_text, consequence_text), or None when `text` is not an
+    optional offer. The leading 「、」 on the consequence is dropped here so no
+    handler has to remember to strip it.
+    """
+    if _OPTIONAL_CONSEQUENCE_MARKER not in text:
+        return None
+    opt_text, _, cons_text = text.partition(_OPTIONAL_CONSEQUENCE_MARKER)
+    return opt_text.strip(), cons_text.strip().lstrip("、")
+
+
+def _count_from_cards(text, default=1):
+    """The 「N枚」 count in `text`, or `default` when the count is unstated."""
+    m = re.search(r"(\d+)枚", text)
+    return int(m.group(1)) if m else default
+
+
+def _committed(action):
+    """`action` with the optional flag cleared — what runs on acceptance."""
+    done = dict(action)
+    done["optional"] = False
+    return done
+
+
+def _on_accept(optional_action, consequence):
+    """The sequential that runs when the player accepts the optional offer."""
+    return {
+        "action": "sequential",
+        "actions": [_committed(optional_action), consequence],
+    }
+
+
+# 「控え室からこのカードを手札に加える」 — the recovery an optional discard buys.
+_RECOVER_SELF_FROM_DISCARD = {
+    "action": "move_cards",
+    "source": "discard",
+    "destination": "hand",
+    "count": 1,
+    "card_type": "card",
+    "self_target": True,
+}
+
+
 def _try_those_cards_add_hand_optional(text):
     """G13: 'それらのカードの中から『X』のライブカードをN枚手札に加えてもよい。
     そうしたとき、[consequence]' → conditional_on_optional. Accepting runs the
     move-to-hand AND the consequence."""
     if "それらのカードの中から" not in text or "手札に加えてもよい" not in text:
         return None
-    if "そうしたとき" not in text:
+    split = _split_optional_offer(text)
+    if split is None:
         return None
-    opt_text, _, cons_text = text.partition("そうしたとき")
-    opt_text = opt_text.strip()
-    cons_text = cons_text.strip().lstrip("、")
+    opt_text, cons_text = split
     groups = deduped_groups(opt_text)
-    m = re.search(r"(\d+)枚", opt_text)
-    count = int(m.group(1)) if m else 1
-    card_type = "live_card" if "ライブカード" in opt_text else "card"
     move_opt = {
         "action": "move_cards",
         "source": "those_cards",
         "destination": "hand",
-        "card_type": card_type,
-        "count": count,
+        "card_type": "live_card" if "ライブカード" in opt_text else "card",
+        "count": _count_from_cards(opt_text),
         "target": "self",
         "optional": True,
         "text": opt_text,
     }
     if groups:
         move_opt["group_names"] = groups
-    move_done = dict(move_opt)
-    move_done["optional"] = False
-    cons = parse_effect(cons_text)
     return make_conditional_on_optional(
         text,
         move_opt,
-        {"action": "sequential", "actions": [move_done, cons]},
+        _on_accept(move_opt, parse_effect(cons_text)),
     )
 
 
@@ -4645,18 +4749,14 @@ def _try_discard_shuffle_to_bottom_optional(text):
         return None
     if "デッキの下に置いてもよい" not in text and "デッキの一番下に置いてもよい" not in text:
         return None
-    if "そうしたとき" not in text:
+    split = _split_optional_offer(text)
+    if split is None:
         return None
-    opt_text, _, cons_text = text.partition("そうしたとき")
-    opt_text = opt_text.strip()
-    cons_text = cons_text.strip().lstrip("、")
+    opt_text, cons_text = split
     groups = deduped_groups(opt_text)
-    m = re.search(r"(\d+)枚", opt_text)
     # "それぞれ1枚ずつ" = 1 from EACH group → the total count equals the number of groups.
     per_each = "それぞれ" in opt_text or "ずつ" in opt_text
-    count = int(m.group(1)) if m else 1
-    if per_each and groups:
-        count = len(groups)
+    count = len(groups) if (per_each and groups) else _count_from_cards(opt_text)
     card_type = "member_card" if "メンバーカード" in opt_text else "card"
     move_opt = {
         "action": "move_cards",
@@ -4686,9 +4786,8 @@ def _try_discard_shuffle_to_bottom_optional(text):
     # sequential of single-group moves so the engine's normal single-group select
     # handles each group independently (no per-group engine plumbing needed).
     if per_each and groups:
-        seq_actions = []
-        for g in groups:
-            gm = {
+        seq_actions = [
+            {
                 "action": "move_cards",
                 "source": "discard",
                 "destination": "deck_bottom",
@@ -4699,22 +4798,20 @@ def _try_discard_shuffle_to_bottom_optional(text):
                 "optional": True,
                 "group_names": [g],
                 "text": opt_text,
+                **({"shuffle": True} if "シャッフル" in opt_text else {}),
             }
-            if "シャッフル" in opt_text:
-                gm["shuffle"] = True
-            seq_actions.append(gm)
+            for g in groups
+        ]
         return make_conditional_on_optional(
             text,
             {"action": "sequential", "actions": seq_actions},
             {"action": "sequential", "actions": seq_actions + [cons]},
         )
 
-    move_done = dict(move_opt)
-    move_done["optional"] = False
     return make_conditional_on_optional(
         text,
         move_opt,
-        {"action": "sequential", "actions": [move_done, cons]},
+        _on_accept(move_opt, cons),
     )
 
 
@@ -4726,50 +4823,42 @@ def _try_discard_hand_recover_self_optional(text):
     recover is gated on the optional actually being performed."""
     if "手札を" not in text or "控え室に置いてもよい" not in text:
         return None
-    if "そうしたとき" not in text or "手札に加える" not in text:
+    if "手札に加える" not in text:
         return None
     if "控え室から" not in text and "控え室にある" not in text:
         return None
-    opt_text, _, cons_text = text.partition("そうしたとき")
-    opt_text = opt_text.strip()
-    cons_text = cons_text.strip().lstrip("、")
-    m = re.search(r"(\d+)枚", opt_text)
-    count = int(m.group(1)) if m else 1
+    split = _split_optional_offer(text)
+    if split is None:
+        return None
+    opt_text, cons_text = split
     discard_opt = {
         "action": "move_cards",
         "source": "hand",
         "destination": "discard",
-        "count": count,
+        "count": _count_from_cards(opt_text),
         "card_type": "card",
         "target": "self",
         "optional": True,
         "text": opt_text,
     }
-    discard_done = dict(discard_opt)
-    discard_done["optional"] = False
     cons = parse_action(cons_text)
     if not isinstance(cons, dict) or cons.get("action") != "move_cards":
         cons = parse_effect(cons_text)
+    # The consequence recovers THIS card out of the discard the optional just
+    # created. A parse that already produced a move gets redirected; anything
+    # else is replaced with the explicit recovery.
+    # The consequence recovers THIS card out of the discard the optional just
+    # created. A parse that already produced a move gets redirected (keeping
+    # whatever count it inferred); anything else is replaced outright.
     if isinstance(cons, dict) and cons.get("action") == "move_cards":
-        cons["source"] = "discard"
-        cons["destination"] = "hand"
-        cons["self_target"] = True
-        cons["card_type"] = "card"
+        cons.update(_RECOVER_SELF_FROM_DISCARD)
         cons.setdefault("count", 1)
     else:
-        cons = {
-            "action": "move_cards",
-            "source": "discard",
-            "destination": "hand",
-            "count": 1,
-            "card_type": "card",
-            "self_target": True,
-            "text": cons_text,
-        }
+        cons = dict(_RECOVER_SELF_FROM_DISCARD, text=cons_text)
     return make_conditional_on_optional(
         text,
         discard_opt,
-        {"action": "sequential", "actions": [discard_done, cons]},
+        _on_accept(discard_opt, cons),
     )
 
 
@@ -5550,8 +5639,9 @@ CARD_TYPE_KEYWORDS = (
     ("energy_card", "エネルギーカード"),
 )
 
-# Reverse lookup: card type id -> its Japanese phrase.
+# Reverse lookups, named for the direction they read in.
 CARD_TYPE_PHRASE = {card_type: phrase for card_type, phrase in CARD_TYPE_KEYWORDS}
+CARD_TYPE_ID = {phrase: card_type for card_type, phrase in CARD_TYPE_KEYWORDS}
 
 # The three phrases as one alternation, for building the "two card types
 # joined by X" patterns below.
@@ -5565,6 +5655,9 @@ _AND_CARD_TYPE_PAIR_RE = re.compile(rf"({_CARD_TYPE_ALT}).*と.*({_CARD_TYPE_ALT
 
 # 『group』のメンバーカード — which group a typed card count refers to.
 _TYPED_GROUP_RE = re.compile(rf"『([^』]+)』の({_CARD_TYPE_ALT})")
+
+# A bare typed card count (メンバーカード3枚) with no group named.
+_TYPED_COUNT_RE = re.compile(rf"(?:{_CARD_TYPE_ALT})\d+枚")
 
 
 def _card_types_in(text, in_text_order=False):
@@ -5615,7 +5708,7 @@ def _infer_card_type(text, action=None):
 
 def _count_resource_icons(text):
     """Count resource icons in text (heart_XX, blade, energy)."""
-    heart_count = len(re.findall(r"{{heart_\d+\.png\|heart\d+}}", text))
+    heart_count = _heart_count(text)
     blade_count = text.count("{{icon_blade.png|ブレード}}")
     energy_count = text.count("{{icon_energy.png|E}}")
     all_heart_count = text.count("{{icon_all.png|ハート}}")
@@ -5670,14 +5763,8 @@ def _enrich_heart_gain_multiset(d, effect_text):
     # part of a "Xを持つ" (target HAS heart X) filter clause is a condition,
     # not a gain — otherwise e.g. "...heart06を持つメンバーはheart06×4を得る"
     # would over-count to 5.
-    icons = []
-    for m in re.finditer(r"{{heart_(\d+)\.png\|heart\d+}}", effect_text):
-        after = effect_text[m.end() : m.end() + 12]
-        if "持つ" in after:
-            continue
-        icons.append(m.group(1))
-    if icons:
-        colors = [f"heart{m.zfill(2)}" for m in icons]
+    colors = _heart_ids_gained(effect_text)
+    if colors:
         m_nts = re.search(r"(\d+)つ得る", effect_text)
         if m_nts:
             n = int(m_nts.group(1))
@@ -5736,19 +5823,15 @@ def infer_count_from_icons(d, text):
     if all_heart_count > 0:
         d["count"] = all_heart_count
         return
-    heart_count = len(re.findall(r"{{heart_\d+\.png\|heart\d+}}", effect_text))
+    heart_count = _heart_count(effect_text)
     if heart_count > 0:
         # Check for consecutive heart icons (e.g. 4 heart06 in a row = gain 4)
         # This correctly handles "{{heart_06.png|heart06}}{{heart_06.png|heart06}}... = gain N"
         # vs "{{heart_06.png|heart06}}を持つ" (has heart06, used as condition not count)
-        consecutive = re.findall(r"(?:{{heart_\d+\.png\|heart\d+}}){2,}", effect_text)
+        consecutive = re.findall(rf"(?:{HEART_ICON}){{2,}}", effect_text)
         if consecutive:
             # Use the longest consecutive run as the actual gain count
-            max_run = max(
-                len(re.findall(r"{{heart_\d+\.png\|heart\d+}}", run))
-                for run in consecutive
-            )
-            d["count"] = max_run
+            d["count"] = max(_heart_count(run) for run in consecutive)
         else:
             d["count"] = heart_count
         return
@@ -5812,16 +5895,13 @@ def _fill_defaults_count_and_refine(action, text, action_text, a):
         else:
             if a == "modify_required_hearts":
                 target_colors = action.get("heart_colors", [])
-                color_counts = {}
-                for m in re.finditer(r"\|(heart\d+)}", action_text):
-                    h = m.group(1)
-                    if not target_colors or h in target_colors:
-                        color_counts[h] = color_counts.get(h, 0) + 1
+                color_counts = {
+                    h: n
+                    for h, n in _heart_label_counts(action_text).items()
+                    if not target_colors or h in target_colors
+                }
                 if color_counts:
-                    counts = list(color_counts.values())
-                    action["count"] = (
-                        counts[0] if len(set(counts)) == 1 else min(counts)
-                    )
+                    action["count"] = _uniform_count(color_counts)
             else:
                 icon_count = _count_resource_icons(action_text)
                 if icon_count > 0:
@@ -5983,8 +6063,8 @@ def _expand_typed_card_move(action, text):
     if not action.get("card_type"):
         return
     if _OR_CARD_TYPE_PAIR_RE.search(text):
-        or_types = _card_types_in(text)
-        if len(or_types) >= 2:
+        or_types = _or_card_types_in(text)
+        if or_types:
             action["or_card_types"] = or_types
             action.pop("card_type", None)
         return
@@ -5995,7 +6075,7 @@ def _expand_typed_card_move(action, text):
         return
     # 『group』のメンバーカード — each type may name its own group.
     typed_groups = {
-        CARD_TYPE_PHRASE[phrase]: group
+        CARD_TYPE_ID[phrase]: group
         for group, phrase in _TYPED_GROUP_RE.findall(text)
     }
     sub_actions = []
@@ -6199,19 +6279,34 @@ def _fill_select_target(action, text):
             return
 
 
+def _or_card_types_in(text):
+    """Card types named by an either-or phrase, in table order.
+
+    Returns [] unless the text names at least two — a single card type is not
+    an either-or, it is just a card_type.
+    """
+    or_types = _card_types_in(text)
+    return or_types if len(or_types) >= 2 else []
+
+
 def _fill_or_card_types(action, text, pop_card_type):
-    or_types = []
+    """Record 「AかB」 / 「Aのどちらか」 as `or_card_types`.
+
+    When the member-card variant carries a cost limit, lift it onto the action
+    at the same time — that clause is only ever written on the member-card
+    half of the either-or.
+    """
     for card_type, phrase in CARD_TYPE_KEYWORDS:
-        if phrase in text:
-            or_types.append(card_type)
-            if card_type == "member_card" and pop_card_type:
-                cl = extract_cost_limit(text)
-                if cl:
-                    action["cost_limit"] = cl
-    if len(or_types) >= 2:
-        action["or_card_types"] = or_types
-        if pop_card_type:
-            action.pop("card_type", None)
+        if phrase in text and card_type == "member_card" and pop_card_type:
+            cl = extract_cost_limit(text)
+            if cl:
+                action["cost_limit"] = cl
+    or_types = _or_card_types_in(text)
+    if not or_types:
+        return
+    action["or_card_types"] = or_types
+    if pop_card_type:
+        action.pop("card_type", None)
 
 
 def _fill_need_heart(action, text):
@@ -7617,19 +7712,10 @@ def _build_reveal_add_discard(fp, sa_text, select_text):
 
 
 def _add_or_card_types_if_needed(d, text):
-    """If text describes an OR between card types (e.g. メンバーカードか...ライブカード),
-    add or_card_types to the dict and remove the single card_type."""
-    card_type_kws = [
-        ("live_card", "ライブカード"),
-        ("member_card", "メンバーカード"),
-        ("energy_card", "エネルギーカード"),
-    ]
-    if re.search(
-        r"(ライブカード|メンバーカード|エネルギーカード).*か.*(ライブカード|メンバーカード|エネルギーカード)",
-        text,
-    ):
-        or_types = [t for t, kw in card_type_kws if kw in text]
-        if len(or_types) >= 2:
+    """「メンバーカードか…ライブカード」 — record or_card_types, drop card_type."""
+    if _OR_CARD_TYPE_PAIR_RE.search(text):
+        or_types = _or_card_types_in(text)
+        if or_types:
             d["or_card_types"] = or_types
             d.pop("card_type", None)
 
@@ -9344,27 +9430,42 @@ def _try_unless_effect(text):
     return None
 
 
-def _matches_shi_sequential(text):
-    if "し、" not in text or CHOICE_MARKER in text:
-        return False
-    if any(marker in text for marker in CONDITION_MARKERS):
-        return False
-    index = text.find("し、")
+# 「Aし、B」 and 「Aを得て、B」 — two effects joined by a connector. The
+# matcher has to parse both legs to decide whether this is the pattern, and
+# the setter needs the very same two parses, so each connector gets one
+# splitter instead of the work being written twice.
+_SHI_SEQUENTIAL_MARKER = "し、"
+_TE_SEQUENTIAL_MARKER = "を得て、"
+
+# A leg that parses to one of these carries no effect, so the connector was
+# not joining two effects after all.
+_INERT_ACTIONS = ("custom", "do_nothing")
+
+
+def _split_shi_sequential(text):
+    """Both parsed legs of 「Aし、B」, or None when either leg is inert."""
+    index = text.find(_SHI_SEQUENTIAL_MARKER)
     if index < 0:
-        return False
-    first = parse_effect(text[: index + 1])
-    second = parse_effect(text[index + 2 :].strip().lstrip("、"))
-    return first.get("action", "custom") not in ("custom", "do_nothing") and second.get(
-        "action", "custom"
-    ) not in ("custom", "do_nothing")
-
-
-def _set_shi_sequential(text, result):
-    index = text.find("し、")
-    result["actions"] = [
+        return None
+    legs = [
         parse_effect(text[: index + 1]),
         parse_effect(text[index + 2 :].strip().lstrip("、")),
     ]
+    if any(leg.get("action", "custom") in _INERT_ACTIONS for leg in legs):
+        return None
+    return legs
+
+
+def _matches_shi_sequential(text):
+    if _SHI_SEQUENTIAL_MARKER not in text or CHOICE_MARKER in text:
+        return False
+    if any(marker in text for marker in CONDITION_MARKERS):
+        return False
+    return _split_shi_sequential(text) is not None
+
+
+def _set_shi_sequential(text, result):
+    result["actions"] = _split_shi_sequential(text)
 
 
 _try_shi_sequential = EffectPattern(
@@ -9374,22 +9475,32 @@ _try_shi_sequential = EffectPattern(
 )
 
 
-def _matches_te_sequential(text):
-    if "を得て、" not in text or "を得る" not in text:
-        return False
-    left, right = text.split("を得て、", 1)
-    return (
-        parse_action(left.strip() + "を得る").get("action") != "custom"
-        and parse_action(right.strip()).get("action") != "custom"
-    )
+def _split_te_sequential(text):
+    """Both parsed legs of 「Aを得て、B」, or None when either leg is inert.
 
-
-def _set_te_sequential(text, result):
-    left, right = text.split("を得て、", 1)
-    result["actions"] = [
+    The left leg lost its verb to the connector, so 「…を得て」 becomes
+    「…を得る」 before parsing.
+    """
+    if _TE_SEQUENTIAL_MARKER not in text:
+        return None
+    left, right = text.split(_TE_SEQUENTIAL_MARKER, 1)
+    legs = [
         parse_action(left.strip() + "を得る"),
         parse_action(right.strip()),
     ]
+    if any(leg.get("action") == "custom" for leg in legs):
+        return None
+    return legs
+
+
+def _matches_te_sequential(text):
+    if _TE_SEQUENTIAL_MARKER not in text or "を得る" not in text:
+        return False
+    return _split_te_sequential(text) is not None
+
+
+def _set_te_sequential(text, result):
+    result["actions"] = _split_te_sequential(text)
 
 
 _try_te_sequential = EffectPattern(
@@ -9747,14 +9858,37 @@ _try_timing_condition_gain = EffectPattern(
 )
 
 
-def _set_place_under_heart_copy(text, result):
+def _parse_place_under_heart_copy(text):
+    """The two legs of 「…下に置く。そうしたとき、元々持つハートと同じになる」.
+
+    Returns (move, heart_text) when both legs are present and the placement
+    really does parse as a move; None otherwise. Matcher and setter share this
+    so "does this phrase match?" and "build the effect" can never disagree.
+    """
+    if "同じになる" not in text or "そうしたとき" not in text:
+        return None
     separator = "そうしたとき、" if "そうしたとき、" in text else "そうしたとき"
     place_text, _, heart_text = text.partition(separator)
     place_text = place_text.strip()
     heart_text = heart_text.strip().lstrip("、")
+    if "このメンバーの下に置く" not in place_text:
+        return None
+    if "元々持つハート" not in heart_text or "と同じになる" not in heart_text:
+        return None
     move = parse_action(place_text)
     if not move or move.get("action") != "move_cards":
         move = parse_effect(place_text)
+    if not isinstance(move, dict) or move.get("action") != "move_cards":
+        return None
+    return move, heart_text
+
+
+def _matches_place_under_heart_copy(text):
+    return _parse_place_under_heart_copy(text) is not None
+
+
+def _set_place_under_heart_copy(text, result):
+    move, heart_text = _parse_place_under_heart_copy(text)
     move.setdefault("destination", "under_member")
     move.setdefault("count", 1)
     result["conditional"] = True
@@ -9771,23 +9905,6 @@ def _set_place_under_heart_copy(text, result):
             "duration": "live_end",
         },
     ]
-
-
-def _matches_place_under_heart_copy(text):
-    if "同じになる" not in text or "そうしたとき" not in text:
-        return False
-    separator = "そうしたとき、" if "そうしたとき、" in text else "そうしたとき"
-    place_text, _, heart_text = text.partition(separator)
-    place_text = place_text.strip()
-    heart_text = heart_text.strip().lstrip("、")
-    if "このメンバーの下に置く" not in place_text:
-        return False
-    if "元々持つハート" not in heart_text or "と同じになる" not in heart_text:
-        return False
-    move = parse_action(place_text)
-    if not move or move.get("action") != "move_cards":
-        move = parse_effect(place_text)
-    return isinstance(move, dict) and move.get("action") == "move_cards"
 
 
 _try_place_under_heart_copy = EffectPattern(
@@ -10748,7 +10865,7 @@ def _fix_unqualified_group_card_move(d):
     text = d.get("text") or ""
     if not re.search(r"カード\d+枚", text):
         return
-    if re.search(r"(?:ライブカード|メンバーカード|エネルギーカード)\d+枚", text):
+    if _TYPED_COUNT_RE.search(text):
         return
     d["card_type"] = "card"
     d["all"] = False

@@ -451,7 +451,7 @@ pub(crate) fn score_candidates(
 ) -> (Vec<Candidate>, OppModel) {
     let board = v8_model::board_pool(gs, me, db);
     let sampler = v8_model::FlipSampler::build(gs, me, db);
-    let pools = sampler.sample_pools(&board, v8_model::FLIP_SAMPLES);
+    let pools = sampler.sample_pools(&board, v8_model::flip_samples());
     let opp = OppModel::build(gs, me, db);
     let draw_credit = draw_value(gs, me, db);
     (

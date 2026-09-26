@@ -40,6 +40,26 @@ use super::strategy_common::{acc_add, Acc};
 /// Shared shuffle realisations per live-set decision. Every candidate
 /// portfolio is scored on the SAME realisations, so `p_pass` differences are
 /// paired and reproducible rather than independent noisy estimates.
+///
+/// Tunable because the decision this feeds is a TAIL probability. At 192
+/// samples a `p_pass` of 0.05 carries a standard error of about 0.016, which
+/// is the same order as the differences between competing portfolios — so the
+/// argmax is partly reading sampling noise. The guide is explicit that hits are
+/// a distribution and that mean-sized portfolios fail about half the time
+/// (section 4, "DERIVED QUANTITIES"), which is exactly the regime where a
+/// coarse tail estimate decides the wrong portfolio.
+///
+/// `V8_FLIP_SAMPLES` overrides it so the resolution can be traded against
+/// runtime by measurement instead of by taste.
+pub fn flip_samples() -> usize {
+    std::env::var("V8_FLIP_SAMPLES")
+        .ok()
+        .and_then(|v| v.parse().ok())
+        .filter(|&n: &usize| n > 0)
+        .unwrap_or(FLIP_SAMPLES)
+}
+
+/// Default realisation count. See [`flip_samples`].
 pub const FLIP_SAMPLES: usize = 192;
 
 /// Score bands from the guides (docs/BOT_STRATEGY.md section 3.3, all 291
