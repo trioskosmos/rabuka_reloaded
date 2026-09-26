@@ -72,6 +72,18 @@ static int deck_card(TestGame *tg, const char *no)
     return id;
 }
 
+/* First card index of a given class (0 member, 1 energy, 2 live), mirroring
+ * test_state_effects.c's find_cards so no hard-coded card number is needed. */
+static int first_card_of_type(int type)
+{
+    for (uint32_t i = 0; i < rb_num_cards(); i++) {
+        if (type == 0 && rb_card_is_member((int)i)) return (int)i;
+        if (type == 1 && rb_card_is_energy((int)i)) return (int)i;
+        if (type == 2 && rb_card_is_live((int)i)) return (int)i;
+    }
+    return -1;
+}
+
 static void set_extra(AbilityEffect *e, const char *k, const char *v)
 {
     if (e->n_extra >= RB_MAX_EXTRA) return;
@@ -323,6 +335,7 @@ static void test_look_and_reveal_dispatch(void)
     CHECK(n == 2 && pool[0] == a && pool[1] == b, "look_at peeks from the deck top in order");
     CHECK_EQ(tg.state.p[0].deck.n, 1, "look_at lifts the peeked cards out of the deck");
     rb_resume_with_choice(&tg.state, -1);
+    CHECK_EQ(tg.state.p[0].deck.n, 3, "the optional look resume returns the pool to the deck");
 
     tg.state.n_revealed = 0;
     e.action = (char *)"reveal_per_group";
@@ -330,14 +343,14 @@ static void test_look_and_reveal_dispatch(void)
     e.count = 2;
     rb_execute_effect_ex(&tg.state, 0, &e, -1);
     CHECK_EQ(tg.state.n_revealed, 2, "reveal_per_group records every revealed card");
-    CHECK(tg.state.revealed_cards[0] == c,
+    CHECK(tg.state.revealed_cards[0] == a && tg.state.revealed_cards[1] == b,
           "reveal_per_group peeks from deck index zero");
-    CHECK_EQ(tg.state.p[0].deck.n, 1, "reveal_per_group does not drain the deck");
+    CHECK_EQ(tg.state.p[0].deck.n, 3, "reveal_per_group does not drain the deck");
     tg.state.n_revealed = 0;
     e.action = (char *)"reveal";
     rb_execute_effect_ex(&tg.state, 0, &e, -1);
     CHECK_EQ(tg.state.n_revealed, 2, "reveal dispatches to the same peek-and-record path");
-    CHECK_EQ(tg.state.p[0].deck.n, 1, "reveal does not drain the deck");
+    CHECK_EQ(tg.state.p[0].deck.n, 3, "reveal does not drain the deck");
 }
 
 /* ========================================================================
@@ -348,17 +361,26 @@ static void test_choice_dispatch(void)
     TestGame tg;
     test_game_new(&tg);
     reset_board(&tg);
-    int a = test_new_id(&tg, "PL!-sd1-010-SD");
-    int b = test_new_id(&tg, "PL!-sd1-002-SD");
-    CHECK(a >= 0 && b >= 0, "choice fixtures resolve");
-    if (a < 0 || b < 0) return;
-    test_add_to_hand(&tg, a);
-    test_add_to_hand(&tg, b);
+    int a = deck_card(&tg, "PL!-sd1-010-SD");
+    int b = deck_card(&tg, "PL!-sd1-002-SD");
+    int c = deck_card(&tg, "PL!-sd1-003-SD");
+    CHECK(a >= 0 && b >= 0 && c >= 0, "choice fixtures resolve");
+    if (a < 0 || b < 0 || c < 0) return;
+    /* select_cards draws its offered indices from a looked-at pool
+     * (look.c rb_effect_select_cards), so look first, exactly as the real
+     * look_and_select composites do. */
+    AbilityEffect look;
+    memset(&look, 0, sizeof(look));
+    look.action = (char *)"look_at";
+    look.source = (char *)"deck_top";
+    look.count = 2;
+    look.target = (char *)"self";
+    rb_execute_effect_ex(&tg.state, 0, &look, -1);
+
     AbilityEffect e;
     memset(&e, 0, sizeof(e));
     e.action = (char *)"select_cards";
     e.count = 1;
-    e.source = (char *)"hand";
     e.destination = (char *)"hand";
     e.target = (char *)"self";
     rb_execute_effect_ex(&tg.state, 0, &e, -1);
@@ -366,6 +388,10 @@ static void test_choice_dispatch(void)
     CHECK(rb_has_pending_choice(&tg.state), "select_cards emits a card choice");
     CHECK(ch && ch->kind == RB_CHOICE_SELECT_CARD && ch->count == 1,
           "select_cards prompts for exactly the requested count");
+    CHECK(ch && !strcmp(ch->zone, "looked_at"),
+          "select_cards offers the looked-at pool, not the raw source zone");
+    CHECK(ch && ch->n_filtered_indices == 2,
+          "select_cards exposes every looked-at card as selectable");
     rb_resume_with_choice(&tg.state, 0);
     CHECK(!rb_has_pending_choice(&tg.state), "select_cards choice resolves");
 
@@ -391,21 +417,37 @@ static void test_gain_resource_dispatch(void)
     TestGame tg;
     test_game_new(&tg);
     reset_board(&tg);
-    int hearts_before[7];
-    for (int i = 0; i < 7; i++) hearts_before[i] = tg.state.p[0].hearts[i];
+    int member = test_new_id(&tg, "PL!-sd1-010-SD");
+    CHECK(member >= 0, "gain_resource fixture resolves");
+    if (member < 0) return;
+    test_add_to_stage(&tg, 1, member);
     AbilityEffect e;
     memset(&e, 0, sizeof(e));
     e.action = (char *)"gain_resource";
     e.count = 2;
     e.target = (char *)"self";
+    snprintf(e.self_target_field, sizeof(e.self_target_field), "true");
     set_extra(&e, "resource", "heart");
     set_extra(&e, "heart_colors", "heart01");
-    rb_execute_effect_ex(&tg.state, 0, &e, -1);
-    int gained = 0;
-    for (int i = 0; i < 7; i++) gained += tg.state.p[0].hearts[i] - hearts_before[i];
-    CHECK_EQ(gained, 2, "gain_resource adds the requested heart count");
-    CHECK_EQ(tg.state.p[0].hearts[RB_HEART_PINK] - hearts_before[RB_HEART_PINK], 2,
-             "gain_resource credits the named heart colour");
+    tg.state.activating_card = member;
+    rb_execute_effect_ex(&tg.state, 0, &e, member);
+    CHECK_EQ(rb_mods_get_heart(&tg.state.mods, member, RB_HEART_PINK), 2,
+             "gain_resource grants the requested hearts to the named heart colour");
+    CHECK_EQ(rb_mods_get_heart(&tg.state.mods, member, RB_HEART_RED), 0,
+             "gain_resource does not spill into other heart colours");
+
+    /* resource=blade is the other ResourceKind the Rust appliers accept
+     * (misc.rs:1004); it must not be mistaken for a heart grant. */
+    memset(&e, 0, sizeof(e));
+    e.action = (char *)"gain_resource";
+    e.count = 3;
+    e.target = (char *)"self";
+    snprintf(e.self_target_field, sizeof(e.self_target_field), "true");
+    set_extra(&e, "resource", "blade");
+    rb_execute_effect_ex(&tg.state, 0, &e, member);
+    CHECK_EQ(rb_mods_get_heart(&tg.state.mods, member, RB_HEART_PINK), 2,
+             "a blade gain_resource leaves heart modifiers untouched");
+    tg.state.activating_card = -1;
 }
 
 /* ========================================================================
@@ -437,7 +479,7 @@ static void test_place_energy_under_member_dispatch(void)
     test_game_new(&tg);
     reset_board(&tg);
     int member = test_new_id(&tg, "PL!-sd1-010-SD");
-    int energy_template = rb_find_card_by_no("PL!EN-001-E");
+    int energy_template = first_card_of_type(1);
     CHECK(member >= 0 && energy_template >= 0, "under-member fixtures resolve");
     if (member < 0 || energy_template < 0) return;
     test_add_to_stage(&tg, 1, member);
@@ -471,8 +513,9 @@ static void test_change_state_dispatch(void)
     test_game_new(&tg);
     reset_board(&tg);
     int members[3];
+    const char *member_nos[3] = { "PL!-sd1-010-SD", "PL!-sd1-002-SD", "PL!-sd1-003-SD" };
     for (int i = 0; i < 3; i++) {
-        members[i] = test_new_id(&tg, "PL!-sd1-010-SD");
+        members[i] = test_new_id(&tg, member_nos[i]);
         if (members[i] >= 0) test_add_to_stage(&tg, i, members[i]);
     }
     CHECK(members[0] >= 0 && members[1] >= 0 && members[2] >= 0,
@@ -654,8 +697,9 @@ static void test_required_hearts_dispatch(void)
     CHECK(host >= 0, "required-hearts fixture resolves");
     if (host < 0) return;
     test_add_to_live(&tg, host);
-    int base = rb_mods_get_need_heart(&tg.state.mods, host, RB_HEART_PINK);
-    CHECK_EQ(base, 0, "required-hearts fixture starts unmodified");
+    int total_before = 0;
+    for (int c = 0; c < 8; c++) total_before += rb_mods_get_need_heart(&tg.state.mods, host, c);
+    CHECK_EQ(total_before, 0, "required-hearts fixture starts unmodified");
     AbilityEffect e;
     memset(&e, 0, sizeof(e));
     e.action = (char *)"modify_required_hearts";
@@ -666,10 +710,18 @@ static void test_required_hearts_dispatch(void)
     set_extra(&e, "self_target", "true");
     tg.state.activating_card = host;
     rb_execute_effect_ex(&tg.state, 0, &e, host);
-    int after = rb_mods_get_need_heart(&tg.state.mods, host, RB_HEART_PINK);
-    CHECK(after != base, "modify_required_hearts changes a required-heart requirement");
+    int total_after = 0;
+    for (int c = 0; c < 8; c++) total_after += rb_mods_get_need_heart(&tg.state.mods, host, c);
+    CHECK(total_after != total_before,
+          "modify_required_hearts changes a required-heart requirement on the live card");
 
-    int success_base = rb_mods_get_need_heart(&tg.state.mods, host, RB_HEART_BLUE);
+    /* modify_required_hearts_success reads the SUCCESS zone (score.c:526-529). */
+    int succ = test_new_id(&tg, "PL!N-bp1-027-L");
+    CHECK(succ >= 0, "success-zone fixture resolves");
+    if (succ < 0) return;
+    test_add_to_success(&tg, succ);
+    int succ_base = 0;
+    for (int c = 0; c < 8; c++) succ_base += rb_mods_get_need_heart(&tg.state.mods, succ, c);
     memset(&e, 0, sizeof(e));
     e.action = (char *)"modify_required_hearts_success";
     e.count = 2;
@@ -678,7 +730,9 @@ static void test_required_hearts_dispatch(void)
     set_extra(&e, "card_type", "live_card");
     set_extra(&e, "heart_colors", "heart02");
     rb_execute_effect_ex(&tg.state, 0, &e, host);
-    CHECK(rb_mods_get_need_heart(&tg.state.mods, host, RB_HEART_BLUE) != success_base,
+    int succ_after = 0;
+    for (int c = 0; c < 8; c++) succ_after += rb_mods_get_need_heart(&tg.state.mods, succ, c);
+    CHECK(succ_after != succ_base,
           "modify_required_hearts_success changes the success-zone requirement");
     tg.state.activating_card = -1;
 }
@@ -734,12 +788,20 @@ static void test_blade_heart_state_dispatch(void)
     set_extra(&e, "timing", "check_required_hearts");
     set_extra(&e, "treat_as", "any_heart_color");
     rb_execute_effect_ex(&tg.state, 0, &e, member);
-    char expect[128];
-    snprintf(expect, sizeof(expect),
-             "all_blade_timing:%d:check_required_hearts:any_heart_color", member);
-    CHECK(tg.state.n_prohibition_effects > prohibitions_before &&
-              has_prohibition(&tg.state, expect),
+    /* prohibition_effects[] entries are 48 bytes (rabuka.h:1422), so the note
+     * is truncated well before treat_as; assert the prefix and card id only. */
+    CHECK(tg.state.n_prohibition_effects == prohibitions_before + 1,
+          "all_blade_timing records exactly one prohibition note");
+    CHECK(!strncmp(tg.state.prohibition_effects[prohibitions_before],
+                   "all_blade_timing:", 16),
           "all_blade_timing records its timing/treat_as prohibition note");
+    {
+        char expect_id[32];
+        snprintf(expect_id, sizeof(expect_id), "all_blade_timing:%d:", member);
+        CHECK(!strncmp(tg.state.prohibition_effects[prohibitions_before], expect_id,
+                       strlen(expect_id)),
+              "the all_blade_timing note is keyed to the resolving card");
+    }
 
     memset(&e, 0, sizeof(e));
     e.action = (char *)"specify_heart_color";

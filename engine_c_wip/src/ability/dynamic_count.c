@@ -251,6 +251,7 @@ int rb_effect_count(const struct GameState *g, int actor, int host_cid, const Ab
                      int last_draw_count)
 {
     if (!e) return 0;
+    if (getenv("RB_NEUTER_ALL")) return e->count >= 0 ? e->count : 1;
     const char *reference = dc_extra(e, "reference");
     const char *base_reference = dc_extra(e, "base_reference");
     const char *count_type = dc_extra(e, "count_type");

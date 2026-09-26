@@ -17,19 +17,10 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <ctype.h>
-#include <signal.h>
-#include <execinfo.h>
-
-static void rb_bt_segv(int sig) {
-    void *frames[64];
-    int n = backtrace(frames, 64);
-    fprintf(stderr, "\n=== SIGSEGV backtrace (%d frames) ===\n", n);
-    backtrace_symbols_fd(frames, n, 2);
-    _exit(99);
-}
+int rb_neuter_all = 0;
 __attribute__((constructor)) static void rb_bt_install(void) {
-    signal(SIGSEGV, rb_bt_segv);
-    signal(SIGABRT, rb_bt_segv);
+    rb_neuter_all = getenv("RB_NEUTER_ALL") ? 1 : 0;
+    fprintf(stderr, "[NEUTER] all=%d\n", rb_neuter_all);
 }
 
 /* Heart-all wildcard key — mirrors util.rs HEART_ALL_KEY ("heart00"). */
@@ -1018,6 +1009,7 @@ static int local_filter_from_public(const RbCardFilter *rf, LocalCardFilter *out
    [A, B, A] into [0, 0]. */
 int rb_matching_indices_filter(const RbCardFilter *rf, const int *cards, int n, int *out_idx, int max) {
     if (!cards || !out_idx) return 0;
+    if (rb_neuter_all) { int r = 0; for (int i = 0; i < n && r < max; i++) out_idx[r++] = i; return r; }
     LocalCardFilter f;
     if (!local_filter_from_public(rf, &f)) {
         int r = 0;
@@ -1033,6 +1025,7 @@ int rb_matching_indices_filter(const RbCardFilter *rf, const int *cards, int n, 
 /* Mirror util.rs::matching_ids — return card IDs matching the filter. */
 int rb_matching_ids(const RbCardFilter *rf, const int *cards, int n, int *out, int max) {
     if (!cards || !out) return 0;
+    if (rb_neuter_all) { int mm = 0; for (int i = 0; i < n && mm < max; i++) out[mm++] = cards[i]; return mm; }
     LocalCardFilter f;
     if (!rf || !rf->has_filter || !local_filter_from_public(rf, &f)) {
         int m = 0;
@@ -1635,6 +1628,7 @@ int rb_calculate_play_cost_reduction(const GameState *g, int pl, int hand_count,
    constant per_unit gain (before base). Uses the effect's filter subset. */
 int rb_constant_per_unit_units(const AbilityEffect *effect, const GameState *g, int pl,
                                int host_card_id) {
+    if (rb_neuter_all) return 1;
     const char *zone = rb_constant_per_unit_zone(effect);
     const RbPlayer *P = &g->p[pl];
 
@@ -1753,7 +1747,7 @@ int rb_calculate_per_unit_multiplier(const GameState *g, int pl, const char *per
 int rb_resolve_per_unit_count(const GameState *g, int pl, const char *per_unit_type,
                               const char *card_type, const char *group,
                               const char *state_filter, int host_card_id) {
-    if (getenv("RB_NEUTER_PU")) return 1;
+    if (rb_neuter_all) return 1;
     if (!per_unit_type) return 1;
     const RbPlayer *P = &g->p[pl];
     const char *zone;

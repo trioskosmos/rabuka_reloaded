@@ -123,6 +123,140 @@ static void sc_build_filter(const AbilityEffect *e, RbCardFilter *f, int exclude
                        f->has_blade_limit);
 }
 
+/* util.rs:686 card_series_matches_group — the canonical group→series mapping. */
+static int sc_series_matches_group(const char *series, const char *group) {
+    if (!series || !group) return 0;
+    if (!strcmp(group, "μ's")) {
+        /* each series line is judged on its own so multi-series joint cards do
+           not match through a bare ラブライブ！ line */
+        const char *p = series;
+        while (*p) {
+            const char *nl = strchr(p, '\n');
+            size_t len = nl ? (size_t)(nl - p) : strlen(p);
+            char line[512];
+            if (len < sizeof line) {
+                memcpy(line, p, len); line[len] = 0;
+                if (strstr(line, "ラブライブ！") &&
+                    !strstr(line, "サンシャイン") && !strstr(line, "虹ヶ咲") &&
+                    !strstr(line, "スーパースター") && !strstr(line, "蓮ノ空"))
+                    return 1;
+            }
+            if (!nl) break;
+            p = nl + 1;
+        }
+        return 0;
+    }
+    if (!strcmp(group, "Aqours"))  return strstr(series, "サンシャイン") != NULL;
+    if (!strcmp(group, "虹ヶ咲"))  return strstr(series, "虹ヶ咲") != NULL;
+    if (!strcmp(group, "Liella!")) return strstr(series, "スーパースター") != NULL;
+    if (!strcmp(group, "蓮ノ空"))  return strstr(series, "蓮ノ空") != NULL;
+    return 0;
+}
+
+/* util.rs norm_group_name — ！(U+FF01) → !, µ(U+00B5) → μ(U+03BC).
+   Returns 1 when the string needed rewriting. */
+static int sc_norm_group(const char *s, char *out, size_t out_sz) {
+    int changed = 0;
+    size_t w = 0;
+    for (const unsigned char *p = (const unsigned char *)s; *p; ) {
+        if (p[0] == 0xEF && p[1] == 0xBC && p[2] == 0x81 && w + 1 < out_sz) {
+            out[w++] = '!'; p += 3; changed = 1; continue;
+        }
+        if (p[0] == 0xC2 && p[1] == 0xB5 && w + 2 < out_sz) {
+            out[w++] = (char)0xCE; out[w++] = (char)0xBC; p += 2; changed = 1; continue;
+        }
+        if (w + 1 < out_sz) out[w++] = (char)*p;
+        p++;
+    }
+    out[w] = 0;
+    return changed;
+}
+
+/* util.rs card_matches_group_str, ported exactly. util.c's
+   rb_card_matches_group_str feeds the raw (frequently empty) card group string
+   into strstr(), so an empty `g` makes every card match every group; the group
+   filter is therefore inert engine-wide. score.c evaluates the group predicate
+   itself so its own filters behave like Rust's; the central fix belongs in
+   util.c (reported separately). */
+static int sc_card_matches_group(int cid, const char *group_name) {
+    if (!group_name) return 1;
+    char gn[256];
+    sc_norm_group(group_name, gn, sizeof gn);
+
+    Card c;
+    if (!rb_decode_card_by_index((uint32_t)cid, &c)) return 0;
+    const char *unit = c.unit_idx ? rb_card_string(c.unit_idx) : NULL;
+    const char *grp  = rb_card_string(c.group_idx);
+    const char *series = c.series_idx ? rb_card_string(c.series_idx) : NULL;
+    if (!unit) unit = "";
+
+    int match = 0;
+    if (!strcmp(unit, gn)) match = 1;
+    if (!match && (strstr(unit, "！") || strstr(unit, "µ"))) {
+        char un[256];
+        sc_norm_group(unit, un, sizeof un);
+        if (!strcmp(un, gn)) match = 1;
+    }
+    if (!match && grp && !strcmp(grp, group_name)) match = 1;
+
+    char names[512];
+    names[0] = 0;
+    if (!match && c.name) {
+        snprintf(names, sizeof names, "%s", c.name);
+        if (strstr(names, gn)) match = 1;
+    }
+    if (!match && (strstr(names, "！") || strstr(names, "µ"))) {
+        char nn[512];
+        sc_norm_group(names, nn, sizeof nn);
+        if (strstr(nn, gn)) match = 1;
+    }
+    if (!match) {
+        char extra[512];
+        extra[0] = 0;
+        if (rb_card_get_card_names(cid, extra, sizeof extra) && extra[0]) {
+            if (strstr(extra, gn)) match = 1;
+            else if (strstr(extra, "！") || strstr(extra, "µ")) {
+                char en[512];
+                sc_norm_group(extra, en, sizeof en);
+                if (strstr(en, gn)) match = 1;
+            }
+        }
+    }
+    if (!match) match = sc_series_matches_group(series, gn);
+
+    /* Constant set_card_identity abilities add group memberships in all zones. */
+    if (!match) {
+        int n = rb_card_num_abilities((uint32_t)cid);
+        for (int i = 0; i < n && !match; i++) {
+            Ability ab;
+            memset(&ab, 0, sizeof ab);
+            if (!rb_decode_card_ability((uint32_t)cid, i, &ab)) continue;
+            AbilityEffect *eff = ab.effect;
+            if (eff && eff->action && !strcmp(eff->action, "set_card_identity")) {
+                const char *ids = sc_extra(eff, "identities");
+                if (!ids) ids = sc_extra(eff, "identity");
+                if (ids) {
+                    char buf[512];
+                    snprintf(buf, sizeof buf, "%s", ids);
+                    char *tok = strtok(buf, ",、 []\"'");
+                    while (tok) {
+                        if (!strcmp(tok, gn)) { match = 1; break; }
+                        if ((strstr(tok, "！") || strstr(tok, "µ"))) {
+                            char tn[256];
+                            sc_norm_group(tok, tn, sizeof tn);
+                            if (!strcmp(tn, gn)) { match = 1; break; }
+                        }
+                        tok = strtok(NULL, ",、 []\"'");
+                    }
+                }
+            }
+            rb_free_ability(&ab);
+        }
+    }
+    rb_free_card(&c);
+    return match;
+}
+
 /* single-card CardFilter::matches (util.rs CardFilter::matches, skip_empty) */
 static int sc_filter_matches(const RbCardFilter *f, int cid) {
     int one = cid;
@@ -193,12 +327,19 @@ static int sc_matches(const RbCardFilter *f, const RbCardFilter *delegated,
                       int nht_flag, int cid)
 {
     if (cid < 0) return 0;
+    int ok;
     if (nht_flag) {
         int one = cid, out[1];
-        if (rb_matching_ids(delegated, &one, 1, out, 1) != 1) return 0;
-        return sc_need_heart_total_ok(cid, f);
+        ok = rb_matching_ids(delegated, &one, 1, out, 1) == 1 &&
+             sc_need_heart_total_ok(cid, f);
+    } else {
+        ok = sc_filter_matches(f, cid);
     }
-    return sc_filter_matches(f, cid);
+    /* util.c's group predicate accepts every card; override it with the
+     score.c port of util.rs::card_matches_group_str. */
+    if (ok && f->has_group && f->group[0] && !sc_card_matches_group(cid, f->group))
+        ok = 0;
+    return ok;
 }
 
 /* The filter pair every recipient / per-unit test runs through. */
@@ -337,15 +478,11 @@ static int score_per_unit_count(const GameState *gs, int pl, const ScFilter *sf,
     int keep[RB_MAX_ZONE];
     if (!heart_colors || !*heart_colors) {
         /* util.rs:2416 count_matching_distinct(cards, db, filter, is_stage) */
-        if (sf->nht_flag) {
-            int nk = 0;
-            for (int i = 0; i < n; i++)
-                if (sc_matches(filter, &sf->delegated, sf->nht_flag, ids[i]))
-                    keep[nk++] = ids[i];
-            n = nk;
-        } else {
-            n = rb_matching_ids(&sf->delegated, ids, n, keep, RB_MAX_ZONE);
-        }
+        int nk = 0;
+        for (int i = 0; i < n; i++)
+            if (sc_matches(filter, &sf->delegated, sf->nht_flag, ids[i]))
+                keep[nk++] = ids[i];
+        n = nk;
     } else {
         /* util.rs:2418-2427 */
         int nk = 0;

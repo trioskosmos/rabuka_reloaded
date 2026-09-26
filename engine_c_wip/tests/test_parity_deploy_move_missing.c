@@ -78,7 +78,7 @@ static void test_deploy_to_stage_keke(void) {
     CHECK_EQ(idx, 0, "the Liella! card is found in hand for selection (rs:34-42)");
     test_resume_choice(&g, idx);
 
-    /* rs:44-52 — several slots are still free, so the destination IS asked. */
+    /* rs:44-52 ”Eseveral slots are still free, so the destination IS asked. */
     CHECK_EQ(test_pending_choice_type(&g) && !strcmp(test_pending_choice_type(&g), "SelectPosition"),
              1, "keke debut asks which stage slot to deploy into (rs:45-49)");
     if (test_has_pending_choice(&g)) test_resume_choice(&g, 0); /* left */
@@ -189,7 +189,7 @@ static void test_empty_area_without_free_slot_is_a_noop(void) {
 
     CHECK_EQ(test_has_pending_choice(&g), 0, "no empty-slot prompt when the stage is full (rs:1979-1981)");
     CHECK_EQ(g.state.p[0].hand.n, hand_before,
-             "「メンバーのいないエリアに」 takes nothing when no slot is empty (rs:1976-1982)");
+             "「メンポ�E㝮㝝E��㝝E��リア㝫〝Etakes nothing when no slot is empty (rs:1976-1982)");
     CHECK_EQ(g.state.p[0].discard.n, 0, "a no-op empty_area move does not leak the card to the waitroom");
 }
 
@@ -210,7 +210,7 @@ static void test_deck_position_insert(void) {
 
     AbilityEffect e;
     move_effect(&e, "hand", "deck", 1);
-    set_extra(&e, "position", "2");   /* 1-based wire value → 0-based index 1 */
+    set_extra(&e, "position", "2");   /* 1-based wire value ↝E0-based index 1 */
     rb_execute_effect_ex(&g.state, 0, &e, -1);
 
     CHECK_EQ(g.state.p[0].deck.n, 4, "the card is inserted, the deck grows by one (rs:1804)");
@@ -351,14 +351,20 @@ static void test_move_discard_to_hand(void) {
     TestGame g;
     test_game_new(&g);
     int a = test_new_id(&g, "PL!-sd1-010-SD");
+    int b = test_new_id(&g, "PL!SP-sd1-006-SD");
     test_add_to_discard(&g, a);
+    test_add_to_discard(&g, b);
 
+    /* all=True ? Rust classify_selection returns Exact for is_all without any
+       prompt (util/selection.rs:39-41). */
     AbilityEffect e;
-    move_effect(&e, "discard", "hand", 1);
+    move_effect(&e, "discard", "hand", -1);
     rb_execute_effect_ex(&g.state, 0, &e, -1);
 
-    CHECK_EQ(test_zone_has_id(&g, 0, "hand", a), 1, "discard → hand recovers the card (util.rs:2112-2114)");
-    CHECK_EQ(g.state.p[0].discard.n, 0, "the card leaves the waitroom");
+    CHECK_EQ(test_has_pending_choice(&g), 0, "an all-of-waitroom take needs no selection prompt");
+    CHECK_EQ(test_zone_has_id(&g, 0, "hand", a), 1, "discard �� hand recovers the card (util.rs:2112-2114)");
+    CHECK_EQ(test_zone_has_id(&g, 0, "hand", b), 1, "every matching waitroom card is recovered");
+    CHECK_EQ(g.state.p[0].discard.n, 0, "the cards leave the waitroom");
 }
 
 static void test_move_stage_to_discard(void) {
@@ -385,7 +391,7 @@ static void test_move_energy_deck_to_hand(void) {
     move_effect(&e, "energy_deck", "hand", 1);
     rb_execute_effect_ex(&g.state, 0, &e, -1);
 
-    CHECK_EQ(test_zone_has_id(&g, 0, "hand", e0), 1, "energy_deck → hand recovers the energy");
+    CHECK_EQ(test_zone_has_id(&g, 0, "hand", e0), 1, "energy_deck ↝Ehand recovers the energy");
     CHECK_EQ(g.state.p[0].energy_deck.n, 0, "the energy deck is drained");
 }
 
@@ -412,20 +418,25 @@ static void test_move_then_resolve_recently_moved(void) {
     TestGame g;
     test_game_new(&g);
     int a = test_new_id(&g, "PL!-sd1-010-SD");
+    int s0 = test_new_id(&g, "PL!SP-sd1-006-SD");
+    int s1 = test_new_id(&g, "PL!-sd1-002-SD");
     test_add_to_discard(&g, a);
+    test_add_to_stage(&g, 0, s0);
+    test_add_to_stage(&g, 1, s1);   /* only Right stays free, so no slot prompt */
 
     AbilityEffect e;
-    move_effect(&e, "discard", "hand", 1);
+    move_effect(&e, "discard", "hand", -1);
     rb_execute_effect_ex(&g.state, 0, &e, -1);
 
+    CHECK_EQ(test_zone_has_id(&g, 0, "hand", a), 1, "the first link of the chain moved the card");
     CHECK_EQ(g.state.n_recently_moved, 1, "a completed move records the card as recently moved (rs:2272)");
     CHECK_EQ(g.state.recently_moved[0], a, "the recorded card is the one that moved (rs:2271-2273)");
 
     move_effect(&e, "recently_moved", "stage", 1);
     rb_execute_effect_ex(&g.state, 0, &e, -1);
 
-    CHECK_EQ(test_zone_has_id(&g, 0, "stage", a), 1,
-             "a follow-up move consumes the recently-moved card (rs:282-318)");
+    CHECK_EQ(g.state.p[0].stage[2], a,
+             "a follow-up move deploys the recently-moved card (rs:282-318)");
     CHECK_EQ(test_hand_has(&g, a), 0, "the relayed card is no longer in hand");
 }
 
@@ -483,9 +494,11 @@ static void test_distinct_filter_drops_short_take(void) {
 static void test_stage_deploy_fires_debut_once(void) {
     TestGame g;
     test_game_new(&g);
-    int host = test_new_id(&g, "PL!SP-sd1-006-SD");
+    int host0 = test_new_id(&g, "PL!SP-sd1-006-SD");
+    int host1 = test_new_id(&g, "PL!-sd1-002-SD");
     int m = test_new_id(&g, "PL!-sd1-010-SD");
-    test_add_to_stage(&g, 0, host);
+    test_add_to_stage(&g, 0, host0);
+    test_add_to_stage(&g, 1, host1);
     test_add_to_hand(&g, m);
     int before = g.state.debut_count_this_turn[0];
 
@@ -493,7 +506,8 @@ static void test_stage_deploy_fires_debut_once(void) {
     move_effect(&e, "hand", "stage", 1);
     rb_execute_effect_ex(&g.state, 0, &e, -1);
 
-    CHECK_EQ(test_zone_has_id(&g, 0, "stage", m), 1, "the card reached a stage slot");
+    CHECK_EQ(test_has_pending_choice(&g), 0, "a single free stage slot needs no position prompt");
+    CHECK_EQ(g.state.p[0].stage[2], m, "the card reached the one free stage slot");
     CHECK_EQ(g.state.debut_count_this_turn[0] - before, 1,
              "a stage deploy counts exactly one debut (rs:2316-2321)");
 }

@@ -1,5 +1,5 @@
-/* Parity suite for engine/tests/test_modules/effects/score/**
- * (card_score/, per_card/, live_total/) against
+/* Parity suite for engine/tests/test_modules/effects/score/ -- the card_score/,
+ * per_card/ and live_total/ sub-clusters -- against
  * engine_c_wip/src/ability/effects/score.c.
  *
  * Every test names the Rust file it mirrors. Score effects only became visible
@@ -105,11 +105,11 @@ static AbilityEffect *synth(SynthEffect *s, const char *target, int n)
     s->e.count = -1;
     s->e.target = (char *)target;
     s->e.text = (char *)"synth-probe";
-    s->e.n_extra = n;
-    for (int i = 0; i < n; i++) {
+    for (int i = 0; i < 8; i++) {
         s->e.extra_k[i] = s->k[i];
         s->e.extra_v[i] = s->v[i];
     }
+    s->e.n_extra = n;
     return &s->e;
 }
 

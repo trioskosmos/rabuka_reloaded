@@ -650,7 +650,8 @@ static void test_select_cards_filters_and_clamps(void)
           "select_cards exposes only the looked-at indices passing the filter");
     CHECK(ch && ch->filtered_indices[0] == 0 && ch->filtered_indices[1] == 2,
           "the filtered indices keep their original looked-at positions");
-    rb_resume_with_choice_indices(&tg.state, ch->filtered_indices, 2);
+    int picks[2] = {0, 2};
+    rb_resume_with_choice_indices(&tg.state, picks, 2);
     CHECK(bag_has(&tg.state.p[0].hand, m1) && bag_has(&tg.state.p[0].hand, m2),
           "only the member cards are selectable out of the looked-at set");
     CHECK(!bag_has(&tg.state.p[0].hand, l1), "the live card cannot be selected");

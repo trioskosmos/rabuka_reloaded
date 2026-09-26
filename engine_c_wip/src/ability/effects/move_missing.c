@@ -126,8 +126,13 @@ void rb_move_execute_move_cards_ported(GameState *g, int actor, AbilityEffect *e
     if (!g || !e) return;
     const char *source = e->source ? e->source : "hand";
     const char *destination = e->destination ? e->destination : "discard";
-    int count = e->count;
-    if (count < 0) count = RB_MAX_ZONE;
+    /* Rust move_cards.rs:1866-1872 — `count` is the effect's own count (0 when
+       absent); `is_all` is a separate flag. move.c instead encodes "all" as a
+       negative count, so the raw value has to reach the resolver unchanged —
+       saturating it to RB_MAX_ZONE here silently turned every `all: true` take
+       into an unsatisfiable "take everything" request. */
+    int raw_count = e->count;
+    int place_count = raw_count < 0 ? RB_MAX_ZONE : raw_count;
 
     /* Rust move_cards.rs:1861-1865 — a multi-target move to the deck is owned by
        the dedicated both-targets path. */
@@ -152,7 +157,7 @@ void rb_move_execute_move_cards_ported(GameState *g, int actor, AbilityEffect *e
     }
 
     int ids[RB_MAX_ZONE];
-    int n = rb_move_resolve_cards_from_source(g, actor, e, count, ids, RB_MAX_ZONE);
+    int n = rb_move_resolve_cards_from_source(g, actor, e, raw_count, ids, RB_MAX_ZONE);
     if (rb_has_pending_choice(g)) return;
 
     /* Rust move_cards.rs:2005-2009 and 2015-2024 — an optional move that found
@@ -173,7 +178,7 @@ void rb_move_execute_move_cards_ported(GameState *g, int actor, AbilityEffect *e
     if (cmf_distinct_dedupe(e)) {
         int deduped[RB_MAX_ZONE];
         int dn = rb_dedupe_by_normalized_name(ids, n, deduped, RB_MAX_ZONE);
-        if (dn < count) return;
+        if (dn < place_count && raw_count > 0) return;
         for (int i = 0; i < dn; i++) ids[i] = deduped[i];
         n = dn;
     }
@@ -236,7 +241,7 @@ void rb_move_execute_move_cards_ported(GameState *g, int actor, AbilityEffect *e
             return;
         } else {
             int r = rb_move_place_card_with_stage_choice(g, actor, -1, e->target,
-                cid, destination, vacated, is_max, count, state, deck_pos, source,
+                cid, destination, vacated, is_max, place_count, state, deck_pos, source,
                 allow_occupied, under_self);
             if (r == 1) return;  /* a sub-choice was issued; the queue resumes it */
             placed = (r == 0);
