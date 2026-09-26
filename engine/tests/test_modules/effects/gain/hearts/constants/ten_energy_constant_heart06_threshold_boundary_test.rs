@@ -33,17 +33,19 @@ fn pl_sp_bp5_016_n_energy_at_least_ten_grants_heart06() {
         game.select_indices(&[0]);
     }
     game.give_energy(4);
-    assert!(
-        game.state.player1.energy_zone.active_count() >= 10,
-        "Precondition: energy >= 10"
+    assert_eq!(
+        game.state.player1.energy_zone.active_count(),
+        10,
+        "Precondition: energy count is exact, so a change in how energy is \
+         granted shows up here rather than as a mystery in the modifier"
     );
     let h06 = game
         .state
         .mods
         .get_heart_modifier(card, HeartColor::Heart06);
-    assert!(
-        h06 >= 2,
-        "Should gain at least heart06 ×2 with energy >= 10 (got {})",
+    assert_eq!(
+        h06, 2,
+        "Should gain exactly heart06 ×2 with energy >= 10 (got {})",
         h06
     );
 }
@@ -106,9 +108,9 @@ fn pl_sp_bp5_016_n_live_phase_evaluates_energy_threshold_constant() {
         .state
         .mods
         .get_heart_modifier(card, HeartColor::Heart06);
-    assert!(
-        h06 >= 2,
-        "Live phase: should gain heart06 ×2 from constant (got {})",
+    assert_eq!(
+        h06, 2,
+        "Live phase: should gain exactly heart06 ×2 from constant (got {})",
         h06
     );
 }

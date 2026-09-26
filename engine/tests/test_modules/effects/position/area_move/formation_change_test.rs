@@ -47,9 +47,10 @@ fn all_three_move_counts() {
     game.select_option(0); // move chii (right) → left (swap)
 
     assert!(!game.has_pending_choice(), "All done");
-    assert!(
-        game.state.cards_moved_this_turn.len() > before,
-        "Card movements should increase"
+    assert_eq!(
+        game.state.cards_moved_this_turn.len() - before,
+        3,
+        "Three swaps, one move recorded each"
     );
 }
 
@@ -79,9 +80,13 @@ fn stay_in_place_no_new_move() {
     }
 
     assert!(!game.has_pending_choice(), "All done");
-    assert!(
-        game.state.cards_moved_this_turn.len() >= before,
-        "Card count should not decrease"
+    assert_eq!(
+        game.state.cards_moved_this_turn.len(),
+        before + 2,
+        "Staying in place should record no movement, but the \
+         select_indices path records one per answered stay — see \
+         one_moves_two_stay. Pinned as-is so the day that is fixed, this test \
+         is the thing that says so."
     );
 }
 
@@ -103,8 +108,12 @@ fn one_moves_two_stay() {
     }
 
     assert!(!game.has_pending_choice(), "All done");
-    assert!(
-        game.state.cards_moved_this_turn.len() > before,
-        "At least 1 card moved"
+    assert_eq!(
+        game.state.cards_moved_this_turn.len() - before,
+        2,
+        "The one swap records one move; the tail answered via \
+         select_indices records one per stay, which is why this is 2 and not \
+         1. all_three_move_counts, which never takes that path, records \
+         exactly one per swap."
     );
 }

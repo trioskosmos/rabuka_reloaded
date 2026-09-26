@@ -292,9 +292,23 @@ fn poppin_no_niji_revealed_effect_fails() {
     game.pass();
     game.pass();
 
+    assert_eq!(
+        game.state.player1.hand.cards.len(),
+        hand_before,
+        "No 虹ヶ咲 revealed → the effect adds nothing (a band of <= here \
+         would pass even if it added a card)"
+    );
     assert!(
-        game.state.player1.hand.cards.len() <= hand_before,
-        "No 虹ヶ咲 → hand should not grow"
+        !game
+            .state
+            .player1
+            .hand
+            .cards
+            .iter()
+            .any(|&id| game.state.card_database.get_card(id).is_some_and(|c| {
+                c.card_no.starts_with("PL!N-pb1-")
+            })),
+        "No 虹ヶ咲 → none reached the hand"
     );
 }
 
