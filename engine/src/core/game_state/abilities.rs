@@ -530,37 +530,6 @@ impl GameState {
         true
     }
 
-    /// Evaluate an event-based condition NOW rather than at resolution time, so
-    /// an auto ability whose trigger has not happened is never queued. Returns
-    /// whether the ability may proceed.
-    ///
-    /// `card_id` stands in as the activating card for the duration of the
-    /// check, because the condition is written from the trigger's point of view.
-    ///
-    /// Only the stage scan calls this. The live-card scan has the same four
-    /// lines inline: evaluating a condition borrows `&mut self`, which the card
-    /// borrow it is nested inside forbids, and only the stage site has the
-    /// debug log — so sharing them was a false economy.
-    fn prefilter_event_condition(
-        &mut self,
-        condition: &Condition,
-        card_id: i16,
-        moved_cards: &[i16],
-    ) -> bool {
-        if !Self::condition_is_event_based(condition) {
-            return true;
-        }
-        let saved_activating = self.activating_card;
-        self.activating_card = Some(card_id);
-        let ctx = crate::ability::condition::ConditionContext::with_moved_cards(
-            self,
-            moved_cards,
-        );
-        let passes = ctx.evaluate_condition(condition);
-        self.activating_card = saved_activating;
-        passes
-    }
-
     /// A 「置かれた」 trigger is about a card that was JUST placed, so it
     /// requires the card to be among this event's moves rather than merely
     /// standing on the field.

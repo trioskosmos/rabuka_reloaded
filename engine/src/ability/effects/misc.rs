@@ -478,7 +478,6 @@ impl AbilityResolver {
         gs: &mut GameState,
         effect: &AbilityEffect,
     ) -> Result<(), String> {
-        let target_str = effect.target_name().to_string();
         let card_db = self.card_db();
         // Read the debug flag once: it is a relaxed atomic load and this path
         // reads it on every traced mutation below.

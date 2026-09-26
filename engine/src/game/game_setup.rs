@@ -1806,8 +1806,7 @@ fn generate_main_phase_actions(game_state: &GameState) -> Vec<Action> {
                             })
                     });
 
-                    let mut has_any_available = false;
-                    let (mut area_candidates, any_area_available) = area_candidates_for(
+                    let (area_candidates, has_any_available) = area_candidates_for(
                         game_state,
                         active_player,
                         stage_card_ids,
@@ -1818,7 +1817,6 @@ fn generate_main_phase_actions(game_state: &GameState) -> Vec<Action> {
                         active_energy_count,
                         display,
                     );
-                    has_any_available = any_area_available;
 
                     // Check if this card has play_baton_touch with count > 1 (double baton)
                     let double_baton_pairs = if has_double_baton(card) {

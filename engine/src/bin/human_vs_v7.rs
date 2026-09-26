@@ -144,6 +144,9 @@ fn main() {
             println!("\nOPTIONS (type the index you want into the script):");
             for (n, a) in actions.iter().enumerate() {
                 println!("  [{n:>2}] {}", describe(a, &db));
+                if std::env::var_os("HUMAN_RAW").is_some() {
+                    println!("        raw params: {:?}", a.parameters);
+                }
             }
             let v8a = strategy_v8::choose_action_v8_entry(&gs, &actions, my_me);
             if let Some(idx) = actions
@@ -182,6 +185,22 @@ fn main() {
         println!("  >> {line}");
         my_log.push(line);
         let _ = execute_and_settle(&mut gs, a);
+        // Selection diagnostics: the mulligan/live selections are engine-side
+        // state, not carried on the action, so a wrong pick here is invisible
+        // unless it is printed. This caught a mulligan that silently selected
+        // nothing.
+        if std::env::var_os("HUMAN_SEL").is_some() {
+            let me_p = if my_me == 0 { &gs.player1 } else { &gs.player2 };
+            let op_p = if my_me == 0 { &gs.player2 } else { &gs.player1 };
+            println!(
+                "     [state] phase={:?} mull_sel={:?} my_hand={:?} opp_hand={:?} active={}",
+                gs.current_phase,
+                gs.mulligan_selected_indices,
+                me_p.hand.cards,
+                op_p.hand.cards,
+                gs.active_player().id
+            );
+        }
     }
     report(&gs, &db, my_me, &my_log, agree, differ, &diverged, auto);
 }
@@ -250,7 +269,12 @@ fn describe(a: &game_setup::Action, db: &CardDatabase) -> String {
                 .map(|c| short(db, c))
                 .or_else(|| {
                     hand_idx
-                        .and_then(|i| CURRENT_HAND.get().and_then(|h| h.get(i).copied()))
+                        .and_then(|i| {
+                            CURRENT_HAND
+                                .get()
+                                .and_then(|h| h.lock().ok())
+                                .and_then(|h| h.get(i).copied())
+                        })
                         .map(|c| short(db, c))
                 })
                 .unwrap_or_else(|| format!("hand#{hand_idx:?}"));

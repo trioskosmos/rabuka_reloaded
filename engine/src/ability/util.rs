@@ -2350,41 +2350,8 @@ pub fn resolve_per_unit_count(
         _ => return 1,
     };
     if Zone::from_str(zone) == Some(Zone::UnderMember) {
-        // "このメンバーの下に置かれているカード1枚につき" is scoped to the HOST
-        // member (whose ability this is), not to every member's under-cards.
-        // Callers with a known host pass it explicitly; otherwise fall back to
-        // counting under-cards of all members.
-        let cards: Vec<i16> = if let Some(host_id) = host_card_id {
-            player
-                .stage
-                .stage
-                .iter()
-                .position(|&id| id == host_id)
-                .map(|idx| player.stage.under_cards[idx].iter().copied().collect())
-                .unwrap_or_default()
-        } else {
-            player
-                .stage
-                .under_cards
-                .iter()
-                .flat_map(|sv| sv.iter())
-                .copied()
-                .collect()
-        };
-        if heart_colors.is_empty() {
-            count_matching_distinct(&cards, card_db, filter, false)
-        } else {
-            let mut matching: Vec<i16> = cards
-                .iter()
-                .filter(|&&id| {
-                    filter.matches(card_db, id, false)
-                        && card_matches_heart_colors(card_db, id, heart_colors)
-                })
-                .copied()
-                .collect();
-            matching = apply_distinct_filter(&matching, filter.distinct, card_db);
-            matching.len().u8_count()
-        }
+        let cards = under_member_cards(player, host_card_id);
+        count_filtered(&cards, card_db, filter, heart_colors, false)
     } else {
         let mut cards: Vec<i16> = zone_cards(player, zone).to_vec();
         // Apply state filter (wait/active) for stage cards
@@ -2399,21 +2366,55 @@ pub fn resolve_per_unit_count(
                 });
             }
         }
-        if heart_colors.is_empty() {
-            count_matching_distinct(&cards, card_db, filter, is_stage)
-        } else {
-            let mut matching: Vec<i16> = cards
-                .iter()
-                .filter(|&&id| {
-                    filter.matches(card_db, id, is_stage)
-                        && card_matches_heart_colors(card_db, id, heart_colors)
-                })
-                .copied()
-                .collect();
-            matching = apply_distinct_filter(&matching, filter.distinct, card_db);
-            matching.len().u8_count()
-        }
+        count_filtered(&cards, card_db, filter, heart_colors, is_stage)
     }
+}
+
+/// The cards sitting under a member: one member's under-cards when the caller
+/// knows which member's ability this is, otherwise every member's.
+///
+/// The scoping matters. 「このメンバーの下に置かれているカード1枚につき」 counts
+/// ONE member's under-cards; falling back to the whole field would multiply
+/// the effect by every member on stage.
+fn under_member_cards(player: &crate::player::Player, host_card_id: Option<i16>) -> Vec<i16> {
+    let host_slot = host_card_id
+        .and_then(|host| player.stage.stage.iter().position(|&id| id == host))
+        .filter(|&idx| idx < player.stage.under_cards.len());
+    match host_slot {
+        Some(idx) => player.stage.under_cards[idx].iter().copied().collect(),
+        None => player
+            .stage
+            .under_cards
+            .iter()
+            .flat_map(|under| under.iter())
+            .copied()
+            .collect(),
+    }
+}
+
+/// How many of `cards` the effect's filter admits. When the effect named no
+/// heart colours the filter alone decides; when it did, a card must also carry
+/// one of them.
+fn count_filtered(
+    cards: &[i16],
+    card_db: &CardDatabase,
+    filter: &CardFilter,
+    heart_colors: &[String],
+    is_stage: bool,
+) -> u8 {
+    if heart_colors.is_empty() {
+        return count_matching_distinct(cards, card_db, filter, is_stage);
+    }
+    let matching: Vec<i16> = cards
+        .iter()
+        .filter(|&&id| {
+            filter.matches(card_db, id, is_stage)
+                && card_matches_heart_colors(card_db, id, heart_colors)
+        })
+        .copied()
+        .collect();
+    let matching = apply_distinct_filter(&matching, filter.distinct, card_db);
+    matching.len().u8_count()
 }
 
 // ============== DISTINCT FILTERING ==============
