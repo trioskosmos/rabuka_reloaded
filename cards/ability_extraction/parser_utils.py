@@ -310,70 +310,6 @@ def extract_operator(text: str) -> Optional[str]:
     return extract_by_pattern(text, OPERATOR_PATTERNS)
 
 
-def extract_heart_types(text):
-    """Extract heart types from text (e.g., heart icons)."""
-    matches = HEART_PATTERN.findall(text)
-    return matches if matches else None
-
-
-def extract_blade_count(text):
-    """Extract blade count from text (number of blade icons)."""
-    matches = BLADE_PATTERN.findall(text)
-    return len(matches) if matches else 0
-
-
-def _check_exclude_self_broad(text):
-    """Check if text contains 'other' patterns (ほかの/他の) that imply exclude_self."""
-    return "ほかの" in text or "他の" in text or "以外" in text
-
-
-def check_distinct_name(text):
-    """Check if text contains 'different name' pattern (名前の異なる)."""
-    return "名前の異なる" in text
-
-
-def check_original_value(text):
-    """Check if text contains 'original value' pattern (元々持つ or bare 元々)."""
-    return "元々持つ" in text or "元々" in text
-
-
-def split_commas_smartly(text):
-    """Split text by commas, but preserve structural commas."""
-    parts = []
-    current = ""
-    i = 0
-    while i < len(text):
-        if text[i] == "、":
-            if i >= 1:
-                prev_char = text[i - 1]
-                if prev_char == "は":
-                    current += "、"
-                    i += 1
-                    continue
-                if i >= 7 and text[i - 7 : i] == "ライブ終了時まで":
-                    current += "、"
-                    i += 1
-                    continue
-                if i >= 2 and text[i - 2 : i] == "場合":
-                    current += "、"
-                    i += 1
-                    continue
-            if i >= 3 and text[i - 3 : i] == "その後":
-                parts.append(current)
-                current = ""
-                i += 1
-                continue
-            parts.append(current)
-            current = ""
-            i += 1
-        else:
-            current += text[i]
-            i += 1
-    if current:
-        parts.append(current)
-    return parts
-
-
 # Main groups (large idol groups) - from rules v1.06 Appendix A
 MAIN_GROUPS = {
     "μ's",
@@ -661,32 +597,13 @@ _CARD_TYPE_LONGEST_FIRST: List[Tuple[str, str]] = sorted(
 )
 
 # ============== PRE-COMPILED REGEXES ==============
-_ALL_KW_RE = re.compile(r"すべての|全ての|全部の|全て|全員|全体|カードをすべて")
-_DISTINCT_NAME_RE = re.compile(r"名前[がの]異なる|カード名が異なる")
-_DISTINCT_COST_RE = re.compile(r"コストがそれぞれ異なる")
-_ORIGINAL_VALUE_RE = re.compile(r"元々持つ|元々")
 _SHUFFLE_RE = re.compile(r"シャッフル")
-_SAME_GROUP_RE = re.compile(r"同じグループ名")
-_DIFF_GROUP_RE = re.compile(r"グループ名[がの]異なる|異なるグループ名")
-_SAME_UNIT_RE = re.compile(r"同じユニット名")
-_NON_STACKABLE_RE = re.compile(r"この効果は重複しない")
 _OPTIONAL_RE = re.compile(r"もよい|てもよい")
-_MULTIPLE_TARGETS_RE = re.compile(r"それぞれ|ずつ")
-_STATE_CHANGE_WAIT = re.compile(r"ウェイト(状態)?に(す|で)(る|き)")
-_STATE_CHANGE_ACTIVE = re.compile(r"アクティブにする")
-_ABILITY_FILTER_HAS = re.compile(r"能力を持つ")
-_ABILITY_FILTER_NO = re.compile(r"能力を持たない|能力も持たない")
-_CARD_PROPERTY_BLADE = re.compile(r"ブレードハートを持たない|ブレードハートがない")
-_CARD_PROPERTY_BLADE_POS = re.compile(r"ブレードハートを持つ")
-_CARD_PROPERTY_SCORE = re.compile(r"\{\{icon_score\.png\|スコア\}\}を持つ")
-_NEGATION_RE = re.compile(r"(がない|がなく|が\d*ない|いない|を持たない)")
-_SELF_TARGET_RE = re.compile(r"この(メンバー|カード)[がは]")
 
 
 def detect_require_all_hearts(text: str) -> bool:
     """Detect if heart icons in text are joined by と (AND / all required)."""
-    heart_block = r"\{\{heart_\d+\.png\|heart\d+\}\}"
-    hearts = re.findall(heart_block, text)
+    hearts = re.findall(HEART_ICON, text)
     if len(hearts) < 2:
         return False
     for i in range(len(hearts) - 1):
