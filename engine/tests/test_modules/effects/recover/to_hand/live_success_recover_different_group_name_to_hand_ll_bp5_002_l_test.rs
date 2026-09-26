@@ -109,6 +109,10 @@ fn three_distinct_groups_center_gets_all_hearts() {
 /// stage" case at all. Now two DISTINCT 『Aqours』 instances plus a μ member, and
 /// the claim is checked as a granted AMOUNT rather than the absence of a map
 /// entry (a zero-valued entry would fail `.is_none()` while nothing was granted).
+///
+/// The old assertion read the modifier of `aqours`, which sits in the LEFT area.
+/// ab#0 grants to the CENTRE, so a test that passed while the effect fired on
+/// `aqours2` would have been green. Every staged member is checked now.
 #[test]
 fn two_distinct_groups_no_effect() {
     let db = load_real_database();
@@ -119,9 +123,14 @@ fn two_distinct_groups_no_effect() {
     let muse = game.id("PL!-bp3-003-R");
     let filler = game.id("PL!-sd1-010-SD");
     game.assert_card_identity(aqours, "PL!S-pb1-003-R");
+    game.assert_card_identity(aqours2, "PL!S-pb1-003-R");
     game.assert_same_card_name(aqours, aqours2, "two 『Aqours』 instances");
     assert_ne!(aqours, aqours2, "two separate card instances");
     game.assert_distinct_card_names(aqours, muse, "『Aqours』 vs μ");
+    // The premise is a group pin. Two 『Aqours』 and one μ is exactly two
+    // distinct groups, which is what the test is about.
+    game.assert_all_in_group(&[aqours, aqours2], "AZALEA", "two 『Aqours』 members");
+    game.assert_card_in_group(muse, "Printemps", "the third stage member is μ");
 
     game.state.player1.stage.stage = [aqours, aqours2, muse];
     game.give_energy(15);
@@ -135,10 +144,19 @@ fn two_distinct_groups_no_effect() {
         game.select_indices(&[]);
     }
 
+    for (i, &member) in game.state.player1.stage.stage.iter().enumerate() {
+        assert_eq!(
+            game.state.mods.get_heart_modifier(member, HeartColor::All),
+            0,
+            "2 distinct groups on stage must not grant the All heart \
+             (area {i}, card id {member})"
+        );
+    }
     assert_eq!(
-        game.state.mods.get_heart_modifier(aqours, HeartColor::All),
-        0,
-        "2 distinct groups on stage must not grant the All heart"
+        game.state.player1.stage.stage[1],
+        aqours2,
+        "setup guard: the centre really is the second 『Aqours』 instance, the one \
+         ab#0 would have granted to"
     );
 }
 
@@ -146,7 +164,14 @@ fn two_distinct_groups_no_effect() {
 ///
 /// The name said "same group" but the fixture was `[muse1, muse1, muse2]` with
 /// `muse1` a 虹ヶ咲 member and `muse2` a μ one — two groups, not one, and the
-/// same card id in two areas besides. Now three separate μ instances.
+/// same card id in two areas besides. Now three separate Printemps members.
+///
+/// The premise is a GROUP pin, not a name pin: the three cards are three
+/// different characters (南ことり / 高坂 穂乃果 / 南 ことり), so asserting a
+/// shared card name here would fail on a fixture that is correct, and asserting
+/// nothing would let a drifted fixture pass. `assert_all_in_group` reads the
+/// same matcher the ability does, which matters because `group_name` is `None`
+/// for every card in cards.json — the group lives in `unit`/`series`.
 #[test]
 fn all_same_group_no_effect() {
     let db = load_real_database();
@@ -156,8 +181,15 @@ fn all_same_group_no_effect() {
     let muse2 = game.id("PL!-sd1-001-SD");
     let muse3 = game.id("PL!-sd1-003-SD");
     let filler = game.id("PL!-sd1-010-SD");
-    game.assert_same_card_name(muse1, muse2, "three μ members");
-    game.assert_same_card_name(muse1, muse3, "three μ members");
+    game.assert_all_in_group(
+        &[muse1, muse2, muse3],
+        "Printemps",
+        "all three stage members are 『Printemps』",
+    );
+    // Same group, three different characters — so the condition is tested on
+    // group membership rather than on three copies of one print.
+    game.assert_distinct_card_names(muse1, muse2, "three different members");
+    game.assert_distinct_card_names(muse2, muse3, "three different members");
     assert_ne!(
         [muse1, muse2, muse3],
         [muse1, muse1, muse1],
@@ -176,10 +208,22 @@ fn all_same_group_no_effect() {
         game.select_indices(&[]);
     }
 
+    // The claim is a granted AMOUNT, not the absence of a map entry: a
+    // zero-valued entry for every colour would satisfy `is_none()` while the
+    // effect had fired. Assert all three members, because ab#0 targets the
+    // centre — checking only one would pass if the effect had landed elsewhere.
+    for (i, &member) in game.state.player1.stage.stage.iter().enumerate() {
+        assert_eq!(
+            game.state.mods.get_heart_modifier(member, HeartColor::All),
+            0,
+            "all three members from ONE group must not grant the All heart \
+             (area {i}, card id {member})"
+        );
+    }
     assert_eq!(
-        game.state.mods.get_heart_modifier(muse1, HeartColor::All),
-        0,
-        "all three members from ONE group must not grant the All heart"
+        game.state.player1.stage.stage[1],
+        muse2,
+        "setup guard: the centre really is one of the three"
     );
 }
 

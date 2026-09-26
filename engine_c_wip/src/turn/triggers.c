@@ -3,6 +3,10 @@
 #include <stdlib.h>
 #include <stdio.h>
 
+/* zones.rs::check_effect_position — declared in src/core/zones.c but not yet
+   surfaced in rabuka.h; declared locally so this translation unit links. */
+int rb_check_effect_position(const char *effect_pos, int card_position);
+
 /* Portable trigger scan — mirrors engine/src/triggers.rs:canonical_trigger
    + engine/src/turn/triggers.rs . Wire trigger strings are Japanese:
    "登場" (Debut), "ライブ開始時", "ライブ成功時", "常時", "起動", "自動" */
@@ -309,6 +313,12 @@ static void apply_constant_effect(GameState *g, int pl, int host_cid,
                                   AbilityEffect *e, RbTempEffect *acc,
                                   int16_t *total_p1, int16_t *total_p2) {
     if (!e || !e->action) return;
+    /* acc != NULL means "record the deltas into this temporary effect" (the
+       Duration::LiveEnd branch of modifiers.rs:recalculate_constants). The
+       recorded duration comes from the effect's own `duration` field so
+       rb_check_expired_effects reverts it at the right phase. */
+    if (acc && acc->dur == 0)
+        acc->dur = effect_is_live_end(e) ? RB_TEMP_LIVE_END : RB_TEMP_TURN_END;
     /* Position-targeted modifiers (ruby front / love_wing_bell center): the
        effect grants its resource to the member at a given stage position rather
        than the host. Mirrors engine/src/core/game_state/modifiers.rs constant
@@ -782,45 +792,128 @@ int rb_is_trigger_suppressed(GameState *g, int pl, const char *trigger_name) {
     return 0;
 }
 
-/* Faithful port of trigger_live_success_abilities */
+/* activation_position of an effect (mirrors AbilityEffect::activation_position_any,
+   ability/types.rs — the wire field the parser stamps). NULL when absent. */
+static const char *effect_activation_position_any(const AbilityEffect *e) {
+    if (!e) return NULL;
+    for (int i = 0; i < e->n_extra; i++)
+        if (e->extra_k[i] && !strcmp(e->extra_k[i], "activation_position"))
+            return e->extra_v[i] ? e->extra_v[i] : "";
+    return NULL;
+}
+
+/* Faithful port of turn/triggers.rs::trigger_live_success_abilities
+   (engine/src/turn/triggers.rs:331-503).
+
+   Rust order, reproduced branch for branch:
+     1. evaluate_success_zone_constant_abilities()      — no C counterpart yet
+     2. restore_performance_need_heart_modifiers()      — no C counterpart yet
+     3. bail unless should_trigger_live_success(player)
+     4. stage_cards (3 areas, position = Some(area)) chained with
+        live_cards (position = None); for each card:
+          - position.is_some() && (id == -1 || invalidated) -> skip card
+          - per ability: activation-position gate via check_effect_position
+          - has_trigger(LiveSuccess) && seen.insert((id, idx)) -> collect
+          - then the card's GAINED abilities, same two gates, ability_idx =
+            GAINED_ABILITY_INDEX_BASE + gained_index
+     5. enqueue every collected ability as AbilityTrigger::LiveSuccess for `pl`
+
+   `seen` is a HashSet<(i16, usize)> in Rust; the C queue is a fixed array, so
+   the (card_id, ability_idx) pairs are kept in a local linear-probed list. */
+#define RBLSS_MAX_SEEN 64
+typedef struct { int card_id; int ability_idx; } RbLiveSuccessSeen;
+
+static int rb_lss_seen_add(RbLiveSuccessSeen *seen, int n, int card_id, int ability_idx) {
+    for (int i = 0; i < n; i++)
+        if (seen[i].card_id == card_id && seen[i].ability_idx == ability_idx) return 0;
+    if (n >= RBLSS_MAX_SEEN) return 0;
+    seen[n].card_id = card_id;
+    seen[n].ability_idx = ability_idx;
+    return 1;
+}
+
 void rb_trigger_live_success_faithful(GameState *g, int pl) {
-    if (!g) return;
-    RbPlayer *P = &g->p[pl];
+    if (!g || pl < 0 || pl > 1) return;
+    const RbPlayer *P = &g->p[pl];
 
-    /* Check if live success should trigger */
-    if (!g->live_surplus_ready_this_turn) return;
+    /* (3) LiveSuccess only triggers when the live card's need_heart is
+       satisfied — engine/src/turn/triggers.rs:346-352. */
+    if (!rb_should_trigger_live_success(g, pl)) return;
 
-    /* Collect abilities to trigger from stage cards */
-    for (int s = 0; s < RB_STAGE_SIZE; s++) {
-        int cid = P->stage[s];
-        if (cid < 0) continue;
-        int nab = rb_card_num_abilities((uint32_t)cid);
-        for (int a = 0; a < nab; a++) {
-            Ability ab;
-            if (!rb_decode_card_ability((uint32_t)cid, a, &ab)) continue;
-            if (ab.effect && ab.triggers && strstr(ab.triggers, "ライブ成功時")) {
-                /* Enqueue the ability */
-                rb_queue_push(&g->queue, cid, a);
-                rb_record_use(&g->queue, cid, a, g->turn);
+    RbLiveSuccessSeen seen[RBLSS_MAX_SEEN];
+    int n_seen = 0;
+    RbLiveSuccessSeen pending[RBLSS_MAX_SEEN];
+    int n_pending = 0;
+
+    /* (4) stage_cards chained with live_cards. area < 0 encodes position=None
+       (live-card zone): the card-level invalidation and activation-position
+       gates only apply to staged members, exactly like Rust's
+       `if position.is_some() && ...`. */
+    for (int zone = 0; zone < 2; zone++) {
+        int count = (zone == 0) ? RB_STAGE_SIZE : P->live.n;
+        for (int i = 0; i < count; i++) {
+            int cid = (zone == 0) ? P->stage[i] : P->live.cards[i];
+            int area = (zone == 0) ? i : -1;
+            if (cid == RB_EMPTY_SLOT) continue;
+            if (zone == 0 && rb_ability_is_invalidated(g, cid, RB_TSTR_LIVE_SUCCESS))
+                continue;
+
+            int nab = rb_card_num_abilities((uint32_t)cid);
+            for (int a = 0; a < nab; a++) {
+                Ability ab;
+                if (!rb_decode_card_ability((uint32_t)cid, a, &ab)) continue;
+                if (area >= 0 &&
+                    !rb_check_effect_position(effect_activation_position_any(ab.effect), area)) {
+                    rb_free_ability(&ab);
+                    continue;
+                }
+                if (ab.triggers && rb_trigger_is(ab.triggers, RB_TSTR_LIVE_SUCCESS) &&
+                    rb_lss_seen_add(seen, n_seen, cid, a) && n_pending < RBLSS_MAX_SEEN) {
+                    n_seen++;
+                    pending[n_pending].card_id = cid;
+                    pending[n_pending].ability_idx = a;
+                    n_pending++;
+                }
+                rb_free_ability(&ab);
             }
-            rb_free_ability(&ab);
+
+            /* gained abilities on the same card (Rust: the
+               `gained_card_abilities` loop nested inside the card loop). */
+            int ng = rb_card_num_gained_abilities(g, cid);
+            for (int gi = 0; gi < ng; gi++) {
+                const Ability *gab = rb_card_gained_ability(g, cid, gi);
+                if (!gab) continue;
+                if (area >= 0 &&
+                    !rb_check_effect_position(effect_activation_position_any(gab->effect), area))
+                    continue;
+                int ability_idx = RB_GAINED_ABILITY_INDEX_BASE + gi;
+                if (gab->triggers && rb_trigger_is(gab->triggers, RB_TSTR_LIVE_SUCCESS) &&
+                    rb_lss_seen_add(seen, n_seen, cid, ability_idx) && n_pending < RBLSS_MAX_SEEN) {
+                    n_seen++;
+                    pending[n_pending].card_id = cid;
+                    pending[n_pending].ability_idx = ability_idx;
+                    n_pending++;
+                }
+            }
         }
     }
 
-    /* Collect abilities from live card zone */
-    for (int i = 0; i < P->live.n; i++) {
-        int cid = P->live.cards[i];
-        if (cid < 0) continue;
-        int nab = rb_card_num_abilities((uint32_t)cid);
-        for (int a = 0; a < nab; a++) {
-            Ability ab;
-            if (!rb_decode_card_ability((uint32_t)cid, a, &ab)) continue;
-            if (ab.effect && ab.triggers && strstr(ab.triggers, "ライブ成功時")) {
-                rb_queue_push(&g->queue, cid, a);
-                rb_record_use(&g->queue, cid, a, g->turn);
-            }
-            rb_free_ability(&ab);
+    /* (5) trigger_auto_ability(..., AbilityTrigger::LiveSuccess, pl, ...) */
+    for (int i = 0; i < n_pending; i++) {
+        int cid = pending[i].card_id;
+        int idx = pending[i].ability_idx;
+        if (idx >= RB_GAINED_ABILITY_INDEX_BASE) {
+            if (rb_queue_push_with_trigger(&g->queue, cid, idx, RB_TSTR_LIVE_SUCCESS, NULL, 0))
+                rb_record_use(&g->queue, cid, idx, g->turn);
+            continue;
         }
+        Ability ab;
+        if (!rb_decode_card_ability((uint32_t)cid, idx, &ab)) continue;
+        int limit = ab.use_limit < 0 ? 99 : ab.use_limit;
+        rb_free_ability(&ab);
+        if (rb_use_limit_reached(&g->queue, cid, idx, limit, g->turn)) continue;
+        if (rb_queue_push_with_trigger(&g->queue, cid, idx, RB_TSTR_LIVE_SUCCESS, NULL, 0))
+            rb_record_use(&g->queue, cid, idx, g->turn);
     }
 }
 

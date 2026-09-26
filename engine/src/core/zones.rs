@@ -6,6 +6,45 @@ use crate::{HashMap, HashSet};
 use serde::{Deserialize, Serialize};
 use smallvec::SmallVec;
 
+/// Warn once per call site instead of on every draw. An empty deck is a legal
+/// state that one effect can hit repeatedly; warning per call buried the signal
+/// under ~1.2k identical lines in a full `cargo test` run.
+#[cfg(target_has_atomic = "ptr")]
+mod empty_deck_warn {
+    use core::sync::atomic::{AtomicBool, Ordering};
+    pub struct OnceFlag(AtomicBool);
+    impl OnceFlag {
+        pub const fn new() -> Self {
+            OnceFlag(AtomicBool::new(false))
+        }
+        /// True on the first call only.
+        pub fn first_call(&self) -> bool {
+            !self.0.swap(true, Ordering::Relaxed)
+        }
+    }
+}
+
+/// No-ptr-atomic targets (PS1 R3000/MIPS-I): stay silent, matching the
+/// compile-time-false `ABILITY_DEBUG` flag in `ability::debug`.
+#[cfg(not(target_has_atomic = "ptr"))]
+mod empty_deck_warn {
+    pub struct OnceFlag;
+    impl OnceFlag {
+        pub const fn new() -> Self {
+            OnceFlag
+        }
+        pub fn first_call(&self) -> bool {
+            false
+        }
+    }
+}
+
+use empty_deck_warn::OnceFlag;
+
+static MAIN_DECK_DRAW_WARNED: OnceFlag = OnceFlag::new();
+static MAIN_DECK_DRAW_BOTTOM_WARNED: OnceFlag = OnceFlag::new();
+static ENERGY_DECK_DRAW_WARNED: OnceFlag = OnceFlag::new();
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[cfg_attr(feature = "serde_support", derive(Serialize, Deserialize))]
 pub enum Orientation {
@@ -848,7 +887,9 @@ impl MainDeck {
     /// Draw the top card (index 0). Returns None if deck is empty.
     pub fn draw(&mut self) -> Option<i16> {
         if self.cards.is_empty() {
-            log::warn!("[EMPTY_DECK_DRAW] main_deck.draw() on EMPTY deck — effect silently does nothing; test setups must stock main_deck");
+            if MAIN_DECK_DRAW_WARNED.first_call() {
+                log::warn!("[EMPTY_DECK_DRAW] main_deck.draw() on EMPTY deck — effect silently does nothing; test setups must stock main_deck");
+            }
             None
         } else {
             Some(self.cards.remove(0))
@@ -858,7 +899,9 @@ impl MainDeck {
     /// Draw the bottom card (last index). Returns None if deck is empty.
     pub fn draw_bottom(&mut self) -> Option<i16> {
         if self.cards.is_empty() {
-            log::warn!("[EMPTY_DECK_DRAW] main_deck.draw_bottom() on EMPTY deck — effect silently does nothing; test setups must stock main_deck");
+            if MAIN_DECK_DRAW_BOTTOM_WARNED.first_call() {
+                log::warn!("[EMPTY_DECK_DRAW] main_deck.draw_bottom() on EMPTY deck — effect silently does nothing; test setups must stock main_deck");
+            }
             None
         } else {
             self.cards.pop()
@@ -902,7 +945,9 @@ impl EnergyDeck {
 
     pub fn draw(&mut self) -> Option<i16> {
         if self.cards.is_empty() {
-            log::warn!("[EMPTY_DECK_DRAW] energy_deck.draw() on EMPTY deck — effect silently does nothing; test setups must stock energy_deck (give_energy fills the ZONE, not the deck)");
+            if ENERGY_DECK_DRAW_WARNED.first_call() {
+                log::warn!("[EMPTY_DECK_DRAW] energy_deck.draw() on EMPTY deck — effect silently does nothing; test setups must stock energy_deck (give_energy fills the ZONE, not the deck)");
+            }
             None
         } else {
             Some(self.cards.remove(0))

@@ -65,6 +65,51 @@ fn fire_ruby_debut_and_move(game: &mut TestGame, ruby: i16, pick_area: MemberAre
     game.drain_auto_ability_choices();
 }
 
+/// The stage areas a member-selection prompt offers, read from whichever
+/// representation the engine used (`SelectTarget` option strings, or
+/// `SelectPosition` + generated actions). Sorted, and de-duplicated, so the
+/// caller can compare the SET against the areas that are really occupied.
+fn offered_areas(game: &TestGame) -> Vec<String> {
+    use rabuka_engine::ability::types::Choice;
+    let mut areas: Vec<String> = match game.get_pending_choice() {
+        Choice::SelectTarget { options, .. } => options
+            .as_ref()
+            .map(|opts| {
+                opts.iter()
+                    .filter_map(|o| {
+                        ["left", "center", "right"]
+                            .into_iter()
+                            .find(|a| o.contains(a))
+                            .map(|a| a.to_string())
+                    })
+                    .collect()
+            })
+            .unwrap_or_default(),
+        Choice::SelectPosition { .. } => game
+            .generated_actions()
+            .iter()
+            .filter_map(|a| {
+                a.parameters
+                    .as_ref()
+                    .and_then(|p| p.stage_area.clone())
+            })
+            .collect(),
+        other => panic!("expected a member-selection choice, got {other:?}"),
+    };
+    areas.sort();
+    areas.dedup();
+    areas
+}
+
+/// The prompt offers every member on the stage — 「自分のステージにいるメンバー
+/// 1人」 — so the offered SET is the set of occupied areas, each exactly once.
+///
+/// Was `assert!(opts.len() >= 2)`: a count, so two copies of the LEFT area, or
+/// left+right with the centre missing, both satisfied it, and the
+/// `SelectPosition` branch asserted nothing at all. The printed claim is about
+/// WHICH members can be picked, so the set is compared, not the length. The
+/// centre is 黒澤ルビィ herself (she debuts there), which is the "self" half of
+/// the test's name.
 #[test]
 fn fixed_center_choice_offers_self_and_other_stage_members() {
     let db = load_real_database();
@@ -73,27 +118,27 @@ fn fixed_center_choice_offers_self_and_other_stage_members() {
     let ruby = fixed_center_id(&game);
     let member_a = filler_id(&game);
     let member_b = filler_id(&game);
-    game.state.player1.stage.stage = [member_a, member_b, -1];
+    game.assert_card_identity(ruby, "PL!S-bp7-018-N");
+    // Centre left free so the debut lands there instead of displacing a member;
+    // after it the stage is full, which is the premise the offer must cover.
+    game.state.player1.stage.stage = [member_a, -1, member_b];
     game.add_to_hand(ruby);
     game.give_energy(10);
 
     game.play_to_stage(ruby, MemberArea::Center);
-    // Ruby's debut must present a member-selection choice.
-    let choice = game.get_pending_choice();
-    match choice {
-        rabuka_engine::ability::types::Choice::SelectTarget { options, .. } => {
-            let opts = options.as_ref().expect("options expected");
-            assert!(
-                opts.len() >= 2,
-                "should be able to choose between the two stage members, got {:?}",
-                opts
-            );
-        }
-        rabuka_engine::ability::types::Choice::SelectPosition { .. } => {
-            // position-based selection is also acceptable
-        }
-        other => panic!("expected member-selection choice, got {:?}", other),
-    }
+    let stage = game.state.player1.stage.stage;
+    assert_eq!(
+        stage,
+        [member_a, ruby, member_b],
+        "precondition: all three areas hold a distinct member after the debut"
+    );
+
+    assert_eq!(
+        offered_areas(&game),
+        vec!["center", "left", "right"],
+        "every occupied area must be offered exactly once — the effect says \
+         「自分のステージにいるメンバー1人」, and 黒澤ルビィ herself is one of them"
+    );
 }
 
 #[test]

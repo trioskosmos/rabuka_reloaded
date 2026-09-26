@@ -1417,49 +1417,107 @@ void rb_resolver_handle_looked_at_selection(RbAbilityResolver *self, GameState *
     rb_resolver_clear_choice_state_and_resume(self);
 }
 
+/* Rust misc.rs:1408-1411: the target-selection prompt carries `filtered_indices` = the
+   STAGE SLOT positions of the filter-matching candidates, so the player's answer indexes
+   the candidate list (Rust choice.rs:2044 `ctx.mfi`) rather than the raw stage. The C
+   producers of this choice (src/ability/effects/misc.c `try_create_target_selection_choice`,
+   src/engine.c gain_resource fallback) leave the field empty, so derive it here from the
+   choice's own declared card_type / group filter — the same filter the answer is validated
+   against below. A choice that already carries filtered_indices is left untouched. */
+static void stage_build_filtered_slots(GameState *g, int pl) {
+    RbChoice *ch = &g->queue.pending;
+    if (ch->n_filtered_indices > 0) return;                 /* producer narrowed it */
+    if (!ch->card_type[0] && !ch->filter_group[0]) return;  /* nothing declared to filter on */
+    int n = 0;
+    for (int slot = 0; slot < RB_STAGE_SIZE && n < RB_MAX_ZONE; slot++) {
+        int cid = g->p[pl].stage[slot];
+        if (cid == RB_EMPTY_SLOT || cid < 0) continue;
+        if (ch->card_type[0] && !rb_card_matches_type(cid, ch->card_type)) continue;
+        if (ch->filter_group[0] && !rb_card_matches_group_str(cid, ch->filter_group)) continue;
+        ch->filtered_indices[n++] = slot;
+    }
+    if (n > 0) ch->n_filtered_indices = n;
+}
+
+/* Rust choice.rs:1006-1008 — `validate_card` is `choice.as_filter().matches`, i.e. the
+   SelectCard choice's own card_type + group_names. Applied per picked card exactly like
+   the Rust handler does before pushing it onto the selection pool. */
+static int stage_choice_accepts(const GameState *g, int cid) {
+    const RbChoice *ch = &g->queue.pending;
+    if (ch->card_type[0] && !rb_card_matches_type(cid, ch->card_type)) return 0;
+    if (ch->filter_group[0] && !rb_card_matches_group_str(cid, ch->filter_group)) return 0;
+    return 1;
+}
+
+/* Publish a validated stage pick into the GameState-level selection pool. The C resume
+   path builds a stack-local RbAbilityResolver (rb_resume_with_choice_indices_internal),
+   so the resolver's own selected_cards dies with the frame; GameState.selected_cards is
+   the pool the deferred target-selection effect reads back (choice.c:2574). */
+static int stage_publish_selected(GameState *g, int cid) {
+    for (int i = 0; i < g->n_selected_cards; i++)
+        if (g->selected_cards[i] == cid) return 0;
+    if (g->n_selected_cards >= RB_MAX_RECENTLY_MOVED) return 0;
+    g->selected_cards[g->n_selected_cards++] = cid;
+    return 1;
+}
+
+/* Rust misc.rs:1412-1413 — the effect saved for the target-selection prompt has
+   target_count CLEARED, so re-running it applies the resource to the cards the player
+   picked (Rust misc.rs:1840-1841) instead of re-deriving targets from the stage.
+   `extra_int` in misc.c treats an empty value as absent, so blanking the value is the
+   faithful C equivalent of `saved.set_target_count(None)`. */
+static void stage_saved_effect_clear_target_count(AbilityEffect *e) {
+    if (!e) return;
+    for (int i = 0; i < e->n_extra; i++) {
+        if (e->extra_k[i] && !strcmp(e->extra_k[i], "target_count") && e->extra_v[i]) {
+            rb_free(e->extra_v[i]);
+            e->extra_v[i] = NULL;
+        }
+    }
+}
+
 void rb_resolver_handle_stage_selection(RbAbilityResolver *self, GameState *g,
                                       const RbSelectionContext *ctx, const char *selected) {
-    /* faithfully mirrors choice.rs:1858 handle_stage_selection is_select_action branch (common forEli etc.).
-       In C is_select_action is signaled via queue.pending.card_type == "member_card" or target "under_member".
-       For is_select_action we just record selected_cards (no immediate zone move); effect will move later.
-       Otherwise we move stage cards to dst. */
+    /* Faithful port of choice.rs:2011 handle_stage_selection, is_select_action branch.
+       Rust maps the answer through SelectionContext::mfi (choice.rs:2044) — i.e.
+       through the choice's filtered_indices, which the target-selection producer fills
+       with STAGE SLOT positions (Rust misc.rs:1408-1411) — and then reads
+       player.stage.stage[slot] by slot (choice.rs:2057-2058), validating each card
+       against the choice filter (choice.rs:2060). The previous C body instead used the
+       raw answer as an index into a COMPACTED stage-card list and only pre-filtered for
+       one hard-coded pending.target string, so any choice carrying filtered_indices
+       resolved to the wrong member and the pick never reached the effect that consumes
+       it. For is_select_action we record the selection (no immediate zone move); the
+       effect moves/consumes it later. Otherwise we move stage cards to dst. */
+    if (!self || !g) return;
     int pl = rb_resolve_target_player(g, g->queue.pending.target_player_id[0] ?
                                      g->queue.pending.target_player_id : "self");
     if (pl < 0 || pl > 1) pl = g->queue.actor;
     int is_select = (g->queue.pending.card_type[0] != '\0'); /* proxy for is_select_action */
     int idx = selected ? atoi(selected) : -1;
     if (is_select) {
+        stage_build_filtered_slots(g, pl);
         if (idx < 0) {
-            /* skip: clear pending commands if source is under_member */
-            self->n_selected_cards=0;
+            /* Rust choice.rs:2018-2020 — an empty answer takes the pending commands and
+               clears the selection pool (skip of an optional target choice). */
+            self->n_selected_cards = 0;
         } else {
-            int ids[RB_MAX_ZONE];
-            int n = rb_zone_cards(g, pl, "stage", ids, RB_MAX_ZONE);
-            int selected_idx = idx;
-            if (!strcmp(g->queue.pending.target, "gain_resource_targets")) {
-                int eligible[RB_STAGE_SIZE];
-                int ne = 0;
-                for (int i = 0; i < n; i++) {
-                    if (g->queue.pending.card_type[0] &&
-                        !rb_card_matches_type(ids[i], g->queue.pending.card_type)) continue;
-                    if (g->queue.pending.filter_group[0] &&
-                        !rb_card_matches_group_str(ids[i], g->queue.pending.filter_group)) continue;
-                    eligible[ne++] = ids[i];
+            /* ctx.mfi(&ctx.indices): the answer indexes filtered_indices, which hold
+               stage SLOT positions — read player.stage.stage[slot], not a compacted list. */
+            int slot = map_choice_index(&g->queue.pending, idx);
+            if (slot >= 0 && slot < RB_STAGE_SIZE) {
+                int cid = g->p[pl].stage[slot];
+                if (cid != RB_EMPTY_SLOT && cid >= 0 && stage_choice_accepts(g, cid)) {
+                    fprintf(stderr, "[STAGE_TARGET_RESULT] pick=%d slot=%d cid=%d target=%s\n",
+                            idx, slot, cid, g->queue.pending.target);
+                    if (self->n_selected_cards < RB_MAX_RECENTLY_MOVED)
+                        self->selected_cards[self->n_selected_cards++] = cid;
+                    /* Publish to the GameState pool so the saved target-selection effect
+                       re-executed by the resume consumes THIS pick. */
+                    stage_publish_selected(g, cid);
+                } else {
+                    fprintf(stderr, "[STAGE_TARGET_RESULT] pick=%d slot=%d rejected\n", idx, slot);
                 }
-                n = ne;
-                memcpy(ids, eligible, (size_t)n * sizeof(ids[0]));
-            }
-            if (selected_idx >= 0 && selected_idx < n) {
-                int cid = ids[selected_idx];
-                fprintf(stderr, "[STAGE_TARGET_RESULT] pick=%d eligible=%d cid=%d target=%s\n",
-                        selected_idx, n, cid, g->queue.pending.target);
-                if (self->n_selected_cards < RB_MAX_RECENTLY_MOVED) self->selected_cards[self->n_selected_cards++] = cid;
-                if ((!strcmp(g->queue.pending.target, "gain_resource_targets") ||
-                     !strcmp(g->queue.pending.target, "gain_ability_targets") ||
-                     !strcmp(g->queue.pending.target, "invalidate_ability") ||
-                     !strcmp(g->queue.pending.target, "change_state")) &&
-                    g->n_selected_cards < RB_MAX_RECENTLY_MOVED)
-                    g->selected_cards[g->n_selected_cards++] = cid;
             }
         }
         rb_resolver_clear_choice_state_and_resume(self);
@@ -2569,9 +2627,18 @@ static int rb_resume_with_choice_indices_internal(GameState *g, const int *selec
             int hc = rb_queue_current_cost_action(g, ca, sizeof(ca));
             int rev = (ptarget && strstr(ptarget, "reveal")) || (pzone && strstr(pzone, "reveal"));
             int cost_hand = (!eff_started && hc && !strcmp(pzone, "hand"));
+            int sel_before = g->n_selected_cards;
             rb_resolver_handle_select_card(&self, g, selected);
             if (rb_has_pending_choice(g) && def) g->queue.deferred = def;
             if (!was_skip && target_selection_eff && !rb_has_pending_choice(g)) {
+                /* Rust misc.rs:1412-1413: the effect parked for a target-selection prompt
+                   is the effect with target_count REMOVED, so re-running it applies the
+                   resource to the member the player just picked (Rust misc.rs:1840-1841)
+                   rather than re-deriving targets from the stage. Only clear it when this
+                   answer actually produced a new selection; otherwise the saved effect
+                   still carries its own target_count limit and must keep it. */
+                if (g->n_selected_cards > sel_before)
+                    stage_saved_effect_clear_target_count(target_selection_eff);
                 rb_execute_effect_ex(g, actor, target_selection_eff, host);
                 rb_effect_free(target_selection_eff);
                 g->queue.target_selection_eff = NULL;

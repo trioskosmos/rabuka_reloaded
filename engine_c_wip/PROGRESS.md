@@ -120,3 +120,52 @@ fraction of the Rust twin) and `audit_placeholders.py` (no TODO/STUB markers lef
   - **Scenario fix (test bug):** cost-modifier replay scenario now targets stage + carries `value` extra (was a correct no-op on empty hand).
   - **Parity loop:** `tests/replay.c` scenario mode + `rb_engine_replay` target + `scenario_oracle` test in `engine/tests/run_all.rs` + pilot `tests/fixtures/scenario_eri_w1.txt`.
 - Next: bulk-port the 137 MISSING enum/builder families (mechanical), then depth-1 stubs; migrate high-value tests to scenarios starting with live→discard and cost/score/heart recalc.
+
+## Fan-out orchestration plan (2026-09-26)
+
+Measured baselines: Rust `engine/src` ≈ 94k lines, C `engine_c_wip/src` ≈ 42.5k lines.
+Rust tests ≈ 135k lines across ~1,500 test files; C tests ≈ 6.7k lines across 29 files.
+Per-module C coverage is already broad (`ability` 16k, `ability/effects` 8.5k,
+`core` 5k, `turn` 3.2k), so the dominant remaining gap is **parity proof via
+tests**, not the existence of production modules.
+
+### Explicitly OUT of scope for the C port
+- `engine/src/bot/**` (~11.8k lines) — Rust-specific bot/AI/search code.
+- `engine/src/bin/**` (~6.4k lines) — Rust binaries and bot arenas.
+- `engine/src/lib.rs` top-level bot re-exports and their tests.
+Agents must not translate these. They are not part of the C engine's behavior.
+
+### Wave order (do these in sequence; do not just fan out forever)
+1. **Integration wave.** Many worktrees were created from a stale baseline and carry
+   large unrelated diffs. Reduce every useful branch to `engine_c_wip`-only changes
+   before anything is merged. Never cherry-pick a branch diff wholesale.
+2. **Canary fixes.** Make `rb_engine_generated` / `rb_engine_ported` build and reduce
+   the known gameplay failures first: opponent live success +2, cross-player
+   movement watcher, `draw_until_count` target_count=5, target selection +4.
+3. **Test-parity wave, one agent per untested Rust cluster.** Priority order from
+   `engine/tests/test_modules` file counts: `effects/recover/to_hand` (40 files),
+   `effects/compound/cost_and_effect` (31), `effects/gain/hearts/constants` (31),
+   `effects/score/card_score` (27), `effects/draw/flat` (24),
+   `effects/gain/blades/{live_start,constants}` (24 each),
+   `effects/state/wait_activation` (21), `characterization` (21),
+   `effects/draw/chains` (20), `effects/compound/condition_and_effect` (19),
+   `effects/gain/hearts/live_start` (17), `effects/look_select/reveal` (15),
+   `effects/ability_mod` (15), `effects/deploy` (15), `effects/score/per_card` (15),
+   `effects/recover/per_card` (15), `effects/gain/blades/per_card` (15).
+4. **Differential replay wave.** Scenario-replay (`tests/replay.c` + Rust
+   `scenario_oracle`) is the highest-leverage parity tool; add scenarios per cluster
+   rather than hand-writing more C assertions where a trace diff will do.
+5. **Re-inventory.** After each merge wave, re-run `tools/dep_audit.py`,
+   `tools/size_audit.py`, and `tools/audit_placeholders.py`, then re-dispatch only
+   what is still missing.
+
+### Agent contract for every new translation agent
+- Work ONLY inside `engine_c_wip` (`src/`, `include/`, `tests/`, `Makefile`).
+- Never touch `engine/`, `cards/`, `platforms/`, `training/`, or docs.
+- Base work on the current `master` checkout, not on another worktree's branch.
+- One writer per `.c` file; prefer a uniquely named new file plus a Makefile entry
+  over editing a file another agent may own.
+- Every agent must finish with: build green, its focused test target run, and one
+  single-purpose commit. Report the test names it added and the commands it ran.
+- No agent may claim parity from a function merely existing; verify with
+  `dep_audit.py` classification `REAL`.

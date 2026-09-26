@@ -173,7 +173,30 @@ fn hazuki_activates_kidou_copied_from_under() {
     );
 }
 
+/// The 起動 texts a card prints, read from the database rather than assumed.
+/// ab#1 copies 「『Liella!』のメンバーカードが持つ起動能力」, so the group is the
+/// only thing the copy is filtered on — a premise pin that names the exact
+/// texts is what makes "nothing was copied" mean something.
+fn kidou_texts(game: &TestGame, card: i16) -> Vec<String> {
+    let mut texts: Vec<String> = game
+        .db
+        .get_card(card)
+        .unwrap_or_else(|| panic!("card id {card} is not in the database"))
+        .resolved_abilities()
+        .filter(|a| a.triggers.as_deref() == Some("起動"))
+        .filter_map(|a| a.triggerless_text.clone())
+        .collect();
+    texts.sort();
+    texts
+}
+
 /// ab#1 only: Non-Liella! card under → filter excludes it → no abilities gained.
+///
+/// The negative is only as strong as its premise. 星空 凛 (`PL!-sd1-005-SD`) is
+/// used rather than a blank filler BECAUSE she prints the same 起動 as the
+/// 『Liella!』 card the positive case copies — so the group is provably the only
+/// thing separating the two fixtures, and "nothing was gained" cannot be
+/// explained by the under-card having no ability in the first place.
 #[test]
 fn hazuki_non_liella_under_no_abilities_gained() {
     let db = load_real_database();
@@ -181,18 +204,53 @@ fn hazuki_non_liella_under_no_abilities_gained() {
     let hazuki = game.id("PL!SP-pb2-005-R");
     let non_liella = game.id("PL!-sd1-005-SD");
     let _filler = game.id("PL!-sd1-010-SD");
+    // The card the positive case copies from (若菜四季, 『Liella!』).
+    let liella = game.new_id("PL!SP-sd1-006-SD");
+
+    game.assert_card_identity(hazuki, "PL!SP-pb2-005-R");
+    game.assert_card_identity(non_liella, "PL!-sd1-005-SD");
+    game.assert_card_identity(liella, "PL!SP-sd1-006-SD");
+    game.assert_card_in_group(liella, "5yncri5e!", "the copying card is 『Liella!』");
+    game.assert_card_in_group(
+        non_liella,
+        "lilywhite",
+        "the under-card is μ, so the 『Liella!』 filter must exclude it",
+    );
+
+    let liella_kidou = kidou_texts(&game, liella);
+    let non_liella_kidou = kidou_texts(&game, non_liella);
+    assert!(
+        !liella_kidou.is_empty(),
+        "precondition: the 『Liella!』 card must print a 起動 for the copy to be \
+         worth testing at all"
+    );
+    assert_eq!(
+        non_liella_kidou, liella_kidou,
+        "precondition: the μ under-card must print the SAME 起動 as the 『Liella!』 \
+         one, so the group filter is the only difference between this fixture and \
+         the copying fixture"
+    );
 
     game.state.player1.stage.stage[1] = hazuki;
     game.state.player1.stage.under_cards[1].push(non_liella);
     fill_decks(&mut game);
     game.give_energy(5);
 
-    game.pass();
-    game.pass();
+    game.advance_to_phase(rabuka_engine::game_state::Phase::Energy);
 
-    let gained = game.state.gained_abilities.get(&hazuki);
+    // Two tables, not one. `gained_abilities` holds the copied triggerless
+    // texts; `gained_card_abilities` holds the resolved Ability structs the
+    // trigger pipeline scans. Asserting both means "the 常時 ran and copied
+    // nothing" rather than "one of the two tables happens to be empty".
+    assert_eq!(
+        game.state.gained_abilities.get(&hazuki),
+        None,
+        "a μ member under Hazuki must contribute no copied ability texts"
+    );
     assert!(
-        gained.is_none() || gained.unwrap().is_empty(),
-        "Non-Liella! under should not produce gained abilities"
+        !game.state.gained_card_abilities.contains_key(&hazuki),
+        "a μ member under Hazuki must contribute no runtime Ability structs \
+         (got {:?})",
+        game.state.gained_card_abilities.get(&hazuki)
     );
 }

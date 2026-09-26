@@ -254,7 +254,6 @@ pub(crate) fn execute_sequential_effect(
                 if crate::ability::compound::consequence::gate_sequential_consequence(resolver, action, repeat_idx, i) {
                     continue 'action_loop;
                 }
-                log::debug!("[SEQUENCE] source={:?} repeat={} step={}/{} action={} execute: condition_failed={:?} pending_before={}", resolver.activating_card_id, repeat_idx + 1, i + 1, repeat_actions.len(), action.action, condition_failed, resolver.pending_choice.is_some());
                 match resolver.execute_effect(gs, &action_to_execute) {
                     Ok(_) => {
                         log::debug!(

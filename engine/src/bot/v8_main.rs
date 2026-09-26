@@ -43,7 +43,7 @@
 //! takes the best follow-up, which is what makes "set up an ability, then
 //! deploy at a discount" visible as a line rather than as two mediocre moves.
 
-use crate::bot::strategy_common::{acc_add, Acc};
+use crate::bot::strategy_common::Acc;
 use crate::card::CardDatabase;
 use crate::game_setup::{self, Action, ActionType};
 use crate::game_state::{GameState, Phase};
@@ -85,6 +85,62 @@ fn initiative_weight() -> f64 {
         .and_then(|v| v.parse().ok())
         .filter(|w: &f64| w.is_finite() && *w >= 0.0)
         .unwrap_or(0.5)
+}
+
+/// Weight on the guides' continuous score-ceiling term in the Main leaf.
+///
+/// This is a MEASURED weight, not an asserted one. It exists because the
+/// placement term alone is a threshold test: while the board is short of every
+/// life in hand it is identically zero and no amount of development moves it,
+/// so 81.8% of Main decisions tied and fell through to the tiebreak. The
+/// ceiling term is monotone in hearts and blades, so it restores a gradient
+/// exactly where the placement term has none.
+///
+/// The default is the largest value that still leaves the placement term
+/// dominant, because the placement term is the one that is rule-exact: a
+/// placement is 1/3 of a game (1.2.1.1 / 8.4.7) and a score band is worth
+/// nothing on its own. `V8_DEV_CEILING` re-weights it; `V8_NO_DEV_CEILING`
+/// restores the pre-fix leaf so the fix can be re-measured.
+fn dev_ceiling_weight() -> f64 {
+    if std::env::var_os("V8_NO_DEV_CEILING").is_some() {
+        return 0.0;
+    }
+    std::env::var("V8_DEV_CEILING")
+        .ok()
+        .and_then(|v| v.parse().ok())
+        .filter(|w: &f64| w.is_finite() && *w >= 0.0)
+        .unwrap_or(PLACEMENT_CREDIT)
+}
+
+/// Weight on the continuous band-progress term, the Main phase's development
+/// signal.
+///
+/// The first attempt used the guides' stage-COST ladder, on the theory that a
+/// one-check leaf was too myopic to see development. That theory was wrong and
+/// the measurement says so plainly: with 700 games, v8's Main and v7's Main
+/// reach an IDENTICAL stage-cost curve (entering T4 11.7 vs 12.2, T7 24.5 vs
+/// 25.9, final 20.1 vs 21.4), both on the guide, and v8 still loses 8.7 points
+/// more. Cost is a proxy for the quantity the check actually reads, which is
+/// hearts and blades (3.2), and on a real decklist the proxy breaks: a
+/// high-cost low-heart member scores the same as a high-cost high-heart one.
+///
+/// So the term is built on `hearts + Binomial(active blades, own density)` —
+/// section 4's "the real scoreboard" — and expressed in score-band units by
+/// interpolating the guide's own band medians, so no conversion constant
+/// between hearts and probability is invented.
+///
+/// `V8_DEV_BAND` re-weights it; `V8_NO_DEV_CEILING` removes it.
+///
+/// Default 4.0, measured: removing the term costs 27 wins over 700 games and
+/// a significant -0.018 placements-per-live-phase, and the curve is flat from
+/// about 2 upward (2.0/4.0/8.0/16.0 all within noise of each other), so the
+/// exact value is not load-bearing - the term being present at all is.
+fn dev_band_weight() -> f64 {
+    std::env::var("V8_DEV_BAND")
+        .ok()
+        .and_then(|v| v.parse().ok())
+        .filter(|w: &f64| w.is_finite() && *w >= 0.0)
+        .unwrap_or(4.0)
 }
 
 /// `P(we place a card at the next check)` and `P(they place)`, given a board
@@ -129,48 +185,98 @@ fn placement_pair(
         // No life in hand: we place nothing and they place whenever they pass.
         return (0.0, opp.pass_prob);
     };
-    let (we_c, they_c, _) = opp.contested_masses(our_score, 1, my_success);
+    let (_, they_c, _) = opp.contested_masses(our_score, 1, my_success);
     let contested = p_pass * opp.pass_prob;
     let opp_place = opp.pass_prob * (1.0 - p_pass) + contested * they_c;
     (our_place.min(1.0), opp_place.min(1.0))
 }
 
+/// Weight on the forward (T+3) placement term relative to the next-check one.
+///
+/// The single-check leaf was the root defect. Measured over 725 decision
+/// points it produced 1.74 distinct values across 5.4 offered actions and tied
+/// at the top in 81.8% of decisions, because `P(place)` is a threshold test
+/// against whichever lives happen to be in hand. Worse, its horizon inverted
+/// the guide: it valued a certain 1-point placement NOW at `PLACEMENT_CREDIT`
+/// and valued the 5-6 point board that actually wins a T4-T5 check at exactly
+/// zero, because that board is not checkable yet. Section 1 is explicit that
+/// most games end on a 6-8 point closeout at T5, so the leaf was pricing the
+/// wrong game.
+///
+/// Two horizons in the same rule-exact currency fixes it without inventing a
+/// weight out of nothing: a tempo grab scores on T+1, a ladder build scores on
+/// T+3, and the bot has to actually choose between them. The default keeps the
+/// next check dominant, because a placement is the only thing that is
+/// unconditionally worth 1/3 of the game (1.2.1.1 / 8.4.7).
+///
+/// `V8_HORIZON` re-weights it; `V8_NO_HORIZON` restores the one-check leaf so
+/// the fix can be re-measured rather than taken on trust.
+///
+/// Default 0, measured OFF. The two-horizon leaf was the right hypothesis and
+/// it did not pay: at 0.5 and 1.0 it moved win rate by less than the noise
+/// floor and never reached significance. The measurement that settled the
+/// question was the development curve, which showed v8's Main and v7's reach
+/// an identical stage-cost profile - so the leaf was never short of horizon,
+/// it was short of hearts and blades. Kept, ablatable, and honest about having
+/// been measured rather than shipped on the argument that it must help.
+fn horizon_weight() -> f64 {
+    if std::env::var_os("V8_NO_HORIZON").is_some() {
+        return 0.0;
+    }
+    std::env::var("V8_HORIZON")
+        .ok()
+        .and_then(|v| v.parse().ok())
+        .filter(|w: &f64| w.is_finite() && *w >= 0.0)
+        .unwrap_or(0.0)
+}
+
 /// Expected placement advantage of a position, in placement units.
 ///
-/// The leaf is deliberately the NEXT CHECK and nothing further:
-///
 /// ```text
-/// leaf = w * (P(we place) - P(they place)) + w * PLACEMENT_CREDIT * (lives in hand + initiative)
+/// leaf = (P(we place) - P(they place))            at the NEXT check
+///      + h * (P(we place) - P(they place))        at the check after two
+///                                                    more of our Main phases
+///      + PLACEMENT_CREDIT * (lives in hand + initiative)
+///      + w * score_ceiling                         (section 4, continuous)
 /// ```
 ///
-/// The first draft also carried a one-turn-forward development term. It is
-/// gone, and the reason matters. A forward projection adds "our best
-/// affordable member" to the projected board, and it does that whether or not
-/// we already played that member this phase - so deploying now and passing
-/// both project onto the same ceiling, the leaf comes out EXACTLY equal, and
-/// the tie falls to list order, where `Pass` is index 0. Measured, that was a
-/// 60% pass rate, a stage cost of 0.8 at T1 against the guide's 4, and a
-/// 1.3-heart average board. The whole game was played a turn behind.
-///
-/// The two regimes are what the guide actually describes, so v8 now uses two
-/// mechanisms instead of one blurred one:
-///
-/// - where a check is live, this leaf decides, in placement units;
-/// - where no check is live yet, [`TieKey`] decides, and `TieKey`'s first
-///   component is the guides' own development metric (section 1: T1=4, T2=9,
-///   T3=13). No conversion constant between "stage cost" and "hearts" is
-///   needed, because none is invented.
+/// The next-check term alone was measured to be inert for 82% of decisions
+/// (above). The forward term is what gives the search something to see: it
+/// runs the guides' 4 -> 9 -> 13 ladder forward through the engine's own turn
+/// structure, so a sideways baton that improves the board in two turns scores
+/// here even though it is worth nothing right now. That is the payoff the
+/// project has been trying to buy with a flat baton bonus since v7 - and a
+/// flat bonus is precisely what double-counted development and measured -18pp
+/// (BOT_STRATEGY.md 9.2, D1). A trajectory term priced by a simulation cannot
+/// double-count, because the member is on stage in the simulated state and is
+/// therefore not deployed twice.
 fn leaf_value(gs: &GameState, me: u8, db: &CardDatabase, opp: &OppModel) -> f64 {
+    let (_blades, density) = super::strategy_v4::flip_stats(gs, me, db);
+
     let supply = v8_model::board_supply(gs, me, db);
-    let (blades, density) = super::strategy_v4::flip_stats(gs, me, db);
-    let (our_place, their_place) = placement_pair(gs, me, db, opp, &supply, blades, density);
+    let (our_now, their_now) =
+        placement_pair(gs, me, db, opp, &supply, v8_model::active_blades(gs, me, db), density);
+
+    // The check the guides' curve is actually aimed at: our board after two
+    // more Main phases, developed by the same forward walk the doctrine
+    // describes rather than by an assumed best case.
+    let (future_hearts, future_blades) = v8_model::forward_supply(gs, me, 2, db);
+    let (our_later, their_later) =
+        placement_pair(gs, me, db, opp, &future_hearts, future_blades, density);
+
     let ammo = v8_model::lives_in_hand(gs.seat_player(me), db) as f64;
     let initiative = if gs.seat_player(me).is_first_attacker {
         initiative_weight()
     } else {
         0.0
     };
-    SCALE * ((our_place - their_place) + PLACEMENT_CREDIT * (ammo + initiative))
+    let ceiling = v8_model::score_ceiling(gs, me, db) as f64;
+    SCALE
+        * ((our_now - their_now)
+            + horizon_weight() * (our_later - their_later)
+            + PLACEMENT_CREDIT * (ammo + initiative)
+            + dev_ceiling_weight() * ceiling
+            + dev_band_weight() * v8_model::band_progress(gs, me, db))
 }
 
 /// Baton detection from the generated action's own destination data. The

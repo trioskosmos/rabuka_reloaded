@@ -471,9 +471,9 @@ static AbilityEffect *decode_effect_body(Rdr *r) {
             effect_decode_dynamic_count(e, r);
             continue;
         }
-        if (key && (!strcmp(key, "optional") == 0 || !strcmp(key, "non_stackable") == 0 ||
-                    !strcmp(key, "conditional") == 0 || !strcmp(key, "conditional_negation") == 0 ||
-                    !strcmp(key, "is_further") == 0 || !strcmp(key, "max") == 0)) {
+        if (key && (!strcmp(key, "optional") || !strcmp(key, "non_stackable") ||
+                    !strcmp(key, "conditional") || !strcmp(key, "conditional_negation") ||
+                    !strcmp(key, "is_further") || !strcmp(key, "max"))) {
             if (strcmp(key, "optional") == 0 && tag == RB_TAG_TRUE) e->is_optional = 1;
             if (strcmp(key, "max") == 0 && tag == RB_TAG_TRUE) effect_set_extra(e, "max", "true");
             if (strcmp(key, "conditional") == 0 && tag == RB_TAG_TRUE) e->conditional_flag = 1;

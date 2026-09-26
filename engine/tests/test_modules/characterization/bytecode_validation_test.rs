@@ -1,7 +1,7 @@
 #[cfg(feature = "bytecode_abilities")]
 mod bytecode_validation {
     use rabuka_engine::ability::abilities_gen::NUM_ABILITIES;
-    use rabuka_engine::ability::vm::{ability_count, get_ability};
+    use rabuka_engine::ability::vm::{ability_count, get_ability, DecodeError};
 
     /// The bytecode compiler intentionally re-encodes some JSON effects into a
     /// different wire format. Given a JSON effect, return the action string the
@@ -270,23 +270,85 @@ mod bytecode_validation {
         }
     }
 
+    /// The index guard is exact, and the error names the index that was wrong.
+    ///
+    /// `is_err()` alone also passes if the guard ever became `idx >
+    /// NUM_ABILITIES` — which would reject the LAST real ability — or if a
+    /// refactor answered an out-of-range index with a different error. The
+    /// variant carries both numbers, so assert them, and pin the off-by-one
+    /// from the other side: the last valid index must still decode to content.
     #[test]
-    fn malformed_bytecode_returns_error() {
-        // Verify that truncated/empty bytecode slices produce Err, not panic.
-        // get_ability(NUM_ABILITIES) should return IndexOutOfRange.
-        let result = get_ability(NUM_ABILITIES);
-        assert!(result.is_err(), "out-of-range index should return Err");
+    fn out_of_range_index_is_named_in_the_error() {
+        match get_ability(NUM_ABILITIES) {
+            Err(DecodeError::IndexOutOfRange { idx, max }) => {
+                assert_eq!(
+                    idx, NUM_ABILITIES,
+                    "the error must name the index that was asked for"
+                );
+                assert_eq!(
+                    max, NUM_ABILITIES,
+                    "the error must name the exclusive bound"
+                );
+            }
+            Err(other) => panic!(
+                "the first out-of-range index must be IndexOutOfRange, got {other:?}"
+            ),
+            Ok(a) => panic!(
+                "index {NUM_ABILITIES} decoded, but it is one past the last ability \
+                 (0..{NUM_ABILITIES}): {:?}",
+                a.effect.as_ref().map(|e| e.action)
+            ),
+        }
+        // The guard is `>=`, not `>`: the last real ability still decodes.
+        let last = get_ability(NUM_ABILITIES - 1)
+            .unwrap_or_else(|e| panic!("the last ability must decode, got {e}"));
+        assert_ne!(
+            last,
+            rabuka_engine::core::card::Ability::default(),
+            "the last ability decoded to the default fallback, so the guard is off \
+             by one on the valid side too"
+        );
+        assert_eq!(
+            get_ability(NUM_ABILITIES + 1000).unwrap_err().to_string(),
+            format!(
+                "ability index {} out of range (max {})",
+                NUM_ABILITIES + 1000,
+                NUM_ABILITIES
+            ),
+            "the error text must name the index and the bound, so a log line is \
+             actionable"
+        );
     }
 
+    /// A valid index never decodes to the default fallback.
+    ///
+    /// The old version of this test asserted only "index 0 is Ok" and
+    /// "NUM_ABILITIES is not", which holds whether the decoder returned real
+    /// content, the empty-slice fallback, or a hardcoded stub — the comment even
+    /// said it could not tell which. There is no public decode-from-slice entry
+    /// point, so the fallback cannot be exercised on its own; what CAN be pinned
+    /// is that no ability lands on it. The corpus-wide count of empty slices is
+    /// `bytecode_empty_slices_match_known_is_null_baseline`; this is the other
+    /// half — every valid index produces a decodable struct that is not blank.
     #[test]
-    fn empty_slice_returns_default_ability() {
-        // Index 0 decodes successfully whether its bytecode slice carries data
-        // or is empty (start==end → default ability). Either way: Ok, no panic.
-        let a = get_ability(0).expect("ability 0 must decode without error");
-        // Whatever the slice contained, decoding must yield a usable ability
-        // object with a known action.
-        let _action = &a.effect.as_ref().map(|e| e.action);
-        // And it must be distinct from the out-of-range error path.
-        assert!(get_ability(NUM_ABILITIES).is_err());
+    fn a_valid_index_never_decodes_to_the_default_fallback() {
+        for i in 0..ability_count() {
+            let a = get_ability(i).unwrap_or_else(|e| panic!("ability {i}: {e}"));
+            assert_ne!(
+                a,
+                rabuka_engine::core::card::Ability::default(),
+                "ability {i} decoded to the default fallback — its bytecode produced \
+                 nothing, so a printed effect would silently do nothing"
+            );
+        }
+        // Control: the loop above would also pass if EVERY index returned the
+        // default, so pin that at least one decode carries a real effect.
+        let with_effect = (0..ability_count())
+            .filter(|&i| get_ability(i).is_ok_and(|a| a.effect.is_some()))
+            .count();
+        assert!(
+            with_effect > 0,
+            "no ability decoded to an effect at all, so the loop above proved nothing"
+        );
     }
 }

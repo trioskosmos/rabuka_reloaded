@@ -1,4 +1,6 @@
 #include "rabuka.h"
+#include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 
 static int16_t saturate_modifier(int64_t value) {
@@ -392,16 +394,19 @@ void rb_clear_card_movement_tracking(GameState *g) {
     g->n_cards_appeared_this_turn = 0;
 }
 
-/* -- remove_revealed_card -- */
+/* -- remove_revealed_card --
+   Mirrors modifiers.rs:1606-1613 — remove the FIRST matching entry only.
+   The previous body stripped every occurrence, so a card id revealed twice
+   (two copies of the same template in the yell) lost both entries instead of
+   one. */
 void rb_remove_revealed_card(GameState *g, int card_id) {
     if (!g) return;
-    int n = 0;
     for (int i = 0; i < g->n_revealed; i++) {
-        if (g->revealed_cards[i] != card_id) {
-            g->revealed_cards[n++] = g->revealed_cards[i];
-        }
+        if (g->revealed_cards[i] != card_id) continue;
+        for (int j = i; j + 1 < g->n_revealed; j++) g->revealed_cards[j] = g->revealed_cards[j + 1];
+        g->n_revealed--;
+        return;
     }
-    g->n_revealed = n;
 }
 
 /* -- clear_revealed_cards -- */
@@ -410,13 +415,182 @@ void rb_clear_revealed_cards(GameState *g) {
     g->n_revealed = 0;
 }
 
-/* -- recalculate_constant_cost_modifiers -- */
+/* ══════════════════════ constant cost modifiers ══════════════════════
+   Port of modifiers.rs::recalculate_constant_cost_modifiers +
+   recalculate_constant_cost_modifiers_with_ids
+   (engine/src/core/game_state/modifiers.rs:1109-1330).
+
+   Every 常時 ModifyCost effect on a stage or hand card is re-evaluated into
+   two expected maps and then DIFFED against what was committed last time:
+     · additive  (operation "add" / "subtract")  -> mods.cost[cid].add
+     · absolute  (operation "set")               -> mods.cost[cid].set
+   The previous body ("Simplified: reset and re-apply") re-applied
+   mods.constant_cost[cid] through rb_mods_set_cost, which (a) turned every
+   additive delta into an absolute set-override and (b) never dropped a bonus
+   whose condition had stopped passing — stale costs accumulated forever. */
+
+/* Typed extra getters (mirror AbilityEffect::{operation,value,location,…}_any) */
+static const char *cost_extra(const AbilityEffect *e, const char *k) {
+    if (!e) return NULL;
+    for (int i = 0; i < e->n_extra; i++)
+        if (e->extra_k[i] && !strcmp(e->extra_k[i], k)) return e->extra_v[i];
+    return NULL;
+}
+static int cost_extra_int(const AbilityEffect *e, const char *k, int fallback) {
+    const char *v = cost_extra(e, k);
+    if (!v || !*v) return fallback;
+    return atoi(v);
+}
+static int cost_extra_flag(const AbilityEffect *e, const char *k) {
+    const char *v = cost_extra(e, k);
+    return v && !strcmp(v, "true");
+}
+static int csv_len(const char *csv) {
+    if (!csv || !*csv) return 0;
+    int n = 1;
+    for (const char *p = csv; *p; p++) if (*p == ',') n++;
+    return n;
+}
+
+/* LL-bp7-001's 「手札3枚捨てて10」 is a pre-play choice, not a passive constant
+   (modifiers.rs:1159-1169): set 10 + location hand + 3 characters + optional. */
+static int cost_is_ll_bp7_play_cost(const AbilityEffect *e) {
+    const char *op = cost_extra(e, "operation");
+    if (!op || strcmp(op, "set") != 0) return 0;
+    if (cost_extra_int(e, "value", 0) != 10) return 0;
+    const char *loc = cost_extra(e, "location");
+    if (!loc || strcmp(loc, "hand") != 0) return 0;
+    if (!cost_extra_flag(e, "optional")) return 0;
+    return csv_len(cost_extra(e, "characters")) == 3;
+}
+
+/* per_unit divisor (modifiers.rs:1194-1259). per_unit_location overrides the
+   counting zone; "stage"+group filters by group, "under_member" flattens the
+   2-D under-card structure, everything else defers to zone_cards. */
+static int cost_per_unit_count(const GameState *g, int pl, const AbilityEffect *e) {
+    const char *per_unit_loc = cost_extra(e, "per_unit_location");
+    const char *loc = cost_extra(e, "location");
+    const char *count_zone = (per_unit_loc && *per_unit_loc) ? per_unit_loc
+                             : ((loc && *loc) ? loc : "hand");
+    const char *group = cost_extra(e, "group_names");
+    if (group && *group && !strcmp(count_zone, "stage")) {
+        int n = 0;
+        for (int s = 0; s < RB_STAGE_SIZE; s++) {
+            int id = g->p[pl].stage[s];
+            if (id == RB_EMPTY_SLOT) continue;
+            if (rb_card_matches_group_str(id, group)) n++;
+        }
+        return n;
+    }
+    if (!strcmp(count_zone, "under_member")) {
+        int under[RB_STAGE_SIZE * 16];
+        int host[RB_STAGE_SIZE * 16];
+        int m = rb_stage_under_cards_with_hosts(&g->p[pl], under, host,
+                                                 RB_STAGE_SIZE * 16);
+        if (!group || !*group) return m;
+        int n = 0;
+        for (int i = 0; i < m; i++)
+            if (rb_card_matches_group_str(under[i], group)) n++;
+        return n;
+    }
+    int ids[RB_MAX_ZONE];
+    return rb_zone_cards(g, pl, count_zone, ids, RB_MAX_ZONE);
+}
+
+/* Is this card a constant-cost host at all? A card that is in neither player's
+   stage nor hand cannot be the target of any 常時 ModifyCost, so a `set`
+   override still sitting on it is provably stale. */
+static int cost_is_constant_host(const GameState *g, int cid) {
+    for (int pl = 0; pl < 2; pl++) {
+        for (int s = 0; s < RB_STAGE_SIZE; s++)
+            if (g->p[pl].stage[s] == cid) return 1;
+        for (int h = 0; h < g->p[pl].hand.n; h++)
+            if (g->p[pl].hand.cards[h] == cid) return 1;
+    }
+    return 0;
+}
+
 void rb_recalculate_constant_cost_modifiers(GameState *g) {
     if (!g) return;
-    /* Simplified: reset and re-apply constant cost modifiers */
-    for (int i = 0; i < RB_MAX_CARD_IDS; i++) {
-        if (g->mods.constant_cost[i]) {
-            rb_mods_set_cost(&g->mods, i, g->mods.constant_cost[i]);
+
+    int16_t expected_add[RB_MAX_CARD_IDS];
+    int16_t expected_set[RB_MAX_CARD_IDS];
+    memset(expected_add, 0, sizeof(expected_add));
+    memset(expected_set, 0, sizeof(expected_set));
+
+    for (int pl = 0; pl < 2; pl++) {
+        for (int slot = 0; slot < RB_STAGE_SIZE + RB_MAX_HAND; slot++) {
+            int cid;
+            if (slot < RB_STAGE_SIZE) {
+                cid = g->p[pl].stage[slot];
+            } else {
+                int h = slot - RB_STAGE_SIZE;
+                if (h >= g->p[pl].hand.n) break;
+                cid = g->p[pl].hand.cards[h];
+            }
+            if (cid < 0) continue;
+
+            int n_abilities = rb_card_num_abilities((uint32_t)cid);
+            for (int ai = 0; ai < n_abilities; ai++) {
+                Ability ab;
+                memset(&ab, 0, sizeof(ab));
+                if (!rb_decode_card_ability((uint32_t)cid, ai, &ab)) continue;
+                const AbilityEffect *e = ab.effect;
+                int usable = e && e->action && !strcmp(e->action, "modify_cost") &&
+                             rb_ability_matches_trigger(&ab, "常時") &&
+                             !cost_is_ll_bp7_play_cost(e);
+                if (usable) {
+                    /* Rust evaluates effect.condition only here — unlike
+                       recalculate_constants it does NOT gate on
+                       activation_position (modifiers.rs:1187-1190). */
+                    int cond_met = !e->has_condition || !e->condition ||
+                                   rb_eval_condition_for_host(g, pl, cid, e->condition);
+                    if (cond_met) {
+                        int value = cost_extra_int(e, "value", 0);
+                        if (cost_extra_flag(e, "per_unit")) {
+                            int count = cost_per_unit_count(g, pl, e);
+                            if (cost_extra_flag(e, "exclude_self") && count > 0) count--;
+                            int per_unit_count = cost_extra_int(e, "per_unit_count", 1);
+                            if (per_unit_count < 1) per_unit_count = 1;
+                            value = (count / per_unit_count) * value;
+                        }
+                        const char *op = cost_extra(e, "operation");
+                        if (!op || !*op) op = "add";
+                        if (!strcmp(op, "add")) {
+                            expected_add[cid] = saturate_modifier((int64_t)expected_add[cid] + value);
+                        } else if (!strcmp(op, "subtract")) {
+                            expected_add[cid] = saturate_modifier((int64_t)expected_add[cid] - value);
+                        } else if (!strcmp(op, "set")) {
+                            expected_set[cid] = saturate_modifier(value);
+                        }
+                    }
+                }
+                rb_free_ability(&ab);
+            }
+        }
+    }
+
+    /* Additive pass — remove what is no longer expected, add what is.
+       mods.constant_cost[cid] holds the last committed additive total, the
+       same role as Rust's mods.constant_cost_bonuses. */
+    for (int cid = 0; cid < RB_MAX_CARD_IDS; cid++) {
+        int old_add = g->mods.constant_cost[cid];
+        int new_add = expected_add[cid];
+        if (old_add == new_add) continue;
+        if (old_add) rb_mods_remove_cost(&g->mods, cid, old_add);
+        if (new_add) rb_mods_add_cost(&g->mods, cid, new_add);
+        g->mods.constant_cost[cid] = (int16_t)new_add;
+    }
+
+    /* Absolute pass. Rust keeps a dedicated mods.constant_cost_set_bonuses map;
+       RbMods has no such field, so a stale set is only dropped when the card
+       can no longer be a constant-cost host — never clobbering a set written
+       by a non-constant path (execute_set_cost etc.). */
+    for (int cid = 0; cid < RB_MAX_CARD_IDS; cid++) {
+        if (expected_set[cid]) {
+            rb_mods_set_cost(&g->mods, cid, expected_set[cid]);
+        } else if (g->mods.cost[cid].set != 0 && !cost_is_constant_host(g, cid)) {
+            rb_mods_clear_cost_set(&g->mods, cid);
         }
     }
 }

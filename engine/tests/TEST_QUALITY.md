@@ -30,31 +30,18 @@ _has_pending_choice asserted without choice identity (pending_choice_type/summar
 
 None.
 
-## assert_only_negative (7)
+## assert_only_negative (0)
 
 _every assertion is a bare is_err()/is_none() — some guard fired, but nothing says which, so a regression tripping a different guard still passes_
 
-| file | test | line | detail |
-| --- | --- | --- | --- |
-| `engine/tests/test_modules/characterization/bytecode_validation_test.rs` | `empty_slice_returns_default_ability` | 281 |  |
-| `engine/tests/test_modules/characterization/bytecode_validation_test.rs` | `malformed_bytecode_returns_error` | 273 |  |
-| `engine/tests/test_modules/effects/ability_mod/rina_gain_live_success_from_under_member_test.rs` | `rina_no_under_cards` | 154 |  |
-| `engine/tests/test_modules/effects/ability_mod/rina_gain_live_success_from_under_member_test.rs` | `rina_not_on_stage` | 177 |  |
-| `engine/tests/test_modules/effects/compound/sequential_effects/baton_touch_place_liella_under_then_activate_copied_ability_pl_sp_pb2_005_test.rs` | `hazuki_non_liella_under_no_abilities_gained` | 177 |  |
-| `engine/tests/test_modules/effects/recover/to_hand/live_success_recover_different_group_name_to_hand_ll_bp5_002_l_test.rs` | `all_same_group_no_effect` | 135 |  |
-| `engine/tests/test_modules/effects/recover/to_hand/live_success_recover_different_group_name_to_hand_ll_bp5_002_l_test.rs` | `two_distinct_groups_no_effect` | 106 |  |
+None.
 
-## assert_only_counts (14)
+## assert_only_counts (8)
 
 _every assertion is about a count/size (len/count/>=1) — '3 options were offered' can hold while the 3 are the wrong 3_
 
 | file | test | line | detail |
 | --- | --- | --- | --- |
-| `engine/tests/test_modules/effects/choice/per_card/energy_or_recycle_live_pl_n_pb1_010_r_test.rs` | `pl_n_pb1_010_r_energy_option_leaves_active_energy` | 20 |  |
-| `engine/tests/test_modules/effects/deck_order/restore/both_waitrooms_member_restore_threshold_q242_test.rs` | `debut_both_waitrooms_member_restore_shrinks_own_waitroom` | 15 |  |
-| `engine/tests/test_modules/effects/position/area_move/debut_selected_member_fixed_center_test.rs` | `fixed_center_choice_offers_self_and_other_stage_members` | 68 |  |
-| `engine/tests/test_modules/effects/state/per_card/sd2_nijigasaki_abilities_gap_test.rs` | `setsuna_debut_gains_heart05` | 319 |  |
-| `engine/tests/test_modules/effects/state/wait_activation/sp_bp5_choice_energy_test.rs` | `sp_bp5_choice_energy_pay_and_draw` | 16 |  |
 | `engine/tests/test_modules/integration/full_round/live_each_time_victory_road_through_real_live_rounds_test.rs` | `live_card_own_live_success_no_trigger` | 894 |  |
 | `engine/tests/test_modules/integration/full_round/live_each_time_victory_road_through_real_live_rounds_test.rs` | `live_success_each_time_draws_card` | 427 |  |
 | `engine/tests/test_modules/integration/full_round/live_each_time_victory_road_through_real_live_rounds_test.rs` | `test_live_success_each_time_drains_after_success` | 842 |  |
@@ -62,7 +49,6 @@ _every assertion is about a count/size (len/count/>=1) — '3 options were offer
 | `engine/tests/test_modules/integration/parser_e2e/parser_issues_e2e_part3_test.rs` | `issue13_mia_three_conditional_blade_checks` | 770 |  |
 | `engine/tests/test_modules/integration/parser_e2e/parser_issues_e2e_test.rs` | `issue5_solitude_rain_heart_color_scoring` | 321 |  |
 | `engine/tests/test_modules/jidou/leaves_stage/self_stage_to_waitroom_recovery_and_group_baton_replacement_test.rs` | `self_stage_to_waitroom_optional_discard_grants_member_heart05_and_blade` | 151 |  |
-| `engine/tests/test_modules/jidou/leaves_stage/self_wait_cost_then_choose_mirakura_member_gains_blade_test.rs` | `hs_cl1_choice_among_multiple_mirakura` | 105 |  |
 | `engine/tests/test_modules/rules/trigger_paths/debut_watcher_baton_and_hand_activation_q196_q197_q198_test.rs` | `cost10_baton_replacement_does_not_draw_from_departed_watcher_q197` | 114 |  |
 
 ## placeholder (0)

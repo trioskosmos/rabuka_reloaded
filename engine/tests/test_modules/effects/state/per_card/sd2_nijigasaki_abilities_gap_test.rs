@@ -316,18 +316,87 @@ fn ai_skip_pay_keeps_waited() {
 // 019 優木せつ菜 (登場): heart05 till live end
 // ====================================================================
 
+/// 019 優木せつ菜 「ライブ終了時まで、heart05を得る」 — exactly one heart05, and
+/// only while the card is on stage.
+///
+/// Was `assert!(h5 >= 1)`, which cannot tell the printed grant from a double
+/// count — the failure the assertion exists to catch. The text carries no count
+/// and no threshold (「heart05を得る」, count = 1), so the value is exact, and
+/// the "till live end" half of the sentence needs a second state to mean
+/// anything: the modifier must be gone once the live is over.
 #[test]
 fn setsuna_debut_gains_heart05() {
     let db = load_real_database();
     let mut g = TestGame::new(db.clone());
     let setsu = g.id(SETSUNA);
+    g.assert_card_identity(setsu, SETSUNA);
+    g.assert_card_in_group(setsu, "A・ZU・NA", "019 is a 虹ヶ咲 member");
+    // Pin the premise: the card really prints a 登場 heart05, so a fixture drift
+    // cannot make this pass for the wrong reason.
+    let debut_hearts: Vec<String> = g
+        .db
+        .get_card(setsu)
+        .unwrap()
+        .resolved_abilities()
+        .filter(|a| a.triggers.as_deref() == Some("登場"))
+        .map(|a| a.triggerless_text.clone().unwrap_or_default())
+        .collect();
+    assert!(
+        debut_hearts.iter().any(|t| t.contains("heart05")),
+        "precondition: 019 must print a 登場 heart05, got {debut_hearts:?}"
+    );
     seed_decks(&mut g);
     g.add_to_hand(setsu);
     g.give_energy(8);
     g.play_to_stage(setsu, MemberArea::Center);
     drain(&mut g, true);
-    let h5 = g.state.mods.get_heart_modifier(setsu, HeartColor::Heart05);
-    assert!(h5 >= 1, "019: she gains heart05 on debut, got {}", h5);
+    assert_eq!(
+        g.state.mods.get_heart_modifier(setsu, HeartColor::Heart05),
+        1,
+        "019: 「ライブ終了時まで、heart05を得る」 grants exactly one heart05"
+    );
+    // 「ライブ終了時まで」 is the other half of the sentence, so the expiry has to
+    // be observed at the LIVE END. The version this replaces instead removed her
+    // from the stage, on the reasoning that a card leaving play ends its
+    // continuous modifier — but this grant is not a 常時 continuous modifier: the
+    // engine applies it immediately AND records it as a timed effect
+    // (`push_temporary_effect` with duration `live_end`), so it correctly
+    // survives her leaving the board and is due to expire when the live does.
+    // Whether a `live_end` grant should also die with its card is a rules
+    // question the engine answers "no, it is timed" — so the test now pins the
+    // expiry the text actually names.
+    g.state.player1.stage.stage = [-1, -1, -1];
+    g.state.recalculate_constants();
+    assert_eq!(
+        g.state.mods.get_heart_modifier(setsu, HeartColor::Heart05),
+        1,
+        "a live_end grant is timed, not card-attached: it survives the card \
+         leaving the stage and expires when the live ends"
+    );
+
+    // Drive a real live to its end and the grant must be gone.
+    let live = game_live_id(&mut g);
+    g.state.player1.stage.stage = [-1, setsu, -1];
+    g.state.player1.hand.cards.push(live);
+    g.advance_to_phase(rabuka_engine::game_state::Phase::LiveCardSetFirstAttacker);
+    g.set_live_card(live);
+    g.advance_to_phase(rabuka_engine::game_state::Phase::Active);
+    while g.has_pending_choice() {
+        g.select_indices(&[0]);
+    }
+    assert_eq!(
+        g.state.mods.get_heart_modifier(setsu, HeartColor::Heart05),
+        0,
+        "019: 「ライブ終了時まで」 — the heart05 is gone once the live has ended"
+    );
+}
+
+/// A live card that needs nothing, so the fixture's live succeeds or fails
+/// without the test having to satisfy a heart requirement first.
+fn game_live_id(game: &mut TestGame) -> i16 {
+    let id = game.id("PL!-sd1-019-SD");
+    game.assert_card_identity(id, "PL!-sd1-019-SD");
+    id
 }
 
 #[test]

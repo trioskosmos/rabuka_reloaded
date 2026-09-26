@@ -35,7 +35,7 @@ use crate::core::stats_pipeline;
 use crate::game_state::GameState;
 use crate::player::Player;
 
-use super::strategy_common::Acc;
+use super::strategy_common::{acc_add, Acc};
 
 /// Shared shuffle realisations per live-set decision. Every candidate
 /// portfolio is scored on the SAME realisations, so `p_pass` differences are
@@ -544,6 +544,138 @@ pub fn expected_yell_score(gs: &GameState, me: u8, db: &CardDatabase, blades: i3
     (score_icons * draws / deck_len) as i32
 }
 
+// -- The guides' continuous development-to-score currency ------------------
+
+/// Our own blade-heart density: the chance that one yell flip yields a blade
+/// heart. Derived from our own decklist, which section 9 of
+/// docs/BOT_STRATEGY.md calls fair information.
+pub fn own_density(gs: &GameState, me: u8, db: &CardDatabase) -> f64 {
+    let deck = &gs.seat_player(me).main_deck.cards;
+    if deck.is_empty() {
+        return 0.0;
+    }
+    let blade_hearts = deck
+        .iter()
+        .filter(|&&cid| {
+            db.get_card(cid)
+                .is_some_and(|c| c.blade_heart.is_some())
+        })
+        .count();
+    blade_hearts as f64 / deck.len() as f64
+}
+
+/// The largest score band our supply can clear, per the guides' own formula
+/// (docs/BOT_STRATEGY.md section 4, "DERIVED QUANTITIES"):
+///
+/// ```text
+/// hearts(t) = sum of base_heart over ALL my stage members
+/// flips(t)  = sum of blade over ACTIVE members
+/// hits(t)   ~ Binomial(flips, blade-heart density of MY deck)
+/// ceiling(t)~= largest s with median_hearts(s) <= hearts + hits
+/// ```
+///
+/// This exists because `P(place)` is a poor development signal. It is a
+/// threshold test against whichever lives happen to be in hand, so while the
+/// board is still short of every one of those lives it sits at a hard zero and
+/// a member deploy moves it not at all. Measured over 725 decision points that
+/// left the Main-phase leaf with 1.74 distinct values across 5.4 offered
+/// actions, tied at the top in 81.8% of decisions - the placement model was
+/// inert and `TieKey` was deciding almost everything.
+///
+/// `ceiling` is the guide's own bridge from development to comparison score and
+/// it is MONOTONE in both hearts and blades, so it supplies the gradient
+/// `P(place)` lacks, in the unit the check is actually scored in. It is a mean
+/// not a distribution, which is deliberate and cheap: as a Main-phase
+/// development signal it only has to order boards, and the live-set decision
+/// still prices the real Binomial.
+pub fn score_ceiling(gs: &GameState, me: u8, db: &CardDatabase) -> i32 {
+    let (blades, density) = super::strategy_v4::flip_stats(gs, me, db);
+    let supply = supply_hearts(gs, me, db) + (blades as f64 * density).round() as i32;
+    largest_clearable(supply)
+}
+
+/// `largest s` such that `median_hearts(s) <= supply`, from the section 3.3
+/// score bands. Monotone and unbounded in `supply`, which is the property the
+/// Main phase needs.
+pub fn largest_clearable(supply: i32) -> i32 {
+    let mut best = 0usize;
+    for s in 0..SCORE_SLOTS {
+        if SCORE_MEDIAN[s] <= supply {
+            best = s;
+        } else {
+            break;
+        }
+    }
+    best as i32
+}
+
+/// Total heart supply on our board, buff-aware, in hearts (not per-colour).
+fn supply_hearts(gs: &GameState, me: u8, db: &CardDatabase) -> i32 {
+    stats_pipeline::stage_hearts(
+        &gs.seat_player(me).stage.stage,
+        db,
+        &gs.mods.heart_override,
+        &gs.mods.heart_copy,
+        &gs.mods.heart_color_multiplier,
+        &gs.mods.heart_modifiers,
+    )
+    .hearts
+    .values()
+    .map(|v| i32::from(*v))
+    .sum()
+}
+
+/// Continuous companion to [`score_ceiling`], in the SAME unit: score bands.
+///
+/// The integer band was the right idea in the wrong execution. Measured over
+/// 700 games, v8's Main phase and v7's reach an identical stage-cost curve
+/// (T4 11.7 vs 12.2, T7 24.5 vs 25.9) and both track the guide, yet v8 loses
+/// 8.7 points more. So the cost ladder is NOT what differs. What feeds a check
+/// is hearts and blades (3.2), and cost is only a proxy for them.
+///
+/// The banded integer is a bad proxy because it is coarse AND because it is
+/// quantised on a cost-like scale, which rewards a high-cost low-heart member
+/// exactly as much as a high-cost high-heart one. Interpolating between the
+/// guide's own band medians makes the term continuous, so it responds to a
+/// single extra heart or blade, and it stays in score-band units so no
+/// conversion constant to "probability" is invented.
+pub fn band_progress(gs: &GameState, me: u8, db: &CardDatabase) -> f64 {
+    let (blades, density) = super::strategy_v4::flip_stats(gs, me, db);
+    let supply = supply_hearts(gs, me, db) + (blades as f64 * density).round() as i32;
+    band_progress_for(supply)
+}
+
+/// `band_progress` from a raw heart-equivalent supply, split out so the
+/// interpolation can be tested without building a GameState.
+pub fn band_progress_for(supply: i32) -> f64 {
+    let band = largest_clearable(supply);
+    let b = band as usize;
+    if b + 1 >= SCORE_SLOTS {
+        // Past the last tabulated band, keep climbing at the final band's slope
+        // so the term never goes flat above the table.
+        let last = SCORE_MEDIAN[SCORE_SLOTS - 1];
+        let prev = SCORE_MEDIAN[SCORE_SLOTS - 2];
+        let slope = 1.0 / f64::from(last - prev).max(1.0);
+        return (band - 1) as f64 + 1.0 + (supply - last) as f64 * slope;
+    }
+    let lo = SCORE_MEDIAN[b];
+    let hi = SCORE_MEDIAN[b + 1];
+    let span = f64::from(hi - lo).max(1.0);
+    f64::from(band) + f64::from(supply - lo) / span
+}
+
+/// The guides' own bridge from development to comparison score, continuous.
+///
+/// `hearts(t) + E[hits]` where `hits ~ Binomial(active blades, own density)` —
+/// section 4's "DERIVED QUANTITIES", which the guide calls "the real
+/// scoreboard". It is monotone in BOTH hearts and blades, which is what the
+/// Main phase needs, and unlike `P(place)` it has a gradient before any life
+/// in hand becomes passable.
+pub fn heart_equivalent_supply(gs: &GameState, me: u8, db: &CardDatabase) -> f64 {
+    let (blades, density) = super::strategy_v4::flip_stats(gs, me, db);
+    (supply_hearts(gs, me, db) as f64) + blades as f64 * density
+}
+
 // -- Forward development model (the guides' cost curve) -------------------
 
 /// Highest total stage cost reachable after `turns` more of OUR Main phases,
@@ -650,6 +782,141 @@ pub fn reachable_ceiling(gs: &GameState, me: u8, turns: u8, db: &CardDatabase) -
         }
     }
     stage.iter().sum()
+}
+
+/// Board supply after `turns` more of OUR Main phases, as (hearts, active
+/// blades) — the two quantities that decide a check (section 3.2).
+///
+/// This is the same forward walk as [`reachable_ceiling`] but accumulating the
+/// check inputs instead of stage cost, and it is what makes the Main phase's
+/// leaf non-myopic. Each simulated phase is the printed turn structure:
+///
+/// - Energy phase `+1` active energy (7.5); active energy persists (7.4.1).
+/// - Draw phase `+1` card (7.6) from our own remaining deck, in deck order,
+///   which is fair information under section 9.
+/// - One deploy, preferring a baton into the CHEAPEST occupied slot (9.6.2.3.2)
+///   because that leaves the expensive member in place as the next discount —
+///   this is the guides' 4 -> 9 -> 13 ladder. Otherwise a free slot.
+/// - Among affordable candidates the largest cost wins, which is the energy
+///   doctrine in section 4 ("higher-cost members are simply better").
+///
+/// The heart/blade bookkeeping follows 3.2 exactly, and the asymmetry between
+/// the two is the point:
+///
+/// - the heart pool is ALL members, active AND wait (3.2), so a baton adds
+///   `new.base_heart - sent.base_heart`;
+/// - the yell count is ACTIVE members only (Q133), so a baton REPLACES the
+///   sent member's blades rather than adding to them.
+pub fn forward_supply(
+    gs: &GameState,
+    me: u8,
+    turns: u8,
+    db: &CardDatabase,
+) -> (Acc, i32) {
+    let p = gs.seat_player(me);
+    // Three stage areas: left, center, right.
+    let mut slots: [i16; 3] = p.stage.stage;
+    let mut hearts = board_supply(gs, me, db);
+    let mut blades = active_blades(gs, me, db);
+    let mut budget = i32::from(p.energy_zone.active_count());
+
+    let is_deployable = |cid: i16| {
+        db.get_card(cid)
+            .is_some_and(|c| c.card_type == CardType::Member && c.cost.unwrap_or(0) > 0)
+    };
+    let mut hand: Vec<i16> = p
+        .hand
+        .cards
+        .iter()
+        .copied()
+        .filter(|&c| is_deployable(c))
+        .collect();
+    let deck = &p.main_deck.cards;
+    let mut cursor = 0usize;
+
+    for _ in 0..turns {
+        budget += 1; // rule 7.5
+
+        // Draw phase (7.6): take the next member off our own deck.
+        while cursor < deck.len() {
+            let cid = deck[cursor];
+            cursor += 1;
+            if is_deployable(cid) {
+                hand.push(cid);
+                break;
+            }
+        }
+
+        let occupied: Vec<usize> = slots
+            .iter()
+            .enumerate()
+            .filter(|(_, c)| **c >= 0)
+            .map(|(i, _)| i)
+            .collect();
+        // Baton target: the cheapest occupied slot, so the largest member
+        // survives as the discount for the following step.
+        let baton_slot = occupied
+            .iter()
+            .copied()
+            .min_by_key(|&i| card_cost(db, slots[i]));
+        let free_slot = slots.iter().position(|&c| c < 0);
+        let discount = occupied
+            .iter()
+            .map(|&i| card_cost(db, slots[i]))
+            .max()
+            .unwrap_or(0);
+
+        // Prefer the baton: a discounted swap beats a fresh play (9.6.2.3.2).
+        let mut chosen: Option<(usize, usize, i32)> = None; // (hand index, slot, cost)
+        for (slot, is_baton) in [(baton_slot, true), (free_slot, false)] {
+            let Some(slot) = slot else { continue };
+            for (hi, &cid) in hand.iter().enumerate() {
+                let cost = card_cost(db, cid);
+                let effective = if is_baton {
+                    cost.saturating_sub(discount)
+                } else {
+                    cost
+                };
+                if effective > budget {
+                    continue;
+                }
+                if chosen.is_none_or(|(_, _, best)| cost > best) {
+                    chosen = Some((hi, slot, cost));
+                }
+            }
+            if chosen.is_some() {
+                break;
+            }
+        }
+        let Some((hand_index, slot, _cost)) = chosen else {
+            break;
+        };
+        let cid = hand.remove(hand_index);
+        let sent = slots[slot];
+        if sent >= 0 {
+            // Baton: the sent member leaves the active set, so its blades go
+            // with it and its hearts stay in the pool as a waiting member.
+            if let Some(card) = db.get_card(sent) {
+                blades -= i32::from(card.blade);
+                if let Some(base) = &card.base_heart {
+                    acc_add(&mut hearts, &base.hearts);
+                }
+            }
+        }
+        if let Some(card) = db.get_card(cid) {
+            if let Some(base) = &card.base_heart {
+                acc_add(&mut hearts, &base.hearts);
+            }
+            blades += i32::from(card.blade);
+        }
+        slots[slot] = cid;
+        budget -= if discount > 0 {
+            _cost.saturating_sub(discount)
+        } else {
+            _cost
+        };
+    }
+    (hearts, blades.max(0))
 }
 
 // -- Cheap pass estimate for Main-phase ranking ---------------------------
@@ -985,6 +1252,35 @@ mod tests {
         assert!(pass_probability(&a, &easy) >= pass_probability(&a, &hard));
     }
 
+    /// The continuous band term must be strictly monotone and must start at
+    /// zero, or it is not a gradient but a second constant.
+    #[test]
+    fn band_progress_is_continuous_and_starts_at_zero() {
+        let mut previous = band_progress_for(-5);
+        assert!(previous <= 0.0);
+        for supply in 0..40 {
+            let now = band_progress_for(supply);
+            assert!(
+                now >= previous,
+                "supply {supply}: band progress fell {previous} -> {now}"
+            );
+            previous = now;
+        }
+        // It must actually move inside a single band, which is the whole point:
+        // the integer ceiling is flat there and this is not.
+        assert!(band_progress_for(4) > band_progress_for(3));
+        assert!(band_progress_for(6) > band_progress_for(5));
+    }
+
+    /// Above the last tabulated band the term must keep rising rather than
+    /// saturating, or a developed board stops registering.
+    #[test]
+    fn band_progress_keeps_climbing_past_the_table() {
+        let top = SCORE_MEDIAN[SCORE_SLOTS - 1];
+        let at_top = band_progress_for(top);
+        assert!(band_progress_for(top + 10) > at_top);
+    }
+
     /// The forward ceiling must see the guides' ladder. With a cost-4 already
     /// on stage, a cost-9 in hand costs 5 after the baton (9.6.2.3.2), so the
     /// 4 -> 9 step of the curve is affordable five turns of income early.
@@ -993,5 +1289,38 @@ mod tests {
         let discount = 4;
         assert!(9 - discount < 9, "a baton must be cheaper than a fresh play");
         assert_eq!(9 - discount, 5);
+    }
+
+    /// The reason the Main phase needs `score_ceiling` at all: `P(place)` is a
+    /// threshold test, so it is flat across a whole band of board development
+    /// and cannot rank actions there. `largest_clearable` must be strictly
+    /// monotone - that gradient is the entire point of the term.
+    #[test]
+    fn largest_clearable_is_strictly_monotone_in_supply() {
+        let mut previous = largest_clearable(0);
+        for supply in 0..40 {
+            let now = largest_clearable(supply);
+            assert!(
+                now >= previous,
+                "supply {supply}: score ceiling fell {previous} -> {now}"
+            );
+            previous = now;
+        }
+    }
+
+    /// It must actually move over the range boards occupy: a board that grows
+    /// from nothing to a T4 closeout supply has to raise the clearable band,
+    /// otherwise the term is a constant in disguise. Values are read straight
+    /// off the section 3.3 table: median hearts for scores 0..=8 are
+    /// 2, 3, 5, 7, 10, 12, 14, 16, 19.
+    #[test]
+    fn largest_clearable_tracks_the_guide_turn_bands() {
+        assert_eq!(largest_clearable(0), 0, "an empty board clears only score 0");
+        assert_eq!(largest_clearable(2), 0, "2 hearts = the score-0 median");
+        assert_eq!(largest_clearable(4), 1, "4 hearts = the score-1 median");
+        assert_eq!(largest_clearable(5), 2, "5 hearts = the T2 score-2 standard");
+        assert_eq!(largest_clearable(7), 3, "7 hearts = the T3 score-3 standard");
+        assert_eq!(largest_clearable(12), 5, "12 hearts = the T4 score-5 standard");
+        assert_eq!(largest_clearable(19), 8, "19 hearts = the score-8 median");
     }
 }

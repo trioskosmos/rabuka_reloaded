@@ -1134,14 +1134,22 @@ impl AbilityResolver {
             }
         }
 
-        log::debug!(
-            "[NEED_HEART] filter: color={:?} total={:?} op={:?} src={:?} card_type={:?}",
-            filter.need_heart_color,
-            filter.need_heart_total,
-            filter.need_heart_operator,
-            c.source_str,
-            c.card_type_filter
-        );
+        // Only log when the filter actually constrains heart selection. Every
+        // unfiltered take printed an all-None line; over a full suite that was
+        // ~1.7k identical no-op lines and swamped the ones that mattered.
+        if filter.need_heart_color.is_some()
+            || filter.need_heart_total.is_some()
+            || filter.need_heart_operator.is_some()
+        {
+            log::debug!(
+                "[NEED_HEART] filter: color={:?} total={:?} op={:?} src={:?} card_type={:?}",
+                filter.need_heart_color,
+                filter.need_heart_total,
+                filter.need_heart_operator,
+                c.source_str,
+                c.card_type_filter
+            );
+        }
 
         match self.take_cards_from_standard_zone(
             player,
@@ -1666,15 +1674,20 @@ gs.set_recently_moved_batch(moved.clone().into(), Some("under_member"));
             || Zone::from_str(source) == Some(Zone::Hand)
             || (Zone::from_str(source) == Some(Zone::LookedAt)
                 && effect.all_any().unwrap_or(false));
-        log::debug!(
-            "[ORDER_CHECK] source={} destination={} eligible_source={} deck_dest={} placement={:?} taken_len={}",
-            source,
-            destination,
-            is_eligible_source,
-            is_deck_dest,
-            effect.placement_order_any(),
-            taken.len()
-        );
+        // The deck-order prompt needs a multi-card take; logging the full gate
+        // for every single-card move produced ~3.5k lines to find ~12 real
+        // prompts. Keep the diagnostic for the case that can actually prompt.
+        if taken.len() > 1 {
+            log::debug!(
+                "[ORDER_CHECK] source={} destination={} eligible_source={} deck_dest={} placement={:?} taken_len={}",
+                source,
+                destination,
+                is_eligible_source,
+                is_deck_dest,
+                effect.placement_order_any(),
+                taken.len()
+            );
+        }
         if !(is_eligible_source
             && is_deck_dest
             && effect.placement_order_any() == Some(PlacementOrder::AnyOrder)
@@ -1925,20 +1938,25 @@ gs.set_recently_moved_batch(moved.clone().into(), Some("under_member"));
         if vacated_stage_area.is_none() {
             vacated_stage_area = baton_arrival_area;
         }
-        log::debug!(
-            "[BATON_UNDER] destination={} source={} self_target={} baton_condition={} arriving={:?} arrival_area={:?} vacated={:?}",
-            destination,
-            source,
-            effect.is_self_target(),
-            effect
-                .condition
-                .as_ref()
-                .and_then(|condition| condition.get_baton_touch_trigger())
-                .unwrap_or(false),
-            gs.baton_touch_arriving_card_id,
-            baton_arrival_area,
-            vacated_stage_area,
-        );
+        // Only the baton-touch path is interesting here; logging every move
+        // printed an all-default line ~3.3k times per suite. Gate on the case
+        // that can actually carry an arrival/vacated area.
+        if baton_arrival_area.is_some() || vacated_stage_area.is_some() {
+            log::debug!(
+                "[BATON_UNDER] destination={} source={} self_target={} baton_condition={} arriving={:?} arrival_area={:?} vacated={:?}",
+                destination,
+                source,
+                effect.is_self_target(),
+                effect
+                    .condition
+                    .as_ref()
+                    .and_then(|condition| condition.get_baton_touch_trigger())
+                    .unwrap_or(false),
+                gs.baton_touch_arriving_card_id,
+                baton_arrival_area,
+                vacated_stage_area,
+            );
+        }
         gs.last_vacated_stage_area = None;
 
         // Store destination for execute_selected_cards_from_zone to read later

@@ -306,6 +306,61 @@ impl TestGame {
         );
     }
 
+    /// Pin a card's printed TYPE (`member_card` / `live_card` / `energy_card`).
+    ///
+    /// The type is the filter many abilities actually read — 「メンバーカードを
+    /// すべて」, 「ライブカードを1枚」 — so a fixture that drifted to the wrong
+    /// type turns a positive test into a test of something else entirely, and a
+    /// negative test into one that holds for the wrong reason.
+    pub fn assert_card_type(&self, card_id: i16, expected: &str, ctx: &str) {
+        let actual = self
+            .db
+            .get_card(card_id)
+            .unwrap_or_else(|| panic!("card id {card_id} is not in the database"))
+            .card_type
+            .to_string();
+        assert_eq!(
+            actual, expected,
+            "{}: '{}' (card id {card_id}) is a '{actual}', not a '{expected}'",
+            ctx,
+            self.card_name_of(card_id)
+        );
+    }
+
+    /// Pin that `card_id` really belongs to `group`, using the engine's own
+    /// matcher (`card_matches_group_str`) rather than a hand-rolled one.
+    ///
+    /// GROUP and CARD NAME are different things, and a fixture that means
+    /// 「3人の『Printemps』」 can be built from three different characters — so
+    /// `assert_same_card_name` is the wrong pin for it and fails on a fixture
+    /// that is actually correct. Conversely a fixture that means 「同じカード名の
+    /// メンバー」 can be built from three different groups. Reading the
+    /// distinction off the engine also means a group_name that is `None` in
+    /// cards.json (all of them are) still matches through `unit`/`series`, the
+    /// same way the ability under test resolves it.
+    pub fn assert_card_in_group(&self, card_id: i16, group: &str, ctx: &str) {
+        let matched = rabuka_engine::ability::util::card_matches_group_str(
+            &self.db,
+            card_id,
+            Some(group),
+        );
+        let name = self.card_name_of(card_id);
+        assert!(
+            matched,
+            "{}: '{}' (card id {card_id}) is not in group '{}' — the fixture is not \
+             the case this test claims",
+            ctx, name, group
+        );
+    }
+
+    /// Pin that every card in `cards` belongs to `group` — the premise of any
+    /// 「『X』のメンバーがN人」 / 「『X』のカードと名前が異なる」 fixture.
+    pub fn assert_all_in_group(&self, cards: &[i16], group: &str, ctx: &str) {
+        for &id in cards {
+            self.assert_card_in_group(id, group, ctx);
+        }
+    }
+
     /// Pin that two instances are different printed cards (not just different
     /// physical copies of one print) — the counterweight to
     /// [`Self::assert_same_card_name`] for 「カード名の異なる」 conditions.

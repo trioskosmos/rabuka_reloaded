@@ -32,6 +32,61 @@ fn drain_choices(game: &mut TestGame) {
     }
 }
 
+/// Same walk as `drain_choices`, but a NON-skippable SelectCard is answered
+/// with its first option instead of an empty selection. Mandatory prompts
+/// exist on this path — 鬼塚夏美's 「手札を1枚控え室に置く」 is one — and the
+/// engine rejects an empty answer for those, so `drain_choices` panics on a
+/// live that actually SUCCEEDS. Skippable prompts still get the empty answer
+/// so an optional branch can decline.
+fn drain_choices_picking_first(game: &mut TestGame) {
+    while game.has_pending_choice() {
+        let must_pick = matches!(
+            game.get_pending_choice(),
+            rabuka_engine::ability::types::Choice::SelectCard {
+                allow_skip: false,
+                ..
+            }
+        );
+        game.select_indices(if must_pick { &[0] } else { &[] });
+    }
+}
+
+/// Pre-grant All hearts to a staged card. All (icon_all) covers every COLOURED
+/// need_heart deficit, so a fixture can satisfy a live card's requirement
+/// without depending on which colours the members happen to print — the yell
+/// RE-COMPUTES the stage hearts from the members, so a hand-set
+/// `stage_hearts` is not enough on its own.
+fn grant_all_hearts(game: &mut TestGame, card_id: i16, count: i16) {
+    use rabuka_engine::core::game_modifiers::ModifierEntry;
+    game.state
+        .mods
+        .heart_modifiers
+        .entry(card_id)
+        .or_default()
+        .entry(HeartColor::All)
+        .or_insert(ModifierEntry::default())
+        .additive += count;
+}
+
+/// `drain_choices_picking_first`, but it hands back the prompt TYPES it saw in
+/// order. A test that only counts cards cannot say which prompt it answered;
+/// this lets one assert "the window raised exactly this, and never that".
+fn drain_choice_types(game: &mut TestGame) -> Vec<String> {
+    let mut seen = Vec::new();
+    while game.has_pending_choice() {
+        seen.push(game.pending_choice_type().unwrap_or_default());
+        let must_pick = matches!(
+            game.get_pending_choice(),
+            rabuka_engine::ability::types::Choice::SelectCard {
+                allow_skip: false,
+                ..
+            }
+        );
+        game.select_indices(if must_pick { &[0] } else { &[] });
+    }
+    seen
+}
+
 fn has_all_heart(gs: &rabuka_engine::core::game_state::GameState, cid: i16) -> bool {
     gs.mods
         .heart_modifiers
@@ -433,6 +488,21 @@ fn live_success_each_time_draws_card() {
     let member = game.id("PL!SP-bp2-009-R\u{ff0b}");
     let filler = game.new_id("PL!-sd1-010-SD");
     let hand_card = game.new_id("PL!-bp3-013-N");
+    // Yell supply. 繚乱！ビクトリーロード needs heart01..heart06 and heart0×7.
+    // The two members on stage only cover h01/h02/h03/h06, and a yelled card's
+    // blade_heart color becomes a heart of that color — so these two fill h04
+    // and h05. Without them the live FAILS the requirement at the yell, the
+    // live card is sent to the waitroom, and every ライブ成功時 assertion
+    // below would be measuring a live that never happened.
+    let yell_h04 = game.id("PL!S-sd1-003-SD");
+    let yell_h05 = game.id("PL!S-PR-014-PR");
+    // Draw markers: three DIFFERENT card numbers, put on the deck AFTER the
+    // yell, so the only thing that can take them is a ライブ成功時 draw. A
+    // count-only "the deck shrank" cannot say which cards came back — and 30
+    // identical fillers cannot either.
+    let m1 = game.id("PL!-sd1-001-SD");
+    let m2 = game.id("PL!-sd1-002-SD");
+    let m3 = game.id("PL!-sd1-003-SD");
 
     game.state.player1.main_deck.cards.clear();
     game.state.player2.main_deck.cards.clear();
@@ -440,7 +510,10 @@ fn live_success_each_time_draws_card() {
         game.state.player1.main_deck.cards.push(filler);
         game.state.player2.main_deck.cards.push(filler);
     }
-    game.state.player1.live_card_zone.cards.push(victory);
+    // ONE copy of the live card: set_live_card moves it out of hand. Pushing
+    // it into live_card_zone as well (as this file used to) staged the same
+    // card id in two zones and left the live judging a second, heartless
+    // copy — which fails the requirement on its own.
     game.state.player1.stage.stage[0] = filler;
     game.state.player1.stage.stage[1] = member;
     game.state.player1.stage.stage[2] = -1;
@@ -454,20 +527,78 @@ fn live_success_each_time_draws_card() {
     finish_live_setup(&mut game);
     drain_choices(&mut game);
 
+    // The yell happens on the first pass into SecondAttackerPerformance.
+    put_on_deck_top(&mut game, 0, yell_h05);
+    put_on_deck_top(&mut game, 0, yell_h04);
+    game.pass();
+    drain_choices(&mut game);
+    assert!(
+        game.state.player1.live_card_zone.cards.contains(&victory),
+        "the yell must MEET the heart requirement — an unmet one sends the live \
+         card to the waitroom and no ライブ成功時 ever resolves"
+    );
+
+    put_on_deck_top(&mut game, 0, m3);
+    put_on_deck_top(&mut game, 0, m2);
+    put_on_deck_top(&mut game, 0, m1);
+    // Baselines taken AFTER the markers go on, so the delta below is only what
+    // the ライブ成功時 abilities move.
     let deck_before = game.state.player1.main_deck.cards.len();
+    let hand_before = game.state.player1.hand.cards.len();
+    let waitroom_before = game.state.player1.waitroom.cards.len();
     set_stage_hearts(&mut game);
 
-    // Advance through: FirstAttackerPerformance → SecondAttackerPerformance → LiveVictoryDetermination
+    // Pass 1 of these: SecondAttackerPerformance → LiveVictoryDetermination
+    // (p2 has no members, so its yell reveals nothing and the deck is
+    // untouched — the markers are still there).
     game.pass();
-    drain_choices(&mut game);
+    drain_choices_picking_first(&mut game);
+    assert_eq!(
+        game.state.player1.main_deck.cards.len(),
+        deck_before,
+        "the p2 yell must not consume the deck (p2 has no members on stage)"
+    );
+    // Pass 2: ライブ成功時 resolves here — the member draws 2 and discards 1,
+    // then Victory Road's each_time draws 1. The live card has NOT moved to
+    // the success zone yet, so a success-zone check here would be a false
+    // negative. The next step is the live actually closing.
     game.pass();
-    drain_choices(&mut game);
-    game.pass();
-    drain_choices(&mut game);
+    drain_choices_picking_first(&mut game);
+    game.advance_to_phase(rabuka_engine::game_state::Phase::Active);
+    drain_choices_picking_first(&mut game);
 
+    // Precondition FIRST: a failed live would leave the deck untouched and the
+    // draw assertions would read as a confusing "0 cards drawn".
     assert!(
-        game.state.player1.main_deck.cards.len() < deck_before,
-        "LiveSuccess + Victory Road each_time should draw cards"
+        game.state.player1.success_live_card_zone.cards.contains(&victory),
+        "the live must SUCCEED before its ライブ成功時 draws mean anything"
+    );
+    // Exact, not "fewer": 鬼塚夏美's 「カードを2枚引き、手札を1枚控え室に置く」
+    // is 2 draws, and Victory Road ab#1's 「カードを1枚引く」 is the third. A
+    // regression that dropped the each_time draw (the thing under test), or
+    // doubled it, would both pass a `<` assertion.
+    assert_eq!(
+        game.state.player1.main_deck.cards.len(),
+        deck_before - 3,
+        "exactly 2 (member) + 1 (Victory Road each_time) cards drawn"
+    );
+    let hand = &game.state.player1.hand.cards;
+    assert!(hand.contains(&m1), "deck top (PL!-sd1-001-SD) reached hand");
+    assert!(hand.contains(&m2), "deck 2nd (PL!-sd1-002-SD) reached hand");
+    assert!(hand.contains(&m3), "deck 3rd (PL!-sd1-003-SD) reached hand");
+    assert_eq!(
+        game.state.player1.waitroom.cards.len(),
+        waitroom_before + 1,
+        "「手札を1枚控え室に置く」 put exactly one card in the waitroom"
+    );
+    assert!(
+        game.state.player1.waitroom.cards.contains(&hand_card),
+        "the discarded card came from HAND (PL!-bp3-013-N), not from the deck"
+    );
+    assert_eq!(
+        hand.len(),
+        hand_before + 2,
+        "hand = before + 3 drawn - 1 discarded"
     );
 }
 
@@ -837,8 +968,10 @@ fn test_three_live_starts_each_order_possible() {
     assert!(has_all_heart(&game.state, ls_c), "ls_c got all-heart");
 }
 
-/// T18: ab#1 (LiveSuccess each_time) also uses the same drain flow.
-///      Set up 1 member with LiveSuccess + Victory Road, verify each_time fires.
+/// T18: ab#1 (LiveSuccess each_time) resolves through the same force-drain the
+///      LiveStart each_time uses (T15/T16) — the player is never asked to order
+///      it. Records the prompt TYPES the ライブ成功時 window raises, which a
+///      "3 cards were drawn" count can never say.
 #[test]
 fn test_live_success_each_time_drains_after_success() {
     let db = load_real_database();
@@ -848,6 +981,11 @@ fn test_live_success_each_time_drains_after_success() {
     let member = game.id("PL!SP-bp2-009-R\u{ff0b}");
     let filler = game.new_id("PL!-sd1-010-SD");
     let hand_card = game.new_id("PL!-bp3-013-N");
+    let yell_h04 = game.id("PL!S-sd1-003-SD");
+    let yell_h05 = game.id("PL!S-PR-014-PR");
+    let m1 = game.id("PL!-sd1-001-SD");
+    let m2 = game.id("PL!-sd1-002-SD");
+    let m3 = game.id("PL!-sd1-003-SD");
 
     game.state.player1.main_deck.cards.clear();
     game.state.player2.main_deck.cards.clear();
@@ -855,8 +993,6 @@ fn test_live_success_each_time_drains_after_success() {
         game.state.player1.main_deck.cards.push(filler);
         game.state.player2.main_deck.cards.push(filler);
     }
-
-    game.state.player1.live_card_zone.cards.push(victory);
     game.state.player1.stage.stage[0] = filler;
     game.state.player1.stage.stage[1] = member;
     game.state.player1.stage.stage[2] = -1;
@@ -870,21 +1006,64 @@ fn test_live_success_each_time_drains_after_success() {
     finish_live_setup(&mut game);
     drain_choices(&mut game);
 
-    set_stage_hearts(&mut game);
-    let deck_before = game.state.player1.main_deck.cards.len();
-
-    // Advance through performance phases — LiveSuccess fires on win
+    put_on_deck_top(&mut game, 0, yell_h05);
+    put_on_deck_top(&mut game, 0, yell_h04);
     game.pass();
     drain_choices(&mut game);
-    game.pass();
-    drain_choices(&mut game);
-    game.pass();
-    drain_choices(&mut game);
-
     assert!(
-        game.state.player1.main_deck.cards.len() < deck_before,
-        "LiveSuccess + each_time draw should decrease deck"
+        game.state.player1.live_card_zone.cards.contains(&victory),
+        "the yell must MEET the heart requirement or no ライブ成功時 resolves"
     );
+
+    put_on_deck_top(&mut game, 0, m3);
+    put_on_deck_top(&mut game, 0, m2);
+    put_on_deck_top(&mut game, 0, m1);
+    let deck_before = game.state.player1.main_deck.cards.len();
+    set_stage_hearts(&mut game);
+
+    // p2's yell (no members → no reveals), then the ライブ成功時 window.
+    let mut window_prompts: Vec<String> = Vec::new();
+    game.pass();
+    window_prompts.extend(drain_choice_types(&mut game));
+    game.pass();
+    window_prompts.extend(drain_choice_types(&mut game));
+    game.advance_to_phase(rabuka_engine::game_state::Phase::Active);
+    window_prompts.extend(drain_choice_types(&mut game));
+
+    // Precondition FIRST: a failed live would leave the deck untouched and the
+    // draw assertions below would read as a confusing "0 cards drawn".
+    assert!(
+        game.state.player1.success_live_card_zone.cards.contains(&victory),
+        "the live must SUCCEED before the ライブ成功時 draws mean anything"
+    );
+    // The each_time is FORCE-drained: had it leaked into the player's choice
+    // pool, a SelectAutoAbility ordering prompt would appear here (that is
+    // exactly what T15/T16 guard against on the LiveStart side).
+    assert!(
+        !window_prompts.iter().any(|t| t == "SelectAutoAbility"),
+        "the each_time must be auto-resolved, never offered as a choice; \
+         prompts in the ライブ成功時 window were {:?}",
+        window_prompts
+    );
+    // The only prompt the window may raise is 鬼塚夏美's mandatory discard.
+    assert_eq!(
+        window_prompts
+            .iter()
+            .filter(|t| *t == "SelectCard")
+            .count(),
+        1,
+        "exactly one SelectCard — 「手札を1枚控え室に置く」; got {:?}",
+        window_prompts
+    );
+    assert_eq!(
+        game.state.player1.main_deck.cards.len(),
+        deck_before - 3,
+        "LiveSuccess (2) + each_time (1) = exactly 3 draws"
+    );
+    let hand = &game.state.player1.hand.cards;
+    assert!(hand.contains(&m1), "deck top (PL!-sd1-001-SD) reached hand");
+    assert!(hand.contains(&m2), "deck 2nd (PL!-sd1-002-SD) reached hand");
+    assert!(hand.contains(&m3), "deck 3rd (PL!-sd1-003-SD) reached hand");
 }
 
 /// T14: ライブカード自身のライブ成功時能力 → メンバーでない → ビクトリーロード発動しない
@@ -901,6 +1080,15 @@ fn live_card_own_live_success_no_trigger() {
     let member = game.id("PL!-bp3-012-N");
     let filler = game.new_id("PL!-sd1-010-SD");
     let hand_card = game.new_id("PL!-bp3-013-N");
+    // Yell supply, as in T12: the live card's need_heart (h01..h06 + h0×7)
+    // must actually be MET, or the live never succeeds and the 「draw 2」 this
+    // test measures never resolves. The two members here print h01/h03 only,
+    // so the coloured gaps are covered with All hearts instead — 君のこころは
+    // 輝いてるかい？ additionally needs h05, which the yelled card covers.
+    let yell_h05 = game.id("PL!S-PR-014-PR");
+    let m1 = game.id("PL!-sd1-001-SD");
+    let m2 = game.id("PL!-sd1-002-SD");
+    let m3 = game.id("PL!-sd1-003-SD");
 
     game.state.player1.main_deck.cards.clear();
     game.state.player2.main_deck.cards.clear();
@@ -925,23 +1113,64 @@ fn live_card_own_live_success_no_trigger() {
     finish_live_setup(&mut game);
     drain_choices(&mut game);
 
+    // Heart budget. 繚乱！ビクトリーロード needs heart01..heart06 PLUS heart0×7
+    // — 13 icons — and 君のこころは輝いてるかい？ needs 2 more. Three staged
+    // members cannot print that many hearts (an All heart covers a coloured
+    // deficit, not the whole heart0 bucket), so the live FAILS at the yell and
+    // the ライブ成功時 under test never resolves. Cancel the COLORLESS (heart0)
+    // requirement on both live cards; the six coloured icons stay enforced,
+    // which is all this test needs in order to reach a successful live.
+    game.state
+        .mods
+        .add_need_heart_modifier(victory, HeartColor::Heart00, -7);
+    game.state
+        .mods
+        .add_need_heart_modifier(live_card, HeartColor::Heart00, -1);
+    put_on_deck_top(&mut game, 0, yell_h05);
+    grant_all_hearts(&mut game, filler, 10);
+    grant_all_hearts(&mut game, member, 10);
+    game.pass();
+    drain_choices(&mut game);
+    assert!(
+        game.state.player1.live_card_zone.cards.contains(&victory),
+        "the yell must MEET the heart requirement or no ライブ成功時 resolves"
+    );
+
+    put_on_deck_top(&mut game, 0, m3);
+    put_on_deck_top(&mut game, 0, m2);
+    put_on_deck_top(&mut game, 0, m1);
     let deck_before = game.state.player1.main_deck.cards.len();
     set_stage_hearts(&mut game);
 
     game.pass();
-    drain_choices(&mut game);
+    drain_choices_picking_first(&mut game);
     game.pass();
-    drain_choices(&mut game);
-    game.pass();
-    drain_choices(&mut game);
+    drain_choices_picking_first(&mut game);
+    game.advance_to_phase(rabuka_engine::game_state::Phase::Active);
+    drain_choices_picking_first(&mut game);
 
+    // Precondition FIRST: a failed live would leave the deck untouched and the
+    // draw assertion below would read as a confusing "0 cards drawn".
+    assert!(
+        game.state.player1.success_live_card_zone.cards.contains(&victory),
+        "the live must SUCCEED before the ライブ成功時 draw means anything"
+    );
     // The live card (PL!S-bp2-024-L) has LiveSuccess → draws 2, discards 1.
     // The member (PL!-bp3-012-N) has NO LiveSuccess.
-    // Victory Road should NOT fire live card's LiveSuccess is from a non-member.
-    // Only the live card's own LiveSuccess draw happens.
+    // Victory Road should NOT fire: 「自分のステージにいるメンバーの」 — a live
+    // card is not a member. Exactly 2, not 3: the third draw is the whole
+    // difference T12 measures, and "the deck shrank" cannot tell them apart.
+    assert_eq!(
+        game.state.player1.main_deck.cards.len(),
+        deck_before - 2,
+        "only the live card's own LiveSuccess (draw 2) — no each_time draw"
+    );
+    let hand = &game.state.player1.hand.cards;
+    assert!(hand.contains(&m1), "deck top (PL!-sd1-001-SD) reached hand");
+    assert!(hand.contains(&m2), "deck 2nd (PL!-sd1-002-SD) reached hand");
     assert!(
-        game.state.player1.main_deck.cards.len() < deck_before,
-        "Live card's own LiveSuccess draws; Victory Road does NOT fire for non-member"
+        !hand.contains(&m3),
+        "the 3rd deck card must NOT be drawn — that is the each_time draw"
     );
 }
 

@@ -173,13 +173,27 @@ fn issue3_ayumu_compound_both_conditions_met() {
     let mut game = TestGame::new(db);
     let ayumu = game.id("PL!N-PR-003-PR");
     let other_member = game.id("PL!N-bp4-001-R");
+    // The 5 cards 「自分のデッキの上からカードを5枚見る」 will reveal: one live
+    // card on top (the only legal pick) and four members. Distinct ids so the
+    // assertions can say WHICH cards moved where.
+    let look_live = game.id("PL!-sd1-019-SD");
+    let filler = game.id("PL!-sd1-010-SD");
 
-    // Stage: Ayumu in center, another Niji member beside her
+    // Stage: Ayumu in center, another Niji member beside her → condition (1)
+    // 「自分のステージにほかのメンバーがおり」 holds.
     game.state.player1.stage.stage = [ayumu, other_member, -1];
+    // Hand: no live card → condition (2) 「公開した手札の中にライブカードがない」 holds.
+    game.add_to_hand(game.new_id("PL!-sd1-010-SD"));
     game.give_energy(9); // Ayumu costs 9
 
-    // Hand: only filler cards (no live cards) → "no live cards in revealed hand" passes
+    fill_decks(&mut game, filler);
+    put_on_deck_top(&mut game, 0, filler);
+    put_on_deck_top(&mut game, 0, filler);
+    put_on_deck_top(&mut game, 0, filler);
+    put_on_deck_top(&mut game, 0, filler);
+    put_on_deck_top(&mut game, 0, look_live);
     let deck_before = game.state.player1.main_deck.cards.len();
+    let waitroom_before = game.state.player1.waitroom.cards.len();
 
     // Activate 起動 ability (activation)
     game.activate_ability(ayumu);
@@ -192,10 +206,23 @@ fn issue3_ayumu_compound_both_conditions_met() {
         }
     }
 
-    // Ability should have looked at cards from deck → deck changed
+    // Exactly five cards left the deck — the printed 「5枚」, not "some".
+    assert_eq!(
+        game.state.player1.main_deck.cards.len(),
+        deck_before - 5,
+        "3a: 「自分のデッキの上からカードを5枚見る」 takes exactly 5"
+    );
+    // The one live card among the five is the only legal pick, and the drain
+    // takes option 0 — so it must be the card that reaches hand.
     assert!(
-        game.state.player1.main_deck.cards.len() < deck_before || !game.state.rule_log.is_empty(),
-        "3a: ability executed (deck changed or log emitted)"
+        game.state.player1.hand.cards.contains(&look_live),
+        "3a: the revealed live card went to hand"
+    );
+    // 「残りを控え室に置く」 — the other four.
+    assert_eq!(
+        game.state.player1.waitroom.cards.len(),
+        waitroom_before + 4,
+        "3a: the 4 non-picked cards went to the waitroom"
     );
 }
 

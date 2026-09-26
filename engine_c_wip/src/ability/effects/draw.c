@@ -371,16 +371,13 @@ int rb_effect_draw_card(GameState *g, int actor, AbilityEffect *e, int host_cid)
         final_count = final_count * multiplier * pc;
     }
 
-    /* draw_until_count: draw up to target_count (hand-based) */
+    /* draw_until_count is its own action in Rust (executor.rs:49-52 dispatches
+       ActionType::DrawUntilCount to AbilityResolver::execute_draw_until_count, not
+       through execute_draw_wrapper). Route to the same handler so both entry
+       points share one implementation. */
     if (act && !strcmp(act, "draw_until_count")) {
-        int pl = draw_effect_target_player(e, actor);
-        int have = g->p[pl].hand.n;
-        int to_draw = final_count - have;
-        if (to_draw < 0) to_draw = 0;
-        int n = rb_draw_cards_for_player(&g->p[pl], (uint8_t)to_draw, source, destination,
-                                         card_type, 0, NULL, NULL, -1);
-        g->last_draw_count = n;
-        return n;
+        rb_effect_draw_until_count(g, actor, e);
+        return g->last_draw_count;
     }
 
     /* Optional draw: emit pay/skip gate; draw is performed on resume.
@@ -692,42 +689,52 @@ void rb_effect_both_hand_keep_shuffle_under(GameState *g, int actor,
 }
 
 /* ── execute_draw_until_count (mirrors draw.rs::execute_draw_until_count) ────
-   Uses saturating_sub (target_count - current_hand). Only draws when hand is
-   below target_count; destination must be Hand for the check. */
+   Rust (engine/src/ability/effects/draw.rs:602-626):
+     let target_count: u8 = effect.target_count_any().unwrap_or(0) as u8;
+     let target       = effect.target_name();                  // "self" default
+     let destination  = effect.destination...unwrap_or(Zone::Hand);
+     let player       = gs.resolve_target_player_mut(target);
+     let current      = match Zone::from_str(destination) { Some(Hand) => hand.len(), _ => return };
+     let to_draw      = (target_count as usize).saturating_sub(current);
+     self.execute_draw(gs, &AbilityEffect::default(), to_draw as u8, target,
+                       Zone::Deck.to_str(), destination, None, false, 1, None);
+   Notes:
+     * the source is hard-coded to Deck (not effect.source) and no card filter /
+       distinct / any_number is used, because the synthesized effect is default;
+     * execute_draw ends with step_state.last_draw_count = final_count, i.e. the
+       REQUESTED count, not the number of cards the deck could actually supply;
+     * the destination gate is on the destination zone, so a non-Hand destination
+       makes the whole effect a no-op. */
+
+/* target_count lives on the effect filter in Rust. The C decoder stores filter
+   scalars in extra_k/extra_v, so "target_count" is read from there first.
+   Fallback: the C ability decoder currently drops that key (the
+   optional/non_stackable/... branch in vm.c::decode_effect_body uses the
+   inverted test `!strcmp(key, "X") == 0`, which matches every key that is NOT
+   one of those six and therefore skip_value()s the field instead of storing it
+   as an extra). For every draw_until_count effect in cards/abilities.json
+   (lines 2791-2795 and 10523-10528) `count` carries the same value as
+   `target_count`, so e->count is an exact stand-in until vm.c is fixed. */
+static int draw_until_target_count(const AbilityEffect *e) {
+    const char *tc = draw_extra(e, "target_count");
+    if (tc) return atoi(tc);
+    return e->count > 0 ? e->count : 0;  /* decoder-gap fallback, see above */
+}
 
 void rb_effect_draw_until_count(GameState *g, int actor, AbilityEffect *e) {
     if (!g || !e) return;
-    int target_count = 0;
-    fprintf(stderr, "[DRAW_UNTIL_FIELDS] action=%s count=%d target=%s destination=%s source=%s n_extra=%d\n",
-            e->action ? e->action : "-", e->count, e->target ? e->target : "-",
-            e->destination ? e->destination : "-", e->source ? e->source : "-", e->n_extra);
-    for (int i = 0; i < e->n_extra; i++) {
-        fprintf(stderr, "[DRAW_UNTIL_EXTRA] key=%s value=%s\n",
-                e->extra_k[i] ? e->extra_k[i] : "-", e->extra_v[i] ? e->extra_v[i] : "-");
-        if (e->extra_k[i] && !strcmp(e->extra_k[i], "target_count") && e->extra_v[i]) {
-            target_count = atoi(e->extra_v[i]);
-            break;
-        }
-    }
-    if (target_count <= 0) return;
+    int target_count = draw_until_target_count(e);
     const char *target = (e->target && *e->target) ? e->target : "self";
-    int who = (e->target &&
-               (!strcmp(e->target, "opponent") || !strcmp(e->target, "p2")))
-              ? actor ^ 1 : actor;
+    int who = (!strcmp(target, "opponent") || !strcmp(target, "p2")) ? actor ^ 1 : actor;
     RbPlayer *P = &g->p[who];
-    /* Only draw-until-count for Hand destination (Rust matches Zone::Hand) */
     const char *dst = e->destination ? e->destination : "hand";
     RbZone z;
-    int zone_result = rb_zone_of_str(dst, &z);
-    fprintf(stderr, "[DRAW_UNTIL_ZONE] dst=%s result=%d zone=%d expected=%d\n",
-            dst, zone_result, (int)z, (int)RB_ZONE_HAND);
-    if (zone_result == 0 || z != RB_ZONE_HAND) return;
+    if (rb_zone_of_str(dst, &z) == 0 || z != RB_ZONE_HAND) return;
     int current = P->hand.n;
     int to_draw = target_count > current ? target_count - current : 0;
-    fprintf(stderr, "[DRAW_UNTIL] actor=%d who=%d target=%d current=%d deck=%d to_draw=%d dst=%s\n",
-            actor, who, target_count, current, P->deck.n, to_draw, dst);
     if (to_draw > 0)
         rb_draw_cards_for_player(P, (uint8_t)to_draw, "deck", dst, NULL, 0, NULL, NULL, -1);
+    g->last_draw_count = to_draw;
 }
 
 /* ── execute_select_heart_color (mirrors draw.rs::execute_select_heart_color) ──

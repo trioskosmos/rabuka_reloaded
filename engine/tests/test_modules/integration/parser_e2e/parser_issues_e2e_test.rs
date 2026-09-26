@@ -318,6 +318,24 @@ fn issue4_you_exclude_aqours_live_start() {
 // Parser fix: per_unit_type = "heart_colors".
 // ====================================================================
 
+/// Distinct heart01..heart06 colours printed on a card. This is exactly what
+/// Solitude Rain's 「heart01、heart04、heart05、heart02、heart03、heart06の
+/// うち1色につき」 counts per 虹ヶ咲 member — computed from the card data rather
+/// than hard-coded, so a data change shows up as a failing number, not as a
+/// tautology.
+fn distinct_note_colors(game: &TestGame, card_id: i16) -> usize {
+    let card = game.db.get_card(card_id).expect("card is in the database");
+    let hearts = card
+        .base_heart
+        .as_ref()
+        .unwrap_or_else(|| panic!("{} prints hearts", card.card_no));
+    hearts
+        .hearts
+        .iter()
+        .filter(|(color, count)| *count > 0 && (1..=6).contains(&color.index()))
+        .count()
+}
+
 #[test]
 fn issue5_solitude_rain_heart_color_scoring() {
     let db = load_real_database();
@@ -338,8 +356,22 @@ fn issue5_solitude_rain_heart_color_scoring() {
         game.select_indices(&[]);
     }
 
-    let score_mod = game.state.mods.get_score_modifier(solitude);
-    assert!(score_mod >= 0, "5: score >= 0, got {}", score_mod);
+    // Only the 虹ヶ咲 member counts: the two μ's members on stage contribute
+    // nothing. The assertion below is the printed rule's value, not ">= 0".
+    let niji_only = distinct_note_colors(&game, niji_member);
+    let counting_everyone = distinct_note_colors(&game, niji_member)
+        + distinct_note_colors(&game, filler);
+    assert_ne!(
+        niji_only, counting_everyone,
+        "fixture is discriminating: the μ's fillers must add colours that \
+         Solitude Rain does NOT score"
+    );
+    assert_eq!(
+        game.state.mods.get_score_modifier(solitude),
+        niji_only as i32,
+        "Solitude Rain: +1 per heart01..heart06 colour held by 虹ヶ咲 members \
+         on stage (expected {niji_only} from PL!N-sd1-010-SD alone)"
+    );
 }
 
 // ====================================================================

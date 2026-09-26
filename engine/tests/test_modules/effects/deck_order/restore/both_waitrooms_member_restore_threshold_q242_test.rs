@@ -12,21 +12,115 @@ fn play_q242_debut(game: &mut TestGame, card_id: i16) {
     }
 }
 
+/// 百生吟子 ab#0, both halves of 「自身と相手はそれぞれ」 with the threshold NOT met.
+///
+/// Was `assert!(waitroom.len() < w1)` — a count, so it passed for the wrong
+/// reasons: a card leaving the discard into the hand, a single card moving
+/// twice, or the OPPONENT's members moving to the wrong deck all satisfy it.
+/// The printed effect is directional and positional, so both are pinned:
+///
+/// - each player's MEMBERS leave THEIR OWN waitroom for THE BOTTOM of THEIR
+///   OWN deck — checked card by card, in both directions, with a sentinel
+///   proving the destination is the bottom and not just "the deck";
+/// - 3 + 3 = 6 is below the 20-card threshold, so neither the live retrieval
+///   nor the blade+2 half fires.
 #[test]
 fn debut_both_waitrooms_member_restore_shrinks_own_waitroom() {
     let db = load_real_database();
     let mut g = TestGame::new(db);
     let c = g.id("PL!HS-pb1-012-R");
-    let m = g.id("PL!-sd1-001-SD");
-    for _ in 0..5 {
-        g.state.player1.waitroom.cards.push(m);
-        g.state.player2.waitroom.cards.push(m);
+    g.assert_card_identity(c, "PL!HS-pb1-012-R");
+    // Distinct prints, not five copies of one: the claim is about WHICH cards
+    // moved, and one id in five slots cannot say that.
+    let prints = [
+        "PL!N-bp1-001-R",
+        "PL!N-bp1-002-R\u{ff0b}",
+        "PL!N-bp1-003-R\u{ff0b}",
+    ];
+    let mut p1_members = Vec::new();
+    let mut p2_members = Vec::new();
+    for card_no in prints {
+        let p1_card = g.id(card_no);
+        let p2_card = g.new_id(card_no);
+        g.assert_card_type(p1_card, "member_card", "the shuffled cards are members");
+        g.assert_card_type(p2_card, "member_card", "the shuffled cards are members");
+        g.state.player1.waitroom.cards.push(p1_card);
+        g.state.player2.waitroom.cards.push(p2_card);
+        p1_members.push(p1_card);
+        p2_members.push(p2_card);
     }
-    let w1 = g.state.player1.waitroom.cards.len();
+    // A live in P1's waitroom: it is not a member, so the shuffle must ignore
+    // it, and the retrieval half must still not fire (6 < 20).
+    let live = g.id("PL!-sd1-019-SD");
+    g.state.player1.waitroom.cards.push(live);
+    // Sentinels already in each deck, so "moved to the BOTTOM" is observable.
+    let p1_sentinel = g.id("PL!-sd1-010-SD");
+    let p2_sentinel = g.new_id("PL!-sd1-010-SD");
+    g.state.player1.main_deck.cards.push(p1_sentinel);
+    g.state.player2.main_deck.cards.push(p2_sentinel);
+
+    let p1_waitroom_before = g.state.player1.waitroom.cards.len();
+    let p2_waitroom_before = g.state.player2.waitroom.cards.len();
     play_q242_debut(&mut g, c);
+
+    assert_eq!(
+        g.state.player1.waitroom.cards.len(),
+        p1_waitroom_before - p1_members.len(),
+        "P1 loses exactly its own 3 members (the live stays: it is not a member)"
+    );
+    assert_eq!(
+        g.state.player2.waitroom.cards.len(),
+        p2_waitroom_before - p2_members.len(),
+        "P2 loses exactly its own 3 members"
+    );
+    for &card in &p1_members {
+        assert!(
+            g.state.player1.main_deck.cards.contains(&card),
+            "a P1 member must reach P1's deck"
+        );
+        assert!(
+            !g.state.player2.main_deck.cards.contains(&card),
+            "a P1 member must NOT cross into P2's deck"
+        );
+    }
+    for &card in &p2_members {
+        assert!(
+            g.state.player2.main_deck.cards.contains(&card),
+            "a P2 member must reach P2's deck"
+        );
+        assert!(
+            !g.state.player1.main_deck.cards.contains(&card),
+            "a P2 member must NOT cross into P1's deck"
+        );
+    }
+    // 「自身のデッキの下に置く」 — under, not merely inside. The sentinel was
+    // already in the deck, so it must end up ABOVE every shuffled member.
+    let p1_deck = &g.state.player1.main_deck.cards;
+    let sentinel_at = p1_deck
+        .iter()
+        .position(|&id| id == p1_sentinel)
+        .expect("the P1 sentinel must still be in P1's deck");
+    let lowest_member = p1_members
+        .iter()
+        .filter_map(|&id| p1_deck.iter().position(|&x| x == id))
+        .min()
+        .expect("P1 members must be in P1's deck");
     assert!(
-        g.state.player1.waitroom.cards.len() < w1,
-        "P1 waitroom shrank"
+        sentinel_at < lowest_member,
+        "members are shuffled UNDER the existing deck: sentinel at {sentinel_at}, \
+         lowest member at {lowest_member} of {} cards",
+        p1_deck.len()
+    );
+    // Below the 20-card threshold, so the second half of the sentence does not
+    // fire — this fixture is the only place the sub-threshold case is pinned.
+    assert!(
+        !g.state.player1.hand.cards.contains(&live),
+        "6 cards total is below the 20 threshold, so no live is retrieved"
+    );
+    assert_eq!(
+        g.state.mods.get_blade_modifier(c),
+        0,
+        "6 cards total is below the 20 threshold, so no blade+2"
     );
 }
 

@@ -230,6 +230,8 @@ Helpers (in `tests/helpers/assertions.rs`):
 | `assert_card_score(id, n)` | 「スコアN以下/以上」 live filters |
 | `assert_same_card_name(a, b, ctx)` | two instances share one printed name ( supplementing / 同じ名前) |
 | `assert_distinct_card_names(a, b, ctx)` | 「カード名の異なる」 — two genuinely different cards |
+| `assert_card_in_group(id, group, ctx)` | a group filter (`『Aqours』`, `『虹ヶ咲』`, …) — reads the SAME matcher the ability does |
+| `assert_all_in_group(&[ids], group, ctx)` | every member of a fixture set is in one group |
 | `assert_energy_untouched_after_refusal(n, ctx)` | a refused action spent nothing |
 | `assert_use_not_recorded(id, ab, ctx)` | a refusal did not consume the ターンN回 use |
 
@@ -237,6 +239,43 @@ Helpers (in `tests/helpers/assertions.rs`):
 `assert_card_identity`: a *name* comparison is what a supplementing or
 「名前が異なる」 condition actually reads, and it catches a fixture that stages
 the same character twice.
+
+**`name`, `unit` and `series` — three different things, and abilities use more
+than one.** Measured over all 2526 cards in `cards.json`:
+
+| field | present on | holds |
+|---|---|---|
+| `name` | 2526 | the printed name: the CHARACTER name for members (高坂 穂乃果, 南 ことり, 唐 可可), the SONG title for lives (START:DASH!!, Poppin' Up!) |
+| `unit` | 2125 | the group: 5yncri5e!, QU4RTZ, A・ZU・NA, CatChu!, KALEIDOSCORE, GuiltyKiss, Printemps, CYaRon！, EdelNote, スリーズブ케, DOLLCHESTRA, みらくらぱーく！ … |
+| `series` | 2450 | the set: ラブライブ！スーパースター!!, …虹ヶ咲学園スクールアイドル同好会, …サンシャイン!!, …蓮ノ空女学院スクールアイドルクラブ, ラブライブ！ |
+| `group`, `group_name` | **0 — the columns do not exist** | — |
+
+Consequences for a fixture:
+
+- `unit` is sparsely populated (401 cards have none) and **lives often have no
+  `unit` at all** (73 of 291 do). So `unit` is not a "is this card in a group"
+  test on its own. Two cards also carry a `series` with embedded newlines
+  joining several sets, so don't hand-compare `series` strings either.
+- 「『Aqours』のメンバー」 in ability text has **no `group` column to read**. The
+  engine resolves it with `card_matches_group_str`, which consults `unit`, the
+  `group` field (absent), card-name fragments, and `series`. Two cards' `unit`
+  values differ only by a full-width vs half-width `！` (みらくらぱーく! vs
+  みらくらぱーく！), which is why the matcher is not a plain string compare.
+- So pin group fixtures with `assert_card_in_group` / `assert_all_in_group`,
+  which go through that same matcher, rather than reading `unit` in a test.
+- For a **name** condition (补充, 「名前が異なる」, 「同じ名前」) use
+  `assert_same_card_name` / `assert_distinct_card_names`. They read `name`, which
+  is what the engine's `normalize_name(&card.name)` reads. Because a live's
+  `name` is its song title, a "different name" fixture must use two different
+  SONGS, not two printings of one song; and three members of one group are
+  usually three different characters, so a 「3人」 fixture must pin group
+  membership and must NOT also assert a shared name.
+
+A frequent trap: three members of ONE group are usually three DIFFERENT
+characters, so a fixture meant to test 「3人」 must pin group membership
+(`assert_all_in_group`) and must not also assert a shared name — asserting
+"three μ members share a name" is a claim about a supplementing fixture, and
+`assert_same_card_name` will correctly reject it.
 
 The `unresolvable_card_id` section of `TEST_QUALITY.md` lists any `game.id("…")`
 literal that names no card at all. It should stay at 0.
@@ -670,7 +709,17 @@ Also, `execute_select()` had a strict check `available < count → skip` that fi
 
 ### Card group matching depends on series
 
-`cards.json` has `group_name: null` for all cards. Group matching works through `card_matches_group_str` which checks `unit`, `group`, card name fragments, and **series** via `card_series_matches_group`. For example, `PL!N-sd1-010-SD` has series `"ラブライブ！虹ヶ咲学園スクールアイドル同好会"` which matches group `"虹ヶ咲"`.
+There is no `group` or `group_name` column in `cards.json` at all (0 of 2526
+cards). Group matching works through `card_matches_group_str`, which checks
+`unit` (present on 2125 cards), the absent `group` field, card-name fragments,
+and **series** via `card_series_matches_group`. For example, `PL!N-sd1-010-SD` has
+series `"ラブライブ！虹ヶ咲学園スクールアイドル同好会"` which matches group `"虹ヶ咲"`.
+
+`unit` is not sufficient on its own: it is missing from 401 cards, and most
+lives have none (only 73 of 291 carry one), so a group fixture must be pinned
+with `assert_card_in_group` / `assert_all_in_group` — which go through that same
+matcher — rather than by reading `unit`. See the field table under
+"Card identity: always pin the print".
 
 ### `select_indices` behavior for non-stage zones
 

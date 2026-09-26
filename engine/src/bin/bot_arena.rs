@@ -24,6 +24,23 @@ use std::sync::Arc;
 
 type ArenaResult<T> = Result<T, Box<dyn std::error::Error>>;
 
+/// How many turns of the development curve to report. Section 1 puts most
+/// games between T5 and T8, and calls anything past T10 a sign that both
+/// sides are failing checks rather than playing an archetype.
+const CURVE_TURNS: usize = 11;
+
+/// Total printed stage cost: the guides' own development metric (section 1,
+/// "DERIVED QUANTIONS" / S1 cost curve).
+fn stage_cost(p: &rabuka_engine::player::Player, db: &CardDatabase) -> i32 {
+    p.stage
+        .stage
+        .iter()
+        .filter(|&&c| c >= 0)
+        .filter_map(|&c| db.get_card(c).and_then(|card| card.cost))
+        .map(i32::from)
+        .sum()
+}
+
 struct Options {
     p1: BotKind,
     p2: BotKind,
@@ -175,6 +192,24 @@ struct GameOutcome {
     /// +1 P1 reached 3 first, -1 P2 did, 0 neither reached 3 (draw/stall).
     result: i8,
     turns: u8,
+    /// Live phases each side actually took. The denominator of the guides'
+    /// pace metric (section 1): placements per live phase.
+    live_p1: u16,
+    live_p2: u16,
+}
+
+impl GameOutcome {
+    /// Placements per live phase, the guide's ~1.0-from-T2 target (section 1).
+    /// `None` when the side never took a live phase, which would make the rate
+    /// undefined rather than zero.
+    fn pace(&self, side: usize) -> Option<f64> {
+        let (placed, phases) = if side == 0 {
+            (self.z1 as f64, self.live_p1)
+        } else {
+            (self.z2 as f64, self.live_p2)
+        };
+        (phases > 0).then(|| placed / f64::from(phases))
+    }
 }
 
 fn classify(z1: usize, z2: usize) -> i8 {
@@ -239,16 +274,19 @@ fn write_outcomes(path: &PathBuf, rows: &[GameOutcome]) -> ArenaResult<()> {
             std::fs::create_dir_all(parent)?;
         }
     }
-    let mut out = String::from("game,engine_seed,success_p1,success_p2,result,turns\n");
+    let mut out =
+        String::from("game,engine_seed,success_p1,success_p2,result,turns,live_p1,live_p2\n");
     for (i, r) in rows.iter().enumerate() {
         out.push_str(&format!(
-            "{},{},{},{},{},{}\n",
+            "{},{},{},{},{},{},{},{}\n",
             i + 1,
             r.engine_seed,
             r.z1,
             r.z2,
             r.result,
-            r.turns
+            r.turns,
+            r.live_p1,
+            r.live_p2
         ));
     }
     std::fs::write(path, out)?;
@@ -273,6 +311,10 @@ fn read_outcomes(path: &PathBuf) -> ArenaResult<Vec<GameOutcome>> {
             z2: f[3].parse()?,
             result: f[4].parse()?,
             turns: f[5].parse()?,
+            // Tolerate logs written before these columns existed, so a
+            // baseline from an older run still pairs instead of erroring.
+            live_p1: f.get(6).and_then(|v| v.parse().ok()).unwrap_or(0),
+            live_p2: f.get(7).and_then(|v| v.parse().ok()).unwrap_or(0),
         });
     }
     Ok(rows)
@@ -361,6 +403,88 @@ fn report_paired(baseline: &[GameOutcome], candidate: &[GameOutcome], base_label
         / joined.max(1) as f64;
     println!("  decisive-rate swing: {:+.2} pp", swing);
     println!("  exact McNemar two-sided p = {p:.5}");
+
+    // The pace metric, paired. Win rate is a race outcome and hides why; the
+    // guides' own instrument is placements per live phase (section 1), and it
+    // moves several times more per game than the win/loss tally does.
+    //
+    // Reported for BOTH sides. It is only informative for a side whose policy
+    // actually changed: in a v8-vs-v7 matchup the P2 delta is pinned near zero
+    // by construction, because v7 played exactly the same games.
+    for (side, label) in [(0usize, "P1"), (1usize, "P2")] {
+        // (baseline place, baseline phases, candidate place, candidate phases)
+        let mut pairs: Vec<(f64, f64, f64, f64)> = Vec::new();
+        for c in candidate {
+            let Some(b) = by_seed.get(&c.engine_seed) else {
+                continue;
+            };
+            let pick = |g: &GameOutcome| -> (f64, f64) {
+                if side == 0 {
+                    (f64::from(g.z1), f64::from(g.live_p1))
+                } else {
+                    (f64::from(g.z2), f64::from(g.live_p2))
+                }
+            };
+            let (bp, bq) = pick(b);
+            let (cp, cq) = pick(c);
+            if bq > 0.0 && cq > 0.0 {
+                pairs.push((bp, bq, cp, cq));
+            }
+        }
+        if pairs.len() < 2 {
+            continue;
+        }
+        let pooled = |side_index: usize| -> f64 {
+            let (place_at, phase_at) = if side_index == 0 { (0, 1) } else { (2, 3) };
+            let place: f64 = pairs
+                .iter()
+                .map(|p| if place_at == 0 { p.0 } else { p.2 })
+                .sum();
+            let phase: f64 = pairs
+                .iter()
+                .map(|p| if phase_at == 1 { p.1 } else { p.3 })
+                .sum();
+            if phase <= 0.0 {
+                0.0
+            } else {
+                place / phase
+            }
+        };
+        let base_rate = pooled(0);
+        let cand_rate = pooled(1);
+        let observed = cand_rate - base_rate;
+
+        // Paired bootstrap over games. Deterministic LCG so the interval is
+        // reproducible: these numbers gate ship decisions, so an interval that
+        // moved between runs would be worse than no interval at all.
+        let n = pairs.len();
+        let mut deltas: Vec<f64> = Vec::with_capacity(2000);
+        let mut rng = 0x2545_F491_4F6C_DD1Du64;
+        for _ in 0..2000 {
+            let (mut bp, mut bq, mut cp, mut cq) = (0.0f64, 0.0f64, 0.0f64, 0.0f64);
+            for _ in 0..n {
+                rng ^= rng >> 12;
+                rng ^= rng << 25;
+                rng ^= rng >> 27;
+                let p = pairs[(rng % n as u64) as usize];
+                bp += p.0;
+                bq += p.1;
+                cp += p.2;
+                cq += p.3;
+            }
+            deltas.push(
+                (if cq > 0.0 { cp / cq } else { 0.0 }) - (if bq > 0.0 { bp / bq } else { 0.0 }),
+            );
+        }
+        deltas.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
+        let (lo, hi) = (deltas[deltas.len() / 40], deltas[deltas.len() * 39 / 40]);
+        let significant = lo > 0.0 || hi < 0.0;
+        println!(
+            "  pace ({label}) baseline {base_rate:.4} -> candidate {cand_rate:.4}  delta {observed:+.4} [{lo:+.4}, {hi:+.4}]{}",
+            if significant { "  SIGNIFICANT" } else { "" }
+        );
+    }
+
     println!(
         "  VERDICT: {}",
         if p < 0.05 {
@@ -372,6 +496,91 @@ fn report_paired(baseline: &[GameOutcome], candidate: &[GameOutcome], base_label
         } else {
             "no significant difference (do not ship a change on this evidence)"
         }
+    );
+}
+
+/// The guides' own definition of a healthy bot (docs/BOT_STRATEGY.md section 1),
+/// reported next to the win rate so a change can be judged on the quantity the
+/// doctrine actually cares about:
+///
+/// - ~1 placement per live phase per side from T2 on
+/// - a rate of ~0.33 or below is "a defect, not an archetype"
+/// - median game length T5-T8, hard band 5-9
+fn report_health(
+    rows: &[GameOutcome],
+    live_p1: u64,
+    live_p2: u64,
+    curve_p1: &[i32; CURVE_TURNS],
+    curve_p2: &[i32; CURVE_TURNS],
+    curve_p1_n: &[u64; CURVE_TURNS],
+    curve_p2_n: &[u64; CURVE_TURNS],
+    end_cost: (i64, i64),
+) {
+    if rows.is_empty() {
+        return;
+    }
+    let placed_p1: u64 = rows.iter().map(|r| u64::from(r.z1)).sum();
+    let placed_p2: u64 = rows.iter().map(|r| u64::from(r.z2)).sum();
+    let rate = |placed: u64, phases: u64| {
+        if phases == 0 {
+            0.0
+        } else {
+            placed as f64 / phases as f64
+        }
+    };
+    let p1_rate = rate(placed_p1, live_p1);
+    let p2_rate = rate(placed_p2, live_p2);
+
+    let mut turns: Vec<u64> = rows.iter().map(|r| u64::from(r.turns)).collect();
+    turns.sort_unstable();
+    let q = |frac: f64| -> u64 {
+        let idx = ((turns.len() as f64 - 1.0) * frac).round() as usize;
+        turns[idx.min(turns.len() - 1)]
+    };
+    let (median, p90, max) = (q(0.5), q(0.9), *turns.last().unwrap_or(&0));
+
+    let flag = |r: f64| if r > 0.0 && r < 0.33 { " <-- DEFECT" } else { "" };
+    println!("GUIDE HEALTH METRICS (docs/BOT_STRATEGY.md section 1)");
+    println!(
+        "  placements per live phase: P1 {p1_rate:.3}{} | P2 {p2_rate:.3}{}   (target ~1.0 from T2; <=0.33 is a defect)",
+        flag(p1_rate),
+        flag(p2_rate)
+    );
+    println!(
+        "  game length: median T{median} | p90 T{p90} | max T{max}   (target median T5-T8, hard band 5-9)"
+    );
+    if median > 9 {
+        println!("    <-- median above the hard band: games are running long");
+    } else if median < 5 {
+        println!("    <-- median below the band: games may be ending before development matters");
+    }
+
+    // The development curve itself, averaged over games. Section 1 gives the
+    // reference points (T1 about 4, T2 about 9, T3 about 13). A bot that wins
+    // while trailing this curve is winning on the other seat's mistakes, which
+    // is the trap that made v6 look like a 76% improvement.
+    //
+    // Bucket N is the board ENTERING turn N, which is the board turn N-1 built.
+    // So the guide's T1=4 line is bucket T2, T2=9 is bucket T3, and so on.
+    let avg = |sum: &[i32; CURVE_TURNS], n: &[u64; CURVE_TURNS]| -> Vec<String> {
+        (1..CURVE_TURNS)
+            .map(|t| {
+                if n[t] == 0 {
+                    format!("T{t}  -")
+                } else {
+                    format!("T{t} {:>2.1}", sum[t] as f64 / n[t] as f64)
+                }
+            })
+            .collect()
+    };
+    println!("  avg stage cost ENTERING each turn (guide board after Tn-1: T1~4, T2~9, T3~13)");
+    println!("    P1 {}", avg(curve_p1, curve_p1_n).join(" "));
+    println!("    P2 {}", avg(curve_p2, curve_p2_n).join(" "));
+    let games = rows.len().max(1) as f64;
+    println!(
+        "  avg FINAL stage cost: P1 {:.1} | P2 {:.1}",
+        end_cost.0 as f64 / games,
+        end_cost.1 as f64 / games
     );
 }
 
@@ -1220,6 +1429,22 @@ fn main() -> ArenaResult<()> {
     let mut _main_confirms = 0u64;
     let mut live_decisions = 0u64;
     let mut live_folds = 0u64;
+    // Per-side live phases, for the guides' own pace metric: section 1 expects
+    // ~1 placement per live phase per side from T2 on, and calls a rate of
+    // ~0.33 "a defect, not an archetype". This is the instrument the project
+    // never had - win rate is a race outcome and hides the actual bottleneck.
+    let mut live_phases_p1 = 0u64;
+    let mut live_phases_p2 = 0u64;
+    // Per-turn development curve, the guides' T1=4 / T2=9 / T3=13 metric.
+    let mut curve_p1 = [0i32; CURVE_TURNS];
+    let mut curve_p2 = [0i32; CURVE_TURNS];
+    let mut curve_p1_n = [0u64; CURVE_TURNS];
+    let mut curve_p2_n = [0u64; CURVE_TURNS];
+    // End-of-game stage cost. A sanity check on the per-turn curve above: if
+    // this is a real number but the curve reads zero, the per-turn bucketing
+    // is wrong, not the bots.
+    let mut end_cost_p1 = 0i64;
+    let mut end_cost_p2 = 0i64;
     let mut main_phase_count = 0u64;
     let mut empty_main_count = 0u64;
     let t0 = std::time::Instant::now();
@@ -1266,6 +1491,12 @@ fn main() -> ArenaResult<()> {
         let plan_p1 = policy_call(|| strategy_v3::V3Plan::detect(&gs, 0, &db));
         let plan_p2 = policy_call(|| strategy_v3::V3Plan::detect(&gs, 1, &db));
         let mut last_turn = 0u8;
+        // Per-GAME live phase counts. These must be per game, not the outer
+        // run totals: recording the running total would make the paired pace
+        // metric meaningless (a cumulative denominator against a per-game
+        // numerator reads as ~0).
+        let mut game_live_p1 = 0u64;
+        let mut game_live_p2 = 0u64;
         let mut stuck = 0u32;
         // Live-phase telemetry: snapshot at every phase change so transcripts
         // show WHO set WHAT and whether checks passed.
@@ -1338,6 +1569,29 @@ fn main() -> ArenaResult<()> {
             } else {
                 stuck = 0;
                 last_turn = gs.turn_number;
+                // Guide development curve (section 1: T1=4, T2=9, T3=13). We
+                // sample once per turn, at the first iteration of that turn,
+                // so this is the board ENTERING turn N - which is the board
+                // the previous turn built, i.e. the guide's T(N-1) line.
+                // Summed (not maxed) across games so the report is a mean;
+                // an earlier max/count pairing silently printed max/games and
+                // read as a flat zero curve.
+                let t = usize::from(gs.turn_number);
+                if games == 1 && std::env::var("CURVE_DEBUG").is_ok() {
+                    eprintln!(
+                        "CURVE turn={} phase={:?} cost_p1={} cost_p2={}",
+                        gs.turn_number,
+                        gs.current_phase,
+                        stage_cost(&gs.player1, &db),
+                        stage_cost(&gs.player2, &db),
+                    );
+                }
+                if t < CURVE_TURNS {
+                    curve_p1[t] += stage_cost(&gs.player1, &db);
+                    curve_p2[t] += stage_cost(&gs.player2, &db);
+                    curve_p1_n[t] += 1;
+                    curve_p2_n[t] += 1;
+                }
                 if logs {
                     timeline.push(format!(
                         "TIMELINE t{} succ {}-{} hand {}({}L)/{}({}L) en {}/{}",
@@ -1491,6 +1745,11 @@ fn main() -> ArenaResult<()> {
                 );
                 if a.action_type == rabuka_engine::game_setup::ActionType::ConfirmLiveCardSet {
                     live_decisions += 1;
+                    if policy_is_p1 {
+                        game_live_p1 += 1;
+                    } else {
+                        game_live_p2 += 1;
+                    }
                     if gs.live_card_selected_indices.is_empty() {
                         live_folds += 1;
                     }
@@ -1611,6 +1870,10 @@ fn main() -> ArenaResult<()> {
 
         let z1 = gs.player1.success_live_card_zone.cards.len();
         let z2 = gs.player2.success_live_card_zone.cards.len();
+        live_phases_p1 += game_live_p1;
+        live_phases_p2 += game_live_p2;
+        end_cost_p1 += i64::from(stage_cost(&gs.player1, &db));
+        end_cost_p2 += i64::from(stage_cost(&gs.player2, &db));
         if gs.game_result != GameResult::Ongoing {
             end_reason = "game_result";
         }
@@ -1648,6 +1911,8 @@ fn main() -> ArenaResult<()> {
             z2: z2.min(255) as u8,
             result: classify(z1, z2),
             turns: gs.turn_number.min(255),
+            live_p1: game_live_p1.min(u16::MAX as u64) as u16,
+            live_p2: game_live_p2.min(u16::MAX as u64) as u16,
         });
 
         if logs {
@@ -1758,6 +2023,16 @@ fn main() -> ArenaResult<()> {
         live_folds,
         live_decisions,
         live_fold_rate * 100.0,
+    );
+    report_health(
+        &outcome_rows,
+        live_phases_p1,
+        live_phases_p2,
+        &curve_p1,
+        &curve_p2,
+        &curve_p1_n,
+        &curve_p2_n,
+        (end_cost_p1, end_cost_p2),
     );
     if let Some(path) = &options.outcomes {
         write_outcomes(path, &outcome_rows)?;
@@ -1878,6 +2153,29 @@ mod tests {
             None
         )
         .is_ok());
+    }
+
+    /// The guide's pace metric: placements divided by live phases actually
+    /// taken. A side that never took a live phase has an undefined rate, not
+    /// a zero rate - conflating them would make a folded bot look "slow"
+    /// instead of "absent", which is the opposite diagnosis.
+    #[test]
+    fn pace_is_placements_over_live_phases_and_undefined_when_absent() {
+        let g = |z, lp| GameOutcome {
+            engine_seed: 1,
+            z1: z,
+            z2: 0,
+            result: 1,
+            turns: 6,
+            live_p1: lp,
+            live_p2: 0,
+        };
+        assert_eq!(g(3, 3).pace(0), Some(1.0), "the guide's ~1.0 target");
+        assert_eq!(g(1, 3).pace(0), Some(1.0 / 3.0), "the ~0.33 defect band");
+        assert_eq!(g(3, 1).pace(0), Some(3.0), "multiple placements per phase is legal");
+        assert_eq!(g(0, 4).pace(0), Some(0.0), "phases but no placement is a real zero");
+        assert_eq!(g(0, 0).pace(0), None, "no phase means undefined, not zero");
+        assert_eq!(g(3, 3).pace(1), None, "P2 took no phases");
     }
 
     fn args(values: &[&str]) -> Vec<String> {

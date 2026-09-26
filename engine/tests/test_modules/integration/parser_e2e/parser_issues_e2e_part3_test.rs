@@ -767,20 +767,74 @@ fn q206_waited_emma_reduces_baton_cost_to_fifteen() {
 // Multi-part IF-THEN: 3 independent checks for blade.
 // ====================================================================
 
+/// Heart01..heart06 icons a card PRINTS (its own `base_heart`), which is what
+/// ミア・テイラー's 登場 compares: 「そのメンバーが持つハートと、このメンバーが
+/// 持つハートの中に同じ色のハートがある場合」.
+fn printed_notes(game: &TestGame, card_id: i16) -> Vec<(rabuka_engine::core::card::HeartColor, u8)> {
+    let card = game.db.get_card(card_id).expect("card is in the database");
+    let hearts = card
+        .base_heart
+        .as_ref()
+        .unwrap_or_else(|| panic!("{} prints hearts", card.card_no));
+    hearts
+        .hearts
+        .iter()
+        .filter(|(color, count)| *count > 0 && (1..=6).contains(&color.index()))
+        .map(|(color, count)| (*color, *count))
+        .collect()
+}
+
+/// Blade ミア's 登場 grants for one chosen member: one per PAIRED heart icon —
+/// for each colour, min(mia's count, the target's count). Derived from card
+/// data, so a data change shows up as a failing number instead of passing a
+/// `>= 0` (which is true of every blade modifier in the game).
+///
+/// Note the card's second sentence extends the same treatment to members with
+/// an equal COST and to an equal printed blade count; those clauses are about
+/// OTHER members on the opponent's stage, and this fixture stages exactly one,
+/// so the heart pairing is the whole story here.
+fn expected_shared_color_blade(game: &TestGame, mia: i16, target: i16) -> usize {
+    let mine = printed_notes(game, mia);
+    let theirs = printed_notes(game, target);
+    mine.iter()
+        .map(|(color, count)| {
+            let matched = theirs
+                .iter()
+                .find(|(c, _)| c == color)
+                .map(|(_, n)| *n)
+                .unwrap_or(0);
+            std::cmp::min(*count as usize, matched as usize)
+        })
+        .sum()
+}
+
 #[test]
 fn issue13_mia_three_conditional_blade_checks() {
     let db = load_real_database();
     let mut game = TestGame::new(db);
     let mia = game.id("PL!N-bp3-011-R");
-    let opp = game.id("PL!N-bp4-001-R");
+    // The target must actually share a heart colour with ミア, otherwise the
+    // printed condition is false and the test proves nothing. Picked from the
+    // card data rather than assumed.
+    let target_no = ["PL!N-bp4-001-R", "PL!N-sd1-010-SD", "PL!-sd1-010-SD", "PL!S-sd1-001-SD"]
+        .into_iter()
+        .find(|no| {
+            let id = card_id(&game.db, no);
+            expected_shared_color_blade(&game, mia, id) > 0
+        })
+        .expect("a member sharing a heart colour with ミア・テイラー");
+    let target = game.id(target_no);
     let filler = game.id("PL!-sd1-010-SD");
 
-    game.state.player2.stage.stage[0] = opp;
+    game.state.player2.stage.stage[0] = target;
     game.state.player1.hand.cards.push(mia);
     game.state.player1.hand.cards.push(filler);
     game.give_energy(7);
     fill_decks(&mut game);
 
+    let expected_blade = expected_shared_color_blade(&game, mia, target);
+    eprintln!("PROBE mia notes={:?}", printed_notes(&game, mia));
+    eprintln!("PROBE target({target_no}) notes={:?}", printed_notes(&game, target));
     game.play_to_stage(mia, MemberArea::Center);
 
     while game.has_pending_choice() {
@@ -791,8 +845,14 @@ fn issue13_mia_three_conditional_blade_checks() {
         }
     }
 
-    let blade = game.state.mods.get_blade_modifier(mia);
-    assert!(blade >= 0, "13: Mia blade >= 0 (got {})", blade);
+    // 「同じ色のハートがある場合、ブレードを得る」 — the exact number of shared
+    // colours, not ">= 0" (which is true for every blade modifier in the game).
+    assert_eq!(
+        game.state.mods.get_blade_modifier(mia),
+        expected_blade as i32,
+        "13: ミア gains one blade per heart colour shared with the chosen \
+         opponent member ({target_no})"
+    );
 }
 
 // ====================================================================

@@ -87,8 +87,8 @@ fn draw_value(gs: &GameState, me: u8, db: &CardDatabase) -> f64 {
 /// curve pieces; here every card is priced by the same check model the live
 /// set uses, so the comparison is in the same units as everything else.
 fn junk_keep_value(
-    gs: &GameState,
-    me: u8,
+    _gs: &GameState,
+    _me: u8,
     db: &CardDatabase,
     cid: i16,
     ctx: &HandContext,

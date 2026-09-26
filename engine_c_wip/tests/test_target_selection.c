@@ -82,6 +82,35 @@ static void target_count_1_gain_resource_chooses_one_of_many(void)
           "Exactly one member got the full +4 heart06 buff");
 }
 
+/* Port of engine/tests/test_modules/rules/targeting/target_selection_test.rs:67-97
+   (target_selection_distinguishes_repeated_card_instances). The same card number
+   appears twice on stage; picking option 1 must buff the RIGHT-side instance only. */
+static void target_selection_distinguishes_repeated_card_instances(void)
+{
+    TestGame tg;
+    test_game_new(&tg);
+    int target_a = test_id(&tg, "PL!N-PR-003-PR");
+    int target_b = test_new_id(&tg, "PL!N-PR-003-PR");
+    int stellar = test_id(&tg, "PL!N-pb1-039-L");
+    tg.state.p[0].stage[0] = target_a;
+    tg.state.p[0].stage[1] = RB_EMPTY_SLOT;
+    tg.state.p[0].stage[2] = target_b;
+    test_add_to_live(&tg, stellar);
+    setup_live_phase_with_hearts(&tg);
+
+    rb_trigger_live_start(&tg.state, 0);
+    rb_process_pending_auto_abilities(&tg.state);
+    CHECK(test_has_pending_choice(&tg), "target-selection prompt expected");
+    int pick[] = {1};
+    test_select_indices(&tg, pick, 1);
+    rb_process_pending_auto_abilities(&tg.state);
+
+    CHECK_EQ(test_get_heart_modifier(&tg, target_a, RB_HEART_PURPLE), 0,
+             "unpicked repeated instance gets no heart06");
+    CHECK_EQ(test_get_heart_modifier(&tg, target_b, RB_HEART_PURPLE), 4,
+             "picked repeated instance gets the full +4 heart06");
+}
+
 static void distinct_card_name_prevents_same_card_twice(void)
 {
     TestGame tg;
@@ -141,6 +170,7 @@ int main(void)
         return 1;
     }
     target_count_1_gain_resource_chooses_one_of_many();
+    target_selection_distinguishes_repeated_card_instances();
     distinct_card_name_prevents_same_card_twice();
     target_count_on_draw_until_count();
     rb_unload();

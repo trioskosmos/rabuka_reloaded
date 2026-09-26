@@ -533,12 +533,71 @@ int rb_move_resolve_from_looked_at(GameState *g, int use_p2, int *out_ids, int m
     return 0;
 }
 
-/* ── resolve_from_under_member ── */
+/* ── resolve_from_under_member ──
+   Rust: engine/src/ability/move_cards.rs:1469-1580 (AbilityResolver::resolve_from_under_member).
+   Collects the stage slots whose under-cards contain at least one energy card; drains
+   the only candidate straight to the energy zone, or presents the stage SelectCard
+   choice when several slots qualify (or the effect is optional, so a single candidate
+   must still be skippable). */
 int rb_move_resolve_from_under_member(GameState *g, int actor, AbilityEffect *e, int use_p2,
                                        int count, int *out_ids, int max) {
     if (!g || !out_ids) return 0;
     int pl = use_p2 ? 1 : actor;
-    return rb_drain_under_cards_to_energy_zone(g, "energy_deck", -1);
+    if (pl < 0 || pl > 1) pl = actor;
+    RbPlayer *P = &g->p[pl];
+    const char *target = (e && e->target && e->target[0]) ? e->target : "self";
+    int is_optional = e && e->is_optional;
+
+    int candidates[RB_STAGE_SIZE];
+    int n_cand = 0;
+    for (int i = 0; i < RB_STAGE_SIZE; i++) {
+        RbBag *under = &P->under_cards[i];
+        if (under->n == 0) continue;
+        int has_energy = 0;
+        for (int k = 0; k < under->n; k++)
+            if (rb_card_is_energy(under->cards[k])) { has_energy = 1; break; }
+        if (has_energy) candidates[n_cand++] = i;
+    }
+    if (n_cand == 0) return 0;
+
+    int chosen = -1;
+    if (n_cand == 1 && !is_optional) {
+        chosen = candidates[0];
+    } else {
+        /* 「Choose a member whose under energies to move」 — same Choice shape as the
+           under-member host prompt in place_card_with_stage_choice. */
+        rb_emit_choice(g, actor, RB_CHOICE_SELECT_CARD, "stage", "member_card",
+                       1, is_optional, NULL);
+        rb_queue_pause_for_choice(g, &g->queue.pending);
+        rb_choice_set_description(&g->queue.pending,
+                                  "Choose a member whose under energies to move");
+        rb_choice_set_route(&g->queue.pending, RB_ROUTE_SELECT_CARDS);
+        g->queue.pending.n_filtered_indices = n_cand;
+        for (int i = 0; i < n_cand; i++) g->queue.pending.filtered_indices[i] = candidates[i];
+        strncpy(g->queue.pending.target_player_id, target,
+                sizeof(g->queue.pending.target_player_id) - 1);
+        g->queue.resume_mode = 1;
+        g->queue.resume_actor = actor;
+        g->queue.resume_draw_target = pl;
+        return 0;
+    }
+    if (chosen < 0) return 0;
+
+    int moved[RB_MAX_ZONE];
+    int n_moved = 0;
+    RbBag *under = &P->under_cards[chosen];
+    for (int k = 0; k < under->n && n_moved < RB_MAX_ZONE; k++)
+        moved[n_moved++] = under->cards[k];
+    /* Resolve explicitly: "self" maps to player 1 in this port, so name `pl` directly. */
+    if (rb_drain_under_cards_to_energy_zone(g, pl == 0 ? "player1" : "player2", chosen) <= 0)
+        return 0;
+    int n_out = 0;
+    for (int i = 0; i < n_moved && n_out < max; i++) {
+        out_ids[n_out] = moved[i];
+        mc_record_movement(g, moved[i]);
+        n_out++;
+    }
+    return n_out;
 }
 
 /* ── take_cards_from_standard_zone ── */
@@ -911,9 +970,11 @@ int rb_move_place_card_with_stage_choice(
         if (t >= 0) pl = t;
     }
     RbPlayer *P = &g->p[pl];
-    if (rb_move_maybe_prompt_success_replacement(g, pl, card_id, destination,
-                                                  player_target))
-        return 1;
+    /* Rust place_card_with_stage_choice (engine/src/ability/move_cards/placement.rs:57-241)
+       performs NO success-zone replacement check — maybe_prompt_success_replacement is a
+       separate one-shot gate owned by execute_move_cards / execute_selected_cards_from_zone
+       (placement.rs:249). Calling it here too could emit a second replacement choice for a
+       success-zone destination routed through the stage placement path. */
     if (!strcmp(destination, "empty_area") || !strcmp(destination, "stage")) {
         int empty_slots[RB_STAGE_SIZE], n_empty = 0;
         for (int i = 0; i < RB_STAGE_SIZE; i++)

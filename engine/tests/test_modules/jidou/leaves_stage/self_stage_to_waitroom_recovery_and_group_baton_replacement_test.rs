@@ -164,11 +164,20 @@ fn self_stage_to_waitroom_optional_discard_grants_member_heart05_and_blade() {
 
     let h05 = game.state.mods.get_heart_modifier(target, HeartColor::Heart05);
     let bl = game.state.mods.get_blade_modifier(target);
+    // 「自分のステージにいるメンバー1人は、heart05ブレードを得る」 — ONE member,
+    // ONE heart05, ONE blade. `>= 1` would also pass if the buff hit every
+    // member on stage or stacked per hand card.
+    assert_eq!(
+        h05, 1,
+        "村野さやか ab#0 grants exactly one heart05 to one stage member"
+    );
+    assert_eq!(
+        bl, 1,
+        "村野さやか ab#0 grants exactly one blade to one stage member"
+    );
     assert!(
-        h05 >= 1 && bl >= 1,
-        "村野さやか ab#0 should grant heart05+blade to a stage member (got h05={} blade={})",
-        h05,
-        bl
+        game.state.player1.stage.stage.contains(&target),
+        "the buffed member is still the one on stage"
     );
 }
 

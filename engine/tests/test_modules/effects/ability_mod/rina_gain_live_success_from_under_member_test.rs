@@ -150,53 +150,152 @@ fn rina_respects_cost_limit() {
     );
 }
 
-/// No cards under member: graceful empty result.
-#[test]
-fn rina_no_under_cards() {
-    let db = load_real_database();
-    let mut game = TestGame::new(db);
-
-    let rina = game.id("PL!N-PR-026-PR");
-    let filler = game.id("PL!-sd1-010-SD");
-
-    game.state.player1.stage.stage = [rina, filler, -1];
-    fill_decks(&mut game, filler);
-    game.give_energy(5);
-
-    game.pass();
-    game.pass();
-
-    let gained = game.state.gained_abilities.get(&rina);
-    assert!(
-        gained.is_none() || gained.unwrap().is_empty(),
-        "No abilities should be gained with no cards under member"
-    );
-}
-
-/// Rina not on stage: graceful skip.
-#[test]
-fn rina_not_on_stage() {
+/// Rina's 常時 is a per-stage-member scan, so a bare `is_none()` on the gain
+/// table cannot say WHICH branch produced the empty result — the scan not
+/// reaching her, the host not being on stage, the under-card not existing, and
+/// the under-card being filtered all look identical.
+///
+/// This runner exists so a negative can be read against its own control. Both
+/// runs share the copy source, the decks and the energy, and differ in exactly
+/// the one fixture detail named by the flag:
+///
+/// - `rina_on_stage` — whether Rina is the left-area host or a card in hand.
+/// - `ayumu_under_rina` — whether the eligible 虹ヶ咲 card sits under the host.
+///
+/// Two passes, as the rest of this file used, but stepped by name.
+fn rina_gain_run(rina_on_stage: bool, ayumu_under_rina: bool) -> (TestGame, i16, i16) {
     let db = load_real_database();
     let mut game = TestGame::new(db);
 
     let rina = game.id("PL!N-PR-026-PR");
     let ayumu = game.id("PL!N-bp4-001-R");
     let filler = game.id("PL!-sd1-010-SD");
+    game.assert_card_identity(rina, "PL!N-PR-026-PR");
+    game.assert_card_identity(ayumu, "PL!N-bp4-001-R");
+    // The copy source must be ELIGIBLE, or "nothing was gained" is true for a
+    // reason that has nothing to do with the gate under test: 虹ヶ咲, cost 2
+    // (under the コスト9以下 ceiling), and it really does print the
+    // ライブ成功時 that ab#1 copies.
+    game.assert_card_cost(ayumu, 2);
+    game.assert_card_in_group(ayumu, "A・ZU・NA", "the copy source is 虹ヶ咲");
+    let triggers: Vec<String> = game
+        .db
+        .get_card(ayumu)
+        .unwrap()
+        .resolved_abilities()
+        .filter_map(|a| a.triggers.as_ref().map(|t| t.to_string()))
+        .collect();
+    assert!(
+        triggers.iter().any(|t| t.contains("ライブ成功時")),
+        "precondition: the copy source must print a ライブ成功時, got {triggers:?}"
+    );
 
-    game.state.player1.hand.cards.push(rina);
-    game.state.player1.stage.stage = [filler, filler, -1];
-    game.state.player1.stage.under_cards[0].push(ayumu);
+    let host = if rina_on_stage { rina } else { filler };
+    game.state.player1.stage.stage = [host, filler, -1];
+    if !rina_on_stage {
+        game.state.player1.hand.cards.push(rina);
+    }
+    if ayumu_under_rina {
+        game.state.player1.stage.under_cards[0].push(ayumu);
+    }
 
     fill_decks(&mut game, filler);
     game.give_energy(5);
 
-    game.pass();
-    game.pass();
+    game.advance_to_phase(Phase::Energy);
+    (game, rina, ayumu)
+}
 
-    let gained = game.state.gained_abilities.get(&rina);
+/// No cards under member: the scan reaches Rina and copies nothing.
+///
+/// Previously this asserted only `gained.is_none() || is_empty()`, which stays
+/// green if the 常時 stops being evaluated at all. The control run is the same
+/// fixture with one eligible under-card added, so a regression that stops the
+/// scan now fails here rather than passing quietly.
+#[test]
+fn rina_no_under_cards() {
+    let (control, control_rina, _) = rina_gain_run(true, true);
     assert!(
-        gained.is_none() || gained.unwrap().is_empty(),
-        "No abilities should be gained when Rina is not on stage"
+        control
+            .state
+            .gained_abilities
+            .get(&control_rina)
+            .is_some_and(|list| !list.is_empty()),
+        "control: with an eligible under-card Rina MUST copy something, otherwise \
+         the negative run below proves nothing"
+    );
+
+    let (game, rina, _) = rina_gain_run(true, false);
+    assert!(
+        game.state.player1.stage.stage.contains(&rina),
+        "setup guard: Rina really is the on-stage host"
+    );
+    assert!(
+        game.state.player1.stage.under_cards[0].is_empty(),
+        "setup guard: the case under test is an EMPTY under-area, got {:?}",
+        game.state.player1.stage.under_cards[0]
+    );
+
+    // Two tables, not one: `gained_abilities` holds copied triggerless texts,
+    // `gained_card_abilities` the resolved Ability structs the trigger pipeline
+    // scans. Both empty says the 常時 ran and found nothing to copy.
+    assert_eq!(
+        game.state.gained_abilities.get(&rina),
+        None,
+        "an empty under-area must contribute no copied ability texts"
+    );
+    assert!(
+        !game.state.gained_card_abilities.contains_key(&rina),
+        "an empty under-area must contribute no runtime Ability structs (got {:?})",
+        game.state.gained_card_abilities.get(&rina)
+    );
+}
+
+/// Rina not on stage: an eligible under-card is present and still nothing is
+/// copied, because the scan is per stage member.
+///
+/// The old fixture put Ayumu under a filler member with Rina in hand, and
+/// asserted only that the table was empty — which is also what a fixture with no
+/// eligible under-card at all produces. Here the under-card is present and
+/// pinned eligible, so the empty table names the gate: the HOST must be on
+/// stage, not the source.
+#[test]
+fn rina_not_on_stage() {
+    let (control, control_rina, _) = rina_gain_run(true, true);
+    assert!(
+        control
+            .state
+            .gained_abilities
+            .get(&control_rina)
+            .is_some_and(|list| !list.is_empty()),
+        "control: Rina on stage with an eligible under-card MUST copy something"
+    );
+
+    let (game, rina, ayumu) = rina_gain_run(false, true);
+    assert!(
+        !game.state.player1.stage.stage.contains(&rina)
+            && !game.state.player2.stage.stage.contains(&rina),
+        "setup guard: Rina really is on nobody's stage"
+    );
+    assert!(
+        game.state.player1.hand.cards.contains(&rina),
+        "setup guard: Rina is in hand, not on stage"
+    );
+    assert!(
+        game.state.player1.stage.under_cards[0].contains(&ayumu),
+        "setup guard: an ELIGIBLE under-card is present, so the only reason \
+         nothing is copied is that its host is not on stage"
+    );
+
+    assert_eq!(
+        game.state.gained_abilities.get(&rina),
+        None,
+        "a card in hand must not gain abilities, even from an eligible under-card"
+    );
+    assert!(
+        !game.state.gained_card_abilities.contains_key(&rina),
+        "a card in hand must gain no runtime Ability structs (got {:?})",
+        game.state.gained_card_abilities.get(&rina)
     );
 }
 

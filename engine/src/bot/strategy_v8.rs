@@ -262,7 +262,7 @@ fn opening_value(
     for &cid in keep {
         opening.add_card(db, cid);
     }
-    for (n, &cid) in discarded.iter().enumerate() {
+    for (n, _cid) in discarded.iter().enumerate() {
         if let Some(drawn) = opening.deck.get(n).copied() {
             opening.redraw.push(drawn);
             opening.add_card(db, drawn);

@@ -218,6 +218,23 @@ static int gain_value(const AbilityEffect *e) {
     return e && e->count >= 0 ? e->count : 0;
 }
 
+/* Upsert a scalar extra on a live effect. vm.c's effect_set_extra is static
+   there, so mirror it here for the bindings this file installs (e.g. the
+   per-recipient `target_card` binding). `value` must outlive the effect. */
+static void s_set_extra(AbilityEffect *e, const char *key, const char *value) {
+    if (!e || !key || !value) return;
+    for (int i = 0; i < e->n_extra; i++) {
+        if (e->extra_k[i] && !strcmp(e->extra_k[i], key)) {
+            e->extra_v[i] = (char *)value;
+            return;
+        }
+    }
+    if (e->n_extra >= RB_MAX_EXTRA) return;
+    e->extra_k[e->n_extra] = (char *)key;
+    e->extra_v[e->n_extra] = (char *)value;
+    e->n_extra++;
+}
+
 static int gain_target(const GameState *g, int actor, const AbilityEffect *e) {
     const char *target_card = gain_extra(e, "target_card");
     if (target_card) return atoi(target_card);
@@ -355,72 +372,144 @@ void rb_invalidate_ability(GameState *g, int actor, AbilityEffect *e){
     if (synthetic_changed) rb_recalc_constants(g);
 }
 
+/* Mirror GameState::check_expired_effects (engine/src/core/game_state/
+   abilities.rs:2729) for the turn-rollover hook. Phase.c calls this right
+   after `g->turn++` at the Live -> Active transition, which is exactly where
+   Rust calls check_expired_effects (engine/src/turn/phases.rs:311).
+   At that point the live is over and the turn counter has advanced, so BOTH
+   live-scoped (LiveEnd/ThisLive/AsLongAs/Unless) and turn-scoped (ThisTurn)
+   durations are expired; Permanent never expires. The revert arms live in
+   rb_check_expired_effects (src/turn/triggers.c) — the same routine the
+   dedicated expiry tests drive — so delegate to it rather than re-deriving
+   the modifier arithmetic. */
 void rb_tick_gained(GameState *g){
-    (void)g;
+    if (!g) return;
+    rb_check_expired_effects(g, RB_TEMP_LIVE_END);
+    rb_check_expired_effects(g, RB_TEMP_TURN_END);
 }
 
-/* Mirror ability_effects.rs::execute_activate_ability. The common path is
-   source_card=="previous_selected": fire the matching-trigger ability of every
-   card in g->selected_cards (default trigger 登場/Debut). Fallback: fire the
-   activating card's own ability effect. */
-void rb_activate_ability_effect(GameState *g, int actor, AbilityEffect *e, int host_cid){
-    const char *source = NULL;
-    const char *trigger = NULL;
-    for(int i=0;i<e->n_extra;i++){
-        if(e->extra_k[i] && !strcmp(e->extra_k[i],"source_card")) source=e->extra_v[i];
-        else if(e->extra_k[i] && !strcmp(e->extra_k[i],"target_trigger")) trigger=e->extra_v[i];
-    }
-    if(!trigger && e->target && strstr(e->target,"登場")) trigger="登場";
+/* Mirror ability_effects.rs:141-227 execute_activate_ability.
 
-    int src_ids[RB_MAX_RECENTLY_MOVED]; int ns=0;
-    if(source && !strcmp(source,"previous_selected")){
-        for(int i=0;i<g->n_selected_cards && ns<RB_MAX_RECENTLY_MOVED;i++)
-            src_ids[ns++]=g->selected_cards[i];
+   "previous_selected" (emitted by the parser for 「そのカード／それらが持つ…能力を発動させる」)
+   fires EVERY selected card's ability whose trigger matches target_trigger.
+   With no target_trigger the fallback stores the ability text on the
+   activating card instead of firing a debut. */
+static void s_execute_activate_ability(GameState *g, int actor, AbilityEffect *e) {
+    if (!g || !e) return;
+    const char *source_card = gain_extra(e, "source_card");
+    const char *trigger = gain_extra(e, "target_trigger");
+    const char *ability_text = gain_extra(e, "ability_text");
+
+    /* Which cards' abilities are fired. */
+    int card_ids[RB_MAX_RECENTLY_MOVED];
+    int n_ids = 0;
+    if (source_card && !strcmp(source_card, "previous_selected")) {
+        for (int i = 0; i < g->n_selected_cards && n_ids < RB_MAX_RECENTLY_MOVED; i++)
+            card_ids[n_ids++] = g->selected_cards[i];
+    } else if (source_card && !strcmp(source_card, "cost_card")) {
+        if (g->n_recently_moved > 0)
+            card_ids[n_ids++] = g->recently_moved[g->n_recently_moved - 1];
     }
-    for(int i=0;i<ns;i++){
-        int cid=src_ids[i];
-        Card c; if(!rb_decode_card_by_index((uint32_t)cid,&c)) continue;
-        AbilityEffect *fx = (c.ability && c.ability->effect) ? c.ability->effect : NULL;
-        int match = fx && (!trigger || (c.ability->triggers && strstr(c.ability->triggers, trigger)));
-        if(match) rb_execute_effect_ex(g, actor, fx, cid);
-        rb_free_card(&c);
+
+    if (trigger && *trigger) {
+        /* Rust compares the FIRST '/'-separated component of the ability's
+           trigger string; rb_card_has_ability_trigger_for applies the same
+           trigger_text_matches normalisation. */
+        for (int i = 0; i < n_ids; i++) {
+            int cid = card_ids[i];
+            if (cid < 0) continue;
+            if (!rb_card_has_ability_trigger_for(g, cid, trigger)) continue;
+            /* Fire through the normal ability queue so the fired ability's own
+               cost is paid before its effect resolves (Q273). */
+            rb_trigger_debut(g, actor, cid);
+        }
+        return;
     }
-    if(ns==0){
-        /* Fallback: fire the activating card's own ability effect if present. */
-        int cid = host_cid;
-        if(cid < 0) for(int q=0;q<RB_STAGE_SIZE;q++) if(g->p[actor].stage[q]>=0){ cid=g->p[actor].stage[q]; break; }
-        if(cid>=0){
-            Card c; if(rb_decode_card_by_index((uint32_t)cid,&c)){
-                if(c.ability && c.ability->effect) rb_execute_effect_ex(g, actor, c.ability->effect, cid);
-                rb_free_card(&c);
+
+    /* Fallback: store the gained ability string on the activating card.
+       Rust pushes the string into GameState::gained_abilities
+       (HashMap<i16, Vec<String>>); the C port has no string map, so the
+       equivalent is a synthetic trigger-carrying gained Ability on the same
+       card — the same store gained_card_abilities uses, so every consumer
+       that clears/reads gained abilities sees it. */
+    if (g->activating_card >= 0) {
+        char buf[256];
+        const char *text = ability_text ? ability_text : "";
+        if (trigger && *trigger)
+            snprintf(buf, sizeof(buf), "%s_trigger:%s", text, trigger);
+        else
+            snprintf(buf, sizeof(buf), "%s", text);
+        Ability gained;
+        memset(&gained, 0, sizeof(gained));
+        gained.use_limit = -1;
+        gained.full_text = rb_strdup2(buf);
+        gained.triggerless_text = rb_strdup2(buf);
+        gained.triggers = (trigger && *trigger) ? rb_strdup2(trigger) : NULL;
+        if (rb_register_gained_ability(g, g->activating_card, &gained) < 0)
+            rb_free_ability(&gained);
+    }
+}
+
+void rb_activate_ability_effect(GameState *g, int actor, AbilityEffect *e, int host_cid){
+    (void)host_cid;
+    s_execute_activate_ability(g, actor, e);
+}
+
+/* Mirror ability_effects.rs:536-681 execute_gain_ability_from_source.
+   「このメンバーの下にあるカードから能力を得る」 COPIES each source card's
+   abilities onto the activating member (as synthetic gained abilities); it
+   does NOT execute the source's effect. Prior gains on the activating card
+   are cleared first, the under-card list is filtered by card_type /
+   cost_limit+operator / group_names, and trigger_filter (when present)
+   restricts which of the source card's abilities are copied. */
+static void s_gain_ability_from_source(GameState *g, int actor, AbilityEffect *e) {
+    if (!g || !e) return;
+    int cid = g->activating_card;
+    if (cid < 0) return;
+
+    /* Rust: gs.gained_abilities.remove(&activating_card) — drop the previous
+       copy set so a re-resolve does not stack duplicates. */
+    while (rb_card_num_gained_abilities(g, cid) > 0)
+        rb_remove_gained_ability(g, cid, 0);
+
+    RbPlayer *P = &g->p[actor];
+    int area = -1;
+    for (int q = 0; q < RB_STAGE_SIZE; q++) if (P->stage[q] == cid) { area = q; break; }
+    if (area < 0) return;
+
+    RbCardFilter filter;
+    memset(&filter, 0, sizeof(filter));
+    rb_effect_filter_subset(e, &filter);
+
+    for (int u = 0; u < P->under_cards[area].n; u++) {
+        int src = P->under_cards[area].cards[u];
+        if (src < 0) continue;
+        if (rb_count_matching_filter(&filter, &src, 1) == 0) continue;
+
+        int n_abilities = rb_card_num_abilities((uint32_t)src);
+        for (int i = 0; i < n_abilities; i++) {
+            Ability ability;
+            memset(&ability, 0, sizeof(ability));
+            if (!rb_decode_card_ability((uint32_t)src, i, &ability)) continue;
+
+            /* trigger_filter: keep the ability when ANY filter appears in (or
+               contains) its trigger string. */
+            int should_copy = 1;
+            const char *tf = gain_extra(e, "trigger_filter");
+            if (tf && *tf) {
+                should_copy = ability.triggers &&
+                              (strstr(ability.triggers, tf) || strstr(tf, ability.triggers));
             }
+            if (should_copy && rb_register_gained_ability(g, cid, &ability) < 0)
+                should_copy = 0;
+            rb_free_ability(&ability);
         }
     }
 }
 
-/* Mirror ability_effects.rs::execute_gain_ability_from_source. Copy the ability
-   effect of a matching source card (found under the activating card) onto the
-   activating card by executing that source's ability effect on the activating
-   card. Bounded: first matching under-card with the requested group filter. */
 void rb_gain_ability_from_source(GameState *g, int actor, AbilityEffect *e, int host_cid){
-    int cid = host_cid;
-    if(cid < 0) for(int q=0;q<RB_STAGE_SIZE;q++) if(g->p[actor].stage[q]>=0){ cid=g->p[actor].stage[q]; break; }
-    if(cid < 0) return;
-    const char *grp=NULL;
-    for(int i=0;i<e->n_extra;i++) if(e->extra_k[i] && !strcmp(e->extra_k[i],"group_names")) grp=e->extra_v[i];
-    RbPlayer *P=&g->p[actor];
-    int area=-1;
-    for(int q=0;q<RB_STAGE_SIZE;q++) if(P->stage[q]==cid){ area=q; break; }
-    if(area<0) return;
-    for(int u=0;u<P->under_cards[area].n;u++){
-        int src=P->under_cards[area].cards[u];
-        Card sc; if(!rb_decode_card_by_index((uint32_t)src,&sc)) continue;
-        int ok=1;
-        if(grp && !(sc.group_idx>=0 && rb_card_matches_group_str(src, grp))) ok=0;
-        if(ok && sc.ability && sc.ability->effect)
-            rb_execute_effect_ex(g, actor, sc.ability->effect, cid);
-        rb_free_card(&sc);
-    }
+    (void)host_cid;
+    s_gain_ability_from_source(g, actor, e);
 }
 
 /* Mirror ability_effects.rs::execute_set_card_identity_effect. When the
@@ -456,106 +545,220 @@ void rb_suppress_ability_trigger(GameState *g, int actor, AbilityEffect *e, int 
     g->n_prohibition++;
 }
 
-/* -- execute_gain_ability_effect -- */
+/* -- execute_gain_ability_effect (ability_effects.rs:13-121) --
+   「…を得る」. Resolves the recipient list, then registers the gained ability
+   once per recipient. Two selection sources precede the activating-card
+   fallback:
+     * stage_member_targeting — 「自分のステージにいる『X』のメンバーN人まで…を得る」:
+       prompt for the members, then re-apply this effect with the picks in
+       selected_cards.
+     * anaphora "cost_waited" — 「これによってウェイト状態になったメンバー」:
+       bind to the members THIS ability's cost waited, not to the source. */
 void rb_execute_gain_ability_effect(GameState *g, int actor, AbilityEffect *e) {
-    rb_gain_ability(g, actor, e);
+    if (!g || !e) return;
+
+    const char *card_type = e->card_type_field[0] ? e->card_type_field
+                                                  : gain_extra(e, "card_type");
+    const char *source = e->source ? e->source : gain_extra(e, "source");
+    const char *grp = gain_extra(e, "group_names");
+
+    int stage_member_targeting = source && !strcmp(source, "stage") &&
+                                 card_type && !strcmp(card_type, "member_card") &&
+                                 grp && *grp;
+
+    if (stage_member_targeting && g->n_selected_cards == 0) {
+        const char *target = rb_effect_target_name(e);
+        RbPlayer *P = &g->p[rb_resolve_target_player(g, target)];
+        int candidates[RB_STAGE_SIZE];
+        int n_cand = 0;
+        for (int q = 0; q < RB_STAGE_SIZE; q++) {
+            int cid = P->stage[q];
+            if (cid == RB_EMPTY_SLOT) continue;
+            if (!rb_card_matches_group_str(cid, grp)) continue;
+            candidates[n_cand++] = q;
+        }
+        if (n_cand > 0) {
+            int pick = rb_effect_count_or(e, 1);
+            if (pick < 1) pick = 1;
+            if (pick > n_cand) pick = n_cand;
+            rb_emit_choice(g, actor, RB_CHOICE_SELECT_CARD, "stage", card_type,
+                           pick, 1, "gain_ability");
+            strncpy(g->queue.pending.filter_group, grp,
+                    sizeof(g->queue.pending.filter_group) - 1);
+            strncpy(g->queue.pending.target_player_id, target,
+                    sizeof(g->queue.pending.target_player_id) - 1);
+            g->queue.pending.n_filtered_indices = 0;
+            for (int i = 0; i < n_cand; i++)
+                g->queue.pending.filtered_indices[g->queue.pending.n_filtered_indices++] =
+                    candidates[i];
+            rb_choice_set_route(&g->queue.pending, RB_ROUTE_SELECT_CARDS);
+            /* Re-apply THIS effect after the choice (Rust:
+               ability_queue.set_pending_actions(vec![effect.clone()])). */
+            g->queue.deferred = rb_effect_deep_clone(e);
+            g->queue.resume_eff = g->queue.deferred;
+            g->queue.resume_actor = actor;
+            g->queue.resume_host = g->activating_card;
+            rb_queue_pause_for_choice(g, &g->queue.pending);
+            return;
+        }
+    }
+
+    int targets[RB_STAGE_SIZE];
+    int n_targets = 0;
+    if (g->n_selected_cards > 0) {
+        for (int i = 0; i < g->n_selected_cards && n_targets < RB_STAGE_SIZE; i++)
+            targets[n_targets++] = g->selected_cards[i];
+        g->n_selected_cards = 0;
+    } else {
+        const char *anaphora = gain_extra(e, "anaphora");
+        if (anaphora && !strcmp(anaphora, "cost_waited") &&
+            g->n_last_cost_waited_members > 0) {
+            for (int i = 0; i < g->n_last_cost_waited_members; i++)
+                targets[n_targets++] = g->last_cost_waited_members[i];
+        } else if (g->activating_card >= 0) {
+            targets[n_targets++] = g->activating_card;
+        }
+    }
+
+    for (int i = 0; i < n_targets; i++) {
+        int target_card = targets[i];
+        if (target_card < 0) continue;
+        /* Bind the recipient for this iteration; rb_gain_ability honours the
+           target_card binding before falling back to the activating card. */
+        char binding[16];
+        snprintf(binding, sizeof(binding), "%d", target_card);
+        s_set_extra(e, "target_card", binding);
+        rb_gain_ability(g, actor, e);
+    }
 }
 
-/* -- execute_set_card_identity_effect -- */
+/* -- execute_set_card_identity_effect (ability_effects.rs:123-137) --
+   all_regions routes to the all-regions rewrite, otherwise the single-region
+   rewrite. Both live in state.c; this is the action-level dispatch. */
 void rb_execute_set_card_identity_effect(GameState *g, int actor, AbilityEffect *e) {
     if (!g || !e) return;
-    const char *identities = NULL;
-    for (int i = 0; i < e->n_extra; i++) {
-        if (e->extra_k[i] && !strcmp(e->extra_k[i], "identities") && e->extra_v[i]) {
-            identities = e->extra_v[i]; break;
-        }
-    }
-    if (identities && g->n_prohibition < 64) {
-        snprintf(g->prohibition[g->n_prohibition], sizeof(g->prohibition[g->n_prohibition]),
-                 "card_identity:%s", identities);
-        g->n_prohibition++;
-    }
-    (void)actor;
+    rb_set_card_identity_effect(g, actor, e, g->activating_card);
 }
 
-/* -- execute_activate_ability -- */
+/* -- execute_activate_ability (ability_effects.rs:141-227) -- */
 void rb_execute_activate_ability(GameState *g, int actor, AbilityEffect *e) {
-    if (!g || !e) return;
-    const char *source_card = NULL;
-    for (int i = 0; i < e->n_extra; i++) {
-        if (e->extra_k[i] && !strcmp(e->extra_k[i], "source_card") && e->extra_v[i]) {
-            source_card = e->extra_v[i]; break;
-        }
-    }
-    if (source_card && !strcmp(source_card, "previous_selected")) {
-        for (int i = 0; i < g->n_selected_cards; i++) {
-            rb_trigger_debut(g, actor, g->selected_cards[i]);
-        }
-    } else {
-        rb_trigger_debut(g, actor, g->queue.resume_host);
-    }
+    s_execute_activate_ability(g, actor, e);
 }
 
-/* -- execute_invalidate_ability -- */
+/* -- execute_invalidate_ability (ability_effects.rs:229-354) --
+   「〜の能力を無効化する」. Only ライブ開始時 / ライブ成功時 are supported;
+   any other target_trigger is an unsupported-effect error in Rust, which the
+   executor records as a failed last_action_result without mutating state
+   (here: no-op). self_target invalidates the activating card directly;
+   otherwise one eligible stage member is chosen and invalidated. */
 void rb_execute_invalidate_ability(GameState *g, int actor, AbilityEffect *e) {
     if (!g || !e) return;
-    const char *target_trigger = NULL;
-    for (int i = 0; i < e->n_extra; i++) {
-        if (e->extra_k[i] && !strcmp(e->extra_k[i], "target_trigger") && e->extra_v[i]) {
-            target_trigger = e->extra_v[i]; break;
+    const char *target_trigger = gain_extra(e, "target_trigger");
+    if (!target_trigger) return;
+    if (strcmp(target_trigger, "ライブ開始時") != 0 &&
+        strcmp(target_trigger, "ライブ成功時") != 0) return;
+
+    /* Duration: util::parse_duration() rejects unknown codes; an absent
+       duration means Permanent. */
+    const char *duration_code = gain_extra(e, "duration");
+    const char *duration = "permanent";
+    if (duration_code && *duration_code) {
+        if (strstr(duration_code, "live") || strstr(duration_code, "ライブ"))
+            duration = "live_end";
+        else if (strstr(duration_code, "turn") || strstr(duration_code, "ターン"))
+            duration = "until_end_of_turn";
+        else if (strstr(duration_code, "permanent") || strstr(duration_code, "永久"))
+            duration = "permanent";
+        else
+            return; /* unsupported duration code */
+    }
+
+    if (e->self_target_field[0] && !strcmp(e->self_target_field, "true")) {
+        if (g->activating_card < 0) return;
+        rb_try_add_ability_invalidation(g, g->activating_card, target_trigger, duration);
+        return;
+    }
+
+    const char *target = e->target && *e->target ? e->target : "self";
+    RbPlayer *P = &g->p[rb_resolve_target_player(g, target)];
+
+    RbCardFilter filter;
+    memset(&filter, 0, sizeof(filter));
+    rb_effect_filter_subset(e, &filter);
+
+    int stage_ids[RB_STAGE_SIZE];
+    int n_stage = 0;
+    for (int q = 0; q < RB_STAGE_SIZE; q++)
+        if (P->stage[q] != RB_EMPTY_SLOT) stage_ids[n_stage++] = P->stage[q];
+
+    /* Valid = the effect filter matches AND the card really has that trigger
+       AND the trigger is not already invalidated. */
+    int matched[RB_STAGE_SIZE];
+    int n_matched = rb_matching_ids(&filter, stage_ids, n_stage, matched, RB_STAGE_SIZE);
+
+    int valid[RB_STAGE_SIZE];
+    int n_valid = 0;
+    for (int i = 0; i < n_matched; i++) {
+        if (!rb_card_has_ability_trigger_for(g, matched[i], target_trigger)) continue;
+        if (rb_ability_is_invalidated(g, matched[i], target_trigger)) continue;
+        valid[n_valid++] = matched[i];
+    }
+    if (n_valid == 0) return;
+
+    if (g->n_selected_cards == 0) {
+        int optional = e->is_optional;
+        const char *opt = gain_extra(e, "optional");
+        if (opt && !strcmp(opt, "true")) optional = 1;
+
+        rb_emit_choice(g, actor, RB_CHOICE_SELECT_CARD, "stage",
+                       e->card_type_field[0] ? e->card_type_field : NULL,
+                       1, optional, "invalidate_ability");
+        if (filter.has_group) {
+            size_t glen = strlen(filter.group);
+            if (glen >= sizeof(g->queue.pending.filter_group))
+                glen = sizeof(g->queue.pending.filter_group) - 1;
+            memcpy(g->queue.pending.filter_group, filter.group, glen);
+            g->queue.pending.filter_group[glen] = 0;
         }
+        strncpy(g->queue.pending.target_player_id, target,
+                sizeof(g->queue.pending.target_player_id) - 1);
+        g->queue.pending.n_filtered_indices = 0;
+        for (int i = 0; i < n_valid; i++)
+            for (int q = 0; q < RB_STAGE_SIZE; q++)
+                if (P->stage[q] == valid[i]) {
+                    g->queue.pending.filtered_indices[g->queue.pending.n_filtered_indices++] = q;
+                    break;
+                }
+        rb_choice_set_route(&g->queue.pending, RB_ROUTE_SELECT_CARDS);
+        g->queue.deferred = rb_effect_deep_clone(e);
+        g->queue.resume_eff = g->queue.deferred;
+        g->queue.resume_actor = actor;
+        g->queue.resume_host = g->activating_card;
+        rb_queue_pause_for_choice(g, &g->queue.pending);
+        return;
     }
-    if (target_trigger && g->n_prohibition < 64) {
-        snprintf(g->prohibition[g->n_prohibition], sizeof(g->prohibition[g->n_prohibition]),
-                 "invalidate:%s", target_trigger);
-        g->n_prohibition++;
-    }
-    (void)actor;
-}
 
-/* -- execute_gain_ability -- */
-void rb_execute_gain_ability(GameState *g, int actor, AbilityEffect *e) {
-    rb_gain_ability(g, actor, e);
-}
-
-/* -- execute_gain_ability_from_source -- */
-void rb_execute_gain_ability_from_source(GameState *g, int actor, AbilityEffect *e) {
-    if (!g || !e) return;
-    /* Resolve the activating card, locate an under-card whose ability matches
-       the requested group, and execute that ability's effect on the target. */
-    int host_cid = -1;
-    RbPlayer *P = &g->p[actor];
-    for (int q = 0; q < RB_STAGE_SIZE; q++) {
-        if (P->stage[q] != RB_EMPTY_SLOT) { host_cid = P->stage[q]; break; }
-    }
-    if (host_cid < 0) return;
-
-    /* Find the area for the host card. */
-    int area = -1;
-    for (int q = 0; q < RB_STAGE_SIZE; q++) {
-        if (P->stage[q] == host_cid) { area = q; break; }
-    }
-    if (area < 0) return;
-
-    const char *grp = NULL;
-    for (int i = 0; i < e->n_extra; i++) {
-        if (e->extra_k[i] && !strcmp(e->extra_k[i], "group_names")) {
-            grp = e->extra_v[i];
+    int selected = g->selected_cards[0];
+    g->n_selected_cards = 0;
+    for (int i = 0; i < n_valid; i++) {
+        if (valid[i] == selected) {
+            rb_try_add_ability_invalidation(g, selected, target_trigger, duration);
             break;
         }
     }
+}
 
-    /* Execute the effect of the first matching under-card's ability. */
-    for (int u = 0; u < P->under_cards[area].n; u++) {
-        int src = P->under_cards[area].cards[u];
-        Card sc;
-        if (!rb_decode_card_by_index((uint32_t)src, &sc)) continue;
-        int ok = 1;
-        if (grp && !(sc.group_idx >= 0 && rb_card_matches_group_str(src, grp))) ok = 0;
-        if (ok && sc.ability && sc.ability->effect) {
-            rb_execute_effect_ex(g, actor, sc.ability->effect, host_cid);
-        }
-        rb_free_card(&sc);
-    }
-    (void)actor;
+/* -- execute_gain_ability (ability_effects.rs:379-534) --
+   The registration half of 「…を得る」. The recipient is bound by
+   execute_gain_ability_effect (target_card extra); rb_gain_ability performs
+   the registration, the immediate per-card score application and the
+   duration bookkeeping that util::push_temporary_effect records. */
+void rb_execute_gain_ability(GameState *g, int actor, AbilityEffect *e) {
+    if (!g || !e) return;
+    rb_gain_ability(g, actor, e);
+}
+
+/* -- execute_gain_ability_from_source (ability_effects.rs:536-681) -- */
+void rb_execute_gain_ability_from_source(GameState *g, int actor, AbilityEffect *e) {
+    s_gain_ability_from_source(g, actor, e);
 }
