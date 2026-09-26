@@ -128,7 +128,10 @@ fn every_card_executes_without_panicking() {
         .max(1);
     let chunk_size = card_nos.len().div_ceil(workers);
 
-    let failures: Vec<String> = std::thread::scope(|scope| {
+    // (failures, cards actually smoked). The count is the point: a chunking
+    // bug or a short circuit would leave cards unexercised and the test would
+    // still pass, because only failures were being reported.
+    let (failures, smoked): (Vec<String>, usize) = std::thread::scope(|scope| {
         let handles: Vec<_> = card_nos
             .chunks(chunk_size)
             .map(|chunk| {
@@ -150,23 +153,36 @@ fn every_card_executes_without_panicking() {
                         }
                     }
                     SMOKE_ACTIVE.fetch_sub(1, Ordering::Relaxed);
-                    fails
+                    (fails, chunk.len())
                 })
             })
             .collect();
         let mut all: Vec<String> = Vec::new();
+        let mut count = 0usize;
         for h in handles {
             match h.join() {
-                Ok(fails) => all.extend(fails),
-                Err(_) => all.push("smoke worker thread panicked (not caught)".into()),
+                Ok((fails, n)) => {
+                    all.extend(fails);
+                    count += n;
+                }
+                Err(_) => {
+                    all.push("smoke worker thread panicked (not caught)".into());
+                }
             }
         }
-        all
+        (all, count)
     });
 
     // Restore the previous hook now that no smoke workers remain.
     std::panic::set_hook(Box::new(move |info| prev_hook(info)));
 
+    assert_eq!(
+        smoked,
+        card_nos.len(),
+        "Every card in the database was actually exercised — a worker that \
+         died or a chunk that never ran would leave cards unchecked and the \
+         test would still have passed"
+    );
     assert!(
         failures.is_empty(),
         "{} card(s) panicked while executing their abilities:\n{}",

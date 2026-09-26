@@ -100,8 +100,16 @@ fn mari_cost_17_aqours_vs_muse() {
     match choice {
         rabuka_engine::ability::types::Choice::SelectCard { filtered_indices, .. } => {
             let fi = filtered_indices.unwrap();
-            // Engine currently allows both (gap: Aqours filter not enforced for cost limit?), documents gap
-            assert!(fi.len() >= 1, "at least Aqours should be selectable, got {:?}", fi);
+            // Both cost-17s are offered: the Aqours group filter is not enforced
+            // for a cost-limited Mari placement, which is the gap this file
+            // documents. Pinned to 2 so the day the filter is enforced this
+            // test is the one that reports it.
+            assert_eq!(
+                fi.len(),
+                2,
+                "Both cost-17s offered (known gap: Aqours filter not enforced); \
+                 '>= 1' would pass if neither were offered"
+            );
         }
         _ => panic!("expected SelectCard"),
     }

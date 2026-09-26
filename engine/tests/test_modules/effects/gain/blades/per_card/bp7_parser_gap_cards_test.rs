@@ -258,9 +258,11 @@ fn kanon_selects_each_group_to_deck_bottom_and_draws() {
         "all 3 group cards must be placed on the deck bottom (got {:?})",
         bottom3
     );
-    assert!(
-        game.state.player1.hand.cards.len() > hand_before,
-        "placing them draws 1 card"
+    assert_eq!(
+        game.state.player1.hand.cards.len() - hand_before,
+        1,
+        "Placing the 3 cards draws exactly 1; '> hand_before' would pass if the \
+         engine drew a second"
     );
 }
 

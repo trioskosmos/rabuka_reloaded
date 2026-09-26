@@ -1,6 +1,6 @@
 {
   "generated_by": "cards/test_inventory.py",
-  "generated_at": "2026-09-26T16:25:54.920299+00:00",
+  "generated_at": "2026-09-26T16:34:49.206049+00:00",
   "stats": {
     "total_cards": 2526,
     "cards_with_abilities": 1565,
@@ -1367,27 +1367,8 @@
       ]
     },
     "count_inequality_only": {
-      "count": 3,
-      "rows": [
-        {
-          "file": "engine/tests/test_modules/characterization/corpus_smoke_test.rs",
-          "test": "every_card_executes_without_panicking",
-          "line": 84,
-          "detail": "1 inequality assertion(s) on a count, vs threshold"
-        },
-        {
-          "file": "engine/tests/test_modules/effects/compound/per_card/debut_blade_lifecycle_and_cost17_aqours_placement_edges_test.rs",
-          "test": "mari_cost_17_aqours_vs_muse",
-          "line": 84,
-          "detail": "1 inequality assertion(s) on a count, vs threshold"
-        },
-        {
-          "file": "engine/tests/test_modules/effects/gain/blades/per_card/bp7_parser_gap_cards_test.rs",
-          "test": "kanon_selects_each_group_to_deck_bottom_and_draws",
-          "line": 223,
-          "detail": "1 inequality assertion(s) on a count, vs baseline"
-        }
-      ]
+      "count": 0,
+      "rows": []
     },
     "unresolvable_card_id": {
       "count": 0,
