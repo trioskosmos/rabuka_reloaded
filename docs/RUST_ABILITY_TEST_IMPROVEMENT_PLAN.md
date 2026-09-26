@@ -103,13 +103,24 @@ All seven are covered. **This list is closed.**
   card state, and exact modifier values. **Done** for the count class
   (`count_inequality_only` 0/15, `assert_only_counts` 0).
 - Repair Emma's prior-opponent-live setup and test both answer branches.
-  **Open.**
+  **Corrected and done.** Emma (`PL!N-bp5-008-R`) has one ability — 「エネルギー
+  置き場にあるエネルギー1枚をこのメンバーの下に置く：エネルギーを2枚アク
+  ティブにする。」— and no prior-opponent-live clause, so that item described a
+  different card. The real defect was that the test named for "activate 2"
+  asserted only a card count, against an all-active energy zone where the
+  activation had nothing to do: it passed while exercising half the ability.
+  It now stages wait energy and asserts both effects.
 - Repair Q242's both-player movement, deck order, exact threshold, and expiry.
-  **Open** — the Mari cost-17 test now pins 2 offered cards and records the
-  Aqours-filter gap as an assertion, so the gap is tracked but the filter is
-  still unenforced.
+  **Done.** `both_waitrooms_member_restore_threshold_q242_test.rs` has 8 tests
+  covering the 19/20 boundary, both directions with a deck-bottom sentinel,
+  the no-recoverable-live branch, and the P+ print. Its own header records the
+  rewrite: "Was `assert!(waitroom.len() < w1)` — a count, so it passed for the
+  wrong reasons."
 - Add boundary and decline branches for Hanamaru and other optional costs.
-  **Open.**
+  **Done for Hanamaru** — `hanamaru_debut_result_character_deploy_test.rs`
+  covers single/forced selection, non-match, no-empty-slot, the no-valid-discard
+  decline, both-matching-one-deploys, and the area-full fallback. The "other
+  optional costs" remainder is open.
 
 ### P2: Organization and quality
 
@@ -156,7 +167,10 @@ That is the remaining part of the P0 ledger.
 2. ~~Per-ability coverage ledger and quality detectors.~~ Detectors done;
    the ledger's per-ability half is open.
 3. ~~Missing multi-ability behavior tests.~~ Done.
-4. Weak assertion repairs and duplicate cleanup. **Done** for the count and
-   board classes; Emma / Q242 / Hanamaru remain.
+4. Weak assertion repairs and duplicate cleanup. **Done** for the count,
+   board, and the three named cards (Emma, Q242, Hanamaru). The open engine
+   question is the Mari/Q242 Aqours group filter for a cost-limited placement,
+   which is now tracked by an assertion rather than ignored: the test pins both
+   cards being offered and says the filter is unenforced.
 5. Documentation and CI synchronization. **This file**, plus the report's
    own caveats.
