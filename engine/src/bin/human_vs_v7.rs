@@ -67,9 +67,9 @@ fn main() {
     game_setup::set_action_display(false);
     game_setup::set_logging_enabled(false);
 
-    let db: Arc<CardDatabase> = fresh_database();
+    let mut db: Arc<CardDatabase> = fresh_database();
     let nums = load_deck(&deck);
-    let (t1, t2) = game_setup::build_two_decks(&db, &nums, &nums).expect("decks");
+    let (t1, t2) = game_setup::build_two_decks(&mut db, &nums, &nums).expect("decks");
 
     let my_me: u8 = if side == "p1" { 0 } else { 1 };
     let opp_me: u8 = 1 - my_me;
@@ -122,8 +122,12 @@ fn main() {
 
         // My turn.
         decision += 1;
+        {
+            let p = if my_me == 0 { &gs.player1 } else { &gs.player2 };
+            publish_hand(&p.hand.cards);
+        }
         let picked = if auto {
-            let a = strategy_v8::decide(&gs, my_me);
+            let a = strategy_v8::choose_action_v8_entry(&gs, &actions, my_me);
             let idx = actions
                 .iter()
                 .position(|x| signature(x) == signature(&a))
@@ -141,7 +145,7 @@ fn main() {
             for (n, a) in actions.iter().enumerate() {
                 println!("  [{n:>2}] {}", describe(a, &db));
             }
-            let v8a = strategy_v8::decide(&gs, my_me);
+            let v8a = strategy_v8::choose_action_v8_entry(&gs, &actions, my_me);
             if let Some(idx) = actions
                 .iter()
                 .position(|x| signature(x) == signature(&v8a))
@@ -151,13 +155,13 @@ fn main() {
                     describe(&v8a, &db)
                 );
             }
-            println!("\n(append {decision - 1} lines? no: append ONE more choice to {script})");
+            println!("\n(append ONE more choice to the script, then re-run)");
             println!("choices already consumed: {used}");
             return;
         };
 
         let a = &actions[picked];
-        let v8a = strategy_v8::decide(&gs, my_me);
+        let v8a = strategy_v8::choose_action_v8_entry(&gs, &actions, my_me);
         let v8_matches = actions
             .iter()
             .position(|x| signature(x) == signature(&v8a))
@@ -237,7 +241,24 @@ fn describe(a: &game_setup::Action, db: &CardDatabase) -> String {
         .unwrap_or_default();
     match a.action_type {
         game_setup::ActionType::PlayMemberToStage => {
-            format!("PlayMember {card} zone={:?}", p.and_then(|p| p.stage_index))
+            // PlayMember actions usually identify the card by its position in
+            // hand, not by id. Resolving the id lets the option list actually
+            // distinguish the members, which is the whole point of the harness.
+            let hand_idx = p.and_then(|p| p.card_index);
+            let resolved = p
+                .and_then(|p| p.card_id)
+                .map(|c| short(db, c))
+                .or_else(|| {
+                    hand_idx
+                        .and_then(|i| CURRENT_HAND.get().and_then(|h| h.get(i).copied()))
+                        .map(|c| short(db, c))
+                })
+                .unwrap_or_else(|| format!("hand#{hand_idx:?}"));
+            format!(
+                "PlayMember {resolved} area={:?} baton={:?}",
+                p.and_then(|p| p.stage_area.clone()),
+                p.and_then(|p| p.use_baton_touch)
+            )
         }
         game_setup::ActionType::SelectLiveCard => format!("SelectLive {card}"),
         game_setup::ActionType::ConfirmLiveCardSet => {
@@ -245,6 +266,17 @@ fn describe(a: &game_setup::Action, db: &CardDatabase) -> String {
         }
         game_setup::ActionType::Pass => "Pass".to_string(),
         other => format!("{other:?} {card}"),
+    }
+}
+
+/// The acting player's hand, published so `describe` can resolve a
+/// hand-indexed card to a name. Scoped to one decision point.
+static CURRENT_HAND: std::sync::OnceLock<std::sync::Mutex<Vec<i16>>> = std::sync::OnceLock::new();
+
+fn publish_hand(hand: &[i16]) {
+    let cell = CURRENT_HAND.get_or_init(|| std::sync::Mutex::new(Vec::new()));
+    if let Ok(mut h) = cell.lock() {
+        *h = hand.to_vec();
     }
 }
 
@@ -306,7 +338,7 @@ fn render(gs: &GameState, db: &CardDatabase, me: u8) {
                 } else {
                     let c = db.get_card(id);
                     let cost = c.and_then(|c| c.cost).unwrap_or(0);
-                    let blade = c.and_then(|c| c.blade).unwrap_or(0);
+                    let blade = c.map_or(0, |c| c.blade);
                     let wait = gs.mods.get_orientation_modifier(id) == Some("wait");
                     format!(
                         "{}[c{cost} b{blade}{}{}]",
@@ -329,7 +361,7 @@ fn render(gs: &GameState, db: &CardDatabase, me: u8) {
             let c = db.get_card(id);
             let ty = c.map(|c| format!("{:?}", c.card_type)).unwrap_or_default();
             let cost = c.and_then(|c| c.cost).unwrap_or(0);
-            let blade = c.and_then(|c| c.blade).unwrap_or(0);
+            let blade = c.map_or(0, |c| c.blade);
             if ty.contains("Member") {
                 hand.push_str(&format!(
                     " {} [c{cost} b{blade}{}]",
@@ -383,11 +415,15 @@ fn report(
         (&gs.player1, &gs.player2)
     } else {
         (&gs.player2, &gs.player1)
-    });
+    };
     let a = mine.success_live_card_zone.cards.len();
     let b = theirs.success_live_card_zone.cards.len();
     println!("\n================ RESULT ================");
-    println!("  {:?}   ME {a} - OPP {b}   turns {}", gs.game_result, gs.turn_number);
+    println!(
+        "  {:?}   ME {a} - OPP {b}   turns {}",
+        gs.game_result,
+        gs.turn_number
+    );
     if a >= 3 && b <= 2 {
         println!("  >>> I WON");
     } else if b >= 3 && a <= 2 {

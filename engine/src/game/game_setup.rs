@@ -1666,7 +1666,6 @@ fn has_double_baton(card: &Card) -> bool {
 /// member card: whether it can be placed there, at what price, and whether the
 /// placement is a baton touch.
 struct AreaCandidate<'a> {
-    index: usize,
     name: &'static str,
     available: bool,
     cost: u8,
@@ -1692,7 +1691,6 @@ fn area_candidates_for<'a>(
     display: bool,
 ) -> ([AreaCandidate<'a>; 3], bool) {
     let mut candidates: [AreaCandidate; 3] = core::array::from_fn(|slot| AreaCandidate {
-        index: slot,
         name: AREA_NAMES[slot],
         available: false,
         cost: card_cost,
