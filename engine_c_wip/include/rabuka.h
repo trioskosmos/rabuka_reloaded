@@ -2070,6 +2070,11 @@ int  rb_resolve_indices_to_ids(const GameState *g, int pl, const char *zone, con
 /* card_property predicates (card.rs::has_blade_heart/has_score_icon/has_all_blade) */
 int  rb_orientation_matches_state(const char *orientation, const char *state);
 int  rb_card_matches_group_str(int card_id, const char *group_name);
+/* Card::group per card_binary.rs:153-174. The blob's group string is empty for
+   every record, so this derives the group from the series like Rust does.
+   Use this, never rb_card_string(card->group_idx), which resolves to "". */
+const char *rb_card_group_name(int card_id);
+const char *rb_card_series_to_group(const char *series);
 int  rb_card_matches_any_group(int card_id, const char **groups, int n);
 int  rb_card_matches_name_constraint(int card_id, const char *name_constraint);
 void rb_set_card_identity(int cid, const char *name);

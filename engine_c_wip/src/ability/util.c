@@ -254,55 +254,68 @@ static void rb_debug_group_match(int card_id, const char *group_name, int result
     (void)card_id; (void)group_name; (void)result;
 }
 
-/* Mirror util.rs::card_matches_group_str — group/unit/name/series + set_card_identity. */
+/* Mirror util.rs::card_matches_group_str — group/unit/name/series + set_card_identity.
+
+   Faithful to util.rs:589-630. The previous body tested raw bidirectional
+   substrings (strstr(group_name, g) with an empty card group is always
+   non-NULL), so EVERY card matched EVERY group filter and every 「『X』の…」
+   ability in the engine silently did nothing. */
 int rb_card_matches_group_str(int card_id, const char *group_name) {
     if (!group_name) return 1;
-    Card c;
-    if (!rb_decode_card_by_index((uint32_t)card_id, &c)) return 0;
 
     char *gn = norm_str(group_name);
-    const char *g  = rb_card_string(c.group_idx);
-    const char *u  = rb_card_string(c.unit_idx);
-    const char *s  = rb_card_string(c.series_idx);
-    char *gnorm = g  ? norm_str(g)  : NULL;
-    char *unorm = u  ? norm_str(u)  : NULL;
-    char *nnorm = c.name ? norm_str(c.name) : NULL;
+    if (!gn) return 0;
 
-    if (!strcmp(group_name, "みらくらぱーく！")) {
-        int match = (s && strstr(s, group_name) != NULL) ||
-                    (g && strstr(g, group_name) != NULL) ||
-                    (u && strstr(u, group_name) != NULL);
-        rb_free_card(&c);
-        if (gn) rb_free(gn);
-        if (gnorm) rb_free(gnorm);
-        if (unorm) rb_free(unorm);
-        if (nnorm) rb_free(nnorm);
-        return match;
-    }
+    Card c;
+    if (!rb_decode_card_by_index((uint32_t)card_id, &c)) { rb_free(gn); return 0; }
 
+    const char *g = rb_card_string(c.group_idx);
+    const char *u = rb_card_string(c.unit_idx);
+    const char *s = rb_card_string(c.series_idx);
+
+    /* util.rs:600-603 — unit == gn, plus the ！/µ exact-normalized fallback. */
     int match = 0;
-    if (gnorm) {
-        /* Exact and substring match on raw strings */
-        if ((g && (!strcmp(g, group_name) || strstr(g, group_name) || strstr(group_name, g))) ||
-            (u && (!strcmp(u, group_name) || strstr(u, group_name) || strstr(group_name, u))) ||
-            (c.name && (strstr(c.name, group_name) || strstr(group_name, c.name))))
-            match = 1;
-        /* Normalized comparisons catch fullwidth-bang / micro mismatches */
-        if (!match && (strstr(gnorm, gn) || strstr(gn, gnorm) ||
-                       (unorm && (strstr(unorm, gn) || strstr(gn, unorm))) ||
-                       (nnorm && (strstr(nnorm, gn) || strstr(gn, nnorm)))))
-            match = 1;
-        /* Series membership (multi-series joint cards match via any line) */
-        if (!match && s && rb_card_series_matches_group(s, group_name))
-            match = 1;
+    if (u && !strcmp(u, gn)) {
+        match = 1;
+    } else if (u && (strstr(u, "！") || strstr(u, "µ"))) {
+        char *unorm = norm_str(u);
+        if (unorm) { match = !strcmp(unorm, gn); rb_free(unorm); }
     }
-    /* set_card_identity overrides */
+
+    /* util.rs:604 — c.group == g, an exact comparison against the raw input.
+       The group must come from rb_card_group_name(): the stored group index
+       resolves to "" for every record in cards.bin, so reading it directly
+       makes this term dead (and made the old body match everything). */
+    if (!match) {
+        const char *g = rb_card_group_name(card_id);
+        if (g && *g && !strcmp(g, group_name)) match = 1;
+    }
+
+    /* util.rs:605-606 — any of the card's names contains gn, with the same
+       ！/µ normalized fallback. Names are '&'/U+FF06 separated. */
+    if (!match) {
+        char names[1024];
+        int n_names = rb_card_get_card_names(card_id, names, sizeof names);
+        const char *p = names;
+        for (int i = 0; i < n_names && p && *p && !match; i++) {
+            if (strstr(p, gn)) {
+                match = 1;
+            } else if (strstr(p, "！") || strstr(p, "µ")) {
+                char *nn = norm_str(p);
+                if (nn) { if (strstr(nn, gn)) match = 1; rb_free(nn); }
+            }
+            p += strlen(p) + 1;
+        }
+    }
+
+    /* util.rs:610 — multi-series joint cards match via any constituent line. */
+    if (!match && s && rb_card_series_matches_group(s, gn)) match = 1;
+
+    /* util.rs:615-622 — constant set_card_identity ("treated as") memberships. */
     if (!match) match = rb_card_matches_identity_str(card_id, group_name);
+
     rb_free_card(&c);
-    if (gn)    rb_free(gn);
-    if (gnorm) rb_free(gnorm);
-    if (unorm) rb_free(unorm);
-    if (nnorm) rb_free(nnorm);
+    rb_free(gn);
     return match;
 }
 
