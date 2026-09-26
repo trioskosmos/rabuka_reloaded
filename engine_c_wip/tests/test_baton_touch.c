@@ -31,7 +31,12 @@ enum {
 };
 
 static void drain_choices_by_skip(TestGame *game) {
+    int guard = 0;
     while (test_has_pending_choice(game)) {
+        if (guard++ >= 256) {
+            CHECK(0, "drain_choices_by_skip converged (skip stopped re-presenting a choice)");
+            return;
+        }
         rb_resume_with_choice(&game->state, -1);
     }
 }
