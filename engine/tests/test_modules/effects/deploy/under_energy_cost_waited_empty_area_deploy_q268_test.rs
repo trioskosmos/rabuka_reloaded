@@ -249,6 +249,17 @@ fn under_energy_cost_waited_deploy_q268_turn_limit_blocks_second_activation() {
 
     // First activation succeeds (right is empty).
     run_activate(&mut game, shioriko);
+    // …and it really did happen, or the second refusal would prove nothing.
+    let turn = game.state.turn_number;
+    assert!(
+        game.state
+            .turn_limited_abilities_used
+            .contains_key(&(shioriko, 0, turn)),
+        "the first activation must record its ターン1回 use (card={shioriko}, \
+         ab#0, turn={turn})"
+    );
+    let energy_after_first = game.state.player1.energy_zone.active_count() as i16;
+    let under_after_first = energy_under_center(&game);
 
     // Second activation same turn must be blocked (ターン1回).
     let result = game.try_activate_ability(shioriko);
@@ -256,6 +267,28 @@ fn under_energy_cost_waited_deploy_q268_turn_limit_blocks_second_activation() {
         result.is_err(),
         "ターン1回: second activation in the same turn must be blocked (got {:?})",
         result
+    );
+    // A use-limit refusal must cost nothing: the energy under her is the
+    // printed cost and must not be paid a second time.
+    game.assert_energy_untouched_after_refusal(energy_after_first, "second 起動 at use_limit");
+    assert_eq!(
+        energy_under_center(&game),
+        under_after_first,
+        "a ターン1回 refusal must not place a second energy under her"
+    );
+    assert!(
+        !game.has_pending_choice(),
+        "a use-limit refusal must not open a prompt"
+    );
+    // The refused attempt must not have added a second use record.
+    assert_eq!(
+        game.state
+            .turn_limited_abilities_used
+            .keys()
+            .filter(|(c, _, _)| *c == shioriko)
+            .count(),
+        1,
+        "one use record for one successful activation, not two"
     );
 }
 

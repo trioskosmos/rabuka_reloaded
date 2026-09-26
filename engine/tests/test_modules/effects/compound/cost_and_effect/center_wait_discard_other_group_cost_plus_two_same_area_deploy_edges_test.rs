@@ -30,6 +30,34 @@ fn center_other_member_cost_plus_two_deploy_not_at_center_activation_blocked() {
 
     let result = game.try_activate_ability(yoshiko);
     assert!(result.is_err(), "activation should fail when not at Center");
+    // The refusal must be the （センターエリアに登場している場合のみ起動できる）
+    // gate, and it must have changed nothing: she is not waited, the hand card
+    // was not discarded, and the 15 energy is unspent.
+    game.assert_card_identity(yoshiko, "PL!S-bp3-006-R＋");
+    assert_ne!(
+        game.state.mods.get_orientation_modifier(yoshiko),
+        Some("wait"),
+        "a refused 起動 must not pay the 「このメンバーをウェイトにし」 cost"
+    );
+    assert_eq!(
+        game.state.player1.hand.cards.len(),
+        1,
+        "a refused 起動 must not discard the 手札 cost card"
+    );
+    assert!(
+        game.state.player1.hand.cards.contains(&filler),
+        "the hand card is still in hand"
+    );
+    game.assert_energy_untouched_after_refusal(15, "津島善子 起動 outside the center");
+    assert_eq!(
+        game.state.player1.stage.stage,
+        [yoshiko, -1, -1],
+        "a refused 起動 leaves the stage as it was"
+    );
+    assert!(
+        !game.has_pending_choice(),
+        "a refused activation must not open a prompt"
+    );
 }
 
 /// No other Aqours on stage (empty stage aside from self).

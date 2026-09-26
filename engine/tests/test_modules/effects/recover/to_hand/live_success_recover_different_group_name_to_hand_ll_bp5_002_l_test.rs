@@ -103,16 +103,27 @@ fn three_distinct_groups_center_gets_all_hearts() {
 }
 
 /// 2 members from 2 different groups → not enough for condition.
+///
+/// The fixture used to be `[aqours, aqours, muse]` — the SAME card id in two
+/// areas, which no legal state can hold — so this was never a "two groups on
+/// stage" case at all. Now two DISTINCT 『Aqours』 instances plus a μ member, and
+/// the claim is checked as a granted AMOUNT rather than the absence of a map
+/// entry (a zero-valued entry would fail `.is_none()` while nothing was granted).
 #[test]
 fn two_distinct_groups_no_effect() {
     let db = load_real_database();
     let mut game = TestGame::new(db);
     let live = game.id("LL-bp5-002-L");
     let aqours = game.id("PL!S-pb1-003-R");
+    let aqours2 = game.new_id("PL!S-pb1-003-R");
     let muse = game.id("PL!-bp3-003-R");
     let filler = game.id("PL!-sd1-010-SD");
+    game.assert_card_identity(aqours, "PL!S-pb1-003-R");
+    game.assert_same_card_name(aqours, aqours2, "two 『Aqours』 instances");
+    assert_ne!(aqours, aqours2, "two separate card instances");
+    game.assert_distinct_card_names(aqours, muse, "『Aqours』 vs μ");
 
-    game.state.player1.stage.stage = [aqours, aqours, muse];
+    game.state.player1.stage.stage = [aqours, aqours2, muse];
     game.give_energy(15);
     game.state.player1.hand.cards.push(live);
     fill_deck(&mut game, filler);
@@ -124,24 +135,36 @@ fn two_distinct_groups_no_effect() {
         game.select_indices(&[]);
     }
 
-    let hm = game.state.mods.heart_modifiers.get(&aqours);
-    assert!(
-        hm.is_none(),
-        "Center should NOT get hearts with only 2 groups"
+    assert_eq!(
+        game.state.mods.get_heart_modifier(aqours, HeartColor::All),
+        0,
+        "2 distinct groups on stage must not grant the All heart"
     );
 }
 
 /// All 3 members from the same group → no effect.
+///
+/// The name said "same group" but the fixture was `[muse1, muse1, muse2]` with
+/// `muse1` a 虹ヶ咲 member and `muse2` a μ one — two groups, not one, and the
+/// same card id in two areas besides. Now three separate μ instances.
 #[test]
 fn all_same_group_no_effect() {
     let db = load_real_database();
     let mut game = TestGame::new(db);
     let live = game.id("LL-bp5-002-L");
     let muse1 = game.id("PL!-bp3-003-R");
-    let muse2 = game.id("PL!-sd1-010-SD");
+    let muse2 = game.id("PL!-sd1-001-SD");
+    let muse3 = game.id("PL!-sd1-003-SD");
     let filler = game.id("PL!-sd1-010-SD");
+    game.assert_same_card_name(muse1, muse2, "three μ members");
+    game.assert_same_card_name(muse1, muse3, "three μ members");
+    assert_ne!(
+        [muse1, muse2, muse3],
+        [muse1, muse1, muse1],
+        "three SEPARATE instances, not one card in three areas"
+    );
 
-    game.state.player1.stage.stage = [muse1, muse1, muse2];
+    game.state.player1.stage.stage = [muse1, muse2, muse3];
     game.give_energy(15);
     game.state.player1.hand.cards.push(live);
     fill_deck(&mut game, filler);
@@ -153,10 +176,10 @@ fn all_same_group_no_effect() {
         game.select_indices(&[]);
     }
 
-    let hm = game.state.mods.heart_modifiers.get(&muse1);
-    assert!(
-        hm.is_none(),
-        "Center should NOT get hearts with all same group"
+    assert_eq!(
+        game.state.mods.get_heart_modifier(muse1, HeartColor::All),
+        0,
+        "all three members from ONE group must not grant the All heart"
     );
 }
 

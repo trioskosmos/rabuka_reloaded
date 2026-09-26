@@ -451,6 +451,31 @@ fn maki_bp6_use_limit_turn1_enforces() {
     }
 
     // Second activation fails
+    // The refusal must be the use_limit and it must have cost nothing. First
+    // prove the FIRST activation recorded its use, or this proves nothing.
+    let turn = game.state.turn_number;
+    assert!(
+        game.state
+            .turn_limited_abilities_used
+            .contains_key(&(maki, 0, turn)),
+        "the first activation must record its use (card={maki}, ab#0, turn={turn})"
+    );
+    let energy_after_first = game.state.player1.energy_zone.active_count() as i16;
+
     let result = game.try_activate_ability(maki);
     assert!(result.is_err(), "use_limit=1 blocks second activation");
+    game.assert_energy_untouched_after_refusal(energy_after_first, "second 起動 at use_limit");
+    assert!(
+        !game.has_pending_choice(),
+        "a use-limit refusal must not open a prompt"
+    );
+    assert_eq!(
+        game.state
+            .turn_limited_abilities_used
+            .keys()
+            .filter(|(c, _, _)| *c == maki)
+            .count(),
+        1,
+        "one use record for one successful activation, not two"
+    );
 }

@@ -169,13 +169,20 @@ fn energy_under_original_blade_limit_opponent_over_limit_not_waited() {
 
     let karin = place_karin(&mut game);
     let sumire = place_opponent(&mut game, "PL!SP-PR-024-PR"); // 平安名すみれ, blade 3
+    assert_eq!(
+        game.db.get_card(sumire).unwrap().blade,
+        3,
+        "fixture guard: this test is about a member ABOVE the threshold"
+    );
     activate_karin(&mut game, karin);
 
-    assert!(
-        game.state
-            .mods
-            .get_orientation_modifier(sumire)
-            .is_none(),
+    // 「〜以下のブレードを持つ」 — assert the member is not WAITED, rather than
+    // that it has no modifier entry at all. `is_none()` is a stronger claim than
+    // the rule makes: a zero-valued entry would fail it while the member is
+    // correctly not waited, so it would break for the wrong reason.
+    assert_ne!(
+        game.state.mods.get_orientation_modifier(sumire),
+        Some("wait"),
         "blade-3 member must NOT be waited when threshold is 2 (1 under + 1)"
     );
 }
@@ -242,14 +249,18 @@ fn energy_under_original_blade_limit_negative_modifier_does_not_make_printed_bla
 
     let karin = place_karin(&mut game);
     let sumire = place_opponent(&mut game, "PL!SP-PR-024-PR"); // 平安名すみれ, printed blade 3
+    assert_eq!(
+        game.db.get_card(sumire).unwrap().blade,
+        3,
+        "fixture guard: this test is about 元々持つ blade 3, not the current total"
+    );
     game.state.mods.add_blade_modifier(sumire, -2); // current = 1
     activate_karin(&mut game, karin);
 
-    assert!(
-        game.state
-            .mods
-            .get_orientation_modifier(sumire)
-            .is_none(),
+    // Not waited, not "has no modifier entry" — see the sibling test's note.
+    assert_ne!(
+        game.state.mods.get_orientation_modifier(sumire),
+        Some("wait"),
         "printed blade 3 exceeds threshold 2 even though the current total is 1"
     );
 }

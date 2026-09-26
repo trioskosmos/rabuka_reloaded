@@ -241,6 +241,25 @@ fn reveal_until_chosen_type_center_requirement_left_side_fails() {
         result.is_err(),
         "Ability should fail from left side (center required)"
     );
+    // The refusal must be the センター requirement, and it must have cost
+    // nothing: the 13 energy is unspent, no prompt opened, and 紗羽司 is still
+    // standing in the left side rather than waited.
+    game.assert_card_identity(honoka, "PL!-pb1-001-R");
+    game.assert_energy_untouched_after_refusal(13, "紗羽司 起動 from the left side");
+    assert_eq!(
+        game.state.player1.stage.stage,
+        [honoka, -1, -1],
+        "a refused 起動 leaves the stage as it was"
+    );
+    assert_ne!(
+        game.state.mods.get_orientation_modifier(honoka),
+        Some("wait"),
+        "a refused 起動 must not wait her as its cost"
+    );
+    assert!(
+        !game.has_pending_choice(),
+        "a refused activation must not open the type-choice prompt"
+    );
 }
 
 #[test]

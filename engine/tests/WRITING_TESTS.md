@@ -106,6 +106,52 @@ fn advance_to_live_start(game: &mut TestGame) {
 - Checks orphaned under-member cards
 - **Processes pending auto abilities** — triggers may fire during phase transitions
 
+### Stepping through the turn: use `advance_to_phase`, not `for _ in 0..N { pass() }`
+
+A pass count is correct only while the phase sequence is frozen. The moment a
+phase gains or loses a step, the test is standing in a different window than it
+thinks — and the first thing that "breaks" is the test's own setup, not the engine.
+
+```rust
+use rabuka_engine::game_state::Phase;
+game.advance_to_phase(Phase::LiveCardSetFirstAttacker);
+game.set_live_card(live);
+game.advance_to_phase(Phase::FirstAttackerPerformance);
+```
+
+It panics if the phase is never reached, instead of spinning.
+
+**Which phase hosts what** (each established by driving a real live):
+
+| target | what is true there |
+|---|---|
+| `LiveCardSetFirstAttacker` / `LiveCardSetSecondAttacker` | where `set_live_card` belongs, for the first and second attacker |
+| `FirstAttackerPerformance` | ライブ開始時 is scanned |
+| `SecondAttackerPerformance` | the **yell** happens — the yell prompt does *not* exist yet in the first attacker's phase |
+| `LiveVictoryDetermination` | after both performances, `performance_snapshots` recorded |
+| `Active` | one full turn later. The reliable way to be sure *every* live phase was traversed when the thing under test is ライブ成功時, which resolves as the live closes. `LiveVictoryDetermination` is too early for it |
+
+**It leaves a prompt pending when it arrives.** That is deliberate: the phase you
+step into is often the phase whose window raises the prompt, and draining it would
+consume the choice the test came to inspect. Intermediate steps are drained with
+`[0]`, so a non-skippable prompt mid-walk is answered rather than rejected.
+
+```rust
+game.advance_to_phase(Phase::FirstAttackerPerformance);
+// …the prompt raised by arriving is still yours to inspect
+assert_eq!(game.pending_choice_type().as_deref(), Some("SelectTarget"));
+game.select_option(0);
+```
+
+**Do not convert a walker shared by many tests in one go.** In
+`rules/phases/live_success_rules_test.rs` the three shared helpers looked like a
+one-edit win for 16 tests and broke 5: several tests reveal a live by pushing into
+the zone rather than calling `set_live_card`, so no single target phase fits them
+all. Convert per call site, where you can watch the individual test. If a
+conversion is not converging, **revert it and record the attempts in a comment** —
+a plausible-looking target that turns the suite red is worse than an honest pass
+count, and the next person needs the attempts, not the guess.
+
 ---
 
 ## Setup Methods
@@ -146,6 +192,54 @@ let d = game.id_ref("PL!-sd1-010-SD");  // stable reference, doesn't consume poo
 - `id()` consumes from a pre-seeded pool (5 IDs per template). Use for cards you reference by variable.
 - `new_id()` falls back to a monotonically increasing counter.
 - `id_ref()` peeks the last available ID without consuming. Use for stable references in assertions (`contains(&id_ref(...))`).
+
+### Card identity: always pin the print
+
+`CardDatabase::get_card_id` is **deliberately lenient**. Given a card number whose
+rarity suffix does not exist, it falls back to *another print of the same card*.
+Both fallback paths now pick the lowest matching key, so it is deterministic — but
+it still silently gives you a **different card** than the one you named.
+
+The trap is specific to this game: the same character is printed at several card
+numbers that differ by one transposed letter, and those printings have
+**different costs and different text**:
+
+| you type | you actually get |
+|---|---|
+| `PL!SP-pb2-006-R` (does not exist) | `PL!SP-bp2-006-P` — cost 2, **no** 常時 cost reduction |
+| `PL!SP-bp1-006-R` | 桜小路きな子 at cost 9 (it is not "a 『Liella!』 member") |
+| `PL!S-pb1-007-R` | 国木田花丸 again (not "an Aqours friend") |
+| `PL!S-bp1-004-P` | resolves to the `-R` print of 平安名すみれ |
+
+Every one of these was found by a pin, including in tests written specifically to
+be careful. **Pin the print in every fixture whose identity matters:**
+
+```rust
+let keke = game.id("PL!SP-bp2-006-R");
+game.assert_card_identity(keke, "PL!SP-bp2-006-R");   // fails loudly on a substitution
+game.assert_card_cost(keke, 9);                       // costs differ between printings
+game.assert_card_score(live, 3);                      // for スコアN以下 / スコアN以上 gates
+```
+
+Helpers (in `tests/helpers/assertions.rs`):
+
+| helper | use it for |
+|---|---|
+| `assert_card_identity(id, "PL!…")` | the staged card is the print you meant |
+| `assert_card_cost(id, n)` | cost-limited plays, 「コストN以下」 filters, energy budgets |
+| `assert_card_score(id, n)` | 「スコアN以下/以上」 live filters |
+| `assert_same_card_name(a, b, ctx)` | two instances share one printed name ( supplementing / 同じ名前) |
+| `assert_distinct_card_names(a, b, ctx)` | 「カード名の異なる」 — two genuinely different cards |
+| `assert_energy_untouched_after_refusal(n, ctx)` | a refused action spent nothing |
+| `assert_use_not_recorded(id, ab, ctx)` | a refusal did not consume the ターンN回 use |
+
+`assert_same_card_name` / `assert_distinct_card_names` are not redundant with
+`assert_card_identity`: a *name* comparison is what a supplementing or
+「名前が異なる」 condition actually reads, and it catches a fixture that stages
+the same character twice.
+
+The `unresolvable_card_id` section of `TEST_QUALITY.md` lists any `game.id("…")`
+literal that names no card at all. It should stay at 0.
 
 ---
 
@@ -312,6 +406,163 @@ If you must manipulate state directly (e.g. opponent's stage), add a comment exp
 
 The helper functions advance through turn phases. During these passes, Draw-phase draws occur, making absolute deck/hand counts unpredictable for assertions. Prefer asserting relative deltas (e.g. waitroom decreased by N, deck top has the expected card ID).
 
+When a delta is still polluted — the opponent's own Active phase refills its energy
+zone, a placement window opens twice — run the **same fixture as a control** and
+compare. This is the only reliable read, and it is often clearer than an absolute
+number:
+
+```rust
+//  energies_placed(set_live: bool) -> (usize, Option<String>)
+let with = run(true);      // live revealed → ライブ成功時 runs
+let without = run(false);   // no live      → the turn's own refill only
+assert!(with.0 > without.0, "the printed effect must add to the control");
+assert_eq!(with.1.as_deref(), Some("wait"));
+```
+
+The same shape settles 「my reveal count is lower than the opponent's」 style
+conditions, and any "A fired but B did not" claim.
+
+### 9. Assertions that cannot fail
+
+All of these have shipped in this repo and all of them pass no matter what the
+engine does. The `assert_only_counts` / `assert_only_negative` sections of
+`TEST_QUALITY.md` track them; both should be 0.
+
+```rust
+assert!(blade >= 0, "…");                    // true for any value
+assert!(b10 >= b9, "…");                     // monotonic: passes when both are 0
+assert!(len >= before, "…");                 // nothing reduced it
+assert!(x.is_none() || x.unwrap().is_empty()) // fine, but check you meant it
+assert!(true, "…");                          // placeholder
+```
+
+- `assert!(m >= 1)` should be `assert_eq!(m, 1)` whenever the card prints an
+  exact number. "At least one" cannot tell one heart from a double-counted grant,
+  and the double count is the failure the gate exists to catch.
+- For a threshold (「2人以上いるかぎり、heart06を得る」) assert the exact value **and**
+  add the case above the threshold: 3 waited members still give 1 heart06 proves it
+  is a floor and not a multiplier.
+- `assert!(true)` tests exist to raise the L0 coverage number. That is gaming the
+  metric, not coverage. `assert!(true)` does not satisfy the audit's `no_assert`
+  check — it is reported as `placeholder`.
+
+### 10. Outcome assertions hidden behind a condition
+
+```rust
+// ❌ a failing trigger now checks nothing, and the test is green
+if success {
+    assert_eq!(cards.len(), before + 1);
+}
+
+// ✅ both branches assert
+if success { assert_eq!(cards.len(), before + 1) } else { assert_eq!(cards.len(), before) }
+```
+
+Same for `let _ = result;` followed by nothing, and for
+`if res.is_err() { …invariants… }` where the invariants are the point.
+
+### 11. `is_err()` alone, and disjunctions that tolerate success
+
+`assert!(res.is_err())` says *a* guard fired, not *which*. A regression tripping a
+different guard still passes. For a refusal, assert the state it left behind:
+
+```rust
+assert!(res.is_err(), "not centre → refused, got {res:?}");
+game.assert_energy_untouched_after_refusal(20, "吉 outside the centre area");
+game.assert_use_not_recorded(yoshi, 0, "refused outside the centre area");
+assert!(!game.has_pending_choice(), "a refusal must not open a prompt");
+```
+
+A disjunction is worse — `res.is_err() || !game.has_pending_choice()` also passes
+when the ability *succeeded* and resolved silently. Prefer a strict
+`assert!(res.is_err(), …)`; if the engine genuinely allows both, assert each
+outcome explicitly.
+
+### 12. A test that can pass without running
+
+```rust
+// ❌ "SP-bp5-027-L" is missing its `PL!` prefix, so this never resolved and
+//    the body never ran — green the whole time
+let a = db.get_card_by_no("SP-bp5-027-L").map(|_| game.id("SP-bp5-027-L"));
+if let (Some(a), Some(b)) = (try_a, try_b) { …assertions… } else { …other assertions… }
+```
+
+The `else` branch doing the real work hides a permanently-unreachable test. If a
+card number is uncertain, look it up and `assert` it exists rather than branching.
+The `no_drive` and `no_assert` sections track the static half of this.
+
+### 13. Grepping `rule_log` by card name
+
+```rust
+// ❌ passes whether or not the printed effect worked, and breaks on a rename
+assert!(rule_log.iter().any(|l| l.contains("渡辺 曜") && l.contains("trigger_live_success")));
+```
+
+`rule_log` proves the trigger was *routed*, which is a real and cheap thing to
+check — but it says nothing about the outcome. Keep it as a companion assertion
+(after checking the live succeeded, see pattern J) and assert the printed effect
+against state. Never use a name grep as the only evidence for a test whose name
+promises behaviour.
+
+### 14. Probes left in the test
+
+Unconditional `eprintln!` state dumps, and `for` loops that answer prompts by
+ordinal (`if step <= 2 { select 2 cards }`), both shipped here. A fixed-count drain
+silently answers the wrong prompt as soon as one prompt is added upstream. Answer
+each prompt by its own identity instead:
+
+```rust
+while game.has_pending_choice() {
+    match game.get_pending_choice() {
+        Choice::SelectAutoAbility { .. } => game.select_indices(&[0]),
+        Choice::SelectCard { zone, .. } if zone == "hand" => { …answer by identity… }
+        other => panic!("unexpected prompt {other:?}"),
+    }
+}
+```
+
+Keep failure diagnostics, but move them into a helper called on the failure path —
+never inline `eprintln!` that fires on every green run.
+
+### 15. A loop that never exits and nobody notices
+
+```rust
+// ❌ the exit condition can never hold, so the loop always exhausts its
+//    iterations and falls through, leaving the caller's assertion as the only guard
+for _ in 0..14 {
+    if zone.len() >= want && phase == FirstAttackerNormal { break; }
+    game.pass();
+}
+// …(placements actually land while the phase is still `Live`)
+```
+
+Return from the success branch and `panic!` at the end with the observed state, so
+a failure says "the window was never reached" instead of a bare count mismatch.
+
+### 16. Known gaps: characterize, do not paper over
+
+When the engine does not do what a card prints, write a **characterization test**
+that pins the current behaviour and names the gap — and keep the parts that DO work
+as separate tests, so the two facts stay separable.
+
+```rust
+assert_eq!(
+    orientation_with.as_deref(), None,
+    "KNOWN GAP: 相手は、エネルギーデッキから…ウェイト状態で置く does not resolve \
+     during a real live for this card, although the live succeeds and its \
+     ライブ成功時 works when fired directly"
+);
+assert!(!probe.state.is_ability_invalidated(live, &AbilityTrigger::LiveSuccess),
+        "precondition: the live succeeds and is not self-invalidated, so the gap \
+         is the live-success window and not the effect");
+```
+
+A characterization test is a tripwire: it passes today and fails loudly the moment
+someone fixes it, at which point it gets rewritten to the real rule. Never leave a
+red test, and never weaken an assertion to match a defect — `TEST_QUALITY.md`'s
+sections are review prompts, not gates, so a queued row is the right place to
+record "not done yet".
+
 ---
 
 ## Behavioral Contracts by Trigger Type
@@ -353,6 +604,48 @@ The helper functions advance through turn phases. During these passes, Draw-phas
 - `デッキの上からN枚見る` looks at top N cards (index 0 = top)
 - Player selects from the looked-at cards, NOT from the deck directly
 - Unselected looked-at cards go to discard (unless specified otherwise)
+
+---
+
+## The static audit: what the generated smells mean
+
+`python cards/test_inventory.py` also writes `engine/tests/TEST_QUALITY.md`, a
+per-fn static audit. Rows are **review prompts, not failures** — the file says so
+too. Read it before adding tests, and after, so you do not add a new instance of a
+class the repo already knows about.
+
+| section | means |
+|---|---|
+| `no_assert` | never asserts — cannot pin behaviour |
+| `no_drive` | mutates state and asserts but never drives the engine |
+| `synthetic_only` | trigger hand-pushed with no real resolution in the same fn |
+| `pendency_only` | asserts a prompt exists without inspecting its identity |
+| `assert_only_negative` | every assertion is a bare `is_err()`/`is_none()` — some guard fired, but which? (mistakes 11) |
+| `assert_only_counts` | every assertion is a count — "3 options offered" can hold while the 3 are wrong (mistake 9) |
+| `placeholder` | `#[ignore]`, `assert!(true)`, `todo!()` |
+| `prompt_ordinal_drain` | prompts answered by position instead of identity (mistake 14) |
+| `blind_phase_stepping` | a pass count instead of `advance_to_phase` (see above) |
+| `similar_cards` | confusable card numbers staged in one file, **with** an identity pin — reviewed, safe |
+| `unpinned_similar_cards` | same, **without** a pin — add `assert_card_identity` |
+| `unresolvable_card_id` | a `game.id("…")` literal naming no card — see the identity section |
+
+Several detectors credit assertions made inside a called helper, and credit the
+shared fixtures under `test_modules/support/`, so moving an assertion into a helper
+does not make a row reappear.
+
+Two of the detectors are deliberately conservative, because a false "you have a
+problem here" is what makes people ignore the report:
+
+- `blind_phase_stepping` is skipped when the test calls `advance_to_phase` or
+  asserts the `current_phase` it reached.
+- `prompt_ordinal_drain` only flags a counter compared with `==`/`<=`/`<`. A
+  runaway guard (`if iter > 20 { panic!() }`) answers nothing by position.
+- Both `assert_only_*` detectors strip string literals first, so quoting the rule
+  in an assertion message (`"opponent>=1"`) does not misfile a specific-value test.
+
+`--check` also enforces a ratchet: a test may not reintroduce a soft guard (the
+`if has_pending_choice() { … }` form). `python cards/test_inventory.py --check`
+must stay clean.
 
 ---
 
@@ -520,6 +813,12 @@ fn test_activate_recover() {
 - **Missing JSON field in abilities.json** — Fix the parser in `card_loader.rs` or `parser.py`.
 - **Infinite loop in while loop** — Add safety counter and `else { skip }` fallback.
 - **Deck assertion off by 1** — Phase-advance draws consumed a card; use relative deltas.
+- **A test suddenly fails after an unrelated engine change** — you are probably standing
+  on a pass count. Switch it to `advance_to_phase` and name the phase.
+- **"the ability is not granted"** — check the *print*: `assert_card_identity` /
+  `assert_card_cost` first. A substituted printing explains most of these.
+- **A ライブ成功時 effect never fires** — assert the live actually **succeeded**
+  first (see pattern J). A failed live never reaches the trigger.
 
 ---
 
@@ -797,3 +1096,71 @@ cd cards && python -c "import json; d=json.load(open('abilities.json',encoding='
 ```
 
 This is debugging/verification, NOT a test — never assert on the JSON in a test.
+
+### J. Any ライブ成功時 test: the live must SUCCEED first
+
+ライブ成功時 only runs when the live passes its heart requirement. A fixture with
+the wrong hearts makes the whole effect untestable, and the symptom is a
+confusing "the ability did nothing" rather than "the live failed".
+
+```rust
+game.advance_to_phase(Phase::LiveCardSetFirstAttacker);
+game.set_live_card(live);
+game.advance_to_phase(Phase::Active);   // traverses the whole live
+while game.has_pending_choice() { game.select_indices(&[0]); }
+
+// PRECONDITION — assert this first, always
+assert!(
+    game.state.player1.success_live_card_zone.cards.contains(&live),
+    "the live must SUCCEED for ライブ成功時 to be evaluated at all"
+);
+```
+
+Two traps around it:
+
+- **A self-invalidating live.** 元気全開DAY！DAY！DAY！ invalidates its own
+  ライブ成功時 when the acting player's group holds 6+ heart02. If a fixture puts
+  heart02 on the stage, assert the invalidation is *absent* before blaming the
+  effect.
+- **The trigger window may not reach the effect at all.** 元気全開's effect works
+  when fired directly (pattern F) but does not resolve during a real live. Keeping
+  those as two tests is what makes that separable — a single test cannot tell
+  "the effect is dead" from "the window never reached it".
+
+### K. Fixture field shapes (they are not what the JSON suggests)
+
+Reading a fixture card's fields directly is good practice (it proves the fixture
+is the case the test claims), but the Rust types are not the JSON types:
+
+| what you want | what compiles |
+|---|---|
+| `blade` | `u8` — `0` when the JSON key is absent (it is *not* `Option`) |
+| `need_heart` / `heart` | `Option<BaseHeart>`, whose counts live in a `hearts: HashMap<HeartColor, u8>` — there is no `.heart01` field |
+| `ability` / `abilities` | text is a single `String`; structured effects need `resolved_abilities()` |
+| triggers | `a.triggers` is an `ArcStr`; use `.as_ref().map(\|t\| t.to_string())` to collect them |
+| `card_no` | `ArcStr`; `.as_str()` is an unstable inherent — use `assert_card_identity` or `to_string()` |
+
+Two `has_blade_heart()`-style accessors disagree with the raw field they appear to
+read; when a pin and the JSON disagree, trust the pin (it is reading the live
+struct) and update the expectation.
+
+### L. Assert the filter's premise, not just the outcome
+
+A negative test that only observes "nothing happened" stays green if the fixture
+drifts out of the case it was built for. Pin the *reason*:
+
+```rust
+// This test is about the COST filter, so pin the over-cost premise AND that the
+// card really prints the trigger being filtered.
+game.assert_card_cost(setsuna, 13);
+let triggers: Vec<String> = game.db.get_card(setsuna).unwrap()
+    .resolved_abilities()
+    .filter_map(|a| a.triggers.as_ref().map(|t| t.to_string()))
+    .collect();
+assert!(triggers.iter().any(|t| t.contains("ライブ成功時")),
+        "the over-cost card must still print a ライブ成功時, otherwise this is not \
+         a cost-filter test, got {triggers:?}");
+```
+
+The same applies to a trigger-filter test (pin that the under-card really prints
+时常 and really does *not* print ライブ成功時), and to any 「AではなくB」 filter.

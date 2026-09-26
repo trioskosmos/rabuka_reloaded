@@ -142,6 +142,22 @@ fn condition_loss_removes_delayed_registration_and_restoring_stage_registers_onc
     }
 }
 
+/// "No ability was gained" for `card`.
+///
+/// The three negative tests below all assert this, and each used to spell it
+/// `gained.is_none() || gained.unwrap().is_empty()` — a double negative that
+/// reads as if some third state were allowed. A zero-length list is the claim.
+fn assert_nothing_gained(game: &TestGame, card: i16, ctx: &str) {
+    match game.state.gained_abilities.get(&card) {
+        None => {}
+        Some(list) => assert!(
+            list.is_empty(),
+            "{}: expected no ability gained, got {list:?}",
+            ctx
+        ),
+    }
+}
+
 /// Empty area → condition fails → no gain.
 #[test]
 fn empty_area_fails_condition() {
@@ -150,16 +166,20 @@ fn empty_area_fails_condition() {
 
     let mari = game.id("PL!S-bp2-008-R\u{ff0b}");
     let chika = game.id("PL!S-sd1-001-SD");
+    game.assert_card_identity(mari, "PL!S-bp2-008-R＋");
 
     game.add_to_stage(MemberArea::LeftSide, mari);
     game.add_to_stage(MemberArea::Center, chika);
     game.state.recalculate_constants();
 
-    let gained = game.state.gained_abilities.get(&mari);
-    assert!(
-        gained.is_none() || gained.unwrap().is_empty(),
-        "Mari should NOT gain ability with empty area"
+    // Setup guard: the right area must really be empty, or this is not the
+    // "empty area" case and the assertion below would pass for any reason.
+    assert_eq!(
+        game.state.player1.stage.stage[2],
+        -1,
+        "setup guard: the right area must be the empty one"
     );
+    assert_nothing_gained(&game, mari, "empty area");
 }
 
 /// Duplicate names → distinct condition fails → no gain.
@@ -171,17 +191,18 @@ fn duplicate_names_fails_condition() {
     let mari = game.id("PL!S-bp2-008-R\u{ff0b}");
     let mari2 = game.new_id("PL!S-bp2-008-R\u{ff0b}");
     let chika = game.id("PL!S-sd1-001-SD");
+    game.assert_card_identity(mari, "PL!S-bp2-008-R＋");
+    // 名前が異なる is the condition under test, so prove the two instances really
+    // share one name and are two separate cards.
+    game.assert_same_card_name(mari, mari2, "two copies of 国木田花丸");
+    assert_ne!(mari, mari2, "two separate card instances");
 
     game.add_to_stage(MemberArea::LeftSide, mari);
     game.add_to_stage(MemberArea::Center, mari2);
     game.add_to_stage(MemberArea::RightSide, chika);
     game.state.recalculate_constants();
 
-    let gained = game.state.gained_abilities.get(&mari);
-    assert!(
-        gained.is_none() || gained.unwrap().is_empty(),
-        "Mari should NOT gain ability with duplicate names"
-    );
+    assert_nothing_gained(&game, mari, "duplicate names");
 }
 
 /// Non-Aqours member on one area → condition fails → no gain.
@@ -193,17 +214,24 @@ fn non_aqours_member_fails_condition() {
     let mari = game.id("PL!S-bp2-008-R\u{ff0b}");
     let chika = game.id("PL!S-sd1-001-SD");
     let filler = game.id("PL!-sd1-010-SD");
+    game.assert_card_identity(mari, "PL!S-bp2-008-R＋");
+    game.assert_card_identity(filler, "PL!-sd1-010-SD");
+    // Group matching is SERIES-based (see WRITING_TESTS "Card group matching
+    // depends on series"), so pin the contrast rather than a group field: the
+    // filler must be a different card from the 『Aqours』 members the positive
+    // twin stages, and the positive twin is what proves the series check works.
+    game.assert_distinct_card_names(
+        filler,
+        game.id("PL!S-bp2-011-N"),
+        "the non-『Aqours』 fixture vs an 『Aqours』 member",
+    );
 
     game.add_to_stage(MemberArea::LeftSide, mari);
     game.add_to_stage(MemberArea::Center, chika);
     game.add_to_stage(MemberArea::RightSide, filler);
     game.state.recalculate_constants();
 
-    let gained = game.state.gained_abilities.get(&mari);
-    assert!(
-        gained.is_none() || gained.unwrap().is_empty(),
-        "Mari should NOT gain ability with non-Aqours member"
-    );
+    assert_nothing_gained(&game, mari, "non-『Aqours』 member on stage");
 }
 
 /// 0 live cards in yell → condition not met → no bonus anywhere.

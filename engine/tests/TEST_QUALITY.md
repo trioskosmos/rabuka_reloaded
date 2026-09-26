@@ -30,7 +30,7 @@ _has_pending_choice asserted without choice identity (pending_choice_type/summar
 
 None.
 
-## assert_only_negative (19)
+## assert_only_negative (7)
 
 _every assertion is a bare is_err()/is_none() — some guard fired, but nothing says which, so a regression tripping a different guard still passes_
 
@@ -38,21 +38,9 @@ _every assertion is a bare is_err()/is_none() — some guard fired, but nothing 
 | --- | --- | --- | --- |
 | `engine/tests/test_modules/characterization/bytecode_validation_test.rs` | `empty_slice_returns_default_ability` | 281 |  |
 | `engine/tests/test_modules/characterization/bytecode_validation_test.rs` | `malformed_bytecode_returns_error` | 273 |  |
-| `engine/tests/test_modules/effects/ability_mod/full_distinct_group_stage_grants_yell_live_score_test.rs` | `duplicate_names_fails_condition` | 166 |  |
-| `engine/tests/test_modules/effects/ability_mod/full_distinct_group_stage_grants_yell_live_score_test.rs` | `empty_area_fails_condition` | 146 |  |
-| `engine/tests/test_modules/effects/ability_mod/full_distinct_group_stage_grants_yell_live_score_test.rs` | `non_aqours_member_fails_condition` | 188 |  |
 | `engine/tests/test_modules/effects/ability_mod/rina_gain_live_success_from_under_member_test.rs` | `rina_no_under_cards` | 154 |  |
 | `engine/tests/test_modules/effects/ability_mod/rina_gain_live_success_from_under_member_test.rs` | `rina_not_on_stage` | 177 |  |
-| `engine/tests/test_modules/effects/compound/cost_and_effect/center_wait_discard_other_group_cost_plus_two_same_area_deploy_edges_test.rs` | `center_other_member_cost_plus_two_deploy_not_at_center_activation_blocked` | 20 |  |
-| `engine/tests/test_modules/effects/compound/cost_and_effect/discard_cost_reveal_five_conditional_mus_search_pl_bp6_006_test.rs` | `maki_bp6_use_limit_turn1_enforces` | 418 |  |
-| `engine/tests/test_modules/effects/compound/cost_and_effect/hand_only_self_discard_draw_group_blade_q196_test.rs` | `hand_only_self_discard_draw_q196_needs_hand_activation` | 58 |  |
 | `engine/tests/test_modules/effects/compound/sequential_effects/baton_touch_place_liella_under_then_activate_copied_ability_pl_sp_pb2_005_test.rs` | `hazuki_non_liella_under_no_abilities_gained` | 177 |  |
-| `engine/tests/test_modules/effects/conditional/zone_source/umi_reveal_live_card_gains_live_total_score_test.rs` | `q176_use_limit_blocks_second_activation_same_turn` | 107 |  |
-| `engine/tests/test_modules/effects/cost_mod/activation_discount/play_time_three_named_member_discard_cost_ten_test.rs` | `play_time_named_discard_waitroom_fodder_cannot_enable_ten_energy_play` | 170 |  |
-| `engine/tests/test_modules/effects/deploy/under_energy_cost_waited_empty_area_deploy_q268_test.rs` | `under_energy_cost_waited_deploy_q268_turn_limit_blocks_second_activation` | 237 |  |
-| `engine/tests/test_modules/effects/energy/under_member/energy_under_original_blade_limit_opponent_wait_test.rs` | `energy_under_original_blade_limit_negative_modifier_does_not_make_printed_blade_eligible` | 238 |  |
-| `engine/tests/test_modules/effects/energy/under_member/energy_under_original_blade_limit_opponent_wait_test.rs` | `energy_under_original_blade_limit_opponent_over_limit_not_waited` | 165 |  |
-| `engine/tests/test_modules/effects/look_select/search_deck/reveal_from_deck_until_chosen_type_found_test.rs` | `reveal_until_chosen_type_center_requirement_left_side_fails` | 222 |  |
 | `engine/tests/test_modules/effects/recover/to_hand/live_success_recover_different_group_name_to_hand_ll_bp5_002_l_test.rs` | `all_same_group_no_effect` | 135 |  |
 | `engine/tests/test_modules/effects/recover/to_hand/live_success_recover_different_group_name_to_hand_ll_bp5_002_l_test.rs` | `two_distinct_groups_no_effect` | 106 |  |
 

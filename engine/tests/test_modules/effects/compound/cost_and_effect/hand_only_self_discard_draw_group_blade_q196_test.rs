@@ -61,9 +61,11 @@ fn hand_only_self_discard_draw_q196_needs_hand_activation() {
     let mut game = TestGame::new(db);
 
     let shizuku = game.id("PL!N-pb1-003-R");
+    game.assert_card_identity(shizuku, "PL!N-pb1-003-R");
 
     game.state.player1.stage.stage[1] = shizuku;
     game.give_energy(15);
+    let deck_before = game.state.player1.main_deck.cards.len();
 
     let result = TurnEngine::execute_main_phase_action(
         &mut game.state,
@@ -76,5 +78,22 @@ fn hand_only_self_discard_draw_q196_needs_hand_activation() {
     assert!(
         result.is_err(),
         "Should not activate from stage (requires hand)"
+    );
+    // The refusal must be "this ability is hand-only", not some unrelated guard:
+    // the 15 energy is unspent, no prompt opened, and the card never moved.
+    game.assert_energy_untouched_after_refusal(15, "時枝 白雪 hand-only 起動 from stage");
+    assert_eq!(
+        game.state.player1.stage.stage,
+        [-1, shizuku, -1],
+        "a refused 起動 leaves her on stage"
+    );
+    assert!(
+        !game.has_pending_choice(),
+        "a refused activation must not open the discard cost prompt"
+    );
+    assert_eq!(
+        game.state.player1.main_deck.cards.len(),
+        deck_before,
+        "カードを1枚引く must not run"
     );
 }

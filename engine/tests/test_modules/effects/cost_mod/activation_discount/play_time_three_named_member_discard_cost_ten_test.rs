@@ -183,6 +183,29 @@ fn play_time_named_discard_waitroom_fodder_cannot_enable_ten_energy_play() {
     // try with only 10 energy and no hand fodder — should fail (needs 15)
     let res = game.try_play_to_stage(triple, rabuka_engine::zones::MemberArea::Center);
     assert!(res.is_err(), "should fail with 10 energy and no hand fodder: {res:?}");
+    // The refusal must be "cannot afford the reduced cost", and it must have
+    // changed nothing: the 3 waitroom members are the wrong zone for the
+    // 手札 named-discard, and none of them may be consumed by a failed play.
+    game.assert_energy_untouched_after_refusal(10, "10 energy vs a 15-cost play");
+    assert_eq!(
+        game.state.player1.stage.stage,
+        [-1, -1, -1],
+        "a refused play must leave the stage empty"
+    );
+    assert!(
+        game.state.player1.hand.cards.contains(&triple),
+        "the card must still be in hand"
+    );
+    assert!(
+        game.state.player1.waitroom.cards.contains(&hanamaru)
+            && game.state.player1.waitroom.cards.contains(&setsuna)
+            && game.state.player1.waitroom.cards.contains(&chisato),
+        "the waitroom named-discard cost must not be paid by a refused play"
+    );
+    assert!(
+        !game.has_pending_choice(),
+        "a refused play must not open a prompt"
+    );
 }
 
 #[test]

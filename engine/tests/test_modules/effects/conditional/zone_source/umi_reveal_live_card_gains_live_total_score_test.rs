@@ -120,11 +120,42 @@ fn q176_use_limit_blocks_second_activation_same_turn() {
     while game.has_pending_choice() {
         game.select_indices(&[0]);
     }
+    // Prove the FIRST activation happened, or the second refusal is vacuous.
+    let turn = game.state.turn_number;
+    assert!(
+        game.state
+            .turn_limited_abilities_used
+            .contains_key(&(umi, 0, turn)),
+        "the first activation must record its use (card={umi}, ab#0, turn={turn})"
+    );
+    let hand_after_first = game.state.player1.hand.cards.len();
+    let energy_after_first = game.state.player1.energy_zone.active_count() as i16;
 
     let result = game.try_activate_ability(umi);
     assert!(
         result.is_err(),
         "Second activation should fail due to use_limit=1"
+    );
+    // A use-limit refusal must cost nothing: the discard cost is not paid a
+    // second time, the energy is unspent, and no prompt opens.
+    assert_eq!(
+        game.state.player1.hand.cards.len(),
+        hand_after_first,
+        "the 手札 discard cost must not be paid a second time"
+    );
+    game.assert_energy_untouched_after_refusal(energy_after_first, "second 起動 at use_limit");
+    assert!(
+        !game.has_pending_choice(),
+        "a use-limit refusal must not open a prompt"
+    );
+    assert_eq!(
+        game.state
+            .turn_limited_abilities_used
+            .keys()
+            .filter(|(c, _, _)| *c == umi)
+            .count(),
+        1,
+        "one use record for one successful activation, not two"
     );
 }
 
