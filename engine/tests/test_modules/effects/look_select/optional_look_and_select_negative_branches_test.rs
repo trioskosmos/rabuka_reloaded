@@ -33,9 +33,9 @@
 //! number. The two observable points are the play and the answer, and both tests
 //! below assert deltas between exactly those two.
 //!
-//! ## A defect found here, and deliberately NOT fixed
+//! ## The skipped-cost path, and why it is NOT a defect
 //!
-//! Declining the optional cost CANCELS the rest of this ability. Measured on
+//! Declining the optional cost cancels the rest of this ability. Measured on
 //! 朝香果林 `PL!N-pb1-028-N` (same shape, N=2):
 //!
 //! ```text
@@ -43,19 +43,29 @@
 //!   cost PAID:     deck=6 hand=3 waitroom=0 looked=0  ->  deck=4 hand=2 waitroom=1 looked=2
 //! ```
 //!
-//! Paying is exactly right: one cost card, two looked, one taken, one banked. The
-//! skip path is where the ability evaporates, and for 「…置いてもよい：見る」 the
-//! printed text makes only the PAYMENT optional — the look is due either way.
+//! An earlier draft of this header called that a defect and left it unpatched. It
+//! is not one, and the engine says so in its own source
+//! (`ability/cost/handlers.rs:364-366`):
 //!
-//! It is not fixed because the cause is not one site. Roughly ten places handle a
-//! declined optional cost, and the one that clears `pending_actions`
-//! (`ability/cost/handlers.rs::handle_optional_cost_payment`) is NOT the one on this
-//! path — the hand-payment skip in `ability/choice.rs` is, and it resumes without
-//! re-queueing the effect. A patch to the wrong one of those is a no-op (as a first
-//! attempt was), and a patch to the wrong one of the OTHERS changes the behaviour
-//! of every card whose whole ability hinges on the cost. Both tests here take the
-//! PAY path, which is the path the engine gets right, and the skip path stays the
-//! reported defect.
+//! > NOTE: this cost colon-gates the effect. When skipped (or empty-hand auto-skip),
+//! > the resolver's cost_was_skipped path prevents the gated effect from firing
+//! > (e.g. 「手札をすべて控え室に置いてもよい：カードを6枚引く」).
+//!
+//! The worked example is nearly this card. So the convention in this engine is that
+//! a declined optional cost gates everything after the 「：」 — which is why
+//! `turn/actions/mod.rs` resolves the resume as `CompleteSkipped` before it
+//! considers `effect_ready`, and why the cost handlers clear `pending_actions` on a
+//! decline rather than re-queueing the effect. Three separate sites agree; this is
+//! a design decision with a stated rationale, not an oversight.
+//!
+//! Whether the OFFICIAL card rules read 「…置いてもよい：A」 as gating A is a
+//! rules-interpretation question that the code cannot settle, and it is the only
+//! thing here worth escalating. An attempt to "fix" the resume branch was written,
+//! verified to compile, and confirmed to flip `optional_skipped` to false — then
+//! reverted, because it contradicted the note above without producing the intended
+//! behaviour: the effect is never queued behind a declined cost, so no resume policy
+//! can recover it. Both tests here take the PAY path, which is the path the engine
+//! handles and which the numbers below describe exactly.
 
 
 use crate::helpers::*;
