@@ -50,17 +50,31 @@
 //! `looked_at_matching_indices` (ability/look.rs:52) finds ZERO matches even though
 //! `card_matches_group_str` accepts the same card.
 //!
-//! The parsed `select_action` carries the filter as `group_names: ["CatChu!"]`, while
-//! `Filter::check_group` (ability/util.rs:1220) reads `self.group` / `self.groups`. That
-//! is where to look: the group is being read and compared, but nothing matches, so
-//! the name arriving at the matcher is not the one in the card data — a decode or
-//! name-mapping problem on this effect shape, not a presentation one.
+//! Where a fix belongs, and what is already ruled out. The group is NOT lost in the
+//! data and is NOT mis-decoded:
+//!
+//! - the parsed `select_action` carries `group_names: ["CatChu!"]` — present and
+//!   correct in abilities.json;
+//! - `effect_decoder_gen.rs` reads `group_names` and `card_names` into SEPARATE
+//!   fields (`ek.group_names` / `ek.card_names`), and `build_filter` carries both, so
+//!   there is no cross-wiring at decode;
+//! - `CardFilter::from_effect` maps `group_names` into BOTH `group` and `groups`
+//!   (util.rs:1539-1543), and `Filter::check_group` (util.rs:1220) consults them;
+//! - `card_matches_group_str(db, <that same card>, Some("CatChu!"))` returns TRUE,
+//!   measured.
+//!
+//! So the group arrives, the matcher accepts the card, and
+//! `looked_at_matching_indices` (look.rs:45-54, via `CardFilter::from_effect`) still
+//! yields ZERO indices. Whatever else the built filter carries is rejecting every
+//! looked card — the next thing to inspect is what `from_effect` populates for this
+//! effect shape beyond the group (util.rs:1526-1565), particularly
+//! `name_fragments`, which is the field most likely to exclude a card on its NAME.
 //!
 //! メイ's identical shape with NO filter retrieves reliably, which is the control:
 //! the look, the count, the cost and the banking all work, and only the filtered
-//! selection is broken. Left unfixed here because the decode path is shared with every
-//! other filtered selection and a speculative change there would be reckless; the
-//! measurements above are what a fix needs.
+//! selection is broken. Left unfixed here because `from_effect` is shared by every
+//! filtered selection in the game, and guessing at it is not a change worth making
+//! without the field in hand.
 
 use crate::helpers::*;
 use rabuka_engine::zones::MemberArea;
