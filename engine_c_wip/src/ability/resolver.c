@@ -36,8 +36,19 @@ int rb_find_card_stage_position(const GameState *g, int cid);
 void rb_log_push_verdict(const char *text, const char *kind, int passed);
 int rb_log_buffer_len(void);
 void rb_log_clear_verdicts(void);
-void rb_log_drain_verdicts_since(int snap);
+/* log.rs:213 — the real signature drains into a caller buffer. The previous
+ * one-arg prototype here did not match src/ability/log.c and would have linked
+ * against garbage if it were ever called. */
+int rb_log_drain_verdicts(RbAbilityLogItem *out, int max);
+int rb_log_drain_verdicts_since(int start_index, RbAbilityLogItem *out, int max);
+void rb_log_free_item(RbAbilityLogItem *item);
 int rb_ability_debug_enabled(void);
+/* cost.c: energy_count_any() — the PayEnergy amount rb_pay_cost actually charges. */
+int rb_cost_energy_count_any(const AbilityEffect *e);
+/* Defined at the foot of this file; used by the condition gate above. */
+void rb_resolver_drain_verdicts(GameState *g);
+void rb_resolver_drain_verdicts_since(GameState *g, int snapshot);
+void rb_resolver_push_verdict(GameState *g, const char *text, const char *kind, int passed);
 /* trigger helpers (rb_ability_has_trigger declared in rabuka.h) */
 int rb_resolve_target_player(const GameState *g, const char *target);
 /* condition field accessors (defined in src/core/card.c, not yet in rabuka.h) */
@@ -101,7 +112,7 @@ static int cond_is_appearance(const Condition *c) {
     return c->variant == RB_COND_APPEARANCE;
 }
 
-/* stable hash for condition cache key (mirrors format!("{:?}", condition) hash)
+/* Stable hash for condition cache key (mirrors format!("{:?}", condition) hash)
    Use pointer + variant + field count as cheap stable key; bytecode conditions
    are interned per ability so pointer identity is sufficient. */
 static int cond_cache_key(const Condition *c) {
@@ -112,6 +123,22 @@ static int cond_cache_key(const Condition *c) {
     h ^= (int)c->n_fields; h *= 16777619;
     h ^= (int)(uintptr_t)c & 0xFFFFFF; h *= 16777619;
     return h;
+}
+
+/* The string-keyed twin of cond_cache_key, for the exported
+ * rb_resolver_{cached,store}_condition_verdict entry points, whose callers hold
+ * a condition TEXT rather than a decoded Condition*. FNV-1a over the text, kept
+ * disjoint from the pointer-derived range (0 for "no key") by never returning
+ * 0. Two texts therefore share a slot exactly when they are byte-identical,
+ * which is the same equality Rust's `format!("{:?}", condition)` key buys. */
+static int cond_text_cache_key(const char *cond_text) {
+    if (!cond_text || !cond_text[0]) return 0;
+    unsigned h = 2166136261u;
+    for (const unsigned char *p = (const unsigned char *)cond_text; *p; p++) {
+        h ^= (unsigned)*p; h *= 16777619u;
+    }
+    int key = (int)(h & 0x7FFFFFFF);
+    return key == 0 ? 1 : key;
 }
 
 /* ── choice_offer_sig (resolver.rs:44) ── */
@@ -174,11 +201,19 @@ static int ability_is_activation(const Ability *ab) {
 /* ── resolver.rs::cached_condition_verdict ──
    Returns 1 if cache hit, writes *out; 0 otherwise. Mirrors Option<bool>. */
 int rb_resolver_cached_condition_verdict(const GameState *g, int actor, const char *cond_text, int *result) {
-    (void)actor; (void)cond_text;
+    (void)actor;
     if (!g || !result) return 0;
-    /* The C condition cache keys on the Condition* pointer + variant (cond_cache_key).
-       The string `cond_text` is not reversible to a Condition* here; callers that
-       have the Condition* should use the internal cached_condition_verdict directly. */
+    /* String-keyed twin of the typed helper below: these entry points are handed
+       a condition TEXT, so the key is derived from that text. This used to be a
+       `(void)` no-op that always reported a miss, so nothing a string-keyed
+       caller stored was ever read back. */
+    int key = cond_text_cache_key(cond_text);
+    if (key == 0) return 0;
+    int cur = g->queue.cur;
+    if (cur < 0 || cur >= g->queue.n_entries) return 0;
+    const RbQueueEntry *e = &g->queue.entries[cur];
+    for (int i = 0; i < e->n_cond_cache; i++)
+        if (e->cond_cache_keys[i] == key) { *result = e->cond_cache_vals[i]; return 1; }
     *result = 0;
     return 0;
 }
@@ -208,7 +243,22 @@ static void store_condition_verdict(GameState *g, const Condition *cond, int pas
     }
 }
 void rb_resolver_store_condition_verdict(GameState *g, int actor, const char *cond_text, int result) {
-    (void)actor; (void)cond_text; (void)g; (void)result;
+    (void)actor;
+    if (!g) return;
+    /* resolver.rs:352-361 — store keyed on the condition, replacing any
+       previously stored verdict for the same key. */
+    int key = cond_text_cache_key(cond_text);
+    if (key == 0) return;
+    int cur = g->queue.cur;
+    if (cur < 0 || cur >= g->queue.n_entries) return;
+    RbQueueEntry *e = &g->queue.entries[cur];
+    for (int i = 0; i < e->n_cond_cache; i++)
+        if (e->cond_cache_keys[i] == key) { e->cond_cache_vals[i] = result ? 1 : 0; return; }
+    if (e->n_cond_cache < RB_COND_CACHE_CAP) {
+        e->cond_cache_keys[e->n_cond_cache] = key;
+        e->cond_cache_vals[e->n_cond_cache] = result ? 1 : 0;
+        e->n_cond_cache++;
+    }
 }
 
 /* ── resolver.rs::store_pending_choice (dedup + snapshot_requested) ── */
@@ -370,8 +420,112 @@ static AbilityEffect clone_cost(const AbilityEffect *c) {
     out = *c; /* shallow clone; extra strings are shared (read-only) */
     return out;
 }
-static AbilityEffect apply_modify_cost_to_ability_cost(GameState *g, const AbilityEffect *cost, const Ability *ability) {
+
+/* resolver.rs::per_unit_reduction (1191-1193) — ONE definition of the
+ * `(units / per_unit_count.max(1)) * amount` math. */
+static int per_unit_reduction(int total_units, int per_unit_count, int unit_amount) {
+    if (per_unit_count < 1) per_unit_count = 1;
+    return (total_units / per_unit_count) * unit_amount;
+}
+
+/* Write `value` into the cloned cost's `key` extra, inserting the pair when the
+ * key is absent. Rust's `cost.set_energy_count(Some(n))` always leaves a
+ * readable value behind; the previous C code only rewrote an EXISTING
+ * "energy_count" pair and silently dropped the whole reduction when the key
+ * had never been decoded.
+ *
+ * The clone is SHALLOW, so an existing value string is still owned by the
+ * decoded ability effect and must NOT be freed here. Returns the index of a
+ * pair this call allocated (owned solely by the clone, released by
+ * cost_clone_release), or -1 when nothing was allocated. */
+static int cost_set_extra_int(AbilityEffect *cost, const char *key, int value) {
+    if (!cost || !key) return -1;
+    char buf[16];
+    snprintf(buf, sizeof(buf), "%d", value);
+    for (int i = 0; i < cost->n_extra; i++) {
+        if (cost->extra_k[i] && !strcmp(cost->extra_k[i], key)) {
+            cost->extra_v[i] = rb_strdup2(buf);
+            return -1;
+        }
+    }
+    if (cost->n_extra >= RB_MAX_EXTRA) return -1;
+    cost->extra_k[cost->n_extra] = rb_strdup2(key);
+    cost->extra_v[cost->n_extra] = rb_strdup2(buf);
+    cost->n_extra++;
+    return cost->n_extra - 1;
+}
+
+static void cost_clone_release(AbilityEffect *cost, int inserted_index) {
+    if (!cost || inserted_index < 0 || inserted_index >= cost->n_extra) return;
+    free(cost->extra_k[inserted_index]);
+    free(cost->extra_v[inserted_index]);
+    cost->extra_k[inserted_index] = NULL;
+    cost->extra_v[inserted_index] = NULL;
+}
+
+/* resolver.rs::apply_per_unit_cost_reduction (1196-1253). */
+static void apply_per_unit_cost_reduction(GameState *g, AbilityEffect *cost,
+                                          const AbilityEffect *mod_cost,
+                                          int *inserted_index) {
+    int per_unit_count = 1;
+    const char *puc = eff_extra(mod_cost, "per_unit_count");
+    if (puc) per_unit_count = atoi(puc);
+    if (per_unit_count < 1) per_unit_count = 1;
+    int unit = mod_cost->count >= 0 ? mod_cost->count : 1;
+    const char *per_unit_type = eff_extra(mod_cost, "per_unit_type");
+
+    if (per_unit_type && !strcmp(per_unit_type, "group_name")) {
+        /* Rust only folds the reduction into an energy cost. The C port used to
+         * subtract from `count` for ANY cost, and rb_pay_cost charges
+         * pay_energy from `energy_count` (cost.c:828) — so on a pay_energy
+         * cost carrying a decoded `count` the reduction landed on a field the
+         * engine never reads and the discount was silently lost. */
+        if (!cost->action || strcmp(cost->action, "pay_energy") != 0) return;
+        int groups = rb_distinct_stage_groups(g, g->active);
+        int reduction = per_unit_reduction(groups, per_unit_count, unit);
+        int current = rb_cost_energy_count_any(cost);
+        if (current < 0) current = 0;
+        int next = current - reduction;
+        if (next < 0) next = 0;
+        if (inserted_index) *inserted_index = cost_set_extra_int(cost, "energy_count", next);
+        if (rb_ability_debug_enabled())
+            fprintf(stderr, "[COST_REDUCE_ENERGY] groups=%d per_unit_cnt=%d unit=%d "
+                            "reduction=%d energy_count=%d->%d\n",
+                    groups, per_unit_count, unit, reduction, current, next);
+        return;
+    }
+    if (per_unit_type && (!strcmp(per_unit_type, "success_live_card_zone") ||
+                          !strcmp(per_unit_type, "success_live_zone") ||
+                          !strcmp(per_unit_type, "live_card_zone") ||
+                          !strcmp(per_unit_type, "live_zone"))) {
+        /* PB1-007: hand discard 3 reduced by 1 per success live. Rust gates
+         * this branch on a move_cards cost as well. */
+        if (!cost->action || strcmp(cost->action, "move_cards") != 0) return;
+        /* resolver.rs:1229-1233 — the success zone belongs to the queue
+         * entry's player (defaulting to player 1), NOT to g->active. */
+        int pl = 0;
+        int cur_entry = g->queue.cur;
+        if (cur_entry >= 0 && cur_entry < g->queue.n_entries) {
+            const char *pid = g->queue.entries[cur_entry].player_id;
+            if (pid && pid[0] == 'p' && (pid[1] == '1' || pid[1] == '2'))
+                pl = pid[1] - '1';
+        }
+        int success_len = g->p[pl].success.n;
+        int reduction = per_unit_reduction(success_len, per_unit_count, unit);
+        int current = cost->count >= 0 ? cost->count : 0;
+        int next = current - reduction;
+        if (next < 0) next = 0;
+        cost->count = next;
+        if (rb_ability_debug_enabled())
+            fprintf(stderr, "[COST_REDUCE_HAND] pl=%d success_len=%d per_unit_cnt=%d "
+                            "unit=%d reduction=%d new_count=%d\n",
+                    pl, success_len, per_unit_count, unit, reduction, next);
+    }
+}
+
+static AbilityEffect apply_modify_cost_to_ability_cost(GameState *g, const AbilityEffect *cost, const Ability *ability, int *inserted_index) {
     AbilityEffect res = clone_cost(cost);
+    if (inserted_index) *inserted_index = -1;
     if (!ability || !ability->effect) return res;
     const AbilityEffect *mod = find_modify_cost_in_effect(ability->effect);
     if (!mod) return res;
@@ -379,43 +533,7 @@ static AbilityEffect apply_modify_cost_to_ability_cost(GameState *g, const Abili
     const char *per_unit = eff_extra(mod, "per_unit");
     if (!op || strcmp(op, "subtract") != 0) return res;
     if (!per_unit || strcmp(per_unit, "true") != 0) return res;
-    const char *per_unit_type = eff_extra(mod, "per_unit_type");
-    int per_unit_count = 1;
-    const char *puc = eff_extra(mod, "per_unit_count");
-    if (puc) per_unit_count = atoi(puc);
-    if (per_unit_count <= 0) per_unit_count = 1;
-    int count = mod->count >= 0 ? mod->count : 1; /* mod->count = per-unit cost reduction amount */
-    if (per_unit_type && !strcmp(per_unit_type, "group_name")) {
-        int groups = rb_distinct_stage_groups(g, g->active);
-        int reduction = (groups / per_unit_count) * count;
-        if (res.count >= 0) {
-            int ne = res.count - reduction;
-            if (ne < 0) ne = 0;
-            res.count = ne;
-        } else {
-            /* pay_energy: energy_count field is extra "energy_count" */
-            const char *ec = eff_extra(&res, "energy_count");
-            int cur = ec ? atoi(ec) : 0;
-            int ne = cur - reduction;
-            if (ne < 0) ne = 0;
-            char buf[16]; snprintf(buf, sizeof(buf), "%d", ne);
-            /* stash back as extra */
-            for (int i = 0; i < res.n_extra; i++) if (res.extra_k[i] && !strcmp(res.extra_k[i], "energy_count")) { free(res.extra_v[i]); res.extra_v[i] = rb_strdup2(buf); break; }
-        }
-    } else if (per_unit_type && (!strcmp(per_unit_type, "success_live_card_zone") || !strcmp(per_unit_type, "success_live_zone") || !strcmp(per_unit_type, "live_card_zone") || !strcmp(per_unit_type, "live_zone"))) {
-        int cur_entry = g->queue.cur;
-        int pl = g->active;
-        if (cur_entry >= 0 && cur_entry < g->queue.n_entries) {
-            /* player_id override not stored; use active */
-        }
-        int success_len = g->p[pl].success.n;
-        int reduction = (success_len / per_unit_count) * count;
-        if (res.count >= 0) {
-            int ne = res.count - reduction;
-            if (ne < 0) ne = 0;
-            res.count = ne;
-        }
-    }
+    apply_per_unit_cost_reduction(g, &res, mod, inserted_index);
     return res;
 }
 
@@ -481,8 +599,13 @@ int rb_can_activate_effect(const GameState *g, int actor, const AbilityEffect *e
             /* The activation condition was decoded as a text marker; evaluate it
                through rb_eval_condition_for_host. Position is merged into the
                condition by the evaluation context (host_cid encodes position). */
+            /* resolver.rs:398-408 — on success drain the pre-check verdicts; the
+               condition is re-evaluated during effect execution, so keeping them
+               would duplicate every entry. On failure they are the only record. */
+            int act_snapshot = rb_log_buffer_len();
             int act_passed = rb_eval_condition_for_host(g, actor, host_cid, eff->condition);
             if (!act_passed) return 0;
+            rb_resolver_drain_verdicts_since((GameState *)g, act_snapshot);
         }
     }
 
@@ -544,6 +667,9 @@ int rb_can_activate_effect(const GameState *g, int actor, const AbilityEffect *e
             }
         }
 
+        /* resolver.rs:466-476 — drain the gate's own verdicts on success (the
+           condition is re-evaluated during execution); keep them on failure. */
+        int cond_snapshot = rb_log_buffer_len();
         int passed = rb_eval_condition_for_host(g, actor, host_cid, cond_for_eval);
 
         /* Free injected fields */
@@ -562,6 +688,7 @@ int rb_can_activate_effect(const GameState *g, int actor, const AbilityEffect *e
         }
 
         store_condition_verdict((GameState *)g, eff->condition, passed);
+        if (passed) rb_resolver_drain_verdicts_since((GameState *)g, cond_snapshot);
         if (!passed) return 0;
     }
 
@@ -643,7 +770,7 @@ static void record_ability_use_guarded(GameState *g, int card_id, int ability_id
 int rb_resolve_ability(GameState *g, int actor, const Ability *ab, int ability_idx, int host_cid, int *resolved) {
     if (resolved) *resolved = 0;
     if (!g || !ab) return 0;
-    if (host_cid == 1049)
+    if (rb_ability_debug_enabled() && host_cid == 1049)
         fprintf(stderr, "[RESOLVE_MERMAID] cur=%d state=%d pending=%d cost=%d started=%d effect=%s\n",
                 g->queue.cur, g->queue.state, g->queue.has_pending,
                 g->queue.cur >= 0 && g->queue.cur < g->queue.n_entries ? g->queue.entries[g->queue.cur].cost_paid : -1,
@@ -689,8 +816,11 @@ int rb_resolve_ability(GameState *g, int actor, const Ability *ab, int ability_i
 
     /* ── pay cost (Rust line 899-926) ── */
     if (!cost_already_paid && ab->cost) {
-        AbilityEffect eff_cost = apply_modify_cost_to_ability_cost(g, ab->cost, ab);
-        if (!rb_pay_cost(g, actor, &eff_cost)) {
+        int inserted_index = -1;
+        AbilityEffect eff_cost = apply_modify_cost_to_ability_cost(g, ab->cost, ab, &inserted_index);
+        int paid = rb_pay_cost(g, actor, &eff_cost);
+        cost_clone_release(&eff_cost, inserted_index);
+        if (!paid) {
             push_ability_result(g, "cost_fail", "cost payment failed");
             g_current_ability_valid = 0;
             return 0;
@@ -821,7 +951,25 @@ int rb_resolve_ability(GameState *g, int actor, const Ability *ab, int ability_i
     return 1;
 }
 
-/* ── stubs kept for ABI compat ── */
-void rb_resolver_drain_verdicts(GameState *g) { (void)g; }
-void rb_resolver_push_verdict(GameState *g, const char *text, const char *kind, int passed) { (void)g; (void)text; (void)kind; (void)passed; }
-void rb_resolver_drain_verdicts_since(GameState *g, int snapshot) { (void)g; (void)snapshot; }
+/* ── log.rs verdict-buffer drains (were `(void)` no-ops) ──
+   Rust drains the buffered AbilityLogItems into the ability-resolution entry;
+   the C keeps the buffer in src/ability/log.c, so these forward to it and
+   release the drained items. Bounded by the buffer cap: a drain never grows
+   the C heap. */
+#define RB_RESOLVER_DRAIN_CAP 64
+void rb_resolver_drain_verdicts(GameState *g) {
+    (void)g;
+    RbAbilityLogItem items[RB_RESOLVER_DRAIN_CAP];
+    int n = rb_log_drain_verdicts(items, RB_RESOLVER_DRAIN_CAP);
+    for (int i = 0; i < n; i++) rb_log_free_item(&items[i]);
+}
+void rb_resolver_drain_verdicts_since(GameState *g, int snapshot) {
+    (void)g;
+    RbAbilityLogItem items[RB_RESOLVER_DRAIN_CAP];
+    int n = rb_log_drain_verdicts_since(snapshot, items, RB_RESOLVER_DRAIN_CAP);
+    for (int i = 0; i < n; i++) rb_log_free_item(&items[i]);
+}
+void rb_resolver_push_verdict(GameState *g, const char *text, const char *kind, int passed) {
+    (void)g;
+    rb_log_push_verdict(text, kind, passed);
+}

@@ -630,94 +630,15 @@ int rb_effect_non_stackable_any(const AbilityEffect *e, int *out) {
 }
 
 /* ── (original CardDatabase-method ports follow) ── */
-static int card_no_equal(const char *stored, const char *query, int prefix) {
-    while (*stored && *query) {
-        uint32_t a, b;
-        size_t an = card_utf8_char(stored, &a);
-        size_t bn = card_utf8_char(query, &b);
-        if (card_no_codepoint(a) != b) return 0;
-        stored += an;
-        query += bn;
-    }
-    return !*query && (prefix || !*stored);
-}
 
-static int card_no_lookup(const char *query, int prefix) {
-    for (uint32_t i = 0; i < rb_num_cards(); i++) {
-        const unsigned char *r = rb_card_record(i);
-        if (!r || rb_card_record_len(i) < 25) continue;
-        const char *no = rb_card_string(le16p(r));
-        if (no && card_no_equal(no, query, prefix)) return (int)i;
-    }
-    return -1;
-}
-
+/* CardDatabase::get_card_id (card.rs:576). The five-step fallback chain —
+   exact, normalized, base+rarity (exact / equivalent rarities / any rarity),
+   stripped rarity, contains — lives in one place, rb_find_card_by_no (data.c),
+   so this entry point cannot drift from the engine-wide lookup. */
 int rb_card_get_card_id(const char *card_no) {
-    if (!card_no) return -1;
-    int id = rb_find_card_by_no(card_no);
-    if (id >= 0) return id;
-    size_t len = strlen(card_no);
-    if (len > (SIZE_MAX - 1) / 3) return -1;
-    char *normalized = rb_malloc(len + 1);
-    if (!normalized) return -1;
-    rb_card_normalize_no(card_no, normalized, len + 1);
-    id = card_no_lookup(normalized, 0);
-    char *dash = strrchr(normalized, '-');
-    if (id < 0 && dash) {
-        char requested[64];
-        size_t rarity_len = strlen(dash + 1);
-        if (rarity_len < sizeof(requested)) {
-            memcpy(requested, dash + 1, rarity_len + 1);
-            char equivalent[32];
-            if (rb_card_equivalent_rarity(requested, equivalent, sizeof(equivalent))) {
-                *dash = 0;
-                size_t base_len = strlen(normalized);
-                size_t eq_len = strlen(equivalent);
-                if (base_len + eq_len + 2 < len + 1) {
-                    normalized[base_len] = '-';
-                    memcpy(normalized + base_len + 1, equivalent, eq_len + 1);
-                    id = card_no_lookup(normalized, 0);
-                }
-                *dash = '-';
-            }
-        }
-        if (id < 0) {
-            *dash = 0;
-            id = card_no_lookup(normalized, 1);
-            *dash = '-';
-        }
-        if (id < 0) {
-            *dash = 0;
-            id = card_no_lookup(normalized, 0);
-            *dash = '-';
-        }
-    }
-    if (id < 0) {
-        char *wide = rb_malloc(strlen(normalized) * 3 + 1);
-        if (wide) {
-            char *w = wide;
-            for (const char *p = normalized; *p; p++) {
-                if (*p == '+') {
-                    memcpy(w, "＋", 3);
-                    w += 3;
-                } else *w++ = *p;
-            }
-            *w = 0;
-            for (uint32_t i = 0; i < rb_num_cards(); i++) {
-                const unsigned char *r = rb_card_record(i);
-                if (!r || rb_card_record_len(i) < 25) continue;
-                const char *no = rb_card_string(le16p(r));
-                if (no && (strstr(no, normalized) || strstr(no, wide))) {
-                    id = (int)i;
-                    break;
-                }
-            }
-            rb_free(wide);
-        }
-    }
-    rb_free(normalized);
-    return id;
+    return rb_find_card_by_no(card_no);
 }
+
 int rb_card_get_card_names(int card_id, char *out, size_t out_sz) {
     if (!out || !out_sz) return 0;
     out[0] = 0;

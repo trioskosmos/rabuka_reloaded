@@ -339,49 +339,155 @@ const unsigned char *rb_bc_slice(uint32_t idx, uint32_t *out_len) {
     return g_bc + start;
 }
 
-static void rb_normalize_card_no(const char *src, char *dst, size_t dst_size) {
-    size_t n = 0;
-    if (!dst_size) return;
-    for (; src[n] && n + 1 < dst_size; n++) {
-        unsigned char ch = (unsigned char)src[n];
-        if (ch >= 0xE0 && ch <= 0xEF && src[n + 1] && src[n + 2]) {
-            unsigned codepoint = ((ch & 0x0F) << 12) |
-                                 (((unsigned char)src[n + 1] & 0x3F) << 6) |
-                                 ((unsigned char)src[n + 2] & 0x3F);
-            if (codepoint >= 0xFF01 && codepoint <= 0xFF5E) {
-                ch = (unsigned char)(codepoint - 0xFEE0);
-                n += 2;
-            }
-        }
-        if (ch >= 'a' && ch <= 'z') {
-            ch = (unsigned char)(ch - 'a' + 'A');
-        }
-        dst[n] = (char)ch;
+/* ── CardDatabase::get_card_id (card.rs:576-629) ──────────────────────────────
+   The lookup is a five-step fallback chain, reproduced here in Rust's order:
+
+     1. exact match against the stored card_no
+     2. normalized match (uppercase, fullwidth → halfwidth)
+     3. split at the LAST dash into (base, requested_rarity) and try
+        a. the exact base+rarity key, then
+        b. the equivalent rarities (R+ / R2 / R＋ all name the R＋ print), then
+        c. ANY rarity of that base
+     4. strip the rarity suffix and retry the bare base
+     5. substring contains, on the raw keys
+
+   Steps 3c and 5 take the LOWEST matching key, mirroring Rust's
+   `min_by(|a, b| a.0.cmp(b.0))`. Rust spells that rule out because taking the
+   first HashMap entry made get_card_id non-deterministic; here the records
+   happen to be stored sorted by card_no so the first match would coincide, but
+   the comparison is kept so the two cannot drift apart if that ever changes.
+   ── */
+
+/* The longest card_no in cards.bin is 25 bytes; 64 leaves room for the
+   "base-<canonical rarity>" keys built below. */
+#define CARD_NO_MAX 64
+
+static const char *card_no_at(uint32_t i) {
+    const unsigned char *r = rb_card_record(i);
+    if (!r) return NULL;
+    return rb_card_string(le16(r));
+}
+
+static int card_no_exact(const char *query) {
+    for (uint32_t i = 0; i < g_num_cards; i++) {
+        const char *no = card_no_at(i);
+        if (no && !strcmp(no, query)) return (int)i;
     }
-    dst[n] = 0;
+    return -1;
+}
+
+/* Compare a stored card_no against an ALREADY normalized key. */
+static int card_no_folded_eq(const char *stored, const char *folded) {
+    char candidate[CARD_NO_MAX];
+    rb_card_normalize_no(stored, candidate, sizeof(candidate));
+    return strcmp(candidate, folded) == 0;
+}
+
+static int card_no_folded_lookup(const char *folded) {
+    for (uint32_t i = 0; i < g_num_cards; i++) {
+        const char *no = card_no_at(i);
+        if (no && card_no_folded_eq(no, folded)) return (int)i;
+    }
+    return -1;
+}
+
+/* Step 3c: the lowest normalized card_no starting with `prefix`. */
+static int card_no_folded_prefix_lowest(const char *prefix) {
+    int best = -1;
+    char best_no[CARD_NO_MAX];
+    size_t prefix_len = strlen(prefix);
+    for (uint32_t i = 0; i < g_num_cards; i++) {
+        const char *no = card_no_at(i);
+        if (!no) continue;
+        char candidate[CARD_NO_MAX];
+        rb_card_normalize_no(no, candidate, sizeof(candidate));
+        if (strncmp(candidate, prefix, prefix_len) != 0) continue;
+        if (best < 0 || strcmp(candidate, best_no) < 0) {
+            best = (int)i;
+            memcpy(best_no, candidate, sizeof(best_no));
+        }
+    }
+    return best;
+}
+
+/* Step 5: the lowest RAW card_no containing either needle. */
+static int card_no_contains_lowest(const char *needle, const char *narrow) {
+    int best = -1;
+    const char *best_no = NULL;
+    for (uint32_t i = 0; i < g_num_cards; i++) {
+        const char *no = card_no_at(i);
+        if (!no) continue;
+        if (!strstr(no, needle) && !strstr(no, narrow)) continue;
+        if (!best_no || strcmp(no, best_no) < 0) { best = (int)i; best_no = no; }
+    }
+    return best;
 }
 
 int rb_find_card_by_no(const char *card_no) {
-    char normalized[128];
     if (!card_no || !g_cards_blob) return -1;
-    for (uint32_t i = 0; i < g_num_cards; i++) {
-        const unsigned char *rec = rb_card_record(i);
-        if (!rec) continue;
-        uint16_t no_idx = le16(rec + 0);
-        const char *no = rb_card_string(no_idx);
-        if (no && strcmp(no, card_no) == 0) return (int)i;
+
+    /* 1. exact */
+    int id = card_no_exact(card_no);
+    if (id >= 0) return id;
+
+    /* 2. normalized (rb_card_normalize_no is the card.rs:634 port; folding a
+       3-byte fullwidth character must write exactly ONE destination byte) */
+    char normalized[CARD_NO_MAX];
+    rb_card_normalize_no(card_no, normalized, sizeof(normalized));
+    id = card_no_folded_lookup(normalized);
+    if (id >= 0) return id;
+
+    /* 3. base + requested rarity */
+    const char *dash = strrchr(normalized, '-');
+    if (dash) {
+        char base[CARD_NO_MAX];
+        size_t base_len = (size_t)(dash - normalized);
+        if (base_len < sizeof(base)) {
+            memcpy(base, normalized, base_len);
+            base[base_len] = 0;
+            const char *requested = dash + 1;
+            char variant[CARD_NO_MAX];
+            int n;
+
+            /* 3a. exact base + requested rarity */
+            n = snprintf(variant, sizeof(variant), "%s-%s", base, requested);
+            if (n > 0 && (size_t)n < sizeof(variant)) {
+                id = card_no_folded_lookup(variant);
+                if (id >= 0) return id;
+            }
+            /* 3b. equivalent rarities. The canonical form keeps the fullwidth
+               ＋, so the key must be normalized before the folded comparison. */
+            char canonical[32];
+            if (rb_card_equivalent_rarity(requested, canonical, sizeof(canonical))) {
+                n = snprintf(variant, sizeof(variant), "%s-%s", base, canonical);
+                if (n > 0 && (size_t)n < sizeof(variant)) {
+                    char folded[CARD_NO_MAX];
+                    rb_card_normalize_no(variant, folded, sizeof(folded));
+                    id = card_no_folded_lookup(folded);
+                    if (id >= 0) return id;
+                }
+            }
+            /* 3c. any rarity of this base, lowest key wins */
+            n = snprintf(variant, sizeof(variant), "%s-", base);
+            if (n > 0 && (size_t)n < sizeof(variant)) {
+                id = card_no_folded_prefix_lowest(variant);
+                if (id >= 0) return id;
+            }
+            /* 4. strip the rarity suffix and retry the bare base */
+            id = card_no_folded_lookup(base);
+            if (id >= 0) return id;
+        }
     }
-    rb_normalize_card_no(card_no, normalized, sizeof(normalized));
-    for (uint32_t i = 0; i < g_num_cards; i++) {
-        const unsigned char *rec = rb_card_record(i);
-        if (!rec) continue;
-        const char *no = rb_card_string(le16(rec));
-        char candidate[128];
-        if (!no) continue;
-        rb_normalize_card_no(no, candidate, sizeof(candidate));
-        if (strcmp(candidate, normalized) == 0) return (int)i;
+
+    /* 5. contains fallback on the raw keys, narrow form widens '+' to '＋' */
+    char narrow[CARD_NO_MAX * 2];
+    size_t w = 0;
+    for (const char *p = normalized; *p && w + 4 < sizeof(narrow); p++) {
+        if (*p == '+') { memcpy(narrow + w, "\xef\xbc\x8b", 3); w += 3; }
+        else narrow[w++] = *p;
     }
-    return -1;
+    narrow[w] = 0;
+    return card_no_contains_lowest(normalized, narrow);
 }
 
 void rb_effect_data_free(RbEffectData *d) {

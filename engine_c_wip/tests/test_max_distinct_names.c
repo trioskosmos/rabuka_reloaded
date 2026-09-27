@@ -1,3 +1,6 @@
+#include "rabuka.h"
+#include "test_game.h"
+
 #include <stdbool.h>
 #include <stdint.h>
 #include <stdio.h>
@@ -251,10 +254,199 @@ static void cyclic_overlap_is_solved_exactly(void) {
     CHECK_EQ(r.collision, 0, "adversarial ordering is collision-free");
 }
 
+/* ── Card-number lookup parity (TEST_PORT_BACKLOG item 3) ───────────────────
+   rb_find_card_by_no is the C port of CardDatabase::get_card_id
+   (engine/src/core/card.rs:576). It used to stop after the exact and the
+   normalized match, so every card number spelled with an ASCII "+" for a print
+   the database stores with a fullwidth "＋" resolved to -1, and the
+   normalizer it used aliased one cursor for both the UTF-8 read and the output
+   write — folding a 3-byte fullwidth character to 1 byte left two
+   UNINITIALIZED bytes in the buffer, so a lookup either missed or silently
+   matched a different print depending on stack contents. These cases pin both.
+   ── */
+
+static void card_lookup_queries(TestGame *tg, const char *no) {
+    (void)tg;
+    int id = rb_find_card_by_no(no);
+    if (id < 0) {
+        fprintf(stderr, "FAIL: card_no '%s' does not resolve\n", no);
+        failures++;
+        return;
+    }
+    Card card;
+    memset(&card, 0, sizeof card);
+    if (!rb_decode_card_by_index((uint32_t)id, &card)) {
+        fprintf(stderr, "FAIL: card_no '%s' (id %d) does not decode\n", no, id);
+        failures++;
+        return;
+    }
+    const char *stored = rb_card_string(card.card_no_idx);
+    printf("ok: '%s' -> id %d (%s)\n", no, id, stored ? stored : "?");
+    rb_free_card(&card);
+}
+
+static void card_lookup_resolves(const char *no, int expected_id) {
+    int id = rb_find_card_by_no(no);
+    if (id != expected_id) {
+        fprintf(stderr, "FAIL: '%s' resolved to %d expected %d\n", no, id, expected_id);
+        failures++;
+    } else {
+        printf("ok: '%s' -> %d\n", no, id);
+    }
+}
+
+static void card_lookup_returns_minus_one(void) {
+    /* A base with no print at all must still miss. Note "PL!N-bp1-999" is NOT
+       a valid negative case: the database has PL!N-bp1-999-SEC＋, so the
+       base-prefix fallback resolves it (and so does the Rust engine). */
+    static const char *const absent[] = { "PL!ZZ-bp1-999-R+", "LL-ZZ-999-R" };
+    for (size_t i = 0; i < sizeof(absent) / sizeof(absent[0]); i++) {
+        int id = rb_find_card_by_no(absent[i]);
+        if (id != -1) {
+            fprintf(stderr, "FAIL: unknown card_no '%s' resolved to %d expected -1\n",
+                    absent[i], id);
+            failures++;
+        } else {
+            printf("ok: unknown card number '%s' is not found\n", absent[i]);
+        }
+    }
+}
+
+/* Every one of these is a print the database stores with a fullwidth "＋"; the
+   ASCII "+" spelling must reach the same card the Rust engine reaches. */
+static void card_lookup_ascii_plus_resolves(void) {
+    TestGame tg;
+    test_game_new(&tg);
+    static const char *const queries[] = {
+        "LL-bp1-001-R+", "LL-bp2-001-R+", "PL!-bp3-008-R+", "PL!-bp5-003-R+",
+        "PL!-bp6-003-R+", "PL!-bp6-006-R+", "PL!-bp6-007-R+", "PL!HS-bp2-007-R+",
+        "PL!N-bp4-007-R+", "PL!N-bp5-005-R+", "PL!N-bp5-012-R+", "PL!N-pb1-009-P+",
+        "PL!N-pb1-022-P+", "PL!S-bp5-001-R+", "PL!S-bp5-002-R+", "PL!S-bp6-004-R+",
+        "PL!S-bp7-007-R+", "PL!SP-bp5-001-R+", "PL!SP-bp5-002-R+", "PL!SP-bp5-004-R+"
+    };
+    for (size_t i = 0; i < sizeof(queries) / sizeof(queries[0]); i++)
+        card_lookup_queries(&tg, queries[i]);
+}
+
+/* The fullwidth and ASCII spellings of one card number must resolve to the
+   SAME print. Before the fix the fullwidth form lost the "＋" to the
+   normalizer's uninitialized hole and returned a neighbouring print. */
+static void card_lookup_plus_spellings_agree(void) {
+    TestGame tg;
+    test_game_new(&tg);
+    int wide = rb_find_card_by_no("PL!SP-pb1-002-P\uff0b");
+    int narrow = rb_find_card_by_no("PL!SP-pb1-002-P+");
+    CHECK_EQ(wide, narrow, "fullwidth and ASCII plus spell the same card");
+    CHECK_EQ(wide, 2259, "PL!SP-pb1-002-P+ resolves the P+ print");
+    if (wide >= 0) {
+        Card card;
+        memset(&card, 0, sizeof card);
+        if (rb_decode_card_by_index((uint32_t)wide, &card)) {
+            const char *stored = rb_card_string(card.card_no_idx);
+            CHECK(stored && !strcmp(stored, "PL!SP-pb1-002-P\uff0b"),
+                  "resolved card is the P+ print, not a neighbouring rarity");
+            rb_free_card(&card);
+        }
+    }
+}
+
+/* Steps 3 and 4 of get_card_id: rarity fallbacks and base-prefix lookup.
+   Each expected id is the print the Rust engine resolves these to. */
+static void card_lookup_fallbacks(void) {
+    TestGame tg;
+    test_game_new(&tg);
+    card_lookup_resolves("PL!HS-pb1-003", 705);
+    card_lookup_resolves("PL!S-bp6-024-R+", 1691);
+    card_lookup_resolves("pl!n-bp1-027-X", 913);
+    card_lookup_resolves("PL!N-bp1-027-L", 913);
+    card_lookup_resolves("pl!n-bp1-027-l", 913);
+}
+
+/* Cards sharing character+number but differing only by print must NOT be
+   conflated: bp2-011-R (debut only) and pb2-011-R (auto + live start) are
+   different cards (engine_c_wip AGENTS.md card-identity rule). */
+static void card_lookup_keeps_prints_distinct(void) {
+    TestGame tg;
+    test_game_new(&tg);
+    int bp2 = rb_find_card_by_no("PL!SP-bp2-011-R");
+    int pb2 = rb_find_card_by_no("PL!SP-pb2-011-R");
+    CHECK(bp2 >= 0 && pb2 >= 0, "both bp2-011-R and pb2-011-R resolve");
+    CHECK(bp2 != pb2, "bp2-011-R and pb2-011-R are different cards");
+    if (bp2 >= 0 && pb2 >= 0) {
+        Card a, b;
+        memset(&a, 0, sizeof a);
+        memset(&b, 0, sizeof b);
+        if (rb_decode_card_by_index((uint32_t)bp2, &a) &&
+            rb_decode_card_by_index((uint32_t)pb2, &b)) {
+            printf("ok: bp2-011-R id=%d cost=%d, pb2-011-R id=%d cost=%d\n",
+                   bp2, (int)a.cost, pb2, (int)b.cost);
+            CHECK(a.cost != b.cost, "the two prints differ");
+            rb_free_card(&a);
+            rb_free_card(&b);
+        }
+    }
+}
+
+/* normalize_card_no must emit no uninitialized bytes: a fullwidth character
+   folds to exactly one output byte, so the result is always exactly as long as
+   the folded input. Poison the buffer and check every byte. */
+static void card_normalize_no_writes_no_holes(void) {
+    static const char *const cases[][2] = {
+        { "PL!N-bp5-010-R\uff0b", "PL!N-BP5-010-R+" },
+        { "LL-bp1-001-R\uff0b",  "LL-BP1-001-R+"  },
+        { "PL!S-pb1-003-P+",     "PL!S-PB1-003-P+" },
+        { "\uff41\uff42\uff01\uff0d\uff0a\uff03\uff0b", "AB!-*#+" }
+    };
+    for (size_t i = 0; i < sizeof(cases) / sizeof(cases[0]); i++) {
+        char buf[64];
+        memset(buf, 0xAA, sizeof buf);
+        rb_card_normalize_no(cases[i][0], buf, sizeof buf);
+        int hole = 0;
+        size_t expect = strlen(cases[i][1]);
+        for (size_t k = 0; k <= expect; k++)
+            if ((unsigned char)buf[k] == 0xAA) hole = 1;
+        if (hole) {
+            fprintf(stderr, "FAIL: normalize left an unwritten byte for '%s'\n", cases[i][0]);
+            failures++;
+        } else if (strcmp(buf, cases[i][1]) != 0) {
+            fprintf(stderr, "FAIL: normalize('%s') = '%s' expected '%s'\n",
+                    cases[i][0], buf, cases[i][1]);
+            failures++;
+        } else {
+            printf("ok: normalize('%s') = '%s'\n", cases[i][0], buf);
+        }
+    }
+}
+
+/* The card blobs are resolved relative to the build tree. tools/isolated_build.sh
+   stages them at ../cards/build rather than copying them into src/, so try the
+   in-tree location first and fall back to the staged one. */
+static int load_card_database(void) {
+    static const char *const dirs[] = { "src", "../cards/build", "cards/build" };
+    for (size_t i = 0; i < sizeof(dirs) / sizeof(dirs[0]); i++) {
+        if (rb_load(dirs[i]) == 0) {
+            printf("ok: card database loaded from %s (%u cards)\n", dirs[i], rb_num_cards());
+            return 1;
+        }
+    }
+    return 0;
+}
+
 int main(void) {
+    if (!load_card_database()) {
+        fprintf(stderr, "FAIL: database load\n");
+        return 1;
+    }
+    card_lookup_fallbacks();
+    card_lookup_ascii_plus_resolves();
+    card_lookup_plus_spellings_agree();
+    card_lookup_keeps_prints_distinct();
+    card_lookup_returns_minus_one();
+    card_normalize_no_writes_no_holes();
     dp_matches_brute_force();
     degenerate_inputs();
     cyclic_overlap_is_solved_exactly();
+    rb_unload();
     if (failures) return 1;
     printf("ALL MAX DISTINCT NAMES CHECKS PASSED\n");
     return 0;
