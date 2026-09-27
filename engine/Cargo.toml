@@ -51,6 +51,16 @@ profiling = ["dep:criterion", "dep:inferno"]
 headless = []
 # Alloc tracker: counts every malloc/free, reports via RABUKA_ALLOC_TRACK env var
 alloc_tracker = []
+# Pooling global allocator for short-lived small allocations. OFF by default.
+# It works and it is correct (full suite green, and the only bug it had — a
+# headerless block returned to the system under the caller's smaller Layout —
+# is fixed), but on the current tree it is worth only ~1.5% actions-per-second
+# over the system allocator, with overlapping run-to-run spread. That is not
+# worth a hand-written global allocator, which is the highest blast-radius code
+# in a program and the last thing to want on the 3DS/wasm/PSP builds. Kept
+# behind the flag so the A/B can be repeated when the allocation count moves
+# again; re-measure before believing it.
+fast_alloc = []
 # Generic no_std flag — used in cfg gates so ports don't touch engine source
 no_std = []
 # PSP target: no_std + alloc mode for mipsel-sony-psp

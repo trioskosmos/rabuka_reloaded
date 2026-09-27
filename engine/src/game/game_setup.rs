@@ -1741,6 +1741,14 @@ fn generate_main_phase_actions(game_state: &GameState) -> Vec<Action> {
             .with_ja("パス - メインフェーズ終了")];
     let stage_groups = game_state.distinct_stage_groups(&active_player.id);
 
+    // The three stage-area names are compile-time constants, so their
+    // `Arc<str>` handles are built once per call and then cloned — a refcount
+    // bump — by the per-hand-card `available_areas` construction below. Only
+    // borrowed on the clone path, so this costs three small allocations per
+    // call instead of three per hand card.
+    let interned_area_names: [ArcStr; 3] =
+        core::array::from_fn(|slot| ArcStr(Arc::from(AREA_NAMES[slot])));
+
     if !game_state.is_action_prohibited("play_member") {
         // Rule 7.7.2.2: Main Phase - Can play member cards to stage.
         // Bound the reserve so the largest burst right at the Main boundary
@@ -1872,8 +1880,16 @@ fn generate_main_phase_actions(game_state: &GameState) -> Vec<Action> {
                         Some(Arc::new(
                             area_candidates
                                 .iter()
-                                .map(|candidate| AreaInfo {
-                                    area: ArcStr::from(candidate.name),
+                                .enumerate()
+                                .map(|(slot, candidate)| AreaInfo {
+                                    // Reuse the per-call interned name rather
+                                    // than re-heaping the constant. `area` is
+                                    // one of three `&'static str` known at
+                                    // compile time, and `ArcStr::from` on a
+                                    // `&str` copies into a fresh allocation —
+                                    // previously three 4-byte copies per hand
+                                    // card, per generated action list.
+                                    area: interned_area_names[slot].clone(),
                                     available: candidate.available,
                                     cost: candidate.cost,
                                     is_baton_touch: candidate.is_baton_touch,
@@ -1960,12 +1976,17 @@ fn generate_main_phase_actions(game_state: &GameState) -> Vec<Action> {
                                                 .map(|area| area.to_index() as u8)
                                                 .unwrap_or(0),
                                         ),
-                                        // available_areas is decision data for v7 baton
-                                        // vision (is_baton_touch on the chosen stage_area);
-                                        // always built. double_baton_pairs is UI-only.
-                                        available_areas: if cfg!(feature = "profiling") {
-                                            None
-                                        } else {
+                                        // available_areas is decision data for baton
+                                        // vision (is_baton_touch on the chosen
+                                        // stage_area), so it is built in every
+                                        // build. It used to be forced to `None`
+                                        // under `profiling`, which meant a
+                                        // profiled run made different decisions
+                                        // from a production one and the profile
+                                        // did not describe the shipping path.
+                                        // double_baton_pairs is genuinely UI-only
+                                        // and stays display-gated.
+                                        available_areas: {
                                             Some(Arc::clone(available_areas.as_ref().unwrap()))
                                         },
                                         double_baton_pairs: if cfg!(feature = "profiling")
@@ -2040,9 +2061,11 @@ fn generate_main_phase_actions(game_state: &GameState) -> Vec<Action> {
                                             },
                                             stage_area_index: Some(pair.placement.to_index() as u8),
                                             card_indices: Some(area_indices),
-                                            available_areas: if cfg!(feature = "profiling") {
-                                                None
-                                            } else {
+                                            // See the note on available_areas
+                                            // above: decision data, not display
+                                            // data, so never elided by build
+                                            // profile.
+                                            available_areas: {
                                                 Some(Arc::clone(available_areas.as_ref().unwrap()))
                                             },
                                             double_baton_pairs: if cfg!(feature = "profiling")

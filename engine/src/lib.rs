@@ -32,9 +32,36 @@ pub(crate) use compat::BTreeMap;
 #[cfg(feature = "alloc_tracker")]
 pub mod alloc_counter;
 
-#[cfg(feature = "alloc_tracker")]
+#[cfg(feature = "fast_alloc")]
+pub mod pool_alloc;
+
+/// One global allocator, three build shapes.
+///
+/// The `alloc_tracker` and `fast_alloc` features each want to own this slot, so
+/// they are resolved here rather than in two places: a crate may only declare a
+/// single `#[global_allocator]`, and letting both features attach one would fail
+/// to compile. When both are on, the counter wraps the pool, which is the
+/// combination that matters — it means the allocation report measures the
+/// allocator the engine actually ships with, not a slower stand-in that exists
+/// only while profiling.
+#[cfg(all(feature = "fast_alloc", feature = "alloc_tracker"))]
 #[global_allocator]
 static ALLOC: alloc_counter::CountingAllocator = alloc_counter::CountingAllocator;
+
+#[cfg(all(feature = "fast_alloc", feature = "alloc_tracker"))]
+type SystemAlloc = pool_alloc::PoolAllocator;
+
+#[cfg(all(feature = "fast_alloc", not(feature = "alloc_tracker")))]
+#[global_allocator]
+static ALLOC: pool_alloc::PoolAllocator = pool_alloc::PoolAllocator;
+
+#[cfg(all(not(feature = "fast_alloc"), feature = "alloc_tracker"))]
+#[global_allocator]
+static ALLOC: alloc_counter::CountingAllocator = alloc_counter::CountingAllocator;
+
+#[cfg(not(any(feature = "fast_alloc", feature = "alloc_tracker")))]
+#[global_allocator]
+static ALLOC: std::alloc::System = std::alloc::System;
 
 // Core data types — re-exported at crate root so all existing imports still work
 pub mod core;

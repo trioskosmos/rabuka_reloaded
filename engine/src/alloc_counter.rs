@@ -1,4 +1,12 @@
-use std::alloc::{GlobalAlloc, Layout, System};
+use std::alloc::{GlobalAlloc, Layout};
+
+// The counter is a wrapper, not a replacement: it measures whatever allocator
+// the engine actually ships with, so that a profiling run and a production run
+// agree about where the time goes. See the `SystemAlloc` resolution in lib.rs.
+#[cfg(feature = "fast_alloc")]
+use crate::pool_alloc::PoolAllocator as SystemAlloc;
+#[cfg(not(feature = "fast_alloc"))]
+use std::alloc::System as SystemAlloc;
 use std::sync::atomic::{AtomicIsize, AtomicUsize, Ordering};
 
 static ALLOC_COUNT: AtomicUsize = AtomicUsize::new(0);
@@ -76,7 +84,7 @@ unsafe impl GlobalAlloc for CountingAllocator {
         } else {
             None
         };
-        let ptr = System.alloc(layout);
+        let ptr = SystemAlloc.alloc(layout);
         if let Some(t0) = t0 {
             ALLOC_SELF_NS.fetch_add(t0.elapsed().as_nanos() as isize, Ordering::Relaxed);
             ALLOC_SELF_SAMPLES.fetch_add(1, Ordering::Relaxed);
@@ -93,7 +101,7 @@ unsafe impl GlobalAlloc for CountingAllocator {
         } else {
             None
         };
-        System.dealloc(ptr, layout);
+        SystemAlloc.dealloc(ptr, layout);
         if let Some(t0) = t0 {
             ALLOC_SELF_DEALLOC_NS.fetch_add(t0.elapsed().as_nanos() as isize, Ordering::Relaxed);
             ALLOC_SELF_DEALLOC_SAMPLES.fetch_add(1, Ordering::Relaxed);
