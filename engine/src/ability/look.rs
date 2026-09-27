@@ -523,7 +523,6 @@ impl AbilityResolver {
     }
 
     /// Build the select-cards prompt for `execute_select`.
-    #[allow(clippy::too_many_arguments)]
     fn build_select_choice(
         source: &str,
         count: u8,

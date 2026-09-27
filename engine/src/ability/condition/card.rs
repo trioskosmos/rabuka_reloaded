@@ -1581,7 +1581,6 @@ impl<'a> ConditionContext<'a> {
         compare_counts(operator, count, target_count)
     }
 
-    #[allow(clippy::too_many_arguments)]
     pub(crate) fn resolve_moved_cards_source(
         &self,
         condition: &Condition,
@@ -2835,7 +2834,6 @@ impl<'a> ConditionContext<'a> {
         negated != has_prop
     }
 
-    #[allow(clippy::too_many_arguments)]
     fn evaluate_appearance_stage(
         &self,
         condition: &Condition,

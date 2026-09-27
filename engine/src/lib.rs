@@ -31,6 +31,7 @@ pub(crate) use compat::BTreeMap;
 
 #[cfg(feature = "alloc_tracker")]
 pub mod alloc_counter;
+
 #[cfg(feature = "alloc_tracker")]
 #[global_allocator]
 static ALLOC: alloc_counter::CountingAllocator = alloc_counter::CountingAllocator;

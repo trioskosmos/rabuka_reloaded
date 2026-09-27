@@ -665,7 +665,7 @@ impl<'a> BcReader<'a> {
         }
     }
 
-    #[allow(dead_code)] // deserialization mirror kept for symmetry with the serializer
+     // deserialization mirror kept for symmetry with the serializer
     fn read_cost_comparison_value(&mut self) -> Option<crate::card::CostComparison> {
         let tag = self.read_u8()?;
         match tag {
@@ -711,7 +711,7 @@ impl<'a> BcReader<'a> {
         }
     }
 
-    #[allow(dead_code)] // deserialization mirror kept for symmetry with the serializer
+     // deserialization mirror kept for symmetry with the serializer
     fn read_trigger_event_value(&mut self) -> Option<Box<crate::card::TriggerEvent>> {
         let tag = self.read_u8()?;
         match tag {

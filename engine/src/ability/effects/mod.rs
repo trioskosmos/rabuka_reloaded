@@ -284,8 +284,7 @@ impl AbilityResolver {
         }
         if self.gate_incomplete_placement(gs, effect) {
             return Ok(());
-        }
-        // Drain condition verdicts from the can_activate_effect pre-check;
+        }        // Drain condition verdicts from the can_activate_effect pre-check;
         // the effect execution will produce its own items and we don't want duplicates.
         #[cfg(not(feature = "no_std"))]
         {
@@ -299,11 +298,15 @@ impl AbilityResolver {
 
         // Effect details are captured in the structured ability_resolution entry
 
+        #[cfg(not(feature = "no_std"))]
+        let _t = crate::timer::Timer::start("effect::gates");
         if self.prepare_opponent_routing(gs, effect)? {
+            drop(_t);
             return Ok(());
         }
 
         if self.run_replacement_effects(gs, effect)? {
+            drop(_t);
             return Ok(());
         }
         if self.replacement_original_suppressed {
@@ -312,10 +315,12 @@ impl AbilityResolver {
                 "[REPLACEMENT] action={} original_suppressed=true",
                 effect.action
             );
+            drop(_t);
             return Ok(());
         }
 
         if self.register_replacement_effect(gs, effect) {
+            drop(_t);
             return Ok(());
         }
 
@@ -338,6 +343,8 @@ impl AbilityResolver {
             return self.execute_sequential_effect(gs, &normalized);
         }
 
+        #[cfg(not(feature = "no_std"))]
+        let _t = crate::timer::Timer::start("effect::dispatch");
         execute_effect_dispatch(self, gs, effect)
     }
 }

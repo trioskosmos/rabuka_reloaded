@@ -200,7 +200,7 @@ struct GameStats {
     trace: Option<GameTrace>,
 }
 
-#[allow(clippy::too_many_arguments)]
+
 fn run_game(
     db: &Arc<CardDatabase>,
     t1: &Deck,

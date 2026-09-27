@@ -933,7 +933,6 @@ impl super::TurnEngine {
         Ok(())
     }
 
-    #[allow(clippy::too_many_arguments)]
     // Q70: An area that had a member placed in it this turn cannot have another
     // member placed in it by any means. Q71: If the member leaves the area,
     // the now-empty area can receive a new member the same turn.

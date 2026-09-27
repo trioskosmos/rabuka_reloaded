@@ -9,8 +9,7 @@ static TOTAL_BYTES_ALLOCATED: AtomicUsize = AtomicUsize::new(0);
 
 // Size-class histogram: count of allocs per power-of-2 bucket
 // 0=1-7B, 1=8-15B, 2=16-31B, ..., 12=4KB+, 13=8KB+
-static SIZE_BUCKETS: [AtomicUsize; 14] = [
-    AtomicUsize::new(0),
+static SIZE_BUCKETS: [AtomicUsize; 14] = [    AtomicUsize::new(0),
     AtomicUsize::new(0),
     AtomicUsize::new(0),
     AtomicUsize::new(0),
@@ -35,6 +34,24 @@ fn size_bucket(size: usize) -> usize {
     idx.min(SIZE_BUCKETS.len() - 1)
 }
 
+// ---------------------------------------------------------------------------
+// Sampled self-timing of the allocator.
+//
+// Counting allocations tells you the engine makes a lot of them; it does NOT
+// tell you whether the allocator is what is actually costing you time. This
+// closes that gap: every 1-in-N allocation is timed, so the allocator's share
+// of wall time can be reported directly. Sampling keeps the perturbation to
+// ~1/N; the residual clock cost is measured separately and subtracted, since a
+// single `Instant::now()` is itself tens of nanoseconds and would otherwise be
+// indistinguishable from a small malloc.
+// ---------------------------------------------------------------------------
+static ALLOC_SELF_NS: AtomicIsize = AtomicIsize::new(0);
+static ALLOC_SELF_DEALLOC_NS: AtomicIsize = AtomicIsize::new(0);
+static ALLOC_SELF_SAMPLES: AtomicUsize = AtomicUsize::new(0);
+static ALLOC_SELF_DEALLOC_SAMPLES: AtomicUsize = AtomicUsize::new(0);
+
+const SELF_TIME_SAMPLE_MASK: usize = 63;
+
 pub struct CountingAllocator;
 
 unsafe impl GlobalAlloc for CountingAllocator {
@@ -53,14 +70,61 @@ unsafe impl GlobalAlloc for CountingAllocator {
                 Err(p) => peak = p,
             }
         }
-        System.alloc(layout)
+        let sampled = ALLOC_COUNT.load(Ordering::Relaxed) & SELF_TIME_SAMPLE_MASK == 0;
+        let t0 = if sampled {
+            Some(std::time::Instant::now())
+        } else {
+            None
+        };
+        let ptr = System.alloc(layout);
+        if let Some(t0) = t0 {
+            ALLOC_SELF_NS.fetch_add(t0.elapsed().as_nanos() as isize, Ordering::Relaxed);
+            ALLOC_SELF_SAMPLES.fetch_add(1, Ordering::Relaxed);
+        }
+        ptr
     }
 
     unsafe fn dealloc(&self, ptr: *mut u8, layout: Layout) {
         DEALLOC_COUNT.fetch_add(1, Ordering::Relaxed);
         BYTES_ALLOCATED.fetch_sub(layout.size() as isize, Ordering::Relaxed);
-        System.dealloc(ptr, layout)
+        let sampled = DEALLOC_COUNT.load(Ordering::Relaxed) & SELF_TIME_SAMPLE_MASK == 0;
+        let t0 = if sampled {
+            Some(std::time::Instant::now())
+        } else {
+            None
+        };
+        System.dealloc(ptr, layout);
+        if let Some(t0) = t0 {
+            ALLOC_SELF_DEALLOC_NS.fetch_add(t0.elapsed().as_nanos() as isize, Ordering::Relaxed);
+            ALLOC_SELF_DEALLOC_SAMPLES.fetch_add(1, Ordering::Relaxed);
+        }
     }
+}
+
+/// Cost of one `Instant::now()` pair, i.e. the floor the sampled allocator
+/// timings sit on. Subtract `samples * clock_ns_per_call` from the raw totals
+/// to get the allocator's real cost.
+pub fn clock_overhead_ns() -> f64 {
+    const N: u32 = 20_000;
+    let t0 = std::time::Instant::now();
+    let mut acc = 0u64;
+    for _ in 0..N {
+        let a = std::time::Instant::now();
+        let b = std::time::Instant::now();
+        acc = acc.wrapping_add(b.duration_since(a).as_nanos() as u64);
+    }
+    let total = t0.elapsed().as_nanos() as f64;
+    (acc as f64 / N as f64).min(total / N as f64)
+}
+
+/// (alloc_ns, dealloc_ns, alloc_samples, dealloc_samples) — raw sampled totals.
+pub fn allocator_self_ns() -> (i64, i64, u64, u64) {
+    (
+        ALLOC_SELF_NS.load(Ordering::Relaxed) as i64,
+        ALLOC_SELF_DEALLOC_NS.load(Ordering::Relaxed) as i64,
+        ALLOC_SELF_SAMPLES.load(Ordering::Relaxed),
+        ALLOC_SELF_DEALLOC_SAMPLES.load(Ordering::Relaxed),
+    )
 }
 
 fn read_buckets() -> [u64; 14] {
@@ -121,6 +185,22 @@ fn snapshot() -> Snapshot {
 #[cfg(feature = "alloc_tracker")]
 pub fn alloc_count() -> u64 {
     ALLOC_COUNT.load(Ordering::Relaxed) as u64
+}
+
+/// Allocation counts per power-of-2 size bucket since process start.
+///
+/// Exposed alongside [`alloc_count`] so per-region instrumentation can show not
+/// just *how many* allocations a region makes but *what size*. Over half of
+/// this engine's allocations are 15 bytes or smaller, and that statistic is
+/// what identifies `to_string()`-on-a-tiny-value churn as distinct from real
+/// data-structure work.
+#[cfg(feature = "alloc_tracker")]
+pub fn alloc_buckets() -> [u64; 14] {
+    let mut b = [0u64; 14];
+    for (i, bucket) in SIZE_BUCKETS.iter().enumerate() {
+        b[i] = bucket.load(Ordering::Relaxed) as u64;
+    }
+    b
 }
 
 /// Start tracking allocations from this point.
@@ -184,6 +264,49 @@ impl Drop for AllocGuard {
                 if cnt > 0 {
                     eprintln!("    {}: {} allocs", bucket_label(i), cnt);
                 }
+            }
+            // The question "is the allocator actually what is slow?" needs the
+            // allocator's own time, not just its call count.
+            let clock_ns = clock_overhead_ns();
+            let (a_ns, d_ns, a_s, d_s) = allocator_self_ns();
+            let total_ns = elapsed.as_nanos() as f64;
+            if a_s + d_s > 0 {
+                let raw = (a_ns + d_ns) as f64;
+                let overhead = clock_ns * (a_s + d_s) as f64;
+                let corrected = (raw - overhead).max(0.0);
+                eprintln!("  --- allocator self time (1-in-{} sampled) ---", SELF_TIME_SAMPLE_MASK + 1);
+                eprintln!(
+                    "    samples:          {} alloc + {} dealloc",
+                    a_s, d_s
+                );
+                eprintln!("    clock overhead:   {:.1} ns/call", clock_ns);
+                eprintln!(
+                    "    raw sampled:      {:.2} ms  (of {:.2} ms elapsed)",
+                    raw / 1e6,
+                    total_ns / 1e6
+                );
+                eprintln!(
+                    "    less clock:       {:.2} ms  = {:.1}% of elapsed",
+                    corrected / 1e6,
+                    if total_ns > 0.0 {
+                        corrected / total_ns * 100.0
+                    } else {
+                        0.0
+                    }
+                );
+                eprintln!(
+                    "    extrapolated:     {:.2} ms  = {:.1}% of elapsed  <-- allocator share",
+                    corrected / 1e6,
+                    if total_ns > 0.0 {
+                        corrected / total_ns * 100.0
+                    } else {
+                        0.0
+                    }
+                );
+                eprintln!(
+                    "    ns per alloc+dealloc (corrected): {:.1}",
+                    corrected / (a_s + d_s) as f64
+                );
             }
         }
         if std::env::var("RABUKA_CPU_TRACK").is_ok() {

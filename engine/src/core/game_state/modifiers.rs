@@ -335,6 +335,8 @@ impl GameState {
     /// blade, ayumu/ayumu-style zone-leave constants).
     #[inline(never)]
     pub fn recalculate_constants(&mut self) {
+        #[cfg(not(feature = "no_std"))]
+        let _t = crate::timer::Timer::start("recalculate_constants");
         tdbg!("RC:0 ENTERED");
         // HANG WORKAROUND (3DS ARMv6K): AtomicBool::load uses 8-bit atomics
         // that may deadlock via Mutex fallback. Use a plain bool on GameState

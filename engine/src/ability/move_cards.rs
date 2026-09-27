@@ -746,7 +746,6 @@ impl AbilityResolver {
         Ok(None)
     }
 
-    #[allow(clippy::too_many_arguments)]
     fn resolve_from_zone(
         &mut self,
         gs: &mut GameState,

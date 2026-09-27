@@ -1714,7 +1714,6 @@ impl AbilityResolver {
     /// Resolve which stage members receive the resource and in what amount.
     /// Extracted verbatim from `execute_gain_resource` — see the audit doc
     /// (docs/CODE_AUDIT_2026-08-23.md, C1).
-    #[allow(clippy::too_many_arguments)]
     fn resolve_gain_resource_targets(
         &mut self,
         gs: &mut GameState,
