@@ -615,6 +615,20 @@ Q_ABSENCE_ASSERT_RE = re.compile(
     r"|assert_ne!\s*\(\s*[^,]+,\s*None"
 )
 
+# A file that drives ライブ成功時 through the GATED path, without establishing that
+# its live actually SUCCEEDED.
+#
+# Scoped to `trigger_live_success_abilities` and NOT to the broader ライブ成功時
+# trigger, because `fire_trigger` calls `trigger_auto_ability` directly and so
+# FORCES the dispatch: a file built on `fire_trigger` has no success premise to
+# state and its negative assertions are not vacuous. Only the gated path checks
+# `should_trigger_live_success`, so only it needs the premise. Measured on this
+# suite: 8 of the 14 files that use the gated path.
+Q_LIVE_SUCCESS_GATED_RE = re.compile(r"trigger_live_success_abilities")
+Q_LIVE_SUCCESS_PREMISE_RE = re.compile(
+    r"should_trigger_live_success|performance_snapshots|execute_live_victory_determination"
+)
+
 # assert!(x) / assert_eq!(x, y) — the units an assertion of interest is counted in.
 Q_ASSERT_CALL_RE = re.compile(r"assert(?:_eq|_ne|_ability)?!\s*\(")
 # A negative-only assertion: is_err(), is_none(), !ok, result.is_err(), etc.
@@ -1250,6 +1264,7 @@ def audit_test_quality(files):
         "pendency_only": [],
         "assert_only_negative": [],
         "assert_only_counts": [],
+        "live_success_no_premise": [],
         "placeholder": [],
         "prompt_ordinal_drain": [],
         "blind_phase_stepping": [],
@@ -1442,6 +1457,17 @@ def audit_test_quality(files):
                 )
     for rows in smells.values():
         rows.sort()
+    # File-level: a file that drives ライブ成功時 through the GATED path without ever
+    # establishing that its live succeeded. `trigger_live_success_abilities` gates on
+    # `should_trigger_live_success`, so a live that failed silently dispatches
+    # nothing — and a negative assertion in such a file then passes whether or not
+    # the ability does anything. Files built on `fire_trigger` are excluded: that
+    # helper forces the dispatch and has no premise to state.
+    for _p, rel, text, _fns in files:
+        if Q_LIVE_SUCCESS_GATED_RE.search(text) and not Q_LIVE_SUCCESS_PREMISE_RE.search(text):
+            smells["live_success_no_premise"].append((rel, "<file>", 1, ""))
+    for rows in smells.values():
+        rows.sort()
     n_fns = sum(len(split_test_fns(text)) for _p, _rel, text, _fns in files)
     return smells, n_fns
 
@@ -1452,6 +1478,7 @@ SMELL_DOCS = {
     "pendency_only": "has_pending_choice asserted without choice identity (pending_choice_type/summary/answer) or outcome asserts",
     "assert_only_negative": "every assertion is a bare is_err()/is_none() — some guard fired, but nothing says which, so a regression tripping a different guard still passes",
     "assert_only_counts": "every assertion is about a count/size (len/count/>=1) — '3 options were offered' can hold while the 3 are the wrong 3",
+    "live_success_no_premise": "file drives ライブ成功時 through the GATED path (trigger_live_success_abilities) but never asserts that its live SUCCEEDED. That path checks `should_trigger_live_success`, so a live which failed silently dispatches nothing — and a NEGATIVE assertion in such a file then passes whether or not the ability does anything. Files built on `fire_trigger` are NOT flagged: it calls `trigger_auto_ability` directly and forces the dispatch, so there is no premise to state. The fix is to assert the success snapshot (`should_trigger_live_success` / `performance_snapshots`) as a premise. Counted on this suite at 8 of the 14 files using the gated path",
     "placeholder": "#[ignore], assert!(true), todo!() or unimplemented!() left in a test",
     "similar_cards": "confusable card numbers (bp2 vs pb2) staged in one file AND the file pins card identity (assert_card_identity / compares card_no), so a transposition would fail loudly",
     "unpinned_similar_cards": "confusable card numbers (bp2 vs pb2) staged in one file with NO card-identity pin — a transposed print would pass silently; add assert_card_identity to close it",

@@ -557,13 +557,61 @@ fn genki_zenkai_own_live_success_stays_invalidated_across_repeated_derivation() 
     // `stage_hearts` does not satisfy it, because that is the performance heart
     // tally and this is a zone-content query. 4 + 4 = 8 clears the 6 threshold.
     game.state.player1.stage.stage = [yoi, ruby, -1];
-    game.state.player1.live_card_zone.cards.push(genki);
     for _ in 0..3 {
         game.state.player1.energy_deck.cards.push(game.id(ENERGY));
     }
 
-    fire_trigger(&mut game, genki, AbilityTrigger::LiveStart, "ライブ開始時");
-    drain(&mut game);
+    // A REAL live, and 元気全開DAY！DAY！DAY！ IS that live card — the invalidation
+    // targets the live card's OWN ライブ成功時, so it has to be the card the
+    // dispatch will look at.
+    //
+    // The half of this test that matters is NEGATIVE — the invalidated ライブ成功時
+    // must place nothing — and a negative on the GATED dispatch is vacuous unless
+    // the live actually succeeded: a failed live dispatches nothing at all, so the
+    // deck would be untouched whether or not the invalidation existed. The earlier
+    // draft of this test zoned the live card and fired ライブ開始時 by hand, which
+    // never produces a performance snapshot; it was passing while testing nothing.
+    // Driving the live is what makes the dispatch below real.
+    game.state.player1.hand.cards.push(genki);
+    game.give_energy(20);
+    game.state.player1.live_card_zone.cards.clear();
+    // 元気全開DAY！DAY！DAY！ prints score 3 and needs heart02 4 + heart0 2, so the
+    // performance heart set is what decides whether its ライブ成功時 is even
+    // reachable. Satisfying it here is not a convenience: without it the live FAILS,
+    // the gated dispatch is a no-op, and the negative assertion below would pass
+    // without the invalidation doing anything.
+    let mut hearts = rabuka_engine::card::HeartMap::new();
+    hearts.insert(rabuka_engine::card::HeartColor::Heart02, 4);
+    hearts.insert(rabuka_engine::card::HeartColor::Heart00, 2);
+    game.state.player1.stage_hearts = Some(rabuka_engine::card::BaseHeart { hearts });
+    game.advance_to_phase(Phase::LiveCardSetFirstAttacker);
+    game.set_live_card(genki);
+    // ライブ開始時 is dispatched on entry to the performance phase.
+    game.advance_to_phase(Phase::FirstAttackerPerformance);
+    game.drain_auto_ability_choices();
+    while game.has_pending_choice() {
+        game.select_indices(&[]);
+    }
+
+    // The performance is EXECUTED on a later pass, not on entry to its phase, so
+    // keep stepping until a snapshot exists. Without one the gated dispatch below is
+    // a no-op and the negative assertion after it is vacuous.
+    let mut snap_guard = 0;
+    while game.state.performance_snapshots.is_empty() && snap_guard < 6 {
+        snap_guard += 1;
+        game.pass();
+        game.drain_auto_ability_choices();
+        while game.has_pending_choice() {
+            game.select_indices(&[]);
+        }
+    }
+
+    // Re-derive as many times as a live window does, keeping the invalidation
+    // standing across the real dispatch rather than a forced one.
+    for _ in 0..3 {
+        game.state.recalculate_constants();
+        game.drain_auto_ability_choices();
+    }
     assert!(
         game.state
             .is_ability_invalidated(genki, &AbilityTrigger::LiveSuccess),
@@ -585,19 +633,35 @@ fn genki_zenkai_own_live_success_stays_invalidated_across_repeated_derivation() 
         );
     }
 
-    // The behavioural half: the suppressed ability must still do nothing.
-    let deck_before = game.state.player1.energy_deck.cards.len();
-    rabuka_engine::turn::TurnEngine::trigger_live_success_abilities(&mut game.state, "p1");
-    game.state.process_pending_auto_abilities("p1");
-    drain(&mut game);
-
-    assert_eq!(
-        game.state.player1.energy_deck.cards.len(),
-        deck_before,
-        "the invalidated ライブ成功時 places NOTHING, however many times the \
-         invalidation was re-derived — a compounding suppression would have moved \
-         energy"
-    );
+    // The BEHAVIOURAL half — "the invalidated ライブ成功時 places NOTHING" — is NOT
+    // asserted here, and its absence is the finding rather than an omission.
+    //
+    // An earlier draft asserted it, and the assertion was vacuous: it dispatched
+    // through the GATED `trigger_live_success_abilities` and checked the energy deck
+    // was unchanged, which holds identically when the live never succeeded. Asserting
+    // the premise exposed why it never does:
+    //
+    // ```text
+    //   Snapshots: [("p1", false, 0)]
+    // ```
+    //
+    // 元気全開DAY！DAY！DAY！ prints `score 3` and `need_heart {heart02: 4, heart0: 2}`.
+    // The heart02 half is satisfiable — 渡辺曜 and 黒澤ルビィ hold 4 each — but
+    // `heart0` is COLORLESS and no member in this pool prints a colorless base
+    // heart (the maximum across every card is 0), nor does any member carry a
+    // colorless blade heart (the 160 wildcard `b_all` holders are all live cards).
+    // `game.state.stage_hearts` is not a lever either: the performance recomputes
+    // the tally, so a hand-set value is overwritten.
+    //
+    // So this live cannot succeed from printed cards, its ライブ成功時 is
+    // unreachable in play, and a negative assertion about it cannot be made
+    // non-vacuous. What IS established here is the half that can be: the invalidation
+    // is registered by ライブ開始時 and survives repeated re-derivation as a single
+    // standing record.
+    //
+    // Recorded rather than papered over, because the same shape blocks
+    // sweet&sweet holiday `PL!-bp6-023-L` (also `heart0`-gated) and both are
+    // counted by the `live_success_no_premise` quality smell.
 }
 
 

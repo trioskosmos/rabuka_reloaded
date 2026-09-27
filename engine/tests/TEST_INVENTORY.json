@@ -1,6 +1,6 @@
 {
   "generated_by": "cards/test_inventory.py",
-  "generated_at": "2026-09-27T00:46:26.794293+00:00",
+  "generated_at": "2026-09-27T01:19:23.392420+00:00",
   "stats": {
     "total_cards": 2526,
     "cards_with_abilities": 1565,
@@ -413,6 +413,59 @@
     "assert_only_counts": {
       "count": 0,
       "rows": []
+    },
+    "live_success_no_premise": {
+      "count": 8,
+      "rows": [
+        {
+          "file": "engine/tests/test_modules/effects/ability_mod/rina_gain_live_success_from_under_member_test.rs",
+          "test": "<file>",
+          "line": 1,
+          "detail": ""
+        },
+        {
+          "file": "engine/tests/test_modules/effects/choice/per_card/conditional_choice_options_execution_test.rs",
+          "test": "<file>",
+          "line": 1,
+          "detail": ""
+        },
+        {
+          "file": "engine/tests/test_modules/effects/gain/blades/constants/success_pile_difference_pl_s_bp6_009_r_plus_test.rs",
+          "test": "<file>",
+          "line": 1,
+          "detail": ""
+        },
+        {
+          "file": "engine/tests/test_modules/effects/recover/to_hand/live_success_partial_resolution_of_revealed_live_q93_test.rs",
+          "test": "<file>",
+          "line": 1,
+          "detail": ""
+        },
+        {
+          "file": "engine/tests/test_modules/effects/score/card_score/live_success_group_heart_gated_live_score_test.rs",
+          "test": "<file>",
+          "line": 1,
+          "detail": ""
+        },
+        {
+          "file": "engine/tests/test_modules/effects/score/per_card/tokimeki_runners_all_heart_colors_live_success_score_test.rs",
+          "test": "<file>",
+          "line": 1,
+          "detail": ""
+        },
+        {
+          "file": "engine/tests/test_modules/integration/full_round/real_card_phase_walkthrough_and_ability_suite_test.rs",
+          "test": "<file>",
+          "line": 1,
+          "detail": ""
+        },
+        {
+          "file": "engine/tests/test_modules/jidou/ability_watch/lifecycle_tail_idempotence_test.rs",
+          "test": "<file>",
+          "line": 1,
+          "detail": ""
+        }
+      ]
     },
     "placeholder": {
       "count": 0,
