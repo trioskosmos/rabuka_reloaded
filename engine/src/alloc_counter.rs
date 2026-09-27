@@ -122,8 +122,8 @@ pub fn allocator_self_ns() -> (i64, i64, u64, u64) {
     (
         ALLOC_SELF_NS.load(Ordering::Relaxed) as i64,
         ALLOC_SELF_DEALLOC_NS.load(Ordering::Relaxed) as i64,
-        ALLOC_SELF_SAMPLES.load(Ordering::Relaxed),
-        ALLOC_SELF_DEALLOC_SAMPLES.load(Ordering::Relaxed),
+        ALLOC_SELF_SAMPLES.load(Ordering::Relaxed) as u64,
+        ALLOC_SELF_DEALLOC_SAMPLES.load(Ordering::Relaxed) as u64,
     )
 }
 
@@ -274,6 +274,10 @@ impl Drop for AllocGuard {
                 let raw = (a_ns + d_ns) as f64;
                 let overhead = clock_ns * (a_s + d_s) as f64;
                 let corrected = (raw - overhead).max(0.0);
+                // `corrected` covers only the 1-in-N samples actually timed, so
+                // scale it back up to the whole run before comparing to elapsed.
+                let sample_rate = (SELF_TIME_SAMPLE_MASK + 1) as f64;
+                let extrapolated = corrected * sample_rate;
                 eprintln!("  --- allocator self time (1-in-{} sampled) ---", SELF_TIME_SAMPLE_MASK + 1);
                 eprintln!(
                     "    samples:          {} alloc + {} dealloc",
@@ -286,19 +290,14 @@ impl Drop for AllocGuard {
                     total_ns / 1e6
                 );
                 eprintln!(
-                    "    less clock:       {:.2} ms  = {:.1}% of elapsed",
-                    corrected / 1e6,
-                    if total_ns > 0.0 {
-                        corrected / total_ns * 100.0
-                    } else {
-                        0.0
-                    }
+                    "    less clock:       {:.2} ms (sampled) ",
+                    corrected / 1e6
                 );
                 eprintln!(
                     "    extrapolated:     {:.2} ms  = {:.1}% of elapsed  <-- allocator share",
-                    corrected / 1e6,
+                    extrapolated / 1e6,
                     if total_ns > 0.0 {
-                        corrected / total_ns * 100.0
+                        extrapolated / total_ns * 100.0
                     } else {
                         0.0
                     }

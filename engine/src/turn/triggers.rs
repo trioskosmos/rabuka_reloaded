@@ -1,6 +1,7 @@
 use crate::game_state::{AbilityTrigger, GameState};
 use crate::types::LogEntry;
 use crate::HashSet;
+use smallvec::SmallVec;
 #[cfg(feature = "no_std")]
 use alloc::{
     string::{String, ToString},
@@ -17,12 +18,10 @@ impl super::TurnEngine {
     ) {
         #[cfg(not(feature = "no_std"))]
         let _t = crate::timer::Timer::start("trig::debut");
-        let player_id_clone = player_id.to_string();
-        let card_no_clone = card_no.to_string();
-        let mut abilities_to_trigger: Vec<(String, String, i16)> = Vec::new();
+        let mut abilities_to_trigger: SmallVec<[(String, String, i16); 4]> = SmallVec::new();
 
         {
-            let player = if player_id_clone == game_state.player1.id {
+            let player = if player_id == game_state.player1.id {
                 &game_state.player1
             } else {
                 &game_state.player2
@@ -45,9 +44,9 @@ impl super::TurnEngine {
                     card.name,
                     card.card_no,
                     card_id,
-                    card_no_clone
+                    card_no
                 );
-                if card.card_no.as_ref() != card_no_clone {
+                if card.card_no.as_ref() != card_no {
                     continue;
                 }
                 for (ability_index, ability_ref) in card.abilities.iter().enumerate() {
@@ -88,12 +87,9 @@ impl super::TurnEngine {
                         GameState::push_structured_log_to(
                             &mut game_state.structured_log,
                             LogEntry {
-                                text: format!(
-                                    "{} {} [ステージ]: 能力確認 [登場]",
-                                    player_id_clone, card.name
-                                ),
+                                text: format!("{} {} [ステージ]: 能力確認 [登場]", player_id, card.name),
                                 turn: game_state.turn_number,
-                                player_label: player_id_clone.clone(),
+                                player_label: player_id.to_string(),
                                 source_card_id: Some(card_id),
                                 source_card_name: Some(card.name.to_string()),
                                 category: "trigger_evaluation".to_string(),
@@ -110,8 +106,8 @@ impl super::TurnEngine {
                         );
                     }
                     abilities_to_trigger.push((
-                        format!("{}_{}", card_no_clone, ability.full_text),
-                        card_no_clone.clone(),
+                        format!("{}_{}", card_no, ability.full_text),
+                        card_no.to_string(),
                         card_id,
                     ));
                 }
@@ -124,7 +120,7 @@ impl super::TurnEngine {
             game_state.trigger_auto_ability(
                 ability_id,
                 AbilityTrigger::Debut,
-                player_id_clone.as_str(),
+                player_id,
                 Some(card_no),
                 Some(stage_card_id),
                 moved_snapshot.clone(),

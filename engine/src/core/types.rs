@@ -854,6 +854,21 @@ impl ZoneId {
             || (*self == ZoneId::EnergyZone && *other == ZoneId::Energy)
     }
 
+    /// Whether this zone satisfies a zone-change condition whose requested
+    /// destination is `dest`. The destination twin of [`Self::matches_source`],
+    /// and deliberately NOT the same rule: `deck` is NOT widened to its
+    /// subzones here, because a condition asking to place *into* the deck must
+    /// not fire for a move into one specific subzone. That asymmetry is the
+    /// point of the pair being two functions.
+    ///
+    /// Four call sites used to hand-roll a weaker copy of this that knew only
+    /// the discard/waitroom pair and so missed the energy aliases. They share
+    /// this one now, so there is a single answer to "is this the zone the
+    /// condition asked for".
+    pub fn matches_dest(&self, dest: &str) -> bool {
+        self.equivalent(&ZoneId::from_str(dest))
+    }
+
     /// Whether this zone should satisfy a zone-change condition whose requested
     /// source is `source`. Semantic aliasing, one-directional:
     ///

@@ -31,6 +31,23 @@ fn get_alloc_timers() -> std::sync::MutexGuard<'static, Option<HashMap<TimerKey,
     guard
 }
 
+/// Per-call-path size-class breakdown, indexed by the same bucket order as
+/// `alloc_counter::alloc_buckets` (0 = 1-7B, 1 = 8-15B, 2 = 16-31B, ...).
+#[cfg(feature = "alloc_tracker")]
+type AllocBucketMap = HashMap<TimerKey, [u64; 14]>;
+
+#[cfg(feature = "alloc_tracker")]
+static ALLOC_BUCKETS: Mutex<Option<AllocBucketMap>> = Mutex::new(None);
+
+#[cfg(feature = "alloc_tracker")]
+fn get_alloc_buckets() -> std::sync::MutexGuard<'static, Option<AllocBucketMap>> {
+    let mut guard = ALLOC_BUCKETS.lock().unwrap();
+    if guard.is_none() {
+        *guard = Some(HashMap::default());
+    }
+    guard
+}
+
 // The label stack MUST be per-thread. With one shared Mutex<Vec<&str>>, two
 // threads interleave their push/pop so each Drop reconstructs a call path
 // neither thread actually took: the key set becomes ~combinatorial, and the
@@ -138,7 +155,7 @@ impl Drop for Timer {
                 {
                     let mut guard = get_alloc_timers();
                     if let Some(ref mut map) = *guard {
-                        *map.entry(call_path).or_insert(0) += allocs;
+                        *map.entry(call_path.clone()).or_insert(0) += allocs;
                     }
                 }
                 // Size-class breakdown per call path. Buckets 0/1/2 are
@@ -347,8 +364,149 @@ fn write_full_report(results: &[(&Vec<&'static str>, &(u64, u128))]) {
             }
         }
     }
+    // Size-class breakdown. The count table above says a region allocates a
+    // lot; this says *what it allocates*. A path whose allocs are all in the
+    // 8-15 byte classes is churning `String`/`to_string` on small values, which
+    // is a different fix from one building real containers, so the two must be
+    // separable before either is worth optimizing.
+    #[cfg(feature = "alloc_tracker")]
+    {
+        let mut rows: Vec<(Vec<&'static str>, [u64; 14], u64)> = Vec::new();
+        {
+            let guard = get_alloc_buckets();
+            if let Some(ref map) = *guard {
+                for (path, buckets) in map.iter() {
+                    // Call count, not the alloc total: the timing table is the
+                    // only place that knows how many times a path ran, and
+                    // dividing allocs by allocs would just print 1.0.
+                    let calls = results
+                        .iter()
+                        .find(|(p, _)| *p == path.as_slice())
+                        .map(|(_, (c, _))| *c)
+                        .unwrap_or(0);
+                    let sum: u64 = buckets.iter().sum();
+                    if sum > 0 {
+                        rows.push((path.clone(), *buckets, calls));
+                    }
+                }
+            }
+        }
+        rows.sort_by_key(|r| {
+            let sum: u64 = r.1.iter().sum();
+            std::cmp::Reverse(sum)
+        });
+        let global: u64 = rows.iter().map(|r| r.2).sum();
+        let mut gsum = [0u64; 14];
+        for r in rows.iter() {
+            for i in 0..14 {
+                gsum[i] += r.1[i];
+            }
+        }
+        writeln!(
+            out,
+            "\n\n=== ALLOC SIZE CLASSES (global) ===\n{:>7}  {:>9}  {:>7}  {}",
+            "allocs", "bytes/avg", "share", "size class"
+        )
+        .unwrap();
+        for i in 0..14 {
+            if gsum[i] == 0 {
+                continue;
+            }
+            writeln!(
+                out,
+                "{:>7}  {:>9}  {:>6.1}%  {}",
+                gsum[i],
+                bucket_bytes(i),
+                gsum[i] as f64 / global.max(1) as f64 * 100.0,
+                bucket_label(i)
+            )
+            .unwrap();
+        }
+        writeln!(
+            out,
+            "\n=== ALLOC SIZE CLASSES by call path (top 60 by allocs) ===\n{:>7}  {:>10}  {}",
+            "allocs", "allocs/call", "size classes, as  pct of that path's allocs"
+        )
+        .unwrap();
+        writeln!(out, "{}", "-".repeat(110)).unwrap();
+        for (path, buckets, count) in rows.iter().take(60) {
+            let sum: u64 = buckets.iter().sum();
+            if sum == 0 {
+                continue;
+            }
+            let per_call = if *count > 0 {
+                sum as f64 / *count as f64
+            } else {
+                0.0
+            };
+            let profile: Vec<String> = (0..14)
+                .filter(|i| buckets[*i] > 0)
+                .map(|i| {
+                    format!(
+                        "{}={:.0}%",
+                        bucket_label(i).trim(),
+                        buckets[i] as f64 / sum as f64 * 100.0
+                    )
+                })
+                .collect();
+            writeln!(
+                out,
+                "{:>7}  {:>10.1}  {}  {}",
+                sum,
+                per_call,
+                path.join(" -> "),
+                profile.join(" ")
+            )
+            .unwrap();
+        }
+    }
     if let Err(e) = std::fs::write("timer_report.txt", out) {
         eprintln!("(could not write timer_report.txt: {})", e);
+    }
+}
+
+#[cfg(feature = "alloc_tracker")]
+fn bucket_label(i: usize) -> &'static str {
+    match i {
+        0 => "1-7B",
+        1 => "8-15B",
+        2 => "16-31B",
+        3 => "32-63B",
+        4 => "64-127B",
+        5 => "128-255",
+        6 => "256-511",
+        7 => "512-1K",
+        8 => "1K-2K",
+        9 => "2K-4K",
+        10 => "4K-8K",
+        11 => "8K-16K",
+        12 => "16K-32K",
+        13 => "32K+",
+        _ => "?",
+    }
+}
+
+/// Midpoint of a size class, for the "bytes/avg" column. An average over a
+/// whole class is only a rough figure, but it is enough to tell a 24-byte
+/// `Vec` header from a 4 KB clone of a card's ability text.
+#[cfg(feature = "alloc_tracker")]
+fn bucket_bytes(i: usize) -> usize {
+    match i {
+        0 => 4,
+        1 => 12,
+        2 => 24,
+        3 => 48,
+        4 => 96,
+        5 => 192,
+        6 => 384,
+        7 => 768,
+        8 => 1536,
+        9 => 3072,
+        10 => 6144,
+        11 => 12288,
+        12 => 24576,
+        13 => 49152,
+        _ => 0,
     }
 }
 

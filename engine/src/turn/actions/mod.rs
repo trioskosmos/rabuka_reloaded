@@ -1394,7 +1394,7 @@ impl super::TurnEngine {
             let opponent_id = game_state.opponent_id(&current);
             log::debug!("[RWC_G1] SET choice_player_id={}", opponent_id);
             if let Some(entry) = game_state.ability_queue.current_entry_mut() {
-                entry.choice_player_id = Some(opponent_id);
+                entry.choice_player_id = Some(opponent_id.to_string());
             }
         } else if self_targeted {
             log::debug!("[RWC_G1] RESET choice_player_id to activator={}", current);

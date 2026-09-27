@@ -31,7 +31,12 @@ pub enum ConditionalChoice {
     Effect(AbilityEffect),
 }
 
-/// Unique identifier for an ability instance in the queue
+/// Unique identifier for an ability instance in the queue.
+///
+/// Built as a formatted string for callers that need to name an ability, but
+/// `AbilityQueueEntry` does not store one: the identity is already carried by
+/// `card_no` + `ability_index` + `trigger_type`, and eagerly formatting it
+/// cost two heap allocations on every single enqueue.
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde_support", derive(Serialize, Deserialize))]
 pub struct AbilityId(pub String);
@@ -39,6 +44,15 @@ pub struct AbilityId(pub String);
 impl AbilityId {
     pub fn new(card_no: &str, ability_index: usize, trigger_type: &str) -> Self {
         AbilityId(format!("{}_{}_{}", card_no, ability_index, trigger_type))
+    }
+
+    /// The canonical string form, rebuilt from an entry's own fields.
+    pub fn from_parts(
+        card_no: &str,
+        ability_index: usize,
+        trigger_type: &crate::core::types::AbilityTrigger,
+    ) -> Self {
+        AbilityId(format!("{}_{}_{:?}", card_no, ability_index, trigger_type))
     }
 }
 
@@ -64,7 +78,6 @@ pub enum QueueState {
 #[derive(Debug, Clone)]
 #[cfg_attr(feature = "serde_support", derive(Serialize, Deserialize))]
 pub struct AbilityQueueEntry {
-    pub id: AbilityId,
     pub card_no: String,
     pub player_id: String,
     pub ability: Arc<Ability>,
@@ -240,9 +253,15 @@ impl AbilityQueue {
         self.entries.iter()
     }
 
-    /// Check if an entry with this ID already exists (completed or not)
+    /// Check if an entry with this ID already exists (completed or not).
+    ///
+    /// The entry no longer stores a prebuilt `AbilityId`; the identity is
+    /// rebuilt from the fields it does store. This is only reached from tests,
+    /// so the temporary formatting cost is irrelevant on the hot enqueue path.
     pub fn has_entry_with_id(&self, id: &AbilityId) -> bool {
-        self.entries.iter().any(|e| e.id == *id)
+        self.entries
+            .iter()
+            .any(|e| *id == AbilityId::from_parts(&e.card_no, e.ability_index, &e.trigger_type))
     }
 
     /// Add ability to queue
@@ -331,7 +350,6 @@ entry_index: u8::try_from(idx).unwrap(),
             QueueState::Idle | QueueState::Completed { .. } => {
                 // Store the choice directly without an entry
                 let dummy_entry = AbilityQueueEntry {
-                    id: AbilityId::new("", 0, "choice"),
                     card_no: String::new(),
                     player_id: String::new(),
                     ability: Arc::new(Ability {
@@ -429,7 +447,6 @@ entry_index: u8::try_from(idx).unwrap(),
     pub fn push_constant_context(&mut self, player_id: String) {
         let idx = self.entries.len();
         self.entries.push(AbilityQueueEntry {
-            id: AbilityId::new("", 0, "const_eval"),
             card_no: String::new(),
             player_id,
             ability: Arc::new(Ability {
@@ -631,7 +648,6 @@ mod tests {
 
     fn make_entry(card_no: &str, player_id: &str) -> AbilityQueueEntry {
         AbilityQueueEntry {
-            id: AbilityId::new(card_no, 0, "auto"),
             card_no: card_no.to_string(),
             player_id: player_id.to_string(),
             ability: Arc::new(Ability::default()),
@@ -781,7 +797,11 @@ mod tests {
     fn has_entry_with_id_detects_duplicates() {
         let mut q = AbilityQueue::new();
         q.enqueue(make_entry("card_1", "p1"));
-        assert!(q.has_entry_with_id(&AbilityId::new("card_1", 0, "auto")));
-        assert!(!q.has_entry_with_id(&AbilityId::new("card_99", 0, "auto")));
+        // Entries no longer carry a prebuilt id, so the identity is rebuilt
+        // from card_no + ability_index + trigger_type.
+        let hit = AbilityId::from_parts("card_1", 0, &AbilityTrigger::Auto);
+        let miss = AbilityId::from_parts("card_99", 0, &AbilityTrigger::Auto);
+        assert!(q.has_entry_with_id(&hit));
+        assert!(!q.has_entry_with_id(&miss));
     }
 }

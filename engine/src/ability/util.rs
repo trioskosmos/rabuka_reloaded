@@ -838,12 +838,14 @@ pub fn card_matches_cost_limit_op(
                 c.cost.or(c.score)
             })
             .flatten()
-            .map(|value| match comparison {
-                Some("min") | Some(">=") => value >= limit,
-                Some("exact") | Some("=") => value == limit,
-                Some(">") => value > limit,
-                Some("<") => value < limit,
-                _ => value <= limit,
+            .map(|value| {
+                compare_with_operator(comparison.unwrap_or("<="), value, limit)
+                    // "min" is a card-text-only spelling of ">=" that the
+                    // canonical table does not carry, so it is mapped here.
+                    .or_else(|| (comparison == Some("min")).then_some(value >= limit))
+                    // An operator this engine does not know keeps the `<=`
+                    // reading: a cost cap defaults to a ceiling.
+                    .unwrap_or(value <= limit)
             })
             .unwrap_or(false),
         None => true,

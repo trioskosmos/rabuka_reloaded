@@ -615,14 +615,17 @@ impl AbilityResolver {
 
                 if let Some(cl) = effect.cost_limit_any() {
                     let card_cost = c.cost.unwrap_or(0);
-                    let passes = match effect.cost_limit_operator_any().as_deref() {
-                        Some("<=") | None => card_cost <= cl,
-                        Some(">=") => card_cost >= cl,
-                        Some("<") => card_cost < cl,
-                        Some(">") => card_cost > cl,
-                        Some("==") => card_cost == cl,
-                        _ => card_cost <= cl,
-                    };
+                    let op_binding = effect.cost_limit_operator_any();
+                    let op = op_binding.as_deref().unwrap_or("<=");
+                    // compare_with_operator knows every operator spelling,
+                    // including "=" — the canonical form Operator::Eq serialises
+                    // to and the VM decodes. This used to hand-roll the list
+                    // and omit "=", which sent equality down the unknown branch
+                    // and silently turned it into "cost at most". An operator
+                    // this engine does not know keeps the old `<=` reading,
+                    // because a cost cap defaults to a ceiling.
+                    let passes = util::compare_with_operator(op, card_cost, cl)
+                        .unwrap_or(card_cost <= cl);
                     if !passes {
                         return false;
                     }

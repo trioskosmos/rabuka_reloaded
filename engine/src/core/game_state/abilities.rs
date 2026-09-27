@@ -220,15 +220,18 @@ impl GameState {
         trigger_moved_cards: Option<SmallVec<[i16; 4]>>,
         triggering_member_id: Option<i16>,
     ) -> crate::ability_queue::AbilityQueueEntry {
-        use crate::ability_queue::{AbilityId, AbilityQueueEntry};
-
-        AbilityQueueEntry {
-            id: AbilityId::new(&card_no, ability_index, &format!("{:?}", trigger_type)),
+        crate::ability_queue::AbilityQueueEntry {
             card_no,
-            player_id: match player_id.as_str() {
-                "player1" => "p1".to_string(),
-                "player2" => "p2".to_string(),
-                other => other.to_string(),
+            // Normalise "player1"/"player2" to "p1"/"p2" exactly as before,
+            // but move the incoming String through untouched in the common
+            // case where it is already canonical — the old `match` rebuilt an
+            // identical String on every single enqueue.
+            player_id: if player_id == "player1" {
+                "p1".to_string()
+            } else if player_id == "player2" {
+                "p2".to_string()
+            } else {
+                player_id
             },
             ability,
             ability_index,
@@ -2697,15 +2700,17 @@ impl GameState {
 
     /// Return the opponent's player ID given a player ID.
     ///
-    /// Returns an owned `String` deliberately: the four callers each hold the
-    /// result across a `&mut game_state` use, so returning a borrow of the
-    /// game state fails the borrow checker. These run on phase transitions,
-    /// not per action, so the allocation is not worth fighting for.
-    pub fn opponent_id(&self, player_id: &str) -> String {
+    /// Returns a cloned [`PlayerId`] (an `Arc<str>` refcount bump) rather than
+    /// an owned `String`: the callers hold the result across a `&mut
+    /// game_state` use, so a borrow of the game state will not do, but the
+    /// allocation was never necessary. This runs once per card play (see
+    /// `turn::phases::handle_play_member_to_stage`) and once per
+    /// `execute_performance_phase`, not merely on phase transitions.
+    pub fn opponent_id(&self, player_id: &str) -> crate::core::player::PlayerId {
         if player_id == self.player1.id {
-            self.player2.id.to_string()
+            self.player2.id.clone()
         } else {
-            self.player1.id.to_string()
+            self.player1.id.clone()
         }
     }
 

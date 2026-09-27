@@ -171,6 +171,63 @@ fn same_name_targets(
 }
 
 
+/// What [`AbilityResolver::calculate_gain_multiplier`] needs to turn a
+/// per-unit 「1枚につき」 into a concrete count.
+///
+/// Same reasoning as [`GainResourceRequest`]: these were 12 positional
+/// arguments, four of which were adjacent `&Option<SmallVec<..>>` or `&str`
+/// that were indistinguishable at the call site, so a mis-ordered pair was a
+/// silent wrong count rather than a compile error. Grouped by origin.
+#[derive(Clone)]
+pub(crate) struct GainMultiplierRequest<'a> {
+    // ── The effect's own shape ──
+    per_unit: bool,
+    base_count: u8,
+    per_unit_type_str: Option<&'a str>,
+    target: &'a str,
+
+    // ── Counts measured before this step ran ──
+    recently_moved: &'a Option<SmallVec<[i16; 4]>>,
+    entry_snapshot: &'a Option<SmallVec<[i16; 4]>>,
+    last_energy: u8,
+    last_discard_count: u8,
+
+    // ── Filters and modifiers in force ──
+    orientation_modifiers: &'a HashMap<i16, crate::core::game_modifiers::CardOrientation>,
+    filter: &'a crate::ability::util::CardFilter<'a>,
+}
+
+
+/// The boolean facts about one gain-or-loss step.
+///
+/// These travelled as a run of adjacent `bool` parameters, where a swapped pair
+/// compiles cleanly and silently means the opposite — the worst kind of bug to
+/// have, because nothing about the call site says which flag was which. Grouping
+/// them makes the call site name each one, and the compiler checks the grouping.
+#[derive(Clone, Copy, Default)]
+pub(crate) struct ResourceFlags {
+    /// The target is the activating player, so the count is not truncated.
+    pub(crate) self_target: bool,
+    /// Applies to every member rather than a chosen set.
+    pub(crate) all: bool,
+    /// Undone when the effect's duration ends.
+    pub(crate) temporary: bool,
+    /// A loss rather than a gain.
+    pub(crate) negative: bool,
+}
+
+impl ResourceFlags {
+    /// The flags for a blade gain: `all` and `temporary` are the only two that
+    /// apply, and both vary, so there is no shorter spelling to reach for.
+    pub(crate) fn for_blade(all: bool, temporary: bool) -> Self {
+        Self {
+            all,
+            temporary,
+            ..Self::default()
+        }
+    }
+}
+
 impl AbilityResolver {
     /// Handles target="both" by executing the effect for self, then opponent.
     /// Returns true if the effect was fully handled (has "both" target), false otherwise.
@@ -491,22 +548,24 @@ impl AbilityResolver {
         Ok(())
     }
 
-    #[allow(clippy::too_many_arguments)]
     pub(crate) fn calculate_gain_multiplier(
         &self,
         gs: &GameState,
         effect: &AbilityEffect,
-        per_unit: bool,
-        base_count: u8,
-        per_unit_type_str: Option<&str>,
-        target: &str,
-        recently_moved: &Option<SmallVec<[i16; 4]>>,
-        entry_snapshot: &Option<SmallVec<[i16; 4]>>,
-        last_energy: u8,
-        last_discard_count: u8,
-        orientation_modifiers: &HashMap<i16, crate::core::game_modifiers::CardOrientation>,
-        filter: &crate::ability::util::CardFilter,
+        req: &GainMultiplierRequest<'_>,
     ) -> u8 {
+        let GainMultiplierRequest {
+            per_unit,
+            base_count,
+            per_unit_type_str,
+            target,
+            recently_moved,
+            entry_snapshot,
+            last_energy,
+            last_discard_count,
+            orientation_modifiers,
+            filter,
+        } = req.clone();
         if !per_unit {
             return base_count;
         }
@@ -1142,8 +1201,7 @@ impl AbilityResolver {
             &blade_targets,
             activating_card_id,
             &all_selected,
-            is_all,
-            is_temporary,
+            ResourceFlags::for_blade(is_all, is_temporary),
             final_count,
             blades_to_add,
         ) {
@@ -1196,10 +1254,12 @@ impl AbilityResolver {
             kind,
             heart_targets,
             activating_card_id,
-            is_self_target,
-            is_all,
-            is_temporary,
-            is_negative,
+            ResourceFlags {
+                self_target: is_self_target,
+                all: is_all,
+                temporary: is_temporary,
+                negative: is_negative,
+            },
             &heart_distribution,
             &heart_color_str,
             heart_to_add,
@@ -1258,15 +1318,18 @@ impl AbilityResolver {
         kind: ResourceKind,
         heart_targets: Vec<i16>,
         activating_card_id: Option<i16>,
-        is_self_target: bool,
-        is_all: bool,
-        is_temporary: bool,
-        is_negative: bool,
+        flags: ResourceFlags,
         heart_distribution: &[(crate::card::HeartColor, u8)],
         heart_color_str: &Option<String>,
         heart_to_add: i16,
         final_count: u8,
     ) -> Option<crate::core::types::EffectData> {
+        let ResourceFlags {
+            self_target: is_self_target,
+            all: is_all,
+            temporary: is_temporary,
+            negative: is_negative,
+        } = flags;
         if kind != ResourceKind::Heart {
             return None;
         }
@@ -1611,11 +1674,15 @@ impl AbilityResolver {
         blade_targets: &SmallVec<[i16; 8]>,
         activating_card_id: Option<i16>,
         all_selected: &[i16],
-        is_all: bool,
-        is_temporary: bool,
+        flags: ResourceFlags,
         final_count: u8,
         blades_to_add: i16,
     ) -> Option<crate::core::types::EffectData> {
+        let ResourceFlags {
+            all: is_all,
+            temporary: is_temporary,
+            ..
+        } = flags;
         if kind != ResourceKind::Blade {
             return None;
         }
@@ -1768,16 +1835,18 @@ impl AbilityResolver {
         let final_count = self.calculate_gain_multiplier(
             gs,
             effect,
-            per_unit,
-            count,
-            per_unit_type_str,
-            target,
-            recently_moved,
-            entry_snapshot,
-            last_energy,
-            last_discard_count,
-            orientation_modifiers,
-            &filter,
+            &GainMultiplierRequest {
+                per_unit,
+                base_count: count,
+                per_unit_type_str,
+                target,
+                recently_moved,
+                entry_snapshot,
+                last_energy,
+                last_discard_count,
+                orientation_modifiers,
+                filter: &filter,
+            },
         );
 
         // "ブレードをNつ以上持つ" (no 元々) — CURRENT blade total filter

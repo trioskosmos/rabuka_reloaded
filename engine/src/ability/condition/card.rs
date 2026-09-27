@@ -1632,9 +1632,7 @@ impl<'a> ConditionContext<'a> {
                             || m.cause_player_id == target_id;
                         src_ok
                             && cause_ok
-                            && (m.dest_zone == dest_zone
-                                || (dest_zone == "discard" && m.dest_zone == "waitroom")
-                                || (dest_zone == "waitroom" && m.dest_zone == "discard"))
+                            && m.dest_zone.matches_dest(dest_zone)
                             && event_cards.contains(&m.moved_card_id)
                     })
                     .map(|m| m.moved_card_id)
@@ -1658,9 +1656,7 @@ impl<'a> ConditionContext<'a> {
                                 || m.cause_player_id == target_id;
                             src_ok
                                 && cause_ok
-                                && (m.dest_zone == dest_zone
-                                    || (dest_zone == "discard" && m.dest_zone == "waitroom")
-                                    || (dest_zone == "waitroom" && m.dest_zone == "discard"))
+                              && m.dest_zone.matches_dest(dest_zone)
                         })
                     })
                     .copied()
@@ -1683,9 +1679,7 @@ impl<'a> ConditionContext<'a> {
                             || m.cause_player_id == target_id;
                         src_ok
                             && cause_ok
-                            && (m.dest_zone == dest_zone
-                                || (dest_zone == "discard" && m.dest_zone == "waitroom")
-                                || (dest_zone == "waitroom" && m.dest_zone == "discard"))
+                              && m.dest_zone.matches_dest(dest_zone)
                     })
                     .map(|m| m.moved_card_id)
                     .collect()
@@ -1830,9 +1824,7 @@ impl<'a> ConditionContext<'a> {
                             let src_match = card_movements.iter().any(|m| {
                                 let src_ok = m.source_zone.matches_source(src_zone);
                                 src_ok
-                                    && (m.dest_zone == *dest
-                                        || (*dest == "discard" && m.dest_zone == "waitroom")
-                                        || (*dest == "waitroom" && m.dest_zone == "discard"))
+                                      && m.dest_zone.matches_dest(dest)
                             });
                             if !src_match {
                                 return false;
