@@ -149,6 +149,12 @@ fn you_does_not_draw_when_reveal_counts_are_equal() {
         0,
         "so she contributes nothing beyond the live card's own draw"
     );
+    assert_eq!(
+        result.hand_gained, 0,
+        "and the hand does not grow either. The live card's own 成功・3枚 goes to its \
+         own destination, so a hand delta of 0 is what a non-drawing 渡辺曜 looks like \
+         from outside."
+    );
 }
 
 /// The other direction: MORE reveals than the opponent is also not 「少ない」.
@@ -183,27 +189,31 @@ fn you_does_not_draw_when_own_reveal_count_is_higher() {
 /// (1, 3) is the case the printed text is about — p1 revealed fewer than p2 — and it
 /// fails. So the condition is not merely conservative, it is unsatisfiable.
 ///
-/// The parsed condition explains why:
+/// ## Scope: one card, not a pattern
 ///
-/// ```text
-/// { "type": "location_condition", "location": "revealed_cards",
-///   "target": "self", "negation": true,
-///   "text": "…相手がエールによって公開したカードの枚数より少ない場合" }
-/// ```
+/// Every condition in `abilities.json` whose text states a comparison was checked.
+/// Four cards matched, and three of them are FINE because the comparison IS
+/// structured there:
 ///
-/// There is no `count`, no `operator`, and no operand on either side. The whole
-/// comparison survives only as free text, so what the engine evaluates is a
-/// zone-presence test on p1's own reveal pool with a negation — and no combination
-/// of pool contents satisfies it, since the pools are what the presence test reads.
+///   * `PL!N-bp5-005-R＋`, `PL!HS-sd1-001-SD`, `PL!S-PR-029-PR` all carry
+///     `cost_limit` together with `cost_limit_operator` — 「コスト10以上」 and
+///     「コスト13以上」 compile to a real operand and an operator.
+///   * `PL!S-bp3-005-R` (渡辺曜) carries NEITHER, and the only field on her condition
+///     is the zone.
 ///
-/// The three tests around it are the controls that make this attributable: the window
-/// opens when built as documented, a closed window draws nothing at all, and the
-/// engine's own rule log shows her ability being routed and given a verdict. So the
-/// failure is in the CONDITION, not in the trigger, the window, or the fixture.
+/// So the parser has a working representation for a ONE-SIDED comparison, and
+/// 渡辺曜 is the single card in this pool whose comparison is TWO-SIDED — a count
+/// against another count, which `cost_limit` + `cost_limit_operator` has no shape
+/// for. That is a precise gap with a count of one, not a general failure, and the
+/// distinction matters: a fix belongs in the parser's comparison representation and
+/// should not disturb the three cards that work.
 ///
-/// A parser test against `Condition`'s fields was not writable — it exposes no
-/// public `text` or `location` — so the evidence is behavioural, which is stronger
-/// anyway: four configurations, and the one the card is about.
+/// ## Not written, and why
+///
+/// A structural test asserting the condition has no comparison operand is not
+/// expressible: `Condition` exposes no public `text` or `location`. The evidence is
+/// behavioural instead, which is stronger — four configurations, including the one the
+/// card is written about.
 #[test]
 fn no_reveal_configuration_satisfies_the_condition() {
     for (p1, p2) in [(0usize, 0usize), (1, 3), (2, 2), (3, 1)] {
