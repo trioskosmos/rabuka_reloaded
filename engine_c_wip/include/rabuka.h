@@ -118,6 +118,13 @@ typedef struct AbilityEffect {
     struct AbilityEffect *opponent_action;
     Condition *result_condition;       /* a Condition, not an effect */
     Condition *alternative_condition;   /* a Condition, not an effect */
+    /* activation_condition_parsed (ability/types.rs, mirrored by
+       AbilityEffect::activation_condition_parsed_any). Checked on its own by
+       AbilityResolver::can_activate_effect (resolver.rs:456-494) IN ADDITION TO
+       `condition`: 13 abilities carry one, and on 9 of them it is the ONLY gate
+       (`condition` is NULL). ADDITIVE field: no existing member's type or order
+       changed. Owned by the effect; released in effect_free (vm.c). */
+    Condition *activation_condition;
     int   repeat_limit;                /* repeat_procedure: max ADDITIONAL iterations */
     int   conditional_flag;            /* effect.compound.conditional */
     int   conditional_negation;        /* effect.compound.conditional_negation (on_optional) */

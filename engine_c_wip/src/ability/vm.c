@@ -367,6 +367,7 @@ static void effect_free(AbilityEffect *e) {
     effect_free(e->opponent_action);
     rb_free_condition(e->result_condition);
     rb_free_condition(e->alternative_condition);
+    rb_free_condition(e->activation_condition);
     free(e);
 }
 static int effect_add_child(AbilityEffect *e, AbilityEffect *c) {
@@ -559,15 +560,14 @@ static AbilityEffect *decode_effect_body(Rdr *r) {
 
            The tree is decoded for real (read_condition, so a malformed
            activation condition is caught here exactly as a malformed `condition`
-           is) and then recorded as a presence marker extra under the SAME wire
-           key, which is the accessor resolver.c already looks up. The
-           Condition itself cannot be kept: AbilityEffect has no field for it
-           and include/rabuka.h is not this agent's file. Adding
-           `Condition *activation_condition;` to AbilityEffect (rabuka.h:120,
-           beside result_condition), `rb_free_condition(e->activation_condition);`
-           in effect_free (vm.c, beside the result_condition free) and pointing
-           resolver.c:606 at `eff->activation_condition` instead of
-           `eff->condition` is what turns this into a retained tree. */
+           is) and RETAINED in AbilityEffect::activation_condition (rabuka.h,
+           beside result_condition), so rb_can_activate_effect can evaluate the
+           actual gate instead of a presence marker. The "true:<variant>:..."
+           extra is still recorded under the SAME wire key: it is the accessor
+           needs_gate in rb_resolve_ability looks up, and it folds
+           location/position into the value so a debug dump identifies the gate.
+
+           effect_free (above) releases the retained tree, so it is not leaked. */
         if (key && strcmp(key, "activation_condition_parsed") == 0) {
             if (tag == RB_TAG_OBJVAR) {
                 Condition *c = read_condition(r);
@@ -586,8 +586,12 @@ static AbilityEffect *decode_effect_body(Rdr *r) {
                         snprintf(marker, sizeof(marker), "true:%s",
                                  cond_variant_name(c->variant));
                     effect_set_extra(e, key, marker);
+                    /* Retain the decoded tree itself; the marker above is a
+                       convenience, not the gate. Guard the (theoretically
+                       impossible) duplicate key so nothing leaks. */
+                    if (e->activation_condition) rb_free_condition(e->activation_condition);
+                    e->activation_condition = c;
                     probe_keep();
-                    rb_free_condition(c);
                 } else probe_drop(key, tag);
             } else { skip_value(r, tag); probe_drop(key, tag); }
             continue;

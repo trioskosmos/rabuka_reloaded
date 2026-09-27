@@ -112,6 +112,53 @@ static int cond_is_appearance(const Condition *c) {
     return c->variant == RB_COND_APPEARANCE;
 }
 
+/* ── Top-level activation-position overlay (resolver.rs:401-405, 421-422,
+      461-468 and the identical application at 509-...) ──
+   Rust's `condition_needs_position_overlay` decides whether the patched copy
+   is worth making at all: cond.get_position().is_none()
+   && cond.get_positions_characters().is_none()
+   && (effect.position_any().is_some() || effect.activation_position_any().is_some()).
+   `positions_characters` has no C accessor, so that clause is vacuous here.
+
+   Returns `cond` unchanged when the overlay would not write; otherwise a
+   patched shallow copy in caller storage `scratch` with the effect's position
+   (else its activation_position) appended as a top-level "position" field, and
+   *injected set so the caller can release it with overlay_release().
+
+   Shared by the activation-condition pre-check and the main condition gate —
+   the two overlay sites in Rust are literally the same rule. */
+static const Condition *position_overlay(const AbilityEffect *eff, const Condition *cond,
+                                         Condition *scratch, int *injected) {
+    *injected = 0;
+    if (!cond) return cond;
+    if (cond_get_position(cond)) return cond;   /* positions_characters not exposed in C */
+    const char *eff_pos = rb_effect_position_any(eff);
+    const char *eff_act_pos = rb_effect_activation_position(eff);
+    if (!eff_pos && !eff_act_pos) return cond;
+    if (cond->n_fields >= RB_MAX_COND_FIELD) return cond;
+    *scratch = *cond;
+    scratch->fields[scratch->n_fields].key = rb_strdup2("position");
+    scratch->fields[scratch->n_fields].v.tag = RB_TAG_STR;
+    scratch->fields[scratch->n_fields].v.s = rb_strdup2(eff_pos ? eff_pos : eff_act_pos);
+    scratch->n_fields++;
+    *injected = 1;
+    return scratch;
+}
+
+/* Release the field position_overlay() appended. Only the trailing field is
+   ever ours, and only when it is one of the two overlay keys, so this never
+   frees anything owned by the decoded condition. */
+static void overlay_release(Condition *scratch) {
+    if (!scratch || scratch->n_fields == 0) return;
+    CondField *f = &scratch->fields[scratch->n_fields - 1];
+    if (!f->key) return;
+    if (strcmp(f->key, "position") != 0 && strcmp(f->key, "group_names") != 0) return;
+    free(f->key);
+    if (f->v.tag == RB_TAG_STR) free(f->v.s);
+    f->key = NULL;
+    memset(&f->v, 0, sizeof(f->v));
+}
+
 /* Stable hash for condition cache key (mirrors format!("{:?}", condition) hash)
    Use pointer + variant + field count as cheap stable key; bytecode conditions
    are interned per ability so pointer identity is sufficient. */
@@ -586,27 +633,42 @@ const char *rb_resolver_merge_group_names(const char **groups, int n) {
 int rb_can_activate_effect(const GameState *g, int actor, const AbilityEffect *eff, int host_cid) {
     if (!g || !eff) return 1;
 
-    /* ── Activation condition check (resolver.rs:298-333) ──
-       Only evaluated when cost has not already been paid. The C decoder folds
-       activation_condition_parsed into the effect's extra_kv; check for it there. */
+    /* ── Activation condition check (resolver.rs:451-493) ──
+       Only evaluated when cost has not already been paid. This is a SEPARATE
+       gate from `condition`: Rust reads effect.activation_condition_parsed_any()
+       (resolver.rs:458) and, on failure, returns false BEFORE the main gate is
+       ever reached (resolver.rs:488-490). Abilities that carry both must
+       satisfy both — an early return here used to skip the has_moved gate.
+
+       The gate is the ACTIVATION tree, not eff->condition. 13 abilities carry
+       one and on 9 of them eff->condition is NULL, and
+       rb_eval_condition_for_host returns 1 for NULL (condition.c:1581) — so
+       evaluating eff->condition here was live-but-vacuous: on those 9 the
+       ability was never actually gated. */
     int cost_already_paid = 0;
     int cur = g->queue.cur;
     if (cur >= 0 && cur < RB_QUEUE_DEPTH && g->queue.entries[cur].cost_paid) cost_already_paid = 1;
 
-    if (!cost_already_paid) {
-        const char *act_cond_str = eff_extra(eff, "activation_condition_parsed");
-        if (act_cond_str && act_cond_str[0]) {
-            /* The activation condition was decoded as a text marker; evaluate it
-               through rb_eval_condition_for_host. Position is merged into the
-               condition by the evaluation context (host_cid encodes position). */
-            /* resolver.rs:398-408 — on success drain the pre-check verdicts; the
-               condition is re-evaluated during effect execution, so keeping them
-               would duplicate every entry. On failure they are the only record. */
+    if (!cost_already_paid && eff->activation_condition) {
+        /* resolver.rs:461-482 — the patched copy is only made when the position
+           overlay would actually write; the plain path evaluates the decoded
+           tree as-is. The verdict drain rides with the clone in Rust, so it is
+           reproduced verbatim: drained on success, kept on failure. */
+        Condition act_tmp;
+        int act_injected = 0;
+        const Condition *act_eval =
+            position_overlay(eff, eff->activation_condition, &act_tmp, &act_injected);
+        int act_passed;
+        if (act_injected) {
             int act_snapshot = rb_log_buffer_len();
-            int act_passed = rb_eval_condition_for_host(g, actor, host_cid, eff->condition);
-            if (!act_passed) return 0;
-            rb_resolver_drain_verdicts_since((GameState *)g, act_snapshot);
+            act_passed = rb_eval_condition_for_host(g, actor, host_cid, act_eval);
+            if (act_passed) rb_resolver_drain_verdicts_since((GameState *)g, act_snapshot);
+        } else {
+            act_passed = rb_eval_condition_for_host(g, actor, host_cid, eff->activation_condition);
         }
+        if (act_injected) overlay_release(&act_tmp);
+        /* Fail closed rather than vacuously pass (resolver.rs:488-490). */
+        if (!act_passed) return 0;
     }
 
     /* ── Main condition gate (resolver.rs:335-404) ── */
@@ -620,29 +682,11 @@ int rb_can_activate_effect(const GameState *g, int actor, const AbilityEffect *e
         /* Build a temporary condition for evaluation, injecting position/group_names */
         Condition tmp_cond;
         int injected = 0;
-        Condition *cond_for_eval = (Condition *)eff->condition;
+        const Condition *cond_for_eval = eff->condition;
 
-        /* Merge effect position into condition if condition lacks position info */
-        if (cond_for_eval) {
-            const char *cond_pos = cond_get_position(cond_for_eval);
-            const char *cond_pos_chars = NULL; /* positions_characters not exposed in C */
-            if (!cond_pos && !cond_pos_chars) {
-                const char *eff_pos = rb_effect_position_any(eff);
-                const char *eff_act_pos = rb_effect_activation_position(eff);
-                if (eff_pos || eff_act_pos) {
-                    tmp_cond = *cond_for_eval;
-                    if (tmp_cond.n_fields < RB_MAX_COND_FIELD) {
-                        const char *pos_to_set = eff_pos ? eff_pos : eff_act_pos;
-                        tmp_cond.fields[tmp_cond.n_fields].key = rb_strdup2("position");
-                        tmp_cond.fields[tmp_cond.n_fields].v.tag = RB_TAG_STR;
-                        tmp_cond.fields[tmp_cond.n_fields].v.s = rb_strdup2(pos_to_set);
-                        tmp_cond.n_fields++;
-                        cond_for_eval = &tmp_cond;
-                        injected = 1;
-                    }
-                }
-            }
-        }
+        /* Merge effect position into condition if condition lacks position info
+           (same overlay the activation pre-check above uses). */
+        cond_for_eval = position_overlay(eff, cond_for_eval, &tmp_cond, &injected);
 
         /* Merge group_names: only for AppearanceCondition or conditions with distinct=true */
         const char *eff_group = rb_effect_group_names_any(eff);
@@ -672,20 +716,8 @@ int rb_can_activate_effect(const GameState *g, int actor, const AbilityEffect *e
         int cond_snapshot = rb_log_buffer_len();
         int passed = rb_eval_condition_for_host(g, actor, host_cid, cond_for_eval);
 
-        /* Free injected fields */
-        if (injected) {
-            for (uint32_t i = 0; i < tmp_cond.n_fields; i++) {
-                if (tmp_cond.fields[i].key) {
-                    int is_injected = (i == tmp_cond.n_fields - 1) &&
-                        (!strcmp(tmp_cond.fields[i].key, "position") ||
-                         !strcmp(tmp_cond.fields[i].key, "group_names"));
-                    if (is_injected) {
-                        free(tmp_cond.fields[i].key);
-                        if (tmp_cond.fields[i].v.tag == RB_TAG_STR) free(tmp_cond.fields[i].v.s);
-                    }
-                }
-            }
-        }
+        /* Free injected fields (same release the overlay's own caller uses). */
+        if (injected) overlay_release(&tmp_cond);
 
         store_condition_verdict((GameState *)g, eff->condition, passed);
         if (passed) rb_resolver_drain_verdicts_since((GameState *)g, cond_snapshot);
@@ -888,6 +920,7 @@ int rb_resolve_ability(GameState *g, int actor, const Ability *ab, int ability_i
     /* ── effect condition gate + execute (Rust line 1009-1088) ── */
     if (ab->effect) {
         int needs_gate = (ab->effect->condition != NULL) ||
+                         (ab->effect->activation_condition != NULL) ||
                          eff_extra(ab->effect, "activation_condition_parsed") != NULL;
         if (needs_gate) {
             int passed = rb_can_activate_effect(g, actor, ab->effect, host_cid);
