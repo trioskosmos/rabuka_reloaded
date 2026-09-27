@@ -22,6 +22,10 @@
      draw_place_in_zone, draw_count_zone_cards, draw_is_deck_source.
 */
 
+/* Defined in src/core/game_state_abilities.c; mirrors Rust's
+   GameState::resolve_target_player_mut (master-player semantics). */
+RbPlayer *rb_resolve_target_player_mut(GameState *g, const char *target);
+
 /* ── Internal helpers ─────────────────────────────────────────────────────── */
 
 static int draw_is_deck_source(const char *source) {
@@ -148,6 +152,101 @@ static int draw_heart_colors(const AbilityEffect *e, const char **out, int max) 
     return n;
 }
 
+/* Mirrors util::card_matches_type (engine/src/ability/util.rs:506-527):
+   only "live_card" / "member_card" / "energy_card" filter; every other value
+   (and None) accepts the card. `member_card` is CardType::Member, NOT
+   "neither live nor energy" — those predicates differ for any other card type. */
+static int draw_card_matches_type(int card, const char *card_type) {
+    if (!card_type) return 1;
+    if (!strcmp(card_type, "live_card"))   return rb_card_is_live(card);
+    if (!strcmp(card_type, "member_card")) return rb_card_is_member(card);
+    if (!strcmp(card_type, "energy_card")) return rb_card_is_energy(card);
+    return 1;
+}
+
+/* Mirrors util::CardFilter::check_exclude_self (util.rs:1198-1206). Applied
+   independently of card_type: Rust builds
+   `CardFilter::new().card_type_opt(ct).exclude_self_opt(self)` and the two
+   checks are separate arms of `matches`. */
+static int draw_exclude_self_passes(int card, int self_target_id) {
+    return !(self_target_id >= 0 && card == self_target_id);
+}
+
+/* "P1"/"P2" for the activating card's owner, else the active player. Mirrors
+   util::player_prefix (util.rs:490-502), which misc.c / state.c each carry a
+   private copy of; draw.c needs its own. */
+static const char *draw_player_prefix(const GameState *g, int card_id) {
+    if (card_id >= 0) {
+        for (int pl = 0; pl < 2; pl++) {
+            const RbPlayer *P = &g->p[pl];
+            for (int q = 0; q < RB_STAGE_SIZE; q++) if (P->stage[q] == card_id) return pl == 0 ? "P1" : "P2";
+            for (int i = 0; i < P->live.n; i++)      if (P->live.cards[i] == card_id) return pl == 0 ? "P1" : "P2";
+            for (int i = 0; i < P->hand.n; i++)      if (P->hand.cards[i] == card_id) return pl == 0 ? "P1" : "P2";
+        }
+    }
+    return g->active == 0 ? "P1" : "P2";
+}
+
+/* draw.rs:597-600 — "<pp> <act_name>: [[log_draw:n=..,from=zone_..,to=zone_..]]" */
+static void draw_push_rule_log(const GameState *g, const char *source,
+                               const char *dst, int n) {
+    char act_name[64]; act_name[0] = '\0';
+    if (g->activating_card >= 0) {
+        Card c;
+        if (rb_decode_card_by_index((uint32_t)g->activating_card, &c)) {
+            if (c.name) strncpy(act_name, c.name, sizeof(act_name) - 1);
+            act_name[sizeof(act_name) - 1] = '\0';
+            rb_free_card(&c);
+        }
+    }
+    char line[224];
+    snprintf(line, sizeof(line), "%s %s: [[log_draw:n=%d,from=zone_%s,to=zone_%s]]",
+             draw_player_prefix(g, g->activating_card), act_name, n,
+             source ? source : "", dst ? dst : "");
+    rb_log_push_verdict(line, "rule_log", 1);
+}
+
+/* Mirrors util::calculate_per_unit_multiplier's stage_count closure
+   (util.rs:2284-2297): occupied stage slots, filtered by orientation. A card
+   with NO orientation modifier only matches state == "active"
+   (`orientation.map_or(state == "active", |o| o == state)`). */
+static int draw_stage_count_with_state(const GameState *g, const RbPlayer *P,
+                                       const char *state) {
+    int c = 0;
+    for (int i = 0; i < RB_STAGE_SIZE; i++) {
+        int cid = P->stage[i];
+        if (cid == RB_EMPTY_SLOT) continue;
+        if (state) {
+            const char *o = rb_mods_get_orientation((RbMods *)&g->mods, cid);
+            if (o) { if (strcmp(o, state) != 0) continue; }
+            else if (strcmp(state, "active") != 0) continue;
+        }
+        c++;
+    }
+    return c;
+}
+
+/* Mirrors util::calculate_per_unit_multiplier (util.rs:2274-2313). */
+static int draw_per_unit_multiplier(const GameState *g, const RbPlayer *P,
+                                    const char *per_unit_type, const char *state) {
+    if (!per_unit_type) return 1;
+    if (!strcmp(per_unit_type, "member") || !strcmp(per_unit_type, "人") ||
+        !strcmp(per_unit_type, "members"))
+        return draw_stage_count_with_state(g, P, state);
+    if (!strcmp(per_unit_type, "hand") || !strcmp(per_unit_type, "card") ||
+        !strcmp(per_unit_type, "枚"))
+        return P->hand.n;
+    if (!strcmp(per_unit_type, "energy")) return P->energy.n;
+    if (!strcmp(per_unit_type, "live_card_zone")) return P->live.n;
+    if (!strcmp(per_unit_type, "discard")) return P->discard.n;
+    if (!strcmp(per_unit_type, "under_member") || !strcmp(per_unit_type, "下")) {
+        int n = 0;
+        for (int s = 0; s < RB_STAGE_SIZE; s++) n += P->under_cards[s].n;
+        return n;
+    }
+    return 1;
+}
+
 /* ── Core draw (mirrors draw.rs::draw_cards_for_player) ──────────────────── */
 
 int rb_draw_cards_for_player(RbPlayer *player, uint8_t count, const char *source,
@@ -157,7 +256,6 @@ int rb_draw_cards_for_player(RbPlayer *player, uint8_t count, const char *source
     (void)distinct; (void)card_db;
     if (is_any_number) return 0;
 
-    const char *deck_src = (!source || !strcmp(source, "deck")) ? "deck_top" : source;
     int deck_bottom = draw_is_deck_source(source) && source && !strcmp(source, "deck_bottom");
     int from_deck   = draw_is_deck_source(source);
     int from_discard = source && (!strcmp(source, "discard") || !strcmp(source, "waitroom"));
@@ -187,13 +285,17 @@ int rb_draw_cards_for_player(RbPlayer *player, uint8_t count, const char *source
                     card = player->deck.cards[--player->deck.n];
                 }
             } else {
-                /* Q104 / Rule 10.2.1: deck empty mid-draw -> refresh from waitroom */
+                /* Q104 / Rule 10.2.1: deck empty mid-draw -> player.refresh()
+                   (player.rs:634-648): shuffle the waitroom, append it UNDER the
+                   deck. draw.rs:73-77 then clears the consecutive-reject counter
+                   and continues, so a refresh restarts the revolution bound. */
                 if (player->discard.n > 0) {
                     for (int i = 0; i < player->discard.n; i++)
                         player->deck.cards[player->deck.n++] = player->discard.cards[i];
                     player->discard.n = 0;
                     rb_shuffle(player->deck.cards, player->deck.n);
                     player->deck_refreshed_this_turn = 1;
+                    rejected = 0;
                     continue;
                 }
                 break;
@@ -233,19 +335,12 @@ int rb_draw_cards_for_player(RbPlayer *player, uint8_t count, const char *source
 
         if (card == -1) break;
 
-        /* card_type filter (mirrors util::CardFilter::matches_card) */
-        int matches = 1;
-        if (card_type_filter) {
-            if (!strcmp(card_type_filter, "live_card"))
-                matches = rb_card_is_live(card);
-            else if (!strcmp(card_type_filter, "member_card"))
-                matches = !rb_card_is_live(card) && !rb_card_is_energy(card);
-            else if (!strcmp(card_type_filter, "energy_card"))
-                matches = rb_card_is_energy(card);
-            /* exclude self */
-            if (self_target_id != -1 && card == self_target_id)
-                matches = 0;
-        }
+        /* card_type filter + exclude_self. Rust builds
+           `CardFilter::new().card_type_opt(ct).exclude_self_opt(self)` and
+           `matches` checks the two independently, so the self-exclusion applies
+           even when the effect carries no card_type at all. */
+        int matches = draw_card_matches_type(card, card_type_filter) &&
+                      draw_exclude_self_passes(card, self_target_id);
 
         if (matches) {
             draw_place_in_zone(player, card, destination ? destination : "hand");
@@ -306,6 +401,18 @@ int rb_effect_draw_card(GameState *g, int actor, AbilityEffect *e, int host_cid)
     if (!g || !e) return 0;
     const char *act = e->action;
 
+    /* draw_until_count is its OWN ActionType in Rust: executor.rs dispatches
+       ActionType::DrawUntilCount straight to AbilityResolver::execute_draw_until_count
+       and it never goes through execute_draw_wrapper. Return here, BEFORE any
+       of the wrapper's count resolution, so none of the wrapper-only rules
+       (dynamic count, the count==0 moved-cards special, per_unit, or the
+       optional pay/skip gate) can perturb a draw_until_count effect — `count`
+       on such an effect is the TARGET hand size, not a draw size. */
+    if (act && !strcmp(act, "draw_until_count")) {
+        rb_effect_draw_until_count(g, actor, e);
+        return g->last_draw_count;
+    }
+
     /* Pull extra fields */
     int is_any_number = 0, is_self_target = 0, per_unit = 0, per_unit_count = 1;
     const char *per_unit_type = NULL, *per_unit_source = NULL;
@@ -352,32 +459,45 @@ int rb_effect_draw_card(GameState *g, int actor, AbilityEffect *e, int host_cid)
         final_count = e->count;
     }
 
+    /* target == "both" is the FIRST branch of Rust's execute_draw
+       (draw.rs:370-386): it draws for each player using the raw `count`
+       argument — i.e. BEFORE the per_unit multiplier, the self_target gate and
+       the any_number gate are considered — records step_state.last_draw_count
+       = count and returns. Reproduce that order and that count. */
+    if (e->target && !strcmp(e->target, "both")) {
+        rb_draw_cards_for_player(&g->p[0], (uint8_t)final_count, source, destination,
+                                 card_type, is_any_number, NULL, NULL, -1);
+        rb_draw_cards_for_player(&g->p[1], (uint8_t)final_count, source, destination,
+                                 card_type, is_any_number, NULL, NULL, -1);
+        g->last_draw_count = final_count;
+        return g->last_draw_count;
+    }
+
     /* per_unit multiplier (mirrors execute_draw::final_count) */
     if (per_unit) {
         int multiplier = 1;
-        if (per_unit_type && !strcmp(per_unit_type, "discard")) {
-            /* Rust: resolve_discard_per_unit_count(tracked, last_discard_count, &card_db, &filter)
-               C approximation: use n_recently_moved (the tracked moved cards) / per_unit_count. */
-            int disc = g->n_recently_moved;
-            multiplier = per_unit_count > 0 ? disc / per_unit_count : disc;
-        } else if (per_unit_source && !strcmp(per_unit_source, "this_cost_waited")) {
-            /* Rust: cost_waited_members.len().u8_count()
-               C: use n_last_cost_waited_members (mirrors the tracked list). */
+        if (per_unit_source && !strcmp(per_unit_source, "this_cost_waited")) {
+            /* 「これにより…ウェイト状態にしたメンバー1人につき」 (draw.rs:422-425):
+               the tracked list of members THIS cost waited replaces the whole
+               stage wait scan. */
             multiplier = g->n_last_cost_waited_members;
+        } else if (per_unit_type && !strcmp(per_unit_type, "discard")) {
+            /* Rust (draw.rs:403-414): resolve_discard_per_unit_count counts the
+               tracked moved cards through the effect's own CardFilter and falls
+               back to last_cost_discard_count, then divides by per_unit_count.
+               C keeps only the counts, so use the tracked-moved count with the
+               cost-discard fallback. */
+            int disc = g->n_recently_moved > 0 ? g->n_recently_moved
+                                               : g->mods.last_cost_discard_count;
+            multiplier = per_unit_count > 0 ? disc / per_unit_count : disc;
         } else {
-            multiplier = 1;
+            /* util::calculate_per_unit_multiplier (util.rs:2274-2313), with
+               effect.state as the orientation filter for member counts. */
+            multiplier = draw_per_unit_multiplier(g, &g->p[actor], per_unit_type,
+                                                  draw_extra(e, "state"));
         }
         int pc = per_unit_count > 0 ? per_unit_count : 1;
         final_count = final_count * multiplier * pc;
-    }
-
-    /* draw_until_count is its own action in Rust (executor.rs:49-52 dispatches
-       ActionType::DrawUntilCount to AbilityResolver::execute_draw_until_count, not
-       through execute_draw_wrapper). Route to the same handler so both entry
-       points share one implementation. */
-    if (act && !strcmp(act, "draw_until_count")) {
-        rb_effect_draw_until_count(g, actor, e);
-        return g->last_draw_count;
     }
 
     /* Optional draw: emit pay/skip gate; draw is performed on resume.
@@ -421,16 +541,6 @@ int rb_effect_draw_card(GameState *g, int actor, AbilityEffect *e, int host_cid)
         return n;
     }
 
-    /* Target resolution */
-    if (e->target && !strcmp(e->target, "both")) {
-        int n0 = rb_draw_cards_for_player(&g->p[0], (uint8_t)final_count, source, destination,
-                                          card_type, 0, NULL, NULL, -1);
-        int n1 = rb_draw_cards_for_player(&g->p[1], (uint8_t)final_count, source, destination,
-                                          card_type, 0, NULL, NULL, -1);
-        g->last_draw_count = n0 + n1;
-        return g->last_draw_count;
-    }
-
     int target = draw_effect_target_player(e, actor);
 
     /* self_target: activating card must be on target's stage (Rust Err -> no draw) */
@@ -442,7 +552,7 @@ int rb_effect_draw_card(GameState *g, int actor, AbilityEffect *e, int host_cid)
             if (!on_stage) return 0;
             int n = rb_draw_cards_for_player(&g->p[target], (uint8_t)final_count, source,
                                              destination, card_type, 0, NULL, NULL, host_cid);
-            g->last_draw_count = n;
+            g->last_draw_count = final_count;
             return n;
         }
         return 0;
@@ -468,34 +578,36 @@ int rb_effect_draw_card(GameState *g, int actor, AbilityEffect *e, int host_cid)
                 card = pile->cards[0];
                 memmove(pile->cards, pile->cards + 1, (size_t)(--pile->n) * sizeof(int));
             }
-            int matches = 1;
-            if (!from_discard && card_type) {
-                if (!strcmp(card_type, "live_card")) matches = rb_card_is_live(card);
-                else if (!strcmp(card_type, "member_card"))
-                    matches = !rb_card_is_live(card) && !rb_card_is_energy(card);
-                else if (!strcmp(card_type, "energy_card")) matches = rb_card_is_energy(card);
-            }
+            /* Rust's Zone::Discard branch (draw.rs:546-582) applies ONLY the
+               distinct dedupe while popping — no card_type filter. The Deck
+               branch (draw.rs:484-531) applies the card_type filter and treats
+               a type reject as "return to the bottom, no draw slot consumed". */
+            int matches = from_discard ? 1 : draw_card_matches_type(card, card_type);
             cards[drawn] = card;
             if (matches && dedupe)
                 matches = rb_apply_distinct_filter(cards, drawn + 1, RB_DISTINCT_CARDNAME, unique, RB_MAX_ZONE) == drawn + 1;
             if (matches) {
                 drawn++;
-            } else if (from_discard) {
-                memmove(pile->cards + 1, pile->cards, (size_t)pile->n * sizeof(int));
-                pile->cards[0] = card;
-                pile->n++;
             } else {
-                pile->cards[pile->n++] = card;
+                if (from_discard) {
+                    memmove(pile->cards + 1, pile->cards, (size_t)pile->n * sizeof(int));
+                    pile->cards[0] = card;
+                    pile->n++;
+                } else {
+                    pile->cards[pile->n++] = card;
+                }
             }
         }
         for (int i = 0; i < drawn; i++)
             draw_place_in_zone(player, cards[i], destination);
         g->last_draw_count = final_count;
+        draw_push_rule_log(g, source, destination, final_count);
         return drawn;
     }
     int n = rb_draw_cards_for_player(&g->p[target], (uint8_t)final_count, source, destination,
                                      card_type, 0, NULL, NULL, -1);
     g->last_draw_count = final_count;
+    draw_push_rule_log(g, source, destination, final_count);
     return n;
 }
 
@@ -706,15 +818,13 @@ void rb_effect_both_hand_keep_shuffle_under(GameState *g, int actor,
      * the destination gate is on the destination zone, so a non-Hand destination
        makes the whole effect a no-op. */
 
-/* target_count lives on the effect filter in Rust. The C decoder stores filter
-   scalars in extra_k/extra_v, so "target_count" is read from there first.
-   Fallback: the C ability decoder currently drops that key (the
-   optional/non_stackable/... branch in vm.c::decode_effect_body uses the
-   inverted test `!strcmp(key, "X") == 0`, which matches every key that is NOT
-   one of those six and therefore skip_value()s the field instead of storing it
-   as an extra). For every draw_until_count effect in cards/abilities.json
-   (lines 2791-2795 and 10523-10528) `count` carries the same value as
-   `target_count`, so e->count is an exact stand-in until vm.c is fixed. */
+/* target_count lives on the effect filter in Rust (`effect.target_count_any()`).
+   The C bytecode decoder stores unmodelled filter scalars in extra_k/extra_v, so
+   "target_count" is read from there; the decode was verified to carry it
+   (RB_DUMP_ABILITY=1 on PL!N-PR-028-PR prints `extra[0]=target_count -> 5`).
+   Fallback to `count` is kept for hand-built effects and stays exact for the
+   card DB: every draw_until_count effect in cards/abilities.json (lines
+   2791-2795 and 10523-10528) carries count == target_count. */
 static int draw_until_target_count(const AbilityEffect *e) {
     const char *tc = draw_extra(e, "target_count");
     if (tc) return atoi(tc);
@@ -723,19 +833,54 @@ static int draw_until_target_count(const AbilityEffect *e) {
 
 void rb_effect_draw_until_count(GameState *g, int actor, AbilityEffect *e) {
     if (!g || !e) return;
-    if (getenv("RB_DBG_DRAW")) { fprintf(stderr, "[DUC] actor=%d hand=%d deck=%d disc=%d act=%s tgt=%s src=%s dst=%s count=%d n_extra=%d\n", actor, g->p[actor].hand.n, g->p[actor].deck.n, g->p[actor].discard.n, e->action?e->action:"(null)", e->target?e->target:"(null)", e->destination?e->destination:"(null)", e->count, e->n_extra); for (int i=0;i<e->n_extra;i++) fprintf(stderr, "    extra[%d]=%s -> %s\n", i, e->extra_k[i]?e->extra_k[i]:"(null)", e->extra_v[i]?e->extra_v[i]:"(null)"); }
+    (void)actor;  /* Rust resolves the target through the ability master, not the caller */
+
     int target_count = draw_until_target_count(e);
     const char *target = (e->target && *e->target) ? e->target : "self";
-    int who = (!strcmp(target, "opponent") || !strcmp(target, "p2")) ? actor ^ 1 : actor;
-    RbPlayer *P = &g->p[who];
-    const char *dst = e->destination ? e->destination : "hand";
+    const char *dst = (e->destination && *e->destination) ? e->destination : "hand";
+
+    if (rb_ability_debug_enabled())
+        fprintf(stderr, "[DRAW_UNTIL_COUNT] target=%s target_count=%d destination=%s "
+                        "effect_count=%d source=%s\n",
+                target, target_count, dst, e->count, e->source ? e->source : "-");
+
+    /* draw.rs:609-613 — the current size is read from the RESOLVED target's
+       hand, and any destination other than Hand makes the effect a no-op. */
     RbZone z;
-    if (rb_zone_of_str(dst, &z) == 0 || z != RB_ZONE_HAND) return;
+    if (rb_zone_of_str(dst, &z) == 0 || z != RB_ZONE_HAND) {
+        if (rb_ability_debug_enabled())
+            fprintf(stderr, "[DRAW_UNTIL_COUNT] no-op: destination '%s' is not a hand\n", dst);
+        return;
+    }
+    RbPlayer *P = rb_resolve_target_player_mut(g, target);
+    if (!P) return;
+    int who = (int)(P - g->p);
     int current = P->hand.n;
+    /* saturating_sub */
     int to_draw = target_count > current ? target_count - current : 0;
-    if (to_draw > 0)
+
+    /* draw.rs:616-627 delegates to execute_draw with a DEFAULT effect, so the
+       source is hard-wired to Deck (not effect.source) and there is no card
+       filter / distinct / any_number / self_target / per_unit. */
+    if (!strcmp(target, "both")) {
+        /* draw.rs:370-386 — the same count is drawn for EACH player, and
+           last_draw_count is set to the count ONCE (not summed). The deficit
+           itself was measured on resolve_target_player_mut("both"), which Rust
+           documents as falling back to player1. */
+        rb_draw_cards_for_player(&g->p[0], (uint8_t)to_draw, "deck", dst, NULL, 0, NULL, NULL, -1);
+        rb_draw_cards_for_player(&g->p[1], (uint8_t)to_draw, "deck", dst, NULL, 0, NULL, NULL, -1);
+    } else {
         rb_draw_cards_for_player(P, (uint8_t)to_draw, "deck", dst, NULL, 0, NULL, NULL, -1);
+    }
+    /* execute_draw ends with step_state.last_draw_count = final_count, i.e. the
+       REQUESTED deficit, not the number of cards the deck could supply. */
     g->last_draw_count = to_draw;
+
+    if (rb_ability_debug_enabled())
+        fprintf(stderr, "[DRAW_UNTIL_COUNT] who=%d current=%d to_draw=%d -> hand=%d "
+                        "deck=%d waitroom=%d last_draw_count=%d\n",
+                who, current, to_draw, P->hand.n, P->deck.n, P->discard.n,
+                g->last_draw_count);
 }
 
 /* ── execute_select_heart_color (mirrors draw.rs::execute_select_heart_color) ──
