@@ -27,11 +27,6 @@ fn energy_p2(g: &TestGame) -> u8 {
     g.state.player2.energy_zone.active_count()
 }
 
-fn dbg(g: &TestGame) {
-    let s1 = &g.state.player1.stage.stage;
-    let s2 = &g.state.player2.stage.stage;
-}
-
 fn drain(game: &mut TestGame, _label: &str) {
     let mut safety = 0;
     while game.has_pending_choice() && safety < 20 {
@@ -66,10 +61,8 @@ fn drain(game: &mut TestGame, _label: &str) {
 }
 
 fn activate_and_drain(game: &mut TestGame, card: i16, label: &str) {
-    dbg(game);
     game.activate_ability(card);
     drain(game, label);
-    dbg(game);
 }
 
 fn pass_phase(game: &mut TestGame) {

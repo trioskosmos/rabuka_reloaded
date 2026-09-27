@@ -106,8 +106,20 @@ fn setup_game_with_deck_top(deck_top: &[&str]) -> (TestGame, i16, i16) {
 /// helper so the test body reads as behaviour, not as a debugging session, and
 /// so the next failure in this area prints the same thing.
 fn dump_live_diagnostics(game: &mut TestGame, sumire: i16, wien: i16) {
+    println!(
+        "phase={} live={:?} success=({}, {}) sumire={} wien={}",
+        game.state.current_phase,
+        game.state.player1.live_card_zone.cards,
+        game.state.player1.success_live_card_zone.cards.len(),
+        game.state.player2.success_live_card_zone.cards.len(),
+        sumire,
+        wien
+    );
     for &id in &game.state.revealed_cards {
-        let card = game.db.get_card(id).unwrap();
+        match game.db.get_card(id) {
+            Some(c) => println!("  revealed {id}: {} (blades={})", c.name, c.blade),
+            None => println!("  revealed {id}: <not in db>"),
+        }
     }
 }
 

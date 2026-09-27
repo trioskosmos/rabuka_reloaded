@@ -19,8 +19,6 @@ fn count_sayaka_offers(game: &TestGame, sayaka: i16) -> usize {
                 && a.parameters.as_ref().and_then(|p| p.card_id) == Some(sayaka)
         })
         .collect();
-    for a in &acts {
-    }
     acts.len()
 }
 
@@ -44,12 +42,6 @@ fn sayaka_activation_charges_energy_and_terminates() {
 
     let mut log: Vec<String> = Vec::new();
     let mut activations = 0usize;
-    // Dump umi's cost structure for comparison (Q228 group-reduction shape).
-    if let Some(card) = game.state.card_database.get_card(game.id("PL!-bp5-004-R＋")) {
-        for (idx, ar) in card.abilities.iter().enumerate() {
-            let ab = ar.resolve();
-        }
-    }
     for step in 0..20 {
         let en_before = game.state.player1.energy_zone.active_count();
         let offers = count_sayaka_offers(&game, sayaka);
@@ -81,6 +73,7 @@ fn sayaka_activation_charges_energy_and_terminates() {
     }
 
     for l in &log {
+        println!("{l}");
     }
     assert!(
         activations <= 5,

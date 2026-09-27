@@ -217,12 +217,6 @@ fn miraclerition_correct_positions_gains_score() {
     let himeno = game.id("PL!HS-sd1-006-SD"); // left_side
     let megumi = game.id("PL!HS-bp1-015-N"); // center (藤島慈)
 
-    // Debug: check stage setup before live start
-    // Check card names
-    for &cid in &[osawa, himeno, megumi] {
-        let name = db.get_card(cid).map(|c| c.name.clone());
-    }
-
     let card_id = setup_miraclerition(&mut game, [himeno, megumi, osawa]);
 
     let score = game.state.mods.get_score_modifier(card_id);

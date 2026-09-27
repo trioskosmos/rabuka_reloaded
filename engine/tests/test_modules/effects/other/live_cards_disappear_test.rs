@@ -66,6 +66,15 @@ fn live_cards_stuck_in_live_zone_instead_of_discard() {
 
     let total_after_set = count_all_cards(&game);
 
+    // The point of this test: setting live cards relocates cards, it never
+    // destroys them. `count_all_cards` is zone-independent, so advancing
+    // through the live-card-set phase and committing three lives must leave
+    // the total untouched.
+    assert_eq!(
+        total_after_set, total_before,
+        "cards were lost setting the live card zone: {total_before} before, \
+         {total_after_set} after"
+    );
     assert_eq!(game.state.player1.live_card_zone.cards.len(), 3);
     assert!(game.state.player1.waitroom.cards.is_empty());
 

@@ -43,12 +43,6 @@ fn group_member_filter_excludes_activating_member() {
         None, // exclude_characters
     );
 
-    for (i, &card_id) in stage_data.iter().enumerate() {
-        if card_id != -1 {
-            let matches = filter.matches(&card_db, card_id, true);
-        }
-    }
-
     // Get matching indices
     let matching_indices =
         rabuka_engine::ability::util::matching_indices(&stage_data, &card_db, &filter, true);

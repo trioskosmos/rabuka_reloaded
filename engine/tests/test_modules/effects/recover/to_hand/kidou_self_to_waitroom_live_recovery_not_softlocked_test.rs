@@ -45,9 +45,6 @@ fn kidou_card_play_to_stage_not_softlocked() {
         .iter()
         .any(|a| a.action_type == game_setup::ActionType::PlayMemberToStage);
 
-    for (i, a) in actions.iter().enumerate() {
-    }
-
     assert!(has_pass, "Should have PASS action");
     assert!(
         has_use_ability || has_play_member,

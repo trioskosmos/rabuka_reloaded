@@ -110,10 +110,6 @@ fn real_deck_top_mill_offers_discard_and_recovers_self() {
 
     trigger_dia_mill(&mut game, dia);
 
-    // Report the real movement the engine recorded.
-    for mv in game.state.turn_movements.iter() {
-    }
-
     assert!(
         game.state.turn_movements
             .iter()

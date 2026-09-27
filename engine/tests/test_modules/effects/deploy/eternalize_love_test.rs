@@ -118,12 +118,6 @@ fn eternalize_love_full_live_flow_heart00_reduction() {
         game.select_indices(&[]);
     }
 
-    // Check modifier during performance
-    let modifier = game
-        .state
-        .mods
-        .get_need_heart_modifier(live, rabuka_engine::card::HeartColor::Heart00);
-
     // Advance through performance phases
     // FirstAttackerPerformance → SecondAttackerPerformance
     game.pass();

@@ -30,8 +30,6 @@ fn matching_group_discard_look_four_increases_hand() {
     game.give_energy(10);
 
     let hand_before = game.state.player1.hand.cards.len();
-    let deck_before = game.state.player1.main_deck.cards.len();
-    let discard_before = game.state.player1.waitroom.cards.len();
 
     game.activate_ability(kotori);
 
@@ -52,8 +50,6 @@ fn matching_group_discard_look_four_increases_hand() {
     }
 
     let hand_after = game.state.player1.hand.cards.len();
-    let deck_after = game.state.player1.main_deck.cards.len();
-    let discard_after = game.state.player1.waitroom.cards.len();
     assert!(
         hand_after > hand_before,
         "Should have gained cards from look_and_select: before={}, after={}",

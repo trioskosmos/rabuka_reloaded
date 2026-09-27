@@ -2693,18 +2693,6 @@ fn hareruya_q64_waitroom_only_five_distinct_liella_condition_met() {
 
     advance_to_live_start(&mut game);
 
-    // Debug: check the ability's condition locations field
-    let card = game
-        .db
-        .get_card(game.state.player1.live_card_zone.cards[0])
-        .expect("live card should exist in database");
-    for ab in card.resolved_abilities() {
-        if let Some(ref ef) = ab.effect {
-            if let Some(ref cond) = ef.condition {
-            }
-        }
-    }
-
     let card_id = game.state.player1.live_card_zone.cards[0];
     let h02_mod = game
         .state

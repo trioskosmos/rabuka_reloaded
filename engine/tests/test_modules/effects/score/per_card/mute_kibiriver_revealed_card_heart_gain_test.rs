@@ -44,17 +44,6 @@ fn mute_kibiriver_normal_flow() {
         }
     }
 
-    // Debug: check all modifiers
-    for color in &[
-        rabuka_engine::card::HeartColor::Heart01,
-        rabuka_engine::card::HeartColor::Heart03,
-        rabuka_engine::card::HeartColor::Heart04,
-        rabuka_engine::card::HeartColor::Heart05,
-        rabuka_engine::card::HeartColor::Heart06,
-    ] {
-        let val = game.state.mods.get_heart_modifier(kasumi, *color);
-    }
-
     // PL!N-bp5-002-R has heart03=3, heart04=1, heart05=1, heart06=1 in base_heart
     assert_eq!(
         game.state

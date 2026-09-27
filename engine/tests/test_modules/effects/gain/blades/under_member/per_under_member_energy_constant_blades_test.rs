@@ -19,8 +19,11 @@ fn constant_blades_equal_under_member_energy_count() {
 
     // Verify the card has abilities
     let abilities: Vec<_> = card.unwrap().resolved_abilities().collect();
-    for a in &abilities {
-    }
+    assert!(
+        !abilities.is_empty(),
+        "Mia Taylor must resolve at least one ability for the per_under_member \
+         blade bonus under test to be reachable"
+    );
 
     game.state.recalculate_constants();
 

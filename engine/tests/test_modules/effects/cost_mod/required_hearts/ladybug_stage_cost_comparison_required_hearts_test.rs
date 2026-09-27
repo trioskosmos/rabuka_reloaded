@@ -57,7 +57,6 @@ fn ladybug_q114_both_members_on_stage_reduces_hearts() {
         .get(&ladybug)
         .and_then(|m| m.get(&rabuka_engine::card::HeartColor::Heart00))
         .map_or(0, rabuka_engine::core::game_modifiers::ModifierEntry::total);
-    let all_mods = heart_mods.get(&ladybug);
     assert_eq!(
         reduction, -3,
         "Q114: Ladybug should reduce heart0 requirement by 3"

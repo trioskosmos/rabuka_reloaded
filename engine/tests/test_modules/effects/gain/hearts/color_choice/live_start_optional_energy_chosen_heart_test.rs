@@ -54,8 +54,6 @@ fn live_start_optional_energy_gains_chosen_heart() {
 
     game.set_live_card(live_card);
 
-    let before = heart_mods(&game, shizuku);
-
     game.pass();
     game.pass();
 

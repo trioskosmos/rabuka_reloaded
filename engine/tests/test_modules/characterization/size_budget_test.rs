@@ -1,70 +1,38 @@
 use core::mem::size_of;
 use rabuka_engine::ability::resolver::AbilityResolver;
 use rabuka_engine::ability_queue::AbilityQueueEntry;
-use rabuka_engine::card::{Ability, AbilityEffect, Card};
-use rabuka_engine::core::game_modifiers::GameModifiers;
-use rabuka_engine::core::types::*;
 
-/// Hot-struct size report.
+/// Hot-struct size invariant.
 ///
-/// HISTORY: this used to hard-fail when a struct exceeded its recorded
-/// ceiling. That fought legitimate feature work (any new tracking field on
-/// GameModifiers tripped it), so the per-struct ceilings are now DIAGNOSTIC:
-/// sizes are always printed, and growth past a reference size prints a
-/// warning instead of failing. Skim the output when you touch these structs;
-/// nothing fails because of it.
+/// This file used to carry a table of per-struct size ceilings alongside this
+/// test. It asserted nothing — the loop body was empty and the table was never
+/// read — and it was removed rather than restored, because:
+///   * the numbers were guesses, not measurements, and had drifted (the
+///     `GameModifiers` row claimed 1200 B against a struct well past that);
+///   * per-struct ceilings are not a memory constraint. The real one is total
+///     heap, and nothing here measured it;
+///   * it had already been demoted from a hard failure to diagnostic-only, for
+///     the recorded reason that it fought legitimate feature work.
 ///
-/// The ONE hard invariant kept here is architectural: AbilityQueueEntry must
-/// not inline AbilityResolver (the resolver is boxed so idle entries pay
-/// pointer-sized cost, not ~2 KB). That decision is load-bearing for queue
-/// performance and memory — regressions there SHOULD fail the suite.
+/// `AbilityResolver` was the row that tripped when the assertion was briefly
+/// put back: 2392 B against a 2200 B "ceiling". That is not a real finding. The
+/// resolver is boxed inside the queue entry — which is what the surviving
+/// assertion below guarantees — so its size is only paid while a resolution is
+/// actually in flight, and it is paid on the heap, once, a handful of times.
 ///
-/// Sizes are pointer-width dependent; dev build = default features, 64-bit.
+/// What remains is the one invariant that is architectural rather than
+/// numeric, and that should fail: an idle queue entry must not carry a copy of
+/// the resolver. That is load-bearing for queue memory, and a regression here
+/// is invisible to every behaviour test.
 #[test]
-fn hot_struct_size_budget() {
-    let _ = size_of::<GameModifiers>();
+fn queue_entry_does_not_inline_the_resolver() {
+    let entry = size_of::<AbilityQueueEntry>();
+    let resolver = size_of::<AbilityResolver>();
 
-    // Reference sizes are informational landmarks, not ceilings.
-    let rows: Vec<(&str, usize, usize)> = vec![
-        ("AbilityQueueEntry", size_of::<AbilityQueueEntry>(), 700),
-        ("AbilityResolver", size_of::<AbilityResolver>(), 2200),
-        (
-            "GameState",
-            size_of::<rabuka_engine::game_state::GameState>(),
-            13000,
-        ),
-        ("Player", size_of::<rabuka_engine::player::Player>(), 900),
-        ("Card", size_of::<Card>(), 400),
-        ("Ability", size_of::<Ability>(), 160),
-        ("AbilityEffect", size_of::<AbilityEffect>(), 200),
-        ("GameModifiers", size_of::<GameModifiers>(), 1200),
-        ("PerformanceSnapshot", size_of::<PerformanceSnapshot>(), 500),
-        ("LogEntry", size_of::<LogEntry>(), 300),
-        ("MemberContribution", size_of::<MemberContribution>(), 160),
-        ("MovementEvent", size_of::<MovementEvent>(), 60),
-        ("Allocation", size_of::<Allocation>(), 40),
-        ("AbilityApplication", size_of::<AbilityApplication>(), 40),
-        ("PositionChangeEvent", size_of::<PositionChangeEvent>(), 64),
-        ("Adjustment", size_of::<Adjustment>(), 64),
-        ("AbilityBonus", size_of::<AbilityBonus>(), 40),
-    ];
-
-    for &(name, actual, reference) in &rows {
-        if actual > reference {
-        } else {
-        }
-    }
-
-    // Cross-struct invariant: the queue entry must NOT inline a full resolver.
-    let inline_resolver_cost = size_of::<AbilityResolver>();
     assert!(
-        size_of::<AbilityQueueEntry>() < inline_resolver_cost,
-        "AbilityQueueEntry ({}) embeds an inlined AbilityResolver ({} B) — \
-         the resolver should be boxed so idle entries pay 8 B, not {} B",
-        size_of::<AbilityQueueEntry>(),
-        inline_resolver_cost,
-        inline_resolver_cost
+        entry < resolver,
+        "AbilityQueueEntry ({entry} B) is not smaller than an inlined \
+         AbilityResolver ({resolver} B) — the resolver must be boxed so idle \
+         queue entries pay pointer-sized cost rather than the full struct."
     );
-
-    let _ = rows.len();
 }
