@@ -25,32 +25,39 @@
 //! 「カードを1枚引く。自分の成功ライブカード置き場に『μ's』のカードがある場合、さらに
 //! カードを1枚引く。」 — a conditional SECOND draw. Three claims are separately
 //! breakable and "it drew" catches none of them: さらに (the observable is a COUNT,
-//! one or two), 自分の成功ライブカード置き場 (p1's own SUCCESS zone — not the live
-//! zone, not the opponent's), and 『μ's』のカード (a group filter on top).
+//! one or two, so a presence check cannot see it), 自分の成功ライブカード置き場 (p1's
+//! own SUCCESS zone — not the live zone, not the opponent's), and 『μ's』のカード (a
+//! group filter on top, so the right zone with the wrong card must not qualify).
 //!
-//! Four drafts failed, all on the MEASUREMENT WINDOW rather than the ability, and
-//! what a probe established is worth more than the attempts:
+//! ### What five attempts established about the harness
+//!
+//! ライブ成功時 fires from `execute_live_victory_determination`, which `advance_phase`
+//! calls from inside `Phase::LiveVictoryDetermination` (phases.rs:266-274). The
+//! rollover looks like two phases and the natural walk covers only the first. Full
+//! phase diagnostics, after adopting the
+//! `integration/per_card/live_end_expiry_rollover_and_dual_trigger_window_gates_test.rs`
+//! idiom verbatim and draining auto-ability choices every step:
 //!
 //! ```text
-//!   guard=3  hand +0  deck -0  live_zone=0
+//!   perf_guard=3  after_perf_phase=Active  vd_guard=0  final_phase=Active
+//!   turn_phase=FirstAttackerNormal  hand=1  deck=39  success_cards=1
+//!   game_result=Ongoing  game_ended=false
 //! ```
 //!
-//! ライブ成功時 fires at victory determination and only for a live that SUCCEEDED.
-//! Dispatching the trigger directly at ライブ開始時 draws nothing because the phase
-//! gate is not met; seven `pass()` calls stop one step short and read zero; an
-//! open-ended walk crosses the rollover and the next turn's Draw phase puts a card
-//! in hand that reads as a second draw. Adopting the
-//! `integration/per_card/live_end_expiry_rollover_and_dual_trigger_window_gates_test.rs`
-//! idiom (five passes, `set_live_card` from hand, two more, then pass while
-//! `current_turn_phase == TurnPhase::Live` WITH `drain_auto_ability_choices` each
-//! step) is what got the walk to the rollover at all — without the auto-ability
-//! drain it stalls in `FirstAttackerNormal` — and from there the draw is still
-//! zero with the live card having left the live zone.
+//! Read carefully, that says the walk does NOT stop at `LiveVictoryDetermination`:
+//! within its three passes the phase goes first → second → victory determination →
+//! `Active`, so the determination executes INSIDE one `pass()` and the loop written
+//! to catch it (`vd_guard=0`) never runs. `game_result`/`game_ended` are clean, so
+//! this is not the early return at phases.rs:267 — the determination ran, and the
+//! trigger still did not dispatch.
 //!
-//! So the remaining unknown is not the card: it is where in this harness a
-//! ライブ成功時 dispatch can be observed at all. That is worth resolving once,
-//! because it gates every ライブ成功時 negative in the coverage report, and
-//! `PL!-bp6-023-L` is only the first card to need it.
+//! So the blocker is not a missing pass and not a card bug: the dispatch happens
+//! inside a single `advance_phase` step and is not observable from outside without
+//! instrumenting `execute_live_victory_determination`. That is worth resolving ONCE,
+//! because it gates every ライブ成功時 negative in the coverage report and
+//! `PL!-bp6-023-L` is only the first card to need it. The three claim variants above
+//! are written down so they are ready when it is.
+//!
 
 use crate::helpers::*;
 use rabuka_engine::zones::MemberArea;
