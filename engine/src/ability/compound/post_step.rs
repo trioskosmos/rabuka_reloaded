@@ -8,6 +8,7 @@ use crate::game_state::GameState;
 
 /// Post-step tracking for non-choice steps. Returns true when the caller
 /// must `return Ok(())` (cancelled remainder / optional no-target stop).
+#[allow(clippy::too_many_arguments)]
 pub(crate) fn track_sequential_post_step(
     resolver: &mut AbilityResolver,
     gs: &mut GameState,

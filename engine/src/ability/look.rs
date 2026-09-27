@@ -276,7 +276,8 @@ impl AbilityResolver {
         self.execution_context = ExecutionContext::SingleEffect { effect_index: 0 };
     }
 
-    pub fn execute_reveal(
+    #[allow(clippy::too_many_arguments)]
+pub fn execute_reveal(
         &mut self,
         gs: &mut GameState,
         source: &str,
@@ -1195,7 +1196,8 @@ impl AbilityResolver {
     /// Push a drawn card into the revealed pool and test termination.
     /// Returns true when matched (caller breaks). Shared by the fresh-draw
     /// and post-refresh paths below, which were copy-pasted.
-    fn reveal_until_check<F>(
+    #[allow(clippy::too_many_arguments)]
+fn reveal_until_check<F>(
         gs: &mut GameState,
         card_db: &crate::card::CardDatabase,
         cid: i16,

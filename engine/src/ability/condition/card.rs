@@ -3286,7 +3286,8 @@ impl<'a> ConditionContext<'a> {
         }
     }
 
-    pub(crate) fn card_matches_count_filters(
+    #[allow(clippy::too_many_arguments)]
+pub(crate) fn card_matches_count_filters(
         &self,
         card_id: i16,
         card_type_filter: Option<&str>,
@@ -3315,7 +3316,8 @@ impl<'a> ConditionContext<'a> {
         self.matches_original_value_filters(condition, card_id, respect_original_value)
     }
 
-    pub(crate) fn count_cards_with_filters(
+    #[allow(clippy::too_many_arguments)]
+pub(crate) fn count_cards_with_filters(
         &self,
         cards: &[i16],
         card_type_filter: Option<&str>,

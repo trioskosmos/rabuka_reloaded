@@ -211,7 +211,8 @@ impl GameState {
     /// modifier state: clear old constant-derived bonuses and re-apply the new
     /// ones (blade, score, per-player score bonus, heart, prohibition, and
     /// global need_heart).
-    fn commit_constant_results(
+    #[allow(clippy::too_many_arguments)]
+fn commit_constant_results(
         &mut self,
         exp_blade: HashMap<i16, i16>,
         exp_score: HashMap<i16, i16>,

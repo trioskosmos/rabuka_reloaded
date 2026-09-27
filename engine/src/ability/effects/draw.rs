@@ -13,6 +13,7 @@ use alloc::{
 };
 use smallvec::SmallVec;
 
+#[allow(clippy::too_many_arguments)]
 pub(crate) fn draw_cards_for_player(
     player: &mut crate::player::Player,
     count: u8,
@@ -342,7 +343,8 @@ impl AbilityResolver {
         }
     }
 
-    pub fn execute_draw(
+    #[allow(clippy::too_many_arguments)]
+pub fn execute_draw(
         &mut self,
         gs: &mut GameState,
         effect: &AbilityEffect,

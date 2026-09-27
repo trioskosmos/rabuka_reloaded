@@ -338,7 +338,8 @@ impl AbilityResolver {
         );
     }
 
-    fn apply_heart_to_card(
+    #[allow(clippy::too_many_arguments)]
+fn apply_heart_to_card(
         &mut self,
         gs: &mut GameState,
         card_id: i16,
@@ -478,7 +479,8 @@ impl AbilityResolver {
         Ok(true)
     }
 
-    pub(crate) fn execute_gain_surplus_heart(
+    #[allow(clippy::too_many_arguments)]
+pub(crate) fn execute_gain_surplus_heart(
         &self,
         gs: &mut GameState,
         _effect: &AbilityEffect,

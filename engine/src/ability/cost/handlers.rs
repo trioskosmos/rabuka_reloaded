@@ -39,6 +39,7 @@ fn has_skip_prompt(cost: &AbilityEffect) -> bool {
     }
 }
 
+#[allow(clippy::too_many_arguments)]
 fn get_change_state_candidates(
     gs: &GameState,
     target: &str,

@@ -362,6 +362,7 @@ pub fn compute_play_cost(
 /// `hand_condition_guard`: when `true`, effects whose condition explicitly
 /// requires `location == "hand"` are skipped (the aura card is on stage, not
 /// in hand, so the condition is not met).
+#[allow(clippy::too_many_arguments)]
 fn scan_abilities_for_cost_reduction(
     abilities: &[crate::ability::ability_store::AbilityRef],
     target_id: i16,
@@ -1681,6 +1682,7 @@ pub fn filter_from_parts<'a>(
     }
 }
 
+#[allow(clippy::too_many_arguments)]
 pub fn filter_from_parts_full<'a>(
     card_type: Option<&'a str>,
     group: Option<&'a str>,
@@ -2312,6 +2314,7 @@ pub fn calculate_per_unit_multiplier(
 
 /// Resolve per-unit count with optional card type / group / heart color filtering.
 /// Returns the effective count multiplier.
+#[allow(clippy::too_many_arguments)]
 pub fn resolve_per_unit_count(
     per_unit: bool,
     per_unit_type: Option<&str>,

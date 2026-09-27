@@ -93,6 +93,7 @@ pub fn get_selection_indices(
 }
 
 /// Full selection resolution: filter → classify → SelectionOutcome.
+#[allow(clippy::too_many_arguments)]
 pub fn resolve_selection(
     cards: &[i16],
     card_db: &CardDatabase,

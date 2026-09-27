@@ -34,6 +34,14 @@ fn _prohibition_destination_blocks(prohibition: &str, zone: &str) -> bool {
         || (dest_zone == Some(Zone::SuccessLiveZone) && target_zone == Some(Zone::LiveCardZone))
 }
 
+/// What caused an ability to be enqueued, carried as one value rather than
+/// three positional parameters that only ever travel together.
+struct AbilityTriggerContext {
+    trigger_type: AbilityTrigger,
+    trigger_moved_cards: Option<SmallVec<[i16; 4]>>,
+    triggering_member_id: Option<i16>,
+}
+
 impl GameState {
     fn stage_card_ids(&self) -> impl Iterator<Item = i16> + '_ {
         self.player1
@@ -216,10 +224,13 @@ impl GameState {
         ability: crate::Arc<crate::card::Ability>,
         card_id: Option<i16>,
         player_id: String,
-        trigger_type: AbilityTrigger,
-        trigger_moved_cards: Option<SmallVec<[i16; 4]>>,
-        triggering_member_id: Option<i16>,
+        trigger: AbilityTriggerContext,
     ) -> crate::ability_queue::AbilityQueueEntry {
+        let AbilityTriggerContext {
+            trigger_type,
+            trigger_moved_cards,
+            triggering_member_id,
+        } = trigger;
         crate::ability_queue::AbilityQueueEntry {
             card_no,
             // Normalise "player1"/"player2" to "p1"/"p2" exactly as before,
@@ -1137,7 +1148,8 @@ impl GameState {
         }
     }
 
-    pub fn trigger_auto_ability(
+    #[allow(clippy::too_many_arguments)]
+pub fn trigger_auto_ability(
         &mut self,
         ability_id: String,
         trigger_type: AbilityTrigger,
@@ -1244,9 +1256,11 @@ impl GameState {
             ability,
             Some(cid),
             player_id.to_string(),
-            trigger_type.clone(),
-            trigger_moved_cards.clone(),
-            triggering_member_id,
+            AbilityTriggerContext {
+                trigger_type: trigger_type.clone(),
+                trigger_moved_cards: trigger_moved_cards.clone(),
+                triggering_member_id,
+            },
         );
         self.push_debug_note_fmt(format_args!(
             "queue+ {} card={} trigger={:?}",
@@ -1309,9 +1323,11 @@ impl GameState {
             ability,
             Some(cid),
             player_id.to_string(),
-            trigger_type.clone(),
-            trigger_moved_cards.clone(),
-            triggering_member_id,
+            AbilityTriggerContext {
+                trigger_type: trigger_type.clone(),
+                trigger_moved_cards: trigger_moved_cards.clone(),
+                triggering_member_id,
+            },
         );
         let mut entry = entry;
         entry.snapshot_movements = self.batch_movements.clone();
@@ -1320,7 +1336,8 @@ impl GameState {
 
     /// Hot-path version of trigger_auto_ability that takes a numeric ability index
     /// instead of a string key. Avoids format!() allocations in the TAS scan loop.
-    pub fn trigger_auto_ability_by_index(
+    #[allow(clippy::too_many_arguments)]
+pub fn trigger_auto_ability_by_index(
         &mut self,
         trigger_type: AbilityTrigger,
         player_id: impl Into<crate::core::player::PlayerId>,
@@ -1341,7 +1358,8 @@ impl GameState {
         )
     }
 
-    fn trigger_auto_ability_by_index_refs(
+    #[allow(clippy::too_many_arguments)]
+fn trigger_auto_ability_by_index_refs(
         &mut self,
         trigger_type: AbilityTrigger,
         player_id: &str,
@@ -1363,9 +1381,11 @@ impl GameState {
                         ar.to_arc(),
                         Some(card_id),
                         player_id.to_string(),
-                        trigger_type,
-                        trigger_moved_cards,
-                        triggering_member_id,
+                        AbilityTriggerContext {
+                            trigger_type: trigger_type.clone(),
+                            trigger_moved_cards: trigger_moved_cards.clone(),
+                            triggering_member_id,
+                        },
                     );
                     let mut entry = entry;
                     entry.snapshot_movements = self.batch_movements.clone();

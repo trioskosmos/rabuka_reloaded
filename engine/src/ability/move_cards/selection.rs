@@ -49,7 +49,8 @@ impl AbilityResolver {
         self.execution_context = ExecutionContext::SingleEffect { effect_index: 0 };
     }
 
-    pub(super) fn take_cards_from_standard_zone(
+    #[allow(clippy::too_many_arguments)]
+pub(super) fn take_cards_from_standard_zone(
         &mut self,
         player: &mut Player,
         card_db: &CardDatabase,

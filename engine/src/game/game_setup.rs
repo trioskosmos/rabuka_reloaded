@@ -1675,6 +1675,7 @@ const AREA_NAMES: [&str; 3] = ["left", "center", "right"];
 /// legal. Returns the three candidates plus whether any area is available at
 /// all (an empty area costs the card's full reduced cost; an occupied one is a
 /// baton touch priced at the card's cost minus the member it replaces).
+#[allow(clippy::too_many_arguments)]
 fn area_candidates_for<'a>(
     game_state: &'a GameState,
     active_player: &crate::player::Player,

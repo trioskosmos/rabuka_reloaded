@@ -2007,16 +2007,17 @@ impl super::TurnEngine {
         _player_id: &str,
         owner: u8,
         card_db: &CardDatabase,
-        blade_modifiers: &HashMap<i16, ModifierEntry>,
-        heart_override: &HashMap<i16, (HeartColor, u8)>,
-        heart_modifiers: &HashMap<i16, HashMap<HeartColor, ModifierEntry>>,
-        blade_type_modifiers: &HashMap<i16, BladeColor>,
-        orientation_modifiers: &HashMap<i16, crate::core::game_modifiers::CardOrientation>,
-        need_heart_modifiers: &HashMap<i16, HashMap<HeartColor, ModifierEntry>>,
-        heart_color_multiplier: &HashMap<i16, HeartColor>,
-        heart_copy: &HashMap<i16, i16>,
+        mods: &crate::core::game_modifiers::GameModifiers,
         cannot_live: bool,
     ) -> LivePerformanceData {
+        let blade_modifiers = &mods.blade_modifiers;
+        let heart_override = &mods.heart_override;
+        let heart_modifiers = &mods.heart_modifiers;
+        let blade_type_modifiers = &mods.blade_type_modifiers;
+        let orientation_modifiers = &mods.orientation_modifiers;
+        let need_heart_modifiers = &mods.need_heart_modifiers;
+        let heart_color_multiplier = &mods.heart_color_multiplier;
+        let heart_copy = &mods.heart_copy;
         #[cfg(not(feature = "no_std"))]
         let _t = crate::timer::Timer::start("player_perform_live");
         // Q68/Rule: "cannot_live" discards live cards during performance; no yell, no live.
@@ -2559,7 +2560,8 @@ impl super::TurnEngine {
     }
 
     /// Recursively enumerate all compositions of `remaining` hearts from `colors[color_idx..]`.
-    fn try_surplus_compositions(
+    #[allow(clippy::too_many_arguments)]
+fn try_surplus_compositions(
         pool: &mut [u8; 8],
         card_needs: &[CardNeed],
         idx: usize,
@@ -2718,7 +2720,8 @@ impl super::TurnEngine {
     }
 
     /// Try all distributions of `remaining` icon_all hearts to deficit types starting at `di`.
-    fn try_all_distribution(
+    #[allow(clippy::too_many_arguments)]
+fn try_all_distribution(
         pool: &mut [u8; 8],
         card_needs: &[CardNeed],
         idx: usize,
@@ -2842,7 +2845,8 @@ impl super::TurnEngine {
     /// by "when you yell" abilities are included in the live success check.
     /// `heart_override`/`heart_modifiers`/`heart_color_multiplier` must come from the
     /// current game state (post-ability-trigger) so ability-granted hearts are counted.
-    pub fn check_live_success(
+    #[allow(clippy::too_many_arguments)]
+pub fn check_live_success(
         player: &mut crate::player::Player,
         resolution_zone: &mut crate::zones::ResolutionZone,
         card_db: &CardDatabase,
@@ -3101,6 +3105,7 @@ fn bonus_source(card_db: &CardDatabase, source_card_id: i16) -> crate::types::Ar
     format!("Ability: {}", name).into()
 }
 
+#[allow(clippy::too_many_arguments)]
 pub fn build_snapshot(
     turn: u8,
     player_id: &str,

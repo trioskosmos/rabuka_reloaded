@@ -340,7 +340,8 @@ impl Player {
     // Q225 / Q235: "How does &-name (multi-member) cards count?"
     //   竊・One card = one member. For group checks, they count as one
     //   member under ANY of their names (player's choice).
-    pub fn move_card_from_hand_to_stage(
+    #[allow(clippy::too_many_arguments)]
+pub fn move_card_from_hand_to_stage(
         &mut self,
         hand_index: usize,
         stage_area: crate::zones::MemberArea,

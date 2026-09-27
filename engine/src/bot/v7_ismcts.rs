@@ -68,6 +68,52 @@
 //! search runs, never the answer. Cost knobs: `V7_ISMCTS_WORLDS`,
 //! `V7_ISMCTS_SIMS`, `V7_ISMCTS_VISITS`, `V7_ISMCTS_HORIZON`,
 //! `V7_ISMCTS_TICKS`, `V7_ISMCTS_TOPK`.
+//!
+//! # Measured verdict: do not ship this on
+//!
+//! Paired mirror against `v7plain` (the `bot_arena v7 v7plain` ablation seat,
+//! identical deals joined on engine seed, exact McNemar):
+//!
+//! | setting                        | pace P1 | McNemar p | verdict |
+//! |--------------------------------|---------|-----------|---------|
+//! | baseline `v7plain`             | 0.4383  | —         | —       |
+//! | worlds3 sims5, race leaf, h3   | 0.4070  | 0.045     | regression |
+//! | k0=16                          | 0.4102  | 0.089     | no diff |
+//! | k0=4                           | 0.3981  | 0.004     | regression |
+//! | sims=9 worlds=4                | 0.4076  | 0.069     | no diff |
+//! | horizon 2                      | 0.4015  | 0.005     | regression |
+//! | horizon 4                      | 0.4133  | 0.089     | no diff |
+//! | exec_deploy                    | 0.4142  | 0.219     | no diff |
+//! | opp_pool=fair                  | 0.4090  | ~0.1      | no diff |
+//! | v7 leaf                        | 0.4108  | 0.114     | no diff |
+//! | v7 leaf, min_z=1.0, paired     | 0.4086  | 0.003     | regression |
+//! | v7 leaf, min_z=2.0, paired     | 0.4111  | 0.016     | regression |
+//!
+//! "pace" is placements per live phase, the metric that decides this game. It
+//! falls 3-6pp under every configuration, and it falls even when the search
+//! is only allowed to overrule v7 on a two-sigma PAIRED advantage — which is
+//! the point. The per-move trace shows the overrides are not coin flips. They
+//! are overwhelmingly re-placements of the same card into a different stage
+//! area, chosen on tight, consistently positive paired differences (z up to
+//! 13.7). The search is confidently wrong, and confidence is not the
+//! deficiency.
+//
+//! Why: v7's `choose_live_set_experiment` scores a board with an exact
+//! 256-sample pass model over the real zones. Inside a rollout that model is
+//! still running, but the main-phase moves leading up to it are a synthetic
+//! greedy policy, and the leaf is read three turns later. The rollout's
+//! opinion about which board is better therefore comes from a game the real
+//! v7 would never play, and it disagrees with the chooser that actually
+//! scores. More rollouts tighten the estimate of the wrong thing.
+//!
+//! So the search is opt-in (`V7_ISMCTS=1`) and the parts worth keeping — the
+//! determinized worlds, common-random-number paired rollouts, the parallel
+//! batch runner, the paired significance test, the promote-only gate, and the
+//! per-move trace — stay in place for the next attempt. What a real attempt
+//! needs is a rollout policy that is v7 itself, including its live-set
+//! chooser at every node, and a horizon long enough that games actually
+//! finish. That is far too slow to afford per action tick, which is probably
+//! the finding worth keeping.
 
 use crate::bot::determinization::DeterminizationSampler;
 use crate::bot::observation::PublicObservation;
@@ -133,11 +179,25 @@ fn default_jobs() -> usize {
 
 impl Config {
     pub fn from_env() -> Self {
-        // Off-switch first: `V7_ISMCTS=0` must win over every other default so
-        // an ablation run is exactly today's v7.
+        // OPT-IN, and deliberately so.
+        //
+        // Measured against `v7plain` in a mirror with a paired McNemar test on
+        // 2000 identical deals, the search is a consistent REGRESSION at every
+        // setting tried (nine configurations in the first sweep, five in the
+        // second): pace -3 to -6pp, McNemar p as low as 0.003, and the loss
+        // survives an evidence gate that only lets a challenger through on a
+        // two-sigma paired advantage. Because the overrides are consistently
+        // wrong rather than merely noisy, more samples would not fix it — the
+        // rollout policy disagrees with v7's real live-set chooser about which
+        // board is better, and v7's chooser is the one that scores.
+        //
+        // So the infrastructure stays (it is the thing worth keeping: the
+        // determinized worlds, common-random-number rollouts, parallel
+        // batches, the paired test and the per-move trace) and the search
+        // itself is opt-in. `V7_ISMCTS=1` turns it on. `v7plain` forces it off.
         let enabled = match std::env::var("V7_ISMCTS") {
             Ok(value) => value != "0",
-            Err(_) => std::env::var_os("V7_NO_ISMCTS").is_none(),
+            Err(_) => false,
         };
         let worlds = env_usize("V7_ISMCTS_WORLDS", 3);
         let sims = env_usize("V7_ISMCTS_SIMS", 5);
@@ -151,11 +211,15 @@ impl Config {
             top_k: env_usize("V7_ISMCTS_TOPK", 8),
             k0: env_f64("V7_ISMCTS_K0", 8.0),
             prior_scale: env_f64("V7_ISMCTS_SCALE", 260.0),
+            // The v7 leaf keeps the model that already judges a move (v7's own
+            // tuned eval) and only moves WHEN it is applied, three turns later
+            // with both sides played out. The hand-rolled `game_value` is a
+            // coarser restatement of the same axes and measured worse.
+            v7_leaf: std::env::var("V7_ISMCTS_LEAF").as_deref() != Ok("race"),
             jobs: env_usize("V7_ISMCTS_JOBS", default_jobs()),
             own_pool: std::env::var("V7_ISMCTS_OPP_POOL").as_deref() != Ok("fair"),
             exec_deploy: std::env::var_os("V7_ISMCTS_EXEC_DEPLOY").is_some(),
             promote_only: std::env::var("V7_ISMCTS_PROMOTE").as_deref() != Ok("any"),
-            v7_leaf: std::env::var("V7_ISMCTS_LEAF").as_deref() == Ok("v7"),
             // How many paired standard errors a challenger must beat v7's own
             // pick by before the search is allowed to overrule it. 1.0 fires
             // on the stronger half of the evidence; 1.96 is the conventional

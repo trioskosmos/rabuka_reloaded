@@ -1001,7 +1001,8 @@ impl GameState {
     }
 
     /// Internal helper: push a card to a revealed list with metadata.
-    fn push_revealed_internal(
+    #[allow(clippy::too_many_arguments)]
+fn push_revealed_internal(
         card_database: &CardDatabase,
         cards: &mut SmallVec<[i16; 8]>,
         meta: &mut SmallVec<[RevealedCardMeta; 8]>,

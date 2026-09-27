@@ -54,7 +54,8 @@ pub(super) fn log_move_result(player: &Player, db: &CardDatabase, card_id: i16, 
 
 impl AbilityResolver {
     /// Returns Ok(true) if a choice was created, Ok(false) if the card was placed immediately.
-    pub(super) fn place_card_with_stage_choice(
+    #[allow(clippy::too_many_arguments)]
+pub(super) fn place_card_with_stage_choice(
         &mut self,
         gs: &mut GameState,
         player_target: &str,

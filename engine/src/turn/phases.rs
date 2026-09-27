@@ -357,12 +357,6 @@ impl super::TurnEngine {
         // borrows drop before later mutable game_state methods.
         let mut yell_data = {
             let card_db = &game_state.card_database;
-            let bm = &game_state.mods.blade_modifiers;
-            let ho = &game_state.mods.heart_override;
-            let btm = &game_state.mods.blade_type_modifiers;
-            let om = &game_state.mods.orientation_modifiers;
-            let hcm = &game_state.mods.heart_color_multiplier;
-            let hcopy = &game_state.mods.heart_copy;
             let player = if is_first {
                 if game_state.player1.is_first_attacker {
                     &mut game_state.player1
@@ -382,14 +376,7 @@ impl super::TurnEngine {
                 &performer_id,
                 performer_seat,
                 card_db,
-                bm,
-                ho,
-                &game_state.mods.heart_modifiers,
-                btm,
-                om,
-                &game_state.mods.need_heart_modifiers,
-                hcm,
-                hcopy,
+                &game_state.mods,
                 cannot_live,
             )
         };

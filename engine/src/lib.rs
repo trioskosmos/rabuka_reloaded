@@ -1,11 +1,26 @@
 #![recursion_limit = "512"]
 #![cfg_attr(feature = "no_std", no_std)]
-// Cast hygiene (audit QUEUE B): surface every remaining lossy cast so new
-// ones can't sneak in. Warn-only; the existing population is being worked
-// down via saturate_* helpers / CardId newtype — see docs/CODE_AUDIT_2026-08-23.md.
-#![warn(clippy::cast_possible_truncation)]
-#![warn(clippy::cast_sign_loss)]
-#![warn(clippy::cast_possible_wrap)]
+// Cast hygiene (audit QUEUE B). The population is now zero: every narrowing
+// goes through the `CountCast` trait in core::constants, which saturates at
+// the top and floors at zero for signed -> unsigned, and the only `as` casts
+// left in the crate are the ones inside that trait's own f64 impl, where a
+// clamp on the preceding line proves the range. These three are DENIED rather
+// than warned, because there is no backlog left to document and a new `as`
+// should fail the build rather than join a list nobody reads.
+#![deny(clippy::cast_possible_truncation)]
+#![deny(clippy::cast_sign_loss)]
+#![deny(clippy::cast_possible_wrap)]
+
+// `too_many_arguments` is allowed per function, not crate-wide, and the
+// functions carrying it all look the same way: the parameter list IS the
+// domain data, not an accident. `execute_gain_ability` takes the effect plus
+// the player, the zone, the card, the source, the ability index and the
+// activation context because a card effect needs all of them at once, and
+// bundling them into a struct would move the call site rather than clarify
+// it. The generated decoders went the other way, via their `*Locals`
+// accumulators, and that is the shape to use when a parameter list is
+// genuinely incidental rather than definitional. See
+// docs/CODE_AUDIT_2026-08-23.md.
 
 #[cfg(feature = "no_std")]
 #[macro_use]

@@ -847,6 +847,7 @@ pub fn zone_to_display_full(
     }
 }
 
+#[allow(clippy::too_many_arguments)]
 pub fn stage_to_display(
     stage: &crate::zones::Stage,
     card_db: &CardDatabase,

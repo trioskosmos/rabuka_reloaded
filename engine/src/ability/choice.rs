@@ -569,6 +569,7 @@ impl super::resolver::AbilityResolver {
 
     /// Move validated hand-cost cards to discard + feed movement tracking.
     /// Returns the newly moved card IDs.
+    #[allow(clippy::too_many_arguments)]
     pub(in crate::ability::choice) fn discard_hand_cost_selection(
         &mut self,
         gs: &mut GameState,
@@ -644,6 +645,7 @@ impl super::resolver::AbilityResolver {
 
     /// Issue a hand-cost re-prompt for `remaining` more cards.
     /// Unifies the three build_reprompt call sites (partial, same-unit, any_number).
+    #[allow(clippy::too_many_arguments)]
     pub(in crate::ability::choice) fn reprompt_hand_cost(
         &mut self,
         gs: &mut GameState,
@@ -677,6 +679,7 @@ impl super::resolver::AbilityResolver {
 
     /// Full hand cost-payment flow (fixed-count, same-unit, any_number).
     /// Always handles the choice when called — the caller must return early.
+    #[allow(clippy::too_many_arguments)]
     pub(in crate::ability::choice) fn handle_hand_cost_payment(
         &mut self,
         gs: &mut GameState,
@@ -1129,6 +1132,7 @@ impl super::resolver::AbilityResolver {
         self.handle_selection_epilogue(gs, &context)
     }
 
+    #[allow(clippy::too_many_arguments)]
     pub(in crate::ability::choice) fn build_reprompt(
         &self,
         ctx: &SelectionContext,

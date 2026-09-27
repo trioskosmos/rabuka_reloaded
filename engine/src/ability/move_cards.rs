@@ -6,6 +6,24 @@ use super::util;
 use crate::ability_queue::ConditionalChoice;
 use crate::card::{AbilityEffect, CardDatabase, Operator, PlacementOrder};
 use crate::game_state::GameState;
+
+/// How many cards a move takes, and under which of the selection modes.
+///
+/// The count and the four flags are one decision made at the call site — "take
+/// up to three, not the activating card, and this is a cost payment" — not
+/// five independent inputs, so they travel as one value.
+struct SelectionSpec {
+    count: usize,
+    /// 「最大で」 — up to `count`, offering a choice rather than demanding.
+    is_max: bool,
+    /// 「すべて」 — every matching card, ignoring `count`.
+    is_all: bool,
+    /// Paying a cost rather than moving: resolves against the paying player
+    /// and cannot pick the card that is paying.
+    is_self_cost: bool,
+    exclude_self: bool,
+    activating_card_id: Option<i16>,
+}
 use crate::player::Player;
 use crate::HashMap;
 #[cfg(feature = "no_std")]
@@ -265,24 +283,31 @@ impl AbilityResolver {
         &mut self,
         gs: &mut GameState,
         effect: &AbilityEffect,
-        count: usize,
-        card_type_filter: Option<&str>,
-        group_name: Option<&str>,
-        cost_limit: Option<u8>,
-        cost_total: Option<u8>,
-        cost_total_operator: Option<&str>,
-        character_filter: Option<&Vec<String>>,
-        name_fragments: Option<&Vec<String>>,
-        is_self_cost: bool,
-        is_max: bool,
-        is_all: bool,
-        exclude_self: bool,
-        activating_card_id: Option<i16>,
+        selection: SelectionSpec,
+        filter: &crate::ability::util::CardFilter<'_>,
         use_p2: bool,
         source: &str,
         destination: &str,
         card_db: &crate::card::CardDatabase,
     ) -> Result<Vec<i16>, String> {
+        let SelectionSpec {
+            count,
+            is_max,
+            is_all,
+            is_self_cost,
+            exclude_self,
+            activating_card_id,
+        } = selection;
+        // Unpack the filter into the names the body below already uses, so the
+        // parameter list carries one value instead of seven loose strings that
+        // have to travel together through every resolver in this chain.
+        let card_type_filter = filter.card_type;
+        let group_name = filter.group;
+        let cost_limit = filter.cost_limit;
+        let cost_total = filter.cost_total;
+        let cost_total_operator = filter.cost_total_operator;
+        let character_filter = filter.characters;
+        let name_fragments = filter.name_fragments;
         let player = if use_p2 {
             &mut gs.player2
         } else {
@@ -350,13 +375,7 @@ impl AbilityResolver {
                 is_all,
                 is_max,
                 effect,
-                card_type_filter,
-                group_name,
-                cost_limit,
-                cost_total,
-                cost_total_operator,
-                character_filter,
-                name_fragments,
+                filter,
                 card_db,
             );
         }
@@ -364,8 +383,7 @@ impl AbilityResolver {
             if let Some(result) = self.resolve_from_those_cards(
                 gs,
                 count,
-                card_type_filter,
-                group_name,
+                filter,
                 destination,
                 effect,
                 use_p2,
@@ -463,6 +481,7 @@ impl AbilityResolver {
         Ok(cards)
     }
 
+    #[allow(clippy::too_many_arguments)]
     fn resolve_from_revealed_cards(
         &mut self,
         gs: &mut GameState,
@@ -470,15 +489,16 @@ impl AbilityResolver {
         is_all: bool,
         is_max: bool,
         effect: &AbilityEffect,
-        card_type_filter: Option<&str>,
-        group_name: Option<&str>,
-        cost_limit: Option<u8>,
-        cost_total: Option<u8>,
-        cost_total_operator: Option<&str>,
-        character_filter: Option<&Vec<String>>,
-        name_fragments: Option<&Vec<String>>,
+        incoming_filter: &crate::ability::util::CardFilter<'_>,
         card_db: &crate::card::CardDatabase,
     ) -> Result<Vec<i16>, String> {
+        let card_type_filter = incoming_filter.card_type;
+        let group_name = incoming_filter.group;
+        let cost_limit = incoming_filter.cost_limit;
+        let cost_total = incoming_filter.cost_total;
+        let cost_total_operator = incoming_filter.cost_total_operator;
+        let character_filter = incoming_filter.characters;
+        let name_fragments = incoming_filter.name_fragments;
         let take_count = if is_all {
             gs.revealed_cards.len()
         } else {
@@ -584,13 +604,14 @@ impl AbilityResolver {
         &mut self,
         gs: &mut GameState,
         count: usize,
-        card_type_filter: Option<&str>,
-        group_name: Option<&str>,
+        filter: &crate::ability::util::CardFilter<'_>,
         destination: &str,
         effect: &AbilityEffect,
         use_p2: bool,
         card_db: &crate::card::CardDatabase,
     ) -> Result<Option<Vec<i16>>, String> {
+        let card_type_filter = filter.card_type;
+        let group_name = filter.group;
         // Handle "those_cards" alias: resolve to the cards that triggered the
         // each_time, captured as `trigger_moved_cards` on THIS queue entry at
         // enqueue time (the authoritative "cards that triggered me"). If no
@@ -2113,19 +2134,29 @@ gs.set_recently_moved_batch(moved.clone().into(), Some("under_member"));
         let mut taken = self.resolve_cards_from_source(
             gs,
             effect,
-            count,
-            card_type_filter,
-            group_name,
-            cost_limit,
-            cost_total,
-            cost_total_operator,
-            character_filter.as_ref(),
-            name_fragments.as_ref(),
-            is_self_cost,
-            is_max,
-            is_all,
-            exclude_self,
-            activating_card_id,
+            SelectionSpec {
+                count,
+                is_max,
+                is_all,
+                is_self_cost,
+                exclude_self,
+                activating_card_id,
+            },
+            &util::filter_from_parts_full(
+                card_type_filter,
+                group_name,
+                cost_limit,
+                // Honor the operator (e.g. 「コスト9以上」 >=) — dropping it let
+                // below-threshold cards through the selection.
+                effect.cost_limit_operator_any().map(Operator::as_str),
+                character_filter.as_ref(),
+                name_fragments.as_ref(),
+                None, // distinct
+                None, // exclude_self
+                cost_total,
+                cost_total_operator,
+                effect.exclude_characters_any(),
+            ),
             use_p2,
             &source,
             &destination,
@@ -2509,7 +2540,8 @@ if util::distinct_should_dedupe(distinct) {
     }
 
     /// Execute card movement from a zone: pre-validate filters, move cards to destination, track side effects.
-    pub fn execute_selected_cards_from_zone(
+    #[allow(clippy::too_many_arguments)]
+pub fn execute_selected_cards_from_zone(
         &mut self,
         gs: &mut GameState,
         zone: &str,

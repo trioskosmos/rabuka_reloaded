@@ -792,7 +792,8 @@ impl AbilityResolver {
     }
 
     /// Change the state of energy zone cards (wait/active).
-    pub(crate) fn execute_energy_state_change(
+    #[allow(clippy::too_many_arguments)]
+pub(crate) fn execute_energy_state_change(
         &mut self,
         gs: &mut GameState,
         effect: &AbilityEffect,

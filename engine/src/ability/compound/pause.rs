@@ -33,6 +33,7 @@ fn save_remaining_actions(
 /// parent-conditional gate, strip already-settled otherwise conditions
 /// from the saved remainder, stash repeat state, and park the rest.
 /// The caller must `return Ok(())` afterwards.
+#[allow(clippy::too_many_arguments)]
 pub(crate) fn pause_for_sequential_choice(
     resolver: &mut AbilityResolver,
     gs: &mut GameState,

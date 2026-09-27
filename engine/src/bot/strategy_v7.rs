@@ -837,6 +837,7 @@ fn live_payoff(my_success: usize, opp_success: usize, my_place: bool, opp_place:
     }
 }
 
+#[allow(clippy::too_many_arguments)]
 fn expected_live_value(
     pass: f64,
     score: i32,

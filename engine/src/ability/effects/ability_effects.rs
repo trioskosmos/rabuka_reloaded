@@ -376,7 +376,8 @@ impl AbilityResolver {
         Ok(())
     }
 
-    pub(crate) fn execute_gain_ability(
+    #[allow(clippy::too_many_arguments)]
+pub(crate) fn execute_gain_ability(
         &mut self,
         gs: &mut GameState,
         ability_text: &str,

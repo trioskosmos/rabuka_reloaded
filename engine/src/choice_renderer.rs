@@ -261,6 +261,7 @@ pub fn render_card_choice_grid(
 /// Text budget is 6 lines (12 tile rows); art sits at tile row 12+ so the
 /// punched image holes never eat the status lines. Every line is capped at
 /// 30 columns so wrapped engine descriptions cannot overflow the budget.
+#[allow(clippy::too_many_arguments)]
 fn render_choice_page(
     ui: &mut dyn PlatformUi,
     cards: &[CardInfo],
