@@ -1,4 +1,5 @@
 use std::hash::{Hash, Hasher};
+use crate::core::constants::CountCast;
 
 use crate::ability::types::Choice;
 use crate::game_state::{GameResult, GameState, Phase, TurnPhase};
@@ -286,12 +287,9 @@ fn player_features(
         let effective = if set != 0 { set } else { base + additive };
         features.live_score = features
             .live_score
-            .saturating_add(crate::constants::count_u16(crate::constants::count_usize(
-            effective.max(0),
-        )));
+            .saturating_add(effective.max(0).u16_count());
     }
-    features.success_count =
-        crate::constants::count_u8(player.success_live_card_zone.cards.len());
+    features.success_count = player.success_live_card_zone.cards.len().u8_count();
     features
 }
 
@@ -336,13 +334,16 @@ fn math_features(state: &GameState, perspective_player: u8) -> [f32; MATH_FEATUR
     out[7] = me.success_live_card_zone.cards.len() as f32 / 3.0;
     out[8] = opp.success_live_card_zone.cards.len() as f32 / 3.0;
     out[9] = if me.is_first_attacker { 1.0 } else { 0.0 };
-    out[10] = density as f32;
+    out[10] = crate::constants::f32_count(density);
     out[13] = strategy_v5::estimate_opp_score(state, perspective_player, db) as f32 / 12.0;
     out[14] = active_slots as f32 / 3.0;
     out[15] = waited_slots as f32 / 3.0;
-    out[16] = (expected[0] + expected[1] + expected[2] + expected[3] + expected[4] + expected[5] + expected[6] + expected[10]) as f32 / 12.0;
+    out[16] = crate::constants::f32_count(
+        expected[0] + expected[1] + expected[2] + expected[3] + expected[4] + expected[5] + expected[6]
+            + expected[10],
+    ) / 12.0;
     for i in 0..6 {
-        out[17 + i] = expected[i + 1] as f32 / 8.0;
+        out[17 + i] = crate::constants::f32_count(expected[i + 1]) / 8.0;
         out[23 + i] = pool_board[i + 1] as f32 / 8.0;
     }
     let mut live_count = 0usize;
@@ -378,7 +379,7 @@ fn math_features(state: &GameState, perspective_player: u8) -> [f32; MATH_FEATUR
         if required[0] > 0 {
             shortfall += required[0];
         }
-        let probability = strategy_v5::binom_ge(blades, shortfall, density) as f32;
+        let probability = crate::constants::f32_count(strategy_v5::binom_ge(blades, shortfall, density));
         best_live_prob = best_live_prob.max(probability);
     }
     out[6] = live_count as f32 / 8.0;
@@ -663,7 +664,7 @@ impl PublicObservation {
             });
         let ability_queue_current_card = ability_queue_current.and_then(|entry| entry.card_id);
         let ability_queue_current_ability = ability_queue_current
-            .map(|entry| crate::constants::count_u8(entry.ability_index));
+            .map(|entry| entry.ability_index.u8_count());
         let ability_queue_current_trigger = ability_queue_current
             .map(|entry| ability_trigger_index(&entry.trigger_type));
         let resolution_zone = if resolution_visible_to(state, perspective_player) {
@@ -689,15 +690,14 @@ impl PublicObservation {
             pending_choice_allow_skip,
             pending_choice_player,
             pending_choice_for_viewer,
-            mulligan_selected_count: crate::constants::count_u8(state.mulligan_selected_indices.len()),
-            live_card_selected_count: crate::constants::count_u8(state.live_card_selected_indices.len()),
-            ability_queue_len: crate::constants::count_u8(
-                state
-                    .ability_queue
-                    .iter()
-                    .filter(|entry| queue_owner_index(&entry.player_id) == Some(perspective_player))
-                    .count(),
-            ),
+            mulligan_selected_count: state.mulligan_selected_indices.len().u8_count(),
+            live_card_selected_count: state.live_card_selected_indices.len().u8_count(),
+            ability_queue_len: state
+                .ability_queue
+                .iter()
+                .filter(|entry| queue_owner_index(&entry.player_id) == Some(perspective_player))
+                .count()
+                .u8_count(),
             ability_queue_waiting: pending_choice_for_viewer
                 && state.ability_queue.is_waiting_for_choice().is_some(),
             ability_queue_current_card,

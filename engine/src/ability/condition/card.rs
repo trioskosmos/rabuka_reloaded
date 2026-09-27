@@ -7,7 +7,7 @@ use crate::ability::util::compare_counts;
 use crate::card::{
     AbilityFilter, BladeColor, CardProperty, ComparisonTarget, Condition, HeartColor,
 };
-use crate::core::constants::U8Count;
+use crate::core::constants::CountCast;
 use crate::{HashMap, HashSet};
 #[cfg(feature = "no_std")]
 use alloc::{
@@ -1251,7 +1251,7 @@ impl<'a> ConditionContext<'a> {
         ] {
             let modifier = self.game_state.mods.get_heart_modifier(card_id, color);
             if modifier > 0 {
-                current_hearts += modifier as u8;
+                        current_hearts += modifier.u8_count();
             }
         }
         let verdict = compare_counts(Some(op), current_hearts, base_hearts);
@@ -1346,8 +1346,12 @@ impl<'a> ConditionContext<'a> {
                         .copied()
                         .filter(|&cid| eligible(cid))
                         .collect();
-                    let count =
-                        util::max_distinct_group_names(card_db, &eligible_cards, group_names) as u8;
+                    let count = util::max_distinct_group_names(
+                        card_db,
+                        &eligible_cards,
+                        group_names,
+                    )
+                    .u8_count();
                     compare_counts(operator, count, count_threshold)
                 }
                 _ => {
@@ -1359,7 +1363,7 @@ impl<'a> ConditionContext<'a> {
                         name_sets.push(card_db.get_card_names(cid));
                     }
                     let best = util::max_distinct_names(&name_sets);
-                    compare_counts(operator, best.distinct as u8, count_threshold)
+                    compare_counts(operator, best.distinct.u8_count(), count_threshold)
                 }
             }
         } else {
@@ -2259,7 +2263,8 @@ impl<'a> ConditionContext<'a> {
                 }
                 _ => 0,
             },
-        } as u8;
+        }
+        .u8_count();
         actual
     }
 
@@ -3444,14 +3449,14 @@ impl<'a> ConditionContext<'a> {
             _ => "card_name",
         };
         match distinct_type {
-            "cost" => self.count_distinct_cost(&matching, None) as u8,
-            "group_name" => util::max_distinct_group_names(card_db, &matching, group_names) as u8,
+            "cost" => self.count_distinct_cost(&matching, None).u8_count(),
+            "group_name" => util::max_distinct_group_names(card_db, &matching, group_names).u8_count(),
             _ => {
                 let name_sets: Vec<Vec<String>> = matching
                     .iter()
                     .map(|&cid| card_db.get_card_names(cid))
                     .collect();
-                util::max_distinct_names(&name_sets).distinct as u8
+                util::max_distinct_names(&name_sets).distinct.u8_count()
             }
         }
     }

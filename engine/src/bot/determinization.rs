@@ -1,3 +1,4 @@
+use crate::core::constants::CountCast;
 use crate::Arc;
 use crate::HashMap;
 
@@ -99,7 +100,7 @@ impl DeterminizationSampler {
         }
         player
             .energy_zone
-            .set_active_count(view.active_energy_count as u8);
+            .set_active_count(view.active_energy_count.u8_count());
 
         for &cid in &view.waitroom {
             player.waitroom.cards.push(cid);

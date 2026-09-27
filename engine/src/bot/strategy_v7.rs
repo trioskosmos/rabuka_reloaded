@@ -34,6 +34,7 @@ use crate::bot::strategy_v4::{
     alloc, flip_stats, hand_lives, heart_pool, heart_pool_buffed, heart_pool_inner, lives_in_hand,
     stage_buff_hearts,
 };
+use crate::core::constants::CountCast;
 use crate::bot::strategy_v5::binom_ge;
 use crate::card::{CardDatabase, CardType};
 use crate::core::stats_pipeline;
@@ -189,7 +190,7 @@ pub fn score_actions(gs: &GameState, actions: &[Action], me: u8) -> Vec<(f64, St
     let dbg = std::env::var("V7_DEBUG").is_ok();
     let db = &gs.card_database;
     let my_now = gs.seat_player(me);
-        let base_hand_len = crate::constants::count_i32(my_now.hand.cards.len());
+        let base_hand_len = my_now.hand.cards.len().i32_count();
     let base_passable = passable_count_buffed(gs, me, db);
     let base_ammo = lives_in_hand(my_now, db);
     let base_stage = stage_hearts_of(my_now, gs, me, db);
@@ -290,7 +291,7 @@ pub fn score_actions(gs: &GameState, actions: &[Action], me: u8) -> Vec<(f64, St
             if d_energy != 0 {
                 parts.push(format!("en{d_energy:+}"));
             }
-            let d_hand = crate::constants::count_i32(my_sim.hand.cards.len()) - base_hand_len;
+            let d_hand = my_sim.hand.cards.len().i32_count() - base_hand_len;
             val += 3.0 * d_hand as f64;
             if d_hand != 0 {
                 parts.push(format!("hand{d_hand:+}"));
@@ -329,7 +330,7 @@ pub fn score_actions(gs: &GameState, actions: &[Action], me: u8) -> Vec<(f64, St
         // milling to waitroom banks lives for retrieval engines.
         if base_ammo <= 1 {
             let drawn =
-            (crate::constants::count_i32(my_sim.hand.cards.len()) - base_hand_len).max(0);
+            (my_sim.hand.cards.len().i32_count() - base_hand_len).max(0);
             val += 70.0 * p_life_draw * drawn as f64;
             let wr_now = my_sim
                 .waitroom
@@ -484,8 +485,8 @@ pub fn choose_live_set_v7(gs: &GameState, actions: &[Action], db: &CardDatabase)
     }
     let me = gs.active_player_index();
     let (my, opp) = gs.seated_pair(me);
-        let my_succ = crate::constants::count_i32(my.success_live_card_zone.cards.len());
-        let opp_succ = crate::constants::count_i32(opp.success_live_card_zone.cards.len());
+        let my_succ = my.success_live_card_zone.cards.len().i32_count();
+        let opp_succ = opp.success_live_card_zone.cards.len().i32_count();
     let is_second = gs.current_phase == Phase::LiveCardSetSecondAttacker;
     let opp_committed = !opp.live_card_zone.cards.is_empty();
 
@@ -525,7 +526,7 @@ pub fn choose_live_set_v7(gs: &GameState, actions: &[Action], db: &CardDatabase)
             })
             .count();
         let max_slots =
-            crate::constants::count_usize(3i32 - i32::from(my.live_card_set_limit_reduction).max(0));
+            (3i32 - i32::from(my.live_card_set_limit_reduction).max(0)).usize_count();
         if desired.len() < max_slots && deck_lives > 0 {
             let mut junk: Vec<(usize, u8)> = my
                 .hand
@@ -580,12 +581,12 @@ fn safest_portfolio(gs: &GameState, me: u8, db: &CardDatabase) -> Vec<usize> {
     let board = heart_pool_inner(gs, me, db, 0.0);
     let lives = hand_lives(my, db);
     let max_slots =
-        crate::constants::count_usize(3i32 - i32::from(my.live_card_set_limit_reduction).max(0));
+        (3i32 - i32::from(my.live_card_set_limit_reduction).max(0)).usize_count();
     if lives.is_empty() || max_slots == 0 {
         return Vec::new();
     }
-        let my_succ = crate::constants::count_i32(my.success_live_card_zone.cards.len());
-        let opp_succ = crate::constants::count_i32(opp.success_live_card_zone.cards.len());
+        let my_succ = my.success_live_card_zone.cards.len().i32_count();
+        let opp_succ = opp.success_live_card_zone.cards.len().i32_count();
     let floor = if opp_succ >= 2 {
         0.35
     } else if my_succ >= 2 {
@@ -950,7 +951,7 @@ fn experiment_expected_yell_score(gs: &GameState, me: u8, db: &CardDatabase, bla
         .map(usize::from)
         .sum();
     let draws = usize::try_from(blades).unwrap_or(usize::MAX).min(deck_len);
-    crate::constants::count_i32(score_icons * draws / deck_len)
+    (score_icons * draws / deck_len).i32_count()
 }
 
 fn experiment_lives(gs: &GameState, me: u8, db: &CardDatabase) -> Vec<(usize, i16, [i32; 11])> {
@@ -1599,7 +1600,7 @@ fn reachable_curve_keep(costs: &[Option<u8>]) -> Vec<usize> {
             continue;
         }
         let rank = (
-            crate::constants::count_u32(line.len()),
+            line.len().u32_count(),
             line.last()
                 .copied()
                 .map(|(_, cost)| u32::from(cost))

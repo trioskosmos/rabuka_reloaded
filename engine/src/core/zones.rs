@@ -1,5 +1,5 @@
 use crate::card::{BaseHeart, CardDatabase, HeartColor};
-use crate::core::constants::U8Count;
+use crate::core::constants::CountCast;
 use crate::core::game_modifiers::ModifierEntry;
 use crate::{HashMap, HashSet};
 #[cfg(feature = "serde_support")]
@@ -527,7 +527,7 @@ impl Stage {
                 let mut m = HashMap::default();
                 for (&col, &delta) in colors {
                     let e = crate::core::game_modifiers::ModifierEntry {
-                        additive: delta as i16,
+                        additive: delta.i16_count(),
                         ..Default::default()
                     };
                     m.insert(col, e);

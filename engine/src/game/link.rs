@@ -33,6 +33,7 @@ use std::string::String;
 use std::vec::Vec;
 
 use crate::card::Card;
+use crate::core::constants::CountCast;
 use crate::game::game_setup::{self, Action, ActionParameters, ActionType};
 use crate::game::match_runner::build_match_state;
 use crate::game::menu::{select_action, show_result};
@@ -119,7 +120,7 @@ impl LinkAction {
                 .unwrap_or_default(),
             stage_area: action_stage_tag(params),
             use_baton_touch: params.and_then(|p| p.use_baton_touch).unwrap_or(false),
-            ability_index: params.and_then(|p| p.ability_index).map(|i| i as u16),
+            ability_index: params.and_then(|p| p.ability_index).map(|i| i.u16_count()),
             seq,
         }
     }
@@ -136,10 +137,10 @@ impl LinkAction {
             }
             None => v.push(0),
         }
-        v.push(self.card_indices.len().min(255) as u8);
-        for idx in &self.card_indices {
-            v.extend_from_slice(&(*idx as u16).to_le_bytes());
-        }
+    v.push(self.card_indices.len().u8_count());
+    for idx in &self.card_indices {
+        v.extend_from_slice(&idx.u16_count().to_le_bytes());
+    }
         v.push(self.stage_area);
         v.push(u8::from(self.use_baton_touch));
         match self.ability_index {
@@ -239,7 +240,7 @@ pub fn find_local_action(acts: &[Action], link: &LinkAction) -> Option<usize> {
             && want_area(a) == link.stage_area
             && a.parameters.as_ref().and_then(|p| p.use_baton_touch).unwrap_or(false)
                 == link.use_baton_touch
-            && a.parameters.as_ref().and_then(|p| p.ability_index).map(|i| i as u16)
+            && a.parameters.as_ref().and_then(|p| p.ability_index).map(|i| i.u16_count())
                 == link.ability_index
     })
 }

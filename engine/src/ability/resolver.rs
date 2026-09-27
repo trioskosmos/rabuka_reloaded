@@ -1,4 +1,5 @@
 use super::debug::AbDebug;
+use crate::core::constants::CountCast;
 #[cfg(not(feature = "no_std"))]
 use super::log::{drain_verdicts, push_verdict, AbilityLogItem};
 use smallvec::SmallVec;
@@ -1235,7 +1236,8 @@ impl AbilityResolver {
                 .unwrap_or(&gs.player2)
                 .success_live_card_zone
                 .cards
-                .len() as u8;
+                .len()
+                .u8_count();
             let reduction = Self::per_unit_reduction(success_len, per_unit_count, unit);
             let new_count = cost.count.unwrap_or(0).saturating_sub(reduction);
             cost.count = Some(new_count);

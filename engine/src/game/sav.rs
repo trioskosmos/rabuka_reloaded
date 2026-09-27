@@ -54,6 +54,8 @@ use std::string::String;
 #[cfg(not(feature = "no_std"))]
 use std::vec::Vec;
 
+use crate::core::constants::CountCast;
+
 /// Magic at image offset 0.
 pub const SAV_MAGIC: &[u8; 4] = b"RBKS";
 /// The only format version this codec reads and writes.
@@ -121,12 +123,12 @@ fn read_padded_str(field: &[u8], allow_empty: bool) -> Option<String> {
 /// numbers / counts loudly instead of truncating silently.
 pub fn encode_sav(decks: &[SavDeck]) -> Result<Vec<u8>, SavError> {
     if decks.len() > MAX_SAV_DECKS {
-        return Err(SavError::TooManyDecks(decks.len() as u8));
+        return Err(SavError::TooManyDecks(decks.len().u8_count()));
     }
     let mut out: Vec<u8> = Vec::with_capacity(SAV_HEADER_LEN + decks.len() * SAV_ENTRY_LEN);
     out.extend_from_slice(SAV_MAGIC);
     out.push(SAV_VERSION);
-    out.push(decks.len() as u8);
+    out.push(decks.len().u8_count());
     out.extend_from_slice(&[0u8; 2]);
     // Checksum placeholder; patched after the entries are written.
     out.extend_from_slice(&[0u8; 2]);
@@ -138,12 +140,12 @@ pub fn encode_sav(decks: &[SavDeck]) -> Result<Vec<u8>, SavError> {
             return Err(SavError::BadName);
         }
         if deck.cards.is_empty() || deck.cards.len() > MAX_CARDS_PER_DECK {
-            return Err(SavError::BadCount(deck.cards.len().min(255) as u8));
+            return Err(SavError::BadCount(deck.cards.len().u8_count()));
         }
         let mut name_field = [0u8; SAV_NAME_LEN];
         name_field[..name_bytes.len()].copy_from_slice(name_bytes);
         out.extend_from_slice(&name_field);
-        out.push(deck.cards.len() as u8);
+        out.push(deck.cards.len().u8_count());
         out.push(0u8);
         // Entry-checksum placeholder.
         out.extend_from_slice(&[0u8; 2]);

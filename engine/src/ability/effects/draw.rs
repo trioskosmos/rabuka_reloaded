@@ -1,4 +1,4 @@
-use crate::core::constants::U8Count;
+use crate::core::constants::CountCast;
 use super::super::enums::Zone;
 use super::super::resolver::AbilityResolver;
 use super::super::types::{Choice, ExecutionContext};
@@ -293,7 +293,7 @@ impl AbilityResolver {
     ) -> crate::ability::types::Choice {
         let player = gs.resolve_target_player_mut(player_target);
         let hand_count = player.hand.cards.len();
-        let pick = count.min(hand_count as u8) as usize;
+        let pick = count.min(hand_count.u8_count()).usize_count();
         crate::ability::types::Choice::select_cards(
             Zone::Hand.to_str(),
             pick,
@@ -322,7 +322,7 @@ impl AbilityResolver {
         let player = gs.resolve_target_player_mut(player_target);
         // Remove the non-selected cards (the hand equals the snapshot here).
         for (idx, cid) in hand_snapshot.iter().enumerate() {
-            if !kept_positions.contains(&(idx as u8)) {
+            if !kept_positions.contains(&idx.u8_count()) {
                 if let Some(pos) = player.hand.cards.iter().position(|c| c == cid) {
                     player.hand.cards.remove(pos);
                 }
@@ -333,7 +333,7 @@ impl AbilityResolver {
         let mut to_move: Vec<i16> = hand_snapshot
             .iter()
             .enumerate()
-            .filter(|(idx, _)| !kept_positions.contains(&(*idx as u8)))
+            .filter(|(idx, _)| !kept_positions.contains(&idx.u8_count()))
             .map(|(_, cid)| *cid)
             .collect();
         crate::rng::shuffle_slice(&mut to_move);
@@ -614,7 +614,7 @@ impl AbilityResolver {
         let _ = self.execute_draw(
             gs,
             &AbilityEffect::default(),
-            to_draw as u8,
+            to_draw.u8_count(),
             target,
             Zone::Deck.to_str(),
             destination,

@@ -1,4 +1,4 @@
-use crate::core::constants::U8Count;
+use crate::core::constants::CountCast;
 use super::enums::Zone;
 use super::resolver::AbilityResolver;
 use super::types::{Choice, ExecutionContext, LookAndSelectStep};
@@ -831,7 +831,7 @@ impl AbilityResolver {
         let mut attempts = 0u8;
         let mut remaining = count;
         while remaining > 0
-            && attempts < (count as u8 + player.main_deck.cards.len().u8_count() + 10)
+            && attempts < (count.u8_count() + player.main_deck.cards.len().u8_count() + 10)
         {
             // Q104 / Rule 10.2.1: deck empty mid-draw → refresh from waitroom
             // and continue. This handles deck-to-discard costs/effects when the
@@ -963,7 +963,7 @@ impl AbilityResolver {
                 .activating_card_id
                 .and_then(|act_id| player.stage.stage.iter().position(|&id| id == act_id))
                 .ok_or_else(|| "Activating card not found at stage".to_string())?;
-            gs.last_vacated_stage_area = Some(idx as u8);
+            gs.last_vacated_stage_area = Some(idx.u8_count());
             if c.destination != "same_area" {
                 Ok(player
                     .remove_member_from_stage_with_recycling(idx, card_db)
@@ -1019,7 +1019,7 @@ impl AbilityResolver {
                             }
                             let cid = player.remove_member_from_stage_with_recycling(i, card_db);
                             if cid.is_some() {
-                                vacated = Some(i as u8);
+                                vacated = Some(i.u8_count());
                             }
                             cid
                         })
@@ -2058,7 +2058,7 @@ gs.set_recently_moved_batch(moved.clone().into(), Some("under_member"));
             let player = gs.resolve_target_player(target);
             gs.baton_touch_arriving_card_id
                 .and_then(|arriving| player.stage.stage.iter().position(|&id| id == arriving))
-                .map(|area| area as u8)
+                .map(|area| area.u8_count())
         } else {
             None
         };

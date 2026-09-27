@@ -1,3 +1,4 @@
+use crate::core::constants::CountCast;
 use std::fs::File;
 use std::io::Read;
 
@@ -112,7 +113,7 @@ impl PolicyNet {
     /// Encode state from observation into flat vector using learned embeddings.
     pub fn encode_state(&self, obs: &super::observation::PublicObservation) -> EncodedState {
         let embed_card = |cid: i16| -> Vec<f32> {
-            let idx = cid.max(0) as usize;
+            let idx = cid.max(0).usize_count();
             let base = idx * CARD_EMBED_DIM;
             if base + CARD_EMBED_DIM <= self.card_embed.len() {
                 self.card_embed[base..base + CARD_EMBED_DIM].to_vec()

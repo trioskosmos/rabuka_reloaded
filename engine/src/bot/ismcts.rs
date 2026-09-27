@@ -1,3 +1,4 @@
+use crate::core::constants::CountCast;
 use crate::game_setup::{self, Action};
 use crate::game_state::GameResult;
 use crate::turn::TurnEngine;
@@ -48,7 +49,7 @@ pub fn search(
         }
     }
 
-    let budget = config.iterations.max(n_actions as u32);
+    let budget = config.iterations.max(n_actions.u32_count());
     while total_visits < budget {
         // UCB1 selection.
         let mut best_idx = 0usize;

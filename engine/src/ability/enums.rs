@@ -740,6 +740,9 @@ pub enum EffectCardType {
 }
 
 impl EffectCardType {
+    // Not `core::str::FromStr`: a wire decode table with a defaulted arm, so
+    // it is total and returns `Self`, not a fallible `Result`.
+    #[allow(clippy::should_implement_trait)]
     pub fn from_str(s: &str) -> Self {
         match s {
             "member_card" => EffectCardType::MemberCard,
@@ -816,6 +819,9 @@ pub enum EffectState {
 }
 
 impl EffectState {
+    // Not `core::str::FromStr`: a wire decode table with a defaulted arm, so
+    // it is total and returns `Self`, not a fallible `Result`.
+    #[allow(clippy::should_implement_trait)]
     pub fn from_str(s: &str) -> Self {
         match s {
             "active" => EffectState::Active,

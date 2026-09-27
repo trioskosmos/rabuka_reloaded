@@ -8,6 +8,7 @@
 //! around. Start is never confirm (A) nor cancel (B).
 
 extern crate alloc;
+use crate::core::constants::CountCast;
 use alloc::format;
 use alloc::string::String;
 use alloc::string::ToString;
@@ -297,8 +298,8 @@ fn render_choice_page(
         let is_dimmed = dimmed.and_then(|d| d.get(idx).copied()).unwrap_or(false);
 
         // Card position in tiles (gapless row, centered via GRID_X0)
-        let x = GRID_X0 + col as i32 * (CARD_TILE_W + CARD_GAP_TILES);
-        let y = GRID_Y + row as i32 * (CARD_TILE_H + CARD_GAP_TILES);
+        let x = GRID_X0 + col.i32_count() * (CARD_TILE_W + CARD_GAP_TILES);
+        let y = GRID_Y + row.i32_count() * (CARD_TILE_H + CARD_GAP_TILES);
 
         let mut flag = 0usize;
         if is_selected {

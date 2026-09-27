@@ -1,4 +1,4 @@
-use crate::core::constants::U8Count;
+use crate::core::constants::CountCast;
 use super::enums::Zone;
 use super::resolver::AbilityResolver;
 use super::types::{Choice, ChoiceRoute, ExecutionContext, LookAndSelectStep};
@@ -320,7 +320,7 @@ impl AbilityResolver {
             log::debug!("DEBUG: is_max: {}, is_optional: {}", is_max, is_optional);
 
             // Create choice if max=true (up to X cards) or optional, or if count < available
-            if is_max || is_optional || count == 0 || count < available as u8 {
+            if is_max || is_optional || count == 0 || count < available.u8_count() {
                 let choices_count = if any_number {
                     available
                 } else {
@@ -1068,7 +1068,7 @@ impl AbilityResolver {
         );
         if look_from_deck {
             let deck_count = gs.resolve_target_player(target).main_deck.cards.len();
-            if (deck_count as u8) < count {
+            if deck_count.u8_count() < count {
                 return self.look_at_with_refresh(gs, effect, count, target, source);
             }
         }

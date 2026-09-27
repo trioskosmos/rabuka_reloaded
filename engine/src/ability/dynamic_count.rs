@@ -3,7 +3,7 @@
 //! Both the constant-path (`recalculate_constants`) and the ability-execution
 //! path (`AbilityResolver`) call this one method, so dynamic_count semantics live
 //! in exactly one place instead of being duplicated per caller.
-use crate::core::constants::U8Count;
+use crate::core::constants::CountCast;
 use crate::card::DynamicCount;
 use crate::game_state::GameState;
 

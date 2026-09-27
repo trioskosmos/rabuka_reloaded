@@ -12,6 +12,7 @@
 
 #[cfg(feature = "no_std")]
 use alloc::string::{String, ToString};
+use crate::core::constants::CountCast;
 #[cfg(feature = "no_std")]
 use alloc::vec::Vec;
 
@@ -41,7 +42,7 @@ pub(crate) fn ai_handle_choice(gs: &mut GameState) -> bool {
             if options.is_empty() {
                 return TurnEngine::resume_with_choice(gs, Some(0), None).is_ok();
             }
-            let idx = crate::constants::count_i16(crate::rng::rand_range(options.len()));
+            let idx = crate::rng::rand_range(options.len()).i16_count();
             TurnEngine::resume_with_choice(gs, Some(idx), None).is_ok()
         }
         Choice::SelectLiveSuccess { options, .. } => {
@@ -56,14 +57,13 @@ pub(crate) fn ai_handle_choice(gs: &mut GameState) -> bool {
             if options.is_empty() {
                 return TurnEngine::resume_with_choice(gs, Some(0), None).is_ok();
             }
-            let idx = crate::constants::count_i16(crate::rng::rand_range(options.len()));
+            let idx = crate::rng::rand_range(options.len()).i16_count();
             TurnEngine::resume_with_choice(gs, Some(idx), None).is_ok()
         }
         Choice::SelectTarget { options, target, .. } => {
             let n = options.as_ref().map(|o| o.len()).unwrap_or(2).max(1);
-            let n_i16 = crate::constants::count_i16(n);
-            let idx = crate::constants::count_i16(crate::rng::rand_range(n))
-                .min(n_i16 - 1);
+            let n_i16 = n.i16_count();
+            let idx = crate::rng::rand_range(n).i16_count().min(n_i16 - 1);
             // Choice::SelectTarget's string variants are dispatched by the
             // target name: "choice"/"choice_string"/conditional_optional use
             // the card-indices channel; everything else uses the i16 channel.
@@ -71,14 +71,14 @@ pub(crate) fn ai_handle_choice(gs: &mut GameState) -> bool {
                 "choice" | "choice_string" | "conditional_optional" => TurnEngine::resume_with_choice(
                     gs,
                     None,
-                    Some(vec![crate::constants::count_usize_i16(idx)]),
+                    Some(vec![idx.usize_count()]),
                 )
                 .is_ok(),
                 _ => TurnEngine::resume_with_choice(gs, Some(idx), None).is_ok(),
             }
         }
         Choice::SelectPosition { .. } => {
-            let idx = crate::constants::count_i16(crate::rng::rand_range(3));
+            let idx = crate::rng::rand_range(3).i16_count();
             TurnEngine::resume_with_choice(gs, Some(idx), None).is_ok()
         }
         Choice::SelectCard {

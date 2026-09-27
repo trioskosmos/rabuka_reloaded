@@ -17,6 +17,7 @@
 //! Fairness: opponent info is public-only (stage, success count). Own deck
 //! composition is fair game — a real player knows their own list.
 
+use crate::core::constants::CountCast;
 use crate::bot::strategy_common as sc;
 use crate::card::{CardDatabase, CardType, HeartColor};
 use crate::game_setup::{self, Action};
@@ -118,7 +119,7 @@ fn pass_probability(
         // Partial Fisher-Yates: draw `flips` distinct cards.
         let mut flipped = [0i32; 11];
         for i in 0..flips {
-            let j = (rng.next() % (n - i) as u64) as usize + i;
+            let j = (rng.next() % (n - i).u64_count()).usize_count() + i;
             idx.swap(i, j);
             if let Some(Some(a)) = pool.get(idx[i]) {
                 for k in 0..11 {
@@ -237,7 +238,7 @@ pub fn choose_live_set_action_v2(
             }
             subsets.push(Subset {
                 count,
-                effective_score: score_sum + expected_icons as i32,
+                effective_score: score_sum + expected_icons.i32_count(),
                 need,
                 indices,
                 prob_milli: std::cell::Cell::new(u32::MAX), // not yet computed
@@ -255,7 +256,7 @@ pub fn choose_live_set_action_v2(
                 policy.mc_trials,
                 &mut rng,
             );
-            s.prob_milli.set((prob * 1000.0) as u32);
+            s.prob_milli.set((prob * 1000.0).u32_count());
         }
 
         // Policy: succeed-at-all-costs ranking, modulated by STANCE — the

@@ -1,4 +1,4 @@
-use rabuka_engine::core::constants::U8Count;
+use rabuka_engine::core::constants::CountCast;
 use std::fs::File;
 use std::io::Write;
 use std::sync::Arc;

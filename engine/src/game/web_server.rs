@@ -1,4 +1,4 @@
-use crate::core::constants::U8Count;
+use crate::core::constants::CountCast;
 use crate::{HashMap, HashSet};
 use actix_cors::Cors;
 use actix_files as fs;

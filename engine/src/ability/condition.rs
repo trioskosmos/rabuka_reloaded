@@ -6,6 +6,7 @@ use crate::ability::debug::ABILITY_DEBUG;
 use crate::ability::enums::ConditionType;
 use crate::ability::enums::Zone;
 use crate::ability_queue::ConditionalChoice;
+use crate::core::constants::CountCast;
 #[cfg(feature = "serde_support")]
 use crate::card::CardState;
 use crate::card::Condition;
@@ -638,7 +639,7 @@ impl<'a> ConditionContext<'a> {
             }
         };
         let cards = &self.game_state.revealed_cards;
-        let count = condition.get_count().unwrap_or(1) as usize;
+        let count = condition.get_count().unwrap_or(1).usize_count();
         let operator = condition.get_operator().unwrap_or(">=");
         let card_db = &self.game_state.card_database;
 
@@ -647,12 +648,13 @@ impl<'a> ConditionContext<'a> {
             .filter(|&&cid| {
                 crate::ability::util::card_matches_heart_colors(card_db, cid, std::slice::from_ref(&color))
             })
-            .count() as u8;
+            .count()
+            .u8_count();
 
         // An operator we do not know is a parser gap, not a threshold that
         // failed: fall back to ">=", which is what this gate defaulted to.
-        crate::ability::util::compare_with_operator(operator, matching, count as u8)
-            .unwrap_or(matching >= count as u8)
+        crate::ability::util::compare_with_operator(operator, matching, count.u8_count())
+            .unwrap_or(matching >= count.u8_count())
     }
 
     /// Evaluate condition and return structured actual value for debug display.

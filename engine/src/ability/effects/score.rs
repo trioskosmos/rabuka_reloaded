@@ -2,6 +2,7 @@ use super::super::enums::Zone;
 use super::super::resolver::AbilityResolver;
 use super::super::util;
 use crate::card::{AbilityEffect, CardDatabase};
+use crate::core::constants::CountCast;
 use crate::game_state::GameState;
 #[cfg(feature = "no_std")]
 use alloc::{
@@ -279,7 +280,7 @@ impl AbilityResolver {
             let clamped_delta = if has_floor && projected_total < 0 {
                 // Clamp so total stays >=0
                 let max_negative = -(base_total + current_bonus as i32);
-                max_negative.max(delta as i32) as i16
+                max_negative.max(i32::from(delta)).i16_count()
             } else {
                 delta
             };
@@ -626,7 +627,8 @@ impl AbilityResolver {
                     .filter(|&&card_id| {
                         unit_filter.accepts(gs, card_db, card_id, &mut seen_names)
                     })
-                    .count() as u8;
+                    .count()
+                    .u8_count();
                 value = per_unit_base(max, value) * capped_units(count, per_unit_count, repeat_limit);
             }
         }
@@ -731,7 +733,7 @@ impl AbilityResolver {
                     effect.text.to_string(),
                     op_kind,
                     *card_id,
-                    Some(color.index() as u8),
+                    Some(color.index().u8_count()),
                     delta,
                 );
             }
@@ -772,7 +774,7 @@ impl AbilityResolver {
                     effect_text.to_string(),
                     "need_heart_mod",
                     *card_id,
-                    Some(color.index() as u8),
+                    Some(color.index().u8_count()),
                     modifier_value,
                 );
             }
@@ -901,7 +903,7 @@ impl AbilityResolver {
                     effect.text.to_string(),
                     "need_heart_mod",
                     card_id,
-                    Some(color.index() as u8),
+                    Some(color.index().u8_count()),
                     delta as i16,
                 );
             }

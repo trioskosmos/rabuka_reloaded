@@ -1,4 +1,5 @@
 use super::{AbilityResolver, GameState, Player, util};
+use crate::core::constants::CountCast;
 #[cfg(feature = "no_std")]
 use alloc::{string::{String, ToString}, vec::Vec};
 use smallvec::SmallVec;
@@ -49,7 +50,7 @@ pub(super) fn remove_card_from_any_zone(
     } else if let Some(pos) = player.stage.stage.iter().position(|&id| id == card_id) {
         player.stage.stage[pos] = -1;
         player.deployed_this_turn.retain(|id| *id != card_id);
-        *last_vacated_stage_area = Some(pos as u8);
+        *last_vacated_stage_area = Some(pos.u8_count());
     } else if let Some(pos) = player.energy_zone.cards.iter().position(|&id| id == card_id) {
         player.energy_zone.cards.remove(pos);
     }

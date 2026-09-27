@@ -1,3 +1,4 @@
+use crate::core::constants::CountCast;
 use crate::ability::debug::AbDebug;
 use crate::ability_queue::QueueState;
 use crate::card::{CardDatabase, CardId};
@@ -306,7 +307,10 @@ impl RevealedCardDisplay {
             card_id,
             source_card_id: meta.and_then(|m| m.source),
             source_card_name: meta.and_then(|m| m.source_name.clone()),
-            owner: meta.and_then(|m| m.owner).map(|o| o as i8).unwrap_or(-1i8),
+            owner: meta
+                .and_then(|m| m.owner)
+                .and_then(|o| i8::try_from(o).ok())
+                .unwrap_or(-1i8),
             is_private: meta.map(|m| m.is_private).unwrap_or(false),
             reveal_type: meta.map(|m| m.reveal_type.to_string()).unwrap_or_default(),
         }
@@ -1325,7 +1329,7 @@ pub fn game_state_to_display(game_state: &GameState) -> GameStateDisplay {
                         .and_then(|v| v.as_i64())
                         .or_else(|| val.as_i64())
                     {
-                        looked_ids.push(id as i16);
+                        looked_ids.push(id.i16_count());
                     }
                 }
             }

@@ -1,4 +1,4 @@
-use crate::core::constants::U8Count;
+use crate::core::constants::CountCast;
 use super::{GameResult, GameState, PermanentLoopProtocol};
 #[cfg(feature = "no_std")]
 use alloc::{
@@ -713,7 +713,7 @@ impl GameState {
                             // Re-scan guard: skip re-enqueueing the exact auto
                             // ability that just completed (numeric key).
                             let num_key =
-            (crate::constants::id_u32(card_id) << 16) | crate::constants::count_u32(ability_idx);
+            (card_id.u32_count() << 16) | ability_idx.u32_count();
                             // Marker-carrying watchers (「対戦相手のカードの
                             // 効果でも発動する。」) watching AREA MOVES are
                             // armed by the push_movement_event hook when their
@@ -809,7 +809,7 @@ impl GameState {
                                 continue;
                             }
                             let num_key =
-            (crate::constants::id_u32(card_id) << 16) | crate::constants::count_u32(ability_idx);
+            (card_id.u32_count() << 16) | ability_idx.u32_count();
                             // Same batch-scoped re-scan guard as the stage loop.
                             if !Self::claim_batch_slot(
                                 &mut self.this_batch_triggered_ability_ids,
@@ -887,8 +887,7 @@ impl GameState {
                                     }
                                 }
                             }
-                            let num_key = (crate::constants::id_u32(moved_card_id) << 16)
-            | crate::constants::count_u32(ability_idx);
+                            let num_key =             (moved_card_id.u32_count() << 16) | ability_idx.u32_count();
                             // Same batch-scoped re-scan guard as the stage loop.
                             if skip_this_card_auto_key == Some(num_key)
                                 && just_completed_batch_matches
@@ -910,7 +909,7 @@ impl GameState {
         let mut cached_card_no = String::new();
         for (card_id, ability_idx, _stage_card_id) in abilities_to_trigger {
             let num_key =
-            (crate::constants::id_u32(card_id) << 16) | crate::constants::count_u32(ability_idx);
+            (card_id.u32_count() << 16) | ability_idx.u32_count();
             if !self.this_batch_triggered_ability_ids.contains(&num_key) {
                 self.this_batch_triggered_ability_ids.push(num_key);
             }
@@ -1026,8 +1025,8 @@ impl GameState {
     /// one turn) each get their own key.
     pub(crate) fn opp_cause_key(num_key: u32, moved_card_id: i16, seq: u16) -> u64 {
         (num_key as u64)
-            ^ ((moved_card_id as i64 as u64) << 20)
-            ^ ((seq as u64).rotate_left(44))
+            ^ (u64::from(moved_card_id.u32_count()) << 20)
+            ^ (u64::from(seq) << 44).rotate_left(44)
     }
 
     /// Opponent-caused trigger arm: 「(対戦相手のカードの効果でも発動する。)」
@@ -1103,7 +1102,7 @@ impl GameState {
                     continue;
                 }
                 let num_key =
-            (crate::constants::id_u32(watcher_id) << 16) | crate::constants::count_u32(ability_idx);
+            (watcher_id.u32_count() << 16) | ability_idx.u32_count();
                 let ekey = Self::opp_cause_key(
                     num_key,
                     moved_card_id,
@@ -1617,7 +1616,7 @@ impl GameState {
             // and must be drained depth-first (§9.5.3.2→§9.5.3.1 loopback).
             let pre_len =
                 self.depth_first_cutoff
-                    .unwrap_or_else(|| crate::constants::count_u16(self.ability_queue.len()))
+                    .unwrap_or_else(|| self.ability_queue.len().u16_count())
             as usize;
             self.depth_first_cutoff = None;
 
@@ -2179,8 +2178,8 @@ impl GameState {
             // card to fire.
             let just_completed_key: Option<u32> =
                 self.ability_queue.current_entry().and_then(|e| {
-        let cid = crate::constants::id_u32(e.card_id?);
-        let idx = crate::constants::count_u32(e.ability_index);
+        let cid = e.card_id?.u32_count();
+        let idx = e.ability_index.u32_count();
                     Some((cid << 16) | idx)
                 });
 
@@ -3250,7 +3249,8 @@ impl GameState {
             .game_state_history
             .iter()
             .filter(|&&seen| seen == hash)
-            .count() as u8;
+            .count()
+            .u8_count();
         if repetition_count < 3 {
             return;
         }

@@ -1,4 +1,4 @@
-use crate::core::constants::U8Count;
+use crate::core::constants::CountCast;
 use super::super::enums::{TargetPlayer, Zone};
 use super::super::resolver::AbilityResolver;
 use super::super::types::{Choice, ChoiceRoute, ExecutionContext};
@@ -58,7 +58,7 @@ impl AbilityResolver {
             // Joint-aware distinct-name count (Q278/Q279): ordinary cards dedupe by
             // name; a joint (multi-name) card adds one unit if it introduces a name
             // not already present as a single-name card.
-            util::count_distinct_member_name_units(&matching, &gs.card_database) as u8
+            util::count_distinct_member_name_units(&matching, &gs.card_database).u8_count()
         } else {
             util::apply_distinct_filter(&matching, effect.distinct_any(), &gs.card_database)
                 .len()
@@ -88,7 +88,7 @@ impl AbilityResolver {
             return if signed < 0 {
                 (Some(0), true)
             } else {
-                (Some(signed as u8), false)
+                (Some(signed.u8_count()), false)
             };
         }
         if effect.blade_limit_from_energy_under_any().unwrap_or(false) {
@@ -100,7 +100,7 @@ impl AbilityResolver {
                     .stage
                     .iter()
                     .position(|&id| id == aid)
-                    .map(|idx| p.stage.under_cards[idx].len() as i32)
+                    .map(|idx| p.stage.under_cards[idx].len().i32_count())
                     .unwrap_or(0)
             });
             return (Some(crate::constants::saturate_u8(under_count + base)), false);
@@ -658,7 +658,7 @@ impl AbilityResolver {
                 let actual_count = if is_cannot_activate_by_effect {
                     0
                 } else {
-                    wait_before_count as u8
+                    wait_before_count.u8_count()
                 };
                 gs.last_state_change_wait_to_active_count = actual_count;
             }
@@ -846,7 +846,7 @@ impl AbilityResolver {
                         .saturating_sub(usize::from(player.energy_zone.active_count())),
                     _ => usize::from(player.energy_zone.active_count()),
                 };
-                let capped = crate::constants::count_u8(usize::from(count).min(available));
+                let capped = usize::from(count).min(available).u8_count();
                 log::debug!(
                     "[ENERGY] max=true: count={} available={} effective={}",
                     count,
@@ -864,7 +864,7 @@ impl AbilityResolver {
                     _ => usize::from(player.energy_zone.active_count()),
                 };
                 log::debug!("[ENERGY] count=0 (all): effective={}", val);
-                val as u8
+                val.u8_count()
             } else {
                 log::debug!("[ENERGY] max=false: count={} effectve={}", count, count);
                 count
@@ -1324,7 +1324,7 @@ impl AbilityResolver {
             format!("Transform hearts to {}", ht),
             "transform",
             card_id,
-            Some(crate::constants::count_u8(color.index())),
+            Some(color.index().u8_count()),
             0,
         );
         let ed = crate::core::types::EffectData::SetBladeCount { card_id };
@@ -1800,7 +1800,7 @@ impl AbilityResolver {
                     let printed =
                         gs.card_database.get_card(cid).and_then(|c| c.cost).unwrap_or(0)
                             as i32;
-                    (resolved - printed).clamp(i16::MIN as i32, i16::MAX as i32) as i16
+                    (resolved - printed).i16_count()
                 })
                 .collect();
             for (card_id, d) in card_ids.iter().zip(deltas.iter()) {

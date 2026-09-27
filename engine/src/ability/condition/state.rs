@@ -3,7 +3,7 @@ use crate::ability::enums::Zone;
 use crate::ability::util;
 use crate::ability::util::compare_counts;
 use crate::card::{CardProperty, Condition, TriggerEvent};
-use crate::core::constants::U8Count;
+use crate::core::constants::CountCast;
 use crate::game_state::Phase;
 use crate::HashSet;
 #[cfg(feature = "no_std")]

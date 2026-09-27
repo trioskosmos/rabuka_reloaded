@@ -1,4 +1,4 @@
-use crate::core::constants::U8Count;
+use crate::core::constants::CountCast;
 use super::GameState;
 #[cfg(feature = "no_std")]
 use alloc::{
@@ -686,7 +686,7 @@ impl GameState {
                                         } else {
                                             let hc_list = effect.heart_colors_any();
                                             let per_entry = i16::try_from(
-                                                n / crate::constants::count_i32(hc_list.len().max(1)),
+                                                    n / hc_list.len().max(1).i32_count(),
                                             )
                                             .unwrap();
                                             for hc in hc_list {
@@ -909,7 +909,7 @@ impl GameState {
                                         exp_global_need_heart.push((
                                             *card_id,
                                             color.to_string(),
-                                            delta as i16,
+                                            delta.i16_count(),
                                         ));
                                         exp_global_nh_sources.push(
                                             crate::core::game_modifiers::BonusSource {
@@ -956,7 +956,7 @@ impl GameState {
                                                     let n = i32::from(sub.count.unwrap_or(1));
                                                     let hc_list = sub.heart_colors_any();
                                                 let per_color = crate::constants::saturate_i16(
-                                                    n / crate::constants::count_i32(hc_list.len().max(1)),
+                                                n / hc_list.len().max(1).i32_count(),
                                                 );
                                                     for hc in hc_list {
                                                         *exp_heart
@@ -1999,7 +1999,7 @@ impl GameState {
                     "heart" => {
                         let heart_colors = effect.heart_colors_any();
                             let per_color = crate::constants::saturate_i16(
-                                amount / crate::constants::count_i32(heart_colors.len().max(1)),
+                                amount / heart_colors.len().max(1).i32_count(),
                             );
                         let colors = heart_colors
                             .iter()

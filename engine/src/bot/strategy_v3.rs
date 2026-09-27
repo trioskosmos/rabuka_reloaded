@@ -22,6 +22,7 @@
 //! public-only.
 
 use crate::card::{CardDatabase, CardType};
+use crate::core::constants::CountCast;
 use crate::game_setup::{self, Action};
 use crate::game_state::GameState;
 use crate::bot::strategy::StrategyWeights;
@@ -322,12 +323,12 @@ pub fn choose_action_heuristic_v3(
         } else {
             acq_features(&sim.player2, db)
         };
-        let d_lives = crate::constants::count_i32(my_after.lives_in_hand)
-            - crate::constants::count_i32(my_before.lives_in_hand);
-        let d_members = crate::constants::count_i32(my_after.playable_members_in_hand)
-            - crate::constants::count_i32(my_before.playable_members_in_hand);
-        let d_wr_lives = crate::constants::count_i32(my_after.lives_in_waitroom)
-            - crate::constants::count_i32(my_before.lives_in_waitroom);
+        let d_lives = my_after.lives_in_hand.i32_count()
+            - my_before.lives_in_hand.i32_count();
+        let d_members = my_after.playable_members_in_hand.i32_count()
+            - my_before.playable_members_in_hand.i32_count();
+        let d_wr_lives = my_after.lives_in_waitroom.i32_count()
+            - my_before.lives_in_waitroom.i32_count();
 
         // Lives into hand: strong want during the rush window (ammo for the
         // flood), moderate otherwise — and DESPERATION-scaled when the hand
@@ -450,7 +451,7 @@ fn plan_score_portfolio(
     candidates.sort_by_key(|c| core::cmp::Reverse(c.1));
 
     let max_slots =
-        crate::constants::count_usize(3i32 - i32::from(my.live_card_set_limit_reduction).max(0));
+        (3i32 - i32::from(my.live_card_set_limit_reduction).max(0)).usize_count();
     let mut desired: Vec<usize> = Vec::new();
     for &(hi, _score, ref need) in &candidates {
         if desired.len() >= max_slots {

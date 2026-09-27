@@ -8,6 +8,7 @@
 
 #[cfg(feature = "no_std")]
 use alloc::format;
+use crate::core::constants::CountCast;
 #[cfg(feature = "no_std")]
 use alloc::string::{String, ToString};
 #[cfg(feature = "no_std")]
@@ -756,7 +757,7 @@ pub fn handle_choice(ui: &mut dyn PlatformUi, gs: &mut GameState) -> bool {
                 return true;
             }
             let sel = menu_select_detailed(ui, gs, &items, prompt, false).unwrap_or(0);
-            TurnEngine::resume_with_choice(gs, Some(crate::constants::count_i16(sel)), None).ok();
+            TurnEngine::resume_with_choice(gs, Some(sel.i16_count()), None).ok();
             true
         }
         Choice::SelectCard {
@@ -980,7 +981,7 @@ if count <= 1 {
                 None => TurnEngine::resume_with_choice(gs, Some(-1), None).ok(),
                 Some(idx) => TurnEngine::resume_with_choice(
                 gs,
-                Some(crate::constants::count_i16(idx)),
+                Some(idx.i16_count()),
                 None,
             )
             .ok(),
@@ -1000,7 +1001,7 @@ if count <= 1 {
             ..
         } => {
             let sel = menu_select(ui, &options, prompt, false).unwrap_or(0);
-            TurnEngine::resume_with_choice(gs, Some(crate::constants::count_i16(sel)), None).ok();
+            TurnEngine::resume_with_choice(gs, Some(sel.i16_count()), None).ok();
             true
         }
         Choice::SelectLiveSuccess {

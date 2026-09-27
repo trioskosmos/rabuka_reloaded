@@ -1,5 +1,6 @@
 use super::super::debug::AbDebug;
 use super::super::enums::{ActionType, Zone};
+use crate::core::constants::CountCast;
 use super::super::resolver::AbilityResolver;
 use super::super::types::{Choice, ChoiceRoute};
 use crate::ability::util;
@@ -984,7 +985,7 @@ let source = cost.source_str().unwrap_or("");
                             self.pay_cost(gs, sub_cost)?;
                         }
                         if let Some(entry) = gs.ability_queue.current_entry_mut() {
-                            entry.cost_paid_index = (i + 1) as u8;
+                            entry.cost_paid_index = (i + 1).u8_count();
                         }
                         if self.pending_choice.is_some() {
                             // If we auto-paid binary costs before this choice, override

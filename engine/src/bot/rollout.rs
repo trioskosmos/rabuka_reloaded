@@ -15,6 +15,7 @@
 //! the cheap heuristic path, which already plays them correctly.
 
 use crate::bot::strategy_v4::{alloc, flip_stats, hand_lives, heart_pool};
+use crate::core::constants::CountCast;
 use crate::card::{CardDatabase, CardType};
 use crate::game_setup::{self, Action};
 use crate::game_state::{GameResult, GameState};
@@ -156,8 +157,8 @@ fn value_outcome(gs: &GameState, me: u8, start_succ: (i32, i32)) -> f64 {
         }
         GameResult::Draw => 0.0,
         GameResult::Ongoing => {
-            let my_now = crate::constants::count_i32(my.success_live_card_zone.cards.len());
-            let opp_now = crate::constants::count_i32(opp.success_live_card_zone.cards.len());
+            let my_now = my.success_live_card_zone.cards.len().i32_count();
+            let opp_now = opp.success_live_card_zone.cards.len().i32_count();
             100.0 * ((my_now - start_succ.0) - (opp_now - start_succ.1)) as f64
         }
     }
@@ -275,15 +276,15 @@ pub fn price_main_actions_at_horizons(
 ) -> Vec<Vec<f64>> {
     let start_turn = gs.turn_number;
     let start_succ = (
-        crate::constants::count_i32(gs.player1.success_live_card_zone.cards.len()),
-        crate::constants::count_i32(gs.player2.success_live_card_zone.cards.len()),
+        gs.player1.success_live_card_zone.cards.len().i32_count(),
+        gs.player2.success_live_card_zone.cards.len().i32_count(),
     );
     let _guard = RngGuard(crate::rng::checkpoint());
     let mut values = vec![vec![0.0; actions.len()]; horizons.len()];
     for (action_index, action) in actions.iter().enumerate() {
         for horizon_index in 0..horizons.len() {
             for simulation in 0..simulations.max(1) {
-                crate::rng::seed(0x51A7 + crate::constants::count_u32(simulation));
+                crate::rng::seed(0x51A7 + simulation.u32_count());
                 let mut sim = fair_rollout_state(gs, me, 0x51A7 + simulation as u64);
                 if game_setup::execute_action(&mut sim, action).is_err() {
                     values[horizon_index][action_index] -= 500.0;
@@ -313,15 +314,15 @@ pub fn price_main_actions(
 ) -> Vec<f64> {
     let start_turn = gs.turn_number;
     let start_succ = (
-        crate::constants::count_i32(gs.player1.success_live_card_zone.cards.len()),
-        crate::constants::count_i32(gs.player2.success_live_card_zone.cards.len()),
+        gs.player1.success_live_card_zone.cards.len().i32_count(),
+        gs.player2.success_live_card_zone.cards.len().i32_count(),
     );
     let horizon_end = start_turn.saturating_add(horizon_turns);
     let _guard = RngGuard(crate::rng::checkpoint());
     let mut totals = vec![0.0; actions.len()];
     for (index, action) in actions.iter().enumerate() {
         for simulation in 0..simulations.max(1) {
-            crate::rng::seed(0x51A7 + crate::constants::count_u32(simulation));
+            crate::rng::seed(0x51A7 + simulation.u32_count());
             let mut sim = fair_rollout_state(gs, me, 0x51A7 + simulation as u64);
             if game_setup::execute_action(&mut sim, action).is_err() {
                 totals[index] -= 500.0;
@@ -345,8 +346,8 @@ pub fn price_portfolios(
 ) -> usize {
     let start_turn = gs.turn_number;
     let start_succ = (
-        crate::constants::count_i32(gs.player1.success_live_card_zone.cards.len()),
-        crate::constants::count_i32(gs.player2.success_live_card_zone.cards.len()),
+        gs.player1.success_live_card_zone.cards.len().i32_count(),
+        gs.player2.success_live_card_zone.cards.len().i32_count(),
     );
     let simulations = std::env::var("V7_LIVE_SIMS")
         .ok()
@@ -405,7 +406,7 @@ pub fn enumerate_candidates(gs: &GameState, me: u8, db: &CardDatabase) -> Vec<Ve
     let (my, _) = gs.seated_pair(me);
     let pool = heart_pool(gs, me, db);
     let lives = hand_lives(my, db);
-    let max_slots = (3i32 - i32::from(my.live_card_set_limit_reduction)).max(0) as usize;
+    let max_slots = (3i32 - i32::from(my.live_card_set_limit_reduction)).max(0).usize_count();
     let (blades, density) = flip_stats(gs, me, db);
 
     let mut scored: Vec<(f64, Vec<usize>)> = Vec::new();
@@ -527,7 +528,7 @@ fn plan_key(gs: &GameState, me: u8) -> (u8, u8, u64) {
 pub fn choose_live_set_v7(gs: &GameState, actions: &[Action], db: &CardDatabase) -> Action {
     let me = gs.active_player_index();
     let (_, opp) = gs.seated_pair(me);
-    let opp_succ = crate::constants::count_i32(opp.success_live_card_zone.cards.len());
+    let opp_succ = opp.success_live_card_zone.cards.len().i32_count();
     let contested = !opp.live_card_zone.cards.is_empty() || opp_succ >= 2;
 
     let key = plan_key(gs, me);
@@ -544,7 +545,7 @@ pub fn choose_live_set_v7(gs: &GameState, actions: &[Action], db: &CardDatabase)
         // so the priced comparison matches what will actually be set.
         let (my, _) = gs.seated_pair(me);
         let max_slots =
-            crate::constants::count_usize(3i32 - i32::from(my.live_card_set_limit_reduction).max(0));
+            (3i32 - i32::from(my.live_card_set_limit_reduction).max(0)).usize_count();
         let deck_lives = my
             .main_deck
             .cards

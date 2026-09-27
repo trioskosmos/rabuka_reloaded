@@ -33,84 +33,6 @@ pub fn saturate_i16(v: i32) -> i16 {
     i16::try_from(v.clamp(i32::from(i16::MIN), i32::from(i16::MAX))).unwrap()
 }
 
-/// Narrow a `usize` count to `u8`, saturating at the top.
-///
-/// The `len() as u8` / `count as u8` idiom is everywhere in this crate: zone
-/// sizes, hand sizes, deck sizes, amounts a card can move. None of them can
-/// actually reach 256 in a legal game, but the cast is written anyway, and
-/// `as` wraps rather than saturates. These four helpers are the single home
-/// for that narrowing: they take the count at its natural `usize` width, so
-/// the entry cast is inside the helper where it is clamped, not spread across
-/// 44 files. The saturating top is the only observable difference from the
-/// old `as` on legal input, where every one of these values is far below 255.
-#[inline]
-pub fn count_u8(v: usize) -> u8 {
-    u8::try_from(v).unwrap_or(u8::MAX)
-}
-
-/// Narrow a `usize` count to `u16`, saturating at the top.
-#[inline]
-pub fn count_u16(v: usize) -> u16 {
-    u16::try_from(v).unwrap_or(u16::MAX)
-}
-
-/// Narrow a `usize` count to `u32`, saturating at the top.
-#[inline]
-pub fn count_u32(v: usize) -> u32 {
-    u32::try_from(v).unwrap_or(u32::MAX)
-}
-
-/// Widen an `i16` identifier to `u32` for hash keys, flooring at zero.
-///
-/// Card and ability indices are non-negative by construction; the old
-/// `as u32` on a negative value produced a huge key instead, which then
-/// collided with nothing and silently failed to match its own entry.
-#[inline]
-pub fn id_u32(v: i16) -> u32 {
-    u32::try_from(v).unwrap_or(0)
-}
-
-/// Widen a `usize` count to `i32`, saturating at the top.
-#[inline]
-pub fn count_i32(v: usize) -> i32 {
-    i32::try_from(v).unwrap_or(i32::MAX)
-}
-
-/// Narrow a `usize` count to `i16`, saturating at the top.
-#[inline]
-pub fn count_i16(v: usize) -> i16 {
-    i16::try_from(v).unwrap_or(i16::MAX)
-}
-
-/// Widen an `i32` count to `usize`, flooring at zero.
-///
-/// The `count as usize` counterpart to the helpers above: a negative count in
-/// the data means "none", and `-1 as usize` is a huge value rather than zero.
-#[inline]
-pub fn count_usize(v: i32) -> usize {
-    usize::try_from(v).unwrap_or(0)
-}
-
-/// Widen an `i16` count to `usize`, flooring at zero.
-#[inline]
-pub fn count_usize_i16(v: i16) -> usize {
-    usize::try_from(v).unwrap_or(0)
-}
-
-/// Widen an `i64` count to `usize`, flooring at zero.
-#[inline]
-pub fn count_usize_i64(v: i64) -> usize {
-    usize::try_from(v).unwrap_or(0)
-}
-
-/// Widen a `u32` count to `usize`. Exact on every target this crate builds
-/// for, but goes through `try_from` so the intent is checked rather than
-/// assumed.
-#[inline]
-pub fn count_usize_u32(v: u32) -> usize {
-    usize::try_from(v).unwrap_or(usize::MAX)
-}
-
 /// Narrow a score-space `f64` to `i32` by truncation, saturating out-of-range
 /// and non-finite inputs.
 ///
@@ -168,17 +90,343 @@ pub fn floored_cost(base: u8, modifier: i32) -> u8 {
     u8::try_from((base as i32 + modifier).max(1)).unwrap_or(u8::MAX)
 }
 
-/// Saturating usize → u8 for card counts, as an extension method so call
-/// sites read `.len().u8_count()` instead of `.len() as u8`. Zone sizes are
-/// small in practice, but waitrooms/decks CAN exceed 255 in long games and a
-/// raw `as u8` silently wraps such counts to garbage (casting cut-downs).
-pub trait U8Count {
+/// Saturating narrowing for the count and index widths this crate uses.
+///
+/// `x as u8` truncates or wraps, and the wrap is never intended: a deck that
+/// grows past 255 cards, or a modifier delta that overflows i16, should
+/// clamp, not become a small value that then wins an ordering comparison it
+/// should have lost. `usize as i32` has the same problem one octave down.
+///
+/// Every narrowing in the crate goes through this trait so the clamp lives in
+/// one place, and so the direction of each conversion is visible at the call
+/// site: `zone.len().u8_count()` says "narrow this count to a byte", where
+/// `zone.len() as u8` only says "there was a cast here".
+///
+/// Only the conversions actually used by the crate are implemented. Unsigned
+/// sources saturate at the top; signed sources clamp at both ends for signed
+/// targets and floor at zero for unsigned ones, so a negative count means
+/// "none" rather than `-1 as usize` (a value near `usize::MAX`).
+pub trait CountCast {
     fn u8_count(self) -> u8;
+    fn u16_count(self) -> u16;
+    fn u32_count(self) -> u32;
+    fn u64_count(self) -> u64;
+    fn i32_count(self) -> i32;
+    fn i16_count(self) -> i16;
+    fn usize_count(self) -> usize;
 }
 
-impl U8Count for usize {
+impl CountCast for usize {
     #[inline]
     fn u8_count(self) -> u8 {
-        u8::try_from(self.min(usize::from(u8::MAX))).unwrap()
+        u8::try_from(self).unwrap_or(u8::MAX)
+    }
+    #[inline]
+    fn u16_count(self) -> u16 {
+        u16::try_from(self).unwrap_or(u16::MAX)
+    }
+    #[inline]
+    fn u32_count(self) -> u32 {
+        u32::try_from(self).unwrap_or(u32::MAX)
+    }
+    #[inline]
+    fn u64_count(self) -> u64 {
+        u64::try_from(self).unwrap_or(u64::MAX)
+    }
+    #[inline]
+    fn i32_count(self) -> i32 {
+        i32::try_from(self).unwrap_or(i32::MAX)
+    }
+    #[inline]
+    fn i16_count(self) -> i16 {
+        i16::try_from(self).unwrap_or(i16::MAX)
+    }
+    #[inline]
+    fn usize_count(self) -> usize {
+        self
+    }
+}
+
+impl CountCast for i32 {
+    #[inline]
+    fn u8_count(self) -> u8 {
+        u8::try_from(self.clamp(0, i32::from(u8::MAX))).unwrap()
+    }
+    #[inline]
+    fn u16_count(self) -> u16 {
+        u16::try_from(self.clamp(0, i32::from(u16::MAX))).unwrap()
+    }
+    #[inline]
+    fn u32_count(self) -> u32 {
+        u32::try_from(self.max(0)).unwrap()
+    }
+    #[inline]
+    fn u64_count(self) -> u64 {
+        u64::try_from(self.max(0)).unwrap()
+    }
+    #[inline]
+    fn i32_count(self) -> i32 {
+        self
+    }
+    #[inline]
+    fn i16_count(self) -> i16 {
+        i16::try_from(self.clamp(i32::from(i16::MIN), i32::from(i16::MAX))).unwrap()
+    }
+    #[inline]
+    fn usize_count(self) -> usize {
+        usize::try_from(self).unwrap_or(0)
+    }
+}
+
+impl CountCast for i16 {
+    #[inline]
+    fn u8_count(self) -> u8 {
+        u8::try_from(self.clamp(0, i16::from(u8::MAX))).unwrap()
+    }
+    #[inline]
+    fn u16_count(self) -> u16 {
+        u16::try_from(self.max(0)).unwrap()
+    }
+    #[inline]
+    fn u32_count(self) -> u32 {
+        u32::try_from(self.max(0)).unwrap()
+    }
+    #[inline]
+    fn u64_count(self) -> u64 {
+        u64::try_from(self.max(0)).unwrap()
+    }
+    #[inline]
+    fn i32_count(self) -> i32 {
+        i32::from(self)
+    }
+    #[inline]
+    fn i16_count(self) -> i16 {
+        self
+    }
+    #[inline]
+    fn usize_count(self) -> usize {
+        usize::try_from(self).unwrap_or(0)
+    }
+}
+
+impl CountCast for u8 {
+    #[inline]
+    fn u8_count(self) -> u8 {
+        self
+    }
+    #[inline]
+    fn u16_count(self) -> u16 {
+        u16::from(self)
+    }
+    #[inline]
+    fn u32_count(self) -> u32 {
+        u32::from(self)
+    }
+    #[inline]
+    fn u64_count(self) -> u64 {
+        u64::from(self)
+    }
+    #[inline]
+    fn i32_count(self) -> i32 {
+        i32::from(self)
+    }
+    #[inline]
+    fn i16_count(self) -> i16 {
+        i16::from(self)
+    }
+    #[inline]
+    fn usize_count(self) -> usize {
+        usize::from(self)
+    }
+}
+
+impl CountCast for i64 {
+    #[inline]
+    fn u8_count(self) -> u8 {
+        u8::try_from(self.clamp(0, i64::from(u8::MAX))).unwrap()
+    }
+    #[inline]
+    fn u16_count(self) -> u16 {
+        u16::try_from(self.clamp(0, i64::from(u16::MAX))).unwrap()
+    }
+    #[inline]
+    fn u32_count(self) -> u32 {
+        u32::try_from(self.max(0)).unwrap()
+    }
+    #[inline]
+    fn u64_count(self) -> u64 {
+        u64::try_from(self.max(0)).unwrap()
+    }
+    #[inline]
+    fn i32_count(self) -> i32 {
+        i32::try_from(self).unwrap_or(if self < 0 { i32::MIN } else { i32::MAX })
+    }
+    #[inline]
+    fn i16_count(self) -> i16 {
+        i16::try_from(self.clamp(i64::from(i16::MIN), i64::from(i16::MAX))).unwrap()
+    }
+    #[inline]
+    fn usize_count(self) -> usize {
+        usize::try_from(self).unwrap_or(0)
+    }
+}
+
+/// Compatibility shim for the `U8Count` -> `CountCast` rename.
+///
+/// Purely additive: the trait gained methods and the old name disappeared,
+/// but call sites across the crate still `use crate::core::constants::U8Count`
+/// and still call `id_u32`/`count_u32`. Re-exporting the old trait name keeps
+/// method resolution working for them, and the two free functions are
+/// restored verbatim. Delete once every caller has migrated.
+pub use CountCast as U8Count;
+
+/// Widen a `usize` count to `u32`, saturating at the top.
+#[inline]
+pub fn count_u32(v: usize) -> u32 {
+    u32::try_from(v).unwrap_or(u32::MAX)
+}
+
+/// Widen an `i16` identifier to `u32` for hash keys, flooring at zero.
+///
+/// Card and ability indices are non-negative by construction; the old
+/// `as u32` on a negative value produced a huge key instead, which then
+/// collided with nothing and silently failed to match its own entry.
+#[inline]
+pub fn id_u32(v: i16) -> u32 {
+    u32::try_from(v).unwrap_or(0)
+}
+
+impl CountCast for u32 {
+    #[inline]
+    fn u8_count(self) -> u8 {
+        u8::try_from(self).unwrap_or(u8::MAX)
+    }
+    #[inline]
+    fn u16_count(self) -> u16 {
+        u16::try_from(self).unwrap_or(u16::MAX)
+    }
+    #[inline]
+    fn u32_count(self) -> u32 {
+        self
+    }
+    #[inline]
+    fn u64_count(self) -> u64 {
+        u64::from(self)
+    }
+    #[inline]
+    fn i32_count(self) -> i32 {
+        i32::try_from(self).unwrap_or(i32::MAX)
+    }
+    #[inline]
+    fn i16_count(self) -> i16 {
+        i16::try_from(self).unwrap_or(i16::MAX)
+    }
+    #[inline]
+    fn usize_count(self) -> usize {
+        usize::try_from(self).unwrap_or(usize::MAX)
+    }
+}
+
+impl CountCast for u64 {
+    #[inline]
+    fn u8_count(self) -> u8 {
+        u8::try_from(self).unwrap_or(u8::MAX)
+    }
+    #[inline]
+    fn u16_count(self) -> u16 {
+        u16::try_from(self).unwrap_or(u16::MAX)
+    }
+    #[inline]
+    fn u32_count(self) -> u32 {
+        u32::try_from(self).unwrap_or(u32::MAX)
+    }
+    #[inline]
+    fn u64_count(self) -> u64 {
+        u64::try_from(self).unwrap_or(u64::MAX)
+    }
+    #[inline]
+    fn i32_count(self) -> i32 {
+        i32::try_from(self).unwrap_or(i32::MAX)
+    }
+    #[inline]
+    fn i16_count(self) -> i16 {
+        i16::try_from(self).unwrap_or(i16::MAX)
+    }
+    #[inline]
+    fn usize_count(self) -> usize {
+        usize::try_from(self).unwrap_or(usize::MAX)
+    }
+}
+
+// The `as` casts below are the f64→int conversions themselves, and every one
+// of them is preceded by a clamp that puts the value provably in range, plus
+// a NaN guard. That clamp IS the fix for cast_possible_truncation here: an
+// unclamped cast of an out-of-range or NaN score wraps to an arbitrary value
+// that then wins or loses a comparison it should not. The lints are allowed
+// on this impl only, because this is the one place the range is proved.
+#[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
+impl CountCast for f64 {
+    #[inline]
+    fn u8_count(self) -> u8 {
+        self.clamp(0.0, f64::from(u8::MAX)) as u8
+    }
+    #[inline]
+    fn u16_count(self) -> u16 {
+        self.clamp(0.0, f64::from(u16::MAX)) as u16
+    }
+    #[inline]
+    fn u32_count(self) -> u32 {
+        if self.is_nan() {
+            return 0;
+        }
+        self.clamp(0.0, f64::from(u32::MAX)) as u32
+    }
+    #[inline]
+    fn u64_count(self) -> u64 {
+        if self.is_nan() || self <= 0.0 {
+            return 0;
+        }
+        self.clamp(0.0, u64::MAX as f64) as u64
+    }
+    #[inline]
+    fn i32_count(self) -> i32 {
+        if self.is_nan() {
+            return 0;
+        }
+        self.clamp(i32::MIN as f64, i32::MAX as f64) as i32
+    }
+    #[inline]
+    fn i16_count(self) -> i16 {
+        if self.is_nan() {
+            return 0;
+        }
+        self.clamp(i16::MIN as f64, i16::MAX as f64) as i16
+    }
+    #[inline]
+    fn usize_count(self) -> usize {
+        if self.is_nan() || self <= 0.0 {
+            return 0;
+        }
+        self.clamp(0.0, usize::MAX as f64) as usize
+    }
+}
+
+/// Saturating f64 → f32. The `as f32` spelling silently turns an
+/// out-of-range density into an infinity, which then propagates through the
+/// feature vector as a NaN rather than as a saturated 1.0. The `as` below is
+/// the conversion itself; the is_finite check is the clamp that makes it
+/// safe, which is why the lint is allowed only here.
+#[allow(clippy::cast_possible_truncation)]
+#[inline]
+pub fn f32_count(v: f64) -> f32 {
+    let narrowed = v as f32;
+    if narrowed.is_finite() {
+        narrowed
+    } else if v.is_nan() {
+        0.0
+    } else if v > 0.0 {
+        f32::MAX
+    } else {
+        f32::MIN
     }
 }

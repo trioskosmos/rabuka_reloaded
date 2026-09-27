@@ -1,4 +1,4 @@
-use crate::core::constants::U8Count;
+use crate::core::constants::CountCast;
 use super::enums::{ActionType, Zone};
 use crate::card::{
     parse_heart_color, Ability, AbilityEffect, AbilityFilter, Card, CardDatabase, DistinctType,
@@ -211,7 +211,7 @@ fn per_unit_cost_reduction(
         raw_count
     };
     let value = effect.value_any().unwrap_or(1);
-    ((effective / per_unit_count) as u8) * value
+    (effective / per_unit_count).u8_count() * value
 }
 
 pub fn calculate_play_cost_reduction(
@@ -342,7 +342,7 @@ pub fn compute_play_cost(
                 let per_unit_count = effect.per_unit_count_any().unwrap_or(1) as usize;
                 let success_count = player.success_live_card_zone.cards.len();
                 let multiplier = effect.count.unwrap_or(1);
-                increase = ((success_count / per_unit_count) as u8) * multiplier;
+                increase = (success_count / per_unit_count).u8_count() * multiplier;
             }
         }
     }
@@ -1829,7 +1829,7 @@ pub fn count_matching_distinct(
     // dedupe by name, and a joint (multi-name) card contributes one unit only when it
     // introduces a name not already present as a single-name card.
     if matches!(filter.distinct, Some(DistinctType::CardName)) {
-        count_distinct_member_name_units(&matching, db) as u8
+        count_distinct_member_name_units(&matching, db).u8_count()
     } else {
         apply_distinct_filter(&matching, filter.distinct, db).len().u8_count()
     }
@@ -2304,7 +2304,8 @@ pub fn calculate_per_unit_multiplier(
             .under_cards
             .iter()
             .map(|sv| sv.len())
-            .sum::<usize>() as u8,
+            .sum::<usize>()
+            .u8_count(),
         _ => 1,
     }
 }

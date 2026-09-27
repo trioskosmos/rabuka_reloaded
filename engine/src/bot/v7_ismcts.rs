@@ -71,6 +71,7 @@
 
 use crate::bot::determinization::DeterminizationSampler;
 use crate::bot::observation::PublicObservation;
+use crate::core::constants::CountCast;
 use crate::bot::strategy_v4::lives_in_hand;
 use crate::bot::v7_main;
 use crate::card::{CardDatabase, CardType};
@@ -92,15 +93,14 @@ pub struct Config {
     pub horizon: u8,
     pub ticks: usize,
     pub top_k: usize,
-    pub c_puct: f64,
     pub k0: f64,
     pub prior_scale: f64,
-    pub prior_temp: f64,
     pub jobs: usize,
     pub own_pool: bool,
     pub exec_deploy: bool,
     pub promote_only: bool,
     pub v7_leaf: bool,
+    pub min_z: f64,
 }
 
 fn env_usize(name: &str, default: usize) -> usize {
@@ -146,18 +146,24 @@ impl Config {
             worlds,
             sims,
             visits: env_usize("V7_ISMCTS_VISITS", worlds * sims * 2),
-            horizon: env_usize("V7_ISMCTS_HORIZON", 3) as u8,
+            horizon: env_usize("V7_ISMCTS_HORIZON", 3).u8_count(),
             ticks: env_usize("V7_ISMCTS_TICKS", 90),
             top_k: env_usize("V7_ISMCTS_TOPK", 8),
-            c_puct: env_f64("V7_ISMCTS_C", 1.25),
             k0: env_f64("V7_ISMCTS_K0", 8.0),
             prior_scale: env_f64("V7_ISMCTS_SCALE", 260.0),
-            prior_temp: env_f64("V7_ISMCTS_TEMP", 55.0),
             jobs: env_usize("V7_ISMCTS_JOBS", default_jobs()),
             own_pool: std::env::var("V7_ISMCTS_OPP_POOL").as_deref() != Ok("fair"),
             exec_deploy: std::env::var_os("V7_ISMCTS_EXEC_DEPLOY").is_some(),
             promote_only: std::env::var("V7_ISMCTS_PROMOTE").as_deref() != Ok("any"),
             v7_leaf: std::env::var("V7_ISMCTS_LEAF").as_deref() == Ok("v7"),
+            // How many paired standard errors a challenger must beat v7's own
+            // pick by before the search is allowed to overrule it. 1.0 fires
+            // on the stronger half of the evidence; 1.96 is the conventional
+            // 95% bar. At the default budget of 4-5 paired samples almost
+            // nothing clears either, which is the correct answer at that
+            // budget — the point is to concentrate overrides where they are
+            // real, not to force one every move.
+            min_z: env_f64("V7_ISMCTS_MINZ", 1.0),
         }
     }
 }
@@ -193,7 +199,7 @@ fn mix64(mut x: u64) -> u64 {
 /// of six such means is the winner's curse, not a decision.
 fn rollout_seed(world: usize, sim: usize) -> u32 {
     let key = (world as u64) << 26 | (sim as u64);
-    (mix64(0x7637_15A7_C713_0000 ^ key) % u64::from(u32::MAX)) as u32
+    (mix64(0x7637_15A7_C713_0000 ^ key) % u64::from(u32::MAX)).u32_count()
 }
 
 /// Own deck list as card numbers — the fair prior for the opponent's hidden
@@ -225,7 +231,9 @@ fn sample_world(gs: &GameState, me: u8, cfg: &Config, index: usize) -> GameState
     };
     // The sampler's shuffles run on the engine's thread-local RNG, so pin it
     // per world: a world must not depend on how many rollouts ran before it.
-    crate::rng::seed(mix64(0x51A7_0000_0000_0000 ^ index as u64) as u32);
+    crate::rng::seed(
+        (mix64(0x51A7_0000_0000_0000 ^ index.u64_count())).u32_count(),
+    );
     let observation = PublicObservation::from_state(gs, me);
     let sampler = DeterminizationSampler::with_policy(
         crate::Arc::clone(&gs.card_database),
@@ -411,10 +419,15 @@ fn game_value_v7(gs: &GameState, me: u8, root: &v7_main::Features) -> f64 {
         }
         GameResult::Ongoing => {
             let now = v7_main::features(gs, me);
-            // v7's leaf is unbounded (a success zone is worth 1000); 400 is
-            // roughly one good deploy, so this keeps ordinary positions in
-            // range and lets terminal outcomes dominate when they happen.
-            (v7_main::value(&now, root, false) / 400.0).clamp(-1.0, 1.0)
+            // Scale is the point where the leaf stops saturating. v7 pays 1000
+            // for a success zone card and ~50 for a good deploy, so a success
+            // really is worth twenty turns of board. Dividing by 400 clamped
+            // "placed a life" and "won the game" to the same 1.0 — the trace
+            // was full of `mean=1.000`, which is a coin flip wearing a
+            // number. Dividing by 1000 puts a success at exactly 1.0 and
+            // leaves an ordinary three-turn swing of board around 0.15, so
+            // the leaf still orders states by how much they matter.
+            (v7_main::value(&now, root, false) / 1000.0).clamp(-1.0, 1.0)
         }
     }
 }
@@ -767,35 +780,6 @@ fn run_batch(
     out
 }
 
-/// PUCT over the candidate list. `Q` is the prior-shrunk rollout mean and the
-/// exploration term is scaled by the softmax prior, so a move v7 likes is
-/// explored more — and, because `k0` pseudo-visits stand behind it, a move
-/// v7 dislikes has to earn its promotion.
-fn select_candidate(
-    sums: &[f64],
-    counts: &[u32],
-    prior: &[f64],
-    prior_prob: &[f64],
-    k0: f64,
-    c_puct: f64,
-) -> usize {
-    let total: u32 = counts.iter().sum();
-    let root_n = f64::from(total.max(1)).sqrt();
-    let mut best = 0usize;
-    let mut best_ucb = f64::NEG_INFINITY;
-    for index in 0..counts.len() {
-        let n = f64::from(counts[index]);
-        let exploitation = (sums[index] + k0 * prior[index]) / (n + k0);
-        let exploration = c_puct * prior_prob[index] * root_n / (1.0 + n);
-        let ucb = exploitation + exploration;
-        if ucb > best_ucb {
-            best_ucb = ucb;
-            best = index;
-        }
-    }
-    best
-}
-
 /// Refine v7's static scores with a determinized root search.
 ///
 /// `forced` overrides the environment for callers that must not be at the
@@ -887,10 +871,6 @@ fn search(
     let _guard = RngGuard(crate::rng::checkpoint());
     let start_turn = gs.turn_number;
 
-    let best_static = candidates
-        .iter()
-        .map(|&index| scores[index].0)
-        .fold(f64::NEG_INFINITY, f64::max);
     // Prior in rollout units. This is v7's OWN score, normalized — NOT
     // regret relative to the best action.
     //
@@ -907,18 +887,6 @@ fn search(
         .iter()
         .map(|&index| (scores[index].0 / cfg.prior_scale).clamp(-1.0, 1.0))
         .collect();
-    let mut prior_prob = vec![0.0f64; candidates.len()];
-    let mut norm = 0.0f64;
-    for (slot, &index) in candidates.iter().enumerate() {
-        let weight = (-(best_static - scores[index].0) / cfg.prior_temp).exp();
-        prior_prob[slot] = weight;
-        norm += weight;
-    }
-    if norm > 0.0 {
-        for weight in &mut prior_prob {
-            *weight /= norm;
-        }
-    }
 
     let worlds: Vec<GameState> = (0..cfg.worlds)
         .map(|index| sample_world(gs, me, cfg, index))
@@ -936,27 +904,13 @@ fn search(
     // differently. `visits` is only a ceiling.
     let target = cfg.visits.min(candidates.len() * cfg.sims.max(1));
 
-    // Round one: every candidate is priced exactly once. Without this an
-    // action with no visits has infinite UCB forever, so the policy would
-    // never test anything below the prior and the "search" would be a no-op.
-    let first: Vec<(usize, usize, usize)> = (0..candidates.len())
-        .map(|slot| (slot, slot % worlds.len(), slot / worlds.len()))
-        .collect();
-    for (value, item) in run_batch(actions, &worlds, me, cfg, &first, start_turn, &root_features)
-        .into_iter()
-        .zip(&first)
-    {
-        sums[item.0] += value;
-        counts[item.0] += 1;
-        used += 1;
-    }
-
-    // Balanced visits, round-robin. No PUCT.
+    // Balanced visits, round-robin, one rollout per candidate per round. No
+    // PUCT.
     //
     // PUCT is the standard choice and it is wrong here, and the per-move trace
     // shows exactly why. The v7 leaf is near-binary: a rollout that places a
     // life reads 1.0, one that does not reads -1.0, so Q saturates and stops
-    // discriminating. With a saturated Q, the exploration bonus is the only
+    // discriminating. With a saturated Q the exploration bonus is the only
     // thing separating children, and the search piles onto whichever child
     // drew a winning sample first:
     //
@@ -964,33 +918,45 @@ fn search(
     //   cand1 play_member_to_stage:2537  n=23 mean=1.000
     //   cand4 play_member_to_stage:2551  n=1  mean=0.024  <= PICKED
     //
-    // Twenty-three visits, all 1.0, and the actual pick is a one-visit
-    // candidate. That is not an estimate, it is a race. Because every action
-    // already gets the SAME (world, sim) sequence by construction — common
-    // random numbers make action A's j-th rollout paired with action B's
-    // j-th — a round-robin over that shared sequence is a properly paired
-    // estimate for every child, and it removes the visit-count artifact
-    // without giving up any information.
-    let batch = (target - used).min(cfg.jobs.max(1));
-    let mut items: Vec<(usize, usize, usize)> = Vec::with_capacity(batch);
-    for offset in 0..batch {
-        let slot = (used + offset) % candidates.len();
-        let visit = counts[slot] as usize;
-        items.push((slot, visit % worlds.len(), visit / worlds.len()));
+    // Twenty-three visits, all 1.0, and the actual pick a one-visit candidate.
+    // That is not an estimate, it is a race.
+    //
+    // Every action already walks the SAME (world, sim) sequence by
+    // construction — common random numbers make action A's j-th rollout paired
+    // with action B's j-th — so a round-robin over that shared sequence is a
+    // properly paired estimate for every child. It removes the visit-count
+    // artifact without giving up any information, and it parallelizes
+    // perfectly: each round is one rollout per candidate.
+    let mut samples: Vec<Vec<f64>> = vec![Vec::new(); candidates.len()];
+    while used < target {
+        let batch = (target - used).min(cfg.jobs.max(1));
+        let mut items: Vec<(usize, usize, usize)> = Vec::with_capacity(batch);
+        for offset in 0..batch {
+            let slot = (used + offset) % candidates.len();
+            let visit = samples[slot].len();
+            items.push((slot, visit % worlds.len(), visit / worlds.len()));
+        }
+        for (value, item) in
+            run_batch(actions, &worlds, me, cfg, &items, start_turn, &root_features)
+                .into_iter()
+                .zip(&items)
+        {
+            sums[item.0] += value;
+            counts[item.0] += 1;
+            samples[item.0].push(value);
+            used += 1;
+        }
     }
-    for (value, item) in
-        run_batch(actions, &worlds, me, cfg, &items, start_turn, &root_features)
-            .into_iter()
-            .zip(&items)
-    {
-        sums[item.0] += value;
-        counts[item.0] += 1;
-        used += 1;
-    }
-}
 
     let mut out = scores.to_vec();
     let mut priced = vec![false; out.len()];
+
+    // The incumbent is the move v7 itself would make, restricted to the moves
+    // the promote-only gate allows. Every candidate's rollouts are kept per
+    // paired sample rather than summed, because the decision is a PAIRED one.
+    let incumbent = candidates[0];
+    let incumbent_slot = 0usize;
+
     for (slot, &index) in candidates.iter().enumerate() {
         priced[index] = true;
         let n = f64::from(counts[slot]);
@@ -1011,22 +977,142 @@ fn search(
         }
     }
 
-    // A search that never changes its mind is a no-op wearing a compute
-    // budget. `V7_ISMCTS_TRACE` reports the rate so a run that "wins by
-    // noise" is distinguishable from one that actually re-ranked.
-    let static_best = candidates[0];
-    let searched_best = candidates
+    // PROMOTE-ONLY GATE. v7's doctrine is that `Pass` scores exactly 0.0 as a
+    // baseline and only a genuinely positive action is worth playing, and it
+    // takes that seriously: `pick_best` breaks a Pass/deploy tie toward Pass
+    // via strict `>`. A leaf-value search has no such tie to break, so
+    // without this gate a repeatable-but-worthless action (use an ability
+    // that nets nothing, pass, use it again) beats Pass on rollout noise and
+    // the game walks into a Rule 12-1 repetition — measured 136 draws in 300
+    // games, against 0 without the search. The gate restates the doctrine as
+    // an invariant: the search may only re-rank among actions v7 already
+    // scored above its own Pass baseline.
+    let promotable: Vec<bool> = if cfg.promote_only {
+        let baseline = scores[static_baseline(actions, scores)].0;
+        candidates
+            .iter()
+            .enumerate()
+            .map(|(slot, _)| {
+                let index = candidates[slot];
+                slot == 0 || scores[index].0 > baseline
+            })
+            .collect()
+    } else {
+        vec![true; candidates.len()]
+    };
+    if promotable.iter().filter(|keep| **keep).count() < 2 {
+        // Nothing v7 was willing to play over Pass: hand the decision back
+        // untouched rather than re-rank on rollouts alone.
+        return None;
+    }
+    let best_promotable = promotable
         .iter()
         .enumerate()
-        .max_by(|left, right| {
-            out[*left.1]
-                .0
-                .total_cmp(&out[*right.1].0)
-                .then_with(|| right.1.cmp(left.1))
-        })
-        .map(|(slot, _)| candidates[slot])
-        .unwrap_or(static_best);
+        .filter(|(_, keep)| **keep)
+        .map(|(slot, _)| out[candidates[slot]].0)
+        .fold(f64::NEG_INFINITY, f64::max);
+    for (slot, &index) in candidates.iter().enumerate() {
+        if !promotable[slot] {
+            out[index].0 = f64::min(out[index].0, best_promotable - 1.0);
+        }
+    }
+
+    // EVIDENCE GATE — a paired test against the incumbent, not a plurality.
+    //
+    // This is the conclusion the per-move trace forces. A three-turn horizon
+    // in this game spans about one live check, so a leaf is dominated by a
+    // single Bernoulli — did that check go my way. v7 pays 1000 for a success
+    // zone card and about 50 for a good deploy, so the leaf is ~95% "did I
+    // place" and ~5% board. The trace is full of candidates at `mean=1.000`
+    // sitting next to each other at `mean=0.534`, all four samples deep. Among
+    // candidates whose static scores differ by 15 points, taking the argmax of
+    // that is taking a coin flip, and it displaces a better move.
+    //
+    // Because every action walks the same (world, sim) sequence, the
+    // difference between two actions is measured on paired samples and the
+    // variance that dominates it — the check's own randomness — cancels. What
+    // is left is the standard error of the difference, and the search may only
+    // override v7 when the challenger's mean beats that error bar. With four
+    // paired samples of a coin flip that is almost never, which is the honest
+    // answer: at this budget the rollouts usually do not know more than v7
+    // does, and a search that overrides anyway is just v7 plus noise.
+    let mut winner = incumbent_slot;
+    let mut best_gain = 0.0f64;
+    let mut best_z = f64::NEG_INFINITY;
+    for slot in 0..candidates.len() {
+        if !promotable[slot] || slot == incumbent_slot {
+            continue;
+        }
+        let challenger = &samples[slot];
+        let base = &samples[incumbent_slot];
+        let paired = challenger.len().min(base.len());
+        if paired < 2 {
+            continue;
+        }
+        let diffs: Vec<f64> = (0..paired)
+            .map(|j| challenger[j] - base[j])
+            .collect();
+        let mean = diffs.iter().sum::<f64>() / paired as f64;
+        if mean <= 0.0 {
+            continue;
+        }
+        let variance = diffs
+            .iter()
+            .map(|d| (d - mean) * (d - mean))
+            .sum::<f64>()
+            / (paired as f64 - 1.0);
+        let z = mean / (variance / paired as f64).sqrt().max(1e-9);
+        if z < cfg.min_z {
+            continue;
+        }
+        if z > best_z {
+            best_z = z;
+            best_gain = mean;
+            winner = slot;
+        }
+    }
+    if winner != incumbent_slot {
+        // Promote the winner above everything else so the caller's argmax
+        // lands on it, and record how much evidence stood behind that.
+        let promoted = out[candidates[winner]].0.max(best_promotable) + 1.0;
+        for (slot, &index) in candidates.iter().enumerate() {
+            if promotable[slot] {
+                out[index].0 = f64::min(out[index].0, promoted - 1.0);
+            }
+        }
+        out[candidates[winner]].0 = promoted;
+        log::debug!(
+            "v7 ismcts t{} me{} OVERRIDE {} -> {} gain={:.3} z={:.2} n={}",
+            gs.turn_number,
+            me,
+            action_label(actions, incumbent),
+            action_label(actions, candidates[winner]),
+            best_gain,
+            best_z,
+            samples[winner].len(),
+        );
+    }
+
+    let static_best = incumbent;
+    let searched_best = candidates[winner];
     let overrode = searched_best != static_best;
+    if std::env::var_os("V7_ISMCTS_TRACE").is_some() && overrode {
+        eprintln!(
+            "V7ISMOVERRIDE t={} me={} {} -> {} gain={:.3} z={:.2} n={} paired_spread={:?}",
+            gs.turn_number,
+            me,
+            action_label(actions, static_best),
+            action_label(actions, searched_best),
+            best_gain,
+            best_z,
+            samples[winner].len(),
+            samples[winner]
+                .iter()
+                .zip(samples[incumbent_slot].iter())
+                .map(|(a, b)| (a - b).abs())
+                .collect::<Vec<_>>(),
+        );
+    }
     if std::env::var_os("V7_ISMCTS_TRACE").is_some() {
         eprintln!(
             "V7ISMCTS t={} me={} phase={:?} cands={} visits={} static={}:{}({:.1}) searched={}:{}({:.3}) overrode={}",
@@ -1091,7 +1177,11 @@ fn search(
                         0.0
                     },
                     out[index].0,
-                    if slot == searched_best { "  <= PICKED" } else { "" },
+                    if candidates[slot] == searched_best {
+                        "  <= PICKED"
+                    } else {
+                        ""
+                    },
                 );
             }
         }
@@ -1282,15 +1372,14 @@ mod tests {
             horizon: 3,
             ticks: 90,
             top_k: 8,
-            c_puct: 1.25,
             k0: 8.0,
             prior_scale: 260.0,
-            prior_temp: 55.0,
             jobs: 1,
             own_pool: true,
             exec_deploy: false,
             promote_only: true,
             v7_leaf: false,
+            min_z: 1.0,
         };
         let world = sample_world(&gs, 0, &cfg, 0);
         assert_eq!(world.player2.main_deck.cards.len(), deck_size);

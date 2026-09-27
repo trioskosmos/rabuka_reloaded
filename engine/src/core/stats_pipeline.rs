@@ -13,6 +13,7 @@
 //!   4. heart_override — "元々持つハートはNになる" (SET; replaces 1-3, 9.9.1.4 — Q195-class layering keeps additives alive)
 //!
 //! Additive modifiers (9.9.1.5) stack ON TOP of whatever 1-4 produced.
+use crate::core::constants::CountCast;
 use crate::card::{CardDatabase, HeartColor, HeartMap};
 use crate::core::game_modifiers::ModifierEntry;
 use crate::HashMap;
@@ -167,7 +168,7 @@ pub fn member_heart_detail(
             let idx = color.index();
             if idx < 8 && entry.total() > 0 {
                 // live.rs previously only counted positive deltas in bonus_hearts
-                bonus_arr[idx] += entry.total() as u8;
+                bonus_arr[idx] += entry.total().u8_count();
             }
         }
         log::debug!(
@@ -220,7 +221,7 @@ pub fn effective_need_heart(
     // Q115/Q127: Set-to-X applies first (per-color), then additive stacks.
     for (color, me) in card_mods {
         if me.set != 0 {
-            adjusted.hearts.insert(*color, me.set as u8);
+            adjusted.hearts.insert(*color, me.set.u8_count());
             log::debug!(
                 "[NEED_HEART_PIPELINE] card={} color={:?} set={} -> {:?}",
                 card_id,

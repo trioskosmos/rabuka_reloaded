@@ -3,6 +3,7 @@
 // Extracted from `ability/util.rs`. These centralize the "distribute total
 // across the color multiset" rule and the per_unit zone/units resolution that
 // was previously copy-pasted between blade/heart paths.
+use crate::core::constants::CountCast;
 
 use super::super::enums::Zone;
 use crate::card::CardDatabase;
@@ -26,7 +27,7 @@ use alloc::{
 /// entry (e.g. `[heart02, heart02]` with total 2 → 1 of heart02, total 2).
 pub fn heart_gain_per_entry(total: i32, heart_colors: &[String]) -> i32 {
     let len = heart_colors.len().max(1);
-    total / len as i32
+    total / len.i32_count()
 }
 
 /// `heart_type == "all"` means wildcard any-color heart. The constant-heart

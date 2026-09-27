@@ -30,6 +30,7 @@
 //! -18pp).
 
 use crate::bot::strategy_common::hc_index;
+use crate::core::constants::CountCast;
 use crate::card::{CardDatabase, CardType};
 use crate::core::stats_pipeline;
 use crate::game_state::GameState;
@@ -105,7 +106,7 @@ impl Drop for RngGuard {
 
 #[inline]
 fn clamp_score(score: i32) -> usize {
-    crate::constants::count_usize(score.clamp(0, SCORE_SLOTS as i32 - 1))
+    score.clamp(0, SCORE_SLOTS.i32_count() - 1).usize_count()
 }
 
 pub fn score_median_hearts(score: i32) -> i32 {
@@ -302,7 +303,7 @@ impl FlipSampler {
         for &(vector, count) in &self.cats {
             deck.extend(std::iter::repeat_n(
                 vector,
-                crate::constants::count_usize_u32(count),
+                count.usize_count(),
             ));
         }
         deck.resize(self.deck_len, [0; 8]);
@@ -318,7 +319,8 @@ impl FlipSampler {
                 rng ^= rng << 25;
                 rng ^= rng >> 27;
                 let span = (self.deck_len - k) as u64;
-                let index = k + (rng.wrapping_mul(0x2545_F491_4F6C_DD1D) % span) as usize;
+                let index =
+        k + (rng.wrapping_mul(0x2545_F491_4F6C_DD1D) % span.u64_count()).usize_count();
                 sampled.swap(k, index);
                 for (have, extra) in pool.iter_mut().zip(sampled[k]) {
                     *have += extra;
@@ -507,7 +509,7 @@ impl OppModel {
         // carries the color risk.
         let mut score_dist = [0.0f64; SCORE_SLOTS];
         for (yield_hearts, weight) in YIELD_PRIOR {
-            let supply = board_total + (blades as f64 * yield_hearts).round() as i32;
+            let supply = board_total + crate::constants::score_to_i32_rounded(blades as f64 * yield_hearts);
             for score in 0..SCORE_SLOTS {
                 if supply >= SCORE_MAX[score] {
                     score_dist[score] += weight;
@@ -535,12 +537,12 @@ impl OppModel {
         // assumed set size, so the forecast is conditioned on their public
         // board rather than being a flat rate: a second attacker with a big
         // board commits more reliably than one with an empty stage.
-        let target = crate::constants::count_i32((2 * set_size).clamp(1, SCORE_SLOTS - 1));
+        let target = (2 * set_size).clamp(1, SCORE_SLOTS - 1).i32_count();
         let bar = score_median_hearts(target);
         let clears = YIELD_PRIOR
             .iter()
             .filter(|(yield_hearts, _)| {
-                board_total + (blades as f64 * yield_hearts).round() as i32 >= bar
+                board_total + crate::constants::score_to_i32_rounded(blades as f64 * yield_hearts) >= bar
             })
             .map(|(_, weight)| *weight)
             .sum::<f64>()
@@ -701,7 +703,7 @@ pub fn expected_yell_score(gs: &GameState, me: u8, db: &CardDatabase, blades: i3
         .map(usize::from)
         .sum();
     let draws = usize::try_from(blades).unwrap_or(usize::MAX).min(deck_len);
-    crate::constants::count_i32(score_icons * draws / deck_len)
+    (score_icons * draws / deck_len).i32_count()
 }
 
 // -- The guides' continuous development-to-score currency ------------------
@@ -732,7 +734,8 @@ pub fn expected_yell_score(gs: &GameState, me: u8, db: &CardDatabase, blades: i3
 /// still prices the real Binomial.
 pub fn score_ceiling(gs: &GameState, me: u8, db: &CardDatabase) -> i32 {
     let (blades, density) = super::strategy_v4::flip_stats(gs, me, db);
-    let supply = supply_hearts(gs, me, db) + (blades as f64 * density).round() as i32;
+    let supply =
+        supply_hearts(gs, me, db) + crate::constants::score_to_i32_rounded(blades as f64 * density);
     largest_clearable(supply)
 }
 
@@ -745,8 +748,8 @@ pub fn largest_clearable(supply: i32) -> i32 {
     let first_unclear = SCORE_MEDIAN.iter().position(|&median| median > supply);
     match first_unclear {
         Some(0) => 0,
-        Some(i) => crate::constants::count_i32(i - 1),
-        None => crate::constants::count_i32(SCORE_SLOTS - 1),
+        Some(i) => (i - 1).i32_count(),
+        None => (SCORE_SLOTS - 1).i32_count(),
     }
 }
 
@@ -782,7 +785,8 @@ pub fn supply_hearts(gs: &GameState, me: u8, db: &CardDatabase) -> i32 {
 /// conversion constant to "probability" is invented.
 pub fn band_progress(gs: &GameState, me: u8, db: &CardDatabase) -> f64 {
     let (blades, density) = super::strategy_v4::flip_stats(gs, me, db);
-    let supply = supply_hearts(gs, me, db) + (blades as f64 * density).round() as i32;
+    let supply =
+        supply_hearts(gs, me, db) + crate::constants::score_to_i32_rounded(blades as f64 * density);
     band_progress_for(supply)
 }
 
@@ -790,7 +794,7 @@ pub fn band_progress(gs: &GameState, me: u8, db: &CardDatabase) -> f64 {
 /// interpolation can be tested without building a GameState.
 pub fn band_progress_for(supply: i32) -> f64 {
     let band = largest_clearable(supply);
-    let b = crate::constants::count_usize(band);
+    let b = band.usize_count();
     if b + 1 >= SCORE_SLOTS {
         // Past the last tabulated band, keep climbing at the final band's slope
         // so the term never goes flat above the table.
@@ -1082,11 +1086,7 @@ pub fn reachable_ceiling(gs: &GameState, me: u8, turns: u8, db: &CardDatabase) -
         .collect();
     draws.sort_unstable_by(|a, b| b.cmp(a));
 
-    for (_turn, drawn) in draws
-        .iter()
-        .enumerate()
-        .take(usize::from(turns))
-    {
+    for drawn in draws.iter().take(usize::from(turns)) {
         budget += 1; // rule 7.5
         pool.push(*drawn);
         let discount = stage.iter().copied().max().unwrap_or(0);

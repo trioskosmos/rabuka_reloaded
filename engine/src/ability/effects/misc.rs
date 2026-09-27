@@ -1,4 +1,4 @@
-use crate::core::constants::U8Count;
+use crate::core::constants::CountCast;
 use super::super::enums::{TargetPlayer, Zone};
 use super::super::resolver::AbilityResolver;
 use super::super::types::{Choice, ChoiceRoute, ExecutionContext};
@@ -449,7 +449,7 @@ impl AbilityResolver {
                 effect.text.to_string(),
                 "heart_bonus",
                 card_id,
-                Some(crate::constants::count_u8(color.index())),
+                Some(color.index().u8_count()),
                 1,
             );
         }
@@ -1128,8 +1128,11 @@ impl AbilityResolver {
             && (final_count as usize) >= effect.heart_colors_any().len()
         {
             let colors = effect.heart_colors_any();
-            let per_color =
-                crate::ability::util::heart_gain_per_entry(i32::from(final_count), colors) as u8;
+            let per_color = crate::ability::util::heart_gain_per_entry(
+                i32::from(final_count),
+                colors,
+            )
+            .u8_count();
             colors
                 .iter()
                 .map(|c| (crate::card::parse_heart_color(c), per_color))
@@ -2941,8 +2944,8 @@ impl AbilityResolver {
                 // Push events BEFORE push_movement_event so the
                 // PositionChangeEvent list captures the change before the
                 // self-trigger fires from within push_movement_event.
-    let source_old = crate::constants::count_u8(current_idx);
-    let source_new = crate::constants::count_u8(target_index);
+    let source_old = current_idx.u8_count();
+    let source_new = target_index.u8_count();
                 if source_id != -1 {
                     gs.position_change_events
                         .push(crate::types::PositionChangeEvent {
@@ -3145,8 +3148,8 @@ impl AbilityResolver {
             occupant[dest_idx] = member_id;
             events.push((
         member_id,
-        crate::constants::count_u8(from_idx),
-        crate::constants::count_u8(dest_idx),
+        from_idx.u8_count(),
+        dest_idx.u8_count(),
     ));
         }
 
@@ -3193,8 +3196,8 @@ impl AbilityResolver {
                     new_under[from_idx] = old_under[dest_idx].clone();
                     events.push((
         evicted_id,
-        crate::constants::count_u8(dest_idx),
-        crate::constants::count_u8(from_idx),
+        dest_idx.u8_count(),
+        from_idx.u8_count(),
     ));
                 }
             }
@@ -3344,8 +3347,8 @@ impl AbilityResolver {
                 gs.position_change_events
                     .push(crate::types::PositionChangeEvent {
                         moved_card_id: source_id2,
-        old_position: crate::constants::count_u8(source_idx),
-        new_position: crate::constants::count_u8(target_index),
+        old_position: source_idx.u8_count(),
+        new_position: target_index.u8_count(),
                         cause_card_id: gs.activating_card,
                         cause_player_id: mover_pid.clone(),
                         effect_only: true,
@@ -3355,8 +3358,8 @@ impl AbilityResolver {
                 gs.position_change_events
                     .push(crate::types::PositionChangeEvent {
                         moved_card_id: target_id2,
-        old_position: crate::constants::count_u8(target_index),
-        new_position: crate::constants::count_u8(source_idx),
+        old_position: target_index.u8_count(),
+        new_position: source_idx.u8_count(),
                         cause_card_id: gs.activating_card,
                         cause_player_id: mover_pid.clone(),
                         effect_only: true,
@@ -3427,8 +3430,8 @@ impl AbilityResolver {
                         gs.position_change_events
                             .push(crate::types::PositionChangeEvent {
                                 moved_card_id: source_id,
-        old_position: crate::constants::count_u8(current_idx),
-        new_position: crate::constants::count_u8(target_index),
+        old_position: current_idx.u8_count(),
+        new_position: target_index.u8_count(),
                                 cause_card_id: gs.activating_card,
                                 cause_player_id: mover_pid.clone(),
                                 effect_only: true,
@@ -3438,8 +3441,8 @@ impl AbilityResolver {
                         gs.position_change_events
                             .push(crate::types::PositionChangeEvent {
                                 moved_card_id: target_id,
-        old_position: crate::constants::count_u8(target_index),
-        new_position: crate::constants::count_u8(current_idx),
+        old_position: target_index.u8_count(),
+        new_position: current_idx.u8_count(),
                                 cause_card_id: gs.activating_card,
                                 cause_player_id: mover_pid.clone(),
                                 effect_only: true,
@@ -3511,8 +3514,8 @@ impl AbilityResolver {
                     gs.position_change_events
                         .push(crate::types::PositionChangeEvent {
                             moved_card_id: activating_card_id,
-                            old_position: current_idx as u8,
-                            new_position: target_index as u8,
+                            old_position: current_idx.u8_count(),
+                            new_position: target_index.u8_count(),
                             cause_card_id: gs.activating_card,
                             cause_player_id: mover_pid.clone(),
                             effect_only: true,
@@ -3521,8 +3524,8 @@ impl AbilityResolver {
                         gs.position_change_events
                             .push(crate::types::PositionChangeEvent {
                                 moved_card_id: target_id3,
-        old_position: crate::constants::count_u8(target_index),
-        new_position: crate::constants::count_u8(current_idx),
+        old_position: target_index.u8_count(),
+        new_position: current_idx.u8_count(),
                                 cause_card_id: gs.activating_card,
                                 cause_player_id: mover_pid.clone(),
                                 effect_only: true,
@@ -3604,8 +3607,8 @@ impl AbilityResolver {
                     player.stage.under_cards[dest_idx] = snapshot_under[src_idx].clone();
                     moved.push(card_id);
                     positions.push((
-        crate::constants::count_u8(src_idx),
-        crate::constants::count_u8(dest_idx),
+        src_idx.u8_count(),
+        dest_idx.u8_count(),
     ));
                 }
                 (moved, positions)

@@ -10,6 +10,7 @@
 //! no-op/hand-reserve breakers.
 
 use crate::bot::strategy_v4::{alloc, flip_stats, hand_lives, heart_pool};
+use crate::core::constants::CountCast;
 use crate::card::{CardDatabase, CardType};
 use crate::game_setup::Action;
 use crate::game_state::{GameState, Phase};
@@ -107,14 +108,14 @@ pub(crate) fn best_portfolio_scored(gs: &GameState, me: u8, db: &CardDatabase) -
     let pool = heart_pool(gs, me, db);
     let lives = hand_lives(my, db);
     let max_slots =
-        crate::constants::count_usize(3i32 - i32::from(my.live_card_set_limit_reduction).max(0));
+        (3i32 - i32::from(my.live_card_set_limit_reduction).max(0)).usize_count();
     if lives.is_empty() || max_slots == 0 {
         return (Vec::new(), 0, 0.0);
     }
     let n = lives.len().min(8);
 
-    let my_succ = crate::constants::count_i32(my.success_live_card_zone.cards.len());
-    let opp_succ = crate::constants::count_i32(opp.success_live_card_zone.cards.len());
+    let my_succ = my.success_live_card_zone.cards.len().i32_count();
+    let opp_succ = opp.success_live_card_zone.cards.len().i32_count();
     // Stance floors (tree L2/L3). Calibrated against reality: a portfolio
     // sized to the MEAN hit count sits at P(pass)≁E.5 E.7 by construction,
     // so demanding 0.75+ folds nearly every contested turn (measured:
@@ -250,8 +251,8 @@ pub fn choose_action_v6(gs: &GameState, actions: &[Action], me: u8) -> Action {
 pub fn choose_live_set_v5(gs: &GameState, actions: &[Action], db: &CardDatabase) -> Action {
     let me = gs.active_player_index();
     let (my, opp) = gs.seated_pair(me);
-    let my_succ = crate::constants::count_i32(my.success_live_card_zone.cards.len());
-    let opp_succ = crate::constants::count_i32(opp.success_live_card_zone.cards.len());
+    let my_succ = my.success_live_card_zone.cards.len().i32_count();
+    let opp_succ = opp.success_live_card_zone.cards.len().i32_count();
     let mut desired = best_portfolio(gs, me, db);
     let my_score: i32 = desired
         .iter()
@@ -305,7 +306,7 @@ pub fn choose_live_set_v5(gs: &GameState, actions: &[Action], db: &CardDatabase)
             })
             .count();
         let max_slots =
-            (3i32 - i32::from(my.live_card_set_limit_reduction)).max(0) as usize;
+            (3i32 - i32::from(my.live_card_set_limit_reduction)).max(0).usize_count();
         if desired.len() < max_slots && deck_lives > 0 {
             let mut junk: Vec<(usize, u8)> = my
                 .hand

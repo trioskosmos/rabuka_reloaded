@@ -1,5 +1,6 @@
 use crate::ability::resolver::AbilityResolver;
 use crate::ability::types::{Choice, ChoiceResult, ChoiceRoute, ExecutionContext};
+use crate::core::constants::CountCast;
 use crate::game_state::GameState;
 
 #[cfg(feature = "no_std")]
@@ -176,7 +177,7 @@ fn handle_heart_color(
     let Choice::SelectHeartColor { count, .. } = choice else {
         return Err("Choice result does not match pending choice".to_string());
     };
-    resolver.handle_heart_selection(gs, *count as u8, colors)
+        resolver.handle_heart_selection(gs, count.u8_count(), colors)
 }
 
 fn handle_heart_type(
@@ -191,7 +192,7 @@ fn handle_heart_type(
     let Choice::SelectHeartType { count, .. } = choice else {
         return Err("Choice result does not match pending choice".to_string());
     };
-    resolver.handle_heart_selection(gs, *count as u8, types)
+        resolver.handle_heart_selection(gs, count.u8_count(), types)
 }
 
 pub fn dispatch_choice_result(

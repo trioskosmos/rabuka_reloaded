@@ -18,6 +18,7 @@
 //! model, binomial floors); adds zero new tuning knobs beyond the curve.
 
 use crate::bot::strategy_v4::{alloc, hand_lives, heart_pool, lives_in_hand, passable_count};
+use crate::core::constants::CountCast;
 use crate::card::{CardDatabase, CardType};
 use crate::game_setup::{self, Action};
 use crate::game_state::GameState;
@@ -61,7 +62,7 @@ pub fn choose_main_conductor(gs: &GameState, actions: &[Action], me: u8) -> Acti
     let db = &gs.card_database;
     let (my_now, _) = gs.seated_pair(me);
     let plan = read_plan(gs);
-    let base_hand_len = crate::constants::count_i32(my_now.hand.cards.len());
+    let base_hand_len = my_now.hand.cards.len().i32_count();
     let base_passable = passable_count(gs, me, db);
     let base_ammo = lives_in_hand(my_now, db);
     // PROGRESS SIGNAL: the unfloored achievable ceiling. The floored
@@ -137,7 +138,7 @@ pub fn choose_main_conductor(gs: &GameState, actions: &[Action], me: u8) -> Acti
         // Starvation digging (proven).
         if base_ammo <= 1 {
             let drawn =
-            (crate::constants::count_i32(my_sim.hand.cards.len()) - base_hand_len).max(0);
+            (my_sim.hand.cards.len().i32_count() - base_hand_len).max(0);
             val += 70.0 * p_life_draw * drawn as f64;
         }
 
@@ -173,7 +174,7 @@ fn passing_portfolios(gs: &GameState, me: u8, db: &CardDatabase) -> Vec<(i32, Ve
     let pool = heart_pool(gs, me, db);
     let lives = hand_lives(my, db);
     let max_slots =
-        (3i32 - i32::from(my.live_card_set_limit_reduction)).max(0) as usize;
+        (3i32 - i32::from(my.live_card_set_limit_reduction)).max(0).usize_count();
     let mut out = Vec::new();
     if lives.is_empty() || max_slots == 0 {
         return out;
@@ -215,7 +216,7 @@ pub fn choose_live_set_conductor(gs: &GameState, actions: &[Action], db: &CardDa
     let me = gs.active_player_index();
     let (my, opp) = gs.seated_pair(me);
     let max_slots =
-        (3i32 - i32::from(my.live_card_set_limit_reduction)).max(0) as usize;
+        (3i32 - i32::from(my.live_card_set_limit_reduction)).max(0).usize_count();
 
     // MEAN-POOL passable only (no binomial floor): measured vs v2, floor-
     // filtering starved placements — failed checks cost almost nothing

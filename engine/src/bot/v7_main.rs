@@ -1,3 +1,4 @@
+use crate::core::constants::CountCast;
 use crate::bot::determinization::DeterminizationSampler;
 use crate::bot::observation::PublicObservation;
 use crate::bot::strategy_common::{acc_add, requirements_met, Acc};
@@ -115,7 +116,7 @@ fn member_reserve(gs: &GameState, me: u8, id: i16) -> f64 {
         .filter_map(|c| c.cost)
         .max()
         .unwrap_or(0) as i32;
-    let budget = p.energy_zone.cards.len() as i32 + 1;
+    let budget = p.energy_zone.cards.len().i32_count() + 1;
     let delay = (cost - discount - budget).max(0) as f64;
     let hearts = card
         .base_heart
@@ -181,7 +182,9 @@ pub(crate) fn features(gs: &GameState, me: u8) -> Features {
     }
     for i in 0..11 {
         mean[i] +=
-            (units[i] * blades as f64 / p.main_deck.cards.len().max(1) as f64).floor() as i32;
+            crate::constants::score_to_i32(
+            (units[i] * blades as f64 / p.main_deck.cards.len().max(1) as f64).floor(),
+        );
     }
     let mut ammo = 0;
     let mut coverage = 0.0;
@@ -333,7 +336,7 @@ impl Search<'_> {
                         continue;
                     }
                     self.nodes += 1;
-                    crate::rng::seed(0x7637 + depth as u32);
+                    crate::rng::seed(0x7637 + depth.u32_count());
                     let mut next = gs.clone();
                     if game_setup::execute_action(&mut next, &action).is_err() {
                         continue;
@@ -364,7 +367,7 @@ impl Search<'_> {
                 continue;
             }
             self.nodes += 1;
-            crate::rng::seed(0x7637 + depth as u32);
+            crate::rng::seed(0x7637 + depth.u32_count());
             let mut next = gs.clone();
             if game_setup::execute_action(&mut next, &action).is_err() {
                 continue;

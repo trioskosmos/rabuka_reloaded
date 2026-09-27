@@ -1,4 +1,5 @@
 use super::observation::PublicObservation;
+use crate::core::constants::CountCast;
 use crate::game_setup::Action;
 
 pub const CARD_EMBED_DIM: usize = 128;
@@ -190,25 +191,25 @@ impl ActionEncoding {
         Self {
             action_type: action_type_index(&action.action_type),
             target_card_id: if target_visible { raw_card_id.unwrap_or(-1) } else { -1 },
-            target_zone: crate::constants::count_u8(target.zone as usize),
+            target_zone: (target.zone as usize).u8_count(),
             position,
             ability_index: params
                 .and_then(|p| p.ability_index)
                 .unwrap_or(0)
-                .min(u8::MAX as usize) as u8,
+                .u8_count(),
             choice_option: params
                 .and_then(|p| p.card_index)
                 .unwrap_or(usize::MAX)
-                .min(u16::MAX as usize) as u16,
+                .u16_count(),
             flags,
             final_cost: params.and_then(|p| p.final_cost).unwrap_or(u8::MAX),
             card_index: params
                 .and_then(|p| p.card_index)
                 .unwrap_or(usize::MAX)
-                .min(u16::MAX as usize) as u16,
+                .u16_count(),
             card_indices_count: params
                 .and_then(|p| p.card_indices.as_ref())
-                .map_or(0, |indices| indices.len().min(u8::MAX as usize) as u8),
+                .map_or(0, |indices| indices.len().u8_count()),
         }
     }
 
@@ -230,7 +231,7 @@ impl ActionEncoding {
         if self.target_card_id < 0 {
             v.extend(vec![0.0f32; CARD_EMBED_DIM]);
         } else {
-            let cid = crate::constants::count_usize_i16(self.target_card_id);
+            let cid = self.target_card_id.usize_count();
             let base = cid * CARD_EMBED_DIM;
             let ce = if base + CARD_EMBED_DIM <= card_embed.len() {
                 &card_embed[base..base + CARD_EMBED_DIM]
@@ -287,7 +288,7 @@ pub fn action_target_zone(action: &Action, obs: &PublicObservation) -> ActionTar
                         2 => ZoneId::MyStagePos2,
                         _ => ZoneId::MyStagePos0,
                     },
-                    position: crate::constants::count_u8(usize::from(position)),
+                    position: position.u8_count(),
                 };
             }
         }

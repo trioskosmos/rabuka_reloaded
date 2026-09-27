@@ -4,7 +4,7 @@
 //!
 //! Usage: cargo run --release --bin bad_game_report -- [games] [worst_k]
 
-use rabuka_engine::core::constants::U8Count;
+use rabuka_engine::core::constants::CountCast;
 use rabuka_engine::bin_common::{deal_default_game, fresh_database, load_deck};
 use rabuka_engine::bot::{strategy_v2, strategy_v4, strategy_v5};
 use rabuka_engine::card::{CardDatabase, CardType};

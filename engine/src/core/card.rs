@@ -1,3 +1,4 @@
+use crate::core::constants::CountCast;
 use crate::ability::ability_store::AbilityRef;
 pub(crate) use crate::ability::enums::{
     ActionType, ConditionType, EffectState, PlacementTarget, TargetPlayer, Zone,
@@ -390,7 +391,7 @@ impl From<i16> for CardId {
 /// this impl deliberately does NOT hide that decision.
 impl From<CardId> for usize {
     fn from(id: CardId) -> Self {
-        id.0 as usize
+        id.0.usize_count()
     }
 }
 
@@ -642,7 +643,10 @@ impl CardDatabase {
                 'ａ'..='ｚ' => {
                     // Fullwidth lowercase → ASCII uppercase: the offset from
                     // 'ａ' maps 1:1 onto 'A'..'Z'.
-                    result.push((u32::from(ch) - u32::from('ａ') + u32::from('A')) as u8 as char);
+                    let upper = u32::from(ch) - u32::from('ａ') + u32::from('A');
+                    // 'ａ'..='ｚ' maps 1:1 onto 'A'..='Z', so `upper` is always
+                    // a valid scalar value; the fallback is unreachable.
+                    result.push(char::from_u32(upper).unwrap_or('?'));
                     changed = true;
                 }
                 '＋' => {
@@ -1584,7 +1588,7 @@ impl AbilityEffect {
                     .map(|arr| {
                         arr.iter()
                             .filter_map(|x| x.as_u64())
-                            .map(|n| n as u8)
+                            .map(|n| n.u8_count())
                             .collect()
                     }),
                 blade_limit: u8_field!("blade_limit"),

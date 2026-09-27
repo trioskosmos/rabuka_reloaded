@@ -15,6 +15,7 @@
 //! No opponent terms exist anywhere in this file.
 
 use crate::card::{CardDatabase, CardType, HeartColor};
+use crate::core::constants::CountCast;
 use crate::game_setup::{self, Action};
 use crate::game_state::GameState;
 
@@ -140,7 +141,8 @@ pub(crate) fn heart_pool_inner(gs: &GameState, me_player: u8, db: &CardDatabase,
     // Expected yell hits, per printed color (Draw/Score icons don't feed checks).
     let expected = expected_flip_units(gs, me_player, db);
     for idx in (0..=7).chain(std::iter::once(10)) {
-        acc[idx] += crate::constants::score_to_i32((expected[idx] as f64 * confidence).floor());
+        acc[idx] +=
+            crate::constants::score_to_i32((expected[idx] * confidence).floor());
     }
     acc
 }
@@ -302,7 +304,7 @@ pub fn choose_action_v4(gs: &GameState, actions: &[Action], me: u8) -> Action {
     let dbg = std::env::var("V4_DEBUG").is_ok();
     let db = &gs.card_database;
     let my_now = if me == 0 { &gs.player1 } else { &gs.player2 };
-        let base_hand_len = crate::constants::count_i32(my_now.hand.cards.len());
+        let base_hand_len = my_now.hand.cards.len().i32_count();
 
     let base_passable = passable_count(gs, me, db);
     let base_ammo = lives_in_hand(my_now, db);
@@ -409,7 +411,7 @@ pub fn choose_action_v4(gs: &GameState, actions: &[Action], me: u8) -> Action {
         // outbid stage growth, so the bot starved instead of digging.
         if base_ammo <= 1 {
             let drawn =
-            (crate::constants::count_i32(my_sim.hand.cards.len()) - base_hand_len).max(0);
+            (my_sim.hand.cards.len().i32_count() - base_hand_len).max(0);
             val += 70.0 * p_life_draw * drawn as f64;
             let wr_lives_now = my_sim
                 .waitroom
@@ -507,7 +509,7 @@ pub fn choose_live_set_v4(gs: &GameState, actions: &[Action], db: &CardDatabase)
     candidates.sort_by_key(|c| core::cmp::Reverse(c.1));
 
     let max_slots =
-        (3i32 - i32::from(my.live_card_set_limit_reduction)).max(0) as usize;
+        (3i32 - i32::from(my.live_card_set_limit_reduction)).max(0).usize_count();
     let mut desired: Vec<usize> = Vec::new();
     for &(hi, _req, ref need) in &candidates {
         if desired.len() >= max_slots {

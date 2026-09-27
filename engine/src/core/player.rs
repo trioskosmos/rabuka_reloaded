@@ -1,4 +1,4 @@
-use crate::core::constants::U8Count;
+use crate::core::constants::CountCast;
 use crate::zones::{
     EnergyDeck, EnergyZone, ExclusionZone, Hand, LiveCardZone, MainDeck, Stage,
     SuccessLiveCardZone, Waitroom,
@@ -547,7 +547,7 @@ impl Player {
     /// flagged cards are subtracted from the count instead of being keyed per card.
     pub fn activate_all_energy_exclude(&mut self, excluded: usize) {
         let total = self.energy_zone.cards.len().u8_count();
-        self.energy_zone.active_energy_count = total.saturating_sub(excluded as u8);
+        self.energy_zone.active_energy_count = total.saturating_sub(excluded.u8_count());
     }
 
     /// IDs of every card this player currently owns across all zones. Used to scope
