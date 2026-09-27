@@ -345,7 +345,7 @@ pub(crate) fn is_baton(gs: &GameState, me: u8, action: &Action) -> bool {
 /// The arena's `ScoreFn` type only carries `(f64, String)`, so the key is kept
 /// here and flattened into the note for debug output.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
-struct TieKey {
+pub(crate) struct TieKey {
     cost_now: i32,
     ceiling: i32,
     baton: u8,

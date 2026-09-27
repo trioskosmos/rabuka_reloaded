@@ -163,6 +163,11 @@ struct HandContext {
     /// Requirement of the life we would most plausibly set, if we hold one.
     best_need: Option<Acc>,
     /// Energy we can reach in the next few turns, plus the baton discount.
+    /// Computed and carried, but no consumer reads it yet: the energy-reach
+    /// half of the hand valuation ended up being done where the value is
+    /// assembled. Kept because the discount term is not trivially recoverable
+    /// and `reachable_next` below is the same shape.
+    #[allow(dead_code)]
     budget: i32,
     /// Stage cost we will reach next turn with no help from this card. A
     /// member at or below this is a CLOG: the guides are explicit that a
@@ -352,6 +357,7 @@ fn collect_junk(gs: &GameState, me: u8, db: &CardDatabase, lives: &[Life], ctx: 
 /// cosmetic: without the gate a junk-only zone is charged a whole placement
 /// credit for holding no life at all, which is the same class of error as not
 /// charging a doomed life.
+#[cfg(test)]
 pub(crate) fn candidate_value(
     outcome: CheckOutcome,
     p_pass: f64,

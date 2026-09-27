@@ -236,6 +236,10 @@ impl GameOutcome {
     /// Placements per live phase, the guide's ~1.0-from-T2 target (section 1).
     /// `None` when the side never took a live phase, which would make the rate
     /// undefined rather than zero.
+    // Not yet called: the summary currently reports placements and live phases
+    // as separate columns rather than this ratio. Kept because the ratio is
+    // the number the guide is actually written against.
+    #[allow(dead_code)]
     fn pace(&self, side: usize) -> Option<f64> {
         let (placed, phases) = if side == 0 {
             (self.z1 as f64, self.live_p1)

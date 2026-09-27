@@ -15,8 +15,6 @@ use alloc::string::{String, ToString};
 #[cfg(feature = "no_std")]
 use alloc::vec::Vec;
 
-use crate::bot::registry::BotKind;
-use crate::bot::{strategy_v2, strategy_v3};
 use crate::card::Card;
 use crate::card::CardDatabase;
 use crate::game::deck_builder::DeckBuilder;

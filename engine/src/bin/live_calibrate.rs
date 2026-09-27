@@ -49,6 +49,9 @@ use std::sync::Arc;
 struct Row {
     turn: u8,
     seat: usize,
+    /// Lives committed at this check. Recorded per check; the current report
+    /// reads `lives`/`junk` but does not break out by set size yet.
+    #[allow(dead_code)]
     set_size: usize,
     lives: usize,
     junk: usize,
@@ -771,9 +774,15 @@ fn attacker_order_report(rows: &[Row]) {
 struct Side {
     label: &'static str,
     board: fn(&Row) -> i32,
+    /// Blades the engine scored. Recorded per check; the current report does
+    /// not break results out by it yet.
+    #[allow(dead_code)]
     blades: fn(&Row) -> i32,
     supply: fn(&Row) -> i32,
     yell: fn(&Row) -> i32,
+    /// Required hearts for the check. Recorded per check; the current report
+    /// does not break results out by it yet.
+    #[allow(dead_code)]
     required: fn(&Row) -> i32,
     passed: fn(&Row) -> bool,
     committed: fn(&Row) -> bool,

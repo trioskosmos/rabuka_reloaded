@@ -172,19 +172,8 @@ pub fn lives_in_hand(p: &Player, db: &CardDatabase) -> usize {
         .count()
 }
 
-pub fn card_hearts(db: &CardDatabase, cid: i16) -> i32 {
-    db.get_card(cid)
-        .and_then(|c| c.base_heart.as_ref())
-        .map(|bh| bh.hearts.values_sum() as i32)
-        .unwrap_or(0)
-}
-
 pub fn card_cost(db: &CardDatabase, cid: i16) -> i32 {
     i32::from(db.get_card(cid).and_then(|c| c.cost).unwrap_or(0))
-}
-
-pub fn card_blades(db: &CardDatabase, cid: i16) -> i32 {
-    i32::from(db.get_card(cid).map(|c| c.blade).unwrap_or(0))
 }
 
 pub fn printed_score(db: &CardDatabase, cid: i16) -> i32 {
@@ -454,9 +443,13 @@ pub struct OppModel {
     /// so the tie rule and any future diagnostic can tell "they set one card"
     /// from "we assume they set one card" - the two differ in exactly the case
     /// that was broken.
+    // Computed on every build, consumed by the forecast tests but not yet by
+    // production code: the forecast currently only reaches `pass_prob`.
+    #[allow(dead_code)]
     pub commitment: Commitment,
     /// `P(they commit a set at all this check)`. 1.0 when observed; the
     /// forecast rate when they attack second and we cannot see them yet.
+    #[allow(dead_code)]
     pub commit_rate: f64,
 }
 
@@ -1176,99 +1169,19 @@ pub fn pass_estimate_from_supply(board: &Acc, blades: i32, density: f64, need: &
 
 /// Deterministic board hearts (buff-aware) in [`Acc`] index space with NO flip
 /// expectation folded in.
+///
+/// Design note, formerly expressed as dead code: a one-turn projection
+/// (`{hearts, blades}` for the best affordable member deploy) used to live here,
+/// feeding a `best_life_pass_now_and_next` that priced an in-hand life by the
+/// placement it would make *later* rather than at full `PLACEMENT_CREDIT`.
+/// Pricing at full credit says a life is only worth committing when it is more
+/// likely than not to pass, which folded roughly a third of all checks and
+/// starved the success zone — the exact placement starvation measured at -9pp
+/// with `beam`. Nothing ended up calling it; the value is now computed inline
+/// where the life is actually priced. This is the shape it had, if a projection
+/// is ever needed again.
 pub fn board_supply(gs: &GameState, me: u8, db: &CardDatabase) -> Acc {
     super::strategy_v4::heart_pool_buffed(gs, me, db, 0.0)
-}
-
-/// The best member we could put on stage next turn, as printed board
-/// contribution plus its blades. Used to project "how good could the following
-/// check get" without committing to a deploy.
-pub struct Projection {
-    pub hearts: Acc,
-    pub blades: i32,
-}
-
-pub fn project_one_turn(gs: &GameState, me: u8, db: &CardDatabase) -> Projection {
-    let p = gs.seat_player(me);
-    // Next turn's budget: this phase's energy plus the guaranteed +1 from the
-    // coming Energy phase (7.5), plus the current baton discount
-    // (9.6.2.3.2) when the stage already has a member to send.
-    let discount = p
-        .stage
-        .stage
-        .iter()
-        .filter(|&&c| c >= 0)
-        .filter_map(|&c| db.get_card(c).and_then(|card| card.cost))
-        .map(i32::from)
-        .max()
-        .unwrap_or(0);
-    let budget = i32::from(p.energy_zone.active_count()) + 1 + discount;
-    let best = p
-        .hand
-        .cards
-        .iter()
-        .filter_map(|&cid| db.get_card(cid))
-        .filter(|card| card.card_type == CardType::Member)
-        .filter(|card| i32::from(card.cost.unwrap_or(0)) <= budget)
-        .max_by_key(|card| card.cost.unwrap_or(0));
-    let mut hearts = [0i32; 11];
-    let mut blades = 0;
-    if let Some(card) = best {
-        if let Some(base) = &card.base_heart {
-            super::strategy_common::acc_add(&mut hearts, &base.hearts);
-        }
-        blades = i32::from(card.blade);
-    }
-    Projection { hearts, blades }
-}
-
-/// `P(our best in-hand life passes)` on the current board, and on the board we
-/// could build next turn with our best affordable deploy.
-///
-/// The second number is what makes a life in hand worth KEEPING. Pricing the
-/// card's future use at its full `PLACEMENT_CREDIT` (the first v8 draft's
-/// mistake) says a life is only worth committing when it is more likely than
-/// not to pass, which folds roughly a third of all checks and starves the
-/// success zone - the exact placement starvation the project measured at -9pp
-/// with `beam`. The honest price of a burned life is the placement it would
-/// have made LATER, which is what this returns.
-pub fn best_life_pass_now_and_next(gs: &GameState, me: u8, db: &CardDatabase) -> (f64, f64) {
-    let (blades, density) = super::strategy_v4::flip_stats(gs, me, db);
-    let board = board_supply(gs, me, db);
-    let needs: Vec<Acc> = gs
-        .seat_player(me)
-        .hand
-        .cards
-        .iter()
-        .filter_map(|&cid| {
-            let card = db.get_card(cid)?;
-            if card.card_type != CardType::Live {
-                return None;
-            }
-            let need = life_need(gs, cid);
-            if has_unpassable_icon(&need) {
-                return None;
-            }
-            Some(need)
-        })
-        .collect();
-    if needs.is_empty() {
-        return (0.0, 0.0);
-    }
-    let best = |supply: &Acc, blades: i32| -> f64 {
-        needs
-            .iter()
-            .map(|need| pass_estimate_from_supply(supply, blades, density, need))
-            .fold(0.0f64, f64::max)
-    };
-    let p_now = best(&board, blades);
-    let projection = project_one_turn(gs, me, db);
-    let mut projected = board;
-    for i in 0..11 {
-        projected[i] += projection.hearts[i];
-    }
-    let p_next = best(&projected, blades + projection.blades);
-    (p_now, p_next)
 }
 
 #[cfg(test)]
