@@ -1721,6 +1721,7 @@ async fn undo(data: web::Data<AppState>, req: actix_web::HttpRequest) -> impl Re
         game_state: display,
         legal_actions: None,
         ui_config: Some(ui_config),
+        ai_turn: None,
     })
 }
 
@@ -1789,6 +1790,7 @@ async fn redo(data: web::Data<AppState>, req: actix_web::HttpRequest) -> impl Re
         game_state: display,
         legal_actions: None,
         ui_config: Some(ui_config),
+        ai_turn: None,
     })
 }
 
@@ -3340,6 +3342,7 @@ async fn init_game(
                 game_state: display,
                 legal_actions: Some(actions),
                 ui_config: Some(ui_config),
+                ai_turn: None,
             });
         }
     }
@@ -3376,6 +3379,7 @@ async fn init_game(
         game_state: display,
         legal_actions: Some(actions),
         ui_config: Some(ui_config),
+        ai_turn: None,
     })
 }
 

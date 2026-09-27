@@ -797,13 +797,12 @@ mod tests {
     use std::path::Path;
     use std::sync::Arc;
 
-    fn test_state() -> (Arc<CardDatabase>, GameState) {
-        let cards = CardLoader::load_cards_from_file(Path::new("../cards/cards.json")).unwrap();
-        let db = Arc::new(CardDatabase::load_or_create(cards));
-        let p1 = Player::new("p1".into(), "P1".into(), true);
-        let p2 = Player::new("p2".into(), "P2".into(), false);
-        (Arc::clone(&db), GameState::new(p1, p2, db))
-    }
+        fn test_state() -> (Arc<CardDatabase>, GameState) {
+            let db = crate::card_loader::test_card_db().clone();
+            let p1 = Player::new("p1".into(), "P1".into(), true);
+            let p2 = Player::new("p2".into(), "P2".into(), false);
+            (Arc::clone(&db), GameState::new(p1, p2, db))
+        }
 
     #[test]
     fn opponent_hand_and_hidden_choice_identity_are_not_exposed() {

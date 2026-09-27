@@ -1383,13 +1383,9 @@ pub fn override_stats() -> (u64, u64) {
 mod tests {
     use super::*;
 
-    fn db_real() -> crate::Arc<CardDatabase> {
-        let cards = crate::card_loader::CardLoader::load_cards_from_file(std::path::Path::new(
-            "../cards/cards.json",
-        ))
-        .unwrap();
-        crate::Arc::new(CardDatabase::load_or_create(cards))
-    }
+        fn db_real() -> crate::Arc<CardDatabase> {
+            crate::card_loader::test_card_db().clone()
+        }
 
     fn fixture() -> (GameState, crate::Arc<CardDatabase>) {
         let db = db_real();

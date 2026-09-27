@@ -1909,11 +1909,7 @@ mod mulligan_tests {
 
     #[test]
     fn mulligan_default_matches_v4_and_curve_variant_recovers_selection() {
-        let cards = crate::card_loader::CardLoader::load_cards_from_file(std::path::Path::new(
-            "../cards/cards.json",
-        ))
-        .unwrap();
-        let db = crate::Arc::new(CardDatabase::load_or_create(cards));
+        let db = crate::card_loader::test_card_db().clone();
         let names = [
             "PL!SP-bp1-005-R",
             "PL!SP-sd1-019-SD",
@@ -1964,13 +1960,9 @@ mod mulligan_tests {
 mod live_experiment_tests {
     use super::*;
 
-    fn db_real() -> crate::Arc<CardDatabase> {
-        let cards = crate::card_loader::CardLoader::load_cards_from_file(std::path::Path::new(
-            "../cards/cards.json",
-        ))
-        .unwrap();
-        crate::Arc::new(CardDatabase::load_or_create(cards))
-    }
+        fn db_real() -> crate::Arc<CardDatabase> {
+            crate::card_loader::test_card_db().clone()
+        }
 
     fn second_attacker_gs(db: &crate::Arc<CardDatabase>) -> (GameState, Player, Player) {
         let p1 = Player::new("p1".into(), "P1".into(), true);

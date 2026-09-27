@@ -576,13 +576,10 @@ mod tests {
             }
         }
 
-        // Load from cards.json
-        let json_path = Path::new(concat!(env!("CARGO_MANIFEST_DIR"), "/../cards/cards.json"));
-        let all_cards =
-            CardLoader::load_cards_from_file(json_path).expect("Failed to load cards.json");
-        // Sort by card_no (same order as blob)
-        let mut all_cards = all_cards;
-        all_cards.sort_by(|a, b| a.card_no.cmp(&b.card_no));
+            // Load from cards.json (shared process-wide parse, not per test)
+            let mut all_cards = crate::core::card_loader::test_cards().to_vec();
+            // Sort by card_no (same order as blob)
+            all_cards.sort_by(|a, b| a.card_no.cmp(&b.card_no));
 
         let count = blob_cards.len().min(all_cards.len().min(num));
 

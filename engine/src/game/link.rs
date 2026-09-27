@@ -838,8 +838,7 @@ mod tests {
     /// language pair, so 2x2 = 4 full database parses for a single test. The
     /// matches themselves are cheap next to that; hoisting the parse is what
     /// makes this test tolerable.
-    fn test_deck_cards() -> &'static [crate::card::Card] {
-        static DECK_CARDS: std::sync::OnceLock<Vec<crate::card::Card>> =
+    fn test_deck_cards() -> &'static [crate::card::Card] {        static DECK_CARDS: std::sync::OnceLock<Vec<crate::card::Card>> =
             std::sync::OnceLock::new();
         DECK_CARDS.get_or_init(|| {
             let json = include_str!("../../../cards/cards.json");
@@ -871,18 +870,14 @@ mod tests {
         lang_a: crate::game::language::Lang,
         lang_b: crate::game::language::Lang,
     ) {
-        let deck_cards = Self::test_deck_cards();
+        let deck_cards = test_deck_cards();
         let all_cards: Vec<crate::card::Card> = deck_cards.to_vec();
-        let p1deck: Vec<String> = members[..6]
-            .iter()
-            .chain(lives[..3].iter())
-            .map(|c| c.card_no.as_ref().to_string())
-            .collect();
-        let p2deck: Vec<String> = members[6..12]
-            .iter()
-            .chain(lives[3..6].iter())
-            .map(|c| c.card_no.as_ref().to_string())
-            .collect();
+        // `picked` is members[..12] then lives[..6], so the two decks are
+        // contiguous slices of it: P1 = members 0..6 + lives 0..3,
+        // P2 = members 6..12 + lives 3..6.
+        let card_no = |i: usize| deck_cards[i].card_no.as_ref().to_string();
+        let p1deck: Vec<String> = (0..6).map(card_no).chain((12..15).map(card_no)).collect();
+        let p2deck: Vec<String> = (6..12).map(card_no).chain((15..18).map(card_no)).collect();
         let p1: Vec<&str> = p1deck.iter().map(|s| s.as_str()).collect();
         let p2: Vec<&str> = p2deck.iter().map(|s| s.as_str()).collect();
         let p1b: Vec<&str> = p1deck.iter().map(|s| s.as_str()).collect();

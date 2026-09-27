@@ -22,6 +22,43 @@ use crate::{HashMap, HashSet};
 
 pub struct CardLoader;
 
+/// The parsed card list, parsed once per test binary.
+///
+/// Every in-crate unit test that wants a realistic database was calling
+/// `load_cards_from_file("../cards/cards.json")` itself, which re-parses all
+/// ~2280 cards from JSON on each call. That is ~1.1 s per test, and roughly
+/// twenty tests pay it — it was the single biggest thing making
+/// `cargo test --lib` slow, and it showed up as a mysterious 13 s test
+/// because the parse dominated everything the test actually cared about.
+///
+/// Clone this when a test needs to own its cards. Cloning the parsed
+/// `Vec<Card>` is much cheaper than re-parsing it, and callers that only read
+/// should prefer [`test_card_db`], which hands out an `Arc` instead.
+#[cfg(all(test, not(feature = "no_std")))]
+pub(crate) fn test_cards() -> &'static [Card] {
+    use std::sync::OnceLock;
+    static CARDS: OnceLock<Vec<Card>> = OnceLock::new();
+    CARDS
+        .get_or_init(|| {
+            CardLoader::load_cards_from_file(std::path::Path::new("../cards/cards.json"))
+                .expect("cards.json")
+        })
+        .as_slice()
+}
+
+/// A shared, read-only card database for tests that only look cards up.
+///
+/// Prefer this over [`test_cards`] when the test does not need its own copy:
+/// it hands out an `Arc`, so there is no per-test clone of 2280 cards at all.
+#[cfg(all(test, not(feature = "no_std")))]
+pub(crate) fn test_card_db() -> &'static std::sync::Arc<crate::card::CardDatabase> {
+    use std::sync::OnceLock;
+    static DB: OnceLock<std::sync::Arc<crate::card::CardDatabase>> = OnceLock::new();
+    DB.get_or_init(|| {
+        std::sync::Arc::new(crate::card::CardDatabase::load_or_create(test_cards().to_vec()))
+    })
+}
+
 impl CardLoader {
     #[cfg(not(feature = "no_std"))]
     pub fn load_cards_from_file(path: &Path) -> Result<Vec<Card>, String> {

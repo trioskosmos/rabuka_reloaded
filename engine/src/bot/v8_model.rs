@@ -1196,13 +1196,9 @@ mod tests {
     /// (a member with no `base_heart`, one with a zero blade, one whose blades
     /// come from a modifier) instead of a hand-built fixture that would hide
     /// exactly the cases that broke.
-    fn real_db() -> CardDatabase {
-        let cards = crate::card_loader::CardLoader::load_cards_from_file(std::path::Path::new(
-            "../cards/cards.json",
-        ))
-        .expect("cards.json");
-        CardDatabase::load_or_create(cards)
-    }
+        fn real_db() -> CardDatabase {
+            CardDatabase::load_or_create(crate::card_loader::test_cards().to_vec())
+        }
 
     fn first_member_with(db: &CardDatabase, skip: usize, pred: impl Fn(&crate::card::Card) -> bool) -> i16 {
         let mut ids: Vec<i16> = db.cards.keys().copied().collect();

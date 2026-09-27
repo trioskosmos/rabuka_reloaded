@@ -31,13 +31,9 @@ use crate::game_state::GameState;
 use crate::player::Player;
 use std::sync::Arc;
 
-fn test_db() -> Arc<CardDatabase> {
-    let cards = crate::card_loader::CardLoader::load_cards_from_strs(include_str!(
-        "../../../cards/cards.json"
-    ))
-    .expect("cards");
-    Arc::new(CardDatabase::load_or_create(cards))
-}
+    fn test_db() -> Arc<CardDatabase> {
+        crate::card_loader::test_card_db().clone()
+    }
 
 /// A minimal state parked in a mulligan phase, with player1 as first attacker
 /// so the phase owner is derivable.

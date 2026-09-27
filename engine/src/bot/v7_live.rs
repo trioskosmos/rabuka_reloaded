@@ -232,11 +232,8 @@ mod tests {
     use super::*;
     use crate::player::Player;
 
-    fn fixture() -> (GameState, crate::Arc<CardDatabase>) {
-        let cards = crate::card_loader::CardLoader::load_cards_from_file(
-            std::path::Path::new("../cards/cards.json"),
-        ).unwrap();
-        let db = crate::Arc::new(CardDatabase::load_or_create(cards));
+        fn fixture() -> (GameState, crate::Arc<CardDatabase>) {
+            let db = crate::card_loader::test_card_db().clone();
         let p1 = Player::new("p1".into(), "P1".into(), true);
         let p2 = Player::new("p2".into(), "P2".into(), false);
         let mut gs = GameState::new(p1, p2, crate::Arc::clone(&db));
