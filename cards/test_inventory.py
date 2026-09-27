@@ -487,6 +487,65 @@ def load_abilities():
         return data["unique_abilities"], data.get("statistics", {})
 
 
+def unplayable_live_cards():
+    """Card numbers of live cards no stage in the pool can satisfy.
+
+    A need_heart requirement above what a stage can supply is unreachable. Three
+    members fit, so the per-colour bound is the per-colour maximum over the pool
+    (a stage cannot exceed the best single member for one colour), and a
+    COLORLESS `heart0` is bounded by the total of the three highest-heart members,
+    because the wildcard draws on every heart on the stage.
+
+    Sound in the strong direction: every card returned is genuinely unplayable, so
+    the set is a lower bound on the true one.
+
+    Bounding `heart0` by the best SINGLE member instead of the best three is wrong
+    and was wrong here first: a live needing `heart0: 10` was reported unplayable
+    while a stage of three members printing 27 hearts satisfies it. The colour bound
+    really is per-member -- three members cannot contribute 3x the best to one
+    colour if the requirement is 2x the best -- so that part stays.
+    """
+    with open(ROOT / "cards" / "cards.json", encoding="utf-8") as f:
+        cards = json.load(f)
+    best: dict[str, int] = {}
+    totals: list[int] = []
+    for c in cards.values():
+        if c.get("type") != "メンバー":
+            continue
+        h = c.get("base_heart") or {}
+        if not h:
+            continue
+        totals.append(sum(h.values()))
+        for k, v in h.items():
+            best[k] = max(best.get(k, 0), v)
+    totals.sort(reverse=True)
+    # Three members fit on a stage, and the wildcard draws on all of them.
+    stage_hearts = sum(totals[:3])
+    bounds = dict(best)
+    bounds["heart0"] = stage_hearts
+
+    out = {}
+    for c in cards.values():
+        if c.get("type") != "ライブ":
+            continue
+        need = c.get("need_heart") or {}
+        if not need:
+            continue
+        short = [
+            f"{colour} needs {n}, best single member prints {bounds.get(colour, 0)}"
+            for colour, n in need.items()
+            if colour != "heart0" and bounds.get(colour, 0) < n
+        ]
+        w = need.get("heart0", 0)
+        if w and stage_hearts < w:
+            short.append(
+                f"heart0 needs {w}, a stage's three best members print {stage_hearts}"
+            )
+        if short:
+            out[c["card_no"]] = short
+    return out
+
+
 def card_base(card_no):
     m = re.match(r"^(.*?-\d+)", card_no)
     return m.group(1) if m else card_no
@@ -646,6 +705,32 @@ Q_LIVE_SUCCESS_PREMISE_RE = re.compile(
     r"should_trigger_live_success|performance_snapshots|execute_live_victory_determination"
 )
 Q_LINE_COMMENT_RE = re.compile(r"//.*$", re.MULTILINE)
+
+# A live card whose printed need_heart cannot be met by ANY stage, so its
+# ライブ成功時 is unreachable and every test that drives it is vacuous by
+# construction -- not merely missing a premise.
+#
+# Sound in the strong direction: a per-colour requirement above the per-colour
+# MAXIMUM over the whole pool cannot be met, because three members cannot
+# contribute 3x the best to a single colour. Only three members fit, so a
+# COLORLESS `heart0` is bounded by the total of the three highest-heart members --
+# bounding it by the best SINGLE member was wrong and cost six false positives
+# (a live needing heart0: 10 was called unplayable while three members printing
+# 27 hearts satisfy it).
+#
+# Necessary, not sufficient: three slots can still conflict across colours, so
+# this is a LOWER BOUND on the unplayable set. "Not reported" therefore means
+# "not provably unplayable", not "demonstrably playable".
+#
+# Measured on this card pool: 46 of the 291 lives that carry a need_heart, 15.8%,
+# are provably unplayable. A test gating on one of those can never be non-vacuous
+# without injecting synthetic hearts, which is legitimate -- the files in
+# live_success_no_premise all use a heart00 wildcard, and the engine treats a
+# heart00 in the PROVIDED hearts as an unbounded wildcard -- but it must be
+# deliberate.
+Q_IMPOSSIBLE_NEED_RE = re.compile(
+    r"PL![A-Za-z0-9!\-_+＋]+-L(?:\s|\)|,)"
+)
 
 # assert!(x) / assert_eq!(x, y) — the units an assertion of interest is counted in.
 Q_ASSERT_CALL_RE = re.compile(r"assert(?:_eq|_ne|_ability)?!\s*\(")
@@ -1303,6 +1388,7 @@ def audit_test_quality(files):
         "assert_only_negative": [],
         "assert_only_counts": [],
         "live_success_no_premise": [],
+        "live_success_impossible_live": [],
         "placeholder": [],
         "prompt_ordinal_drain": [],
         "blind_phase_stepping": [],
@@ -1505,6 +1591,22 @@ def audit_test_quality(files):
         code = Q_LINE_COMMENT_RE.sub("", text)
         if Q_LIVE_SUCCESS_CALL_RE.search(code) and not Q_LIVE_SUCCESS_PREMISE_RE.search(code):
             smells["live_success_no_premise"].append((rel, "<file>", 1, ""))
+    # A live no stage can satisfy makes its ライブ成功時 unreachable, so the test is
+    # vacuous BY CONSTRUCTION rather than merely missing a premise. Reported
+    # separately because the remedy differs: the premise assertion is not enough
+    # here, the test has to inject synthetic hearts deliberately or pick another
+    # live.
+    unplayable = unplayable_live_cards()
+    for _p, rel, text, _fns in files:
+        code = Q_LINE_COMMENT_RE.sub("", text)
+        if not Q_LIVE_SUCCESS_CALL_RE.search(code):
+            continue
+        for card_no, why in unplayable.items():
+            if card_no in code:
+                smells["live_success_impossible_live"].append(
+                    (rel, card_no, 1, "; ".join(why))
+                )
+                break
     for rows in smells.values():
         rows.sort()
     n_fns = sum(len(split_test_fns(text)) for _p, _rel, text, _fns in files)
@@ -1518,6 +1620,7 @@ SMELL_DOCS = {
     "assert_only_negative": "every assertion is a bare is_err()/is_none() — some guard fired, but nothing says which, so a regression tripping a different guard still passes",
     "assert_only_counts": "every assertion is about a count/size (len/count/>=1) — '3 options were offered' can hold while the 3 are the wrong 3",
     "live_success_no_premise": "file CALLS trigger_live_success_abilities but never asserts the state of the ライブ成功時 window it dispatches through. That path checks `should_trigger_live_success`, so a live which failed silently dispatches nothing — and a NEGATIVE assertion in such a file then passes whether or not the ability does anything. The remedy is NOT always 'assert the window is open': a test of the heart requirement itself depends on the window being CLOSED, so each site must assert the state it actually relies on. Files built on `fire_trigger` are NOT flagged: it calls `trigger_auto_ability` directly and forces the dispatch, so there is no window to state. The fix is to assert `should_trigger_live_success` (or the performance snapshot) for the state the test depends on. See the comment above for the four scopings that were wrong first, and note that a live's `heart0` requirement is a COLORLESS WILDCARD satisfied by any colour, not a literal colour",
+    "live_success_impossible_live": "file CALLS trigger_live_success_abilities on a live whose printed need_heart no stage in the pool can satisfy — a requirement above what ANY single member prints, and only three members fit on a stage. Such a live's ライブ成功時 is unreachable, so the test is vacuous BY CONSTRUCTION, which is strictly stronger than a missing premise: adding a should_trigger_live_success assertion here would just fail. The remedy is to inject synthetic hearts deliberately (a heart00 wildcard, which the engine treats as an unbounded wildcard in the PROVIDED hearts, as the files in live_success_no_premise do) or to pick a live the pool can satisfy. The card set itself is worth reviewing: 46 of the 291 lives carrying a need_heart (15.8%) are provably unplayable, which is a card-DATA observation and not a harness one. The check is a LOWER BOUND — necessary, not sufficient, since three slots can still conflict across colours — so 'not reported' means 'not provably unplayable'",
     "placeholder": "#[ignore], assert!(true), todo!() or unimplemented!() left in a test",
     "similar_cards": "confusable card numbers (bp2 vs pb2) staged in one file AND the file pins card identity (assert_card_identity / compares card_no), so a transposition would fail loudly",
     "unpinned_similar_cards": "confusable card numbers (bp2 vs pb2) staged in one file with NO card-identity pin — a transposed print would pass silently; add assert_card_identity to close it",
