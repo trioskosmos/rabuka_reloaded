@@ -145,6 +145,15 @@ fn setup_tokimeki_live_success(game: &mut TestGame, score_modifier: i16) -> (i16
     game.state.player1.waitroom.cards.push(recoverable);
     game.state.mods.set_score_modifier(live, score_modifier);
     game.state.current_phase = Phase::LiveVictoryDetermination;
+    // The wildcard hearts, the zoned live card and the phase above OPEN the
+    // ライブ成功時 window; this asserts it is open before either caller dispatches.
+    // The second caller is a NEGATIVE (score two recovers nothing), and a closed
+    // window would satisfy it without the score threshold ever being consulted.
+    assert!(
+        game.state.should_trigger_live_success(&game.state.player1),
+        "precondition: the ライブ成功時 window must be OPEN, or the dispatch in the \
+         callers below does nothing and the negative is vacuous"
+    );
     (live, recoverable)
 }
 

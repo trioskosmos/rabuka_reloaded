@@ -5,6 +5,17 @@ use rabuka_engine::turn::TurnEngine;
 
 fn trigger_and_drain(game: &mut TestGame) {
     game.state.current_phase = Phase::LiveVictoryDetermination;
+    // This helper is the single door every test in this file dispatches through, so
+    // the window is asserted HERE rather than at each call site. Without it a
+    // zero-matching-members test is indistinguishable from a closed window, and the
+    // "no cap needed" positive would fail for a reason that has nothing to do with
+    // the cap under test.
+    assert!(
+        game.state.should_trigger_live_success(&game.state.player1),
+        "precondition: the ライブ成功時 window must be OPEN — each caller seeds \
+         stage_hearts and zones the live card, and if those stop sufficing the \
+         dispatch below is a silent no-op"
+    );
     TurnEngine::trigger_live_success_abilities(&mut game.state, "p1");
     game.state.process_pending_auto_abilities("p1");
     // Drain any remaining choices (e.g. from the live card's own LiveSuccess)

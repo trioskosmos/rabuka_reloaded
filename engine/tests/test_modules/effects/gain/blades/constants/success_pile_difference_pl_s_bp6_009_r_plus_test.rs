@@ -70,6 +70,14 @@ fn fire_ruby_live_success(game: &mut TestGame, live_card: i16) {
     game.state.player1.stage_hearts = Some(BaseHeart { hearts: heart_map });
     game.state.player1.live_card_zone.cards.push(live_card);
     game.state.current_phase = Phase::LiveVictoryDetermination;
+    // The wildcard hearts and the phase above OPEN the ライブ成功時 window this
+    // dispatches through. Asserted so a failure here is reported as "the window is
+    // shut" rather than as whatever the success-pile difference happens to read.
+    assert!(
+        game.state.should_trigger_live_success(&game.state.player1),
+        "precondition: the ライブ成功時 window must be OPEN, or the dispatch below \
+         does nothing at all"
+    );
     TurnEngine::trigger_live_success_abilities(&mut game.state, "p1");
     game.state.process_pending_auto_abilities("p1");
 }

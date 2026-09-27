@@ -216,6 +216,15 @@ fn kanon_ab1_live_success_pay_optional_cost() {
 
     // Set phase and trigger LiveSuccess abilities
     game.state.current_phase = Phase::LiveVictoryDetermination;
+    // The wildcard hearts and the phase above OPEN the ライブ成功時 window this
+    // dispatches through. Asserted at each site so a shut window is NAMED, rather
+    // than showing up as a resolution that quietly did nothing — which is
+    // indistinguishable here from the partial-resolution behaviour under test.
+    assert!(
+        game.state.should_trigger_live_success(&game.state.player1),
+        "precondition: the ライブ成功時 window must be OPEN, or the dispatch below \
+         does nothing and any negative expectation is vacuous"
+    );
     TurnEngine::trigger_live_success_abilities(&mut game.state, "p1");
     game.state.process_pending_auto_abilities("p1");
 

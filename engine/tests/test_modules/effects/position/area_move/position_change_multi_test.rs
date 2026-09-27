@@ -576,6 +576,17 @@ fn formation_change_with_group_names_and_empty_slots() {
     // the only member is 唐 可可 from Liella!). Then the position_change
     // effect fires with multiple_targets=true and group_names=["Liella!"].
     game.state.live_success_triggered_this_turn = false;
+    // The wildcard hearts and the phase above are what OPEN the window this
+    // dispatch goes through, and the effect under test only fires if it is open —
+    // so the premise is asserted rather than assumed. Without it, a "the ability
+    // did nothing" outcome could mean a shut window rather than a position-change
+    // that failed to apply.
+    assert!(
+        game.state.should_trigger_live_success(&game.state.player1),
+        "precondition: the ライブ成功時 window must be OPEN, or the dispatch below \
+         does nothing and the position-change outcome is not attributable to the \
+         ability"
+    );
     TurnEngine::trigger_live_success_abilities(&mut game.state, &player_id);
     game.state.process_pending_auto_abilities(&player_id);
 

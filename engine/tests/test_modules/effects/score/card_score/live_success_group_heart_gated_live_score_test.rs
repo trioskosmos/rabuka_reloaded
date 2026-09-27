@@ -16,6 +16,15 @@ fn setup_live_success(game: &mut TestGame, revealed: &[i16]) -> i16 {
     game.state.player1.live_card_zone.cards.push(live);
     game.state.revealed_cards.extend_from_slice(revealed);
     game.state.current_phase = Phase::LiveVictoryDetermination;
+    // The wildcard hearts, the zoned live card and the phase above are what OPEN
+    // the ライブ成功時 window both tests dispatch through. Asserted here, once, so
+    // `aquarium_live_success_non_aqours_hearts_do_not_score` — a NEGATIVE — cannot
+    // pass on a closed window and be read as the group filter working.
+    assert!(
+        game.state.should_trigger_live_success(&game.state.player1),
+        "precondition: the ライブ成功時 window must be OPEN, or the dispatch in the \
+         callers below does nothing and the negative is vacuous"
+    );
     live
 }
 

@@ -465,6 +465,14 @@ fn bouken_gain_ability_draws_on_live_success() {
     h.hearts.insert(HeartColor::Heart00, 20);
     game.state.player1.stage_hearts = Some(h);
 
+    // The wildcard hearts OPEN the ライブ成功時 window, and this site depends on it
+    // being open: the assertions after the dispatch are about what the triggered
+    // ability did, so a shut window would make them vacuous.
+    assert!(
+        game.state.should_trigger_live_success(&game.state.player1),
+        "precondition: hearts were injected so the window must be OPEN, or the \
+         dispatch below does nothing"
+    );
     TurnEngine::trigger_live_success_abilities(&mut game.state, "p1");
     game.state.process_pending_auto_abilities("p1");
 
@@ -503,6 +511,17 @@ fn bouken_gain_ability_no_draw_on_failed_live() {
 
     // No hearts → LiveSuccess should not trigger
     game.state.current_phase = Phase::LiveVictoryDetermination;
+    // The OPPOSITE premise from the site above, and deliberately so. This test
+    // exists to show the heart requirement gates the trigger, so the window it
+    // depends on is CLOSED — and that is exactly what makes its negative
+    // meaningful. Asserting the window is shut states the test's premise; leaving
+    // it unstated is what would let a closed window elsewhere masquerade as the
+    // requirement working.
+    assert!(
+        !game.state.should_trigger_live_success(&game.state.player1),
+        "precondition: with no hearts the ライブ成功時 window must be SHUT, which is \
+         what this test's negative rests on"
+    );
     TurnEngine::trigger_live_success_abilities(&mut game.state, "p1");
     game.state.process_pending_auto_abilities("p1");
 

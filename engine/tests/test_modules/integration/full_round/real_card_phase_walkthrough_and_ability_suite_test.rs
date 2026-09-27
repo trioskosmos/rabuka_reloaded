@@ -2526,6 +2526,31 @@ fn lovepeace_q150_self_hearts_greater_than_opponent_score_plus_1() {
     // Trigger live_success for P1 (this fires ab#1 which compares stage hearts)
     // P1 has 20 hearts > P2 has 2 hearts → should grant +1 score
     game.state.current_phase = rabuka_engine::game_state::Phase::LiveVictoryDetermination;
+    // The calculated stage hearts and the phase above OPEN the window this dispatch
+    // goes through. The assertion is on the score comparison's own precondition —
+    // that p1's hearts actually exceed p2's — so a "+1" here is attributable to the
+    // ability rather than to a window that happened to be shut.
+    // Computed from the state's own copy, since `p1_hearts` was moved into
+    // `stage_hearts` above.
+    let p1_heart_total: i32 = game
+        .state
+        .player1
+        .stage_hearts
+        .as_ref()
+        .map(|h| h.hearts.values().map(|v| *v as i32).sum::<i32>())
+        .unwrap_or(0);
+    let p2_heart_total: i32 = game
+        .state
+        .player2
+        .stage_hearts
+        .as_ref()
+        .map(|h| h.hearts.values().map(|v| *v as i32).sum::<i32>())
+        .unwrap_or(0);
+    assert!(
+        game.state.should_trigger_live_success(&game.state.player1),
+        "precondition: the ライブ成功時 window must be OPEN (p1 {p1_heart_total} hearts \
+         vs p2 {p2_heart_total}), or the dispatch below does nothing"
+    );
     rabuka_engine::turn::TurnEngine::trigger_live_success_abilities(&mut game.state, "p1");
     game.state.process_pending_auto_abilities("p1");
 
