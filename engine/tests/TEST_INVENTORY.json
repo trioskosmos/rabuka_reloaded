@@ -1,14 +1,14 @@
 {
   "generated_by": "cards/test_inventory.py",
-  "generated_at": "2026-09-27T05:38:07.188045+00:00",
+  "generated_at": "2026-09-27T05:51:28.189220+00:00",
   "stats": {
     "total_cards": 2526,
     "cards_with_abilities": 1565,
     "total_abilities": 2011,
     "unique_abilities": 936
   },
-  "n_files": 923,
-  "n_tests": 3722,
+  "n_files": 924,
+  "n_tests": 3723,
   "total_cards": 771,
   "covered_cards": 771,
   "abilities_on_covered": 936,
@@ -309,8 +309,8 @@
     ]
   },
   "depth_counts": {
-    "L2+choice": 828,
-    "L1+choice": 32,
+    "L2+choice": 829,
+    "L1+choice": 31,
     "L2": 76
   },
   "qa_rulings": {
@@ -388,8 +388,15 @@
       "rows": []
     },
     "no_drive": {
-      "count": 0,
-      "rows": []
+      "count": 1,
+      "rows": [
+        {
+          "file": "engine/tests/test_modules/effects/draw/flat/live_success_compare_revealed_draw_behaviour_test.rs",
+          "test": "the_live_success_window_opens_for_a_start_dash_live",
+          "line": 114,
+          "detail": ""
+        }
+      ]
     },
     "synthetic_only": {
       "count": 0,
@@ -937,7 +944,7 @@
       ]
     }
   },
-  "n_test_fns_parsed": 3722,
+  "n_test_fns_parsed": 3723,
   "abilities": [
     {
       "idx": 0,
@@ -17673,6 +17680,7 @@
         "engine/tests/test_modules/effects/draw/chains/card_ability_test.rs",
         "engine/tests/test_modules/effects/draw/conditional/score_or_revealed_live_pl_sp_pb2_004_r_test.rs",
         "engine/tests/test_modules/effects/draw/flat/boosted_member_live_success_draw_test.rs",
+        "engine/tests/test_modules/effects/draw/flat/live_success_compare_revealed_draw_behaviour_test.rs",
         "engine/tests/test_modules/effects/draw/flat/live_success_compare_revealed_draw_test.rs",
         "engine/tests/test_modules/effects/draw/flat/live_zone_count_gated_draw_test.rs",
         "engine/tests/test_modules/effects/draw/flat/per_own_stage_member_draw_then_discard_q146_test.rs",
@@ -17792,7 +17800,7 @@
         "ayumu_live_start_triggers",
         "ayumu_no_wait_with_non_nijigasaki_ally"
       ],
-      "covering_test_count": 848,
+      "covering_test_count": 849,
       "direct_tests": [
         "any_card_fails_hearts_all_fail",
         "aoku_haruka_live_start_fails_with_only_non_suzu_live_cards",
@@ -23238,23 +23246,26 @@
       ],
       "base": "PL!S-bp3-005",
       "covered": true,
-      "depth": "L1+choice",
+      "depth": "L2+choice",
       "has_assert": true,
       "has_choice": true,
-      "has_negative": false,
+      "has_negative": true,
       "covering_files": [
+        "engine/tests/test_modules/effects/draw/flat/live_success_compare_revealed_draw_behaviour_test.rs",
         "engine/tests/test_modules/effects/draw/flat/live_success_compare_revealed_draw_test.rs"
       ],
       "covering_tests": [
         "hanamaru_bp3_016_success_zone_cost_increase_constant_parsed",
         "maki_sd1_006_success_zone_restriction_parsed",
+        "the_live_success_window_opens_for_a_start_dash_live",
         "you_bp3_005_live_success_trigger_is_evaluated_and_records_a_verdict"
       ],
-      "covering_test_count": 3,
+      "covering_test_count": 4,
       "direct_tests": [
+        "the_live_success_window_opens_for_a_start_dash_live",
         "you_bp3_005_live_success_trigger_is_evaluated_and_records_a_verdict"
       ],
-      "direct_test_count": 1,
+      "direct_test_count": 2,
       "is_null": false,
       "use_limit": null,
       "watches_abilities": false,
