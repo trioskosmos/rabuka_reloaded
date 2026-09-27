@@ -1370,6 +1370,39 @@ def _card_numbers():
     return set()
 
 
+def stale_report_bases(rows):
+    """Ability rows whose `base` is a PREFIX of no card in the pool.
+
+    `base` is a 12-character truncation of a card number, so resolving one means
+    "some card_no starts with this". `unresolvable_card_literals` checks what test
+    SOURCES name, which is the other direction: a stale base could sit in this
+    report itself and no test would ever name it, so nothing else here would see it.
+
+    Kept as DEFENCE, not because an instance is known. When this was added the
+    motivating case turned out to be me: a scratch listing printed
+    `PL!N-pb3-014: UNRESOLVED`, I read past it, and hand-wrote `PL!N-pb3-014-N` as
+    the card number, which panics on `game.id(...)`. There was never a bad row in the
+    report. The check earns its place because the failure mode is real -- the report is
+    what the L1+choice frontier is read from, and a base that resolves to nothing sends
+    the reader to a card that does not exist -- not because the report is known to
+    contain one.
+
+    Sound in the strong direction: a base that IS a prefix of a real card is never
+    reported, so a row is only flagged when nothing in the pool can satisfy it.
+    """
+    numbers = _card_numbers()
+    if not numbers:
+        return []
+    out = []
+    for r in rows:
+        base = r.get("base")
+        if not base:
+            continue
+        if not any(n.startswith(base) for n in numbers):
+            out.append(base)
+    return sorted(set(out))
+
+
 def unresolvable_card_literals(files, card_numbers):
     """[(rel, line, literal)] for id literals absent from the card database.
 
@@ -2279,6 +2312,7 @@ def build_inventory():
             if r["action"] in STATEFUL_REGISTRATION_ACTIONS and r["direct_test_count"]
         ),
         "qa": qa,
+        "stale_bases": stale_report_bases(rows),
         "all_src_len": len(all_src),
     }
     quality_smells, n_test_fns_parsed = audit_test_quality(files)
@@ -2917,6 +2951,11 @@ def main():
     print(f"depth: {dict(inv['depth_counts'])}")
     print(f"jidou interaction: watchers+cause+multi = {sum(1 for r in inv['abilities'] if r['watches_abilities'])}+{sum(1 for r in inv['abilities'] if r['effect_cause'])}+{sum(1 for r in inv['abilities'] if '自動' in r['trigger_list'] and r['jidou_partners'])}; specific-requirement thin: {len(inv['specific_requirements_thin'])}/{inv['specific_requirements_total']}")
     print(f"lifecycle gaps: {len(inv['lifecycle_gaps'])}/{inv['lifecycle_total']} stateful-registration abilities missing a transition")
+    stale = inv["stale_bases"]
+    if stale:
+        print(f"REPORT INTEGRITY: {len(stale)} ability rows name a card that is not in the pool: {stale[:6]}")
+    else:
+        print("report integrity: every ability row names a card in the pool")
     return 0
 
 
