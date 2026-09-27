@@ -137,6 +137,38 @@ static int score_of(TestGame *tg, int cid)
     return test_get_score_modifier(tg, cid);
 }
 
+/* ---- TEMPORARY DIAGNOSTIC (removed before commit) ---- */
+static void dbg_card(const char *tag, int cid)
+{
+    Card c;
+    if (cid < 0 || cid == RB_EMPTY_SLOT) { printf("DBG %s: <empty>\n", tag); return; }
+    if (!rb_decode_card_by_index((uint32_t)cid, &c)) { printf("DBG %s: <nodecode %d>\n", tag, cid); return; }
+    printf("DBG %s: cid=%d no=%s name=%s group=%s cost=%d blade=%d score=%d\n",
+           tag, cid, c.card_no, c.name, c.group, (int)c.cost, (int)c.blade, (int)c.score);
+    rb_free_card(&c);
+}
+static void dbg_stage(TestGame *tg, int pl, const char *tag)
+{
+    printf("DBG %s: pl=%d stage=[%d,%d,%d] wait=%d disc=%d under=%d deck=%d live=%d succ=%d\n",
+           tag, pl,
+           tg->state.p[pl].stage[0], tg->state.p[pl].stage[1], tg->state.p[pl].stage[2],
+           tg->state.p[pl].waitroom.n, tg->state.p[pl].discard.n,
+           0, tg->state.p[pl].deck.n, tg->state.p[pl].live.n, tg->state.p[pl].success.n);
+    for (int i = 0; i < 3; i++) {
+        char t[32]; snprintf(t, sizeof t, "%s.stage[%d]", tag, i);
+        dbg_card(t, tg->state.p[pl].stage[i]);
+    }
+    for (int i = 0; i < tg->state.p[pl].waitroom.n; i++) {
+        char t[32]; snprintf(t, sizeof t, "%s.wait[%d]", tag, i);
+        dbg_card(t, tg->state.p[pl].waitroom.cards[i]);
+    }
+    for (int i = 0; i < tg->state.p[pl].live.n; i++) {
+        char t[32]; snprintf(t, sizeof t, "%s.live[%d]", tag, i);
+        dbg_card(t, tg->state.p[pl].live.cards[i]);
+    }
+}
+#define DBG(...) do { printf(__VA_ARGS__); fflush(stdout); } while (0)
+
 static int base_score_of(int cid)
 {
     Card c;
@@ -329,6 +361,9 @@ static void nonfiction_p2(int p1_center, int p2_center, int expected, const char
     /* The phase machine dispatches P2's LiveStart itself when the second
        attacker starts; no extra rb_trigger_live_start() here. */
     drain_skip(&tg);
+    DBG("DBG nonfiction_p2 p1c=%d p2c=%d exp=%d got=%d\n", p1_center, p2_center, expected, score_of(&tg, nonfiction));
+    dbg_card("nfp2 p1.center", tg.state.p[0].stage[1]);
+    dbg_card("nfp2 p2.center", tg.state.p[1].stage[1]);
     CHECK_EQ(score_of(&tg, nonfiction), expected, what);
 }
 static void test_nonfiction_center_cost_comparison(void)
@@ -515,6 +550,8 @@ static void test_phoenix_stellar_reciprocal(void)
         test_add_to_live(&tg, filler_live);
         fire_live_start(&tg, 0, phoenix);
         drain_first(&tg);
+        dbg_card("phoenix filler_live", filler_live);
+        dbg_stage(&tg, 0, "phoenixneg");
         CHECK_EQ(score_of(&tg, phoenix), 0,
                  "PHOENIX gets no score: the other live card is not Nijigasaki");
         CHECK_EQ(test_get_heart_modifier(&tg, member, RB_HEART_ORANGE), 0,
@@ -542,6 +579,9 @@ static void aurora_flower(int a, int b, int c, int expected, const char *what)
     test_set_live_card(&tg, 0, aurora);
     finish_live_setup(&tg);
     drain_skip(&tg);
+    dbg_card("aurora a", tg.state.p[0].stage[0]);
+    dbg_card("aurora b", tg.state.p[0].stage[1]);
+    dbg_card("aurora c", tg.state.p[0].stage[2]);
     CHECK_EQ(score_of(&tg, aurora), expected, what);
 }
 
@@ -631,6 +671,7 @@ static void test_dream_with_you_total_blade(void)
         test_set_live_card(&tg, 0, dream);
         finish_live_setup(&tg);
         drain_skip(&tg);
+        dbg_stage(&tg, 0, "dream12");
         CHECK_EQ(score_of(&tg, dream), 1,
                  "Dream with You: total stage blade 12 >= 10 -> +1");
     }
@@ -832,6 +873,7 @@ static void test_mirakura_stage_threshold(void)
            exact-position guard is not portable through the C port's LiveStart
            dispatch, so this keeps the fixture intent (three DISTINCT instances
            staged) without asserting an unrelated positional invariant. */
+        dbg_stage(&tg, 0, "mirakura3");
         CHECK(test_stage_has(&tg, 0, mirakura) || test_stage_has(&tg, 1, mirakura) ||
               test_stage_has(&tg, 2, mirakura),
               "setup guard: the first DISTINCT mirakura instance is on stage");

@@ -340,7 +340,7 @@ const unsigned char *rb_bc_slice(uint32_t idx, uint32_t *out_len) {
 }
 
 /* ── CardDatabase::get_card_id (card.rs:576-629) ──────────────────────────────
-   The lookup is a five-step fallback chain, reproduced here in Rust's order:
+   The lookup is a five-step chain, reproduced here in Rust's order:
 
      1. exact match against the stored card_no
      2. normalized match (uppercase, fullwidth → halfwidth)
@@ -358,9 +358,17 @@ const unsigned char *rb_bc_slice(uint32_t idx, uint32_t *out_len) {
    the comparison is kept so the two cannot drift apart if that ever changes.
    ── */
 
-/* The longest card_no in cards.bin is 25 bytes; 64 leaves room for the
-   "base-<canonical rarity>" keys built below. */
-#define CARD_NO_MAX 64
+/* The longest card_no in cards.bin is 25 bytes ("LL-PR-007-PRLoveLive!Days"),
+   so a folded copy of a STORED key always fits this stack buffer. The lookup
+   KEY is a different matter: it is derived from the caller's string, and
+   sizing it from strlen(card_no) is what stops a long key from being
+   silently truncated — a truncated key would make the base/rarity split below
+   run on a different string than Rust's parse_base_and_rarity sees, and "any
+   rarity of this base" would then fire where Rust returns None. */
+#define CARD_NO_FOLD_MAX 256
+/* Enough for the common case without touching the heap; longer keys fall back
+   to an exact-size allocation. */
+#define CARD_NO_STACK_SZ 512
 
 static const char *card_no_at(uint32_t i) {
     const unsigned char *r = rb_card_record(i);
@@ -378,7 +386,7 @@ static int card_no_exact(const char *query) {
 
 /* Compare a stored card_no against an ALREADY normalized key. */
 static int card_no_folded_eq(const char *stored, const char *folded) {
-    char candidate[CARD_NO_MAX];
+    char candidate[CARD_NO_FOLD_MAX];
     rb_card_normalize_no(stored, candidate, sizeof(candidate));
     return strcmp(candidate, folded) == 0;
 }
@@ -394,17 +402,18 @@ static int card_no_folded_lookup(const char *folded) {
 /* Step 3c: the lowest normalized card_no starting with `prefix`. */
 static int card_no_folded_prefix_lowest(const char *prefix) {
     int best = -1;
-    char best_no[CARD_NO_MAX];
+    char best_no[CARD_NO_FOLD_MAX];
     size_t prefix_len = strlen(prefix);
     for (uint32_t i = 0; i < g_num_cards; i++) {
         const char *no = card_no_at(i);
         if (!no) continue;
-        char candidate[CARD_NO_MAX];
+        char candidate[CARD_NO_FOLD_MAX];
         rb_card_normalize_no(no, candidate, sizeof(candidate));
         if (strncmp(candidate, prefix, prefix_len) != 0) continue;
         if (best < 0 || strcmp(candidate, best_no) < 0) {
             best = (int)i;
-            memcpy(best_no, candidate, sizeof(best_no));
+            /* bounded copy: the tail of candidate is untouched padding */
+            memcpy(best_no, candidate, strlen(candidate) + 1);
         }
     }
     return best;
@@ -423,6 +432,77 @@ static int card_no_contains_lowest(const char *needle, const char *narrow) {
     return best;
 }
 
+/* Steps 2-5 of get_card_id. `scratch` holds four NUL-terminated buffers laid
+   out back to back — normalized, base, variant, narrow — and must be at least
+   card_no_scratch_bytes(len) bytes. Every buffer is sized from the caller's
+   string, never a fixed one, so no step ever sees a truncated key. */
+static size_t card_no_scratch_bytes(size_t len) {
+    return 3 * (len + 1) + 2 + 3 * len + 4 + 1;
+}
+
+static int card_no_resolve_chain(const char *card_no, char *scratch, size_t len) {
+    char *normalized = scratch;
+    char *base       = scratch + (len + 1);
+    char *variant    = base + (len + 1);
+    char *narrow     = variant + (len + 2);
+
+    /* 2. normalized (rb_card_normalize_no is the card.rs:634 port; folding a
+       3-byte fullwidth character must write exactly ONE destination byte) */
+    rb_card_normalize_no(card_no, normalized, len + 1);
+    int id = card_no_folded_lookup(normalized);
+    if (id >= 0) return id;
+
+    /* 3. base + requested rarity */
+    const char *dash = strrchr(normalized, '-');
+    if (dash) {
+        size_t base_len = (size_t)(dash - normalized);
+        memcpy(base, normalized, base_len);
+        base[base_len] = 0;
+        const char *requested = dash + 1;
+        int n;
+
+        /* 3a. exact base + requested rarity */
+        n = snprintf(variant, len + 2, "%s-%s", base, requested);
+        if (n > 0 && (size_t)n < len + 2) {
+            id = card_no_folded_lookup(variant);
+            if (id >= 0) return id;
+        }
+        /* 3b. equivalent rarities. The canonical form keeps the fullwidth
+           ＋, so the key must be normalized before the folded comparison.
+           Folding only ever shortens a string, so the freed tail of `variant`
+           is exactly wide enough to hold the folded form. */
+        char canonical[32];
+        if (base_len + 1 < sizeof(canonical) &&
+            rb_card_equivalent_rarity(requested, canonical, sizeof(canonical))) {
+            n = snprintf(variant, len + 2, "%s-%s", base, canonical);
+            if (n > 0 && (size_t)n < len + 2) {
+                char *folded = variant + (size_t)n + 1;
+                rb_card_normalize_no(variant, folded, len - (size_t)n);
+                id = card_no_folded_lookup(folded);
+                if (id >= 0) return id;
+            }
+        }
+        /* 3c. any rarity of this base, lowest key wins */
+        n = snprintf(variant, len + 2, "%s-", base);
+        if (n > 0 && (size_t)n < len + 2) {
+            id = card_no_folded_prefix_lowest(variant);
+            if (id >= 0) return id;
+        }
+        /* 4. strip the rarity suffix and retry the bare base */
+        id = card_no_folded_lookup(base);
+        if (id >= 0) return id;
+    }
+
+    /* 5. contains step on the raw keys, narrow form widens '+' to '＋' */
+    size_t w = 0;
+    for (const char *p = normalized; *p; p++) {
+        if (*p == '+') { memcpy(narrow + w, "\xef\xbc\x8b", 3); w += 3; }
+        else narrow[w++] = *p;
+    }
+    narrow[w] = 0;
+    return card_no_contains_lowest(normalized, narrow);
+}
+
 int rb_find_card_by_no(const char *card_no) {
     if (!card_no || !g_cards_blob) return -1;
 
@@ -430,64 +510,16 @@ int rb_find_card_by_no(const char *card_no) {
     int id = card_no_exact(card_no);
     if (id >= 0) return id;
 
-    /* 2. normalized (rb_card_normalize_no is the card.rs:634 port; folding a
-       3-byte fullwidth character must write exactly ONE destination byte) */
-    char normalized[CARD_NO_MAX];
-    rb_card_normalize_no(card_no, normalized, sizeof(normalized));
-    id = card_no_folded_lookup(normalized);
-    if (id >= 0) return id;
-
-    /* 3. base + requested rarity */
-    const char *dash = strrchr(normalized, '-');
-    if (dash) {
-        char base[CARD_NO_MAX];
-        size_t base_len = (size_t)(dash - normalized);
-        if (base_len < sizeof(base)) {
-            memcpy(base, normalized, base_len);
-            base[base_len] = 0;
-            const char *requested = dash + 1;
-            char variant[CARD_NO_MAX];
-            int n;
-
-            /* 3a. exact base + requested rarity */
-            n = snprintf(variant, sizeof(variant), "%s-%s", base, requested);
-            if (n > 0 && (size_t)n < sizeof(variant)) {
-                id = card_no_folded_lookup(variant);
-                if (id >= 0) return id;
-            }
-            /* 3b. equivalent rarities. The canonical form keeps the fullwidth
-               ＋, so the key must be normalized before the folded comparison. */
-            char canonical[32];
-            if (rb_card_equivalent_rarity(requested, canonical, sizeof(canonical))) {
-                n = snprintf(variant, sizeof(variant), "%s-%s", base, canonical);
-                if (n > 0 && (size_t)n < sizeof(variant)) {
-                    char folded[CARD_NO_MAX];
-                    rb_card_normalize_no(variant, folded, sizeof(folded));
-                    id = card_no_folded_lookup(folded);
-                    if (id >= 0) return id;
-                }
-            }
-            /* 3c. any rarity of this base, lowest key wins */
-            n = snprintf(variant, sizeof(variant), "%s-", base);
-            if (n > 0 && (size_t)n < sizeof(variant)) {
-                id = card_no_folded_prefix_lowest(variant);
-                if (id >= 0) return id;
-            }
-            /* 4. strip the rarity suffix and retry the bare base */
-            id = card_no_folded_lookup(base);
-            if (id >= 0) return id;
-        }
-    }
-
-    /* 5. contains fallback on the raw keys, narrow form widens '+' to '＋' */
-    char narrow[CARD_NO_MAX * 2];
-    size_t w = 0;
-    for (const char *p = normalized; *p && w + 4 < sizeof(narrow); p++) {
-        if (*p == '+') { memcpy(narrow + w, "\xef\xbc\x8b", 3); w += 3; }
-        else narrow[w++] = *p;
-    }
-    narrow[w] = 0;
-    return card_no_contains_lowest(normalized, narrow);
+    size_t len = strlen(card_no);
+    size_t need = card_no_scratch_bytes(len);
+    char stack_scratch[CARD_NO_STACK_SZ];
+    if (need <= sizeof(stack_scratch))
+        return card_no_resolve_chain(card_no, stack_scratch, len);
+    char *heap_scratch = rb_malloc(need);
+    if (!heap_scratch) return -1;
+    id = card_no_resolve_chain(card_no, heap_scratch, len);
+    rb_free(heap_scratch);
+    return id;
 }
 
 void rb_effect_data_free(RbEffectData *d) {

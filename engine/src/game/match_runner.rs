@@ -46,6 +46,9 @@ use crate::Arc;
 /// `kind` is the strategy to play. Anything the registry routes to a random or
 /// type-weighted fallback still returns a legal action; only an empty offer
 /// returns None.
+// Only the web server drives a selectable policy, so this is dead weight in a
+// default (no-`server`) build.
+#[cfg(feature = "server")]
 pub(crate) fn ai_pick_action_bot(
     gs: &GameState,
     acts: &[game_setup::Action],

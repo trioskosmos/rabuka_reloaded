@@ -1019,6 +1019,45 @@ fn card_has_usable_ability(card: &crate::card::Card) -> bool {
     })
 }
 
+/// How close this board is to actually passing a check, in [0, 1].
+///
+/// This is the term v7's Main-phase evaluation was missing, and it is
+/// available for free because `choose_live_set_experiment` already models the
+/// check exactly — 256 determinized deck draws, evaluated against the real
+/// board pool, with the engine's own bucket/wildcard semantics. `value()`
+/// approximated that with `60 × Δpassable`, which is a one-ply coverage proxy:
+/// it counts lives the board could *already* pass, and is blind to the thing
+/// that actually decides a check, which is ACTIVE BLADES, because blades are
+/// the deck draws the check gets to see.
+///
+/// It matters most late, and it is the same option value the junk-fill
+/// experiment exposed from the other side. A life that cannot clear the
+/// reliability floor on the current board often can two turns later, because
+/// the board grew. Valuing pressure makes Main-phase development aim at the
+/// check instead of at an ever-larger stage, which is the direction the stage
+/// cost curve has been drifting on its own.
+///
+/// Returns the best single-life pass probability; 0.0 when no live is in hand,
+/// which is the honest "no check to aim at" rather than a neutral 0.5.
+pub(crate) fn check_pressure(gs: &GameState, me: u8, db: &CardDatabase) -> f64 {
+    let lives = experiment_lives(gs, me, db);
+    if lives.is_empty() {
+        return 0.0;
+    }
+    let (cats, deck_len) = experiment_flip_categories(gs, me, db);
+    let blades = experiment_blades(gs, me, db);
+    let board = experiment_board_pool(gs, me, db);
+    if blades <= 0 || deck_len == 0 {
+        return 0.0;
+    }
+    let pools = experiment_sample_pools(&cats, deck_len, blades, &board);
+    lives
+        .iter()
+        .filter(|(_, _, need)| need[8] == 0 && need[9] == 0)
+        .map(|(_, _, need)| experiment_pass_probability_pools(&pools, need))
+        .fold(0.0f64, f64::max)
+}
+
 fn experiment_junk_fill(gs: &GameState, me: u8, db: &CardDatabase, desired: &mut Vec<usize>) {
     let (my, _) = gs.seated_pair(me);
     let deck_lives = my

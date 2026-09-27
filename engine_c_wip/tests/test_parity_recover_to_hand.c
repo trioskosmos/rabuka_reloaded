@@ -694,6 +694,60 @@ static void test_series_level_and_unit_level_groups_resolve_by_different_routes(
           "a card whose unit IS 5yncri5e! does match it");
 }
 
+static void probe_liella(void)
+{
+    TestGame tg;
+    test_game_new(&tg);
+    clear_p1(&tg);
+    int me = test_id(&tg, "PL!SP-bp4-018-N");
+    tg.state.p[0].stage[0] = me;
+    printf("PROBE before: total=%d hand=%d wait=%d\n", test_total_card_count(&tg),
+           tg.state.p[0].hand.n, tg.state.p[0].discard.n);
+    test_activate_ability(&tg, me);
+    printf("PROBE after: total=%d hand=%d wait=%d pending=%d\n", test_total_card_count(&tg),
+           tg.state.p[0].hand.n, tg.state.p[0].discard.n, rb_has_pending_choice(&tg.state));
+    test_print_board(&tg);
+    for (int i = 0; i < tg.state.p[0].discard.n; i++)
+        printf("  wait[%d]=%d no=%s\n", i, tg.state.p[0].discard.cards[i],
+               card_no_of(tg.state.p[0].discard.cards[i]));
+    for (int i = 0; i < tg.state.p[0].hand.n; i++)
+        printf("  hand[%d]=%d no=%s\n", i, tg.state.p[0].hand.cards[i],
+               card_no_of(tg.state.p[0].hand.cards[i]));
+}
+
+static void probe_proteinbar(void)
+{
+    TestGame tg;
+    test_game_new(&tg);
+    clear_p1(&tg);
+    int me = test_id(&tg, "PL!N-sd1-005-PRproteinbar");
+    int niji = test_id(&tg, "PL!N-bp3-004-R");
+    tg.state.p[0].stage[0] = me;
+    test_add_to_discard(&tg, niji);
+    int f1 = test_new_id(&tg, "PL!-sd1-010-SD");
+    int f2 = test_new_id(&tg, "PL!-sd1-010-SD");
+    test_add_to_hand(&tg, f1);
+    test_add_to_hand(&tg, f2);
+    printf("PROBE before: total=%d hand=%d wait=%d\n", test_total_card_count(&tg),
+           tg.state.p[0].hand.n, tg.state.p[0].discard.n);
+    test_activate_ability(&tg, me);
+    const RbChoice *ch = rb_get_pending_choice(&tg.state);
+    printf("PROBE cost prompt: type=%s zone=%s count=%d nfiltered=%d\n",
+           test_pending_choice_type(&tg), ch ? ch->zone : "-", ch ? ch->count : -1,
+           ch ? ch->n_filtered_indices : -1);
+    int both[2] = { 0, 1 };
+    pick_n(&tg, both, 2);
+    printf("PROBE after cost: total=%d hand=%d wait=%d pending=%d\n", test_total_card_count(&tg),
+           tg.state.p[0].hand.n, tg.state.p[0].discard.n, rb_has_pending_choice(&tg.state));
+    test_print_board(&tg);
+    for (int i = 0; i < tg.state.p[0].discard.n; i++)
+        printf("  wait[%d]=%d no=%s\n", i, tg.state.p[0].discard.cards[i],
+               card_no_of(tg.state.p[0].discard.cards[i]));
+    for (int i = 0; i < tg.state.p[0].hand.n; i++)
+        printf("  hand[%d]=%d no=%s\n", i, tg.state.p[0].hand.cards[i],
+               card_no_of(tg.state.p[0].hand.cards[i]));
+}
+
 /* ---------------------------------------------------------------------- */
 
 static int load_card_db(void)
@@ -775,6 +829,8 @@ static void run_all(const char *only)
         { "fiveync_ok",              test_three_5yncri5e_members_recover_waitroom_live },
         { "fiveync_no",              test_only_two_5yncri5e_members_do_not_recover_live },
         { "group_routes",            test_series_level_and_unit_level_groups_resolve_by_different_routes },
+        { "probe_liella",            probe_liella },
+        { "probe_proteinbar",        probe_proteinbar },
     };
     for (size_t i = 0; i < sizeof cases / sizeof cases[0]; i++) {
         if (only && *only && !strstr(cases[i].name, only)) continue;

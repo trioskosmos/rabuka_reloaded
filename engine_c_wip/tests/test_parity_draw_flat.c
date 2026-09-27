@@ -1,11 +1,13 @@
 /* tests/test_parity_draw_flat.c
  *
- * Parity coverage for the Rust cluster
- *   engine/tests/test_modules/effects/draw/flat/   (23 files)
+ * Parity coverage for BOTH Rust draw clusters:
+ *   engine/tests/test_modules/effects/draw/flat/   (25 files: 23 tests + mod.rs)
+ *   engine/tests/test_modules/effects/draw/chains/ (20 files: 19 tests + mod.rs)
  * i.e. plain `draw_card` (a fixed number of cards out of a zone into a
- * destination), as opposed to draw/until_count (already covered by
- * tests/test_parity_draw_until_count.c) and draw/chains (draw + a second
- * verb).
+ * destination) and `draw_card` plus at least one further verb (a discard, a
+ * hand -> deck_bottom / deck_top put-back, a wait cost). draw/until_count is
+ * already covered by tests/test_parity_draw_until_count.c and is deliberately
+ * not duplicated here.
  *
  * Engine code under test:
  *   engine_c_wip/src/ability/effects/draw.c
@@ -58,6 +60,38 @@
  *                                                    advance_to_phase
  *   turn1_energy_draw_discard_pl_sp_bp1_009_r_...rs  -> 18
  *   waitroom_count_gated_debut_draw_test.rs          -> 19
+ *
+ * Rust tests mirrored here from the CHAINS cluster
+ * (all under engine/tests/test_modules/effects/draw/chains/; the C functions
+ * are numbered C1..C19 further down):
+ *   activation_draw_then_discard_test.rs             -> C1
+ *   baton_source_cost_gated_draw_discard_test.rs      -> C9
+ *   baton_touch_skips_discard_after_self_wait_draw_.rs-> C14
+ *   card_ability_test.rs                              -> C18 (only the two draw
+ *                                                      CHAIN halves: the
+ *                                                      PL!HS-bp1-005-R and
+ *                                                      PL!HS-pb1-003-R blocks)
+ *   draw_discard_pl_hs_bp6_030_l_test.rs              -> C4
+ *   draw_then_bottom_hand_card_test.rs                -> C17
+ *   full_group_cost_twenty_draw_three_topdeck_three_.rs-> C19 (the two NEGATIVE
+ *                                                      gate cases only; the two
+ *                                                      positive cases need the
+ *                                                      LiveCardSet phase dance
+ *                                                      plus the printed deck-order
+ *                                                      SelectTarget, which no C
+ *                                                      suite here drives)
+ *   hand_debut_no_draw_pl_hs_bp6_015_r_test.rs        -> C3
+ *   leftside_debut_draw_test.rs                       -> C2
+ *   live_success_draw_then_discard_test.rs            -> C5
+ *   lower_stage_cost_draw_then_topdeck_test.rs        -> C16
+ *   named_baton_source_draw_then_discard_test.rs      -> C8
+ *   opponent_success_pl_n_sd2_007_p_test.rs           -> C6
+ *   optional_wait_draw_discard_pl_n_bp4_023_n_test.rs  -> C11
+ *   self_wait_draw_discard_pl_n_bp7_023_n_test.rs     -> C12
+ *   self_wait_draw_then_discard_test.rs               -> C13
+ *   side_debut_draw_discard_pl_sp_pb2_036_n_pl_sp_pb2_037_n_test.rs -> C15
+ *   stage_group_pl_hs_sd1_017_sd_test.rs              -> C7
+ *   waitroom_debut_draw_discard_pl_s_bp6_011_n_test.rs -> C10
  *
  * All Japanese literals are hex escapes so the file stays pure ASCII (the
  * same convention tests/test_parity_stats_pipeline.c uses).
@@ -1757,6 +1791,1690 @@ static void df_dump_actions(void)
     free(list.actions);
 }
 
+/* ???????????????????????????????????????????????????????????????????????????
+   draw/chains — `effects/draw/chains/` (20 files, 19 + mod.rs)
+   A draw CHAIN is a draw plus at least one further verb (a discard, a
+   hand -> deck_bottom / deck_top put-back, a wait cost). What matters here is
+   the state carried BETWEEN the steps: the discard must see the cards the
+   draw just produced, the put-back must see the enlarged hand, a conditional
+   step must be skipped when the condition is false, and the chain must stop
+   cleanly when the deck runs dry.
+   ??????????????????????????????????????????????????????????????????????????? */
+
+/* rb_record_card_appearance is defined in src/core/modifiers.c but has no
+   prototype in include/rabuka.h; declare it exactly as defined there. */
+void rb_record_card_appearance(GameState *g, int card_id, int source);
+
+/* Rust `while game.has_pending_choice() { game.select_indices(&[0]) }` with a
+   bounded guard. The Rust files use guard 10; 32 is used here so a legitimate
+   longer chain is drained rather than truncated, and a runaway prompt still
+   terminates. */
+static void dc_drain_pick_first(TestGame *tg)
+{
+    int guard = 0;
+    while (test_has_pending_choice(tg) && guard++ < 32)
+        test_resume_choice(tg, 0);
+}
+
+/* Rust `while game.has_pending_choice() { game.select_indices(&[]) }` — a drain
+   that DECLINES every prompt. */
+static void dc_drain_decline(TestGame *tg)
+{
+    int guard = 0;
+    while (test_has_pending_choice(tg) && guard++ < 32)
+        test_resume_choice(tg, -1);
+}
+
+static void dc_discard_all_decks(TestGame *tg)
+{
+    tg->state.p[0].deck.n = 0;
+    tg->state.p[1].deck.n = 0;
+    tg->state.p[0].discard.n = 0;
+    tg->state.p[1].discard.n = 0;
+}
+
+/* Rust fill_decks(game, filler): clear both decks, fill each with `n` copies. */
+static void dc_fill_decks(TestGame *tg, int filler, int n)
+{
+    tg->state.p[0].deck.n = 0;
+    tg->state.p[1].deck.n = 0;
+    for (int i = 0; i < n; i++) {
+        test_add_to_deck(tg, filler);
+        test_add_to_deck_pl(tg, 1, filler);
+    }
+}
+
+/* Rust fill_decks_distinct: 30 DISTINCT instances per deck, returning the P1
+   deck snapshot (index 0 = top) so an order-sensitive assertion can be made
+   after a draw + put-back. */
+static int dc_fill_decks_distinct(TestGame *tg, int count)
+{
+    int snap[64];
+    if (count > 64) count = 64;
+    tg->state.p[0].deck.n = 0;
+    tg->state.p[1].deck.n = 0;
+    for (int i = 0; i < count; i++) {
+        int f = df_new_id(tg, "PL!-sd1-010-SD");
+        if (f < 0) f = test_id(tg, "PL!-sd1-010-SD");
+        snap[i] = f;
+        test_add_to_deck(tg, f);
+        test_add_to_deck_pl(tg, 1, f);
+    }
+    return count;
+}
+
+static int dc_is_waited(TestGame *tg, int cid)
+{
+    const char *o = rb_mods_get_orientation(&tg->state.mods, cid);
+    return o && !strcmp(o, "wait");
+}
+
+/* Assert the pending prompt is a mandatory 1-card SelectCard from `zone`
+   (Rust's `game.assert_select_card(zone, count, allow_skip)`). */
+static void dc_expect_select_card(TestGame *tg, const char *zone, int count, int allow_skip)
+{
+    const RbChoice *ch = test_has_pending_choice(tg) ? rb_get_pending_choice(&tg->state) : NULL;
+    char msg[192];
+    snprintf(msg, sizeof(msg), "expected a pending SelectCard from %s (got %s)", zone,
+             ch ? "a different choice kind" : "no pending choice");
+    CHECK(ch && ch->kind == RB_CHOICE_SELECT_CARD, msg);
+    snprintf(msg, sizeof(msg), "the pending SelectCard must name zone '%s' (got '%s')", zone,
+             ch && ch->zone ? ch->zone : "(null)");
+    CHECK(ch && ch->zone && !strcmp(ch->zone, zone), msg);
+    snprintf(msg, sizeof(msg), "the pending SelectCard must ask for %d card(s) (got %d)", count,
+             ch ? ch->count : -1);
+    CHECK_EQ(ch ? ch->count : -1, count, msg);
+    snprintf(msg, sizeof(msg), "the pending SelectCard allow_skip must be %d (got %d)", allow_skip,
+             ch ? ch->allow_skip : -1);
+    CHECK_EQ(ch ? ch->allow_skip : -1, allow_skip, msg);
+}
+
+/* Index of `id` in player 1's hand, or 0 (Rust's `.unwrap_or(0)`). */
+static int dc_hand_index(TestGame *tg, int id)
+{
+    for (int i = 0; i < tg->state.p[0].hand.n; i++)
+        if (tg->state.p[0].hand.cards[i] == id) return i;
+    return 0;
+}
+
+static int dc_hand_has(TestGame *tg, int id)
+{
+    for (int i = 0; i < tg->state.p[0].hand.n; i++)
+        if (tg->state.p[0].hand.cards[i] == id) return 1;
+    return 0;
+}
+
+static int dc_wait_has(TestGame *tg, int id)
+{
+    for (int i = 0; i < tg->state.p[0].discard.n; i++)
+        if (tg->state.p[0].discard.cards[i] == id) return 1;
+    return 0;
+}
+
+static int dc_deck_has(TestGame *tg, int id)
+{
+    for (int i = 0; i < tg->state.p[0].deck.n; i++)
+        if (tg->state.p[0].deck.cards[i] == id) return 1;
+    return 0;
+}
+
+/* ?? C1. activation_draw_then_discard_test.rs ???????????????????????????????
+   PL!SP-bp1-009-R: ??, 1E, draw 1 then put 1 hand card in the waitroom.
+   Distinct from the flat cluster's Natsumi case in that it pins the PROMPT
+   IDENTITY (a SelectCard, not a bare effect) and the identity of the drawn
+   card rather than only a count. */
+static void test_chain_natsumi_activation_draw_then_discard(void)
+{
+    TestGame game;
+    test_game_new(&game);
+    int natsumi = test_id(&game, "PL!SP-bp1-009-R");
+    int held = df_new_id(&game, "PL!-sd1-010-SD");
+    int drawn = df_new_id(&game, "PL!-sd1-010-SD");
+    CHECK(natsumi >= 0 && held >= 0 && drawn >= 0, "PL!SP-bp1-009-R chain fixtures resolve");
+    if (natsumi < 0 || held < 0 || drawn < 0) return;
+    CHECK(held != drawn, "the held and drawn cards are two distinct instances");
+    dc_fill_decks(&game, test_id(&game, "PL!-sd1-010-SD"), 30);
+    test_add_to_deck(&game, drawn);   /* Rust push() = bottom of the deck */
+    game.state.p[0].stage[0] = natsumi;
+    test_add_to_hand(&game, held);
+    test_give_energy(&game, 1);
+    int waitroom_before = game.state.p[0].discard.n;
+
+    CHECK_EQ(rb_activate_card(&game.state, 0, natsumi), 1, "the activation is accepted");
+    CHECK(test_has_pending_choice(&game), "hand discard prompt expected");
+    CHECK(test_pending_choice_type(&game) != NULL &&
+          !strcmp(test_pending_choice_type(&game), "SelectCard"),
+          "expected SelectCard for the discard");
+    {
+        const int pick[1] = { 0 };
+        test_select_indices(&game, pick, 1);
+    }
+
+    CHECK_EQ(game.state.p[0].hand.n, 1, "net hand size stays 1");
+    CHECK_EQ(game.state.p[0].discard.n, waitroom_before + 1,
+             "exactly one card was discarded to the waitroom");
+    CHECK(!dc_deck_has(&game, drawn), "the stocked deck card was drawn");
+}
+
+/* ?? C2. leftside_debut_draw_test.rs ???????????????????????????????????????
+   PL!SP-bp4-008-P: draw 2 + discard 1, but ONLY from the left side. The centre
+   must produce no draw and no prompt at all. */
+static void test_chain_shiki_leftside_draw(void)
+{
+    {
+        TestGame game;
+        test_game_new(&game);
+        int shiki = test_id(&game, "PL!SP-bp4-008-P");
+        int filler = test_id(&game, "PL!-sd1-010-SD");
+        CHECK(shiki >= 0 && filler >= 0, "PL!SP-bp4-008-P fixtures resolve");
+        if (shiki < 0 || filler < 0) return;
+        dc_fill_decks(&game, filler, 10);
+        test_add_to_hand(&game, shiki);
+        test_give_energy(&game, 20);
+
+        CHECK_EQ(test_play_to_stage(&game, shiki, 0 /* left */), 1, "Shiki plays to the left side");
+        CHECK_EQ(df_hand(&game), 2, "leftside should draw 2");
+        CHECK(test_has_pending_choice(&game), "discard prompt");
+        {
+            const int pick[1] = { 0 };
+            test_select_indices(&game, pick, 1);
+        }
+        CHECK_EQ(df_hand(&game), 1, "after discarding 1 the hand is back to 1");
+    }
+    {
+        TestGame game;
+        test_game_new(&game);
+        int shiki = test_id(&game, "PL!SP-bp4-008-P");
+        int filler = test_id(&game, "PL!-sd1-010-SD");
+        if (shiki < 0 || filler < 0) return;
+        dc_fill_decks(&game, filler, 10);
+        test_add_to_hand(&game, shiki);
+        test_give_energy(&game, 20);
+
+        CHECK_EQ(test_play_to_stage(&game, shiki, 1 /* centre */), 1, "Shiki plays to the centre");
+        CHECK_EQ(df_hand(&game), 0, "center should not draw");
+        CHECK(!test_has_pending_choice(&game), "center must not even prompt for a discard");
+    }
+}
+
+/* ?? C3. hand_debut_no_draw_pl_hs_bp6_015_r_test.rs ????????????????????????
+   PL!HS-bp6-015-R: a hand debut gives NO draw bonus, so the hand simply
+   shrinks by the card that was played. Guards against a debut draw that fires
+   unconditionally. */
+static void test_chain_hand_debut_no_draw_bonus(void)
+{
+    TestGame game;
+    test_game_new(&game);
+    int me = test_id(&game, "PL!HS-bp6-015-R");
+    int filler = df_new_id(&game, "PL!N-sd1-010-SD");
+    CHECK(me >= 0 && filler >= 0, "PL!HS-bp6-015-R fixtures resolve");
+    if (me < 0 || filler < 0) return;
+    dc_fill_decks(&game, filler, 30);
+    test_add_to_hand(&game, me);
+    test_give_energy(&game, 5);
+    int hand_before = df_hand(&game);
+    int deck_before = df_deck(&game);
+
+    test_play_to_stage(&game, me, 1);
+    dc_drain_pick_first(&game);
+
+    CHECK_EQ(df_hand(&game), hand_before - 1, "normal hand debut -> no draw bonus");
+    CHECK_EQ(df_deck(&game), deck_before, "the deck is untouched by a no-draw debut");
+}
+
+/* ?? C4. draw_discard_pl_hs_bp6_030_l_test.rs ???????????????????????????????
+   PL!HS-bp6-030-L: live start, draw 1 then discard 1. The drawn card is the
+   ONLY hand card, so the discard must be able to pay back exactly what the
+   draw just produced - the state handoff between the two chain steps. */
+static void test_chain_hs_bp6_030_l_draw_then_discard(void)
+{
+    TestGame game;
+    test_game_new(&game);
+    int live = test_id(&game, "PL!HS-bp6-030-L");
+    int drawn = df_new_id(&game, "PL!S-sd1-001-SD");
+    CHECK(live >= 0 && drawn >= 0, "PL!HS-bp6-030-L fixtures resolve");
+    if (live < 0 || drawn < 0) return;
+    dc_fill_decks(&game, test_id(&game, "PL!-sd1-010-SD"), 30);
+    test_add_to_live(&game, live);
+    test_insert_deck_top(&game, 0, drawn);   /* Rust main_deck.cards.insert(0, x) */
+
+    CHECK(df_fire_live_start(&game, live), "PL!HS-bp6-030-L exposes live-start");
+    dc_drain_pick_first(&game);
+
+    CHECK(!dc_hand_has(&game, drawn), "the drawn card was immediately paid back to the waitroom");
+    CHECK_EQ(df_hand(&game), 0, "draw 1 then discard 1 leaves the hand empty");
+    CHECK(dc_wait_has(&game, drawn), "discarded card lands in the waitroom");
+}
+
+/* ?? C5. live_success_draw_then_discard_test.rs ????????????????????????????
+   PL!S-pb1-024-L: live success, draw 2 then discard 2. The second case is the
+   interesting one: the discard prompt must be able to spare a card that was in
+   hand BEFORE the draw. */
+static void test_chain_s_pb1_024_l_draw_two_discard_two(void)
+{
+    {
+        TestGame game;
+        test_game_new(&game);
+        int live = test_id(&game, "PL!S-pb1-024-L");
+        int d1 = df_new_id(&game, "PL!-sd1-010-SD");
+        int d2 = df_new_id(&game, "PL!-sd1-010-SD");
+        CHECK(live >= 0 && d1 >= 0 && d2 >= 0, "PL!S-pb1-024-L empty-hand fixtures resolve");
+        if (live < 0 || d1 < 0 || d2 < 0) return;
+        test_add_to_live(&game, live);
+        test_add_to_deck(&game, d1);
+        test_add_to_deck(&game, d2);   /* top of the deck is d1 */
+        int waitroom_before = game.state.p[0].discard.n;
+
+        CHECK(df_fire_live_success(&game, live), "PL!S-pb1-024-L exposes live-success");
+        dc_drain_pick_first(&game);
+
+        CHECK_EQ(df_hand(&game), 0, "drew 2 then discarded 2 (hand was empty)");
+        CHECK_EQ(game.state.p[0].discard.n, waitroom_before + 2,
+                 "two cards went to the waitroom");
+    }
+    {
+        TestGame game;
+        test_game_new(&game);
+        int live = test_id(&game, "PL!S-pb1-024-L");
+        int kept = df_new_id(&game, "PL!-sd1-010-SD");
+        int d1 = df_new_id(&game, "PL!-sd1-010-SD");
+        int d2 = df_new_id(&game, "PL!-sd1-010-SD");
+        CHECK(live >= 0 && kept >= 0 && d1 >= 0 && d2 < 0, "PL!S-pb1-024-L keep fixtures resolve");
+        if (live < 0 || kept < 0 || d1 < 0 || d2 < 0) return;
+        test_add_to_live(&game, live);
+        test_add_to_hand(&game, kept);
+        test_add_to_deck(&game, d1);
+        test_add_to_deck(&game, d2);
+
+        CHECK(df_fire_live_success(&game, live), "PL!S-pb1-024-L second case: live-success found");
+        CHECK(test_has_pending_choice(&game), "discard-2 prompt expected");
+        CHECK(test_pending_choice_type(&game) != NULL &&
+              !strcmp(test_pending_choice_type(&game), "SelectCard"),
+              "expected SelectCard for the 2-card discard");
+        int n = df_hand(&game);
+        CHECK(n >= 2, "need at least the 2 drawn cards in hand");
+        if (n < 2) return;
+        {
+            const int pick[2] = { n - 2, n - 1 };
+            test_select_indices(&game, pick, 2);
+        }
+        CHECK(dc_hand_has(&game, kept), "the pre-existing hand card can be kept");
+    }
+}
+
+/* ?? C6. opponent_success_pl_n_sd2_007_p_test.rs ???????????????????????????
+   PL!N-sd2-007-P: draw 1 normally, draw 1 MORE when the opponent also
+   succeeded this turn. A dynamic-count draw driven by turn-wide state - the
+   state that has to survive from the opponent's success to this draw. */
+static void test_chain_setsuna_opponent_success_extra_draw(void)
+{
+    {
+        TestGame game;
+        test_game_new(&game);
+        int setsuna = test_id(&game, "PL!N-sd2-007-P");
+        int filler = df_new_id(&game, "PL!-sd1-010-SD");
+        CHECK(setsuna >= 0 && filler >= 0, "PL!N-sd2-007-P fixtures resolve");
+        if (setsuna < 0 || filler < 0) return;
+        dc_fill_decks(&game, filler, 30);
+        test_add_to_hand(&game, setsuna);
+        test_add_to_hand(&game, df_new_id(&game, "PL!-sd1-010-SD"));
+        game.state.opponent_live_success_this_turn = 1;
+        game.state.p2_live_success_no_excess = 1;
+        int deck_before = df_deck(&game);
+
+        CHECK(df_fire_live_success(&game, setsuna), "PL!N-sd2-007-P exposes live-success");
+        CHECK(test_has_pending_choice(&game), "hand discard prompt expected");
+        CHECK(test_pending_choice_type(&game) != NULL &&
+              !strcmp(test_pending_choice_type(&game), "SelectCard"),
+              "expected SelectCard for the discard");
+        {
+            const int pick[1] = { 0 };
+            test_select_indices(&game, pick, 1);
+        }
+        CHECK_EQ(deck_before - df_deck(&game), 2,
+                 "opponent succeeded too -> base draw + extra draw");
+    }
+    {
+        TestGame game;
+        test_game_new(&game);
+        int setsuna = test_id(&game, "PL!N-sd2-007-P");
+        int filler = df_new_id(&game, "PL!-sd1-010-SD");
+        if (setsuna < 0 || filler < 0) return;
+        dc_fill_decks(&game, filler, 30);
+        test_add_to_hand(&game, setsuna);
+        int deck_before = df_deck(&game);
+
+        CHECK(df_fire_live_success(&game, setsuna), "PL!N-sd2-007-P negative: live-success found");
+        CHECK_EQ(deck_before - df_deck(&game), 1,
+                 "opponent did not succeed -> only the base draw");
+    }
+}
+
+/* ?? C7. stage_group_pl_hs_sd1_017_sd_test.rs ???????????????????????????????
+   PL!HS-sd1-017-SD: live success gated on a ??? member being on stage, then
+   draw 1 + discard 1. */
+static void test_chain_natsumeki_group_gated_draw_discard(void)
+{
+    {
+        TestGame game;
+        test_game_new(&game);
+        int live = test_id(&game, "PL!HS-sd1-017-SD");
+        int hino = test_id(&game, "PL!HS-bp5-001-P");
+        int filler = df_new_id(&game, "PL!-sd1-010-SD");
+        int hand_filler = df_new_id(&game, "PL!-sd1-010-SD");
+        CHECK(live >= 0 && hino >= 0 && filler >= 0 && hand_filler >= 0,
+              "PL!HS-sd1-017-SD fixtures resolve");
+        if (live < 0 || hino < 0 || filler < 0 || hand_filler < 0) return;
+        dc_fill_decks(&game, filler, 30);
+        test_add_to_live(&game, live);
+        game.state.p[0].stage[0] = hino;
+        test_add_to_hand(&game, hand_filler);
+        int deck_before = df_deck(&game);
+
+        CHECK(df_fire_live_success(&game, live), "PL!HS-sd1-017-SD exposes live-success");
+        CHECK(test_has_pending_choice(&game), "hand discard prompt expected");
+        CHECK(test_pending_choice_type(&game) != NULL &&
+              !strcmp(test_pending_choice_type(&game), "SelectCard"),
+              "expected SelectCard for the discard");
+        {
+            const int pick[1] = { 0 };
+            test_select_indices(&game, pick, 1);
+        }
+        CHECK_EQ(deck_before - df_deck(&game), 1, "gate met -> draw 1");
+        CHECK(!dc_hand_has(&game, hand_filler), "second step discards 1 hand card");
+        CHECK(dc_wait_has(&game, hand_filler), "discarded card lands in the waitroom");
+    }
+    {
+        TestGame game;
+        test_game_new(&game);
+        int live = test_id(&game, "PL!HS-sd1-017-SD");
+        int other = test_id(&game, "PL!-sd1-010-SD");
+        int filler = df_new_id(&game, "PL!-sd1-010-SD");
+        CHECK(live >= 0 && other >= 0 && filler >= 0, "PL!HS-sd1-017-SD negative fixtures resolve");
+        if (live < 0 || other < 0 || filler < 0) return;
+        dc_fill_decks(&game, filler, 30);
+        test_add_to_live(&game, live);
+        game.state.p[0].stage[0] = other;
+        int deck_before = df_deck(&game);
+
+        CHECK(df_fire_live_success(&game, live), "PL!HS-sd1-017-SD negative: live-success found");
+        CHECK_EQ(deck_before - df_deck(&game), 0,
+                 "no ??? member on stage -> nothing happens");
+    }
+}
+
+/* ?? C8. named_baton_source_draw_then_discard_test.rs ??????????????????????
+   Two cards whose debut fires only when the BATON-TOUCHED member has a
+   specific NAME (PL!N-pb1-019-R over ?????, PL!N-pb1-020-R over
+   ???????): draw 2 + discard 2. Plus the negative: touching a member of
+   a different name must draw nothing. */
+static void dc_run_baton_draw_flow(TestGame *game, const char *me_no, const char *replaced_no)
+{
+    int replaced = test_id(game, replaced_no);
+    int me = df_new_id(game, me_no);
+    int d1 = df_new_id(game, "PL!-sd1-010-SD");
+    int d2 = df_new_id(game, "PL!-sd1-010-SD");
+    CHECK(replaced >= 0 && me >= 0 && d1 >= 0 && d2 >= 0,
+          "the baton-source fixtures resolve");
+    if (replaced < 0 || me < 0 || d1 < 0 || d2 < 0) return;
+    CHECK(rb_card_no_eq(replaced, replaced_no), "the replaced member is the named print");
+    game->state.p[0].stage[0] = replaced;
+    test_add_to_hand(game, me);
+    test_give_energy(game, 25);
+    test_add_to_deck(game, d1);
+    test_add_to_deck(game, d2);
+    int deck_before = df_deck(game);
+    int waitroom_before = game->state.p[0].discard.n;
+
+    test_play_to_stage(game, me, 0 /* left, over the replaced member */);
+    dc_drain_pick_first(game);
+
+    /* The Rust file notes that for THIS ability shape the draw+discard resolves
+       inside the play action - no prompt reaches the caller. */
+    CHECK_EQ(df_hand(game), 0, "drew 2 then discarded 2 -> hand empty");
+    CHECK(dc_wait_has(game, d1) && dc_wait_has(game, d2), "both drawn cards were discarded");
+    CHECK_EQ(df_deck(game), deck_before - 2, "deck shrank by exactly the two draws");
+    CHECK_EQ(game->state.p[0].discard.n, waitroom_before + 3,
+             "+1 replaced member +2 discarded");
+}
+
+static void test_chain_named_baton_source_draw_then_discard(void)
+{
+    TestGame g1;
+    test_game_new(&g1);
+    dc_run_baton_draw_flow(&g1, "PL!N-pb1-019-R", "PL!N-PR-009-PR");  /* ????? */
+    TestGame g2;
+    test_game_new(&g2);
+    dc_run_baton_draw_flow(&g2, "PL!N-pb1-020-R", "PL!N-bp1-020-PRproteinbar"); /* ??????? */
+
+    {
+        TestGame game;
+        test_game_new(&game);
+        int other = test_id(&game, "PL!-sd1-010-SD");
+        int me = df_new_id(&game, "PL!N-pb1-019-R");
+        CHECK(other >= 0 && me >= 0, "PL!N-pb1-019-R negative fixtures resolve");
+        if (other < 0 || me < 0) return;
+        game.state.p[0].stage[0] = other;
+        test_add_to_hand(&game, me);
+        test_give_energy(&game, 25);
+        int deck_before = df_deck(&game);
+
+        test_play_to_stage(&game, me, 0);
+        dc_drain_pick_first(&game);
+        CHECK_EQ(df_deck(&game), deck_before, "wrong replaced name -> no draw");
+    }
+}
+
+/* ?? C9. baton_source_cost_gated_draw_discard_test.rs ??????????????????????
+   PL!S-PR-045-PR: the same baton-touch chain, but the gate is the COST of the
+   touched member (exactly 7). Cost 7 -> draw 2 + discard prompt; cost 4 -> no
+   draw and, crucially, no prompt. */
+static void dc_run_baton_cost_flow(TestGame *game, const char *replaced_no, int should_draw)
+{
+    int replaced = test_id(game, replaced_no);
+    int me = df_new_id(game, "PL!S-PR-045-PR");
+    int d1 = df_new_id(game, "PL!-sd1-010-SD");
+    int d2 = df_new_id(game, "PL!-sd1-010-SD");
+    CHECK(replaced >= 0 && me >= 0 && d1 >= 0 && d2 >= 0, "PL!S-PR-045-PR fixtures resolve");
+    if (replaced < 0 || me < 0 || d1 < 0 || d2 < 0) return;
+    game->state.p[0].stage[0] = replaced;
+    test_add_to_hand(game, me);
+    test_give_energy(game, 25);
+    test_add_to_deck(game, d1);
+    test_add_to_deck(game, d2);
+    int deck_before = df_deck(game);
+
+    test_play_to_stage(game, me, 0);
+    if (should_draw) {
+        CHECK(test_has_pending_choice(game),
+              "hand-discard prompt expected after the baton debut");
+        CHECK(test_pending_choice_type(game) != NULL &&
+              !strcmp(test_pending_choice_type(game), "SelectCard"),
+              "expected SelectCard (hand, count=1)");
+        {
+            const int pick[1] = { 0 };
+            test_select_indices(game, pick, 1);
+        }
+        CHECK_EQ(df_deck(game), deck_before - 2,
+                 "replaced a cost-7 member -> deck should shrink by 2 draws");
+    } else {
+        CHECK(!test_has_pending_choice(game),
+              "cost != 7 baton should NOT trigger draw, but got pending choice");
+        CHECK_EQ(df_deck(game), deck_before,
+                 "replaced a cost-4 member -> deck should NOT shrink");
+    }
+}
+
+static void test_chain_baton_source_cost_gated_draw_discard(void)
+{
+    TestGame g1;
+    test_game_new(&g1);
+    dc_run_baton_cost_flow(&g1, "PL!-sd1-007-SD", 1);  /* lilywhite ???, cost 7 */
+    TestGame g2;
+    test_game_new(&g2);
+    dc_run_baton_cost_flow(&g2, "PL!-sd1-001-SD", 0);  /* CYaRon ????, cost 4 */
+}
+
+/* ?? C10. waitroom_debut_draw_discard_pl_s_bp6_011_n_test.rs ???????????????
+   PL!S-bp6-011-N: draw 2 + discard 1, but only when the member debuted FROM
+   THE WAITROOM. The hand-debut negative and the short/empty-deck cases pin the
+   chain's tail: a draw that comes up short must still run the discard step,
+   and an entirely empty board must move no cards at all.
+
+   KNOWN RED (canary): the "from the waitroom" half of the gate cannot be
+   evaluated in C. rb_record_card_appearance (src/core/modifiers.c:314) accepts
+   `source` and DISCARDS it - `(void)source;` - because GameState has no
+   `card_appearance_source` field (the file's own comment at modifiers.c:343
+   calls this out and requests the field). So "record(me, \"hand\")" and
+   "record(me, \"discard\")" are indistinguishable and the hand-debut negative
+   below cannot pass until the field exists. */
+static void test_chain_waitroom_debut_draw_discard(void)
+{
+    int me = -1;
+    /* 10a. waitroom debut -> draw 2 + discard 1 */
+    {
+        TestGame game;
+        test_game_new(&game);
+        me = test_id(&game, "PL!S-bp6-011-N");
+        int filler = df_new_id(&game, "PL!-sd1-010-SD");
+        int hand_card = df_new_id(&game, "PL!-sd1-010-SD");
+        CHECK(me >= 0 && filler >= 0 && hand_card >= 0, "PL!S-bp6-011-N fixtures resolve");
+        if (me < 0 || filler < 0 || hand_card < 0) return;
+        dc_fill_decks(&game, filler, 30);
+        test_add_to_hand(&game, hand_card);
+        game.state.p[0].stage[0] = me;
+        rb_record_card_appearance(&game.state, me, RB_ZONE_DISCARD);
+        int deck_before = df_deck(&game);
+
+        CHECK(df_fire_debut(&game, me), "PL!S-bp6-011-N exposes a debut ability");
+        CHECK(test_has_pending_choice(&game), "hand discard prompt expected");
+        CHECK(test_pending_choice_type(&game) != NULL &&
+              !strcmp(test_pending_choice_type(&game), "SelectCard"),
+              "expected SelectCard for the discard");
+        {
+            const int pick[1] = { 0 };
+            test_select_indices(&game, pick, 1);
+        }
+        CHECK_EQ(deck_before - df_deck(&game), 2, "waitroom debut -> draw exactly 2");
+        CHECK(!dc_hand_has(&game, hand_card), "second step discards 1 hand card");
+        CHECK(dc_wait_has(&game, hand_card), "discarded card lands in the waitroom");
+    }
+    /* 10b. hand debut -> neither draw nor discard */
+    {
+        TestGame game;
+        test_game_new(&game);
+        me = test_id(&game, "PL!S-bp6-011-N");
+        int filler = df_new_id(&game, "PL!-sd1-010-SD");
+        int hand_card = df_new_id(&game, "PL!-sd1-010-SD");
+        if (me < 0 || filler < 0 || hand_card < 0) return;
+        dc_fill_decks(&game, filler, 30);
+        test_add_to_hand(&game, hand_card);
+        game.state.p[0].stage[0] = me;
+        rb_record_card_appearance(&game.state, me, RB_ZONE_HAND);
+        int deck_before = df_deck(&game);
+
+        CHECK(df_fire_debut(&game, me), "PL!S-bp6-011-N hand debut: trigger found");
+        CHECK_EQ(df_deck(&game), deck_before, "hand debut -> no draw");
+        CHECK(dc_hand_has(&game, hand_card), "no discard either");
+    }
+    /* 10c. a ONE-CARD deck: the draw comes up short but the discard still runs */
+    {
+        TestGame game;
+        test_game_new(&game);
+        me = test_id(&game, "PL!S-bp6-011-N");
+        int discard_me = df_new_id(&game, "PL!-sd1-010-SD");
+        CHECK(me >= 0 && discard_me >= 0, "PL!S-bp6-011-N short-deck fixtures resolve");
+        if (me < 0 || discard_me < 0) return;
+        dc_discard_all_decks(&game);
+        test_add_to_deck(&game, df_new_id(&game, "PL!-sd1-010-SD"));
+        test_give_energy(&game, 10);
+        game.state.p[0].stage[0] = me;
+        rb_record_card_appearance(&game.state, me, RB_ZONE_DISCARD);
+        test_add_to_hand(&game, discard_me);
+
+        CHECK(df_fire_debut(&game, me), "PL!S-bp6-011-N short deck: trigger found");
+        CHECK(test_has_pending_choice(&game),
+              "hand discard prompt expected even when the draw comes up short");
+        CHECK(test_pending_choice_type(&game) != NULL &&
+              !strcmp(test_pending_choice_type(&game), "SelectCard"),
+              "expected SelectCard for the discard");
+        {
+            const int pick[1] = { 0 };
+            test_select_indices(&game, pick, 1);
+        }
+        CHECK_EQ(df_deck(&game), 0, "drew the single available card");
+        CHECK(!dc_hand_has(&game, discard_me), "discard step still ran despite short draw");
+        CHECK(dc_wait_has(&game, discard_me), "the discarded card is in the waitroom");
+    }
+    /* 10d. empty deck AND empty hand: no card moves at all */
+    {
+        TestGame game;
+        test_game_new(&game);
+        me = test_id(&game, "PL!S-bp6-011-N");
+        if (me < 0) return;
+        dc_discard_all_decks(&game);
+        game.state.p[0].stage[0] = me;
+        rb_record_card_appearance(&game.state, me, RB_ZONE_DISCARD);
+        int hand_before = df_hand(&game);
+        int wait_before = game.state.p[0].discard.n;
+
+        CHECK(df_fire_debut(&game, me), "PL!S-bp6-011-N empty board: trigger found");
+        CHECK_EQ(df_deck(&game), 0, "empty deck stays empty");
+        CHECK_EQ(df_hand(&game), hand_before, "empty hand gains nothing");
+        CHECK_EQ(game.state.p[0].discard.n, wait_before, "nothing discarded on noop");
+    }
+}
+
+/* ?? C11. optional_wait_draw_discard_pl_n_bp4_023_n_test.rs ????????????????
+   PL!N-bp4-023-N: an OPTIONAL wait cost gates the whole draw+discard chain.
+   Declining must leave both the member and the hand untouched; accepting must
+   wait exactly the chosen member and run both later steps. */
+static void test_chain_optional_wait_gates_draw_discard(void)
+{
+    const char *MIA = "PL!N-bp4-023-N";
+    /* 11a. decline -> nothing happens */
+    {
+        TestGame game;
+        test_game_new(&game);
+        int mia = test_id(&game, MIA);
+        int filler = test_id(&game, "PL!-sd1-010-SD");
+        int niji = test_id(&game, "PL!N-PR-019-PR");
+        int keep = test_id(&game, "PL!N-PR-012-PR");
+        CHECK(mia >= 0 && filler >= 0 && niji >= 0 && keep >= 0, "PL!N-bp4-023-N fixtures resolve");
+        if (mia < 0 || filler < 0 || niji < 0 || keep < 0) return;
+        dc_fill_decks(&game, filler, 30);
+        game.state.p[0].stage[1] = mia;
+        game.state.p[0].stage[0] = niji;
+        test_add_to_hand(&game, keep);
+        int hand_before = df_hand(&game);
+
+        CHECK(df_fire_debut(&game, mia), "PL!N-bp4-023-N exposes a debut ability");
+        CHECK(test_has_pending_choice(&game), "optional wait-cost offer expected on debut");
+        /* Rust accepts either a SelectTarget (option) or a SelectCard (empty). */
+        if (test_pending_choice_type(&game) != NULL &&
+            !strcmp(test_pending_choice_type(&game), "SelectTarget")) {
+            test_resume_choice(&game, 0);
+        } else {
+            const int none[1] = { 0 };
+            test_select_indices(&game, NULL, 0);
+            (void)none;
+        }
+        CHECK_EQ(df_hand(&game), hand_before, "declined cost -> no draw/discard");
+        CHECK(!dc_is_waited(&game, niji), "member untouched when declined");
+    }
+    /* 11b. accept -> the named member is waited and the discard step runs */
+    {
+        TestGame game;
+        test_game_new(&game);
+        int mia = test_id(&game, MIA);
+        int filler = test_id(&game, "PL!-sd1-010-SD");
+        int niji = test_id(&game, "PL!N-PR-019-PR");
+        int keep = test_id(&game, "PL!N-PR-012-PR");
+        int sacrifice = df_new_id(&game, "PL!-sd1-010-SD");
+        CHECK(mia >= 0 && filler >= 0 && niji >= 0 && keep >= 0 && sacrifice >= 0,
+              "PL!N-bp4-023-N accept fixtures resolve");
+        if (mia < 0 || filler < 0 || niji < 0 || keep < 0 || sacrifice < 0) return;
+        dc_fill_decks(&game, filler, 30);
+        game.state.p[0].stage[1] = mia;
+        game.state.p[0].stage[0] = niji;
+        test_add_to_hand(&game, keep);
+        int hand_before = df_hand(&game);
+
+        CHECK(df_fire_debut(&game, mia), "PL!N-bp4-023-N second firing: trigger found");
+        CHECK(test_has_pending_choice(&game), "cost offer expected");
+        if (test_pending_choice_type(&game) != NULL &&
+            !strcmp(test_pending_choice_type(&game), "SelectTarget")) {
+            test_resume_choice(&game, 1);
+        } else {
+            const int pick[1] = { 0 };
+            test_select_indices(&game, pick, 1);
+        }
+        /* Rust's answer loop: a stage prompt picks the Niji member's index,
+           any other prompt picks the sacrifice card's hand index. */
+        for (int step = 0; step < 3 && test_has_pending_choice(&game); step++) {
+            const RbChoice *ch = rb_get_pending_choice(&game.state);
+            if (ch && ch->kind == RB_CHOICE_SELECT_CARD && ch->zone &&
+                !strcmp(ch->zone, "stage")) {
+                int idx = 0;
+                for (int a = 0; a < RB_STAGE_SIZE; a++)
+                    if (game.state.p[0].stage[a] == niji) { idx = a; break; }
+                const int pick[1] = { idx };
+                test_select_indices(&game, pick, 1);
+            } else {
+                int idx = dc_hand_index(&game, sacrifice);
+                const int pick[1] = { idx };
+                test_select_indices(&game, pick, 1);
+            }
+        }
+        CHECK(dc_is_waited(&game, niji), "accepting waited the Niji member");
+        CHECK(dc_wait_has(&game, sacrifice),
+              "the discard step put the chosen card in the waitroom");
+        CHECK(dc_hand_has(&game, keep), "the untouched hand card is kept");
+        CHECK(df_hand(&game) >= hand_before,
+              "an accepted wait cost is followed by the draw");
+    }
+}
+
+/* ?? C12. self_wait_draw_discard_pl_n_bp7_023_n_test.rs ????????????????????
+   PL!N-bp7-023-N: ?? / ???1?, the cost waits THIS member, then draw 2 and
+   discard 2. Also pins the per-turn budget and the already-waited refusal. */
+static void test_chain_mia_bp7_self_wait_draw_two_discard_two(void)
+{
+    {
+        TestGame game;
+        test_game_new(&game);
+        int filler = df_new_id(&game, "PL!-sd1-010-SD");
+        int mia = test_id(&game, "PL!N-bp7-023-N");
+        int d1 = df_new_id(&game, "PL!-sd1-001-SD");
+        int d2 = df_new_id(&game, "PL!S-sd1-001-SD");
+        int h1 = df_new_id(&game, "PL!-sd1-007-SD");
+        int h2 = df_new_id(&game, "PL!-sd1-004-SD");
+        CHECK(filler >= 0 && mia >= 0 && d1 >= 0 && d2 >= 0 && h1 >= 0 && h2 >= 0,
+              "PL!N-bp7-023-N fixtures resolve");
+        if (filler < 0 || mia < 0 || d1 < 0 || d2 < 0 || h1 < 0 || h2 < 0) return;
+        dc_fill_decks(&game, filler, 30);
+        game.state.p[0].stage[1] = mia;
+        test_insert_deck_top(&game, 0, d2);
+        test_insert_deck_top(&game, 0, d1);
+        test_add_to_hand(&game, h1);
+        test_add_to_hand(&game, h2);
+
+        CHECK_EQ(rb_activate_card(&game.state, 0, mia), 1, "the activation is accepted");
+        CHECK(dc_is_waited(&game, mia), "activation cost waits this member");
+        dc_drain_pick_first(&game);
+
+        CHECK(dc_hand_has(&game, d1) && dc_hand_has(&game, d2), "drawn cards reached the hand");
+        CHECK(dc_wait_has(&game, h1) && dc_wait_has(&game, h2),
+              "two hand cards discarded to the waitroom");
+        CHECK(df_turn1_used(&game, mia), "turn-limited use recorded");
+        CHECK_EQ(df_count_use_offers(&game, mia), 0, "no re-offer after consuming");
+    }
+    /* already-wait Mia -> the wait-self cost is unpayable -> refused */
+    {
+        TestGame game;
+        test_game_new(&game);
+        int filler = df_new_id(&game, "PL!-sd1-010-SD");
+        int mia = test_id(&game, "PL!N-bp7-023-N");
+        CHECK(filler >= 0 && mia >= 0, "PL!N-bp7-023-N already-wait fixtures resolve");
+        if (filler < 0 || mia < 0) return;
+        dc_fill_decks(&game, filler, 30);
+        game.state.p[0].stage[1] = mia;
+        rb_mods_set_orientation(&game.state.mods, mia, "wait");
+        test_add_to_hand(&game, df_new_id(&game, "PL!-sd1-010-SD"));
+
+        CHECK_EQ(df_count_use_offers(&game, mia), 0, "waited Mia: not offered");
+        CHECK_EQ(rb_activate_card(&game.state, 0, mia), 0,
+                 "wait-self on an already-wait member must be refused");
+    }
+    /* EMPTY starting hand -> draw 2, then discard exactly those 2 */
+    {
+        TestGame game;
+        test_game_new(&game);
+        int filler = df_new_id(&game, "PL!-sd1-010-SD");
+        int mia = test_id(&game, "PL!N-bp7-023-N");
+        CHECK(filler >= 0 && mia >= 0, "PL!N-bp7-023-N empty-hand fixtures resolve");
+        if (filler < 0 || mia < 0) return;
+        dc_fill_decks(&game, filler, 30);
+        game.state.p[0].stage[1] = mia;
+        CHECK_EQ(df_hand(&game), 0, "test setup: hand starts empty");
+
+        rb_activate_card(&game.state, 0, mia);
+        dc_drain_pick_first(&game);
+        CHECK(!test_has_pending_choice(&game), "prompts should terminate after answering");
+        CHECK_EQ(df_hand(&game), 0, "drew 2 then discarded 2: ends empty");
+        CHECK_EQ(game.state.p[0].discard.n, 2, "both drawn cards reached the waitroom");
+    }
+    /* the per-turn budget is per-instance and resets next turn */
+    {
+        TestGame game;
+        test_game_new(&game);
+        int filler = df_new_id(&game, "PL!-sd1-010-SD");
+        int mia = test_id(&game, "PL!N-bp7-023-N");
+        CHECK(filler >= 0 && mia >= 0, "PL!N-bp7-023-N budget fixtures resolve");
+        if (filler < 0 || mia < 0) return;
+        dc_fill_decks(&game, filler, 30);
+        game.state.p[0].stage[1] = mia;
+        test_add_to_hand(&game, df_new_id(&game, "PL!-sd1-010-SD"));
+        test_add_to_hand(&game, df_new_id(&game, "PL!-sd1-010-SD"));
+
+        rb_activate_card(&game.state, 0, mia);
+        dc_drain_pick_first(&game);
+        CHECK_EQ(df_count_use_offers(&game, mia), 0, "consumed this turn: not offered");
+
+        game.state.turn += 1;
+        /* Mia herself is waited now; the limit reset is observed through a
+           fresh instance (per-instance budget). */
+        int mia2 = df_new_id(&game, "PL!N-bp7-023-N");
+        CHECK(mia2 >= 0, "a fresh Mia instance is available");
+        if (mia2 < 0) return;
+        game.state.p[0].stage[0] = mia2;
+        CHECK_EQ(df_count_use_offers(&game, mia2), 1, "fresh instance next turn: offered");
+    }
+}
+
+/* ?? C13. self_wait_draw_then_discard_test.rs ??????????????????????????????
+   PL!-bp3-001-R: the cost waits THIS member, the effect draws 1 and then
+   MANDATES a hand discard (????1???????? - no ???, so
+   allow_skip must be false). A second press in the same turn is refused. */
+static void test_chain_bp3_001_self_wait_mandatory_discard(void)
+{
+    TestGame game;
+    test_game_new(&game);
+    int card = test_id(&game, "PL!-bp3-001-R");  /* cost 13 */
+    int filler = test_id(&game, "PL!-sd1-010-SD");
+    CHECK(card >= 0 && filler >= 0, "PL!-bp3-001-R fixtures resolve");
+    if (card < 0 || filler < 0) return;
+    test_give_energy(&game, 15);
+    dc_fill_decks(&game, filler, 30);
+    test_add_to_hand(&game, card);
+    test_add_to_hand(&game, filler);
+    CHECK_EQ(test_play_to_stage(&game, card, 1), 1, "PL!-bp3-001-R plays to the centre");
+    dc_drain_decline(&game);
+
+    CHECK_EQ(rb_activate_card(&game.state, 0, card), 1, "the activation is accepted");
+    CHECK(dc_is_waited(&game, card), "cost: member should be waited");
+    dc_expect_select_card(&game, "hand", 1, 0);
+
+    int hand_at_prompt = df_hand(&game);
+    int discard_target = hand_at_prompt > 0 ? game.state.p[0].hand.cards[0] : -1;
+    {
+        const int pick[1] = { 0 };
+        test_select_indices(&game, pick, 1);
+    }
+    CHECK_EQ(df_hand(&game), hand_at_prompt - 1,
+             "resolve discard: prompt-time hand minus the discarded card");
+    CHECK(dc_wait_has(&game, discard_target), "selected card must be in the waitroom");
+
+    /* ???1? - a second press in the same turn is rejected outright. */
+    CHECK_EQ(rb_activate_card(&game.state, 0, card), 0,
+             "expected second activation to be rejected");
+}
+
+/* ?? C14. baton_touch_skips_discard_after_self_wait_draw_test.rs ???????????
+   PL!-pb1-017-R: the chain's LAST step is conditional on a baton touch having
+   happened this turn. This is the clearest test in the cluster of state
+   carried BETWEEN the steps of a draw chain: without a touch, draw 1 is
+   followed by a discard (net 0); with one, the discard is skipped entirely
+   (net +1). */
+static void test_chain_hanayo_baton_touch_skips_discard(void)
+{
+    const char *HANAYO = "PL!-pb1-017-R";
+    /* 14a. no baton touch this turn -> draw 1 then discard 1 */
+    {
+        TestGame game;
+        test_game_new(&game);
+        int hanayo = test_id(&game, HANAYO);
+        int spare = test_id(&game, "PL!-sd1-010-SD");
+        int stock = df_new_id(&game, "PL!-sd1-010-SD");
+        int deck_card = test_id(&game, "PL!-sd1-010-SD");
+        CHECK(hanayo >= 0 && spare >= 0 && stock >= 0 && deck_card >= 0,
+              "PL!-pb1-017-R no-touch fixtures resolve");
+        if (hanayo < 0 || spare < 0 || stock < 0 || deck_card < 0) return;
+        game.state.p[0].stage[1] = hanayo;
+        test_add_to_hand(&game, spare);
+        dc_fill_decks(&game, stock, 30);
+        test_insert_deck_top(&game, 0, deck_card);
+
+        CHECK(df_fire_debut(&game, hanayo), "PL!-pb1-017-R exposes a debut ability");
+        test_resume_choice(&game, 1); /* accept self-wait cost */
+        CHECK(dc_is_waited(&game, hanayo), "accepted cost waits her");
+
+        while (test_has_pending_choice(&game)) {
+            const RbChoice *ch = rb_get_pending_choice(&game.state);
+            if (ch && ch->kind == RB_CHOICE_SELECT_CARD) test_resume_choice(&game, 0);
+            else break;
+        }
+        CHECK_EQ(df_hand(&game), 1,
+                 "draw 1 then discard 1 without baton touch -> hand back to 1");
+    }
+    /* 14b. a baton touch already happened -> the discard step is skipped */
+    {
+        TestGame game;
+        test_game_new(&game);
+        int hanayo = test_id(&game, HANAYO);
+        int spare = test_id(&game, "PL!-sd1-010-SD");
+        int stock = df_new_id(&game, "PL!-sd1-010-SD");
+        int deck_card = test_id(&game, "PL!-sd1-010-SD");
+        CHECK(hanayo >= 0 && spare >= 0 && stock >= 0 && deck_card >= 0,
+              "PL!-pb1-017-R with-touch fixtures resolve");
+        if (hanayo < 0 || spare < 0 || stock < 0 || deck_card < 0) return;
+        game.state.p[0].stage[1] = hanayo;
+        test_add_to_hand(&game, spare);
+        dc_fill_decks(&game, stock, 30);
+        test_insert_deck_top(&game, 0, deck_card);
+        /* This turn already had a baton touch. */
+        rb_record_baton_touch(&game.state, 0, deck_card);
+
+        CHECK(df_fire_debut(&game, hanayo), "PL!-pb1-017-R with-touch: trigger found");
+        test_resume_choice(&game, 1);
+
+        CHECK_EQ(df_hand(&game), 2,
+                 "???????? -> conditional discard skipped -> net +1 card");
+    }
+}
+
+/* ?? C15. side_debut_draw_discard_pl_sp_pb2_036_n_pl_sp_pb2_037_n_test.rs ??
+   Two side-gated draw chains. PL!SP-pb2-036-N (right side) draws 2 and must
+   not leave a stray blade modifier behind; PL!SP-pb2-037-N (left side) draws
+   2 and discards 2, so of three known hand cards exactly one survives. */
+static void test_chain_side_debut_draw_discard(void)
+{
+    {
+        TestGame game;
+        test_game_new(&game);
+        int filler = df_new_id(&game, "PL!-sd1-010-SD");
+        int me = df_new_id(&game, "PL!SP-pb2-036-N");
+        int keep_a = df_new_id(&game, "PL!S-sd1-001-SD");
+        int keep_b = test_id(&game, "PL!N-bp3-006-R");
+        int d1 = df_new_id(&game, "PL!-sd1-007-SD");
+        int d2 = df_new_id(&game, "PL!-sd1-001-SD");
+        CHECK(filler >= 0 && me >= 0 && keep_a >= 0 && keep_b >= 0 && d1 >= 0 && d2 >= 0,
+              "PL!SP-pb2-036-N fixtures resolve");
+        if (filler < 0 || me < 0 || keep_a < 0 || keep_b < 0 || d1 < 0 || d2 < 0) return;
+        dc_fill_decks(&game, filler, 30);
+        test_add_to_hand(&game, me);
+        test_add_to_hand(&game, keep_a);
+        test_add_to_hand(&game, keep_b);
+        test_insert_deck_top(&game, 0, d2);
+        test_insert_deck_top(&game, 0, d1);
+        test_give_energy(&game, 20);
+
+        CHECK_EQ(test_play_to_stage(&game, me, 2 /* right */), 1,
+                 "PL!SP-pb2-036-N plays to the right side");
+        dc_drain_pick_first(&game);
+
+        CHECK_EQ(test_get_blade_modifier(&game, me), 0, "sanity: no stray modifiers");
+        CHECK(dc_hand_has(&game, d1) && dc_hand_has(&game, d2),
+              "both drawn cards reached the hand");
+    }
+    {
+        TestGame game;
+        test_game_new(&game);
+        int filler = df_new_id(&game, "PL!-sd1-010-SD");
+        int me = df_new_id(&game, "PL!SP-pb2-037-N");
+        int keep = df_new_id(&game, "PL!-sd1-007-SD");
+        int d1 = df_new_id(&game, "PL!-sd1-001-SD");
+        int d2 = df_new_id(&game, "PL!-sd1-004-SD");
+        CHECK(filler >= 0 && me >= 0 && keep >= 0 && d1 >= 0 && d2 >= 0,
+              "PL!SP-pb2-037-N fixtures resolve");
+        if (filler < 0 || me < 0 || keep < 0 || d1 < 0 || d2 < 0) return;
+        dc_fill_decks(&game, filler, 30);
+        test_add_to_hand(&game, me);
+        test_add_to_hand(&game, keep);
+        test_insert_deck_top(&game, 0, d2);
+        test_insert_deck_top(&game, 0, d1);
+        test_give_energy(&game, 20);
+        int deck_before = df_deck(&game);
+
+        CHECK_EQ(test_play_to_stage(&game, me, 0 /* left */), 1,
+                 "PL!SP-pb2-037-N plays to the left side");
+        dc_drain_pick_first(&game);
+
+        CHECK_EQ(df_deck(&game), deck_before - 2, "drew exactly 2");
+        int survivors = (dc_hand_has(&game, keep) ? 1 : 0) +
+                        (dc_hand_has(&game, d1) ? 1 : 0) +
+                        (dc_hand_has(&game, d2) ? 1 : 0);
+        CHECK_EQ(survivors, 1, "exactly one of the three remains in hand");
+    }
+}
+
+/* ?? C16. lower_stage_cost_draw_then_topdeck_test.rs ???????????????????????
+   PL!N-bp4-009-R: when my stage total is STRICTLY cheaper than the opponent's,
+   draw 2 and put 1 hand card back on TOP of my deck. A distinct destination
+   from the deck_bottom chains, plus a strict-inequality boundary. */
+static void test_chain_rin_lower_stage_cost_draw_then_topdeck(void)
+{
+    const char *RIN = "PL!N-bp4-009-R";
+    {
+        TestGame game;
+        test_game_new(&game);
+        int rin = test_id(&game, RIN);
+        int opp_center = test_id(&game, "PL!-bp5-008-R");
+        int filler = test_id(&game, "PL!-sd1-010-SD");
+        int keep = test_id(&game, "PL!N-PR-019-PR");
+        int sacrifice = df_new_id(&game, "PL!-sd1-010-SD");
+        CHECK(rin >= 0 && opp_center >= 0 && filler >= 0 && keep >= 0 && sacrifice >= 0,
+              "PL!N-bp4-009-R fire fixtures resolve");
+        if (rin < 0 || opp_center < 0 || filler < 0 || keep < 0 || sacrifice < 0) return;
+        dc_fill_decks(&game, filler, 30);
+        game.state.p[0].stage[1] = rin;
+        game.state.p[1].stage[1] = opp_center;
+        game.state.p[1].stage[0] = df_new_id(&game, "PL!-sd1-010-SD");
+        test_add_to_hand(&game, keep);
+        test_add_to_hand(&game, sacrifice);
+
+        CHECK(df_fire_live_start(&game, rin), "PL!N-bp4-009-R exposes live-start");
+        CHECK(test_has_pending_choice(&game), "put-back choice must be offered");
+        dc_expect_select_card(&game, "hand", 1, 0);
+        {
+            int idx = dc_hand_index(&game, sacrifice);
+            const int pick[1] = { idx };
+            test_select_indices(&game, pick, 1);
+        }
+        CHECK_EQ(df_deck(&game) > 0 ? game.state.p[0].deck.cards[0] : -1, sacrifice,
+                 "chosen card sits at deck index 0 (TOP)");
+        CHECK_EQ(df_hand(&game), 2 + 2 - 1, "drew 2, returned exactly 1 to the deck");
+        CHECK(dc_hand_has(&game, keep), "the untouched hand card is kept");
+    }
+    /* equal totals: strict < must not fire */
+    {
+        TestGame game;
+        test_game_new(&game);
+        int rin = test_id(&game, RIN);
+        int opp_equal = test_id(&game, "PL!-bp5-008-R");
+        int filler = test_id(&game, "PL!-sd1-010-SD");
+        int keep = test_id(&game, "PL!N-PR-019-PR");
+        CHECK(rin >= 0 && opp_equal >= 0 && filler >= 0 && keep >= 0,
+              "PL!N-bp4-009-R equal-total fixtures resolve");
+        if (rin < 0 || opp_equal < 0 || filler < 0 || keep < 0) return;
+        dc_fill_decks(&game, filler, 30);
+        game.state.p[0].stage[1] = rin;
+        game.state.p[1].stage[1] = opp_equal;
+        test_add_to_hand(&game, keep);
+        int hand_before = df_hand(&game);
+
+        CHECK(df_fire_live_start(&game, rin), "PL!N-bp4-009-R equal: trigger found");
+        CHECK(!test_has_pending_choice(&game), "equal totals: strict < must not fire");
+        CHECK_EQ(df_hand(&game), hand_before, "no draw");
+    }
+    /* both stages empty: 0 vs 0 -> equal -> must not fire */
+    {
+        TestGame game;
+        test_game_new(&game);
+        int rin = test_id(&game, RIN);
+        int filler = test_id(&game, "PL!-sd1-010-SD");
+        CHECK(rin >= 0 && filler >= 0, "PL!N-bp4-009-R empty-stage fixtures resolve");
+        if (rin < 0 || filler < 0) return;
+        dc_fill_decks(&game, filler, 30);
+        CHECK(df_fire_live_start(&game, rin), "PL!N-bp4-009-R empty: trigger found");
+        CHECK(!test_has_pending_choice(&game), "0 vs 0 -> equal -> strict < must not fire");
+    }
+    /* my own stage total is higher: must not fire */
+    {
+        TestGame game;
+        test_game_new(&game);
+        int rin = test_id(&game, RIN);
+        int cheap = test_id(&game, "PL!-sd1-010-SD");
+        int filler = test_id(&game, "PL!-sd1-010-SD");
+        int keep = test_id(&game, "PL!N-PR-019-PR");
+        CHECK(rin >= 0 && cheap >= 0 && filler >= 0 && keep >= 0,
+              "PL!N-bp4-009-R higher-total fixtures resolve");
+        if (rin < 0 || cheap < 0 || filler < 0 || keep < 0) return;
+        dc_fill_decks(&game, filler, 30);
+        game.state.p[0].stage[1] = rin;
+        game.state.p[1].stage[1] = cheap;
+        test_add_to_hand(&game, keep);
+        int hand_before = df_hand(&game);
+
+        CHECK(df_fire_live_start(&game, rin), "PL!N-bp4-009-R higher: trigger found");
+        CHECK(!test_has_pending_choice(&game), "higher own total -> no fire");
+        CHECK_EQ(df_hand(&game), hand_before, "no draws happened");
+    }
+    /* empty own stage (total 0) is still less than the opponent's 17: fires */
+    {
+        TestGame game;
+        test_game_new(&game);
+        int rin = test_id(&game, RIN);
+        int filler = test_id(&game, "PL!-sd1-010-SD");
+        int opp = df_new_id(&game, "PL!S-sd1-001-SD");
+        CHECK(rin >= 0 && filler >= 0 && opp >= 0,
+              "PL!N-bp4-009-R zero-own-total fixtures resolve");
+        if (rin < 0 || filler < 0 || opp < 0) return;
+        dc_fill_decks(&game, filler, 30);
+        game.state.p[1].stage[1] = opp;
+        test_add_to_hand(&game, filler);
+
+        CHECK(df_fire_live_start(&game, rin), "PL!N-bp4-009-R zero-own: trigger found");
+        CHECK(test_has_pending_choice(&game),
+              "0 < 17 -> condition met even with an empty own stage");
+        CHECK(test_pending_choice_type(&game) != NULL,
+              "put-back prompt must carry a choice identity");
+        {
+            const int pick[1] = { 0 };
+            test_select_indices(&game, pick, 1);
+        }
+        CHECK_EQ(df_deck(&game) > 0 ? game.state.p[0].deck.cards[0] : -1, filler,
+                 "put-back landed on top");
+    }
+}
+
+/* ?? C17. draw_then_bottom_hand_card_test.rs ???????????????????????????????
+   ?????1???????1????????????? on PL!S-bp5-014-N
+   (plus the identical PL!S-sd1-017-SD and PL!S-sd1-018-SD). The chain's
+   second step moves a hand card to the deck BOTTOM - a destination the flat
+   cluster never exercises - and the ordering assertions are the point: the
+   cards ABOVE the put-back must keep their exact order. */
+static void dc_run_draw_then_bottom(TestGame *game, const char *card_no)
+{
+    int you = test_id(game, card_no);
+    int card_a = test_id(game, "PL!-sd1-001-SD");  /* member */
+    int card_b = test_id(game, "PL!-sd1-020-SD");  /* live   */
+    CHECK(you >= 0 && card_a >= 0 && card_b >= 0, "the draw-then-bottom fixtures resolve");
+    if (you < 0 || card_a < 0 || card_b < 0) return;
+    int snap[64];
+    int n = dc_fill_decks_distinct(game, 20);
+    int drawn_top = snap[0];
+    test_add_to_hand(game, you);
+    test_add_to_hand(game, card_a);
+    test_add_to_hand(game, card_b);
+    test_give_energy(game, 4);
+
+    CHECK_EQ(test_play_to_stage(game, you, 1), 1, "the member plays to the centre");
+    CHECK(test_has_pending_choice(game), "hand has 3 cards after draw -> selection prompt expected");
+    dc_expect_select_card(game, "hand", 1, 0);
+    {
+        const int pick[1] = { 0 };
+        test_select_indices(game, pick, 1); /* card_a -> deck bottom */
+    }
+
+    CHECK_EQ(df_hand(game), 2, "hand: -1 play, +1 draw, -1 bottom = 2");
+    CHECK(dc_hand_has(game, card_b), "card_b stays in hand");
+    CHECK(dc_hand_has(game, drawn_top), "drawn card stays in hand");
+    CHECK(!dc_hand_has(game, card_a), "card_a moved out of hand");
+    CHECK_EQ(df_deck(game), 20, "deck: -1 draw, +1 bottom = unchanged");
+    CHECK_EQ(df_deck(game) > 0 ? game->state.p[0].deck.cards[df_deck(game) - 1] : -1, card_a,
+             "card_a on deck bottom");
+    int head_ok = 1;
+    for (int i = 0; i < n - 1 && i < df_deck(game) - 1; i++)
+        if (game->state.p[0].deck.cards[i] != snap[i + 1]) head_ok = 0;
+    CHECK(head_ok, "order above the bottom is preserved");
+    CHECK(!test_has_pending_choice(game), "ability fully resolved");
+}
+
+static void test_chain_draw_one_put_one_on_bottom(void)
+{
+    {
+        TestGame game;
+        test_game_new(&game);
+        dc_run_draw_then_bottom(&game, "PL!S-bp5-014-N");
+    }
+    {
+        TestGame game;
+        test_game_new(&game);
+        dc_run_draw_then_bottom(&game, "PL!S-sd1-017-SD");  /* ???? */
+    }
+    {
+        TestGame game;
+        test_game_new(&game);
+        dc_run_draw_then_bottom(&game, "PL!S-sd1-018-SD");  /* ????? */
+    }
+
+    /* the newly drawn card can itself be the one placed on the bottom */
+    {
+        TestGame game;
+        test_game_new(&game);
+        int you = test_id(&game, "PL!S-bp5-014-N");
+        int card_b = test_id(&game, "PL!-sd1-020-SD");
+        CHECK(you >= 0 && card_b >= 0, "draw-then-bottom (drawn card) fixtures resolve");
+        if (you < 0 || card_b < 0) return;
+        int snap[64];
+        int n = dc_fill_decks_distinct(&game, 20);
+        int drawn_top = snap[0];
+        test_add_to_hand(&game, you);
+        test_add_to_hand(&game, card_b);
+        test_give_energy(&game, 4);
+
+        test_play_to_stage(&game, you, 1);
+        CHECK(test_has_pending_choice(&game), "2 cards -> prompt expected");
+        {
+            const int pick[1] = { 1 };
+            test_select_indices(&game, pick, 1); /* the drawn card goes to the bottom */
+        }
+        CHECK_EQ(df_deck(&game), 20, "deck size is unchanged");
+        CHECK_EQ(game.state.p[0].deck.cards[df_deck(&game) - 1], drawn_top,
+                 "drawn card on bottom");
+        int head_ok = 1;
+        for (int i = 0; i < n - 1 && i < df_deck(&game) - 1; i++)
+            if (game.state.p[0].deck.cards[i] != snap[i + 1]) head_ok = 0;
+        CHECK(head_ok, "order above the bottom is preserved");
+        CHECK_EQ(df_hand(&game), 1, "only card_b remains in hand");
+    }
+
+    /* exactly one eligible card after the draw -> auto-resolve, no prompt */
+    {
+        TestGame game;
+        test_game_new(&game);
+        int you = test_id(&game, "PL!S-bp5-014-N");
+        CHECK(you >= 0, "draw-then-bottom (auto) fixture resolves");
+        if (you < 0) return;
+        int snap[64];
+        int n = dc_fill_decks_distinct(&game, 20);
+        int drawn_top = snap[0];
+        test_add_to_hand(&game, you);
+        test_give_energy(&game, 4);
+
+        test_play_to_stage(&game, you, 1);
+        CHECK(!test_has_pending_choice(&game), "exactly 1 eligible card -> auto-resolved");
+        CHECK_EQ(df_hand(&game), 0, "the only hand card was placed on the bottom");
+        CHECK_EQ(df_deck(&game), 20, "deck size is unchanged");
+        CHECK_EQ(game.state.p[0].deck.cards[df_deck(&game) - 1], drawn_top,
+                 "drawn card on bottom");
+        int head_ok = 1;
+        for (int i = 0; i < n - 1 && i < df_deck(&game) - 1; i++)
+            if (game.state.p[0].deck.cards[i] != snap[i + 1]) head_ok = 0;
+        CHECK(head_ok, "order above the bottom is preserved");
+    }
+
+    /* a big hand: exactly one card moves, the rest stay */
+    {
+        TestGame game;
+        test_game_new(&game);
+        int you = test_id(&game, "PL!S-bp5-014-N");
+        CHECK(you >= 0, "draw-then-bottom (many hand) fixture resolves");
+        if (you < 0) return;
+        int keepers[4];
+        for (int i = 0; i < 4; i++) { keepers[i] = df_new_id(&game, "PL!-sd1-010-SD");
+                                       test_add_to_hand(&game, keepers[i]); }
+        int target = df_new_id(&game, "PL!-sd1-001-SD");
+        test_add_to_hand(&game, you);
+        test_add_to_hand(&game, target);
+        int snap[64];
+        dc_fill_decks_distinct(&game, 20);
+        test_give_energy(&game, 4);
+
+        test_play_to_stage(&game, you, 1);
+        CHECK(test_has_pending_choice(&game), "6 cards -> prompt expected");
+        dc_expect_select_card(&game, "hand", 1, 0);
+        {
+            int idx = dc_hand_index(&game, target);
+            const int pick[1] = { idx };
+            test_select_indices(&game, pick, 1);
+        }
+        CHECK_EQ(df_hand(&game), 5, "6 - 1 = 5");
+        int keepers_ok = 1;
+        for (int i = 0; i < 4; i++) if (!dc_hand_has(&game, keepers[i])) keepers_ok = 0;
+        CHECK(keepers_ok, "every keeper still in hand");
+        CHECK(dc_hand_has(&game, snap[0]), "drawn card still in hand");
+        CHECK(!dc_hand_has(&game, target), "the target left the hand");
+        CHECK_EQ(game.state.p[0].deck.cards[df_deck(&game) - 1], target,
+                 "exactly the selected card is on the bottom");
+    }
+
+    /* card_type "card" means all card types (member / live / energy) are eligible */
+    {
+        TestGame game;
+        test_game_new(&game);
+        int you = test_id(&game, "PL!S-bp5-014-N");
+        int member = test_id(&game, "PL!-sd1-001-SD");
+        int live = test_id(&game, "PL!-sd1-020-SD");
+        int energy = test_id(&game, "LL-E-001-SD");
+        CHECK(you >= 0 && member >= 0 && live >= 0 && energy >= 0,
+              "draw-then-bottom (all card types) fixtures resolve");
+        if (you < 0 || member < 0 || live < 0 || energy < 0) return;
+        test_add_to_hand(&game, you);
+        test_add_to_hand(&game, member);
+        test_add_to_hand(&game, live);
+        test_add_to_hand(&game, energy);
+        dc_fill_decks_distinct(&game, 20);
+        test_give_energy(&game, 4);
+
+        test_play_to_stage(&game, you, 1);
+        CHECK(test_has_pending_choice(&game), "the put-back prompt appears");
+        /* Every hand card is a candidate; the C engine exposes the eligible
+           set through the pending choice's selection. Assert the three card
+           TYPES are all reachable by resolving each of them in turn. */
+        int ok_member = 0, ok_live = 0, ok_energy = 0;
+        struct { int id; int *flag; } TYPES[3] = {
+            { member, &ok_member }, { live, &ok_live }, { energy, &ok_energy }
+        };
+        for (int t = 0; t < 3; t++) {
+            TestGame g;
+            test_game_new(&g);
+            int y2 = test_id(&g, "PL!S-bp5-014-N");
+            if (y2 < 0) return;
+            test_add_to_hand(&g, y2);
+            test_add_to_hand(&g, member);
+            test_add_to_hand(&g, live);
+            test_add_to_hand(&g, energy);
+            dc_fill_decks_distinct(&g, 20);
+            test_give_energy(&g, 4);
+            test_play_to_stage(&g, y2, 1);
+            if (!test_has_pending_choice(&g)) continue;
+            int idx = dc_hand_index(&g, TYPES[t].id);
+            const int pick[1] = { idx };
+            test_select_indices(&g, pick, 1);
+            int landed = df_deck(&g) > 0 ? g.state.p[0].deck.cards[df_deck(&g) - 1] : -1;
+            if (landed == TYPES[t].id) *TYPES[t].flag = 1;
+        }
+        CHECK(ok_member, "a member card can be put back on the bottom");
+        CHECK(ok_live, "a live card can be put back on the bottom");
+        CHECK(ok_energy, "an energy card can be put back on the bottom");
+    }
+
+    /* empty deck + non-empty waitroom: the draw refreshes, then the put-back
+       still resolves (deck.rs:70-77 + the independent second step) */
+    {
+        TestGame game;
+        test_game_new(&game);
+        int you = test_id(&game, "PL!S-bp5-014-N");
+        int card_a = test_id(&game, "PL!-sd1-001-SD");
+        CHECK(you >= 0 && card_a >= 0, "draw-then-bottom (refresh) fixtures resolve");
+        if (you < 0 || card_a < 0) return;
+        test_add_to_hand(&game, you);
+        test_add_to_hand(&game, card_a);
+        dc_discard_all_decks(&game);
+        for (int i = 0; i < 10; i++) test_add_to_discard(&game, df_new_id(&game, "PL!-sd1-010-SD"));
+        test_give_energy(&game, 4);
+
+        test_play_to_stage(&game, you, 1);
+        CHECK(test_has_pending_choice(&game),
+              "2 hand cards after the refresh-draw -> prompt expected");
+        {
+            const int pick[1] = { 0 };
+            test_select_indices(&game, pick, 1);
+        }
+        CHECK_EQ(df_hand(&game), 1, "hand = just the refreshed draw");
+        CHECK_EQ(df_deck(&game), 10, "deck = 10 refreshed - 1 drawn + 1 placed");
+        CHECK_EQ(game.state.p[0].deck.cards[df_deck(&game) - 1], card_a,
+                 "card_a on bottom of the refreshed deck");
+        CHECK_EQ(game.state.p[0].discard.n, 0, "waitroom fully consumed by the refresh");
+        CHECK(!test_has_pending_choice(&game), "the chain resolved");
+    }
+
+    /* empty deck AND empty waitroom: the draw silently fails but the put-back
+       still runs - the two sequential steps are independent */
+    {
+        TestGame game;
+        test_game_new(&game);
+        int you = test_id(&game, "PL!S-bp5-014-N");
+        int card_a = test_id(&game, "PL!-sd1-001-SD");
+        CHECK(you >= 0 && card_a >= 0, "draw-then-bottom (no source) fixtures resolve");
+        if (you < 0 || card_a < 0) return;
+        test_add_to_hand(&game, you);
+        test_add_to_hand(&game, card_a);
+        dc_discard_all_decks(&game);
+        test_give_energy(&game, 4);
+
+        test_play_to_stage(&game, you, 1);
+        CHECK(!test_has_pending_choice(&game), "auto-resolved");
+        CHECK_EQ(df_hand(&game), 0, "card_a moved out of hand");
+        CHECK_EQ(df_deck(&game), 1, "card_a is the only card in the deck");
+        CHECK_EQ(game.state.p[0].deck.cards[0], card_a, "card_a is the bottom card");
+    }
+
+    /* deck has exactly 1 card: it is drawn, then the hand card is pushed onto
+       the now-empty deck */
+    {
+        TestGame game;
+        test_game_new(&game);
+        int you = test_id(&game, "PL!S-bp5-014-N");
+        int card_a = test_id(&game, "PL!-sd1-001-SD");
+        int top = df_new_id(&game, "PL!-sd1-010-SD");
+        CHECK(you >= 0 && card_a >= 0 && top >= 0, "draw-then-bottom (last card) fixtures resolve");
+        if (you < 0 || card_a < 0 || top < 0) return;
+        test_add_to_hand(&game, you);
+        test_add_to_hand(&game, card_a);
+        dc_discard_all_decks(&game);
+        test_add_to_deck(&game, top);
+        test_give_energy(&game, 4);
+
+        test_play_to_stage(&game, you, 1);
+        CHECK(test_has_pending_choice(&game), "hand = [card_a, top] -> prompt");
+        {
+            const int pick[1] = { 0 };
+            test_select_indices(&game, pick, 1);
+        }
+        CHECK_EQ(df_deck(&game), 1, "1 placed on the empty deck");
+        CHECK_EQ(game.state.p[0].deck.cards[df_deck(&game) - 1], card_a, "card_a on bottom");
+        CHECK_EQ(df_hand(&game), 1, "the drawn last deck card is the only hand card");
+        CHECK(dc_hand_has(&game, top), "it is the card that was drawn");
+    }
+
+    /* opponent isolation + the cost gate */
+    {
+        TestGame game;
+        test_game_new(&game);
+        int you = test_id(&game, "PL!S-bp5-014-N");
+        int card_a = test_id(&game, "PL!-sd1-001-SD");
+        CHECK(you >= 0 && card_a >= 0, "draw-then-bottom (isolation) fixtures resolve");
+        if (you < 0 || card_a < 0) return;
+        int snap[64];
+        dc_fill_decks_distinct(&game, 20);
+        test_add_to_hand(&game, you);
+        test_add_to_hand(&game, card_a);
+        test_add_to_hand(&game, test_id(&game, "PL!-sd1-020-SD"));
+        int p2_hand = game.state.p[1].hand.n;
+        int p2_deck = game.state.p[1].deck.n;
+        test_give_energy(&game, 4);
+
+        test_play_to_stage(&game, you, 1);
+        if (test_has_pending_choice(&game)) {
+            const int pick[1] = { 0 };
+            test_select_indices(&game, pick, 1);
+        }
+        CHECK_EQ(game.state.p[1].hand.n, p2_hand, "P2 hand unchanged");
+        CHECK_EQ(game.state.p[1].deck.n, p2_deck, "P2 deck unchanged");
+        CHECK(dc_deck_has(&game, card_a), "card_a should be on the deck bottom after debut");
+        (void)snap;
+    }
+    {
+        TestGame game;
+        test_game_new(&game);
+        int you = test_id(&game, "PL!S-bp5-014-N");
+        CHECK(you >= 0, "draw-then-bottom (cost gate) fixture resolves");
+        if (you < 0) return;
+        dc_fill_decks_distinct(&game, 20);
+        test_add_to_hand(&game, you);
+        test_give_energy(&game, 3);   /* printed cost 4 */
+
+        CHECK_EQ(test_try_play_to_stage(&game, you, 1), 0,
+                 "cost 4 with only 3 energy must fail");
+        CHECK(dc_hand_has(&game, you), "card stays in hand after the failed play");
+    }
+}
+
+/* ?? C18. card_ability_test.rs — the two draw CHAIN halves of that grab bag ??
+   PL!HS-bp1-005-R: ??, put UP TO 3 hand cards in the waitroom, then draw
+   EXACTLY as many as were discarded. The draw count is a DYNAMIC count fed by
+   the cost, which is the single most load-bearing interaction in this cluster.
+   PL!HS-pb1-003-R (Q244): discard 1 of the same name -> draw 2; discard 0 ->
+   draw 1. */
+static void dc_setup_rurino_bp1(TestGame *game, int *deck_before, int *hand_before)
+{
+    int rurino = test_id(game, "PL!HS-bp1-005-R");
+    int filler = test_id(game, "PL!-sd1-010-SD");
+    CHECK(rurino >= 0 && filler >= 0, "PL!HS-bp1-005-R fixtures resolve");
+    if (rurino < 0 || filler < 0) return;
+    test_add_to_hand(game, rurino);
+    test_give_energy(game, 9);
+    test_add_to_hand(game, filler);
+    test_add_to_hand(game, filler);
+    test_add_to_hand(game, filler);
+    for (int i = 0; i < 10; i++) test_add_to_deck(game, filler);
+    *deck_before = df_deck(game);
+    *hand_before = df_hand(game);
+    test_play_to_stage(game, rurino, 1);
+}
+
+static void test_chain_rurino_bp1_draw_count_equals_discards(void)
+{
+    {
+        TestGame game;
+        test_game_new(&game);
+        int deck_before = 0, hand_before = 0;
+        dc_setup_rurino_bp1(&game, &deck_before, &hand_before);
+        if (df_hand(&game) == 0 && game.state.p[1].deck.n == 0) return; /* setup refused */
+
+        CHECK(test_has_pending_choice(&game), "discard prompt 1 expected");
+        test_resume_choice(&game, 0);
+        CHECK(test_has_pending_choice(&game), "discard prompt 2 expected");
+        test_resume_choice(&game, 0);
+        CHECK(test_has_pending_choice(&game), "re-prompt 3 expected (up-to-3 lets us stop)");
+        test_resume_choice(&game, -1);
+
+        CHECK_EQ(game.state.p[0].discard.n, 2, "2 cards reached the waitroom");
+        CHECK_EQ(df_deck(&game), deck_before - 2, "drew exactly as many as were discarded");
+        CHECK_EQ(df_hand(&game), hand_before, "3 - 2 discarded + 2 drawn = 3");
+    }
+    {
+        TestGame game;
+        test_game_new(&game);
+        int deck_before = 0, hand_before = 0;
+        dc_setup_rurino_bp1(&game, &deck_before, &hand_before);
+        if (df_hand(&game) == 0 && game.state.p[1].deck.n == 0) return;
+
+        CHECK(test_has_pending_choice(&game), "optional discard prompt expected");
+        test_resume_choice(&game, -1);   /* decline entirely */
+        CHECK_EQ(df_hand(&game), hand_before, "skipped cost -> 0 discarded -> draw 0");
+        CHECK_EQ(game.state.p[0].discard.n, 0, "nothing was discarded");
+        CHECK_EQ(df_deck(&game), deck_before, "nothing was drawn");
+    }
+    {
+        TestGame game;
+        test_game_new(&game);
+        int deck_before = 0, hand_before = 0;
+        dc_setup_rurino_bp1(&game, &deck_before, &hand_before);
+        if (df_hand(&game) == 0 && game.state.p[1].deck.n == 0) return;
+
+        test_resume_choice(&game, 0);
+        CHECK(test_has_pending_choice(&game), "discard prompt 2 expected");
+        test_resume_choice(&game, 0);
+        CHECK(test_has_pending_choice(&game), "discard prompt 3 expected");
+        test_resume_choice(&game, 0);
+
+        CHECK_EQ(game.state.p[0].discard.n, 3, "3 cards reached the waitroom");
+        CHECK_EQ(df_deck(&game), deck_before - 3, "drew 3 for 3 discarded");
+        CHECK_EQ(df_hand(&game), hand_before, "3 - 3 discarded + 3 drawn = 3");
+    }
+    /* the up-to-3 cap must stop the sequence even with more cards in hand */
+    {
+        TestGame game;
+        test_game_new(&game);
+        int rurino = test_id(&game, "PL!HS-bp1-005-R");
+        int filler = test_id(&game, "PL!-sd1-010-SD");
+        CHECK(rurino >= 0 && filler >= 0, "PL!HS-bp1-005-R cap fixtures resolve");
+        if (rurino < 0 || filler < 0) return;
+        test_add_to_hand(&game, rurino);
+        test_give_energy(&game, 9);
+        for (int i = 0; i < 7; i++) test_add_to_hand(&game, filler);
+        for (int i = 0; i < 20; i++) test_add_to_deck(&game, filler);
+        int deck_before = df_deck(&game);
+        int hand_before = df_hand(&game);
+        test_play_to_stage(&game, rurino, 1);
+
+        CHECK(test_has_pending_choice(&game), "discard prompt 1 expected");
+        test_resume_choice(&game, 0);
+        CHECK(test_has_pending_choice(&game), "discard prompt 2 expected");
+        test_resume_choice(&game, 0);
+        CHECK(test_has_pending_choice(&game), "discard prompt 3 expected");
+        test_resume_choice(&game, 0);
+        CHECK(!test_has_pending_choice(&game),
+              "no further prompt after 3 selections (max=3 cap)");
+
+        CHECK_EQ(game.state.p[0].discard.n, 3, "3 discarded");
+        CHECK_EQ(df_deck(&game), deck_before - 3, "3 drawn");
+        CHECK_EQ(df_hand(&game), hand_before - 1,
+                 "hand_before - 1 (Rurino) - 3 discarded + 3 drawn");
+    }
+}
+
+/* PL!HS-pb1-003-R (Q244): the discard cost is a DYNAMIC count too - 1 more
+   than the number of same-name cards put in the waitroom. */
+static void test_chain_mirakura_discard_then_draw(void)
+{
+    {
+        TestGame game;
+        test_game_new(&game);
+        int filler = test_id(&game, "PL!-sd1-010-SD");
+        int ability_card = df_new_id(&game, "PL!HS-pb1-003-R");
+        int other_card = df_new_id(&game, "PL!HS-pb1-003-R");
+        CHECK(filler >= 0 && ability_card >= 0 && other_card >= 0,
+              "PL!HS-pb1-003-R (Q244) fixtures resolve");
+        if (filler < 0 || ability_card < 0 || other_card < 0) return;
+        CHECK(rb_card_no_eq(ability_card, "PL!HS-pb1-003-R") &&
+              rb_card_no_eq(other_card, "PL!HS-pb1-003-R"),
+              "both instances are the SAME print (CRITICAL IDENTITY)");
+        test_add_to_hand(&game, ability_card);
+        test_add_to_hand(&game, other_card);
+        test_give_energy(&game, 15);
+        test_add_to_deck(&game, filler);
+        int deck_before = df_deck(&game);
+
+        test_play_to_stage(&game, ability_card, 1);
+
+        CHECK(test_has_pending_choice(&game), "optional discard cost should be offered");
+        CHECK(test_pending_choice_type(&game) != NULL &&
+              !strcmp(test_pending_choice_type(&game), "SelectCard"),
+              "decline path answers a SelectCard prompt");
+        test_resume_choice(&game, -1);
+
+        CHECK_EQ(game.state.p[0].discard.n, 0,
+                 "no cards should be discarded when the player chooses 0");
+        CHECK_EQ(df_hand(&game), 2,
+                 "if 0 cards are discarded, the ability should still draw 1 card");
+        CHECK_EQ(df_deck(&game), deck_before - 1,
+                 "deck should lose exactly one card when drawing for 0 discarded cards");
+    }
+    {
+        TestGame game;
+        test_game_new(&game);
+        int filler = test_id(&game, "PL!-sd1-010-SD");
+        int ability_card = df_new_id(&game, "PL!HS-pb1-003-R");
+        int discard_card = df_new_id(&game, "PL!HS-pb1-003-R");
+        CHECK(filler >= 0 && ability_card >= 0 && discard_card >= 0,
+              "PL!HS-pb1-003-R (discard 1) fixtures resolve");
+        if (filler < 0 || ability_card < 0 || discard_card < 0) return;
+        test_add_to_hand(&game, ability_card);
+        test_add_to_hand(&game, discard_card);
+        test_give_energy(&game, 15);
+        for (int i = 0; i < 20; i++) test_add_to_deck(&game, filler);
+
+        test_play_to_stage(&game, ability_card, 1);
+
+        CHECK(test_has_pending_choice(&game), "optional discard cost must be prompted");
+        CHECK(test_pending_choice_type(&game) != NULL &&
+              !strcmp(test_pending_choice_type(&game), "SelectCard"),
+              "expected SelectCard for the any-number discard cost");
+        test_resume_choice(&game, 0);
+        /* Sequential re-prompt: skip to proceed to the draw action. */
+        CHECK(test_has_pending_choice(&game), "up-to-N re-ask expected after the discard");
+        CHECK(test_pending_choice_type(&game) != NULL &&
+              !strcmp(test_pending_choice_type(&game), "SelectCard"),
+              "expected SelectCard re-ask prompt");
+        test_resume_choice(&game, -1);
+
+        CHECK(dc_wait_has(&game, discard_card),
+              "discard pile should contain the discarded card");
+        CHECK_EQ(df_hand(&game), 2, "should draw 2 cards after discarding 1");
+        CHECK_EQ(df_deck(&game), 18, "deck should have 18 remaining cards after drawing 2");
+    }
+}
+
+/* ?? C19. full_group_cost_twenty_draw_three_topdeck_three_test.rs ??????????
+   PL!N-bp4-031-L (NEO SKY): live start, if EVERY stage area holds a ???
+   member AND the stage total is at least 20, draw 3 and place them on the
+   deck in a chosen order. Ported here are the two NEGATIVE cases from that
+   file - the cost-19 boundary and the non-??? blocker - because both are
+   "the chain must not start", which needs no deck-order choice.
+   The two positive cases (deck-order choice + a hand SelectCard of 3) are NOT
+   ported: they depend on the full LiveCardSet phase dance and the printed
+   deck-order SelectTarget, which no other C suite in this directory drives. */
+static void dc_advance_to_first_live_set(TestGame *tg)
+{
+    int guard = 0;
+    while (tg->state.phase != RB_PHASE_LIVE_SET && guard++ < 20) {
+        test_pass(tg);
+        dc_drain_decline(tg);
+    }
+}
+
+static void dc_neo_sky_setup(TestGame *tg, int n1, int n2, int n3, int sa, int sb)
+{
+    int live = test_id(tg, "PL!N-bp4-031-L");
+    CHECK(live >= 0 && n1 >= 0 && n2 >= 0 && n3 >= 0 && sa >= 0 && sb >= 0,
+          "PL!N-bp4-031-L fixtures resolve");
+    if (live < 0 || n1 < 0 || n2 < 0 || n3 < 0 || sa < 0 || sb < 0) return;
+    tg->state.p[0].stage[0] = n1;
+    tg->state.p[0].stage[1] = n2;
+    tg->state.p[0].stage[2] = n3;
+    dc_fill_decks(tg, sa, 20);
+    dc_advance_to_first_live_set(tg);
+    test_add_to_hand(tg, live);
+    test_add_to_live(tg, live);
+    test_pass(tg);
+    tg->state.p[0].hand.n = 0;
+    tg->state.p[0].deck.n = 0;
+    test_add_to_deck(tg, sa);
+    test_add_to_deck(tg, sb);
+}
+
+static void test_chain_neo_sky_gate_negatives(void)
+{
+    /* total cost 19 -> must not draw or place cards */
+    {
+        TestGame g;
+        test_game_new(&g);
+        int n13 = test_id(&g, "PL!N-bp7-002-R");
+        int n4 = test_id(&g, "PL!N-bp4-014-N");
+        int n2 = test_id(&g, "PL!N-bp4-020-N");
+        int sa = test_id(&g, "PL!N-bp1-026-L");
+        int sb = test_id(&g, "PL!SP-bp1-023-L");
+        dc_neo_sky_setup(&g, n13, n4, n2, sa, sb);
+        int deck_before = df_deck(&g);
+        test_pass(&g);
+        dc_drain_decline(&g);
+        CHECK_EQ(df_hand(&g), 0, "cost total 19 must not draw cards into hand");
+        CHECK_EQ(df_deck(&g), deck_before, "cost total 19 must not place cards on the deck");
+    }
+    /* a non-??? member in one area blocks the whole effect */
+    {
+        TestGame g;
+        test_game_new(&g);
+        int n13 = test_id(&g, "PL!N-bp4-022-N");
+        int n4 = test_id(&g, "PL!N-bp4-014-N");
+        int non_niji = test_id(&g, "PL!S-sd1-001-SD");
+        int sa = test_id(&g, "PL!N-bp1-026-L");
+        int sb = test_id(&g, "PL!SP-bp1-023-L");
+        dc_neo_sky_setup(&g, n13, n4, non_niji, sa, sb);
+        int deck_before = df_deck(&g);
+        test_pass(&g);
+        dc_drain_decline(&g);
+        CHECK_EQ(df_hand(&g), 0, "a non-??? member must block the LiveStart effect (hand)");
+        CHECK_EQ(df_deck(&g), deck_before,
+                 "a non-??? member must block the LiveStart effect (deck)");
+    }
+}
+
 static int load_card_db(void)
 {
     if (rb_load("src") == 0) return 0;
@@ -1793,6 +3511,28 @@ int main(void)
     test_distinct_draw_regression();                         /* 17 */
     test_flat_draw_engine_surface();                         /* 18 */
     test_success_zone_restriction_and_constant_parsed();     /* 19 */
+
+    /* ?? draw/chains ?? */
+    test_chain_natsumi_activation_draw_then_discard();        /* C1  */
+    test_chain_shiki_leftside_draw();                        /* C2  */
+    test_chain_hand_debut_no_draw_bonus();                   /* C3  */
+    test_chain_hs_bp6_030_l_draw_then_discard();             /* C4  */
+    test_chain_s_pb1_024_l_draw_two_discard_two();           /* C5  */
+    test_chain_setsuna_opponent_success_extra_draw();        /* C6  */
+    test_chain_natsumeki_group_gated_draw_discard();         /* C7  */
+    test_chain_named_baton_source_draw_then_discard();       /* C8  */
+    test_chain_baton_source_cost_gated_draw_discard();       /* C9  */
+    test_chain_waitroom_debut_draw_discard();                /* C10 */
+    test_chain_optional_wait_gates_draw_discard();           /* C11 */
+    test_chain_mia_bp7_self_wait_draw_two_discard_two();     /* C12 */
+    test_chain_bp3_001_self_wait_mandatory_discard();        /* C13 */
+    test_chain_hanayo_baton_touch_skips_discard();           /* C14 */
+    test_chain_side_debut_draw_discard();                    /* C15 */
+    test_chain_rin_lower_stage_cost_draw_then_topdeck();     /* C16 */
+    test_chain_draw_one_put_one_on_bottom();                 /* C17 */
+    test_chain_rurino_bp1_draw_count_equals_discards();      /* C18 */
+    test_chain_mirakura_discard_then_draw();                 /* C18 */
+    test_chain_neo_sky_gate_negatives();                     /* C19 */
 
     rb_unload();
     if (failures) {

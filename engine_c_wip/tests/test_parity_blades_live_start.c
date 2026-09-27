@@ -112,6 +112,25 @@ static int heart(TestGame *tg, int cid, int color)
     return test_get_heart_modifier(tg, cid, color);
 }
 
+/* The heart slot a printed heartNN actually occupies.
+ *   heart00 -> 0 (RB_HEART_PINK, the wildcard slot)   heart01 -> 1 (RED)
+ *   heart02 -> 2 (YELLOW)   heart03 -> 3 (GREEN)      heart04 -> 4 (BLUE)
+ *   heart05 -> 5 (PURPLE)   heart06 -> 6 (ORANGE)
+ * (src/ability/util.c:rb_parse_heart_color is the single owner of that map.)
+ *
+ * Read it through rb_mods_get_heart DIRECTLY rather than test_get_heart_modifier:
+ * the shim remaps a requested colour of 5 onto RB_HEART_ORANGE, which silently
+ * turns a heart05 query into a heart06 query. Same hazard the rescued
+ * test_tp_joint_card_live_start.c documents. */
+#define BL_HEART01 1
+#define BL_HEART05 5
+#define BL_HEART06 6
+
+static int heart_slot(TestGame *tg, int cid, int slot)
+{
+    return rb_mods_get_heart(&tg->state.mods, cid, slot);
+}
+
 static int printed_blade(int cid)
 {
     Card c;
@@ -261,6 +280,56 @@ static void bl_drain_decline_optional(TestGame *tg)
         const RbChoice *c = rb_get_pending_choice(&tg->state);
         int idx = BL_SKIP;
         if (c && c->kind == RB_CHOICE_SELECT_AUTO_ABILITY) idx = BL_ACCEPT;
+        rb_resume_with_choice(&tg->state, idx);
+    }
+}
+
+/* success_score_comparison_pl_bp4_018_n_test.rs:
+ *     while game.has_pending_choice() { game.select_indices(&[0]); }
+ * Unconditional index 0 -- the C fold of `select_indices(&[0])`. Unlike the
+ * drains above there is NO per-kind branch: every prompt is answered with the
+ * first index, which in the C engine means "accept". Used where the Rust test
+ * needs a pending 登場 gate resolved before it starts pushing success cards. */
+static void bl_drain_pick_first(TestGame *tg)
+{
+    int guard = 0;
+    while (test_has_pending_choice(tg) && guard++ < 32) {
+        rb_resume_with_choice(&tg->state, 0);
+    }
+}
+
+/* live_start_optional_energy_self_blades_test.rs:
+ *     fn skip_optional_card_and_target_choices(game: &mut TestGame) {
+ *         while game.has_pending_choice() && guard < 30 {
+ *             match game.get_pending_choice() {
+ *                 Choice::SelectAutoAbility { .. }          => game.select_indices(&[]),
+ *                 Choice::SelectCard { allow_skip: true, ..} => game.select_indices(&[]),
+ *                 Choice::SelectTarget{ allow_skip: true, ..} => game.select_option(0),
+ *                 _ => break,
+ *             }
+ *         }
+ *     }
+ * NOTE this is NOT the same as bl_drain_decline_optional above, and the
+ * distinction is the whole point of the B14 declined-vs-paid twin:
+ * `select_indices(&[])` is a DECLINE (index -1), so the ライブ開始時 ability is
+ * NOT used at all, whereas a SelectTarget is answered with select_option(0) =
+ * ACCEPT. Any prompt outside those three shapes breaks the loop, as in Rust. */
+static void bl_drain_skip_optional(TestGame *tg)
+{
+    int guard = 0;
+    while (test_has_pending_choice(tg) && guard++ < 30) {
+        const RbChoice *c = rb_get_pending_choice(&tg->state);
+        int idx;
+        if (!c) break;
+        if (c->kind == RB_CHOICE_SELECT_AUTO_ABILITY) {
+            idx = BL_SKIP;            /* select_indices(&[]) */
+        } else if (c->kind == RB_CHOICE_SELECT_CARD && c->allow_skip) {
+            idx = BL_SKIP;            /* select_indices(&[]) */
+        } else if (c->kind == RB_CHOICE_SELECT_TARGET && c->allow_skip) {
+            idx = BL_ACCEPT;          /* select_option(0) */
+        } else {
+            break;                    /* _ => break */
+        }
         rb_resume_with_choice(&tg->state, idx);
     }
 }
@@ -422,12 +491,12 @@ static void a_exactly_two_members_pl_s_pr_037(void)
     test_add_to_stage(&tg, 1, card);
     test_recalc(&tg);
     CHECK_EQ(blade(&tg, card), 0, "1 stage member -> no blade");
-    CHECK_EQ(heart(&tg, card, 4), 0, "1 stage member -> no heart05");
+    CHECK_EQ(heart_slot(&tg, card, BL_HEART05), 0, "1 stage member -> no heart05");
 
     test_add_to_stage(&tg, 0, a);
     test_recalc(&tg);
     CHECK(blade(&tg, card) >= 1, "2 stage members -> blade granted");
-    CHECK(heart(&tg, card, 4) >= 1, "2 stage members -> heart05 granted");
+    CHECK(heart_slot(&tg, card, BL_HEART05) >= 1, "2 stage members -> heart05 granted");
 
     test_add_to_stage(&tg, 2, test_new_id(&tg, "PL!-sd1-002-SD"));
     test_recalc(&tg);
@@ -447,15 +516,15 @@ static void a_compound_self_two_opp_three_pl_hs_pb1_007(void)
     tg.state.p[1].stage[0] = mid(&tg, "PL!-sd1-001-SD");
     tg.state.p[1].stage[1] = mid(&tg, "PL!-sd1-002-SD");
     test_recalc(&tg);
-    CHECK_EQ(heart(&tg, card, 5), 0, "self=2, opp=2 -> no heart06");
+    CHECK_EQ(heart_slot(&tg, card, BL_HEART06), 0, "self=2, opp=2 -> no heart06");
 
     tg.state.p[1].stage[2] = mid(&tg, "PL!-sd1-003-SD");
     test_recalc(&tg);
-    CHECK(heart(&tg, card, 5) >= 1, "self=2, opp=3 -> heart06 granted");
+    CHECK(heart_slot(&tg, card, BL_HEART06) >= 1, "self=2, opp=3 -> heart06 granted");
 
     test_add_to_stage(&tg, 2, mid(&tg, "PL!-sd1-004-SD"));
     test_recalc(&tg);
-    CHECK_EQ(heart(&tg, card, 5), 0, "self=3 -> no heart06");
+    CHECK_EQ(heart_slot(&tg, card, BL_HEART06), 0, "self=3 -> no heart06");
 }
 
 /* A4c. constant_ability_edge_cases_test.rs -- PL!HS-pb1-022-N member names. */
@@ -472,17 +541,17 @@ static void a_member_name_constants_pl_hs_pb1_022(void)
 
     test_add_to_stage(&tg, 1, card);
     test_recalc(&tg);
-    CHECK_EQ(heart(&tg, card, 0), 0, "no named members -> no heart01");
+    CHECK_EQ(heart_slot(&tg, card, BL_HEART01), 0, "no named members -> no heart01");
     CHECK_EQ(blade(&tg, card), 0, "no named members -> no blade");
 
     test_add_to_stage(&tg, 0, toko);
     test_recalc(&tg);
-    CHECK_EQ(heart(&tg, card, 0), 0, "only 藤島慈 -> no heart01");
+    CHECK_EQ(heart_slot(&tg, card, BL_HEART01), 0, "only 藤島慈 -> no heart01");
     CHECK(blade(&tg, card) >= 2, "藤島慈 on stage -> blade x2");
 
     test_add_to_stage(&tg, 2, rurino);
     test_recalc(&tg);
-    CHECK(heart(&tg, card, 0) >= 2, "大沢瑠璃乃 on stage -> heart01 x2");
+    CHECK(heart_slot(&tg, card, BL_HEART01) >= 2, "大沢瑠璃乃 on stage -> heart01 x2");
 
     tg.state.p[0].stage[0] = RB_EMPTY_SLOT;
     test_recalc(&tg);
@@ -2423,6 +2492,58 @@ static void b_mymai_two_copies_and_mixed_lives(void)
           "two copies of MY舞 each grant their own blade");
 }
 
+/* Diagnostic dump (RB_DUMP_ABILITY=<card_no>[,<card_no>...]) -- same idiom as
+ * test_parity_draw_until_count.c. Used to classify a red check as a parser gap
+ * (the ability decodes wrong) versus an engine-evaluation gap (it decodes right
+ * and the condition is mis-evaluated). */
+static void bl_dump_effect(const char *tag, const AbilityEffect *e, int depth)
+{
+    if (!e) { fprintf(stderr, "  %*s%s: (null)\n", depth * 2, "", tag); return; }
+    fprintf(stderr, "  %*s%s: action=%s count=%d target=%s source=%s dest=%s optional=%d n_child=%d n_extra=%d\n",
+            depth * 2, "", tag, e->action ? e->action : "-", e->count,
+            e->target ? e->target : "-", e->source ? e->source : "-",
+            e->destination ? e->destination : "-", e->is_optional, e->n_child, e->n_extra);
+    for (int i = 0; i < e->n_extra; i++)
+        fprintf(stderr, "  %*s  extra[%d]=%s -> %s\n", depth * 2, "", i,
+                e->extra_k[i] ? e->extra_k[i] : "-", e->extra_v[i] ? e->extra_v[i] : "-");
+    for (int i = 0; i < e->n_child; i++) {
+        char sub[32]; snprintf(sub, sizeof(sub), "child[%d]", i);
+        bl_dump_effect(sub, e->child[i], depth + 1);
+    }
+}
+
+static void bl_dump_ability(const char *card_no)
+{
+    int card_id = rb_find_card_by_no(card_no);
+    if (card_id < 0) { fprintf(stderr, "[DUMP] %s: NOT FOUND\n", card_no); return; }
+    int n = rb_card_num_abilities((uint32_t)card_id);
+    fprintf(stderr, "[DUMP] %s id=%d n_abilities=%d name=%s\n", card_no, card_id, n,
+            test_card_name(card_id));
+    for (int i = 0; i < n; i++) {
+        Ability ab;
+        if (!rb_decode_card_ability((uint32_t)card_id, i, &ab)) continue;
+        fprintf(stderr, "  ability[%d] triggers=%s is_null=%d text=%s\n", i,
+                ab.triggers ? ab.triggers : "-", ab.is_null,
+                ab.full_text ? ab.full_text : "-");
+        bl_dump_effect("cost", ab.cost, 1);
+        bl_dump_effect("effect", ab.effect, 1);
+        rb_free_ability(&ab);
+    }
+}
+
+static void bl_run_dump(const char *list)
+{
+    char buf[1024];
+    snprintf(buf, sizeof(buf), "%s", list);
+    char *cursor = buf;
+    while (cursor && *cursor) {
+        char *comma = strchr(cursor, ',');
+        if (comma) *comma = '\0';
+        if (*cursor) bl_dump_ability(cursor);
+        cursor = comma ? comma + 1 : NULL;
+    }
+}
+
 /* ── main ────────────────────────────────────────────────────────────────── */
 
 int main(void)
@@ -2430,6 +2551,10 @@ int main(void)
     if (load_card_db() != 0) {
         fprintf(stderr, "load_cards failed\n");
         return 1;
+    }
+    {
+        const char *d = getenv("RB_DUMP_ABILITY");
+        if (d && *d) { bl_run_dump(d); rb_unload(); return 0; }
     }
     setvbuf(stdout, NULL, _IONBF, 0);
 

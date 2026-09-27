@@ -520,6 +520,20 @@ pub fn score_actions(gs: &GameState, actions: &[Action], me: u8) -> Vec<(f64, St
     let base = features(&root, me);
     let opponent = features(&root, 1 - me);
     let pending = gs.has_pending_choice();
+    // Off (0.0) until measured. `V7_CHECK_PRESSURE=<weight>` enables it; the
+    // weight is in v7's own score units, so 75 means "a deploy that takes the
+    // best life in hand from a coin flip to near-certainty is worth about one
+    // good member".
+    let pressure_weight: f64 = std::env::var("V7_CHECK_PRESSURE")
+        .ok()
+        .and_then(|value| value.parse().ok())
+        .filter(|value: &f64| value.is_finite() && *value >= 0.0)
+        .unwrap_or(0.0);
+    let base_pressure = if pressure_weight > 0.0 {
+        crate::bot::strategy_v7::check_pressure(&root, me, &gs.card_database)
+    } else {
+        0.0
+    };
     // MEASURED 2026-09-23: Pass=-0.05 + energy tax exploded draws
     // (1569/3000, avg turns 3.7) — every UseAbility at score≈0 then beat
     // Pass and main never ended cleanly. Keep flat 0.0 (v6 doctrine).
@@ -572,6 +586,20 @@ pub fn score_actions(gs: &GameState, actions: &[Action], me: u8) -> Vec<(f64, St
         let baton = is_baton_action(gs, me, action);
         if !pending && action.action_type == ActionType::UseAbility && score <= 0.0 {
             score -= 0.01;
+        }
+        // Check pressure: how much closer this action brings the board to
+        // actually PASSING the next check, using the same 256-draw model that
+        // `choose_live_set_experiment` uses to decide whether to set a life at
+        // all. `value()`'s `60 × Δpassable` is a one-ply coverage proxy and is
+        // blind to active blades, which are the deck draws the check reads.
+        //
+        // Deliberately a DELTA from the root pressure, for the same reason
+        // every other term here is: Pass leaves the board untouched, so its
+        // pressure delta is exactly 0 and its 0.0 score is unchanged. An
+        // action that buys a placement has to outbid ending the phase.
+        if pressure_weight > 0.0 {
+            let after = crate::bot::strategy_v7::check_pressure(&sim, me, &gs.card_database);
+            score += pressure_weight * (after - base_pressure);
         }
         let explanation = format!(
             "value={score:.2} choices={} depth={depth} status={status}{}",

@@ -1102,6 +1102,16 @@ def clean_msg(lit, ctx):
     return c_str(lit)
 
 
+def c_cond_text(cond):
+    """Fallback CHECK message when the Rust assert carried no string literal.
+
+    The Rust source is not valid C, so it has to be quoted and escaped before
+    it can be used as the diagnostic text.
+    """
+    t = " ".join(str(cond).split())
+    return '"' + c_str('"' + t + '"')[1:-1] + '"'
+
+
 def transpile_assert(s, ctx, kind):
     name, args, end = split_macro_args(s)
     if end < 0 or not args:
@@ -1152,7 +1162,7 @@ def transpile_assert(s, ctx, kind):
         ctx.todo(s)
         return
     ctx.n_check += 1
-    ctx.emit(f'    CHECK({c}, {msg or cond});')
+    ctx.emit(f'    CHECK({c}, {msg or c_cond_text(cond)});')
 
 
 def unwrap_option_cmp(a_expr, b_expr, a, b, ctx):
@@ -1651,6 +1661,7 @@ def emit_let(ls_i, lhs, rhs, ctx, ind):
         return i + 1
     if re.match(r'^\w+$', lhs) and 'TestGame::new' in rhs:
         v = ctx.fresh(lhs)
+        ctx.have_game = True
         ctx.emit(f"{ind}TestGame {v};")
         ctx.emit(f"{ind}test_game_new(&{v});")
         return i + 1
@@ -1938,7 +1949,7 @@ def map_mutator(full, ctx):
 # Per-test-function porting
 # ──────────────────────────────────────────────────────────────────────
 def port_test(fname, body, helpers, consts):
-    """-> (ctx, ok).  Raises Skip when the function cannot be ported."""
+    """-> ctx.  Raises Skip when the function cannot be ported honestly."""
     ctx = Ctx(helpers, consts, fname)
     text = body
     text = inline_trivial(text, helpers, consts)
@@ -1946,7 +1957,22 @@ def port_test(fname, body, helpers, consts):
     ls = logical_lines(text)
     # a Rust test body is a sequence; trailing stray braces are tolerated
     transpile_stmts(ls, ctx, 0, "    ")
+    verify_grounded(ctx)
     return ctx
+
+
+def verify_grounded(ctx):
+    """Refuse to emit a function that references `game` without owning one.
+
+    Several Rust setup forms (`let (game, a) = helper()`, a `let mut game`
+    that lost its initializer) fail to map.  Before this guard the rest of
+    the body still emitted `test_id(&game, ...)` against a `game` that was
+    never declared, so the file compiled to nothing.  Skipping is the tool's
+    documented contract: unknown code is dropped, never guessed.
+    """
+    body = "\n".join(ctx.lines)
+    if re.search(r'\bgame\b', body) and not ctx.have_game:
+        raise Skip("no TestGame declaration but body uses `game`")
 
 
 # ──────────────────────────────────────────────────────────────────────

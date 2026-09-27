@@ -89,6 +89,9 @@ static void bare_board(TestGame *tg)
     tg->state.n_selected_cards = 0;
     tg->state.live_set_limit_reduction[0] = 0;
     tg->state.live_set_limit_reduction[1] = 0;
+    tg->state.queue.deferred = NULL;
+    tg->state.queue.resume_eff = NULL;
+    tg->state.activation_keepalive_valid = 0;
     rb_clear_pending_choice(&tg->state);
 }
 
@@ -131,55 +134,69 @@ static int need(TestGame *tg, int *out, const char *no, int n)
     return ok;
 }
 
-/* Activate ability `idx` of `card` — the port of
- * TurnEngine::execute_main_phase_action_with_ability_index(.., Some(idx)).
+/* Resolve ability `idx` of `card` in the shape BOTH engine paths use for
+ * "cost first, then effect":
  *
- * It reproduces rb_activate_card()'s cost+effect bridge (engine.c:1150-1170):
- * the decoded cost and effect are wrapped into ONE root effect so an optional
- * cost that opens a choice can carry the effect across the resume, the decoded
- * Ability is parked in activation_keepalive for the choice round-trip, and the
- * ability queue is drained. Driving rb_resolve_ability() directly instead would
- * run the cost on its own and abandon the effect at the first prompt, which is
- * a harness artefact, not an engine behaviour. */
+ *   Rust  resolver::resolve_ability — validate + pay the printed COST, and
+ *         only then run the EFFECT. An unpayable cost aborts the resolution.
+ *   C     engine.c:1089-1102 (the 登場 path) — rb_pay_cost(), and when the
+ *         cost opens a choice park the effect in g->queue.deferred so that the
+ *         cost's ANSWER is what runs it.
+ *
+ * Driving the decoded cost as a child of the effect executor instead (what
+ * rb_activate_card's own bridge at engine.c:1150-1159 does) is a DIFFERENT
+ * code path with different semantics — the effect executor auto-resolves an
+ * exact-count pick where the cost path prompts for it. The bridge's own
+ * divergence is pinned separately, in
+ * test_gap_sequential_cost_root_dropped_by_bridge(). */
 static int activate_ability_index(TestGame *tg, int card, int idx)
 {
     Ability ab;
     memset(&ab, 0, sizeof ab);
-    if (!rb_decode_card_ability((uint32_t)card, idx, &ab)) {
+    if (!rb_decode_card_ability((uint32_t)card, (uint32_t)idx, &ab)) {
         rb_free_ability(&ab);
         return 0;
     }
     if (!ab.cost && !ab.effect) { rb_free_ability(&ab); return 0; }
-    AbilityEffect *act = (AbilityEffect *)calloc(1, sizeof(AbilityEffect));
-    /* A `sequential_cost` cost ROOT is a deliberate no-op in the effect
-     * executor (executor.c:357: "the sub-costs are already paid in order by
-     * the dedicated cost path"), so handing it to rb_execute_effect_ex pays
-     * NOTHING. Pay such a root through the cost path first — which is what
-     * Rust's resolver does (cost/handlers.rs sequential_cost) and what the
-     * engine never does inside this bridge. The bridge's drop is pinned
-     * separately by test_gap_sequential_cost_root_dropped_by_bridge(). */
-    if (ab.cost && ab.cost->action && !strcmp(ab.cost->action, "sequential_cost")) {
-        rb_pay_cost(&tg->state, 0, ab.cost);
-    } else if (ab.cost) {
-        act->child[act->n_child++] = ab.cost;
-    }
-    if (ab.effect) act->child[act->n_child++] = ab.effect;
-    tg->state.activation_act = act;
-    tg->state.activation_keepalive = ab;
-    tg->state.activation_keepalive_valid = 1;
+
+    /* A 「このカードを手札から控え室に置く」 cost resolves against the card
+     * being activated, so the activating card has to be published first
+     * (rb_activate_card sets it from the action; engine.c's 登場 loop gets it
+     * from the play). */
+    tg->state.activating_card = card;
     tg->state.n_recently_moved = 0;
-    rb_execute_effect_ex(&tg->state, 0, act, card);
-    rb_drain_ability_queue(&tg->state);
-    if (!tg->state.queue.has_pending) {
-        act->n_child = 0;
-        tg->state.activation_keepalive.cost = NULL;
-        tg->state.activation_keepalive.effect = NULL;
-        rb_free_ability(&tg->state.activation_keepalive);
-        tg->state.activation_keepalive_valid = 0;
-        free(act);
-        tg->state.activation_act = NULL;
+
+    int paid = 1;
+    if (ab.cost) {
+        paid = rb_pay_cost(&tg->state, 0, ab.cost) != 0;
+        if (test_has_pending_choice(tg) && ab.effect) {
+            /* engine.c:1091-1098 — the cost opened a choice, so the effect
+             * becomes the captured continuation of that choice. */
+            tg->state.queue.deferred = ab.effect;
+            tg->state.queue.resume_host = card;
+            tg->state.queue.resume_eff = ab.effect;
+            /* The cost prompt's resume may dereference the tree, so hand the
+             * whole ability to the keepalive and detach it from `ab`. */
+            tg->state.activation_keepalive = ab;
+            tg->state.activation_keepalive_valid = 1;
+            ab.cost = NULL;
+            ab.effect = NULL;
+        }
     }
+    if (ab.effect && paid && !test_has_pending_choice(tg))
+        rb_execute_effect_ex(&tg->state, 0, ab.effect, card);
+    rb_drain_ability_queue(&tg->state);
+    rb_free_ability(&ab);
     return 1;
+}
+
+/* Release the parked ability once nothing is waiting on it (engine.c:1161). */
+static void release_activation_keepalive(TestGame *tg)
+{
+    if (tg->state.queue.has_pending || tg->state.queue.deferred) return;
+    if (!tg->state.activation_keepalive_valid) return;
+    rb_free_ability(&tg->state.activation_keepalive);
+    tg->state.activation_keepalive_valid = 0;
 }
 
 /* The resolver entry point, WITHOUT the rb_activate_card cost+effect bridge.
@@ -216,6 +233,7 @@ static void drain_accept(TestGame *tg)
         else
             rb_resume_with_choice(&tg->state, 0);
         rb_process_pending_auto_abilities(&tg->state);
+        release_activation_keepalive(tg);
     }
 }
 
@@ -232,6 +250,7 @@ static void drain_decline(TestGame *tg)
         else
             rb_resume_with_choice(&tg->state, -1);
         rb_process_pending_auto_abilities(&tg->state);
+        release_activation_keepalive(tg);
     }
 }
 
@@ -293,6 +312,58 @@ static int find_live_with_score(int score)
         if (match) return (int)i;
     }
     return -1;
+}
+
+/* Opt-in decoder dump: set RB_COSTEFF_DUMP=1 to print the cost/effect tree of
+ * every fixture this file touches. Diagnostic only — no assertion reads it. */
+static void dump_tree(const AbilityEffect *e, int depth)
+{
+    if (!e) return;
+    for (int i = 0; i < depth; i++) fputs("  ", stderr);
+    fprintf(stderr, "%s src=%s dst=%s tgt=%s n=%d opt=%d",
+            e->action ? e->action : "(null)",
+            e->source ? e->source : "-", e->destination ? e->destination : "-",
+            e->target ? e->target : "-", e->count, e->is_optional);
+    for (int i = 0; i < e->n_extra; i++)
+        fprintf(stderr, " [%s=%s]", e->extra_k[i] ? e->extra_k[i] : "?",
+                e->extra_v[i] ? e->extra_v[i] : "?");
+    fputc('\n', stderr);
+    for (int i = 0; i < e->n_child; i++) dump_tree(e->child[i], depth + 1);
+    if (e->optional_action) { for (int i=0;i<=depth;i++) fputs("  ", stderr);
+        fprintf(stderr, "OPTIONAL->\n"); dump_tree(e->optional_action, depth+1); }
+    if (e->conditional_action) { for (int i=0;i<=depth;i++) fputs("  ", stderr);
+        fprintf(stderr, "CONDITIONAL->\n"); dump_tree(e->conditional_action, depth+1); }
+}
+
+static void dump_fixture(const char *no, int idx)
+{
+    int id = rb_find_card_by_no(no);
+    if (id < 0) { fprintf(stderr, "DUMP %s ab#%d: NO SUCH CARD\n", no, idx); return; }
+    Ability ab;
+    memset(&ab, 0, sizeof ab);
+    if (!rb_decode_card_ability((uint32_t)id, (uint32_t)idx, &ab)) {
+        fprintf(stderr, "DUMP %s ab#%d: DECODE FAILED\n", no, idx);
+        rb_free_ability(&ab);
+        return;
+    }
+    fprintf(stderr, "DUMP %s (idx %d) ab#%d:\n  COST:\n", no, id, idx);
+    dump_tree(ab.cost, 2);
+    fprintf(stderr, "  EFFECT:\n");
+    dump_tree(ab.effect, 2);
+    rb_free_ability(&ab);
+}
+
+static void dump_all_fixtures(void)
+{
+    if (!getenv("RB_COSTEFF_DUMP")) return;
+    static const char *const cards[] = {
+        "PL!N-pb1-003-R", "PL!N-bp5-003-R", "PL!-bp4-002-R＋", "PL!-pb1-007-R",
+        "PL!S-bp7-005-R＋", "PL!SP-bp7-003-R＋", "PL!S-bp3-021-L", "PL!SP-bp5-027-L",
+        "PL!-bp6-021-L", "PL!S-pb1-006-R", "PL!HS-pb1-004-R", "PL!N-bp3-008-R＋",
+        "PL!HS-bp2-018-N", "PL!HS-sd1-008-SD", "PL!S-bp3-006-R＋", "PL!-bp6-006-R＋",
+    };
+    for (unsigned i = 0; i < sizeof(cards) / sizeof(cards[0]); i++)
+        for (int idx = 0; idx < 4; idx++) dump_fixture(cards[i], idx);
 }
 
 static const char *pending_zone(TestGame *tg)
@@ -560,6 +631,14 @@ static void test_success_score_gate_offers_no_cost(void)
     CHECK(test_play_to_stage(&tg, eli, 1), "C0: 絢瀬絵里 deploys to the centre stage");
     CHECK(!test_has_pending_choice(&tg),
           "C0: below the 成功数6 gate the recovery offers no cost prompt");
+    /* The 起動 is ability #1 (ability #0 is her 常時 heart06 clause) — the
+     * 成功数6 parenthetical must gate the activation itself. */
+    activate_ability_index(&tg, eli, 1);
+    drain_accept(&tg);
+    CHECK(!test_has_pending_choice(&tg),
+          "C0: the 起動 is refused outright below the 成功数6 gate");
+    CHECK_EQ(tg.state.p[0].hand.n, 3,
+             "C0: the refused 起動 discards no cost card");
 }
 
 static void test_success_score_sequential_discard_two(void)
@@ -584,7 +663,8 @@ static void test_success_score_sequential_discard_two(void)
     test_give_energy(&tg, 15);
 
     CHECK(test_play_to_stage(&tg, eli, 1), "C1: 絢瀬絵里 deploys to the centre stage");
-    activate_ability_index(&tg, eli, 0);
+    /* ab#1 is the 起動; ab#0 is her 常時 clause. */
+    activate_ability_index(&tg, eli, 1);
 
     CHECK(test_has_pending_choice(&tg), "C1: the hand-discard cost prompts (1/2)");
     CHECK_EQ(test_pending_choice_count(&tg), 1, "C1: a pending choice is outstanding");
@@ -1458,15 +1538,20 @@ static void test_optional_two_card_cost_pay_and_skip(void)
 
         int live = cid(&tg, MUS_LIVE);
         if (live >= 0) test_set_live_card(&tg, 0, live);
-        fire_live_start(&tg);
+        /* ab#1 is 桂城 泉's ライブ開始時 (the optional 2-card 蓮ノ空 cost);
+         * ab#0 is her 常時 clause, which carries no cost at all. */
+        activate_ability_index(&tg, izumi, 1);
 
         CHECK(test_has_pending_choice(&tg), "M1: the optional cost prompts");
         const RbChoice *ch = rb_get_pending_choice(&tg.state);
         CHECK(ch != NULL && ch->count == 2, "M1: the printed cost is 2 hand cards");
         CHECK(ch != NULL && ch->allow_skip, "M1: the two-card cost is optional");
 
-        for (int i = 0; i < 2 && test_has_pending_choice(&tg); i++)
-            rb_resume_with_choice(&tg.state, 0);
+        /* The Rust twin pays it with ONE select_indices(&[0, 1]). */
+        {
+            const int picks[2] = { 0, 1 };
+            rb_resume_with_choice_indices(&tg.state, picks, 2);
+        }
         drain_accept(&tg);
 
         CHECK_EQ(test_get_heart_modifier(&tg, kozue, RB_HEART_PINK), 2,
@@ -1490,7 +1575,7 @@ static void test_optional_two_card_cost_pay_and_skip(void)
 
         int live = cid(&tg, MUS_LIVE);
         if (live >= 0) test_set_live_card(&tg, 0, live);
-        fire_live_start(&tg);
+        activate_ability_index(&tg, izumi, 1);
         drain_decline(&tg);
 
         int total = 0;
@@ -1618,16 +1703,23 @@ static void maki_setup(TestGame *tg, int maki, int filler, const int *deck_top, 
 
 static void test_maki_cost_discard_and_all_match_blade(void)
 {
-    TestGame tg;
-    test_game_new(&tg);
+    /* Each case gets its OWN TestGame. bare_board() clears the zones but NOT
+     * tg->state.mods, and ブレード granted by ① is a live-end modifier that
+     * would still be counted in case ② — reusing one TestGame made the blade
+     * read 3+3 and then 3+3+3, which looks exactly like an engine bug. */
     int maki, filler, ruby, mus_maki;
-    if (!need(&tg, &maki, "PL!-bp6-006-R＋", 1) ||
-        !need(&tg, &filler, FILLER_M, 1) ||
-        !need(&tg, &ruby, "PL!S-bp2-009-R", 1) ||
-        !need(&tg, &mus_maki, "PL!-bp5-015-N", 1)) { CHECK(0, "O fixtures"); return; }
+    {
+        TestGame ids;
+        test_game_new(&ids);
+        if (!need(&ids, &maki, "PL!-bp6-006-R＋", 1) ||
+            !need(&ids, &filler, FILLER_M, 1) ||
+            !need(&ids, &ruby, "PL!S-bp2-009-R", 1) ||
+            !need(&ids, &mus_maki, "PL!-bp5-015-N", 1)) { CHECK(0, "O fixtures"); return; }
+    }
 
     /* the printed cost is a hand discard: one card out, no energy spent */
     {
+        TestGame tg; test_game_new(&tg);
         int top[5];
         for (int i = 0; i < 5; i++) top[i] = filler;
         maki_setup(&tg, maki, filler, top, 5);
@@ -1645,6 +1737,7 @@ static void test_maki_cost_discard_and_all_match_blade(void)
 
     /* all five revealed cards carry heart02 → blade +3 and a μ's pick */
     {
+        TestGame tg; test_game_new(&tg);
         int top[5] = { ruby, ruby, ruby, ruby, mus_maki };
         maki_setup(&tg, maki, filler, top, 5);
         activate_ability_index(&tg, maki, 0);
@@ -1657,6 +1750,7 @@ static void test_maki_cost_discard_and_all_match_blade(void)
 
     /* 4 of 5 match → the condition fails and no blade is granted */
     {
+        TestGame tg; test_game_new(&tg);
         int top[5] = { ruby, ruby, ruby, ruby, filler };
         maki_setup(&tg, maki, filler, top, 5);
         activate_ability_index(&tg, maki, 0);
@@ -1741,6 +1835,7 @@ int main(void)
         return 2;
     }
     setvbuf(stdout, NULL, _IONBF, 0);
+    dump_all_fixtures();
 
     test_q196_mandatory_cost_then_draw();
     test_q196_hand_only_gate_from_stage();

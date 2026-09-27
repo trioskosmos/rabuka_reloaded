@@ -333,10 +333,6 @@ fn choose(
     }
 }
 
-fn build_deck(db: &mut Arc<CardDatabase>, numbers: &[String]) -> Result<Deck, Box<dyn std::error::Error>> {
-    Ok(game_setup::build_two_decks(db, numbers, numbers)?.0)
-}
-
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     // NOTE: deliberately NOT set_training_mode(true). That helper turns OFF
     // action display and rule logging, which are exactly the two things this

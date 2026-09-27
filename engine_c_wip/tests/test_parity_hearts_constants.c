@@ -1220,6 +1220,73 @@ static void test_six_heart_types_constant_all_heart(void)
     }
 }
 
+/* ── HC_TRACE diagnostic ─────────────────────────────────────────────────
+ * HC_TRACE=<case> runs exactly one scenario with the engine's own [recalc]
+ * trace enabled, so a failing constant can be attributed to "the condition
+ * was never evaluated" vs "the condition evaluated wrongly". Read-only; it
+ * never changes an assertion. Unset by default. */
+static int trace_case(const char *which)
+{
+    TestGame tg; test_game_new(&tg);
+    rb_ability_debug_set(1);
+    if (!strcmp(which, "position")) {
+        int m = cid(&tg, "PL!SP-bp5-011-R");
+        set_stage(&tg, 0, m, RB_EMPTY_SLOT, RB_EMPTY_SLOT);
+    } else if (!strcmp(which, "ten_energy")) {
+        int m = cid(&tg, "PL!SP-bp5-016-N");
+        stage_center(&tg, m);
+        set_energy(&tg, 0, 0, 0);
+    } else if (!strcmp(which, "wien")) {
+        int m = cid(&tg, "PL!SP-pb2-032-N");
+        stage_center(&tg, m);
+        set_energy(&tg, 0, 0, 0);
+    } else if (!strcmp(which, "per_unit")) {
+        int m = cid(&tg, "PL!N-bp7-007-R＋");
+        stage_center(&tg, m);
+    } else if (!strcmp(which, "combined_energy")) {
+        int m = cid(&tg, "PL!N-bp4-007-R＋");
+        stage_center(&tg, m);
+        set_energy(&tg, 0, 8, 8);
+        set_energy(&tg, 1, 7, 7);
+    } else if (!strcmp(which, "combined_stage")) {
+        int m = cid(&tg, "PL!N-PR-027-PR");
+        set_stage(&tg, 0, m, cid_new(&tg, COST_4), cid_new(&tg, COST_4));
+        int a = cid_new(&tg, COST_4), b = cid_new(&tg, COST_4), c = cid_new(&tg, COST_4);
+        set_stage(&tg, 1, a, b, c);
+    } else if (!strcmp(which, "cost13")) {
+        int m = cid(&tg, "PL!SP-sd2-008-SD2");
+        set_stage(&tg, 0, m, cid(&tg, "PL!HS-bp5-004-R"), RB_EMPTY_SLOT);
+    } else if (!strcmp(which, "opponent_energy")) {
+        int m = cid(&tg, "PL!S-bp7-014-N");
+        set_stage(&tg, 0, m, RB_EMPTY_SLOT, RB_EMPTY_SLOT);
+        set_energy(&tg, 0, 2, 2);
+        set_energy(&tg, 1, 2, 2);
+    } else if (!strcmp(which, "distinct_names")) {
+        int m = cid(&tg, "PL!-bp5-003-R+");
+        set_stage(&tg, 0, m, cid_new(&tg, "PL!-bp5-003-R+"), cid(&tg, "PL!-sd1-002-SD"));
+    } else {
+        fprintf(stderr, "unknown HC_TRACE case \"%s\"\n", which);
+        return 1;
+    }
+    test_recalc(&tg);
+    rb_ability_debug_set(0);
+    {
+        int probe[8];
+        int any = -1;
+        for (int z = 0; z < 8; z++) {
+            RbPlayer *P = &tg.state.p[0];
+            for (int s = 0; s < RB_STAGE_SIZE; s++)
+                if (P->stage[s] != RB_EMPTY_SLOT)
+                    probe[z] = rb_mods_get_heart(&tg.state.mods, P->stage[s], z);
+            if (probe[z]) any = z;
+        }
+        printf("[trace] constant_heart by color:");
+        for (int z = 0; z < 8; z++) printf(" c%d=%d", z, probe[z]);
+        printf(" (last nonzero color=%d)\n", any);
+    }
+    return 0;
+}
+
 /* ── load the card DB ────────────────────────────────────────────────── */
 
 static int load_card_db(void)
@@ -1294,6 +1361,8 @@ static void dump_card(const char *no)
     Card card;
     printf("=== %s (id=%d)\n", no, c);
     if (!rb_decode_card_by_index((uint32_t)c, &card)) { printf("  decode failed\n"); return; }
+    printf("  resolved_card_no=%s name=%s\n", rb_card_string(card.card_no_idx),
+           card.name ? card.name : "(null)");
     printf("  cost=%d hearts:", card.cost);
     for (int i = 0; i < card.num_base; i++)
         printf(" %d:%d", card.heart_color[i], card.heart_count[i]);
@@ -1326,6 +1395,12 @@ int main(void)
             dump_card(tok);
         rb_unload();
         return 0;
+    }
+
+    if (getenv("HC_TRACE")) {
+        int rc = trace_case(getenv("HC_TRACE"));
+        rb_unload();
+        return rc;
     }
 
     test_ten_energy_constant_heart06();

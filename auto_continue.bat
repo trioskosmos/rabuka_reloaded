@@ -9,7 +9,7 @@ exit /b
 param(
     [int]$IntervalMinutes = 8,
     [string]$WindowTitle = "",
-    [string]$Message = "continue what you are doing. do not stop. if you think you are done you are not there is more to do, find and do it"
+    [string]$Message = "continue what you are doing. do not stop. if you think you are done you are not there is more to do, find and do it. you need to combine especially jidou abilities with other abilities. you need to find tests that miss the point of the ability and actually make them work properly. even if you just comb through individually on abilities.json. now get to work."
 )
 
 Add-Type -AssemblyName System.Windows.Forms

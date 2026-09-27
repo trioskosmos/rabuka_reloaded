@@ -2022,9 +2022,9 @@ static void test_maki_opponent_own_wait_blocked_by_immunity(void)
 
     CHECK(test_play_to_stage(&tg, maki, 1), "真姫 is played to centre");
     int guard = 0;
-    while (rb_has_pending_choice(&tg->state) && guard++ < 20) {
-        if (!strcmp(test_pending_choice_type(tg), "SelectCard")) answer(tg, 0);
-        else answer(tg, 1);
+    while (rb_has_pending_choice(&tg.state) && guard++ < 20) {
+        if (!strcmp(test_pending_choice_type(&tg), "SelectCard")) answer(&tg, 0);
+        else answer(&tg, 1);
     }
     drain_skip(&tg, 8);
 
