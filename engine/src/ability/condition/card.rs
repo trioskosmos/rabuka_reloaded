@@ -2703,11 +2703,15 @@ impl<'a> ConditionContext<'a> {
                     pos.get_position()
                 );
                 let pos_str = pos.get_position();
-                let pos_idx = match pos_str {
-                    Some("left") | Some("leftside") | Some("left_side") => 0,
-                    Some("center") | Some("centre") => 1,
-                    Some("right") | Some("rightside") | Some("right_side") => 2,
-                    _ => {
+                // stage_position_index is the single place that knows which
+                // spellings mean which slot. It also accepts the Japanese forms,
+                // which this ladder did not — and the extra arms it used to
+                // carry ("leftside", "rightside", "centre") could never match:
+                // the parser maps 「{{leftside.png|左サイド}}」 to "left_side" in
+                // parser_fields.py, so those spellings never reach the engine.
+                let pos_idx = match util::stage_position_index(pos_str.unwrap_or("")) {
+                    Some(idx) => idx,
+                    None => {
                         log::debug!("[APPEARANCE] unknown position: {:?}", pos_str);
                         push_rich(&format!("不明な位置: {:?}", pos_str), false);
                         return false;
