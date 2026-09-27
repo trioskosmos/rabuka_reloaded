@@ -224,9 +224,21 @@ int rb_executor_execute(GameState *g, int actor, AbilityEffect *effect, int host
                strcmp(action, "choose_required_hearts") == 0 ||
                strcmp(action, "re_yell") == 0 ||
                strcmp(action, "perform_yell") == 0 ||
-               strcmp(action, "shuffle") == 0 ||
-               strcmp(action, "custom") == 0) {
+               strcmp(action, "shuffle") == 0) {
         result = execute_misc(g, actor, effect, host_cid);
+    } else if (strcmp(action, "custom") == 0) {
+        /* engine/src/ability/effects/mod.rs:94-97 (prepare_opponent_routing):
+         * "Empty action (default) with action_by means it was entirely handled
+         * by opponent" — a Custom effect that carries `action_by` was already
+         * routed to the opponent by the wrapper, so the executor must do
+         * NOTHING. Without this the C fell into execute_misc and re-ran the
+         * effect against the actor. A Custom effect with no `action_by` still
+         * dispatches to execute_custom via the misc path (executor.rs:144). */
+        if (rb_effect_action_by_any(effect)) {
+            result = 1;
+        } else {
+            result = execute_misc(g, actor, effect, host_cid);
+        }
     } else if (strcmp(action, "modify_score") == 0 || strcmp(action, "gain_score") == 0) {
         if (host_cid < 0 && !effect->target && !effect->self_target_field[0]) {
             const char *operation = effect_extra(effect, "operation");
@@ -307,11 +319,25 @@ int rb_executor_execute(GameState *g, int actor, AbilityEffect *effect, int host
         else if (effect->n_child > 0)
             rb_execute_effect_ex(g, actor, effect->child[0], host_cid);
     } else if (strcmp(action, "opponent_action") == 0) {
-        AbilityEffect routed = *effect;
-        routed.target = (char *)"opponent";
-        if (effect->primary_effect)
-            routed.primary_effect = effect->primary_effect;
-        rb_execute_effect_ex(g, actor, &routed, host_cid);
+        /* engine/src/ability/effects/mod.rs:73-105 (prepare_opponent_routing).
+         * Rust clones the NESTED `opponent_action` effect — never the wrapper —
+         * forces target="opponent" when the nested target is absent or "self",
+         * executes that clone, and then the wrapper itself resolves to Ok(true)
+         * (nothing further to do).
+         *
+         * The previous code instead re-dispatched the WRAPPER with only
+         * `target` rewritten, so `routed.action` was still "opponent_action" and
+         * rb_executor_execute recursed on itself until the engine.c depth cap
+         * (64) stopped it: the nested opponent effect never ran, at the cost of
+         * 64 stack frames per occurrence. */
+        const AbilityEffect *nested = effect->opponent_action;
+        if (nested) {
+            AbilityEffect routed = *nested;
+            if (!routed.target || !strcmp(routed.target, "self"))
+                routed.target = (char *)"opponent";
+            rb_execute_effect_ex(g, actor, &routed, host_cid);
+        }
+        result = 1;
     } else if (strcmp(action, "modify_yell_source") == 0) {
         const char *source = effect_extra(effect, "yell_source");
         if (!source) source = effect->source;
@@ -327,6 +353,16 @@ int rb_executor_execute(GameState *g, int actor, AbilityEffect *effect, int host
                strcmp(action, "choice_condition") == 0 ||
                strcmp(action, "energy_condition") == 0 ||
                strcmp(action, "do_nothing") == 0) {
+        result = 1;
+    } else if (strcmp(action, "sequential_cost") == 0) {
+        /* engine/src/ability/effects/executor.rs:187 — SequentialCost is in the
+         * same `=> Ok(())` group as CompoundAction/OpponentAction/ActionBy:
+         * the sub-costs are already paid in order by the dedicated cost path
+         * (engine/src/ability/cost/handlers.rs:957-967, the C twin is
+         * cost.c's cost_is_sequential), so the effect executor must do nothing.
+         * It previously fell through to the unsupported-action arm below and
+         * reported result=0 ("no state change") instead of Rust's Ok(()).
+         * 28 compiled abilities declare a sequential_cost cost. */
         result = 1;
     } else {
         /* Unsupported fallback. Rust's match is exhaustive over ActionType, so
