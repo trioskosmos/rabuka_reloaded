@@ -112,6 +112,17 @@ fn snapshot() -> Snapshot {
     }
 }
 
+/// Total allocation calls since process start.
+///
+/// Exposed so per-region instrumentation (see `timer`) can attribute
+/// allocations to a call path. The engine is allocation-bound rather than
+/// compute-bound, so a region that costs little wall time can still be the
+/// one producing hundreds of allocations per action.
+#[cfg(feature = "alloc_tracker")]
+pub fn alloc_count() -> u64 {
+    ALLOC_COUNT.load(Ordering::Relaxed) as u64
+}
+
 /// Start tracking allocations from this point.
 /// Returns a Guard that prints the delta on drop.
 pub fn start() -> Option<AllocGuard> {

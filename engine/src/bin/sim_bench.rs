@@ -897,6 +897,22 @@ fn real_main() -> Result<(), String> {
         );
     }
 
+    // --features profiling: the engine's `timer` instrumentation only reports
+    // if something asks for it. profile_target does; sim_bench (the canonical
+    // production-path bench) did not, so the one harness that runs the real
+    // execute_and_settle path could never produce a profile.
+    if cfg!(feature = "profiling") {
+        if opts.jobs > 1 {
+            eprintln!(
+                "SIM_BENCH: jobs={} -- timer rows are aggregated across threads and the \
+                 global TIMERS mutex is on the hot path, so these timings are NOT \
+                 comparable to a jobs=1 run. Use --jobs 1 for profiling.",
+                opts.jobs
+            );
+        }
+        rabuka_engine::timer::print_results();
+    }
+
     println!(
         "\nSIM_BENCH_SUMMARY policy={} seed={} games={} decks={} repeat={} jobs={} total_secs={:.3} mean_gps={:.3} mean_aps={:.1} total_actions={}",
         opts.policy_raw,

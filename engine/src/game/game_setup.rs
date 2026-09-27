@@ -1762,29 +1762,38 @@ fn generate_main_phase_actions(game_state: &GameState) -> Vec<Action> {
             game_state.card_database.get_card(stage_card_ids[2]),
         ];
 
+        // Members currently holding the 「待机」 orientation. This is a property
+        // of the STAGE, not of the hand card being considered, so it is built
+        // once per call rather than once per hand card (it was a per-card Vec
+        // allocation + rescan of all three slots, 34k+ times a bench run).
+        let waited_stage_cards: Vec<i16> = active_player
+            .stage
+            .stage
+            .iter()
+            .copied()
+            .filter(|card_id| {
+                *card_id != -1
+                    && game_state.mods.get_orientation_modifier(*card_id) == Some("wait")
+            })
+            .collect();
+
         for (hand_index, card_id) in active_player.hand.cards.iter().enumerate() {
             if let Some(card) = game_state.card_database.get_card(*card_id) {
                 if card.is_member() && !card.is_live() {
                     let card_cost = card.cost.unwrap_or(0);
                     let hand_count = active_player.hand.cards.len();
-                    let waited_stage_cards: Vec<i16> = active_player
-                        .stage
-                        .stage
-                        .iter()
-                        .copied()
-                        .filter(|card_id| {
-                            *card_id != -1
-                                && game_state.mods.get_orientation_modifier(*card_id) == Some("wait")
-                        })
-                        .collect();
-                    let reduction = crate::ability::util::calculate_play_cost_reduction(
-                        &active_player.stage,
-                        &active_player.success_live_card_zone.cards,
-                        hand_count,
-                        *card_id,
-                        &game_state.card_database,
-                        &waited_stage_cards,
-                    );
+                    let reduction = {
+                        #[cfg(not(feature = "no_std"))]
+                        let _t = crate::timer::Timer::start("gen::cost_reduction");
+                        crate::ability::util::calculate_play_cost_reduction(
+                            &active_player.stage,
+                            &active_player.success_live_card_zone.cards,
+                            hand_count,
+                            *card_id,
+                            &game_state.card_database,
+                            &waited_stage_cards,
+                        )
+                    };
                     let effective_cost = card_cost.saturating_sub(reduction);
                     let active_energy_count = active_player.energy_zone.active_count();
 
@@ -1804,17 +1813,21 @@ fn generate_main_phase_actions(game_state: &GameState) -> Vec<Action> {
                             })
                     });
 
-                    let (area_candidates, has_any_available) = area_candidates_for(
-                        game_state,
-                        active_player,
-                        stage_card_ids,
-                        stage_cards,
-                        baton_touch_protected,
-                        card_cost,
-                        effective_cost,
-                        active_energy_count,
-                        display,
-                    );
+                    let (area_candidates, has_any_available) = {
+                        #[cfg(not(feature = "no_std"))]
+                        let _t = crate::timer::Timer::start("gen::area_candidates");
+                        area_candidates_for(
+                            game_state,
+                            active_player,
+                            stage_card_ids,
+                            stage_cards,
+                            baton_touch_protected,
+                            card_cost,
+                            effective_cost,
+                            active_energy_count,
+                            display,
+                        )
+                    };
 
                     // Check if this card has play_baton_touch with count > 1 (double baton)
                     let double_baton_pairs = if has_double_baton(card) {

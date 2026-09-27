@@ -354,6 +354,10 @@ pub fn handle_pending_choice(
     cost_already_paid: bool,
     is_cost_choice: bool,
 ) -> bool {
+    // Called twice per ability resolution; the early-out below means this is
+    // almost always free, so its cost is only interesting when it is not.
+    #[cfg(not(feature = "no_std"))]
+    let _timer = crate::timer::Timer::start("resolve::handle_pending_choice");
     if resolver.pending_choice.is_none() {
         return false;
     }

@@ -18,6 +18,7 @@
 - Do not use `git` to revert or fall back on unless explicitly asked — fix the code properly.
 
 ## Tests
+- **⛔ ONLY `cargo test`. NEVER run `cargo check` or `cargo build` — ever.** Compile validation comes exclusively from the test suite below; a `cargo check`/`cargo build` invocation is wasted time and wrong.
 - The engine test suite is run from the `engine` directory: `cargo test --test run_all`.
 - To run a single module: `cargo test --test run_all <module_name>` (debug env only when diagnosing).
 - Tests load the real card database from `cards/cards.json` via the baked bytecode; regenerate card abilities with `python ability_extraction/extract_card_abilities.py` from the `cards` directory when the parser changes, then run the engine suite. Note: `condition_decoder_gen.rs` / `effect_decoder_gen.rs` are AUTO-GENERATED (see their headers) — edit `cards/generate_condition_decoder.py` / the generator, never the generated file.

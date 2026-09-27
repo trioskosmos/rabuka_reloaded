@@ -85,11 +85,11 @@ pub fn deal_default_game(db: &Arc<CardDatabase>, t1: &Deck, t2: &Deck) -> GameSt
 /// automatic phases. Mirrors the per-bin inline block. Returns the engine
 /// result (the existing per-bin blocks discard it with `let _`).
 pub fn execute_and_settle(gs: &mut GameState, action: &game_setup::Action) -> Result<(), String> {
+    let _timer = crate::timer::Timer::start("bin_common::execute_and_settle");
     let res = game_setup::execute_action(gs, action);
     game_setup::settle_single_player_state(gs);
     res
 }
-
 /// Win/loss outcome derived from the success zones + engine game result.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum GameOutcome {

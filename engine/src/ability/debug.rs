@@ -114,6 +114,12 @@ mod inner {
             card_id: &str,
             ability: &Ability,
         ) {
+            // Same guard as `condition`. Without it this ran on EVERY ability
+            // resolution: two `format!`s (one per use_limit) and a `Vec` of
+            // pad spaces, all discarded by the ABILITY_DEBUG check inside `p`.
+            if !super::ABILITY_DEBUG.load(Ordering::Relaxed) {
+                return;
+            }
             // Name the card by its PRINTED number as well as the internal id:
             // an id alone cannot be checked against cards/cards.json, which is
             // the first thing you want when a verdict is about the wrong card.

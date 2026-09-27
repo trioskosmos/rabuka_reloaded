@@ -545,6 +545,12 @@ impl GameState {
         player_id: &str,
         event: &crate::ability::types::TriggerEvent,
     ) {
+        // Called 4x per card play (self + opponent, before and after the
+        // placement). This is the scan, not the resolve: separating it from
+        // trig::process_pending is what tells you whether a slow turn is
+        // spent LOOKING for triggers or RUNNING them.
+        #[cfg(not(feature = "no_std"))]
+        let _timer = crate::timer::Timer::start("trig::auto_scan");
         let queued_before = self.ability_queue.len();
         let player_id_clone = player_id.to_string();
         let mut abilities_to_trigger: Vec<(i16, usize, i16)> = Vec::new();
@@ -1789,6 +1795,8 @@ impl GameState {
     }
 
     pub fn process_pending_auto_abilities(&mut self, raw_player_id: &str) {
+        #[cfg(not(feature = "no_std"))]
+        let _timer = crate::timer::Timer::start("trig::process_pending");
         let active_player_id = match raw_player_id {
             "player1" => "p1",
             "player2" => "p2",
@@ -1823,6 +1831,8 @@ impl GameState {
     /// store the resolver for choice resume, and preserve the exact post-resolve
     /// scan and debug-log ordering. Keep this ownership boundary intact.
     pub(crate) fn process_current_ability(&mut self) {
+        #[cfg(not(feature = "no_std"))]
+        let _timer = crate::timer::Timer::start("resolve::current_ability");
         // Safety timeout: a runaway ability re-trigger loop (e.g. an each_time
         // watcher re-queued by its own effect's movement) must never spin forever.
         // Abort resolution past an absurd number of calls instead of hanging or
@@ -1985,7 +1995,11 @@ impl GameState {
         resolver.debug_trace =
             crate::ability::debug::ABILITY_DEBUG.load(core::sync::atomic::Ordering::Relaxed);
 
-        match resolver.resolve_ability(self, &ability, card_id, ability_index) {
+        #[cfg(not(feature = "no_std"))]
+        let _t = crate::timer::Timer::start("resolve::resolve_ability_total");
+        let resolve_result = resolver.resolve_ability(self, ability.clone(), card_id, ability_index);
+        drop(_t);
+        match resolve_result {
             Ok(()) => {
                 self.push_debug_note_fmt(format_args!(
                     "resolve ok card={:?} idx={} pending_choice={}",
@@ -3200,6 +3214,12 @@ impl GameState {
     }
 
     pub fn record_action_boundary(&mut self, action: crate::game_setup::ActionType) {
+        // This is the only caller-visible cost of the Rule 12-1 loop protocol
+        // (full-board state hash + O(n) history scan) and it is invisible in
+        // profile_target, which calls execute_main_phase_action directly and
+        // never reaches here. Time it or it stays invisible.
+        #[cfg(not(feature = "no_std"))]
+        let _timer = crate::timer::Timer::start("record_action_boundary");
         if self.loop_last_action != Some(action) {
             self.game_state_history.clear();
             self.pending_loop_protocol = None;

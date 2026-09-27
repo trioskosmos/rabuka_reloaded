@@ -239,6 +239,11 @@ fn get_decompressed_bytecode() -> &'static [u8] {
 }
 
 pub fn get_ability(idx: usize) -> Result<Ability, DecodeError> {
+    // Every ability resolution re-decodes from the blob; there is no resolved-
+    // ability cache (see the "Lazy decoding flow" note below). This is the only
+    // place that cost is paid, so this is the only place it can be measured.
+    #[cfg(not(feature = "no_std"))]
+    let _timer = crate::timer::Timer::start("vm::get_ability");
     if idx >= NUM_ABILITIES {
         return Err(DecodeError::IndexOutOfRange {
             idx,
