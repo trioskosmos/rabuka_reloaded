@@ -747,6 +747,176 @@ static int map_choice_index(const RbChoice *choice, int index)
     return index;
 }
 
+/* ── SelectCard answered with MORE THAN ONE index ───────────────────────────
+   Rust hands the WHOLE selection to the handler: result_handlers.rs:41-65
+   copies `indices.to_vec()` into SelectionContext and choice.rs:1167 does
+   `let mapped_indices = ctx.mfi(&ctx.indices)` — every named card travels
+   through the same call. The C handlers take a single `const char *selected`
+   holding one index, so an answer naming N>1 cards could only ever apply
+   indices[0] and then re-prompt for the remainder: a SelectCard cost/effect
+   with count N could not be completed in one answer.
+
+   This is the faithful multi-index port of the two hand arms of Rust
+   handle_select_card:
+     * the hand-COST arm        choice.rs:1020-1034 -> handle_hand_cost_payment
+     * the hand-SELECTION arm   choice.rs:1057-1059 -> handle_hand_selection
+   Returns 1 when it consumed the answer, 0 when the pending choice is not one
+   of those arms so the caller can fall back to the single-index handler. A
+   return of -1 mirrors Rust's Err(..) ("No cards selected from hand for
+   required selection"), which the callers also return verbatim. */
+static int choice_handle_hand_indices(RbAbilityResolver *self, GameState *g,
+                                      const RbChoice *ch,
+                                      const int *indices, int n_indices)
+{
+    if (!self || !g || !ch || !indices || n_indices <= 0) return 0;
+    const char *zone = ch->zone[0] ? ch->zone : "hand";
+    if (strcmp(zone, "hand") != 0) return 0;
+    /* Reveal arm (choice.rs:981-991) and the C6 keep-N-shuffle-under phase
+       keep their own bookkeeping in the single-index handlers; not ported. */
+    if (ch->is_reveal) return 0;
+    if (ch->target[0] && strstr(ch->target, "reveal")) return 0;
+    if (g->keep_shuffle_under_phase > 0) return 0;
+
+    int actor = g->queue.actor;
+    int count = ch->count;
+    int allow_skip = ch->allow_skip;
+    int cur = g->queue.cur;
+    int effect_started = (cur >= 0 && cur < RB_QUEUE_DEPTH)
+                            ? g->queue.entries[cur].effect_started : 0;
+    char cost_act[48]; cost_act[0] = '\0';
+    int has_cost = rb_queue_current_cost_action(g, cost_act, sizeof(cost_act));
+    if (!effect_started && has_cost && !strcmp(cost_act, "reveal")) return 0;
+
+    int ids[RB_MAX_ZONE];
+    int n_ids = rb_zone_cards(g, actor, "hand", ids, RB_MAX_ZONE);
+    /* ctx.mfi already applied by the caller; drop out-of-range and duplicate
+       positions the way Rust's `.get(idx)` / `moved_cards.push` pair does. */
+    int picked[RB_MAX_ZONE];
+    int n_picked = 0;
+    for (int i = 0; i < n_indices; i++) {
+        int idx = indices[i];
+        if (idx < 0 || idx >= n_ids) continue;
+        int dup = 0;
+        for (int j = 0; j < n_picked; j++) if (picked[j] == idx) { dup = 1; break; }
+        if (dup) continue;
+        if (n_picked < RB_MAX_ZONE) picked[n_picked++] = idx;
+    }
+
+    /* ── hand COST payment (choice.rs:683-743) ── */
+    if (!effect_started && has_cost) {
+        if (n_picked > 0 && cur >= 0) g->queue.entries[cur].optional_cost_result = 1;
+        for (int i = 0; i < n_picked; i++) {
+            int cid = ids[picked[i]];
+            rb_choice_send_to_dst(g, actor, cid, "waitroom");
+            if (self->n_moved_cards < RB_MAX_RECENTLY_MOVED) self->moved_cards[self->n_moved_cards++] = cid;
+            if (self->n_selected_cards < RB_MAX_RECENTLY_MOVED) self->selected_cards[self->n_selected_cards++] = cid;
+            if (g->n_recently_moved < RB_MAX_RECENTLY_MOVED) g->recently_moved[g->n_recently_moved++] = cid;
+        }
+        g->mods.last_cost_discard_count = self->n_moved_cards;
+        for (int i = 0; i < self->n_moved_cards && i < RB_MAX_RECENTLY_MOVED; i++)
+            g->mods.last_cost_moved_card_ids[i] = self->moved_cards[i];
+        g->mods.n_last_cost_moved_card_ids = self->n_moved_cards;
+        if (n_picked == 0) {
+            /* choice.rs:718-736 — nothing moved: the cost is either already
+               satisfied (committed) or explicitly skippable. */
+            if (self->n_moved_cards > 0 || allow_skip) {
+                if (cur >= 0) {
+                    g->queue.entries[cur].cost_paid = 1;
+                    g->queue.entries[cur].optional_cost_result = self->n_moved_cards > 0 ? 1 : 0;
+                }
+            }
+            rb_resolver_clear_choice_state_and_resume(self);
+            return 1;
+        }
+        if (cur >= 0) g->queue.entries[cur].cost_paid = 1;
+        /* Rule 9.4.2.3 — a fixed-count cost must be paid in full. */
+        if (count > 0 && self->n_moved_cards < count) {
+            int remaining = count - self->n_moved_cards;
+            char en[80]; char ja[80];
+            snprintf(en, sizeof(en), "Select %d more card(s) from hand for cost", remaining);
+            snprintf(ja, sizeof(ja), "コストとして手札からさらに%d枚選択", remaining);
+            choice_build_reprompt(g, actor, "hand", remaining, en, ja, 0, NULL, 0);
+            return 1;
+        }
+        if (count == 0 && allow_skip && g->p[actor].hand.n > 0) {
+            char en[80]; char ja[80];
+            snprintf(en, sizeof(en), "Select more card(s) from hand for cost (or skip to finish)");
+            snprintf(ja, sizeof(ja), "コストとして手札からさらに選択（スキップで終了）");
+            choice_build_reprompt(g, actor, "hand", 0, en, ja, 1, NULL, 0);
+            return 1;
+        }
+        rb_pay_deferred_costs(g, actor, NULL);
+        rb_resolver_clear_choice_state_and_resume(self);
+        return 1;
+    }
+
+    /* ── hand SELECTION (choice.rs:1289-1502) ── */
+    if (n_picked == 0 && !allow_skip && count > 0) return -1;
+    if (n_picked > 0 || allow_skip) {
+        if (n_picked > 0 && count > 0 && n_picked < count) {
+            /* Partial answer: record the picks and re-offer for the rest
+               (choice.rs:1290-1368). */
+            for (int i = 0; i < n_picked; i++) {
+                int cid = ids[picked[i]];
+                int exists = 0;
+                for (int j = 0; j < self->n_selected_cards; j++)
+                    if (self->selected_cards[j] == cid) { exists = 1; break; }
+                if (!exists && self->n_selected_cards < RB_MAX_RECENTLY_MOVED)
+                    self->selected_cards[self->n_selected_cards++] = cid;
+            }
+            int remaining = count - n_picked;
+            char en[80]; char ja[80];
+            snprintf(en, sizeof(en), "Select %d more card(s) from hand", remaining);
+            snprintf(ja, sizeof(ja), "手札からさらに%d枚選択", remaining);
+            choice_build_reprompt(g, actor, "hand", remaining, en, ja, 0, NULL, 0);
+            return 1;
+        }
+        if (n_picked > 0 && count == 0 && allow_skip) {
+            /* any_number batch: apply it, then re-offer with skip
+               (choice.rs:1369-1430). */
+            rb_resolver_execute_selected_cards_from_zone(self, g, "hand", picked, n_picked,
+                ch->card_type[0] ? ch->card_type : NULL, ch->cost_limit,
+                ch->cost_limit_op[0] ? ch->cost_limit_op : NULL, ch->cost_total,
+                ch->cost_total_op[0] ? ch->cost_total_op : NULL,
+                ch->filter_group[0] ? ch->filter_group : NULL, NULL, 0,
+                ch->target_player_id[0] ? ch->target_player_id : NULL);
+            if (rb_has_pending_choice(g)) return 1;   /* a sub-choice took over */
+            char en[96]; char ja[96];
+            snprintf(en, sizeof(en), "Select more card(s) from hand (or skip to finish)");
+            snprintf(ja, sizeof(ja), "手札からさらに選択（スキップで終了）");
+            choice_build_reprompt(g, actor, "hand", 0, en, ja, 1, NULL, 0);
+            return 1;
+        }
+        if (n_picked > 0) {
+            /* Complete answer (choice.rs:1431-1486): Rust executes the
+               selection through execute_selected_cards_from_zone, which is
+               where the zone move happens, then drops selected_cards unless
+               the effect consumes them. */
+            rb_resolver_execute_selected_cards_from_zone(self, g, "hand", picked, n_picked,
+                ch->card_type[0] ? ch->card_type : NULL, ch->cost_limit,
+                ch->cost_limit_op[0] ? ch->cost_limit_op : NULL, ch->cost_total,
+                ch->cost_total_op[0] ? ch->cost_total_op : NULL,
+                ch->filter_group[0] ? ch->filter_group : NULL, NULL, 0,
+                ch->target_player_id[0] ? ch->target_player_id : NULL);
+            self->n_selected_cards = 0;
+        }
+    }
+    if (allow_skip) {
+        int cur2 = g->queue.cur;
+        if (cur2 >= 0 && cur2 < g->queue.n_entries) {
+            g->queue.entries[cur2].optional_cost_result =
+                (n_picked > 0 || self->n_moved_cards > 0) ? 1 : 0;
+            if (n_picked == 0 && count > 0 && self->n_moved_cards == 0) {
+                int is_opp = (ch->target_player_id[0] &&
+                              strstr(ch->target_player_id, "opponent"));
+                if (!is_opp) rb_queue_take_pending_actions(g);
+            }
+        }
+    }
+    rb_resolver_handle_selection_epilogue(self, g);
+    return 1;
+}
+
 int rb_resolver_handle_select_card(RbAbilityResolver *self, GameState *g, const char *selected) {
     if (!g || !g->queue.has_pending) return -1;
     int actor = g->queue.actor;
@@ -2418,6 +2588,30 @@ void rb_clear_pending_choice(GameState *g) {
     g->queue.deferred = NULL;
     g->queue.resume_is_select = 0;
 }
+void rb_resolver_continue_siblings(GameState *g, int actor, int host,
+                                   const AbilityEffect *cont, int cont_from);
+
+/* Continuation for a SKIPPED choice: run the effect the engine parked while the
+   choice was outstanding. See the comment at the SelectCard skip arms in
+   rb_resume_with_choice_indices_internal for why this is the C equivalent of
+   Rust's resume_execution continuing the resolver's execution context.
+
+   A declined COST is not paid — that is the whole point of the skip — so only
+   the effect half of a parked continuation runs; a parked cost just records
+   the refusal. `cont`/`cont_from` mirror Rust's parent-effect child
+   continuation (rb_resolver_continue_siblings): an ability whose cost and
+   effect are one wrapped tree still has to reach its effect. */
+static void choice_run_skipped_continuation(GameState *g, AbilityEffect *def, int is_cost,
+                                            int actor, int host,
+                                            const AbilityEffect *cont, int cont_from)
+{
+    if (!g) return;
+    if (def && !is_cost && !rb_has_pending_choice(g))
+        rb_execute_effect_ex(g, actor, def, host);
+    if (!rb_has_pending_choice(g))
+        rb_resolver_continue_siblings(g, actor, host, cont, cont_from);
+}
+
 /* Continue any remaining sibling effects of the parent ability after a choice
     resolves (mirrors Rust's parent-effect child continuation in provide_choice_result). */
 void rb_resolver_continue_siblings(GameState *g, int actor, int host,
@@ -2597,41 +2791,68 @@ static int rb_resume_with_choice_indices_internal(GameState *g, const int *selec
         char selbuf[32];
         const char *selected = NULL;
         if (!was_skip) { snprintf(selbuf, sizeof(selbuf), "%d", selected_idx); selected = selbuf; }
+        /* The full answer, mapped through the choice's filtered_indices exactly
+           like the mode==2 (select) arm above and like Rust's ctx.mfi. */
+        int sel_multi[RB_MAX_ZONE];
+        int n_sel_multi = 0;
+        for (int i = 0; i < n_indices; i++) {
+            int mi = (selected_indices && selected_indices[i] >= 0)
+                        ? map_choice_index(&saved_pending, selected_indices[i]) : -1;
+            if (mi >= 0 && n_sel_multi < RB_MAX_ZONE) sel_multi[n_sel_multi++] = mi;
+        }
         int is_cost = (def && def->action &&
                        (!strcmp(def->action, "pay_energy") ||
                         !strcmp(def->action, "pay_cost") ||
                         !strcmp(def->action, "activation_cost") ||
                         !strcmp(def->action, "pay_any_cost")));
-        /* "discard your entire hand" optional cost (mirrors Rust
-            handle_pay_cost_all_discard routing). */
-        if (g->queue.pending.target && strstr(g->queue.pending.target, "pay_cost_all_discard")) {
-            rb_handle_pay_cost_all_discard(g, actor, selected);
-            rb_resolver_continue_siblings(g, actor, host, cont, cont_from);
-            return 1;
-        }
         /* Faithful port of Rust dispatch_choice_result
            (engine/src/ability/choice/result_handlers.rs:204-226):
              (SelectCard{count:0, allow_skip:true}, Skip) => handle_any_number_skip
              (SelectCard{..} | SelectTarget{..}, Skip)       => handle_general_skip
              (SelectCard{..}, CardSelected{..})              => handle_select_card
            A Skip on a SelectCard therefore NEVER reaches handle_select_card /
-           handle_discard_selection: handle_general_skip (result_handlers.rs:78-86)
-           takes the pending actions, clears the choice state and resumes execution.
-           Without this, a skip on a MANDATORY (allow_skip=false) discard-zone
-           SelectCard re-entered handle_discard_selection, whose "an empty pick
-           must re-offer" branch (choice.rs:2346-2371) rebuilt the same pending
-           choice forever, so rb_resume_with_choice(state, -1) never converged. */
+           handle_discard_selection: handle_general_skip takes the pending
+           actions, clears the choice state and resumes execution. Without the
+           dedicated skip arms, a skip on a MANDATORY (allow_skip=false)
+           discard-zone SelectCard re-entered handle_discard_selection, whose
+           "an empty pick must re-offer" branch (choice.rs:2346-2371) rebuilt
+           the same pending choice forever, so rb_resume_with_choice(state, -1)
+           never converged.
+           Rust's two SelectCard skip handlers both end in a resume of the
+           resolver's EXECUTION CONTEXT: handle_general_skip is
+           take_pending_actions -> clear_choice_state -> resume_execution
+           (result_handlers.rs:79-87) and handle_any_number_skip is
+           clear_choice_state_and_resume (result_handlers.rs:68-73). In Rust
+           the ability's own effect lives on the ability_queue entry that is
+           still current, so continuing the context runs it. In C the ability
+           was never queued: engine.c:1089-1102 parks ab.effect in
+           queue.deferred and then SKIPS the inline run precisely because a
+           choice is pending, so queue.deferred IS the execution context and
+           only this function can carry it forward. rb_resolver_clear_choice_
+           state() reaches rb_clear_pending_choice() (choice.c:2418), which
+           NULLs queue.deferred, which is why the continuation has to be run
+           from the pointer captured before the clear — otherwise declining an
+           optional SelectCard cost drops the ability's effect entirely. */
         if (was_skip && kind == RB_CHOICE_SELECT_CARD &&
             !(saved_pending.count == 0 && saved_pending.allow_skip)) {
             rb_queue_take_pending_actions(g);
             rb_resolver_clear_choice_state(&self);
+            choice_run_skipped_continuation(g, def, is_cost, actor, host, cont, cont_from);
             rb_resolver_resume_execution(&self);
             goto choice_resume_tail;
         }
         if (was_skip && kind == RB_CHOICE_SELECT_CARD) {
             /* handle_any_number_skip (result_handlers.rs:67-72) */
+            choice_run_skipped_continuation(g, def, is_cost, actor, host, cont, cont_from);
             rb_resolver_clear_choice_state_and_resume(&self);
             goto choice_resume_tail;
+        }
+        /* "discard your entire hand" optional cost (mirrors Rust
+            handle_pay_cost_all_discard routing). */
+        if (g->queue.pending.target && strstr(g->queue.pending.target, "pay_cost_all_discard")) {
+            rb_handle_pay_cost_all_discard(g, actor, selected);
+            rb_resolver_continue_siblings(g, actor, host, cont, cont_from);
+            return 1;
         }
         switch (kind) {
         case RB_CHOICE_SELECT_CARD: {
@@ -2652,7 +2873,30 @@ static int rb_resume_with_choice_indices_internal(GameState *g, const int *selec
             int rev = (ptarget && strstr(ptarget, "reveal")) || (pzone && strstr(pzone, "reveal"));
             int cost_hand = (!eff_started && hc && !strcmp(pzone, "hand"));
             int sel_before = g->n_selected_cards;
-            rb_resolver_handle_select_card(&self, g, selected);
+            /* Rust dispatches the WHOLE answer (result_handlers.rs:41-65 copies
+               `indices.to_vec()`), so an answer naming more than one card must
+               not be collapsed to indices[0]. `selbuf`/`selected` above only
+               ever carry the first pick, which is what makes the single-index
+               handler below re-prompt for the remainder. Give the multi-index
+               port the mapped list first; it declines (returns 0) for the zones
+               it does not cover, and then the single-index path runs exactly as
+               before. */
+            int multi = 0;
+            if (!was_skip && n_indices > 1) {
+                multi = choice_handle_hand_indices(&self, g, &saved_pending,
+                                                   sel_multi, n_sel_multi);
+                if (multi) {
+                    if (multi < 0) { fprintf(stderr, "[SELECT_CARD_MULTI] required hand selection was empty\n"); }
+                    else fprintf(stderr, "[SELECT_CARD_MULTI] n=%d count=%d zone=%s\n",
+                                 n_sel_multi, saved_pending.count, saved_pending.zone);
+                } else {
+                    /* not one of the arms it covers: restore the pending choice
+                       for the single-index handler. */
+                    g->queue.pending = saved_pending;
+                    g->queue.has_pending = 1;
+                }
+            }
+            if (!multi) rb_resolver_handle_select_card(&self, g, selected);
             if (rb_has_pending_choice(g) && def) g->queue.deferred = def;
             if (!was_skip && target_selection_eff && !rb_has_pending_choice(g)) {
                 /* Rust misc.rs:1412-1413: the effect parked for a target-selection prompt

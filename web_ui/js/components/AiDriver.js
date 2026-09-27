@@ -93,6 +93,18 @@ export const AiDriver = {
 
         if (state.game_over) { this.stop(); return false; }
 
+        // Server-authoritative gate. The server plays the AI's entire reply
+        // chain inline inside the human's execute-action, so by the time a
+        // frame reaches the browser it is normally the HUMAN's turn and
+        // ai_turn is false. This driver therefore acts only when the server
+        // genuinely left the AI to move.
+        //
+        // It previously did not: it picked a random legal action and posted
+        // it, which raced the real policy and could slip a random move into
+        // the middle of a strategy test. Do not remove this gate — if the
+        // AI seems stuck, check run_ai_replies in web_server.rs instead.
+        if (state.ai_turn === false) return false;
+
         const actions = state.legal_actions;
         if (!actions || actions.length === 0) return false;
 

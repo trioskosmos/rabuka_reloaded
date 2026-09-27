@@ -3,6 +3,13 @@
 #include <stdlib.h>
 #include <string.h>
 
+/* Defined in src/core/game_state_abilities.c; folds Rust
+   GameState::fire_opponent_cause_watchers_for_move (abilities.rs:1049-1149).
+   include/rabuka.h does not export it, so it is declared with the same extern
+   pattern already used at src/ability/choice.c:6. */
+extern void rb_fire_opponent_cause_watchers_for_move(GameState *g, int moved_card_id,
+                                                      int causer_player);
+
 static int16_t saturate_modifier(int64_t value) {
     if (value > INT16_MAX) return INT16_MAX;
     if (value < INT16_MIN) return INT16_MIN;
@@ -395,6 +402,21 @@ void rb_record_card_movement(GameState *g, int card_id, int from_zone, int to_zo
         memmove(g->recently_moved, g->recently_moved + 1,
                 (RB_MAX_RECENTLY_MOVED - 1) * sizeof(g->recently_moved[0]));
         g->recently_moved[RB_MAX_RECENTLY_MOVED - 1] = card_id;
+    }
+    /* modifiers.rs:1526-1552 — the stage->stage (area) move arm, which the C
+       fold used to drop on the floor, so the turn-level position flag and the
+       opponent-cause watcher were only ever set by whichever call site
+       remembered to do so by hand. Rust order: recently_moved is appended
+       first, then the area-move arm runs, which is why the hook sits here and
+       not at the top of the function.
+       Rust guards the hook on `caused_by_opponent` (the moved card's owner
+       differs from event.cause_player_id); that same test lives INSIDE the
+       hook (game_state_abilities.c:1592-1593, abilities.rs:1054-1063, owner ==
+       causer_player returns silently), so calling it unconditionally is
+       behaviourally identical. Rust's turn_area_movements has no C field. */
+    if (from_zone == RB_ZONEID_STAGE && to_zone == RB_ZONEID_STAGE) {
+        g->position_change_occurred_this_turn = 1;
+        rb_fire_opponent_cause_watchers_for_move(g, card_id, causer);
     }
 }
 

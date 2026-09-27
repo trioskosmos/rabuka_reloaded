@@ -28,10 +28,12 @@ int test_new_id(TestGame *tg, const char *card_no){
     if (template_id < 0) return -1;
     return rb_create_card_copy(template_id);
 }
-void test_add_to_hand(TestGame *tg, int card_id){
-    RbPlayer *P=&tg->state.p[0];
+void test_add_to_hand_for(TestGame *tg, int pl, int card_id){
+    if(!tg || pl<0 || pl>1) return;
+    RbPlayer *P=&tg->state.p[pl];
     if(P->hand.n < RB_MAX_ZONE) P->hand.cards[P->hand.n++]=card_id;
 }
+void test_add_to_hand(TestGame *tg, int card_id){ test_add_to_hand_for(tg, 0, card_id); }
 void test_add_to_discard(TestGame *tg, int card_id){
     RbPlayer *P=&tg->state.p[0];
     if(P->discard.n < RB_MAX_ZONE) P->discard.cards[P->discard.n++]=card_id;
@@ -86,8 +88,13 @@ void test_insert_deck_top(TestGame *tg, int pl, int card_id){
 void test_add_to_energy(TestGame *tg, int pl, int card_id){
     if(pl<0||pl>1) return;
     RbPlayer *P=&tg->state.p[pl];
-    if(P->energy.n < RB_MAX_ZONE) P->energy.cards[P->energy.n++]=card_id;
-    if(P->energy_active < RB_MAX_ZONE) P->energy_active++;
+    /* Mirror rb_energy_add_card (zones.c): the card is appended and the
+       ACTIVE count rises with it. Only bump active when the card really
+       landed, so energy_active <= energy.n stays true (the invariant
+       rb_energy_activate_all relies on). */
+    if(P->energy.n >= RB_MAX_ZONE) return;
+    P->energy.cards[P->energy.n++]=card_id;
+    if(P->energy_active < P->energy.n) P->energy_active++;
 }
 void test_set_energy_active(TestGame *tg, int pl, int n){
     if(pl<0||pl>1) return;
@@ -98,16 +105,10 @@ void test_add_to_revealed(TestGame *tg, int card_id){
         tg->state.revealed_cards[tg->state.n_revealed++]=card_id;
 }
 void test_give_opp_energy(TestGame *tg, int count){
-    int eid = rb_find_card_by_no("LL-E-001-SD");
-    if(eid<0) eid=0;
-    RbPlayer *P=&tg->state.p[1];
-    for(int i=0;i<count;i++){
-        if(P->energy.n < RB_MAX_ZONE) P->energy.cards[P->energy.n++]=eid;
-        if(P->energy_active < RB_MAX_ENERGY_CARDS) P->energy_active++;
-    }
+    test_give_energy_for(tg, 1, count);
 }
 /* Find a live card with a specific score — mirrors Rust's db lookup.
-   Returns 0 if not found. */
+   Returns the card index, or -1 when no live card carries that score. */
 int test_find_live_by_score(TestGame *tg, int score){
     (void)tg;
     uint32_t n = rb_num_cards();
@@ -122,22 +123,39 @@ int test_find_live_by_score(TestGame *tg, int score){
     return -1;
 }
 
-void test_give_energy(TestGame *tg, int count){
+void test_give_energy(TestGame *tg, int count){ test_give_energy_for(tg, 0, count); }
+
+/* Give `count` energy cards to seat `pl`, all Active.
+   Mirror Rust TestGame::give_energy_for -> energy_zone.push_active. The C
+   energy zone is an unordered bag plus a SEPARATE `energy_active` count (see
+   rb_energy_add_card / rb_energy_activate_all in zones.c), so "push active"
+   is: append the card, then raise the active count with it. A card that does
+   not land never raises the count, so energy_active <= energy.n — the
+   invariant rb_energy_activate_all relies on — always holds. */
+void test_give_energy_for(TestGame *tg, int pl, int count){
+    if(!tg || pl<0 || pl>1) return;
     int eid = rb_find_card_by_no("LL-E-001-SD");
     if(eid<0) eid=0;
-    RbPlayer *P=&tg->state.p[0];
+    RbPlayer *P=&tg->state.p[pl];
     for(int i=0;i<count;i++){
-        if(P->energy.n < RB_MAX_ZONE) P->energy.cards[P->energy.n++]=eid;
-        P->energy_active++;   /* test helper: bypass the 7/12 in-game cap */
+        if(P->energy.n >= RB_MAX_ZONE) return;  /* bypasses the 7/12 cap, not the bag */
+        P->energy.cards[P->energy.n++]=eid;
+        P->energy_active++;
     }
 }
 int test_play_to_stage(TestGame *tg, int card_id, int area){
-    /* find card in hand */
-    RbPlayer *P=&tg->state.p[0];
+    return test_play_to_stage_for(tg, 0, card_id, area);
+}
+/* Mirror TestGame::try_play_to_stage_for(Side, card, area): make `pl` the
+   attacking seat, then run the real main-phase play action. Returns 1 on
+   success, 0 when the card is not in that seat's hand. */
+int test_play_to_stage_for(TestGame *tg, int pl, int card_id, int area){
+    if(!tg || pl<0 || pl>1) return 0;
+    RbPlayer *P=&tg->state.p[pl];
     int idx=-1;
     for(int i=0;i<P->hand.n;i++) if(P->hand.cards[i]==card_id){ idx=i; break; }
     if(idx<0) return 0;
-    return rb_play_member(&tg->state, 0, idx, area);
+    return rb_play_member(&tg->state, pl, idx, area);
 }
 int test_try_play_to_stage(TestGame *tg, int card_id, int area){
     return test_play_to_stage(tg, card_id, area);
@@ -160,12 +178,18 @@ void test_add_to_opp_success(TestGame *tg, int card_id){
 void test_fire_debut(TestGame *tg, int card_id){ rb_fire_debut(&tg->state, 0, card_id); }
 void test_expire_effects(TestGame *tg){ rb_check_expired_effects(&tg->state, 0); }
 int test_activate_ability(TestGame *tg, int card_id){
-    RbPlayer *P = &tg->state.p[0];
+    return test_activate_ability_for(tg, 0, card_id);
+}
+/* Mirror TestGame::activate_ability_for(Side, card): make `pl` the attacking
+   seat, then run the real 起動 path. */
+int test_activate_ability_for(TestGame *tg, int pl, int card_id){
+    if(!tg || pl<0 || pl>1) return 0;
+    RbPlayer *P = &tg->state.p[pl];
     for (int i = 0; i < P->hand.n; i++)
-        if (P->hand.cards[i] == card_id) return rb_activate_ability(&tg->state, 0, i);
+        if (P->hand.cards[i] == card_id) return rb_activate_ability(&tg->state, pl, i);
     /* Rust activate_ability also fires a member already on stage — run the real
         multi-ability activate path (cost + 起動-triggered effect). */
-    return rb_activate_card(&tg->state, 0, card_id);
+    return rb_activate_card(&tg->state, pl, card_id);
 }
 void test_spend_energy(TestGame *tg, int n){
     RbPlayer *P=&tg->state.p[0];
@@ -187,33 +211,99 @@ void test_resume_choice(TestGame *tg, int idx){
     if (rb_has_pending_choice(&tg->state)) rb_resume_with_choice(&tg->state, idx);
 }
 
-/* Select indices from a choice — mirrors game.select_indices(&[idx, ...]).
-   Assumes a choice is currently pending. */
+/* Select indices from a pending choice — mirrors game.select_indices(&[..]).
+   n == 0 is Rust's DECLINE (select_indices(&[])) and must go through the
+   engine's skip path (rb_resume_with_choice(g, -1)); it is NOT a no-op.
+   n > 1 is a genuine multi-index answer and must reach the engine intact
+   (rb_resume_with_choice_indices). The previous revision used only indices[0]
+   and skipped the resume entirely when n == 0, so "decline" left the prompt
+   pending (turning the ubiquitous
+       while (test_has_pending_choice(g)) test_select_indices(g, NULL, 0);
+   drain loops into no-ops) and a multi-card pick could never complete. */
 void test_select_indices(TestGame *tg, const int *indices, int n){
-    if (!rb_has_pending_choice(&tg->state)) return;
-    if (n > 0) rb_resume_with_choice(&tg->state, indices[0]);
+    if (!tg || !rb_has_pending_choice(&tg->state)) return;
+    if (n > 0 && indices) rb_resume_with_choice_indices(&tg->state, indices, n);
+    else                     rb_resume_with_choice(&tg->state, -1);
 }
 int test_has_pending_choice(TestGame *tg){ return rb_has_pending_choice(&tg->state); }
 int test_pending_choice_count(TestGame *tg){ return rb_has_pending_choice(&tg->state) ? 1 : 0; }
-void test_set_live_card(TestGame *tg, int zone, int card_id){
+void test_set_live_card(TestGame *tg, int slot, int card_id){
+    /* Live-card placement — mirror Rust TestGame::set_live_card(card_id).
+       The live zone is an ORDERED bag: the card leaves the hand and is
+       APPENDED to live.cards[live.n++], which is what live_card_zone.cards
+       .push does in Rust.
+
+       The `slot` parameter is IGNORED. It exists only because
+       tools/port_one.py emits test_set_live_card(&game, 0, id) for the
+       one-argument Rust call, and every call site in the transpiled corpus
+       passes 0. The previous revision wrote live.cards[slot] at a FIXED index
+       and only grew n to slot+1, so three consecutive calls put ONE card in
+       the zone and silently invalidated every transpiled live test (canary
+       live_cards_stuck_in_live_zone_instead_of_discard: "got 1 expected 3").
+       Use test_insert_live_card_at for genuine positional placement. */
+    (void)slot;
+    if(!tg || card_id < 0) return;
     RbPlayer *P=&tg->state.p[0];
-    if(zone<0||zone>=RB_MAX_LIVE_CARDS) return;
     for (int i = 0; i < P->hand.n; i++) {
         if (P->hand.cards[i] == card_id) {
             rb_hand_remove_card(P, i);
             break;
         }
     }
-    P->live.cards[zone]=card_id;
-    if(zone+1 > P->live.n) P->live.n = zone+1;
+    if (P->live.n >= RB_MAX_LIVE_CARDS) return;   /* the live zone holds at most 3 */
+    P->live.cards[P->live.n++] = card_id;
 }
+/* Explicit positional live-zone placement: shift the tail right and place the
+   card at `slot`, growing the zone to cover it. Test-only; prefer the append
+   path (test_set_live_card) so a test never has to reason about slot reuse. */
+void test_insert_live_card_at(TestGame *tg, int slot, int card_id){
+    if(!tg || card_id < 0) return;
+    if(slot<0 || slot>=RB_MAX_LIVE_CARDS) return;
+    RbPlayer *P=&tg->state.p[0];
+    for (int i = 0; i < P->hand.n; i++) {
+        if (P->hand.cards[i] == card_id) {
+            rb_hand_remove_card(P, i);
+            break;
+        }
+    }
+    if (P->live.n > slot) {
+        int n = P->live.n;
+        if (n >= RB_MAX_LIVE_CARDS) n = RB_MAX_LIVE_CARDS - 1;
+        for (int i = n; i > slot; i--) P->live.cards[i] = P->live.cards[i-1];
+        P->live.n = n + 1;
+    } else {
+        P->live.n = slot + 1;
+    }
+    P->live.cards[slot] = card_id;
+}
+/* Debug-only card-name accessor. rb_decode_card_by_index allocates a Card
+   whose `name` is heap-owned, so the previous revision either leaked the whole
+   Card on every call (it never freed) or, once freed, handed back a dangling
+   pointer. Copy the name into a small rotating set of static buffers: no
+   leak, and the returned pointer stays valid for the last 8 calls. */
+#define TEST_NAME_SLOTS 8
+#define TEST_NAME_LEN   256
+static char g_name_buf[TEST_NAME_SLOTS][TEST_NAME_LEN];
+static int  g_name_next;
 const char *test_card_name(int card_id){
-    Card c; if(!rb_decode_card_by_index((uint32_t)card_id,&c)) return "?";
-    const char *n=c.name; /* borrowed */
-    /* Note: caller must not free; for debug only immediate use */
-    return n ? n : "?";
+    if(card_id < 0) return "?";
+    Card c;
+    if(!rb_decode_card_by_index((uint32_t)card_id,&c)) return "?";
+    char *slot = g_name_buf[g_name_next];
+    g_name_next = (g_name_next + 1) % TEST_NAME_SLOTS;
+    if(c.name){
+        strncpy(slot, c.name, TEST_NAME_LEN - 1);
+        slot[TEST_NAME_LEN - 1] = '\0';
+    } else {
+        slot[0] = '?'; slot[1] = '\0';
+    }
+    rb_free_card(&c);
+    return slot;
 }
-int test_stage_has(TestGame *tg, int area, int card_id){ return tg->state.p[0].stage[area]==card_id; }
+int test_stage_has(TestGame *tg, int area, int card_id){
+    if(!tg || area<0 || area>=RB_STAGE_SIZE) return 0;
+    return tg->state.p[0].stage[area]==card_id;
+}
 int test_hand_has(TestGame *tg, int card_id){
     for(int i=0;i<tg->state.p[0].hand.n;i++) if(tg->state.p[0].hand.cards[i]==card_id) return 1;
     return 0;
@@ -263,41 +353,170 @@ int test_filler_hand(TestGame *tg){ return rb_find_card_by_no("PL!-sd1-010-SD");
 /* Collection-predicate helpers mirroring the Rust tests' ubiquitous
    `zone.cards.iter().any(|c| c.card_no == "X")` / `.contains(&id)` patterns,
    which a line-based transpiler cannot emit directly. */
-static int zone_bag(TestGame *tg, int pl, const char *zone, RbBag **out){
-    if(!strcmp(zone,"hand")) *out=&tg->state.p[pl].hand;
-    else if(!strcmp(zone,"deck")||!strcmp(zone,"main_deck")) *out=&tg->state.p[pl].deck;
-    else if(!strcmp(zone,"discard")||!strcmp(zone,"waitroom")) *out=&tg->state.p[pl].discard;
-    else if(!strcmp(zone,"live")) *out=&tg->state.p[pl].live;
-    else if(!strcmp(zone,"success")) *out=&tg->state.p[pl].success;
-    else if(!strcmp(zone,"energy")||!strcmp(zone,"energy_zone")) *out=&tg->state.p[pl].energy;
-    else *out=NULL;
-    return *out!=NULL;
+static RbBag *zone_bag(TestGame *tg, int pl, const char *zone){
+    /* `pl` is validated HERE so no caller can index p[] out of range. */
+    if(!tg || !zone || pl<0 || pl>1) return NULL;
+    RbPlayer *P=&tg->state.p[pl];
+    if(!strcmp(zone,"hand")) return &P->hand;
+    if(!strcmp(zone,"deck")||!strcmp(zone,"main_deck")) return &P->deck;
+    if(!strcmp(zone,"discard")||!strcmp(zone,"waitroom")) return &P->discard;
+    if(!strcmp(zone,"live")||!strcmp(zone,"live_card_zone")) return &P->live;
+    if(!strcmp(zone,"success")||!strcmp(zone,"success_live_card_zone")) return &P->success;
+    if(!strcmp(zone,"energy")||!strcmp(zone,"energy_zone")) return &P->energy;
+    if(!strcmp(zone,"energy_deck")) return &P->energy_deck;
+    return NULL;
+}
+/* The i-th card of `zone` for seat `pl`, or -1 when out of range / unknown
+   zone. One accessor, so test_zone_len / test_zone_ids /
+   test_zone_count_of_id / test_zone_has_id / test_zone_has_card_no can never
+   disagree about what a zone contains. `stage` skips empty slots; `under<0..2>`
+   addresses the per-member under-card bag. */
+static int zone_card_at(TestGame *tg, int pl, const char *zone, int i){
+    if(!tg || !zone || pl<0 || pl>1 || i<0) return -1;
+    RbPlayer *P=&tg->state.p[pl];
+    if(!strcmp(zone,"stage")){
+        int seen=0;
+        for(int a=0;a<RB_STAGE_SIZE;a++){
+            if(P->stage[a]==RB_EMPTY_SLOT) continue;
+            if(seen++==i) return P->stage[a];
+        }
+        return -1;
+    }
+    if(!strncmp(zone,"under",5) && zone[5]){
+        int a=0; const char *d=zone+5;
+        while(*d>='0' && *d<='9'){ a=a*10+(*d-'0'); d++; }
+        if(*d || a<0 || a>=RB_STAGE_SIZE) return -1;
+        RbBag *b=&P->under_cards[a];
+        return i<b->n ? b->cards[i] : -1;
+    }
+    RbBag *b=zone_bag(tg,pl,zone);
+    if(!b || i>=b->n) return -1;
+    return b->cards[i];
+}
+int test_zone_len(TestGame *tg, int pl, const char *zone){
+    int n=0;
+    while(n<RB_MAX_ZONE && zone_card_at(tg,pl,zone,n)>=0) n++;
+    return n;
+}
+int test_zone_ids(TestGame *tg, int pl, const char *zone, int *out, int max){
+    if(!out || max<=0) return 0;
+    int n=0;
+    while(n<max){
+        int c=zone_card_at(tg,pl,zone,n);
+        if(c<0) break;
+        out[n++]=c;
+    }
+    return n;
+}
+int test_zone_count_of_id(TestGame *tg, int pl, const char *zone, int id){
+    int n=0;
+    for(int i=0;i<RB_MAX_ZONE;i++){
+        int c=zone_card_at(tg,pl,zone,i);
+        if(c<0) break;
+        if(c==id) n++;
+    }
+    return n;
+}
+int test_total_card_count(TestGame *tg){
+    /* Zone-independent census: every card slot of BOTH seats. A move between
+       zones must leave this unchanged; a drain that duplicates or drops a card
+       changes it. */
+    static const char *const zones[] = {
+        "hand","main_deck","waitroom","live","success","energy","energy_deck"
+    };
+    if(!tg) return 0;
+    int total=0;
+    for(int pl=0;pl<2;pl++){
+        total += test_zone_len(tg,pl,"stage");
+        for(int a=0;a<RB_STAGE_SIZE;a++){
+            char z[16];
+            snprintf(z,sizeof(z),"under%d",a);
+            total += test_zone_len(tg,pl,z);
+        }
+        for(size_t i=0;i<sizeof(zones)/sizeof(zones[0]);i++)
+            total += test_zone_len(tg,pl,zones[i]);
+    }
+    return total;
 }
 int rb_card_no_eq(int card_id, const char *no){
-    Card c; if(!rb_decode_card_by_index((uint32_t)card_id,&c)) return 0;
+    if(!no || card_id<0) return 0;
+    Card c;
+    if(!rb_decode_card_by_index((uint32_t)card_id,&c)) return 0;
     const char *cn = rb_card_string(c.card_no_idx);
-    return cn && strcmp(cn, no)==0;
+    int eq = (cn && strcmp(cn, no)==0);
+    rb_free_card(&c);   /* the decoded Card is heap-owned */
+    return eq;
 }
 int test_zone_has_card_no(TestGame *tg, int pl, const char *zone, const char *no){
-    RbBag *b=NULL;
-    if(!strcmp(zone,"stage")){
-        for(int i=0;i<RB_STAGE_SIZE;i++)
-            if(tg->state.p[pl].stage[i]!=RB_EMPTY_SLOT && rb_card_no_eq(tg->state.p[pl].stage[i],no)) return 1;
-        return 0;
+    if(!no) return 0;
+    for(int i=0;i<RB_MAX_ZONE;i++){
+        int c=zone_card_at(tg,pl,zone,i);
+        if(c<0) return 0;
+        if(rb_card_no_eq(c,no)) return 1;
     }
-    if(!zone_bag(tg,pl,zone,&b)) return 0;
-    for(int i=0;i<b->n;i++) if(rb_card_no_eq(b->cards[i],no)) return 1;
     return 0;
 }
 int test_zone_has_id(TestGame *tg, int pl, const char *zone, int id){
-    RbBag *b=NULL;
-    if(!strcmp(zone,"stage")){
-        for(int i=0;i<RB_STAGE_SIZE;i++)
-            if(tg->state.p[pl].stage[i]!=RB_EMPTY_SLOT && tg->state.p[pl].stage[i]==id) return 1;
-        return 0;
+    for(int i=0;i<RB_MAX_ZONE;i++){
+        int c=zone_card_at(tg,pl,zone,i);
+        if(c<0) return 0;
+        if(c==id) return 1;
     }
-    if(!zone_bag(tg,pl,zone,&b)) return 0;
-    for(int i=0;i<b->n;i++) if(b->cards[i]==id) return 1;
+    return 0;
+}
+
+/* ── cost / selection zone moves (see the header for the scope note) ── */
+static int bag_take_id(RbBag *b, int id){
+    for(int i=0;i<b->n;i++){
+        if(b->cards[i]!=id) continue;
+        for(int k=i;k<b->n-1;k++) b->cards[k]=b->cards[k+1];
+        b->n--;
+        return 1;
+    }
+    return 0;
+}
+int test_move_hand_to_waitroom(TestGame *tg, int pl, int n){
+    if(!tg || pl<0 || pl>1) return 0;
+    RbPlayer *P=&tg->state.p[pl];
+    int moved=0;
+    for(int i=0;i<n && P->hand.n>0;i++){
+        int id=P->hand.cards[0];
+        rb_hand_remove_card(P,0);
+        rb_waitroom_add(P,id);
+        moved++;
+    }
+    return moved;
+}
+int test_move_ids_to_waitroom(TestGame *tg, int pl, const int *ids, int n){
+    if(!tg || !ids || n<=0 || pl<0 || pl>1) return 0;
+    RbPlayer *P=&tg->state.p[pl];
+    int moved=0;
+    for(int i=0;i<n;i++){
+        int id=ids[i];
+        if(id<0) continue;
+        /* hand, then live, then success: the zones a cost / selection pick can
+           legitimately come from. */
+        if(bag_take_id(&P->hand,id) || bag_take_id(&P->live,id) || bag_take_id(&P->success,id)){
+            rb_waitroom_add(P,id);
+            moved++;
+        }
+    }
+    return moved;
+}
+
+/* Mirror TestGame::advance_to_phase: step the turn until `target` is current.
+   A prompt raised by the arriving step is deliberately NOT answered here — the
+   caller is usually there to inspect it. Returns 1 on arrival, 0 on timeout. */
+int test_advance_to_phase(TestGame *tg, int target){
+    if(!tg) return 0;
+    for(int i=0;i<16;i++){
+        if(tg->state.phase==target) return 1;
+        test_pass(tg);
+        if(tg->state.phase==target) return 1;
+        int guard=0;
+        while(rb_has_pending_choice(&tg->state) && guard++<64)
+            rb_resume_with_choice(&tg->state, 0);
+    }
     return 0;
 }
 

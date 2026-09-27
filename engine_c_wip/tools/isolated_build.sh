@@ -26,8 +26,20 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 EC="$(cd "$SCRIPT_DIR/.." && pwd)"
 REPO="$(cd "$EC/.." && pwd)"
 
-ROOT="${ISOLATED_BUILD_ROOT:-/c/Users/trios/AppData/Local/Temp/kilo/rb_isobuild}/$AGENT"
+# The build root is made UNIQUE PER INVOCATION. Several agents (and parallel
+# runs of the same agent) share this directory, and a shared root meant one
+# run's `rm -rf` deleted another's .o files mid-make ("No rule to make target
+# src/ability/vm.o", "can't create src/turn/phase.o").
+BUILD_ROOT="${ISOLATED_BUILD_ROOT:-/c/Users/trios/AppData/Local/Temp/kilo/rb_isobuild}"
+ROOT="$BUILD_ROOT/$AGENT.$$.$(date +%s)"
 TREE="$ROOT/engine_c"
+
+# Prune stale roots so parallel fan-outs cannot fill the disk. Anything older
+# than 90 minutes is abandoned by definition (a build does not take that long).
+find "$BUILD_ROOT" -maxdepth 1 -mindepth 1 -type d -mmin +90 -exec rm -rf {} + 2>/dev/null || true
+
+cleanup() { rm -rf "$ROOT"; }
+trap cleanup EXIT
 
 rm -rf "$TREE"
 mkdir -p "$TREE"

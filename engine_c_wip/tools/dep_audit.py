@@ -182,10 +182,17 @@ def parse_header_decls(path):
 def main():
     gen_report = False
     report_path = "DEPENDENCY_AUDIT.md"
-    for a in sys.argv[1:]:
-        if a.startswith("--report"):
-            gen_report=True
-            if "=" in a: report_path=a.split("=",1)[1]
+    argv = sys.argv[1:]
+    for i, a in enumerate(argv):
+        # Accept BOTH --report=PATH and --report PATH. The space form used to be
+        # silently ignored, which overwrote the shared DEPENDENCY_AUDIT.md.
+        if a == "--report":
+            gen_report = True
+            if i + 1 < len(argv):
+                report_path = argv[i + 1]
+        elif a.startswith("--report="):
+            gen_report = True
+            report_path = a.split("=", 1)[1]
 
     # Only audit files that are actually compiled. The Makefile SRC list is the
     # source of truth — ignore stray *_frag_*.c fragments and other non-built files.

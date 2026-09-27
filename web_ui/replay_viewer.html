@@ -1,0 +1,341 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Rabuka | Scored Replay Viewer</title>
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { height: 100%; font-family: 'Segoe UI', 'Noto Sans JP', system-ui, sans-serif; background: #1a1a2e; color: #e0e0e0; }
+#app { display: flex; flex-direction: column; height: 100%; }
+
+header {
+  display: flex; align-items: center; gap: 14px; padding: 8px 14px;
+  background: #16213e; border-bottom: 1px solid #0f3460; flex-shrink: 0; flex-wrap: wrap;
+}
+header h1 { font-size: 14px; color: #e94560; white-space: nowrap; }
+#meta { font-size: 11px; color: #8899b0; display: flex; gap: 12px; flex-wrap: wrap; }
+#meta b { color: #c8d4e8; font-weight: 600; }
+#result { font-size: 11px; padding: 2px 8px; border-radius: 3px; background: #0f3460; color: #c8d4e8; }
+#result.win-p1 { background: #1b4d3e; color: #7ee0b0; }
+#result.win-p2 { background: #5a2030; color: #ffa8b8; }
+#loadbtn { font-size: 11px; padding: 4px 10px; background: #e94560; color: #fff; border: none;
+  border-radius: 3px; cursor: pointer; }
+#loadbtn:hover { background: #ff5c76; }
+
+main { display: flex; flex: 1; min-height: 0; }
+
+#sidebar {
+  width: 300px; display: flex; flex-direction: column; background: #16213e;
+  border-right: 1px solid #0f3460; flex-shrink: 0;
+}
+#filters { padding: 8px 10px; border-bottom: 1px solid #0f3460; display: flex; flex-direction: column; gap: 5px; }
+#filters label { font-size: 10px; color: #8888a0; text-transform: uppercase; letter-spacing: 0.2px; }
+#filters select { width: 100%; padding: 3px 5px; background: #1a1a2e; color: #e0e0e0;
+  border: 1px solid #0f3460; border-radius: 3px; font-size: 11px; outline: none; }
+#decisions { flex: 1; overflow-y: auto; }
+#decisions::-webkit-scrollbar { width: 5px; }
+#decisions::-webkit-scrollbar-thumb { background: #0f3460; border-radius: 2px; }
+.dec {
+  padding: 5px 10px; border-bottom: 1px solid #131c33; cursor: pointer; font-size: 11px;
+  display: flex; align-items: center; gap: 7px;
+}
+.dec:hover { background: #1c2a4d; }
+.dec.sel { background: #e94560; color: #fff; }
+.dec .turn { font-weight: 700; min-width: 26px; }
+.dec .seat { font-size: 9px; padding: 1px 4px; border-radius: 2px; background: #0f3460; color: #9fb3d1; }
+.dec.sel .seat { background: rgba(255,255,255,0.25); color: #fff; }
+.dec .phase { color: #8899b0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.dec.sel .phase { color: #ffe0e6; }
+.dec .pick { color: #7ee0b0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1; }
+.dec.sel .pick { color: #fff; }
+.dec.live-mark { border-left: 3px solid #f0a500; }
+
+#panel { flex: 1; overflow-y: auto; padding: 12px 16px; }
+#panel::-webkit-scrollbar { width: 8px; }
+#panel::-webkit-scrollbar-thumb { background: #0f3460; border-radius: 4px; }
+
+.empty { color: #6b7a99; font-size: 12px; padding: 30px 0; text-align: center; line-height: 1.7; }
+
+h2.sec { font-size: 11px; color: #e94560; text-transform: uppercase; letter-spacing: 0.5px;
+  margin: 14px 0 6px; padding-bottom: 3px; border-bottom: 1px solid #0f3460; }
+h2.sec:first-child { margin-top: 0; }
+
+.navrow { display: flex; align-items: center; gap: 6px; margin-bottom: 10px; flex-wrap: wrap; }
+.navrow button { font-size: 11px; padding: 4px 10px; background: #16213e; color: #c8d4e8;
+  border: 1px solid #0f3460; border-radius: 3px; cursor: pointer; }
+.navrow button:hover { border-color: #e94560; color: #fff; }
+.navrow .pos { font-size: 11px; color: #8899b0; }
+
+.board { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.side { background: #16213e; border: 1px solid #0f3460; border-radius: 5px; padding: 8px 10px; }
+.side.act { border-color: #e94560; }
+.side h3 { font-size: 11px; color: #9fb3d1; margin-bottom: 6px; display: flex; justify-content: space-between; }
+.side h3 .succ { color: #7ee0b0; font-weight: 700; }
+.side h3 .en { color: #f0a500; }
+.zrow { display: flex; align-items: flex-start; gap: 4px; margin-bottom: 5px; flex-wrap: wrap; }
+.zlabel { font-size: 9px; color: #66789a; width: 44px; padding-top: 3px; flex-shrink: 0;
+  text-transform: uppercase; letter-spacing: 0.3px; }
+.chip {
+  font-size: 10px; padding: 2px 5px; border-radius: 2px; background: #0f3460; color: #c8d4e8;
+  white-space: nowrap; max-width: 190px; overflow: hidden; text-overflow: ellipsis;
+}
+.chip.live { background: #4a3a6b; color: #ddd0ff; }
+.chip.succ { background: #1b4d3e; color: #7ee0b0; }
+.chip.energy { background: #4a4420; color: #ffe08a; }
+.chip.empty { background: transparent; color: #4a5670; border: 1px dashed #2a3a5a; }
+
+table.opts { width: 100%; border-collapse: collapse; font-size: 11px; }
+table.opts th { text-align: left; font-size: 9px; color: #66789a; text-transform: uppercase;
+  letter-spacing: 0.3px; padding: 3px 5px; border-bottom: 1px solid #0f3460; font-weight: 600; }
+table.opts td { padding: 4px 5px; border-bottom: 1px solid #131c33; vertical-align: top; }
+table.opts tr.chosen { background: #1b4d3e; }
+table.opts tr.chosen td { color: #c8ffe4; }
+table.opts td.idx { color: #66789a; width: 26px; }
+table.opts td.sc { width: 62px; text-align: right; font-variant-numeric: tabular-nums; font-weight: 700; }
+table.opts tr.chosen td.sc { color: #7ee0b0; }
+.bar { height: 5px; background: #0f3460; border-radius: 3px; overflow: hidden; margin-top: 2px; }
+.bar > i { display: block; height: 100%; background: #4a6bd4; }
+table.opts tr.chosen .bar > i { background: #7ee0b0; }
+.comp { font-size: 9px; color: #66789a; font-family: Consolas, monospace; margin-top: 2px;
+  word-break: break-word; }
+.abil { font-size: 9px; color: #8899b0; margin-top: 2px; max-width: 420px;
+  border-left: 2px solid #2a3a5a; padding-left: 5px; }
+.tag { font-size: 8px; padding: 1px 4px; border-radius: 2px; background: #0f3460; color: #9fb3d1; }
+.tag.m { background: #2a3a5a; } .tag.l { background: #4a3a6b; } .tag.e { background: #4a4420; }
+
+.note { font-size: 10px; color: #8899b0; background: #16213e; border-left: 3px solid #0f3460;
+  padding: 5px 8px; margin-bottom: 8px; line-height: 1.5; }
+.verdict { font-size: 11px; padding: 5px 8px; border-radius: 3px; margin-bottom: 4px; line-height: 1.5; }
+.verdict.p1 { background: #1b4d3e; color: #a8f0cc; }
+.verdict.p2 { background: #5a2030; color: #ffc0cc; }
+.verdict.none { background: #16213e; color: #8899b0; }
+input[type=file] { display: none; }
+.drop { position: fixed; inset: 0; background: rgba(26,26,46,0.95); display: none;
+  align-items: center; justify-content: center; font-size: 18px; color: #e94560; z-index: 99; }
+.drop.on { display: flex; }
+</style>
+</head>
+<body>
+<div id="app">
+  <header>
+    <h1>&#9679; Scored Replay</h1>
+    <div id="meta"></div>
+    <div id="result"></div>
+    <button id="loadbtn">Open replay JSON&hellip;</button>
+    <input type="file" id="file" accept=".json">
+  </header>
+  <main>
+    <div id="sidebar">
+      <div id="filters">
+        <label>Seat</label>
+        <select id="fseat"><option value="">both</option><option value="0">P1</option><option value="1">P2</option></select>
+        <label>Phase</label>
+        <select id="fphase"><option value="">all phases</option></select>
+        <label>Only scored decisions</label>
+        <select id="fscored"><option value="">all</option><option value="1">scored only</option></select>
+      </div>
+      <div id="decisions"></div>
+    </div>
+    <div id="panel"><div class="empty">
+      Load a replay JSON produced by <code>bot_replay</code>.<br><br>
+      <code>cd engine &amp;&amp; cargo run --release --bin bot_replay -- v7 v7 --deck "5CP3Z idou" --seed 11 --out ../test_output/replay_v7v7.json</code><br><br>
+      Or drop the file anywhere on this window.
+    </div></div>
+  </main>
+</div>
+<div class="drop" id="drop">Drop replay JSON here</div>
+
+<script>
+'use strict';
+let DATA = null, VIEW = [], SEL = 0;
+
+const $ = id => document.getElementById(id);
+const esc = s => String(s == null ? '' : s).replace(/[&<>"]/g, c =>
+  ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+
+function hearts(h) {
+  if (!h) return '';
+  return Object.entries(h).map(([k, v]) => v + k.replace('heart', '')).join(' ');
+}
+
+// A stage array is always three slots; negative ids are empty.
+function slotChip(c) {
+  if (!c || c.unresolved || c.id == null || c.id < 0) return '<span class="chip empty">&mdash;</span>';
+  const t = (c.type || '')[0] || '?';
+  const cls = t === 'L' ? 'live' : '';
+  return `<span class="chip ${cls}" title="${esc(c.card_no)}">${esc(c.name)}</span>`;
+}
+
+function load(obj) {
+  DATA = obj;
+  if (!DATA || DATA.format !== 'rabuka-scored-replay') {
+    alert('Not a rabuka-scored-replay file (format=' + (DATA && DATA.format) + ')');
+    return;
+  }
+  const m = DATA.metadata, r = DATA.result;
+  $('meta').innerHTML =
+    `<span>P1 <b>${esc(m.p1)}</b> vs P2 <b>${esc(m.p2)}</b></span>` +
+    `<span>deck <b>${esc(m.deck)}</b>${m.mirrored ? '' : ' vs ' + esc(m.deck2)}</span>` +
+    `<span>seed <b>${esc(m.seed)}</b></span>` +
+    `<span>turns <b>${r.turns}</b></span>` +
+    `<span>decisions <b>${r.decisions}</b></span>`;
+  const w = $('result');
+  w.textContent = r.winner === 'p1' ? 'P1 WINS' : r.winner === 'p2' ? 'P2 WINS' :
+    r.winner.toUpperCase();
+  w.className = r.winner === 'p1' ? 'win-p1' : r.winner === 'p2' ? 'win-p2' : '';
+
+  const ph = $('fphase');
+  ph.innerHTML = '<option value="">all phases</option>' +
+    [...new Set(DATA.decisions.map(d => d.phase))].map(p =>
+      `<option value="${esc(p)}">${esc(p)}</option>`).join('');
+  SEL = 0;
+  applyFilter();
+}
+
+// Filters re-slice the decision list rather than hiding rows, so the index
+// shown in the header always refers to the filtered sequence you are stepping.
+function applyFilter() {
+  const seat = $('fseat').value, phase = $('fphase').value, sc = $('fscored').value;
+  VIEW = DATA.decisions.map((d, i) => ({ d, i })).filter(({ d }) =>
+    (!seat || String(d.seat) === seat) &&
+    (!phase || d.phase === phase) &&
+    (!sc || d.scored));
+  SEL = 0;
+  renderList();
+  renderPanel();
+}
+
+function renderList() {
+  const marks = new Set(DATA.live_checks.map(c => c.turn));
+  $('decisions').innerHTML = VIEW.map(({ d }, k) => {
+    const pick = (d.options[d.chosen_index] || {}).label || '?';
+    return `<div class="dec ${k === SEL ? 'sel' : ''} ${marks.has(d.turn) ? 'live-mark' : ''}" data-k="${k}">
+      <span class="turn">T${d.turn}</span>
+      <span class="seat">P${d.seat + 1}</span>
+      <span class="pick">${esc(pick)}</span>
+      <span class="phase">${esc(d.phase.replace(/FirstAttacker|SecondAttacker/g, ''))}</span>
+    </div>`;
+  }).join('');
+  $('decisions').querySelectorAll('.dec').forEach(el =>
+    el.onclick = () => { SEL = +el.dataset.k; renderList(); renderPanel(); });
+}
+
+function renderPanel() {
+  if (!VIEW.length) { $('panel').innerHTML = '<div class="empty">No decisions match the filter.</div>'; return; }
+  SEL = Math.max(0, Math.min(SEL, VIEW.length - 1));
+  const { d, i } = VIEW[SEL];
+  const own = d.view.own, opp = d.view.opponent_public;
+  const scores = d.options.map(o => o.score).filter(v => typeof v === 'number');
+  const lo = Math.min(...scores), hi = Math.max(...scores);
+
+  const side = (title, tag, v, isOpp) => `
+    <div class="side ${isOpp ? '' : 'act'}">
+      <h3><span>${title}</span>
+        <span><span class="succ">&#9733;${v.success_count}</span>
+        <span class="en">&#9889;${v.energy_active}/${v.energy_total}</span>
+        ${isOpp ? '' : `<span class="en">${v.is_first_attacker ? '1st atk' : '2nd atk'}</span>`}</span>
+      </h3>
+      <div class="zrow"><span class="zlabel">Stage</span>${v.stage.map(slotChip).join('')}</div>
+      ${v.hand && v.hand.length ? `<div class="zrow"><span class="zlabel">Hand</span>${
+        v.hand.map(c => `<span class="chip" title="${esc(c.card_no)}">${esc(c.name)}` +
+        `<span class="tag ${(c.type || '')[0] === 'L' ? 'l' : 'm'}">${esc((c.type || '')[0])}</span></span>`).join('')
+      }</div>` : ''}
+      <div class="zrow"><span class="zlabel">Live</span>${
+        v.live_zone.length ? v.live_zone.map(c =>
+          `<span class="chip live">${esc(c.name)} <span class="tag l">${esc(c.score)}pt</span></span>`).join('')
+        : '<span class="chip empty">none set</span>'}</div>
+      <div class="zrow"><span class="zlabel">Success</span>${
+        v.success.length ? v.success.map(c =>
+          `<span class="chip succ">${esc(c.name)} <span class="tag l">${esc(c.score)}pt</span></span>`).join('')
+        : '<span class="chip empty">&mdash;</span>'}</div>
+    </div>`;
+
+  const live = DATA.live_checks.filter(c => c.turn === d.turn);
+  const cls = t => t.includes('P1-WINS') ? 'p1' : t.includes('P2-WINS') ? 'p2' : 'none';
+
+  $('panel').innerHTML = `
+    <div class="navrow">
+      <button id="first">&#124;&lt;</button><button id="prev">&lt; prev</button>
+      <button id="nextp">next placement &gt;</button><button id="next">next &gt;</button>
+      <button id="last">&gt;&#124;</button>
+      <span class="pos">decision ${SEL + 1} / ${VIEW.length} &nbsp;(source #${i + 1} of ${DATA.decisions.length})</span>
+    </div>
+
+    <div class="note">
+      <b>T${d.turn} &middot; ${esc(d.phase)} &middot; P${d.seat + 1} played by ${esc(d.bot)}</b>
+      &nbsp;&mdash;&nbsp;${d.option_count} legal option(s), chose
+      <b>#${d.chosen_index}</b> ${esc((d.options[d.chosen_index] || {}).label || '')}<br>
+      ${d.scored ? `Scores from <b>${esc(d.scored_by)}</b>. ${esc(d.score_note)}`
+                 : `<span style="color:#f0a500">No static score here &mdash; ${esc(d.score_note)}</span>`}
+    </div>
+
+    ${live.length ? `<h2 class="sec">Engine live verdicts this turn</h2>` +
+      live.map(c => `<div class="verdict ${cls(c.text)}">${esc(c.text)}</div>`).join('') : ''}
+
+    <h2 class="sec">Board as P${d.seat + 1} saw it</h2>
+    <div class="board">
+      ${side('Opponent (public)', '', opp, true)}
+      ${side('Acting player', '', own, false)}
+    </div>
+
+    <h2 class="sec">Options and scores</h2>
+    <table class="opts">
+      <tr><th></th><th>Score</th><th>Option</th><th>Card detail</th></tr>
+      ${d.options.map(o => {
+        const w = (typeof o.score === 'number' && hi > lo)
+          ? Math.max(3, 100 * (o.score - lo) / (hi - lo)) : 100;
+        const c = o.card;
+        const detail = !c || c.unresolved || c.id < 0 ? '' : `
+          <b>${esc(c.name)}</b> <span class="tag ${(c.type || '')[0] === 'L' ? 'l' : (c.type || '')[0] === 'E' ? 'e' : 'm'}">${esc(c.type)}</span>
+          <span class="tag">${esc(c.card_no)}</span><br>
+          cost ${esc(c.cost)} &middot; blade ${esc(c.blade)} &middot; base&#9829; ${esc(hearts(c.base_hearts))}
+          &middot; blade&#9829; ${esc(hearts(c.blade_hearts))}
+          ${c.score != null ? `&middot; score ${esc(c.score)}pt` : ''}
+          ${c.need_hearts ? `&middot; needs ${esc(hearts(c.need_hearts))}` : ''}
+          ${(c.abilities || []).length ? c.abilities.map(a =>
+            `<div class="abil">${esc(String(a).replace(/\{\{[^}]*\}\}/g, '').trim())}</div>`).join('') : ''}`;
+        return `<tr class="${o.chosen ? 'chosen' : ''}">
+          <td class="idx">${o.chosen ? '&#9654;' : o.index}</td>
+          <td class="sc">${o.score == null ? '&mdash;' : esc(o.score)}
+            <div class="bar"><i style="width:${o.score == null ? 0 : w}%"></i></div></td>
+          <td>${esc(o.label)}<div class="comp">${esc(o.components || '')}</div></td>
+          <td>${detail}</td>
+        </tr>`;
+      }).join('')}
+    </table>`;
+
+  const go = k => { SEL = Math.max(0, Math.min(VIEW.length - 1, k)); renderList(); renderPanel(); };
+  $('first').onclick = () => go(0);
+  $('prev').onclick = () => go(SEL - 1);
+  $('next').onclick = () => go(SEL + 1);
+  $('last').onclick = () => go(VIEW.length - 1);
+  $('nextp').onclick = () => {
+    const t = VIEW[SEL].d.turn;
+    const n = VIEW.findIndex(({ d }, k) => k > SEL && DATA.live_checks.some(c => c.turn === d.turn));
+    go(n === -1 ? VIEW.length - 1 : n);
+  };
+}
+
+['fseat', 'fphase', 'fscored'].forEach(id => $(id).onchange = applyFilter);
+$('loadbtn').onclick = () => $('file').click();
+$('file').onchange = e => {
+  const f = e.target.files[0];
+  if (!f) return;
+  f.text().then(t => load(JSON.parse(t)));
+};
+document.addEventListener('dragover', e => { e.preventDefault(); $('drop').classList.add('on'); });
+document.addEventListener('dragleave', e => { if (e.clientX === 0 && e.clientY === 0) $('drop').classList.remove('on'); });
+document.addEventListener('drop', e => {
+  e.preventDefault(); $('drop').classList.remove('on');
+  const f = e.dataTransfer.files[0];
+  if (f) f.text().then(t => load(JSON.parse(t)));
+});
+document.addEventListener('keydown', e => {
+  if (!DATA) return;
+  if (e.key === 'ArrowRight') { SEL = Math.min(VIEW.length - 1, SEL + 1); renderList(); renderPanel(); }
+  if (e.key === 'ArrowLeft') { SEL = Math.max(0, SEL - 1); renderList(); renderPanel(); }
+});
+</script>
+</body>
+</html>

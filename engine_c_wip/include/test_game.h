@@ -56,16 +56,63 @@ void test_spend_energy(TestGame *tg, int n);
 /* choice / pending-choice shims (mirror helpers/mod.rs has_pending_choice /
    select_indices / select_option / pending_choice_count) */
 int  test_has_pending_choice(TestGame *tg);
-int  test_pending_choice_count(TestGame *tg);
-/* live shim (mirror helpers/mod.rs set_live_card) */
-void test_set_live_card(TestGame *tg, int zone, int card_id);
+int  test_pending_choice_count(TestGame *tg);/* live shim (mirror helpers/mod.rs set_live_card).
+   Rust's set_live_card(card_id) takes ONE argument and the engine APPENDS the
+   card to the live card zone. `slot` exists only because tools/port_one.py
+   emits test_set_live_card(&game, 0, id); it is deliberately IGNORED.
+   A previous revision wrote live.cards[slot] at a fixed index, so three
+   consecutive calls (the transpiler always passes 0) left ONE live card in
+   the zone and silently invalidated every transpiled live test. Do not
+   reintroduce a positional write here -- use test_insert_live_card_at. */
+void test_set_live_card(TestGame *tg, int slot, int card_id);
+/* Explicit positional live-zone placement, for the rare test that needs a
+   card at a specific live slot. test_set_live_card is the append path. */
+void test_insert_live_card_at(TestGame *tg, int slot, int card_id);
 const char *test_card_name(int card_id);
+int  test_find_live_by_score(TestGame *tg, int score);
 
 /* board helpers for assertions */
 int  test_stage_has(TestGame *tg, int area, int card_id);
 int  test_hand_has(TestGame *tg, int card_id);
 int  test_success_count(TestGame *tg);
 void test_print_board(TestGame *tg);
+
+/* ── side-parameterised setup (mirror the Rust `*_for(Side, ..)` family) ── */
+void test_add_to_hand_for(TestGame *tg, int pl, int card_id);
+void test_give_energy_for(TestGame *tg, int pl, int count);
+int  test_play_to_stage_for(TestGame *tg, int pl, int card_id, int area);
+int  test_activate_ability_for(TestGame *tg, int pl, int card_id);
+
+/* ── phase advance (mirror TestGame::advance_to_phase) ──
+   Steps the turn until `target` (an RbPhase) is current, handing any prompt
+   raised by the arriving step back to the caller. Returns 1 on arrival, 0 if
+   the phase was never reached within 16 passes. */
+int  test_advance_to_phase(TestGame *tg, int target);
+
+/* ── zone-content assertions (beyond test_zone_has_id) ──
+   `zone` accepts the Rust field names and the short C aliases:
+   "hand", "deck"/"main_deck", "discard"/"waitroom", "live"/"live_card_zone",
+   "success"/"success_live_card_zone", "energy"/"energy_zone",
+   "energy_deck", "stage", "under<0..2>" (e.g. "under0"). */
+int  test_zone_len(TestGame *tg, int pl, const char *zone);
+int  test_zone_count_of_id(TestGame *tg, int pl, const char *zone, int id);
+/* Dump a zone's contents in order for order-sensitive assertions. Returns the
+   number of cards written (capped at `max`). */
+int  test_zone_ids(TestGame *tg, int pl, const char *zone, int *out, int max);
+/* Zone-independent card census: every card slot of BOTH seats across every
+   zone (deck, hand, stage, under-cards, energy, energy-deck, live, success,
+   waitroom). A card that moves between zones must leave this total unchanged. */
+int  test_total_card_count(TestGame *tg);
+
+/* ── cost/selection zone moves ──
+   TEST-SIDE stand-in for a known engine gap: the fixed-count hand-selection
+   cost path (rb_resolver_handle_hand_selection, choice.c) records the picks
+   in resolver state and never moves them, so the cost cards stay in hand.
+   These helpers let a test perform -- and therefore assert -- the move the
+   engine omits. They do NOT emulate any engine decision; do not use them to
+   paper over engine behaviour a test is meant to exercise. */
+int  test_move_hand_to_waitroom(TestGame *tg, int pl, int n);
+int  test_move_ids_to_waitroom(TestGame *tg, int pl, const int *ids, int n);
 
 /* phase / choice introspection + modifier getters (mirror TestGame helpers) */
 void test_pass(TestGame *tg);
@@ -87,6 +134,12 @@ void test_answer_play_cost_choice(TestGame *tg, int accept);
 /* Choice-resume + introspection helpers used by the scenario replay runner
  (tests/replay.c scenario mode). Defined in src/test_game.c. */
 void test_resume_choice(TestGame *tg, int idx);
+/* Select indices from a pending choice — mirrors game.select_indices(&[..]).
+   n == 0 DECLINES the prompt (Rust's select_indices(&[])), which is
+   rb_resume_with_choice(g, -1); n > 1 passes the whole multi-index answer to
+   rb_resume_with_choice_indices. The previous revision silently used only
+   indices[0] and treated n == 0 as a total no-op, so a Rust "decline" left
+   the prompt pending and a multi-pick could never complete. */
 void test_select_indices(TestGame *tg, const int *indices, int n);
 int  test_deck_len(TestGame *tg);
 int  test_hand_len(TestGame *tg);

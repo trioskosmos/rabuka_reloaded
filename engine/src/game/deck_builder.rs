@@ -35,7 +35,7 @@ pub fn validate_deck_construction(
     let mut member_count = 0;
     let mut live_count = 0;
     let mut energy_count = 0;
-    let mut copies_by_card_no: HashMap<&str, usize> = HashMap::with_hasher(Default::default());
+    let mut copies_by_card_no: HashMap<&str, usize> = HashMap::new();
 
     for requested_card_no in card_numbers {
         let template_id = card_db

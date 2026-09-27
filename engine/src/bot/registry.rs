@@ -29,6 +29,9 @@ pub enum BotKind {
     /// v7 with the ISMCTS refinement forced off — the ablation seat for a
     /// mirror `v7 vs v7plain`. Same build, same heuristics, one variable.
     V7Plain,
+    /// The ISMCTS rollout policy played as a real bot. This is how you grade
+    /// the thing a leaf is measured with, instead of assuming it is good.
+    V7Rollout,
     V8,
     Neural,
     Conductor,
@@ -46,6 +49,7 @@ impl BotKind {
         "v6",
         "v7",
         "v7plain",
+        "v7rollout",
         "v8",
         "neural",
         "conductor",
@@ -62,6 +66,7 @@ impl BotKind {
             "v6" => BotKind::V6,
             "v7" => BotKind::V7,
             "v7plain" => BotKind::V7Plain,
+            "v7rollout" => BotKind::V7Rollout,
             "v8" => BotKind::V8,
             "neural" => BotKind::Neural,
             "conductor" => BotKind::Conductor,
@@ -79,6 +84,7 @@ impl BotKind {
             BotKind::V6 => "v6",
             BotKind::V7 => "v7",
             BotKind::V7Plain => "v7plain",
+            BotKind::V7Rollout => "v7rollout",
             BotKind::V8 => "v8",
             BotKind::Neural => "neural",
             BotKind::Conductor => "conductor",
@@ -107,6 +113,7 @@ impl BotKind {
             BotKind::V6 => strategy_v6::choose_action(gs, actions, me),
             BotKind::V7 => strategy_v7::choose_action(gs, actions, me),
             BotKind::V7Plain => super::v7_main::choose_action_plain(gs, actions, me),
+            BotKind::V7Rollout => super::v7_ismcts::choose_rollout_policy(gs, actions, me),
             BotKind::V8 => strategy_v8::choose_action(gs, actions, me),
             BotKind::Neural => actions.first().cloned().unwrap_or(Action {
                 description: "pass".into(),
@@ -148,6 +155,7 @@ impl BotKind {
             BotKind::V6 => strategy_v6::choose_live_set(gs, actions, db),
             BotKind::V7 => strategy_v7::choose_live_set(gs, actions, db),
             BotKind::V7Plain => strategy_v7::choose_live_set(gs, actions, db),
+            BotKind::V7Rollout => strategy_v7::choose_live_set(gs, actions, db),
             BotKind::V8 => strategy_v8::choose_live_set(gs, actions, db),
             BotKind::Neural => actions.first().cloned().unwrap_or(Action {
                 description: "pass".into(),
@@ -192,6 +200,7 @@ impl BotKind {
             BotKind::V6 => strategy_v6::choose_mulligan(gs, actions, db),
             BotKind::V7 => strategy_v7::choose_mulligan(gs, actions, db),
             BotKind::V7Plain => strategy_v7::choose_mulligan(gs, actions, db),
+            BotKind::V7Rollout => strategy_v7::choose_mulligan(gs, actions, db),
             BotKind::V8 => strategy_v8::choose_mulligan(gs, actions, db),
             BotKind::Neural => actions.first().cloned().unwrap_or(Action {
                 description: "skip".into(),

@@ -98,6 +98,45 @@ static int bag_equals_pair(const RbBag *bag, int first, int second)
     return bag->n == 2 && bag->cards[0] == first && bag->cards[1] == second;
 }
 
+static void clear_bag(RbBag *bag)
+{
+    bag->n = 0;
+}
+
+static int set_live_for(TestGame *tg, int pl, int card_id)
+{
+    if (pl < 0 || pl > 1) return 0;
+    RbPlayer *P = &tg->state.p[pl];
+    for (int i = 0; i < P->hand.n; i++) {
+        if (P->hand.cards[i] != card_id) continue;
+        int card = rb_hand_remove_card(P, i);
+        return card >= 0 && rb_live_add_card(P, card) == 0;
+    }
+    return 0;
+}
+
+/* Drive the round from wherever it stands until it rolls over into the next turn's
+   Active phase, answering the two prompts a live can raise (the ライブ成功時
+   look_and_select and the auto-ability prompt) the same way
+   tests/test_performance_phase_rules.c:run_full_turn does. */
+static int run_round(TestGame *tg)
+{
+    for (int i = 0; i < 60; i++) {
+        if (tg->state.phase == RB_PHASE_ACTIVE && !test_has_pending_choice(tg)) return 1;
+        const char *choice = test_pending_choice_type(tg);
+        if (strcmp(choice, "SelectCard") == 0) {
+            rb_resume_with_choice(&tg->state, -1);
+        } else if (strcmp(choice, "SelectAutoAbility") == 0) {
+            rb_resume_with_choice(&tg->state, 0);
+        } else if (choice[0] == 0) {
+            test_pass(tg);
+        } else {
+            return 0;
+        }
+    }
+    return 0;
+}
+
 static void test_active_phase_stands_only_the_turn_players_cards(void)
 {
     TestGame tg;
@@ -243,6 +282,126 @@ static void test_live_card_set_refill_draws_placed_count(void)
                "placed 0 live cards means 0 refill draws for the second attacker");
 }
 
+/* Rule 8.4.13 — the VICTORY-phase rollover must NOT run its own first-attacker
+   election, and the seats must follow the SUCCESS-ZONE DELTA that live.c's
+   rb_move_to_success_and_update_attacker already applied.
+
+   Rust has exactly two writers of `is_first_attacker`: actions/mod.rs:230-231
+   (RPS) and live.rs:1283-1289, the latter inside move_to_success_and_update_attacker,
+   which runs from execute_live_victory_determination — i.e. from inside
+   rb_execute_performance_phase, BEFORE advance_phase's VICTORY branch. The Rust
+   counterpart of that branch (phases.rs:265-311) writes no seat at all. The Rust
+   election reads p1_added / p2_added, i.e. whether a card actually LANDED in the
+   success zone — not whether that seat won the live.
+
+   The winner-based election that used to live in phase.c disagreed exactly when a
+   sole winner placed nothing. The fixture below builds that case:
+     - the seats start as (first=1, second=0), so P1 is the SECOND attacker;
+     - P1 stands a member and sets PL!-sd1-019-SD, so she passes and is the SOLE
+       live winner; P2 sets nothing, so P2 cannot win;
+     - a standing "cannot place into the success live zone" prohibition stops P1's
+       live card from being placed, so process_player_live_result (live.rs:1437-1458)
+       routes it to the waitroom and the success-zone DELTA is 0/0.
+   Rust therefore keeps the previous first attacker. The removed phase.c election
+   saw "P1 won alone" and flipped the seats to (0, 1) anyway. */
+static void setup_sole_winner_places_nothing(TestGame *tg, int *live_p1)
+{
+    test_game_new(tg);
+    int live = test_id(tg, "PL!-sd1-019-SD");
+    int member = test_id(tg, "PL!-sd1-001-SD");
+    int filler = test_id(tg, "PL!-sd1-010-SD");
+    *live_p1 = live;
+
+    clear_bag(&tg->state.p[0].deck);
+    clear_bag(&tg->state.p[0].hand);
+    clear_bag(&tg->state.p[0].discard);
+    clear_bag(&tg->state.p[0].success);
+    clear_bag(&tg->state.p[0].energy_deck);
+    clear_bag(&tg->state.p[1].deck);
+    clear_bag(&tg->state.p[1].hand);
+    clear_bag(&tg->state.p[1].discard);
+    clear_bag(&tg->state.p[1].success);
+    clear_bag(&tg->state.p[1].energy_deck);
+    for (int i = 0; i < 40; i++) {
+        test_add_to_deck_pl(tg, 0, filler);
+        test_add_to_deck_pl(tg, 1, filler);
+    }
+    /* Only P1 stands a member, so only P1 can satisfy the live's h01 demand. */
+    tg->state.p[0].stage[1] = member;
+    test_add_to_hand(tg, live);
+
+    /* P2 opens the live: the seats are deliberately (first=1, second=0) so the
+       removed winner-based election would have been VISIBLE if it ran. */
+    tg->state.first_attacker = 1;
+    tg->state.second_attacker = 0;
+
+    /* Standing restriction: the live card may not be placed into the success zone,
+       so the sole winner's success-zone DELTA stays 0. */
+    snprintf(tg->state.prohibition[tg->state.n_prohibition], 48,
+             "restriction:cannot_place:success_live_zone");
+    tg->state.n_prohibition++;
+}
+
+/* Drive one live through to the roll-over. P2 sets nothing and P1 sets one card, so
+   the round is: P2 live set, P1 live set, first window, second window, victory. */
+static void play_sole_winner_live(TestGame *tg, int live_p1)
+{
+    test_pass(tg);                                   /* MAIN -> P2 live card set */
+    test_pass(tg);                                   /* P2 places nothing -> P1 */
+    if (set_live_for(tg, 0, live_p1)) test_pass(tg); /* P1 sets + confirms */
+}
+
+static void test_first_attacker_survives_a_win_that_placed_nothing(void)
+{
+    TestGame tg;
+    int live_p1 = -1;
+    setup_sole_winner_places_nothing(&tg, &live_p1);
+
+    play_sole_winner_live(&tg, live_p1);
+    REQUIRE(run_round(&tg), "the round rolls over into the next Active phase");
+
+    REQUIRE_EQ(tg.state.p1_live_won, 1, "precondition: P1 is the sole live winner");
+    REQUIRE_EQ(tg.state.p2_live_won, 0, "precondition: P2 did not win the live");
+    REQUIRE_EQ(tg.state.p[0].success.n, 0,
+               "8.4.13: the winner placed no success card, so the delta is 0");
+    REQUIRE(test_zone_has_id(&tg, 0, "discard", live_p1),
+            "an unplaceable live card is routed to the waitroom");
+
+    REQUIRE_EQ(tg.state.first_attacker, 1,
+               "8.4.13: a win that placed nothing does NOT re-elect the winner");
+    REQUIRE_EQ(tg.state.second_attacker, 0,
+               "8.4.13: the seat order is left untouched by a no-placement win");
+    REQUIRE_EQ(tg.state.active, 1,
+               "the next round opens with the retained first attacker");
+}
+
+/* Companion half of the same rule, and the guard against over-correcting: when the
+   sole winner DOES place a success card, the seats must still move to that seat.
+   This is the election live.c owns (live.rs:1283-1289) and the one the removed
+   phase.c lines happened to agree with — proving the fix delegates rather than
+   disables the promotion. */
+static void test_first_attacker_follows_a_placed_success_card(void)
+{
+    TestGame tg;
+    int live_p1 = -1;
+    setup_sole_winner_places_nothing(&tg, &live_p1);
+    tg.state.n_prohibition = 0; /* lift the restriction: P1 can now place */
+
+    play_sole_winner_live(&tg, live_p1);
+    REQUIRE(run_round(&tg), "the round rolls over into the next Active phase");
+
+    REQUIRE_EQ(tg.state.p1_live_won, 1, "precondition: P1 is the sole live winner");
+    REQUIRE_EQ(tg.state.p[0].success.n, 1,
+               "the sole winner's live card lands in the success zone");
+
+    REQUIRE_EQ(tg.state.first_attacker, 0,
+               "8.4.13: the sole placer becomes the first attacker");
+    REQUIRE_EQ(tg.state.second_attacker, 1,
+               "8.4.13: the other seat becomes the second attacker");
+    REQUIRE_EQ(tg.state.active, 0,
+               "the next round opens with the newly elected first attacker");
+}
+
 int main(void)
 {
     if (rb_load("src") != 0) {
@@ -254,6 +413,8 @@ int main(void)
     test_energy_phase_draws_one_and_empty_deck_skips();
     test_draw_phase_on_empty_main_deck_refreshes_then_draws();
     test_live_card_set_refill_draws_placed_count();
+    test_first_attacker_survives_a_win_that_placed_nothing();
+    test_first_attacker_follows_a_placed_success_card();
 
     rb_unload();
     if (failures) return 1;

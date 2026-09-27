@@ -221,6 +221,9 @@ export const GameSetupModal = {
         Modals.pvpJoinPid = null;
         State._gameMode = null;
         State._aiMode = false;
+        // Hide the AI strategy picker again; the next setup may be PVP.
+        const policyRow = document.getElementById('setup-ai-policy-row');
+        if (policyRow) policyRow.style.display = 'none';
         // Only return to lobby if a game hasn't started yet
         if (!State.gameHasStarted) {
             ModalManager.show(DOM_IDS.MODAL_ROOM);
@@ -301,6 +304,13 @@ export const GameSetupModal = {
             const body = { mode: gameMode };
             if (gameMode === 'pvp' && State._aiMode) {
                 body.is_ai = true;
+                // Strategy version for the AI seat. The server stores this on
+                // the room and resolves it per move, so one server can run
+                // several different test matches concurrently.
+                const policySelect = document.getElementById('setup-ai-policy');
+                if (policySelect && policySelect.value) {
+                    body.ai_policy = policySelect.value;
+                }
             }
             const roomRes = await apiFetch('api/rooms/create', {
                 method: 'POST',
@@ -496,6 +506,9 @@ export const GameSetupModal = {
         const p1Col = document.getElementById('setup-p1-col');
         const title = document.getElementById('setup-title');
         const roomCodeEl = document.getElementById('setup-room-code');
+        // Only PvE has an AI seat to configure.
+        const policyRow = document.getElementById('setup-ai-policy-row');
+        if (policyRow) policyRow.style.display = '';
         if (title) title.textContent = i18n.t('vs_ai_setup');
         if (roomCodeEl) {
             roomCodeEl.style.display = DISPLAY_VALUES.NONE;

@@ -129,11 +129,28 @@ void rb_advance_phase(GameState *g) {
             if(rb_has_pending_choice(g)) return;
             g->live_victory_pending = 0;
         }
-        /* victory check + rollover */
-        /* Rule 8.4.13: determine who placed a live this turn; if only one player
-            did, they become first attacker next round (mirrors live.rs::
-            move_live_to_success_and_handle_wins first-attacker promotion). A score
-            tie means both placed, so first attacker is left unchanged. */
+        /* victory check + rollover.
+           The result fields are a pure re-read of what
+           rb_execute_live_victory_determination already recorded
+           (live.c:1603-1605), so they are not re-decided here.
+
+           The first/second-attacker seats are deliberately NOT elected in this
+           branch. Rust has exactly two writers of `is_first_attacker`:
+           actions/mod.rs:230-231 (RPS) and live.rs:1283-1289, the latter inside
+           move_to_success_and_update_attacker — which runs from
+           rb_execute_live_victory_determination, i.e. BEFORE the VICTORY branch
+           of advance_phase (phases.rs:265-311, the Rust counterpart of this
+           block, writes no seat at all). That election keys off the SUCCESS-ZONE
+           DELTA (p1_added / p2_added), not off who won the live.
+
+           The election this branch used to do was winner-based and had no Rust
+           counterpart: it flipped the seats whenever exactly one seat won, even
+           when that seat placed nothing into the success zone (e.g. the
+           p1_must_skip / p2_must_skip path in
+           rb_move_live_to_success_and_handle_wins, where the winner sends its
+           live card to the waitroom instead), and it declined to flip when both
+           seats won even though only one of them actually placed. live.c owns the
+           election; do not overwrite it here. */
         int p1_won=0, p2_won=0;
         rb_determine_live_winners(g, &p1_won, &p2_won);
         g->p1_live_won = p1_won; g->p2_live_won = p2_won;

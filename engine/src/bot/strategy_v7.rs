@@ -719,6 +719,16 @@ const EXPERIMENT_SAMPLES: usize = 256;
 type ExperimentPortfolio = (f64, i32, Vec<usize>);
 type ExperimentSingle = (f64, i32, usize, [i32; 11]);
 
+/// Outranks any stat utility the junk loop can build, so a card with a live
+/// ability is never the first thing binned from hand.
+const ABILITY_KEEP_BONUS: f64 = 500.0;
+
+/// Penalty for a no-ability member the development curve has already passed.
+const CURVE_PASSED_PENALTY: f64 = 20.0;
+
+/// How far below the top stage cost a member must sit to count as curve-passed.
+const CURVE_PASSED_MARGIN: i32 = 2;
+
 fn experiment_flip_categories(
     gs: &GameState,
     me: u8,
@@ -986,6 +996,29 @@ fn experiment_blades(gs: &GameState, me: u8, db: &CardDatabase) -> i32 {
     ))
 }
 
+/// Does this card still have an ability worth keeping it in hand for?
+///
+/// This is the term `experiment_junk_fill` was missing, and it is the one the
+/// guide's junk definition actually turns on: junk is "genuinely low-future-
+/// value non-lives, NOT merely expensive cards". The old utility was
+/// `2*cost + 2*blade + hearts` — it never opened `card.abilities`, so a
+/// costless activation scored like a vanilla stat stick and was thrown into
+/// the live zone to be discarded. On a curve-saturated board that is how you
+/// lose the only card in hand that could still convert.
+///
+/// Deliberately conservative: an unknown, null, or exhausted-to-zero ability
+/// does not count, and we do not try to price whether the effect is any good.
+/// False positives (kept a card we should have binned) cost one slot of junk
+/// and draw a replacement; false negatives (binned a livewire) cost the card.
+fn card_has_usable_ability(card: &crate::card::Card) -> bool {
+    card.abilities.iter().any(|ability_ref| {
+        let ability = ability_ref.resolve();
+        !ability.is_null
+            && ability.effect.is_some()
+            && ability.use_limit.unwrap_or(u8::MAX) > 0
+    })
+}
+
 fn experiment_junk_fill(gs: &GameState, me: u8, db: &CardDatabase, desired: &mut Vec<usize>) {
     let (my, _) = gs.seated_pair(me);
     let deck_lives = my
@@ -1012,6 +1045,11 @@ fn experiment_junk_fill(gs: &GameState, me: u8, db: &CardDatabase, desired: &mut
         return;
     }
     let future_junk = std::env::var_os("V7_NO_FUTURE_JUNK").is_none();
+    // Opt-in, measured separately (see the module's experiment log). Neither
+    // changes the existing default until it has cleared the paired protocol in
+    // both seat orientations.
+    let keep_ability = std::env::var_os("V7_JUNK_ABILITY").is_some();
+    let junk_curve_passed = std::env::var_os("V7_JUNK_CURVE").is_some();
     let max_stage_cost = my
         .stage
         .stage
@@ -1021,21 +1059,72 @@ fn experiment_junk_fill(gs: &GameState, me: u8, db: &CardDatabase, desired: &mut
         .max()
         .unwrap_or(0) as i32;
     let budget = i32::from(u16::from(my.energy_zone.active_count())) + 1;
+
+    // Lives v7 has ALREADY decided not to set are disposal candidates.
+    //
+    // The junk pool used to exclude `CardType::Live` outright, which meant a
+    // live the bot will never play could never be binned: it sat in hand for
+    // the rest of the game clogging draws, while a junk slot sat empty that
+    // would have drawn a replacement for free under 8.3.4. The live zone
+    // disposes of up to three member AND/OR live cards — it is not restricted
+    // to the spare slots alongside a real life, because a junk-only zone
+    // places nothing exactly like an empty one and still draws the
+    // replacements. So there is no reason to hoard a card we will not use.
+    //
+    // Gated on `V7_JUNK_LIVES` and on the card genuinely being below the
+    // reliability floor: a life we might set is never binned, only one the
+    // pass model has already rejected.
+    let junk_lives = std::env::var_os("V7_JUNK_LIVES").is_some();
+    let floor = live_reliability_floor(gs, me);
+    let unplayable_lives: std::collections::HashSet<usize> = if junk_lives {
+        let (cats, deck_len) = experiment_flip_categories(gs, me, db);
+        let blades = experiment_blades(gs, me, db);
+        let board = experiment_board_pool(gs, me, db);
+        let pools = experiment_sample_pools(&cats, deck_len, blades, &board);
+        experiment_lives(gs, me, db)
+            .into_iter()
+            .filter(|(_, _, need)| {
+                need[8] == 0 && need[9] == 0 && need.iter().sum::<i32>() > 0
+            })
+            .filter(|(_, _, need)| {
+                experiment_pass_probability_pools(&pools, need) < floor
+            })
+            .map(|(hi, _, _)| hi)
+            .collect()
+    } else {
+        std::collections::HashSet::new()
+    };
+
     let mut junk: Vec<(usize, u8, i32)> = my
         .hand
         .cards
         .iter()
         .enumerate()
         .filter(|&(i, &cid)| {
-            !desired.contains(&i)
-                && db
-                    .get_card(cid)
-                    .is_some_and(|c| c.card_type != CardType::Live)
+            if desired.contains(&i) {
+                return false;
+            }
+            let Some(card) = db.get_card(cid) else {
+                return false;
+            };
+            if card.card_type != CardType::Live {
+                return true;
+            }
+            // Only a live we have already given up on, and never more than the
+            // slots allow.
+            unplayable_lives.contains(&i)
         })
         .map(|(i, &cid)| {
             let card = db.get_card(cid);
             let cost = card.and_then(|c| c.cost).unwrap_or(0);
-            let utility = if future_junk && card.is_some_and(|c| c.card_type == CardType::Member) {
+            // A binned live is pure upside: it was never going to be set, and
+            // the replacement draw is free. Rank it as the cheapest possible
+            // junk so it goes out first, ahead of any member we might still
+            // be able to develop.
+            let is_live = card.is_some_and(|c| c.card_type == CardType::Live);
+            let mut utility = if is_live {
+                -1_000.0
+            } else if future_junk && card.is_some_and(|c| c.card_type == CardType::Member) {
                 let hearts = card
                     .and_then(|c| c.base_heart.as_ref())
                     .map(|h| h.hearts.values_sum() as i32)
@@ -1048,7 +1137,30 @@ fn experiment_junk_fill(gs: &GameState, me: u8, db: &CardDatabase, desired: &mut
             } else {
                 0.0
             };
-            let class = if future_junk && card.is_some_and(|c| c.card_type == CardType::Energy) {
+            if keep_ability && card.is_some_and(card_has_usable_ability) {
+                // Large enough to outrank any stat utility the loop can
+                // produce, so an ability-bearing card is never the first thing
+                // binned. It still yields if every other card in hand is
+                // equally alive and slots run out.
+                utility += ABILITY_KEEP_BONUS;
+            }
+            if junk_curve_passed
+                && card.is_some_and(|c| c.card_type == CardType::Member)
+                && !card.is_some_and(card_has_usable_ability)
+                && max_stage_cost > 0
+                && i32::from(cost) + CURVE_PASSED_MARGIN <= max_stage_cost
+            {
+                // The board has moved past this card. A cost-1 member under a
+                // cost-15 stage adds one point of development and a rounding
+                // error of blades, and the check reads blades — so it is dead
+                // weight that only clogs the hand. A pure dev card with no
+                // ability is exactly what the live zone is FOR.
+                utility -= CURVE_PASSED_PENALTY;
+            }
+            let class = if is_live {
+                // Lowest class so a binned live is chosen before members.
+                0
+            } else if future_junk && card.is_some_and(|c| c.card_type == CardType::Energy) {
                 2
             } else if future_junk {
                 1
@@ -1080,6 +1192,38 @@ fn experiment_free_win(gs: &GameState, me: u8, db: &CardDatabase) -> Option<usiz
         .filter(|(_, _, need)| experiment_feasible(&pool, need))
         .min_by_key(|(hi, cid, _)| (db.get_card(*cid).and_then(|c| c.score).unwrap_or(0), *hi))
         .map(|(hi, _, _)| hi)
+}
+
+/// The reliability floor: the minimum estimated pass probability before v7 will
+/// commit a life at all.
+///
+/// This was DUPLICATED — hard-coded inside `experiment_portfolio_rank` and
+/// separately recomputed in `live_set_plan`, where `V7_LIVE_FLOOR` could reach
+/// it. So there were two independent gates and the environment variable moved
+/// only one. Measured consequence: a floor sweep over `V7_LIVE_FLOOR` at 0.25,
+/// 0.35 and 0.50 produced games byte-identical to the default (McNemar
+/// p = 1.00000, 539-461 both ways), which is not a plausible result for a
+/// threshold raised above the 0.45 default — it is the signature of a knob
+/// that is not connected to the decision. Any earlier tuning of this threshold
+/// was only tuning half of it.
+///
+/// One function, one value, both call sites.
+fn live_reliability_floor(gs: &GameState, me: u8) -> f64 {
+    if let Ok(value) = std::env::var("V7_LIVE_FLOOR") {
+        if let Some(parsed) = value.parse::<f64>().ok() {
+            if parsed.is_finite() && (0.0..=1.0).contains(&parsed) {
+                return parsed;
+            }
+        }
+    }
+    let (my, opp) = gs.seated_pair(me);
+    if opp.success_live_card_zone.cards.len() >= 2 {
+        0.35
+    } else if my.success_live_card_zone.cards.len() >= 2 {
+        0.60
+    } else {
+        0.45
+    }
 }
 
 fn experiment_portfolio_rank(
@@ -1161,13 +1305,8 @@ fn experiment_portfolio_rank(
             |pools| experiment_pass_probability_pools(pools, &need_total),
         );
         let (_, opp) = gs.seated_pair(me);
-        let floor = if opp.success_live_card_zone.cards.len() >= 2 {
-            0.35
-        } else if my.success_live_card_zone.cards.len() >= 2 {
-            0.60
-        } else {
-            0.45
-        };
+        let floor = live_reliability_floor(gs, me);
+        let _ = opp;
         if p < floor {
             continue;
         }
@@ -1217,17 +1356,7 @@ pub(crate) fn live_set_plan(gs: &GameState, db: &CardDatabase) -> Vec<usize> {
     let opp_succ = opp.success_live_card_zone.cards.len();
     let is_second = gs.current_phase == Phase::LiveCardSetSecondAttacker;
     let opp_committed = !opp.live_card_zone.cards.is_empty();
-    let floor = std::env::var("V7_LIVE_FLOOR")
-        .ok()
-        .and_then(|value| value.parse::<f64>().ok())
-        .filter(|value: &f64| value.is_finite() && *value >= 0.0 && *value <= 1.0)
-        .unwrap_or(if opp_succ >= 2 {
-            0.35
-        } else if my_succ >= 2 {
-            0.60
-        } else {
-            0.45
-        });
+    let floor = live_reliability_floor(gs, me);
 
     let mut desired: Vec<usize> = Vec::new();
 

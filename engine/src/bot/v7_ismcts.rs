@@ -1341,6 +1341,27 @@ fn action_label(actions: &[Action], index: usize) -> String {
     format!("{}:{}", action.action_type, card)
 }
 
+/// The rollout policy, exposed as a real bot so it can be MEASURED instead of
+/// assumed.
+///
+/// This exists because the search's entire value rests on an unexamined
+/// premise: that a position which wins under this policy is a position that
+/// wins under v7. That premise deserves a win rate, not a comment. Register
+/// it as `v7rollout` and run `bot_arena v7rollout v7plain` — whatever that
+/// scores is the ceiling on how much signal a leaf can possibly carry.
+///
+/// Read the policy before trusting it. It is a greedy one-ply player: member
+/// deploys are scored syntactically at `8*paid_cost + 3*d_hearts + 6*d_blades`
+/// and never executed, so a member's DEBUT ability is invisible to it — and in
+/// this game a lot of the reason to play a particular member is its debut. It
+/// has no notion of holding a live card back, no notion of saving energy for a
+/// check, and no ability sequencing beyond "does this ability move v7's
+/// feature vector right now". It is a much weaker player than the bot it is
+/// being used to overrule.
+pub fn choose_rollout_policy(gs: &GameState, actions: &[Action], me: u8) -> Action {
+    rollout_action(gs, actions, me, true)
+}
+
 thread_local! {
     static OVERRIDES: std::cell::Cell<(u64, u64)> = const { std::cell::Cell::new((0, 0)) };
 }
@@ -1377,6 +1398,53 @@ mod tests {
         let mut gs = GameState::new(p1, p2, crate::Arc::clone(&db));
         gs.current_phase = Phase::Main;
         (gs, db)
+    }
+
+    /// A position with enough energy and cards that `generate_possible_actions`
+    /// genuinely offers a choice. Tests assert on the search's behaviour, so a
+    /// fixture that quietly yields one action and sends them down an early
+    /// return turns a real test into a no-op that always passes.
+    fn choice_fixture() -> (GameState, Vec<Action>, crate::Arc<CardDatabase>) {
+        let (mut gs, db) = fixture();
+        let member = db.get_card_id("PL!SP-bp1-005-R").unwrap();
+        assert_eq!(
+            db.get_card(member).unwrap().card_no,
+            "PL!SP-bp1-005-R",
+            "the fixture must exist in the real card database"
+        );
+        let energy = db
+            .cards
+            .values()
+            .find(|card| card.is_energy())
+            .and_then(|card| db.get_card_id(card.card_no.as_ref()))
+            .expect("database has energy cards");
+        for _ in 0..8 {
+            gs.player1.energy_zone.cards.push(energy);
+        }
+        gs.player1.energy_zone.active_energy_count = 8;
+        gs.player1.hand.cards.extend([member; 4]);
+        gs.player1.main_deck.cards.extend([member; 20]);
+        gs.player2.main_deck.cards.extend([member; 20]);
+        gs.player2.hand.cards.extend([member; 4]);
+        let actions = game_setup::generate_possible_actions(&gs);
+        assert!(
+            actions.len() >= 2,
+            "choice_fixture must offer a real choice, got {}",
+            actions.len()
+        );
+        (gs, actions, db)
+    }
+
+    /// A config for tests that assert the search DOES something. `enabled`
+    /// defaults to false now (the search is opt-in because it measured as a
+    /// regression), so a test that inherits the environment would silently
+    /// assert nothing at all.
+    fn enabled_config() -> Config {
+        Config {
+            enabled: true,
+            jobs: 1,
+            ..Config::from_env()
+        }
     }
 
     #[test]
@@ -1456,29 +1524,23 @@ mod tests {
 
     #[test]
     fn search_is_independent_of_worker_count() {
-        let (mut gs, db) = fixture();
-        let member = db.get_card_id("PL!SP-bp1-005-R").unwrap();
-        gs.player1.hand.cards.extend([member, member, member]);
-        gs.player1.main_deck.cards.extend([member; 20]);
-        gs.player2.main_deck.cards.extend([member; 20]);
-        let actions = game_setup::generate_possible_actions(&gs);
-        if actions.len() < 2 {
-            return;
-        }
-        let scores: Vec<(f64, String)> =
-            actions.iter().map(|_| (1.0, "t".to_string())).collect();
-        let mut serial = Config::from_env();
-        serial.jobs = 1;
+        let (gs, actions, _db) = choice_fixture();
+        let scores: Vec<(f64, String)> = actions
+            .iter()
+            .enumerate()
+            .map(|(index, _)| (index as f64, "t".to_string()))
+            .collect();
+        let mut serial = enabled_config();
         serial.worlds = 2;
         serial.sims = 1;
         serial.visits = 6;
+        serial.promote_only = false;
         let mut parallel = serial;
         parallel.jobs = 4;
-        let one = search(&gs, &actions, 0, &scores, &serial);
-        let many = search(&gs, &actions, 0, &scores, &parallel);
-        assert!(one.is_some() && many.is_some());
-        let one = one.unwrap();
-        let many = many.unwrap();
+        let one = search(&gs, &actions, 0, &scores, &serial)
+            .expect("serial search must produce scores");
+        let many = search(&gs, &actions, 0, &scores, &parallel)
+            .expect("parallel search must produce scores");
         for (index, (score, _)) in one.iter().enumerate() {
             assert!(
                 (score - many[index].0).abs() < 1e-12,
@@ -1490,38 +1552,20 @@ mod tests {
 
     #[test]
     fn the_search_refuses_states_it_must_not_price() {
-        let (mut gs, db) = fixture();
-        let member = db.get_card_id("PL!SP-bp1-005-R").unwrap();
-        assert_eq!(db.get_card(member).unwrap().card_no, "PL!SP-bp1-005-R");
-        let energy = db
-            .cards
-            .values()
-            .find(|card| card.is_energy())
-            .map(|card| db.get_card_id(card.card_no.as_ref()).unwrap())
-            .expect("database has energy cards");
-        for _ in 0..6 {
-            gs.player1.energy_zone.cards.push(energy);
-        }
-        gs.player1.energy_zone.add_active(3);
-        gs.player1.hand.cards.extend([member, member, member]);
-        gs.player1.main_deck.cards.extend([member; 20]);
-        gs.player2.main_deck.cards.extend([member; 20]);
-        let actions = game_setup::generate_possible_actions(&gs);
-        assert!(actions.len() >= 2, "fixture must offer a real choice");
+        let (mut gs, actions, _db) = choice_fixture();
         let scores: Vec<(f64, String)> = actions
             .iter()
             .enumerate()
             .map(|(index, _)| (index as f64, "a".into()))
             .collect();
-        let cfg = Config::from_env();
+        let cfg = enabled_config();
+        // Main is the scope, and the search must actually run there.
+        assert!(search(&gs, &actions, 0, &scores, &cfg).is_some());
         // A live-card set is a multi-tick emission chain, not a decision.
         gs.current_phase = Phase::LiveCardSetSecondAttacker;
         assert!(search(&gs, &actions, 0, &scores, &cfg).is_none());
         gs.current_phase = Phase::MulliganFirstAttacker;
         assert!(search(&gs, &actions, 0, &scores, &cfg).is_none());
-        // Main is the scope.
-        gs.current_phase = Phase::Main;
-        assert!(search(&gs, &actions, 0, &scores, &cfg).is_some());
         // Rule 12-1 is a rules prompt, never a rollout question.
         gs.pending_loop_protocol = Some(crate::core::game_state::PermanentLoopProtocol {
             state_hash: 0,
@@ -1591,9 +1635,42 @@ mod tests {
         // (nothing clears the baseline), so the search must decline.
         let scores = vec![(0.0, String::new()), (3.0, String::new())];
         let (gs, _db) = fixture();
-        let mut cfg = Config::from_env();
+        let mut cfg = enabled_config();
         cfg.promote_only = true;
         assert!(search(&gs, &actions, 0, &scores, &cfg).is_none());
+    }
+
+    #[test]
+    fn the_search_is_opt_in_because_it_measured_as_a_regression() {
+        // Not a style preference: the paired mirror (bot_arena v7 v7plain,
+        // identical deals, exact McNemar, n up to 2000) put the search BELOW
+        // `v7plain` at fourteen different settings, and below it even when it
+        // could only overrule v7 on a two-sigma paired advantage. If a change
+        // ever makes the search measurably better than v7, this assertion is
+        // the thing that has to be revisited — deliberately, with the numbers
+        // in hand, rather than by a default quietly flipping.
+        let unset = std::env::var("V7_ISMCTS");
+        assert!(
+            !matches!(unset.as_deref(), Ok("1") | Ok("true")),
+            "this test assumes V7_ISMCTS is unset; got {unset:?}"
+        );
+        assert!(
+            !Config::from_env().enabled,
+            "the ISMCTS search must not be on by default"
+        );
+        // ...but it must still be reachable, or none of the above is testable.
+        let mut forced = Config::from_env();
+        forced.enabled = true;
+        let (gs, actions, _db) = choice_fixture();
+        let scores: Vec<(f64, String)> = actions
+            .iter()
+            .enumerate()
+            .map(|(index, _)| (index as f64, "t".into()))
+            .collect();
+        assert!(
+            search(&gs, &actions, 0, &scores, &forced).is_some(),
+            "V7_ISMCTS=1 must still run the search"
+        );
     }
 
     #[test]

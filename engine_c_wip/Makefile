@@ -69,14 +69,14 @@ src/abilities_strings.bin: $(STRINGS_BIN)
 # matching (this toolchain's GNU Make 4.4.1 fails to match pattern rules that
 # carry prerequisites, which is exactly the shape a test rule needs).
 .PHONY: t
-t: $(OBJ_LIB)
+t: $(OBJ_LIB) data
 	@test -f tests/test_$(T).c || { echo "no such test: tests/test_$(T).c"; exit 2; }
 	$(CC) $(CFLAGS) -o $(TARGET)_t_$(T) $(OBJ_LIB) tests/test_$(T).c
 	./$(TARGET)_t_$(T)
 
 # Build + run every tests/test_*.c that has a main(). Logs land in tests/*.log.
 .PHONY: run-all-tests
-run-all-tests: $(OBJ_LIB)
+run-all-tests: $(OBJ_LIB) data
 	@fail=0; \
 	for f in tests/test_*.c; do \
 	  stem=`basename $$f .c`; stem=$${stem#test_}; \

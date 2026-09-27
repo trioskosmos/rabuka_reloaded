@@ -831,26 +831,48 @@ mod tests {
         }
     }
 
+    /// The 18 cards this test plays with, parsed and ability-attached ONCE.
+    ///
+    /// `load_cards_from_strs` parses the whole ~2280-card `cards.json`, and
+    /// this used to run inside `assert_loopback_lockstep` — i.e. once per
+    /// language pair, so 2x2 = 4 full database parses for a single test. The
+    /// matches themselves are cheap next to that; hoisting the parse is what
+    /// makes this test tolerable.
+    fn test_deck_cards() -> &'static [crate::card::Card] {
+        static DECK_CARDS: std::sync::OnceLock<Vec<crate::card::Card>> =
+            std::sync::OnceLock::new();
+        DECK_CARDS.get_or_init(|| {
+            let json = include_str!("../../../cards/cards.json");
+            let all_json = crate::card_loader::CardLoader::load_cards_from_strs(json)
+                .expect("cards load");
+            let mut members: Vec<&crate::card::Card> =
+                all_json.iter().filter(|c| c.is_member()).collect();
+            members.sort_by(|a, b| a.card_no.as_ref().cmp(b.card_no.as_ref()));
+            let mut lives: Vec<&crate::card::Card> =
+                all_json.iter().filter(|c| c.is_live()).collect();
+            lives.sort_by(|a, b| a.card_no.as_ref().cmp(b.card_no.as_ref()));
+            assert!(
+                members.len() >= 12 && lives.len() >= 6,
+                "test needs 12 members and 6 lives, found {} and {}",
+                members.len(),
+                lives.len()
+            );
+            let mut picked: Vec<crate::card::Card> = members[..12]
+                .iter()
+                .chain(lives[..6].iter())
+                .map(|c| (*c).clone())
+                .collect();
+            crate::card_loader::CardLoader::attach_abilities(&mut picked);
+            picked
+        })
+    }
+
     fn assert_loopback_lockstep(
         lang_a: crate::game::language::Lang,
         lang_b: crate::game::language::Lang,
     ) {
-        let json = include_str!("../../../cards/cards.json");
-        let all_json =
-            crate::card_loader::CardLoader::load_cards_from_strs(json).expect("cards load");
-        let mut members: Vec<&crate::card::Card> =
-            all_json.iter().filter(|c| c.is_member()).collect();
-        members.sort_by(|a, b| a.card_no.as_ref().cmp(b.card_no.as_ref()));
-        let mut lives: Vec<&crate::card::Card> =
-            all_json.iter().filter(|c| c.is_live()).collect();
-        lives.sort_by(|a, b| a.card_no.as_ref().cmp(b.card_no.as_ref()));
-        assert!(members.len() >= 12 && lives.len() >= 6);
-        let mut all_cards: Vec<crate::card::Card> = members[..12]
-            .iter()
-            .chain(lives[..6].iter())
-            .map(|c| (*c).clone())
-            .collect();
-        crate::card_loader::CardLoader::attach_abilities(&mut all_cards);
+        let deck_cards = Self::test_deck_cards();
+        let all_cards: Vec<crate::card::Card> = deck_cards.to_vec();
         let p1deck: Vec<String> = members[..6]
             .iter()
             .chain(lives[..3].iter())

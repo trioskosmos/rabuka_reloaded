@@ -1529,6 +1529,23 @@ typedef struct GameState {
     Ability  entry_keepalive[RB_ENTRY_KEEPALIVE_SLOTS];
     unsigned char entry_keepalive_used[RB_ENTRY_KEEPALIVE_SLOTS];
     int      entry_keepalive_next;
+    /* ── recently_moved_from_zone (mirrors GameState.recently_moved_from_zone:
+       Option<String>, engine/src/core/game_state/mod.rs:204) ──
+       The FROM-zone label of the current recently-moved batch, written only by
+       the set_recently_moved_batch choke point (modifiers.rs:1566) and cleared by
+       clear_recently_moved_batch. It is the source that populates
+       TriggerEvent.moved_from_zone (abilities.rs:424 / actions/mod.rs:1469), which
+       is what a 移動時 condition gated on the source zone matches against. An empty
+       string means None (no label), which is also the memset-zero state produced by
+       rb_game_init.
+
+       PLACED AT THE END OF THE STRUCT ON PURPOSE. It is semantically adjacent to
+       `recently_moved` (RB_MAX_RECENTLY_MOVED entries above), but inserting it
+       there would shift the offset of every field after it and silently
+       invalidate any object file compiled against the previous header. Appending
+       keeps all pre-existing offsets and orderings bit-identical; the only cost is
+       that GameState grows by RB_TE_ZONE_SZ bytes. */
+    char     recently_moved_from_zone[RB_TE_ZONE_SZ];
 } GameState;
 
 /* ── Tracking (engine/src/core/game_state/tracking.rs) ── */
@@ -2014,6 +2031,11 @@ struct RbAbilityLogItem {
 typedef RbAbilityLogItem RbLogItem; /* backward-compatible alias */
 
 int  rb_log_drain_verdicts(RbAbilityLogItem *out, int max);
+/* log.rs: drain only the entries appended at/after `start_index` — a snapshot of
+   rb_log_buffer_len() taken before a resolution began. Declared once here so
+   resolver.c and the log tests stop hand-declaring it locally (resolver.c once
+   carried a wrong one-arg prototype that would have linked against garbage). */
+int  rb_log_drain_verdicts_since(int start_index, RbAbilityLogItem *out, int max);
 
 /* Variant-specific push helpers (mirrors AbilityLogItem variants + children). */
 void rb_log_push_verdict_condition(const char *text, const char *condition_type,
@@ -2168,7 +2190,18 @@ typedef struct {
 
 int rb_effect_filter_subset(const AbilityEffect *e, RbCardFilter *out);
 int rb_condition_filter_subset(const Condition *c, RbCardFilter *out);
-#define rb_card_filter_subset(e, out) rb_effect_filter_subset((e), (out))
+/* CardFilter subset built from a card-selecting source. This used to be a bare
+   `#define rb_card_filter_subset(e, out) rb_effect_filter_subset((e), (out))`,
+   which was NOT a dangling declaration — the macro expanded to the fully
+   implemented rb_effect_filter_subset (src/core/card.c) and tests/
+   test_ported_generated.c calls it that way. But because it had no function
+   body of its own, tools/dep_audit.py reported it under "declared in rabuka.h
+   but never defined (MISSING)". Spelling it as a real static inline gives it a
+   definition, keeps the two-argument call sites source-compatible, and clears
+   the audit. A Condition argument belongs in rb_condition_filter_subset above. */
+static inline int rb_card_filter_subset(const AbilityEffect *e, RbCardFilter *out) {
+    return rb_effect_filter_subset(e, out);
+}
 const char *rb_effect_target_name(const AbilityEffect *e);
 const char *rb_effect_source_or(const AbilityEffect *e, const char *default_source);
 int rb_effect_count_or(const AbilityEffect *e, int default_count);
@@ -2368,6 +2401,24 @@ void rb_resolver_emit_pay_skip_gate(GameState *g, int actor, const AbilityEffect
                                      const char *description, int optional, const char *route);
 void rb_resolver_fmt_card(int cid, char *out, size_t out_sz);
 const char *rb_resolver_fmt_ids(const int *ids, int n);
+
+/* ── resolver.rs: condition-verdict cache + verdict-buffer drains ──
+   The string-keyed entry points. resolver.rs caches a condition's boolean
+   verdict per queue entry so a repeated `cache`-flagged condition is evaluated
+   once (cached_condition_verdict / store_condition_verdict), and drained into
+   the log buffer (push_verdict / drain_verdicts / drain_verdicts_since).
+   Previously resolver.c declared the last three locally and the tests
+   re-declared all five, so no single authoritative signature existed. */
+/* Returns 1 on a cache hit and writes *result; returns 0 on a miss. */
+int  rb_resolver_cached_condition_verdict(const GameState *g, int actor,
+                                          const char *cond_text, int *result);
+/* Store/replace the cached verdict for `cond_text` on the current queue entry. */
+void rb_resolver_store_condition_verdict(GameState *g, int actor,
+                                         const char *cond_text, int result);
+/* Drain the whole verdict buffer, and the entries since a buffer-length snapshot. */
+void rb_resolver_drain_verdicts(GameState *g);
+void rb_resolver_drain_verdicts_since(GameState *g, int snapshot);
+void rb_resolver_push_verdict(GameState *g, const char *text, const char *kind, int passed);
 
 /* ── choice.rs public API (complete translation, engine_c/src/ability/choice.c) ── */
 int  rb_resolver_resume_execution(RbAbilityResolver *self);

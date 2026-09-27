@@ -481,7 +481,7 @@ use std::hash::{Hash, Hasher};
 
 thread_local! {
     static PLAN_CACHE: RefCell<HashMap<(u8, u8, u64), Vec<usize>>> =
-            RefCell::new(HashMap::with_hasher(Default::default()));
+            RefCell::new(HashMap::new());
 }
 
 fn plan_key(gs: &GameState, me: u8) -> (u8, u8, u64) {

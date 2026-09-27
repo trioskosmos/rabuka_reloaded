@@ -133,6 +133,18 @@ struct GameStateResponse {
     legal_actions: Option<Vec<ActionIndex>>,
     #[cfg_attr(feature = "serde_support", serde(skip_serializing_if = "Option::is_none"))]
     ui_config: Option<UiConfig>,
+    /// True when this is an AI room AND it is genuinely the AI seat's turn.
+    ///
+    /// The server plays the whole AI reply chain inline inside the human's
+    /// `execute-action` (see `run_ai_replies`), so this is normally false by
+    /// the time the browser sees it. It exists so the browser driver can be a
+    /// genuine fallback instead of a competitor: `AiDriver.js` used to pick a
+    /// RANDOM legal action and post it, which would race the real policy and
+    /// silently corrupt any strategy test. Gating on this flag means a random
+    /// move can only ever happen when the server did not drive, which is the
+    /// one case where something has to move.
+    #[cfg_attr(feature = "serde_support", serde(skip_serializing_if = "Option::is_none"))]
+    ai_turn: Option<bool>,
 }
 
 /// Minimal response for execute-action: only what the client needs to confirm
@@ -1049,10 +1061,27 @@ pub async fn get_game_state(
     } else {
         Some(actions)
     };
+    // Server-authoritative "is it the AI's move": the browser driver may act
+    // only when this is true. The AI seat is the one the requester is not.
+    let ai_turn = room_id_str.as_deref().and_then(|rid| {
+        data.rooms
+            .lock()
+            .ok()
+            .and_then(|r| r.get(rid).map(|room| room.is_ai_room))
+    });
+    let ai_turn = match (ai_turn, requester_player_id) {
+        (Some(true), Some(human)) => {
+            let gs = lock_state!(gs_arc, read);
+            Some(gs.can_player_act(1 - human))
+        }
+        (Some(true), None) => Some(false),
+        _ => Some(false),
+    };
     HttpResponse::Ok().json(GameStateResponse {
         game_state: display,
         legal_actions: final_actions,
         ui_config: Some(ui_config),
+        ai_turn,
     })
 }
 
@@ -1439,10 +1468,20 @@ pub async fn execute_action(
                 } else {
                     Some(actions)
                 };
+                // `run_ai_replies` above already played the AI's whole reply
+                // chain, so by here it is normally the human's turn again.
+                // Carry the same server-side `ai_turn` flag the GET returns so
+                // the browser driver cannot inject a random move into a game
+                // the server just finished driving.
+                let ai_turn = match (room_is_ai, pvp_player_pid) {
+                    (true, Some(human)) => game_state.can_player_act(1 - human),
+                    _ => false,
+                };
                 HttpResponse::Ok().json(GameStateResponse {
                     game_state: display,
                     legal_actions: final_actions,
                     ui_config: None,
+                    ai_turn: Some(ai_turn),
                 })
             }
         }
@@ -3616,7 +3655,7 @@ pub async fn run_web_server_with_ngrok(ngrok_authtoken: Option<String>) -> std::
         room_broadcasts: Arc::new(Mutex::new(HashMap::default())),
         // Start WebSocket relay actor
         relay_addr: SyncArbiter::start(1, || WsRelayActor {
-            sessions: HashMap::with_hasher(Default::default()),
+            sessions: HashMap::new(),
         }),
     });
 

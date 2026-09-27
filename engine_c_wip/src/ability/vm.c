@@ -896,6 +896,7 @@ void rb_free_ability(Ability *a) {
 typedef struct {
     char *ability_filter;
     char **ability_filter_triggers; int n_ability_filter_triggers;
+    char *action_reference;
     char *activation_position;
     char *aggregate;
     int all; int has_all;
@@ -965,6 +966,7 @@ typedef struct {
     char *scope;
     int self_effect_only; int has_self_effect_only;
     int self_target; int has_self_target;
+    int shuffle; int has_shuffle;
     char *source;
     char *state;
     char *sub_checks;
@@ -1099,6 +1101,7 @@ static void cond_copy_common(Condition *c, const ConditionLocals *l) {
     if (l->ability_filter) cond_add_str(c, "ability_filter", l->ability_filter);
     if (l->ability_filter_triggers && l->n_ability_filter_triggers > 0)
         cond_add_str_array(c, "ability_filter_triggers", l->ability_filter_triggers, l->n_ability_filter_triggers);
+    if (l->action_reference) cond_add_str(c, "action_reference", l->action_reference);
     if (l->activation_position) cond_add_str(c, "activation_position", l->activation_position);
     if (l->aggregate) cond_add_str(c, "aggregate", l->aggregate);
     if (l->has_all) cond_add_bool(c, "all", l->all);
@@ -1157,6 +1160,7 @@ static void cond_copy_common(Condition *c, const ConditionLocals *l) {
     if (l->scope) cond_add_str(c, "scope", l->scope);
     if (l->has_self_effect_only) cond_add_bool(c, "self_effect_only", l->self_effect_only);
     if (l->has_self_target) cond_add_bool(c, "self_target", l->self_target);
+    if (l->has_shuffle) cond_add_bool(c, "shuffle", l->shuffle);
     if (l->source) cond_add_str(c, "source", l->source);
     if (l->state) cond_add_str(c, "state", l->state);
     if (l->sub_checks) cond_add_str(c, "sub_checks", l->sub_checks);
@@ -1284,6 +1288,21 @@ Condition *build_resource(const ConditionLocals *l) {
     return c;
 }
 
+/* build_abilityfilter: variant 9 — ability_filter_condition
+   condition_decoder_gen.rs:1727 maps variant 9 to build_abilityfilter, and
+   card.rs `AbilityFilter { common, ability_filter }` adds exactly one field
+   beyond ConditionCommon — `ability_filter`, which cond_copy_common already
+   carries. The evaluator `eval_ability_filter` (condition.c:1604) was already
+   present and unreachable: the decoder used to return NULL here, so the whole
+   condition was silently dropped and the gate became vacuously true. */
+Condition *build_abilityfilter(const ConditionLocals *l) {
+    Condition *c = calloc(1, sizeof(Condition));
+    if (!c) return NULL;
+    c->variant = RB_COND_ABILITY_FILTER;
+    cond_copy_common(c, l);
+    return c;
+}
+
 /* build_scorethreshold: variant 10 — score_threshold_condition */
 Condition *build_scorethreshold(const ConditionLocals *l) {
     Condition *c = calloc(1, sizeof(Condition));
@@ -1321,6 +1340,18 @@ Condition *build_complex(const ConditionLocals *l) {
             c->n_fields++;
         }
     }
+    return c;
+}
+
+/* build_positioncond: variant 13 — position_condition
+   condition_decoder_gen.rs:1731 maps variant 13 to build_positioncond, and
+   card.rs `PositionCond { common }` has no field beyond ConditionCommon.
+   `eval_position` (condition.c:1608) already existed but was unreachable. */
+Condition *build_positioncond(const ConditionLocals *l) {
+    Condition *c = calloc(1, sizeof(Condition));
+    if (!c) return NULL;
+    c->variant = RB_COND_POSITION;
+    cond_copy_common(c, l);
     return c;
 }
 
@@ -1404,6 +1435,17 @@ static int decode_condition_field(Rdr *r, const char *key, ConditionLocals *l) {
             return 1;
         }
         return 0;
+    }
+    /* action_reference (condition_decoder_gen.rs:127, read_arc_str_value) is a
+       ConditionCommon field, so every variant receives it. It is not inert:
+       compound/conditional_on.rs:50-54 uses it to test `resolver.last_action_result`
+       instead of evaluating the condition. Decoding it into the condition is the
+       decoder's half; compound.c:487-488 is the consumer half and still ignores it. */
+    if (strcmp(key, "action_reference") == 0) {
+        if (tag == RB_TAG_STR) { uint32_t idx; if (!rd_idx(r, &idx)) return 0; l->action_reference = rb_strdup(rb_get_string(idx)); }
+        else if (tag == RB_TAG_NULL) { l->action_reference = NULL; }
+        else return 0;
+        return 1;
     }
     if (strcmp(key, "activation_position") == 0) {
         if (tag == RB_TAG_STR) { uint32_t idx; if (!rd_idx(r, &idx)) return 0; l->activation_position = rb_strdup(rb_get_string(idx)); }
@@ -1964,6 +2006,16 @@ static int decode_condition_field(Rdr *r, const char *key, ConditionLocals *l) {
         else return 0;
         return 1;
     }
+    /* shuffle (condition_decoder_gen.rs:197, read_bool_value) is a ConditionCommon
+       field (card.rs `pub shuffle: Option<bool>`) carrying the location_condition
+       "shuffle all waitroom members under deck" flag. */
+    if (strcmp(key, "shuffle") == 0) {
+        if (tag == RB_TAG_TRUE) { l->shuffle = 1; l->has_shuffle = 1; }
+        else if (tag == RB_TAG_FALSE) { l->shuffle = 0; l->has_shuffle = 1; }
+        else if (tag == RB_TAG_NULL) { l->has_shuffle = 0; }
+        else return 0;
+        return 1;
+    }
     if (strcmp(key, "source") == 0) {
         if (tag == RB_TAG_STR) { uint32_t idx; if (!rd_idx(r, &idx)) return 0; l->source = rb_strdup(rb_get_string(idx)); }
         else if (tag == RB_TAG_NULL) { l->source = NULL; }
@@ -2090,17 +2142,26 @@ Condition *decode_condition_direct(Rdr *r, uint8_t variant) {
         case 6: return build_temporal(&l);
         case 7: return build_state(&l);
         case 8: return build_resource(&l);
-        case 9: rb_note_decode_fallback(r->ability, "condition_variant", "9"); return NULL;
+        case 9: return build_abilityfilter(&l);
         case 10: return build_scorethreshold(&l);
         case 11: return build_choice(&l);
         case 12: return build_complex(&l);
-        case 13: rb_note_decode_fallback(r->ability, "condition_variant", "13"); return NULL;
+        case 13: return build_positioncond(&l);
         case 14: return build_opponentchoice(&l);
         case 15: return build_opponentlivesuccess(&l);
         case 16: return build_noexcessheart(&l);
         case 17: return build_alwaystrue(&l);
         case 18: return build_anyof(&l);
         case 19: return build_allrevealedmatchheartcolor(&l);
+        /* Variant 20 is Condition::Unsupported in Rust
+           (condition_decoder_gen.rs:1738 -> build_unsupported) and evaluates to
+           FALSE (condition.rs:482-484, 546). It is deliberately NOT decoded here:
+           the C evaluator's terminal `default: r = 1` (condition.c, the
+           evaluate_condition dispatch) would score it TRUE, which is worse than
+           the condition being absent. Both halves are needed:
+             - vm.c:  case 20: return build_unsupported(&l);
+             - condition.c: add `case 20: r = 0; break;` to the variant switch
+           (rbuka.h would also need an RB_COND_UNSUPPORTED enumerator). */
         default: {
             char value[16];
             snprintf(value, sizeof(value), "%u", variant);
@@ -2199,20 +2260,32 @@ static uint32_t g_decode_fallback_count = 0;
 static uint32_t g_decode_fallback_abilities[RB_DECODE_AUDIT_MAX] = {0};
 
 void rb_note_decode_fallback(int ability, const char *field, const char *value) {
-    (void)field; (void)value;
-    g_decode_fallback_count++;
+    /* vm.rs:100-111 — the counter bump is only half of the contract. Rust also
+       log::warn!'s every site ("[decode_audit] fallback #n (ability Some(i)):
+       field = value"), because a silent default-substitution is exactly the
+       defect this audit exists to surface; the C previously dropped `field` and
+       `value` on the floor with (void) casts, leaving no way to find the gap.
+       ability < 0 is Rust's None (bc.idx is Option<usize>). */
+    uint32_t n = ++g_decode_fallback_count;
     if (ability >= 0 && ability < RB_DECODE_AUDIT_MAX) {
         g_decode_fallback_abilities[ability]++;
     }
+    fprintf(stderr, "[decode_audit] fallback #%u (ability %s%d): %s = \"%s\"\n",
+            n, ability < 0 ? "None, " : "", ability,
+            field ? field : "<null>", value ? value : "");
 }
 
 uint32_t rb_decode_fallback_count(void) {
     return g_decode_fallback_count;
 }
 
+/* vm.rs:119-125 collects (0..NUM_ABILITIES.min(DECODE_AUDIT_MAX)), so indices at
+   or past NUM_ABILITIES are never reported even if a stale counter survived. */
 int rb_decode_fallback_abilities(uint32_t *out, int max) {
+    uint32_t limit = RBKA_NUM_ABILITIES;
+    if (limit > RB_DECODE_AUDIT_MAX) limit = RB_DECODE_AUDIT_MAX;
     int n = 0;
-    for (uint32_t i = 0; i < RB_DECODE_AUDIT_MAX && n < max; i++) {
+    for (uint32_t i = 0; i < limit && n < max; i++) {
         if (g_decode_fallback_abilities[i] > 0) {
             out[n++] = i;
         }

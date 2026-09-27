@@ -28,6 +28,61 @@ use crate::rng;
 use crate::turn::TurnEngine;
 use crate::Arc;
 
+/// Pick the AI's action with a chosen strategy version, without executing it,
+/// so callers that commit their own bookkeeping (the web server's reply loop)
+/// can share the policy.
+///
+/// The phase routing matters and is not cosmetic: Mulligan phases must be
+/// concluded through a Confirm/Skip rather than a per-card Select, or the AI
+/// toggles cards forever and never reaches Main; and live-set phases fill
+/// their slots before confirming, or the AI fields an empty live zone every
+/// game. Both are handled by dispatching to the matching registry entry
+/// instead of calling `choose_action` for everything.
+///
+/// Engine RNG is checkpointed and restored around the call: policy scoring
+/// can draw from the global stream, and the web server's game must not have
+/// its shuffle perturbed just because a bot thought about a move.
+///
+/// `kind` is the strategy to play. Anything the registry routes to a random or
+/// type-weighted fallback still returns a legal action; only an empty offer
+/// returns None.
+pub(crate) fn ai_pick_action_bot(
+    gs: &GameState,
+    acts: &[game_setup::Action],
+    me: u8,
+    kind: crate::bot::registry::BotKind,
+) -> Option<game_setup::Action> {
+    if acts.is_empty() {
+        return None;
+    }
+    let checkpoint = rng::checkpoint();
+    let v2_policy = crate::bot::strategy_v2::V2Policy::default();
+    let plan = crate::bot::strategy_v3::V3Plan::detect(gs, me, &gs.card_database);
+    let action = if gs.has_pending_choice() {
+        kind.choose_action(gs, acts, me, &v2_policy, &plan)
+    } else {
+        match gs.current_phase {
+            Phase::MulliganFirstAttacker | Phase::MulliganSecondAttacker => {
+                kind.choose_mulligan(gs, acts, &gs.card_database)
+            }
+            Phase::LiveCardSetFirstAttacker | Phase::LiveCardSetSecondAttacker => {
+                kind.choose_live_set(gs, acts, &gs.card_database, &v2_policy, &plan)
+            }
+            // RPS and first-attacker election are turn-STRUCTURE, not tactical
+            // choices: every structural option scores identically under a
+            // board-value policy, so the argmax is arbitrary and the turn
+            // order never resolves. Rule 8.4.13 — the RPS loser attacks first.
+            Phase::RockPaperScissors | Phase::ChooseFirstAttacker => {
+                let i = rng::rand_range(acts.len());
+                acts[i].clone()
+            }
+            _ => kind.choose_action(gs, acts, me, &v2_policy, &plan),
+        }
+    };
+    rng::restore(checkpoint);
+    Some(action)
+}
+
 /// Auto-resolve a pending choice for the AI (random but legal). Returns false
 /// only if the engine rejects the synthetic answer.
 /// Shared with the web server's AI reply loop, hence pub(crate).

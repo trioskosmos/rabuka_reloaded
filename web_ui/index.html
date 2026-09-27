@@ -587,6 +587,24 @@
                     <!-- Player 1 -->
                     <div id="setup-p1-col" class="setup-column">
                         <h4 style="color: var(--accent-pink);">Player 2</h4>
+                        <!-- PvE only: which strategy the AI seat plays. Hidden for
+                             PVP, where there is no AI. Values are the same
+                             registry names bot_arena / bot_replay accept, so a
+                             number measured offline means the same bot here. -->
+                        <div class="setting-item" id="setup-ai-policy-row" style="display: none;">
+                            <label>AI Strategy</label>
+                            <select id="setup-ai-policy" class="form-select highlight-hover">
+                                <option value="v7" selected>v7 &mdash; search (shipping default)</option>
+                                <option value="v8">v8 &mdash; search + edge features</option>
+                                <option value="v6">v6 &mdash; search (pre-v7)</option>
+                                <option value="v5">v5</option>
+                                <option value="v4">v4</option>
+                                <option value="v3">v3</option>
+                                <option value="v2">v2</option>
+                                <option value="v1">v1 &mdash; heuristic</option>
+                                <option value="random">random &mdash; baseline</option>
+                            </select>
+                        </div>
                         <div class="setting-item">
                             <label>Deck</label>
                             <select id="p1-deck-select" class="form-select highlight-hover"

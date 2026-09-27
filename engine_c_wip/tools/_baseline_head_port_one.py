@@ -285,79 +285,11 @@ def match_paren(s, start):
     return -1
 
 
-BLOCK_HEAD_RE = re.compile(r'^(?:.*\b(?:if|else|for|while|loop|unsafe|match)\b.*|)$')
-
-
-def _match_brace(s, i):
-    d, instr, j = 0, None, i
-    while j < len(s):
-        ch = s[j]
-        if instr:
-            if ch == "\\":
-                j += 2; continue
-            if ch == instr:
-                instr = None
-        elif ch in "\"'":
-            instr = ch
-        elif ch == "{":
-            d += 1
-        elif ch == "}":
-            d -= 1
-            if d == 0:
-                return j
-        j += 1
-    return -1
-
-
-def split_inline_blocks(s):
-    """`if c { a } else { b }` written on ONE line -> separate lines.
-
-    Only a `{` that opens a *block* (nothing or a block keyword before it)
-    is split, so struct literals in expressions such as
-    `AbilityEffect { condition: x }` are left intact.
-    """
-    s = s.strip()
-    d, instr, i = 0, None, 0
-    while i < len(s):
-        ch = s[i]
-        if instr:
-            if ch == "\\":
-                i += 2; continue
-            if ch == instr:
-                instr = None
-            i += 1; continue
-        if ch in "\"'":
-            instr = ch; i += 1; continue
-        if ch in "([":
-            d += 1; i += 1; continue
-        if ch in ")]":
-            d -= 1; i += 1; continue
-        if d > 0:
-            i += 1; continue
-        if ch == "{" and BLOCK_HEAD_RE.match(s[:i].strip()):
-            end = _match_brace(s, i)
-            if end < 0:
-                return [s]
-            head = s[:i].strip()
-            inner = s[i + 1:end].strip()
-            tail = s[end + 1:].strip()
-            out = [head + " {"] if head else ["{"]
-            if inner:
-                out.extend(split_inline_blocks(inner))
-            out.append("}")
-            if tail:
-                out.extend(split_inline_blocks(tail))
-            return out
-        i += 1
-    return [s]
-
-
 def logical_lines(body):
     """Join continuation lines into one logical statement per entry.
 
     A line ENDS a statement when brackets balance and it does not end with
     a continuation token.  A line ending in '{' or '}' always ends one.
-    Single-line blocks are exploded so every block head gets its own line.
     """
     out, cur = [], ""
     for raw in body.split("\n"):
@@ -368,14 +300,14 @@ def logical_lines(body):
             continue
         cur = (cur + " " + s).strip() if cur else s
         if cur.endswith("{") or cur.endswith("}") or cur in ("};", "})", ");"):
-            out.extend(split_inline_blocks(cur)); cur = ""; continue
+            out.append(cur); cur = ""; continue
         if depth_of(cur) > 0:
             continue
         if cur.endswith((".", "+", "&&", "||", "==", "!=", "=>", ",", "<", ">", "?")):
             continue
-        out.extend(split_inline_blocks(cur)); cur = ""
+        out.append(cur); cur = ""
     if cur:
-        out.extend(split_inline_blocks(cur))
+        out.append(cur)
     return out
 
 
@@ -1042,9 +974,6 @@ def map_option(expr, ctx, var):
 
 CHOICE_RE = re.compile(
     r'^(?:rabuka_engine::ability::types::)?Choice::(\w+)\s*(\{.*\})?$')
-# `match game.pending_choice_type().as_deref() { Some("SelectCard") => ... }`
-CHOICE_NAME_MATCH_RE = re.compile(r'pending_choice_type\(\)')
-SOME_STR_RE = re.compile(r'^Some\(\s*"((?:[^"\\]|\\.)*)"\s*\)$')
 
 
 def map_choice_pattern(pat, ctx):
@@ -1106,9 +1035,7 @@ def transpile_assert(s, ctx, kind):
     name, args, end = split_macro_args(s)
     if end < 0 or not args:
         raise Skip(f"unparsed macro: {s}")
-    # A trailing string literal is the human message only when at least one
-    # operand is left over: `assert_eq!(a, b, "m")` vs `assert_eq!(a, "b")`.
-    msg = clean_msg(msg_of(args), ctx) if (msg_of(args) is not None and len(args) >= 3) else None
+    msg = clean_msg(msg_of(args), ctx)
     if kind == "assert_eq":
         # trailing message already excluded by construction below
         core = args
@@ -1143,11 +1070,9 @@ def transpile_assert(s, ctx, kind):
         if sp:
             lhs, op, rhs = sp
             a, b = cexpr(lhs, ctx), cexpr(rhs, ctx)
-            a, b = unwrap_option_cmp(lhs, rhs, a, b, ctx)
             if a and b:
                 ctx.n_check += 1
-                ctx.emit(f'    CHECK(({a}) {op} ({b}), '
-                         f'{msg or c_cond_text(cond)});')
+                ctx.emit(f'    CHECK(({a}) {op} ({b}), {msg or cond});')
                 return
         ctx.todo(s)
         return
@@ -1238,22 +1163,6 @@ def emit_block_head(ls, i, ctx, ind, head_c, skip_braces=True):
     return j
 
 
-def cond_cexpr(cond, ctx):
-    """A Rust boolean condition -> C, including the `lhs OP rhs` form whose
-    operands may be `Some(..)` / Option-map reads."""
-    c = cexpr(cond, ctx)
-    if c is not None:
-        return c
-    sp = split_top_cmp(cond)
-    if sp:
-        lhs, op, rhs = sp
-        a, b = cexpr(lhs, ctx), cexpr(rhs, ctx)
-        a, b = unwrap_option_cmp(lhs, rhs, a, b, ctx)
-        if a and b:
-            return f'(({a}) {op} ({b}))'
-    return None
-
-
 def transpile_stmt(ls, i, ctx, ind):
     s = ls[i].strip()
     pad = ind
@@ -1271,7 +1180,7 @@ def transpile_stmt(ls, i, ctx, ind):
 
     # ---- `match` ---------------------------------------------------
     if s.startswith("match ") or s == "match":
-        return emit_match(ls, i, ctx, ind)
+        raise Skip("match expression")
 
     # ---- `if let` --------------------------------------------------
     m = re.match(r'^if\s+let\s+(.+?)\s*=\s*(.+?)\s*\{$', s)
@@ -1299,13 +1208,11 @@ def transpile_stmt(ls, i, ctx, ind):
         var, rng = m.group(1), m.group(2)
         r = re.match(r'^(\d+)\s*\.\.\s*(\d+)$', rng)
         if r and var == "_":
-            v = ctx.fresh("i")
-            c = f"for (int {v} = {r.group(1)}; {v} < {r.group(2)}; {v}++)"
+            c = f"for (int {ctx.fresh('i')}_ = {r.group(1)}; {ctx.fresh('i')}_ < {r.group(2)}; {ctx.fresh('i')}_++)"
             return emit_block_head(ls, i, ctx, ind, c)
         r = re.match(r'^(\d+)\s*\.\.=\s*(\d+)$', rng)
         if r and var == "_":
-            v = ctx.fresh("i")
-            c = f"for (int {v} = {r.group(1)}; {v} <= {r.group(2)}; {v}++)"
+            c = f"for (int {ctx.fresh('i')}_ = {r.group(1)}; {ctx.fresh('i')}_ <= {r.group(2)}; {ctx.fresh('i')}_++)"
             return emit_block_head(ls, i, ctx, ind, c)
         r = re.match(r'^(\w+)\s*\.\.\s*(\d+)$', rng)
         if r:
@@ -1377,213 +1284,6 @@ def maybe_else(ls, j, ctx, ind):
             if rest == "":
                 return emit_block_head(ls, j, ctx, ind, "else")
     return j
-
-
-def split_match_arms(ls, i):
-    """Split the arms of the `match` starting at ls[i].
-
-    Returns (arms, j) where each arm is ([pattern, ...], body_text) and `j`
-    indexes the line holding the match's own closing brace.  `depth` is tracked
-    so an arm body's `{ ... }` never splits an arm in half.
-    """
-    arms, cur, pending, depth, j = [], None, None, 0, i + 1
-    while j < len(ls):
-        line = ls[j].strip()
-        if cur is None:
-            if line == "}":
-                break
-            # A pattern header may wrap over several lines before its `=>`
-            # (e.g. `Choice::SelectCard {` / `count: _,` / `..` / `} => {`).
-            if "=>" in line:
-                head, rest = line.split("=>", 1)
-                head = ((pending + " " + head).strip() if pending
-                        else head).strip()
-                pending = None
-                pats = [p.strip() for p in
-                        re.split(r'\s*\|\s*(?=[A-Za-z_])', head) if p.strip()]
-                cur = [pats, rest.strip()]
-            else:
-                pending = (pending + " " + line).strip() if pending else line
-                j += 1
-                continue
-        else:
-            cur[1] = (cur[1] + " " + line).strip()
-        depth += line.count("{") - line.count("}")
-        if depth <= 0:
-            arms.append((cur[0], cur[1]))
-            cur = None
-            depth = 0
-        j += 1
-    if cur is not None or pending:
-        raise Skip("match: unterminated arm")
-    return arms, j
-
-
-def arm_body_lines(body):
-    """Normalise one match arm body into logical lines for transpile_stmts."""
-    b = body.strip().rstrip(",").strip()
-    if b.startswith("{") and b.endswith("}"):
-        return logical_lines(b[1:-1]), False
-    return logical_lines(b.rstrip(";") + ";"), True
-
-
-def emit_match(ls, i, ctx, ind):
-    """Backlog item 5, second half: lower `match` instead of skipping the fn.
-
-    Three shapes are handled, and they are the ones that actually occur in the
-    corpus (512 `match` sites over 924 Rust test files):
-
-      * `match choice { Choice::SelectCard {..} => A, _ => B }` -- lowered with
-        the existing `pz_choice_kind` probe, no new shim needed;
-      * `match game.pending_choice_type().as_deref() { Some("SelectCard") => A,
-        _ => B }` -- lowered with the existing `test_pending_choice_type`
-        getter, also no new shim;
-      * `match i { 0 => A, 1 => B, _ => C }` on a translatable int scrutinee.
-    """
-    s = ls[i].strip()
-    m = re.match(r'^match\s+(.+?)\s*\{$', s)
-    if not m:
-        raise Skip("match expression")
-    scrut = m.group(1).strip()
-    arms, j = split_match_arms(ls, i)
-    if not arms:
-        raise Skip("match with no arms")
-
-    # ---- Choice-kind match ------------------------------------------
-    choice_arms, default = [], None
-    is_choice = True
-    for pats, body in arms:
-        if is_default_arm(pats):
-            default = body
-            continue
-        kinds, fields = [], []
-        for p in pats:
-            fm = CHOICE_RE.match(p)
-            if not fm:
-                is_choice = False
-                break
-            kinds.append(CHOICE_KIND[fm.group(1)])
-            if fm.group(2):
-                for part in split_top_commas(fm.group(2).strip("{}").strip()):
-                    part = part.strip()
-                    if not part or part == "..":
-                        continue
-                    name = part.split(":")[0].strip().lstrip("&").strip()
-                    if re.fullmatch(r'[a-z_]\w*', name):
-                        fields.append(name)
-        if not is_choice:
-            break
-        choice_arms.append((kinds, fields, body))
-    if is_choice and choice_arms:
-        return emit_match_choice(ls, i, j, ctx, ind, choice_arms, default)
-
-    # ---- Choice-name match -----------------------------------------
-    # `match game.pending_choice_type().as_deref() {
-    #     Some("SelectCard") => A, _ => B }`
-    # The scrutinee is the pending choice's name, so the same
-    # test_pending_choice_type getter decides it -- no new shim.
-    if CHOICE_NAME_MATCH_RE.search(scrut):
-        slot = ctx.fresh("_cname")
-        cond_arms, default, ok = [], None, True
-        for pats, body in arms:
-            if is_default_arm(pats):
-                default = body
-                continue
-            names = []
-            for p in pats:
-                nm = SOME_STR_RE.match(p)
-                if not nm:
-                    ok = False
-                    break
-                names.append(nm.group(1))
-            if not ok:
-                break
-            cond = " || ".join(
-                f'({slot} && strcmp({slot}, "{n}") == 0)' for n in names)
-            cond_arms.append((cond, [], body))
-        if ok and cond_arms:
-            return emit_match_dispatch(
-                ls, j, ctx, ind,
-                f'const char *{slot} = test_pending_choice_type(&{ctx.g});',
-                cond_arms, default)
-
-    # ---- scalar match ----------------------------------------------
-    scrut_c = cexpr(scrut, ctx)
-    if scrut_c is None:
-        raise Skip(f"match over unmapped scrutinee: {scrut[:60]}")
-    cond_arms, default = [], None
-    for pats, body in arms:
-        if is_default_arm(pats):
-            default = body
-            continue
-        vals = []
-        for p in pats:
-            v = cexpr(p, ctx)
-            if v is None:
-                raise Skip(f"match arm over unmapped pattern: {p[:40]}")
-            vals.append(v)
-        cond_arms.append((vals, body))
-    return emit_match_scalar(ls, i, j, ctx, ind, scrut_c, cond_arms, default)
-
-
-def is_default_arm(pats):
-    """`_` and a bare binding (`other => ...`) are both catch-all arms."""
-    return any(p == "_" or re.fullmatch(r'(?:ref\s+|mut\s+)*[a-z_]\w*', p)
-               for p in pats)
-
-
-def emit_match_dispatch(ls, j, ctx, ind, slot_head, arms, default):
-    """Shared arm emitter for the choice and scalar match forms.
-
-    `arms` is [(condition_c, [field_names], body_text)]. Emits a braced block
-    so the arm chain can be followed by whatever came after the match.
-    """
-    ctx.emit(f"{ind}{{")
-    ctx.emit(f"{ind}    {slot_head}")
-    first = True
-    for cond, fields, body in arms:
-        head = "if" if first else "} else if"
-        emit_arm(ctx, ind, f"{head} ({cond})", fields, body)
-        first = False
-    if default is not None:
-        emit_arm(ctx, ind, "} else", [], default)
-    if first:
-        raise Skip("match: no arm resolved")
-    ctx.emit(f"{ind}    }}")
-    ctx.emit(f"{ind}}}")
-    return j + 1
-
-
-def emit_match_choice(ls, i, j, ctx, ind, arms, default):
-    ctx.use("choice_kind")
-    slot = ctx.fresh("_kind")
-    head = f"int {slot} = pz_choice_kind(&{ctx.g});"
-    cond_arms = [(" || ".join(f"({slot} == {k})" for k in kinds), fields, body)
-                 for kinds, fields, body in arms]
-    return emit_match_dispatch(ls, j, ctx, ind, head, cond_arms, default)
-
-
-def emit_match_scalar(ls, i, j, ctx, ind, scrut_c, arms, default):
-    slot = ctx.fresh("_sw")
-    head = f"int {slot} = {scrut_c};"
-    cond_arms = [(" || ".join(f"({slot} == {v})" for v in vals), [], body)
-                 for vals, body in arms]
-    return emit_match_dispatch(ls, j, ctx, ind, head, cond_arms, default)
-
-
-def emit_arm(ctx, ind, head, fields, body):
-    """Emit one `if (...) {` / `} else {` arm plus its body."""
-    ctx.emit(f"{ind}    {head} {{")
-    ctx.loop_depth += 1
-    for f in dict.fromkeys(fields):
-        # Choice fields are not readable through any existing shim; declare the
-        # binding so the body still compiles and the gap stays visible.
-        ctx.declared.add(f)
-        ctx.emit(f"{ind}        int {f} = 0; "
-                 f"/* TODO(rs): Choice field, no C accessor */")
-    lines, _is_expr = arm_body_lines(body)
-    transpile_stmts(lines, ctx, 0, ind + "        ")
-    ctx.loop_depth -= 1
 
 
 def emit_if_let(ls, i, ctx, ind, pat, expr):
@@ -2158,11 +1858,11 @@ def audit(paths, report=None, jsonout=None):
                 ported_names.append(f"{p.name}::{name}")
             except Skip as ex:
                 skipped_fn += 1
-                key = ex.reason[:70]
+                key = ex.reason.split(":", 1)[0][:60]
                 skip_reasons[key] = skip_reasons.get(key, 0) + 1
             except Exception as ex:
                 skipped_fn += 1
-                key = "internal: " + type(ex).__name__ + ": " + str(ex)[:60]
+                key = "internal: " + type(ex).__name__
                 skip_reasons[key] = skip_reasons.get(key, 0) + 1
     res = {
         "files": files,

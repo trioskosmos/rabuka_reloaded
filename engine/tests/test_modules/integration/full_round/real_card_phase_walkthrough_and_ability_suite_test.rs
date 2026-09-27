@@ -2508,7 +2508,7 @@ fn lovepeace_q150_self_hearts_greater_than_opponent_score_plus_1() {
     // P1: 13 member hearts + add 7 yell blade hearts (heart03) to satisfy OH's 15 need.
     let mut p1_hearts = game.state.player1.calculate_stage_hearts(
         &game.state.card_database,
-        &Default::default(),
+        &std::collections::HashMap::new(),
         &Default::default(),
         &Default::default(),
         &Default::default(),
@@ -2517,7 +2517,7 @@ fn lovepeace_q150_self_hearts_greater_than_opponent_score_plus_1() {
     game.state.player1.stage_hearts = Some(p1_hearts);
     game.state.player2.stage_hearts = Some(game.state.player2.calculate_stage_hearts(
         &game.state.card_database,
-        &Default::default(),
+        &std::collections::HashMap::new(),
         &Default::default(),
         &Default::default(),
         &Default::default(),
