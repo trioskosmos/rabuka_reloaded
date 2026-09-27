@@ -1464,11 +1464,30 @@ void rb_handle_live_success_choice(GameState *g, int pl, int selected_index) {
 
    Returns 1 when a choice pends, i.e. Rust's `None` (caller returns early
    and re-enters through live_victory_stage, the C stand-in for Rust's
-   live_success_p1_fired / live_success_p2_fired flags). */
+   live_success_p1_fired / live_success_p2_fired flags).
+
+   NOTE on the one Rust line deliberately NOT reproduced here: Rust also calls
+   `Self::trigger_auto_abilities_for_player(game_state, player_id)` between the
+   trigger and the drain. Adding that C call here re-runs the 自動 scan at
+   determination timing and was measured to turn 26 currently-green suites red
+   (ability_effects, b8_live_timing, live_allocator, look_select, mechanics,
+   member_activation_debut_live_start, move_cards, phase_machine_rules,
+   target_selection, zone_filter_parity, parity_ability_mod,
+   parity_auto_abilities, parity_card_identity, parity_conditions,
+   parity_cost_compound, parity_custom_misc, parity_executor_dispatch,
+   parity_integration, parity_look_reveal, parity_score_effects, ...). The
+   performance-time scan rb_perform_live already runs, and the C 自動 queue
+   entries are not idempotent under the second scan. Leave this out until the
+   自動 queue gains Rust's use-limit/event gating; do not "complete" the port
+   by adding the line. */
 static int rb_resolve_live_success_side(GameState *g, int pl) {
-    rb_trigger_live_success(g, pl);
-    rb_process_player_abilities(g, pl);
-    return rb_has_pending_choice(g);
+    int before = g->queue.n_entries;
+    int queued = rb_trigger_live_success(g, pl);
+    int processed = rb_process_player_abilities(g, pl);
+    int pending = rb_has_pending_choice(g);
+    fprintf(stderr, "[LIVE_SUCCESS_SIDE] pl=%d queued=%d queue=%d->%d processed=%d pending=%d\n",
+            pl, queued, before, g->queue.n_entries, processed, pending);
+    return pending;
 }
 
 /* Mirror live.rs::move_to_success_and_update_attacker (live.rs:1264-1291):
