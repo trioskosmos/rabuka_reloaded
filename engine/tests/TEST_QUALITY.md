@@ -24,12 +24,13 @@ _trigger event hand-pushed with no real ability resolution in the same fn (weake
 
 None.
 
-## pendency_only (1)
+## pendency_only (2)
 
 _has_pending_choice asserted without choice identity (pending_choice_type/summary/answer) or outcome asserts_
 
 | file | test | line | detail |
 | --- | --- | --- | --- |
+| `engine/tests/test_modules/effects/gain/hearts/color_choice/chosen_colour_is_a_replacement_not_a_grant_test.rs` | `kasumi_colour_override_does_not_survive_the_live_that_set_it` | 198 |  |
 | `engine/tests/test_modules/jidou/debut_watch/three_way_choices_and_look_at_three_test.rs` | `wakana_the_chosen_heart_replaces_her_printed_hearts` | 159 |  |
 
 ## assert_only_negative (0)

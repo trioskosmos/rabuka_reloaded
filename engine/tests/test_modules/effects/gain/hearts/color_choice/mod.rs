@@ -2,6 +2,7 @@
 // Regenerated from the directory listing at compile time.
 pub mod chosen_color_transform_live_start_test;
 pub mod chosen_color_transform_scope_options_test;
+pub mod chosen_colour_is_a_replacement_not_a_grant_test;
 pub mod live_start_optional_energy_chosen_heart_test;
 pub mod paid_discard_color_choice_heart_test;
 pub mod paid_energy_color_choice_heart01_test;

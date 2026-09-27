@@ -1,14 +1,14 @@
 {
   "generated_by": "cards/test_inventory.py",
-  "generated_at": "2026-09-27T05:15:24.644366+00:00",
+  "generated_at": "2026-09-27T05:26:37.156912+00:00",
   "stats": {
     "total_cards": 2526,
     "cards_with_abilities": 1565,
     "total_abilities": 2011,
     "unique_abilities": 936
   },
-  "n_files": 922,
-  "n_tests": 3719,
+  "n_files": 923,
+  "n_tests": 3722,
   "total_cards": 771,
   "covered_cards": 771,
   "abilities_on_covered": 936,
@@ -309,8 +309,8 @@
     ]
   },
   "depth_counts": {
-    "L2+choice": 826,
-    "L1+choice": 34,
+    "L2+choice": 828,
+    "L1+choice": 32,
     "L2": 76
   },
   "qa_rulings": {
@@ -396,8 +396,14 @@
       "rows": []
     },
     "pendency_only": {
-      "count": 1,
+      "count": 2,
       "rows": [
+        {
+          "file": "engine/tests/test_modules/effects/gain/hearts/color_choice/chosen_colour_is_a_replacement_not_a_grant_test.rs",
+          "test": "kasumi_colour_override_does_not_survive_the_live_that_set_it",
+          "line": 198,
+          "detail": ""
+        },
         {
           "file": "engine/tests/test_modules/jidou/debut_watch/three_way_choices_and_look_at_three_test.rs",
           "test": "wakana_the_chosen_heart_replaces_her_printed_hearts",
@@ -931,7 +937,7 @@
       ]
     }
   },
-  "n_test_fns_parsed": 3719,
+  "n_test_fns_parsed": 3722,
   "abilities": [
     {
       "idx": 0,
@@ -17682,6 +17688,7 @@
         "engine/tests/test_modules/effects/gain/blades/per_card/eri_debut_up_to_two_opponent_members_to_wait_test.rs",
         "engine/tests/test_modules/effects/gain/blades/per_card/q46_kanako_all_heart_timing_test.rs",
         "engine/tests/test_modules/effects/gain/blades/per_card/turn_scope_regression_test.rs",
+        "engine/tests/test_modules/effects/gain/hearts/color_choice/chosen_colour_is_a_replacement_not_a_grant_test.rs",
         "engine/tests/test_modules/effects/gain/hearts/color_choice/success_pile_chosen_heart_color_test.rs",
         "engine/tests/test_modules/effects/gain/hearts/constants/group_live_need_heart_eight_constant_heart03_test.rs",
         "engine/tests/test_modules/effects/gain/hearts/constants/six_heart_types_constant_all_heart_matrix_test.rs",
@@ -17785,7 +17792,7 @@
         "ayumu_live_start_triggers",
         "ayumu_no_wait_with_non_nijigasaki_ally"
       ],
-      "covering_test_count": 845,
+      "covering_test_count": 848,
       "direct_tests": [
         "any_card_fails_hearts_all_fail",
         "aoku_haruka_live_start_fails_with_only_non_suzu_live_cards",
@@ -17818,7 +17825,7 @@
         "debut_opponent_live_discard_q130_decline_preserves_opponent_hand",
         "debut_reveal_until_live_q102_live_immediately_on_top"
       ],
-      "direct_test_count": 369,
+      "direct_test_count": 370,
       "is_null": false,
       "use_limit": null,
       "watches_abilities": false,
@@ -41938,26 +41945,32 @@
       ],
       "base": "PL!N-bp3-014",
       "covered": true,
-      "depth": "L1+choice",
+      "depth": "L2+choice",
       "has_assert": true,
       "has_choice": true,
-      "has_negative": false,
+      "has_negative": true,
       "covering_files": [
         "engine/tests/test_modules/effects/compound/per_card/live_start_selected_heart_replaces_original_heart_pl_n_bp3_014_n_test.rs",
+        "engine/tests/test_modules/effects/gain/hearts/color_choice/chosen_colour_is_a_replacement_not_a_grant_test.rs",
         "engine/tests/test_modules/rules/conditions/rule_9_9_layering_test.rs"
       ],
       "covering_tests": [
         "blade_set_then_additive_stacks_through_real_cards",
         "heart_override_additive_stacks_in_both_stage_heart_calcs",
         "kanan_livestart_converts_all_hearts_to_heart04",
-        "kasumi_heart_transform_reflected_in_header_stats"
+        "kasumi_chosen_colour_is_a_replacement_not_a_granted_heart",
+        "kasumi_colour_override_does_not_survive_the_live_that_set_it",
+        "kasumi_heart_transform_reflected_in_header_stats",
+        "shioriko_unchosen_printed_hearts_are_superseded"
       ],
-      "covering_test_count": 4,
+      "covering_test_count": 7,
       "direct_tests": [
         "heart_override_additive_stacks_in_both_stage_heart_calcs",
+        "kasumi_chosen_colour_is_a_replacement_not_a_granted_heart",
+        "kasumi_colour_override_does_not_survive_the_live_that_set_it",
         "kasumi_heart_transform_reflected_in_header_stats"
       ],
-      "direct_test_count": 2,
+      "direct_test_count": 4,
       "is_null": false,
       "use_limit": null,
       "watches_abilities": false,
@@ -44330,26 +44343,31 @@
       ],
       "base": "PL!N-pb1-034",
       "covered": true,
-      "depth": "L1+choice",
+      "depth": "L2+choice",
       "has_assert": true,
       "has_choice": true,
-      "has_negative": false,
+      "has_negative": true,
       "covering_files": [
-        "engine/tests/test_modules/effects/gain/hearts/color_choice/chosen_color_transform_live_start_test.rs"
+        "engine/tests/test_modules/effects/gain/hearts/color_choice/chosen_color_transform_live_start_test.rs",
+        "engine/tests/test_modules/effects/gain/hearts/color_choice/chosen_colour_is_a_replacement_not_a_grant_test.rs"
       ],
       "covering_tests": [
+        "kasumi_chosen_colour_is_a_replacement_not_a_granted_heart",
+        "kasumi_colour_override_does_not_survive_the_live_that_set_it",
         "lanzhu_pl_n_pb1_036_n_choose_last_color_heart06",
         "shioriko_pl_n_pb1_034_n_choose_first_color_heart03_leaves_bystander_unchanged",
         "shioriko_pl_n_pb1_034_n_choose_last_color_heart05",
-        "shioriko_pl_n_pb1_034_n_choose_mid_color_heart04"
+        "shioriko_pl_n_pb1_034_n_choose_mid_color_heart04",
+        "shioriko_unchosen_printed_hearts_are_superseded"
       ],
-      "covering_test_count": 4,
+      "covering_test_count": 7,
       "direct_tests": [
         "shioriko_pl_n_pb1_034_n_choose_first_color_heart03_leaves_bystander_unchanged",
         "shioriko_pl_n_pb1_034_n_choose_last_color_heart05",
-        "shioriko_pl_n_pb1_034_n_choose_mid_color_heart04"
+        "shioriko_pl_n_pb1_034_n_choose_mid_color_heart04",
+        "shioriko_unchosen_printed_hearts_are_superseded"
       ],
-      "direct_test_count": 3,
+      "direct_test_count": 4,
       "is_null": false,
       "use_limit": null,
       "watches_abilities": false,
