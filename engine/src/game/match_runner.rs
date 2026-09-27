@@ -208,34 +208,6 @@ pub(crate) fn ai_pick_action(
     Some(best_idx)
 }
 
-pub(crate) fn ai_pick_action_v7(
-    gs: &GameState,
-    acts: &[game_setup::Action],
-    me: u8,
-) -> Option<game_setup::Action> {
-    if acts.is_empty() {
-        return None;
-    }
-    let checkpoint = rng::checkpoint();
-    let v2_policy = strategy_v2::V2Policy::default();
-    let plan = strategy_v3::V3Plan::detect(gs, me, &gs.card_database);
-    let action = if gs.has_pending_choice() {
-        BotKind::V7.choose_action(gs, acts, me, &v2_policy, &plan)
-    } else {
-        match gs.current_phase {
-            Phase::MulliganFirstAttacker | Phase::MulliganSecondAttacker => {
-                BotKind::V7.choose_mulligan(gs, acts, &gs.card_database)
-            }
-            Phase::LiveCardSetFirstAttacker | Phase::LiveCardSetSecondAttacker => {
-                BotKind::V7.choose_live_set(gs, acts, &gs.card_database, &v2_policy, &plan)
-            }
-            _ => BotKind::V7.choose_action(gs, acts, me, &v2_policy, &plan),
-        }
-    };
-    rng::restore(checkpoint);
-    Some(action)
-}
-
 /// AI turn: pick with the shared policy and execute the best action.
 /// Mulligan phases MUST be concluded first, otherwise the AI can keep
 /// toggling card selections forever and the game never reaches main phase,

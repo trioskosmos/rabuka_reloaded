@@ -8,6 +8,9 @@ Output: engine/src/ability/effect_decoder_gen.rs
 
 import re, os, sys
 
+sys.path.insert(0, os.path.dirname(__file__))
+from generator_types import is_copy_type
+
 CARD_RS = os.path.join(
     os.path.dirname(__file__), "..", "engine", "src", "core", "card.rs"
 )
@@ -43,19 +46,6 @@ READER_MAP = {
     "Option<AbilityFilter>": "bc.read_ability_filter_value()",
     "Option<Box<Vec<AbilityFilterBranch>>>": "bc.read_or_ability_filters_value()",
 }
-
-
-# Types that implement Copy - no .clone() needed
-COPY_TYPES = {
-    "bool", "u8", "i8", "Operator", "Operation", "PlacementOrder",
-    "Option<bool>", "Option<u8>", "Option<i8>", "Option<Operator>",
-    "Option<Operation>", "Option<PlacementOrder>",
-}
-
-
-def is_copy_type(ftype: str) -> bool:
-    """Check if a field type implements Copy (so .clone() is unnecessary)."""
-    return ftype.strip() in COPY_TYPES
 
 
 def rust_type_to_reader(field_type):

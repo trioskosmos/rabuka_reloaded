@@ -540,7 +540,7 @@ fn resolve(pending: &mut Vec<Pending>, gs: &GameState, rows: &mut Vec<Row>) {
                 .iter()
                 .map(|l| l.required.iter().map(|v| i32::from(*v)).sum::<i32>())
                 .sum();
-            item.row.opp_set_actual = snap.live_card_ids.len();
+            item.row.opp_set_actual = snap.lives.len();
         }
         item.row.placed = mine.success_live_card_zone.cards.len() > item.z_me;
         item.row.opp_placed = theirs.success_live_card_zone.cards.len() > item.z_them;

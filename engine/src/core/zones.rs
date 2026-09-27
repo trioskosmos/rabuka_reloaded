@@ -526,8 +526,10 @@ impl Stage {
             .map(|(&cid, colors)| {
                 let mut m = HashMap::default();
                 for (&col, &delta) in colors {
-                    let mut e = crate::core::game_modifiers::ModifierEntry::default();
-                    e.additive = delta as i16;
+                    let e = crate::core::game_modifiers::ModifierEntry {
+                        additive: delta as i16,
+                        ..Default::default()
+                    };
                     m.insert(col, e);
                 }
                 (cid, m)

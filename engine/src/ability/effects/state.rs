@@ -315,13 +315,15 @@ impl AbilityResolver {
             let card_db = self.card_db();
             let player = gs.resolve_target_player_mut(&target);
 
-            let mut filter = crate::ability::util::CardFilter::default();
-            filter.card_type = card_type_filter.as_deref();
-            filter.group = group_filter.as_deref();
-            filter.cost_limit = cost_limit;
-            filter.cost_operator = cost_limit_operator.as_deref();
-            filter.characters = characters;
-            filter.exclude_self = exclude_self_id;
+            let filter = crate::ability::util::CardFilter {
+                card_type: card_type_filter.as_deref(),
+                group: group_filter.as_deref(),
+                cost_limit,
+                cost_operator: cost_limit_operator.as_deref(),
+                characters,
+                exclude_self: exclude_self_id,
+                ..Default::default()
+            };
             let filter = filter.original_blade_limit(blade_limit, blade_limit_operator);
             let mut candidates: Vec<(usize, i16)> = Vec::new();
 

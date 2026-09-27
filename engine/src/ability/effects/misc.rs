@@ -47,6 +47,130 @@ struct GainTargets {
     final_count: u8,
 }
 
+/// Everything [`AbilityResolver::resolve_gain_resource_targets`] needs to turn
+/// one gain-resource effect into its blade and heart target lists.
+///
+/// These were 26 positional parameters. At that width every call site was an
+/// unlabelled wall of arguments in which two adjacent `&[i16]` or two adjacent
+/// `Option<SmallVec<..>>` were indistinguishable, and reordering one was a
+/// silent bug rather than a compile error. Grouping them by where each value
+/// comes from makes the shape of the operation readable and makes the grouping
+/// itself the documentation.
+#[derive(Clone)]
+struct GainResourceRequest<'a> {
+    // ── What is being gained, and how much ──
+    kind: ResourceKind,
+    /// The resource name, for diagnostics only.
+    resource: &'a str,
+    count: u8,
+    /// Per-unit scaling, e.g. 「1枚につき」.
+    per_unit: bool,
+    per_unit_type_str: Option<&'a str>,
+
+    // ── Who it goes to ──
+    target: &'a str,
+    /// The effect applies to every member, not a chosen set.
+    is_all: bool,
+    /// The target is the activating player, so no count truncation.
+    is_self_target: bool,
+    card_type_filter: Option<&'a str>,
+    group_filter: Option<&'a str>,
+
+    // ── Cards a preceding step already chose ──
+    activating_card_id: Option<i16>,
+    exclude_self_id: Option<i16>,
+    /// Everything chosen so far in this action.
+    all_selected: &'a [i16],
+    /// What the immediately preceding step chose.
+    selected_for_current: &'a [i16],
+    /// Cards that have appeared this turn.
+    appeared_ids: &'a HashSet<i16>,
+
+    // ── Multipliers measured before this step ran ──
+    last_energy: u8,
+    last_discard_count: u8,
+    recently_moved: &'a Option<SmallVec<[i16; 4]>>,
+    entry_snapshot: &'a Option<SmallVec<[i16; 4]>>,
+    preceding_moved: &'a Option<SmallVec<[i16; 4]>>,
+    orientation_modifiers: &'a HashMap<i16, crate::core::game_modifiers::CardOrientation>,
+
+    /// A heart colour fixed by an enclosing effect (e.g. an energy placed for
+    /// heart05). Wins over the effect's own heart colour.
+    single_fixed_heart: Option<String>,
+}
+
+/// The part of `selected` chosen BEFORE the distinct-choice save point.
+///
+/// A saved distinct action excludes what was already chosen before the choice
+/// so a card cannot be picked twice, while a later step in the same action
+/// targets what the choice added (see [`selected_after_save`]). With no save
+/// point, or one at or past the end, the whole selection is on one side of the
+/// split.
+fn selected_before_save(selected: &[i16], save_len: Option<u8>) -> Vec<i16> {
+    match save_len {
+        Some(n) if (n as usize) < selected.len() => selected[..n as usize].to_vec(),
+        _ => selected.to_vec(),
+    }
+}
+
+/// The part of `selected` chosen AFTER the distinct-choice save point.
+fn selected_after_save(selected: &[i16], save_len: Option<u8>) -> Vec<i16> {
+    match save_len {
+        Some(n) if (n as usize) < selected.len() => selected[n as usize..].to_vec(),
+        _ => selected.to_vec(),
+    }
+}
+
+/// Keep only the targets standing in the one stage slot the effect names.
+///
+/// The blade and heart target lists each applied this inline, so a position
+/// constraint could be enforced on one and silently skipped on the other. Both
+/// now come through here. An unparseable or unstated position is not a
+/// constraint, so it leaves the list alone.
+fn position_limited_targets(
+    player: &crate::player::Player,
+    position: Option<&str>,
+    targets: &[i16],
+) -> Vec<i16> {
+    let Some(idx) = position.and_then(util::stage_position_index) else {
+        return targets.to_vec();
+    };
+    let expected = player.stage.stage[idx];
+    targets
+        .iter()
+        .copied()
+        .filter(|&cid| cid == expected)
+        .collect()
+}
+
+/// Keep only the targets whose name matches a card moved as cost (`same_name`).
+///
+/// No moved card means nothing can match, so the list empties rather than
+/// passing everything through. The blade and heart paths each had their own
+/// copy of this; they share it now so the two cannot disagree.
+fn same_name_targets(
+    db: &crate::card::CardDatabase,
+    moved: &[i16],
+    targets: &[i16],
+) -> Vec<i16> {
+    let ref_names: Vec<String> = moved
+        .iter()
+        .filter_map(|&cid| db.get_card(cid).map(|c| c.name.to_string()))
+        .collect();
+    if ref_names.is_empty() {
+        return Vec::new();
+    }
+    targets
+        .iter()
+        .copied()
+        .filter(|&cid| {
+            db.get_card(cid)
+                .is_some_and(|c| ref_names.contains(&c.name.to_string()))
+        })
+        .collect()
+}
+
+
 impl AbilityResolver {
     /// Handles target="both" by executing the effect for self, then opponent.
     /// Returns true if the effect was fully handled (has "both" target), false otherwise.
@@ -625,7 +749,8 @@ impl AbilityResolver {
         &mut self,
         gs: &mut GameState,
         effect: &AbilityEffect,
-    ) -> Result<(), String> {        if crate::ability::debug::ABILITY_DEBUG.load(core::sync::atomic::Ordering::Relaxed) {
+    ) -> Result<(), String> {
+        if crate::ability::debug::ABILITY_DEBUG.load(core::sync::atomic::Ordering::Relaxed) {
             log::debug!("[GR_ENTER] resource={:?} count={:?} target_count={:?} source={:?} card_type={:?} target={:?} exclude_self={:?} target_from_sel={:?}",
                 effect.resource_any(), effect.count_any(), effect.target_count_any(), effect.source_any(), effect.card_type_any(), effect.target_any(), effect.exclude_self_any(), effect.target_from_selection_any());
         }
@@ -875,28 +1000,30 @@ impl AbilityResolver {
         } = self.resolve_gain_resource_targets(
             gs,
             effect,
-            kind,
-            resource.as_str(),
-            count,
-            per_unit,
-            per_unit_type_str.as_deref(),
-            &target,
-            is_all,
-            is_self_target,
-            exclude_self_id,
-            activating_card_id,
-            single_fixed_heart.clone(),
-            &all_selected,
-            &selected_for_current,
-            &appeared_ids,
-            &recently_moved,
-            &entry_snapshot,
-            &preceding_moved,
-            last_energy,
-            last_discard_count,
-            &orientation_modifiers,
-            card_type_filter.as_deref(),
-            group_filter.as_deref(),
+            &GainResourceRequest {
+                kind,
+                resource: resource.as_str(),
+                count,
+                per_unit,
+                per_unit_type_str: per_unit_type_str.as_deref(),
+                target: &target,
+                is_all,
+                is_self_target,
+                card_type_filter: card_type_filter.as_deref(),
+                group_filter: group_filter.as_deref(),
+                activating_card_id,
+                exclude_self_id,
+                all_selected: &all_selected,
+                selected_for_current: &selected_for_current,
+                appeared_ids: &appeared_ids,
+                last_energy,
+                last_discard_count,
+                recently_moved: &recently_moved,
+                entry_snapshot: &entry_snapshot,
+                preceding_moved: &preceding_moved,
+                orientation_modifiers: &orientation_modifiers,
+                single_fixed_heart: single_fixed_heart.clone(),
+            },
         );
 
         // Store selected card IDs when target_count/distinct is set
@@ -1592,29 +1719,34 @@ impl AbilityResolver {
         &mut self,
         gs: &mut GameState,
         effect: &AbilityEffect,
-        kind: ResourceKind,
-        resource: &str,
-        count: u8,
-        per_unit: bool,
-        per_unit_type_str: Option<&str>,
-        target: &str,
-        is_all: bool,
-        is_self_target: bool,
-        exclude_self_id: Option<i16>,
-        activating_card_id: Option<i16>,
-        single_fixed_heart: Option<String>,
-        all_selected: &[i16],
-        selected_for_current: &[i16],
-        appeared_ids: &HashSet<i16>,
-        recently_moved: &Option<SmallVec<[i16; 4]>>,
-        entry_snapshot: &Option<SmallVec<[i16; 4]>>,
-        preceding_moved: &Option<SmallVec<[i16; 4]>>,
-        last_energy: u8,
-        last_discard_count: u8,
-        orientation_modifiers: &HashMap<i16, crate::core::game_modifiers::CardOrientation>,
-        card_type_filter: Option<&str>,
-        group_filter: Option<&str>,
+        req: &GainResourceRequest<'_>,
     ) -> GainTargets {
+        // Unpacked by value so the body below reads exactly as it did when
+        // these were 26 positional parameters. The struct is the documentation.
+        let GainResourceRequest {
+            kind,
+            resource,
+            count,
+            per_unit,
+            per_unit_type_str,
+            target,
+            is_all,
+            is_self_target,
+            card_type_filter,
+            group_filter,
+            activating_card_id,
+            exclude_self_id,
+            all_selected,
+            selected_for_current,
+            appeared_ids,
+            last_energy,
+            last_discard_count,
+            recently_moved,
+            entry_snapshot,
+            preceding_moved,
+            orientation_modifiers,
+            single_fixed_heart,
+        } = req.clone();
         let card_db = self.card_db();
         let mut filter = effect.filter_subset();
         filter.exclude_self = exclude_self_id;
@@ -1699,21 +1831,8 @@ impl AbilityResolver {
             && effect.distinct_any().is_some()
             && !all_selected.is_empty()
         {
-            if let Some(save_len) = self.selected_count_at_save {
-                if (save_len as usize) < all_selected.len() {
-                    let prev: SmallVec<[i16; 8]> =
-                        all_selected[..save_len as usize].iter().copied().collect();
-                    if !prev.is_empty() {
-                        Some(prev)
-                    } else {
-                        None
-                    }
-                } else {
-                    Some(all_selected.to_vec().into())
-                }
-            } else {
-                Some(all_selected.to_vec().into())
-            }
+            let before = selected_before_save(all_selected, self.selected_count_at_save);
+            (!before.is_empty()).then(|| before.into())
         } else {
             None
         };
@@ -1759,15 +1878,13 @@ impl AbilityResolver {
             all_candidates.retain(|cid| current_blade_eligible.contains(cid));
         }
 
-        // Filter by position if the effect specifies one (e.g. "center").
-        if let Some(ref pos) = effect.position_any() {
-            if let Some(p) = pos.get_position() {
-                if let Some(stage_idx) = util::stage_position_index(p) {
-                    let expected = player.stage.stage[stage_idx];
-                    all_candidates.retain(|cid| *cid == expected);
-                }
-            }
-        }
+        // Filter by position if the effect specifies one (e.g. "center"). Read
+        // once and applied to both the blade and the heart target list, so the
+        // constraint cannot hold for one and be skipped for the other.
+        let effect_position: Option<String> =
+            effect.position_any().and_then(|p| p.get_position().map(str::to_string));
+        all_candidates = position_limited_targets(player, effect_position.as_deref(), &all_candidates)
+            .into();
         // Issue 6: Filter by timing_condition (e.g. "appeared_this_turn")
         log::debug!(
             "[APP_IDS] appeared_ids={:?} all_candidates before={:?}",
@@ -1781,26 +1898,12 @@ impl AbilityResolver {
         // same_name: filter candidates to only members whose name matches
         // the card(s) moved as cost (self.moved_cards).
         if effect.same_name_any().unwrap_or(false) {
-            let ref_names: Vec<String> = self
-                .moved_cards
-                .iter()
-                .filter_map(|&cid| card_db.get_card(cid).map(|c| c.name.to_string()))
-                .collect();
             log::debug!(
-                "[SAME_NAME] ref_names={:?} before={}",
-                ref_names,
+                "[SAME_NAME] before={} candidates={}",
+                self.moved_cards.len(),
                 all_candidates.len()
             );
-            if !ref_names.is_empty() {
-                all_candidates.retain(|cid| {
-                    card_db
-                        .get_card(*cid)
-                        .map(|c| ref_names.contains(&c.name.to_string()))
-                        .unwrap_or(false)
-                });
-            } else {
-                all_candidates.clear();
-            }
+            all_candidates = same_name_targets(&card_db, &self.moved_cards, &all_candidates).into();
             log::debug!("[SAME_NAME] after={}", all_candidates.len());
         }
 
@@ -1875,15 +1978,7 @@ impl AbilityResolver {
             {
                 // Saved action from distinct choice: target only the
                 // NEWLY selected cards (after the pre-choice save point).
-                if let Some(save_len) = self.selected_count_at_save {
-                    if (save_len as usize) < selected_for_current.len() {
-                        selected_for_current[save_len as usize..].to_vec()
-                    } else {
-                        selected_for_current.to_vec()
-                    }
-                } else {
-                    selected_for_current.to_vec()
-                }
+                selected_after_save(selected_for_current, self.selected_count_at_save)
             } else if effect.card_type_any().is_none()
                 && effect.group_names_any().is_none()
                 && effect.characters_any().is_none()
@@ -1912,34 +2007,13 @@ impl AbilityResolver {
             }
             // same_name: filter heart_targets to same-name members
             if effect.same_name_any().unwrap_or(false) {
-                let ref_names: Vec<String> = self
-                    .moved_cards
-                    .iter()
-                    .filter_map(|&cid| card_db.get_card(cid).map(|c| c.name.to_string()))
-                    .collect();
-                if !ref_names.is_empty() {
-                    h.retain(|cid| {
-                        card_db
-                            .get_card(*cid)
-                            .map(|c| ref_names.contains(&c.name.to_string()))
-                            .unwrap_or(false)
-                    });
-                } else {
-                    h.clear();
-                }
+                h = same_name_targets(&card_db, &self.moved_cards, &h);
             }
             h
         } else {
             vec![]
         };
-        if let Some(ref pos) = effect.position_any() {
-            if let Some(p) = pos.get_position() {
-                if let Some(stage_idx) = util::stage_position_index(p) {
-                    let expected = player.stage.stage[stage_idx];
-                    heart_targets.retain(|&cid| cid == expected);
-                }
-            }
-        }
+        heart_targets = position_limited_targets(player, effect_position.as_deref(), &heart_targets);
 
         // "ブレードをNつ以上持つ" (no 元々) — heart targets are resolved via
         // a SEPARATE matching_ids_filtered call, so apply the current-blade

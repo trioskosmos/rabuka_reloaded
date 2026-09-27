@@ -26,9 +26,25 @@ use rabuka_engine::bot::strategy_v7;
 use rabuka_engine::bot::strategy_v8;
 use rabuka_engine::card::CardDatabase;
 use rabuka_engine::game_state::{GameResult, GameState};
+use rabuka_engine::types::Phase;
 use rabuka_engine::game_setup;
 use rabuka_engine::turn::TurnEngine;
 use std::sync::Arc;
+
+/// Active blades on a seat's stage (Q133: the yell count is active members
+/// only). Public information, so this is what a fair player can count.
+fn board_blades(gs: &GameState, pid: &str) -> i32 {
+    let stage = if gs.player1.id == pid {
+        &gs.player1.stage.stage
+    } else {
+        &gs.player2.stage.stage
+    };
+    stage
+        .iter()
+        .filter(|&&c| c >= 0)
+        .filter_map(|&c| gs.card_database.get_card(c).map(|k| i32::from(k.blade)))
+        .sum()
+}
 
 fn main() {
     let args: Vec<String> = std::env::args().skip(1).collect();
@@ -401,6 +417,65 @@ fn main() {
                     "\n  v8 would play [{idx}]: {}   <-- v8's pick",
                     describe(&v8a, &db)
                 );
+            }
+
+            // v8's own live-set model, printed with the numbers it uses.
+            //
+            // The point of a hand-played game is seeing WHY the opponent took
+            // the action it took, in its own units, rather than only what it
+            // did. Every previous look at v8's live set was an aggregate -
+            // fold rate, pace - and an aggregate cannot distinguish "v8 folded
+            // because it thought the check would fail" from "v8 folded because
+            // it thought the comparison was lost", which are opposite problems.
+            // Calibrating that model against the engine's own verdicts showed
+            // the second case was the live one for the FIRST attacker: v8 read
+            // the not-yet-set opponent zone as a fold and believed a passed
+            // check was a free placement.
+            if std::env::var_os("V8_MODEL").is_some() {
+                let live_phase = matches!(
+                    gs.current_phase,
+                    Phase::LiveCardSetFirstAttacker | Phase::LiveCardSetSecondAttacker
+                );
+                if live_phase {
+                    if let Some(pred) = strategy_v8::predict_live_set_v8(&gs, &db) {
+                        let role = if gs.current_phase == Phase::LiveCardSetFirstAttacker {
+                            "FIRST attacker - their set does not exist yet, so it is FORECAST"
+                        } else {
+                            "SECOND attacker - their set size is readable (8.4.3.2)"
+                        };
+                        println!("\n  === v8's live-set model [{role}] ===");
+                        println!(
+                            "    successes: ours {}  theirs {}   their set size {}",
+                            pred.my_success, pred.opp_success, pred.opp_set_size
+                        );
+                        println!(
+                            "    our board {} hearts, {} active blades, the zone needs {}",
+                            pred.board_hearts,
+                            board_blades(&gs, &gs.seat_player(my_me).id),
+                            pred.need_hearts
+                        );
+                        println!(
+                            "    P(our check passes) {:.3}   P(they pass) {:.3}   P(WE place) {:.3}   \
+                             P(THEY place) {:.3}",
+                            pred.p_pass, pred.opp_pass, pred.p_place, pred.opp_place
+                        );
+                        println!(
+                            "    chosen value {:.4} over {} candidate zones; margin over runner-up {}",
+                            pred.value,
+                            pred.n_candidates,
+                            pred.runner_up.as_ref().map_or("n/a".to_string(), |(_, v, _)| {
+                                format!("{:.4}", (pred.value - v).abs())
+                            })
+                        );
+                        println!(
+                            "    its choice: lives at hand {:?}, junk at {:?}; {} life(s) priceable in hand",
+                            pred.lives, pred.junk, pred.n_lives_in_hand
+                        );
+                        if let Some((idx, v, pp)) = &pred.runner_up {
+                            println!("    runner-up: lives at {idx:?}, value {v:.4}, P(place) {pp:.3}");
+                        }
+                    }
+                }
             }
 
             // v7's own scoring of every option, as a reference ranking. v7's

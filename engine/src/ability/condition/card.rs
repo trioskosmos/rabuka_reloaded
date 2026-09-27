@@ -368,7 +368,6 @@ impl<'a> ConditionContext<'a> {
         }
         let hc: &[String] = condition.get_heart_colors().unwrap_or(&[]);
         if !hc.is_empty() {
-            let card_db = &self.game_state.card_database;
             let card_type = condition
                 .get_card_type()
                 .map(|ct| ct.as_str())
@@ -3307,12 +3306,14 @@ impl<'a> ConditionContext<'a> {
     ) -> bool {
         // Delegate to the canonical CardFilter from util.rs to avoid
         // maintaining two parallel filtering implementations.
-        let mut filter = crate::ability::util::CardFilter::default();
-        filter.card_type = card_type_filter;
-        filter.group = group_names.and_then(|g| g.first().map(|s| s.as_str()));
-        filter.heart_colors = heart_colors;
-        filter.cost_limit = cost_limit;
-        filter.cost_operator = cost_limit_operator;
+        let filter = crate::ability::util::CardFilter {
+            card_type: card_type_filter,
+            group: group_names.and_then(|g| g.first().map(|s| s.as_str())),
+            heart_colors,
+            cost_limit,
+            cost_operator: cost_limit_operator,
+            ..Default::default()
+        };
 
         let card_db = &self.game_state.card_database;
         if !filter.matches(card_db, card_id, true) {

@@ -2480,8 +2480,10 @@ impl AbilityEffect {
                 out
             }
             ActionType::ConditionalOnOptional => {
-                let mut step = AbilityEffect::default();
-                step.action = ActionType::ConditionalOptional;
+                let mut step = AbilityEffect {
+                    action: ActionType::ConditionalOptional,
+                    ..Default::default()
+                };
                 if let Some(ref oa) = self.compound.optional_action {
                     step.text = oa.text.clone();
                 }

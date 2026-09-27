@@ -315,16 +315,103 @@ fn collect_junk(gs: &GameState, me: u8, db: &CardDatabase, lives: &[Life], ctx: 
 ///    scored negative and v8 folded 6.3% of checks - against v7's 0.3%, and
 ///    against the guide's D2b finding that folding burns a whole live phase for
 ///    nothing.
+///
+/// ## The price of a burned life, and why the shape was wrong
+///
+/// Charging `p * (1 - p)` is a stationary price: it says a life is worth
+/// committing in proportion to the placement it can make *here*. The problem is
+/// that it vanishes at BOTH ends, and the two ends are exactly where the truth
+/// diverges from the formula:
+///
+/// - `p = 1`: the life places, so nothing was lost. Zero is right.
+/// - `p = 0`: the life cannot pass, and 8.3.16 discards it. The card is gone
+///   permanently, and one of the three successes the game needs went with it.
+///   Charging zero makes a guaranteed-to-fail life look FREE.
+///
+/// Found by playing, not by an aggregate. A hand-played T1 live set, v8
+/// folding against a 3-life v7 zone on a two-heart board, produced two
+/// candidates at a value of exactly 0.0629 - the life-free zone and the zone
+/// containing a life that could not pass - because the burn term disappears at
+/// `p = 0`. The fold was still chosen, by the fewer-lives tie-break, so nothing
+/// visibly broke: the zone was ranked on a tie rather than on its merits, and
+/// any change to `filter_value` or to the junk ordering would have flipped it
+/// silently. An aggregate cannot see that; a printed candidate table does.
+///
+/// The price of a burned life is the OPTION VALUE of the card you no longer
+/// hold. You lose it with probability `1 - p`, and holding a life is worth one
+/// placement ticket, so the burn is `(1 - p) * CREDIT` - not
+/// `(1 - p) * p * CREDIT`. The two agree in the middle and disagree at the ends.
+/// `V8_LIFE_BURN=stationary` restores the old shape so the comparison stays
+/// re-runnable.
 /// 3. `+ filter_value` - what the spare-slot hand filter buys. Each card set
 ///    as junk is discarded before the check and draws a replacement (8.3.4), so
 ///    the slot is worth a draw minus whatever that card was worth in hand.
+/// The price of a burned life. `p_pass` is the ZONE's pass probability, which
+/// is 0 for a junk-only zone - and a zone with no life in it burns nothing, so
+/// the price has to be gated on the zone actually holding one. Gating it is not
+/// cosmetic: without the gate a junk-only zone is charged a whole placement
+/// credit for holding no life at all, which is the same class of error as not
+/// charging a doomed life.
 pub(crate) fn candidate_value(
     outcome: CheckOutcome,
     p_pass: f64,
     filter_value: f64,
 ) -> f64 {
-    let burned = (1.0 - p_pass) * p_pass * PLACEMENT_CREDIT;
+    candidate_value_zone(outcome, p_pass, filter_value, true)
+}
+
+/// `candidate_value`, with the burn explicitly gated on the zone holding a life.
+pub(crate) fn candidate_value_zone(
+    outcome: CheckOutcome,
+    p_pass: f64,
+    filter_value: f64,
+    holds_life: bool,
+) -> f64 {
+    let burned = if !holds_life {
+        0.0
+    } else if matches!(std::env::var("V8_LIFE_BURN").as_deref(), Ok("stationary")) {
+        // The old price: one parameter doing two jobs. Kept so the comparison
+        // against it stays re-runnable.
+        (1.0 - p_pass) * p_pass * PLACEMENT_CREDIT
+    } else {
+        (1.0 - p_pass) * life_resale_value() * PLACEMENT_CREDIT
+    };
     outcome.value - burned + filter_value
+}
+
+/// What one life in hand is worth, in placement tickets, when it is NOT the one
+/// being set.
+///
+/// This is the parameter the old price was missing. Burning a life forfeits the
+/// chance to place it on some LATER check, and that chance is a separate
+/// quantity from the probability that the current check fails. The old price
+/// used `p` for both - it charged `p * (1 - p)` - which is only right if a life
+/// converts on a later check exactly as often as it converts on this one, and
+/// the two are not the same event: a later check has a different board, a
+/// different opponent commitment, and a different turn order.
+///
+/// The consequence of the conflation is that the price vanishes at `p = 0`: a
+/// life that cannot pass is charged nothing, although 8.3.16 discards it
+/// permanently and one of the three successes the game needs went with it. A
+/// junk-only zone and a zone holding a doomed life then tie exactly, and the
+/// decision falls to the fewer-lives tie-break. Found by hand-playing a T1 live
+/// set: both candidates read 0.0629.
+///
+/// With the resale price separated, the price is non-zero at `p = 0` and zero
+/// at `p = 1`, which are the two cases the formula used to get wrong, and the
+/// break-even moves to `p == resale / (1 + resale)` - 23% at the default,
+/// rather than the 50% a full-ticket price would demand.
+///
+/// `V8_LIFE_BURN=stationary` restores `p * (1 - p)`, so the comparison against
+/// the old behaviour stays re-runnable.
+fn life_resale_value() -> f64 {
+    match std::env::var("V8_LIFE_RESALE")
+        .ok()
+        .and_then(|v| v.parse::<f64>().ok())
+    {
+        Some(q) if (0.0..=1.0).contains(&q) => q,
+        _ => 0.30,
+    }
 }
 
 /// Enumerate every live-zone of up to `max_slots` hand cards: choose a subset
@@ -453,7 +540,7 @@ fn enumerate_candidates(
             .iter()
             .map(|j| draw_credit - j.keep_value)
             .sum();
-        let value = candidate_value(outcome, p_pass, filter_value);
+        let value = candidate_value_zone(outcome, p_pass, filter_value, !chosen.is_empty());
         out.push(Candidate {
             lives: chosen.iter().map(|life| life.index).collect(),
             junk: filler.iter().map(|j| j.index).collect(),
@@ -705,6 +792,74 @@ mod tests {
     }
 
     /// Value dominates, and the tiebreak prefers conserving ammunition.
+    /// A life that cannot pass must be strictly worse than not setting it.
+    ///
+    /// The burn price used to be `p * (1 - p)`, which is ZERO at `p = 0`, so a
+    /// guaranteed-to-fail life cost nothing and a zone containing one tied
+    /// exactly with the same zone without it. The decision was then made by the
+    /// fewer-lives tie-break, which is a coin flip wearing a rank - and which
+    /// flips the moment `filter_value` or the junk ordering moves.
+    ///
+    /// This was found by hand-playing a T1 live set and printing the candidate
+    /// values, where the life-free zone and the doomed-life zone both read
+    /// 0.0629. No aggregate can see it: fold rate and pace are unchanged either
+    /// way, because the tie-break happened to land on the right answer.
+    #[test]
+    fn a_life_that_cannot_pass_is_strictly_worse_than_not_setting_it() {
+        let doomed = CheckOutcome {
+            p_pass: 0.0,
+            p_place: 0.0,
+            opp_place: 0.0,
+            value: 0.0,
+        };
+        let free = CheckOutcome {
+            p_pass: 0.0,
+            p_place: 0.0,
+            opp_place: 0.0,
+            value: 0.0,
+        };
+        let with_life = candidate_value(doomed, 0.0, 0.38);
+        let without_life = candidate_value_zone(free, 0.0, 0.38, false);
+        assert!(
+            with_life < without_life,
+            "a life at p=0 must cost something: {with_life} vs {without_life}"
+        );
+        // And the price must shrink as the life gets likelier to place, or the
+        // model would refuse to commit lives it is about to place.
+        let certain = candidate_value(
+            CheckOutcome {
+                p_pass: 1.0,
+                p_place: 1.0,
+                opp_place: 0.0,
+                value: PLACEMENT_CREDIT,
+            },
+            1.0,
+            0.0,
+        );
+        assert!(
+            certain > with_life,
+            "committing a life that certainly places must be worth more than burning a doomed one"
+        );
+    }
+
+    #[test]
+    fn a_life_that_certainly_places_is_not_charged_a_burn() {
+        let v = candidate_value(
+            CheckOutcome {
+                p_pass: 1.0,
+                p_place: 1.0,
+                opp_place: 0.0,
+                value: PLACEMENT_CREDIT,
+            },
+            1.0,
+            0.0,
+        );
+        assert!(
+            (v - PLACEMENT_CREDIT).abs() < 1e-12,
+            "a placed life forfeits nothing: {v}"
+        );
+    }
+
     #[test]
     fn ranking_prefers_value_then_fewer_lives() {
         let mk = |lives: &[usize], value: f64| Candidate {
@@ -741,13 +896,39 @@ mod tests {
     /// at opponent match point the same thin life IS right, because folding
     /// there hands them the game. One objective, both answers.
     #[test]
+    fn a_junk_only_zone_is_not_charged_for_holding_no_life() {
+        // A junk-only zone has p_pass = 0, so an ungated burn price charges it
+        // a full placement credit for setting nothing. That is the same error
+        // as failing to charge a doomed life: the price must follow the cards
+        // actually at risk.
+        let junk = candidate_value_zone(outcome(0.0, 0.0, 0.0), 0.0, 0.02, false);
+        assert!(
+            junk > 0.0,
+            "a junk-only zone is worth its hand filter alone: {junk}"
+        );
+    }
+
+    /// A thin life can be worth less than a junk set, but only because of the
+    /// option value it forfeits - not because a life is never worth committing.
+    ///
+    /// Uncontested, a life worth `p` gains `p * PLACEMENT_CREDIT` and forfeits
+    /// the option on the rest, so the break-even sits where the forfeited
+    /// option equals the hand filter it loses by not junking. The `0.45` case
+    /// below is the load-bearing one: on the same board, the same life, the
+    /// same junk ordering, the decision flips on `p` alone.
+    ///
+    /// Paired with `v8_model::match_point_makes_a_thin_check_worth_taking`:
+    /// at opponent match point the same thin life IS right, because folding
+    /// there hands them the game. One objective, both answers.
+    #[test]
     fn a_thin_life_can_be_worth_less_than_a_junk_set() {
-        let junk_only = candidate_value(outcome(0.0, 0.0, 0.0), 0.0, 0.02);
+        let junk_only = candidate_value_zone(outcome(0.0, 0.0, 0.0), 0.0, 0.02, false);
         assert!(junk_only > 0.0);
-        // p = 0.20: 0.20/3 gained against 0.80 * 0.20/3 forfeited. Below break
-        // even, so the argmax sets junk and keeps the life for another check.
+        // p = 0.20: the forfeited option on a life that probably cannot place
+        // outweighs the placement it might make. Below break-even, so the argmax
+        // sets junk and keeps the life for another check.
         let thin = candidate_value(outcome(0.20, 0.20, 0.20 * PLACEMENT_CREDIT), 0.20, 0.0);
-        assert!(thin < junk_only);
+        assert!(thin < junk_only, "thin {thin} vs junk {junk_only}");
         // p = 0.45 on the same board: the placement this life can make here
         // outweighs the one it forfeits, and it is committed. A thin life is
         // not junk; only a hopeless one is.
@@ -756,7 +937,7 @@ mod tests {
             0.45,
             0.0,
         );
-        assert!(thicker > junk_only);
+        assert!(thicker > junk_only, "thicker {thicker} vs junk {junk_only}");
         // The life is still charged for its own failure, monotonically.
         let certain = candidate_value(
             outcome(0.95, 0.95, 0.95 * PLACEMENT_CREDIT),

@@ -26,8 +26,7 @@ fn drain_verdicts_since(_snapshot: usize) -> Vec<AbilityLogItem> {
 }
 
 use super::gates::{
-    pre_cost_gates, post_cost_gates, effect_gates, record_use_limit,
-    handle_pending_choice, use_limit_gate, activation_keywords_gate,
+    pre_cost_gates, post_cost_gates, effect_gates, record_use_limit, handle_pending_choice,
     UseLimitPhase,
 };
 use super::types::{

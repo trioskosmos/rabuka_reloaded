@@ -135,6 +135,12 @@ def parse_condition_common(text):
     return fields
 
 
+# Types that are `Copy` live in one shared place, so this generator and
+# generate_effect_decoder.py cannot disagree about which fields need a clone.
+sys.path.insert(0, os.path.dirname(__file__))
+from generator_types import is_copy_type
+
+
 def build_field_expr(fname, ftype):
     """Return the Condition enum field expression for a variant field."""
     if fname in CONVERSION_FIELDS:
@@ -144,7 +150,7 @@ def build_field_expr(fname, ftype):
         if fname == "ability_filter":
             if ftype == "Option<AbilityFilter>":
                 return "ability_filter: l.ability_filter.as_deref().map(AbilityFilter::from_str)"
-            return "ability_filter: l.ability_filter.clone()"
+            return f"ability_filter: l.ability_filter{'.clone()' if not is_copy_type(ftype) else ''}"
         enum = {
             "card_type": "ConditionCardType",
             "card_property": "CardProperty",
@@ -156,7 +162,7 @@ def build_field_expr(fname, ftype):
         return '#[cfg(feature = "debug_conditions")] text: l.text.clone()'
     if fname == "trigger_event":
         return '#[cfg(feature = "debug_conditions")] trigger_event: l.trigger_event.clone()'
-    return f"{fname}: l.{fname}.clone()"
+    return f"{fname}: l.{fname}{'.clone()' if not is_copy_type(ftype) else ''}"
 
 
 def main():
@@ -240,35 +246,35 @@ def main():
         if fname == "text":
             lines.append(
                 '            #[cfg(feature = "debug_conditions")]'
-                ' "text" => { l.text = bc.read_string_value(); return Some(true); }'
+                ' "text" => { l.text = bc.read_string_value(); Some(true) }'
             )
             lines.append(
                 '            #[cfg(not(feature = "debug_conditions"))]'
-                ' "text" => { bc.skip_value()?; return Some(true); }'
+                ' "text" => { bc.skip_value()?; Some(true) }'
             )
             continue
         if fname == "trigger_event":
             lines.append(
                 '            #[cfg(feature = "debug_conditions")]'
-                ' "trigger_event" => { l.trigger_event = bc.read_trigger_event_value(); return Some(true); }'
+                ' "trigger_event" => { l.trigger_event = bc.read_trigger_event_value(); Some(true) }'
             )
             lines.append(
                 '            #[cfg(not(feature = "debug_conditions"))]'
-                ' "trigger_event" => { bc.skip_value()?; return Some(true); }'
+                ' "trigger_event" => { bc.skip_value()?; Some(true) }'
             )
             continue
         reader = READER_MAP.get(field_type(fname) or "")
         if reader:
             lines.append(
-                f'            "{fname}" => {{ l.{fname} = {reader}; return Some(true); }}'
+                f'            "{fname}" => {{ l.{fname} = {reader}; Some(true) }}'
             )
         else:
             # Unknown-but-in-enum field type: skip the value.
             lines.append(
-                f'            "{fname}" => {{ bc.skip_value()?; return Some(true); }}'
+                f'            "{fname}" => {{ bc.skip_value()?; Some(true) }}'
             )
-    lines.append('            "type" => { bc.skip_value()?; return Some(true); }')
-    lines.append('            _ => { note_decode_fallback(Some(bc.idx.unwrap_or(usize::MAX)), "condition_field", key); bc.skip_value()?; return Some(true); }')
+    lines.append('            "type" => { bc.skip_value()?; Some(true) }')
+    lines.append('            _ => { note_decode_fallback(Some(bc.idx.unwrap_or(usize::MAX)), "condition_field", key); bc.skip_value()?; Some(true) }')
     lines.append("        }")
     lines.append("    }")
     lines.append("")
