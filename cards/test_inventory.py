@@ -752,26 +752,28 @@ Q_IMPOSSIBLE_NEED_RE = re.compile(
 # card whose `select_cards` is optional.
 #
 # On a skippable prompt, `[0]` is NOT reliably "take" and NOT reliably "skip" — it
-# depends on the prompt KIND, and the harness exposes no way to tell which you have.
-# Two prompts in this suite disagree:
+# depends on the PROMPT KIND, and the harness does not say which you have. Two
+# prompts in this suite disagree:
 #
 #   * an optional-COST prompt (`pay_optional_cost:skip_optional_cost`) — `[0]`
 #     DISCARDS the cost card, `[]` skips it
 #       (effects/look_select/look_and_filter/look_at_deck_top_optional_discard_test.rs,
-#        whose two tests differ only in `select_indices(&[0])` vs `(&[])`)
-#   * a `looked_at` SELECTION with a group filter — `[0]` DECLINES, `[]` also
-#     declines, and the matching card needs a different index
-#       (measured: `answer [0] -> the CatChu! card IS taken`, so the order there is
-#        [card, ...] and 0 is the card — which is the OPPOSITE of the case that
-#        cost me three commits)
+#        whose two tests differ only in `select_indices(&[0])` vs `(&[])`);
+#   * a `looked_at` SELECTION with a group filter — measured, `[0]` TAKES the
+#     matching card and `[]` declines, so that order is [card, ...].
 #
 # So the hazard is AMBIGUITY, not a known-wrong order: a test that intends to take
-# and instead declines passes silently whenever its assertion is an absence, and
-# `assert_select_card(zone, n, allow_skip)` is how to state which prompt you have.
+# and instead declines passes silently whenever its assertion is an absence, which a
+# positive assertion would have caught.
 #
-# A row is EXPOSURE, not a defect: nothing static can see which prompt a given [0]
-# answers, and the file above is a true negative in the sense that it is correct --
-# it just needs the prompt kind to be right, not luck.
+# EXPECTED YIELD IS LOW, and that is measured rather than hoped. Thirty of these files
+# assert absence directly about a look or selection, and the two read to check --
+# `look_and_filter/per_group_take_one_from_look_five_test.rs` and
+# `reveal/debut_group_look_three_reveal_test.rs` -- are both exemplars: each states
+# the prompt with `assert_select_card("looked_at", 1, true)` before answering, takes
+# with `[0]` and declines with `[]` deliberately, and pairs every absence assertion
+# with a positive twin that a silent decline would fail. Read the row as "spend five
+# minutes here", not as 49 problems.
 Q_DRAIN_ZERO_RE = re.compile(r"select_indices\(\s*&\[\s*0\s*\]\s*\)")
 Q_ABSENCE_ASSERT_RE = re.compile(
     r"assert!\s*\(\s*!"
@@ -1679,7 +1681,7 @@ SMELL_DOCS = {
     "assert_only_counts": "every assertion is about a count/size (len/count/>=1) — '3 options were offered' can hold while the 3 are the wrong 3",
     "live_success_no_premise": "file CALLS trigger_live_success_abilities but never asserts the state of the ライブ成功時 window it dispatches through. That path checks `should_trigger_live_success`, so a live which failed silently dispatches nothing — and a NEGATIVE assertion in such a file then passes whether or not the ability does anything. The remedy is NOT always 'assert the window is open': a test of the heart requirement itself depends on the window being CLOSED, so each site must assert the state it actually relies on. Files built on `fire_trigger` are NOT flagged: it calls `trigger_auto_ability` directly and forces the dispatch, so there is no window to state. The fix is to assert `should_trigger_live_success` (or the performance snapshot) for the state the test depends on. See the comment above for the four scopings that were wrong first, and note that a live's `heart0` requirement is a COLORLESS WILDCARD satisfied by any colour, not a literal colour",
     "live_success_impossible_live": "file CALLS trigger_live_success_abilities on a live whose printed need_heart no stage in the pool can satisfy — a requirement above what ANY single member prints, and only three members fit on a stage. Such a live's ライブ成功時 is unreachable, so the test is vacuous BY CONSTRUCTION, which is strictly stronger than a missing premise: adding a should_trigger_live_success assertion here would just fail. The remedy is to inject synthetic hearts deliberately (a heart00 wildcard, which the engine treats as an unbounded wildcard in the PROVIDED hearts, as the files in live_success_no_premise do) or to pick a live the pool can satisfy. The card set itself is worth reviewing: 46 of the 291 lives carrying a need_heart (15.8%) are provably unplayable, which is a card-DATA observation and not a harness one. The check is a LOWER BOUND — necessary, not sufficient, since three slots can still conflict across colours — so 'not reported' means 'not provably unplayable'",
-    "drain_zero_may_decline": "file drains a prompt with index [0] AND asserts an absence, while naming a card whose select_cards is `optional`. On a skippable prompt [0] is NOT reliably 'take' and NOT reliably 'skip' — it depends on the PROMPT KIND, and the harness does not say which. An optional-COST prompt takes the card on [0] (effects/look_select/look_and_filter/look_at_deck_top_optional_discard_test.rs proves it: its two tests differ only in [0] vs []); a `looked_at` selection behaves differently again. So the hazard is AMBIGUITY: a test that intends to take and instead declines passes silently whenever its assertion is an absence, which a positive assertion would have caught. `assert_select_card(zone, n, allow_skip)` is how to state the prompt you have. EXPOSURE, not a defect — nothing static can see which prompt a given [0] answers. It is not hypothetical: a draft here 'proved' 平安名すみれ's filtered retrieval unreachable across three commits before the cause turned out to be this ambiguity rather than the engine",
+    "drain_zero_may_decline": "file drains a prompt with index [0] AND asserts an absence, while naming a card whose select_cards is `optional`. On a skippable prompt [0] is NOT reliably 'take' and NOT reliably 'skip' — it depends on the PROMPT KIND and the harness does not say which. An optional-COST prompt takes the card on [0] (look_at_deck_top_optional_discard_test.rs proves it: two tests differing only in [0] vs []); a `looked_at` selection behaves differently again. So the hazard is AMBIGUITY: a test intending to take and instead declines passes silently when its assertion is an absence, which a positive assertion would have caught. `assert_select_card(zone, n, allow_skip)` states the prompt. EXPECTED YIELD IS LOW and measured, not hoped: 30 of these files assert absence directly about a look or selection, and the two read to check are both exemplars that state the prompt before answering and pair every absence with a positive twin. Read a row as 'spend five minutes here', not as 49 problems",
     "placeholder": "#[ignore], assert!(true), todo!() or unimplemented!() left in a test",
     "similar_cards": "confusable card numbers (bp2 vs pb2) staged in one file AND the file pins card identity (assert_card_identity / compares card_no), so a transposition would fail loudly",
     "unpinned_similar_cards": "confusable card numbers (bp2 vs pb2) staged in one file with NO card-identity pin — a transposed print would pass silently; add assert_card_identity to close it",
