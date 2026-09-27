@@ -69,6 +69,10 @@ static int set_live_card(TestGame *tg, int card_id) {
 
 static int run_full_turn(TestGame *tg) {
     for (int i = 0; i < 30; i++) {
+        fprintf(stderr, "PROBE_TURN i=%d phase=%d sumire_h06=%d wien_h03=%d\n", i,
+                tg->state.phase,
+                test_get_heart_modifier(tg, test_id(tg, "PL!SP-bp2-015-N"), RB_HEART_ORANGE),
+                test_get_heart_modifier(tg, test_id(tg, "PL!SP-bp2-021-N"), RB_HEART_GREEN));
         if (tg->state.phase == RB_PHASE_ACTIVE && !test_has_pending_choice(tg)) return 1;
         const char *choice = test_pending_choice_type(tg);
         if (strcmp(choice, "SelectCard") == 0) {

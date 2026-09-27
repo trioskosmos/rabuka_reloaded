@@ -8,6 +8,8 @@
 //! Ability execution itself lives in `crate::ability` (`AbilityResolver`).
 pub mod actions;
 pub mod live;
+#[cfg(test)]
+mod mulligan_tests;
 pub mod phases;
 pub mod triggers;
 

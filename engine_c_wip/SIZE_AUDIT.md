@@ -8,44 +8,44 @@ actually present in C.
 ## Summary
 
 - C files audited (mapped to a Rust twin): 28
-- Total C lines (non-blank/comment): 29629   Total Rust lines: 46795
-- Total C functions: 1481   Total Rust functions (all): 1122
-- Total Rust **port-target** functions (excl. constructors/trait glue): 904
-- **Function-count gap (Rust port-targets − C, summed): -577** (approx. unported functions)
-- Best-effort unmatched Rust function names: 38 (heuristic)
+- Total C lines (non-blank/comment): 29577   Total Rust lines: 46660
+- Total C functions: 1480   Total Rust functions (all): 1151
+- Total Rust **port-target** functions (excl. constructors/trait glue): 931
+- **Function-count gap (Rust port-targets − C, summed): -549** (approx. unported functions)
+- Best-effort unmatched Rust function names: 43 (heuristic)
 
 ## Per-file gap (sorted by missing-function count, worst first)
 
 | C file | C lines | Rust lines | C/Rust % | C fns | Rust port fns | missing ≈ | Rust twin(s) |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: | --- |
 | `src/ability/vm.c` | 1915 | 3664 | 52% | 75 | 82 | 7 | vm.rs, effect_decoder_gen.rs, condition_decoder_gen.rs |
-| `src/ability/effects/state.c` | 1696 | 5200 | 32% | 49 | 50 | 1 | state.rs, misc.rs |
-| `src/ability/condition.c` | 2727 | 6119 | 44% | 113 | 82 | -31 | condition.rs, card.rs, compound.rs, state.rs |
-| `src/ability/choice.c` | 2595 | 3432 | 75% | 90 | 47 | -43 | choice.rs |
-| `src/ability/ability_queue.c` | 597 | 690 | 86% | 54 | 32 | -22 | ability_queue.rs, triggers.rs |
+| `src/ability/effects/state.c` | 1696 | 5222 | 32% | 49 | 55 | 6 | state.rs, misc.rs |
+| `src/ability/condition.c` | 2727 | 6029 | 45% | 113 | 87 | -26 | condition.rs, card.rs, compound.rs, state.rs |
+| `src/ability/choice.c` | 2595 | 3442 | 75% | 90 | 48 | -42 | choice.rs |
+| `src/ability/ability_queue.c` | 597 | 679 | 87% | 54 | 32 | -22 | ability_queue.rs, triggers.rs |
 | `src/ability/dynamic_count.c` | 297 | 158 | 187% | 10 | 2 | -8 | dynamic_count.rs |
-| `src/ability/util.c` | 1787 | 2117 | 84% | 97 | 86 | -11 | util.rs |
-| `src/ability/cost.c` | 1335 | 0 | -1% | 54 | 0 | -54 | cost.rs |
+| `src/ability/util.c` | 1784 | 2072 | 86% | 97 | 90 | -7 | util.rs |
+| `src/ability/cost.c` | 1351 | 0 | -1% | 55 | 0 | -55 | cost.rs |
 | `src/ability/compound.c` | 523 | 0 | -1% | 31 | 0 | -31 | compound.rs |
-| `src/ability/resolver.c` | 634 | 1172 | 54% | 42 | 34 | -8 | resolver.rs |
-| `src/ability/effects/move.c` | 1685 | 2921 | 57% | 51 | 33 | -18 | move_cards.rs |
+| `src/ability/resolver.c` | 634 | 994 | 63% | 42 | 26 | -16 | resolver.rs |
+| `src/ability/effects/move.c` | 1685 | 2928 | 57% | 51 | 34 | -17 | move_cards.rs |
 | `src/ability/effects/look.c` | 832 | 1222 | 68% | 41 | 25 | -16 | look.rs |
 | `src/ability/effects/ability.c` | 532 | 597 | 89% | 30 | 7 | -23 | ability_effects.rs |
-| `src/ability/effects/misc.c` | 1462 | 3552 | 41% | 56 | 33 | -23 | misc.rs |
+| `src/ability/effects/misc.c` | 1447 | 3563 | 40% | 56 | 36 | -20 | misc.rs |
 | `src/ability/effects/draw.c` | 725 | 727 | 99% | 21 | 14 | -7 | draw.rs |
-| `src/ability/effects/score.c` | 789 | 787 | 100% | 34 | 6 | -28 | score.rs |
+| `src/ability/effects/score.c` | 789 | 819 | 96% | 34 | 12 | -22 | score.rs |
 | `src/core/card.c` | 1089 | 3631 | 29% | 103 | 97 | -6 | card.rs |
 | `src/core/data.c` | 663 | 1044 | 63% | 46 | 12 | -34 | mod.rs, types.rs |
 | `src/core/alloc.c` | 177 | 140 | 126% | 15 | 5 | -10 | pool.rs |
-| `src/core/modifiers.c` | 499 | 416 | 119% | 67 | 22 | -45 | game_modifiers.rs, modifiers.rs |
+| `src/core/modifiers.c` | 499 | 435 | 114% | 67 | 23 | -44 | game_modifiers.rs, modifiers.rs |
 | `src/core/stats_pipeline.c` | 184 | 226 | 81% | 14 | 8 | -6 | stats_pipeline.rs |
-| `src/core/game_state_abilities.c` | 1669 | 2596 | 64% | 107 | 73 | -34 | abilities.rs |
+| `src/core/game_state_abilities.c` | 1619 | 2686 | 60% | 105 | 80 | -25 | abilities.rs |
 | `src/core/tracking.c` | 141 | 88 | 160% | 10 | 6 | -4 | tracking.rs |
 | `src/core/zones.c` | 638 | 1224 | 52% | 74 | 48 | -26 | zones.rs, player.rs |
-| `src/turn/phase.c` | 947 | 1494 | 63% | 55 | 37 | -18 | phases.rs |
-| `src/turn/live.c` | 1412 | 2757 | 51% | 54 | 50 | -4 | live.rs |
+| `src/turn/phase.c` | 947 | 1513 | 62% | 55 | 37 | -18 | phases.rs |
+| `src/turn/live.c` | 1412 | 2734 | 51% | 54 | 52 | -2 | live.rs |
 | `src/turn/triggers.c` | 857 | 480 | 178% | 31 | 5 | -26 | triggers.rs |
-| `src/engine.c` | 1222 | 341 | 358% | 57 | 8 | -49 | main.rs, lib.rs, mod.rs, game.rs |
+| `src/engine.c` | 1222 | 343 | 356% | 57 | 8 | -49 | main.rs, lib.rs, mod.rs, game.rs |
 
 ## Best-effort unmatched Rust function names (heuristic — verify manually)
 
@@ -54,13 +54,16 @@ some listed names DO have a C twin under a different name. Use as an
 investigation starting point, not gospel.
 
 - `src/core/card.c` (12 unmatched): `ek_box_new`, `serialize`, `deserialize`, `get`, `keys`, `raw`, `load_or_create`, `default_blade`, `common`, `common_mut`, `has_score_icon`, `has_all_blade`
-- `src/ability/effects/state.c` (9 unmatched): `handle_both_targets`, `handle_bp6_pattern`, `calculate_gain_multiplier`, `execute_gain_resource`, `try_create_target_selection_choice`, `resolve_gain_resource_targets`, `execute_choice`, `execute_restriction`, `rule_log_activated`
+- `src/ability/effects/state.c` (10 unmatched): `handle_both_targets`, `handle_bp6_pattern`, `calculate_gain_multiplier`, `execute_gain_resource`, `is_broadly_self`, `try_create_target_selection_choice`, `resolve_gain_resource_targets`, `execute_choice`, `execute_restriction`, `rule_log_activated`
 - `src/core/zones.c` (4 unmatched): `push_waited`, `mark_waited`, `owner_at`, `swap_slots`
 - `src/turn/phase.c` (3 unmatched): `deselect_index`, `deduped_desc`, `trigger_baton_touch_abilities`
 - `src/ability/choice.c` (2 unmatched): `consume_deferred_gate`, `handle_apply_replacement`
 - `src/core/data.c` (2 unmatched): `serialize`, `deserialize`
 - `src/core/game_state_abilities.c` (2 unmatched): `write`, `finish`
+- `src/turn/live.c` (2 unmatched): `debug_label`, `bonus_source`
 - `src/ability/condition.c` (1 unmatched): `owner_is_active`
 - `src/ability/util.c` (1 unmatched): `ability_trigger_can_activate`
 - `src/ability/resolver.c` (1 unmatched): `per_unit_reduction`
+- `src/ability/effects/misc.c` (1 unmatched): `is_broadly_self`
+- `src/ability/effects/score.c` (1 unmatched): `accepts`
 - `src/core/alloc.c` (1 unmatched): `serialize`

@@ -21,7 +21,22 @@ static void rb_clear_area_placement_tracking(GameState *g){
     g->n_areas_placed_this_turn = 0;
 }
 
+/* Mirror GameState::reset_keyword_tracking —
+   engine/src/core/game_state/tracking.rs:6-36.
+
+   Call site in Rust: engine/src/turn/phases.rs:98, the `Phase::Active` arm of
+   advance_phase, i.e. on entry to EACH player's Active phase (twice per round).
+   The C turn rollover in src/turn/phase.c has no equivalent call; see the
+   report for the exact insertion point.
+
+   NOT cleared here, deliberately (Rust tracking.rs:9-17): debut counts and the
+   card-appearance / movement trackers. This method runs twice per round while
+   「このターン」 spans the whole round, so clearing them here truncated
+   first-attacker-window facts before live-start / live-success conditions could
+   read them (PL!N-pb1-037-L Q203, PL!N-bp3-005-R＋, PL!HS-bp2-021-L). They are
+   cleared together at the turn rollover (phases.rs:310 → rb_clear_card_movement_tracking). */
 void rb_reset_keyword_tracking(GameState *g){
+    if(!g) return;
     g->n_turn1_abilities_played = 0;
     g->n_turn2_abilities_played = 0;
     g->player1_cheer_blade_heart_count = 0;
@@ -31,20 +46,43 @@ void rb_reset_keyword_tracking(GameState *g){
     g->last_resolution_cards_p1.n = 0;
     g->last_resolution_cards_p2.n = 0;
     rb_clear_auto_ability_trigger_tracking(g);
+    /* reset_change_flags (abilities.rs:3152-3173) owns the live-success /
+       change-of-state "this turn" flags. C keeps a two-slot mirror in
+       g->live_success[]; clearing it here matches Rust semantics (Rust clears
+       p1/p2_live_success_this_turn inside reset_change_flags). C does NOT
+       track turn_state_changes (Rust abilities.rs:3168-3171 explicitly does not
+       clear it here either) or recently_state_changed. */
     rb_reset_change_flags(g);
     g->live_success[0] = 0;
     g->live_success[1] = 0;
-    g->opponent_choice_declined = 0;
     g->cheer_check_completed = 0;
     rb_reset_loop_detection(g);
-    g->baton_touch_count_p1 = 0;
-    g->baton_touch_count_p2 = 0;
-    g->n_baton_touch_arriving_card_ids = 0;
+    /* Baton-touch tracking (tracking.rs:28-34). Rust clears the same seven
+       fields in clear_baton_touch_tracking; delegate so the two entry points
+       can never drift. */
+    rb_clear_baton_touch_tracking(g);
+    rb_clear_area_placement_tracking(g);
+}
+
+/* Mirror GameState::clear_play_scoped_baton_touch —
+   engine/src/core/game_state/modifiers.rs:1442-1447.
+   Call site in Rust: engine/src/turn/phases.rs:1154, the first statement of
+   handle_play_member_to_stage (i.e. at the head of every member play).
+
+   Only the PLAY-scoped half of the baton state is reset: the replaced-member
+   identity/cost, the zero-cost flag and the last arriving id. The TURN-scoped
+   history — per-player counts and the arriving-id list — intentionally
+   SURVIVES across plays within a turn, because
+   「このターン中にバトンタッチして登場したメンバーが2人以上」
+   (PL!HS-bp2-023-L / PL!HS-bp2-025-L) requires two separate baton plays to
+   ACCUMULATE. Only the full rb_clear_baton_touch_tracking (via
+   rb_reset_keyword_tracking at the Active-phase boundary) drops those. */
+void rb_clear_play_scoped_baton_touch(GameState *g){
+    if(!g) return;
     g->baton_touch_zero_cost = 0;
     g->baton_touch_replaced_member_cost = -1;
     g->baton_touch_replaced_member_id = -1;
     g->baton_touch_arriving_card_id = -1;
-    rb_clear_area_placement_tracking(g);
 }
 
 void rb_add_yell_count_modifier(GameState *g, uint8_t player_slot, int32_t delta){

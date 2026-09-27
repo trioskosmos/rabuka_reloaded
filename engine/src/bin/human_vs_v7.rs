@@ -38,6 +38,8 @@ fn main() {
     let mut script = String::from("my_script.txt");
     let mut auto = false;
     let mut quiet = false;
+    let mut peek = false;
+    let mut diverge_games = 0u32;
     let mut i = 0;
     while i < args.len() {
         match args[i].as_str() {
@@ -59,6 +61,11 @@ fn main() {
             }
             "--auto" => auto = true,
             "--quiet" => quiet = true,
+            "--peek" => peek = true,
+            "--diverge" => {
+                i += 1;
+                diverge_games = args[i].parse().unwrap_or(1);
+            }
             other => panic!("unknown flag {other}"),
         }
         i += 1;
@@ -78,6 +85,176 @@ fn main() {
     // function of (seed, my choices). This is what makes the script/continue
     // loop sound.
     rabuka_engine::rng::seed(seed);
+    // --diverge: play N games with v8 on my side and v7 on the other, and
+    // record every decision where v8's pick differs from v7's argmax. Playing
+    // a side by hand surfaces divergences one at a time and only for the games
+    // I happen to reach; this reports the same thing across many games, grouped
+    // by the kind of decision, which is what actually points at a fix.
+    if diverge_games > 0 {
+        use std::collections::BTreeMap;
+        let mut tally: BTreeMap<String, usize> = BTreeMap::new();
+        let mut samples: BTreeMap<String, String> = BTreeMap::new();
+        let mut phase_tally: BTreeMap<String, usize> = BTreeMap::new();
+        // (phase, life v7 picked, life v8 picked) on SelectLiveCard steps.
+        let mut live_picks: Vec<(String, String, String)> = Vec::new();
+        let mut total_decisions = 0usize;
+        let mut total_diverged = 0usize;
+        let mut my_wins = 0usize;
+
+        for game in 0..diverge_games {
+            rabuka_engine::rng::seed(seed.wrapping_add(game));
+            let mut gs = deal(&db, &t1, &t2);
+            let mut last_key = String::new();
+            let mut repeats = 0u32;
+            for _ in 0..3000 {
+                TurnEngine::check_victory_condition(&mut gs);
+                if gs.game_result != GameResult::Ongoing {
+                    break;
+                }
+                // Without a repeat guard a phase that never advances burns the
+                // whole step budget and the game silently "finishes" unfinished.
+                let key = format!("{:?}:{}", gs.current_phase, gs.active_player().id);
+                if key == last_key {
+                    repeats += 1;
+                    if repeats > 200 {
+                        break;
+                    }
+                } else {
+                    last_key = key;
+                    repeats = 0;
+                }
+                if game_setup::auto_advance_one(&mut gs) {
+                    continue;
+                }
+                let actions = game_setup::generate_possible_actions(&gs);
+                if actions.is_empty() {
+                    TurnEngine::advance_phase(&mut gs);
+                    continue;
+                }
+                let active_me = if gs.active_player().id == "p1" { 0u8 } else { 1u8 };
+                let chosen = route(&gs, &actions, active_me, &db, active_me == my_me);
+                if active_me == my_me {
+                    total_decisions += 1;
+                    *phase_tally
+                        .entry(format!("{:?}", gs.current_phase))
+                        .or_insert(0usize) += 1;
+                    let scored = strategy_v7::score_actions(&gs, &actions, my_me);
+                    let mut v7_best = 0usize;
+                    for i in 0..scored.len() {
+                        if scored[i].0 > scored[v7_best].0 {
+                            v7_best = i;
+                        }
+                    }
+                    // Record the life each side picked on a SelectLiveCard
+                    // step, so "picked a different life" is separable from
+                    // "reached the decision at a different point in the search".
+                    if actions[v7_best].action_type
+                        == game_setup::ActionType::SelectLiveCard
+                        && chosen.action_type == game_setup::ActionType::SelectLiveCard
+                    {
+                        live_picks.push((
+                            format!("{:?}", gs.current_phase),
+                            describe(&actions[v7_best], &db),
+                            describe(&chosen, &db),
+                        ));
+                    }
+                    // Compare signatures, not indices: v8 may return a
+                    // canonicalised action whose parameters differ cosmetically
+                    // from the generated one, and an index lookup would then
+                    // report "no divergence" for every single decision.
+                    if signature(&actions[v7_best]) != signature(&chosen) {
+                        total_diverged += 1;
+                        let me_p = gs.seat_player(my_me);
+                        let key = format!(
+                            "{:?} -> v7:{} | v8:{}",
+                            actions[v7_best].action_type,
+                            describe(&actions[v7_best], &db),
+                            describe(&chosen, &db)
+                        );
+                        *tally.entry(key.clone()).or_insert(0) += 1;
+                        samples.entry(key).or_insert_with(|| {
+                            format!(
+                                "  seed {} turn {} energy {} stage cost {}",
+                                seed.wrapping_add(game),
+                                gs.turn_number,
+                                me_p.energy_zone.active_count(),
+                                me_p.stage
+                                    .stage
+                                    .iter()
+                                    .filter(|&&c| c >= 0)
+                                    .filter_map(|&c| db.get_card(c).and_then(|x| x.cost))
+                                    .map(i32::from)
+                                    .sum::<i32>()
+                            )
+                        });
+                    }
+                }
+                let _ = execute_and_settle(&mut gs, &chosen);
+            }
+            let (a, b) = if my_me == 0 {
+                (
+                    gs.player1.success_live_card_zone.cards.len(),
+                    gs.player2.success_live_card_zone.cards.len(),
+                )
+            } else {
+                (
+                    gs.player2.success_live_card_zone.cards.len(),
+                    gs.player1.success_live_card_zone.cards.len(),
+                )
+            };
+            if a >= 3 && b <= 2 {
+                my_wins += 1;
+            }
+        }
+
+        println!("=== DIVERGENCE: v8 vs v7 argmax over {diverge_games} games ===");
+        println!("v8 (my side) won {my_wins}/{diverge_games}");
+        println!(
+            "decisions {total_decisions}, v8 disagreed with v7 on {total_diverged} ({:.1}%)",
+            100.0 * total_diverged as f64 / total_decisions.max(1) as f64
+        );
+        println!("decisions by phase: {:?}", phase_tally);
+        let mut rows: Vec<(&String, &usize)> = tally.iter().collect();
+        rows.sort_by(|a, b| b.1.cmp(a.1));
+        for (k, n) in rows.iter().take(16) {
+            println!("  {n:>5}x  {k}");
+            if let Some(s) = samples.get(*k) {
+                println!("        e.g.{s}");
+            }
+        }
+
+        // Which life each bot actually picks. A `ConfirmLiveSet` vs
+        // `SelectLive` disagreement counts a sequencing difference in the
+        // search, not a different choice, so the question worth answering is
+        // narrower: where the two ARE picking a life, do they pick the same
+        // one? That separates "v8 chose differently" from "v8 chose worse",
+        // which the aggregate tally above cannot do.
+        println!("\n=== life selection: same or different ===");
+        let mut picked: BTreeMap<String, (usize, usize)> = BTreeMap::new();
+        let mut pick_decisions = 0usize;
+        let mut same = 0usize;
+        for c in &live_picks {
+            pick_decisions += 1;
+            if c.1 == c.2 {
+                same += 1;
+            }
+            picked.entry(c.1.clone()).or_insert((0, 0)).0 += 1;
+            picked.entry(c.2.clone()).or_insert((0, 0)).1 += 1;
+        }
+        println!(
+            "  life-picking decisions {pick_decisions}, same life chosen {same} ({:.1}%)",
+            100.0 * same as f64 / pick_decisions.max(1) as f64
+        );
+        let mut pr: Vec<(&String, &(usize, usize))> = picked.iter().collect();
+        pr.sort_by(|a, b| (b.1.0 + b.1.1).cmp(&(a.1.0 + a.1.1)));
+        println!("  {:<24} {:>5} {:>5}", "life", "v7", "v8");
+        for (life, (v7, v8)) in pr.iter().take(12) {
+            println!("  {life:<24} {v7:>5} {v8:>5}");
+        }
+        return;
+    }
+
+
     let mut gs = deal(&db, &t1, &t2);
 
     let choices: Vec<usize> = std::fs::read_to_string(&script)
@@ -85,6 +262,73 @@ fn main() {
         .lines()
         .filter_map(|l| l.trim().parse::<usize>().ok())
         .collect();
+
+    // --peek: report the opening hand and stop. Two of the first hands dealt
+    // had no castable Live at all, which makes the game unwinnable regardless
+    // of how it is played. Discovering that one decision at a time is wasteful,
+    // so this answers "is this seed worth playing" in one call.
+    if peek {
+        // Stop where a mulligan decision is actually on offer, rather than
+        // inferring it from the phase: `auto_advance_one` can walk past a
+        // mulligan in a single call, and a peek that samples after that sees
+        // a post-mulligan hand and reports a different game.
+        for _ in 0..60 {
+            if game_setup::auto_advance_one(&mut gs) {
+                continue;
+            }
+            let actions = game_setup::generate_possible_actions(&gs);
+            if actions.is_empty() {
+                // Early in setup the hand is not dealt yet, so "no actions"
+                // means "not ready", not "finished". Keep going.
+                continue;
+            }
+            if actions
+                .iter()
+                .any(|a| a.action_type == game_setup::ActionType::SelectMulligan)
+            {
+                break;
+            }
+            let pick = actions
+                .iter()
+                .find(|a| {
+                    matches!(
+                        a.action_type,
+                        game_setup::ActionType::RockChoice
+                            | game_setup::ActionType::PaperChoice
+                            | game_setup::ActionType::ScissorsChoice
+                            | game_setup::ActionType::ChooseFirstAttacker
+                            | game_setup::ActionType::ChooseSecondAttacker
+                    )
+                })
+                .cloned();
+            match pick {
+                Some(p) => {
+                    let _ = execute_and_settle(&mut gs, &p);
+                }
+                None => break,
+            }
+        }
+        let p = if my_me == 0 { &gs.player1 } else { &gs.player2 };
+        let mut total = 0usize;
+        for &id in p.hand.cards.iter() {
+            let Some(c) = db.get_card(id) else { continue };
+            if c.card_type != rabuka_engine::card::CardType::Live {
+                continue;
+            }
+            total += 1;
+            println!(
+                "  live {}  score={}  need={}",
+                short(&db, id),
+                c.score.unwrap_or(0),
+                need_of(&db, id)
+            );
+        }
+        if total == 0 {
+            println!("  (no live cards in the opening hand)");
+        }
+        println!("seed {seed}: {total} live(s) in hand");
+        return;
+    }
 
     let mut used = 0usize;
     let mut decision = 0usize;
@@ -112,7 +356,7 @@ fn main() {
 
         if active_me != my_me {
             // v7's turn. Deterministic, so no script needed.
-            let a = strategy_v7::choose_action_v7(&gs, &actions, opp_me);
+            let a = route(&gs, &actions, opp_me, &db, false);
             if !quiet {
                 println!("  v7 plays {}", describe(&a, &db));
             }
@@ -149,14 +393,40 @@ fn main() {
                 }
             }
             let v8a = strategy_v8::choose_action_v8_entry(&gs, &actions, my_me);
-            if let Some(idx) = actions
+            let v8_idx = actions
                 .iter()
-                .position(|x| signature(x) == signature(&v8a))
-            {
+                .position(|x| signature(x) == signature(&v8a));
+            if let Some(idx) = v8_idx {
                 println!(
-                    "\n  v8 would play [{idx}]: {}   <-- v8 is behind you",
+                    "\n  v8 would play [{idx}]: {}   <-- v8's pick",
                     describe(&v8a, &db)
                 );
+            }
+
+            // v7's own scoring of every option, as a reference ranking. v7's
+            // Main phase is the best-measured one in the project, so where its
+            // argmax disagrees with v8's pick is where to look for a real
+            // defect rather than a matter of taste.
+            if std::env::var_os("V7_SCORES").is_some() {
+                let scored = strategy_v7::score_actions(&gs, &actions, my_me);
+                let mut best = 0usize;
+                for (i, (_, _)) in scored.iter().enumerate() {
+                    if scored[i].0 > scored[best].0 {
+                        best = i;
+                    }
+                }
+                println!("\n  v7's ranking (its argmax is [{best}]):");
+                let mut rows: Vec<(usize, f64, String)> = scored
+                    .iter()
+                    .enumerate()
+                    .map(|(i, (v, label))| (i, *v, label.clone()))
+                    .collect();
+                rows.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
+                for (i, v, label) in rows.iter().take(8) {
+                    let mark = if *i == best { " <= v7 argmax" } else { "" };
+                    let v8mark = if Some(*i) == v8_idx { "   [v8's pick]" } else { "" };
+                    println!("    [{i:>2}] {v:>12.4}  {label}{mark}{v8mark}");
+                }
             }
             println!("\n(append ONE more choice to the script, then re-run)");
             println!("choices already consumed: {used}");
@@ -227,14 +497,84 @@ fn deal(
     gs
 }
 
+/// Identity of an action for comparison purposes.
+///
+/// This must include the card AND the target area. An earlier version keyed
+/// only on (type, card_id, card_indices), which made a difference in
+/// `stage_area_index` - a different member slot - read as agreement. That
+/// silently reported zero divergences, which is worse than no tool at all
+/// because it looks like a result.
+/// Route a decision to the right entry point for a bot, by phase.
+///
+/// Every generation exposes three separate entry points - main action, live
+/// set, mulligan - and calling the main-phase one for everything is the bug
+/// that made the first divergence run report 0 wins and 0 disagreements: the
+/// live set and mulligan were being decided by a Main-phase chooser, so no
+/// game ever resolved. `bot_arena` routes the same way.
+fn route(
+    gs: &GameState,
+    actions: &[game_setup::Action],
+    me: u8,
+    db: &CardDatabase,
+    v8: bool,
+) -> game_setup::Action {
+    use rabuka_engine::core::types::Phase;
+    use rabuka_engine::bot::{choose_live_set_v7, choose_live_set_v8, choose_mulligan_v7,
+                             choose_mulligan_v8};
+    match gs.current_phase {
+        // RPS needs special handling, and the reason is specific to how this
+        // fork drives the phase headlessly: only player1 is ever offered the
+        // choice, and the phase advances when player1's gesture CHANGES from
+        // the previous round - that is what stands in for the second seat.
+        // Re-picking the same gesture is a tie that re-offers, so an
+        // unattended run sits in RockPaperScissors forever. Every earlier
+        // attempt of this harness burned 100% of its decisions here.
+        //
+        // Cycling the gesture is therefore not a shortcut, it is the only way
+        // to drive the phase from a single seat. `bot_arena` does not hit this
+        // because it seeds the RNG per game and the bots' own choices vary.
+        Phase::RockPaperScissors => {
+            use std::sync::atomic::{AtomicUsize, Ordering};
+            static RPS: AtomicUsize = AtomicUsize::new(0);
+            let cycle = [
+                game_setup::ActionType::RockChoice,
+                game_setup::ActionType::PaperChoice,
+                game_setup::ActionType::ScissorsChoice,
+            ];
+            let i = RPS.fetch_add(1, Ordering::Relaxed) % cycle.len();
+            actions
+                .iter()
+                .find(|a| a.action_type == cycle[i])
+                .or_else(|| actions.first())
+                .cloned()
+                .unwrap_or_else(|| unreachable!("RPS offers at least one gesture"))
+        }
+        Phase::MulliganFirstAttacker | Phase::MulliganSecondAttacker => {
+            if v8 { choose_mulligan_v8(gs, actions, db) } else { choose_mulligan_v7(gs, actions, db) }
+        }
+        Phase::LiveCardSetFirstAttacker | Phase::LiveCardSetSecondAttacker => {
+            if v8 { choose_live_set_v8(gs, actions, db) } else { choose_live_set_v7(gs, actions, db) }
+        }
+        _ => {
+            if v8 {
+                strategy_v8::choose_action_v8_entry(gs, actions, me)
+            } else {
+                strategy_v7::choose_action_v7(gs, actions, me)
+            }
+        }
+    }
+}
+
 fn signature(a: &game_setup::Action) -> String {
+    let p = a.parameters.as_ref();
     format!(
-        "{:?}|{:?}|{:?}",
+        "{:?}|id={:?}|idx={:?}|area={:?}|baton={:?}|abilities={:?}",
         a.action_type,
-        a.parameters.as_ref().and_then(|p| p.card_id),
-        a.parameters
-            .as_ref()
-            .and_then(|p| p.card_indices.clone())
+        p.and_then(|p| p.card_id),
+        p.and_then(|p| p.card_index),
+        p.and_then(|p| p.stage_area_index),
+        p.and_then(|p| p.use_baton_touch),
+        p.and_then(|p| p.ability_index),
     )
 }
 

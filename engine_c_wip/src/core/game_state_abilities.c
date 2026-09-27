@@ -942,49 +942,116 @@ int rb_entry_has_pending_choice(const GameState *g) {
 /* NOTE: rb_get_pending_choice lives in src/ability/choice.c (single owner;
    deleted duplicate here 2026-09-14). */
 
-const AbilityEffect *rb_entry_cost(const GameState *g) {
-    if (!g || g->queue.cur < 0 || g->queue.cur >= g->queue.n_entries) return NULL;
+/* ── Entry ability accessors: memory safety (was: use-after-free) ──────
+ *
+ * These three accessors used to decode the current entry's Ability, stash
+ * `ab.cost` / `ab.effect` (or a `->destination` string), call rb_free_ability()
+ * on the whole tree and then RETURN A POINTER INTO THE FREED TREE. Every
+ * dereference by the callers was undefined behaviour on freed heap, not a
+ * cosmetic bug.
+ *
+ * Two shapes fix it:
+ *
+ *  1. Copy-out (preferred, no shared state at all) -- `rb_entry_ability_copy`
+ *     and `rb_entry_destination_copy` below. The caller owns the result and
+ *     releases it with the existing rb_free_ability() cleanup. New code should
+ *     use these.
+ *
+ *  2. The legacy `const AbilityEffect *` accessors keep their signatures --
+ *     they have 9 call sites in choice.c / cost.c / move.c, none of which live
+ *     in this file -- but are now backed by a per-GameState KEEP-ALIVE RING.
+ *     Every call decodes a FRESH ability into the next ring slot, so the tree a
+ *     caller holds stays owned by the GameState and is only released when the
+ *     ring wraps. Lifetime contract for these: a returned pointer stays valid
+ *     for RB_ENTRY_KEEPALIVE_SLOTS-1 further entry-accessor calls (4 in
+ *     practice; the deepest observed nesting is 2). It is per-GameState, never
+ *     static or thread-local, so two live GameStates never alias each other.
+ *     RB_ENTRY_KEEPALIVE_SLOTS itself lives in include/rabuka.h (the ring is
+ *     embedded in GameState). */
+
+/* Resolve (card_id, ability_idx) of the current queue entry. Returns 0 when
+   there is no current entry or it has no card. */
+static int rb_entry_current_target(const GameState *g, int *out_cid, int *out_aidx) {
+    if (!g || g->queue.cur < 0 || g->queue.cur >= g->queue.n_entries) return 0;
     int cid = g->queue.entries[g->queue.cur].card_id;
-    int aidx = g->queue.entries[g->queue.cur].ability_idx;
-    if (cid < 0) return NULL;
-    Ability ab;
-    if (!rb_decode_card_ability((uint32_t)cid, aidx, &ab)) return NULL;
-    const AbilityEffect *cost = ab.cost;
-    rb_free_ability(&ab);
-    return cost;
+    if (cid < 0) return 0;
+    if (out_cid) *out_cid = cid;
+    if (out_aidx) *out_aidx = g->queue.entries[g->queue.cur].ability_idx;
+    return 1;
+}
+
+/* Decode (cid, aidx) into the next keep-alive slot, releasing the slot this
+   ring is about to reuse. Returns NULL when the ability cannot be decoded. */
+static Ability *rb_entry_keepalive_decode(const GameState *cg, int cid, int aidx) {
+    GameState *g = (GameState *)cg; /* the keep-alive ring is GameState state */
+    if (!g) return NULL;
+    int slot = g->entry_keepalive_next;
+    if (g->entry_keepalive_used[slot]) {
+        rb_free_ability(&g->entry_keepalive[slot]);
+        g->entry_keepalive_used[slot] = 0;
+    }
+    g->entry_keepalive_next = (slot + 1) % RB_ENTRY_KEEPALIVE_SLOTS;
+    memset(&g->entry_keepalive[slot], 0, sizeof(g->entry_keepalive[slot]));
+    if (!rb_decode_card_ability((uint32_t)cid, aidx, &g->entry_keepalive[slot]))
+        return NULL;
+    g->entry_keepalive_used[slot] = 1;
+    return &g->entry_keepalive[slot];
+}
+
+const AbilityEffect *rb_entry_cost(const GameState *g) {
+    int cid, aidx;
+    if (!rb_entry_current_target(g, &cid, &aidx)) return NULL;
+    const Ability *ab = rb_entry_keepalive_decode(g, cid, aidx);
+    return ab ? ab->cost : NULL;
 }
 
 const AbilityEffect *rb_entry_effect(const GameState *g) {
-    if (!g || g->queue.cur < 0 || g->queue.cur >= g->queue.n_entries) return NULL;
-    int cid = g->queue.entries[g->queue.cur].card_id;
-    int aidx = g->queue.entries[g->queue.cur].ability_idx;
-    if (cid < 0) return NULL;
-    Ability ab;
-    if (!rb_decode_card_ability((uint32_t)cid, aidx, &ab)) return NULL;
-    const AbilityEffect *eff = ab.effect;
-    rb_free_ability(&ab);
-    return eff;
+    int cid, aidx;
+    if (!rb_entry_current_target(g, &cid, &aidx)) return NULL;
+    const Ability *ab = rb_entry_keepalive_decode(g, cid, aidx);
+    return ab ? ab->effect : NULL;
 }
 
+/* Cost destination while the effect has not started, else the effect
+   destination (unchanged semantics; now a single decode of a live tree). */
 const char *rb_entry_destination(const GameState *g) {
-    if (!g || g->queue.cur < 0 || g->queue.cur >= g->queue.n_entries) return NULL;
+    int cid, aidx;
+    if (!rb_entry_current_target(g, &cid, &aidx)) return NULL;
     const RbQueueEntry *e = &g->queue.entries[g->queue.cur];
-    if (!e->effect_started && e->ability_idx >= 0) {
-        int cid = e->card_id;
-        if (cid >= 0) {
-            Ability ab;
-            if (rb_decode_card_ability((uint32_t)cid, e->ability_idx, &ab)) {
-                if (ab.cost && ab.cost->destination) {
-                    const char *dest = ab.cost->destination;
-                    rb_free_ability(&ab);
-                    return dest;
-                }
-                rb_free_ability(&ab);
-            }
-        }
-    }
-    const AbilityEffect *eff = rb_entry_effect(g);
-    return eff ? eff->destination : NULL;
+    const Ability *ab = rb_entry_keepalive_decode(g, cid, aidx);
+    if (!ab) return NULL;
+    if (!e->effect_started && ab->cost && ab->cost->destination)
+        return ab->cost->destination;
+    return ab->effect ? ab->effect->destination : NULL;
+}
+
+/* ── Copy-out accessors (preferred; caller frees with rb_free_ability) ── */
+
+int rb_entry_ability_copy(const GameState *g, Ability *out) {
+    if (!out) return 0;
+    memset(out, 0, sizeof(*out));
+    out->use_limit = -1;
+    int cid, aidx;
+    if (!rb_entry_current_target(g, &cid, &aidx)) return 0;
+    return rb_decode_card_ability((uint32_t)cid, aidx, out);
+}
+
+int rb_entry_destination_copy(const GameState *g, char *buf, size_t buf_len) {
+    if (!buf || buf_len == 0) return 0;
+    buf[0] = '\0';
+    int cid, aidx;
+    if (!rb_entry_current_target(g, &cid, &aidx)) return 0;
+    const RbQueueEntry *e = &g->queue.entries[g->queue.cur];
+    Ability ab;
+    memset(&ab, 0, sizeof(ab));
+    ab.use_limit = -1;
+    if (!rb_decode_card_ability((uint32_t)cid, aidx, &ab)) return 0;
+    const char *src = NULL;
+    if (!e->effect_started && ab.cost && ab.cost->destination) src = ab.cost->destination;
+    else if (ab.effect) src = ab.effect->destination;
+    if (src) snprintf(buf, buf_len, "%s", src);
+    rb_free_ability(&ab);
+    return src ? 1 : 0;
 }
 
 
@@ -1540,11 +1607,16 @@ int rb_fire_recorded_auto(GameState *g, int pl) {
 
 /* ── Queue drain + resolution loop ──────────────────────────────────── */
 
-static int rb_process_current_ability(GameState *g);
-
-
-
-static int rb_process_current_ability(GameState *g) {
+/* Resolves the entry at g->queue.cur (cost, then effect). NOT static: the
+   Rule 9.5.3.2 answer path needs it. Rust's resume_auto_ability_choice
+   (engine/src/turn/actions/mod.rs:1229-1245) promotes the chosen entry and then
+   calls process_current_ability() ONCE before re-entering
+   process_pending_auto_abilities; rb_resolver_handle_auto_ability_selection
+   (src/ability/choice.c:2979) currently omits that call, which is why the
+   SelectAutoAbility prompt stays disabled in rb_process_player_abilities
+   below. Exported (declared in include/rabuka.h) so that choice.c can make the
+   call; it has no caller outside this file yet, so this changes no behaviour. */
+int rb_process_current_ability(GameState *g) {
     if (!g || g->queue.cur < 0 || g->queue.cur >= g->queue.n_entries) return 0;
 
     RbQueueEntry *entry = &g->queue.entries[g->queue.cur];
@@ -1651,6 +1723,19 @@ int rb_process_player_abilities(GameState *g, int pl) {
        whereas Rust resolves the promoted entry FIRST
        (engine/src/turn/actions/mod.rs:1240-1246). Emitting the prompt from
        this file without that counterpart re-prompts forever. */
+    /* NOTE: Rust's Rule 9.5.3.2 branch (engine/src/core/game_state/abilities.rs
+       :1626-1659) pauses with Choice::SelectAutoAbility when two entries are
+       available at once. That arm is deliberately NOT reproduced here, and the
+       deadlock reasoning was RE-VERIFIED against the current Rust: the C
+       answer path rb_resolver_handle_auto_ability_selection
+       (src/ability/choice.c:2979) only swaps the chosen entry and re-enters
+       rb_process_pending_auto_abilities, never resolving the promoted entry,
+       whereas Rust resolves it FIRST
+       (engine/src/turn/actions/mod.rs:1235-1245: promote_entry_by_abs ->
+       start_next -> process_current_ability). Without that call both entries
+       stay available, the same 2-of-N condition is rediscovered and the
+       prompt re-fires forever. Emitting the prompt from here before choice.c
+       is fixed hangs the drain; do not enable it. */
     for (int guard = 0; guard < 200; guard++) {
         int pre_len = g->queue.n_entries;
         int avail[RB_QUEUE_DEPTH];

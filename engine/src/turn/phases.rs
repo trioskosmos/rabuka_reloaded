@@ -733,7 +733,22 @@ impl super::TurnEngine {
         card_id: Option<i16>,
         card_indices: Option<Vec<usize>>,
     ) -> Result<(), String> {
-        let idx = Self::resolve_hand_answer_index(game_state, card_id, card_indices);
+        // Resolve against the mulligan OWNER, not `active_player()`. They agree
+        // while the phase is still live, but naming the owner explicitly keeps
+        // the selection and the confirmation reading the same hand, which is
+        // what made this bug invisible.
+        let owner = game_state.mulligan_owner_index();
+        let idx = if let Some(indices) = card_indices {
+            indices.first().copied().unwrap_or(0)
+        } else if let Some(cid) = card_id {
+            let p = match owner {
+                Some(1) => &game_state.player2,
+                _ => &game_state.player1,
+            };
+            p.get_card_index_by_id(cid).unwrap_or(0)
+        } else {
+            0
+        };
         if !Self::deselect_index(&mut game_state.mulligan_selected_indices, idx) {
             game_state
                 .mulligan_selected_indices
@@ -746,20 +761,34 @@ impl super::TurnEngine {
         game_state: &mut GameState,
         card_indices: Option<Vec<usize>>,
     ) -> Result<(), String> {
+        // Capture the owner BEFORE the phase advances. `advance_mulligan_phase`
+        // flips MulliganFirstAttacker -> MulliganSecondAttacker, after which
+        // `active_player()` reports the other seat entirely, and the
+        // replacement below was being applied to the OPPONENT's hand.
+        let owner = game_state.mulligan_owner_index();
         if !Self::advance_mulligan_phase(game_state) {
             return Ok(());
         }
-        // Use provided indices (from PVP/local selection) or fallback to server state
-        let mulligan_indices: Vec<usize> = card_indices.unwrap_or_else(|| {
-            game_state
-                .mulligan_selected_indices
-                .iter()
-                .map(|&i| i as usize)
-                .collect()
-        });
+        // Use provided indices (from PVP/local selection) or fallback to server
+        // state. An empty explicit list is treated as "not specified" so the
+        // server-side selection is not silently discarded.
+        let mulligan_indices: Vec<usize> = card_indices
+            .filter(|v| !v.is_empty())
+            .unwrap_or_else(|| {
+                game_state
+                    .mulligan_selected_indices
+                    .iter()
+                    .map(|&i| i as usize)
+                    .collect()
+            });
         // Sort descending so removals don't shift other targets
         let mut removed_count = 0;
-        let player = game_state.active_player_mut();
+        let owner = owner.unwrap_or(0);
+        let player = if owner == 0 {
+            &mut game_state.player1
+        } else {
+            &mut game_state.player2
+        };
         for &idx in Self::deduped_desc(mulligan_indices).iter() {
             if idx < player.hand.cards.len() {
                 let card = player.hand.cards.remove(idx);

@@ -1005,6 +1005,12 @@ or term that can be tuned from the outside.
 
 # CORRECTION: the mulligan was replacing the OPPONENT''s cards
 
+> Full engineering record, including the measurement rig, the ablation, every
+> measured dead end, and the first non-mirrored numbers, is in
+> [`V8_IMPROVEMENT_LOG.md`](V8_IMPROVEMENT_LOG.md). This section is kept here
+> because the correction invalidates a result recorded above.
+
+
 Found 2026-09-26 by playing a side manually against v7, not by any automated
 measurement. This invalidates a result recorded above.
 

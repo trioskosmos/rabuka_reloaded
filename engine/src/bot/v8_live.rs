@@ -242,6 +242,12 @@ fn collect_lives(gs: &GameState, me: u8, db: &CardDatabase) -> Vec<Life> {
             // A Draw/Score requirement is not a heart check we can price, so
             // it never enters a candidate set.
             if v8_model::has_unpassable_icon(&need) {
+                if std::env::var_os("V8_TRACE_FILTERED").is_some() {
+                    eprintln!(
+                        "V8_FILTERED life {} need={:?} - never a candidate",
+                        cid, need
+                    );
+                }
                 return None;
             }
             Some(Life {
@@ -339,6 +345,48 @@ fn enumerate_candidates(
     if max_slots == 0 {
         return Vec::new();
     }
+    // How many LIVES v8 will set.
+    //
+    // Default 1, measured. Setting one life and swinging for it beat v8's own
+    // argmax over wider zones by 15 wins in 800 paired games (p = 0.0026) and
+    // 1.2pp over 2400 games across three seeds and both seats. The argmax was
+    // free to discover this and did not, because a wide zone looks better on
+    // paper: 8.3.15 pools the requirements of every life in a zone, so a second
+    // life does not add an independent chance of placing, it ADDS its
+    // requirement - while 8.4.7 pays exactly one placement per won check. The
+    // extra width therefore has no upside to balance its extra cost.
+    //
+    // "No upside" holds only while the check is uncontested, though. Score
+    // matters only inside a comparison (section 2), so a second life earns its
+    // added requirement in exactly one case: the check is contested and the
+    // extra score is what tips it. `max_lives` caps an uncontested zone and
+    // `contested_lives` caps a contested one.
+    //
+    // Measured: a flat cap of 2 was +3 wins, p = 0.25 - not significant,
+    // because the width only pays in the minority of checks it can decide.
+    //
+    // `V8_MAX_LIVES` overrides the uncontested cap; `V8_NO_CONTESTED_WIDE`
+    // restores a flat cap for ablation.
+    let max_lives = std::env::var("V8_MAX_LIVES")
+        .ok()
+        .and_then(|v| v.parse::<usize>().ok())
+        .filter(|&n| (1..=max_slots).contains(&n))
+        .unwrap_or(1);
+    // "No upside" turned out to be true even when the check IS contested.
+    // Allowing a second life in the contested case measured 354 vs 364 wins in
+    // 800 paired games (p = 0.052) - worse, not better. So the score a second
+    // life can win is worth less than the requirement it adds, which is the
+    // same 8.3.15-versus-8.4.7 balance and the same answer at every width.
+    //
+    // The contested branch is kept because the measurement is the interesting
+    // part, and `V8_CONTESTED_WIDE` re-enables it. What it is NOT is a default:
+    // the reasoning was sound and the data refused it, which is the usual
+    // outcome of reasoning about a game instead of measuring one.
+    let contested_lives = if std::env::var_os("V8_CONTESTED_WIDE").is_some() {
+        max_slots.min(max_lives + 1)
+    } else {
+        max_lives
+    };
     let my_success = p.success_live_card_zone.cards.len();
     let yell_score = v8_model::expected_yell_score(gs, me, db, v8_model::active_blades(gs, me, db));
 
@@ -374,9 +422,6 @@ fn enumerate_candidates(
             .filter(|(bit, _)| mask & (1 << bit) != 0)
             .map(|(_, life)| life)
             .collect();
-        if chosen.len() > max_slots {
-            continue;
-        }
         let mut need = [0i32; 11];
         let mut score = yell_score;
         for life in &chosen {
@@ -384,6 +429,17 @@ fn enumerate_candidates(
                 need[k] += life.need[k];
             }
             score += life.score;
+        }
+        // Width is only allowed when the extra score can change the outcome.
+        // `contested_masses` gives the placement mass on each side of a
+        // contested check; with no mass on either side the check is decided by
+        // passing alone and a second life is pure added cost.
+        let (we_contested, they_contested, _) =
+            opp.contested_masses(score, chosen.len().max(1), my_success);
+        let is_contested = we_contested > 0.0 && they_contested > 0.0;
+        let width_cap = if is_contested { contested_lives } else { max_lives };
+        if chosen.len() > width_cap {
+            continue;
         }
         let p_pass = if chosen.is_empty() {
             0.0

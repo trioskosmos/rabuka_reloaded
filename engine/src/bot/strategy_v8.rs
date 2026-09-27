@@ -75,6 +75,19 @@ pub fn choose_action_v8_entry(gs: &GameState, actions: &[Action], me: u8) -> Act
     if flag("V8_MAIN_V7") {
         return crate::bot::strategy_v7::choose_action_v7(gs, actions, me);
     }
+    // Turn order, rule 8.4.13. Investigated by playing the side against v7 and
+    // comparing: over 30 games v7 and v8 disagreed on the RPS turn-order pick
+    // 30 out of 30, v7 taking first and v8 second. A perfect split reads like
+    // one bot picking option 0 and the other option 1 rather than a judgement.
+    //
+    // It is NOT fixed here, and the reason is worth recording. Intercepting
+    // `ChooseFirstAttacker` in this entry point to take v7's option produced a
+    // byte-identical 800-game paired result (0 discordant games, p = 1.0),
+    // because `bot_arena` does not route the turn-order phase through this
+    // entry - v8's Main-phase chooser handles it and already takes first.
+    // So the divergence is specific to the harness path and is not a v8 defect
+    // on the measured path. Reverted rather than shipped as a change that
+    // cannot be shown to do anything.
     super::v8_main::choose_action_v8(gs, actions, me)
 }
 

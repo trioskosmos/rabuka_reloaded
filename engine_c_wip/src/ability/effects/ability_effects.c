@@ -40,6 +40,25 @@ int rb_translated_execute_gain_ability_effect(GameState *g, int actor,
                                                 AbilityEffect *effect, int host_cid)
 {
     if (!g || !effect) return 0;
+    fprintf(stderr, "[DBG_GAIN] actor=%d host=%d act=%s ag=%s gat=%s ge=%s ge_act=%s ge_tgt=%s ge_cnt=%d src=%s ct=%s gn=%s self_tgt=%s nsel=%d cond=%d\n",
+            actor, host_cid, effect->action?effect->action:"-",
+            effect_extra(effect,"ability_gain")?:"-",
+            effect_extra(effect,"ability_gain_trigger")?:"-",
+            effect->gained_effect?"yes":"no",
+            (effect->gained_effect&&effect->gained_effect->action)?effect->gained_effect->action:"-",
+            (effect->gained_effect&&effect->gained_effect->target)?effect->gained_effect->target:"-",
+            effect->gained_effect?effect->gained_effect->count:-99,
+            effect->source, effect->card_type_field[0],
+            effect_extra(effect,"group_names"),
+            effect->self_target_field[0],
+            g->n_selected_cards, effect->has_condition);
+    if (effect->gained_effect) {
+        const AbilityEffect *gi = effect->gained_effect;
+        fprintf(stderr, "[DBG_GAIN_INNER] count=%d target=%s action=%s value=%s nex=%d\n",
+                gi->count, gi->target, gi->action, effect_extra(gi, "value"), gi->n_extra);
+        for (int i = 0; i < gi->n_extra; i++)
+            fprintf(stderr, "[DBG_GAIN_INNER_KV] %s = %s\n", gi->extra_k[i], gi->extra_v[i]);
+    }
     if (effect->source && strcmp(effect->source, "stage") == 0 &&
         effect->card_type_field[0] && !strcmp(effect->card_type_field, "member_card") &&
         g->n_selected_cards == 0) {
@@ -189,6 +208,12 @@ int rb_translated_execute_invalidate_ability(GameState *g, int actor,
                                               AbilityEffect *effect)
 {
     if (!g || !effect) return 0;
+    fprintf(stderr, "[DBG_INVAL] actor=%d act=%d tt=%s dur=%s tgt=%s ct=%s gn=%s self=%s\n",
+            actor, g->activating_card, effect_extra(effect,"target_trigger"),
+            effect_extra(effect,"duration"), effect->target,
+            effect->card_type_field[0],
+            effect_extra(effect,"group_names"),
+            effect->self_target_field[0]);
     const char *trigger = effect_extra(effect, "target_trigger");
     if (!trigger || !*trigger) return 0;
     /* Rust (ability_effects.rs:242-251) runs the duration code through
@@ -327,7 +352,7 @@ int rb_translated_execute_gain_ability_from_source(GameState *g, int actor,
     if (!g || !effect) return 0;
     int target_card = g->activating_card >= 0 ? g->activating_card : host_cid;
     if (target_card < 0) return 0;
-    while (rb_card_num_gained_abilities(g, target_card) > 0)
+    fprintf(stderr, "[DBG_FROM_SRC] actor=%d target=%d host=%d ct=%s cost_limit=%s op=%s group=%s tf=%s n=%d\n", actor, target_card, host_cid, effect->card_type_field[0]?effect->card_type_field:"-", effect_extra(effect,"cost_limit")?:"-", effect_extra(effect,"cost_limit_operator")?:"-", effect_extra(effect,"group_names")?:"-", effect_extra(effect,"trigger_filter")?:"-", g->n_selected_cards);    while (rb_card_num_gained_abilities(g, target_card) > 0)
         rb_remove_gained_ability(g, target_card, 0);
 
     int owner = rb_owner_of_card(g, target_card);
@@ -353,6 +378,10 @@ int rb_translated_execute_gain_ability_from_source(GameState *g, int actor,
     RbBag *under = &g->p[owner].under_cards[area];
     for (int i = 0; i < under->n; i++) {
         int source_card = under->cards[i];
+        fprintf(stderr, "[DBG_SRC] i=%d src=%d type_ok=%d cost_ok=%d group_ok=%d n_und=%d\n", i, source_card,
+                (!card_type || rb_card_matches_type(source_card, card_type)),
+                (cost_limit < 0 || rb_card_matches_cost_limit(source_card, cost_limit, cost_op)),
+                (!group || rb_card_matches_group_str(source_card, group)), under->n);
         if (source_card < 0) continue;
         if (card_type && !rb_card_matches_type(source_card, card_type)) continue;
         if (cost_limit >= 0 && !rb_card_matches_cost_limit(source_card, cost_limit, cost_op)) continue;
@@ -361,6 +390,7 @@ int rb_translated_execute_gain_ability_from_source(GameState *g, int actor,
         for (int a = 0; a < count; a++) {
             Ability source;
             if (!rb_decode_card_ability((uint32_t)source_card, a, &source)) continue;
+            fprintf(stderr, "[DBG_ABIL] a=%d trig=%s tf_ok=%d\n", a, source.triggers?source.triggers:"-", trigger_filter_matches(&source, trigger_filter));
             if (trigger_filter_matches(&source, trigger_filter))
                 copied += copy_source_ability(g, target_card, &source);
             rb_free_ability(&source);

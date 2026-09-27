@@ -721,6 +721,27 @@ impl GameState {
         }
     }
 
+    /// Index of the player whose mulligan decision the current mulligan phase
+    /// belongs to: 0 = player1, 1 = player2. `None` outside a mulligan phase.
+    ///
+    /// This exists because `active_player()` cannot answer the question when
+    /// the mulligan is applied. `handle_mulligan_confirmation` advances the
+    /// phase BEFORE it mutates a hand, so by the time it asks, `active_player()`
+    /// already reports the other seat - and the mulligan removed the player's
+    /// own selected cards from their OPPONENT's hand and dealt the
+    /// replacements to the opponent. Observed directly while playing a side
+    /// manually against v7: a two-card mulligan left the acting player's hand
+    /// byte-identical while the opponent lost two cards and gained two.
+    ///
+    /// Callers must capture the owner BEFORE advancing the phase.
+    pub fn mulligan_owner_index(&self) -> Option<usize> {
+        match self.current_phase {
+            Phase::MulliganFirstAttacker => Some(usize::from(!self.player1.is_first_attacker)),
+            Phase::MulliganSecondAttacker => Some(usize::from(self.player1.is_first_attacker)),
+            _ => None,
+        }
+    }
+
     pub fn first_attacker(&self) -> &Player {
         if self.player1.is_first_attacker {
             &self.player1

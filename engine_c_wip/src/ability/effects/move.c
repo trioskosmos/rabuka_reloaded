@@ -72,6 +72,8 @@ int rb_move_place_card_with_stage_choice(GameState *g, int actor, int host_cid,
                                             int deck_position, const char *source_zone,
                                             int allow_occupied_stage, int under_self);
 void rb_move_execute_move_cards_ported(GameState *g, int actor, AbilityEffect *e);
+/* Defined in src/core/modifiers.c; not declared in rabuka.h. */
+void rb_on_cards_left_zones(GameState *g, int card_id);
 
 
 /* ── card_matches_filter: full effect filter (static for this TU) ── */
@@ -1138,7 +1140,13 @@ int rb_move_execute_stage_placement_choices(GameState *g, int actor,
 int rb_move_maybe_prompt_success_replacement(GameState *g, int actor, int card_id,
                                               const char *dest, const char *target) {
     if (!g || !dest) return 0;
-    if (strcmp(dest, "success_zone") != 0 && strcmp(dest, "success_live_zone") != 0) return 0;
+    /* Rust placement.rs:256 — `Zone::from_str(dest) != Some(Zone::SuccessLiveZone)`
+       gates the whole check. "success_zone" is a DIFFERENT variant
+       (Zone::SuccessZone, engine/src/ability/enums.rs:48/92) and must not
+       trigger a replacement prompt. "success_live_card_zone" is the same
+       variant as "success_live_zone" (enums.rs:94). */
+    if (strcmp(dest, "success_live_zone") != 0 &&
+        strcmp(dest, "success_live_card_zone") != 0) return 0;
     int pl = actor;
     if (target && *target) {
         int resolved = rb_resolve_target_player(g, target);
@@ -1175,8 +1183,15 @@ void rb_move_finalize_card_movement(GameState *g, int actor,
                                      const char *state_change, const char *target) {
     if (!g || !moved_cards || n_moved <= 0) return;
     (void)source;
+    /* Rust move_cards.rs:2278 calls `gs.on_cards_left_zones(moved_cards)`, the
+       single zone-exit choke point (engine/src/core/game_state/modifiers.rs:1677)
+       that clears BOTH the modifier tables AND any runtime-gained abilities.
+       Calling `rb_mods_clear_card` alone left constant 「能力付与」 grants alive
+       on a card that had just changed zones. `rb_on_cards_left_zones` is defined
+       in src/core/modifiers.c:599 but was previously declared in no header and
+       called from nowhere. */
     for (int i = 0; i < n_moved; i++)
-        rb_mods_clear_card(&g->mods, moved_cards[i]);
+        rb_on_cards_left_zones(g, moved_cards[i]);
     if (state_change && *state_change) {
         if (!strcmp(state_change, "wait")) {
             for (int i = 0; i < n_moved; i++)
@@ -1547,11 +1562,18 @@ void rb_move_execute_selected_cards_from_zone(
 
     int dest_is_stage = !strcmp(destination, "stage") || !strcmp(destination, "empty_area") || !strcmp(destination, "same_area");
     int dest_is_deck_top_or_bottom = !strcmp(destination, "deck_top_or_bottom");
+    /* Rust move_cards.rs:2607-2688 dispatches on `Zone::from_str(dest)`:
+       2607-2619 Stage/EmptyArea/SameArea (guarded by `zone_enum != Some(Zone::Deck)`),
+       2620-2649 Deck, 2650-2662 deck_top_or_bottom, 2663-2688 the `_` fallback
+       that owns the success-zone replacement check. "deck"/"main_deck" therefore
+       never reaches the `_` arm, and a `deck` SOURCE never reaches the stage arm. */
+    int source_is_deck = !strcmp(zone, "deck") || !strcmp(zone, "main_deck");
+    int dest_is_deck = !strcmp(destination, "deck") || !strcmp(destination, "main_deck");
 
     int moved[RB_MAX_RECENTLY_MOVED];
     int nm = 0;
 
-    if (dest_is_stage) {
+    if (dest_is_stage && !source_is_deck) {
         int out_ids[RB_MAX_RECENTLY_MOVED];
         nm = rb_move_execute_stage_placement_choices(g, actor, card_ids, n_ids,
                                                       zone, destination, -1,
@@ -1562,6 +1584,13 @@ void rb_move_execute_selected_cards_from_zone(
             return;
         }
     } else {
+        /* Rust move_cards.rs:2671-2681 — the success-zone replacement offer
+           (錯覚CROSSROADS and friends) is the FIRST thing the `_` arm does,
+           before the cards leave `zone`. This is the second of the two
+           construction points named at placement.rs:246-248. */
+        if (!dest_is_deck && n_ids > 0 &&
+            rb_move_maybe_prompt_success_replacement(g, pl, card_ids[0], destination, target))
+            return;
         rb_zone_remove_at_indices(g, pl, zone, filtered, nf);
         for (int i = 0; i < n_ids; i++) {
             rb_place_card_in_zone(g, pl, card_ids[i], destination, -1);

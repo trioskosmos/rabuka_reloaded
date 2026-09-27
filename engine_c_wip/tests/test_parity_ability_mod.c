@@ -166,6 +166,14 @@ static int fire_trigger(TestGame *tg, int cid, const char *trig, const char *tri
     if (!card_prints_trigger(cid, trig)) return 0;
     tg->state.activating_card = cid;
     int queued = rb_queue_trigger_abilities(&tg->state, 0, trig);
+    if (getenv("ABMOD_DEBUG"))
+        for (int i = 0; i < tg->state.queue.n_entries; i++)
+            fprintf(stderr, "[DBG_ENTRY] i=%d cid=%d ab=%d pid=%s trig=%s completed=%d\n",
+                    i, tg->state.queue.entries[i].card_id,
+                    tg->state.queue.entries[i].ability_idx,
+                    tg->state.queue.entries[i].player_id,
+                    tg->state.queue.entries[i].trigger,
+                    tg->state.queue.entries[i].completed);
     if (queued <= 0) return 0;
     rb_process_pending_auto_abilities(&tg->state);
     return 1;
@@ -958,6 +966,7 @@ int main(void)
     /* unbuffered stdout so ok/FAIL lines stay in execution order even though
      * failures go to stderr */
     setvbuf(stdout, NULL, _IONBF, 0);
+    if (getenv("ABMOD_DEBUG")) rb_ability_debug_set(1);
     if (rb_load("src") != 0) {
         fprintf(stderr, "FAIL: database load\n");
         return 1;

@@ -723,6 +723,7 @@ static int draw_until_target_count(const AbilityEffect *e) {
 
 void rb_effect_draw_until_count(GameState *g, int actor, AbilityEffect *e) {
     if (!g || !e) return;
+    if (getenv("RB_DBG_DRAW")) { fprintf(stderr, "[DUC] actor=%d hand=%d deck=%d disc=%d act=%s tgt=%s src=%s dst=%s count=%d n_extra=%d\n", actor, g->p[actor].hand.n, g->p[actor].deck.n, g->p[actor].discard.n, e->action?e->action:"(null)", e->target?e->target:"(null)", e->destination?e->destination:"(null)", e->count, e->n_extra); for (int i=0;i<e->n_extra;i++) fprintf(stderr, "    extra[%d]=%s -> %s\n", i, e->extra_k[i]?e->extra_k[i]:"(null)", e->extra_v[i]?e->extra_v[i]:"(null)"); }
     int target_count = draw_until_target_count(e);
     const char *target = (e->target && *e->target) ? e->target : "self";
     int who = (!strcmp(target, "opponent") || !strcmp(target, "p2")) ? actor ^ 1 : actor;

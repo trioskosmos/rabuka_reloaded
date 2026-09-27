@@ -424,6 +424,42 @@ static int effect_decode_extra(AbilityEffect *e, const char *key, Rdr *r, uint8_
     Rust: TAG_OBJECT_VARIANT (0x09) + variant u8 + len + fields.
     The variant selects EffectKind but C stores only action string; we consume
     the byte and ignore it. Mirrors vm.rs:decode_ability_effect_direct . */
+/* ---- TEMPORARY PROBE INSTRUMENTATION (removed before hand-off) ---- */
+uint32_t g_probe_seen = 0, g_probe_retained = 0, g_probe_effects = 0;
+static char g_probe_dropped[4096][48];
+static uint8_t g_probe_dropped_tag[4096];
+static uint32_t g_probe_ndropped = 0;
+static char g_probe_keys[1024][48];
+static uint32_t g_probe_keycount[1024];
+static uint32_t g_probe_nkeys = 0;
+static void probe_seen(const char *k) {
+    g_probe_seen++;
+    if (k) for (uint32_t i = 0; i < g_probe_nkeys; i++)
+        if (!strcmp(g_probe_keys[i], k)) { g_probe_keycount[i]++; return; }
+    if (g_probe_nkeys < 1024) {
+        snprintf(g_probe_keys[g_probe_nkeys], 48, "%s", k);
+        g_probe_keycount[g_probe_nkeys] = 1;
+        g_probe_nkeys++;
+    }
+}
+uint32_t rb_probe_nkeys(void) { return g_probe_nkeys; }
+const char *rb_probe_key(uint32_t i) { return i < g_probe_nkeys ? g_probe_keys[i] : NULL; }
+uint32_t rb_probe_keycount(uint32_t i) { return i < g_probe_nkeys ? g_probe_keycount[i] : 0; }
+static void probe_keep(void) { g_probe_retained++; }
+static void probe_drop(const char *k, uint8_t t) {
+    if (g_probe_ndropped < 4096) {
+        snprintf(g_probe_dropped[g_probe_ndropped], 48, "%s", k ? k : "<null>");
+        g_probe_dropped_tag[g_probe_ndropped] = t;
+        g_probe_ndropped++;
+    }
+}
+void rb_probe_reset(void) { g_probe_seen = g_probe_retained = g_probe_effects =
+    g_probe_ndropped = 0; g_probe_nkeys = 0; }
+uint32_t rb_probe_ndropped_keys(void) { return g_probe_ndropped; }
+const char *rb_probe_dropped_key(uint32_t i) { return i < g_probe_ndropped ? g_probe_dropped[i] : NULL; }
+uint8_t rb_probe_dropped_tag(uint32_t i) { return i < g_probe_ndropped ? g_probe_dropped_tag[i] : 0; }
+/* ---- END TEMPORARY PROBE ---- */
+
 static AbilityEffect *decode_effect_value(Rdr *r, uint8_t tag);
 static AbilityEffect *decode_effect_body(Rdr *r) {
     uint8_t variant;
@@ -432,17 +468,19 @@ static AbilityEffect *decode_effect_body(Rdr *r) {
     if (!rd_len(r, &count)) return NULL;
     AbilityEffect *e = effect_new();
     if (!e) return NULL;
+    g_probe_effects++;
     for (i = 0; i < count; i++) {
         uint32_t kidx; if (!rd_idx(r, &kidx)) goto fail;
         const char *key = rb_get_string(kidx);
         uint8_t tag; if (!rd_u8(r, &tag)) goto fail;
+        probe_seen(key);
 
         if (key && strcmp(key, "text") == 0) {
-            free(e->text); e->text = rd_string_val(r, tag); continue;
+            free(e->text); e->text = rd_string_val(r, tag); probe_keep(); continue;
         }
         if (key && (!strcmp(key, "action") || !strcmp(key, "type") ||
                     !strcmp(key, "cost_type"))) {
-            free(e->action); e->action = rd_string_val(r, tag); continue;
+            free(e->action); e->action = rd_string_val(r, tag); probe_keep(); continue;
         }
         if (key && (!strcmp(key, "source") || !strcmp(key, "destination") ||
                     !strcmp(key, "target") || !strcmp(key, "zone"))) {
@@ -454,32 +492,58 @@ static AbilityEffect *decode_effect_body(Rdr *r) {
             if (!strcmp(key, "source") || !strcmp(key, "zone")) { free(e->source); e->source = s; }
             else if (!strcmp(key, "destination")) { free(e->destination); e->destination = s; }
             else { free(e->target); e->target = s; }
+            probe_keep();
             continue;
         }
         if (key && strcmp(key, "count") == 0) {
-            if (tag == RB_TAG_I64) { int64_t v; if (rd_int(r, &v)) e->count = (int)v; }
-            else skip_value(r, tag);
+            if (tag == RB_TAG_I64) { int64_t v; if (rd_int(r, &v)) { e->count = (int)v; probe_keep(); } }
+            else { skip_value(r, tag); probe_drop(key, tag); }
             continue;
         }
         if (key && (strcmp(key, "condition") == 0)) {
             e->has_condition = 1;
-            if (tag == RB_TAG_OBJVAR) e->condition = read_condition(r);
-            else skip_value(r, tag);
+            if (tag == RB_TAG_OBJVAR) { e->condition = read_condition(r); if (e->condition) probe_keep(); else probe_drop(key, tag); }
+            else { skip_value(r, tag); probe_drop(key, tag); }
             continue;
         }
         if (key && !strcmp(key, "dynamic_count") && tag == RB_TAG_OBJVAR) {
             effect_decode_dynamic_count(e, r);
+            probe_keep();
             continue;
         }
+        /* Boolean wire fields. The wire encodes all six as BOOL
+           (engine/src/ability/effect_decoder_gen.rs:55-59,63,73 read_bool_value:
+           TAG_NULL -> None, TAG_TRUE -> Some(true), TAG_FALSE -> Some(false)).
+           Previously this branch only ever *set* a struct flag and called
+           skip_value(), so the key/value pair was thrown away: `non_stackable` was
+           lost outright (core/card.c:626 rb_effect_non_stackable_any reads the extra
+           and therefore always returned "no"), `optional` was lost outright
+           (core/modifiers.c:463 cost_extra_flag(e,"optional") was always 0), and
+           `max`/`conditional`/`conditional_negation`/`is_further` were lost whenever
+           the value was false. The pair is now retained as an extra as well as
+           driving the struct flag, so both the struct-field readers and the
+           extras-table readers see the same truth. */
         if (key && (!strcmp(key, "optional") || !strcmp(key, "non_stackable") ||
                     !strcmp(key, "conditional") || !strcmp(key, "conditional_negation") ||
                     !strcmp(key, "is_further") || !strcmp(key, "max"))) {
-            if (strcmp(key, "optional") == 0 && tag == RB_TAG_TRUE) e->is_optional = 1;
-            if (strcmp(key, "max") == 0 && tag == RB_TAG_TRUE) effect_set_extra(e, "max", "true");
-            if (strcmp(key, "conditional") == 0 && tag == RB_TAG_TRUE) e->conditional_flag = 1;
-            if (strcmp(key, "conditional_negation") == 0 && tag == RB_TAG_TRUE) e->conditional_negation = 1;
-            if (strcmp(key, "is_further") == 0 && tag == RB_TAG_TRUE) e->is_further = 1;
-            skip_value(r, tag);
+            const char *sv = NULL;
+            char nbuf[24];
+            int b = 0;
+            if (tag == RB_TAG_TRUE) { b = 1; sv = "true"; }
+            else if (tag == RB_TAG_FALSE) { b = 0; sv = "false"; }
+            else if (tag == RB_TAG_I64) {
+                int64_t v;
+                if (!rd_int(r, &v)) goto fail;
+                b = (v != 0);
+                snprintf(nbuf, sizeof(nbuf), "%lld", (long long)v);
+                sv = nbuf;
+            } else { skip_value(r, tag); probe_drop(key, tag); continue; }
+            if (!strcmp(key, "optional") && b) e->is_optional = 1;
+            if (!strcmp(key, "conditional") && b) e->conditional_flag = 1;
+            if (!strcmp(key, "conditional_negation") && b) e->conditional_negation = 1;
+            if (!strcmp(key, "is_further") && b) e->is_further = 1;
+            effect_set_extra(e, key, sv);
+            probe_keep();
             continue;
         }
         /* compound sub-conditions (mirror AbilityEffect::compound.result_condition /
@@ -491,7 +555,8 @@ static AbilityEffect *decode_effect_body(Rdr *r) {
                 Condition *c = read_condition(r);
                 if (strcmp(key, "result_condition") == 0) e->result_condition = c;
                 else e->alternative_condition = c;
-            } else skip_value(r, tag);
+                if (c) probe_keep(); else probe_drop(key, tag);
+            } else { skip_value(r, tag); probe_drop(key, tag); }
             continue;
         }
         /* nested effect(s) */
@@ -506,8 +571,9 @@ static AbilityEffect *decode_effect_body(Rdr *r) {
                             if (!c || !effect_add_child(e, c)) goto fail;
                         } else skip_value(r, st);
                     }
+                    probe_keep();
                 }
-            } else skip_value(r, tag);
+            } else { skip_value(r, tag); probe_drop(key, tag); }
             continue;
         }
         if (key && strcmp(key, "options") == 0) {
@@ -520,8 +586,9 @@ static AbilityEffect *decode_effect_body(Rdr *r) {
                             if (c) e->options[e->n_options++] = c;
                         } else skip_value(r, st);
                     }
+                    probe_keep();
                 }
-            } else skip_value(r, tag);
+            } else { skip_value(r, tag); probe_drop(key, tag); }
             continue;
         }
         if (key && (strcmp(key, "look_action") == 0 || strcmp(key, "select_action") == 0)) {
@@ -536,7 +603,8 @@ static AbilityEffect *decode_effect_body(Rdr *r) {
                         e->select_action = c;
                     }
                 }
-            } else skip_value(r, tag);
+                if (e->look_action || e->select_action) probe_keep(); else probe_drop(key, tag);
+            } else { skip_value(r, tag); probe_drop(key, tag); }
             continue;
         }
         /* compound sub-effects (mirror AbilityEffect::compound primary/alternative/
@@ -561,52 +629,97 @@ static AbilityEffect *decode_effect_body(Rdr *r) {
                     else if (!strcmp(key, "resource_on_select")) { effect_free(e->resource_on_select); e->resource_on_select = c; }
                     else { effect_free(e->opponent_action); e->opponent_action = c; }
                 }
-            } else skip_value(r, tag);
+                if (c) probe_keep(); else probe_drop(key, tag);
+            } else { skip_value(r, tag); probe_drop(key, tag); }
             continue;
         }
         if (key && strcmp(key, "gained_effect") == 0) {
             e->gained_effect = decode_effect_value(r, tag);
+            if (e->gained_effect || tag == RB_TAG_NULL) probe_keep(); else probe_drop(key, tag);
             continue;
         }
         /* compound scalar fields mirrored from AbilityEffect::compound / root. These
            are also retained as extras (below) for callers that read them as strings. */
         if (key && !strcmp(key, "repeat_limit") && tag == RB_TAG_I64) {
-            int64_t v; if (rd_int(r, &v)) e->repeat_limit = (int)v;
+            int64_t v; if (rd_int(r, &v)) { e->repeat_limit = (int)v; probe_keep(); }
             continue;
         }
         if (key && !strcmp(key, "per_unit_count") && tag == RB_TAG_I64) {
-            int64_t v; if (rd_int(r, &v)) e->per_unit_count = (int)v;
+            int64_t v; if (rd_int(r, &v)) { e->per_unit_count = (int)v; probe_keep(); }
             continue;
         }
         if (key && !strcmp(key, "cost_reduction_per_group") && tag == RB_TAG_I64) {
-            int64_t v; if (rd_int(r, &v)) e->cost_reduction_per_group = (int)v;
+            int64_t v; if (rd_int(r, &v)) { e->cost_reduction_per_group = (int)v; probe_keep(); }
             continue;
         }
         if (key && !strcmp(key, "id") && tag == RB_TAG_STR) {
-            uint32_t idx; if (rd_idx(r, &idx)) { const char *s = rb_get_string(idx); if (s) { strncpy(e->id_field, s, 31); e->id_field[31]=0; } }
+            uint32_t idx; if (rd_idx(r, &idx)) { const char *s = rb_get_string(idx); if (s) { strncpy(e->id_field, s, 31); e->id_field[31]=0; probe_keep(); } }
             continue;
         }
         if (key && (!strcmp(key, "self_target") || !strcmp(key, "card_type")) && tag == RB_TAG_STR) {
             uint32_t idx; if (rd_idx(r, &idx)) { const char *s = rb_get_string(idx); if (s) {
                 if (!strcmp(key,"self_target")) { strncpy(e->self_target_field, s, 7); e->self_target_field[7]=0; }
                 else { strncpy(e->card_type_field, s, 23); e->card_type_field[23]=0; }
+                probe_keep();
             } }
             continue;
         }
-        if (key && (!strcmp(key, "per_unit") || !strcmp(key, "distinct")) && tag == RB_TAG_I64) {
-            int64_t v; if (rd_int(r, &v)) { if (!strcmp(key,"per_unit")) e->per_unit = (int)v; else e->distinct_flag = (int)v; }
+        if (key && !strcmp(key, "self_target") &&
+            (tag == RB_TAG_TRUE || tag == RB_TAG_FALSE)) {
+            /* effect_decoder_gen.rs:79 reads self_target with read_bool_value(), so
+               the wire carries TRUE/FALSE, not a string. The struct field used to be
+               filled only for TAG_STR and was therefore dead for all card data. */
+            const char *sv = tag == RB_TAG_TRUE ? "true" : "false";
+            strncpy(e->self_target_field, sv, 7); e->self_target_field[7] = 0;
+            effect_set_extra(e, key, sv);
+            probe_keep();
             continue;
         }
-        if (key && !strcmp(key, "distinct") && tag == RB_TAG_TRUE) { e->distinct_flag = 1; continue; }
+        /* `per_unit` is BOOL (effect_decoder_gen.rs:89 read_bool_value) and `distinct`
+           is BOOL-or-STR (vm.rs:1051 read_distinct_value: NULL -> None,
+           FALSE -> DistinctType::CardName, TRUE -> DistinctType::True,
+           STR -> "card_name" | "true" | "distinct" enable the filter).
+           The old code required RB_TAG_I64, so AbilityEffect.per_unit and
+           AbilityEffect.distinct_flag were 0 for every effect in the corpus. The raw
+           value is still retained as an extra so the extras-table readers
+           (cost.c:cr_per_unit, compound.c:eff_distinct_any, dynamic_count.c,
+           resolver.c, core/modifiers.c) keep seeing it unchanged. */
+        if (key && (!strcmp(key, "per_unit") || !strcmp(key, "distinct"))) {
+            int is_per_unit = !strcmp(key, "per_unit");
+            const char *sv = NULL;
+            char nbuf[24];
+            int flag = 0, have = 1;
+            if (tag == RB_TAG_TRUE) { flag = 1; sv = "true"; }
+            else if (tag == RB_TAG_FALSE) { flag = 0; sv = "false"; }
+            else if (tag == RB_TAG_NULL) { have = 0; }
+            else if (tag == RB_TAG_I64) {
+                int64_t v;
+                if (!rd_int(r, &v)) goto fail;
+                flag = (int)v;
+                snprintf(nbuf, sizeof(nbuf), "%lld", (long long)v);
+                sv = nbuf;
+            } else if (tag == RB_TAG_STR) {
+                uint32_t idx;
+                if (!rd_idx(r, &idx)) goto fail;
+                const char *s = rb_get_string(idx);
+                sv = s ? s : "";
+                flag = (!strcmp(sv, "card_name") || !strcmp(sv, "true") ||
+                        !strcmp(sv, "distinct"));
+            } else { skip_value(r, tag); probe_drop(key, tag); continue; }
+            if (have) { if (is_per_unit) e->per_unit = flag; else e->distinct_flag = flag; }
+            if (sv) effect_set_extra(e, key, sv);
+            if (sv) probe_keep(); else probe_drop(key, tag);
+            continue;
+        }
         /* scalar extras (stringify) — also handle heart_colors array */
         if (tag == RB_TAG_STR) {
-            uint32_t idx; if (rd_idx(r, &idx)) effect_set_extra(e, key, rb_get_string(idx));
+            uint32_t idx; if (rd_idx(r, &idx)) { effect_set_extra(e, key, rb_get_string(idx)); probe_keep(); } else probe_drop(key, tag);
         } else if (tag == RB_TAG_I64) {
-            int64_t v; if (rd_int(r, &v)) { char buf[24]; snprintf(buf,sizeof(buf),"%lld",(long long)v); effect_set_extra(e, key, buf); }
+            int64_t v; if (rd_int(r, &v)) { char buf[24]; snprintf(buf,sizeof(buf),"%lld",(long long)v); effect_set_extra(e, key, buf); probe_keep(); } else probe_drop(key, tag);
         } else if (tag == RB_TAG_TRUE) {
-            effect_set_extra(e, key, "true");
+            effect_set_extra(e, key, "true"); probe_keep();
         } else if (tag == RB_TAG_FALSE) {
-            effect_set_extra(e, key, "false");
+            effect_set_extra(e, key, "false"); probe_keep();
         } else if (tag == RB_TAG_ARRAY) {
             char *value = decode_extra_value(r, tag);
             if (!value) return NULL;
@@ -615,9 +728,11 @@ static AbilityEffect *decode_effect_body(Rdr *r) {
                 ok = effect_set_extra(e, "heart_color", value);
             }
             free(value);
+            if (ok) probe_keep(); else probe_drop(key, tag);
             if (!ok) goto fail;
         } else {
             skip_value(r, tag);
+            probe_drop(key, tag);
         }
     }
     return e;

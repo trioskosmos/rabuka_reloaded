@@ -330,7 +330,12 @@ int rb_has_card_appeared_this_turn(GameState *g, int card_id) {
     return 0;
 }
 
-/* -- clear_card_appearance_tracking -- */
+/* -- clear_card_appearance_tracking --
+   Mirror modifiers.rs:1397-1400 (GameState::clear_card_appearance_tracking).
+   Rust clears BOTH cards_appeared_this_turn and card_appearance_source.
+   RbMods/GameState has no card_appearance_source field (rb_record_card_appearance
+   discards its `source` argument), so the second clear has no C counterpart
+   here — see the field-addition request in the report. */
 void rb_clear_card_appearance_tracking(GameState *g) {
     if (!g) return;
     g->n_cards_appeared_this_turn = 0;
@@ -354,7 +359,13 @@ int rb_get_baton_touch_count(const GameState *g, int pl) {
     return pl == 0 ? g->baton_touch_count_p1 : g->baton_touch_count_p2;
 }
 
-/* -- clear_baton_touch_tracking -- */
+/* -- clear_baton_touch_tracking --
+   Mirror modifiers.rs:1425-1433 (GameState::clear_baton_touch_tracking): the
+   FULL turn-scoped reset. Reached from rb_reset_keyword_tracking
+   (tracking.rs:28-34) on entry to each player's Active phase. The narrower
+   PLAY-scoped half is rb_clear_play_scoped_baton_touch (modifiers.rs:1442-1447,
+   called at phases.rs:1154) and deliberately does NOT drop the counts or the
+   arriving-id list. */
 void rb_clear_baton_touch_tracking(GameState *g) {
     if (!g) return;
     g->baton_touch_count_p1 = 0;
@@ -387,10 +398,27 @@ void rb_record_card_movement(GameState *g, int card_id, int from_zone, int to_zo
     }
 }
 
-/* -- clear_card_movement_tracking -- */
+/* -- clear_card_movement_tracking --
+   Mirror modifiers.rs:1588-1596 (GameState::clear_card_movement_tracking).
+   Rust clears five turn-scoped structures:
+     cards_moved_this_turn  -> g->moved_this_turn[]            (held)
+     turn_movements         -> g->batch_movements[]            (held; C folds
+                              push_movement_event into
+                              rb_record_card_movement, so the event log and
+                              the per-card flag share one entry point)
+     cards_appeared_this_turn-> g->cards_appeared_this_turn[]  (held)
+     turn_area_movements    -> (no C field)
+     mods.opp_cause_fired_keys -> (no C field; the C engine dedupes
+                              opponent-cause watchers per move batch via
+                              g->batch_triggered_keys instead, which is a
+                              different — and weaker — scope)
+   NOT cleared, matching Rust: g->recently_moved / recently_appeared.
+   Call site in Rust: engine/src/turn/phases.rs:310, inside the victory /
+   turn-rollover arm of advance_phase, immediately after turn_number += 1. */
 void rb_clear_card_movement_tracking(GameState *g) {
     if (!g) return;
     memset(g->moved_this_turn, 0, sizeof(g->moved_this_turn));
+    g->n_batch_movements = 0;
     g->n_cards_appeared_this_turn = 0;
 }
 
@@ -409,7 +437,13 @@ void rb_remove_revealed_card(GameState *g, int card_id) {
     }
 }
 
-/* -- clear_revealed_cards -- */
+/* -- clear_revealed_cards --
+   Mirror modifiers.rs:1620-1623 (GameState::clear_revealed_cards).
+   Rust clears revealed_cards AND revealed_card_meta; RbMods/GameState has no
+   revealed_card_meta field (see field-addition request in the report).
+   Call site in Rust: engine/src/turn/phases.rs:278, the first statement of the
+   victory-determination arm of advance_phase — the same arm that calls
+   rb_clear_card_movement_tracking at :310. */
 void rb_clear_revealed_cards(GameState *g) {
     if (!g) return;
     g->n_revealed = 0;
@@ -498,14 +532,18 @@ static int cost_per_unit_count(const GameState *g, int pl, const AbilityEffect *
 }
 
 /* Is this card a constant-cost host at all? A card that is in neither player's
-   stage nor hand cannot be the target of any 常時 ModifyCost, so a `set`
-   override still sitting on it is provably stale. */
+   stage, hand nor energy zone cannot be the target of any 常時 ModifyCost, so a
+   `set` override still sitting on it is provably stale. Membership set mirrors
+   the p1_memberships / p2_memberships of modifiers.rs:1120-1137, which also
+   chain in energy_zone. */
 static int cost_is_constant_host(const GameState *g, int cid) {
     for (int pl = 0; pl < 2; pl++) {
         for (int s = 0; s < RB_STAGE_SIZE; s++)
             if (g->p[pl].stage[s] == cid) return 1;
         for (int h = 0; h < g->p[pl].hand.n; h++)
             if (g->p[pl].hand.cards[h] == cid) return 1;
+        for (int h = 0; h < g->p[pl].energy.n; h++)
+            if (g->p[pl].energy.cards[h] == cid) return 1;
     }
     return 0;
 }
@@ -595,7 +633,18 @@ void rb_recalculate_constant_cost_modifiers(GameState *g) {
     }
 }
 
-/* -- on_cards_left_zones -- */
+/* -- on_cards_left_zones --
+   Mirror modifiers.rs:1673-1685 (GameState::on_cards_left_zones): the single
+   choke point for rule 4.1.4 zone-exit cleanup (a card that changes zones is a
+   NEW card — all runtime state resets). Rust takes a slice and loops; the C
+   port takes one card id per call and the zone-exit paths must call it per
+   card (Rust call sites: move_cards.rs:339, :1370, :2278, :2548).
+
+   Rust clears clear_all_for_card + clear_gained_abilities_for_card; the latter
+   drops FOUR maps (modifiers.rs:1666-1671). The C port clears the two it can
+   hold: the modifier tables and g->gained_card_abilities[]. constant_gained_
+   abilities, gained_abilities and gained_ability_sources have no C field — see
+   the field-addition request in the report. */
 void rb_on_cards_left_zones(GameState *g, int card_id) {
     if (!g || card_id < 0 || card_id >= RB_MAX_CARD_IDS) return;
     rb_mods_clear_card(&g->mods, card_id);

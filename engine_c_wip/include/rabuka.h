@@ -1289,6 +1289,11 @@ typedef struct {
 #define RB_MAX_SNAPSHOTS 64
 #define RB_MAX_RECENTLY_MOVED 8
 #define RB_MAX_REVEALED_CARDS RB_MAX_ZONE
+/* Slots in the per-GameState keep-alive ring that backs rb_entry_cost() /
+   rb_entry_effect() / rb_entry_destination() (see the entry-accessor block at
+   the bottom of this header). 4 decoded abilities is enough for the deepest
+   observed call nesting (2) with headroom. */
+#define RB_ENTRY_KEEPALIVE_SLOTS 4
 
 /* batch_movements / position_change_events entry types (must precede GameState) */
 typedef struct {
@@ -1508,6 +1513,22 @@ typedef struct GameState {
     int      n_gained_cards;               /* number of distinct cards with gains */
     RbAbilityInvalidation ability_invalidations[RB_MAX_ABILITY_INVALIDATIONS];
     int      n_ability_invalidations;
+    /* ── entry-accessor keep-alive ring (use-after-free fix) ──
+       rb_entry_cost() / rb_entry_effect() / rb_entry_destination() return
+       pointers INTO one of these slots instead of into a tree they had already
+       freed. Each call decodes a fresh ability into the next slot and releases
+       the slot the ring is about to reuse, so a returned pointer stays valid
+       for RB_ENTRY_KEEPALIVE_SLOTS-1 further entry-accessor calls.
+       Zero-initialised by rb_game_init's memset(g, 0, sizeof(*g)) (and by the
+       tests' own memset), which is all the initialisation these need: an unused
+       slot has entry_keepalive_used[slot] == 0. There is no GameState
+       destructor in the C port, so the ring is not explicitly drained at
+       teardown; a live GameState holds at most RB_ENTRY_KEEPALIVE_SLOTS decoded
+       abilities, matching the pre-existing (unbounded) `activation_keepalive`
+       keep-alive at the top of this struct. */
+    Ability  entry_keepalive[RB_ENTRY_KEEPALIVE_SLOTS];
+    unsigned char entry_keepalive_used[RB_ENTRY_KEEPALIVE_SLOTS];
+    int      entry_keepalive_next;
 } GameState;
 
 /* ── Tracking (engine/src/core/game_state/tracking.rs) ── */
@@ -1726,7 +1747,8 @@ int  rb_fire_all_auto(GameState *g, int pl);
 int  rb_fire_auto_and_pending(GameState *g, int pl);
 void rb_record_event(GameState *g, int pl, const char *trig);
 int  rb_fire_recorded_auto(GameState *g, int pl);
-int  rb_process_pending_auto_abilities(GameState *g);
+int rb_process_current_ability(GameState *g);
+int rb_process_pending_auto_abilities(GameState *g);
 void rb_recalc_constants(GameState *g);
 int  rb_register_gained_ability(GameState *g, int card_id, const Ability *ability);
 int  rb_remove_gained_ability(GameState *g, int card_id, int index);
@@ -2458,9 +2480,22 @@ int  rb_ability_has_remaining_uses(const GameState *g, int cid, int idx);
 int  rb_resolve_target_player(const GameState *g, const char *target);
 
 /* ── Ability Queue Entry Accessors (GameState entry_* methods) ── */
+/* The three pointer-returning accessors below are backed by a per-GameState
+   keep-alive ring (GameState.entry_keepalive*): the returned tree is owned by
+   the GameState and is released only when the ring wraps, so a returned pointer
+   is never a dangling pointer into freed memory. It remains valid for
+   RB_ENTRY_KEEPALIVE_SLOTS-1 further entry-accessor calls. Prefer the copy-out
+   variants below, which hand the caller ownership and no lifetime coupling. */
 const AbilityEffect *rb_entry_effect(const GameState *g);
 const AbilityEffect *rb_entry_cost(const GameState *g);
 const char *rb_entry_destination(const GameState *g);
+/* Copy-out: `out` receives a freshly decoded Ability the CALLER owns; release it
+   with rb_free_ability(out) (safe on a zeroed/failed result). Returns 1 when
+   the current entry decoded. No shared state, no lifetime limit. */
+int rb_entry_ability_copy(const GameState *g, Ability *out);
+/* Copy-out for the destination string; writes "" and returns 0 when the current
+   entry has no destination (or no current entry). */
+int rb_entry_destination_copy(const GameState *g, char *buf, size_t buf_len);
 int rb_entry_has_pending_choice(const GameState *g);
 const RbChoice *rb_get_pending_choice(const GameState *g);
 int rb_get_pending_choice_player_id(const GameState *g);

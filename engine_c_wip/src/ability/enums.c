@@ -335,7 +335,7 @@ int rb_select_target_kind_from_str(const char *s) {
     if (!s) return -1;
     if (!strcmp(s, "choice")) return RB_STK_CHOICE;
     if (!strcmp(s, "choice_string")) return RB_STK_CHOICE_STRING;
-    if (!strcmp(s, "pay_optional_cost:skip_optional_cost")) return RB_STK_PAY_OPTIONAL_COST_SKIP_OPTIONAL_COST;
+    if (!strcmp(s, RB_PAY_SKIP_TARGET)) return RB_STK_PAY_OPTIONAL_COST_SKIP_OPTIONAL_COST;
     if (!strcmp(s, "double_baton_touch")) return RB_STK_DOUBLE_BATON_TOUCH;
     if (!strcmp(s, "primary|alternative")) return RB_STK_PRIMARY_ALTERNATIVE;
     if (!strcmp(s, "apply_replacement")) return RB_STK_APPLY_REPLACEMENT;
@@ -356,7 +356,7 @@ const char *rb_select_target_kind_to_str(int stk) {
     switch (stk) {
         case RB_STK_CHOICE:                       return "choice";
         case RB_STK_CHOICE_STRING:                return "choice_string";
-        case RB_STK_PAY_OPTIONAL_COST_SKIP_OPTIONAL_COST: return "pay_optional_cost:skip_optional_cost";
+        case RB_STK_PAY_OPTIONAL_COST_SKIP_OPTIONAL_COST: return RB_PAY_SKIP_TARGET;
         case RB_STK_DOUBLE_BATON_TOUCH:           return "double_baton_touch";
         case RB_STK_PRIMARY_ALTERNATIVE:          return "primary|alternative";
         case RB_STK_APPLY_REPLACEMENT:            return "apply_replacement";

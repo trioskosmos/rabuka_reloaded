@@ -523,6 +523,17 @@ static void test_mill_three_deck_four(void)
              "Q234: the top three deck cards pay the activation cost");
     CHECK(rb_has_pending_choice(&tg.state),
           "position_change offers a destination choice after the cost");
+    {
+        const RbChoice *dbg = rb_get_pending_choice(&tg.state);
+        fprintf(stderr, "[DBG mill3] kind=%d route=%d zone=%s target=%s cnt=%d nfid=%d fids=[",
+                dbg ? (int)dbg->kind : -1, dbg ? (int)dbg->route : -1,
+                dbg ? dbg->zone : "", dbg ? dbg->target : "",
+                dbg ? dbg->count : -1, dbg ? dbg->n_filtered_indices : -1);
+        if (dbg) for (int i = 0; i < dbg->n_filtered_indices; i++) fprintf(stderr, "%d,", dbg->filtered_indices[i]);
+        fprintf(stderr, "] desc=%s host=%d actor=%d resume_mode=%d resume_eff=%p\n", dbg ? dbg->description : "",
+                tg.state.queue.resume_host, tg.state.queue.actor, tg.state.queue.resume_mode,
+                (void *)tg.state.queue.resume_eff);
+    }
     /* Source is left, so the destination options are [center, right]. */
     rb_resume_with_choice(&tg.state, 1);
     CHECK_EQ(tg.state.p[0].stage[AREA_LEFT], RB_EMPTY_SLOT,

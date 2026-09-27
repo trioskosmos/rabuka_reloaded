@@ -54,6 +54,8 @@ struct Options {
     outcomes: Option<PathBuf>,
     /// Paired significance test of this run against a baseline outcome log.
     vs: Option<PathBuf>,
+    /// Decklist for seat 2, so a matchup need not be a mirror.
+    deck2: Option<String>,
     trace: bool,
     logs: bool,
 }
@@ -68,6 +70,7 @@ impl Options {
         let mut compare = None;
         let mut outcomes = None;
         let mut vs = None;
+        let mut deck2 = None;
         let mut trace = false;
         let mut logs = false;
         let mut args = args.iter();
@@ -76,7 +79,7 @@ impl Options {
                 "--trace" => trace = true,
                 "--logs" => logs = true,
                 "--games" | "--seed" | "--audit" | "--snapshots" | "--compare" | "--outcomes"
-                | "--vs" => {
+                | "--vs" | "--deck2" => {
                     let value = args
                         .next()
                         .filter(|v| !v.starts_with("--"))
@@ -88,6 +91,7 @@ impl Options {
                         "--compare" => compare = Some(PathBuf::from(value)),
                         "--outcomes" => outcomes = Some(PathBuf::from(value)),
                         "--vs" => vs = Some(PathBuf::from(value)),
+                        "--deck2" => deck2 = Some(value.clone()),
                         _ => audit = Some(PathBuf::from(value)),
                     }
                 }
@@ -154,6 +158,7 @@ impl Options {
             compare,
             outcomes,
             vs,
+            deck2,
             trace,
             logs,
         })
@@ -1372,12 +1377,32 @@ fn main() -> ArenaResult<()> {
 
     let mut db = fresh_database();
     let nums = load_deck(deck_name);
+    // Seat 2 may use a different decklist. This is not a nicety: every result
+    // in the project was measured in a mirror, and a mirror is exactly the
+    // configuration in which a change that helps one seat and hurts the other
+    // is invisible. The mulligan bug was found by hand precisely because a
+    // mirror could not show it - each seat corrupted the other, the two
+    // effects cancelled, and the ablation reported the broken policy as
+    // "neutral". Without a way to run asymmetric decks, any conclusion that
+    // depends on which seat benefits is unfalsifiable.
+    let nums2 = match options.deck2.as_deref() {
+        Some(other) if other != deck_name => load_deck(other),
+        _ => nums.clone(),
+    };
     eprintln!(
         "ARENA deck={} entries={} distinct={}",
         deck_name,
         nums.len(),
         nums.iter().collect::<std::collections::HashSet<_>>().len()
     );
+    if options.deck2.is_some() && nums2 != nums {
+        eprintln!(
+            "ARENA deck2={} entries={} distinct={}  (ASYMMETRIC: seat1 and seat2 differ)",
+            options.deck2.as_deref().unwrap_or(""),
+            nums2.len(),
+            nums2.iter().collect::<std::collections::HashSet<_>>().len()
+        );
+    }
     let (t1, t2) = build_templates(&mut db, &nums, &nums);
 
     let v2_policy = strategy_v2::V2Policy::default();
@@ -2456,7 +2481,7 @@ mod tests {
         rabuka_engine::rng::seed(17);
         let mut db = fresh_database();
         let nums = load_deck("5CP3Z idou");
-        let (t1, t2) = build_templates(&mut db, &nums, &nums);
+    let (t1, t2) = build_templates(&mut db, &nums, &nums2);
         let mut gs = deal_from_templates(&db, &t1, &t2);
         let mut setup_rng = Lcg(17321);
         for _ in 0..100 {

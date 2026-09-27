@@ -80,7 +80,12 @@ static void test_success_replacement_move(void) {
     TestGame game;
     test_game_new(&game);
     int original = test_new_id(&game, "PL!-bp6-024-L");
-    int replacement = test_new_id(&game, "PL!HS-bp1-019-L");
+    /* Rust fixture: engine/tests/test_modules/effects/conditional/zone_source/
+       live_phase_success_zone_replacement_q256_test.rs:19 — the substitute is
+       「僕らのLIVE 君とのLIFE」, the μ's live. PL!HS-bp1-019-L is 蓮ノ空
+       (Dream Believers) and must NOT satisfy a 「『μ's』の…」 group filter
+       (engine/src/ability/util.rs:602-637), so it is not a legal replacement. */
+    int replacement = test_new_id(&game, "PL!-bp3-019-L");
     test_add_to_hand(&game, original);
     test_add_to_discard(&game, replacement);
     AbilityEffect effect = {0};

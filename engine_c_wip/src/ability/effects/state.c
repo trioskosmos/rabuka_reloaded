@@ -8,6 +8,7 @@ static int s_who(const char *target, int actor);
 static int s_value(const AbilityEffect *e, int dflt);
 static int s_has_group(const AbilityEffect *e, const char **out);
 static int s_has_chars(const AbilityEffect *e, const char **out);
+static int s_filter_requested(const AbilityEffect *e);
 static int s_match_chars(int cid, const char *chars);
 static int s_pass_filter(int cid, const char *grp, const char *chars);
 static int s_excluded_group(int cid, const AbilityEffect *e);
@@ -167,7 +168,11 @@ void rb_effect_change_state(GameState *g, int actor, AbilityEffect *e, int host_
     /* ── Optional gate: verify at least one valid target exists ── */
     if(optional){
         int decided = -1;
-        if(g->queue.cur >= 0 && g->queue.cur < RB_QUEUE_DEPTH)
+        /* state.rs:160-163 — `current_entry().and_then(|e| e.optional_cost_result)`.
+           With no entry in flight the answer is None, so the gate is still
+           undecided and must be offered; -1 is this port's "None". */
+        if(g->queue.cur >= 0 && g->queue.cur < g->queue.n_entries &&
+           g->queue.cur < RB_QUEUE_DEPTH)
             decided = g->queue.entries[g->queue.cur].optional_cost_result;
         if(decided < 0){
             int can_target = 0;
@@ -294,17 +299,19 @@ candidates_ready:
     }
 
     int change_all = (count == 0);
-    int is_self_target_prompt = (count == 1
-        && strcmp(target, "opponent") == 0
+    /* state.rs:477-486 — a single-target effect on "this member" (not the
+       opponent) auto-selects the activating card instead of prompting. */
+    int is_self_target = (count == 1
+        && strcmp(target, "opponent") != 0
         && card_type_filter && !strcmp(card_type_filter, "member_card")
-        && host_cid >= 0);
-    if(is_self_target_prompt){
-        int found_self = 0;
-        for(int i=0;i<nc;i++) if(cands[i] == host_cid) found_self = 1;
-        is_self_target_prompt = found_self ? 1 : 0;
+        && g->activating_card >= 0);
+    if(is_self_target){
+        int found_act = 0;
+        for(int i=0;i<nc;i++) if(cands[i] == g->activating_card) found_act = 1;
+        is_self_target = found_act ? 1 : 0;
     }
     int needs_prompt = 0;
-    if(!is_self_target_prompt && g->n_selected_cards == 0){
+    if(!is_self_target && g->n_selected_cards == 0){
         if(max && nc > 0) needs_prompt = 1;
         else if(!change_all && nc > count) needs_prompt = 1;
     }
@@ -340,6 +347,19 @@ candidates_ready:
     }
 
     int nchange = change_all ? nc : (count < nc ? count : nc);
+
+    /* state.rs:541-553 — when the effect means "this member", the applied set
+       is the activating card, not the first `nchange` candidates. */
+    if(is_self_target){
+        int keep[RB_STAGE_SIZE]; int nk = 0;
+        for(int i=0;i<nc && nk<nchange;i++)
+            if(cands[i] == g->activating_card) keep[nk++] = cands[i];
+        if(nk > 0){
+            for(int i=0;i<nk;i++) cands[i] = keep[i];
+            nc = nk;
+            nchange = nk;
+        }
+    }
 
     /* snapshot orientations before change */
     int snap_ids[RB_STAGE_SIZE];
@@ -634,7 +654,11 @@ void rb_effect_set_cost(GameState *g, int actor, AbilityEffect *e, int host_cid)
         for(int i=0;i<P->hand.n;i++) ids[n++] = P->hand.cards[i];
     }
     const char *grp = NULL, *chars = NULL;
-    if(s_has_group(e, &grp) || s_has_chars(e, &chars)){
+    s_has_group(e, &grp); s_has_chars(e, &chars);
+    /* state.rs:1040-1056 — the filter runs when ANY of group_names /
+       exclude_group_names / characters / exclude_characters is present; an
+       exclude-only shape is a filter on its own. */
+    if(s_filter_requested(e)){
         int fids[RB_MAX_ZONE]; int fn = 0;
         for(int i=0;i<n;i++)
             if(s_pass_filter(ids[i], grp, chars) &&
@@ -1024,11 +1048,14 @@ void rb_effect_set_card_identity_all_regions(GameState *g, int actor, AbilityEff
         }
     if(id && cid >= 0) {
         char buf[256]; snprintf(buf, sizeof buf, "%s", id);
-        char *tok = strtok(buf, ",、 ");
+        /* identities_any() is a Vec<String> in Rust — entries are separated by
+           the list delimiters only, never by a space (unit names contain
+           spaces: "Aoyama Ichika"). Same token set as score.c:241. */
+        char *tok = strtok(buf, ",、[]\"'");
         while(tok && g->n_prohibition_effects < 64) {
             snprintf(g->prohibition_effects[g->n_prohibition_effects++],
                      sizeof(g->prohibition_effects[0]), "card_identity:%d:%s", cid, tok);
-            tok = strtok(NULL, ",、 ");
+            tok = strtok(NULL, ",、[]\"'");
         }
     }
     const char *pp = s_player_prefix(g, cid);
@@ -1131,9 +1158,57 @@ void rb_effect_set_cost_to_use(GameState *g, int actor, AbilityEffect *e, int ho
     }
 }
 
+/* ── all_blade_timing record store ──────────────────────────────────────────
+   state.rs:1634-1639 pushes ONE note per effect into
+   `gs.prohibition_effects: Vec<String>`. This port models that field as
+   `char prohibition_effects[64][48]` (rabuka.h:1422), and the note with the
+   DEFAULT arguments is 59 bytes ("all_blade_timing:<card>:" +
+   "check_required_hearts" + ":" + "any_heart_color"), so it cannot be stored
+   there whole. The authoritative record therefore lives in this file-owned
+   table, keyed by the owning GameState so two concurrent games never read
+   each other's notes; prohibition_effects still gets a bounded key so the
+   existing note scanners (core/tracking.c, game_state_abilities.c) keep
+   seeing that the effect fired. */
+#define S_ABT_CAP 64
+typedef struct {
+    const GameState *owner;
+    int card_id;
+    char timing[48];
+    char treat_as[48];
+} RbAllBladeTimingNote;
+static RbAllBladeTimingNote s_all_blade_timing[S_ABT_CAP];
+static int s_n_all_blade_timing;
+
+int rb_all_blade_timing_record(const GameState *g, int card_id,
+                               char *timing, int timing_sz,
+                               char *treat_as, int treat_as_sz) {
+    for (int i = s_n_all_blade_timing - 1; i >= 0; i--) {
+        if (s_all_blade_timing[i].owner != g) continue;
+        if (card_id >= 0 && s_all_blade_timing[i].card_id != card_id) continue;
+        if (timing && timing_sz > 0)
+            snprintf(timing, (size_t)timing_sz, "%s", s_all_blade_timing[i].timing);
+        if (treat_as && treat_as_sz > 0)
+            snprintf(treat_as, (size_t)treat_as_sz, "%s", s_all_blade_timing[i].treat_as);
+        return 1;
+    }
+    return 0;
+}
+
+int rb_all_blade_timing_clear(const GameState *g) {
+    int w = 0;
+    for (int i = 0; i < s_n_all_blade_timing; i++) {
+        if (g && s_all_blade_timing[i].owner != g) {
+            if (w != i) s_all_blade_timing[w] = s_all_blade_timing[i];
+            w++;
+        }
+    }
+    s_n_all_blade_timing = w;
+    return 0;
+}
+
 /* Mirror engine/src/ability/effects/state.rs::execute_all_blade_timing.
-   Sets the member's blade type to "all" so its blade satisfies any blade-timing
-   condition. Records a prohibition note with timing/treat_as. */
+   Records the blade-timing note ("all_blade_timing:<card>:<timing>:<treat_as>",
+   state.rs:1629-1639) so the member's blade satisfies any blade-timing check. */
 void rb_effect_all_blade_timing(GameState *g, int actor, AbilityEffect *e, int host_cid){
     (void)actor;
     int cid = host_cid >= 0 ? host_cid : g->activating_card;
@@ -1141,10 +1216,20 @@ void rb_effect_all_blade_timing(GameState *g, int actor, AbilityEffect *e, int h
     if(!timing) timing = "check_required_hearts";
     const char *treat_as = s_eff_extra(e, "treat_as");
     if(!treat_as) treat_as = "any_heart_color";
-    if(cid >= 0 && g->n_prohibition_effects < 64)
-        snprintf(g->prohibition_effects[g->n_prohibition_effects++],
-                 sizeof(g->prohibition_effects[0]), "all_blade_timing:%d:%s:%s",
-                 cid, timing, treat_as);
+    if(cid >= 0){
+        if(s_n_all_blade_timing >= S_ABT_CAP) rb_all_blade_timing_clear(g);
+        if(s_n_all_blade_timing < S_ABT_CAP){
+            RbAllBladeTimingNote *n = &s_all_blade_timing[s_n_all_blade_timing++];
+            n->owner = g;
+            n->card_id = cid;
+            snprintf(n->timing, sizeof n->timing, "%s", timing);
+            snprintf(n->treat_as, sizeof n->treat_as, "%s", treat_as);
+        }
+        if(g->n_prohibition_effects < 64)
+            snprintf(g->prohibition_effects[g->n_prohibition_effects++],
+                     sizeof(g->prohibition_effects[0]), "all_blade_timing:%d:%s",
+                     cid, timing);
+    }
     {
         const char *pp = s_player_prefix(g, g->activating_card >= 0 ? g->activating_card : host_cid);
         char act_name[64]; act_name[0] = 0;
@@ -1206,14 +1291,19 @@ void rb_effect_modify_cost(GameState *g, int actor, AbilityEffect *e, int host_c
 
     int ids[RB_MAX_ZONE]; int n = 0;
     const char *ct = e->card_type_field;
-    if(ct && !strcmp(ct, "live_card")){ for(int i=0;i<P->live.n;i++) ids[n++] = P->live.cards[i]; }
+    /* state.rs:1699-1720 — is_hand_cost is tested FIRST, so a hand-scoped
+       modifier wins over card_type ("手札にあるこのカードのコストは…"). */
+    if(is_hand_cost){ for(int i=0;i<P->hand.n;i++) ids[n++] = P->hand.cards[i]; }
+    else if(ct && !strcmp(ct, "live_card")){ for(int i=0;i<P->live.n;i++) ids[n++] = P->live.cards[i]; }
     else if(ct && !strcmp(ct, "member_card")){ for(int q=0;q<RB_STAGE_SIZE;q++) if(P->stage[q]!=RB_EMPTY_SLOT) ids[n++]=P->stage[q]; }
     else if(ct && !strcmp(ct, "energy_card")){ for(int i=0;i<P->energy.n;i++) ids[n++] = P->energy.cards[i]; }
-    else if(is_hand_cost){ for(int i=0;i<P->hand.n;i++) ids[n++] = P->hand.cards[i]; }
     else { for(int i=0;i<P->hand.n;i++) ids[n++] = P->hand.cards[i]; }
 
     const char *grp = NULL, *chars = NULL;
-    if(s_has_group(e, &grp) || s_has_chars(e, &chars)){
+    s_has_group(e, &grp); s_has_chars(e, &chars);
+    /* state.rs:1722-1726 — exclude_group_names / exclude_characters alone
+       already select filter_subset(). */
+    if(s_filter_requested(e)){
         int fids[RB_MAX_ZONE]; int fn = 0;
         for(int i=0;i<n;i++)
             if(s_pass_filter(ids[i], grp, chars) &&
@@ -1540,6 +1630,21 @@ static int s_has_chars(const AbilityEffect *e, const char **out){
     return 0;
 }
 
+/* Mirror the gate that guards the `filter_subset()` call in state.rs
+   (set_cost 1040-1044, set_blade_type 1118-1122, modify_cost 1722-1726):
+   ANY of group_names / exclude_group_names / characters / exclude_characters
+   turns the filter on. Checking only the positive keys loses every
+   exclude-only shape. */
+static int s_filter_requested(const AbilityEffect *e){
+    static const char *keys[4] = { "group_names", "exclude_group_names",
+                                   "characters", "exclude_characters" };
+    for(int k=0;k<4;k++){
+        const char *v = s_eff_extra(e, keys[k]);
+        if(v && *v) return 1;
+    }
+    return 0;
+}
+
 static int s_match_chars(int cid, const char *chars){
     if(!chars) return 1;
     char buf[256]; strncpy(buf, chars, 255); buf[255] = 0;
@@ -1770,7 +1875,14 @@ static int s_state_filter_matches(GameState *g, const AbilityEffect *e, int card
     if (card_id < 0 || card_id == exclude_self_id) return 0;
     RbCardFilter filter;
     rb_effect_filter_subset(e, &filter);
+    /* The caller decides card_type / group / cost_limit / blade_limit for this
+       scan (state.rs:318-325 rebuilds CardFilter::default() and fills those
+       four fields explicitly). Drop everything rb_effect_filter_subset pulled
+       in so an unset group_filter cannot keep the effect's own group_names.
+       local_filter_from_public (util.c:965-966) keys card_type and group off
+       the STRING, not off has_group, so the text has to be cleared too. */
     filter.card_type[0] = 0;
+    filter.group[0] = 0;
     filter.has_group = 0;
     filter.has_cost_limit = 0;
     filter.has_original_blade = 0;
@@ -1802,12 +1914,22 @@ static int s_state_filter_matches(GameState *g, const AbilityEffect *e, int card
 
 /* ── Ported from engine/src/core/card.rs (Card impl block) ──────────────── */
 
-/* Mirror Card::total_hearts — base_heart (printed hearts) for member cards,
-   need_heart (live-card cost hearts) for live cards. */
+/* Mirror Card::total_hearts (card.rs:4194-4202) — sum base_heart, and fall
+   back to need_heart ONLY when the card has no base_heart section. Blade and
+   need hearts are never folded in (Q149/Q172: 「ハートの総数」 counts the
+   member's basic hearts plus ability-granted ones, not blade/need hearts). */
 int rb_card_total_hearts(const Card *c) {
     if (!c) return 0;
     int total = 0;
-    for (int h = 0; h < c->n_hearts; h++) total += c->heart_count[h];
+    if (c->num_base > 0) {
+        for (int h = 0; h < c->num_base && h < c->n_hearts; h++) total += c->heart_count[h];
+        return total;
+    }
+    if (c->n_hearts > 0) {
+        int start = c->num_base + c->num_blade;
+        int end = start + c->num_need;
+        for (int h = start; h < end && h < c->n_hearts; h++) total += c->heart_count[h];
+    }
     return total;
 }
 

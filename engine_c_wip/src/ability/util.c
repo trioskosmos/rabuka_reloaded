@@ -6,11 +6,12 @@
    These are shared by the condition evaluators and the effect executors; keeping
    them in one place mirrors the Rust single-source layout.
 
-   Group matching is an approximation of the Rust card_matches_group_str: the C
-   Card exposes group/unit/name strings (via rb_card_string) but not the series
-   or set_card_identity-derived memberships, so only group/unit/name substring
-   matches are performed. Fullwidth '！'(U+FF01) and micro 'µ'(U+00B5) are
-   normalized to '!'/'μ' exactly like the Rust norm_group_name helper. */
+   rb_card_matches_group_str is a faithful port of util.rs:602-643: exact unit
+   match, the '！'(U+FF01)/'µ'(U+00B5) normalized fallback, the exact comparison
+   against the card's DERIVED group (rb_card_group_name — the stored group
+   string is "" for every record in cards.bin, so it must never be read
+   directly), per-name containment over the '&'/'＆'-separated name list, series
+   membership, then the constant set_card_identity memberships. */
 
 #include "rabuka.h"
 #include <string.h>
@@ -20,6 +21,26 @@
 
 /* Heart-all wildcard key — mirrors util.rs HEART_ALL_KEY ("heart00"). */
 #define RB_HEART_ALL_KEY "heart00"
+
+/* ── Pending header fields ─────────────────────────────────────────────
+   Two CardFilter/GameModifiers fields exist in the Rust twin but not yet in
+   include/rabuka.h (which another agent owns). The faithful code paths below
+   are compiled only when the header advertises the field, so the build stays
+   green until the diff in the session report lands. Define the macro (or add
+   the field to the struct) to switch the path on:
+
+     util.rs:1102  card_property: Option<&'a str>        in RbCardFilter
+     game_modifiers.rs:183  last_cost_energy_count: u8   in RbMods                */
+#ifdef RB_CARD_FILTER_CARD_PROPERTY
+#define RF_CARD_PROPERTY(rf) ((rf)->card_property)
+#else
+#define RF_CARD_PROPERTY(rf) ""
+#endif
+#ifdef RB_MODS_LAST_COST_ENERGY_COUNT
+#define RB_LAST_COST_ENERGY(m) ((m)->last_cost_energy_count)
+#else
+#define RB_LAST_COST_ENERGY(m) (0)
+#endif
 
 /* ── Internal filter struct (mirrors CardFilter) ─────────────────────── */
 
@@ -53,7 +74,9 @@ typedef struct {
     char  ability_filter[32];
     char  ability_filter_triggers[8][32];
     int   n_ability_filter_triggers;
-    int   negation;
+    char  card_property[32];   /* Rust util.rs:1102 card_property */
+    int   has_card_property;
+    int   negation;            /* Rust util.rs:1105 negation — negates card_property */
     int   exclude_self_id;
     int   has_exclude_self;
     int   cost_total;
@@ -254,6 +277,59 @@ static void rb_debug_group_match(int card_id, const char *group_name, int result
     (void)card_id; (void)group_name; (void)result;
 }
 
+/* Mirror the constant set_card_identity term of util.rs:628-635: a card whose
+   ROOT ability effect has action "set_card_identity" carries every entry of its
+   `identities` list as an extra group membership. The C decoder flattens a
+   string array into a CSV extra, so the list is split back out here; each entry
+   is compared exactly, with the same ！/µ normalized fallback the unit / name
+   terms use. Runtime identities recorded by rb_set_card_identity (a C-only
+   registry) are OR-ed in by the caller. */
+static int card_identity_ability_matches(int card_id, const char *gn) {
+    int n_abilities = rb_card_num_abilities((uint32_t)card_id);
+    for (int i = 0; i < n_abilities; i++) {
+        Ability ab;
+        if (!rb_decode_card_ability((uint32_t)card_id, i, &ab)) continue;
+        int match = 0;
+        const AbilityEffect *eff = ab.effect;
+        if (eff && eff->action && !strcmp(eff->action, "set_card_identity")) {
+            const char *ids = NULL;
+            for (int k = 0; k < eff->n_extra; k++)
+                if (eff->extra_k[k] && !strcmp(eff->extra_k[k], "identities") && eff->extra_v[k]) {
+                    ids = eff->extra_v[k];
+                    break;
+                }
+            for (const char *cur = ids; cur && *cur && !match; ) {
+                const char *comma = strchr(cur, ',');
+                size_t len = comma ? (size_t)(comma - cur) : strlen(cur);
+                char tok[64];
+                if (len >= sizeof tok) len = sizeof tok - 1;
+                memcpy(tok, cur, len);
+                tok[len] = '\0';
+                /* The CSV writer quotes an entry only when it contains a
+                   separator, so strip one layer of quotes. */
+                size_t tl = strlen(tok);
+                if (tl >= 2 && tok[0] == '"' && tok[tl - 1] == '"') {
+                    memmove(tok, tok + 1, tl - 2);
+                    tok[tl - 2] = '\0';
+                }
+                if (tok[0]) {
+                    if (!strcmp(tok, gn)) {
+                        match = 1;
+                    } else if (strstr(tok, "！") || strstr(tok, "µ")) {
+                        char *tn = norm_str(tok);
+                        if (tn) { if (!strcmp(tn, gn)) match = 1; rb_free(tn); }
+                    }
+                }
+                if (!comma) break;
+                cur = comma + 1;
+            }
+        }
+        rb_free_ability(&ab);
+        if (match) return 1;
+    }
+    return 0;
+}
+
 /* Mirror util.rs::card_matches_group_str — group/unit/name/series + set_card_identity.
 
    Faithful to util.rs:589-630. The previous body tested raw bidirectional
@@ -269,7 +345,6 @@ int rb_card_matches_group_str(int card_id, const char *group_name) {
     Card c;
     if (!rb_decode_card_by_index((uint32_t)card_id, &c)) { rb_free(gn); return 0; }
 
-    const char *g = rb_card_string(c.group_idx);
     const char *u = rb_card_string(c.unit_idx);
     const char *s = rb_card_string(c.series_idx);
 
@@ -295,6 +370,7 @@ int rb_card_matches_group_str(int card_id, const char *group_name) {
        ！/µ normalized fallback. Names are '&'/U+FF06 separated. */
     if (!match) {
         char names[1024];
+        names[0] = '\0';
         int n_names = rb_card_get_card_names(card_id, names, sizeof names);
         const char *p = names;
         for (int i = 0; i < n_names && p && *p && !match; i++) {
@@ -311,7 +387,10 @@ int rb_card_matches_group_str(int card_id, const char *group_name) {
     /* util.rs:610 — multi-series joint cards match via any constituent line. */
     if (!match && s && rb_card_series_matches_group(s, gn)) match = 1;
 
-    /* util.rs:615-622 — constant set_card_identity ("treated as") memberships. */
+    /* util.rs:615-622 — constant set_card_identity ("treated as") memberships:
+       the ability-declared list first, then the runtime registry the C port
+       records when the ability has actually fired. */
+    if (!match) match = card_identity_ability_matches(card_id, gn);
     if (!match) match = rb_card_matches_identity_str(card_id, group_name);
 
     rb_free_card(&c);
@@ -330,24 +409,25 @@ int rb_card_matches_any_group(int card_id, const char **groups, int n) {
 
 /* ── Card predicate helpers ───────────────────────────────────────────── */
 
-/* Mirror util.rs::card_matches_characters — name must contain any listed name
-   (after normalization). */
+/* Mirror util.rs::card_matches_characters (util.rs:789-801) — the query name is
+   whitespace-normalized and must be CONTAINED IN one of the card's '&'-separated
+   names. The C port used to strstr the card's raw unsplit name, which also
+   matched a query spanning the separator (「A&B」 matched a joint card 「A&B&C」). */
 int rb_card_matches_characters(int card_id, const char **names, int n) {
     if (n <= 0) return 1;
-    Card c;
-    if (!rb_decode_card_by_index((uint32_t)card_id, &c)) return 0;
+    char card_names[1024];
+    card_names[0] = '\0';
+    int n_card_names = rb_card_get_card_names(card_id, card_names, sizeof card_names);
     int r = 0;
-    if (c.name) {
-        char norm_card[512];
-        rb_card_normalize_name(c.name, norm_card, sizeof norm_card);
+    const char *p = card_names;
+    for (int i = 0; i < n_card_names && p && *p && !r; i++, p += strlen(p) + 1) {
         for (int k = 0; k < n; k++) {
             if (!names[k]) continue;
             char norm_name[256];
             rb_card_normalize_name(names[k], norm_name, sizeof norm_name);
-            if (strstr(norm_card, norm_name)) { r = 1; break; }
+            if (strstr(p, norm_name)) { r = 1; break; }
         }
     }
-    rb_free_card(&c);
     return r;
 }
 
@@ -377,11 +457,40 @@ static int card_has_heart_in_range(const Card *c, int hc, int start, int end) {
     return 0;
 }
 
+/* Sum of the printed heart COUNTS of colour `hc` over [start, end) — mirrors
+   HeartMap::get(&hc).unwrap_or(&0). Pass hc < 0 to sum every colour
+   (HeartMap::values_sum). */
+static int heart_count_in_range(const Card *c, int hc, int start, int end) {
+    int total = 0;
+    for (int i = start; i < end && i < c->n_hearts; i++)
+        if (hc < 0 || (int)c->heart_color[i] == hc) total += c->heart_count[i];
+    return total;
+}
+
+/* Mirror Card::total_hearts (card.rs:4194-4202): base_heart.values_sum() when the
+   card prints base hearts (a member), else need_heart.values_sum() over the need
+   slice (a live card's cost hearts). Blade hearts are never counted. */
+static int card_total_hearts(const Card *c) {
+    if (c->num_base > 0) return heart_count_in_range(c, -1, 0, c->num_base);
+    return heart_count_in_range(c, -1, c->num_base + c->num_blade,
+                                c->num_base + c->num_blade + c->num_need);
+}
+
+/* Mirror util.rs::heart_count_for_threshold (util.rs:1111-1120): whichever of the
+   printed base heart and the need heart holds more hearts of `color` counts. */
+static int heart_count_for_threshold(const Card *c, int hc) {
+    int base = heart_count_in_range(c, hc, 0, c->num_base);
+    int need = heart_count_in_range(c, hc, c->num_base + c->num_blade,
+                                    c->num_base + c->num_blade + c->num_need);
+    return base > need ? base : need;
+}
+
 /* Mirror util.rs::card_matches_heart_colors — OR logic over the listed colors. */
 int rb_card_matches_heart_colors(int card_id, const char **heart_colors, int n) {
     if (n <= 0) return 1;
     Card c;
-    if (!rb_decode_card_by_index((uint32_t)card_id, &c)) return 0;
+    /* util.rs:845 — a card the database does not know PASSES (is_none_or). */
+    if (!rb_decode_card_by_index((uint32_t)card_id, &c)) return 1;
     int r = 0;
     for (int k = 0; k < n; k++) {
         int hc = (int)rb_parse_heart_color(heart_colors[k]);
@@ -399,7 +508,8 @@ int rb_card_matches_heart_colors(int card_id, const char **heart_colors, int n) 
 int rb_card_matches_all_heart_colors(int card_id, const char **heart_colors, int n) {
     if (n <= 0) return 1;
     Card c;
-    if (!rb_decode_card_by_index((uint32_t)card_id, &c)) return 0;
+    /* util.rs:869 — same is_none_or pass for an unknown card. */
+    if (!rb_decode_card_by_index((uint32_t)card_id, &c)) return 1;
     int r = 1;
     for (int k = 0; k < n; k++) {
         int hc = (int)rb_parse_heart_color(heart_colors[k]);
@@ -827,35 +937,42 @@ static int local_filter_matches(const LocalCardFilter *f, int card_id) {
         if (!ok) return 0;
     }
     if (f->heart_color_count > 0) {
-        /* Per-color count threshold check */
+        /* util.rs:1257-1271 — heart_count_for_threshold(color) >= min_count for
+           EVERY listed colour when require_all_heart_colors, else for ANY one.
+           The C port used a 0/1 presence flag (so a threshold of 2 could never
+           pass) and ignored require_all. */
         Card c;
         if (rb_decode_card_by_index((uint32_t)card_id, &c)) {
-            int passes = 0;
+            int passes = f->require_all_heart_colors ? 1 : 0;
             for (int hc_idx = 0; hc_idx < f->n_heart_colors; hc_idx++) {
                 int hc = (int)rb_parse_heart_color(f->heart_colors[hc_idx]);
-                int base_amount = 0, need_amount = 0;
-                if (c.num_base > 0)
-                    base_amount = card_has_heart_in_range(&c, hc, 0, c.num_base) ? 1 : 0;
-                else
-                    need_amount = card_has_heart_in_range(&c, hc,
-                        c.num_base + c.num_blade, c.num_base + c.num_blade + c.num_need) ? 1 : 0;
-                if (base_amount >= f->heart_color_count || need_amount >= f->heart_color_count)
+                int meets = heart_count_for_threshold(&c, hc) >= f->heart_color_count;
+                if (f->require_all_heart_colors) {
+                    if (!meets) { passes = 0; break; }
+                } else if (meets) {
                     passes = 1;
+                    break;
+                }
             }
             rb_free_card(&c);
             if (!passes) return 0;
         }
     }
     if (f->has_need_heart_total) {
+        /* util.rs:1282-1308 — with need_heart_color, the COUNT of that colour
+           in need_heart; otherwise Card::total_hearts() (printed base hearts for
+           a member, need_heart for a live card). The C port counted heart
+           ENTRIES for the total (c.num_base / c.num_need) and a 0/1 presence
+           flag for the per-colour form. */
         Card c;
         int total = 0;
         if (rb_decode_card_by_index((uint32_t)card_id, &c)) {
             if (f->need_heart_color[0]) {
                 int hc = (int)rb_parse_heart_color(f->need_heart_color);
-                total = card_has_heart_in_range(&c, hc,
-                    c.num_base + c.num_blade, c.num_base + c.num_blade + c.num_need) ? 1 : 0;
+                total = heart_count_in_range(&c, hc,
+                    c.num_base + c.num_blade, c.num_base + c.num_blade + c.num_need);
             } else {
-                total = c.num_base > 0 ? c.num_base : c.num_need;
+                total = card_total_hearts(&c);
             }
             rb_free_card(&c);
         }
@@ -924,6 +1041,18 @@ static int local_filter_matches(const LocalCardFilter *f, int card_id) {
             rb_free_card(&c);
         }
     }
+    /* util.rs:1390-1408 (CardFilter::check_card_property, checked last, after the
+       ability filter). `negation` inverts the property test. An unknown property
+       string is false, so with negation it passes — a card the database cannot
+       decode also counts as "no property", matching Rust's
+       `get_card(id).is_some_and(..)` on a missing card. */
+    if (f->has_card_property && f->card_property[0]) {
+        Card c;
+        const Card *cp = rb_decode_card_by_index((uint32_t)card_id, &c) ? &c : NULL;
+        int passes = rb_check_card_property(f->card_property, f->negation, cp);
+        if (cp) rb_free_card(&c);
+        if (!passes) return 0;
+    }
     return 1;
 }
 
@@ -934,7 +1063,8 @@ static int local_has_filter(const LocalCardFilter *f) {
     return f->card_type[0] || f->has_group || f->has_cost_limit || f->has_characters ||
            f->has_exclude_characters || f->n_heart_colors > 0 || f->has_need_heart_total ||
            f->n_name_fragments > 0 || f->has_original_blade || f->ability_filter[0] ||
-           f->has_exclude_self || f->has_cost_total || f->n_cost_values > 0 || f->has_blade_limit;
+           f->has_card_property || f->has_exclude_self || f->has_cost_total ||
+           f->n_cost_values > 0 || f->has_blade_limit;
 }
 
 /* Mirror util.rs::CardFilter::matches — check all present filter fields. */
@@ -996,6 +1126,12 @@ static int local_filter_from_public(const RbCardFilter *rf, LocalCardFilter *out
         f.n_ability_filter_triggers = rf->n_ability_filter_triggers;
     }
     f.negation = rf->negation;
+    /* util.rs:1536 card_property: effect.card_property_any(). The field is not in
+       include/rabuka.h yet, so it arrives as "" until the header diff lands. */
+    {
+        const char *cp = RF_CARD_PROPERTY(rf);
+        if (cp && *cp) { strncpy(f.card_property, cp, sizeof f.card_property - 1); f.has_card_property = 1; }
+    }
     if (rf->has_exclude_self) { f.exclude_self_id = rf->exclude_self_id; f.has_exclude_self = 1; }
     if (rf->has_cost_total) { f.cost_total = rf->cost_total;
                                if (rf->cost_total_op[0]) strncpy(f.cost_total_op, rf->cost_total_op, sizeof f.cost_total_op - 1);
@@ -1753,6 +1889,12 @@ int rb_resolve_per_unit_count(const GameState *g, int pl, const char *per_unit_t
                               const char *card_type, const char *group,
                               const char *state_filter, int host_card_id) {
     if (!per_unit_type) return 1;
+    /* score.rs:232-234 / misc.rs:832-834 — 「1つにつき」 on a cost that pays ENERGY
+       counts the energy paid by the most recent cost step, i.e.
+       GameModifiers::last_cost_energy_count (game_modifiers.rs:183), not a zone.
+       Until that field reaches RbMods the accessor macro yields the pre-field
+       behaviour (0). */
+    if (!strcmp(per_unit_type, "つ")) return RB_LAST_COST_ENERGY((RbMods *)&g->mods);
     const RbPlayer *P = &g->p[pl];
     const char *zone;
     int under_member_zone = 0;
@@ -1863,15 +2005,14 @@ static int rb_max_distinct_names_greedy(const int *cards, int n) {
     return rb_max_distinct_names(cards, n);
 }
 
-/* Mirror util.rs::prune_dominated (util.rs:990-1005) — "removes any mask that is
-   a strict subset of another mask in the list". The algorithm below is a line
-   for line port: sort, dedup, then for each candidate skip it when some already
-   kept mask is a superset (m ⊆ k), otherwise drop every kept mask that m
-   subsumes and push m.
-   Divergence from Rust: the Rust twin operates on u128 and the C header
-   declares uint64_t, so the C form can only reason about the low 64 bits.
-   `kept` is heap-sized from *n because the previous fixed RB_MAX_ZONE (64)
-   array overflowed its bounds for longer inputs. */
+/* Mirror util.rs::prune_dominated (util.rs:1003-1018) — sort, dedup, then for
+   each candidate skip it when some already kept mask is a superset (m ⊆ k),
+   otherwise drop every kept mask that m subsumes and push m.
+   Divergence from Rust, structural: the Rust twin operates on u128 and the C
+   header declares uint64_t, so the C form can only reason about the low 64 bits.
+   `kept` is heap-sized from the deduped count so a long input cannot overflow a
+   fixed array; the input array itself is used for the sort, so it is the
+   caller's buffer and is not clamped to RB_MAX_ZONE. */
 static int cmp_u64(const void *a, const void *b) {
     uint64_t va = *(const uint64_t *)a, vb = *(const uint64_t *)b;
     return (va > vb) - (va < vb);
@@ -1879,7 +2020,6 @@ static int cmp_u64(const void *a, const void *b) {
 void rb_prune_dominated(uint64_t *masks, int *n) {
     if (!masks || !n || *n <= 1) return;
     int total = *n;
-    if (total > RB_MAX_ZONE) total = RB_MAX_ZONE;
     qsort(masks, (size_t)total, sizeof(uint64_t), cmp_u64);
     int m = 1;
     for (int i = 1; i < total; i++)
