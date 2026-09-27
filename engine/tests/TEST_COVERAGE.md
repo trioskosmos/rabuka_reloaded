@@ -24,7 +24,7 @@ A card with multiple abilities counts as **covered** if *any* is touched; check 
 - **Distinct cards (base identity):** 771
 - **Cards referenced in tests (L0):** 771 / 771  (771/771)
 - **Abilities on a referenced card:** 936 / 936
-- **Depth (inferred):** L1+choice: 67, L2: 76, L2+choice: 793
+- **Depth (inferred):** L1+choice: 39, L2: 76, L2+choice: 821
 
 ## By trigger type
 
@@ -122,9 +122,9 @@ A card with multiple abilities counts as **covered** if *any* is touched; check 
 
 | Depth | Count |
 |---|---|
-| L1+choice | 67 |
+| L1+choice | 39 |
 | L2 | 76 |
-| L2+choice | 793 |
+| L2+choice | 821 |
 
 ## Untested abilities (gap)
 

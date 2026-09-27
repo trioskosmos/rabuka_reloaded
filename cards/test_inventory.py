@@ -597,6 +597,24 @@ Q_IDENT_RE = re.compile(
 # card_no, so a transposed bp2/pb2 (or SEC/P) card number would fail loudly.
 Q_CARD_PIN_RE = re.compile(r"assert_card_identity|card_no")
 
+# An ABSENCE claim: an assertion that something did NOT happen, as opposed to a
+# presence check or a value comparison. This is the structural counterpart to
+# NEGATIVE_RE, which only matches a NAME hint.
+#
+# Only unambiguous forms count. `== 0` and `>= 1` are deliberately NOT here: 0 is
+# both "nothing" and a real value in this suite, and `>= 1` is a presence check —
+# the opposite of a negative. Crediting either would move abilities UP the ladder
+# on evidence that does not support it, which is the wrong direction for a
+# gap-finder.
+Q_ABSENCE_ASSERT_RE = re.compile(
+    r"\.is_empty\(\)"
+    r"|!\s*[A-Za-z_][A-Za-z0-9_]*(?:\.[A-Za-z_][A-Za-z0-9_]*)*\.contains\("
+    r"|\.is_none\(\)"
+    r"|\.is_err\(\)"
+    r"|assert!\s*\(\s*!"
+    r"|assert_ne!\s*\(\s*[^,]+,\s*None"
+)
+
 # assert!(x) / assert_eq!(x, y) — the units an assertion of interest is counted in.
 Q_ASSERT_CALL_RE = re.compile(r"assert(?:_eq|_ne|_ability)?!\s*\(")
 # A negative-only assertion: is_err(), is_none(), !ok, result.is_err(), etc.
@@ -1479,13 +1497,24 @@ def render_quality(smells, inv):
     return "\n".join(w)
 
 
-def infer_ability_depth(covering_texts, covering_rels, covering_fns):
-    """Return depth label and flags for an ability. Negative = file/test name hint only."""
+def infer_ability_depth(covering_texts, covering_rels, covering_fns, absence_in_direct=False):
+    """Return depth label and flags for an ability.
+
+    Negative coverage is credited two ways: a NEGATIVE_RE name hint on the
+    covering file or test name, OR an absence assertion inside a test that actually
+    drives this ability. The second signal exists because the name hint alone
+    reported 67 abilities as needing a negative test when most already had one —
+    a bucket that size cries wolf, and cries wolf is why gaps go unworked.
+    """
     if not covering_texts:
         return "none", {"has_assert": False, "has_choice": False, "has_negative": False}
     has_assert = any("assert" in t for t in covering_texts)
     has_choice = any(bool(CHOICE_RE.search(t)) for t in covering_texts)
-    has_negative = any(bool(NEGATIVE_RE.search(r)) for r in covering_rels) or any(bool(NEGATIVE_RE.search(fn)) for fn in covering_fns)
+    has_negative = (
+        any(bool(NEGATIVE_RE.search(r)) for r in covering_rels)
+        or any(bool(NEGATIVE_RE.search(fn)) for fn in covering_fns)
+        or absence_in_direct
+    )
     if has_negative and has_assert:
         depth = "L2"
     elif has_assert:
@@ -1496,6 +1525,26 @@ def infer_ability_depth(covering_texts, covering_rels, covering_fns):
     if has_choice and depth in ("L1", "L2"):
         depth = depth + "+choice"
     return depth, {"has_assert": has_assert, "has_choice": has_choice, "has_negative": has_negative}
+
+
+def _fn_bodies_assert_absence(fn_bodies):
+    """True when any of these test-fn bodies makes an absence claim.
+
+    Structural counterpart to the NEGATIVE_RE name hint, and scoped to the fns
+    that actually DRIVE the ability rather than to the whole covering file. That
+    scope is the point: a file covering five cards routinely contains an absence
+    assertion belonging to a card other than the one being scored, and crediting
+    it would move that ability up the ladder on someone else's evidence.
+
+    Helper bodies count, for the same reason `has_assert` already follows them
+    (`_only_asserts_of_kind`): moving an assertion into a fixture is the natural
+    refactor and must not silently un-credit the test.
+    """
+    for body in fn_bodies:
+        stripped = _strip_rust_strings(body)
+        if Q_ABSENCE_ASSERT_RE.search(stripped):
+            return True
+    return False
 
 
 def lifecycle_signals_in(body):
@@ -1833,7 +1882,13 @@ def build_inventory():
                                 direct_bodies.append(helper_body)
 
         covered = bool(covered_rels) or covers_override is not None
-        depth, flags = infer_ability_depth(covering_texts, covered_rels, covering_fns)
+        # Structural negative signal, at the granularity that makes it trustworthy:
+        # only the bodies of the tests that actually DRIVE this card, plus the
+        # local helpers they call.
+        absence_in_direct = _fn_bodies_assert_absence(direct_bodies)
+        depth, flags = infer_ability_depth(
+            covering_texts, covered_rels, covering_fns, absence_in_direct
+        )
         # Lifecycle dimension: only meaningful for the actions that MUTATE
         # persistent ability state, and only judgeable once the card is driven
         # at all — a card with no direct test is already reported as untested.

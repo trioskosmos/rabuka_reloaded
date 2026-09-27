@@ -1,6 +1,6 @@
 {
   "generated_by": "cards/test_inventory.py",
-  "generated_at": "2026-09-26T23:54:16.124688+00:00",
+  "generated_at": "2026-09-27T00:28:52.858576+00:00",
   "stats": {
     "total_cards": 2526,
     "cards_with_abilities": 1565,
@@ -309,8 +309,8 @@
     ]
   },
   "depth_counts": {
-    "L2+choice": 793,
-    "L1+choice": 67,
+    "L2+choice": 821,
+    "L1+choice": 39,
     "L2": 76
   },
   "qa_rulings": {
@@ -1889,10 +1889,10 @@
       ],
       "base": "PL!-PR-007",
       "covered": true,
-      "depth": "L1+choice",
+      "depth": "L2+choice",
       "has_assert": true,
       "has_choice": true,
-      "has_negative": false,
+      "has_negative": true,
       "covering_files": [
         "engine/tests/test_modules/effects/look_select/search_deck/paid_discard_look_fetches_named_subunit_test.rs",
         "engine/tests/test_modules/effects/state/wait_activation/optional_self_wait_target_pl_pr_007_pr_test.rs"
@@ -10034,10 +10034,10 @@
       ],
       "base": "PL!-bp6-007",
       "covered": true,
-      "depth": "L1+choice",
+      "depth": "L2+choice",
       "has_assert": true,
       "has_choice": true,
-      "has_negative": false,
+      "has_negative": true,
       "covering_files": [
         "engine/tests/test_modules/effects/look_select/reveal/live_success_reveal_top_member_without_blade_heart_total_score_test.rs"
       ],
@@ -10437,10 +10437,10 @@
       ],
       "base": "PL!HS-bp6-001",
       "covered": true,
-      "depth": "L1+choice",
+      "depth": "L2+choice",
       "has_assert": true,
       "has_choice": true,
-      "has_negative": false,
+      "has_negative": true,
       "covering_files": [
         "engine/tests/test_modules/effects/look_select/pin_top/dynamic_count_pin_one_to_top_test.rs"
       ],
@@ -10480,10 +10480,10 @@
       ],
       "base": "PL!HS-bp6-001",
       "covered": true,
-      "depth": "L1+choice",
+      "depth": "L2+choice",
       "has_assert": true,
       "has_choice": true,
-      "has_negative": false,
+      "has_negative": true,
       "covering_files": [
         "engine/tests/test_modules/effects/look_select/pin_top/dynamic_count_pin_one_to_top_test.rs"
       ],
@@ -21079,10 +21079,10 @@
       ],
       "base": "PL!SP-bp2-005",
       "covered": true,
-      "depth": "L1+choice",
+      "depth": "L2+choice",
       "has_assert": true,
       "has_choice": true,
-      "has_negative": false,
+      "has_negative": true,
       "covering_files": [
         "engine/tests/test_modules/effects/look_select/search_deck/paid_energy_look_seven_fetches_group_member_test.rs"
       ],
@@ -22484,10 +22484,10 @@
       ],
       "base": "PL!-bp3-001",
       "covered": true,
-      "depth": "L1+choice",
+      "depth": "L2+choice",
       "has_assert": true,
       "has_choice": true,
-      "has_negative": false,
+      "has_negative": true,
       "covering_files": [
         "engine/tests/test_modules/effects/draw/chains/self_wait_draw_then_discard_test.rs",
         "engine/tests/test_modules/effects/state/per_card/member_activation_debut_and_live_start_test.rs"
@@ -22528,10 +22528,10 @@
       ],
       "base": "PL!-bp3-001",
       "covered": true,
-      "depth": "L1+choice",
+      "depth": "L2+choice",
       "has_assert": true,
       "has_choice": true,
-      "has_negative": false,
+      "has_negative": true,
       "covering_files": [
         "engine/tests/test_modules/effects/draw/chains/self_wait_draw_then_discard_test.rs",
         "engine/tests/test_modules/effects/state/per_card/member_activation_debut_and_live_start_test.rs"
@@ -22894,10 +22894,10 @@
       ],
       "base": "PL!S-bp3-004",
       "covered": true,
-      "depth": "L1+choice",
+      "depth": "L2+choice",
       "has_assert": true,
       "has_choice": true,
-      "has_negative": false,
+      "has_negative": true,
       "covering_files": [
         "engine/tests/test_modules/effects/gain/hearts/live_start/live_start_discard_distinct_heart_colors_q246_test.rs"
       ],
@@ -23016,10 +23016,10 @@
       ],
       "base": "PL!S-bp3-008",
       "covered": true,
-      "depth": "L1+choice",
+      "depth": "L2+choice",
       "has_assert": true,
       "has_choice": true,
-      "has_negative": false,
+      "has_negative": true,
       "covering_files": [
         "engine/tests/test_modules/effects/recover/to_hand/self_to_waitroom_live_recovery_energy_activation_test.rs"
       ],
@@ -23393,10 +23393,10 @@
       ],
       "base": "PL!N-bp3-010",
       "covered": true,
-      "depth": "L1+choice",
+      "depth": "L2+choice",
       "has_assert": true,
       "has_choice": true,
-      "has_negative": false,
+      "has_negative": true,
       "covering_files": [
         "engine/tests/test_modules/effects/choice/target_player/target_player_deck_routing_pl_n_bp3_010_r_pl_n_bp4_002_r_test.rs"
       ],
@@ -23735,10 +23735,10 @@
       ],
       "base": "PL!-pb1-003",
       "covered": true,
-      "depth": "L1+choice",
+      "depth": "L2+choice",
       "has_assert": true,
       "has_choice": true,
-      "has_negative": false,
+      "has_negative": true,
       "covering_files": [
         "engine/tests/test_modules/effects/state/wait_activation/self_wait_printemps_energy_pl_pb1_003_r_test.rs"
       ],
@@ -25189,10 +25189,10 @@
       ],
       "base": "PL!N-bp4-002",
       "covered": true,
-      "depth": "L1+choice",
+      "depth": "L2+choice",
       "has_assert": true,
       "has_choice": true,
-      "has_negative": false,
+      "has_negative": true,
       "covering_files": [
         "engine/tests/test_modules/effects/choice/target_player/target_player_deck_routing_pl_n_bp3_010_r_pl_n_bp4_002_r_test.rs"
       ],
@@ -27582,10 +27582,10 @@
       ],
       "base": "PL!N-pb1-013",
       "covered": true,
-      "depth": "L1+choice",
+      "depth": "L2+choice",
       "has_assert": true,
       "has_choice": true,
-      "has_negative": false,
+      "has_negative": true,
       "covering_files": [
         "engine/tests/test_modules/effects/deploy/optional_two_energy_named_member_deploy_q199_q200_test.rs",
         "engine/tests/test_modules/effects/deploy/paid_energy_same_name_debut_chain_q200_q201_q202_test.rs"
@@ -28010,10 +28010,10 @@
       ],
       "base": "PL!N-pb1-023",
       "covered": true,
-      "depth": "L1+choice",
+      "depth": "L2+choice",
       "has_assert": true,
       "has_choice": true,
-      "has_negative": false,
+      "has_negative": true,
       "covering_files": [
         "engine/tests/test_modules/effects/deploy/paid_energy_same_name_debut_chain_q200_q201_q202_test.rs"
       ],
@@ -29892,10 +29892,10 @@
       ],
       "base": "PL!HS-pb1-012",
       "covered": true,
-      "depth": "L1+choice",
+      "depth": "L2+choice",
       "has_assert": true,
       "has_choice": true,
-      "has_negative": false,
+      "has_negative": true,
       "covering_files": [
         "engine/tests/test_modules/effects/deck_order/restore/both_waitrooms_member_restore_threshold_q242_test.rs"
       ],
@@ -32055,10 +32055,10 @@
       ],
       "base": "PL!SP-pb2-007",
       "covered": true,
-      "depth": "L1+choice",
+      "depth": "L2+choice",
       "has_assert": true,
       "has_choice": true,
-      "has_negative": false,
+      "has_negative": true,
       "covering_files": [
         "engine/tests/test_modules/effects/recover/to_hand/optional_energy_live_recovery_pl_sp_pb2_007_r_test.rs"
       ],
@@ -34559,10 +34559,10 @@
       ],
       "base": "PL!SP-bp7-023",
       "covered": true,
-      "depth": "L1+choice",
+      "depth": "L2+choice",
       "has_assert": true,
       "has_choice": true,
-      "has_negative": false,
+      "has_negative": true,
       "covering_files": [
         "engine/tests/test_modules/effects/deck_order/restore/revealed_liella_pl_sp_bp7_023_l_test.rs"
       ],
@@ -39369,10 +39369,10 @@
       ],
       "base": "PL!HS-bp2-012",
       "covered": true,
-      "depth": "L1+choice",
+      "depth": "L2+choice",
       "has_assert": true,
       "has_choice": true,
-      "has_negative": false,
+      "has_negative": true,
       "covering_files": [
         "engine/tests/test_modules/jidou/leaves_stage/stage_to_discard_watcher_requires_actual_stage_leaving_move_test.rs"
       ],
@@ -40274,10 +40274,10 @@
       ],
       "base": "PL!S-pb1-013",
       "covered": true,
-      "depth": "L1+choice",
+      "depth": "L2+choice",
       "has_assert": true,
       "has_choice": true,
-      "has_negative": false,
+      "has_negative": true,
       "covering_files": [
         "engine/tests/test_modules/effects/look_select/reveal/look_four_take_live_with_heart_requirement_test.rs"
       ],
@@ -43834,10 +43834,10 @@
       ],
       "base": "PL!SP-bp4-018",
       "covered": true,
-      "depth": "L1+choice",
+      "depth": "L2+choice",
       "has_assert": true,
       "has_choice": true,
-      "has_negative": false,
+      "has_negative": true,
       "covering_files": [
         "engine/tests/test_modules/effects/recover/to_hand/self_to_waitroom_liella_recovery_test.rs"
       ],
@@ -48829,10 +48829,10 @@
       ],
       "base": "PL!S-sd1-009",
       "covered": true,
-      "depth": "L1+choice",
+      "depth": "L2+choice",
       "has_assert": true,
       "has_choice": true,
-      "has_negative": false,
+      "has_negative": true,
       "covering_files": [
         "engine/tests/test_modules/effects/deck_order/restore/revealed_hand_aqours_pl_s_sd1_009_sd_test.rs"
       ],
@@ -51616,10 +51616,10 @@
       ],
       "base": "PL!HS-bp6-030",
       "covered": true,
-      "depth": "L1+choice",
+      "depth": "L2+choice",
       "has_assert": true,
       "has_choice": true,
-      "has_negative": false,
+      "has_negative": true,
       "covering_files": [
         "engine/tests/test_modules/effects/draw/chains/draw_discard_pl_hs_bp6_030_l_test.rs"
       ],
@@ -51877,10 +51877,10 @@
       ],
       "base": "PL!HS-cl1-001",
       "covered": true,
-      "depth": "L1+choice",
+      "depth": "L2+choice",
       "has_assert": true,
       "has_choice": true,
-      "has_negative": false,
+      "has_negative": true,
       "covering_files": [
         "engine/tests/test_modules/effects/look_select/heart_colour_choice_and_optional_banking_test.rs",
         "engine/tests/test_modules/effects/look_select/look_and_filter/look_at_deck_top_optional_discard_test.rs"
@@ -52055,10 +52055,10 @@
       ],
       "base": "PL!HS-cl1-006",
       "covered": true,
-      "depth": "L1+choice",
+      "depth": "L2+choice",
       "has_assert": true,
       "has_choice": true,
-      "has_negative": false,
+      "has_negative": true,
       "covering_files": [
         "engine/tests/test_modules/effects/gain/blades/live_start/debut_and_live_start_blade_grant_test.rs",
         "engine/tests/test_modules/effects/gain/blades/per_card/modifier_layer_characterization_test.rs",
@@ -53133,10 +53133,10 @@
       ],
       "base": "PL!SP-pb2-028",
       "covered": true,
-      "depth": "L1+choice",
+      "depth": "L2+choice",
       "has_assert": true,
       "has_choice": true,
-      "has_negative": false,
+      "has_negative": true,
       "covering_files": [
         "engine/tests/test_modules/effects/position/area_move/area_move_triggered_auto_ability_stress_test.rs"
       ],
@@ -54055,10 +54055,10 @@
       ],
       "base": "PL!S-bp7-013",
       "covered": true,
-      "depth": "L1+choice",
+      "depth": "L2+choice",
       "has_assert": true,
       "has_choice": true,
-      "has_negative": false,
+      "has_negative": true,
       "covering_files": [
         "engine/tests/test_modules/effects/choice/target_player/target_player_deck_routing_pl_n_bp3_010_r_pl_n_bp4_002_r_test.rs",
         "engine/tests/test_modules/effects/choice/target_player/target_player_recycle_pl_s_bp7_013_n_test.rs"
@@ -54498,10 +54498,10 @@
       ],
       "base": "PL!S-bp7-025",
       "covered": true,
-      "depth": "L1+choice",
+      "depth": "L2+choice",
       "has_assert": true,
       "has_choice": true,
-      "has_negative": false,
+      "has_negative": true,
       "covering_files": [
         "engine/tests/test_modules/characterization/pipeline_characterization_test.rs",
         "engine/tests/test_modules/effects/choice/per_card/wait_or_draw_pl_s_bp7_025_l_test.rs"
@@ -55736,10 +55736,10 @@
       ],
       "base": "PL!SP-bp7-022",
       "covered": true,
-      "depth": "L1+choice",
+      "depth": "L2+choice",
       "has_assert": true,
       "has_choice": true,
-      "has_negative": false,
+      "has_negative": true,
       "covering_files": [
         "engine/tests/test_modules/effects/position/area_move/energy_return_cost_position_change_test.rs"
       ],
