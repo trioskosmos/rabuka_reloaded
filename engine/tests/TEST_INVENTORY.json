@@ -1,14 +1,14 @@
 {
   "generated_by": "cards/test_inventory.py",
-  "generated_at": "2026-09-27T02:35:29.577538+00:00",
+  "generated_at": "2026-09-27T03:19:19.974940+00:00",
   "stats": {
     "total_cards": 2526,
     "cards_with_abilities": 1565,
     "total_abilities": 2011,
     "unique_abilities": 936
   },
-  "n_files": 918,
-  "n_tests": 3709,
+  "n_files": 919,
+  "n_tests": 3711,
   "total_cards": 771,
   "covered_cards": 771,
   "abilities_on_covered": 936,
@@ -309,8 +309,8 @@
     ]
   },
   "depth_counts": {
-    "L2+choice": 821,
-    "L1+choice": 39,
+    "L2+choice": 822,
+    "L1+choice": 38,
     "L2": 76
   },
   "qa_rulings": {
@@ -625,7 +625,7 @@
       "rows": []
     }
   },
-  "n_test_fns_parsed": 3709,
+  "n_test_fns_parsed": 3711,
   "abilities": [
     {
       "idx": 0,
@@ -17380,6 +17380,7 @@
         "engine/tests/test_modules/effects/look_select/reveal/optional_live_discard_look_five_take_one_test.rs",
         "engine/tests/test_modules/effects/look_select/search_deck/reveal_from_deck_until_chosen_type_found_test.rs",
         "engine/tests/test_modules/effects/look_select/sequential_mill_then_group_recovery_test.rs",
+        "engine/tests/test_modules/effects/look_select/unit_filter_look_and_live_only_cost_test.rs",
         "engine/tests/test_modules/effects/mill/all_members_blades_pl_hs_bp5_013_n_test.rs",
         "engine/tests/test_modules/effects/mill/bottom_member_tiers_pl_s_bp7_021_l_test.rs",
         "engine/tests/test_modules/effects/mill/debut_mill_and_all_member_draw_test.rs",
@@ -17466,7 +17467,7 @@
         "ayumu_live_start_triggers",
         "ayumu_no_wait_with_non_nijigasaki_ally"
       ],
-      "covering_test_count": 839,
+      "covering_test_count": 841,
       "direct_tests": [
         "any_card_fails_hearts_all_fail",
         "aoku_haruka_live_start_fails_with_only_non_suzu_live_cards",
@@ -17499,7 +17500,7 @@
         "debut_opponent_live_discard_q130_decline_preserves_opponent_hand",
         "debut_reveal_until_live_q102_live_immediately_on_top"
       ],
-      "direct_test_count": 366,
+      "direct_test_count": 367,
       "is_null": false,
       "use_limit": null,
       "watches_abilities": false,
@@ -38826,14 +38827,17 @@
       "has_choice": true,
       "has_negative": false,
       "covering_files": [
-        "engine/tests/test_modules/effects/look_select/reveal/paid_discard_look_reveal_group_card_test.rs"
+        "engine/tests/test_modules/effects/look_select/reveal/paid_discard_look_reveal_group_card_test.rs",
+        "engine/tests/test_modules/effects/look_select/unit_filter_look_and_live_only_cost_test.rs"
       ],
       "covering_tests": [
+        "mei_declined_live_only_cost_cancels_the_look_by_the_colon_gate",
+        "mei_paid_cost_looks_five_takes_one_and_banks_the_rest",
         "pl_n_sd2_012_sd2_paid_discard_looks_three_takes_nijigasaki_card",
         "pl_sp_pb1_015_n_paid_discard_looks_five_takes_catchu_card",
         "pl_sp_pb1_016_n_paid_discard_looks_five_takes_kaleidoscore_card"
       ],
-      "covering_test_count": 3,
+      "covering_test_count": 5,
       "direct_tests": [
         "pl_sp_pb1_015_n_paid_discard_looks_five_takes_catchu_card"
       ],
@@ -55605,23 +55609,28 @@
       ],
       "base": "PL!SP-bp7-018",
       "covered": true,
-      "depth": "L1+choice",
+      "depth": "L2+choice",
       "has_assert": true,
       "has_choice": true,
-      "has_negative": false,
+      "has_negative": true,
       "covering_files": [
-        "engine/tests/test_modules/effects/look_select/reveal/optional_live_discard_look_five_take_one_test.rs"
+        "engine/tests/test_modules/effects/look_select/reveal/optional_live_discard_look_five_take_one_test.rs",
+        "engine/tests/test_modules/effects/look_select/unit_filter_look_and_live_only_cost_test.rs"
       ],
       "covering_tests": [
         "mei_bp7_018_n_declined_live_discard_preserves_cost_card_in_hand",
-        "mei_bp7_018_n_paid_live_discard_looks_five_and_takes_one"
+        "mei_bp7_018_n_paid_live_discard_looks_five_and_takes_one",
+        "mei_declined_live_only_cost_cancels_the_look_by_the_colon_gate",
+        "mei_paid_cost_looks_five_takes_one_and_banks_the_rest"
       ],
-      "covering_test_count": 2,
+      "covering_test_count": 4,
       "direct_tests": [
         "mei_bp7_018_n_declined_live_discard_preserves_cost_card_in_hand",
-        "mei_bp7_018_n_paid_live_discard_looks_five_and_takes_one"
+        "mei_bp7_018_n_paid_live_discard_looks_five_and_takes_one",
+        "mei_declined_live_only_cost_cancels_the_look_by_the_colon_gate",
+        "mei_paid_cost_looks_five_takes_one_and_banks_the_rest"
       ],
-      "direct_test_count": 2,
+      "direct_test_count": 4,
       "is_null": false,
       "use_limit": null,
       "watches_abilities": false,
