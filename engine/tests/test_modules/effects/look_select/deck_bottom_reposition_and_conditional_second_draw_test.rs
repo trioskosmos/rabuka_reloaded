@@ -46,21 +46,32 @@
 //! answer, not a missing pass. The live cards reaching NEITHER success zone is the
 //! same fact from the other side.
 //!
-//! The cause was the wrong field being read. This live prints `score 4` and
+//! The cause was the stage, not the harness. This live prints `score 4` and
 //! `need_heart {heart01: 2, heart03: 4, heart0: 4}`. Every draft had staged members
-//! carrying none of those, so the performance could not succeed. And `heart0: 4` is
-//! unsatisfiable from PRINTED cards in this pool: no member has a colorless base
-//! heart (the maximum across every card is 0), and the 160 cards carrying a
-//! wildcard `b_all` blade heart are all LIVE cards, not members.
-//! `game.state.stage_hearts` is not a lever either —
-//! `execute_live_victory_determination` calls `rebuild_stage_hearts_with_yell`
-//! before the performance, so a hand-set value is overwritten.
+//! carrying none of those, so the performance could not succeed.
+//!
+//! `heart0: 4` is NOT the obstacle an earlier version of this note claimed. `heart0`
+//! is a COLORLESS WILSCARD, satisfied by any colour: `check_heart_requirement`
+//! (core/card.rs:4250-4274) skips `Heart00` in the per-colour loop and then requires
+//! the leftover sum of every other colour to cover it. No member prints a literal
+//! colorless base heart — that is true and irrelevant. This was the second time in
+//! this investigation that `heart0` was misread as a literal colour, and the engine
+//! was right both times.
+//!
+//! What the drafts actually needed was a stage carrying heart01 2, heart03 4, plus 4
+//! hearts of any colour — and `game.state.stage_hearts` is a usable lever, but ONLY
+//! when injected immediately before a DIRECT dispatch. Set before a PHASE WALK it is
+//! useless: `execute_live_victory_determination` calls
+//! `rebuild_stage_hearts_with_yell` and the performance recomputes the tally, so a
+//! hand-set value is overwritten before it is read. That is the whole difference
+//! between this file's drafts and
+//! `recover/to_hand/live_success_recover_different_group_name_to_hand_ll_bp5_002_l_test.rs`,
+//! which opens the window and then ASSERTS it is open.
 //!
 //! So the answer to "where can a ライブ成功時 dispatch be observed" is: wherever a
-//! live can be MADE TO SUCCEED, and this particular one cannot be from printed
-//! cards. That is a property of the card and the pool, not of the harness, and the
-//! three claim variants above are written down for whoever runs it against a live
-//! whose `need_heart` the pool can satisfy.
+//! live can be MADE TO SUCCEED, and the recipe is a real stage plus the window
+//! opened directly. The three claim variants above are written down for whoever
+//! runs it that way.
 //!
 
 use crate::helpers::*;

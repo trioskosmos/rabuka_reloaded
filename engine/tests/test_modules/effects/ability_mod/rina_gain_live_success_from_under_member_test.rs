@@ -364,6 +364,18 @@ fn setup_rina_live_success(game: &mut TestGame, p1_energy: usize, p2_energy: usi
     game.state.player1.stage_hearts = Some(stage_hearts);
     game.state.current_phase = Phase::LiveVictoryDetermination;
     game.state.recalculate_constants();
+    // The three steps above — wildcard hearts, the live in the zone, and
+    // LiveVictoryDetermination — are what OPEN the ライブ成功時 window that the
+    // callers below dispatch through. Asserting it here, once, means every test in
+    // this file states the premise it depends on: without it the dispatch is a silent
+    // no-op, and `rina_copied_live_success_ability_does_nothing_without_energy_deficit`
+    // in particular would pass for the wrong reason — a closed window and a genuine
+    // energy-deficit failure look identical from the outside.
+    assert!(
+        game.state.should_trigger_live_success(&game.state.player1),
+        "precondition: the ライブ成功時 window must be OPEN — if it is not, the \
+         dispatch below does nothing at all"
+    );
     (rina, deck_energy)
 }
 

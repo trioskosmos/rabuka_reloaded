@@ -645,23 +645,37 @@ fn genki_zenkai_own_live_success_stays_invalidated_across_repeated_derivation() 
     //   Snapshots: [("p1", false, 0)]
     // ```
     //
-    // 元気全開DAY！DAY！DAY！ prints `score 3` and `need_heart {heart02: 4, heart0: 2}`.
-    // The heart02 half is satisfiable — 渡辺曜 and 黒澤ルビィ hold 4 each — but
-    // `heart0` is COLORLESS and no member in this pool prints a colorless base
-    // heart (the maximum across every card is 0), nor does any member carry a
-    // colorless blade heart (the 160 wildcard `b_all` holders are all live cards).
-    // `game.state.stage_hearts` is not a lever either: the performance recomputes
-    // the tally, so a hand-set value is overwritten.
+    // 元気全開DAY！DAY！DAY！ prints `score 3` and `need_heart {heart02: 4, heart0: 2}`,
+    // and BOTH halves are satisfiable — 渡辺曜 and 黒澤ルビィ hold 4 heart02 each,
+    // and `heart0` is a COLORLESS WILDCARD, satisfied by any colour
+    // (`check_heart_requirement`, core/card.rs:4250-4274, skips Heart00 in the
+    // per-colour loop and then requires the leftover sum of every other colour).
     //
-    // So this live cannot succeed from printed cards, its ライブ成功時 is
-    // unreachable in play, and a negative assertion about it cannot be made
-    // non-vacuous. What IS established here is the half that can be: the invalidation
-    // is registered by ライブ開始時 and survives repeated re-derivation as a single
-    // standing record.
+    // An earlier version of this comment claimed the opposite — that no member
+    // prints a colorless heart and so the live cannot succeed. That was wrong: it
+    // read `heart0` as a literal colour, the same mistake made twice while
+    // diagnosing sweet&sweet holiday. No member prints a literal colorless heart and
+    // that is true, but it is irrelevant.
     //
-    // Recorded rather than papered over, because the same shape blocks
-    // sweet&sweet holiday `PL!-bp6-023-L` (also `heart0`-gated) and both are
-    // counted by the `live_success_no_premise` quality smell.
+    // The real reason the earlier draft saw `success=false` is the line above:
+    // the test set `game.state.player1.stage_hearts` BEFORE walking to the
+    // performance, and the performance recomputes the tally, so the hand-set value
+    // was overwritten before it was ever read. The `stage_hearts` lever only works
+    // when injected immediately before a DIRECT dispatch, not before a phase walk —
+    // which is exactly the pattern
+    // `live_success_recover_different_group_name_to_hand_ll_bp5_002_l_test.rs`
+    // already uses, and why that file satisfies the window where this one did not.
+    //
+    // So the behavioural half is achievable and is simply not written yet: drive a
+    // real live with a stage that satisfies heart02 4 plus any 2 further hearts, and
+    // assert the invalidated ライブ成功時 places nothing while an UNinvalidated twin
+    // places one. What IS established here is the half that needs no window: the
+    // invalidation is registered by ライブ開始時 and survives repeated re-derivation
+    // as a single standing record.
+    //
+    // Recorded rather than papered over, because the `live_success_no_premise`
+    // quality smell exists for exactly this shape and a reader arriving at the
+    // missing assertion deserves the reason.
 }
 
 
