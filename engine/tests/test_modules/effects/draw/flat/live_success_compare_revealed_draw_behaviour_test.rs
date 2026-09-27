@@ -189,14 +189,14 @@ fn you_does_not_draw_when_own_reveal_count_is_higher() {
 /// (1, 3) is the case the printed text is about — p1 revealed fewer than p2 — and it
 /// fails. So the condition is not merely conservative, it is unsatisfiable.
 ///
-/// ## Scope: one card, not a pattern
+/// ## Scope: one card, and a lead-generator that needs the same discipline
 ///
 /// Every condition in `abilities.json` whose text states a comparison was checked.
 /// Four cards matched, and three of them are FINE because the comparison IS
 /// structured there:
 ///
 ///   * `PL!N-bp5-005-R＋`, `PL!HS-sd1-001-SD`, `PL!S-PR-029-PR` all carry
-///     `cost_limit` together with `cost_limit_operator` — 「コスト10以上」 and
+///     `cost_limit` together with `cost_limit_operator`, so 「コスト10以上」 and
 ///     「コスト13以上」 compile to a real operand and an operator.
 ///   * `PL!S-bp3-005-R` (渡辺曜) carries NEITHER, and the only field on her condition
 ///     is the zone.
@@ -204,9 +204,33 @@ fn you_does_not_draw_when_own_reveal_count_is_higher() {
 /// So the parser has a working representation for a ONE-SIDED comparison, and
 /// 渡辺曜 is the single card in this pool whose comparison is TWO-SIDED — a count
 /// against another count, which `cost_limit` + `cost_limit_operator` has no shape
-/// for. That is a precise gap with a count of one, not a general failure, and the
-/// distinction matters: a fix belongs in the parser's comparison representation and
-/// should not disturb the three cards that work.
+/// for. A precise gap with a count of one, and the distinction matters: a fix
+/// belongs in the parser's comparison representation and should not disturb the
+/// three cards that work.
+///
+/// ## The wider scan, and why its other hits are not claims
+///
+/// Extending the same signature to every condition TYPE finds more candidates, and
+/// most are an artefact of the scan rather than a defect:
+///
+///   * `quantifier_all` on `compound` — 3 cards, e.g. 「自分のステージのエリアすべてに
+///     『蓮ノ空』のメンバーが登場しており」. A compound's `text` carries its CHILD's
+///     vocabulary, so the parent's own fields are checked against text that is not
+///     the parent's. And this one is KNOWN GOOD: 乙宗梢 `PL!S-bp2-008-R＋` is the
+///     all-areas card and `constant_conditions_exact_counts_and_names_test.rs` passes
+///     on it — emptying an area withdraws the grant. A scan reporting it would have
+///     sent someone to a working card.
+///   * `count_of_zone` on `compound` — 11 cards, the same nesting: the 「3枚以上」
+///     belongs to a `card_count_condition` child that does carry a count.
+///   * `quantifier_all` on `card_count_condition` — 9 cards, e.g. 「それらがすべて
+///     heart04 を持つメンバーカードの場合」. A real lead, and NOT verified either way:
+///     「all of them」 is a distinct quantifier and nothing in the suite has driven
+///     it. Flagged as a lead, deliberately not as a defect.
+///
+/// So the discipline that produced this finding is the one the scan itself needs:
+/// attribute vocabulary to the condition that OWNS it, and confirm a suspected gap
+/// behaviourally before reporting it. The wider scan is a lead-generator; only
+/// 渡辺曜 has been confirmed.
 ///
 /// ## Not written, and why
 ///
