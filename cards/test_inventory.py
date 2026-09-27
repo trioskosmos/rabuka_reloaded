@@ -673,20 +673,37 @@ Q_IDENT_RE = re.compile(
 Q_CARD_PIN_RE = re.compile(r"assert_card_identity|card_no")
 
 # An ABSENCE claim: an assertion that something did NOT happen, as opposed to a
-# presence check or a value comparison. This is the structural counterpart to
-# NEGATIVE_RE, which only matches a NAME hint.
+# presence check or a value comparison. Structural counterpart to NEGATIVE_RE, which
+# only matches a NAME hint.
 #
-# Only unambiguous forms count. `== 0` and `>= 1` are deliberately NOT here: 0 is
-# both "nothing" and a real value in this suite, and `>= 1` is a presence check —
-# the opposite of a negative. Crediting either would move abilities UP the ladder
-# on evidence that does not support it, which is the wrong direction for a
-# gap-finder.
+# The forms are deliberately narrow. `== 0` and `>= 1` are NOT absence claims: 0 is
+# both "nothing" and a real value in this suite, and `>= 1` is a presence check.
+# Crediting either would move abilities UP the ladder on evidence that does not
+# support it, which is the wrong direction for a gap-finder.
+#
+# KNOWN LIMIT, and it is why a card can sit on the L1+choice frontier while every
+# test for it is green and meaningful. This keys on absence SHAPES, so it cannot see
+# a negative written as a positive equality — "the second trigger did not raise the
+# value" is `assert_eq!(x, 1)`, and 1 is not a form here.
+#
+# 澁谷かのん PL!SP-sd2-012-SD2 and 鬼塚冬毬 PL!SP-sd2-022-SD2 are the worked example.
+# `cross_player_jidou_triggers_test.rs` covers both for the TRIGGER firing — a
+# self-caused move grants the heart, an opponent-caused move grants it too, which is
+# the 「でも発動する」 exception — and every assertion in it is `assert_eq!(x, 1)`. So
+# the ladder reported "no negative" and both rows sat on the frontier while nothing was
+# missing except the two lifecycle clauses, now tested in
+# `jidou/movement/self_area_move_watch/area_move_grant_turn_limit_and_live_end_expiry_test.rs`.
+#
+# Deliberately not worked around: deciding that `assert_eq!(x, 1)` is a negative needs
+# to know what could have raised 1, which is not statically decidable, and a metric that
+# guesses moves abilities UP on invented evidence.
 Q_ABSENCE_ASSERT_RE = re.compile(
-    r"\.is_empty\(\)"
-    r"|!\s*[A-Za-z_][A-Za-z0-9_]*(?:\.[A-Za-z_][A-Za-z0-9_]*)*\.contains\("
+    r"assert!\s*\(\s*!"
+    r"|assert_eq!\s*\([^,]+,\s*(?:0|false)\s*\)"
+    r"|assert_eq!\s*\([^,]*\.len\(\)[^,]*,\s*0\s*\)"
+    r"|is_empty\(\)"
     r"|\.is_none\(\)"
     r"|\.is_err\(\)"
-    r"|assert!\s*\(\s*!"
     r"|assert_ne!\s*\(\s*[^,]+,\s*None"
 )
 
@@ -775,12 +792,6 @@ Q_IMPOSSIBLE_NEED_RE = re.compile(
 # with a positive twin that a silent decline would fail. Read the row as "spend five
 # minutes here", not as 49 problems.
 Q_DRAIN_ZERO_RE = re.compile(r"select_indices\(\s*&\[\s*0\s*\]\s*\)")
-Q_ABSENCE_ASSERT_RE = re.compile(
-    r"assert!\s*\(\s*!"
-    r"|assert_eq!\s*\([^,]+,\s*(?:0|false)\s*\)"
-    r"|assert_eq!\s*\([^,]*\.len\(\)[^,]*,\s*0\s*\)"
-    r"|is_empty\(\)"
-)
 
 # assert!(x) / assert_eq!(x, y) — the units an assertion of interest is counted in.
 Q_ASSERT_CALL_RE = re.compile(r"assert(?:_eq|_ne|_ability)?!\s*\(")

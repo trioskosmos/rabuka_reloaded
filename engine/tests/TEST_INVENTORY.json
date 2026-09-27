@@ -1,14 +1,14 @@
 {
   "generated_by": "cards/test_inventory.py",
-  "generated_at": "2026-09-27T04:15:10.203802+00:00",
+  "generated_at": "2026-09-27T05:00:45.846349+00:00",
   "stats": {
     "total_cards": 2526,
     "cards_with_abilities": 1565,
     "total_abilities": 2011,
     "unique_abilities": 936
   },
-  "n_files": 919,
-  "n_tests": 3711,
+  "n_files": 921,
+  "n_tests": 3716,
   "total_cards": 771,
   "covered_cards": 771,
   "abilities_on_covered": 936,
@@ -309,8 +309,8 @@
     ]
   },
   "depth_counts": {
-    "L2+choice": 822,
-    "L1+choice": 38,
+    "L2+choice": 825,
+    "L1+choice": 35,
     "L2": 76
   },
   "qa_rulings": {
@@ -924,7 +924,7 @@
       "rows": []
     }
   },
-  "n_test_fns_parsed": 3711,
+  "n_test_fns_parsed": 3716,
   "abilities": [
     {
       "idx": 0,
@@ -17537,6 +17537,7 @@
       "has_negative": true,
       "covering_files": [
         "engine/tests/test_modules/integration/multi_card/opponent_forced_position_change_arms_opponent_area_move_watcher_test.rs",
+        "engine/tests/test_modules/jidou/movement/self_area_move_watch/area_move_grant_turn_limit_and_live_end_expiry_test.rs",
         "engine/tests/test_modules/jidou/movement/self_move_heart_watch/self_move_grants_heart06_until_live_end_test.rs",
         "engine/tests/test_modules/jidou/movement/self_move_heart_watch/self_move_watch_cause_and_effect_only_flag_test.rs",
         "engine/tests/test_modules/jidou/movement/self_move_heart_watch/self_move_watch_natural_move_and_turn_limit_edges_test.rs",
@@ -17544,10 +17545,14 @@
       ],
       "covering_tests": [
         "chisato_self_and_opponent_blades",
+        "fuyumari_heart03_does_not_survive_the_live_that_granted_it",
         "fuyumari_self_and_opponent_heart03",
+        "fuyumari_turn1_blocks_a_second_area_move",
         "himeko_debut_repositions_opponent_member_and_koko_responds",
         "himeko_gate_blocked_no_reposition_no_koko_response",
+        "kanon_heart02_does_not_survive_the_live_that_granted_it",
         "kanon_self_and_opponent_heart02",
+        "kanon_turn1_blocks_a_second_area_move",
         "keke_jidou_effect_only_false_no_trigger",
         "keke_jidou_self_effect_move_triggers",
         "koko_opponent_effect_triggers",
@@ -17560,7 +17565,7 @@
         "sd2_002_turn_limit_blocks_second_move",
         "tomari_self_and_opponent_blade"
       ],
-      "covering_test_count": 16,
+      "covering_test_count": 20,
       "direct_tests": [
         "himeko_debut_repositions_opponent_member_and_koko_responds",
         "himeko_gate_blocked_no_reposition_no_koko_response",
@@ -17721,6 +17726,7 @@
         "engine/tests/test_modules/jidou/debut_watch/three_way_choices_and_look_at_three_test.rs",
         "engine/tests/test_modules/jidou/discard_watch/deck_to_discard_optional_hand_discard_recover_self_test.rs",
         "engine/tests/test_modules/jidou/discard_watch/live_discard_optional_deck_top_bottom_q252_test.rs",
+        "engine/tests/test_modules/jidou/movement/self_area_move_watch/area_move_grant_turn_limit_and_live_end_expiry_test.rs",
         "engine/tests/test_modules/jidou/movement/under_member_placement/live_success_or_self_move_place_discard_group_member_under_self_test.rs",
         "engine/tests/test_modules/rules/conditions/q38_live_card_zone_test.rs",
         "engine/tests/test_modules/rules/phases/cheer_pipeline_test.rs",
@@ -17766,7 +17772,7 @@
         "ayumu_live_start_triggers",
         "ayumu_no_wait_with_non_nijigasaki_ally"
       ],
-      "covering_test_count": 841,
+      "covering_test_count": 845,
       "direct_tests": [
         "any_card_fails_hearts_all_fail",
         "aoku_haruka_live_start_fails_with_only_non_suzu_live_cards",
@@ -17799,7 +17805,7 @@
         "debut_opponent_live_discard_q130_decline_preserves_opponent_hand",
         "debut_reveal_until_live_q102_live_immediately_on_top"
       ],
-      "direct_test_count": 367,
+      "direct_test_count": 369,
       "is_null": false,
       "use_limit": null,
       "watches_abilities": false,
@@ -23676,21 +23682,24 @@
       "has_choice": true,
       "has_negative": true,
       "covering_files": [
+        "engine/tests/test_modules/characterization/kashino_player_choice_and_order_measurements_test.rs",
         "engine/tests/test_modules/effects/choice/target_player/target_player_deck_routing_pl_n_bp3_010_r_pl_n_bp4_002_r_test.rs"
       ],
       "covering_tests": [
         "dia_then_azuna_share_opponent_waitroom_and_preserve_selection_order",
+        "kashino_parses_the_player_choice_and_the_order_the_routing_depends_on",
         "pl_n_bp3_010_r_choose_opponent_recycle_empties_opponent_waitroom",
         "pl_n_bp3_010_r_choose_self_recycle_leaves_at_least_two_deck_cards",
         "pl_n_bp4_002_r_choose_self_discards_looked_top_card"
       ],
-      "covering_test_count": 4,
+      "covering_test_count": 5,
       "direct_tests": [
         "dia_then_azuna_share_opponent_waitroom_and_preserve_selection_order",
+        "kashino_parses_the_player_choice_and_the_order_the_routing_depends_on",
         "pl_n_bp3_010_r_choose_opponent_recycle_empties_opponent_waitroom",
         "pl_n_bp3_010_r_choose_self_recycle_leaves_at_least_two_deck_cards"
       ],
-      "direct_test_count": 3,
+      "direct_test_count": 4,
       "is_null": false,
       "use_limit": null,
       "watches_abilities": false,
@@ -31591,6 +31600,7 @@
       "has_negative": true,
       "covering_files": [
         "engine/tests/test_modules/integration/multi_card/opponent_forced_position_change_arms_opponent_area_move_watcher_test.rs",
+        "engine/tests/test_modules/jidou/movement/self_area_move_watch/area_move_grant_turn_limit_and_live_end_expiry_test.rs",
         "engine/tests/test_modules/jidou/movement/self_move_heart_watch/self_move_grants_heart06_until_live_end_test.rs",
         "engine/tests/test_modules/jidou/movement/self_move_heart_watch/self_move_watch_cause_and_effect_only_flag_test.rs",
         "engine/tests/test_modules/jidou/movement/self_move_heart_watch/self_move_watch_natural_move_and_turn_limit_edges_test.rs",
@@ -31598,10 +31608,14 @@
       ],
       "covering_tests": [
         "chisato_self_and_opponent_blades",
+        "fuyumari_heart03_does_not_survive_the_live_that_granted_it",
         "fuyumari_self_and_opponent_heart03",
+        "fuyumari_turn1_blocks_a_second_area_move",
         "himeko_debut_repositions_opponent_member_and_koko_responds",
         "himeko_gate_blocked_no_reposition_no_koko_response",
+        "kanon_heart02_does_not_survive_the_live_that_granted_it",
         "kanon_self_and_opponent_heart02",
+        "kanon_turn1_blocks_a_second_area_move",
         "keke_jidou_effect_only_false_no_trigger",
         "keke_jidou_self_effect_move_triggers",
         "koko_opponent_effect_triggers",
@@ -31614,7 +31628,7 @@
         "sd2_002_turn_limit_blocks_second_move",
         "tomari_self_and_opponent_blade"
       ],
-      "covering_test_count": 16,
+      "covering_test_count": 20,
       "direct_tests": [
         "himeko_debut_repositions_opponent_member_and_koko_responds",
         "himeko_gate_blocked_no_reposition_no_koko_response",
@@ -39449,6 +39463,7 @@
       "covering_files": [
         "engine/tests/test_modules/characterization/strict_engine_bug_expected_fail_test.rs",
         "engine/tests/test_modules/effects/look_select/per_card/turn_limited_yell_second_activation_blocked_test.rs",
+        "engine/tests/test_modules/effects/look_select/unit_filter_look_and_live_only_cost_test.rs",
         "engine/tests/test_modules/effects/recover/to_hand/unit_group_recovery_excludes_same_series_test.rs",
         "engine/tests/test_modules/integration/multi_card/sumire_wien_yell_no_blade_gain_through_real_live_test.rs",
         "engine/tests/test_modules/jidou/yell/no_blade_heart_reveal_gain/no_blade_heart_reveal_gain_heart06_or_heart03_test.rs",
@@ -39457,6 +39472,8 @@
         "engine/tests/test_modules/jidou/yell/no_blade_heart_reveal_gain/no_blade_heart_reveal_two_watchers_modifier_bounds_test.rs"
       ],
       "covering_tests": [
+        "mei_declined_live_only_cost_cancels_the_look_by_the_colon_gate",
+        "mei_paid_cost_looks_five_takes_one_and_banks_the_rest",
         "series_level_and_unit_level_groups_resolve_by_different_routes",
         "strict_highest_cost_respects_modifier",
         "strict_joint_sumire_wien_both_gain_no_blade",
@@ -39484,11 +39501,9 @@
         "yell_q112_blade_heart_member_as_live_setup_leaves_heart06_zero",
         "yell_q112_no_blade_heart_member_as_live_setup_leaves_heart06_zero",
         "yell_q113_member_as_live_setup_leaves_heart06_zero",
-        "yell_turn1_blocks_second_trigger",
-        "yell_turn_limit_resets_next_turn",
-        "yell_two_no_blade_heart_watchers_have_zero_or_one_heart_modifier"
+        "yell_turn1_blocks_second_trigger"
       ],
-      "covering_test_count": 31,
+      "covering_test_count": 33,
       "direct_tests": [
         "strict_joint_sumire_wien_both_gain_no_blade",
         "sumire_turn_limit_blocks_second_yell",
@@ -52869,11 +52884,12 @@
       ],
       "base": "PL!SP-sd2-012",
       "covered": true,
-      "depth": "L1+choice",
+      "depth": "L2+choice",
       "has_assert": true,
       "has_choice": true,
-      "has_negative": false,
+      "has_negative": true,
       "covering_files": [
+        "engine/tests/test_modules/jidou/movement/self_area_move_watch/area_move_grant_turn_limit_and_live_end_expiry_test.rs",
         "engine/tests/test_modules/jidou/movement/self_area_move_watch/area_swap_grants_blade_heart_or_recovers_group_live_test.rs",
         "engine/tests/test_modules/rules/trigger_paths/cross_player_jidou_triggers_test.rs"
       ],
@@ -52883,8 +52899,12 @@
         "area_swap_grants_self_two_blades",
         "area_swap_recovers_low_score_group_live",
         "chisato_self_and_opponent_blades",
+        "fuyumari_heart03_does_not_survive_the_live_that_granted_it",
         "fuyumari_self_and_opponent_heart03",
+        "fuyumari_turn1_blocks_a_second_area_move",
+        "kanon_heart02_does_not_survive_the_live_that_granted_it",
         "kanon_self_and_opponent_heart02",
+        "kanon_turn1_blocks_a_second_area_move",
         "koko_opponent_effect_triggers",
         "koko_self_effect_triggers",
         "koko_turn1_blocks_second",
@@ -52892,12 +52912,14 @@
         "self_wait_activation_then_area_swap_removes_wait_state",
         "tomari_self_and_opponent_blade"
       ],
-      "covering_test_count": 13,
+      "covering_test_count": 17,
       "direct_tests": [
         "area_swap_grants_self_heart02",
-        "kanon_self_and_opponent_heart02"
+        "kanon_heart02_does_not_survive_the_live_that_granted_it",
+        "kanon_self_and_opponent_heart02",
+        "kanon_turn1_blocks_a_second_area_move"
       ],
-      "direct_test_count": 2,
+      "direct_test_count": 4,
       "is_null": false,
       "use_limit": 1,
       "watches_abilities": false,
@@ -52984,11 +53006,12 @@
       ],
       "base": "PL!SP-sd2-022",
       "covered": true,
-      "depth": "L1+choice",
+      "depth": "L2+choice",
       "has_assert": true,
       "has_choice": true,
-      "has_negative": false,
+      "has_negative": true,
       "covering_files": [
+        "engine/tests/test_modules/jidou/movement/self_area_move_watch/area_move_grant_turn_limit_and_live_end_expiry_test.rs",
         "engine/tests/test_modules/jidou/movement/self_area_move_watch/area_swap_grants_blade_heart_or_recovers_group_live_test.rs",
         "engine/tests/test_modules/rules/trigger_paths/cross_player_jidou_triggers_test.rs"
       ],
@@ -52998,8 +53021,12 @@
         "area_swap_grants_self_two_blades",
         "area_swap_recovers_low_score_group_live",
         "chisato_self_and_opponent_blades",
+        "fuyumari_heart03_does_not_survive_the_live_that_granted_it",
         "fuyumari_self_and_opponent_heart03",
+        "fuyumari_turn1_blocks_a_second_area_move",
+        "kanon_heart02_does_not_survive_the_live_that_granted_it",
         "kanon_self_and_opponent_heart02",
+        "kanon_turn1_blocks_a_second_area_move",
         "koko_opponent_effect_triggers",
         "koko_self_effect_triggers",
         "koko_turn1_blocks_second",
@@ -53007,12 +53034,14 @@
         "self_wait_activation_then_area_swap_removes_wait_state",
         "tomari_self_and_opponent_blade"
       ],
-      "covering_test_count": 13,
+      "covering_test_count": 17,
       "direct_tests": [
         "area_swap_grants_self_heart03",
-        "fuyumari_self_and_opponent_heart03"
+        "fuyumari_heart03_does_not_survive_the_live_that_granted_it",
+        "fuyumari_self_and_opponent_heart03",
+        "fuyumari_turn1_blocks_a_second_area_move"
       ],
-      "direct_test_count": 2,
+      "direct_test_count": 4,
       "is_null": false,
       "use_limit": 1,
       "watches_abilities": false,
@@ -56027,10 +56056,10 @@
       ],
       "base": "PL!SP-bp7-022",
       "covered": true,
-      "depth": "L1+choice",
+      "depth": "L2+choice",
       "has_assert": true,
       "has_choice": true,
-      "has_negative": false,
+      "has_negative": true,
       "covering_files": [
         "engine/tests/test_modules/effects/position/area_move/energy_return_cost_position_change_test.rs"
       ],
