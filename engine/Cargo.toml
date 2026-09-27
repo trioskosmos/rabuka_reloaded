@@ -201,7 +201,11 @@ test = false
 [[bin]]
 name = "bot_arena"
 path = "src/bin/bot_arena.rs"
-test = false
+# The paired-statistics tests in this bin pin the instrument every v8 claim
+# rests on (exact McNemar, Wilson, the win classifier, the (seed, N) deal
+# function). With `test = false` they were compiled by nobody and run by
+# nobody, and a stale edit in the file above was enough to break the build
+# silently. The unit tests now run with the rest of the suite.
 
 [[bin]]
 name = "calibrate"

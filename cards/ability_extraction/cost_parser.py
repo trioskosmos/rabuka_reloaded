@@ -39,6 +39,19 @@ _COST_BATON_TOUCH_PATTERNS = [
     (r"「([^」]+)」からバトンタッチ", "baton_touch_source"),
     (r"『([^』]+)』からバトンタッチ", "baton_touch_group"),
 ]
+# A cost that puts a card into a state rather than moving it. This is the
+# shape `change_state` is classified by, and it is deliberately narrower than
+# parser_utils.STATE_CHANGE_PATTERNS: the extra spellings there (〜にしてもよい,
+# 〜にし) are cost wording that does not by itself mean a state change here.
+_WAIT_ACTIVATE_PHRASES = (
+    "ウェイトにする",
+    "ウェイト状態で置く",
+    "ウェイト状態で登場させる",
+    "アクティブにする",
+)
+# Destinations that mean "energy zone" for classification purposes: a cost
+# ending in one of these, with no source of its own, moves a card into it.
+_ENERGY_DESTINATIONS = ("energy_deck", "energy_zone")
 
 
 def _mark_discard_all_hand(cost, text):
@@ -259,6 +272,32 @@ def _apply_source_only_classification(cost, text):
     return None
 
 
+def _is_wait_or_activate(cost, text):
+    return any(phrase in text for phrase in _WAIT_ACTIVATE_PHRASES) or bool(
+        cost.get("state_change")
+    )
+
+
+def _is_pay_energy(cost, text):
+    return ENERGY_ICON in text and ("支払う" in text or "支払って" in text)
+
+
+def _cost_type(name):
+    """A classification row that only names the type, writing no fields.
+
+    Several rows of `_CLASSIFY_COST_RULES` are pure answers — the fields are
+    already on `cost` by the time classification runs, and the row's whole job
+    is to say which type that shape is. This gives those rows the same
+    `(predicate, apply)` shape as the rows that do write fields, so the table
+    stays one kind of thing instead of mixing in bare strings.
+    """
+
+    def apply(cost, text):
+        return name
+
+    return apply
+
+
 # Ordered classification table for `_classify_cost`: first match wins.
 # Each row is (predicate, apply). The predicates run in the same order as
 # the legacy if-chain; `apply` performs the branch's field writes and
@@ -271,31 +310,15 @@ _CLASSIFY_COST_RULES = [
     ),
     (
         lambda cost, text: bool(cost.get("source") and cost.get("destination")),
-        lambda cost, text: "move_cards",
+        _cost_type("move_cards"),
     ),
     (
-        lambda cost, text: cost.get("destination") in ("energy_deck", "energy_zone")
+        lambda cost, text: cost.get("destination") in _ENERGY_DESTINATIONS
         and not cost.get("source"),
-        lambda cost, text: "move_cards",
+        _cost_type("move_cards"),
     ),
-    (
-        lambda cost, text: any(
-            phrase in text
-            for phrase in (
-                "ウェイトにする",
-                "ウェイト状態で置く",
-                "ウェイト状態で登場させる",
-                "アクティブにする",
-            )
-        )
-        or cost.get("state_change"),
-        lambda cost, text: "change_state",
-    ),
-    (
-        lambda cost, text: ENERGY_ICON in text
-        and ("支払う" in text or "支払って" in text),
-        _apply_pay_energy_classification,
-    ),
+    (_is_wait_or_activate, _cost_type("change_state")),
+    (_is_pay_energy, _apply_pay_energy_classification),
     (
         lambda cost, text: bool(cost.get("source")),
         _apply_source_only_classification,

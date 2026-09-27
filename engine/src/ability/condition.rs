@@ -647,16 +647,12 @@ impl<'a> ConditionContext<'a> {
             .filter(|&&cid| {
                 crate::ability::util::card_matches_heart_colors(card_db, cid, &[color.clone()])
             })
-            .count();
+            .count() as u8;
 
-        match operator {
-            ">=" => matching >= count,
-            ">" => matching > count,
-            "=" => matching == count,
-            "<=" => matching <= count,
-            "<" => matching < count,
-            _ => matching >= count,
-        }
+        // An operator we do not know is a parser gap, not a threshold that
+        // failed: fall back to ">=", which is what this gate defaulted to.
+        crate::ability::util::compare_with_operator(operator, matching, count as u8)
+            .unwrap_or(matching >= count as u8)
     }
 
     /// Evaluate condition and return structured actual value for debug display.

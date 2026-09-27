@@ -154,15 +154,9 @@ impl OriginalScoreFilter<'_> {
         ) else {
             return true;
         };
-        match op {
-            ">=" => score >= threshold,
-            "<=" => score <= threshold,
-            ">" => score > threshold,
-            "<" => score < threshold,
-            "==" => score == threshold,
-            "!=" => score != threshold,
-            _ => true,
-        }
+        // An operator we do not know is a parser gap, not a threshold that
+        // failed, so it accepts rather than silently filtering the card out.
+        crate::ability::util::compare_with_operator(op, score, threshold).unwrap_or(true)
     }
 }
 

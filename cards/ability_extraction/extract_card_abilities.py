@@ -10,6 +10,7 @@ Source: data/cards.json
 import json
 import logging
 import re
+import subprocess
 import sys
 import io
 import argparse
@@ -20,7 +21,6 @@ logging.basicConfig(
     level=logging.WARNING,
     format="%(levelname)s: %(message)s",
 )
-from collections import defaultdict
 
 # Ensure stdout can handle Unicode (cp932 is the default on Windows Japanese)
 try:
@@ -325,135 +325,130 @@ def _normalize_heart_notation(text: str) -> str:
     return _JP_HEART_RE.sub(_repl, text)
 
 
+def _parse_sample(sample):
+    """Parse one grouped ability into its (cost, effect) pair.
+
+    Single parsing owner: parser.parse_ability handles phase-gate extraction,
+    cost/effect split, condition back-fill, activation position, tree
+    normalization, and cost promotion.
+
+    A crash means the ability would silently do nothing in game, so it is
+    surfaced loudly and re-raised rather than baked into bytecode unnoticed.
+    """
+    try:
+        parsed = parse_ability(sample["triggerless_text"])
+    except Exception:
+        print("ERROR: parse_ability crashed — ability would be a no-op!")
+        print(f"  text: {sample['triggerless_text'][:120]}")
+        raise
+    effect = parsed.get("effect", {})
+    if isinstance(effect, dict) and "actions" in effect and not effect.get("actions"):
+        print(
+            f"Warning: Effect parsed with empty actions: "
+            f"{sample['triggerless_text'][:100]}"
+        )
+        print(f"Effect dict: {effect}")
+    _enrich_effect_type(effect, triggerless=sample["triggerless_text"])
+    return parsed.get("cost"), effect
+
+
+def _repository_root() -> Path:
+    return Path(__file__).parent.parent.parent
+
+
+def _git_head() -> str:
+    """Short HEAD hash for reproducibility tracking, or 'unknown'."""
+    try:
+        result = subprocess.run(
+            ["git", "rev-parse", "--short", "HEAD"],
+            capture_output=True,
+            text=True,
+            cwd=str(_repository_root()),
+            timeout=5,
+        )
+    except Exception:
+        return "unknown"
+    return result.stdout.strip() if result.returncode == 0 else "unknown"
+
+
 def extract_all_abilities(cards_file: Path) -> dict:
     """Extract all abilities from cards.json."""
     with open(cards_file, encoding="utf-8") as f:
         cards = json.load(f)
 
-    all_abilities = []
-    ability_groups = defaultdict(list)
-
     # Handle both dict and list formats
-    if isinstance(cards, list):
-        cards_dict = {card.get("card_no", str(i)): card for i, card in enumerate(cards)}
-    else:
-        cards_dict = cards
+    cards_dict = (
+        {card.get("card_no", str(i)): card for i, card in enumerate(cards)}
+        if isinstance(cards, list)
+        else cards
+    )
 
+    # Group by full_text. The first ability to claim a text is the one that
+    # gets parsed, so the sample is captured as the group is formed. Looking it
+    # up afterwards meant rescanning every ability collected so far, once per
+    # group.
+    groups: dict = {}
+    total_abilities = 0
     for card_id, card in cards_dict.items():
-        abilities = extract_abilities_from_card(card_id, card)
-        for ability in abilities:
+        for ability in extract_abilities_from_card(card_id, card):
             ability["full_text"] = _normalize_heart_notation(ability["full_text"])
             ability["triggerless_text"] = _normalize_heart_notation(
                 ability["triggerless_text"]
             )
-            all_abilities.append(ability)
-            card_example = (
-                f"{card_id} | {card.get('name', '')} (ab#{ability['ability_index']})"
-            )
-            ability_groups[ability["full_text"]].append(card_example)
+            total_abilities += 1
+            example = f"{card_id} | {card.get('name', '')} (ab#{ability['ability_index']})"
+            full_text = ability["full_text"]
+            if full_text in groups:
+                groups[full_text]["cards"].append(example)
+            else:
+                groups[full_text] = {"sample": ability, "cards": [example]}
 
-    # Group abilities by full_text
     unique_abilities = []
-    for full_text, card_examples in ability_groups.items():
-        sample = next(a for a in all_abilities if a["full_text"] == full_text)
-
-        # Skip parsing for is_null abilities (notes without triggers)
-        if sample.get("is_null", False):
-            unique_abilities.append(
-                {
-                    "full_text": full_text,
-                    "triggerless_text": sample["triggerless_text"],
-                    "card_count": len(card_examples),
-                    "cards": card_examples,
-                    "triggers": ", ".join(sample["triggers"])
-                    if sample["triggers"]
-                    else None,
-                    "use_limit": sample["use_limit"],
-                    "is_null": True,
-                    "cost": None,
-                    "effect": None,
-                }
-            )
-            continue
-
-        # Single parsing owner: parser.parse_ability handles phase-gate
-        # extraction, cost/effect split, condition back-fill, activation
-        # position, tree normalization, and cost promotion.
-        try:
-            parsed = parse_ability(sample["triggerless_text"])
-            cost = parsed.get("cost")
-            effect = parsed.get("effect", {})
-            if (
-                isinstance(effect, dict)
-                and "actions" in effect
-                and not effect.get("actions")
-            ):
-                print(f"Warning: Effect parsed with empty actions: {sample['triggerless_text'][:100]}")
-                print(f"Effect dict: {effect}")
-        except Exception:
-            # A parse crash means the ability would silently do nothing in
-            # game. Surface it loudly and fail the run so it can never be
-            # baked into bytecode unnoticed.
-            print("ERROR: parse_ability crashed — ability would be a no-op!")
-            print(f"  text: {sample['triggerless_text'][:120]}")
-            raise
-
-        _enrich_effect_type(effect, triggerless=sample["triggerless_text"])
-
-        ability_entry = {
-            "full_text": full_text,
-            "triggerless_text": sample["triggerless_text"],
-            "card_count": len(card_examples),
-            "cards": card_examples,
-            "triggers": ", ".join(sample["triggers"]) if sample["triggers"] else None,
-            "use_limit": sample["use_limit"],
-            "is_null": sample.get("is_null", False),
-            "cost": cost,
-            "effect": effect,
-        }
-        unique_abilities.append(ability_entry)
+    for group in groups.values():
+        sample = group["sample"]
+        card_examples = group["cards"]
+        # Notes without triggers are recorded as-is and never parsed.
+        is_null = bool(sample.get("is_null", False))
+        cost, effect = (None, None) if is_null else _parse_sample(sample)
+        unique_abilities.append(
+            {
+                "full_text": sample["full_text"],
+                "triggerless_text": sample["triggerless_text"],
+                "card_count": len(card_examples),
+                "cards": card_examples,
+                "triggers": ", ".join(sample["triggers"])
+                if sample["triggers"]
+                else None,
+                "use_limit": sample["use_limit"],
+                "is_null": is_null,
+                "cost": cost,
+                "effect": effect,
+            }
+        )
 
     # Sort by card count
     unique_abilities.sort(key=lambda x: -x["card_count"])
 
     # Compute repository-relative source path
     try:
-        repo_root = Path(__file__).parent.parent.parent
-        rel_source = cards_file.relative_to(repo_root).as_posix()
+        rel_source = cards_file.relative_to(_repository_root()).as_posix()
     except ValueError:
         rel_source = cards_file.as_posix()
-
-    # Get git commit hash for reproducibility tracking
-    git_hash = "unknown"
-    try:
-        import subprocess
-
-        result = subprocess.run(
-            ["git", "rev-parse", "--short", "HEAD"],
-            capture_output=True,
-            text=True,
-            cwd=str(Path(__file__).parent.parent.parent),
-            timeout=5,
-        )
-        if result.returncode == 0:
-            git_hash = result.stdout.strip()
-    except Exception:
-        pass
 
     return {
         "schema": "extracted_abilities.v1",
         "generated_at": datetime.now().isoformat(),
         "generated_by": "cards/ability_extraction/extract_card_abilities.py",
         "source_file": rel_source,
-        "engine_commit": git_hash,
+        "engine_commit": _git_head(),
         "parser_version": "1.0",
         "input_hash": None,  # filled by caller if needed
         "statistics": {
             "total_cards": len(cards_dict),
-            "cards_with_abilities": len(
-                [c for c in cards_dict.values() if c.get("ability")]
+            "cards_with_abilities": sum(
+                1 for c in cards_dict.values() if c.get("ability")
             ),
-            "total_abilities": len(all_abilities),
+            "total_abilities": total_abilities,
             "unique_abilities": len(unique_abilities),
         },
         "unique_abilities": unique_abilities,
@@ -579,8 +574,6 @@ def main():
         return
 
     # Auto-regenerate bytecode so abilities_gen.rs stays in sync
-    import subprocess, sys
-
     compile_script = Path(__file__).parent.parent / "compile_abilities.py"
     if compile_script.exists():
         bin_file = compile_script.parent / "build" / "abilities.bin"

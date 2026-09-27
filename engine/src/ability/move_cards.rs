@@ -91,6 +91,112 @@ fn numeric_deck_position(
         .filter(|&n| n > 0)
 }
 
+/// The filter a card-selection step applies to a chosen card.
+///
+/// Assembled from the Choice the player was offered, plus `card_property` and
+/// `negation`, which that Choice does not carry and which therefore come from
+/// the activating effect. Same shape as the other selection filters in the
+/// engine: build once, then ask `accepts` about each candidate.
+struct SelectionFilter<'a> {
+    db: std::sync::Arc<CardDatabase>,
+    card_type: Option<&'a str>,
+    cost_limit: Option<u8>,
+    cost_operator: Option<&'a str>,
+    group: Option<&'a str>,
+    characters: Option<&'a Vec<String>>,
+    card_property: Option<String>,
+    property_negation: bool,
+}
+
+impl SelectionFilter<'_> {
+    /// Does `cid` satisfy every stated restriction?
+    ///
+    /// A card property with a name this engine does not know is treated as
+    /// absent rather than as a filter nothing can pass, so an unrecognised
+    /// property cannot silently empty the selection.
+    fn accepts(&self, cid: i16) -> bool {
+        util::card_matches_type(&self.db, cid, self.card_type)
+            && util::card_matches_cost_limit_op(
+                &self.db,
+                cid,
+                self.cost_limit,
+                self.cost_operator,
+            )
+            && util::card_matches_group_str(&self.db, cid, self.group)
+            && match self.characters {
+                Some(chars) if !chars.is_empty() => {
+                    util::card_matches_characters(&self.db, cid, Some(chars))
+                }
+                _ => true,
+            }
+            && match self.card_property.as_deref() {
+                Some(prop) => {
+                    let has = match prop {
+                        "has_blade_heart" => {
+                            self.db.get_card(cid).is_some_and(|c| c.has_blade_heart())
+                        }
+                        "has_score_icon" => {
+                            self.db.get_card(cid).is_some_and(|c| c.has_score_icon())
+                        }
+                        "has_all_blade" => {
+                            self.db.get_card(cid).is_some_and(|c| c.has_all_blade())
+                        }
+                        _ => false,
+                    };
+                    if self.property_negation {
+                        !has
+                    } else {
+                        has
+                    }
+                }
+                None => true,
+            }
+    }
+}
+
+impl<'a> SelectionFilter<'a> {
+    /// Keep only the indices whose card passes the filter, logging each
+    /// rejection. Non-matching cards are silently skipped from the effect's
+    /// point of view (consistent with the cost-phase handler).
+    fn retain_valid(
+        &self,
+        player: &crate::player::Player,
+        zone: &str,
+        indices: &[usize],
+    ) -> Vec<usize> {
+        let cards = util::zone_cards(player, zone);
+        let result: Vec<usize> = indices
+            .iter()
+            .filter(|&&idx| {
+                let ok = idx < cards.len() && self.accepts(cards[idx]);
+                if !ok {
+                    log::debug!(
+                        "[SELECTION_REJECTED] zone={} index={} reason={}",
+                        zone,
+                        idx,
+                        if idx >= cards.len() {
+                            "out_of_bounds"
+                        } else {
+                            "filter_mismatch"
+                        }
+                    );
+                    log::trace!("[SELECTION_CARD] index={} id={:?}", idx, cards.get(idx));
+                }
+                ok
+            })
+            .copied()
+            .collect();
+        log::debug!(
+            "[SELECTION_MAPPED] zone={} requested={:?} accepted={:?}",
+            zone,
+            indices,
+            result
+        );
+        result
+    }
+}
+
+
 impl AbilityResolver {
     fn resolve_cost_limit_reference(
         &self,
@@ -2454,62 +2560,25 @@ if util::distinct_should_dedupe(distinct) {
         // 持たないメンバーカード」→ card_property="has_blade_heart",
         // negation=true). The Choice advertised to the player does not carry
         // these fields, so read them from the activating effect.
-        let card_property = gs
-            .entry_effect()
-            .and_then(|e| e.card_property_any().map(|s| s.to_string()));
-        let property_negation = gs
-            .entry_effect()
-            .and_then(|e| e.negation_any())
-            .unwrap_or(false);
-        let passes = |cid: i16| -> bool {
-            util::card_matches_type(&card_db, cid, card_type_filter)
-                && util::card_matches_cost_limit_op(&card_db, cid, cost_limit, cost_limit_operator)
-                && util::card_matches_group_str(&card_db, cid, group)
-                && match characters {
-                    Some(chars) if !chars.is_empty() => {
-                        util::card_matches_characters(&card_db, cid, Some(chars))
-                    }
-                    _ => true,
-                }
-                && match card_property.as_deref() {
-                    Some(prop) => {
-                        let has = match prop {
-                            "has_blade_heart" => card_db.get_card(cid).is_some_and(|c| c.has_blade_heart()),
-                            "has_score_icon" => card_db.get_card(cid).is_some_and(|c| c.has_score_icon()),
-                            "has_all_blade" => card_db.get_card(cid).is_some_and(|c| c.has_all_blade()),
-                            _ => false,
-                        };
-                        if property_negation { !has } else { has }
-                    }
-                    None => true,
-                }
+        let filter = SelectionFilter {
+            db: card_db.clone(),
+            card_type: card_type_filter,
+            cost_limit,
+            cost_operator: cost_limit_operator,
+            group,
+            characters,
+            card_property: gs
+                .entry_effect()
+                .and_then(|e| e.card_property_any().map(|s| s.to_string())),
+            property_negation: gs
+                .entry_effect()
+                .and_then(|e| e.negation_any())
+                .unwrap_or(false),
         };
 
         // Filter indices to only include cards that match required filters.
-        // Non-matching cards are silently skipped (consistent with cost-phase handler).
-        let filtered_indices: Vec<usize> = {
-            let player = gs.resolve_target_player(&target);
-            let cards = util::zone_cards(player, zone);
-            let result: Vec<usize> = indices
-                .iter()
-                .filter(|&&idx| {
-                    let ok = idx < cards.len() && passes(cards[idx]);
-                    if !ok {
-                        log::debug!(
-                            "[SELECTION_REJECTED] zone={} index={} reason={}",
-                            zone,
-                            idx,
-                            if idx >= cards.len() { "out_of_bounds" } else { "filter_mismatch" }
-                        );
-                        log::trace!("[SELECTION_CARD] index={} id={:?}", idx, cards.get(idx));
-                    }
-                    ok
-                })
-                .copied()
-                .collect();
-            log::debug!("[SELECTION_MAPPED] zone={} requested={:?} accepted={:?}", zone, indices, result);
-            result
-        };
+        let filtered_indices: Vec<usize> =
+            filter.retain_valid(gs.resolve_target_player(&target), zone, indices);
 
         let zone_enum = Zone::from_str(zone);
         let dest = destination
@@ -2581,13 +2650,11 @@ if util::distinct_should_dedupe(distinct) {
                         .iter()
                         .filter_map(|&cid| card_db.get_card(cid).and_then(|c| c.cost))
                         .sum();
-                    let ok = match op {
-                        ">=" => total_cost >= limit,
-                        ">" => total_cost > limit,
-                        "<" => total_cost < limit,
-                        "exact" | "=" => total_cost == limit,
-                        _ => total_cost <= limit,
-                    };
+                    // A selection with no stated operator means "up to the
+                    // limit", so an operator we do not know keeps that meaning
+                    // rather than rejecting the selection.
+                    let ok = util::compare_with_operator(op, total_cost, limit)
+                        .unwrap_or(total_cost <= limit);
                     if !ok {
                         log::debug!(
                             "[SELECTION_REJECTED] reason=total_cost actual={} operator={} limit={}",

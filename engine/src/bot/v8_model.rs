@@ -348,6 +348,93 @@ pub fn pass_probability(pools: &[[i32; 8]], need: &Acc) -> f64 {
 
 // -- Public-information opponent model ------------------------------------
 
+/// Whether the opponent's live zone is a fact or a forecast.
+///
+/// This distinction is the largest single defect v8 shipped with, and it was
+/// invisible until the model was scored against the engine's own verdicts.
+///
+/// Sets are committed face-down, in attacker order (8.2.2). The SECOND attacker
+/// sees the first attacker's set SIZE, and 8.4.3.2 makes that size decisive: a
+/// sole passer places regardless of contents. The FIRST attacker sees nothing,
+/// because the second attacker's set does not exist yet - and an empty live
+/// zone is the NORMAL state at that point in the phase order, not evidence of a
+/// fold.
+///
+/// The model read `live_card_zone.len()` as a commitment either way, so for the
+/// first attacker it read "not yet chosen" as "chose nothing", set the
+/// opponent's pass probability to exactly zero, and concluded that any check it
+/// passed was a free placement. Measured over 1762 first-attacker live phases
+/// against the engine's verdicts: the model predicted `P(place) = 0.589` and
+/// `P(they place) = 0.000`; the truth was `0.154` and `0.157`, with the
+/// opponent committing and passing on 47.9% of them. The same model read as the
+/// second attacker - where the zone IS a fact - predicted `0.437` against a
+/// truth of `0.428`.
+///
+/// The consequence is not a mistuned number. As first attacker the live set
+/// collapses to "maximise the chance my own check passes", because score only
+/// ever matters inside a comparison (section 2) and the model believed there
+/// would not be one; the Main-phase leaf reads the same blind model, so its
+/// development signal is wrong on the majority of turns.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Commitment {
+    /// The opponent has already set. Their zone is public information.
+    Observed,
+    /// We attack first. Their set does not exist yet and must be forecast.
+    Unobserved,
+}
+
+/// Should the opponent model forecast the commitment, or read it?
+///
+/// In a live-set phase the answer is the phase itself. Outside one - the Main
+/// phase, the mulligan - it is turn order (8.4.13): whoever is first attacker
+/// this check will face a set that does not exist yet, and whoever is not gets
+/// to see it.
+pub fn commitment_of(gs: &GameState, me: u8) -> Commitment {
+    match gs.current_phase {
+        crate::game_state::Phase::LiveCardSetSecondAttacker => Commitment::Observed,
+        crate::game_state::Phase::LiveCardSetFirstAttacker => Commitment::Unobserved,
+        _ => {
+            if gs.seat_player(me).is_first_attacker {
+                Commitment::Unobserved
+            } else {
+                Commitment::Observed
+            }
+        }
+    }
+}
+
+/// The forecast to use for an unobserved opponent set.
+///
+/// `V8_NO_ASSUME_COMMIT=1` restores the pre-fix behaviour (assume a fold), and
+/// is kept as the ablation handle, because the measurement that settled the
+/// question is the one that should be re-runnable: an unobserved commitment
+/// read as a fold is a 3.8x over-estimate of `P(place)`, not a small bias.
+///
+/// `V8_ASSUME_SET` overrides the assumed set size and `V8_ASSUME_COMMIT` the
+/// probability that the second attacker commits at all, so the rate can be
+/// measured instead of asserted. The defaults are the measured ones: over 1762
+/// first-attacker phases the second attacker committed on 48% of them, and a
+/// committed second attacker is overwhelmingly a single life.
+fn assume_commitment_enabled() -> bool {
+    std::env::var_os("V8_NO_ASSUME_COMMIT").is_none()
+}
+
+fn assume_set_size() -> usize {
+    std::env::var("V8_ASSUME_SET")
+        .ok()
+        .and_then(|v| v.parse().ok())
+        .filter(|&n: &usize| (1..=3).contains(&n))
+        .unwrap_or(1)
+}
+
+fn assume_commit_rate() -> f64 {
+    std::env::var("V8_ASSUME_COMMIT")
+        .ok()
+        .and_then(|v| v.parse().ok())
+        .filter(|w: &f64| w.is_finite() && *w > 0.0 && *w <= 1.0)
+        .unwrap_or(0.55)
+}
+
 /// What the guides allow us to infer about the opponent from public zones
 /// only. Their hand, deck and set contents are never read.
 #[derive(Clone, Debug)]
@@ -363,12 +450,42 @@ pub struct OppModel {
     pub score_dist: [f64; SCORE_SLOTS],
     /// `P(their committed set passes its own check)`.
     pub pass_prob: f64,
+    /// Whether the set size above is observed or forecast. Kept in the model
+    /// so the tie rule and any future diagnostic can tell "they set one card"
+    /// from "we assume they set one card" - the two differ in exactly the case
+    /// that was broken.
+    pub commitment: Commitment,
+    /// `P(they commit a set at all this check)`. 1.0 when observed; the
+    /// forecast rate when they attack second and we cannot see them yet.
+    pub commit_rate: f64,
 }
 
 impl OppModel {
     pub fn build(gs: &GameState, me: u8, db: &CardDatabase) -> Self {
+        Self::build_with(gs, me, db, commitment_of(gs, me))
+    }
+
+    /// Build the model, given whether the opponent's zone is readable.
+    pub fn build_with(
+        gs: &GameState,
+        me: u8,
+        db: &CardDatabase,
+        commitment: Commitment,
+    ) -> Self {
         let (_, opp) = gs.seated_pair(me);
-        let set_size = opp.live_card_zone.cards.len();
+        let observed = opp.live_card_zone.cards.len();
+        // An unobserved zone is empty by construction, never by choice, so the
+        // forecast replaces it rather than reading it. `V8_NO_ASSUME_COMMIT`
+        // restores the pre-fix reading - empty means fold - which is the
+        // ablation that keeps the measurement re-runnable.
+        let forecast = commitment == Commitment::Unobserved
+            && observed == 0
+            && assume_commitment_enabled();
+        let set_size = if forecast {
+            assume_set_size()
+        } else {
+            observed
+        };
         let success = opp.success_live_card_zone.cards.len();
 
         let hearts = stats_pipeline::stage_hearts(
@@ -415,26 +532,53 @@ impl OppModel {
         // Whether they pass at all: they commit a set they believe will pass,
         // so the bar is the median requirement of a set roughly worth
         // `2 * set_size` points.
+        //
+        // When the commitment is a FORECAST, this is the probability they both
+        // commit and pass - the product, because either half failing means they
+        // place nothing. The bar itself is the same, evaluated against the
+        // assumed set size, so the forecast is conditioned on their public
+        // board rather than being a flat rate: a second attacker with a big
+        // board commits more reliably than one with an empty stage.
         let target = (2 * set_size).clamp(1, SCORE_SLOTS - 1) as i32;
         let bar = score_median_hearts(target);
+        let clears = YIELD_PRIOR
+            .iter()
+            .filter(|(yield_hearts, _)| {
+                board_total + (blades as f64 * yield_hearts).round() as i32 >= bar
+            })
+            .map(|(_, weight)| *weight)
+            .sum::<f64>()
+            .min(1.0);
+        let commit_rate = if forecast {
+            assume_commit_rate()
+        } else {
+            1.0
+        };
         let pass_prob = if set_size == 0 {
             0.0
         } else {
-            YIELD_PRIOR
-                .iter()
-                .filter(|(yield_hearts, _)| {
-                    board_total + (blades as f64 * yield_hearts).round() as i32 >= bar
-                })
-                .map(|(_, weight)| *weight)
-                .sum::<f64>()
-                .min(1.0)
+            clears * commit_rate
         };
+
+        log::debug!(
+            "v8 opp t{} me{} {} zone={observed} modelled_set={set_size} board={board_total} \
+             blades={blades} bar={bar} clears={clears:.3} commit={commit_rate:.3} \
+             pass={pass_prob:.3}",
+            gs.turn_number,
+            me,
+            match commitment {
+                Commitment::Observed => "observed",
+                Commitment::Unobserved => "FORECAST",
+            },
+        );
 
         Self {
             set_size,
             success,
             score_dist,
             pass_prob,
+            commitment,
+            commit_rate,
         }
     }
 
@@ -668,21 +812,250 @@ pub fn band_progress_for(supply: i32) -> f64 {
 
 // -- Forward development model (the guides' cost curve) -------------------
 
+/// The printed turn structure, run forward: energy phase `+1` (7.5), draw
+/// phase `+1` card (7.6), one Main-phase deploy.
+///
+/// - A baton into an occupied slot costs `own_cost - sent_cost` (9.6.2.3.2), so
+///   a new member is reachable at `budget + max_stage_cost`. That is the guides'
+///   4 -> 9 -> 13 ladder.
+/// - The baton targets the CHEAPEST occupied slot, so the most expensive member
+///   survives as the next discount.
+/// - Among affordable candidates the largest cost wins, which is section 4's
+///   energy doctrine: "higher-cost members are simply better".
+///
+/// The heart/blade bookkeeping follows 3.2 exactly, and the asymmetry between
+/// the two inputs is the whole point:
+///
+/// - the heart pool is ALL members, active AND wait (3.2), so a baton ADDS the
+///   sent member's hearts to the pool and the new member's;
+/// - the yell count is ACTIVE members only (Q133), so a baton REPLACES the sent
+///   member's blades rather than adding to them.
+///
+/// ## Why this is one type and not two functions
+///
+/// This walk existed twice. The Main-phase leaf's copy handled the baton
+/// correctly; the mulligan's copy overwrote the stage slot and moved on, so it
+/// counted the sent member's blades as still active and its hearts as lost, and
+/// the error compounded with every step of the ladder. Two copies of a rule is
+/// how a number stops meaning what its comment says, so there is one walk now
+/// and both callers build it from their own opening.
+#[derive(Clone, Debug)]
+pub struct Forward {
+    pub hearts: Acc,
+    pub blades: i32,
+    /// Left, centre, right. `-1` is an empty slot.
+    pub stage: [i16; 3],
+    pub budget: i32,
+    pub hand: Vec<i16>,
+    pub deck: Vec<i16>,
+    pub cursor: usize,
+    /// Lives held, which are ammunition (section 2: every placement is a
+    /// success card and a success card only arrives through a won check).
+    pub lives: usize,
+    pub density: f64,
+    /// Cards the opening's replacement drew, in resolution order. They are part
+    /// of the hand BEFORE turn 1, which is the entire reason a mulligan
+    /// replacement can ever look like an improvement - and the reason the deck
+    /// walk has to start past them.
+    pub redraw: Vec<i16>,
+}
+
+impl Forward {
+    /// A walk seeded from the real position: our hand and our own deck, both of
+    /// which are fair information (section 9).
+    pub fn from_state(gs: &GameState, me: u8, db: &CardDatabase) -> Self {
+        let p = gs.seat_player(me);
+        let (_blades, density) = super::strategy_v4::flip_stats(gs, me, db);
+        Self {
+            hearts: board_supply(gs, me, db),
+            blades: active_blades(gs, me, db),
+            stage: p.stage.stage,
+            budget: i32::from(p.energy_zone.active_count()),
+            hand: p.hand.cards.to_vec(),
+            deck: p.main_deck.cards.to_vec(),
+            cursor: 0,
+            lives: lives_in_hand(p, db),
+            density,
+            redraw: Vec::new(),
+        }
+    }
+
+    /// A walk seeded from a hypothetical opening.
+    ///
+    /// `redraw` names the cards the opening's replacement drew; they are added
+    /// to the hand immediately AND removed from the deck walk. That second part
+    /// is the one that was missing: a mulligan replacement draws from the top
+    /// of the deck, so if the forward walk then starts again at the top it
+    /// deals the same card twice - once as a replacement and once as turn 1's
+    /// draw - and an opening that replaces three cards gets three phantom
+    /// members for free.
+    pub fn from_opening(
+        db: &CardDatabase,
+        energy: i32,
+        deck: Vec<i16>,
+        keep: &[i16],
+        redraw: &[i16],
+    ) -> Self {
+        let mut walk = Self {
+            hearts: [0; 11],
+            blades: 0,
+            stage: [-1; 3],
+            budget: energy,
+            hand: Vec::new(),
+            deck,
+            cursor: 0,
+            lives: 0,
+            density: 0.0,
+            redraw: Vec::new(),
+        };
+        for &cid in keep {
+            walk.add(db, cid);
+        }
+        for &cid in redraw {
+            walk.add(db, cid);
+            walk.redraw.push(cid);
+        }
+        walk.cursor = walk.redraw.len();
+        walk
+    }
+
+    fn add(&mut self, db: &CardDatabase, cid: i16) {
+        let Some(card) = db.get_card(cid) else { return };
+        match card.card_type {
+            CardType::Member => {
+                if card.cost.unwrap_or(0) > 0 {
+                    self.hand.push(cid);
+                } else {
+                    if let Some(base) = &card.base_heart {
+                        acc_add(&mut self.hearts, &base.hearts);
+                    }
+                }
+            }
+            CardType::Energy => {
+                // Energy exists only to buy a deploy (7.5); +1 is what it buys.
+                self.budget += 1;
+            }
+            CardType::Live => self.lives += 1,
+        }
+    }
+
+    fn deployable(&self, db: &CardDatabase, cid: i16) -> bool {
+        db.get_card(cid)
+            .is_some_and(|c| c.card_type == CardType::Member && c.cost.unwrap_or(0) > 0)
+    }
+
+    /// One of our Main phases. Returns whether anything was deployed.
+    pub fn step(&mut self, db: &CardDatabase) -> bool {
+        self.budget += 1; // rule 7.5
+
+        // Draw phase (7.6): the next member off our own deck, in deck order.
+        while self.cursor < self.deck.len() {
+            let cid = self.deck[self.cursor];
+            self.cursor += 1;
+            if self.deployable(db, cid) {
+                self.hand.push(cid);
+                break;
+            }
+        }
+
+        let occupied: Vec<usize> = self
+            .stage
+            .iter()
+            .enumerate()
+            .filter(|(_, c)| **c >= 0)
+            .map(|(i, _)| i)
+            .collect();
+        let baton_slot = occupied
+            .iter()
+            .copied()
+            .min_by_key(|&i| card_cost(db, self.stage[i]));
+        let free_slot = self.stage.iter().position(|&c| c < 0);
+        let discount = occupied
+            .iter()
+            .map(|&i| card_cost(db, self.stage[i]))
+            .max()
+            .unwrap_or(0);
+
+        // A baton is preferred: a discounted swap beats a fresh play (9.6.2.3.2).
+        let mut chosen: Option<(usize, usize, i32)> = None; // (hand index, slot, cost)
+        for (slot, is_baton) in [(baton_slot, true), (free_slot, false)] {
+            let Some(slot) = slot else { continue };
+            for (hi, &cid) in self.hand.iter().enumerate() {
+                let cost = card_cost(db, cid);
+                let effective = if is_baton {
+                    cost.saturating_sub(discount)
+                } else {
+                    cost
+                };
+                if effective > self.budget {
+                    continue;
+                }
+                if chosen.is_none_or(|(_, _, best)| cost > best) {
+                    chosen = Some((hi, slot, cost));
+                }
+            }
+            if chosen.is_some() {
+                break;
+            }
+        }
+        let Some((hand_index, slot, cost)) = chosen else {
+            return false;
+        };
+        let cid = self.hand.remove(hand_index);
+        let sent = self.stage[slot];
+        if sent >= 0 {
+            // Baton. The sent member leaves the active set, so its blades go
+            // with it (Q133) and its hearts stay in the pool as a waiting member
+            // (3.2, heart pool is ALL members).
+            if let Some(card) = db.get_card(sent) {
+                self.blades -= i32::from(card.blade);
+                if let Some(base) = &card.base_heart {
+                    acc_add(&mut self.hearts, &base.hearts);
+                }
+            }
+        }
+        if let Some(card) = db.get_card(cid) {
+            if let Some(base) = &card.base_heart {
+                acc_add(&mut self.hearts, &base.hearts);
+            }
+            self.blades += i32::from(card.blade);
+        }
+        self.stage[slot] = cid;
+        self.budget -= cost.saturating_sub(if sent >= 0 { discount } else { 0 });
+        self.blades = self.blades.max(0);
+        true
+    }
+
+    /// Run `turns` of our own Main phases and report what the check would then
+    /// read: `(hearts by colour, active blades)`.
+    pub fn run(&mut self, turns: u8, db: &CardDatabase) -> (Acc, i32) {
+        for _ in 0..turns {
+            if !self.step(db) {
+                break;
+            }
+        }
+        (self.hearts, self.blades)
+    }
+}
+
+/// Board supply after `turns` more of OUR Main phases, as (hearts, active
+/// blades) - the two quantities that decide a check (section 3.2). This is what
+/// makes the Main phase's leaf non-myopic: it prices the check the guides'
+/// curve is aimed at, not the one this turn happens to afford.
+pub fn forward_supply(gs: &GameState, me: u8, turns: u8, db: &CardDatabase) -> (Acc, i32) {
+    Forward::from_state(gs, me, db).run(turns, db)
+}
+
 /// Highest total stage cost reachable after `turns` more of OUR Main phases,
 /// using the printed turn structure. `turns == 0` returns the CURRENT stage
 /// cost, which is the guides' development metric read directly.
 ///
-/// - Energy phase `+1` active energy per turn (7.5) and active energy persists
-///   (7.4.1), so the budget compounds.
-/// - Draw phase `+1` card per turn (7.6). Our own remaining deck is fair
-///   information, so assumed draws come from it best-first.
-/// - Baton touch: playing over an occupied slot costs
-///   `own_cost - sent_cost` (9.6.2.3.2), so a new member is reachable at
-///   `budget + max_stage_cost`. This is the guides' 4 -> 9 -> 13 ladder.
-///
 /// This is a FORWARD quantity, and that is the whole point. A one-ply cost
-/// delta prices an upgrade by what it changes right now, which is how v7
-/// could pass over a free 2 -> 7 baton step and end up a full turn behind.
+/// delta prices an upgrade by what it changes right now, which is how v7 could
+/// pass over a free 2 -> 7 baton step and end up a full turn behind. It is
+/// deliberately the *cheapest* member each turn rather than the largest, so it
+/// is a lower bound on reachable development and not a second opinion about
+/// which member to deploy - the leaf is the one that decides that.
 pub fn reachable_ceiling(gs: &GameState, me: u8, turns: u8, db: &CardDatabase) -> i32 {
     let p = gs.seat_player(me);
     let mut stage: Vec<i32> = p
@@ -774,140 +1147,6 @@ pub fn reachable_ceiling(gs: &GameState, me: u8, turns: u8, db: &CardDatabase) -
     stage.iter().sum()
 }
 
-/// Board supply after `turns` more of OUR Main phases, as (hearts, active
-/// blades) ? the two quantities that decide a check (section 3.2).
-///
-/// This is the same forward walk as [`reachable_ceiling`] but accumulating the
-/// check inputs instead of stage cost, and it is what makes the Main phase's
-/// leaf non-myopic. Each simulated phase is the printed turn structure:
-///
-/// - Energy phase `+1` active energy (7.5); active energy persists (7.4.1).
-/// - Draw phase `+1` card (7.6) from our own remaining deck, in deck order,
-///   which is fair information under section 9.
-/// - One deploy, preferring a baton into the CHEAPEST occupied slot (9.6.2.3.2)
-///   because that leaves the expensive member in place as the next discount ?
-///   this is the guides' 4 -> 9 -> 13 ladder. Otherwise a free slot.
-/// - Among affordable candidates the largest cost wins, which is the energy
-///   doctrine in section 4 ("higher-cost members are simply better").
-///
-/// The heart/blade bookkeeping follows 3.2 exactly, and the asymmetry between
-/// the two is the point:
-///
-/// - the heart pool is ALL members, active AND wait (3.2), so a baton adds
-///   `new.base_heart - sent.base_heart`;
-/// - the yell count is ACTIVE members only (Q133), so a baton REPLACES the
-///   sent member's blades rather than adding to them.
-pub fn forward_supply(
-    gs: &GameState,
-    me: u8,
-    turns: u8,
-    db: &CardDatabase,
-) -> (Acc, i32) {
-    let p = gs.seat_player(me);
-    // Three stage areas: left, center, right.
-    let mut slots: [i16; 3] = p.stage.stage;
-    let mut hearts = board_supply(gs, me, db);
-    let mut blades = active_blades(gs, me, db);
-    let mut budget = i32::from(p.energy_zone.active_count());
-
-    let is_deployable = |cid: i16| {
-        db.get_card(cid)
-            .is_some_and(|c| c.card_type == CardType::Member && c.cost.unwrap_or(0) > 0)
-    };
-    let mut hand: Vec<i16> = p
-        .hand
-        .cards
-        .iter()
-        .copied()
-        .filter(|&c| is_deployable(c))
-        .collect();
-    let deck = &p.main_deck.cards;
-    let mut cursor = 0usize;
-
-    for _ in 0..turns {
-        budget += 1; // rule 7.5
-
-        // Draw phase (7.6): take the next member off our own deck.
-        while cursor < deck.len() {
-            let cid = deck[cursor];
-            cursor += 1;
-            if is_deployable(cid) {
-                hand.push(cid);
-                break;
-            }
-        }
-
-        let occupied: Vec<usize> = slots
-            .iter()
-            .enumerate()
-            .filter(|(_, c)| **c >= 0)
-            .map(|(i, _)| i)
-            .collect();
-        // Baton target: the cheapest occupied slot, so the largest member
-        // survives as the discount for the following step.
-        let baton_slot = occupied
-            .iter()
-            .copied()
-            .min_by_key(|&i| card_cost(db, slots[i]));
-        let free_slot = slots.iter().position(|&c| c < 0);
-        let discount = occupied
-            .iter()
-            .map(|&i| card_cost(db, slots[i]))
-            .max()
-            .unwrap_or(0);
-
-        // Prefer the baton: a discounted swap beats a fresh play (9.6.2.3.2).
-        let mut chosen: Option<(usize, usize, i32)> = None; // (hand index, slot, cost)
-        for (slot, is_baton) in [(baton_slot, true), (free_slot, false)] {
-            let Some(slot) = slot else { continue };
-            for (hi, &cid) in hand.iter().enumerate() {
-                let cost = card_cost(db, cid);
-                let effective = if is_baton {
-                    cost.saturating_sub(discount)
-                } else {
-                    cost
-                };
-                if effective > budget {
-                    continue;
-                }
-                if chosen.is_none_or(|(_, _, best)| cost > best) {
-                    chosen = Some((hi, slot, cost));
-                }
-            }
-            if chosen.is_some() {
-                break;
-            }
-        }
-        let Some((hand_index, slot, _cost)) = chosen else {
-            break;
-        };
-        let cid = hand.remove(hand_index);
-        let sent = slots[slot];
-        if sent >= 0 {
-            // Baton: the sent member leaves the active set, so its blades go
-            // with it and its hearts stay in the pool as a waiting member.
-            if let Some(card) = db.get_card(sent) {
-                blades -= i32::from(card.blade);
-                if let Some(base) = &card.base_heart {
-                    acc_add(&mut hearts, &base.hearts);
-                }
-            }
-        }
-        if let Some(card) = db.get_card(cid) {
-            if let Some(base) = &card.base_heart {
-                acc_add(&mut hearts, &base.hearts);
-            }
-            blades += i32::from(card.blade);
-        }
-        slots[slot] = cid;
-        budget -= if discount > 0 {
-            _cost.saturating_sub(discount)
-        } else {
-            _cost
-        };
-    }
-    (hearts, blades.max(0))
-}
 
 // -- Cheap pass estimate for Main-phase ranking ---------------------------
 
@@ -1036,6 +1275,47 @@ pub fn best_life_pass_now_and_next(gs: &GameState, me: u8, db: &CardDatabase) ->
 mod tests {
     use super::*;
 
+    /// The real card database, so these tests exercise the real card shapes
+    /// (a member with no `base_heart`, one with a zero blade, one whose blades
+    /// come from a modifier) instead of a hand-built fixture that would hide
+    /// exactly the cases that broke.
+    fn real_db() -> CardDatabase {
+        let cards = crate::card_loader::CardLoader::load_cards_from_file(std::path::Path::new(
+            "../cards/cards.json",
+        ))
+        .expect("cards.json");
+        CardDatabase::load_or_create(cards)
+    }
+
+    fn first_member_with(db: &CardDatabase, skip: usize, pred: impl Fn(&crate::card::Card) -> bool) -> i16 {
+        let mut ids: Vec<i16> = db.cards.keys().copied().collect();
+        ids.sort();
+        ids.into_iter()
+            .filter(|&id| {
+                db.get_card(id)
+                    .is_some_and(|c| c.card_type == CardType::Member && pred(c))
+            })
+            .nth(skip)
+            .expect("a member matching the predicate exists in cards.json")
+    }
+
+    fn bare_state(db: &CardDatabase) -> GameState {
+        let p1 = crate::player::Player::new("p1".into(), "P1".into(), true);
+        let p2 = crate::player::Player::new("p2".into(), "P2".into(), false);
+        GameState::new(p1, p2, std::sync::Arc::new(db.clone()))
+    }
+
+    /// Put a real member on `seat`'s stage, preferring one with hearts.
+    fn stage_member(db: &CardDatabase, gs: &mut GameState, seat: usize) -> (i16, i32) {
+        let member = first_member_with(db, 0, |c| c.base_heart.is_some() && c.cost.unwrap_or(0) > 0);
+        let card = db.get_card(member).unwrap();
+        let hearts = card.base_heart.as_ref().map_or(0, |b| b.hearts.values_sum() as i32);
+        let player = if seat == 0 { &mut gs.player1 } else { &mut gs.player2 };
+        player.stage.stage[0] = member;
+        (member, hearts)
+    }
+
+
     fn opp_model(
         set_size: usize,
         success: usize,
@@ -1057,6 +1337,8 @@ mod tests {
             success,
             score_dist,
             pass_prob,
+            commitment: Commitment::Observed,
+            commit_rate: 1.0,
         }
     }
 
@@ -1285,6 +1567,210 @@ mod tests {
     /// threshold test, so it is flat across a whole band of board development
     /// and cannot rank actions there. `largest_clearable` must be strictly
     /// monotone - that gradient is the entire point of the term.
+    /// A baton must be booked on BOTH sides of the check, and the two sides
+    /// move in opposite directions. The sent member's blades leave the active
+    /// set (Q133: the yell count is active members only) but its hearts stay in
+    /// the pool (3.2: the heart pool is ALL members), while the arriving member
+    /// adds both.
+    ///
+    /// The mulligan's copy of this walk got the blades wrong - it overwrote the
+    /// stage slot and moved on - so the mulligan thought a board grew sharper
+    /// with every rung of the 4 -> 9 -> 13 ladder. Blades are Binomial trials
+    /// (section 4), so that error is priced directly into placement probability.
+    #[test]
+    fn a_baton_books_the_sent_member_blades_out_and_hearts_in() {
+        let db = real_db();
+        // Two real members, deliberately chosen for opposite blade counts: the
+        // one that arrives must be bladier, so a walk that forgets to remove the
+        // sent member's blades reads strictly too high.
+        let sent = first_member_with(&db, 1, |c| c.blade >= 1);
+        let fresh = first_member_with(&db, 1, |c| {
+            c.blade > 0 && c.cost.unwrap_or(0) > db.get_card(sent).unwrap().cost.unwrap_or(0)
+        });
+        let sent_card = db.get_card(sent).unwrap();
+        let sent_hearts = sent_card.base_heart.as_ref().map_or(0, |b| b.hearts.values_sum() as i32);
+        let sent_blades = i32::from(sent_card.blade);
+        let fresh_card = db.get_card(fresh).unwrap();
+        let fresh_hearts = fresh_card
+            .base_heart
+            .as_ref()
+            .map_or(0, |b| b.hearts.values_sum() as i32);
+        let fresh_blades = i32::from(fresh_card.blade);
+        let cost = i32::from(fresh_card.cost.unwrap());
+        let sent_cost = i32::from(sent_card.cost.unwrap());
+
+        let mut walk = Forward {
+            hearts: [0; 11],
+            blades: sent_blades,
+            stage: [sent, -1, -1],
+            budget: 10_000,
+            hand: vec![fresh],
+            deck: Vec::new(),
+            cursor: 0,
+            lives: 0,
+            density: 0.0,
+            redraw: Vec::new(),
+        };
+        assert!(walk.step(&db));
+        assert_eq!(
+            walk.blades,
+            fresh_blades,
+            "the sent member's {sent_blades} blades leave the active set and only the arriving \
+             member's {fresh_blades} count toward the yell"
+        );
+        assert_eq!(
+            walk.hearts.iter().copied().sum::<i32>(),
+            sent_hearts + fresh_hearts,
+            "3.2: the heart pool is ALL members, so the sent member's {sent_hearts} hearts stay in \
+             it alongside the arriving member's {fresh_hearts}"
+        );
+        assert_eq!(
+            walk.budget,
+            10_000 + 1 - (cost - sent_cost),
+            "9.6.2.3.2: the baton costs own - sent, after the Energy phase's +1 (7.5)"
+        );
+    }
+
+    /// A replacement draws from the top of the deck, so the forward walk has to
+    /// start PAST it. The mulligan's model did not, so an opening that replaced
+    /// three cards received three phantom members - once as the replacement and
+    /// again as the following turns' draws.
+    #[test]
+    fn a_replacement_is_consumed_from_the_deck_walk_not_drawn_twice() {
+        let db = real_db();
+        let first = first_member_with(&db, 2, |c| c.cost.unwrap_or(0) > 0);
+        let second = first_member_with(&db, 2, |c| {
+            c.cost.unwrap_or(0) > 0 && c.card_no != db.get_card(first).unwrap().card_no
+        });
+        let walk = Forward::from_opening(&db, 3, vec![first, second], &[], &[first]);
+        assert_eq!(walk.cursor, 1, "the redrawn card is off the top of the deck");
+        assert_eq!(walk.hand, vec![first]);
+        assert_eq!(walk.redraw, vec![first]);
+        // The next turn's draw must be the SECOND deck card, not the first.
+        let mut walk = walk;
+        walk.step(&db);
+        assert!(
+            walk.hand.contains(&second),
+            "turn 1 drew the wrong card: {:?}",
+            walk.hand
+        );
+    }
+
+    /// The defect this model shipped with, pinned as a test.
+    ///
+    /// An empty opponent live zone means OPPOSITE things to the two attackers.
+    /// To the second attacker it is a fact: they folded, and 8.4.3.2 hands the
+    /// check over. To the FIRST attacker it is the normal state of a phase
+    /// whose other half has not happened yet, and it says nothing.
+    ///
+    /// The model read one observation as the other, so on the majority of live
+    /// phases it believed a passed check was a free placement. Scored against
+    /// the engine's own verdicts over 1762 first-attacker phases: predicted
+    /// `P(place) = 0.589`, truth `0.154`; predicted `P(they place) = 0.000`,
+    /// truth `0.157`. The identical model read as the second attacker, where
+    /// the zone really is a fact, scored 0.437 against a truth of 0.428.
+    ///
+    /// So the fix is structural rather than numeric: an unobserved commitment
+    /// is a forecast, and a forecast must be conditioned on the opponent's
+    /// public board rather than pinned at zero.
+    #[test]
+    fn an_empty_opponent_zone_means_different_things_to_the_two_attackers() {
+        let db = real_db();
+        let mut gs = bare_state(&db);
+        // A board for each side with real hearts on stage, so neither bar is
+        // trivially zero and the test measures the forecast, not a floor.
+        let (member, _) = stage_member(&db, &mut gs, 0);
+        let _ = member;
+        stage_member(&db, &mut gs, 1);
+        gs.current_phase = crate::game_state::Phase::LiveCardSetFirstAttacker;
+        let as_first = OppModel::build(&gs, 0, &db);
+        gs.current_phase = crate::game_state::Phase::LiveCardSetSecondAttacker;
+        let as_second = OppModel::build(&gs, 0, &db);
+
+        assert_eq!(
+            as_first.commitment,
+            Commitment::Unobserved,
+            "attacking first, the opponent's set does not exist yet"
+        );
+        assert_eq!(as_second.commitment, Commitment::Observed);
+        assert!(
+            as_first.pass_prob > 0.0,
+            "an unobserved commitment must be forecast, not read as a fold; got {}",
+            as_first.pass_prob
+        );
+        assert!(
+            as_first.pass_prob < as_second.commit_rate,
+            "and it must stay a probability of committing, not a certainty"
+        );
+        // The forecast must move with their public board, or it is a flat
+        // constant wearing a forecast's clothes - covered in depth by
+        // `the_forecast_rises_with_the_opponents_public_board` below.
+    }
+
+    /// The forecast must never claim the opponent is certain to place. An
+    /// earlier shape of this fix set the assumed set size to 1 and left the
+    /// pass probability alone, which is a guaranteed contested check - the
+    /// mirror image of the original error, and equally wrong.
+    #[test]
+    fn a_forecast_commitment_is_strictly_less_than_certain() {
+        let mut opp = opp_model(1, 0, 1.0, &[(4, 1.0)]);
+        opp.commitment = Commitment::Unobserved;
+        opp.commit_rate = assume_commit_rate();
+        opp.pass_prob *= opp.commit_rate;
+        assert!(opp.pass_prob < 1.0);
+        assert!(opp.pass_prob > 0.0);
+    }
+
+    /// The forecast has to be conditioned on the opponent's PUBLIC board, or it
+    /// is a flat constant wearing a forecast's clothes - and the whole point of
+    /// modelling the unobserved commitment was to say more than "assume the
+    /// worst".
+    #[test]
+    fn the_forecast_rises_with_the_opponents_public_board() {
+        let db = real_db();
+        // Three real members ordered by printed hearts, so "weak" and "strong"
+        // are the same cards in different quantities.
+        let mut members: Vec<i16> = {
+            let mut ids: Vec<i16> = db.cards.keys().copied().collect();
+            ids.sort();
+            ids.into_iter()
+                .filter(|&id| {
+                    db.get_card(id).is_some_and(|c| {
+                        c.card_type == CardType::Member
+                            && c.cost.unwrap_or(0) > 0
+                            && c.base_heart.is_some()
+                    })
+                })
+                .collect()
+        };
+        assert!(members.len() > 3, "need members to build two boards");
+        members.sort_by_key(|&id| {
+            -db.get_card(id)
+                .unwrap()
+                .base_heart
+                .as_ref()
+                .map_or(0, |b| b.hearts.values_sum() as i32)
+        });
+        let weakest = members[members.len() - 1];
+        let strongest = members[0];
+
+        let forecast = |opp_members: &[i16]| {
+            let mut gs = bare_state(&db);
+            for (i, &id) in opp_members.iter().enumerate() {
+                gs.player2.stage.stage[i.min(2)] = id;
+            }
+            gs.current_phase = crate::game_state::Phase::LiveCardSetFirstAttacker;
+            OppModel::build(&gs, 0, &db).pass_prob
+        };
+        let weak = forecast(&[weakest]);
+        let strong = forecast(&[strongest, strongest, strongest]);
+        assert!(
+            strong > weak,
+            "the unobserved-commitment forecast must read the opponent's public board: \
+             strong board {strong} vs weak board {weak}"
+        );
+    }
+
     #[test]
     fn largest_clearable_is_strictly_monotone_in_supply() {
         let mut previous = largest_clearable(0);

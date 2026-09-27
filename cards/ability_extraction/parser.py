@@ -80,7 +80,7 @@ Condition types produced (type field in condition dict):
 import re
 import copy
 import sys
-from typing import Dict, Any, Optional, Tuple, List
+from typing import Callable, Dict, Any, NamedTuple, Optional, Tuple, List
 
 
 from parser_utils import (
@@ -13438,21 +13438,35 @@ def _check_structural_semantics(eff, t, cards, i, trigger, all_issues, seen_by_r
     _check_sequential_patterns(eff, cards, i, trigger, all_issues, seen_by_rule)
 
 
+class SemanticRule(NamedTuple):
+    """One "did the parser actually handle this phrase?" check.
+
+    `pattern` matches the ability text; a hit outside quotes and parentheses is
+    a candidate mechanic. `handled` receives (ability_entry, effect) and returns
+    True when the parsed JSON already represents it — False is the reportable
+    case, and means the phrase survived parsing with nothing standing for it.
+    """
+
+    name: str
+    pattern: str
+    handled: Callable[[dict, dict], bool]
+    description: str
+
+
 def _validate_semantic(abilities):
     """Validate parsed JSON against text patterns to find missing mechanics.
 
-    Each rule: (name, regex, check_fn(entry, effect) -> bool, description)
-    check_fn returns True if the mechanic IS correctly handled.
-
     Returns a list of issues: (rule_name, cards, trigger, snippet, desc).
     """
-    issues = []
-
-    RULES = [
-        # ─── Per-unit scaling ───
+    # The rules are grouped by what they are about rather than by where the
+    # phrase sits in the text, so a mechanic can be found by its family. The
+    # order of this tuple does not affect the report: _print_semantic_report
+    # groups hits by rule name and prints in its own priority order.
+    RULES: Tuple[SemanticRule, ...] = (
+        # ═══ Counting, selection and repetition ═══
         # Scaling sense only ("…1枚/1人/1つにつき"); "各グループ名につき" is
         # per-group selection inside look_and_select, not a count multiplier.
-        (
+        SemanticRule(
             "per_unit",
             r"[枚人つ個]につき",
             lambda e, eff: _json_has_field(eff, "per_unit", True)
@@ -13460,8 +13474,88 @@ def _validate_semantic(abilities):
             or _json_has_field(eff, "type", "dynamic_count"),
             "Per-unit scaling (につき) but no per_unit/dynamic_count structure",
         ),
-        # ─── Negation / prohibition scope ───
-        (
+        SemanticRule(
+            "select_number",
+            r"(数を選ん|[数数字]を[選選え])",
+            lambda e, eff: _json_has_action(eff, "select_number")
+            or _json_has_field(eff, "action", "select"),
+            "Text says 'choose a number' but no select_number action found",
+        ),
+        SemanticRule(
+            "distinct_name",
+            r"(カード名の異なる|カード名が異なる|名前の異なる|名前が異なる|異なるカード名)",
+            lambda e, eff: _json_has_field(eff, "distinct", "card_name"),
+            "Distinct card names required but no distinct field",
+        ),
+        SemanticRule(
+            "reveal_until",
+            r"(公開するまで|まで公開し続け|現れるまで)",
+            lambda e, eff: _json_has_action(eff, "reveal_until_live_card")
+            or _json_has_action(eff, "reveal_until_chosen_card"),
+            "Reveal until condition but no reveal_until action",
+        ),
+        SemanticRule(
+            "repeat_procedure",
+            r"(繰り返す|まで繰り返|もう一度行う|再度)",
+            lambda e, eff: _json_has_action(eff, "repeat_procedure")
+            or _json_has_field(eff, "repeat_limit"),
+            "Repeat/loop described but no repeat_procedure or repeat_limit",
+        ),
+        SemanticRule(
+            "discard_until",
+            r"(枚になるまで.*捨て|枚になるまで.*トラッシュ|枚になるまで.*墓地|になるまで捨て|になるまでトラッシュ)",
+            lambda e, eff: _json_has_action(eff, "discard_until_count"),
+            "Discard until hand size but no discard_until_count",
+        ),
+        SemanticRule(
+            "draw_until_hand",
+            r"(枚になるまで|になるまで)",
+            lambda e, eff: _json_has_action(eff, "draw_until_count")
+            or _json_has_action(eff, "discard_until_count"),
+            "Until-hand-size action but no draw_until_count or discard_until_count",
+        ),
+        SemanticRule(
+            "multiple_targets",
+            r"(?:枚|人|体)(?:まで|.{0,15}?まで)",
+            lambda e, eff: _json_has_field(eff, "multiple_targets")
+            or _json_has_field(eff, "max")
+            or _json_has_field(eff, "count")
+            or _json_has_field(e.get("condition", {}), "operator")
+            or _json_has_field(e.get("cost", {}), "max")
+            or _json_has_field(e.get("cost", {}), "count"),
+            "Multiple target count but no multiple_targets or max/count field",
+        ),
+        # ═══ Cost and payment ═══
+        SemanticRule(
+            "pay_energy_cost",
+            r"(エネルギーを.*支払|エネルギー.*払う)",
+            lambda e, eff: _json_has_action(eff, "pay_energy"),
+            "Pay energy described but no pay_energy action",
+        ),
+        SemanticRule(
+            "set_cost",
+            r"(コストを.*変更|コストを.*増や|コストを.*減ら|コスト.*変え|支払うコスト)",
+            lambda e, eff: _json_has_action(eff, "set_cost")
+            or _json_has_action(eff, "modify_cost"),
+            "Cost modification but no set_cost or modify_cost",
+        ),
+        SemanticRule(
+            "state_change",
+            r"(ウェイト|レスト|スタンド)(状態)?(にす|にで)(る|き)",
+            lambda e, eff: _json_has_field(eff, "state_change")
+            or _json_has_field(e.get("cost", {}), "state_change"),
+            "State change described but no state_change field",
+        ),
+        SemanticRule(
+            "shuffle",
+            r"(シャッフルする|シャッフルして)",
+            lambda e, eff: _json_has_action(eff, "shuffle")
+            or _json_has_field(eff, "shuffle")
+            or _json_has_field(e.get("cost", {}), "shuffle"),
+            "Shuffle described but no shuffle action or flag",
+        ),
+        # ═══ Restrictions and negation ═══
+        SemanticRule(
             "cannot_restriction",
             r"できない",
             lambda e, eff: _json_has_field(eff, "restriction_type")
@@ -13470,56 +13564,14 @@ def _validate_semantic(abilities):
             or _json_has_action(eff, "restriction"),
             "できない but no restriction/negation structure",
         ),
-        # ─── Self-referential effect clamps ───
-        # 「この効果ではライブの合計スコアは０未満にならない」 → now represented as
-        # score_floor:0 / effect_constraint:"min:0" on parent + each modify_score child.
-        (
-            "effect_self_clamp",
-            r"この効果では.{0,20}ない",
-            lambda e, eff: _json_has_field(eff, "score_floor", 0)
-            or _json_has_field(eff, "effect_constraint", "min:0"),
-            "Self-referential effect clamp (この効果では…) has no structural representation",
+        SemanticRule(
+            "restriction",
+            r"(?<!支払)(?:ことが|を)?できない",
+            lambda e, eff: _json_has_action(eff, "restriction")
+            or _json_has_field(eff, "max_repeats"),
+            "Restriction/cannot described but no restriction action or max_repeats",
         ),
-        # ─── Number selection ───
-        (
-            "select_number",
-            r"(数を選ん|[数数字]を[選選え])",
-            lambda e, eff: _json_has_action(eff, "select_number")
-            or _json_has_field(eff, "action", "select"),
-            "Text says 'choose a number' but no select_number action found",
-        ),
-        # ─── Opponent choice ───
-        (
-            "opponent_choice",
-            r"相手[はが].*[選選え]ぶ",
-            lambda e, eff: _json_has_field(eff, "action_by", "opponent"),
-            "Opponent chooses but no action_by: opponent",
-        ),
-        # ─── Distinct card names ───
-        (
-            "distinct_name",
-            r"(カード名の異なる|カード名が異なる|名前の異なる|名前が異なる|異なるカード名)",
-            lambda e, eff: _json_has_field(eff, "distinct", "card_name"),
-            "Distinct card names required but no distinct field",
-        ),
-        # ─── Reveal until condition ───
-        (
-            "reveal_until",
-            r"(公開するまで|まで公開し続け|現れるまで)",
-            lambda e, eff: _json_has_action(eff, "reveal_until_live_card")
-            or _json_has_action(eff, "reveal_until_chosen_card"),
-            "Reveal until condition but no reveal_until action",
-        ),
-        # ─── Repeat procedure ───
-        (
-            "repeat_procedure",
-            r"(繰り返す|まで繰り返|もう一度行う|再度)",
-            lambda e, eff: _json_has_action(eff, "repeat_procedure")
-            or _json_has_field(eff, "repeat_limit"),
-            "Repeat/loop described but no repeat_procedure or repeat_limit",
-        ),
-        # ─── Conditional alternative (if not, otherwise) ───
-        (
+        SemanticRule(
             "conditional_alt",
             r"(なかった場合|なければ|ない場合|なけれ|以外の場合)",
             lambda e, eff: _json_has_action(eff, "conditional_alternative")
@@ -13534,68 +13586,16 @@ def _validate_semantic(abilities):
             or _json_has_action(eff, "position_change")
             or _json_has_field(eff, "otherwise_condition"),
             "Fallback/alternative (if not) but no conditional_alternative",
-            # Accept: conditional actions, negation on any node, choice actions,
-            # or condition with comparison operator (少ない場合 etc.)
         ),
-        # ─── Placement order ───
-        (
-            "placement_order",
-            r"(好きな順番|任意の順番|好きな順序|任意の順|好きな順)",
-            lambda e, eff: _json_has_field(eff, "placement_order")
-            or _json_has_field(e.get("cost", {}), "placement_order"),
-            "Any-order placement but no placement_order field",
-        ),
-        # ─── Discard until hand count ───
-        (
-            "discard_until",
-            r"(枚になるまで.*捨て|枚になるまで.*トラッシュ|枚になるまで.*墓地|になるまで捨て|になるまでトラッシュ)",
-            lambda e, eff: _json_has_action(eff, "discard_until_count"),
-            "Discard until hand size but no discard_until_count",
-        ),
-        # ─── Pay energy as cost ───
-        (
-            "pay_energy_cost",
-            r"(エネルギーを.*支払|エネルギー.*払う)",
-            lambda e, eff: _json_has_action(eff, "pay_energy"),
-            "Pay energy described but no pay_energy action",
-        ),
-        # ─── ALL blade / any-color handling ───
-        (
-            "all_blade",
-            r"(ALLブレード|全てのブレード|任意の色のブレード|ALL blade)",
-            lambda e, eff: _json_has_field(eff, "all_blade_timing")
-            or _json_has_action(eff, "all_blade_timing")
-            or _json_has_action(eff, "set_blade_type")
-            or _json_has_field(eff, "card_property", "has_all_blade"),
-            "ALL blade / any-color handling but no all_blade_timing",
-        ),
-        # ─── Invalidate / suppress ability ───
-        (
+        SemanticRule(
             "invalidate_ability",
             r"(無効|発動しな|発動を防|無効にす|能力を.*失)",
             lambda e, eff: _json_has_action(eff, "invalidate_ability")
             or _json_has_action(eff, "suppress_ability_trigger"),
             "Ability nullification but no invalidate_ability or suppress_ability_trigger",
         ),
-        # ─── Both players / both targets ───
-        (
-            "both_targets",
-            r"(お互い|両プレイヤー|相手と自分(?!の)|自分と相手(?!の)|両方(?!(?:とも|ある)))",
-            lambda e, eff: _json_has_field(eff, "target", "both")
-            or _json_has_field(eff, "comparison_target"),
-            "Both players affected but no target='both'",
-        ),
-        # ─── Additional Yell ───
-        (
-            "additional_yell",
-            r"(追加で.*エール|エール.*追加|もう一度.*エール|さらに.*エール|追エール)",
-            lambda e, eff: _json_has_action(eff, "perform_yell")
-            or _json_has_action(eff, "re_yell")
-            or _json_has_action(eff, "modify_yell_count"),
-            "Additional Yell but no perform_yell or re_yell",
-        ),
-        # ─── Under member (place or reference) ───
-        (
+        # ═══ Card movement and zones ═══
+        SemanticRule(
             "under_member",
             r"(?:この)?メンバーの下(?:に置|にあ|から|に置かれ)",
             lambda e, eff: _json_has_field(eff, "source", "under_member")
@@ -13608,8 +13608,7 @@ def _validate_semantic(abilities):
             or _json_has_field(e.get("cost", {}), "location", "under_member"),
             "Under-member operation but no under_member source/destination",
         ),
-        # ─── Energy deck/zone operation ───
-        (
+        SemanticRule(
             "energy_deck_to_zone",
             r"(エネルギー置き場|エネルギーデッキ)",
             lambda e, eff: _json_has_field(eff, "source", "energy_deck")
@@ -13625,230 +13624,18 @@ def _validate_semantic(abilities):
             ),
             "Energy deck/zone operation but no energy_deck/energy_zone field",
         ),
-        # ─── Blade type conversion ───
-        (
-            "blade_type",
-            r"ブレード(?:として扱|とみな|treat)",
-            lambda e, eff: _json_has_action(eff, "set_blade_type"),
-            "Blade type conversion but no set_blade_type",
+        SemanticRule(
+            "placement_order",
+            r"(好きな順番|任意の順番|好きな順序|任意の順|好きな順)",
+            lambda e, eff: _json_has_field(eff, "placement_order")
+            or _json_has_field(e.get("cost", {}), "placement_order"),
+            "Any-order placement but no placement_order field",
         ),
-        # ─── Cost modification ───
-        (
-            "set_cost",
-            r"(コストを.*変更|コストを.*増や|コストを.*減ら|コスト.*変え|支払うコスト)",
-            lambda e, eff: _json_has_action(eff, "set_cost")
-            or _json_has_action(eff, "modify_cost"),
-            "Cost modification but no set_cost or modify_cost",
-        ),
-        # ─── Draw/discard until hand count ───
-        (
-            "draw_until_hand",
-            r"(枚になるまで|になるまで)",
-            lambda e, eff: _json_has_action(eff, "draw_until_count")
-            or _json_has_action(eff, "discard_until_count"),
-            "Until-hand-size action but no draw_until_count or discard_until_count",
-        ),
-        # ─── Heart type conversion ───
-        (
-            "heart_type",
-            r"ハート(?:として扱|とみな|treat)",
-            lambda e, eff: _json_has_action(eff, "set_heart_type")
-            or _json_has_action(eff, "all_blade_timing"),
-            "Heart type conversion but no set_heart_type",
-        ),
-        # ─── Card identity setting ───
-        (
-            "card_identity",
-            r"(としても扱|として扱う|同一として扱|として見な)",
-            lambda e, eff: _json_has_action(eff, "set_card_identity")
-            or _json_has_action(eff, "all_blade_timing")
-            or _json_has_action(eff, "set_heart_type"),
-            "Card identity/card name treated as but no set_card_identity",
-        ),
-        # ─── Multiple targets ───
-        (
-            "multiple_targets",
-            r"(?:枚|人|体)(?:まで|.{0,15}?まで)",
-            lambda e, eff: _json_has_field(eff, "multiple_targets")
-            or _json_has_field(eff, "max")
-            or _json_has_field(eff, "count")
-            or _json_has_field(e.get("condition", {}), "operator")
-            or _json_has_field(e.get("cost", {}), "max")
-            or _json_has_field(e.get("cost", {}), "count"),
-            "Multiple target count but no multiple_targets or max/count field",
-        ),
-        # ─── Exclude self ───
-        (
-            "exclude_self",
-            r"(自分以外|自身以外|このカード以外|このメンバー以外|自分を除く)",
-            lambda e, eff: _json_has_field(eff, "exclude_self")
-            or _json_has_field(e.get("cost", {}), "exclude_self"),
-            "Exclude self described but no exclude_self field",
-        ),
-        # ─── Shuffle ───
-        (
-            "shuffle",
-            r"(シャッフルする|シャッフルして)",
-            lambda e, eff: _json_has_action(eff, "shuffle")
-            or _json_has_field(eff, "shuffle")
-            or _json_has_field(e.get("cost", {}), "shuffle"),
-            "Shuffle described but no shuffle action or flag",
-        ),
-        # ─── Restriction ───
-        (
-            "restriction",
-            r"(?<!支払)(?:ことが|を)?できない",
-            lambda e, eff: _json_has_action(eff, "restriction")
-            or _json_has_field(eff, "max_repeats"),
-            "Restriction/cannot described but no restriction action or max_repeats",
-        ),
-        # ─── Look at cards ───
-        (
-            "look_at",
-            r"(見てもよい|見ることができる|(?<!必要ハートを)確認する)",
-            lambda e, eff: _json_has_action(eff, "look_at"),
-            "Look at cards described but no look_at action",
-        ),
-        # ─── Non-stackable ───
-        (
-            "non_stackable",
-            r"重複しない",
-            lambda e, eff: _json_has_field(eff, "non_stackable"),
-            "Non-stackable described but no non_stackable flag",
-        ),
-        # ─── Per-group ───
-        (
-            "per_group",
-            r"各グループ",
-            lambda e, eff: _json_has_field(eff, "per_group")
-            or _json_has_field(eff, "per_group_count")
-            or _json_has_field(eff, "per_unit_type"),
-            "Per-group described but no per_group/per_group_count/per_unit_type field",
-        ),
-        # ─── Baton touch ───
-        (
-            "baton_touch",
-            r"バトンタッチして登場",
-            lambda e, eff: _json_has_field(eff, "baton_touch_trigger")
-            or _json_has_field(eff, "baton_touch_source"),
-            "Baton touch but no baton_touch_trigger or baton_touch_source",
-        ),
-        # ─── Lose resource (should have sign: negative) ───
-        (
-            "lose_resource",
-            r"失う",
-            lambda e, eff: _json_has_field(eff, "sign", "negative"),
-            "Lose resource described but no sign: negative",
-        ),
-        # ─── Same name ───
-        (
-            "same_name",
-            r"同じ名前",
-            lambda e, eff: _json_has_field(eff, "same_name")
-            or _json_has_field(eff.get("condition", {}), "same_name"),
-            "Same name required but no same_name field",
-        ),
-        # ─── Card property (has_blade_heart / has_score_icon) ───
-        (
-            "card_property",
-            r"(ブレードハートを持|ブレードハートがない|スコアを持つ)",
-            lambda e, eff: _json_has_field(eff, "card_property")
-            or _json_has_field(e.get("cost", {}), "card_property"),
-            "Card property (blade heart / score icon) but no card_property field",
-        ),
-        # ─── OR location (zone1 か zone2) ───
-        (
-            "or_location",
-            r"(?:成功)?ライブカード置き場(?:か(?!ら)|又は)",
-            lambda e, eff: len(
-                (eff.get("condition") or {}).get("locations", [])
-            )
-            >= 2,
-            "OR location pattern but fewer than 2 locations in condition",
-        ),
-        # ─── Heart content (required heart N in card filter) ───
-        (
-            "heart_content",
-            rf"必要ハートに含まれる{HEART_ICON}が\d+",
-            lambda e, eff: _json_has_field(eff, "heart_colors")
-            and _json_has_field(eff, "count"),
-            "Heart content pattern but missing heart_colors or count",
-        ),
-        # ─── State change (ウェイト/レスト/スタンド にする) ───
-        (
-            "state_change",
-            r"(ウェイト|レスト|スタンド)(状態)?(にす|にで)(る|き)",
-            lambda e, eff: _json_has_field(eff, "state_change")
-            or _json_has_field(e.get("cost", {}), "state_change"),
-            "State change described but no state_change field",
-        ),
-        # ─── Universal quantifier over preceding cards (それらがすべてX) ───
-        # The engine only implements "ALL moved cards match" as
-        # card_count_condition{source: preceding_moved, operator: "="}.
-        (
-            "all_preceding_match",
-            r"それらがすべて",
-            lambda e, eff: _json_has(
-                eff,
-                lambda d: isinstance(d, dict)
-                and d.get("type") == "card_count_condition"
-                and d.get("source") == "preceding_moved"
-                and d.get("operator") == "=",
-            ),
-            "'それらがすべて' (all moved cards match) but no "
-            "card_count_condition with source=preceding_moved + operator='='",
-        ),
-        # ─── Deck refresh this turn ───
-        # Engine evaluates temporal=this_turn + location=deck as
-        # deck_refreshed_this_turn — anything else loses the mechanic.
-        (
-            "refresh_condition",
-            r"リフレッシュし(?:ていた|た)場合",
-            lambda e, eff: _json_has(
-                eff.get("condition") or {},
-                lambda d: isinstance(d, dict)
-                and d.get("location") == "deck"
-                and d.get("temporal") == "this_turn",
-            ),
-            "Deck-refresh condition but condition is not "
-            "{location: deck, temporal: this_turn}",
-        ),
-        # ─── Exact count (ちょうどN人/枚) ───
-        (
-            "exact_count",
-            r"ちょうど\d+(人|枚|つ)",
-            lambda e, eff: _json_has(
-                eff,
-                lambda d: isinstance(d, dict)
-                and (
-                    (
-                        d.get("operator") in ("=", "==")
-                        and d.get("count") is not None
-                    )
-                    # blade-count filters encode ちょうど as blade_limit + "=="
-                    or d.get("blade_limit_operator") in ("=", "==")
-                ),
-            ),
-            "'ちょうどN' (exactly N) but no condition with operator '='",
-        ),
-        # ─── Replacement placement keeps the original destination ───
-        (
-            "replacement_destination",
-            r"成功ライブカード置き場に置く場合、代わりに",
-            lambda e, eff: _json_has(
-                eff,
-                lambda d: isinstance(d, dict)
-                and d.get("action") == "move_cards"
-                and d.get("destination") == "success_live_zone",
-            ),
-            "Replacement effect but alternative move has no "
-            "destination=success_live_zone",
-        ),
-        # ─── Energy returned to the energy deck must come from the zone ───
-        # Covers both effect moves and activation costs (エネルギーN枚を…デッキに
-        # 置く：). Engine defaults an empty source to discard, which never holds
-        # energy, so a missing source makes the move silently no-op.
-        (
+        # Energy returned to the energy deck must come from the zone. Covers both
+        # effect moves and activation costs (エネルギーN枚を…デッキに置く：).
+        # Engine defaults an empty source to discard, which never holds energy,
+        # so a missing source makes the move silently no-op.
+        SemanticRule(
             "energy_to_deck_source",
             r"エネルギー\d*枚をエネルギーデッキに置",
             lambda e, eff: _json_has(
@@ -13867,7 +13654,199 @@ def _validate_semantic(abilities):
             "Energy-to-energy-deck move but move/cost has no source "
             "(engine defaults empty source to discard, which never holds energy)",
         ),
-    ]
+        SemanticRule(
+            "replacement_destination",
+            r"成功ライブカード置き場に置く場合、代わりに",
+            lambda e, eff: _json_has(
+                eff,
+                lambda d: isinstance(d, dict)
+                and d.get("action") == "move_cards"
+                and d.get("destination") == "success_live_zone",
+            ),
+            "Replacement effect but alternative move has no "
+            "destination=success_live_zone",
+        ),
+        SemanticRule(
+            "or_location",
+            r"(?:成功)?ライブカード置き場(?:か(?!ら)|又は)",
+            lambda e, eff: len(
+                (eff.get("condition") or {}).get("locations", [])
+            )
+            >= 2,
+            "OR location pattern but fewer than 2 locations in condition",
+        ),
+        # ═══ Types, identity and conversion ═══
+        SemanticRule(
+            "blade_type",
+            r"ブレード(?:として扱|とみな|treat)",
+            lambda e, eff: _json_has_action(eff, "set_blade_type"),
+            "Blade type conversion but no set_blade_type",
+        ),
+        SemanticRule(
+            "heart_type",
+            r"ハート(?:として扱|とみな|treat)",
+            lambda e, eff: _json_has_action(eff, "set_heart_type")
+            or _json_has_action(eff, "all_blade_timing"),
+            "Heart type conversion but no set_heart_type",
+        ),
+        SemanticRule(
+            "card_identity",
+            r"(としても扱|として扱う|同一として扱|として見な)",
+            lambda e, eff: _json_has_action(eff, "set_card_identity")
+            or _json_has_action(eff, "all_blade_timing")
+            or _json_has_action(eff, "set_heart_type"),
+            "Card identity/card name treated as but no set_card_identity",
+        ),
+        SemanticRule(
+            "all_blade",
+            r"(ALLブレード|全てのブレード|任意の色のブレード|ALL blade)",
+            lambda e, eff: _json_has_field(eff, "all_blade_timing")
+            or _json_has_action(eff, "all_blade_timing")
+            or _json_has_action(eff, "set_blade_type")
+            or _json_has_field(eff, "card_property", "has_all_blade"),
+            "ALL blade / any-color handling but no all_blade_timing",
+        ),
+        SemanticRule(
+            "baton_touch",
+            r"バトンタッチして登場",
+            lambda e, eff: _json_has_field(eff, "baton_touch_trigger")
+            or _json_has_field(eff, "baton_touch_source"),
+            "Baton touch but no baton_touch_trigger or baton_touch_source",
+        ),
+        SemanticRule(
+            "non_stackable",
+            r"重複しない",
+            lambda e, eff: _json_has_field(eff, "non_stackable"),
+            "Non-stackable described but no non_stackable flag",
+        ),
+        # ═══ Card properties and filters ═══
+        SemanticRule(
+            "card_property",
+            r"(ブレードハートを持|ブレードハートがない|スコアを持つ)",
+            lambda e, eff: _json_has_field(eff, "card_property")
+            or _json_has_field(e.get("cost", {}), "card_property"),
+            "Card property (blade heart / score icon) but no card_property field",
+        ),
+        SemanticRule(
+            "same_name",
+            r"同じ名前",
+            lambda e, eff: _json_has_field(eff, "same_name")
+            or _json_has_field(eff.get("condition", {}), "same_name"),
+            "Same name required but no same_name field",
+        ),
+        SemanticRule(
+            "heart_content",
+            rf"必要ハートに含まれる{HEART_ICON}が\d+",
+            lambda e, eff: _json_has_field(eff, "heart_colors")
+            and _json_has_field(eff, "count"),
+            "Heart content pattern but missing heart_colors or count",
+        ),
+        SemanticRule(
+            "exclude_self",
+            r"(自分以外|自身以外|このカード以外|このメンバー以外|自分を除く)",
+            lambda e, eff: _json_has_field(eff, "exclude_self")
+            or _json_has_field(e.get("cost", {}), "exclude_self"),
+            "Exclude self described but no exclude_self field",
+        ),
+        # ═══ Targeting, choice and turn state ═══
+        SemanticRule(
+            "both_targets",
+            r"(お互い|両プレイヤー|相手と自分(?!の)|自分と相手(?!の)|両方(?!(?:とも|ある)))",
+            lambda e, eff: _json_has_field(eff, "target", "both")
+            or _json_has_field(eff, "comparison_target"),
+            "Both players affected but no target='both'",
+        ),
+        SemanticRule(
+            "opponent_choice",
+            r"相手[はが].*[選選え]ぶ",
+            lambda e, eff: _json_has_field(eff, "action_by", "opponent"),
+            "Opponent chooses but no action_by: opponent",
+        ),
+        SemanticRule(
+            "additional_yell",
+            r"(追加で.*エール|エール.*追加|もう一度.*エール|さらに.*エール|追エール)",
+            lambda e, eff: _json_has_action(eff, "perform_yell")
+            or _json_has_action(eff, "re_yell")
+            or _json_has_action(eff, "modify_yell_count"),
+            "Additional Yell but no perform_yell or re_yell",
+        ),
+        SemanticRule(
+            "per_group",
+            r"各グループ",
+            lambda e, eff: _json_has_field(eff, "per_group")
+            or _json_has_field(eff, "per_group_count")
+            or _json_has_field(eff, "per_unit_type"),
+            "Per-group described but no per_group/per_group_count/per_unit_type field",
+        ),
+        SemanticRule(
+            "look_at",
+            r"(見てもよい|見ることができる|(?<!必要ハートを)確認する)",
+            lambda e, eff: _json_has_action(eff, "look_at"),
+            "Look at cards described but no look_at action",
+        ),
+        SemanticRule(
+            "lose_resource",
+            r"失う",
+            lambda e, eff: _json_has_field(eff, "sign", "negative"),
+            "Lose resource described but no sign: negative",
+        ),
+        # The engine only implements "ALL moved cards match" as
+        # card_count_condition{source: preceding_moved, operator: "="}.
+        SemanticRule(
+            "all_preceding_match",
+            r"それらがすべて",
+            lambda e, eff: _json_has(
+                eff,
+                lambda d: isinstance(d, dict)
+                and d.get("type") == "card_count_condition"
+                and d.get("source") == "preceding_moved"
+                and d.get("operator") == "=",
+            ),
+            "'それらがすべて' (all moved cards match) but no "
+            "card_count_condition with source=preceding_moved + operator='='",
+        ),
+        # Engine evaluates temporal=this_turn + location=deck as
+        # deck_refreshed_this_turn — anything else loses the mechanic.
+        SemanticRule(
+            "refresh_condition",
+            r"リフレッシュし(?:ていた|た)場合",
+            lambda e, eff: _json_has(
+                eff.get("condition") or {},
+                lambda d: isinstance(d, dict)
+                and d.get("location") == "deck"
+                and d.get("temporal") == "this_turn",
+            ),
+            "Deck-refresh condition but condition is not "
+            "{location: deck, temporal: this_turn}",
+        ),
+        SemanticRule(
+            "exact_count",
+            r"ちょうど\d+(人|枚|つ)",
+            lambda e, eff: _json_has(
+                eff,
+                lambda d: isinstance(d, dict)
+                and (
+                    (
+                        d.get("operator") in ("=", "==")
+                        and d.get("count") is not None
+                    )
+                    # blade-count filters encode ちょうど as blade_limit + "=="
+                    or d.get("blade_limit_operator") in ("=", "==")
+                ),
+            ),
+            "'ちょうどN' (exactly N) but no condition with operator '='",
+        ),
+        # 「この効果ではライブの合計スコアは０未満にならない」 → represented as
+        # score_floor:0 / effect_constraint:"min:0" on the parent and on each
+        # modify_score child.
+        SemanticRule(
+            "effect_self_clamp",
+            r"この効果では.{0,20}ない",
+            lambda e, eff: _json_has_field(eff, "score_floor", 0)
+            or _json_has_field(eff, "effect_constraint", "min:0"),
+            "Self-referential effect clamp (この効果では…) has no structural representation",
+        ),
+    )
 
     seen_by_rule = {}  # rule_name -> set of frozenset(cards)
     all_issues = []  # (rule_name, cards, trigger, snippet, desc)
@@ -13878,11 +13857,10 @@ def _validate_semantic(abilities):
         if not t or not isinstance(eff, dict):
             continue
         cards = entry.get("cards", [])
-        card_lbl = cards[0] if cards else "???"
         trigger = entry.get("triggers", "")
 
-        for rule_name, pattern, check_fn, desc in RULES:
-            for m in re.finditer(pattern, t):
+        for rule in RULES:
+            for m in re.finditer(rule.pattern, t):
                 # Skip matches inside quoted ability names (「」) — those are text
                 # references, not actual mechanic descriptions.
                 if _match_in_quotes(t, m):
@@ -13891,13 +13869,20 @@ def _validate_semantic(abilities):
                 # are game-rule reminder text, not card effect descriptions.
                 if _match_in_parens(t, m):
                     continue
-                # Check if JSON correctly handles the mechanic
-                if not check_fn(entry, eff):
-                    matched = m.group(0)
+                # Report the phrase only when the JSON has nothing standing for it.
+                if not rule.handled(entry, eff):
                     start = max(0, m.start() - 20)
                     end = min(len(t), m.end() + 30)
-                    snippet = t[start:end]
-                    _report_semantic_issue(all_issues, seen_by_rule, rule_name, cards, i, trigger, snippet, desc)
+                    _report_semantic_issue(
+                        all_issues,
+                        seen_by_rule,
+                        rule.name,
+                        cards,
+                        i,
+                        trigger,
+                        t[start:end],
+                        rule.description,
+                    )
 
         # ─── Structural checks (not regex-based) ─────────────────────────
         _check_structural_semantics(eff, t, cards, i, trigger, all_issues, seen_by_rule)
@@ -13962,38 +13947,21 @@ def _print_semantic_report(all_issues, total_abilities):
     ]
 
     SEP = "-" * 60
-    printed_rules = set()
+    listed = set(priority_order)
 
-    for rule_name in priority_order:
-        if rule_name not in by_rule:
-            continue
-        printed_rules.add(rule_name)
+    # Priority rules first, in the order above; anything that triggered but is
+    # not listed follows, sorted by name. The two groups differ only in how
+    # many example cards they show, so they print through one path.
+    ordered = [(name, 10) for name in priority_order if name in by_rule]
+    ordered += [(name, 5) for name in sorted(by_rule) if name not in listed]
+
+    for rule_name, sample_size in ordered:
         entries = by_rule[rule_name]
-        desc = entries[0][4]
         print(f"\n{SEP}")
         print(f">> {rule_name}  ({len(entries)} abilities)")
-        print(f"   {desc}")
+        print(f"   {entries[0][4]}")
         print(SEP)
-        for r in entries[:10]:
-            _, cards, trigger, snippet, _ = r
-            card_str = cards[0] if cards else "(no card)"
-            print(f"\n  CARD: {card_str}")
-            if trigger:
-                print(f"  TRIGGER: {trigger}")
-            print(f"  TEXT: ...{snippet}...")
-
-    for rule_name in sorted(by_rule.keys()):
-        if rule_name in printed_rules:
-            continue
-        printed_rules.add(rule_name)
-        entries = by_rule[rule_name]
-        desc = entries[0][4]
-        print(f"\n{SEP}")
-        print(f">> {rule_name}  ({len(entries)} abilities)")
-        print(f"   {desc}")
-        print(SEP)
-        for r in entries[:5]:
-            _, cards, trigger, snippet, _ = r
+        for _, cards, trigger, snippet, _ in entries[:sample_size]:
             card_str = cards[0] if cards else "(no card)"
             print(f"\n  CARD: {card_str}")
             if trigger:

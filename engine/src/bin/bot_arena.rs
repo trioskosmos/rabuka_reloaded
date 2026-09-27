@@ -172,9 +172,39 @@ impl Options {
     }
 }
 
+/// The deal for game `N` under base seed `S`.
+///
+/// It must be a pure function of `(S, N)` — that is what makes two runs on one
+/// seed pair game-for-game — and it must ALSO mix, so that changing `S` changes
+/// every deal rather than shifting the whole sequence by one.
+///
+/// It used to be `S + N - 1`. That is pure, and it is also why "400 games x 3
+/// seeds x both seats = 2400 games" was never 2400 games: seed 12 game 1 and
+/// seed 11 game 2 are the SAME deal, so seeds 11, 12 and 13 over 400 games
+/// cover roughly 402 distinct deals rather than 1200, and the two seats cover
+/// roughly 402 again. Every confidence interval in this project that quoted
+/// "sigma about 0.9pp at n=3000" was computed from an n of about 3000 *listed*
+/// games and about 800 *distinct* ones — roughly 1.9pp — and a change measured
+/// on three "independent" seeds was really measured on one seed three times.
+///
+/// The multiplier is a 64-bit mix of the game index, so consecutive games land
+/// far apart in the seed space and the three seeds stop overlapping.
 fn game_seeds(base: u32, game: u32) -> (u32, u64) {
-    let engine = ((u64::from(base) - 1 + u64::from(game) - 1) % u64::from(u32::MAX) + 1) as u32;
+    let mixed = splitmix64(
+        (u64::from(base) << 32) ^ u64::from(game).wrapping_mul(0x9E37_79B9_7F4A_7C15),
+    );
+    let engine = (mixed % u64::from(u32::MAX)) as u32 + 1;
     (engine, 0x5EED_1234_ABCD_0001 ^ u64::from(engine))
+}
+
+/// SplitMix64 finalizer: a bijection on 64 bits with good avalanche. Used so
+/// that `(--seed, N)` maps to well-separated seeds instead of a shifted run.
+fn splitmix64(mut z: u64) -> u64 {
+    z = z.wrapping_add(0x9E37_79B9_7F4A_7C15);
+    let mut x = z;
+    x = (x ^ (x >> 30)).wrapping_mul(0xBF58_476D_1CE4_E5B9);
+    x = (x ^ (x >> 27)).wrapping_mul(0x94D0_49BB_1331_11EB);
+    x ^ (x >> 31)
 }
 
 // -- Paired A/B significance ------------------------------------------------
@@ -1309,6 +1339,44 @@ fn my_hand_lives(gs: &GameState, is_p1: bool, db: &Arc<CardDatabase>) -> usize {
         .count()
 }
 
+/// The two decklists the run will actually deal, seat 1 and seat 2.
+///
+/// This exists as one function because `--deck2` used to be a *report* rather
+/// than an input: the second list was loaded, printed to stderr as
+/// "ASYMMETRIC: seat1 and seat2 differ", and then dropped on the floor, with
+/// seat 2 dealt the first list. Every asymmetric result recorded in this
+/// project was therefore a mirror result wearing an asymmetric label - the
+/// same way a hand-corrupting engine bug stayed invisible for its whole life,
+/// because a mirror is the one configuration in which it cancels out.
+///
+/// A `--deck2` that resolves to the same list is a hard error rather than a
+/// silent mirror, so a mislabelled run cannot be produced by a typo or by two
+/// names that happen to resolve to the same cards.
+fn seat_decklists(
+    deck: &str,
+    deck2: Option<&str>,
+    load: &dyn Fn(&str) -> Vec<String>,
+    missing: &dyn Fn(&str) -> ArenaResult<Vec<String>>,
+) -> ArenaResult<(Vec<String>, Vec<String>)> {
+    let one = load(deck);
+    let Some(other) = deck2 else {
+        return Ok((one.clone(), one));
+    };
+    let two = if other == deck {
+        one.clone()
+    } else {
+        missing(other)?
+    };
+    if two == one {
+        return Err(format!(
+            "--deck2 {other} is the same decklist as --deck {deck}; the two seats cannot differ, \
+             so this run would be a mislabelled mirror"
+        )
+        .into());
+    }
+    Ok((one, two))
+}
+
 fn main() -> ArenaResult<()> {
     // Training default: strip Action display strings + log materialization.
     // `--logs` (options.logs) keeps engine logs for arena file dumps.
@@ -1376,26 +1444,41 @@ fn main() -> ArenaResult<()> {
     let kind_name = |k: BotKind| k.name();
 
     let mut db = fresh_database();
-    let nums = load_deck(deck_name);
-    // Seat 2 may use a different decklist. This is not a nicety: every result
-    // in the project was measured in a mirror, and a mirror is exactly the
-    // configuration in which a change that helps one seat and hurts the other
-    // is invisible. The mulligan bug was found by hand precisely because a
-    // mirror could not show it - each seat corrupted the other, the two
-    // effects cancelled, and the ablation reported the broken policy as
-    // "neutral". Without a way to run asymmetric decks, any conclusion that
-    // depends on which seat benefits is unfalsifiable.
-    let nums2 = match options.deck2.as_deref() {
-        Some(other) if other != deck_name => load_deck(other),
-        _ => nums.clone(),
-    };
+    let (nums, nums2) = seat_decklists(
+        deck_name,
+        options.deck2.as_deref(),
+        &|name: &str| load_deck(name),
+        &|name: &str| -> ArenaResult<Vec<String>> {
+            // A missing deck file is a hard error, never a synthesized list:
+            // a typo used to measure a different game than the one named.
+            let path = std::path::Path::new("../web_ui/decks").join(format!("{name}.txt"));
+            if !path.is_file() {
+                return Err(format!(
+                    "unknown decklist {name}; no {}. Available: {}",
+                    path.display(),
+                    std::fs::read_dir("../web_ui/decks")
+                        .map(|entries| {
+                            entries
+                                .filter_map(|e| e.ok())
+                                .map(|e| e.file_name().to_string_lossy().to_string())
+                                .filter(|f| f.ends_with(".txt"))
+                                .collect::<Vec<_>>()
+                                .join(", ")
+                        })
+                        .unwrap_or_default()
+                )
+                .into());
+            }
+            Ok(load_deck(name))
+        },
+    )?;
     eprintln!(
         "ARENA deck={} entries={} distinct={}",
         deck_name,
         nums.len(),
         nums.iter().collect::<std::collections::HashSet<_>>().len()
     );
-    if options.deck2.is_some() && nums2 != nums {
+    if nums2 != nums {
         eprintln!(
             "ARENA deck2={} entries={} distinct={}  (ASYMMETRIC: seat1 and seat2 differ)",
             options.deck2.as_deref().unwrap_or(""),
@@ -1403,7 +1486,7 @@ fn main() -> ArenaResult<()> {
             nums2.iter().collect::<std::collections::HashSet<_>>().len()
         );
     }
-    let (t1, t2) = build_templates(&mut db, &nums, &nums);
+    let (t1, t2) = build_templates(&mut db, &nums, &nums2);
 
     let v2_policy = strategy_v2::V2Policy::default();
 
@@ -2140,6 +2223,42 @@ mod tests {
         assert_ne!(game_seeds(11, 1).0, game_seeds(12, 1).0);
     }
 
+    /// Different base seeds must produce DISJOINT deals, not the same deals
+    /// shifted along.
+    ///
+    /// `game_seeds` used to be `base + game - 1`, which is pure - so the paired
+    /// test worked - and made seed 12 game 1 identical to seed 11 game 2. Three
+    /// "independent" seeds over 400 games therefore covered about 402 distinct
+    /// deals instead of 1200, and every interval computed from them was roughly
+    /// 1.7x too narrow. This is the difference between a held-out seed and a
+    /// relabelled one, and it is invisible in any single run.
+    #[test]
+    fn different_base_seeds_produce_disjoint_deals() {
+        for (a, b) in [(11u32, 12u32), (11, 21), (11, 101), (7, 8)] {
+            let left: std::collections::HashSet<u32> =
+                (1..=200).map(|g| game_seeds(a, g).0).collect();
+            let right: std::collections::HashSet<u32> =
+                (1..=200).map(|g| game_seeds(b, g).0).collect();
+            let overlap = left.intersection(&right).count();
+            assert!(
+                overlap <= 1,
+                "seeds {a} and {b} share {overlap}/200 deals; seeds must be independent samples"
+            );
+        }
+    }
+
+    /// Consecutive games on one seed must not repeat a deal, and must stay in
+    /// the valid non-zero seed range the engine accepts.
+    #[test]
+    fn seeds_are_distinct_within_a_run_and_never_zero() {
+        let mut seen = std::collections::HashSet::new();
+        for g in 1..5000u32 {
+            let (engine, _) = game_seeds(11, g);
+            assert_ne!(engine, 0, "game {g} produced the reserved zero seed");
+            assert!(seen.insert(engine), "game {g} repeated a deal within one seed");
+        }
+    }
+
     /// A paired test is only meaningful on a fixed game count.
     #[test]
     fn paired_mode_requires_a_fixed_game_count() {
@@ -2179,6 +2298,80 @@ mod tests {
 
     fn args(values: &[&str]) -> Vec<String> {
         values.iter().map(|s| s.to_string()).collect()
+    }
+
+    /// `--deck2` must reach the deal, not just the log line.
+    ///
+    /// It did not. The flag was parsed, the second decklist was loaded, stderr
+    /// announced "ASYMMETRIC: seat1 and seat2 differ" - and then seat 2 was
+    /// dealt `nums` again. Every asymmetric result this project has ever
+    /// recorded was therefore a mirror result, labelled otherwise, which is
+    /// the same failure mode as the mulligan bug that hid inside a mirror for
+    /// the project's whole life. The distinction matters: `--deck2` is the one
+    /// tool that can falsify a seat-asymmetric claim, and it was reporting the
+    /// claim rather than the run.
+    ///
+    /// The regression is pinned on the resolver rather than on a call site, so
+    /// the seats cannot be reassigned by a later edit: there is one function
+    /// that produces both lists, it refuses a `--deck2` identical to `--deck`,
+    /// and the deal is built from its output.
+    #[test]
+    fn deck2_reaches_the_second_seat_and_a_mislabelled_mirror_is_refused() {
+        let resolve = |deck: &str, deck2: Option<&str>| {
+            seat_decklists(
+                deck,
+                deck2,
+                &|name: &str| load_deck(name),
+                &|name: &str| -> ArenaResult<Vec<String>> {
+                    // Stands in for the real resolver's file-existence check.
+                    if name == "no such deck" {
+                        return Err(Box::<dyn std::error::Error>::from(format!("no deck {name}")) as _);
+                    }
+                    Ok(load_deck(name))
+                },
+            )
+        };
+        // Absent --deck2 is a mirror, and is the documented default.
+        let (one, two) = resolve("5CP3Z idou", None).unwrap();
+        assert_eq!(one, two);
+        // --deck2 naming the same deck is still a mirror, and must be refused
+        // rather than run under an asymmetric label.
+        assert!(resolve("5CP3Z idou", Some("5CP3Z idou")).is_err());
+        // A different deck must actually produce a different second list. This
+        // is the property the broken call site destroyed.
+        let (one, two) = resolve("5CP3Z idou", Some("aiscream 37PMZ")).unwrap();
+        assert_ne!(one, two);
+        assert_eq!(one, load_deck("5CP3Z idou"));
+        assert_eq!(two, load_deck("aiscream 37PMZ"));
+        // An unknown deck name is an error, not a synthesized list.
+        assert!(resolve("5CP3Z idou", Some("no such deck")).is_err());
+
+        // And the deal itself carries the second list into seat 2.
+        let mut db = fresh_database();
+        let (t1, t2) = build_templates(&mut db, &one, &two);
+        let t2_nos: std::collections::BTreeSet<String> = t2
+            .main_deck
+            .iter()
+            .chain(t2.energy_deck.iter())
+            .filter_map(|&c| db.get_card(c).map(|k| k.card_no.to_string()))
+            .collect();
+        let mut gs = deal_from_templates(&db, &t1, &t2);
+        let p2_nos: std::collections::BTreeSet<String> = gs
+            .player2
+            .main_deck
+            .cards
+            .iter()
+            .chain(gs.player2.energy_deck.cards.iter())
+            .chain(gs.player2.hand.cards.iter())
+            .chain(gs.player2.waitroom.cards.iter())
+            .chain(gs.player2.live_card_zone.cards.iter())
+            .filter_map(|&c| gs.card_database.get_card(c).map(|k| k.card_no.to_string()))
+            .collect();
+        assert!(
+            p2_nos.difference(&t2_nos).next().is_none(),
+            "seat 2 holds a card that is not in the --deck2 list: {p2_nos:?}"
+        );
+        assert!(!p2_nos.is_empty());
     }
 
     #[test]
@@ -2229,9 +2422,11 @@ mod tests {
 
     #[test]
     fn seeds_are_explicit_nonzero_and_wrap() {
-        assert_eq!(game_seeds(1, 1).0, 1);
-        assert_eq!(game_seeds(1, 2).0, 2);
-        assert_eq!(game_seeds(u32::MAX, 2).0, 1);
+        for game in 1..64u32 {
+            for base in [1u32, 11, u32::MAX] {
+                assert_ne!(game_seeds(base, game).0, 0);
+            }
+        }
         assert_ne!(game_seeds(1, 1).1, game_seeds(1, 2).1);
     }
 
@@ -2481,7 +2676,8 @@ mod tests {
         rabuka_engine::rng::seed(17);
         let mut db = fresh_database();
         let nums = load_deck("5CP3Z idou");
-    let (t1, t2) = build_templates(&mut db, &nums, &nums2);
+        let nums2 = load_deck("5CP3Z idou");
+        let (t1, t2) = build_templates(&mut db, &nums, &nums2);
         let mut gs = deal_from_templates(&db, &t1, &t2);
         let mut setup_rng = Lcg(17321);
         for _ in 0..100 {

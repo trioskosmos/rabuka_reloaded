@@ -2,6 +2,7 @@ import re
 from typing import List
 
 from parser_utils import (
+    COUNT_SUFFIXES,
     STATE_CHANGE_PATTERNS,
     _OPTIONAL_RE,
     _SHUFFLE_RE,
@@ -73,7 +74,11 @@ def extract_optional(text: str) -> bool:
 
 
 def extract_max(text: str) -> bool:
-    return any(counter + "まで" in text for counter in ("人", "枚", "つ", "個"))
+    """True when the text caps a count with 「まで」 (up to N)."""
+    return any(counter + "まで" in text for counter in COUNT_SUFFIXES)
+
+
+_EXCLUDE_SUFFIX = "以外"
 
 
 def _quoted_names(text: str) -> List[str]:
@@ -81,15 +86,18 @@ def _quoted_names(text: str) -> List[str]:
 
 
 def _split_include_exclude_chars(text):
+    """Split 「name」 quotes into the ones a filter keeps and the 以外 ones it drops.
+
+    「X」以外 names something the effect skips; every other 「X」 names
+    something it applies to. The closing bracket is always present, because the
+    name came out of the same text.
+    """
     include_chars = []
     exclude_chars = []
     for name in _quoted_names(text):
-        marker = f"「{name}」"
-        idx = text.find(marker)
-        if idx >= 0:
-            after = text[idx + len(marker) : idx + len(marker) + 3]
-            destination = exclude_chars if after.startswith("以外") else include_chars
-            destination.append(name)
+        tail = text.split(f"「{name}」", 1)[1]
+        destination = exclude_chars if tail.startswith(_EXCLUDE_SUFFIX) else include_chars
+        destination.append(name)
     return include_chars, exclude_chars
 
 

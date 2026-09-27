@@ -56,7 +56,7 @@
 //! - `V8_DEBUG` - decision table on stderr (UNTRACED runs only; logging
 //!   perturbs allocation layout and changes outcomes, section 8.4).
 
-use crate::bot::strategy_common::{acc_add, emit_mulligan, Acc};
+use crate::bot::strategy_common::{emit_mulligan, Acc};
 use crate::card::{CardDatabase, CardType};
 use crate::game_setup::Action;
 use crate::game_state::GameState;
@@ -106,137 +106,13 @@ pub fn choose_live_set_v8_entry(gs: &GameState, actions: &[Action], db: &CardDat
 
 // ── Mulligan: a three-turn forward evaluation of every legal opening ─────
 
-/// Hypothetical board after a prefix of our own Main phases.
-struct Opening {
-    hearts: Acc,
-    blades: i32,
-    stage: [i32; 3],
-    budget: i32,
-    hand: Vec<i16>,
-    /// Cards the mulligan redraws into hand, in resolution order. They are
-    /// part of the hand BEFORE turn 1, which is the whole point: without them
-    /// a replacement can only ever look like a loss, and the search degenerates
-    /// into "keep every card".
-    redraw: Vec<i16>,
-    deck: Vec<i16>,
-    deck_cursor: usize,
-    lives_kept: usize,
-}
-
-impl Opening {
-    fn new(me_energy: i32) -> Self {
-        Self {
-            hearts: [0; 11],
-            blades: 0,
-            stage: [0; 3],
-            budget: me_energy,
-            hand: Vec::new(),
-            redraw: Vec::new(),
-            deck: Vec::new(),
-            deck_cursor: 0,
-            lives_kept: 0,
-        }
-    }
-
-    fn add_card(&mut self, db: &CardDatabase, cid: i16) {
-        let Some(card) = db.get_card(cid) else {
-            return;
-        };
-        match card.card_type {
-            CardType::Member => {
-                self.hand.push(cid);
-            }
-            CardType::Energy => {
-                // Energy is a budget unit; +1 is exactly what it buys.
-                self.budget += 1;
-            }
-            CardType::Live => {
-                self.lives_kept += 1;
-            }
-        }
-    }
-
-    /// One of our Main phases: energy phase, draw phase, best affordable
-    /// member deploy.
-    fn step(&mut self, db: &CardDatabase) {
-        self.budget += 1; // rule 7.5
-        if let Some(cid) = self.deck.get(self.deck_cursor).copied() {
-            self.deck_cursor += 1;
-            if db
-                .get_card(cid)
-                .is_some_and(|c| c.card_type == CardType::Member)
-            {
-                self.hand.push(cid);
-            }
-        }
-        let discount = self.stage.iter().copied().max().unwrap_or(0);
-        let has_occupied = discount > 0;
-        let baton_slot = self
-            .stage
-            .iter()
-            .enumerate()
-            .filter(|(_, c)| **c > 0)
-            .min_by_key(|(_, c)| **c)
-            .map(|(i, _)| i);
-        let free_slot = self.stage.iter().position(|c| *c == 0);
-
-        let mut choice: Option<(usize, i32)> = None;
-        for (i, &cid) in self.hand.iter().enumerate() {
-            let Some(card) = db.get_card(cid) else {
-                continue;
-            };
-            let cost = i32::from(card.cost.unwrap_or(0));
-            if cost <= 0 {
-                continue;
-            }
-            let effective = if has_occupied {
-                cost.saturating_sub(discount)
-            } else if free_slot.is_some() {
-                cost
-            } else {
-                continue;
-            };
-            if effective > self.budget {
-                continue;
-            }
-            if choice.is_none_or(|(_, best)| cost > best) {
-                choice = Some((i, cost));
-            }
-        }
-        let Some((index, cost)) = choice else {
-            return;
-        };
-        let cid = self.hand.remove(index);
-        if let Some(card) = db.get_card(cid) {
-            if let Some(base) = &card.base_heart {
-                acc_add(&mut self.hearts, &base.hearts);
-            }
-            self.blades += i32::from(card.blade);
-        }
-        let slot = if has_occupied {
-            baton_slot.unwrap_or(0)
-        } else {
-            free_slot.unwrap_or(0)
-        };
-        if let Some(cell) = self.stage.get_mut(slot) {
-            *cell = cost;
-        }
-        self.budget -= if has_occupied {
-            cost.saturating_sub(discount)
-        } else {
-            cost
-        };
-    }
-}
-
 /// `P(we place at the next check)` for the best life in the kept hand, using
 /// the same closed-form estimate as the Main phase.
 fn opening_place(
-    opening: &Opening,
+    opening: &v8_model::Forward,
     gs: &GameState,
     me: u8,
     lives: &[(i32, Acc)],
-    density: f64,
 ) -> f64 {
     let db = &gs.card_database;
     let opp = super::v8_model::OppModel::build(gs, me, db);
@@ -244,8 +120,12 @@ fn opening_place(
     lives
         .iter()
         .map(|(score, need)| {
-            let p_pass =
-                v8_model::pass_estimate_from_supply(&opening.hearts, opening.blades, density, need);
+            let p_pass = v8_model::pass_estimate_from_supply(
+                &opening.hearts,
+                opening.blades,
+                opening.density,
+                need,
+            );
             v8_model::check_outcome(p_pass, score + yell, 1, 0, &opp).p_place
         })
         .fold(0.0f64, f64::max)
@@ -259,6 +139,14 @@ fn opening_place(
 /// - which the first draft did - makes "keep every card" the argmax of every
 /// search, and v8 replaced 1.24 cards against v4's 2.00. Our own deck is fair
 /// information (section 9), so the redraw is taken from its top in order.
+///
+/// The walk itself is [`v8_model::Forward`], the same one the Main-phase leaf
+/// runs. It used to be a second copy written next to it, and the two copies
+/// disagreed about baton touches: this one overwrote the stage slot without
+/// moving the sent member's blades out of the active set or its hearts into the
+/// pool, so it over-counted blades and under-counted hearts by one member for
+/// every step of the ladder, and the error grew with the depth of the walk this
+/// function takes. One walk, one answer.
 fn opening_value(
     db: &CardDatabase,
     gs: &GameState,
@@ -268,21 +156,20 @@ fn opening_value(
     energy: i32,
     density: f64,
 ) -> f64 {
-    let mut opening = Opening::new(energy);
-    // Our own deck is fair information; assume the draws come from it in the
-    // order the guides' curve wants (best affordable first).
-    opening.deck = gs.seat_player(me).main_deck.cards.to_vec();
-    for &cid in keep {
-        opening.add_card(db, cid);
-    }
-    for (n, _cid) in discarded.iter().enumerate() {
-        if let Some(drawn) = opening.deck.get(n).copied() {
-            opening.redraw.push(drawn);
-            opening.add_card(db, drawn);
-        }
-    }
-    let mut lives: Vec<(i32, Acc)> = keep
+    let mut opening = v8_model::Forward::from_opening(
+        db,
+        energy,
+        gs.seat_player(me).main_deck.cards.to_vec(),
+        keep,
+        discarded,
+    );
+    opening.density = density;
+    // A kept life and a REDRAWN life are both in hand at turn 1, so both are
+    // settable ammunition and both belong in the check the opening is scored
+    // against. A replacement that draws a life is worth a replacement.
+    let lives: Vec<(i32, Acc)> = keep
         .iter()
+        .chain(opening.redraw.iter())
         .filter_map(|&cid| {
             let card = db.get_card(cid)?;
             if card.card_type != CardType::Live {
@@ -295,22 +182,11 @@ fn opening_value(
             Some((score, need))
         })
         .collect();
-    // A redrawn life is ammunition too, and it has to be scored as one.
-    for &cid in &opening.redraw {
-        if let Some(card) = db.get_card(cid) {
-            if card.card_type == CardType::Live {
-                let need = v8_model::life_need(gs, cid);
-                if !v8_model::has_unpassable_icon(&need) {
-                    lives.push((v8_model::printed_score(db, cid), need));
-                }
-            }
-        }
-    }
 
     // Five snapshots: the opening board plus one per Main phase of T1..T4.
     let mut snapshots: Vec<f64> = Vec::with_capacity(5);
     for _ in 0..5 {
-        snapshots.push(opening_place(&opening, gs, me, &lives, density));
+        snapshots.push(opening_place(&opening, gs, me, &lives));
         opening.step(db);
     }
     // Placement by T3, plus the gain the following turn's development unlocks,
@@ -318,7 +194,7 @@ fn opening_value(
     // `v8_main::leaf_value`, so the opening and the play agree on units.
     let place_3 = snapshots[3];
     let place_4 = snapshots[4];
-    SCALE * (place_3 + (place_4 - place_3)) + SCALE * PLACEMENT_CREDIT * opening.lives_kept as f64
+    SCALE * (place_3 + (place_4 - place_3)) + SCALE * PLACEMENT_CREDIT * opening.lives as f64
 }
 
 /// Which hand indices to DISCARD. The engine permits zero through six
@@ -404,3 +280,15 @@ pub use choose_action_v8_entry as choose_action;
 pub use choose_live_set_v8_entry as choose_live_set;
 pub use choose_mulligan_v8 as choose_mulligan;
 pub use score_actions_v8 as score_actions;
+
+pub use super::v8_live::LivePrediction;
+
+/// The live-set decision's own numbers, for offline calibration against engine
+/// outcomes. Recomputes the argmax from the same inputs and reads no hidden
+/// state, so calling it cannot change a game.
+pub fn predict_live_set_v8(
+    gs: &GameState,
+    db: &CardDatabase,
+) -> Option<LivePrediction> {
+    super::v8_live::predict_live_set(gs, db)
+}

@@ -2536,6 +2536,306 @@ impl<'a> ConditionContext<'a> {
             && self.game_state.has_card_appeared_this_turn(cid)
     }
 
+    /// Cost-limit gate: does any card on the stage have a cost satisfying the
+    /// condition's `cost_limit` under its `operator`? (e.g. 「コスト10のメンバー」)
+    ///
+    /// An operator this engine does not know leaves the gate open, matching the
+    /// cost-threshold checks elsewhere: a parser gap must not silently disable
+    /// the ability.
+    fn stage_satisfies_cost_limit(&self, condition: &Condition, stage_ids: &[i16]) -> bool {
+        let Some(cost_limit) = condition.get_cost_limit() else {
+            return true;
+        };
+        let operator = condition.get_operator().unwrap_or("=");
+        let met = stage_ids.iter().any(|&cid| {
+            self.game_state
+                .card_database
+                .get_card(cid)
+                .and_then(|c| c.cost)
+                .and_then(|cost| util::compare_with_operator(operator, cost, cost_limit))
+                .unwrap_or(false)
+        });
+        if !met {
+            log::debug!(
+                "[APPEARANCE] cost_limit unmet limit={} operator={:?} stage={:?}",
+                cost_limit,
+                operator,
+                stage_ids
+            );
+        }
+        met
+    }
+
+    /// Card-type gate: does any card on the stage have the required type?
+    /// (e.g. 「メンバー」 → member_card)
+    fn stage_has_card_type(&self, condition: &Condition, stage_ids: &[i16]) -> bool {
+        let Some(ref card_type) = condition.get_card_type() else {
+            return true;
+        };
+        stage_ids.iter().any(|&cid| {
+            util::card_matches_type(
+                &self.game_state.card_database,
+                cid,
+                Some(card_type.as_str()),
+            )
+        })
+    }
+
+    /// Is appearance tracking still populated? Once it has been cleared the
+    /// ability was queued by the trigger event, so the "did this card appear
+    /// this turn" refinements are skipped.
+    fn tracks_appearances(&self) -> bool {
+        !self.game_state.cards_appeared_this_turn.is_empty()
+    }
+
+    /// Does any card on the stage that matches `matches_group` and appeared this
+    /// turn satisfy `exclude_activating`?
+    fn some_appeared_matching(
+        &self,
+        matches_group: &dyn Fn(i16) -> bool,
+        stage_ids: &[i16],
+        exclude_activating: bool,
+    ) -> bool {
+        stage_ids.iter().any(|&cid| {
+            matches_group(cid)
+                && (!exclude_activating
+                    || self
+                        .activating_card_id
+                        .map_or(true, |act_id| cid != act_id))
+                && self.game_state.has_card_appeared_this_turn(cid)
+        })
+    }
+
+    /// Group gate for an appearance condition.
+    ///
+    /// Three things are checked, in order: some card on the stage is in the
+    /// group (every slot, when the condition demands all areas); the matching
+    /// card itself appeared this turn, because the first check only proves SOME
+    /// stage card is in the group; and, when the condition excludes self, the
+    /// match is not the activating card alone on its own appearance. Baton-touch
+    /// appearances legitimately trigger on the activating card, so the last two
+    /// are skipped then.
+    fn stage_satisfies_groups(
+        &self,
+        condition: &Condition,
+        stage_ids: &[i16],
+        baton_touch_trigger: bool,
+        push_rich: &dyn Fn(&str, bool),
+    ) -> bool {
+        let Some(groups) = condition.get_group_names() else {
+            return true;
+        };
+        if groups.is_empty() {
+            return true;
+        }
+        let card_db = &self.game_state.card_database;
+        let matches_group = |cid: i16| -> bool {
+            groups.iter().any(|g| {
+                crate::ability::util::card_matches_group_str(card_db, cid, Some(g))
+            })
+        };
+        let met = if condition.get_all_areas().unwrap_or(false) {
+            stage_ids.iter().all(|&cid| matches_group(cid))
+        } else {
+            stage_ids.iter().any(|&cid| matches_group(cid))
+        };
+        if !met {
+            push_rich(&format!("グループ不一致: {:?}", groups), false);
+            return false;
+        }
+        if baton_touch_trigger || !self.tracks_appearances() {
+            return true;
+        }
+        if !self.some_appeared_matching(&matches_group, stage_ids, false) {
+            push_rich("該当グループ未登場", false);
+            return false;
+        }
+        if condition.get_exclude_self().unwrap_or(false)
+            && !self.some_appeared_matching(&matches_group, stage_ids, true)
+        {
+            push_rich("自カードのみ登場", false);
+            return false;
+        }
+        true
+    }
+
+    /// Position-and-name gate: every 「<name>@<position>」 entry must name the
+    /// card actually standing in that slot.
+    fn stage_satisfies_positioned_characters(
+        &self,
+        condition: &Condition,
+        player: &crate::player::Player,
+        push_rich: &dyn Fn(&str, bool),
+    ) -> bool {
+        let Some(pos_chars) = condition.get_positions_characters() else {
+            return true;
+        };
+        log::debug!(
+            "[POSCHARS] checking {} entries: {:?}",
+            pos_chars.len(),
+            pos_chars
+                .iter()
+                .map(|p| format!("{}@{}", p.character, p.position))
+                .collect::<Vec<_>>()
+        );
+        for pc in pos_chars {
+            // stage_position_index is the single place that knows which
+            // spellings mean which slot, so this reads positions exactly the
+            // way the `position` gate does.
+            let Some(pos_idx) = util::stage_position_index(&pc.position) else {
+                push_rich(&format!("不明な位置: {}", pc.position), false);
+                return false;
+            };
+            let Some(&card_id) = player.stage.stage.get(pos_idx) else {
+                push_rich(&format!("不明な位置: {}", pc.position), false);
+                return false;
+            };
+            if card_id == -1 {
+                push_rich(&format!("{}にカードなし", pc.position), false);
+                return false;
+            }
+            let card_name = self
+                .game_state
+                .card_database
+                .get_card(card_id)
+                .map(|c| crate::card::CardDatabase::normalize_name(&c.name));
+            let wanted = crate::card::CardDatabase::normalize_name(&pc.character);
+            match card_name {
+                Some(ref name) if name.contains(&wanted) => {}
+                _ => {
+                    push_rich(
+                        &format!(
+                            "{}に{}不在(実際={:?})",
+                            pc.position, pc.character, card_name
+                        ),
+                        false,
+                    );
+                    return false;
+                }
+            }
+        }
+        true
+    }
+
+    /// The cost of the first card on the stage whose name contains `name`.
+    fn stage_cost_of_name(&self, stage_ids: &[i16], name: &str) -> Option<u8> {
+        let wanted = crate::card::CardDatabase::normalize_name(name);
+        stage_ids.iter().find_map(|&cid| {
+            let card = self.game_state.card_database.get_card(cid)?;
+            let norm_name = crate::card::CardDatabase::normalize_name(&card.name);
+            norm_name.contains(&wanted).then_some(card.cost)?
+        })
+    }
+
+    /// Character gate: every named character must be on the stage. When the
+    /// condition also names a reference character, the two costs are compared.
+    fn stage_satisfies_characters(
+        &self,
+        condition: &Condition,
+        stage_ids: &[i16],
+        push_rich: &dyn Fn(&str, bool),
+    ) -> bool {
+        let chars = condition.get_characters().unwrap_or_default();
+        if chars.is_empty() {
+            let r = !stage_ids.is_empty();
+            push_rich(&format!("ステージ在籍={}", stage_ids.len()), r);
+            return r;
+        }
+        let stage_card_names: Vec<String> = stage_ids
+            .iter()
+            .filter_map(|&cid| {
+                self.game_state
+                    .card_database
+                    .get_card(cid)
+                    .map(|c| crate::card::CardDatabase::normalize_name(&c.name))
+            })
+            .collect();
+        log::debug!("[APPEARANCE] stage card names: {:?}", stage_card_names);
+        let present = chars.iter().all(|name| {
+            let norm = crate::card::CardDatabase::normalize_name(name);
+            stage_card_names.iter().any(|cname| cname.contains(&norm))
+        });
+        log::debug!("[APPEARANCE] result={}", present);
+        if !present {
+            push_rich(
+                &format!(
+                    "キャラ不在: 期待={:?}, 在籍=[{}]",
+                    chars,
+                    stage_card_names.join(", ")
+                ),
+                false,
+            );
+            return false;
+        }
+        match condition.get_cost_reference_character() {
+            Some(ref_char) => {
+                let subject = chars[0].as_str();
+                let subject_cost = self.stage_cost_of_name(stage_ids, subject);
+                let ref_cost = self.stage_cost_of_name(stage_ids, ref_char);
+                let op = condition
+                    .get_cost_reference_operator()
+                    .map(|o| o.as_str())
+                    .unwrap_or(">");
+                // A missing cost on either side is not a comparison that failed.
+                let ok = match (subject_cost, ref_cost) {
+                    (Some(sc), Some(rc)) => {
+                        util::compare_with_operator(op, sc, rc).unwrap_or(false)
+                    }
+                    _ => false,
+                };
+                log::debug!(
+                    "[APPEARANCE] cost_compare: subject={} cost={:?} ref={} cost={:?} op={} ok={}",
+                    subject,
+                    subject_cost,
+                    ref_char,
+                    ref_cost,
+                    op,
+                    ok
+                );
+                push_rich(
+                    &format!(
+                        "{}({}) {} {}({}) → {}",
+                        subject,
+                        subject_cost.unwrap_or(0),
+                        if ok { "成立" } else { "不成立" },
+                        ref_char,
+                        ref_cost.unwrap_or(0),
+                        if ok { "成立" } else { "不成立" }
+                    ),
+                    ok,
+                );
+                ok
+            }
+            None => {
+                push_rich(&format!("全キャラ在籍: {:?}", chars), true);
+                true
+            }
+        }
+    }
+
+    /// Card-property gate over the cards moved this turn, honouring the
+    /// condition's `negation`. Only meaningful when the stage is occupied.
+    fn stage_satisfies_card_property(&self, condition: &Condition) -> bool {
+        if self.moved_cards.is_empty() {
+            return true;
+        }
+        let Some(ref prop) = condition.get_card_property() else {
+            return true;
+        };
+        let has_prop = self.moved_cards.iter().any(|&cid| {
+            self.game_state
+                .card_database
+                .get_card(cid)
+                .is_some_and(|c| match *prop {
+                    CardProperty::HasBladeHeart => c.has_blade_heart(),
+                    CardProperty::HasScoreIcon => c.has_score_icon(),
+                    CardProperty::HasAllBlade => c.has_all_blade(),
+                })
+        });
+        let negated = condition.get_negation().unwrap_or(false);
+        negated != has_prop
+    }
+
     #[allow(clippy::too_many_arguments)]
     fn evaluate_appearance_stage(
         &self,
@@ -2588,86 +2888,19 @@ impl<'a> ConditionContext<'a> {
         }
         // Check cost_limit if specified (e.g. コスト10のメンバー)
         if let Some(cost_limit) = condition.get_cost_limit() {
-            let operator = condition.get_operator().unwrap_or("=");
-            let cost_match = stage_ids.iter().any(|&cid| {
-                self.game_state
-                    .card_database
-                    .get_card(cid)
-                    .and_then(|c| c.cost)
-                    .map_or(false, |cost| match operator {
-                        ">=" => cost >= cost_limit,
-                        "<=" => cost <= cost_limit,
-                        ">" => cost > cost_limit,
-                        "<" => cost < cost_limit,
-                        "!=" => cost != cost_limit,
-                        _ => cost == cost_limit,
-                    })
-            });
-            if !cost_match {
+            if !self.stage_satisfies_cost_limit(condition, stage_ids) {
                 push_rich(&format!("コスト不一致(limit={})", cost_limit), false);
                 return false;
             }
         }
-        // Check card_type if specified (e.g. メンバー → member_card)
         if let Some(ref ct) = condition.get_card_type() {
-            if !stage_ids.iter().any(|&cid| {
-                util::card_matches_type(&self.game_state.card_database, cid, Some(ct.as_str()))
-            }) {
+            if !self.stage_has_card_type(condition, stage_ids) {
                 push_rich(&format!("カード種別不一致(type={})", ct.as_str()), false);
                 return false;
             }
         }
-        if let Some(ref groups) = condition.get_group_names() {
-            if !groups.is_empty() {
-                let card_db = &self.game_state.card_database;
-                let all_areas = condition.get_all_areas().unwrap_or(false);
-                let match_fn = |cid: i16| -> bool {
-                    groups.iter().any(|g| {
-                        crate::ability::util::card_matches_group_str(card_db, cid, Some(g))
-                    })
-                };
-                let ok = if all_areas {
-                    stage_ids.iter().all(|&cid| match_fn(cid))
-                } else {
-                    stage_ids.iter().any(|&cid| match_fn(cid))
-                };
-                if !ok {
-                    push_rich(&format!("グループ不一致: {:?}", groups), false);
-                    return false;
-                }
-                // Verify that an appeared card matches the group filter.
-                // The group check above ensures SOME card on stage belongs
-                // to the group, but the appearance trigger should only fire
-                // when a card THAT actually appeared this turn matches the group.
-                // If appearance tracking is cleared (resolution time), accept
-                // — the ability was already queued by the trigger event.
-                if !baton_touch_trigger && !self.game_state.cards_appeared_this_turn.is_empty() {
-                    let has_appeared_matching = stage_ids.iter().any(|&cid| {
-                        match_fn(cid) && self.game_state.has_card_appeared_this_turn(cid)
-                    });
-                    if !has_appeared_matching {
-                        push_rich("該当グループ未登場", false);
-                        return false;
-                    }
-                }
-                // Prevent self-trigger on own appearance when the condition
-                // explicitly excludes self (e.g. "ほかのメンバー" / exclude_self).
-                // baton_touch appearances legitimately trigger on the activating card.
-                if !baton_touch_trigger
-                    && !self.game_state.cards_appeared_this_turn.is_empty()
-                    && condition.get_exclude_self().unwrap_or(false)
-                {
-                    let has_other_matching = stage_ids.iter().any(|&cid| {
-                        match_fn(cid)
-                            && self.activating_card_id.map_or(true, |act_id| cid != act_id)
-                            && self.game_state.has_card_appeared_this_turn(cid)
-                    });
-                    if !has_other_matching {
-                        push_rich("自カードのみ登場", false);
-                        return false;
-                    }
-                }
-            }
+        if !self.stage_satisfies_groups(condition, stage_ids, baton_touch_trigger, push_rich) {
+            return false;
         }
         // activation_position: independent position requirement for the
         // activating card itself (e.g. "center" means ability only works
@@ -2735,156 +2968,16 @@ impl<'a> ConditionContext<'a> {
             condition.get_characters().map(|v| v.len()),
             condition.condition_type()
         );
-        if let Some(pos_chars) = condition.get_positions_characters() {
-            log::debug!(
-                "[POSCHARS] checking {} entries: {:?}",
-                pos_chars.len(),
-                pos_chars
-                    .iter()
-                    .map(|p| format!("{}@{}", p.character, p.position))
-                    .collect::<Vec<_>>()
-            );
-            for pc in pos_chars {
-                let pos_idx = match pc.position.as_str() {
-                    "left_side" => 0,
-                    "center" => 1,
-                    "right_side" => 2,
-                    _ => {
-                        push_rich(&format!("不明な位置: {}", pc.position), false);
-                        return false;
-                    }
-                };
-                let card_id = player.stage.stage[pos_idx];
-                if card_id == -1 {
-                    push_rich(&format!("{}にカードなし", pc.position), false);
-                    return false;
-                }
-                let card_name = self
-                    .game_state
-                    .card_database
-                    .get_card(card_id)
-                    .map(|c| crate::card::CardDatabase::normalize_name(&c.name));
-                let norm_char = crate::card::CardDatabase::normalize_name(&pc.character);
-                match card_name {
-                    Some(ref name) if name.contains(&norm_char) => {}
-                    _ => {
-                        push_rich(
-                            &format!(
-                                "{}に{}不在(実際={:?})",
-                                pc.position, pc.character, card_name
-                            ),
-                            false,
-                        );
-                        return false;
-                    }
-                }
-            }
+        if !self.stage_satisfies_positioned_characters(condition, player, push_rich) {
+            return false;
         }
-        if let Some(ref chars) = condition.get_characters() {
+        if condition.get_characters().is_some() {
             log::debug!(
                 "[APPEARANCE] checking characters: {:?} against stage_ids={:?}",
-                chars,
+                condition.get_characters(),
                 stage_ids
             );
-            if chars.is_empty() {
-                let r = !stage_ids.is_empty();
-                push_rich(&format!("ステージ在籍={}", stage_ids.len()), r);
-                return r;
-            }
-            let stage_card_names: Vec<String> = stage_ids
-                .iter()
-                .filter_map(|&cid| {
-                    self.game_state
-                        .card_database
-                        .get_card(cid)
-                        .map(|c| crate::card::CardDatabase::normalize_name(&c.name))
-                })
-                .collect();
-            log::debug!("[APPEARANCE] stage card names: {:?}", stage_card_names);
-            let result = chars.iter().all(|name| {
-                let norm = crate::card::CardDatabase::normalize_name(name);
-                stage_card_names.iter().any(|cname| cname.contains(&norm))
-            });
-            log::debug!("[APPEARANCE] result={}", result);
-            if !result {
-                let names = stage_card_names.join(", ");
-                push_rich(
-                    &format!("キャラ不在: 期待={:?}, 在籍=[{}]", chars, names),
-                    false,
-                );
-                return false;
-            }
-            if let Some(ref ref_char) = condition.get_cost_reference_character() {
-                let subject = chars[0].as_str();
-                let norm_subject = crate::card::CardDatabase::normalize_name(subject);
-                let subject_cost = stage_ids
-                    .iter()
-                    .filter_map(|&cid| {
-                        let card = self.game_state.card_database.get_card(cid)?;
-                        let norm_name = crate::card::CardDatabase::normalize_name(&card.name);
-                        if norm_name.contains(&norm_subject) {
-                            card.cost
-                        } else {
-                            None
-                        }
-                    })
-                    .next();
-                let norm_ref = crate::card::CardDatabase::normalize_name(ref_char);
-                let ref_cost = stage_ids
-                    .iter()
-                    .filter_map(|&cid| {
-                        let card = self.game_state.card_database.get_card(cid)?;
-                        let norm_name = crate::card::CardDatabase::normalize_name(&card.name);
-                        if norm_name.contains(&norm_ref) {
-                            card.cost
-                        } else {
-                            None
-                        }
-                    })
-                    .next();
-                let op = condition
-                    .get_cost_reference_operator()
-                    .map(|o| o.as_str())
-                    .unwrap_or(">");
-                let ok = match (subject_cost, ref_cost) {
-                    (Some(sc), Some(rc)) if op == ">" => sc > rc,
-                    (Some(sc), Some(rc)) if op == ">=" => sc >= rc,
-                    (Some(sc), Some(rc)) if op == "<" => sc < rc,
-                    (Some(sc), Some(rc)) if op == "<=" => sc <= rc,
-                    _ => false,
-                };
-                log::debug!(
-                    "[APPEARANCE] cost_compare: subject={} cost={:?} ref={} cost={:?} op={} ok={}",
-                    subject,
-                    subject_cost,
-                    ref_char,
-                    ref_cost,
-                    op,
-                    ok
-                );
-                let _cost_actual = match (subject_cost, ref_cost) {
-                    (Some(sc), Some(rc)) => format!("{} {} {}", sc, op, rc),
-                    (Some(sc), None) => format!("{} {} ?", sc, op),
-                    (None, Some(rc)) => format!("? {} {}", op, rc),
-                    (None, None) => format!("コスト未取得"),
-                };
-                push_rich(
-                    &format!(
-                        "{}({}) {} {}({}) → {}",
-                        subject,
-                        subject_cost.unwrap_or(0),
-                        if ok { "成立" } else { "不成立" },
-                        ref_char,
-                        ref_cost.unwrap_or(0),
-                        if ok { "成立" } else { "不成立" }
-                    ),
-                    ok,
-                );
-                ok
-            } else {
-                push_rich(&format!("全キャラ在籍: {:?}", chars), true);
-                true
-            }
+            return self.stage_satisfies_characters(condition, stage_ids, push_rich);
         } else {
             if let Some(expected_source) = condition.get_appearance_source() {
                 let card_to_check = self.activating_card_id;
@@ -2908,25 +3001,10 @@ impl<'a> ConditionContext<'a> {
                 .join(", ");
             push_rich(&format!("在籍キャラ: [{}]", names), true);
             let stage_occupied = !stage_ids.is_empty();
-            if stage_occupied {
-                if let Some(ref prop) = condition.get_card_property() {
-                    if !self.moved_cards.is_empty() {
-                        let has_prop = self.moved_cards.iter().any(|&cid| {
-                            self.game_state
-                                .card_database
-                                .get_card(cid)
-                                .is_some_and(|c| match *prop {
-                                    CardProperty::HasBladeHeart => c.has_blade_heart(),
-                                    CardProperty::HasScoreIcon => c.has_score_icon(),
-                                    CardProperty::HasAllBlade => c.has_all_blade(),
-                                })
-                        });
-                        if condition.get_negation().unwrap_or(false) == has_prop {
-                            push_rich(&format!("card_property={} unmet", prop.as_str()), false);
-                            return false;
-                        }
-                    }
-                }
+            if stage_occupied && !self.stage_satisfies_card_property(condition) {
+                let prop = condition.get_card_property().unwrap();
+                push_rich(&format!("card_property={} unmet", prop.as_str()), false);
+                return false;
             }
             stage_occupied
         }
@@ -3191,14 +3269,10 @@ impl<'a> ConditionContext<'a> {
             .count()
             .u8_count();
 
-        match operator {
-            "=" => match_count == count_needed,
-            ">=" => match_count >= count_needed,
-            "<=" => match_count <= count_needed,
-            ">" => match_count > count_needed,
-            "<" => match_count < count_needed,
-            _ => match_count >= count_needed,
-        }
+        // An operator we do not know is a parser gap, not a count that fell
+        // short, so it falls back to ">=", which is what this gate defaulted to.
+        crate::ability::util::compare_with_operator(operator, match_count, count_needed)
+            .unwrap_or(match_count >= count_needed)
     }
 
     pub(crate) fn zone_len(&self, player: &crate::player::Player, location: &str) -> u8 {

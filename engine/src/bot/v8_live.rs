@@ -592,6 +592,105 @@ pub fn choose_live_set_v8(gs: &GameState, actions: &[Action], db: &CardDatabase)
     emit_live_set(gs, actions, &desired)
 }
 
+// ── Introspection: what the live-set decision PREDICTED ──────────────────
+
+/// What the live-set decision predicted for one check, in the same numbers the
+/// decision used, exposed for offline calibration against engine outcomes.
+///
+/// This exists because every claim about v8's live set has been an aggregate.
+/// Win rate, fold rate and pace all say *that* the live set is leaving
+/// placements on the table; none of them say whether the model is
+/// **mis-calibrated** - i.e. whether a candidate the model scored 0.7 passes
+/// only 45% of the time. That distinction decides what to fix. If `p_place` is
+/// well calibrated and pace is still 0.42, the model is right and the game is
+/// genuinely contested, and the fix is development. If `p_place` is
+/// systematically optimistic or pessimistic, the argmax is ranking candidates
+/// on a lie and the fix is the model - and no amount of development work will
+/// show up.
+///
+/// A prediction is a pure function of the decision, so this cannot perturb the
+/// game: it recomputes the same argmax from the same inputs and reads no hidden
+/// state.
+#[derive(Clone, Debug)]
+pub struct LivePrediction {
+    /// Hand indices of the lives in the chosen zone, and of the junk.
+    pub lives: Vec<usize>,
+    pub junk: Vec<usize>,
+    pub p_pass: f64,
+    pub p_place: f64,
+    pub opp_place: f64,
+    pub value: f64,
+    pub opp_pass: f64,
+    pub opp_set_size: usize,
+    pub my_success: usize,
+    pub opp_success: usize,
+    pub n_lives_in_hand: usize,
+    pub n_candidates: usize,
+    /// The best candidate that was NOT chosen: `(hand indices, value, p_place)`.
+    /// The gap between this and the chosen value is the decision's margin, and
+    /// a decision taken on a margin of 0.001 is a decision taken on sampling
+    /// noise.
+    pub runner_up: Option<(Vec<usize>, f64, f64)>,
+    /// Total heart supply on our board, and the requirement the chosen zone
+    /// actually had to clear. The two together are what `p_pass` is a
+    /// probability OF, so a calibration report can be sliced by how far short
+    /// the board actually fell rather than only by the model's own guess.
+    pub board_hearts: i32,
+    pub need_hearts: i32,
+}
+
+/// Recompute the live-set decision and report what it believed, without
+/// emitting anything. `None` when the set phase is suppressed outright.
+pub fn predict_live_set(gs: &GameState, db: &CardDatabase) -> Option<LivePrediction> {
+    let me = gs.active_player_index();
+    let p = gs.seat_player(me);
+    if p.live_card_set_limit_reduction >= 3 || gs.cannot_live_players.contains(&p.id) {
+        return None;
+    }
+    let (candidates, opp) = score_candidates(gs, me, db);
+    let best = candidates
+        .iter()
+        .fold(None::<&Candidate>, |acc, cand| match acc {
+            None => Some(cand),
+            Some(current) if better(cand, current) => Some(cand),
+            keep => keep,
+        })?
+        .clone();
+    let runner_up = candidates
+        .iter()
+        .filter(|c| c.lives != best.lives || c.junk != best.junk)
+        .max_by(|a, b| a.value.partial_cmp(&b.value).unwrap_or(std::cmp::Ordering::Equal))
+        .map(|c| (c.lives.clone(), c.value, c.outcome.p_place));
+    let need_hearts: i32 = best
+        .lives
+        .iter()
+        .filter_map(|&i| p.hand.cards.get(i).copied())
+        .map(|cid| v8_model::life_need(gs, cid))
+        .map(|need| need.iter().copied().filter(|&n| n > 0).sum::<i32>())
+        .sum();
+    let board_hearts: i32 = v8_model::board_supply(gs, me, db)
+        .iter()
+        .filter(|&&n| n > 0)
+        .sum();
+    Some(LivePrediction {
+        lives: best.lives.clone(),
+        junk: best.junk.clone(),
+        p_pass: best.outcome.p_pass,
+        p_place: best.outcome.p_place,
+        opp_place: best.outcome.opp_place,
+        value: best.value,
+        opp_pass: opp.pass_prob,
+        opp_set_size: opp.set_size,
+        my_success: p.success_live_card_zone.cards.len(),
+        opp_success: opp.success,
+        n_lives_in_hand: collect_lives(gs, me, db).len(),
+        n_candidates: candidates.len(),
+        runner_up,
+        board_hearts,
+        need_hearts,
+    })
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

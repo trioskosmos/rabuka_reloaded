@@ -437,15 +437,9 @@ fn cost_threshold_met(card: &crate::card::Card, effect: &crate::card::AbilityEff
     ) {
         (Some(threshold), Some(op)) => {
             let cost = card.cost.unwrap_or(0);
-            let met = match op {
-                ">=" => cost >= threshold,
-                "<=" => cost <= threshold,
-                ">" => cost > threshold,
-                "<" => cost < threshold,
-                "==" => cost == threshold,
-                "!=" => cost != threshold,
-                _ => true,
-            };
+            // An operator we do not know is a parser gap, not a threshold that
+            // failed, so it accepts rather than filtering the card out.
+            let met = compare_with_operator(op, cost, threshold).unwrap_or(true);
             if !met {
                 return false;
             }
@@ -1950,17 +1944,34 @@ pub fn count_in_zone(
 
 // ============== UTILITY ==============
 
-pub fn compare_counts(operator: Option<&str>, actual: u8, expected: u8) -> bool {
-    let op = operator.unwrap_or(">=");
-    match op {
-        ">=" => actual >= expected,
-        ">" => actual > expected,
-        "<=" => actual <= expected,
-        "<" => actual < expected,
-        "==" | "=" => actual == expected,
-        "!=" => actual != expected,
-        _ => true,
+/// Compare `actual` against `expected` under a card-text comparison operator.
+///
+/// This is the one place the operator spellings are known. Every comparison in
+/// the engine routes through it, so adding a spelling — or fixing one — is a
+/// single edit instead of one per call site, and an operator two sites spell
+/// differently can no longer mean two different things.
+///
+/// Returns `None` when the operator is not one this engine knows. That is a
+/// parser gap rather than a comparison that came out false, and the call sites
+/// disagree about what to do about it, so the choice is left to the caller
+/// (see `compare_counts` for the common "treat unknown as met" policy).
+pub fn compare_with_operator(operator: &str, actual: u8, expected: u8) -> Option<bool> {
+    match operator {
+        ">=" => Some(actual >= expected),
+        ">" => Some(actual > expected),
+        "<=" => Some(actual <= expected),
+        "<" => Some(actual < expected),
+        "=" | "==" | "exact" => Some(actual == expected),
+        "!=" => Some(actual != expected),
+        _ => None,
     }
+}
+
+/// `compare_with_operator` for counts, defaulting to ">=" and treating an
+/// unrecognised operator as met (a parser gap must not silently disable an
+/// ability).
+pub fn compare_counts(operator: Option<&str>, actual: u8, expected: u8) -> bool {
+    compare_with_operator(operator.unwrap_or(">="), actual, expected).unwrap_or(true)
 }
 
 pub fn remove_card_from_zone(

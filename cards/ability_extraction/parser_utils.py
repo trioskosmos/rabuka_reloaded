@@ -11,10 +11,15 @@ from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional, Tuple, Callable
 
 # Precompiled regex patterns for performance
-COUNT_PATTERN = re.compile(r"(\d+)枚")
-PEOPLE_PATTERN = re.compile(r"(\d+)人")
-COUNTER_PATTERN = re.compile(r"(\d+)つ")  # Generic counter (e.g., "3つ")
-ITEM_PATTERN = re.compile(r"(\d+)個")  # Item counter (e.g., "4個")
+#
+# The counters card text counts with, in priority order: a text carrying both
+# "3枚" and "2人" answers 枚, so this order IS the extract_count contract.
+# parser_fields.extract_max reads the same list to recognise the "up to N"
+# form, which is why the suffix characters are spelled exactly once.
+COUNT_SUFFIXES = ("枚", "人", "つ", "個")  # 枚 cards, 人 members, つ counters, 個 items
+COUNT_PATTERN, PEOPLE_PATTERN, COUNTER_PATTERN, ITEM_PATTERN = (
+    re.compile(rf"(\d+){suffix}") for suffix in COUNT_SUFFIXES
+)
 GROUP_PATTERN = re.compile(r"『(.+?)』")
 QUOTED_NAME_PATTERN = re.compile(r"「(.+?)」")
 
@@ -84,30 +89,42 @@ def normalize_fullwidth_digits(text):
     return text.translate(translation)
 
 
+# Ordered counters for extract_count: the first that appears wins. "N枚まで"
+# ("up to N") is first so it outranks the bare "N枚" it contains, and the bare
+# "N以上" is last because it is a fallback for text with no counter at all
+# (e.g. "ブレードの合計が10以上").
+_COUNT_PATTERNS: Tuple[Any, ...] = (
+    re.compile(r"(\d+)枚まで"),
+    COUNT_PATTERN,
+    PEOPLE_PATTERN,
+    COUNTER_PATTERN,
+    ITEM_PATTERN,
+    re.compile(r"(\d+)以上"),
+)
+# Ordered cost-limit shapes for extract_cost_limit, most specific first.
+_COST_LIMIT_PATTERNS: Tuple[Any, ...] = tuple(
+    re.compile(pattern)
+    for pattern in (
+        r"元々のコスト[がは](\d+)(?:以上|以下|未満|超)",
+        r"(\d+)コスト(?:以上|以下|未満|超)",
+        r"コスト(\d+)(?:以上|以下|未満|超)",
+        r"コスト[がは](\d+)(?:以上|以下|未満|超)",
+        r"(\d+)\s*以下",
+        r"以下\s*(\d+)",
+        r"(\d+)\s*合計",
+        r"コスト(\d+)の",
+    )
+)
+
+
 def extract_count(text):
     """Extract count from text (e.g., '3枚' -> 3, '2人' -> 2, '3つ' -> 3, '4個' -> 4).
     Prefers count from 'N枚まで' (up to N) over the first bare 'N枚' match.
     """
-    # Prefer count from "X枚まで" (e.g., "3枚まで") over the first bare \d+枚
-    max_match = re.search(r"(\d+)枚まで", text)
-    if max_match:
-        return int(max_match.group(1))
-    match = COUNT_PATTERN.search(text)
-    if match:
-        return int(match.group(1))
-    match = PEOPLE_PATTERN.search(text)
-    if match:
-        return int(match.group(1))
-    match = COUNTER_PATTERN.search(text)
-    if match:
-        return int(match.group(1))
-    match = ITEM_PATTERN.search(text)
-    if match:
-        return int(match.group(1))
-    # Fallback: bare number before 以上 (e.g. "10以上" in "ブレードの合計が10以上")
-    bare = re.search(r"(\d+)以上", text)
-    if bare:
-        return int(bare.group(1))
+    for pattern in _COUNT_PATTERNS:
+        match = pattern.search(text)
+        if match:
+            return int(match.group(1))
     return None
 
 
@@ -235,33 +252,49 @@ def iter_dict_nodes(value: Any, keys: Optional[Tuple[str, ...]] = None):
             yield from iter_dict_nodes(item, keys)
 
 
+_WALK_HOOKS = (
+    "enter",
+    "leave",
+    "child_context",
+    "prepare_child",
+    "after_child",
+    "after_key",
+)
+
+
 def walk_dict_tree(
     value: Any,
     *,
     keys: Tuple[str, ...],
     list_keys: Optional[Tuple[str, ...]] = None,
     context: Any = None,
-    enter: Optional[Callable[[dict, Any], Any]] = None,
-    leave: Optional[Callable[[dict, Any], None]] = None,
-    child_context: Optional[Callable[[dict, Any, str, dict], Any]] = None,
-    prepare_child: Optional[Callable[[dict, Any, str, dict], dict]] = None,
-    after_child: Optional[Callable[[dict, Any, str, dict], None]] = None,
-    after_key: Optional[Callable[[dict, Any, str], None]] = None,
+    **hooks: Any,
 ) -> None:
-    """Walk parser dictionaries in child-key order with optional context hooks."""
+    """Walk parser dictionaries in child-key order with optional context hooks.
+
+    `hooks` are the optional callbacks `enter`, `leave`, `child_context`,
+    `prepare_child`, `after_child` and `after_key`; each is forwarded verbatim
+    to every recursive step, so the walk's plumbing is stated once here instead
+    of being re-spelled at each of the three recursion points. Unknown hook
+    names still raise TypeError, so a typo cannot silently disable a callback.
+    """
+    unknown = set(hooks) - set(_WALK_HOOKS)
+    if unknown:
+        raise TypeError(
+            f"walk_dict_tree() got unexpected keyword arguments: "
+            f"{', '.join(sorted(unknown))}"
+        )
+    enter = hooks.get("enter")
+    leave = hooks.get("leave")
+    child_context = hooks.get("child_context")
+    prepare_child = hooks.get("prepare_child")
+    after_child = hooks.get("after_child")
+    after_key = hooks.get("after_key")
+
     if isinstance(value, list):
         for item in value:
             walk_dict_tree(
-                item,
-                keys=keys,
-                list_keys=list_keys,
-                context=context,
-                enter=enter,
-                leave=leave,
-                child_context=child_context,
-                prepare_child=prepare_child,
-                after_child=after_child,
-                after_key=after_key,
+                item, keys=keys, list_keys=list_keys, context=context, **hooks
             )
         return
     if not isinstance(value, dict):
@@ -288,17 +321,7 @@ def walk_dict_tree(
                 continue
             if prepare_child:
                 item = prepare_child(value, node_context, key, item)
-            walk_dict_tree(
-                item,
-                keys=keys,
-                context=item_context,
-                enter=enter,
-                leave=leave,
-                child_context=child_context,
-                prepare_child=prepare_child,
-                after_child=after_child,
-                after_key=after_key,
-            )
+            walk_dict_tree(item, keys=keys, context=item_context, **hooks)
             if after_child:
                 after_child(value, context, key, item)
         if after_key:
@@ -577,8 +600,8 @@ _OPTIONAL_RE = re.compile(r"もよい|てもよい")
 
 
 def check_original_value(text):
-    """Check if text contains 'original value' pattern (元々持つ or bare 元々)."""
-    return "元々持つ" in text or "元々" in text
+    """Check if text contains the 'original value' pattern (元々)."""
+    return "元々" in text
 
 
 def detect_require_all_hearts(text: str) -> bool:
@@ -596,19 +619,10 @@ def detect_require_all_hearts(text: str) -> bool:
 
 def extract_cost_limit(text: str) -> Optional[int]:
     """Extract cost limit value from text."""
-    for pat in [
-        r"元々のコスト[がは](\d+)(?:以上|以下|未満|超)",
-        r"(\d+)コスト(?:以上|以下|未満|超)",
-        r"コスト(\d+)(?:以上|以下|未満|超)",
-        r"コスト[がは](\d+)(?:以上|以下|未満|超)",
-        r"(\d+)\s*以下",
-        r"以下\s*(\d+)",
-        r"(\d+)\s*合計",
-        r"コスト(\d+)の",
-    ]:
-        m = re.search(pat, text)
-        if m:
-            return int(m.group(1))
+    for pattern in _COST_LIMIT_PATTERNS:
+        match = pattern.search(text)
+        if match:
+            return int(match.group(1))
     return None
 
 
@@ -651,6 +665,14 @@ def detect_card_property(text: str) -> Optional[Tuple[str, bool]]:
     return None
 
 
+_DECK_POSITION_RE = re.compile(r"デッキの一番上から(\d+)枚目に置(?:いてもよい|く)")
+# The を-construction the literal lists miss: 「デッキを(1枚)上から/下から…」.
+# Only fires when 上から/下から directly follows a デッキを phrase, so draws
+# (デッキを1枚引く) are unaffected.
+_DECK_FROM_TOP_RE = re.compile(r"デッキを.{0,6}?上から")
+_DECK_FROM_BOTTOM_RE = re.compile(r"デッキを.{0,6}?下から")
+
+
 def extract_source(text: str) -> Optional[str]:
     """Extract source location (FROM zone).
 
@@ -672,14 +694,29 @@ def extract_source(text: str) -> Optional[str]:
             best_pos = pos
     if best_value is not None:
         return best_value
-    # を-construction the literal list misses: 「デッキを(1枚)上から/下から…」
-    # (e.g. pb1-014-R's mill clause). Only fires when 上から/下から directly
-    # follows a デッキを phrase, so draws (デッキを1枚引く) are unaffected.
-    if re.search(r"デッキを.{0,6}?上から", text):
+    if _DECK_FROM_TOP_RE.search(text):
         return "deck_top"
-    if re.search(r"デッキを.{0,6}?下から", text):
+    if _DECK_FROM_BOTTOM_RE.search(text):
         return "deck_bottom"
     return extract_by_pattern(text, SOURCE_PATTERNS)
+
+
+# Destination fallbacks for shapes DESTINATION_PATTERNS does not list, in
+# priority order. Two of them answer energy_zone for different phrasings of
+# the same move; they stay as separate rows because the empty-area phrase sits
+# between them, and the narrower one has to win first.
+_ENERGY_CARD_WAIT = "エネルギーカードを1枚ウェイト状態で置いてもよい"
+_EMPTY_AREA = "メンバーのいないエリア"
+_ENERGY_CARD_PLACED = "エネルギーカードを"
+_WAIT_PLACE = "ウェイト状態で置く"
+_PLACE_VERBS = ("置く", "置いてもよい")
+_DESTINATION_FALLBACKS: Tuple[Tuple[Callable[[str], bool], str], ...] = (
+    (lambda t: bool(_DECK_POSITION_RE.search(t)), "deck"),
+    (lambda t: _ENERGY_CARD_WAIT in t, "energy_zone"),
+    (lambda t: f"{_EMPTY_AREA}に登場させる" in t or f"{_EMPTY_AREA}にウェイト状態で登場させる" in t, "empty_area"),
+    (lambda t: _WAIT_PLACE in t or (_ENERGY_CARD_PLACED in t and any(v in t for v in _PLACE_VERBS)), "energy_zone"),
+    (lambda t: "登場させる" in t, "stage"),
+)
 
 
 def extract_destination(text: str) -> Optional[str]:
@@ -687,59 +724,60 @@ def extract_destination(text: str) -> Optional[str]:
     pattern_result = extract_by_pattern(text, DESTINATION_PATTERNS)
     if pattern_result:
         return pattern_result
-    m = re.search(r"デッキの一番上から(\d+)枚目に置(?:いてもよい|く)", text)
-    if m:
-        return "deck"
-    if "エネルギーカードを1枚ウェイト状態で置いてもよい" in text:
-        return "energy_zone"
-    if (
-        "メンバーのいないエリアに登場させる" in text
-        or "メンバーのいないエリアにウェイト状態で登場させる" in text
-    ):
-        return "empty_area"
-    if "ウェイト状態で置く" in text or (
-        "エネルギーカードを" in text and ("置く" in text or "置いてもよい" in text)
-    ):
-        return "energy_zone"
-    if "登場させる" in text:
-        return "stage"
+    for matches, zone in _DESTINATION_FALLBACKS:
+        if matches(text):
+            return zone
     return None
+
+
+# "both" is checked first because a phrase naming both sides also contains
+# 自分の and 相手の on their own, so the single-side patterns below would
+# otherwise claim it. Within that pair 相手 wins, because these read the
+# original text: 「自分のカードの効果」 is stripped above so it cannot form the
+# "both" test, but a text carrying it alongside 相手の is still an opponent
+# target, not a self one.
+_BOTH_TARGET_PHRASES = (
+    "自分と相手の",
+    "自分と相手は",
+    "自分と対戦相手は",
+    "自分と対戦相手の",
+    "自分と対戦相手",
+)
+_SINGLE_TARGET_PATTERNS: List[Tuple[str, str]] = [
+    ("相手の", "opponent"),
+    ("自分の", "self"),
+]
+_EITHER_TARGET_PHRASE = "自分か相手の"
+
+# 「相手は見ないで」 → the opponent picks from your hand; 「自分は見ないで」 →
+# you pick from the opponent's hand.
+_PICKER_PATTERNS: List[Tuple[str, str]] = [
+    ("相手は見ないで", "opponent"),
+    ("自分は見ないで", "self"),
+]
 
 
 def extract_target(text: str) -> Optional[str]:
     """Extract target (self/opponent/both/either)."""
-    t = text.replace("自分のカードの効果", "")
-    if (
-        ("自分の" in t and "相手の" in t)
-        or "自分と相手の" in text
-        or "自分と相手は" in text
-        or "自分と対戦相手は" in text
-        or "自分と対戦相手の" in text
-        or "自分と対戦相手" in text
-    ):
+    stripped = text.replace("自分のカードの効果", "")
+    names_both_sides = (
+        ("自分の" in stripped and "相手の" in stripped)
+        or any(phrase in text for phrase in _BOTH_TARGET_PHRASES)
+    )
+    if names_both_sides:
         return "both"
-    if "自分か相手の" in text:
+    if _EITHER_TARGET_PHRASE in text:
         return "either"
-    if "相手の" in text:
-        return "opponent"
-    if "自分の" in text:
-        return "self"
-    return None
+    return extract_by_pattern(text, _SINGLE_TARGET_PATTERNS)
 
 
 def extract_picker(text: str) -> Optional[str]:
     """Extract who performs the blind pick in a reveal effect.
 
-    Patterns:
-      '相手は見ないで' → opponent picks from your hand
-      '自分は見ないで' → you pick from opponent's hand
-    Returns 'opponent', 'self', or None.
+    Returns 'opponent' (相手は見ないで → opponent picks from your hand),
+    'self' (自分は見ないで → you pick from the opponent's hand), or None.
     """
-    if "相手は見ないで" in text:
-        return "opponent"
-    if "自分は見ないで" in text:
-        return "self"
-    return None
+    return extract_by_pattern(text, _PICKER_PATTERNS)
 
 
 def extract_card_type(text: str) -> Optional[str]:
@@ -949,8 +987,35 @@ def _apply_rule_fields(rule, text: str, result: Dict[str, Any]) -> None:
             result[field] = _coerce_capture(match.group(1))
 
 
+class _TextRule:
+    """The shared text-match contract behind the declarative rule dataclasses.
+
+    ActionRule, EffectPattern and ConditionPattern all declare the same five
+    matcher fields — `match`, `match_any`, `match_all`, `exclude`,
+    `exclude_any` — and each used to inline its own copy of the `text_matches`
+    keyword call. Three copies of that call is three places for the contract to
+    drift, so it lives here and the subclasses say only what they do with a hit.
+
+    The subclasses keep their own field lists on purpose: ConditionPattern is
+    constructed positionally as `ConditionPattern(name, tier, handler)`, so its
+    field order is part of its call API and cannot be inherited from a base
+    whose defaulted matcher fields would sort ahead of it.
+    """
+
+    def matches_text(self, text: str) -> bool:
+        """True when `text` satisfies this rule's match/match_*/exclude fields."""
+        return text_matches(
+            text,
+            match=self.match,
+            match_any=self.match_any,
+            match_all=self.match_all,
+            exclude=self.exclude,
+            exclude_any=self.exclude_any,
+        )
+
+
 @dataclass
-class ActionRule:
+class ActionRule(_TextRule):
     """Declarative action parsing rule: text pattern → action type + field defaults.
 
     Usage:
@@ -984,14 +1049,7 @@ class ActionRule:
         self.setter = _as_two_arg(self.setter)
 
     def matches(self, text: str, action: Optional[Dict] = None) -> bool:
-        if not text_matches(
-            text,
-            match=self.match,
-            match_any=self.match_any,
-            match_all=self.match_all,
-            exclude=self.exclude,
-            exclude_any=self.exclude_any,
-        ):
+        if not self.matches_text(text):
             return False
         if self.condition and action is not None:
             try:
@@ -1013,7 +1071,7 @@ class ActionRule:
 
 
 @dataclass
-class EffectPattern:
+class EffectPattern(_TextRule):
     """Declarative effect parsing pattern: text pattern → effect dict.
 
     An EffectPattern is callable with (text, ctx) → dict | None, making it
@@ -1039,14 +1097,7 @@ class EffectPattern:
     def matches(self, text: str) -> bool:
         if self.handler is not None:
             return True
-        if not text_matches(
-            text,
-            match=self.match,
-            match_any=self.match_any,
-            match_all=self.match_all,
-            exclude=self.exclude,
-            exclude_any=self.exclude_any,
-        ):
+        if not self.matches_text(text):
             return False
         if self.condition:
             return bool(self.condition(text))
@@ -1065,7 +1116,7 @@ class EffectPattern:
 
 
 @dataclass
-class ConditionPattern:
+class ConditionPattern(_TextRule):
     name: str = ""
     tier: int = 0
     handler: Optional[Callable] = None
@@ -1080,14 +1131,7 @@ class ConditionPattern:
     def __call__(self, text: str, ctx: Optional[dict] = None) -> Optional[Dict]:
         if self.handler is not None:
             return self.handler(text)
-        if not text_matches(
-            text,
-            match=self.match,
-            match_any=self.match_any,
-            match_all=self.match_all,
-            exclude=self.exclude,
-            exclude_any=self.exclude_any,
-        ):
+        if not self.matches_text(text):
             return None
         if self.condition and not self.condition(text):
             return None

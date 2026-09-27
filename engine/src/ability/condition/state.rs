@@ -1213,14 +1213,10 @@ impl<'a> ConditionContext<'a> {
                             .get_cost_limit_operator()
                             .map(|o| o.as_str())
                             .unwrap_or("<=");
-                        match op {
-                            "<=" => card_cost <= cl,
-                            "<" => card_cost < cl,
-                            ">=" => card_cost >= cl,
-                            ">" => card_cost > cl,
-                            "==" | "=" => card_cost == cl,
-                            _ => true,
-                        }
+                        // An operator we do not know is a parser gap, not a
+                        // cost that failed the limit, so it admits the card.
+                        crate::ability::util::compare_with_operator(op, card_cost, cl)
+                            .unwrap_or(true)
                     });
                     if !cost_ok {
                         continue;

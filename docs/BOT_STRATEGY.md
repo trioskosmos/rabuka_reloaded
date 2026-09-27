@@ -1007,8 +1007,10 @@ or term that can be tuned from the outside.
 
 > Full engineering record, including the measurement rig, the ablation, every
 > measured dead end, and the first non-mirrored numbers, is in
-> [`V8_IMPROVEMENT_LOG.md`](V8_IMPROVEMENT_LOG.md). This section is kept here
-> because the correction invalidates a result recorded above.
+> [`V8_IMPROVEMENT_LOG.md`](V8_IMPROVEMENT_LOG.md). The state of play and the
+> ranked list of next methods are in [`V8_NEXT_METHODS.md`](V8_NEXT_METHODS.md).
+> This section is kept here because the correction invalidates a result
+> recorded above.
 
 
 Found 2026-09-26 by playing a side manually against v7, not by any automated
