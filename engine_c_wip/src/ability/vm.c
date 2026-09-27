@@ -460,6 +460,37 @@ const char *rb_probe_dropped_key(uint32_t i) { return i < g_probe_ndropped ? g_p
 uint8_t rb_probe_dropped_tag(uint32_t i) { return i < g_probe_ndropped ? g_probe_dropped_tag[i] : 0; }
 /* ---- END TEMPORARY PROBE ---- */
 
+/* Name of a decoded Condition variant (RB_COND_*). Used to label the
+   activation-condition marker below; Condition has no wire `type` string of its
+   own in the C tree, only the variant byte. */
+static const char *cond_variant_name(int v) {
+    static const char *names[] = {
+        "compound_condition",   "location_condition",   "comparison_condition",
+        "movement_condition",   "group_condition",      "appearance_condition",
+        "temporal_condition",   "state_condition",      "resource_condition",
+        "ability_filter_condition", "score_threshold_condition",
+        "choice_condition",     "complex_condition",    "position_condition",
+        "opponent_choice_condition", "opponent_live_success",
+        "no_excess_heart",      "always_true",          "any_of_condition",
+        "all_revealed_match_heart_color"
+    };
+    int n = (int)(sizeof(names) / sizeof(names[0]));
+    return (v >= 0 && v < n) ? names[v] : "unsupported_condition";
+}
+
+/* One string field off a decoded Condition tree. condition.c has a static
+   get_str() for the same purpose but it is not visible from this file. */
+static const char *cond_field_str(const Condition *c, const char *key) {
+    if (!c || !key) return NULL;
+    for (uint32_t i = 0; i < c->n_fields; i++) {
+        const CondField *f = &c->fields[i];
+        if (f->key && !strcmp(f->key, key) &&
+            (f->v.tag == RB_TAG_STR || f->v.tag == RB_TAG_F64))
+            return f->v.s;
+    }
+    return NULL;
+}
+
 static AbilityEffect *decode_effect_value(Rdr *r, uint8_t tag);
 static AbilityEffect *decode_effect_body(Rdr *r) {
     uint8_t variant;
@@ -504,6 +535,61 @@ static AbilityEffect *decode_effect_body(Rdr *r) {
             e->has_condition = 1;
             if (tag == RB_TAG_OBJVAR) { e->condition = read_condition(r); if (e->condition) probe_keep(); else probe_drop(key, tag); }
             else { skip_value(r, tag); probe_drop(key, tag); }
+            continue;
+        }
+        /* activation_condition_parsed — effect_decoder_gen.rs:159,
+           "activation_condition_parsed" => ek.activation_condition_parsed =
+           bc.read_condition_value(), i.e. Option<Box<Condition>>: TAG_NULL ->
+           None, TAG_OBJECT_VARIANT -> the tree, anything else -> None
+           (vm.rs:555-565). It is a *separate* gate from `condition`, checked on
+           its own in resolver.rs:456-494 and required in ADDITION to `condition`.
+
+           13 abilities in cards/abilities.json carry it, and it is the only
+           gate on all of them: a location_condition pinning the host to
+           left_side/right_side/center, an appearance_condition with
+           activation_position "left_side,right_side", 「このカードが控え室にある場合」
+           (discard), 「このカードが手札にある場合」 (hand), and two
+           success_live_card_zone score >= 6 conditions. Before this branch the
+           key fell through to the scalar tail at the bottom of the loop, which
+           skip_value()d the whole nested object and retained nothing — so
+           rb_can_activate_effect's activation-condition branch (resolver.c:596)
+           and rb_resolver_needs_gate's activation term (resolver.c:891) were
+           dead: `needs_gate` was always `condition != NULL`, and an ability
+           with only an activation condition was never gated at all.
+
+           The tree is decoded for real (read_condition, so a malformed
+           activation condition is caught here exactly as a malformed `condition`
+           is) and then recorded as a presence marker extra under the SAME wire
+           key, which is the accessor resolver.c already looks up. The
+           Condition itself cannot be kept: AbilityEffect has no field for it
+           and include/rabuka.h is not this agent's file. Adding
+           `Condition *activation_condition;` to AbilityEffect (rabuka.h:120,
+           beside result_condition), `rb_free_condition(e->activation_condition);`
+           in effect_free (vm.c, beside the result_condition free) and pointing
+           resolver.c:606 at `eff->activation_condition` instead of
+           `eff->condition` is what turns this into a retained tree. */
+        if (key && strcmp(key, "activation_condition_parsed") == 0) {
+            if (tag == RB_TAG_OBJVAR) {
+                Condition *c = read_condition(r);
+                if (c) {
+                    /* Extras in this decoder are "true"/"false" strings, so the
+                       marker follows that convention; the variant is folded in
+                       so the gate is identifiable in a debug dump. */
+                    char marker[80];
+                    const char *loc = cond_field_str(c, "location");
+                    const char *pos = cond_field_str(c, "position");
+                    if (loc || pos)
+                        snprintf(marker, sizeof(marker), "true:%s:%s%s",
+                                 cond_variant_name(c->variant),
+                                 loc ? loc : "-", pos ? pos : "");
+                    else
+                        snprintf(marker, sizeof(marker), "true:%s",
+                                 cond_variant_name(c->variant));
+                    effect_set_extra(e, key, marker);
+                    probe_keep();
+                    rb_free_condition(c);
+                } else probe_drop(key, tag);
+            } else { skip_value(r, tag); probe_drop(key, tag); }
             continue;
         }
         if (key && !strcmp(key, "dynamic_count") && tag == RB_TAG_OBJVAR) {
