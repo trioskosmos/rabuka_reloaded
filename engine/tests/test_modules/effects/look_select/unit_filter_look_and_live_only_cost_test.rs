@@ -50,31 +50,47 @@
 //! `looked_at_matching_indices` (ability/look.rs:52) finds ZERO matches even though
 //! `card_matches_group_str` accepts the same card.
 //!
-//! Where a fix belongs, and what is already ruled out. The group is NOT lost in the
-//! data and is NOT mis-decoded:
+//! ## The filter is NOT the cause — this is measured, field by field
 //!
-//! - the parsed `select_action` carries `group_names: ["CatChu!"]` — present and
-//!   correct in abilities.json;
-//! - `effect_decoder_gen.rs` reads `group_names` and `card_names` into SEPARATE
-//!   fields (`ek.group_names` / `ek.card_names`), and `build_filter` carries both, so
-//!   there is no cross-wiring at decode;
-//! - `CardFilter::from_effect` maps `group_names` into BOTH `group` and `groups`
-//!   (util.rs:1539-1543), and `Filter::check_group` (util.rs:1220) consults them;
-//! - `card_matches_group_str(db, <that same card>, Some("CatChu!"))` returns TRUE,
-//!   measured.
+//! Four candidate causes were eliminated by dumping the `CardFilter` that
+//! `looked_at_matching_indices` actually builds for her `select_action`:
 //!
-//! So the group arrives, the matcher accepts the card, and
-//! `looked_at_matching_indices` (look.rs:45-54, via `CardFilter::from_effect`) still
-//! yields ZERO indices. Whatever else the built filter carries is rejecting every
-//! looked card — the next thing to inspect is what `from_effect` populates for this
-//! effect shape beyond the group (util.rs:1526-1565), particularly
-//! `name_fragments`, which is the field most likely to exclude a card on its NAME.
+//! ```text
+//!   filter.group     = Some("CatChu!")
+//!   filter.groups    = Some(["CatChu!"])
+//!   filter.card_type = None      filter.name_fragments = None
+//!   filter.characters= None      filter.heart_colors  = []
+//!   filter.cost_*    = None      filter.need_heart_*  = None
+//!   filter.exclude_* = None      filter.distinct      = None
+//! ```
 //!
-//! メイ's identical shape with NO filter retrieves reliably, which is the control:
-//! the look, the count, the cost and the banking all work, and only the filtered
-//! selection is broken. Left unfixed here because `from_effect` is shared by every
-//! filtered selection in the game, and guessing at it is not a change worth making
-//! without the field in hand.
+//! The filter is exactly the printed group and nothing else, and
+//! `card_matches_group_str` accepts the very card the look rejects. So the group is
+//! not lost in the JSON, not mis-decoded (`group_names` and `card_names` decode into
+//! separate fields), and not mis-mapped (`from_effect` sets both `group` and
+//! `groups`). `name_fragments` is empty too -- the compiler reflects over the JSON
+//! generically and never emits `card_names` at all.
+//!
+//! ## What actually distinguishes the broken case
+//!
+//! One field. すみれ's `select_action` carries `optional: Some(true)`, from
+//! 「1枚公開して手札に**加えてもよい**」. 米女's retrieval is unmarked and its prompt
+//! comes back `allow_skip=false` and retrieves reliably.
+//!
+//! So the symptom is specific to an OPTIONAL looked-at selection: with one matching
+//! card among the five, the prompt never appears and all five are banked. An
+//! optional retrieval should present a SKIPPABLE prompt — the card is right there,
+//! declining is a choice, not the absence of one.
+//!
+//! Left unfixed here because the branch that decides an optional looked-at selection
+//! is not isolated here, and the four wrong theories above are the cost of guessing
+//! around it. What is committed is the elimination, which is the expensive part: a
+//! fixer does not need to re-check the JSON, the decode, `from_effect`, the group
+//! matcher or `name_fragments`, and knows to look at how `optional` is handled in
+//! `execute_look_and_select` / `offer_looked_at_selection` (ability/look.rs:85-178).
+//!
+//! メイ's identical shape with no filter and no `optional` retrieves reliably, so
+//! the look, the count, the cost and the banking are all sound.
 
 use crate::helpers::*;
 use rabuka_engine::zones::MemberArea;
