@@ -19,9 +19,9 @@
 //! p1under0..2, p2under0..2. Empty stage slots (`-1`) are skipped.
 
 use std::cell::{Cell, RefCell};
-use std::collections::HashMap;
 
 use rabuka_engine::card::HeartColor;
+use rabuka_engine::compat::HashMap;
 
 use super::TestGame;
 
@@ -90,8 +90,8 @@ impl Trace {
 /// (card_no, occurrence) enumeration in the FIXED zone order. Returns
 /// id -> "card_no#k" for every card currently in a listed zone.
 fn occurrences(game: &TestGame) -> HashMap<i16, String> {
-    let mut out: HashMap<i16, String> = HashMap::new();
-    let mut counts: HashMap<String, usize> = HashMap::new();
+    let mut out: HashMap<i16, String> = HashMap::with_hasher(Default::default());
+    let mut counts: HashMap<String, usize> = HashMap::with_hasher(Default::default());
     let mut put = |id: i16, no: String| {
         if id < 0 || out.contains_key(&id) {
             return;

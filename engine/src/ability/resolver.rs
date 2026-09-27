@@ -27,8 +27,8 @@ fn drain_verdicts_since(_snapshot: usize) -> Vec<AbilityLogItem> {
 }
 
 use super::gates::{
-    pre_cost_gates, post_cost_gates, effect_gates, record_use_limit, handle_pending_choice,
-    UseLimitPhase,
+    check_ability_gates, check_effect_gates, record_use_limit, handle_pending_choice,
+    EFFECT_GATES, POST_COST_GATES, PRE_COST_GATES, UseLimitPhase,
 };
 use super::types::{
     Choice, EffectPipeline, EffectSpawnContext, ExecutionContext, StepState, ZoneSnapshot,
@@ -360,6 +360,71 @@ impl AbilityResolver {
         }
     }
 
+    /// Merge effect-level group_names into conditions that need group
+    /// filtering: AppearanceCondition (group appeared check) and conditions
+    /// with distinct (name distinctness within group). Recurses into compound
+    /// sub-conditions with the same logic.
+    fn merge_group_names(cond: &mut Condition, group_names: Option<&[String]>) {
+        if Self::condition_node_needs_group_merge(cond, group_names) {
+            if let Some(gns) = group_names {
+                cond.set_group_names(gns.to_vec());
+            }
+        }
+        if let Some(ref mut sub_conds) = cond.get_conditions_mut() {
+            for sub in sub_conds.iter_mut() {
+                Self::merge_group_names(sub, group_names);
+            }
+        }
+    }
+
+    /// True when `merge_group_names` would write into this exact node.
+    fn condition_node_needs_group_merge(
+        cond: &Condition,
+        group_names: Option<&[String]>,
+    ) -> bool {
+        if group_names.is_none_or(|g| g.is_empty()) {
+            return false;
+        }
+        let needs_group = cond.condition_type()
+            == Some(crate::ability::enums::ConditionType::AppearanceCondition)
+            || cond.get_distinct().is_some_and(|d| d.is_distinct());
+        needs_group
+            && (cond.get_group_names().is_none()
+                || cond.get_group_names().is_some_and(|v| v.is_empty()))
+    }
+
+    /// Whether evaluating `condition` requires a patched copy first.
+    ///
+    /// Mirrors the two overlay rules `can_activate_effect` applies — the
+    /// activation-position patch (top level only) and the group-names merge
+    /// (recursive) — exactly, so a `false` here means the copy would have been
+    /// value-identical to the original and the clone was pure waste. A
+    /// `Condition` is a recursive tree with a `Box<ConditionCommon>` per node,
+    /// so that clone is 10-30 allocations for a typical 3-level compound, paid
+    /// on every single ability resolution.
+    fn condition_needs_overlay(
+        cond: &Condition,
+        effect: &AbilityEffect,
+        group_names: Option<&[String]>,
+    ) -> bool {
+        if cond.get_position().is_none()
+            && cond.get_positions_characters().is_none()
+            && (effect.position_any().is_some() || effect.activation_position_any().is_some())
+        {
+            return true;
+        }
+        fn any_needs_merge(cond: &Condition, group_names: Option<&[String]>) -> bool {
+            if AbilityResolver::condition_node_needs_group_merge(cond, group_names) {
+                return true;
+            }
+            if let Some(sub_conds) = cond.get_conditions() {
+                return sub_conds.iter().any(|s| any_needs_merge(s, group_names));
+            }
+            false
+        }
+        any_needs_merge(cond, group_names)
+    }
+
     pub fn can_activate_effect(&self, gs: &mut GameState, effect: &AbilityEffect) -> bool {
         log::trace!(
             "[EFFECT] activation check: source={:?} action={} has_condition={}",
@@ -428,52 +493,39 @@ impl AbilityResolver {
                     log::debug!("[CONDITION] source={:?} action={} passed={} verdict=cached type={:?}", self.activating_card_id, effect.action, cached, condition.condition_type());
                     return cached;
                 }
-                let mut cond = condition.clone();
-                if cond.get_position().is_none() && cond.get_positions_characters().is_none() {
-                    if let Some(pos) = effect.position_any() {
-                        cond.set_position(pos.clone());
-                    } else if let Some(act_pos) = effect.activation_position_any() {
-                        cond.set_activation_position(act_pos.to_string());
-                    }
-                }
-                // Merge effect-level group_names into conditions that need
-                // group filtering: AppearanceCondition (group appeared check)
-                // and conditions with distinct (name distinctness within group).
-                // Recurse into compound sub-conditions with the same logic.
-                fn merge_group_names(cond: &mut Condition, group_names: Option<&Vec<String>>) {
-                    let needs_group = cond.condition_type()
-                        == Some(crate::ability::enums::ConditionType::AppearanceCondition)
-                        || cond.get_distinct().is_some_and(|d| d.is_distinct());
-                    if needs_group
-                        && (cond.get_group_names().is_none()
-                            || cond.get_group_names().is_some_and(|v| v.is_empty()))
+                // The code below used to deep-clone the condition on EVERY
+                // resolution just so it could patch two things into the copy:
+                // an activation position, and merged group names. A
+                // `Condition` is a recursive tree with a `Box<ConditionCommon>`
+                // per node, so that clone is 10-30 allocations for a typical
+                // 3-level compound — paid even when nothing needed patching,
+                // which is the overwhelmingly common case. Ask first instead.
+                let gns = effect.group_names_any().map(|v| v.as_slice());
+                let passed = if Self::condition_needs_overlay(condition, effect, gns) {
+                    let mut cond = condition.clone();
+                    if cond.get_position().is_none()
+                        && cond.get_positions_characters().is_none()
                     {
-                        if let Some(gns) = group_names {
-                            if !gns.is_empty() {
-                                cond.set_group_names(gns.clone());
-                            }
+                        if let Some(pos) = effect.position_any() {
+                            cond.set_position(pos.clone());
+                        } else if let Some(act_pos) = effect.activation_position_any() {
+                            cond.set_activation_position(act_pos.to_string());
                         }
                     }
-                    if let Some(ref mut sub_conds) = cond.get_conditions_mut() {
-                        for sub in sub_conds.iter_mut() {
-                            merge_group_names(sub, group_names);
-                        }
-                    }
-                }
-                let gns_binding = effect.group_names_any();
-                let gns = gns_binding.as_ref();
-                merge_group_names(&mut cond, gns.map(|v| &**v));
-                #[cfg(not(feature = "no_std"))]
-                let cond_snapshot = crate::ability::log::buffer_len();
-                let passed = ctx.evaluate_condition(&cond);
-                // On success: drain (will be re-evaluated during execution).
-                // On failure: keep verdicts.
-                #[cfg(not(feature = "no_std"))]
-                {
+                    Self::merge_group_names(&mut cond, gns);
+                    #[cfg(not(feature = "no_std"))]
+                    let cond_snapshot = crate::ability::log::buffer_len();
+                    let passed = ctx.evaluate_condition(&cond);
+                    // On success: drain (will be re-evaluated during execution).
+                    // On failure: keep verdicts.
+                    #[cfg(not(feature = "no_std"))]
                     if passed {
                         crate::ability::log::drain_verdicts_since(cond_snapshot);
                     }
-                }
+                    passed
+                } else {
+                    ctx.evaluate_condition(condition)
+                };
                 // Cache the result if the condition asks for it
                 self.store_condition_verdict(gs, condition, passed);
                 if !passed {
@@ -928,7 +980,7 @@ impl AbilityResolver {
         };
         
         // Effect-level gates
-        let gate_result = effect_gates().check_effect(self, gs, effect);
+        let gate_result = check_effect_gates(EFFECT_GATES, self, gs, effect);
         if gate_result.is_stop() {
             let (reason, result_type) = gate_result.unwrap_stop();
             let items = drain_verdicts();
@@ -1102,7 +1154,7 @@ impl AbilityResolver {
         // Pre-cost gates
         #[cfg(not(feature = "no_std"))]
         let _t = crate::timer::Timer::start("resolve::pre_gates");
-        let pre_gate_result = pre_cost_gates().check_ability(self, gs, &ability);
+        let pre_gate_result = check_ability_gates(PRE_COST_GATES, self, gs, &ability);
         drop(_t);
         if pre_gate_result.is_stop() {
             let (reason, result_type) = pre_gate_result.unwrap_stop();
@@ -1129,7 +1181,7 @@ impl AbilityResolver {
         }
 
         // Post-cost gates
-        let post_gate_result = post_cost_gates().check_ability(self, gs, &ability);
+        let post_gate_result = check_ability_gates(POST_COST_GATES, self, gs, &ability);
         if post_gate_result.is_stop() {
             let (reason, result_type) = post_gate_result.unwrap_stop();
             let items = drain_verdicts();

@@ -192,7 +192,7 @@ fn q280_opponents_active_phase_does_not_clear_owner_flag() {
 
     // Simulate the OPPONENT's active phase ticking; since p1 owns the cards, the
     // opponent's turn must NOT consume p1's flag (it is the opponent's own active).
-    let opponent_owned: std::collections::HashSet<i16> =
+    let opponent_owned: rabuka_engine::compat::HashSet<i16> =
         game.state.player2.all_card_ids().into_iter().collect();
     game.state
         .mods
@@ -205,7 +205,7 @@ fn q280_opponents_active_phase_does_not_clear_owner_flag() {
     }
 
     // The owner's own active phase DOES consume the flag for the flagged energy.
-    let owner_owned: std::collections::HashSet<i16> =
+        let owner_owned: rabuka_engine::compat::HashSet<i16> =
         game.state.player1.all_card_ids().into_iter().collect();
     game.state.mods.tick_delayed_cannot_active_for(&owner_owned);
     for &c in &flagged {

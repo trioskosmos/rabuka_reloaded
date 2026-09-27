@@ -2508,7 +2508,7 @@ fn lovepeace_q150_self_hearts_greater_than_opponent_score_plus_1() {
     // P1: 13 member hearts + add 7 yell blade hearts (heart03) to satisfy OH's 15 need.
     let mut p1_hearts = game.state.player1.calculate_stage_hearts(
         &game.state.card_database,
-        &std::collections::HashMap::new(),
+        &Default::default(),
         &Default::default(),
         &Default::default(),
         &Default::default(),
@@ -2517,7 +2517,7 @@ fn lovepeace_q150_self_hearts_greater_than_opponent_score_plus_1() {
     game.state.player1.stage_hearts = Some(p1_hearts);
     game.state.player2.stage_hearts = Some(game.state.player2.calculate_stage_hearts(
         &game.state.card_database,
-        &std::collections::HashMap::new(),
+        &Default::default(),
         &Default::default(),
         &Default::default(),
         &Default::default(),
@@ -2537,14 +2537,14 @@ fn lovepeace_q150_self_hearts_greater_than_opponent_score_plus_1() {
         .player1
         .stage_hearts
         .as_ref()
-        .map(|h| h.hearts.values().map(|v| *v as i32).sum::<i32>())
+            .map(|h| h.hearts.values().map(|v| i32::from(*v)).sum::<i32>())
         .unwrap_or(0);
     let p2_heart_total: i32 = game
         .state
         .player2
         .stage_hearts
         .as_ref()
-        .map(|h| h.hearts.values().map(|v| *v as i32).sum::<i32>())
+            .map(|h| h.hearts.values().map(|v| i32::from(*v)).sum::<i32>())
         .unwrap_or(0);
     assert!(
         game.state.should_trigger_live_success(&game.state.player1),

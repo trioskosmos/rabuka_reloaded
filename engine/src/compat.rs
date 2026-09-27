@@ -1,40 +1,96 @@
 /// Platform-compatibility re-exports.
 /// Maps std types to their no_std equivalents when compiling for PSP.
-
-#[cfg(feature = "no_std")]
-mod psp_hash {
+///
+/// The `HashMap`/`HashSet` aliases below are the engine's single most-used
+/// containers and are keyed overwhelmingly on small integers — `i16` card
+/// ids (a dense 0..2280 space), `HeartColor` (8 values), `u64` keys. The
+/// console builds already had a cheap hasher here and the desktop build did
+/// not, so the configuration everything is profiled on was paying SipHash-1-3
+/// for what is a multiply-and-rotate on this key space.
+///
+/// FxHash-style mixing rather than the byte-at-a-time multiply-131 the
+/// consoles used, because this is a hashbrown SwissTable and it wants a
+/// well-distributed final mix rather than a weak fold. The seed is a fixed
+/// constant, not a random one, so iteration order stays reproducible across
+/// runs; it is simply not the same order std produced, which is why the
+/// determinism tests and the full suite gate this change.
+///
+/// MEASUREMENT NOTE: do not re-A/B this on wall-clock alone. On this box
+/// `sim_bench --policy random` reads 452 gps when the machine is quiet and
+/// 188-280 gps on identical binaries under load, so any single before/after
+/// pair is meaningless. Use allocation counts, or the profiling build's
+/// per-path Total ms. See docs/PERF_INCREMENTALIZATION_PLAN.md §1.
+mod fast_hash {
     use core::hash::{BuildHasher, Hasher};
 
-    #[derive(Default, Clone, Copy)]
-    pub struct PspHasher(u64);
+    const SEED: u64 = 0x51_7c_c1_b7_27_22_0a_95;
 
-    impl Hasher for PspHasher {
-        fn write(&mut self, bytes: &[u8]) {
-            for &b in bytes {
-                self.0 = self.0.wrapping_mul(131).wrapping_add(b as u64);
-            }
+    #[derive(Default, Clone, Copy)]
+    pub struct FastHasher(u64);
+
+    impl FastHasher {
+        #[inline]
+        fn add(&mut self, word: u64) {
+            self.0 = (self.0.rotate_left(5) ^ word).wrapping_mul(SEED);
         }
+    }
+
+    impl Hasher for FastHasher {
+        #[inline]
+        fn write(&mut self, bytes: &[u8]) {
+            let mut chunks = bytes.chunks_exact(8);
+            for c in &mut chunks {
+                self.add(u64::from_le_bytes([c[0], c[1], c[2], c[3], c[4], c[5], c[6], c[7]]));
+            }
+            let mut tail = 0u64;
+            for (i, &b) in chunks.remainder().iter().enumerate() {
+                tail |= (b as u64) << (i * 8);
+            }
+            self.add(tail);
+        }
+
+        #[inline]
+        fn write_u8(&mut self, i: u8) {
+            self.add(i as u64);
+        }
+        #[inline]
+        fn write_u16(&mut self, i: u16) {
+            self.add(i as u64);
+        }
+        #[inline]
+        fn write_u32(&mut self, i: u32) {
+            self.add(i as u64);
+        }
+        #[inline]
+        fn write_u64(&mut self, i: u64) {
+            self.add(i);
+        }
+        #[inline]
+        fn write_usize(&mut self, i: usize) {
+            self.add(i as u64);
+        }
+
+        #[inline]
         fn finish(&self) -> u64 {
             self.0
         }
     }
 
-    impl BuildHasher for PspHasher {
-        type Hasher = PspHasher;
-        fn build_hasher(&self) -> PspHasher {
-            PspHasher(0)
+    impl BuildHasher for FastHasher {
+        type Hasher = FastHasher;
+        #[inline]
+        fn build_hasher(&self) -> FastHasher {
+            FastHasher(0)
         }
     }
-
-    pub type HashMap<K, V> = hashbrown::HashMap<K, V, PspHasher>;
-    pub type HashSet<K> = hashbrown::HashSet<K, PspHasher>;
 }
 
-#[cfg(feature = "no_std")]
-pub(crate) use psp_hash::{HashMap, HashSet};
-
-#[cfg(not(feature = "no_std"))]
-pub(crate) use std::collections::{HashMap, HashSet};
+/// Public because the engine's own public structs expose these types — e.g.
+/// every `GameModifiers` field, and `Player::deployed_this_turn` — so
+/// out-of-crate callers (integration tests, tools) need a way to name and
+/// build the exact type, not `std::collections`' structurally different one.
+pub type HashMap<K, V> = hashbrown::HashMap<K, V, fast_hash::FastHasher>;
+pub type HashSet<K> = hashbrown::HashSet<K, fast_hash::FastHasher>;
 
 #[cfg(all(feature = "no_std", target_has_atomic = "ptr"))]
 pub(crate) use alloc::sync::Arc;

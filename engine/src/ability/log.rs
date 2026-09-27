@@ -62,6 +62,17 @@ mod inner {
         VERDICT_BUFFER.with(|buf| f(&mut buf.borrow_mut()))
     }
 
+    /// Whether verdicts are actually being recorded.
+    ///
+    /// `buffer_len` is NOT a substitute for this: it returns 0 when debug is
+    /// off, so a caller comparing it against a `before` snapshot also taken
+    /// with debug off gets `0 <= 0` — true — and concludes it must record a
+    /// verdict that `push_verdict` then discards. Gate on this instead.
+    #[inline]
+    pub fn debug_enabled() -> bool {
+        ABILITY_DEBUG.load(Ordering::Relaxed)
+    }
+
     pub fn push_verdict(item: AbilityLogItem) {
         if !ABILITY_DEBUG.load(Ordering::Relaxed) {
             return;

@@ -578,7 +578,9 @@ impl<'a> ConditionContext<'a> {
         // (e.g. comparison_condition, card_count_condition).
         #[cfg(not(feature = "no_std"))]
         {
-            if crate::ability::log::buffer_len() <= before {
+            if crate::ability::log::debug_enabled()
+                && crate::ability::log::buffer_len() <= before
+            {
                 let actual = self.describe_condition_actual(condition);
                 push_cond_verdict(condition, &actual, final_result, vec![]);
             }

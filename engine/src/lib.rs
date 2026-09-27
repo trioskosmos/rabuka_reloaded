@@ -38,8 +38,11 @@ macro_rules! eprintln {
     ($($arg:tt)*) => {};
 }
 
-// Platform compat: maps std types to no_std equivalents for PSP
-pub(crate) mod compat;
+// Platform compat: maps std types to no_std equivalents for PSP.
+// The module is public because `compat::HashMap`/`compat::HashSet` are the
+// types behind the engine's own public struct fields, so out-of-crate code
+// has to be able to name them.
+pub mod compat;
 pub(crate) use compat::{Arc, Box, HashMap, HashSet, VecDeque};
 #[cfg(feature = "serde_support")]
 pub(crate) use compat::BTreeMap;

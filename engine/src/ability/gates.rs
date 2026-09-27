@@ -40,45 +40,52 @@ impl GateResult {
     }
 }
 
-/// Unified gate function type for composability.
-pub type AbilityGateFn = dyn Fn(&mut crate::ability::resolver::AbilityResolver, &mut GameState, &Ability) -> GateResult + Send + Sync;
-pub type EffectGateFn = dyn Fn(&mut crate::ability::resolver::AbilityResolver, &mut GameState, &AbilityEffect) -> GateResult + Send + Sync;
+/// Gate function signatures, as plain `fn` pointers rather than `dyn Fn`.
+///
+/// The gate lists below are compile-time constants, so the old
+/// `CompositeGate::new(vec![Box::new(..), ..])` was allocating one `Vec`
+/// plus one `Box` per gate on *every* ability resolution and every effect
+/// execution — six allocations per `resolve_ability`, three per
+/// `run_effect` — and then calling through a trait object, which stopped
+/// the gate bodies from ever being inlined. A `&[fn(..)]` is a static and
+/// the calls are direct.
+pub type AbilityGateFn =
+    fn(&mut crate::ability::resolver::AbilityResolver, &mut GameState, &Ability) -> GateResult;
+pub type EffectGateFn =
+    fn(&mut crate::ability::resolver::AbilityResolver, &mut GameState, &AbilityEffect) -> GateResult;
 
-/// Composite gate that runs multiple gates in sequence.
-pub struct CompositeGate<T: ?Sized> {
-    gates: Vec<Box<T>>,
-}
-
-impl<T: ?Sized> CompositeGate<T> {
-    pub fn new(gates: Vec<Box<T>>) -> Self {
-        Self { gates }
-    }
-}
-
-impl CompositeGate<AbilityGateFn> {
-    #[inline]
-    pub fn check_ability(&self, resolver: &mut crate::ability::resolver::AbilityResolver, gs: &mut GameState, ability: &Ability) -> GateResult {
-        for gate in &self.gates {
-            let result = gate(resolver, gs, ability);
-            if result.is_stop() {
-                return result;
-            }
+/// Run an ability gate list, stopping at the first gate that stops.
+#[inline]
+pub fn check_ability_gates(
+    gates: &[AbilityGateFn],
+    resolver: &mut crate::ability::resolver::AbilityResolver,
+    gs: &mut GameState,
+    ability: &Ability,
+) -> GateResult {
+    for &gate in gates {
+        let result = gate(resolver, gs, ability);
+        if result.is_stop() {
+            return result;
         }
-        GateResult::Continue
     }
+    GateResult::Continue
 }
 
-impl CompositeGate<EffectGateFn> {
-    #[inline]
-    pub fn check_effect(&self, resolver: &mut crate::ability::resolver::AbilityResolver, gs: &mut GameState, effect: &AbilityEffect) -> GateResult {
-        for gate in &self.gates {
-            let result = gate(resolver, gs, effect);
-            if result.is_stop() {
-                return result;
-            }
+/// Run an effect gate list, stopping at the first gate that stops.
+#[inline]
+pub fn check_effect_gates(
+    gates: &[EffectGateFn],
+    resolver: &mut crate::ability::resolver::AbilityResolver,
+    gs: &mut GameState,
+    effect: &AbilityEffect,
+) -> GateResult {
+    for &gate in gates {
+        let result = gate(resolver, gs, effect);
+        if result.is_stop() {
+            return result;
         }
-        GateResult::Continue
     }
+    GateResult::Continue
 }
 
 /// Check use limit gate.
@@ -245,28 +252,13 @@ pub fn incomplete_placement_gate(
 }
 
 /// Pre-cost gates (run before cost payment).
-#[inline]
-pub fn pre_cost_gates() -> CompositeGate<AbilityGateFn> {
-    CompositeGate::new(vec![
-        Box::new(use_limit_gate),
-        Box::new(activation_keywords_gate),
-    ])
-}
+pub const PRE_COST_GATES: &[AbilityGateFn] = &[use_limit_gate, activation_keywords_gate];
 
 /// Post-cost gates (run after cost payment, before effect).
-#[inline]
-pub fn post_cost_gates() -> CompositeGate<AbilityGateFn> {
-    CompositeGate::new(vec![
-        Box::new(post_cost_position_gate),
-        Box::new(optional_cost_skip_gate),
-    ])
-}
+pub const POST_COST_GATES: &[AbilityGateFn] = &[post_cost_position_gate, optional_cost_skip_gate];
 
 /// Effect execution gates (run before each effect).
-#[inline]
-pub fn effect_gates() -> CompositeGate<EffectGateFn> {
-    CompositeGate::new(vec![Box::new(incomplete_placement_gate)])
-}
+pub const EFFECT_GATES: &[EffectGateFn] = &[incomplete_placement_gate];
 
 /// Unified use limit recording logic.
 /// 

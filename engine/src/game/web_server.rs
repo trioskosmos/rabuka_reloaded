@@ -99,7 +99,9 @@ impl FrameSnapshot {
             frame,
             turn: game_state.turn_number,
             phase: format!("{:?}", game_state.current_phase),
-            active_player: game_state.active_player().id.clone(),
+            // PlayerId is an Arc<str> newtype (player.rs); FrameSnapshot wants
+            // an owned String.
+            active_player: game_state.active_player().id.to_string(),
             label,
             p1: p(&game_state.player1),
             p2: p(&game_state.player2),
@@ -241,6 +243,15 @@ pub struct Room {
     #[cfg_attr(feature = "serde_support", serde(skip))]
     pub is_ai_room: bool,
 
+    /// Strategy version the AI seat plays in this room, as the raw registry
+    /// name. Stored as a String rather than a `BotKind` so it round-trips
+    /// through serde without needing `BotKind: Default`, and resolved by
+    /// [`Room::ai_policy_kind`]. Per-room so a lobby can run several test
+    /// matches at once, each against a different bot, without restarting the
+    /// server. Unknown names degrade to the default rather than blocking play.
+    #[cfg_attr(feature = "serde_support", serde(default))]
+    pub ai_policy: String,
+
     pub created_at: u64,
 
     pub last_active: u64,
@@ -275,6 +286,28 @@ pub struct Room {
     pub recording_before: Vec<u8>, // serialized state before pending action
     #[cfg_attr(feature = "serde_support", serde(skip))]
     pub recording_action: Option<(i16, u8)>, // pending action (card_id, type_idx)
+}
+
+impl Room {
+    /// Resolve the room's stored policy name into a registry entry.
+    ///
+    /// Deliberately total: an unrecognized name falls back to v7 rather than
+    /// erroring. This string arrives from a browser dropdown, and a stale tab
+    /// or a typo should still produce a playable game — the alternative is a
+    /// room that refuses to start, which is a far worse failure than playing
+    /// the default opponent.
+    pub fn ai_policy_kind(&self) -> crate::bot::registry::BotKind {
+        let name = self.ai_policy.trim();
+        if name.is_empty() {
+            return crate::bot::registry::BotKind::V7;
+        }
+        if crate::bot::registry::BotKind::ALL.contains(&name) {
+            crate::bot::registry::BotKind::parse(name)
+        } else {
+            log::warn!("unknown ai_policy {:?}, falling back to v7", self.ai_policy);
+            crate::bot::registry::BotKind::V7
+        }
+    }
 }
 
 // WebSocket relay for WASM P2P
@@ -436,6 +469,13 @@ pub struct CreateRoomRequest {
     pub p1_energy: Option<Vec<String>>,
 
     pub is_ai: Option<bool>,
+
+    /// Which strategy version the AI seat plays. `None` means the default
+    /// (v7). Parsed by `BotKind::parse`, so it accepts the same names as
+    /// `bot_arena` / `bot_replay` (`v1`..`v8`, `random`, ...). An unknown
+    /// name is NOT an error — it falls back to the default, because a typo in
+    /// a UI dropdown should start a playable game, not a 400.
+    pub ai_policy: Option<String>,
 }
 
 #[derive()]
@@ -845,6 +885,7 @@ fn run_ai_replies(
     room_id: Option<&str>,
     game_state: &mut GameState,
     human_pid: i32,
+    policy: crate::bot::registry::BotKind,
 ) -> usize {
     use crate::game_setup::ActionType;
     let ai_pid: u8 = if human_pid == 0 { 1 } else { 0 };
@@ -872,7 +913,8 @@ fn run_ai_replies(
         if acts.is_empty() {
             break;
         }
-        let Some(action) = crate::game::match_runner::ai_pick_action_v7(game_state, &acts, ai_pid)
+        let Some(action) =
+            crate::game::match_runner::ai_pick_action_bot(game_state, &acts, ai_pid, policy)
         else {
             break;
         };
@@ -1311,11 +1353,21 @@ pub async fn execute_action(
             }
 
             // Room flags for the reply loop and the response shape below.
-            let (is_pvp, room_is_ai) = exec_room_id_str.as_ref().map(|rid| {
-                data.rooms.lock().ok().and_then(|r| r.get(rid).map(|room| {
-                    (room.mode.as_str() == "pvp", room.is_ai_room)
-                })).unwrap_or((false, false))
-            }).unwrap_or((false, false));
+            let (is_pvp, room_is_ai, room_ai_policy) = exec_room_id_str
+                .as_ref()
+                .map(|rid| {
+                    data.rooms.lock().ok().and_then(|r| {
+                        r.get(rid).map(|room| {
+                            (
+                                room.mode.as_str() == "pvp",
+                                room.is_ai_room,
+                                room.ai_policy_kind(),
+                            )
+                        })
+                    })
+                    .unwrap_or((false, false, crate::bot::registry::BotKind::V7))
+                })
+                .unwrap_or((false, false, crate::bot::registry::BotKind::V7));
 
             // VS AI rooms: play the AI's replies inline so one request
             // covers the full exchange — no per-move round trips, no
@@ -1329,8 +1381,9 @@ pub async fn execute_action(
                         exec_room_id_str.as_deref(),
                         &mut game_state,
                         human_pid,
+                        room_ai_policy,
                     );
-                    log::debug!("[AI_REPLY] committed {} AI moves", ai_moves);
+                    log::debug!("[AI_REPLY] committed {} {} moves", ai_moves, room_ai_policy.name());
                 }
             }
 
@@ -2027,16 +2080,19 @@ async fn debug_dump_frames(data: web::Data<AppState>) -> impl Responder {
 fn conditions_on_card(card: &Card) -> Vec<(usize, &'static str, Box<crate::card::Condition>)> {
     let mut found = Vec::new();
     for (ability_idx, ar) in card.abilities.iter().enumerate() {
-        let Some(effect) = ar.resolve().effect else {
+        // `effect` is a Box; bind by reference so the resolved ability can
+        // still drop at end of iteration.
+        let resolved = ar.resolve();
+        let Some(effect) = resolved.effect.as_ref() else {
             continue;
         };
-        if let Some(c) = effect.condition {
+        if let Some(c) = effect.condition.clone() {
             found.push((ability_idx, "condition", c));
         }
-        if let Some(c) = effect.compound.alternative_condition {
+        if let Some(c) = effect.compound.alternative_condition.clone() {
             found.push((ability_idx, "alternative_condition", c));
         }
-        if let Some(c) = effect.compound.result_condition {
+        if let Some(c) = effect.compound.result_condition.clone() {
             found.push((ability_idx, "result_condition", c));
         }
     }
@@ -2285,7 +2341,7 @@ fn store_room_deck(
             log::warn!("[set_deck] room {room_id} not found; deck for player {player} dropped");
             return false;
         };
-        let decks = room.custom_decks.get_or_insert_with(HashMap::new);
+        let decks = room.custom_decks.get_or_insert_with(HashMap::default);
         decks.insert(
             player,
             CustomDeck {
@@ -2687,6 +2743,11 @@ pub async fn rooms_create(
 
         is_ai_room: is_ai_game,
 
+        ai_policy: req
+            .ai_policy
+            .clone()
+            .unwrap_or_else(|| crate::bot::registry::BotKind::V7.name().to_string()),
+
         created_at: now,
 
         last_active: now,
@@ -3037,14 +3098,18 @@ async fn init_game(
 
     // Map frontend deck names to deck file names
 
-    let deck_name_mapping = HashMap::from([
+    // HashMap here is hashbrown with the project's FastHasher, which has no
+    // `new()`; collect through the Default hasher instead.
+    let deck_name_mapping: HashMap<&str, &str> = [
         ("Aqours Cup", "aqours_cup"),
         ("Muse Cup", "muse_cup"),
         ("Nijigaku Cup", "nijigaku_cup"),
         ("Liella Cup", "liella_cup"),
         ("Hasunosora Cup", "hasunosora_cup"),
         ("Fade Deck", "fade deck"),
-    ]);
+    ]
+    .into_iter()
+    .collect();
 
     // Select deck based on request, default to first deck if not specified or not found
 
@@ -3550,7 +3615,9 @@ pub async fn run_web_server_with_ngrok(ngrok_authtoken: Option<String>) -> std::
         actions_dirty: Arc::new(Mutex::new(true)),
         room_broadcasts: Arc::new(Mutex::new(HashMap::default())),
         // Start WebSocket relay actor
-        relay_addr: SyncArbiter::start(1, || WsRelayActor { sessions: HashMap::new() }),
+        relay_addr: SyncArbiter::start(1, || WsRelayActor {
+            sessions: HashMap::with_hasher(Default::default()),
+        }),
     });
 
     let port: u16 = std::env::var("PORT")

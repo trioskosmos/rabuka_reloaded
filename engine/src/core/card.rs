@@ -429,7 +429,7 @@ mod card_id_tests {
 
     #[test]
     fn usable_as_map_key() {
-        let mut m = HashMap::new();
+        let mut m = HashMap::with_hasher(Default::default());
         m.insert(CardId::from_raw(3), "x");
         assert_eq!(m.get(&CardId::from_raw(3)), Some(&"x"));
         assert_eq!(m.get(&CardId::from_raw(4)), None);

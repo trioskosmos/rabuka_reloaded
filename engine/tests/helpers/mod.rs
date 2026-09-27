@@ -1,5 +1,8 @@
 use std::cell::RefCell;
-use std::collections::HashMap;
+// The engine's map aliases carry a non-default hasher, so anything passed
+// into an engine API has to be the engine's type, not std's structurally
+// different one. See `src/compat.rs`.
+use rabuka_engine::compat::HashMap;
 use std::sync::{Arc, OnceLock};
 
 mod assertions;
@@ -84,7 +87,7 @@ pub fn load_real_database() -> Arc<CardDatabase> {
             CardLoader::load_cards_from_strs(CARDS_JSON).expect("Failed to load embedded cards");
         let mut db = CardDatabase::load_or_create(cards);
         let tids: Vec<i16> = db.cards.keys().copied().collect();
-        let mut pool: HashMap<i16, Vec<i16>> = HashMap::new();
+        let mut pool: HashMap<i16, Vec<i16>> = HashMap::with_hasher(Default::default());
         for &tid in &tids {
             let mut v = Vec::with_capacity(11);
             for _ in 0..11 {
@@ -198,7 +201,7 @@ impl TestGame {
             db: state.card_database.clone(),
             state,
             debug_enabled,
-            pool_positions: RefCell::new(HashMap::new()),
+            pool_positions: RefCell::new(HashMap::with_hasher(Default::default())),
             trace: trace::Trace::new(),
             #[cfg(feature = "alloc_tracker")]
             _alloc_guard: rabuka_engine::alloc_counter::start(),
