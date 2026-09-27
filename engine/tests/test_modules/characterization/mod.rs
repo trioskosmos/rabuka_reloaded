@@ -13,6 +13,7 @@ pub mod character_condition_fix_test;
 pub mod corpus_smoke_test;
 pub mod decode_audit_behavior_pins_test;
 pub mod describe_parity_test;
+pub mod kashino_player_choice_and_order_measurements_test;
 pub mod kinako_hs_test;
 pub mod logging_test;
 pub mod performance_snapshot_audit_test;
