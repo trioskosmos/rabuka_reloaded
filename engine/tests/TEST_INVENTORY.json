@@ -1,6 +1,6 @@
 {
   "generated_by": "cards/test_inventory.py",
-  "generated_at": "2026-09-27T05:51:28.189220+00:00",
+  "generated_at": "2026-09-27T06:11:00.369595+00:00",
   "stats": {
     "total_cards": 2526,
     "cards_with_abilities": 1565,
@@ -8,7 +8,7 @@
     "unique_abilities": 936
   },
   "n_files": 924,
-  "n_tests": 3723,
+  "n_tests": 3726,
   "total_cards": 771,
   "covered_cards": 771,
   "abilities_on_covered": 936,
@@ -388,15 +388,8 @@
       "rows": []
     },
     "no_drive": {
-      "count": 1,
-      "rows": [
-        {
-          "file": "engine/tests/test_modules/effects/draw/flat/live_success_compare_revealed_draw_behaviour_test.rs",
-          "test": "the_live_success_window_opens_for_a_start_dash_live",
-          "line": 114,
-          "detail": ""
-        }
-      ]
+      "count": 0,
+      "rows": []
     },
     "synthetic_only": {
       "count": 0,
@@ -944,7 +937,7 @@
       ]
     }
   },
-  "n_test_fns_parsed": 3723,
+  "n_test_fns_parsed": 3726,
   "abilities": [
     {
       "idx": 0,
@@ -17800,7 +17793,7 @@
         "ayumu_live_start_triggers",
         "ayumu_no_wait_with_non_nijigasaki_ally"
       ],
-      "covering_test_count": 849,
+      "covering_test_count": 852,
       "direct_tests": [
         "any_card_fails_hearts_all_fail",
         "aoku_haruka_live_start_fails_with_only_non_suzu_live_cards",
@@ -17833,7 +17826,7 @@
         "debut_opponent_live_discard_q130_decline_preserves_opponent_hand",
         "debut_reveal_until_live_q102_live_immediately_on_top"
       ],
-      "direct_test_count": 370,
+      "direct_test_count": 371,
       "is_null": false,
       "use_limit": null,
       "watches_abilities": false,
@@ -23257,12 +23250,15 @@
       "covering_tests": [
         "hanamaru_bp3_016_success_zone_cost_increase_constant_parsed",
         "maki_sd1_006_success_zone_restriction_parsed",
-        "the_live_success_window_opens_for_a_start_dash_live",
-        "you_bp3_005_live_success_trigger_is_evaluated_and_records_a_verdict"
+        "no_reveal_configuration_satisfies_the_condition",
+        "the_live_cards_own_draw_only_happens_inside_the_open_window",
+        "you_bp3_005_live_success_trigger_is_evaluated_and_records_a_verdict",
+        "you_does_not_draw_when_own_reveal_count_is_higher",
+        "you_does_not_draw_when_reveal_counts_are_equal"
       ],
-      "covering_test_count": 4,
+      "covering_test_count": 7,
       "direct_tests": [
-        "the_live_success_window_opens_for_a_start_dash_live",
+        "the_live_cards_own_draw_only_happens_inside_the_open_window",
         "you_bp3_005_live_success_trigger_is_evaluated_and_records_a_verdict"
       ],
       "direct_test_count": 2,

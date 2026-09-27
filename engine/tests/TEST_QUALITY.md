@@ -12,13 +12,11 @@ _test never asserts (smoke at best — cannot pin behavior)_
 
 None.
 
-## no_drive (1)
+## no_drive (0)
 
 _trigger-context test that mutates state and asserts but never drives the engine (no scan/activate/play/fire): vacuous negatives/positives_
 
-| file | test | line | detail |
-| --- | --- | --- | --- |
-| `engine/tests/test_modules/effects/draw/flat/live_success_compare_revealed_draw_behaviour_test.rs` | `the_live_success_window_opens_for_a_start_dash_live` | 114 |  |
+None.
 
 ## synthetic_only (0)
 
