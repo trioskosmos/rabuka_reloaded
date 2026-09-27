@@ -50,47 +50,42 @@
 //! `looked_at_matching_indices` (ability/look.rs:52) finds ZERO matches even though
 //! `card_matches_group_str` accepts the same card.
 //!
-//! ## The filter is NOT the cause — this is measured, field by field
+//! ## There is no engine defect here — three commits said otherwise
 //!
-//! Four candidate causes were eliminated by dumping the `CardFilter` that
-//! `looked_at_matching_indices` actually builds for her `select_action`:
+//! This file previously carried a bug report claiming 平安名すみれ's filtered
+//! retrieval was unreachable. **It is reachable, and the engine is right.** The
+//! prompt appears, carries the filter, and takes the matching card:
 //!
 //! ```text
-//!   filter.group     = Some("CatChu!")
-//!   filter.groups    = Some(["CatChu!"])
-//!   filter.card_type = None      filter.name_fragments = None
-//!   filter.characters= None      filter.heart_colors  = []
-//!   filter.cost_*    = None      filter.need_heart_*  = None
-//!   filter.exclude_* = None      filter.distinct      = None
+//!   prompt: SelectCard zone=looked_at count=1 allow_skip=true card_type=None
+//!           group=Some("CatChu!") options=Some(1)
+//!     answer [0]  ->  hand=1 waitroom=5  CatChu! in hand = TRUE    <- takes it
+//!     answer []   ->  hand=0 waitroom=6  CatChu! in hand = false   <- declines
+//!     answer [1]  ->  hand=0 waitroom=6  CatChu! in hand = false   <- declines
 //! ```
 //!
-//! The filter is exactly the printed group and nothing else, and
-//! `card_matches_group_str` accepts the very card the look rejects. So the group is
-//! not lost in the JSON, not mis-decoded (`group_names` and `card_names` decode into
-//! separate fields), and not mis-mapped (`from_effect` sets both `group` and
-//! `groups`). `name_fragments` is empty too -- the compiler reflects over the JSON
-//! generically and never emits `card_names` at all.
+//! What I got wrong, in order, all of it measured in the wrong place:
 //!
-//! ## What actually distinguishes the broken case
+//!   1. The **filter** is exactly right and never was the cause:
+//!      `group = Some("CatChu!")`, `groups = Some(["CatChu!"])`, and every other
+//!      field — `exclude_cards`, `name_fragments`, all cost and heart fields — is
+//!      `None`. `card_matches_group_str` accepts the very card in question.
+//!   2. The **prompt was always offered.** I concluded it "never appears" from a
+//!      trace that banked all five cards — but banking the remainder is what the
+//!      DECLINE path does, so the trace was showing a decline and I read it as an
+//!      absence.
+//!   3. The cause was my own drain loop, which answered every prompt with `[0]`.
+//!      That is right for a mandatory selection and WRONG for a skippable one here:
+//!      `resume_indices` maps indices onto the choice's generated option list, where
+//!      an `allow_skip` prompt leads with the skip entry, so `[0]` can decline the very
+//!      choice whose text says 「加えてもよい」.
 //!
-//! One field. すみれ's `select_action` carries `optional: Some(true)`, from
-//! 「1枚公開して手札に**加えてもよい**」. 米女's retrieval is unmarked and its prompt
-//! comes back `allow_skip=false` and retrieves reliably.
-//!
-//! So the symptom is specific to an OPTIONAL looked-at selection: with one matching
-//! card among the five, the prompt never appears and all five are banked. An
-//! optional retrieval should present a SKIPPABLE prompt — the card is right there,
-//! declining is a choice, not the absence of one.
-//!
-//! Left unfixed here because the branch that decides an optional looked-at selection
-//! is not isolated here, and the four wrong theories above are the cost of guessing
-//! around it. What is committed is the elimination, which is the expensive part: a
-//! fixer does not need to re-check the JSON, the decode, `from_effect`, the group
-//! matcher or `name_fragments`, and knows to look at how `optional` is handled in
-//! `execute_look_and_select` / `offer_looked_at_selection` (ability/look.rs:85-178).
-//!
-//! メイ's identical shape with no filter and no `optional` retrieves reliably, so
-//! the look, the count, the cost and the banking are all sound.
+//! So the three rules worth keeping, none of which is a bug:
+//!   * a banked remainder after a look is not evidence that the look failed;
+//!   * `optional: true` on a `select_cards` makes `[0]` a decline, so the retrieval
+//!     needs a different index than a mandatory one;
+//!   * and when a behaviour looks impossible, print the filter the code actually
+//!     built. Three theories died against that dump and the real one was in my harness.
 
 use crate::helpers::*;
 use rabuka_engine::zones::MemberArea;
