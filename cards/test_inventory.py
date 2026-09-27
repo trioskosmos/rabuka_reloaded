@@ -618,16 +618,34 @@ Q_ABSENCE_ASSERT_RE = re.compile(
 # A file that drives ライブ成功時 through the GATED path, without establishing that
 # its live actually SUCCEEDED.
 #
-# Scoped to `trigger_live_success_abilities` and NOT to the broader ライブ成功時
-# trigger, because `fire_trigger` calls `trigger_auto_ability` directly and so
-# FORCES the dispatch: a file built on `fire_trigger` has no success premise to
-# state and its negative assertions are not vacuous. Only the gated path checks
-# `should_trigger_live_success`, so only it needs the premise. Measured on this
-# suite: 8 of the 14 files that use the gated path.
-Q_LIVE_SUCCESS_GATED_RE = re.compile(r"trigger_live_success_abilities")
+# `trigger_live_success_abilities` checks `should_trigger_live_success`, so a live
+# that failed silently dispatches nothing — and a NEGATIVE assertion in such a file
+# then passes whether or not the ability does anything. `fire_trigger` is
+# deliberately excluded: it calls `trigger_auto_ability` directly and FORCES the
+# dispatch, so a file built on it has no premise to state.
+#
+# Scoped to a CALL, in code rather than prose. Four earlier scopings were wrong, each
+# because the pattern matched something other than a dispatch; the counts are carried
+# here so they are not re-derived:
+#   * matching ライブ成功時 anywhere reported 91 — it hits comments and strings;
+#   * matching the bare function name reported 70, which is really "files that
+#     mention it";
+#   * matching the name without a call paren still counted a file whose only hit was
+#     a comment explaining the smell itself;
+#   * the correct rule is comment-stripped + call-paren, and it reports 10.
+#
+# A triage of those 10 found the lives they drive are satisfiable, so the remedy is
+# to add the premise. An earlier triage concluded the opposite, twice: it compared a
+# live's `heart0` requirement against a member's `heart0` bucket, but `heart0` is a
+# COLORLESS WILDCARD (core/card.rs `check_heart_requirement` skips Heart00 in the
+# per-colour loop and then requires the leftover sum of every other colour to cover
+# it), and no member prints a literal colorless heart. Both times the engine was
+# right and the script was wrong.
+Q_LIVE_SUCCESS_CALL_RE = re.compile(r"trigger_live_success_abilities\s*\(")
 Q_LIVE_SUCCESS_PREMISE_RE = re.compile(
     r"should_trigger_live_success|performance_snapshots|execute_live_victory_determination"
 )
+Q_LINE_COMMENT_RE = re.compile(r"//.*$", re.MULTILINE)
 
 # assert!(x) / assert_eq!(x, y) — the units an assertion of interest is counted in.
 Q_ASSERT_CALL_RE = re.compile(r"assert(?:_eq|_ne|_ability)?!\s*\(")
@@ -1464,7 +1482,8 @@ def audit_test_quality(files):
     # the ability does anything. Files built on `fire_trigger` are excluded: that
     # helper forces the dispatch and has no premise to state.
     for _p, rel, text, _fns in files:
-        if Q_LIVE_SUCCESS_GATED_RE.search(text) and not Q_LIVE_SUCCESS_PREMISE_RE.search(text):
+        code = Q_LINE_COMMENT_RE.sub("", text)
+        if Q_LIVE_SUCCESS_CALL_RE.search(code) and not Q_LIVE_SUCCESS_PREMISE_RE.search(code):
             smells["live_success_no_premise"].append((rel, "<file>", 1, ""))
     for rows in smells.values():
         rows.sort()
@@ -1478,7 +1497,7 @@ SMELL_DOCS = {
     "pendency_only": "has_pending_choice asserted without choice identity (pending_choice_type/summary/answer) or outcome asserts",
     "assert_only_negative": "every assertion is a bare is_err()/is_none() — some guard fired, but nothing says which, so a regression tripping a different guard still passes",
     "assert_only_counts": "every assertion is about a count/size (len/count/>=1) — '3 options were offered' can hold while the 3 are the wrong 3",
-    "live_success_no_premise": "file drives ライブ成功時 through the GATED path (trigger_live_success_abilities) but never asserts that its live SUCCEEDED. That path checks `should_trigger_live_success`, so a live which failed silently dispatches nothing — and a NEGATIVE assertion in such a file then passes whether or not the ability does anything. Files built on `fire_trigger` are NOT flagged: it calls `trigger_auto_ability` directly and forces the dispatch, so there is no premise to state. The fix is to assert the success snapshot (`should_trigger_live_success` / `performance_snapshots`) as a premise. Counted on this suite at 8 of the 14 files using the gated path",
+    "live_success_no_premise": "file CALLS trigger_live_success_abilities but never asserts that its live SUCCEEDED. That path checks `should_trigger_live_success`, so a live which failed silently dispatches nothing — and a NEGATIVE assertion in such a file then passes whether or not the ability does anything. Files built on `fire_trigger` are NOT flagged: it calls `trigger_auto_ability` directly and forces the dispatch, so there is no premise to state. The fix is to assert the success snapshot (`should_trigger_live_success` / `performance_snapshots`) as a premise. Reports 10 files; the lives they drive are satisfiable, so this is a remedy and not a dead end. See the comment above for the four scopings that were wrong first, and note that a live's `heart0` requirement is a COLORLESS WILDCARD satisfied by any colour, not a literal colour",
     "placeholder": "#[ignore], assert!(true), todo!() or unimplemented!() left in a test",
     "similar_cards": "confusable card numbers (bp2 vs pb2) staged in one file AND the file pins card identity (assert_card_identity / compares card_no), so a transposition would fail loudly",
     "unpinned_similar_cards": "confusable card numbers (bp2 vs pb2) staged in one file with NO card-identity pin — a transposed print would pass silently; add assert_card_identity to close it",

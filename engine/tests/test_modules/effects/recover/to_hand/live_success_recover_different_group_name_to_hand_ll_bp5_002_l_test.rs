@@ -52,6 +52,18 @@ fn force_live_success(game: &mut TestGame, live_card_id: i16) {
     // Set phase to LiveVictoryDetermination (required by should_trigger_live_success)
     game.state.current_phase = Phase::LiveVictoryDetermination;
 
+    // The three lines above are what open the ライブ成功時 window; this asserts it.
+    // Without the assertion the dispatch below is a silent no-op if any of them stops
+    // being sufficient, and every NEGATIVE expectation in this file then passes for
+    // the wrong reason. Asserted once here rather than at each call site, because
+    // this helper is the single door the whole file comes through.
+    assert!(
+        game.state.should_trigger_live_success(&game.state.player1),
+        "precondition: the ライブ成功時 window must be OPEN before the dispatch — a \
+         heart00 wildcard plus LiveVictoryDetermination is what opens it, and if this \
+         is false the trigger below does nothing at all"
+    );
+
     // Fire LiveSuccess and process
     TurnEngine::trigger_live_success_abilities(&mut game.state, "p1");
     game.state.process_pending_auto_abilities("p1");

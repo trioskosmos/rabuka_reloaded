@@ -1,6 +1,6 @@
 {
   "generated_by": "cards/test_inventory.py",
-  "generated_at": "2026-09-27T01:19:23.392420+00:00",
+  "generated_at": "2026-09-27T01:37:01.814172+00:00",
   "stats": {
     "total_cards": 2526,
     "cards_with_abilities": 1565,
@@ -415,7 +415,7 @@
       "rows": []
     },
     "live_success_no_premise": {
-      "count": 8,
+      "count": 9,
       "rows": [
         {
           "file": "engine/tests/test_modules/effects/ability_mod/rina_gain_live_success_from_under_member_test.rs",
@@ -436,6 +436,12 @@
           "detail": ""
         },
         {
+          "file": "engine/tests/test_modules/effects/position/area_move/position_change_multi_test.rs",
+          "test": "<file>",
+          "line": 1,
+          "detail": ""
+        },
+        {
           "file": "engine/tests/test_modules/effects/recover/to_hand/live_success_partial_resolution_of_revealed_live_q93_test.rs",
           "test": "<file>",
           "line": 1,
@@ -448,6 +454,12 @@
           "detail": ""
         },
         {
+          "file": "engine/tests/test_modules/effects/score/live_total/live_success_per_under_member_live_total_score_cap_test.rs",
+          "test": "<file>",
+          "line": 1,
+          "detail": ""
+        },
+        {
           "file": "engine/tests/test_modules/effects/score/per_card/tokimeki_runners_all_heart_colors_live_success_score_test.rs",
           "test": "<file>",
           "line": 1,
@@ -455,12 +467,6 @@
         },
         {
           "file": "engine/tests/test_modules/integration/full_round/real_card_phase_walkthrough_and_ability_suite_test.rs",
-          "test": "<file>",
-          "line": 1,
-          "detail": ""
-        },
-        {
-          "file": "engine/tests/test_modules/jidou/ability_watch/lifecycle_tail_idempotence_test.rs",
           "test": "<file>",
           "line": 1,
           "detail": ""
@@ -50222,15 +50228,23 @@
       "has_negative": false,
       "covering_files": [
         "engine/tests/test_modules/effects/draw/conditional/success_zone_group_pl_bp6_023_l_test.rs",
-        "engine/tests/test_modules/effects/look_select/deck_bottom_reposition_and_conditional_second_draw_test.rs"
+        "engine/tests/test_modules/effects/look_select/deck_bottom_reposition_and_conditional_second_draw_test.rs",
+        "engine/tests/test_modules/jidou/ability_watch/lifecycle_tail_idempotence_test.rs"
       ],
       "covering_tests": [
+        "butterfly_wing_suppression_survives_repeated_constant_scans",
         "chika_repositions_the_examined_card_to_the_fourth_from_the_top",
+        "genki_zenkai_own_live_success_stays_invalidated_across_repeated_derivation",
+        "hanamaru_grant_stays_single_then_expires_at_live_end",
+        "honoka_grant_is_permanent_and_leaves_only_on_zone_exit",
+        "joint_three_score_grant_expires_at_the_real_live_end_rollover",
+        "joint_three_score_grant_stays_single_across_repeated_scans",
+        "nozomi_grant_stays_single_then_expires_at_live_end",
         "sweet_sweet_holiday_pl_bp6_023_l_draws_extra_with_mus_live_in_success_zone",
         "sweet_sweet_holiday_pl_bp6_023_l_non_mus_live_in_success_zone_single_draw",
         "sweet_sweet_holiday_pl_bp6_023_l_single_draw_without_success_zone_card"
       ],
-      "covering_test_count": 4,
+      "covering_test_count": 11,
       "direct_tests": [
         "sweet_sweet_holiday_pl_bp6_023_l_draws_extra_with_mus_live_in_success_zone",
         "sweet_sweet_holiday_pl_bp6_023_l_non_mus_live_in_success_zone_single_draw",

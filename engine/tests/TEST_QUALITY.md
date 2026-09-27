@@ -44,20 +44,21 @@ _every assertion is about a count/size (len/count/>=1) — '3 options were offer
 
 None.
 
-## live_success_no_premise (8)
+## live_success_no_premise (9)
 
-_file drives ライブ成功時 through the GATED path (trigger_live_success_abilities) but never asserts that its live SUCCEEDED. That path checks `should_trigger_live_success`, so a live which failed silently dispatches nothing — and a NEGATIVE assertion in such a file then passes whether or not the ability does anything. Files built on `fire_trigger` are NOT flagged: it calls `trigger_auto_ability` directly and forces the dispatch, so there is no premise to state. The fix is to assert the success snapshot (`should_trigger_live_success` / `performance_snapshots`) as a premise. Counted on this suite at 8 of the 14 files using the gated path_
+_file CALLS trigger_live_success_abilities but never asserts that its live SUCCEEDED. That path checks `should_trigger_live_success`, so a live which failed silently dispatches nothing — and a NEGATIVE assertion in such a file then passes whether or not the ability does anything. Files built on `fire_trigger` are NOT flagged: it calls `trigger_auto_ability` directly and forces the dispatch, so there is no premise to state. The fix is to assert the success snapshot (`should_trigger_live_success` / `performance_snapshots`) as a premise. Reports 10 files; the lives they drive are satisfiable, so this is a remedy and not a dead end. See the comment above for the four scopings that were wrong first, and note that a live's `heart0` requirement is a COLORLESS WILDCARD satisfied by any colour, not a literal colour_
 
 | file | test | line | detail |
 | --- | --- | --- | --- |
 | `engine/tests/test_modules/effects/ability_mod/rina_gain_live_success_from_under_member_test.rs` | `<file>` | 1 |  |
 | `engine/tests/test_modules/effects/choice/per_card/conditional_choice_options_execution_test.rs` | `<file>` | 1 |  |
 | `engine/tests/test_modules/effects/gain/blades/constants/success_pile_difference_pl_s_bp6_009_r_plus_test.rs` | `<file>` | 1 |  |
+| `engine/tests/test_modules/effects/position/area_move/position_change_multi_test.rs` | `<file>` | 1 |  |
 | `engine/tests/test_modules/effects/recover/to_hand/live_success_partial_resolution_of_revealed_live_q93_test.rs` | `<file>` | 1 |  |
 | `engine/tests/test_modules/effects/score/card_score/live_success_group_heart_gated_live_score_test.rs` | `<file>` | 1 |  |
+| `engine/tests/test_modules/effects/score/live_total/live_success_per_under_member_live_total_score_cap_test.rs` | `<file>` | 1 |  |
 | `engine/tests/test_modules/effects/score/per_card/tokimeki_runners_all_heart_colors_live_success_score_test.rs` | `<file>` | 1 |  |
 | `engine/tests/test_modules/integration/full_round/real_card_phase_walkthrough_and_ability_suite_test.rs` | `<file>` | 1 |  |
-| `engine/tests/test_modules/jidou/ability_watch/lifecycle_tail_idempotence_test.rs` | `<file>` | 1 |  |
 
 ## placeholder (0)
 
