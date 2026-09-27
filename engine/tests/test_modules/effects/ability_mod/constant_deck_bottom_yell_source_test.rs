@@ -251,7 +251,7 @@ fn bottom_yell_source_in_success_zone_applies() {
 
     let revealed: Vec<i16> = game.state.resolution_zone.cards.iter().copied().collect();
     assert!(
-        same_set(&revealed, &top[3..].to_vec()),
+        same_set(&revealed, &top[3..]),
         "AQUARIUM in the success zone still forces yell-from-bottom, got {:?}",
         revealed
     );

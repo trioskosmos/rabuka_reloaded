@@ -337,6 +337,12 @@ impl PolicyNet {
 
 }
 
+impl Default for PolicyNet {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 fn relu(x: f32) -> f32 {
     if x > 0.0 {
         x

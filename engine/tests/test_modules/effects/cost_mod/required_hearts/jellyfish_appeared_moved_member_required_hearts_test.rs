@@ -121,7 +121,7 @@ fn jellyfish_position_change_swap_creates_countable_movement() {
             assert_eq!(target, "area_select");
             assert!(options
                 .as_ref()
-                .map_or(false, |o| o.contains(&"left".to_string())));
+                .is_some_and(|o| o.contains(&"left".to_string())));
         }
         _ => panic!("Expected SelectTarget for area_select"),
     }

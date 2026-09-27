@@ -658,7 +658,7 @@ fn short(db: &CardDatabase, id: i16) -> String {
         None => format!("#{id}"),
         Some(c) => {
             let n: String = c.name.chars().take(10).collect();
-            format!("{n}")
+            n.to_string()
         }
     }
 }

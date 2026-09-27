@@ -159,7 +159,7 @@ fn chika_bp5_001_baton_touch_draw_triggers_refresh() {
         "Draw 1 from refreshed deck compensates hand loss"
     );
     assert!(
-        game.state.player1.main_deck.cards.len() > 0 || game.state.player1.waitroom.cards.len() > 0,
+        !game.state.player1.main_deck.cards.is_empty() || !game.state.player1.waitroom.cards.is_empty(),
         "Refresh should have occurred (cards exist somewhere)"
     );
 }

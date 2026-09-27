@@ -50,12 +50,12 @@ mod bytecode_deep_compare {
         }
         let mut ab: Ability = serde_json::from_value::<Ability>(normalized.clone()).ok()?;
         if let Some(ref mut effect) = ab.effect {
-            if let Some(ref je) = normalized.get("effect") {
+            if let Some(je) = normalized.get("effect") {
                 effect.populate_from_json(je);
             }
         }
         if let Some(ref mut cost) = ab.cost {
-            if let Some(ref ce) = normalized.get("cost") {
+            if let Some(ce) = normalized.get("cost") {
                 cost.0.populate_from_json(ce);
             }
         }

@@ -163,7 +163,7 @@ pub fn encode_sav(decks: &[SavDeck]) -> Result<Vec<u8>, SavError> {
         }
         // Pad unwritten slots (deck shorter than the max).
         let missing = MAX_CARDS_PER_DECK - deck.cards.len();
-        out.extend(core::iter::repeat(0u8).take(missing * SAV_CARD_LEN));
+        out.extend(std::iter::repeat_n(0u8, missing * SAV_CARD_LEN));
         let entry_sum = checksum(&out[cards_start..]);
         out[entry_start + SAV_NAME_LEN + 2..entry_start + SAV_NAME_LEN + 4]
             .copy_from_slice(&entry_sum.to_le_bytes());

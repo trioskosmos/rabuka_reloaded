@@ -43,7 +43,7 @@ fn hand_card_cost_reduced_by_hand_count_minus_1() {
     let db_card = game.db.get_card(card).unwrap();
     let base_cost = db_card.cost.unwrap();
     let hand_count = game.state.player1.hand.cards.len();
-    let expected_reduction = (hand_count.saturating_sub(1) * 1) as u32;
+    let expected_reduction = hand_count.saturating_sub(1) as u32;
 
     // Verify the cost modifier stored by recalculate_constants
     // (modifiers.rs stores per-card cost bonuses for display/condition eval)

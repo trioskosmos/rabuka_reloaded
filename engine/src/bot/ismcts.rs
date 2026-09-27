@@ -123,12 +123,11 @@ fn run_rollout(
         if state.game_result != GameResult::Ongoing {
             break;
         }
-        if !state.has_pending_choice() {
-            if crate::game_setup::is_automatic_phase(&state) {
+        if !state.has_pending_choice()
+            && crate::game_setup::is_automatic_phase(&state) {
                 TurnEngine::advance_phase(&mut state);
                 continue;
             }
-        }
         let ra = game_setup::generate_possible_actions(&state);
         if ra.is_empty() {
             TurnEngine::advance_phase(&mut state);

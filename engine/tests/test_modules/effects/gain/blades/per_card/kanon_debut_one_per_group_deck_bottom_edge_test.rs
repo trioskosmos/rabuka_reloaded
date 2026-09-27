@@ -76,7 +76,7 @@ fn kanon_select_three_any_order_and_draws_nothing() {
     let deck = &game.state.player1.main_deck.cards;
     for (card, name) in [(cat, "CatChu!"), (kale, "KALEIDOSCORE"), (five, "5yncri5e!")] {
         assert!(
-            deck.contains(&card) == false,
+            !deck.contains(&card),
             "{} is not in the deck before the selection either, so the comparison \
              below would be vacuous",
             name

@@ -250,7 +250,6 @@ impl super::TurnEngine {
                     }
                     game_state.process_pending_auto_abilities(&second_attacker_id);
                     if game_state.has_pending_choice() {
-                        return;
                     }
                 }
                 Phase::FirstAttackerPerformance => {
@@ -337,12 +336,10 @@ impl super::TurnEngine {
         } else {
             game_state.second_attacker().id.clone()
         };
-        let performer = game_state
+        let performer = if game_state
             .player1
             .id
-            .eq(&player_id)
-            .then_some(&mut game_state.player1)
-            .unwrap_or(&mut game_state.player2);
+            .eq(&player_id) { &mut game_state.player1 } else { &mut game_state.player2 };
         performer.live_card_zone.face_up = true;
         log::debug!(
             "[LIVE_REVEAL] performer={} cards={:?}",
@@ -1128,7 +1125,7 @@ impl super::TurnEngine {
                 game_state.trigger_auto_ability(
                     ability_id,
                     crate::game_state::AbilityTrigger::Debut,
-                    &*player_id,
+                    player_id,
                     Some(card_no),
                     Some(bt_card_id),
                     None,

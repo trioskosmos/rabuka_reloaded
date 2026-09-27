@@ -343,7 +343,7 @@ fn run_game(
                     policy.choose_mulligan(&gs, &actions, &gs.card_database)
                 }),
                 PolicyRoute::LiveSet => policy_call(|| {
-                    policy.choose_live_set(&gs, &actions, &gs.card_database, v2_policy, &plan)
+                    policy.choose_live_set(&gs, &actions, &gs.card_database, v2_policy, plan)
                 }),
                 PolicyRoute::Action => {
                     if gs.current_phase == Phase::RockPaperScissors {
@@ -361,7 +361,7 @@ fn run_game(
                         }
                     } else {
                         policy_call(|| {
-                            policy.choose_action(&gs, &actions, me, v2_policy, &plan)
+                            policy.choose_action(&gs, &actions, me, v2_policy, plan)
                         })
                     }
                 }
@@ -782,7 +782,7 @@ fn real_main() -> Result<(), String> {
                 for w in 0..4 {
                     let (es, ps) = game_seeds(
                         opts.seed ^ 0xA5A5_A5A5,
-                        (passes as u32) * 10_000 + (di as u32) * 10 + w + 1,
+                        passes * 10_000 + (di as u32) * 10 + w + 1,
                     );
                     let _ = run_game(&db, &t1w, &t2w, es, ps, opts.policy, &v2w, 0, false)
                         .expect("sim_bench warmup failed");

@@ -347,10 +347,7 @@ fn own_live_zone_discard_optional_deck_single_card_deck_top_exact_identity() {
     );
     // Check deck order below top preserved — use Vec comparison
     let expected_tail: Vec<i16> = deck_snapshot.iter().copied().collect();
-    let actual_tail: Vec<i16> = game.state.player1.main_deck.cards[1..]
-        .iter()
-        .copied()
-        .collect();
+    let actual_tail: Vec<i16> = game.state.player1.main_deck.cards[1..].to_vec();
     assert_eq!(
         actual_tail, expected_tail,
         "original deck order preserved below top"
@@ -395,10 +392,7 @@ fn own_live_zone_discard_optional_deck_single_card_deck_bottom_exact_identity() 
         "live card is at deck bottom"
     );
     let snapshot_vec: Vec<i16> = deck_snapshot.iter().copied().collect();
-    let actual_head: Vec<i16> = game.state.player1.main_deck.cards[..deck_snapshot.len()]
-        .iter()
-        .copied()
-        .collect();
+    let actual_head: Vec<i16> = game.state.player1.main_deck.cards[..deck_snapshot.len()].to_vec();
     assert_eq!(
         actual_head, snapshot_vec,
         "original deck order preserved above bottom"

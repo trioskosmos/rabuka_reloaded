@@ -11,11 +11,16 @@ use crate::card::{ConditionCommon, DistinctInfo};
 #[cfg(feature = "debug_conditions")]
 use crate::card::TriggerEvent;
 
+#[allow(
+    // Recursive decode types need the Box inside the Vec. Rationale:
+    // cards/generate_condition_decoder.py ITEM_ALLOW note.
+    clippy::vec_box
+)]
 /// Accumulator for Condition fields during direct decode.
 #[derive(Default)]
 struct ConditionLocals {
     pub ability_filter: Option<ArcStr>,
-    pub ability_filter_triggers: Option<Box<Vec<String>>>,
+    pub ability_filter_triggers: Option<Vec<String>>,
     pub action_reference: Option<ArcStr>,
     pub activation_position: Option<ArcStr>,
     pub aggregate: Option<ArcStr>,
@@ -32,11 +37,11 @@ struct ConditionLocals {
     pub blade_limit: Option<u8>,
     pub blade_limit_operator: Option<Operator>,
     pub cache: Option<bool>,
-    pub card_names: Option<Box<Vec<String>>>,
+    pub card_names: Option<Vec<String>>,
     pub card_property: Option<ArcStr>,
     pub card_type: Option<ArcStr>,
     pub cause: Option<Box<Condition>>,
-    pub characters: Option<Box<Vec<String>>>,
+    pub characters: Option<Vec<String>>,
     pub check_self: Option<bool>,
     pub comparison_source: Option<ArcStr>,
     pub comparison_target: Option<ArcStr>,
@@ -56,29 +61,29 @@ struct ConditionLocals {
     pub effect: Option<Box<AbilityEffect>>,
     pub energy_placed: Option<bool>,
     pub energy_state: Option<ArcStr>,
-    pub exclude_characters: Option<Box<Vec<String>>>,
-    pub exclude_group_names: Option<Box<Vec<String>>>,
+    pub exclude_characters: Option<Vec<String>>,
+    pub exclude_group_names: Option<Vec<String>>,
     pub exclude_self: Option<bool>,
     pub from_state: Option<ArcStr>,
-    pub group_names: Option<Box<Vec<String>>>,
+    pub group_names: Option<Vec<String>>,
     pub group_reference: Option<ArcStr>,
-    pub heart_colors: Option<Box<Vec<String>>>,
+    pub heart_colors: Option<Vec<String>>,
     pub heart_source: Option<ArcStr>,
     pub heart_type: Option<ArcStr>,
     pub location: Option<ArcStr>,
-    pub locations: Option<Box<Vec<String>>>,
+    pub locations: Option<Vec<String>>,
     pub min_baton_touch_count: Option<u8>,
     pub movement: Option<ArcStr>,
     pub negation: Option<bool>,
     pub no_excess_heart: Option<bool>,
     pub operator: Option<ArcStr>,
-    pub options: Option<Box<Vec<Box<AbilityEffect>>>>,
+    pub options: Option<Vec<Box<AbilityEffect>>>,
     pub original_value: Option<bool>,
     pub phase: Option<ArcStr>,
     pub phase_target: Option<ArcStr>,
     pub position: Option<Box<PositionInfo>>,
     pub position_compare: Option<ArcStr>,
-    pub positions_characters: Option<Box<Vec<PositionCharacter>>>,
+    pub positions_characters: Option<Vec<PositionCharacter>>,
     pub reference_card: Option<ArcStr>,
     pub require_position_cards: Option<bool>,
     pub resource_type: Option<ArcStr>,
@@ -100,10 +105,15 @@ struct ConditionLocals {
     pub trigger_event: Option<Box<TriggerEvent>>,
     pub turn_number: Option<u8>,
     pub unit: Option<ArcStr>,
-    pub values: Option<Box<Vec<u8>>>,
+    pub values: Option<Vec<u8>>,
     pub yell_trigger: Option<bool>,
 }
 
+#[allow(
+    // Recursive decode types need the Box inside the Vec. Rationale:
+    // cards/generate_condition_decoder.py ITEM_ALLOW note.
+    clippy::vec_box
+)]
 /// Read one field from a condition object.
 /// Returns true if the field was recognized and consumed, false to skip.
 fn decode_condition_field(
@@ -113,7 +123,7 @@ fn decode_condition_field(
 ) -> Option<bool> {
     match key {
             "ability_filter" => { l.ability_filter = bc.read_arc_str_value(); Some(true) }
-            "ability_filter_triggers" => { l.ability_filter_triggers = bc.read_opt_str_vec_value(); Some(true) }
+            "ability_filter_triggers" => { l.ability_filter_triggers = bc.read_opt_str_vec_value().map(|b| *b); Some(true) }
             "action_reference" => { l.action_reference = bc.read_arc_str_value(); Some(true) }
             "activation_position" => { l.activation_position = bc.read_arc_str_value(); Some(true) }
             "aggregate" => { l.aggregate = bc.read_arc_str_value(); Some(true) }
@@ -130,11 +140,11 @@ fn decode_condition_field(
             "blade_limit" => { l.blade_limit = bc.read_u8_value(); Some(true) }
             "blade_limit_operator" => { l.blade_limit_operator = bc.read_operator_value(); Some(true) }
             "cache" => { l.cache = bc.read_bool_value(); Some(true) }
-            "card_names" => { l.card_names = bc.read_opt_str_vec_value(); Some(true) }
+            "card_names" => { l.card_names = bc.read_opt_str_vec_value().map(|b| *b); Some(true) }
             "card_property" => { l.card_property = bc.read_arc_str_value(); Some(true) }
             "card_type" => { l.card_type = bc.read_arc_str_value(); Some(true) }
             "cause" => { l.cause = bc.read_condition_value(); Some(true) }
-            "characters" => { l.characters = bc.read_opt_str_vec_value(); Some(true) }
+            "characters" => { l.characters = bc.read_opt_str_vec_value().map(|b| *b); Some(true) }
             "check_self" => { l.check_self = bc.read_bool_value(); Some(true) }
             "comparison_source" => { l.comparison_source = bc.read_arc_str_value(); Some(true) }
             "comparison_target" => { l.comparison_target = bc.read_arc_str_value(); Some(true) }
@@ -154,29 +164,29 @@ fn decode_condition_field(
             "effect" => { l.effect = bc.read_effect_value(); Some(true) }
             "energy_placed" => { l.energy_placed = bc.read_bool_value(); Some(true) }
             "energy_state" => { l.energy_state = bc.read_arc_str_value(); Some(true) }
-            "exclude_characters" => { l.exclude_characters = bc.read_opt_str_vec_value(); Some(true) }
-            "exclude_group_names" => { l.exclude_group_names = bc.read_opt_str_vec_value(); Some(true) }
+            "exclude_characters" => { l.exclude_characters = bc.read_opt_str_vec_value().map(|b| *b); Some(true) }
+            "exclude_group_names" => { l.exclude_group_names = bc.read_opt_str_vec_value().map(|b| *b); Some(true) }
             "exclude_self" => { l.exclude_self = bc.read_bool_value(); Some(true) }
             "from_state" => { l.from_state = bc.read_arc_str_value(); Some(true) }
-            "group_names" => { l.group_names = bc.read_opt_str_vec_value(); Some(true) }
+            "group_names" => { l.group_names = bc.read_opt_str_vec_value().map(|b| *b); Some(true) }
             "group_reference" => { l.group_reference = bc.read_arc_str_value(); Some(true) }
-            "heart_colors" => { l.heart_colors = bc.read_opt_str_vec_value(); Some(true) }
+            "heart_colors" => { l.heart_colors = bc.read_opt_str_vec_value().map(|b| *b); Some(true) }
             "heart_source" => { l.heart_source = bc.read_arc_str_value(); Some(true) }
             "heart_type" => { l.heart_type = bc.read_arc_str_value(); Some(true) }
             "location" => { l.location = bc.read_arc_str_value(); Some(true) }
-            "locations" => { l.locations = bc.read_opt_str_vec_value(); Some(true) }
+            "locations" => { l.locations = bc.read_opt_str_vec_value().map(|b| *b); Some(true) }
             "min_baton_touch_count" => { l.min_baton_touch_count = bc.read_u8_value(); Some(true) }
             "movement" => { l.movement = bc.read_arc_str_value(); Some(true) }
             "negation" => { l.negation = bc.read_bool_value(); Some(true) }
             "no_excess_heart" => { l.no_excess_heart = bc.read_bool_value(); Some(true) }
             "operator" => { l.operator = bc.read_arc_str_value(); Some(true) }
-            "options" => { l.options = bc.read_effect_vec_boxed_value(); Some(true) }
+            "options" => { l.options = bc.read_effect_vec_boxed_value().map(|b| *b); Some(true) }
             "original_value" => { l.original_value = bc.read_bool_value(); Some(true) }
             "phase" => { l.phase = bc.read_arc_str_value(); Some(true) }
             "phase_target" => { l.phase_target = bc.read_arc_str_value(); Some(true) }
             "position" => { l.position = bc.read_position_value(); Some(true) }
             "position_compare" => { l.position_compare = bc.read_arc_str_value(); Some(true) }
-            "positions_characters" => { l.positions_characters = bc.read_positions_characters_value(); Some(true) }
+            "positions_characters" => { l.positions_characters = bc.read_positions_characters_value().map(|b| *b); Some(true) }
             "reference_card" => { l.reference_card = bc.read_arc_str_value(); Some(true) }
             "require_position_cards" => { l.require_position_cards = bc.read_bool_value(); Some(true) }
             "resource_type" => { l.resource_type = bc.read_arc_str_value(); Some(true) }
@@ -198,17 +208,22 @@ fn decode_condition_field(
             #[cfg(not(feature = "debug_conditions"))] "trigger_event" => { bc.skip_value()?; Some(true) }
             "turn_number" => { l.turn_number = bc.read_u8_value(); Some(true) }
             "unit" => { l.unit = bc.read_arc_str_value(); Some(true) }
-            "values" => { l.values = bc.read_opt_u8_vec_value(); Some(true) }
+            "values" => { l.values = bc.read_opt_u8_vec_value().map(|b| *b); Some(true) }
             "yell_trigger" => { l.yell_trigger = bc.read_bool_value(); Some(true) }
             "type" => { bc.skip_value()?; Some(true) }
             _ => { note_decode_fallback(Some(bc.idx.unwrap_or(usize::MAX)), "condition_field", key); bc.skip_value()?; Some(true) }
         }
     }
 
+#[allow(
+    // Recursive decode types need the Box inside the Vec. Rationale:
+    // cards/generate_condition_decoder.py ITEM_ALLOW note.
+    clippy::vec_box
+)]
 fn build_compound(l: &ConditionLocals) -> Condition {
     Condition::Compound {
         common: Box::new(ConditionCommon {
-            ability_filter_triggers: l.ability_filter_triggers.clone(),
+            ability_filter_triggers: l.ability_filter_triggers.clone().map(Box::new),
             action_reference: l.action_reference.clone(),
             activation_position: l.activation_position.clone(),
             aggregate: l.aggregate.clone(),
@@ -219,10 +234,10 @@ fn build_compound(l: &ConditionLocals) -> Condition {
             blade_limit: l.blade_limit,
             blade_limit_operator: l.blade_limit_operator,
             cache: l.cache,
-            card_names: l.card_names.clone(),
+            card_names: l.card_names.clone().map(Box::new),
             card_property: l.card_property.as_deref().map(CardProperty::from_str),
             card_type: l.card_type.as_deref().map(ConditionCardType::from_str),
-            characters: l.characters.clone(),
+            characters: l.characters.clone().map(Box::new),
             check_self: l.check_self,
             comparison_target: l.comparison_target.as_deref().map(ComparisonTarget::from_str),
             comparison_type: l.comparison_type.as_deref().map(ComparisonType::from_str),
@@ -232,15 +247,15 @@ fn build_compound(l: &ConditionLocals) -> Condition {
             delta: l.delta,
             destination: l.destination.clone(),
             distinct: l.distinct.clone(),
-            exclude_characters: l.exclude_characters.clone(),
-            exclude_group_names: l.exclude_group_names.clone(),
+            exclude_characters: l.exclude_characters.clone().map(Box::new),
+            exclude_group_names: l.exclude_group_names.clone().map(Box::new),
             exclude_self: l.exclude_self,
             from_state: l.from_state.clone(),
-            group_names: l.group_names.clone(),
-            heart_colors: l.heart_colors.clone(),
+            group_names: l.group_names.clone().map(Box::new),
+            heart_colors: l.heart_colors.clone().map(Box::new),
             heart_source: l.heart_source.clone(),
             location: l.location.clone(),
-            locations: l.locations.clone(),
+            locations: l.locations.clone().map(Box::new),
             min_baton_touch_count: l.min_baton_touch_count,
             movement: l.movement.clone(),
             negation: l.negation,
@@ -270,10 +285,15 @@ fn build_compound(l: &ConditionLocals) -> Condition {
     }
 }
 
+#[allow(
+    // Recursive decode types need the Box inside the Vec. Rationale:
+    // cards/generate_condition_decoder.py ITEM_ALLOW note.
+    clippy::vec_box
+)]
 fn build_location(l: &ConditionLocals) -> Condition {
     Condition::Location {
         common: Box::new(ConditionCommon {
-            ability_filter_triggers: l.ability_filter_triggers.clone(),
+            ability_filter_triggers: l.ability_filter_triggers.clone().map(Box::new),
             action_reference: l.action_reference.clone(),
             activation_position: l.activation_position.clone(),
             aggregate: l.aggregate.clone(),
@@ -284,10 +304,10 @@ fn build_location(l: &ConditionLocals) -> Condition {
             blade_limit: l.blade_limit,
             blade_limit_operator: l.blade_limit_operator,
             cache: l.cache,
-            card_names: l.card_names.clone(),
+            card_names: l.card_names.clone().map(Box::new),
             card_property: l.card_property.as_deref().map(CardProperty::from_str),
             card_type: l.card_type.as_deref().map(ConditionCardType::from_str),
-            characters: l.characters.clone(),
+            characters: l.characters.clone().map(Box::new),
             check_self: l.check_self,
             comparison_target: l.comparison_target.as_deref().map(ComparisonTarget::from_str),
             comparison_type: l.comparison_type.as_deref().map(ComparisonType::from_str),
@@ -297,15 +317,15 @@ fn build_location(l: &ConditionLocals) -> Condition {
             delta: l.delta,
             destination: l.destination.clone(),
             distinct: l.distinct.clone(),
-            exclude_characters: l.exclude_characters.clone(),
-            exclude_group_names: l.exclude_group_names.clone(),
+            exclude_characters: l.exclude_characters.clone().map(Box::new),
+            exclude_group_names: l.exclude_group_names.clone().map(Box::new),
             exclude_self: l.exclude_self,
             from_state: l.from_state.clone(),
-            group_names: l.group_names.clone(),
-            heart_colors: l.heart_colors.clone(),
+            group_names: l.group_names.clone().map(Box::new),
+            heart_colors: l.heart_colors.clone().map(Box::new),
             heart_source: l.heart_source.clone(),
             location: l.location.clone(),
-            locations: l.locations.clone(),
+            locations: l.locations.clone().map(Box::new),
             min_baton_touch_count: l.min_baton_touch_count,
             movement: l.movement.clone(),
             negation: l.negation,
@@ -339,10 +359,15 @@ fn build_location(l: &ConditionLocals) -> Condition {
     }
 }
 
+#[allow(
+    // Recursive decode types need the Box inside the Vec. Rationale:
+    // cards/generate_condition_decoder.py ITEM_ALLOW note.
+    clippy::vec_box
+)]
 fn build_comparison(l: &ConditionLocals) -> Condition {
     Condition::Comparison {
         common: Box::new(ConditionCommon {
-            ability_filter_triggers: l.ability_filter_triggers.clone(),
+            ability_filter_triggers: l.ability_filter_triggers.clone().map(Box::new),
             action_reference: l.action_reference.clone(),
             activation_position: l.activation_position.clone(),
             aggregate: l.aggregate.clone(),
@@ -353,10 +378,10 @@ fn build_comparison(l: &ConditionLocals) -> Condition {
             blade_limit: l.blade_limit,
             blade_limit_operator: l.blade_limit_operator,
             cache: l.cache,
-            card_names: l.card_names.clone(),
+            card_names: l.card_names.clone().map(Box::new),
             card_property: l.card_property.as_deref().map(CardProperty::from_str),
             card_type: l.card_type.as_deref().map(ConditionCardType::from_str),
-            characters: l.characters.clone(),
+            characters: l.characters.clone().map(Box::new),
             check_self: l.check_self,
             comparison_target: l.comparison_target.as_deref().map(ComparisonTarget::from_str),
             comparison_type: l.comparison_type.as_deref().map(ComparisonType::from_str),
@@ -366,15 +391,15 @@ fn build_comparison(l: &ConditionLocals) -> Condition {
             delta: l.delta,
             destination: l.destination.clone(),
             distinct: l.distinct.clone(),
-            exclude_characters: l.exclude_characters.clone(),
-            exclude_group_names: l.exclude_group_names.clone(),
+            exclude_characters: l.exclude_characters.clone().map(Box::new),
+            exclude_group_names: l.exclude_group_names.clone().map(Box::new),
             exclude_self: l.exclude_self,
             from_state: l.from_state.clone(),
-            group_names: l.group_names.clone(),
-            heart_colors: l.heart_colors.clone(),
+            group_names: l.group_names.clone().map(Box::new),
+            heart_colors: l.heart_colors.clone().map(Box::new),
             heart_source: l.heart_source.clone(),
             location: l.location.clone(),
-            locations: l.locations.clone(),
+            locations: l.locations.clone().map(Box::new),
             min_baton_touch_count: l.min_baton_touch_count,
             movement: l.movement.clone(),
             negation: l.negation,
@@ -400,7 +425,7 @@ fn build_comparison(l: &ConditionLocals) -> Condition {
             #[cfg(feature = "debug_conditions")] trigger_event: l.trigger_event.clone(),
             yell_trigger: l.yell_trigger,
         }),
-        values: l.values.clone(),
+        values: l.values.clone().map(Box::new),
         cost_total: l.cost_total,
         cost_total_operator: l.cost_total_operator,
         comparison_source: l.comparison_source.clone(),
@@ -409,10 +434,15 @@ fn build_comparison(l: &ConditionLocals) -> Condition {
     }
 }
 
+#[allow(
+    // Recursive decode types need the Box inside the Vec. Rationale:
+    // cards/generate_condition_decoder.py ITEM_ALLOW note.
+    clippy::vec_box
+)]
 fn build_movement(l: &ConditionLocals) -> Condition {
     Condition::Movement {
         common: Box::new(ConditionCommon {
-            ability_filter_triggers: l.ability_filter_triggers.clone(),
+            ability_filter_triggers: l.ability_filter_triggers.clone().map(Box::new),
             action_reference: l.action_reference.clone(),
             activation_position: l.activation_position.clone(),
             aggregate: l.aggregate.clone(),
@@ -423,10 +453,10 @@ fn build_movement(l: &ConditionLocals) -> Condition {
             blade_limit: l.blade_limit,
             blade_limit_operator: l.blade_limit_operator,
             cache: l.cache,
-            card_names: l.card_names.clone(),
+            card_names: l.card_names.clone().map(Box::new),
             card_property: l.card_property.as_deref().map(CardProperty::from_str),
             card_type: l.card_type.as_deref().map(ConditionCardType::from_str),
-            characters: l.characters.clone(),
+            characters: l.characters.clone().map(Box::new),
             check_self: l.check_self,
             comparison_target: l.comparison_target.as_deref().map(ComparisonTarget::from_str),
             comparison_type: l.comparison_type.as_deref().map(ComparisonType::from_str),
@@ -436,15 +466,15 @@ fn build_movement(l: &ConditionLocals) -> Condition {
             delta: l.delta,
             destination: l.destination.clone(),
             distinct: l.distinct.clone(),
-            exclude_characters: l.exclude_characters.clone(),
-            exclude_group_names: l.exclude_group_names.clone(),
+            exclude_characters: l.exclude_characters.clone().map(Box::new),
+            exclude_group_names: l.exclude_group_names.clone().map(Box::new),
             exclude_self: l.exclude_self,
             from_state: l.from_state.clone(),
-            group_names: l.group_names.clone(),
-            heart_colors: l.heart_colors.clone(),
+            group_names: l.group_names.clone().map(Box::new),
+            heart_colors: l.heart_colors.clone().map(Box::new),
             heart_source: l.heart_source.clone(),
             location: l.location.clone(),
-            locations: l.locations.clone(),
+            locations: l.locations.clone().map(Box::new),
             min_baton_touch_count: l.min_baton_touch_count,
             movement: l.movement.clone(),
             negation: l.negation,
@@ -479,10 +509,15 @@ fn build_movement(l: &ConditionLocals) -> Condition {
     }
 }
 
+#[allow(
+    // Recursive decode types need the Box inside the Vec. Rationale:
+    // cards/generate_condition_decoder.py ITEM_ALLOW note.
+    clippy::vec_box
+)]
 fn build_group(l: &ConditionLocals) -> Condition {
     Condition::Group {
         common: Box::new(ConditionCommon {
-            ability_filter_triggers: l.ability_filter_triggers.clone(),
+            ability_filter_triggers: l.ability_filter_triggers.clone().map(Box::new),
             action_reference: l.action_reference.clone(),
             activation_position: l.activation_position.clone(),
             aggregate: l.aggregate.clone(),
@@ -493,10 +528,10 @@ fn build_group(l: &ConditionLocals) -> Condition {
             blade_limit: l.blade_limit,
             blade_limit_operator: l.blade_limit_operator,
             cache: l.cache,
-            card_names: l.card_names.clone(),
+            card_names: l.card_names.clone().map(Box::new),
             card_property: l.card_property.as_deref().map(CardProperty::from_str),
             card_type: l.card_type.as_deref().map(ConditionCardType::from_str),
-            characters: l.characters.clone(),
+            characters: l.characters.clone().map(Box::new),
             check_self: l.check_self,
             comparison_target: l.comparison_target.as_deref().map(ComparisonTarget::from_str),
             comparison_type: l.comparison_type.as_deref().map(ComparisonType::from_str),
@@ -506,15 +541,15 @@ fn build_group(l: &ConditionLocals) -> Condition {
             delta: l.delta,
             destination: l.destination.clone(),
             distinct: l.distinct.clone(),
-            exclude_characters: l.exclude_characters.clone(),
-            exclude_group_names: l.exclude_group_names.clone(),
+            exclude_characters: l.exclude_characters.clone().map(Box::new),
+            exclude_group_names: l.exclude_group_names.clone().map(Box::new),
             exclude_self: l.exclude_self,
             from_state: l.from_state.clone(),
-            group_names: l.group_names.clone(),
-            heart_colors: l.heart_colors.clone(),
+            group_names: l.group_names.clone().map(Box::new),
+            heart_colors: l.heart_colors.clone().map(Box::new),
             heart_source: l.heart_source.clone(),
             location: l.location.clone(),
-            locations: l.locations.clone(),
+            locations: l.locations.clone().map(Box::new),
             min_baton_touch_count: l.min_baton_touch_count,
             movement: l.movement.clone(),
             negation: l.negation,
@@ -544,10 +579,15 @@ fn build_group(l: &ConditionLocals) -> Condition {
     }
 }
 
+#[allow(
+    // Recursive decode types need the Box inside the Vec. Rationale:
+    // cards/generate_condition_decoder.py ITEM_ALLOW note.
+    clippy::vec_box
+)]
 fn build_appearance(l: &ConditionLocals) -> Condition {
     Condition::Appearance {
         common: Box::new(ConditionCommon {
-            ability_filter_triggers: l.ability_filter_triggers.clone(),
+            ability_filter_triggers: l.ability_filter_triggers.clone().map(Box::new),
             action_reference: l.action_reference.clone(),
             activation_position: l.activation_position.clone(),
             aggregate: l.aggregate.clone(),
@@ -558,10 +598,10 @@ fn build_appearance(l: &ConditionLocals) -> Condition {
             blade_limit: l.blade_limit,
             blade_limit_operator: l.blade_limit_operator,
             cache: l.cache,
-            card_names: l.card_names.clone(),
+            card_names: l.card_names.clone().map(Box::new),
             card_property: l.card_property.as_deref().map(CardProperty::from_str),
             card_type: l.card_type.as_deref().map(ConditionCardType::from_str),
-            characters: l.characters.clone(),
+            characters: l.characters.clone().map(Box::new),
             check_self: l.check_self,
             comparison_target: l.comparison_target.as_deref().map(ComparisonTarget::from_str),
             comparison_type: l.comparison_type.as_deref().map(ComparisonType::from_str),
@@ -571,15 +611,15 @@ fn build_appearance(l: &ConditionLocals) -> Condition {
             delta: l.delta,
             destination: l.destination.clone(),
             distinct: l.distinct.clone(),
-            exclude_characters: l.exclude_characters.clone(),
-            exclude_group_names: l.exclude_group_names.clone(),
+            exclude_characters: l.exclude_characters.clone().map(Box::new),
+            exclude_group_names: l.exclude_group_names.clone().map(Box::new),
             exclude_self: l.exclude_self,
             from_state: l.from_state.clone(),
-            group_names: l.group_names.clone(),
-            heart_colors: l.heart_colors.clone(),
+            group_names: l.group_names.clone().map(Box::new),
+            heart_colors: l.heart_colors.clone().map(Box::new),
             heart_source: l.heart_source.clone(),
             location: l.location.clone(),
-            locations: l.locations.clone(),
+            locations: l.locations.clone().map(Box::new),
             min_baton_touch_count: l.min_baton_touch_count,
             movement: l.movement.clone(),
             negation: l.negation,
@@ -606,17 +646,22 @@ fn build_appearance(l: &ConditionLocals) -> Condition {
             yell_trigger: l.yell_trigger,
         }),
         appearance: l.appearance,
-        positions_characters: l.positions_characters.clone(),
+        positions_characters: l.positions_characters.clone().map(Box::new),
         cost_reference_character: l.cost_reference_character.clone(),
         cost_reference_operator: l.cost_reference_operator,
         appearance_source: l.appearance_source.clone(),
     }
 }
 
+#[allow(
+    // Recursive decode types need the Box inside the Vec. Rationale:
+    // cards/generate_condition_decoder.py ITEM_ALLOW note.
+    clippy::vec_box
+)]
 fn build_temporal(l: &ConditionLocals) -> Condition {
     Condition::Temporal {
         common: Box::new(ConditionCommon {
-            ability_filter_triggers: l.ability_filter_triggers.clone(),
+            ability_filter_triggers: l.ability_filter_triggers.clone().map(Box::new),
             action_reference: l.action_reference.clone(),
             activation_position: l.activation_position.clone(),
             aggregate: l.aggregate.clone(),
@@ -627,10 +672,10 @@ fn build_temporal(l: &ConditionLocals) -> Condition {
             blade_limit: l.blade_limit,
             blade_limit_operator: l.blade_limit_operator,
             cache: l.cache,
-            card_names: l.card_names.clone(),
+            card_names: l.card_names.clone().map(Box::new),
             card_property: l.card_property.as_deref().map(CardProperty::from_str),
             card_type: l.card_type.as_deref().map(ConditionCardType::from_str),
-            characters: l.characters.clone(),
+            characters: l.characters.clone().map(Box::new),
             check_self: l.check_self,
             comparison_target: l.comparison_target.as_deref().map(ComparisonTarget::from_str),
             comparison_type: l.comparison_type.as_deref().map(ComparisonType::from_str),
@@ -640,15 +685,15 @@ fn build_temporal(l: &ConditionLocals) -> Condition {
             delta: l.delta,
             destination: l.destination.clone(),
             distinct: l.distinct.clone(),
-            exclude_characters: l.exclude_characters.clone(),
-            exclude_group_names: l.exclude_group_names.clone(),
+            exclude_characters: l.exclude_characters.clone().map(Box::new),
+            exclude_group_names: l.exclude_group_names.clone().map(Box::new),
             exclude_self: l.exclude_self,
             from_state: l.from_state.clone(),
-            group_names: l.group_names.clone(),
-            heart_colors: l.heart_colors.clone(),
+            group_names: l.group_names.clone().map(Box::new),
+            heart_colors: l.heart_colors.clone().map(Box::new),
             heart_source: l.heart_source.clone(),
             location: l.location.clone(),
-            locations: l.locations.clone(),
+            locations: l.locations.clone().map(Box::new),
             min_baton_touch_count: l.min_baton_touch_count,
             movement: l.movement.clone(),
             negation: l.negation,
@@ -680,10 +725,15 @@ fn build_temporal(l: &ConditionLocals) -> Condition {
     }
 }
 
+#[allow(
+    // Recursive decode types need the Box inside the Vec. Rationale:
+    // cards/generate_condition_decoder.py ITEM_ALLOW note.
+    clippy::vec_box
+)]
 fn build_state(l: &ConditionLocals) -> Condition {
     Condition::State {
         common: Box::new(ConditionCommon {
-            ability_filter_triggers: l.ability_filter_triggers.clone(),
+            ability_filter_triggers: l.ability_filter_triggers.clone().map(Box::new),
             action_reference: l.action_reference.clone(),
             activation_position: l.activation_position.clone(),
             aggregate: l.aggregate.clone(),
@@ -694,10 +744,10 @@ fn build_state(l: &ConditionLocals) -> Condition {
             blade_limit: l.blade_limit,
             blade_limit_operator: l.blade_limit_operator,
             cache: l.cache,
-            card_names: l.card_names.clone(),
+            card_names: l.card_names.clone().map(Box::new),
             card_property: l.card_property.as_deref().map(CardProperty::from_str),
             card_type: l.card_type.as_deref().map(ConditionCardType::from_str),
-            characters: l.characters.clone(),
+            characters: l.characters.clone().map(Box::new),
             check_self: l.check_self,
             comparison_target: l.comparison_target.as_deref().map(ComparisonTarget::from_str),
             comparison_type: l.comparison_type.as_deref().map(ComparisonType::from_str),
@@ -707,15 +757,15 @@ fn build_state(l: &ConditionLocals) -> Condition {
             delta: l.delta,
             destination: l.destination.clone(),
             distinct: l.distinct.clone(),
-            exclude_characters: l.exclude_characters.clone(),
-            exclude_group_names: l.exclude_group_names.clone(),
+            exclude_characters: l.exclude_characters.clone().map(Box::new),
+            exclude_group_names: l.exclude_group_names.clone().map(Box::new),
             exclude_self: l.exclude_self,
             from_state: l.from_state.clone(),
-            group_names: l.group_names.clone(),
-            heart_colors: l.heart_colors.clone(),
+            group_names: l.group_names.clone().map(Box::new),
+            heart_colors: l.heart_colors.clone().map(Box::new),
             heart_source: l.heart_source.clone(),
             location: l.location.clone(),
-            locations: l.locations.clone(),
+            locations: l.locations.clone().map(Box::new),
             min_baton_touch_count: l.min_baton_touch_count,
             movement: l.movement.clone(),
             negation: l.negation,
@@ -746,10 +796,15 @@ fn build_state(l: &ConditionLocals) -> Condition {
     }
 }
 
+#[allow(
+    // Recursive decode types need the Box inside the Vec. Rationale:
+    // cards/generate_condition_decoder.py ITEM_ALLOW note.
+    clippy::vec_box
+)]
 fn build_resource(l: &ConditionLocals) -> Condition {
     Condition::Resource {
         common: Box::new(ConditionCommon {
-            ability_filter_triggers: l.ability_filter_triggers.clone(),
+            ability_filter_triggers: l.ability_filter_triggers.clone().map(Box::new),
             action_reference: l.action_reference.clone(),
             activation_position: l.activation_position.clone(),
             aggregate: l.aggregate.clone(),
@@ -760,10 +815,10 @@ fn build_resource(l: &ConditionLocals) -> Condition {
             blade_limit: l.blade_limit,
             blade_limit_operator: l.blade_limit_operator,
             cache: l.cache,
-            card_names: l.card_names.clone(),
+            card_names: l.card_names.clone().map(Box::new),
             card_property: l.card_property.as_deref().map(CardProperty::from_str),
             card_type: l.card_type.as_deref().map(ConditionCardType::from_str),
-            characters: l.characters.clone(),
+            characters: l.characters.clone().map(Box::new),
             check_self: l.check_self,
             comparison_target: l.comparison_target.as_deref().map(ComparisonTarget::from_str),
             comparison_type: l.comparison_type.as_deref().map(ComparisonType::from_str),
@@ -773,15 +828,15 @@ fn build_resource(l: &ConditionLocals) -> Condition {
             delta: l.delta,
             destination: l.destination.clone(),
             distinct: l.distinct.clone(),
-            exclude_characters: l.exclude_characters.clone(),
-            exclude_group_names: l.exclude_group_names.clone(),
+            exclude_characters: l.exclude_characters.clone().map(Box::new),
+            exclude_group_names: l.exclude_group_names.clone().map(Box::new),
             exclude_self: l.exclude_self,
             from_state: l.from_state.clone(),
-            group_names: l.group_names.clone(),
-            heart_colors: l.heart_colors.clone(),
+            group_names: l.group_names.clone().map(Box::new),
+            heart_colors: l.heart_colors.clone().map(Box::new),
             heart_source: l.heart_source.clone(),
             location: l.location.clone(),
-            locations: l.locations.clone(),
+            locations: l.locations.clone().map(Box::new),
             min_baton_touch_count: l.min_baton_touch_count,
             movement: l.movement.clone(),
             negation: l.negation,
@@ -810,10 +865,15 @@ fn build_resource(l: &ConditionLocals) -> Condition {
     }
 }
 
+#[allow(
+    // Recursive decode types need the Box inside the Vec. Rationale:
+    // cards/generate_condition_decoder.py ITEM_ALLOW note.
+    clippy::vec_box
+)]
 fn build_abilityfilter(l: &ConditionLocals) -> Condition {
     Condition::AbilityFilter {
         common: Box::new(ConditionCommon {
-            ability_filter_triggers: l.ability_filter_triggers.clone(),
+            ability_filter_triggers: l.ability_filter_triggers.clone().map(Box::new),
             action_reference: l.action_reference.clone(),
             activation_position: l.activation_position.clone(),
             aggregate: l.aggregate.clone(),
@@ -824,10 +884,10 @@ fn build_abilityfilter(l: &ConditionLocals) -> Condition {
             blade_limit: l.blade_limit,
             blade_limit_operator: l.blade_limit_operator,
             cache: l.cache,
-            card_names: l.card_names.clone(),
+            card_names: l.card_names.clone().map(Box::new),
             card_property: l.card_property.as_deref().map(CardProperty::from_str),
             card_type: l.card_type.as_deref().map(ConditionCardType::from_str),
-            characters: l.characters.clone(),
+            characters: l.characters.clone().map(Box::new),
             check_self: l.check_self,
             comparison_target: l.comparison_target.as_deref().map(ComparisonTarget::from_str),
             comparison_type: l.comparison_type.as_deref().map(ComparisonType::from_str),
@@ -837,15 +897,15 @@ fn build_abilityfilter(l: &ConditionLocals) -> Condition {
             delta: l.delta,
             destination: l.destination.clone(),
             distinct: l.distinct.clone(),
-            exclude_characters: l.exclude_characters.clone(),
-            exclude_group_names: l.exclude_group_names.clone(),
+            exclude_characters: l.exclude_characters.clone().map(Box::new),
+            exclude_group_names: l.exclude_group_names.clone().map(Box::new),
             exclude_self: l.exclude_self,
             from_state: l.from_state.clone(),
-            group_names: l.group_names.clone(),
-            heart_colors: l.heart_colors.clone(),
+            group_names: l.group_names.clone().map(Box::new),
+            heart_colors: l.heart_colors.clone().map(Box::new),
             heart_source: l.heart_source.clone(),
             location: l.location.clone(),
-            locations: l.locations.clone(),
+            locations: l.locations.clone().map(Box::new),
             min_baton_touch_count: l.min_baton_touch_count,
             movement: l.movement.clone(),
             negation: l.negation,
@@ -875,10 +935,15 @@ fn build_abilityfilter(l: &ConditionLocals) -> Condition {
     }
 }
 
+#[allow(
+    // Recursive decode types need the Box inside the Vec. Rationale:
+    // cards/generate_condition_decoder.py ITEM_ALLOW note.
+    clippy::vec_box
+)]
 fn build_scorethreshold(l: &ConditionLocals) -> Condition {
     Condition::ScoreThreshold {
         common: Box::new(ConditionCommon {
-            ability_filter_triggers: l.ability_filter_triggers.clone(),
+            ability_filter_triggers: l.ability_filter_triggers.clone().map(Box::new),
             action_reference: l.action_reference.clone(),
             activation_position: l.activation_position.clone(),
             aggregate: l.aggregate.clone(),
@@ -889,10 +954,10 @@ fn build_scorethreshold(l: &ConditionLocals) -> Condition {
             blade_limit: l.blade_limit,
             blade_limit_operator: l.blade_limit_operator,
             cache: l.cache,
-            card_names: l.card_names.clone(),
+            card_names: l.card_names.clone().map(Box::new),
             card_property: l.card_property.as_deref().map(CardProperty::from_str),
             card_type: l.card_type.as_deref().map(ConditionCardType::from_str),
-            characters: l.characters.clone(),
+            characters: l.characters.clone().map(Box::new),
             check_self: l.check_self,
             comparison_target: l.comparison_target.as_deref().map(ComparisonTarget::from_str),
             comparison_type: l.comparison_type.as_deref().map(ComparisonType::from_str),
@@ -902,15 +967,15 @@ fn build_scorethreshold(l: &ConditionLocals) -> Condition {
             delta: l.delta,
             destination: l.destination.clone(),
             distinct: l.distinct.clone(),
-            exclude_characters: l.exclude_characters.clone(),
-            exclude_group_names: l.exclude_group_names.clone(),
+            exclude_characters: l.exclude_characters.clone().map(Box::new),
+            exclude_group_names: l.exclude_group_names.clone().map(Box::new),
             exclude_self: l.exclude_self,
             from_state: l.from_state.clone(),
-            group_names: l.group_names.clone(),
-            heart_colors: l.heart_colors.clone(),
+            group_names: l.group_names.clone().map(Box::new),
+            heart_colors: l.heart_colors.clone().map(Box::new),
             heart_source: l.heart_source.clone(),
             location: l.location.clone(),
-            locations: l.locations.clone(),
+            locations: l.locations.clone().map(Box::new),
             min_baton_touch_count: l.min_baton_touch_count,
             movement: l.movement.clone(),
             negation: l.negation,
@@ -939,10 +1004,15 @@ fn build_scorethreshold(l: &ConditionLocals) -> Condition {
     }
 }
 
+#[allow(
+    // Recursive decode types need the Box inside the Vec. Rationale:
+    // cards/generate_condition_decoder.py ITEM_ALLOW note.
+    clippy::vec_box
+)]
 fn build_choice(l: &ConditionLocals) -> Condition {
     Condition::Choice {
         common: Box::new(ConditionCommon {
-            ability_filter_triggers: l.ability_filter_triggers.clone(),
+            ability_filter_triggers: l.ability_filter_triggers.clone().map(Box::new),
             action_reference: l.action_reference.clone(),
             activation_position: l.activation_position.clone(),
             aggregate: l.aggregate.clone(),
@@ -953,10 +1023,10 @@ fn build_choice(l: &ConditionLocals) -> Condition {
             blade_limit: l.blade_limit,
             blade_limit_operator: l.blade_limit_operator,
             cache: l.cache,
-            card_names: l.card_names.clone(),
+            card_names: l.card_names.clone().map(Box::new),
             card_property: l.card_property.as_deref().map(CardProperty::from_str),
             card_type: l.card_type.as_deref().map(ConditionCardType::from_str),
-            characters: l.characters.clone(),
+            characters: l.characters.clone().map(Box::new),
             check_self: l.check_self,
             comparison_target: l.comparison_target.as_deref().map(ComparisonTarget::from_str),
             comparison_type: l.comparison_type.as_deref().map(ComparisonType::from_str),
@@ -966,15 +1036,15 @@ fn build_choice(l: &ConditionLocals) -> Condition {
             delta: l.delta,
             destination: l.destination.clone(),
             distinct: l.distinct.clone(),
-            exclude_characters: l.exclude_characters.clone(),
-            exclude_group_names: l.exclude_group_names.clone(),
+            exclude_characters: l.exclude_characters.clone().map(Box::new),
+            exclude_group_names: l.exclude_group_names.clone().map(Box::new),
             exclude_self: l.exclude_self,
             from_state: l.from_state.clone(),
-            group_names: l.group_names.clone(),
-            heart_colors: l.heart_colors.clone(),
+            group_names: l.group_names.clone().map(Box::new),
+            heart_colors: l.heart_colors.clone().map(Box::new),
             heart_source: l.heart_source.clone(),
             location: l.location.clone(),
-            locations: l.locations.clone(),
+            locations: l.locations.clone().map(Box::new),
             min_baton_touch_count: l.min_baton_touch_count,
             movement: l.movement.clone(),
             negation: l.negation,
@@ -1000,14 +1070,19 @@ fn build_choice(l: &ConditionLocals) -> Condition {
             #[cfg(feature = "debug_conditions")] trigger_event: l.trigger_event.clone(),
             yell_trigger: l.yell_trigger,
         }),
-        options: l.options.clone(),
+        options: l.options.clone().map(Box::new),
     }
 }
 
+#[allow(
+    // Recursive decode types need the Box inside the Vec. Rationale:
+    // cards/generate_condition_decoder.py ITEM_ALLOW note.
+    clippy::vec_box
+)]
 fn build_complex(l: &ConditionLocals) -> Condition {
     Condition::Complex {
         common: Box::new(ConditionCommon {
-            ability_filter_triggers: l.ability_filter_triggers.clone(),
+            ability_filter_triggers: l.ability_filter_triggers.clone().map(Box::new),
             action_reference: l.action_reference.clone(),
             activation_position: l.activation_position.clone(),
             aggregate: l.aggregate.clone(),
@@ -1018,10 +1093,10 @@ fn build_complex(l: &ConditionLocals) -> Condition {
             blade_limit: l.blade_limit,
             blade_limit_operator: l.blade_limit_operator,
             cache: l.cache,
-            card_names: l.card_names.clone(),
+            card_names: l.card_names.clone().map(Box::new),
             card_property: l.card_property.as_deref().map(CardProperty::from_str),
             card_type: l.card_type.as_deref().map(ConditionCardType::from_str),
-            characters: l.characters.clone(),
+            characters: l.characters.clone().map(Box::new),
             check_self: l.check_self,
             comparison_target: l.comparison_target.as_deref().map(ComparisonTarget::from_str),
             comparison_type: l.comparison_type.as_deref().map(ComparisonType::from_str),
@@ -1031,15 +1106,15 @@ fn build_complex(l: &ConditionLocals) -> Condition {
             delta: l.delta,
             destination: l.destination.clone(),
             distinct: l.distinct.clone(),
-            exclude_characters: l.exclude_characters.clone(),
-            exclude_group_names: l.exclude_group_names.clone(),
+            exclude_characters: l.exclude_characters.clone().map(Box::new),
+            exclude_group_names: l.exclude_group_names.clone().map(Box::new),
             exclude_self: l.exclude_self,
             from_state: l.from_state.clone(),
-            group_names: l.group_names.clone(),
-            heart_colors: l.heart_colors.clone(),
+            group_names: l.group_names.clone().map(Box::new),
+            heart_colors: l.heart_colors.clone().map(Box::new),
             heart_source: l.heart_source.clone(),
             location: l.location.clone(),
-            locations: l.locations.clone(),
+            locations: l.locations.clone().map(Box::new),
             min_baton_touch_count: l.min_baton_touch_count,
             movement: l.movement.clone(),
             negation: l.negation,
@@ -1070,10 +1145,15 @@ fn build_complex(l: &ConditionLocals) -> Condition {
     }
 }
 
+#[allow(
+    // Recursive decode types need the Box inside the Vec. Rationale:
+    // cards/generate_condition_decoder.py ITEM_ALLOW note.
+    clippy::vec_box
+)]
 fn build_positioncond(l: &ConditionLocals) -> Condition {
     Condition::PositionCond {
         common: Box::new(ConditionCommon {
-            ability_filter_triggers: l.ability_filter_triggers.clone(),
+            ability_filter_triggers: l.ability_filter_triggers.clone().map(Box::new),
             action_reference: l.action_reference.clone(),
             activation_position: l.activation_position.clone(),
             aggregate: l.aggregate.clone(),
@@ -1084,10 +1164,10 @@ fn build_positioncond(l: &ConditionLocals) -> Condition {
             blade_limit: l.blade_limit,
             blade_limit_operator: l.blade_limit_operator,
             cache: l.cache,
-            card_names: l.card_names.clone(),
+            card_names: l.card_names.clone().map(Box::new),
             card_property: l.card_property.as_deref().map(CardProperty::from_str),
             card_type: l.card_type.as_deref().map(ConditionCardType::from_str),
-            characters: l.characters.clone(),
+            characters: l.characters.clone().map(Box::new),
             check_self: l.check_self,
             comparison_target: l.comparison_target.as_deref().map(ComparisonTarget::from_str),
             comparison_type: l.comparison_type.as_deref().map(ComparisonType::from_str),
@@ -1097,15 +1177,15 @@ fn build_positioncond(l: &ConditionLocals) -> Condition {
             delta: l.delta,
             destination: l.destination.clone(),
             distinct: l.distinct.clone(),
-            exclude_characters: l.exclude_characters.clone(),
-            exclude_group_names: l.exclude_group_names.clone(),
+            exclude_characters: l.exclude_characters.clone().map(Box::new),
+            exclude_group_names: l.exclude_group_names.clone().map(Box::new),
             exclude_self: l.exclude_self,
             from_state: l.from_state.clone(),
-            group_names: l.group_names.clone(),
-            heart_colors: l.heart_colors.clone(),
+            group_names: l.group_names.clone().map(Box::new),
+            heart_colors: l.heart_colors.clone().map(Box::new),
             heart_source: l.heart_source.clone(),
             location: l.location.clone(),
-            locations: l.locations.clone(),
+            locations: l.locations.clone().map(Box::new),
             min_baton_touch_count: l.min_baton_touch_count,
             movement: l.movement.clone(),
             negation: l.negation,
@@ -1134,10 +1214,15 @@ fn build_positioncond(l: &ConditionLocals) -> Condition {
     }
 }
 
+#[allow(
+    // Recursive decode types need the Box inside the Vec. Rationale:
+    // cards/generate_condition_decoder.py ITEM_ALLOW note.
+    clippy::vec_box
+)]
 fn build_opponentchoice(l: &ConditionLocals) -> Condition {
     Condition::OpponentChoice {
         common: Box::new(ConditionCommon {
-            ability_filter_triggers: l.ability_filter_triggers.clone(),
+            ability_filter_triggers: l.ability_filter_triggers.clone().map(Box::new),
             action_reference: l.action_reference.clone(),
             activation_position: l.activation_position.clone(),
             aggregate: l.aggregate.clone(),
@@ -1148,10 +1233,10 @@ fn build_opponentchoice(l: &ConditionLocals) -> Condition {
             blade_limit: l.blade_limit,
             blade_limit_operator: l.blade_limit_operator,
             cache: l.cache,
-            card_names: l.card_names.clone(),
+            card_names: l.card_names.clone().map(Box::new),
             card_property: l.card_property.as_deref().map(CardProperty::from_str),
             card_type: l.card_type.as_deref().map(ConditionCardType::from_str),
-            characters: l.characters.clone(),
+            characters: l.characters.clone().map(Box::new),
             check_self: l.check_self,
             comparison_target: l.comparison_target.as_deref().map(ComparisonTarget::from_str),
             comparison_type: l.comparison_type.as_deref().map(ComparisonType::from_str),
@@ -1161,15 +1246,15 @@ fn build_opponentchoice(l: &ConditionLocals) -> Condition {
             delta: l.delta,
             destination: l.destination.clone(),
             distinct: l.distinct.clone(),
-            exclude_characters: l.exclude_characters.clone(),
-            exclude_group_names: l.exclude_group_names.clone(),
+            exclude_characters: l.exclude_characters.clone().map(Box::new),
+            exclude_group_names: l.exclude_group_names.clone().map(Box::new),
             exclude_self: l.exclude_self,
             from_state: l.from_state.clone(),
-            group_names: l.group_names.clone(),
-            heart_colors: l.heart_colors.clone(),
+            group_names: l.group_names.clone().map(Box::new),
+            heart_colors: l.heart_colors.clone().map(Box::new),
             heart_source: l.heart_source.clone(),
             location: l.location.clone(),
-            locations: l.locations.clone(),
+            locations: l.locations.clone().map(Box::new),
             min_baton_touch_count: l.min_baton_touch_count,
             movement: l.movement.clone(),
             negation: l.negation,
@@ -1198,10 +1283,15 @@ fn build_opponentchoice(l: &ConditionLocals) -> Condition {
     }
 }
 
+#[allow(
+    // Recursive decode types need the Box inside the Vec. Rationale:
+    // cards/generate_condition_decoder.py ITEM_ALLOW note.
+    clippy::vec_box
+)]
 fn build_opponentlivesuccess(l: &ConditionLocals) -> Condition {
     Condition::OpponentLiveSuccess {
         common: Box::new(ConditionCommon {
-            ability_filter_triggers: l.ability_filter_triggers.clone(),
+            ability_filter_triggers: l.ability_filter_triggers.clone().map(Box::new),
             action_reference: l.action_reference.clone(),
             activation_position: l.activation_position.clone(),
             aggregate: l.aggregate.clone(),
@@ -1212,10 +1302,10 @@ fn build_opponentlivesuccess(l: &ConditionLocals) -> Condition {
             blade_limit: l.blade_limit,
             blade_limit_operator: l.blade_limit_operator,
             cache: l.cache,
-            card_names: l.card_names.clone(),
+            card_names: l.card_names.clone().map(Box::new),
             card_property: l.card_property.as_deref().map(CardProperty::from_str),
             card_type: l.card_type.as_deref().map(ConditionCardType::from_str),
-            characters: l.characters.clone(),
+            characters: l.characters.clone().map(Box::new),
             check_self: l.check_self,
             comparison_target: l.comparison_target.as_deref().map(ComparisonTarget::from_str),
             comparison_type: l.comparison_type.as_deref().map(ComparisonType::from_str),
@@ -1225,15 +1315,15 @@ fn build_opponentlivesuccess(l: &ConditionLocals) -> Condition {
             delta: l.delta,
             destination: l.destination.clone(),
             distinct: l.distinct.clone(),
-            exclude_characters: l.exclude_characters.clone(),
-            exclude_group_names: l.exclude_group_names.clone(),
+            exclude_characters: l.exclude_characters.clone().map(Box::new),
+            exclude_group_names: l.exclude_group_names.clone().map(Box::new),
             exclude_self: l.exclude_self,
             from_state: l.from_state.clone(),
-            group_names: l.group_names.clone(),
-            heart_colors: l.heart_colors.clone(),
+            group_names: l.group_names.clone().map(Box::new),
+            heart_colors: l.heart_colors.clone().map(Box::new),
             heart_source: l.heart_source.clone(),
             location: l.location.clone(),
-            locations: l.locations.clone(),
+            locations: l.locations.clone().map(Box::new),
             min_baton_touch_count: l.min_baton_touch_count,
             movement: l.movement.clone(),
             negation: l.negation,
@@ -1262,10 +1352,15 @@ fn build_opponentlivesuccess(l: &ConditionLocals) -> Condition {
     }
 }
 
+#[allow(
+    // Recursive decode types need the Box inside the Vec. Rationale:
+    // cards/generate_condition_decoder.py ITEM_ALLOW note.
+    clippy::vec_box
+)]
 fn build_noexcessheart(l: &ConditionLocals) -> Condition {
     Condition::NoExcessHeart {
         common: Box::new(ConditionCommon {
-            ability_filter_triggers: l.ability_filter_triggers.clone(),
+            ability_filter_triggers: l.ability_filter_triggers.clone().map(Box::new),
             action_reference: l.action_reference.clone(),
             activation_position: l.activation_position.clone(),
             aggregate: l.aggregate.clone(),
@@ -1276,10 +1371,10 @@ fn build_noexcessheart(l: &ConditionLocals) -> Condition {
             blade_limit: l.blade_limit,
             blade_limit_operator: l.blade_limit_operator,
             cache: l.cache,
-            card_names: l.card_names.clone(),
+            card_names: l.card_names.clone().map(Box::new),
             card_property: l.card_property.as_deref().map(CardProperty::from_str),
             card_type: l.card_type.as_deref().map(ConditionCardType::from_str),
-            characters: l.characters.clone(),
+            characters: l.characters.clone().map(Box::new),
             check_self: l.check_self,
             comparison_target: l.comparison_target.as_deref().map(ComparisonTarget::from_str),
             comparison_type: l.comparison_type.as_deref().map(ComparisonType::from_str),
@@ -1289,15 +1384,15 @@ fn build_noexcessheart(l: &ConditionLocals) -> Condition {
             delta: l.delta,
             destination: l.destination.clone(),
             distinct: l.distinct.clone(),
-            exclude_characters: l.exclude_characters.clone(),
-            exclude_group_names: l.exclude_group_names.clone(),
+            exclude_characters: l.exclude_characters.clone().map(Box::new),
+            exclude_group_names: l.exclude_group_names.clone().map(Box::new),
             exclude_self: l.exclude_self,
             from_state: l.from_state.clone(),
-            group_names: l.group_names.clone(),
-            heart_colors: l.heart_colors.clone(),
+            group_names: l.group_names.clone().map(Box::new),
+            heart_colors: l.heart_colors.clone().map(Box::new),
             heart_source: l.heart_source.clone(),
             location: l.location.clone(),
-            locations: l.locations.clone(),
+            locations: l.locations.clone().map(Box::new),
             min_baton_touch_count: l.min_baton_touch_count,
             movement: l.movement.clone(),
             negation: l.negation,
@@ -1326,10 +1421,15 @@ fn build_noexcessheart(l: &ConditionLocals) -> Condition {
     }
 }
 
+#[allow(
+    // Recursive decode types need the Box inside the Vec. Rationale:
+    // cards/generate_condition_decoder.py ITEM_ALLOW note.
+    clippy::vec_box
+)]
 fn build_alwaystrue(l: &ConditionLocals) -> Condition {
     Condition::AlwaysTrue {
         common: Box::new(ConditionCommon {
-            ability_filter_triggers: l.ability_filter_triggers.clone(),
+            ability_filter_triggers: l.ability_filter_triggers.clone().map(Box::new),
             action_reference: l.action_reference.clone(),
             activation_position: l.activation_position.clone(),
             aggregate: l.aggregate.clone(),
@@ -1340,10 +1440,10 @@ fn build_alwaystrue(l: &ConditionLocals) -> Condition {
             blade_limit: l.blade_limit,
             blade_limit_operator: l.blade_limit_operator,
             cache: l.cache,
-            card_names: l.card_names.clone(),
+            card_names: l.card_names.clone().map(Box::new),
             card_property: l.card_property.as_deref().map(CardProperty::from_str),
             card_type: l.card_type.as_deref().map(ConditionCardType::from_str),
-            characters: l.characters.clone(),
+            characters: l.characters.clone().map(Box::new),
             check_self: l.check_self,
             comparison_target: l.comparison_target.as_deref().map(ComparisonTarget::from_str),
             comparison_type: l.comparison_type.as_deref().map(ComparisonType::from_str),
@@ -1353,15 +1453,15 @@ fn build_alwaystrue(l: &ConditionLocals) -> Condition {
             delta: l.delta,
             destination: l.destination.clone(),
             distinct: l.distinct.clone(),
-            exclude_characters: l.exclude_characters.clone(),
-            exclude_group_names: l.exclude_group_names.clone(),
+            exclude_characters: l.exclude_characters.clone().map(Box::new),
+            exclude_group_names: l.exclude_group_names.clone().map(Box::new),
             exclude_self: l.exclude_self,
             from_state: l.from_state.clone(),
-            group_names: l.group_names.clone(),
-            heart_colors: l.heart_colors.clone(),
+            group_names: l.group_names.clone().map(Box::new),
+            heart_colors: l.heart_colors.clone().map(Box::new),
             heart_source: l.heart_source.clone(),
             location: l.location.clone(),
-            locations: l.locations.clone(),
+            locations: l.locations.clone().map(Box::new),
             min_baton_touch_count: l.min_baton_touch_count,
             movement: l.movement.clone(),
             negation: l.negation,
@@ -1390,10 +1490,15 @@ fn build_alwaystrue(l: &ConditionLocals) -> Condition {
     }
 }
 
+#[allow(
+    // Recursive decode types need the Box inside the Vec. Rationale:
+    // cards/generate_condition_decoder.py ITEM_ALLOW note.
+    clippy::vec_box
+)]
 fn build_anyof(l: &ConditionLocals) -> Condition {
     Condition::AnyOf {
         common: Box::new(ConditionCommon {
-            ability_filter_triggers: l.ability_filter_triggers.clone(),
+            ability_filter_triggers: l.ability_filter_triggers.clone().map(Box::new),
             action_reference: l.action_reference.clone(),
             activation_position: l.activation_position.clone(),
             aggregate: l.aggregate.clone(),
@@ -1404,10 +1509,10 @@ fn build_anyof(l: &ConditionLocals) -> Condition {
             blade_limit: l.blade_limit,
             blade_limit_operator: l.blade_limit_operator,
             cache: l.cache,
-            card_names: l.card_names.clone(),
+            card_names: l.card_names.clone().map(Box::new),
             card_property: l.card_property.as_deref().map(CardProperty::from_str),
             card_type: l.card_type.as_deref().map(ConditionCardType::from_str),
-            characters: l.characters.clone(),
+            characters: l.characters.clone().map(Box::new),
             check_self: l.check_self,
             comparison_target: l.comparison_target.as_deref().map(ComparisonTarget::from_str),
             comparison_type: l.comparison_type.as_deref().map(ComparisonType::from_str),
@@ -1417,15 +1522,15 @@ fn build_anyof(l: &ConditionLocals) -> Condition {
             delta: l.delta,
             destination: l.destination.clone(),
             distinct: l.distinct.clone(),
-            exclude_characters: l.exclude_characters.clone(),
-            exclude_group_names: l.exclude_group_names.clone(),
+            exclude_characters: l.exclude_characters.clone().map(Box::new),
+            exclude_group_names: l.exclude_group_names.clone().map(Box::new),
             exclude_self: l.exclude_self,
             from_state: l.from_state.clone(),
-            group_names: l.group_names.clone(),
-            heart_colors: l.heart_colors.clone(),
+            group_names: l.group_names.clone().map(Box::new),
+            heart_colors: l.heart_colors.clone().map(Box::new),
             heart_source: l.heart_source.clone(),
             location: l.location.clone(),
-            locations: l.locations.clone(),
+            locations: l.locations.clone().map(Box::new),
             min_baton_touch_count: l.min_baton_touch_count,
             movement: l.movement.clone(),
             negation: l.negation,
@@ -1455,10 +1560,15 @@ fn build_anyof(l: &ConditionLocals) -> Condition {
     }
 }
 
+#[allow(
+    // Recursive decode types need the Box inside the Vec. Rationale:
+    // cards/generate_condition_decoder.py ITEM_ALLOW note.
+    clippy::vec_box
+)]
 fn build_allrevealedmatchheartcolor(l: &ConditionLocals) -> Condition {
     Condition::AllRevealedMatchHeartColor {
         common: Box::new(ConditionCommon {
-            ability_filter_triggers: l.ability_filter_triggers.clone(),
+            ability_filter_triggers: l.ability_filter_triggers.clone().map(Box::new),
             action_reference: l.action_reference.clone(),
             activation_position: l.activation_position.clone(),
             aggregate: l.aggregate.clone(),
@@ -1469,10 +1579,10 @@ fn build_allrevealedmatchheartcolor(l: &ConditionLocals) -> Condition {
             blade_limit: l.blade_limit,
             blade_limit_operator: l.blade_limit_operator,
             cache: l.cache,
-            card_names: l.card_names.clone(),
+            card_names: l.card_names.clone().map(Box::new),
             card_property: l.card_property.as_deref().map(CardProperty::from_str),
             card_type: l.card_type.as_deref().map(ConditionCardType::from_str),
-            characters: l.characters.clone(),
+            characters: l.characters.clone().map(Box::new),
             check_self: l.check_self,
             comparison_target: l.comparison_target.as_deref().map(ComparisonTarget::from_str),
             comparison_type: l.comparison_type.as_deref().map(ComparisonType::from_str),
@@ -1482,15 +1592,15 @@ fn build_allrevealedmatchheartcolor(l: &ConditionLocals) -> Condition {
             delta: l.delta,
             destination: l.destination.clone(),
             distinct: l.distinct.clone(),
-            exclude_characters: l.exclude_characters.clone(),
-            exclude_group_names: l.exclude_group_names.clone(),
+            exclude_characters: l.exclude_characters.clone().map(Box::new),
+            exclude_group_names: l.exclude_group_names.clone().map(Box::new),
             exclude_self: l.exclude_self,
             from_state: l.from_state.clone(),
-            group_names: l.group_names.clone(),
-            heart_colors: l.heart_colors.clone(),
+            group_names: l.group_names.clone().map(Box::new),
+            heart_colors: l.heart_colors.clone().map(Box::new),
             heart_source: l.heart_source.clone(),
             location: l.location.clone(),
-            locations: l.locations.clone(),
+            locations: l.locations.clone().map(Box::new),
             min_baton_touch_count: l.min_baton_touch_count,
             movement: l.movement.clone(),
             negation: l.negation,
@@ -1519,10 +1629,15 @@ fn build_allrevealedmatchheartcolor(l: &ConditionLocals) -> Condition {
     }
 }
 
+#[allow(
+    // Recursive decode types need the Box inside the Vec. Rationale:
+    // cards/generate_condition_decoder.py ITEM_ALLOW note.
+    clippy::vec_box
+)]
 fn build_unsupported(l: &ConditionLocals) -> Condition {
     Condition::Unsupported {
         common: Box::new(ConditionCommon {
-            ability_filter_triggers: l.ability_filter_triggers.clone(),
+            ability_filter_triggers: l.ability_filter_triggers.clone().map(Box::new),
             action_reference: l.action_reference.clone(),
             activation_position: l.activation_position.clone(),
             aggregate: l.aggregate.clone(),
@@ -1533,10 +1648,10 @@ fn build_unsupported(l: &ConditionLocals) -> Condition {
             blade_limit: l.blade_limit,
             blade_limit_operator: l.blade_limit_operator,
             cache: l.cache,
-            card_names: l.card_names.clone(),
+            card_names: l.card_names.clone().map(Box::new),
             card_property: l.card_property.as_deref().map(CardProperty::from_str),
             card_type: l.card_type.as_deref().map(ConditionCardType::from_str),
-            characters: l.characters.clone(),
+            characters: l.characters.clone().map(Box::new),
             check_self: l.check_self,
             comparison_target: l.comparison_target.as_deref().map(ComparisonTarget::from_str),
             comparison_type: l.comparison_type.as_deref().map(ComparisonType::from_str),
@@ -1546,15 +1661,15 @@ fn build_unsupported(l: &ConditionLocals) -> Condition {
             delta: l.delta,
             destination: l.destination.clone(),
             distinct: l.distinct.clone(),
-            exclude_characters: l.exclude_characters.clone(),
-            exclude_group_names: l.exclude_group_names.clone(),
+            exclude_characters: l.exclude_characters.clone().map(Box::new),
+            exclude_group_names: l.exclude_group_names.clone().map(Box::new),
             exclude_self: l.exclude_self,
             from_state: l.from_state.clone(),
-            group_names: l.group_names.clone(),
-            heart_colors: l.heart_colors.clone(),
+            group_names: l.group_names.clone().map(Box::new),
+            heart_colors: l.heart_colors.clone().map(Box::new),
             heart_source: l.heart_source.clone(),
             location: l.location.clone(),
-            locations: l.locations.clone(),
+            locations: l.locations.clone().map(Box::new),
             min_baton_touch_count: l.min_baton_touch_count,
             movement: l.movement.clone(),
             negation: l.negation,
@@ -1583,6 +1698,11 @@ fn build_unsupported(l: &ConditionLocals) -> Condition {
     }
 }
 
+#[allow(
+    // Recursive decode types need the Box inside the Vec. Rationale:
+    // cards/generate_condition_decoder.py ITEM_ALLOW note.
+    clippy::vec_box
+)]
 /// Direct decoder for TAG_OBJECT_VARIANT conditions.
 fn decode_condition_direct(
     bc: &mut BcReader,

@@ -1101,10 +1101,10 @@ pub fn player_to_display(
     let mut current_score = 0u8;
     for &cid in &player.stage.stage {
         if let Some(card) = card_db.get_card(cid) {
-            current_score += card.score.unwrap_or(0) as u8;
+            current_score += card.score.unwrap_or(0);
         }
     }
-    for (_, &val) in score_modifiers {
+    for &val in score_modifiers.values() {
         current_score = crate::constants::saturate_u8(current_score as i32 + val);
     }
 

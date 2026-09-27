@@ -44,7 +44,7 @@ fn pl_hs_bp6_013_r_live_start_waits_low_blade_opponent_member() {
     let mut game = TestGame::new(db);
     let victim = pl_hs_bp6_013_r_wait_flow(&mut game, "ライブ開始時", AbilityTrigger::LiveStart);
     assert_eq!(
-        game.state.mods.get_orientation_modifier(victim).as_deref(),
+        game.state.mods.get_orientation_modifier(victim),
         Some("wait"),
         "opponent low-blade member waited"
     );

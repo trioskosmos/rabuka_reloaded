@@ -149,7 +149,7 @@ fn future_development(gs: &GameState, me: u8) -> f64 {
 }
 
 #[derive(Clone)]
-struct Features {
+pub(crate) struct Features {
     hearts: i32,
     blades: i32,
     cost: i32,
@@ -162,7 +162,7 @@ struct Features {
     success: usize,
 }
 
-fn features(gs: &GameState, me: u8) -> Features {
+pub(crate) fn features(gs: &GameState, me: u8) -> Features {
     let p = gs.seat_player(me);
     let (pool, blades, cost) = board(gs, me);
     let mut mean = pool;
@@ -236,7 +236,9 @@ fn terminal_win(gs: &GameState, me: u8) -> bool {
     }
 }
 
-fn value(now: &Features, base: &Features, deploy: bool) -> f64 {
+/// Leaf value of the v7 chain search, in v7's own units. `v7_ismcts` reuses
+/// it to grade rollout actions so the policy and the prior it refines agree.
+pub(crate) fn value(now: &Features, base: &Features, deploy: bool) -> f64 {
     // Development weight: default 8.0 (historical). V7_DEV_WEIGHT for
     // ablation — losses still cluster on dev_gap (audit 2026-09-23).
     let dev_w: f64 = std::env::var("V7_DEV_WEIGHT")
@@ -478,7 +480,7 @@ fn rollout_suggestion(gs: &GameState, actions: &[Action], me: u8) -> Option<Acti
         .iter()
         .enumerate()
         .max_by(|(_, left), (_, right)| left.total_cmp(right))?;
-    Some(actions.get(index).cloned()?)
+    actions.get(index).cloned()
 }
 fn pick_best(gs: &GameState, me: u8, actions: &[Action], scores: &[(f64, String)]) -> usize {
     let mut best = 0usize;
@@ -617,8 +619,32 @@ pub fn score_actions(gs: &GameState, actions: &[Action], me: u8) -> Vec<(f64, St
     scores
 }
 
+/// v7's main-phase decision WITH the ISMCTS refinement (the product bot).
 pub fn choose_action(gs: &GameState, actions: &[Action], me: u8) -> Action {
+    choose_action_impl(gs, actions, me, None)
+}
+
+/// v7's main-phase decision with the ISMCTS refinement forced OFF.
+///
+/// This is the arena's `v7plain` ablation seat. It exists so a mirror
+/// `v7 vs v7plain` measures the search and nothing else: same build, same
+/// heuristics, same live set, one variable.
+pub fn choose_action_plain(gs: &GameState, actions: &[Action], me: u8) -> Action {
+    choose_action_impl(gs, actions, me, Some(false))
+}
+
+fn choose_action_impl(
+    gs: &GameState,
+    actions: &[Action],
+    me: u8,
+    forced: Option<bool>,
+) -> Action {
     let scores = score_actions(gs, actions, me);
+    // ISMCTS refinement. The static scores above are the prior; the search
+    // promotes a move only when the determinized rollouts beat it, and every
+    // failure path (disabled, nothing to choose, proven win, non-finite
+    // scores) returns these same scores, so this can only add signal.
+    let scores = crate::bot::v7_ismcts::refine_scores(gs, actions, me, &scores, forced);
     let best = pick_best(gs, me, actions, &scores);
     let chosen = actions.get(best).cloned().unwrap_or(Action {
         action_type: ActionType::Pass,

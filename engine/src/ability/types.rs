@@ -1108,7 +1108,7 @@ impl StepState {
         if let Some(ref id) = effect.id_any() {
             self.step_results
                 .entry(id.to_string())
-                .or_insert_with(StepOutput::default)
+                .or_default()
                 .merge(&output);
         }
     }

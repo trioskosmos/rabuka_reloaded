@@ -21,8 +21,8 @@ fn shizuku_pay_2e_deploys_shizuku() {
     let mut safety=0;
     while game.has_pending_choice() && safety<5 { safety+=1; game.select_indices(&[0]); }
     // Deployed shizuku should be on stage (either left/right)
-    let has_shizuku_hand = game.state.player1.stage.stage.iter().any(|&id| id==shizuku_hand);
-    assert!(has_shizuku_hand || game.state.player1.hand.cards.contains(&shizuku_hand)==false, "Shizuku should have left hand");
+    let has_shizuku_hand = game.state.player1.stage.stage.contains(&shizuku_hand);
+    assert!(has_shizuku_hand || !game.state.player1.hand.cards.contains(&shizuku_hand), "Shizuku should have left hand");
     assert!(!game.has_pending_choice());
 }
 #[test]

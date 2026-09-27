@@ -28,7 +28,7 @@ impl CardLoader {
         #[cfg(feature = "compact_card_data")]
         {
             let _ = path;
-            return Ok(Self::load_all_cards_from_blob());
+            Ok(Self::load_all_cards_from_blob())
         }
         #[cfg(not(feature = "compact_card_data"))]
         {
@@ -47,7 +47,7 @@ impl CardLoader {
         #[cfg(all(feature = "compact_card_data", not(feature = "snes")))]
         {
             let _ = cards_json;
-            return Ok(Self::load_all_cards_from_blob());
+            Ok(Self::load_all_cards_from_blob())
         }
         #[cfg(feature = "snes")]
         {

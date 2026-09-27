@@ -16,7 +16,7 @@ fn group_member_filter_excludes_activating_member() {
     game.add_to_stage(MemberArea::LeftSide, chika);
     game.add_to_stage(MemberArea::RightSide, riko);
 
-    let stage_data = game.player().stage.stage.clone();
+    let stage_data = game.player().stage.stage;
     let card_db = game.state.card_database.clone();
 
     assert!(

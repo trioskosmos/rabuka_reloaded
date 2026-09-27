@@ -44,9 +44,9 @@ impl AbilityResolver {
                 gs,
                 text,
                 effect.target_any().unwrap_or("self"),
-                effect.duration_any().as_deref(),
+                effect.duration_any(),
                 effect.gained_effect_any().cloned(),
-                effect.ability_gain_trigger_any().as_deref(),
+                effect.ability_gain_trigger_any(),
                 gs.activating_card,
             );
         }

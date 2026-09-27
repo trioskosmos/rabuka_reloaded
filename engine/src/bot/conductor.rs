@@ -89,7 +89,7 @@ pub fn choose_main_conductor(gs: &GameState, actions: &[Action], me: u8) -> Acti
         .main_deck
         .cards
         .iter()
-        .filter(|&&c| db.get_card(c).map_or(false, |x| x.card_type == CardType::Live))
+        .filter(|&&c| db.get_card(c).is_some_and(|x| x.card_type == CardType::Live))
         .count();
     let deck_len = my_now.main_deck.cards.len().max(1);
     let p_life_draw = deck_lives as f64 / deck_len as f64;
@@ -250,7 +250,7 @@ fn fill_junk(gs: &GameState, me: u8, db: &CardDatabase, desired: &mut Vec<usize>
         .main_deck
         .cards
         .iter()
-        .filter(|&&cid| db.get_card(cid).map_or(false, |c| c.card_type == CardType::Live))
+        .filter(|&&cid| db.get_card(cid).is_some_and(|c| c.card_type == CardType::Live))
         .count();
     if desired.len() >= max_slots || deck_lives == 0 {
         return;
@@ -265,7 +265,7 @@ fn fill_junk(gs: &GameState, me: u8, db: &CardDatabase, desired: &mut Vec<usize>
         .enumerate()
         .filter(|&(i, &cid)| {
             !desired.contains(&i)
-                && db.get_card(cid).map_or(false, |c| c.card_type != CardType::Live)
+                && db.get_card(cid).is_some_and(|c| c.card_type != CardType::Live)
         })
         .map(|(i, &cid)| {
             let cost = db.get_card(cid).and_then(|c| c.cost).unwrap_or(0) as i32;

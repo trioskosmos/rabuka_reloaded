@@ -34,11 +34,10 @@ impl PlayerId {
     pub fn as_str(&self) -> &str {
         &self.0
     }
-    /// Owned copy, for the (shrinking) number of callers that need a `String`.
-    #[inline]
-    pub fn to_string(&self) -> String {
-        self.0.to_string()
-    }
+    // No inherent `to_string`: `Display` already gives every caller the same
+    // owned `String` through the `ToString` blanket impl, and an inherent
+    // method of that name silently shadows `Display` for any future
+    // `format_args`-style use. Every `.to_string()` call site is unaffected.
 }
 
 impl Deref for PlayerId {
@@ -446,7 +445,7 @@ impl Player {
                         .get_card(member_id)
                         .is_some_and(|existing_card| {
                             crate::ability::util::has_cannot_baton_touch_protection(
-                                &card_db,
+                                card_db,
                                 card_id,
                                 existing_card,
                             )

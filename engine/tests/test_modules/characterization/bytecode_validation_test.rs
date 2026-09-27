@@ -159,7 +159,7 @@ mod bytecode_validation {
             let json_entry = &json_abilities[i];
 
             // Check effect action matches
-            if let Some(ref json_effect) = json_entry.get("effect") {
+            if let Some(json_effect) = json_entry.get("effect") {
                 if let Some(json_action) = json_effect.get("action").and_then(|v| v.as_str()) {
                     if !json_action.is_empty() && ability.effect.is_some() {
                         let eff = ability.effect.as_ref().unwrap();

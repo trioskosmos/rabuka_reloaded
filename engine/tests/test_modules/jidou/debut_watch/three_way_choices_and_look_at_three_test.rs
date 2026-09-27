@@ -56,7 +56,7 @@ fn fill_decks(game: &mut TestGame) {
 }
 
 fn heart_mod(game: &TestGame, card: i16, colour: HeartColor) -> i32 {
-    i32::from(game.state.mods.get_heart_modifier(card, colour))
+    game.state.mods.get_heart_modifier(card, colour)
 }
 
 /// Answer the next prompt with option `index`, or skip it when there is none.

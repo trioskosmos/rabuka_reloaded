@@ -33,7 +33,7 @@ fn count_all_cards(game: &TestGame) -> usize {
     total += game.state.revealed_cards.len();
     total += game.state.revealed_cost_cards.len();
     total += game.state.looked_at_cards.len();
-    total as usize
+    total
 }
 
 #[test]

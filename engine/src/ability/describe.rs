@@ -210,7 +210,7 @@ pub fn describe_effect(effect: &AbilityEffect, ja: bool) -> String {
                     } else {
                         format!("Place {} from {} to {}", maybe_plural(c, ct), src, dest)
                     };
-                    if let Some("wait") = effect.state_change_any().as_deref() {
+                    if let Some("wait") = effect.state_change_any() {
                         result += if ja { "（レスト）" } else { " (rest)" };
                     }
                     result
@@ -242,9 +242,9 @@ pub fn describe_effect(effect: &AbilityEffect, ja: bool) -> String {
 
         "gain_resource" => {
             let r_binding = effect.resource_any();
-            let r = resource_label_inner(r_binding.as_deref(), ja);
+            let r = resource_label_inner(r_binding, ja);
             let dur_binding = effect.duration_any();
-            let dur = dur_binding.as_deref().and_then(|d| {
+            let dur = dur_binding.and_then(|d| {
                 let lbl = duration_label_inner(Some(d), ja);
                 if lbl.is_empty() {
                     None
@@ -257,7 +257,7 @@ pub fn describe_effect(effect: &AbilityEffect, ja: bool) -> String {
                 .unwrap_or_default();
             let count_str = if ja {
                 if c == Some(1) {
-                    format!("{}", r)
+                    r.to_string()
                 } else {
                     format!("{} {}", c.unwrap_or(1), r)
                 }
@@ -274,7 +274,7 @@ pub fn describe_effect(effect: &AbilityEffect, ja: bool) -> String {
 
         "change_state" => {
             let verb_binding = effect.state_change_any();
-            let verb = state_verb_inner(verb_binding.as_deref(), ja);
+            let verb = state_verb_inner(verb_binding, ja);
             let cnt = c.unwrap_or(1);
             if ja {
                 let who = match t {
@@ -327,7 +327,7 @@ pub fn describe_effect(effect: &AbilityEffect, ja: bool) -> String {
         }
 
         "position_change" => {
-            if let Some(ep) = effect.exclude_position_any().as_deref() {
+            if let Some(ep) = effect.exclude_position_any() {
                 if ja {
                     format!("{}を避けてポジションチェンジ", ep)
                 } else {
@@ -583,9 +583,9 @@ pub fn describe_effect(effect: &AbilityEffect, ja: bool) -> String {
         },
 
         "set_card_identity" => match (ja, effect.identities_any()) {
-            (true, Some(ref ids)) => format!("扱い：{}", ids.join(", ")),
+            (true, Some(ids)) => format!("扱い：{}", ids.join(", ")),
             (true, None) => "カードの扱いを設定".to_string(),
-            (false, Some(ref ids)) => format!("Treat as: {}", ids.join(", ")),
+            (false, Some(ids)) => format!("Treat as: {}", ids.join(", ")),
             (false, None) => "Set card identity".to_string(),
         },
 
@@ -892,7 +892,7 @@ pub fn describe_effect(effect: &AbilityEffect, ja: bool) -> String {
         }
 
         "modify_yell_source" => {
-            let bottom = effect.yell_source_any().as_deref() == Some("deck_bottom");
+            let bottom = effect.yell_source_any() == Some("deck_bottom");
             if ja {
                 if bottom {
                     "エールはデッキの下から行う".to_string()
@@ -907,7 +907,7 @@ pub fn describe_effect(effect: &AbilityEffect, ja: bool) -> String {
         }
 
         "suppress_ability_trigger" => {
-            let live_start = effect.suppressed_trigger_any().as_deref() == Some("live_start");
+            let live_start = effect.suppressed_trigger_any() == Some("live_start");
             match (ja, live_start) {
                 (true, true) => "ライブ開始時能力は発動しない".to_string(),
                 (true, false) => "能力は発動しない".to_string(),

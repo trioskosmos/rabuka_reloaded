@@ -85,7 +85,7 @@ pub fn ability_under_use_limit(
         .get(key)
         .copied()
         .unwrap_or(0);
-    u8::from(used) < use_limit
+    used < use_limit
 }
 
 /// True when the ability activates from the discard pile
@@ -110,8 +110,8 @@ pub fn ability_effective_cost(
 ) -> (u8, u8) {
     match ability.cost.as_ref() {
         Some(c) => (
-            c.energy_cost_total() as u8,
-            game_state.effective_activation_cost_for(c, groups) as u8,
+            c.energy_cost_total(),
+            game_state.effective_activation_cost_for(c, groups),
         ),
         None => (0, 0),
     }
@@ -125,8 +125,8 @@ pub fn find_modify_cost<'a>(
     loc: Option<&str>,
 ) -> Option<&'a crate::card::AbilityEffect> {
     if effect.action == crate::ability::enums::ActionType::ModifyCost
-        && op.is_none_or(|o| effect.operation_any().as_deref() == Some(o))
-        && loc.is_none_or(|l| effect.location_any().as_deref() == Some(l))
+        && op.is_none_or(|o| effect.operation_any() == Some(o))
+        && loc.is_none_or(|l| effect.location_any() == Some(l))
     {
         return Some(effect);
     }
@@ -174,11 +174,10 @@ fn play_cost_reduction_matches(
     }
     // ability_filter: e.g. "no_ability" means only reduce cost for members
     // whose abilities list is empty.
-    if effect.ability_filter_any().as_deref() == Some("no_ability") {
-        if !card.abilities.is_empty() {
+    if effect.ability_filter_any().as_deref() == Some("no_ability")
+        && !card.abilities.is_empty() {
             return false;
         }
-    }
     true
 }
 
@@ -211,7 +210,7 @@ fn per_unit_cost_reduction(
     } else {
         raw_count
     };
-    let value = effect.value_any().unwrap_or(1) as u8;
+    let value = effect.value_any().unwrap_or(1);
     ((effective / per_unit_count) as u8) * value
 }
 
@@ -241,7 +240,7 @@ pub fn calculate_play_cost_reduction(
                     cost_reduction = per_unit_cost_reduction(mod_cost, stage, hand_count, card_db);
                 } else {
                     let reduction = mod_cost.value_any().unwrap_or(1);
-                    cost_reduction = cost_reduction.max(reduction as u8);
+                    cost_reduction = cost_reduction.max(reduction);
                 }
                 break;
             }
@@ -333,11 +332,11 @@ pub fn compute_play_cost(
         if let Some(ref effect) = ability.effect {
             if effect.action == crate::ability::enums::ActionType::ModifyCost
                 && matches!(
-                    effect.operation_any().as_deref(),
+                    effect.operation_any(),
                     Some("increase") | Some("add")
                 )
                 && crate::ability::enums::Zone::from_str(
-                    effect.location_any().as_deref().unwrap_or(""),
+                    effect.location_any().unwrap_or(""),
                 ) == Some(crate::ability::enums::Zone::SuccessLiveZone)
             {
                 let per_unit_count = effect.per_unit_count_any().unwrap_or(1) as usize;
@@ -377,8 +376,8 @@ fn scan_abilities_for_cost_reduction(
         let ability = ar.resolve();
         if let Some(ref effect) = ability.effect {
             if effect.action != ActionType::ModifyCost
-                || effect.operation_any().as_deref() != Some("subtract")
-                || effect.location_any().as_deref().and_then(Zone::from_str) != Some(Zone::Hand)
+                || effect.operation_any() != Some("subtract")
+                || effect.location_any().and_then(Zone::from_str) != Some(Zone::Hand)
             {
                 continue;
             }
@@ -398,7 +397,6 @@ fn scan_abilities_for_cost_reduction(
                         *stage_id != -1
                             && waited_stage_cards.contains(stage_id)
                             && groups
-                                .as_deref()
                                 .map(|names| {
                                     card_matches_any_group(card_db, *stage_id, names)
                                 })
@@ -412,7 +410,6 @@ fn scan_abilities_for_cost_reduction(
             // Group filter: the played card must belong to the aura's group.
             let group_matches = effect
                 .group_names_any()
-                .as_deref()
                 .map(|gns| card_matches_any_group(card_db, target_id, gns))
                 .unwrap_or(true);
             if !group_matches {
@@ -436,15 +433,14 @@ fn scan_abilities_for_cost_reduction(
             // ability_filter: e.g. "no_ability" means only reduce cost for
             // members whose abilities list is empty (the TARGET card, not
             // the stage card providing the aura).
-            if effect.ability_filter_any().as_deref() == Some("no_ability") {
-                if !target_card.abilities.is_empty() {
+            if effect.ability_filter_any().as_deref() == Some("no_ability")
+                && !target_card.abilities.is_empty() {
                     continue;
                 }
-            }
             let reduction = if effect.per_unit_any().unwrap_or(false) {
                 per_unit_cost_reduction(effect, stage, hand_count, card_db)
             } else {
-                effect.value_any().unwrap_or(1) as u8
+                effect.value_any().unwrap_or(1)
             };
             return Some(reduction);
         }
@@ -693,10 +689,10 @@ pub fn has_cannot_baton_touch_protection(
 ) -> bool {
     existing_card.resolved_abilities().any(|ability| {
         ability.effect.as_ref().is_some_and(|ef| {
-            if ef.restriction_type_any().as_deref() != Some("cannot_baton_touch") {
+            if ef.restriction_type_any() != Some("cannot_baton_touch") {
                 return false;
             }
-            if let Some(ref exclude_groups) = ef.exclude_group_names_any() {
+            if let Some(exclude_groups) = ef.exclude_group_names_any() {
                 if card_matches_any_group(card_db, incoming_card_id, exclude_groups) {
                     return false;
                 }
@@ -1069,7 +1065,7 @@ fn max_distinct_names_greedy(name_sets: &[Vec<String>]) -> DistinctNamesResult {
 pub struct CardFilter<'a> {
     pub card_type: Option<&'a str>,
     pub group: Option<&'a str>,
-    pub groups: Option<&'a Vec<String>>,
+    pub groups: Option<&'a [String]>,
     pub cost_limit: Option<u8>,
     pub cost_operator: Option<&'a str>,
     /// Discrete set of allowed cost values (OR) — e.g. "コストが10か20" → [10, 20].
@@ -1274,7 +1270,7 @@ impl<'a> CardFilter<'a> {
         }
         // Heart color count threshold check (e.g. "heart05を2個以上").
         if let Some(min_count) = self.heart_color_count {
-            let threshold = min_count as u8;
+            let threshold = min_count;
             let meets = |color: &String| heart_count_for_threshold(db, id, color) >= threshold;
             // 「require_all」 means EVERY named colour must meet the count;
             // otherwise any one of them does.
@@ -1308,7 +1304,7 @@ impl<'a> CardFilter<'a> {
                     .map(|nh| *nh.hearts.get(&color).unwrap_or(&0))
                     .unwrap_or(0);
                 let op = self.need_heart_operator.unwrap_or(">=");
-                if !compare_counts(Some(op), card_amount.into(), need_total.into()) {
+                if !compare_counts(Some(op), card_amount, need_total) {
                     return false;
                 }
             } else {
@@ -1319,7 +1315,7 @@ impl<'a> CardFilter<'a> {
                 // total_hearts() instead. Per Q149 + Q172.
                 let card_total = db.get_card(id).map(|c| c.total_hearts()).unwrap_or(0);
                 let op = self.need_heart_operator.unwrap_or(">=");
-                if !compare_counts(Some(op), card_total, need_total.into()) {
+                if !compare_counts(Some(op), card_total, need_total) {
                     return false;
                 }
             }
@@ -1498,7 +1494,7 @@ impl<'a> CardFilter<'a> {
         // modified values.
         if let Some(bl) = self.original_blade_limit {
             let card_blade = db.get_card(id).map(|c| c.blade).unwrap_or(0);
-            if !compare_counts(self.original_blade_operator, card_blade.into(), bl.into()) {
+            if !compare_counts(self.original_blade_operator, card_blade, bl) {
                 return false;
             }
         }
@@ -1507,7 +1503,7 @@ impl<'a> CardFilter<'a> {
         if let Some(ct) = self.cost_total {
             if let Some(op) = self.cost_total_operator {
                 let card_cost = db.get_card(id).and_then(|c| c.cost).unwrap_or(99);
-                if !compare_counts(Some(op), card_cost.into(), ct.into()) {
+                if !compare_counts(Some(op), card_cost, ct) {
                     return false;
                 }
             }
@@ -1558,7 +1554,7 @@ impl<'a> CardFilter<'a> {
                 .as_ref()
                 .and_then(|v| v.first())
                 .map(|s| s.as_str()),
-            groups: group_names.as_ref().map(|v| &**v),
+            groups: group_names.map(Vec::as_slice),
             cost_limit: effect.cost_limit_any(),
             cost_operator,
             cost_values: None,
@@ -1569,13 +1565,13 @@ impl<'a> CardFilter<'a> {
             characters: effect.characters_any(),
             exclude_characters: effect.exclude_characters_any(),
             exclude_group_names: effect.exclude_group_names_any().map(Vec::as_slice),
-            heart_colors: &effect.heart_colors_any(),
+            heart_colors: effect.heart_colors_any(),
             require_all_heart_colors: effect.require_all_heart_colors_any().unwrap_or(false),
             heart_color_count: effect.heart_color_count_any(),
             need_heart_total: effect.need_heart_total_any(),
             need_heart_operator,
             need_heart_color,
-            name_fragments: if effect.card_names_any().map_or(true, |v| v.is_empty()) {
+            name_fragments: if effect.card_names_any().is_none_or(|v| v.is_empty()) {
                 None
             } else {
                 effect.card_names_any()
@@ -1787,7 +1783,7 @@ pub fn matching_ids_filtered(
                 if !excluded_names.is_empty() {
                     results.retain(|id| {
                         db.get_card(*id)
-                            .map_or(true, |c| !excluded_names.contains(c.name.as_ref()))
+                            .is_none_or(|c| !excluded_names.contains(c.name.as_ref()))
                     });
                 }
             }
@@ -2342,11 +2338,11 @@ pub fn resolve_per_unit_count(
                         let has = card
                             .base_heart
                             .as_ref()
-                            .map_or(false, |bh| bh.hearts.contains_key(&hc))
+                            .is_some_and(|bh| bh.hearts.contains_key(&hc))
                             || card
                                 .need_heart
                                 .as_ref()
-                                .map_or(false, |nh| nh.hearts.contains_key(&hc));
+                                .is_some_and(|nh| nh.hearts.contains_key(&hc));
                         if has {
                             colors_found.insert(hc);
                         }

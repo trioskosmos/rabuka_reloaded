@@ -78,11 +78,11 @@ impl AbilityResolver {
         // Flat effects carry target="opponent" directly and dispatch via
         // ActionType; only the legacy wrapper needs unwrapping.
         if effect.action == ActionType::OpponentAction {
-            if let Some(ref opponent_action) = effect.opponent_action() {
+            if let Some(opponent_action) = effect.opponent_action() {
                 // G3: tag spawn context so choices created for this
                 // opponent action are routed to the opponent player.
                 self.spawn_context.target = Some("opponent".to_string());
-                let mut modified = (*opponent_action).clone();
+                let mut modified = opponent_action.clone();
                 if modified.target.is_none() || modified.target.as_deref() == Some("self") {
                     modified.target = Some("opponent".into());
                 }
@@ -98,7 +98,7 @@ impl AbilityResolver {
 
         // G3: for non-empty actions with action_by: opponent, tag spawn context
         // so choices created inside are routed to the opponent player.
-        if effect.action_by().as_deref() == Some("opponent") {
+        if effect.action_by() == Some("opponent") {
             self.spawn_context.target = Some("opponent".to_string());
         }
         Ok(false)
@@ -190,9 +190,9 @@ impl AbilityResolver {
     /// Register a "replacement" effect_type for its original event.
     /// Returns true when registered (caller returns `Ok(())`).
     fn register_replacement_effect(&mut self, gs: &mut GameState, effect: &AbilityEffect) -> bool {
-        if let Some(ref effect_type) = effect.effect_type() {
-            if *effect_type == "replacement" {
-                let original_event = effect.replaces_event_any().clone();
+        if let Some(effect_type) = effect.effect_type() {
+            if effect_type == "replacement" {
+                let original_event = effect.replaces_event_any();
                 let is_choice_based = effect.choice_based_any().unwrap_or(false);
                 let card_id = gs.activating_card.unwrap_or(-1);
                 let player_id =

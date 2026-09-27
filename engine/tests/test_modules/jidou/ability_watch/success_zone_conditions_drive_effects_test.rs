@@ -61,11 +61,11 @@ const BIBI_LIVE: &str = "PL!-bp4-026-L";
 const LILYWHITE: &str = "PL!-sd1-004-SD";
 
 fn heart_mod(game: &TestGame, card: i16, colour: HeartColor) -> i32 {
-    i32::from(game.state.mods.get_heart_modifier(card, colour))
+    game.state.mods.get_heart_modifier(card, colour)
 }
 
 fn score_mod(game: &TestGame, card: i16) -> i32 {
-    i32::from(game.state.mods.get_score_modifier(card))
+    game.state.mods.get_score_modifier(card)
 }
 
 /// p1's ライブの合計スコア constant bonus.
@@ -81,7 +81,7 @@ fn total_score_bonus(game: &TestGame) -> i32 {
 }
 
 fn need_heart_mod(game: &TestGame, card: i16, colour: HeartColor) -> i32 {
-    i32::from(game.state.mods.get_need_heart_modifier(card, colour))
+    game.state.mods.get_need_heart_modifier(card, colour)
 }
 
 // ====================================================================

@@ -16,6 +16,7 @@ pub mod strategy_v5;
 pub mod strategy_v6;
 pub mod strategy_v7;
 mod v7_main;
+pub mod v7_ismcts;
 pub mod strategy_v8;
 mod v8_live;
 mod v8_main;

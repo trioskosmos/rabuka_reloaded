@@ -187,8 +187,8 @@ pub(crate) fn prepare_sequential_action(
     }
     if action_to_execute
         .card_names_any()
-        .map_or(true, |v| v.is_empty())
-        && !effect.card_names_any().map_or(true, |v| v.is_empty())
+        .is_none_or(|v| v.is_empty())
+        && !effect.card_names_any().is_none_or(|v| v.is_empty())
     {
         if let Some(names) = effect.card_names_any() {
             action_to_execute.set_card_names(names.clone());
@@ -244,7 +244,7 @@ pub(crate) fn execute_sequential_effect(
                 );
 
                 if action.action == ActionType::OpponentAction
-                    || action.action_by().as_deref() == Some("opponent")
+                    || action.action_by() == Some("opponent")
                 {
                     resolver.spawn_context.target = Some("opponent".to_string());
                 }

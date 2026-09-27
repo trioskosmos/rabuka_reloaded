@@ -34,7 +34,7 @@ fn sp_bp5_leftside_cost_fails_in_center() {
     let f = game.id("PL!-sd1-010-SD");
 
     game.state.player1.stage.stage = [f, card, -1];
-    let stage_before = game.player().stage.stage.clone();
+    let stage_before = game.player().stage.stage;
     let result = game.try_activate_ability(card);
 
     assert!(result.is_err(), "Should fail when not on left side");
@@ -51,7 +51,7 @@ fn sp_bp5_leftside_cost_fails_in_right_side() {
     let f = game.id("PL!-sd1-010-SD");
 
     game.state.player1.stage.stage = [f, -1, card];
-    let stage_before = game.player().stage.stage.clone();
+    let stage_before = game.player().stage.stage;
     let result = game.try_activate_ability(card);
 
     assert!(result.is_err(), "Should fail when not on left side");

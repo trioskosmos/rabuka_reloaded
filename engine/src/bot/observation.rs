@@ -281,10 +281,8 @@ fn player_features(
             continue;
         };
         let base = i32::from(card.get_score());
-        let set = i32::from(state.mods.get_score_set_modifier(card_id));
-        let additive = i32::from(
-            state.mods.get_score_modifier(card_id) - state.mods.get_score_set_modifier(card_id),
-        );
+        let set = state.mods.get_score_set_modifier(card_id);
+        let additive = state.mods.get_score_modifier(card_id) - state.mods.get_score_set_modifier(card_id);
         let effective = if set != 0 { set } else { base + additive };
         features.live_score = features
             .live_score
@@ -676,7 +674,7 @@ impl PublicObservation {
         Self {
             me,
             opp,
-            current_phase: state.current_phase.clone(),
+            current_phase: state.current_phase,
             current_turn_phase: state.current_turn_phase,
             turn_number: state.turn_number,
             game_result: state.game_result.clone(),

@@ -118,7 +118,7 @@ impl AbilityResolver {
             );
             return Ok(());
         }
-        let draw_count = if let Some(ref dc) = effect.dynamic_count_any() {
+        let draw_count = if let Some(dc) = effect.dynamic_count_any() {
             self.resolve_dynamic_count(gs, dc)
         } else if effect.count_any() == Some(0) {
             log::debug!("[DRAW_ZERO] self.moved_cards={:?}", self.moved_cards);
@@ -159,7 +159,7 @@ impl AbilityResolver {
             effect.card_type_any().map(|ct| ct.as_card_str()),
             effect.per_unit_any().unwrap_or(false),
             effect.per_unit_count_any().unwrap_or(1),
-            effect.per_unit_type_any().as_deref(),
+            effect.per_unit_type_any(),
         )
     }
 
@@ -418,7 +418,7 @@ impl AbilityResolver {
                 // without it (e.g. 「ウェイト状態のメンバー1人につき…」) keep
                 // counting all currently-waited members.
                 let multiplier =
-                    if effect.per_unit_source_any().as_deref() == Some("this_cost_waited") {
+                    if effect.per_unit_source_any() == Some("this_cost_waited") {
                         cost_waited_members.len().u8_count()
                     } else {
                         util::calculate_per_unit_multiplier(
@@ -426,7 +426,7 @@ impl AbilityResolver {
                             per_unit_type,
                             player,
                             &orientation_modifiers,
-                            effect.state_any().as_deref(),
+                            effect.state_any(),
                         )
                     };
                 multiplier * per_unit_count
@@ -600,7 +600,7 @@ impl AbilityResolver {
     }
 
     pub fn execute_draw_until_count(&mut self, gs: &mut GameState, effect: &AbilityEffect) {
-        let target_count: u8 = effect.target_count_any().unwrap_or(0) as u8;
+        let target_count: u8 = effect.target_count_any().unwrap_or(0);
         let target = effect.target_name();
         let destination = effect.destination.map(|z| z.as_str()).unwrap_or(Zone::Hand.to_str());
         let player = gs.resolve_target_player_mut(target);

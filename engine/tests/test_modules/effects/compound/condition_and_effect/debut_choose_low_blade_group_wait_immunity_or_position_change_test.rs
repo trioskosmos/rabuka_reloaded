@@ -42,7 +42,7 @@ fn p1_play_wait_immunity_choice_source(game: &mut TestGame, opt: i16) -> i16 {
 }
 
 fn is_waited(game: &TestGame, id: i16) -> bool {
-    game.state.mods.get_orientation_modifier(id).as_deref() == Some("wait")
+    game.state.mods.get_orientation_modifier(id) == Some("wait")
 }
 
 /// 1. Choosing option 1 records protection for the Aqours member on the owner's stage.

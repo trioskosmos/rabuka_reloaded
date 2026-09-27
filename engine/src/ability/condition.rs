@@ -124,7 +124,7 @@ impl<'a> ConditionContext<'a> {
         effect
             .condition
             .as_ref()
-            .map_or(true, |c| self.evaluate_condition(c))
+            .is_none_or(|c| self.evaluate_condition(c))
     }
 }
 
@@ -144,7 +144,7 @@ fn describe_condition_expectation(condition: &Condition) -> String {
 
     match condition {
         Condition::Appearance { .. } => {
-            if let Some(ref chars) = condition.get_characters() {
+            if let Some(chars) = condition.get_characters() {
                 if !chars.is_empty() {
                     let has_cost_ref = matches!(
                         condition,
@@ -645,7 +645,7 @@ impl<'a> ConditionContext<'a> {
         let matching = cards
             .iter()
             .filter(|&&cid| {
-                crate::ability::util::card_matches_heart_colors(card_db, cid, &[color.clone()])
+                crate::ability::util::card_matches_heart_colors(card_db, cid, std::slice::from_ref(&color))
             })
             .count() as u8;
 
@@ -777,11 +777,11 @@ impl<'a> ConditionContext<'a> {
             }
             Some(ConditionType::LocationCondition) => {
                 let loc = condition.get_location().unwrap_or("");
-                if let Some(ref pos) = condition.get_position() {
+                if let Some(pos) = condition.get_position() {
                     let pos_str = pos.get_position().unwrap_or("?");
                     format!("位置={}", pos_str)
                 } else {
-                    format!("{}", loc)
+                    loc.to_string()
                 }
             }
             Some(ConditionType::StateCondition) => {
@@ -852,7 +852,7 @@ impl<'a> ConditionContext<'a> {
                 }
             }
             Some(ConditionType::ChoiceCondition) => {
-                if let Some(ref opts) = condition.get_options() {
+                if let Some(opts) = condition.get_options() {
                     format!("選択肢={}個", opts.len())
                 } else {
                     "選択肢なし".into()
@@ -891,7 +891,7 @@ impl<'a> ConditionContext<'a> {
 
         // Check position constraints first
         let mut position_str = String::new();
-        if let Some(ref pos) = condition.get_position() {
+        if let Some(pos) = condition.get_position() {
             position_str = format!("位置={}", pos.get_position().unwrap_or("?"));
         } else if let Some(ref act_pos) = condition.get_activation_position() {
             let card_id = self.activating_card_id;

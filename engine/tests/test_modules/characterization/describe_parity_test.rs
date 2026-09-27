@@ -32,7 +32,7 @@ fn collect_nodes<'a>(eff: &'a AbilityEffect, out: &mut Vec<&'a AbilityEffect>) {
             collect_nodes(b, out);
         }
     }
-    if let Some(ref b) = eff.alternative_effect_any() {
+    if let Some(b) = eff.alternative_effect_any() {
         collect_nodes(b, out);
     }
 }

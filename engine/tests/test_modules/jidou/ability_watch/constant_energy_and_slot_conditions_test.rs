@@ -29,15 +29,15 @@ const OTHER_SUR: &str = "PL!HS-bp1-012-PR";
 const FILLER: &str = "PL!-sd1-010-SD";
 
 fn blade_mod(game: &TestGame, card: i16) -> i32 {
-    i32::from(game.state.mods.get_blade_modifier(card))
+    game.state.mods.get_blade_modifier(card)
 }
 
 fn heart_mod(game: &TestGame, card: i16, colour: HeartColor) -> i32 {
-    i32::from(game.state.mods.get_heart_modifier(card, colour))
+    game.state.mods.get_heart_modifier(card, colour)
 }
 
 fn cost_mod(game: &TestGame, card: i16) -> i32 {
-    i32::from(game.state.mods.get_cost_modifier(card))
+    game.state.mods.get_cost_modifier(card)
 }
 
 fn energy_cards(game: &TestGame) -> usize {

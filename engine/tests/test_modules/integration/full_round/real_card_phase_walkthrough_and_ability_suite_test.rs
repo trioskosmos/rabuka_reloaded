@@ -2892,7 +2892,7 @@ fn turn_limit_prevents_second_activation() {
     let hand_before = game.state.player1.hand.cards.len();
     let wait_before = game.state.player1.waitroom.cards.len();
     let result = game.try_activate_ability(chika);
-    if let Ok(_) = result {
+    if result.is_ok() {
         // Some paths answer Ok but no-op; either way nothing may change.
     }
     let mut guard2 = 0;

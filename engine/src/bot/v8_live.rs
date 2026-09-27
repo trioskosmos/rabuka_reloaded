@@ -99,7 +99,7 @@ fn junk_keep_value(
     match card.card_type {
         // Energy exists only to buy a deploy that raises check power, so one
         // energy is worth one more shot at the check we are building toward.
-        CardType::Energy => return PLACEMENT_CREDIT,
+        CardType::Energy => PLACEMENT_CREDIT,
         CardType::Member => {
             // (1) Direct board contribution: what does this member's printed
             //     heart and blade supply do to our best in-hand life's chance

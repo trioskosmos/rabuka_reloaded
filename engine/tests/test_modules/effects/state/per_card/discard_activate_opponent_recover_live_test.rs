@@ -36,7 +36,7 @@ fn discard_to_activate_opponent_recovers_live_from_waitroom() {
     }
     // The waited opponent member was activated by the ability.
     assert_eq!(
-        g.state.mods.get_orientation_modifier(opp).as_deref(),
+        g.state.mods.get_orientation_modifier(opp),
         Some("active"),
         "waited opponent member must be active after activation"
     );

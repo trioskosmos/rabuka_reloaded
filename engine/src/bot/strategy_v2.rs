@@ -293,7 +293,7 @@ pub fn choose_live_set_action_v2(
             let rank = (std::cmp::Reverse(milli), s.count, std::cmp::Reverse(-s.effective_score));
             if best
                 .as_ref()
-                .map_or(true, |(bp, bc, bs, _)| {
+                .is_none_or(|(bp, bc, bs, _)| {
                     rank < (std::cmp::Reverse(*bp), *bc, std::cmp::Reverse(-*bs))
                 })
             {

@@ -550,11 +550,7 @@ impl CardDatabase {
 
     /// Parse card_no into (base, rarity) where base is everything before last dash.
     fn parse_base_and_rarity(s: &str) -> Option<(String, String)> {
-        if let Some(idx) = s.rfind('-') {
-            Some((s[..idx].to_string(), s[idx + 1..].to_string()))
-        } else {
-            None
-        }
+        s.rfind('-').map(|idx| (s[..idx].to_string(), s[idx + 1..].to_string()))
     }
 
     /// Return equivalent rarities for fallback lookup.
@@ -2304,7 +2300,7 @@ impl AbilityEffect {
 impl AbilityEffect {
     pub fn set_card_names(&mut self, val: Vec<String>) {
         if let Some(f) = self.kind.as_deref_mut().and_then(|k| k.filter_mut()) {
-            f.card_names = Box::new(val);
+            *f.card_names = val;
         }
     }
     pub fn set_group_names(&mut self, val: Option<Box<Vec<String>>>) {
@@ -4232,8 +4228,8 @@ pub fn check_heart_requirement(need: &BaseHeart, provided: &BaseHeart) -> bool {
     if need.hearts.is_empty() {
         return true;
     }
-    let total_provided: u8 = provided.hearts.values_sum().into();
-    let total_required: u8 = need.hearts.values_sum().into();
+    let total_provided: u8 = provided.hearts.values_sum();
+    let total_required: u8 = need.hearts.values_sum();
     if total_provided < total_required {
         return false;
     }

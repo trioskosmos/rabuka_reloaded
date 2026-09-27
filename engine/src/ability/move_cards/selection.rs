@@ -42,7 +42,7 @@ impl AbilityResolver {
                     }).unwrap_or_else(|| "self".to_string()),
                 ))
                 .filtered_indices(filtered_indices)
-                .destination(effect.destination.clone().map(|s| s.to_string()))
+                .destination(effect.destination.map(|s| s.to_string()))
                 .discard_remaining(effect.discard_remaining_any())
                 .build(),
         );

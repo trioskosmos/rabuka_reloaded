@@ -53,7 +53,7 @@ fn pay_cost(game: &mut TestGame) {
 }
 
 fn opponent_waited(game: &TestGame, id: i16) -> bool {
-    game.state.mods.get_orientation_modifier(id).as_deref() == Some("wait")
+    game.state.mods.get_orientation_modifier(id) == Some("wait")
 }
 
 fn energy_under_center(game: &TestGame) -> usize {

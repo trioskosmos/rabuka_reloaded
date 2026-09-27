@@ -551,7 +551,7 @@ pub fn choose_live_set_v7(gs: &GameState, actions: &[Action], db: &CardDatabase)
             .iter()
             .filter(|&&cid| {
                 db.get_card(cid)
-                    .map_or(false, |c| c.card_type == crate::card::CardType::Live)
+                    .is_some_and(|c| c.card_type == crate::card::CardType::Live)
             })
             .count();
         if !plan.is_empty() && plan.len() < max_slots && deck_lives > 0 {
@@ -564,7 +564,7 @@ pub fn choose_live_set_v7(gs: &GameState, actions: &[Action], db: &CardDatabase)
                     !plan.contains(&i)
                         && db
                             .get_card(cid)
-                            .map_or(false, |c| c.card_type != crate::card::CardType::Live)
+                            .is_some_and(|c| c.card_type != crate::card::CardType::Live)
                 })
                 .map(|(i, _)| i)
                 .collect();
@@ -589,7 +589,7 @@ pub fn choose_live_set_v7(gs: &GameState, actions: &[Action], db: &CardDatabase)
                 .enumerate()
                 .filter(|&(_, &cid)| {
                     db.get_card(cid)
-                        .map_or(false, |c| c.card_type != crate::card::CardType::Live)
+                        .is_some_and(|c| c.card_type != crate::card::CardType::Live)
                 })
                 .map(|(i, _)| i)
                 .collect();

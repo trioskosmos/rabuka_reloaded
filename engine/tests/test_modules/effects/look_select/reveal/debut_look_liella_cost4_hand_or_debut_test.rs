@@ -98,9 +98,7 @@ fn kanon_select_liella_debut_to_stage() {
         game.state
             .player1
             .stage
-            .stage
-            .iter()
-            .any(|&id| id == liella),
+            .stage.contains(&liella),
         "on stage"
     );
     assert!(
@@ -268,9 +266,7 @@ fn kanon_stage_full_falls_back_to_hand() {
             .state
             .player1
             .stage
-            .stage
-            .iter()
-            .any(|&id| id == liella),
+            .stage.contains(&liella),
         "not on stage"
     );
 }

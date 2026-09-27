@@ -115,7 +115,7 @@ fn build_game(db: &mut Arc<CardDatabase>, deck_path: &std::path::Path) -> GameSt
     let numbers = DeckParser::deck_list_to_card_numbers(&deck);
     let (t1, t2) =
         game_setup::build_two_decks(db, &numbers, &numbers).expect("build two decks");
-    rabuka_engine::bin_common::deal_game(&mut db.clone(), &t1, &t2, "p1", "P1", "p2", "P2")
+    rabuka_engine::bin_common::deal_game(&db.clone(), &t1, &t2, "p1", "P1", "p2", "P2")
 }
 
 fn flush_log(gs: &GameState, seen: &mut usize) {

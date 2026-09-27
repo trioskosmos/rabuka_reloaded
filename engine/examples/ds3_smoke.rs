@@ -51,7 +51,7 @@ fn main() {
     let acts = rabuka_engine::game_setup::generate_possible_actions(&gs);
     eprintln!("actions: {}", acts.len());
     assert!(
-        acts.len() > 0,
+        !acts.is_empty(),
         "should have at least one action at game start"
     );
 

@@ -111,7 +111,7 @@ fn center_wait_discard_cost_plus_two_deploy_fails_not_in_center() {
     game.give_energy(5);
 
     // Try to activate ability - should fail
-    let stage_before = game.player().stage.stage.clone();
+    let stage_before = game.player().stage.stage;
     let result = game.try_activate_ability(yoshiko);
 
     // Verify ability cannot be activated

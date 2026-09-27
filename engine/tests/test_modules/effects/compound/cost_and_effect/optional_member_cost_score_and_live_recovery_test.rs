@@ -12,14 +12,11 @@ fn answer_optional(game: &mut TestGame, accept: bool) -> bool {
             game.select_choice_option(if accept { 1 } else { 0 });
             true
         }
-        Choice::SelectCard { allow_skip, .. } => {
-            if !accept && *allow_skip {
+        Choice::SelectCard { allow_skip, .. }
+            if !accept && *allow_skip => {
                 game.select_indices(&[]);
                 true
-            } else {
-                false
             }
-        }
         _ => {
             false
         }

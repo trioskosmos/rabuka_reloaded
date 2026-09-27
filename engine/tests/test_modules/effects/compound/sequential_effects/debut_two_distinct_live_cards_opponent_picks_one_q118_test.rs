@@ -111,7 +111,7 @@ fn toubatsu_wait_option_waits_opponent_member() {
     scan_autos_both(&mut game);
     assert!(!game.has_pending_choice());
     assert_eq!(
-        game.state.mods.get_orientation_modifier(opp).as_deref(),
+        game.state.mods.get_orientation_modifier(opp),
         Some("wait"),
         "opponent ≤2-blade member must be waited"
     );

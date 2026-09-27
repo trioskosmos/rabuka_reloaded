@@ -316,7 +316,7 @@ fn live_card_set_refill_draws_placed_count() {
 
     // P2 placed nothing: her own refill (crossing into performances) draws 0.
     let p2_hand_at_refill = game.state.player2.hand.cards.len();
-    assert_eq!(p2_hand_before, p2_hand_at_refill - 0);
+    assert_eq!(p2_hand_before, p2_hand_at_refill);
     game.pass(); // Second LiveCardSet → performances: P2's boundary
     assert_eq!(
         game.state.player2.hand.cards.len(),

@@ -146,7 +146,7 @@ fn jidou_both_on_same_card_coexist_and_fire_separately() {
         "neither jidou moves cards into the energy zone"
     );
     assert!(
-        game.state.mods.blade_modifiers.len() > 0,
+        !game.state.mods.blade_modifiers.is_empty(),
         "the turn2 jidou grants its blade on the second sensor"
     );
 }

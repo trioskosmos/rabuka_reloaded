@@ -84,7 +84,7 @@ fn live_start_draw_cost_nine_wait_waits_eligible_member() {
     // ab#0: should have drawn 1 card
     let hand_after = game.state.player1.hand.cards.len();
     assert!(
-        hand_after >= hand_before + 1,
+        hand_after > hand_before,
         "ab#0 should draw 1 card: before={}, after={}",
         hand_before,
         hand_after
@@ -123,7 +123,7 @@ fn live_start_draw_cost_nine_wait_no_wait_over_cost() {
     // Should draw but NOT wait the high-cost member
     let hand_after = game.state.player1.hand.cards.len();
     assert!(
-        hand_after >= hand_before + 1,
+        hand_after > hand_before,
         "Should still draw: before={}, after={}",
         hand_before,
         hand_after
@@ -157,7 +157,7 @@ fn live_start_draw_cost_nine_wait_empty_opponent() {
 
     let hand_after = game.state.player1.hand.cards.len();
     assert!(
-        hand_after >= hand_before + 1,
+        hand_after > hand_before,
         "Should draw: before={}, after={}",
         hand_before,
         hand_after

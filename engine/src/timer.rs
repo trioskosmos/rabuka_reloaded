@@ -126,7 +126,7 @@ impl Timer {
             // Profiling off: no clock read, no stack push, no mutex. The
             // struct is zero-sized-ish and Drop is a no-op — hot paths pay
             // nothing for Timer construction.
-            return Timer { label };
+            Timer { label }
         }
         #[cfg(feature = "profiling")]
         {
@@ -356,8 +356,8 @@ fn write_full_report(results: &[(&Vec<&'static str>, &(u64, u128))]) {
     .unwrap();
     writeln!(
         out,
-        "{:>7}  {:>11}  {:>10}  {:>5}  {}",
-        "calls", "total_ms", "avg_us", "depth", "call path"
+        "{:>7}  {:>11}  {:>10}  {:>5}  call path",
+        "calls", "total_ms", "avg_us", "depth"
     )
     .unwrap();
     let top_level: u128 = results
@@ -400,7 +400,7 @@ fn write_full_report(results: &[(&Vec<&'static str>, &(u64, u128))]) {
             let incl_total: u128 = results.iter().map(|r| r.1 .1).sum();
             writeln!(
                 out,
-                "\n\n=== SELF TIME (exclusive; sums exactly, unlike the inclusive table) ===\ntotal self: {:.2} ms  of {:.2} ms inclusive ({:.1}%)\n{:>7}  {:>10}  {:>9}  {:>5}  {}",
+                "\n\n=== SELF TIME (exclusive; sums exactly, unlike the inclusive table) ===\ntotal self: {:.2} ms  of {:.2} ms inclusive ({:.1}%)\n{:>7}  {:>10}  {:>9}  {:>5}  call path",
                 self_total as f64 / 1_000_000.0,
                 incl_total as f64 / 1_000_000.0,
                 if incl_total > 0 {
@@ -411,8 +411,7 @@ fn write_full_report(results: &[(&Vec<&'static str>, &(u64, u128))]) {
                 "calls",
                 "self_ms",
                 "self_us",
-                "depth",
-                "call path"
+                "depth"
             )
             .unwrap();
             for (path, (calls, ns)) in rows.iter().take(45) {

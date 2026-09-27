@@ -64,7 +64,7 @@ fn heart_pool(gs: &GameState, me_player: u8, db: &CardDatabase, confidence: f64)
         .main_deck
         .cards
         .iter()
-        .filter(|&&cid| db.get_card(cid).map_or(false, |c| c.blade_heart.is_some()))
+        .filter(|&&cid| db.get_card(cid).is_some_and(|c| c.blade_heart.is_some()))
         .count() as f64
         / deck_len as f64;
     acc[10] += ((blades as f64 * density) * confidence).floor() as i32;

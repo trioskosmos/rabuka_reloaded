@@ -395,7 +395,7 @@ impl<'a> ConditionContext<'a> {
                                     hc.iter()
                                         .map(|color_str| {
                                             let color = crate::card::parse_heart_color(color_str);
-                                            bh.hearts.get(&color).copied().unwrap_or(0) as u8
+                                            bh.hearts.get(&color).copied().unwrap_or(0)
                                         })
                                         .sum::<u8>()
                                 })
@@ -462,7 +462,7 @@ impl<'a> ConditionContext<'a> {
                         ))
                     } else {
                         // No operator: check each color individually across all cards
-                        let threshold = condition.get_count().unwrap_or(1) as u8;
+                        let threshold = condition.get_count().unwrap_or(1);
                         let all_ok = hc.iter().all(|color_str| {
                             let color = crate::card::parse_heart_color(color_str);
                             let total: u8 = self
@@ -505,7 +505,7 @@ impl<'a> ConditionContext<'a> {
                 .iter()
                 .filter(|&&id| id != -1)
                 .filter(|&&id| {
-                    group.map_or(true, |g| util::card_matches_group_str(card_db, id, Some(g)))
+                    group.is_none_or(|g| util::card_matches_group_str(card_db, id, Some(g)))
                 })
                 .filter_map(|&id| card_db.get_card(id))
                 .map(|card| {
@@ -797,7 +797,7 @@ impl<'a> ConditionContext<'a> {
 
         if condition.get_comparison_type() == Some("equality") {
             // Cross-position equality: compare cost/count at position vs position_compare
-            if let (Some(ref pos_a), Some(ref pos_b)) =
+            if let (Some(pos_a), Some(pos_b)) =
                 (&condition.get_position(), &condition.get_position_compare())
             {
                 let pos_a_str = pos_a.get_position().unwrap_or("");
@@ -806,11 +806,10 @@ impl<'a> ConditionContext<'a> {
                 // When require_position_cards is set, both positions must have
                 // cards for the comparison to be meaningful (e.g. "右サイドエリアと
                 // 左サイドエリアにいるメンバーのコストが同じ場合").
-                if condition.get_require_position_cards().unwrap_or(false) {
-                    if card_a.is_none() || card_b.is_none() {
+                if condition.get_require_position_cards().unwrap_or(false)
+                    && (card_a.is_none() || card_b.is_none()) {
                         return false;
                     }
-                }
                 let cost_a = card_a
                     .and_then(|id| card_db.get_card(id))
                     .and_then(|c| c.cost)
@@ -1471,7 +1470,7 @@ impl<'a> ConditionContext<'a> {
         }
 
         // Aggregate total check (sum of heart values, e.g. heart02 >= 6)
-        if let Some(res) = self.check_aggregate_total(condition, &g_player, g_location) {
+        if let Some(res) = self.check_aggregate_total(condition, g_player, g_location) {
             return res;
         }
 
@@ -1839,7 +1838,7 @@ impl<'a> ConditionContext<'a> {
             .collect::<Vec<i16>>();
         // unit:"types" → count DISTINCT blade-heart colors among the moved member
         // cards (G18: "…の中に2種類以上のブレードハートの色がある場合"), not card count.
-        let unit_is_types = condition.get_unit().as_deref() == Some("types");
+        let unit_is_types = condition.get_unit() == Some("types");
         let actual: u8 = if unit_is_types {
             let mut colors: HashSet<HeartColor> = HashSet::default();
             for &cid in &moved_ids {
@@ -2006,7 +2005,7 @@ impl<'a> ConditionContext<'a> {
 
         let actual = match Zone::from_str(location) {
             Some(Zone::RevealedCards) => {
-                if condition.get_unit().as_deref() == Some("types") && !hc.is_empty() {
+                if condition.get_unit() == Some("types") && !hc.is_empty() {
                     let required_colors: Vec<crate::card::HeartColor> = hc
                         .iter()
                         .map(|s| crate::card::parse_heart_color(s))
@@ -2107,7 +2106,7 @@ impl<'a> ConditionContext<'a> {
                             Some(card_type)
                         },
                     )
-                } else if condition.get_unit().as_deref() == Some("types") {
+                } else if condition.get_unit() == Some("types") {
                     let required_colors: Vec<crate::card::HeartColor> = hc
                         .iter()
                         .map(|s| crate::card::parse_heart_color(s))
@@ -2317,7 +2316,7 @@ impl<'a> ConditionContext<'a> {
         }
 
         // Early-out for aggregate total (sum heart colors, not count cards)
-        let stage_types = condition.get_unit().as_deref() == Some("types")
+        let stage_types = condition.get_unit() == Some("types")
             && Zone::from_str(location) == Some(Zone::Stage);
         log::debug!(
             "[AGGREGATE_DISPATCH] location={} unit={:?} stage_types={} aggregate={:?}",
@@ -2334,7 +2333,7 @@ impl<'a> ConditionContext<'a> {
 
         let is_old_movement = condition.get_source() == Some("preceding_moved")
             || condition.get_source() == Some("previous_moved_cards");
-        let is_new_movement = condition.get_source().map_or(true, |s| {
+        let is_new_movement = condition.get_source().is_none_or(|s| {
             s != "preceding_moved" && s != "previous_moved_cards"
         }) && condition.get_destination().is_some();
 
@@ -2366,7 +2365,7 @@ impl<'a> ConditionContext<'a> {
             let threshold = opp_count.saturating_add(count);
             let op = condition
                 .get_operator()
-                .unwrap_or_else(|| if count == 0 { "==" } else { ">=" });
+                .unwrap_or(if count == 0 { "==" } else { ">=" });
             log::debug!(
                 "[CARD_COUNT_OPPONENT] self={} opp={} count={} threshold={} op={}",
                 actual,
@@ -2589,9 +2588,8 @@ impl<'a> ConditionContext<'a> {
         stage_ids.iter().any(|&cid| {
             matches_group(cid)
                 && (!exclude_activating
-                    || self
-                        .activating_card_id
-                        .map_or(true, |act_id| cid != act_id))
+                    || (self
+                        .activating_card_id != Some(cid)))
                 && self.game_state.has_card_appeared_this_turn(cid)
         })
     }
@@ -2862,7 +2860,7 @@ impl<'a> ConditionContext<'a> {
             && (condition.get_cost_limit().is_some() || condition.get_card_type().is_some())
         {
             let has_other_appeared = stage_ids.iter().any(|&cid| {
-                self.activating_card_id.map_or(true, |act_id| cid != act_id)
+                (self.activating_card_id != Some(cid))
                     && self.game_state.has_card_appeared_this_turn(cid)
             });
             if !has_other_appeared {
@@ -2966,11 +2964,11 @@ impl<'a> ConditionContext<'a> {
                 condition.get_characters(),
                 stage_ids
             );
-            return self.stage_satisfies_characters(condition, stage_ids, push_rich);
+            self.stage_satisfies_characters(condition, stage_ids, push_rich)
         } else {
             if let Some(expected_source) = condition.get_appearance_source() {
                 let card_to_check = self.activating_card_id;
-                let ok = card_to_check.map_or(false, |cid| {
+                let ok = card_to_check.is_some_and(|cid| {
                     self.game_state.get_card_appearance_source(cid) == Some(expected_source)
                 });
                 if !ok {
@@ -3567,7 +3565,7 @@ impl<'a> ConditionContext<'a> {
         let zone = Zone::from_str(location);
         match comparison_type {
             Some("score") => {
-                let is_live_zone = zone.map_or(true, |z| {
+                let is_live_zone = zone.is_none_or(|z| {
                     matches!(z, Zone::LiveCardZone | Zone::SuccessLiveZone)
                 });
 
@@ -3696,7 +3694,7 @@ impl<'a> ConditionContext<'a> {
             if id == -1 {
                 continue;
             }
-            if let Some(ref groups) = condition.get_group_names() {
+            if let Some(groups) = condition.get_group_names() {
                 if !groups.is_empty()
                     && !groups
                         .iter()
@@ -3803,7 +3801,7 @@ impl<'a> ConditionContext<'a> {
                 let player = self.resolve_condition_player(target);
                 let card_db = &self.game_state.card_database;
                 let location = condition.get_location().unwrap_or("stage");
-                let mut cards = util::zone_card_ids(&player, location);
+                let mut cards = util::zone_card_ids(player, location);
                 if Zone::from_str(location) == Some(Zone::Stage) {
                     cards.retain(|&id| id != -1);
                 }
@@ -3818,7 +3816,7 @@ impl<'a> ConditionContext<'a> {
                 let mut filter = condition.filter_subset();
                 filter.exclude_self = exclude_id;
                 let groups_vec = condition.get_group_names().map(|v| v.to_vec());
-                filter.groups = groups_vec.as_ref();
+                filter.groups = groups_vec.as_deref();
                 let mut max_cost: u8 = 0;
                 for &id in cards.iter() {
                     if !filter.matches(card_db, id, false) {
@@ -3844,14 +3842,14 @@ impl<'a> ConditionContext<'a> {
                 if !loc.is_empty() {
                     let player = self.resolve_condition_player(target);
                     let card_db = &self.game_state.card_database;
-                    let mut cards = util::zone_card_ids(&player, loc);
+                    let mut cards = util::zone_card_ids(player, loc);
                     if Zone::from_str(loc) == Some(Zone::Stage) {
                         cards.retain(|&id| id != -1);
                     }
                     let total: u8 = cards
                         .iter()
                         .filter(|&&id| {
-                            if let Some(ref groups) = condition.get_group_names() {
+                            if let Some(groups) = condition.get_group_names() {
                                 if !groups.is_empty()
                                     && !groups
                                         .iter()
@@ -3949,7 +3947,7 @@ impl<'a> ConditionContext<'a> {
             && self.game_state.revealed_cards.is_empty()
             && !self.moved_cards.is_empty()
         {
-            let total = self.total_effective_cost(&self.moved_cards);
+            let total = self.total_effective_cost(self.moved_cards);
             if total > 0 {
                 return total;
             }
@@ -4150,7 +4148,7 @@ impl<'a> ConditionContext<'a> {
                     &player.success_live_card_zone.cards,
                     ct,
                     group_name,
-                    |card| card.score.unwrap_or(0) as u8,
+                    |card| card.score.unwrap_or(0),
                 ),
                 _ => 0,
             };

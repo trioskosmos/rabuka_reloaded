@@ -122,7 +122,7 @@ fn pb1_007_insufficient_hand_blocked() {
     hand_with_n(&mut game, 2);
     let res = game.try_activate_ability(me);
     // Engine should reject activation due to insufficient cost
-    assert!(res.is_err() || game.has_pending_choice() == false, "should be blocked or err, got {:?}", res);
+    assert!(res.is_err() || !game.has_pending_choice(), "should be blocked or err, got {:?}", res);
     // If it did prompt, it would require 3 but hand only 2 -> cannot select 3
     if game.has_pending_choice() {
         assert_eq!(game.pending_choice_count(), 3);

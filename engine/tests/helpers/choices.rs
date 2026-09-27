@@ -338,13 +338,7 @@ impl TestGame {
         match self.pending_choice_view() {
             PendingChoiceView::Live(choice) => Some(choice_type(choice).to_string()),
             PendingChoiceView::Json(pc) => Some(
-                match pc["choice_type"].as_str() {
-                    Some(
-                        name @ ("SelectCard" | "SelectTarget" | "SelectPosition" | "SelectHeartColor"
-                        | "SelectHeartType" | "SelectAutoAbility" | "SelectLiveSuccess"),
-                    ) => name,
-                    _ => "Unknown",
-                }
+                pc["choice_type"].as_str().unwrap_or("Unknown")
                 .to_string(),
             ),
             PendingChoiceView::None => None,

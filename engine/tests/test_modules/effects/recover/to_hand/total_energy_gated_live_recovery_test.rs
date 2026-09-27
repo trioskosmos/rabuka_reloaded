@@ -127,5 +127,5 @@ fn sp_bp1_007_debut_noop_when_waitroom_has_no_live_card() {
         game.select_indices(&[]);
     }
 
-    assert!(game.has_pending_choice() == false, "no stuck prompts");
+    assert!(!game.has_pending_choice(), "no stuck prompts");
 }

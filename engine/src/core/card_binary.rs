@@ -195,7 +195,7 @@ fn decode_card_from_record(rec: &[u8], strtab: &[u8]) -> Option<Card> {
         let scount = data[pos + 1];
         if scount > 0 {
             let mut hearts = HeartMap::new();
-            hearts.insert(color_from_u8(sc), scount as u8);
+            hearts.insert(color_from_u8(sc), scount);
             Some(SpecialHeart { hearts })
         } else {
             None
@@ -218,13 +218,13 @@ fn decode_card_from_record(rec: &[u8], strtab: &[u8]) -> Option<Card> {
         card_type,
         unit,
         cost: if has_cost != 0 {
-            Some(cost_val as u8)
+            Some(cost_val)
         } else {
             None
         },
-        blade: blade_val as u8,
+        blade: blade_val,
         score: if has_score != 0 {
-            Some(score_val as u8)
+            Some(score_val)
         } else {
             None
         },
@@ -331,7 +331,7 @@ fn parse_hearts(data: &[u8], count: usize) -> HeartMap {
             break;
         }
         let color = color_from_u8(data[base]);
-        let count_val = data[base + 1] as u8;
+        let count_val = data[base + 1];
         if count_val > 0 {
             map.insert(color, count_val);
         }

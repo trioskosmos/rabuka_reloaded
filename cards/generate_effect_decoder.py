@@ -32,20 +32,88 @@ READER_MAP = {
     "Option<Operator>": "bc.read_operator_value()",
     "Option<Operation>": "bc.read_operation_value()",
     "Option<Box<Vec<String>>>": "bc.read_opt_str_vec_value()",
+    "Option<Vec<String>>": "bc.read_opt_str_vec_value().map(|b| *b)",
     "Box<Vec<String>>": "bc.read_str_vec_value()",
+    "Vec<String>": "*bc.read_str_vec_value()",
     "Option<Box<Vec<u8>>>": "bc.read_opt_u8_vec_value()",
     "Option<Vec<u8>>": "bc.read_opt_u8_vec_value().map(|b| *b)",
     "Option<Box<Condition>>": "bc.read_condition_value()",
     "Option<Box<AbilityEffect>>": "bc.read_effect_value()",
     "Option<Vec<Box<AbilityEffect>>>": "bc.read_effect_vec_value()",
     "Option<Box<Vec<Box<AbilityEffect>>>>": "bc.read_effect_vec_boxed_value()",
+    "Option<Vec<Box<Box<AbilityEffect>>>>": "bc.read_effect_vec_boxed_value().map(|b| *b)",
     "Option<Box<PositionInfo>>": "bc.read_position_value()",
     "Option<Box<DynamicCount>>": "bc.read_dynamic_count_value()",
     "Option<Box<EffectState>>": "bc.read_effect_state_value()",
     "Option<Box<DistinctType>>": "bc.read_distinct_value()",
     "Option<AbilityFilter>": "bc.read_ability_filter_value()",
     "Option<Box<Vec<AbilityFilterBranch>>>": "bc.read_or_ability_filters_value()",
+    "Option<Vec<AbilityFilterBranch>>": "bc.read_or_ability_filters_value().map(|b| *b)",
 }
+
+# Lints that cannot apply to a generated decode table. Emitted on every
+# generated top-level item so the output is warning-free without hand edits
+# (hand edits here are wiped by regeneration and fail the CI freshness check).
+# It has to be an outer attribute on each item, not a crate/module inner
+# attribute: vm.rs `include!`s this file, where `#![...]` is not permitted.
+#
+# - `vec_box`: `AbilityEffect`/`Condition` are recursive, so the decoded
+#   `Vec<Box<T>>` boxes are load-bearing. Clippy's `Vec<T>` suggestion would
+#   make the type infinitely sized.
+# - `too_many_arguments`: the parameter list IS `AbilityEffect`/`CompoundBranch`'s
+#   own field list. The EffectKind half of the decode already went through a
+#   `EffectKindLocals` accumulator; the AbilityEffect half is passed as the
+#   live struct's own fields so the decoder writes them in place with no
+#   per-variant builder to clone them back out of.
+ITEM_ALLOW = (
+    "#[allow(\n"
+    "    // Recursive decode types need the Box inside the Vec, and the\n"
+    "    // dispatch signature is the struct's own field list. Rationale:\n"
+    "    // cards/generate_effect_decoder.py LINT_ALLOW note.\n"
+    "    clippy::vec_box,\n"
+    "    clippy::too_many_arguments\n"
+    ")]"
+)
+
+
+def debox(ftype):
+    """Scratch-accumulator type for an `EffectKind` field type.
+
+    `EffectKindLocals` exists for the duration of a single
+    `decode_effect_direct` call and is consumed only by `build_filter`.
+    `Box<Vec<T>>` buys nothing there (a Vec is already a heap allocation, so
+    the Box is a second one), but the `EffectFilter` field it feeds genuinely
+    is `Option<Box<Vec<T>>>` — so the accumulator drops the Box on read and
+    `build_filter` puts it back. The wire format is untouched: the BcReader
+    methods still decode the same bytes.
+    """
+    m = re.fullmatch(r"Option<Box<Vec<(.+)>>>", ftype)
+    if m:
+        return "Option<Vec<{}>>".format(m.group(1))
+    m = re.fullmatch(r"Box<Vec<(.+)>>", ftype)
+    if m:
+        return "Vec<{}>".format(m.group(1))
+    return ftype
+
+
+def rebox_expr(local_type, target_type, base):
+    """Wrap `base` so an accumulator read as `local_type` builds a `target_type`.
+
+    Returns `base` unchanged when the two types already agree.
+    """
+    if local_type == target_type:
+        return base
+    m = re.fullmatch(r"Option<Box<Vec<(.+)>>>", target_type)
+    if m and local_type == "Option<Vec<{}>>".format(m.group(1)):
+        return "{}.map(Box::new)".format(base)
+    m = re.fullmatch(r"Box<Vec<(.+)>>", target_type)
+    if m:
+        inner = m.group(1)
+        if local_type == "Vec<{}>".format(inner):
+            return "Box::new({})".format(base)
+        if local_type == "Option<Vec<{}>>".format(inner):
+            return "{}.map(Box::new)".format(base)
+    return base
 
 
 def rust_type_to_reader(field_type):
@@ -205,13 +273,14 @@ def generate_decoder(variants, ability_effect_fields, compound_fields, filter_fi
     for vfields in variants.values():
         for fname, ftype, aliases in vfields:
             if fname not in ek_field_map:
-                reader = rust_type_to_reader(ftype)
+                reader = rust_type_to_reader(debox(ftype))
                 if reader:
                     ek_field_map[fname] = (reader, ftype)
             for alias in aliases:
                 ek_aliases[alias] = fname
 
     # === Build the decode_effect_field function ===
+    lines.append(ITEM_ALLOW)
     lines.append("/// Read one field from a TAG_OBJECT_VARIANT effect object.")
     lines.append(
         "/// Returns true if the field was recognized and consumed, false to skip."
@@ -293,7 +362,7 @@ def generate_decoder(variants, ability_effect_fields, compound_fields, filter_fi
     filter_field_types = {f[0]: f[1] for f in filter_fields}
     for fname, ftype, _ in filter_fields:
         if fname not in filter_only_keys:
-            reader = rust_type_to_reader(ftype)
+            reader = rust_type_to_reader(debox(ftype))
             if reader:
                 lines.append(
                     f'            "{fname}" => {{ ek.{fname} = {reader}; Some(true) }}'
@@ -327,7 +396,7 @@ def generate_decoder(variants, ability_effect_fields, compound_fields, filter_fi
         if target in ek_field_map:
             reader, _ = ek_field_map[target]
         elif target in filter_field_types:
-            reader = rust_type_to_reader(filter_field_types[target])
+            reader = rust_type_to_reader(debox(filter_field_types[target]))
         if reader:
             lines.append(
                 f'            "{alias}" => {{ ek.{target} = {reader}; Some(true) }}'
@@ -356,24 +425,23 @@ def generate_decoder(variants, ability_effect_fields, compound_fields, filter_fi
             if ftype == "Option<Box<ArcStr>>":
                 boxed_arcstr_fields.add(fname)
 
+    lines.append(ITEM_ALLOW)
     lines.append("/// Accumulator for EffectKind fields during direct decode.")
     lines.append("#[derive(Default)]")
     lines.append("pub(crate) struct EffectKindLocals {")
     for fname, ftype in sorted(all_ek_fields.items()):
-        if ftype.startswith("Box<Vec<String>>"):
-            lines.append(f"    pub {fname}: {ftype},")
-        elif ftype.startswith("Box<Vec<"):
-            lines.append(f"    pub {fname}: {ftype},")
-        elif ftype == "Vec<String>":
-            lines.append(f"    pub {fname}: {ftype},")
-        elif ftype.startswith("Option<"):
-            lines.append(f"    pub {fname}: {ftype},")
+        ltype = debox(ftype)
+        if ltype == "Vec<String>":
+            lines.append(f"    pub {fname}: {ltype},")
+        elif ltype.startswith("Option<"):
+            lines.append(f"    pub {fname}: {ltype},")
         else:
-            lines.append(f"    pub {fname}: Option<{ftype}>,")
+            lines.append(f"    pub {fname}: Option<{ltype}>,")
     lines.append("}")
     lines.append("")
 
     # === build_filter function ===
+    lines.append(ITEM_ALLOW)
     lines.append("/// Build an EffectFilter from the flat EffectKindLocals.")
     lines.append("/// Lazily allocates: returns None when every filter field is empty,")
     lines.append("/// so effects that carry no targeting/filter data pay no heap box.")
@@ -382,10 +450,15 @@ def generate_decoder(variants, ability_effect_fields, compound_fields, filter_fi
     for fname, ftype, _ in filter_fields:
         if fname in all_ek_fields:
             ek_type = all_ek_fields[fname]
+            ltype = debox(ek_type)
             if is_copy_type(ek_type):
                 lines.append(f"        {fname}: ek.{fname},")
             else:
-                lines.append(f"        {fname}: ek.{fname}.clone(),")
+                lines.append(
+                    "        {}: {},".format(
+                        fname, rebox_expr(ltype, ftype, f"ek.{fname}.clone()")
+                    )
+                )
         else:
             lines.append(f"        {fname}: Default::default(),")
     lines.append("    };")

@@ -110,7 +110,7 @@ impl PerUnitFilter<'_> {
         let key = if names.is_empty() {
             CardDatabase::normalize_name(&card.name)
         } else {
-            names.iter().cloned().collect::<Vec<_>>().join("|")
+            names.to_vec().join("|")
         };
         seen_names.insert(key)
     }
@@ -125,7 +125,7 @@ impl PerUnitFilter<'_> {
         card_db
             .get_card(card_id)
             .and_then(|card| card.base_heart.as_ref())
-            .map_or(false, |base| {
+            .is_some_and(|base| {
                 base.hearts
                     .keys()
                     .all(|hc| excluded.iter().any(|exc| &hc.to_string() == exc))
@@ -168,10 +168,9 @@ impl AbilityResolver {
     ) -> Result<(), String> {
         let operation = effect
             .operation_any()
-            .as_deref()
             .unwrap_or("add")
             .to_string();
-        let value: u8 = effect.value_any().unwrap_or(0) as u8;
+        let value: u8 = effect.value_any().unwrap_or(0);
         let target = effect.target_name().to_string();
         let duration = effect.duration_any().map(|s| s.to_string());
         let card_type_filter = effect
@@ -179,19 +178,18 @@ impl AbilityResolver {
             .map(|ct| ct.as_card_str().to_string());
         let group_filter = effect.group_name().map(|s| s.to_string());
         let per_unit = effect.per_unit_any().unwrap_or(false);
-        let per_unit_count_val = effect.per_unit_count_any().unwrap_or(1) as u8;
+        let per_unit_count_val = effect.per_unit_count_any().unwrap_or(1);
         let per_unit_type_str = effect.per_unit_type_any().map(|s| s.to_string());
         let location = effect.location_any().map(|s| s.to_string());
         let effect_constraint = effect.effect_constraint_any().map(|s| s.to_string());
         let self_target = effect.is_self_target();
         let heart_colors = effect.heart_colors_any();
-        if crate::ability::debug::ABILITY_DEBUG.load(core::sync::atomic::Ordering::Relaxed) {
-            if crate::ability::debug::ABILITY_DEBUG.load(core::sync::atomic::Ordering::Relaxed) { log::debug!("[SCORE_DIAG] execute_modify_score called: value={} target={} op={} condition={:?}",
+        if crate::ability::debug::ABILITY_DEBUG.load(core::sync::atomic::Ordering::Relaxed)
+            && crate::ability::debug::ABILITY_DEBUG.load(core::sync::atomic::Ordering::Relaxed) { log::debug!("[SCORE_DIAG] execute_modify_score called: value={} target={} op={} condition={:?}",
                 value,
                 target,
                 operation,
                 effect.condition.is_some()); }
-        }
         let card_db = self.card_db();
         let exclude_self_id = if effect.exclude_self_any().unwrap_or(false) {
             gs.activating_card
@@ -205,7 +203,7 @@ impl AbilityResolver {
         let orientation_modifiers = gs.mods.orientation_modifiers.clone();
         let last_energy = gs.mods.last_cost_energy_count;
         let has_floor = is_live_total
-            && (effect.effect_constraint_any().as_deref() == Some("min:0")
+            && (effect.effect_constraint_any() == Some("min:0")
                 || effect.score_floor_any().is_some());
         if is_live_total {
             let effective_value: u8 = if per_unit {
@@ -234,7 +232,7 @@ impl AbilityResolver {
                         &card_db,
                         &filter,
                         heart_colors,
-                        effect.state_any().as_deref(),
+                        effect.state_any(),
                         &orientation_modifiers,
                         None,
                     )
@@ -384,7 +382,7 @@ impl AbilityResolver {
                         &card_db,
                         &filter,
                         heart_colors,
-                        effect.state_any().as_deref(),
+                        effect.state_any(),
                         &orientation_modifiers,
                         None,
                     )
@@ -551,26 +549,26 @@ impl AbilityResolver {
         effect: &AbilityEffect,
     ) -> Result<(), String> {
         let operation_binding = effect.operation_any();
-        let operation = operation_binding.as_deref().unwrap_or("decrease");
-        let mut value: u8 = effect.value_or_count(0) as u8;
+        let operation = operation_binding.unwrap_or("decrease");
+        let mut value: u8 = effect.value_or_count(0);
         let heart_colors = effect.heart_colors_any();
         let target = effect.target_name();
         let per_unit = effect.per_unit_any().unwrap_or(false);
-        let per_unit_count: u8 = effect.per_unit_count_any().unwrap_or(1) as u8;
+        let per_unit_count: u8 = effect.per_unit_count_any().unwrap_or(1);
         let group_name = effect.group_name();
         let timing_condition_binding = effect.timing_condition_any();
-        let timing_condition = timing_condition_binding.as_deref();
+        let timing_condition = timing_condition_binding;
         let location_binding = effect.location_any();
-        let location = location_binding.as_deref();
+        let location = location_binding;
         let original_value = effect.original_value_any();
-        let original_count = effect.original_count_any().map(|v| v as u8);
+        let original_count = effect.original_count_any().map(|v| v);
         let original_operator_binding = effect.original_operator_any();
         let original_operator = original_operator_binding.as_deref();
         let exclude_self = effect.exclude_self_any().unwrap_or(false);
         let self_target = effect.is_self_target();
         let exclude_heart_colors = effect.exclude_heart_colors_any();
         let max = effect.max.unwrap_or(false);
-        let repeat_limit = effect.repeat_limit_any().map(|v| v as u8);
+        let repeat_limit = effect.repeat_limit_any().map(|v| v);
         let per_unit_heart_colors = effect.per_unit_heart_colors_any();
         let distinct = effect.distinct_any();
         let is_distinct_names = matches!(
@@ -793,8 +791,8 @@ impl AbilityResolver {
 
     pub(crate) fn execute_modify_yell_count(&mut self, gs: &mut GameState, effect: &AbilityEffect) {
         let operation_binding = effect.operation_any();
-        let operation = operation_binding.as_deref().unwrap_or("subtract");
-        let count: u8 = effect.count_or(0) as u8;
+        let operation = operation_binding.unwrap_or("subtract");
+        let count: u8 = effect.count_or(0);
         let pp = self.player_prefix(gs);
         let act_name = gs
             .activating_card
@@ -822,8 +820,8 @@ impl AbilityResolver {
         effect: &AbilityEffect,
     ) -> Result<(), String> {
         let operation_binding = effect.operation_any();
-        let operation = operation_binding.as_deref().unwrap_or("decrease");
-        let count: u8 = effect.count_or(0) as u8;
+        let operation = operation_binding.unwrap_or("decrease");
+        let count: u8 = effect.count_or(0);
         let pp = self.player_prefix(gs);
         let act_name = gs
             .activating_card
@@ -853,8 +851,8 @@ impl AbilityResolver {
         effect: &AbilityEffect,
     ) {
         let operation_binding = effect.operation_any();
-        let operation = operation_binding.as_deref().unwrap_or("increase");
-        let value: u8 = effect.value_any().unwrap_or(0) as u8;
+        let operation = operation_binding.unwrap_or("increase");
+        let value: u8 = effect.value_any().unwrap_or(0);
         let target = effect.target_name();
         let card_type = effect.card_type_any().map(|ct| ct.as_card_str());
         let heart_colors = effect.heart_colors_any();

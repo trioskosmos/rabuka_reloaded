@@ -111,7 +111,7 @@ fn public_opponent_ceiling(gs: &GameState, me: u8, db: &CardDatabase) -> i32 {
 }
 
 /// Passable lives under the buff-aware mean pool.
-fn passable_count_buffed(gs: &GameState, me: u8, db: &CardDatabase) -> usize {
+pub(crate) fn passable_count_buffed(gs: &GameState, me: u8, db: &CardDatabase) -> usize {
     let p = gs.seat_player(me);
     let pool = heart_pool_buffed(gs, me, db, 1.0);
     hand_lives(p, db)
@@ -217,7 +217,7 @@ pub fn score_actions(gs: &GameState, actions: &[Action], me: u8) -> Vec<(f64, St
         .iter()
         .filter(|&&c| {
             db.get_card(c)
-                .map_or(false, |x| x.card_type == CardType::Live)
+                .is_some_and(|x| x.card_type == CardType::Live)
         })
         .count();
     let deck_len = my_now.main_deck.cards.len().max(1);
@@ -228,7 +228,7 @@ pub fn score_actions(gs: &GameState, actions: &[Action], me: u8) -> Vec<(f64, St
         .iter()
         .filter(|&&c| {
             db.get_card(c)
-                .map_or(false, |x| x.card_type == CardType::Live)
+                .is_some_and(|x| x.card_type == CardType::Live)
         })
         .count();
 
@@ -336,7 +336,7 @@ pub fn score_actions(gs: &GameState, actions: &[Action], me: u8) -> Vec<(f64, St
                 .iter()
                 .filter(|&&c| {
                     db.get_card(c)
-                        .map_or(false, |x| x.card_type == CardType::Live)
+                        .is_some_and(|x| x.card_type == CardType::Live)
                 })
                 .count();
             if wr_now > waitroom_lives && p_life_draw > 0.0 {
@@ -520,7 +520,7 @@ pub fn choose_live_set_v7(gs: &GameState, actions: &[Action], db: &CardDatabase)
             .iter()
             .filter(|&&cid| {
                 db.get_card(cid)
-                    .map_or(false, |c| c.card_type == CardType::Live)
+                    .is_some_and(|c| c.card_type == CardType::Live)
             })
             .count();
         let max_slots = (3i32 - i32::from(my.live_card_set_limit_reduction)).max(0) as usize;
@@ -534,7 +534,7 @@ pub fn choose_live_set_v7(gs: &GameState, actions: &[Action], db: &CardDatabase)
                     !desired.contains(&i)
                         && db
                             .get_card(cid)
-                            .map_or(false, |c| c.card_type != CardType::Live)
+                            .is_some_and(|c| c.card_type != CardType::Live)
                 })
                 .map(|(i, &cid)| (i, db.get_card(cid).and_then(|c| c.cost).unwrap_or(0)))
                 .collect();
@@ -944,7 +944,7 @@ fn experiment_expected_yell_score(gs: &GameState, me: u8, db: &CardDatabase, bla
         .filter_map(|&cid| db.get_card(cid))
         .filter_map(|card| card.special_heart.as_ref())
         .filter_map(|hearts| hearts.hearts.get(&crate::card::HeartColor::Score).copied())
-        .map(|count| usize::from(count))
+        .map(usize::from)
         .sum();
     let draws = usize::try_from(blades).unwrap_or(usize::MAX).min(deck_len);
     (score_icons * draws / deck_len) as i32
@@ -1182,7 +1182,7 @@ fn count_lives(gs: &GameState, desired: &[usize], db: &CardDatabase) -> usize {
     desired
         .iter()
         .filter(|&&hi| {
-            my.hand.cards.get(hi).copied().map_or(false, |cid| {
+            my.hand.cards.get(hi).copied().is_some_and(|cid| {
                 db.get_card(cid)
                     .is_some_and(|c| c.card_type == CardType::Live)
             })
@@ -1195,6 +1195,17 @@ pub(crate) fn choose_live_set_experiment(
     actions: &[Action],
     db: &CardDatabase,
 ) -> Action {
+    let desired = live_set_plan(gs, db);
+    emit(gs, actions, &desired)
+}
+
+/// The live-card portfolio v7 wants, as hand indices.
+///
+/// Split out of `choose_live_set_experiment` so `v7_ismcts` can plan a
+/// whole live phase once and then replay the plan across that phase's
+/// action ticks, instead of re-running the 256-sample pass model on every
+/// tick of a stateless emission chain.
+pub(crate) fn live_set_plan(gs: &GameState, db: &CardDatabase) -> Vec<usize> {
     let me = gs.active_player_index();
     let (my, opp) = gs.seated_pair(me);
     let my_succ = my.success_live_card_zone.cards.len();
@@ -1216,7 +1227,7 @@ pub(crate) fn choose_live_set_experiment(
     let mut desired: Vec<usize> = Vec::new();
 
     if my.live_card_set_limit_reduction >= 3 || gs.cannot_live_players.contains(&my.id) {
-        return emit(gs, actions, &desired);
+        return desired;
     }
     if is_second && !opp_committed {
         if let Some(hi) = experiment_free_win(gs, me, db) {
@@ -1224,7 +1235,7 @@ pub(crate) fn choose_live_set_experiment(
             if std::env::var_os("V7_FREE_JUNK").is_some() {
                 experiment_junk_fill(gs, me, db, &mut desired);
             }
-            return emit(gs, actions, &desired);
+            return desired;
         }
     }
 
@@ -1324,7 +1335,7 @@ pub(crate) fn choose_live_set_experiment(
                             gap,
                             floor
                         );
-                        return emit(gs, actions, &desired);
+                        return desired;
                     }
                 }
             }
@@ -1433,7 +1444,7 @@ pub(crate) fn choose_live_set_experiment(
     if contested && std::env::var("V7_ROLLOUT_ASSIST").is_ok() {
         let candidates = crate::bot::rollout::enumerate_candidates(gs, me, db);
         if !candidates.is_empty() {
-            let index = crate::bot::rollout::price_portfolios(gs, me, &candidates, actions);
+            let index = crate::bot::rollout::price_portfolios(gs, me, &candidates, &[]);
             desired = candidates[index].clone();
         }
     }
@@ -1509,7 +1520,7 @@ pub(crate) fn choose_live_set_experiment(
             opp_succ
         );
     }
-    emit(gs, actions, &desired)
+    desired
 }
 
 pub fn live_set_audit_note(gs: &GameState) -> Option<String> {

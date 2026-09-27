@@ -55,7 +55,7 @@ fn tomari_sp_bp7_022_activation_without_energy_keeps_member_on_stage() {
         "mandatory energy cost with 0 energy must refuse activation"
     );
     assert!(
-        game.state.player1.stage.stage.iter().any(|&c| c == me),
+        game.state.player1.stage.stage.contains(&me),
         "member stays on stage"
     );
 }

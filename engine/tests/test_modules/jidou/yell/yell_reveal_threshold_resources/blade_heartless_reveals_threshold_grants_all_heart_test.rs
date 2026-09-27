@@ -15,7 +15,7 @@ fn has_all_heart_modifier(game: &TestGame) -> bool {
         .mods
         .heart_modifiers
         .iter()
-        .any(|(_, hm)| hm.get(&HeartColor::All).map_or(false, |e| e.total() > 0))
+        .any(|(_, hm)| hm.get(&HeartColor::All).is_some_and(|e| e.total() > 0))
 }
 
 #[test]

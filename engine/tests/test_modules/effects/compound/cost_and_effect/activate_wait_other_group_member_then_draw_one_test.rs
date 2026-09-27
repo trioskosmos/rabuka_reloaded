@@ -102,20 +102,17 @@ fn wait_other_group_draw_other_group_member_pays_cost() {
     let niji_waited = game
         .state
         .mods
-        .get_orientation_modifier(niji)
-        .map_or(false, |o| o == "wait");
+        .get_orientation_modifier(niji) == Some("wait");
     assert!(niji_waited, "niji (only 虹ヶ咲 candidate) must be auto-waited as cost");
     let emma_waited = game
         .state
         .mods
-        .get_orientation_modifier(emma)
-        .map_or(false, |o| o == "wait");
+        .get_orientation_modifier(emma) == Some("wait");
     assert!(!emma_waited, "exclude_self: Emma herself must NOT be waited");
     let filler_waited = game
         .state
         .mods
-        .get_orientation_modifier(filler)
-        .map_or(false, |o| o == "wait");
+        .get_orientation_modifier(filler) == Some("wait");
     assert!(!filler_waited, "non-虹ヶ咲 filler must NOT be waited");
 
     let hand_count = game.state.player1.hand.cards.len();

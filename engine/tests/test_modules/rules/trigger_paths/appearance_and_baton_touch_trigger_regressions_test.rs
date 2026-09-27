@@ -471,7 +471,7 @@ fn baton_touch_cleared_between_actions() {
         .db
         .get_card(fresh_card)
         .and_then(|c| c.cost)
-        .unwrap_or(0) as u8;
+        .unwrap_or(0);
     let energy_after = game.state.player1.energy_zone.active_count();
     assert_eq!(
         energy_after,
@@ -500,8 +500,8 @@ fn baton_touch_cleared_between_actions() {
         game.state.baton_touch_arriving_card_id, None,
         "baton_touch_arriving_card_id must be None after cleared second action"
     );
-    assert_eq!(
-        game.state.baton_touch_zero_cost, false,
+    assert!(
+        !game.state.baton_touch_zero_cost,
         "baton_touch_zero_cost must be false after cleared second action"
     );
 }

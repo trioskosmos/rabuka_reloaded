@@ -53,8 +53,7 @@ fn konata_bp4_deploy_blade_heart_member_waits() {
     let konata_waited = game
         .state
         .mods
-        .get_orientation_modifier(konata)
-        .map_or(false, |o| o == "wait");
+        .get_orientation_modifier(konata) == Some("wait");
     assert!(
         konata_waited,
         "Kanata should become wait when deploying BH member"
@@ -124,8 +123,7 @@ fn konata_bp4_deploy_non_blade_heart_member_stays_active() {
     let konata_waited = game
         .state
         .mods
-        .get_orientation_modifier(konata)
-        .map_or(false, |o| o == "wait");
+        .get_orientation_modifier(konata) == Some("wait");
     assert!(
         !konata_waited,
         "Kanata should stay active when deploying non-BH member"
@@ -167,8 +165,7 @@ fn konata_bp4_skip_cost_no_effect() {
     let konata_waited = game
         .state
         .mods
-        .get_orientation_modifier(konata)
-        .map_or(false, |o| o == "wait");
+        .get_orientation_modifier(konata) == Some("wait");
     assert!(
         !konata_waited,
         "Kanata should stay active when cost skipped"

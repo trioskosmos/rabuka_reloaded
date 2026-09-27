@@ -47,7 +47,7 @@ fn shiki_swap_to(game: &mut TestGame, shiki: i16, want_area: &str) {
             a.parameters
                 .as_ref()
                 .and_then(|p| p.stage_area.as_deref())
-                .is_some_and(|area| area == want_area || area == &format!("{want_area}_side"))
+                .is_some_and(|area| area == want_area || area == format!("{want_area}_side"))
         })
         .expect("swap target area not offered");
     game.select_generated(idx);

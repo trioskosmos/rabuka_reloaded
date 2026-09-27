@@ -278,6 +278,7 @@ pub enum PlacementTarget {
     derive(serde::Serialize, serde::Deserialize)
 )]
 #[cfg_attr(feature = "serde_support", serde(rename_all = "snake_case"))]
+#[derive(Default)]
 pub enum ActionType {
     // Card movement
     DrawCard,
@@ -341,6 +342,7 @@ pub enum ActionType {
     // Utility
     Shuffle,
     ReYell,
+    #[default]
     Custom,
     DoNothing,
     Choice,
@@ -530,11 +532,6 @@ impl ActionType {
     }
 }
 
-impl Default for ActionType {
-    fn default() -> Self {
-        ActionType::Custom
-    }
-}
 
 impl core::fmt::Display for ActionType {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {

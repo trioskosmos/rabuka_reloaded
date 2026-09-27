@@ -261,8 +261,7 @@ fn q280_mei_activation_then_payment_keeps_next_phase_restriction() {
         !game.state
             .player1
             .energy_zone
-            .cards
-            .get(0)
+            .cards.first()
             .is_some_and(|&cid| cid == restricted),
         "the ordinary energy, not the restricted energy, should be active"
     );

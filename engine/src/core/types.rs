@@ -900,7 +900,7 @@ impl PartialEq<&str> for ZoneId {
 
 impl PartialEq<ZoneId> for &str {
     fn eq(&self, other: &ZoneId) -> bool {
-        ZoneId::from_str(*self) == *other
+        ZoneId::from_str(self) == *other
     }
 }
 

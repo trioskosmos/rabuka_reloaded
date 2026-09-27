@@ -34,7 +34,7 @@ fn set_active(game: &mut TestGame, p1_active: bool) {
 }
 
 fn is_waited(game: &TestGame, id: i16) -> bool {
-    game.state.mods.get_orientation_modifier(id).as_deref() == Some("wait")
+    game.state.mods.get_orientation_modifier(id) == Some("wait")
 }
 
 /// Player2 activates 朝香果林 on their stage. The wait first pays the cost (place 1

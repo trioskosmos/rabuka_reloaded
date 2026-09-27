@@ -391,7 +391,7 @@ let source = cost.source_str().unwrap_or("");
         let pl = gs.resolve_target_player(target_str);
         let card_db = &gs.card_database;
         let is_same_group_name =
-            cost.group_reference_any().as_deref() == Some("same_group_name");
+            cost.group_reference_any() == Some("same_group_name");
         let indices: Vec<usize> = if is_same_group_name {
             // "same_group_name" = 2 cards from hand that share a group name
             // with each other (any group, not necessarily the activating card's).
@@ -410,7 +410,7 @@ let source = cost.source_str().unwrap_or("");
             }
             let needed = count;
             let mut indices: Vec<usize> = Vec::new();
-            for (_group, members) in &group_counts {
+            for members in group_counts.values() {
                 if members.len() >= needed {
                     indices.extend(members);
                 }
@@ -544,7 +544,7 @@ let source = cost.source_str().unwrap_or("");
         }
         let source_zone = Zone::from_str(source);
         let dest_opt = cost.destination_any();
-        let is_hand_to_waitroom = source_zone == Some(Zone::Hand) && matches!(dest_opt.as_deref(), Some("discard") | Some("waitroom"));
+        let is_hand_to_waitroom = source_zone == Some(Zone::Hand) && matches!(dest_opt, Some("discard") | Some("waitroom"));
         let dest_str = if is_hand_to_waitroom { " to waitroom" } else { "" };
         let filter_desc = cost_filter_desc_en(cost);
         let desc = if is_any_number {
@@ -601,7 +601,7 @@ let source = cost.source_str().unwrap_or("");
                 )
                 .group(
                     None::<String>
-                        .or_else(|| cost.group_names_any().clone().map(|v| v.join(","))),
+                        .or_else(|| cost.group_names_any().map(|v| v.join(","))),
                 )
                 .characters(cost.characters_any().cloned())
                 .target_player_id(Some(
@@ -1116,7 +1116,7 @@ let source = cost.source_str().unwrap_or("");
 
                 if optional && !is_activation {
                     let player = gs.resolve_target_player(target);
-                    let active = player.energy_zone.active_count() as u8;
+                    let active = player.energy_zone.active_count();
                     if active < energy {
                         if let Some(entry) = gs.ability_queue.current_entry_mut() {
                             entry.cost_paid = true;
@@ -1263,7 +1263,7 @@ let source = cost.source_str().unwrap_or("");
                             .ability_queue
                             .current_entry()
                             .and_then(|entry| entry.ability.effect.as_deref())
-                            .is_some_and(|effect| util::effect_uses_selected_cards(effect));
+                            .is_some_and(util::effect_uses_selected_cards);
                     if effect_uses_selected {
                         self.selected_cards = card_ids.into();
                     }
@@ -1416,13 +1416,13 @@ let source = cost.source_str().unwrap_or("");
         // dedicated handlers like PlaceEnergyUnderMember manage their own
         // optionality and must NOT be marked (double-executes otherwise).
         let gated_move = |a: &AbilityEffect| {
-            a.source.is_some_and(|z| Self::optional_gate_source(z))
+            a.source.is_some_and(Self::optional_gate_source)
                 && matches!(
                     a.action,
                     ActionType::MoveCards | ActionType::Sequential
                 )
         };
-        let is_gated_effect_move = gs.entry_effect().is_some_and(|e| gated_move(e))
+        let is_gated_effect_move = gs.entry_effect().is_some_and(&gated_move)
             || gs
                 .ability_queue
                 .current_entry()
@@ -1450,7 +1450,7 @@ let source = cost.source_str().unwrap_or("");
                         .pay_energy(energy)?;
                 }
             }
-            if cost.state_change_any().as_deref() == Some("wait") {
+            if cost.state_change_any() == Some("wait") {
                 if cost.self_cost_any() == Some(true) {
                     if let Some(id) = gs.activating_card {
                         // Q159: The card must be on stage to be put to wait.
@@ -1459,9 +1459,7 @@ let source = cost.source_str().unwrap_or("");
                         let on_stage = gs
                             .resolve_target_player_mut("self")
                             .stage
-                            .stage
-                            .iter()
-                            .any(|&sid| sid == id);
+                            .stage.contains(&id);
                         if !on_stage {
                             return Err("Cannot pay cost: member is not on stage".to_string());
                         }
@@ -1525,7 +1523,7 @@ let source = cost.source_str().unwrap_or("");
                                 )),
                             )))
                             .card_type(cost.card_type_any().map(|s| s.to_string()))
-                            .group(cost.group_names_any().clone().map(|v| v.join(",")))
+                            .group(cost.group_names_any().map(|v| v.join(",")))
                             .target_player_id(Some(
                                 cost.target.as_deref().unwrap_or("self").to_string(),
                             ))
@@ -1555,7 +1553,7 @@ let source = cost.source_str().unwrap_or("");
             // Handle sequential_cost sub-costs — pay each after user confirmed
             if let Some(ref costs) = cost.compound.actions {
                 for sub_cost in costs {
-                    if sub_cost.state_change_any().as_deref() == Some("wait")
+                    if sub_cost.state_change_any() == Some("wait")
                         && sub_cost.self_cost_any() == Some(true)
                     {
                         if let Some(id) = gs.activating_card {
@@ -1573,7 +1571,7 @@ let source = cost.source_str().unwrap_or("");
                 "[OPT_COST] checking cost_type: {:?}, entry_cost: {:?}, entry_effect_action: {:?}",
                 cost.action,
                 gs.entry_cost().is_some(),
-                gs.entry_effect().map(|e| e.action.clone())
+                gs.entry_effect().map(|e| e.action)
             );
             if cost.action == ActionType::PlaceEnergyUnderMember {
                 self.execute_place_energy_under_member_non_optional(gs, &cost.0);
@@ -1584,8 +1582,8 @@ let source = cost.source_str().unwrap_or("");
         log::debug!(
             "[HANDLE_OPT_COST] entry_cost={:?} entry_effect={:?} effect_action={:?}",
             gs.entry_cost().and_then(|c| c.state_change_any()),
-            gs.entry_effect().map(|e| e.action.clone()),
-            gs.entry_effect().map(|e| e.action.clone())
+            gs.entry_effect().map(|e| e.action),
+            gs.entry_effect().map(|e| e.action)
         );
         log::debug!(
             "[HANDLE_OPT_COST2] entering if: entry_cost.is_some={}",

@@ -109,13 +109,13 @@ impl GameState {
             .stage
             .under_cards_with_hosts()
             .into_iter()
-            .chain(self.player2.stage.under_cards_with_hosts().into_iter())
+            .chain(self.player2.stage.under_cards_with_hosts())
         {
             let card = match self.card_database.get_card(under_cid) {
                 Some(c) => c,
                 None => continue,
             };
-            for (_ability_idx, ar) in card.abilities.iter().enumerate() {
+            for ar in card.abilities.iter() {
                 let ability = ar.resolve();
                 if !GameState::ability_matches_trigger(
                     &ability,
@@ -127,7 +127,7 @@ impl GameState {
                     continue;
                 };
                 if effect.action != crate::ability::enums::ActionType::GainResource
-                    || !matches!(effect.resource_any().as_deref(), Some("blade"))
+                    || !matches!(effect.resource_any(), Some("blade"))
                 {
                     continue;
                 }
@@ -279,13 +279,13 @@ impl GameState {
                 for (cid, cols) in &old_heart {
                     for (color_str, &delta) in cols {
                         let hc = crate::card::parse_heart_color(color_str);
-                        self.mods.remove_heart_modifier(*cid, hc, delta as i16);
+                        self.mods.remove_heart_modifier(*cid, hc, delta);
                     }
                 }
                 for (cid, cols) in &exp_heart {
                     for (color_str, delta) in cols {
                         let hc = crate::card::parse_heart_color(color_str);
-                        self.mods.add_heart_modifier(*cid, hc, *delta as i16);
+                        self.mods.add_heart_modifier(*cid, hc, *delta);
                     }
                 }
             }
@@ -311,12 +311,12 @@ impl GameState {
             for (card_id, color_str, delta) in &old_global_nh {
                 let hc = crate::card::parse_heart_color(color_str);
                 self.mods
-                    .add_need_heart_modifier(*card_id, hc, -*delta as i16);
+                    .add_need_heart_modifier(*card_id, hc, -*delta);
             }
             for (card_id, color_str, delta) in &exp_global_need_heart {
                 let hc = crate::card::parse_heart_color(color_str);
                 self.mods
-                    .add_need_heart_modifier(*card_id, hc, *delta as i16);
+                    .add_need_heart_modifier(*card_id, hc, *delta);
             }
         }
         self.mods.constant_global_need_heart = exp_global_need_heart;
@@ -485,9 +485,9 @@ impl GameState {
                         }
                         match effect.action {
                             crate::ability::enums::ActionType::GainResource => {
-                                match effect.resource_any().as_deref().unwrap_or("") {
+                                match effect.resource_any().unwrap_or("") {
                                     "blade" => {
-                                        let n = if let Some(ref dc) = effect.dynamic_count_any() {
+                                        let n = if let Some(dc) = effect.dynamic_count_any() {
                                             self.resolve_dynamic_count(
                                                 dc,
                                                 &[],
@@ -502,7 +502,7 @@ impl GameState {
                                             // else defaults to the host's own side.
                                             let host_on_p1 =
                                                 self.player1.stage.stage.contains(&card_id);
-                                            let player = match effect.target_any().as_deref() {
+                                            let player = match effect.target_any() {
                                                 Some("opponent") => {
                                                     if host_on_p1 {
                                                         &self.player2
@@ -542,7 +542,7 @@ impl GameState {
                                         // "失う" (lose) is represented as sign:negative.
                                         // Apply the sign so the modifier is negative.
                                         let sign_mult: i16 = if matches!(
-                                            effect.sign_any().as_deref(),
+                                            effect.sign_any(),
                                             Some("negative") | Some("-")
                                         ) {
                                             -1
@@ -627,7 +627,7 @@ impl GameState {
                                         }
                                     }
                                     "heart" => {
-                                        let n = if let Some(ref dc) = effect.dynamic_count_any() {
+                                        let n = if let Some(dc) = effect.dynamic_count_any() {
                                             // Unified dynamic_count resolution (dynamic_count.rs).
                                             // The constant path has no resolver step context, so
                                             // pass empty moved/selected and 0 draw count.
@@ -643,7 +643,7 @@ impl GameState {
                                             // blade path above.
                                             let host_on_p1 =
                                                 self.player1.stage.stage.contains(&card_id);
-                                            let player = match effect.target_any().as_deref() {
+                                            let player = match effect.target_any() {
                                                 Some("opponent") => {
                                                     if host_on_p1 {
                                                         &self.player2
@@ -679,7 +679,7 @@ impl GameState {
                                                 source_card_id: card_id,
                                                 ability_text: ui_text(&effect.text),
                                                 target_card_id: card_id,
-                                                amount: i32::from(n),
+                                                amount: n,
                                                 color: Some(crate::ability::util::HEART_ALL_KEY.to_string()),
                                                 kind: ui_kind("heart"),
                                             });
@@ -796,11 +796,10 @@ impl GameState {
                             //   - Legacy text parse: bonus_score → icon_score.png badge
                             //     PLUS bonus_triggers → trigger texticon
                             crate::ability::enums::ActionType::GainAbility => {
-                                if effect.ability_gain_any().as_deref()
+                                if effect.ability_gain_any()
                                     == Some("{{icon_all.png|ハート}}")
                                     || effect
                                         .ability_gain_any()
-                                        .as_deref()
                                         .is_some_and(|t| t.contains("ALL"))
                                 {
                                     // All-heart: store as single "all" entry (HeartColor::All)
@@ -817,7 +816,7 @@ impl GameState {
                                         color: Some("all".to_string()),
                                         kind: ui_kind("gained_ability"),
                                     });
-                                } else if let Some(gain_text) = effect.ability_gain_any().as_deref()
+                                } else if let Some(gain_text) = effect.ability_gain_any()
                                 {
                                     // Determine which player this card belongs to
                                     let belongs_to_p1 = self.player1.stage.stage.contains(&card_id);
@@ -829,11 +828,11 @@ impl GameState {
 
                                     let texts = expected_gained_texts.entry(card_id).or_default();
                                     if !texts.iter().any(|text| text == gain_text) {
-                                        texts.push(ui_text(&gain_text));
+                                        texts.push(ui_text(gain_text));
                                     }
 
                                     // Use gained_effect if available (structured data from parser)
-                                    if let Some(ref gained) = effect.gained_effect_any() {
+                                    if let Some(gained) = effect.gained_effect_any() {
                                         let action = gained.action;
                                         if action
 == crate::ability::enums::ActionType::ModifyScore
@@ -843,7 +842,7 @@ impl GameState {
                                         if val != 0 {
                                             self.mods.constant_score_sources.push((
                                                 card_id,
-                                                ui_text(&gain_text),
+                                                ui_text(gain_text),
                                                 i16::try_from(val).unwrap(),
                                             ));
                                         }
@@ -855,7 +854,7 @@ impl GameState {
                                             // constant evaluation time.  Store them for later
                                             // evaluation during execute_live_victory_determination.
                                             exp_delayed_gained_effects
-                                                .push((card_id, *(*gained).clone()));
+                                                .push((card_id, *gained.clone()));
                                         }
                                     } else {
                                         // Fallback: parse value from text (legacy path)
@@ -872,7 +871,7 @@ impl GameState {
                                             if val != 0 {
                                                 self.mods.constant_score_sources.push((
                                                     card_id,
-                                                    ui_text(&gain_text),
+                                                    ui_text(gain_text),
                                                     i16::try_from(val).unwrap(),
                                                 ));
                                             }
@@ -917,7 +916,7 @@ impl GameState {
                                                 source_card_id: host_id,
                                                 ability_text: ui_text(&effect.text),
                                                 target_card_id: *card_id,
-                                                amount: delta as i32,
+                                                amount: delta,
                                                 color: Some(color.to_string()),
                                                 kind: ui_kind("need_heart"),
                                             },
@@ -938,7 +937,7 @@ impl GameState {
                                         if sub.action
                                             == crate::ability::enums::ActionType::GainResource
                                         {
-                                            match sub.resource_any().as_deref().unwrap_or("") {
+                                            match sub.resource_any().unwrap_or("") {
                                                 "blade" => {
                                                     let n = sub
                                                         .resource_icon_count_any()
@@ -1093,7 +1092,7 @@ impl GameState {
                         }) && ability.effect.as_ref().is_some_and(|effect| {
                             effect.action
                                 == crate::ability::enums::ActionType::ModifyYellSource
-                                && effect.yell_source_any().as_deref() == Some("deck_bottom")
+                                && effect.yell_source_any() == Some("deck_bottom")
                         })
                     })
                 });
@@ -1153,9 +1152,9 @@ impl GameState {
                 // LL-bp7-001 play-time cost (手札3枚捨てて10) is NOT a passive constant;
                 // it is handled via the pre-play choice hook in phases.rs.
                 // Detect by: set 10 + location hand + 3 characters + optional.
-                let is_ll_bp7_play_cost = effect.operation_any().as_deref() == Some("set")
+                let is_ll_bp7_play_cost = effect.operation_any() == Some("set")
                     && effect.value_any() == Some(10)
-                    && effect.location_any().as_deref() == Some("hand")
+                    && effect.location_any() == Some("hand")
                     && effect.optional.unwrap_or(false)
                     && effect.characters_any().map(|c| c.len() == 3).unwrap_or(false);
                 if is_ll_bp7_play_cost {
@@ -1254,7 +1253,7 @@ impl GameState {
                     log::debug!(
                         "[COST_MOD] cid={} op={:?} val={}",
                         cid,
-                        effect.operation_any().as_deref(),
+                        effect.operation_any(),
                         value
                     );
 
@@ -1304,10 +1303,10 @@ impl GameState {
         let old_sets = core::mem::take(&mut self.mods.constant_cost_set_bonuses);
         if old_bonuses != expected {
             for (cid, old) in &old_bonuses {
-                self.mods.remove_cost_modifier(*cid, *old as i16);
+                self.mods.remove_cost_modifier(*cid, *old);
             }
             for (&cid, &new_val) in &expected {
-                self.mods.add_cost_modifier(cid, new_val as i16);
+                self.mods.add_cost_modifier(cid, new_val);
             }
         }
         if old_sets != expected_set {
@@ -1315,7 +1314,7 @@ impl GameState {
                 self.mods.remove_cost_modifier_set(*cid);
             }
             for (&cid, &new_val) in &expected_set {
-                self.mods.set_cost_modifier(cid, new_val as i16);
+                self.mods.set_cost_modifier(cid, new_val);
             }
         }
         self.mods.constant_cost_bonuses = expected;
@@ -1356,7 +1355,7 @@ impl GameState {
             effect_type: "heart_override".to_string(),
             duration,
             created_turn: self.turn_number,
-            created_phase: self.current_phase.clone(),
+            created_phase: self.current_phase,
             target_player_id: String::new(),
             description: format!("Heart override: card {} = {:?} x{}", card_id, color, count),
             creation_order: 0,
@@ -1712,7 +1711,7 @@ impl GameState {
     /// Single source of truth shared by the victory-determination flow
     /// (turn/live.rs) and live-success triggering (turn/triggers.rs).
     pub fn restore_performance_need_heart_modifiers(&mut self) {
-        use crate::core::game_modifiers::ModifierEntry;
+        
         // IMPORTANT: deduplicate (cid,color) pairs — the same global modifier
         // may appear in multiple players' snapshots, causing double-counting.
         let mut restored: HashSet<(i16, crate::card::HeartColor)> = HashSet::default();
@@ -1727,7 +1726,7 @@ impl GameState {
                     .entry(cid)
                     .or_default()
                     .entry(color)
-                    .or_insert(ModifierEntry::default());
+                    .or_default();
                 if entry.set != 0 && target.set == 0 {
                     target.set = entry.set;
                 }
@@ -1754,7 +1753,7 @@ impl GameState {
         // ── Clear previously-applied success zone bonuses ──
         let old_sz_blade = core::mem::take(&mut self.mods.success_zone_blade_bonuses);
         for (cid, val) in &old_sz_blade {
-            self.mods.remove_blade_modifier(*cid, *val as i16);
+            self.mods.remove_blade_modifier(*cid, *val);
         }
         let old_sz_heart = core::mem::take(&mut self.mods.success_zone_heart_bonuses);
         for (cid, cols) in &old_sz_heart {
@@ -1765,7 +1764,7 @@ impl GameState {
         }
         let old_sz_score = core::mem::take(&mut self.mods.success_zone_score_bonuses);
         for (cid, val) in &old_sz_score {
-            self.mods.remove_score_modifier(*cid, *val as i16);
+            self.mods.remove_score_modifier(*cid, *val);
         }
         // Source attribution is rebuilt from scratch alongside the bonuses.
         self.mods.success_zone_blade_sources.clear();
@@ -1922,7 +1921,7 @@ impl GameState {
                     .enumerate()
                     .filter(|&(_, &idx)| idx != -1)
                     .filter(|&(pos, _)| {
-                        if let Some(ref pos_req) = effect.position_any() {
+                        if let Some(pos_req) = effect.position_any() {
                             let pos_str = pos_req.get_position();
                             match pos_str {
                                 Some("center") => pos == 1,
@@ -1935,7 +1934,7 @@ impl GameState {
                         }
                     })
                     .filter(|&(_, &id)| {
-                        if let Some(ref groups) = effect.group_names_any() {
+                        if let Some(groups) = effect.group_names_any() {
                             groups.iter().any(|g| {
                                 crate::ability::util::card_matches_group_str(
                                     &card_db,

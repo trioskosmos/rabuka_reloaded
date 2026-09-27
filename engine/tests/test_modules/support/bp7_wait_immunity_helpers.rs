@@ -96,5 +96,5 @@ pub fn p1_establish_wait_immunity(game: &mut TestGame) -> i16 {
 }
 
 pub fn is_waited(game: &TestGame, id: i16) -> bool {
-    game.state.mods.get_orientation_modifier(id).as_deref() == Some("wait")
+    game.state.mods.get_orientation_modifier(id) == Some("wait")
 }

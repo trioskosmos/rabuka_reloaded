@@ -50,7 +50,7 @@ impl AbilityResolver {
                 // Clear looked_at_cards
                 gs.looked_at_cards.clear();
             }
-        } else if let Some(ref or_types) = effect.or_card_types_any() {
+        } else if let Some(or_types) = effect.or_card_types_any() {
             // No card type chosen yet — create the type choice prompt.
             let desc = format!("Choose: {}", or_types.join(", or "));
             self.pending_choice = Some(Choice::SelectTarget {
@@ -179,18 +179,17 @@ impl AbilityResolver {
                 .moved_cards
                 .iter()
                 .filter_map(|&cid| gs.card_database.get_card(cid).and_then(|c| c.cost))
-                .map(|v| v as u8)
                 .sum();
-            let divisor = effect.per_unit_count_any().unwrap_or(1) as u8;
+            let divisor = effect.per_unit_count_any().unwrap_or(1);
             let mut c = total_cost / divisor;
             if let Some(cap) = effect.repeat_limit_any() {
-                c = c.min(cap as u8);
+                c = c.min(cap);
             }
             c
-        } else if let Some(ref dc) = effect.dynamic_count_any() {
+        } else if let Some(dc) = effect.dynamic_count_any() {
             self.resolve_dynamic_count(gs, dc)
         } else {
-            effect.count_or(1) as u8
+            effect.count_or(1)
         };
         let target = effect.target_name();
         let card_db = gs.card_database.clone();

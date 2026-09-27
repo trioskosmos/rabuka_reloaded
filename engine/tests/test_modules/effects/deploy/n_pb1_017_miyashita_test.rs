@@ -18,7 +18,7 @@ fn miyashita_pay_2e_deploys() {
     assert!(game.has_pending_choice(), "pay 2E prompt");
     game.select_option(1);
     let mut s=0; while game.has_pending_choice() && s<5 { s+=1; game.select_indices(&[0]); }
-    assert!(game.state.player1.stage.stage.iter().any(|&id| id==miya_hand));
+    assert!(game.state.player1.stage.stage.contains(&miya_hand));
 }
 #[test]
 fn miyashita_skip_no_deploy() {

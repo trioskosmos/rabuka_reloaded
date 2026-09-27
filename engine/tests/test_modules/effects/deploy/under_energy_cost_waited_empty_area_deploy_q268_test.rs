@@ -132,7 +132,7 @@ fn under_energy_cost_waited_deploy_q268_deploy_to_empty_area_in_wait_state() {
     );
     // Deployed member is in WAIT state.
     assert_eq!(
-        game.state.mods.get_orientation_modifier(target).as_deref(),
+        game.state.mods.get_orientation_modifier(target),
         Some("wait"),
         "member deployed by this effect is in WAIT state"
     );

@@ -29,7 +29,7 @@ fn lives_in_hand(p: &rabuka_engine::player::Player, db: &CardDatabase) -> u8 {
     p.hand
         .cards
         .iter()
-        .filter(|&&c| db.get_card(c).map_or(false, |x| x.card_type == CardType::Live))
+        .filter(|&&c| db.get_card(c).is_some_and(|x| x.card_type == CardType::Live))
         .count().u8_count()
 }
 

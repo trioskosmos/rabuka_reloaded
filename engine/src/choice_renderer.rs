@@ -59,7 +59,7 @@ pub fn render_card_choice_grid(
     for (item, card_no) in items.iter().zip(card_nos.iter()) {
         let ability_text = db
             .get_card_by_no(card_no)
-            .map(|c| card_ability_text(c))
+            .map(card_ability_text)
             .unwrap_or_default();
         cards.push(CardInfo {
             card_no: card_no.clone(),
@@ -79,7 +79,7 @@ pub fn render_card_choice_grid(
     if total_items == 0 {
         return None;
     }
-    let total_pages = (total_items + CARDS_PER_PAGE - 1) / CARDS_PER_PAGE;
+    let total_pages = total_items.div_ceil(CARDS_PER_PAGE);
 
     // Card number of the ability currently being resolved (L shows its
     // detail screen). Cloned up front so the input loop stays simple.
@@ -239,7 +239,7 @@ pub fn render_card_choice_grid(
             // last row clamps onto its final cell.
             let up = ui.just_pressed_up();
             let col = sel % COLS;
-            let rows = (total_items + COLS - 1) / COLS;
+            let rows = total_items.div_ceil(COLS);
             let row = sel / COLS;
             let new_row = if up {
                 (row + rows - 1) % rows

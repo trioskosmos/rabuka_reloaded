@@ -22,7 +22,7 @@ fn drain_choices(game: &mut TestGame) {
                 let count = game.pending_choice_count();
                 if count == 0 {
                     // count=0 means nothing to select; skip by selecting nothing.
-                    if let Err(_) = game.try_select_indices(&[]) {
+                    if game.try_select_indices(&[]).is_err() {
                         break;
                     }
                 } else {

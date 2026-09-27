@@ -1275,22 +1275,22 @@ fn generate_pending_choice_actions(game_state: &GameState, choice: &Choice) -> V
                 }
 
                 // Soft filters: any failure → greyed out (look) or hidden (non-look)
-                let in_fi = fi_set.as_ref().map_or(true, |s| s.contains(zone_index));
-                let matches_chars = characters.as_ref().map_or(true, |chars| {
+                let in_fi = fi_set.as_ref().is_none_or(|s| s.contains(zone_index));
+                let matches_chars = characters.as_ref().is_none_or(|chars| {
                     crate::ability::util::card_matches_characters(
                         &game_state.card_database,
                         *card_id,
                         Some(chars),
                     )
                 });
-                let matches_group = group.as_ref().map_or(true, |grp| {
+                let matches_group = group.as_ref().is_none_or(|grp| {
                     crate::ability::util::card_matches_group_str(
                         &game_state.card_database,
                         *card_id,
                         Some(grp.as_str()),
                     )
                 });
-                let matches_cost = cost_limit.map_or(true, |lim| {
+                let matches_cost = cost_limit.is_none_or(|lim| {
                     crate::ability::util::card_matches_cost_limit_op(
                         &game_state.card_database,
                         *card_id,

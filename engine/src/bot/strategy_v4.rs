@@ -66,7 +66,7 @@ pub(crate) fn flip_stats(gs: &GameState, me_player: u8, db: &CardDatabase) -> (i
         .main_deck
         .cards
         .iter()
-        .filter(|&&cid| db.get_card(cid).map_or(false, |c| c.blade_heart.is_some()))
+        .filter(|&&cid| db.get_card(cid).is_some_and(|c| c.blade_heart.is_some()))
         .count() as f64
         / deck_len as f64;
     (blades, density)
@@ -253,8 +253,8 @@ pub(crate) fn alloc(pool: &Acc, need: &Acc) -> Option<Acc> {
     Some(p)
 }
 
-pub(crate) fn hand_lives<'a>(
-    p: &'a crate::player::Player,
+pub(crate) fn hand_lives(
+    p: &crate::player::Player,
     db: &CardDatabase,
 ) -> Vec<(usize, i16, Acc)> {
     let mut out = Vec::new();
@@ -288,7 +288,7 @@ pub(crate) fn lives_in_hand(p: &crate::player::Player, db: &CardDatabase) -> usi
         .cards
         .iter()
         .filter(|&&c| {
-            db.get_card(c).map_or(false, |x| x.card_type == CardType::Live)
+            db.get_card(c).is_some_and(|x| x.card_type == CardType::Live)
         })
         .count()
 }
@@ -330,7 +330,7 @@ pub fn choose_action_v4(gs: &GameState, actions: &[Action], me: u8) -> Action {
         .cards
         .iter()
         .filter(|&&c| {
-            db.get_card(c).map_or(false, |x| x.card_type == CardType::Live)
+            db.get_card(c).is_some_and(|x| x.card_type == CardType::Live)
         })
         .count();
     let deck_len = my_now.main_deck.cards.len().max(1);
@@ -340,7 +340,7 @@ pub fn choose_action_v4(gs: &GameState, actions: &[Action], me: u8) -> Action {
         .cards
         .iter()
         .filter(|&&c| {
-            db.get_card(c).map_or(false, |x| x.card_type == CardType::Live)
+            db.get_card(c).is_some_and(|x| x.card_type == CardType::Live)
         })
         .count();
 
@@ -393,7 +393,7 @@ pub fn choose_action_v4(gs: &GameState, actions: &[Action], me: u8) -> Action {
         // big-member scores the guides take for granted.
         if a.parameters.as_ref().and_then(|p| p.use_baton_touch) == Some(true) {
             val += 45.0;
-            dbg_parts.push(format!("baton+45"));
+            dbg_parts.push("baton+45".to_string());
         }
 
         // Hand reserve: ≤1 card can't set lives or pay costs.
@@ -415,7 +415,7 @@ pub fn choose_action_v4(gs: &GameState, actions: &[Action], me: u8) -> Action {
                 .cards
                 .iter()
                 .filter(|&&c| {
-                    db.get_card(c).map_or(false, |x| x.card_type == CardType::Live)
+                    db.get_card(c).is_some_and(|x| x.card_type == CardType::Live)
                 })
                 .count();
             let wr_before = waitroom_lives;

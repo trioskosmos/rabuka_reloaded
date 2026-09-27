@@ -827,10 +827,7 @@ impl super::TurnEngine {
         }
         let saved_revealed = core::mem::take(&mut game_state.revealed_cards);
         let saved_activating_card = game_state.activating_card;
-        let saved_queue = core::mem::replace(
-            &mut game_state.ability_queue,
-            crate::ability_queue::AbilityQueue::new(),
-        );
+        let saved_queue = std::mem::take(&mut game_state.ability_queue);
         let delayed = core::mem::take(&mut game_state.delayed_gained_effects);
         for (card_id, gained) in &delayed {
             let Some(owner) = game_state.owner_of_card(*card_id) else {
@@ -1439,6 +1436,22 @@ impl super::TurnEngine {
                     snap.total_score
                 )
             };
+            // Check whether this summary is wanted BEFORE building it.
+            //
+            // `summarize` allocates a card-name String per live card, a
+            // `format!` per live, and for every *failed* live up to eight
+            // `format!`s plus a `join`. The `logging_enabled` guard used to sit
+            // *below* this line, so all of that was built and then discarded
+            // whenever logging was off — which is the case for the benchmark,
+            // every bot rollout, and every training run.
+            //
+            // `summarize` only reads game state and returns a String, so
+            // hoisting the guard above it is behaviour-preserving. Measured
+            // 10,848,527 -> 10,794,138 allocations over a 78,036-action run
+            // (139.02 -> 138.33 per action), deterministically.
+            if !crate::game_setup::logging_enabled() {
+                return;
+            }
             let p1_sum = summarize(game_state, &player1_id);
             let p2_sum = summarize(game_state, &player2_id);
             let verdict = match (player1_won, player2_won) {
@@ -1447,9 +1460,6 @@ impl super::TurnEngine {
                 (false, true) => "P2-WINS",
                 _ => "NO-CONTEST",
             };
-            if !crate::game_setup::logging_enabled() {
-                return;
-            }
             game_state.push_structured_log(crate::types::LogEntry {
                 text: format!(
                     "LIVE {} | P1 {} → succ={}(+{}) | P2 {} → succ={}(+{})",

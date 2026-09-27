@@ -118,15 +118,12 @@ fn vivid_world_live_phase_blade_and_success() {
     // Advance to LiveCardSet phase
     game.state.player1.hand.cards.push(live_card);
     game.state.player1.hand.cards.push(filler);
-    match game.state.current_phase {
-        rabuka_engine::game_state::Phase::Main => {
-            game.pass();
-            game.pass();
-            game.pass();
-            game.pass();
-            game.pass();
-        }
-        _ => {}
+    if game.state.current_phase == rabuka_engine::game_state::Phase::Main {
+        game.pass();
+        game.pass();
+        game.pass();
+        game.pass();
+        game.pass();
     }
     assert!(
         game.state.current_phase.to_string().contains("LiveCardSet"),

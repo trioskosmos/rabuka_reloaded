@@ -49,7 +49,7 @@ fn main() {
         step += 1;
         let active = gs.active_player();
         let pid = active.id.clone();
-        let phase = gs.current_phase.clone();
+        let phase = gs.current_phase;
         let turn = gs.turn_number;
 
         let phase_key = format!("{pid}:{phase:?}");
@@ -101,7 +101,7 @@ fn main() {
             .unwrap_or_default();
         println!("  -> {ctype} {card_name}");
 
-        let _ = rabuka_engine::bin_common::execute_and_settle(&mut gs, &action);
+        let _ = rabuka_engine::bin_common::execute_and_settle(&mut gs, action);
     }
 }
 
@@ -116,7 +116,7 @@ fn print_board(gs: &GameState, show_p1: bool, db: &CardDatabase) {
             .iter()
             .filter_map(|&id| {
                 db.get_card(id).map(|c| {
-                    let cost = c.cost.map_or(0, |v| v);
+                    let cost = c.cost.unwrap_or(0);
                     let blade = c.blade;
                     format!("{}[c{}b{}]", &c.name[..c.name.len().min(8)], cost, blade)
                 })
@@ -133,7 +133,7 @@ fn print_board(gs: &GameState, show_p1: bool, db: &CardDatabase) {
                 }
                 db.get_card(id)
                     .map(|c| {
-                        let cost = c.cost.map_or(0, |v| v);
+                        let cost = c.cost.unwrap_or(0);
                         let blade = c.blade;
                         let heart_str = c
                             .base_heart
@@ -172,7 +172,7 @@ fn print_board(gs: &GameState, show_p1: bool, db: &CardDatabase) {
             .iter()
             .filter_map(|&id| {
                 db.get_card(id).map(|c| {
-                    let score = c.score.map_or(0, |v| v);
+                    let score = c.score.unwrap_or(0);
                     let nh = c
                         .need_heart
                         .as_ref()

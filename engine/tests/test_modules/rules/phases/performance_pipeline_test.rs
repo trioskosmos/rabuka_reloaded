@@ -270,7 +270,7 @@ fn heart00_passes_check_fails_when_insufficient() {
     );
 
     // First card should pass (it gets all 4 hearts)
-    let first = perf.lives.get(0).expect("First live card");
+    let first = perf.lives.first().expect("First live card");
     assert!(
         first.passed,
         "First live card should PASS: it consumes all available hearts"

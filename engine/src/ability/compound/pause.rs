@@ -43,7 +43,7 @@ pub(crate) fn pause_for_sequential_choice(
     let current_was_optional = action.optional.unwrap_or(false);
     let is_opponent_action = action.action
         == ActionType::OpponentAction
-        || action.action_by().as_deref() == Some("opponent");
+        || action.action_by() == Some("opponent");
     if conditional
         && action.condition.is_none()
         && condition_failed.is_none()
@@ -98,7 +98,7 @@ pub(crate) fn pause_for_sequential_choice(
         }
     }
     if repeats_remaining > 0 && has_repeat {
-        if let Some(ref repeat_action) = actions.last() {
+        if let Some(repeat_action) = actions.last() {
             if repeat_action.action == ActionType::RepeatProcedure
                 && repeat_action.optional.unwrap_or(false)
             {

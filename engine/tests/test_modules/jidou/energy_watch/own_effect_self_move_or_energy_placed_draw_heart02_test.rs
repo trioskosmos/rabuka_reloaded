@@ -126,7 +126,7 @@ fn own_move_or_energy_draw_heart02_opponent_no_trigger() {
 
     let before_hand = game.state.player1.hand.cards.len();
     let player_id = game.state.player1.id.clone();
-    let _ = rabuka_engine::turn::TurnEngine::trigger_auto_abilities_for_player(
+    rabuka_engine::turn::TurnEngine::trigger_auto_abilities_for_player(
         &mut game.state,
         &player_id,
     );
@@ -159,7 +159,7 @@ fn own_move_or_energy_draw_heart02_opponent_energy_no_trigger() {
 
     let before_hand = game.state.player1.hand.cards.len();
     let player_id = game.state.player1.id.clone();
-    let _ = rabuka_engine::turn::TurnEngine::trigger_auto_abilities_for_player(
+    rabuka_engine::turn::TurnEngine::trigger_auto_abilities_for_player(
         &mut game.state,
         &player_id,
     );
@@ -264,7 +264,7 @@ fn own_move_or_energy_draw_heart02_no_event_no_trigger() {
 
     let before_hand = game.state.player1.hand.cards.len();
     let player_id = game.state.player1.id.clone();
-    let _ = rabuka_engine::turn::TurnEngine::trigger_auto_abilities_for_player(
+    rabuka_engine::turn::TurnEngine::trigger_auto_abilities_for_player(
         &mut game.state,
         &player_id,
     );

@@ -109,7 +109,7 @@ fn butterfly_wing_q260_control_live_start_resolves() {
 
     // Meis' LiveStart abilities should be in the queue
     assert!(
-        game.state.ability_queue.len() > 0,
+        !game.state.ability_queue.is_empty(),
         "Without suppression: LiveStart abilities should be queued (len > 0)"
     );
 

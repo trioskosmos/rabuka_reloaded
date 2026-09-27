@@ -516,7 +516,7 @@ impl super::TurnEngine {
                     loc,
                     player.stage.stage.iter().position(|&id| id == card_id)
                 );
-                if Self::can_activate_at_location(&player, &ability, card_id, loc) {
+                if Self::can_activate_at_location(player, &ability, card_id, loc) {
                     // Check use limit
                     if let Some(use_limit) = ability.use_limit {
                         let key = (card_id, idx, game_state.turn_number);

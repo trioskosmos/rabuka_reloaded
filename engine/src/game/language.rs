@@ -27,18 +27,15 @@ use crate::game::platform_ui::PlatformUi;
 /// server's `"jp"` default).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[cfg_attr(feature = "serde_support", derive(serde::Serialize, serde::Deserialize))]
+#[derive(Default)]
 pub enum Lang {
     #[cfg_attr(feature = "serde_support", serde(rename = "en"))]
     English,
     #[cfg_attr(feature = "serde_support", serde(rename = "jp"))]
+    #[default]
     Japanese,
 }
 
-impl Default for Lang {
-    fn default() -> Self {
-        Lang::Japanese
-    }
-}
 
 impl Lang {
     /// Language registry: every supported UI language, default first.

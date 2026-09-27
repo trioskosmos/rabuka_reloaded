@@ -57,14 +57,14 @@ fn drain_choices_picking_first(game: &mut TestGame) {
 /// RE-COMPUTES the stage hearts from the members, so a hand-set
 /// `stage_hearts` is not enough on its own.
 fn grant_all_hearts(game: &mut TestGame, card_id: i16, count: i16) {
-    use rabuka_engine::core::game_modifiers::ModifierEntry;
+    
     game.state
         .mods
         .heart_modifiers
         .entry(card_id)
         .or_default()
         .entry(HeartColor::All)
-        .or_insert(ModifierEntry::default())
+        .or_default()
         .additive += count;
 }
 
@@ -92,7 +92,7 @@ fn has_all_heart(gs: &rabuka_engine::core::game_state::GameState, cid: i16) -> b
         .heart_modifiers
         .get(&cid)
         .and_then(|h| h.get(&HeartColor::All))
-        .map_or(false, |e| e.total() > 0)
+        .is_some_and(|e| e.total() > 0)
 }
 
 fn total_all_heart(gs: &rabuka_engine::core::game_state::GameState, cid: i16) -> i32 {
@@ -205,14 +205,14 @@ fn already_has_all_heart_no_double_grant() {
     game.state.player1.hand.cards.push(filler);
 
     // Pre-grant all-heart (simulating first resolution in same live)
-    use rabuka_engine::core::game_modifiers::ModifierEntry;
+    
     game.state
         .mods
         .heart_modifiers
         .entry(member)
         .or_default()
         .entry(HeartColor::All)
-        .or_insert(ModifierEntry::default())
+        .or_default()
         .additive = 1;
 
     let before = total_all_heart(&game.state, member);
@@ -706,7 +706,7 @@ fn test_each_time_drains_between_live_starts_no_mix() {
     // ── Step 1: Queue LiveStart abilities ──
     let p1_id = game.state.player1.id.clone();
     rabuka_engine::turn::TurnEngine::trigger_live_start_abilities(&mut game.state, &p1_id);
-    rabuka_engine::turn::TurnEngine::trigger_live_start_abilities(&mut game.state, &"player2");
+    rabuka_engine::turn::TurnEngine::trigger_live_start_abilities(&mut game.state, "player2");
 
     // ── Step 2: Start processing ──
     // process_pending_auto_abilities enters process_player_abilities,
@@ -810,7 +810,7 @@ fn test_one_live_start_each_time_drains_no_choice() {
     // ──
     let p1_id = game.state.player1.id.clone();
     rabuka_engine::turn::TurnEngine::trigger_live_start_abilities(&mut game.state, &p1_id);
-    rabuka_engine::turn::TurnEngine::trigger_live_start_abilities(&mut game.state, &"player2");
+    rabuka_engine::turn::TurnEngine::trigger_live_start_abilities(&mut game.state, "player2");
     game.state.process_pending_auto_abilities(&p1_id);
 
     // After the fix, everything auto-resolves except the resolved LS member's

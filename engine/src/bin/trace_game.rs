@@ -66,7 +66,7 @@ fn main() {
                 .filter_map(|&id| {
                     gs.card_database
                         .get_card(id)
-                        .map(|c| format!("{}", &c.name[..c.name.len().min(8)]))
+                        .map(|c| c.name[..c.name.len().min(8)].to_string())
                 })
                 .collect();
             // Print stage card names with heart colors

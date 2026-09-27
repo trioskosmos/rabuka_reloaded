@@ -282,7 +282,7 @@ fn deploy_single_cost4_ok() {
             "cost_total should be 0 (budget exhausted)"
         );
         assert!(
-            filtered_indices.as_ref().map_or(false, |fi| fi.is_empty()),
+            filtered_indices.as_ref().is_some_and(|fi| fi.is_empty()),
             "filtered_indices should be empty (no cards fit remaining budget)"
         );
     }

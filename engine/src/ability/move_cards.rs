@@ -204,7 +204,7 @@ impl AbilityResolver {
         effect: &AbilityEffect,
     ) -> Result<Option<u8>, String> {
         let ref_binding = effect.cost_reference_any();
-        let reference = match ref_binding.as_deref() {
+        let reference = match ref_binding {
             Some(r) => r,
             None => return Ok(effect.cost_limit_any()),
         };
@@ -329,7 +329,7 @@ impl AbilityResolver {
                 .iter()
                 .filter(|&&cid| {
                     cid != -1
-                        && character_filter.map_or(true, |cf| {
+                        && character_filter.is_none_or(|cf| {
                             util::card_matches_characters(card_db, cid, Some(cf))
                         })
                 })
@@ -510,7 +510,7 @@ impl AbilityResolver {
                 if !filter.matches(card_db, id, false) {
                     return false;
                 }
-                if let Some(prop) = effect.card_property_any().as_deref() {
+                if let Some(prop) = effect.card_property_any() {
                     let has_prop = match prop {
                         "has_blade_heart" => {
                             card_db.get_card(id).is_some_and(|c| c.has_blade_heart())
@@ -631,8 +631,8 @@ impl AbilityResolver {
                 let mut all_matching: Vec<i16> = Vec::new();
                 for &cid in &trigger_cards {
                     if card_type_filter
-                        .map_or(true, |ct| util::card_matches_type(card_db, cid, Some(ct)))
-                        && group_name.map_or(true, |gn| {
+                        .is_none_or(|ct| util::card_matches_type(card_db, cid, Some(ct)))
+                        && group_name.is_none_or(|gn| {
                             util::card_matches_group_str(card_db, cid, Some(gn))
                         })
                     {
@@ -649,8 +649,8 @@ impl AbilityResolver {
                     // NOT fall through to the discard pile.
                     self.last_move_moved_any = Some(false);
                     return Ok(Some(vec![]));
-                } else if all_matching.len() <= count as usize
-                    && (&*destination == "deck_top_or_bottom"
+                } else if all_matching.len() <= count
+                    && (destination == "deck_top_or_bottom"
                         || !effect.optional.unwrap_or(false))
                 {
                     log::debug!("[THOSE_RESOLVE] branch=direct_take all_matching={:?}", all_matching);
@@ -677,7 +677,7 @@ impl AbilityResolver {
                     }
                     self.last_move_moved_any = Some(!found.is_empty());
                     return Ok(Some(found));
-                } else if &*destination == "deck_top_or_bottom" {
+                } else if destination == "deck_top_or_bottom" {
                     log::debug!("[THOSE_RESOLVE] branch=choice_dtob all_matching={:?}", all_matching);
                     // Q252: more matching cards than count, player chooses which one.
                     // Directly create a SelectCard choice restricted to the
@@ -689,13 +689,13 @@ impl AbilityResolver {
                     };
                     let filtered_indices = matching_waitroom_indices(player, &all_matching);
                     let description = card_type_filter
-                        .and_then(|_| group_name)
+                        .and(group_name)
                         .map(|g| format!("Select 1 {g} card to place on deck"))
-                        .unwrap_or_else(|| "Select 1 card to place on deck".to_string().into());
+                        .unwrap_or_else(|| "Select 1 card to place on deck".to_string());
                     let description_ja = card_type_filter
-                        .and_then(|_| group_name)
+                        .and(group_name)
                         .map(|g| format!("{g}カードを山札に置く1枚を選択"))
-                        .unwrap_or_else(|| "山札に置く1枚を選択".to_string().into());
+                        .unwrap_or_else(|| "山札に置く1枚を選択".to_string());
                     self.pending_choice = Some(
                         Choice::select_cards(Zone::Discard.to_str(), 1, description, false)
                             .description_ja(Some(description_ja))
@@ -718,13 +718,13 @@ impl AbilityResolver {
                     };
                     let filtered_indices = matching_waitroom_indices(player, &all_matching);
                     let description = card_type_filter
-                        .and_then(|_| group_name)
+                        .and(group_name)
                         .map(|g| format!("Select {count} {g} {}", util::card_plural(count)))
                         .unwrap_or_else(|| format!("Select {}", util::card_plural(count)));
                     let description_ja = card_type_filter
-                        .and_then(|_| group_name)
+                        .and(group_name)
                         .map(|g| format!("{g}カードを{count}枚選択"))
-                        .unwrap_or_else(|| "カードを選択".to_string().into());
+                        .unwrap_or_else(|| "カードを選択".to_string());
                     self.pending_choice = Some(
                         Choice::select_cards(
                             Zone::Discard.to_str(),
@@ -771,10 +771,9 @@ impl AbilityResolver {
                     c.effective_source,
                     c.destination,
                 );
-                if optional && !decided {
-                if self.gate_optional_source(gs, &c, Zone::Energy) {
+                if optional && !decided
+                && self.gate_optional_source(gs, &c, Zone::Energy) {
                     return Ok(vec![]);
-                }
                 }
                 if c.destination == "energy_deck" || c.destination == Zone::EnergyDeck.as_str() {
                     // Energy zone→energy_deck movement: take from the end of
@@ -928,7 +927,7 @@ impl AbilityResolver {
         // UnderMember destinations keep their own conditional_optional
         // machinery (e.g. 宮下 愛's PlaceEnergyUnderMember); the shared gate
         // covers plain energy-deck moves like HOT PASSION!!.
-        let under_member = Zone::from_str(&c.destination) == Some(Zone::UnderMember);
+        let under_member = Zone::from_str(c.destination) == Some(Zone::UnderMember);
         if !under_member && self.gate_optional_source(gs, c, Zone::EnergyDeck) {
             return Ok(vec![]);
         }
@@ -1194,13 +1193,13 @@ impl AbilityResolver {
         let nho_binding = effect.need_heart_operator_any();
         filter.need_heart_operator = nho_binding.as_deref();
         let nhc_binding = effect.need_heart_color_any();
-        filter.need_heart_color = nhc_binding.as_deref();
+        filter.need_heart_color = nhc_binding;
         filter.heart_colors = effect.heart_colors_any();
         if has_effect_groups {
-            filter.groups = effect.group_names_any();
+            filter.groups = effect.group_names_any().map(Vec::as_slice);
         }
         let cp_binding = effect.card_property_any();
-        filter.card_property = cp_binding.as_deref();
+        filter.card_property = cp_binding;
         // The property's polarity lives in `negation` (「ブレードハートを
         // 持たない」→ negation=true). Forgetting it inverted emma bp7-008's
         // eligibility: blade-heart holders were offered instead of excluded.
@@ -1232,7 +1231,7 @@ impl AbilityResolver {
             })
             .unwrap_or(false);
         if !cond_has_grp
-            && effect.group_reference_any().as_deref() == Some("different_group_names")
+            && effect.group_reference_any() == Some("different_group_names")
             && c.source_str == "discard"
         {
             let mut stage_groups: SmallVec<[String; 8]> = SmallVec::new();
@@ -1412,7 +1411,7 @@ impl AbilityResolver {
                     .target_player_id(Some(
                         effect.target.as_deref().unwrap_or("self").to_string(),
                     ))
-                    .destination(effect.destination.clone().map(|s| s.to_string()))
+                    .destination(effect.destination.map(|s| s.to_string()))
                     .discard_remaining(effect.discard_remaining_any())
                     .build(),
             );
@@ -1610,7 +1609,7 @@ impl AbilityResolver {
             log::debug!("[UNDER_MEMBER] second call selected={:?}", self.selected_cards);
             let selected_member_id = self.selected_cards[0];
             let idx_opt = {
-let player = gs.resolve_target_player(&target);
+let player = gs.resolve_target_player(target);
                 player.stage.stage.iter().position(|&id| id == selected_member_id)
             };
             if let Some(idx) = idx_opt {
@@ -1759,8 +1758,8 @@ gs.set_recently_moved_batch(moved.clone().into(), Some("under_member"));
 
     /// Resolve `name_constraint == contains_all` from revealed cards into name fragments.
     fn resolve_name_fragments(gs: &GameState, effect: &AbilityEffect) -> Option<Vec<String>> {
-        if effect.name_constraint_any().as_deref() != Some("contains_all")
-            || effect.name_constraint_source_any().as_deref() != Some("revealed_card")
+        if effect.name_constraint_any() != Some("contains_all")
+            || effect.name_constraint_source_any() != Some("revealed_card")
         {
             return None;
         }
@@ -1997,7 +1996,7 @@ gs.set_recently_moved_batch(moved.clone().into(), Some("under_member"));
         }
         let count = if effect.count.is_some() {
             effect.count.unwrap() as usize
-        } else if let Some(ref dc) = effect.dynamic_count_any() {
+        } else if let Some(dc) = effect.dynamic_count_any() {
             self.resolve_dynamic_count(gs, dc) as usize
         } else {
             0
@@ -2060,7 +2059,7 @@ gs.set_recently_moved_batch(moved.clone().into(), Some("under_member"));
                 .and_then(|condition| condition.get_baton_touch_trigger())
                 .unwrap_or(false)
         {
-            let player = gs.resolve_target_player(&target);
+            let player = gs.resolve_target_player(target);
             gs.baton_touch_arriving_card_id
                 .and_then(|arriving| player.stage.stage.iter().position(|&id| id == arriving))
                 .map(|area| area as u8)
@@ -2108,7 +2107,7 @@ gs.set_recently_moved_batch(moved.clone().into(), Some("under_member"));
         // For empty_area / stage destinations: skip selection prompt entirely
         // if the target has no empty slots (card text says "メンバーのいないエリアに").
         if Zone::from_str(&destination) == Some(Zone::EmptyArea) {
-            let player = gs.resolve_target_player(&target);
+            let player = gs.resolve_target_player(target);
             let has_empty_slot = (0..3).any(|i| player.stage.stage[i] == -1);
             if !has_empty_slot {
                 return Ok(());
@@ -2420,7 +2419,7 @@ if util::distinct_should_dedupe(distinct) {
                 for &cid in moved_cards {
                     gs.push_movement_event(
                         cid,
-                        &source.to_string(),
+                        source,
                         destination,
                         cause_cid,
                         &cause_pid,
@@ -2549,7 +2548,7 @@ if util::distinct_should_dedupe(distinct) {
                 gs.entry_effect()
                     .and_then(|e| e.target.clone().map(|s| s.to_string()))
             })
-            .unwrap_or_else(|| "self".to_string().into());
+            .unwrap_or_else(|| "self".to_string());
         // target_player_id is only used for choice routing, not for zone operations
         let _choice_player = target_player_id;
         let card_db = gs.card_database.clone();
@@ -2855,7 +2854,7 @@ if util::distinct_should_dedupe(distinct) {
                 gs.entry_effect()
                     .and_then(|e| e.target.clone().map(|s| s.to_string()))
             })
-            .unwrap_or_else(|| "self".to_string().into());
+            .unwrap_or_else(|| "self".to_string());
         let select_action = self
             .current_effect
             .as_ref()
@@ -2894,19 +2893,19 @@ if util::distinct_should_dedupe(distinct) {
             .as_ref()
             .and_then(|sa| sa.discard_remaining_any())
             .or_else(|| current.and_then(|c| c.discard_remaining_any()))
-            .or_else(|| ctx_discard_remaining);
+            .or(ctx_discard_remaining);
         let (destination, discard_remaining, placement_order) = (
             select_action
                 .as_ref()
-                .and_then(|sa| sa.destination.clone().map(|s| s.to_string()))
-                .or_else(|| current.and_then(|c| c.destination.clone().map(|s| s.to_string())))
-                .or_else(|| ctx_destination)
-                .unwrap_or_else(|| Zone::Hand.to_str().to_string().into()),
+                .and_then(|sa| sa.destination.map(|s| s.to_string()))
+                .or_else(|| current.and_then(|c| c.destination.map(|s| s.to_string())))
+                .or(ctx_destination)
+                .unwrap_or_else(|| Zone::Hand.to_str().to_string()),
             explicit_discard.unwrap_or(true),
             select_action
                 .as_ref()
-                .and_then(|sa| sa.placement_order_any().clone())
-                .or_else(|| current.and_then(|c| c.placement_order_any().clone())),
+                .and_then(|sa| sa.placement_order_any())
+                .or_else(|| current.and_then(|c| c.placement_order_any())),
         );
 
         if gs.looked_at_cards.is_empty() && !self.selected_cards.is_empty() {

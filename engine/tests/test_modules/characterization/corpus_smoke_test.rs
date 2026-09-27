@@ -18,7 +18,7 @@ fn assert_state_invariants(game: &TestGame) {
     let p1 = &game.state.player1;
     let p2 = &game.state.player2;
 
-    fn zone_vecs<'a>(p: &'a rabuka_engine::player::Player) -> Vec<(&'static str, &'a [i16])> {
+    fn zone_vecs(p: &rabuka_engine::player::Player) -> Vec<(&'static str, &[i16])> {
         vec![
             ("stage", &p.stage.stage[..]),
             ("hand", &p.hand.cards),

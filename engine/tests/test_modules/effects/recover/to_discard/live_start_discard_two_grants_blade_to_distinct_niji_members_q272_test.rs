@@ -87,7 +87,7 @@ fn trigger_start(
                     }
                 } else if zone == "stage" {
                     // Fixed-count selection of distinct 虹ヶ咲 members.
-                    let n = select_members.min(count as usize);
+                    let n = select_members.min(count);
                     let idx: Vec<usize> = (0..n).collect();
                     game.select_indices(&idx);
                 } else {

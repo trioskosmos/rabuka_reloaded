@@ -70,7 +70,7 @@ fn tie_with_two_card_live_zones_allows_selection() {
                 Some("SelectLiveSuccess") => game.select_indices(&[0]),
                 Some("SelectAutoAbility") => {
                     let n = game.pending_choice_count();
-                    let idxs: Vec<usize> = (0..n.max(1) as usize).collect();
+                    let idxs: Vec<usize> = (0..n.max(1)).collect();
                     game.select_indices(&idxs);
                 }
                 _ => game.select_indices(&[]),
@@ -142,7 +142,7 @@ fn tie_at_two_successes_blocks_third_placement() {
             match game.pending_choice_type().as_deref() {
                 Some("SelectAutoAbility") => {
                     let n = game.pending_choice_count();
-                    let idxs: Vec<usize> = (0..n.max(1) as usize).collect();
+                    let idxs: Vec<usize> = (0..n.max(1)).collect();
                     game.select_indices(&idxs);
                 }
                 _ => game.select_indices(&[]),

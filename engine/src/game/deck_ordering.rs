@@ -60,7 +60,7 @@ pub fn extract_series(card_no: &str) -> &str {
 
 /// Extract rarity suffix from card_no (e.g., "PL!-BP1-001-R" -> "R").
 pub fn extract_rarity(card_no: &str) -> &str {
-    card_no.split('-').last().unwrap_or("")
+    card_no.split('-').next_back().unwrap_or("")
 }
 
 /// Extract base card number without rarity (e.g., "PL!-BP1-001-R" -> "PL!-BP1-001").
@@ -83,7 +83,7 @@ pub fn gba_sort_key(card_no: &str) -> (usize, usize, String) {
 
 /// Sort a deck's card list for optimal GBA navigation.
 pub fn sort_deck_for_gba(cards: &mut [(String, u8)]) {
-    cards.sort_by(|a, b| gba_sort_key(&a.0).cmp(&gba_sort_key(&b.0)));
+    cards.sort_by_key(|a| gba_sort_key(&a.0));
 }
 
 /// Build a flat card list (expanded by quantity) sorted for GBA.
@@ -94,7 +94,7 @@ pub fn flatten_and_sort_for_gba(cards: &[(String, u8)]) -> Vec<String> {
             flat.push(card_no.clone());
         }
     }
-    flat.sort_by(|a, b| gba_sort_key(a).cmp(&gba_sort_key(b)));
+    flat.sort_by_key(|a| gba_sort_key(a));
     flat
 }
 

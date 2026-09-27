@@ -44,7 +44,7 @@ fn candidate_pool_filter_by_group_name() {
     // (If the test card is actually not Liella, this will be false — we just pin that group filtering is active)
     let aqours_matches = filter.matches(&db, aqours, true);
     // At least the Liella card must match; the other may or may not depending on data, but filter must be deterministic
-    assert!(aqours_matches == false || aqours_matches == true, "group filter deterministic");
+    assert!(!aqours_matches || aqours_matches, "group filter deterministic");
 }
 
 #[test]

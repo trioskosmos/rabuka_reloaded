@@ -426,7 +426,7 @@ fn plan_score_portfolio(
         .main_deck
         .cards
         .iter()
-        .filter(|&&cid| db.get_card(cid).map_or(false, |c| c.blade_heart.is_some()))
+        .filter(|&&cid| db.get_card(cid).is_some_and(|c| c.blade_heart.is_some()))
         .count() as f64
         / deck_len.max(1) as f64;
     let expected_hits = (blades as f64 * density).round() as i32;
@@ -471,7 +471,7 @@ fn plan_score_portfolio(
         let mut best: Option<(i32, usize)> = None; // (deficit, hand_index)
         for &(hi, _score, ref need) in &candidates {
             let d = requirement_deficit(&pool, need);
-            if best.map_or(true, |(bd, _)| d < bd) {
+            if best.is_none_or(|(bd, _)| d < bd) {
                 best = Some((d, hi));
             }
         }
@@ -551,7 +551,7 @@ pub fn estimate_max_score(
         my.main_deck
             .cards
             .iter()
-            .filter(|&&cid| db.get_card(cid).map_or(false, |c| c.blade_heart.is_some()))
+            .filter(|&&cid| db.get_card(cid).is_some_and(|c| c.blade_heart.is_some()))
             .count() as f64
             / deck_len as f64
     } else {
@@ -724,7 +724,7 @@ pub fn analyze_hand(gs: &GameState, me_player: u8, db: &CardDatabase) -> HandUse
                 && db
                     .get_card(sid)
                     .and_then(|c| c.cost)
-                    .map_or(false, |sc| {
+                    .is_some_and(|sc| {
                         i32::from(sc) >= cost - (active_energy + 2)
                     })
         });
@@ -784,7 +784,7 @@ pub fn choose_mulligan_action_v3(
             CardType::Live => {
                 // Supported iff every needed color has enough producers in
                 // the deck.
-                let supported = card.need_heart.as_ref().map_or(true, |nh| {
+                let supported = card.need_heart.as_ref().is_none_or(|nh| {
                     nh.hearts.iter().all(|(c, v)| {
                         let idx = heart_index(*c);
                         if idx >= 7 {

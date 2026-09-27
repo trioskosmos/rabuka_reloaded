@@ -44,7 +44,7 @@ fn fire_live_success_as(game: &mut TestGame, cid: i16, seat: &str) {
         None,
     );
     game.state.activating_card = Some(cid);
-    game.state.process_pending_auto_abilities(&seat.to_string());
+    game.state.process_pending_auto_abilities(seat);
 }
 
 fn give_total_energy(game: &mut TestGame, seat: usize, active: usize, waited: usize) {
@@ -350,7 +350,7 @@ fn fire_rina_debut_as(game: &mut TestGame, rina: i16, seat: &str) {
         None,
     );
     game.state.activating_card = Some(rina);
-    game.state.process_pending_auto_abilities(&seat.to_string());
+    game.state.process_pending_auto_abilities(seat);
     game.drain_auto_ability_choices();
 }
 
@@ -480,7 +480,7 @@ fn fire_ginko_debut_as(game: &mut TestGame, gin: i16, seat: &str) {
         None,
     );
     game.state.activating_card = Some(gin);
-    game.state.process_pending_auto_abilities(&seat.to_string());
+    game.state.process_pending_auto_abilities(seat);
 }
 
 /// Drive 吟子's prompt chain. The 「置いてもよい」 gate IS the SelectCard's
@@ -495,7 +495,7 @@ fn drain_ginko(game: &mut TestGame, accept: bool) {
         match game.get_pending_choice() {
             Choice::SelectCard { count, .. } => {
                 if accept {
-                    let n = (*count).max(1) as usize;
+                    let n = (*count).max(1);
                     let idxs: Vec<usize> = (0..n).collect();
                     game.select_indices(&idxs);
                 } else {

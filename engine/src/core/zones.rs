@@ -450,15 +450,14 @@ impl Stage {
         let mut total = 0;
         for &card_id in &self.stage {
             if card_id != -1 {
-                if !include_waited {
-                    if orientation_modifiers
+                if !include_waited
+                    && orientation_modifiers
                         .get(&card_id)
                         .map(|o| *o == crate::core::game_modifiers::CardOrientation::Wait)
                         .unwrap_or(false)
                     {
                         continue;
                     }
-                }
                 if card_db.get_card(card_id).is_some() {
                     // A2: use unified effective_blade
                     let entry = blade_entries.get(&card_id).copied().unwrap_or_default();
@@ -806,7 +805,7 @@ impl EnergyZone {
             }
         }
         let new_active = still_active.len();
-        still_active.extend(rest.into_iter());
+        still_active.extend(rest);
         self.cards = still_active.into_iter().collect();
         self.active_energy_count = new_active.u8_count();
     }
@@ -825,7 +824,7 @@ impl EnergyZone {
             }
         }
         let new_active = now_active.len();
-        now_active.extend(rest.into_iter());
+        now_active.extend(rest);
         self.cards = now_active.into_iter().collect();
         self.active_energy_count = new_active.u8_count();
     }

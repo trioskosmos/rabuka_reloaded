@@ -83,7 +83,7 @@ fn position_change_two_members() {
     assert!(game.has_pending_choice(), "Second choice");
     // Collision rule: later members see only unclaimed areas.
     let opts = pending_target_options(&game);
-    assert!(opts.len() < 3 && opts.len() >= 1, "claimed areas excluded");
+    assert!(opts.len() < 3 && !opts.is_empty(), "claimed areas excluded");
     game.select_option(opts.len() as i16 - 1);
     assert!(game.has_pending_choice(), "Third choice");
     let opts = pending_target_options(&game);
@@ -241,7 +241,7 @@ fn position_change_skip_optional() {
     game.select_option(0);
     assert!(game.has_pending_choice(), "Second choice");
     let opts = pending_target_options(&game);
-    assert!(opts.len() < 3 && opts.len() >= 1, "claimed areas excluded");
+    assert!(opts.len() < 3 && !opts.is_empty(), "claimed areas excluded");
     game.select_option(opts.len() as i16 - 1);
     assert!(game.has_pending_choice(), "Third choice");
     let opts = pending_target_options(&game);
@@ -667,7 +667,7 @@ fn formation_change_destination_excludes_already_claimed_area() {
     game.state.current_phase =
         rabuka_engine::game_state::Phase::LiveVictoryDetermination;
     game.state.live_success_triggered_this_turn = false;
-    TurnEngine::trigger_live_success_abilities(&mut game_state_ref(&mut game), &player_id);
+    TurnEngine::trigger_live_success_abilities(game_state_ref(&mut game), &player_id);
     game.state.process_pending_auto_abilities(&player_id);
 
     // First member's destination choice.

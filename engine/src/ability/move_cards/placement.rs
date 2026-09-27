@@ -398,7 +398,7 @@ impl AbilityResolver {
                 }
                 Ok(false) => {
                     moved.push(card_id);
-                    self.fire_debut_side_effects(gs, card_id, &target);
+                    self.fire_debut_side_effects(gs, card_id, target);
                 }
                 Err(_) => {
                     let player = gs.resolve_target_player_mut(target);

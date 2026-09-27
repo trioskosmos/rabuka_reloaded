@@ -32,8 +32,7 @@ impl<'a> ConditionContext<'a> {
                 self.game_state
                     .card_database
                     .get_card(cid)
-                    .and_then(|c| c.score)
-                    .map_or(false, |s| s == val)
+                    .and_then(|c| c.score) == Some(val)
             })
         })
     }
@@ -57,7 +56,7 @@ impl<'a> ConditionContext<'a> {
         {
             return self.evaluate_original_score(condition);
         }
-        if let Some(ref pos) = condition.get_position() {
+        if let Some(pos) = condition.get_position() {
             if pos.get_position() == Some("front") {
                 return self.evaluate_front_comparison(condition);
             }
@@ -81,7 +80,7 @@ impl<'a> ConditionContext<'a> {
                 condition.get_operator()
             );
         }
-        if let Some(ref values) = condition.get_values() {
+        if let Some(values) = condition.get_values() {
             if condition.get_comparison_type() == Some("score") {
                 let location = condition.get_location().unwrap_or("");
                 let target = condition.get_target().unwrap_or("self");
@@ -103,7 +102,7 @@ impl<'a> ConditionContext<'a> {
                         .card_database
                         .get_card(cid)
                         .and_then(|c| c.score)
-                        .map_or(false, |s| values.contains(&s))
+                        .is_some_and(|s| values.contains(&s))
                 });
             }
             return values.contains(&count);
@@ -206,7 +205,7 @@ impl<'a> ConditionContext<'a> {
         let Some(card_id) = util::card_at_position(player, position) else {
             return false;
         };
-        if let Some(ref groups) = condition.get_group_names() {
+        if let Some(groups) = condition.get_group_names() {
             if !util::card_matches_any_group(card_db, card_id, groups) {
                 return false;
             }
@@ -280,7 +279,7 @@ impl<'a> ConditionContext<'a> {
             return self.get_count_for_target(condition, target);
         };
         let ctype = condition.get_comparison_type().unwrap_or("cost");
-        if !player.stage.stage.iter().any(|&id| id == act_id) {
+        if !player.stage.stage.contains(&act_id) {
             return self.get_count_for_target(condition, target);
         }
         let base = self

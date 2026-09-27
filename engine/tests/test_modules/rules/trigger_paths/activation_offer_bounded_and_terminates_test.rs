@@ -34,10 +34,7 @@ fn sayaka_activation_charges_energy_and_terminates() {
     // Waitroom full of legal retrieval targets (蓮ノ空 members ≤15 cost).
     // Hasunosora series cards from the same set.
     for no in ["PL!HS-bp1-002-R", "PL!HS-bp1-005-R", "PL!HS-bp1-006-P"] {
-        match std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| game.id(no))) {
-            Ok(cid) => game.add_to_discard(cid),
-            Err(_) => {}
-        }
+        if let Ok(cid) = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| game.id(no))) { game.add_to_discard(cid) }
     }
 
     let mut log: Vec<String> = Vec::new();

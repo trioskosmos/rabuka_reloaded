@@ -4,8 +4,8 @@ use rabuka_engine::core::types::AbilityTrigger;
 fn hot_passion_pl_sp_bp5_027_l_setup(game: &mut TestGame) -> i16 {
     let live = game.id("PL!SP-bp5-027-L");
     fill_decks(game, {
-        let f = game.new_id("PL!-sd1-010-SD");
-        f
+        
+        game.new_id("PL!-sd1-010-SD")
     });
     game.state.player1.live_card_zone.cards.push(live);
     fill_energy_deck(game, 0, 2);

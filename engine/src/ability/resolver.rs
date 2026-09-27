@@ -381,16 +381,16 @@ impl AbilityResolver {
 
         let mut activation_condition_passed = true;
         if !cost_already_paid {
-            if let Some(ref activation_condition) = effect.activation_condition_parsed_any() {
+            if let Some(activation_condition) = effect.activation_condition_parsed_any() {
                 let mut merged_cond = Box::clone(activation_condition);
                 // Merge the effect's position info into the condition so it's checked.
                 if merged_cond.get_position().is_none()
                     && merged_cond.get_positions_characters().is_none()
                 {
-                    if let Some(ref pos) = effect.position_any() {
-                        merged_cond.set_position((*pos).clone());
-                    } else if let Some(ref act_pos) = effect.activation_position_any() {
-                        merged_cond.set_activation_position((*act_pos).to_string());
+                    if let Some(pos) = effect.position_any() {
+                        merged_cond.set_position(pos.clone());
+                    } else if let Some(act_pos) = effect.activation_position_any() {
+                        merged_cond.set_activation_position(act_pos.to_string());
                     }
                 }
                 #[cfg(not(feature = "no_std"))]
@@ -429,10 +429,10 @@ impl AbilityResolver {
                 }
                 let mut cond = condition.clone();
                 if cond.get_position().is_none() && cond.get_positions_characters().is_none() {
-                    if let Some(ref pos) = effect.position_any() {
-                        cond.set_position((*pos).clone());
-                    } else if let Some(ref act_pos) = effect.activation_position_any() {
-                        cond.set_activation_position((*act_pos).to_string());
+                    if let Some(pos) = effect.position_any() {
+                        cond.set_position(pos.clone());
+                    } else if let Some(act_pos) = effect.activation_position_any() {
+                        cond.set_activation_position(act_pos.to_string());
                     }
                 }
                 // Merge effect-level group_names into conditions that need
@@ -1173,10 +1173,10 @@ impl AbilityResolver {
         let mut cost = cost.clone();
         if let Some(ref effect) = ability.effect {
             if let Some(mod_cost) = util::find_modify_cost(effect, None, None) {
-                if mod_cost.operation_any().as_deref() == Some("subtract")
+                if mod_cost.operation_any() == Some("subtract")
                     && mod_cost.per_unit_any().unwrap_or(false)
                 {
-                    self.apply_per_unit_cost_reduction(gs, &mut cost, &mod_cost);
+                    self.apply_per_unit_cost_reduction(gs, &mut cost, mod_cost);
                 }
             }
         }
@@ -1201,7 +1201,7 @@ impl AbilityResolver {
         let per_unit_count = mod_cost.per_unit_count_any().unwrap_or(1);
         let unit = mod_cost.count.unwrap_or(1);
         let per_unit_type = mod_cost.per_unit_type_any();
-        if per_unit_type.as_deref() == Some("group_name") {
+        if per_unit_type == Some("group_name") {
             // Count distinct group names on self's stage
             // (shared with generation's effective-cost evaluator).
             let groups = gs.distinct_stage_groups("self");
@@ -1216,7 +1216,7 @@ impl AbilityResolver {
             return;
         }
         if matches!(
-            per_unit_type.as_deref(),
+            per_unit_type,
             Some("success_live_card_zone")
                 | Some("success_live_zone")
                 | Some("live_card_zone")

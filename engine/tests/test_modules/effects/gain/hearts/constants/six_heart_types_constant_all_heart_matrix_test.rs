@@ -66,10 +66,8 @@ fn get_setsuna_heart_contribution(
                 base[HeartColor::Heart05.index()] + bonus[HeartColor::Heart05.index()],
                 base[HeartColor::Heart06.index()] + bonus[HeartColor::Heart06.index()],
             );
-        } else {
-        }
-    } else {
-    }
+        } 
+    } 
     (0, 0, 0, 0, 0, 0, 0)
 }
 
@@ -97,7 +95,7 @@ fn setsuna_pb1_verify_card_metadata() {
     // The ability should be the constant (常時) one
     let constant_ability = card
         .resolved_abilities()
-        .find(|ab| ab.triggers.as_ref().map_or(false, |t| t.contains("常時")))
+        .find(|ab| ab.triggers.as_ref().is_some_and(|t| t.contains("常時")))
         .expect("Should have a 常時 (constant) ability");
 
     // Verify the ability structure includes the condition and effect

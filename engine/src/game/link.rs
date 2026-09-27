@@ -97,7 +97,7 @@ fn action_stage_tag(params: Option<&ActionParameters>) -> u8 {
                     2 => Some(3),
                     _ => None,
                 })
-                .or_else(|| match p.stage_area.as_deref() {
+                .or(match p.stage_area.as_deref() {
                     Some("left") => Some(1),
                     Some("center") => Some(2),
                     Some("right") => Some(3),
@@ -366,7 +366,7 @@ fn send_reliable<U: PlatformUi, T: LinkTransport>(
             }
         }
         spins += 1;
-        if spins % 60 == 0 && !link.send_packet(payload) {
+        if spins.is_multiple_of(60) && !link.send_packet(payload) {
             return false;
         }
         if spins >= SPIN_BUDGET {

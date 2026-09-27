@@ -166,4 +166,10 @@ mod inner {
             self.p("EFFECT", format_args!("{}", effect.action));
         }
     }
+
+    impl Default for AbDebug {
+        fn default() -> Self {
+            Self::new()
+        }
+    }
 }

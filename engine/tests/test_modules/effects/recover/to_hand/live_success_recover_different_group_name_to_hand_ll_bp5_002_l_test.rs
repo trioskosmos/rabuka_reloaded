@@ -32,7 +32,7 @@ fn has_all_heart(game: &TestGame, card_id: i16) -> bool {
         .heart_modifiers
         .get(&card_id)
         .and_then(|mods| mods.get(&HeartColor::All))
-        .map_or(false, |entry| entry.total() > 0)
+        .is_some_and(|entry| entry.total() > 0)
 }
 
 /// Bypass the actual live resolution and directly trigger LiveSuccess

@@ -96,7 +96,7 @@ impl AbilityResolver {
             // abilities.json — the +1 belongs to これによってウェイト状態に
             // なったメンバー, so a baton touch removing the source must keep
             // the bonus and removing the recipient must drop it).
-            let refs_cost_wait = effect.anaphora_any().as_deref() == Some("cost_waited");
+            let refs_cost_wait = effect.anaphora_any() == Some("cost_waited");
             if refs_cost_wait && !gs.last_cost_waited_members.is_empty() {
                 gs.last_cost_waited_members.clone()
             } else {
@@ -111,9 +111,9 @@ impl AbilityResolver {
                 gs,
                 text,
                 effect.target_name(),
-                effect.duration_any().as_deref(),
+                effect.duration_any(),
                 effect.gained_effect_any().cloned(),
-                effect.ability_gain_trigger_any().as_deref(),
+                effect.ability_gain_trigger_any(),
                 Some(target_card),
             );
         }
@@ -140,11 +140,11 @@ impl AbilityResolver {
 
     pub(crate) fn execute_activate_ability(&mut self, gs: &mut GameState, effect: &AbilityEffect) {
         let ability_text_binding = effect.ability_text_any();
-        let ability_text = ability_text_binding.as_deref().unwrap_or("");
+        let ability_text = ability_text_binding.unwrap_or("");
         let target_trigger_binding = effect.target_trigger_any();
-        let target_trigger = target_trigger_binding.as_deref();
+        let target_trigger = target_trigger_binding;
         let source_card_binding = effect.source_card_any();
-        let source_card = source_card_binding.as_deref();
+        let source_card = source_card_binding;
 
         // Which cards' abilities are fired. "previous_selected" (emitted by the
         // parser for 「そのカーチEそれらが持つ…能力を発動させる、E fires EVERY selected
@@ -410,94 +410,91 @@ impl AbilityResolver {
         // The old "+N digit parse" fallback only remains for legacy cards
         // whose gain_ability carries no structured gained_effect.
         let mut gained_constant = false;
-        match (gained_effect, target_card) {
-            (Some(gained), Some(card_id)) => {
-                let triggers = trigger.and_then(|t| {
-                    if t.is_empty() {
-                        None
-                    } else {
-                        Some(t.to_string())
-                    }
-                });
-                let is_live_total = gained.target_any() == Some("live_total");
-                let immediate_val = if gained.action == crate::ability::enums::ActionType::ModifyScore
-                    && !is_live_total
-                {
-                    // Structured value first; fall back to the "+N"/"＋N" text
-                    // the old hack parsed (many cards carry no structured value).
-                    gained.value_any().or_else(|| {
-                        ability_text
-                            .split(['+', '\u{FF0B}'])
-                            .nth(1)
-                            .and_then(|s| {
-                                s.chars()
-                                    .take_while(|c| c.is_ascii_digit())
-                                    .collect::<String>()
-                                    .parse::<u8>()
-                                    .ok()
-                            })
-                    })
-                } else {
+        if let (Some(gained), Some(card_id)) = (gained_effect, target_card) {
+            let triggers = trigger.and_then(|t| {
+                if t.is_empty() {
                     None
+                } else {
+                    Some(t.to_string())
                 }
-                .unwrap_or(0);
-                let gained_ability = Ability {
-                    full_text: ability_text.to_string(),
-                    triggerless_text: Some(ability_text.to_string()),
-                    triggers: triggers.map(Into::into),
-                    use_limit: None,
-                    is_null: false,
-                    cost: None,
-                    effect: Some(gained),
-                    keywords: None,
-                };
-                gained_constant = GameState::ability_matches_trigger(
-                    &gained_ability,
-                    &crate::core::types::AbilityTrigger::Constant,
-                );
-                gs.gained_card_abilities
-                    .entry(card_id)
-                    .or_default()
-                    .push(gained_ability);
-                gs.gained_ability_sources
-                    .entry(card_id)
-                    .or_default()
-                    .push(gs.activating_card.unwrap_or(-1));
-                log::debug!(
-                    target: "rabuka_engine::events",
-                    "[T{} {:?}] {} gains an ability | recipient={} source={:?} trigger={:?} duration={:?} constant={} live_total={}",
-                    gs.turn_number,
-                    gs.current_phase,
-                    gs.card_database.get_card(card_id).map(|card| card.name.as_ref()).unwrap_or("unknown card"),
-                    card_id,
-                    gs.activating_card,
-                    trigger,
-                    duration,
-                    gained_constant,
-                    is_live_total
-                );
-                // Per-card score gains must ALSO apply immediately: many flows
-                // and assertions read mods.score_modifiers right after
-                // resolution, and live.rs computes live card scores from it.
-                // (target="live_total" gains route through the constant scanner
-                // into p*_constant_total_score_bonus instead.)
-                if immediate_val != 0 {
-                    gs.mods.add_score_modifier(card_id, i16::from(immediate_val));
-                    log::debug!(
-                        "[GAINED_ABILITY] immediate +{} score to card {}",
-                        immediate_val,
-                        card_id
-                    );
-                }
-                // A gained 常時 changes the constant landscape — make sure the
-                // next recalculation picks it up.
-                self.last_gain_effect_data = Some(crate::core::types::EffectData::GainAbility {
-                    card_id,
-                    amount: i16::from(immediate_val),
-                    is_live_total,
-                });
+            });
+            let is_live_total = gained.target_any() == Some("live_total");
+            let immediate_val = if gained.action == crate::ability::enums::ActionType::ModifyScore
+                && !is_live_total
+            {
+                // Structured value first; fall back to the "+N"/"＋N" text
+                // the old hack parsed (many cards carry no structured value).
+                gained.value_any().or_else(|| {
+                    ability_text
+                        .split(['+', '\u{FF0B}'])
+                        .nth(1)
+                        .and_then(|s| {
+                            s.chars()
+                                .take_while(|c| c.is_ascii_digit())
+                                .collect::<String>()
+                                .parse::<u8>()
+                                .ok()
+                        })
+                })
+            } else {
+                None
             }
-            _ => {}
+            .unwrap_or(0);
+            let gained_ability = Ability {
+                full_text: ability_text.to_string(),
+                triggerless_text: Some(ability_text.to_string()),
+                triggers: triggers.map(Into::into),
+                use_limit: None,
+                is_null: false,
+                cost: None,
+                effect: Some(gained),
+                keywords: None,
+            };
+            gained_constant = GameState::ability_matches_trigger(
+                &gained_ability,
+                &crate::core::types::AbilityTrigger::Constant,
+            );
+            gs.gained_card_abilities
+                .entry(card_id)
+                .or_default()
+                .push(gained_ability);
+            gs.gained_ability_sources
+                .entry(card_id)
+                .or_default()
+                .push(gs.activating_card.unwrap_or(-1));
+            log::debug!(
+                target: "rabuka_engine::events",
+                "[T{} {:?}] {} gains an ability | recipient={} source={:?} trigger={:?} duration={:?} constant={} live_total={}",
+                gs.turn_number,
+                gs.current_phase,
+                gs.card_database.get_card(card_id).map(|card| card.name.as_ref()).unwrap_or("unknown card"),
+                card_id,
+                gs.activating_card,
+                trigger,
+                duration,
+                gained_constant,
+                is_live_total
+            );
+            // Per-card score gains must ALSO apply immediately: many flows
+            // and assertions read mods.score_modifiers right after
+            // resolution, and live.rs computes live card scores from it.
+            // (target="live_total" gains route through the constant scanner
+            // into p*_constant_total_score_bonus instead.)
+            if immediate_val != 0 {
+                gs.mods.add_score_modifier(card_id, i16::from(immediate_val));
+                log::debug!(
+                    "[GAINED_ABILITY] immediate +{} score to card {}",
+                    immediate_val,
+                    card_id
+                );
+            }
+            // A gained 常時 changes the constant landscape — make sure the
+            // next recalculation picks it up.
+            self.last_gain_effect_data = Some(crate::core::types::EffectData::GainAbility {
+                card_id,
+                amount: i16::from(immediate_val),
+                is_live_total,
+            });
         }
 
         let pp = self.player_prefix(gs);
@@ -631,7 +628,7 @@ impl AbilityResolver {
                     }
                 }
 
-                if let Some(ref groups) = effect.group_names_any() {
+                if let Some(groups) = effect.group_names_any() {
                     if !groups.iter().any(|g| {
                         crate::ability::util::card_matches_group_str(&card_db, id, Some(g))
                     }) {

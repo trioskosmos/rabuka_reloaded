@@ -59,7 +59,7 @@ fn main() {
         eprintln!("No weights  -- random policy");
     }
 
-    let (mut t1, mut t2) =
+    let (t1, t2) =
         game_setup::build_two_decks(&mut db, &card_numbers, &card_numbers).unwrap();
 
     let mut out = File::create(&out_path).expect("create output");
@@ -75,7 +75,7 @@ fn main() {
     let start = std::time::Instant::now();
 
     for game_idx in 0..num_games {
-        let mut gs = setup_game(&db, &mut t1, &mut t2);
+        let mut gs = setup_game(&db, &t1, &t2);
         let plan_p1 = strategy_v3::V3Plan::detect(&gs, 0, &db);
         let plan_p2 = strategy_v3::V3Plan::detect(&gs, 1, &db);
         let mut trajectory: Vec<Step> = Vec::with_capacity(200);

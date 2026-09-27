@@ -277,7 +277,7 @@ pub fn menu_select(
         } else if ui.just_pressed_right() {
             sel = (sel + vis).min(all_items.len() - 1);
         } else if ui.just_pressed_l() || ui.just_pressed_r() {
-            show_detail(ui, &all_items[sel]);
+            show_detail(ui, all_items[sel]);
         } else if ui.just_pressed_a() || ui.just_pressed_start() {
             if Some(sel) == skip_idx {
                 return None;

@@ -83,7 +83,7 @@ fn you_draw_one_put_one_on_bottom_basic() {
     assert_eq!(p1_deck.len(), 20, "deck: -1 draw, +1 bottom = unchanged");
     assert_eq!(p1_deck.last(), Some(&card_a), "card_a on deck bottom");
 
-    let actual_head: Vec<i16> = p1_deck[..19].iter().copied().collect();
+    let actual_head: Vec<i16> = p1_deck[..19].to_vec();
     assert_eq!(actual_head, deck[1..20], "order above bottom preserved");
     assert!(!game.has_pending_choice(), "ability fully resolved");
 }
@@ -113,7 +113,7 @@ fn you_drawn_card_can_be_placed_on_bottom() {
     let p1_deck = &game.state.player1.main_deck.cards;
     assert_eq!(p1_deck.last(), Some(&drawn_top), "drawn card on bottom");
     assert_eq!(p1_deck.len(), 20);
-    let actual_head: Vec<i16> = p1_deck[..19].iter().copied().collect();
+    let actual_head: Vec<i16> = p1_deck[..19].to_vec();
     assert_eq!(actual_head, deck[1..20], "order above bottom preserved");
     let hand: Vec<i16> = game.state.player1.hand.cards.iter().copied().collect();
     assert_eq!(hand, vec![card_b], "only card_b remains in hand");
@@ -147,7 +147,7 @@ fn you_single_card_hand_auto_resolves_no_prompt() {
     let p1_deck = &game.state.player1.main_deck.cards;
     assert_eq!(p1_deck.len(), 20);
     assert_eq!(p1_deck.last(), Some(&drawn_top), "drawn card on bottom");
-    let actual_head: Vec<i16> = p1_deck[..19].iter().copied().collect();
+    let actual_head: Vec<i16> = p1_deck[..19].to_vec();
     assert_eq!(actual_head, deck[1..20]);
 }
 

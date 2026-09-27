@@ -39,8 +39,8 @@ fn setup_baton_touch_scenario(
     // Place arriving card on stage (as it would be after baton touch)
     game.state.player1.stage.stage[0] = arriving_card;
 
-    let _ = game.state.trigger_auto_abilities_for_player("p1");
-    let _ = game.state.process_pending_auto_abilities("p1");
+    game.state.trigger_auto_abilities_for_player("p1");
+    game.state.process_pending_auto_abilities("p1");
 
     (initial_hand, initial_energy_active)
 }
@@ -87,7 +87,7 @@ fn niji_bp5_partner_cost15_noblade_energizes_2_and_draws_1() {
         final_energy_active
     );
     assert!(
-        final_hand >= initial_hand + 1,
+        final_hand > initial_hand,
         "Partner cost=15 no blade → should draw 1 card (was {}, now {})",
         initial_hand,
         final_hand

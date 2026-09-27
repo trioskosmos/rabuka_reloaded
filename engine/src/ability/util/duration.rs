@@ -71,7 +71,7 @@ pub fn push_temporary_effect(
                     effect_type: effect_type.to_string(),
                     duration,
                     created_turn: game_state.turn_number,
-                    created_phase: game_state.current_phase.clone(),
+                    created_phase: game_state.current_phase,
                     target_player_id: target_player_id.to_string(),
                     description: description.to_string(),
                     creation_order: 0,

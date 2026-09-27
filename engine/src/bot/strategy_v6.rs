@@ -95,7 +95,7 @@ pub fn score_actions(gs: &GameState, actions: &[Action], me: u8) -> Vec<(f64, St
         .main_deck
         .cards
         .iter()
-        .filter(|&&c| db.get_card(c).map_or(false, |x| x.card_type == CardType::Live))
+        .filter(|&&c| db.get_card(c).is_some_and(|x| x.card_type == CardType::Live))
         .count();
     let deck_len = my_now.main_deck.cards.len().max(1);
     let p_life_draw = deck_lives as f64 / deck_len as f64;
@@ -103,7 +103,7 @@ pub fn score_actions(gs: &GameState, actions: &[Action], me: u8) -> Vec<(f64, St
         .waitroom
         .cards
         .iter()
-        .filter(|&&c| db.get_card(c).map_or(false, |x| x.card_type == CardType::Live))
+        .filter(|&&c| db.get_card(c).is_some_and(|x| x.card_type == CardType::Live))
         .count();
 
     let mut vals: Vec<f64> = vec![f64::NEG_INFINITY; actions.len()];
@@ -175,7 +175,7 @@ pub fn score_actions(gs: &GameState, actions: &[Action], me: u8) -> Vec<(f64, St
                 .waitroom
                 .cards
                 .iter()
-                .filter(|&&c| db.get_card(c).map_or(false, |x| x.card_type == CardType::Live))
+                .filter(|&&c| db.get_card(c).is_some_and(|x| x.card_type == CardType::Live))
                 .count();
             if wr_now > waitroom_lives && p_life_draw > 0.0 {
                 val += 25.0;
@@ -308,7 +308,7 @@ pub fn choose_live_set_v6(gs: &GameState, actions: &[Action], db: &CardDatabase)
             .main_deck
             .cards
             .iter()
-            .filter(|&&cid| db.get_card(cid).map_or(false, |c| c.card_type == CardType::Live))
+            .filter(|&&cid| db.get_card(cid).is_some_and(|c| c.card_type == CardType::Live))
             .count();
         let max_slots = (3i32 - i32::from(my.live_card_set_limit_reduction)).max(0) as usize;
         if desired.len() < max_slots && deck_lives > 0 {
@@ -319,7 +319,7 @@ pub fn choose_live_set_v6(gs: &GameState, actions: &[Action], db: &CardDatabase)
                 .enumerate()
                 .filter(|&(i, &cid)| {
                     !desired.contains(&i)
-                        && db.get_card(cid).map_or(false, |c| c.card_type != CardType::Live)
+                        && db.get_card(cid).is_some_and(|c| c.card_type != CardType::Live)
                 })
                 .map(|(i, &cid)| (i, db.get_card(cid).and_then(|c| c.cost).unwrap_or(0)))
                 .collect();
@@ -335,8 +335,8 @@ pub fn choose_live_set_v6(gs: &GameState, actions: &[Action], db: &CardDatabase)
             let n_lives = desired
                 .iter()
                 .filter(|&&hi| {
-                    my.hand.cards.get(hi).copied().map_or(false, |cid| {
-                        db.get_card(cid).map_or(false, |c| c.card_type == CardType::Live)
+                    my.hand.cards.get(hi).copied().is_some_and(|cid| {
+                        db.get_card(cid).is_some_and(|c| c.card_type == CardType::Live)
                     })
                 })
                 .count();

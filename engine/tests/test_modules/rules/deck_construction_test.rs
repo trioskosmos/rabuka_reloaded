@@ -25,17 +25,17 @@ fn test_deck() -> (CardDatabase, Vec<String>, [String; 3]) {
     for index in 0..12 {
         let card_no = format!("TEST-M-{:03}-N", index);
         cards.push(test_card(&card_no, "メンバー"));
-        card_numbers.extend(std::iter::repeat(card_no).take(4));
+        card_numbers.extend(std::iter::repeat_n(card_no, 4));
     }
     for index in 0..3 {
         let card_no = format!("TEST-L-{:03}-N", index);
         cards.push(test_card(&card_no, "ライブ"));
-        card_numbers.extend(std::iter::repeat(card_no).take(4));
+        card_numbers.extend(std::iter::repeat_n(card_no, 4));
     }
     for index in 0..3 {
         let card_no = format!("TEST-E-{:03}-N", index);
         cards.push(test_card(&card_no, "エネルギー"));
-        card_numbers.extend(std::iter::repeat(card_no).take(4));
+        card_numbers.extend(std::iter::repeat_n(card_no, 4));
     }
 
     let spare_members = format!("TEST-M-{:03}-N", 12);

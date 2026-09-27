@@ -34,7 +34,7 @@ const NOT_AQOURS: &str = "PL!HS-bp5-004-R";
 const LIVE: &str = "PL!-sd1-019-SD";
 
 fn blades(game: &TestGame, member: i16) -> i32 {
-    i32::from(game.state.mods.get_blade_modifier(member))
+    game.state.mods.get_blade_modifier(member)
 }
 
 fn drain(game: &mut TestGame) {

@@ -31,7 +31,7 @@ const OPP_B2: &str = "PL!-sd1-006-SD"; // 西木野 真姫, blade 2
 const OPP_B3: &str = "PL!-sd1-001-SD"; // 高坂 穂乃果, blade 3
 
 fn opponent_waited(game: &TestGame, id: i16) -> bool {
-    game.state.mods.get_orientation_modifier(id).as_deref() == Some("wait")
+    game.state.mods.get_orientation_modifier(id) == Some("wait")
 }
 
 /// Place 鬼塚夏美 on p1 center and an optional-costable Liella! member on p1 stage

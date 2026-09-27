@@ -15,7 +15,7 @@ impl<'a> ConditionContext<'a> {
             .heart_modifiers
             .get(&card_id)
             .and_then(|m| m.get(&HeartColor::All))
-            .map_or(false, |e| e.total() > 0)
+            .is_some_and(|e| e.total() > 0)
             || mods
                 .constant_heart_bonuses
                 .get(&card_id)
@@ -171,6 +171,6 @@ pub(super) fn member_count_operator(condition: &Condition, count: u8) -> Option<
     } else {
         condition
             .get_operator()
-            .or_else(|| if count == 0 { Some("==") } else { Some(">=") })
+            .or(if count == 0 { Some("==") } else { Some(">=") })
     }
 }

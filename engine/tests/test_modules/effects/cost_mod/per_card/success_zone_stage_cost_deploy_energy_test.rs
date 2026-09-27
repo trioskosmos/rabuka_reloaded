@@ -43,7 +43,7 @@ fn success_zone_stage_cost_ability_deploy_spends_at_least_base_plus_one() {
     // whole point of the card, so it is asserted as a number.
     assert_eq!(
         game.state.player1.energy_zone.active_count(),
-        ((base_cost as u8) + 5) - expected_cost as u8,
+        (base_cost + 5) - expected_cost,
         "exactly base + 1 energy consumed — one success_live_zone card means \
          cost +1 (base {})",
         base_cost

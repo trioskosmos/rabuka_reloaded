@@ -136,7 +136,7 @@ fn kasumi_chosen_colour_is_a_replacement_not_a_granted_heart() {
          addition are indistinguishable (printed {printed:?}, chose {chosen:?})"
     );
     assert_eq!(
-        i32::from(game.state.mods.get_heart_modifier(kasumi, chosen)),
+        game.state.mods.get_heart_modifier(kasumi, chosen),
         0,
         "「元々持つハートは選んだハートになる」 is a REPLACEMENT, so the chosen colour is \
          not also granted: a +1 modifier here is what an ADDING implementation would \
@@ -176,7 +176,7 @@ fn shioriko_unchosen_printed_hearts_are_superseded() {
     );
     for colour in superseded {
         assert_eq!(
-            i32::from(game.state.mods.get_heart_modifier(shioriko, colour)),
+            game.state.mods.get_heart_modifier(shioriko, colour),
             0,
             "{colour:?} is one she printed but did not choose, so it is not hers any \
              more; a +1 modifier here would mean the choice was ADDED to her printed \

@@ -37,15 +37,57 @@ READER_MAP = {
     "Option<Vec<String>>": "bc.read_opt_str_vec_value().map(|b| *b)",
     "Option<Vec<Box<Condition>>>": "bc.read_condition_vec_value()",
     "Option<Box<Vec<u8>>>": "bc.read_opt_u8_vec_value()",
+    "Option<Vec<u8>>": "bc.read_opt_u8_vec_value().map(|b| *b)",
     "Option<Box<Vec<Box<AbilityEffect>>>>": "bc.read_effect_vec_boxed_value()",
+    "Option<Vec<Box<AbilityEffect>>>": "bc.read_effect_vec_boxed_value().map(|b| *b)",
     "Option<Box<Condition>>": "bc.read_condition_value()",
     "Option<Box<AbilityEffect>>": "bc.read_effect_value()",
     "Option<Box<PositionInfo>>": "bc.read_position_value()",
     "Option<Box<DistinctInfo>>": "bc.read_distinct_info_value()",
     "Option<Box<Vec<PositionCharacter>>>": "bc.read_positions_characters_value()",
+    "Option<Vec<PositionCharacter>>": "bc.read_positions_characters_value().map(|b| *b)",
     "Option<Box<LocationSubChecks>>": "bc.read_location_sub_checks_value()",
     "Option<Box<TriggerEvent>>": "bc.read_trigger_event_value()",
 }
+
+# Lints that cannot apply to a generated decode table. Emitted on every
+# generated top-level item so the output is warning-free without hand edits
+# (hand edits here are wiped by regeneration and fail the CI freshness check).
+# It has to be an outer attribute on each item, not a crate/module inner
+# attribute: vm.rs `include!`s this file, where `#![...]` is not permitted.
+#
+# - `vec_box`: `Condition`/`AbilityEffect` are recursive, so the decoded
+#   `Vec<Box<T>>` boxes are load-bearing. Clippy's `Vec<T>` suggestion would
+#   make the type infinitely sized.
+ITEM_ALLOW = (
+    "#[allow(\n"
+    "    // Recursive decode types need the Box inside the Vec. Rationale:\n"
+    "    // cards/generate_condition_decoder.py ITEM_ALLOW note.\n"
+    "    clippy::vec_box\n"
+    ")]"
+)
+
+
+def debox(ftype):
+    """Scratch-accumulator type for a Condition enum field type.
+
+    `ConditionLocals` exists for the duration of a single `decode_condition`
+    call and is consumed by one `build_*`. `Box<Vec<T>>` buys nothing there
+    (a Vec is already a heap allocation, so the Box is a second one), but the
+    enum field it feeds genuinely is `Option<Box<Vec<T>>>` — so the accumulators
+    drop the Box on read and `build_field_expr` puts it back when building the
+    variant. The wire format is untouched: the BcReader methods still decode
+    the same bytes.
+    """
+    m = re_fullmatch(r"Option<Box<Vec<(.+)>>>", ftype)
+    if m:
+        return "Option<Vec<{}>>".format(m.group(1))
+    return ftype
+
+
+def rebox_to(ftype):
+    """True when a de-boxed accumulator has to be re-boxed to build `ftype`."""
+    return bool(re_fullmatch(r"Option<Box<Vec<(.+)>>>", ftype))
 
 # Fields stored as raw ArcStr in the superset locals; converted per-variant in
 # build_* (the serde field types differ across variants for the same key).
@@ -162,6 +204,8 @@ def build_field_expr(fname, ftype):
         return '#[cfg(feature = "debug_conditions")] text: l.text.clone()'
     if fname == "trigger_event":
         return '#[cfg(feature = "debug_conditions")] trigger_event: l.trigger_event.clone()'
+    if rebox_to(ftype):
+        return f"{fname}: l.{fname}.clone().map(Box::new)"
     return f"{fname}: l.{fname}{'.clone()' if not is_copy_type(ftype) else ''}"
 
 
@@ -219,6 +263,7 @@ def main():
     lines.append("")
 
     # === ConditionLocals accumulator ===
+    lines.append(ITEM_ALLOW)
     lines.append("/// Accumulator for Condition fields during direct decode.")
     lines.append("#[derive(Default)]")
     lines.append("struct ConditionLocals {")
@@ -227,11 +272,12 @@ def main():
         cfg = ""
         if fname in ("text", "trigger_event"):
             cfg = '#[cfg(feature = "debug_conditions")]\n    '
-        lines.append(f"    {cfg}pub {fname}: {ftype},")
+        lines.append(f"    {cfg}pub {fname}: {debox(ftype)},")
     lines.append("}")
     lines.append("")
 
     # === decode_condition_field ===
+    lines.append(ITEM_ALLOW)
     lines.append("/// Read one field from a condition object.")
     lines.append(
         "/// Returns true if the field was recognized and consumed, false to skip."
@@ -263,7 +309,7 @@ def main():
                 ' "trigger_event" => { bc.skip_value()?; Some(true) }'
             )
             continue
-        reader = READER_MAP.get(field_type(fname) or "")
+        reader = READER_MAP.get(debox(field_type(fname) or ""))
         if reader:
             lines.append(
                 f'            "{fname}" => {{ l.{fname} = {reader}; Some(true) }}'
@@ -281,6 +327,7 @@ def main():
 
     # === build_* per variant ===
     for vname, vfields in variants.items():
+        lines.append(ITEM_ALLOW)
         lines.append(f"fn build_{vname.lower()}(l: &ConditionLocals) -> Condition {{")
         lines.append(f"    Condition::{vname} {{")
         lines.append("        common: Box::new(ConditionCommon {")
@@ -296,6 +343,7 @@ def main():
         lines.append("")
 
     # === decode_condition_direct ===
+    lines.append(ITEM_ALLOW)
     lines.append("/// Direct decoder for TAG_OBJECT_VARIANT conditions.")
     lines.append("fn decode_condition_direct(")
     lines.append("    bc: &mut BcReader,")
@@ -332,6 +380,12 @@ def re_match(pattern, text):
     import re
 
     return re.match(pattern, text)
+
+
+def re_fullmatch(pattern, text):
+    import re
+
+    return re.fullmatch(pattern, text)
 
 
 if __name__ == "__main__":

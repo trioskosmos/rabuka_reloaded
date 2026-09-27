@@ -52,11 +52,10 @@ fn resolved_ability_leaves_no_pending() {
             Some(LogMetadata::AbilityResolution { resolved: Some(true), .. }) => {
                 resolutions += 1;
             }
-            Some(LogMetadata::TriggerEvaluation { result, .. }) if result == "pending" => {
-                if entry.source_card_name.as_deref() == Some(&himeno_name) {
+            Some(LogMetadata::TriggerEvaluation { result, .. }) if result == "pending"
+                && entry.source_card_name.as_deref() == Some(&himeno_name) => {
                     pending_himeno += 1;
                 }
-            }
             _ => {}
         }
     }

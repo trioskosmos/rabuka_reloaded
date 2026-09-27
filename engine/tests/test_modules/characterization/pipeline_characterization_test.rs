@@ -172,8 +172,8 @@ fn cross_seat_mirror_sp_bp5_027_and_s_bp7_025() {
 
     let ca = db.get_card(a).unwrap();
     let cb = db.get_card(b).unwrap();
-    assert!(!ca.abilities.is_empty() || ca.ability.len() > 0, "HOT PASSION!! should have ability");
-    assert!(!cb.abilities.is_empty() || cb.ability.len() > 0, "Guilty Night, Guilty Kiss! should have ability");
+    assert!(!ca.abilities.is_empty() || !ca.ability.is_empty(), "HOT PASSION!! should have ability");
+    assert!(!cb.abilities.is_empty() || !cb.ability.is_empty(), "Guilty Night, Guilty Kiss! should have ability");
 }
 
 // D: Q39/Q34/Q33/Q31/Q29 rulings still unpinned — at least pin that related cards exist and basic rules hold

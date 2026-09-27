@@ -30,34 +30,31 @@ fn main() {
         }
     };
 
-    let deck1 = deck_lists
-        .get(0)
+    let deck1 = deck_lists.first()
         .cloned()
         .unwrap_or_else(|| deck_lists[0].clone());
-    let deck2 = deck_lists
-        .get(0)
+    let deck2 = deck_lists.first()
         .cloned()
         .unwrap_or_else(|| deck_lists[0].clone());
 
     let card_numbers1 = deck_parser::DeckParser::deck_list_to_card_numbers(&deck1);
     let card_numbers2 = deck_parser::DeckParser::deck_list_to_card_numbers(&deck2);
 
-    let player1_deck;
-    let player2_deck;
-    match game_setup::build_two_decks(&mut card_database, &card_numbers1, &card_numbers2) {
+    
+    
+    let (player1_deck, player2_deck) = match game_setup::build_two_decks(&mut card_database, &card_numbers1, &card_numbers2) {
         Ok((mut d1, mut d2)) => {
             d1.shuffle_main_deck();
             d1.shuffle_energy_deck();
             d2.shuffle_main_deck();
             d2.shuffle_energy_deck();
-            player1_deck = d1;
-            player2_deck = d2;
+            (d1, d2)
         }
         Err(e) => {
             eprintln!("Failed to build decks: {}", e);
             return;
         }
-    }
+    };
 
     let mut p1 = Player::new("p1".to_string(), "Player 1".to_string(), true);
     let mut p2 = Player::new("p2".to_string(), "Player 2".to_string(), false);
@@ -196,7 +193,7 @@ fn settle_automatic(game_state: &mut GameState) {
                 | game_state_mod::Phase::SecondAttackerPerformance
                 | game_state_mod::Phase::LiveVictoryDetermination
         ) {
-            let _ = turn::TurnEngine::advance_phase(game_state);
+            turn::TurnEngine::advance_phase(game_state);
         } else {
             break;
         }

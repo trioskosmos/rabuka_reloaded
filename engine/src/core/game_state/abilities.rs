@@ -117,7 +117,7 @@ impl GameState {
             .push(crate::core::types::AbilityInvalidation {
                 card_id,
                 trigger: trigger.clone(),
-                duration: duration.clone(),
+                duration,
                 created_turn,
             });
         log::debug!(
@@ -269,11 +269,10 @@ impl GameState {
                     if Self::ability_matches_trigger(
                         &ability,
                         &crate::game_state::AbilityTrigger::Constant,
-                    ) {
-                        if ability.effect.is_some() {
+                    )
+                        && ability.effect.is_some() {
                             ids.push((cid, idx));
                         }
-                    }
                 }
             }
             // Runtime-gained abilities (「…を得る、Egrants a 常晁Eetc.) live in
@@ -409,7 +408,7 @@ impl GameState {
     /// Legacy wrapper: calls with default event (reads flags from self).
     pub fn trigger_auto_abilities_for_player(&mut self, player_id: &str) {
         let event = crate::ability::types::TriggerEvent {
-            moved_cards: self.recently_moved_cards.clone().unwrap_or_default().into(),
+            moved_cards: self.recently_moved_cards.clone().unwrap_or_default(),
             moved_from_zone: self.recently_moved_from_zone.clone(),
             ..Default::default()
         };
@@ -420,7 +419,7 @@ impl GameState {
     /// post-movement snapshot (recently moved cards + position-change flag).
     pub fn trigger_auto_abilities_for_movement(&mut self, player_id: &str) {
         let event = crate::ability::types::TriggerEvent {
-            moved_cards: self.recently_moved_cards.clone().unwrap_or_default().into(),
+            moved_cards: self.recently_moved_cards.clone().unwrap_or_default(),
             position_change_occurred: self.position_change_occurred_this_turn,
             ..Default::default()
         };
@@ -557,7 +556,7 @@ impl GameState {
         let queued_before = self.ability_queue.len();
         let player_id_clone = player_id.to_string();
         let mut abilities_to_trigger: Vec<(i16, usize, i16)> = Vec::new();
-        let skip_this_card_auto_key = self.just_completed_ability_key.clone();
+        let skip_this_card_auto_key = self.just_completed_ability_key;
         let just_completed_batch_matches =
             self.just_completed_batch_matches(&event.moved_cards);
         {
@@ -671,7 +670,7 @@ impl GameState {
                                     // prevent re-triggering on stale comparisons
                                     // like "energy_zone >= 0" during phase-based
                                     // energy placement).
-                                    if effect.trigger_type_any().as_deref() == Some("each_time")
+                                    if effect.trigger_type_any() == Some("each_time")
                                         && matches!(
                                             condition.as_ref(),
                                             crate::card::Condition::Comparison { .. }
@@ -1455,9 +1454,9 @@ impl GameState {
     }
 
     /// Recursive condition-tree search: first non-empty group filter found.
-    fn condition_tree_group_names<'a>(
-        cond: &'a crate::card::Condition,
-    ) -> Option<&'a [String]> {
+    fn condition_tree_group_names(
+        cond: &crate::card::Condition,
+    ) -> Option<&[String]> {
         if let Some(g) = cond.get_group_names() {
             if !g.is_empty() {
                 return Some(g);
@@ -1479,7 +1478,7 @@ impl GameState {
     /// LS/LSS ability completes — their group/location condition also reads
     /// as a static board query, so the TAS must never fire them on its own.
     fn effect_is_ability_resolution_watcher(effect: &crate::card::AbilityEffect) -> bool {
-        effect.trigger_type_any().as_deref() == Some("each_time")
+        effect.trigger_type_any() == Some("each_time")
             && effect.watches_ability_resolution.unwrap_or(false)
     }
 
@@ -1520,7 +1519,7 @@ impl GameState {
                         Some(e) => e,
                         None => continue,
                     };
-                    if effect.trigger_type_any().as_deref() != Some("each_time") {
+                    if effect.trigger_type_any() != Some("each_time") {
                         continue;
                     }
                     let watch_text = match &effect.condition {
@@ -1647,7 +1646,7 @@ impl GameState {
                             .card_database
                             .get_card(cid)
                             .map(|c| c.name.to_string())
-                            .unwrap_or_else(|| entry.card_no.to_string().into());
+                            .unwrap_or_else(|| entry.card_no.to_string());
                         Some(crate::ability::types::AutoAbilityOption {
                             card_name,
                             ability_text: entry.ability.full_text.clone(),
@@ -2202,7 +2201,7 @@ impl GameState {
                     );
                 }
                 let event = crate::ability::types::TriggerEvent {
-                    moved_cards: self.recently_moved_cards.clone().unwrap_or_default().into(),
+                    moved_cards: self.recently_moved_cards.clone().unwrap_or_default(),
                     moved_from_zone: self.recently_moved_from_zone.clone(),
                     position_change_occurred: self.position_change_occurred_this_turn,
                     energy_placed_by_effect: self.last_energy_placed_by_effect(),
@@ -2856,7 +2855,7 @@ impl GameState {
                         let dest = effect.destination.map(|d| d.to_str());
                         let restricted_to = res_dest.or(dest);
                         if effect.action == crate::ability::enums::ActionType::Restriction
-                            && effect.restriction_type_any().as_deref() == Some("cannot_place")
+                            && effect.restriction_type_any() == Some("cannot_place")
                             && {
                                 let rz = restricted_to.and_then(Zone::from_str);
                                 let cz = Zone::from_str(zone);

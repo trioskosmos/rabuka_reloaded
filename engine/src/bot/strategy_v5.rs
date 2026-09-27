@@ -191,7 +191,7 @@ pub(crate) fn best_portfolio_scored(gs: &GameState, me: u8, db: &CardDatabase) -
         if dump {
             all_cands.push((ev, score, p_pass, idxs.clone()));
         }
-        let better = best.as_ref().map_or(true, |(be, bc, _, _)| {
+        let better = best.as_ref().is_none_or(|(be, bc, _, _)| {
             ev > *be + f64::EPSILON || ((ev - *be).abs() <= f64::EPSILON && cnt < *bc)
         });
         if better {
@@ -301,7 +301,7 @@ pub fn choose_live_set_v5(gs: &GameState, actions: &[Action], db: &CardDatabase)
             .cards
             .iter()
             .filter(|&&cid| {
-                db.get_card(cid).map_or(false, |c| c.card_type == CardType::Live)
+                db.get_card(cid).is_some_and(|c| c.card_type == CardType::Live)
             })
             .count();
         let max_slots =
@@ -316,7 +316,7 @@ pub fn choose_live_set_v5(gs: &GameState, actions: &[Action], db: &CardDatabase)
                     !desired.contains(&i)
                         && db
                             .get_card(cid)
-                            .map_or(false, |c| c.card_type != CardType::Live)
+                            .is_some_and(|c| c.card_type != CardType::Live)
                 })
                 .map(|(i, &cid)| {
                     (
@@ -337,8 +337,8 @@ pub fn choose_live_set_v5(gs: &GameState, actions: &[Action], db: &CardDatabase)
             let n_lives = desired
                 .iter()
                 .filter(|&&hi| {
-                    my.hand.cards.get(hi).copied().map_or(false, |cid| {
-                        db.get_card(cid).map_or(false, |c| c.card_type == CardType::Live)
+                    my.hand.cards.get(hi).copied().is_some_and(|cid| {
+                        db.get_card(cid).is_some_and(|c| c.card_type == CardType::Live)
                     })
                 })
                 .count();
@@ -425,7 +425,7 @@ pub(crate) fn nearest_miss_life(gs: &GameState, me: u8, db: &CardDatabase) -> Op
         if deficit == 0 {
             continue;
         }
-        if best.as_ref().map_or(true, |(bp, bd, _)| p > *bp + f64::EPSILON || ((p - *bp).abs() <= f64::EPSILON && deficit < *bd)) {
+        if best.as_ref().is_none_or(|(bp, bd, _)| p > *bp + f64::EPSILON || ((p - *bp).abs() <= f64::EPSILON && deficit < *bd)) {
             best = Some((p, deficit, hi));
         }
     }

@@ -45,7 +45,7 @@ pub(crate) fn execute_conditional_alternative(
         if effect.compound.alternative_condition.is_some() && effect.condition.is_some() {
             if let Some(ref alt_cond) = effect.compound.alternative_condition {
                 if ctx.evaluate_condition(alt_cond) {
-                    if let Some(ref alt_effect) = effect.alternative_effect_any() {
+                    if let Some(alt_effect) = effect.alternative_effect_any() {
                         return resolver.execute_effect(gs, alt_effect);
                     }
                 }
@@ -70,7 +70,7 @@ pub(crate) fn execute_conditional_alternative(
                 !cond_passed
             };
             if branch {
-                if let Some(ref alt_effect) = effect.alternative_effect_any() {
+                if let Some(alt_effect) = effect.alternative_effect_any() {
                     return resolver.execute_effect(gs, alt_effect);
                 }
             } else {
@@ -80,7 +80,7 @@ pub(crate) fn execute_conditional_alternative(
             }
         }
     } else if has_alternative {
-        if let Some(ref alt_effect) = effect.alternative_effect_any() {
+        if let Some(alt_effect) = effect.alternative_effect_any() {
             return resolver.execute_effect(gs, alt_effect);
         }
     } else if has_primary {

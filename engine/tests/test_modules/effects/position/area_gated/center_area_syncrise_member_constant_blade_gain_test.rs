@@ -265,7 +265,7 @@ fn self_target_card_moves_triggers_own_ability() {
     trigger_position_change_via_kinako(&mut game, "left");
     let after = game.state.mods.get_blade_modifier(self_target);
     assert!(
-        after >= before + 1,
+        after > before,
         "Self-target moved → gain 1 blade (was {}, now {})",
         before,
         after

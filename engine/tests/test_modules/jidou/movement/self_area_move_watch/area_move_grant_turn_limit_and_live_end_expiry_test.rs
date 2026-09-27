@@ -67,7 +67,7 @@ fn move_and_trigger(game: &mut TestGame, who: i16) {
 }
 
 fn heart_of(game: &TestGame, who: i16, colour: HeartColor) -> i32 {
-    i32::from(game.state.mods.get_heart_modifier(who, colour))
+    game.state.mods.get_heart_modifier(who, colour)
 }
 
 // ====================================================================

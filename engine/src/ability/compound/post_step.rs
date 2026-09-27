@@ -83,7 +83,7 @@ pub(crate) fn record_step_output(
         resolver.step_state
             .step_results
             .entry(step_id.to_string())
-            .or_insert_with(StepOutput::default)
+            .or_default()
             .merge(&out);
         log::debug!(
             "[SEQUENCE] source={:?} repeat={} step={} action={} output_id={} cards={:?} value={:?}",
@@ -111,7 +111,7 @@ pub(crate) fn maybe_prompt_repeat_continue(
     if repeats_remaining == 0 {
         return false;
     }
-    if let Some(ref repeat_action) = actions.last() {
+    if let Some(repeat_action) = actions.last() {
         if repeat_action.action == ActionType::RepeatProcedure
             && repeat_action.optional.unwrap_or(false)
         {

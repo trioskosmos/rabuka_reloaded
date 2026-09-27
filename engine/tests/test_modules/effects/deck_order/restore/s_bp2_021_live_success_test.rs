@@ -114,5 +114,5 @@ fn s_bp2_021_live_success_skip_optional() {
     game.drain_choices_strict(&["SelectCard", "SelectAutoAbility"], &[]);
     // Deck should be unchanged when skipped
     assert_eq!(game.state.player1.main_deck.cards, deck_before);
-    assert!(game.state.revealed_cards.contains(&live_in_yell) || game.state.player1.main_deck.cards.contains(&live_in_yell)==false, "skip should leave revealed");
+    assert!(game.state.revealed_cards.contains(&live_in_yell) || !game.state.player1.main_deck.cards.contains(&live_in_yell), "skip should leave revealed");
 }

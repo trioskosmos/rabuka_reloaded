@@ -91,6 +91,6 @@ fn hanamaru_bp3_016_success_zone_cost_increase_constant_parsed() {
     );
     let constant_ability = card_data
         .resolved_abilities()
-        .any(|a| a.triggers.as_ref().map_or(false, |t| &**t == "常時"));
+        .any(|a| a.triggers.as_ref().is_some_and(|t| &**t == "常時"));
     assert!(constant_ability, "Should have at least one 常時 ability");
 }

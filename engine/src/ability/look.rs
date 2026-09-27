@@ -723,7 +723,7 @@ impl AbilityResolver {
                     .and_then(|v| v.first().cloned()),
             )
             .characters(effect.characters_any().cloned())
-            .destination(effect.destination.clone().map(|s| s.to_string()))
+            .destination(effect.destination.map(|s| s.to_string()))
             .build();
             self.pending_choice = Some(choice);
             return Ok(());
@@ -759,7 +759,7 @@ impl AbilityResolver {
                         .iter()
                         .enumerate()
                         .filter(|&(_, &card_id)| {
-                            oct.map_or(true, |ct| {
+                            oct.is_none_or(|ct| {
                                 util::card_matches_type(card_db, card_id, Some(ct))
                             }) && filter.matches(card_db, card_id, false)
                         })
@@ -788,7 +788,7 @@ impl AbilityResolver {
                     .iter()
                     .enumerate()
                     .filter(|&(_, &card_id)| {
-                        oct.map_or(true, |ct| {
+                        oct.is_none_or(|ct| {
                             util::card_matches_type(card_db, card_id, Some(ct))
                         }) && filter.matches(card_db, card_id, false)
                     })
@@ -965,10 +965,10 @@ impl AbilityResolver {
 
     /// Look count: dynamic count, then per-unit multiplication.
     fn resolve_look_count(&mut self, gs: &mut GameState, effect: &AbilityEffect) -> u8 {
-        let base_count: u8 = if let Some(ref dc) = effect.dynamic_count_any() {
+        let base_count: u8 = if let Some(dc) = effect.dynamic_count_any() {
             self.resolve_dynamic_count(gs, dc)
         } else {
-            effect.count_or(1) as u8
+            effect.count_or(1)
         };
         if !effect.per_unit_any().unwrap_or(false) {
             return base_count;
@@ -977,7 +977,7 @@ impl AbilityResolver {
         let filter = util::CardFilter::from_effect(effect);
         let per_mult = util::resolve_per_unit_count(
             true,
-            effect.per_unit_type_any().as_deref(),
+            effect.per_unit_type_any(),
             player,
             &gs.card_database,
             &filter,
@@ -1138,7 +1138,7 @@ impl AbilityResolver {
         effect: &AbilityEffect,
     ) -> Result<(), String> {
         let source = effect.source_or(Zone::Hand.to_str());
-        let count = effect.count_or(1) as u8;
+        let count = effect.count_or(1);
         let target = effect.target_name();
         let card_db = gs.card_database.clone();
         let card_ids: Vec<i16> = {

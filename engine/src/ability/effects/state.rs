@@ -31,7 +31,7 @@ impl AbilityResolver {
         cost_limit: Option<u8>,
         count: u8,
     ) -> u8 {
-        let per_unit_cnt = effect.per_unit_count_any().unwrap_or(1) as u8;
+        let per_unit_cnt = effect.per_unit_count_any().unwrap_or(1);
         if effect
             .per_unit_source_any()
             .is_some_and(|s| s.contains("previous_moved"))
@@ -105,7 +105,7 @@ impl AbilityResolver {
             });
             return (Some(crate::constants::saturate_u8(under_count + base)), false);
         }
-        (effect.blade_limit_any().map(|v| v as u8), false)
+        (effect.blade_limit_any().map(|v| v), false)
     }
 
     pub(crate) fn execute_change_state(
@@ -126,7 +126,7 @@ impl AbilityResolver {
             effect.cost_limit_any()
         };
         // Per-unit count derivation (1x per N matching cards).
-        let mut count: u8 = effect.count_or(0) as u8;
+        let mut count: u8 = effect.count_or(0);
         let mut group_name = effect.group_name();
         if effect.per_unit_any().unwrap_or(false) {
             count = self.per_unit_state_count(gs, effect, &target, cost_limit, count);
@@ -193,7 +193,7 @@ impl AbilityResolver {
                         }
                         true
                     })
-                } else if state_change == "wait" && effect.state_any().as_deref() == Some("active")
+                } else if state_change == "wait" && effect.state_any() == Some("active")
                 {
                     // wait effect targeting only active members:
                     // check if there is at least one active (non-wait) member
@@ -372,7 +372,7 @@ impl AbilityResolver {
                     let matches_state = if state_change == "active" {
                         let ori = gs.mods.get_orientation_modifier(*card_id);
                         ori.is_some_and(|o| o == "wait")
-                    } else if effect.state_any().as_deref() == Some("active") {
+                    } else if effect.state_any() == Some("active") {
                         // e.g. "アクティブ状態のメンバーをウェイトにする"
                         // Only members currently in active state (no wait modifier).
                         let ori = gs.mods.get_orientation_modifier(*card_id);
@@ -1023,7 +1023,7 @@ impl AbilityResolver {
     }
 
     pub(crate) fn execute_set_cost(&mut self, gs: &mut GameState, effect: &AbilityEffect) {
-        let value: u8 = effect.value_any().unwrap_or(0) as u8;
+        let value: u8 = effect.value_any().unwrap_or(0);
         let target = effect.target_name();
         let ct_binding = effect.card_type_any();
         let card_type = ct_binding;
@@ -1080,10 +1080,10 @@ impl AbilityResolver {
 
     pub(crate) fn execute_set_blade_type(&mut self, gs: &mut GameState, effect: &AbilityEffect) {
         let bt_binding = effect.blade_type_any();
-        let blade_type = bt_binding.as_deref();
+        let blade_type = bt_binding;
         let target = effect.target_name();
         let dur_binding = effect.duration_any();
-        let duration = dur_binding.as_deref();
+        let duration = dur_binding;
         let pp = self.player_prefix(gs);
         let act_name = gs
             .activating_card
@@ -1172,7 +1172,7 @@ impl AbilityResolver {
         // C4: heart becomes the same as the card just placed under this member
         // (ref_value="placed_under") — a copy, not a fixed color.
         if effect.ref_value_any() == Some("placed_under") {
-            self.execute_set_heart_copy_from_under(gs, effect.duration_any().as_deref());
+            self.execute_set_heart_copy_from_under(gs, effect.duration_any());
             return;
         }
         let is_self_target = effect.is_self_target();
@@ -1191,7 +1191,7 @@ impl AbilityResolver {
                 heart_type,
                 effect.target_name(),
                 effect.count_or(1) as i32,
-                effect.duration_any().as_deref(),
+                effect.duration_any(),
             );
         } else if self.selected_cards.is_empty() {
             // Need target selection: find eligible stage members
@@ -1226,7 +1226,7 @@ impl AbilityResolver {
                     heart_type,
                     effect.target_name(),
                     effect.count_or(1) as i32,
-                    effect.duration_any().as_deref(),
+                    effect.duration_any(),
                 );
             } else {
                 // Multiple eligible: create SelectCard choice
@@ -1267,7 +1267,7 @@ impl AbilityResolver {
                 heart_type,
                 effect.target_name(),
                 effect.count_or(1) as i32,
-                effect.duration_any().as_deref(),
+                effect.duration_any(),
             );
         }
     }
@@ -1410,11 +1410,11 @@ impl AbilityResolver {
 
     pub(crate) fn execute_activation_cost(&mut self, gs: &mut GameState, effect: &AbilityEffect) {
         let operation_binding = effect.operation_any();
-        let operation = operation_binding.as_deref().unwrap_or("increase");
-        let value: u8 = effect.value_any().unwrap_or(0) as u8;
+        let operation = operation_binding.unwrap_or("increase");
+        let value: u8 = effect.value_any().unwrap_or(0);
         let target = effect.target_name();
         let duration_binding = effect.duration_any();
-        let duration = duration_binding.as_deref();
+        let duration = duration_binding;
         let pp = self.player_prefix(gs);
         let act_name = gs
             .activating_card
@@ -1460,7 +1460,7 @@ impl AbilityResolver {
         gs: &mut GameState,
         effect: &AbilityEffect,
     ) {
-        let count: u8 = effect.count_or(1) as u8;
+        let count: u8 = effect.count_or(1);
         let pp = self.player_prefix(gs);
         let act_name = gs
             .activating_card
@@ -1475,7 +1475,7 @@ impl AbilityResolver {
     }
 
     pub(crate) fn execute_set_blade_count(&mut self, gs: &mut GameState, effect: &AbilityEffect) {
-        let value: u8 = effect.value_any().unwrap_or(effect.count_or(0)) as u8;
+        let value: u8 = effect.value_any().unwrap_or(effect.count_or(0));
         let target = effect.target_name();
         let pp = self.player_prefix(gs);
         let act_name = gs
@@ -1508,7 +1508,7 @@ impl AbilityResolver {
             )
             .into();
         }
-        if let Some(ref pos) = effect.position_any() {
+        if let Some(pos) = effect.position_any() {
             if let Some(p) = pos.get_position() {
                 if let Some(stage_idx) = util::stage_position_index(p) {
                     let player = gs.resolve_target_player(target);
@@ -1536,7 +1536,7 @@ impl AbilityResolver {
                 util::push_temporary_effect(
                     gs,
                     "set_blade_count",
-                    effect.duration_any().as_deref(),
+                    effect.duration_any(),
                     target,
                     &format!("set blade count to {} for card {}", value, card_id),
                     Some(crate::core::types::EffectData::SetBladeCount { card_id }),
@@ -1614,7 +1614,7 @@ impl AbilityResolver {
         gs: &mut GameState,
         effect: &AbilityEffect,
     ) -> Result<(), String> {
-        let value: u8 = effect.value_any().unwrap_or(0) as u8;
+        let value: u8 = effect.value_any().unwrap_or(0);
         let card_id = self.activating_card_id.or(gs.activating_card);
         if let Some(card_id) = card_id {
             gs.mods.set_cost_modifier(card_id, value as i16);
@@ -1631,9 +1631,9 @@ impl AbilityResolver {
 
     pub(crate) fn execute_all_blade_timing(&mut self, gs: &mut GameState, effect: &AbilityEffect) {
         let timing_binding = effect.timing_any();
-        let timing = timing_binding.as_deref().unwrap_or("check_required_hearts");
+        let timing = timing_binding.unwrap_or("check_required_hearts");
         let treat_as_binding = effect.treat_as_any();
-        let treat_as = treat_as_binding.as_deref().unwrap_or("any_heart_color");
+        let treat_as = treat_as_binding.unwrap_or("any_heart_color");
         let card_id = self.activating_card_id.or(gs.activating_card);
         if let Some(card_id) = card_id {
             gs.prohibition_effects.push(format!(
@@ -1655,11 +1655,11 @@ impl AbilityResolver {
         let operation = op_binding.unwrap_or("add");
         let target = effect.target_name();
         let ct_binding = effect.card_type_any();
-        let card_type = ct_binding.as_deref();
+        let card_type = ct_binding;
         let dur_binding = effect.duration_any();
-        let duration = dur_binding.as_deref();
+        let duration = dur_binding;
         // Compute the final value: base value scaled by per-unit count.
-        let mut value: u8 = effect.value_any().unwrap_or(0) as u8;
+        let mut value: u8 = effect.value_any().unwrap_or(0);
         if effect.per_unit_any().unwrap_or(false) {
             let put_binding = effect.per_unit_type_any();
             let loc_binding2 = effect.location_any();
@@ -1676,17 +1676,17 @@ impl AbilityResolver {
                 &gs.card_database,
                 &per_unit_filter,
                 &[],
-                effect.state_any().as_deref(),
+                effect.state_any(),
                 &gs.mods.orientation_modifiers,
                 gs.activating_card,
             );
-            let per_unit_count = effect.per_unit_count_any().unwrap_or(1) as u8;
+            let per_unit_count = effect.per_unit_count_any().unwrap_or(1);
             let mut units = matching_count / per_unit_count;
             // Apply max_repeats cap (aliased as repeat_limit).
             // The text side-constraint "N枚までしか数えない" is parsed as
             // max_repeats on the effect.
             if let Some(cap) = effect.repeat_limit_any() {
-                units = units.min(cap as u8);
+                units = units.min(cap);
             }
             value *= units;
         }

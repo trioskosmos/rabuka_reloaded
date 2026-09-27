@@ -124,7 +124,7 @@ impl<'a> ConditionContext<'a> {
                                             condition.get_group_names().map(|g| g.to_vec())
                                         });
                                     let card_db = &self.game_state.card_database;
-                                    let in_group = groups.as_ref().map_or(true, |g| {
+                                    let in_group = groups.as_ref().is_none_or(|g| {
                                         g.iter().any(|name| {
                                             crate::ability::util::card_matches_group_str(
                                                 card_db,
@@ -164,7 +164,7 @@ impl<'a> ConditionContext<'a> {
                                     player.stage.stage.iter().any(|&cid| {
                                         cid != -1
                                             && self.game_state.has_card_moved_this_turn(cid)
-                                            && groups.as_ref().map_or(true, |g| {
+                                            && groups.as_ref().is_none_or(|g| {
                                                 g.iter().any(|name| {
                                                     crate::ability::util::card_matches_group_str(
                                                         card_db,
@@ -272,7 +272,7 @@ impl<'a> ConditionContext<'a> {
                         }
                         for &cid in &cards {
                             if let Some(card) = self.game_state.card_database.get_card(cid) {
-                                let group_ok = condition.get_group_names().map_or(true, |groups| {
+                                let group_ok = condition.get_group_names().is_none_or(|groups| {
                                     groups.iter().any(|g| {
                                         crate::ability::util::card_matches_group_str(
                                             &self.game_state.card_database,
@@ -298,7 +298,7 @@ impl<'a> ConditionContext<'a> {
                                 if let Some(hc_list) = condition.get_heart_colors() {
                                     if let Some(ref nh) = card.need_heart {
                                         // Check if ALL specified heart colors meet the count threshold
-                                        let threshold = condition.get_count().unwrap_or(1) as u8;
+                                        let threshold = condition.get_count().unwrap_or(1);
                                         let all_hearts_present = hc_list.iter().all(|color_str| {
                                             let color = crate::card::parse_heart_color(color_str);
                                             nh.hearts.get(&color).copied().unwrap_or(0) >= threshold
@@ -651,9 +651,9 @@ impl<'a> ConditionContext<'a> {
             if !own_waitroom.contains(&replaced_id) {
                 return false;
             }
-            if !location.is_empty() {
-                if Zone::from_str(location) == Some(Zone::Discard)
-                    || Zone::from_str(location) == Some(Zone::Waitroom)
+            if !location.is_empty()
+                && (Zone::from_str(location) == Some(Zone::Discard)
+                    || Zone::from_str(location) == Some(Zone::Waitroom))
                 {
                     let in_discard = self
                         .game_state
@@ -671,7 +671,6 @@ impl<'a> ConditionContext<'a> {
                         return false;
                     }
                 }
-            }
             if condition.get_exclude_self().unwrap_or(false)
                 && self.game_state.activating_card == Some(replaced_id)
             {
@@ -725,11 +724,10 @@ impl<'a> ConditionContext<'a> {
                                     return false;
                                 }
                             }
-                            "has_ability" => {
-                                if card.abilities.is_empty() {
+                            "has_ability"
+                                if card.abilities.is_empty() => {
                                     return false;
                                 }
-                            }
                             _ => {}
                         }
                     }
@@ -837,7 +835,7 @@ impl<'a> ConditionContext<'a> {
 
         match movement {
             "moved" => {
-                self.evaluate_has_moved(condition, &player)
+                self.evaluate_has_moved(condition, player)
                     && self.moved_cards_match_cost_limit(condition)
             }
             "position_change" => {
@@ -863,12 +861,12 @@ impl<'a> ConditionContext<'a> {
                     let in_current_batch = |cid: i16| {
                         cid == self.activating_card_id.unwrap_or(-1)
                             && (self.moved_cards.contains(&cid)
-                                || entry_snapshot.as_ref().map_or(false, |v| v.contains(&cid))
+                                || entry_snapshot.as_ref().is_some_and(|v| v.contains(&cid))
                                 || self
                                     .game_state
                                     .recently_moved_cards
                                     .as_ref()
-                                    .map_or(false, |v| v.contains(&cid)))
+                                    .is_some_and(|v| v.contains(&cid)))
                     };
                     self.game_state.turn_area_movements.iter().any(|m| {
                         self.activating_card_id == Some(m.moved_card_id)
@@ -886,7 +884,7 @@ impl<'a> ConditionContext<'a> {
                 condition,
                 te,
                 location,
-                &player,
+                player,
             ),
             "moves" => {
                 let self_effect_only = condition
@@ -922,7 +920,7 @@ impl<'a> ConditionContext<'a> {
                             .game_state
                             .recently_moved_cards
                             .as_ref()
-                            .map_or(false, |v| v.contains(&cid));
+                            .is_some_and(|v| v.contains(&cid));
                     // Deferred cross-seat resolutions run AFTER the movement
                     // batch is cleared; the enqueue-time snapshot of the
                     // triggering batch is the durable record that THIS card's
@@ -930,7 +928,7 @@ impl<'a> ConditionContext<'a> {
                     let in_trigger_batch = self
                         .game_state
                         .entry_trigger_moved_cards()
-                        .map_or(false, |tm| tm.contains(&cid));
+                        .is_some_and(|tm| tm.contains(&cid));
                     in_pce || (in_tam && in_current_batch) || in_trigger_batch
                 });
                 let area_ok = if !this_card_moved {
@@ -971,13 +969,13 @@ impl<'a> ConditionContext<'a> {
                         .game_state
                         .ability_queue
                         .current_entry()
-                        .map(|e| e.snapshot_movements.iter().any(|m| is_watched_placement(m)))
+                        .map(|e| e.snapshot_movements.iter().any(&is_watched_placement))
                         .unwrap_or(false);
                     let live_has = self
                         .game_state
                         .batch_movements
                         .iter()
-                        .any(|m| is_watched_placement(m));
+                        .any(&is_watched_placement);
                     // Pre-enqueue scans have no current entry yet, so the live
                     // batch governs; post-enqueue the durable snapshot does.
                     let energy_val = snapshot_has || live_has;
@@ -1252,7 +1250,7 @@ impl<'a> ConditionContext<'a> {
             // WHOLE turn — including activations by earlier main-phase effects —
             // and can filter on the SOURCE effect's group (『虹ヶ咲』のカードの効果)
             // and the TARGET kind (energy vs member).
-            if condition.get_temporal().map(|t| t.as_ref()) == Some("this_turn") {
+            if condition.get_temporal().map(|t| t) == Some("this_turn") {
                 let card_db = &self.game_state.card_database;
                 let want_kind = condition.get_card_type().map(|ct| ct.as_str().to_string());
                 // The target card must belong to the conditioned player.
@@ -1376,7 +1374,7 @@ impl<'a> ConditionContext<'a> {
                     let loc = loc_binding.unwrap_or("hand");
                     let zone = crate::ability::enums::Zone::from_str(loc);
                     let target = effect.target_name();
-                    let player = self.resolve_condition_player(&target);
+                    let player = self.resolve_condition_player(target);
                     let cards = util::zone_cards(player, loc);
                     let matching = match zone {
                         Some(z) if z == crate::ability::enums::Zone::RevealedCards => {

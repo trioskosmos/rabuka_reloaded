@@ -86,7 +86,7 @@ fn main() {
             acts_cache = game_setup::generate_possible_actions(&gs);
             dirty = false;
             // Only print actions occasionally so we don't spam the log for 2000 frames
-            if frames % 100 == 0 || frames < 10 {
+            if frames.is_multiple_of(100) || frames < 10 {
                 println!(
                     "[frame {}] ACTIONS({}): phase={:?}",
                     frames,

@@ -55,7 +55,7 @@ mod inner {
     use std::cell::RefCell;
 
     thread_local! {
-        static VERDICT_BUFFER: RefCell<Vec<AbilityLogItem>> = RefCell::new(Vec::new());
+        static VERDICT_BUFFER: RefCell<Vec<AbilityLogItem>> = const { RefCell::new(Vec::new()) };
     }
 
     fn with_buffer<R>(f: impl FnOnce(&mut Vec<AbilityLogItem>) -> R) -> R {
@@ -73,7 +73,7 @@ mod inner {
         if !ABILITY_DEBUG.load(Ordering::Relaxed) {
             return vec![];
         }
-        with_buffer(|buf| buf.drain(..).collect())
+        with_buffer(std::mem::take)
     }
 
     pub fn buffer_len() -> usize {

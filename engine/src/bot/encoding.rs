@@ -165,10 +165,10 @@ impl ActionEncoding {
             .or_else(|| {
                 params
                     .and_then(|p| p.stage_area.as_deref())
-                    .and_then(|area| match area {
-                        "center" => Some(1),
-                        "right" => Some(2),
-                        _ => Some(0),
+                    .map(|area| match area {
+                        "center" => 1,
+                        "right" => 2,
+                        _ => 0,
                     })
             })
             .unwrap_or(target.position);

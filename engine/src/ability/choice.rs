@@ -417,10 +417,10 @@ impl super::resolver::AbilityResolver {
             .destination
             .clone()
             .or(edst)
-            .unwrap_or_else(|| Zone::Discard.to_string().into());
+            .unwrap_or_else(|| Zone::Discard.to_string());
         let tgt = target_player_id
             .clone()
-            .unwrap_or_else(|| "self".to_string().into());
+            .unwrap_or_else(|| "self".to_string());
         let player = gs.resolve_target_player_mut(&tgt);
         let card_ids: Vec<i16> = ctx.mfi(&ctx.indices)
             .iter()
@@ -455,7 +455,7 @@ impl super::resolver::AbilityResolver {
     ) {
         let target = target_player_id
             .clone()
-            .unwrap_or_else(|| "self".to_string().into());
+            .unwrap_or_else(|| "self".to_string());
         let player = gs.resolve_target_player_mut(&target);
         let mapped_indices = ctx.mfi(&ctx.indices);
         let mut cards: Vec<i16> = Vec::new();
@@ -490,10 +490,10 @@ impl super::resolver::AbilityResolver {
             .destination
             .clone()
             .or(edst)
-            .unwrap_or_else(|| Zone::EnergyDeck.to_str().to_string().into());
+            .unwrap_or_else(|| Zone::EnergyDeck.to_str().to_string());
         let tgt = target_player_id
             .clone()
-            .unwrap_or_else(|| "self".to_string().into());
+            .unwrap_or_else(|| "self".to_string());
         let moved = self.move_from_under_member(
             gs,
             &ctx.indices,
@@ -697,7 +697,7 @@ impl super::resolver::AbilityResolver {
         }
         let target = target_player_id
             .clone()
-            .unwrap_or_else(|| "self".to_string().into());
+            .unwrap_or_else(|| "self".to_string());
         let hand_cards: Vec<i16> = {
             let p = gs.resolve_target_player_mut(&target);
             p.hand.cards.to_vec()
@@ -925,7 +925,7 @@ impl super::resolver::AbilityResolver {
             };
             let target = target_player_id
                 .clone()
-                .unwrap_or_else(|| "self".to_string().into());
+                .unwrap_or_else(|| "self".to_string());
             self.pending_choice = Some(
                 self.build_reprompt(
                     ctx,
@@ -1080,7 +1080,7 @@ impl super::resolver::AbilityResolver {
                     .destination
                     .clone()
                     .or(edst)
-                    .unwrap_or_else(|| Zone::Discard.to_string().into());
+                    .unwrap_or_else(|| Zone::Discard.to_string());
                 self.handle_revealed_cards_selection(gs, &ctx, &mut validate_card, &dst_str)?;
             }
             Some(Zone::Energy) => {
@@ -1126,7 +1126,7 @@ impl super::resolver::AbilityResolver {
             self.selected_cards.len(),
             self.selected_cards
         );
-        return self.handle_selection_epilogue(gs, &context);
+        self.handle_selection_epilogue(gs, &context)
     }
 
     pub(in crate::ability::choice) fn build_reprompt(
@@ -1511,7 +1511,7 @@ impl super::resolver::AbilityResolver {
         let target = ctx
             .target_player_id
             .clone()
-            .unwrap_or_else(|| "self".to_string().into());
+            .unwrap_or_else(|| "self".to_string());
 
         let hand_positions: Vec<usize> = if let Some(ref fi) = ctx.filtered_indices {
             if ctx.count == 0 {
@@ -1611,7 +1611,7 @@ impl super::resolver::AbilityResolver {
             .current_effect
             .clone()
             .or_else(|| gs.entry_effect().cloned())
-            .filter(|effect| util::effect_uses_selected_cards(effect));
+            .filter(util::effect_uses_selected_cards);
         if !effect_started {
             let cost_source = gs.current_ability_source_card_id();
             let cost_owner = util::target_player_index(&target, gs.ability_master_id().as_deref());
@@ -1739,7 +1739,7 @@ impl super::resolver::AbilityResolver {
             .destination
             .clone()
             .or(edst)
-            .unwrap_or_else(|| Zone::Discard.to_string().into());
+            .unwrap_or_else(|| Zone::Discard.to_string());
         let target = ctx.target_player_id.as_deref().unwrap_or("self");
         let card_db = gs.card_database.clone();
         let player = gs.resolve_target_player_mut(target);
@@ -1873,7 +1873,7 @@ gs.set_recently_moved_batch(valid_ids.into(), Some(Zone::SuccessLiveZone.to_str(
             .current_effect
             .clone()
             .or_else(|| gs.entry_effect().cloned())
-            .filter(|effect| util::effect_uses_selected_cards(effect));
+            .filter(util::effect_uses_selected_cards);
         if let Some(effect) = selected_effect {
             if let Some(entry) = gs.ability_queue.current_entry_mut() {
                 entry.effect_started = true;
@@ -2195,7 +2195,7 @@ gs.set_recently_moved_batch(moved.clone().into(), Some("under_member"));
                 .destination
                 .clone()
                 .or(edst)
-                .unwrap_or_else(|| Zone::Discard.to_string().into());
+                .unwrap_or_else(|| Zone::Discard.to_string());
             let card_db = gs.card_database.clone();
             let player =
                 gs.resolve_target_player_mut(ctx.target_player_id.as_deref().unwrap_or("self"));
@@ -2334,7 +2334,7 @@ gs.set_recently_moved_batch(valid_ids.into(), Some("stage"));
                 self.store_pending_choice(gs);
                 return Ok(());
             }
-            return self.finalize_choice(gs, &context);
+            return self.finalize_choice(gs, context);
         } else {
             // An empty pick (index outside filtered_indices, or nothing mapped)
             // must never satisfy a MANDATORY (allow_skip=false) selection:
@@ -2604,7 +2604,7 @@ gs.set_recently_moved_batch(valid_ids.into(), Some("stage"));
                         // remaining options.
                         let commands = vec![selected_effect];
                         let wants_re_prompt = !remaining.is_empty()
-                            && gs.entry_effect().map_or(false, |eff| {
+                            && gs.entry_effect().is_some_and(|eff| {
                                 if eff.any_number_any().unwrap_or(false) {
                                     return true;
                                 }
@@ -2612,7 +2612,7 @@ gs.set_recently_moved_batch(valid_ids.into(), Some("stage"));
                                     let ctx =
                                         ConditionContext::with_moved_cards(gs, &self.moved_cards);
                                     ctx.evaluate_condition(alt_cond)
-                                        && eff.alternative_count_type_any().as_deref()
+                                        && eff.alternative_count_type_any()
                                             == Some("any_number")
                                 } else {
                                     false
@@ -2944,7 +2944,7 @@ gs.set_recently_moved_batch(valid_ids.into(), Some("stage"));
             "[HPCC] entry: choice_card_no={:?} selected={} entry_effect={:?} activating={:?}",
             choice_card_no,
             selected,
-            gs.entry_effect().map(|e| e.action.clone()),
+            gs.entry_effect().map(|e| e.action),
             gs.activating_card
         );
         if selected == "skip" {
@@ -3017,7 +3017,7 @@ gs.set_recently_moved_batch(valid_ids.into(), Some("stage"));
                     .target
                     .clone()
                     .map(|s| s.to_string())
-                    .unwrap_or_else(|| "self".to_string().into());
+                    .unwrap_or_else(|| "self".to_string());
                 self.clear_choice_meta(gs);
                 self.pending_choice = None;
                 // If the card fixes the destination (e.g. "…をセンターエリアにポジション
@@ -3105,7 +3105,7 @@ modified.destination = Some(Zone::from_source_str(dest));
                             .card_database
                             .get_card(next_cid)
                             .map(|c| c.name.to_string())
-                            .unwrap_or_else(|| "member".to_string().into());
+                            .unwrap_or_else(|| "member".to_string());
                         let current_pos = {
                             let player = gs.resolve_target_player_mut(
                                 effect.target.as_deref().unwrap_or("self"),
@@ -3238,9 +3238,9 @@ modified.destination = Some(Zone::from_source_str(dest));
             {
                 effect
                     .alternative_effect_any()
-                    .or(effect.compound.primary_effect.as_ref().map(|b| &**b))
+                    .or(effect.compound.primary_effect.as_deref())
             } else {
-                effect.compound.primary_effect.as_ref().map(|b| &**b)
+                effect.compound.primary_effect.as_deref()
             };
             if let Some(sub_effect) = chosen {
                 *effect = sub_effect.clone();
@@ -3340,7 +3340,7 @@ modified.destination = Some(Zone::from_source_str(dest));
                 crate::ability::util::place_card_in_zone(
                     player,
                     card_id,
-                    &destination,
+                    destination,
                     None,
                     false,
                     1,
@@ -3505,7 +3505,7 @@ modified.destination = Some(Zone::from_source_str(dest));
                 ConditionalChoice::Effect(e) => Some(e),
                 _ => None,
             })
-            .or_else(|| entry_eff);
+            .or(entry_eff);
         if let Some(effect) = effect {
             let is_negation = effect.compound.conditional_negation.unwrap_or(false);
             if chose_yes && !is_negation {

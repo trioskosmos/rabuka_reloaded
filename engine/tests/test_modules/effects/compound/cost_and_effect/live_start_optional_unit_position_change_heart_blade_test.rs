@@ -57,8 +57,7 @@ fn resolve_and_count_position_changes(game: &mut TestGame) -> (bool, usize) {
                 count += 1;
                 if count == 1 {
                     first_found = true;
-                } else {
-                }
+                } 
                 // Resolve: select first available destination, or skip if possible
                 let actions = game.generated_actions();
                 if actions.is_empty() {

@@ -211,7 +211,6 @@ fn two_ginako_discard_one_gains_blade_on_self() {
             }
             rabuka_engine::ability::types::Choice::SelectCard {
                 zone,
-                allow_skip: _,
                 ..
             } => {
                 if zone == "hand" && !paid {

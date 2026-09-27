@@ -329,7 +329,7 @@ impl TestGame {
 
     fn trace_node_matches(node: &AbilityTraceNode, pattern: &str) -> bool {
         node.label.contains(pattern)
-            || node.card.as_deref().map_or(false, |c| c.contains(pattern))
+            || node.card.as_deref().is_some_and(|c| c.contains(pattern))
             || node
                 .children
                 .iter()

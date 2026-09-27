@@ -229,7 +229,7 @@ pub fn choose_live_set_action(
             None => continue,
         };
         let score = db.get_card(cid).and_then(|c| c.score).unwrap_or(0);
-        if best_select.map_or(true, |(_, s)| score > s) {
+        if best_select.is_none_or(|(_, s)| score > s) {
             best_select = Some((i, score));
         }
     }

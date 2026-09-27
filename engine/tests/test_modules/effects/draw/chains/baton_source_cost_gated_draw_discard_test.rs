@@ -38,7 +38,7 @@ fn run_flow(db: std::sync::Arc<rabuka_engine::card::CardDatabase>, replaced_no: 
             "replaced {:?} (cost {}) -> deck should shrink by 2 draws",
             replaced_no,
             {
-                let c = game.db.get_card(game.id(replaced_no)).map(|x| x.cost).flatten();
+                let c = game.db.get_card(game.id(replaced_no)).and_then(|x| x.cost);
                 format!("{:?}", c)
             }
         );
@@ -53,7 +53,7 @@ fn run_flow(db: std::sync::Arc<rabuka_engine::card::CardDatabase>, replaced_no: 
             "replaced {:?} (cost {}) -> deck should NOT shrink",
             replaced_no,
             {
-                let c = game.db.get_card(game.id(replaced_no)).map(|x| x.cost).flatten();
+                let c = game.db.get_card(game.id(replaced_no)).and_then(|x| x.cost);
                 format!("{:?}", c)
             }
         );

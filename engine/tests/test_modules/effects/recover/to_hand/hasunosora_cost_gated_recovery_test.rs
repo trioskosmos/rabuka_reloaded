@@ -230,7 +230,7 @@ fn cl1008_self_to_waitroom_retrieves_hasunosora() {
     }
 
     assert!(
-        !game.state.player1.stage.stage.iter().any(|&c| c == me),
+        !game.state.player1.stage.stage.contains(&me),
         "activation cost moved this member off stage"
     );
     assert!(

@@ -136,7 +136,7 @@ fn karin_live_start_window_rests_exactly_blade4_member() {
             // decline the very live-start window under test.
             Choice::SelectAutoAbility { .. } => {
                 let n = game.pending_choice_count();
-                let idxs: Vec<usize> = (0..n.max(1) as usize).collect();
+                let idxs: Vec<usize> = (0..n.max(1)).collect();
                 game.select_indices(&idxs);
             }
             Choice::SelectTarget { .. } => game.select_option(1),

@@ -33,7 +33,7 @@ pub fn heart_gain_per_entry(total: i32, heart_colors: &[String]) -> i32 {
 /// map stores it as `"heart00"` (HeartColor::Heart00 placeholder) while the
 /// GainAbility path stores it as `"all"`. Keep the string check centralized.
 pub fn is_all_heart_type(effect: &crate::card::AbilityEffect) -> bool {
-    effect.heart_type_any().as_deref() == Some("all")
+    effect.heart_type_any() == Some("all")
 }
 pub const HEART_ALL_KEY: &str = "heart00";
 
@@ -65,7 +65,7 @@ pub fn constant_per_unit_units(
         card_db,
         &filter,
         &[],
-        effect.state_any().as_deref(),
+        effect.state_any(),
         orientation_modifiers,
         Some(host_card_id),
     );
@@ -80,7 +80,7 @@ pub fn constant_per_unit_units(
         host_card_id,
         player.id,
         zone,
-        effect.state_any().as_deref(),
+        effect.state_any(),
         effect.target_any(),
         per_count,
         effect.per_unit_count_any(),

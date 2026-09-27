@@ -69,7 +69,7 @@ pub fn execute_effect(
             effect,
             effect.position_any().cloned(),
             effect.target_name(),
-            effect.target_member_any().as_deref().unwrap_or("this_member"),
+            effect.target_member_any().unwrap_or("this_member"),
         ),
         ActionType::Rotation => resolver.execute_rotation(gs, effect, effect.target_name()),
         ActionType::PlaceEnergyUnderMember => {
@@ -162,8 +162,8 @@ pub fn execute_effect(
         }
         ActionType::ModifyRequiredHeartsGlobal => resolver.execute_modify_required_hearts_standard(
             gs,
-            effect.operation_any().as_deref().unwrap_or("increase"),
-            effect.value_or_count(1) as u8,
+            effect.operation_any().unwrap_or("increase"),
+            effect.value_or_count(1),
             effect.heart_colors_any(),
             effect.target_name(),
             &effect.text,

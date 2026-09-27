@@ -40,7 +40,7 @@ fn private_wars_activates_waited_member_and_grants_only_that_member_one_blade() 
     fire(&mut game, live);
     game.select_choice_option(0);
     game.drain_choices_strict(&[], &[]);
-    assert_eq!(game.state.mods.get_orientation_modifier(ally).as_deref(), Some("active"));
+    assert_eq!(game.state.mods.get_orientation_modifier(ally), Some("active"));
     assert_eq!(game.state.mods.get_blade_modifier(ally), 1);
     assert_eq!(game.state.mods.get_blade_modifier(arise), 0);
     assert_eq!(game.state.mods.get_blade_modifier(live), 0);
@@ -57,9 +57,9 @@ fn private_wars_waits_original_three_blades_but_not_four() {
     fire(&mut game, live);
     game.select_choice_option(1);
     game.drain_choices_strict(&[], &[]);
-    assert_eq!(game.state.mods.get_orientation_modifier(low).as_deref(), Some("wait"));
-    assert_ne!(game.state.mods.get_orientation_modifier(high).as_deref(), Some("wait"));
-    assert_eq!(game.state.mods.get_orientation_modifier(ally).as_deref(), Some("wait"));
+    assert_eq!(game.state.mods.get_orientation_modifier(low), Some("wait"));
+    assert_ne!(game.state.mods.get_orientation_modifier(high), Some("wait"));
+    assert_eq!(game.state.mods.get_orientation_modifier(ally), Some("wait"));
     assert_eq!(game.state.mods.get_blade_modifier(ally), 0);
 }
 
@@ -69,6 +69,6 @@ fn private_wars_without_arise_does_not_activate_or_grant_blades() {
     game.state.player1.stage.stage[0] = -1;
     fire(&mut game, live);
     assert!(!game.has_pending_choice());
-    assert_eq!(game.state.mods.get_orientation_modifier(ally).as_deref(), Some("wait"));
+    assert_eq!(game.state.mods.get_orientation_modifier(ally), Some("wait"));
     assert_eq!(game.state.mods.get_blade_modifier(ally), 0);
 }

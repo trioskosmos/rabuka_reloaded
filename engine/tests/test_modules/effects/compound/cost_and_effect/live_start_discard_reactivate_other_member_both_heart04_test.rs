@@ -93,7 +93,7 @@ fn live_start_discard_reactivate_heart_activates_wait_both_gain_heart04() {
     // Verify the wait member is now active
     let orientation = game.state.mods.get_orientation_modifier(wait_member);
     assert!(
-        orientation.is_none() || orientation.as_deref() != Some("wait"),
+        orientation.is_none() || orientation != Some("wait"),
         "Activated member should no longer be in wait state"
     );
 }

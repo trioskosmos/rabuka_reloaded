@@ -775,7 +775,7 @@ fn behaviorally_equal(a: &GameState, b: &GameState) -> ArenaResult<bool> {
 }
 
 fn corpus_fold(seed: u32) -> &'static str {
-    if seed % 5 == 0 {
+    if seed.is_multiple_of(5) {
         "holdout"
     } else {
         "train"
@@ -2000,7 +2000,7 @@ fn main() -> ArenaResult<()> {
             z1: z1.min(255) as u8,
             z2: z2.min(255) as u8,
             result: classify(z1, z2),
-            turns: gs.turn_number.min(255),
+            turns: gs.turn_number,
             live_p1: game_live_p1.min(u16::MAX as u64) as u16,
             live_p2: game_live_p2.min(u16::MAX as u64) as u16,
         });
@@ -2363,7 +2363,7 @@ mod tests {
             .chain(t2.energy_deck.iter())
             .filter_map(|&c| db.get_card(c).map(|k| k.card_no.to_string()))
             .collect();
-        let mut gs = deal_from_templates(&db, &t1, &t2);
+        let gs = deal_from_templates(&db, &t1, &t2);
         let p2_nos: std::collections::BTreeSet<String> = gs
             .player2
             .main_deck

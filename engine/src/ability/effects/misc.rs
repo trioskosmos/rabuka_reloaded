@@ -408,9 +408,9 @@ impl AbilityResolver {
         // bp6 pattern: "gain 1 heart per distinct color among discarded cards"
         // Detected by: resource=heart, per_unit=true, per_unit_type="discard", multiple_targets=true
         // For each distinct heart color present among recently_moved_cards, grant 1 heart of that color.
-        let is_bp6 = effect.resource_any().as_deref() == Some("heart")
+        let is_bp6 = effect.resource_any() == Some("heart")
             && effect.per_unit_any().unwrap_or(false)
-            && Zone::from_str(effect.per_unit_type_any().as_deref().unwrap_or(""))
+            && Zone::from_str(effect.per_unit_type_any().unwrap_or(""))
                 == Some(Zone::Discard)
             && effect.multiple_targets_any().unwrap_or(false);
         if !is_bp6 {
@@ -418,8 +418,8 @@ impl AbilityResolver {
         }
 
         let card_db = self.card_db();
-        let duration = effect.duration_any().clone();
-        let is_temporary = duration.is_some() && duration.as_deref() != Some("permanent");
+        let duration = effect.duration_any();
+        let is_temporary = duration.is_some() && duration != Some("permanent");
         let target = effect.target_name().to_string();
         let activating_card_id = gs.activating_card;
 
@@ -469,7 +469,7 @@ impl AbilityResolver {
             util::push_temporary_effect(
                 gs,
                 "gain_heart",
-                duration.as_deref(),
+                duration,
                 &target,
                 &format!("Gain 1 heart of each color: {}", color_names.join(", ")),
                 Some(crate::core::types::EffectData::MultiCard { items }),
@@ -538,8 +538,8 @@ impl AbilityResolver {
             util::push_temporary_effect(
                 gs,
                 "gain_surplus_heart",
-                duration.as_deref(),
-                &target,
+                duration,
+                target,
                 &desc,
                 effect_data,
             );
@@ -575,7 +575,7 @@ impl AbilityResolver {
         // If the effect has an explicit location, use that as the count zone
         // instead of the generic per_unit_type → zone mapping.
         let loc_binding = effect.location_any();
-        let effective_per_unit_type = loc_binding.as_deref().or(per_unit_type_str);
+        let effective_per_unit_type = loc_binding.or(per_unit_type_str);
         let mut matching_count = if effective_per_unit_type == Some("つ") {
             last_energy
         } else {
@@ -586,7 +586,7 @@ impl AbilityResolver {
                 &card_db,
                 filter,
                 &[],
-                effect.state_any().as_deref(),
+                effect.state_any(),
                 orientation_modifiers,
                 None,
             )
@@ -723,7 +723,7 @@ impl AbilityResolver {
                                     color,
                                     gs.mods.get_heart_modifier(target_id, color));
                             }
-                            if effect.duration_any().as_deref() == Some("live_end") {
+                            if effect.duration_any() == Some("live_end") {
                                 let effect_data = crate::core::types::EffectData::SingleCard {
                                     card_id: target_id,
                                     amount: 1,
@@ -761,7 +761,7 @@ impl AbilityResolver {
         let has_explicit_target = effect.target_any().is_some();
         let player = gs.resolve_target_player_mut(&target_str);
         let card_id = triggering_member.or_else(|| {
-            if let Some(ref pos) = effect.position_any() {
+            if let Some(pos) = effect.position_any() {
                 let pos_str = pos.get_position()?;
                 let idx = crate::ability::util::stage_position_index(pos_str)?;
                 if idx < player.stage.stage.len() && player.stage.stage[idx] != -1 {
@@ -785,7 +785,7 @@ impl AbilityResolver {
                 card_id,
                 &effect.text,
             );
-            if effect.duration_any().as_deref() == Some("live_end") {
+            if effect.duration_any() == Some("live_end") {
                 let effect_data = crate::core::types::EffectData::SingleCard {
                     card_id,
                     amount,
@@ -815,7 +815,7 @@ impl AbilityResolver {
         }
         // heart_colors_from_selected_card: gain 1 heart of each color
         // that the previously-selected card in the sequential has (base_heart).
-        if effect.resource_any().as_deref() == Some("heart")
+        if effect.resource_any() == Some("heart")
             && effect
                 .heart_colors_from_selected_card_any()
                 .unwrap_or(false)
@@ -823,8 +823,8 @@ impl AbilityResolver {
             return self.gain_heart_colors_from_selected_card(gs, effect);
         }
 
-        if effect.resource_any().as_deref() == Some("heart")
-            && effect.heart_type_any().as_deref() == Some("all")
+        if effect.resource_any() == Some("heart")
+            && effect.heart_type_any() == Some("all")
         {
             return self.gain_heart_all_type(gs, effect);
         }
@@ -832,7 +832,7 @@ impl AbilityResolver {
         if self.handle_bp6_pattern(gs, effect)? {
             return Ok(());
         }
-        let resource = effect.resource_any().as_deref().unwrap_or("").to_string();
+        let resource = effect.resource_any().unwrap_or("").to_string();
         // Normalize once — card data spells resources in EN or JA; ad-hoc
         // string matching scattered through this function is how the two
         // spellings drift apart.
@@ -841,15 +841,15 @@ impl AbilityResolver {
             .resource_icon_count_any()
             .unwrap_or(effect.count_or(1));
         let target = effect.target_name().to_string();
-        let duration = effect.duration_any().clone();
-        let is_temporary = duration.is_some() && duration.as_deref() != Some("permanent");
+        let duration = effect.duration_any();
+        let is_temporary = duration.is_some() && duration != Some("permanent");
         let card_type_filter = effect.card_type_any().map(|s| s.to_string());
         let group_filter = effect.group_name().map(|s| s.to_string());
-        let per_unit_type_str = effect.per_unit_type_any().clone();
+        let per_unit_type_str = effect.per_unit_type_any();
         let heart_selection = effect.heart_selection_any().unwrap_or(false);
         let per_unit = effect.per_unit_any().unwrap_or(false);
         let sign_binding = effect.sign_any();
-        let sign = sign_binding.as_deref();
+        let sign = sign_binding;
         let activating_card_id = gs.activating_card;
         let card_db = self.card_db();
         let is_self_target = effect.is_self_target();
@@ -880,7 +880,7 @@ impl AbilityResolver {
                 effect,
                 &target,
                 is_temporary,
-                duration.as_deref(),
+                duration,
                 sign,
                 is_all,
             );
@@ -952,7 +952,7 @@ impl AbilityResolver {
         // cross-character leakage in sequential (e.g. blade for char A leaks
         // into blade for char B).
         let selected_for_current: Vec<i16> = if !all_selected.is_empty() {
-            if let Some(ref chars) = effect.characters_any() {
+            if let Some(chars) = effect.characters_any() {
                 all_selected
                     .iter()
                     .filter(|&&cid| {
@@ -1016,7 +1016,7 @@ impl AbilityResolver {
         let last_energy = gs.mods.last_cost_energy_count;
         // Issue 6: Pre-compute appeared/moved-this-turn sets before mutable borrow
         let appeared_ids: HashSet<i16> =
-            if effect.timing_condition_any().as_deref() == Some("appeared_this_turn") {
+            if effect.timing_condition_any() == Some("appeared_this_turn") {
                 let p = gs.resolve_target_player(&target);
                 p.stage
                     .stage
@@ -1024,7 +1024,7 @@ impl AbilityResolver {
                     .filter(|&&cid| cid != -1 && gs.has_card_appeared_this_turn(cid))
                     .copied()
                     .collect()
-            } else if effect.timing_condition_any().as_deref() == Some("moved_this_turn") {
+            } else if effect.timing_condition_any() == Some("moved_this_turn") {
                 let area_moved_ids: HashSet<i16> = gs
                     .turn_area_movements
                     .iter()
@@ -1064,7 +1064,7 @@ impl AbilityResolver {
                 resource: resource.as_str(),
                 count,
                 per_unit,
-                per_unit_type_str: per_unit_type_str.as_deref(),
+                per_unit_type_str,
                 target: &target,
                 is_all,
                 is_self_target,
@@ -1183,7 +1183,7 @@ impl AbilityResolver {
                     util::push_temporary_effect(
                         gs,
                         &format!("gain_{}", resource),
-                        duration.as_deref(),
+                        duration,
                         &target,
                         &format!("Gain {} {}", final_count, resource),
                         effect_data,
@@ -1211,7 +1211,7 @@ impl AbilityResolver {
         // group_reference: "same_group_name" — filter heart targets to only
         // include cards whose group name (c.group, card position ②) matches the
         // group of the card that was discarded as cost (tracked in self.moved_cards).
-        if effect.group_reference_any().as_deref() == Some("same_group_name") {
+        if effect.group_reference_any() == Some("same_group_name") {
             log::debug!("[SAME_GROUP] moved_cards={:?}", self.moved_cards);
             let ref_group: Option<String> = self
                 .moved_cards
@@ -1286,7 +1286,7 @@ impl AbilityResolver {
             util::push_temporary_effect(
                 gs,
                 &format!("gain_{}", resource),
-                duration.as_deref(),
+                duration,
                 &target,
                 &format!("Gain {} {}", final_count, resource),
                 effect_data,
@@ -1302,7 +1302,7 @@ impl AbilityResolver {
             pp,
             act_name,
             effect.count_any().unwrap_or(1),
-            effect.resource_any().as_deref().unwrap_or("?")
+            effect.resource_any().unwrap_or("?")
         ));
         Ok(())
     }
@@ -1449,7 +1449,7 @@ impl AbilityResolver {
             && effect.card_type_any().is_none()
             && !effect.target_from_selection_any().unwrap_or(false)
             && !effect.multiple_targets_any().unwrap_or(false)
-            && effect.group_names_any().map_or(true, |g| g.is_empty())
+            && effect.group_names_any().is_none_or(|g| g.is_empty())
             && !effect.all_any().unwrap_or(false)
     }
 
@@ -1473,7 +1473,7 @@ impl AbilityResolver {
                 .as_ref()
                 .and_then(|p| p.get_position())?;
             let stage_idx = util::stage_position_index(pos)?;
-            let card_id = gs.resolve_target_player_mut(&effect.target_name()).stage.stage
+            let card_id = gs.resolve_target_player_mut(effect.target_name()).stage.stage
                 [stage_idx];
             return (card_id != -1).then_some(card_id);
         }
@@ -1528,9 +1528,8 @@ impl AbilityResolver {
         prelim_filter.exclude_self = exclude_self_id;
         let exclude_names: Vec<String> = effect
             .exclude_by_name_source_any()
-            .as_deref()
             .filter(|&s| s == "preceding_moved")
-            .and_then(|_| preceding_moved.as_ref())
+            .and(preceding_moved.as_ref())
             .map(|moved| {
                 moved
                     .iter()
@@ -1566,7 +1565,7 @@ impl AbilityResolver {
             );
         }
         // Filter target_count candidates by position if specified.
-        if let Some(ref pos) = effect.position_any() {
+        if let Some(pos) = effect.position_any() {
             if let Some(p) = pos.get_position() {
                 if let Some(stage_idx) = util::stage_position_index(p) {
                     let p = gs.resolve_target_player(target);
@@ -1578,7 +1577,7 @@ impl AbilityResolver {
         // Filter candidates by group_reference: "same_group_name" — use the
         // cost-discarded card's group (c.group, card position ②) so the target
         // prompt shows only members matching that group name.
-        if effect.group_reference_any().as_deref() == Some("same_group_name") {
+        if effect.group_reference_any() == Some("same_group_name") {
             let ref_group: Option<String> = self
                 .moved_cards
                 .first()
@@ -1696,7 +1695,7 @@ impl AbilityResolver {
                 && effect.position_any().is_none()
             {
                 let stage_ids: Vec<i16> = {
-                    let player = gs.resolve_target_player(&effect.target_name());
+                    let player = gs.resolve_target_player(effect.target_name());
                     player
                         .stage
                         .stage
@@ -1718,7 +1717,7 @@ impl AbilityResolver {
                 if let Some(pos_info) = effect.position_any().as_ref() {
                     if let Some(p) = pos_info.get_position() {
                         if let Some(stage_idx) = util::stage_position_index(p) {
-                            let player = gs.resolve_target_player_mut(&effect.target_name());
+                            let player = gs.resolve_target_player_mut(effect.target_name());
                             let card_id = player.stage.stage[stage_idx];
                             if card_id != -1 {
                                 Self::grant_blade(gs, effect, card_id, blades_to_add);
@@ -1818,9 +1817,8 @@ impl AbilityResolver {
         filter.exclude_self = exclude_self_id;
         let exclude_names: Vec<String> = effect
             .exclude_by_name_source_any()
-            .as_deref()
             .filter(|&s| s == "preceding_moved")
-            .and_then(|_| preceding_moved.as_ref())
+            .and(preceding_moved.as_ref())
             .map(|moved| {
                 moved
                     .iter()
@@ -2036,7 +2034,7 @@ impl AbilityResolver {
                 selected_for_current.to_vec()
             }
         } else if use_raw {
-            all_selected.iter().copied().collect()
+            all_selected.to_vec()
         } else if kind == ResourceKind::Heart {
             let mut h = if !selected_for_current.is_empty() && effect.distinct_any().is_none() {
                 selected_for_current.to_vec()
@@ -2117,7 +2115,7 @@ impl AbilityResolver {
         gs: &mut GameState,
         effect: &AbilityEffect,
     ) -> Result<(), String> {
-        let count: u8 = effect.count_or(1) as u8;
+        let count: u8 = effect.count_or(1);
         let target = effect.target_name();
         log::debug!("play_baton_touch: count={}, target={}", count, target);
         let player_id = gs.resolve_target_player(target).id.clone();
@@ -2201,10 +2199,10 @@ impl AbilityResolver {
         force_non_optional: bool,
     ) {
         // Resolve the count (dynamic_count overrides energy_count).
-        let count: u8 = if let Some(ref dc) = effect.dynamic_count_any() {
+        let count: u8 = if let Some(dc) = effect.dynamic_count_any() {
             self.resolve_dynamic_count(gs, dc)
         } else {
-            effect.energy_count_any().unwrap_or(1) as u8
+            effect.energy_count_any().unwrap_or(1)
         };
         let target = effect.target_name().to_string();
         let optional = !force_non_optional && effect.optional.unwrap_or(false);
@@ -2222,7 +2220,7 @@ impl AbilityResolver {
             && effect.destination == Some(Zone::Energy);
         let canonical_energy_deck_to_zone = source.as_deref() == Some("energy_deck")
             && effect.destination == Some(Zone::Energy)
-            && effect.state_change_any().as_deref() == Some("wait");
+            && effect.state_change_any() == Some("wait");
         if wants_wait_energy_to_zone || canonical_energy_deck_to_zone {
             let player = gs.resolve_target_player_mut(&target);
             for _ in 0..count {
@@ -2266,13 +2264,13 @@ impl AbilityResolver {
             .description_ja(Some(desc_ja))
             .card_type(effect.card_type_any().map(|s| s.to_string()))
             .target_player_id(Some(target_str));
-            if let Some(ref groups) = effect.group_names_any() {
+            if let Some(groups) = effect.group_names_any() {
                 if let Some(first) = groups.first() {
                     b = b.group(Some(first.clone()));
                 }
             }
             b = b.cost_limit(
-                effect.cost_limit_any().map(|v| v as u8),
+                effect.cost_limit_any().map(|v| v),
                 effect.cost_limit_operator_any().map(|s| s.to_string()),
             );
             self.pending_choice = Some(b.build());
@@ -2427,7 +2425,6 @@ impl AbilityResolver {
             .build(),
         );
         self.execution_context = ExecutionContext::SingleEffect { effect_index: 0 };
-        return;
     }
 
     pub fn execute_position_change(
@@ -2452,7 +2449,7 @@ impl AbilityResolver {
         // The parsed `position` field belongs to the TRIGGER clause
         // (「センターエリアにいる…」) and must not be read as a source or
         // destination here (Q255: the resolver may already have left center).
-        if effect.trigger_type_any().as_deref() == Some("each_time") {
+        if effect.trigger_type_any() == Some("each_time") {
             if let Some(triggering_member) = gs
                 .ability_queue
                 .current_entry()
@@ -2514,15 +2511,14 @@ impl AbilityResolver {
         // Check source_position from effect (new parser field), fall back to position param
         let source_pos_binding = effect.source_position_any();
         let source_pos = source_pos_binding
-            .as_deref()
             .or_else(|| position.as_ref().and_then(|p| p.get_position()));
         let position_str = source_pos.unwrap_or("");
 
         // If destination is already specified (from conditional position_change or area_select),
         // route directly to execute_position_change_with_destination.
         // EXCEPTION: "front" destination for opponent needs source selection first.
-        if let Some(ref dest) = effect.destination_any() {
-            if &**dest == "front" && target == "opponent" {
+        if let Some(dest) = effect.destination_any() {
+            if dest == "front" && target == "opponent" {
                 // "front" destination for opponent: the destination is fixed (front area of
                 // activating card). Create a choice to select which OPPONENT member to move.
                 let valid_sources: Vec<String> = {
@@ -2698,7 +2694,7 @@ impl AbilityResolver {
                 let _first_card_name = card_db
                     .get_card(first_card_id)
                     .map(|c| c.name.to_string())
-                    .unwrap_or_else(|| "member".to_string().into());
+                    .unwrap_or_else(|| "member".to_string());
 
                 let valid_destinations =
                     self.compute_valid_position_destinations(gs, effect, target_m);
@@ -2768,7 +2764,7 @@ impl AbilityResolver {
                     "center" => "Center",
                     "left" | "left_side" => "Left",
                     "right" | "right_side" => "Right",
-                    _ => &position_str,
+                    _ => position_str,
                 };
                 self.pending_choice = Some(Choice::SelectTarget {
                     target: "position|destination".to_string(),
@@ -2845,7 +2841,6 @@ impl AbilityResolver {
             let target_m = target.to_string();
             let card_no = effect
                 .target_member_any()
-                .as_deref()
                 .unwrap_or("")
                 .to_string();
             let optional = effect.optional.unwrap_or(false);
@@ -2879,7 +2874,7 @@ impl AbilityResolver {
                 let card_name = card_db
                     .get_card(card_id)
                     .map(|c| c.name.to_string())
-                    .unwrap_or_else(|| "member".to_string().into());
+                    .unwrap_or_else(|| "member".to_string());
                 let valid_destinations =
                     self.compute_valid_position_destinations(gs, effect, &target_m);
                 if valid_destinations.is_empty() {
@@ -3121,7 +3116,7 @@ impl AbilityResolver {
 
         // Phase 1: place every planned card at its destination.
         // Track which card got evicted from each destination.
-        let mut occupant: [i16; 3] = old_stage.clone(); // current occupant of each pos
+        let mut occupant: [i16; 3] = old_stage; // current occupant of each pos
         for &(member_id, ref dest) in &self.formation_plan {
             if member_id == -1 || dest.is_empty() {
                 continue;
@@ -3249,7 +3244,7 @@ impl AbilityResolver {
         let target_member = target_member_binding.unwrap_or("this_member");
         // Check source_position first (new parser field), fall back to position
         let sp_binding = effect.source_position_any();
-        let source_position = sp_binding.as_deref().or_else(|| {
+        let source_position = sp_binding.or_else(|| {
             effect
                 .position_any()
                 .as_ref()
@@ -3644,11 +3639,11 @@ impl AbilityResolver {
         let co_binding = effect.choice_options_any();
         let choice_options = co_binding.as_ref();
         let ct_binding = effect.choice_type_any();
-        let choice_type = ct_binding.as_deref();
+        let choice_type = ct_binding;
         let opt_binding = effect.options_any();
         let options = opt_binding.as_ref();
         let cm_binding = effect.choice_maker_any();
-        let choice_maker = cm_binding.as_deref();
+        let choice_maker = cm_binding;
         let heart_colors = effect.heart_colors_any();
         if !heart_colors.is_empty()
             && options.is_none()
@@ -3664,7 +3659,7 @@ impl AbilityResolver {
             self.execute_select_heart_color(
                 gs,
                 effect.count_or(1),
-                &heart_colors.to_vec(),
+                heart_colors,
                 effect.target_name(),
             );
             return Ok(());
@@ -3729,12 +3724,8 @@ impl AbilityResolver {
         let conditional_choice_val = if let Some(ref opts) = propagated_options {
             Some(ConditionalChoice::Effects(opts.clone()))
         } else if let Some(opts) = options {
-            Some(ConditionalChoice::Effects(opts.iter().cloned().collect()))
-        } else if let Some(opts) = choice_options {
-            Some(ConditionalChoice::Strings(opts.to_vec()))
-        } else {
-            None
-        };
+            Some(ConditionalChoice::Effects(opts.to_vec()))
+        } else { choice_options.map(|opts| ConditionalChoice::Strings(opts.to_vec())) };
         if let Some(entry) = gs.ability_queue.current_entry_mut() {
             entry.choice_card_no = if options.is_some() {
                 Some(ChoiceRoute::Choice)
@@ -3827,12 +3818,12 @@ impl AbilityResolver {
         gs: &mut GameState,
         effect: &AbilityEffect,
     ) -> Result<(), String> {
-        let count: u8 = if let Some(ref dc) = effect.dynamic_count_any() {
+        let count: u8 = if let Some(dc) = effect.dynamic_count_any() {
             self.resolve_dynamic_count(gs, dc)
         } else {
             effect
                 .energy_count_any()
-                .unwrap_or_else(|| effect.count_or(0)) as u8
+                .unwrap_or_else(|| effect.count_or(0))
         };
         if effect.optional.unwrap_or(false) {
             let player = gs.resolve_target_player(effect.target_name());
@@ -3877,7 +3868,7 @@ impl AbilityResolver {
         gs: &mut GameState,
         effect: &AbilityEffect,
     ) -> Result<(), String> {
-        let target_count: u8 = effect.target_count_any().unwrap_or(0) as u8;
+        let target_count: u8 = effect.target_count_any().unwrap_or(0);
         let target = effect.target_name();
         let player = gs.resolve_target_player_mut(target);
         let current_count = player.hand.cards.len();
@@ -3918,10 +3909,9 @@ impl AbilityResolver {
         effect: &AbilityEffect,
     ) -> Result<(), String> {
         let restriction_type_binding = effect.restriction_type_any();
-        let restriction_type = restriction_type_binding.as_deref();
+        let restriction_type = restriction_type_binding;
         let restricted_dest_binding = effect.restricted_destination_any();
         let restricted_destination = restricted_dest_binding
-            .as_deref()
             .or(effect.destination.map(|z| z.as_str()));
         let target = effect.target_name();
         let delayed = effect.delayed_any().unwrap_or(false);
@@ -4007,12 +3997,12 @@ impl AbilityResolver {
             );
             let (owner_stage, owner_id): (Vec<i16>, String) = if owner_is_p2 {
                 (
-                    gs.player2.stage.stage.iter().copied().collect(),
+                    gs.player2.stage.stage.to_vec(),
                     gs.player2.id.to_string(),
                 )
             } else {
                 (
-                    gs.player1.stage.stage.iter().copied().collect(),
+                    gs.player1.stage.stage.to_vec(),
                     gs.player1.id.to_string(),
                 )
             };
@@ -4022,7 +4012,7 @@ impl AbilityResolver {
                 .map(|g| g.to_vec())
                 .unwrap_or_default();
             let ct = effect.card_type_any().map(|c| c.as_card_str());
-            let blade_limit = effect.blade_limit_any().unwrap_or(u8::MAX) as u8;
+            let blade_limit = effect.blade_limit_any().unwrap_or(u8::MAX);
             let blade_op = effect.blade_limit_operator_any().map(|o| o.as_str());
             let original_blade = effect.original_value_any().unwrap_or(false);
             let mut to_protect: Vec<i16> = Vec::new();

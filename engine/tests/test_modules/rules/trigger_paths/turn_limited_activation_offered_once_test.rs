@@ -236,7 +236,7 @@ fn kasumi_limit_is_per_instance() {
                     .parameters
                     .as_ref()
                     .and_then(|p| p.card_id)
-                    .map_or(false, |cid| cid == k1 || cid == k2)
+                    .is_some_and(|cid| cid == k1 || cid == k2)
         })
         .count();
     assert_eq!(offers, 2, "each instance gets its own ターン1回 budget");
