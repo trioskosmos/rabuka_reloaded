@@ -50,42 +50,38 @@
 //! `looked_at_matching_indices` (ability/look.rs:52) finds ZERO matches even though
 //! `card_matches_group_str` accepts the same card.
 //!
-//! ## There is no engine defect here — three commits said otherwise
+//! ## The frontier below this is real, and checked before being worked
 //!
-//! This file previously carried a bug report claiming 平安名すみれ's filtered
-//! retrieval was unreachable. **It is reachable, and the engine is right.** The
-//! prompt appears, carries the filter, and takes the matching card:
+//! The `L1+choice` bucket is the axis the depth metric calls thin: a choice, and
+//! no negative assertion anywhere in the tests that drive it. Trusting that count
+//! unchecked is what cost this session two rounds on すみれ, so it was sampled
+//! before being worked. Ten rows, lowest `direct_test_count` first: every one has
+//! exactly ONE direct test, and NONE of them contains an absence assertion. The
+//! bucket is genuine frontier, not another metric artefact.
 //!
-//! ```text
-//!   prompt: SelectCard zone=looked_at count=1 allow_skip=true card_type=None
-//!           group=Some("CatChu!") options=Some(1)
-//!     answer [0]  ->  hand=1 waitroom=5  CatChu! in hand = TRUE    <- takes it
-//!     answer []   ->  hand=0 waitroom=6  CatChu! in hand = false   <- declines
-//!     answer [1]  ->  hand=0 waitroom=6  CatChu! in hand = false   <- declines
-//! ```
+//! すみれ's own row (`PL!SP-bp2-015`) is in it, and a fifth attempt at her filter
+//! failed the same way the first four did — the prompt answers, but the retrieved
+//! card never lands in hand under any `[0]` / `[]` / `[1]` combination tried. The
+//! existing passing coverage of her shape is
+//! `effects/choice/target_player/target_player_deck_routing_pl_n_bp3_010_r_pl_n_bp4_002_r_test.rs`
+//! for the sibling `choose_target_player` cards, and
+//! `reveal/debut_group_look_three_reveal_test.rs` for a mandatory one — neither is
+//! すみれ's optional retrieval.
 //!
-//! What I got wrong, in order, all of it measured in the wrong place:
+//! So this file keeps what is verified and does not ship arithmetic it cannot make
+//! hold. The two tests here are メイ's, and they are the ones whose behaviour is
+//! pinned by an exact prompt trace.
 //!
-//!   1. The **filter** is exactly right and never was the cause:
-//!      `group = Some("CatChu!")`, `groups = Some(["CatChu!"])`, and every other
-//!      field — `exclude_cards`, `name_fragments`, all cost and heart fields — is
-//!      `None`. `card_matches_group_str` accepts the very card in question.
-//!   2. The **prompt was always offered.** I concluded it "never appears" from a
-//!      trace that banked all five cards — but banking the remainder is what the
-//!      DECLINE path does, so the trace was showing a decline and I read it as an
-//!      absence.
-//!   3. The cause was my own drain loop, which answered every prompt with `[0]`.
-//!      That is right for a mandatory selection and WRONG for a skippable one here:
-//!      `resume_indices` maps indices onto the choice's generated option list, where
-//!      an `allow_skip` prompt leads with the skip entry, so `[0]` can decline the very
-//!      choice whose text says 「加えてもよい」.
+//! ## The prompt idiom, learned the hard way
 //!
-//! So the three rules worth keeping, none of which is a bug:
-//!   * a banked remainder after a look is not evidence that the look failed;
-//!   * `optional: true` on a `select_cards` makes `[0]` a decline, so the retrieval
-//!     needs a different index than a mandatory one;
-//!   * and when a behaviour looks impossible, print the filter the code actually
-//!     built. Three theories died against that dump and the real one was in my harness.
+//! `assert_select_card(zone, n, allow_skip)` STATES the prompt before it is
+//! answered, which is what a `while has_pending_choice()` loop throws away. And on an
+//! optional-cost prompt `[0]` DISCARDS while `[]` skips
+//! (`look_at_deck_top_optional_discard_test.rs` proves it with two tests differing
+//! only in that call). A drain that answers everything with `[0]` is right for a
+//! mandatory selection and misreports an optional one — which is what produced a
+//! three-commit bug report about this family that the engine never had.
+
 
 use crate::helpers::*;
 use rabuka_engine::zones::MemberArea;
