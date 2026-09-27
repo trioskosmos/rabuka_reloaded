@@ -1,7 +1,8 @@
 use crate::core::constants::U8Count;
 use super::enums::{ActionType, Zone};
 use crate::card::{
-    parse_heart_color, Ability, AbilityFilter, Card, CardDatabase, DistinctType, Operator,
+    parse_heart_color, Ability, AbilityEffect, AbilityFilter, Card, CardDatabase, DistinctType,
+    Operator,
 };
 use crate::{HashMap, HashSet};
 #[cfg(feature = "no_std")]
@@ -25,6 +26,27 @@ pub use selection::{classify_selection, get_selection_indices, resolve_selection
 
 // Labels, heart gains and constant per_unit live in `util/{labels,hearts}`.
 // (Bodies moved out; re-exported at the top of this file.)
+
+// ============== EFFECT SOURCE INSPECTION ==============
+/// Whether this effect draws its cards from the selected-card pool, at any
+/// depth. Recurses through `compound.actions` because a sequential or
+/// conditional step that reads the pool inherits the property from its parent.
+///
+/// This was duplicated byte-for-byte in `choice.rs` and `cost/handlers.rs`;
+/// both call sites are in the same ability-resolution flow, so a divergence
+/// would have been a silent behavioural split.
+pub fn effect_uses_selected_cards(effect: &AbilityEffect) -> bool {
+    effect.source == Some(Zone::SelectedCards)
+        || effect
+            .compound
+            .actions
+            .as_ref()
+            .is_some_and(|actions| {
+                actions
+                    .iter()
+                    .any(|action| effect_uses_selected_cards(action))
+            })
+}
 
 // ============== ABILITY FILTER MATCHING ==============
 /// What an ability filter that names a kind of trigger but lists no triggers

@@ -13,19 +13,6 @@ use alloc::{
     vec::Vec,
 };
 
-fn effect_uses_selected_cards(effect: &AbilityEffect) -> bool {
-    effect.source == Some(Zone::SelectedCards)
-        || effect
-            .compound
-            .actions
-            .as_ref()
-            .is_some_and(|actions| {
-                actions
-                    .iter()
-                    .any(|action| effect_uses_selected_cards(action))
-            })
-}
-
 impl AbilityResolver {
     /// Pay all deferred costs that were stored during sequential_cost handler.
     /// Clears the list after paying. Returns error if any cost cannot be paid.
@@ -1271,12 +1258,12 @@ let source = cost.source_str().unwrap_or("");
                     let effect_uses_selected = gs
                         .entry_effect()
                         .as_ref()
-                        .is_some_and(|effect| effect_uses_selected_cards(effect))
+                        .is_some_and(|effect| util::effect_uses_selected_cards(effect))
                         || gs
                             .ability_queue
                             .current_entry()
                             .and_then(|entry| entry.ability.effect.as_deref())
-                            .is_some_and(|effect| effect_uses_selected_cards(effect));
+                            .is_some_and(|effect| util::effect_uses_selected_cards(effect));
                     if effect_uses_selected {
                         self.selected_cards = card_ids.into();
                     }

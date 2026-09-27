@@ -20,19 +20,6 @@ use smallvec::SmallVec;
 
 mod result_handlers;
 
-fn effect_uses_selected_cards(effect: &AbilityEffect) -> bool {
-    effect.source == Some(Zone::SelectedCards)
-        || effect
-            .compound
-            .actions
-            .as_ref()
-            .is_some_and(|actions| {
-                actions
-                    .iter()
-                    .any(|action| effect_uses_selected_cards(action))
-            })
-}
-
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum Continuation {
     Immediate,
@@ -1487,7 +1474,7 @@ impl super::resolver::AbilityResolver {
                         .current_entry()
                         .and_then(|entry| entry.ability.effect.as_deref().cloned())
                 })
-                .is_some_and(|effect| effect_uses_selected_cards(&effect));
+                .is_some_and(|effect| util::effect_uses_selected_cards(&effect));
             if keep_selected {
                 self.selected_cards = selected_hand_ids.into();
             } else {
@@ -1624,7 +1611,7 @@ impl super::resolver::AbilityResolver {
             .current_effect
             .clone()
             .or_else(|| gs.entry_effect().cloned())
-            .filter(effect_uses_selected_cards);
+            .filter(|effect| util::effect_uses_selected_cards(effect));
         if !effect_started {
             let cost_source = gs.current_ability_source_card_id();
             let cost_owner = util::target_player_index(&target, gs.ability_master_id().as_deref());
@@ -1886,7 +1873,7 @@ gs.set_recently_moved_batch(valid_ids.into(), Some(Zone::SuccessLiveZone.to_str(
             .current_effect
             .clone()
             .or_else(|| gs.entry_effect().cloned())
-            .filter(effect_uses_selected_cards);
+            .filter(|effect| util::effect_uses_selected_cards(effect));
         if let Some(effect) = selected_effect {
             if let Some(entry) = gs.ability_queue.current_entry_mut() {
                 entry.effect_started = true;
