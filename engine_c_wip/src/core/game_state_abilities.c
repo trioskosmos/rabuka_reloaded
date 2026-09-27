@@ -503,6 +503,32 @@ static void rb_build_ability_queue_entry(GameState *g, int card_id, int ability_
                                          const int *trigger_moved_cards, int n_moved,
                                          int triggering_member_id);
 static int rb_effect_is_ability_resolution_watcher(const AbilityEffect *e);
+/* Defined with the opponent-cause watcher hook below (Rust
+   abilities.rs:506-545); the stage TAS scan needs it earlier. */
+static int rb_hooked_by_foreign_cause(const GameState *g, const AbilityEffect *e,
+                                      int card_id, int player);
+
+/* ── Enqueue-time use-limit consumption ─────────────────────────────────
+   Rust records a turn-limited ability's use at RESOLUTION, and guards it with
+   the queue entry's own `use_limit_recorded` flag so one activation records
+   exactly once (abilities.rs:197-215, resolver.rs / choice.rs call sites).
+   The C port consumes the use at ENQUEUE instead — rb_record_use right after
+   each enqueue, a convention every scan in src/turn/triggers.c also relies on
+   and that must not be removed here.
+
+   The two have to be reconciled or the entry rejects itself: the
+   resolution-time gate in rb_process_current_ability sees uses_used == limit
+   for the entry that just consumed it and skips the effect. Marking the entry
+   closes that loop the same way Rust's flag does — the gate then only rejects
+   entries whose use was consumed by an EARLIER activation, and a second
+   enqueue in the same turn is stopped by the trigger-time gate
+   (rb_use_limit_reached in the scans, Rust's ability_has_remaining_uses at
+   abilities.rs:934). */
+static void rb_mark_entries_use_limit_recorded(GameState *g, int from_index) {
+    if (!g) return;
+    for (int i = from_index > 0 ? from_index : 0; i < g->queue.n_entries; i++)
+        g->queue.entries[i].use_limit_recorded = 1;
+}
 
 static int rb_condition_requires_yell(const Condition *c) {
     if (!c) return 0;
@@ -1091,6 +1117,23 @@ const char *rb_entry_snapshot_last_area_move_by_player(const GameState *g) {
 
 /* ── Build ability queue entry ──────────────────────────────────────── */
 
+/* Mirror abilities.rs:220-248 (GameState::build_ability_queue_entry).
+
+   The `player_id` arm of Rust's struct literal NORMALISES the long form to the
+   canonical short one before the entry is ever seen by the drain:
+
+       player_id: if player_id == "player1" { "p1".to_string() }
+                  else if player_id == "player2" { "p2".to_string() }
+                  else { player_id }
+
+   The C body copied the string verbatim, so every entry enqueued by a caller
+   that passes the long form (the TAS zone scan, queue_zone_abilities) was
+   stamped "player1"/"player2" while the owner-scoped drain
+   (par_available_for, abilities.rs:1473-1476) matches the SHORT form only.
+   Such an entry was enqueued, counted as queued, and then silently dropped by
+   `rb_process_pending_auto_abilities` without ever resolving — which is why
+   the cross-player movement watchers appeared to "arm" (queue grew to 1) but
+   granted nothing. Ported here so the drain can see them. */
 static void rb_build_ability_queue_entry(GameState *g, int card_id, int ability_idx,
                                          const char *card_no, const char *player_id,
                                          const char *trigger_type,
@@ -1110,7 +1153,13 @@ static void rb_build_ability_queue_entry(GameState *g, int card_id, int ability_
     e->use_limit_recorded = 0;
     e->choice_player_id[0] = '\0';
     if (player_id) {
-        snprintf(e->player_id, sizeof(e->player_id), "%s", player_id);
+        const char *canonical = player_id;
+        if (!strcmp(player_id, "player1"))      canonical = "p1";
+        else if (!strcmp(player_id, "player2")) canonical = "p2";
+        snprintf(e->player_id, sizeof(e->player_id), "%s", canonical);
+        if (strcmp(player_id, canonical) != 0)
+            fprintf(stderr, "[QUEUE_PID_NORMALIZE] entry=%d card=%d ab=%d '%s' -> '%s'\n",
+                    idx, card_id, ability_idx, player_id, canonical);
     }
     g->queue.n_entries++;
 }
@@ -1327,6 +1376,15 @@ static int queue_zone_abilities(GameState *g, int actor, const int *ids, int n,
                     if (!in_batch) { rb_free_ability(&ab); continue; }
                 }
             }
+            /* abilities.rs:728-744 (hooked_by_foreign_cause) — a marker-
+               carrying AREA-MOVE watcher whose last area move was caused by
+               the other player belongs to the push_movement_event hook; the
+               generic scan must not enqueue it a second time. Stage cards
+               only, matching the Rust loop the guard lives in. */
+            if (is_stage && rb_hooked_by_foreign_cause(g, ab.effect, cid, actor)) {
+                rb_free_ability(&ab);
+                continue;
+            }
             int key = rb_queue_key(cid, a);
             int limit = ab.use_limit < 0 ? 99 : ab.use_limit;
             if (key == g->just_completed_ability_key) { rb_free_ability(&ab); continue; }
@@ -1335,6 +1393,7 @@ static int queue_zone_abilities(GameState *g, int actor, const int *ids, int n,
             for (int b = 0; b < g->n_batch_triggered_keys; b++)
                 if (g->batch_triggered_keys[b] == key) { dup = 1; break; }
             if (!dup) {
+                int entry_base = g->queue.n_entries;
                 int cap = (int)(sizeof(g->batch_triggered_keys)/sizeof(g->batch_triggered_keys[0]));
                 if (g->n_batch_triggered_keys < cap)
                     g->batch_triggered_keys[g->n_batch_triggered_keys++] = key;
@@ -1353,6 +1412,7 @@ static int queue_zone_abilities(GameState *g, int actor, const int *ids, int n,
                     queued++;
                 }
                 rb_record_use(&g->queue, cid, a, g->turn);
+                rb_mark_entries_use_limit_recorded(g, entry_base);
             }
             rb_free_ability(&ab);
         }
@@ -1406,12 +1466,14 @@ static int queue_moved_cards_abilities(GameState *g, const int *moved_cards, int
             for (int b = 0; b < g->n_batch_triggered_keys; b++)
                 if (g->batch_triggered_keys[b] == key) { dup = 1; break; }
             if (!dup) {
+                int entry_base = g->queue.n_entries;
                 int cap = (int)(sizeof(g->batch_triggered_keys)/sizeof(g->batch_triggered_keys[0]));
                 if (g->n_batch_triggered_keys < cap)
                     g->batch_triggered_keys[g->n_batch_triggered_keys++] = key;
                 rb_build_ability_queue_entry(g, moved_card_id, a, "", player_id_clone,
                                             trigger, moved_cards, n_moved, -1);
                 rb_record_use(&g->queue, moved_card_id, a, g->turn);
+                rb_mark_entries_use_limit_recorded(g, entry_base);
                 queued++;
             }
             rb_free_ability(&ab);
@@ -1420,15 +1482,119 @@ static int queue_moved_cards_abilities(GameState *g, const int *moved_cards, int
     return queued;
 }
 
-/* ── Opponent-cause watchers ────────────────────────────────────────── */
+/* ── Opponent-cause watchers ──────────────────────────────────────────
+   Rust twin: engine/src/core/game_state/abilities.rs:1033-1149
+   (opp_cause_key + fire_opponent_cause_watchers_for_move), armed from
+   GameState::push_movement_event (modifiers.rs:1538-1551) for every
+   stage→stage area move whose cause player differs from the moved card's
+   owner. */
+
+/* 「(対戦相手のカードの効果でも発動する。)」 marker.
+   Rust: AbilityEffect::fires_on_opponent_effects (card.rs:1393-1399) reads the
+   parser-stamped flag; C exposes it as an extra on the decoded effect, with a
+   card-level lookup as the fallback for printings that stamp the card rather
+   than the effect. */
+static int rb_effect_fires_on_opponent_effects(const AbilityEffect *e, int card_id) {
+    if (e) {
+        for (int k = 0; k < e->n_extra; k++)
+            if (e->extra_k[k] && !strcmp(e->extra_k[k], "fires_on_opponent_effects"))
+                return e->extra_v[k] && !strcmp(e->extra_v[k], "true");
+    }
+    extern int rb_card_fires_on_opponent_effects(int card_id);
+    return rb_card_fires_on_opponent_effects(card_id);
+}
+
+/* ── Opponent-cause dedupe identity (abilities.rs:1033-1041, 1122-1131) ──
+   Rust keeps the fired identities in `GameState.mods.opp_cause_fired_keys`
+   (a HashSet<u64>), cleared with the rest of the turn-scoped movement data by
+   clear_card_movement_tracking (modifiers.rs:1597-1599). C has no field for
+   the set, and include/rabuka.h is owned by another agent, so the set lives
+   here as a per-(GameState, turn) side table. Scoping by BOTH the state
+   pointer and g->turn reproduces Rust's turn-scoped lifetime without a hook
+   into src/core/modifiers.c: an entry only matches while the same game is
+   still on the same turn, and entries for any other game/turn are dead weight
+   reclaimed in place. */
+#define RB_OPP_CAUSE_FIRED_CAP 512
+typedef struct { const GameState *g; int turn; uint64_t key; } RbOppCauseFired;
+static RbOppCauseFired s_opp_cause_fired[RB_OPP_CAUSE_FIRED_CAP];
+static int s_n_opp_cause_fired;
+
+static int rb_opp_cause_fired_contains(const GameState *g, uint64_t key) {
+    if (!g) return 0;
+    for (int i = 0; i < s_n_opp_cause_fired; i++)
+        if (s_opp_cause_fired[i].g == g && s_opp_cause_fired[i].turn == g->turn &&
+            s_opp_cause_fired[i].key == key)
+            return 1;
+    return 0;
+}
+
+static void rb_opp_cause_fired_add(const GameState *g, uint64_t key) {
+    if (!g || rb_opp_cause_fired_contains(g, key)) return;
+    if (s_n_opp_cause_fired >= RB_OPP_CAUSE_FIRED_CAP) {
+        /* Reclaim everything that is neither this game nor this turn. If the
+           table is still full, this game alone owns it and the turn has been
+           running a very long time: drop the oldest identity (FIFO). */
+        int w = 0;
+        for (int i = 0; i < s_n_opp_cause_fired; i++)
+            if (s_opp_cause_fired[i].g == g && s_opp_cause_fired[i].turn == g->turn)
+                s_opp_cause_fired[w++] = s_opp_cause_fired[i];
+        s_n_opp_cause_fired = w;
+        if (s_n_opp_cause_fired >= RB_OPP_CAUSE_FIRED_CAP) {
+            memmove(&s_opp_cause_fired[0], &s_opp_cause_fired[1],
+                    (RB_OPP_CAUSE_FIRED_CAP - 1) * sizeof(s_opp_cause_fired[0]));
+            s_n_opp_cause_fired = RB_OPP_CAUSE_FIRED_CAP - 1;
+        }
+    }
+    s_opp_cause_fired[s_n_opp_cause_fired].g = g;
+    s_opp_cause_fired[s_n_opp_cause_fired].turn = g->turn;
+    s_opp_cause_fired[s_n_opp_cause_fired].key = key;
+    s_n_opp_cause_fired++;
+}
+
+/* movement_event_counter mirror (modifiers.rs:1503): a monotonically
+   increasing per-movement sequence number. It is part of the dedupe identity
+   so the SAME watcher arms once PER MOVE — two distinct moves of the same
+   card within one turn each get their own key, while a re-scan of one move
+   does not re-arm. Scoped per (game, turn), which is the granularity the
+   fired-key set itself is cleared at. */
+#define RB_MOVEMENT_SEQ_SLOTS 8
+typedef struct { const GameState *g; int turn; uint32_t seq; } RbMovementSeq;
+static RbMovementSeq s_movement_seq[RB_MOVEMENT_SEQ_SLOTS];
+static int s_n_movement_seq;
+
+static uint16_t rb_movement_event_next_seq(const GameState *g) {
+    int slot = -1, dead = -1;
+    for (int i = 0; i < s_n_movement_seq; i++) {
+        if (s_movement_seq[i].g == g && s_movement_seq[i].turn == g->turn) { slot = i; break; }
+        if (dead < 0 && s_movement_seq[i].g != g) dead = i;
+    }
+    if (slot < 0) {
+        if (s_n_movement_seq < RB_MOVEMENT_SEQ_SLOTS) {
+            slot = s_n_movement_seq++;
+        } else if (dead >= 0) {
+            slot = dead;
+        } else {
+            slot = 0; /* every slot is this game: reuse (value only feeds a hash) */
+        }
+        s_movement_seq[slot].g = g;
+        s_movement_seq[slot].turn = g->turn;
+        s_movement_seq[slot].seq = 0;
+    }
+    return (uint16_t)(++s_movement_seq[slot].seq);
+}
 
 void rb_fire_opponent_cause_watchers_for_move(GameState *g, int moved_card_id,
                                               int causer_player) {
     if (!g || moved_card_id < 0) return;
+    /* abilities.rs:1054-1063 -- the watcher belongs to the MOVED CARD's owner.
+       A cause by that same owner is already covered by the owner-side TAS
+       scan, so the hook stays silent. */
     int owner = rb_owner_of_card(g, moved_card_id);
-    fprintf(stderr, "[OPP_CAUSE_MOVE] moved=%d owner=%d causer=%d recent=%d\n",
-            moved_card_id, owner, causer_player, g->n_recently_moved);
     if (owner < 0 || owner == causer_player) return;
+
+    uint16_t seq = rb_movement_event_next_seq(g);
+
+    /* abilities.rs:1064-1068 -- scan the OWNER's stage. */
     const RbPlayer *op = &g->p[owner];
     for (int s = 0; s < RB_STAGE_SIZE; s++) {
         int watcher_id = op->stage[s];
@@ -1437,36 +1603,101 @@ void rb_fire_opponent_cause_watchers_for_move(GameState *g, int moved_card_id,
         for (int a = 0; a < nab; a++) {
             Ability ab;
             if (!rb_decode_card_ability((uint32_t)watcher_id, a, &ab)) continue;
+            /* abilities.rs:1083-1088 -- 自動 only. */
             if (!rb_ability_matches_trigger(&ab, "自動")) { rb_free_ability(&ab); continue; }
             if (!ab.effect) { rb_free_ability(&ab); continue; }
-            int fires_opp = 0;
-            for (int k = 0; k < ab.effect->n_extra; k++)
-                if (ab.effect->extra_k[k] && !strcmp(ab.effect->extra_k[k], "fires_on_opponent_effects")
-                    && ab.effect->extra_v[k] && !strcmp(ab.effect->extra_v[k], "true"))
-                    fires_opp = 1;
-            extern int rb_card_fires_on_opponent_effects(int card_id);
-            if (!fires_opp && rb_card_fires_on_opponent_effects(watcher_id))                fires_opp = 1;
-            if (!fires_opp) { rb_free_ability(&ab); continue; }
+            /* abilities.rs:1094-1098 -- only effects carrying the explicit
+               「(対戦相手のカードの効果でも発動する。)」 parenthetical. */
+            if (!rb_effect_fires_on_opponent_effects(ab.effect, watcher_id)) {
+                rb_free_ability(&ab); continue;
+            }
             if (!ab.effect->condition) { rb_free_ability(&ab); continue; }
-            int passes = rb_eval_condition_for_host(g, owner, watcher_id, ab.effect->condition);
-            fprintf(stderr, "[OPP_CAUSE_WATCHER] watcher=%d ability=%d moved=%d passes=%d\n",
-                    watcher_id, a, moved_card_id, passes);
+            /* abilities.rs:1103-1111 -- evaluate the condition under the
+               watcher as the activating card and with a moved-card context of
+               EXACTLY [moved_card_id] (ConditionContext::with_moved_cards).
+               The C condition evaluator reads its moved-card context straight
+               out of g->recently_moved, so the context is narrowed here and
+               restored afterwards rather than leaking the wider batch. */
+            int saved_n_recent = g->n_recently_moved;
+            int saved_recent[RB_MAX_RECENTLY_MOVED];
+            memcpy(saved_recent, g->recently_moved,
+                   sizeof(int) * (size_t)saved_n_recent);
+            g->recently_moved[0] = moved_card_id;
+            g->n_recently_moved = 1;
+            int passes = rb_eval_condition_for_host(g, owner, watcher_id,
+                                                    ab.effect->condition);
+            memcpy(g->recently_moved, saved_recent,
+                   sizeof(int) * (size_t)saved_n_recent);
+            g->n_recently_moved = saved_n_recent;
             if (!passes) { rb_free_ability(&ab); continue; }
+            /* abilities.rs:1115-1131 -- per-MOVE dedupe identity, then claim
+               the plain batch key so an empty-batch rescan pass (which
+               bypasses movement gating for composites) cannot re-fire this
+               watcher after the hook already did. */
             int num_key = rb_queue_key(watcher_id, a);
-            int dup = 0;
+            uint64_t ekey = rb_opp_cause_key((uint32_t)num_key, moved_card_id, seq);
+            if (rb_opp_cause_fired_contains(g, ekey)) { rb_free_ability(&ab); continue; }
+            rb_opp_cause_fired_add(g, ekey);
+            /* abilities.rs:1129-1131 ADDS the plain batch key; it does not
+               TEST it. The only gate on this arm is opp_cause_fired_keys, which
+               is keyed by (ability, moved card, movement sequence) — so a SECOND
+               distinct move of the same card in the same turn is a different
+               key and must arm again. Treating a pre-existing batch key as a
+               skip suppressed that second arming. Duplicate suppression
+               against the generic scan is the scan's own claim_batch_slot plus
+               rb_hooked_by_foreign_cause, not this side. */
+            int already_claimed = 0;
             for (int b = 0; b < g->n_batch_triggered_keys; b++)
-                if (g->batch_triggered_keys[b] == num_key) { dup = 1; break; }
-            if (!dup) {
-                int cap = (int)(sizeof(g->batch_triggered_keys)/sizeof(g->batch_triggered_keys[0]));
-                if (g->n_batch_triggered_keys < cap)
-                    g->batch_triggered_keys[g->n_batch_triggered_keys++] = num_key;
-                rb_build_ability_queue_entry(g, watcher_id, a, "", (owner == 0) ? "p1" : "p2", "自動",
+                if (g->batch_triggered_keys[b] == num_key) { already_claimed = 1; break; }
+            {
+                int entry_base = g->queue.n_entries;
+                if (!already_claimed) {
+                    int cap = (int)(sizeof(g->batch_triggered_keys) /
+                                    sizeof(g->batch_triggered_keys[0]));
+                    if (g->n_batch_triggered_keys < cap)
+                        g->batch_triggered_keys[g->n_batch_triggered_keys++] = num_key;
+                }
+                /* abilities.rs:1138-1146 — the enqueue carries the move as
+                   the watcher's trigger batch. */
+                rb_build_ability_queue_entry(g, watcher_id, a, "",
+                                            (owner == 0) ? "p1" : "p2", "自動",
                                             &moved_card_id, 1, -1);
                 rb_record_use(&g->queue, watcher_id, a, g->turn);
+                rb_mark_entries_use_limit_recorded(g, entry_base);
             }
             rb_free_ability(&ab);
         }
     }
+}
+
+/* ── Hook-ownership guard for the generic TAS scan ────────────────────
+   Rust: GameState::hooked_by_foreign_cause (abilities.rs:506-545), consulted
+   from the STAGE loop of trigger_auto_abilities_for_player_with_event
+   (abilities.rs:728-744) just before claim_batch_slot.
+
+   A 「対戦相手のカードの効果でも発動する。」 watcher on an AREA MOVE is armed by
+   the push_movement_event hook and ONLY when the move was caused by the other
+   player. If the generic scan enqueued it as well, a foreign-caused area move
+   would fire the watcher twice (once per identity) and — worse — an
+   own-caused move could be attributed to the hook. The guard therefore looks
+   at the watcher's OWN last area-move record, which is stable across rescan
+   passes unlike the per-batch key set.
+
+   Rust reads `turn_area_movements` (modifiers.rs:1536). C has no such vector;
+   `g->batch_movements` is the movement event log pushed by
+   rb_record_card_movement and reset with the rest of the turn-scoped movement
+   data by rb_clear_card_movement_tracking, so the same lookup is done there
+   (scanning in reverse, like Rust's `.iter().rev().find(...)`). */
+static int rb_hooked_by_foreign_cause(const GameState *g, const AbilityEffect *e,
+                                      int card_id, int player) {
+    if (!g || !e || !rb_effect_fires_on_opponent_effects(e, card_id)) return 0;
+    for (int i = g->n_batch_movements - 1; i >= 0; i--) {
+        const RbBatchMovement *m = &g->batch_movements[i];
+        if (m->moved_card_id != card_id) continue;
+        if (m->source_zone != RB_ZONEID_STAGE || m->dest_zone != RB_ZONEID_STAGE) continue;
+        return m->cause_player_id != player;
+    }
+    return 0;
 }
 
 /* ── Trigger each_time_for_member ───────────────────────────────────── */
@@ -1508,8 +1739,10 @@ void rb_trigger_each_time_for_member(GameState *g, int pl,
                     }
                 if (!member_matches) { rb_free_ability(&ab); continue; }
             }
+            int each_time_entry_base = g->queue.n_entries;
             rb_build_ability_queue_entry(g, cid, a, "", (pl == 0) ? "p1" : "p2", "自動", NULL, 0, member_card_id);
             rb_record_use(&g->queue, cid, a, g->turn);
+            rb_mark_entries_use_limit_recorded(g, each_time_entry_base);
             rb_free_ability(&ab);
         }
     }
@@ -1644,7 +1877,16 @@ int rb_process_current_ability(GameState *g) {
         fprintf(stderr, "[PROCESS_CURRENT] cid=%d ab=%d owner=%d queue_actor=%d use=%d\n",
                 cid, aidx, actor, g->queue.actor, ab.use_limit);
 
-    if (ab.use_limit > 0) {
+    /* Resolution-time turn-limit gate (Rust ability/gates.rs:89-102, via
+       GameState::ability_uses_used). Rust records the use at resolution and
+       the entry's `use_limit_recorded` flag makes that record happen exactly
+       once per activation (abilities.rs:197-215), so the gate sees 0 uses for
+       the activation that is about to run. The C scans consume the use at
+       ENQUEUE instead (see rb_mark_entries_use_limit_recorded), so an entry
+       flagged `use_limit_recorded` has already spent its own use and the gate
+       must not reject it — that double count silently dropped every
+       「{{ターン1回}}」 自動 effect reached through a TAS scan. */
+    if (ab.use_limit > 0 && !entry->use_limit_recorded) {
         if (rb_resolver_use_limit_reached(g, cid, aidx, ab.use_limit)) {
             rb_free_ability(&ab);
             g->queue.cur++;
@@ -1669,8 +1911,11 @@ int rb_process_current_ability(GameState *g) {
         rb_execute_effect_ex(g, actor, ab.effect, cid);
     }
 
-    if (ab.use_limit > 0)
+    /* abilities.rs:203-209 -- one activation consumes one use, never two. */
+    if (ab.use_limit > 0 && !entry->use_limit_recorded) {
         rb_record_ability_use(g, cid, aidx);
+        entry->use_limit_recorded = 1;
+    }
 
     rb_free_ability(&ab);
 

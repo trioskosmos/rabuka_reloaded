@@ -2,12 +2,28 @@
 #include "test_game.h"
 
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 
 #define HIMEKO "PL!HS-pb1-014-R"
 #define MIRAKURA_RURINO "PL!HS-PR-029-PR"
 #define NON_MIRAKURA_MEMBER "PL!-sd1-010-SD"
 #define KOKO "PL!SP-sd2-002-P"
+
+/* Push-movement-event hook, declared in src/ability/choice.c the same way
+   because include/rabuka.h does not export it. Rust reaches it through
+   GameState::push_movement_event (modifiers.rs:1546-1551); the C port splits
+   that single Rust call across rb_record_card_movement (the event log, in
+   src/core/modifiers.c) and this hook (the arming), so move_and_trigger below
+   drives both halves explicitly. */
+extern void rb_fire_opponent_cause_watchers_for_move(GameState *g, int moved_card_id,
+                                                     int causer_player);
+#define KOKO_SD2 "PL!SP-sd2-002-SD2"
+#define NATSUME "PL!SP-pb1-020-N"
+#define TOMARI "PL!SP-sd2-011-SD2"
+#define KANON "PL!SP-sd2-012-SD2"
+#define FUYUMARI "PL!SP-sd2-022-SD2"
+#define CHISATO "PL!SP-pb1-006-R"
 
 static int failures;
 
@@ -139,8 +155,221 @@ static void himeko_gate_blocked_no_reposition_no_koko_response(void)
              "no movement happened, so 可可's watcher must be silent");
 }
 
+/* ══════════════════════════════════════════════════════════════════════
+   movement-event watcher arm — port of
+   engine/tests/test_modules/rules/trigger_paths/cross_player_jidou_triggers_test.rs
+   and the two lifecycle clauses in
+   engine/tests/test_modules/jidou/movement/self_area_move_watch/
+       area_move_grant_turn_limit_and_live_end_expiry_test.rs
+
+   These drive the C analogue of Rust's `push_movement_event(card, "stage",
+   "stage", Some(card), cause_player, true)` — the SINGLE choke point every
+   movement funnels through — and then run p1's 自動 to completion. The 姫芽
+   case above only proves the hook is wired at one hand-picked call site; these
+   prove it is wired at the choke point itself.
+   ══════════════════════════════════════════════════════════════════════ */
+
+/* Mirror cross_player_jidou_triggers_test.rs::move_and_trigger. The final
+   argument of Rust's push_movement_event is `effect_only` (true in BOTH the
+   self-caused and the opponent-caused case) — the CAUSE PLAYER is what
+   separates the two arms, not that flag.
+
+   Rust's push_movement_event does three things in one call: records the event,
+   flags the area move, and ARMS the opponent-cause watchers
+   (modifiers.rs:1527-1551). The C port splits that: rb_record_card_movement
+   (src/core/modifiers.c) only records, so the arming half is invoked here
+   explicitly. Without it the helper would silently test only the owner-side
+   scan, and every "opponent-caused" case below would be a lie. */
+static void move_and_trigger(TestGame *game, int moved, int cause_player)
+{
+    rb_record_card_movement(&game->state, moved,
+                            RB_ZONEID_STAGE, RB_ZONEID_STAGE,
+                            cause_player, 1);
+    game->state.position_change_occurred_this_turn = 1;
+    rb_fire_opponent_cause_watchers_for_move(&game->state, moved, cause_player);
+    rb_trigger_auto_abilities_for_player(&game->state, 0);
+    rb_process_pending_auto_abilities(&game->state);
+    test_drain_auto_choices(game);
+    while (test_has_pending_choice(game)) {
+        test_select_indices(game, NULL, 0);
+    }
+    /* 「ライブ終了時まで」 grants are materialised into the modifier tables by
+       the constant recalculation, exactly as the real arming path does
+       (src/ability/choice.c:2028 calls rb_recalc_constants right after the
+       movement hook). */
+    rb_recalc_constants(&game->state);
+}
+
+static int heart_col(TestGame *game, int card_id, int color)
+{
+    return test_get_heart_modifier(game, card_id, color);
+}
+
+/* Heart indices mirror Rust's HeartColor ordinal: Heart06 = 6 = RB_HEART_ORANGE,
+   Heart02 = 2 = RB_HEART_YELLOW, Heart03 = 3 = RB_HEART_GREEN. */
+static void koko_self_effect_triggers(void)
+{
+    TestGame game;
+    test_game_new(&game);
+    int koko = test_id(&game, KOKO_SD2);
+    int filler = test_id(&game, NON_MIRAKURA_MEMBER);
+    CHECK(koko >= 0, "koko sd2 card id resolves");
+    fill_decks(&game, filler);
+    game.state.p[0].stage[1] = koko;
+
+    move_and_trigger(&game, koko, 0);
+
+    CHECK_EQ(heart_col(&game, koko, RB_HEART_ORANGE),
+             1, "self-caused area move grants heart06");
+}
+
+static void koko_opponent_effect_triggers(void)
+{
+    TestGame game;
+    test_game_new(&game);
+    int koko = test_id(&game, KOKO_SD2);
+    int filler = test_id(&game, NON_MIRAKURA_MEMBER);
+    fill_decks(&game, filler);
+    game.state.p[0].stage[1] = koko;
+
+    /* Same event, caused by the OPPOSING player. The watcher carries
+       「(対戦相手のカードの効果でも発動する。)」 so it must still arm. */
+    move_and_trigger(&game, koko, 1);
+
+    CHECK_EQ(heart_col(&game, koko, RB_HEART_ORANGE), 1,
+             "opponent-caused area move also grants heart06 (でも発動する)");
+}
+
+static void koko_turn1_blocks_second(void)
+{
+    TestGame game;
+    test_game_new(&game);
+    int koko = test_id(&game, KOKO_SD2);
+    int filler = test_id(&game, NON_MIRAKURA_MEMBER);
+    fill_decks(&game, filler);
+    game.state.p[0].stage[1] = koko;
+
+    move_and_trigger(&game, koko, 0);
+    CHECK_EQ(heart_col(&game, koko, RB_HEART_ORANGE), 1, "first move grants heart06");
+    move_and_trigger(&game, koko, 0);
+    CHECK_EQ(heart_col(&game, koko, RB_HEART_ORANGE), 1,
+             "「{{ターン1回}}」 — a second area move in the same turn adds nothing");
+}
+
+static void natsume_opponent_draw(void)
+{
+    TestGame game;
+    test_game_new(&game);
+    int natsume = test_id(&game, NATSUME);
+    int filler = test_id(&game, NON_MIRAKURA_MEMBER);
+    game.state.p[0].deck.n = 0;
+    for (int i = 0; i < 10; i++) test_add_to_deck_pl(&game, 0, filler);
+    game.state.p[0].stage[0] = natsume;
+    int before = game.state.p[0].hand.n;
+
+    move_and_trigger(&game, natsume, 1);
+
+    CHECK_EQ(game.state.p[0].hand.n, before + 1,
+             "opponent-caused area move also draws 1 for 夏美");
+}
+
+/* The dedupe identity of an opponent-cause arm is (ability, moved card,
+   movement sequence number) — GameState::opp_cause_key, abilities.rs:1037-1041
+   — so the watcher arms ONCE PER MOVE: two distinct opponent-caused moves in
+   one turn each arm it, while a rescan of the SAME move must not. 夏美 has no
+   use limit, so her hand size reads the arm count out directly. */
+static void opp_cause_arms_once_per_move(void)
+{
+    TestGame game;
+    test_game_new(&game);
+    int natsume = test_id(&game, NATSUME);
+    int filler = test_id(&game, NON_MIRAKURA_MEMBER);
+    game.state.p[0].deck.n = 0;
+    for (int i = 0; i < 10; i++) test_add_to_deck_pl(&game, 0, filler);
+    game.state.p[0].stage[0] = natsume;
+    int before = game.state.p[0].hand.n;
+
+    move_and_trigger(&game, natsume, 1);
+    CHECK_EQ(game.state.p[0].hand.n, before + 1,
+             "first opponent-caused area move arms 夏美 once");
+
+    /* Rescan the SAME movement event. The hook owns foreign-cause firings, so
+       the generic stage scan must skip the watcher (hooked_by_foreign_cause,
+       abilities.rs:506-545) and the per-move key must block a re-arm. */
+    rb_trigger_auto_abilities_for_player(&game.state, 0);
+    rb_process_pending_auto_abilities(&game.state);
+    test_drain_auto_choices(&game);
+    CHECK_EQ(game.state.p[0].hand.n, before + 1,
+             "a rescan of the same opponent-caused move must not re-arm");
+
+    move_and_trigger(&game, natsume, 1);
+    CHECK_EQ(game.state.p[0].hand.n, before + 2,
+             "a second DISTINCT opponent-caused area move arms 夏美 again");
+}
+
+static void tomari_opponent_blade(void)
+{
+    TestGame game;
+    test_game_new(&game);
+    int tomari = test_id(&game, TOMARI);
+    int filler = test_id(&game, NON_MIRAKURA_MEMBER);
+    fill_decks(&game, filler);
+    game.state.p[0].stage[0] = tomari;
+
+    move_and_trigger(&game, tomari, 1);
+
+    CHECK_EQ(test_get_blade_modifier(&game, tomari), 1,
+             "opponent-caused area move also grants a blade for 冬毬");
+}
+
+static void kanon_opponent_heart02(void)
+{
+    TestGame game;
+    test_game_new(&game);
+    int kanon = test_id(&game, KANON);
+    int filler = test_id(&game, NON_MIRAKURA_MEMBER);
+    fill_decks(&game, filler);
+    game.state.p[0].stage[0] = kanon;
+
+    move_and_trigger(&game, kanon, 1);
+
+    CHECK_EQ(heart_col(&game, kanon, RB_HEART_YELLOW), 1,
+             "opponent-caused area move also grants heart02 for かのん");
+}
+
+static void fuyumari_opponent_heart03(void)
+{
+    TestGame game;
+    test_game_new(&game);
+    int fuyu = test_id(&game, FUYUMARI);
+    int filler = test_id(&game, NON_MIRAKURA_MEMBER);
+    fill_decks(&game, filler);
+    game.state.p[0].stage[0] = fuyu;
+
+    move_and_trigger(&game, fuyu, 1);
+
+    CHECK_EQ(heart_col(&game, fuyu, RB_HEART_GREEN), 1,
+             "opponent-caused area move also grants heart03 for 冬毬");
+}
+
+static void chisato_opponent_blades(void)
+{
+    TestGame game;
+    test_game_new(&game);
+    int chisato = test_id(&game, CHISATO);
+    int filler = test_id(&game, NON_MIRAKURA_MEMBER);
+    fill_decks(&game, filler);
+    game.state.p[0].stage[0] = chisato;
+
+    move_and_trigger(&game, chisato, 1);
+
+    CHECK_EQ(test_get_blade_modifier(&game, chisato), 2,
+             "opponent-caused area move also grants 2 blades for 千砂都");
+}
+
 int main(void)
 {
+    if (getenv("XP_DBG")) rb_ability_debug_set(1);
     if (rb_load("src") != 0) {
         fprintf(stderr, "FAIL: database load\n");
         return 1;
@@ -148,6 +377,15 @@ int main(void)
 
     himeko_debut_repositions_opponent_member_and_koko_responds();
     himeko_gate_blocked_no_reposition_no_koko_response();
+    koko_self_effect_triggers();
+    koko_opponent_effect_triggers();
+    koko_turn1_blocks_second();
+    natsume_opponent_draw();
+    opp_cause_arms_once_per_move();
+    tomari_opponent_blade();
+    kanon_opponent_heart02();
+    fuyumari_opponent_heart03();
+    chisato_opponent_blades();
 
     rb_unload();
     if (failures) {
