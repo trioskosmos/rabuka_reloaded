@@ -3,8 +3,6 @@
 #include <string.h>
 
 extern int rb_complete_double_baton(GameState *g, int selected_pair);
-extern void rb_fire_opponent_cause_watchers_for_move(GameState *g, int moved_card_id,
-                                                      int causer_player);
 #include <stdio.h>
 #include <stdlib.h>
 
@@ -2193,10 +2191,19 @@ int rb_resolver_handle_position_change_choice(RbAbilityResolver *self, GameState
                 P->stage_wait[src_idx] = displaced_wait;
                 P->stage[dst_idx] = moved;
                 P->stage_wait[dst_idx] = moved_wait;
+                /* Redundant since commit 219d1522 moved the area-move arm into the
+                   choke point, but harmless: both this line and modifiers.c:418
+                   store 1, and nothing reads the flag between them. */
                 g->position_change_occurred_this_turn = 1;
-                rb_record_card_movement(g, moved, 0, 0, actor, 1);
+                /* A position change is a genuine stage->stage (area) move, so the two
+                   zones are spelled out: RB_ZONEID_STAGE == 0, and the choke point
+                   does all three jobs of Rust's push_movement_event in one call —
+                   event log, turn-level position flag, opponent-cause watcher arming
+                   (modifiers.rs:1526-1552; the hook is src/core/modifiers.c:417-420).
+                   A hand-call to rb_fire_opponent_cause_watchers_for_move used to
+                   follow this line and double-fired every opponent-caused watcher. */
+                rb_record_card_movement(g, moved, RB_ZONEID_STAGE, RB_ZONEID_STAGE, actor, 1);
                 rb_recalc_constants(g);
-                rb_fire_opponent_cause_watchers_for_move(g, moved, actor);
             }
             rb_resolver_clear_choice_state_and_resume(self);
             return 0;
@@ -2255,8 +2262,11 @@ int rb_resolver_handle_position_change_choice(RbAbilityResolver *self, GameState
                 P->stage[src_idx] = b; P->stage_wait[src_idx] = P->stage_wait[dst_idx];
                 P->stage[dst_idx] = a; P->stage_wait[dst_idx] = P->stage_wait[src_idx];
                 g->position_change_occurred_this_turn = 1;
-                rb_record_card_movement(g, a, 0, 0, 0, 0);
-                if (b >= 0) rb_record_card_movement(g, b, 0, 0, 0, 0);
+                /* Two members swapped places on the stage: a real area move, so both
+                   zones are named explicitly (the 0,0 this replaces was already
+                   stage->stage, see the position_change:opponent:front arm above). */
+                rb_record_card_movement(g, a, RB_ZONEID_STAGE, RB_ZONEID_STAGE, 0, 0);
+                if (b >= 0) rb_record_card_movement(g, b, RB_ZONEID_STAGE, RB_ZONEID_STAGE, 0, 0);
                 rb_trigger_auto_abilities_for_movement_current(g);
             }
             rb_resolver_clear_choice_state_and_resume(self);
@@ -2362,8 +2372,11 @@ int rb_resolver_handle_position_change_choice(RbAbilityResolver *self, GameState
                 P->stage[src_idx] = b; P->stage_wait[src_idx] = P->stage_wait[dst_idx];
                 P->stage[dst_idx] = a; P->stage_wait[dst_idx] = P->stage_wait[src_idx];
                 g->position_change_occurred_this_turn = 1;
-                rb_record_card_movement(g, a, 0, 0, 0, 0);
-                if (b >= 0) rb_record_card_movement(g, b, 0, 0, 0, 0);
+                /* Two members swapped places on the stage: a real area move, so both
+                   zones are named explicitly (the 0,0 this replaces was already
+                   stage->stage, see the position_change:opponent:front arm above). */
+                rb_record_card_movement(g, a, RB_ZONEID_STAGE, RB_ZONEID_STAGE, 0, 0);
+                if (b >= 0) rb_record_card_movement(g, b, RB_ZONEID_STAGE, RB_ZONEID_STAGE, 0, 0);
                 rb_trigger_auto_abilities_for_movement_current(g);
             }
             rb_resolver_clear_choice_state_and_resume(self);
@@ -3150,7 +3163,16 @@ void rb_resolver_handle_energy_zone_selection(GameState *g, int actor, const int
                 for (int i = 0; i < n_removed; i++) {
                     rb_stage_place_under_card(P, target_index, removed[i]);
                     rb_mods_clear_card(&g->mods, removed[i]);
-                    rb_record_card_movement(g, removed[i], 0, 0, 0, 0);
+                    /* move_cards.rs:3366 — the only push_movement_event in
+                       handle_energy_zone_selection, and it names both zones:
+                       "energy_zone" -> "under_member". Spelled out here because
+                       RB_ZONEID_STAGE == 0, so a bare 0,0 would be read as a
+                       stage->stage area move by the choke point's hook
+                       (modifiers.c:417-420) and spuriously set
+                       position_change_occurred_this_turn and arm the
+                       opponent-cause watchers. */
+                    rb_record_card_movement(g, removed[i], RB_ZONEID_ENERGY_ZONE,
+                                            RB_ZONEID_UNDER_MEMBER, 0, 0);
                 }
             } else {
                 for (int i = 0; i < n_removed; i++) {
@@ -3160,10 +3182,18 @@ void rb_resolver_handle_energy_zone_selection(GameState *g, int actor, const int
             }
         }
     } else if (destination) {
+        /* Arbitrary destination (hand / deck / discard / ...). The source is the
+           energy zone, so the from-zone is never RB_ZONEID_STAGE and this pair
+           can never be mistaken for the stage->stage area move the choke point
+           keys on. rb_zone_id_from_str mirrors Rust's ZoneId::from_str: an
+           unrecognised wire name yields RB_ZONEID_UNKNOWN, which is Rust's own
+           alias-drift value (modifiers.rs:1492-1502) and is likewise not a
+           stage zone. */
+        int dest_zone = rb_zone_id_from_str(destination);
         for (int i = 0; i < n_removed; i++) {
             rb_place_card_in_zone(g, actor, removed[i], destination, -1);
             rb_mods_clear_card(&g->mods, removed[i]);
-            rb_record_card_movement(g, removed[i], 0, 0, 0, 0);
+            rb_record_card_movement(g, removed[i], RB_ZONEID_ENERGY_ZONE, dest_zone, 0, 0);
         }
     } else {
         for (int i = 0; i < n_removed; i++) {
@@ -3181,6 +3211,7 @@ void rb_resolver_handle_select_position(GameState *g, int actor, const char *pos
     if (pl < 0 || pl >= 2) pl = actor;
     RbPlayer *P = &g->p[pl];
     int should_lock = source_zone && strcmp(source_zone, "stage") != 0;
+    int placed_on_stage = 0;
     if (pos_idx >= 0 && pos_idx < RB_STAGE_SIZE) {
         if (P->stage[pos_idx] < 0) {
             P->stage[pos_idx] = card_id;
@@ -3190,11 +3221,22 @@ void rb_resolver_handle_select_position(GameState *g, int actor, const char *pos
             P->stage[pos_idx] = card_id;
             if (should_lock) { (void)g; }
         }
+        placed_on_stage = 1;
     } else {
         rb_hand_add(P, card_id);
     }
     rb_mods_clear_card(&g->mods, card_id);
-    rb_record_card_movement(g, card_id, 0, 0, 0, 0);
+    /* move_cards.rs:2325-2326 — the MoveCardsPosition arm of
+       handle_select_position records the card as moved but pushes NO
+       MovementEvent: Rust logs the pair only (log_move_result, :2334). The C
+       choke point fuses the two, so the from-zone is passed as
+       RB_ZONEID_UNKNOWN — Rust's own ZoneId::Unknown (types.rs / rabuka.h:490),
+       produced by ZoneId::from_str for any wire name it cannot resolve — which
+       is the faithful way to say "no zone pair was recorded here". A bare 0,0
+       would instead read as RB_ZONEID_STAGE -> RB_ZONEID_STAGE and trip the
+       area-move arm at modifiers.c:417-420. */
+    rb_record_card_movement(g, card_id, RB_ZONEID_UNKNOWN,
+                            placed_on_stage ? RB_ZONEID_STAGE : RB_ZONEID_HAND, 0, 0);
     if (state_change == 1 || state_change == 2)
         rb_mods_set_orientation(&g->mods, card_id, "wait");
     rb_move_fire_debut_side_effects(g, actor, card_id, target ? target : "self", source_zone ? source_zone : "");
