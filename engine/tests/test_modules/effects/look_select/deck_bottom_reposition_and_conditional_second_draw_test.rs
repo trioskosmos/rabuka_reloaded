@@ -23,25 +23,34 @@
 //! ## Not covered here: sweet&sweet holiday `PL!-bp6-023-L`
 //!
 //! 「カードを1枚引く。自分の成功ライブカード置き場に『μ's』のカードがある場合、さらに
-//! カードを1枚引く。」 — a conditional SECOND draw, where the zone is p1's OWN
-//! SUCCESS zone and the opponent's zone must not qualify.
+//! カードを1枚引く。」 — a conditional SECOND draw. Three claims are separately
+//! breakable and "it drew" catches none of them: さらに (the observable is a COUNT,
+//! one or two), 自分の成功ライブカード置き場 (p1's own SUCCESS zone — not the live
+//! zone, not the opponent's), and 『μ's』のカード (a group filter on top).
 //!
-//! Three drafts failed to pin the measurement window, and the harness's own phase
-//! model defeated each, so this is recorded rather than shipped as a test that
-//! measures the wrong interval:
+//! Four drafts failed, all on the MEASUREMENT WINDOW rather than the ability, and
+//! what a probe established is worth more than the attempts:
 //!
-//!   * dispatching ライブ成功時 directly at ライブ開始時 draws nothing — the trigger
-//!     fires at victory determination, and only for a live that SUCCEEDED;
-//!   * seven passes stop at ライブ開始時, one step short, and measure zero;
-//!   * an open twelve reaches past the rollover, so the next turn's Draw phase
-//!     puts a card in hand and reads as a second draw.
+//! ```text
+//!   guard=3  hand +0  deck -0  live_zone=0
+//! ```
 //!
-//! What a probe established: after the walk the phase is `FirstAttackerNormal` with
-//! `hand +0 / deck -0`, so the loop exits before the performance ends and
-//! `current_turn_phase == TurnPhase::Live` is not the boundary this harness
-//! exposes. The entry point for finishing it is the existing
+//! ライブ成功時 fires at victory determination and only for a live that SUCCEEDED.
+//! Dispatching the trigger directly at ライブ開始時 draws nothing because the phase
+//! gate is not met; seven `pass()` calls stop one step short and read zero; an
+//! open-ended walk crosses the rollover and the next turn's Draw phase puts a card
+//! in hand that reads as a second draw. Adopting the
 //! `integration/per_card/live_end_expiry_rollover_and_dual_trigger_window_gates_test.rs`
-//! idiom, which reaches a genuine victory determination including the dispatch.
+//! idiom (five passes, `set_live_card` from hand, two more, then pass while
+//! `current_turn_phase == TurnPhase::Live` WITH `drain_auto_ability_choices` each
+//! step) is what got the walk to the rollover at all — without the auto-ability
+//! drain it stalls in `FirstAttackerNormal` — and from there the draw is still
+//! zero with the live card having left the live zone.
+//!
+//! So the remaining unknown is not the card: it is where in this harness a
+//! ライブ成功時 dispatch can be observed at all. That is worth resolving once,
+//! because it gates every ライブ成功時 negative in the coverage report, and
+//! `PL!-bp6-023-L` is only the first card to need it.
 
 use crate::helpers::*;
 use rabuka_engine::zones::MemberArea;
