@@ -1,14 +1,14 @@
 {
   "generated_by": "cards/test_inventory.py",
-  "generated_at": "2026-09-27T00:28:52.858576+00:00",
+  "generated_at": "2026-09-27T00:46:26.794293+00:00",
   "stats": {
     "total_cards": 2526,
     "cards_with_abilities": 1565,
     "total_abilities": 2011,
     "unique_abilities": 936
   },
-  "n_files": 917,
-  "n_tests": 3708,
+  "n_files": 918,
+  "n_tests": 3709,
   "total_cards": 771,
   "covered_cards": 771,
   "abilities_on_covered": 936,
@@ -647,7 +647,7 @@
       "rows": []
     }
   },
-  "n_test_fns_parsed": 3708,
+  "n_test_fns_parsed": 3709,
   "abilities": [
     {
       "idx": 0,
@@ -50168,14 +50168,16 @@
       "has_choice": true,
       "has_negative": false,
       "covering_files": [
-        "engine/tests/test_modules/effects/draw/conditional/success_zone_group_pl_bp6_023_l_test.rs"
+        "engine/tests/test_modules/effects/draw/conditional/success_zone_group_pl_bp6_023_l_test.rs",
+        "engine/tests/test_modules/effects/look_select/deck_bottom_reposition_and_conditional_second_draw_test.rs"
       ],
       "covering_tests": [
+        "chika_repositions_the_examined_card_to_the_fourth_from_the_top",
         "sweet_sweet_holiday_pl_bp6_023_l_draws_extra_with_mus_live_in_success_zone",
         "sweet_sweet_holiday_pl_bp6_023_l_non_mus_live_in_success_zone_single_draw",
         "sweet_sweet_holiday_pl_bp6_023_l_single_draw_without_success_zone_card"
       ],
-      "covering_test_count": 3,
+      "covering_test_count": 4,
       "direct_tests": [
         "sweet_sweet_holiday_pl_bp6_023_l_draws_extra_with_mus_live_in_success_zone",
         "sweet_sweet_holiday_pl_bp6_023_l_non_mus_live_in_success_zone_single_draw",
@@ -53936,18 +53938,21 @@
       "has_choice": true,
       "has_negative": false,
       "covering_files": [
-        "engine/tests/test_modules/effects/look_select/bottom_inspect/bottom_card_accepted_to_fourth_from_top_test.rs"
+        "engine/tests/test_modules/effects/look_select/bottom_inspect/bottom_card_accepted_to_fourth_from_top_test.rs",
+        "engine/tests/test_modules/effects/look_select/deck_bottom_reposition_and_conditional_second_draw_test.rs"
       ],
       "covering_tests": [
+        "chika_repositions_the_examined_card_to_the_fourth_from_the_top",
         "pl_s_bp7_010_n_accept_bottom_card_to_fourth_from_top",
         "pl_s_bp7_010_n_decline_keeps_bottom_card"
       ],
-      "covering_test_count": 2,
+      "covering_test_count": 3,
       "direct_tests": [
+        "chika_repositions_the_examined_card_to_the_fourth_from_the_top",
         "pl_s_bp7_010_n_accept_bottom_card_to_fourth_from_top",
         "pl_s_bp7_010_n_decline_keeps_bottom_card"
       ],
-      "direct_test_count": 2,
+      "direct_test_count": 3,
       "is_null": false,
       "use_limit": null,
       "watches_abilities": false,
