@@ -5,6 +5,7 @@
 //! - `live`: yell reveal, heart allocation, success determination, scoring.
 //! - `actions`: main-phase actions (play member, use ability, set live…).
 //! - `triggers`: trigger scanning → ability queue entries.
+//!
 //! Ability execution itself lives in `crate::ability` (`AbilityResolver`).
 pub mod actions;
 pub mod live;

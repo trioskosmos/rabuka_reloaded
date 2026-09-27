@@ -56,7 +56,7 @@ pub fn estimate_opp_score(gs: &GameState, me: u8, db: &CardDatabase) -> i32 {
         }
         if let Some(c) = db.get_card(cid) {
             if let Some(bh) = &c.base_heart {
-                pool += bh.hearts.values_sum() as i32;
+                pool += i32::from(bh.hearts.values_sum());
             }
         }
     }
@@ -69,11 +69,11 @@ pub fn estimate_opp_score(gs: &GameState, me: u8, db: &CardDatabase) -> i32 {
         let waiting = gs.mods.get_orientation_modifier(cid) == Some("wait");
         if !waiting {
             if let Some(c) = db.get_card(cid) {
-                blades += c.blade as i32;
+                blades += i32::from(c.blade);
             }
         }
     }
-    pool += (blades as f64 * density).floor() as i32;
+        pool += crate::constants::score_to_i32((blades as f64 * density).floor());
     if pool < 3 {
         0
     } else {
@@ -107,14 +107,14 @@ pub(crate) fn best_portfolio_scored(gs: &GameState, me: u8, db: &CardDatabase) -
     let pool = heart_pool(gs, me, db);
     let lives = hand_lives(my, db);
     let max_slots =
-        (3i32 - i32::from(my.live_card_set_limit_reduction)).max(0) as usize;
+        crate::constants::count_usize(3i32 - i32::from(my.live_card_set_limit_reduction).max(0));
     if lives.is_empty() || max_slots == 0 {
         return (Vec::new(), 0, 0.0);
     }
     let n = lives.len().min(8);
 
-    let my_succ = my.success_live_card_zone.cards.len() as i32;
-    let opp_succ = opp.success_live_card_zone.cards.len() as i32;
+    let my_succ = crate::constants::count_i32(my.success_live_card_zone.cards.len());
+    let opp_succ = crate::constants::count_i32(opp.success_live_card_zone.cards.len());
     // Stance floors (tree L2/L3). Calibrated against reality: a portfolio
     // sized to the MEAN hit count sits at P(pass)≁E.5 E.7 by construction,
     // so demanding 0.75+ folds nearly every contested turn (measured:
@@ -156,13 +156,13 @@ pub(crate) fn best_portfolio_scored(gs: &GameState, me: u8, db: &CardDatabase) -
         let mut total_req = 0i32;
         let mut idxs = Vec::with_capacity(cnt);
         let mut ok = true;
-        for bit in 0..n {
+        for (bit, live) in lives.iter().enumerate().take(n) {
             if mask & (1 << bit) != 0 {
-                let (hi, cid, ref need) = lives[bit];
+                let (hi, cid, ref need) = *live;
                 match alloc(&p, need) {
                     Some(next) => {
                         p = next;
-                        score += db.get_card(cid).and_then(|c| c.score).unwrap_or(0) as i32;
+                        score += i32::from(db.get_card(cid).and_then(|c| c.score).unwrap_or(0));
                         total_req += (0..=7).chain(std::iter::once(10)).map(|i| need[i]).sum::<i32>();
                         idxs.push(hi);
                     }
@@ -250,14 +250,14 @@ pub fn choose_action_v6(gs: &GameState, actions: &[Action], me: u8) -> Action {
 pub fn choose_live_set_v5(gs: &GameState, actions: &[Action], db: &CardDatabase) -> Action {
     let me = gs.active_player_index();
     let (my, opp) = gs.seated_pair(me);
-    let my_succ = my.success_live_card_zone.cards.len() as i32;
-    let opp_succ = opp.success_live_card_zone.cards.len() as i32;
+    let my_succ = crate::constants::count_i32(my.success_live_card_zone.cards.len());
+    let opp_succ = crate::constants::count_i32(opp.success_live_card_zone.cards.len());
     let mut desired = best_portfolio(gs, me, db);
     let my_score: i32 = desired
         .iter()
         .filter_map(|&hi| my.hand.cards.get(hi).copied())
         .filter_map(|cid| db.get_card(cid))
-        .map(|c| c.score.unwrap_or(0) as i32)
+        .map(|c| i32::from(c.score.unwrap_or(0)))
         .sum();
 
     // COMMITMENT RULE for everything below: whatever we decide to set joins

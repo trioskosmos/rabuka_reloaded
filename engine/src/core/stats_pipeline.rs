@@ -8,12 +8,11 @@
 //!
 //! Canonical order for a member's ORIGINAL hearts:
 //!   1. printed base (9.9.1.1)
-//!   2. heart_copy    — "元々持つハートは、下に置いたカードと同じになる"
-//!                      (re-defines the base; 9.9.1.3 class)
+//!   2. heart_copy — "元々持つハートは、下に置いたカードと同じになる" (re-defines the base; 9.9.1.3 class)
 //!   3. color multiplier — "ハートがすべてXになる" (type conversion)
-//!   4. heart_override — "元々持つハートはNになる" (SET; replaces 1–3,
-//!                      9.9.1.4 — Q195-class layering keeps additives alive)
-//! Additive modifiers (9.9.1.5) stack ON TOP of whatever 1–4 produced.
+//!   4. heart_override — "元々持つハートはNになる" (SET; replaces 1-3, 9.9.1.4 — Q195-class layering keeps additives alive)
+//!
+//! Additive modifiers (9.9.1.5) stack ON TOP of whatever 1-4 produced.
 use crate::card::{CardDatabase, HeartColor, HeartMap};
 use crate::core::game_modifiers::ModifierEntry;
 use crate::HashMap;

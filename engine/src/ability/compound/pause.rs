@@ -12,6 +12,12 @@ use alloc::{
 };
 
 /// Save remaining actions back to the queue.
+#[allow(
+    // `AbilityEffect` is recursive, so the queue's own `Vec<Box<AbilityEffect>>`
+    // is the only well-sized spelling. vec_box's `Vec<AbilityEffect>` would
+    // make this type infinitely sized.
+    clippy::vec_box
+)]
 fn save_remaining_actions(
     gs: &mut GameState,
     remaining: Vec<Box<AbilityEffect>>,

@@ -190,7 +190,7 @@ impl ActionEncoding {
         Self {
             action_type: action_type_index(&action.action_type),
             target_card_id: if target_visible { raw_card_id.unwrap_or(-1) } else { -1 },
-            target_zone: target.zone as u8,
+            target_zone: crate::constants::count_u8(target.zone as usize),
             position,
             ability_index: params
                 .and_then(|p| p.ability_index)
@@ -219,7 +219,7 @@ impl ActionEncoding {
         action_type_embed: &[f32],
     ) -> Vec<f32> {
         let mut v = Vec::with_capacity(ACTION_ENC_DIM);
-        let action_row = (self.action_type as usize).min(ACTION_TYPE_COUNT - 1)
+        let action_row = usize::from(self.action_type).min(ACTION_TYPE_COUNT - 1)
             * ACTION_TYPE_EMBED_DIM;
         let action_end = action_row + ACTION_TYPE_EMBED_DIM;
         if action_end <= action_type_embed.len() {
@@ -230,7 +230,7 @@ impl ActionEncoding {
         if self.target_card_id < 0 {
             v.extend(vec![0.0f32; CARD_EMBED_DIM]);
         } else {
-            let cid = self.target_card_id as usize;
+            let cid = crate::constants::count_usize_i16(self.target_card_id);
             let base = cid * CARD_EMBED_DIM;
             let ce = if base + CARD_EMBED_DIM <= card_embed.len() {
                 &card_embed[base..base + CARD_EMBED_DIM]
@@ -239,7 +239,7 @@ impl ActionEncoding {
             };
             v.extend_from_slice(ce);
         }
-        let zid = (self.target_zone as usize).min(NUM_ZONES - 1);
+        let zid = usize::from(self.target_zone).min(NUM_ZONES - 1);
         let zbase = zid * ZONE_EMBED_DIM;
         v.extend_from_slice(&zone_embed[zbase..zbase + ZONE_EMBED_DIM]);
         v.push((self.position as f32) / 3.0);
@@ -287,7 +287,7 @@ pub fn action_target_zone(action: &Action, obs: &PublicObservation) -> ActionTar
                         2 => ZoneId::MyStagePos2,
                         _ => ZoneId::MyStagePos0,
                     },
-                    position: position as u8,
+                    position: crate::constants::count_u8(usize::from(position)),
                 };
             }
         }

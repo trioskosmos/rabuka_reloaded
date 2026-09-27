@@ -137,8 +137,8 @@ fn opening_place(
 /// `discarded` matters as much as `keep`: a replacement puts a card from our
 /// own deck into the hand before turn 1. Modelling a replacement as a pure loss
 /// - which the first draft did - makes "keep every card" the argmax of every
-/// search, and v8 replaced 1.24 cards against v4's 2.00. Our own deck is fair
-/// information (section 9), so the redraw is taken from its top in order.
+///   search, and v8 replaced 1.24 cards against v4's 2.00. Our own deck is fair
+///   information (section 9), so the redraw is taken from its top in order.
 ///
 /// The walk itself is [`v8_model::Forward`], the same one the Main-phase leaf
 /// runs. It used to be a second copy written next to it, and the two copies

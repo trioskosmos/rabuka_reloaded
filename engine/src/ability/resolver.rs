@@ -382,7 +382,7 @@ impl AbilityResolver {
         let mut activation_condition_passed = true;
         if !cost_already_paid {
             if let Some(activation_condition) = effect.activation_condition_parsed_any() {
-                let mut merged_cond = Box::clone(activation_condition);
+                let mut merged_cond = Box::new(activation_condition.clone());
                 // Merge the effect's position info into the condition so it's checked.
                 if merged_cond.get_position().is_none()
                     && merged_cond.get_positions_characters().is_none()

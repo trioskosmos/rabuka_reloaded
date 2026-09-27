@@ -812,8 +812,6 @@ impl AbilityResolver {
         let is_max = effect.max.unwrap_or(false);
         let max_select = if any_number {
             matching_count
-        } else if is_max || optional {
-            core::cmp::min(count, matching_count)
         } else {
             core::cmp::min(count, matching_count)
         };

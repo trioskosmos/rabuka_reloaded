@@ -80,7 +80,7 @@ pub(crate) fn route_sequential_step(
         log::debug!("[SEQUENCE] source={:?} repeat={} step={} action={} skipped: preceding condition failed", resolver.activating_card_id, repeat_idx + 1, i + 1, action.action);
         return StepRoute::Skip;
     }
-    if action.condition.is_some() {
+    if let Some(cond) = action.condition.as_ref() {
         let same_as_prev = i > 0
             && repeat_actions[i - 1].condition.as_ref()
                 == action.condition.as_ref();
@@ -91,7 +91,6 @@ pub(crate) fn route_sequential_step(
             }
             return StepRoute::Execute;
         }
-        let cond = action.condition.as_ref().unwrap();
         let moved_cards = resolver.moved_cards.clone();
         let passed = ConditionContext::with_moved_cards(gs, &moved_cards).evaluate_condition(cond);
         if !action.optional.unwrap_or(false) {

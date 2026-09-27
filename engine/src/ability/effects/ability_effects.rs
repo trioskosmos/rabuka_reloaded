@@ -112,7 +112,7 @@ impl AbilityResolver {
                 text,
                 effect.target_name(),
                 effect.duration_any(),
-                effect.gained_effect_any().cloned(),
+                effect.gained_effect_any().cloned().map(Box::new),
                 effect.ability_gain_trigger_any(),
                 Some(target_card),
             );

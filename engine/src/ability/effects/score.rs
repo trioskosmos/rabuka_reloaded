@@ -561,14 +561,14 @@ impl AbilityResolver {
         let location_binding = effect.location_any();
         let location = location_binding;
         let original_value = effect.original_value_any();
-        let original_count = effect.original_count_any().map(|v| v);
+        let original_count = effect.original_count_any();
         let original_operator_binding = effect.original_operator_any();
         let original_operator = original_operator_binding.as_deref();
         let exclude_self = effect.exclude_self_any().unwrap_or(false);
         let self_target = effect.is_self_target();
         let exclude_heart_colors = effect.exclude_heart_colors_any();
         let max = effect.max.unwrap_or(false);
-        let repeat_limit = effect.repeat_limit_any().map(|v| v);
+        let repeat_limit = effect.repeat_limit_any();
         let per_unit_heart_colors = effect.per_unit_heart_colors_any();
         let distinct = effect.distinct_any();
         let is_distinct_names = matches!(

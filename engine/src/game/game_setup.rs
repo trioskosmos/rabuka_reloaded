@@ -469,8 +469,6 @@ pub fn settle_single_player_state(game_state: &mut GameState) {
         }
         if is_automatic_phase(game_state) {
             crate::turn::TurnEngine::advance_phase(game_state);
-        } else if is_live_card_set_phase(game_state) {
-            break;
         } else {
             break;
         }
@@ -851,10 +849,10 @@ fn generate_pending_choice_actions(game_state: &GameState, choice: &Choice) -> V
                     .map(|(i, pos)| {
                         let idx = crate::ability::util::stage_position_index(pos);
                         let (stage_area, card_id) = match idx {
-                            Some(0) => ("left".to_string(), i as i16),
-                            Some(1) => ("center".to_string(), i as i16),
-                            Some(2) => ("right".to_string(), i as i16),
-                            _ => (pos.clone(), i as i16),
+                            Some(0) => ("left".to_string(), crate::constants::count_i16(i)),
+                            Some(1) => ("center".to_string(), crate::constants::count_i16(i)),
+                            Some(2) => ("right".to_string(), crate::constants::count_i16(i)),
+                            _ => (pos.clone(), crate::constants::count_i16(i)),
                         };
                         let capitalize = |s: &str| -> String {
                             let mut c = s.chars();
@@ -958,7 +956,7 @@ fn generate_pending_choice_actions(game_state: &GameState, choice: &Choice) -> V
                             ActionType::ChoiceDecision,
                             &label,
                             ActionParameters {
-                                card_id: Some(n as i16),
+                                card_id: Some(crate::constants::count_i16(n)),
                                 card_no: Some(n.to_string()),
                                 ..make_params()
                             },
@@ -991,7 +989,7 @@ fn generate_pending_choice_actions(game_state: &GameState, choice: &Choice) -> V
                             ActionType::ChoiceOption,
                             if bilingual { en_parts[i] } else { *opt_ja },
                             ActionParameters {
-                                card_id: Some(i as i16),
+                                card_id: Some(crate::constants::count_i16(i)),
                                 card_no: Some(i.to_string()),
                                 ..make_params()
                             },
@@ -1060,7 +1058,7 @@ fn generate_pending_choice_actions(game_state: &GameState, choice: &Choice) -> V
                                 ActionType::ChoiceOption,
                                 opt,
                                 ActionParameters {
-                                    card_id: Some(i as i16),
+                                    card_id: Some(crate::constants::count_i16(i)),
                                     card_no: Some(i.to_string()),
                                     ..make_params()
                                 },
@@ -1080,7 +1078,7 @@ fn generate_pending_choice_actions(game_state: &GameState, choice: &Choice) -> V
                                     ActionType::ChoiceOption,
                                     opt,
                                     ActionParameters {
-                                        card_id: Some(i as i16),
+                                        card_id: Some(crate::constants::count_i16(i)),
                                         card_no: Some(i.to_string()),
                                         ..make_params()
                                     },
@@ -1101,7 +1099,7 @@ fn generate_pending_choice_actions(game_state: &GameState, choice: &Choice) -> V
                                 ActionType::ChoiceOption,
                                 opt,
                                 ActionParameters {
-                                    card_id: Some(i as i16),
+                                    card_id: Some(crate::constants::count_i16(i)),
                                     card_no: Some(i.to_string()),
                                     ..make_params()
                                 },
@@ -1125,7 +1123,7 @@ fn generate_pending_choice_actions(game_state: &GameState, choice: &Choice) -> V
                                 ActionType::ChoiceOption,
                                 opt,
                                 ActionParameters {
-                                    card_id: Some(i as i16),
+                                    card_id: Some(crate::constants::count_i16(i)),
                                     card_no: Some(i.to_string()),
                                     ..make_params()
                                 },
@@ -1537,7 +1535,7 @@ fn generate_mulligan_actions(game_state: &GameState) -> Vec<Action> {
     for (hand_index, card_id) in mulligan_player.hand.cards.iter().enumerate() {
         let is_selected = game_state
             .mulligan_selected_indices
-            .contains(&(hand_index as u8));
+            .contains(&crate::constants::count_u8(hand_index));
         let card = game_state.card_database.get_card(*card_id);
         let card_name = card.map(|c| c.name.as_ref()).unwrap_or("Unknown");
         let display = action_display_enabled();
@@ -1624,8 +1622,7 @@ fn double_baton_options(
 ) -> Vec<DoubleBatonOption> {
     let mut occupied: [(usize, MemberArea, i16); 3] = [(0, MemberArea::Center, -1); 3];
     let mut occupied_count = 0;
-    for slot in 0..3 {
-        let card_id = stage_card_ids[slot];
+    for (slot, &card_id) in stage_card_ids.iter().enumerate().take(3) {
         if is_baton_touchable(active_player, card_id, baton_touch_protected, slot) {
             occupied[occupied_count] = (slot, MemberArea::ALL[slot], card_id);
             occupied_count += 1;
@@ -1973,7 +1970,7 @@ fn generate_main_phase_actions(game_state: &GameState) -> Vec<Action> {
                                             area.area
                                                 .as_ref()
                                                 .parse::<MemberArea>()
-                                                .map(|area| area.to_index() as u8)
+                                                .map(|area| crate::constants::count_u8(area.to_index()))
                                                 .unwrap_or(0),
                                         ),
                                         // available_areas is decision data for baton
@@ -2059,7 +2056,7 @@ fn generate_main_phase_actions(game_state: &GameState) -> Vec<Action> {
                                             } else {
                                                 None
                                             },
-                                            stage_area_index: Some(pair.placement.to_index() as u8),
+                                            stage_area_index: Some(crate::constants::count_u8(pair.placement.to_index())),
                                             card_indices: Some(area_indices),
                                             // See the note on available_areas
                                             // above: decision data, not display
@@ -2385,14 +2382,13 @@ fn generate_live_card_set_actions(game_state: &GameState) -> Vec<Action> {
         a
     }];
 
-    let max_live_cards =
-        3i32 - i32::try_from(active_player.live_card_set_limit_reduction).unwrap_or(0);
+    let max_live_cards = 3i32 - i32::from(active_player.live_card_set_limit_reduction);
     let already_selected = game_state.live_card_selected_indices.len();
-    let max_allowed = max_live_cards.max(0) as usize;
+    let max_allowed = crate::constants::count_usize(max_live_cards.max(0));
     for (hand_index, card_id) in active_player.hand.cards.iter().enumerate() {
         let is_selected = game_state
             .live_card_selected_indices
-            .contains(&(hand_index as u8));
+            .contains(&crate::constants::count_u8(hand_index));
         let at_limit = already_selected >= max_allowed;
         if at_limit && !is_selected {
             continue;

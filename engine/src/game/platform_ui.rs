@@ -136,8 +136,8 @@ pub trait PlatformUi {
             self.clear_screen();
             self.println(&title);
             let end = (off + H).min(lines.len());
-            for l in off..end {
-                self.println(&lines[l]);
+            for l in &lines[off..end] {
+                self.println(l);
             }
             if lines.len() > end {
                 self.println(&more_line(lines.len() - end, self.ui_lang()));
@@ -200,8 +200,8 @@ pub trait PlatformUi {
             self.clear_screen();
             self.println(scroll_hint(self.ui_lang()));
             let end = (off + H).min(lines.len());
-            for l in off..end {
-                self.println(&lines[l]);
+            for l in &lines[off..end] {
+                self.println(l);
             }
             if lines.len() > end {
                 self.println(&more_line(lines.len() - end, self.ui_lang()));

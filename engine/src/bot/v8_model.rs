@@ -105,7 +105,7 @@ impl Drop for RngGuard {
 
 #[inline]
 fn clamp_score(score: i32) -> usize {
-    score.clamp(0, SCORE_SLOTS as i32 - 1) as usize
+    crate::constants::count_usize(score.clamp(0, SCORE_SLOTS as i32 - 1))
 }
 
 pub fn score_median_hearts(score: i32) -> i32 {
@@ -300,7 +300,10 @@ impl FlipSampler {
         }
         let mut deck = Vec::with_capacity(self.deck_len);
         for &(vector, count) in &self.cats {
-            deck.extend(std::iter::repeat_n(vector, count as usize));
+            deck.extend(std::iter::repeat_n(
+                vector,
+                crate::constants::count_usize_u32(count),
+            ));
         }
         deck.resize(self.deck_len, [0; 8]);
         let mut pools = Vec::with_capacity(samples);
@@ -532,7 +535,7 @@ impl OppModel {
         // assumed set size, so the forecast is conditioned on their public
         // board rather than being a flat rate: a second attacker with a big
         // board commits more reliably than one with an empty stage.
-        let target = (2 * set_size).clamp(1, SCORE_SLOTS - 1) as i32;
+        let target = crate::constants::count_i32((2 * set_size).clamp(1, SCORE_SLOTS - 1));
         let bar = score_median_hearts(target);
         let clears = YIELD_PRIOR
             .iter()
@@ -698,7 +701,7 @@ pub fn expected_yell_score(gs: &GameState, me: u8, db: &CardDatabase, blades: i3
         .map(usize::from)
         .sum();
     let draws = usize::try_from(blades).unwrap_or(usize::MAX).min(deck_len);
-    (score_icons * draws / deck_len) as i32
+    crate::constants::count_i32(score_icons * draws / deck_len)
 }
 
 // -- The guides' continuous development-to-score currency ------------------
@@ -737,15 +740,14 @@ pub fn score_ceiling(gs: &GameState, me: u8, db: &CardDatabase) -> i32 {
 /// score bands. Monotone and unbounded in `supply`, which is the property the
 /// Main phase needs.
 pub fn largest_clearable(supply: i32) -> i32 {
-    let mut best = 0usize;
-    for s in 0..SCORE_SLOTS {
-        if SCORE_MEDIAN[s] <= supply {
-            best = s;
-        } else {
-            break;
-        }
+    // The highest band whose median is still within `supply` — i.e. the slot
+    // BEFORE the first one that is not, not that slot itself.
+    let first_unclear = SCORE_MEDIAN.iter().position(|&median| median > supply);
+    match first_unclear {
+        Some(0) => 0,
+        Some(i) => crate::constants::count_i32(i - 1),
+        None => crate::constants::count_i32(SCORE_SLOTS - 1),
     }
-    best as i32
 }
 
 /// Total heart supply on our board, buff-aware, in hearts (not per-colour).
@@ -788,7 +790,7 @@ pub fn band_progress(gs: &GameState, me: u8, db: &CardDatabase) -> f64 {
 /// interpolation can be tested without building a GameState.
 pub fn band_progress_for(supply: i32) -> f64 {
     let band = largest_clearable(supply);
-    let b = band as usize;
+    let b = crate::constants::count_usize(band);
     if b + 1 >= SCORE_SLOTS {
         // Past the last tabulated band, keep climbing at the final band's slope
         // so the term never goes flat above the table.
@@ -1080,11 +1082,13 @@ pub fn reachable_ceiling(gs: &GameState, me: u8, turns: u8, db: &CardDatabase) -
         .collect();
     draws.sort_unstable_by(|a, b| b.cmp(a));
 
-    for turn in 0..turns as usize {
+    for (_turn, drawn) in draws
+        .iter()
+        .enumerate()
+        .take(usize::from(turns))
+    {
         budget += 1; // rule 7.5
-        if let Some(drawn) = draws.get(turn) {
-            pool.push(*drawn);
-        }
+        pool.push(*drawn);
         let discount = stage.iter().copied().max().unwrap_or(0);
         let has_occupied = discount > 0;
         // Baton into the CHEAPEST occupied slot: that leaves the expensive
@@ -1222,7 +1226,7 @@ mod tests {
     fn stage_member(db: &CardDatabase, gs: &mut GameState, seat: usize) -> (i16, i32) {
         let member = first_member_with(db, 0, |c| c.base_heart.is_some() && c.cost.unwrap_or(0) > 0);
         let card = db.get_card(member).unwrap();
-        let hearts = card.base_heart.as_ref().map_or(0, |b| b.hearts.values_sum() as i32);
+        let hearts = card.base_heart.as_ref().map_or(0, |b| i32::from(b.hearts.values_sum()));
         let player = if seat == 0 { &mut gs.player1 } else { &mut gs.player2 };
         player.stage.stage[0] = member;
         (member, hearts)
@@ -1501,13 +1505,13 @@ mod tests {
             c.blade > 0 && c.cost.unwrap_or(0) > db.get_card(sent).unwrap().cost.unwrap_or(0)
         });
         let sent_card = db.get_card(sent).unwrap();
-        let sent_hearts = sent_card.base_heart.as_ref().map_or(0, |b| b.hearts.values_sum() as i32);
+        let sent_hearts = sent_card.base_heart.as_ref().map_or(0, |b| i32::from(b.hearts.values_sum()));
         let sent_blades = i32::from(sent_card.blade);
         let fresh_card = db.get_card(fresh).unwrap();
         let fresh_hearts = fresh_card
             .base_heart
             .as_ref()
-            .map_or(0, |b| b.hearts.values_sum() as i32);
+            .map_or(0, |b| i32::from(b.hearts.values_sum()));
         let fresh_blades = i32::from(fresh_card.blade);
         let cost = i32::from(fresh_card.cost.unwrap());
         let sent_cost = i32::from(sent_card.cost.unwrap());
@@ -1662,7 +1666,7 @@ mod tests {
                 .unwrap()
                 .base_heart
                 .as_ref()
-                .map_or(0, |b| b.hearts.values_sum() as i32)
+                .map_or(0, |b| i32::from(b.hearts.values_sum()))
         });
         let weakest = members[members.len() - 1];
         let strongest = members[0];

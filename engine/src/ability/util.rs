@@ -829,11 +829,10 @@ pub fn card_matches_cost_limit_op(
     match cost_limit {
         Some(limit) => card_db
             .get_card(card_id)
-            .map(|c| {
+            .and_then(|c| {
                 // Use score for live cards, cost for members
                 c.cost.or(c.score)
             })
-            .flatten()
             .map(|value| {
                 compare_with_operator(comparison.unwrap_or("<="), value, limit)
                     // "min" is a card-text-only spelling of ">=" that the
@@ -2467,6 +2466,7 @@ pub fn apply_distinct_filter(
 ///   - each ordinary single-name card contributes its name once (dedup);
 ///   - a joint (multi-name) card ("A&...") adds one additional unit ONLY when it
 ///     introduces at least one name not already present as a single-name card.
+///
 ///   Q278 (歩 + joint{歩,かのん,花帆}) = 2; Q279 (歩+かのん+花帆 + same joint) = 3,
 ///   because the joint's constituent names are already present as standalones.
 pub fn count_distinct_member_name_units(cards: &[i16], card_db: &CardDatabase) -> usize {

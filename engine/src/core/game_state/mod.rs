@@ -68,6 +68,11 @@ pub struct PermanentLoopProtocol {
     pub choice: crate::ability::types::Choice,
 }
 
+/// One heart a Live has handed to a member: (colour name, count).
+pub type LiveOwnedHeart = (String, u8);
+/// A member and the live-owned hearts it is currently holding.
+pub type LiveOwnedHearts = (CardId, Vec<LiveOwnedHeart>);
+
 /// choice (常時「このカードをプレイする際…コストは減る」).
 #[derive(Debug, Clone)]
 #[cfg_attr(feature = "serde_support", derive(Serialize, Deserialize))]
@@ -108,7 +113,7 @@ pub struct GameState {
     /// Ability IDs played this turn (turn 2) — CardId + count for limit tracking.
     pub turn2_abilities_played: SmallVec<[(CardId, u8); 8]>,
     /// Live-owned hearts per member — CardId + (color, count) for display/UI.
-    pub live_owned_hearts: SmallVec<[(CardId, Vec<(String, u8)>); 4]>,
+    pub live_owned_hearts: SmallVec<[LiveOwnedHearts; 4]>,
     pub temporary_effects: SmallVec<[TemporaryEffect; 4]>,
     pub prohibition_effects: SmallVec<[String; 4]>,
     pub delayed_prohibition_effects: SmallVec<[String; 4]>,

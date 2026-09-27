@@ -16,7 +16,14 @@ macro_rules! wire_tables {
     ($($variant:ident => $wire:literal $(| $alias:literal)*),+ $(,)?) => {
         /// Convert a wire string to the typed value.
         /// Returns None for unrecognized names (makes typos detectable at parse time).
-        pub fn from_str(s: &str) -> Option<Self> {
+        // Not `core::str::FromStr`: this is a wire decode table that returns
+        // `Option` (an unknown wire name is "no such variant"), and it is a
+        // sibling of the generated `to_str` below, not a general parser.
+        #[allow(clippy::should_implement_trait)]
+        // Not `core::str::FromStr`: a wire decode table returning `Option`, not a
+    // fallible parser.
+    #[allow(clippy::should_implement_trait)]
+    pub fn from_str(s: &str) -> Option<Self> {
             match s {
                 $($wire $(| $alias)* => Some(Self::$variant),)+
                 _ => None,
@@ -76,6 +83,9 @@ pub enum Zone {
 impl Zone {
     /// Convert a string zone name to the typed enum.
     /// Returns None for unrecognized zone names (prevents silent typos from becoming silent no-ops).
+    // Not `core::str::FromStr`: a wire decode table returning `Option`, not a
+    // fallible parser.
+    #[allow(clippy::should_implement_trait)]
     pub fn from_str(s: &str) -> Option<Self> {
         match s {
             "hand" => Some(Zone::Hand),
@@ -221,6 +231,9 @@ impl TargetPlayer {
     /// Parse a player-target string. Returns `None` for values that are not a
     /// player target ("deck", ability-reference strings, etc.), so callers can
     /// fall back to the raw string for those cases.
+    // Not `core::str::FromStr`: a wire decode table returning `Option`, not a
+    // fallible parser.
+    #[allow(clippy::should_implement_trait)]
     pub fn from_str(s: &str) -> Option<Self> {
         match s {
             "self" => Some(TargetPlayer::Self_),
@@ -648,6 +661,9 @@ pub enum SelectTargetKind {
 }
 
 impl SelectTargetKind {
+    // Not `core::str::FromStr`: a wire decode table returning `Option`, not a
+    // fallible parser.
+    #[allow(clippy::should_implement_trait)]
     pub fn from_str(s: &str) -> Option<Self> {
         match s {
             "choice" => Some(Self::Choice),

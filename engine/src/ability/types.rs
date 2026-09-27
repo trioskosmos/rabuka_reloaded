@@ -88,6 +88,11 @@ impl fmt::Display for ChoiceRoute {
     feature = "serde_support",
     derive(serde::Serialize, serde::Deserialize)
 )]
+// SelectCard carries ~10 prompt fields where the other variants carry 0-2, so
+// the enum is lopsided by construction. Boxing it would change the serde shape
+// that crosses the JSON boundary to the frontend, which the arena/UI protocols
+// depend on, so the size is accepted rather than paid for.
+#[allow(clippy::large_enum_variant)]
 pub enum Choice {
     SelectCard {
         zone: String,

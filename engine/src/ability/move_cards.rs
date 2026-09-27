@@ -1378,10 +1378,8 @@ impl AbilityResolver {
             );
             let mut filter = util::CardFilter::from_effect(effect);
             // Resolve dynamic cost limit reference (e.g. "previous_moved_card" + offset)
-            if let Ok(resolved) = self.resolve_cost_limit_reference(gs, effect) {
-                if let Some(cost) = resolved {
-                    filter.cost_limit = Some(cost);
-                }
+            if let Ok(Some(cost)) = self.resolve_cost_limit_reference(gs, effect) {
+                filter.cost_limit = Some(cost);
             }
             // 「デッキの上からN番目に置いてもよい」: the answer-time handler
             // (handle_select_cards_looked_at) has no access to this effect, so
@@ -1477,10 +1475,8 @@ impl AbilityResolver {
             util::SelectionOutcome::Prompt => {
                 let mut filter = util::CardFilter::from_effect(effect);
                 // Resolve dynamic cost limit reference (e.g. "previous_moved_card" + offset)
-                if let Ok(resolved) = self.resolve_cost_limit_reference(gs, effect) {
-                    if let Some(cost) = resolved {
-                        filter.cost_limit = Some(cost);
-                    }
+                if let Ok(Some(cost)) = self.resolve_cost_limit_reference(gs, effect) {
+                    filter.cost_limit = Some(cost);
                 }
                 self.prompt_card_selection(
                     Zone::SelectedCards.to_str(),
@@ -1994,8 +1990,8 @@ gs.set_recently_moved_batch(moved.clone().into(), Some("under_member"));
         {
             return self.execute_move_cards_both(gs, effect);
         }
-        let count = if effect.count.is_some() {
-            effect.count.unwrap() as usize
+        let count = if let Some(c) = effect.count {
+            c as usize
         } else if let Some(dc) = effect.dynamic_count_any() {
             self.resolve_dynamic_count(gs, dc) as usize
         } else {
@@ -2639,28 +2635,30 @@ if util::distinct_should_dedupe(distinct) {
                 // already enforced by the filtered_indices pass above.
                 let sum_limit = cost_total;
                 let sum_operator = cost_total_operator;
-                if zone_enum == Some(Zone::Discard) && sum_limit.is_some() {
-                    let player = gs.resolve_target_player(&target);
-                    let limit = sum_limit.unwrap();
-                    let op = sum_operator.unwrap_or("<=");
-                    let card_ids = util::resolve_indices_to_ids(player, zone, &filtered_indices);
-                    let total_cost: u8 = card_ids
-                        .iter()
-                        .filter_map(|&cid| card_db.get_card(cid).and_then(|c| c.cost))
-                        .sum();
-                    // A selection with no stated operator means "up to the
-                    // limit", so an operator we do not know keeps that meaning
-                    // rather than rejecting the selection.
-                    let ok = util::compare_with_operator(op, total_cost, limit)
-                        .unwrap_or(total_cost <= limit);
-                    if !ok {
-                        log::debug!(
-                            "[SELECTION_REJECTED] reason=total_cost actual={} operator={} limit={}",
-                            total_cost,
-                            op,
-                            limit
-                        );
-                        return Ok(());
+                if zone_enum == Some(Zone::Discard) {
+                    if let Some(limit) = sum_limit {
+                        let player = gs.resolve_target_player(&target);
+                        let op = sum_operator.unwrap_or("<=");
+                        let card_ids =
+                            util::resolve_indices_to_ids(player, zone, &filtered_indices);
+                        let total_cost: u8 = card_ids
+                            .iter()
+                            .filter_map(|&cid| card_db.get_card(cid).and_then(|c| c.cost))
+                            .sum();
+                        // A selection with no stated operator means "up to the
+                        // limit", so an operator we do not know keeps that meaning
+                        // rather than rejecting the selection.
+                        let ok = util::compare_with_operator(op, total_cost, limit)
+                            .unwrap_or(total_cost <= limit);
+                        if !ok {
+                            log::debug!(
+                                "[SELECTION_REJECTED] reason=total_cost actual={} operator={} limit={}",
+                                total_cost,
+                                op,
+                                limit
+                            );
+                            return Ok(());
+                        }
                     }
                 }
 

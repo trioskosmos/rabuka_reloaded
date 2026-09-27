@@ -80,8 +80,9 @@ fn sha256_hex(data: &[u8]) -> String {
 /// hand-editing declarations. Each generated file declares:
 /// - every sibling `*.rs` file except `mod.rs` itself, as `pub mod <stem>;`
 /// - every subdirectory containing at least one `.rs` file, as `pub mod <dir>;`
-/// Sorted alphabetically for stable output. Rewrites only when content
-/// differs, so unchanged trees do not touch mtimes.
+///
+///   Sorted alphabetically for stable output. Rewrites only when content
+///   differs, so unchanged trees do not touch mtimes.
 ///
 /// EXCLUDED_FILES are present on disk but deliberately not compiled (broken
 /// or dormant experiments); they must stay commented out, so the generator

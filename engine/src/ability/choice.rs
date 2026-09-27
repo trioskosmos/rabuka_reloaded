@@ -778,7 +778,7 @@ impl super::resolver::AbilityResolver {
         if count > 0 && new_card_ids.len() == count {
             if let Some(cost) = gs.entry_cost() {
                 if cost.same_unit_name_any().unwrap_or(false) {
-                    let total_needed = cost.count.unwrap_or(1) as usize;
+                    let total_needed = crate::constants::count_usize_i64(i64::from(cost.count.unwrap_or(1)));
                     let total_moved = self.moved_cards.len();
                     if total_moved < total_needed {
                         let remaining = total_needed - total_moved;
@@ -829,7 +829,7 @@ impl super::resolver::AbilityResolver {
         let cost_max_cap = gs
             .entry_cost()
             .and_then(|c| c.count)
-            .map(|c| c as usize)
+            .map(usize::from)
             .unwrap_or(usize::MAX);
         if count == 0 && allow_skip && self.moved_cards.len() < cost_max_cap {
             log::debug!("[COST] source={:?} choose more cards or finish: added={} paid_cards={:?} cap={}", self.activating_card_id, new_card_ids.len(), self.moved_cards, cost_max_cap);
@@ -900,8 +900,8 @@ impl super::resolver::AbilityResolver {
         if count_paid > 0 {
             let player =
                 gs.resolve_target_player_mut(target_player_id.as_deref().unwrap_or("self"));
-            player.energy_zone.pay_energy(count_paid as u8)?;
-            gs.mods.last_cost_energy_count += count_paid as u8;
+            player.energy_zone.pay_energy(crate::constants::count_u8(count_paid))?;
+            gs.mods.last_cost_energy_count += crate::constants::count_u8(count_paid);
             if let Some(entry) = gs.ability_queue.current_entry_mut() {
                 entry.cost_paid = true;
                 entry.optional_cost_result = Some(true);
@@ -1183,14 +1183,14 @@ impl super::resolver::AbilityResolver {
             // Record the chosen hand POSITIONS to keep (hand is unchanged during
             // selection, so these absolute positions map onto the snapshot).
             for &idx in hand_idx.iter() {
-                let idx = idx as u8;
+                let idx = crate::constants::count_u8(idx);
                 if !self.keep_shuffle_selected.contains(&idx) {
                     self.keep_shuffle_selected.push(idx);
                 }
             }
-            let count = self.keep_shuffle_under_count as usize;
+            let count = usize::from(self.keep_shuffle_under_count);
             let available_idxs: Vec<usize> = (0..hand_cards.len())
-                .filter(|i| !self.keep_shuffle_selected.contains(&(*i as u8)))
+                .filter(|i| !self.keep_shuffle_selected.contains(&crate::constants::count_u8(*i)))
                 .collect();
             if hand_idx.len() < count && !hand_idx.is_empty() && !available_idxs.is_empty() {
                 let remaining = count.saturating_sub(self.keep_shuffle_selected.len().min(count));
@@ -1528,8 +1528,11 @@ impl super::resolver::AbilityResolver {
 
         if !hand_positions.is_empty() && ctx.count > 0 && hand_positions.len() < ctx.count {
             for &hp in &hand_positions {
-                if !self.selected_cards.contains(&(hp as i16)) {
-                    self.selected_cards.push(hp as i16);
+                if !self
+                    .selected_cards
+                    .contains(&crate::constants::count_i16(hp))
+                {
+                    self.selected_cards.push(crate::constants::count_i16(hp));
                 }
             }
             let remaining = ctx.count - hand_positions.len();
@@ -1557,7 +1560,10 @@ impl super::resolver::AbilityResolver {
                 .blind(ctx.blind)
                 .is_reveal(true)
                 .filtered_indices(Some(
-                    self.selected_cards.iter().map(|&i| i as usize).collect(),
+                    self.selected_cards
+            .iter()
+            .map(|&i| crate::constants::count_usize_i16(i))
+            .collect(),
                 ))
                 .build(),
             );
@@ -1565,7 +1571,11 @@ impl super::resolver::AbilityResolver {
             return Ok(());
         }
 
-        let mut all_indices: Vec<usize> = self.selected_cards.iter().map(|&i| i as usize).collect();
+        let mut all_indices: Vec<usize> = self
+            .selected_cards
+            .iter()
+            .map(|&i| crate::constants::count_usize_i16(i))
+            .collect();
         self.selected_cards.clear();
         for &hp in &hand_positions {
             if !all_indices.contains(&hp) {
@@ -1624,7 +1634,10 @@ impl super::resolver::AbilityResolver {
         }
 
         if ctx.count == 0 && ctx.allow_skip && !effect_started && !all_indices.is_empty() {
-            self.selected_cards = all_indices.iter().map(|&i| i as i16).collect();
+            self.selected_cards = all_indices
+            .iter()
+            .map(|&i| crate::constants::count_i16(i))
+            .collect();
             let hand_len = {
                 let p = gs.resolve_target_player_mut(&target);
                 p.hand.cards.len()
@@ -1819,7 +1832,7 @@ gs.set_recently_moved_batch(valid_ids.into(), Some(Zone::SuccessLiveZone.to_str(
                 }
             })
             .collect();
-        let count = cost.count.unwrap_or(1) as usize;
+        let count = crate::constants::count_usize_i64(i64::from(cost.count.unwrap_or(1)));
         if card_ids.is_empty() && cost.optional.unwrap_or(false) {
             self.selected_cards.clear();
             if let Some(entry) = gs.ability_queue.current_entry_mut() {
@@ -1945,7 +1958,9 @@ gs.set_recently_moved_batch(valid_ids.into(), Some(Zone::SuccessLiveZone.to_str(
                 let any_number = sa.and_then(|s| s.any_number_any()).unwrap_or(false);
                 let is_max = sa.and_then(|s| s.max).unwrap_or(false);
                 let is_optional = sa.and_then(|s| s.optional).unwrap_or(false);
-                let json_count = sa.and_then(|s| s.count).unwrap_or(1) as usize;
+                let json_count = crate::constants::count_usize_i64(i64::from(
+        sa.and_then(|s| s.count).unwrap_or(1),
+    ));
                 let max_count = ctx.count;
                 let selected_count = valid.len();
                 let remaining = gs.looked_at_cards.len();
@@ -2220,7 +2235,7 @@ gs.set_recently_moved_batch(moved.clone().into(), Some("under_member"));
             );
             if moved_count > 0 {
                 if let Some(pos) = last_vacated {
-                    gs.last_vacated_stage_area = Some(pos as u8);
+                    gs.last_vacated_stage_area = Some(crate::constants::count_u8(pos));
                 }
                 self.selected_cards = valid_ids.clone().into();
                 self.moved_cards = valid_ids.clone().into();
@@ -2847,7 +2862,7 @@ gs.set_recently_moved_batch(valid_ids.into(), Some("stage"));
             if count > 0 {
                 crate::ability::effects::draw_cards_for_player(
                     player,
-                    count as u8,
+                    crate::constants::count_u8(count),
                     source,
                     destination,
                     card_type,
@@ -3469,8 +3484,15 @@ modified.destination = Some(Zone::from_source_str(dest));
         static LAST_CARD: AtomicU32 = AtomicU32::new(u32::MAX);
         static LAST_ABILITY: AtomicU32 = AtomicU32::new(u32::MAX);
         let entry = gs.ability_queue.current_entry();
-        let key_card = entry.and_then(|e| e.card_id).unwrap_or(-1) as i32 as u32;
-        let key_ability = entry.map(|e| e.ability_index as u32).unwrap_or(u32::MAX);
+        let key_card = u32::try_from(
+            entry
+                .and_then(|e| e.card_id)
+                .map_or(-1, i32::from),
+        )
+        .unwrap_or(u32::MAX);
+        let key_ability = entry
+            .map(|e| crate::constants::count_u32(e.ability_index))
+            .unwrap_or(u32::MAX);
         if LAST_CARD.load(Ordering::Relaxed) != key_card
             || LAST_ABILITY.load(Ordering::Relaxed) != key_ability
         {
@@ -3654,8 +3676,8 @@ modified.destination = Some(Zone::from_source_str(dest));
                     format!("Treat hearts as {} ×{}", chosen, count.max(1)),
                     "heart_override",
                     card_id,
-                    Some(color.index() as u8),
-                    count.max(1) as i16,
+        Some(crate::constants::count_u8(color.index())),
+        crate::constants::count_i16(usize::from(count.max(1))),
                 );
             }
             if let Some(entry) = gs.ability_queue.current_entry_mut() {

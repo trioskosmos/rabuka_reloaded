@@ -45,7 +45,7 @@ impl AbilityResolver {
                 text,
                 effect.target_any().unwrap_or("self"),
                 effect.duration_any(),
-                effect.gained_effect_any().cloned(),
+                effect.gained_effect_any().cloned().map(Box::new),
                 effect.ability_gain_trigger_any(),
                 gs.activating_card,
             );

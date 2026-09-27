@@ -100,6 +100,7 @@ pub struct Config {
     pub own_pool: bool,
     pub exec_deploy: bool,
     pub promote_only: bool,
+    pub v7_leaf: bool,
 }
 
 fn env_usize(name: &str, default: usize) -> usize {
@@ -156,6 +157,7 @@ impl Config {
             own_pool: std::env::var("V7_ISMCTS_OPP_POOL").as_deref() != Ok("fair"),
             exec_deploy: std::env::var_os("V7_ISMCTS_EXEC_DEPLOY").is_some(),
             promote_only: std::env::var("V7_ISMCTS_PROMOTE").as_deref() != Ok("any"),
+            v7_leaf: std::env::var("V7_ISMCTS_LEAF").as_deref() == Ok("v7"),
         }
     }
 }
@@ -381,6 +383,42 @@ fn game_value(gs: &GameState, me: u8) -> f64 {
     }
 }
 
+/// Leaf value that defers to v7's OWN evaluation, read at the horizon
+/// position instead of at the root.
+///
+/// This is the smallest honest increment over v7: nothing about how a move is
+/// judged changes, the model that judges it is the same tuned one v7 already
+/// ships, and the only new thing is that it is applied three turns later with
+/// both sides played out. Measured against the hand-rolled `game_value` above,
+/// which is a coarser restatement of the same axes plus a sampled opponent —
+/// the version that lost 5pp of placements per live phase.
+fn game_value_v7(gs: &GameState, me: u8, root: &v7_main::Features) -> f64 {
+    match gs.game_result {
+        GameResult::Draw => 0.0,
+        GameResult::FirstAttackerWins => {
+            if gs.player1.is_first_attacker == (me == 0) {
+                1.0
+            } else {
+                -1.0
+            }
+        }
+        GameResult::SecondAttackerWins => {
+            if gs.player1.is_first_attacker == (me == 0) {
+                -1.0
+            } else {
+                1.0
+            }
+        }
+        GameResult::Ongoing => {
+            let now = v7_main::features(gs, me);
+            // v7's leaf is unbounded (a success zone is worth 1000); 400 is
+            // roughly one good deploy, so this keeps ordinary positions in
+            // range and lets terminal outcomes dominate when they happen.
+            (v7_main::value(&now, root, false) / 400.0).clamp(-1.0, 1.0)
+        }
+    }
+}
+
 fn printed_hearts(db: &CardDatabase, cid: i16) -> i32 {
     db.get_card(cid)
         .and_then(|card| card.base_heart.as_ref())
@@ -531,7 +569,14 @@ fn rollout_action(gs: &GameState, actions: &[Action], me: u8, exec_deploy: bool)
 }
 
 /// Play `root` out from `world` and return its leaf value.
-fn play_out(world: &GameState, me: u8, cfg: &Config, root: &Action, start_turn: u8) -> f64 {
+fn play_out(
+    world: &GameState,
+    me: u8,
+    cfg: &Config,
+    root: &Action,
+    start_turn: u8,
+    root_features: &v7_main::Features,
+) -> f64 {
     let horizon_end = start_turn.saturating_add(cfg.horizon);
     let mut sim = world.clone();
     compact(&mut sim);
@@ -546,20 +591,39 @@ fn play_out(world: &GameState, me: u8, cfg: &Config, root: &Action, start_turn: 
     // would be recomputed on every tick of the phase. Memoize it per phase.
     let mut live_plan: Option<(u8, u8, Vec<usize>)> = None;
 
-    for _ in 0..cfg.ticks {
+    // The leaf is read at the START of the horizon turn's Main phase, not at
+    // whichever tick the budget happened to run out on.
+    //
+    // This matters more than it looks. A tick budget stops wherever it stops:
+    // possibly with one live card selected and a pending choice outstanding,
+    // one player mid-ability, energy half-spent. `lives_in_hand` and
+    // `passable_count_buffed` are then describing a state that does not exist
+    // at any decision point, so the value function scores noise — and a noisy
+    // leaf is worse than no leaf, because the search still trusts it. The Main
+    // phase of turn N is the one position every rollout can be compared at:
+    // fresh hand, refreshed energy, complete board, no pending choice. It is
+    // also exactly where the next decision happens, so it is the position the
+    // root action is actually being judged for.
+    let mut ticks = 0usize;
+    loop {
         crate::turn::TurnEngine::check_victory_condition(&mut sim);
         if sim.game_result != GameResult::Ongoing {
             break;
         }
-        if sim.turn_number > horizon_end {
+        if sim.turn_number >= horizon_end && matches!(sim.current_phase, Phase::Main) {
+            break;
+        }
+        if ticks >= cfg.ticks || sim.turn_number > horizon_end {
             break;
         }
         if game_setup::auto_advance_one(&mut sim) {
+            ticks += 1;
             continue;
         }
         let actions = game_setup::generate_possible_actions(&sim);
         if actions.is_empty() {
             crate::turn::TurnEngine::advance_phase(&mut sim);
+            ticks += 1;
             continue;
         }
         let chosen = match sim.current_phase {
@@ -583,6 +647,7 @@ fn play_out(world: &GameState, me: u8, cfg: &Config, root: &Action, start_turn: 
         };
         if game_setup::execute_action(&mut sim, &chosen).is_err() {
             crate::turn::TurnEngine::advance_phase(&mut sim);
+            ticks += 1;
             continue;
         }
         // A speculative game must never stop to ask whether it is looping.
@@ -593,9 +658,14 @@ fn play_out(world: &GameState, me: u8, cfg: &Config, root: &Action, start_turn: 
             sim.game_state_history.clear();
         }
         game_setup::settle_single_player_state(&mut sim);
+        ticks += 1;
     }
     crate::turn::TurnEngine::check_victory_condition(&mut sim);
-    game_value(&sim, me)
+    if cfg.v7_leaf {
+        game_value_v7(&sim, me, root_features)
+    } else {
+        game_value(&sim, me)
+    }
 }
 
 /// The live-card portfolio for the seat now acting. Ours is v7's measured
@@ -647,6 +717,7 @@ fn run_batch(
     cfg: &Config,
     items: &[(usize, usize, usize)],
     start_turn: u8,
+    root_features: &v7_main::Features,
 ) -> Vec<f64> {
     if items.is_empty() {
         return Vec::new();
@@ -654,7 +725,14 @@ fn run_batch(
     let run = |item: &(usize, usize, usize)| -> f64 {
         let (action, world, sim) = *item;
         crate::rng::seed(rollout_seed(world, sim));
-        play_out(&worlds[world], me, cfg, &actions[action], start_turn)
+        play_out(
+            &worlds[world],
+            me,
+            cfg,
+            &actions[action],
+            start_turn,
+            root_features,
+        )
     };
 
     if cfg.jobs <= 1 || items.len() == 1 {
@@ -674,8 +752,14 @@ fn run_batch(
                 for (offset, item) in part.iter().enumerate() {
                     let (action, world, sim) = *item;
                     crate::rng::seed(rollout_seed(world, sim));
-                    slice[offset] =
-                        play_out(&worlds[world], me, cfg, &actions[action], start_turn);
+                    slice[offset] = play_out(
+                        &worlds[world],
+                        me,
+                        cfg,
+                        &actions[action],
+                        start_turn,
+                        root_features,
+                    );
                 }
             });
         }
@@ -839,6 +923,10 @@ fn search(
     let worlds: Vec<GameState> = (0..cfg.worlds)
         .map(|index| sample_world(gs, me, cfg, index))
         .collect();
+    // The reference position for the v7 leaf: v7's own features at the root,
+    // so `value(features(leaf), features(root))` reads as "how much better is
+    // the board three turns from now than it is now".
+    let root_features = v7_main::features(gs, me);
 
     let mut sums = vec![0.0f64; candidates.len()];
     let mut counts = vec![0u32; candidates.len()];
@@ -854,7 +942,7 @@ fn search(
     let first: Vec<(usize, usize, usize)> = (0..candidates.len())
         .map(|slot| (slot, slot % worlds.len(), slot / worlds.len()))
         .collect();
-    for (value, item) in run_batch(actions, &worlds, me, cfg, &first, start_turn)
+    for (value, item) in run_batch(actions, &worlds, me, cfg, &first, start_turn, &root_features)
         .into_iter()
         .zip(&first)
     {
@@ -863,27 +951,43 @@ fn search(
         used += 1;
     }
 
-    while used < target {
-        let batch = (target - used).min(cfg.jobs.max(1));
-        let mut items: Vec<(usize, usize, usize)> = Vec::with_capacity(batch);
-        for _ in 0..batch {
-            let slot =
-                select_candidate(&sums, &counts, &prior, &prior_prob, cfg.k0, cfg.c_puct);
-            // The action's OWN visit index picks the (world, sim) slot, so
-            // every action's j-th rollout is paired with every other action's
-            // j-th rollout. PUCT decides who is sampled; common random
-            // numbers decide that the answer is comparable.
-            let visit = counts[slot] as usize;
-            items.push((slot, visit % worlds.len(), visit / worlds.len()));
-        }
-        for (value, item) in
-            run_batch(actions, &worlds, me, cfg, &items, start_turn).into_iter().zip(&items)
-        {
-            sums[item.0] += value;
-            counts[item.0] += 1;
-            used += 1;
-        }
+    // Balanced visits, round-robin. No PUCT.
+    //
+    // PUCT is the standard choice and it is wrong here, and the per-move trace
+    // shows exactly why. The v7 leaf is near-binary: a rollout that places a
+    // life reads 1.0, one that does not reads -1.0, so Q saturates and stops
+    // discriminating. With a saturated Q, the exploration bonus is the only
+    // thing separating children, and the search piles onto whichever child
+    // drew a winning sample first:
+    //
+    //   cand0 play_member_to_stage:2551  n=1  mean=0.171
+    //   cand1 play_member_to_stage:2537  n=23 mean=1.000
+    //   cand4 play_member_to_stage:2551  n=1  mean=0.024  <= PICKED
+    //
+    // Twenty-three visits, all 1.0, and the actual pick is a one-visit
+    // candidate. That is not an estimate, it is a race. Because every action
+    // already gets the SAME (world, sim) sequence by construction — common
+    // random numbers make action A's j-th rollout paired with action B's
+    // j-th — a round-robin over that shared sequence is a properly paired
+    // estimate for every child, and it removes the visit-count artifact
+    // without giving up any information.
+    let batch = (target - used).min(cfg.jobs.max(1));
+    let mut items: Vec<(usize, usize, usize)> = Vec::with_capacity(batch);
+    for offset in 0..batch {
+        let slot = (used + offset) % candidates.len();
+        let visit = counts[slot] as usize;
+        items.push((slot, visit % worlds.len(), visit / worlds.len()));
     }
+    for (value, item) in
+        run_batch(actions, &worlds, me, cfg, &items, start_turn, &root_features)
+            .into_iter()
+            .zip(&items)
+    {
+        sums[item.0] += value;
+        counts[item.0] += 1;
+        used += 1;
+    }
+}
 
     let mut out = scores.to_vec();
     let mut priced = vec![false; out.len()];
@@ -940,15 +1044,54 @@ fn search(
             overrode,
         );
         if overrode {
+            let me_player = gs.seat_player(me);
+            let opp_player = gs.seat_player(1 - me);
+            eprintln!(
+                "    BOARD t{} me{} energy={}/{} hand={} stage={:?} blades={} covered={} succ={}..{} | opp blades={} succ={} opp_hand={}",
+                gs.turn_number,
+                me,
+                me_player.energy_zone.cards.len(),
+                me_player.energy_zone.active_energy_count,
+                me_player.hand.cards.len(),
+                me_player.stage.stage,
+                me_player
+                    .stage
+                    .total_blades(
+                        &gs.card_database,
+                        &gs.mods.blade_modifiers,
+                        &gs.mods.orientation_modifiers,
+                        false,
+                    ),
+                crate::bot::strategy_v7::passable_count_buffed(gs, me, &gs.card_database),
+                me_player.success_live_card_zone.cards.len(),
+                opp_player.success_live_card_zone.cards.len(),
+                opp_player
+                    .stage
+                    .total_blades(
+                        &gs.card_database,
+                        &gs.mods.blade_modifiers,
+                        &gs.mods.orientation_modifiers,
+                        false,
+                    ),
+                opp_player.success_live_card_zone.cards.len(),
+                opp_player.hand.cards.len(),
+            );
             for (slot, &index) in candidates.iter().enumerate() {
                 eprintln!(
-                    "    cand{} {} v={:.3} n={} prior={:.3} sum={:.2}",
+                    "    cand{} {:<34} static={:>8.1} prior={:>6.3} n={} sum={:>7.2} mean={:>6.3} -> blended={:>6.3}{}",
                     slot,
                     action_label(actions, index),
-                    out[index].0,
-                    counts[slot],
+                    scores[index].0,
                     prior[slot],
+                    counts[slot],
                     sums[slot],
+                    if counts[slot] > 0 {
+                        sums[slot] / f64::from(counts[slot])
+                    } else {
+                        0.0
+                    },
+                    out[index].0,
+                    if slot == searched_best { "  <= PICKED" } else { "" },
                 );
             }
         }
@@ -1147,6 +1290,7 @@ mod tests {
             own_pool: true,
             exec_deploy: false,
             promote_only: true,
+            v7_leaf: false,
         };
         let world = sample_world(&gs, 0, &cfg, 0);
         assert_eq!(world.player2.main_deck.cards.len(), deck_size);

@@ -276,39 +276,44 @@ impl PolicyNet {
         }
     }
 
+    // The row width comes from EncodedState::state_dim(), which is derived
+    // from the encoder's feature counts at runtime — not a const, so
+    // as_chunks::<N> cannot be used here.
+    #[allow(clippy::chunks_exact_to_as_chunks)]
     fn forward_state(&self, state_flat: &[f32]) -> Vec<f32> {
         let state_dim = EncodedState::state_dim();
         let mut h = vec![0.0f32; HIDDEN];
-        for i in 0..HIDDEN {
+        for (i, row) in self.w1_state.chunks_exact(state_dim).enumerate() {
             let mut s = self.b1[i];
-            for j in 0..state_dim {
-                s += self.w1_state[i * state_dim + j] * state_flat[j];
+            for (w, x) in row.iter().zip(state_flat) {
+                s += w * x;
             }
             h[i] = relu(s);
         }
         h
     }
 
+    #[allow(clippy::chunks_exact_to_as_chunks)]
     fn action_logit(&self, h_state: &[f32], action_enc: &[f32]) -> f32 {
         let mut h = vec![0.0f32; HIDDEN];
-        for i in 0..HIDDEN {
+        for (i, row) in self.w1_action.chunks_exact(ACTION_ENC_DIM).enumerate() {
             let mut s = h_state[i];
-            for j in 0..ACTION_ENC_DIM {
-                s += self.w1_action[i * ACTION_ENC_DIM + j] * action_enc[j];
+            for (w, x) in row.iter().zip(action_enc) {
+                s += w * x;
             }
             h[i] = relu(s);
         }
         let mut logit = self.b_policy;
-        for i in 0..HIDDEN {
-            logit += self.w_policy[i] * h[i];
+        for (w, h_i) in self.w_policy.iter().zip(h.iter()) {
+            logit += w * h_i;
         }
         logit
     }
 
     fn state_value(&self, h_state: &[f32]) -> f32 {
         let mut v = self.b_value;
-        for i in 0..HIDDEN {
-            v += self.w_value[i] * h_state[i];
+        for (w, h_i) in self.w_value.iter().zip(&h_state[..HIDDEN]) {
+            v += w * h_i;
         }
         v.tanh()
     }

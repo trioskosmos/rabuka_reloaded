@@ -1829,12 +1829,12 @@ impl AbilityEffect {
 
     filter_str_getter!(ability_text_any, ability_text);
 
-    pub fn activation_condition_parsed_any(&self) -> Option<&Box<Condition>> {
+    pub fn activation_condition_parsed_any(&self) -> Option<&Condition> {
         self.kind
             .as_deref()?
             .filter()?
             .activation_condition_parsed
-            .as_ref()
+            .as_deref()
     }
 
     filter_str_getter!(activation_position_any, activation_position);
@@ -1979,11 +1979,11 @@ impl AbilityEffect {
         filter_targets_by_heart_colors
     );
 
-    pub fn gained_effect_any(&self) -> Option<&Box<AbilityEffect>> {
+    pub fn gained_effect_any(&self) -> Option<&AbilityEffect> {
         self.kind
             .as_deref()
             .and_then(|k| k.filter())
-            .and_then(|f| f.gained_effect.as_ref())
+            .and_then(|f| f.gained_effect.as_deref())
     }
 
     filter_opt_vec_ref_getter!(group_names_any, group_names);
@@ -2116,11 +2116,11 @@ impl AbilityEffect {
 
     filter_u8_getter!(resource_icon_count_any, resource_icon_count);
 
-    pub fn resource_on_select_any(&self) -> Option<&Box<AbilityEffect>> {
+    pub fn resource_on_select_any(&self) -> Option<&AbilityEffect> {
         self.kind
             .as_deref()
             .and_then(|k| k.filter())
-            .and_then(|f| f.resource_on_select.as_ref())
+            .and_then(|f| f.resource_on_select.as_deref())
     }
 
     filter_str_getter!(restricted_destination_any, restricted_destination);
@@ -2610,6 +2610,9 @@ impl CardState {
         }
     }
 
+    // Not `core::str::FromStr`: this is a wire decode table with a deliberate
+    // default arm, so it is total and returns `Self`, not a fallible `Result`.
+    #[allow(clippy::should_implement_trait)]
     pub fn from_str(s: &str) -> CardState {
         match s {
             "active" => CardState::Active,
@@ -2672,6 +2675,9 @@ impl CardProperty {
         }
     }
 
+    // Not `core::str::FromStr`: a wire decode table returning `Option`, not a
+    // fallible parser.
+    #[allow(clippy::should_implement_trait)]
     pub fn from_str(s: &str) -> CardProperty {
         match s {
             "has_score_icon" => CardProperty::HasScoreIcon,
@@ -2843,6 +2849,9 @@ impl ComparisonType {
         }
     }
 
+    // Not `core::str::FromStr`: a wire decode table returning `Option`, not a
+    // fallible parser.
+    #[allow(clippy::should_implement_trait)]
     pub fn from_str(s: &str) -> ComparisonType {
         match s {
             "cost" => ComparisonType::Cost,
@@ -2879,6 +2888,9 @@ impl AbilityFilter {
         }
     }
 
+    // Not `core::str::FromStr`: a wire decode table returning `Option`, not a
+    // fallible parser.
+    #[allow(clippy::should_implement_trait)]
     pub fn from_str(s: &str) -> AbilityFilter {
         match s {
             "has_ability" => AbilityFilter::HasAbility,
@@ -2937,6 +2949,9 @@ impl ConditionCardType {
         }
     }
 
+    // Not `core::str::FromStr`: a wire decode table returning `Option`, not a
+    // fallible parser.
+    #[allow(clippy::should_implement_trait)]
     pub fn from_str(s: &str) -> ConditionCardType {
         match s {
             "live_card" => ConditionCardType::LiveCard,

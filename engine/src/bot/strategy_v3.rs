@@ -74,7 +74,7 @@ fn heart_index(c: crate::card::HeartColor) -> usize {
 
 fn acc_add_hearts(acc: &mut HeartAcc, hearts: &crate::card::HeartMap) {
     for (c, v) in hearts.iter() {
-        acc[heart_index(*c)] += *v as i32;
+        acc[heart_index(*c)] += i32::from(*v);
     }
 }
 
@@ -175,7 +175,7 @@ impl V3Plan {
     }
 
     pub fn milestone(&self, turn: u8) -> i32 {
-        CURVE[(turn as usize - 1).min(CURVE.len() - 1)]
+        CURVE[(usize::from(turn) - 1).min(CURVE.len() - 1)]
     }
 }
 
@@ -228,7 +228,7 @@ fn curve_term(gs: &GameState, me_player: u8, plan: &V3Plan, w: &StrategyWeights)
     for &cid in my.stage.stage.iter() {
         if cid >= 0 {
             if let Some(card) = gs.card_database.get_card(cid) {
-                stage_cost += card.cost.unwrap_or(0) as i32;
+                stage_cost += i32::from(card.cost.unwrap_or(0));
             }
         }
     }
@@ -322,11 +322,12 @@ pub fn choose_action_heuristic_v3(
         } else {
             acq_features(&sim.player2, db)
         };
-        let d_lives = my_after.lives_in_hand as i32 - my_before.lives_in_hand as i32;
-        let d_members = my_after.playable_members_in_hand as i32
-            - my_before.playable_members_in_hand as i32;
-        let d_wr_lives =
-            my_after.lives_in_waitroom as i32 - my_before.lives_in_waitroom as i32;
+        let d_lives = crate::constants::count_i32(my_after.lives_in_hand)
+            - crate::constants::count_i32(my_before.lives_in_hand);
+        let d_members = crate::constants::count_i32(my_after.playable_members_in_hand)
+            - crate::constants::count_i32(my_before.playable_members_in_hand);
+        let d_wr_lives = crate::constants::count_i32(my_after.lives_in_waitroom)
+            - crate::constants::count_i32(my_before.lives_in_waitroom);
 
         // Lives into hand: strong want during the rush window (ammo for the
         // flood), moderate otherwise — and DESPERATION-scaled when the hand
@@ -417,7 +418,7 @@ fn plan_score_portfolio(
         let waiting = gs.mods.get_orientation_modifier(cid) == Some("wait");
         if !waiting {
             if let Some(card) = db.get_card(cid) {
-                blades += card.blade as i32;
+                blades += i32::from(card.blade);
             }
         }
     }
@@ -429,7 +430,7 @@ fn plan_score_portfolio(
         .filter(|&&cid| db.get_card(cid).is_some_and(|c| c.blade_heart.is_some()))
         .count() as f64
         / deck_len.max(1) as f64;
-    let expected_hits = (blades as f64 * density).round() as i32;
+    let expected_hits = crate::constants::score_to_i32_rounded(blades as f64 * density);
     pool[10] += expected_hits;
 
     let mut candidates: Vec<(usize, i32, [i32; 11])> = Vec::new();
@@ -444,12 +445,12 @@ fn plan_score_portfolio(
         if let Some(nh) = &card.need_heart {
             acc_add_hearts(&mut need, &nh.hearts);
         }
-        candidates.push((hand_index, card.score.unwrap_or(0) as i32, need));
+        candidates.push((hand_index, i32::from(card.score.unwrap_or(0)), need));
     }
-    candidates.sort_by(|a, b| b.1.cmp(&a.1));
+    candidates.sort_by_key(|c| core::cmp::Reverse(c.1));
 
     let max_slots =
-        (3i32 - i32::from(my.live_card_set_limit_reduction)).max(0) as usize;
+        crate::constants::count_usize(3i32 - i32::from(my.live_card_set_limit_reduction).max(0));
     let mut desired: Vec<usize> = Vec::new();
     for &(hi, _score, ref need) in &candidates {
         if desired.len() >= max_slots {
@@ -489,7 +490,7 @@ fn plan_score_portfolio(
     let selected: Vec<usize> = gs
         .live_card_selected_indices
         .iter()
-        .map(|&i| i as usize)
+        .map(|&i| usize::from(i))
         .collect();
     let find_select = |hand_index: usize, want: bool| -> Option<Action> {
         actions
@@ -537,10 +538,10 @@ pub fn estimate_max_score(
         let waiting = gs.mods.get_orientation_modifier(cid) == Some("wait");
         if let Some(card) = db.get_card(cid) {
             if let Some(bh) = &card.base_heart {
-                hearts += bh.hearts.values_sum() as i32;
+                hearts += i32::from(bh.hearts.values_sum());
             }
             if !waiting {
-                blades += card.blade as i32;
+                blades += i32::from(card.blade);
             }
         }
     }
@@ -557,14 +558,14 @@ pub fn estimate_max_score(
     } else {
         0.0
     };
-    let total = hearts + (blades as f64 * density).round() as i32;
+    let total = hearts + crate::constants::score_to_i32_rounded(blades as f64 * density);
     // Largest score band whose median requirement fits (exact table from
     // cards.json; see docs/BOT_STRATEGY_TREE.md §1.3).
     const BAND: [i32; 10] = [0, 3, 5, 7, 10, 12, 14, 16, 19, 21];
     let mut best = 0;
     for (s, &need) in BAND.iter().enumerate().skip(1) {
         if need <= total {
-            best = s as i32;
+            best = crate::constants::score_to_i32(s as f64);
         }
     }
     best
@@ -790,9 +791,9 @@ pub fn choose_mulligan_action_v3(
                         if idx >= 7 {
                             true // wildcards are always support
                         } else if idx == 0 {
-                            total_producers >= MIN_COLOR_SUPPORT * (*v as i32)
+                            total_producers >= MIN_COLOR_SUPPORT * i32::from(*v)
                         } else {
-                            producers[idx] >= MIN_COLOR_SUPPORT * (*v as i32)
+                            producers[idx] >= MIN_COLOR_SUPPORT * i32::from(*v)
                         }
                     })
                 });
@@ -841,7 +842,7 @@ pub fn choose_mulligan_action_v3(
     let selected: Vec<usize> = gs
         .mulligan_selected_indices
         .iter()
-        .map(|&i| i as usize)
+        .map(|&i| usize::from(i))
         .collect();
     for &hi in &discard {
         if !selected.contains(&hi) {

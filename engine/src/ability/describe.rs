@@ -359,9 +359,10 @@ pub fn describe_effect(effect: &AbilityEffect, ja: bool) -> String {
             };
             if ja {
                 format!(
-                    "{}から{}を選ぶ{}",
+                    "{}から{}枚の{}{}を選ぶ",
                     src,
-                    format!("{}枚の{}", c.unwrap_or(1), ct),
+                    c.unwrap_or(1),
+                    ct,
                     opt
                 )
             } else {
@@ -672,7 +673,7 @@ pub fn describe_effect(effect: &AbilityEffect, ja: bool) -> String {
             // Set-cost (「コストはNになる」) uses the absolute `value` field,
             // not the additive count — e.g. LL-bp7-001 sets cost to 10.
             if op == "set" {
-                match effect.value_any().and_then(|v| i16::try_from(v).ok()) {
+                match effect.value_any().map(i16::from) {
                     Some(v) if ja => format!("コストは{}になる", v),
                     Some(v) => format!("Cost becomes {}", v),
                     None if ja => "コストを設定".to_string(),

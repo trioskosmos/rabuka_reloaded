@@ -51,11 +51,24 @@ impl<T> Pool<T> {
     /// the slot for the lifetime of the pooled value (enforced by the
     /// PoolBox slot/heap discipline). Returns nothing — handing out `&mut T`
     /// from a `&self` receiver is unsound under stacked borrows.
+    ///
+    /// # Safety
+    ///
+    /// `idx` must be a slot previously handed out by [`Self::alloc`] and not
+    /// yet released via [`Self::free_idx`] or [`Self::drop_value`], and no
+    /// other reference to that slot's value may be live.
     pub unsafe fn put(&self, idx: usize, val: T) {
         let ptr = self.slots[idx].get().cast::<T>();
         ptr.write(val);
     }
 
+    /// Drop the value currently occupying slot `idx` in place.
+    ///
+    /// # Safety
+    ///
+    /// `idx` must be a live allocated slot whose value was initialised (via
+    /// [`Self::alloc`] or [`Self::put`]) and has not already been dropped, and
+    /// no reference to that value may be live.
     pub unsafe fn drop_value(&self, idx: usize) {
         self.slots[idx].get().cast::<T>().drop_in_place();
     }

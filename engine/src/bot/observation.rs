@@ -286,9 +286,12 @@ fn player_features(
         let effective = if set != 0 { set } else { base + additive };
         features.live_score = features
             .live_score
-            .saturating_add(effective.max(0) as u16);
+            .saturating_add(crate::constants::count_u16(crate::constants::count_usize(
+            effective.max(0),
+        )));
     }
-    features.success_count = player.success_live_card_zone.cards.len().min(u8::MAX as usize) as u8;
+    features.success_count =
+        crate::constants::count_u8(player.success_live_card_zone.cards.len());
     features
 }
 
@@ -578,7 +581,7 @@ impl PublicObservation {
                 my_data.stage.under_cards[2].to_vec(),
             ],
             energy_zone: my_data.energy_zone.cards.to_vec(),
-            active_energy_count: my_data.energy_zone.active_count() as usize,
+            active_energy_count: usize::from(my_data.energy_zone.active_count()),
             waitroom: my_data.waitroom.cards.to_vec(),
             success_zone: my_data.success_live_card_zone.cards.to_vec(),
             live_zone: me_live.to_vec(),
@@ -625,7 +628,7 @@ impl PublicObservation {
                 opp_data.stage.under_cards[2].to_vec(),
             ],
             energy_zone: opp_data.energy_zone.cards.to_vec(),
-            active_energy_count: opp_data.energy_zone.active_count() as usize,
+            active_energy_count: usize::from(opp_data.energy_zone.active_count()),
             waitroom: opp_data.waitroom.cards.to_vec(),
             success_zone: opp_data.success_live_card_zone.cards.to_vec(),
             live_zone: opp_live,
@@ -660,7 +663,7 @@ impl PublicObservation {
             });
         let ability_queue_current_card = ability_queue_current.and_then(|entry| entry.card_id);
         let ability_queue_current_ability = ability_queue_current
-            .map(|entry| entry.ability_index.min(u8::MAX as usize) as u8);
+            .map(|entry| crate::constants::count_u8(entry.ability_index));
         let ability_queue_current_trigger = ability_queue_current
             .map(|entry| ability_trigger_index(&entry.trigger_type));
         let resolution_zone = if resolution_visible_to(state, perspective_player) {
@@ -686,14 +689,15 @@ impl PublicObservation {
             pending_choice_allow_skip,
             pending_choice_player,
             pending_choice_for_viewer,
-            mulligan_selected_count: state.mulligan_selected_indices.len().min(u8::MAX as usize) as u8,
-            live_card_selected_count: state.live_card_selected_indices.len().min(u8::MAX as usize) as u8,
-            ability_queue_len: state
-                .ability_queue
-                .iter()
-                .filter(|entry| queue_owner_index(&entry.player_id) == Some(perspective_player))
-                .count()
-                .min(u8::MAX as usize) as u8,
+            mulligan_selected_count: crate::constants::count_u8(state.mulligan_selected_indices.len()),
+            live_card_selected_count: crate::constants::count_u8(state.live_card_selected_indices.len()),
+            ability_queue_len: crate::constants::count_u8(
+                state
+                    .ability_queue
+                    .iter()
+                    .filter(|entry| queue_owner_index(&entry.player_id) == Some(perspective_player))
+                    .count(),
+            ),
             ability_queue_waiting: pending_choice_for_viewer
                 && state.ability_queue.is_waiting_for_choice().is_some(),
             ability_queue_current_card,

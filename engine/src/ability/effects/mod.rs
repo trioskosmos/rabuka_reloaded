@@ -247,7 +247,7 @@ impl AbilityResolver {
     }
 
     /// Shared MoveCards/DiscardCard tail (rule log + current-effect pinning
-    /// + move execution) — the registry's logged-move arms delegate here so
+    /// and move execution) — the registry's logged-move arms delegate here so
     /// the 3-line sequence lives in exactly one place.
     pub(crate) fn execute_logged_move(
         &mut self,

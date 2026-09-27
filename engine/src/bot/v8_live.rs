@@ -518,8 +518,8 @@ fn enumerate_candidates(
         let mut need = [0i32; 11];
         let mut score = yell_score;
         for life in &chosen {
-            for k in 0..11 {
-                need[k] += life.need[k];
+            for (need_k, life_need) in need.iter_mut().zip(life.need.iter()) {
+                *need_k += *life_need;
             }
             score += life.score;
         }

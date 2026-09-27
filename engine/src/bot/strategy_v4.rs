@@ -41,7 +41,7 @@ fn hc_index(c: crate::card::HeartColor) -> usize {
 
 fn acc_add(acc: &mut Acc, hearts: &crate::card::HeartMap) {
     for (c, v) in hearts.iter() {
-        acc[hc_index(*c)] += *v as i32;
+        acc[hc_index(*c)] += i32::from(*v);
     }
 }
 
@@ -57,7 +57,7 @@ pub(crate) fn flip_stats(gs: &GameState, me_player: u8, db: &CardDatabase) -> (i
         let waiting = gs.mods.get_orientation_modifier(cid) == Some("wait");
         if let Some(card) = db.get_card(cid) {
             if !waiting {
-                blades += card.blade as i32;
+                blades += i32::from(card.blade);
             }
         }
     }
@@ -140,7 +140,7 @@ pub(crate) fn heart_pool_inner(gs: &GameState, me_player: u8, db: &CardDatabase,
     // Expected yell hits, per printed color (Draw/Score icons don't feed checks).
     let expected = expected_flip_units(gs, me_player, db);
     for idx in (0..=7).chain(std::iter::once(10)) {
-        acc[idx] += (expected[idx] * confidence).floor() as i32;
+        acc[idx] += crate::constants::score_to_i32((expected[idx] as f64 * confidence).floor());
     }
     acc
 }
@@ -302,7 +302,7 @@ pub fn choose_action_v4(gs: &GameState, actions: &[Action], me: u8) -> Action {
     let dbg = std::env::var("V4_DEBUG").is_ok();
     let db = &gs.card_database;
     let my_now = if me == 0 { &gs.player1 } else { &gs.player2 };
-    let base_hand_len = my_now.hand.cards.len() as i32;
+        let base_hand_len = crate::constants::count_i32(my_now.hand.cards.len());
 
     let base_passable = passable_count(gs, me, db);
     let base_ammo = lives_in_hand(my_now, db);
@@ -316,7 +316,7 @@ pub fn choose_action_v4(gs: &GameState, actions: &[Action], me: u8) -> Action {
             .map(|&c| {
                 db.get_card(c)
                     .and_then(|x| x.base_heart.as_ref())
-                    .map(|bh| bh.hearts.values_sum() as i32)
+                    .map(|bh| i32::from(bh.hearts.values_sum()))
                     .unwrap_or(0)
             })
             .sum()
@@ -408,7 +408,8 @@ pub fn choose_action_v4(gs: &GameState, actions: &[Action], me: u8) -> Action {
         // the board sat at 19 blades — the old 30× lottery weight never
         // outbid stage growth, so the bot starved instead of digging.
         if base_ammo <= 1 {
-            let drawn = (my_sim.hand.cards.len() as i32 - base_hand_len).max(0);
+            let drawn =
+            (crate::constants::count_i32(my_sim.hand.cards.len()) - base_hand_len).max(0);
             val += 70.0 * p_life_draw * drawn as f64;
             let wr_lives_now = my_sim
                 .waitroom
@@ -500,10 +501,10 @@ pub fn choose_live_set_v4(gs: &GameState, actions: &[Action], db: &CardDatabase)
     let mut candidates: Vec<(usize, i32, [i32; 11])> = Vec::new();
     for &(hi, cid, ref need) in &hand_lives(my, db) {
         if let Some(card) = db.get_card(cid) {
-            candidates.push((hi, card.score.unwrap_or(0) as i32, *need));
+            candidates.push((hi, i32::from(card.score.unwrap_or(0)), *need));
         }
     }
-    candidates.sort_by(|a, b| b.1.cmp(&a.1));
+    candidates.sort_by_key(|c| core::cmp::Reverse(c.1));
 
     let max_slots =
         (3i32 - i32::from(my.live_card_set_limit_reduction)).max(0) as usize;
@@ -580,7 +581,7 @@ pub fn choose_mulligan_v4(gs: &GameState, actions: &[Action], db: &CardDatabase)
     let selected: Vec<usize> = gs
         .mulligan_selected_indices
         .iter()
-        .map(|&i| i as usize)
+        .map(|&i| usize::from(i))
         .collect();
     for &hi in &discard {
         if !selected.contains(&hi) {

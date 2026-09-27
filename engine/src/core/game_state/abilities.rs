@@ -354,6 +354,7 @@ impl GameState {
     ///   - execute_performance_phase() for yell/performance triggers (line ~350)
     ///   - debut placement in phases.rs
     ///   - state change effects in effects/state.rs
+    ///
     /// Check if a condition describes an event that can be evaluated at
     /// scanning time.  Event-based conditions depend on tracking flags
     /// (recently_moved_cards, cards_moved_this_turn, cards_appeared_this_turn)
@@ -711,7 +712,8 @@ impl GameState {
                             }
                             // Re-scan guard: skip re-enqueueing the exact auto
                             // ability that just completed (numeric key).
-                            let num_key = ((card_id as u32) << 16) | (ability_idx as u32);
+                            let num_key =
+            (crate::constants::id_u32(card_id) << 16) | crate::constants::count_u32(ability_idx);
                             // Marker-carrying watchers (「対戦相手のカードの
                             // 効果でも発動する。」) watching AREA MOVES are
                             // armed by the push_movement_event hook when their
@@ -806,7 +808,8 @@ impl GameState {
                             }) {
                                 continue;
                             }
-                            let num_key = ((card_id as u32) << 16) | (ability_idx as u32);
+                            let num_key =
+            (crate::constants::id_u32(card_id) << 16) | crate::constants::count_u32(ability_idx);
                             // Same batch-scoped re-scan guard as the stage loop.
                             if !Self::claim_batch_slot(
                                 &mut self.this_batch_triggered_ability_ids,
@@ -884,7 +887,8 @@ impl GameState {
                                     }
                                 }
                             }
-                            let num_key = ((moved_card_id as u32) << 16) | (ability_idx as u32);
+                            let num_key = (crate::constants::id_u32(moved_card_id) << 16)
+            | crate::constants::count_u32(ability_idx);
                             // Same batch-scoped re-scan guard as the stage loop.
                             if skip_this_card_auto_key == Some(num_key)
                                 && just_completed_batch_matches
@@ -905,7 +909,8 @@ impl GameState {
         let mut cached_card_id = None;
         let mut cached_card_no = String::new();
         for (card_id, ability_idx, _stage_card_id) in abilities_to_trigger {
-            let num_key = ((card_id as u32) << 16) | (ability_idx as u32);
+            let num_key =
+            (crate::constants::id_u32(card_id) << 16) | crate::constants::count_u32(ability_idx);
             if !self.this_batch_triggered_ability_ids.contains(&num_key) {
                 self.this_batch_triggered_ability_ids.push(num_key);
             }
@@ -1097,7 +1102,8 @@ impl GameState {
                 if !passes {
                     continue;
                 }
-                let num_key = ((watcher_id as u32) << 16) | (ability_idx as u32);
+                let num_key =
+            (crate::constants::id_u32(watcher_id) << 16) | crate::constants::count_u32(ability_idx);
                 let ekey = Self::opp_cause_key(
                     num_key,
                     moved_card_id,
@@ -1611,7 +1617,8 @@ impl GameState {
             // and must be drained depth-first (§9.5.3.2→§9.5.3.1 loopback).
             let pre_len =
                 self.depth_first_cutoff
-                    .unwrap_or_else(|| self.ability_queue.len() as u16) as usize;
+                    .unwrap_or_else(|| crate::constants::count_u16(self.ability_queue.len()))
+            as usize;
             self.depth_first_cutoff = None;
 
             let mut available_indices = (0..pre_len).filter(|&i| {
@@ -2125,8 +2132,6 @@ impl GameState {
                         }
                     } else if targets_opponent {
                         if entry.player_id == "p1" { "p2" } else { "p1" }
-                    } else if matches!(c, crate::ability::types::Choice::SelectCard { target_player_id: Some(tpid), .. } if tpid == "self") {
-                        &entry.player_id
                     } else {
                         &entry.player_id
                     };
@@ -2174,8 +2179,8 @@ impl GameState {
             // card to fire.
             let just_completed_key: Option<u32> =
                 self.ability_queue.current_entry().and_then(|e| {
-                    let cid = e.card_id? as u32;
-                    let idx = e.ability_index as u32;
+        let cid = crate::constants::id_u32(e.card_id?);
+        let idx = crate::constants::count_u32(e.ability_index);
                     Some((cid << 16) | idx)
                 });
 
@@ -2593,20 +2598,19 @@ impl GameState {
                     }
                 }
             } else if let Some(choice) = self.ability_queue.is_waiting_for_choice() {
-                match choice {
-                    crate::ability::types::Choice::SelectAutoAbility { player_id, .. }
-                    | crate::ability::types::Choice::SelectLiveSuccess { player_id, .. } => {
-                        let normalized = match player_id.as_str() {
-                            "player1" => "p1",
-                            "player2" => "p2",
-                            _ => player_id.as_str(),
-                        };
-                        obj.insert(
-                            "choice_player_id".into(),
-                            serde_json::Value::String(normalized.to_string()),
-                        );
-                    }
-                    _ => {}
+                if let crate::ability::types::Choice::SelectAutoAbility { player_id, .. }
+                | crate::ability::types::Choice::SelectLiveSuccess { player_id, .. } =
+                    choice
+                {
+                    let normalized = match player_id.as_str() {
+                        "player1" => "p1",
+                        "player2" => "p2",
+                        _ => player_id.as_str(),
+                    };
+                    obj.insert(
+                        "choice_player_id".into(),
+                        serde_json::Value::String(normalized.to_string()),
+                    );
                 }
             }
         }
@@ -3046,8 +3050,7 @@ impl GameState {
                         amount,
                         is_live_total,
                     } = data
-                    {
-                        if !is_live_total && *amount != 0 {
+                    {                        if !is_live_total && *amount != 0 {
                             self.mods.remove_score_modifier(*card_id, *amount);
                             log::debug!(
                                 "Reverted gained ability score modifier +{} for card {}",

@@ -449,7 +449,7 @@ impl AbilityResolver {
                 effect.text.to_string(),
                 "heart_bonus",
                 card_id,
-                Some(color.index() as u8),
+                Some(crate::constants::count_u8(color.index())),
                 1,
             );
         }
@@ -1129,7 +1129,7 @@ impl AbilityResolver {
         {
             let colors = effect.heart_colors_any();
             let per_color =
-                crate::ability::util::heart_gain_per_entry(final_count as i32, colors) as u8;
+                crate::ability::util::heart_gain_per_entry(i32::from(final_count), colors) as u8;
             colors
                 .iter()
                 .map(|c| (crate::card::parse_heart_color(c), per_color))
@@ -2270,7 +2270,7 @@ impl AbilityResolver {
                 }
             }
             b = b.cost_limit(
-                effect.cost_limit_any().map(|v| v),
+                effect.cost_limit_any(),
                 effect.cost_limit_operator_any().map(|s| s.to_string()),
             );
             self.pending_choice = Some(b.build());
@@ -2941,8 +2941,8 @@ impl AbilityResolver {
                 // Push events BEFORE push_movement_event so the
                 // PositionChangeEvent list captures the change before the
                 // self-trigger fires from within push_movement_event.
-                let source_old = current_idx as u8;
-                let source_new = target_index as u8;
+    let source_old = crate::constants::count_u8(current_idx);
+    let source_new = crate::constants::count_u8(target_index);
                 if source_id != -1 {
                     gs.position_change_events
                         .push(crate::types::PositionChangeEvent {
@@ -3143,7 +3143,11 @@ impl AbilityResolver {
             new_stage[dest_idx] = member_id;
             new_under[dest_idx] = old_under[from_idx].clone();
             occupant[dest_idx] = member_id;
-            events.push((member_id, from_idx as u8, dest_idx as u8));
+            events.push((
+        member_id,
+        crate::constants::count_u8(from_idx),
+        crate::constants::count_u8(dest_idx),
+    ));
         }
 
         // Phase 2: place evicted cards / stay-in-place.
@@ -3187,7 +3191,11 @@ impl AbilityResolver {
                 {
                     new_stage[from_idx] = evicted_id;
                     new_under[from_idx] = old_under[dest_idx].clone();
-                    events.push((evicted_id, dest_idx as u8, from_idx as u8));
+                    events.push((
+        evicted_id,
+        crate::constants::count_u8(dest_idx),
+        crate::constants::count_u8(from_idx),
+    ));
                 }
             }
         }
@@ -3336,8 +3344,8 @@ impl AbilityResolver {
                 gs.position_change_events
                     .push(crate::types::PositionChangeEvent {
                         moved_card_id: source_id2,
-                        old_position: source_idx as u8,
-                        new_position: target_index as u8,
+        old_position: crate::constants::count_u8(source_idx),
+        new_position: crate::constants::count_u8(target_index),
                         cause_card_id: gs.activating_card,
                         cause_player_id: mover_pid.clone(),
                         effect_only: true,
@@ -3347,8 +3355,8 @@ impl AbilityResolver {
                 gs.position_change_events
                     .push(crate::types::PositionChangeEvent {
                         moved_card_id: target_id2,
-                        old_position: target_index as u8,
-                        new_position: source_idx as u8,
+        old_position: crate::constants::count_u8(target_index),
+        new_position: crate::constants::count_u8(source_idx),
                         cause_card_id: gs.activating_card,
                         cause_player_id: mover_pid.clone(),
                         effect_only: true,
@@ -3419,8 +3427,8 @@ impl AbilityResolver {
                         gs.position_change_events
                             .push(crate::types::PositionChangeEvent {
                                 moved_card_id: source_id,
-                                old_position: current_idx as u8,
-                                new_position: target_index as u8,
+        old_position: crate::constants::count_u8(current_idx),
+        new_position: crate::constants::count_u8(target_index),
                                 cause_card_id: gs.activating_card,
                                 cause_player_id: mover_pid.clone(),
                                 effect_only: true,
@@ -3430,8 +3438,8 @@ impl AbilityResolver {
                         gs.position_change_events
                             .push(crate::types::PositionChangeEvent {
                                 moved_card_id: target_id,
-                                old_position: target_index as u8,
-                                new_position: current_idx as u8,
+        old_position: crate::constants::count_u8(target_index),
+        new_position: crate::constants::count_u8(current_idx),
                                 cause_card_id: gs.activating_card,
                                 cause_player_id: mover_pid.clone(),
                                 effect_only: true,
@@ -3513,8 +3521,8 @@ impl AbilityResolver {
                         gs.position_change_events
                             .push(crate::types::PositionChangeEvent {
                                 moved_card_id: target_id3,
-                                old_position: target_index as u8,
-                                new_position: current_idx as u8,
+        old_position: crate::constants::count_u8(target_index),
+        new_position: crate::constants::count_u8(current_idx),
                                 cause_card_id: gs.activating_card,
                                 cause_player_id: mover_pid.clone(),
                                 effect_only: true,
@@ -3595,7 +3603,10 @@ impl AbilityResolver {
                     player.stage.stage[dest_idx] = card_id;
                     player.stage.under_cards[dest_idx] = snapshot_under[src_idx].clone();
                     moved.push(card_id);
-                    positions.push((src_idx as u8, dest_idx as u8));
+                    positions.push((
+        crate::constants::count_u8(src_idx),
+        crate::constants::count_u8(dest_idx),
+    ));
                 }
                 (moved, positions)
             };
@@ -4160,7 +4171,7 @@ impl AbilityResolver {
         .to_string()
     }
 
-    pub(crate) fn card_name<'a>(&self, card_id: i16) -> String {
+    pub(crate) fn card_name(&self, card_id: i16) -> String {
         self.card_db()
             .get_card(card_id)
             .map(|c| c.name.to_string())

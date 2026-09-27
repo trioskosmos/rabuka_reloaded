@@ -51,7 +51,7 @@ fn ui_kind(s: &str) -> String {
 /// read as "does not name this slot"; callers decide whether that means pass.
 fn slot_named(requirement: &str, slot: Option<u8>) -> bool {
     slot.is_some_and(|s| {
-        crate::ability::util::activation_position_index(requirement) == Some(s as usize)
+            crate::ability::util::activation_position_index(requirement) == Some(usize::from(s))
     })
 }
 
@@ -159,7 +159,7 @@ impl GameState {
                     source_card_id: under_cid,
                     ability_text: ui_text(&effect.text),
                     target_card_id: host,
-                    amount: count as i32,
+                        amount: i32::from(count),
                     color: None,
                     kind: ui_kind("blade"),
                 });
@@ -686,7 +686,7 @@ impl GameState {
                                         } else {
                                             let hc_list = effect.heart_colors_any();
                                             let per_entry = i16::try_from(
-                                                n / hc_list.len().max(1) as i32,
+                                                n / crate::constants::count_i32(hc_list.len().max(1)),
                                             )
                                             .unwrap();
                                             for hc in hc_list {
@@ -699,7 +699,7 @@ impl GameState {
                                                     source_card_id: card_id,
                                                     ability_text: ui_text(&effect.text),
                                                     target_card_id: card_id,
-                                                    amount: per_entry as i32,
+                                                        amount: i32::from(per_entry),
                                                     color: Some(hc.clone()),
                                                     kind: ui_kind("heart"),
                                                 });
@@ -854,7 +854,7 @@ impl GameState {
                                             // constant evaluation time.  Store them for later
                                             // evaluation during execute_live_victory_determination.
                                             exp_delayed_gained_effects
-                                                .push((card_id, *gained.clone()));
+                                                .push((card_id, gained.clone()));
                                         }
                                     } else {
                                         // Fallback: parse value from text (legacy path)
@@ -955,8 +955,9 @@ impl GameState {
                                                 "heart" => {
                                                     let n = i32::from(sub.count.unwrap_or(1));
                                                     let hc_list = sub.heart_colors_any();
-                                                    let per_color =
-                                                        (n / hc_list.len().max(1) as i32) as i16;
+                                                let per_color = crate::constants::saturate_i16(
+                                                    n / crate::constants::count_i32(hc_list.len().max(1)),
+                                                );
                                                     for hc in hc_list {
                                                         *exp_heart
                                                             .entry(card_id)
@@ -967,7 +968,7 @@ impl GameState {
                                                             source_card_id: card_id,
                                                             ability_text: ui_text(&effect.text),
                                                             target_card_id: card_id,
-                                                            amount: per_color as i32,
+                                                            amount: i32::from(per_color),
                                                             color: Some(hc.clone()),
                                                             kind: ui_kind("heart"),
                                                         });
@@ -1272,7 +1273,8 @@ impl GameState {
                             });
                         }
                         "subtract" => {
-                            *expected.entry(cid).or_insert(0) -= value as i16;
+                                *expected.entry(cid).or_insert(0) -=
+                                    crate::constants::saturate_i16(value);
                             cost_sources.push(crate::core::game_modifiers::BonusSource {
                                 source_card_id: cid,
                                 ability_text: ui_text(&effect.text),
@@ -1283,7 +1285,7 @@ impl GameState {
                             });
                         }
                         "set" => {
-                            expected_set.insert(cid, value as i16);
+                            expected_set.insert(cid, crate::constants::saturate_i16(value));
                             cost_sources.push(crate::core::game_modifiers::BonusSource {
                                 source_card_id: cid,
                                 ability_text: ui_text(&effect.text),
@@ -1692,6 +1694,7 @@ impl GameState {
     ///   - gain_resource(heart): heart grants to stage members
     ///   - modify_score: score bonuses to live cards
     ///   - sequential: recurses into sub-actions
+    ///
     /// Uses a clear-and-re-evaluate pattern to ensure as_long_as semantics: when a
     /// card leaves the success zone, its modifier is not re-applied.
     /// Evaluate all constant (常時) abilities on cards in the success_live_card_zone.
@@ -1974,12 +1977,13 @@ impl GameState {
                                     target_id
                                 );
                             }
-                            self.mods.add_blade_modifier(target_id, amount as i16);
+                                self.mods
+                                    .add_blade_modifier(target_id, crate::constants::saturate_i16(amount));
                             *self
                                 .mods
                                 .success_zone_blade_bonuses
                                 .entry(target_id)
-                                .or_insert(0) += amount as i16;
+                                    .or_insert(0) += crate::constants::saturate_i16(amount);
                             self.mods.success_zone_blade_sources.push(
                                 crate::core::game_modifiers::BonusSource {
                                     source_card_id: cid,
@@ -1994,7 +1998,9 @@ impl GameState {
                     }
                     "heart" => {
                         let heart_colors = effect.heart_colors_any();
-                        let per_color = (amount / heart_colors.len().max(1) as i32) as i16;
+                            let per_color = crate::constants::saturate_i16(
+                                amount / crate::constants::count_i32(heart_colors.len().max(1)),
+                            );
                         let colors = heart_colors
                             .iter()
                             .map(String::as_str)

@@ -189,12 +189,12 @@ pub fn score_actions(gs: &GameState, actions: &[Action], me: u8) -> Vec<(f64, St
     let dbg = std::env::var("V7_DEBUG").is_ok();
     let db = &gs.card_database;
     let my_now = gs.seat_player(me);
-    let base_hand_len = my_now.hand.cards.len() as i32;
+        let base_hand_len = crate::constants::count_i32(my_now.hand.cards.len());
     let base_passable = passable_count_buffed(gs, me, db);
     let base_ammo = lives_in_hand(my_now, db);
     let base_stage = stage_hearts_of(my_now, gs, me, db);
     let base_blades = total_blades_of(my_now, gs, db);
-    let base_energy = my_now.energy_zone.active_count() as i32;
+        let base_energy = i32::from(my_now.energy_zone.active_count());
     let base_buffs = stage_buff_hearts(gs, me);
     let base_wait = wait_fingerprint(gs, me);
     let base_blade_mods = blade_mod_fingerprint(gs, me);
@@ -285,12 +285,12 @@ pub fn score_actions(gs: &GameState, actions: &[Action], me: u8) -> Vec<(f64, St
         // energy refreshes next turn (activate_all), and their hand cost is
         // already priced via passable/ammo above.
         if a.action_type != ActionType::PlayMemberToStage {
-            let d_energy = my_sim.energy_zone.active_count() as i32 - base_energy;
+            let d_energy = i32::from(my_sim.energy_zone.active_count()) - base_energy;
             val += 2.0 * d_energy as f64;
             if d_energy != 0 {
                 parts.push(format!("en{d_energy:+}"));
             }
-            let d_hand = my_sim.hand.cards.len() as i32 - base_hand_len;
+            let d_hand = crate::constants::count_i32(my_sim.hand.cards.len()) - base_hand_len;
             val += 3.0 * d_hand as f64;
             if d_hand != 0 {
                 parts.push(format!("hand{d_hand:+}"));
@@ -328,7 +328,8 @@ pub fn score_actions(gs: &GameState, actions: &[Action], me: u8) -> Vec<(f64, St
         // Life acquisition when starved: drawing digs toward the next life;
         // milling to waitroom banks lives for retrieval engines.
         if base_ammo <= 1 {
-            let drawn = (my_sim.hand.cards.len() as i32 - base_hand_len).max(0);
+            let drawn =
+            (crate::constants::count_i32(my_sim.hand.cards.len()) - base_hand_len).max(0);
             val += 70.0 * p_life_draw * drawn as f64;
             let wr_now = my_sim
                 .waitroom
@@ -483,8 +484,8 @@ pub fn choose_live_set_v7(gs: &GameState, actions: &[Action], db: &CardDatabase)
     }
     let me = gs.active_player_index();
     let (my, opp) = gs.seated_pair(me);
-    let my_succ = my.success_live_card_zone.cards.len() as i32;
-    let opp_succ = opp.success_live_card_zone.cards.len() as i32;
+        let my_succ = crate::constants::count_i32(my.success_live_card_zone.cards.len());
+        let opp_succ = crate::constants::count_i32(opp.success_live_card_zone.cards.len());
     let is_second = gs.current_phase == Phase::LiveCardSetSecondAttacker;
     let opp_committed = !opp.live_card_zone.cards.is_empty();
 
@@ -523,7 +524,8 @@ pub fn choose_live_set_v7(gs: &GameState, actions: &[Action], db: &CardDatabase)
                     .is_some_and(|c| c.card_type == CardType::Live)
             })
             .count();
-        let max_slots = (3i32 - i32::from(my.live_card_set_limit_reduction)).max(0) as usize;
+        let max_slots =
+            crate::constants::count_usize(3i32 - i32::from(my.live_card_set_limit_reduction).max(0));
         if desired.len() < max_slots && deck_lives > 0 {
             let mut junk: Vec<(usize, u8)> = my
                 .hand
@@ -577,12 +579,13 @@ fn safest_portfolio(gs: &GameState, me: u8, db: &CardDatabase) -> Vec<usize> {
     let pool = heart_pool(gs, me, db);
     let board = heart_pool_inner(gs, me, db, 0.0);
     let lives = hand_lives(my, db);
-    let max_slots = (3i32 - i32::from(my.live_card_set_limit_reduction)).max(0) as usize;
+    let max_slots =
+        crate::constants::count_usize(3i32 - i32::from(my.live_card_set_limit_reduction).max(0));
     if lives.is_empty() || max_slots == 0 {
         return Vec::new();
     }
-    let my_succ = my.success_live_card_zone.cards.len() as i32;
-    let opp_succ = opp.success_live_card_zone.cards.len() as i32;
+        let my_succ = crate::constants::count_i32(my.success_live_card_zone.cards.len());
+        let opp_succ = crate::constants::count_i32(opp.success_live_card_zone.cards.len());
     let floor = if opp_succ >= 2 {
         0.35
     } else if my_succ >= 2 {
@@ -947,7 +950,7 @@ fn experiment_expected_yell_score(gs: &GameState, me: u8, db: &CardDatabase, bla
         .map(usize::from)
         .sum();
     let draws = usize::try_from(blades).unwrap_or(usize::MAX).min(deck_len);
-    (score_icons * draws / deck_len) as i32
+    crate::constants::count_i32(score_icons * draws / deck_len)
 }
 
 fn experiment_lives(gs: &GameState, me: u8, db: &CardDatabase) -> Vec<(usize, i16, [i32; 11])> {
@@ -1050,7 +1053,7 @@ fn experiment_junk_fill(gs: &GameState, me: u8, db: &CardDatabase, desired: &mut
             } else {
                 0
             };
-            (i, cost, class * 1_000_000 + utility as i32)
+            (i, cost, class * 1_000_000 + crate::constants::score_to_i32(utility))
         })
         .collect();
     junk.sort_by_key(|&(_, cost, utility)| {
@@ -1536,7 +1539,7 @@ pub fn live_set_audit_note(gs: &GameState) -> Option<String> {
     let selected = gs
         .live_card_selected_indices
         .iter()
-        .filter_map(|&hi| my.hand.cards.get(hi as usize).copied())
+        .filter_map(|&hi| my.hand.cards.get(usize::from(hi)).copied())
         .map(|cid| {
             let card = db.get_card(cid);
             format!(
@@ -1596,7 +1599,7 @@ fn reachable_curve_keep(costs: &[Option<u8>]) -> Vec<usize> {
             continue;
         }
         let rank = (
-            line.len() as u32,
+            crate::constants::count_u32(line.len()),
             line.last()
                 .copied()
                 .map(|(_, cost)| u32::from(cost))

@@ -721,6 +721,9 @@ pub enum ZoneId {
 }
 
 impl ZoneId {
+    // Not `core::str::FromStr`: this is a wire decode table with a deliberate
+    // default arm, so it is total and returns `Self`, not a fallible `Result`.
+    #[allow(clippy::should_implement_trait)]
     pub fn from_str(s: &str) -> Self {
         match s {
             "stage" | "ステージ" => ZoneId::Stage,

@@ -174,9 +174,7 @@ impl DeckParser {
             if c == '<' {
                 acc.push('\n');
                 acc
-            } else if c == '>' {
-                acc
-            } else if acc.ends_with('\n') && c == '\n' {
+            } else if c == '>' || (acc.ends_with('\n') && c == '\n') {
                 acc
             } else {
                 acc.push(c);

@@ -1114,6 +1114,7 @@ impl<'a> ConditionContext<'a> {
     ///     センターエリアにいる『Liella!』のメンバーが、このターン中に移動して
     ///     いる場合」 (PL!SP-bp4-025-L ab#1): the mover is a filtered stage
     ///     member, not the activating card.
+    ///
     /// A fix was attempted and reverted: with `subject_is_activating` forced
     /// true (this original behaviour) and with the qualifier branch active, the
     /// whole 3613-test suite passes identically, and no test distinguishes the
@@ -1250,7 +1251,7 @@ impl<'a> ConditionContext<'a> {
             // WHOLE turn — including activations by earlier main-phase effects —
             // and can filter on the SOURCE effect's group (『虹ヶ咲』のカードの効果)
             // and the TARGET kind (energy vs member).
-            if condition.get_temporal().map(|t| t) == Some("this_turn") {
+            if condition.get_temporal() == Some("this_turn") {
                 let card_db = &self.game_state.card_database;
                 let want_kind = condition.get_card_type().map(|ct| ct.as_str().to_string());
                 // The target card must belong to the conditioned player.
@@ -1377,7 +1378,7 @@ impl<'a> ConditionContext<'a> {
                     let player = self.resolve_condition_player(target);
                     let cards = util::zone_cards(player, loc);
                     let matching = match zone {
-                        Some(z) if z == crate::ability::enums::Zone::RevealedCards => {
+                        Some(crate::ability::enums::Zone::RevealedCards) => {
                             self.game_state.revealed_cards.to_vec()
                         }
                         _ => cards.to_vec(),

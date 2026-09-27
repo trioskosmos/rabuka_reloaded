@@ -105,7 +105,7 @@ impl AbilityResolver {
             });
             return (Some(crate::constants::saturate_u8(under_count + base)), false);
         }
-        (effect.blade_limit_any().map(|v| v), false)
+        (effect.blade_limit_any(), false)
     }
 
     pub(crate) fn execute_change_state(
@@ -491,7 +491,7 @@ impl AbilityResolver {
 
             if needs_prompt {
                 let allow_skip = max;
-                let pick_count = if max { count as usize } else { count as usize };
+                let pick_count = usize::from(count);
                 let desc = if max {
                     format!("Select up to {} member(s) to change state", count)
                 } else {
@@ -830,7 +830,7 @@ impl AbilityResolver {
             // (or auto-taking) an already-correct card would move the active
             // counter without changing any state.
             let is_activate = state_change == "active";
-            let active_len = player.energy_zone.active_count() as usize;
+            let active_len = usize::from(player.energy_zone.active_count());
             let state_indices: Vec<usize> = valid_indices
                 .iter()
                 .copied()
@@ -843,10 +843,10 @@ impl AbilityResolver {
                         .energy_zone
                         .cards
                         .len()
-                        .saturating_sub(player.energy_zone.active_count() as usize),
-                    _ => player.energy_zone.active_count() as usize,
+                        .saturating_sub(usize::from(player.energy_zone.active_count())),
+                    _ => usize::from(player.energy_zone.active_count()),
                 };
-                let capped = (count as usize).min(available) as u8;
+                let capped = crate::constants::count_u8(usize::from(count).min(available));
                 log::debug!(
                     "[ENERGY] max=true: count={} available={} effective={}",
                     count,
@@ -860,8 +860,8 @@ impl AbilityResolver {
                         .energy_zone
                         .cards
                         .len()
-                        .saturating_sub(player.energy_zone.active_count() as usize),
-                    _ => player.energy_zone.active_count() as usize,
+                        .saturating_sub(usize::from(player.energy_zone.active_count())),
+                    _ => usize::from(player.energy_zone.active_count()),
                 };
                 log::debug!("[ENERGY] count=0 (all): effective={}", val);
                 val as u8
@@ -1066,7 +1066,7 @@ impl AbilityResolver {
         gs.rule_log
             .push(format!("{} {}: [[log_set_cost]]", pp, act_name));
         for card_id in card_ids {
-            gs.mods.set_cost_modifier(card_id, value as i16);
+            gs.mods.set_cost_modifier(card_id, i16::from(value));
             gs.record_ability_application(
                 gs.activating_card.unwrap_or(-1),
                 effect.text.to_string(),
@@ -1213,7 +1213,7 @@ impl AbilityResolver {
                 // No eligible targets — no-op
                 return;
             }
-            let tc = effect.target_count_any().unwrap_or(1) as usize;
+            let tc = usize::from(effect.target_count_any().unwrap_or(1));
             if candidates.len() <= tc {
                 // Auto-select: push to selected_cards and apply
                 for &cid in &candidates {
@@ -1324,7 +1324,7 @@ impl AbilityResolver {
             format!("Transform hearts to {}", ht),
             "transform",
             card_id,
-            Some(color.index() as u8),
+            Some(crate::constants::count_u8(color.index())),
             0,
         );
         let ed = crate::core::types::EffectData::SetBladeCount { card_id };
@@ -1522,7 +1522,7 @@ impl AbilityResolver {
             }
         }
         for &card_id in &stage_cards {
-            gs.mods.set_blade_modifier(card_id, value as i16);
+            gs.mods.set_blade_modifier(card_id, i16::from(value));
             gs.record_ability_application(
                 gs.activating_card.unwrap_or(-1),
                 effect.text.to_string(),
@@ -1617,7 +1617,7 @@ impl AbilityResolver {
         let value: u8 = effect.value_any().unwrap_or(0);
         let card_id = self.activating_card_id.or(gs.activating_card);
         if let Some(card_id) = card_id {
-            gs.mods.set_cost_modifier(card_id, value as i16);
+            gs.mods.set_cost_modifier(card_id, i16::from(value));
         }
         let pp = self.player_prefix(gs);
         let act_name = gs

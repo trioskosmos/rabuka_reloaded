@@ -43,7 +43,7 @@ fn stage_hearts_of(p: &Player, db: &CardDatabase) -> i32 {
         .map(|&c| {
             db.get_card(c)
                 .and_then(|x| x.base_heart.as_ref())
-                .map(|bh| bh.hearts.values_sum() as i32)
+                .map(|bh| i32::from(bh.hearts.values_sum()))
                 .unwrap_or(0)
         })
         .sum()
@@ -60,7 +60,9 @@ fn total_blades_of(p: &Player, gs: &GameState, db: &CardDatabase) -> i32 {
             if waiting {
                 0
             } else {
-                db.get_card(c).map(|x| x.blade as i32).unwrap_or(0)
+                db.get_card(c)
+            .map(|x| i32::from(x.blade))
+            .unwrap_or(0)
             }
         })
         .sum()
@@ -85,7 +87,7 @@ pub fn score_actions(gs: &GameState, actions: &[Action], me: u8) -> Vec<(f64, St
     let dbg = std::env::var("V6_DEBUG").is_ok();
     let db = &gs.card_database;
     let my_now = if me == 0 { &gs.player1 } else { &gs.player2 };
-    let base_hand_len = my_now.hand.cards.len() as i32;
+        let base_hand_len = crate::constants::count_i32(my_now.hand.cards.len());
     let base_passable = passable_count(gs, me, db);
     let base_ammo = lives_in_hand(my_now, db);
     let base_stage = stage_hearts_of(my_now, db);
@@ -169,7 +171,8 @@ pub fn score_actions(gs: &GameState, actions: &[Action], me: u8) -> Vec<(f64, St
         // Life acquisition when starved: drawing digs toward the next life;
         // milling to waitroom banks lives for retrieval engines.
         if base_ammo <= 1 {
-            let drawn = (my_sim.hand.cards.len() as i32 - base_hand_len).max(0);
+            let drawn =
+            (crate::constants::count_i32(my_sim.hand.cards.len()) - base_hand_len).max(0);
             val += 70.0 * p_life_draw * drawn as f64;
             let wr_now = my_sim
                 .waitroom
@@ -270,14 +273,14 @@ pub fn score_actions(gs: &GameState, actions: &[Action], me: u8) -> Vec<(f64, St
 pub fn choose_live_set_v6(gs: &GameState, actions: &[Action], db: &CardDatabase) -> Action {
     let me = gs.active_player_index();
     let (my, opp) = gs.seated_pair(me);
-    let my_succ = my.success_live_card_zone.cards.len() as i32;
-    let opp_succ = opp.success_live_card_zone.cards.len() as i32;
+    let my_succ = crate::constants::count_i32(my.success_live_card_zone.cards.len());
+    let opp_succ = crate::constants::count_i32(opp.success_live_card_zone.cards.len());
     let mut desired = best_portfolio(gs, me, db);
     let my_score: i32 = desired
         .iter()
         .filter_map(|&hi| my.hand.cards.get(hi).copied())
         .filter_map(|cid| db.get_card(cid))
-        .map(|c| c.score.unwrap_or(0) as i32)
+        .map(|c| i32::from(c.score.unwrap_or(0)))
         .sum();
 
     if desired.is_empty() {
@@ -310,7 +313,8 @@ pub fn choose_live_set_v6(gs: &GameState, actions: &[Action], db: &CardDatabase)
             .iter()
             .filter(|&&cid| db.get_card(cid).is_some_and(|c| c.card_type == CardType::Live))
             .count();
-        let max_slots = (3i32 - i32::from(my.live_card_set_limit_reduction)).max(0) as usize;
+        let max_slots =
+        crate::constants::count_usize(3i32 - i32::from(my.live_card_set_limit_reduction).max(0));
         if desired.len() < max_slots && deck_lives > 0 {
             let mut junk: Vec<(usize, u8)> = my
                 .hand

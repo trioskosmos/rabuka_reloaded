@@ -61,7 +61,7 @@ pub fn choose_main_conductor(gs: &GameState, actions: &[Action], me: u8) -> Acti
     let db = &gs.card_database;
     let (my_now, _) = gs.seated_pair(me);
     let plan = read_plan(gs);
-    let base_hand_len = my_now.hand.cards.len() as i32;
+    let base_hand_len = crate::constants::count_i32(my_now.hand.cards.len());
     let base_passable = passable_count(gs, me, db);
     let base_ammo = lives_in_hand(my_now, db);
     // PROGRESS SIGNAL: the unfloored achievable ceiling. The floored
@@ -78,7 +78,7 @@ pub fn choose_main_conductor(gs: &GameState, actions: &[Action], me: u8) -> Acti
     let base_proj = ceiling(gs);
     let stage_hearts_of = |p: &crate::player::Player| -> i32 {
         p.stage.stage.iter().filter(|&&c| c >= 0)
-            .map(|&c| db.get_card(c).and_then(|x| x.base_heart.as_ref()).map(|bh| bh.hearts.values_sum() as i32).unwrap_or(0))
+            .map(|&c| db.get_card(c).and_then(|x| x.base_heart.as_ref())            .map(|bh| i32::from(bh.hearts.values_sum())).unwrap_or(0))
             .sum()
     };
     let base_stage = stage_hearts_of(my_now);
@@ -136,7 +136,8 @@ pub fn choose_main_conductor(gs: &GameState, actions: &[Action], me: u8) -> Acti
 
         // Starvation digging (proven).
         if base_ammo <= 1 {
-            let drawn = (my_sim.hand.cards.len() as i32 - base_hand_len).max(0);
+            let drawn =
+            (crate::constants::count_i32(my_sim.hand.cards.len()) - base_hand_len).max(0);
             val += 70.0 * p_life_draw * drawn as f64;
         }
 
@@ -187,13 +188,13 @@ fn passing_portfolios(gs: &GameState, me: u8, db: &CardDatabase) -> Vec<(i32, Ve
         let mut score = 0i32;
         let mut idxs = Vec::with_capacity(cnt);
         let mut ok = true;
-        for bit in 0..n {
+        for (bit, live) in lives.iter().enumerate().take(n) {
             if mask & (1 << bit) != 0 {
-                let (hi, cid, ref need) = lives[bit];
+                let (hi, cid, ref need) = *live;
                 match alloc(&p, need) {
                     Some(next) => {
                         p = next;
-                        score += db.get_card(cid).and_then(|c| c.score).unwrap_or(0) as i32;
+                        score += i32::from(db.get_card(cid).and_then(|c| c.score).unwrap_or(0));
                         idxs.push(hi);
                     }
                     None => {
@@ -257,7 +258,7 @@ fn fill_junk(gs: &GameState, me: u8, db: &CardDatabase, desired: &mut Vec<usize>
     }
     // Protect the late curve: never junk a member we can afford now or
     // reasonably next turn. Energy cards and unaffordable members go first.
-    let budget = my.energy_zone.active_count() as i32 + 4;
+        let budget = i32::from(my.energy_zone.active_count()) + 4;
     let mut junk: Vec<(usize, i32)> = my
         .hand
         .cards
@@ -268,7 +269,7 @@ fn fill_junk(gs: &GameState, me: u8, db: &CardDatabase, desired: &mut Vec<usize>
                 && db.get_card(cid).is_some_and(|c| c.card_type != CardType::Live)
         })
         .map(|(i, &cid)| {
-            let cost = db.get_card(cid).and_then(|c| c.cost).unwrap_or(0) as i32;
+            let cost = i32::from(db.get_card(cid).and_then(|c| c.cost).unwrap_or(0));
             (i, cost)
         })
         .collect();

@@ -54,8 +54,8 @@ fn show_lines(ui: &mut dyn PlatformUi, lines: &[String]) {
         ui.clear_screen();
         ui.println(scroll_hint(lang));
         let end = (off + H).min(lines.len());
-        for l in off..end {
-            ui.println(&lines[l]);
+        for l in &lines[off..end] {
+            ui.println(l);
         }
         if lines.len() > end {
             ui.println(&more_line(lines.len() - end, lang));
@@ -185,10 +185,10 @@ fn select_impl(
         ui.println(title);
         let end = (scroll + vis).min(items.len());
         let mut buf = String::new();
-        for n in scroll..end {
+        for (n, row) in rows.iter().enumerate().skip(scroll).take(end - scroll) {
             buf.clear();
             buf.push_str(if n == sel { " >" } else { "  " });
-            buf.push_str(&rows[n][2..]);
+            buf.push_str(&row[2..]);
             ui.println(&buf);
         }
         if items.len() > end {
@@ -257,10 +257,10 @@ pub fn menu_select(
         ui.println(title);
         let end = (scroll + vis).min(all_items.len());
         let mut buf = String::new();
-        for n in scroll..end {
+        for (n, row) in rows.iter().enumerate().skip(scroll).take(end - scroll) {
             buf.clear();
             buf.push_str(if n == sel { " >" } else { "  " });
-            buf.push_str(&rows[n][2..]);
+            buf.push_str(&row[2..]);
             ui.println(&buf);
         }
         if all_items.len() > end {
@@ -350,10 +350,10 @@ pub fn menu_select_with_cards(
         ui.println(title);
         let end = (scroll + vis).min(all_items.len());
         let mut buf = String::new();
-        for n in scroll..end {
+        for (n, row) in rows.iter().enumerate().skip(scroll).take(end - scroll) {
             buf.clear();
             buf.push_str(if n == sel { " >" } else { "  " });
-            buf.push_str(&rows[n][2..]);
+            buf.push_str(&row[2..]);
             // Dimmed rows read as unpickable on text-only ports too.
             if Some(n) != skip_idx && is_dimmed(n) {
                 buf.push_str(" --");
@@ -621,10 +621,10 @@ pub fn select_action(
         }
         let end = (scroll + vis).min(acts.len());
         let mut buf = String::new();
-        for a in scroll..end {
+        for (a, row) in rows.iter().enumerate().skip(scroll).take(end - scroll) {
             buf.clear();
             buf.push_str(if a == sel { " >" } else { "  " });
-            buf.push_str(&rows[a]);
+            buf.push_str(row);
             ui.println(&buf);
         }
         if acts.len() > end {
@@ -662,9 +662,8 @@ pub fn select_action(
                     .and_then(|n| gs.card_database.get_card_by_no(n));
                 match card {
                     Some(c) => {
-                        let mut header: Vec<String> = Vec::new();
-                        header.push(card_detail_title(c));
-                        header.push(card_stat_text(c));
+                        let header: Vec<String> =
+                            vec![card_detail_title(c), card_stat_text(c)];
                         let ab = card_ability_text(c);
                         let desc = act.display_desc_for(lang);
                         let body = if ab.trim().is_empty() {
@@ -685,9 +684,8 @@ pub fn select_action(
                     .and_then(|p| p.card_no.as_ref())
                     .and_then(|n| gs.card_database.get_card_by_no(n));
                 if let Some(c) = card {
-                    let mut header: Vec<String> = Vec::new();
-                    header.push(card_detail_title(c));
-                    header.push(card_stat_text(c));
+                    let header: Vec<String> =
+                        vec![card_detail_title(c), card_stat_text(c)];
                     ui.show_detail_screen(
                         gs,
                         Some(c.card_no.as_ref()),
@@ -758,7 +756,7 @@ pub fn handle_choice(ui: &mut dyn PlatformUi, gs: &mut GameState) -> bool {
                 return true;
             }
             let sel = menu_select_detailed(ui, gs, &items, prompt, false).unwrap_or(0);
-            TurnEngine::resume_with_choice(gs, Some(sel as i16), None).ok();
+            TurnEngine::resume_with_choice(gs, Some(crate::constants::count_i16(sel)), None).ok();
             true
         }
         Choice::SelectCard {
@@ -980,7 +978,12 @@ if count <= 1 {
             let sel = menu_select(ui, &items, prompt, allow_skip);
             match sel {
                 None => TurnEngine::resume_with_choice(gs, Some(-1), None).ok(),
-                Some(idx) => TurnEngine::resume_with_choice(gs, Some(idx as i16), None).ok(),
+                Some(idx) => TurnEngine::resume_with_choice(
+                gs,
+                Some(crate::constants::count_i16(idx)),
+                None,
+            )
+            .ok(),
             };
             true
         }
@@ -997,7 +1000,7 @@ if count <= 1 {
             ..
         } => {
             let sel = menu_select(ui, &options, prompt, false).unwrap_or(0);
-            TurnEngine::resume_with_choice(gs, Some(sel as i16), None).ok();
+            TurnEngine::resume_with_choice(gs, Some(crate::constants::count_i16(sel)), None).ok();
             true
         }
         Choice::SelectLiveSuccess {

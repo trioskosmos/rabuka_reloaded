@@ -958,8 +958,8 @@ let source = cost.source_str().unwrap_or("");
                         gs.ability_queue
                             .current_entry()
                             .map_or(0, |e| e.cost_paid_index) as usize;
-                    for i in start_idx..costs.len() {
-                        if let Err(e) = self.validate_cost(gs, &costs[i]) {
+                    for cost_item in &costs[start_idx..] {
+                        if let Err(e) = self.validate_cost(gs, cost_item) {
                             return Err(format!("Cannot pay sequential cost: {}", e));
                         }
                     }

@@ -340,6 +340,7 @@ impl Stage {
     /// Rule 10.5.3-10.5.4: When a member leaves its area, recycle under-cards:
     /// - Member cards under → go to waitroom
     /// - Energy cards under → go to energy deck
+    ///
     /// Returns (waitroom_cards, energy_deck_cards)
     pub fn recycle_under_cards(
         &mut self,
@@ -596,6 +597,10 @@ impl LiveCardZone {
 
     pub fn len(&self) -> usize {
         self.cards.len()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.cards.is_empty()
     }
 
     pub fn calculate_live_score(
@@ -1044,6 +1049,10 @@ impl Waitroom {
         self.cards.len()
     }
 
+    pub fn is_empty(&self) -> bool {
+        self.cards.is_empty()
+    }
+
     pub fn remove_card(&mut self, card_id: i16) {
         self.cards.retain(|c| *c != card_id);
     }
@@ -1079,6 +1088,10 @@ impl SuccessLiveCardZone {
 
     pub fn len(&self) -> usize {
         self.cards.len()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.cards.is_empty()
     }
 }
 
@@ -1172,5 +1185,9 @@ impl ResolutionZone {
 
     pub fn len(&self) -> usize {
         self.cards.len()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.cards.is_empty()
     }
 }

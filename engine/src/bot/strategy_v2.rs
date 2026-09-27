@@ -226,12 +226,11 @@ pub fn choose_live_set_action_v2(
             let mut score_sum = 0i32;
             let mut need = [0i32; 11];
             let mut indices = Vec::with_capacity(count);
-            for bit in 0..n {
+            for (bit, c) in candidates.iter().enumerate().take(n) {
                 if mask & (1 << bit) != 0 {
-                    let c = &candidates[bit];
                     score_sum += c.score;
-                    for k in 0..11 {
-                        need[k] += c.need[k];
+                    for (need_k, c_need) in need.iter_mut().zip(c.need.iter()) {
+                        *need_k += *c_need;
                     }
                     indices.push(c.hand_index);
                 }

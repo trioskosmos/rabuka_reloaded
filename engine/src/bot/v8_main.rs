@@ -557,9 +557,9 @@ fn pick_best(scores: &[ActionScore]) -> usize {
             continue;
         }
         let (value, incumbent) = (scores[i].value, scores[best].value);
-        if value > incumbent + 1e-9 {
-            best = i;
-        } else if (value - incumbent).abs() <= 1e-9 && scores[i].tie > scores[best].tie {
+        if value > incumbent + 1e-9
+            || ((value - incumbent).abs() <= 1e-9 && scores[i].tie > scores[best].tie)
+        {
             best = i;
         }
     }
