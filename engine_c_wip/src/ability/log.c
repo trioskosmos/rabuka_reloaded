@@ -210,10 +210,25 @@ int rb_log_drain_verdicts(RbAbilityLogItem *out, int max) {
     return n;
 }
 
+/* log.rs:97-108 drain_verdicts_since: `buf.drain(start_index..)` removes and
+ * returns [start_index, end) and KEEPS [0, start_index) — the pre-snapshot head
+ * survives, the post-snapshot tail is what the caller receives.
+ *
+ * Ported: the C is capped, so up to `max` post-snapshot entries are handed to
+ * the caller. Survivors are therefore the head [0, start_index) PLUS any tail
+ * the cap left behind ([start_index+n, end)). Everything else is discarded and
+ * its tree freed here (the caller owns the deep copies in `out`).
+ *
+ * Order matters: the drained ORIGINALS are freed first, and they are disjoint
+ * from the tail SOURCE region, so the compaction memmove never reads a freed
+ * tree. The head is never freed or moved. The vacated high slots are zeroed so
+ * a later push's log_dispose_slot() cannot free a stale alias of a tail entry
+ * that now lives at a lower index. */
 int rb_log_drain_verdicts_since(int start_index, RbAbilityLogItem *out, int max) {
     if (!g_log_enabled) return 0;
     if (start_index < 0) start_index = 0;
     if (start_index >= g_log_n) return 0;
+    if (max < 0) max = 0;
     int avail = g_log_n - start_index;
     int n = avail < max ? avail : max;
     for (int i = 0; i < n; i++) {
@@ -225,14 +240,20 @@ int rb_log_drain_verdicts_since(int start_index, RbAbilityLogItem *out, int max)
             memset(&out[i], 0, sizeof(RbAbilityLogItem));
         }
     }
-    int remaining = g_log_n - (start_index + n);
-    for (int i = 0; i < remaining; i++) {
-        log_dispose_slot(i);
-        g_log_buf[i] = g_log_buf[start_index + n + i];
-    }
-    for (int i = remaining; i < g_log_n; i++) {
+    /* Discarded originals [start_index, start_index+n): caller now owns copies. */
+    for (int i = start_index; i < start_index + n; i++) {
         log_free_tree(&g_log_buf[i]);
     }
-    g_log_n = remaining;
+    /* Keep head [0, start_index) then undrained tail [start_index+n, end). */
+    int tail = g_log_n - (start_index + n);
+    if (tail > 0) {
+        memmove(&g_log_buf[start_index], &g_log_buf[start_index + n],
+                (size_t)tail * sizeof(RbAbilityLogItem));
+        /* Clear vacated high slots so no stale alias of a moved tail entry is
+         * left for a later push's log_dispose_slot() to double free. */
+        memset(&g_log_buf[start_index + tail], 0,
+               (size_t)(g_log_n - (start_index + tail)) * sizeof(RbAbilityLogItem));
+    }
+    g_log_n = start_index + tail; /* == g_log_n - n : everything not drained */
     return n;
 }
