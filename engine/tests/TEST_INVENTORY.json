@@ -1,14 +1,14 @@
 {
   "generated_by": "cards/test_inventory.py",
-  "generated_at": "2026-09-27T05:00:45.846349+00:00",
+  "generated_at": "2026-09-27T05:15:24.644366+00:00",
   "stats": {
     "total_cards": 2526,
     "cards_with_abilities": 1565,
     "total_abilities": 2011,
     "unique_abilities": 936
   },
-  "n_files": 921,
-  "n_tests": 3716,
+  "n_files": 922,
+  "n_tests": 3719,
   "total_cards": 771,
   "covered_cards": 771,
   "abilities_on_covered": 936,
@@ -309,8 +309,8 @@
     ]
   },
   "depth_counts": {
-    "L2+choice": 825,
-    "L1+choice": 35,
+    "L2+choice": 826,
+    "L1+choice": 34,
     "L2": 76
   },
   "qa_rulings": {
@@ -920,11 +920,18 @@
       "rows": []
     },
     "unresolvable_card_id": {
-      "count": 0,
-      "rows": []
+      "count": 1,
+      "rows": [
+        {
+          "file": "engine/tests/test_modules/effects/state/wait_activation/wondermates_group_filter_negatives_test.rs",
+          "test": "<literal>",
+          "line": 30,
+          "detail": "PL!N-bp1-013-R"
+        }
+      ]
     }
   },
-  "n_test_fns_parsed": 3716,
+  "n_test_fns_parsed": 3719,
   "abilities": [
     {
       "idx": 0,
@@ -2080,6 +2087,7 @@
         "engine/tests/test_modules/effects/state/per_card/nijigasaki_bp1_006_promoted_pay_two_draw_one_test.rs",
         "engine/tests/test_modules/effects/state/wait_activation/kanata_active_phase_restriction_and_live_success_self_wait_test.rs",
         "engine/tests/test_modules/effects/state/wait_activation/self_wait_and_nijigasaki_activation_test.rs",
+        "engine/tests/test_modules/effects/state/wait_activation/wondermates_group_filter_negatives_test.rs",
         "engine/tests/test_modules/rules/conditions/restriction_and_aura_mechanics_test.rs",
         "engine/tests/test_modules/rules/phases/live_success_rules_test.rs"
       ],
@@ -2115,7 +2123,7 @@
         "nineteen_restored_members_grant_neither_recovery_nor_blades_q242",
         "no_appearance_condition_fails"
       ],
-      "covering_test_count": 55,
+      "covering_test_count": 58,
       "direct_tests": [
         "different_niji_member_on_turn2_activates",
         "kanata_does_not_block_manual_ability_activation",
@@ -2136,9 +2144,11 @@
         "q77_self_appearance_activates_energy",
         "sumire_bpb4004_double_baton_removes_both_and_clamps_cost",
         "use_limit_blocks_both_abilities",
+        "wondermates_activates_a_nijigasaki_member_and_never_the_outsider",
+        "wondermates_leaves_an_already_active_nijigasaki_member_alone",
         "wondermates_n_sd2_025_live_start_waited_nijigasaki_activates_and_retains_ability_offer"
       ],
-      "direct_test_count": 20,
+      "direct_test_count": 22,
       "is_null": false,
       "use_limit": 1,
       "watches_abilities": false,
@@ -3333,6 +3343,7 @@
         "engine/tests/test_modules/effects/state/per_card/nijigasaki_bp1_006_promoted_pay_two_draw_one_test.rs",
         "engine/tests/test_modules/effects/state/wait_activation/kanata_active_phase_restriction_and_live_success_self_wait_test.rs",
         "engine/tests/test_modules/effects/state/wait_activation/self_wait_and_nijigasaki_activation_test.rs",
+        "engine/tests/test_modules/effects/state/wait_activation/wondermates_group_filter_negatives_test.rs",
         "engine/tests/test_modules/rules/conditions/restriction_and_aura_mechanics_test.rs"
       ],
       "covering_tests": [
@@ -3367,7 +3378,7 @@
         "ruby_bpb7009_front_blade_loss_respects_mirror_and_cost",
         "sumire_bpb4004_double_baton_removes_both_and_clamps_cost"
       ],
-      "covering_test_count": 35,
+      "covering_test_count": 38,
       "direct_tests": [
         "different_niji_member_on_turn2_activates",
         "kanata_does_not_block_manual_ability_activation",
@@ -3384,9 +3395,11 @@
         "q77_self_appearance_activates_energy",
         "sumire_bpb4004_double_baton_removes_both_and_clamps_cost",
         "use_limit_blocks_both_abilities",
+        "wondermates_activates_a_nijigasaki_member_and_never_the_outsider",
+        "wondermates_leaves_an_already_active_nijigasaki_member_alone",
         "wondermates_n_sd2_025_live_start_waited_nijigasaki_activates_and_retains_ability_offer"
       ],
-      "direct_test_count": 16,
+      "direct_test_count": 18,
       "is_null": false,
       "use_limit": 1,
       "watches_abilities": false,
@@ -35025,22 +35038,29 @@
       ],
       "base": "PL!N-sd2-025",
       "covered": true,
-      "depth": "L1+choice",
+      "depth": "L2+choice",
       "has_assert": true,
       "has_choice": true,
-      "has_negative": false,
+      "has_negative": true,
       "covering_files": [
-        "engine/tests/test_modules/effects/state/wait_activation/self_wait_and_nijigasaki_activation_test.rs"
+        "engine/tests/test_modules/effects/state/wait_activation/self_wait_and_nijigasaki_activation_test.rs",
+        "engine/tests/test_modules/effects/state/wait_activation/wondermates_group_filter_negatives_test.rs"
       ],
       "covering_tests": [
         "kanata_n_bp3_006_debut_active_self_becomes_waited",
+        "wondermates_activates_a_nijigasaki_member_and_never_the_outsider",
+        "wondermates_activates_nothing_when_no_nijigasaki_member_is_staged",
+        "wondermates_leaves_an_already_active_nijigasaki_member_alone",
         "wondermates_n_sd2_025_live_start_waited_nijigasaki_activates_and_retains_ability_offer"
       ],
-      "covering_test_count": 2,
+      "covering_test_count": 5,
       "direct_tests": [
+        "wondermates_activates_a_nijigasaki_member_and_never_the_outsider",
+        "wondermates_activates_nothing_when_no_nijigasaki_member_is_staged",
+        "wondermates_leaves_an_already_active_nijigasaki_member_alone",
         "wondermates_n_sd2_025_live_start_waited_nijigasaki_activates_and_retains_ability_offer"
       ],
-      "direct_test_count": 1,
+      "direct_test_count": 4,
       "is_null": false,
       "use_limit": null,
       "watches_abilities": false,

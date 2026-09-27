@@ -20,3 +20,4 @@ pub mod self_discard_target_wait_pl_bp6_010_n_test;
 pub mod self_wait_and_nijigasaki_activation_test;
 pub mod self_wait_printemps_energy_pl_pb1_003_r_test;
 pub mod sp_bp5_choice_energy_test;
+pub mod wondermates_group_filter_negatives_test;

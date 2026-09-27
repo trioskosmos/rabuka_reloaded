@@ -184,8 +184,10 @@ _every assertion is an INEQUALITY on a count and there is no assert_eq anywhere 
 
 None.
 
-## unresolvable_card_id (0)
+## unresolvable_card_id (1)
 
 _a card-number literal that is not in the database — either written inline in a `game.id("…")` or bound to a name (`const X: &str = "…"` / `let x: &str = "…"`), because const-bound card numbers are the dominant idiom here and the call-site form alone cannot see them. get_card_id's lenient fallback silently substitutes a DIFFERENT PRINT of the same card, so the test stages the wrong card and passes: `PL!SP-bp1-014-PR` resolved to `PL!SP-bp1-014-N` and left a "three DISTINCT names" premise unpinned_
 
-None.
+| file | test | line | detail |
+| --- | --- | --- | --- |
+| `engine/tests/test_modules/effects/state/wait_activation/wondermates_group_filter_negatives_test.rs` | `<literal>` | 30 | PL!N-bp1-013-R |
