@@ -8,6 +8,7 @@ pub mod distinct_draw_regression_test;
 pub mod dollchestra_live_zone_gated_draw_test;
 pub mod dream_believers_test;
 pub mod higher_cost_member_live_success_draw_test;
+pub mod live_success_compare_revealed_draw_behaviour_test;
 pub mod live_success_compare_revealed_draw_test;
 pub mod live_success_optional_three_energy_draw_test;
 pub mod live_zone_count_gated_draw_test;
