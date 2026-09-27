@@ -89,6 +89,18 @@ def normalize_fullwidth_digits(text):
     return text.translate(translation)
 
 
+def as_int(text):
+    """Parse a number that may still be in full-width form (e.g. "３" -> 3).
+
+    Every numeric read in the parser goes through here. The card text is full
+    of full-width digits, and 36 of the 38 extraction sites used to call `int()`
+    on unnormalized text, so a card printing ３ where another prints 3 silently
+    produced no count. Non-numeric input yields 0, which is what those sites
+    already fell back to.
+    """
+    return int(normalize_fullwidth_digits(str(text).strip()) or 0)
+
+
 # Ordered counters for extract_count: the first that appears wins. "N枚まで"
 # ("up to N") is first so it outranks the bare "N枚" it contains, and the bare
 # "N以上" is last because it is a fallback for text with no counter at all

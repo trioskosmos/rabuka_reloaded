@@ -87,6 +87,7 @@ from parser_utils import (
     extract_dynamic_count,
     COUNT_PATTERN,
     normalize_fullwidth_digits,
+    as_int,
     strip_suffix_period,
     extract_by_pattern,
     extract_cost_values,
@@ -426,7 +427,7 @@ def extract_cost_range(text: str) -> Optional[Dict[str, int]]:
     Returns {"min": min_val, "max": max_val} or None."""
     m = re.search(r"コスト(\d+)以上(\d+)以下", text)
     if m:
-        return {"min": int(m.group(1)), "max": int(m.group(2))}
+        return {"min": as_int(m.group(1)), "max": as_int(m.group(2))}
     return None
 
 
@@ -456,7 +457,7 @@ def extract_blade_limit(text: str) -> Optional[Dict[str, Any]]:
         m = re.search(pattern, normalized)
         if not m:
             continue
-        result: Dict[str, Any] = {"blade_limit": int(m.group(1))}
+        result: Dict[str, Any] = {"blade_limit": as_int(m.group(1))}
         if op_kind == "captured":
             result["blade_limit_operator"] = _BLADE_LIMIT_OPERATORS[m.group(2)]
         else:
@@ -477,7 +478,7 @@ def extract_deck_position(text: str) -> Optional[int]:
     for pattern in _DECK_POSITION_PATTERNS:
         match = re.search(pattern, text)
         if match:
-            return int(match.group(1))
+            return as_int(match.group(1))
     return None
 
 
@@ -616,9 +617,9 @@ def extract_cost_modification(text: str) -> Optional[Dict[str, Any]]:
         if "modification_type" not in result:
             result["modification_type"] = mod_type
             if match.groups():
-                result["value"] = int(match.group(1))
+                result["value"] = as_int(match.group(1))
         if mod_type in COST_THRESHOLD_TYPES:
-            result["cost_threshold"] = int(match.group(1))
+            result["cost_threshold"] = as_int(match.group(1))
             result["threshold_operator"] = COST_THRESHOLD_TYPES[mod_type]
 
     return result if result else None
@@ -985,8 +986,8 @@ def extract_phase_gate(text: str) -> Tuple[Optional[Dict[str, Any]], str]:
     # Turn number (e.g. このゲームの1ターン目のライブフェイズの場合)
     turn_m = re.search(r"(\d+)ターン目", gate_phrase)
     if turn_m:
-        gate["turn_number"] = int(turn_m.group(1))
-        gate["trigger_event"]["turn_number"] = int(turn_m.group(1))
+        gate["turn_number"] = as_int(turn_m.group(1))
+        gate["trigger_event"]["turn_number"] = as_int(turn_m.group(1))
 
     return gate, remaining
 
@@ -1562,7 +1563,7 @@ def _apply_cost_operation(action, text):
     action["operation"] = "set"
     set_match = _COST_SET_RE.search(text)
     if set_match:
-        action["value"] = int(set_match.group(1))
+        action["value"] = as_int(set_match.group(1))
     # A hand-cost modifier is about the card being played, so the engine has to
     # read the card in hand rather than on the stage.
     if "このカード" in text or "このメンバーカード" in text:
@@ -1588,11 +1589,11 @@ def _apply_cost_value(action, text):
     """The numeric amount the cost change is worth."""
     delta = _COST_DELTA_RE.search(text)
     if delta:
-        action["value"] = int(delta.group(1))
+        action["value"] = as_int(delta.group(1))
         return
     signed = _COST_SIGNED_RE.search(text)
     if signed:
-        action["value"] = int(signed.group(1))
+        action["value"] = as_int(signed.group(1))
 
 
 def _handle_cost_modification(text, action):
@@ -1634,7 +1635,7 @@ def _set_score_op(t, a):
     """Set operation and value for modify_score from text patterns."""
     sm = re.search(r"([+\-])(\d+)", t)
     if sm:
-        a["value"] = int(sm.group(2))
+        a["value"] = as_int(sm.group(2))
         a["operation"] = "remove" if sm.group(1) == "-" else "add"
         return
     cnt = extract_count(t)
@@ -1796,13 +1797,13 @@ def _set_action_008(t, a):
     """Draw from the deck into hand, until the hand holds N cards."""
     a["source"] = "deck"
     a["destination"] = "hand"
-    a["target_count"] = int(_DRAW_UNTIL_RE.search(t).group(1))
+    a["target_count"] = as_int(_DRAW_UNTIL_RE.search(t).group(1))
     return a
 
 
 def _set_action_009(t, a):
     """Draw until the hand holds N cards."""
-    a["target_count"] = int(_DRAW_UNTIL_RE.search(t).group(1))
+    a["target_count"] = as_int(_DRAW_UNTIL_RE.search(t).group(1))
     return a
 
 
@@ -1998,7 +1999,7 @@ def _set_action_040(t, a):
     elif "count" not in a:
         count_match = re.search(r"(\d+)(?:つ|個|枚)", t)
         if count_match:
-            a["count"] = int(count_match.group(1))
+            a["count"] = as_int(count_match.group(1))
     if "すべて" in t or "全て" in t:
         a["all"] = True
     if "メンバーカード" in t or "ステージのメンバー" in t:
@@ -2153,7 +2154,7 @@ def _set_action_063(t, a):
     """「N回」 — a use limit of N per turn."""
     m = re.search(r"(\d+)回", t)
     if m is not None:
-        a["max_repeats"] = int(m.group(1))
+        a["max_repeats"] = as_int(m.group(1))
     return a
 
 
@@ -2162,7 +2163,7 @@ def _set_action_069(t, a):
     a["operation"] = "set"
     m = re.search(r"(\d+).*(になる|なった|なっている)", t)
     if m:
-        a["value"] = int(m.group(1))
+        a["value"] = as_int(m.group(1))
     return a
 
 
@@ -2373,7 +2374,7 @@ def _extract_per_unit_info_from_text(text):
     if "。" in per_unit_text:
         return None, text
     count_match = re.search(r"(\d+)(?:人|枚|つ)", per_unit_text)
-    per_unit_count = int(count_match.group(1)) if count_match else 1
+    per_unit_count = as_int(count_match.group(1)) if count_match else 1
     per_unit_type = None
     if "成功ライブカード置き場" in per_unit_text:
         per_unit_type = "success_live_card_zone"
@@ -2481,7 +2482,7 @@ def _check_heart_blade_split_from_text(text, action):
     if not actions:
         return None
     tc_match = re.search(r"(\d+)人", text)
-    target_count = int(tc_match.group(1)) if tc_match else None
+    target_count = as_int(tc_match.group(1)) if tc_match else None
     is_same_name = "と同じ名前" in text or ("同じ名前" in text and "持つ" in text)
     card_type = _infer_card_type(text, action)
     for sub in actions:
@@ -2748,7 +2749,7 @@ def parse_action(text: str) -> Dict[str, Any]:
     # Extract target count (e.g., "1人は" → target_count=1)
     tc_match = re.search(r"(\d+)(人|枚)は", text)
     if tc_match:
-        action["target_count"] = int(tc_match.group(1))
+        action["target_count"] = as_int(tc_match.group(1))
 
     # Extract deck position
     position = extract_deck_position_constraint(text)
@@ -3014,7 +3015,7 @@ def _try_dual_distinct(text):
         cm = re.search(r"(\d+)人以上", text)
         if not cm:
             continue
-        count = int(cm.group(1))
+        count = as_int(cm.group(1))
         dist1 = ATTR_MAP.get(attr1)
         dist2 = ATTR_MAP.get(attr2)
         if not dist1 or not dist2:
@@ -3090,7 +3091,7 @@ def _try_distinct(text):
         # "名前の異なる『X』のメンバーが2人いる場合" — no 以上, exact people count.
         m = re.search(r"(\d+)人(?:いる|ある)", text)
     if m:
-        result["count"] = int(m.group(1))
+        result["count"] = as_int(m.group(1))
         result["operator"] = ">="
         result["unit"] = m.group(2) if len(m.groups()) >= 2 and m.group(2) else "人"
     gns = extract_all_groups(text)
@@ -3126,7 +3127,7 @@ def _set_blade_count_condition(text, result):
         result.update(
             {
                 "type": "card_blade_condition",
-                "count": int(match.group(1)),
+                "count": as_int(match.group(1)),
                 "operator": operator,
                 "source": "selected_cards",
             }
@@ -3312,7 +3313,7 @@ def _try_hand_count_compound(result, text):
     hand_m = re.search(r"手札が(\d+)枚以下(の|の場)", text)
     if not hand_m:
         return None
-    hand_count = int(hand_m.group(1))
+    hand_count = as_int(hand_m.group(1))
     split_pos = hand_m.start()
     for marker in ["とき、", "場合、", "なら、"]:
         pos = text.rfind(marker, 0, hand_m.start())
@@ -3376,7 +3377,7 @@ def _try_card_count(text):
         if m:
             result = {
                 "type": "card_count_condition",
-                "count": int(m.group(1)),
+                "count": as_int(m.group(1)),
                 "operator": op,
                 "text": text,
             }
@@ -3523,8 +3524,8 @@ def _try_temporal_turn_phase(text):
     }
     tm = re.search(r"(\d+)ターン目", text)
     if tm:
-        result["turn_number"] = int(tm.group(1))
-        result["trigger_event"]["turn_number"] = int(tm.group(1))
+        result["turn_number"] = as_int(tm.group(1))
+        result["trigger_event"]["turn_number"] = as_int(tm.group(1))
     return result
 
 
@@ -3582,7 +3583,7 @@ def _try_baton_touch(text):
                 result["characters"] = gns[:1]
     count_m = re.search(rf"(\d+)人{sep}バトンタッチ", text)
     if count_m:
-        te_data["min_count"] = int(count_m.group(1))
+        te_data["min_count"] = as_int(count_m.group(1))
     # Extract cost limit (e.g., "コスト10以上" → cost_limit=10, cost_limit_operator=">=")
     cl_op = extract_cost_limit_with_operator(text)
     if cl_op:
@@ -3632,8 +3633,8 @@ def _try_temporal_count(text):
     }
     m = re.search(r"(\d+)回", text)
     if m:
-        result["count"] = int(m.group(1))
-        result["trigger_event"]["count"] = int(m.group(1))
+        result["count"] = as_int(m.group(1))
+        result["trigger_event"]["count"] = as_int(m.group(1))
     elif "登場" in text and "回" not in text:
         result["count"] = 1
     if "ライブフェイズ" in text:
@@ -4148,7 +4149,7 @@ def _try_appearance(text):
             result["exclude_characters"] = [bte.group(1)]
         count_m = re.search(r"(\d+)人からバトンタッチ", text)
         if count_m:
-            result["min_baton_touch_count"] = int(count_m.group(1))
+            result["min_baton_touch_count"] = as_int(count_m.group(1))
         # 「バトンタッチして登場していないかぎり、…する」 gates the action on
         # the event NOT having happened — encode the polarity explicitly.
         if re.search(r"バトンタッチ[^。]*?していない", text):
@@ -4469,7 +4470,7 @@ def _try_state_change(text):
     ]:
         m = re.search(pat, text)
         if m:
-            result["count"] = int(m.group(1))
+            result["count"] = as_int(m.group(1))
             result["operator"] = op
             if unit:
                 result["unit"] = unit
@@ -4536,11 +4537,11 @@ def _try_live_mid(text):
         result["operator"] = ">="
         result["card_type"] = "live_card"
         result["location"] = "live_card_zone"
-        result["cost_limit"] = int(normalize_fullwidth_digits(score_match.group(1)))
+        result["cost_limit"] = as_int(score_match.group(1))
         result["cost_limit_operator"] = "<="
     elif count_match:
         result["type"] = "card_count_condition"
-        result["count"] = int(normalize_fullwidth_digits(count_match.group(1)))
+        result["count"] = as_int(count_match.group(1))
         result["operator"] = ">="
         result["card_type"] = "live_card"
         result["temporal"] = "during_live"
@@ -4787,7 +4788,7 @@ def _split_optional_offer(text):
 def _count_from_cards(text, default=1):
     """The 「N枚」 count in `text`, or `default` when the count is unstated."""
     m = re.search(r"(\d+)枚", text)
-    return int(m.group(1)) if m else default
+    return as_int(m.group(1)) if m else default
 
 
 def _committed(action):
@@ -5019,7 +5020,7 @@ def _try_discard_hand_reactivate_optional(text):
         "to_state": "wait",
     }
     m = re.search(r"(\d+)枚", opt_text)
-    count = int(m.group(1)) if m else 1
+    count = as_int(m.group(1)) if m else 1
     discard_opt = {
         "action": "move_cards",
         "source": "hand",
@@ -5135,7 +5136,7 @@ def _extract_score_threshold(condition, text):
         return
     if re.match(r"\s*(?:か|または|や|のいずれか)", score_text[match.end() :]):
         return
-    condition["count"] = int(match.group(1))
+    condition["count"] = as_int(match.group(1))
     condition.setdefault("operator", "=")
 
 
@@ -5157,7 +5158,7 @@ def _extract_heart_resource(condition, text):
                 condition["heart_types"] = hts
                 tm = re.search(r"合計(\d+)種類以上", text)
                 if tm:
-                    condition["types_count"] = int(tm.group(1))
+                    condition["types_count"] = as_int(tm.group(1))
                     condition["operator"] = ">="
         else:
             for pat, rt in [
@@ -5452,11 +5453,11 @@ def _extract_generic_fields(condition, text):
     if "いずれか" in text:
         vm = re.search(r"(\d+)(?:、(\d+))+(?:のいずれか)", text)
         if vm:
-            condition["values"] = [int(v) for v in re.findall(r"\d+", vm.group(0))]
+            condition["values"] = [as_int(v) for v in re.findall(r"\d+", vm.group(0))]
     # Also handle "1か5" pattern (score is 1 or 5)
     vm = re.search(r"(\d+)[か](\d+)", text)
     if vm:
-        condition["values"] = [int(v) for v in re.findall(r"\d+", vm.group(0))]
+        condition["values"] = [as_int(v) for v in re.findall(r"\d+", vm.group(0))]
 
     _extract_group_scope(condition, text)
 
@@ -5507,8 +5508,8 @@ def _infer_comparison_kind_type(condition, text):
         condition.setdefault("operator", "=")
         cm = re.search(r"合計が、?(\d+)", text)
         if cm:
-            condition["count"] = int(cm.group(1))
-            condition["cost_total"] = int(cm.group(1))
+            condition["count"] = as_int(cm.group(1))
+            condition["cost_total"] = as_int(cm.group(1))
 
 
 def _infer_resource_type(condition, text):
@@ -5559,7 +5560,7 @@ def _infer_aggregate_total_type(condition, text):
         cm = re.search(r"合計が、?(\d+)\s*(以上|以下|未満|超|未満)?", text)
         quantifier = None
         if cm:
-            condition["count"] = int(cm.group(1))
+            condition["count"] = as_int(cm.group(1))
             quantifier = cm.group(2)
         # cost_total mirrors count for the EXACT-total shape ("合計が8の場合"),
         # not only the ones that spell out コスト. Follow-up branches of a
@@ -5731,7 +5732,7 @@ def _enrich_heart_content(cond, text):
     hc_m = re.search(rf"必要ハートに含まれる{HEART_ICON_ID}が(\d+)", text)
     if hc_m:
         heart_color = f"heart{hc_m.group(1).zfill(2)}"
-        heart_count = int(hc_m.group(2))
+        heart_count = as_int(hc_m.group(2))
         # 必要ハート lives on the live card — the engine's aggregate-total
         # evaluator reads need_heart from live_card_zone (+success zone).
         # Without location the condition can't be routed to that evaluator;
@@ -5907,7 +5908,7 @@ def _enrich_heart_gain_multiset(d, effect_text):
     if colors:
         m_nts = re.search(r"(\d+)つ得る", effect_text)
         if m_nts:
-            n = int(m_nts.group(1))
+            n = as_int(m_nts.group(1))
             distinct = list(dict.fromkeys(colors))
             if len(distinct) == 1:
                 # "heart02を3つ得る" -> 3 tokens of heart02
@@ -5922,7 +5923,7 @@ def _enrich_heart_gain_multiset(d, effect_text):
     # explicit "Nつ" count (e.g. "選んだハートを2つ得る").
     m_nts = re.search(r"(\d+)つ得る", effect_text)
     if m_nts:
-        d["count"] = int(m_nts.group(1))
+        d["count"] = as_int(m_nts.group(1))
 
 
 def infer_count_from_icons(d, text):
@@ -5944,7 +5945,7 @@ def infer_count_from_icons(d, text):
     # so that "ハートを2つ得る" with a single heart icon correctly gets count=2
     count_match = re.search(r"(\d+)つ", effect_text)
     if count_match:
-        d["count"] = int(count_match.group(1))
+        d["count"] = as_int(count_match.group(1))
         return
     # Fix D19: a numeric count in the FULL text may belong to a blade-count
     # filter clause ("ブレードを4つ以上持つ") rather than to the resource being
@@ -5953,7 +5954,7 @@ def infer_count_from_icons(d, text):
     if not _blade_icon_is_target_filter(text):
         count_match = re.search(r"(\d+)つ", text)
         if count_match:
-            d["count"] = int(count_match.group(1))
+            d["count"] = as_int(count_match.group(1))
             return
     blade_count = effect_text.count(BLADE_ICON)
     if blade_count > 0:
@@ -6123,7 +6124,7 @@ def _rescue_custom_action(action, text):
         action.setdefault("operation", "add")
         signed = _SIGNED_NUMBER_RE.search(text)
         if signed:
-            action["value"] = int(signed.group(2))
+            action["value"] = as_int(signed.group(2))
 
 
 # 「AをBに」 with no explicit source: which zone the cards come from. Ordered,
@@ -6213,7 +6214,7 @@ def _apply_previous_move_cost_reference(action, text):
     m = _PREVIOUS_MOVE_COST_RE.search(text)
     if m:
         action["cost_reference"] = "previous_moved_card"
-        action["cost_offset"] = int(m.group(1))
+        action["cost_offset"] = as_int(m.group(1))
         action.setdefault("cost_limit_operator", "=")
 
 
@@ -6390,7 +6391,7 @@ def _fill_gain_resource(action, text, action_text):
     # Extract target_count from "N人" (e.g., "メンバー1人" → target_count=1)
     tc_match = re.search(r"(\d+)人", text)
     if tc_match:
-        action["target_count"] = int(tc_match.group(1))
+        action["target_count"] = as_int(tc_match.group(1))
     # Extract distinct_card_name from "名前の異なる" (different name constraint)
     if "名前の異なる" in text:
         action["distinct"] = "card_name"
@@ -6457,7 +6458,7 @@ def _fill_per_unit_extras(action, text, a):
             action["per_unit_type"] = "cost"
             cm = re.search(r"コスト(\d+)につき", text)
             if cm:
-                action["per_unit_count"] = int(cm.group(1))
+                action["per_unit_count"] = as_int(cm.group(1))
         # Issue 15: per_unit_source from "これにより控え室に置いたカード" pattern
         if "これにより" in text and ("置いた" in text or "置かれた" in text):
             action["per_unit_source"] = "previous_moved_cards"
@@ -6466,7 +6467,7 @@ def _fill_per_unit_extras(action, text, a):
     if not max_m:
         max_m = re.search(r"(\d+)までしか", text)
     if max_m:
-        action["max_repeats"] = int(max_m.group(1))
+        action["max_repeats"] = as_int(max_m.group(1))
     # Issue 6: Detect timing constraint for gain_resource
     if "このターンに登場" in text and a == "gain_resource":
         action["timing_condition"] = "appeared_this_turn"
@@ -6537,15 +6538,15 @@ def _fill_need_heart(action, text):
         # Extract the heart color from the raw text (either bare "heart06" or icon "{{heart_06.png|heart06}}")
         color_match = re.search(r"heart(\d{2})", text[: nh.end()])
         if color_match:
-            action["need_heart_color"] = f"heart{int(color_match.group(1)):02d}"
-            action["need_heart_total"] = int(nh.group(1))
+            action["need_heart_color"] = f"heart{as_int(color_match.group(1)):02d}"
+            action["need_heart_total"] = as_int(nh.group(1))
             action["need_heart_operator"] = ">="
 
     # Also parse plain-text patterns like "ハートを4つ以上持つ" (without heart icon)
     nh2 = re.search(r"ハートを(\d+)つ以上持つ", text)
     if nh2:
         # Total heart icon count threshold (any colors)
-        action["need_heart_total"] = int(nh2.group(1))
+        action["need_heart_total"] = as_int(nh2.group(1))
         action["need_heart_operator"] = ">="
 
 
@@ -6752,7 +6753,7 @@ def _per_unit_count_type(result, text, per_text):
     """Resolve per_unit_count / per_unit_type from reference + full text."""
     pm = re.search(r"(\d+)(人|枚|つ)(につき|ごとに)", text)
     if pm:
-        result["per_unit_count"] = int(pm.group(1))
+        result["per_unit_count"] = as_int(pm.group(1))
         result["per_unit_type"] = pm.group(2)
         if "ライブ中のカード" in text or "ライブ中のライブカード" in text:
             result["per_unit_type"] = "live_card_zone"
@@ -6760,7 +6761,7 @@ def _per_unit_count_type(result, text, per_text):
         # Handle "コストNにつき" (cost-based scaling without explicit counter unit)
         cm = re.search(r"コスト(\d+)(につき|ごとに)", text)
         if cm:
-            result["per_unit_count"] = int(cm.group(1))
+            result["per_unit_count"] = as_int(cm.group(1))
             result["per_unit_type"] = "cost"
         for kw, t in [
             ("メンバー", "member"),
@@ -6984,7 +6985,7 @@ def _try_per_unit(text):
     # Issue 15: Extract max_repeats from "N枚/回/つまでしか" patterns
     max_m = _MAX_REPEATS_RE.search(text)
     if max_m:
-        action["max_repeats"] = int(max_m.group(1))
+        action["max_repeats"] = as_int(max_m.group(1))
 
     action["text"] = text
     return action
@@ -7287,7 +7288,7 @@ def _try_energy_ahead_alternative(text):
         "condition": {
             "type": "comparison_condition",
             "comparison_type": "energy_relative",
-            "count": int(n1),
+            "count": as_int(n1),
             "operator": "==",
             "target": "self",
             "text": f"相手のエネルギーが自分より{n1}枚多い場合",
@@ -7296,7 +7297,7 @@ def _try_energy_ahead_alternative(text):
         "alternative_condition": {
             "type": "comparison_condition",
             "comparison_type": "energy_relative",
-            "count": int(n2),
+            "count": as_int(n2),
             "operator": ">=",
             "target": "self",
             "text": f"{n2}枚以上多い場合",
@@ -7336,7 +7337,7 @@ def _try_cost_set_from_reference(text):
     select_part = parse_action(m.group("sel"))
     if not isinstance(select_part, dict):
         return None
-    n = int(m.group("n"))
+    n = as_int(m.group("n"))
     offset = -n if m.group("dir") == "低い" else n
     dur_txt = m.group("dur") or "ライブ終了時まで"
     duration = "live_end" if "ライブ" in dur_txt else "this_turn"
@@ -7367,7 +7368,7 @@ def _try_cost_set_from_reference(text):
                 # effective cost. Distinguishes from Rina-style 「合計コストがN」
                 # conditions (no location), which sum moved-card costs.
                 "location": "activating_card",
-                "count": int(mt.group(1)),
+                "count": as_int(mt.group(1)),
                 "operator": ">=",
                 "target": "self",
                 "text": f"これによりこのカードのコストが{mt.group(1)}以上になった場合",
@@ -7535,7 +7536,7 @@ def _try_character_specific(text):
             effects.append(
                 {
                     "character": pm.group(1),
-                    "count": int(pm.group(2)),
+                    "count": as_int(pm.group(2)),
                     "resources": pm.group(3),
                 }
             )
@@ -7601,7 +7602,7 @@ def _make_cost_mod_action(text_part, operation="decrease"):
         a["per_unit_type"] = "group_name"
         cm = re.search(r"(\d+)種類", text_part)
         if cm:
-            a["per_unit_count"] = int(cm.group(1))
+            a["per_unit_count"] = as_int(cm.group(1))
     return a
 
 
@@ -7638,7 +7639,7 @@ def _try_cost_modification(text):
                 # Fallback: if main effect didn't parse, return just cost mod
                 return _make_cost_mod_action(second, op)
     value_match = re.search(r"(\d+)(少なくなる|減る|増える|増やす)", text)
-    value = int(value_match.group(1)) if value_match else energy_count
+    value = as_int(value_match.group(1)) if value_match else energy_count
     result = {
         "action": "modify_cost",
         "operation": "subtract",
@@ -7664,7 +7665,7 @@ def _try_cost_modification(text):
     unit_match = re.search(r"(\d+)(枚|人)につき", text)
     if unit_match:
         result["per_unit"] = True
-        result["per_unit_count"] = int(unit_match.group(1))
+        result["per_unit_count"] = as_int(unit_match.group(1))
         result["per_unit_type"] = unit_match.group(2)
         # Detect when per-unit count targets stage members
         # (「ステージにいる...メンバー」) vs the effect's location
@@ -7973,7 +7974,7 @@ def _build_reveal_add_discard(fp, sa_text, select_text):
     pg = re.search(r"各グループ名につき(\d+)枚ずつ", select_text)
     if pg:
         result["per_group"] = True
-        result["per_group_count"] = int(pg.group(1))
+        result["per_group_count"] = as_int(pg.group(1))
     _add_or_card_types_if_needed(result, select_text)
     return result
 
@@ -7994,7 +7995,7 @@ def _add_heart_color_threshold(d, text):
         return
     m = re.search(rf"{HEART_ICON_ID}を(\d+)(?:個)?以上", text)
     if m:
-        count = int(m.group(2))
+        count = as_int(m.group(2))
         if count > 0:
             d["heart_color_count"] = count
 
@@ -8351,7 +8352,7 @@ def _try_heart_select_reveal(text):
     reveal_m = re.search(r"デッキの上からカードを(\d+)枚公開", rest)
     if not reveal_m:
         return None
-    reveal_count = int(reveal_m.group(1))
+    reveal_count = as_int(reveal_m.group(1))
     # Parse the "合計N枚含まれる場合" condition from the before-text
     # "公開されたカードの中に...合計N枚含まれる場合"
     heart_match_condition = None
@@ -8360,7 +8361,7 @@ def _try_heart_select_reveal(text):
         before,
     )
     if cond_m:
-        cond_count = int(cond_m.group(1))
+        cond_count = as_int(cond_m.group(1))
         heart_match_condition = {
             "type": "all_revealed_match_heart_color",
             "count": cond_count,
@@ -8600,7 +8601,7 @@ def _set_reveal_until_chosen_card(text, result):
         "all": False,
     }
     if cost_match:
-        first["cost_limit"] = int(cost_match.group(1))
+        first["cost_limit"] = as_int(cost_match.group(1))
         first["cost_limit_operator"] = ">="
     result["actions"] = [
         first,
@@ -8662,7 +8663,7 @@ def _try_self_and_other(text):
     effect_part = action_text[m.end() :].strip()
     # Determine count of other targets
     tc_match = re.search(r"(\d+)人", other_part)
-    other_count = int(tc_match.group(1)) if tc_match else 1
+    other_count = as_int(tc_match.group(1)) if tc_match else 1
     # Extract group names from the other-target part
     other_groups = extract_all_groups(other_part)
     # Extract duration prefix
@@ -9332,7 +9333,7 @@ def _try_conditional(text):
     # Special: yell count modification
     if "エールによって公開される自分のカードの枚数が" in at:
         cm = re.search(COUNT_PATTERN, at)
-        cnt = int(cm.group(1)) if cm else None
+        cnt = as_int(cm.group(1)) if cm else None
         result = {
             "text": text,
             "condition": cond,
@@ -9708,7 +9709,7 @@ def _try_unless_effect(text):
     # the action manually.
     m = re.search(r"手札を(\d+)枚控え室に置", unless_text)
     if m:
-        count = int(m.group(1))
+        count = as_int(m.group(1))
         fa = {
             "action": "move_cards",
             "source": "hand",
@@ -9822,7 +9823,7 @@ def _set_global_modifier_fields(text, result):
     if heart_match:
         result["heart_colors"] = [f"heart{heart_match.group(1).zfill(2)}"]
     value_match = re.search(r"(\d+)つ多", text)
-    result["value"] = int(value_match.group(1)) if value_match else 1
+    result["value"] = as_int(value_match.group(1)) if value_match else 1
 
 
 _try_play_baton_touch = EffectPattern(
@@ -9906,7 +9907,7 @@ def _set_blade_count_set(text, result):
         r"(\d+)になる", pattern_text
     )
     if match:
-        result["count"] = int(match.group(1))
+        result["count"] = as_int(match.group(1))
     if "ライブ終了時まで" in pattern_text:
         result["duration"] = "live_end"
 
@@ -9960,7 +9961,7 @@ def _set_both_discard_until(text, result):
     }
     count_match = re.search(r"(\d+)枚になるまで", first["text"])
     if count_match:
-        first["target_count"] = int(count_match.group(1))
+        first["target_count"] = as_int(count_match.group(1))
     result["target"] = "both"
     result["multiple_targets"] = True
     result["actions"] = [first, parse_effect(second_text.strip())]
@@ -10053,7 +10054,7 @@ def _try_heart_choice(text):
     count = 1
     cm = re.search(r"選んだ(\d+)つ", at[idx:])
     if cm:
-        count = int(cm.group(1))
+        count = as_int(cm.group(1))
     optional = "してもよい" in at or "てもよい" in at
     operation = "set"
     if "減らす" in at or "減る" in at:
@@ -10362,9 +10363,9 @@ def _set_both_hand_keep_shuffle_under(t: str, r: Dict[str, Any]) -> None:
       draw   (deck -> hand, both, count=N)
     """
     cm = re.search(r"カードを(\d+)枚まで選び", t)
-    count = int(cm.group(1)) if cm else 1
+    count = as_int(cm.group(1)) if cm else 1
     cm2 = re.search(r"その後、[^。]*カードを(\d+)枚引く", t)
-    draw_count = int(cm2.group(1)) if cm2 else count
+    draw_count = as_int(cm2.group(1)) if cm2 else count
     actions = [
         {
             "text": t,
@@ -10503,7 +10504,7 @@ def _try_play_time_cost_set(text):
         "text": text,
         "action": "modify_cost",
         "operation": "set",
-        "value": int(vm.group(1)),
+        "value": as_int(vm.group(1)),
         "source": "hand",
         "location": "hand",
         "card_type": "member_card",
@@ -11370,7 +11371,7 @@ def _state_energy_is_object(txt: str) -> bool:
 def _fw_int(txt: str, pattern: str) -> int:
     """First integer capture of `pattern` in `txt`, full-width normalized."""
     m = re.search(pattern, txt.translate(str.maketrans("０１２３４５６７８９", "0123456789")))
-    return int(m.group(1)) if m else 1
+    return as_int(m.group(1)) if m else 1
 
 
 def _energy_state_option(state, count, text):
@@ -11477,7 +11478,7 @@ def _split_mixed_state_change(node):
             if not m2b:
                 return node
         if m2b:
-            energy_n = int(m2b.group(2))
+            energy_n = as_int(m2b.group(2))
             options = [
                 member_option(m2b.group(1)),
                 _energy_state_option(
@@ -11487,7 +11488,7 @@ def _split_mixed_state_change(node):
                 ),
             ]
         else:
-            energy_n = int(m2.group(2)) if m2.group(2) else 1
+            energy_n = as_int(m2.group(2)) if m2.group(2) else 1
             options = [
                 member_option(m2.group(1)),
                 {
@@ -12269,7 +12270,7 @@ def _fix_condition_enrichment(eff, t):
             if not cond.get("count"):
                 cm = re.search(r"(\d+)以上", ct2)
                 if cm:
-                    cond["count"] = int(cm.group(1))
+                    cond["count"] = as_int(cm.group(1))
                     changed = True
     if HAS_SCORE_ICON in t:
         if eff.get("action") in ("move_cards", "select") and not eff.get(
@@ -12286,7 +12287,7 @@ def _fix_condition_enrichment(eff, t):
     ):
         nh = re.search(r"ハートを(\d+)つ以上持つ", t)
         if nh:
-            eff["need_heart_total"] = int(nh.group(1))
+            eff["need_heart_total"] = as_int(nh.group(1))
             eff["need_heart_operator"] = ">="
 
 
@@ -12539,7 +12540,7 @@ def _fix_conditional_on_result(eff, t):
                 }
                 count_m = re.search(r"(\d+)", cond_text)
                 if count_m:
-                    cond_dict["count"] = int(count_m.group(1))
+                    cond_dict["count"] = as_int(count_m.group(1))
                 cond_dict["operator"] = ">="
                 if "余剰ハート" in cond_text:
                     cond_dict["resource_type"] = "surplus_heart"
