@@ -393,6 +393,17 @@ impl AbilityResolver {
                 || cond.get_group_names().is_some_and(|v| v.is_empty()))
     }
 
+    /// Whether the activation-position overlay would write anything.
+    ///
+    /// The two overlay rules are separate: this one is top-level only, and
+    /// applies to both the activation-condition pre-check and the main
+    /// condition gate.
+    fn condition_needs_position_overlay(cond: &Condition, effect: &AbilityEffect) -> bool {
+        cond.get_position().is_none()
+            && cond.get_positions_characters().is_none()
+            && (effect.position_any().is_some() || effect.activation_position_any().is_some())
+    }
+
     /// Whether evaluating `condition` requires a patched copy first.
     ///
     /// Mirrors the two overlay rules `can_activate_effect` applies — the
@@ -407,10 +418,7 @@ impl AbilityResolver {
         effect: &AbilityEffect,
         group_names: Option<&[String]>,
     ) -> bool {
-        if cond.get_position().is_none()
-            && cond.get_positions_characters().is_none()
-            && (effect.position_any().is_some() || effect.activation_position_any().is_some())
-        {
+        if Self::condition_needs_position_overlay(cond, effect) {
             return true;
         }
         fn any_needs_merge(cond: &Condition, group_names: Option<&[String]>) -> bool {
@@ -448,29 +456,30 @@ impl AbilityResolver {
         let mut activation_condition_passed = true;
         if !cost_already_paid {
             if let Some(activation_condition) = effect.activation_condition_parsed_any() {
-                let mut merged_cond = Box::new(activation_condition.clone());
-                // Merge the effect's position info into the condition so it's checked.
-                if merged_cond.get_position().is_none()
-                    && merged_cond.get_positions_characters().is_none()
-                {
+                // Same deal as the main condition gate below: the clone is
+                // only needed if the position patch would actually write.
+                let result = if Self::condition_needs_position_overlay(activation_condition, effect) {
+                    let mut merged_cond = Box::new(activation_condition.clone());
+                    // Merge the effect's position info into the condition so it's checked.
                     if let Some(pos) = effect.position_any() {
                         merged_cond.set_position(pos.clone());
                     } else if let Some(act_pos) = effect.activation_position_any() {
                         merged_cond.set_activation_position(act_pos.to_string());
                     }
-                }
-                #[cfg(not(feature = "no_std"))]
-                let snapshot = crate::ability::log::buffer_len();
-                let result = ctx.evaluate_condition(&merged_cond);
-                // On success: drain pre-check verdicts (condition will be re-evaluated
-                // during effect execution, avoiding duplicates).
-                // On failure: keep verdicts (they're the only info for the failure path).
-                #[cfg(not(feature = "no_std"))]
-                {
-                    if result {
+                    #[cfg(not(feature = "no_std"))]
+                    let snapshot = crate::ability::log::buffer_len();
+                    let passed = ctx.evaluate_condition(&merged_cond);
+                    // On success: drain pre-check verdicts (condition will be re-evaluated
+                    // during effect execution, avoiding duplicates).
+                    // On failure: keep verdicts (they're the only info for the failure path).
+                    #[cfg(not(feature = "no_std"))]
+                    if passed {
                         crate::ability::log::drain_verdicts_since(snapshot);
                     }
-                }
+                    passed
+                } else {
+                    ctx.evaluate_condition(activation_condition)
+                };
                 // Fall through to the main condition gate as well — abilities with
                 // BOTH a parenthetical activation-position restriction and a real
                 // condition (e.g. 「このターン、このメンバーがエリアを移動している場合」)
