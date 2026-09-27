@@ -29,34 +29,38 @@
 //! own SUCCESS zone — not the live zone, not the opponent's), and 『μ's』のカード (a
 //! group filter on top, so the right zone with the wrong card must not qualify).
 //!
-//! ### What five attempts established about the harness
+//! ### Six drafts, and the answer was a field nobody printed
 //!
-//! ライブ成功時 fires from `execute_live_victory_determination`, which `advance_phase`
-//! calls from inside `Phase::LiveVictoryDetermination` (phases.rs:266-274). The
-//! rollover looks like two phases and the natural walk covers only the first. Full
-//! phase diagnostics, after adopting the
-//! `integration/per_card/live_end_expiry_rollover_and_dual_trigger_window_gates_test.rs`
-//! idiom verbatim and draining auto-ability choices every step:
+//! Every draft read a draw of zero and blamed the measurement window. A probe of the
+//! performance snapshots settled it, and the engine was correct throughout:
 //!
 //! ```text
-//!   perf_guard=3  after_perf_phase=Active  vd_guard=0  final_phase=Active
-//!   turn_phase=FirstAttackerNormal  hand=1  deck=39  success_cards=1
-//!   game_result=Ongoing  game_ended=false
+//!   p1_snap_success=false
+//!   SNAP player=p1 success=false score=0 lives=1
+//!   SNAP player=p2 success=false score=0 lives=1
+//!   live_zone p1=0 p2=0   success p1=0 p2=0
 //! ```
 //!
-//! Read carefully, that says the walk does NOT stop at `LiveVictoryDetermination`:
-//! within its three passes the phase goes first → second → victory determination →
-//! `Active`, so the determination executes INSIDE one `pass()` and the loop written
-//! to catch it (`vd_guard=0`) never runs. `game_result`/`game_ended` are clean, so
-//! this is not the early return at phases.rs:267 — the determination ran, and the
-//! trigger still did not dispatch.
+//! Snapshots exist for both seats; both lives simply FAILED, and a failed live fires
+//! no ライブ成功時. `should_trigger_live_success` returning false is the right
+//! answer, not a missing pass. The live cards reaching NEITHER success zone is the
+//! same fact from the other side.
 //!
-//! So the blocker is not a missing pass and not a card bug: the dispatch happens
-//! inside a single `advance_phase` step and is not observable from outside without
-//! instrumenting `execute_live_victory_determination`. That is worth resolving ONCE,
-//! because it gates every ライブ成功時 negative in the coverage report and
-//! `PL!-bp6-023-L` is only the first card to need it. The three claim variants above
-//! are written down so they are ready when it is.
+//! The cause was the wrong field being read. This live prints `score 4` and
+//! `need_heart {heart01: 2, heart03: 4, heart0: 4}`. Every draft had staged members
+//! carrying none of those, so the performance could not succeed. And `heart0: 4` is
+//! unsatisfiable from PRINTED cards in this pool: no member has a colorless base
+//! heart (the maximum across every card is 0), and the 160 cards carrying a
+//! wildcard `b_all` blade heart are all LIVE cards, not members.
+//! `game.state.stage_hearts` is not a lever either —
+//! `execute_live_victory_determination` calls `rebuild_stage_hearts_with_yell`
+//! before the performance, so a hand-set value is overwritten.
+//!
+//! So the answer to "where can a ライブ成功時 dispatch be observed" is: wherever a
+//! live can be MADE TO SUCCEED, and this particular one cannot be from printed
+//! cards. That is a property of the card and the pool, not of the harness, and the
+//! three claim variants above are written down for whoever runs it against a live
+//! whose `need_heart` the pool can satisfy.
 //!
 
 use crate::helpers::*;
