@@ -60,6 +60,62 @@ _file CALLS trigger_live_success_abilities on a live whose printed need_heart no
 | `engine/tests/test_modules/effects/gain/blades/constants/success_pile_difference_pl_s_bp6_009_r_plus_test.rs` | `PL!S-bp2-026-L` | 1 | heart04 needs 6, best single member prints 5 |
 | `engine/tests/test_modules/integration/full_round/real_card_phase_walkthrough_and_ability_suite_test.rs` | `PL!S-bp2-026-L` | 1 | heart04 needs 6, best single member prints 5 |
 
+## drain_zero_may_decline (49)
+
+_file drains a prompt with index [0] AND asserts an absence, while naming a card whose select_cards is `optional`. On a skippable SelectCard, [0] is the SKIP: resume_indices maps indices onto the choice's generated option list, where an allow_skip prompt leads with the skip entry. A test asserting a POSITIVE outcome cannot be silently declining -- it would fail -- but one asserting a NEGATIVE outcome can be, and passes. This is EXPOSURE, not a defect: nothing here can see which prompt a given [0] answers. The question to answer is 'which prompt does this [0] answer, and is it the skippable one?'. It is not hypothetical -- a draft here 'proved' 平安名すみれ's filtered retrieval unreachable across three commits before the cause turned out to be this drain rather than the engine_
+
+| file | test | line | detail |
+| --- | --- | --- | --- |
+| `engine/tests/test_modules/effects/choice/per_card/daydream_mermaid_live_success_energy_or_recover_choice_test.rs` | `PL!S-sd1-003-SD` | 1 |  |
+| `engine/tests/test_modules/effects/compound/per_card/position_change_draw_and_rotation_multi_card_fixes_test.rs` | `PL!SP-bp5-013-N` | 1 |  |
+| `engine/tests/test_modules/effects/compound/sequential_effects/deficit_mill_live_topdeck_pl_n_pr_032_pr_test.rs` | `PL!S-sd1-003-SD` | 1 |  |
+| `engine/tests/test_modules/effects/draw/chains/self_wait_draw_discard_pl_n_bp7_023_n_test.rs` | `PL!-sd1-004-SD` | 1 |  |
+| `engine/tests/test_modules/effects/draw/flat/b9_more_test.rs` | `PL!S-sd1-003-SD` | 1 |  |
+| `engine/tests/test_modules/effects/gain/blades/under_member/shizuku_under_member_heart_copy_test.rs` | `PL!N-sd1-001-SD` | 1 |  |
+| `engine/tests/test_modules/effects/gain/hearts/live_start/live_start_discard_distinct_heart_colors_q246_test.rs` | `PL!S-bp3-004-R` | 1 |  |
+| `engine/tests/test_modules/effects/gain/hearts/live_start/live_start_lone_group_member_hearts_become_heart04_test.rs` | `PL!S-bp5-007-R` | 1 |  |
+| `engine/tests/test_modules/effects/look_select/look_and_filter/all_or_any_three_heart_member_filter_look_test.rs` | `PL!S-bp6-005-R` | 1 |  |
+| `engine/tests/test_modules/effects/look_select/look_and_filter/card_filter_test.rs` | `PL!-bp6-002-R,PL!-bp6-004-R` | 1 |  |
+| `engine/tests/test_modules/effects/look_select/look_and_filter/look_at_deck_top_optional_discard_test.rs` | `PL!-sd1-015-SD` | 1 |  |
+| `engine/tests/test_modules/effects/look_select/look_and_filter/look_count_from_total_live_score_test.rs` | `PL!-sd1-015-SD` | 1 |  |
+| `engine/tests/test_modules/effects/look_select/look_and_filter/look_seven_select_three_heart_member_test.rs` | `PL!S-sd1-003-SD` | 1 |  |
+| `engine/tests/test_modules/effects/look_select/look_and_filter/no_blade_heart_group_look_test.rs` | `PL!N-bp7-018-N` | 1 |  |
+| `engine/tests/test_modules/effects/look_select/look_and_filter/or_card_types_heart05_threshold_look_test.rs` | `PL!S-pb1-015-N` | 1 |  |
+| `engine/tests/test_modules/effects/look_select/look_and_filter/per_group_take_one_from_look_five_test.rs` | `PL!SP-bp5-007-R` | 1 |  |
+| `engine/tests/test_modules/effects/look_select/look_and_filter/success_score_gated_look_fetches_musume_test.rs` | `PL!-bp4-006-R` | 1 |  |
+| `engine/tests/test_modules/effects/look_select/optional_look_and_select_negative_branches_test.rs` | `PL!-pb1-016-R,PL!-sd1-004-SD` | 1 |  |
+| `engine/tests/test_modules/effects/look_select/per_card/live_success_revealed_cards_extra_yells_test.rs` | `PL!S-bp3-009-R` | 1 |  |
+| `engine/tests/test_modules/effects/look_select/reveal/debut_group_look_three_reveal_test.rs` | `PL!N-sd2-009-SD2` | 1 |  |
+| `engine/tests/test_modules/effects/look_select/reveal/look_five_reveal_cost9_group_member_test.rs` | `PL!-bp5-002-R,PL!HS-bp5-008-R,PL!N-bp5-009-R` | 1 |  |
+| `engine/tests/test_modules/effects/look_select/reveal/look_four_take_live_with_heart_requirement_test.rs` | `PL!S-pb1-013-N,PL!S-pb1-014-N` | 1 |  |
+| `engine/tests/test_modules/effects/look_select/reveal/optional_hand_discard_cost_look_three_take_one_test.rs` | `PL!-sd1-015-SD` | 1 |  |
+| `engine/tests/test_modules/effects/look_select/reveal/sequential_cost_look_five_take_cost9_member_test.rs` | `PL!-bp5-002-R` | 1 |  |
+| `engine/tests/test_modules/effects/look_select/reveal/sequential_cost_look_five_take_group_member_test.rs` | `PL!HS-bp5-008-R` | 1 |  |
+| `engine/tests/test_modules/effects/look_select/search_deck/look_five_take_group_live_card_test.rs` | `PL!-sd1-004-SD` | 1 |  |
+| `engine/tests/test_modules/effects/look_select/search_deck/look_two_reveal_named_member_to_hand_test.rs` | `PL!N-pb1-016-R,PL!N-pb1-018-R,PL!N-pb1-021-R` | 1 |  |
+| `engine/tests/test_modules/effects/look_select/search_deck/optional_discard_look_five_take_unit_live_test.rs` | `PL!HS-bp1-009-R` | 1 |  |
+| `engine/tests/test_modules/effects/look_select/search_deck/paid_discard_look_fetches_named_subunit_test.rs` | `PL!-pb1-016-R,PL!HS-pb1-018-N,PL!SP-pb1-017-N` | 1 |  |
+| `engine/tests/test_modules/effects/look_select/search_deck/paid_energy_look_five_fetches_group_member_test.rs` | `PL!SP-bp1-010-R` | 1 |  |
+| `engine/tests/test_modules/effects/look_select/search_deck/paid_energy_look_seven_fetches_group_member_test.rs` | `PL!SP-bp2-005-R` | 1 |  |
+| `engine/tests/test_modules/effects/look_select/unit_filter_look_and_live_only_cost_test.rs` | `PL!SP-pb1-015-N` | 1 |  |
+| `engine/tests/test_modules/effects/recover/to_discard/live_start_discard_two_from_unit_with_two_or_more_cards_gain_heart04_and_blade_test.rs` | `PL!-sd1-004-SD` | 1 |  |
+| `engine/tests/test_modules/effects/recover/to_hand/optional_discard_two_split_group_recovery_ginko_test.rs` | `PL!HS-sd1-002-SD` | 1 |  |
+| `engine/tests/test_modules/integration/full_round/live_each_time_victory_road_through_real_live_rounds_test.rs` | `PL!S-sd1-003-SD` | 1 |  |
+| `engine/tests/test_modules/integration/full_round/real_card_phase_walkthrough_and_ability_suite_test.rs` | `PL!-sd1-015-SD,PL!SP-bp2-002-P` | 1 |  |
+| `engine/tests/test_modules/integration/parser_e2e/parser_issues_e2e_part2_test.rs` | `PL!N-PR-003-PR` | 1 |  |
+| `engine/tests/test_modules/integration/parser_e2e/parser_issues_e2e_test.rs` | `PL!HS-bp1-009-P,PL!HS-bp1-009-R` | 1 |  |
+| `engine/tests/test_modules/integration/per_card/live_end_expiry_rollover_and_dual_trigger_window_gates_test.rs` | `PL!N-PR-008-PR` | 1 |  |
+| `engine/tests/test_modules/jidou/leaves_stage/self_discard_optional_hand_discard_recovers_live_and_member_test.rs` | `PL!N-PR-003-PR` | 1 |  |
+| `engine/tests/test_modules/jidou/leaves_stage/stage_to_discard_watcher_requires_actual_stage_leaving_move_test.rs` | `PL!HS-bp2-012-N` | 1 |  |
+| `engine/tests/test_modules/jidou/title_once/dive_ab0_does_not_arm_without_own_main_phase_discard_to_hand_test.rs` | `PL!N-PR-003-PR` | 1 |  |
+| `engine/tests/test_modules/jidou/title_once/dive_ab0_phase_gate_and_multi_copy_live_zone_limit_edges_test.rs` | `PL!N-PR-003-PR,PL!N-sd1-001-SD` | 1 |  |
+| `engine/tests/test_modules/jidou/title_once/dive_retrieved_to_hand_ab0_places_live_zone_ab1_grants_blade_test.rs` | `PL!N-PR-003-PR,PL!N-sd1-001-SD` | 1 |  |
+| `engine/tests/test_modules/rules/baton/baton_touch_replacement_name_and_cost_gate_test.rs` | `PL!HS-bp1-011-PR` | 1 |  |
+| `engine/tests/test_modules/rules/baton/double_baton_touch_draw_deploy_q193_q194_test.rs` | `PL!SP-bp1-005-R` | 1 |  |
+| `engine/tests/test_modules/rules/phases/live_success_rules_test.rs` | `PL!S-sd1-003-SD` | 1 |  |
+| `engine/tests/test_modules/rules/trigger_paths/appearance_and_baton_touch_trigger_regressions_test.rs` | `PL!HS-sd1-002-SD` | 1 |  |
+| `engine/tests/test_modules/rules/trigger_paths/joint_card_live_start_test.rs` | `PL!N-sd1-001-SD` | 1 |  |
+
 ## placeholder (0)
 
 _#[ignore], assert!(true), todo!() or unimplemented!() left in a test_

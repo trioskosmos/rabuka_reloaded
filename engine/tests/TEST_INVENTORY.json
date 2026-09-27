@@ -1,6 +1,6 @@
 {
   "generated_by": "cards/test_inventory.py",
-  "generated_at": "2026-09-27T03:29:01.637899+00:00",
+  "generated_at": "2026-09-27T03:59:07.912308+00:00",
   "stats": {
     "total_cards": 2526,
     "cards_with_abilities": 1565,
@@ -438,6 +438,305 @@
           "test": "PL!S-bp2-026-L",
           "line": 1,
           "detail": "heart04 needs 6, best single member prints 5"
+        }
+      ]
+    },
+    "drain_zero_may_decline": {
+      "count": 49,
+      "rows": [
+        {
+          "file": "engine/tests/test_modules/effects/choice/per_card/daydream_mermaid_live_success_energy_or_recover_choice_test.rs",
+          "test": "PL!S-sd1-003-SD",
+          "line": 1,
+          "detail": ""
+        },
+        {
+          "file": "engine/tests/test_modules/effects/compound/per_card/position_change_draw_and_rotation_multi_card_fixes_test.rs",
+          "test": "PL!SP-bp5-013-N",
+          "line": 1,
+          "detail": ""
+        },
+        {
+          "file": "engine/tests/test_modules/effects/compound/sequential_effects/deficit_mill_live_topdeck_pl_n_pr_032_pr_test.rs",
+          "test": "PL!S-sd1-003-SD",
+          "line": 1,
+          "detail": ""
+        },
+        {
+          "file": "engine/tests/test_modules/effects/draw/chains/self_wait_draw_discard_pl_n_bp7_023_n_test.rs",
+          "test": "PL!-sd1-004-SD",
+          "line": 1,
+          "detail": ""
+        },
+        {
+          "file": "engine/tests/test_modules/effects/draw/flat/b9_more_test.rs",
+          "test": "PL!S-sd1-003-SD",
+          "line": 1,
+          "detail": ""
+        },
+        {
+          "file": "engine/tests/test_modules/effects/gain/blades/under_member/shizuku_under_member_heart_copy_test.rs",
+          "test": "PL!N-sd1-001-SD",
+          "line": 1,
+          "detail": ""
+        },
+        {
+          "file": "engine/tests/test_modules/effects/gain/hearts/live_start/live_start_discard_distinct_heart_colors_q246_test.rs",
+          "test": "PL!S-bp3-004-R",
+          "line": 1,
+          "detail": ""
+        },
+        {
+          "file": "engine/tests/test_modules/effects/gain/hearts/live_start/live_start_lone_group_member_hearts_become_heart04_test.rs",
+          "test": "PL!S-bp5-007-R",
+          "line": 1,
+          "detail": ""
+        },
+        {
+          "file": "engine/tests/test_modules/effects/look_select/look_and_filter/all_or_any_three_heart_member_filter_look_test.rs",
+          "test": "PL!S-bp6-005-R",
+          "line": 1,
+          "detail": ""
+        },
+        {
+          "file": "engine/tests/test_modules/effects/look_select/look_and_filter/card_filter_test.rs",
+          "test": "PL!-bp6-002-R,PL!-bp6-004-R",
+          "line": 1,
+          "detail": ""
+        },
+        {
+          "file": "engine/tests/test_modules/effects/look_select/look_and_filter/look_at_deck_top_optional_discard_test.rs",
+          "test": "PL!-sd1-015-SD",
+          "line": 1,
+          "detail": ""
+        },
+        {
+          "file": "engine/tests/test_modules/effects/look_select/look_and_filter/look_count_from_total_live_score_test.rs",
+          "test": "PL!-sd1-015-SD",
+          "line": 1,
+          "detail": ""
+        },
+        {
+          "file": "engine/tests/test_modules/effects/look_select/look_and_filter/look_seven_select_three_heart_member_test.rs",
+          "test": "PL!S-sd1-003-SD",
+          "line": 1,
+          "detail": ""
+        },
+        {
+          "file": "engine/tests/test_modules/effects/look_select/look_and_filter/no_blade_heart_group_look_test.rs",
+          "test": "PL!N-bp7-018-N",
+          "line": 1,
+          "detail": ""
+        },
+        {
+          "file": "engine/tests/test_modules/effects/look_select/look_and_filter/or_card_types_heart05_threshold_look_test.rs",
+          "test": "PL!S-pb1-015-N",
+          "line": 1,
+          "detail": ""
+        },
+        {
+          "file": "engine/tests/test_modules/effects/look_select/look_and_filter/per_group_take_one_from_look_five_test.rs",
+          "test": "PL!SP-bp5-007-R",
+          "line": 1,
+          "detail": ""
+        },
+        {
+          "file": "engine/tests/test_modules/effects/look_select/look_and_filter/success_score_gated_look_fetches_musume_test.rs",
+          "test": "PL!-bp4-006-R",
+          "line": 1,
+          "detail": ""
+        },
+        {
+          "file": "engine/tests/test_modules/effects/look_select/optional_look_and_select_negative_branches_test.rs",
+          "test": "PL!-pb1-016-R,PL!-sd1-004-SD",
+          "line": 1,
+          "detail": ""
+        },
+        {
+          "file": "engine/tests/test_modules/effects/look_select/per_card/live_success_revealed_cards_extra_yells_test.rs",
+          "test": "PL!S-bp3-009-R",
+          "line": 1,
+          "detail": ""
+        },
+        {
+          "file": "engine/tests/test_modules/effects/look_select/reveal/debut_group_look_three_reveal_test.rs",
+          "test": "PL!N-sd2-009-SD2",
+          "line": 1,
+          "detail": ""
+        },
+        {
+          "file": "engine/tests/test_modules/effects/look_select/reveal/look_five_reveal_cost9_group_member_test.rs",
+          "test": "PL!-bp5-002-R,PL!HS-bp5-008-R,PL!N-bp5-009-R",
+          "line": 1,
+          "detail": ""
+        },
+        {
+          "file": "engine/tests/test_modules/effects/look_select/reveal/look_four_take_live_with_heart_requirement_test.rs",
+          "test": "PL!S-pb1-013-N,PL!S-pb1-014-N",
+          "line": 1,
+          "detail": ""
+        },
+        {
+          "file": "engine/tests/test_modules/effects/look_select/reveal/optional_hand_discard_cost_look_three_take_one_test.rs",
+          "test": "PL!-sd1-015-SD",
+          "line": 1,
+          "detail": ""
+        },
+        {
+          "file": "engine/tests/test_modules/effects/look_select/reveal/sequential_cost_look_five_take_cost9_member_test.rs",
+          "test": "PL!-bp5-002-R",
+          "line": 1,
+          "detail": ""
+        },
+        {
+          "file": "engine/tests/test_modules/effects/look_select/reveal/sequential_cost_look_five_take_group_member_test.rs",
+          "test": "PL!HS-bp5-008-R",
+          "line": 1,
+          "detail": ""
+        },
+        {
+          "file": "engine/tests/test_modules/effects/look_select/search_deck/look_five_take_group_live_card_test.rs",
+          "test": "PL!-sd1-004-SD",
+          "line": 1,
+          "detail": ""
+        },
+        {
+          "file": "engine/tests/test_modules/effects/look_select/search_deck/look_two_reveal_named_member_to_hand_test.rs",
+          "test": "PL!N-pb1-016-R,PL!N-pb1-018-R,PL!N-pb1-021-R",
+          "line": 1,
+          "detail": ""
+        },
+        {
+          "file": "engine/tests/test_modules/effects/look_select/search_deck/optional_discard_look_five_take_unit_live_test.rs",
+          "test": "PL!HS-bp1-009-R",
+          "line": 1,
+          "detail": ""
+        },
+        {
+          "file": "engine/tests/test_modules/effects/look_select/search_deck/paid_discard_look_fetches_named_subunit_test.rs",
+          "test": "PL!-pb1-016-R,PL!HS-pb1-018-N,PL!SP-pb1-017-N",
+          "line": 1,
+          "detail": ""
+        },
+        {
+          "file": "engine/tests/test_modules/effects/look_select/search_deck/paid_energy_look_five_fetches_group_member_test.rs",
+          "test": "PL!SP-bp1-010-R",
+          "line": 1,
+          "detail": ""
+        },
+        {
+          "file": "engine/tests/test_modules/effects/look_select/search_deck/paid_energy_look_seven_fetches_group_member_test.rs",
+          "test": "PL!SP-bp2-005-R",
+          "line": 1,
+          "detail": ""
+        },
+        {
+          "file": "engine/tests/test_modules/effects/look_select/unit_filter_look_and_live_only_cost_test.rs",
+          "test": "PL!SP-pb1-015-N",
+          "line": 1,
+          "detail": ""
+        },
+        {
+          "file": "engine/tests/test_modules/effects/recover/to_discard/live_start_discard_two_from_unit_with_two_or_more_cards_gain_heart04_and_blade_test.rs",
+          "test": "PL!-sd1-004-SD",
+          "line": 1,
+          "detail": ""
+        },
+        {
+          "file": "engine/tests/test_modules/effects/recover/to_hand/optional_discard_two_split_group_recovery_ginko_test.rs",
+          "test": "PL!HS-sd1-002-SD",
+          "line": 1,
+          "detail": ""
+        },
+        {
+          "file": "engine/tests/test_modules/integration/full_round/live_each_time_victory_road_through_real_live_rounds_test.rs",
+          "test": "PL!S-sd1-003-SD",
+          "line": 1,
+          "detail": ""
+        },
+        {
+          "file": "engine/tests/test_modules/integration/full_round/real_card_phase_walkthrough_and_ability_suite_test.rs",
+          "test": "PL!-sd1-015-SD,PL!SP-bp2-002-P",
+          "line": 1,
+          "detail": ""
+        },
+        {
+          "file": "engine/tests/test_modules/integration/parser_e2e/parser_issues_e2e_part2_test.rs",
+          "test": "PL!N-PR-003-PR",
+          "line": 1,
+          "detail": ""
+        },
+        {
+          "file": "engine/tests/test_modules/integration/parser_e2e/parser_issues_e2e_test.rs",
+          "test": "PL!HS-bp1-009-P,PL!HS-bp1-009-R",
+          "line": 1,
+          "detail": ""
+        },
+        {
+          "file": "engine/tests/test_modules/integration/per_card/live_end_expiry_rollover_and_dual_trigger_window_gates_test.rs",
+          "test": "PL!N-PR-008-PR",
+          "line": 1,
+          "detail": ""
+        },
+        {
+          "file": "engine/tests/test_modules/jidou/leaves_stage/self_discard_optional_hand_discard_recovers_live_and_member_test.rs",
+          "test": "PL!N-PR-003-PR",
+          "line": 1,
+          "detail": ""
+        },
+        {
+          "file": "engine/tests/test_modules/jidou/leaves_stage/stage_to_discard_watcher_requires_actual_stage_leaving_move_test.rs",
+          "test": "PL!HS-bp2-012-N",
+          "line": 1,
+          "detail": ""
+        },
+        {
+          "file": "engine/tests/test_modules/jidou/title_once/dive_ab0_does_not_arm_without_own_main_phase_discard_to_hand_test.rs",
+          "test": "PL!N-PR-003-PR",
+          "line": 1,
+          "detail": ""
+        },
+        {
+          "file": "engine/tests/test_modules/jidou/title_once/dive_ab0_phase_gate_and_multi_copy_live_zone_limit_edges_test.rs",
+          "test": "PL!N-PR-003-PR,PL!N-sd1-001-SD",
+          "line": 1,
+          "detail": ""
+        },
+        {
+          "file": "engine/tests/test_modules/jidou/title_once/dive_retrieved_to_hand_ab0_places_live_zone_ab1_grants_blade_test.rs",
+          "test": "PL!N-PR-003-PR,PL!N-sd1-001-SD",
+          "line": 1,
+          "detail": ""
+        },
+        {
+          "file": "engine/tests/test_modules/rules/baton/baton_touch_replacement_name_and_cost_gate_test.rs",
+          "test": "PL!HS-bp1-011-PR",
+          "line": 1,
+          "detail": ""
+        },
+        {
+          "file": "engine/tests/test_modules/rules/baton/double_baton_touch_draw_deploy_q193_q194_test.rs",
+          "test": "PL!SP-bp1-005-R",
+          "line": 1,
+          "detail": ""
+        },
+        {
+          "file": "engine/tests/test_modules/rules/phases/live_success_rules_test.rs",
+          "test": "PL!S-sd1-003-SD",
+          "line": 1,
+          "detail": ""
+        },
+        {
+          "file": "engine/tests/test_modules/rules/trigger_paths/appearance_and_baton_touch_trigger_regressions_test.rs",
+          "test": "PL!HS-sd1-002-SD",
+          "line": 1,
+          "detail": ""
+        },
+        {
+          "file": "engine/tests/test_modules/rules/trigger_paths/joint_card_live_start_test.rs",
+          "test": "PL!N-sd1-001-SD",
+          "line": 1,
+          "detail": ""
         }
       ]
     },
@@ -28735,10 +29034,10 @@
       ],
       "base": "PL!SP-bp5-222",
       "covered": true,
-      "depth": "L1+choice",
+      "depth": "L2+choice",
       "has_assert": true,
       "has_choice": true,
-      "has_negative": false,
+      "has_negative": true,
       "covering_files": [
         "engine/tests/test_modules/effects/energy/place/live_start_optional_payment_wait_energy_test.rs",
         "engine/tests/test_modules/effects/gain/blades/constants/exact_energy_gain_pl_pr_021_pr_test.rs",
@@ -55728,10 +56027,10 @@
       ],
       "base": "PL!SP-bp7-022",
       "covered": true,
-      "depth": "L2+choice",
+      "depth": "L1+choice",
       "has_assert": true,
       "has_choice": true,
-      "has_negative": true,
+      "has_negative": false,
       "covering_files": [
         "engine/tests/test_modules/effects/position/area_move/energy_return_cost_position_change_test.rs"
       ],

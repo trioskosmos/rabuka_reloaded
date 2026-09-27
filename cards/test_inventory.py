@@ -487,6 +487,22 @@ def load_abilities():
         return data["unique_abilities"], data.get("statistics", {})
 
 
+def card_numbers_with_optional_select():
+    """Card numbers whose `select_cards` step is marked `optional`.
+
+    Those are the cards where an index-0 answer can be a DECLINE rather than a
+    choice, because the prompt's generated option list leads with the skip entry.
+    """
+    out = set()
+    for u in load_abilities()[0]:
+        sel = (u.get("effect") or {}).get("select_action") or {}
+        if sel.get("action") != "select_cards" or sel.get("optional") is not True:
+            continue
+        for entry in u.get("cards", []):
+            out.add(entry.split(" | ")[0])
+    return out
+
+
 def unplayable_live_cards():
     """Card numbers of live cards no stage in the pool can satisfy.
 
@@ -730,6 +746,30 @@ Q_LINE_COMMENT_RE = re.compile(r"//.*$", re.MULTILINE)
 # deliberate.
 Q_IMPOSSIBLE_NEED_RE = re.compile(
     r"PL![A-Za-z0-9!\-_+＋]+-L(?:\s|\)|,)"
+)
+
+# A test that drains prompts with index [0] AND asserts an ABSENCE. On a skippable
+# `SelectCard`, index 0 is the SKIP: `resume_indices` maps indices onto the choice's
+# generated option list, and an `allow_skip` prompt leads with the skip entry. So
+# `[0]` can decline the very choice whose text says 「…加えてもよい」.
+#
+# A test asserting a POSITIVE outcome cannot be silently declining -- it would fail.
+# A test asserting a NEGATIVE one can be, and passes. That asymmetry is the whole
+# risk, and it is not hypothetical: a draft here "proved" 平安名すみれ's filtered
+# retrieval unreachable across three commits before the cause turned out to be this
+# drain, not the engine.
+#
+# A row is EXPOSURE, not a defect: nothing here can see WHICH prompt a given `[0]`
+# answers, so a file that drains its cost with `[0]` and asserts absence about
+# something unrelated is a false positive. The review question is "which prompt does
+# this `[0]` answer, and is that the skippable one?" -- and answering it is cheap,
+# where discovering it by chasing a phantom engine bug is not.
+Q_DRAIN_ZERO_RE = re.compile(r"select_indices\(\s*&\[\s*0\s*\]\s*\)")
+Q_ABSENCE_ASSERT_RE = re.compile(
+    r"assert!\s*\(\s*!"
+    r"|assert_eq!\s*\([^,]+,\s*(?:0|false)\s*\)"
+    r"|assert_eq!\s*\([^,]*\.len\(\)[^,]*,\s*0\s*\)"
+    r"|is_empty\(\)"
 )
 
 # assert!(x) / assert_eq!(x, y) — the units an assertion of interest is counted in.
@@ -1389,6 +1429,7 @@ def audit_test_quality(files):
         "assert_only_counts": [],
         "live_success_no_premise": [],
         "live_success_impossible_live": [],
+        "drain_zero_may_decline": [],
         "placeholder": [],
         "prompt_ordinal_drain": [],
         "blind_phase_stepping": [],
@@ -1607,6 +1648,15 @@ def audit_test_quality(files):
                     (rel, card_no, 1, "; ".join(why))
                 )
                 break
+    # A drain of [0] that can silently DECLINE a skippable selection, in a file whose
+    # assertion is an absence. Exposure, not a defect -- see the comment above.
+    optional_select = card_numbers_with_optional_select()
+    for _p, rel, text, _fns in files:
+        if not Q_DRAIN_ZERO_RE.search(text) or not Q_ABSENCE_ASSERT_RE.search(text):
+            continue
+        hit = sorted(c for c in optional_select if c in text)
+        if hit:
+            smells["drain_zero_may_decline"].append((rel, ",".join(hit[:3]), 1, ""))
     for rows in smells.values():
         rows.sort()
     n_fns = sum(len(split_test_fns(text)) for _p, _rel, text, _fns in files)
@@ -1621,6 +1671,7 @@ SMELL_DOCS = {
     "assert_only_counts": "every assertion is about a count/size (len/count/>=1) — '3 options were offered' can hold while the 3 are the wrong 3",
     "live_success_no_premise": "file CALLS trigger_live_success_abilities but never asserts the state of the ライブ成功時 window it dispatches through. That path checks `should_trigger_live_success`, so a live which failed silently dispatches nothing — and a NEGATIVE assertion in such a file then passes whether or not the ability does anything. The remedy is NOT always 'assert the window is open': a test of the heart requirement itself depends on the window being CLOSED, so each site must assert the state it actually relies on. Files built on `fire_trigger` are NOT flagged: it calls `trigger_auto_ability` directly and forces the dispatch, so there is no window to state. The fix is to assert `should_trigger_live_success` (or the performance snapshot) for the state the test depends on. See the comment above for the four scopings that were wrong first, and note that a live's `heart0` requirement is a COLORLESS WILDCARD satisfied by any colour, not a literal colour",
     "live_success_impossible_live": "file CALLS trigger_live_success_abilities on a live whose printed need_heart no stage in the pool can satisfy — a requirement above what ANY single member prints, and only three members fit on a stage. Such a live's ライブ成功時 is unreachable, so the test is vacuous BY CONSTRUCTION, which is strictly stronger than a missing premise: adding a should_trigger_live_success assertion here would just fail. The remedy is to inject synthetic hearts deliberately (a heart00 wildcard, which the engine treats as an unbounded wildcard in the PROVIDED hearts, as the files in live_success_no_premise do) or to pick a live the pool can satisfy. The card set itself is worth reviewing: 46 of the 291 lives carrying a need_heart (15.8%) are provably unplayable, which is a card-DATA observation and not a harness one. The check is a LOWER BOUND — necessary, not sufficient, since three slots can still conflict across colours — so 'not reported' means 'not provably unplayable'",
+    "drain_zero_may_decline": "file drains a prompt with index [0] AND asserts an absence, while naming a card whose select_cards is `optional`. On a skippable SelectCard, [0] is the SKIP: resume_indices maps indices onto the choice's generated option list, where an allow_skip prompt leads with the skip entry. A test asserting a POSITIVE outcome cannot be silently declining -- it would fail -- but one asserting a NEGATIVE outcome can be, and passes. This is EXPOSURE, not a defect: nothing here can see which prompt a given [0] answers. The question to answer is 'which prompt does this [0] answer, and is it the skippable one?'. It is not hypothetical -- a draft here 'proved' 平安名すみれ's filtered retrieval unreachable across three commits before the cause turned out to be this drain rather than the engine",
     "placeholder": "#[ignore], assert!(true), todo!() or unimplemented!() left in a test",
     "similar_cards": "confusable card numbers (bp2 vs pb2) staged in one file AND the file pins card identity (assert_card_identity / compares card_no), so a transposition would fail loudly",
     "unpinned_similar_cards": "confusable card numbers (bp2 vs pb2) staged in one file with NO card-identity pin — a transposed print would pass silently; add assert_card_identity to close it",
