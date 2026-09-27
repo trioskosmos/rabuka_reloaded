@@ -32,18 +32,35 @@
 //! gated effect from firing" — observed rather than inferred. It is also the easiest
 //! thing in this family to mistake for a broken ability, so it is asserted.
 //!
-//! ## Not covered here
+//! ## An engine defect found here, and left unfixed
 //!
 //! 平安名すみれ `PL!SP-pb1-015-N` has the same shape with a UNIT-level group filter
-//! (『CatChu!』), which makes it the natural unit-vs-series probe against 嵐千砂都 — a
-//! `5yncri5e!` member of the same series. Two drafts drove it and neither converged:
-//! with a live card in hand the cost pays and the look runs, but the hand ends one
-//! lower in BOTH the refusing and the taking arm, so the retrieval adds nothing either
-//! way. メイ's identical shape retrieves reliably, which points at how a
-//! `looked_at` selection is presented when a group admits only ONE of the five offered
-//! — a different option shape from the five-wide one above, and not one that
-//! answering `[0]` exercises the same way. Left out rather than committed with
-//! numbers I could not account for.
+//! (『CatChu!』), and her printed retrieval is UNREACHABLE. Measured, with the 『CatChu!』
+//! member sitting third in the looked five:
+//!
+//! ```text
+//!   card_matches_group_str(CatChu!) = true    <- the matcher accepts the card
+//!   prompt #1  zone=hand count=1 allow_skip=true
+//!     after [0]:  deck=80 hand=0 waitroom=6 looked=[]
+//!   FINAL       deck=80 hand=0 waitroom=6       <- all five banked, no selection prompt
+//! ```
+//!
+//! Five cards leave the deck and ALL SIX (the cost card plus the five) reach the
+//! waitroom, and the `looked_at` selection prompt never appears. So
+//! `looked_at_matching_indices` (ability/look.rs:52) finds ZERO matches even though
+//! `card_matches_group_str` accepts the same card.
+//!
+//! The parsed `select_action` carries the filter as `group_names: ["CatChu!"]`, while
+//! `Filter::check_group` (ability/util.rs:1220) reads `self.group` / `self.groups`. That
+//! is where to look: the group is being read and compared, but nothing matches, so
+//! the name arriving at the matcher is not the one in the card data — a decode or
+//! name-mapping problem on this effect shape, not a presentation one.
+//!
+//! メイ's identical shape with NO filter retrieves reliably, which is the control:
+//! the look, the count, the cost and the banking all work, and only the filtered
+//! selection is broken. Left unfixed here because the decode path is shared with every
+//! other filtered selection and a speculative change there would be reckless; the
+//! measurements above are what a fix needs.
 
 use crate::helpers::*;
 use rabuka_engine::zones::MemberArea;
