@@ -241,10 +241,9 @@ pub fn dispatch_choice_result(
         (Choice::SelectHeartType { .. }, ChoiceResult::HeartTypeSelected { .. }) => {
             handle_heart_type(resolver, gs, choice, result)
         }
-        (Choice::SelectAutoAbility { .. }, _)
-        | (Choice::SelectLiveSuccess { .. }, _) => {
-            Err("Choice result does not match pending choice".to_string())
-        }
+        // SelectAutoAbility and SelectLiveSuccess used to have their own arm
+        // here with a body identical to this one, so it was dead the moment it
+        // was written.
         _ => Err("Choice result does not match pending choice".to_string()),
     }
 }

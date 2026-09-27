@@ -4226,10 +4226,6 @@ impl Card {
             .as_ref()
             .is_some_and(|bh| bh.hearts.contains_key(&HeartColor::BAll))
     }
-
-    pub fn need_heart_satisfied(need: &BaseHeart, provided_hearts: &BaseHeart) -> bool {
-        check_heart_requirement(need, provided_hearts)
-    }
 }
 
 pub fn check_heart_requirement(need: &BaseHeart, provided: &BaseHeart) -> bool {
