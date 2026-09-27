@@ -1207,7 +1207,11 @@ impl DecisionAudit {
         chosen: &game_setup::Action,
     ) -> ArenaResult<Value> {
         let owner = decision_player(gs);
-        let boundary = (gs.turn_number, gs.current_phase, owner.id.clone());
+        let boundary = (
+            gs.turn_number,
+            gs.current_phase,
+            owner.id.to_string(),
+        );
         if self.boundary.as_ref() != Some(&boundary) {
             self.boundary = Some(boundary);
             self.boundary_id += 1;

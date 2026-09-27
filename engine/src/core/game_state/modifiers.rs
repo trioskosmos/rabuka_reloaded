@@ -471,7 +471,7 @@ impl GameState {
                             jyouji_statuses.push(crate::types::ConstantAbilityStatus {
                                 card_id,
                                 card_name: status_card_name.clone(),
-                                owner: status_owner.clone(),
+                                owner: status_owner.to_string(),
                                 zone: "stage".to_string(),
                                 ability_text: ui_text(&effect.text),
                                 all_conditions_met: pos_ok && cond_met,
@@ -756,7 +756,7 @@ impl GameState {
                                     let tgt_opt = effect.target_any();
                                     let tgt = tgt_opt.unwrap_or("self");
                                     if rt == "cannot_activate_by_effect" {
-                                        let resolved = self.resolve_target_player(tgt).id.clone();
+                                        let resolved = self.resolve_target_player(tgt).id.to_string();
                                         if !self.cannot_activate_members.contains(&resolved) {
                                             self.cannot_activate_members.push(resolved);
                                         }
@@ -768,7 +768,7 @@ impl GameState {
                                         } else {
                                             // Player-level: block all members of the target player
                                             let resolved =
-                                                self.resolve_target_player(tgt).id.clone();
+                                                self.resolve_target_player(tgt).id.to_string();
                                             self.constant_cannot_activate_members.push(resolved);
                                         }
                                     }

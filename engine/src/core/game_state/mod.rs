@@ -1,7 +1,7 @@
 use crate::ability_queue::AbilityQueue;
 use crate::card::{CardDatabase, CardId};
 use crate::core::game_modifiers::{CardOrientation, GameModifiers};
-use crate::player::Player;
+use crate::player::{Player, PlayerId};
 use crate::zones::{MemberArea, ResolutionZone};
 use crate::Arc;
 use crate::HashMap;
@@ -113,9 +113,14 @@ pub struct GameState {
     pub prohibition_effects: SmallVec<[String; 4]>,
     pub delayed_prohibition_effects: SmallVec<[String; 4]>,
     pub non_stackable_effects: SmallVec<[String; 16]>,
+    // These two hold EITHER a player id OR a card-id string (see
+    // modifiers.rs: a `cannot_activate_by_effect` pushes a player id, a
+    // `cannot_activate` on self pushes a card id), so they stay `String` and
+    // are discriminated by whether they parse as i16.
     pub cannot_activate_members: SmallVec<[String; 2]>,
     pub constant_cannot_activate_members: SmallVec<[String; 4]>,
-    pub cannot_live_players: SmallVec<[String; 2]>,
+    /// Player ids only.
+    pub cannot_live_players: SmallVec<[PlayerId; 2]>,
     /// Member cards that are immune to being put to WAIT by an OPPONENT's effect
     /// ("相手の効果によってはウェイトしない"), recorded as (member_id, owner_id) by
     /// the `cannot_wait_by_effect` restriction. Cleared at the end of the live.
@@ -1110,6 +1115,13 @@ impl GameState {
 
     /// Determine the player label (P1/P2) for the activating card.
     pub fn player_prefix(&self) -> String {
+        self.player_prefix_id().to_string()
+    }
+
+    /// Same as [`Self::player_prefix`] but without materialising a `String`.
+    /// Prefer this on any path that only compares or formats the id; the
+    /// owned form allocates on every call and this is called constantly.
+    pub fn player_prefix_id(&self) -> &PlayerId {
         if let Some(card_id) = self.activating_card {
             if self.player1.stage.stage.contains(&card_id)
                 || self
@@ -1119,7 +1131,7 @@ impl GameState {
                     .iter()
                     .any(|uc| uc.contains(&card_id))
             {
-                return self.player1.id.clone();
+                return &self.player1.id;
             }
             if self.player2.stage.stage.contains(&card_id)
                 || self
@@ -1129,10 +1141,10 @@ impl GameState {
                     .iter()
                     .any(|uc| uc.contains(&card_id))
             {
-                return self.player2.id.clone();
+                return &self.player2.id;
             }
         }
-        self.active_player().id.clone()
+        &self.active_player().id
     }
 
     /// Snapshot current zone sizes for delta tracking.

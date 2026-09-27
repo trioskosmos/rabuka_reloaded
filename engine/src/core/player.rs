@@ -7,10 +7,151 @@ use crate::zones::{
 use crate::card::CardDatabase;
 use crate::core::game_modifiers::ModifierEntry;
 
-use crate::{HashMap, VecDeque};
+use crate::{Arc, HashMap, VecDeque};
+use core::ops::Deref;
 #[cfg(feature = "no_std")]
 use alloc::string::{String, ToString};
 use smallvec::SmallVec;
+
+/// A player id — always "p1" or "p2", i.e. two bytes.
+///
+/// This is a shared, immutable handle rather than an owned `String`. The engine
+/// allocates roughly 36.7k times per game and more than half of those
+/// allocations were 15 bytes or smaller; `Player.id` was the single densest
+/// source, because the ability path clones it constantly (75+ `.id.clone()`
+/// sites in the engine, several per resolved ability) and every one of those
+/// clones was a heap allocation to copy the text "p1".
+///
+/// It is a newtype rather than a bare `Arc<str>` so that the `PartialEq`
+/// impls keep every existing `player.id == "p1"` comparison compiling — std
+/// provides no `Arc<str> == &str` impl. Serialization is byte-identical to the
+/// old `String`: it writes as a plain string.
+#[derive(Clone, Debug, Hash, PartialEq, Eq, PartialOrd, Ord)]
+pub struct PlayerId(Arc<str>);
+
+impl PlayerId {
+    #[inline]
+    pub fn as_str(&self) -> &str {
+        &self.0
+    }
+    /// Owned copy, for the (shrinking) number of callers that need a `String`.
+    #[inline]
+    pub fn to_string(&self) -> String {
+        self.0.to_string()
+    }
+}
+
+impl Deref for PlayerId {
+    type Target = str;
+    #[inline]
+    fn deref(&self) -> &str {
+        &self.0
+    }
+}
+
+impl AsRef<str> for PlayerId {
+    #[inline]
+    fn as_ref(&self) -> &str {
+        &self.0
+    }
+}
+
+impl core::fmt::Display for PlayerId {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        f.write_str(&self.0)
+    }
+}
+
+impl From<&str> for PlayerId {
+    fn from(s: &str) -> Self {
+        PlayerId(Arc::from(s))
+    }
+}
+impl From<String> for PlayerId {
+    fn from(s: String) -> Self {
+        PlayerId(Arc::from(s))
+    }
+}
+impl From<&String> for PlayerId {
+    fn from(s: &String) -> Self {
+        PlayerId(Arc::from(s.as_str()))
+    }
+}
+impl From<Arc<str>> for PlayerId {
+    fn from(s: Arc<str>) -> Self {
+        PlayerId(s)
+    }
+}
+impl From<&PlayerId> for PlayerId {
+    fn from(id: &PlayerId) -> Self {
+        id.clone()
+    }
+}
+impl From<&PlayerId> for Arc<str> {
+    fn from(id: &PlayerId) -> Self {
+        id.0.clone()
+    }
+}
+
+impl PartialEq<str> for PlayerId {
+    #[inline]
+    fn eq(&self, other: &str) -> bool {
+        &*self.0 == other
+    }
+}
+impl PartialEq<&str> for PlayerId {
+    #[inline]
+    fn eq(&self, other: &&str) -> bool {
+        &*self.0 == *other
+    }
+}
+impl PartialEq<String> for PlayerId {
+    #[inline]
+    fn eq(&self, other: &String) -> bool {
+        &*self.0 == other.as_str()
+    }
+}
+impl PartialEq<PlayerId> for str {
+    #[inline]
+    fn eq(&self, other: &PlayerId) -> bool {
+        self == &*other.0
+    }
+}
+impl PartialEq<PlayerId> for &str {
+    #[inline]
+    fn eq(&self, other: &PlayerId) -> bool {
+        *self == &*other.0
+    }
+}
+impl PartialEq<PlayerId> for String {
+    #[inline]
+    fn eq(&self, other: &PlayerId) -> bool {
+        self.as_str() == &*other.0
+    }
+}
+
+#[cfg(feature = "serde_support")]
+impl serde::Serialize for PlayerId {
+    fn serialize<S: serde::Serializer>(&self, s: S) -> Result<S::Ok, S::Error> {
+        s.serialize_str(&self.0)
+    }
+}
+#[cfg(feature = "serde_support")]
+impl<'de> serde::Deserialize<'de> for PlayerId {
+    fn deserialize<D: serde::Deserializer<'de>>(d: D) -> Result<Self, D::Error> {
+        struct V;
+        impl serde::de::Visitor<'_> for V {
+            type Value = PlayerId;
+            fn expecting(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+                f.write_str("a player id string")
+            }
+            fn visit_str<E: serde::de::Error>(self, v: &str) -> Result<PlayerId, E> {
+                Ok(PlayerId(Arc::from(v)))
+            }
+        }
+        d.deserialize_str(V)
+    }
+}
 
 #[derive(Debug, Clone)]
 #[cfg_attr(
@@ -18,7 +159,9 @@ use smallvec::SmallVec;
     derive(serde::Serialize, serde::Deserialize)
 )]
 pub struct Player {
-    pub id: String,
+    /// Shared, not owned — see [`PlayerId`]. Cloning this is a refcount bump
+    /// instead of a heap allocation.
+    pub id: PlayerId,
 
     pub name: String,
 
@@ -69,9 +212,13 @@ pub struct Player {
 }
 
 impl Player {
+    /// Takes the id as an owned `String` and interns it once, so that the ~40
+    /// existing `Player::new("p1".into(), ..)` call sites across bins, bots
+    /// and tests keep compiling untouched. This runs once per game, so the
+    /// allocation here is irrelevant to throughput.
     pub fn new(id: String, name: String, is_first_attacker: bool) -> Self {
         Player {
-            id,
+            id: PlayerId::from(id),
 
             name,
 

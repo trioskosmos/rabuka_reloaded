@@ -124,7 +124,7 @@ impl super::TurnEngine {
             game_state.trigger_auto_ability(
                 ability_id,
                 AbilityTrigger::Debut,
-                player_id_clone.clone(),
+                player_id_clone.as_str(),
                 Some(card_no),
                 Some(stage_card_id),
                 moved_snapshot.clone(),
@@ -313,7 +313,7 @@ impl super::TurnEngine {
             game_state.trigger_auto_ability(
                 ability_id,
                 AbilityTrigger::LiveStart,
-                player_id_clone.clone(),
+                player_id_clone.as_str(),
                 Some(card_no),
                 explicit_card_id,
                 None,
@@ -493,7 +493,7 @@ impl super::TurnEngine {
             game_state.trigger_auto_ability(
                 ability_id,
                 AbilityTrigger::LiveSuccess,
-                player_id_clone.clone(),
+                player_id_clone.as_str(),
                 Some(card_no),
                 Some(source_card_id),
                 None,

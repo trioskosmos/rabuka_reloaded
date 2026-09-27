@@ -197,7 +197,7 @@ fn own_live_zone_discard_optional_deck_e2e_cannot_live_triggers() {
 
     game.state.player1.stage.stage = [-1, riko, -1];
     game.state.player1.hand.cards.push(live);
-    game.state.cannot_live_players.push("p1".to_string());
+    game.state.cannot_live_players.push("p1".into());
 
     game.state.player1.main_deck.cards.clear();
     game.state.player2.main_deck.cards.clear();

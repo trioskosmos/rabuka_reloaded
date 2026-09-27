@@ -301,7 +301,9 @@ impl AbilityResolver {
             // Check cannot_activate_by_effect restriction before mutable borrow.
             let is_cannot_activate_by_effect = if state_change == "active" {
                 let target_player = gs.resolve_target_player(&target);
-                gs.cannot_activate_members.contains(&target_player.id)
+                gs.cannot_activate_members
+                    .iter()
+                    .any(|x| x.as_str() == target_player.id.as_str())
             } else {
                 false
             };
@@ -670,9 +672,9 @@ impl AbilityResolver {
                     .activating_card
                     .and_then(|cid| {
                         if gs.player1.contains_card(cid) {
-                            Some(gs.player1.id.clone())
+                            Some(gs.player1.id.to_string())
                         } else if gs.player2.contains_card(cid) {
-                            Some(gs.player2.id.clone())
+                            Some(gs.player2.id.to_string())
                         } else {
                             None
                         }
@@ -680,7 +682,7 @@ impl AbilityResolver {
                     .or_else(|| {
                         gs.ability_queue
                             .current_entry()
-                            .map(|e| e.player_id.clone())
+                            .map(|e| e.player_id.to_string())
                     })
                     .unwrap_or_default();
                 for (card_id, before_ori) in &before {
@@ -1112,7 +1114,7 @@ impl AbilityResolver {
                     if id == -1 {
                         None
                     } else {
-                        Some((id, player.id.clone()))
+                        Some((id, player.id.to_string()))
                     }
                 })
                 .collect()

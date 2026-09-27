@@ -1134,7 +1134,10 @@ impl GameState {
         &mut self,
         ability_id: String,
         trigger_type: AbilityTrigger,
-        player_id: String,
+        // Accepts a `PlayerId`, a `String`, or a `&str` so callers can pass an
+        // already-shared id instead of allocating a throwaway copy of
+        // "p1"/"p2" purely to hand it over.
+        player_id: impl Into<crate::core::player::PlayerId>,
         source_card_id: Option<String>,
         explicit_card_id: Option<i16>,
         trigger_moved_cards: Option<SmallVec<[i16; 4]>>,
@@ -1148,8 +1151,9 @@ impl GameState {
         let Some(card_no) = source_card_id else {
             return;
         };
-        let card_id =
-            explicit_card_id.or_else(|| self.find_card_by_number_for_player(&card_no, &player_id).1);
+        let player_id = player_id.into();
+        let card_id = explicit_card_id
+            .or_else(|| self.find_card_by_number_for_player(&card_no, &player_id).1);
         let Some(cid) = card_id else {
             return;
         };
@@ -1312,7 +1316,7 @@ impl GameState {
     pub fn trigger_auto_ability_by_index(
         &mut self,
         trigger_type: AbilityTrigger,
-        player_id: String,
+        player_id: impl Into<crate::core::player::PlayerId>,
         source_card_id: Option<String>,
         explicit_card_id: Option<i16>,
         ability_index: usize,
@@ -1321,7 +1325,7 @@ impl GameState {
     ) {
         self.trigger_auto_ability_by_index_refs(
             trigger_type,
-            &player_id,
+            &player_id.into(),
             source_card_id.as_deref(),
             explicit_card_id,
             ability_index,
@@ -2365,11 +2369,11 @@ impl GameState {
     pub fn get_pending_choice_player_id(&self) -> Option<String> {
         if self.pending_loop_protocol.is_some() {
             let active = if core::ptr::eq(self.active_player(), &self.player1) {
-                self.player2.id.clone()
+                &self.player2.id
             } else {
-                self.player1.id.clone()
+                &self.player1.id
             };
-            return Some(active);
+            return Some(active.to_string());
         }
         self.ability_queue
             .current_entry()
@@ -2622,7 +2626,7 @@ impl GameState {
         self.ability_master_id().or_else(|| {
             self.activating_card
                 .and_then(|cid| self.owner_of_card(cid))
-                .map(|p| p.id.clone())
+                .map(|p| p.id.to_string())
         })
     }
 
@@ -2692,11 +2696,16 @@ impl GameState {
     }
 
     /// Return the opponent's player ID given a player ID.
+    ///
+    /// Returns an owned `String` deliberately: the four callers each hold the
+    /// result across a `&mut game_state` use, so returning a borrow of the
+    /// game state fails the borrow checker. These run on phase transitions,
+    /// not per action, so the allocation is not worth fighting for.
     pub fn opponent_id(&self, player_id: &str) -> String {
         if player_id == self.player1.id {
-            self.player2.id.clone()
+            self.player2.id.to_string()
         } else {
-            self.player1.id.clone()
+            self.player1.id.to_string()
         }
     }
 
@@ -3148,14 +3157,14 @@ impl GameState {
     pub fn add_replacement_effect(
         &mut self,
         card_id: i16,
-        player_id: String,
+        player_id: impl Into<crate::core::player::PlayerId>,
         original_event: String,
         replacement_effects: Vec<crate::card::AbilityEffect>,
         is_choice_based: bool,
     ) {
         self.replacement_effects.push(ReplacementEffect {
             card_id,
-            player_id,
+            player_id: player_id.into().to_string(),
             original_event,
             replacement_effects,
             is_choice_based,

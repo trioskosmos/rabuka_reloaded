@@ -867,7 +867,7 @@ impl AbilityResolver {
             }
         }
         if deck_emptied {
-            gs.deck_emptied_by_effect = Some(player_id);
+            gs.deck_emptied_by_effect = Some(player_id.to_string());
             log::debug!(
                 "[DECK_EMPTIED_BY_EFFECT] player={} source={} destination={}",
                 gs.deck_emptied_by_effect.as_deref().unwrap_or_default(),
@@ -910,7 +910,7 @@ impl AbilityResolver {
             }
         }
         if deck_emptied {
-            gs.deck_emptied_by_effect = Some(player_id);
+            gs.deck_emptied_by_effect = Some(player_id.to_string());
             log::debug!(
                 "[DECK_EMPTIED_BY_EFFECT] player={} source={} destination={}",
                 gs.deck_emptied_by_effect.as_deref().unwrap_or_default(),
@@ -2491,7 +2491,7 @@ if util::distinct_should_dedupe(distinct) {
                     gs.trigger_auto_ability(
                         ability_id,
                         crate::core::types::AbilityTrigger::Debut,
-                        player_id.clone(),
+                        player_id.as_str(),
                         Some(card_no.clone()),
                         Some(card_id),
                         None,

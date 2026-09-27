@@ -1129,7 +1129,7 @@ impl super::TurnEngine {
                 game_state.trigger_auto_ability(
                     ability_id,
                     crate::game_state::AbilityTrigger::Debut,
-                    player_id.to_string(),
+                    &*player_id,
                     Some(card_no),
                     Some(bt_card_id),
                     None,

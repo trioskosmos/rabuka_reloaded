@@ -298,7 +298,7 @@ impl AbilityResolver {
                 }
             }
             gs.pending_reyell_rebuild = Some(crate::types::PendingReyellRebuild {
-                owner: gs.resolve_target_player(target).id.clone(),
+                owner: gs.resolve_target_player(target).id.to_string(),
                 prev_note_icons: {
                     let player = gs.resolve_target_player(target);
                     gs.cheer_count_by_id(&player.id)

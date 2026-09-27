@@ -3912,7 +3912,7 @@ impl AbilityResolver {
                     gs.mods.add_delayed_cannot_active(card_id, 1);
                 }
             } else {
-                let resolved = gs.resolve_target_player(target).id.clone();
+                let resolved = gs.resolve_target_player(target).id.to_string();
                 if !gs.cannot_activate_members.contains(&resolved) {
                     gs.cannot_activate_members.push(resolved);
                 }
@@ -3940,12 +3940,12 @@ impl AbilityResolver {
             let (owner_stage, owner_id): (Vec<i16>, String) = if owner_is_p2 {
                 (
                     gs.player2.stage.stage.iter().copied().collect(),
-                    gs.player2.id.clone(),
+                    gs.player2.id.to_string(),
                 )
             } else {
                 (
                     gs.player1.stage.stage.iter().copied().collect(),
-                    gs.player1.id.clone(),
+                    gs.player1.id.to_string(),
                 )
             };
             let card_db = &gs.card_database;

@@ -200,7 +200,7 @@ impl AbilityResolver {
                     gs.trigger_auto_ability(
                         ability_id,
                         crate::game_state::AbilityTrigger::Debut,
-                        player_id.clone(),
+                        player_id.as_str(),
                         Some(card_no),
                         Some(cid),
                         None,

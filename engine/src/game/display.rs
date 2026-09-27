@@ -1302,7 +1302,7 @@ pub fn player_to_display(
         prevent_baton,
         deployed_this_turn: player.deployed_this_turn.iter().copied().collect(),
         debut_count_this_turn: player.debut_count_this_turn,
-        id: player.id.clone(),
+        id: player.id.to_string(),
         name: player.name.to_string(),
         is_first_attacker: player.is_first_attacker,
         exclusion_zone: zone_to_display(&player.exclusion_zone.cards, card_db),
@@ -1362,13 +1362,13 @@ pub fn game_state_to_display(game_state: &GameState) -> GameStateDisplay {
 
     let mulligan_player_id = match game_state.current_phase {
         crate::game_state::Phase::MulliganFirstAttacker => {
-            Some(game_state.first_attacker().id.clone())
+            Some(game_state.first_attacker().id.to_string())
         }
         crate::game_state::Phase::MulliganSecondAttacker => {
             Some(if game_state.first_attacker().id == game_state.player1.id {
-                game_state.player2.id.clone()
+                game_state.player2.id.to_string()
             } else {
-                game_state.player1.id.clone()
+                game_state.player1.id.to_string()
             })
         }
         _ => None,
@@ -1394,13 +1394,13 @@ pub fn game_state_to_display(game_state: &GameState) -> GameStateDisplay {
 
     let live_card_player_id = match game_state.current_phase {
         crate::game_state::Phase::LiveCardSetFirstAttacker => {
-            Some(game_state.first_attacker().id.clone())
+            Some(game_state.first_attacker().id.to_string())
         }
         crate::game_state::Phase::LiveCardSetSecondAttacker => {
             Some(if game_state.first_attacker().id == game_state.player1.id {
-                game_state.player2.id.clone()
+                game_state.player2.id.to_string()
             } else {
-                game_state.player1.id.clone()
+                game_state.player1.id.to_string()
             })
         }
         _ => None,
@@ -1768,7 +1768,7 @@ pub fn game_state_to_display(game_state: &GameState) -> GameStateDisplay {
     GameStateDisplay {
         turn: game_state.turn_number,
         phase: format!("{:?}", game_state.current_phase),
-        active_player: game_state.active_player().id.clone(),
+        active_player: game_state.active_player().id.to_string(),
         player1,
         player2,
         #[cfg(feature = "serde_support")]
@@ -1783,13 +1783,13 @@ pub fn game_state_to_display(game_state: &GameState) -> GameStateDisplay {
         mode: String::new(),
         winner: match game_state.game_result {
             crate::types::GameResult::FirstAttackerWins => {
-                Some(game_state.first_attacker().id.clone())
+                Some(game_state.first_attacker().id.to_string())
             }
             crate::types::GameResult::SecondAttackerWins => {
                 Some(if game_state.player1.is_first_attacker {
-                    game_state.player2.id.clone()
+                    game_state.player2.id.to_string()
                 } else {
-                    game_state.player1.id.clone()
+                    game_state.player1.id.to_string()
                 })
             }
             _ => None,
@@ -1858,7 +1858,11 @@ pub fn game_state_to_display(game_state: &GameState) -> GameStateDisplay {
         non_stackable_effects: game_state.non_stackable_effects.iter().cloned().collect(),
         prohibition_effects: game_state.prohibition_effects.to_vec(),
         delayed_prohibition_effects: game_state.delayed_prohibition_effects.to_vec(),
-        cannot_live_players: game_state.cannot_live_players.to_vec(),
+        cannot_live_players: game_state
+            .cannot_live_players
+            .iter()
+            .map(|p| p.to_string())
+            .collect(),
         cannot_activate_members: game_state.cannot_activate_members.to_vec(),
         constant_cannot_activate_members: game_state
             .constant_cannot_activate_members

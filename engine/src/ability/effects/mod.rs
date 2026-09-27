@@ -204,7 +204,7 @@ impl AbilityResolver {
                 if let Some(event) = original_event {
                     gs.add_replacement_effect(
                         card_id,
-                        player_id,
+                        player_id.to_string(),
                         event.to_string(),
                         vec![effect.clone()],
                         is_choice_based,

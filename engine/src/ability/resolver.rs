@@ -1229,7 +1229,7 @@ impl AbilityResolver {
                 .ability_queue
                 .current_entry()
                 .map(|e| e.player_id.clone())
-                .unwrap_or_else(|| gs.player1.id.clone());
+                .unwrap_or_else(|| gs.player1.id.to_string());
             let success_len = gs
                 .try_player_by_id(&player_id)
                 .unwrap_or(&gs.player2)

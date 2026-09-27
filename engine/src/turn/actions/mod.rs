@@ -582,7 +582,7 @@ impl super::TurnEngine {
         game_state.trigger_auto_ability(
             ability_id,
             crate::game_state::AbilityTrigger::Activation,
-            player_id.clone(),
+            player_id.as_str(),
             Some(card.card_no.to_string()),
             Some(card_id),
             None,
