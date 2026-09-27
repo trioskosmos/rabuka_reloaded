@@ -106,20 +106,11 @@ _confusable card numbers (bp2 vs pb2) staged in one file with NO card-identity p
 
 None.
 
-## duplicate_stage_id (8)
+## duplicate_stage_id (0)
 
 _the same card INSTANCE in two stage slots (`stage.stage = [filler, y, filler]`) — not a legal board; anything that counts members or dedupes by name measures a board that cannot occur, so use a second `new_id`_
 
-| file | test | line | detail |
-| --- | --- | --- | --- |
-| `engine/tests/test_modules/jidou/ability_watch/constant_conditions_exact_counts_and_names_test.rs` | `komari_grants_only_when_both_stages_together_hold_six_members` | 161 | FILLER in 3 slots |
-| `engine/tests/test_modules/jidou/ability_watch/constant_conditions_exact_counts_and_names_test.rs` | `komari_grants_only_when_both_stages_together_hold_six_members` | 161 | new_id in 3 slots |
-| `engine/tests/test_modules/jidou/ability_watch/constant_conditions_exact_counts_and_names_test.rs` | `wakana_grants_heart02_and_heart03_on_the_same_six_member_condition` | 269 | FILLER in 2 slots |
-| `engine/tests/test_modules/jidou/ability_watch/constant_conditions_exact_counts_and_names_test.rs` | `wakana_grants_heart02_and_heart03_on_the_same_six_member_condition` | 269 | FILLER in 3 slots |
-| `engine/tests/test_modules/jidou/ability_watch/constant_conditions_exact_counts_and_names_test.rs` | `wakana_grants_heart02_and_heart03_on_the_same_six_member_condition` | 269 | new_id in 2 slots |
-| `engine/tests/test_modules/jidou/ability_watch/constant_conditions_exact_counts_and_names_test.rs` | `wakana_grants_heart02_and_heart03_on_the_same_six_member_condition` | 269 | new_id in 3 slots |
-| `engine/tests/test_modules/jidou/ability_watch/constant_energy_and_slot_conditions_test.rs` | `natsumi_three_blades_while_own_stage_cost_total_is_below_the_opponents` | 139 | FILLER in 3 slots |
-| `engine/tests/test_modules/jidou/ability_watch/constant_energy_and_slot_conditions_test.rs` | `natsumi_three_blades_while_own_stage_cost_total_is_below_the_opponents` | 139 | new_id in 3 slots |
+None.
 
 ## count_inequality_only (0)
 

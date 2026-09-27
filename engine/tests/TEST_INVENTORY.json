@@ -1,6 +1,6 @@
 {
   "generated_by": "cards/test_inventory.py",
-  "generated_at": "2026-09-27T02:03:02.280985+00:00",
+  "generated_at": "2026-09-27T02:19:04.653264+00:00",
   "stats": {
     "total_cards": 2526,
     "cards_with_abilities": 1565,
@@ -590,57 +590,8 @@
       "rows": []
     },
     "duplicate_stage_id": {
-      "count": 8,
-      "rows": [
-        {
-          "file": "engine/tests/test_modules/jidou/ability_watch/constant_conditions_exact_counts_and_names_test.rs",
-          "test": "komari_grants_only_when_both_stages_together_hold_six_members",
-          "line": 161,
-          "detail": "FILLER in 3 slots"
-        },
-        {
-          "file": "engine/tests/test_modules/jidou/ability_watch/constant_conditions_exact_counts_and_names_test.rs",
-          "test": "komari_grants_only_when_both_stages_together_hold_six_members",
-          "line": 161,
-          "detail": "new_id in 3 slots"
-        },
-        {
-          "file": "engine/tests/test_modules/jidou/ability_watch/constant_conditions_exact_counts_and_names_test.rs",
-          "test": "wakana_grants_heart02_and_heart03_on_the_same_six_member_condition",
-          "line": 269,
-          "detail": "FILLER in 2 slots"
-        },
-        {
-          "file": "engine/tests/test_modules/jidou/ability_watch/constant_conditions_exact_counts_and_names_test.rs",
-          "test": "wakana_grants_heart02_and_heart03_on_the_same_six_member_condition",
-          "line": 269,
-          "detail": "FILLER in 3 slots"
-        },
-        {
-          "file": "engine/tests/test_modules/jidou/ability_watch/constant_conditions_exact_counts_and_names_test.rs",
-          "test": "wakana_grants_heart02_and_heart03_on_the_same_six_member_condition",
-          "line": 269,
-          "detail": "new_id in 2 slots"
-        },
-        {
-          "file": "engine/tests/test_modules/jidou/ability_watch/constant_conditions_exact_counts_and_names_test.rs",
-          "test": "wakana_grants_heart02_and_heart03_on_the_same_six_member_condition",
-          "line": 269,
-          "detail": "new_id in 3 slots"
-        },
-        {
-          "file": "engine/tests/test_modules/jidou/ability_watch/constant_energy_and_slot_conditions_test.rs",
-          "test": "natsumi_three_blades_while_own_stage_cost_total_is_below_the_opponents",
-          "line": 139,
-          "detail": "FILLER in 3 slots"
-        },
-        {
-          "file": "engine/tests/test_modules/jidou/ability_watch/constant_energy_and_slot_conditions_test.rs",
-          "test": "natsumi_three_blades_while_own_stage_cost_total_is_below_the_opponents",
-          "line": 139,
-          "detail": "new_id in 3 slots"
-        }
-      ]
+      "count": 0,
+      "rows": []
     },
     "count_inequality_only": {
       "count": 0,

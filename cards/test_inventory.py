@@ -779,8 +779,23 @@ def _count_inequality_only(body):
 # identifiers and report each twice, which is noise rather than a duplicate.
 # Each inline card is collapsed to a placeholder that is unique per occurrence,
 # so two different inline cards in one literal stay distinct.
+#
+# The argument may be a string literal OR a bare identifier, because a const-bound
+# card number is the dominant idiom in this suite:
+#
+#     const FILLER: &str = "PL!-sd1-010-SD";
+#     game.state.player1.stage.stage = [wakana, game.new_id(FILLER), game.new_id(FILLER)];
+#
+# Both of those `new_id` calls allocate DISTINCT instances, and reading the bare
+# identifier `FILLER` twice in one bracket instead reported it as one card in two
+# slots. That is the same const-binding blind spot this file had twice already, in
+# `unresolvable_card_id` and in `similar_cards`: a pattern that only sees inline
+# literals is blind to the way this suite actually names its cards.
+#
+# A genuinely repeated VARIABLE (`[filler, yoshiko, filler]`) is still reported,
+# because a bare identifier with no call in front of it is not collapsed.
 Q_INLINE_CARD_RE = re.compile(
-    r"[A-Za-z_][A-Za-z0-9_]*\.(?:id|new_id)\(\s*\"[^\"]*\"\s*\)"
+    r"[A-Za-z_][A-Za-z0-9_]*\.(?:id|new_id)\s*\(\s*(?:\"[^\"]*\"|[A-Za-z_][A-Za-z0-9_]*)\s*\)"
 )
 
 
@@ -802,6 +817,11 @@ def _duplicate_stage_ids(body):
     `game.new_id(...)` — which is the correct way to get three copies — is never
     reported. That keeps the false-positive rate at zero for well-formed
     fixtures; a row here means one id is literally repeated in the list.
+
+    Known gap: brackets are read one at a time, so a bare id reused across BOTH
+    players' stage assignments is not reported, even though one card in two
+    players' stages is as illegal as one card in two slots of a single stage. That
+    is a narrowing, not a false negative in what this does claim.
     """
     for m in Q_STAGE_LITERAL_RE.finditer(body):
         counts = {}
