@@ -2,6 +2,7 @@
 #include "test_game.h"
 
 #include <stdio.h>
+#include <stdlib.h>
 
 #define P1_MEMBER "PL!-sd1-007-SD"
 #define P1_LIVE "PL!-sd1-019-SD"
@@ -148,9 +149,22 @@ static void p2_owned_trapper_scores_from_p1_success_in_real_round(void)
              "P2-owned Trapper must gain +2 from P1's no-excess success");
 }
 
+/* The card blobs live in src/ in the in-tree build, but the isolated build root
+ * (tools/isolated_build.sh) only copies sources/headers, so fall back to the
+ * canonical cards/build directory. Test-harness plumbing, not a behaviour change. */
+static int load_test_database(void)
+{
+    static const char *const dirs[] = {"src", "../cards/build", "../../cards/build"};
+    for (size_t i = 0; i < sizeof(dirs) / sizeof(dirs[0]); i++) {
+        if (rb_load(dirs[i]) == 0) return 0;
+    }
+    return -1;
+}
+
 int main(void)
 {
-    if (rb_load("src") != 0) {
+    if (getenv("RB_ABILITY_DEBUG")) rb_ability_debug_set(1);
+    if (load_test_database() != 0) {
         fprintf(stderr, "FAIL: database load\n");
         return 1;
     }

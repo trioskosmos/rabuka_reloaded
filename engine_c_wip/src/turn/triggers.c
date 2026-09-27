@@ -16,6 +16,28 @@ int rb_trigger_is(const char *triggers, const char *needle) {
     return strstr(triggers, needle) != NULL;
 }
 
+/* Rust turn/triggers.rs drives every trigger through
+ * `GameState::trigger_auto_ability(ability_id, trigger, player_id, ...)`, which
+ * builds the AbilityQueueEntry with `player_id: player_id.to_string()`. The C
+ * drain path is owner-scoped: `rb_process_player_abilities`
+ * (src/core/game_state_abilities.c) collects the available entries whose
+ * `player_id` equals "p1"/"p2" and, when nothing matches, clears the queue
+ * outright. `rb_queue_push_with_trigger` leaves `player_id` empty, so an entry
+ * pushed that way is invisible to the owner-scoped drain and is dropped without
+ * ever resolving. Enqueue through `rb_queue_enqueue` (which stamps the owner)
+ * and set the trigger token separately, exactly as
+ * `rb_build_ability_queue_entry` does for the 自動 scan. */
+static int rb_push_owned_entry(GameState *g, int pl, int card_id, int ability_idx,
+                               const char *trigger)
+{
+    if (!g || pl < 0 || pl > 1) return 0;
+    int idx = rb_queue_enqueue(g, card_id, ability_idx, ability_idx,
+                               (pl == 0) ? "p1" : "p2", NULL);
+    if (idx < 0) return 0;
+    rb_queue_set_entry_trigger(g, idx, trigger, NULL, 0);
+    return 1;
+}
+
 static int queue_gained_trigger(GameState *g, int pl, int card_id, const char *trigger)
 {
     if (!g || card_id < 0 || !trigger) return 0;
@@ -28,12 +50,11 @@ static int queue_gained_trigger(GameState *g, int pl, int card_id, const char *t
         int limit = ability->use_limit < 0 ? 99 : ability->use_limit;
         int ability_idx = RB_GAINED_ABILITY_INDEX_BASE + i;
         if (rb_use_limit_reached(&g->queue, card_id, ability_idx, limit, g->turn)) continue;
-        if (rb_queue_push_with_trigger(&g->queue, card_id, ability_idx, trigger, NULL, 0)) {
+        if (rb_push_owned_entry(g, pl, card_id, ability_idx, trigger)) {
             rb_record_use(&g->queue, card_id, ability_idx, g->turn);
             queued++;
         }
     }
-    (void)pl;
     return queued;
 }
 
@@ -183,7 +204,7 @@ static int queue_live_success_for_card(GameState *g, int pl, int cid, int occurr
             fprintf(stderr, "[LIVE_SUCCESS_QUEUE] cid=%d ab=%d occurrence=%d limit=%d reached=%d completed=%d\n",
                     cid, i, occurrence, limit + occurrence, reached, key == g->just_completed_ability_key);
             if (key != g->just_completed_ability_key && !reached) {
-                rb_queue_push_with_trigger(&g->queue, cid, i, "ライブ成功時", NULL, 0);
+                rb_push_owned_entry(g, pl, cid, i, "ライブ成功時");
                 rb_record_use(&g->queue, cid, i, g->turn);
                 queued++;
             }
@@ -903,7 +924,7 @@ void rb_trigger_live_success_faithful(GameState *g, int pl) {
         int cid = pending[i].card_id;
         int idx = pending[i].ability_idx;
         if (idx >= RB_GAINED_ABILITY_INDEX_BASE) {
-            if (rb_queue_push_with_trigger(&g->queue, cid, idx, RB_TSTR_LIVE_SUCCESS, NULL, 0))
+            if (rb_push_owned_entry(g, pl, cid, idx, RB_TSTR_LIVE_SUCCESS))
                 rb_record_use(&g->queue, cid, idx, g->turn);
             continue;
         }
@@ -912,7 +933,7 @@ void rb_trigger_live_success_faithful(GameState *g, int pl) {
         int limit = ab.use_limit < 0 ? 99 : ab.use_limit;
         rb_free_ability(&ab);
         if (rb_use_limit_reached(&g->queue, cid, idx, limit, g->turn)) continue;
-        if (rb_queue_push_with_trigger(&g->queue, cid, idx, RB_TSTR_LIVE_SUCCESS, NULL, 0))
+        if (rb_push_owned_entry(g, pl, cid, idx, RB_TSTR_LIVE_SUCCESS))
             rb_record_use(&g->queue, cid, idx, g->turn);
     }
 }

@@ -315,10 +315,24 @@ int rb_backtrack_allocate(const int pool[8], const int card_needs[8], int n_card
 
 /* Greedy allocation + verdict (mirror compute_allocations / check_live_success).
    Returns 1 if all lives pass. Computes surplus (total - required) for no_excess
-   checks. */
+   checks.
+
+   `pre_score` selects which per-card score modifier the live score is built
+   from, mirroring zones.rs:606 calculate_live_score's `score_modifiers`
+   argument:
+     - NULL  → the CURRENT mods. This is the performance path
+               (LivePerformance::compute_allocations), where the live result
+               must reflect everything granted so far.
+     - non-NULL → `pre_score_flat`, the pre-trigger snapshot taken by
+               snapshot_score_flats (live.rs:1064-1092). compute_pregame_scores
+               passes it so the LiveSuccess delta is counted exactly once:
+               base + PRE here, then + pX_extra (= current - PRE) by the
+               caller. Reading the CURRENT value here and adding the delta
+               again double-counts every ライブ成功時 score bonus. */
 static int allocate_and_verdict(const GameState *g, int pl, const int total_hearts[8],
                                 int score_bonus, int *out_passed, int *out_score,
-                                int *out_surplus, int *out_per_live){
+                                int *out_surplus, int *out_per_live,
+                                const int *pre_score){
     RbPlayer *P=(RbPlayer*)&g->p[pl];
     int total_score=0;
     int pool[8]; memcpy(pool,total_hearts,8*sizeof(int));
@@ -378,8 +392,11 @@ static int allocate_and_verdict(const GameState *g, int pl, const int total_hear
         if(out_per_live && li<RB_MAX_LIVE_CARDS) out_per_live[li]=ok?1:0;
         if(ok){
             Card sc; int base=0;
-            if(rb_decode_card_by_index((uint32_t)P->live.cards[li],&sc)){ base=(int)sc.score; rb_free_card(&sc); }
-            score=base + rb_mods_get_score((RbMods*)&g->mods, P->live.cards[li]);
+            int cid = P->live.cards[li];
+            if(rb_decode_card_by_index((uint32_t)cid,&sc)){ base=(int)sc.score; rb_free_card(&sc); }
+            int mod = pre_score ? (cid >= 0 && cid < RB_MAX_CARD_IDS ? pre_score[cid] : 0)
+                                : rb_mods_get_score((RbMods*)&g->mods, cid);
+            score=base + mod;
             if(score<0) score=0;
             total_score+=score;
         } else all_pass=0;
@@ -473,7 +490,7 @@ int rb_perform_live(GameState *g, int pl){
     if (g->n_snapshots < RB_MAX_SNAPSHOTS)
         memset(&g->snapshots[g->n_snapshots], 0, sizeof(g->snapshots[g->n_snapshots]));
     allocate_and_verdict(g, pl, total_hearts, note_icons,
-                         &passed, &live_score, &surplus, live_passed);
+                         &passed, &live_score, &surplus, live_passed, NULL);
     g->live_success[pl] = passed; /* record this turn's live result for opponent_live_success */
     /* push snapshot for parity diff (trace_game oracle) — surplus feeds
        NoExcessHeart condition (engine/src/turn/live.rs compute_surplus_and_flags) */
@@ -544,7 +561,7 @@ int rb_perform_live(GameState *g, int pl){
         int passed2=0, score2=0, surplus2=-1;
         int live_passed2[RB_MAX_LIVE_CARDS]={0};
         allocate_and_verdict(g, pl, total2, note_icons + g->re_yell_note_icons,
-                             &passed2, &score2, &surplus2, live_passed2);
+                             &passed2, &score2, &surplus2, live_passed2, NULL);
         passed = passed2; live_score = score2; surplus = surplus2;
         g->live_success[pl] = passed;
         g->live_score[pl] = live_score;
@@ -847,7 +864,15 @@ static int rb_latest_snapshot_note_icons(const GameState *g, int pl)
 /* Mirror live.rs::TurnEngine::compute_pregame_scores: each player's live score from
     current stage hearts + granted hearts, plus the per-player extra (LiveSuccess
     delta). Reuses the shared allocation/verdict path so the score formula stays a
-    single source of truth with rb_perform_live. */
+    single source of truth with rb_perform_live.
+
+    The per-card score is built from the PRE-trigger modifier snapshot
+    (`live_pre_score`, captured by rb_perform_live and standing in for Rust's
+    snapshot_score_flats / pre_score_flat) and the LiveSuccess delta is added
+    once as `extra` — see live.rs:1064-1092:
+        "Capture pre-trigger score modifiers so we can avoid double-counting:
+         calculate_live_score gets the PRE values, and pX_extra carries only
+         the delta from LiveSuccess-triggered abilities." */
 void rb_compute_pregame_scores(const GameState *g, int p1_extra, int p2_extra,
                                int *p1_score, int *p2_score){
     for (int pl = 0; pl < 2; pl++){
@@ -860,8 +885,9 @@ void rb_compute_pregame_scores(const GameState *g, int p1_extra, int p2_extra,
         int total[8];
         for (int i = 0; i < 8; i++) total[i] = stage[i] + g->p[pl].hearts[i];
         int passed = 0, score = 0, surplus = -1;
+        const int *pre = g->live_pre_valid[pl] ? g->live_pre_score[pl] : NULL;
         allocate_and_verdict(g, pl, total, rb_latest_snapshot_note_icons(g, pl),
-                             &passed, &score, &surplus, NULL);
+                             &passed, &score, &surplus, NULL, pre);
         int extra = (pl == 0) ? p1_extra : p2_extra;
         int s = score + extra;
         if (s < 0) s = 0;
@@ -1419,6 +1445,92 @@ void rb_handle_live_success_choice(GameState *g, int pl, int selected_index) {
     }
 }
 
+/* Mirror live.rs::resolve_live_success_extras' per-seat block
+    Self::trigger_live_success_abilities(game_state, player_id);
+    Self::trigger_auto_abilities_for_player(game_state, player_id);
+    game_state.process_pending_auto_abilities(player_id);
+    if game_state.has_pending_choice() { return None; }
+
+   Rust drives the drain ONE SEAT AT A TIME — process_pending_auto_abilities
+   takes the player_id — so a seat's LiveSuccess entries are resolved before
+   the other seat's pass runs. The C `rb_process_pending_auto_abilities` walks
+   BOTH seats and `rb_process_player_abilities` empties the whole queue when it
+   leaves no pending choice, so calling it after queueing P1's triggers drops
+   P2's freshly queued entries (they carry P2's owner id and are not selected
+   during the P1 pass) before the P2 pass ever sees them. Resolving the seat
+   that was just triggered — the same call Rust makes — is what keeps a
+   ライブ成功時 bonus (e.g. Strawberry Trapper's +2, which reads the OPPONENT's
+   no-excess result) from being silently dropped.
+
+   Returns 1 when a choice pends, i.e. Rust's `None` (caller returns early
+   and re-enters through live_victory_stage, the C stand-in for Rust's
+   live_success_p1_fired / live_success_p2_fired flags). */
+static int rb_resolve_live_success_side(GameState *g, int pl) {
+    rb_trigger_live_success(g, pl);
+    rb_process_player_abilities(g, pl);
+    return rb_has_pending_choice(g);
+}
+
+/* Mirror live.rs::move_to_success_and_update_attacker (live.rs:1264-1291):
+
+     let p1_before = game_state.player1.success_live_card_zone.cards.len();
+     let p2_before = game_state.player2.success_live_card_zone.cards.len();
+     Self::move_live_to_success_and_handle_wins(game_state, player1_won, player2_won);
+     let p1_now = game_state.player1.success_live_card_zone.cards.len();
+     let p2_now = game_state.player2.success_live_card_zone.cards.len();
+     let p1_added = p1_now > p1_before;
+     let p2_added = p2_now > p2_before;
+     if p1_added && !p2_added {
+         game_state.player1.is_first_attacker = true;
+         game_state.player2.is_first_attacker = false;
+     } else if p2_added && !p1_added {
+         game_state.player1.is_first_attacker = false;
+         game_state.player2.is_first_attacker = true;
+     }
+     (p1_now, p1_added, p2_now, p2_added)
+
+   Rule 8.4.13: if only ONE seat moved a card into the success zone this live,
+   that seat becomes the first attacker for the next live. The previous C body
+   called rb_move_live_to_success_and_handle_wins directly and never ran this
+   step, so the attacker seats were never re-elected on the strength of THIS
+   live's success-zone placement. Rust stores the flag per player
+   (`player.is_first_attacker`); the C model stores it as the seat indices
+   `GameState::first_attacker` / `second_attacker` (the same encoding
+   phase.c:140-141 uses for the identical election), so the faithful C form is
+   to move the two seat indices. The added/now counts are also the values Rust's
+   structured "LIVE <verdict> | Pn ... → succ=N(+1)" summary line prints. */
+static void rb_move_to_success_and_update_attacker(GameState *g, int p1_won, int p2_won,
+                                                    int *p1_now, int *p1_added,
+                                                    int *p2_now, int *p2_added) {
+    int p1_before = g->p[0].success.n;
+    int p2_before = g->p[1].success.n;
+    rb_move_live_to_success_and_handle_wins(g);
+
+    int p1_n = g->p[0].success.n;
+    int p2_n = g->p[1].success.n;
+    int p1_got = p1_n > p1_before;
+    int p2_got = p2_n > p2_before;
+
+    if (p1_got && !p2_got) {
+        g->first_attacker = 0;
+        g->second_attacker = 1;
+        fprintf(stderr, "[FIRST_ATTACKER_RULE_8_4_13] first_attacker=0\n");
+    } else if (p2_got && !p1_got) {
+        g->first_attacker = 1;
+        g->second_attacker = 0;
+        fprintf(stderr, "[FIRST_ATTACKER_RULE_8_4_13] first_attacker=1\n");
+    } else {
+        fprintf(stderr, "[FIRST_ATTACKER_RULE_8_4_13] first_attacker unchanged (=%d) p1_added=%d p2_added=%d\n",
+                g->first_attacker, p1_got, p2_got);
+    }
+    fprintf(stderr, "[LIVE_SUCCESS_SUMMARY] p1_won=%d p2_won=%d p1_succ=%d(+%d) p2_succ=%d(+%d)\n",
+            p1_won, p2_won, p1_n, p1_got, p2_n, p2_got);
+    if (p1_now) *p1_now = p1_n;
+    if (p1_added) *p1_added = p1_got;
+    if (p2_now) *p2_now = p2_n;
+    if (p2_added) *p2_added = p2_got;
+}
+
 /* Mirror live.rs::execute_live_victory_determination — main orchestration for
    live victory determination. */
 void rb_execute_live_victory_determination(GameState *g) {
@@ -1426,7 +1538,9 @@ void rb_execute_live_victory_determination(GameState *g) {
     if (g->live_victory_stage == 3) {
         fprintf(stderr, "[LIVE_VICTORY_RESUME] stage=3 p1_live=%d p2_live=%d\n",
                 g->p[0].live.n, g->p[1].live.n);
-        rb_move_live_to_success_and_handle_wins(g);
+        int rn = 0, ra = 0;
+        rb_move_to_success_and_update_attacker(g, g->p1_live_won, g->p2_live_won,
+                                               &rn, &ra, &rn, &ra);
         if (rb_has_pending_choice(g)) return;
         g->live_victory_stage = 0;
         return;
@@ -1436,18 +1550,14 @@ void rb_execute_live_victory_determination(GameState *g) {
     rb_record_pretrigger_live_results(g);
 
     if (g->live_victory_stage == 0) {
-        rb_trigger_live_success(g, 0);
-        rb_process_pending_auto_abilities(g);
-        if (rb_has_pending_choice(g)) {
+        if (rb_resolve_live_success_side(g, 0)) {
             g->live_victory_stage = 1;
             return;
         }
     }
 
     if (g->live_victory_stage <= 1) {
-        rb_trigger_live_success(g, 1);
-        rb_process_pending_auto_abilities(g);
-        if (rb_has_pending_choice(g)) {
+        if (rb_resolve_live_success_side(g, 1)) {
             g->live_victory_stage = 2;
             return;
         }
@@ -1479,7 +1589,9 @@ void rb_execute_live_victory_determination(GameState *g) {
     rb_merge_late_score_apps(g);
     rb_compute_surplus_and_flags(g, p1_won, p2_won);
     g->live_victory_stage = 3;
-    rb_move_live_to_success_and_handle_wins(g);
+    int p1_now = 0, p1_added = 0, p2_now = 0, p2_added = 0;
+    rb_move_to_success_and_update_attacker(g, p1_won, p2_won,
+                                           &p1_now, &p1_added, &p2_now, &p2_added);
     if (rb_has_pending_choice(g)) return;
     g->live_victory_stage = 0;
 }

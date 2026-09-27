@@ -301,8 +301,138 @@ static void test_check_invalid_live_cards_distinguishes_players(void) {
     CHECK(p2_moves != NULL && p2_moves->cause_player_id == 1, "player 2 movement cause id");
 }
 
+/* phase.c implements the phases.rs live-card-set handlers but does not export
+ * them in rabuka.h; they are the real engine path for SetLiveCard
+ * (helpers/mod.rs::set_live_card runs the same action), so drive them
+ * directly instead of the index-writing test_set_live_card shim. */
+int rb_handle_live_card_selection(GameState *g, int card_id, const int *indices, int n_indices);
+int rb_handle_live_card_confirmation(GameState *g, const int *indices, int n_indices);
+
+/* ── Port of engine/tests/test_modules/effects/other/live_cards_disappear_test.rs
+ *    ::live_cards_stuck_in_live_zone_instead_of_discard ───────────────────────
+ * Zone-independent card census (Rust count_all_cards) — setting live cards and
+ * running live victory determination must relocate cards, never destroy them. */
+static int count_all_cards(const GameState *state) {
+    int total = 0;
+    for (int pl = 0; pl < 2; pl++) {
+        const RbPlayer *P = &state->p[pl];
+        total += P->hand.n;
+        total += P->deck.n;
+        total += P->energy.n;
+        for (int i = 0; i < RB_STAGE_SIZE; i++) if (P->stage[i] != RB_EMPTY_SLOT) total++;
+        total += P->live.n;
+        total += P->success.n;
+        total += P->discard.n;
+    }
+    total += state->resolution.n;
+    total += state->n_revealed;
+    return total;
+}
+
+/* Rust advance_to_live_card_set: five passes out of Main reach LiveCardSet. */
+static void advance_to_live_card_set(TestGame *game) {
+    for (int i = 0; i < 5; i++) test_pass(game);
+}
+
+/* Rust: drain SelectAutoAbility with [] and SelectLiveSuccess with [0]. The C
+ * engine models the live-success prompt as a SelectCard whose pending target is
+ * "select_live_success" (live.c:rb_try_take_success_zone_choice), so key off
+ * that rather than the Rust choice-variant name. */
+static int drain_live_choices(TestGame *game, int *matched_live_success) {
+    int safety = 20;
+    while (test_has_pending_choice(game) && safety > 0) {
+        const char *type = test_pending_choice_type(game);
+        int is_auto = type && strcmp(type, "SelectAutoAbility") == 0;
+        int is_live_success = game->state.queue.pending.target &&
+                              strstr(game->state.queue.pending.target, "select_live_success") != NULL;
+        if (is_auto) {
+            test_resume_choice(game, -1);
+        } else if (is_live_success) {
+            test_resume_choice(game, 0);
+            *matched_live_success = 1;
+        } else {
+            break;
+        }
+        safety--;
+    }
+    return safety;
+}
+
+static void test_live_cards_stuck_in_live_zone_instead_of_discard(void) {
+    TestGame game;
+    test_game_new(&game);
+    clear_movement_log();
+
+    int live1 = test_id(&game, "PL!SP-sd1-023-SD");
+    int live2 = test_new_id(&game, "PL!SP-sd1-023-SD");
+    int live3 = test_new_id(&game, "PL!SP-sd1-023-SD");
+    int filler = test_id(&game, "PL!-sd1-010-SD");
+    CHECK(live1 >= 0 && live2 >= 0 && live3 >= 0 && filler >= 0, "live card templates resolve");
+
+    fill_decks(&game, filler);
+    game.state.p[0].hand.cards[game.state.p[0].hand.n++] = live1;
+    game.state.p[0].hand.cards[game.state.p[0].hand.n++] = live2;
+    game.state.p[0].hand.cards[game.state.p[0].hand.n++] = live3;
+    for (int i = 0; i < RB_STAGE_SIZE; i++) {
+        game.state.p[0].stage[i] = RB_EMPTY_SLOT;
+        game.state.p[1].stage[i] = RB_EMPTY_SLOT;
+    }
+
+    int total_before = count_all_cards(&game.state);
+
+    advance_to_live_card_set(&game);
+    /* Rust drives the real SetLiveCard action three times; the C shim
+     * test_set_live_card writes at a fixed index and would overwrite, so use the
+     * engine's live-card selection + confirmation handlers. */
+    CHECK_EQ(rb_handle_live_card_selection(&game.state, live1, NULL, 0), 1, "first live card selected");
+    CHECK_EQ(rb_handle_live_card_selection(&game.state, live2, NULL, 0), 1, "second live card selected");
+    CHECK_EQ(rb_handle_live_card_selection(&game.state, live3, NULL, 0), 1, "third live card selected");
+    CHECK_EQ(rb_handle_live_card_confirmation(&game.state, NULL, 0), 1, "live card selection confirmed");
+
+    int total_after_set = count_all_cards(&game.state);
+    CHECK_EQ(total_after_set, total_before, "setting the live zone loses no cards");
+    CHECK_EQ(game.state.p[0].live.n, 3, "all three lives are in the live zone");
+    CHECK_EQ(game.state.p[0].discard.n, 0, "waitroom is empty right after the live set");
+
+    test_pass(&game);
+    test_pass(&game);
+    int matched = 0;
+    drain_live_choices(&game, &matched);
+
+    for (int i = 0; i < 10; i++) {
+        if (game.state.phase == RB_PHASE_MAIN || game.state.phase == RB_PHASE_LIVE_SET) break;
+        if (!test_has_pending_choice(&game)) test_pass(&game);
+        if (drain_live_choices(&game, &matched) <= 0) break;
+    }
+    fprintf(stderr, "[CANARY] live=%d waitroom=%d success=%d resolution=%d revealed=%d matched_live_success=%d\n",
+            game.state.p[0].live.n, game.state.p[0].discard.n, game.state.p[0].success.n,
+            game.state.resolution.n, game.state.n_revealed, matched);
+
+    int total_after = count_all_cards(&game.state);
+    CHECK_EQ(total_after, total_before, "no cards vanish across live victory determination");
+
+    /* Zero-stage boards => every live fails its heart requirement => rule 8.4.8
+     * drains ALL remaining live-zone cards to the waitroom. */
+    CHECK_EQ(game.state.p[0].live.n, 0, "8.4.8: failed live cards leave the live zone");
+    CHECK_EQ(game.state.p[0].discard.n, 3, "all three failed lives land in the waitroom");
+    CHECK_EQ(game.state.p[0].success.n, 0, "failed lives never reach the success zone");
+    CHECK_EQ(game.state.resolution.n, 0, "resolution zone is drained by victory determination");
+    CHECK_EQ(game.state.n_revealed, 0, "revealed zone is drained by victory determination");
+}
+
+/* The card blobs live in src/ in the in-tree build, but the isolated build root
+ * (tools/isolated_build.sh) only copies sources/headers, so fall back to the
+ * canonical cards/build directory. Test-harness plumbing, not a behaviour change. */
+static int load_test_database(void) {
+    static const char *const dirs[] = {"src", "../cards/build", "../../cards/build"};
+    for (size_t i = 0; i < sizeof(dirs) / sizeof(dirs[0]); i++) {
+        if (rb_load(dirs[i]) == 0) return 0;
+    }
+    return -1;
+}
+
 int main(void) {
-    if (rb_load("src") != 0) {
+    if (load_test_database() != 0) {
         fprintf(stderr, "FAIL: database load\n");
         return 1;
     }
@@ -316,6 +446,7 @@ int main(void) {
     test_source_dest_condition_excludes_other_player();
     test_source_dest_condition_opponent_target_includes_other_player();
     test_check_invalid_live_cards_distinguishes_players();
+    test_live_cards_stuck_in_live_zone_instead_of_discard();
     rb_unload();
     if (failures) {
         fprintf(stderr, "%d runtime failures\n", failures);
