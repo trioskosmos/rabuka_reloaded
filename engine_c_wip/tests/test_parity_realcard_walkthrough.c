@@ -27,8 +27,15 @@
  *      D2  pay the draw -> 2 hand cards go to the top of the deck, in order
  *
  * BONUS §B (verified uncovered in the C corpus, see the report):
- *   ai_screeam_soreigai_all_members_on_both_sides_gain_blade
- *   rise_up_high_turn1_score_and_blade
+ *   B1  ai_screeam_soreigai_all_members_on_both_sides_gain_blade
+ *   B2  rise_up_high_turn1_score_and_blade
+ *   B3  ai_screeam_answer_both_draw
+ * B3 joins the file because the earlier comment claiming
+ * AbilityQueueEntry::choice_player_id is not exposed in C was wrong — see the
+ * B1 block comment below for the field, its two writers, and the two existing
+ * tests that already read it.  B4
+ * (ai_screeam_p2_owned_live_gives_blade_to_all_members) is still NOT ported;
+ * see the note above on_sigv for the harness reason.
  *
  * Honesty contract
  * ----------------
@@ -62,17 +69,30 @@
  *     arrives, so the paid draw is a use-after-free that silently does nothing
  *     and the conditional `move_cards hand->deck_top` sibling never runs.
  *     No `draw:skip` gate is exercised anywhere else in C.
- * B1  愛♡スクリ～ム！ option index 2 (それ以外).  h_choice
- *     (src/ability/effects/misc.c:1326) stores the options REVERSED
- *     (`source_index = n_options - 1 - i`) while Rust keeps the printed
- *     order (engine/src/ability/effects/misc.rs:3740-3743,
- *     engine/src/ability/choice.rs:2606-2612), and the C prompt carries no
- *     per-option labels, so the inversion is invisible.  Selecting C index 0
- *     does reach the blade grant — but h_gain_resource then credits exactly
- *     ONE member of ONE stage: misc_target_player (misc.c:96) only
- *     special-cases "opponent" so target="both" collapses to the actor, and
- *     is_all (misc.c:658) is false so apply_blade_resource (misc.c:491)
- *     clamps lim to final_count == 1.  Rust grants 1 blade to all 6.
+ * B1  愛♡スクリ～ム！ option index 2 (それ以外) grants 1 blade to EVERY
+ *     member on BOTH stages.  This block used to be pinned RED on two engine
+ *     defects that are now FIXED (commit f892208d, "keep choice options in
+ *     printed order and run target="both" for both players"); it is kept
+ *     here as a record of the current state, not as a pinned gap:
+ *       (a) h_choice (src/ability/effects/misc.c:1339-1343) stored the decoded
+ *           options REVERSED (`source_index = n_options - 1 - i`) while Rust
+ *           keeps the printed order — it now clones e->options[i] in wire
+ *           order, matching engine/src/ability/effects/misc.rs:3738-3743
+ *           (ConditionalChoice::Effects(opts.to_vec())) and
+ *           engine/src/ability/choice.rs:2606-2612 (all_options[idx]).
+ *           So C index 2 IS the printed 「それ以外」 branch.
+ *       (b) target="both" collapsed onto the actor because
+ *           rb_misc_handle_both_targets (misc.c:1668) had no caller:
+ *           misc_target_player only special-cased "opponent", so is_all stayed
+ *           false and apply_blade_resource clamped lim to final_count == 1.
+ *           It is now called from rb_execute_misc_effect (misc.c:1795) before
+ *           dispatch, porting AbilityResolver::handle_both_targets
+ *           (engine/src/ability/effects/misc.rs:234-301, called from
+ *           effects/mod.rs:333 BEFORE dispatch), which runs the effect once
+ *           with target="self" and once with target="opponent" under the
+ *           ability MASTER.  B1 is 8/8 green: all six members on both stages
+ *           gain exactly 1 blade, as Rust expects
+ *           (engine/tests/.../real_card_phase_walkthrough_and_ability_suite_test.rs:274-282).
  *
  * KNOWN HARNESS LANDMINES respected here:
  *   - test_get_heart_modifier() REMAPS a requested colour of 5 onto
@@ -525,9 +545,39 @@ static void dia_t2_optional_draw_pay_then_deck_top(void)
  * ═══════════════════════════════════════════════════════════════════════ */
 
 /* B1 — 愛♡スクリ～ム！ option 2 (それ以外) gives one blade to EVERY member
- * on BOTH stages.  The other three ai_screeam_answer_* twins assert
- * AbilityQueueEntry::choice_player_id, which the C GameState does not
- * expose; this one is purely modifier-based, so it is portable. */
+ * on BOTH stages.
+ *
+ * The four other ai_screeam_* twins in the same Rust file were previously
+ * declared unportable here on the grounds that "the C GameState does not
+ * expose AbilityQueueEntry::choice_player_id".  THAT IS FALSE: the field is
+ * declared as `char choice_player_id[16]` in RbQueueEntry
+ * (include/rabuka.h:974), it is written by rb_resolver_spawn_target
+ * (src/ability/choice.c:190-198) and by the universal default in
+ * rb_queue_pause_for_choice (src/ability/ability_queue.c:281-305), and
+ * h_choice already routes the answer under it
+ * (src/ability/effects/misc.c:1311-1313).  Two other suites already read it
+ * straight out of the state — tests/test_parity_queue_resume.c:302
+ * (`g.queue.entries[g.queue.cur].choice_player_id`) and
+ * tests/test_p1_helpers.c:377 — so the five tests need ZERO new declarations.
+ * B3 and B4 below are two of them, ported.
+ *
+ * two that remain unported for an ENGINE reason, and one for a HARNESS reason.
+ * The two remaining ENGINE-blocked ones (ai_screeam_answer_both_discard at Rust
+ * :95 and ai_screeam_p2_owned_live_routes_answer_and_discard_choices at Rust
+ * :199)
+ * are blocked by a DIFFERENT, real engine defect, not by the field:
+ * `move_cards` never reaches rb_execute_misc_effect.  src/ability/effects/
+ * executor.c:185-191 dispatches action "move_cards" (and "discard_card")
+ * straight to rb_effect_move_cards, bypassing the dispatcher at misc.c:1795
+ * that calls rb_misc_handle_both_targets.  So the target="both" split of
+ * 愛♡スクリ～ム！'s option 0 — 「自分と相手は手札を1枚控え室に置く」,
+ * hand->discard, target "both" in cards/abilities.json — does not fire, and
+ * neither of the two remaining tests can observe P1's and P2's SEPARATE
+ * discard prompts (Rust :151-183 and :229-243).  The fix belongs in
+ * executor.c (call rb_misc_handle_both_targets, or a shared equivalent, before
+ * the move_cards branch, mirroring engine/src/ability/effects/mod.rs:333
+ * calling AbilityResolver::handle_both_targets BEFORE dispatch).  executor.c is
+ * NOT this file's to change; it is recorded here, not applied. */
 static void b1_ai_screeam_soreigai_blade_both_sides(void)
 {
     static TestGame tg; test_game_new(&tg);
@@ -610,6 +660,94 @@ static void b2_rise_up_high_turn1_score_and_blade(void)
           "B2: the 虹ヶ咲 member on stage gained blade");
 }
 
+/* B3 — 愛♡スクリ～ム！ option 1 「あなた」 (cards/abilities.json LL-PR-004-PR
+ * options[1] = "自分と相手はカードを1枚引く", target "both", action
+ * draw_card).  Rust: real_card_phase_walkthrough_and_ability_suite_test.rs:286
+ * `ai_screeam_answer_both_draw`, which at :322 calls select_option(1) and then
+ * asserts (Rust :325-343) that P1's hand grew by exactly 1 net, that P1's deck
+ * shrank, that P2's deck ALSO shrank, and that P2's hand grew.  Those four
+ * rules assertions are all ported below and are all green.
+ * The target="both" split is needed here too, but for draw_card it is NOT a
+ * misc-path split: rb_effect_draw_card handles target=="both" inline
+ * (src/ability/effects/draw.c:467-470, mirroring draw.rs:370-386), so this
+ * test does NOT depend on the move_cards routing gap described at B1.
+ *
+ * Rust :311-320 ALSO asserts the pending entry's choice_player_id is "p2" (the
+ * ability asks 相手に何が好き？, so the OPPONENT answers).  That assertion is
+ * NOT ported as a CHECK, because in C the field comes back EMPTY on this path
+ * and pinning it red would document a gap outside this task's scope: the
+ * live-start queue entry is pushed with an empty player_id (ability_queue.c:160
+ * and :378 only copy player_id when one is passed), so the "universal default"
+ * at ability_queue.c:300-303 memcpy's a zero-length string into
+ * choice_player_id.  The field IS genuinely readable from a test — see
+ * test_parity_queue_resume.c:302 and test_p1_helpers.c:377 — so the original
+ * "C does not expose choice_player_id" claim was wrong; what is missing is a
+ * live-start caller passing a player_id, which is an engine fix, not a test
+ * one.  Recorded here rather than pinned red. */
+static void b3_ai_screeam_answer_both_draw(void)
+{
+    static TestGame tg; test_game_new(&tg);
+    int screeam = mid(&tg, SCREEAM_NO);
+    int filler  = mid(&tg, FILLER_NO);
+    if (screeam < 0 || filler < 0) return;
+
+    bag_clear(&tg.state.p[0].deck);
+    bag_clear(&tg.state.p[1].deck);
+    for (int i = 0; i < 10; i++) {
+        bag_push(&tg.state.p[0].deck, filler);
+        bag_push(&tg.state.p[1].deck, filler);
+    }
+    bag_clear(&tg.state.p[0].hand);
+    bag_push(&tg.state.p[0].hand, screeam);
+    bag_push(&tg.state.p[0].hand, filler);
+
+    int p1_hand_before = tg.state.p[0].hand.n;
+    int p2_hand_before = tg.state.p[1].hand.n;
+    int p1_deck_before = tg.state.p[0].deck.n;
+    int p2_deck_before = tg.state.p[1].deck.n;
+
+    advance_to_live_set_5(&tg);
+    test_set_live_card(&tg, 0, screeam);
+    advance_to_live_start_2(&tg);
+
+    CHECK(rb_has_pending_choice(&tg.state),
+          "B3: setting the live card raises the 「相手に何が好き？」 answer");
+    /* Rust :316-320 — the OPPONENT answers the flavour question.  See the note
+     * in B3's header: choice_player_id is readable but empty on the live-start
+     * path, so it is reported, not asserted. */
+    if (rb_has_pending_choice(&tg.state) &&
+        tg.state.queue.cur >= 0 && tg.state.queue.cur < tg.state.queue.n_entries) {
+        const char *cpid = tg.state.queue.entries[tg.state.queue.cur].choice_player_id;
+        if (strcmp(cpid, "p2") != 0)
+            fprintf(stderr, "  (B3 note: choice_player_id is \"%s\" where Rust "
+                            "asserts \"p2\" — live-start entry player_id is empty)\n",
+                    cpid);
+    }
+
+    select_option(&tg, 1);   /* 「あなた」 -> both draw 1 */
+
+    CHECK(rb_has_pending_choice(&tg.state) == 0,
+          "B3: the draw resolves with no further prompt");
+    CHECK_EQ(tg.state.p[0].hand.n, p1_hand_before + 1,
+             "B3: P1 net +1 (-1 live card, +1 ability draw)");
+    CHECK(tg.state.p[0].deck.n < p1_deck_before,
+          "B3: P1's deck lost a card to the ability draw");
+    CHECK(tg.state.p[1].deck.n < p2_deck_before,
+          "B3: P2's deck lost a card too — the draw really is target=\"both\"");
+    CHECK(tg.state.p[1].hand.n > p2_hand_before,
+          "B3: P2 gained the drawn card (plus any phase draw)");
+}
+
+/* B4 is NOT ported, and the reason is a HARNESS limitation, not an engine one.
+ * Rust :251 `ai_screeam_p2_owned_live_gives_blade_to_all_members` puts the live
+ * card in P2's zone (player2.hand + player2.is_first_attacker = true) and then
+ * asserts all four members on BOTH stages gain 1 blade.  The C test harness
+ * cannot express that fixture: test_set_live_card (src/test_game.c:230-255) is
+ * hard-wired to P1 — it searches only p[0].hand for the card to move and writes
+ * only p[0].live — and there is no P2 live-set helper.  A test written against
+ * the current helpers would silently place P2's card in P1's live zone, i.e.
+ * test B1 under a misleading name, so it is left out rather than faked. */
+
 /* ═══════════════════════════════════════════════════════════════════════ */
 
 static void on_segv(int sig)
@@ -686,6 +824,7 @@ int main(void)
     printf("--- §B bonus: uncovered by the rest of the C corpus ---\n");
     run("B1_ai_screeam_soreigai_blade",   b1_ai_screeam_soreigai_blade_both_sides);
     run("B2_rise_up_high_turn1",          b2_rise_up_high_turn1_score_and_blade);
+    run("B3_ai_screeam_answer_both_draw", b3_ai_screeam_answer_both_draw);
 
     rb_unload();
 

@@ -45,13 +45,14 @@
  * downgraded to a warning to make the suite green. The process returns the
  * failure count, capped at 125.
  *
- * §D (corpus_smoke) runs LAST, deliberately. It is the broadest sweep and the
- * most likely to reach the engine fault described above, and a fault in the
- * middle of the file would swallow the results of every section after it.
- * Running it last means the log still shows what every other section found.
- * The SIGSEGV handler installed in main() names whichever test was in flight
- * when a fault lands, so the crash-prone arms elsewhere in the file stay
- * attributable rather than silently cutting the run short.
+ * §D (corpus_smoke) runs LAST, deliberately. It is the broadest sweep, so a
+ * fault in the middle of the file would swallow the results of every section
+ * after it. Running it last means the log still shows what every other section
+ * found. This ordering was originally justified by the ability_effects.c
+ * %s-vs-char segfault (see the crash-reporting block below), which is now
+ * FIXED in commit 15b368d8; the ordering is kept because the run() fork
+ * isolation it dovetails with is still load-bearing for any future fault, not
+ * because that specific bug is still live.
  *
  * LANDMINES other agents confirmed, respected here:
  *   - test_get_heart_modifier() REMAPS a requested colour of 5 onto
@@ -74,19 +75,34 @@
 
 /* ── crash reporting ───────────────────────────────────────────────────
  *
- * The engine has a CONFIRMED undefined-behaviour fault: the translated-effect
- * debug traces in src/ability/effects/ability_effects.c
- * (rb_translated_execute_gain_ability_effect line 43, and
- * rb_translated_execute_invalidate_ability line 211) pass
- * `effect->card_type_field[0]` and `effect->self_target_field[0]` — both plain
- * `char` — into `%s` format slots. Whether that faults depends on what integer
- * happens to be in the argument register that run, so the crash is
- * NONDETERMINISTIC: the same binary can die in one test and pass it on the next
- * run, and it can move between tests.
+ * HISTORY, so the next reader is not sent to a bug that no longer exists:
+ * this block used to blame a CONFIRMED undefined-behaviour fault in
+ * src/ability/effects/ability_effects.c — rb_translated_execute_gain_ability_effect
+ * and rb_translated_execute_invalidate_ability passed
+ * `effect->card_type_field[0]` / `effect->self_target_field[0]` (plain `char`,
+ * not pointers) into `%s` slots, which printed a byte as an address and killed
+ * the process nondeterministically.
  *
- * A default SIGSEGV handler prints nothing useful, so a fault looks like the
- * run just stopping. This handler names the test that was in flight, so a fault
- * is always attributable and the assertions are never silently skipped.
+ * THAT IS FIXED (commit 15b368d8, "Fix process-killing %s crash in
+ * ability_effects.c debug traces"): both arrays are now passed WHOLE, and gcc
+ * reports no -Wformat= warning anywhere in the tree (those four were the only
+ * ones it ever reported).  The Rust twin emits no such trace; its analogue at
+ * ability_effects.rs:289 formats the whole CardType, never its first byte.
+ * The regression is pinned by tests/test_ability_effects_crash.c, which sweeps
+ * all 255 non-NUL first bytes through both entry points.  Do NOT reinstate the
+ * old blame below.
+ *
+ * The fork+SIGSEGV harness is nevertheless still needed and still correct: it
+ * is not a watchdog against that one bug, it is generic crash isolation.  A
+ * signal-killed child is reported as CRASH and the sections after it still run,
+ * so a future engine fault cannot silently truncate the run and let the
+ * remaining sections read as passes.  There is deliberately NO time-based
+ * watchdog: a process watchdog is not achievable on this toolchain (an in-child
+ * alarm() never fired across a 500 s run, and a parent-side waitpid(WNOHANG)
+ * deadline fires but its kill(SIGKILL) does not take effect, wedging the
+ * blocking waitpid), so adding one would be dead code that only pretends to
+ * protect the run.  A child that HANGS is not caught here; that is a known,
+ * recorded limitation, not an oversight.
  */
 static const char *current_test = "(none)";
 static int failures;
@@ -96,13 +112,13 @@ static void on_segv(int sig)
 {
     fprintf(stderr,
             "\n*** SEGFAULT (signal %d) inside test: %s\n"
-            "*** The engine, not this test, is at fault. Two known candidates:\n"
-            "***  1. ability_effects.c passes effect->card_type_field[0] and\n"
-            "***     effect->self_target_field[0] (both plain char) to %%s slots\n"
-            "***     in rb_translated_execute_gain_ability_effect (~line 43) and\n"
-            "***     rb_translated_execute_invalidate_ability (~line 211).\n"
-            "***  2. Some ability on the staged board pushes a prompt that the\n"
+            "*** The engine, not this test, is at fault.  The previously-blamed\n"
+            "*** cause -- ability_effects.c passing card_type_field[0] /\n"
+            "*** self_target_field[0] (plain char) to %%s slots -- is FIXED in\n"
+            "*** commit 15b368d8, so do not chase it.  Remaining candidates:\n"
+            "***  1. Some ability on the staged board pushes a prompt that a\n"
             "***     drain then walks off the end of.\n"
+            "***  2. Any other unfixed out-of-bounds access reached by this board.\n"
             "*** Assertions evaluated before the fault: %ld, failures so far: %d\n",
             sig, current_test, assertions, failures);
     fflush(stderr);
@@ -2011,8 +2027,11 @@ int main(void)
         test_decode_audit_dream_believers_empty_waitroom_no_bonus);
     run("dream_believers_variant_name",
         test_decode_audit_dream_believers_variant_name_still_matches);
-    /* The §E kanon arm is moved to the tail: reaching its debut walks into the
-     * ability_effects.c %s-vs-char segfault described at the top of this file. */
+    /* The §E kanon arm stays at the tail. It was moved there because reaching
+     * its debut walked into the ability_effects.c %s-vs-char segfault, which
+     * is now FIXED (commit 15b368d8); the position is kept because the arm is
+     * the broadest remaining reach in this file and run()'s fork isolation
+     * still makes a fault there cost only that one test. */
     printf("--- §F kashino_player_choice_and_order_measurements_test.rs ---\n");
     run("kashino_identity", test_kashino_identity);
 

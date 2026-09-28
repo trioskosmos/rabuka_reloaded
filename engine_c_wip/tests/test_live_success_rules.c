@@ -283,7 +283,18 @@ static void test_daydream_mermaid_choices(void) {
         fill_decks(&tg, h05, 40, 20);
         run_performance(&tg);
         CHECK(test_has_pending_choice(&tg), with_niji ? "Mermaid with niji prompts choice" : "Mermaid without niji prompts choice");
-        if (test_has_pending_choice(&tg)) test_resume_choice(&tg, 0);
+        /* Options reach the player in PRINTED order, as Rust keeps them
+           (cards/abilities.json PL!N-bp4-030-L):
+             index 0 「自分のエネルギーデッキから、エネルギーカードを1枚ウェイト状態で置く」
+             index 1 「自分の控え室からメンバーカードを1枚手札に加える」
+           The any-number (niji) branch stays on 0 — it only needs SOME pick and
+           then asserts the energy branch placed a card. The no-niji branch
+           must pick the RECOVER option, which is printed second:
+           engine/tests/.../live_success_rules_test.rs:494
+             game.select_option(1); // Pick option 1 (recover)
+           and daydream_mermaid_live_success_energy_or_recover_choice_test.rs:69
+           select_option(0) -> energy, :112 select_option(1) -> recover. */
+        if (test_has_pending_choice(&tg)) test_resume_choice(&tg, with_niji ? 0 : 1);
         if (with_niji) {
             CHECK(test_has_pending_choice(&tg), "Mermaid recovery target selection appears");
             if (test_has_pending_choice(&tg)) test_resume_choice(&tg, 0);
