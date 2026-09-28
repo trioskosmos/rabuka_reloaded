@@ -1072,7 +1072,7 @@ pub async fn get_game_state(
     let ai_turn = match (ai_turn, requester_player_id) {
         (Some(true), Some(human)) => {
             let gs = lock_state!(gs_arc, read);
-            Some(gs.can_player_act(1 - human))
+            Some(!gs.can_player_act(human) && gs.can_player_act(1 - human))
         }
         (Some(true), None) => Some(false),
         _ => Some(false),
@@ -1473,8 +1473,15 @@ pub async fn execute_action(
                 // Carry the same server-side `ai_turn` flag the GET returns so
                 // the browser driver cannot inject a random move into a game
                 // the server just finished driving.
+                //
+                // The human-must-not-be-able-to-act half matters: RPS offers
+                // both seats a choice, so "the AI can act" alone would report
+                // the AI on move at deal time and park a fresh game.
                 let ai_turn = match (room_is_ai, pvp_player_pid) {
-                    (true, Some(human)) => game_state.can_player_act(1 - human),
+                    (true, Some(human)) => {
+                        !game_state.can_player_act(human)
+                            && game_state.can_player_act(1 - human)
+                    }
                     _ => false,
                 };
                 HttpResponse::Ok().json(GameStateResponse {
@@ -3332,17 +3339,51 @@ async fn init_game(
                     use_baton_touch: false,
                 },
             ));
-            let display = crate::display::game_state_to_display(&gs.read().unwrap());
-            let actions = actions_with_index(&gs.read().unwrap());
-            room.game_state = Some(gs);
+            // For a VS AI room, the human seat is the session that called
+            // init; the AI seat is the other one. Resolved once here, before
+            // the rooms lock is dropped, so the opening reply loop knows who
+            // to skip and the response can report `ai_turn` without
+            // re-locking.
+            let human_pid = get_session_token_from_req(&http_req)
+                .and_then(|tok| room.sessions.get(&tok))
+                .map(|s| s.player_id);
+            let is_ai_room = room.is_ai_room;
+            let ai_policy = room.ai_policy_kind();
+            let ai_seat = human_pid.map(|h| 1 - h);
+            room.game_state = Some(gs.clone());
             drop(rooms);
             notify_room_clients(&data, rid);
+
+            // A freshly dealt game starts in RockPaperScissors, which is an
+            // AI-seat decision. Without this the game NEVER STARTS in PvE:
+            // the human has no legal action to submit, so `run_ai_replies` —
+            // which only runs after a human action — is never reached, and
+            // both sides wait forever. Play the AI's opening chain here, with
+            // the same selected policy the rest of the match will use.
+            if is_ai_room {
+                if let Some(human) = human_pid {
+                    let mut guard = gs.write().unwrap();
+                    let moves = run_ai_replies(&data, Some(rid), &mut guard, human, ai_policy);
+                    if moves > 0 {
+                        log::debug!("[AI_REPLY] {} opening {} moves", moves, ai_policy.name());
+                    }
+                }
+            }
+            notify_room_clients(&data, rid);
+
+            let display = crate::display::game_state_to_display(&gs.read().unwrap());
+            let actions = actions_with_index(&gs.read().unwrap());
+            let ai_turn = is_ai_room
+                && ai_seat.is_some_and(|seat| {
+                    !gs.read().unwrap().can_player_act(human_pid.unwrap_or(seat))
+                        && gs.read().unwrap().can_player_act(seat)
+                });
             let ui_config = lock_recover(&data.ui_config).clone();
             return HttpResponse::Ok().json(GameStateResponse {
                 game_state: display,
                 legal_actions: Some(actions),
                 ui_config: Some(ui_config),
-                ai_turn: None,
+                ai_turn: Some(ai_turn),
             });
         }
     }

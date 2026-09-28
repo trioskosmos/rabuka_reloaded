@@ -487,8 +487,6 @@ pub fn resolve_card_no(index: &[(String, usize)], card_no: &str) -> Option<usize
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::card_loader::CardLoader;
-    use std::path::Path;
 
     #[test]
     fn test_parse_header() {

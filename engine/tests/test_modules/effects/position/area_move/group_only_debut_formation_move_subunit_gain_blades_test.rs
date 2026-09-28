@@ -49,7 +49,7 @@ fn total_blade(game: &TestGame) -> i32 {
 }
 
 /// 1. Debut with a SaintSnow member on stage → a formation-change choice appears;
-/// moving a SaintSnow member grants blade×2 (live-end duration).
+///    moving a SaintSnow member grants blade×2 (live-end duration).
 #[test]
 fn group_gated_debut_saintsnow_stage_formation_change_grants_blade() {
     let db = load_real_database();

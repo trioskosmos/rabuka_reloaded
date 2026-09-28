@@ -52,8 +52,8 @@ fn setup(extra_hand: usize, aqours_stage: usize) -> (TestGame, i16, usize, usize
     }
 
     let mut stage = [-1; 3];
-    for i in 0..aqours_stage.min(3) {
-        stage[i] = if i == 0 {
+    for (i, slot) in stage.iter_mut().enumerate().take(aqours_stage.min(3)) {
+        *slot = if i == 0 {
             aq_member
         } else {
             game.new_id("PL!S-sd1-001-SD")

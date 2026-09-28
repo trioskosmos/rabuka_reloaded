@@ -936,10 +936,10 @@ fn a_source_over_the_cost_ceiling_copies_nothing_even_in_the_right_group() {
 
     game.assert_card_in_group(source, "A・ZU・NA", "the source IS in the right group");
     game.assert_card_cost(source, 13);
-    assert!(
-        13 > 9,
-        "precondition: the source must be over 天王寺璃奈's コスト9以下 ceiling"
-    );
+    // Documents the fixture's intent: the source must be over 天王寺璃奈's
+    // コスト9以下 ceiling for the test below to mean anything. The cost is
+    // pinned immediately above, so there is nothing left to assert here.
+    const _CEILING_DOC: () = ();
 
     game.state.recalculate_constants();
 

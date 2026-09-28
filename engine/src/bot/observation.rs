@@ -791,10 +791,10 @@ fn game_result_u8(r: &GameResult) -> u8 {
 mod tests {
     use super::*;
     use crate::card::CardDatabase;
-    use crate::card_loader::CardLoader;
+
     use crate::game_setup::{Action, ActionParameters, ActionType};
     use crate::player::Player;
-    use std::path::Path;
+
     use std::sync::Arc;
 
         fn test_state() -> (Arc<CardDatabase>, GameState) {

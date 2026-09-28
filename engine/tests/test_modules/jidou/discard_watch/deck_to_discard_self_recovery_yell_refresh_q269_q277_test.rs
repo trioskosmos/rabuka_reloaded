@@ -106,7 +106,7 @@ fn q269_yell_reveal_mid_pool_does_not_trigger() {
 }
 
 /// 3. A yell reveals a ミア while ANOTHER ミア copy already sits in the waitroom.
-/// The yell still moves nothing deck→discard, so ab#0 must not recover it.
+///    The yell still moves nothing deck→discard, so ab#0 must not recover it.
 #[test]
 fn q269_yell_reveal_does_not_recover_existing_waitroom_copy() {
     let db = load_real_database();
@@ -137,8 +137,8 @@ fn q269_yell_reveal_does_not_recover_existing_waitroom_copy() {
 }
 
 /// 4. Positive control: a genuine deck→discard movement DOES fire ab#0, proving
-/// the scan is live (the no-triggers above are specifically because yell
-/// ≠ deck→discard).
+///    the scan is live (the no-triggers above are specifically because yell
+///    ≠ deck→discard).
 #[test]
 fn q269_control_deck_to_discard_triggers() {
     let db = load_real_database();

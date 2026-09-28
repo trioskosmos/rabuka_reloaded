@@ -422,12 +422,14 @@ fn wakana_008_debut_left_to_empty_center() {
 
     // Options should exclude Left, include Center and Right
     let choice = game.get_pending_choice();
-    if let rabuka_engine::ability::types::Choice::SelectTarget { options, .. } = choice {
-        if let Some(opts) = options {
-            assert!(!opts.contains(&"left".to_string()), "Left excluded");
-            assert!(opts.contains(&"center".to_string()), "Center is option");
-            assert!(opts.contains(&"right".to_string()), "Right is option");
-        }
+    if let rabuka_engine::ability::types::Choice::SelectTarget {
+        options: Some(opts),
+        ..
+    } = choice
+    {
+        assert!(!opts.contains(&"left".to_string()), "Left excluded");
+        assert!(opts.contains(&"center".to_string()), "Center is option");
+        assert!(opts.contains(&"right".to_string()), "Right is option");
     }
     game.select_option(0); // Center (index 0 in ["center", "right"])
 
@@ -466,12 +468,14 @@ fn wakana_008_debut_right_to_empty_center() {
     game.play_to_stage(wakana, MemberArea::RightSide);
 
     let choice = game.get_pending_choice();
-    if let rabuka_engine::ability::types::Choice::SelectTarget { options, .. } = choice {
-        if let Some(opts) = options {
-            assert!(!opts.contains(&"right".to_string()), "Right excluded");
-            assert!(opts.contains(&"left".to_string()), "Left is option");
-            assert!(opts.contains(&"center".to_string()), "Center is option");
-        }
+    if let rabuka_engine::ability::types::Choice::SelectTarget {
+        options: Some(opts),
+        ..
+    } = choice
+    {
+        assert!(!opts.contains(&"right".to_string()), "Right excluded");
+        assert!(opts.contains(&"left".to_string()), "Left is option");
+        assert!(opts.contains(&"center".to_string()), "Center is option");
     }
     // Options: ["left", "center"] → option 0 = "left"
     game.select_option(0); // Left
@@ -510,12 +514,14 @@ fn wakana_008_debut_both_occupied_swap_either() {
 
     // Both Left and Right are options (Center excluded)
     let choice = game.get_pending_choice();
-    if let rabuka_engine::ability::types::Choice::SelectTarget { options, .. } = choice {
-        if let Some(opts) = options {
-            assert!(opts.contains(&"left".to_string()), "Left is option");
-            assert!(opts.contains(&"right".to_string()), "Right is option");
-            assert_eq!(opts.len(), 2, "Exactly 2 options");
-        }
+    if let rabuka_engine::ability::types::Choice::SelectTarget {
+        options: Some(opts),
+        ..
+    } = choice
+    {
+        assert!(opts.contains(&"left".to_string()), "Left is option");
+        assert!(opts.contains(&"right".to_string()), "Right is option");
+        assert_eq!(opts.len(), 2, "Exactly 2 options");
     }
     game.select_option(0); // Left → swap with filler
 

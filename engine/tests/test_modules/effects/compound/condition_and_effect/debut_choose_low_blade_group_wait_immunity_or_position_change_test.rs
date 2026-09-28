@@ -75,7 +75,7 @@ fn debut_wait_immunity_option2_no_protection() {
 }
 
 /// 3. OPPONENT wait blocked: player2's 朝香果林 activates to wait player1's protected
-/// Aqours member (blade 2 ≤ limit) — immunity keeps it active.
+///    Aqours member (blade 2 ≤ limit) — immunity keeps it active.
 #[test]
 fn debut_wait_immunity_blocks_opponent_under_energy_blade_limit_wait() {
     let db = load_real_database();

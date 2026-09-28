@@ -102,7 +102,6 @@ fn pools(game: &TestGame) -> Pools {
 }
 
 /// Resolve 希's 登場 and report the pools either side of its single prompt.
-
 ///
 /// The helper ASSERTS nothing about the outcome — that is the caller's job, with
 /// numbers the caller can see. An earlier version tried to decide "was something

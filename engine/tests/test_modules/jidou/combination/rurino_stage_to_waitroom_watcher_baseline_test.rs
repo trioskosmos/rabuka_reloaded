@@ -27,12 +27,15 @@
 //!    メンバー」 and this member costs 5; the live-phase recoveries return her in
 //!    the *next* turn, which cannot distinguish 無制限 from ターン1回.)
 //!
+//! 1. **The first departure.** See above.
+//!
 //! 2. **The second departure — BLOCKED by the area lock.** Playing her back
 //!    consumes that area's turn lock, and `can_baton_touch` rejects a
 //!    replacement in an area deployed this turn: *"Cannot baton touch: area is
-//!    locked this turn"*. The round trip uses the 起動 card's area (deployed turn
-//!    1) and the re-played slot, so by the second departure every area holding a
-//!    member is locked. This is Rule 9.6.2.1 behaviour, not an engine defect.
+//!    locked this turn"*. The round trip uses the 起動 card's area (deployed
+//!    turn 1) and the re-played slot, so by the second departure every area
+//!    holding a member is locked. This is Rule 9.6.2.1 behaviour, not an
+//!    engine defect.
 //!
 //! So the 無制限 ceiling for this family is not observable in one turn with the
 //! current card pool: the re-entry works, and the area lock forbids the second

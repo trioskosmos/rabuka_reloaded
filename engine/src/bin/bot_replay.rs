@@ -49,13 +49,11 @@ use rabuka_engine::bin_common::{execute_and_settle, fresh_database, load_deck};
 use rabuka_engine::bot::{registry::BotKind, strategy_v2, strategy_v3, strategy_v6, strategy_v7,
     strategy_v8};
 use rabuka_engine::card::CardDatabase;
-use rabuka_engine::deck_builder::Deck;
 use rabuka_engine::game_setup::{self, Action, ActionType};
 use rabuka_engine::game_state::{GameResult, GameState, Phase};
 use rabuka_engine::rng::Lcg;
 use rabuka_engine::turn::TurnEngine;
 use serde_json::{json, Value};
-use std::sync::Arc;
 
 type ScoreFn = fn(&GameState, &[Action], u8) -> Vec<(f64, String)>;
 

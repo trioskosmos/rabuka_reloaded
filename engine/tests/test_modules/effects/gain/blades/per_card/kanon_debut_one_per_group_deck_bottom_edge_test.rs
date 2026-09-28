@@ -4,7 +4,7 @@ use crate::helpers::*;
 /// 自分の控え室から、『CatChu!』と『KALEIDOSCORE』と『5yncri5e!』のカードをそれぞれ1枚ずつ選び、
 /// それらを好きな順番でデッキの下に置いてもよい。そうしたとき、カードを1枚引く。
 /// Nuance: optional, each group exactly 1, any_order under deck, conditional draw, and decline (0 selection).
-
+///
 /// Returns (kanon, cat, kale, five) — the four INSTANCES it staged.
 ///
 /// The ids come from a pool: every `game.id(card_no)` call returns a DIFFERENT

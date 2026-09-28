@@ -1,5 +1,4 @@
 use crate::helpers::*;
-use rabuka_engine::card::HeartColor;
 
 /// Into the live card set, then on to the ライブ開始時 window — both named.
 /// The old shape was two 5-pass walks with a `contains("LiveCardSet")` assert

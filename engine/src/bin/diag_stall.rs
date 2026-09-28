@@ -25,7 +25,7 @@ fn main() {
     let (t1, t2) = game_setup::build_two_decks(&mut db, &nums, &nums).expect("build");
     let policy = V2Policy::default();
 
-    let mut rng = Lcg(0xC0FFEE_1234_5678);
+    let mut rng = Lcg(0x00C0_FFEE_1234_5678);
     'games: for game_idx in 0..20 {
         let mut d1 = t1.clone();
         d1.shuffle_main_deck();

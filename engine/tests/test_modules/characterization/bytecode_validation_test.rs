@@ -154,16 +154,20 @@ mod bytecode_validation {
     #[test]
     fn bytecode_nonempty_effects_match_action() {
         let json_abilities = load_json_abilities();
-        for i in 0..json_abilities.len() {
+        for (i, json_entry) in json_abilities.iter().enumerate() {
             let ability = get_ability(i).unwrap();
-            let json_entry = &json_abilities[i];
 
             // Check effect action matches
             if let Some(json_effect) = json_entry.get("effect") {
                 if let Some(json_action) = json_effect.get("action").and_then(|v| v.as_str()) {
-                    if !json_action.is_empty() && ability.effect.is_some() {
-                        let eff = ability.effect.as_ref().unwrap();
-                        let bc_action = eff.action.to_str();
+                    // An absent bytecode effect is compared below against the
+                    // empty wire action rather than unwrapped.
+                    if !json_action.is_empty() {
+                        let bc_action = ability
+                            .effect
+                            .as_ref()
+                            .map(|eff| eff.action.to_str())
+                            .unwrap_or_default();
                         if bc_action.is_empty() {
                             // skip — compound effects use different naming
                         } else if bc_action != json_action {
@@ -186,9 +190,8 @@ mod bytecode_validation {
     #[test]
     fn bytecode_cost_matches_json() {
         let json_abilities = load_json_abilities();
-        for i in 0..json_abilities.len() {
+        for (i, json_entry) in json_abilities.iter().enumerate() {
             let ability = get_ability(i).unwrap();
-            let json_entry = &json_abilities[i];
             let has_json_cost = json_entry.get("cost").is_some_and(|c| {
                 if let Some(arr) = c.as_array() {
                     !arr.is_empty()

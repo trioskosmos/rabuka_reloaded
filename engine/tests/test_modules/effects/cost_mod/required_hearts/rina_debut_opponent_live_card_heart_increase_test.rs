@@ -10,7 +10,6 @@ use rabuka_engine::card::HeartColor;
 ///   - heart02 < 5 → no effect
 ///   - heart02 >= 5 → opponent's live card need modified
 ///   - Affects opponent's turn, not own
-
 fn trigger_debut_for_card(game: &mut TestGame, card_id: i16) {
     let card = game.db.get_card(card_id).unwrap();
     let ab = card

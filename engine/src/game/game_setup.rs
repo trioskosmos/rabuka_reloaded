@@ -1661,8 +1661,11 @@ fn has_double_baton(card: &Card) -> bool {
 /// What the main phase found for one stage area while considering one hand
 /// member card: whether it can be placed there, at what price, and whether the
 /// placement is a baton touch.
-struct AreaCandidate<'a> {
-    name: &'static str,
+    struct AreaCandidate<'a> {
+        /// Display label. Kept for the debug/audit dumps that print the
+        /// candidate table; the placement decision reads `available`/`cost`.
+        #[allow(dead_code)]
+        name: &'static str,
     available: bool,
     cost: u8,
     is_baton_touch: bool,

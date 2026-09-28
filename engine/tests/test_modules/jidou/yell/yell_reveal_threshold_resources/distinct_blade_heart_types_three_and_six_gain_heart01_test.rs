@@ -1,11 +1,6 @@
 use crate::helpers::*;
 use rabuka_engine::card::HeartColor;
 
-/// Test card: PL!N-bp5-001-R＋ (上原歩夢, A・ZU・NA, cost 5, blade 4)
-/// Ability: When you yell, if ≥3 different blade heart types (heart01-heart06)
-/// among revealed cards → gain heart01 until live end.
-/// If ≥6 types → additionally gain "常時 ライブの合計スコアを+1する".
-
 const ABILITY_CARD: &str = "PL!N-bp5-001-R＋";
 
 /// Blade heart color reference cards (each contributes exactly 1 color via blade_heart)

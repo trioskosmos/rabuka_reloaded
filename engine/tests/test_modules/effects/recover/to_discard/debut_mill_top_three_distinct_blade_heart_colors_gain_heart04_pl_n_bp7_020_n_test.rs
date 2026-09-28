@@ -127,7 +127,7 @@ fn emma_all_one_color_no_heart04() {
 }
 
 /// 4. Only 1 of the 3 milled cards is a member → NO heart04 (needs >=2 distinct
-/// among the member cards).
+///    among the member cards).
 #[test]
 fn emma_only_one_member_milled_no_heart04() {
     let db = load_real_database();

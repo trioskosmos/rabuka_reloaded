@@ -354,7 +354,7 @@ fn like_a_treasure_multiple_niji_live_adds_one() {
 }
 
 /// 5. ab#1 is ターン1回 — it only fires once per turn (use_limit 1).
-/// Two identical mills in the same turn → only the first offers the optional.
+///    Two identical mills in the same turn → only the first offers the optional.
 #[test]
 fn like_a_treasure_turn_limit_fires_once() {
     let db = load_real_database();
@@ -389,8 +389,8 @@ fn like_a_treasure_turn_limit_fires_once() {
 }
 
 /// 6. "those cards" — only cards actually MOVED by the live-success mill count.
-/// A 虹ヶ咲 live card that is ALREADY in the waitroom (not part of this mill)
-/// must NOT be added to hand, even though it qualifies by type/group.
+///    A 虹ヶ咲 live card that is ALREADY in the waitroom (not part of this mill)
+///    must NOT be added to hand, even though it qualifies by type/group.
 #[test]
 fn like_a_treasure_preexisting_waitroom_niji_not_added() {
     let db = load_real_database();
@@ -420,7 +420,7 @@ fn like_a_treasure_preexisting_waitroom_niji_not_added() {
 }
 
 /// 7. The card added must be a LIVE card, not just any 虹ヶ咲 card.
-/// A 虹ヶ咲 MEMBER card among the moved cards must NOT be added (card_type filter).
+///    A 虹ヶ咲 MEMBER card among the moved cards must NOT be added (card_type filter).
 #[test]
 fn like_a_treasure_niji_member_not_added() {
     let db = load_real_database();
@@ -459,7 +459,7 @@ fn like_a_treasure_no_movement_does_not_fire() {
 }
 
 /// 9. Duplicate copies of the same 虹ヶ咲 live card id among the moved cards →
-/// still at most one is added, and only one copy.
+///    still at most one is added, and only one copy.
 #[test]
 fn like_a_treasure_duplicate_niji_copies_add_one() {
     let db = load_real_database();

@@ -3,7 +3,6 @@ use crate::helpers::*;
 /// Gameplay tests for abilities as written in Japanese.
 /// Yell: during a live, `blade` on stage = number of cards revealed from deck.
 /// Each revealed card's hearts/score are counted toward `need_heart` / `total score`.
-
 const FILLER: &str = "PL!-sd1-010-SD";
 
 #[allow(dead_code)]

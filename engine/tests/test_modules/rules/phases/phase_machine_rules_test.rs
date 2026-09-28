@@ -252,10 +252,10 @@ fn simultaneous_refresh_uses_first_attacker_order() {
 
     let mut expected_p1 = p1_cards.clone();
     let mut expected_p2 = p2_cards.clone();
-    rabuka_engine::rng::seed(0x51A7_106);
+    rabuka_engine::rng::seed(0x051A_7106);
     rabuka_engine::rng::shuffle_slice(&mut expected_p2);
     rabuka_engine::rng::shuffle_slice(&mut expected_p1);
-    rabuka_engine::rng::seed(0x51A7_106);
+    rabuka_engine::rng::seed(0x051A_7106);
 
     rabuka_engine::turn::TurnEngine::check_timing(&mut game.state);
 

@@ -128,9 +128,7 @@ fn main() {
             "P1 wins".to_string()
         } else if p2_success >= 3 && p1_success <= 2 {
             "P2 wins".to_string()
-        } else if p1_success >= 3 && p2_success >= 3 {
-            "Draw (permanent loop)".to_string()
-        } else if gs.game_result == GameResult::Draw {
+        } else if p1_success >= 3 && p2_success >= 3 || gs.game_result == GameResult::Draw {
             "Draw (permanent loop)".to_string()
         } else {
             "Draw (stuck)".to_string()
@@ -150,7 +148,7 @@ fn main() {
     );
     eprintln!("\n=== Game Outcomes ===");
     let mut sorted: Vec<_> = outcomes.into_iter().collect();
-    sorted.sort_by(|a, b| b.1.cmp(&a.1));
+    sorted.sort_by_key(|a| std::cmp::Reverse(a.1));
     for (label, count) in &sorted {
         eprintln!(
             "  {:30} {:>5} ({:>4.1}%)",

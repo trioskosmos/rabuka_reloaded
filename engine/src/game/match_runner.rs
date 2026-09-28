@@ -58,6 +58,26 @@ pub(crate) fn ai_pick_action_bot(
     if acts.is_empty() {
         return None;
     }
+    // RPS and first-attacker election are turn-STRUCTURE, not tactical
+    // choices: every structural option scores identically under a board-value
+    // policy, so the argmax is arbitrary and the turn order never resolves.
+    // Rule 8.4.13 — the RPS loser attacks first.
+    //
+    // These are drawn BEFORE the RNG checkpoint below, deliberately. A
+    // RockPaperScissors round only clears when the two seats present
+    // different gestures, so a draw that gets rolled back repeats the same
+    // gesture forever and the game never leaves the opening phase. (Rule
+    // 8.4.13 hands ChooseFirstAttacker a real choice, but a random pick is
+    // fine there and keeps the same no-rollback guarantee.)
+    if !gs.has_pending_choice() {
+        match gs.current_phase {
+            Phase::RockPaperScissors | Phase::ChooseFirstAttacker => {
+                let i = rng::rand_range(acts.len());
+                return Some(acts[i].clone());
+            }
+            _ => {}
+        }
+    }
     let checkpoint = rng::checkpoint();
     let v2_policy = crate::bot::strategy_v2::V2Policy::default();
     let plan = crate::bot::strategy_v3::V3Plan::detect(gs, me, &gs.card_database);
@@ -70,14 +90,6 @@ pub(crate) fn ai_pick_action_bot(
             }
             Phase::LiveCardSetFirstAttacker | Phase::LiveCardSetSecondAttacker => {
                 kind.choose_live_set(gs, acts, &gs.card_database, &v2_policy, &plan)
-            }
-            // RPS and first-attacker election are turn-STRUCTURE, not tactical
-            // choices: every structural option scores identically under a
-            // board-value policy, so the argmax is arbitrary and the turn
-            // order never resolves. Rule 8.4.13 — the RPS loser attacks first.
-            Phase::RockPaperScissors | Phase::ChooseFirstAttacker => {
-                let i = rng::rand_range(acts.len());
-                acts[i].clone()
             }
             _ => kind.choose_action(gs, acts, me, &v2_policy, &plan),
         }

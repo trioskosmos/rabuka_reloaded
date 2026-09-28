@@ -77,9 +77,7 @@ fn blade_pipeline_unified_set_plus_additive() {
     for _ in 0..10 { game.state.player1.main_deck.cards.push(filler); }
 
     // Set blade to 5, then additive +2 should stack on top per 9.9.1.5
-    let mut entry = ModifierEntry::default();
-    entry.set = 5;
-    entry.additive = 2;
+    let entry = ModifierEntry { set: 5, additive: 2 };
     game.state.mods.blade_modifiers.insert(m, entry);
 
     let via_stage = game.state.player1.stage.total_blades(&db, &game.state.mods.blade_modifiers, &game.state.mods.orientation_modifiers, true);
@@ -90,8 +88,7 @@ fn blade_pipeline_unified_set_plus_additive() {
 
     // Without set, additive stacks on printed blade
     let printed = db.get_card(m).unwrap().blade;
-    let mut entry2 = ModifierEntry::default();
-    entry2.additive = 3;
+    let entry2 = ModifierEntry { additive: 3, ..Default::default() };
     let via2 = stats_pipeline::effective_blade(&db, m, entry2);
     assert_eq!(via2, printed + 3);
 }

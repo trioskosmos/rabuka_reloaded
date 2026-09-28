@@ -227,7 +227,7 @@ mod tests {
             for r in refs {
                 let idx = r.idx();
                 assert!(
-                    idx < crate::ability::abilities_gen::NUM_ABILITIES as u16,
+                    usize::from(idx) < crate::ability::abilities_gen::NUM_ABILITIES,
                     "card {} has ability index {} >= {}",
                     card_no,
                     idx,

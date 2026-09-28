@@ -342,7 +342,10 @@ impl CountCast for u64 {
     }
     #[inline]
     fn u64_count(self) -> u64 {
-        u64::try_from(self).unwrap_or(u64::MAX)
+        // `u64` is the widest integer type, so this conversion is a no-op. It
+        // stays spelled through the trait so every count conversion in the
+        // crate reads the same rather than leaving bare `as` casts around.
+        self
     }
     #[inline]
     fn i32_count(self) -> i32 {

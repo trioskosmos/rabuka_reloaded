@@ -1,21 +1,23 @@
-/// BP07 parser/engine fix C5: `PL!N-bp7-004-R` / `PL!N-bp7-004-P` 朝香果林 ab#0 (起動).
-///
-/// 起動[ターン1回]エネルギー置き場にあるエネルギー1枚をこのメンバーの下に置く：
-/// 相手のステージにいる、元々持つブレードの数がこのメンバーの下にあるエネルギー
-/// カードの枚数に1を足した数以下のメンバー1人をウェイトにする。
-///
-/// "起動(turn 1): place 1 energy from the energy zone under this member: wait 1
-/// opponent member whose ORIGINAL blade count ≤ (energy cards under this
-/// member) + 1."
-///
-/// The defect (C5): the cost was parsed with card_type=member_card and no source,
-/// and the effect was parsed as `place_energy_under_member` instead of
-/// `change_state(wait)` — the dynamic blade limit
-/// `(energy under this member) + 1` (≤, original value) was dropped entirely.
-///
-/// These tests pin the behavior as written: the cost moves exactly one energy
-/// from the energy zone under 朝香果林, then exactly one opponent member whose
-/// ORIGINAL (printed) blade is at most `(energy under her) + 1` is waited.
+//! BP07 parser/engine fix C5: `PL!N-bp7-004-R` / `PL!N-bp7-004-P` 朝香果林 ab#0 (起動).
+//!
+//! 起動[ターン1回]エネルギー置き場にあるエネルギー1枚をこのメンバーの下に置く：
+//! 相手のステージにいる、元々持つブレードの数がこのメンバーの下にあるエネルギー
+//! カードの枚数に1を足した数以下のメンバー1人をウェイトにする。
+//!
+//! "起動(turn 1): place 1 energy from the energy zone under this member: wait 1
+//! opponent member whose ORIGINAL blade count ≤ (energy cards under this
+//! member) + 1."
+//!
+//! The defect (C5): the cost was parsed with card_type=member_card and no source,
+//! and the effect was parsed as `place_energy_under_member` instead of
+//! `change_state(wait)` — the dynamic blade limit
+//! `(energy under this member) + 1` (≤, original value) was dropped entirely.
+//!
+//! These tests pin the behavior as written: the cost moves exactly one energy
+//! from the energy zone under 朝香果林, then exactly one opponent member whose
+//! ORIGINAL (printed) blade is at most `(energy under her) + 1` is waited.
+
+use crate::helpers::*;
 
 // ====================================================================
 // Bytecode roundtrip: the card's ability is decoded from the embedded
@@ -60,7 +62,6 @@ fn energy_under_original_blade_limit_bytecode_carries_explicit_offset() {
     assert_eq!(effect.blade_limit_operator_any().map(|o| o.as_str()), Some("<="));
     assert_eq!(effect.state_change_any(), Some("wait"));
 }
-use crate::helpers::*;
 use rabuka_engine::zones::MemberArea;
 
 const ENERGY: &str = "LL-E-001-SD";

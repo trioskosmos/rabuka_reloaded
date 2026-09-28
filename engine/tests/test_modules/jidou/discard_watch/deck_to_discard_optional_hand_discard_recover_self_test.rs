@@ -18,7 +18,7 @@ const FILLER: &str = "PL!-sd1-010-SD";
 
 /// Trigger ミア's ab#0 each_time by simulating her moving deck→discard (the real
 /// live-success/effect path records a movement event per card). Runs the TAS scan
-/// + standby processing, then answers the conditional_on_optional.
+/// and standby processing, then answers the conditional_on_optional.
 /// `accept`: true → option 1 (pay/do it), false → option 0 (skip).
 fn trigger_mia(game: &mut TestGame, mia: i16, moved: Vec<i16>, accept: bool) {
     trigger_mia_from(game, mia, moved, "deck", accept);
@@ -137,7 +137,7 @@ fn deck_to_discard_self_recovery_skip_no_discard_no_recover() {
 }
 
 /// 3. Empty hand → the optional discard cannot happen, so ミア is NOT recovered.
-/// そうしたとき — recover is contingent on actually discarding.
+///    そうしたとき — recover is contingent on actually discarding.
 #[test]
 fn deck_to_discard_self_recovery_empty_hand_no_recover() {
     let db = load_real_database();
@@ -159,7 +159,7 @@ fn deck_to_discard_self_recovery_empty_hand_no_recover() {
 }
 
 /// 4. The recovered card is specifically ミア (self), not a random discard card.
-/// Put another card in the discard that is NOT ミア — it must not be recovered.
+///    Put another card in the discard that is NOT ミア — it must not be recovered.
 #[test]
 fn deck_to_discard_self_recovery_recovers_only_self() {
     let db = load_real_database();
@@ -185,7 +185,7 @@ fn deck_to_discard_self_recovery_recovers_only_self() {
 }
 
 /// 5. The each_time only fires when ミア goes deck→discard. If the moved card is
-/// a different card, ab#0 does not fire (self_target trigger).
+///    a different card, ab#0 does not fire (self_target trigger).
 #[test]
 fn deck_to_discard_self_recovery_does_not_fire_for_other_card() {
     let db = load_real_database();
@@ -207,10 +207,10 @@ fn deck_to_discard_self_recovery_does_not_fire_for_other_card() {
 }
 
 /// 6. The deck→discard trigger must NOT fire when ミア goes hand→discard.
-/// The Japanese text says デッキから控え室に置かれた (placed from deck to discard).
-/// Before the parser fix the `source` was dropped, so ANY movement into the
-/// discard fired ab#0 — which would let a ミア already in hand + one in discard
-/// loop forever. source="deck" now restricts it.
+///    The Japanese text says デッキから控え室に置かれた (placed from deck to discard).
+///    Before the parser fix the `source` was dropped, so ANY movement into the
+///    discard fired ab#0 — which would let a ミア already in hand + one in discard
+///    loop forever. source="deck" now restricts it.
 #[test]
 fn deck_to_discard_self_recovery_does_not_fire_on_hand_to_discard() {
     let db = load_real_database();

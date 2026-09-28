@@ -1063,7 +1063,7 @@ pub fn reachable_ceiling(gs: &GameState, me: u8, turns: u8, db: &CardDatabase) -
         .iter()
         .map(|&cid| if cid < 0 { 0 } else { card_cost(db, cid) })
         .collect();
-    let mut budget = i32::from(p.energy_zone.active_count());
+    let budget = i32::from(p.energy_zone.active_count());
 
     let mut pool: Vec<i32> = p
         .hand
@@ -1086,8 +1086,12 @@ pub fn reachable_ceiling(gs: &GameState, me: u8, turns: u8, db: &CardDatabase) -
         .collect();
     draws.sort_unstable_by(|a, b| b.cmp(a));
 
-    for drawn in draws.iter().take(usize::from(turns)) {
-        budget += 1; // rule 7.5
+    // rule 7.5: each assumed draw costs one more energy, so the budget for
+    // the i-th draw is the opening budget plus i. Zipping the counter into the
+    // loop keeps that relationship explicit instead of a bare `+= 1`.
+    let n_draws = draws.len().min(usize::from(turns));
+    for (draw_index, drawn) in draws.iter().take(n_draws).enumerate() {
+        let budget = budget + draw_index.i32_count();
         pool.push(*drawn);
         let discount = stage.iter().copied().max().unwrap_or(0);
         let has_occupied = discount > 0;

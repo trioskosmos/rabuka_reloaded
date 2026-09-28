@@ -9,7 +9,7 @@
 //! - PL!HS-pb1-003-R     登場 hand-discard → 自動 per-discard heart01+blade
 //! - PL!SP-bp7-005-R＋   自動×2: zone→deck placement feeds the other's own-effect gate
 //! - PL!N-bp3-005-R＋    ライブ開始時 conditional constant grant coexisting with
-//!                       the debut-counting 自動 draw-to-five
+//!   the debut-counting 自動 draw-to-five
 
 use crate::helpers::*;
 use rabuka_engine::card::HeartColor;

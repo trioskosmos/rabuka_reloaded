@@ -9,19 +9,19 @@
 ///
 /// Cards involved:
 ///   - PL!SP-bp2-010-P (ウィーン・マルガレーテ):
-///       常時: 相手のライブカード置き場にあるすべてのライブカードは、
-///             成功させるための必要ハートがheart0多くなる。
-///       (modify_required_hearts_global: increase heart00 by 1)
+///     常時: 相手のライブカード置き場にあるすべてのライブカードは、
+///     成功させるための必要ハートがheart0多くなる。
+///     (modify_required_hearts_global: increase heart00 by 1)
 ///
 ///   - PL!HS-bp2-019-L (Bloom the smile, Bloom the dream!):
-///       ライブ開始時: 必要ハートを選択する (set operation):
-///         Option 1: heart01×2 + heart0×1
-///         Option 2: heart04×2 + heart0×1
-///         Option 3: heart05×2 + heart0×1
+///     ライブ開始時: 必要ハートを選択する (set operation):
+///     Option 1: heart01×2 + heart0×1
+///     Option 2: heart04×2 + heart0×1
+///     Option 3: heart05×2 + heart0×1
 ///
 ///   - PL!SP-bp1-026-L (未来予報ハレルヤ！):
-///       ライブ開始時: 条件満たすとコスト変更 (set operation):
-///         heart02×2 + heart03×2 + heart06×2
+///     ライブ開始時: 条件満たすとコスト変更 (set operation):
+///     heart02×2 + heart03×2 + heart06×2
 ///
 /// Rule Q115: Set-to-X applies first, then add/subtract modifiers stack.
 ///

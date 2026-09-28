@@ -14,6 +14,7 @@
 ///   - the condition used `location:"stage"` instead of discard, and
 ///   - the AND-branch (LIVE card AND member-without-blade-heart) was collapsed
 ///     to `card_type:member_card` only — the LIVE-card requirement was lost.
+///
 /// These tests pin the correct behavior.
 use crate::helpers::*;
 use rabuka_engine::card::HeartColor;

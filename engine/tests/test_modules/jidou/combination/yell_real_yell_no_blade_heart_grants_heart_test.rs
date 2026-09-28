@@ -75,7 +75,7 @@ fn setup(watcher: i16) -> TestGame {
 
 #[test]
 fn wien_real_yell_with_no_blade_heart_grants_heart03_during_the_live() {
-    let mut game = TestGame::new(load_real_database());
+    let game = TestGame::new(load_real_database());
     let wien = game.id("PL!SP-bp2-021-N");
     game.assert_card_identity(wien, "PL!SP-bp2-021-N");
     let mut game = setup(wien);
@@ -112,7 +112,7 @@ fn wien_real_yell_with_no_blade_heart_grants_heart03_during_the_live() {
 
 #[test]
 fn sumire_real_yell_with_no_blade_heart_grants_heart06_during_the_live() {
-    let mut game = TestGame::new(load_real_database());
+    let game = TestGame::new(load_real_database());
     let sumire = game.id("PL!SP-bp2-015-N");
     game.assert_card_identity(sumire, "PL!SP-bp2-015-N");
     let mut game = setup(sumire);

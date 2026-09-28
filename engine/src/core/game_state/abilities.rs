@@ -416,13 +416,15 @@ impl GameState {
         }
         // Recurse into compound conditions -- if any child is event-based,
         // the whole compound is pre-filtered.
-        if let crate::card::Condition::Compound { ref conditions, .. } = condition {
-            if let Some(ref children) = conditions {
+            if let crate::card::Condition::Compound {
+                conditions: Some(ref children),
+                ..
+            } = condition
+            {
                 if children.iter().any(|c| Self::condition_is_event_based(c)) {
                     return true;
                 }
             }
-        }
         false
     }
 
@@ -2530,19 +2532,18 @@ fn trigger_auto_ability_by_index_refs(
                     serde_json::Value::String(normalized.to_string()),
                 );
                 // Inject selection_cards for SelectCard choices so the frontend can render options.
-                if let Some(choice) = self.ability_queue.is_waiting_for_choice() {
-                    if let crate::ability::types::Choice::SelectCard {
-                        ref zone,
-                        ref card_type,
-                        cost_limit,
-                        ref cost_limit_operator,
-                        ref target_player_id,
-                        ref group,
-                        ref characters,
-                        ref filtered_indices,
-                        ..
-                    } = choice
-                    {
+                if let Some(crate::ability::types::Choice::SelectCard {
+                    ref zone,
+                    ref card_type,
+                    cost_limit,
+                    ref cost_limit_operator,
+                    ref target_player_id,
+                    ref group,
+                    ref characters,
+                    ref filtered_indices,
+                    ..
+                }) = self.ability_queue.is_waiting_for_choice()
+                {
                         let target = target_player_id.as_deref().unwrap_or("self");
                         let player = self.resolve_target_player(target);
                         let card_ids: Vec<i16> = match Zone::from_str(zone) {
@@ -2640,11 +2641,13 @@ fn trigger_auto_ability_by_index_refs(
                         }).collect();
                         obj.insert("selection_cards".into(), serde_json::Value::Array(sel));
                     }
-                }
             } else if let Some(choice) = self.ability_queue.is_waiting_for_choice() {
-                if let crate::ability::types::Choice::SelectAutoAbility { player_id, .. }
-                | crate::ability::types::Choice::SelectLiveSuccess { player_id, .. } =
-                    choice
+                // The or-pattern has to bind through a reference, so this
+                // cannot collapse into the outer `if let` (clippy asks, the
+                // pattern does not type-check against `Option<&Choice>`).
+                #[allow(clippy::collapsible_match)]
+                if let crate::ability::types::Choice::SelectAutoAbility { ref player_id, .. }
+                | crate::ability::types::Choice::SelectLiveSuccess { ref player_id, .. } = choice
                 {
                     let normalized = match player_id.as_str() {
                         "player1" => "p1",
@@ -3088,22 +3091,21 @@ fn trigger_auto_ability_by_index_refs(
                 // gains were never applied per card (they live in the
                 // p*_constant_total_score_bonus accumulator and expire
                 // with the gained_card_abilities entry itself).
-                if let Some(ref data) = effect.effect_data {
-                    if let crate::core::types::EffectData::GainAbility {
-                        card_id,
-                        amount,
-                        is_live_total,
-                    } = data
-                    {                        if !is_live_total && *amount != 0 {
-                            self.mods.remove_score_modifier(*card_id, *amount);
-                            log::debug!(
-                                "Reverted gained ability score modifier +{} for card {}",
-                                amount,
-                                card_id
-                            );
-                        }
-                        self.clear_gained_abilities_for_card(*card_id);
+                if let Some(crate::core::types::EffectData::GainAbility {
+                    card_id,
+                    amount,
+                    is_live_total,
+                }) = effect.effect_data.as_ref()
+                {
+                    if !is_live_total && *amount != 0 {
+                        self.mods.remove_score_modifier(*card_id, *amount);
+                        log::debug!(
+                            "Reverted gained ability score modifier +{} for card {}",
+                            amount,
+                            card_id
+                        );
                     }
+                    self.clear_gained_abilities_for_card(*card_id);
                 }
                 return true;
             }

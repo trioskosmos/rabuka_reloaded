@@ -14,7 +14,6 @@ use rabuka_engine::turn::TurnEngine;
 /// Q105: Multi-name contributes ONE constituent group.
 /// Q208: When a multi-name card shares a name with another card on stage,
 ///   it uses one of its OTHER names.
-
 fn fill_deck(game: &mut TestGame, filler: i16) {
     game.state.player1.main_deck.cards.clear();
     game.state.player2.main_deck.cards.clear();

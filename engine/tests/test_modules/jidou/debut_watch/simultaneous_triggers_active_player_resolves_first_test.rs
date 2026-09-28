@@ -4,7 +4,6 @@ use rabuka_engine::zones::MemberArea;
 /// Q84: when auto abilities trigger simultaneously, the active player's
 /// resolve first (owner choosing their order), then the non-active player's.
 /// These tests pin the ordering of multiple triggers within one action.
-
 fn fill_deck(game: &mut TestGame) {
     let f = game.id("PL!-sd1-010-SD");
     for _ in 0..40 {

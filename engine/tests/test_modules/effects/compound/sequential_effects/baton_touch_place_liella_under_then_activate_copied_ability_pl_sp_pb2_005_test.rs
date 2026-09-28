@@ -8,7 +8,6 @@ use rabuka_engine::zones::MemberArea;
 ///
 /// ab#1 (常時): このメンバーは、このメンバーの下に置かれている『Liella!』の
 ///   メンバーカードが持つ起動能力をすべて得る。
-
 fn fill_decks(game: &mut TestGame) {
     let filler = game.id("PL!-sd1-010-SD");
     for _ in 0..10 {

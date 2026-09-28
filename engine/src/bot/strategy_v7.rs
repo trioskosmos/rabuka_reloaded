@@ -1248,12 +1248,12 @@ fn experiment_free_win(gs: &GameState, me: u8, db: &CardDatabase) -> Option<usiz
 ///
 /// One function, one value, both call sites.
 fn live_reliability_floor(gs: &GameState, me: u8) -> f64 {
-    if let Ok(value) = std::env::var("V7_LIVE_FLOOR") {
-        if let Some(parsed) = value.parse::<f64>().ok() {
-            if parsed.is_finite() && (0.0..=1.0).contains(&parsed) {
-                return parsed;
-            }
-        }
+    if let Some(parsed) = std::env::var("V7_LIVE_FLOOR")
+        .ok()
+        .and_then(|v| v.parse::<f64>().ok())
+        .filter(|p| p.is_finite() && (0.0..=1.0).contains(p))
+    {
+        return parsed;
     }
     let (my, opp) = gs.seated_pair(me);
     if opp.success_live_card_zone.cards.len() >= 2 {

@@ -3,8 +3,9 @@
 //! Plays v4-vs-v2 games; at every v4 live-set CONFIRM captures the portfolio,
 //! then measures ACTUAL placement rate across K shuffled-deck trials using
 //! the engine itself. Compares two predictors:
-//!   - CONSERVATIVE (0.6× flip credit) — what v4 currently uses
-//!   - FULL-MEAN (1.0× flip credit)
+//!   - CONSERVATIVE (0.6x flip credit) — what v4 currently uses
+//!   - FULL-MEAN (1.0x flip credit)
+//!
 //! Reports confusion matrices vs empirical outcomes.
 
 use rabuka_engine::bin_common::{deal_default_game, fresh_database, load_deck};

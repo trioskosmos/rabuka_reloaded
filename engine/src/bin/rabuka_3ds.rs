@@ -146,11 +146,8 @@ fn main() {
 fn pick_action_for_phase(game_state: &GameState, actions: &[game_setup::Action]) -> usize {
     match game_state.current_phase {
         game_state_mod::Phase::Main => {
-            if actions.len() > 2 {
-                0
-            } else {
-                0
-            }
+            let _ = actions.len();
+            0
         }
         game_state_mod::Phase::RockPaperScissors => {
             if game_state.player1_rps_choice.is_none() {

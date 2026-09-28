@@ -337,10 +337,9 @@ fn sumire_bpb4004_double_baton_removes_both_and_clamps_cost() {
         })
         .expect("center-placement double baton offered");
     let mut chosen = chosen.clone();
-    chosen
-        .parameters
-        .as_mut()
-        .map(|p| p.card_id = Some(sumire));
+    if let Some(p) = chosen.parameters.as_mut() {
+        p.card_id = Some(sumire);
+    }
     rabuka_engine::game_setup::execute_action(&mut game.state, &chosen).expect("resolve");
     while game.has_pending_choice() {
         match game.pending_choice_type().as_deref() {

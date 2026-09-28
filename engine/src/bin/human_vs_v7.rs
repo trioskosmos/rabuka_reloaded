@@ -262,7 +262,7 @@ fn main() {
             100.0 * same as f64 / pick_decisions.max(1) as f64
         );
         let mut pr: Vec<(&String, &(usize, usize))> = picked.iter().collect();
-        pr.sort_by(|a, b| (b.1.0 + b.1.1).cmp(&(a.1.0 + a.1.1)));
+        pr.sort_by_key(|a| std::cmp::Reverse(a.1.0 + a.1.1));
         println!("  {:<24} {:>5} {:>5}", "life", "v7", "v8");
         for (life, (v7, v8)) in pr.iter().take(12) {
             println!("  {life:<24} {v7:>5} {v8:>5}");

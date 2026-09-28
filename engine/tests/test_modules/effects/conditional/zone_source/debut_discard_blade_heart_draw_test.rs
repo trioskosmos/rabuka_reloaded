@@ -6,7 +6,6 @@ use rabuka_engine::zones::MemberArea;
 /// 登場: 手札の『KALEIDOSCORE』のカードを1枚控え室に置いてもよい：
 ///   自分のエネルギーデッキから、エネルギーカードを1枚ウェイト状態で置く。
 ///   これにより控え室に置いたカードがブレードハートを持たない場合、カードを1枚引く。
-
 /// Discard KALEIDOSCORE card WITH blade_heart → energy placed, no draw
 #[test]
 fn keke_discard_blade_heart_no_draw() {

@@ -492,8 +492,7 @@ fn ab0_placement_reduces_live_card_set_limit() {
     // Verify phase limit computation: max_allowed = 3 - reduction = 2,
     // independent of already_placed cards. The player should be able to
     // select up to 2 cards during LiveCardSet.
-    let max_allowed =
-        3i32 - i32::try_from(g.state.player1.live_card_set_limit_reduction).unwrap_or(0);
+    let max_allowed = 3i32 - i32::from(g.state.player1.live_card_set_limit_reduction);
     assert_eq!(max_allowed, 2, "phase limit should be 2 (3-1)");
 }
 

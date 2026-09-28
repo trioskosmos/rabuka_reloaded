@@ -4,26 +4,26 @@
 /// subtleties the engine previously mishandled:
 ///
 /// - bp1 (上原歩夢＆澁谷かのん＆日野下花帆):
-///     Cost=discard exactly 3 matching name cards (any combo including self).
-///     Effect=gain「常時スコア+3」ability until live end.
+///   Cost=discard exactly 3 matching name cards (any combo including self).
+///   Effect=gain「常時スコア+3」ability until live end.
 ///
 /// - bp2 (渡辺曜＆鬼塚夏美＆大沢瑠璃乃):
-///     Cost=discard ANY NUMBER of matching (including self).
-///     Effect=gain 1 blade per discarded card until live end.
+///   Cost=discard ANY NUMBER of matching (including self).
+///   Effect=gain 1 blade per discarded card until live end.
 ///
 /// - bp3 (園田海未＆津島善子＆天王寺璃奈):
-///     ライブ開始時: pay 6E optional → gain 3 blade until live end.
-///     (Energy-only cost, simpler, but still exercises the trigger path.)
+///   ライブ開始時: pay 6E optional → gain 3 blade until live end.
+///   (Energy-only cost, simpler, but still exercises the trigger path.)
 ///
 /// - bp4 (絢瀬絵里＆朝香果林＆葉月恋):
-///     triggers="ライブ開始時, 登場" (DUAL trigger) — previously the engine
-///     used == instead of .contains() so the live_start NEVER fired.
-///     Effect=look top 5, optionally take one of the three named members,
-///     then wait opponent members ≤ revealed card cost with ≤3 blade.
+///   triggers="ライブ開始時, 登場" (DUAL trigger) — previously the engine
+///   used == instead of .contains() so the live_start NEVER fired.
+///   Effect=look top 5, optionally take one of the three named members,
+///   then wait opponent members ≤ revealed card cost with ≤3 blade.
 ///
 /// - bp6 (南ことり＆黒澤ダイヤ＆徒町小鈴):
-///     Cost=discard ANY NUMBER of matching (including self).
-///     Effect=for each distinct heart COLOR among discarded cards, gain 1 of that color.
+///   Cost=discard ANY NUMBER of matching (including self).
+///   Effect=for each distinct heart COLOR among discarded cards, gain 1 of that color.
 ///
 use crate::helpers::*;
 use rabuka_engine::game_setup::ActionType;

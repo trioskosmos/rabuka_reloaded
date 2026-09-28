@@ -82,9 +82,9 @@ fn run_opponent_under_energy_blade_limit_wait(game: &mut TestGame, select_pos: u
 }
 
 /// 1. Q274 exact case: the wait-immune member is STILL OFFERED to the opponent and,
-/// when selected, simply is not waited. Player1's 果南 (Aqours, blade 2) is wall at
-/// center (stage index 1); a non-immune μ's member sits at index 0. Both board targets
-/// of 朝香果林's wait (blade ≤ 2). We select 果南 (the immune one).
+///    when selected, simply is not waited. Player1's 果南 (Aqours, blade 2) is wall at
+///    center (stage index 1); a non-immune μ's member sits at index 0. Both board targets
+///    of 朝香果林's wait (blade ≤ 2). We select 果南 (the immune one).
 #[test]
 fn q274_immune_target_still_offered_and_not_waited() {
     let db = load_real_database();

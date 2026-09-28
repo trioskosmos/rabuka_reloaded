@@ -4,21 +4,22 @@
 ///  1. PL!SP-bp7-010-R ウィーン・マルガレーテ ab#0 (起動):
 ///     このメンバーをステージから控え室に置く：自分のエネルギー置き場にある
 ///     エネルギー1枚をエネルギーデッキに置く。その後、自分の控え室からカードを
-///     1枚手札に加える。
-///     → cost: self to discard; then move energy_zone→energy_deck; then discard→hand.
+///     1枚手札に加える.
+///     → cost: self to discard; then move energy_zone→energy_deck; then
+///     discard→hand.
 ///
 ///  2. PL!N-bp7-001-R 上原歩夢 ab#0 (自動, ターン1):
 ///     自分のエネルギー置き場にあるエネルギーがメンバーの下に置かれたとき、
 ///     自分のエネルギーデッキから、エネルギーカードを1枚ウェイト状態で置く。
-///     → when energy is placed under a member, place 1 energy from the energy
-///       deck into the energy zone in WAIT.
+///     → when energy is placed under a member, place 1 energy from the
+///     energy deck into the energy zone in WAIT.
 ///
 ///  3. PL!SP-bp7-012-N 澁谷かのん ab#0 (登場):
 ///     自分の控え室から、『CatChu!』と『KALEIDOSCORE』と『5yncri5e!』のカードを
 ///     それぞれ1枚ずつ選び、それらを好きな順番でデッキの下に置いてもよい。
 ///     そうしたとき、カードを1枚引く。
-///     → select 1 card of each of the 3 groups from the waitroom, place them on
-///       the deck bottom in any order; if you did, draw 1 card.
+///     → select 1 card of each of the 3 groups from the waitroom, place them
+///     on the deck bottom in any order; if you did, draw 1 card.
 use crate::helpers::*;
 use rabuka_engine::core::types::AbilityTrigger;
 use rabuka_engine::zones::MemberArea;
