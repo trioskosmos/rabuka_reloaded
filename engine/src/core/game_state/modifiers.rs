@@ -1118,26 +1118,18 @@ fn commit_constant_results(
         let mut expected_set: HashMap<i16, i16> = HashMap::default();
         // Per-source attribution for the committed cost bonuses.
         let mut cost_sources: Vec<crate::core::game_modifiers::BonusSource> = Vec::new();
-        let mut p1_memberships: HashSet<i16> = HashSet::default();
-        let mut p2_memberships: HashSet<i16> = HashSet::default();
-        p1_memberships.extend(
-            self.player1
-                .stage
-                .stage
-                .iter()
-                .chain(self.player1.hand.cards.iter())
-                .chain(self.player1.energy_zone.cards.iter())
-                .copied(),
-        );
-        p2_memberships.extend(
-            self.player2
-                .stage
-                .stage
-                .iter()
-                .chain(self.player2.hand.cards.iter())
-                .chain(self.player2.energy_zone.cards.iter())
-                .copied(),
-        );
+        // Whether `cid` is in this player's stage, hand or energy zone.
+        //
+        // This used to be a `HashSet<i16>` built per `recalculate_constants`
+        // call and consulted once per ability. Those zones hold about 22 ids
+        // between them, so the set cost two heap allocations and ~44 hashes to
+        // answer one question a linear scan answers in ~44 comparisons and no
+        // allocation — and this function runs a couple of times per action.
+        fn owns(p: &crate::player::Player, id: i16) -> bool {
+            p.stage.stage.contains(&id)
+                || p.hand.cards.contains(&id)
+                || p.energy_zone.cards.contains(&id)
+        }
         {
             // Chain stage and hand ability IDs, look up each effect, filter to ModifyCost
             let all_ids = stage_ids.iter().chain(hand_ids.iter());
@@ -1167,8 +1159,8 @@ fn commit_constant_results(
                 // perspective. A shared context would evaluate every copy as if
                 // it belonged to player1, wrongly applying a mirror-match ability
                 // to both sides when only the side with more energy should qualify.
-                let owner_in_p1 = p1_memberships.contains(&cid);
-                let owner_in_p2 = p2_memberships.contains(&cid);
+                let owner_in_p1 = owns(&self.player1, cid);
+                let owner_in_p2 = owns(&self.player2, cid);
                 let self_player = if owner_in_p1 {
                     Some(&self.player1)
                 } else if owner_in_p2 {
