@@ -349,14 +349,16 @@ fn main() {
     let mut used = 0usize;
     let mut decision = 0usize;
     let mut my_log: Vec<String> = Vec::new();
-    let mut agree = 0usize;
-    let mut differ = 0usize;
-    let mut diverged: Vec<String> = Vec::new();
+    let mut d = Divergence {
+        agree: 0,
+        differ: 0,
+        diverged: Vec::new(),
+    };
 
     for _step in 0..3000 {
         TurnEngine::check_victory_condition(&mut gs);
         if gs.game_result != GameResult::Ongoing {
-            report(&gs, &db, my_me, &my_log, agree, differ, &diverged, auto);
+            report(&gs, &db, my_me, &my_log, &d, auto);
             return;
         }
         if game_setup::auto_advance_one(&mut gs) {
@@ -515,11 +517,11 @@ fn main() {
             .position(|x| signature(x) == signature(&v8a))
             .is_some_and(|idx| idx == picked);
         if v8_matches {
-            agree += 1;
+            d.agree += 1;
         } else {
-            differ += 1;
-            if diverged.len() < 40 {
-                diverged.push(format!(
+            d.differ += 1;
+            if d.diverged.len() < 40 {
+                d.diverged.push(format!(
                     "  decision {decision}: v8 chose {} | I/v8-alt chose {}",
                     describe(&v8a, &db),
                     describe(a, &db)
@@ -547,7 +549,7 @@ fn main() {
             );
         }
     }
-    report(&gs, &db, my_me, &my_log, agree, differ, &diverged, auto);
+    report(&gs, &db, my_me, &my_log, &d, auto);
 }
 
 fn deal(
@@ -840,14 +842,22 @@ fn render(gs: &GameState, db: &CardDatabase, me: u8) {
     }
 }
 
+/// How far the two sides' answers diverged on the choices offered.
+struct Divergence {
+    /// How many decisions both sides answered the same way.
+    agree: usize,
+    /// How many decisions the sides answered differently.
+    differ: usize,
+    /// One line per divergent decision, for the human to eyeball.
+    diverged: Vec<String>,
+}
+
 fn report(
     gs: &GameState,
     db: &CardDatabase,
     me: u8,
     log: &[String],
-    agree: usize,
-    differ: usize,
-    diverged: &[String],
+    d: &Divergence,
     auto: bool,
 ) {
     let (mine, theirs) = if me == 0 {
@@ -870,11 +880,14 @@ fn report(
     }
     if !auto {
         println!("  my decisions: {}", log.len());
-        println!("  agreement with v8: {agree}   divergence: {differ}");
-        if !diverged.is_empty() {
+        println!(
+            "  agreement with v8: {}   divergence: {}",
+            d.agree, d.differ
+        );
+        if !d.diverged.is_empty() {
             println!("  where v8 differs from the played line:");
-            for d in diverged.iter().take(25) {
-                println!("{d}");
+            for line in d.diverged.iter().take(25) {
+                println!("{line}");
             }
         }
     }

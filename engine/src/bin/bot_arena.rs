@@ -537,6 +537,43 @@ fn report_paired(baseline: &[GameOutcome], candidate: &[GameOutcome], base_label
     );
 }
 
+/// One side's stage-cost curve: the running total and the sample count for
+/// each turn. They are incremented together and consumed together, so they
+/// travel as one value rather than as two parallel arrays.
+struct StageCostCurve {
+    total: [i32; CURVE_TURNS],
+    samples: [u64; CURVE_TURNS],
+}
+
+impl StageCostCurve {
+    fn new() -> Self {
+        Self {
+            total: [0i32; CURVE_TURNS],
+            samples: [0u64; CURVE_TURNS],
+        }
+    }
+
+    fn record(&mut self, turn: usize, cost: i32) {
+        self.total[turn] += cost;
+        self.samples[turn] += 1;
+    }
+
+    fn average(&self) -> Vec<String> {
+        self.total
+            .iter()
+            .zip(self.samples.iter())
+            .enumerate()
+            .map(|(t, (sum, n))| {
+                if *n == 0 {
+                    format!("T{t}   -")
+                } else {
+                    format!("T{t} {:>2.1}", *sum as f64 / *n as f64)
+                }
+            })
+            .collect()
+    }
+}
+
 /// The guides' own definition of a healthy bot (docs/BOT_STRATEGY.md section 1),
 /// reported next to the win rate so a change can be judged on the quantity the
 /// doctrine actually cares about:
@@ -548,10 +585,8 @@ fn report_health(
     rows: &[GameOutcome],
     live_p1: u64,
     live_p2: u64,
-    curve_p1: &[i32; CURVE_TURNS],
-    curve_p2: &[i32; CURVE_TURNS],
-    curve_p1_n: &[u64; CURVE_TURNS],
-    curve_p2_n: &[u64; CURVE_TURNS],
+    curve_p1: &StageCostCurve,
+    curve_p2: &StageCostCurve,
     end_cost: (i64, i64),
 ) {
     if rows.is_empty() {
@@ -600,20 +635,9 @@ fn report_health(
     //
     // Bucket N is the board ENTERING turn N, which is the board turn N-1 built.
     // So the guide's T1=4 line is bucket T2, T2=9 is bucket T3, and so on.
-    let avg = |sum: &[i32; CURVE_TURNS], n: &[u64; CURVE_TURNS]| -> Vec<String> {
-        (1..CURVE_TURNS)
-            .map(|t| {
-                if n[t] == 0 {
-                    format!("T{t}  -")
-                } else {
-                    format!("T{t} {:>2.1}", sum[t] as f64 / n[t] as f64)
-                }
-            })
-            .collect()
-    };
     println!("  avg stage cost ENTERING each turn (guide board after Tn-1: T1~4, T2~9, T3~13)");
-    println!("    P1 {}", avg(curve_p1, curve_p1_n).join(" "));
-    println!("    P2 {}", avg(curve_p2, curve_p2_n).join(" "));
+    println!("    P1 {}", curve_p1.average().join(" "));
+    println!("    P2 {}", curve_p2.average().join(" "));
     let games = rows.len().max(1) as f64;
     println!(
         "  avg FINAL stage cost: P1 {:.1} | P2 {:.1}",
@@ -1526,10 +1550,8 @@ fn main() -> ArenaResult<()> {
     let mut live_phases_p1 = 0u64;
     let mut live_phases_p2 = 0u64;
     // Per-turn development curve, the guides' T1=4 / T2=9 / T3=13 metric.
-    let mut curve_p1 = [0i32; CURVE_TURNS];
-    let mut curve_p2 = [0i32; CURVE_TURNS];
-    let mut curve_p1_n = [0u64; CURVE_TURNS];
-    let mut curve_p2_n = [0u64; CURVE_TURNS];
+    let mut curve_p1 = StageCostCurve::new();
+    let mut curve_p2 = StageCostCurve::new();
     // End-of-game stage cost. A sanity check on the per-turn curve above: if
     // this is a real number but the curve reads zero, the per-turn bucketing
     // is wrong, not the bots.
@@ -1677,10 +1699,8 @@ fn main() -> ArenaResult<()> {
                     );
                 }
                 if t < CURVE_TURNS {
-                    curve_p1[t] += stage_cost(&gs.player1, &db);
-                    curve_p2[t] += stage_cost(&gs.player2, &db);
-                    curve_p1_n[t] += 1;
-                    curve_p2_n[t] += 1;
+                    curve_p1.record(t, stage_cost(&gs.player1, &db));
+                    curve_p2.record(t, stage_cost(&gs.player2, &db));
                 }
                 if logs {
                     timeline.push(format!(
@@ -2120,8 +2140,6 @@ fn main() -> ArenaResult<()> {
         live_phases_p2,
         &curve_p1,
         &curve_p2,
-        &curve_p1_n,
-        &curve_p2_n,
         (end_cost_p1, end_cost_p2),
     );
     if let Some(path) = &options.outcomes {

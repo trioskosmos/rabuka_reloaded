@@ -7,6 +7,17 @@ use crate::ability_queue::ConditionalChoice;
 use crate::card::{AbilityEffect, CardDatabase, Operator, PlacementOrder};
 use crate::game_state::GameState;
 
+/// Where a move's cards come from and go to, and for which side.
+///
+/// These three are the routing decision itself: which zone to read, where the
+/// cards land, and whether the destination is the acting player or the
+/// opponent. They always travel together, so they are one value.
+struct MoveRoute<'a> {
+    source: &'a str,
+    destination: &'a str,
+    use_p2: bool,
+}
+
 /// How many cards a move takes, and under which of the selection modes.
 ///
 /// The count and the four flags are one decision made at the call site — "take
@@ -285,11 +296,14 @@ impl AbilityResolver {
         effect: &AbilityEffect,
         selection: SelectionSpec,
         filter: &crate::ability::util::CardFilter<'_>,
-        use_p2: bool,
-        source: &str,
-        destination: &str,
+        route: MoveRoute<'_>,
         card_db: &crate::card::CardDatabase,
     ) -> Result<Vec<i16>, String> {
+        let MoveRoute {
+            source,
+            destination,
+            use_p2,
+        } = route;
         let SelectionSpec {
             count,
             is_max,
@@ -369,24 +383,19 @@ impl AbilityResolver {
             return self.resolve_from_looked_at(gs, use_p2);
         }
         if source_str == "revealed_cards" {
-            return self.resolve_from_revealed_cards(
-                gs,
-                count,
-                is_all,
-                is_max,
-                effect,
-                filter,
-                card_db,
-            );
+            return self.resolve_from_revealed_cards(gs, selection, effect, filter, card_db);
         }
         if source_str == "those_cards" {
             if let Some(result) = self.resolve_from_those_cards(
                 gs,
-                count,
+                selection,
                 filter,
-                destination,
                 effect,
-                use_p2,
+                MoveRoute {
+                    source: source_str,
+                    destination,
+                    use_p2,
+                },
                 card_db,
             )? {
                 return Ok(result);
@@ -485,13 +494,12 @@ impl AbilityResolver {
     fn resolve_from_revealed_cards(
         &mut self,
         gs: &mut GameState,
-        count: usize,
-        is_all: bool,
-        is_max: bool,
+        selection: SelectionSpec,
         effect: &AbilityEffect,
         incoming_filter: &crate::ability::util::CardFilter<'_>,
         card_db: &crate::card::CardDatabase,
     ) -> Result<Vec<i16>, String> {
+        let SelectionSpec { count, is_all, is_max, .. } = selection;
         let card_type_filter = incoming_filter.card_type;
         let group_name = incoming_filter.group;
         let cost_limit = incoming_filter.cost_limit;
@@ -603,13 +611,18 @@ impl AbilityResolver {
     fn resolve_from_those_cards(
         &mut self,
         gs: &mut GameState,
-        count: usize,
+        selection: SelectionSpec,
         filter: &crate::ability::util::CardFilter<'_>,
-        destination: &str,
         effect: &AbilityEffect,
-        use_p2: bool,
+        route: MoveRoute<'_>,
         card_db: &crate::card::CardDatabase,
     ) -> Result<Option<Vec<i16>>, String> {
+        let MoveRoute {
+            source: _,
+            destination,
+            use_p2,
+        } = route;
+        let count = selection.count;
         let card_type_filter = filter.card_type;
         let group_name = filter.group;
         // Handle "those_cards" alias: resolve to the cards that triggered the
@@ -2157,9 +2170,11 @@ gs.set_recently_moved_batch(moved.clone().into(), Some("under_member"));
                 cost_total_operator,
                 effect.exclude_characters_any(),
             ),
-            use_p2,
-            &source,
-            &destination,
+            MoveRoute {
+                source: &source,
+                destination: &destination,
+                use_p2,
+            },
             &card_db,
         )?;
         if effect.optional.unwrap_or(false) && taken.is_empty() && self.pending_choice.is_none() {
@@ -2240,13 +2255,14 @@ if util::distinct_should_dedupe(distinct) {
         context: ExecutionContext,
     ) -> Result<(), String> {
         match &context {
-            ExecutionContext::LookAndSelect { step } => {
-                if let LookAndSelectStep::Finalize {
-                    destination,
-                    source_zone,
-                } = step
-                {
-                    if Zone::from_str(destination) == Some(Zone::Stage) {
+            ExecutionContext::LookAndSelect {
+                step:
+                    LookAndSelectStep::Finalize {
+                        destination,
+                        source_zone,
+                    },
+            } => {
+                if Zone::from_str(destination) == Some(Zone::Stage) {
                         if let Some(&card_id) = gs.looked_at_cards.last() {
                             let player = &mut gs.player1;
                             let pos_idx = super::util::stage_position_index(position);
@@ -2277,7 +2293,6 @@ if util::distinct_should_dedupe(distinct) {
                             gs.looked_at_cards.clear();
                         }
                     }
-                }
             }
             ExecutionContext::MoveCardsPosition {
                 card_id,

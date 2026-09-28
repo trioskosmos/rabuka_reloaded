@@ -201,17 +201,33 @@ struct GameStats {
 }
 
 
-fn run_game(
-    db: &Arc<CardDatabase>,
-    t1: &Deck,
-    t2: &Deck,
+/// The immutable setup for one simulated game: the two decks, the seeds, and
+/// the bot wiring. These are fixed for the whole game, as opposed to the
+/// `GameState` that evolves, so they are passed as one value.
+struct GameSetup<'a> {
+    db: &'a Arc<CardDatabase>,
+    player1_deck: &'a Deck,
+    player2_deck: &'a Deck,
     engine_seed: u32,
     arena_seed: u64,
     policy: BotKind,
-    v2_policy: &strategy_v2::V2Policy,
+    v2_policy: &'a strategy_v2::V2Policy,
+}
+
+fn run_game(
+    setup: GameSetup<'_>,
     game: usize,
     record: bool,
 ) -> Result<GameStats, String> {
+    let GameSetup {
+        db,
+        player1_deck: t1,
+        player2_deck: t2,
+        engine_seed,
+        arena_seed,
+        policy,
+        v2_policy,
+    } = setup;
     rabuka_engine::rng::seed(engine_seed);
     let mut rng = Lcg(arena_seed);
     let mut gs = rabuka_engine::bin_common::deal_game(
@@ -542,13 +558,15 @@ fn run_sweep(
             for g in 0..games {
                 let (engine_seed, arena_seed) = game_seeds(base_seed, g.wrapping_add(1));
                 let stats = run_game(
-                    db,
-                    &t1,
-                    &t2,
-                    engine_seed,
-                    arena_seed,
-                    opts.policy,
-                    &v2_policy,
+                    GameSetup {
+                        db,
+                        player1_deck: &t1,
+                        player2_deck: &t2,
+                        engine_seed,
+                        arena_seed,
+                        policy: opts.policy,
+                        v2_policy: &v2_policy,
+                    },
                     g as usize,
                     trace_writer.is_some(),
                 )?;
@@ -604,13 +622,15 @@ fn run_sweep(
                                 let (engine_seed, arena_seed) =
                                     game_seeds(base_seed, g.wrapping_add(1));
                                 let stats = run_game(
-                                    db,
-                                    t1,
-                                    t2,
-                                    engine_seed,
-                                    arena_seed,
-                                    opts.policy,
-                                    v2_policy,
+                                    GameSetup {
+                                        db,
+                                        player1_deck: t1,
+                                        player2_deck: t2,
+                                        engine_seed,
+                                        arena_seed,
+                                        policy: opts.policy,
+                                        v2_policy,
+                                    },
                                     g as usize,
                                     false,
                                 )
@@ -784,8 +804,20 @@ fn real_main() -> Result<(), String> {
                         opts.seed ^ 0xA5A5_A5A5,
                         passes * 10_000 + (di as u32) * 10 + w + 1,
                     );
-                    let _ = run_game(&db, &t1w, &t2w, es, ps, opts.policy, &v2w, 0, false)
-                        .expect("sim_bench warmup failed");
+                    let _ = run_game(
+                        GameSetup {
+                            db: &db,
+                            player1_deck: &t1w,
+                            player2_deck: &t2w,
+                            engine_seed: es,
+                            arena_seed: ps,
+                            policy: opts.policy,
+                            v2_policy: &v2w,
+                        },
+                        0,
+                        false,
+                    )
+                    .expect("sim_bench warmup failed");
                     warmup_games += 1;
                 }
             }
