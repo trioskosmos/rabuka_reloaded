@@ -76,9 +76,10 @@ fn discard_member_gives_heart04_and_blade_to_same_name() {
     assert!(game.has_pending_choice());
     game.select_indices(&[0]);
 
-    while game.has_pending_choice() {
-        game.select_indices(&[]);
-    }
+    // Answer what cannot be declined, decline what can: a mandatory
+    // prompt left parked mid-ability produces exactly the absence
+    // the next assertion checks, so nothing fails.
+    game.drain_choices();
 
     assert!(game.state.player1.waitroom.cards.contains(&nahone_hand));
     assert_eq!(get_heart04(&game, nahone_stage), 1);
@@ -149,9 +150,10 @@ fn discard_non_member_no_buff() {
     assert!(game.has_pending_choice());
     game.select_indices(&[0]);
 
-    while game.has_pending_choice() {
-        game.select_indices(&[]);
-    }
+    // Answer what cannot be declined, decline what can: a mandatory
+    // prompt left parked mid-ability produces exactly the absence
+    // the next assertion checks, so nothing fails.
+    game.drain_choices();
 
     assert!(game.state.player1.waitroom.cards.contains(&live_discard));
     assert_eq!(get_heart04(&game, nahone_stage), 0);
@@ -217,9 +219,10 @@ fn discard_member_different_name_than_activating() {
     assert!(game.has_pending_choice());
     game.select_indices(&[0]);
 
-    while game.has_pending_choice() {
-        game.select_indices(&[]);
-    }
+    // Answer what cannot be declined, decline what can: a mandatory
+    // prompt left parked mid-ability produces exactly the absence
+    // the next assertion checks, so nothing fails.
+    game.drain_choices();
 
     assert!(game.state.player1.waitroom.cards.contains(&other_member));
     assert_eq!(get_heart04(&game, nahone_stage), 1);
@@ -254,9 +257,10 @@ fn discard_same_name_as_activating_card() {
     assert!(game.has_pending_choice());
     game.select_indices(&[0]);
 
-    while game.has_pending_choice() {
-        game.select_indices(&[]);
-    }
+    // Answer what cannot be declined, decline what can: a mandatory
+    // prompt left parked mid-ability produces exactly the absence
+    // the next assertion checks, so nothing fails.
+    game.drain_choices();
 
     assert_eq!(get_heart04(&game, nahone_stage), 1);
     assert!(get_blade(&game, nahone_stage) >= 1);
@@ -409,9 +413,10 @@ fn discarded_card_goes_to_waitroom() {
     assert!(game.has_pending_choice());
     game.select_indices(&[0]);
 
-    while game.has_pending_choice() {
-        game.select_indices(&[]);
-    }
+    // Answer what cannot be declined, decline what can: a mandatory
+    // prompt left parked mid-ability produces exactly the absence
+    // the next assertion checks, so nothing fails.
+    game.drain_choices();
 
     assert!(!game.state.player1.hand.cards.contains(&nahone_hand));
     assert!(game.state.player1.waitroom.cards.contains(&nahone_hand));
@@ -445,9 +450,10 @@ fn heart04_only_no_other_colors() {
     assert!(game.has_pending_choice());
     game.select_indices(&[0]);
 
-    while game.has_pending_choice() {
-        game.select_indices(&[]);
-    }
+    // Answer what cannot be declined, decline what can: a mandatory
+    // prompt left parked mid-ability produces exactly the absence
+    // the next assertion checks, so nothing fails.
+    game.drain_choices();
 
     assert_eq!(get_heart04(&game, nahone_stage), 1);
     assert_eq!(
@@ -504,9 +510,10 @@ fn p_variant_works() {
     assert!(game.has_pending_choice());
     game.select_indices(&[0]);
 
-    while game.has_pending_choice() {
-        game.select_indices(&[]);
-    }
+    // Answer what cannot be declined, decline what can: a mandatory
+    // prompt left parked mid-ability produces exactly the absence
+    // the next assertion checks, so nothing fails.
+    game.drain_choices();
 
     assert_eq!(get_heart04(&game, nahone_stage), 1);
     assert!(get_blade(&game, nahone_stage) >= 1);
@@ -540,9 +547,10 @@ fn p_plus_variant_works() {
     assert!(game.has_pending_choice());
     game.select_indices(&[0]);
 
-    while game.has_pending_choice() {
-        game.select_indices(&[]);
-    }
+    // Answer what cannot be declined, decline what can: a mandatory
+    // prompt left parked mid-ability produces exactly the absence
+    // the next assertion checks, so nothing fails.
+    game.drain_choices();
 
     assert_eq!(get_heart04(&game, nahone_stage), 1);
     assert!(get_blade(&game, nahone_stage) >= 1);
@@ -576,9 +584,10 @@ fn sec_variant_works() {
     assert!(game.has_pending_choice());
     game.select_indices(&[0]);
 
-    while game.has_pending_choice() {
-        game.select_indices(&[]);
-    }
+    // Answer what cannot be declined, decline what can: a mandatory
+    // prompt left parked mid-ability produces exactly the absence
+    // the next assertion checks, so nothing fails.
+    game.drain_choices();
 
     assert_eq!(get_heart04(&game, nahone_stage), 1);
     assert!(get_blade(&game, nahone_stage) >= 1);
@@ -613,9 +622,10 @@ fn discard_from_non_contiguous_hand() {
     assert!(game.has_pending_choice());
     game.select_indices(&[1]);
 
-    while game.has_pending_choice() {
-        game.select_indices(&[]);
-    }
+    // Answer what cannot be declined, decline what can: a mandatory
+    // prompt left parked mid-ability produces exactly the absence
+    // the next assertion checks, so nothing fails.
+    game.drain_choices();
 
     assert!(game.state.player1.waitroom.cards.contains(&nahone_hand));
     assert_eq!(get_heart04(&game, nahone_stage), 1);
@@ -678,9 +688,10 @@ fn nahone_at_left_position() {
     assert!(game.has_pending_choice());
     game.select_indices(&[0]);
 
-    while game.has_pending_choice() {
-        game.select_indices(&[]);
-    }
+    // Answer what cannot be declined, decline what can: a mandatory
+    // prompt left parked mid-ability produces exactly the absence
+    // the next assertion checks, so nothing fails.
+    game.drain_choices();
 
     assert_eq!(get_heart04(&game, nahone_stage), 1);
     assert!(get_blade(&game, nahone_stage) >= 1);
@@ -714,9 +725,10 @@ fn nahone_at_right_position() {
     assert!(game.has_pending_choice());
     game.select_indices(&[0]);
 
-    while game.has_pending_choice() {
-        game.select_indices(&[]);
-    }
+    // Answer what cannot be declined, decline what can: a mandatory
+    // prompt left parked mid-ability produces exactly the absence
+    // the next assertion checks, so nothing fails.
+    game.drain_choices();
 
     assert_eq!(get_heart04(&game, nahone_stage), 1);
     assert!(get_blade(&game, nahone_stage) >= 1);
@@ -751,9 +763,10 @@ fn hand_mixed_cards_discard_member_only() {
     assert!(game.has_pending_choice());
     game.select_indices(&[1]);
 
-    while game.has_pending_choice() {
-        game.select_indices(&[]);
-    }
+    // Answer what cannot be declined, decline what can: a mandatory
+    // prompt left parked mid-ability produces exactly the absence
+    // the next assertion checks, so nothing fails.
+    game.drain_choices();
 
     assert!(game.state.player1.waitroom.cards.contains(&nahone_hand));
     assert_eq!(get_heart04(&game, nahone_stage), 1);
@@ -792,9 +805,10 @@ fn discard_different_name_member_no_target() {
     assert!(game.has_pending_choice());
     game.select_indices(&[0]);
 
-    while game.has_pending_choice() {
-        game.select_indices(&[]);
-    }
+    // Answer what cannot be declined, decline what can: a mandatory
+    // prompt left parked mid-ability produces exactly the absence
+    // the next assertion checks, so nothing fails.
+    game.drain_choices();
 
     assert!(game.state.player1.waitroom.cards.contains(&other_member));
     assert_eq!(
@@ -897,9 +911,10 @@ fn effect_tracked_as_temporary_live_end() {
     assert!(game.has_pending_choice());
     game.select_indices(&[0]);
 
-    while game.has_pending_choice() {
-        game.select_indices(&[]);
-    }
+    // Answer what cannot be declined, decline what can: a mandatory
+    // prompt left parked mid-ability produces exactly the absence
+    // the next assertion checks, so nothing fails.
+    game.drain_choices();
 
     let has_live_end_effect = game
         .state

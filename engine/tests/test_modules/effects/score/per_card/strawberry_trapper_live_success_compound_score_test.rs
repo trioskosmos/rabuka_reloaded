@@ -58,9 +58,10 @@ fn strawberry_q36_only_fires_in_live_victory_determination() {
         "Q36: Now in LiveVictoryDetermination phase"
     );
 
-    while game.has_pending_choice() {
-        game.select_indices(&[]);
-    }
+    // Answer what cannot be declined, decline what can: a mandatory
+    // prompt left parked mid-ability produces exactly the absence
+    // the next assertion checks, so nothing fails.
+    game.drain_choices();
 }
 
 /// Q132: First attacker's live_success ability is evaluated during

@@ -191,9 +191,10 @@ fn konata_bp4_q188_placed_in_wait_no_trigger() {
     game.state.mods.add_orientation_modifier(konata, "wait");
 
     rabuka_engine::turn::TurnEngine::trigger_auto_abilities_for_player(&mut game.state, "p1");
-    while game.has_pending_choice() {
-        game.select_indices(&[]);
-    }
+    // Answer what cannot be declined, decline what can: a mandatory
+    // prompt left parked mid-ability produces exactly the absence
+    // the next assertion checks, so nothing fails.
+    game.drain_choices();
 
     assert_eq!(
         game.state.player1.hand.cards.len(),

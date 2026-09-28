@@ -39,9 +39,10 @@ fn q137_keke_active_cost_pay_applies_wait() {
     assert_eq!(ori, Some("wait"), "Keke should be waited after paying cost");
 
     // Effect resolves (look_at_4) — no valid Liella! live cards → skip selection
-    while game.has_pending_choice() {
-        game.select_indices(&[]);
-    }
+    // Answer what cannot be declined, decline what can: a mandatory
+    // prompt left parked mid-ability produces exactly the absence
+    // the next assertion checks, so nothing fails.
+    game.drain_choices();
 
     // Keke on stage, cost paid
     assert!(game.state.player1.stage.stage.contains(&keke));
@@ -67,9 +68,10 @@ fn q137_keke_skip_cost_no_wait() {
     game.select_option(0); // Skip
 
     // Resolve any remaining effect
-    while game.has_pending_choice() {
-        game.select_indices(&[]);
-    }
+    // Answer what cannot be declined, decline what can: a mandatory
+    // prompt left parked mid-ability produces exactly the absence
+    // the next assertion checks, so nothing fails.
+    game.drain_choices();
 
     // Keke should NOT be in wait state
     let ori = game.state.mods.get_orientation_modifier(keke);
@@ -97,9 +99,10 @@ fn q137_keke_already_waited_cannot_pay_again() {
     // Pay the cost — Keke becomes waited
     assert!(game.has_pending_choice(), "Should have cost choice");
     game.select_option(1); // Pay
-    while game.has_pending_choice() {
-        game.select_indices(&[]);
-    }
+    // Answer what cannot be declined, decline what can: a mandatory
+    // prompt left parked mid-ability produces exactly the absence
+    // the next assertion checks, so nothing fails.
+    game.drain_choices();
 
     assert_eq!(
         game.state.mods.get_orientation_modifier(keke),

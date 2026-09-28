@@ -281,9 +281,10 @@ fn center_other_member_cost_plus_two_deploy_empty_hand_cost_fails() {
         "unpayable discard cost must refuse activation, got {:?}",
         result
     );
-    while game.has_pending_choice() {
-        game.select_indices(&[]);
-    }
+    // Answer what cannot be declined, decline what can: a mandatory
+    // prompt left parked mid-ability produces exactly the absence
+    // the next assertion checks, so nothing fails.
+    game.drain_choices();
 
     // Stage should be unchanged (cost not paid, effect not executed)
     assert_eq!(

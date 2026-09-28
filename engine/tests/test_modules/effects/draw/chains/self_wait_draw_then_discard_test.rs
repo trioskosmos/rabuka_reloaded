@@ -26,9 +26,10 @@ fn bp3_001_activation_waits_self_draw_then_discard() {
     game.state.player1.hand.cards.push(card);
     game.state.player1.hand.cards.push(filler);
     game.play_to_stage(card, MemberArea::Center);
-    while game.has_pending_choice() {
-        game.select_indices(&[]);
-    }
+    // Answer what cannot be declined, decline what can: a mandatory
+    // prompt left parked mid-ability produces exactly the absence
+    // the next assertion checks, so nothing fails.
+    game.drain_choices();
 
     game.activate_ability(card);
 

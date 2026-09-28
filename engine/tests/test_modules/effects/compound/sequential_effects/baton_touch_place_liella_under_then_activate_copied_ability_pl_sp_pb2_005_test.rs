@@ -33,9 +33,10 @@ fn hazuki_baton_touch_places_liella_under() {
 
     game.play_to_stage(hazuki, MemberArea::Center);
 
-    while game.has_pending_choice() {
-        game.select_indices(&[]);
-    }
+    // Answer what cannot be declined, decline what can: a mandatory
+    // prompt left parked mid-ability produces exactly the absence
+    // the next assertion checks, so nothing fails.
+    game.drain_choices();
 
     let under = game.state.player1.stage.get_under_cards(MemberArea::Center);
     assert!(
@@ -65,9 +66,10 @@ fn hazuki_baton_touch_non_liella_places_nothing() {
 
     game.play_to_stage(hazuki, MemberArea::Center);
 
-    while game.has_pending_choice() {
-        game.select_indices(&[]);
-    }
+    // Answer what cannot be declined, decline what can: a mandatory
+    // prompt left parked mid-ability produces exactly the absence
+    // the next assertion checks, so nothing fails.
+    game.drain_choices();
 
     let under = game.state.player1.stage.get_under_cards(MemberArea::Center);
     assert!(
@@ -95,9 +97,10 @@ fn hazuki_full_workflow_gains_abilities_from_under() {
 
     game.play_to_stage(hazuki, MemberArea::Center);
 
-    while game.has_pending_choice() {
-        game.select_indices(&[]);
-    }
+    // Answer what cannot be declined, decline what can: a mandatory
+    // prompt left parked mid-ability produces exactly the absence
+    // the next assertion checks, so nothing fails.
+    game.drain_choices();
 
     let under = game.state.player1.stage.get_under_cards(MemberArea::Center);
     assert!(
@@ -158,9 +161,10 @@ fn hazuki_activates_kidou_copied_from_under() {
     // The 起動 ability (from 若菜四季): self-stage→waitroom cost (auto via self_cost) +
     // return 1 live from discard (auto-selects when exactly 1 live in discard)
     // No pending choices expected since both steps auto-resolve.
-    while game.has_pending_choice() {
-        game.select_indices(&[]);
-    }
+    // Answer what cannot be declined, decline what can: a mandatory
+    // prompt left parked mid-ability produces exactly the absence
+    // the next assertion checks, so nothing fails.
+    game.drain_choices();
 
     assert!(
         game.state.player1.waitroom.cards.contains(&hazuki),

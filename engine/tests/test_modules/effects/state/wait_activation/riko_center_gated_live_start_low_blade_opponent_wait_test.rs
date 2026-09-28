@@ -63,9 +63,10 @@ fn run_live_start(game: &mut TestGame) {
     advance_to_live_card_set(game);
     game.set_live_card(live);
     advance_to_live_start(game);
-    while game.has_pending_choice() {
-        game.select_indices(&[]);
-    }
+    // Answer what cannot be declined, decline what can: a mandatory
+    // prompt left parked mid-ability produces exactly the absence
+    // the next assertion checks, so nothing fails.
+    game.drain_choices();
 }
 
 // ===================================================================

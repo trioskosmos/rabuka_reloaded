@@ -80,9 +80,10 @@ fn fill_decks(game: &mut TestGame) {
 }
 
 fn drain(game: &mut TestGame) {
-    while game.has_pending_choice() {
-        game.select_indices(&[]);
-    }
+    // Answer what cannot be declined, decline what can: a mandatory
+    // prompt left parked mid-ability produces exactly the absence
+    // the next assertion checks, so nothing fails.
+    game.drain_choices();
 }
 
 /// Seat a live card and advance to the point where ライブ開始時 dispatch is real.

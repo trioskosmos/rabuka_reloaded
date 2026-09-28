@@ -28,9 +28,10 @@ fn tote_mari_q68_debut_draws_and_sets_cannot_live() {
     game.play_to_stage(totemari, rabuka_engine::zones::MemberArea::LeftSide);
 
     // Debut ability auto-triggers: draw 1, set cannot_live
-    while game.has_pending_choice() {
-        game.select_indices(&[]);
-    }
+    // Answer what cannot be declined, decline what can: a mandatory
+    // prompt left parked mid-ability produces exactly the absence
+    // the next assertion checks, so nothing fails.
+    game.drain_choices();
 
     // Hand: 3 initial - 1 played + 1 drawn = 3
     assert_eq!(game.state.player1.hand.cards.len(), 3, "Debut drew 1 card");
@@ -67,9 +68,10 @@ fn tote_mari_q68_can_still_set_live_card() {
     game.give_energy(4);
     game.play_to_stage(totemari, rabuka_engine::zones::MemberArea::LeftSide);
 
-    while game.has_pending_choice() {
-        game.select_indices(&[]);
-    }
+    // Answer what cannot be declined, decline what can: a mandatory
+    // prompt left parked mid-ability produces exactly the absence
+    // the next assertion checks, so nothing fails.
+    game.drain_choices();
 
     // Now advance to live phase — by NAME. A 5-pass walk means "roughly the
     // live", and Q68 is precisely about which phase this turn can still reach.
@@ -118,9 +120,10 @@ fn tote_mari_q68_live_performance_discards_live_card() {
     game.give_energy(4);
 
     game.play_to_stage(totemari, rabuka_engine::zones::MemberArea::Center);
-    while game.has_pending_choice() {
-        game.select_indices(&[]);
-    }
+    // Answer what cannot be declined, decline what can: a mandatory
+    // prompt left parked mid-ability produces exactly the absence
+    // the next assertion checks, so nothing fails.
+    game.drain_choices();
 
     // Advance to LiveCardSetFirstAttacker (P1's turn to set live cards).
     // Each pass() advances ONE phase without settle: Main→Active→Energy→Draw→Main→LiveCardSetFirstAttacker

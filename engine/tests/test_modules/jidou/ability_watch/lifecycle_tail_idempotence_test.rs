@@ -589,9 +589,10 @@ fn genki_zenkai_own_live_success_stays_invalidated_across_repeated_derivation() 
     // ライブ開始時 is dispatched on entry to the performance phase.
     game.advance_to_phase(Phase::FirstAttackerPerformance);
     game.drain_auto_ability_choices();
-    while game.has_pending_choice() {
-        game.select_indices(&[]);
-    }
+    // Answer what cannot be declined, decline what can: a mandatory
+    // prompt left parked mid-ability produces exactly the absence
+    // the next assertion checks, so nothing fails.
+    game.drain_choices();
 
     // The performance is EXECUTED on a later pass, not on entry to its phase, so
     // keep stepping until a snapshot exists. Without one the gated dispatch below is
@@ -601,9 +602,10 @@ fn genki_zenkai_own_live_success_stays_invalidated_across_repeated_derivation() 
         snap_guard += 1;
         game.pass();
         game.drain_auto_ability_choices();
-        while game.has_pending_choice() {
-            game.select_indices(&[]);
-        }
+        // Answer what cannot be declined, decline what can: a mandatory
+        // prompt left parked mid-ability produces exactly the absence
+        // the next assertion checks, so nothing fails.
+        game.drain_choices();
     }
 
     // Re-derive as many times as a live window does, keeping the invalidation

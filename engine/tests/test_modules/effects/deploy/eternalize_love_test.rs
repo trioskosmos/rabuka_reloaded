@@ -114,9 +114,10 @@ fn eternalize_love_full_live_flow_heart00_reduction() {
     game.advance_to_phase(rabuka_engine::game_state::Phase::FirstAttackerPerformance);
 
     // Handle any pending choices from LiveStart
-    while game.has_pending_choice() {
-        game.select_indices(&[]);
-    }
+    // Answer what cannot be declined, decline what can: a mandatory
+    // prompt left parked mid-ability produces exactly the absence
+    // the next assertion checks, so nothing fails.
+    game.drain_choices();
 
     // Advance through performance phases
     // FirstAttackerPerformance → SecondAttackerPerformance
@@ -124,14 +125,16 @@ fn eternalize_love_full_live_flow_heart00_reduction() {
     game.pass();
     // LiveVictoryDetermination
     game.pass();
-    while game.has_pending_choice() {
-        game.select_indices(&[]);
-    }
+    // Answer what cannot be declined, decline what can: a mandatory
+    // prompt left parked mid-ability produces exactly the absence
+    // the next assertion checks, so nothing fails.
+    game.drain_choices();
     // LVD → Active (check_expired_effects runs)
     game.pass();
-    while game.has_pending_choice() {
-        game.select_indices(&[]);
-    }
+    // Answer what cannot be declined, decline what can: a mandatory
+    // prompt left parked mid-ability produces exactly the absence
+    // the next assertion checks, so nothing fails.
+    game.drain_choices();
 
     // Check modifier after live
     let modifier_after = game

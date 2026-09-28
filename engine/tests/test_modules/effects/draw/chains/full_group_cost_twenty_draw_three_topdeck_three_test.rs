@@ -9,9 +9,10 @@ fn advance_to_first_live_card_set(game: &mut TestGame) {
         guard += 1;
         assert!(guard < 20, "did not reach the first live-card set phase");
         game.pass();
-        while game.has_pending_choice() {
-            game.select_indices(&[]);
-        }
+        // Answer what cannot be declined, decline what can: a mandatory
+        // prompt left parked mid-ability produces exactly the absence
+        // the next assertion checks, so nothing fails.
+        game.drain_choices();
     }
 }
 

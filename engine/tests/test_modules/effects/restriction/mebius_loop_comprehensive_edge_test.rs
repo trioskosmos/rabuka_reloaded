@@ -173,9 +173,10 @@ fn mebius_tie_when_both_fail_still_restricts() {
     // Into the performance window BY NAME: the tie this test measures is
     // decided at the victory determination, not "3 passes after setting".
     game.advance_to_phase(rabuka_engine::game_state::Phase::FirstAttackerPerformance);
-    while game.has_pending_choice() {
-        game.select_indices(&[]);
-    }
+    // Answer what cannot be declined, decline what can: a mandatory
+    // prompt left parked mid-ability produces exactly the absence
+    // the next assertion checks, so nothing fails.
+    game.drain_choices();
     advance_victory(&mut game);
     while game.has_pending_choice() { game.select_indices(&[0]); }
     game.pass();

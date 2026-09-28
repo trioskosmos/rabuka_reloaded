@@ -29,9 +29,10 @@ fn setup_mymai_only(game: &mut TestGame) -> (i16, i16) {
 fn advance_to_performance(game: &mut TestGame) {
     game.pass(); // LiveCardSetFirstAttacker → LiveCardSetSecondAttacker
     game.pass(); // LiveCardSetSecondAttacker → FirstAttackerPerformance → LiveStart
-    while game.has_pending_choice() {
-        game.select_indices(&[]);
-    }
+    // Answer what cannot be declined, decline what can: a mandatory
+    // prompt left parked mid-ability produces exactly the absence
+    // the next assertion checks, so nothing fails.
+    game.drain_choices();
 }
 
 /// Condition: Aqours live card other than MY舞☆TONIGHT → blade gained.

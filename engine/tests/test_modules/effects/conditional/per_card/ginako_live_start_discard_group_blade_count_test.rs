@@ -143,9 +143,10 @@ fn ginako_discard_non_ginako_gains_one_blade() {
     assert!(game.has_pending_choice(), "ab#1 optional discard");
     game.select_indices(&[0]);
 
-    while game.has_pending_choice() {
-        game.select_indices(&[]);
-    }
+    // Answer what cannot be declined, decline what can: a mandatory
+    // prompt left parked mid-ability produces exactly the absence
+    // the next assertion checks, so nothing fails.
+    game.drain_choices();
 
     let blade = game.state.mods.get_blade_modifier(ginako);
     assert_eq!(blade, 1);
@@ -172,9 +173,10 @@ fn ginako_skip_cost_gains_zero_blades() {
     assert!(game.has_pending_choice(), "ab#1 optional discard");
     game.select_indices(&[]);
 
-    while game.has_pending_choice() {
-        game.select_indices(&[]);
-    }
+    // Answer what cannot be declined, decline what can: a mandatory
+    // prompt left parked mid-ability produces exactly the absence
+    // the next assertion checks, so nothing fails.
+    game.drain_choices();
 
     let blade = game.state.mods.get_blade_modifier(ginako);
     assert_eq!(blade, 0);
@@ -225,9 +227,10 @@ fn two_ginako_discard_one_gains_blade_on_self() {
             }
         }
     }
-    while game.has_pending_choice() {
-        game.select_indices(&[]);
-    }
+    // Answer what cannot be declined, decline what can: a mandatory
+    // prompt left parked mid-ability produces exactly the absence
+    // the next assertion checks, so nothing fails.
+    game.drain_choices();
 
     let blade1 = game.state.mods.get_blade_modifier(ginako1);
     let blade2 = game.state.mods.get_blade_modifier(ginako2);

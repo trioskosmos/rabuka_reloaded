@@ -29,9 +29,10 @@ fn distinct_group_activation_discount_q228_four_unique_groups_cost_zero() {
 
     game.activate_ability(umi);
 
-    while game.has_pending_choice() {
-        game.select_indices(&[]);
-    }
+    // Answer what cannot be declined, decline what can: a mandatory
+    // prompt left parked mid-ability produces exactly the absence
+    // the next assertion checks, so nothing fails.
+    game.drain_choices();
 
     let active = game.state.player1.energy_zone.active_count();
     assert_eq!(active, 0, "Cost=0, no active energy consumed");
@@ -49,9 +50,10 @@ fn distinct_group_activation_discount_q228_zero_cost_all_rarities() {
         game.state.player1.stage.stage = [umi, multi, -1];
         assert_eq!(game.state.distinct_stage_groups("p1"), 4);
         game.activate_ability(umi);
-        while game.has_pending_choice() {
-            game.select_indices(&[]);
-        }
+        // Answer what cannot be declined, decline what can: a mandatory
+        // prompt left parked mid-ability produces exactly the absence
+        // the next assertion checks, so nothing fails.
+        game.drain_choices();
 
         assert_eq!(
             game.state.player1.energy_zone.active_count(),
@@ -150,9 +152,10 @@ fn distinct_group_activation_discount_q228_reduction_charges_effective_cost() {
     );
 
     game.activate_ability(umi);
-    while game.has_pending_choice() {
-        game.select_indices(&[]);
-    }
+    // Answer what cannot be declined, decline what can: a mandatory
+    // prompt left parked mid-ability produces exactly the absence
+    // the next assertion checks, so nothing fails.
+    game.drain_choices();
 
     assert_eq!(
         game.state.player1.energy_zone.active_count(),
@@ -183,9 +186,10 @@ fn distinct_group_activation_selects_one_eligible_opponent_physical_instance() {
     game.activate_ability(umi);
     assert!(game.has_pending_choice());
     game.select_indices(&[1]);
-    while game.has_pending_choice() {
-        game.select_indices(&[]);
-    }
+    // Answer what cannot be declined, decline what can: a mandatory
+    // prompt left parked mid-ability produces exactly the absence
+    // the next assertion checks, so nothing fails.
+    game.drain_choices();
 
     assert_eq!(
         game.state.mods.get_orientation_modifier(target_b),

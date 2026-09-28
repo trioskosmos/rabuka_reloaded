@@ -170,9 +170,10 @@ fn riko_bp5_condition_met_increases_opponent_hearts() {
 
     game.play_to_stage(riko_bp5, MemberArea::RightSide);
 
-    while game.has_pending_choice() {
-        game.select_indices(&[]);
-    }
+    // Answer what cannot be declined, decline what can: a mandatory
+    // prompt left parked mid-ability produces exactly the absence
+    // the next assertion checks, so nothing fails.
+    game.drain_choices();
 
     let mod_val = game
         .state
@@ -205,9 +206,10 @@ fn riko_bp5_condition_not_met_does_nothing() {
 
     game.play_to_stage(riko_bp5, MemberArea::RightSide);
 
-    while game.has_pending_choice() {
-        game.select_indices(&[]);
-    }
+    // Answer what cannot be declined, decline what can: a mandatory
+    // prompt left parked mid-ability produces exactly the absence
+    // the next assertion checks, so nothing fails.
+    game.drain_choices();
 
     let mod_val = game
         .state

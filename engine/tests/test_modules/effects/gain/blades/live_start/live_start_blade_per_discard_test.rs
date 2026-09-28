@@ -83,9 +83,10 @@ fn triple_no_matching_zero_blades() {
     game.set_live_card(live);
     advance_to_live_start(&mut game);
 
-    while game.has_pending_choice() {
-        game.select_indices(&[]);
-    }
+    // Answer what cannot be declined, decline what can: a mandatory
+    // prompt left parked mid-ability produces exactly the absence
+    // the next assertion checks, so nothing fails.
+    game.drain_choices();
 
     let blade = game
         .state

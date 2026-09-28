@@ -187,9 +187,10 @@ fn mebius_does_not_fire_on_untied_scores() {
     // Transition through both performance phases.
     game.pass();
     game.pass();
-    while game.has_pending_choice() {
-        game.select_indices(&[]);
-    }
+    // Answer what cannot be declined, decline what can: a mandatory
+    // prompt left parked mid-ability produces exactly the absence
+    // the next assertion checks, so nothing fails.
+    game.drain_choices();
 
     advance_to_live_victory(&mut game);
     while game.has_pending_choice() {

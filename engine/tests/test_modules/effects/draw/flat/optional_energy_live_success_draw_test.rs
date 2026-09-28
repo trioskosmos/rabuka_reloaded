@@ -70,9 +70,10 @@ fn fire_live_success_and_answer(game: &mut TestGame, live: i16, pay: bool) {
         other => panic!("expected a pay/skip SelectTarget, got {other:?}"),
     }
     game.select_option(if pay { 1 } else { 0 });
-    while game.has_pending_choice() {
-        game.select_indices(&[]);
-    }
+    // Answer what cannot be declined, decline what can: a mandatory
+    // prompt left parked mid-ability produces exactly the absence
+    // the next assertion checks, so nothing fails.
+    game.drain_choices();
 }
 
 /// EEE live: paying draws exactly 1 and spends exactly 3 energy.
@@ -161,9 +162,10 @@ fn one_energy_live_success_with_zero_energy_neither_pays_nor_draws() {
     while game.has_pending_choice() {
         game.select_option(1);
     }
-    while game.has_pending_choice() {
-        game.select_indices(&[]);
-    }
+    // Answer what cannot be declined, decline what can: a mandatory
+    // prompt left parked mid-ability produces exactly the absence
+    // the next assertion checks, so nothing fails.
+    game.drain_choices();
 
     assert_eq!(
         game.state.player1.energy_zone.active_count(),

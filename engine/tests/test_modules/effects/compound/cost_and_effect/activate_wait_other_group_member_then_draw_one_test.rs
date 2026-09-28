@@ -32,9 +32,10 @@ fn wait_other_group_draw_self_excluded_no_other_group_cost_fails() {
     );
 
     // Drain any pending choices
-    while game.has_pending_choice() {
-        game.select_indices(&[]);
-    }
+    // Answer what cannot be declined, decline what can: a mandatory
+    // prompt left parked mid-ability produces exactly the absence
+    // the next assertion checks, so nothing fails.
+    game.drain_choices();
 
     // Cost should fail since exclude_self leaves no candidates.
     // The failed cost should not proceed to draw.

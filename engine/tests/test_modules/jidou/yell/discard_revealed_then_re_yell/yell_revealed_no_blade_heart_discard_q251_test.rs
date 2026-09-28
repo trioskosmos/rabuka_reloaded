@@ -186,9 +186,10 @@ fn yell_revealed_optional_discard_decline_keeps_member_revealed_q251() {
     game.select_indices(&[]); // skip
 
     // After skipping, drain any remaining auto-resolve choices (e.g. second action)
-    while game.has_pending_choice() {
-        game.select_indices(&[]);
-    }
+    // Answer what cannot be declined, decline what can: a mandatory
+    // prompt left parked mid-ability produces exactly the absence
+    // the next assertion checks, so nothing fails.
+    game.drain_choices();
     assert!(
         game.state.revealed_cards.contains(&m1),
         "Card stays in revealed_cards after skip"

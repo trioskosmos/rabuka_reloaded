@@ -67,9 +67,10 @@ fn own_effect_wait_of_cheap_opponent_after_debut_draws_one_q177() {
     );
     game.select_indices(&[0]);
     // Consume any remaining choices
-    while game.has_pending_choice() {
-        game.select_indices(&[]);
-    }
+    // Answer what cannot be declined, decline what can: a mandatory
+    // prompt left parked mid-ability produces exactly the absence
+    // the next assertion checks, so nothing fails.
+    game.drain_choices();
 
     // Ab#1 draws 1 → hand goes from 1 to 2
     assert_eq!(
@@ -128,9 +129,10 @@ fn declined_unit_wait_cost_leaves_expensive_opponent_active_and_no_draw() {
     );
     game.select_option(0); // skip → no effect fires
     // Cost was skipped → opponent action doesn't fire → no choice
-    while game.has_pending_choice() {
-        game.select_indices(&[]);
-    }
+    // Answer what cannot be declined, decline what can: a mandatory
+    // prompt left parked mid-ability produces exactly the absence
+    // the next assertion checks, so nothing fails.
+    game.drain_choices();
 
     // Member was NOT waited (cost wasn't paid)
     assert!(
@@ -218,9 +220,10 @@ fn declined_unit_wait_cost_with_empty_opponent_stage_draws_nothing() {
     );
     game.select_option(0);
     // Opponent has no members → no pending choice after skip
-    while game.has_pending_choice() {
-        game.select_indices(&[]);
-    }
+    // Answer what cannot be declined, decline what can: a mandatory
+    // prompt left parked mid-ability produces exactly the absence
+    // the next assertion checks, so nothing fails.
+    game.drain_choices();
 
     assert_eq!(
         game.state.player1.hand.cards.len(),

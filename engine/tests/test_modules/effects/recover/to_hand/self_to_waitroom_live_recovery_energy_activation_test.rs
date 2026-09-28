@@ -119,9 +119,10 @@ fn self_to_waitroom_cost_paid_without_recoverable_live_pl_s_bp3_008_r() {
     game.add_to_discard(game.new_id(FILLER));
 
     game.activate_ability(mari);
-    while game.has_pending_choice() {
-        game.select_indices(&[]);
-    }
+    // Answer what cannot be declined, decline what can: a mandatory
+    // prompt left parked mid-ability produces exactly the absence
+    // the next assertion checks, so nothing fails.
+    game.drain_choices();
     assert!(
         game.state.player1.waitroom.cards.contains(&mari),
         "Q123: usable — cost was paid"

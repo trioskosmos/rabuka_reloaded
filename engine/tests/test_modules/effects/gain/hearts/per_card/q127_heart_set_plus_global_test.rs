@@ -80,9 +80,10 @@ fn q127_wien_plus1_stacks_on_bloom_set() {
     );
     game.select_option(0); // heart01 pattern: heart01×2 + heart0×1
 
-    while game.has_pending_choice() {
-        game.select_indices(&[]);
-    }
+    // Answer what cannot be declined, decline what can: a mandatory
+    // prompt left parked mid-ability produces exactly the absence
+    // the next assertion checks, so nothing fails.
+    game.drain_choices();
 
     let bloom_id = game.state.player1.live_card_zone.cards[0];
 
@@ -161,9 +162,10 @@ fn q127_wien_plus1_stacks_on_hareruya_set() {
     game.set_live_card(hareruya);
     advance_to_live_start(&mut game);
 
-    while game.has_pending_choice() {
-        game.select_indices(&[]);
-    }
+    // Answer what cannot be declined, decline what can: a mandatory
+    // prompt left parked mid-ability produces exactly the absence
+    // the next assertion checks, so nothing fails.
+    game.drain_choices();
 
     let hareruya_id = game.state.player1.live_card_zone.cards[0];
 
@@ -228,9 +230,10 @@ fn q127_two_wien_stack_plus2_heart00() {
     assert!(game.has_pending_choice());
     game.select_option(0); // heart01 pattern
 
-    while game.has_pending_choice() {
-        game.select_indices(&[]);
-    }
+    // Answer what cannot be declined, decline what can: a mandatory
+    // prompt left parked mid-ability produces exactly the absence
+    // the next assertion checks, so nothing fails.
+    game.drain_choices();
 
     let bloom_id = game.state.player1.live_card_zone.cards[0];
 
@@ -274,9 +277,10 @@ fn q127_wien_leaves_stage_modifier_removed() {
     assert!(game.has_pending_choice());
     game.select_option(0);
 
-    while game.has_pending_choice() {
-        game.select_indices(&[]);
-    }
+    // Answer what cannot be declined, decline what can: a mandatory
+    // prompt left parked mid-ability produces exactly the absence
+    // the next assertion checks, so nothing fails.
+    game.drain_choices();
 
     let bloom_id = game.state.player1.live_card_zone.cards[0];
 
@@ -359,9 +363,10 @@ fn q127_wien_adds_heart00_not_in_set() {
     game.set_live_card(hareruya);
     advance_to_live_start(&mut game);
 
-    while game.has_pending_choice() {
-        game.select_indices(&[]);
-    }
+    // Answer what cannot be declined, decline what can: a mandatory
+    // prompt left parked mid-ability produces exactly the absence
+    // the next assertion checks, so nothing fails.
+    game.drain_choices();
 
     let hareruya_id = game.state.player1.live_card_zone.cards[0];
 
@@ -423,9 +428,10 @@ fn q127_wien_only_affects_heart00() {
     assert!(game.has_pending_choice());
     game.select_option(0); // heart01 pattern
 
-    while game.has_pending_choice() {
-        game.select_indices(&[]);
-    }
+    // Answer what cannot be declined, decline what can: a mandatory
+    // prompt left parked mid-ability produces exactly the absence
+    // the next assertion checks, so nothing fails.
+    game.drain_choices();
 
     let bloom_id = game.state.player1.live_card_zone.cards[0];
 
@@ -489,9 +495,10 @@ fn q127_wien_plus_bloom_heart04_pattern() {
     assert!(game.has_pending_choice());
     game.select_option(1); // heart04 pattern: heart04×2 + heart0×1
 
-    while game.has_pending_choice() {
-        game.select_indices(&[]);
-    }
+    // Answer what cannot be declined, decline what can: a mandatory
+    // prompt left parked mid-ability produces exactly the absence
+    // the next assertion checks, so nothing fails.
+    game.drain_choices();
 
     let bloom_id = game.state.player1.live_card_zone.cards[0];
 
@@ -543,9 +550,10 @@ fn q127_wien_plus_bloom_heart05_pattern() {
     assert!(game.has_pending_choice());
     game.select_option(2); // heart05 pattern: heart05×2 + heart0×1
 
-    while game.has_pending_choice() {
-        game.select_indices(&[]);
-    }
+    // Answer what cannot be declined, decline what can: a mandatory
+    // prompt left parked mid-ability produces exactly the absence
+    // the next assertion checks, so nothing fails.
+    game.drain_choices();
 
     let bloom_id = game.state.player1.live_card_zone.cards[0];
 
@@ -596,9 +604,10 @@ fn q127_no_wien_bloom_set_standalone() {
     assert!(game.has_pending_choice());
     game.select_option(0); // heart01 pattern
 
-    while game.has_pending_choice() {
-        game.select_indices(&[]);
-    }
+    // Answer what cannot be declined, decline what can: a mandatory
+    // prompt left parked mid-ability produces exactly the absence
+    // the next assertion checks, so nothing fails.
+    game.drain_choices();
 
     let bloom_id = game.state.player1.live_card_zone.cards[0];
 
@@ -642,9 +651,10 @@ fn q127_build_card_needs_set_plus_additive() {
     assert!(game.has_pending_choice());
     game.select_option(0);
 
-    while game.has_pending_choice() {
-        game.select_indices(&[]);
-    }
+    // Answer what cannot be declined, decline what can: a mandatory
+    // prompt left parked mid-ability produces exactly the absence
+    // the next assertion checks, so nothing fails.
+    game.drain_choices();
 
     let bloom_id = game.state.player1.live_card_zone.cards[0];
     let card = game.db.get_card(bloom_id).expect("card should exist");

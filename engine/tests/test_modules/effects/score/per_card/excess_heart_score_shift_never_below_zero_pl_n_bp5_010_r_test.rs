@@ -43,9 +43,10 @@ fn mifune_q231_excess_heart_2_score_cancels_to_0() {
     game.pass();
 
     // Consume any residual choices from the live phase / ability triggers
-    while game.has_pending_choice() {
-        game.select_indices(&[]);
-    }
+    // Answer what cannot be declined, decline what can: a mandatory
+    // prompt left parked mid-ability produces exactly the absence
+    // the next assertion checks, so nothing fails.
+    game.drain_choices();
 
     // The ability should have applied both +1 score and -1 penalty (net 0)
     let mod_val = game.state.mods.get_score_modifier(mifune);
@@ -86,9 +87,10 @@ fn mifune_q231_excess_heart_2_score_cancels_to_0_all_rarities() {
         // checks are applied there, and "5 passes after setting" only happens
         // to be that window today.
         game.advance_to_phase(rabuka_engine::game_state::Phase::FirstAttackerPerformance);
-        while game.has_pending_choice() {
-            game.select_indices(&[]);
-        }
+        // Answer what cannot be declined, decline what can: a mandatory
+        // prompt left parked mid-ability produces exactly the absence
+        // the next assertion checks, so nothing fails.
+        game.drain_choices();
 
         assert_eq!(
             game.state.mods.get_score_modifier(mifune),

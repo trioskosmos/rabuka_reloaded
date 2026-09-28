@@ -110,9 +110,10 @@ fn run(game: &mut TestGame, p1_reveals: usize, p2_reveals: usize) -> Run {
     let deck_before = game.state.player1.main_deck.cards.len();
     TurnEngine::trigger_live_success_abilities(&mut game.state, "p1");
     game.state.process_pending_auto_abilities("p1");
-    while game.has_pending_choice() {
-        game.select_indices(&[]);
-    }
+    // Answer what cannot be declined, decline what can: a mandatory
+    // prompt left parked mid-ability produces exactly the absence
+    // the next assertion checks, so nothing fails.
+    game.drain_choices();
 
     let log: Vec<String> = game
         .state
@@ -274,9 +275,10 @@ fn the_live_cards_own_draw_only_happens_inside_the_open_window() {
     let deck_before = game.state.player1.main_deck.cards.len();
     TurnEngine::trigger_live_success_abilities(&mut game.state, "p1");
     game.state.process_pending_auto_abilities("p1");
-    while game.has_pending_choice() {
-        game.select_indices(&[]);
-    }
+    // Answer what cannot be declined, decline what can: a mandatory
+    // prompt left parked mid-ability produces exactly the absence
+    // the next assertion checks, so nothing fails.
+    game.drain_choices();
 
     assert_eq!(
         game.state.player1.main_deck.cards.len(),

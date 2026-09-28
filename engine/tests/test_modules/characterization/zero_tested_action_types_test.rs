@@ -141,9 +141,10 @@ fn vivid_world_live_phase_blade_and_success() {
         "VIVID WORLD ab#0: blade_type_modifiers set on stage"
     );
 
-    while game.has_pending_choice() {
-        game.select_indices(&[]);
-    }
+    // Answer what cannot be declined, decline what can: a mandatory
+    // prompt left parked mid-ability produces exactly the absence
+    // the next assertion checks, so nothing fails.
+    game.drain_choices();
     game.pass();
     game.pass();
     game.pass();
@@ -298,9 +299,10 @@ fn natsumi_sunshine_pay_any_energy_for_score() {
     game.pass();
     game.pass();
 
-    while game.has_pending_choice() {
-        game.select_indices(&[]);
-    }
+    // Answer what cannot be declined, decline what can: a mandatory
+    // prompt left parked mid-ability produces exactly the absence
+    // the next assertion checks, so nothing fails.
+    game.drain_choices();
 
     game.pass();
     game.pass();
@@ -372,15 +374,17 @@ fn vitamin_summer_live_success_hand_condition() {
     game.set_live_card(live);
     game.pass();
     game.pass();
-    while game.has_pending_choice() {
-        game.select_indices(&[]);
-    }
+    // Answer what cannot be declined, decline what can: a mandatory
+    // prompt left parked mid-ability produces exactly the absence
+    // the next assertion checks, so nothing fails.
+    game.drain_choices();
     game.pass();
     game.pass();
     game.pass();
-    while game.has_pending_choice() {
-        game.select_indices(&[]);
-    }
+    // Answer what cannot be declined, decline what can: a mandatory
+    // prompt left parked mid-ability produces exactly the absence
+    // the next assertion checks, so nothing fails.
+    game.drain_choices();
 
     assert_eq!(
         game.state.mods.get_score_modifier(live),

@@ -29,9 +29,11 @@ fn cutie_panther_live_start_reduce_hearts() {
     // Step to the performance phase BY NAME: the ライブ開始時 scan happens there,
     // and a fixed pass count would silently walk past it if a phase changed.
     game.advance_to_phase(rabuka_engine::game_state::Phase::FirstAttackerPerformance);
-    while game.has_pending_choice() {
-        game.select_indices(&[]);
-    }
+    // Answer what cannot be declined, decline what can: a mandatory prompt
+    // left parked mid-ability, and the absence assertion that usually
+    // follows is exactly what a wrong answer produces.
+    game.drain_choices();
+
     use rabuka_engine::card::HeartColor;
     assert_eq!(
         game.state.mods.get_need_heart_modifier(cutie, HeartColor::Heart00),

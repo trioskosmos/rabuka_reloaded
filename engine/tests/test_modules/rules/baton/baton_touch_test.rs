@@ -105,9 +105,10 @@ fn baton_touch_does_not_lock_all_full_lanes() {
     game.state.player1.hand.cards.push(second_arriver);
 
     game.play_to_stage(first_arriver, MemberArea::Center);
-    while game.has_pending_choice() {
-        game.select_indices(&[]);
-    }
+    // Answer what cannot be declined, decline what can: a mandatory
+    // prompt left parked mid-ability produces exactly the absence
+    // the next assertion checks, so nothing fails.
+    game.drain_choices();
 
     let actions = generate_possible_actions(&game.state);
     let second_action = actions
@@ -155,9 +156,10 @@ fn baton_touch_hanaho_auto_ability_triggers() {
     game.state.player1.hand.cards.push(arriver);
     game.state.player1.hand.cards.push(filler);
     game.play_to_stage(arriver, rabuka_engine::zones::MemberArea::Center);
-    while game.has_pending_choice() {
-        game.select_indices(&[]);
-    }
+    // Answer what cannot be declined, decline what can: a mandatory
+    // prompt left parked mid-ability produces exactly the absence
+    // the next assertion checks, so nothing fails.
+    game.drain_choices();
 
     assert!(
         game.state.player1.waitroom.cards.contains(&hanaho),
@@ -202,9 +204,10 @@ fn baton_touch_count_per_player() {
     );
 
     game.play_to_stage(arriver, rabuka_engine::zones::MemberArea::Center);
-    while game.has_pending_choice() {
-        game.select_indices(&[]);
-    }
+    // Answer what cannot be declined, decline what can: a mandatory
+    // prompt left parked mid-ability produces exactly the absence
+    // the next assertion checks, so nothing fails.
+    game.drain_choices();
 
     assert_eq!(
         game.state.get_baton_touch_count("p1"),
@@ -239,9 +242,10 @@ fn baton_touch_arriving_card_ids_tracked() {
     );
 
     game.play_to_stage(arriver, rabuka_engine::zones::MemberArea::Center);
-    while game.has_pending_choice() {
-        game.select_indices(&[]);
-    }
+    // Answer what cannot be declined, decline what can: a mandatory
+    // prompt left parked mid-ability produces exactly the absence
+    // the next assertion checks, so nothing fails.
+    game.drain_choices();
 
     assert!(
         game.state.baton_touch_arriving_card_ids.contains(&arriver),
@@ -278,9 +282,10 @@ fn opponent_baton_touch_discard_does_not_trigger() {
 
     // Perform baton touch from P1's hand
     game.play_to_stage(arriver, rabuka_engine::zones::MemberArea::Center);
-    while game.has_pending_choice() {
-        game.select_indices(&[]);
-    }
+    // Answer what cannot be declined, decline what can: a mandatory
+    // prompt left parked mid-ability produces exactly the absence
+    // the next assertion checks, so nothing fails.
+    game.drain_choices();
 
     // P1's hanaho was replaced and should have triggered (activate 2 energy for P1)
     // P2's hanaho should NOT have triggered even though it's in the waitroom,

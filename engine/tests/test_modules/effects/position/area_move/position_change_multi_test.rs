@@ -698,9 +698,10 @@ fn formation_change_destination_excludes_already_claimed_area() {
     // collisions and matches the plan.
     let left_idx = second_opts.iter().position(|o| o == "left").unwrap();
     game.select_option(left_idx as i16);
-    while game.has_pending_choice() {
-        game.select_indices(&[]);
-    }
+    // Answer what cannot be declined, decline what can: a mandatory
+    // prompt left parked mid-ability produces exactly the absence
+    // the next assertion checks, so nothing fails.
+    game.drain_choices();
 
     let st = game.state.player1.stage.stage;
     assert_eq!(

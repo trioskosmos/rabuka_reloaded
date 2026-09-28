@@ -67,9 +67,10 @@ fn live_phase_group_wait_decline_discard_stays_wait() {
 
     assert!(game.has_pending_choice(), "optional discard prompted");
     game.select_indices(&[]);
-    while game.has_pending_choice() {
-        game.select_indices(&[]);
-    }
+    // Answer what cannot be declined, decline what can: a mandatory
+    // prompt left parked mid-ability produces exactly the absence
+    // the next assertion checks, so nothing fails.
+    game.drain_choices();
     assert_eq!(
         game.state.mods.orientation_modifiers.get(&waited),
         Some(&CardOrientation::Wait),

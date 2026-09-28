@@ -799,9 +799,10 @@ fn sayaka_q243_max_three_per_activation_recounts() {
 
     // First activation: 2 under → max=3 → heart05+2
     trigger_sayaka_live_start(&mut game, sayaka);
-    while game.has_pending_choice() {
-        game.select_indices(&[]);
-    }
+    // Answer what cannot be declined, decline what can: a mandatory
+    // prompt left parked mid-ability produces exactly the absence
+    // the next assertion checks, so nothing fails.
+    game.drain_choices();
 
     let heart_1 = game
         .state
@@ -832,9 +833,10 @@ fn sayaka_q243_max_three_per_activation_recounts() {
 
     // Second activation: 5 under → max=3 → heart05+3 (new cards counted)
     trigger_sayaka_live_start(&mut game, sayaka);
-    while game.has_pending_choice() {
-        game.select_indices(&[]);
-    }
+    // Answer what cannot be declined, decline what can: a mandatory
+    // prompt left parked mid-ability produces exactly the absence
+    // the next assertion checks, so nothing fails.
+    game.drain_choices();
 
     let heart_total = game
         .state
@@ -848,9 +850,10 @@ fn sayaka_q243_max_three_per_activation_recounts() {
 
     // Edge: third activation with no new under-cards → still counts 3
     trigger_sayaka_live_start(&mut game, sayaka);
-    while game.has_pending_choice() {
-        game.select_indices(&[]);
-    }
+    // Answer what cannot be declined, decline what can: a mandatory
+    // prompt left parked mid-ability produces exactly the absence
+    // the next assertion checks, so nothing fails.
+    game.drain_choices();
 
     let heart_final = game
         .state

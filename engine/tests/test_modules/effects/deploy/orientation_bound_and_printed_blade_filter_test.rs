@@ -108,9 +108,10 @@ fn izumi_waits_every_member_on_both_stages_whose_printed_blades_are_three_or_few
     // Play her into a free p1 slot; the effect then covers BOTH stages.
     game.state.player1.stage.stage[2] = -1;
     game.play_to_stage(izumi, MemberArea::RightSide);
-    while game.has_pending_choice() {
-        game.select_indices(&[]);
-    }
+    // Answer what cannot be declined, decline what can: a mandatory
+    // prompt left parked mid-ability produces exactly the absence
+    // the next assertion checks, so nothing fails.
+    game.drain_choices();
 
     // `自分と相手のステージ` — the opponent's members are included.
     assert_eq!(
@@ -191,9 +192,10 @@ fn izumi_judges_the_printed_blade_count_not_a_modified_one() {
     game.add_to_hand(izumi);
     game.give_energy(20);
     game.play_to_stage(izumi, MemberArea::Center);
-    while game.has_pending_choice() {
-        game.select_indices(&[]);
-    }
+    // Answer what cannot be declined, decline what can: a mandatory
+    // prompt left parked mid-ability produces exactly the absence
+    // the next assertion checks, so nothing fails.
+    game.drain_choices();
 
     assert_eq!(
         orientation(&game, two),

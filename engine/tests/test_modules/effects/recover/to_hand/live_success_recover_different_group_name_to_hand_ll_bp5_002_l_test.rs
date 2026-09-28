@@ -100,9 +100,10 @@ fn three_distinct_groups_center_gets_all_hearts() {
     advance_to_live_card_set_p1(&mut game);
     game.set_live_card(live);
     advance_to_live_start(&mut game);
-    while game.has_pending_choice() {
-        game.select_indices(&[]);
-    }
+    // Answer what cannot be declined, decline what can: a mandatory
+    // prompt left parked mid-ability produces exactly the absence
+    // the next assertion checks, so nothing fails.
+    game.drain_choices();
 
     let hm = game.state.mods.heart_modifiers.get(&aqours);
     assert!(hm.is_some(), "Center (Aqours) should have heart modifier");
@@ -151,9 +152,10 @@ fn two_distinct_groups_no_effect() {
     advance_to_live_card_set_p1(&mut game);
     game.set_live_card(live);
     advance_to_live_start(&mut game);
-    while game.has_pending_choice() {
-        game.select_indices(&[]);
-    }
+    // Answer what cannot be declined, decline what can: a mandatory
+    // prompt left parked mid-ability produces exactly the absence
+    // the next assertion checks, so nothing fails.
+    game.drain_choices();
 
     for (i, &member) in game.state.player1.stage.stage.iter().enumerate() {
         assert_eq!(
@@ -215,9 +217,10 @@ fn all_same_group_no_effect() {
     advance_to_live_card_set_p1(&mut game);
     game.set_live_card(live);
     advance_to_live_start(&mut game);
-    while game.has_pending_choice() {
-        game.select_indices(&[]);
-    }
+    // Answer what cannot be declined, decline what can: a mandatory
+    // prompt left parked mid-ability produces exactly the absence
+    // the next assertion checks, so nothing fails.
+    game.drain_choices();
 
     // The claim is a granted AMOUNT, not the absence of a map entry: a
     // zero-valued entry for every colour would satisfy `is_none()` while the
@@ -256,9 +259,10 @@ fn center_empty_no_effect() {
     advance_to_live_card_set_p1(&mut game);
     game.set_live_card(live);
     advance_to_live_start(&mut game);
-    while game.has_pending_choice() {
-        game.select_indices(&[]);
-    }
+    // Answer what cannot be declined, decline what can: a mandatory
+    // prompt left parked mid-ability produces exactly the absence
+    // the next assertion checks, so nothing fails.
+    game.drain_choices();
 
     // "Empty center → no effect" means NOBODY gained a heart, not that the
     // sentinel id -1 has no modifier. The old assertion keyed on -1, which is
@@ -310,9 +314,10 @@ fn multi_name_card_single_slot_one_group_not_three() {
     advance_to_live_card_set_p1(&mut game);
     game.set_live_card(live);
     advance_to_live_start(&mut game);
-    while game.has_pending_choice() {
-        game.select_indices(&[]);
-    }
+    // Answer what cannot be declined, decline what can: a mandatory
+    // prompt left parked mid-ability produces exactly the absence
+    // the next assertion checks, so nothing fails.
+    game.drain_choices();
 
     // Q105: one multi-name card = one group → 3-group condition fails.
     // `is_none()` on a HashMap entry only proves no ENTRY exists; a zero-valued
@@ -353,9 +358,10 @@ fn q225_joint_card_counts_as_one_member() {
     advance_to_live_card_set_p1(&mut game);
     game.set_live_card(live);
     advance_to_live_start(&mut game);
-    while game.has_pending_choice() {
-        game.select_indices(&[]);
-    }
+    // Answer what cannot be declined, decline what can: a mandatory
+    // prompt left parked mid-ability produces exactly the absence
+    // the next assertion checks, so nothing fails.
+    game.drain_choices();
 
     assert!(
         !has_all_heart(&game, joint),
@@ -381,9 +387,10 @@ fn q225_joint_cards_can_supply_distinct_groups() {
     advance_to_live_card_set_p1(&mut game);
     game.set_live_card(live);
     advance_to_live_start(&mut game);
-    while game.has_pending_choice() {
-        game.select_indices(&[]);
-    }
+    // Answer what cannot be declined, decline what can: a mandatory
+    // prompt left parked mid-ability produces exactly the absence
+    // the next assertion checks, so nothing fails.
+    game.drain_choices();
 
     assert!(
         has_all_heart(&game, joint2),

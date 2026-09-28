@@ -59,9 +59,10 @@ fn baton_touch_blocked_on_arrival_turn_allowed_next_turn() {
     {
         guard += 1;
         game.pass();
-        while game.has_pending_choice() {
-            game.select_indices(&[]);
-        }
+        // Answer what cannot be declined, decline what can: a mandatory
+        // prompt left parked mid-ability produces exactly the absence
+        // the next assertion checks, so nothing fails.
+        game.drain_choices();
     }
 
     game.try_play_to_stage_for(Side::P1, second, MemberArea::LeftSide)

@@ -49,9 +49,10 @@ fn nozomi_bp3_007_live_start_with_empty_hand_skips_discard_cost_and_look() {
         !game.has_pending_choice(),
         "empty hand → optional 2-discard auto-skips, must not prompt"
     );
-    while game.has_pending_choice() {
-        game.select_indices(&[]);
-    }
+    // Answer what cannot be declined, decline what can: a mandatory
+    // prompt left parked mid-ability produces exactly the absence
+    // the next assertion checks, so nothing fails.
+    game.drain_choices();
 
     assert_eq!(
         game.state.player1.main_deck.cards.len(),

@@ -55,9 +55,10 @@ fn trigger_mei_live_success(game: &mut TestGame, mei: i16) {
     );
     game.state.activating_card = Some(mei);
     game.state.process_pending_auto_abilities(&pid);
-    while game.has_pending_choice() {
-        game.select_indices(&[]);
-    }
+    // Answer what cannot be declined, decline what can: a mandatory
+    // prompt left parked mid-ability produces exactly the absence
+    // the next assertion checks, so nothing fails.
+    game.drain_choices();
 }
 
 fn trigger_mei_energy_activation(game: &mut TestGame, mei: i16) {
@@ -81,9 +82,10 @@ fn trigger_mei_energy_activation(game: &mut TestGame, mei: i16) {
     );
     game.state.activating_card = Some(mei);
     game.state.process_pending_auto_abilities(&pid);
-    while game.has_pending_choice() {
-        game.select_indices(&[]);
-    }
+    // Answer what cannot be declined, decline what can: a mandatory
+    // prompt left parked mid-ability produces exactly the absence
+    // the next assertion checks, so nothing fails.
+    game.drain_choices();
 }
 
 // ====================================================================

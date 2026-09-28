@@ -37,13 +37,15 @@ fn discard_group_member_placed_under_self_on_live_success() {
     advance_to_live_card_set_p1(&mut game);
     game.set_live_card(live);
     advance_to_live_start(&mut game);
-    while game.has_pending_choice() {
-        game.select_indices(&[]);
-    }
+    // Answer what cannot be declined, decline what can: a mandatory
+    // prompt left parked mid-ability produces exactly the absence
+    // the next assertion checks, so nothing fails.
+    game.drain_choices();
     advance_to_live_victory(&mut game);
-    while game.has_pending_choice() {
-        game.select_indices(&[]);
-    }
+    // Answer what cannot be declined, decline what can: a mandatory
+    // prompt left parked mid-ability produces exactly the absence
+    // the next assertion checks, so nothing fails.
+    game.drain_choices();
     game.pass();
 
     assert_eq!(

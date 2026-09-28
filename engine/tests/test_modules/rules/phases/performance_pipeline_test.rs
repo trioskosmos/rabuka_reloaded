@@ -64,9 +64,10 @@ fn performance_pipeline_blade_yell_heart_score() {
     game.pass();
 
     // Handle any pending choices (live-start triggers etc.)
-    while game.has_pending_choice() {
-        game.select_indices(&[]);
-    }
+    // Answer what cannot be declined, decline what can: a mandatory
+    // prompt left parked mid-ability produces exactly the absence
+    // the next assertion checks, so nothing fails.
+    game.drain_choices();
 
     // Now advance through remaining phases
     game.pass(); // → SecondAttackerPerformance
@@ -174,9 +175,10 @@ fn performance_pipeline_fail_when_hearts_insufficient() {
     game.pass();
     game.pass();
 
-    while game.has_pending_choice() {
-        game.select_indices(&[]);
-    }
+    // Answer what cannot be declined, decline what can: a mandatory
+    // prompt left parked mid-ability produces exactly the absence
+    // the next assertion checks, so nothing fails.
+    game.drain_choices();
     game.pass();
     game.pass();
     game.pass();
@@ -246,9 +248,10 @@ fn heart00_passes_check_fails_when_insufficient() {
     game.pass();
     game.pass();
 
-    while game.has_pending_choice() {
-        game.select_indices(&[]);
-    }
+    // Answer what cannot be declined, decline what can: a mandatory
+    // prompt left parked mid-ability produces exactly the absence
+    // the next assertion checks, so nothing fails.
+    game.drain_choices();
     game.pass();
     game.pass();
     game.pass();
@@ -314,9 +317,10 @@ fn heart00_passes_check_succeeds_when_sufficient() {
     game.pass();
     game.pass();
 
-    while game.has_pending_choice() {
-        game.select_indices(&[]);
-    }
+    // Answer what cannot be declined, decline what can: a mandatory
+    // prompt left parked mid-ability produces exactly the absence
+    // the next assertion checks, so nothing fails.
+    game.drain_choices();
     game.pass();
     game.pass();
     game.pass();
@@ -371,9 +375,10 @@ fn live_card_base_score_stored_correctly() {
     game.pass();
     game.pass();
 
-    while game.has_pending_choice() {
-        game.select_indices(&[]);
-    }
+    // Answer what cannot be declined, decline what can: a mandatory
+    // prompt left parked mid-ability produces exactly the absence
+    // the next assertion checks, so nothing fails.
+    game.drain_choices();
     game.pass();
     game.pass();
     game.pass();

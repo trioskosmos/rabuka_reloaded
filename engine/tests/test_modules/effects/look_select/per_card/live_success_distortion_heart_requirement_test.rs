@@ -138,9 +138,10 @@ fn distortion_three_distinct_catchu_reduces_and_scores() {
     advance_to_live_card_set_p1(&mut game);
     advance_to_live_start(&mut game);
 
-    while game.has_pending_choice() {
-        game.select_indices(&[]);
-    }
+    // Answer what cannot be declined, decline what can: a mandatory
+    // prompt left parked mid-ability produces exactly the absence
+    // the next assertion checks, so nothing fails.
+    game.drain_choices();
 
     let after_h00 = need_heart(&game, live, HeartColor::Heart00);
     let after_h02 = need_heart(&game, live, HeartColor::Heart02);
@@ -160,9 +161,10 @@ fn distortion_one_catchu_no_score_gate_not_met() {
     let (mut game, live) = setup_with_members(&["PL!SP-bp1-012-N"]);
     advance_to_live_card_set_p1(&mut game);
     advance_to_live_start(&mut game);
-    while game.has_pending_choice() {
-        game.select_indices(&[]);
-    }
+    // Answer what cannot be declined, decline what can: a mandatory
+    // prompt left parked mid-ability produces exactly the absence
+    // the next assertion checks, so nothing fails.
+    game.drain_choices();
     let after_h00 = need_heart(&game, live, HeartColor::Heart00);
     let after_h02 = need_heart(&game, live, HeartColor::Heart02);
     assert_eq!(after_h00, 7, "heart00 9-2*1=7");
@@ -193,9 +195,10 @@ fn distortion_duplicate_names_dedupe() {
     );
     advance_to_live_card_set_p1(&mut game);
     advance_to_live_start(&mut game);
-    while game.has_pending_choice() {
-        game.select_indices(&[]);
-    }
+    // Answer what cannot be declined, decline what can: a mandatory
+    // prompt left parked mid-ability produces exactly the absence
+    // the next assertion checks, so nothing fails.
+    game.drain_choices();
     let after_h00 = need_heart(&game, live, HeartColor::Heart00);
     let after_h02 = need_heart(&game, live, HeartColor::Heart02);
     assert_eq!(after_h00, 7, "duplicate names → 1 unit: 9-2=7");
@@ -209,9 +212,10 @@ fn distortion_no_catchu_no_change() {
     let (mut game, live) = setup_with_members(&["PL!-sd1-010-SD"]);
     advance_to_live_card_set_p1(&mut game);
     advance_to_live_start(&mut game);
-    while game.has_pending_choice() {
-        game.select_indices(&[]);
-    }
+    // Answer what cannot be declined, decline what can: a mandatory
+    // prompt left parked mid-ability produces exactly the absence
+    // the next assertion checks, so nothing fails.
+    game.drain_choices();
     assert_eq!(need_heart(&game, live, HeartColor::Heart00), 9, "unchanged");
     assert_eq!(need_heart(&game, live, HeartColor::Heart02), 6, "unchanged");
     assert_eq!(live_score_mod(&game, live), 0);

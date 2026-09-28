@@ -187,9 +187,10 @@ fn pl_s_bp7_020_l_reduction_honored_at_performance_end_to_end() {
     game.advance_to_phase(rabuka_engine::game_state::Phase::LiveCardSetFirstAttacker);
     game.set_live_card(hpt);
     game.advance_to_phase(rabuka_engine::game_state::Phase::FirstAttackerPerformance);
-    while game.has_pending_choice() {
-        game.select_indices(&[]);
-    }
+    // Answer what cannot be declined, decline what can: a mandatory
+    // prompt left parked mid-ability produces exactly the absence
+    // the next assertion checks, so nothing fails.
+    game.drain_choices();
 
     assert_eq!(
         need_mod(&game, hpt),
@@ -200,9 +201,10 @@ fn pl_s_bp7_020_l_reduction_honored_at_performance_end_to_end() {
     // "Run the live to its end" said by name, so the snapshot below is read at
     // the performance close rather than seven steps after wherever we started.
     game.advance_to_phase(rabuka_engine::game_state::Phase::Active);
-    while game.has_pending_choice() {
-        game.select_indices(&[]);
-    }
+    // Answer what cannot be declined, decline what can: a mandatory
+    // prompt left parked mid-ability produces exactly the absence
+    // the next assertion checks, so nothing fails.
+    game.drain_choices();
 
     let snap = game
         .state

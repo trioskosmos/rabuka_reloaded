@@ -132,9 +132,10 @@ fn discard_low_cost_group_member_trigger_debut_center_gate_fails_in_waitroom_q10
     game.select_indices(&[0]);
 
     // Drain any remaining choices (debut ability activation followup, etc.)
-    while game.has_pending_choice() {
-        game.select_indices(&[]);
-    }
+    // Answer what cannot be declined, decline what can: a mandatory
+    // prompt left parked mid-ability produces exactly the absence
+    // the next assertion checks, so nothing fails.
+    game.drain_choices();
 
     // Sumire should be in discard (cost paid)
     assert!(
@@ -189,9 +190,10 @@ fn discard_low_cost_group_member_trigger_debut_center_gate_fails_for_all_kinako_
 
         assert!(game.has_pending_choice(), "{card_no}: cost prompt");
         game.select_indices(&[0]);
-        while game.has_pending_choice() {
-            game.select_indices(&[]);
-        }
+        // Answer what cannot be declined, decline what can: a mandatory
+        // prompt left parked mid-ability produces exactly the absence
+        // the next assertion checks, so nothing fails.
+        game.drain_choices();
 
         assert!(
             game.state.player1.waitroom.cards.contains(&sumire),
@@ -248,9 +250,10 @@ fn discard_low_cost_group_member_trigger_debut_non_center_cost_card_reaches_wait
     );
     game.select_indices(&[0]);
     // Drain followup: if the debut ability triggers additional choices
-    while game.has_pending_choice() {
-        game.select_indices(&[]);
-    }
+    // Answer what cannot be declined, decline what can: a mandatory
+    // prompt left parked mid-ability produces exactly the absence
+    // the next assertion checks, so nothing fails.
+    game.drain_choices();
 
     assert!(
         game.state.player1.waitroom.cards.contains(&debut_card),

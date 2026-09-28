@@ -87,9 +87,10 @@ fn reveal_and_resolve(game: &mut TestGame, chisato: i16, pick: usize) -> bool {
     }
     let picks: Vec<usize> = (0..pick).collect();
     game.select_indices(&picks);
-    while game.has_pending_choice() {
-        game.select_indices(&[]);
-    }
+    // Answer what cannot be declined, decline what can: a mandatory
+    // prompt left parked mid-ability produces exactly the absence
+    // the next assertion checks, so nothing fails.
+    game.drain_choices();
     true
 }
 
@@ -217,9 +218,10 @@ fn reveal_hand_cost_total_turn1_blocks_second() {
         game.try_activate_ability(chisato).is_err(),
         "the second activation must be refused, got Ok"
     );
-    while game.has_pending_choice() {
-        game.select_indices(&[]);
-    }
+    // Answer what cannot be declined, decline what can: a mandatory
+    // prompt left parked mid-ability produces exactly the absence
+    // the next assertion checks, so nothing fails.
+    game.drain_choices();
     assert_eq!(
         game.state.mods.p1_constant_total_score_bonus,
         1,

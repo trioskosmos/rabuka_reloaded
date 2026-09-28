@@ -184,9 +184,10 @@ fn riko_blade_expires_at_live_end() {
         "the expiry is checked at the live close, not at an arbitrary later pass"
     );
     game.advance_to_phase(rabuka_engine::game_state::Phase::Active);
-    while game.has_pending_choice() {
-        game.select_indices(&[]);
-    }
+    // Answer what cannot be declined, decline what can: a mandatory
+    // prompt left parked mid-ability produces exactly the absence
+    // the next assertion checks, so nothing fails.
+    game.drain_choices();
 
     assert_eq!(
         game.state.mods.get_blade_modifier(riko),

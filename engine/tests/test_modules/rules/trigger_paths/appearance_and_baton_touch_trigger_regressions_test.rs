@@ -149,9 +149,10 @@ fn serasu_edelnote_appears_fires_once() {
 
     // Drain the choice
     game.select_indices(&[0]);
-    while game.has_pending_choice() {
-        game.select_indices(&[]);
-    }
+    // Answer what cannot be declined, decline what can: a mandatory prompt
+    // left parked mid-ability, and the absence assertion that usually
+    // follows is exactly what a wrong answer produces.
+    game.drain_choices();
 
     assert!(
         game.state.ability_queue.is_idle(),
@@ -197,9 +198,10 @@ fn serasu_edelnote_appears_with_non_edelnote_on_stage() {
         "Ability must fire despite non-EdelNote on stage"
     );
     game.select_indices(&[0]);
-    while game.has_pending_choice() {
-        game.select_indices(&[]);
-    }
+    // Answer what cannot be declined, decline what can: a mandatory prompt
+    // left parked mid-ability, and the absence assertion that usually
+    // follows is exactly what a wrong answer produces.
+    game.drain_choices();
 
     let a_waited =
         game.state.mods.orientation_modifiers.get(&p2_member_a) == Some(&CardOrientation::Wait);
@@ -236,9 +238,15 @@ fn hanaho_played_to_stage_no_baton_touch_does_not_trigger() {
 
     game.play_to_stage(hanaho, MemberArea::Center);
 
-    while game.has_pending_choice() {
-        game.select_indices(&[]);
-    }
+    // Answer what cannot be declined, decline what can: a mandatory prompt
+
+    // left parked mid-ability, and the absence assertion that usually
+
+    // follows is exactly what a wrong answer produces.
+
+    game.drain_choices();
+
+
 
     let energy_after = game.state.player1.energy_zone.active_count();
     assert_eq!(
@@ -297,9 +305,10 @@ fn hanaho_baton_touch_triggers_activates_energy() {
     game.state.player1.hand.cards.push(arriver);
     game.state.player1.hand.cards.push(filler);
     game.play_to_stage(arriver, MemberArea::Center);
-    while game.has_pending_choice() {
-        game.select_indices(&[]);
-    }
+    // Answer what cannot be declined, decline what can: a mandatory prompt
+    // left parked mid-ability, and the absence assertion that usually
+    // follows is exactly what a wrong answer produces.
+    game.drain_choices();
 
     assert!(
         game.state.player1.waitroom.cards.contains(&hanaho),
@@ -337,9 +346,10 @@ fn hanaho_baton_touch_low_cost_no_trigger() {
     game.state.player1.hand.cards.push(low_cost);
     game.state.player1.hand.cards.push(filler);
     game.play_to_stage(low_cost, MemberArea::Center);
-    while game.has_pending_choice() {
-        game.select_indices(&[]);
-    }
+    // Answer what cannot be declined, decline what can: a mandatory prompt
+    // left parked mid-ability, and the absence assertion that usually
+    // follows is exactly what a wrong answer produces.
+    game.drain_choices();
 
     let energy_after = game.state.player1.energy_zone.active_count();
     // low_cost = 4, hanaho = 9. Since cost < 4, the engine pays 0 (cost wraps).
@@ -370,9 +380,10 @@ fn hanaho_baton_touch_wrong_group_no_trigger() {
     game.state.player1.hand.cards.push(filler);
     // Play to an occupied area triggers auto baton touch
     game.play_to_stage(wrong_group, MemberArea::Center);
-    while game.has_pending_choice() {
-        game.select_indices(&[]);
-    }
+    // Answer what cannot be declined, decline what can: a mandatory prompt
+    // left parked mid-ability, and the absence assertion that usually
+    // follows is exactly what a wrong answer produces.
+    game.drain_choices();
 
     let energy_after = game.state.player1.energy_zone.active_count();
     // wrong_group cost = 9, hanaho cost = 9, baton cost = 0
@@ -400,9 +411,10 @@ fn hanaho_baton_touch_triggers_exactly_once() {
     game.state.player1.hand.cards.push(arriver);
     game.state.player1.hand.cards.push(filler);
     game.play_to_stage(arriver, MemberArea::Center);
-    while game.has_pending_choice() {
-        game.select_indices(&[]);
-    }
+    // Answer what cannot be declined, decline what can: a mandatory prompt
+    // left parked mid-ability, and the absence assertion that usually
+    // follows is exactly what a wrong answer produces.
+    game.drain_choices();
 
     let energy_after = game.state.player1.energy_zone.active_count();
     // - If fires once:  -6 + 2 = -4
@@ -454,17 +466,19 @@ fn baton_touch_cleared_between_actions() {
     game.state.player1.hand.cards.push(arriver);
     game.state.player1.hand.cards.push(filler);
     game.play_to_stage(arriver, MemberArea::Center);
-    while game.has_pending_choice() {
-        game.select_indices(&[]);
-    }
+    // Answer what cannot be declined, decline what can: a mandatory prompt
+    // left parked mid-ability, and the absence assertion that usually
+    // follows is exactly what a wrong answer produces.
+    game.drain_choices();
 
     // Action 2: play a plain card to an empty area (no baton touch)
     game.add_to_hand(fresh_card);
     let energy_before = game.state.player1.energy_zone.active_count();
     game.play_to_stage(fresh_card, MemberArea::LeftSide);
-    while game.has_pending_choice() {
-        game.select_indices(&[]);
-    }
+    // Answer what cannot be declined, decline what can: a mandatory prompt
+    // left parked mid-ability, and the absence assertion that usually
+    // follows is exactly what a wrong answer produces.
+    game.drain_choices();
 
     // No stale baton touch state should leak into action 2
     let cost = game
@@ -529,9 +543,10 @@ fn serasu_double_trigger_regression() {
     game.play_to_stage(edelnote_member, MemberArea::LeftSide);
 
     // Drain any pending choices (single opponent = auto-resolve)
-    while game.has_pending_choice() {
-        game.select_indices(&[]);
-    }
+    // Answer what cannot be declined, decline what can: a mandatory prompt
+    // left parked mid-ability, and the absence assertion that usually
+    // follows is exactly what a wrong answer produces.
+    game.drain_choices();
 
     assert!(
         game.state.ability_queue.is_idle(),

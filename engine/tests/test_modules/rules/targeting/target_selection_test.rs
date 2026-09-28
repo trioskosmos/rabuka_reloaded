@@ -150,9 +150,10 @@ fn target_count_on_draw_until_count() {
         "expected SelectCard (hand, count=2, allow_skip)"
     );
     game.select_indices(&[0, 1]);
-    while game.has_pending_choice() {
-        game.select_indices(&[]);
-    }
+    // Answer what cannot be declined, decline what can: a mandatory
+    // prompt left parked mid-ability produces exactly the absence
+    // the next assertion checks, so nothing fails.
+    game.drain_choices();
     assert_eq!(
         game.state.player1.hand.cards.len(),
         5,

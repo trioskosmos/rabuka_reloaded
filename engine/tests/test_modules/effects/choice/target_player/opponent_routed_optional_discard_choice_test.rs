@@ -326,9 +326,10 @@ fn serasu_edelnote_appear_no_opponent_member() {
     game.play_to_stage(edelnote_member, MemberArea::LeftSide);
 
     // Auto fires (mandatory trigger) but opponent has no members → fizzle.
-    while game.has_pending_choice() {
-        game.select_indices(&[]);
-    }
+    // Answer what cannot be declined, decline what can: a mandatory
+    // prompt left parked mid-ability produces exactly the absence
+    // the next assertion checks, so nothing fails.
+    game.drain_choices();
     scan_autos_both(&mut game);
 
     // No crash is necessary but not sufficient: assert the fizzle changed
@@ -410,9 +411,10 @@ fn kowareyasuki_opponent_loses_surplus_hearts_score_up() {
     );
 
     // LiveSuccess phase — ability fires
-    while game.has_pending_choice() {
-        game.select_indices(&[]);
-    }
+    // Answer what cannot be declined, decline what can: a mandatory
+    // prompt left parked mid-ability produces exactly the absence
+    // the next assertion checks, so nothing fails.
+    game.drain_choices();
 
     // Score should be unchanged since no surplus hearts were set
     assert_eq!(
@@ -479,9 +481,10 @@ fn kowareyasuki_opponent_loses_2plus_hearts_gets_score_bonus() {
 
     game.pass(); // LiveVictoryDetermination → LiveSuccess ability fires
 
-    while game.has_pending_choice() {
-        game.select_indices(&[]);
-    }
+    // Answer what cannot be declined, decline what can: a mandatory
+    // prompt left parked mid-ability produces exactly the absence
+    // the next assertion checks, so nothing fails.
+    game.drain_choices();
 
     // Opponent had surplus hearts (from p2_member on stage, ≥2), so score bonus +1
     // Check via performance snapshot (modifiers with live_end duration are cleaned up
@@ -540,9 +543,10 @@ fn kowareyasuki_opponent_loses_exactly_2_gets_bonus() {
 
     game.pass(); // LiveVictoryDetermination → LiveSuccess
 
-    while game.has_pending_choice() {
-        game.select_indices(&[]);
-    }
+    // Answer what cannot be declined, decline what can: a mandatory
+    // prompt left parked mid-ability produces exactly the absence
+    // the next assertion checks, so nothing fails.
+    game.drain_choices();
 
     // Check via performance snapshot (modifiers with live_end duration are cleaned up
     // after the live ends)
@@ -600,9 +604,10 @@ fn kowareyasuki_opponent_loses_1_no_bonus() {
 
     game.pass(); // LiveVictoryDetermination → LiveSuccess
 
-    while game.has_pending_choice() {
-        game.select_indices(&[]);
-    }
+    // Answer what cannot be declined, decline what can: a mandatory
+    // prompt left parked mid-ability produces exactly the absence
+    // the next assertion checks, so nothing fails.
+    game.drain_choices();
 
     assert_eq!(
         game.state.mods.get_score_modifier(koware),

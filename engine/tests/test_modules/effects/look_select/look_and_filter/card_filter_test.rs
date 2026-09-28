@@ -61,9 +61,10 @@ fn ayase_group_filter_rejects_non_mus() {
     game.play_to_stage(ayase, MemberArea::Center);
 
     // Drain — no selectable cards remain after group filter
-    while game.has_pending_choice() {
-        game.select_indices(&[]);
-    }
+    // Answer what cannot be declined, decline what can: a mandatory prompt
+    // left parked mid-ability, and the absence assertion that usually
+    // follows is exactly what a wrong answer produces.
+    game.drain_choices();
 
     let non_mus_waitroom = game
         .state
@@ -98,9 +99,10 @@ fn ayase_rejects_debut_trigger_mus() {
     game.state.player1.stage.stage = [-1, -1, -1];
 
     game.play_to_stage(ayase, MemberArea::Center);
-    while game.has_pending_choice() {
-        game.select_indices(&[]);
-    }
+    // Answer what cannot be declined, decline what can: a mandatory prompt
+    // left parked mid-ability, and the absence assertion that usually
+    // follows is exactly what a wrong answer produces.
+    game.drain_choices();
 
     // Both debut cards should be rejected (has abilities, not 常時)
     assert!(
@@ -155,9 +157,10 @@ fn ayase_accepts_jyouji_rejects_debut() {
 
     // Select it
     game.select_indices(&[0]);
-    while game.has_pending_choice() {
-        game.select_indices(&[]);
-    }
+    // Answer what cannot be declined, decline what can: a mandatory prompt
+    // left parked mid-ability, and the absence assertion that usually
+    // follows is exactly what a wrong answer produces.
+    game.drain_choices();
 
     // 常時 card goes to hand, debut card goes to waitroom
     assert!(
@@ -206,9 +209,10 @@ fn ayase_accepts_no_ability_mus() {
     );
 
     game.select_indices(&[0]);
-    while game.has_pending_choice() {
-        game.select_indices(&[]);
-    }
+    // Answer what cannot be declined, decline what can: a mandatory prompt
+    // left parked mid-ability, and the absence assertion that usually
+    // follows is exactly what a wrong answer produces.
+    game.drain_choices();
 
     assert!(
         game.state.player1.hand.cards.contains(&no_ability_mus),
@@ -256,9 +260,10 @@ fn ayase_both_match_only_one_selectable() {
     );
 
     game.select_indices(&[1]);
-    while game.has_pending_choice() {
-        game.select_indices(&[]);
-    }
+    // Answer what cannot be declined, decline what can: a mandatory prompt
+    // left parked mid-ability, and the absence assertion that usually
+    // follows is exactly what a wrong answer produces.
+    game.drain_choices();
 
     assert_eq!(
         game.state.player1.hand.cards.len(),

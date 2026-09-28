@@ -74,17 +74,19 @@ fn p2_owned_trapper_scores_from_p1_success_in_real_round() {
     // Drive the real round: P1 Main → … → LiveCardSetP1.
     for _ in 0..5 {
         g.pass();
-        while g.has_pending_choice() {
-            g.select_indices(&[]);
-        }
+        // Answer what cannot be declined, decline what can: a mandatory
+        // prompt left parked mid-ability produces exactly the absence
+        // the next assertion checks, so nothing fails.
+        g.drain_choices();
     }
     g.set_live_card(p1_live);
 
     // Next: LiveCardSetSecondAttacker → P2 performs the TRAPPER.
     g.pass();
-    while g.has_pending_choice() {
-        g.select_indices(&[]);
-    }
+    // Answer what cannot be declined, decline what can: a mandatory
+    // prompt left parked mid-ability produces exactly the absence
+    // the next assertion checks, so nothing fails.
+    g.drain_choices();
     g.set_live_card(trapper);
 
     // Performances + victory determination. Drain prompts (yell reveals,
@@ -92,17 +94,19 @@ fn p2_owned_trapper_scores_from_p1_success_in_real_round() {
     // Stop advancing the MOMENT determination records per-seat results:
     // crossing into the next turn resets them (Active-phase entry).
     for _ in 0..8 {
-        while g.has_pending_choice() {
-            g.select_indices(&[]);
-        }
+        // Answer what cannot be declined, decline what can: a mandatory
+        // prompt left parked mid-ability produces exactly the absence
+        // the next assertion checks, so nothing fails.
+        g.drain_choices();
         if g.state.p1_live_success_this_turn || g.state.p2_live_success_this_turn {
             break;
         }
         g.pass();
     }
-    while g.has_pending_choice() {
-        g.select_indices(&[]);
-    }
+    // Answer what cannot be declined, decline what can: a mandatory
+    // prompt left parked mid-ability produces exactly the absence
+    // the next assertion checks, so nothing fails.
+    g.drain_choices();
 
     // Capture at determination.
     let p1_won = g.state.p1_live_success_this_turn;
@@ -121,9 +125,10 @@ fn p2_owned_trapper_scores_from_p1_success_in_real_round() {
         if !g.has_pending_choice() {
             g.pass();
         }
-        while g.has_pending_choice() {
-            g.select_indices(&[]);
-        }
+        // Answer what cannot be declined, decline what can: a mandatory
+        // prompt left parked mid-ability produces exactly the absence
+        // the next assertion checks, so nothing fails.
+        g.drain_choices();
     }
 
     // The interaction payoff: P2's Trapper sees ITS opponent (P1) succeed

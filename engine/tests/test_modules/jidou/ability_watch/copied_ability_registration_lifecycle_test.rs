@@ -484,9 +484,10 @@ fn the_offered_gained_activation_executes_its_own_copied_effect() {
     );
 
     game.activate_ability_index(hazuki, offered_index);
-    while game.has_pending_choice() {
-        game.select_indices(&[]);
-    }
+    // Answer what cannot be declined, decline what can: a mandatory
+    // prompt left parked mid-ability produces exactly the absence
+    // the next assertion checks, so nothing fails.
+    game.drain_choices();
 
     assert!(
         !game.state.player1.stage.stage.contains(&hazuki),
@@ -734,9 +735,10 @@ fn real_phase_walk_to_live_success_registers_and_fires_the_copy_once() {
     let mut scans = 0usize;
     while game.state.current_phase != Phase::LiveVictoryDetermination {
         game.pass();
-        while game.has_pending_choice() {
-            game.select_indices(&[]);
-        }
+        // Answer what cannot be declined, decline what can: a mandatory
+        // prompt left parked mid-ability produces exactly the absence
+        // the next assertion checks, so nothing fails.
+        game.drain_choices();
         scans += 1;
         assert!(
             scans < 32,
@@ -790,9 +792,10 @@ fn real_phase_walk_to_live_success_registers_and_fires_the_copy_once() {
     );
     // Victory determination is what the real flow uses to run the ライブ成功時.
     TurnEngine::execute_live_victory_determination(&mut game.state);
-    while game.has_pending_choice() {
-        game.select_indices(&[]);
-    }
+    // Answer what cannot be declined, decline what can: a mandatory
+    // prompt left parked mid-ability produces exactly the absence
+    // the next assertion checks, so nothing fails.
+    game.drain_choices();
 
     assert_eq!(
         game.state.player1.energy_deck.cards.len(),

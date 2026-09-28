@@ -41,9 +41,10 @@ fn live_start_two_success_cards_apply_score_and_required_hearts_q254() {
     game.set_live_card(live_card);
     advance_to_live_start(&mut game);
 
-    while game.has_pending_choice() {
-        game.select_indices(&[]);
-    }
+    // Answer what cannot be declined, decline what can: a mandatory
+    // prompt left parked mid-ability produces exactly the absence
+    // the next assertion checks, so nothing fails.
+    game.drain_choices();
 
     assert!(
         !game.has_pending_choice(),
@@ -102,9 +103,10 @@ fn live_start_one_success_card_applies_no_score_or_required_hearts_q254() {
     game.set_live_card(live_card);
     advance_to_live_start(&mut game);
 
-    while game.has_pending_choice() {
-        game.select_indices(&[]);
-    }
+    // Answer what cannot be declined, decline what can: a mandatory
+    // prompt left parked mid-ability produces exactly the absence
+    // the next assertion checks, so nothing fails.
+    game.drain_choices();
 
     assert_eq!(
         game.state.mods.get_score_modifier(live_card),
@@ -155,9 +157,10 @@ fn live_start_zero_success_cards_apply_no_score_or_required_hearts_q254() {
     game.set_live_card(live_card);
     advance_to_live_start(&mut game);
 
-    while game.has_pending_choice() {
-        game.select_indices(&[]);
-    }
+    // Answer what cannot be declined, decline what can: a mandatory
+    // prompt left parked mid-ability produces exactly the absence
+    // the next assertion checks, so nothing fails.
+    game.drain_choices();
 
     assert_eq!(
         game.state.mods.get_score_modifier(live_card),
@@ -210,9 +213,10 @@ fn live_start_three_success_cards_apply_score_and_required_hearts_q254() {
     game.set_live_card(live_card);
     advance_to_live_start(&mut game);
 
-    while game.has_pending_choice() {
-        game.select_indices(&[]);
-    }
+    // Answer what cannot be declined, decline what can: a mandatory
+    // prompt left parked mid-ability produces exactly the absence
+    // the next assertion checks, so nothing fails.
+    game.drain_choices();
 
     assert_eq!(
         game.state.mods.get_score_modifier(live_card),
@@ -275,9 +279,10 @@ fn live_start_success_threshold_sets_required_hearts_distinct_from_base_q254() {
     game.set_live_card(live_card);
     advance_to_live_start(&mut game);
 
-    while game.has_pending_choice() {
-        game.select_indices(&[]);
-    }
+    // Answer what cannot be declined, decline what can: a mandatory
+    // prompt left parked mid-ability produces exactly the absence
+    // the next assertion checks, so nothing fails.
+    game.drain_choices();
 
     let h02 = game
         .state
@@ -338,9 +343,10 @@ fn live_start_success_threshold_sets_required_hearts_with_high_heart_stage_q254(
     game.set_live_card(live_card);
     advance_to_live_start(&mut game);
 
-    while game.has_pending_choice() {
-        game.select_indices(&[]);
-    }
+    // Answer what cannot be declined, decline what can: a mandatory
+    // prompt left parked mid-ability produces exactly the absence
+    // the next assertion checks, so nothing fails.
+    game.drain_choices();
 
     assert_eq!(
         game.state
@@ -391,9 +397,10 @@ fn live_start_empty_success_zone_preserves_base_required_hearts_q254() {
     game.set_live_card(live_card);
     advance_to_live_start(&mut game);
 
-    while game.has_pending_choice() {
-        game.select_indices(&[]);
-    }
+    // Answer what cannot be declined, decline what can: a mandatory
+    // prompt left parked mid-ability produces exactly the absence
+    // the next assertion checks, so nothing fails.
+    game.drain_choices();
 
     assert_eq!(
         game.state.mods.get_score_modifier(live_card),
@@ -448,9 +455,10 @@ fn live_start_p_variant_applies_mandatory_success_threshold_q254() {
     game.set_live_card(live_card);
     advance_to_live_start(&mut game);
 
-    while game.has_pending_choice() {
-        game.select_indices(&[]);
-    }
+    // Answer what cannot be declined, decline what can: a mandatory
+    // prompt left parked mid-ability produces exactly the absence
+    // the next assertion checks, so nothing fails.
+    game.drain_choices();
 
     assert!(!game.has_pending_choice());
     assert_eq!(game.state.mods.get_score_modifier(live_card), 5);

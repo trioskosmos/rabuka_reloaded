@@ -2459,9 +2459,10 @@ fn bella_positive_surplus_heart04_ability_fires() {
     // Advance through phases, handling any pending choices
     for _ in 0..8 {
         game.pass();
-        while game.has_pending_choice() {
-            game.select_indices(&[]);
-        }
+        // Answer what cannot be declined, decline what can: a mandatory
+        // prompt left parked mid-ability produces exactly the absence
+        // the next assertion checks, so nothing fails.
+        game.drain_choices();
     }
 
     // Surplus heart04 = 4 - 2 = 2 ≥ 1 → condition TRUE → ability fires.

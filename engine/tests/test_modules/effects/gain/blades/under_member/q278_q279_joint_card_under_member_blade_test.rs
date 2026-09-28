@@ -186,9 +186,10 @@ fn q278_ability_placed_card_and_joint_are_counted_at_live_start() {
     // The ライブ開始時 window, by name: the assertion below is about what the
     // live START counted, and "two passes after setting" is not that window.
     game.advance_to_phase(rabuka_engine::game_state::Phase::FirstAttackerPerformance);
-    while game.has_pending_choice() {
-        game.select_indices(&[]);
-    }
+    // Answer what cannot be declined, decline what can: a mandatory
+    // prompt left parked mid-ability produces exactly the absence
+    // the next assertion checks, so nothing fails.
+    game.drain_choices();
 
     assert_eq!(game.state.mods.get_heart_copy(shizuku), Some(ayumu));
     assert_eq!(

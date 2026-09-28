@@ -98,9 +98,10 @@ fn q276_cheer_mode_returns_to_hand_not_success_zone() {
         "Cheer Mode set as the live card"
     );
     advance_to_live_start(&mut game);
-    while game.has_pending_choice() {
-        game.select_indices(&[]);
-    }
+    // Answer what cannot be declined, decline what can: a mandatory
+    // prompt left parked mid-ability produces exactly the absence
+    // the next assertion checks, so nothing fails.
+    game.drain_choices();
     advance_to_live_victory(&mut game);
 
     drain_q276_choices(&mut game, cheer, false);
@@ -141,9 +142,10 @@ fn q276_cheer_discarded_by_own_ability_goes_to_waitroom_not_success() {
     advance_to_live_card_set(&mut game);
     game.set_live_card(cheer);
     advance_to_live_start(&mut game);
-    while game.has_pending_choice() {
-        game.select_indices(&[]);
-    }
+    // Answer what cannot be declined, decline what can: a mandatory
+    // prompt left parked mid-ability produces exactly the absence
+    // the next assertion checks, so nothing fails.
+    game.drain_choices();
     advance_to_live_victory(&mut game);
 
     drain_q276_choices(&mut game, cheer, true);
@@ -187,13 +189,15 @@ fn q276_control_normal_live_does_go_to_success_zone() {
     advance_to_live_card_set(&mut game);
     game.set_live_card(live);
     advance_to_live_start(&mut game);
-    while game.has_pending_choice() {
-        game.select_indices(&[]);
-    }
+    // Answer what cannot be declined, decline what can: a mandatory
+    // prompt left parked mid-ability produces exactly the absence
+    // the next assertion checks, so nothing fails.
+    game.drain_choices();
     advance_to_live_victory(&mut game);
-    while game.has_pending_choice() {
-        game.select_indices(&[]);
-    }
+    // Answer what cannot be declined, decline what can: a mandatory
+    // prompt left parked mid-ability produces exactly the absence
+    // the next assertion checks, so nothing fails.
+    game.drain_choices();
     // One more pass finalizes the winner's success-zone placement.
     game.pass();
 
@@ -222,13 +226,15 @@ fn q276_failed_live_does_not_return_cheer_to_hand() {
     advance_to_live_card_set(&mut game);
     game.set_live_card(cheer);
     advance_to_live_start(&mut game);
-    while game.has_pending_choice() {
-        game.select_indices(&[]);
-    }
+    // Answer what cannot be declined, decline what can: a mandatory
+    // prompt left parked mid-ability produces exactly the absence
+    // the next assertion checks, so nothing fails.
+    game.drain_choices();
     advance_to_live_victory(&mut game);
-    while game.has_pending_choice() {
-        game.select_indices(&[]);
-    }
+    // Answer what cannot be declined, decline what can: a mandatory
+    // prompt left parked mid-ability produces exactly the absence
+    // the next assertion checks, so nothing fails.
+    game.drain_choices();
 
     assert!(!game.state.player1.success_live_card_zone.cards.contains(&cheer));
     assert!(!game.state.player1.hand.cards.contains(&cheer));

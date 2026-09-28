@@ -232,9 +232,10 @@ fn s9_check_timing_cascade_smoke() {
     if game.state.player1.hand.cards.contains(&live) {
         game.set_live_card(live);
         game.advance_to_phase(rabuka_engine::game_state::Phase::FirstAttackerPerformance);
-        while game.has_pending_choice() {
-            game.select_indices(&[]);
-        }
+        // Answer what cannot be declined, decline what can: a mandatory
+        // prompt left parked mid-ability produces exactly the absence
+        // the next assertion checks, so nothing fails.
+        game.drain_choices();
         // Even if we don't go through full phases, the pipeline helpers should be callable
         let hearts = game.state.player1.stage.get_available_hearts(&db, &game.state.mods.heart_override, &game.state.mods.heart_modifiers, &game.state.mods.heart_color_multiplier, &game.state.mods.heart_copy);
         assert!(hearts.hearts.values_sum() >= 2);

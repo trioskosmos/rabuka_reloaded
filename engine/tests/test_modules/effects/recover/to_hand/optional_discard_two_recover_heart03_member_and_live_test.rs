@@ -146,9 +146,10 @@ fn heart03_filter_works() {
         );
     }
 
-    while game.has_pending_choice() {
-        game.select_indices(&[]);
-    }
+    // Answer what cannot be declined, decline what can: a mandatory
+    // prompt left parked mid-ability produces exactly the absence
+    // the next assertion checks, so nothing fails.
+    game.drain_choices();
 
     // At least one heart03 card was retrieved
     let has_member = game.state.player1.hand.cards.contains(&hc_member);
@@ -204,9 +205,10 @@ fn no_heart03_cards_skips_cleanly() {
         "zero-candidate selects should auto-skip without prompting"
     );
 
-    while game.has_pending_choice() {
-        game.select_indices(&[]);
-    }
+    // Answer what cannot be declined, decline what can: a mandatory
+    // prompt left parked mid-ability produces exactly the absence
+    // the next assertion checks, so nothing fails.
+    game.drain_choices();
 
     // Verify no cards were moved to hand
     assert_eq!(
@@ -293,9 +295,10 @@ fn only_member_matches_skips_live() {
         "live-card select should auto-skip without prompting when no live matches"
     );
 
-    while game.has_pending_choice() {
-        game.select_indices(&[]);
-    }
+    // Answer what cannot be declined, decline what can: a mandatory
+    // prompt left parked mid-ability produces exactly the absence
+    // the next assertion checks, so nothing fails.
+    game.drain_choices();
 
     // hc_member should be in hand
     assert!(

@@ -29,9 +29,10 @@ fn kidou_card_play_to_stage_not_softlocked() {
     game.play_to_stage(kidou_card, MemberArea::Center);
 
     // Resolve any pending choices from debut/auto triggers
-    while game.has_pending_choice() {
-        game.select_indices(&[]);
-    }
+    // Answer what cannot be declined, decline what can: a mandatory
+    // prompt left parked mid-ability produces exactly the absence
+    // the next assertion checks, so nothing fails.
+    game.drain_choices();
 
     // Now check: generate actions. We should NOT be softlocked.
     let actions = game_setup::generate_possible_actions(&game.state);

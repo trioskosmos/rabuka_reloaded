@@ -39,6 +39,79 @@ impl TestGame {
         self.state.get_pending_choice().expect("No pending choice")
     }
 
+    /// Drain every pending prompt: decline the skippable ones, answer the rest
+    /// with their first option. Returns the prompt kinds, in the order seen.
+    ///
+    /// This is the general form of the suite's ~140 hand-rolled
+    /// `while has_pending_choice() { select_indices(&[]) }` loops, and the
+    /// difference is the half those loops got wrong. Declining is only a
+    /// legal answer when `Choice::allow_skip` says so: a mandatory `looked_at`
+    /// selection has to be picked from, and `SelectHeartColor`,
+    /// `SelectAutoAbility` and `SelectLiveSuccess` are never skippable.
+    /// Declining one of those leaves the game parked mid-ability, and the
+    /// assertion that usually follows a drain is an *absence* — which is
+    /// exactly what a wrong answer produces, so nothing fails. That is the
+    /// `drain_zero_may_decline` smell in `engine/tests/TEST_QUALITY.md`.
+    ///
+    /// Answering goes through [`answer_choice`], which dispatches per kind
+    /// (`SelectHeartColor` needs `select_option`, `SelectPosition` needs
+    /// `select_generated`), so "pick the first option" means the same thing
+    /// for every prompt type.
+    pub fn drain_choices(&mut self) -> Vec<&'static str> {
+        let mut seen = Vec::new();
+        while let Some(choice) = self.state.get_pending_choice().cloned() {
+            assert!(
+                seen.len() <= 1000,
+                "drain_choices: exceeded 1000 prompts — non-terminating choice loop.\n{}",
+                self.pending_choice_summary()
+            );
+            let kind = choice_type(&choice);
+            seen.push(kind);
+            if choice.allow_skip() {
+                self.select_indices(&[]);
+            } else {
+                answer_choice(self, 0);
+            }
+        }
+        seen
+    }
+
+    /// As [`Self::drain_choices`], but declines every prompt it can and
+    /// *fails* on the ones it cannot.
+    ///
+    /// Use this where declining a mandatory prompt would mean the test is
+    /// reaching a code path it never meant to: a silent wrong answer in a
+    /// test that only asserts absence is the failure mode this exists to
+    /// prevent, so a test that cannot state which prompts it expects should
+    /// fail loudly rather than drain.
+    pub fn decline_all_remaining(&mut self) -> Vec<&'static str> {
+        let mut seen = Vec::new();
+        while let Some(choice) = self.state.get_pending_choice().cloned() {
+            assert!(
+                seen.len() <= 1000,
+                "decline_all_remaining: exceeded 1000 prompts — non-terminating \
+                 choice loop.\n{}",
+                self.pending_choice_summary()
+            );
+            let kind = choice_type(&choice);
+            assert!(
+                choice.allow_skip(),
+                "this {kind} prompt is not skippable: the test has to answer it, \
+                 not decline it. Declining leaves the game mid-ability and makes \
+                 a later absence assertion pass for the wrong reason. Use \
+                 Self::drain_choices() to answer mandatory prompts with their \
+                 first option, or answer this one explicitly."
+            );
+            seen.push(kind);
+            self.select_indices(&[]);
+        }
+        assert!(
+            !seen.is_empty(),
+            "decline_all_remaining called with no pending choice"
+        );
+        seen
+    }
+
     pub fn select_indices(&mut self, indices: &[usize]) {
         self.do_select_indices(indices)
             .expect("select_indices failed");

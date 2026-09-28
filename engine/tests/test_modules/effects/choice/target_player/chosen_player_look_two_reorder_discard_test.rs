@@ -189,9 +189,10 @@ fn chosen_player_look_two_live_start_sufficient_deck_fires() {
     game.select_indices(&[0]);
 
     // Resolve any remaining prompts (finish selection, order, etc.)
-    while game.has_pending_choice() {
-        game.select_indices(&[]);
-    }
+    // Answer what cannot be declined, decline what can: a mandatory
+    // prompt left parked mid-ability produces exactly the absence
+    // the next assertion checks, so nothing fails.
+    game.drain_choices();
 
     assert!(
         !game.has_pending_choice(),
@@ -245,9 +246,10 @@ fn chosen_player_look_two_choose_opponent_look_at_opponent_deck() {
     // Keep card 0, discard the rest
     game.select_indices(&[0]);
 
-    while game.has_pending_choice() {
-        game.select_indices(&[]);
-    }
+    // Answer what cannot be declined, decline what can: a mandatory
+    // prompt left parked mid-ability produces exactly the absence
+    // the next assertion checks, so nothing fails.
+    game.drain_choices();
 
     assert!(!game.has_pending_choice(), "No more pending choices");
 

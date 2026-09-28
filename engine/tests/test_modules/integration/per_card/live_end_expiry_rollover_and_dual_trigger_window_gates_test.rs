@@ -65,9 +65,11 @@ fn live_end_grant_expires_through_real_phase_rollover() {
         guard += 1;
         game.pass();
         game.drain_auto_ability_choices();
-        while game.has_pending_choice() {
-            game.select_indices(&[]);
-        }
+        // Answer what cannot be declined, decline what can: a mandatory prompt
+        // left parked mid-ability, and the absence assertion that usually
+        // follows is exactly what a wrong answer produces.
+        game.drain_choices();
+
     }
 
     assert_ne!(

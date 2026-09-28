@@ -44,9 +44,10 @@ fn optional_unit_discard_draw_cost_gain_live_start_modify_cost_only_applies_to_d
     game.select_indices(&[0]);
 
     // Draw happens automatically. No more choices expected.
-    while game.has_pending_choice() {
-        game.select_indices(&[]);
-    }
+    // Answer what cannot be declined, decline what can: a mandatory
+    // prompt left parked mid-ability produces exactly the absence
+    // the next assertion checks, so nothing fails.
+    game.drain_choices();
 
     let doll_mod = game.state.mods.get_cost_modifier(doll);
     let sayaka_mod = game.state.mods.get_cost_modifier(sayaka);

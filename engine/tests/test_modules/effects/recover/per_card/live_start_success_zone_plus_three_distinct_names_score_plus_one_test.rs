@@ -61,9 +61,10 @@ fn miracle_stay_tune_both_conditions_met_score_plus_1() {
     game.set_live_card(card);
     advance_to_live_start(&mut game);
 
-    while game.has_pending_choice() {
-        game.select_indices(&[]);
-    }
+    // Answer what cannot be declined, decline what can: a mandatory
+    // prompt left parked mid-ability produces exactly the absence
+    // the next assertion checks, so nothing fails.
+    game.drain_choices();
 
     let mod_val = game.state.mods.get_score_modifier(card);
     assert_eq!(mod_val, 1, "Both conditions met → score +1");
@@ -102,9 +103,10 @@ fn miracle_stay_tune_fewer_than_3_distinct_members_no_score() {
     game.set_live_card(card);
     advance_to_live_start(&mut game);
 
-    while game.has_pending_choice() {
-        game.select_indices(&[]);
-    }
+    // Answer what cannot be declined, decline what can: a mandatory
+    // prompt left parked mid-ability produces exactly the absence
+    // the next assertion checks, so nothing fails.
+    game.drain_choices();
 
     let mod_val = game.state.mods.get_score_modifier(card);
     assert_eq!(mod_val, 0, "Only 1 distinct member → no score");
@@ -139,9 +141,10 @@ fn miracle_stay_tune_empty_success_zone_no_score() {
     game.set_live_card(card);
     advance_to_live_start(&mut game);
 
-    while game.has_pending_choice() {
-        game.select_indices(&[]);
-    }
+    // Answer what cannot be declined, decline what can: a mandatory
+    // prompt left parked mid-ability produces exactly the absence
+    // the next assertion checks, so nothing fails.
+    game.drain_choices();
 
     let mod_val = game.state.mods.get_score_modifier(card);
     assert_eq!(mod_val, 0, "Empty success zone → no score");
@@ -176,9 +179,10 @@ fn miracle_stay_tune_neither_condition_no_score() {
     game.set_live_card(card);
     advance_to_live_start(&mut game);
 
-    while game.has_pending_choice() {
-        game.select_indices(&[]);
-    }
+    // Answer what cannot be declined, decline what can: a mandatory
+    // prompt left parked mid-ability produces exactly the absence
+    // the next assertion checks, so nothing fails.
+    game.drain_choices();
 
     let mod_val = game.state.mods.get_score_modifier(card);
     assert_eq!(mod_val, 0, "Neither condition met → no score");

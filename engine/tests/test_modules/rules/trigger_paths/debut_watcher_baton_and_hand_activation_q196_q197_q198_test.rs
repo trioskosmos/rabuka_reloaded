@@ -51,9 +51,10 @@ fn cost11_baton_replacement_moves_debut_watcher_to_waitroom_q198() {
 
     // Auto should NOT fire — Ranju was replaced before cost11 appeared.
     // Ranju is now in waitroom, so the condition "location: stage" fails.
-    while game.has_pending_choice() {
-        game.select_indices(&[]);
-    }
+    // Answer what cannot be declined, decline what can: a mandatory
+    // prompt left parked mid-ability produces exactly the absence
+    // the next assertion checks, so nothing fails.
+    game.drain_choices();
 
     // Verify no extra energy was placed (energy deck unchanged)
     // Initial give_energy(20) adds 20 energy to energy zone.
@@ -93,9 +94,10 @@ fn cost11_debut_with_watcher_retains_nonempty_energy_zone_q198() {
     game.play_to_stage(cost11, MemberArea::Center);
 
     // Auto should fire: energy deck → place 1 energy in wait state
-    while game.has_pending_choice() {
-        game.select_indices(&[]);
-    }
+    // Answer what cannot be declined, decline what can: a mandatory
+    // prompt left parked mid-ability produces exactly the absence
+    // the next assertion checks, so nothing fails.
+    game.drain_choices();
 
     assert!(
         game.state.player1.energy_zone.cards.contains(&energy)
@@ -139,9 +141,10 @@ fn cost10_baton_replacement_does_not_draw_from_departed_watcher_q197() {
     game.play_to_stage(cost10, MemberArea::Center);
 
     // Auto should NOT fire
-    while game.has_pending_choice() {
-        game.select_indices(&[]);
-    }
+    // Answer what cannot be declined, decline what can: a mandatory
+    // prompt left parked mid-ability produces exactly the absence
+    // the next assertion checks, so nothing fails.
+    game.drain_choices();
 
     // The play must have happened — otherwise an empty hand would "prove"
     // nothing about the watcher.
@@ -196,9 +199,10 @@ fn cost10_debut_with_watcher_draws_to_replace_played_card_q197() {
     game.play_to_stage(cost10, MemberArea::Center);
 
     // Auto should fire: draw 1 card
-    while game.has_pending_choice() {
-        game.select_indices(&[]);
-    }
+    // Answer what cannot be declined, decline what can: a mandatory
+    // prompt left parked mid-ability produces exactly the absence
+    // the next assertion checks, so nothing fails.
+    game.drain_choices();
 
     // Hand: [cost10] → play cost10 → [] → draw → [drawn]. hand_before=1, final=1.
     // The draw compensates the play. Auto fires = hand stays same.
@@ -254,9 +258,10 @@ fn hand_activation_empty_stage_resolves_draw_after_discard_choices_q196() {
         "self-discard cost must resolve without a card-choice prompt"
     );
 
-    while game.has_pending_choice() {
-        game.select_indices(&[]);
-    }
+    // Answer what cannot be declined, decline what can: a mandatory
+    // prompt left parked mid-ability produces exactly the absence
+    // the next assertion checks, so nothing fails.
+    game.drain_choices();
 
     // Hand: [shizuku, filler, filler] = 3
     // Self-cost removes shizuku: [filler, filler] = 2
@@ -310,9 +315,10 @@ fn hand_activation_draw_and_lone_nijigasaki_blade_resolve_q196() {
         "lone blade-target candidate must auto-resolve without prompting"
     );
 
-    while game.has_pending_choice() {
-        game.select_indices(&[]);
-    }
+    // Answer what cannot be declined, decline what can: a mandatory
+    // prompt left parked mid-ability produces exactly the absence
+    // the next assertion checks, so nothing fails.
+    game.drain_choices();
 
     // Hand: 3 → 2 (self-cost) → 3 (draw)
     assert_eq!(game.state.player1.hand.cards.len(), 3);

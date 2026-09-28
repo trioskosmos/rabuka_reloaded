@@ -48,9 +48,10 @@ fn yell_two_no_blade_heart_watchers_are_covered_by_the_real_yell_test() {
     advance_to_live(&mut game);
     game.set_live_card(filler); // 0-SCORE live => no yell
     game.advance_to_phase(rabuka_engine::game_state::Phase::LiveVictoryDetermination);
-    while game.has_pending_choice() {
-        game.select_indices(&[]);
-    }
+    // Answer what cannot be declined, decline what can: a mandatory
+    // prompt left parked mid-ability produces exactly the absence
+    // the next assertion checks, so nothing fails.
+    game.drain_choices();
     assert!(
         !game.state.yell_occurred,
         "a 0-score live card produces no yell, so this fixture cannot exercise \

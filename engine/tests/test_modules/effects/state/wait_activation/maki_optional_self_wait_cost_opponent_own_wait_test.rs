@@ -50,9 +50,10 @@ fn maki_debut_pay_cost_opponent_waits_one() {
     game.select_indices(&[0]);
 
     // 3. ab#1 triggers (state change detected) and auto-resolves
-    while game.has_pending_choice() {
-        game.select_indices(&[]);
-    }
+    // Answer what cannot be declined, decline what can: a mandatory
+    // prompt left parked mid-ability produces exactly the absence
+    // the next assertion checks, so nothing fails.
+    game.drain_choices();
 
     // Maki should be waited (state change, not moved to waitroom)
     assert_eq!(
@@ -98,9 +99,10 @@ fn maki_debut_skip_cost_no_effect() {
     // Skip the optional cost (card_id != Some(1) → "skip_optional_cost")
     game.select_option(0);
 
-    while game.has_pending_choice() {
-        game.select_indices(&[]);
-    }
+    // Answer what cannot be declined, decline what can: a mandatory
+    // prompt left parked mid-ability produces exactly the absence
+    // the next assertion checks, so nothing fails.
+    game.drain_choices();
 
     let orientation = game.state.mods.orientation_modifiers.get(&maki);
     assert!(
@@ -149,9 +151,10 @@ fn maki_ab1_draws_on_cost4_or_less_opponent_waited() {
     // ab#1 is pre-filtered out (no state change yet). ab#0 auto-resolves.
     game.select_option(1); // Pay optional cost → effect waits opponent → ab#1 triggers (state change detected) and draws from deck
                            // hand = [filler, extra] = 2. deck = [].
-    while game.has_pending_choice() {
-        game.select_indices(&[]);
-    }
+    // Answer what cannot be declined, decline what can: a mandatory
+    // prompt left parked mid-ability produces exactly the absence
+    // the next assertion checks, so nothing fails.
+    game.drain_choices();
 
     assert_eq!(
         game.state.player1.hand.cards.len(),
@@ -185,9 +188,10 @@ fn maki_ab1_no_draw_on_cost_over4_opponent_waited() {
 
     game.select_option(1); // Pay optional cost
                            // Opponent wait happens, but ab#1 condition fails for cost 13 > 4 → no draw.
-    while game.has_pending_choice() {
-        game.select_indices(&[]);
-    }
+    // Answer what cannot be declined, decline what can: a mandatory
+    // prompt left parked mid-ability produces exactly the absence
+    // the next assertion checks, so nothing fails.
+    game.drain_choices();
 
     assert_eq!(
         game.state.player1.hand.cards.len(),
@@ -229,9 +233,10 @@ fn maki_ab1_use_limit_once_per_turn() {
         "Wait-member choice must be routed to opponent (p2)"
     );
     game.select_indices(&[0]); // Opponent waits p2_a (cost 4 ≤ 4 → ab#1 draws)
-    while game.has_pending_choice() {
-        game.select_indices(&[]);
-    }
+    // Answer what cannot be declined, decline what can: a mandatory
+    // prompt left parked mid-ability produces exactly the absence
+    // the next assertion checks, so nothing fails.
+    game.drain_choices();
     // hand = [filler, drawn] = 2 (play -1, draw +1 = net 0)
     assert_eq!(
         game.state.player1.hand.cards.len(),
@@ -282,9 +287,10 @@ fn maki_ab0_plus_ab1_end_to_end() {
 
     // ab#1 pre-filtered out (no state change yet). ab#0 auto-resolves.
     game.select_option(1); // Pay optional cost
-    while game.has_pending_choice() {
-        game.select_indices(&[]);
-    }
+    // Answer what cannot be declined, decline what can: a mandatory
+    // prompt left parked mid-ability produces exactly the absence
+    // the next assertion checks, so nothing fails.
+    game.drain_choices();
 
     assert_eq!(
         game.state.mods.orientation_modifiers.get(&p2_member),

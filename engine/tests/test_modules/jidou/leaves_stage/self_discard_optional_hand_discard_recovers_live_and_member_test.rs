@@ -96,9 +96,10 @@ fn hanabiko_static_discard_no_trigger() {
     rabuka_engine::turn::TurnEngine::trigger_auto_abilities_for_player(&mut g.state, &pid);
     g.state.process_pending_auto_abilities(&pid);
 
-    while g.has_pending_choice() {
-        g.select_indices(&[]);
-    }
+    // Answer what cannot be declined, decline what can: a mandatory
+    // prompt left parked mid-ability produces exactly the absence
+    // the next assertion checks, so nothing fails.
+    g.drain_choices();
 
     // Verify hanabiko did not trigger (it was already in discard, not moved)
     assert!(
@@ -130,9 +131,10 @@ fn hanabiko_static_stage_no_trigger() {
     rabuka_engine::turn::TurnEngine::trigger_auto_abilities_for_player(&mut g.state, &pid);
     g.state.process_pending_auto_abilities(&pid);
 
-    while g.has_pending_choice() {
-        g.select_indices(&[]);
-    }
+    // Answer what cannot be declined, decline what can: a mandatory
+    // prompt left parked mid-ability produces exactly the absence
+    // the next assertion checks, so nothing fails.
+    g.drain_choices();
 
     // Hanabiko should still be on stage — its ability should NOT trigger
     assert!(
@@ -344,9 +346,10 @@ fn hanabiko_replaced_by_new_card_on_same_position_triggers() {
 
     // Play replacement to center (baton-touch: Hanabiko goes to waitroom)
     g.play_to_stage(replacement, rabuka_engine::zones::MemberArea::Center);
-    while g.has_pending_choice() {
-        g.select_indices(&[]);
-    }
+    // Answer what cannot be declined, decline what can: a mandatory
+    // prompt left parked mid-ability produces exactly the absence
+    // the next assertion checks, so nothing fails.
+    g.drain_choices();
 
     // After the replacement, Hanabiko should be in waitroom
     assert!(

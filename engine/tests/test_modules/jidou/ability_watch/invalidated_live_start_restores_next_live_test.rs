@@ -61,9 +61,10 @@ fn live_start_energy_delta(game: &mut TestGame, wanted: i16) -> (i32, i32) {
             break;
         }
         game.pass();
-        while game.has_pending_choice() {
-            game.select_indices(&[]);
-        }
+        // Answer what cannot be declined, decline what can: a mandatory
+        // prompt left parked mid-ability produces exactly the absence
+        // the next assertion checks, so nothing fails.
+        game.drain_choices();
     }
     assert_eq!(
         game.state.current_phase,
@@ -90,9 +91,10 @@ fn live_start_energy_delta(game: &mut TestGame, wanted: i16) -> (i32, i32) {
             game.state.player2.energy_zone.active_count() as i32,
         );
         game.pass();
-        while game.has_pending_choice() {
-            game.select_indices(&[]);
-        }
+        // Answer what cannot be declined, decline what can: a mandatory
+        // prompt left parked mid-ability produces exactly the absence
+        // the next assertion checks, so nothing fails.
+        game.drain_choices();
     }
     panic!(
         "the turn never reached FirstAttackerPerformance within 16 passes (stuck \
@@ -229,9 +231,10 @@ fn kanon_invalidation_silences_the_live_start_then_restores_it_next_live() {
         "expected a target selection for the invalidation"
     );
     game.select_indices(&[0]);
-    while game.has_pending_choice() {
-        game.select_indices(&[]);
-    }
+    // Answer what cannot be declined, decline what can: a mandatory
+    // prompt left parked mid-ability produces exactly the absence
+    // the next assertion checks, so nothing fails.
+    game.drain_choices();
 
     assert!(
         game.state.is_ability_invalidated(mei, &AbilityTrigger::LiveStart),
@@ -255,9 +258,10 @@ fn kanon_invalidation_silences_the_live_start_then_restores_it_next_live() {
             break;
         }
         game.pass();
-        while game.has_pending_choice() {
-            game.select_indices(&[]);
-        }
+        // Answer what cannot be declined, decline what can: a mandatory
+        // prompt left parked mid-ability produces exactly the absence
+        // the next assertion checks, so nothing fails.
+        game.drain_choices();
     }
     assert_eq!(
         game.state.current_phase,
@@ -332,9 +336,10 @@ fn kanon_invalidation_does_not_touch_the_opponents_copy() {
     // taking index 0 must still be p1's, and the p2 assertion below is what
     // actually decides the test.
     game.select_indices(&[0]);
-    while game.has_pending_choice() {
-        game.select_indices(&[]);
-    }
+    // Answer what cannot be declined, decline what can: a mandatory
+    // prompt left parked mid-ability produces exactly the absence
+    // the next assertion checks, so nothing fails.
+    game.drain_choices();
 
     assert!(
         game.state.is_ability_invalidated(mei_p1, &AbilityTrigger::LiveStart),

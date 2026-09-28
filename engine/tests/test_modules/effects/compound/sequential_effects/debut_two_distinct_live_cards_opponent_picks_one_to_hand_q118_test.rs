@@ -185,9 +185,10 @@ fn fuyumari_q118_only_one_live_card_no_effect() {
 
     // Fewer than 2 distinct live cards → select creates no choice → effect ends
     // Consume any remaining choice
-    while game.has_pending_choice() {
-        game.select_indices(&[]);
-    }
+    // Answer what cannot be declined, decline what can: a mandatory
+    // prompt left parked mid-ability produces exactly the absence
+    // the next assertion checks, so nothing fails.
+    game.drain_choices();
     assert!(
         !game.state.player1.hand.cards.contains(&live),
         "No live card should be added when <2 available"
@@ -236,9 +237,10 @@ fn fuyumari_q118_card_count_integrity() {
         "expected SelectCard for the opponent's pick from selected_cards"
     );
     game.select_indices(&[0]); // opponent selects first of the two
-    while game.has_pending_choice() {
-        game.select_indices(&[]);
-    }
+    // Answer what cannot be declined, decline what can: a mandatory
+    // prompt left parked mid-ability produces exactly the absence
+    // the next assertion checks, so nothing fails.
+    game.drain_choices();
 
     let total_after = total_cards(&game.state.player1);
     assert_eq!(

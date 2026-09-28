@@ -72,9 +72,10 @@ fn cost_skipped_does_not_apply_wait_state() {
     );
     game.select_option(0);
     // Effect still runs for skip (original engine behavior). Resolve any sub-choices.
-    while game.has_pending_choice() {
-        game.select_indices(&[]);
-    }
+    // Answer what cannot be declined, decline what can: a mandatory
+    // prompt left parked mid-ability produces exactly the absence
+    // the next assertion checks, so nothing fails.
+    game.drain_choices();
 
     // Verify Rin is NOT in wait state
     let orientation = game.state.mods.get_orientation_modifier(rin);
@@ -118,9 +119,10 @@ fn select_zero_cards_both_discarded() {
         "Should have look_and_select choice"
     );
     game.select_indices(&[]);
-    while game.has_pending_choice() {
-        game.select_indices(&[]);
-    }
+    // Answer what cannot be declined, decline what can: a mandatory
+    // prompt left parked mid-ability produces exactly the absence
+    // the next assertion checks, so nothing fails.
+    game.drain_choices();
 
     // Both looked-at cards go to discard
     assert!(
@@ -166,9 +168,10 @@ fn select_one_card_other_discarded() {
         "Should have look_and_select choice"
     );
     game.select_indices(&[0]);
-    while game.has_pending_choice() {
-        game.select_indices(&[]);
-    }
+    // Answer what cannot be declined, decline what can: a mandatory
+    // prompt left parked mid-ability produces exactly the absence
+    // the next assertion checks, so nothing fails.
+    game.drain_choices();
 
     assert_eq!(
         game.state.player1.main_deck.cards[0], card_a,
@@ -235,9 +238,10 @@ fn select_both_cards_stay_on_deck() {
         "expected SelectTarget order prompt"
     );
     game.select_option(0);
-    while game.has_pending_choice() {
-        game.select_indices(&[]);
-    }
+    // Answer what cannot be declined, decline what can: a mandatory
+    // prompt left parked mid-ability produces exactly the absence
+    // the next assertion checks, so nothing fails.
+    game.drain_choices();
 
     assert!(game.state.player1.main_deck.cards.contains(&card_a));
     assert!(game.state.player1.main_deck.cards.contains(&card_b));
@@ -301,9 +305,10 @@ fn select_both_cards_any_order_card_b_on_top() {
         "expected SelectTarget order prompt"
     );
     game.select_option(1);
-    while game.has_pending_choice() {
-        game.select_indices(&[]);
-    }
+    // Answer what cannot be declined, decline what can: a mandatory
+    // prompt left parked mid-ability produces exactly the absence
+    // the next assertion checks, so nothing fails.
+    game.drain_choices();
 
     assert_eq!(
         game.state.player1.main_deck.cards[0], card_b,
@@ -348,9 +353,10 @@ fn card_count_integrity() {
         "Should have look_and_select choice"
     );
     game.select_indices(&[0]);
-    while game.has_pending_choice() {
-        game.select_indices(&[]);
-    }
+    // Answer what cannot be declined, decline what can: a mandatory
+    // prompt left parked mid-ability produces exactly the absence
+    // the next assertion checks, so nothing fails.
+    game.drain_choices();
 
     let total_final = total_cards(&mut game);
     assert_eq!(

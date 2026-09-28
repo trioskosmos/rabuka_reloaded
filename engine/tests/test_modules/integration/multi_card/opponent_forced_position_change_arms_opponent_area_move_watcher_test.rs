@@ -60,9 +60,10 @@ fn himeko_debut_repositions_opponent_member_and_koko_responds() {
     g.assert_pending_choice_type("SelectTarget", "reposition target choice");
     g.select_indices(&[0]); // options[0] = "right" = 可可's slot
 
-    while g.has_pending_choice() {
-        g.select_indices(&[]);
-    }
+    // Answer what cannot be declined, decline what can: a mandatory
+    // prompt left parked mid-ability produces exactly the absence
+    // the next assertion checks, so nothing fails.
+    g.drain_choices();
 
     // 1) 姫芽's effect moved 可可 off P2-right…
     assert_ne!(
@@ -108,9 +109,10 @@ fn himeko_gate_blocked_no_reposition_no_koko_response() {
     g.give_energy(15);
 
     g.play_to_stage(himeko, MemberArea::Center);
-    while g.has_pending_choice() {
-        g.select_indices(&[]);
-    }
+    // Answer what cannot be declined, decline what can: a mandatory
+    // prompt left parked mid-ability produces exactly the absence
+    // the next assertion checks, so nothing fails.
+    g.drain_choices();
 
     assert_eq!(
         g.state.player2.stage.stage[2], koko,

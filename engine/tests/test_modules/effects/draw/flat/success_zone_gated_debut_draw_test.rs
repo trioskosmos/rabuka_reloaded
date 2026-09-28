@@ -32,9 +32,10 @@ fn pb1_005_debut_draws_with_cards_in_success_zone() {
     game.state.player1.hand.cards.push(card);
     let hand_before = game.state.player1.hand.cards.len();
     game.play_to_stage(card, MemberArea::Center);
-    while game.has_pending_choice() {
-        game.select_indices(&[]);
-    }
+    // Answer what cannot be declined, decline what can: a mandatory
+    // prompt left parked mid-ability produces exactly the absence
+    // the next assertion checks, so nothing fails.
+    game.drain_choices();
 
     // Debut: card left hand (-1), condition met → drew 1 (+1).
     assert_eq!(
@@ -65,9 +66,10 @@ fn pb1_005_debut_no_draw_without_success_zone_cards() {
 
     game.state.player1.hand.cards.push(card);
     game.play_to_stage(card, MemberArea::Center);
-    while game.has_pending_choice() {
-        game.select_indices(&[]);
-    }
+    // Answer what cannot be declined, decline what can: a mandatory
+    // prompt left parked mid-ability produces exactly the absence
+    // the next assertion checks, so nothing fails.
+    game.drain_choices();
 
     // No condition, no draw: hand went 1 → 0.
     assert_eq!(

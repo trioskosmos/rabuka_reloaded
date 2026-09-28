@@ -195,9 +195,10 @@ fn ab1_no_blade_when_statically_in_live_zone() {
     let pid = g.state.player1.id.clone();
     rabuka_engine::turn::TurnEngine::trigger_auto_abilities_for_player(&mut g.state, &pid);
     g.state.process_pending_auto_abilities(&pid);
-    while g.has_pending_choice() {
-        g.select_indices(&[]);
-    }
+    // Answer what cannot be declined, decline what can: a mandatory
+    // prompt left parked mid-ability produces exactly the absence
+    // the next assertion checks, so nothing fails.
+    g.drain_choices();
 
     assert_eq!(
         blade_mod(&g, niji),

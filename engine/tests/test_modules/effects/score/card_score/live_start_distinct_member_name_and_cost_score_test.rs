@@ -39,9 +39,10 @@ fn aurora_flower_all_distinct_names_and_costs_grants_score() {
     game.set_live_card(aurora);
     finish_live_setup(&mut game);
 
-    while game.has_pending_choice() {
-        game.select_indices(&[]);
-    }
+    // Answer what cannot be declined, decline what can: a mandatory
+    // prompt left parked mid-ability produces exactly the absence
+    // the next assertion checks, so nothing fails.
+    game.drain_choices();
 
     let score = game.state.mods.get_score_modifier(aurora);
     assert_eq!(
@@ -75,9 +76,10 @@ fn aurora_flower_same_cost_no_score() {
     game.set_live_card(aurora);
     finish_live_setup(&mut game);
 
-    while game.has_pending_choice() {
-        game.select_indices(&[]);
-    }
+    // Answer what cannot be declined, decline what can: a mandatory
+    // prompt left parked mid-ability produces exactly the absence
+    // the next assertion checks, so nothing fails.
+    game.drain_choices();
 
     let score = game.state.mods.get_score_modifier(aurora);
     assert_eq!(score, 0, "2 distinct costs should NOT grant score (need 3)");
@@ -108,9 +110,10 @@ fn aurora_flower_same_name_no_score() {
     game.set_live_card(aurora);
     finish_live_setup(&mut game);
 
-    while game.has_pending_choice() {
-        game.select_indices(&[]);
-    }
+    // Answer what cannot be declined, decline what can: a mandatory
+    // prompt left parked mid-ability produces exactly the absence
+    // the next assertion checks, so nothing fails.
+    game.drain_choices();
 
     let score = game.state.mods.get_score_modifier(aurora);
     assert_eq!(score, 0, "2 distinct names should NOT grant score (need 3)");
@@ -140,9 +143,10 @@ fn aurora_flower_two_members_no_score() {
     game.set_live_card(aurora);
     finish_live_setup(&mut game);
 
-    while game.has_pending_choice() {
-        game.select_indices(&[]);
-    }
+    // Answer what cannot be declined, decline what can: a mandatory
+    // prompt left parked mid-ability produces exactly the absence
+    // the next assertion checks, so nothing fails.
+    game.drain_choices();
 
     let score = game.state.mods.get_score_modifier(aurora);
     assert_eq!(score, 0, "Only 2 members should NOT grant score");

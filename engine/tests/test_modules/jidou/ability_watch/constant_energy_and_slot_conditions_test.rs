@@ -352,9 +352,10 @@ fn sayaka_no_energy_from_her_own_presence_but_yes_from_another_suriesubeke_membe
     // member, and ほかの excludes her — so the counter stops at the cost.
     game.add_to_hand(sayaka);
     game.play_to_stage(sayaka, MemberArea::Center);
-    while game.has_pending_choice() {
-        game.select_indices(&[]);
-    }
+    // Answer what cannot be declined, decline what can: a mandatory
+    // prompt left parked mid-ability produces exactly the absence
+    // the next assertion checks, so nothing fails.
+    game.drain_choices();
     assert_eq!(
         game.state.player1.energy_zone.active_count(),
         3,
@@ -375,9 +376,10 @@ fn sayaka_no_energy_from_her_own_presence_but_yes_from_another_suriesubeke_membe
     positive.add_to_hand(sayaka2);
 
     positive.play_to_stage(sayaka2, MemberArea::Center);
-    while positive.has_pending_choice() {
-        positive.select_indices(&[]);
-    }
+    // Answer what cannot be declined, decline what can: a mandatory
+    // prompt left parked mid-ability produces exactly the absence
+    // the next assertion checks, so nothing fails.
+    positive.drain_choices();
 
     assert_eq!(
         positive.state.player1.energy_zone.active_count(),

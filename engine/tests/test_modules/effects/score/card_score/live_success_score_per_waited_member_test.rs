@@ -40,9 +40,10 @@ fn live_success_score_counts_waited_members_but_not_active_members() {
     );
     game.state.activating_card = Some(live);
     game.state.process_pending_auto_abilities(&pid);
-    while game.has_pending_choice() {
-        game.select_indices(&[]);
-    }
+    // Answer what cannot be declined, decline what can: a mandatory
+    // prompt left parked mid-ability produces exactly the absence
+    // the next assertion checks, so nothing fails.
+    game.drain_choices();
 
     let score = game.state.mods.get_score_modifier(live);
     assert_eq!(
@@ -84,9 +85,10 @@ fn live_success_waited_member_bonus_reaches_performance_score_and_success_zone()
     advance_to_live_card_set_p1(&mut game);
     game.set_live_card(live);
     advance_to_live_start(&mut game);
-    while game.has_pending_choice() {
-        game.select_indices(&[]);
-    }
+    // Answer what cannot be declined, decline what can: a mandatory
+    // prompt left parked mid-ability produces exactly the absence
+    // the next assertion checks, so nothing fails.
+    game.drain_choices();
 
     // FirstAttackerPerformance → SecondAttackerPerformance → victory phase
     game.pass();
@@ -94,9 +96,10 @@ fn live_success_waited_member_bonus_reaches_performance_score_and_success_zone()
     // One more pass executes victory determination, which evaluates
     // ライブ成功時 for succeeded lives.
     game.pass();
-    while game.has_pending_choice() {
-        game.select_indices(&[]);
-    }
+    // Answer what cannot be declined, decline what can: a mandatory
+    // prompt left parked mid-ability produces exactly the absence
+    // the next assertion checks, so nothing fails.
+    game.drain_choices();
 
     // The bonus feeds the performance total and the board resets when the
     // turn rolls over, so the durable observable is the player-facing

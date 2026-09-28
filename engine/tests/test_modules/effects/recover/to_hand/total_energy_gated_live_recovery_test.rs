@@ -28,9 +28,10 @@ fn sp_bp1_007_debut_counts_total_energy_not_active() {
 
     game.state.player1.hand.cards.push(card);
     game.play_to_stage(card, MemberArea::Center);
-    while game.has_pending_choice() {
-        game.select_indices(&[]);
-    }
+    // Answer what cannot be declined, decline what can: a mandatory
+    // prompt left parked mid-ability produces exactly the absence
+    // the next assertion checks, so nothing fails.
+    game.drain_choices();
 
     // Full-price play: 13 of 15 flipped to wait → only 2 ACTIVE left.
     assert_eq!(
@@ -81,9 +82,10 @@ fn sp_bp1_007_debut_no_retrieve_when_total_below_11_via_baton_touch() {
         Some(true),
     )
     .expect("baton touch play should succeed at zero cost");
-    while game.has_pending_choice() {
-        game.select_indices(&[]);
-    }
+    // Answer what cannot be declined, decline what can: a mandatory
+    // prompt left parked mid-ability produces exactly the absence
+    // the next assertion checks, so nothing fails.
+    game.drain_choices();
 
     assert!(
         game.state.player1.stage.stage.contains(&card),

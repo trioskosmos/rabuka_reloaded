@@ -37,9 +37,10 @@ fn setup_and_trigger_himeno(game: &mut TestGame, left: i16, center: i16, right: 
 
     game.play_to_stage(himeno, MemberArea::LeftSide);
     // Drain all pending choices (auto abilities, optional costs, etc.)
-    while game.has_pending_choice() {
-        game.select_indices(&[]);
-    }
+    // Answer what cannot be declined, decline what can: a mandatory
+    // prompt left parked mid-ability produces exactly the absence
+    // the next assertion checks, so nothing fails.
+    game.drain_choices();
 }
 
 /// No matching character on stage → ability must NOT fire.
@@ -180,9 +181,10 @@ fn finish_live_setup(game: &mut TestGame) {
     game.pass();
     // Drain all pending choices: auto ability selections + optional cost prompts
     // (stage members like osawa may have their own live_start abilities)
-    while game.has_pending_choice() {
-        game.select_indices(&[]);
-    }
+    // Answer what cannot be declined, decline what can: a mandatory
+    // prompt left parked mid-ability produces exactly the absence
+    // the next assertion checks, so nothing fails.
+    game.drain_choices();
 }
 
 /// Helper: place characters on stage, set up live card, advance to live start.

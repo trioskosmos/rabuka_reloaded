@@ -38,9 +38,10 @@ fn bp5_006_live_start_draws_when_live_zone_has_two_cards() {
 
     game.state.player1.hand.cards.push(card);
     game.play_to_stage(card, MemberArea::Center);
-    while game.has_pending_choice() {
-        game.select_indices(&[]);
-    }
+    // Answer what cannot be declined, decline what can: a mandatory
+    // prompt left parked mid-ability produces exactly the absence
+    // the next assertion checks, so nothing fails.
+    game.drain_choices();
 
     game.state.player1.hand.cards.push(live_card);
     advance_to_live_card_set(&mut game);
@@ -91,9 +92,10 @@ fn bp5_006_live_start_draws_at_exactly_two_cards_boundary() {
 
     game.state.player1.hand.cards.push(card);
     game.play_to_stage(card, MemberArea::Center);
-    while game.has_pending_choice() {
-        game.select_indices(&[]);
-    }
+    // Answer what cannot be declined, decline what can: a mandatory
+    // prompt left parked mid-ability produces exactly the absence
+    // the next assertion checks, so nothing fails.
+    game.drain_choices();
 
     game.state.player1.hand.cards.push(live_card);
     advance_to_live_card_set(&mut game);
@@ -134,9 +136,10 @@ fn bp5_006_live_start_no_draw_when_zone_below_two() {
 
     game.state.player1.hand.cards.push(card);
     game.play_to_stage(card, MemberArea::Center);
-    while game.has_pending_choice() {
-        game.select_indices(&[]);
-    }
+    // Answer what cannot be declined, decline what can: a mandatory
+    // prompt left parked mid-ability produces exactly the absence
+    // the next assertion checks, so nothing fails.
+    game.drain_choices();
 
     game.state.player1.hand.cards.push(live_card);
     advance_to_live_card_set(&mut game);

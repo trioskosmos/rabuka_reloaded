@@ -237,9 +237,10 @@ fn rin_live_success_ability_triggers() {
         rabuka_engine::game_state::Phase::Active,
         "the whole live window must have been traversed"
     );
-    while game.has_pending_choice() {
-        game.select_indices(&[]);
-    }
+    // Answer what cannot be declined, decline what can: a mandatory
+    // prompt left parked mid-ability produces exactly the absence
+    // the next assertion checks, so nothing fails.
+    game.drain_choices();
 
     // Rin's LiveSuccess must be routed and resolved with an explicit verdict.
     let rin_live_success = game.state.rule_log.iter().any(|l| {

@@ -43,9 +43,10 @@ fn solitude_q67_hasetsu_member_with_heart01_score_plus_1() {
     game.pass();
     game.pass();
 
-    while game.has_pending_choice() {
-        game.select_indices(&[]);
-    }
+    // Answer what cannot be declined, decline what can: a mandatory
+    // prompt left parked mid-ability produces exactly the absence
+    // the next assertion checks, so nothing fails.
+    game.drain_choices();
 
     let score_mod = game.state.mods.get_score_modifier(solitude);
     // hasetsu has heart01, heart02, heart04 → 3 unique colors → +3
@@ -84,9 +85,10 @@ fn solitude_q67_non_hasetsu_member_no_score() {
     game.pass();
     game.pass();
 
-    while game.has_pending_choice() {
-        game.select_indices(&[]);
-    }
+    // Answer what cannot be declined, decline what can: a mandatory
+    // prompt left parked mid-ability produces exactly the absence
+    // the next assertion checks, so nothing fails.
+    game.drain_choices();
 
     let score_mod = game.state.mods.get_score_modifier(solitude);
     assert_eq!(score_mod, 0, "Non-虹ヶ咲 should not contribute score");

@@ -209,9 +209,10 @@ fn own_live_zone_discard_optional_deck_e2e_cannot_live_triggers() {
     advance_to_live_card_set_p1(&mut game);
     game.set_live_card(live);
 
-    while game.has_pending_choice() {
-        game.select_indices(&[]);
-    }
+    // Answer what cannot be declined, decline what can: a mandatory
+    // prompt left parked mid-ability produces exactly the absence
+    // the next assertion checks, so nothing fails.
+    game.drain_choices();
 
     // Advance to FirstAttackerPerformance — cannot_live moves cards to waitroom,
     // then 8.3.13 check timing fires auto abilities. Riko should trigger.

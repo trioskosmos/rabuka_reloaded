@@ -65,9 +65,15 @@ fn yoshiko_look_select_member_heart05_2() {
     game.select_option(1);
     game.select_indices(&[0]);
 
-    while game.has_pending_choice() {
-        game.select_indices(&[]);
-    }
+    // Answer what cannot be declined, decline what can: a mandatory prompt
+
+    // left parked mid-ability, and the absence assertion that usually
+
+    // follows is exactly what a wrong answer produces.
+
+    game.drain_choices();
+
+
 
     assert!(
         game.state.player1.hand.cards.contains(&member_heart05_2),
@@ -105,9 +111,15 @@ fn yoshiko_look_select_live_heart05_2() {
     game.select_option(0);
     game.select_indices(&[0]);
 
-    while game.has_pending_choice() {
-        game.select_indices(&[]);
-    }
+    // Answer what cannot be declined, decline what can: a mandatory prompt
+
+    // left parked mid-ability, and the absence assertion that usually
+
+    // follows is exactly what a wrong answer produces.
+
+    game.drain_choices();
+
+
 
     assert!(
         game.state.player1.hand.cards.contains(&live_heart05_2),
@@ -200,9 +212,15 @@ fn yoshiko_look_select_both_types_eligible() {
     game.select_option(1);
     game.select_indices(&[0]);
 
-    while game.has_pending_choice() {
-        game.select_indices(&[]);
-    }
+    // Answer what cannot be declined, decline what can: a mandatory prompt
+
+    // left parked mid-ability, and the absence assertion that usually
+
+    // follows is exactly what a wrong answer produces.
+
+    game.drain_choices();
+
+
 
     assert!(
         game.state.player1.hand.cards.contains(&member_heart05_2),
@@ -257,9 +275,15 @@ fn yoshiko_look_select_discard_remaining() {
     game.select_option(1);
     game.select_indices(&[0]);
 
-    while game.has_pending_choice() {
-        game.select_indices(&[]);
-    }
+    // Answer what cannot be declined, decline what can: a mandatory prompt
+
+    // left parked mid-ability, and the absence assertion that usually
+
+    // follows is exactly what a wrong answer produces.
+
+    game.drain_choices();
+
+
 
     assert!(
         game.state.player1.waitroom.cards.contains(&filler),

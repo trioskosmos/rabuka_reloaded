@@ -89,9 +89,10 @@ fn pb2_020_decline_discard_no_extra_yells() {
     fire_yell_watchers(&mut game);
     assert!(game.has_pending_choice(), "optional discard prompted");
     game.select_indices(&[]);
-    while game.has_pending_choice() {
-        game.select_indices(&[]);
-    }
+    // Answer what cannot be declined, decline what can: a mandatory
+    // prompt left parked mid-ability produces exactly the absence
+    // the next assertion checks, so nothing fails.
+    game.drain_choices();
 
     assert!(
         game.state.player1.hand.cards.contains(&live),

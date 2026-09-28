@@ -285,9 +285,10 @@ fn success_zone_score_six_stage_cost_baton_touch_uses_modified_cost() {
 
     game.state.player1.hand.cards.push(arriver);
     game.play_to_stage(arriver, MemberArea::Center);
-    while game.has_pending_choice() {
-        game.select_indices(&[]);
-    }
+    // Answer what cannot be declined, decline what can: a mandatory
+    // prompt left parked mid-ability produces exactly the absence
+    // the next assertion checks, so nothing fails.
+    game.drain_choices();
 
     // Should have succeeded: 5 - 4 = 1 energy remaining
     let remaining = game.state.player1.energy_zone.active_count();

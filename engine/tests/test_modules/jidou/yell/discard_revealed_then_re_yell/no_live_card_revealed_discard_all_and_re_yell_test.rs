@@ -70,7 +70,8 @@ fn q107_dia_skip_discard_no_followup() {
 
     assert!(game.has_pending_choice(), "Optional discard prompt");
     game.select_indices(&[]);
-    while game.has_pending_choice() {
-        game.select_indices(&[]);
-    }
+    // Answer what cannot be declined, decline what can: a mandatory
+    // prompt left parked mid-ability produces exactly the absence
+    // the next assertion checks, so nothing fails.
+    game.drain_choices();
 }

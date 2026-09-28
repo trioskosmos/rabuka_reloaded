@@ -35,9 +35,10 @@ fn sp_bp2_013_debut_places_waitroom_card_on_deck_top() {
         "expected SelectCard to pick a waitroom card"
     );
     game.select_indices(&[0]);
-    while game.has_pending_choice() {
-        game.select_indices(&[]);
-    }
+    // Answer what cannot be declined, decline what can: a mandatory
+    // prompt left parked mid-ability produces exactly the absence
+    // the next assertion checks, so nothing fails.
+    game.drain_choices();
 
     assert_eq!(
         game.state.player1.main_deck.cards.first(),
@@ -69,9 +70,10 @@ fn sp_bp2_013_debut_can_place_zero_cards() {
     game.play_to_stage(card, MemberArea::Center);
     // Decline: take nothing from the waitroom.
     game.select_indices(&[]);
-    while game.has_pending_choice() {
-        game.select_indices(&[]);
-    }
+    // Answer what cannot be declined, decline what can: a mandatory
+    // prompt left parked mid-ability produces exactly the absence
+    // the next assertion checks, so nothing fails.
+    game.drain_choices();
 
     assert_eq!(
         game.state.player1.main_deck.cards.len(),

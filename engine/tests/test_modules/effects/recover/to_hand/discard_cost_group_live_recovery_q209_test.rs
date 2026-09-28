@@ -58,9 +58,10 @@ fn debut_discard_two_recovers_same_edelnote_live_q209() {
     // Effect: single candidate (the just-discarded edel_live) AUTO-RESOLVES
     // — no retrieval prompt; outcome pinned by the hand assertion below.
 
-    while game.has_pending_choice() {
-        game.select_indices(&[]);
-    }
+    // Answer what cannot be declined, decline what can: a mandatory
+    // prompt left parked mid-ability produces exactly the absence
+    // the next assertion checks, so nothing fails.
+    game.drain_choices();
 
     assert!(
         game.state.player1.hand.cards.contains(&edel_live),
@@ -104,9 +105,10 @@ fn debut_discard_two_recovers_preexisting_edelnote_live_q209() {
 
     // Effect: move_cards with count=1 from a waitroom with exactly 1 EdelNote live
     // → engine auto-resolves (single candidate), no prompt. Verify outcome strictly.
-    while game.has_pending_choice() {
-        game.select_indices(&[]);
-    }
+    // Answer what cannot be declined, decline what can: a mandatory
+    // prompt left parked mid-ability produces exactly the absence
+    // the next assertion checks, so nothing fails.
+    game.drain_choices();
 
     assert!(
         game.state.player1.hand.cards.contains(&edel_live),
@@ -148,9 +150,10 @@ fn debut_discard_two_without_edelnote_live_recovers_nothing_q209() {
     // After play_to_stage: ceras removed from hand, [filler, filler]
     // After cost discard 2: hand empty
     // After effect (no match): hand still empty
-    while game.has_pending_choice() {
-        game.select_indices(&[]);
-    }
+    // Answer what cannot be declined, decline what can: a mandatory
+    // prompt left parked mid-ability produces exactly the absence
+    // the next assertion checks, so nothing fails.
+    game.drain_choices();
 
     assert_eq!(
         game.state.player1.hand.cards.len(),
@@ -191,9 +194,10 @@ fn debut_declined_discard_two_preserves_hand_count_q209() {
     TurnEngine::resume_with_choice(&mut game.state, Some(-1), None).expect("skip");
 
     // No cost paid → no effect → hand unchanged (minus ceras which is on stage)
-    while game.has_pending_choice() {
-        game.select_indices(&[]);
-    }
+    // Answer what cannot be declined, decline what can: a mandatory
+    // prompt left parked mid-ability produces exactly the absence
+    // the next assertion checks, so nothing fails.
+    game.drain_choices();
 
     assert_eq!(
         game.state.player1.hand.cards.len(),
@@ -243,9 +247,10 @@ fn debut_discard_two_selects_one_of_multiple_edelnote_lives_q209() {
     );
     game.select_indices(&[1]); // pick the second one
 
-    while game.has_pending_choice() {
-        game.select_indices(&[]);
-    }
+    // Answer what cannot be declined, decline what can: a mandatory
+    // prompt left parked mid-ability produces exactly the absence
+    // the next assertion checks, so nothing fails.
+    game.drain_choices();
 
     assert!(
         game.state.player1.hand.cards.contains(&edel_b),
@@ -310,9 +315,10 @@ fn activation_energy_and_discard_recovers_same_nijigasaki_live_q209() {
     game.select_indices(&[0]); // discard first card (niji_live)
 
     // Drain any residual prompts (defensive; retrieval auto-resolves).
-    while game.has_pending_choice() {
-        game.select_indices(&[]);
-    }
+    // Answer what cannot be declined, decline what can: a mandatory
+    // prompt left parked mid-ability produces exactly the absence
+    // the next assertion checks, so nothing fails.
+    game.drain_choices();
 
     // Strict outcome:
     assert!(
@@ -372,9 +378,10 @@ fn activation_energy_and_discard_without_nijigasaki_live_recovers_nothing_q209()
     game.select_indices(&[0]); // discard filler
 
     // No 虹ヶ咲 live in waitroom → no retrieval choice
-    while game.has_pending_choice() {
-        game.select_indices(&[]);
-    }
+    // Answer what cannot be declined, decline what can: a mandatory
+    // prompt left parked mid-ability produces exactly the absence
+    // the next assertion checks, so nothing fails.
+    game.drain_choices();
 
     // Hand: initially [kasumi, filler, filler] = 3
     // After play_to_stage: [filler, filler] = 2
@@ -490,9 +497,10 @@ fn activation_energy_and_discard_recovers_preexisting_nijigasaki_live_q209() {
     );
     game.select_indices(&[0]); // retrieve niji_a
 
-    while game.has_pending_choice() {
-        game.select_indices(&[]);
-    }
+    // Answer what cannot be declined, decline what can: a mandatory
+    // prompt left parked mid-ability produces exactly the absence
+    // the next assertion checks, so nothing fails.
+    game.drain_choices();
 
     assert!(
         game.state.player1.hand.cards.contains(&niji_a),

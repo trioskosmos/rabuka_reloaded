@@ -52,9 +52,10 @@ fn kanon_select_liella_cost4_keep_in_hand() {
 
     game.select_indices(&[0]); // select liella from looked_at
                                // skip stage debut followup → card stays in hand
-    while game.has_pending_choice() {
-        game.select_indices(&[]);
-    }
+    // Answer what cannot be declined, decline what can: a mandatory
+    // prompt left parked mid-ability produces exactly the absence
+    // the next assertion checks, so nothing fails.
+    game.drain_choices();
     assert!(
         game.state.player1.hand.cards.contains(&liella),
         "Liella! in hand"
@@ -118,9 +119,10 @@ fn kanon_skip_cost_effect_not_executed() {
 
     game.play_to_stage(kanon, MemberArea::Center);
     // Skip optional cost
-    while game.has_pending_choice() {
-        game.select_indices(&[]);
-    }
+    // Answer what cannot be declined, decline what can: a mandatory
+    // prompt left parked mid-ability produces exactly the absence
+    // the next assertion checks, so nothing fails.
+    game.drain_choices();
     assert!(
         !game.state.player1.hand.cards.contains(&liella),
         "not in hand"
@@ -139,9 +141,10 @@ fn kanon_no_matching_cards_discard_all() {
     game.play_to_stage(kanon, MemberArea::Center);
     pay_optional_cost(&mut game);
     // Drain followup choice
-    while game.has_pending_choice() {
-        game.select_indices(&[]);
-    }
+    // Answer what cannot be declined, decline what can: a mandatory
+    // prompt left parked mid-ability produces exactly the absence
+    // the next assertion checks, so nothing fails.
+    game.drain_choices();
     assert!(
         game.state.player1.waitroom.cards.contains(&filler),
         "discarded"
@@ -163,9 +166,10 @@ fn kanon_cost_above_4_rejected() {
 
     game.play_to_stage(kanon, MemberArea::Center);
     pay_optional_cost(&mut game);
-    while game.has_pending_choice() {
-        game.select_indices(&[]);
-    }
+    // Answer what cannot be declined, decline what can: a mandatory
+    // prompt left parked mid-ability produces exactly the absence
+    // the next assertion checks, so nothing fails.
+    game.drain_choices();
     // Cost-11 Kanon copy is Liella! but above the cost≤4 filter → rejected,
     // so nothing was selected and both looked_at cards end up discarded.
     assert!(
@@ -189,9 +193,10 @@ fn kanon_non_liella_cost4_rejected() {
 
     game.play_to_stage(kanon, MemberArea::Center);
     pay_optional_cost(&mut game);
-    while game.has_pending_choice() {
-        game.select_indices(&[]);
-    }
+    // Answer what cannot be declined, decline what can: a mandatory
+    // prompt left parked mid-ability produces exactly the absence
+    // the next assertion checks, so nothing fails.
+    game.drain_choices();
     // μ's member fails the 『Liella!』 group filter → rejected and discarded.
     assert!(
         !game.state.player1.hand.cards.contains(&non_liella),
@@ -216,9 +221,10 @@ fn kanon_max_1_enforced() {
     pay_optional_cost(&mut game);
     game.select_indices(&[0]); // select first matching from looked_at
                                // skip followup
-    while game.has_pending_choice() {
-        game.select_indices(&[]);
-    }
+    // Answer what cannot be declined, decline what can: a mandatory
+    // prompt left parked mid-ability produces exactly the absence
+    // the next assertion checks, so nothing fails.
+    game.drain_choices();
     // Only 1 of the 2 Liella! cards should be in hand (max=1)
     let hand_count = game
         .state

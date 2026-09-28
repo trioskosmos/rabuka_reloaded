@@ -32,7 +32,7 @@ _has_pending_choice asserted without choice identity (pending_choice_type/summar
 | --- | --- | --- | --- |
 | `engine/tests/test_modules/effects/gain/hearts/color_choice/chosen_colour_is_a_replacement_not_a_grant_test.rs` | `kasumi_colour_override_does_not_survive_the_live_that_set_it` | 198 |  |
 | `engine/tests/test_modules/jidou/debut_watch/three_way_choices_and_look_at_three_test.rs` | `wakana_the_chosen_heart_replaces_her_printed_hearts` | 159 |  |
-| `engine/tests/test_modules/jidou/yell/no_blade_heart_reveal_gain/no_blade_heart_reveal_two_watchers_modifier_bounds_test.rs` | `yell_two_no_blade_heart_watchers_are_covered_by_the_real_yell_test` | 31 |  |
+| `engine/tests/test_modules/jidou/yell/no_blade_heart_reveal_gain/no_blade_heart_reveal_two_watchers_modifier_bounds_test.rs` | `yell_two_no_blade_heart_watchers_are_covered_by_the_real_yell_test` | 30 |  |
 
 ## assert_only_negative (0)
 
@@ -187,11 +187,8 @@ _every assertion is an INEQUALITY on a count and there is no assert_eq anywhere 
 
 None.
 
-## unresolvable_card_id (2)
+## unresolvable_card_id (0)
 
 _a card-number literal that is not in the database — either written inline in a `game.id("…")` or bound to a name (`const X: &str = "…"` / `let x: &str = "…"`), because const-bound card numbers are the dominant idiom here and the call-site form alone cannot see them. get_card_id's lenient fallback silently substitutes a DIFFERENT PRINT of the same card, so the test stages the wrong card and passes: `PL!SP-bp1-014-PR` resolved to `PL!SP-bp1-014-N` and left a "three DISTINCT names" premise unpinned_
 
-| file | test | line | detail |
-| --- | --- | --- | --- |
-| `engine/tests/test_modules/effects/state/wait_activation/wondermates_group_filter_negatives_test.rs` | `<literal>` | 30 | PL!N-bp1-013-R |
-| `engine/tests/test_modules/jidou/combination/sp_bp5_005_mill_arms_jidou_recover_test.rs` | `<literal>` | 44 | PL!SP-bp1-002-R |
+None.

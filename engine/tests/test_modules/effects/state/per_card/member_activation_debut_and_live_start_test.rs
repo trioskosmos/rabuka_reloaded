@@ -42,9 +42,10 @@ fn bp3_005_debut_activates_all_waited_members() {
 
     game.state.player1.hand.cards.push(card);
     game.play_to_stage(card, MemberArea::RightSide);
-    while game.has_pending_choice() {
-        game.select_indices(&[]);
-    }
+    // Answer what cannot be declined, decline what can: a mandatory
+    // prompt left parked mid-ability produces exactly the absence
+    // the next assertion checks, so nothing fails.
+    game.drain_choices();
 
     assert_eq!(
         game.state.mods.get_orientation_modifier(mate_a),
@@ -72,16 +73,18 @@ fn combo_bp3_005_mass_activate_readies_self_waited_ability_member() {
 
     game.state.player1.hand.cards.push(kanata);
     game.play_to_stage(kanata, MemberArea::LeftSide);
-    while game.has_pending_choice() {
-        game.select_indices(&[]);
-    }
+    // Answer what cannot be declined, decline what can: a mandatory
+    // prompt left parked mid-ability produces exactly the absence
+    // the next assertion checks, so nothing fails.
+    game.drain_choices();
 
     // Kanata's 起動: waits herself, activates 1 energy.
     let energy_before = game.state.player1.energy_zone.active_count();
     game.activate_ability(kanata);
-    while game.has_pending_choice() {
-        game.select_indices(&[]);
-    }
+    // Answer what cannot be declined, decline what can: a mandatory
+    // prompt left parked mid-ability produces exactly the absence
+    // the next assertion checks, so nothing fails.
+    game.drain_choices();
     assert_eq!(
         game.state.mods.get_orientation_modifier(kanata),
         Some("wait"),
@@ -96,9 +99,10 @@ fn combo_bp3_005_mass_activate_readies_self_waited_ability_member() {
     // Play bp3-005 — its debut activates ALL members incl. kanata.
     game.state.player1.hand.cards.push(mass);
     game.play_to_stage(mass, MemberArea::Center);
-    while game.has_pending_choice() {
-        game.select_indices(&[]);
-    }
+    // Answer what cannot be declined, decline what can: a mandatory
+    // prompt left parked mid-ability produces exactly the absence
+    // the next assertion checks, so nothing fails.
+    game.drain_choices();
 
     assert_eq!(
         game.state.mods.get_orientation_modifier(kanata),
@@ -108,9 +112,10 @@ fn combo_bp3_005_mass_activate_readies_self_waited_ability_member() {
     // Kanata can immediately be used again (no turn limit on her ability).
     let e2 = game.state.player1.energy_zone.active_count();
     game.activate_ability(kanata);
-    while game.has_pending_choice() {
-        game.select_indices(&[]);
-    }
+    // Answer what cannot be declined, decline what can: a mandatory
+    // prompt left parked mid-ability produces exactly the absence
+    // the next assertion checks, so nothing fails.
+    game.drain_choices();
     assert_eq!(
         game.state.player1.energy_zone.active_count(),
         e2 + 1,
@@ -137,9 +142,10 @@ fn bp3_001_live_start_activates_one_chosen_member() {
 
     game.state.player1.hand.cards.push(card);
     game.play_to_stage(card, MemberArea::Center);
-    while game.has_pending_choice() {
-        game.select_indices(&[]);
-    }
+    // Answer what cannot be declined, decline what can: a mandatory
+    // prompt left parked mid-ability produces exactly the absence
+    // the next assertion checks, so nothing fails.
+    game.drain_choices();
 
     game.state.player1.hand.cards.push(live_card);
     advance_to_live_card_set(&mut game);
@@ -205,9 +211,10 @@ fn bp3_001_live_start_can_skip_activation() {
 
     game.state.player1.hand.cards.push(card);
     game.play_to_stage(card, MemberArea::Center);
-    while game.has_pending_choice() {
-        game.select_indices(&[]);
-    }
+    // Answer what cannot be declined, decline what can: a mandatory
+    // prompt left parked mid-ability produces exactly the absence
+    // the next assertion checks, so nothing fails.
+    game.drain_choices();
 
     game.state.player1.hand.cards.push(live_card);
     advance_to_live_card_set(&mut game);

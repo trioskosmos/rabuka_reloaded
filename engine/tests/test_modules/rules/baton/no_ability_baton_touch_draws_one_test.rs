@@ -70,9 +70,10 @@ fn chika_bp5_001_baton_touch_from_ability_member_no_draw() {
     let hand_before = game.state.player1.hand.cards.len();
     game.play_to_stage(chika, rabuka_engine::zones::MemberArea::Center);
 
-    while game.has_pending_choice() {
-        game.select_indices(&[]);
-    }
+    // Answer what cannot be declined, decline what can: a mandatory
+    // prompt left parked mid-ability produces exactly the absence
+    // the next assertion checks, so nothing fails.
+    game.drain_choices();
 
     assert_eq!(game.state.player1.stage.stage[1], chika, "Chika at Center");
     assert_eq!(
@@ -101,9 +102,10 @@ fn chika_bp5_001_normal_debut_no_draw() {
     let hand_before = game.state.player1.hand.cards.len();
     game.play_to_stage(chika, rabuka_engine::zones::MemberArea::Center);
 
-    while game.has_pending_choice() {
-        game.select_indices(&[]);
-    }
+    // Answer what cannot be declined, decline what can: a mandatory
+    // prompt left parked mid-ability produces exactly the absence
+    // the next assertion checks, so nothing fails.
+    game.drain_choices();
 
     assert_eq!(game.state.player1.stage.stage[1], chika, "Chika at Center");
     assert_eq!(

@@ -94,9 +94,10 @@ fn kosuzu_bp6_condition_met_gains_heart05_and_blade() {
     );
 
     // Resolve any remaining choices
-    while game.has_pending_choice() {
-        game.select_indices(&[]);
-    }
+    // Answer what cannot be declined, decline what can: a mandatory
+    // prompt left parked mid-ability produces exactly the absence
+    // the next assertion checks, so nothing fails.
+    game.drain_choices();
 
     game.print_trace();
 
@@ -206,9 +207,10 @@ fn kosuzu_bp6_condition_not_met_no_heart05_no_blade() {
          not."
     );
 
-    while game.has_pending_choice() {
-        game.select_indices(&[]);
-    }
+    // Answer what cannot be declined, decline what can: a mandatory
+    // prompt left parked mid-ability produces exactly the absence
+    // the next assertion checks, so nothing fails.
+    game.drain_choices();
 
     // 蓮ノ空 total with +6 = 16 < opponent 19 → should NOT gain blade or heart05
     let blade = game.state.mods.get_blade_modifier(kosuzu);

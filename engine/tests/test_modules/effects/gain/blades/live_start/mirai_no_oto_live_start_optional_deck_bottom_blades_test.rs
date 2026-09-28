@@ -151,9 +151,10 @@ fn mirai_skip_leaves_discard_and_no_blade() {
     trigger_live_start(&mut game, mirai);
     assert!(game.has_pending_choice(), "optional should be offered");
     game.select_choice_option(0); // Skip
-    while game.has_pending_choice() {
-        game.select_indices(&[]);
-    }
+    // Answer what cannot be declined, decline what can: a mandatory
+    // prompt left parked mid-ability produces exactly the absence
+    // the next assertion checks, so nothing fails.
+    game.drain_choices();
 
     assert_eq!(
         game.state.player1.waitroom.cards.len(),

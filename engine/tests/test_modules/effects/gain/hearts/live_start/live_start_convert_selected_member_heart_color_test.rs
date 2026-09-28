@@ -30,9 +30,10 @@ fn pl_hs_bp5_021_l_single_hasunosora_member_heart01_conversion() {
     fill_decks(&mut game, filler);
     game.state.player1.hand.cards.push(member);
     game.play_to_stage(member, MemberArea::Center);
-    while game.has_pending_choice() {
-        game.select_indices(&[]);
-    }
+    // Answer what cannot be declined, decline what can: a mandatory
+    // prompt left parked mid-ability produces exactly the absence
+    // the next assertion checks, so nothing fails.
+    game.drain_choices();
     game.state.player1.hand.cards.push(live_card);
     pl_hs_bp5_021_l_advance_to_live_card_set(&mut game);
     game.set_live_card(live_card);
@@ -90,13 +91,15 @@ fn pl_hs_bp5_021_l_multiple_hasunosora_members_only_selected_converted() {
     game.state.player1.hand.cards.push(member_a);
     game.state.player1.hand.cards.push(member_b);
     game.play_to_stage(member_a, MemberArea::LeftSide);
-    while game.has_pending_choice() {
-        game.select_indices(&[]);
-    }
+    // Answer what cannot be declined, decline what can: a mandatory
+    // prompt left parked mid-ability produces exactly the absence
+    // the next assertion checks, so nothing fails.
+    game.drain_choices();
     game.play_to_stage(member_b, MemberArea::Center);
-    while game.has_pending_choice() {
-        game.select_indices(&[]);
-    }
+    // Answer what cannot be declined, decline what can: a mandatory
+    // prompt left parked mid-ability produces exactly the absence
+    // the next assertion checks, so nothing fails.
+    game.drain_choices();
     game.state.player1.hand.cards.push(live_card);
     pl_hs_bp5_021_l_advance_to_live_card_set(&mut game);
     game.set_live_card(live_card);
@@ -147,9 +150,10 @@ fn pl_hs_bp5_021_l_no_hasunosora_member_no_heart_conversion() {
     fill_decks(&mut game, filler);
     game.state.player1.hand.cards.push(filler_member);
     game.play_to_stage(filler_member, MemberArea::Center);
-    while game.has_pending_choice() {
-        game.select_indices(&[]);
-    }
+    // Answer what cannot be declined, decline what can: a mandatory
+    // prompt left parked mid-ability produces exactly the absence
+    // the next assertion checks, so nothing fails.
+    game.drain_choices();
     game.state.player1.hand.cards.push(live_card);
     pl_hs_bp5_021_l_advance_to_live_card_set(&mut game);
     game.set_live_card(live_card);
@@ -179,17 +183,20 @@ fn pl_hs_bp5_021_l_three_eligible_members_only_picked_center_converted() {
     game.state.player1.hand.cards.push(member_b);
     game.state.player1.hand.cards.push(member_c);
     game.play_to_stage(member, MemberArea::LeftSide);
-    while game.has_pending_choice() {
-        game.select_indices(&[]);
-    }
+    // Answer what cannot be declined, decline what can: a mandatory
+    // prompt left parked mid-ability produces exactly the absence
+    // the next assertion checks, so nothing fails.
+    game.drain_choices();
     game.play_to_stage(member_b, MemberArea::Center);
-    while game.has_pending_choice() {
-        game.select_indices(&[]);
-    }
+    // Answer what cannot be declined, decline what can: a mandatory
+    // prompt left parked mid-ability produces exactly the absence
+    // the next assertion checks, so nothing fails.
+    game.drain_choices();
     game.play_to_stage(member_c, MemberArea::RightSide);
-    while game.has_pending_choice() {
-        game.select_indices(&[]);
-    }
+    // Answer what cannot be declined, decline what can: a mandatory
+    // prompt left parked mid-ability produces exactly the absence
+    // the next assertion checks, so nothing fails.
+    game.drain_choices();
     game.state.player1.hand.cards.push(live_card);
     pl_hs_bp5_021_l_advance_to_live_card_set(&mut game);
     game.set_live_card(live_card);
@@ -256,13 +263,15 @@ fn pl_hs_bp5_021_l_one_eligible_one_ineligible_auto_selects_eligible() {
     game.state.player1.hand.cards.push(hasuno);
     game.state.player1.hand.cards.push(non_hasuno);
     game.play_to_stage(hasuno, MemberArea::Center);
-    while game.has_pending_choice() {
-        game.select_indices(&[]);
-    }
+    // Answer what cannot be declined, decline what can: a mandatory
+    // prompt left parked mid-ability produces exactly the absence
+    // the next assertion checks, so nothing fails.
+    game.drain_choices();
     game.play_to_stage(non_hasuno, MemberArea::LeftSide);
-    while game.has_pending_choice() {
-        game.select_indices(&[]);
-    }
+    // Answer what cannot be declined, decline what can: a mandatory
+    // prompt left parked mid-ability produces exactly the absence
+    // the next assertion checks, so nothing fails.
+    game.drain_choices();
     game.state.player1.hand.cards.push(live_card);
     pl_hs_bp5_021_l_advance_to_live_card_set(&mut game);
     game.set_live_card(live_card);
@@ -321,9 +330,10 @@ fn pl_hs_bp5_021_l_heart01_conversion_preserves_exact_total() {
     fill_decks(&mut game, filler);
     game.state.player1.hand.cards.push(member);
     game.play_to_stage(member, MemberArea::Center);
-    while game.has_pending_choice() {
-        game.select_indices(&[]);
-    }
+    // Answer what cannot be declined, decline what can: a mandatory
+    // prompt left parked mid-ability produces exactly the absence
+    // the next assertion checks, so nothing fails.
+    game.drain_choices();
     game.state.player1.hand.cards.push(live_card);
     pl_hs_bp5_021_l_advance_to_live_card_set(&mut game);
     game.set_live_card(live_card);

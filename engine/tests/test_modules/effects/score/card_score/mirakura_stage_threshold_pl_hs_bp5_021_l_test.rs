@@ -33,17 +33,20 @@ fn pl_hs_bp5_021_l_three_mirakura_members_grant_score_bonus() {
     game.state.player1.hand.cards.push(mirakura_b);
     game.state.player1.hand.cards.push(mirakura_c);
     game.play_to_stage(mirakura, MemberArea::LeftSide);
-    while game.has_pending_choice() {
-        game.select_indices(&[]);
-    }
+    // Answer what cannot be declined, decline what can: a mandatory
+    // prompt left parked mid-ability produces exactly the absence
+    // the next assertion checks, so nothing fails.
+    game.drain_choices();
     game.play_to_stage(mirakura_b, MemberArea::Center);
-    while game.has_pending_choice() {
-        game.select_indices(&[]);
-    }
+    // Answer what cannot be declined, decline what can: a mandatory
+    // prompt left parked mid-ability produces exactly the absence
+    // the next assertion checks, so nothing fails.
+    game.drain_choices();
     game.play_to_stage(mirakura_c, MemberArea::RightSide);
-    while game.has_pending_choice() {
-        game.select_indices(&[]);
-    }
+    // Answer what cannot be declined, decline what can: a mandatory
+    // prompt left parked mid-ability produces exactly the absence
+    // the next assertion checks, so nothing fails.
+    game.drain_choices();
     game.state.player1.hand.cards.push(live_card);
     pl_hs_bp5_021_l_advance_to_live_card_set(&mut game);
     game.set_live_card(live_card);
@@ -79,13 +82,15 @@ fn pl_hs_bp5_021_l_one_mirakura_member_no_score_bonus() {
     game.state.player1.hand.cards.push(mirakura);
     game.state.player1.hand.cards.push(other);
     game.play_to_stage(mirakura, MemberArea::Center);
-    while game.has_pending_choice() {
-        game.select_indices(&[]);
-    }
+    // Answer what cannot be declined, decline what can: a mandatory
+    // prompt left parked mid-ability produces exactly the absence
+    // the next assertion checks, so nothing fails.
+    game.drain_choices();
     game.play_to_stage(other, MemberArea::LeftSide);
-    while game.has_pending_choice() {
-        game.select_indices(&[]);
-    }
+    // Answer what cannot be declined, decline what can: a mandatory
+    // prompt left parked mid-ability produces exactly the absence
+    // the next assertion checks, so nothing fails.
+    game.drain_choices();
     game.state.player1.hand.cards.push(live_card);
     pl_hs_bp5_021_l_advance_to_live_card_set(&mut game);
     game.set_live_card(live_card);

@@ -51,9 +51,10 @@ fn revealed_live_above_hand_threshold_does_not_draw_again() {
     game.pass(); // P2Turn → LiveStart (looks 2 from deck: 99→97) → cheer → auto abilities
 
     // After LiveStart choice (if any)
-    while game.has_pending_choice() {
-        game.select_indices(&[]);
-    }
+    // Answer what cannot be declined, decline what can: a mandatory
+    // prompt left parked mid-ability produces exactly the absence
+    // the next assertion checks, so nothing fails.
+    game.drain_choices();
 
     let hand = game.state.player1.hand.cards.as_slice();
     assert_eq!(hand.len(), 8, "only the selected live should enter hand");

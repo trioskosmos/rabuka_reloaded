@@ -128,9 +128,10 @@ fn baton_displaced_self_as_arriver_not_displaced() {
     let kanon = game.id(KANON);
     game.state.player1.hand.cards.push(kanon);
     game.play_to_stage(kanon, MemberArea::Center);
-    while game.has_pending_choice() {
-        game.select_indices(&[]);
-    }
+    // Answer what cannot be declined, decline what can: a mandatory
+    // prompt left parked mid-ability produces exactly the absence
+    // the next assertion checks, so nothing fails.
+    game.drain_choices();
 
     assert_eq!(
         game.state.player1.stage.stage[1], kanon,

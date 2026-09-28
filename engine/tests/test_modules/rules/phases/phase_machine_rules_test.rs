@@ -43,9 +43,10 @@ fn pass_until(game: &mut TestGame, phase: Phase, seat: usize) {
         guard += 1;
         assert!(guard <= 24, "phase {:?} (seat {}) not reached", phase, seat);
         game.pass();
-        while game.has_pending_choice() {
-            game.select_indices(&[]);
-        }
+        // Answer what cannot be declined, decline what can: a mandatory
+        // prompt left parked mid-ability produces exactly the absence
+        // the next assertion checks, so nothing fails.
+        game.drain_choices();
     }
 }
 
@@ -285,9 +286,10 @@ fn live_card_set_refill_draws_placed_count() {
     {
         guard += 1;
         game.pass();
-        while game.has_pending_choice() {
-            game.select_indices(&[]);
-        }
+        // Answer what cannot be declined, decline what can: a mandatory
+        // prompt left parked mid-ability produces exactly the absence
+        // the next assertion checks, so nothing fails.
+        game.drain_choices();
     }
 
     game.set_live_card(live1);

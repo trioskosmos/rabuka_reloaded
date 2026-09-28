@@ -234,9 +234,10 @@ fn required_hearts_twelve_gain_two_all_hearts_expires_at_live_end() {
     advance_to_live_start(&mut game);
 
     // Handle any pending choices from LiveStart triggers
-    while game.has_pending_choice() {
-        game.select_indices(&[]);
-    }
+    // Answer what cannot be declined, decline what can: a mandatory
+    // prompt left parked mid-ability produces exactly the absence
+    // the next assertion checks, so nothing fails.
+    game.drain_choices();
 
     // During live phase: exactly +2 all-heart
     let all = game.state.mods.get_heart_modifier(riko, HeartColor::All);
@@ -250,9 +251,10 @@ fn required_hearts_twelve_gain_two_all_hearts_expires_at_live_end() {
     game.pass();
 
     // Handle any pending choices (e.g. LiveSuccess triggers)
-    while game.has_pending_choice() {
-        game.select_indices(&[]);
-    }
+    // Answer what cannot be declined, decline what can: a mandatory
+    // prompt left parked mid-ability produces exactly the absence
+    // the next assertion checks, so nothing fails.
+    game.drain_choices();
 
     // Advance: LiveVictoryDetermination → Active
     game.pass();

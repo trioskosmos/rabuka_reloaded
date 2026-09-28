@@ -272,9 +272,10 @@ fn chisato_promo_ab1_live_start() {
 
     // Step into the first attacker performance, where ライブ開始時 resolves.
     game.advance_to_phase(rabuka_engine::game_state::Phase::FirstAttackerPerformance);
-    while game.has_pending_choice() {
-        game.select_indices(&[]);
-    }
+    // Answer what cannot be declined, decline what can: a mandatory
+    // prompt left parked mid-ability produces exactly the absence
+    // the next assertion checks, so nothing fails.
+    game.drain_choices();
 
     // Since Chisato's ab#1 triggers automatically and is not optional,
     // the members and energy should be activated.

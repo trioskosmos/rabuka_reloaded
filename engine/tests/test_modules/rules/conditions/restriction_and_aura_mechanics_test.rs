@@ -143,9 +143,10 @@ fn niko_pb1009_suppresses_effect_activations_for_the_turn() {
         );
         game.state.activating_card = Some(nico);
         game.state.process_pending_auto_abilities(&pid);
-        while game.has_pending_choice() {
-            game.select_indices(&[]);
-        }
+        // Answer what cannot be declined, decline what can: a mandatory
+        // prompt left parked mid-ability produces exactly the absence
+        // the next assertion checks, so nothing fails.
+        game.drain_choices();
     }
 
     trigger_auto(
@@ -154,9 +155,10 @@ fn niko_pb1009_suppresses_effect_activations_for_the_turn() {
         AbilityTrigger::Debut,
         "登場",
     );
-    while game.has_pending_choice() {
-        game.select_indices(&[]);
-    }
+    // Answer what cannot be declined, decline what can: a mandatory
+    // prompt left parked mid-ability produces exactly the absence
+    // the next assertion checks, so nothing fails.
+    game.drain_choices();
 
     assert!(
         game.state.mods.get_orientation_modifier(victim) == Some("wait"),
@@ -225,9 +227,10 @@ fn mijuku_dreamer_refresh_condition_scores() {
         AbilityTrigger::LiveSuccess,
         "ライブ成功時",
     );
-    while game.has_pending_choice() {
-        game.select_indices(&[]);
-    }
+    // Answer what cannot be declined, decline what can: a mandatory
+    // prompt left parked mid-ability produces exactly the absence
+    // the next assertion checks, so nothing fails.
+    game.drain_choices();
     assert_eq!(
         game.state.mods.get_score_modifier(live),
         0,
@@ -242,9 +245,10 @@ fn mijuku_dreamer_refresh_condition_scores() {
         AbilityTrigger::LiveSuccess,
         "ライブ成功時",
     );
-    while game.has_pending_choice() {
-        game.select_indices(&[]);
-    }
+    // Answer what cannot be declined, decline what can: a mandatory
+    // prompt left parked mid-ability produces exactly the absence
+    // the next assertion checks, so nothing fails.
+    game.drain_choices();
     assert_eq!(
         game.state.mods.get_score_modifier(live),
         2,

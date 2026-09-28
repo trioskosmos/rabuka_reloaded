@@ -119,9 +119,10 @@ fn honoka_bp4_001_live_start_cheaper_stage_total_draws_one_otherwise_skips() {
     game.state.player2.stage.stage[1] = big;
     let before = game.state.player1.hand.cards.len();
     trigger_auto(&mut game, honoka, AbilityTrigger::LiveStart, "ライブ開始時");
-    while game.has_pending_choice() {
-        game.select_indices(&[]);
-    }
+    // Answer what cannot be declined, decline what can: a mandatory
+    // prompt left parked mid-ability produces exactly the absence
+    // the next assertion checks, so nothing fails.
+    game.drain_choices();
     assert_eq!(
         game.state.player1.hand.cards.len(),
         before + 1,
@@ -132,9 +133,10 @@ fn honoka_bp4_001_live_start_cheaper_stage_total_draws_one_otherwise_skips() {
     game.state.player2.stage.stage[1] = small;
     let before2 = game.state.player1.hand.cards.len();
     trigger_auto(&mut game, honoka, AbilityTrigger::LiveStart, "ライブ開始時");
-    while game.has_pending_choice() {
-        game.select_indices(&[]);
-    }
+    // Answer what cannot be declined, decline what can: a mandatory
+    // prompt left parked mid-ability produces exactly the absence
+    // the next assertion checks, so nothing fails.
+    game.drain_choices();
     assert_eq!(
         game.state.player1.hand.cards.len(),
         before2,

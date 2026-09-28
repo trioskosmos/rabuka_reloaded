@@ -80,9 +80,10 @@ fn pl_hs_bp5_016_n_decline_without_waited_opponents_no_constant_heart06() {
     fill_decks(&mut game, filler);
     game.state.player1.hand.cards.push(card);
     game.play_to_stage(card, MemberArea::Center);
-    while game.has_pending_choice() {
-        game.select_indices(&[]);
-    }
+    // Answer what cannot be declined, decline what can: a mandatory
+    // prompt left parked mid-ability produces exactly the absence
+    // the next assertion checks, so nothing fails.
+    game.drain_choices();
     let h06 = game
         .state
         .mods

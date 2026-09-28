@@ -502,9 +502,10 @@ fn test_bp4_debut_look_select_puts_card_in_hand() {
     );
 
     // No pending choices should remain
-    while game.has_pending_choice() {
-        game.select_indices(&[]);
-    }
+    // Answer what cannot be declined, decline what can: a mandatory
+    // prompt left parked mid-ability produces exactly the absence
+    // the next assertion checks, so nothing fails.
+    game.drain_choices();
     assert!(
         !game.has_pending_choice(),
         "All choices should be resolved after look-and-select completes"
@@ -617,9 +618,10 @@ fn test_bp4_debut_wait_opponent_members_after_selection() {
 
     game.select_indices(&[0]);
 
-    while game.has_pending_choice() {
-        game.select_indices(&[]);
-    }
+    // Answer what cannot be declined, decline what can: a mandatory
+    // prompt left parked mid-ability produces exactly the absence
+    // the next assertion checks, so nothing fails.
+    game.drain_choices();
 
     // ayumu cost=2 → filter: cost≤2 AND original blade≤3
     // p2_low (cost=2, blade=1) should be waited (orientation = "wait")

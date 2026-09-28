@@ -95,9 +95,10 @@ fn choose_color(game: &mut TestGame, cid: i16, option: i16) {
         card.card_no
     );
     game.select_option(option);
-    while game.has_pending_choice() {
-        game.select_indices(&[]);
-    }
+    // Answer what cannot be declined, decline what can: a mandatory
+    // prompt left parked mid-ability produces exactly the absence
+    // the next assertion checks, so nothing fails.
+    game.drain_choices();
 }
 
 // ====================================================================
@@ -219,9 +220,10 @@ fn kasumi_colour_override_does_not_survive_the_live_that_set_it() {
         guard += 1;
         game.pass();
         game.drain_auto_ability_choices();
-        while game.has_pending_choice() {
-            game.select_indices(&[]);
-        }
+        // Answer what cannot be declined, decline what can: a mandatory
+        // prompt left parked mid-ability produces exactly the absence
+        // the next assertion checks, so nothing fails.
+        game.drain_choices();
     }
     game.state.recalculate_constants();
 

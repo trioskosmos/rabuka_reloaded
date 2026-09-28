@@ -47,9 +47,10 @@ fn pass_into_phase_capturing_energy(game: &mut TestGame, target: Phase) -> (i32,
             game.state.player2.energy_zone.active_count() as i32,
         );
         game.pass();
-        while game.has_pending_choice() {
-            game.select_indices(&[]);
-        }
+        // Answer what cannot be declined, decline what can: a mandatory
+        // prompt left parked mid-ability produces exactly the absence
+        // the next assertion checks, so nothing fails.
+        game.drain_choices();
     }
     panic!(
         "the turn never reached {:?} within 16 passes (stuck at {:?})",
@@ -96,9 +97,10 @@ fn genki_exactly_6_heart02_across_two_members_invalidates_live_success() {
     game.state.player1.hand.cards.push(genki);
     game.set_live_card(genki);
     advance_to_live_start(&mut game);
-    while game.has_pending_choice() {
-        game.select_indices(&[]);
-    }
+    // Answer what cannot be declined, decline what can: a mandatory
+    // prompt left parked mid-ability produces exactly the absence
+    // the next assertion checks, so nothing fails.
+    game.drain_choices();
 
     assert!(
         game.state
@@ -150,9 +152,10 @@ fn genki_5_heart02_keeps_live_success_and_it_resolves() {
     game.state.player1.hand.cards.push(genki);
     game.set_live_card(genki);
     advance_to_live_start(&mut game);
-    while game.has_pending_choice() {
-        game.select_indices(&[]);
-    }
+    // Answer what cannot be declined, decline what can: a mandatory
+    // prompt left parked mid-ability produces exactly the absence
+    // the next assertion checks, so nothing fails.
+    game.drain_choices();
 
     assert!(
         !game.state
@@ -162,9 +165,10 @@ fn genki_5_heart02_keeps_live_success_and_it_resolves() {
 
     for _ in 0..3 {
         game.pass();
-        while game.has_pending_choice() {
-            game.select_indices(&[]);
-        }
+        // Answer what cannot be declined, decline what can: a mandatory
+        // prompt left parked mid-ability produces exactly the absence
+        // the next assertion checks, so nothing fails.
+        game.drain_choices();
     }
 
     assert!(
@@ -201,9 +205,10 @@ fn butterfly_suppresses_own_live_start_but_still_scores_on_live_success() {
     game.state.player1.hand.cards.push(butterfly);
     game.set_live_card(butterfly);
     advance_to_live_start(&mut game);
-    while game.has_pending_choice() {
-        game.select_indices(&[]);
-    }
+    // Answer what cannot be declined, decline what can: a mandatory
+    // prompt left parked mid-ability produces exactly the absence
+    // the next assertion checks, so nothing fails.
+    game.drain_choices();
 
     assert_eq!(
         game.state.player1.energy_zone.active_count(),
@@ -213,9 +218,10 @@ fn butterfly_suppresses_own_live_start_but_still_scores_on_live_success() {
 
     for _ in 0..3 {
         game.pass();
-        while game.has_pending_choice() {
-            game.select_indices(&[]);
-        }
+        // Answer what cannot be declined, decline what can: a mandatory
+        // prompt left parked mid-ability produces exactly the absence
+        // the next assertion checks, so nothing fails.
+        game.drain_choices();
     }
 
     let live = game

@@ -318,9 +318,10 @@ fn miyamiya_baton_touch_cost15_newcomer_full_payoff() {
     // (rules 9.6.2.3.2): Ai -> waitroom, newcomer arrives; net payment =
     // newcomer cost - Ai's printed cost.
     g.play_to_stage(newcomer, rabuka_engine::zones::MemberArea::Center);
-    while g.has_pending_choice() {
-        g.select_indices(&[]);
-    }
+    // Answer what cannot be declined, decline what can: a mandatory
+    // prompt left parked mid-ability produces exactly the absence
+    // the next assertion checks, so nothing fails.
+    g.drain_choices();
 
     let ai_cost = i32::from(
         g.state.card_database.get_card(ai).unwrap().cost.unwrap(),
@@ -367,9 +368,10 @@ fn miyamiya_baton_touch_cost13_newcomer_energy_only() {
     let hand_before = g.state.player1.hand.cards.len();
 
     g.play_to_stage(newcomer, rabuka_engine::zones::MemberArea::Center);
-    while g.has_pending_choice() {
-        g.select_indices(&[]);
-    }
+    // Answer what cannot be declined, decline what can: a mandatory
+    // prompt left parked mid-ability produces exactly the absence
+    // the next assertion checks, so nothing fails.
+    g.drain_choices();
 
     let ai_cost = i32::from(
         g.state.card_database.get_card(ai).unwrap().cost.unwrap(),
@@ -448,9 +450,10 @@ fn miyamiya_baton_touch_blade_heart_newcomer_nothing() {
     let hand_before = g.state.player1.hand.cards.len();
 
     g.play_to_stage(newcomer, rabuka_engine::zones::MemberArea::Center);
-    while g.has_pending_choice() {
-        g.select_indices(&[]);
-    }
+    // Answer what cannot be declined, decline what can: a mandatory
+    // prompt left parked mid-ability produces exactly the absence
+    // the next assertion checks, so nothing fails.
+    g.drain_choices();
 
     let ai_cost = i32::from(
         g.state.card_database.get_card(ai).unwrap().cost.unwrap(),

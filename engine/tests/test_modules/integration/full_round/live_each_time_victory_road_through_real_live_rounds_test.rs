@@ -26,29 +26,31 @@ fn set_stage_hearts(game: &mut TestGame) {
     game.state.player1.stage_hearts = Some(h);
 }
 
+/// Drain every prompt: decline the skippable ones, answer the rest with their
+/// first option.
+///
+/// The answer half is not an optimisation, it is correctness. Mandatory
+/// prompts exist on this path — 鬼塚夏美's 「手札を1枚控え室に置く」 is one,
+/// and the engine rejects an empty answer for it — and the non-SelectCard
+/// kinds (`SelectHeartColor`, `SelectAutoAbility`, `SelectLiveSuccess`) are
+/// never skippable at all. A drain that sent them an empty selection left the
+/// game parked mid-ability, and the absence assertion that usually follows is
+/// exactly what a wrong answer produces, so nothing failed. See
+/// `TestGame::drain_choices`.
 fn drain_choices(game: &mut TestGame) {
-    while game.has_pending_choice() {
-        game.select_indices(&[]);
-    }
+    game.drain_choices();
 }
 
-/// Same walk as `drain_choices`, but a NON-skippable SelectCard is answered
-/// with its first option instead of an empty selection. Mandatory prompts
-/// exist on this path — 鬼塚夏美's 「手札を1枚控え室に置く」 is one — and the
-/// engine rejects an empty answer for those, so `drain_choices` panics on a
-/// live that actually SUCCEEDS. Skippable prompts still get the empty answer
-/// so an optional branch can decline.
+/// `drain_choices`, under the name the older call sites use.
+///
+/// It used to differ: it handled a NON-skippable `SelectCard` where
+/// `drain_choices` did not, because the engine rejects an empty answer for a
+/// mandatory selection. That special case is now the general rule in
+/// `TestGame::drain_choices` — decline what may be declined, answer the rest
+/// with its first option — so the two are the same walk and the name is kept
+/// only so the call sites below still read as "pick something real".
 fn drain_choices_picking_first(game: &mut TestGame) {
-    while game.has_pending_choice() {
-        let must_pick = matches!(
-            game.get_pending_choice(),
-            rabuka_engine::ability::types::Choice::SelectCard {
-                allow_skip: false,
-                ..
-            }
-        );
-        game.select_indices(if must_pick { &[0] } else { &[] });
-    }
+    game.drain_choices();
 }
 
 /// Pre-grant All hearts to a staged card. All (icon_all) covers every COLOURED
@@ -68,23 +70,14 @@ fn grant_all_hearts(game: &mut TestGame, card_id: i16, count: i16) {
         .additive += count;
 }
 
-/// `drain_choices_picking_first`, but it hands back the prompt TYPES it saw in
+/// Same walk as `drain_choices`, but it hands back the prompt TYPES it saw in
 /// order. A test that only counts cards cannot say which prompt it answered;
 /// this lets one assert "the window raised exactly this, and never that".
 fn drain_choice_types(game: &mut TestGame) -> Vec<String> {
-    let mut seen = Vec::new();
-    while game.has_pending_choice() {
-        seen.push(game.pending_choice_type().unwrap_or_default());
-        let must_pick = matches!(
-            game.get_pending_choice(),
-            rabuka_engine::ability::types::Choice::SelectCard {
-                allow_skip: false,
-                ..
-            }
-        );
-        game.select_indices(if must_pick { &[0] } else { &[] });
-    }
-    seen
+    game.drain_choices()
+        .into_iter()
+        .map(|k| k.to_string())
+        .collect()
 }
 
 fn has_all_heart(gs: &rabuka_engine::core::game_state::GameState, cid: i16) -> bool {
@@ -758,9 +751,10 @@ fn test_each_time_drains_between_live_starts_no_mix() {
     );
 
     // ── Step 5: Drain any remaining choices ──
-    while game.has_pending_choice() {
-        game.select_indices(&[]);
-    }
+    // Answer what cannot be declined, decline what can: a mandatory prompt
+    // left parked mid-ability, and the absence assertion that usually
+    // follows is exactly what a wrong answer produces.
+    game.drain_choices();
 
     // ── Step 6: Verify both members got All Heart from each_time triggers ──
     assert!(
@@ -828,9 +822,15 @@ fn test_one_live_start_each_time_drains_no_choice() {
          the choice pool (available should have been 1 → auto-promote)"
     );
 
-    while game.has_pending_choice() {
-        game.select_indices(&[]);
-    }
+    // Answer what cannot be declined, decline what can: a mandatory prompt
+
+    // left parked mid-ability, and the absence assertion that usually
+
+    // follows is exactly what a wrong answer produces.
+
+    game.drain_choices();
+
+
 
     assert!(
         has_all_heart(&game.state, member),
@@ -958,9 +958,10 @@ fn test_three_live_starts_each_order_possible() {
 
     // ── Last LS auto-resolves (no choice) ──
     // Drain the final heart selection from LS_c's effect
-    while game.has_pending_choice() {
-        game.select_indices(&[]);
-    }
+    // Answer what cannot be declined, decline what can: a mandatory prompt
+    // left parked mid-ability, and the absence assertion that usually
+    // follows is exactly what a wrong answer produces.
+    game.drain_choices();
 
     // All 3 members should have All Heart from the each_time triggers
     assert!(has_all_heart(&game.state, ls_a), "ls_a got all-heart");

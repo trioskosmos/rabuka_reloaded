@@ -38,9 +38,10 @@ fn dream_with_you_blade_10_score_plus_1() {
     game.pass();
     game.pass();
 
-    while game.has_pending_choice() {
-        game.select_indices(&[]);
-    }
+    // Answer what cannot be declined, decline what can: a mandatory
+    // prompt left parked mid-ability produces exactly the absence
+    // the next assertion checks, so nothing fails.
+    game.drain_choices();
 
     let mod_val = game.state.mods.get_score_modifier(dream);
     assert_eq!(mod_val, 1, "Blade ≥10 → score +1");
@@ -75,9 +76,10 @@ fn dream_with_you_blade_6_no_score() {
     game.pass();
     game.pass();
 
-    while game.has_pending_choice() {
-        game.select_indices(&[]);
-    }
+    // Answer what cannot be declined, decline what can: a mandatory
+    // prompt left parked mid-ability produces exactly the absence
+    // the next assertion checks, so nothing fails.
+    game.drain_choices();
 
     let mod_val = game.state.mods.get_score_modifier(dream);
     assert_eq!(mod_val, 0, "Blade <10 → no score");
@@ -104,9 +106,10 @@ fn dream_with_you_reduced_yell_count_does_not_block_score() {
     game.set_live_card(dream);
     game.pass();
     game.pass();
-    while game.has_pending_choice() {
-        game.select_indices(&[]);
-    }
+    // Answer what cannot be declined, decline what can: a mandatory
+    // prompt left parked mid-ability produces exactly the absence
+    // the next assertion checks, so nothing fails.
+    game.drain_choices();
 
     assert!(game.state.initial_yell_revealed_cards.len() <= 9);
     assert_eq!(

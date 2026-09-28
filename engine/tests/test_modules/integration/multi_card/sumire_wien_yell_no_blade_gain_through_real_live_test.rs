@@ -148,9 +148,10 @@ fn yell_proper_no_blade_gains_via_live() {
 
     // After performance, yell occurred and autos resolved.
     // Drain any remaining choices (e.g., live success look)
-    while game.has_pending_choice() {
-        game.select_indices(&[]);
-    }
+    // Answer what cannot be declined, decline what can: a mandatory
+    // prompt left parked mid-ability produces exactly the absence
+    // the next assertion checks, so nothing fails.
+    game.drain_choices();
     if heart06(&game, sumire) != 1 || heart03(&game, wien) != 1 {
         dump_live_diagnostics(&mut game, sumire, wien);
     }
@@ -176,9 +177,10 @@ fn yell_proper_with_blade_blocks_via_live() {
         setup_game_with_deck_top(&[NO_BLADE, NO_BLADE, BLADE]);
     let live = game.state.player1.hand.cards[0];
     set_live_via_phase(&mut game, live);
-    while game.has_pending_choice() {
-        game.select_indices(&[]);
-    }
+    // Answer what cannot be declined, decline what can: a mandatory
+    // prompt left parked mid-ability produces exactly the absence
+    // the next assertion checks, so nothing fails.
+    game.drain_choices();
     assert_eq!(
         heart06(&game, sumire),
         0,
@@ -198,9 +200,10 @@ fn yell_proper_all_blade_blocks_via_live() {
         setup_game_with_deck_top(&[NO_BLADE, NO_BLADE, ALL_BLADE]);
     let live = game.state.player1.hand.cards[0];
     set_live_via_phase(&mut game, live);
-    while game.has_pending_choice() {
-        game.select_indices(&[]);
-    }
+    // Answer what cannot be declined, decline what can: a mandatory
+    // prompt left parked mid-ability produces exactly the absence
+    // the next assertion checks, so nothing fails.
+    game.drain_choices();
     assert_eq!(heart06(&game, sumire), 0, "ALL blade must block Sumire");
     assert_eq!(heart03(&game, wien), 0, "ALL blade must block Wien");
 }

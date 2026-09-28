@@ -1,14 +1,14 @@
 {
   "generated_by": "cards/test_inventory.py",
-  "generated_at": "2026-09-28T07:26:40.911689+00:00",
+  "generated_at": "2026-09-28T13:44:14.674342+00:00",
   "stats": {
     "total_cards": 2526,
     "cards_with_abilities": 1565,
     "total_abilities": 2011,
     "unique_abilities": 936
   },
-  "n_files": 931,
-  "n_tests": 3743,
+  "n_files": 932,
+  "n_tests": 3744,
   "total_cards": 771,
   "covered_cards": 771,
   "abilities_on_covered": 936,
@@ -413,7 +413,7 @@
         {
           "file": "engine/tests/test_modules/jidou/yell/no_blade_heart_reveal_gain/no_blade_heart_reveal_two_watchers_modifier_bounds_test.rs",
           "test": "yell_two_no_blade_heart_watchers_are_covered_by_the_real_yell_test",
-          "line": 31,
+          "line": 30,
           "detail": ""
         }
       ]
@@ -938,24 +938,11 @@
       "rows": []
     },
     "unresolvable_card_id": {
-      "count": 2,
-      "rows": [
-        {
-          "file": "engine/tests/test_modules/effects/state/wait_activation/wondermates_group_filter_negatives_test.rs",
-          "test": "<literal>",
-          "line": 30,
-          "detail": "PL!N-bp1-013-R"
-        },
-        {
-          "file": "engine/tests/test_modules/jidou/combination/sp_bp5_005_mill_arms_jidou_recover_test.rs",
-          "test": "<literal>",
-          "line": 44,
-          "detail": "PL!SP-bp1-002-R"
-        }
-      ]
+      "count": 0,
+      "rows": []
     }
   },
-  "n_test_fns_parsed": 3743,
+  "n_test_fns_parsed": 3744,
   "abilities": [
     {
       "idx": 0,
@@ -1094,7 +1081,7 @@
         "both_empty_stages_skip_draw_and_topdeck_pl_n_bp4_009_r",
         "both_sides_cost13_still_only_two_blades"
       ],
-      "covering_test_count": 412,
+      "covering_test_count": 413,
       "direct_tests": [
         "all_members_excluded_no_reduction",
         "center_mus_zero_heart03_no_reduction",
@@ -1275,7 +1262,7 @@
         "ayumu_live_start_triggers",
         "ayumu_q62_and_name_has_individual_names"
       ],
-      "covering_test_count": 401,
+      "covering_test_count": 402,
       "direct_tests": [
         "a_group_filter_that_matches_nothing_banks_every_looked_card",
         "all_members_excluded_no_reduction",
@@ -1429,7 +1416,7 @@
         "bella_q174_no_member_on_stage_ability_does_not_fire",
         "burn_multiple_under_all_moved_and_scores"
       ],
-      "covering_test_count": 315,
+      "covering_test_count": 316,
       "direct_tests": [
         "ai_screeam_soreigai_all_members_on_both_sides_gain_blade",
         "awakening_targets_energy_owner_member_only",
@@ -2599,7 +2586,7 @@
         "distortion_no_refresh_when_no_wait_energy",
         "distortion_q103_two_triggers_only_one_plus_1"
       ],
-      "covering_test_count": 122,
+      "covering_test_count": 123,
       "direct_tests": [
         "bp2024_cannot_place_blocks_both_live_zones",
         "genki_invalidate_isolated_to_self",
@@ -4854,7 +4841,7 @@
         "dream_with_you_reduced_yell_count_does_not_block_score",
         "energy_zone_capacity_handled"
       ],
-      "covering_test_count": 87,
+      "covering_test_count": 88,
       "direct_tests": [
         "blade_gained_after_live_start_does_not_reduce_yell_checks",
         "dream_with_you_reduced_yell_count_does_not_block_score",
@@ -4945,7 +4932,7 @@
         "dream_with_you_reduced_yell_count_does_not_block_score",
         "energy_zone_capacity_handled"
       ],
-      "covering_test_count": 87,
+      "covering_test_count": 88,
       "direct_tests": [
         "blade_gained_after_live_start_does_not_reduce_yell_checks",
         "dream_with_you_reduced_yell_count_does_not_block_score",
@@ -8802,7 +8789,7 @@
         "hareruya_q74_multiname_distinct_counting",
         "kanon_activation_choice_condition_discard_flow"
       ],
-      "covering_test_count": 69,
+      "covering_test_count": 70,
       "direct_tests": [
         "kanon_activation_choice_condition_discard_flow",
         "kanon_activation_choice_condition_wait_option",
@@ -8878,7 +8865,7 @@
         "hareruya_q74_multiname_distinct_counting",
         "kanon_activation_choice_condition_discard_flow"
       ],
-      "covering_test_count": 69,
+      "covering_test_count": 70,
       "direct_tests": [
         "kanon_activation_choice_condition_discard_flow",
         "kanon_activation_choice_condition_wait_option",
@@ -11674,7 +11661,7 @@
         "riko_responds_only_to_own_side_live_zone",
         "shizuku_heart_copy_matches_placed_card",
         "shizuku_heart_copy_no_discard_card",
-        "shizuku_heart_copy_rejects_cost_over_17",
+        "shizuku_heart_copy_rejects_non_nijigasaki_group",
         "shizuku_heart_copy_uses_placed_cards_hearts"
       ],
       "covering_test_count": 34,
@@ -11686,7 +11673,7 @@
         "q278_ability_placed_card_and_joint_are_counted_at_live_start",
         "shizuku_heart_copy_matches_placed_card",
         "shizuku_heart_copy_no_discard_card",
-        "shizuku_heart_copy_rejects_cost_over_17",
+        "shizuku_heart_copy_rejects_non_nijigasaki_group",
         "shizuku_heart_copy_uses_placed_cards_hearts",
         "shizuku_live_start_blade_counts_only_under",
         "shizuku_live_start_blade_dedups_same_name",
@@ -11759,7 +11746,7 @@
         "riko_responds_only_to_own_side_live_zone",
         "shizuku_heart_copy_matches_placed_card",
         "shizuku_heart_copy_no_discard_card",
-        "shizuku_heart_copy_rejects_cost_over_17",
+        "shizuku_heart_copy_rejects_non_nijigasaki_group",
         "shizuku_heart_copy_uses_placed_cards_hearts"
       ],
       "covering_test_count": 34,
@@ -11771,7 +11758,7 @@
         "q278_ability_placed_card_and_joint_are_counted_at_live_start",
         "shizuku_heart_copy_matches_placed_card",
         "shizuku_heart_copy_no_discard_card",
-        "shizuku_heart_copy_rejects_cost_over_17",
+        "shizuku_heart_copy_rejects_non_nijigasaki_group",
         "shizuku_heart_copy_uses_placed_cards_hearts",
         "shizuku_live_start_blade_counts_only_under",
         "shizuku_live_start_blade_dedups_same_name",
@@ -13024,7 +13011,7 @@
         "eli_declined_cost_skips_look_entirely",
         "energy_zone_capacity_handled"
       ],
-      "covering_test_count": 107,
+      "covering_test_count": 108,
       "direct_tests": [
         "ai_screeam_soreigai_all_members_on_both_sides_gain_blade",
         "eli_cost_look_three_takes_one_to_hand",
@@ -13103,7 +13090,7 @@
         "center_tied_with_right_no_heart",
         "choice_condition_shows_proper_labels_in_actions"
       ],
-      "covering_test_count": 96,
+      "covering_test_count": 97,
       "direct_tests": [
         "all_equal_cost_no_heart",
         "all_three_equal_cost_grants_no_heart",
@@ -14396,7 +14383,7 @@
         "hareruya_q64_waitroom_only_five_distinct_liella_condition_met",
         "hareruya_q74_multiname_distinct_counting"
       ],
-      "covering_test_count": 86,
+      "covering_test_count": 87,
       "direct_tests": [
         "distinct_card_name_prevents_same_card_twice",
         "hareruya_q64_waitroom_only_five_distinct_liella_condition_met",
@@ -16043,7 +16030,7 @@
         "distortion_same_name_catchu_condition_not_met",
         "distortion_two_same_one_diff_catchu_condition_met"
       ],
-      "covering_test_count": 98,
+      "covering_test_count": 99,
       "direct_tests": [
         "distinct_group_activation_selects_one_eligible_opponent_physical_instance",
         "honoka_bp4_001_live_start_cheaper_stage_total_draws_one_otherwise_skips",
@@ -17832,7 +17819,7 @@
         "ayumu_live_start_triggers",
         "ayumu_no_wait_with_non_nijigasaki_ally"
       ],
-      "covering_test_count": 852,
+      "covering_test_count": 853,
       "direct_tests": [
         "any_card_fails_hearts_all_fail",
         "aoku_haruka_live_start_fails_with_only_non_suzu_live_cards",
@@ -20547,7 +20534,7 @@
         "hareruya_q74_multiname_distinct_counting",
         "kanon_activation_choice_condition_discard_flow"
       ],
-      "covering_test_count": 68,
+      "covering_test_count": 69,
       "direct_tests": [
         "distortion_basic_energy_refresh_with_catchu",
         "distortion_exact_max_boundary_6_wait_all_refreshed",
@@ -21142,7 +21129,7 @@
         "distortion_no_refresh_when_no_wait_energy",
         "distortion_q103_two_triggers_only_one_plus_1"
       ],
-      "covering_test_count": 115,
+      "covering_test_count": 116,
       "direct_tests": [
         "bp2024_cannot_place_blocks_both_live_zones",
         "genki_invalidate_isolated_to_self",
@@ -21218,7 +21205,7 @@
         "hareruya_q74_multiname_distinct_counting",
         "kanon_activation_choice_condition_discard_flow"
       ],
-      "covering_test_count": 63,
+      "covering_test_count": 64,
       "direct_tests": [
         "nico_q170_placed_cards_debut_abilities_fire"
       ],
@@ -24761,7 +24748,7 @@
         "hareruya_q74_multiname_distinct_counting",
         "heart00_passes_check_fails_when_insufficient"
       ],
-      "covering_test_count": 85,
+      "covering_test_count": 86,
       "direct_tests": [
         "lovepeace_q150_self_hearts_greater_than_opponent_score_plus_1",
         "performance_pipeline_blade_yell_heart_score",
@@ -25053,7 +25040,7 @@
         "hareruya_q74_multiname_distinct_counting",
         "kanon_activation_choice_condition_discard_flow"
       ],
-      "covering_test_count": 69,
+      "covering_test_count": 70,
       "direct_tests": [
         "nico_both_players_two_eligible_cards",
         "nico_cost_filter_only_shows_eligible",
@@ -27475,7 +27462,7 @@
         "distortion_q103_two_triggers_only_one_plus_1",
         "distortion_q96_score_permanent_after_energy_used"
       ],
-      "covering_test_count": 105,
+      "covering_test_count": 106,
       "direct_tests": [
         "bella_positive_surplus_heart04_ability_fires",
         "bella_q173_single_life_places_single_waited_energy",
@@ -27551,7 +27538,7 @@
         "distortion_q103_two_triggers_only_one_plus_1",
         "distortion_q96_score_permanent_after_energy_used"
       ],
-      "covering_test_count": 105,
+      "covering_test_count": 106,
       "direct_tests": [
         "bella_positive_surplus_heart04_ability_fires",
         "bella_q173_single_life_places_single_waited_energy",
@@ -29414,7 +29401,7 @@
         "distinct_group_activation_discount_q228_four_unique_groups_cost_zero",
         "distinct_group_activation_discount_q228_one_group_cost_three_not_offered_at_two_energy"
       ],
-      "covering_test_count": 122,
+      "covering_test_count": 123,
       "direct_tests": [
         "activation_reveals_same_name_hand_member_and_moves_it_under_self",
         "distinct_group_activation_selects_one_eligible_opponent_physical_instance",
@@ -29495,7 +29482,7 @@
         "distinct_group_activation_discount_q228_four_unique_groups_cost_zero",
         "distinct_group_activation_discount_q228_one_group_cost_three_not_offered_at_two_energy"
       ],
-      "covering_test_count": 122,
+      "covering_test_count": 123,
       "direct_tests": [
         "activation_reveals_same_name_hand_member_and_moves_it_under_self",
         "distinct_group_activation_selects_one_eligible_opponent_physical_instance",
@@ -29801,7 +29788,7 @@
         "hareruya_q74_multiname_distinct_counting",
         "kanon_activation_choice_condition_discard_flow"
       ],
-      "covering_test_count": 66,
+      "covering_test_count": 67,
       "direct_tests": [
         "kosuzu_choose_number_adds_to_hand",
         "kosuzu_choose_number_gains_blade",
@@ -33842,25 +33829,19 @@
       "has_choice": true,
       "has_negative": true,
       "covering_files": [
-        "engine/tests/test_modules/effects/draw/chains/full_group_cost_twenty_draw_three_topdeck_three_test.rs",
-        "engine/tests/test_modules/effects/gain/blades/under_member/shizuku_under_member_heart_copy_test.rs"
+        "engine/tests/test_modules/effects/draw/chains/full_group_cost_twenty_draw_three_topdeck_three_test.rs"
       ],
       "covering_tests": [
         "neo_sky_live_start_does_not_fire_at_total_cost_nineteen",
         "neo_sky_live_start_draws_three_and_places_them_in_chosen_order",
         "neo_sky_live_start_requires_every_area_to_be_nijigasaki",
-        "neo_sky_live_start_selects_three_from_larger_hand_before_ordering",
-        "shizuku_heart_copy_matches_placed_card",
-        "shizuku_heart_copy_no_discard_card",
-        "shizuku_heart_copy_rejects_cost_over_17",
-        "shizuku_heart_copy_uses_placed_cards_hearts"
+        "neo_sky_live_start_selects_three_from_larger_hand_before_ordering"
       ],
-      "covering_test_count": 8,
+      "covering_test_count": 4,
       "direct_tests": [
-        "neo_sky_live_start_does_not_fire_at_total_cost_nineteen",
-        "shizuku_heart_copy_rejects_cost_over_17"
+        "neo_sky_live_start_does_not_fire_at_total_cost_nineteen"
       ],
-      "direct_test_count": 2,
+      "direct_test_count": 1,
       "is_null": false,
       "use_limit": null,
       "watches_abilities": false,
@@ -36379,7 +36360,7 @@
         "hanamaru_score_icon_filter",
         "hareruya_q64_waitroom_only_five_distinct_liella_condition_met"
       ],
-      "covering_test_count": 80,
+      "covering_test_count": 81,
       "direct_tests": [
         "heart_pipeline_three_entries_agree_with_copy_multiplier_override",
         "izumi_waits_every_member_on_both_stages_whose_printed_blades_are_three_or_fewer",
@@ -36489,7 +36470,7 @@
         "hareruya_q74_multiname_distinct_counting",
         "joint_cost_accepts_mixed_six_card_names"
       ],
-      "covering_test_count": 72,
+      "covering_test_count": 73,
       "direct_tests": [
         "joint_cost_accepts_mixed_six_card_names",
         "joint_cost_creates_choice_with_7_matching_cards",
@@ -37511,7 +37492,7 @@
         "group_membership_known_gap_sunny_passion_filter_is_unsatisfiable",
         "group_membership_works_for_the_three_covered_groups"
       ],
-      "covering_test_count": 67,
+      "covering_test_count": 68,
       "direct_tests": [
         "ai_screeam_answer_both_discard",
         "ai_screeam_answer_both_draw",
@@ -37594,7 +37575,7 @@
         "baad_cage_cost_limit_two_hasunosora_members_grants_score",
         "baad_cage_counts_two_physical_instances_of_same_hasunosora_member"
       ],
-      "covering_test_count": 170,
+      "covering_test_count": 171,
       "direct_tests": [
         "ab1_multiname_discard_blocked_by_one_matching_group",
         "ab1_two_multiname_stage_blocks_more_groups",
@@ -37700,7 +37681,7 @@
         "baad_cage_cost_limit_two_hasunosora_members_grants_score",
         "baad_cage_counts_two_physical_instances_of_same_hasunosora_member"
       ],
-      "covering_test_count": 170,
+      "covering_test_count": 171,
       "direct_tests": [
         "ab1_multiname_discard_blocked_by_one_matching_group",
         "ab1_two_multiname_stage_blocks_more_groups",
@@ -38830,7 +38811,7 @@
         "bella_q174_no_member_on_stage_ability_does_not_fire",
         "catchu_basic_two_distinct_activate_2"
       ],
-      "covering_test_count": 303,
+      "covering_test_count": 304,
       "direct_tests": [
         "ab0_only_energy_under_counts",
         "aspire_liella_and_non_liella_moved_only_liella_gains_blade",
@@ -39038,7 +39019,7 @@
         "dia_sd1_optional_draw_pay_then_deck_top",
         "dia_sd1_optional_draw_skip_skips_movement"
       ],
-      "covering_test_count": 115,
+      "covering_test_count": 116,
       "direct_tests": [
         "baton_displaced_self_baton_touch_places_under_arriver",
         "baton_displaced_self_placed_under_liella_arriver_grants_host_blade",
@@ -40400,7 +40381,7 @@
         "chisato_cost_hits_threshold_condition_passes",
         "chisato_cost_misses_threshold_condition_fails"
       ],
-      "covering_test_count": 147,
+      "covering_test_count": 148,
       "direct_tests": [
         "ab1_multiname_discard_blocked_when_group_matches_stage",
         "ab1_multiname_discard_selectable_when_groups_differ",
@@ -40506,7 +40487,7 @@
         "chisato_cost_hits_threshold_condition_passes",
         "chisato_cost_misses_threshold_condition_fails"
       ],
-      "covering_test_count": 147,
+      "covering_test_count": 148,
       "direct_tests": [
         "ab1_multiname_discard_blocked_when_group_matches_stage",
         "ab1_multiname_discard_selectable_when_groups_differ",
@@ -40612,7 +40593,7 @@
         "chisato_cost_hits_threshold_condition_passes",
         "chisato_cost_misses_threshold_condition_fails"
       ],
-      "covering_test_count": 147,
+      "covering_test_count": 148,
       "direct_tests": [
         "ab1_multiname_discard_blocked_when_group_matches_stage",
         "ab1_multiname_discard_selectable_when_groups_differ",
@@ -41456,7 +41437,7 @@
         "hareruya_q64_waitroom_only_five_distinct_liella_condition_met",
         "hareruya_q74_multiname_distinct_counting"
       ],
-      "covering_test_count": 76,
+      "covering_test_count": 77,
       "direct_tests": [
         "blade_set_then_additive_stacks_through_real_cards",
         "live_revealed_in_yell_with_eight_hand_cards_does_not_draw",
@@ -41534,7 +41515,7 @@
         "hareruya_q64_waitroom_only_five_distinct_liella_condition_met",
         "hareruya_q74_multiname_distinct_counting"
       ],
-      "covering_test_count": 76,
+      "covering_test_count": 77,
       "direct_tests": [
         "blade_set_then_additive_stacks_through_real_cards",
         "live_revealed_in_yell_with_eight_hand_cards_does_not_draw",
@@ -42297,7 +42278,7 @@
         "hanamaru_score_icon_filter",
         "hareruya_q64_waitroom_only_five_distinct_liella_condition_met"
       ],
-      "covering_test_count": 65,
+      "covering_test_count": 66,
       "direct_tests": [
         "bella_positive_surplus_heart04_ability_fires",
         "bella_q173_single_life_places_single_waited_energy",
@@ -42368,7 +42349,7 @@
         "hareruya_q74_multiname_distinct_counting",
         "kanon_activation_choice_condition_discard_flow"
       ],
-      "covering_test_count": 68,
+      "covering_test_count": 69,
       "direct_tests": [
         "bella_q174_no_heart04_surplus_ability_does_not_fire",
         "love_u_q192_live_success_all_blade_score_up",
@@ -43984,11 +43965,12 @@
         "hareruya_q74_multiname_distinct_counting",
         "kanon_activation_choice_condition_discard_flow"
       ],
-      "covering_test_count": 63,
+      "covering_test_count": 64,
       "direct_tests": [
+        "rise_up_high_does_not_fire_on_turn_2",
         "rise_up_high_turn1_score_and_blade"
       ],
-      "direct_test_count": 1,
+      "direct_test_count": 2,
       "is_null": false,
       "use_limit": null,
       "watches_abilities": false,
@@ -48494,7 +48476,7 @@
         "hareruya_q74_multiname_distinct_counting",
         "kanon_activation_choice_condition_discard_flow"
       ],
-      "covering_test_count": 68,
+      "covering_test_count": 69,
       "direct_tests": [
         "kosuzu_choose_number_adds_to_hand",
         "kosuzu_choose_number_gains_blade",
@@ -49056,7 +49038,7 @@
         "hareruya_q74_multiname_distinct_counting",
         "kanon_activation_choice_condition_discard_flow"
       ],
-      "covering_test_count": 79,
+      "covering_test_count": 80,
       "direct_tests": [
         "dia_sd1_optional_draw_pay_then_deck_top",
         "dia_sd1_optional_draw_skip_skips_movement",
@@ -49225,7 +49207,7 @@
         "hareruya_q74_multiname_distinct_counting",
         "kanon_activation_choice_condition_discard_flow"
       ],
-      "covering_test_count": 63,
+      "covering_test_count": 64,
       "direct_tests": [
         "hanamaru_score_icon_filter"
       ],

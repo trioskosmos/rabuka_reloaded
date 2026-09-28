@@ -521,9 +521,10 @@ fn fuyumari_real_play_to_stage_triggers_appearance() {
     game.play_to_stage(fuyumari, MemberArea::LeftSide);
 
     // Drain all pending choices (auto abilities, etc.)
-    while game.has_pending_choice() {
-        game.select_indices(&[]);
-    }
+    // Answer what cannot be declined, decline what can: a mandatory
+    // prompt left parked mid-ability produces exactly the absence
+    // the next assertion checks, so nothing fails.
+    game.drain_choices();
 
     // Fuyumari should be on P1 stage
     assert_eq!(
@@ -577,9 +578,10 @@ fn fuyumari_p2_play_to_stage_triggers_appearance() {
     game.set_live_card(p1_live);
     for _ in 0..40 {
         game.pass();
-        while game.has_pending_choice() {
-            game.select_indices(&[]);
-        }
+        // Answer what cannot be declined, decline what can: a mandatory
+        // prompt left parked mid-ability produces exactly the absence
+        // the next assertion checks, so nothing fails.
+        game.drain_choices();
         let phase = game.state.current_phase.to_string();
         let active = game.state.active_player().id.clone();
         let p2 = game.state.player2.id.clone();
@@ -594,9 +596,10 @@ fn fuyumari_p2_play_to_stage_triggers_appearance() {
     );
 
     game.play_to_stage(fuyumari, MemberArea::LeftSide);
-    while game.has_pending_choice() {
-        game.select_indices(&[]);
-    }
+    // Answer what cannot be declined, decline what can: a mandatory
+    // prompt left parked mid-ability produces exactly the absence
+    // the next assertion checks, so nothing fails.
+    game.drain_choices();
 
     let ori = game.state.mods.get_orientation_modifier(target);
     assert_eq!(
@@ -632,9 +635,10 @@ fn fuyumari_baton_touch_triggers_area_move() {
 
     // Baton touch: play Fuyumari to occupied Center → existing goes to waitroom
     game.play_to_stage(fuyumari, MemberArea::Center);
-    while game.has_pending_choice() {
-        game.select_indices(&[]);
-    }
+    // Answer what cannot be declined, decline what can: a mandatory
+    // prompt left parked mid-ability produces exactly the absence
+    // the next assertion checks, so nothing fails.
+    game.drain_choices();
 
     // Fuyumari should be on stage at Center
     assert_eq!(
@@ -687,9 +691,10 @@ fn fuyumari_baton_touch_left_to_center_triggers() {
     // Actually to trigger baton touch, we need to play to an OCCUPIED area.
     // Let's baton touch to Center: existing goes to waitroom
     game.play_to_stage(fuyumari, MemberArea::Center);
-    while game.has_pending_choice() {
-        game.select_indices(&[]);
-    }
+    // Answer what cannot be declined, decline what can: a mandatory
+    // prompt left parked mid-ability produces exactly the absence
+    // the next assertion checks, so nothing fails.
+    game.drain_choices();
 
     let ori = game.state.mods.get_orientation_modifier(target);
     assert_eq!(

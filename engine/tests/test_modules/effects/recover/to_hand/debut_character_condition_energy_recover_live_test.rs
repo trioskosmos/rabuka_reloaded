@@ -21,9 +21,10 @@ fn play_himeno(game: &mut TestGame, left: i16, center: i16, right: i16) {
     game.give_energy(15);
 
     game.play_to_stage(himeno, MemberArea::LeftSide);
-    while game.has_pending_choice() {
-        game.select_indices(&[]);
-    }
+    // Answer what cannot be declined, decline what can: a mandatory
+    // prompt left parked mid-ability produces exactly the absence
+    // the next assertion checks, so nothing fails.
+    game.drain_choices();
 }
 
 fn debut_result_and_actions(game: &TestGame) -> (String, Vec<String>) {

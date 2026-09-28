@@ -101,9 +101,10 @@ fn pl_sp_pr_021_pr_below_five_hearts_no_opponent_wait() {
     fill_deck(&mut game, "p2", 10);
     let filler_live = game.id(FILLER_LIVE);
     trigger_live_start_with(&mut game, filler_live);
-    while game.has_pending_choice() {
-        game.select_indices(&[]);
-    }
+    // Answer what cannot be declined, decline what can: a mandatory
+    // prompt left parked mid-ability produces exactly the absence
+    // the next assertion checks, so nothing fails.
+    game.drain_choices();
     assert_ne!(
         game.state.mods.get_orientation_modifier(opponent_member),
         Some("wait"),

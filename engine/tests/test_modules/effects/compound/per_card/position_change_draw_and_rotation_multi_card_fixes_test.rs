@@ -1322,9 +1322,10 @@ fn kanon_unless_pay_pay_avoids_discard() {
         energy_after
     );
     // Consume any remaining choices
-    while game.has_pending_choice() {
-        game.select_indices(&[]);
-    }
+    // Answer what cannot be declined, decline what can: a mandatory
+    // prompt left parked mid-ability produces exactly the absence
+    // the next assertion checks, so nothing fails.
+    game.drain_choices();
 }
 
 /// Skip paying → discard effect fires (2 cards removed from hand).
@@ -1394,9 +1395,10 @@ fn kanon_unless_pay_skip_triggers_discard() {
         energy_after
     );
     // Consume any remaining choices
-    while game.has_pending_choice() {
-        game.select_indices(&[]);
-    }
+    // Answer what cannot be declined, decline what can: a mandatory
+    // prompt left parked mid-ability produces exactly the absence
+    // the next assertion checks, so nothing fails.
+    game.drain_choices();
     let energy_after = game.state.player1.energy_zone.active_count();
     assert!(
         energy_after < 11,

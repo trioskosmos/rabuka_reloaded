@@ -40,9 +40,10 @@ fn optional_discard_look_five_selects_unit_live_q82_bp1_023() {
     game.select_indices(&[0]);
 
     // Resolve any remaining sub-choices (reveal, move to hand, discard rest)
-    while game.has_pending_choice() {
-        game.select_indices(&[]);
-    }
+    // Answer what cannot be declined, decline what can: a mandatory prompt
+    // left parked mid-ability, and the absence assertion that usually
+    // follows is exactly what a wrong answer produces.
+    game.drain_choices();
 
     assert!(!game.has_pending_choice(), "Ability should have ended");
     assert!(

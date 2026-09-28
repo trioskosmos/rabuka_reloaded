@@ -71,14 +71,16 @@ fn strawberry_trapper_q132_conditions_met_score_plus_2() {
     // Let the test proceed without getting stuck in AUTO_TRIGGER loops
     // Handle infinite Riko auto-trigger loop: just let choices pile up
     for _ in 0..5 {
-        while game.has_pending_choice() {
-            game.select_indices(&[]);
-        }
+        // Answer what cannot be declined, decline what can: a mandatory
+        // prompt left parked mid-ability produces exactly the absence
+        // the next assertion checks, so nothing fails.
+        game.drain_choices();
         game.pass();
     }
-    while game.has_pending_choice() {
-        game.select_indices(&[]);
-    }
+    // Answer what cannot be declined, decline what can: a mandatory
+    // prompt left parked mid-ability produces exactly the absence
+    // the next assertion checks, so nothing fails.
+    game.drain_choices();
 
     assert_eq!(
         game.state.mods.get_score_modifier(strawberry),

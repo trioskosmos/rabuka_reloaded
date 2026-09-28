@@ -266,9 +266,10 @@ fn debut_outside_main_phase_fires_nothing() {
     );
 
     fire_trigger(&mut game, member, AbilityTrigger::Debut, "登場");
-    while game.has_pending_choice() {
-        game.select_indices(&[]);
-    }
+    // Answer what cannot be declined, decline what can: a mandatory
+    // prompt left parked mid-ability produces exactly the absence
+    // the next assertion checks, so nothing fails.
+    game.drain_choices();
 
     assert!(
         !game.has_pending_choice(),

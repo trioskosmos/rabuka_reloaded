@@ -72,9 +72,10 @@ fn baton_both_hands_non_aqours_baton_touch_does_not_fire() {
     let dia = game.id("PL!S-bp7-004-P");
     game.state.player1.hand.cards.push(dia);
     game.play_to_stage(dia, MemberArea::Center);
-    while game.has_pending_choice() {
-        game.select_indices(&[]);
-    }
+    // Answer what cannot be declined, decline what can: a mandatory
+    // prompt left parked mid-ability produces exactly the absence
+    // the next assertion checks, so nothing fails.
+    game.drain_choices();
 
     // No draw, no hand reorder: hands and deck are unchanged.
     assert_eq!(

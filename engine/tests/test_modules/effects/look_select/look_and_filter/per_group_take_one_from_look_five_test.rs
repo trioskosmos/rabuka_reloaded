@@ -42,9 +42,11 @@ fn select_and_finish(game: &mut TestGame, count: usize) {
         );
         game.select_indices(&[0]);
     }
-    while game.has_pending_choice() {
-        game.select_indices(&[]);
-    }
+    // Answer what cannot be declined, decline what can: a mandatory prompt
+    // left parked mid-ability, and the absence assertion that usually
+    // follows is exactly what a wrong answer produces.
+    game.drain_choices();
+
 }
 
 /// Setup: Mei + 1 filler in hand, 5 deck cards from 3 different series

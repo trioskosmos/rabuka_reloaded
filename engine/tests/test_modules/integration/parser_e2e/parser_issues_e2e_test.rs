@@ -353,9 +353,10 @@ fn issue5_solitude_rain_heart_color_scoring() {
     game.set_live_card(solitude);
     advance_to_live_start(&mut game);
 
-    while game.has_pending_choice() {
-        game.select_indices(&[]);
-    }
+    // Answer what cannot be declined, decline what can: a mandatory
+    // prompt left parked mid-ability produces exactly the absence
+    // the next assertion checks, so nothing fails.
+    game.drain_choices();
 
     // Only the 虹ヶ咲 member counts: the two μ's members on stage contribute
     // nothing. The assertion below is the printed rule's value, not ">= 0".
@@ -403,9 +404,10 @@ fn issue6_natsumi_self_and_other_blade() {
     game.set_live_card(live);
     advance_to_live_start(&mut game);
 
-    while game.has_pending_choice() {
-        game.select_indices(&[]);
-    }
+    // Answer what cannot be declined, decline what can: a mandatory
+    // prompt left parked mid-ability produces exactly the absence
+    // the next assertion checks, so nothing fails.
+    game.drain_choices();
 
     let b_self = game.state.mods.get_blade_modifier(natsumi);
     let b_other = game.state.mods.get_blade_modifier(other_liella);
@@ -431,9 +433,10 @@ fn issue6_natsumi_self_only_blade() {
     game.set_live_card(live);
     advance_to_live_start(&mut game);
 
-    while game.has_pending_choice() {
-        game.select_indices(&[]);
-    }
+    // Answer what cannot be declined, decline what can: a mandatory
+    // prompt left parked mid-ability produces exactly the absence
+    // the next assertion checks, so nothing fails.
+    game.drain_choices();
 
     assert_eq!(
         game.state.mods.get_blade_modifier(natsumi),
@@ -459,9 +462,10 @@ fn issue6_natsumi_low_energy_no_blade() {
     game.set_live_card(live);
     advance_to_live_start(&mut game);
 
-    while game.has_pending_choice() {
-        game.select_indices(&[]);
-    }
+    // Answer what cannot be declined, decline what can: a mandatory
+    // prompt left parked mid-ability produces exactly the absence
+    // the next assertion checks, so nothing fails.
+    game.drain_choices();
 
     assert_eq!(
         game.state.mods.get_blade_modifier(natsumi),
@@ -494,9 +498,10 @@ fn issue6_natsumi_blade_expires_after_live_victory_determination() {
     game.set_live_card(live);
     advance_to_live_start(&mut game);
 
-    while game.has_pending_choice() {
-        game.select_indices(&[]);
-    }
+    // Answer what cannot be declined, decline what can: a mandatory
+    // prompt left parked mid-ability produces exactly the absence
+    // the next assertion checks, so nothing fails.
+    game.drain_choices();
     // Blade granted at LiveStart with duration=live_end
     assert_eq!(
         game.state.mods.get_blade_modifier(natsumi),
@@ -525,9 +530,10 @@ fn issue6_natsumi_blade_expires_after_live_victory_determination() {
     game.pass();
 
     // Handle the LookAndSelect pending choice from LiveSuccess
-    while game.has_pending_choice() {
-        game.select_indices(&[]);
-    }
+    // Answer what cannot be declined, decline what can: a mandatory
+    // prompt left parked mid-ability produces exactly the absence
+    // the next assertion checks, so nothing fails.
+    game.drain_choices();
 
     // Pass again: LiveVictoryDetermination → Active, which runs
     // check_expired_effects and cleans up live_end-temporary effects.
@@ -574,9 +580,10 @@ fn issue7_hajimari_set_required_hearts() {
     game.set_live_card(live_card);
     advance_to_live_start(&mut game);
 
-    while game.has_pending_choice() {
-        game.select_indices(&[]);
-    }
+    // Answer what cannot be declined, decline what can: a mandatory
+    // prompt left parked mid-ability produces exactly the absence
+    // the next assertion checks, so nothing fails.
+    game.drain_choices();
 
     assert_eq!(
         game.state.mods.get_score_modifier(live_card),
@@ -620,9 +627,10 @@ fn issue7_hajimari_no_success_live_no_effect() {
     game.set_live_card(live_card);
     advance_to_live_start(&mut game);
 
-    while game.has_pending_choice() {
-        game.select_indices(&[]);
-    }
+    // Answer what cannot be declined, decline what can: a mandatory
+    // prompt left parked mid-ability produces exactly the absence
+    // the next assertion checks, so nothing fails.
+    game.drain_choices();
 
     assert_eq!(
         game.state.mods.get_score_modifier(live_card),
@@ -652,9 +660,10 @@ fn issue7_hajimari_set_modifier_replaces_not_adds() {
     game.set_live_card(live_card);
     advance_to_live_start(&mut game);
 
-    while game.has_pending_choice() {
-        game.select_indices(&[]);
-    }
+    // Answer what cannot be declined, decline what can: a mandatory
+    // prompt left parked mid-ability produces exactly the absence
+    // the next assertion checks, so nothing fails.
+    game.drain_choices();
 
     // Verify set modifiers are correct type (set not additive)
     if let Some(color_mods) = game.state.mods.need_heart_modifiers.get(&live_card) {
@@ -771,9 +780,10 @@ fn issue9_izumi_debut_draw_2_discard_1() {
         "expected SelectCard"
     );
     game.select_indices(&[0]);
-    while game.has_pending_choice() {
-        game.select_indices(&[]);
-    }
+    // Answer what cannot be declined, decline what can: a mandatory
+    // prompt left parked mid-ability produces exactly the absence
+    // the next assertion checks, so nothing fails.
+    game.drain_choices();
 
     // net: -izumi + 2 draws - 1 discard = 0
     assert_eq!(
@@ -814,9 +824,10 @@ fn issue9_izumi_debut_empty_hand() {
         "expected SelectCard"
     );
     game.select_indices(&[0]);
-    while game.has_pending_choice() {
-        game.select_indices(&[]);
-    }
+    // Answer what cannot be declined, decline what can: a mandatory
+    // prompt left parked mid-ability produces exactly the absence
+    // the next assertion checks, so nothing fails.
+    game.drain_choices();
 
     // draw 2 - discard 1 = 1 card in hand
     assert_eq!(
@@ -848,9 +859,10 @@ fn issue10_dream_with_you_no_blade_no_score() {
     game.set_live_card(dream);
     advance_to_live_start(&mut game);
 
-    while game.has_pending_choice() {
-        game.select_indices(&[]);
-    }
+    // Answer what cannot be declined, decline what can: a mandatory
+    // prompt left parked mid-ability produces exactly the absence
+    // the next assertion checks, so nothing fails.
+    game.drain_choices();
 
     // No blade on stage → condition fails
     assert_eq!(
@@ -880,9 +892,10 @@ fn issue10_dream_with_you_high_blade_plus_1_score() {
     game.set_live_card(dream);
     advance_to_live_start(&mut game);
 
-    while game.has_pending_choice() {
-        game.select_indices(&[]);
-    }
+    // Answer what cannot be declined, decline what can: a mandatory
+    // prompt left parked mid-ability produces exactly the absence
+    // the next assertion checks, so nothing fails.
+    game.drain_choices();
 
     // With 3+4+5 = 12 blade on stage, condition should be met
     let score = game.state.mods.get_score_modifier(dream);

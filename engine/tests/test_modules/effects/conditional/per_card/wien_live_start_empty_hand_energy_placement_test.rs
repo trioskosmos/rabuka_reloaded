@@ -152,9 +152,10 @@ fn wien_live_success_choice_draw_via_trigger() {
     // Option 0 = draw 2
     game.select_option(0);
     // Drain any follow-up (draw is immediate)
-    while game.has_pending_choice() {
-        game.select_indices(&[]);
-    }
+    // Answer what cannot be declined, decline what can: a mandatory
+    // prompt left parked mid-ability produces exactly the absence
+    // the next assertion checks, so nothing fails.
+    game.drain_choices();
     assert_eq!(
         game.state.player1.hand.cards.len(),
         hand_before + 2,
@@ -184,9 +185,10 @@ fn wien_live_success_choice_energy_via_trigger() {
     assert!(game.has_pending_choice(), "LiveSuccess should present choice");
     // Option 1 = place energy wait (second option) — should NOT draw
     game.select_option(1);
-    while game.has_pending_choice() {
-        game.select_indices(&[]);
-    }
+    // Answer what cannot be declined, decline what can: a mandatory
+    // prompt left parked mid-ability produces exactly the absence
+    // the next assertion checks, so nothing fails.
+    game.drain_choices();
     assert_eq!(
         game.state.player1.hand.cards.len(),
         hand_before,
