@@ -123,6 +123,142 @@ static int execute_misc(GameState *g, int actor, const AbilityEffect *effect, in
     return rb_execute_misc_effect_ex(g, actor, &g->p[actor], effect, host_cid, &resolved);
 }
 
+/* ───────────────── target="both" split for move_cards ──────────────────────────
+ *
+ * engine/src/ability/effects/mod.rs:327-335 runs
+ * AbilityResolver::handle_both_targets (engine/src/ability/effects/misc.rs:234-301)
+ * BEFORE the action dispatch, so a target="both" effect executes once for self
+ * and then once for opponent instead of once against one collapsed player.
+ * rb_execute_misc_effect is that seam for every action in the misc table
+ * (misc.c:1795); `move_cards` is dispatched by rb_executor_execute itself and
+ * therefore never reached it — so 「自分と相手は手札を1枚控え室に置く」
+ * (cards/abilities.json ability 575, 愛♡スクリ～ム！, hand->discard target="both")
+ * moved exactly one player's card and the other player's half silently vanished.
+ *
+ * The two arms are re-dispatched through rb_executor_execute, the C twin of
+ * Rust's `self.execute_effect(gs, &for_self)` (misc.rs:279/298), and NOT through
+ * rb_execute_misc_effect: the misc action table has no `move_cards` arm, so an
+ * arm routed there would fall through to `else r = 0` (misc.c:1822) and move
+ * nothing at all. Re-dispatching the whole arm — rather than calling
+ * rb_effect_move_cards twice by hand — is what guarantees each player gets
+ * exactly ONE application of the effect, and each arm's own single-player
+ * target makes the split non-recursive.
+ *
+ * This is the same Rust function rb_misc_handle_both_targets ports; the split
+ * is expressed twice because the two dispatch seams dispatch different action
+ * tables. Consolidating them needs a change in misc.c (see the executor.c
+ * commit message): making rb_misc_handle_both_targets' arms call
+ * rb_executor_execute instead of rb_execute_misc_effect would let every action
+ * use the one handler, and this helper could then be deleted. */
+
+static int exec_extra_true(const AbilityEffect *e, const char *key)
+{
+    const char *v = effect_extra(e, key);
+    return v && (!strcmp(v, "true") || !strcmp(v, "1"));
+}
+
+/* engine/src/ability/effects/misc.rs:248-259 (`is_move_cards_both`) and :251-259
+ * (`primary_is_move_cards_both`) — the two halves of the multi-target-to-deck
+ * exemption, kept as one predicate because the exemption is one `||`.
+ *
+ * Note `is_move_cards_both` is unreachable in Rust: the guard at misc.rs:240 has
+ * already required target == "both" and this predicate requires target == "deck".
+ * Only the `primary_effect` half can ever fire, and that is the shape that keeps
+ * a compound wrapper from being split in two when its primary effect already
+ * runs opponent-first through execute_move_cards_both
+ * (engine/src/ability/move_cards.rs:3411-3445). */
+static int is_multi_target_move_cards_to_deck(const AbilityEffect *e)
+{
+    return e && e->action && !strcmp(e->action, "move_cards") &&
+           exec_extra_true(e, "multiple_targets") &&
+           e->target && !strcmp(e->target, "deck");
+}
+
+/* "self" is measured FROM the ability's master (Rust `ability_master_id()` =
+ * the queue entry's player_id), not from whoever is answering the prompt in
+ * flight. Under choice_maker="opponent" the C parks the ANSWERER in
+ * queue.actor (h_choice, misc.c:1320/1364), so a both-arm that trusted the
+ * caller's `actor` would read target="self" as the answerer's side and run the
+ * two arms against the wrong pair of players. Mirrors both_master (misc.c:1639). */
+static int exec_both_master(const GameState *g, int actor)
+{
+    int cur = g->queue.cur;
+    if (cur >= 0 && cur < g->queue.n_entries) {
+        const char *pid = g->queue.entries[cur].player_id;
+        if (pid && !strcmp(pid, "p1")) return 0;
+        if (pid && !strcmp(pid, "p2")) return 1;
+    }
+    return actor;
+}
+
+/* misc.rs:273-275 / :283-285 / :294-296 — clone the effect and rewrite exactly
+ * `target` and, when the effect already carries one, `action_by` (so the right
+ * human answers the arm's prompt). Mirrors both_variant (misc.c:1623). */
+static AbilityEffect exec_both_variant(const AbilityEffect *e, const char *target)
+{
+    AbilityEffect c = *e;
+    c.target = (char *)target;
+    for (int i = 0; i < e->n_extra && i < RB_MAX_EXTRA; i++)
+        if (e->extra_k[i] && !strcmp(e->extra_k[i], "action_by"))
+            c.extra_v[i] = (char *)target;
+    return c;
+}
+
+/* engine/src/ability/effects/misc.rs:234-301, restricted to the move_cards
+ * shape. Returns 1 when the effect was fully handled here (the caller must NOT
+ * also run rb_effect_move_cards, or the cards would move twice per player), 0
+ * when the caller dispatches normally. */
+static int execute_move_cards_both_targets(GameState *g, int actor,
+                                            const AbilityEffect *effect, int host_cid)
+{
+    if (!g || !effect || !effect->target || strcmp(effect->target, "both")) return 0;
+    /* misc.rs:240-244 — position_change is exempt (it handles "both" itself).
+     * move_cards is not, so only the two multi-target-to-deck halves apply. */
+    if (effect->action && !strcmp(effect->action, "position_change")) return 0;
+    if (is_multi_target_move_cards_to_deck(effect) ||
+        is_multi_target_move_cards_to_deck(effect->primary_effect))
+        return 0;
+
+    AbilityEffect for_self     = exec_both_variant(effect, "self");
+    AbilityEffect for_opponent = exec_both_variant(effect, "opponent");
+    int master = exec_both_master(g, actor);
+
+    /* misc.rs:278-279 — SELF FIRST. */
+    int had_choice_before = rb_has_pending_choice(g);
+    rb_executor_execute(g, master, &for_self, host_cid);
+
+    /* misc.rs:281-291 — if the self arm opened a NEW pending choice, the
+     * opponent arm is deferred until that answer arrives: keep whatever was
+     * already parked and append ours so the other half runs right after. */
+    if (rb_has_pending_choice(g) && !had_choice_before) {
+        AbilityEffect *actions[RB_ENTRY_PENDING_CAP];
+        int n = 0;
+        int cur = g->queue.cur;
+        if (cur >= 0 && cur < g->queue.n_entries) {
+            RbQueueEntry *en = &g->queue.entries[cur];
+            for (int i = 0; i < en->pending_actions_n; i++) {
+                AbilityEffect *p = en->pending_actions[i];
+                en->pending_actions[i] = NULL;  /* detach: store_pending_actions frees the slot */
+                if (!p) continue;
+                if (n < RB_ENTRY_PENDING_CAP) actions[n++] = p;
+                else rb_effect_free(p);
+            }
+            en->pending_actions_n = 0;
+        }
+        AbilityEffect *clone = rb_effect_deep_clone(&for_opponent);
+        if (clone && n < RB_ENTRY_PENDING_CAP) actions[n++] = clone;
+        else if (clone) rb_effect_free(clone);
+        if (n > 0) rb_queue_store_pending_actions(g, actions, n);
+        /* store_pending_actions took its own deep clones; drop ours. */
+        for (int i = 0; i < n; i++) rb_effect_free(actions[i]);
+        return 1;
+    }
+
+    /* misc.rs:293-298 — no new choice, so the opponent arm runs immediately. */
+    rb_executor_execute(g, master, &for_opponent, host_cid);
+    return 1;
+}
+
 static int execute_modify_required_hearts_global(GameState *g, int actor,
                                                   const AbilityEffect *effect)
 {
@@ -183,6 +319,14 @@ int rb_executor_execute(GameState *g, int actor, AbilityEffect *effect, int host
         fprintf(stderr, "[EXECUTOR_DRAW_UNTIL] actor=%d ptr=%p\n", actor, (void *)effect);
         rb_effect_draw_until_count(g, actor, effect);
     } else if (strcmp(action, "move_cards") == 0) {
+        /* engine/src/ability/effects/mod.rs:327-335 — the target="both" split
+         * runs BEFORE the action dispatch. When it fires, Rust returns Ok(())
+         * from execute_effect without ever reaching execute_effect_dispatch, so
+         * the wrapper pushes NO verdict of its own (executor.rs:191) and only
+         * the two arms do. Mirror both facts: return early with no wrapper
+         * verdict, and never let the single-player path run as well. */
+        if (execute_move_cards_both_targets(g, actor, effect, host_cid))
+            return 1;
         rb_effect_move_cards(g, actor, effect);
     } else if (strcmp(action, "discard_card") == 0) {
         AbilityEffect moved = *effect;
