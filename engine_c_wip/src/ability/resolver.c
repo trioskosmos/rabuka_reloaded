@@ -57,6 +57,10 @@ const char *rb_condition_get_group_names(const Condition *c);
 const char *rb_condition_get_position(const Condition *c);
 const char *rb_condition_get_activation_position(const Condition *c);
 int rb_condition_get_distinct(const Condition *c);
+/* Defined in src/ability/vm.c, beside the positions_characters decoder that
+   produces the field this reads (the other accessors live in src/core/card.c,
+   which this wave did not own). */
+int rb_condition_get_positions_characters(const Condition *c);
 
 /* ── Card helpers ── */
 int rb_card_has_blade_heart(const Card *c);
@@ -104,6 +108,9 @@ static const char *cond_get_group_names(const Condition *c) {
 static const char *cond_get_position(const Condition *c) {
     return rb_condition_get_position(c);
 }
+static int cond_get_positions_characters(const Condition *c) {
+    return rb_condition_get_positions_characters(c);
+}
 static int cond_get_distinct(const Condition *c) {
     return rb_condition_get_distinct(c);
 }
@@ -118,7 +125,11 @@ static int cond_is_appearance(const Condition *c) {
    is worth making at all: cond.get_position().is_none()
    && cond.get_positions_characters().is_none()
    && (effect.position_any().is_some() || effect.activation_position_any().is_some()).
-   `positions_characters` has no C accessor, so that clause is vacuous here.
+   Both `is_none()` clauses are live in Rust; positions_characters used to have
+   no C accessor at all, so the second clause was vacuous here and an effect
+   that declared `position` would patch a position onto a condition that had
+   already pinned its own slots through positions_characters, overriding the
+   per-pair area names the card actually declared.
 
    Returns `cond` unchanged when the overlay would not write; otherwise a
    patched shallow copy in caller storage `scratch` with the effect's position
@@ -131,7 +142,7 @@ static const Condition *position_overlay(const AbilityEffect *eff, const Conditi
                                          Condition *scratch, int *injected) {
     *injected = 0;
     if (!cond) return cond;
-    if (cond_get_position(cond)) return cond;   /* positions_characters not exposed in C */
+    if (cond_get_position(cond) || cond_get_positions_characters(cond)) return cond;
     const char *eff_pos = rb_effect_position_any(eff);
     const char *eff_act_pos = rb_effect_activation_position(eff);
     if (!eff_pos && !eff_act_pos) return cond;

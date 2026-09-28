@@ -312,6 +312,95 @@ fail:
     return v;
 }
 
+/* ── positions_characters (engine/src/ability/vm.rs:621-661,
+      BcReader::read_positions_characters_value) ──
+   A LIST of {character, position} pairs, flattened to one string per entry,
+   {"position":"<p>","character":"<c>"}.
+
+   This is NOT the generic read_cond_value() shape. That arm decodes each
+   element as a nested object into CondValue.cond, while
+   stage_satisfies_positioned_characters (condition.c) pulls the two fields
+   back out of a FLAT STRING and rejects anything whose tag is not
+   RB_TAG_STR. So the generic shape made every entry unreadable and the gate
+   rejected PL!HS-bp2-026-L no matter how the board was arranged. Flattening
+   happens here, at decode time, exactly as the direct condition decoder's
+   "positions_characters" arm does. */
+static int read_positions_characters_value(Rdr *r, CondValue *out) {
+    uint32_t n, i;
+    if (!rd_len(r, &n)) return 0;
+    out->tag = RB_TAG_ARRAY;
+    out->arr_n = n;
+    out->arr = calloc(n ? n : 1, sizeof(CondValue));
+    if (!out->arr) return 0;
+    for (i = 0; i < n; i++) {
+        uint8_t etag;
+        if (!rd_u8(r, &etag)) return 0;
+        if (etag != RB_TAG_OBJECT && etag != RB_TAG_OBJVAR) {
+            /* Rust drops the element (vm.rs:633-634). The slot is kept and left
+               NULL instead: dropping would shrink the array, and a half-decoded
+               list must not satisfy the all-entries conjunction by having
+               fewer entries left to fail. The evaluator rejects a NULL entry,
+               so this is the fail-closed direction. */
+            if (!skip_value(r, etag)) return 0;
+            continue;
+        }
+        if (etag == RB_TAG_OBJVAR) { uint8_t vb; if (!rd_u8(r, &vb)) return 0; }
+        uint32_t ocount;
+        if (!rd_len(r, &ocount)) return 0;
+        char buf[512];
+        size_t blen = 0;
+        int emitted = 0, overflow = 0;
+        buf[0] = 0;
+        for (uint32_t j = 0; j < ocount; j++) {
+            uint32_t kidx;
+            uint8_t vtag;
+            if (!rd_idx(r, &kidx) || !rd_u8(r, &vtag)) return 0;
+            const char *kstr = rb_get_string(kidx);
+            int is_pos = kstr && !strcmp(kstr, "position");
+            int is_chr = kstr && !strcmp(kstr, "character");
+            if (!is_pos && !is_chr) { if (!skip_value(r, vtag)) return 0; continue; }
+            const char *val = NULL;
+            if (vtag == RB_TAG_STR) {
+                uint32_t sidx;
+                if (!rd_idx(r, &sidx)) return 0;
+                val = rb_get_string(sidx);
+            } else if (vtag == RB_TAG_NULL) {
+                val = "";    /* Rust: read_string_value().unwrap_or_default() */
+            } else {
+                /* Rust's read_string_value (vm.rs:398-408) returns None for any
+                   tag other than NULL/STR WITHOUT consuming the payload, which
+                   would leave this reader mid-value and corrupt every field after
+                   this object. Consume it here so the stream stays aligned. */
+                if (!skip_value(r, vtag)) return 0;
+            }
+            if (!val) val = "";
+            if (!overflow) {
+                int w = snprintf(buf + blen, sizeof(buf) - blen,
+                                 "%s\"%s\":\"%s\"", emitted ? "," : "",
+                                 is_pos ? "position" : "character", val);
+                if (w < 0 || (size_t)w >= sizeof(buf) - blen) { buf[blen] = 0; overflow = 1; }
+                else blen += (size_t)w;
+            }
+            emitted++;
+        }
+        /* The separator counts the pairs actually written, not the raw field
+           index, so an unknown key ahead of "position" cannot push a leading
+           comma into the flattened text. A pair too large to flatten is stored
+           NULL rather than truncated: a truncated pair would still parse as a
+           real, wrong requirement, and the evaluator rejects NULL instead. */
+        if (!overflow) {
+            char *s = malloc(strlen(buf) + 3);
+            if (!s) return 0;
+            s[0] = '{';
+            strcpy(s + 1, buf);
+            strcat(s, "}");
+            out->arr[i].tag = RB_TAG_STR;
+            out->arr[i].s = s;
+        }
+    }
+    return 1;
+}
+
 static Condition *read_condition_fields(Rdr *r, uint8_t variant) {
     uint32_t count;
     if (!rd_len(r, &count) || count > RB_MAX_COND_FIELD) return NULL;
@@ -325,8 +414,12 @@ static Condition *read_condition_fields(Rdr *r, uint8_t variant) {
         CondField *f = &c->fields[c->n_fields++];
         f->key = rb_strdup(rb_get_string(kidx));
         if (!f->key) goto fail;
-        f->v = read_cond_value(r, tag);
-        if (f->v.tag == 0xFF) goto fail;
+        if (!strcmp(f->key, "positions_characters") && tag == RB_TAG_ARRAY) {
+            if (!read_positions_characters_value(r, &f->v)) goto fail;
+        } else {
+            f->v = read_cond_value(r, tag);
+            if (f->v.tag == 0xFF) goto fail;
+        }
     }
     return c;
 fail:
@@ -1500,6 +1593,24 @@ Condition *build_allrevealedmatchheartcolor(const ConditionLocals *l) {
     return c;
 }
 
+/* resolver.rs:403 and :516 — `cond.get_positions_characters().is_none()`.
+   Returns 1 when the condition carries the field, 0 when it does not. Rust's
+   `is_none()` is false for a present-but-empty list, but the decoder only
+   emits the field when it holds at least one entry (cond_add_str_array is
+   gated on n > 0, as it is for every other list field here), and an empty
+   positions_characters states no requirement, so the two agree.
+
+   Defined in this file rather than beside its siblings in src/core/card.c
+   because that file belongs to another agent; the forward declaration sits in
+   resolver.c with the other rb_condition_get_* prototypes. */
+int rb_condition_get_positions_characters(const Condition *c) {
+    if (!c) return 0;
+    for (uint32_t i = 0; i < c->n_fields; i++)
+        if (c->fields[i].key && !strcmp(c->fields[i].key, "positions_characters"))
+            return c->fields[i].v.tag != RB_TAG_NULL;
+    return 0;
+}
+
 /* ── decode_condition_field: read one field from bytecode into locals ── */
 static int decode_condition_field(Rdr *r, const char *key, ConditionLocals *l) {
     uint8_t tag;
@@ -2008,43 +2119,79 @@ static int decode_condition_field(Rdr *r, const char *key, ConditionLocals *l) {
         if (tag == RB_TAG_NULL) return 1;
         if (tag == RB_TAG_ARRAY) {
             uint32_t n; if (!rd_len(r, &n)) return 0;
-            l->positions_characters = malloc(sizeof(char*) * n);
-            l->n_positions_characters = n;
+            l->positions_characters = calloc(n ? n : 1, sizeof(char*));
+            if (!l->positions_characters) return 0;
+            l->n_positions_characters = (int)n;
             for (uint32_t i = 0; i < n; i++) {
                 /* Each element is an object with position + character fields.
-                   We serialize it as a JSON-like string for simplicity. */
-                if (tag == RB_TAG_OBJVAR || tag == RB_TAG_OBJECT) {
-                    char buf[256]; buf[0] = 0;
-                    uint8_t obtag = tag;
-                    if (obtag == RB_TAG_OBJVAR) { uint8_t vb; if (!rd_u8(r, &vb)) return 0; }
-                    uint32_t ocount; if (!rd_len(r, &ocount)) return 0;
-                    strcat(buf, "{");
-                    for (uint32_t j = 0; j < ocount; j++) {
-                        uint32_t kidx; if (!rd_idx(r, &kidx)) return 0;
-                        const char *kstr = rb_get_string(kidx);
-                        uint8_t vtag; if (!rd_u8(r, &vtag)) return 0;
-                        if (strcmp(kstr, "position") == 0 && vtag == RB_TAG_STR) {
-                            uint32_t pidx; if (!rd_idx(r, &pidx)) return 0;
-                            if (j > 0) strcat(buf, ",");
-                            strcat(buf, "\"position\":\"");
-                            strcat(buf, rb_get_string(pidx));
-                            strcat(buf, "\"");
-                        } else if (strcmp(kstr, "character") == 0 && vtag == RB_TAG_STR) {
-                            uint32_t cidx; if (!rd_idx(r, &cidx)) return 0;
-                            if (j > 0) strcat(buf, ",");
-                            strcat(buf, "\"character\":\"");
-                            strcat(buf, rb_get_string(cidx));
-                            strcat(buf, "\"");
-                        } else {
-                            skip_value(r, vtag);
-                        }
-                    }
-                    strcat(buf, "}");
-                    l->positions_characters[i] = rb_strdup(buf);
-                } else {
-                    skip_value(r, tag);
+                   We serialize it as a JSON-like string for simplicity.
+
+                   vm.rs:630-631 reads the tag of EACH ELEMENT here, before
+                   deciding whether it is an object. This branch used to test
+                   `tag` instead — but `tag` was already established to be
+                   RB_TAG_ARRAY by the test above, so the comparison against
+                   RB_TAG_OBJVAR/RB_TAG_OBJECT was dead, every element fell
+                   through to `skip_value(r, tag)`, and every entry was stored
+                   NULL. The field then decoded with the right length and no
+                   payload, and stage_satisfies_positioned_characters
+                   (condition.c) rejects a NULL entry, so PL!HS-bp2-026-L could
+                   never award its +2 no matter how the board was arranged. */
+                uint8_t etag; if (!rd_u8(r, &etag)) return 0;
+                if (etag != RB_TAG_OBJECT && etag != RB_TAG_OBJVAR) {
+                    /* Rust drops the element (vm.rs:633-634). C keeps the slot
+                       and stores NULL instead: dropping would shrink the array,
+                       and a half-decoded list must not be able to satisfy the
+                       all-entries conjunction by having fewer entries to fail.
+                       The evaluator rejects a NULL entry, so this is the
+                       fail-closed direction. */
+                    if (!skip_value(r, etag)) return 0;
                     l->positions_characters[i] = NULL;
+                    continue;
                 }
+                if (etag == RB_TAG_OBJVAR) { uint8_t vb; if (!rd_u8(r, &vb)) return 0; }
+                uint32_t ocount; if (!rd_len(r, &ocount)) return 0;
+                char buf[512];
+                size_t blen = 0;
+                int emitted = 0, overflow = 0;
+                buf[0] = 0;
+                for (uint32_t j = 0; j < ocount; j++) {
+                    uint32_t kidx; if (!rd_idx(r, &kidx)) return 0;
+                    const char *kstr = rb_get_string(kidx);
+                    uint8_t vtag; if (!rd_u8(r, &vtag)) return 0;
+                    int is_pos = kstr && !strcmp(kstr, "position");
+                    int is_chr = kstr && !strcmp(kstr, "character");
+                    if (!is_pos && !is_chr) { if (!skip_value(r, vtag)) return 0; continue; }
+                    const char *val = NULL;
+                    if (vtag == RB_TAG_STR) {
+                        uint32_t sidx; if (!rd_idx(r, &sidx)) return 0;
+                        val = rb_get_string(sidx);
+                    } else if (vtag == RB_TAG_NULL) {
+                        val = "";    /* Rust: read_string_value().unwrap_or_default() */
+                    } else {
+                        /* Rust's read_string_value (vm.rs:398-408) returns None
+                           for any tag other than NULL/STR WITHOUT consuming the
+                           payload. Leaving it unconsumed would desync this
+                           reader and corrupt every field after this object, so
+                           consume it here and keep the stream aligned. */
+                        if (!skip_value(r, vtag)) return 0;
+                    }
+                    if (!val) val = "";
+                    if (!overflow) {
+                        int w = snprintf(buf + blen, sizeof(buf) - blen, "%s\"%s\":\"%s\"",
+                                         emitted ? "," : "",
+                                         is_pos ? "position" : "character", val);
+                        if (w < 0 || (size_t)w >= sizeof(buf) - blen) { buf[blen] = 0; overflow = 1; }
+                        else blen += (size_t)w;
+                    }
+                    emitted++;
+                }
+                /* The separator counts the pairs actually written, not the raw
+                   field index, so an unknown key ahead of "position" cannot
+                   push a leading comma into the flattened text. An entry too
+                   large to flatten is stored NULL rather than truncated: a
+                   truncated pair would still parse as a real, wrong
+                   requirement, and the evaluator rejects NULL instead. */
+                l->positions_characters[i] = overflow ? NULL : rb_strdup(buf);
             }
             return 1;
         }
