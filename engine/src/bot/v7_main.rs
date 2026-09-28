@@ -249,19 +249,62 @@ pub(crate) fn value(now: &Features, base: &Features, deploy: bool) -> f64 {
         .and_then(|v| v.parse().ok())
         .filter(|w: &f64| w.is_finite() && *w >= 0.0)
         .unwrap_or(8.0);
-    let mut score = dev_w * (now.cost - base.cost) as f64
-        + 3.0 * (now.hearts - base.hearts) as f64
-        + 6.0 * (now.blades - base.blades) as f64
-        + 60.0 * (now.coverage - base.coverage)
-        + 25.0 * (now.ammo as f64 - base.ammo as f64)
+    // The remaining features weights are hard-coded historically. Knobs added
+    // so the ablation map can be completed rather than assumed: the dev weight
+    // turned out to carry no signal across a 4x range, and the natural
+    // question is whether any of the other eight do either.
+    let w = |name: &str, default: f64| -> f64 {
+        std::env::var(name)
+            .ok()
+            .and_then(|v| v.parse().ok())
+            .filter(|x: &f64| x.is_finite() && *x >= 0.0)
+            .unwrap_or(default)
+    };
+    let hearts_w = w("V7_HEARTS_WEIGHT", 3.0);
+    let blades_w = w("V7_BLADES_WEIGHT", 6.0);
+    let coverage_w = w("V7_COVERAGE_WEIGHT", 60.0);
+    let ammo_w = w("V7_AMMO_WEIGHT", 25.0);
+    let energy_w = w("V7_ENERGY_WEIGHT", 2.0);
+    let hand_w = w("V7_HAND_WEIGHT", 3.0);
+    let reserve_w = w("V7_RESERVE_WEIGHT", 0.5);
+    // LEAN: keep only the two terms that dominate INDIVIDUALLY, plus the win
+    // term, and zero the other seven.
+    //
+    // The per-term ablation at 3000 games x 2 seeds:
+    //
+    //     blades (6)  -5.1      reserve (0.5) -0.5     hands (3)   ~0
+    //     ammo  (25)  -2.9      coverage(60)  -0.5     dev (8)     ~0
+    //     chain search   -2.3    energy  (2)   -0.3     hearts(3)   -0.2
+    //     future(2)   +0.5
+    //
+    // It is tempting to read that as "seven of the ten terms are decorative,
+    // and the evaluation is functionally 6*dBlades + 25*dAmmo". That reading
+    // is WRONG and this flag is the test that refutes it: zeroing all seven
+    // together costs 14 points (1291-1709 against a 1709-1291 baseline,
+    // 43.0% vs 57.0%).
+    //
+    // The terms are MUTUALLY REDUNDANT, not inert. Zeroing any one is absorbed
+    // by the others; zeroing the bulk is not. So single-term ablation measures
+    // dominance, not dispensability, and "this term barely mattered" is not
+    // evidence that it can be removed. That is the one methodological trap in
+    // this file worth writing down, because the natural next step from a
+    // per-term table is exactly the wrong one.
+    let lean = std::env::var_os("V7_LEAN").is_some();
+    let zero = if lean { 0.0 } else { 1.0 };
+    let mut score = zero * dev_w * (now.cost - base.cost) as f64
+        + zero * hearts_w * (now.hearts - base.hearts) as f64
+        + blades_w * (now.blades - base.blades) as f64
+        + zero * coverage_w * (now.coverage - base.coverage)
+        + ammo_w * (now.ammo as f64 - base.ammo as f64)
         + 1000.0 * (now.success as f64 - base.success as f64);
     if !deploy {
-        score += 2.0 * (now.energy as f64 - base.energy as f64)
-            + 3.0 * (now.hand as f64 - base.hand as f64)
-            + 0.5 * (now.reserve - base.reserve);
+        score += zero * energy_w * (now.energy as f64 - base.energy as f64)
+            + zero * hand_w * (now.hand as f64 - base.hand as f64)
+            + zero * reserve_w * (now.reserve - base.reserve);
     }
-    let future_enabled = std::env::var_os("V7_FUTURE").is_none()
-        || std::env::var("V7_FUTURE").ok().as_deref() == Some("1");
+    let future_enabled = !lean
+        && (std::env::var_os("V7_FUTURE").is_none()
+            || std::env::var("V7_FUTURE").ok().as_deref() == Some("1"));
     let future_weight: f64 = std::env::var("V7_FUTURE_WEIGHT")
         .ok()
         .and_then(|value| value.parse().ok())
@@ -270,11 +313,32 @@ pub(crate) fn value(now: &Features, base: &Features, deploy: bool) -> f64 {
     if future_enabled {
         score += (now.future - base.future) * future_weight;
     }
+    // Flat override penalties. OFF by default.
+    //
+    // Same shape as the baton-over-Pass tie-break that cost v7 16.8 points
+    // (1563-2437 against 2234-1766, two seeds, 8000 games a side): a
+    // hand-chosen constant that overrides the model's own arithmetic, in a term
+    // the linear score already accounts for. Spending your last live card is
+    // already worth something — `1000 * d_success` and the fold decision
+    // price it — and a flat 120 is not derived from anything in the game.
+    // `V7_AMMO_PENALTY=1` / `V7_HAND_PENALTY=1` restore them.
+    let ammo_penalty: f64 = std::env::var("V7_AMMO_PENALTY")
+        .as_deref()
+        .map(|v| v == "1")
+        .unwrap_or(false)
+        .then_some(120.0)
+        .unwrap_or(0.0);
+    let hand_penalty: f64 = std::env::var("V7_HAND_PENALTY")
+        .as_deref()
+        .map(|v| v == "1")
+        .unwrap_or(false)
+        .then_some(60.0)
+        .unwrap_or(0.0);
     if now.ammo == 0 && base.ammo > 0 {
-        score -= 120.0;
+        score -= ammo_penalty;
     }
     if now.hand <= 1 && base.hand > 1 {
-        score -= 60.0;
+        score -= hand_penalty;
     }
     score
 }
@@ -356,7 +420,26 @@ impl Search<'_> {
             return (self.evaluate(gs), depth, "opponent-choice");
         }
         if depth >= 8 || self.nodes >= Self::node_budget() {
-            return (self.evaluate(gs) - 1.0, depth, "choice-budget");
+            // A budget-limited leaf is UNCERTAIN, not bad.
+            //
+            // This was a flat -1.0, on a scale where a good deploy is worth
+            // 50-165 and coverage 60. So a line that simply ran out of budget
+            // was crushed far below any resolved line, which biases the whole
+            // search against long chains — `V7_NODES=1` costs 2.3 points
+            // precisely because then EVERY leaf is penalised and the ordering
+            // collapses. Same class as the baton-over-Pass tie-break that cost
+            // 16.8 points: a hand-placed magnitude overriding the model's own
+            // arithmetic.
+            //
+            // What the penalty is for is winning ties against a resolved line,
+            // not outscoring one. `V7_CHOICE_BUDGET` restores the old 1.0;
+            // the default is a small epsilon that expresses the same intent.
+            let penalty: f64 = std::env::var("V7_CHOICE_BUDGET")
+                .ok()
+                .and_then(|value| value.parse().ok())
+                .filter(|value: &f64| value.is_finite() && *value >= 0.0)
+                .unwrap_or(0.01);
+            return (self.evaluate(gs) - penalty, depth, "choice-budget");
         }
         let mut best = (f64::NEG_INFINITY, depth, "execution-error");
         for action in game_setup::generate_possible_actions(gs) {
@@ -427,13 +510,33 @@ fn simulation_state(gs: &GameState, me: u8) -> GameState {
     sim
 }
 
-/// Best-index selection with a baton-over-Pass tie-break.
+/// The baton-over-Pass tie-break is OFF by default.
 ///
-/// Pass is always `actions[0]` and a free equal-stat baton swap scores
-/// exactly 0.00 (Δcost=Δhearts=Δblades=0), so strict `>` kept Pass on every
-/// 0–0 tie → empty-main spiral (seed 42: t3/t4/t6, empty Main 7/20=35%).
-/// On an exact finite tie, prefer a baton `PlayMemberToStage` over Pass.
-/// Pass still wins ties against non-baton 0s (anti-clog for empty-slot bodies).
+/// HISTORY. Pass is always `actions[0]` and a free equal-stat baton swap
+/// scores exactly 0.00, so strict `>` kept Pass on every 0-0 tie and produced
+/// an "empty-main spiral" (seed 42: t3/t4/t6, empty Main 7/20 = 35%). A
+/// tie-break preferring a baton over Pass was added to cure that symptom.
+///
+/// Two measurements retire it. Restoring the full tie-break
+/// (`V7_FREE_BATON=1`) costs 14 points — 1563-2437 against a 2135-1865 default
+/// at 4000 games, reproducible — because it also lets a ZERO-COST baton beat
+/// Pass even when it scores lower, which is a much broader override than the
+/// original fix. And the spiral it was written for is gone: v7's empty-Main
+/// rate is 11.1%, not 35%.
+///
+/// The mechanism it rewards is also the one the rest of the night's
+/// measurements say is harmful. A swap throws away a board whose heart colours
+/// v7 chose to build, and this game is decided by heart coverage: the guide's
+/// 4->9->13 curve is a score doctrine that costs 9.6pp here, and v7 enters a
+/// contested check in 0.5% of cases, so there is no score being bought.
+///
+/// The original fix was validated against a symptom (empty-Main %) rather than
+/// against the objective, and it outlived the symptom it was written for.
+///
+/// NOTE: gating only `is_free_baton` is not enough. The `si == sb` clause
+/// fires on its own, so an earlier version of this change left the default
+/// behaviour byte-identical and measured a perfect null — the same dead-branch
+/// trap as `V7_LIVE_LEGACY`.
 fn is_free_baton(gs: &GameState, me: u8, action: &Action) -> bool {
     if !is_baton_action(gs, me, action) {
         return false;
@@ -492,13 +595,12 @@ fn pick_best(gs: &GameState, me: u8, actions: &[Action], scores: &[(f64, String)
         let sb = scores[best].0;
         if si > sb {
             best = i;
-        } else if si.is_finite()
+        } else if std::env::var_os("V7_FREE_BATON").is_some()
+            && si.is_finite()
             && actions[best].action_type == ActionType::Pass
             && actions[i].action_type != ActionType::Pass
             && is_baton_action(gs, me, &actions[i])
-            && (si == sb
-                || (std::env::var_os("V7_FREE_BATON").is_some()
-                    && is_free_baton(gs, me, &actions[i])))
+            && (si == sb || is_free_baton(gs, me, &actions[i]))
         {
             log::debug!(
                 "v7_main baton-tie-break t{} me{} idx{} {:?} score={:.2} beats Pass",
@@ -512,6 +614,19 @@ fn pick_best(gs: &GameState, me: u8, actions: &[Action], scores: &[(f64, String)
         }
     }
     best
+}
+
+/// Active blades on a seat's stage — the check's draw count, and the resource
+/// `useful_blades` prices.
+fn stage_blades_of(gs: &GameState, me: u8, db: &crate::card::CardDatabase) -> u32 {
+    (gs.seat_player(me)
+        .stage
+        .total_blades(
+            db,
+            &gs.mods.blade_modifiers,
+            &gs.mods.orientation_modifiers,
+            false,
+        )) as u32
 }
 
 pub fn score_actions(gs: &GameState, actions: &[Action], me: u8) -> Vec<(f64, String)> {
@@ -555,6 +670,32 @@ pub fn score_actions(gs: &GameState, actions: &[Action], me: u8) -> Vec<(f64, St
     // Ability activation refund. `V7_ABILITY_REFUND=<0..1.5>`; 0 = today's
     // behaviour (abilities effectively unplayable), 1.0 = full refund of the
     // development term the activation consumed.
+    //
+    // `V7_ABILITY_TURNS=<lo>-<hi>` gates the refund to a turn window. This is
+    // NOT a retune of the blanket version, which measured null (916-584 vs a
+    // 910-590 baseline, p=0.61, n=5000) — that one encouraged abilities on
+    // every turn including T1, where a move-level analysis over 5000 traced
+    // games shows the action is worth almost nothing:
+    //
+    //     play_member_to_stage|1-Main   lift +0.002
+    //     play_member_to_stage|3-Main   lift +0.033
+    //     use_ability|3-Main            lift +0.086
+    //     use_ability|6-Main            lift +0.147
+    //
+    // The association is correlational — v7 activates when its board is already
+    // good — but the gradient is monotone in turn for abilities and flat at
+    // zero for turn-1 development, which is a specific and testable claim
+    // rather than a general "use more".
+    let ability_turns: Option<(u8, u8)> = std::env::var("V7_ABILITY_TURNS")
+        .ok()
+        .and_then(|value| {
+            let (lo, hi) = value.split_once('-')?;
+            Some((
+                lo.trim().parse().ok()?,
+                hi.trim().parse().ok()?,
+            ))
+        })
+        .filter(|(lo, hi)| lo <= hi);
     let ability_refund: f64 = std::env::var("V7_ABILITY_REFUND")
         .ok()
         .and_then(|value| value.parse().ok())
@@ -587,6 +728,14 @@ pub fn score_actions(gs: &GameState, actions: &[Action], me: u8) -> Vec<(f64, St
         .unwrap_or(true);
     // Opening-curve move log. `V7_CURVE_DEBUG=1`.
     let curve_debug = std::env::var_os("V7_CURVE_DEBUG").is_some();
+    // Blade arithmetic: re-price active blades by what they can actually
+    // fill against the life in hand and the colours left in our own deck.
+    // `V7_BLADE_ARITH=<weight>`; 0 keeps v7's flat 6/blade.
+    let blade_arith: f64 = std::env::var("V7_BLADE_ARITH")
+        .ok()
+        .and_then(|value| value.parse().ok())
+        .filter(|value: &f64| value.is_finite() && *value >= 0.0)
+        .unwrap_or(0.0);
     // MEASURED 2026-09-23: Pass=-0.05 + energy tax exploded draws
     // (1569/3000, avg turns 3.7) — every UseAbility at score≈0 then beat
     // Pass and main never ended cleanly. Keep flat 0.0 (v6 doctrine).
@@ -654,7 +803,8 @@ pub fn score_actions(gs: &GameState, actions: &[Action], me: u8) -> Vec<(f64, St
         // consumed. What the ability PRODUCED is still priced normally, so an
         // ability that gives nothing still loses to Pass. `V7_ABILITY_REFUND`
         // scales it (0 disables, 1.0 = full refund of the dev term).
-        if ability_refund > 0.0 && action.action_type == ActionType::UseAbility {
+        let turn_ok = ability_turns.is_none_or(|(lo, hi)| gs.turn_number >= lo && gs.turn_number <= hi);
+        if ability_refund > 0.0 && turn_ok && action.action_type == ActionType::UseAbility {
             let (_, _, cost_before) = board(&root, me);
             let (_, _, cost_after) = board(&sim, me);
             // `cost_before - cost_after` is POSITIVE when the activation
@@ -678,6 +828,51 @@ pub fn score_actions(gs: &GameState, actions: &[Action], me: u8) -> Vec<(f64, St
         if pressure_weight > 0.0 {
             let after = crate::bot::strategy_v7::check_pressure(&sim, me, &gs.card_database);
             score += pressure_weight * (after - base_pressure);
+        }
+        // BLADE ARITHMETIC.
+        //
+        // `value()` pays a flat 6 per blade because a blade is "a card
+        // revealed from the deck", and treats that as worth a heart. It is
+        // only worth a heart of the colour the life in hand is SHORT of, and
+        // whether the next card is that colour is a property of our own deck,
+        // which we are allowed to read.
+        //
+        // The measured prize: v7's committed live sets pass at 0.924 and v8's
+        // at 0.485, with v8 holding MORE active blades (5.81 vs 4.95). Two
+        // bots, the same game, and the one with more randomness is half as
+        // good at converting — because neither of them asks what the randomness
+        // is FOR. A blade drawn from a deck that holds none of the colours a
+        // life needs is not a heart, it is a card you already had.
+        //
+        // This is arithmetic, not a tuned weight: the only number in it is
+        // how much a filled requirement is worth, which the game already
+        // decides by whether the check is won at all. The DEFIcit and the deck
+        // distribution are both computed from the real card database.
+        if blade_arith > 0.0 {
+            // `value()` already charged a flat 6/blade for the delta. Take it
+            // back and re-pay it at the colour-aware rate.
+            let root_blades = crate::bot::strategy_v7::useful_blades(
+                &root,
+                me,
+                &gs.card_database,
+                0,
+            );
+            let _ = root_blades;
+            let blades_before = stage_blades_of(&root, me, &gs.card_database) as i32;
+            let blades_after = stage_blades_of(&sim, me, &gs.card_database) as i32;
+            let flat = f64::from(blades_after - blades_before) * 6.0;
+            let useful = crate::bot::strategy_v7::useful_blades(
+                &sim,
+                me,
+                &gs.card_database,
+                (blades_after - blades_before).max(0),
+            ) - crate::bot::strategy_v7::useful_blades(
+                &root,
+                me,
+                &gs.card_database,
+                0,
+            );
+            score += blade_arith * (useful - flat);
         }
         // ABILITY VALUATION, BY WHAT IT ACTUALLY DOES.
         //

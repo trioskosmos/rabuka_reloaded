@@ -487,8 +487,94 @@ static int printed_blade_heart_colour(int cid)
     return s;
 }
 
+/* All distinct blade-heart colours a print carries, for a blade-heart count
+ * the printed ability may not limit to one. */
+static int printed_blade_heart_colours(int cid, int *out, int max)
+{
+    Card c; int n = 0;
+    if (cid < 0 || !rb_decode_card_by_index((uint32_t)cid, &c)) return 0;
+    for (int i = 0; i < c.num_blade && n < max; i++) {
+        int col = c.heart_color[c.num_base + i];
+        if (col == (int)RB_HEART_ALL) continue;
+        int seen = 0;
+        for (int k = 0; k < n; k++) if (out[k] == col) seen = 1;
+        if (!seen) out[n++] = col;
+    }
+    rb_free_card(&c);
+    return n;
+}
+
 static int card_is_member(int cid) { return rb_card_is_member(cid); }
 static int card_is_live(int cid)   { return rb_card_is_live(cid); }
+
+/* How many abilities the COMPILED card database actually holds for `cid`.
+ *
+ * This matters because cards/cards.json is not what the engine reads: the C
+ * tree loads cards/build (cards.bin + abilities.bin, produced by
+ * compile_cards.py / compile_abilities.py), and a card whose JSON has a full
+ * 「ability」 field can still decode to ZERO abilities in that build. When
+ * that happens every ability-driven case for the card is measuring a DATA
+ * BUILD, not the engine, and the run would otherwise report a silent
+ * behavioural "gap" with the wrong cause. The section-level guard below turns
+ * that into a named, single, unambiguous failure. */
+static int n_abilities(int cid)
+{
+    return (cid >= 0) ? rb_card_num_abilities((uint32_t)cid) : -1;
+}
+
+/* A one-line report of every ability a card decodes to, so a data gap names
+ * itself. */
+static void dump_abilities(int cid, const char *tag)
+{
+    if (cid < 0) return;
+    Card c;
+    if (!rb_decode_card_by_index((uint32_t)cid, &c)) return;
+    int n = rb_card_num_abilities((uint32_t)cid);
+    fprintf(stderr, "  (%s) %s: %d ability/abilities in the compiled DB\n",
+            tag, rb_card_string(c.card_no_idx), n);
+    for (int a = 0; a < n; a++) {
+        Ability ab;
+        memset(&ab, 0, sizeof ab);
+        if (!rb_decode_card_ability((uint32_t)cid, a, &ab)) continue;
+        fprintf(stderr, "      [%d] triggers=%s action=%s\n", a,
+                ab.triggers ? ab.triggers : "(null)",
+                (ab.effect && ab.effect->action) ? ab.effect->action : "(no effect)");
+        rb_free_ability(&ab);
+    }
+    rb_free_card(&c);
+}
+
+/* The UNIT NAME, which is what 「同じユニット名」 and 「『蓮ノ空』」 actually
+ * mean. rb_card_group_name returns the SERIES ("ラブライブ！") for every card
+   in a set, so it CANNOT be used to compare units -- three of the abilities in
+   this file are unit-scoped, and a series comparison would make all of them
+   vacuous. Card.unit_idx indexes the same string table rb_card_string reads, so
+   that is the faithful accessor. Rotating buffer: callers compare two names in
+   one expression. */
+static const char *unit_of(int cid)
+{
+    static char bufs[4][80];
+    static int  next = 0;
+    char *buf = bufs[next];
+    next = (next + 1) & 3;
+    Card c;
+    buf[0] = 0;
+    if (cid >= 0 && rb_decode_card_by_index((uint32_t)cid, &c)) {
+        const char *s = (c.unit_idx == UINT16_MAX) ? NULL : rb_card_string(c.unit_idx);
+        if (s) snprintf(buf, 80, "%s", s);
+        rb_free_card(&c);
+    }
+    return buf;
+}
+
+/* 「同じユニット名」 -- two cards share a unit iff their UNIT names match. */
+static int same_unit(int a, int b)
+{
+    const char *ua = unit_of(a);
+    const char *ub = unit_of(b);
+    if (!ua || !ua[0] || !ub || !ub[0]) return 0;
+    return strcmp(ua, ub) == 0;
+}
 
 /* ── choice plumbing ─────────────────────────────────────────────────────── */
 
@@ -661,6 +747,71 @@ static void walk_to_live_start(TestGame *tg)
     test_pass(tg);
 }
 
+/* ── position-change answer index ───────────────────────────────────────────
+ * The 「移動」 (position_change) prompt is a SelectTarget whose resume handler
+ * rb_resolver_handle_position_destination (choice.c) reads the answer with
+ * `atoi(selected)` and applies it DIRECTLY as a stage slot via
+ * rb_stage_position_index -- there is no filtered-candidate remap, so
+ *
+ *      answer 0 -> LEFT, 1 -> CENTRE, 2 -> RIGHT
+ *
+ * and the answer SWAPS the source slot with the destination slot. The
+ * destination is NOT chosen relative to the source and there is no "same
+ * slot" option, so answering the source's own index is a no-op swap. Every
+ * position case in sections E4, F2 and G uses these constants so the index is
+ * stated once. */
+#define PICK_LEFT   0
+#define PICK_CENTRE 1
+#define PICK_RIGHT  2
+
+/* Drive the 「移動」 prompt to a destination OTHER than the card's current
+ * slot, without hard-coding an answer index.
+ *
+ * WHY THIS EXISTS: the prompt is a SelectTarget with target
+ * "position|destination" and n_filtered_indices == 0, so the answer index is
+ * passed straight through -- but rb_resume_position_change (state.c) then reads
+ * the SOURCE slot by searching the stage for `g->queue.resume_host`. A test
+ * that hard-codes an index is therefore testing its own guess about which of
+ * those two conventions the engine uses.
+ *
+ * This helper picks the lowest other slot and RETURNS it, so the caller
+ * asserts the card landed at the slot this function actually requested. The
+ * engine-behaviour assertions (blades gained, etc.) are unchanged and strict;
+ * only the bookkeeping says which destination was chosen.
+ *
+ * Returns the chosen slot, or -1 if there was no prompt. */
+static int drive_position_to_other_slot(TestGame *tg, int src_slot)
+{
+    if (!pending(tg)) return -1;
+    const RbChoice *c = rb_get_pending_choice(&tg->state);
+    if (!c) return -1;
+    fprintf(stderr, "  (position) src_slot=%d kind=%s target=%s n_filtered=%d\n",
+            src_slot, test_pending_choice_type(tg), c->target, c->n_filtered_indices);
+
+    /* An explicit candidate list wins; otherwise the index IS the slot. */
+    for (int i = 0; i < c->n_filtered_indices; i++) {
+        int cand = c->filtered_indices[i];
+        if (cand >= 0 && cand < RB_STAGE_SIZE && cand != src_slot) {
+            answer(tg, i);
+            return cand;
+        }
+    }
+    for (int slot = 0; slot < RB_STAGE_SIZE; slot++) {
+        if (slot == src_slot) continue;
+        answer(tg, slot);
+        return slot;
+    }
+    return -1;
+}
+
+/* Which stage slot currently holds `cid`, or -1. */
+static int slot_of(TestGame *tg, int pl, int cid)
+{
+    for (int i = 0; i < RB_STAGE_SIZE; i++)
+        if (tg->state.p[pl].stage[i] == cid) return i;
+    return -1;
+}
+
 static void push_deck(TestGame *tg, int pl, int cid, int n)
 {
     RbPlayer *P = &tg->state.p[pl];
@@ -723,6 +874,8 @@ static void a0_sumire_center_highest_cost_heart03(void)
     test_recalc(&tg);
     CHECK_EQ(heart_of(&tg, cost10, H03), 0,
              "A0: the 常時 grants to ITSELF, never to the qualifying centre member");
+    CHECK_EQ(heart_of(&tg, sumire, H03), 0,
+             "A0: sumire is on the RIGHT, so the centre-gate does not reach it");
 
     /* sumire moves to the centre: it is now strictly the highest. */
     set_stage(&tg, 0, sumire, cost10, cost4);
@@ -750,13 +903,17 @@ static void a0_sumire_tie_for_highest_no_heart03(void)
     test_recalc(&tg);
     CHECK_EQ(heart_of(&tg, tie_b, H03), 0,
              "A0: the centre SHARES the highest cost with a side member -> no heart03");
+    CHECK_EQ(heart_of(&tg, tie_a, H03), 0,
+             "A0: the 常時 grants to itself only, never to the tied peer");
 
-    /* CONTROL, and the only thing making the check above non-vacuous: the same
-     * two cards with one of them pulled from the stage must flip the answer. */
+    /* CONTROL, and the only thing making the check above non-vacuous: the SAME
+     * two cards, with the tied peer pulled off the stage, must flip the answer.
+     * Without a control the zero above would also read on a board where the
+     * 常時 never resolved. */
     set_stage(&tg, 0, RB_EMPTY_SLOT, tie_b, low);
     test_recalc(&tg);
     CHECK_EQ(heart_of(&tg, tie_b, H03), 1,
-             "A0 CONTROL: with the tied peer gone the lone centre member is "
+             "A0 CONTROL: with the tied peer gone, the lone centre member is "
              "trivially highest -> heart03 appears, so the tie check above is "
              "measuring the tie and not a dead ability");
 }
@@ -896,14 +1053,23 @@ static void a2_condition_met_single_target_auto_applies(void)
     int hanasaka = a2_setup(&tg, 10, -1, -1);
     if (hanasaka < 0) return;
     int hasu = tg.state.p[0].stage[1];
+    CHECK_EQ(stage_has(&tg, 0, hasu), 1,
+             "A2: the 蓮ノ空 member really is staged");
     CHECK(printed_cost(hasu) == 10,
           "A2 fixture: the staged 蓮ノ空 member is the cost-10 print");
 
     CHECK(fire_live_start(&tg, hanasaka), "A2: the ライブ開始時 ability fires");
+    if (pending(&tg)) describe_pending(&tg, "A2 single");
     int prompts = pc_pay(&tg, 12);
     fprintf(stderr, "  (A2 single) prompts = %d\n", prompts);
 
     CHECK_EQ(disc_len(&tg, 0), 10, "A2 CONTROL: the waitroom still holds the 10 members");
+    /* Exactly one eligible target means the effect auto-applies with NO prompt,
+     * so the prompt count is deliberately NOT the control here. The control is
+     * the a2_two_targets case on the same card, which DOES open a prompt. */
+    CHECK_EQ(prompts, 0,
+             "A2: with a single eligible target the effect auto-applies without "
+             "a selection prompt");
     CHECK_EQ(heart_of(&tg, hasu, H04), 1,
              "A2: the sole eligible 蓮ノ空 member gains exactly +1 heart04");
     CHECK_EQ(heart_of(&tg, hanasaka, H04), 0,
@@ -922,6 +1088,7 @@ static void a2_condition_not_met_no_effect(void)
     int hasu = tg.state.p[0].stage[1];
 
     CHECK(fire_live_start(&tg, hanasaka), "A2: the ライブ開始時 ability fires at 9 too");
+    if (pending(&tg)) describe_pending(&tg, "A2 nine");
     int prompts = pc_pay(&tg, 12);
     fprintf(stderr, "  (A2 nine) prompts = %d\n", prompts);
 
@@ -954,6 +1121,7 @@ static void a2_non_hasunosora_not_targeted(void)
              "only the STAGE filter can be what blocks the grant");
 
     CHECK(fire_live_start(&tg, hanasaka), "A2: the ability fires");
+    if (pending(&tg)) describe_pending(&tg, "A2 non-hasu");
     int prompts = pc_pay(&tg, 12);
     fprintf(stderr, "  (A2 non-hasu) prompts = %d\n", prompts);
 
@@ -969,20 +1137,24 @@ static void a2_two_targets_only_selected_gains(void)
 {
     static TestGame tg;
     reset_board(&tg);
+    /* TWO distinct 蓮ノ空 prints staged -- HANANO_A on the left, HANANO_B in
+     * the centre. Both satisfy 「蓮ノ空」, so a player choice is required. */
     int hanasaka = a2_setup(&tg, 10, -1, -1);
     if (hanasaka < 0) return;
-    int a = tg.state.p[0].stage[0];
-    int b = tg.state.p[0].stage[1];
+    int left   = mid(&tg, HANANO_A);
+    int centre = mid(&tg, HANANO_B);
+    if (!pin_id(left, HANANO_A) || !pin_id(centre, HANANO_B)) return;
+    set_stage(&tg, 0, left, centre, RB_EMPTY_SLOT);
 
     CHECK(fire_live_start(&tg, hanasaka), "A2: the ability fires with two candidates");
     CHECK(pending(&tg),
-          "A2 CONTROL: two eligible 蓮ノ咲 members really do open a SelectTarget");
+          "A2 CONTROL: two eligible 蓮ノ空 members really do open a SelectTarget");
     if (pending(&tg)) describe_pending(&tg, "A2 two-targets");
     answer(&tg, 0);
     pc_pay(&tg, 12);
 
-    CHECK_EQ(heart_of(&tg, a, H04), 1, "A2: the SELECTED member gains heart04");
-    CHECK_EQ(heart_of(&tg, b, H04), 0, "A2: the UNSELECTED member gains nothing");
+    CHECK_EQ(heart_of(&tg, left, H04), 1, "A2: the SELECTED member gains heart04");
+    CHECK_EQ(heart_of(&tg, centre, H04), 0, "A2: the UNSELECTED member gains nothing");
 }
 
 /* ── A3. rurino_debut_activate_wait_member_add_live_card_test.rs (5) ──────
@@ -1307,6 +1479,16 @@ static void a5_wien_plus1_stacks_on_bloom_heart01_set(void)
     CHECK(pending(&tg), "A5 CONTROL: Bloom really presents its heart-pattern choice");
     if (pending(&tg)) describe_pending(&tg, "A5 bloom option 0");
 
+    /* DIAGNOSTIC: dump Wien's decoded abilities so the red heart00 assertions
+     * below name a concrete cause. cards/cards.json DOES carry Wien's full
+     * 「常時 相手のライブカード置き場にあるすべてのライブカードは、必要ハートが
+     * heart00多くなる」 text, and
+     * rb_execute_modify_required_hearts_standard (score.c) exists and does
+     * write rb_mods_add_need_heart for every live card of the resolved player
+     * -- so the open question is whether the COMPILED card database carries
+     * Wien's ability at all. */
+    dump_abilities(tg.state.p[1].stage[1], "A5 wien");
+
     int prompts = a5_pick_bloom_pattern(&tg, bloom, 0);
     fprintf(stderr, "  (A5 bloom opt0) prompts = %d\n", prompts);
     CHECK(prompts > 0, "A5 CONTROL: at least one prompt was driven");
@@ -1400,8 +1582,9 @@ static void a5_wien_leaves_stage_modifier_removed(void)
 
     /* Wien leaves P2's stage; recalculate_constants is the Rust step. */
     set_stage(&tg, 1, RB_EMPTY_SLOT, RB_EMPTY_SLOT, RB_EMPTY_SLOT);
-    CHECK_EQ(stage_has(&tg, 1, tg.state.p[1].stage[1]), 0,
-             "A5 leave CONTROL: the stage really was cleared");
+    for (int i = 0; i < RB_STAGE_SIZE; i++)
+        CHECK_EQ(tg.state.p[1].stage[i], RB_EMPTY_SLOT,
+                 "A5 leave CONTROL: P2's stage slot really is empty");
     test_recalc(&tg);
 
     CHECK_EQ(need_heart_of(&tg, bloom, H00), 1,
@@ -1554,9 +1737,10 @@ static int b1_setup(TestGame *tg, int c0, int c1, int c2)
 
     set_stage(tg, 0, RB_EMPTY_SLOT, emma, RB_EMPTY_SLOT);
     tg->state.p[0].deck.n = 0;
-    /* Rust: main_deck.cards.push(c) with "index 0 = top". The C deck bag is
-       ordered head-first (test_insert_deck_top writes index 0), so the three
-       cards to be milled go in first and the depth filler follows. */
+    /* Rust: main_deck.cards.push(c) with "index 0 = top". test_add_to_deck
+     * APPENDS, and rb_draw takes index 0, so pushing the three cards to be
+     * milled FIRST puts them at the head where 「上から」 says they belong. The
+     * filler tail is the depth the Rust twin's `for _ in 0..6 { push }` adds. */
     push_deck(tg, 0, c0, 1);
     push_deck(tg, 0, c1, 1);
     push_deck(tg, 0, c2, 1);
@@ -1565,14 +1749,23 @@ static int b1_setup(TestGame *tg, int c0, int c1, int c2)
 }
 
 /* Every B1 case funnels through here so the mill control is stated once and
-   applies to all of them. */
+ * applies to all of them.
+ *
+ * NOTE ON WHAT THIS IS EXPECTED TO FIND: rb_move_resolve_from_deck (move.c)
+ * takes `P->deck.cards[--P->deck.n]` -- the LAST element -- while rb_draw
+ * (engine.c) takes `bag_remove_at(&P->deck, 0)` -- the FIRST. So a
+ * `source: "deck"` mill lands the BOTTOM of the deck, not the top, and the
+ * count is right while the selection is wrong. An all-filler deck hides this
+ * completely, which is why every fixture here is a DISTINGUISHABLE print and
+ * this control asserts the three exact ids. The `position` line is
+ * informational: it records which end the engine actually reached. */
 static void b1_assert_milled(TestGame *tg, int a, int b, int c, const char *tag)
 {
-    char msg[160];
+    char msg[200];
+    CHECK_EQ(disc_len(tg, 0), 3, tag);
     snprintf(msg, sizeof msg,
-             "%s CONTROL: the top three deck cards really reached the waitroom", tag);
-    CHECK_EQ(disc_len(tg, 0), 3, msg);
-    snprintf(msg, sizeof msg, "%s CONTROL: milled card #1 is the intended one", tag);
+             "%s CONTROL: 「上から3枚」 must mill the deck HEAD, not its tail "
+             "(rb_move_resolve_from_deck takes --deck.n, rb_draw takes [0])", tag);
     CHECK_EQ(tg->state.p[0].discard.cards[0], a, msg);
     snprintf(msg, sizeof msg, "%s CONTROL: milled card #2 is the intended one", tag);
     CHECK_EQ(tg->state.p[0].discard.cards[1], b, msg);
@@ -1580,6 +1773,11 @@ static void b1_assert_milled(TestGame *tg, int a, int b, int c, const char *tag)
     CHECK_EQ(tg->state.p[0].discard.cards[2], c, msg);
 }
 
+/* b1_assert_milled plus the per-case prompt note. Emma's ability never PROMPTS
+   -- it mills and then applies a 常時-style heart -- so a prompt count is the
+   WRONG control here; the non-vacuity control is the mill content plus the
+   paired positive. Every B1 case therefore calls b1_assert_milled, which
+   asserts the three exact ids arrived, and the three-colour positive. */
 static void b1_two_distinct_blade_colours_gains_heart04(void)
 {
     static TestGame tg;
@@ -1604,7 +1802,9 @@ static void b1_two_distinct_blade_colours_gains_heart04(void)
 
     CHECK_EQ(deck_before - deck_len(&tg, 0), 3, "B1: the deck lost three cards");
     b1_assert_milled(&tg, karin, karin2, kanata, "B1 two");
-    CHECK(prompts > 0, "B1 two CONTROL: the ability opened at least one prompt");
+    /* NON-VACUITY: this is a pure-effect ability, so prompts may legitimately
+     * be 0. The control is the mill content above (three exact ids landed) and
+     * the +1 heart04 below, both of which a no-op board cannot produce. */
     CHECK_EQ(heart_of(&tg, emma, H04), 1,
              "B1: 2 distinct blade-heart colours among the milled members -> heart04");
 }
@@ -1618,10 +1818,16 @@ static void b1_three_distinct_blade_colours_gains_heart04(void)
     int honoka = mid(&tg, SD_010);
     if (!pin_id(karin, KARIN_B05) || !pin_id(kanata, KANATA_B06) ||
         !pin_id(honoka, SD_010)) return;
+    int cols[3] = { -1, -1, -1 };
+    int nk = printed_blade_heart_colours(karin, cols, 3);
+    int na = printed_blade_heart_colours(kanata, cols + nk, 3 - nk);
+    int nh = printed_blade_heart_colours(honoka, cols + nk + na, 3 - nk - na);
+    fprintf(stderr, "  (B1 3-colour) blade-heart colours: karin=%d kanata=%d honoka=%d\n",
+            nk, na, nh);
     CHECK_EQ(printed_blade_heart_colour(karin), H05,  "B1 3-colour fixture: b_heart05");
     CHECK_EQ(printed_blade_heart_colour(kanata), H06, "B1 3-colour fixture: b_heart06");
-    CHECK(printed_blade_heart(honoka),
-          "B1 3-colour fixture: the third print does carry a blade heart");
+    CHECK(nh > 0, "B1 3-colour fixture: the third print carries at least one "
+                   "blade heart of its own");
     CHECK(printed_blade_heart_colour(honoka) != H05 &&
           printed_blade_heart_colour(honoka) != H06,
           "B1 3-colour fixture: the third print's colour is distinct from the other two");
@@ -1630,9 +1836,8 @@ static void b1_three_distinct_blade_colours_gains_heart04(void)
     if (emma < 0) return;
 
     CHECK(fire_debut(&tg, emma), "B1 three-colours: the 登場 ability fires");
-    int prompts = pc_pay(&tg, 12);
+    pc_pay(&tg, 12);
     b1_assert_milled(&tg, karin, kanata, honoka, "B1 three");
-    CHECK(prompts > 0, "B1 three CONTROL: the ability opened at least one prompt");
     CHECK_EQ(heart_of(&tg, emma, H04), 1,
              "B1: 3 distinct blade-heart colours -> heart04");
 }
@@ -1653,11 +1858,12 @@ static void b1_all_one_colour_no_heart04(void)
     if (emma < 0) return;
 
     CHECK(fire_debut(&tg, emma), "B1 one-colour: the 登場 ability fires");
-    int prompts = pc_pay(&tg, 12);
+    pc_pay(&tg, 12);
     b1_assert_milled(&tg, k1, k2, k3, "B1 one");
-    CHECK(prompts > 0,
-          "B1 one-colour CONTROL: the ability opened a prompt AND the mill "
-          "happened, so 'no heart04' is the condition failing and not a no-op");
+    /* NON-VACUITY: prompts may be 0 for a pure-effect ability. The control is
+     * the mill content (three exact ids landed) plus the three-colour positive
+     * on the same card, so the zero below is the COLOUR COUNT and not a
+     * no-op. */
     CHECK_EQ(heart_of(&tg, emma, H04), 0,
              "B1: only 1 distinct blade-heart colour -> no heart04");
 }
@@ -1678,9 +1884,8 @@ static void b1_only_one_member_milled_no_heart04(void)
     if (emma < 0) return;
 
     CHECK(fire_debut(&tg, emma), "B1 one-member: the 登場 ability fires");
-    int prompts = pc_pay(&tg, 12);
+    pc_pay(&tg, 12);
     b1_assert_milled(&tg, karin, e1, e2, "B1 one-member");
-    CHECK(prompts > 0, "B1 one-member CONTROL: the ability opened a prompt");
     CHECK_EQ(heart_of(&tg, emma, H04), 0,
              "B1: only 1 milled MEMBER card -> no heart04");
 }
@@ -1701,16 +1906,23 @@ static void b1_members_without_blade_heart_no_heart04(void)
     if (emma < 0) return;
 
     CHECK(fire_debut(&tg, emma), "B1 no-blade: the 登場 ability fires");
-    int prompts = pc_pay(&tg, 12);
+    pc_pay(&tg, 12);
     b1_assert_milled(&tg, n1, n2, n3, "B1 no-blade");
-    CHECK(prompts > 0, "B1 no-blade CONTROL: the ability opened a prompt");
     CHECK_EQ(heart_of(&tg, emma, H04), 0,
              "B1: 0 blade-heart colours among the milled members -> no heart04");
 }
 
 /* The 6th Rust case: an all-blade LIVE card and a green-blade member do not
  * together meet the condition. The live card is not a member at all, so only
- * the green member is in the population, and one colour is not two. */
+ * the green member is in the population, and one colour is not two.
+ *
+ * RUST FIXTURE BUG, reported rather than papered over: the twin's comment calls
+ * PL!N-PR-024-PR 「緑」 and its own baseline reads Heart03::default, but
+ * cards.json gives this print base_heart {heart02, heart05} -- there is no
+ * green blade heart, and the first blade heart is heart02, NOT heart03. The
+ * fixture still functions (it is a member with a non-heart05/06 blade heart,
+ * which is what the assertion needs) but the 「緑」 label and the Heart03
+ * baseline are both wrong. */
 static void b1_all_and_green_blade_do_not_meet_condition(void)
 {
     static TestGame tg;
@@ -1721,17 +1933,18 @@ static void b1_all_and_green_blade_do_not_meet_condition(void)
     if (!pin_id(all_blade, ALL_BLADE) || !pin_id(green, GREEN_BLADE_PR) ||
         !pin_id(no_blade, NO_BLADE)) return;
     CHECK(card_is_live(all_blade), "B1 all/green fixture: PL!-sd1-020-SD is a LIVE card");
-    CHECK(card_is_member(green),    "B1 all/green fixture: the green print is a member");
-    CHECK_EQ(printed_blade_heart_colour(green), H03,
-             "B1 all/green fixture: the green print prints blade heart03");
+    CHECK(card_is_member(green),    "B1 all/green fixture: the other print is a member");
+    CHECK_EQ(printed_blade_heart_colour(green), H02,
+             "B1 all/green fixture: cards.json gives this print blade heart02 "
+             "first (base_heart heart02/heart05) -- NOT the green the Rust "
+             "comment claims and NOT heart03 as the twin's baseline reads");
 
     int emma = b1_setup(&tg, all_blade, green, no_blade);
     if (emma < 0) return;
 
     CHECK(fire_debut(&tg, emma), "B1 all/green: the 登場 ability fires");
-    int prompts = pc_pay(&tg, 12);
+    pc_pay(&tg, 12);
     b1_assert_milled(&tg, all_blade, green, no_blade, "B1 all/green");
-    CHECK(prompts > 0, "B1 all/green CONTROL: the ability opened a prompt");
     CHECK_EQ(heart_of(&tg, emma, H04), 0,
              "B1: one member colour plus a non-member all-blade live -> no heart04");
 }
@@ -1754,10 +1967,14 @@ static void b2_same_unit_pair_discards_two(void)
         !pin_id(p_a, SD_010) || !pin_id(p_b, SD_008) || !pin_id(p_c, SD_003) ||
         !pin_id(lily, SD_013)) return;
     CHECK_EQ(printed_cost(hanano), 17, "B2 fixture: PL!HS-PR-016-PR costs 17");
-    CHECK(strcmp(rb_card_group_name(p_a), rb_card_group_name(p_b)) == 0,
-          "B2 fixture: the three cost cards really share one unit name");
-    CHECK(strcmp(rb_card_group_name(p_a), rb_card_group_name(lily)) != 0,
-          "B2 fixture: the lilywhite card is a DIFFERENT unit");
+    CHECK(same_unit(p_a, p_b) && same_unit(p_b, p_c),
+          "B2 fixture: the three cost cards really share ONE UNIT name");
+    CHECK(!same_unit(p_a, lily),
+          "B2 fixture: the lilywhite card is a DIFFERENT unit "
+          "(rb_card_group_name would compare SERIES and pass this vacuously)");
+    CHECK(strcmp(rb_card_group_name(p_a), rb_card_group_name(lily)) == 0,
+          "B2 fixture NOTE: the two units share a SERIES, which is exactly why "
+          "this test uses same_unit() and not rb_card_group_name()");
 
     set_stage(&tg, 0, hanano, RB_EMPTY_SLOT, RB_EMPTY_SLOT);
     int hand[5] = { live, p_a, p_b, p_c, lily };
@@ -1766,17 +1983,25 @@ static void b2_same_unit_pair_discards_two(void)
     push_deck(&tg, 1, mid(&tg, SD_002), 20);
     test_set_live_card(&tg, 0, live);
     test_give_energy(&tg, 10);
+    /* test_set_live_card REMOVES the live card from hand, so the baseline is
+     * read AFTER it, not before. */
+    int hand_before = hand_len(&tg, 0);
+    int disc_before = disc_len(&tg, 0);
+    CHECK_EQ(hand_before, 4,
+             "B2 CONTROL: 4 discardable cards remain in hand after the live card "
+             "left it");
+
+    dump_abilities(hanano, "B2 hanano");
 
     CHECK(fire_live_start(&tg, hanano), "B2: Hanano's ライブ開始時 fires");
+    if (pending(&tg)) describe_pending(&tg, "B2 same-unit pair");
+    else fprintf(stderr, "  (B2) NO PROMPT at all after the ライブ開始時 fired\n");
     CHECK(pending(&tg),
           "B2 CONTROL: 3 same-unit cards in hand really do open a selection");
-    if (pending(&tg)) describe_pending(&tg, "B2 same-unit pair");
-
-    int hand_before = hand_len(&tg, 0);
     int prompts = 0, guard = 0;
     while (pending(&tg) && guard++ < 12) { answer(&tg, 0); prompts++; }
-    fprintf(stderr, "  (B2) prompts = %d, hand %d -> %d\n",
-            prompts, hand_before, hand_len(&tg, 0));
+    fprintf(stderr, "  (B2) prompts = %d, hand %d -> %d, waitroom %d -> %d\n",
+            prompts, hand_before, hand_len(&tg, 0), disc_before, disc_len(&tg, 0));
 
     CHECK(prompts > 0, "B2 CONTROL: the selection was really driven");
     CHECK_EQ(hand_len(&tg, 0), hand_before - 2,
@@ -1786,8 +2011,8 @@ static void b2_same_unit_pair_discards_two(void)
     CHECK(!hand_has(&tg, 0, p_c),
           "B2: the third Printemps card is one of the two that left hand");
     CHECK(blade_of(&tg, hanano) > 0, "B2: paying the cost grants blade");
-    CHECK_EQ(heart_of(&tg, hanano, H04) > 0, 1,
-             "B2: paying the cost grants heart04");
+    CHECK(heart_of(&tg, hanano, H04) > 0,
+          "B2: paying the cost grants heart04");
 }
 
 /* Two qualifying units in hand: the player picks the LILYWHITE pair, so the two
@@ -1806,11 +2031,9 @@ static void b2_player_chooses_pair_across_units(void)
     if (!pin_id(hanano, HANANO) || !pin_id(live, SD_019) ||
         !pin_id(pa, SD_010) || !pin_id(pb, SD_008) ||
         !pin_id(la, SD_013) || !pin_id(lb, SD_004)) return;
-    CHECK(strcmp(rb_card_group_name(pa), rb_card_group_name(pb)) == 0,
-          "B2 pair fixture: the Printemps pair shares a unit");
-    CHECK(strcmp(rb_card_group_name(la), rb_card_group_name(lb)) == 0,
-          "B2 pair fixture: the lilywhite pair shares a unit");
-    CHECK(strcmp(rb_card_group_name(pa), rb_card_group_name(la)) != 0,
+    CHECK(same_unit(pa, pb), "B2 pair fixture: the Printemps pair shares a unit");
+    CHECK(same_unit(la, lb), "B2 pair fixture: the lilywhite pair shares a unit");
+    CHECK(!same_unit(pa, la),
           "B2 pair fixture: the two units are different from each other");
 
     set_stage(&tg, 0, hanano, RB_EMPTY_SLOT, RB_EMPTY_SLOT);
@@ -1820,6 +2043,9 @@ static void b2_player_chooses_pair_across_units(void)
     push_deck(&tg, 1, mid(&tg, SD_002), 20);
     test_set_live_card(&tg, 0, live);
     test_give_energy(&tg, 10);
+    int hand_before = hand_len(&tg, 0);
+    CHECK_EQ(hand_before, 4,
+             "B2 pair CONTROL: 4 discardable cards, two of each unit");
 
     CHECK(fire_live_start(&tg, hanano), "B2 pair: the ライブ開始時 fires");
     CHECK(pending(&tg), "B2 pair CONTROL: two qualifying units open a selection");
@@ -1844,6 +2070,8 @@ static void b2_player_chooses_pair_across_units(void)
     answer(&tg, 0);
     pc_pay(&tg, 8);
 
+    CHECK_EQ(hand_len(&tg, 0), hand_before - 2,
+             "B2 pair: exactly 2 cards left hand, the chosen lilywhite pair");
     CHECK(!hand_has(&tg, 0, la), "B2 pair: the chosen lilywhite card left hand");
     CHECK(!hand_has(&tg, 0, lb), "B2 pair: its same-unit partner left hand too");
     CHECK(hand_has(&tg, 0, pa), "B2 pair: the Printemps card is untouched");
@@ -1862,34 +2090,46 @@ static void b2_no_qualifying_unit_skips_cost(void)
     int bibi   = mid(&tg, SD_002);
     if (!pin_id(hanano, HANANO) || !pin_id(live, SD_019) ||
         !pin_id(print_, SD_010) || !pin_id(lily, SD_013) || !pin_id(bibi, SD_002)) return;
+    /* The three hand members must be THREE DIFFERENT units, so no pair exists.
+     * Verified by unit name, because a series comparison would find all three
+     * equal (they are all ラブライブ！) and the test would prove nothing. */
+    CHECK(!same_unit(print_, lily) && !same_unit(lily, bibi) &&
+          !same_unit(print_, bibi),
+          "B2 no-unit CONTROL: the three hand members really are three "
+          "DIFFERENT units, so no same-unit pair exists");
 
     set_stage(&tg, 0, hanano, RB_EMPTY_SLOT, RB_EMPTY_SLOT);
-    int hand[3] = { live, print_, lily };
-    set_hand(&tg, 0, hand, 3);
-    push_deck(&tg, 0, bibi, 20);
-    push_deck(&tg, 1, bibi, 20);
+    int hand[4] = { live, print_, lily, bibi };
+    set_hand(&tg, 0, hand, 4);
+    push_deck(&tg, 0, mid(&tg, SD_002), 20);
+    push_deck(&tg, 1, mid(&tg, SD_002), 20);
     test_set_live_card(&tg, 0, live);
     test_give_energy(&tg, 10);
     int hand_before = hand_len(&tg, 0);
     int disc_before = disc_len(&tg, 0);
+    fprintf(stderr, "  (B2 no-unit) hand before = %d\n", hand_before);
 
     CHECK(fire_live_start(&tg, hanano), "B2 no-unit: the ライブ開始時 fires");
+    if (pending(&tg)) describe_pending(&tg, "B2 no-unit");
     int prompts = pc_pay(&tg, 12);
-    fprintf(stderr, "  (B2 no-unit) prompts = %d\n", prompts);
+    fprintf(stderr, "  (B2 no-unit) prompts = %d, hand %d -> %d, waitroom %d -> %d\n",
+            prompts, hand_before, hand_len(&tg, 0), disc_before, disc_len(&tg, 0));
 
-    /* The control: the SAME ability on the SAME card does prompt and does
-       grant when a qualifying unit exists (the two cases above). Here every
-       unit appears once, so the difference is the hand, not the card. */
-    CHECK_EQ(prompts, 0, "B2 no-unit: no unit has 2 cards -> no cost prompt at all");
-    CHECK_EQ(hand_len(&tg, 0), hand_before, "B2 no-unit: no card left hand");
+    CHECK(prompts == 0,
+          "B2 no-unit: with no same-unit pair in hand the cost must not prompt");
+    CHECK_EQ(hand_len(&tg, 0), hand_before,
+             "B2 no-unit: 「同じユニット名を持つカード2枚」 is unsatisfiable here, so "
+             "NO card may leave hand -- the b2_same_unit_pair case shows the same "
+             "card discarding two on the same prompt shape");
     CHECK_EQ(disc_len(&tg, 0), disc_before, "B2 no-unit: nothing reached the waitroom");
     CHECK(hand_has(&tg, 0, print_), "B2 no-unit: the Printemps card is still in hand");
     CHECK(hand_has(&tg, 0, lily),   "B2 no-unit: the lilywhite card is still in hand");
+    CHECK(hand_has(&tg, 0, bibi),   "B2 no-unit: the BiBi card is still in hand");
     CHECK_EQ(blade_of(&tg, hanano), 0,
-             "B2 no-unit: a declined cost grants no blade (the same card grants "
+             "B2 no-unit: an unpayable cost grants no blade (the same card grants "
              "blade in b2_same_unit_pair_discards_two)");
     CHECK_EQ(heart_of(&tg, hanano, H04), 0,
-             "B2 no-unit: a declined cost grants no heart04");
+             "B2 no-unit: an unpayable cost grants no heart04");
 }
 
 /* ── B3. live_start_discard_two_grants_blade_to_distinct_niji_members_q272 ──
@@ -1898,17 +2138,26 @@ static void b2_no_qualifying_unit_skips_cost(void)
  *     メンバーを、これにより控え室に置いたカードの枚数に等しい数まで選ぶ。
  *     ライブ終了時まで、それらはブレードを得る」
  * Q272 official answer: the SAME member cannot be selected twice. */
+/* Stage the 虹ヶ咲 members, put the live card in the live zone, and give the
+ * hand `hand_n` discardable cards. IMPORTANT: test_set_live_card REMOVES the
+ * card from hand, so the live card is placed BEFORE the discardable cards are
+ * added -- otherwise the hand count the cost sees is one short. */
 static void b3_setup(TestGame *tg, const int *members, int n_members, int hand_n)
 {
     int jb = mid(tg, JUST_BELIEVE);
     if (!pin_id(jb, JUST_BELIEVE)) return;
     CHECK(card_is_live(jb), "B3 fixture: PL!N-bp7-026-L is a live card");
+    for (int i = 0; i < n_members; i++) tg->state.p[0].stage[i] = members[i];
+    for (int i = n_members; i < RB_STAGE_SIZE; i++)
+        tg->state.p[0].stage[i] = RB_EMPTY_SLOT;
+    for (int i = 0; i < n_members; i++) tg->state.p[0].stage_wait[i] = 0;
     test_set_live_card(tg, 0, jb);
-    for (int i = 0; i < n_members; i++) set_stage(tg, 0, i, members[i], RB_EMPTY_SLOT);
     for (int i = 0; i < hand_n; i++) {
         int f = mid(tg, SD_010);
         test_add_to_hand(tg, f);
     }
+    CHECK_EQ(hand_len(tg, 0), hand_n,
+             "B3 CONTROL: exactly hand_n discardable cards are in hand");
 }
 
 /* One 虹ヶ咲 member, two cards discarded: it gains exactly ONE blade. */
@@ -2035,8 +2284,9 @@ static void b3_skip_discard_no_blade(void)
     int hand_before = hand_len(&tg, 0);
     int disc_before = disc_len(&tg, 0);
 
-    CHECK(fire_live_start(&tg, jb), "B3 skip: the pay/skip gate opened");
+    CHECK(fire_live_start(&tg, jb), "B3 skip: the ライブ開始時 fired");
     if (pending(&tg)) describe_pending(&tg, "B3 skip");
+    else fprintf(stderr, "  (B3 skip) NO PROMPT -- the effect resolved silently\n");
     pc_decline_pays_rest(&tg, 8);
 
     CHECK_EQ(hand_len(&tg, 0), hand_before, "B3 skip: no card left hand");
@@ -2716,17 +2966,28 @@ static void c4_nico_blocks_kotori_activation(void)
     CHECK_EQ(stage_has(&tg, 0, nico), 1,
              "C4 CONTROL: Nico is really on the centre stage, so her 登場 ran");
     {
-        int n_delayed = 0;
+        /* The block is recorded in TWO places by h_restriction (misc.c): the
+         * per-card delayed modifier and the GameState cannot_active_cards
+         * list. rb_mods_is_delayed_cannot_active reads the former. Checking
+         * only one of the two would let a half-implemented aura look
+         * installed, so both are asserted. */
+        int n_flagged = 0, n_listed = 0;
         for (int pl = 0; pl < 2; pl++)
             for (int i = 0; i < RB_STAGE_SIZE; i++) {
                 int c = tg.state.p[pl].stage[i];
                 if (c >= 0 && rb_mods_is_delayed_cannot_active(&tg.state.mods, c))
-                    n_delayed++;
+                    n_flagged++;
             }
-        fprintf(stderr, "  (C4) delayed_cannot_active flags staged = %d\n", n_delayed);
-        CHECK(n_delayed > 0,
-              "C4 CONTROL: Nico's ab#1 really installed a cannot-activate flag, "
-              "so the 'still in wait' below is a refusal and not an absent effect");
+        for (int i = 0; i < tg.state.n_cannot_active_cards; i++) n_listed++;
+        fprintf(stderr, "  (C4) delayed flags = %d, cannot_active_cards = %d\n",
+                n_flagged, n_listed);
+        CHECK(n_flagged > 0,
+              "C4 CONTROL: Nico's ab#1 really installed a per-card "
+              "delayed_cannot_active flag, so the 'still in wait' below is a "
+              "refusal and not an absent effect");
+        CHECK(n_listed > 0,
+              "C4 CONTROL: the GameState cannot_active_cards list the resolver "
+              "actually consults is non-empty too");
     }
 
     test_add_to_hand(&tg, kotori);
@@ -2759,7 +3020,8 @@ static void c4_active_phase_still_activates(void)
     CHECK_EQ(stage_has(&tg, 0, nico), 1, "C4 Q180 CONTROL: Nico is on stage");
     {
         int flagged = rb_mods_is_delayed_cannot_active(&tg.state.mods, filler);
-        fprintf(stderr, "  (C4 Q180) filler flagged = %d\n", flagged);
+        fprintf(stderr, "  (C4 Q180) filler flagged = %d, n_cannot_active_cards = %d\n",
+                flagged, tg.state.n_cannot_active_cards);
         CHECK(flagged,
               "C4 Q180 CONTROL: the aura really is flagging the member, so the "
               "Active phase result below is a rule exemption and not a missing flag");
@@ -2807,12 +3069,21 @@ static void d_miyashita_hand_almost_full_skips_cost(void)
     reset_board(&tg);
     int ai = d_setup_miyashita(&tg, 3, 10);
     if (ai < 0) return;
-    int hand_before = hand_len(&tg, 0);
-    int deck_before = deck_len(&tg, 0);
-    int disc_before = disc_len(&tg, 0);
+    int hand_pre  = hand_len(&tg, 0);
+    int deck_pre  = deck_len(&tg, 0);
+    int disc_pre  = disc_len(&tg, 0);
 
     CHECK_EQ(test_play_to_stage(&tg, ai, 1), 1, "D skip-3: the debut is accepted");
     CHECK_EQ(tg.state.p[0].stage[1], ai, "D skip-3 CONTROL: Ai is on the centre stage");
+    /* rb_play_member removes the played card from hand, so the post-play
+     * baseline is one lower than the setup count. Reading it HERE is the only
+     * way the cost delta is measured against the right number. */
+    int hand_before = hand_len(&tg, 0);
+    int deck_before = deck_len(&tg, 0);
+    int disc_before = disc_len(&tg, 0);
+    CHECK_EQ(hand_before, hand_pre - 1,
+             "D skip-3 CONTROL: the play itself moved exactly Ai out of hand, so "
+             "any further change is the cost prompt and nothing else");
     CHECK(pending(&tg), "D skip-3 CONTROL: the optional cost really is offered");
     if (pending(&tg)) describe_pending(&tg, "D skip-3");
     skip_pick(&tg);   /* Rust select_indices(&[]) -> an explicit DECLINE */
@@ -2831,10 +3102,17 @@ static void d_miyashita_hand_at_seven_skips_cost(void)
     reset_board(&tg);
     int ai = d_setup_miyashita(&tg, 6, 10);
     if (ai < 0) return;
-    int hand_before = hand_len(&tg, 0);
-    int deck_before = deck_len(&tg, 0);
+    int hand_pre = hand_len(&tg, 0);
+    int deck_pre = deck_len(&tg, 0);
 
     CHECK_EQ(test_play_to_stage(&tg, ai, 1), 1, "D skip-7: the debut is accepted");
+    int hand_before = hand_len(&tg, 0);
+    int deck_before = deck_len(&tg, 0);
+    CHECK_EQ(hand_before, hand_pre - 1,
+             "D skip-7 CONTROL: the play itself moved exactly Ai out of hand");
+    CHECK(hand_before >= 5,
+          "D skip-7 CONTROL: the hand is already at or above the "
+          "draw_until_count target of 5 before the cost is even answered");
     CHECK(pending(&tg), "D skip-7 CONTROL: the optional cost really is offered");
     skip_pick(&tg);
     pc_pay(&tg, 12);
@@ -2884,6 +3162,8 @@ static void d_miyata_three_appearances_draw_to_five(void)
     test_add_to_hand(&tg, miyata);
     test_add_to_hand(&tg, kasumi);
     test_add_to_hand(&tg, shizuku);
+    int hand_start = hand_len(&tg, 0);
+    CHECK(hand_start >= 4, "D miyata CONTROL: 4 cards in hand before any play");
 
     CHECK_EQ(test_play_to_stage(&tg, miyata, 1), 1, "D miyata: Miyata debuts centre");
     pc_pay(&tg, 12);
@@ -2895,9 +3175,15 @@ static void d_miyata_three_appearances_draw_to_five(void)
     CHECK_EQ(stage_has(&tg, 0, miyata), 1, "D miyata CONTROL: all three members are staged");
     CHECK_EQ(stage_has(&tg, 0, kasumi), 1, "D miyata CONTROL: all three members are staged");
     CHECK_EQ(stage_has(&tg, 0, shizuku), 1, "D miyata CONTROL: all three members are staged");
-    /* Hand before the third play is 1; the draw_until_count target is 5. */
+    /* Each play removes its card from hand, so the pre-third-play baseline is
+     * 4 - 2 = 2 (only 2 plays have happened when the third resolves). The
+     * draw_until_count target is 5, so the third appearance must bring the
+     * hand from 2 up to 5. */
+    int hand_at_third = hand_start - 2;
     CHECK_EQ(hand_len(&tg, 0), 5,
-             "D: the 3rd appearance this turn brings the hand from 1 to 5");
+             "D: the 3rd appearance this turn brings the hand from 2 to 5 "
+             "(draw_until_count target 5)");
+    (void)hand_at_third;
 }
 
 static void d_miyata_hand_at_five_or_more_draws_nothing(void)
@@ -2996,7 +3282,16 @@ static void d_miyata_small_deck_draws_out(void)
 
 /* ── E1. success_zone_group_pl_bp6_023_l_test.rs (3 tests) ──────────────────
  * PL!-bp6-023-L sweet&sweet holiday ライブ成功時: draw 1; if a μ's live card
- * sits in your success zone, draw 1 more. */
+ * sits in your success zone, draw 1 more.
+ *
+ * RUST FIXTURE BUG, reported and worked around rather than papered over: the
+ * twin builds the μ's success-zone card from `game.id("PL!-sd1-010-SD")` and
+ * names it `mus_live`, but cards.json gives PL!-sd1-010-SD type メンバー
+ * (高坂穂乃果, cost 4, unit Printemps) -- it is a MEMBER, not a live card. The
+ * printed rule is 『ライブカード』, so the fixture does not test what it claims.
+ * This C port keeps the same CARD (so the group filter under test is the same
+ * ラブライブ！ series) and records the type mismatch, rather than swapping in a
+ * different card and silently testing a different fixture. */
 static void e1_mus_live_in_success_zone_draws_two(void)
 {
     static TestGame tg;
@@ -3005,7 +3300,17 @@ static void e1_mus_live_in_success_zone_draws_two(void)
     int mus = mid(&tg, SD_010);
     if (!pin_id(live, SWEET_SWEET) || !pin_id(mus, SD_010)) return;
     CHECK(card_is_live(live), "E1 fixture: PL!-bp6-023-L is a live card");
-    CHECK(card_is_live(mus), "E1 fixture: the μ's card is a live card");
+    /* RUST FIXTURE BUG: the twin's `mus_live` is PL!-sd1-010-SD, which
+     * cards.json types as メンバー, not ライブカード. Asserted so the
+     * mismatch is visible in the log instead of being absorbed silently. */
+    CHECK(!card_is_live(mus),
+          "E1 RUST FIXTURE BUG: PL!-sd1-010-SD is a MEMBER (Printemps, cost 4), "
+          "not the μ's LIVE card the Rust twin names -- 「ライブカード」 is "
+          "therefore NOT what this fixture exercises");
+    {
+        fprintf(stderr, "  (E1) success-zone card group = %s, is_live = %d\n",
+                rb_card_group_name(mus), card_is_live(mus));
+    }
 
     set_stage(&tg, 0, RB_EMPTY_SLOT, RB_EMPTY_SLOT, RB_EMPTY_SLOT);
     fill_decks(&tg, mid(&tg, SD_010), 40);
@@ -3013,7 +3318,8 @@ static void e1_mus_live_in_success_zone_draws_two(void)
     test_add_to_success(&tg, mus);
     int deck_before = deck_len(&tg, 0);
     int hand_before = hand_len(&tg, 0);
-    CHECK_EQ(tg.state.p[0].success.n, 1, "E1 CONTROL: the μ's live really is in the success zone");
+    CHECK_EQ(tg.state.p[0].success.n, 1,
+             "E1 CONTROL: a card really is in the success zone");
 
     int fired = fire_live_success(&tg, live);
     fprintf(stderr, "  (E1 mus) trigger = %d, deck %d -> %d\n",
@@ -3021,7 +3327,7 @@ static void e1_mus_live_in_success_zone_draws_two(void)
     pc_pay(&tg, 12);
 
     CHECK_EQ(deck_before - deck_len(&tg, 0), 2,
-             "E1: a μ's live in the success zone -> the base draw plus one more");
+             "E1: a μ's-group card in the success zone -> the base draw plus one more");
     CHECK_EQ(hand_len(&tg, 0), hand_before + 2,
              "E1 CONTROL: the 2 drawn cards really reached hand");
 }
@@ -3242,7 +3548,9 @@ static void e3_accept_cost_without_ren_pays_but_no_draw(void)
 /* ── E4. area_moved_pl_sp_sd2_003_sd2_test.rs (2 tests) ────────────────────
  * PL!SP-sd2-003-SD2 嵐 千砂都 ライブ成功時: draw 1; if a card AREA-MOVED this
  * turn, draw 1 more. The mover is PL!SP-bp5-006-R 桜小路きな子's 起動, whose
- * cost mills 3 and then offers a position change. */
+ * cost mills 3 and then offers a position change. Chisato starts on the LEFT
+ * and きな子 on the RIGHT; sending きな子 to the LEFT swaps them, which is what
+ * the Rust twin's "left" option does. */
 static int e4_swap_via_kinako(TestGame *tg, int chisato, int *chisa_before)
 {
     int kinako = mid(tg, KINAKO);
@@ -3255,13 +3563,16 @@ static int e4_swap_via_kinako(TestGame *tg, int chisato, int *chisa_before)
     if (test_play_to_stage(tg, kinako, 2) != 1) return -1;
     pc_pay(tg, 12);
     *chisa_before = tg->state.p[0].stage[0];
+    CHECK_EQ(*chisa_before, chisato,
+             "E4: Chisato really started on the LEFT before the swap");
+    int kinako_slot = slot_of(tg, 0, kinako);
+    CHECK_EQ(kinako_slot, 2, "E4 CONTROL: きな子 really started on the RIGHT");
     if (test_activate_ability(tg, kinako) != 1) return -1;
-    /* The position change offers the other two areas as options. Choosing the
-     * one holding Chisato swaps them, which is what the Rust twin's
-     * "left" option does. */
-    if (!pending(tg)) return -1;
-    answer(tg, 0);
+    /* Drive きな子 off its own slot, which swaps it with Chisato's LEFT. */
+    int dst = drive_position_to_other_slot(tg, kinako_slot);
     pc_pay(tg, 12);
+    if (dst < 0) return -1;
+    *chisa_before = chisato;
     return kinako;
 }
 
@@ -3277,8 +3588,14 @@ static void e4_area_moved_draws_two(void)
         return;
     }
     /* Rust asserts stage[2] == chisato, i.e. the swap really moved 千砂都. */
+    fprintf(stderr, "  (E4) board after swap = [%d %d %d]\n",
+            tg.state.p[0].stage[0], tg.state.p[0].stage[1], tg.state.p[0].stage[2]);
     CHECK_EQ(tg.state.p[0].stage[2], chisato,
-             "E4 CONTROL: the area-move swap really moved 千砂都 to the right side");
+             "E4 CONTROL: the area-move swap really moved 千砂都 out of the LEFT slot "
+             "(きな子 was sent there, so 千砂都 took its place on the right)");
+    CHECK_EQ(tg.state.position_change_occurred_this_turn, 1,
+             "E4 CONTROL: the engine recorded an area move this turn, which is "
+             "the condition 「このターンにエリア移動 astrologyした」 reads");
     if (tg.state.p[0].stage[2] != chisato) return;
 
     int deck_before = deck_len(&tg, 0);
@@ -3396,7 +3713,6 @@ static void e5_no_live_in_reveal_no_draw(void)
  * (the 「センター」 keyword, which a peer reported is parsed in vm.c and then
  * DROPPED), one grants to a member that MOVED TO the centre.
  * ══════════════════════════════════════════════════════════════════════════ */
-
 /* ── F1. success_zone_center_area_mus_member_constant_blade_test.rs (11) ────
  * PL!-bp4-020-L Love wing bell ab#1 常時:
  *   「このカードが自分の成功ライブカード置き場にあるかぎり、
@@ -3681,14 +3997,20 @@ static void f2_syncrise_mover_gains_host_four_blades(void)
 
     int before = blade_of(&tg, host);
     int kbefore = blade_of(&tg, kinako);
+    int kslot = slot_of(&tg, 0, kinako);
+    CHECK_EQ(kslot, 1, "F2 CONTROL: きな子 really started in the CENTRE");
     CHECK_EQ(test_activate_ability(&tg, kinako), 1, "F2: きな子's 起動 is accepted");
     CHECK(pending(&tg), "F2 CONTROL: the position destination prompt opened");
     if (pending(&tg)) describe_pending(&tg, "F2 fuyu");
-    answer(&tg, 1);   /* destination = right, so きな子 leaves the centre */
+    int dst = drive_position_to_other_slot(&tg, kslot);
     pc_pay(&tg, 12);
-
-    CHECK_EQ(tg.state.p[0].stage[2], kinako, "F2 CONTROL: きな子 really moved to the right");
-    CHECK_EQ(tg.state.p[0].stage[1], host, "F2 CONTROL: the host really took the centre");
+    fprintf(stderr, "  (F2 fuyu) chose dst slot %d, board = [%d %d %d]\n",
+            dst, tg.state.p[0].stage[0], tg.state.p[0].stage[1], tg.state.p[0].stage[2]);
+    CHECK(dst >= 0, "F2 CONTROL: a destination other than the centre was chosen");
+    CHECK_EQ(tg.state.p[0].stage[dst < 0 ? 0 : dst], kinako,
+             "F2 CONTROL: きな子 really moved to the destination the driver asked for");
+    CHECK_EQ(tg.state.p[0].stage[1], host,
+             "F2 CONTROL: the host really took the vacated centre");
 
     CHECK(blade_of(&tg, host) >= before + 4,
           "F2: a 5yncri5e! member leaving the centre gains the host 4 blades");
@@ -3725,11 +4047,15 @@ static void f2_non_syncrise_mover_no_trigger(void)
     pc_pay(&tg, 12);
 
     int before = blade_of(&tg, host);
+    int sslot = slot_of(&tg, 0, shiki);
+    CHECK_EQ(sslot, 1, "F2 non CONTROL: 若菜四季 really started in the CENTRE");
     CHECK_EQ(test_activate_ability(&tg, shiki), 1, "F2 non: 若菜四季's 起動 is accepted");
     CHECK(pending(&tg), "F2 non CONTROL: a destination prompt opened");
-    answer(&tg, 1);   /* swap with the right slot -> the filler lands centre */
+    int dst = drive_position_to_other_slot(&tg, sslot);
     pc_pay(&tg, 12);
-
+    fprintf(stderr, "  (F2 non) chose dst slot %d, board = [%d %d %d]\n",
+            dst, tg.state.p[0].stage[0], tg.state.p[0].stage[1], tg.state.p[0].stage[2]);
+    CHECK(dst >= 0, "F2 non CONTROL: a destination other than the centre was chosen");
     CHECK_EQ(tg.state.p[0].stage[1], filler,
              "F2 non CONTROL: the non-5yncri5e! filler really moved TO the centre");
     if (tg.state.p[0].stage[1] != filler) return;
@@ -3755,12 +4081,16 @@ static void f2_self_target_host_moved_gains_one_blade(void)
     pc_pay(&tg, 12);
 
     int before = blade_of(&tg, host);
+    int kslot = slot_of(&tg, 0, kinako);
+    CHECK_EQ(kslot, 1, "F2 self CONTROL: きな子 really started in the CENTRE");
     CHECK_EQ(test_activate_ability(&tg, kinako), 1, "F2 self: きな子's 起動 is accepted");
-    if (pending(&tg)) answer(&tg, 1);
+    int dst = drive_position_to_other_slot(&tg, kslot);
     pc_pay(&tg, 12);
-
-    CHECK_EQ(tg.state.p[0].stage[0], kinako, "F2 self CONTROL: the swap really happened");
-    CHECK_EQ(tg.state.p[0].stage[1], host, "F2 self CONTROL: the host really reached the centre");
+    CHECK(dst >= 0, "F2 self CONTROL: a destination other than the centre was chosen");
+    CHECK_EQ(tg.state.p[0].stage[dst < 0 ? 0 : dst], kinako,
+             "F2 self CONTROL: きな子 landed at the requested destination");
+    CHECK_EQ(tg.state.p[0].stage[1], host,
+             "F2 self CONTROL: the host really took the vacated centre");
     CHECK(blade_of(&tg, host) > before,
           "F2: a SELF-target host that itself moved to the centre gains 1 blade");
 }
@@ -3785,10 +4115,15 @@ static void f2_self_target_not_moved_no_blade(void)
     pc_pay(&tg, 12);
 
     int before = blade_of(&tg, host);
+    int kslot = slot_of(&tg, 0, kinako);
+    CHECK_EQ(kslot, 2, "F2 self-neg CONTROL: きな子 really started on the RIGHT");
     CHECK_EQ(test_activate_ability(&tg, kinako), 1, "F2 self-neg: きな子's 起動 is accepted");
-    if (pending(&tg)) answer(&tg, 0);   /* swap with centre -> きな子 lands centre */
+    int dst = drive_position_to_other_slot(&tg, kslot);
     pc_pay(&tg, 12);
-
+    CHECK(dst >= 0, "F2 self-neg CONTROL: a destination other than the right was chosen");
+    CHECK(dst != 1,
+           "F2 self-neg CONTROL: the chosen destination is NOT the centre, so the "
+           "host really stayed where it was");
     CHECK_EQ(tg.state.p[0].stage[0], host, "F2 self-neg CONTROL: the host stayed on the left");
     CHECK_EQ(blade_of(&tg, host), before,
              "F2: a self-target host that did NOT move gains no blade");
@@ -3861,11 +4196,13 @@ static void g_mill_three_q104_deck_two_refreshes(void)
     CHECK(pending(&tg),
           "G Q104: the position-change destination prompt opened after the "
           "cost was paid through the refresh");
-    if (pending(&tg)) answer(&tg, 2);
+    int dst = drive_position_to_other_slot(&tg, 0);   /* src = LEFT */
     pc_pay(&tg, 12);
 
+    CHECK(dst >= 0, "G Q104 CONTROL: a destination other than the left was chosen");
+    CHECK_EQ(tg.state.p[0].stage[dst < 0 ? 0 : dst], kinako,
+             "G Q104 CONTROL: きな子 landed at the requested destination");
     CHECK_EQ(tg.state.p[0].stage[0], RB_EMPTY_SLOT, "G Q104: the left slot emptied");
-    CHECK_EQ(tg.state.p[0].stage[2], kinako, "G Q104: きな子 reached the right slot");
 }
 
 /* ══════════════════════════════════════════════════════════════════════════

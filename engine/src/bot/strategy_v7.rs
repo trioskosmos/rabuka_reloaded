@@ -1510,6 +1510,308 @@ pub(crate) struct AbilityFeatures {
     pub ammo: i32,
 }
 
+/// Pass probability of an already-chosen set, under the same exact 256-draw
+/// model the chooser uses. For telemetry only: it answers "was the set we
+/// committed to actually any good", which is a different question from "did
+/// we pick the best one".
+/// The best pass probability reachable by ANY set from the lives in hand,
+/// ignoring the reliability floor.
+///
+/// This is the headroom measurement. `chosen_set_pass_probability` says what
+/// v7 committed to; this says what it could have had. A large gap means the
+/// floor is binding and the fix is a threshold. A small gap with a low chosen
+/// p means the board genuinely cannot support a check and the fix is upstream
+/// (curve, blades, life quality). Those are opposite conclusions and the
+/// chosen-p line alone cannot tell them apart.
+pub(crate) fn best_available_pass_probability(gs: &GameState, me: u8, db: &CardDatabase) -> f64 {
+    let lives = experiment_lives(gs, me, db);
+    if lives.is_empty() {
+        return 0.0;
+    }
+    let (cats, deck_len) = experiment_flip_categories(gs, me, db);
+    let blades = experiment_blades(gs, me, db);
+    let board = experiment_board_pool(gs, me, db);
+    if blades <= 0 || deck_len == 0 {
+        return 0.0;
+    }
+    let pools = experiment_sample_pools(&cats, deck_len, blades, &board);
+    lives
+        .iter()
+        .filter(|(_, _, need)| need[8] == 0 && need[9] == 0)
+        .map(|(_, _, need)| experiment_pass_probability_pools(&pools, need))
+        .fold(0.0f64, f64::max)
+}
+
+/// The colour deficit of the best life in hand: what the board cannot cover,
+/// and therefore what the deck draws have to cover.
+///
+/// This is the quantity the game is actually about. A check passes iff the
+/// top-`blades` cards of the deck cover `d`. The board's job is to make `d`
+/// small, and a blade's job is to draw the colours in `d`.
+///
+/// Everything v7 and v8 do instead is a proxy for this. `value()` pays a flat
+/// 6 per blade and 60 per passable life; v8 pays `Binomial(blades, density)`.
+/// Both are colour-blind, and the measured consequence is large: with
+/// essentially the same board, v7's committed sets pass at 0.918 and v8's at
+/// 0.485, with v8 having MORE active blades (5.81 vs 4.95). Blades are only
+/// worth having if the deck contains the colours the held life needs.
+pub(crate) fn best_life_deficit(gs: &GameState, me: u8, db: &CardDatabase) -> [i32; 11] {
+    let mut best = [0i32; 11];
+    let mut found = false;
+    for (_, _, need) in experiment_lives(gs, me, db) {
+        if need[8] > 0 || need[9] > 0 {
+            continue;
+        }
+        if !found || need.iter().sum::<i32>() > best.iter().sum::<i32>() {
+            best = need;
+            found = true;
+        }
+    }
+    if !found {
+        return [0i32; 11];
+    }
+    // Reduce by what the board already provides.
+    let board = experiment_board_pool(gs, me, db);
+    let mut deficit = [0i32; 11];
+    for c in 1..=6 {
+        deficit[c] = (best[c] - board[c]).max(0);
+    }
+    deficit[0] = best[0];
+    deficit[7] = best[7];
+    deficit
+}
+
+/// How many of `blades` additional blades are worth something, given the
+/// colours still in our own deck and the deficit of the life we hold.
+///
+/// Legal information only: our own deck and our own hand. Nothing here reads
+/// the opponent, so this is arithmetic on visible state, not lookahead.
+///
+/// The reasoning: each active blade reveals one more card from our deck, and a
+/// revealed card contributes its own colour. So one blade is worth one unit of
+/// the colour that the next card happens to be, and the expected value of a
+/// blade is therefore the deck's own colour distribution weighted by whether
+/// that colour reduces the deficit. A deck with none of the needed colours
+/// makes blades worthless here, however many we can afford — and a deck full
+/// of them makes a blade the best card in the game.
+pub(crate) fn useful_blades(gs: &GameState, me: u8, db: &CardDatabase, blades: i32) -> f64 {
+    if blades <= 0 {
+        return 0.0;
+    }
+    let deficit = best_life_deficit(gs, me, db);
+    let needed: i32 = deficit[1..=6].iter().sum::<i32>() + deficit[0];
+    if needed <= 0 {
+        // The board already covers the life. Extra blades only add pool we do
+        // not need, so they are worth the same as any other stat and no more.
+        return 0.0;
+    }
+    let (cats, deck_len) = experiment_flip_categories(gs, me, db);
+    if deck_len == 0 {
+        return 0.0;
+    }
+    // The sampler already precomputed, per deck category, the colour vector a
+    // revealed card contributes. Weight each category by how likely it is to
+    // be drawn next, and score it by how much of the deficit it would fill.
+    let mut expected = 0.0f64;
+    let mut remaining = deck_len;
+    for (vector, count) in &cats {
+        if *count == 0 || remaining == 0 {
+            continue;
+        }
+        let share = *count as f64 / remaining as f64;
+        let mut fills = 0i32;
+        for c in 1..=6 {
+            if deficit[c] > 0 {
+                fills += vector[c].min(deficit[c]);
+            }
+        }
+        if vector[7] > 0 && deficit[1..=6].iter().any(|d| *d > 0) {
+            // `icon_all` is the wildcard: it counts toward any one colour.
+            fills += vector[7].min(1);
+        }
+        if fills > 0 {
+            expected += share * f64::from(fills).min(f64::from(needed));
+        }
+        remaining -= *count;
+    }
+    // One blade reveals one card, so the expected fill per blade is `expected`,
+    // capped at the size of the deficit so we never credit blades for filling
+    // a requirement twice.
+    f64::from(blades) * expected.min(f64::from(needed).max(1.0))
+}
+
+/// Total size of the requirement the best held life imposes, and how much of
+/// it the board already covers. These two numbers separate the two possible
+/// causes of a low pass probability — a HARD life in hand, or a board that
+/// does not cover it — which is the distinction every hypothesis this round
+/// has been unable to make.
+pub(crate) fn deficit_total(gs: &GameState, me: u8, db: &CardDatabase) -> i32 {
+    let deficit = best_life_deficit(gs, me, db);
+    deficit[1..=6].iter().sum::<i32>() + deficit[0]
+}
+
+/// How many of the best held life's coloured requirement the board meets.
+pub(crate) fn board_cover_of_best_life(gs: &GameState, me: u8, db: &CardDatabase) -> i32 {
+    let lives = experiment_lives(gs, me, db);
+    let board = experiment_board_pool(gs, me, db);
+    let mut best_need = 0i32;
+    let mut best_cover = 0i32;
+    for (_, _, need) in lives {
+        if need[8] > 0 || need[9] > 0 {
+            continue;
+        }
+        let total: i32 = need[1..=6].iter().sum();
+        if total <= best_need {
+            continue;
+        }
+        let mut cover = 0i32;
+        for c in 1..=6 {
+            cover += need[c].min(board[c]);
+        }
+        best_need = total;
+        best_cover = cover;
+    }
+    best_cover
+}
+
+/// The opponent's pass probability, from what is PUBLIC about them: the cards
+/// they committed to the live zone and their active blades.
+///
+/// Returns `None` when they have committed nothing — then there is no `q` to
+/// compare against, only the risk that they assemble a set later, which is
+/// what the reliability floor is for.
+///
+/// Built by calling the SAME pool machinery with the other seat, rather than by
+/// re-deriving a colour convention from card data. A first attempt did the
+/// latter and had to guess the `heart0` / `b_all` / `b_heart0N` slot mapping;
+/// this is the engine's own model of a board and a deck draw, so it cannot
+/// drift from what the check will actually do.
+pub(crate) fn opponent_pass_probability(gs: &GameState, me: u8, db: &CardDatabase) -> Option<f64> {
+    let opp_seat = 1 - me;
+    let opp = gs.seat_player(opp_seat);
+    if opp.live_card_zone.cards.is_empty() {
+        return None;
+    }
+    let mut need = [0i32; 11];
+    let mut any = false;
+    for &cid in &opp.live_card_zone.cards {
+        let base = db.get_card(cid).and_then(|card| card.need_heart.as_ref());
+        let Some(effective) = crate::core::stats_pipeline::effective_need_heart(
+            base,
+            cid,
+            &gs.mods.need_heart_modifiers,
+        ) else {
+            continue;
+        };
+        any = true;
+        for (color, count) in &effective.hearts {
+            need[color.index()] += i32::from(*count);
+        }
+    }
+    if !any {
+        return None;
+    }
+    if need[8] > 0 || need[9] > 0 {
+        // They are holding something that cannot pass, so q is 0 and a commit
+        // is always right.
+        return Some(0.0);
+    }
+    let (cats, deck_len) = experiment_flip_categories(gs, opp_seat, db);
+    let blades = experiment_blades(gs, opp_seat, db);
+    if blades <= 0 || deck_len == 0 {
+        return Some(0.0);
+    }
+    let their_board = experiment_board_pool(gs, opp_seat, db);
+    let pools = experiment_sample_pools(&cats, deck_len, blades, &their_board);
+    Some(experiment_pass_probability_pools(&pools, &need))
+}
+/// The two public facts a fold decision needs about the opponent: how likely
+/// their committed set is to pass, and what it scores if it does.
+///
+/// Both come from the live zone, which is public once set. Neither reads
+/// their hand or their deck order beyond the same 256-draw model the check
+/// itself uses.
+pub(crate) fn opponent_response_inputs(
+    gs: &GameState,
+    me: u8,
+    db: &CardDatabase,
+) -> Option<(f64, i32)> {
+    let opp_seat = 1 - me;
+    let opp = gs.seat_player(opp_seat);
+    if opp.live_card_zone.cards.is_empty() {
+        return None;
+    }
+    let mut need = [0i32; 11];
+    let mut score = 0i32;
+    let mut any = false;
+    for &cid in &opp.live_card_zone.cards {
+        let Some(card) = db.get_card(cid) else { continue };
+        score += i32::from(card.score.unwrap_or(0));
+        let base = card.need_heart.as_ref();
+        let Some(effective) = crate::core::stats_pipeline::effective_need_heart(
+            base,
+            cid,
+            &gs.mods.need_heart_modifiers,
+        ) else {
+            continue;
+        };
+        any = true;
+        for (color, count) in &effective.hearts {
+            need[color.index()] += i32::from(*count);
+        }
+    }
+    if !any {
+        return None;
+    }
+    if need[8] > 0 || need[9] > 0 {
+        return Some((0.0, score));
+    }
+    let (cats, deck_len) = experiment_flip_categories(gs, opp_seat, db);
+    let blades = experiment_blades(gs, opp_seat, db);
+    if blades <= 0 || deck_len == 0 {
+        return Some((0.0, score));
+    }
+    let their_board = experiment_board_pool(gs, opp_seat, db);
+    let pools = experiment_sample_pools(&cats, deck_len, blades, &their_board);
+    Some((
+        experiment_pass_probability_pools(&pools, &need),
+        score,
+    ))
+}
+
+pub(crate) fn chosen_set_pass_probability(
+    gs: &GameState,
+    me: u8,
+    db: &CardDatabase,
+    desired: &[usize],
+) -> f64 {
+    if desired.is_empty() {
+        return 0.0;
+    }
+    let mut need = [0i32; 11];
+    for &hi in desired {
+        if let Some((_, _, n)) = experiment_lives(gs, me, db)
+            .iter()
+            .find(|(h, _, _)| *h == hi)
+        {
+            for k in 0..11 {
+                need[k] += n[k];
+            }
+        }
+    }
+    if need[8] > 0 || need[9] > 0 {
+        return 0.0;
+    }
+    let (cats, deck_len) = experiment_flip_categories(gs, me, db);
+    let blades = experiment_blades(gs, me, db);
+    let board = experiment_board_pool(gs, me, db);
+    if blades <= 0 || deck_len == 0 {
+        return 0.0;
+    }
+    let pools = experiment_sample_pools(&cats, deck_len, blades, &board);
+    experiment_pass_probability_pools(&pools, &need)
+}
+
 fn experiment_junk_fill(gs: &GameState, me: u8, db: &CardDatabase, desired: &mut Vec<usize>) {
     let (my, _) = gs.seated_pair(me);
     let deck_lives = my
@@ -1876,23 +2178,87 @@ pub(crate) fn live_set_plan(gs: &GameState, db: &CardDatabase) -> Vec<usize> {
     // dominant axis. `best_response_set` prices the choice with the payoff
     // table that was already written and never called, using the opponent's
     // PUBLIC blades and committed set size.
-    if response_model_enabled() {
-        let opp_set_size = opp.live_card_zone.cards.len();
-        if (is_second && opp_set_size > 0) || opp_succ >= 2 {
-            let response = best_response_set(gs, me, db);
-            if !response.is_empty() {
-                log::debug!(
-                    "v7 response t{} me{} opp_set={} opp_succ={} -> {:?}",
-                    gs.turn_number,
-                    me,
-                    opp_set_size,
-                    opp_succ,
-                    response
-                );
-                return response;
+        if response_model_enabled() {
+            let opp_set_size = opp.live_card_zone.cards.len();
+            if (is_second && opp_set_size > 0) || opp_succ >= 2 {
+                // THE FOLD ARITHMETIC.
+                //
+                // Folding is not "keep the life and try later". A fold hands
+                // the check over: the opponent resolves against their own set
+                // and places if they pass. So the two options are
+                //
+                //     commit :  p * (a placement)  -  (1 - p) * (the life)
+                //     fold   :  0                  -  q * (they place)
+                //
+                // and commit wins exactly when p > q. There is no constant in
+                // that. The three floors this replaces (0.45, 0.60, 0.35) were
+                // all standing in for `q` — a guessed chance that the
+                // OPPONENT passes — which is why tuning them did nothing: the
+                // quantity they were approximating is observable.
+                //
+                // When the opponent has committed (the second attacker sees
+                // the set, which is why the rules make going second
+                // informative) `q` is exact: it is their set's pass
+                // probability under the same 256-draw model, from their
+                // committed cards and their blades. That is public information
+                // about a public zone, so this is arithmetic rather than
+                // lookahead into hidden state.
+                //
+                // This also explains the v8 measurements that survived every
+                // falsification this round. v8 commits at p = 0.485 and folds
+                // at a rate tuned as if folding were free; it is not, it pays
+                // the opponent. Every threshold change moved the bot in the
+                // direction that conceded more or won fewer, and both lost.
+                if let Some((q_pass, q_score)) = opponent_response_inputs(gs, me, db) {
+                    let mine_p = best_available_pass_probability(gs, me, db);
+                    // `q_pass` alone is the UPPER bound on the threat: passing
+                    // a check is not placing in it, you must also win the score
+                    // comparison, and that factor is well under 1. Using the
+                    // upper bound inflated `q` and made v7 fold 23x more often
+                    // (fold 0.5% -> 11.6%, 1645-1355 -> 1304-1696, p=0.00000).
+                    //
+                    // So the fold decision is the payoff table's, not a
+                    // threshold's. It carries all three terms at once: our
+                    // pass probability, their pass probability, and who wins
+                    // the comparison if both pass. Zero is the break-even and
+                    // it is not a tuned constant — it is where committing and
+                    // conceding have the same expected value.
+                    let value = expected_live_value(
+                        mine_p,
+                        0,
+                        1,
+                        my_succ,
+                        opp_succ,
+                        q_pass,
+                        q_score,
+                        opp.live_card_zone.cards.len(),
+                    );
+                    if value <= 0.0 {
+                        log::debug!(
+                            "v7 fold-by-payoff t{} me{} mine={:.3} theirs={:.3} v={:.3} -> fold",
+                            gs.turn_number,
+                            me,
+                            mine_p,
+                            q_pass,
+                            value
+                        );
+                        return Vec::new();
+                    }
+                }
+                let response = best_response_set(gs, me, db);
+                if !response.is_empty() {
+                    log::debug!(
+                        "v7 response t{} me{} opp_set={} opp_succ={} -> {:?}",
+                        gs.turn_number,
+                        me,
+                        opp_set_size,
+                        opp_succ,
+                        response
+                    );
+                    return response;
+                }
             }
         }
-    }
 
     if my.live_card_set_limit_reduction >= 3 || gs.cannot_live_players.contains(&my.id) {
         return desired;
@@ -2155,6 +2521,34 @@ pub(crate) fn live_set_plan(gs: &GameState, db: &CardDatabase) -> Vec<usize> {
     let lives_before_junk = count_lives(gs, &desired, db);
     experiment_junk_fill(gs, me, db, &mut desired);
     let n_lives = count_lives(gs, &desired, db);
+    // Per-check telemetry: how good was the set we actually committed to?
+    //
+    // This is the measurement that separates "v8 builds a bigger board and
+    // passes fewer checks" into a cause. If v8's chosen p_place is LOWER than
+    // v7's at the same blade count, then its development is colour-blind: it
+    // grows a board whose colours do not match the lives in hand, so more
+    // cost buys less conversion. If the two are equal, the difference is
+    // elsewhere and this is a dead end.
+    if std::env::var_os("V7_CHECK_P").is_some() {
+        let chosen_p = chosen_set_pass_probability(gs, me, db, &desired);
+        // Best AVAILABLE set, whether or not it cleared the floor. The gap
+        // between this and `chosen_p` is the headroom: it is the difference
+        // between "the board cannot support a check" and "v7 declined the
+        // check it could have made", and those call for opposite fixes.
+        let best_available = best_available_pass_probability(gs, me, db);
+        eprintln!(
+            "V7CHK t={} me={} blades={} set={} p={:.3} succ={} need={} boardcovers={} deck={}",
+            gs.turn_number,
+            me,
+            experiment_blades(gs, me, db),
+            n_lives,
+            chosen_p,
+            my_succ,
+            deficit_total(gs, me, db) as usize,
+            board_cover_of_best_life(gs, me, db) as usize,
+            my.main_deck.cards.len(),
+        );
+    }
     log::debug!(
         "v7 experiment t{} me{} n={} lives={} junk={} contested={} floor={:.2} my{} opp{}",
         gs.turn_number,
@@ -2329,6 +2723,60 @@ fn opening_curve_keep(costs: &[Option<u8>]) -> Vec<usize> {
 /// connected 2->7->11 ladder are rare in this deck's live-heavy opens), and
 /// when it does fire it preserves members whose value the one-ply Main eval
 /// already captures from redraws. v4's expensive-first replacement stays.
+/// The colour requirement of the first three lives in hand — the ones a
+/// mulligan should be keeping, since only three live slots exist.
+fn kept_live_requirement(gs: &GameState, db: &CardDatabase) -> [i32; 8] {
+    let mut want = [0i32; 8];
+    let mut lives = 0usize;
+    for &cid in &gs.active_player().hand.cards {
+        let Some(card) = db.get_card(cid) else { continue };
+        if card.card_type != CardType::Live {
+            continue;
+        }
+        lives += 1;
+        if lives > 3 {
+            break;
+        }
+        if let Some(vector) = live_need_vector(db, cid) {
+            for c in 0..8 {
+                want[c] += vector[c];
+            }
+        }
+    }
+    want
+}
+
+/// A member's printed heart vector, in the model's 0..=7 slots (0 colorless,
+/// 7 the `icon_all` wildcard).
+fn member_heart_vector(db: &CardDatabase, cid: i16) -> Option<[i32; 8]> {
+    let card = db.get_card(cid)?;
+    if card.card_type != CardType::Member {
+        return None;
+    }
+    let mut vector = [0i32; 8];
+    if let Some(base) = &card.base_heart {
+        for (color, count) in &base.hearts {
+            vector[color.index()] += i32::from(*count);
+        }
+    }
+    Some(vector)
+}
+
+/// A live card's requirement, in the model's 0..=7 slots.
+fn live_need_vector(db: &CardDatabase, cid: i16) -> Option<[i32; 8]> {
+    let card = db.get_card(cid)?;
+    if card.card_type != CardType::Live {
+        return None;
+    }
+    let mut vector = [0i32; 8];
+    if let Some(need) = &card.need_heart {
+        for (color, count) in &need.hearts {
+            vector[color.index()] += i32::from(*count);
+        }
+    }
+    Some(vector)
+}
+
 fn choose_mulligan_curve(gs: &GameState, actions: &[Action], db: &CardDatabase) -> Action {
     let costs: Vec<Option<u8>> = gs
         .active_player()
@@ -2343,6 +2791,7 @@ fn choose_mulligan_curve(gs: &GameState, actions: &[Action], db: &CardDatabase) 
             })
         })
         .collect();
+    let mulligan_coverage = std::env::var_os("V7_MULLIGAN_COVERAGE").is_some();
     let keep = if std::env::var_os("V7_MULLIGAN_REACHABLE").is_some() {
         reachable_curve_keep(&costs)
     } else {
@@ -2370,7 +2819,44 @@ fn choose_mulligan_curve(gs: &GameState, actions: &[Action], db: &CardDatabase) 
         .filter_map(|(index, cost)| cost.map(|cost| (index, cost)))
         .filter(|(index, _)| !keep.contains(index))
         .collect();
-    members.sort_by_key(|&(_, cost)| std::cmp::Reverse(cost));
+    if mulligan_coverage {
+        // DUMP BY COVERAGE, NOT BY COST.
+        //
+        // The whole night of measurement landed on one fact: this game is won
+        // by heart coverage against a held life, not by stage cost. The mulligan
+        // was choosing which cards to bin by cost alone, which is a question
+        // about a resource (board size) that the check does not read.
+        //
+        // So bin the members that help least with the lives this hand is
+        // keeping. That is derived, not fitted: it asks "does this card
+        // contribute a colour the kept lives need", which the card database
+        // answers, and it introduces no coefficient to tune. It also falls out
+        // naturally on the default deck, which is 24x cost-2 — dumping the
+        // most EXPENSIVE members there means binning the scarce big-colour
+        // cards and keeping a wall of duplicates.
+        let wanted = kept_live_requirement(gs, db);
+        let mut supply = [0i32; 8];
+        for (index, _) in &members {
+            if let Some(vector) = member_heart_vector(db, gs.active_player().hand.cards[*index]) {
+                for c in 0..8 {
+                    supply[c] += vector[c];
+                }
+            }
+        }
+        members.sort_by_key(|&(index, _)| {
+            let vector = member_heart_vector(db, gs.active_player().hand.cards[index])
+                .unwrap_or([0; 8]);
+            // How much of what the kept lives need does this member supply?
+            let mut contributes = 0i32;
+            for c in 1..=6 {
+                contributes += vector[c].min(wanted[c]);
+            }
+            // Ascending: the least useful member is the first binned.
+            std::cmp::Reverse(contributes)
+        });
+    } else {
+        members.sort_by_key(|&(_, cost)| std::cmp::Reverse(cost));
+    }
     for (index, _) in members {
         if desired.len() >= 3 {
             break;
@@ -2574,6 +3060,7 @@ fn response_model_enabled() -> bool {
 }
 
 pub fn choose_mulligan_v7(gs: &GameState, actions: &[Action], db: &CardDatabase) -> Action {
+    let mulligan_coverage = std::env::var_os("V7_MULLIGAN_COVERAGE").is_some();
     if std::env::var("V7_MULLIGAN_CURVE").is_ok() || std::env::var("V7_MULLIGAN_REACHABLE").is_ok()
     {
         return choose_mulligan_curve(gs, actions, db);
@@ -2601,6 +3088,73 @@ pub fn choose_mulligan_v7(gs: &GameState, actions: &[Action], db: &CardDatabase)
     // Dump the most expensive members first: they are furthest from playable,
     // and energy is never dumped.
     members.sort_by_key(|&(_, cost)| std::cmp::Reverse(cost));
+
+    // `V7_MULLIGAN_KEEP=all` keeps the entire opening hand.
+    //
+    // The mulligan has never been ablated against doing nothing. The docs
+    // record `V7_MULLIGAN_REACHABLE` as a "mixed result at 1000 games per
+    // seat, remains opt-in", which establishes that one alternative discard
+    // rule beats another only weakly — not that discarding beats keeping. Same
+    // question as the baton tie-break: is a hand-placed mechanism that fires
+    // every game still earning its place?
+    if std::env::var("V7_MULLIGAN_KEEP").as_deref() == Ok("all") {
+        members.clear();
+    }
+
+    if mulligan_coverage {
+        // DUMP BY COVERAGE, NOT BY COST — the default path, not the opt-in one.
+        //
+        // An earlier version of this landed in `choose_mulligan_curve`, which
+        // only runs under V7_MULLIGAN_CURVE / V7_MULLIGAN_REACHABLE, and so
+        // measured p = 1.00000 over 3000 games: byte-identical, because it had
+        // never executed in the default build. Same failure as the
+        // V7_LIVE_LEGACY branch, and worth stating because it has now happened
+        // twice — an improvement wired into a non-default path measures as a
+        // perfect null rather than as an error.
+        //
+        // The night of measurement landed on one fact: the game is won by
+        // heart coverage against a held life, not by stage cost. Binning by
+        // cost alone is a question about a resource the check never reads. On
+        // the default deck — 24x cost-2 — it means binning the scarce
+        // big-colour cards and keeping a wall of duplicates.
+        let wanted = kept_live_requirement(gs, db);
+        let mut supply = [0i32; 8];
+        for (index, _) in &members {
+            if let Some(vector) = member_heart_vector(db, me.hand.cards[*index]) {
+                for c in 0..8 {
+                    supply[c] += vector[c];
+                }
+            }
+        }
+        // How much of what the kept lives need does each member supply?
+        let mut usefulness: Vec<(usize, i32)> = members
+            .iter()
+            .map(|&(index, _)| {
+                let vector =
+                    member_heart_vector(db, me.hand.cards[index]).unwrap_or([0; 8]);
+                let mut contributes = 0i32;
+                for c in 1..=6 {
+                    contributes += vector[c].min(wanted[c]);
+                }
+                (index, contributes)
+            })
+            .collect();
+        // Least useful first, and ties broken by most expensive so a genuinely
+        // neutral card is still binned over a useful cheap one.
+        usefulness.sort_by_key(|&(index, contributes)| {
+            let cost = me.hand.cards[index];
+            let cost = db.get_card(cost).and_then(|c| c.cost).unwrap_or(0);
+            (contributes, std::cmp::Reverse(cost))
+        });
+        members = usefulness
+            .into_iter()
+            .map(|(index, _)| {
+                let cost = me.hand.cards[index];
+                (index, db.get_card(cost).and_then(|c| c.cost).unwrap_or(0))
+            })
+            .collect();
+        let _ = supply;
+    }
     for &(hi, _) in &members {
         if discard.len() >= 3 {
             break;

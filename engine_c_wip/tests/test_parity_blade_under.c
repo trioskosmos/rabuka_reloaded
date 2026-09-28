@@ -123,9 +123,15 @@
  *     normalise fullwidth->halfwidth the way Rust's CardDatabase::get_card_id
  *     does, so a hand-typed '+' would resolve to a different (or no) print.
  *
- * This file is pure ASCII: every Japanese string literal is an explicit UTF-8
- * byte escape so the file survives any tool that rewrites sources in a legacy
- * code page.
+ * The file is valid UTF-8. Card NUMBERS and TRIGGER KEYWORDS are always written
+ * as explicit byte escapes (see TRIG_* below and the "\xEF\xBC\x8B" fullwidth
+ * plus), because those are compared byte-for-byte against the database and the
+ * engine. Japanese card NAMES appear only inside assertion MESSAGE strings,
+ * which are printed and never compared; those are plain UTF-8 so the failure
+ * output is readable. (An earlier revision of this file claimed to be "pure
+ * ASCII"; that was false -- the names are UTF-8 literals. Verified with a
+ * scan that every CJK run in the file round-trips as a real Japanese name or
+ * trigger keyword found in cards/cards.json, i.e. no CP932 mojibake.)
  */
 #include "rabuka.h"
 #include "test_game.h"
@@ -172,10 +178,24 @@ static const char *current_test = "(none)";
  * carries when the match fails, so a typo here can never hide. */
 #define TRIG_DEBUT        "\xE7\x99\xBB\xE5\xA0\xB4"                            /* 登場        */
 #define TRIG_LIVE_START   "\xE3\x83\xA9\xE3\x82\xA4\xE3\x83\x96\xE9\x96\x8B\xE5\xA7\x8B\xE6\x99\x82" /* ライブ開始時 */
-#define TRIG_CONSTANT     "\xE6\x99\x82\xE6\x97\xB6"                            /* 常時        */
 
 /* 起動 = the activation trigger string, used as a trigger_type token. */
 #define TRIG_ACTIVATE     "\xE8\xB5\xB7\xE5\x8B\x95"                            /* 起動        */
+
+/* 常時 — 常 is U+5E38 (E5 B8 B8), 時 is U+6642 (E6 99 82). An earlier revision of
+ * this file hand-typed this constant as E6 99 82 E6 97 B6, which decodes to
+ * 「時时」: the traditional 時 followed by the SIMPLIFIED 时 (U+65F6). That never
+ * matched any card, so every bu_fire_trigger() call with TRIG_CONSTANT hit the
+ * [TRIGGER-MISS] path -- silently, because bu_fire_trigger was itself unused.
+ * Both defects had to be fixed together: the wrong bytes AND the unused shim.
+ * Do not hand-type any macro here; copy the bytes from the card dump. */
+#define TRIG_CONSTANT_CORRECT "\xE5\xB8\xB8\xE6\x99\x82"                      /* 常時        */
+
+/* A self-check constant that is WRONG on purpose. The EXTRA trigger-shim test
+ * feeds this to bu_fire_trigger() and requires the [TRIGGER-MISS] diagnostic to
+ * fire, which proves the diagnostic is live rather than a comment. If a future
+ * edit "fixes" this to the real 常時, that test goes red and says why. */
+#define TRIG_CONSTANT_WRONG   "\xE6\x99\x82\xE6\x97\xB6"                      /* 時时 (bad)  */
 
 /* Heart colour slots (src/ability/util.c:rb_parse_heart_color):
  * heart01 -> 1, heart02 -> 2, heart03 -> 3, heart04 -> 4, heart06 -> 6. */
@@ -444,41 +464,70 @@ static const char *bu_prompt_zone(TestGame *tg)
 static int bu_drain_pick0(TestGame *tg, int rounds)
 {
     int guard = 0;
-    while (bu_prompt(tg) && guard++ < rounds) {
+    while (bu_prompt(tg) && guard < rounds) {
         rb_resume_with_choice(&tg->state, BU_ACCEPT);
         rb_process_pending_auto_abilities(&tg->state);
+        guard++;
     }
+    if (bu_prompt(tg))
+        fprintf(stderr,
+                "[DRAIN-CAP] bu_drain_pick0 used all %d rounds, choice still "
+                "pending (kind=%d zone=\"%s\")\n",
+                rounds, bu_prompt_kind(tg), bu_prompt_zone(tg));
     return guard;
 }
 
 /* PROCEED the auto-ability step, DECLINE everything else. See
  * test_parity_under_member.c for why the skip index must never be used on a
  * SelectAutoAbility: it refuses the WHOLE ability and the negative
- * assertions then pass on a board where nothing ran. */
+ * assertions then pass on a board where nothing ran.
+ *
+ * `rounds` is a hard cap (see bu_pick_index). */
 static int bu_drain_skip(TestGame *tg, int rounds)
 {
     int guard = 0;
-    while (bu_prompt(tg) && guard++ < rounds) {
+    while (bu_prompt(tg) && guard < rounds) {
         const RbChoice *c = rb_get_pending_choice(&tg->state);
         int idx = (c && c->kind == RB_CHOICE_SELECT_AUTO_ABILITY) ? BU_ACCEPT : BU_SKIP;
         rb_resume_with_choice(&tg->state, idx);
         rb_process_pending_auto_abilities(&tg->state);
+        guard++;
     }
+    if (bu_prompt(tg))
+        fprintf(stderr,
+                "[DRAIN-CAP] bu_drain_skip used all %d rounds, choice still "
+                "pending (kind=%d zone=\"%s\")\n",
+                rounds, bu_prompt_kind(tg), bu_prompt_zone(tg));
     return guard;
 }
 
 /* Answer with one explicit index (Rust's `select_indices(&[i])`), then let the
  * auto-ability queue settle. Used where the CHOICE of index is the claim
- * (which stage member the 渡辺 曜 登場 parks the card under). */
+ * (which stage member the 渡辺 曜 登場 parks the card under).
+ *
+ * `rounds` is a HARD cap: an ability that re-prompts with the identical choice
+ * forever must terminate here rather than hang the suite. The guard value is
+ * returned so a caller can assert the drain actually reached a settled state
+ * (`bu_pick_index(...) < rounds` means it did NOT hang and did NOT exhaust). */
 static int bu_pick_index(TestGame *tg, int idx, int rounds)
 {
     int guard = 0;
-    while (bu_prompt(tg) && guard++ < rounds) {
+    while (bu_prompt(tg) && guard < rounds) {
         const RbChoice *c = rb_get_pending_choice(&tg->state);
         int use = (c && c->kind == RB_CHOICE_SELECT_AUTO_ABILITY) ? BU_ACCEPT : idx;
         rb_resume_with_choice(&tg->state, use);
         rb_process_pending_auto_abilities(&tg->state);
+        guard++;
     }
+    /* A drain that used every round hit the cap -- almost always an ability
+     * re-prompting itself. Say so instead of letting a downstream zone
+     * assertion take the blame. */
+    if (bu_prompt(tg))
+        fprintf(stderr,
+                "[DRAIN-CAP] bu_pick_index(idx=%d) used all %d rounds and a "
+                "choice is STILL pending (kind=%d zone=\"%s\") -- the ability "
+                "is re-prompting\n",
+                idx, rounds, bu_prompt_kind(tg), bu_prompt_zone(tg));
     return guard;
 }
 
@@ -743,7 +792,10 @@ static void A_in_hand_contributes_nothing(void)
     if (host < 0 || kanon < 0) return;
     set_stage(&tg, 0, RB_EMPTY_SLOT, host, RB_EMPTY_SLOT);
     test_add_to_hand(&tg, kanon);
+    CHECK(hand_has(&tg, kanon), "setup: 澁谷かのん really is in hand");
     CHECK_EQ(under_n(&tg, 0, AREA_CENTER), 0, "setup: 澁谷かのん is in hand");
+    CHECK_EQ(tg.state.p[0].stage[AREA_LEFT], RB_EMPTY_SLOT,
+             "setup: 澁谷かのん is NOT on the stage either (hand only)");
     test_recalc(&tg);
 
     CHECK_EQ(blade_of(&tg, host), 0, "澁谷かのん only in hand -> host gains 0");
@@ -862,6 +914,24 @@ static void B_aqours_host_with_member_under_gains_blade(void)
              "『Aqours』 member with a member card under it -> 1 blade");
     CHECK_EQ(blade_of(&tg, watanabe), 0,
              "the grant goes to the FILTERED member, not to 渡辺 曜 herself");
+
+    /* The "not to 渡辺 曜 herself" half is a NEGATIVE about the grant's
+     * recipient, so it needs its own paired positive: the same board with the
+     * under-card removed must leave BOTH cards at 0. Without it, a 0 on
+     * 渡辺 曜 is also what a filter that grants nobody at all produces. */
+    static TestGame neg;
+    new_board(&neg);
+    int n_wat = card(&neg, WATANABE);
+    int n_host = card(&neg, HOST_AQOURS);
+    if (n_wat < 0 || n_host < 0) return;
+    set_stage(&neg, 0, RB_EMPTY_SLOT, n_host, n_wat);
+    CHECK_EQ(under_n(&neg, 0, AREA_CENTER), 0, "negative setup: nothing under");
+    test_recalc(&neg);
+    CHECK_EQ(blade_of(&neg, n_host), 0,
+             "PAIRED NEGATIVE: no card under the host -> 0 blade; the 1 above "
+             "is the under-card filter, not an unconditional +1");
+    CHECK_EQ(blade_of(&neg, n_wat), 0,
+             "PAIRED NEGATIVE: no card under anybody -> 0 blade for 渡辺 曜 too");
 }
 
 /* B2 :: watanabe_aqours_host_without_under_gains_nothing */
@@ -925,11 +995,26 @@ static void B_non_aqours_host_with_member_under_gains_nothing(void)
              "non-『Aqours』 host with a member card under it -> 0 blade (group scope)");
 }
 
-/* B5 :: watanabe_self_no_under_gains_nothing */
+/* B5 :: watanabe_self_no_under_gains_nothing
+ *
+ * ANTI-VACUITY CONTROL (added by tr_bladeunder2): the Rust original is a lone
+ * negative (0 blade for 渡辺 曜 alone), satisfied for free by a dead filter.
+ * The paired positive below is the SAME host with a member card under her,
+ * same board shape, same 常時 scan -- only the under-card differs. */
 static void B_self_no_under_gains_nothing(void)
 {
-    int control = b_control_aqours_host_under_member();
-    CHECK_EQ(control, 1, "ANTI-VACUITY CONTROL: the filtered host must gain 1");
+    static TestGame ctl;
+    new_board(&ctl);
+    int c_wat = card(&ctl, WATANABE);
+    int c_host = card(&ctl, HOST_AQOURS);
+    int c_under = card(&ctl, MEMBER_UNDER);
+    if (c_wat < 0 || c_host < 0 || c_under < 0) return;
+    set_stage(&ctl, 0, RB_EMPTY_SLOT, c_host, c_wat);
+    test_place_under(&ctl, 0, AREA_CENTER, c_under);
+    test_recalc(&ctl);
+    CHECK_EQ(blade_of(&ctl, c_wat), 1,
+             "ANTI-VACUITY CONTROL: 渡辺 曜 herself with a member card under "
+             "her must gain 1 blade -- otherwise the 0 below is free");
 
     static TestGame tg;
     new_board(&tg);
@@ -968,7 +1053,12 @@ static void B_two_hosts_both_gain(void)
 
 /* B7 :: watanabe_debut_offers_which_member_to_place_under
  * ab#0 must raise a SelectCard over the STAGE asking which member receives
- * the waitroom card. */
+ * the waitroom card.
+ *
+ * The prompt-shape assertions below deliberately print WHAT the engine actually
+ * raised rather than only comparing: the C engine can satisfy
+ * `has_pending_choice()` while offering the wrong zone entirely, and a bare
+ * "expected stage, got discard" with no context reads like a typo. */
 static void B_debut_offers_which_member_to_place_under(void)
 {
     static TestGame tg;
@@ -986,13 +1076,24 @@ static void B_debut_offers_which_member_to_place_under(void)
 
     CHECK_EQ(test_play_to_stage(&tg, watanabe, AREA_CENTER), 1,
              "play_to_stage: 渡辺 曜 reaches Center");
+    /* PROMPT CONTROL: ab#0 must raise SOMETHING. */
     CHECK(bu_prompt(&tg),
-          "PROMPT CONTROL: ab#0 must prompt which member to place the card under");
+          "PROMPT CONTROL: ab#0 must prompt for the 登場 effect");
+    /* Diagnostics: whatever was raised, recorded before the shape asserts so a
+     * failure names the actual zone/kind/count instead of only the expected
+     * ones. Two stage members are on the field here, so a correctly-scoped
+     * engine MUST be offering a choice between them. */
+    fprintf(stderr, "[B7-PROMPT] kind=%d zone=\"%s\" count=%d\n",
+            bu_prompt_kind(&tg), bu_prompt_zone(&tg), bu_prompt_count(&tg));
+    CHECK_EQ(under_n(&tg, 0, AREA_LEFT) + under_n(&tg, 0, AREA_CENTER),
+             0, "setup: nothing is under either stage member before the answer");
     CHECK_EQ((int)bu_prompt_kind(&tg), (int)RB_CHOICE_SELECT_CARD,
              "the prompt is a SelectCard");
     CHECK_EQ(bu_prompt_count(&tg), 1, "exactly 1 stage member is requested");
     CHECK(!strcmp(bu_prompt_zone(&tg), "stage"),
-          "the pick comes from the STAGE (the card to place is already chosen)");
+          "the pick comes from the STAGE (the card to place is already chosen); "
+          "the engine instead offered zone \"%s\"",
+          bu_prompt_zone(&tg));
 }
 
 /* B8 :: watanabe_debut_places_under_chosen_host_and_grants_blade */
@@ -1056,9 +1157,40 @@ static void B_debut_places_under_self_grants_blade(void)
  * The minimal shape of B's constant, without the 登場 half.
  * ===================================================================== */
 
-/* C1 :: aqours_member_with_member_underneath_gains_one_blade */
+/* C1 :: aqours_member_with_member_underneath_gains_one_blade
+ *
+ * ANTI-VACUITY CONTROL (added by tr_bladeunder2): this test is a POSITIVE, so
+ * it cannot use a "the prompt happened" control -- but a positive whose board
+ * happens to also satisfy a BROADER, unfiltered reading is still worthless.
+ * The board here is 渡辺 曜 (the ability card ITSELF) with an 『Aqours』 card
+ * under her, which is simultaneously:
+ *     (a) the filtered shape the Rust test means -- "an 『Aqours』 member that
+ *         has a member card under it gains 1", and
+ *     (b) the shape a BUGGY engine produces -- "the 常時 grants the host itself
+ *         +1 unconditionally".
+ * The two are indistinguishable here, so this test passes green even when the
+ * `group_names:["Aqours"]` / `requires_under_card` filter is dead. The paired
+ * NEGATIVE arm below is what makes the positive mean what it claims: same
+ * board, same host, same 常時 scan -- only the filter's input is removed. */
 static void C_aqours_member_with_member_under_gains_one_blade(void)
 {
+    /* Control arm first: an 『Aqours』 card UNDER her must be what earns the
+     * blade. With the filter dead this still reads 1 (the unconditional
+     * self-grant), so the negative below is the one that carries the claim. */
+    static TestGame ctl;
+    new_board(&ctl);
+    int c_member = card(&ctl, WATANABE);
+    int c_under = card(&ctl, UNDER_AQOURS1);
+    int c_filler = card(&ctl, FILLER_NO);
+    if (c_member < 0 || c_under < 0 || c_filler < 0) return;
+    set_stage(&ctl, 0, RB_EMPTY_SLOT, c_member, RB_EMPTY_SLOT);
+    test_place_under(&ctl, 0, AREA_CENTER, c_under);
+    CHECK_EQ(under_n(&ctl, 0, AREA_CENTER), 1,
+             "control setup: an 『Aqours』 member under her");
+    test_recalc(&ctl);
+    CHECK_EQ(blade_of(&ctl, c_member), 1,
+             "ANTI-VACUITY CONTROL: 『Aqours』 card under 渡辺 曜 -> 1 blade");
+
     static TestGame tg;
     new_board(&tg);
     int member = card(&tg, WATANABE);
@@ -1071,6 +1203,22 @@ static void C_aqours_member_with_member_under_gains_one_blade(void)
 
     CHECK_EQ(blade_of(&tg, member), 1,
              "under-card 『Aqours』 member should gain exactly +1 blade");
+
+    /* The paired negative: the SAME host with nothing under her. If the engine
+     * really filters on "has a member card underneath", this must be 0. If it
+     * grants unconditionally, this reads 1 and the positive above was an
+     * accident. Kept inside C1 (rather than as a separate case) so the two
+     * halves can never drift apart. */
+    static TestGame neg;
+    new_board(&neg);
+    int n_member = card(&neg, WATANABE);
+    if (n_member < 0) return;
+    set_stage(&neg, 0, RB_EMPTY_SLOT, n_member, RB_EMPTY_SLOT);
+    CHECK_EQ(under_n(&neg, 0, AREA_CENTER), 0, "negative setup: nothing under her");
+    test_recalc(&neg);
+    CHECK_EQ(blade_of(&neg, n_member), 0,
+             "PAIRED NEGATIVE: no card under 渡辺 曜 -> 0 blade; a 1 here means the "
+             "positive above was the unconditional self-grant, not the filter");
 }
 
 /* ========================================================================
@@ -1153,7 +1301,14 @@ static void D_chika_constant_blade_zero_under(void)
     CHECK_EQ(blade_of(&tg, chika), 0, "0 member cards under -> 0 blade");
 }
 
-/* D3 :: chika_constant_blade_counts_only_under */
+/* D3 :: chika_constant_blade_counts_only_under
+ *
+ * ANTI-VACUITY CONTROL (added by tr_bladeunder2): this is a POSITIVE reading 1,
+ * and the cluster's actual defect makes an UNFILTERED constant also read 1 (see
+ * D2, where 0 under-cards reads 1). A positive of 1 therefore proves nothing on
+ * its own here. The paired negative below is the same board with the under-card
+ * removed; it must read 0 for the "elsewhere NOT counted" claim to mean
+ * anything. */
 static void D_chika_constant_blade_counts_only_under(void)
 {
     static TestGame tg;
@@ -1174,9 +1329,34 @@ static void D_chika_constant_blade_counts_only_under(void)
 
     CHECK_EQ(blade_of(&tg, chika), 1,
              "1 member under + 4 elsewhere -> 1 blade (elsewhere NOT counted)");
+
+    /* Paired negative: identical board, under-card removed. The 4 "elsewhere"
+     * cards are still present (2 on stage, 1 in hand, 1 in the waitroom, 1 in
+     * the deck), so a leak into any of those zones shows up here as > 0. */
+    static TestGame neg;
+    new_board(&neg);
+    int n_chika = card(&neg, CHIKA);
+    int n_kanon = card(&neg, "PL!SP-sd1-001-SD");
+    int n_sumire = card(&neg, "PL!SP-sd1-004-SD");
+    int n_filler = card(&neg, FILLER_NO);
+    if (n_chika < 0 || n_kanon < 0 || n_sumire < 0 || n_filler < 0) return;
+    set_stage(&neg, 0, n_kanon, n_chika, n_sumire);
+    test_add_to_hand(&neg, n_kanon);
+    test_add_to_discard(&neg, n_sumire);
+    test_add_to_deck_pl(&neg, 0, n_filler);
+    CHECK_EQ(under_n(&neg, 0, AREA_CENTER), 0,
+             "negative setup: the same 4 elsewhere-cards, nothing under");
+    test_recalc(&neg);
+    CHECK_EQ(blade_of(&neg, n_chika), 0,
+             "PAIRED NEGATIVE: the same 4 elsewhere-cards with NO card under -> "
+             "0 blade; anything above 0 is a per_unit location leak");
 }
 
-/* D4 :: shizuku_live_start_blade_per_distinct_under */
+/* D4 :: shizuku_live_start_blade_per_distinct_under
+ *
+ * ANTI-VACUITY CONTROL (added by tr_bladeunder2): 3 cards -> 3 is what a raw
+ * count gives too, so the Rust original alone cannot show the `distinct` half
+ * is honoured. The paired arm repeats a name and pins the count at 3. */
 static void D_shizuku_live_start_blade_per_distinct_under(void)
 {
     static TestGame tg;
@@ -1184,6 +1364,15 @@ static void D_shizuku_live_start_blade_per_distinct_under(void)
     const char *u[3] = { "PL!SP-sd1-001-SD", "PL!SP-sd1-004-SD", "PL!SP-sd1-003-SD" };
     int blade = d_run_shizuku_live_start(&tg, u, 3);
     CHECK_EQ(blade, 3, "3 distinct-named member cards under -> 3 blade");
+
+    static TestGame dup;
+    new_board(&dup);
+    const char *du[4] = { "PL!SP-sd1-001-SD", "PL!SP-sd1-004-SD",
+                          "PL!SP-sd1-003-SD", "PL!SP-sd1-001-SD" };
+    int dup_blade = d_run_shizuku_live_start(&dup, du, 4);
+    CHECK_EQ(dup_blade, 3,
+             "PAIRED NEGATIVE: the same 3 names as 4 cards still give 3 blade; "
+             "4 here means distinct:card_name is ignored");
 }
 
 /* D5 :: shizuku_live_start_blade_dedups_same_name */
@@ -1215,9 +1404,25 @@ static void D_shizuku_live_start_blade_zero_under(void)
     CHECK_EQ(blade, 0, "0 member cards under -> 0 blade");
 }
 
-/* D7 :: shizuku_live_start_blade_counts_only_under */
+/* D7 :: shizuku_live_start_blade_counts_only_under
+ *
+ * ANTI-VACUITY CONTROL (added by tr_bladeunder2): the Rust original is a bare
+ * positive (`assert_eq!(blade, 1)`), which is satisfiable by a board where the
+ * ライブ開始時 never fired and something else happened to grant exactly 1.
+ * The control arm below drives the SAME walk with 3 distinct names under her
+ * and requires 3, which can only come from the ライブ開始時. Without it the
+ * "1 blade, and nothing from hand/discard/deck" claim is unreadable. */
 static void D_shizuku_live_start_blade_counts_only_under(void)
 {
+    static TestGame ctl;
+    new_board(&ctl);
+    const char *cu[3] = { "PL!SP-sd1-001-SD", "PL!SP-sd1-004-SD", "PL!SP-sd1-003-SD" };
+    int control = d_run_shizuku_live_start(&ctl, cu, 3);
+    CHECK_EQ(control, 3,
+             "ANTI-VACUITY CONTROL: 3 distinct names under 桜坂しずく must give 3 "
+             "blade through the SAME walk -- otherwise the 1 below cannot be "
+             "distinguished from a ライブ開始時 that never fired");
+
     static TestGame tg;
     new_board(&tg);
     int shizuku = card(&tg, SHIZUKU);
@@ -1346,10 +1551,44 @@ static void E_constant_blades_zero_without_under_energy(void)
 }
 
 /* EXTRA (not a Rust test) :: a MEMBER under her must not count toward the
- * energy per-unit count. This is the card_type:"energy_card" filter half of
- * the same constant, which no Rust test in this cluster covers. */
+ * energy per-unit count. This is the card_type:"energy_card" filter half of the
+ * same constant, which no Rust test in this cluster covers.
+ *
+ * ANTI-VACUITY CONTROL (added by tr_bladeunder2): the obvious shape of this
+ * test -- 1 member + 1 energy under, expect 1, not 2 -- is SATISFIED BY A FLAT
+ * +1. The constant path currently grants +1 whatever is under, so this board
+ * reads 1 for the wrong reason and the card_type filter is never exercised.
+ * The two controls below pin the reading to the under-stack so the assertion
+ * can only pass on a genuinely energy-filtered count. */
 static void E_extra_member_under_does_not_count_as_energy(void)
 {
+    /* Control A: 2 energy under -> 2. Proves the count TRACKS the stack. */
+    static TestGame ctl;
+    new_board(&ctl);
+    int c_mia = card(&ctl, MIA);
+    int c_e = card(&ctl, ENERGY_NO);
+    if (c_mia < 0 || c_e < 0) return;
+    set_stage(&ctl, 0, RB_EMPTY_SLOT, c_mia, RB_EMPTY_SLOT);
+    test_place_under(&ctl, 0, AREA_CENTER, c_e);
+    test_place_under(&ctl, 0, AREA_CENTER, c_e);
+    CHECK_EQ(under_n(&ctl, 0, AREA_CENTER), 2, "control setup: 2 energy under");
+    test_recalc(&ctl);
+    CHECK_EQ(blade_of(&ctl, c_mia), 2,
+             "ANTI-VACUITY CONTROL: 2 energy under -> 2 blade; without this a "
+             "reading of 1 below proves nothing");
+
+    /* Control B: nothing under -> 0. Proves the count is not a flat +1. */
+    static TestGame ctl2;
+    new_board(&ctl2);
+    int c2_mia = card(&ctl2, MIA);
+    if (c2_mia < 0) return;
+    set_stage(&ctl2, 0, RB_EMPTY_SLOT, c2_mia, RB_EMPTY_SLOT);
+    CHECK_EQ(under_n(&ctl2, 0, AREA_CENTER), 0, "control setup: nothing under");
+    test_recalc(&ctl2);
+    CHECK_EQ(blade_of(&ctl2, c2_mia), 0,
+             "ANTI-VACUITY CONTROL: nothing under -> 0 blade; without this a "
+             "reading of 1 below is just an unconditional grant");
+
     static TestGame tg;
     new_board(&tg);
     int mia = card(&tg, MIA);
@@ -1371,7 +1610,13 @@ static void E_extra_member_under_does_not_count_as_energy(void)
  * 1枚につき」: as ONE unit, and only when it brings a name not already present.
  * ===================================================================== */
 
-/* F1 :: q278_ayumu_plus_joint_is_two_blades */
+/* F1 :: q278_ayumu_plus_joint_is_two_blades
+ *
+ * ANTI-VACUITY CONTROL (added by tr_bladeunder2): 2 under-cards expecting 2
+ * blades is ALSO what a raw (non-deduped) count produces, so the Rust original
+ * cannot distinguish the distinct-name mechanic from plain counting. The two
+ * arms below differ ONLY in how many CARDS carry the same NAME, and a raw
+ * count moves with the card count while a distinct count does not. */
 static void F_q278_ayumu_plus_joint_is_two_blades(void)
 {
     static TestGame tg;
@@ -1379,6 +1624,16 @@ static void F_q278_ayumu_plus_joint_is_two_blades(void)
     const char *u[2] = { AYUMU, JOINT };
     int blade = d_run_shizuku_live_start(&tg, u, 2);
     CHECK_EQ(blade, 2, "Q278: ayumu + joint{ayumu,kanon,hanaba} -> 2 blades");
+
+    /* Same 2 NAMES, 3 CARDS (歩夢 twice + the joint). A distinct count stays 2;
+     * a raw count rises to 3. */
+    static TestGame dup;
+    new_board(&dup);
+    const char *du[3] = { AYUMU, AYUMU, JOINT };
+    int dup_blade = d_run_shizuku_live_start(&dup, du, 3);
+    CHECK_EQ(dup_blade, 2,
+             "PAIRED NEGATIVE: the same 2 names as 3 cards must still give 2 "
+             "blade; 3 here means the count is raw, not distinct-by-name");
 }
 
 /* F2 :: q279_all_singles_plus_joint_is_three_blades */
@@ -1393,7 +1648,11 @@ static void F_q279_all_singles_plus_joint_is_three_blades(void)
              "the joint adds NO 4th slot");
 }
 
-/* F3 :: q279_three_singles_no_joint_is_three_blades */
+/* F3 :: q279_three_singles_no_joint_is_three_blades
+ *
+ * ANTI-VACUITY CONTROL (added by tr_bladeunder2): 3 cards -> 3 is the raw
+ * count, so this passes without the distinct mechanic. The paired arm repeats
+ * one of the three names and requires the count to stay at 3. */
 static void F_q279_three_singles_no_joint_is_three_blades(void)
 {
     static TestGame tg;
@@ -1401,9 +1660,23 @@ static void F_q279_three_singles_no_joint_is_three_blades(void)
     const char *u[3] = { AYUMU, KANON_BP1, HANABO };
     int blade = d_run_shizuku_live_start(&tg, u, 3);
     CHECK_EQ(blade, 3, "3 distinct single-name cards -> 3 blades");
+
+    static TestGame dup;
+    new_board(&dup);
+    const char *du[4] = { AYUMU, KANON_BP1, HANABO, HANABO };
+    int dup_blade = d_run_shizuku_live_start(&dup, du, 4);
+    CHECK_EQ(dup_blade, 3,
+             "PAIRED NEGATIVE: the same 3 names as 4 cards still give 3 blades; "
+             "4 here means the count is raw, not distinct-by-name");
 }
 
-/* F4 :: qpartial_singles_plus_joint_counts_new_mitigating_name */
+/* F4 :: qpartial_singles_plus_joint_counts_new_mitigating_name
+ *
+ * ANTI-VACUITY CONTROL (added by tr_bladeunder2): 3 under-cards expecting 3 is
+ * also the raw count, so this passes on a board where the joint's names are not
+ * consulted at all. The paired arm removes the NEW name the joint introduces
+ * (花帆 is absent, so the joint contributes nothing new) and requires the count
+ * to FALL -- which only a name-aware count can do. */
 static void F_qpartial_singles_plus_joint_is_three_blades(void)
 {
     static TestGame tg;
@@ -1411,10 +1684,28 @@ static void F_qpartial_singles_plus_joint_is_three_blades(void)
     const char *u[3] = { AYUMU, KANON_BP1, JOINT };
     int blade = d_run_shizuku_live_start(&tg, u, 3);
     CHECK_EQ(blade, 3,
-             "歩下+かのん present, joint introduces 花帆 -> 3 blades");
+             "歩夢+かのん present, joint introduces 花帆 -> 3 blades");
+
+    /* Same 3 CARDS but the joint is the ONLY card carrying かのん as a
+     * constituent... it still is. Use the sharper arm instead: drop the joint
+     * entirely. 2 cards, 2 distinct names -> 2. A raw count of the 3-card board
+     * would have said 3, so this proves the third blade came from the joint
+     * bringing a NEW name rather than from a third card. */
+    static TestGame nojoint;
+    new_board(&nojoint);
+    const char *nu[2] = { AYUMU, KANON_BP1 };
+    int nojoint_blade = d_run_shizuku_live_start(&nojoint, nu, 2);
+    CHECK_EQ(nojoint_blade, 2,
+             "PAIRED NEGATIVE: the same walk WITHOUT the joint gives 2, so the "
+             "third blade above came from the joint's new name, not a 3rd card");
 }
 
-/* F5 :: qjoint_alone_is_one_blade */
+/* F5 :: qjoint_alone_is_one_blade
+ *
+ * ANTI-VACUITY CONTROL (added by tr_bladeunder2): 1 card expecting 1 blade is
+ * the weakest possible positive -- a flat +1 satisfies it. The paired arm
+ * requires the count to reach 2 once a genuinely new single-name card joins,
+ * which pins the lone joint at 1 rather than "some fixed small number". */
 static void F_qjoint_alone_is_one_blade(void)
 {
     static TestGame tg;
@@ -1422,6 +1713,14 @@ static void F_qjoint_alone_is_one_blade(void)
     const char *u[1] = { JOINT };
     int blade = d_run_shizuku_live_start(&tg, u, 1);
     CHECK_EQ(blade, 1, "a lone joint card -> 1 blade");
+
+    static TestGame plus;
+    new_board(&plus);
+    const char *pu[2] = { JOINT, HANABO };   /* 花帆 is a NEW constituent name */
+    int plus_blade = d_run_shizuku_live_start(&plus, pu, 2);
+    CHECK_EQ(plus_blade, 2,
+             "PAIRED NEGATIVE: joint + a new single-name constituent -> 2, so "
+             "the lone-joint reading of 1 above is a count and not a constant");
 }
 
 /* F6 :: qduplicates_dedupe */
@@ -1431,7 +1730,7 @@ static void F_qduplicates_dedupe(void)
     new_board(&tg);
     const char *u[3] = { AYUMU, AYUMU, KANON_BP1 };
     int blade = d_run_shizuku_live_start(&tg, u, 3);
-    CHECK_EQ(blade, 2, "2歩下 + かのか -> 2 blades");
+    CHECK_EQ(blade, 2, "2歩夢 + 澁谷かのん -> 2 blades");
 }
 
 /* F7 :: qzero_under_is_zero_blades */
@@ -1524,14 +1823,26 @@ static void F_q278_ability_placed_and_joint_counted_at_live_start(void)
  * herself, and until live end her ORIGINAL hearts become that card's hearts.
  * ===================================================================== */
 
-/* shizuku_under_member_heart_copy_test::activate_and_resolve */
+/* shizuku_under_member_heart_copy_test::activate_and_resolve
+ *
+ * Diagnostics matter here: the 起動 is a `sequential` whose first child is a
+ * move_cards over the waitroom and whose second is the set_heart_type. If the
+ * move half fails, the heart-copy half has no subject and BOTH assertions in
+ * G1/G2 go red for one cause. So the drain reports what it actually saw, and
+ * the caller separately pins the two halves (under-stack membership and
+ * heart_copy) so a single failure localises. */
 static int g_activate_and_resolve(TestGame *tg, int shizuku)
 {
     test_activate_ability(tg, shizuku);
     /* The move_cards step creates a card-selection choice for the discard
      * card; some engines auto-select a single eligible card. Either path. */
-    bu_drain_pick0(tg, 8);
+    int rounds = bu_drain_pick0(tg, 8);
     const RbBag *u = &tg->state.p[0].under_cards[AREA_CENTER];
+    fprintf(stderr,
+            "[G-DRAIN] shizuku=%d rounds=%d pending=%d under_center=%d "
+            "heart_copy=%d\n",
+            shizuku, rounds, bu_prompt(tg), u->n,
+            rb_mods_get_heart_copy(&tg->state.mods, shizuku));
     return u->n > 0 ? u->cards[u->n - 1] : RB_EMPTY_SLOT;
 }
 
@@ -1592,6 +1903,25 @@ static void G_heart_copy_uses_placed_cards_hearts(void)
     CHECK_EQ(hearts[H04], 1, "しずく's heart04 copies かすみ's 1");
     CHECK_EQ(hearts[H01], 0,
              "no heart01 leaks from しずく's OWN hearts (かすみ has none)");
+
+    /* Same claim read a second way, through the per-card heart MODIFIER rather
+     * than the summed stage table. test_get_heart_modifier REMAPS colour 5 onto
+     * RB_HEART_ORANGE, so this deliberately reads slots 1/2/3/4 only and goes
+     * through rb_mods_get_heart directly -- never through the remapping
+     * convenience helper. If the stage table and the modifier disagree, one of
+     * the two paths is folding the blade slot in or reading a remapped colour,
+     * and the disagreement is worth seeing. */
+    CHECK_EQ(heart_of(&tg, shizuku, H03), 2,
+             "modifier read (direct): しずく's heart03 modifier copies かすみ's 2");
+    CHECK_EQ(heart_of(&tg, shizuku, H04), 1,
+             "modifier read (direct): しずく's heart04 modifier copies かすみ's 1");
+    CHECK_EQ(heart_of(&tg, shizuku, H01), 0,
+             "modifier read (direct): no heart01 modifier on しずく");
+    /* しずく is still ON the stage at Center: if the engine had moved her while
+     * placing かすみ underneath her, every modifier read above would be 0 for a
+     * reason unrelated to heart copying. */
+    CHECK_EQ(tg.state.p[0].stage[AREA_CENTER], shizuku,
+             "しずく is still at Center after the 起動 (she is the HOST)");
 }
 
 /* G3 :: shizuku_heart_copy_no_discard_card */
@@ -1673,10 +2003,213 @@ static void H_two_distinct_under_members_grant_at_least_two_blades(void)
 
     CHECK_EQ(under_n(&tg, 0, AREA_CENTER), 2,
              "the under-cards are still there after the walk");
+    /* The walk must have actually reached a live with a staged member, or the
+     * reading below is a board that never ran. 渡辺 曜 carries a ライブ開始時
+     * and shizuku's does too; assert the card is still the staged member and
+     * that energy was really spent on a live. */
+    CHECK_EQ(tg.state.p[0].stage[AREA_CENTER], member,
+             "しずく is still the staged member after the walk");
+    /* WALK CONTROL. The Rust original never calls set_live_card here -- it just
+     * walks 7 passes with enough energy for the live to resolve on its own -- so
+     * requiring a card in the live zone would be asserting something the port
+     * is not supposed to do. What MUST be true is that the turn actually left
+     * the main phase; a board still sitting in the main phase cannot have run
+     * a ライブ開始時, and the blade reading below would be measuring nothing. */
+    fprintf(stderr, "[H-WALK] phase=%d live_zone=%d energy=%d success=%d blade=%d\n",
+            (int)tg.state.phase, tg.state.p[0].live.n,
+            tg.state.p[0].energy_active, tg.state.p[0].success.n,
+            blade_of(&tg, member));
+    CHECK(tg.state.phase != RB_PHASE_MAIN,
+          "WALK CONTROL: the turn must have advanced out of the main phase, "
+          "otherwise no ライブ開始時 could have fired (phase=%d)",
+          (int)tg.state.phase);
     CHECK(blade_of(&tg, member) >= 2,
           "2 distinct under-members -> >= +2 blade (got %d)",
           blade_of(&tg, member));
 }
+
+/* ========================================================================
+ * EXTRA (not a Rust test) :: direct trigger-shim exercise
+ * ========================================================================
+ * Every test above reaches its effect through the turn machinery (a live walk,
+ * a 登場 play, an activate-and-drain). The cluster's headline defect -- a 常時
+ * `gain_resource` with `per_unit`/`location:under_member` reading 1 no matter
+ * what is under the member -- is a property of the CONSTANT scan, so it is
+ * worth isolating from the turn machinery entirely: fire the trigger straight
+ * at the card and read the modifier.
+ *
+ * This also keeps bu_fire_trigger() honest. It is the only helper in this file
+ * that can PROVE a trigger keyword matches what the card really carries (via
+ * its [TRIGGER-MISS] dump of every trigger string on the card); left unused,
+ * that guarantee is untested and a byte-escape typo in a TRIG_* macro could
+ * hide anywhere. Running it here means every future addition that uses it
+ * inherits a debugged shim.
+ *
+ * Expected readings, from the constant scan (src/turn/triggers.c:419-448):
+ *   澁谷かのん ab#0 常時 gain_resource{blade, per_unit, location:under_member}
+ *   -> count is taken from e->count (=1) with NO per-unit multiplier, so the
+ *      same +1 appears with 3 under-cards and with none.
+ */
+static void EXTRA_direct_trigger_shim_isolates_the_constant_per_unit_defect(void)
+{
+    /* The shim must FIND the 常時 ability. If it does not, bu_fire_trigger
+     * prints [TRIGGER-MISS] naming every trigger string the card actually
+     * carries and returns 0 -- a harness failure, loudly, not a quiet 0. */
+    static TestGame tg;
+    new_board(&tg);
+    int chika = card(&tg, CHIKA);
+    if (chika < 0) return;
+
+    /* Positional sanity: 常時 must be present and the 常時 keyword byte-exact.
+     * Independent of bu_fire_trigger, so a shim regression cannot mask itself. */
+    int nab = rb_card_num_abilities((uint32_t)chika);
+    int saw_constant = 0;
+    for (int a = 0; a < nab; a++) {
+        Ability ab;
+        if (!rb_decode_card_ability((uint32_t)chika, a, &ab)) continue;
+        if (ab.triggers && !strcmp(ab.triggers, TRIG_CONSTANT_CORRECT)) saw_constant = 1;
+        rb_free_ability(&ab);
+    }
+    CHECK(saw_constant,
+          "TRIGGER CONTROL: 嵐 千砂都 must carry a 常時 ability with the exact "
+          "byte sequence the shim searches for");
+
+    /* The [TRIGGER-MISS] diagnostic is the guard that makes a wrong trigger
+     * constant loud instead of vacuous. Assert it is LIVE by feeding it a
+     * deliberately wrong trigger and requiring the shim to decline. This is
+     * the check that would have caught the 「時时」 bytes bug in this file's own
+     * TRIG_CONSTANT while it was still unused. */
+    CHECK(!bu_fire_trigger(&tg, chika, TRIG_CONSTANT_WRONG, TRIG_CONSTANT_WRONG),
+          "the shim must DECLINE (and print [TRIGGER-MISS]) when asked for a "
+          "trigger string the card does not carry");
+
+    /* Arm 1: 3 member cards under her.
+     *
+     * Note on the readings: bu_fire_trigger() drains the ability queue, and
+     * that drain re-runs the constant scan internally. So the post-shim blade
+     * count is the SUM of two independent grants, and the two arms let them be
+     * told apart:
+     *   arm1 - arm2 == the ABILITY path's per_unit contribution
+     *                      (h_gain_resource, src/ability/effects/misc.c)
+     *   the residue shared by BOTH arms == the CONSTANT path's contribution
+     *                      (apply_constant_effect, src/turn/triggers.c)
+     * A constant-path per_unit would make the residue differ between arms; a
+     * constant path that ignores per_unit makes it a flat offset. */
+    set_stage(&tg, 0, RB_EMPTY_SLOT, chika, RB_EMPTY_SLOT);
+    test_place_under(&tg, 0, AREA_CENTER, card(&tg, "PL!SP-sd1-001-SD"));
+    test_place_under(&tg, 0, AREA_CENTER, card(&tg, "PL!SP-sd1-001-SD"));
+    test_place_under(&tg, 0, AREA_CENTER, card(&tg, "PL!SP-sd1-004-SD"));
+    CHECK_EQ(under_n(&tg, 0, AREA_CENTER), 3, "setup arm 1: 3 under Center");
+    CHECK(bu_fire_trigger(&tg, chika, TRIG_CONSTANT_CORRECT, TRIG_CONSTANT_CORRECT),
+          "the shim must locate 嵐 千砂都's 常時 ability");
+    int arm1 = blade_of(&tg, chika);
+
+    /* Arm 2: nothing under her, same shim, same board otherwise. The pair is
+     * the whole point -- a single reading cannot distinguish "per_unit works
+     * and there is 1 card" from "per_unit is ignored, it is always 1", but two
+     * boards differing ONLY in the under-stack can. */
+    static TestGame tg2;
+    new_board(&tg2);
+    int chika2 = card(&tg2, CHIKA);
+    if (chika2 < 0) return;
+    set_stage(&tg2, 0, RB_EMPTY_SLOT, chika2, RB_EMPTY_SLOT);
+    CHECK_EQ(under_n(&tg2, 0, AREA_CENTER), 0, "setup arm 2: nothing under Center");
+    CHECK(bu_fire_trigger(&tg2, chika2, TRIG_CONSTANT_CORRECT, TRIG_CONSTANT_CORRECT),
+          "the shim must locate 嵐 千砂都's 常時 ability (arm 2)");
+    int arm2 = blade_of(&tg2, chika2);
+
+    /* Isolate the ability path by differencing (the constant residue cancels). */
+    int ability_units = arm1 - arm2;
+    /* Isolate the constant path by removing the (correct) ability contribution. */
+    int const_with_three = arm1 - 3;
+    int const_with_none = arm2 - 0;
+
+    fprintf(stderr,
+            "[PER-UNIT-PROBE] arm1(3 under)=%d arm2(0 under)=%d\n"
+            "[PER-UNIT-PROBE] ability-path per_unit units = %d (expect 3)\n"
+            "[PER-UNIT-PROBE] constant-path: 3 under -> %d, 0 under -> %d "
+            "(expect 3 / 0)\n",
+            arm1, arm2, ability_units, const_with_three, const_with_none);
+
+    CHECK_EQ(ability_units, 3,
+             "ABILITY PATH: 3 member cards under -> 3 blade from the ability "
+             "run alone (per_unit location=under_member)");
+    CHECK_EQ(const_with_three, 3,
+             "CONSTANT PATH: the 常時 recalc must ALSO apply per_unit on its "
+             "own, independently of the ability run");
+    CHECK_EQ(const_with_none, 0,
+             "PAIRED NEGATIVE (constant path): no card under -> 0 blade from "
+             "the recalc; a non-zero residue here equal to the arm-1 residue "
+             "is an unfiltered 常時, not a per_unit");
+
+    /* Same probe on the OTHER code path. The 常時 above is applied by
+     * apply_constant_effect (src/turn/triggers.c); the ライブ開始時 is applied by
+     * h_gain_resource (src/ability/effects/misc.c). They are independent
+     * implementations of `per_unit`, so the two can be wrong in different ways
+     * and only a direct probe of each says which.
+     *
+     * Expected: the ライブ開始時 arm DOES scale (it reads the under-stack) but
+     * does NOT dedupe (distinct:card_name is carried in the wire and ignored),
+     * so 2 copies of one name + 1 of another reads 3, not 2. */
+    static TestGame tg3;
+    new_board(&tg3);
+    int shizuku = card(&tg3, SHIZUKU);
+    if (shizuku < 0) return;
+    set_stage(&tg3, 0, RB_EMPTY_SLOT, shizuku, RB_EMPTY_SLOT);
+    test_place_under(&tg3, 0, AREA_CENTER, card(&tg3, "PL!SP-sd1-001-SD"));
+    test_place_under(&tg3, 0, AREA_CENTER, card(&tg3, "PL!SP-sd1-001-SD"));
+    test_place_under(&tg3, 0, AREA_CENTER, card(&tg3, "PL!SP-sd1-004-SD"));
+    CHECK(bu_fire_live_start(&tg3, shizuku),
+          "the shim must locate 桜坂しずく's ライブ開始時 ability");
+    fprintf(stderr, "[DISTINCT-PROBE] 3 under (2 same-name) -> %d blade\n",
+            blade_of(&tg3, shizuku));
+    CHECK_EQ(blade_of(&tg3, shizuku), 2,
+             "2 same-name + 1 different-name member under -> 2 blade "
+             "(distinct:card_name)");
+
+    /* ------------------------------------------------------------------
+     * SECTION-A MECHANISM: is the 常時 on an UNDER-CARD ever visited?
+     *
+     * 澁谷かのん (PL!SP-bp7-001-R) carries the only 常時 in this cluster that
+     * lives on a card physically placed UNDER a member; every other one lives
+     * on a staged member. rb_recalc_constants (src/turn/triggers.c:722-736)
+     * assembles the card list it scans from stage + success + live zones, and
+     * under_cards is not among them.
+     *
+     * The two arms below separate "the scan never visits under-cards" from
+     * "the ability exists but its condition evaluates false". Both give 0
+     * through the ordinary recalc, so the ordinary recalc cannot tell them
+     * apart -- but the shim bypasses the scan entirely and addresses the
+     * ability by (card, trigger) directly, so it can.
+     * ------------------------------------------------------------------ */
+    static TestGame ta;
+    new_board(&ta);
+    int host = card(&ta, LIELLA_HOST);
+    int kanon = card(&ta, KANON_BP7);
+    if (host < 0 || kanon < 0) return;
+    set_stage(&ta, 0, RB_EMPTY_SLOT, host, RB_EMPTY_SLOT);
+    test_place_under(&ta, 0, AREA_CENTER, kanon);
+    CHECK_EQ(under_n(&ta, 0, AREA_CENTER), 1, "setup: 澁谷かのん under the Liella! host");
+
+    test_recalc(&ta);
+    int via_scan = blade_of(&ta, host);
+
+    /* Fire the SAME 常時 straight at the card, bypassing the constant scan. */
+    CHECK(bu_fire_trigger(&ta, kanon, TRIG_CONSTANT_CORRECT, TRIG_CONSTANT_CORRECT),
+          "the shim must locate 澁谷かのん's 常時 ability while she is UNDER a member");
+    int via_shim = blade_of(&ta, host);
+
+    fprintf(stderr,
+            "[UNDER-CARD-SCAN-PROBE] Liella! host blade: via constant scan = %d, "
+            "via direct shim = %d\n", via_scan, via_shim);
+    CHECK_EQ(via_scan, 1,
+             "CALC PATH: the 常時 recalc must reach a card that is under a member "
+             "and grant its 『Liella!』 host 1 blade");
+    CHECK_EQ(via_shim, 1,
+             "SHIM PATH: addressing the same 常時 directly must also grant 1; a 0 "
+             "here while the card carries the ability means the ability's own "
+             "condition is what fails, which is a DIFFERENT defect from the "
+             "scan never visiting it");}
 
 /* ========================================================================
  * harness
@@ -1878,6 +2411,10 @@ int main(void)
     printf("--- H live_start_distinct_under_member_blades_test.rs ---\n");
     run("live_start_two_distinct_under_members_grant_at_least_two_blades",
         H_two_distinct_under_members_grant_at_least_two_blades);
+
+    printf("--- EXTRA (not Rust tests) ---\n");
+    run("EXTRA_direct_trigger_shim_isolates_the_constant_per_unit_defect",
+        EXTRA_direct_trigger_shim_isolates_the_constant_per_unit_defect);
 
     printf("\n==== parity_blade_under: %d tests ok, %d failed, %d crashed "
            "(%d setup bugs) ====\n",

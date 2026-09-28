@@ -579,8 +579,87 @@ fn enumerate_candidates(
 /// the scarce resource), then a higher placement probability, then a stable
 /// hand-order tiebreak. No randomness anywhere, so the chosen zone is stable
 /// across the select/deselect/confirm ticks of one set phase.
+///
+/// `P_FIRST=1` reorders this to the guide's primary rule — "maximise the
+/// probability of winning the actual live comparison" — with the existing
+/// value as the tiebreak.
+///
+/// This is the one measured difference between v8 and v7, and it is large:
+///
+///     v7  n=7821  mean committed p = 0.924  blades 4.95  commits 99%
+///     v8  n=7660  mean committed p = 0.485  blades 5.81  commits 82%
+///
+/// v8 has MORE blades and commits MORE often, and lands at less than half
+/// v7's pass probability. So v8 is not short of board and not short of
+/// nerve; it is choosing sets it will fail. A check that fails places nothing
+/// (8.4.7: one card per win) and destroys the life (8.3.4, all-or-nothing
+/// across the set), so a set at p=0.5 is worth about half of a set at p=1.0
+/// and costs a card outright the other half of the time.
+///
+/// The arithmetic closes on the observed placement rates:
+///     v7  0.99 commits x 0.924 = 0.91   (arena measures 0.46 with junk/flow)
+///     v8  0.82 commits x 0.485 = 0.40   (arena measures 0.389)
+///
+/// So the ranking key, not the commit rule and not the board, is the deficit.
+/// v8's own `V8_NO_FOLD` experiment agrees: forcing MORE commits made it
+/// worse (896-1104 -> 752-1248), because its extra commits are coin flips.
 fn better(a: &Candidate, b: &Candidate) -> bool {
     const EPS: f64 = 1e-9;
+    // AMMUNITION FLOOR. Refuse to commit a set this unlikely to be won.
+    //
+    // A failed check is not a neutral outcome. The live goes to the waitroom
+    // (8.3.4) and 8.4.7 places at most one card, so committing at probability
+    // `p` spends the life outright with probability `1 - p`. The life is the
+    // only way to place a card, so the loss is not "this check" — it is the
+    // per-check probability for the rest of the game.
+    //
+    // The measured prize, and it is a feedback loop rather than a single bad
+    // choice:
+    //
+    //     v7  n=7821  mean committed p = 0.924  commits 99%  -> burns ~8% of lives
+    //     v8  n=7660  mean committed p = 0.485  commits 82%  -> burns ~52% of lives
+    //
+    // So v8 starts with similar ammunition, spends half of it per check, and
+    // is left holding worse lives than v7 — which is why its committed p stays
+    // near 0.48 no matter how it ranks. Reordering the ranking to prefer `p`
+    // (`V8_P_FIRST`) moved the mean by 0.008, because there was nothing better
+    // in the candidate set to promote: the lives themselves are the problem.
+    //
+    // The floor is the break-even of the arithmetic, not a fitted constant:
+    // committing trades the life for the placement, so a set is worth
+    // committing when `p` exceeds the value of keeping the live for a later,
+    // better-supported check. Above 1/2 the placement is worth more than the
+    // life; below it the life is worth more than the check. `V8_P_FLOOR`
+    // moves it for ablation.
+    if std::env::var_os("V8_P_FLOOR").is_some() {
+        let floor: f64 = std::env::var("V8_P_FLOOR")
+            .ok()
+            .and_then(|v| v.parse().ok())
+            .filter(|&f: &f64| f.is_finite() && (0.0..=1.0).contains(&f))
+            .unwrap_or(0.6);
+        let a_ok = a.lives.is_empty() || a.outcome.p_place >= floor;
+        let b_ok = b.lives.is_empty() || b.outcome.p_place >= floor;
+        match (a_ok, b_ok) {
+            (true, false) => return true,
+            (false, true) => return false,
+            _ => {}
+        }
+    }
+    if std::env::var_os("V8_P_FIRST").is_some() {
+        // Primary: will this check actually be won.
+        if (a.outcome.p_place - b.outcome.p_place).abs() > EPS {
+            return a.outcome.p_place > b.outcome.p_place;
+        }
+        // Then the existing value, which carries score comparison, the
+        // contested case, and the fold-versus-commit trade.
+        if (a.value - b.value).abs() > EPS {
+            return a.value > b.value;
+        }
+        if a.lives.len() != b.lives.len() {
+            return a.lives.len() < b.lives.len();
+        }
+        return a.lives < b.lives;
+    }
     if (a.value - b.value).abs() > EPS {
         return a.value > b.value;
     }
@@ -603,10 +682,32 @@ pub(crate) fn score_candidates(
     let pools = sampler.sample_pools(&board, v8_model::flip_samples());
     let opp = OppModel::build(gs, me, db);
     let draw_credit = draw_value(gs, me, db);
-    (
-        enumerate_candidates(gs, me, db, &pools, &opp, draw_credit),
-        opp,
-    )
+    let candidates = enumerate_candidates(gs, me, db, &pools, &opp, draw_credit);
+    // Per-check telemetry, paired with v7's `V7CHK` line so the two can be
+    // compared at the same blade count. v8 develops a bigger board than v7
+    // (T4 12.8 vs 11.2) and passes fewer checks (0.389 vs 0.435), and
+    // forcing fewer folds made it WORSE, so the fold is not the cause. The
+    // live candidate for that: v8 grows cost without colour match, so more
+    // board buys less conversion. This line says whether that is true.
+    if std::env::var_os("V7_CHECK_P").is_some() {
+        let chosen = candidates
+            .iter()
+            .filter(|c| !c.lives.is_empty())
+            .max_by(|a, b| a.value.partial_cmp(&b.value).unwrap_or(std::cmp::Ordering::Equal));
+        eprintln!(
+            "V8CHK t={} me={} blades={} set={} p={:.3} succ={} need={} boardcovers={} deck={}",
+            gs.turn_number,
+            me,
+            super::strategy_v4::flip_stats(gs, me, db).0,
+            chosen.map(|c| c.lives.len()).unwrap_or(0),
+            chosen.map(|c| c.outcome.p_place).unwrap_or(0.0),
+            gs.seat_player(me).success_live_card_zone.cards.len(),
+            super::strategy_v7::deficit_total(gs, me, db) as usize,
+            super::strategy_v7::board_cover_of_best_life(gs, me, db) as usize,
+            gs.seat_player(me).main_deck.cards.len(),
+        );
+    }
+    (candidates, opp)
 }
 
 pub fn choose_live_set_v8(gs: &GameState, actions: &[Action], db: &CardDatabase) -> Action {
