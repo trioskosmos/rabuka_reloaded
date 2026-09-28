@@ -1,5 +1,12 @@
 # Engine Performance Baseline Plan (Phase 0)
 
+> **Superseded by `docs/PERF_ENGINE_COMBINED.md`**, which carries this
+> forward together with the rest of the engine-performance work. Kept for
+> history; not maintained separately.
+
+
+
+
 Status: executed as part of the engine-speedup program. This document is the
 plan and the contract for what “baseline” means; recorded numbers live in
 `test_output/baseline_<date>.md`.

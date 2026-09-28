@@ -1,5 +1,12 @@
 # Rabuka Reloaded — Unified Memory & Bytecode Optimization Guide
 
+> **Superseded by `docs/PERF_ENGINE_COMBINED.md`**, which carries this
+> forward together with the rest of the engine-performance work. Kept for
+> history; not maintained separately.
+
+
+
+
 > **One document to rule them all.** This supersedes the following historical docs
 > (kept in git for history but no longer maintained separately):
 > - `docs/memory_optimization_plan.md` (previous pass)

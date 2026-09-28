@@ -1,5 +1,12 @@
 # Performance plan: incrementalising the engine
 
+> **Superseded by `docs/PERF_ENGINE_COMBINED.md`**, which carries this
+> forward together with the rest of the engine-performance work. Kept for
+> history; not maintained separately.
+
+
+
+
 Status: analysis complete, no optimisation landed that I can defend as a win.
 Baseline commit: `f5107b71`. Bench: `sim_bench`, `5CP3Z idou`, random policy.
 

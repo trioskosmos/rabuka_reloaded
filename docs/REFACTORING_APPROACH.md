@@ -1,5 +1,12 @@
 # Refactoring approach, and what is still worth doing
 
+> **Superseded by `docs/PERF_ENGINE_COMBINED.md`**, which carries this
+> forward together with the rest of the engine-performance work. Kept for
+> history; not maintained separately.
+
+
+
+
 Written after a full pass over `cards/ability_extraction/` and `engine/`. It
 records the reasoning, not just the results, because the reasoning is what tells
 you which of the remaining items are worth anyone's time.
