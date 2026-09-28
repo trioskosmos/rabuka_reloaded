@@ -852,6 +852,51 @@ static int map_choice_index(const RbChoice *choice, int index)
     return index;
 }
 
+/* ── choice_is_reveal_prompt — the reveal arm's gate (choice.rs:981) ────────
+   Rust enters handle_reveal_selection from the Choice's OWN is_reveal flag
+   (`if ctx.is_reveal && Zone::from_str(zone) == Some(Zone::Hand)`), and ctx
+   is filled from the prompt the producer parked — see look.rs:272
+   offer_reveal_choice `.is_reveal(true)`, mirrored by
+   rb_effect_reveal (src/ability/effects/look.c:668) and by rb_look_and_select
+   (look.c:938).  Re-deriving the fact from `strstr(target,"reveal")` /
+   `strstr(zone,"reveal")` misses every one of those prompts: the reveal arm's
+   prompt has zone="hand" and an empty target (the reveal-ness is not in the
+   TEXT), so Umi's 登场 reveal over a hand wider than `count` silently took
+   the hand-selection arm, never recorded the cards and never decremented the
+   re-prompt count.
+
+   The substring test survives only as choice_reveal_is_legacy_text, for the
+   producers that still spell reveal semantics into target/zone. */
+static int choice_is_reveal_prompt(const RbChoice *ch)
+{
+    if (!ch) return 0;
+    const char *zone = (ch->zone[0]) ? ch->zone : "hand";
+    return ch->is_reveal && !strcmp(zone, "hand");
+}
+
+/* Legacy fallback: a SelectCard that announces reveal-ness through its target
+   or zone strings instead of the flag.  Audited producers of a SelectCard:
+     * rb_effect_reveal        (look.c:663-671)   -> sets is_reveal  [FLAG]
+     * rb_look_and_select      (look.c:911-938)   -> sets is_reveal  [FLAG],
+       but its prompt is zone="looked_at", so choice.rs:981's Hand gate keeps
+       it out of the reveal arm exactly as the substring test did.
+     * cost reveal prompts     (cost.c:1097-1112) -> no flag; routed by
+       is_cost_reveal (the entry's cost action), not by this test.
+     * the reveal-cost re-prompts this file builds (handle_entry_cost_reveal)
+       carry target="reveal" with no flag; nothing reaches them today, and the
+       substring is what would keep them on the reveal path if it did.
+     * a revealed_cards-zone prompt matches strstr(zone,"reveal"); the flag test
+       deliberately does not capture it, and neither did Rust.
+   The substring is therefore kept for the string-carrying prompts only, so the
+   flag fix cannot reroute them. */
+static int choice_reveal_is_legacy_text(const RbChoice *ch)
+{
+    if (!ch) return 0;
+    const char *zone = ch->zone[0] ? ch->zone : "hand";
+    const char *target = ch->target[0] ? ch->target : NULL;
+    return (target && strstr(target, "reveal")) || (zone && strstr(zone, "reveal"));
+}
+
 /* ── SelectCard answered with MORE THAN ONE index ───────────────────────────
    Rust hands the WHOLE selection to the handler: result_handlers.rs:41-65
    copies `indices.to_vec()` into SelectionContext and choice.rs:1167 does
@@ -1045,7 +1090,8 @@ int rb_resolver_handle_select_card(RbAbilityResolver *self, GameState *g, const 
     int effect_started = (cur >= 0 && cur < RB_QUEUE_DEPTH) ? g->queue.entries[cur].effect_started : 0;
     char cost_act[48]; cost_act[0] = '\0';
     int has_cost = rb_queue_current_cost_action(g, cost_act, sizeof(cost_act));
-    int is_reveal = (target && strstr(target, "reveal")) || (zone && strstr(zone, "reveal"));
+    int is_reveal = choice_is_reveal_prompt(&g->queue.pending);
+    int is_reveal_text = choice_reveal_is_legacy_text(&g->queue.pending);
     int is_cost_reveal = (!effect_started && has_cost && !strcmp(cost_act, "reveal"));
 
     if (self->deferred_conditional_gate) {
@@ -1055,7 +1101,28 @@ int rb_resolver_handle_select_card(RbAbilityResolver *self, GameState *g, const 
         }
     }
 
-    if (is_reveal || is_cost_reveal) {
+    if (is_reveal) {
+        /* choice.rs:981-983 — the flagged hand reveal is handle_reveal_selection
+           (choice.rs:1505-1684).  `selected` is passed through RAW: for
+           count>0 Rust uses ctx.indices verbatim and ignores the prompt's
+           filtered_indices (choice.rs:1520-1531), while the display-index
+           mapping `idx` above already applied is the count==0 any_number arm
+           the handler performs itself. */
+        RbSelectionContext rctx; memset(&rctx, 0, sizeof(rctx));
+        rctx.count = g->queue.pending.count;
+        rctx.allow_skip = allow_skip;
+        rctx.is_reveal = g->queue.pending.is_reveal;
+        rctx.blind = g->queue.pending.blind;
+        if (g->queue.pending.card_type[0])
+            strncpy(rctx.card_type, g->queue.pending.card_type, sizeof(rctx.card_type) - 1);
+        if (g->queue.pending.target_player_id[0])
+            strncpy(rctx.target_player_id, g->queue.pending.target_player_id,
+                    sizeof(rctx.target_player_id) - 1);
+        rb_resolver_handle_reveal_selection(self, g, &rctx, selected);
+        return 1;
+    }
+
+    if (is_reveal_text || is_cost_reveal) {
         if (!was_skip) {
             int ids[RB_MAX_ZONE];
             int n = rb_zone_cards(g, actor, zone, ids, RB_MAX_ZONE);
@@ -1545,41 +1612,201 @@ int rb_resolver_handle_hand_selection(RbAbilityResolver *self, GameState *g, con
     return rb_resolver_handle_selection_epilogue(self, g), 0;
 }
 
-/* ── handle_reveal_selection (choice.rs:1399) — faithful: reveal hand cards, cost handling, any_number reprompt ──
-   Mirrors Rust handle_reveal_selection with filtered_indices, is_reveal, effect_started cost vs effect distinction,
-   and any_number re-prompt. */
+/* ── effect_uses_selected_cards (cost.c:150, mirroring util.rs) ────────────
+   cost.c keeps a file-static copy; this one is needed because Rust's
+   handle_reveal_selection filters its `selected_effect` on the same predicate
+   (choice.rs:1624-1628) to decide whether the revealed ids become the
+   resolver's selected_cards. */
+static int choice_effect_uses_selected_cards(const AbilityEffect *e)
+{
+    if (!e) return 0;
+    if (e->source && !strcmp(e->source, "selected_cards")) return 1;
+    for (int i = 0; i < e->n_child; i++)
+        if (choice_effect_uses_selected_cards(e->child[i])) return 1;
+    return 0;
+}
+
+/* ── choice_reveal_target_label (choice.rs:1515-1518 + 1563) ────────────────
+   Rust carries ctx.target_player_id — the EFFECT's own target string, e.g.
+   "opponent" for 相手の手札を…公開 — through handle_reveal_selection and
+   re-publishes it on the re-prompt.  look.c publishes the RESOLVED seat
+   ("p2") instead, so the label is re-derived from it: the C prompt keeps
+   naming the seat it addresses, in the vocabulary the rest of the prompt
+   layer uses. */
+static void choice_reveal_target_label(const GameState *g, const char *tpid, int actor,
+                                       char *out, int outsz)
+{
+    const char *t = (tpid && *tpid) ? tpid : "self";
+    if (!strcmp(t, "self") || !strcmp(t, "opponent")) {
+        snprintf(out, outsz, "%s", t);
+        return;
+    }
+    int who = rb_resolve_target_player(g, t);
+    if (who < 0) { snprintf(out, outsz, "%s", t); return; }
+    snprintf(out, outsz, "%s", (who == actor) ? "self" : "opponent");
+}
+
+/* ── handle_reveal_selection (choice.rs:1505-1684) ─────────────────────────
+   Faithful port.  The C resolver is a per-answer stack object (Rust's
+   AbilityResolver is a long-lived field), so the accumulation Rust keeps in
+   `self.selected_cards` travels between answers in the re-prompt's
+   filtered_indices — which is exactly the field Rust writes it into at
+   choice.rs:1566-1571 and reads back at 1578-1582.  Hand POSITIONS (not card
+   ids) are kept, because that is what Rust accumulates and what
+   `resolve_indices_to_ids` consumes. */
 void rb_resolver_handle_reveal_selection(RbAbilityResolver *self, GameState *g,
                                          const RbSelectionContext *ctx, const char *selected) {
     if (!g) { rb_resolver_clear_choice_state_and_resume(self); return; }
+    RbSelectionContext local;
+    if (!ctx) { memset(&local, 0, sizeof(local)); ctx = &local; }
     int actor = g->queue.actor;
-    int idx = selected ? atoi(selected) : -1;
-    int is_any_number = (g->queue.pending.count==0 && g->queue.pending.allow_skip);
-    if (idx >= 0) {
-        int ids[RB_MAX_ZONE];
-        int n = rb_zone_cards(g, actor, g->queue.pending.zone[0] ? g->queue.pending.zone : "hand", ids, RB_MAX_ZONE);
-        if (idx >=0 && idx < n) {
-            int cid = ids[idx];
-            if (g->n_revealed < RB_MAX_REVEALED_CARDS) g->revealed_cards[g->n_revealed++] = cid;
-            if (self->n_selected_cards < RB_MAX_RECENTLY_MOVED) self->selected_cards[self->n_selected_cards++] = cid;
-            /* also push to revealed cost tracking if effect not started */
-            int cur = g->queue.cur;
-            int eff_started = (cur>=0 && cur<RB_QUEUE_DEPTH) ? g->queue.entries[cur].effect_started : 0;
-            if (!eff_started) {
-                /* cost reveal: mirror push_revealed_cost_card */
-            }
+    int cur = g->queue.cur;
+    int effect_started = (cur >= 0 && cur < RB_QUEUE_DEPTH)
+                            ? g->queue.entries[cur].effect_started : 0;
+    int raw = selected ? atoi(selected) : -1;      /* ctx.indices[0], unmapped */
+    int count = g->queue.pending.count;
+    int allow_skip = g->queue.pending.allow_skip;
+    int blind = g->queue.pending.blind;
+    char tpid[24];
+    choice_reveal_target_label(g, g->queue.pending.target_player_id, actor,
+                               tpid, sizeof(tpid));
+    int who = rb_resolve_target_player(g, tpid);
+    if (who < 0) who = actor;
+
+    /* self.selected_cards carried from the previous answers (choice.rs:1566) */
+    int acc[RB_MAX_ZONE]; int n_acc = 0;
+    memset(acc, 0, sizeof(acc));
+    for (int i = 0; i < g->queue.pending.n_filtered_indices && n_acc < RB_MAX_ZONE; i++)
+        acc[n_acc++] = g->queue.pending.filtered_indices[i];
+
+    /* hand_positions = this answer's hand positions (choice.rs:1520-1531):
+       count==0 (any_number) maps the display index through the prompt's
+       filtered_indices, count>0 uses the answer's raw positions. */
+    int hand_pos[RB_MAX_ZONE]; int n_hand = 0;
+    memset(hand_pos, 0, sizeof(hand_pos));
+    if (count == 0 && g->queue.pending.n_filtered_indices > 0) {
+        if (raw >= 0 && raw < g->queue.pending.n_filtered_indices)
+            hand_pos[n_hand++] = g->queue.pending.filtered_indices[raw];
+    } else if (raw >= 0) {
+        hand_pos[n_hand++] = raw;
+    }
+
+    /* choice.rs:1533-1576 — the answer is short of `count`, so accumulate and
+       re-prompt for the remainder.  This is the 3 -> 2 -> 1 re-prompt. */
+    if (n_hand > 0 && count > 0 && n_hand < count) {
+        for (int i = 0; i < n_hand; i++) {
+            int dup = 0;
+            for (int j = 0; j < n_acc; j++) if (acc[j] == hand_pos[i]) { dup = 1; break; }
+            if (!dup && n_acc < RB_MAX_ZONE) acc[n_acc++] = hand_pos[i];
         }
-        if (is_any_number) {
-            /* any_number re-prompt: show remaining hand cards */
-            int hand_n = g->p[actor].hand.n;
-            if (hand_n > g->n_revealed) {
-                RbChoice ch; memset(&ch,0,sizeof(ch));
-                ch.kind=RB_CHOICE_SELECT_CARD; strncpy(ch.zone,"hand",sizeof(ch.zone)-1);
-                ch.count=0; ch.allow_skip=1; strncpy(ch.target,"reveal",sizeof(ch.target)-1);
-                g->queue.pending=ch; g->queue.has_pending=1; return;
-            }
+        int remaining = count - n_hand;
+        RbChoice ch; memset(&ch, 0, sizeof(ch));
+        ch.kind = RB_CHOICE_SELECT_CARD;
+        ch.count = remaining;
+        ch.allow_skip = 0;
+        ch.blind = blind;
+        ch.is_reveal = 1;
+        ch.route = RB_ROUTE_SELECT_CARDS;
+        ch.actor = actor;
+        strncpy(ch.zone, "hand", sizeof(ch.zone) - 1);
+        strncpy(ch.target_player_id, tpid, sizeof(ch.target_player_id) - 1);
+        if (g->queue.pending.card_type[0])
+            strncpy(ch.card_type, g->queue.pending.card_type, sizeof(ch.card_type) - 1);
+        snprintf(ch.description, sizeof(ch.description),
+                 "Select %d more card(s) from hand%s", remaining, blind ? " (blind)" : "");
+        for (int i = 0; i < n_acc && i < RB_MAX_ZONE; i++)
+            ch.filtered_indices[i] = acc[i];
+        ch.n_filtered_indices = n_acc;
+        g->queue.pending = ch;
+        g->queue.has_pending = 1;
+        g->queue.actor = actor;
+        g->queue.state = RB_QUEUE_AWAITING_CHOICE;
+        return;
+    }
+
+    /* choice.rs:1578-1598 — all_indices = the accumulated picks followed by
+       this answer's, then resolve them against the TARGET player's hand. */
+    int all_pos[RB_MAX_ZONE]; int n_all = 0;
+    memset(all_pos, 0, sizeof(all_pos));
+    for (int i = 0; i < n_acc; i++) all_pos[n_all++] = acc[i];
+    for (int i = 0; i < n_hand; i++) {
+        int dup = 0;
+        for (int j = 0; j < n_all; j++) if (all_pos[j] == hand_pos[i]) { dup = 1; break; }
+        if (!dup && n_all < RB_MAX_ZONE) all_pos[n_all++] = hand_pos[i];
+    }
+    int hand_n = g->p[who].hand.n;
+    const int *to_reveal = (count == 0) ? hand_pos : all_pos;
+    int n_to_reveal = (count == 0) ? n_hand : n_all;
+    int revealed[RB_MAX_ZONE]; int n_revealed = 0;
+    memset(revealed, 0, sizeof(revealed));
+    for (int i = 0; i < n_to_reveal; i++) {
+        int pos = to_reveal[i];
+        if (pos < 0 || pos >= hand_n) continue;
+        int cid = g->p[who].hand.cards[pos];
+        if (n_revealed < RB_MAX_ZONE) revealed[n_revealed++] = cid;
+    }
+    /* choice.rs:1602-1604 — push_revealed_card for every revealed id. */
+    for (int i = 0; i < n_revealed; i++)
+        if (g->n_revealed < RB_MAX_REVEALED_CARDS)
+            g->revealed_cards[g->n_revealed++] = revealed[i];
+    /* choice.rs:1605-1612 — an empty skippable reveal closes the cost. */
+    if (n_revealed == 0 && allow_skip && !effect_started) {
+        if (cur >= 0 && cur < g->queue.n_entries) {
+            g->queue.entries[cur].cost_paid = 1;
+            g->queue.entries[cur].optional_cost_result = 0;
+        }
+        rb_resolver_clear_choice_state_and_resume(self);
+        return;
+    }
+    /* choice.rs:1617-1622 logs [[log_reveal_hand:n=N]]; the C port has no rule
+       log sink for it, exactly as the looked_at reveal above. */
+    /* choice.rs:1624-1628 + 1636-1638 — the revealed ids become the resolver's
+       selected_cards only when the effect actually reads that zone. */
+    const AbilityEffect *selected_effect = g->queue.resume_eff;
+    if (!selected_effect) selected_effect = rb_entry_effect(g);
+    if (choice_effect_uses_selected_cards(selected_effect)) {
+        self->n_selected_cards = 0;
+        for (int i = 0; i < n_revealed; i++)
+            if (self->n_selected_cards < RB_MAX_RECENTLY_MOVED)
+                self->selected_cards[self->n_selected_cards++] = revealed[i];
+    }
+
+    /* choice.rs:1640-1671 — the any_number arm keeps prompting while hand
+       positions remain.  The re-prompt's filtered_indices are the REMAINING
+       positions (not the accumulated ones), so the count==0 mapping above
+       resolves the display index to a hand position. */
+    if (count == 0 && allow_skip && !effect_started && n_all > 0) {
+        int remaining_pos[RB_MAX_ZONE]; int n_remaining = 0;
+        memset(remaining_pos, 0, sizeof(remaining_pos));
+        for (int i = 0; i < hand_n; i++) {
+            int taken = 0;
+            for (int j = 0; j < n_all; j++) if (all_pos[j] == i) { taken = 1; break; }
+            if (!taken && n_remaining < RB_MAX_ZONE) remaining_pos[n_remaining++] = i;
+        }
+        if (n_remaining > 0) {
+            RbChoice ch; memset(&ch, 0, sizeof(ch));
+            ch.kind = RB_CHOICE_SELECT_CARD;
+            ch.count = 0;
+            ch.allow_skip = 1;
+            ch.is_reveal = 1;
+            ch.route = RB_ROUTE_SELECT_CARDS;
+            ch.actor = actor;
+            strncpy(ch.zone, "hand", sizeof(ch.zone) - 1);
+            strncpy(ch.target_player_id, tpid, sizeof(ch.target_player_id) - 1);
+            if (g->queue.pending.card_type[0])
+                strncpy(ch.card_type, g->queue.pending.card_type, sizeof(ch.card_type) - 1);
+            strncpy(ch.description, "Select more cards to reveal from hand (or skip to finish)",
+                    sizeof(ch.description) - 1);
+            for (int i = 0; i < n_remaining; i++) ch.filtered_indices[i] = remaining_pos[i];
+            ch.n_filtered_indices = n_remaining;
+            g->queue.pending = ch;
+            g->queue.has_pending = 1;
+            g->queue.actor = actor;
+            g->queue.state = RB_QUEUE_AWAITING_CHOICE;
+            return;
         }
     }
-    (void)ctx;
+    /* choice.rs:1674-1683 — clear + resume. */
     rb_resolver_clear_choice_state_and_resume(self);
 }
 
@@ -3074,13 +3301,18 @@ static int rb_resume_with_choice_indices_internal(GameState *g, const int *selec
                 based on the chosen index — the engine models selection via
                 deferred re-execution rather than the handler doing the move. */
             const char *pzone = g->queue.pending.zone[0] ? g->queue.pending.zone : "hand";
-            const char *ptarget = g->queue.pending.target[0] ? g->queue.pending.target : NULL;
             int cur = g->queue.cur;
             int eff_started = (cur >= 0 && cur < RB_QUEUE_DEPTH) ? g->queue.entries[cur].effect_started : 0;
             char ca[48]; ca[0] = '\0';
             int from_debut = 0;
             int hc = rb_queue_cost_action_for_choice(g, &saved_pending, ca, sizeof(ca), &from_debut);
-            int rev = (ptarget && strstr(ptarget, "reveal")) || (pzone && strstr(pzone, "reveal"));
+            /* The reveal arm answers in the handler (it records the revealed
+               cards and decrements the re-prompt), so the deferred effect must
+               NOT be re-run underneath it.  Same gate as
+               rb_resolver_handle_select_card: the producer's flag first, the
+               legacy target/zone substring second. */
+            int rev = choice_is_reveal_prompt(&saved_pending) ||
+                      choice_reveal_is_legacy_text(&saved_pending);
             /* `cost_hand` means the handler just paid a hand COST, so the ability
                must not be resolved twice. A QUEUED ability carries itself in
                queue.entries[cur] and advances cost -> effect inside
