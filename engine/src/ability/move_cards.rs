@@ -2631,11 +2631,7 @@ pub fn execute_selected_cards_from_zone(
             });
         log::debug!("[SELECTION_ROUTE] source={} destination={} fallback={} target={} choice_player={:?}", zone, dest, destination.is_none(), target, target_player_id);
         if zone_enum == Some(Zone::Hand) {
-            if let Some(effect) = self
-                .current_effect
-                .clone()
-                .or_else(|| gs.entry_effect().cloned())
-            {
+            if let Some(effect) = self.owning_effect(gs) {
                 let mut order_indices = filtered_indices.clone();
                 order_indices.sort_unstable_by(|a, b| b.cmp(a));
                 let order_card_ids = {

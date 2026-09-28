@@ -1926,6 +1926,22 @@ pub fn zone_card_ids(player: &crate::player::Player, zone: &str) -> Vec<i16> {
     zone_cards(player, zone).to_vec()
 }
 
+/// `zone_card_ids`, minus the `-1` placeholders that pad an unoccupied
+/// `stage` slot.
+///
+/// Stage is a fixed 3-slot array holding `-1` for empty positions, so every
+/// caller that counts or sums "cards in the stage" must drop them or it counts
+/// vacant slots as cards. Callers that genuinely want the raw 3 entries (e.g.
+/// checking whether the centre slot is occupied) must use `zone_card_ids`
+/// directly — the placeholder is meaningful there.
+pub fn zone_card_ids_occupied(player: &crate::player::Player, zone: &str) -> Vec<i16> {
+    let mut ids = zone_card_ids(player, zone);
+    if crate::ability::enums::Zone::from_str(zone) == Some(crate::ability::enums::Zone::Stage) {
+        ids.retain(|&id| id != -1);
+    }
+    ids
+}
+
 /// Indices of ACTIVE energy cards. Positional convention: cards
 /// `[0..active_count]` are active, the rest waited. Shared by every energy
 /// menu so offerable sets can't diverge per call site.

@@ -4622,9 +4622,19 @@ CONDITION_PATTERNS = [
     ConditionPattern("live_mid", 7, _try_live_mid),
 ]
 
-_condition_registry = PriorityRegistry("condition_rules")
-for _ci, _rule in enumerate(CONDITION_PATTERNS):
-    _condition_registry.register(_rule.tier * 100 + _ci, _rule.name, _rule)
+# Conditions are ordered by TIER, not by list position: tier 1 clauses are the
+# whole-sentence shapes, tier 7 the narrow fragments. The table is already in
+# tier order, so registration index is the priority and the `tier` argument is
+# documentation. (It used to drive `tier * 100 + index`, which silently breaks
+# the tiering the moment the table passes 100 rows.)
+#
+# Rules whose clause shape must beat the whole-sentence handlers append to
+# _CONDITION_DISPATCH_ORDER below; register all of them in one pass further
+# down, once every handler is defined.
+_CONDITION_DISPATCH_ORDER: List[Tuple[str, ConditionPattern]] = [
+    (_rule.name, _rule) for _rule in CONDITION_PATTERNS
+]
+
 
 
 def _try_placed_discard_live_or_member(text):
@@ -4674,11 +4684,22 @@ def _try_placed_discard_live_or_member(text):
     }
 
 
-_condition_registry.register(
-    1,
-    "placed_discard_live_or_member",
-    ConditionPattern(handler=_try_placed_discard_live_or_member),
+# Ahead of the whole-sentence tier-1 handlers: this clause names a specific
+# 「控え室に置いたカードの中…」 shape that a generic count handler would
+# otherwise absorb. It used to be registered at priority 1 AFTER the table was
+# built, where it shadowed the entire tier-1 block it was written next to.
+_CONDITION_DISPATCH_ORDER.insert(
+    0,
+    (
+        "placed_discard_live_or_member",
+        ConditionPattern(handler=_try_placed_discard_live_or_member),
+    ),
 )
+
+# The one place conditions are registered. Registration index IS the priority.
+_condition_registry = PriorityRegistry("condition_rules")
+for _ci, (_name, _rule) in enumerate(_CONDITION_DISPATCH_ORDER):
+    _condition_registry.register(_ci, _name, _rule)
 
 
 def _try_discard_live_and_member_optional(text):
@@ -10411,79 +10432,47 @@ _register_effect_rule(
         setter=_set_both_hand_keep_shuffle_under,
     )
 )
-# Structural effect rules share the canonical EffectPattern dispatch contract.
-_effect_registry = PriorityRegistry("effect_rules")
-for _ri, _h in enumerate(_EFFECT_RULES):
-    _hn = getattr(_h, "__name__", f"effect_rule_{_ri}")
-    _effect_registry.register(_ri, _hn, _h)
-for _i, _rule in enumerate(_STRUCTURAL_EFFECT_RULES):
-    _hn = getattr(_rule, "__name__", f"structural_rule_{_i}")
-    _effect_registry.register(100 + _i, _hn, _rule)
-
-
-_effect_registry.register(
-    10000,
-    "blade_conversion",
-    EffectPattern(
-        condition=lambda t: "すべて[" in t and "]になる" in t,
-        action="set_blade_type",
-        setter=_set_blade_conversion,
-    ),
+# Trailing effect rules. Named constants so the dispatch list below can hold
+# them in order without burying the order in register() calls.
+_EFFECT_BLADE_CONVERSION = EffectPattern(
+    condition=lambda t: "すべて[" in t and "]になる" in t,
+    action="set_blade_type",
+    setter=_set_blade_conversion,
 )
-_effect_registry.register(
-    10001,
-    "blade_equal_gain",
-    EffectPattern(
-        condition=lambda t: "を得る" in t and "コストが同じ" in t,
-        action="gain_resource",
-        setter=_set_blade_equal_gain,
-    ),
+_EFFECT_BLADE_EQUAL_GAIN = EffectPattern(
+    condition=lambda t: "を得る" in t and "コストが同じ" in t,
+    action="gain_resource",
+    setter=_set_blade_equal_gain,
 )
-_effect_registry.register(
-    10002,
-    "blade_same_thing_gain",
-    EffectPattern(
-        match="同じことを行う",
-        action="gain_resource",
-        setter=_set_blade_same_thing_gain,
-    ),
+_EFFECT_BLADE_SAME_THING_GAIN = EffectPattern(
+    match="同じことを行う",
+    action="gain_resource",
+    setter=_set_blade_same_thing_gain,
 )
-_effect_registry.register(
-    10003,
-    "blade_count_set",
-    EffectPattern(
-        condition=lambda t: re.search(
-            r"ブレードの数は(\d+)つになる",
-            re.sub(r"\{\{[^|]+\|([^}]+)\}\}", r"\1", re.sub(r"\s+", "", t)),
-        )
-        is not None,
-        action="set_blade_count",
-        setter=_set_blade_count_set,
-    ),
+_EFFECT_BLADE_COUNT_SET = EffectPattern(
+    condition=lambda t: re.search(
+        r"ブレードの数は(\d+)つになる",
+        re.sub(r"\{\{[^|]+\|([^}]+)\}\}", r"\1", re.sub(r"\s+", "", t)),
+    )
+    is not None,
+    action="set_blade_count",
+    setter=_set_blade_count_set,
 )
-_effect_registry.register(
-    10004,
-    "restriction",
-    EffectPattern(
-        condition=lambda t: "ウェイトしない" in t
-        or "アクティブにならない" in t
-        or "アクティブにしない" in t,
-        action="restriction",
-        setter=_set_restriction_fields,
-    ),
+_EFFECT_RESTRICTION = EffectPattern(
+    condition=lambda t: "ウェイトしない" in t
+    or "アクティブにならない" in t
+    or "アクティブにしない" in t,
+    action="restriction",
+    setter=_set_restriction_fields,
 )
-_effect_registry.register(
-    10005,
-    "global_modifier",
-    EffectPattern(
-        condition=lambda t: re.search(r".+は、.+", t)
-        is not None
-        and "ある場合" not in t
-        and "必要ハート" in t
-        and ("多くなる" in t or "少なくなる" in t),
-        action="modify_required_hearts_global",
-        setter=_set_global_modifier_fields,
-    ),
+_EFFECT_GLOBAL_MODIFIER = EffectPattern(
+    condition=lambda t: re.search(r".+は、.+", t)
+    is not None
+    and "ある場合" not in t
+    and "必要ハート" in t
+    and ("多くなる" in t or "少なくなる" in t),
+    action="modify_required_hearts_global",
+    setter=_set_global_modifier_fields,
 )
 
 
@@ -10542,13 +10531,61 @@ def _try_play_time_cost_set(text):
     return effect
 
 
-# Negative priority: play-time costs are the most specific shape in effect
-# text and must win before generic handlers mis-parse them.
-_effect_registry.register(
-    -10,
-    "play_time_cost_set",
+# ======================================================================
+# EFFECT DISPATCH — the one place the effect rules are registered, in the
+# order they fire. Registration index IS the priority, so the order is read
+# off this one list instead of inferred from scattered magic numbers.
+#
+# This reproduces the previous priorities exactly, which encoded:
+#   -10  play_time_cost_set  (most specific shape; must win before the
+#                             generic handlers mis-parse a play-time cost)
+#    0..4   _EFFECT_RULES
+#  100..147 _STRUCTURAL_EFFECT_RULES
+# 10000..10005 the six trailing rules
+#
+# Ordering rule, if you add a rule: a NARROWER phrase must come before a
+# broader one that would otherwise swallow it. Narrowest first.
+# ======================================================================
+_EFFECT_DISPATCH_ORDER = [
+    # Most specific: play-time costs must beat the generic cost/effect
+    # handlers, which would otherwise mis-type 「プレイに際し…」.
     EffectPattern(action="custom", handler=_try_play_time_cost_set),
-)
+    *_EFFECT_RULES,
+    *_STRUCTURAL_EFFECT_RULES,
+    _EFFECT_BLADE_CONVERSION,
+    _EFFECT_BLADE_EQUAL_GAIN,
+    _EFFECT_BLADE_SAME_THING_GAIN,
+    _EFFECT_BLADE_COUNT_SET,
+    _EFFECT_RESTRICTION,
+    _EFFECT_GLOBAL_MODIFIER,
+]
+
+# Stable, searchable name for a registered rule, in descending order of how
+# well it identifies the phrase:
+#   handler — structural rules are `EffectPattern(handler=_try_x)` wrappers,
+#             so the phrase they recognise lives on the HANDLER's __name__;
+#             asking the wrapper alone left 49 of 50 named `structural_rule_N`.
+#   setter  — declarative rules are identified by the field-populator they
+#             delegate to, which is unique per rule where the action is not.
+#   action  — last resort before a positional index, so no rule is ever
+#             identified only by where it happens to sit in the list.
+def _rule_name(rule, fallback: str) -> str:
+    for candidate in (
+        getattr(rule, "handler", None),
+        getattr(rule, "setter", None),
+        rule,
+    ):
+        name = getattr(candidate, "__name__", None)
+        # `<lambda>` identifies nothing; keep looking.
+        if name and name != "<lambda>":
+            return name
+    action = getattr(rule, "action", None)
+    return f"{action}#{fallback}" if action else fallback
+
+
+_effect_registry = PriorityRegistry("effect_rules")
+for _ri, _rule in enumerate(_EFFECT_DISPATCH_ORDER):
+    _effect_registry.register(_ri, _rule_name(_rule, f"effect_rule_{_ri}"), _rule)
 
 # ======================================================================
 # POST-PROCESSING NORMALIZERS & CHAINING
@@ -14008,22 +14045,24 @@ def _list_rules() -> None:
     for i, h in enumerate(_COST_HANDLERS):
         print(f"  {i:3}  {getattr(h, '__name__', h)}")
     print(sep)
-    print("EFFECT RULES  (_EFFECT_RULES — canonical effect grammar)")
+    print("EFFECT RULES  (_effect_registry — EFFECTIVE dispatch order, first match wins)")
     print(sep)
-    for i, r in enumerate(_EFFECT_RULES):
-        print(
-            f"  {i:3}  match={getattr(r, 'match', None)!r} match_any={getattr(r, 'match_any', None)} action={r.action!r}"
+    for i, (_p, name, _r) in enumerate(_effect_registry.sorted_handlers()):
+        rule = _r
+        detail = (
+            f"match={getattr(rule, 'match', None)!r} "
+            f"match_any={getattr(rule, 'match_any', None)} "
+            f"action={getattr(rule, 'action', None)!r}"
         )
+        print(f"  {i:3}  {name:34} {detail}")
     print(sep)
-    print("STRUCTURAL EFFECT RULES  (_STRUCTURAL_EFFECT_RULES — canonical rules, priority 100+)")
+    print("CONDITION RULES  (_condition_registry — EFFECTIVE dispatch order, first match wins)")
     print(sep)
-    for i, h in enumerate(_STRUCTURAL_EFFECT_RULES):
-        print(f"  {i:3}  {getattr(h, '__name__', h)}")
-    print(sep)
-    print("CONDITION PATTERNS  (name, tier — tier*100 = priority base)")
-    print(sep)
-    for name, tier, handler in CONDITION_PATTERNS:
-        print(f"  t{max(1, tier):3}  {name:40} {getattr(handler, '__name__', handler)}")
+    for i, (_p, name, rule) in enumerate(_condition_registry.sorted_handlers()):
+        print(
+            f"  {i:3}  {name:34} tier={getattr(rule, 'tier', 0)} "
+            f"{getattr(getattr(rule, 'handler', None), '__name__', rule)}"
+        )
 
 
 if __name__ == "__main__":

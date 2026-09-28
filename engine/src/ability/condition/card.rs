@@ -1814,7 +1814,7 @@ impl<'a> ConditionContext<'a> {
                     let expected_source = condition.get_location().or_else(|| {
                         condition
                             .get_source()
-                            .filter(|&s| s != "preceding_moved" && s != "previous_moved_cards")
+                            .filter(|s| !super::is_moved_source(s))
                     });
                     if let Some(src_zone) = expected_source {
                         let card_movements: Vec<_> = self
@@ -2336,11 +2336,13 @@ impl<'a> ConditionContext<'a> {
             }
         }
 
-        let is_old_movement = condition.get_source() == Some("preceding_moved")
-            || condition.get_source() == Some("previous_moved_cards");
-        let is_new_movement = condition.get_source().is_none_or(|s| {
-            s != "preceding_moved" && s != "previous_moved_cards"
-        }) && condition.get_destination().is_some();
+        let is_old_movement = condition
+            .get_source()
+            .is_some_and(super::is_moved_source);
+        let is_new_movement = !condition
+            .get_source()
+            .is_some_and(super::is_moved_source)
+            && condition.get_destination().is_some();
 
         if is_old_movement || is_new_movement {
             return self.resolve_moved_cards_source(
@@ -3807,8 +3809,9 @@ pub(crate) fn count_cards_with_filters(
         let resource_type = condition.get_resource_type();
         if comparison_type == Some("score") {
             if condition.get_location().is_none()
-                && (condition.get_source() == Some("preceding_moved")
-                    || condition.get_source() == Some("previous_moved_cards"))
+                && condition
+                    .get_source()
+                    .is_some_and(super::is_moved_source)
             {
                 return self.count_for_preceding_moved_score(condition);
             }
@@ -3843,10 +3846,7 @@ pub(crate) fn count_cards_with_filters(
                 let player = self.resolve_condition_player(target);
                 let card_db = &self.game_state.card_database;
                 let location = condition.get_location().unwrap_or("stage");
-                let mut cards = util::zone_card_ids(player, location);
-                if Zone::from_str(location) == Some(Zone::Stage) {
-                    cards.retain(|&id| id != -1);
-                }
+                let cards = util::zone_card_ids_occupied(player, location);
                 if cards.is_empty() {
                     return 0;
                 }
@@ -3884,10 +3884,7 @@ pub(crate) fn count_cards_with_filters(
                 if !loc.is_empty() {
                     let player = self.resolve_condition_player(target);
                     let card_db = &self.game_state.card_database;
-                    let mut cards = util::zone_card_ids(player, loc);
-                    if Zone::from_str(loc) == Some(Zone::Stage) {
-                        cards.retain(|&id| id != -1);
-                    }
+                    let cards = util::zone_card_ids_occupied(player, loc);
                     let total: u8 = cards
                         .iter()
                         .filter(|&&id| {
@@ -3949,8 +3946,9 @@ pub(crate) fn count_cards_with_filters(
         // For preceding_moved conditions, count matching cards in moved_cards
         // rather than summing costs (fixes wrong log display for card_count_condition).
         if location.is_empty()
-            && (condition.get_source() == Some("preceding_moved")
-                || condition.get_source() == Some("previous_moved_cards"))
+            && condition
+                .get_source()
+                .is_some_and(super::is_moved_source)
             && !self.moved_cards.is_empty()
         {
             let ct = condition.get_card_type().map(|ct| ct.as_str());
@@ -4200,8 +4198,9 @@ pub(crate) fn count_cards_with_filters(
         let exc = condition.get_exclude_characters();
 
         // Preceding-moved path: check recently moved cards instead of a zone.
-        if condition.get_source() == Some("preceding_moved")
-            || condition.get_source() == Some("previous_moved_cards")
+        if condition
+            .get_source()
+            .is_some_and(super::is_moved_source)
         {
             let moved_source: SmallVec<[i16; 8]> = if self.moved_cards.is_empty() {
                 let enqueued = self.game_state.entry_trigger_moved_cards();

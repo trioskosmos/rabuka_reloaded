@@ -190,6 +190,11 @@ impl super::resolver::AbilityResolver {
 
         let sub_choice = self.sub_choice_created;
         self.sub_choice_created = false;
+        // The owner snapshot exists only for the span between storing a choice
+        // and answering it, and this epilogue is the end of that span. Clearing
+        // it here (rather than at each of the many `pending_choice = None`
+        // sites) keeps it from going stale into the next choice.
+        self.pending_choice_owner = None;
         if !should_preserve && !sub_choice {
             self.pending_choice = None;
         }
@@ -1469,10 +1474,13 @@ impl super::resolver::AbilityResolver {
                 ctx.characters.as_ref(),
                 ctx.target_player_id.as_deref(),
             )?;
+            // The widest of the owner chains: the snapshot, then the queue
+            // entry's root effect, then the queued ability's own effect. This
+            // site accepts a card selection made on behalf of an ability whose
+            // effect lives on the ability rather than the entry, so the third
+            // link is load-bearing here and nowhere else.
             let keep_selected = self
-                .current_effect
-                .clone()
-                .or_else(|| gs.entry_effect().cloned())
+                .answering_effect(gs)
                 .or_else(|| {
                     gs.ability_queue
                         .current_entry()
@@ -1622,9 +1630,7 @@ impl super::resolver::AbilityResolver {
             ));
         }
         let selected_effect = self
-            .current_effect
-            .clone()
-            .or_else(|| gs.entry_effect().cloned())
+            .answering_effect(gs)
             .filter(util::effect_uses_selected_cards);
         if !effect_started {
             let cost_source = gs.current_ability_source_card_id();
@@ -1887,9 +1893,7 @@ gs.set_recently_moved_batch(valid_ids.into(), Some(Zone::SuccessLiveZone.to_str(
         }
         self.selected_cards = card_ids.into();
         let selected_effect = self
-            .current_effect
-            .clone()
-            .or_else(|| gs.entry_effect().cloned())
+            .answering_effect(gs)
             .filter(util::effect_uses_selected_cards);
         if let Some(effect) = selected_effect {
             if let Some(entry) = gs.ability_queue.current_entry_mut() {

@@ -31,6 +31,21 @@ pub(crate) fn stage_has_any_member(player: &crate::player::Player) -> bool {
     player.stage.stage.iter().any(|&id| id != -1)
 }
 
+/// Whether a condition's `source` marker means "the cards in question are the
+/// ones the preceding effect just moved", rather than naming a zone.
+///
+/// Card text produces both spellings for the same idea, so evaluators that
+/// count over moved cards must accept either. Five sites in `condition/card.rs`
+/// were spelling the pair out by hand; this is the one place that decides.
+///
+/// Note this is deliberately NOT the same test as `route_location_condition`,
+/// which matches only `"preceding_moved"`. Widening that router to accept both
+/// spellings would change which evaluator handles those conditions, so the
+/// narrow check there is left alone.
+pub(crate) fn is_moved_source(source: &str) -> bool {
+    source == "preceding_moved" || source == "previous_moved_cards"
+}
+
 /// Read-only context for evaluating ability conditions.
 /// Extracted from AbilityResolver to reduce the god-struct surface.
 pub struct ConditionContext<'a> {

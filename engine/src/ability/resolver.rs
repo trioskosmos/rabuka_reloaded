@@ -95,6 +95,21 @@ pub struct AbilityResolver {
     /// Parent effect that created a nested choice (e.g. look_and_select with or_card_types).
     /// Preserved so choice handlers can access or_card_types after sub-effects overwrite current_effect.
     pub parent_effect: Option<AbilityEffect>,
+    /// The effect that BUILT the currently-pending choice, captured by
+    /// `store_pending_choice` and dropped by `finalize_choice`.
+    ///
+    /// A choice pauses execution, and executors keep writing `current_effect`
+    /// while it waits. So at answer time `current_effect` is whatever ran last,
+    /// not necessarily the effect whose question is being answered — which is
+    /// why the handlers used to re-derive the owner from
+    /// `current_effect`/`entry_effect`/`ability.effect` and why those three
+    /// sites did not agree on the chain. Snapshotting the owner once, at the
+    /// one place every choice is stored, removes the guess.
+    ///
+    /// `parent_effect` was an earlier, hand-placed snapshot of the same idea for
+    /// one caller (look_and_select with `or_card_types`); it stays for that
+    /// purpose. This field is the general one.
+    pub pending_choice_owner: Option<AbilityEffect>,
     pub is_reveal_cost: bool,
     pub selected_cards: SmallVec<[i16; 4]>,
     /// Member card IDs actually changed state by the most recent change_state
@@ -182,6 +197,43 @@ pub struct AbilityResolver {
 }
 
 impl AbilityResolver {
+    /// The effect that owns the work in flight, for ANSWER-TIME lookups.
+    ///
+    /// A choice pauses execution mid-effect. By the time the player's answer
+    /// comes back, `current_effect` may have been overwritten by a sub-effect
+    /// spawned after the choice was built (that is why `parent_effect` exists),
+    /// so answer-time code asking "which effect am I continuing?" cannot read
+    /// the resolver's current slot and assume it is still the right one.
+    ///
+    /// Resolution order, most specific first:
+    ///   1. `current_effect` — the executor running right now
+    ///   2. `gs.entry_effect()` — the queue entry's root effect
+    ///
+    /// Deliberately only two links. Several call sites used to open-code this
+    /// chain by hand, and they did not agree: `handle_select_card` also fell
+    /// through to the ability's own effect, so the same question had two
+    /// different answers depending on which site asked it. That one site now
+    /// spells its wider chain out explicitly rather than sharing a helper whose
+    /// contract overlaps this one.
+    pub fn owning_effect(&self, gs: &GameState) -> Option<AbilityEffect> {
+        self.current_effect
+            .clone()
+            .or_else(|| gs.entry_effect().cloned())
+    }
+
+    /// The effect that asked the question now being answered.
+    ///
+    /// Prefer this over `owning_effect` anywhere in an ANSWER path. While a
+    /// choice waits, executors keep overwriting `current_effect`, so the live
+    /// slot answers "what ran last", not "what is being answered". Once
+    /// `finalize_choice` runs the snapshot is gone and `owning_effect` is the
+    /// right accessor again, so the two differ only while a choice is pending.
+    pub fn answering_effect(&self, gs: &GameState) -> Option<AbilityEffect> {
+        self.pending_choice_owner
+            .clone()
+            .or_else(|| self.owning_effect(gs))
+    }
+
     /// Whether the ability currently being resolved is a 起動 (activation).
     /// Single source of truth for the trigger check previously copy-pasted at
     /// every optional-cost site.
@@ -241,6 +293,7 @@ impl AbilityResolver {
             execution_context: ExecutionContext::None,
             current_effect: None,
             parent_effect: None,
+            pending_choice_owner: None,
             is_reveal_cost: false,
             selected_cards: SmallVec::new(),
             changed_state_members: SmallVec::new(),
@@ -662,6 +715,13 @@ impl AbilityResolver {
 
     pub(crate) fn store_pending_choice(&mut self, gs: &mut GameState) {
         gs.ability_queue.snapshot_requested = true;
+        // Snapshot the owner ONCE, here, where every pending choice enters.
+        // `current_effect` keeps moving while the choice waits, so capturing it
+        // at answer time (as the handlers used to) reports whichever executor
+        // ran last instead of the effect that asked the question.
+        if self.pending_choice_owner.is_none() {
+            self.pending_choice_owner = self.current_effect.clone();
+        }
         if let Some(ref choice) = self.pending_choice {
             // Record a `choice_offered` structured entry at presentation time so
             // the log captures what options were actually shown (before the

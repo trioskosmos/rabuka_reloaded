@@ -77,44 +77,103 @@ duplicates of the engine copies. That is wrong:
 `platforms/snes/bytecode_data.c` is the third, separately-generated copy that
 `platforms/snes/build.rs:26` compiles.
 
-## Remaining debt (live)
+### Dispatch order made honest (2026-09-28)
 
-### Four dispatch tables, still not one (partially done)
+The four tables still exist, but the **order is now readable off one list per
+registry** instead of being encoded in magic numbers nothing explained.
 
-The 2026-09-28 pass removed the phantom `priority`/`order` fields, so list order
-now honestly *is* the priority. What remains is the table count. A new clause
-still has to pick one of five places:
+Effect priorities used to be `-10`, `0..4`, `100..147` and `10000..10005`, with
+the `-10` and `10000+` rules registered *after* the tables were built — so
+reading `_EFFECT_RULES` did not tell you the real order. They are now
+`_EFFECT_DISPATCH_ORDER`, one list in the order they fire, registered
+sequentially: registration index IS the priority. Same order, same output.
 
-| Clause kind | Where | Mechanism |
+Conditions were `tier * 100 + index`, which silently breaks the tiering the
+moment the table passes 100 rows. They are now `_CONDITION_DISPATCH_ORDER`,
+extended by the one out-of-band rule and registered in a single pass.
+`placed_discard_live_or_member` used to be registered at priority `1` *after*
+the table was built, shadowing the whole tier-1 block it was written next to; it
+is now visibly first in the list.
+
+Rule names were the other half. Effects registered under
+`getattr(rule, "__name__", f"effect_rule_{i}")`, but a rule is an
+`EffectPattern` *wrapper* — the function that recognises the phrase is its
+`handler`, and asking the wrapper left **30 of 61 rules named `effect_rule_N`**,
+so the dead-rule test could not say which phrase had gone stale. `_rule_name`
+now falls through handler → setter → action, and no registered rule is
+identified only by its position.
+
+`python parser.py --list-rules` prints the **effective** order for all layers.
+Trust it over the order the tables are written in.
+
+### Merging the four tables — NOT the right fix, don't attempt it
+
+An earlier draft of this doc listed "collapse the four dispatch tables into one
+registry" as the remaining parser untangle. On inspection that goal is
+**ill-posed**, and attempting it would make things worse:
+
+| Table | Produces | Entry point |
 |---|---|---|
-| action | `_ACTION_RULES` | `ActionRule` row + optional `_set_action_NNN` |
-| cost | `cost_parser.py` | `@_register_cost` handler |
-| effect | `_EFFECT_RULES` | `EffectPattern` row |
-| effect (structural) | `_STRUCTURAL_EFFECT_RULES` | `EffectPattern(handler=...)` |
-| condition | `CONDITION_PATTERNS` | `ConditionPattern(name, tier, handler)` |
+| `_ACTION_RULES` | the `action` dict (what the card DOES) | `parse_action` |
+| `CONDITION_PATTERNS` | a `condition` dict (a sub-clause) | `parse_condition` |
+| `_EFFECT_RULES` + `_STRUCTURAL_EFFECT_RULES` | the `effect` dict (effect text) | `parse_effect` |
+| `_COST_HANDLERS` | the `cost` dict (payment) | `parse_cost` |
 
-The awkward parts, in rough priority order for whoever picks this up next:
+These are four different OUTPUT SHAPES parsed from four different parts of a
+clause. A single dispatch loop would have to be told which shape it is
+producing on every call, and the first-match-wins guarantee would have to hold
+across tables whose outputs are not comparable — a condition rule that
+"matched" would shadow an effect rule for reasons the reader cannot follow. The
+tables stay separate.
 
-1. **Magic priorities.** Effects register at `-10`, `0..4`, `100..147` and
-   `10000..10005`; conditions at `tier * 100 + index`. The `10000` block and the
-   `play_time_cost_set` rule at `-10` are registered *after* the tables are
-   built, so reading the table does not tell you the real order. `parser.py --list-rules`
-   prints the effective order for all five layers — use that, not the source order.
-2. **One out-of-band condition registration.** `placed_discard_live_or_member` is
-   registered at priority `1` after the table (`parser.py:4664`), which shadows
-   the whole tier-1 block it is written next to.
-3. **`ConditionPattern`'s declarative fields are unused.** All 35 rows pass only
-   `handler=`; the class contributes a name and a tier and nothing else.
-4. **Rule names are synthetic for effects.** Effects register under
-   `getattr(_h, "__name__", f"effect_rule_{_ri}")` and `EffectPattern` has no
-   `__name__`, so every effect rule is named `effect_rule_N` and the dead-rule
-   test cannot say which phrase died.
-5. **`_ACTION_RULES` is not covered by the dead-rule test.** `test_registry_coverage`
-   checks the effect and condition registries only — which is how `action_047`
-   stayed hidden.
+What actually caused the pain — not the count, but the invisible *order* — has
+been fixed. See "Dispatch order made honest" above: no magic priorities, no
+out-of-band registrations, every rule named, and `--list-rules` printing the
+effective order. The residual cost is one decision per new clause ("is this an
+action, a condition, an effect, or a cost?"), which is inherent to clause
+grammar and not something a merged table would remove.
 
-Consolidating these is a real change to first-match-wins order, so it needs the
-byte-diff gate run per table, not once at the end.
+### 36 action rules are shadowed — biggest open finding (2026-09-28)
+
+Adding the action registry to `test_registry_coverage` surfaced this. The test
+asks whether a rule ever WINS dispatch (not whether it matches — the list is
+first-match-wins, so a rule that always loses is dead while looking alive).
+**36 of 83 rules never win on the current corpus.** The list is recorded in
+`SHADOWED_ACTION_RULES` in the test, and the test fails only if that set GROWS.
+
+They are *shadowed*, not unreachable. Worked example: `action_043_reveal`
+(`公開する`) matches 78 corpus texts and loses every one of them —
+`action_029_move_cards` takes 53 (`加える`), `action_035_move_cards` 8,
+`action_012_draw_card` 4. So a clause that both reveals and adds to hand is
+typed as `move_cards` and the reveal is never seen by the action layer.
+
+Do **not** bulk-delete these. Most are broad deliberate fallbacks that are
+still correct for card text this corpus does not contain; removing the loser
+trades a latent fallback for a guaranteed break on any unseen card. The real
+question per rule is whether the shadowing is intended, which needs per-rule
+card-text review. `action_047` was the one case where the shadowing was
+provably wrong (strict subset of `action_039`, which also has a `setter` that
+047 lacks) and it has been deleted.
+
+### Still open (deliberately not done)
+
+- **The 9 count entry points in `ability/condition/card.rs` still overlap
+  structurally.** The duplicated *mechanics* were extracted (`is_moved_source`,
+  `util::zone_card_ids_occupied`), but `get_count_for_condition` /
+  `get_count_for_target` / `get_group_card_count` remain three parallel
+  dispatchers over shared player resolution, multi-zone fan-out and zone
+  dispatch. Merging them changes which dispatcher evaluates a given condition,
+  so it needs characterization pins per condition shape.
+- **`ConditionPattern`'s declarative fields are unused**: all 36 rows pass only
+  `handler=`; the `match`/`match_any`/`exclude` half of `_TextRule` is dead
+  weight on that class.
+- **Engine:** `owning_effect` / `answering_effect` and the
+  `pending_choice_owner` snapshot (2026-09-28) remove the guess at the three
+  answer sites. Still open: the sites that read `current_effect` outright with
+  no fallback, and `move_cards.rs:2900`'s hand-rolled `select_action` chain,
+  which is a third resolution shape not yet folded in.
+
+## Remaining debt (live)
 
 ### Engine-side key audit (2026-08-24)
 Cross-referenced every JSON key emitted into `abilities.json` against
@@ -155,23 +214,32 @@ dissolved into its producer or removed as dead. Remaining FIX blocks are
 genuine pipeline steps, each with a known ability-count blast radius.
 
 ## Fundamental structural issues (from the deep-refactor review)
-1. **`_fill_defaults` re-extracts fields `parse_action` already set**
-   Re-extracts source, destination, cost_limit, optional, max, position,
-   group_names, heart_colors. Reader can't tell which function sets which field.
-   *Fix*: move all extraction into `parse_action`; `_fill_defaults` only sets
-   action-type-specific defaults (draw→deck/hand, shuffle→move_cards).
-2. **`_fill_defaults_move_cards` is ~131 lines of source inference**
-   Complex source→destination inference that belongs in the dispatch table or
-   `parse_action` itself.
-3. **`_walk` + `_propagate_context` = two full tree walks**
-   `_walk` (11 sub-walkers) runs during normalization; `_propagate_context`
-   (~240 lines) runs after `_process_pre_fix`. Overlapping work; merging requires
-   understanding the timing dependency (propagate needs pre_fix output).
-4. **`_process_pre_fix` is ~340 lines of compensating patches**
-   See triage table above: most are load-bearing; dissolution = producer fixes.
-5. **Double/triple extraction of the same fields**
-   `extract_source`, `extract_destination`, `extract_card_type`, etc. are called
-   3–4 times on the same text across `parse_action`, `_fill_defaults`, `_walk`.
+> **Re-verified 2026-09-28 — this list is partly STALE.** Items 1 and 5 were
+> already done before this session and should not be re-attempted. Read the
+> verdicts, not the original claims.
+
+1. **`_fill_defaults` re-extracts fields `parse_action` already set** —
+   ~~open~~ **ALREADY FIXED (pre-2026-09-28).** `_fill_defaults` states the
+   contract in its own docstring: `parse_action` owns ALL extraction, and
+   `_fill_defaults` "ONLY fills defaults for fields left unset". Every
+   re-extract there is guarded by `not in action` / `is none`; `source` and
+   `destination` are additionally threaded in as `_cached_source` /
+   `_cached_dest` so they are not recomputed. Pinned by
+   `test_parse_action_scans_source_and_destination_once`. The docstring also
+   forbids adding extraction here, so the confusion it caused is designed out.
+2. **`_fill_defaults_move_cards` is source inference** — **still open.** ~309
+   lines (the "~131" figure is stale). Takes `_cached_source`/`_cached_dest`,
+   so it no longer recomputes; what remains is the inference itself.
+3. **`_walk` + `_propagate_context` = two full tree walks** — **still open.**
+   `_walk` (11 sub-walkers) during normalization; `_propagate_context`
+   (~240 lines) after `_process_pre_fix`. Merging needs the timing dependency
+   understood first — propagate consumes pre_fix output.
+4. **`_process_pre_fix` is ~340 lines of compensating patches** — mostly
+   **dissolved**; see the triage table above. What remains are genuine
+   pipeline steps with a known ability-count blast radius.
+5. **Double/triple extraction of the same fields** — ~~open~~ **ALREADY FIXED,
+   same refactor as item 1.** `extract_source`/`extract_destination` are
+   computed once per `parse_action` call and passed down.
 
 ## Completed work (history)
 
