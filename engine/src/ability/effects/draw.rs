@@ -3,7 +3,7 @@ use super::super::enums::Zone;
 use super::super::resolver::AbilityResolver;
 use super::super::types::{Choice, ExecutionContext};
 use super::super::util;
-use crate::ability_queue::ConditionalChoice;
+use crate::ability::queue::ConditionalChoice;
 use crate::card::{AbilityEffect, DistinctType};
 use crate::game_state::GameState;
 #[cfg(feature = "no_std")]

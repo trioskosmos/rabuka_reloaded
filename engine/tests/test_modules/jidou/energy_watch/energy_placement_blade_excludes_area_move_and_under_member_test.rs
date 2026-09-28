@@ -27,7 +27,7 @@ const TUTOR: &str = "PL!N-bp3-007-R";
 const SETSUNA: &str = "PL!N-PR-009-PR";
 const ENERGY: &str = "LL-E-001-SD";
 
-fn blade(game: &TestGame, cid: i16) -> i32 {
+fn blade(game: &TestGame, cid: i16) -> i16 {
     game.state.mods.get_blade_modifier(cid)
 }
 

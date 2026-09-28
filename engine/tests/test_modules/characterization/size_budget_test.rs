@@ -1,6 +1,6 @@
 use core::mem::size_of;
 use rabuka_engine::ability::resolver::AbilityResolver;
-use rabuka_engine::ability_queue::AbilityQueueEntry;
+use rabuka_engine::ability::queue::AbilityQueueEntry;
 
 /// Hot-struct size invariant.
 ///

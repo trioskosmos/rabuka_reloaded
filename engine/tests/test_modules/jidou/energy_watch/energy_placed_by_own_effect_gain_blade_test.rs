@@ -40,7 +40,7 @@ fn fill_deck_and_energy(game: &mut TestGame) {
     game.state.player1.energy_zone.set_active_count(15);
 }
 
-fn blade(game: &TestGame, cid: i16) -> i32 {
+fn blade(game: &TestGame, cid: i16) -> i16 {
     game.state.mods.get_blade_modifier(cid)
 }
 

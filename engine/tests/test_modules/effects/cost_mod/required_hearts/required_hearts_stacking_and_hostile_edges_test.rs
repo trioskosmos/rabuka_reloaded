@@ -63,7 +63,7 @@ fn hpt_in_live_zone(game: &mut TestGame) -> i16 {
     hpt
 }
 
-fn need_mod(game: &TestGame, hpt: i16) -> i32 {
+fn need_mod(game: &TestGame, hpt: i16) -> i16 {
     game.state
         .mods
         .get_need_heart_modifier(hpt, HeartColor::Heart00)

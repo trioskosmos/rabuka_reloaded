@@ -283,8 +283,16 @@ fn player_features(
         };
         let base = i32::from(card.get_score());
         let set = state.mods.get_score_set_modifier(card_id);
-        let additive = state.mods.get_score_modifier(card_id) - state.mods.get_score_set_modifier(card_id);
-        let effective = if set != 0 { set } else { base + additive };
+        let additive =
+            state.mods.get_score_modifier(card_id) - state.mods.get_score_set_modifier(card_id);
+        // A non-zero set replaces the printed score, so it is selected rather
+        // than added to. Wide arithmetic kept deliberately: the value feeds a
+        // feature sum that must not itself clamp at u8.
+        let effective = if set != 0 {
+            i32::from(set)
+        } else {
+            base + i32::from(additive)
+        };
         features.live_score = features
             .live_score
             .saturating_add(effective.max(0).u16_count());

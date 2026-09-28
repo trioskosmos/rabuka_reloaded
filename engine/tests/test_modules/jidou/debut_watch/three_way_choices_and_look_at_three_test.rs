@@ -55,7 +55,7 @@ fn fill_decks(game: &mut TestGame) {
     }
 }
 
-fn heart_mod(game: &TestGame, card: i16, colour: HeartColor) -> i32 {
+fn heart_mod(game: &TestGame, card: i16, colour: HeartColor) -> i16 {
     game.state.mods.get_heart_modifier(card, colour)
 }
 

@@ -26,13 +26,13 @@ const RURINO: &str = "PL!HS-pb1-003-R"; // 大沢瑠璃乃
 const RURINO_P: &str = "PL!HS-pb1-003-P＋"; // same card, ＋ printing
 const MIRAKU: &str = "PL!HS-sd1-011-SD"; // a 『みらくらぱーく！』 member
 
-fn heart01_mod(game: &TestGame, card_id: i16) -> i32 {
+fn heart01_mod(game: &TestGame, card_id: i16) -> i16 {
     game.state
         .mods
         .get_heart_modifier(card_id, HeartColor::Heart01)
 }
 
-fn blade_mod(game: &TestGame, card_id: i16) -> i32 {
+fn blade_mod(game: &TestGame, card_id: i16) -> i16 {
     game.state
         .mods
         .blade_modifiers

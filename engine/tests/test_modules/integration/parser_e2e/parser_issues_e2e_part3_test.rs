@@ -846,7 +846,7 @@ fn issue13_mia_three_conditional_blade_checks() {
     // colours, not ">= 0" (which is true for every blade modifier in the game).
     assert_eq!(
         game.state.mods.get_blade_modifier(mia),
-        expected_blade as i32,
+        expected_blade as i16,
         "13: ミア gains one blade per heart colour shared with the chosen \
          opponent member ({target_no})"
     );

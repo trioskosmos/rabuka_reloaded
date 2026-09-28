@@ -92,10 +92,10 @@ pub fn stage_member_and_swap_area(game: &mut TestGame, target: i16, target_area:
     activate_mill_three_position_swap(game, target_area);
 }
 
-pub fn heart_modifier(game: &TestGame, cid: i16, hc: HeartColor) -> i32 {
+pub fn heart_modifier(game: &TestGame, cid: i16, hc: HeartColor) -> i16 {
     game.state.mods.get_heart_modifier(cid, hc)
 }
 
-pub fn blade_modifier(game: &TestGame, cid: i16) -> i32 {
+pub fn blade_modifier(game: &TestGame, cid: i16) -> i16 {
     game.state.mods.get_blade_modifier(cid)
 }

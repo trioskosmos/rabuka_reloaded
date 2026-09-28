@@ -218,7 +218,7 @@ fn setup_lat_live_zone(game: &mut TestGame) -> i16 {
     lat
 }
 
-fn score(game: &TestGame, id: i16) -> i32 {
+fn score(game: &TestGame, id: i16) -> i16 {
     game.state.mods.get_score_modifier(id)
 }
 

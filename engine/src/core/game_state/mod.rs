@@ -1,4 +1,22 @@
-use crate::ability_queue::AbilityQueue;
+//! `GameState`: the whole mutable game, plus the operations on it.
+//!
+//! This file holds the state itself and the accessors. The `impl GameState`
+//! blocks that DO something to it are split across three real submodules (they
+//! were textual `include!()` splices once):
+//!
+//! - `modifiers` — recalculating the derived modifier tables from cards.
+//! - `abilities` — playing cards, spending energy, resolving choices.
+//! - `tracking` — per-step bookkeeping (moves, reveals, baton touches).
+//!
+//! They are declared at the TOP of this file, not at the bottom: with three of
+//! them split out, the declarations are the reader's index into a 1600-line
+//! module, and burying them under the last `impl` block is what makes the
+//! structure invisible.
+mod abilities;
+mod modifiers;
+mod tracking;
+
+use crate::ability::queue::AbilityQueue;
 use crate::card::{CardDatabase, CardId};
 use crate::core::game_modifiers::{CardOrientation, GameModifiers};
 use crate::player::{Player, PlayerId};
@@ -1650,12 +1668,6 @@ fn push_revealed_internal(
         }
     }
 }
-
-// Real child modules now (were textual include!() splices). Each contains
-// inherent `impl GameState` blocks split out of this file.
-mod abilities;
-mod modifiers;
-mod tracking;
 
 #[cfg(test)]
 mod serde_roundtrip_tests {

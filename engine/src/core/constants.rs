@@ -65,15 +65,33 @@ pub fn score_to_i32_rounded(v: f64) -> i32 {
     v.round().clamp(i32::MIN as f64, i32::MAX as f64) as i32
 }
 
-/// Effective value of a printed u8 stat plus a constant modifier, kept wide.
+/// Effective value of a printed u8 stat plus its modifier, saturating to u8.
 ///
-/// ONE home for the `printed as i32 + get_*_modifier` chain smeared across
-/// condition evaluation and cost math (comparison.rs, predicates.rs,
-/// condition/card.rs). Callers narrow with [`saturate_u8`]/[`saturate_i16`]
-/// or keep the i32 for sums — either way the entry cast lives here, once.
+/// ONE home for the `printed + modifier` chain that condition evaluation and
+/// cost math spell out (comparison.rs, predicates.rs, condition/card.rs).
+///
+/// The modifier arrives as `i16` because that is what `ModifierEntry` stores
+/// and what every `mods.get_*_modifier` accessor returns; this function is the
+/// single place that widens for the addition and narrows the result. Callers
+/// pass the modifier straight through, with no cast on either side.
 #[inline]
-pub fn effective_stat(printed: u8, modifier: i32) -> i32 {
-    printed as i32 + modifier
+pub fn effective_stat(printed: u8, modifier: i16) -> u8 {
+    saturate_u8(i32::from(printed) + i32::from(modifier))
+}
+
+/// The sibling of [`effective_stat`] for the OTHER case: a figure that already
+/// has an absolute set-override in place of its printed value.
+///
+/// Kept separate rather than folded into `effective_stat` because the two
+/// inputs are not the same kind of number. A printed stat is a `u8` — it came
+/// off the card. A set override is a modifier `i16`: 「ブレードの値が5になる」
+/// stores whatever the ability said, and it stacks additively on top like any
+/// other modifier. One function taking `impl Into<i32>` for both would compile
+/// at every call site and quietly invite passing a set value where a printed
+/// one belongs, which is a rule error, not a type error.
+#[inline]
+pub fn overridden_stat(set: i16, modifier: i16) -> u8 {
+    saturate_u8(i32::from(set) + i32::from(modifier))
 }
 
 /// Effective playable cost with floor-at-1: `(base + modifier).max(1)`,
@@ -86,8 +104,8 @@ pub fn effective_stat(printed: u8, modifier: i32) -> i32 {
 /// saturate instead of wrapping — unreachable in this game (costs ≤ ~15,
 /// modifiers ±single digits) and never intended.
 #[inline]
-pub fn floored_cost(base: u8, modifier: i32) -> u8 {
-    u8::try_from((base as i32 + modifier).max(1)).unwrap_or(u8::MAX)
+pub fn floored_cost(base: u8, modifier: i16) -> u8 {
+    saturate_u8(i32::from(base) + i32::from(modifier)).max(1)
 }
 
 /// Saturating narrowing for the count and index widths this crate uses.

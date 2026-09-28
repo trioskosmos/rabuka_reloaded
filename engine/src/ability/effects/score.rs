@@ -479,7 +479,11 @@ impl AbilityResolver {
         for (card_id, delta) in &live_card_ids {
             if has_floor {
                 let current_mod = gs.mods.get_score_modifier(*card_id);
-                if current_mod + (*delta as i32) < 0 {
+                // `saturating_add` rather than `+`: a score modifier is a
+                // running i16 total, and the floor test is asking whether the
+                // delta would push it below zero — which must be false for a
+                // wrapped-around value, not true.
+                if current_mod.saturating_add(*delta) < 0 {
                     continue;
                 }
             }

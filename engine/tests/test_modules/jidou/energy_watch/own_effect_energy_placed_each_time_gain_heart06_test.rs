@@ -31,7 +31,7 @@ fn setup_hazuki(game: &mut TestGame) -> i16 {
     hazuki
 }
 
-fn heart06_mod(game: &TestGame, card_id: i16) -> i32 {
+fn heart06_mod(game: &TestGame, card_id: i16) -> i16 {
     game.state
         .mods
         .get_heart_modifier(card_id, HeartColor::Heart06)

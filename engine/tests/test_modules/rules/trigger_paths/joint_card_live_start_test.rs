@@ -779,9 +779,9 @@ fn test_bp6_live_start_same_color_deduplicates() {
     } else {
         vec![]
     };
-    let expected: i32 = distinct_colors.len() as i32; // 1 per distinct color, deduped
+    let expected: i16 = distinct_colors.len() as i16; // 1 per distinct color, deduped
 
-    let total: i32 = [
+    let total: i16 = [
         HeartColor::Heart01,
         HeartColor::Heart02,
         HeartColor::Heart03,
@@ -830,7 +830,7 @@ fn test_bp6_live_start_skip_gains_no_heart() {
     // Skip — select nothing
     game.select_indices(&[]);
 
-    let total: i32 = [
+    let total: i16 = [
         HeartColor::Heart01,
         HeartColor::Heart02,
         HeartColor::Heart03,

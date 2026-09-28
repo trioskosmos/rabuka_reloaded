@@ -55,7 +55,7 @@ pub fn constant_per_unit_units(
     card_db: &CardDatabase,
     orientation_modifiers: &HashMap<i16, crate::core::game_modifiers::CardOrientation>,
     host_card_id: i16,
-) -> i32 {
+) -> i16 {
     let zone = constant_per_unit_zone(effect);
     let mut filter = effect.filter_subset();
     filter.exclude_self = Some(host_card_id);
@@ -70,10 +70,16 @@ pub fn constant_per_unit_units(
         orientation_modifiers,
         Some(host_card_id),
     );
-    let mut units = per_count as i32 / effect.per_unit_count_any().unwrap_or(1).max(1) as i32;
+    // `i16` because this is a unit COUNT feeding a modifier product, not a
+    // score. The divisor is `.max(1)` so it can never be zero, and both
+    // operands are `u8`, so the quotient is always in `i16` range — the
+    // `try_from` is belt-and-braces against a future wider `per_count`.
+    let mut units = i16::from(
+        per_count / effect.per_unit_count_any().unwrap_or(1).max(1),
+    );
     if effect.max.unwrap_or(false) {
         if let Some(cap) = effect.count_any() {
-            units = units.min(cap as i32);
+            units = units.min(i16::from(cap));
         }
     }
     log::debug!(

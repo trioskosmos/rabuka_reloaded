@@ -53,11 +53,11 @@ fn snapshot_adjustments(game: &TestGame) -> Vec<(&str, i16, u8)> {
     items
 }
 
-fn score_bonus(game: &TestGame, cid: i16) -> i32 {
+fn score_bonus(game: &TestGame, cid: i16) -> i16 {
     game.state.mods.get_score_modifier(cid)
 }
 
-fn heart_modifier(game: &TestGame, cid: i16, color: HeartColor) -> i32 {
+fn heart_modifier(game: &TestGame, cid: i16, color: HeartColor) -> i16 {
     game.state.mods.get_need_heart_modifier(cid, color)
 }
 

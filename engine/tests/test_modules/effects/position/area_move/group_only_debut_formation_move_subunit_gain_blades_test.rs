@@ -38,11 +38,11 @@ fn play_kanan_on_saintsnow_stage(game: &mut TestGame) -> i16 {
     kanan
 }
 
-fn total_blade(game: &TestGame) -> i32 {
-    let mut sum = 0;
+fn total_blade(game: &TestGame) -> i16 {
+    let mut sum: i16 = 0;
     for &cid in &game.state.player1.stage.stage {
         if cid != -1 {
-            sum += game.state.mods.get_blade_modifier(cid);
+            sum = sum.saturating_add(game.state.mods.get_blade_modifier(cid));
         }
     }
     sum

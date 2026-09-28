@@ -6,11 +6,11 @@ use rabuka_engine::card::HeartColor;
 
 const FILLER: &str = "PL!-sd1-010-SD";
 
-fn blade(game: &TestGame, cid: i16) -> i32 {
+fn blade(game: &TestGame, cid: i16) -> i16 {
     game.state.mods.get_blade_modifier(cid)
 }
 
-fn heart(game: &TestGame, cid: i16, hc: HeartColor) -> i32 {
+fn heart(game: &TestGame, cid: i16, hc: HeartColor) -> i16 {
     game.state.mods.get_heart_modifier(cid, hc)
 }
 

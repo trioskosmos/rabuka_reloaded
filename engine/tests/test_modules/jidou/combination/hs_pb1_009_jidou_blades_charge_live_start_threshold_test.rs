@@ -51,8 +51,8 @@ const FILLER: &str = "PL!-sd1-010-SD";
 /// card database (rather than hard-coding 4) makes this a precondition check: if
 /// the card data changes, the test says so instead of silently testing a
 /// different threshold.
-fn total_blade(game: &TestGame, cid: i16) -> i32 {
-    let printed = game.db.get_card(cid).map(|c| c.blade as i32).unwrap_or(0);
+fn total_blade(game: &TestGame, cid: i16) -> i16 {
+    let printed = game.db.get_card(cid).map(|c| c.blade as i16).unwrap_or(0);
     printed + game.state.mods.get_blade_modifier(cid)
 }
 

@@ -12,7 +12,7 @@ fn setup(game: &mut TestGame) -> i16 {
     ds
 }
 
-fn score_of(game: &TestGame, ds: i16) -> i32 {
+fn score_of(game: &TestGame, ds: i16) -> i16 {
     game.state
         .mods
         .score_modifiers

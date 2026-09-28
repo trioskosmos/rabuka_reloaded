@@ -3,7 +3,7 @@ use rabuka_engine::ability::types::Choice;
 use rabuka_engine::card::HeartColor;
 use rabuka_engine::zones::MemberArea;
 
-fn heart_mod(game: &TestGame, card_id: i16, heart: HeartColor) -> i32 {
+fn heart_mod(game: &TestGame, card_id: i16, heart: HeartColor) -> i16 {
     game.state.mods.get_heart_modifier(card_id, heart)
 }
 

@@ -347,8 +347,8 @@ pub fn move_card_from_hand_to_stage(
         stage_area: crate::zones::MemberArea,
         use_baton_touch: bool,
         card_db: &CardDatabase,
-        replaced_member_cost_mod: i32,
-        played_card_cost_mod: i32,
+        replaced_member_cost_mod: i16,
+        played_card_cost_mod: i16,
         waited_stage_cards: &[i16],
     ) -> Result<(u8, bool, Option<u8>, Option<i16>), String> {
         // Rule 8.2: Main Phase - Play member card from hand to stage

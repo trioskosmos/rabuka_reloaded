@@ -1,7 +1,7 @@
 use crate::helpers::*;
 use rabuka_engine::zones::MemberArea;
 
-fn blade_mod(g: &TestGame, cid: i16) -> i32 {
+fn blade_mod(g: &TestGame, cid: i16) -> i16 {
     g.state
         .mods
         .blade_modifiers

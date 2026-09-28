@@ -3,7 +3,7 @@ use super::enums::Zone;
 use super::resolver::AbilityResolver;
 use super::types::{Choice, ExecutionContext, LookAndSelectStep};
 use super::util;
-use crate::ability_queue::ConditionalChoice;
+use crate::ability::queue::ConditionalChoice;
 use crate::card::{AbilityEffect, CardDatabase, Operator, PlacementOrder};
 use crate::game_state::GameState;
 

@@ -3,7 +3,7 @@ use super::super::enums::{TargetPlayer, Zone};
 use super::super::resolver::AbilityResolver;
 use super::super::types::{Choice, ChoiceRoute, ExecutionContext};
 use super::super::util;
-use crate::ability_queue::ConditionalChoice;
+use crate::ability::queue::ConditionalChoice;
 use crate::card::AbilityEffect;
 use crate::core::game_modifiers::CardOrientation;
 use crate::game_state::GameState;

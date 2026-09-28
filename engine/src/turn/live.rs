@@ -205,7 +205,7 @@ pub(crate) fn process_yell_revealed_card_icons(
 fn record_pretrigger_live_results(
     gs: &mut GameState,
     need_heart_flat: &HashMap<i16, HashMap<crate::card::HeartColor, ModifierEntry>>,
-    pre_score_flat: &HashMap<i16, i32>,
+    pre_score_flat: &HashMap<i16, i16>,
 ) {
     // (won, no_excess) per seat, computed from finalised allocations.
     let mut results = [(false, false); 2];
@@ -261,13 +261,13 @@ fn record_pretrigger_live_results(
                         required[color.index()] = u8::try_from(me.set).unwrap();
                     }
                 }
-                for (color, me) in card_mods {
-                    if me.additive != 0 {
-                        let idx = color.index();
-                        let current = required[idx] as i32;
-                        required[idx] = crate::constants::saturate_u8(current + me.additive as i32);
-                    }
-                }
+                // The Q115/Q127 set-then-add rule has one definition, in
+                // `apply_need_heart_modifiers`. This loop used to restate the
+                // additive half of it, which is how the two drifted.
+                crate::core::game_modifiers::apply_need_heart_modifiers(
+                    &mut required,
+                    card_mods,
+                );
             }
             // Same acceptance rules as the authoritative PASS/FAIL pass:
             // total coverage, then heart0 bucket, then per-color deficits
@@ -401,7 +401,7 @@ impl super::TurnEngine {
     fn compute_pregame_scores(
         game_state: &GameState,
         need_heart_flat: &HashMap<i16, HashMap<HeartColor, ModifierEntry>>,
-        pre_score_flat: &HashMap<i16, i32>,
+        pre_score_flat: &HashMap<i16, i16>,
         p1_extra: u8,
         p2_extra: u8,
     ) -> (u8, u8) {
@@ -521,15 +521,18 @@ impl super::TurnEngine {
                 snap.lives[i].card_no = crate::types::ArcStr::from(card.card_no.as_ref());
                 if card.need_heart.is_none() {
                     snap.lives[i].passed = true;
-                    let base_score = card.get_score() as i32;
+                    let base_score = card.get_score();
                     let set_score = game_state.mods.get_score_set_modifier(lc_id);
                     let additive = game_state.mods.get_score_modifier(lc_id) - set_score;
-                    let effective_base = if set_score != 0 {
-                        set_score
+                    // A non-zero set replaces the printed score outright, so
+                    // the two are selected, never added. `overridden_stat`
+                    // because the set half is a modifier, not a printed u8.
+                    let effective = if set_score != 0 {
+                        crate::constants::overridden_stat(set_score, additive)
                     } else {
-                        base_score
+                        crate::constants::effective_stat(base_score, additive)
                     };
-                    snap.lives[i].score = crate::constants::saturate_u8(effective_base + additive);
+                    snap.lives[i].score = effective;
                     continue;
                 }
                 let nh = card.need_heart.as_ref().unwrap();
@@ -645,7 +648,10 @@ impl super::TurnEngine {
                                 } else {
                                     String::new()
                                 },
-                                value: i16::try_from(total).unwrap(),
+                                // `total` is already the i16 `Adjustment.value`
+                                // type; the `try_from` only existed to undo an
+                                // i32 widening that no longer happens.
+                                value: total,
                                 color: u8::try_from(color.index()).unwrap(),
                                 source: if verbose {
                                     format!("{} req modifier ({})", card.name, color_label)
@@ -679,15 +685,15 @@ impl super::TurnEngine {
                 snap.lives[i].required = required_arr;
                 snap.lives[i].filled = filled;
                 snap.lives[i].passed = passed;
-                let base_score = card.get_score() as i32;
+                let base_score = card.get_score();
                 let set_score = game_state.mods.get_score_set_modifier(lc_id);
                 let additive = game_state.mods.get_score_modifier(lc_id) - set_score;
-                let effective_base = if set_score != 0 {
-                    set_score
+                let effective = if set_score != 0 {
+                    crate::constants::overridden_stat(set_score, additive)
                 } else {
-                    base_score
+                    crate::constants::effective_stat(base_score, additive)
                 };
-                snap.lives[i].score = crate::constants::saturate_u8(effective_base + additive);
+                snap.lives[i].score = effective;
             }
         }
     }
@@ -796,9 +802,9 @@ impl super::TurnEngine {
 
     fn revert_live_success_score_modifiers(
         game_state: &mut GameState,
-        pre_score_flat: &HashMap<i16, i32>,
+        pre_score_flat: &HashMap<i16, i16>,
     ) {
-        let post: HashMap<i16, i32> = game_state
+        let post: HashMap<i16, i16> = game_state
             .mods
             .score_modifiers
             .iter()
@@ -806,18 +812,24 @@ impl super::TurnEngine {
             .collect();
         for (&cid, post_total) in &post {
             let pre = pre_score_flat.get(&cid).copied().unwrap_or(0);
-            let delta = post_total - pre;
+            // `saturating_sub`/`saturating_neg` rather than `-`: both
+            // operands are a card's running score modifier, and a wrap would
+            // produce a small delta that then looks like a legitimate small
+            // correction. Saturating keeps the direction of any overflow.
+            let delta = post_total.saturating_sub(pre);
             if delta != 0 {
-                game_state
-                    .mods
-                    .add_score_modifier(cid, i16::try_from(-delta).unwrap());
+                game_state.mods.add_score_modifier(cid, delta.saturating_neg());
             }
         }
         for (&cid, &pre_total) in pre_score_flat {
             if !post.contains_key(&cid) {
-                game_state
-                    .mods
-                    .set_score_modifier(cid, i16::try_from(pre_total).unwrap());
+                // Restores a card whose modifier entry was dropped entirely.
+                // NOTE: this writes the *total* into the `set` half of the
+                // entry, so the value is later read back as a set-override
+                // rather than as an additive delta. That is pre-existing
+                // behaviour and is preserved exactly here; it is correct only
+                // because the entry's `additive` is zero at this point.
+                game_state.mods.set_score_modifier(cid, pre_total);
             }
         }
         log::debug!(
@@ -1069,13 +1081,13 @@ impl super::TurnEngine {
     fn snapshot_score_flats(
         game_state: &GameState,
     ) -> (
-        HashMap<i16, i32>,
+        HashMap<i16, i16>,
         HashMap<i16, HashMap<HeartColor, ModifierEntry>>,
     ) {
         // Capture pre-trigger score modifiers so we can avoid double-counting:
         // calculate_live_score gets the PRE values, and pX_extra carries only
         // the delta from LiveSuccess-triggered abilities.
-        let pre_score_flat: HashMap<i16, i32> = game_state
+        let pre_score_flat: HashMap<i16, i16> = game_state
             .mods
             .score_modifiers
             .iter()
@@ -1149,9 +1161,12 @@ impl super::TurnEngine {
     /// Score delta since the pre-trigger snapshot for one side's live zone.
     fn side_score_extra(
         game_state: &GameState,
-        pre_score_flat: &HashMap<i16, i32>,
+        pre_score_flat: &HashMap<i16, i16>,
         live_zone: &[i16],
     ) -> u8 {
+        // Wide accumulator kept deliberately: each term is a signed difference
+        // and this sums one per live card, so `i32` stops a single addition
+        // from being the thing that wraps. Each term is an i16 difference.
         let mut total = 0i32;
         for &cid in live_zone {
             let current = game_state
@@ -1159,7 +1174,9 @@ impl super::TurnEngine {
                 .score_modifiers
                 .get(&cid)
                 .map_or(0, |entry| entry.total());
-            total += current - pre_score_flat.get(&cid).copied().unwrap_or(0);
+            total += i32::from(
+                current.saturating_sub(pre_score_flat.get(&cid).copied().unwrap_or(0)),
+            );
         }
         crate::constants::saturate_u8(total)
     }
@@ -1172,7 +1189,7 @@ impl super::TurnEngine {
         game_state: &mut GameState,
         player1_id: &str,
         player2_id: &str,
-        pre_score_flat: &HashMap<i16, i32>,
+        pre_score_flat: &HashMap<i16, i16>,
     ) -> Option<(u8, u8)> {
         if !game_state.live_success_triggered_this_turn {
             game_state.live_success_triggered_this_turn = true;
@@ -2918,22 +2935,13 @@ pub fn check_live_success(
                 for (color, needed) in &base_nh.hearts {
                     required_arr[color.index()] = *needed;
                 }
-                // Apply set modifiers (per-color override).
+                // Q115/Q127: per-colour set first, then additive on top — the
+                // single definition of that rule, not a third restatement.
                 if let Some(card_mods) = need_heart_modifiers.get(&lc_id) {
-                    // Q115: Set-to-X applies first, then additive stacks.
-                    for (color, me) in card_mods {
-                        if me.set != 0 {
-                            required_arr[color.index()] = u8::try_from(me.set).unwrap();
-                        }
-                    }
-                    for (color, me) in card_mods {
-                        if me.additive != 0 {
-                            let idx = color.index();
-                            let current = required_arr[idx] as i32;
-                            required_arr[idx] =
-                                crate::constants::saturate_u8(current + me.additive as i32);
-                        }
-                    }
+                    crate::core::game_modifiers::apply_need_heart_modifiers(
+                        &mut required_arr,
+                        card_mods,
+                    );
                 }
                 let filled = per_card_filled[live_idx];
                 // COLORLESS hearts (filled[0], e.g. from b_heart07) count toward the

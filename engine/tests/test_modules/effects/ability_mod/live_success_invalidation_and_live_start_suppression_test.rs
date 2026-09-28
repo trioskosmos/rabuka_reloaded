@@ -77,7 +77,7 @@ fn genki_exactly_6_heart02_across_two_members_invalidates_live_success() {
     game.add_to_stage(MemberArea::RightSide, filler);
     game.state.mods.add_heart_modifier(chika, HeartColor::Heart02, 2);
 
-    let total_heart02: i32 = [chika, ruby]
+    let total_heart02: i16 = [chika, ruby]
         .iter()
         .map(|&id| {
             let printed = game
@@ -87,7 +87,7 @@ fn genki_exactly_6_heart02_across_two_members_invalidates_live_success() {
                 .and_then(|h| h.hearts.get(&HeartColor::Heart02))
                 .copied()
                 .unwrap_or(0);
-            printed as i32 + game.state.mods.get_heart_modifier(id, HeartColor::Heart02)
+            printed as i16 + game.state.mods.get_heart_modifier(id, HeartColor::Heart02)
         })
         .sum();
     assert_eq!(total_heart02, 6, "setup must reach exactly 6 heart02");
@@ -131,7 +131,7 @@ fn genki_5_heart02_keeps_live_success_and_it_resolves() {
     game.add_to_stage(MemberArea::RightSide, filler);
     game.state.mods.add_heart_modifier(chika, HeartColor::Heart02, 1);
 
-    let total_heart02: i32 = [chika, ruby]
+    let total_heart02: i16 = [chika, ruby]
         .iter()
         .map(|&id| {
             let printed = game
@@ -141,7 +141,7 @@ fn genki_5_heart02_keeps_live_success_and_it_resolves() {
                 .and_then(|h| h.hearts.get(&HeartColor::Heart02))
                 .copied()
                 .unwrap_or(0);
-            printed as i32 + game.state.mods.get_heart_modifier(id, HeartColor::Heart02)
+            printed as i16 + game.state.mods.get_heart_modifier(id, HeartColor::Heart02)
         })
         .sum();
     assert_eq!(total_heart02, 5, "setup must reach exactly 5 heart02");

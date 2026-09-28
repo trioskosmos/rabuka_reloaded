@@ -35,7 +35,7 @@ fn under(game: &mut TestGame, card_no: &str) -> i16 {
 
 /// Set up しずく at center, place the given under-cards, drive to after ライブ開始時
 /// (LiveStart), and return the blade modifier the skill granted herself.
-fn run_and_get_blade(game: &mut TestGame, under_cards: &[&str]) -> i32 {
+fn run_and_get_blade(game: &mut TestGame, under_cards: &[&str]) -> i16 {
     let shizuku = game.id(SHIZUKU);
     game.state.player1.stage.stage = [-1, shizuku, -1];
     for c in under_cards {

@@ -159,7 +159,7 @@ impl GameState {
                     source_card_id: under_cid,
                     ability_text: ui_text(&effect.text),
                     target_card_id: host,
-                        amount: i32::from(count),
+                    amount: count,
                     color: None,
                     kind: ui_kind("blade"),
                 });
@@ -222,8 +222,8 @@ fn commit_constant_results(
         exp_blade_sources: Vec<crate::core::game_modifiers::BonusSource>,
         exp_heart_sources: Vec<crate::core::game_modifiers::BonusSource>,
         exp_global_nh_sources: Vec<crate::core::game_modifiers::BonusSource>,
-        p1_constant_score_bonus: i32,
-        p2_constant_score_bonus: i32,
+        p1_constant_score_bonus: i16,
+        p2_constant_score_bonus: i16,
     ) {
         // Blade
         tdbg!("RC:7 BLADE");
@@ -259,8 +259,8 @@ fn commit_constant_results(
 
         // Per-player global score bonus (from GainAbility modify_score)
         if log::log_enabled!(log::Level::Debug)
-            && (i32::from(self.mods.p1_constant_total_score_bonus) != p1_constant_score_bonus
-                || i32::from(self.mods.p2_constant_total_score_bonus) != p2_constant_score_bonus)
+            && (self.mods.p1_constant_total_score_bonus != p1_constant_score_bonus
+                || self.mods.p2_constant_total_score_bonus != p2_constant_score_bonus)
         {
             log::debug!(
                 "[CONSTANT_SCORE] live-total bonus: p1 {} -> {}, p2 {} -> {}",
@@ -375,8 +375,8 @@ fn commit_constant_results(
         let mut exp_blade_sources: Vec<crate::core::game_modifiers::BonusSource> = Vec::new();
         let mut exp_heart_sources: Vec<crate::core::game_modifiers::BonusSource> = Vec::new();
         let mut exp_global_nh_sources: Vec<crate::core::game_modifiers::BonusSource> = Vec::new();
-        let mut p1_constant_score_bonus: i32 = 0;
-        let mut p2_constant_score_bonus: i32 = 0;
+        let mut p1_constant_score_bonus: i16 = 0;
+        let mut p2_constant_score_bonus: i16 = 0;
         let mut jyouji_statuses: Vec<crate::types::ConstantAbilityStatus> = Vec::new();
         tdbg!("RC:3 VEC_HASHMAP_INIT_OK");
 
@@ -488,14 +488,21 @@ fn commit_constant_results(
                             crate::ability::enums::ActionType::GainResource => {
                                 match effect.resource_any().unwrap_or("") {
                                     "blade" => {
-                                        let n = if let Some(dc) = effect.dynamic_count_any() {
-                                            self.resolve_dynamic_count(
+                                        // `i16` end to end. This used to be
+                                        // computed as an i32 — including a
+                                        // `units * base` product — only to be
+                                        // narrowed by a `try_from(..).unwrap()`
+                                        // a few lines later, which would have
+                                        // panicked rather than clamped on a
+                                        // count a card could legally produce.
+                                        let n: i16 = if let Some(dc) = effect.dynamic_count_any() {
+                                            i16::from(self.resolve_dynamic_count(
                                                 dc,
                                                 &[],
                                                 &[],
                                                 0,
                                                 Some(card_id),
-                                            ) as i32
+                                            ))
                                         } else if effect.per_unit_any().unwrap_or(false) {
                                             // Per-unit constants count units on a stage.
                                             // `target: "opponent"` (相手のステージにいる…)
@@ -527,18 +534,21 @@ fn commit_constant_results(
                                                 card_id,
                                             );
                                             let base = if effect.max.unwrap_or(false) {
-                                                1
+                                                1u8
                                             } else {
                                                 effect
                                                     .resource_icon_count_any()
                                                     .unwrap_or(effect.count_any().unwrap_or(1))
                                             };
-                                            units * base as i32
+                                            units.saturating_mul(i16::from(base))
                                         } else {
-                                            effect
-                                                .resource_icon_count_any()
-                                                .unwrap_or(effect.count_any().unwrap_or(1))
-                                                as i32
+                                            i16::from(
+                                                effect
+                                                    .resource_icon_count_any()
+                                                    .unwrap_or(
+                                                        effect.count_any().unwrap_or(1),
+                                                    ),
+                                            )
                                         };
                                         // "失う" (lose) is represented as sign:negative.
                                         // Apply the sign so the modifier is negative.
@@ -550,7 +560,11 @@ fn commit_constant_results(
                                         } else {
                                             1
                                         };
-                                        let delta = i16::try_from(n).unwrap() * sign_mult;
+                                        // `saturating_mul`: a per-unit count
+                                        // large enough to overflow should clamp,
+                                            // not panic the way the `try_from`
+                                            // this replaces did.
+                                        let delta = n.saturating_mul(sign_mult);
                                         // Determine blade grant targets:
                                         //   - position "front" (正面のエリア): opponent's
                                         //     mirrored slot (your left faces opp right, etc.)
@@ -569,7 +583,7 @@ fn commit_constant_results(
                                                     source_card_id: card_id,
                                                     ability_text: ui_text(&effect.text),
                                                     target_card_id: tid,
-                                                    amount: delta as i32,
+                                                    amount: delta,
                                                     color: None,
                                                     kind: ui_kind("blade"),
                                                 });
@@ -610,7 +624,7 @@ fn commit_constant_results(
                                                     source_card_id: card_id,
                                                     ability_text: ui_text(&effect.text),
                                                     target_card_id: mid,
-                                                    amount: delta as i32,
+                                                    amount: delta,
                                                     color: None,
                                                     kind: ui_kind("blade"),
                                                 });
@@ -621,24 +635,24 @@ fn commit_constant_results(
                                                 source_card_id: card_id,
                                                 ability_text: ui_text(&effect.text),
                                                 target_card_id: card_id,
-                                                amount: delta as i32,
+                                                amount: delta,
                                                 color: None,
                                                 kind: ui_kind("blade"),
                                             });
                                         }
                                     }
                                     "heart" => {
-                                        let n = if let Some(dc) = effect.dynamic_count_any() {
+                                        let n: i16 = if let Some(dc) = effect.dynamic_count_any() {
                                             // Unified dynamic_count resolution (dynamic_count.rs).
                                             // The constant path has no resolver step context, so
                                             // pass empty moved/selected and 0 draw count.
-                                                self.resolve_dynamic_count(
-                                                    dc,
-                                                    &[],
-                                                    &[],
-                                                    0,
-                                                    Some(card_id),
-                                                ) as i32
+                                            i16::from(self.resolve_dynamic_count(
+                                                dc,
+                                                &[],
+                                                &[],
+                                                0,
+                                                Some(card_id),
+                                            ))
                                         } else if effect.per_unit_any().unwrap_or(false) {
                                             // Same target=opponent resolution as the
                                             // blade path above.
@@ -668,7 +682,7 @@ fn commit_constant_results(
                                                 card_id,
                                             )
                                         } else {
-                                            effect.count_any().unwrap_or(1) as i32
+                                            i16::from(effect.count_any().unwrap_or(1))
                                         };
                                         if crate::ability::util::is_all_heart_type(effect) {
                                             *exp_heart
@@ -686,10 +700,7 @@ fn commit_constant_results(
                                             });
                                         } else {
                                             let hc_list = effect.heart_colors_any();
-                                            let per_entry = i16::try_from(
-                                                    n / hc_list.len().max(1).i32_count(),
-                                            )
-                                            .unwrap();
+                                            let per_entry = n / hc_list.len().max(1).max(1) as i16;
                                             for hc in hc_list {
                                                 *exp_heart
                                                     .entry(card_id)
@@ -700,7 +711,7 @@ fn commit_constant_results(
                                                     source_card_id: card_id,
                                                     ability_text: ui_text(&effect.text),
                                                     target_card_id: card_id,
-                                                        amount: i32::from(per_entry),
+                                                    amount: per_entry,
                                                     color: Some(hc.clone()),
                                                     kind: ui_kind("heart"),
                                                 });
@@ -711,12 +722,16 @@ fn commit_constant_results(
                                 }
                             }
                             crate::ability::enums::ActionType::ModifyScore => {
-                                let sv = i32::from(effect.value_any().unwrap_or(0));
+                                // `i16` throughout: the value is a modifier, and
+                                // it feeds the same i16 accumulators as every
+                                // other constant score delta. It was widened to
+                                // i32 here and narrowed again three lines down.
+                                let sv = i16::from(effect.value_any().unwrap_or(0));
                                 if sv != 0 {
                                     self.mods.constant_score_sources.push((
                                         card_id,
                                         ui_text(&effect.text),
-                                        i16::try_from(sv).unwrap(),
+                                        sv,
                                     ));
                                 }
                                 // target="live_total" (parser-emitted for
@@ -735,7 +750,7 @@ fn commit_constant_results(
                                         p2_constant_score_bonus += sv;
                                     }
                                 } else {
-                                    *exp_score.entry(card_id).or_insert(0) += i16::try_from(sv).unwrap();
+                                    *exp_score.entry(card_id).or_insert(0) += sv;
                                 }
                             }
                             crate::ability::enums::ActionType::Restriction => {
@@ -838,7 +853,7 @@ fn commit_constant_results(
                                         if action
 == crate::ability::enums::ActionType::ModifyScore
                                     {
-                                        let val = i32::from(gained.value_any().unwrap_or(0));
+                                        let val = i16::from(gained.value_any().unwrap_or(0));
                                         *bonus_target += val;
                                         if val != 0 {
                                             self.mods.constant_score_sources.push((
@@ -864,7 +879,7 @@ fn commit_constant_results(
                                                 s.chars()
                                                     .take_while(|c| c.is_ascii_digit())
                                                     .collect::<String>()
-                                                    .parse::<i32>()
+                                                    .parse::<i16>()
                                                     .ok()
                                             })
                                         {
@@ -873,7 +888,7 @@ fn commit_constant_results(
                                                 self.mods.constant_score_sources.push((
                                                     card_id,
                                                     ui_text(gain_text),
-                                                    i16::try_from(val).unwrap(),
+                                                    val,
                                                 ));
                                             }
                                         }
@@ -890,12 +905,15 @@ fn commit_constant_results(
                             crate::ability::enums::ActionType::ModifyRequiredHeartsGlobal => {
                                 let target_name = effect.target_name();
                                 let target_player = self.resolve_target_player(target_name);
-                                let value = effect.value_or_count(1) as i32;
+                                let value = i16::from(effect.value_or_count(1));
                                 let op_str = effect.operation_any().unwrap_or("increase");
                                 let op = op_str;
+                                // `saturating_neg` so a "decrease" of a value
+                                // that cannot be negated in i16 clamps rather
+                                // than wrapping into a positive delta.
                                 let delta = match op {
                                     "increase" => value,
-                                    "decrease" => -value,
+                                    "decrease" => value.saturating_neg(),
                                     _ => value,
                                 };
                                 let heart_colors = effect.heart_colors_any();
@@ -910,7 +928,7 @@ fn commit_constant_results(
                                         exp_global_need_heart.push((
                                             *card_id,
                                             color.to_string(),
-                                            delta.i16_count(),
+                                            delta,
                                         ));
                                         exp_global_nh_sources.push(
                                             crate::core::game_modifiers::BonusSource {
@@ -940,10 +958,11 @@ fn commit_constant_results(
                                         {
                                             match sub.resource_any().unwrap_or("") {
                                                 "blade" => {
-                                                    let n = sub
-                                                        .resource_icon_count_any()
-                                                        .unwrap_or(sub.count.unwrap_or(1)) as i32;
-                                                    *exp_blade.entry(card_id).or_insert(0) += i16::try_from(n).unwrap();
+                                                    let n = i16::from(
+                                                        sub.resource_icon_count_any()
+                                                            .unwrap_or(sub.count.unwrap_or(1)),
+                                                    );
+                                                    *exp_blade.entry(card_id).or_insert(0) += n;
                                                     exp_blade_sources.push(crate::core::game_modifiers::BonusSource {
                                                         source_card_id: card_id,
                                                         ability_text: ui_text(&effect.text),
@@ -954,11 +973,17 @@ fn commit_constant_results(
                                                     });
                                                 }
                                                 "heart" => {
-                                                    let n = i32::from(sub.count.unwrap_or(1));
+                                                    let n = i16::from(sub.count.unwrap_or(1));
                                                     let hc_list = sub.heart_colors_any();
-                                                let per_color = crate::constants::saturate_i16(
-                                                n / hc_list.len().max(1).i32_count(),
-                                                );
+                                                    // Split the count evenly across the
+                                                    // named colours. `i32` for the
+                                                    // division only: a colour list
+                                                    // can be long enough that the
+                                                    // quotient must not itself be
+                                                    // the thing that saturates.
+                                                    let per_color = crate::constants::saturate_i16(
+                                                        n.i32_count() / hc_list.len().max(1).i32_count(),
+                                                    );
                                                     for hc in hc_list {
                                                         *exp_heart
                                                             .entry(card_id)
@@ -969,7 +994,7 @@ fn commit_constant_results(
                                                             source_card_id: card_id,
                                                             ability_text: ui_text(&effect.text),
                                                             target_card_id: card_id,
-                                                            amount: i32::from(per_color),
+                                                            amount: per_color,
                                                             color: Some(hc.clone()),
                                                             kind: ui_kind("heart"),
                                                         });
@@ -1176,7 +1201,11 @@ fn commit_constant_results(
                     .as_ref()
                     .is_none_or(|c| ctx.evaluate_condition(c));
                 if cond_met {
-                    let mut value = effect.value_any().unwrap_or(0) as i32;
+                    // `i16`: a cost modifier, the same width `ModifierEntry`
+                    // stores. The per-unit branch below multiplies by a unit
+                    // COUNT, and that product is clamped here rather than
+                    // wrapping.
+                    let mut value = i16::from(effect.value_any().unwrap_or(0));
 
                     // Handle per_unit cost reduction (e.g. "1 per other card in hand")
                     if effect.per_unit_any().unwrap_or(false) {
@@ -1240,7 +1269,10 @@ fn commit_constant_results(
                         } else {
                             count
                         };
-                        value = ((effective / per_unit_count) * u8::try_from(value).unwrap()) as i32;
+                        // Saturating: a per-unit cost modifier is a count
+                        // product, and a large count should clamp rather than
+                        // wrap into a small (or negative) cost.
+                        value = value.saturating_mul((effective / per_unit_count) as i16);
                         log::debug!("[COST_MOD] cid={} zone={} count={} eff={} per_unit_cnt={} val={} exclude={}",
                             cid, count_zone, count, effective, per_unit_count, value, exclude_self);
                     }
@@ -1255,7 +1287,7 @@ fn commit_constant_results(
                     let op = op_str;
                     match op {
                         "add" => {
-                            *expected.entry(cid).or_insert(0) += i16::try_from(value).unwrap();
+                            *expected.entry(cid).or_insert(0) += value;
                             cost_sources.push(crate::core::game_modifiers::BonusSource {
                                 source_card_id: cid,
                                 ability_text: ui_text(&effect.text),
@@ -1266,19 +1298,19 @@ fn commit_constant_results(
                             });
                         }
                         "subtract" => {
-                                *expected.entry(cid).or_insert(0) -=
-                                    crate::constants::saturate_i16(value);
+                            *expected.entry(cid).or_insert(0) -=
+                                crate::constants::saturate_i16(i32::from(value));
                             cost_sources.push(crate::core::game_modifiers::BonusSource {
                                 source_card_id: cid,
                                 ability_text: ui_text(&effect.text),
                                 target_card_id: cid,
-                                amount: -(value),
+                                amount: value.saturating_neg(),
                                 color: None,
                                 kind: ui_kind("cost"),
                             });
                         }
                         "set" => {
-                            expected_set.insert(cid, crate::constants::saturate_i16(value));
+                            expected_set.insert(cid, value);
                             cost_sources.push(crate::core::game_modifiers::BonusSource {
                                 source_card_id: cid,
                                 ability_text: ui_text(&effect.text),
@@ -1968,9 +2000,11 @@ fn commit_constant_results(
             ActionType::GainResource => {
                 let resource_binding = effect.resource_any();
                 let resource = resource_binding.unwrap_or("");
-                let amount = effect
-                    .resource_icon_count_any()
-                    .unwrap_or(effect.count_or(1)) as i32;
+                let amount = i16::from(
+                    effect
+                        .resource_icon_count_any()
+                        .unwrap_or(effect.count_or(1)),
+                );
                 let card_db = self.card_database.clone();
                 let player = match effect.target_name() {
                     "self" | "自分" => owner_player,
@@ -2055,12 +2089,12 @@ fn commit_constant_results(
                                 );
                             }
                                 self.mods
-                                    .add_blade_modifier(target_id, crate::constants::saturate_i16(amount));
+                                    .add_blade_modifier(target_id, amount);
                             *self
                                 .mods
                                 .success_zone_blade_bonuses
                                 .entry(target_id)
-                                    .or_insert(0) += crate::constants::saturate_i16(amount);
+                                    .or_insert(0) += amount;
                             self.mods.success_zone_blade_sources.push(
                                 crate::core::game_modifiers::BonusSource {
                                     source_card_id: cid,
@@ -2075,9 +2109,7 @@ fn commit_constant_results(
                     }
                     "heart" => {
                         let heart_colors = effect.heart_colors_any();
-                            let per_color = crate::constants::saturate_i16(
-                                amount / heart_colors.len().max(1).i32_count(),
-                            );
+                        let per_color = amount / heart_colors.len().max(1) as i16;
                         let colors = heart_colors
                             .iter()
                             .map(String::as_str)
@@ -2098,7 +2130,7 @@ fn commit_constant_results(
                                         source_card_id: cid,
                                         ability_text: ui_text(&effect.text),
                                         target_card_id: target_id,
-                                        amount: per_color as i32,
+                                        amount: per_color,
                                         color: Some(color_str.to_string()),
                                         kind: ui_kind("heart"),
                                     },
@@ -2143,7 +2175,7 @@ fn commit_constant_results(
                                     source_card_id: cid,
                                     ability_text: ui_text(&effect.text),
                                     target_card_id: target_id,
-                                    amount: value as i32,
+                                    amount: value,
                                     color: None,
                                     kind: ui_kind("score_set"),
                                 },
@@ -2161,7 +2193,7 @@ fn commit_constant_results(
                                     source_card_id: cid,
                                     ability_text: ui_text(&effect.text),
                                     target_card_id: target_id,
-                                    amount: value as i32,
+                                    amount: value,
                                     color: None,
                                     kind: ui_kind("score"),
                                 },

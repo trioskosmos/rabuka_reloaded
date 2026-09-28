@@ -480,7 +480,7 @@ fn issue8_honoka_live_score_1_plus_2() {
 // so playing to left/right granted blades to whatever member was at center.
 // ====================================================================
 
-fn assert_blade(game: &TestGame, card_id: i16, expected: i32) -> i32 {
+fn assert_blade(game: &TestGame, card_id: i16, expected: i16) -> i16 {
     let actual = game.state.mods.get_blade_modifier(card_id);
     assert_eq!(actual, expected, "blade modifier for card {}", card_id);
     actual

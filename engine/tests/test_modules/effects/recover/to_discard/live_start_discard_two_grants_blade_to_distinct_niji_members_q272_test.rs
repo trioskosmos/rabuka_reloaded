@@ -26,10 +26,10 @@ const WITH_BLADE_MEMBER: &str = "PL!-sd1-010-SD";
 const LIVE_CARD: &str = "PL!-sd1-020-SD";
 const FILLER: &str = "PL!-sd1-010-SD";
 
-fn blade(g: &TestGame, id: i16) -> i32 {
+fn blade(g: &TestGame, id: i16) -> i16 {
     g.state.mods.get_blade_modifier(id)
 }
-fn score(g: &TestGame, id: i16) -> i32 {
+fn score(g: &TestGame, id: i16) -> i16 {
     g.state.mods.get_score_modifier(id)
 }
 

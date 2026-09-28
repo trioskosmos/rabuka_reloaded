@@ -131,6 +131,62 @@ fn record_trace(size: usize) {
     });
 }
 
+/// Disarms the trace on drop. `None` when the site is not the one being
+/// traced, so the call site is a bare `let _trace = ...` and costs nothing.
+pub struct TraceGuard {
+    label: &'static str,
+    armed: bool,
+}
+
+impl Drop for TraceGuard {
+    fn drop(&mut self) {
+        if !self.armed {
+            return;
+        }
+        let rows = disarm_alloc_trace();
+        let total: u64 = rows.iter().map(|r| r.1).sum();
+        let bytes: u64 = rows.iter().map(|r| r.2).sum();
+        eprintln!(
+            "\n=== ALLOC TRACE: {} ===\n{total} allocations, {bytes} bytes, \
+             across {} distinct call sites\n",
+            self.label,
+            rows.len()
+        );
+        for (site, count, site_bytes) in rows.iter().take(40) {
+            eprintln!("{count:>6}x {site_bytes:>9}B  {site}");
+        }
+    }
+}
+
+/// Arm the tracer at a named site inside the engine, Nth time it is reached.
+///
+/// `RABUKA_TRACE_AT=<label>#<n>` — e.g. `process_current_ability#3` — arms
+/// there, and the returned guard disarms on the way out. This is for
+/// hotspots the bench cannot wrap from outside because the engine reaches
+/// them from inside `execute_and_settle`. Costs one relaxed atomic load per
+/// call when unset, and nothing at all when the feature is off, because every
+/// call site is behind `#[cfg(feature = "alloc_tracker")]`.
+pub fn maybe_arm(label: &'static str) -> Option<TraceGuard> {
+    static CACHE: std::sync::OnceLock<Option<(String, u64)>> = std::sync::OnceLock::new();
+    static HITS: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
+    let want = CACHE.get_or_init(|| {
+        let raw = std::env::var("RABUKA_TRACE_AT").ok()?;
+        let (label, n) = raw.rsplit_once('#')?;
+        Some((label.to_string(), n.parse().ok()?))
+    });
+    match want {
+        Some((want_label, n)) if want_label == label => {
+            if HITS.fetch_add(1, Ordering::Relaxed) == *n {
+                arm_alloc_trace();
+                Some(TraceGuard { label, armed: true })
+            } else {
+                None
+            }
+        }
+        _ => None,
+    }
+}
+
 /// Start recording allocation call sites. Nesting is not supported: a second
 /// arm while armed is ignored.
 pub fn arm_alloc_trace() {

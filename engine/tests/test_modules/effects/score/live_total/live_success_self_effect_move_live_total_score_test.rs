@@ -49,7 +49,7 @@ fn trigger_live_success(game: &mut TestGame, card_id: i16) {
     );
 }
 
-fn score_mod(game: &TestGame, card_id: i16) -> i32 {
+fn score_mod(game: &TestGame, card_id: i16) -> i16 {
     game.state.mods.get_score_modifier(card_id)
 }
 

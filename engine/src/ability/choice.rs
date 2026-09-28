@@ -6,7 +6,7 @@ use super::types::{
 };
 use super::util;
 use crate::ability::debug::ABILITY_DEBUG;
-use crate::ability_queue::ConditionalChoice;
+use crate::ability::queue::ConditionalChoice;
 use crate::card::AbilityEffect;
 use crate::game_state::GameState;
 #[cfg(feature = "no_std")]
@@ -417,16 +417,22 @@ impl super::resolver::AbilityResolver {
         card_db: &crate::card::CardDatabase,
         validate_card: &mut impl FnMut(i16) -> bool,
     ) {
-        let edst = gs.entry_destination().map(|s| s.to_string());
-        let dst_str = ctx
-            .destination
-            .clone()
-            .or(edst)
-            .unwrap_or_else(|| Zone::Discard.to_string());
-        let tgt = target_player_id
-            .clone()
-            .unwrap_or_else(|| "self".to_string());
-        let player = gs.resolve_target_player_mut(&tgt);
+        // Neither of these needs to be an owned `String`. `target_player_id`
+        // is a borrowed parameter and `ctx.destination` borrows the context,
+        // so neither touches the game state; building `tgt` as a String here
+        // was two heap allocations to satisfy a `&str` parameter. Only the
+        // fallback has to read through `gs`, and that one copy is what
+        // releases the borrow for the mutable player lookup below.
+        let tgt = target_player_id.as_deref().unwrap_or("self");
+        let dst_str: std::borrow::Cow<'_, str> = match ctx.destination.as_deref() {
+            Some(d) => std::borrow::Cow::Borrowed(d),
+            None => std::borrow::Cow::Owned(
+                gs.entry_destination()
+                    .unwrap_or_else(|| Zone::Discard.to_str())
+                    .to_string(),
+            ),
+        };
+        let player = gs.resolve_target_player_mut(tgt);
         let card_ids: Vec<i16> = ctx.mfi(&ctx.indices)
             .iter()
             .filter_map(|&i| player.live_card_zone.cards.get(i).copied())

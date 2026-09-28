@@ -33,7 +33,7 @@ const NOT_AQOURS: &str = "PL!HS-bp5-004-R";
 /// A cheap live used to walk a real live; it is only a vehicle for the rollover.
 const LIVE: &str = "PL!-sd1-019-SD";
 
-fn blades(game: &TestGame, member: i16) -> i32 {
+fn blades(game: &TestGame, member: i16) -> i16 {
     game.state.mods.get_blade_modifier(member)
 }
 

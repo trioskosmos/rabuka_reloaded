@@ -53,7 +53,7 @@ fn ladybug_q114_both_members_on_stage_reduces_hearts() {
     // Verify the engine processed without error and reduced hearts.
     // The exact reduction is visible in game state need_heart_modifiers.
     let heart_mods = &game.state.mods.need_heart_modifiers;
-    let reduction: i32 = heart_mods
+    let reduction: i16 = heart_mods
         .get(&ladybug)
         .and_then(|m| m.get(&rabuka_engine::card::HeartColor::Heart00))
         .map_or(0, rabuka_engine::core::game_modifiers::ModifierEntry::total);
@@ -86,7 +86,7 @@ fn ladybug_q114_missing_sayaka_no_reduction() {
     game.set_live_card(ladybug);
     advance_to_live_start(&mut game);
 
-    let reduction: i32 = game
+    let reduction: i16 = game
         .state
         .mods
         .need_heart_modifiers
@@ -112,7 +112,7 @@ fn ladybug_q114_missing_kosuzu_no_reduction() {
     advance_to_live_card_set_p1(&mut game);
     game.set_live_card(ladybug);
     advance_to_live_start(&mut game);
-    let reduction: i32 = game.state.mods.need_heart_modifiers.get(&ladybug).and_then(|m| m.get(&rabuka_engine::card::HeartColor::Heart00)).map_or(0, rabuka_engine::core::game_modifiers::ModifierEntry::total);
+    let reduction: i16 = game.state.mods.need_heart_modifiers.get(&ladybug).and_then(|m| m.get(&rabuka_engine::card::HeartColor::Heart00)).map_or(0, rabuka_engine::core::game_modifiers::ModifierEntry::total);
     assert_eq!(reduction, 0, "Missing kosuzu → no reduction");
 }
 
@@ -130,7 +130,7 @@ fn ladybug_q114_wrong_character_no_reduction() {
     advance_to_live_card_set_p1(&mut game);
     game.set_live_card(ladybug);
     advance_to_live_start(&mut game);
-    let reduction: i32 = game.state.mods.need_heart_modifiers.get(&ladybug).and_then(|m| m.get(&rabuka_engine::card::HeartColor::Heart00)).map_or(0, rabuka_engine::core::game_modifiers::ModifierEntry::total);
+    let reduction: i16 = game.state.mods.need_heart_modifiers.get(&ladybug).and_then(|m| m.get(&rabuka_engine::card::HeartColor::Heart00)).map_or(0, rabuka_engine::core::game_modifiers::ModifierEntry::total);
     assert_eq!(reduction, 0, "Wrong characters should not trigger");
 }
 
@@ -145,6 +145,6 @@ fn ladybug_q114_no_members_no_reduction() {
     advance_to_live_card_set_p1(&mut game);
     game.set_live_card(ladybug);
     advance_to_live_start(&mut game);
-    let reduction: i32 = game.state.mods.need_heart_modifiers.get(&ladybug).and_then(|m| m.get(&rabuka_engine::card::HeartColor::Heart00)).map_or(0, rabuka_engine::core::game_modifiers::ModifierEntry::total);
+    let reduction: i16 = game.state.mods.need_heart_modifiers.get(&ladybug).and_then(|m| m.get(&rabuka_engine::card::HeartColor::Heart00)).map_or(0, rabuka_engine::core::game_modifiers::ModifierEntry::total);
     assert_eq!(reduction, 0, "No members → no reduction");
 }

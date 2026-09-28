@@ -78,7 +78,29 @@ static ALLOC: alloc_counter::CountingAllocator = alloc_counter::CountingAllocato
 #[global_allocator]
 static ALLOC: std::alloc::System = std::alloc::System;
 
-// Core data types — re-exported at crate root so all existing imports still work
+// ── Module map ──
+//
+// The engine has four layers. Reading order follows the data, not the alphabet,
+// so a change to how a card resolves can be traced without jumping around.
+//
+//   core   — game data and pure rules: card definitions, zones, player state,
+//            the modifier tables, and the stat pipeline.
+//   ability— WHAT an effect means: conditions, effects, and the resolver that
+//            runs them.
+//   turn   — WHEN things happen: the phase machine, live scoring, and trigger
+//            scanning. This layer calls into `ability`; never the reverse.
+//   game   — what the outside world sees: setup, deck handling, and the JSON
+//            display shapes the UI and server serialise.
+//
+// Three modules sit outside that flow. `triggers` (the trigger vocabulary) and
+// `ability::queue` (the pending-ability mailbox) are both shared between
+// `ability` and `turn`, and are grouped with the layers they bridge. The
+// std-only helpers are last.
+
+// ── core: game data and pure rules ──
+//
+// Re-exported at the crate root so the many `use rabuka_engine::card::…`
+// imports across the tree keep working.
 pub mod core;
 pub use core::card;
 pub use core::card_loader;
@@ -88,20 +110,16 @@ pub use core::player;
 pub use core::types;
 pub use core::zones;
 
-// Per-deck compact card data baked from web_ui/decks/*.txt (see
-// tools/bake_deck_cards.py). load_two_decks() decodes only the two selected
-// decks' cards from these blobs.
-pub mod decks_cards_gen;
+// ── ability / turn: what effects mean, and when they run ──
+pub mod ability;
+// The trigger vocabulary — the `起動` / `常時` strings and `TriggerKind`. What a
+// trigger IS. The code that decides WHEN one fires is `turn::trigger_scan`.
+// The pending-ability queue lives in `ability::queue`; it is the mailbox
+// between the two layers above, not a third layer of its own.
+pub mod triggers;
+pub mod turn;
 
-// Bot AI module (excluded on PSP)
-#[cfg(not(feature = "no_std"))]
-pub mod bot;
-
-// Shared orchestration helpers for the std-only engine binaries
-#[cfg(not(feature = "no_std"))]
-pub mod bin_common;
-
-// Game logic modules
+// ── game: the outside world's view ──
 pub mod game;
 pub use game::deck_builder;
 pub use game::deck_ordering;
@@ -111,16 +129,26 @@ pub use game::game_setup;
 #[cfg(feature = "server")]
 pub use game::web_server;
 
-// Choice renderer for card selection menus
+// ── Baked card data ──
+//
+// Per-deck compact card data baked from web_ui/decks/*.txt (see
+// tools/bake_deck_cards.py). load_two_decks() decodes only the two selected
+// decks' cards from these blobs.
+pub mod decks_cards_gen;
+
+// ── Presentation helpers ──
+//
+// Choice renderer for card selection menus.
 pub mod choice_renderer;
 
-// Effect/condition system
-pub mod ability;
-pub mod ability_queue;
-pub mod rng;
+// ── std-only support (excluded on no_std targets) ──
+#[cfg(not(feature = "no_std"))]
+pub mod bot;
+#[cfg(not(feature = "no_std"))]
+pub mod bin_common;
 #[cfg(not(feature = "no_std"))]
 pub mod timer;
 #[cfg(all(not(feature = "no_std"), feature = "serde_support"))]
 pub mod replay;
-pub mod triggers;
-pub mod turn;
+
+pub mod rng;

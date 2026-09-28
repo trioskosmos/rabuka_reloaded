@@ -204,7 +204,11 @@ impl TestGame {
         );
     }
 
-    pub fn assert_blade(&self, card_id: i16, expected: i32, msg: &str) {
+    /// `expected` is `i16` to match the engine's modifier width. A test that
+    /// writes a literal still infers `i16` fine; only an explicitly-typed `i32`
+    /// expression needs a cast, and that cast belongs in the test rather than
+    /// in the engine.
+    pub fn assert_blade(&self, card_id: i16, expected: i16, msg: &str) {
         let actual = self.state.mods.get_blade_modifier(card_id);
         self.trace_check(
             format!("blade {}", trace::ref_of(self, card_id)),

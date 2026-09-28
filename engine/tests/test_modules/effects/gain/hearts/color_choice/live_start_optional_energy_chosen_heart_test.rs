@@ -1,6 +1,6 @@
 use crate::helpers::*;
 
-fn heart_mods(game: &TestGame, card: i16) -> [i32; 6] {
+fn heart_mods(game: &TestGame, card: i16) -> [i16; 6] {
     use rabuka_engine::card::HeartColor;
     [
         game.state

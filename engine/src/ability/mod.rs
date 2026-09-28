@@ -5,6 +5,10 @@
 //!   `ExecutionContext`, `ActionType`, `Zone`). Start here.
 //! - `resolver`: `AbilityResolver::resolve_ability` — the per-ability
 //!   pipeline (gates → cost → `execute_effect` → choice bookkeeping).
+//! - `queue`: the pending-ability queue. The mailbox between this module and
+//!   `crate::turn` — trigger scans post entries, the turn engine drains them.
+//!   It was a crate-root `ability_queue.rs`, which read as a peer of `ability`
+//!   when it is really a part of it.
 //! - `effects`: `execute_effect` — guards + the `ActionType` dispatch match.
 //! - `cost`: cost payment (`pay_cost` → per-action payers).
 //! - `compound`: `Sequential` / `Conditional*` multi-step execution.
@@ -30,14 +34,15 @@ pub mod describe;
 pub mod dynamic_count;
 pub mod effects;
 pub mod enums;
+pub mod gates;
 #[cfg(not(feature = "no_std"))]
 pub mod log;
 pub mod look;
 pub mod move_cards;
+pub mod queue;
 pub mod resolver;
 pub mod types;
 pub mod util;
-pub mod gates;
 
 pub mod abilities_gen;
 #[cfg(feature = "bytecode_abilities")]

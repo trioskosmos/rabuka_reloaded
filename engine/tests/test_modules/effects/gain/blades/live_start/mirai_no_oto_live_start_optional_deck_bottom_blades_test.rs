@@ -64,7 +64,7 @@ fn setup(game: &mut TestGame, n_liella: usize, extra_non: usize) -> (i16, i16) {
     (a, b)
 }
 
-fn blade_of(game: &TestGame, id: i16) -> i32 {
+fn blade_of(game: &TestGame, id: i16) -> i16 {
     game.state.mods.get_blade_modifier(id)
 }
 

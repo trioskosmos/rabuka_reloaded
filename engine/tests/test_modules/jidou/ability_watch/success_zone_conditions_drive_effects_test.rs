@@ -60,11 +60,11 @@ const BIBI_LIVE: &str = "PL!-bp4-026-L";
 /// is the condition's own `card_type: "live_card"` clause.
 const LILYWHITE: &str = "PL!-sd1-004-SD";
 
-fn heart_mod(game: &TestGame, card: i16, colour: HeartColor) -> i32 {
+fn heart_mod(game: &TestGame, card: i16, colour: HeartColor) -> i16 {
     game.state.mods.get_heart_modifier(card, colour)
 }
 
-fn score_mod(game: &TestGame, card: i16) -> i32 {
+fn score_mod(game: &TestGame, card: i16) -> i16 {
     game.state.mods.get_score_modifier(card)
 }
 
@@ -80,7 +80,7 @@ fn total_score_bonus(game: &TestGame) -> i32 {
     i32::from(game.state.mods.p1_constant_total_score_bonus)
 }
 
-fn need_heart_mod(game: &TestGame, card: i16, colour: HeartColor) -> i32 {
+fn need_heart_mod(game: &TestGame, card: i16, colour: HeartColor) -> i16 {
     game.state.mods.get_need_heart_modifier(card, colour)
 }
 
@@ -418,7 +418,7 @@ fn song_boost_scales_with_the_number_of_cards_in_the_success_zone() {
         ] {
             assert_eq!(
                 need_heart_mod(&g, song, colour),
-                i32::from(cards as u8),
+                i16::from(cards as u8),
                 "{cards} card(s) → {cards} added to each of heart01/heart03/heart06/heart0; \
                  the second clause scales with the first"
             );

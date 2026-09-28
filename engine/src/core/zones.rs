@@ -554,19 +554,24 @@ impl LiveCardZone {
         need_heart_modifiers: Option<
             &HashMap<i16, HashMap<crate::card::HeartColor, ModifierEntry>>,
         >,
-        score_modifiers: Option<&HashMap<i16, i32>>,
+        // `i16`, matching `ModifierEntry::total`. The map is built by mapping
+        // `total()` straight out of the modifier map at each of its three call
+        // sites, so an `i32` here meant three local bindings that had to be
+        // widened to match and then narrowed back when summed against the
+        // printed score.
+        score_modifiers: Option<&HashMap<i16, i16>>,
         constant_total_score_bonus: i16,
     ) -> u8 {
         let mut total_score = 0;
 
         for card_id in &self.cards {
             if let Some(card) = card_db.get_card(*card_id) {
-                let base_score = card.get_score() as i32;
                 let modifier = score_modifiers
                     .and_then(|sm| sm.get(card_id))
                     .copied()
                     .unwrap_or(0);
-                let card_score = crate::constants::saturate_u8(base_score + modifier);
+                let card_score =
+                    crate::constants::effective_stat(card.get_score(), modifier);
 
                 // A4: use unified effective_need_heart + check_heart_requirement
                 let heart_needs_satisfied = if let Some(ref need_heart) = card.need_heart {
@@ -599,7 +604,7 @@ impl LiveCardZone {
 
         total_score
             + cheer_blade_heart_count
-            + crate::constants::saturate_u8(constant_total_score_bonus as i32)
+            + crate::constants::saturate_u8(i32::from(constant_total_score_bonus))
     }
 }
 

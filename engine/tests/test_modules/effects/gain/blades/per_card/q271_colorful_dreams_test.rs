@@ -28,7 +28,7 @@ const BLADE_YELLOW: &str = "PL!-sd1-022-SD"; // b_heart03 (yellow)
 const NIJI_MEMBER: &str = "PL!N-sd1-004-SD";
 const NON_NIJI_MEMBER: &str = "PL!-sd1-010-SD";
 
-fn score(g: &TestGame, id: i16) -> i32 {
+fn score(g: &TestGame, id: i16) -> i16 {
     g.state.mods.get_score_modifier(id)
 }
 

@@ -46,7 +46,7 @@ fn trigger_live_start(game: &mut TestGame, card_id: i16) {
 }
 
 /// Helper: get heart04 modifier for a card.
-fn heart04_mod(game: &TestGame, card_id: i16) -> i32 {
+fn heart04_mod(game: &TestGame, card_id: i16) -> i16 {
     game.state
         .mods
         .get_heart_modifier(card_id, HeartColor::Heart04)

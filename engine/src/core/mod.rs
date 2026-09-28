@@ -1,3 +1,8 @@
+// `core::pool` (a hand-rolled `Pool<T>` + `make_pool_box!` for `EkBox`) used
+// to live here. It was dead once `EkBox` became `Arc<EffectKind>` in card.rs —
+// see the comment there for why the pool was the slower of the two designs —
+// and nothing referenced it. Removed rather than left declared.
+
 pub mod card;
 pub mod card_loader;
 pub mod constants;

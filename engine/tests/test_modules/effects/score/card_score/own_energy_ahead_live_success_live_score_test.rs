@@ -12,7 +12,7 @@ use rabuka_engine::core::types::AbilityTrigger;
 const WW: &str = "PL!SP-bp7-024-L";
 const ENERGY: &str = "LL-E-001-SD";
 
-fn score(g: &TestGame, id: i16) -> i32 {
+fn score(g: &TestGame, id: i16) -> i16 {
     g.state.mods.get_score_modifier(id)
 }
 

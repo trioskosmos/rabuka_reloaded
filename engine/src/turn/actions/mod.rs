@@ -1211,7 +1211,7 @@ impl super::TurnEngine {
         choice: &crate::ability::types::Choice,
         result: &crate::ability::types::ChoiceResult,
     ) -> Result<bool, String> {
-        if let crate::ability_queue::QueueState::WaitingForAutoAbilityChoice { .. } =
+        if let crate::ability::queue::QueueState::WaitingForAutoAbilityChoice { .. } =
             game_state.ability_queue.get_state()
         {
             if let crate::ability::types::ChoiceResult::AutoAbilitySelected { queue_index } = result

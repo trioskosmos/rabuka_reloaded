@@ -20,13 +20,13 @@ fn setup_rurino(game: &mut TestGame) -> i16 {
     rurino
 }
 
-fn heart01_mod(game: &TestGame, card_id: i16) -> i32 {
+fn heart01_mod(game: &TestGame, card_id: i16) -> i16 {
     game.state
         .mods
         .get_heart_modifier(card_id, HeartColor::Heart01)
 }
 
-fn blade_mod(game: &TestGame, card_id: i16) -> i32 {
+fn blade_mod(game: &TestGame, card_id: i16) -> i16 {
     game.state
         .mods
         .blade_modifiers

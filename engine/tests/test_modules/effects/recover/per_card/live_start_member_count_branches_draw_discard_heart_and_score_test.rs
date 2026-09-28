@@ -65,7 +65,7 @@ fn sunny_branch1_1_member_triggers_draw() {
 fn live_window_deltas(
     live_no: &str,
     stage_member: Option<&str>,
-) -> (usize, usize, usize, usize, i32) {
+) -> (usize, usize, usize, usize, i16) {
     let db = load_real_database();
     let mut game = TestGame::new(db);
 

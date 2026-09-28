@@ -229,13 +229,13 @@ impl GameState {
         card_id: Option<i16>,
         player_id: String,
         trigger: AbilityTriggerContext,
-    ) -> crate::ability_queue::AbilityQueueEntry {
+    ) -> crate::ability::queue::AbilityQueueEntry {
         let AbilityTriggerContext {
             trigger_type,
             trigger_moved_cards,
             triggering_member_id,
         } = trigger;
-        crate::ability_queue::AbilityQueueEntry {
+        crate::ability::queue::AbilityQueueEntry {
             card_no,
             // Normalise "player1"/"player2" to "p1"/"p2" exactly as before,
             // but move the incoming String through untouched in the common
@@ -1885,6 +1885,12 @@ fn trigger_auto_ability_by_index_refs(
     pub(crate) fn process_current_ability(&mut self) {
         #[cfg(not(feature = "no_std"))]
         let _timer = crate::timer::Timer::start("resolve::current_ability");
+        // Scoped allocation trace. Free unless `RABUKA_TRACE_AT` names this
+        // site, and compiled out entirely without the feature. This one is
+        // reached from inside `execute_and_settle`, so the bench cannot arm it
+        // from outside — and it is the largest self-time site in the engine.
+        #[cfg(feature = "alloc_tracker")]
+        let _alloc_trace = crate::alloc_counter::maybe_arm("process_current_ability");
         // Safety timeout: a runaway ability re-trigger loop (e.g. an each_time
         // watcher re-queued by its own effect's movement) must never spin forever.
         // Abort resolution past an absurd number of calls instead of hanging or
@@ -2337,7 +2343,7 @@ fn trigger_auto_ability_by_index_refs(
             .and_then(|e| e.choice_card_no.clone())
     }
 
-    pub fn entry_conditional_choice(&self) -> Option<crate::ability_queue::ConditionalChoice> {
+    pub fn entry_conditional_choice(&self) -> Option<crate::ability::queue::ConditionalChoice> {
         self.ability_queue
             .current_entry()
             .and_then(|e| e.conditional_choice.clone())

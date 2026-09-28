@@ -4,7 +4,7 @@ use crate::core::constants::CountCast;
 use super::super::resolver::AbilityResolver;
 use super::super::types::{Choice, ChoiceRoute};
 use crate::ability::util;
-use crate::ability_queue::ConditionalChoice;
+use crate::ability::queue::ConditionalChoice;
 use crate::card::AbilityEffect;
 use crate::game_state::GameState;
 use crate::HashMap;

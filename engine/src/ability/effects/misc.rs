@@ -3,7 +3,7 @@ use super::super::enums::{TargetPlayer, Zone};
 use super::super::resolver::AbilityResolver;
 use super::super::types::{Choice, ChoiceRoute, ExecutionContext};
 use super::super::util;
-use crate::ability_queue::ConditionalChoice;
+use crate::ability::queue::ConditionalChoice;
 use crate::card::{AbilityEffect, PositionInfo};
 use crate::game_state::GameState;
 use crate::{HashMap, HashSet};
@@ -3906,10 +3906,7 @@ pub(crate) fn execute_gain_surplus_heart(
                 if cid == -1 {
                     continue;
                 }
-                let base_blade = card_db
-                    .get_card(cid)
-                    .map(|c| c.blade as i32)
-                    .unwrap_or(0);
+                let base_blade = card_db.get_card(cid).map(|c| c.blade).unwrap_or(0);
                 if let Some(t) = ct {
                     if !crate::ability::util::card_matches_type(card_db, cid, Some(t)) {
                         continue;
@@ -3922,8 +3919,16 @@ pub(crate) fn execute_gain_surplus_heart(
                 {
                     continue;
                 }
-                let current_blade = base_blade + gs.mods.get_blade_modifier(cid);
-                let blade = if original_blade { base_blade } else { current_blade };
+                // `i32` for the same reason as the limit being compared against
+                // it: a negative modifier is a legal blade value here and must
+                // survive the addition rather than floor at zero.
+                let current_blade =
+                    i32::from(base_blade) + i32::from(gs.mods.get_blade_modifier(cid));
+                let blade = if original_blade {
+                    i32::from(base_blade)
+                } else {
+                    current_blade
+                };
                 log::debug!(
                     "[WAIT_IMMUNITY_FILTER] member={} printed_blade={} current_blade={} limit={} original_value={}",
                     cid,

@@ -24,7 +24,7 @@ const ENERGY: &str = "LL-E-001-SD";
 // A 9-cost member used for baton-pass cost arithmetic.
 const COST9: &str = "PL!-sd1-006-SD"; // 西木野 真姫, cost 9
 
-fn cost_mod(game: &TestGame, id: i16) -> i32 {
+fn cost_mod(game: &TestGame, id: i16) -> i16 {
     game.state.mods.get_cost_modifier(id)
 }
 

@@ -40,7 +40,7 @@ fn fire_trigger_nth(
 #[test]
 fn pl_bp4_021_l_success_score_thresholds_reduce_required_heart_then_add_score() {
     let db = load_real_database();
-    let run = |success_scores: &[i16]| -> (i32, i32) {
+    let run = |success_scores: &[i16]| -> (i16, i16) {
         let mut game = TestGame::new(db.clone());
         let hb = game.id("PL!-bp4-021-L");
         game.state.player1.live_card_zone.cards.push(hb);

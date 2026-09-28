@@ -212,7 +212,7 @@ fn mute_kibiriver_multiple_kasumi_in_revealed_select_one() {
         .iter()
         .filter(|(color, count)| *count > 0 && (1..=6).contains(&color.index()))
         .count() as i16;
-    let gained: i32 = (1..=6)
+    let gained: i16 = (1..=6)
         .map(|i| {
             game.state
                 .mods
@@ -220,7 +220,7 @@ fn mute_kibiriver_multiple_kasumi_in_revealed_select_one() {
         })
         .sum();
     assert_eq!(
-        gained, printed as i32,
+        gained, printed,
         "the staged Kasumi gains one heart per colour the SELECTED card prints \
          ({} colours on PL!N-bp5-002-R)",
         printed

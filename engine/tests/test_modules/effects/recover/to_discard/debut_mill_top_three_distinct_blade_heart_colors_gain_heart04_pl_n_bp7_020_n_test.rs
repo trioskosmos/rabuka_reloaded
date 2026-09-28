@@ -61,7 +61,7 @@ fn setup(game: &mut TestGame, top3: [i16; 3]) -> i16 {
     emma
 }
 
-fn heart04(game: &TestGame, id: i16) -> i32 {
+fn heart04(game: &TestGame, id: i16) -> i16 {
     game.state.mods.get_heart_modifier(id, HeartColor::Heart04)
 }
 

@@ -38,6 +38,7 @@ use crate::core::constants::CountCast;
 use crate::bot::strategy_v5::binom_ge;
 use crate::card::{CardDatabase, CardType};
 use crate::core::stats_pipeline;
+use crate::game_state::GameResult;
 use crate::game_setup::{Action, ActionType};
 use crate::game_state::{GameState, Phase};
 use crate::player::Player;
@@ -81,7 +82,10 @@ fn total_blades_of(p: &Player, gs: &GameState, db: &CardDatabase) -> i32 {
             if waiting {
                 0
             } else {
-                db.get_card(c).map(|x| x.blade as i32).unwrap_or(0) + gs.mods.get_blade_modifier(c)
+                // `i32` because this is a per-member total summed across the
+                // stage; a member's blade can be negative after a reduction.
+                i32::from(db.get_card(c).map(|x| x.blade).unwrap_or(0))
+                    + i32::from(gs.mods.get_blade_modifier(c))
             }
         })
         .sum()
@@ -149,7 +153,9 @@ fn blade_mod_fingerprint(gs: &GameState, me: u8) -> Vec<i16> {
             if c < 0 {
                 0i16
             } else {
-                crate::constants::saturate_i16(gs.mods.get_blade_modifier(c))
+                // Already the i16 the vector stores — the `saturate_i16` that
+                // used to stand here only existed to undo the accessor's i32.
+                gs.mods.get_blade_modifier(c)
             }
         })
         .collect()
@@ -490,9 +496,25 @@ pub fn choose_live_set_v7(gs: &GameState, actions: &[Action], db: &CardDatabase)
     let is_second = gs.current_phase == Phase::LiveCardSetSecondAttacker;
     let opp_committed = !opp.live_card_zone.cards.is_empty();
 
-    // Comparison likely: opponent committed lives, or must contest at match
-    // point → v6 score-max EV (proven there).
-    if (is_second && opp_committed) || opp_succ >= 2 {
+    // Contested / match-point: owned by v7, not rented from v6.
+    //
+    // This used to be an unconditional `return choose_live_set_v6(...)` on
+    // `(is_second && opp_committed) || opp_succ >= 2`. That is not an
+    // experiment gate — it handed v7's live set to an older version for the
+    // whole contested class, which is most of the decisive moments in a game,
+    // and it is the same class where the research is unambiguous: score
+    // comparison and initiative decide this game, and v6's score-max EV is
+    // not a model of either.
+    //
+    // v7 already has the right model for it and was not using it here:
+    // `live_payoff` / `expected_live_value` price the four-outcome payoff
+    // table (win / tie / loss / failed check, conditioned on both success
+    // counts) that the contested case actually needs. That model previously
+    // regressed when it was applied *broadly*; it was never applied *only
+    // here*, which is where it belongs. `V7_LEASE_V6=1` restores the old
+    // delegation so the two can be compared directly.
+    let lease_v6 = std::env::var_os("V7_LEASE_V6").is_some();
+    if lease_v6 && ((is_second && opp_committed) || opp_succ >= 2) {
         return crate::bot::strategy_v6::choose_live_set_v6(gs, actions, db);
     }
 
@@ -508,8 +530,9 @@ pub fn choose_live_set_v7(gs: &GameState, actions: &[Action], db: &CardDatabase)
     // safest-single search.
     let mut desired = safest_portfolio(gs, me, db);
 
-    if desired.is_empty() {
-        // v6 gamble + junk-dig fallback, unchanged.
+    if desired.is_empty() && lease_v6 {
+        // v6 gamble + junk-dig fallback — now opt-in, like the contested path
+        // above, so the default v7 live set is self-contained.
         return crate::bot::strategy_v6::choose_live_set_v6(gs, actions, db);
     }
 
@@ -1045,6 +1068,275 @@ pub(crate) fn check_pressure(gs: &GameState, me: u8, db: &CardDatabase) -> f64 {
         .filter(|(_, _, need)| need[8] == 0 && need[9] == 0)
         .map(|(_, _, need)| experiment_pass_probability_pools(&pools, need))
         .fold(0.0f64, f64::max)
+}
+
+/// Deterministic forward ladder for `placement_forecast`.
+///
+/// Deliberately NOT a policy search. The ISMCTS failed because a rollout policy
+/// that plays badly makes the leaf a losing player's opinion; here the ladder
+/// only has to be *honest and monotone*, because the value comes from the
+/// exact check model at each horizon, not from how well the ladder plays
+/// chess. One deploy per step, preferring active blades (the check reads
+/// blades) and then hearts, then a discounted cost upgrade.
+fn forecast_develop(gs: &mut GameState, me: u8, db: &CardDatabase) {
+    let (my, _) = gs.seated_pair(me);
+    let energy = my.energy_zone.active_count() as i32 + 1;
+    let mut best: Option<(i32, i32, i32, usize)> = None; // (blades, hearts, cost, hand idx)
+    for (index, &cid) in my.hand.cards.iter().enumerate() {
+        let Some(card) = db.get_card(cid) else { continue };
+        if card.card_type != CardType::Member {
+            continue;
+        }
+        let cost = card.cost.unwrap_or(0) as i32;
+        if cost > energy {
+            continue;
+        }
+        let already = my.stage.stage.contains(&cid);
+        let hearts = card
+            .base_heart
+            .as_ref()
+            .map(|h| h.hearts.values_sum() as i32)
+            .unwrap_or(0);
+        // Prefer a card we do not already have on stage; among equals, blades.
+        let key = (if already { 0 } else { 1 }, card.blade as i32, hearts);
+        let cand = (key.0, key.1, key.2, index);
+        if best.is_none_or(|current| {
+            (cand.0, cand.1, cand.2) > (current.0, current.1, current.2)
+        }) {
+            best = Some(cand);
+        }
+    }
+    if let Some((_, _, _, index)) = best {
+        let cid = gs.seat_player(me).hand.cards[index];
+        let mut action = crate::game_setup::Action {
+            description: "forecast".into(),
+            description_ja: None,
+            action_type: ActionType::PlayMemberToStage,
+            parameters: None,
+            selected: None,
+        };
+        let free = gs.seat_player(me).stage.stage.iter().all(|&s| s < 0);
+        let mut params = crate::game_setup::ActionParameters {
+            card_id: Some(cid),
+            card_index: None,
+            card_indices: None,
+            stage_area: None,
+            stage_area_index: None,
+            use_baton_touch: None,
+            card_name: None,
+            card_no: None,
+            ability_index: None,
+            source_ability: None,
+            base_cost: None,
+            final_cost: None,
+            available_areas: None,
+            double_baton_pairs: None,
+            disabled: None,
+        };
+        if free {
+            params.stage_area = Some(format!(
+                "{}",
+                crate::zones::MemberArea::Center.to_string()
+            ));
+        } else {
+            // Baton: replace the most expensive stage member.
+            let target = gs
+                .seat_player(me)
+                .stage
+                .stage
+                .iter()
+                .enumerate()
+                .max_by_key(|(_, &s)| {
+                    s.checked_sub(0).map_or(0, |id| {
+                        db.get_card(id).and_then(|c| c.cost).unwrap_or(0) as i32
+                    })
+                })
+                .map(|(i, _)| i)
+                .unwrap_or(0);
+            params.stage_area_index = Some(target as u8);
+        }
+        action.parameters = Some(params);
+        crate::rng::seed(0x7637);
+        if crate::game_setup::execute_action(gs, &action).is_ok() {
+            game_setup_settle(gs);
+        }
+        // Refresh for the next step so the ladder sees a realistic turn.
+        gs.seat_player_mut(me).refresh();
+    }
+}
+
+fn game_setup_settle(gs: &mut GameState) {
+    crate::game_setup::settle_single_player_state(gs);
+}
+
+/// Expected placements over the next `depth` checks, each under a projected
+/// board, discounted by turn.
+///
+/// This is the paradigm change. Everything v7 has ever valued in the Main
+/// phase is a one-ply delta over stage-cost growth, hearts, blades and
+/// coverage — proxies for "this will convert later". This integrates the
+/// actual conversion: at each projected turn it runs the same exact 256-draw
+/// check model the live-set chooser uses, and adds the probability that the
+/// best life in hand actually passes. A check places at most one card
+/// (8.4.7), so the best single life is the right quantity.
+///
+/// Consequences that no one-ply term can produce:
+///   * an investment that pays off two turns later is visible, so long-horizon
+///     value is not invisible the way it is under `60 x passable`;
+///   * a big board that cannot pass any check is worth LESS than a small board
+///     that can, which is the opposite of what raw development growth implies;
+///   * because the leaf is the check pass probability rather than board size,
+///     a weak forward ladder cannot bias the answer the way a weak rollout
+///     policy did.
+pub(crate) fn placement_forecast(gs: &GameState, me: u8, db: &CardDatabase, depth: usize) -> f64 {
+    let mut sim = gs.clone();
+    let mut total = 0.0f64;
+    for step in 0..depth {
+        if sim.game_result != GameResult::Ongoing {
+            break;
+        }
+        let lives = experiment_lives(&sim, me, db);
+        if !lives.is_empty() {
+            let (cats, deck_len) = experiment_flip_categories(&sim, me, db);
+            let blades = experiment_blades(&sim, me, db);
+            let board_pool = experiment_board_pool(&sim, me, db);
+            if blades > 0 && deck_len > 0 {
+                let pools = experiment_sample_pools(&cats, deck_len, blades, &board_pool);
+                let best = lives
+                    .iter()
+                    .filter(|(_, _, need)| need[8] == 0 && need[9] == 0)
+                    .map(|(_, _, need)| experiment_pass_probability_pools(&pools, need))
+                    .fold(0.0f64, f64::max);
+                // Geometric discount: a placement next check is worth more
+                // than the same placement three checks out.
+                let discount = 0.85f64.powi(step as i32);
+                total += discount * best;
+            }
+        }
+        forecast_develop(&mut sim, me, db);
+    }
+    total
+}
+
+/// What an ability actually did, read from the resolved state rather than
+/// assumed from its text.
+///
+/// The point of this is that abilities are not interchangeable. A +1 energy
+/// swing, a search that finds the 4 that completes the ladder, +2 blades (the
+/// check's draw count, which `value()` prices at a linear 6), a two-card draw,
+/// and a member that leaves the stage are five different trades. Classifying
+/// them lets the caller price each in its own currency, and lets `V7_DEBUG`
+/// print *why* an ability was taken instead of a bare number.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub(crate) struct AbilityEffect {
+    pub draws: i32,
+    pub energy: i32,
+    pub blades: i32,
+    pub hearts: i32,
+    pub ammo: i32,
+    pub stage_cost: i32,
+    pub hand: i32,
+}
+
+impl AbilityEffect {
+    /// A short label for the dominant thing the ability did, for diagnostics.
+    pub fn classify(&self) -> &'static str {
+        if self.ammo > 0 {
+            "live-gain"
+        } else if self.blades > 0 {
+            "blades"
+        } else if self.draws > 0 && self.energy > 0 {
+            "tempo"
+        } else if self.energy > 0 {
+            "energy"
+        } else if self.draws > 0 {
+            "draw"
+        } else if self.hearts > 0 {
+            "hearts"
+        } else if self.stage_cost < 0 {
+            "removal"
+        } else {
+            "other"
+        }
+    }
+}
+
+/// Measure an ability by its resolved delta. `sim` is the state after
+/// execution, `root` the state before — both already built by `score_actions`.
+pub(crate) fn measure_ability(
+    sim: &GameState,
+    root: &GameState,
+    me: u8,
+    db: &CardDatabase,
+) -> AbilityEffect {
+    let (after, before) = (v7_features(sim, me), v7_features(root, me));
+    let blades_after = stage_blades(sim, me, db) as i32;
+    let blades_before = stage_blades(root, me, db) as i32;
+    let cost_after = stage_cost_total(sim, me, db) as i32;
+    let cost_before = stage_cost_total(root, me, db) as i32;
+    AbilityEffect {
+        // `hand` counts cards in hand, so a net draw is the rise in hand.
+        draws: after.hand - before.hand,
+        energy: after.energy - before.energy,
+        blades: blades_after - blades_before,
+        hearts: after.hearts - before.hearts,
+        ammo: after.ammo - before.ammo,
+        stage_cost: cost_after - cost_before,
+        hand: after.hand - before.hand,
+    }
+}
+
+fn stage_blades(gs: &GameState, me: u8, db: &CardDatabase) -> i32 {
+    gs.seat_player(me)
+        .stage
+        .total_blades(
+            db,
+            &gs.mods.blade_modifiers,
+            &gs.mods.orientation_modifiers,
+            false,
+        ) as i32
+}
+
+fn stage_cost_total(gs: &GameState, me: u8, db: &CardDatabase) -> i32 {
+    gs.seat_player(me)
+        .stage
+        .stage
+        .iter()
+        .filter(|&&cid| cid >= 0)
+        .filter_map(|&cid| db.get_card(cid).and_then(|c| c.cost))
+        .map(i32::from)
+        .sum()
+}
+
+/// v7's feature view of a state, for the ability delta above. A tiny local
+/// mirror of `v7_main::features` so this module does not have to expose the
+/// struct's private fields; only the six quantities the delta needs.
+fn v7_features(gs: &GameState, me: u8) -> AbilityFeatures {
+    let p = gs.seat_player(me);
+    let hearts = p
+        .stage
+        .get_available_hearts(
+            &gs.card_database,
+            &gs.mods.heart_override,
+            &gs.mods.heart_modifiers,
+            &gs.mods.heart_color_multiplier,
+            &gs.mods.heart_copy,
+        )
+        .hearts
+        .values_sum() as i32;
+    AbilityFeatures {
+        hearts,
+        energy: p.energy_zone.active_count() as i32,
+        hand: p.hand.cards.len() as i32,
+        ammo: p.live_card_zone.cards.len() as i32,
+    }
+}
+
+pub(crate) struct AbilityFeatures {
+    pub hearts: i32,
+    pub energy: i32,
+    pub hand: i32,
+    pub ammo: i32,
 }
 
 fn experiment_junk_fill(gs: &GameState, me: u8, db: &CardDatabase, desired: &mut Vec<usize>) {
@@ -1894,12 +2186,75 @@ fn choose_mulligan_curve(gs: &GameState, actions: &[Action], db: &CardDatabase) 
         .expect("mulligan actions non-empty")
 }
 
+/// v7's own mulligan. Self-contained — it does NOT call v4.
+///
+/// v7 previously delegated its entire mulligan to `strategy_v4`, which made
+/// "v7" partly a v4 build: a change to the older version's opening would
+/// silently change the newest one, and the two could not be A/B'd
+/// independently. The behaviour is deliberately identical to the v4 rule it
+/// replaces (keep at most 3 lives, then dump the most expensive members, 3
+/// cards total), so this is a decoupling and not a behaviour change — which is
+/// why `v7_mulligan_matches_the_v4_rule_it_replaced` can lock it.
+///
+/// The guide's version of this is an opening-quality evaluation that enumerates
+/// the first three Main turns; that is `choose_mulligan_curve` above, still
+/// opt-in. What this removes is the dependency, not the ambition.
 pub fn choose_mulligan_v7(gs: &GameState, actions: &[Action], db: &CardDatabase) -> Action {
     if std::env::var("V7_MULLIGAN_CURVE").is_ok() || std::env::var("V7_MULLIGAN_REACHABLE").is_ok()
     {
         return choose_mulligan_curve(gs, actions, db);
     }
-    crate::bot::strategy_v4::choose_mulligan_v4(gs, actions, db)
+    let me = gs.active_player();
+    let mut discard: Vec<usize> = Vec::new();
+    let mut lives_seen = 0usize;
+    let mut members: Vec<(usize, u8)> = Vec::new();
+    for (hand_index, &cid) in me.hand.cards.iter().enumerate() {
+        let Some(card) = db.get_card(cid) else {
+            continue;
+        };
+        match card.card_type {
+            CardType::Live => {
+                lives_seen += 1;
+                if lives_seen > 3 {
+                    // Only three lives are usable per turn (three live slots).
+                    discard.push(hand_index);
+                }
+            }
+            CardType::Member => members.push((hand_index, card.cost.unwrap_or(0))),
+            CardType::Energy => {}
+        }
+    }
+    // Dump the most expensive members first: they are furthest from playable,
+    // and energy is never dumped.
+    members.sort_by_key(|&(_, cost)| std::cmp::Reverse(cost));
+    for &(hi, _) in &members {
+        if discard.len() >= 3 {
+            break;
+        }
+        if !discard.contains(&hi) {
+            discard.push(hi);
+        }
+    }
+
+    let selected: Vec<usize> = gs
+        .mulligan_selected_indices
+        .iter()
+        .map(|&i| usize::from(i))
+        .collect();
+    for &hi in &discard {
+        if selected.contains(&hi) {
+            continue;
+        }
+        if let Some(action) = actions.iter().find(|a| {
+            a.action_type == ActionType::SelectMulligan
+                && a.selected == Some(false)
+                && a.parameters.as_ref().and_then(|p| p.card_index) == Some(hi)
+        }) {
+            return action.clone();
+        }
+    }
+    // Nothing left to add: the chain is either complete or was folded.
+    crate::bot::strategy_common::emit_mulligan(gs, actions, &selected)
 }
 
 // Re-exports with generic names for the registry (bot/registry.rs): adding
@@ -1911,6 +2266,109 @@ pub use choose_mulligan_v7 as choose_mulligan;
 #[cfg(test)]
 mod mulligan_tests {
     use super::*;
+
+    /// Version independence, as an executable claim: v7 computes its own
+    /// mulligan, and that computation agrees with the v4 rule it replaced.
+    /// If someone re-links v7 to v4 this stops testing the thing it claims to
+    /// test; if v4 changes, this is the test that tells you v7 did not.
+    #[test]
+    fn v7_mulligan_matches_the_v4_rule_it_replaced() {
+        let cards = crate::card_loader::CardLoader::load_cards_from_file(std::path::Path::new(
+            "../cards/cards.json",
+        ))
+        .unwrap();
+        let db = crate::Arc::new(CardDatabase::load_or_create(cards));
+
+        let member_ids: Vec<i16> = db
+            .cards
+            .values()
+            .filter(|c| c.card_type == CardType::Member)
+            .take(12)
+            .map(|c| db.get_card_id(c.card_no.as_ref()).unwrap())
+            .collect();
+        let live_ids: Vec<i16> = db
+            .cards
+            .values()
+            .filter(|c| c.card_type == CardType::Live)
+            .take(6)
+            .map(|c| db.get_card_id(c.card_no.as_ref()).unwrap())
+            .collect();
+        assert!(member_ids.len() >= 4 && live_ids.len() >= 4, "need real cards");
+
+        for variant in 0..6usize {
+            let p1 = crate::player::Player::new("p1".into(), "P1".into(), true);
+            let p2 = crate::player::Player::new("p2".into(), "P2".into(), false);
+            let mut gs = GameState::new(p1, p2, crate::Arc::clone(&db));
+            gs.current_phase = Phase::MulliganFirstAttacker;
+            let seat = gs.active_player_index();
+            let lives = (variant % 4) + 1;
+            for i in 0..lives {
+                gs.seat_player_mut(seat).hand.cards.push(live_ids[i]);
+            }
+            for i in 0..5 {
+                gs.seat_player_mut(seat).hand.cards.push(member_ids[(i + variant) % member_ids.len()]);
+            }
+            let actions = crate::game_setup::generate_possible_actions(&gs);
+            if actions.len() < 2 {
+                continue;
+            }
+            let v7_pick = choose_mulligan_v7(&gs, &actions, &db);
+            let v4_pick = crate::bot::strategy_v4::choose_mulligan_v4(&gs, &actions, &db);
+            assert_eq!(
+                v7_pick.action_type, v4_pick.action_type,
+                "variant {variant}: action type diverged"
+            );
+            assert_eq!(
+                v7_pick.parameters.as_ref().and_then(|p| p.card_index),
+                v4_pick.parameters.as_ref().and_then(|p| p.card_index),
+                "variant {variant}: mulligan pick diverged from the v4 rule"
+            );
+        }
+    }
+
+    /// v7 must not hold 4+ lives: only three live slots exist, so a fourth is
+    /// the one card type where being confident is always right.
+    #[test]
+    fn v7_mulligan_dumps_lives_beyond_the_three_slots() {
+        let cards = crate::card_loader::CardLoader::load_cards_from_file(std::path::Path::new(
+            "../cards/cards.json",
+        ))
+        .unwrap();
+        let db = crate::Arc::new(CardDatabase::load_or_create(cards));
+        let live_ids: Vec<i16> = db
+            .cards
+            .values()
+            .filter(|c| c.card_type == CardType::Live)
+            .take(5)
+            .map(|c| db.get_card_id(c.card_no.as_ref()).unwrap())
+            .collect();
+        assert!(live_ids.len() >= 5, "need five distinct lives");
+        let p1 = crate::player::Player::new("p1".into(), "P1".into(), true);
+        let p2 = crate::player::Player::new("p2".into(), "P2".into(), false);
+        let mut gs = GameState::new(p1, p2, crate::Arc::clone(&db));
+        gs.current_phase = Phase::MulliganFirstAttacker;
+        for id in &live_ids {
+            let seat = gs.active_player_index();
+            gs.seat_player_mut(seat).hand.cards.push(*id);
+        }
+        let actions = crate::game_setup::generate_possible_actions(&gs);
+        if actions.len() < 2 {
+            return;
+        }
+        let picked = choose_mulligan_v7(&gs, &actions, &db);
+        let index = picked
+            .parameters
+            .as_ref()
+            .and_then(|p| p.card_index)
+            .expect("mulligan must select a card");
+        // A life at hand index < 3 is one of the first three seen, so keeping
+        // it is correct; anything else is the overflow.
+        assert!(
+            index >= 3,
+            "v7 kept a fourth live (index {index}) instead of dumping the overflow"
+        );
+    }
+
 
     #[test]
     fn opening_curve_keep_finds_connected_ladder_only() {

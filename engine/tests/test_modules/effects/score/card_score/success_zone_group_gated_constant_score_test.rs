@@ -70,7 +70,7 @@ fn angelic_angel_in_live_set_zone_not_success_no_mod() {
 
     // Also verify the live set zone card itself has no modifier
     // (should only have its base score 4, no +5)
-    let base_score = game.db.get_card(angel).unwrap().get_score() as i32;
+    let base_score = game.db.get_card(angel).unwrap().get_score() as i16;
     let effective = base_score + score_mod;
     assert_eq!(
         effective, 4,

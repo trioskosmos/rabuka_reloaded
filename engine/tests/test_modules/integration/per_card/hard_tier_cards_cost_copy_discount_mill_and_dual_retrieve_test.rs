@@ -17,12 +17,12 @@ use crate::helpers::*;
 use rabuka_engine::card::HeartColor;
 use rabuka_engine::core::types::AbilityTrigger;
 
-fn effective_cost(game: &TestGame, cid: i16) -> i32 {
+fn effective_cost(game: &TestGame, cid: i16) -> i16 {
     let printed = game
         .db
         .get_card(cid)
         .and_then(|c| c.cost)
-        .expect("test card must have printed cost") as i32;
+        .expect("test card must have printed cost") as i16;
     printed + game.state.mods.get_cost_modifier(cid)
 }
 

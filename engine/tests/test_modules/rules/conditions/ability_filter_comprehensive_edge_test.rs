@@ -3,7 +3,7 @@
 use crate::helpers::*;
 use rabuka_engine::card::HeartColor;
 
-fn h06(g: &TestGame, id: i16) -> i32 { g.state.mods.get_heart_modifier(id, HeartColor::Heart06) }
+fn h06(g: &TestGame, id: i16) -> i16 { g.state.mods.get_heart_modifier(id, HeartColor::Heart06) }
 
 #[test]
 fn ability_filter_live_zone_empty_no_gain() {

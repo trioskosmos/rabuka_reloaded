@@ -28,7 +28,7 @@ fn fill_decks(game: &mut TestGame, filler: i16) {
     game.state.player2.hand.cards.push(filler);
 }
 
-fn get_heart01(game: &TestGame, card_id: i16) -> i32 {
+fn get_heart01(game: &TestGame, card_id: i16) -> i16 {
     game.state
         .mods
         .get_heart_modifier(card_id, rabuka_engine::card::HeartColor::Heart01)

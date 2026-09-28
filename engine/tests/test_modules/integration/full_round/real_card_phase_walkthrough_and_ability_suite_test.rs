@@ -81,7 +81,7 @@ fn advance_to_live_start(game: &mut TestGame) {
 }
 
 #[allow(dead_code)]
-fn assert_score(game: &TestGame, expected: i32) {
+fn assert_score(game: &TestGame, expected: i16) {
     let live_card_id = game.state.player1.live_card_zone.cards[0];
     assert_eq!(game.state.mods.get_score_modifier(live_card_id), expected);
 }
@@ -803,7 +803,7 @@ fn distortion_q103_two_triggers_only_one_plus_1() {
     game.drain_auto_ability_choices();
     assert!(!game.has_pending_choice());
     assert_eq!(game.state.player1.energy_zone.active_count(), 7);
-    let total_score: i32 = game
+    let total_score: i16 = game
         .state
         .player1
         .live_card_zone

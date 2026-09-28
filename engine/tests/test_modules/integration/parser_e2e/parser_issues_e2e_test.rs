@@ -370,7 +370,7 @@ fn issue5_solitude_rain_heart_color_scoring() {
     );
     assert_eq!(
         game.state.mods.get_score_modifier(solitude),
-        niji_only as i32,
+        niji_only as i16,
         "Solitude Rain: +1 per heart01..heart06 colour held by 虹ヶ咲 members \
          on stage (expected {niji_only} from PL!N-sd1-010-SD alone)"
     );

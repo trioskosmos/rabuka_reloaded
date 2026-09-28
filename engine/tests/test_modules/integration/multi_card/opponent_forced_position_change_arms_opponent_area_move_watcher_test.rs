@@ -22,7 +22,7 @@ const MIRAKURA_RURINO: &str = "PL!HS-PR-029-PR"; // 大沢瑠璃乃, cost 5, Mir
 const NON_MIRAKURA_MEMBER: &str = "PL!-sd1-010-SD"; // μ's — breaks the gate
 const KOKO: &str = "PL!SP-sd2-002-P";
 
-fn heart06(g: &TestGame, cid: i16) -> i32 {
+fn heart06(g: &TestGame, cid: i16) -> i16 {
     g.state.mods.get_heart_modifier(cid, HeartColor::Heart06)
 }
 

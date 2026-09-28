@@ -1,7 +1,7 @@
 //! Additional methods for AbilityResolver: compound effect execution
 
 use crate::ability::resolver::AbilityResolver;
-use crate::ability_queue::ConditionalChoice;
+use crate::ability::queue::ConditionalChoice;
 use crate::card::AbilityEffect;
 use crate::game_state::GameState;
 

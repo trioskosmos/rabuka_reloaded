@@ -534,6 +534,39 @@ pub fn score_actions(gs: &GameState, actions: &[Action], me: u8) -> Vec<(f64, St
     } else {
         0.0
     };
+    // Placement forecast: expected placements over the next few checks under a
+    // projected board, each evaluated with the exact 256-draw check model.
+    // `V7_FORECAST=<weight>`, `V7_FORECAST_DEPTH=<n>`. Off until measured.
+    let forecast_weight: f64 = std::env::var("V7_FORECAST")
+        .ok()
+        .and_then(|value| value.parse().ok())
+        .filter(|value: &f64| value.is_finite() && *value >= 0.0)
+        .unwrap_or(0.0);
+    let forecast_depth: usize = std::env::var("V7_FORECAST_DEPTH")
+        .ok()
+        .and_then(|value| value.parse().ok())
+        .filter(|value: &usize| *value > 0)
+        .unwrap_or(3);
+    let base_forecast = if forecast_weight > 0.0 {
+        crate::bot::strategy_v7::placement_forecast(&root, me, &gs.card_database, forecast_depth)
+    } else {
+        0.0
+    };
+    // Ability activation refund. `V7_ABILITY_REFUND=<0..1.5>`; 0 = today's
+    // behaviour (abilities effectively unplayable), 1.0 = full refund of the
+    // development term the activation consumed.
+    let ability_refund: f64 = std::env::var("V7_ABILITY_REFUND")
+        .ok()
+        .and_then(|value| value.parse().ok())
+        .filter(|value: &f64| value.is_finite() && *value >= 0.0)
+        .unwrap_or(0.0);
+    // Ability valuation by resolved effect. `V7_ABILITY_FORECAST=<weight>`.
+    // Supersedes the blanket refund, which measured as a null.
+    let ability_forecast_weight: f64 = std::env::var("V7_ABILITY_FORECAST")
+        .ok()
+        .and_then(|value| value.parse().ok())
+        .filter(|value: &f64| value.is_finite() && *value >= 0.0)
+        .unwrap_or(0.0);
     // MEASURED 2026-09-23: Pass=-0.05 + energy tax exploded draws
     // (1569/3000, avg turns 3.7) — every UseAbility at score≈0 then beat
     // Pass and main never ended cleanly. Keep flat 0.0 (v6 doctrine).
@@ -587,6 +620,31 @@ pub fn score_actions(gs: &GameState, actions: &[Action], me: u8) -> Vec<(f64, St
         if !pending && action.action_type == ActionType::UseAbility && score <= 0.0 {
             score -= 0.01;
         }
+        // ABILITY REFUND. `value()` prices stage-cost growth at 8/cost because
+        // in the Main phase development IS the objective. For an activation
+        // that is wrong in a way that makes abilities unplayable: the member is
+        // *consumed by design*, so the stage loses its cost and blades, and the
+        // term charges -8*4 = -32 plus -6*blades for it — while the ability's
+        // actual production (cards drawn, energy, hearts, blades granted) is
+        // worth far less than 32 in `value()` units. The bot therefore scored
+        // real abilities at -25 and declined them, which the move-level trace
+        // confirms across every game sampled.
+        //
+        // So: refund the development term for the cost the ability itself
+        // consumed. What the ability PRODUCED is still priced normally, so an
+        // ability that gives nothing still loses to Pass. `V7_ABILITY_REFUND`
+        // scales it (0 disables, 1.0 = full refund of the dev term).
+        if ability_refund > 0.0 && action.action_type == ActionType::UseAbility {
+            let (_, _, cost_before) = board(&root, me);
+            let (_, _, cost_after) = board(&sim, me);
+            // `cost_before - cost_after` is POSITIVE when the activation
+            // consumed a member, which is exactly the penalty to hand back.
+            // (Getting this sign wrong is not hypothetical: the first version
+            // added a further -32 to consuming abilities and measured ability
+            // usage DROPPING from 185 to 128 in 200 games.)
+            let refund = ability_refund * (cost_before - cost_after) as f64 * 8.0;
+            score += refund;
+        }
         // Check pressure: how much closer this action brings the board to
         // actually PASSING the next check, using the same 256-draw model that
         // `choose_live_set_experiment` uses to decide whether to set a life at
@@ -600,6 +658,67 @@ pub fn score_actions(gs: &GameState, actions: &[Action], me: u8) -> Vec<(f64, St
         if pressure_weight > 0.0 {
             let after = crate::bot::strategy_v7::check_pressure(&sim, me, &gs.card_database);
             score += pressure_weight * (after - base_pressure);
+        }
+        // ABILITY VALUATION, BY WHAT IT ACTUALLY DOES.
+        //
+        // A blanket refund was the "all abilities are the same" mistake and it
+        // measured as one: enabling 28% more ability uses changed nothing
+        // (v7 vs v6, 743 -> 752, p=0.35). The abilities v7 newly reached were
+        // net-negative, because the refund was not asking whether an ability
+        // was worth using — only whether its member cost had been charged.
+        //
+        // So: execute the ability (already done above — `sim` IS the resolved
+        // state) and ask what it did to the CONVERSION outlook, over several
+        // turns, using the exact 256-draw check model. That is specific to the
+        // ability by construction — no two abilities produce the same resolved
+        // board, and a draw, a search, an energy swing, +2 blades and a member
+        // removal are all priced by what they actually buy rather than by a
+        // shared discount. It is also why the forecast was inert as a
+        // deploy term (a deploy moves the board marginally) but should not be
+        // inert here: an ability can move it a long way.
+        //
+        // Legal information only: our own hand, stage and deck, and public
+        // board. Nothing here reads the opponent's hidden zones, so this is
+        // future sight, not cheating.
+        if ability_forecast_weight > 0.0 && action.action_type == ActionType::UseAbility {
+            let after_forecast = crate::bot::strategy_v7::placement_forecast(
+                &sim,
+                me,
+                &gs.card_database,
+                forecast_depth,
+            );
+            score += ability_forecast_weight * 0.5 * (after_forecast - base_forecast);
+            if std::env::var_os("V7_DEBUG").is_some() {
+                // Name what the ability did, so "why did it use that" is
+                // answerable from the trace instead of guessed at.
+                let delta =
+                    crate::bot::strategy_v7::measure_ability(&sim, &root, me, &gs.card_database);
+                eprintln!(
+                    "V7AB t={} me={} kind={} draws={} en={} bl={} h={} ammo={} cost={} d_forecast={:.3}",
+                    gs.turn_number,
+                    me,
+                    delta.classify(),
+                    delta.draws,
+                    delta.energy,
+                    delta.blades,
+                    delta.hearts,
+                    delta.ammo,
+                    delta.stage_cost,
+                    after_forecast - base_forecast,
+                );
+            }
+        }
+        if forecast_weight > 0.0 {
+            let after = crate::bot::strategy_v7::placement_forecast(
+                &sim,
+                me,
+                &gs.card_database,
+                forecast_depth,
+            );
+            // Scaled out of forecast units: the forecast spans roughly 0..2, so
+            // divide by 2 to keep it in the same neighbourhood as the other
+            // terms before the weight is applied.
+            score += forecast_weight * 0.5 * (after - base_forecast);
         }
         let explanation = format!(
             "value={score:.2} choices={} depth={depth} status={status}{}",

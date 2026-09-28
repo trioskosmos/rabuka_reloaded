@@ -268,7 +268,7 @@ fn live_start_discard_single_member_gains_its_three_heart_colors_q246() {
         "H06 from kosuzu"
     );
 
-    let total: i32 = [
+    let total: i16 = [
         HeartColor::Heart01,
         HeartColor::Heart02,
         HeartColor::Heart03,

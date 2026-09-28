@@ -184,7 +184,9 @@ pub(crate) fn stage_buff_hearts(gs: &GameState, me_player: u8) -> Acc {
             if idx == 8 || idx == 9 {
                 continue;
             }
-            acc[idx] += gs.mods.get_heart_modifier(cid, *color);
+            // `i32` because `Acc` sums per-colour totals across every member;
+            // the per-term modifier is an i16 and widens here.
+            acc[idx] += i32::from(gs.mods.get_heart_modifier(cid, *color));
         }
     }
     acc

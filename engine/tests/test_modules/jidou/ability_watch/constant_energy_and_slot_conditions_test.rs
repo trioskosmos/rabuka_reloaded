@@ -28,15 +28,15 @@ const SAYAKA: &str = "PL!HS-bp6-012-R"; // 百生吟子 — 「ほかの」ス�
 const OTHER_SUR: &str = "PL!HS-bp1-012-PR";
 const FILLER: &str = "PL!-sd1-010-SD";
 
-fn blade_mod(game: &TestGame, card: i16) -> i32 {
+fn blade_mod(game: &TestGame, card: i16) -> i16 {
     game.state.mods.get_blade_modifier(card)
 }
 
-fn heart_mod(game: &TestGame, card: i16, colour: HeartColor) -> i32 {
+fn heart_mod(game: &TestGame, card: i16, colour: HeartColor) -> i16 {
     game.state.mods.get_heart_modifier(card, colour)
 }
 
-fn cost_mod(game: &TestGame, card: i16) -> i32 {
+fn cost_mod(game: &TestGame, card: i16) -> i16 {
     game.state.mods.get_cost_modifier(card)
 }
 

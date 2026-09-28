@@ -20,7 +20,7 @@ use crate::helpers::*;
 
 const LIVE: &str = "PL!S-bp6-022-L";
 
-fn score_mod(game: &TestGame, cid: i16) -> i32 {
+fn score_mod(game: &TestGame, cid: i16) -> i16 {
     game.state.mods.get_score_modifier(cid)
 }
 

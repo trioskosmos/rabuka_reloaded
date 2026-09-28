@@ -283,7 +283,9 @@ pub fn dump_state(game: &TestGame, tr: &Trace) {
         }
     }
     // Mods: absolute totals, sorted by (kind, ref, color) for determinism.
-    let mut mods: Vec<(String, String, i32, i32)> = Vec::new();
+    // The value is `i16` — the engine's modifier width — so this mirrors the
+    // trace it is printing rather than widening it on the way in.
+    let mut mods: Vec<(String, String, i32, i16)> = Vec::new();
     let mut ids: Vec<i16> = occ.keys().copied().collect();
     ids.sort();
     for id in ids {

@@ -30,9 +30,28 @@ impl core::fmt::Display for CardOrientation {
     }
 }
 
-/// Stores both the additive delta and absolute set value for a modifier.
+/// One stat's pending modification, as a base override plus stacked deltas.
 /// Replaces the old dual-map pattern (`blade_modifiers` + `set_blade_modifiers`).
-#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+///
+/// **Width rule for this type: both fields are `i16`, and the whole crate
+/// keeps modifiers at that width.** A modifier is a delta on a printed stat
+/// (a `u8` blade / cost / score / heart requirement), so it is inherently a
+/// small signed number. It is NOT an accumulated total and must not be widened
+/// to `i32` while passing around — that widening is what produced the `as i32`
+/// traffic this file's `total()` doc describes, and it bought nothing.
+///
+/// `i16` also happens to be the right *storage* width: narrowing `set` to `i8`
+/// (the card data only ever sets values 2–10) saves **zero bytes**, because
+/// Rust pads the struct to the alignment of the widest field — `i16`+`i8` and
+/// `i16`+`i16` are both 4 bytes. Verified, not assumed. Only `i8`+`i8` would
+/// halve it, and `additive` cannot safely be an `i8`: it is `saturating_add`-
+/// accumulated across every card and ability in a game, and a wide stack is
+/// exactly the case a wrapping `i8` would turn into a sign flip.
+///
+/// Consumers that genuinely need a wider number — a sum over many cards, a
+/// score total, a bot feature — should widen at the point of accumulation with
+/// `i32::from(..)` or `CountCast`, not by widening this type.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Hash)]
 #[cfg_attr(
     feature = "serde_support",
     derive(serde::Serialize, serde::Deserialize)
@@ -43,6 +62,13 @@ pub struct ModifierEntry {
     /// Set via `set_*` calls (absolute override).
     pub set: i16,
 }
+
+// Makes the width decision above enforceable rather than advisory. The
+// `i16`+`i16` layout is 4 bytes; widening either field to `i32` would make it
+// 8 and pay a rehash of every modifier map, and — the real cost — would let
+// the `as i32` traffic creep back in. If this stops compiling, that is the
+// signal, not an obstacle to delete.
+const _: () = assert!(core::mem::size_of::<ModifierEntry>() == 4);
 
 impl core::fmt::Display for ModifierEntry {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
@@ -77,23 +103,40 @@ pub fn apply_need_heart_modifiers(
     for (color, me) in color_mods {
         if me.set != 0 {
             if let Some(slot) = need.get_mut(color.index()) {
-                *slot = crate::constants::saturate_u8(me.set as i32);
+                *slot = crate::constants::saturate_u8(i32::from(me.set));
             }
         }
     }
     for (color, me) in color_mods {
         if me.additive != 0 {
             if let Some(slot) = need.get_mut(color.index()) {
-                *slot = crate::constants::saturate_u8(*slot as i32 + me.additive as i32);
+                *slot = crate::constants::saturate_u8(i32::from(*slot) + i32::from(me.additive));
             }
         }
     }
 }
 
 impl ModifierEntry {
-    pub fn total(&self) -> i32 {
-        // set (absolute override) is the base; additive deltas stack on top.
-        self.set as i32 + self.additive as i32
+    /// `set` (absolute override) as the base, with `additive` deltas stacked
+    /// on top — the one definition of what a modifier entry means.
+    ///
+    /// Stays in the storage width. This used to widen to `i32`, and that one
+    /// return type was the source of most of the crate's cast traffic: the
+    /// storage is two `i16`s, so a caller adding a `u8` printed stat to the
+    /// result had to write `printed as i32 + entry.total()` and then narrow
+    /// the sum back with `saturate_u8`, at ~70 sites across 14 files. Keeping
+    /// the sum in `i16` leaves exactly one widening — into `saturate_u8` — and
+    /// makes the entry's natural range visible at the type.
+    ///
+    /// `saturating_add` rather than `+`: the two fields are independently
+    /// `saturating_add`-accumulated, so their sum is not provably in `i16`.
+    /// A wrapping sum would silently turn a large positive modifier into a
+    /// negative one and invert a comparison; saturating keeps the direction
+    /// of the overflow. Unreachable in play (modifiers are single-digit card
+    /// deltas), but the type now says it cannot happen, so it must not wrap.
+    #[inline]
+    pub fn total(&self) -> i16 {
+        self.set.saturating_add(self.additive)
     }
 }
 
@@ -111,7 +154,10 @@ pub struct BonusSource {
     pub source_card_id: i16,
     pub ability_text: String,
     pub target_card_id: i16,
-    pub amount: i32,
+    /// `i16`, the modifier width. This is a projected modifier — the same
+    /// quantity `ModifierEntry` stores — so it was never a computed score and
+    /// never needed a wider type.
+    pub amount: i16,
     /// Heart color string ("heart01", "all", …) for heart/need-heart bonuses.
     #[cfg_attr(feature = "serde_support", serde(default))]
     pub color: Option<String>,
@@ -292,14 +338,14 @@ impl GameModifiers {
         }
     }
 
-    pub fn get_blade_modifier(&self, card_id: i16) -> i32 {
+    pub fn get_blade_modifier(&self, card_id: i16) -> i16 {
         self.blade_modifiers.get(&card_id).map_or(0, |e| e.total())
     }
 
-    pub fn get_blade_set_modifier(&self, card_id: i16) -> i32 {
+    pub fn get_blade_set_modifier(&self, card_id: i16) -> i16 {
         self.blade_modifiers
             .get(&card_id)
-            .map_or(0, |e| e.set as i32)
+            .map_or(0, |e| e.set)
     }
 
     pub fn set_blade_modifier(&mut self, card_id: i16, value: i16) {
@@ -356,19 +402,22 @@ impl GameModifiers {
         });
     }
 
-    pub fn get_heart_modifier(&self, card_id: i16, color: HeartColor) -> i32 {
+    pub fn get_heart_modifier(&self, card_id: i16, color: HeartColor) -> i16 {
         let by_color = self.heart_modifiers.get(&card_id);
-        let color_val = || -> i32 {
+        let color_val = || -> i16 {
             by_color
                 .and_then(|colors| colors.get(&color))
                 .map_or(0, |e| e.total())
         };
-        let wildcard_val = || -> i32 {
+        let wildcard_val = || -> i16 {
             by_color
                 .and_then(|colors| colors.get(&HeartColor::Heart00))
                 .map_or(0, |e| e.total())
         };
-        color_val() + wildcard_val()
+        // Two independent entries on the same card. `saturating_add` for the
+        // same reason as `total()`: neither is individually bounded by the
+        // other, and a wrap here would show up as a wrong per-colour need.
+        color_val().saturating_add(wildcard_val())
     }
 
     pub fn remove_heart_modifier(&mut self, card_id: i16, color: HeartColor, delta: i16) {
@@ -417,7 +466,7 @@ impl GameModifiers {
         }
     }
 
-    pub fn get_score_modifier(&self, card_id: i16) -> i32 {
+    pub fn get_score_modifier(&self, card_id: i16) -> i16 {
         self.score_modifiers.get(&card_id).map_or(0, |e| e.total())
     }
 
@@ -425,10 +474,8 @@ impl GameModifiers {
         self.score_modifiers.entry(card_id).or_default().set = value;
     }
 
-    pub fn get_score_set_modifier(&self, card_id: i16) -> i32 {
-        self.score_modifiers
-            .get(&card_id)
-            .map_or(0, |e| e.set as i32)
+    pub fn get_score_set_modifier(&self, card_id: i16) -> i16 {
+        self.score_modifiers.get(&card_id).map_or(0, |e| e.set)
     }
 
     pub fn clear_score_set_modifier(&mut self, card_id: i16) {
@@ -448,7 +495,7 @@ impl GameModifiers {
         entry.additive = entry.additive.saturating_add(delta);
     }
 
-    pub fn get_need_heart_modifier(&self, card_id: i16, color: HeartColor) -> i32 {
+    pub fn get_need_heart_modifier(&self, card_id: i16, color: HeartColor) -> i16 {
         self.need_heart_modifiers
             .get(&card_id)
             .and_then(|colors| colors.get(&color))
@@ -494,17 +541,14 @@ impl GameModifiers {
         }
     }
 
-    pub fn get_cost_modifier(&self, card_id: i16) -> i32 {
+    pub fn get_cost_modifier(&self, card_id: i16) -> i16 {
         self.cost_modifiers.get(&card_id).map_or(0, |e| e.total())
     }
 
     /// The absolute set-override cost (コストはNになる) if one exists for the
     /// card, else None. A set override replaces the base cost entirely.
-    pub fn get_cost_modifier_set(&self, card_id: i16) -> Option<i32> {
-        self.cost_modifiers
-            .get(&card_id)
-            .map(|e| e.set as i32)
-            .filter(|&v| v != 0)
+    pub fn get_cost_modifier_set(&self, card_id: i16) -> Option<i16> {
+        self.cost_modifiers.get(&card_id).map(|e| e.set).filter(|&v| v != 0)
     }
 
     pub fn set_cost_modifier(&mut self, card_id: i16, value: i16) {

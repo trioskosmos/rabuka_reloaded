@@ -122,7 +122,7 @@ fn pl_hs_sd1_008_live_start_skip_cost_no_effect() {
         }
     }
 
-    let total: i32 = [
+    let total: i16 = [
         HeartColor::Heart01,
         HeartColor::Heart04,
         HeartColor::Heart05,

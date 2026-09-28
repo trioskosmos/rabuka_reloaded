@@ -1,7 +1,7 @@
 use crate::helpers::*;
 use rabuka_engine::zones::MemberArea;
 
-fn blade_count(v: &TestGame, cid: i16) -> i32 {
+fn blade_count(v: &TestGame, cid: i16) -> i16 {
     v.state
         .mods
         .blade_modifiers

@@ -21,7 +21,7 @@ use rabuka_engine::zones::MemberArea;
 const SETSUNA: &str = "PL!N-bp7-007-R＋";
 const ENERGY: &str = "LL-E-001-SD";
 
-fn heart02(game: &TestGame, cid: i16) -> i32 {
+fn heart02(game: &TestGame, cid: i16) -> i16 {
     game.state
         .mods
         .get_heart_modifier(cid, HeartColor::Heart02)

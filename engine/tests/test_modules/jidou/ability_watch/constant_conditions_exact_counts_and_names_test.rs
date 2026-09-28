@@ -33,11 +33,11 @@ const RURINO: &str = "PL!HS-bp1-014-N";
 const MEGUMI: &str = "PL!HS-bp1-015-N";
 const FILLER: &str = "PL!-sd1-010-SD";
 
-fn heart_mod(game: &TestGame, card: i16, colour: HeartColor) -> i32 {
+fn heart_mod(game: &TestGame, card: i16, colour: HeartColor) -> i16 {
     game.state.mods.get_heart_modifier(card, colour)
 }
 
-fn blade_mod(game: &TestGame, card: i16) -> i32 {
+fn blade_mod(game: &TestGame, card: i16) -> i16 {
     game.state.mods.get_blade_modifier(card)
 }
 

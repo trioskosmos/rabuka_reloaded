@@ -88,7 +88,7 @@ fn has_all_heart(gs: &rabuka_engine::core::game_state::GameState, cid: i16) -> b
         .is_some_and(|e| e.total() > 0)
 }
 
-fn total_all_heart(gs: &rabuka_engine::core::game_state::GameState, cid: i16) -> i32 {
+fn total_all_heart(gs: &rabuka_engine::core::game_state::GameState, cid: i16) -> i16 {
     gs.mods
         .heart_modifiers
         .get(&cid)

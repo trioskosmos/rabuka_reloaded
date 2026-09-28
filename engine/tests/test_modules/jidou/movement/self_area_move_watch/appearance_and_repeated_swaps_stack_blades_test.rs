@@ -9,7 +9,7 @@ fn fill_deck_and_energy(game: &mut TestGame) {
     game.give_energy(100);
 }
 
-fn blade_mod(game: &TestGame, card_id: i16) -> i32 {
+fn blade_mod(game: &TestGame, card_id: i16) -> i16 {
     game.state.mods.get_blade_modifier(card_id)
 }
 

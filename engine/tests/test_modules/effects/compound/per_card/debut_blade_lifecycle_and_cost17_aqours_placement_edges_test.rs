@@ -2,7 +2,7 @@
 use crate::helpers::*;
 use rabuka_engine::zones::MemberArea;
 
-fn blade(v: &TestGame, cid: i16) -> i32 {
+fn blade(v: &TestGame, cid: i16) -> i16 {
     v.state.mods.blade_modifiers.get(&cid).map(|e| e.total()).unwrap_or(0)
 }
 fn drain(v: &mut TestGame) {

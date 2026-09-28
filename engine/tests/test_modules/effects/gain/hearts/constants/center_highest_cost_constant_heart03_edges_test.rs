@@ -9,7 +9,7 @@ fn game_id(card_no: &str) -> i16 {
     card_id(&db, card_no)
 }
 
-fn heart03_mod(game: &TestGame, card_id: i16) -> i32 {
+fn heart03_mod(game: &TestGame, card_id: i16) -> i16 {
     game.state
         .mods
         .get_heart_modifier(card_id, HeartColor::Heart03)
@@ -20,7 +20,7 @@ fn setup_and_check(
     sumire_id: i16,
     center_id: i16,
     right_id: i16,
-) -> (i32, i32) {
+) -> (i16, i16) {
     let db = load_real_database();
     let mut game = TestGame::new(db);
 

@@ -22,7 +22,7 @@ const SETSUNA_SINGLE: &str = "PL!N-bp5-019-N";
 /// Another Nijigasaki live card (distinct name from DIVE!) for wrong-target picks.
 const OTHER_NIJI_LIVE: &str = "PL!N-bp4-025-L";
 
-fn blade_mod(g: &TestGame, cid: i16) -> i32 {
+fn blade_mod(g: &TestGame, cid: i16) -> i16 {
     g.state
         .mods
         .blade_modifiers

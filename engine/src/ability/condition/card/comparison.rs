@@ -1,8 +1,9 @@
 use super::{comparison_default_count, ConditionContext};
 use crate::ability::enums::Zone;
 use crate::ability::util::{self, compare_counts};
-use crate::ability_queue::ConditionalChoice;
+use crate::ability::queue::ConditionalChoice;
 use crate::card::{ComparisonTarget, Condition};
+use crate::core::constants::CountCast;
 #[cfg(feature = "no_std")]
 use alloc::vec::Vec;
 use smallvec::SmallVec;
@@ -161,10 +162,10 @@ impl<'a> ConditionContext<'a> {
 
     fn evaluate_activating_cost(&self, condition: &Condition, act: i16) -> bool {
         let printed = self.printed_cost(act);
-        let effective = crate::constants::saturate_u8(crate::constants::effective_stat(
+        let effective = crate::constants::effective_stat(
             printed,
             self.game_state.mods.get_cost_modifier(act),
-        ));
+        );
         let threshold = condition.get_count().unwrap_or(0);
         let op = condition.get_operator().unwrap_or(">=");
         log::debug!(target: "rabuka_engine::ability::condition::card",
@@ -190,10 +191,10 @@ impl<'a> ConditionContext<'a> {
         let op = condition.get_operator();
         ids.iter().any(|&id| {
             let original = card_db.get_card(id).and_then(|c| c.score).unwrap_or(0);
-            let current = crate::constants::saturate_u8(crate::constants::effective_stat(
+            let current = crate::constants::effective_stat(
                 original,
                 self.game_state.mods.get_score_modifier(id),
-            ));
+            );
             compare_counts(op, current, original)
         })
     }
@@ -295,9 +296,17 @@ impl<'a> ConditionContext<'a> {
             })
             .unwrap_or(0);
         if ctype == "cost" {
-            base.saturating_sub(crate::constants::saturate_u8(
-                self.game_state.mods.get_cost_modifier(act_id),
-            ))
+            // A cost reduction is a signed modifier; `saturating_sub` on the
+            // u8 printed value already floors at 0, and `u8_count` keeps a
+            // negative delta (a cost INCREASE) as "no reduction" rather than
+            // subtracting it a second time.
+            base.saturating_sub(
+                self.game_state
+                    .mods
+                    .get_cost_modifier(act_id)
+                    .max(0)
+                    .u8_count(),
+            )
         } else {
             base
         }
@@ -353,14 +362,17 @@ impl<'a> ConditionContext<'a> {
     }
 
     fn sum_condition_costs(&self, condition: &Condition, cards: &[i16]) -> i32 {
+        // `i32` because the result is compared against a parsed threshold and
+        // a wide card list must not itself be the thing that overflows. Each
+        // per-card value is already a saturated `u8`.
         cards
             .iter()
             .filter(|&&id| self.matches_condition_groups_and_type(condition, id))
             .map(|&id| {
-                crate::constants::effective_stat(
+                i32::from(crate::constants::effective_stat(
                     self.printed_cost(id),
                     self.game_state.mods.get_cost_modifier(id),
-                )
+                ))
             })
             .sum()
     }

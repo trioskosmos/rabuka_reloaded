@@ -1,6 +1,6 @@
 use crate::core::constants::CountCast;
 use crate::ability::debug::AbDebug;
-use crate::ability_queue::QueueState;
+use crate::ability::queue::QueueState;
 use crate::card::{CardDatabase, CardId};
 use crate::card::HeartColor;
 use crate::game_state::{GameState, LOG_BOUND_RULE, LOG_BOUND_STRUCTURED};
@@ -91,8 +91,11 @@ pub struct BonusSourceDisplay {
     /// Bonus category: blade | heart | score | score_set | cost | cost_set |
     /// need_heart | gained_ability
     pub kind: String,
+    /// `i16`, matching `ModifierEntry` — this is a projected modifier, not a
+    /// computed score. Serde writes it as the same JSON number either way, so
+    /// narrowing costs the wire nothing.
     #[cfg_attr(feature = "serde_support", serde(default))]
-    pub amount: i32,
+    pub amount: i16,
     #[cfg_attr(feature = "serde_support", serde(default))]
     pub color: Option<String>,
 }
@@ -135,13 +138,20 @@ pub struct CardDisplay {
 
     // ── Additive bonuses (ModifyBlade, GainResource blade) ──
     // Shows icon_blade.png with "+N" or "-N"
+    //
+    // Every numeric field from here to `set_cost` is an `i16` for one shared
+    // reason: each is a projected `ModifierEntry` total or set value, so the
+    // engine's own storage width is the exact width. They were `i32` because
+    // `ModifierEntry::total()` used to widen, and the type stuck after the
+    // value stopped needing it. On the wire they are unchanged — serde emits
+    // the same JSON number for an i16 as for an i32.
     #[cfg_attr(feature = "serde_support", serde(default))]
-    pub bonus_blade: i32,
+    pub bonus_blade: i16,
 
     // ── Additive heart bonuses (ModifyHeart, GainResource heart) ──
     // Shows per-color heart icons with "+N" or "-N"
     #[cfg_attr(feature = "serde_support", serde(default))]
-    pub bonus_hearts: Vec<i32>,
+    pub bonus_hearts: Vec<i16>,
 
     // ── Additive score bonus (ModifyScore, GainAbility score) ──
     // Shows icon_score.png with "+N" or "-N"
@@ -149,34 +159,34 @@ pub struct CardDisplay {
     // recalculate_constants → score_modifier, but does NOT add a
     // jyouji.png trigger icon. The trigger type is in bonus_triggers.
     #[cfg_attr(feature = "serde_support", serde(default))]
-    pub bonus_score: i32,
+    pub bonus_score: i16,
 
     // ── Additive cost modifier (ModifyCost) ──
     // Shows icon_energy.png with "+N" or "-N"
     #[cfg_attr(feature = "serde_support", serde(default))]
-    pub bonus_cost: i32,
+    pub bonus_cost: i16,
 
     // ── Set/override blade (SetBladeCount, SetBladeType) ──
     // Shows icon_blade.png with plain "N" (no +/-)
     // Separate from bonus_blade so both can appear simultaneously:
     // e.g. set_blade=5 (base) + bonus_blade=+2 (modifier)
     #[cfg_attr(feature = "serde_support", serde(default))]
-    pub set_blade: i32,
+    pub set_blade: i16,
 
     // ── Set/override hearts (SetHeartType) ──
     // Shows per-color heart icons with plain "N" (no +/-)
     #[cfg_attr(feature = "serde_support", serde(default))]
-    pub set_hearts: Vec<i32>,
+    pub set_hearts: Vec<i16>,
 
     // ── Set/override score (SetScore) ──
     // Shows icon_score.png with plain "N" (no +/-)
     #[cfg_attr(feature = "serde_support", serde(default))]
-    pub set_score: i32,
+    pub set_score: i16,
 
     // ── Set/override cost (SetCost, SetCostToUse) ──
     // Shows icon_energy.png with plain "N" (no +/-)
     #[cfg_attr(feature = "serde_support", serde(default))]
-    pub set_cost: i32,
+    pub set_cost: i16,
 
     // ── Gained ability trigger texticons (GainAbility) ──
     // Populated from gained_card_abilities in game_state_to_display.
@@ -219,7 +229,7 @@ pub struct PlayerDisplay {
     #[cfg_attr(feature = "serde_support", serde(default))]
     pub last_resolution_cards: Vec<CardDisplay>,
     #[cfg_attr(feature = "serde_support", serde(default))]
-    pub score_modifiers: HashMap<i16, i32>,
+    pub score_modifiers: HashMap<i16, i16>,
     #[cfg_attr(feature = "serde_support", serde(default))]
     pub total_hearts: Vec<u8>,
     #[cfg_attr(feature = "serde_support", serde(default))]
@@ -235,21 +245,21 @@ pub struct PlayerDisplay {
     #[cfg_attr(feature = "serde_support", serde(default))]
     pub active_restrictions: Vec<String>,
     #[cfg_attr(feature = "serde_support", serde(default))]
-    pub need_heart_modifiers: HashMap<String, Vec<i32>>,
+    pub need_heart_modifiers: HashMap<String, Vec<i16>>,
     #[cfg_attr(feature = "serde_support", serde(default))]
     pub mulligan_selection: Option<Vec<usize>>,
     #[cfg_attr(feature = "serde_support", serde(default))]
     pub live_card_selection: Option<Vec<usize>>,
     #[cfg_attr(feature = "serde_support", serde(default))]
-    pub blade_buffs: Vec<i32>,
+    pub blade_buffs: Vec<i16>,
     #[cfg_attr(feature = "serde_support", serde(default))]
-    pub heart_buffs: Vec<Vec<i32>>,
+    pub heart_buffs: Vec<Vec<i16>>,
     #[cfg_attr(feature = "serde_support", serde(default))]
-    pub cost_reduction: i32,
+    pub cost_reduction: i16,
     #[cfg_attr(feature = "serde_support", serde(default))]
-    pub prevent_baton_touch: i32,
+    pub prevent_baton_touch: i16,
     #[cfg_attr(feature = "serde_support", serde(default))]
-    pub prevent_baton: i32,
+    pub prevent_baton: i16,
     #[cfg_attr(feature = "serde_support", serde(default))]
     pub deployed_this_turn: Vec<i16>,
     #[cfg_attr(feature = "serde_support", serde(default))]
@@ -533,14 +543,20 @@ pub struct GameStateDisplay {
     pub last_state_change_wait_to_active_count: u8,
 
     // GameModifiers constant* breakdown
+    //
+    // These mirror the engine's own `constant_*_bonuses` fields one-for-one,
+    // and those are `i16` modifiers. Copying them into `i32` here meant every
+    // value was widened on the way into the display and never used at the
+    // wider width. Serde emits the same JSON number either way, so the wire
+    // format is unchanged.
     #[cfg_attr(feature = "serde_support", serde(default))]
-    pub constant_blade_bonuses: HashMap<i16, i32>,
+    pub constant_blade_bonuses: HashMap<i16, i16>,
     #[cfg_attr(feature = "serde_support", serde(default))]
-    pub constant_cost_bonuses: HashMap<i16, i32>,
+    pub constant_cost_bonuses: HashMap<i16, i16>,
     #[cfg_attr(feature = "serde_support", serde(default))]
-    pub constant_score_bonuses: HashMap<i16, i32>,
+    pub constant_score_bonuses: HashMap<i16, i16>,
     #[cfg_attr(feature = "serde_support", serde(default))]
-    pub constant_heart_bonuses: HashMap<i16, HashMap<String, i32>>,
+    pub constant_heart_bonuses: HashMap<i16, HashMap<String, i16>>,
     #[cfg_attr(feature = "serde_support", serde(default))]
     pub constant_global_need_heart: Vec<[String; 3]>,
     #[cfg_attr(feature = "serde_support", serde(default))]
@@ -567,7 +583,7 @@ pub fn card_to_display(
     card_id: i16,
     card_db: &CardDatabase,
     orientation: Option<Orientation>,
-    blade_modifier: i32,
+    blade_modifier: i16,
 ) -> Option<CardDisplay> {
     card_db.get_card(card_id).map(|card| {
         let base_heart = card.base_heart.as_ref().map(|bh| {
@@ -576,6 +592,11 @@ pub fn card_to_display(
                 .map(|(color, count)| (color.as_str().to_string(), *count))
                 .collect()
         });
+        // No set figures are available on this reduced path, so the printed
+        // blade is always the base — but the total still goes through
+        // `effective_stat` so the saturation rule matches the full builder
+        // rather than being restated here.
+        let total_blade = crate::constants::effective_stat(card.blade, blade_modifier);
         CardDisplay {
             card_no: card.card_no.to_string(),
             name: card.name.to_string(),
@@ -586,7 +607,7 @@ pub fn card_to_display(
             total_blade: if orientation == Some(Orientation::Wait) {
                 0
             } else {
-                crate::constants::saturate_u8((card.blade as i32) + blade_modifier)
+                total_blade
             },
             id: card_id,
             ability_text: Some(card.ability_text().to_string()),
@@ -649,20 +670,24 @@ pub fn card_to_display(
 /// The heart maps and trigger list are owned rather than borrowed because a
 /// card absent from a table yields an empty map, and a borrow of that
 /// temporary would not outlive the call.
+///
+/// Every figure is `i16`, because every figure here IS a `ModifierEntry`
+/// total or set value pulled straight out of the modifier tables. Widening
+/// them to `i32` on the way out only bought a `try_from` on the way into JSON.
 pub struct CardFigures {
     /// Additive modifiers (accumulated via `add_*` / `+=`) — shown with a
     /// +/- prefix.
-    pub blade: i32,
-    pub score: i32,
-    pub heart: HashMap<crate::card::HeartColor, i32>,
-    pub cost: i32,
+    pub blade: i16,
+    pub score: i16,
+    pub heart: HashMap<crate::card::HeartColor, i16>,
+    pub cost: i16,
     /// Absolute set/override modifiers (set via `set_*`) — shown without a
     /// +/- prefix. A non-zero value replaces the printed figure outright
     /// rather than adjusting it.
-    pub blade_set: i32,
-    pub score_set: i32,
-    pub heart_set: HashMap<crate::card::HeartColor, i32>,
-    pub cost_set: i32,
+    pub blade_set: i16,
+    pub score_set: i16,
+    pub heart_set: HashMap<crate::card::HeartColor, i16>,
+    pub cost_set: i16,
     /// 「ハートをXに変える」 — the whole heart set becomes this colour.
     pub heart_transform: Option<crate::card::HeartColor>,
     /// Trigger texticon badges for gained abilities (e.g. "jyouji").
@@ -670,16 +695,20 @@ pub struct CardFigures {
 }
 
 /// The per-card modifier tables the display layer reads.
+///
+/// `i16` throughout, matching `ModifierEntry` and `SharedDisplay`. The
+/// `*_additive` tables are derived as `total - set`, so they are modifier
+/// values too, not computed figures.
 pub struct DisplayModifiers<'a> {
-    pub blade_additive: &'a HashMap<i16, i32>,
-    pub blade_set: &'a HashMap<i16, i32>,
-    pub score_additive: &'a HashMap<i16, i32>,
-    pub score_set: &'a HashMap<i16, i32>,
-    pub heart_additive: &'a HashMap<i16, HashMap<crate::card::HeartColor, i32>>,
-    pub heart_set: &'a HashMap<i16, HashMap<crate::card::HeartColor, i32>>,
+    pub blade_additive: &'a HashMap<i16, i16>,
+    pub blade_set: &'a HashMap<i16, i16>,
+    pub score_additive: &'a HashMap<i16, i16>,
+    pub score_set: &'a HashMap<i16, i16>,
+    pub heart_additive: &'a HashMap<i16, HashMap<crate::card::HeartColor, i16>>,
+    pub heart_set: &'a HashMap<i16, HashMap<crate::card::HeartColor, i16>>,
     pub heart_color_multiplier: &'a HashMap<i16, crate::card::HeartColor>,
-    pub cost_additive: &'a HashMap<i16, i32>,
-    pub cost_set: &'a HashMap<i16, i32>,
+    pub cost_additive: &'a HashMap<i16, i16>,
+    pub cost_set: &'a HashMap<i16, i16>,
     pub bonus_triggers: &'a HashMap<i16, Vec<String>>,
 }
 
@@ -733,23 +762,26 @@ pub fn card_to_display_full(
                 .collect()
         });
         // Additive hearts (shown with +/-)
-        let mut bonus_hearts = vec![0i32; 8];
+        let mut bonus_hearts = vec![0i16; 8];
         for (color, val) in heart_additive {
             if let Some(idx) = heart_color_index(color) {
-                bonus_hearts[idx] += val;
+                bonus_hearts[idx] = bonus_hearts[idx].saturating_add(*val);
             }
         }
         // Set/override hearts (shown without +/-)
-        let mut set_hearts = vec![0i32; 8];
+        let mut set_hearts = vec![0i16; 8];
         for (color, val) in heart_set {
             if let Some(idx) = heart_color_index(color) {
-                set_hearts[idx] += val;
+                set_hearts[idx] = set_hearts[idx].saturating_add(*val);
             }
         }
+        // A non-zero set replaces the printed blade outright, so the two are
+        // selected rather than added — otherwise a set of 5 plus a +2 additive
+        // would report 7 blades instead of 5.
         let total_blade = if blade_set != 0 {
-            crate::constants::saturate_u8(blade_set + blade_additive)
+            crate::constants::overridden_stat(blade_set, blade_additive)
         } else {
-            crate::constants::saturate_u8((card.blade as i32) + blade_additive)
+            crate::constants::effective_stat(card.blade, blade_additive)
         };
         let transform_str = heart_transform.map(|hc| hc.as_str().to_string());
         CardDisplay {
@@ -820,39 +852,23 @@ pub fn zone_to_display_full(
     }
 }
 
-#[allow(clippy::too_many_arguments)]
+/// Build the stage display from the shared modifier tables.
+///
+/// Takes [`DisplayModifiers`] rather than re-listing its ten fields: the ten
+/// parameters this used to take were exactly that struct, hand-expanded at
+/// every call site, and a field added to one but not the other would not fail
+/// to compile — it would just read zeros.
 pub fn stage_to_display(
     stage: &crate::zones::Stage,
     card_db: &CardDatabase,
-    blade_additive: &HashMap<i16, i32>,
-    blade_set: &HashMap<i16, i32>,
     orientation_modifiers: &HashMap<i16, crate::core::game_modifiers::CardOrientation>,
-    heart_additive: &HashMap<i16, HashMap<crate::card::HeartColor, i32>>,
-    heart_set: &HashMap<i16, HashMap<crate::card::HeartColor, i32>>,
-    score_additive: &HashMap<i16, i32>,
-    score_set: &HashMap<i16, i32>,
-    heart_color_multiplier: &HashMap<i16, crate::card::HeartColor>,
-    cost_additive: &HashMap<i16, i32>,
-    cost_set: &HashMap<i16, i32>,
-    bonus_triggers: &HashMap<i16, Vec<String>>,
+    mods: &DisplayModifiers<'_>,
 ) -> StageDisplay {
     let orientation_of = |cid: i16| {
         orientation_modifiers.get(&cid).map(|o| match o {
             crate::core::game_modifiers::CardOrientation::Wait => Orientation::Wait,
             _ => Orientation::Active,
         })
-    };
-    let mods = DisplayModifiers {
-        blade_additive,
-        blade_set,
-        score_additive,
-        score_set,
-        heart_additive,
-        heart_set,
-        heart_color_multiplier,
-        cost_additive,
-        cost_set,
-        bonus_triggers,
     };
     // The three stage slots differ only in their index.
     let slot = |idx: usize| {
@@ -892,11 +908,11 @@ fn add_hearts(totals: &mut [u8], hearts: &crate::card::HeartMap) {
 /// 255 so a bad modifier cannot wrap the display.
 fn add_modified_hearts(
     totals: &mut [u8],
-    modifiers: &HashMap<crate::card::HeartColor, i32>,
+    modifiers: &HashMap<crate::card::HeartColor, i16>,
 ) {
     for (color, modifier) in modifiers {
         if let Some(idx) = heart_color_index(color) {
-            totals[idx] = crate::constants::saturate_u8(totals[idx] as i32 + *modifier);
+            totals[idx] = crate::constants::effective_stat(totals[idx], *modifier);
         }
     }
 }
@@ -914,24 +930,28 @@ fn add_modified_hearts(
 pub struct SharedDisplay<'a> {
     pub card_db: &'a CardDatabase,
     // Combined modifier totals (additive + set) — for stat computations.
-    pub blade_modifiers: &'a HashMap<i16, i32>,
-    pub score_modifiers: &'a HashMap<i16, i32>,
-    pub heart_modifiers: &'a HashMap<i16, HashMap<crate::card::HeartColor, i32>>,
+    //
+    // `i16` throughout, matching `ModifierEntry`. Every one of these maps is a
+    // projection of the engine's own modifier tables, so the display layer
+    // holding them any wider meant every consumer here re-widened them.
+    pub blade_modifiers: &'a HashMap<i16, i16>,
+    pub score_modifiers: &'a HashMap<i16, i16>,
+    pub heart_modifiers: &'a HashMap<i16, HashMap<crate::card::HeartColor, i16>>,
     // The "set" portion of each ModifierEntry (absolute overrides), extracted
     // so card badges can display them without a +/-. See the CardDisplay doc
     // for the full additive-vs-set breakdown.
-    pub blade_set: &'a HashMap<i16, i32>,
-    pub score_set: &'a HashMap<i16, i32>,
-    pub heart_set: &'a HashMap<i16, HashMap<crate::card::HeartColor, i32>>,
+    pub blade_set: &'a HashMap<i16, i16>,
+    pub score_set: &'a HashMap<i16, i16>,
+    pub heart_set: &'a HashMap<i16, HashMap<crate::card::HeartColor, i16>>,
     pub orientation_modifiers: &'a HashMap<i16, crate::core::game_modifiers::CardOrientation>,
     pub gained_abilities: &'a HashMap<i16, Vec<String>>,
-    pub need_heart_modifiers: &'a HashMap<i16, HashMap<crate::card::HeartColor, i32>>,
+    pub need_heart_modifiers: &'a HashMap<i16, HashMap<crate::card::HeartColor, i16>>,
     pub prohibition_effects: &'a [String],
     pub cannot_activate_members: &'a [String],
     pub heart_color_multiplier: &'a HashMap<i16, crate::card::HeartColor>,
     // Cost modifier totals (additive + set) and the set portion.
-    pub cost_modifiers: &'a HashMap<i16, i32>,
-    pub cost_set: &'a HashMap<i16, i32>,
+    pub cost_modifiers: &'a HashMap<i16, i16>,
+    pub cost_set: &'a HashMap<i16, i16>,
     /// Gained-ability trigger texticon badges, from gained_card_abilities.
     /// Each entry is a trigger type name; the frontend renders a texticon.
     /// `gain_ability` without this would leave no icon on the card.
@@ -1058,20 +1078,23 @@ pub fn player_to_display(
         }
     }
 
-    // Compute live_card_scores: card_no -> total score
+    // Compute live_card_scores: card_no -> total score. The live-set zone and
+    // the success zone are the same computation over the same table, so they
+    // share one pass; a card in both is simply written twice with the same
+    // value, exactly as the two separate loops did.
     let mut live_card_scores = HashMap::default();
-    for &cid in &player.live_card_zone.cards {
+    for &cid in player
+        .live_card_zone
+        .cards
+        .iter()
+        .chain(player.success_live_card_zone.cards.iter())
+    {
         if let Some(card) = card_db.get_card(cid) {
-            let base = card.score.unwrap_or(0);
             let bonus = score_modifiers.get(&cid).copied().unwrap_or(0);
-            live_card_scores.insert(card.card_no.to_string(), crate::constants::saturate_u8(base as i32 + bonus));
-        }
-    }
-    for &cid in &player.success_live_card_zone.cards {
-        if let Some(card) = card_db.get_card(cid) {
-            let base = card.score.unwrap_or(0);
-            let bonus = score_modifiers.get(&cid).copied().unwrap_or(0);
-            live_card_scores.insert(card.card_no.to_string(), crate::constants::saturate_u8(base as i32 + bonus));
+            live_card_scores.insert(
+                card.card_no.to_string(),
+                crate::constants::effective_stat(card.score.unwrap_or(0), bonus),
+            );
         }
     }
 
@@ -1079,11 +1102,11 @@ pub fn player_to_display(
     let mut current_score = 0u8;
     for &cid in &player.stage.stage {
         if let Some(card) = card_db.get_card(cid) {
-            current_score += card.score.unwrap_or(0);
+            current_score = current_score.saturating_add(card.score.unwrap_or(0));
         }
     }
     for &val in score_modifiers.values() {
-        current_score = crate::constants::saturate_u8(current_score as i32 + val);
+        current_score = crate::constants::effective_stat(current_score, val);
     }
 
     // Collect gained abilities for this player's cards
@@ -1113,7 +1136,7 @@ pub fn player_to_display(
             || player.success_live_card_zone.cards.contains(&cid)
         {
             if let Some(card) = card_db.get_card(cid) {
-                let mut arr = vec![0i32; 8];
+                let mut arr = vec![0i16; 8];
                 for (color, &val) in colors {
                     if let Some(idx) = heart_color_index(color) {
                         arr[idx] = val;
@@ -1143,29 +1166,48 @@ pub fn player_to_display(
             .collect()
     });
 
-    // Compute additive maps = total - set (for bonus_* display)
-    let blade_additive: HashMap<i16, i32> = blade_modifiers
+    // Compute additive maps = total - set (for bonus_* display). Subtraction
+    // in i16 via the shared totals, saturating so a large total against a
+    // large set cannot wrap into a bogus positive badge.
+    let blade_additive: HashMap<i16, i16> = blade_modifiers
         .iter()
-        .map(|(&k, &total)| (k, total - blade_set.get(&k).copied().unwrap_or(0)))
+        .map(|(&k, &total)| {
+            (
+                k,
+                total.saturating_sub(blade_set.get(&k).copied().unwrap_or(0)),
+            )
+        })
         .collect();
-    let score_additive: HashMap<i16, i32> = score_modifiers
+    let score_additive: HashMap<i16, i16> = score_modifiers
         .iter()
-        .map(|(&k, &total)| (k, total - score_set.get(&k).copied().unwrap_or(0)))
+        .map(|(&k, &total)| {
+            (
+                k,
+                total.saturating_sub(score_set.get(&k).copied().unwrap_or(0)),
+            )
+        })
         .collect();
-    let heart_additive: HashMap<i16, HashMap<crate::card::HeartColor, i32>> = heart_modifiers
+    let heart_additive: HashMap<i16, HashMap<crate::card::HeartColor, i16>> = heart_modifiers
         .iter()
         .map(|(&k, colors)| {
             let set_colors = heart_set.get(&k).cloned().unwrap_or_default();
-            let add: HashMap<crate::card::HeartColor, i32> = colors
+            let add: HashMap<crate::card::HeartColor, i16> = colors
                 .iter()
-                .map(|(&c, &total)| (c, total - set_colors.get(&c).copied().unwrap_or(0)))
+                .map(|(&c, &total)| {
+                    (
+                        c,
+                        total.saturating_sub(set_colors.get(&c).copied().unwrap_or(0)),
+                    )
+                })
                 .collect();
             (k, add)
         })
         .collect();
-    let cost_additive: HashMap<i16, i32> = cost_modifiers
+    let cost_additive: HashMap<i16, i16> = cost_modifiers
         .iter()
-        .map(|(&k, &total)| (k, total - cost_set.get(&k).copied().unwrap_or(0)))
+        .map(|(&k, &total)| {
+            (k, total.saturating_sub(cost_set.get(&k).copied().unwrap_or(0)))
+        })
         .collect();
 
     let prevent_baton = if restrictions
@@ -1195,21 +1237,7 @@ pub fn player_to_display(
     PlayerDisplay {
         energy: energy_display,
         hand: zone_to_display_full(&player.hand.cards, card_db, &mods),
-        stage: stage_to_display(
-            &player.stage,
-            card_db,
-            &blade_additive,
-            blade_set,
-            orientation_modifiers,
-            &heart_additive,
-            heart_set,
-            &score_additive,
-            score_set,
-            heart_color_multiplier,
-            &cost_additive,
-            cost_set,
-            bonus_triggers,
-        ),
+        stage: stage_to_display(&player.stage, card_db, orientation_modifiers, &mods),
         live_zone: zone_to_display_full(&player.live_card_zone.cards, card_db, &mods),
         success_live_card_zone: zone_to_display_full(
             &player.success_live_card_zone.cards,
@@ -1255,9 +1283,9 @@ pub fn player_to_display(
             .iter()
             .map(|&cid| {
                 if cid == -1 {
-                    return vec![0i32; 6];
+                    return vec![0i16; 6];
                 }
-                let mut arr = vec![0i32; 6];
+                let mut arr = vec![0i16; 6];
                 if let Some(card_hm) = heart_modifiers.get(&cid) {
                     for (color, modifier) in card_hm {
                         let idx = match color {
@@ -1392,30 +1420,34 @@ pub fn game_state_to_display(game_state: &GameState) -> GameStateDisplay {
         .is_some_and(|id| *id == game_state.player2.id)
         .then_some(live_indices_usize.as_slice());
 
-    let mut blade_flat: HashMap<i16, i32> = HashMap::with_capacity_and_hasher(
+    // Every map below is a straight projection of `ModifierEntry` into
+    // something the UI can read per-card. All of them are `i16` for the reason
+    // the entries are: the value IS the entry total, so keeping it wider only
+    // bought a cast on the way out and a `try_from` on the way into JSON.
+    let mut blade_flat: HashMap<i16, i16> = HashMap::with_capacity_and_hasher(
         game_state.mods.blade_modifiers.len(),
         Default::default(),
     );
-    let mut blade_set_flat: HashMap<i16, i32> = HashMap::with_capacity_and_hasher(
+    let mut blade_set_flat: HashMap<i16, i16> = HashMap::with_capacity_and_hasher(
         game_state.mods.blade_modifiers.len(),
         Default::default(),
     );
     for (&k, v) in &game_state.mods.blade_modifiers {
         blade_flat.insert(k, v.total());
-        blade_set_flat.insert(k, v.set as i32);
+        blade_set_flat.insert(k, v.set);
     }
 
-    let mut score_flat: HashMap<i16, i32> = HashMap::with_capacity_and_hasher(
+    let mut score_flat: HashMap<i16, i16> = HashMap::with_capacity_and_hasher(
         game_state.mods.score_modifiers.len(),
         Default::default(),
     );
-    let mut score_set_flat: HashMap<i16, i32> = HashMap::with_capacity_and_hasher(
+    let mut score_set_flat: HashMap<i16, i16> = HashMap::with_capacity_and_hasher(
         game_state.mods.score_modifiers.len(),
         Default::default(),
     );
     for (&k, v) in &game_state.mods.score_modifiers {
         score_flat.insert(k, v.total());
-        score_set_flat.insert(k, v.set as i32);
+        score_set_flat.insert(k, v.set);
     }
 
     // Gained constant abilities (gain_ability 常時 → +N live score) apply
@@ -1424,46 +1456,50 @@ pub fn game_state_to_display(game_state: &GameState) -> GameStateDisplay {
     // card's bonus_score so it renders with a normal "+N score" badge.
     for (cid, _text, val) in &game_state.mods.constant_score_sources {
         if *val != 0 {
-            *score_flat.entry(*cid).or_insert(0) += *val as i32;
+            *score_flat.entry(*cid).or_insert(0) = score_flat
+                .get(cid)
+                .copied()
+                .unwrap_or(0)
+                .saturating_add(*val);
         }
     }
 
-    let mut heart_flat: HashMap<i16, HashMap<crate::card::HeartColor, i32>> =
+    let mut heart_flat: HashMap<i16, HashMap<crate::card::HeartColor, i16>> =
         HashMap::with_capacity_and_hasher(
             game_state.mods.heart_modifiers.len(),
             Default::default(),
         );
-    let mut heart_set_flat: HashMap<i16, HashMap<crate::card::HeartColor, i32>> =
+    let mut heart_set_flat: HashMap<i16, HashMap<crate::card::HeartColor, i16>> =
         HashMap::with_capacity_and_hasher(
             game_state.mods.heart_modifiers.len(),
             Default::default(),
         );
     for (&k, colors) in &game_state.mods.heart_modifiers {
-        let total: HashMap<crate::card::HeartColor, i32> =
+        let total: HashMap<crate::card::HeartColor, i16> =
             colors.iter().map(|(&c, e)| (c, e.total())).collect();
-        let set: HashMap<crate::card::HeartColor, i32> =
-            colors.iter().map(|(&c, e)| (c, e.set as i32)).collect();
+        let set: HashMap<crate::card::HeartColor, i16> =
+            colors.iter().map(|(&c, e)| (c, e.set)).collect();
         heart_flat.insert(k, total);
         heart_set_flat.insert(k, set);
     }
-    let need_heart_flat: HashMap<i16, HashMap<crate::card::HeartColor, i32>> = game_state
+    let need_heart_flat: HashMap<i16, HashMap<crate::card::HeartColor, i16>> = game_state
         .mods
         .need_heart_modifiers
         .iter()
         .map(|(&k, colors)| {
-            let flat: HashMap<crate::card::HeartColor, i32> =
+            let flat: HashMap<crate::card::HeartColor, i16> =
                 colors.iter().map(|(&c, e)| (c, e.total())).collect();
             (k, flat)
         })
         .collect();
 
-    let mut cost_flat: HashMap<i16, i32> =
+    let mut cost_flat: HashMap<i16, i16> =
         HashMap::with_capacity_and_hasher(game_state.mods.cost_modifiers.len(), Default::default());
-    let mut cost_set_flat: HashMap<i16, i32> =
+    let mut cost_set_flat: HashMap<i16, i16> =
         HashMap::with_capacity_and_hasher(game_state.mods.cost_modifiers.len(), Default::default());
     for (&k, v) in &game_state.mods.cost_modifiers {
         cost_flat.insert(k, v.total());
-        cost_set_flat.insert(k, v.set as i32);
+        cost_set_flat.insert(k, v.set);
     }
 
     // ── Build bonus_triggers map from gained_card_abilities ────────
@@ -1603,26 +1639,25 @@ pub fn game_state_to_display(game_state: &GameState) -> GameStateDisplay {
                     color: src.color.clone(),
                 });
             };
-        for s in &game_state.mods.constant_blade_sources {
-            push(&mut effect_attribution, s);
-        }
-        for s in &game_state.mods.constant_heart_sources {
-            push(&mut effect_attribution, s);
-        }
-        for s in &game_state.mods.constant_cost_sources {
-            push(&mut effect_attribution, s);
-        }
-        for s in &game_state.mods.constant_need_heart_sources {
-            push(&mut effect_attribution, s);
-        }
-        for s in &game_state.mods.success_zone_blade_sources {
-            push(&mut effect_attribution, s);
-        }
-        for s in &game_state.mods.success_zone_heart_sources {
-            push(&mut effect_attribution, s);
-        }
-        for s in &game_state.mods.success_zone_score_sources {
-            push(&mut effect_attribution, s);
+        // Seven lists, one push. Naming them in an array keeps the merge in a
+        // single pass and makes the set of attributed sources a list you can
+        // read in one line, rather than seven near-identical loops that have
+        // to be kept in step by hand. Same order, same records, same output.
+        //
+        // (There is no `success_zone_cost_sources` — cost bonuses in the
+        // success zone are recorded as `constant_cost_sources` above.)
+        for sources in [
+            &game_state.mods.constant_blade_sources,
+            &game_state.mods.constant_heart_sources,
+            &game_state.mods.constant_cost_sources,
+            &game_state.mods.constant_need_heart_sources,
+            &game_state.mods.success_zone_blade_sources,
+            &game_state.mods.success_zone_heart_sources,
+            &game_state.mods.success_zone_score_sources,
+        ] {
+            for s in sources {
+                push(&mut effect_attribution, s);
+            }
         }
         // Constant score bonuses (existing tuple records).
         for (cid, text, val) in &game_state.mods.constant_score_sources {
@@ -1630,7 +1665,7 @@ pub fn game_state_to_display(game_state: &GameState) -> GameStateDisplay {
                 source_card_id: *cid,
                 ability_text: text.clone(),
                 kind: "score".to_string(),
-                amount: *val as i32,
+                amount: *val,
                 color: None,
             });
         }
@@ -1656,19 +1691,6 @@ pub fn game_state_to_display(game_state: &GameState) -> GameStateDisplay {
         effect_attribution.len(),
         effect_attribution.values().map(Vec::len).sum::<usize>()
     );
-
-    // Constant heart bonuses: HashMap<i16, HashMap<String, i32>>
-    let const_heart: HashMap<i16, HashMap<String, i32>> = game_state
-        .mods
-        .constant_heart_bonuses
-        .iter()
-        .map(|(cid, map)| {
-            (
-                *cid,
-                map.iter().map(|(k, &v)| (k.clone(), v as i32)).collect(),
-            )
-        })
-        .collect();
 
     // Delayed cannot active: HashMap<i16, u8>
     let delayed_cannot: HashMap<i16, u8> = game_state.mods.delayed_cannot_active.clone();
@@ -1891,25 +1913,14 @@ pub fn game_state_to_display(game_state: &GameState) -> GameStateDisplay {
         ability_applications: ability_apps,
         effect_attribution,
         last_state_change_wait_to_active_count: game_state.last_state_change_wait_to_active_count,
-        constant_blade_bonuses: game_state
-            .mods
-            .constant_blade_bonuses
-            .iter()
-            .map(|(&k, &v)| (k, v as i32))
-            .collect(),
-        constant_cost_bonuses: game_state
-            .mods
-            .constant_cost_bonuses
-            .iter()
-            .map(|(&k, &v)| (k, v as i32))
-            .collect(),
-        constant_score_bonuses: game_state
-            .mods
-            .constant_score_bonuses
-            .iter()
-            .map(|(&k, &v)| (k, v as i32))
-            .collect(),
-        constant_heart_bonuses: const_heart,
+        // All four constant maps are already the exact `i16` shape the
+        // `PlayerDisplay` fields want, so these are straight clones. They were
+        // re-collected through `map(|v| v as i32)` purely to widen each value
+        // back out again, which is four allocations per display for no gain.
+        constant_blade_bonuses: game_state.mods.constant_blade_bonuses.clone(),
+        constant_cost_bonuses: game_state.mods.constant_cost_bonuses.clone(),
+        constant_score_bonuses: game_state.mods.constant_score_bonuses.clone(),
+        constant_heart_bonuses: game_state.mods.constant_heart_bonuses.clone(),
         constant_global_need_heart: game_state
             .mods
             .constant_global_need_heart

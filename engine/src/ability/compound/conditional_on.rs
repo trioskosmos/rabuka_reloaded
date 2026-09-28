@@ -4,7 +4,7 @@ use crate::ability::enums::ActionType;
 use crate::ability::condition::ConditionContext;
 use crate::ability::resolver::AbilityResolver;
 use crate::ability::types::Choice;
-use crate::ability_queue::ConditionalChoice;
+use crate::ability::queue::ConditionalChoice;
 use crate::card::AbilityEffect;
 use crate::game_state::GameState;
 #[cfg(feature = "no_std")]

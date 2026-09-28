@@ -57,13 +57,15 @@ pub fn member_original_hearts(
 }
 
 /// 9.9.1.5: additive modifiers stack ON TOP, saturating at 0/255.
+///
+/// Takes the deltas as `i16` because that is `ModifierEntry::total`'s return
+/// type: the caller maps straight out of the modifier map with no widening.
 pub fn apply_additive_heart_mods(
     hearts: &mut HeartMap,
-    mods: impl Iterator<Item = (HeartColor, i32)>,
+    mods: impl Iterator<Item = (HeartColor, i16)>,
 ) {
     for (color, delta) in mods {
-        let new_val =
-            crate::constants::saturate_u8(hearts.get(&color).copied().unwrap_or(0) as i32 + delta);
+        let new_val = crate::constants::saturate_u8(i32::from(hearts.get(&color).copied().unwrap_or(0)) + i32::from(delta));
         if new_val > 0 {
             hearts.insert(color, new_val);
         } else {
@@ -77,14 +79,11 @@ pub fn apply_additive_heart_mods(
 /// the split exists because MemberContribution tracks them separately.
 pub fn effective_blade_parts(entry: &ModifierEntry, printed_blade: u8) -> (u8, u8) {
     if entry.set != 0 {
-        (
-            crate::constants::saturate_u8(entry.total()),
-            0,
-        )
+        (crate::constants::saturate_u8(i32::from(entry.total())), 0)
     } else {
         (
             printed_blade,
-            crate::constants::saturate_u8(entry.total()),
+            crate::constants::saturate_u8(i32::from(entry.total())),
         )
     }
 }
@@ -194,9 +193,9 @@ pub fn effective_blade(
         .map(|c| c.blade)
         .unwrap_or(0);
     if entry.set != 0 {
-        crate::constants::saturate_u8(entry.total())
+        crate::constants::saturate_u8(i32::from(entry.total()))
     } else {
-        crate::constants::saturate_u8(printed as i32 + entry.total())
+        crate::constants::effective_stat(printed, entry.total())
     }
 }
 
@@ -234,7 +233,7 @@ pub fn effective_need_heart(
     for (color, me) in card_mods {
         if me.additive != 0 {
             let new_val = crate::constants::saturate_u8(
-                adjusted.hearts.get(color).copied().unwrap_or(0) as i32 + me.additive as i32,
+                i32::from(adjusted.hearts.get(color).copied().unwrap_or(0)) + i32::from(me.additive),
             );
             if new_val > 0 {
                 adjusted.hearts.insert(*color, new_val);

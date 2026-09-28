@@ -1,5 +1,13 @@
-// Trigger type constants used for ability matching and each_time watcher text.
-// These correspond to the trigger text embedded in card abilities in abilities.json.
+//! The trigger VOCABULARY: what a trigger is, and how its printed text parses.
+//!
+//! This module answers "does this ability have a `常時` trigger" — the strings,
+//! [`TriggerKind`], and the parsers. It never scans the board. The code that
+//! decides WHEN a trigger fires and queues the ability is
+//! [`crate::turn::trigger_scan`]; keep that split in mind, since the two were
+//! both once named `triggers`.
+//!
+//! Trigger type constants used for ability matching and each_time watcher text.
+//! These correspond to the trigger text embedded in card abilities in abilities.json.
 
 /// Ability activation trigger: "起動" — player-initiated, once per turn
 #[cfg(feature = "no_std")]

@@ -307,7 +307,7 @@ pub fn compute_play_cost(
     player: &crate::player::Player,
     card_id: i16,
     card_db: &CardDatabase,
-    set_override: i32,
+    set_override: i16,
     waited_stage_cards: &[i16],
 ) -> u8 {
     let Some(card) = card_db.get_card(card_id) else {
@@ -349,8 +349,8 @@ pub fn compute_play_cost(
     let mut cost = base_cost.saturating_sub(reduction).saturating_add(increase);
     // Constant set-override ("コストはNになる", e.g. LL-bp7-001-R＋ ab#0)
     // replaces the base play cost entirely. 0 means no set modifier.
-    if set_override != 0 && set_override != base_cost as i32 {
-        cost = crate::constants::saturate_u8(set_override);
+    if set_override != 0 && set_override != i16::from(base_cost) {
+        cost = crate::constants::saturate_u8(i32::from(set_override));
     }
     cost
 }
@@ -1635,15 +1635,19 @@ pub fn filter_current_blade(
     candidates
         .into_iter()
         .filter(|&cid| {
-            let base = gs
-                .card_database
-                .get_card(cid)
-                .map(|c| c.blade as i32)
-                .unwrap_or(0);
+            let base = gs.card_database.get_card(cid).map(|c| c.blade).unwrap_or(0);
             let set = gs.mods.get_blade_set_modifier(cid);
-            let effective = if set != 0 { set } else { base };
+            // `get_*_modifier` is set + additive, so the additive alone is the
+            // total minus the set.
             let additive = gs.mods.get_blade_modifier(cid) - set;
-            let total = crate::constants::saturate_u8(effective + additive);
+            // A non-zero set REPLACES the printed blade, so the printed value
+            // must not also be in the base — hence the selection, and hence
+            // `overridden_stat` rather than `effective_stat`.
+            let total = if set != 0 {
+                crate::constants::overridden_stat(set, additive)
+            } else {
+                crate::constants::effective_stat(base, additive)
+            };
             compare_counts(Some(op), total, bl)
         })
         .collect()

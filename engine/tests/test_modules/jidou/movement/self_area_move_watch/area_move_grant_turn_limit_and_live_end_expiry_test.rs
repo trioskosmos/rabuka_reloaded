@@ -66,7 +66,7 @@ fn move_and_trigger(game: &mut TestGame, who: i16) {
     game.drain_auto_ability_choices();
 }
 
-fn heart_of(game: &TestGame, who: i16, colour: HeartColor) -> i32 {
+fn heart_of(game: &TestGame, who: i16, colour: HeartColor) -> i16 {
     game.state.mods.get_heart_modifier(who, colour)
 }
 

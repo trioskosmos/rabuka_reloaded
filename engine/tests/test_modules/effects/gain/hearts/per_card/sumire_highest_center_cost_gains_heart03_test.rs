@@ -24,7 +24,7 @@ use crate::helpers::*;
 use rabuka_engine::card::HeartColor;
 
 /// heart03 on the subject, after constants are recomputed.
-fn heart03(game: &TestGame, cid: i16) -> i32 {
+fn heart03(game: &TestGame, cid: i16) -> i16 {
     game.state.mods.get_heart_modifier(cid, HeartColor::Heart03)
 }
 

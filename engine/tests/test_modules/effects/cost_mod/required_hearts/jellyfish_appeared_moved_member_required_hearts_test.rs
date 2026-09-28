@@ -20,7 +20,7 @@ fn advance_to_live_start(game: &mut TestGame) {
     game.pass();
 }
 
-fn check_heart_reduction(game: &TestGame, card_id: i16, expected: i32) {
+fn check_heart_reduction(game: &TestGame, card_id: i16, expected: i16) {
     use rabuka_engine::card::HeartColor;
     let reduction = game
         .state

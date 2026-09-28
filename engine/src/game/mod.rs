@@ -1,10 +1,13 @@
 //! Game shell: setup, persistence, menus and display around the engine.
 //!
-//! - `game_setup`: deck loading, game creation, mulligan, `execute_action`
-//!   (the UI/test entry point into main-phase actions).
-//! - `match_runner`: full-game loops (bot arena, replays).
+//! Everything here sits OUTSIDE the rules. It prepares a game, presents it, or
+//! persists it; it does not decide anything about how a card resolves.
+//!
 //! - `deck_builder` / `deck_ordering` / `deck_parser`: deck formats.
-//! - `display` / `menu` / `platform_ui` / `language`: rendering + prompts.
+//! - `game_setup`: deck loading, game creation, mulligan, and
+//!   `execute_action` — the UI/test entry point into main-phase actions.
+//! - `match_runner`: full-game loops (bot arena, replays).
+//! - `display` / `language` / `menu` / `platform_ui`: rendering and prompts.
 //! - `sav`: save files. `link`: link battles. `web_server` (feature-gated).
 //!
 //! Rules live in `crate::turn`; card data in `crate::core`.
@@ -15,9 +18,9 @@ pub mod display;
 pub mod game_setup;
 pub mod language;
 pub mod link;
-pub mod platform_ui;
-pub mod menu;
 pub mod match_runner;
+pub mod menu;
+pub mod platform_ui;
 pub mod sav;
 #[cfg(feature = "server")]
 pub mod web_server;

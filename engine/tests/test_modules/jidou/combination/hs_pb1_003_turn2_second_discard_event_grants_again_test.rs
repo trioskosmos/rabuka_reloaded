@@ -55,11 +55,11 @@ fn setup() -> (TestGame, i16) {
     (game, rurino)
 }
 
-fn blade_mod(game: &TestGame, cid: i16) -> i32 {
+fn blade_mod(game: &TestGame, cid: i16) -> i16 {
     game.state.mods.get_blade_modifier(cid)
 }
 
-fn heart01_mod(game: &TestGame, cid: i16) -> i32 {
+fn heart01_mod(game: &TestGame, cid: i16) -> i16 {
     game.state.mods.get_heart_modifier(cid, HeartColor::Heart01)
 }
 

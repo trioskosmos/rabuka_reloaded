@@ -9,7 +9,7 @@ exit /b
 param(
     [int]$IntervalMinutes = 8,
     [string]$WindowTitle = "",
-    [string]$Message = "continue what you are doing. do not stop. if you think you are done you are not there is more to do, spend more time surveying. improve tests. improve speed. improve simplicity. do not worry about engine_c_wip. harder better faster stronger. there are many md files talking about this, consolidate them as well. no worktrees."
+    [string]$Message = "keep experimenting. keep playing games. keep researching the internet too. keep going to the move level in experimentation. also make abilities useful. they do different things. don't just make it tuning slop make it as qualatative as possible. also make the versions be independent of one another."
 )
 
 Add-Type -AssemblyName System.Windows.Forms

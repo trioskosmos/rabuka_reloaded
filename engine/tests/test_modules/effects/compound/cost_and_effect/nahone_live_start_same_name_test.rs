@@ -34,17 +34,17 @@ fn fill_decks(game: &mut TestGame, filler: i16) {
     game.state.player2.hand.cards.push(filler);
 }
 
-fn get_heart04(game: &TestGame, card_id: i16) -> i32 {
+fn get_heart04(game: &TestGame, card_id: i16) -> i16 {
     game.state
         .mods
         .get_heart_modifier(card_id, HeartColor::Heart04)
 }
 
-fn get_blade(game: &TestGame, card_id: i16) -> i32 {
+fn get_blade(game: &TestGame, card_id: i16) -> i16 {
     game.state.mods.get_blade_modifier(card_id)
 }
 
-fn get_heart_modifier(game: &TestGame, card_id: i16, color: HeartColor) -> i32 {
+fn get_heart_modifier(game: &TestGame, card_id: i16, color: HeartColor) -> i16 {
     game.state.mods.get_heart_modifier(card_id, color)
 }
 

@@ -11,7 +11,7 @@ fn drain_auto(v: &mut TestGame) {
     }
 }
 
-fn score_bonus(v: &TestGame, cid: i16) -> i32 {
+fn score_bonus(v: &TestGame, cid: i16) -> i16 {
     v.state.mods.get_score_modifier(cid)
 }
 

@@ -5,7 +5,7 @@ use crate::ability::debug::ABILITY_DEBUG;
 #[cfg(feature = "serde_support")]
 use crate::ability::enums::ConditionType;
 use crate::ability::enums::Zone;
-use crate::ability_queue::ConditionalChoice;
+use crate::ability::queue::ConditionalChoice;
 use crate::core::constants::CountCast;
 #[cfg(feature = "serde_support")]
 use crate::card::CardState;

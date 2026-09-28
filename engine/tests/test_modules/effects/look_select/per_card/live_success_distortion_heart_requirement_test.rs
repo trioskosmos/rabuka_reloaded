@@ -44,10 +44,10 @@ fn need_heart(game: &TestGame, live: i16, color: HeartColor) -> u8 {
         .copied()
         .unwrap_or(0);
     let modifier = game.state.mods.get_need_heart_modifier(live, color);
-    (base as i32 + modifier).max(0) as u8
+    (base as i16 + modifier).max(0) as u8
 }
 
-fn live_score_mod(game: &TestGame, live: i16) -> i32 {
+fn live_score_mod(game: &TestGame, live: i16) -> i16 {
     game.state.mods.get_score_modifier(live)
 }
 

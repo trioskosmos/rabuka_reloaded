@@ -25,10 +25,10 @@ const BLADE: &str = "PL!-pb1-014-R";
 const ALL_BLADE: &str = "PL!HS-PR-010-PR";
 const LIVE: &str = "PL!-sd1-019-SD";
 
-fn heart06(g: &TestGame, id: i16) -> i32 {
+fn heart06(g: &TestGame, id: i16) -> i16 {
     g.state.mods.get_heart_modifier(id, HeartColor::Heart06)
 }
-fn heart03(g: &TestGame, id: i16) -> i32 {
+fn heart03(g: &TestGame, id: i16) -> i16 {
     g.state.mods.get_heart_modifier(id, HeartColor::Heart03)
 }
 

@@ -16,7 +16,7 @@ const HOST_NON_AQOURS: &str = "PL!SP-sd1-001-SD"; // 澁谷かのん (Liella!, n
 const MEMBER_UNDER: &str = "PL!-sd1-001-SD"; // a generic member card to place under
 const ENERGY_UNDER: &str = "LL-E-001-SD";
 
-fn blade_of(game: &TestGame, id: i16) -> i32 {
+fn blade_of(game: &TestGame, id: i16) -> i16 {
     game.state.mods.get_blade_modifier(id)
 }
 
