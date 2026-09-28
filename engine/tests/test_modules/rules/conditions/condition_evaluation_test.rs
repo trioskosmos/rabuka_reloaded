@@ -47,7 +47,7 @@ fn unsupported_condition_fails_closed_and_missing_condition_stays_unconditional(
     assert!(context.allows(&unconditional));
 
     let guarded = AbilityEffect {
-        condition: Some(Box::new(unsupported)),
+        condition: Some(std::sync::Arc::new(unsupported)),
         ..AbilityEffect::default()
     };
     assert!(!context.allows(&guarded));

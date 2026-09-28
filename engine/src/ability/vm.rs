@@ -17,6 +17,12 @@ use crate::card::{
     QuotedText,
 };
 use crate::core::types::ArcStr;
+// The generated decoders below name `Arc<Condition>` unqualified: effects and
+// compound branches hold their conditions behind an `Arc` so that copying an
+// ability is a refcount bump rather than a deep copy of a recursive tree. They
+// are `include!`d, so they share this module's scope like every other type they
+// name unqualified.
+use crate::Arc;
 
 include!("effect_decoder_gen.rs");
 include!("condition_decoder_gen.rs");
@@ -1398,7 +1404,11 @@ fn decode_ability_effect_direct(bc: &mut BcReader, _variant: u8) -> Option<Abili
     let mut destination: Option<Zone> = None;
     let mut count_val: Option<u8> = None;
     let mut target: Option<ArcStr> = None;
-    let mut condition: Option<Box<Condition>> = None;
+    // `Arc`, not `Box`: the generated `decode_effect_field` writes these
+    // straight through to the struct, and holding a condition behind an `Arc`
+    // is what makes copying an ability a refcount bump instead of a deep copy
+    // of a recursive tree.
+    let mut condition: Option<crate::Arc<Condition>> = None;
     let mut non_stackable: Option<bool> = None;
     let mut conditional: Option<bool> = None;
     let mut is_further: Option<bool> = None;
@@ -1409,8 +1419,8 @@ fn decode_ability_effect_direct(bc: &mut BcReader, _variant: u8) -> Option<Abili
     let mut select_action: Option<Box<AbilityEffect>> = None;
     let mut actions: Option<Vec<Box<AbilityEffect>>> = None;
     let mut primary_effect: Option<Box<AbilityEffect>> = None;
-    let mut alternative_condition: Option<Box<Condition>> = None;
-    let mut result_condition: Option<Box<Condition>> = None;
+    let mut alternative_condition: Option<crate::Arc<Condition>> = None;
+    let mut result_condition: Option<crate::Arc<Condition>> = None;
     let mut followup_action: Option<Box<AbilityEffect>> = None;
     let mut optional_action: Option<Box<AbilityEffect>> = None;
     let mut conditional_action: Option<Box<AbilityEffect>> = None;
@@ -1564,9 +1574,9 @@ impl AbilityEffect {
                 }
             }
         }
-        if let Some(ref mut cond) = self.condition {
+        if let Some(cond) = self.condition.as_mut() {
             if let Some(cond_json) = json_val.get("condition") {
-                condition_populate_from_json(cond, cond_json);
+                condition_populate_from_json(crate::Arc::make_mut(cond), cond_json);
             }
         }
         if let Some(opts) = self

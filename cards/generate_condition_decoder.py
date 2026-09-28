@@ -185,6 +185,13 @@ from generator_types import is_copy_type
 
 def build_field_expr(fname, ftype):
     """Return the Condition enum field expression for a variant field."""
+    # `AbilityEffect` and `CompoundBranch` hold their conditions as
+    # `Option<Arc<Condition>>` so that copying an effect is a refcount bump
+    # rather than a deep copy of a recursive tree. The accumulator below is
+    # still a plain `Option<Box<Condition>>` (it is the wire reading buffer,
+    # not something the engine holds), so re-wrap on the way out.
+    if ftype.startswith("Option<Arc<"):
+        return f"{fname}: l.{fname}.clone().map(|b| crate::Arc::new(*b))"
     if fname in CONVERSION_FIELDS:
         if fname == "state":
             enum = "CardState" if ftype == "Option<CardState>" else "EffectState"

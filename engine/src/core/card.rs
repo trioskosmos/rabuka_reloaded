@@ -914,9 +914,9 @@ pub struct CompoundBranch {
     #[cfg_attr(feature = "serde_support", serde(default))]
     pub primary_effect: Option<Box<AbilityEffect>>,
     #[cfg_attr(feature = "serde_support", serde(default))]
-    pub alternative_condition: Option<Box<Condition>>,
+    pub alternative_condition: Option<Arc<Condition>>,
     #[cfg_attr(feature = "serde_support", serde(default))]
-    pub result_condition: Option<Box<Condition>>,
+    pub result_condition: Option<Arc<Condition>>,
     #[cfg_attr(feature = "serde_support", serde(default))]
     pub followup_action: Option<Box<AbilityEffect>>,
     #[cfg_attr(feature = "serde_support", serde(default))]
@@ -1116,8 +1116,8 @@ pub struct EffectFilter {
     pub suppressed_trigger: Option<ArcStr>,
     pub option: Option<ArcStr>,
     pub alternative_effect: Option<Box<AbilityEffect>>,
-    pub choice_condition: Option<Box<Condition>>,
-    pub alternative_condition: Option<Box<Condition>>,
+    pub choice_condition: Option<Arc<Condition>>,
+    pub alternative_condition: Option<Arc<Condition>>,
     pub restriction_type: Option<ArcStr>,
     pub restricted_destination: Option<ArcStr>,
     pub delayed: Option<bool>,
@@ -1327,7 +1327,7 @@ pub struct AbilityEffect {
     #[cfg_attr(feature = "serde_support", serde(default))]
     pub target: Option<ArcStr>,
     #[cfg_attr(feature = "serde_support", serde(default))]
-    pub condition: Option<Box<Condition>>,
+    pub condition: Option<Arc<Condition>>,
     #[cfg_attr(feature = "serde_support", serde(flatten))]
     pub compound: Box<CompoundBranch>,
     #[cfg_attr(feature = "serde_support", serde(skip))]

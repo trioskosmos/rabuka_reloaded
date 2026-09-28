@@ -18,7 +18,7 @@ fn decode_effect_field(bc: &mut BcReader, key: &str,
     destination: &mut Option<Zone>,
     count: &mut Option<u8>,
     target: &mut Option<ArcStr>,
-    condition: &mut Option<Box<Condition>>,
+    condition: &mut Option<Arc<Condition>>,
     non_stackable: &mut Option<bool>,
     conditional: &mut Option<bool>,
     is_further: &mut Option<bool>,
@@ -33,8 +33,8 @@ fn decode_effect_field(bc: &mut BcReader, key: &str,
     select_action: &mut Option<Box<AbilityEffect>>,
     actions: &mut Option<Vec<Box<AbilityEffect>>>,
     primary_effect: &mut Option<Box<AbilityEffect>>,
-    alternative_condition: &mut Option<Box<Condition>>,
-    result_condition: &mut Option<Box<Condition>>,
+    alternative_condition: &mut Option<Arc<Condition>>,
+    result_condition: &mut Option<Arc<Condition>>,
     followup_action: &mut Option<Box<AbilityEffect>>,
     optional_action: &mut Option<Box<AbilityEffect>>,
     conditional_action: &mut Option<Box<AbilityEffect>>,
@@ -58,7 +58,7 @@ fn decode_effect_field(bc: &mut BcReader, key: &str,
             "destination" => { *destination = bc.read_zone_value(); Some(true) }
             "count" => { *count = bc.read_u8_value(); Some(true) }
             "target" => { *target = bc.read_arc_str_value(); Some(true) }
-            "condition" => { *condition = bc.read_condition_value(); Some(true) }
+            "condition" => { *condition = bc.read_condition_value().map(|c| crate::Arc::new(*c)); Some(true) }
             "non_stackable" => { *non_stackable = bc.read_bool_value(); Some(true) }
             "conditional" => { *conditional = bc.read_bool_value(); Some(true) }
             "is_further" => { *is_further = bc.read_bool_value(); Some(true) }
@@ -72,8 +72,8 @@ fn decode_effect_field(bc: &mut BcReader, key: &str,
             "select_action" => { *select_action = bc.read_effect_value(); Some(true) }
             "actions" => { *actions = bc.read_effect_vec_value(); Some(true) }
             "primary_effect" => { *primary_effect = bc.read_effect_value(); Some(true) }
-            "alternative_condition" => { *alternative_condition = bc.read_condition_value(); Some(true) }
-            "result_condition" => { *result_condition = bc.read_condition_value(); Some(true) }
+            "alternative_condition" => { *alternative_condition = bc.read_condition_value().map(|c| crate::Arc::new(*c)); Some(true) }
+            "result_condition" => { *result_condition = bc.read_condition_value().map(|c| crate::Arc::new(*c)); Some(true) }
             "followup_action" => { *followup_action = bc.read_effect_value(); Some(true) }
             "optional_action" => { *optional_action = bc.read_effect_value(); Some(true) }
             "conditional_action" => { *conditional_action = bc.read_effect_value(); Some(true) }
@@ -214,7 +214,7 @@ fn decode_effect_field(bc: &mut BcReader, key: &str,
             "suppressed_trigger" => { ek.suppressed_trigger = bc.read_arc_str_value(); Some(true) }
             "option" => { ek.option = bc.read_arc_str_value(); Some(true) }
             "alternative_effect" => { ek.alternative_effect = bc.read_effect_value(); Some(true) }
-            "choice_condition" => { ek.choice_condition = bc.read_condition_value(); Some(true) }
+            "choice_condition" => { ek.choice_condition = bc.read_condition_value().map(|c| crate::Arc::new(*c)); Some(true) }
             "restriction_type" => { ek.restriction_type = bc.read_arc_str_value(); Some(true) }
             "restricted_destination" => { ek.restricted_destination = bc.read_arc_str_value(); Some(true) }
             "delayed" => { ek.delayed = bc.read_bool_value(); Some(true) }
@@ -258,7 +258,7 @@ pub(crate) struct EffectKindLocals {
     pub all: Option<bool>,
     pub all_regions: Option<bool>,
     pub allow_occupied_stage: Option<bool>,
-    pub alternative_condition: Option<Box<Condition>>,
+    pub alternative_condition: Option<Arc<Condition>>,
     pub alternative_count_type: Option<ArcStr>,
     pub alternative_effect: Option<Box<AbilityEffect>>,
     pub anaphora: Option<ArcStr>,
@@ -278,7 +278,7 @@ pub(crate) struct EffectKindLocals {
     pub characters: Option<Vec<String>>,
     pub choice: Option<bool>,
     pub choice_based: Option<bool>,
-    pub choice_condition: Option<Box<Condition>>,
+    pub choice_condition: Option<Arc<Condition>>,
     pub choice_maker: Option<ArcStr>,
     pub choice_options: Option<Vec<String>>,
     pub choice_type: Option<ArcStr>,

@@ -38,6 +38,10 @@ READER_MAP = {
     "Option<Box<Vec<u8>>>": "bc.read_opt_u8_vec_value()",
     "Option<Vec<u8>>": "bc.read_opt_u8_vec_value().map(|b| *b)",
     "Option<Box<Condition>>": "bc.read_condition_value()",
+    # Effects and compound branches hold conditions behind an `Arc` so copying
+    # an ability is a refcount bump rather than a deep copy of a recursive
+    # tree. The wire reader still produces a `Box`; re-wrap on the way out.
+    "Option<Arc<Condition>>": "bc.read_condition_value().map(|c| crate::Arc::new(*c))",
     "Option<Box<AbilityEffect>>": "bc.read_effect_value()",
     "Option<Vec<Box<AbilityEffect>>>": "bc.read_effect_vec_value()",
     "Option<Box<Vec<Box<AbilityEffect>>>>": "bc.read_effect_vec_boxed_value()",

@@ -589,8 +589,9 @@ impl AbilityResolver {
                 // Same deal as the main condition gate below: the clone is
                 // only needed if the position patch would actually write.
                 let result = if Self::condition_needs_position_overlay(activation_condition, effect) {
-                    let mut merged_cond = Box::new(activation_condition.clone());
+                    let mut merged_cond = crate::Arc::new(activation_condition.clone());
                     // Merge the effect's position info into the condition so it's checked.
+                    let merged_cond = crate::Arc::make_mut(&mut merged_cond);
                     if let Some(pos) = effect.position_any() {
                         merged_cond.set_position(pos.clone());
                     } else if let Some(act_pos) = effect.activation_position_any() {
@@ -598,7 +599,7 @@ impl AbilityResolver {
                     }
                     #[cfg(not(feature = "no_std"))]
                     let snapshot = crate::ability::log::buffer_len();
-                    let passed = ctx.evaluate_condition(&merged_cond);
+                    let passed = ctx.evaluate_condition(merged_cond);
                     // On success: drain pre-check verdicts (condition will be re-evaluated
                     // during effect execution, avoiding duplicates).
                     // On failure: keep verdicts (they're the only info for the failure path).
@@ -642,6 +643,7 @@ impl AbilityResolver {
                 let gns = effect.group_names_any().map(|v| v.as_slice());
                 let passed = if Self::condition_needs_overlay(condition, effect, gns) {
                     let mut cond = condition.clone();
+                    let cond = crate::Arc::make_mut(&mut cond);
                     if cond.get_position().is_none()
                         && cond.get_positions_characters().is_none()
                     {
@@ -651,10 +653,11 @@ impl AbilityResolver {
                             cond.set_activation_position(act_pos.to_string());
                         }
                     }
-                    Self::merge_group_names(&mut cond, gns);
+                    Self::merge_group_names(cond, gns);
+                    let cond = &*cond;
                     #[cfg(not(feature = "no_std"))]
                     let cond_snapshot = crate::ability::log::buffer_len();
-                    let passed = ctx.evaluate_condition(&cond);
+                    let passed = ctx.evaluate_condition(cond);
                     // On success: drain (will be re-evaluated during execution).
                     // On failure: keep verdicts.
                     #[cfg(not(feature = "no_std"))]
