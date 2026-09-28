@@ -11972,6 +11972,57 @@ _PROPAGATE_CHILD_KEYS = (
 )
 
 
+def _compound_location(conditions, context_location=None):
+    """The zone a compound's bare sub-conditions should adopt, or None.
+
+    An inherited context location wins over the compound's own first location:
+    a 「AかつB」 clause is read in one zone throughout, and when an enclosing
+    clause has already named that zone it is the more specific statement.
+    """
+    first_location = next(
+        (
+            sub["location"]
+            for sub in conditions
+            if isinstance(sub, dict) and sub.get("location")
+        ),
+        None,
+    )
+    return context_location or first_location
+
+
+def _propagate_compound_locations(conditions, context_location=None, *, only_type=None):
+    """Point a compound condition's bare sub-conditions at one zone.
+
+    Four kinds of sub-condition must keep their own scope, because the zone
+    would contradict what they assert:
+      - one already carrying `temporal` — it is scoped to a turn or a live
+      - one carrying `resource_type` — the resource reads, not the zone
+      - a `comparison_type` of "score" — a score is never zone-scoped
+      - one that already has a `location`
+
+    `only_type` narrows the pass to a single sub-condition type. The three
+    callers differ exactly there and nowhere else: the context walk reaches
+    every bare sub-condition, the whole-tree pass reaches only the
+    `temporal_condition` ones (a run over every node, so it stays narrow to
+    avoid stamping the zone on unrelated bare sub-conditions).
+    """
+    location = _compound_location(conditions, context_location)
+    if not location:
+        return
+    for sub in conditions:
+        if not isinstance(sub, dict) or sub.get("location"):
+            continue
+        if only_type is not None and sub.get("type") != only_type:
+            continue
+        if (
+            sub.get("temporal")
+            or sub.get("resource_type")
+            or sub.get("comparison_type") == "score"
+        ):
+            continue
+        sub["location"] = location
+
+
 def _propagate_context(node, ctx=None, *, t="", eff_root=None):
     def enter(current, parent_ctx):
         context = {} if parent_ctx is None else parent_ctx
@@ -11989,25 +12040,9 @@ def _propagate_context(node, ctx=None, *, t="", eff_root=None):
                 child_ctx[field] = current[field]
 
         if current.get("type") == "compound" and "conditions" in current:
-            first_location = next(
-                (
-                    sub["location"]
-                    for sub in current["conditions"]
-                    if isinstance(sub, dict) and sub.get("location")
-                ),
-                None,
+            _propagate_compound_locations(
+                current["conditions"], child_ctx.get("location")
             )
-            for sub in current["conditions"]:
-                if not isinstance(sub, dict):
-                    continue
-                location = child_ctx.get("location") or first_location
-                if location and not sub.get("location"):
-                    if (
-                        not sub.get("temporal")
-                        and not sub.get("resource_type")
-                        and sub.get("comparison_type") != "score"
-                    ):
-                        sub["location"] = location
             walk_dict_tree(
                 current["conditions"],
                 keys=_PROPAGATE_CHILD_KEYS,
@@ -12065,25 +12100,9 @@ def _propagate_context(node, ctx=None, *, t="", eff_root=None):
             _infer_baton_touch(current, text)
 
         if current.get("type") == "compound" and "conditions" in current:
-            first_location = next(
-                (
-                    sub["location"]
-                    for sub in current["conditions"]
-                    if isinstance(sub, dict) and sub.get("location")
-                ),
-                None,
+            _propagate_compound_locations(
+                current["conditions"], _context.get("location")
             )
-            location = _context.get("location") or first_location
-            for sub in current["conditions"]:
-                if (
-                    isinstance(sub, dict)
-                    and not sub.get("location")
-                    and location
-                    and not sub.get("temporal")
-                    and not sub.get("resource_type")
-                    and sub.get("comparison_type") != "score"
-                ):
-                    sub["location"] = location
             for sub in current["conditions"]:
                 if isinstance(sub, dict) and isinstance(sub.get("parenthetical"), list):
                     sub.pop("parenthetical", None)
@@ -12141,25 +12160,11 @@ def _propagate_context(node, ctx=None, *, t="", eff_root=None):
 def _apply_recursive_fixes(d):
     for current in iter_dict_nodes(d):
         if current.get("type") == "compound" and current.get("conditions"):
-            first_location = next(
-                (
-                    sub["location"]
-                    for sub in current["conditions"]
-                    if isinstance(sub, dict) and sub.get("location")
-                ),
-                None,
+            # Whole-tree pass, so it stays narrowed to temporal sub-conditions;
+            # the context walk in _propagate_context reaches the rest.
+            _propagate_compound_locations(
+                current["conditions"], only_type="temporal_condition"
             )
-            if first_location:
-                for sub in current["conditions"]:
-                    if (
-                        isinstance(sub, dict)
-                        and sub.get("type") == "temporal_condition"
-                        and not sub.get("location")
-                        and not sub.get("temporal")
-                        and not sub.get("resource_type")
-                        and sub.get("comparison_type") != "score"
-                    ):
-                        sub["location"] = first_location
 
         if current.get("type") == "appearance_condition" and "控え室から" in current.get(
             "text", ""
@@ -12715,161 +12720,209 @@ def _fix_conditional_on_result(eff, t):
         eff.pop("actions", None)
 
 
+def _fix_conditional_on_result_pass(ability, eff, t):
+    """_repair_corpus entry with the uniform (ability, effect, text) signature."""
+    _fix_conditional_on_result(eff, t)
+
+
+def _fix_leaked_condition_heart_colors(ability, eff, t):
+    """Strip heart_colors that leaked from the effect onto a pure-count condition.
+
+    heart_colors on a condition means "only count cards with this heart color".
+    If heart_colors is present but the condition text has no {{heart_ icons,
+    it's effect metadata that leaked into a pure-count condition.
+    """
+    cond = eff.get("condition")
+    if isinstance(cond, dict) and cond.get("heart_colors"):
+        if "{{heart_" not in (cond.get("text") or ""):
+            del cond["heart_colors"]
+
+
+def _fix_cost_card_property(ability, eff, t):
+    """Cost clauses do not run through the condition extractors, so ブレードハート
+    is read straight off the cost text."""
+    cost = ability.get("cost")
+    if isinstance(cost, dict) and not cost.get("card_property"):
+        ct = cost.get("text", "") or ""
+        if "ブレードハート" in ct:
+            cost["card_property"] = "has_blade_heart"
+            if "持たない" in ct or "ない" in ct:
+                cost["negation"] = True
+
+
+def _fix_primary_effect_trailing_period(ability, eff, t):
+    pe = eff.get("primary_effect")
+    if isinstance(pe, dict) and isinstance(pe.get("text"), str):
+        if pe["text"].endswith("。"):
+            pe["text"] = pe["text"].rstrip("。")
+
+
+def _fix_dollchestra_primary_split(ability, eff, t):
+    """DOLLCHESTRA-type primary_effect: split select+modify_cost into sequential.
+
+    Only fires once the effect is a conditional container, so it must run AFTER
+    _fix_conditional_on_result has done the COR restructuring.
+    """
+    if eff.get("action") not in ("conditional_on_result", "conditional_alternative"):
+        return
+    pe = eff.get("primary_effect")
+    if (
+        isinstance(pe, dict)
+        and pe.get("action") == "select"
+        and pe.get("original_value") is True
+    ):
+        pe_text = pe.get("text") or ""
+        parts = pe_text.split("。")
+        if len(parts) >= 2:
+            text_select = parts[0]
+            text_cost = "。".join(parts[1:]).lstrip("。")
+            pe["action"] = "sequential"
+            pe["actions"] = [
+                {
+                    "text": text_select,
+                    "source": pe.get("source"),
+                    "count": pe.get("count", 1),
+                    "card_type": pe.get("card_type"),
+                    "target": pe.get("target"),
+                    "group_names": pe.get("group_names"),
+                    "action": "select",
+                },
+                {
+                    "text": text_cost,
+                    "duration": "live_end",
+                    "card_type": pe.get("card_type"),
+                    "action": "modify_cost",
+                    "group_names": pe.get("group_names"),
+                    "original_value": True,
+                },
+            ]
+            for k in ("source", "count", "duration", "card_type", "target"):
+                pe.pop(k, None)
+
+
+def _fix_surplus_heart_revert(ability, eff, t):
+    """Revert over-eager conditional_on_result to sequential (surplus_heart).
+
+    Keeps the result_condition as a condition on the followup_action.
+    """
+    if eff.get("action") != "conditional_on_result":
+        return
+    pe = eff.get("primary_effect", {})
+    if isinstance(pe, dict) and pe.get("resource") == "surplus_heart":
+        actions = [pe]
+        fa = eff.get("followup_action")
+        rc = eff.get("result_condition")
+        if isinstance(fa, dict):
+            if isinstance(rc, dict):
+                fa["condition"] = rc
+            actions.append(fa)
+        if actions:
+            eff["action"] = "sequential"
+            eff["actions"] = actions
+            eff.pop("primary_effect", None)
+            eff.pop("result_condition", None)
+            eff.pop("followup_action", None)
+
+
+def _fix_cor_followup_self_cost(cor_eff):
+    fa = cor_eff.get("followup_action")
+    if isinstance(fa, dict) and fa.get("action") == "change_state":
+        if "このメンバー" in fa.get("text", ""):
+            if fa.get("self_cost") is None:
+                fa["self_cost"] = True
+
+
+def _fix_cor_followup_self_cost_pass(ability, eff, t):
+    """self_cost on a このメンバー change_state inside a conditional_on_result.
+
+    FIX 9b in _apply_recursive_fixes runs before COR restructuring creates
+    followup_action, so this has to run after the structure is final.
+    """
+    if eff.get("action") == "conditional_on_result":
+        _fix_cor_followup_self_cost(eff)
+    elif eff.get("action") == "sequential":
+        for act in eff.get("actions", []):
+            if isinstance(act, dict) and act.get("action") == "conditional_on_result":
+                _fix_cor_followup_self_cost(act)
+
+
+def _fix_propagate_context(ability, eff, t):
+    _propagate_context(eff, t=t, eff_root=eff)
+
+
+def _fix_self_revival_allow_occupied_stage(ability, eff, t):
+    """Q76 rule: self-revival from discard to stage can place on occupied areas."""
+    if (
+        eff.get("action") == "move_cards"
+        and eff.get("source") == "discard"
+        and eff.get("destination") == "stage"
+        and eff.get("self_target") is True
+    ):
+        eff["allow_occupied_stage"] = True
+
+
+def _fix_occupied_stage_by_text(ability, eff, t):
+    """Text form of the Q76 rule: 「既にメンバーがいるエリアにも登場できる」."""
+    if eff.get("action") == "move_cards" and eff.get("destination") == "stage":
+        text = eff.get("text", "")
+        parenthetical = " ".join(eff.get("parenthetical", []) or [])
+        if "既にメンバーがいるエリア" in text + parenthetical:
+            eff["allow_occupied_stage"] = True
+
+
+def _fix_live_card_set_phase_misparse(ability, eff, t):
+    """Parser misclassifies 「ライブカードセットフェイズ…」 as set_card_identity
+    because 「セット」 matches. Re-classify to reduce_live_card_set_limit."""
+    if eff.get("action") != "sequential":
+        return
+    for sub in eff.get("actions", []):
+        if isinstance(sub, dict) and sub.get("action") == "set_card_identity":
+            act_text = sub.get("text", "")
+            if (
+                "ライブカードセットフェイズ" in act_text
+                and ("上限" in act_text or "枚数" in act_text)
+                and ("減る" in act_text or "減らす" in act_text)
+            ):
+                sub["action"] = "reduce_live_card_set_limit"
+                sub.pop("card_type", None)
+
+
+# The post-parse correction pass, in EXECUTION ORDER — the order is part of the
+# contract, not an implementation detail. Each entry rewrites one ability's
+# parsed dict in place; `_fix_conditional_on_result` and `_propagate_context`
+# sit mid-pass because later entries read the structure they produce, and the
+# COR split is why _fix_dollchestra_primary_split has to follow the first of
+# them. Every entry must be safe to run on a corpus that was already fully
+# parsed, so an ability that no entry matches comes out unchanged.
+#
+# A new correction goes HERE as a named `_fix_*` above, never inline in the
+# caller — that is the only way the order stays readable in one place.
+_CORPUS_FIXES = (
+    _fix_leaked_condition_heart_colors,
+    _fix_cost_card_property,
+    _fix_primary_effect_trailing_period,
+    _fix_conditional_on_result_pass,
+    _fix_dollchestra_primary_split,
+    _fix_surplus_heart_revert,
+    _fix_cor_followup_self_cost_pass,
+    _fix_propagate_context,
+    _fix_self_revival_allow_occupied_stage,
+    _fix_occupied_stage_by_text,
+    _fix_live_card_set_phase_misparse,
+)
+
+
 def _repair_corpus(data: Dict[str, Any]) -> None:
     """Post-processing: recursive fixes, action inference & engine compat fixes, post-hoc fixes."""
     _apply_recursive_fixes(data["unique_abilities"])
-
-    # ====================================================================
-    # POST-PROCESSING: action inference & engine compat fixes
-    # ====================================================================
-    # After all abilities are parsed, this section:
-    #   1. Infers action types for effects with empty actions
-    #   2. Propagates card_type to sub-actions in sequential effects
-    #   3. Fixes known engine compatibility gaps
-    # ====================================================================
 
     for ability in data["unique_abilities"]:
         eff = ability.get("effect")
         if not isinstance(eff, dict):
             continue
         t = ability.get("triggerless_text", "")
-        cond = eff.get("condition", {})
-
-        # ---- Strip leaked heart_colors from conditions ----
-        # heart_colors on a condition means "only count cards with this heart color".
-        # If heart_colors is present but the condition text has no {{heart_ icons,
-        # it's effect metadata that leaked into a pure-count condition. Strip it.
-        if isinstance(cond, dict) and cond.get("heart_colors"):
-            cond_text = cond.get("text", "")
-            if "{{heart_" not in cond_text:
-                del cond["heart_colors"]
-
-        # ---- Cost: card_property enrichment ----
-        cost = ability.get("cost")
-        if isinstance(cost, dict) and not cost.get("card_property"):
-            ct = cost.get("text", "") or ""
-            if "ブレードハート" in ct:
-                cost["card_property"] = "has_blade_heart"
-                if "持たない" in ct or "ない" in ct:
-                    cost["negation"] = True
-
-        # ---- A: Strip trailing period from primary_effect text ----
-        pe = eff.get("primary_effect")
-        if isinstance(pe, dict) and isinstance(pe.get("text"), str):
-            if pe["text"].endswith("。"):
-                pe["text"] = pe["text"].rstrip("。")
-
-            # ---- A1: Structural transforms (keep) ----
-
-        _fix_conditional_on_result(eff, t)
-
-        # E0: Fix DOLLCHESTRA-type primary_effect — split select+modify_cost into sequential
-        if eff.get("action") in ("conditional_on_result", "conditional_alternative"):
-            pe = eff.get("primary_effect")
-            if (
-                isinstance(pe, dict)
-                and pe.get("action") == "select"
-                and pe.get("original_value") is True
-            ):
-                pe_text = pe.get("text") or ""
-                parts = pe_text.split("。")
-                if len(parts) >= 2:
-                    text_select = parts[0]
-                    text_cost = "。".join(parts[1:]).lstrip("。")
-                    pe["action"] = "sequential"
-                    pe["actions"] = [
-                        {
-                            "text": text_select,
-                            "source": pe.get("source"),
-                            "count": pe.get("count", 1),
-                            "card_type": pe.get("card_type"),
-                            "target": pe.get("target"),
-                            "group_names": pe.get("group_names"),
-                            "action": "select",
-                        },
-                        {
-                            "text": text_cost,
-                            "duration": "live_end",
-                            "card_type": pe.get("card_type"),
-                            "action": "modify_cost",
-                            "group_names": pe.get("group_names"),
-                            "original_value": True,
-                        },
-                    ]
-                    for k in ("source", "count", "duration", "card_type", "target"):
-                        pe.pop(k, None)
-
-        # E: Revert over-eager conditional_on_result to sequential (surplus_heart)
-        # Keep the result_condition as a condition on the followup_action.
-        if eff.get("action") == "conditional_on_result":
-            pe = eff.get("primary_effect", {})
-            if isinstance(pe, dict) and pe.get("resource") == "surplus_heart":
-                actions = [pe]
-                fa = eff.get("followup_action")
-                rc = eff.get("result_condition")
-                if isinstance(fa, dict):
-                    if isinstance(rc, dict):
-                        fa["condition"] = rc
-                    actions.append(fa)
-                if actions:
-                    eff["action"] = "sequential"
-                    eff["actions"] = actions
-                    eff.pop("primary_effect", None)
-                    eff.pop("result_condition", None)
-                    eff.pop("followup_action", None)
-
-        # ---- B1: Post-restructuring fix — self_cost on このメンバー change_state ----
-        # FIX 9b in _apply_recursive_fixes runs before COR restructuring creates
-        # followup_action, so we add self_cost here after the structure is final.
-        def _fix_change_state_self_cost(cor_eff):
-            fa = cor_eff.get("followup_action")
-            if isinstance(fa, dict) and fa.get("action") == "change_state":
-                if "このメンバー" in fa.get("text", ""):
-                    if fa.get("self_cost") is None:
-                        fa["self_cost"] = True
-
-        if eff.get("action") == "conditional_on_result":
-            _fix_change_state_self_cost(eff)
-        elif eff.get("action") == "sequential":
-            for act in eff.get("actions", []):
-                if (
-                    isinstance(act, dict)
-                    and act.get("action") == "conditional_on_result"
-                ):
-                    _fix_change_state_self_cost(act)
-
-        # ---- B: Scoped context propagation (inherits specific fields) ----
-        _propagate_context(eff, t=t, eff_root=eff)
-
-        # Q76 rule: self-revival from discard to stage can place on occupied areas
-        if (
-            eff.get("action") == "move_cards"
-            and eff.get("source") == "discard"
-            and eff.get("destination") == "stage"
-            and eff.get("self_target") is True
-        ):
-            eff["allow_occupied_stage"] = True
-        # Text-based detection for "既にメンバーがいるエリアにも登場できる"
-        if eff.get("action") == "move_cards" and eff.get("destination") == "stage":
-            text = eff.get("text", "")
-            parenthetical = " ".join(eff.get("parenthetical", []) or [])
-            if "既にメンバーがいるエリア" in text + parenthetical:
-                eff["allow_occupied_stage"] = True
-
-        # FIX: Parser misclassifies "ライブカードセットフェイズ..." as
-        # set_card_identity because "セット" matches. Re-classify to
-        # reduce_live_card_set_limit.
-        if eff.get("action") == "sequential":
-            for sub in eff.get("actions", []):
-                if isinstance(sub, dict) and sub.get("action") == "set_card_identity":
-                    act_text = sub.get("text", "")
-                    if (
-                        "ライブカードセットフェイズ" in act_text
-                        and ("上限" in act_text or "枚数" in act_text)
-                        and ("減る" in act_text or "減らす" in act_text)
-                    ):
-                        sub["action"] = "reduce_live_card_set_limit"
-                        sub.pop("card_type", None)
+        for fix in _CORPUS_FIXES:
+            fix(ability, eff, t)
 
     # Card-specific post-hoc fixes (e.g. PL!S-bp2-008 gain_ability) live in
     # card_overrides.py and are applied by the pipeline.

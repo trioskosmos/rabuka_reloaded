@@ -9,7 +9,7 @@ exit /b
 param(
     [int]$IntervalMinutes = 8,
     [string]$WindowTitle = "",
-    [string]$Message = "continue what you are doing. do not stop. if you think you are done you are not there is more to do, find and do it. you need to combine especially jidou abilities with other abilities. you need to find tests that miss the point of the ability and actually make them work properly. even if you just comb through individually on abilities.json. now get to work."
+    [string]$Message = "continue what you are doing. do not stop. if you think you are done you are not there is more to do, spend more time surveying. improve tests. improve speed. improve simplicity. do not worry about engine_c_wip. harder better faster stronger. there are many md files talking about this, consolidate them as well. no worktrees."
 )
 
 Add-Type -AssemblyName System.Windows.Forms

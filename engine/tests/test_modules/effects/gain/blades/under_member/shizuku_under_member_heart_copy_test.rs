@@ -169,6 +169,16 @@ fn shizuku_heart_copy_no_discard_card() {
 
     game.activate_ability(shizuku);
 
+    // Anti-vacuity, same reasoning as
+    // `shizuku_heart_copy_rejects_non_nijigasaki_group`: an unanswered prompt
+    // would leave the effect unrun, and both assertions below would hold
+    // without the filter ever being consulted.
+    assert!(
+        !game.has_pending_choice(),
+        "with no eligible discard card the ability must decline outright rather \
+         than park a selection prompt nobody answers"
+    );
+
     assert!(
         game.state.mods.get_heart_copy(shizuku).is_none(),
         "no heart_copy without an eligible discard card"
@@ -179,27 +189,50 @@ fn shizuku_heart_copy_no_discard_card() {
     );
 }
 
-/// Cost>17 虹ヶ咲 member is NOT eligible → no placement, no heart_copy.
+/// A non-虹ヶ咲 discard card is NOT eligible → no placement, no heart_copy.
+///
+/// RENAMED from `shizuku_heart_copy_rejects_cost_over_17`, which this test did
+/// not do. The name asserted the 「コスト17以下」 half of the filter while the
+/// body exercised the GROUP half, via a μ's card — and it carried a dead
+/// `let over_cost = …; let _ = over_cost;` that documented the author looking
+/// for a cost-18 虹ヶ咲 card and not finding one. A test named for a rule it
+/// does not exercise is worse than no test: it makes the coverage report claim
+/// a boundary that nothing checks.
+///
+/// The 「コスト17以下」 boundary is therefore UNTESTED, and untestable with the
+/// current card pool: no single 虹ヶ咲 member prints a cost above 17 (the only
+/// >17 entries carrying that group are `LL-bp*` combo cards, which are not
+/// members in the sense this filter reads). Same shape as the `heart0` lives
+/// the inventory documents — a printed requirement no stage can reach, where a
+/// test can only be made non-vacuous by injecting synthetic values.
 #[test]
-fn shizuku_heart_copy_rejects_cost_over_17() {
+fn shizuku_heart_copy_rejects_non_nijigasaki_group() {
     let db = load_real_database();
     let mut game = TestGame::new(db.clone());
 
     let shizuku = game.id("PL!N-bp7-003-R＋");
-    // 桜坂しずく PL!N-bp7-003-R＋ itself is 虹ヶ咲 cost 15 (eligible), so use a
-    // cost-18+ 虹ヶ咲 card instead if one exists; otherwise assert cost-limit via
-    // a high-cost member from another group is also rejected (group check).
-    let over_cost = game.id("PL!N-bp7-002-P"); // 桜坂しずく cost? — check grouping instead
-    let _ = over_cost;
+    // 高坂穂乃果 (PL!-sd1-010-SD) is μ's — fails the 虹ヶ咲 group filter at cost 4.
+    let honoka = game.id("PL!-sd1-010-SD");
+    game.state.player1.waitroom.cards.push(honoka);
 
     game.state.player1.stage.stage = [-1, shizuku, -1];
     seed_deck(&mut game);
 
-    // 高坂穂乃果 (PL!-sd1-010-SD) is μ's — fails the 虹ヶ咲 group filter even at cost 4.
-    let honoka = game.id("PL!-sd1-010-SD");
-    game.state.player1.waitroom.cards.push(honoka);
-
     game.activate_ability(shizuku);
+
+    // Anti-vacuity: if the ability had offered a card-selection prompt and this
+    // test simply never answered it, the effect would not have run and BOTH
+    // absence assertions below would hold for the wrong reason. A prompt left
+    // dangling is the silent-decline failure this file is prone to, so it is
+    // stated rather than assumed. The positive twin
+    // (`shizuku_heart_copy_matches_placed_card`) is what proves the ability
+    // does reach the placement step on an eligible card.
+    assert!(
+        !game.has_pending_choice(),
+        "the ability must decline outright on a non-虹ヶ咲 discard card, not park \
+         an unanswered selection prompt — otherwise the absence assertions below \
+         pass without the filter ever being evaluated"
+    );
 
     assert!(
         game.state.mods.get_heart_copy(shizuku).is_none(),
@@ -210,3 +243,4 @@ fn shizuku_heart_copy_rejects_cost_over_17() {
         "no card should be placed under shizuku"
     );
 }
+

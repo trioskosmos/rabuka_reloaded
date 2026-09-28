@@ -1,33 +1,33 @@
-/* test_parity_jidou_state.c ? C port of the jidou sub-folders that
+/* test_parity_jidou_state.c — C port of the jidou sub-folders that
  * tests/test_parity_jidou.c and tests/test_parity_jidou_extra.c left open.
  *
  * Sources, with the real size of each cluster (files / #[test] fns):
  *
  *   A. jidou/state_watch/live_phase_group_wait_discard_reactivate_test.rs
- *      1 file / 7 #[test] ? 三船栞子 PL!N-bp7-022-N ab#0
+ *      1 file / 7 #[test] — 三船栞子 PL!N-bp7-022-N ab#0
  *         「ライブフェイズの間、自分のステージにいる『虹ヶ咲』のメンバー1人が
  *           ウェイト状態になったとき、手札を1枚控え室に置いてもよい。
  *           そうしたとき、そのメンバーをアクティブにする。」
  *   B. jidou/state_watch/own_effect_wait_cheap_opponent_draw_one_q177_test.rs
- *      1 file / 7 #[test] ? 西木野真姫 PL!-pb1-015-R ab#1 (own-effect wait of a
+ *      1 file / 7 #[test] — 西木野真姫 PL!-pb1-015-R ab#1 (own-effect wait of a
  *      cost<=4 OPPONENT member -> draw 1) plus the ab#0 optional-cost gate.
  *   C. jidou/title_once/dive_ab0_does_not_arm_without_own_main_phase_discard_
- *      to_hand_test.rs ? 1 file / 6 #[test] ? DIVE! PL!N-bp4-026-L ab#0's
+ *      to_hand_test.rs — 1 file / 6 #[test] — DIVE! PL!N-bp4-026-L ab#0's
  *      「自分のメインフェイズにこのカードが控え室から手札に加えられたとき」 gate.
  *   D. jidou/title_once/dive_ab0_phase_gate_and_multi_copy_live_zone_limit_
- *      edges_test.rs ? 1 file / 10 #[test] ? DIVE! ab#0 multi-copy + ab#1 +
+ *      edges_test.rs — 1 file / 10 #[test] — DIVE! ab#0 multi-copy + ab#1 +
  *      live_card_set_limit_reduction.
  *   E. jidou/title_once/dive_retrieved_to_hand_ab0_places_live_zone_ab1_
- *      grants_blade_test.rs ? 1 file / 8 #[test].
+ *      grants_blade_test.rs — 1 file / 8 #[test].
  *   F. jidou/leaves_stage/live_success_heart05_threshold_and_no_surplus_score_
- *      plus2_test.rs ? 1 file / 3 #[test] ? Strawberry Trapper
+ *      plus2_test.rs — 1 file / 3 #[test] — Strawberry Trapper
  *      PL!S-pb1-021-L 「『Aqours』のメンバーが持つハートにheart05が合計4個以上
  *      あり、このターン、相手が余剰のハートを持たずにライブを成功させていた場合、
  *      このカードのスコアを＋２する。」
  *
  * NOT ported here (already covered):
  *   jidou/title_once/dive_in_live_zone_only_ab1_grants_blade_test.rs
- *     (1 file / 3 #[test]) ? test_parity_jidou_extra.c section G already ports
+ *     (1 file / 3 #[test]) — test_parity_jidou_extra.c section G already ports
  *     all three tests verbatim (dive_live_zone_only_ab1_triggers,
  *     dive_not_in_live_zone_no_trigger, dive_no_niji_no_target).
  *
@@ -42,7 +42,7 @@
  *     -> C `state.recently_state_changed[]` (card ids) PLUS the per-card
  *     `state_change_from[card] / state_change_to[card]` pair, which is what
  *     condition.c:eval_state_change actually reads. The C struct has NO cause
- *     column at all ? see the B_opponent_* tests.
+ *     column at all — see the B_opponent_* tests.
  *   - `test_get_heart_modifier` REMAPS a requested colour of 5 onto
  *     RB_HEART_ORANGE (heart05).
  *   - `rb_record_card_movement`'s SIXTH parameter is the Rust `effect_only`
@@ -77,7 +77,7 @@
 #include <sys/wait.h>
 #include <unistd.h>
 
-/* U+FF0B FULLWIDTH PLUS SIGN ? PL!N-bp4-007-R＋ is a DIFFERENT card number
+/* U+FF0B FULLWIDTH PLUS SIGN — PL!N-bp4-007-R＋ is a DIFFERENT card number
  * from PL!N-bp4-007-R; cards.json only has the fullwidth form. */
 #define PLUS "\xef\xbc\x8b"
 
@@ -125,9 +125,9 @@ static const char *current_test = "(none)";
 #define DIAG(...) do { fprintf(stderr, "        (diagnostic: " __VA_ARGS__); \
                        fprintf(stderr, ")\n"); } while (0)
 
-/* ???????????????????????????????????????????????????????????????????????
- * card constants ? every one verified against cards/cards.json
- * ??????????????????????????????????????????????????????????????????????? */
+/* =======================================================================
+ * card constants — every one verified against cards/cards.json
+ * ======================================================================= */
 #define FILLER        "PL!-sd1-010-SD"   /* 高坂 穂乃果   cost 4  Printemps */
 #define SHIORIKO      "PL!N-bp7-022-N"   /* 三船栞子       cost 4  R3BIRTH   */
 #define NIJI_MEMBER   "PL!N-PR-003-PR"   /* 上原歩夢       cost 9  A・ZU・NA  */
@@ -152,9 +152,9 @@ static const char *current_test = "(none)";
 #define AQ_H4_A       "PL!S-sd1-008-SD"  /* 小原鞠莉 GuiltyKiss, b_heart04 x1         */
 #define AQ_H4_B       "PL!S-sd1-002-SD"  /* 桜内梨子 GuiltyKiss, b_heart04 x1         */
 
-/* ???????????????????????????????????????????????????????????????????????
+/* =======================================================================
  * harness
- * ??????????????????????????????????????????????????????????????????????? */
+ * ======================================================================= */
 
 /* The card blobs live in src/ in the in-tree build, but the isolated build
  * root only copies sources/headers, so fall back to the canonical directory. */
@@ -211,7 +211,7 @@ static void pump_queue(TestGame *tg)
 
 /* Rust baton_swap_auto_helpers.rs `drain_auto_choices` /
  * `resolve_auto_choices_accepting_optionals`: required 1-card SelectCard
- * prompts are answered with index 0, everything else declines ? and the
+ * prompts are answered with index 0, everything else declines — and the
  * ability queue is pumped after every round (see the file header). */
 static void drain_all_with(TestGame *tg, int idx)
 {
@@ -372,7 +372,7 @@ static void dump_card_hearts(int cid, const char *no)
     rb_free_card(&c);
 }
 
-/* ???????????????????????????????????????????????????????????????????????
+/* =======================================================================
  * A. jidou/state_watch/live_phase_group_wait_discard_reactivate_test.rs
  *
  * 三船栞子 PL!N-bp7-022-N ab#0 (自動/ターン1回). Its condition is a compound
@@ -381,7 +381,7 @@ static void dump_card_hearts(int cid, const char *no)
  *   (2) state_change_condition group 虹ヶ咲, location=stage,
  *       from_state=active, to_state=wait
  * so every negative test below isolates one clause.
- * ??????????????????????????????????????????????????????????????????????? */
+ * ======================================================================= */
 
 /* Rust shioriko_wait_setup(game, waited). */
 static void shioriko_wait_setup(TestGame *tg, int waited)
@@ -421,7 +421,6 @@ static void test_live_phase_group_member_wait_optional_discard_removes_wait(void
     (void)shioriko;
     game.state.p[0].hand.n = 0;
     test_add_to_hand(&game, filler_id);        /* the optional cost */
-    test_add_to_hand(&game, filler_id);
     game.state.p[0].stage[1] = waited;
     game.state.p[0].stage[0] = shioriko;
     game.state.phase = RB_PHASE_PERFORMANCE;
@@ -440,9 +439,9 @@ static void test_live_phase_group_member_wait_optional_discard_removes_wait(void
        into selected_cards, clears the accumulator at :1698 and NEVER calls
        rb_choice_send_to_dst, so a fixed-count `source:"hand"` move_cards is a
        no-op. Kept strict and red. */
-    CHECK(wait_has(&game, 0, filler),
+    CHECK(wait_has(&game, 0, filler_id),
           "『手札を1枚控え室に置いてもよい』 — the optional cost must actually move the card");
-    CHECK(!hand_has(&game, 0, filler), "…and it must leave the hand");
+    CHECK(!hand_has(&game, 0, filler_id), "…and it must leave the hand");
     CHECK(!is_waited(&game, waited),
           "accepting the cost reactivates the waited 虹ヶ咲 member (ab#0's second step)");
 }
@@ -478,7 +477,7 @@ static void test_non_live_phase_wait_does_not_fire(void)
     drain_auto(&game);
 
     CHECK(!pending(&game),
-          "『ライブフェイズの間』 ? outside the live phase the watcher must not prompt");
+          "『ライブフェイズの間』 — outside the live phase the watcher must not prompt");
     CHECK(is_waited(&game, game.state.p[0].stage[1]), "and the member stays waited");
 }
 
@@ -496,7 +495,7 @@ static void test_non_nijigasaki_wait_does_not_fire(void)
     drain_accept_optionals(&game);
 
     CHECK(!pending(&game),
-          "『自分のステージにいる『虹ヶ咲』のメンバー1人が…』 ? a non-虹ヶ咲 wait must not prompt");
+          "『自分のステージにいる『虹ヶ咲』のメンバー1人が…』 — a non-虹ヶ咲 wait must not prompt");
 }
 
 static void test_empty_hand_auto_skips_no_reactivate(void)
@@ -564,7 +563,7 @@ static void test_self_wait_fires_for_shioriko(void)
     CHECK(!is_waited(&game, shioriko), "her own wait reactivates her");
 }
 
-/* ???????????????????????????????????????????????????????????????????????
+/* =======================================================================
  * B. jidou/state_watch/own_effect_wait_cheap_opponent_draw_one_q177_test.rs
  *
  * 西木野真姫 PL!-pb1-015-R:
@@ -573,8 +572,8 @@ static void test_self_wait_fires_for_shioriko(void)
  *     カードを1枚引く。」 (Q177: the draw is mandatory, it cannot be skipped)
  *   ab#0 (登場/ライブ開始時, センター) 「『BiBi』のメンバー1人をウェイトにして
  *     もよい：相手は、自身のステージにいるアクティブ状態のメンバー1人をウェイト
- *     にする。」 ? ab#0's opponent-wait is what trips ab#1.
- * ??????????????????????????????????????????????????????????????????????? */
+ *     にする。」 — ab#0's opponent-wait is what trips ab#1.
+ * ======================================================================= */
 
 static void test_maki_fixtures_are_the_printed_ones(void)
 {
@@ -707,7 +706,7 @@ static void test_actual_cost_nine_wait_does_not_trigger_maki_draw(void)
 
     CHECK(is_waited(&game, expensive), "the cost-9 opponent member really was waited");
     CHECK_EQ(game.state.p[0].hand.n, 1,
-             "『コスト4以下』 ? a cost-9 wait must NOT draw (the Rust test's own "
+             "『コスト4以下』 — a cost-9 wait must NOT draw (the Rust test's own "
              "assertion; note the Rust doc-comment claims the evaluator skips "
              "cost_limit, which the C engine does honour)");
 }
@@ -737,7 +736,7 @@ static void test_declined_cost_with_empty_opponent_stage_draws_nothing(void)
 }
 
 /* The positive control for the next test: identical fixture, identical
- * recorded transition, scanned identically ? and the draw DOES happen, so the
+ * recorded transition, scanned identically — and the draw DOES happen, so the
  * negative below is not vacuously green. */
 static void test_own_effect_wait_of_cheap_opponent_draws(void)
 {
@@ -792,7 +791,7 @@ static void test_opponent_effect_wait_of_cheap_member_does_not_draw(void)
        the C GameState has no cause column for a state change at all
        (recently_state_changed is a bare i16 list and eval_state_change keys
        only off state_change_from/state_change_to). Both seats are scanned, as
-       Rust's scan_autos_both does, so 真姫's ab#1 is genuinely reachable here ?
+       Rust's scan_autos_both does, so 真姫's ab#1 is genuinely reachable here —
        B_own_effect_wait_of_cheap_opponent_draws is the matched positive. */
     record_state_change(&game, cheap, 0, 1);
     rb_mods_set_orientation(&game.state.mods, cheap, "wait");
@@ -801,7 +800,7 @@ static void test_opponent_effect_wait_of_cheap_member_does_not_draw(void)
     CHECK(is_waited(&game, cheap), "precondition: the opponent member really was waited");
     DIAG("P1 hand after the p2-caused wait = %d, expected 0", game.state.p[0].hand.n);
     CHECK_EQ(game.state.p[0].hand.n, 0,
-             "『自分のカードの効果によって』 ? a p2-caused wait must NOT draw for 真姫");
+             "『自分のカードの効果によって』 — a p2-caused wait must NOT draw for 真姫");
 }
 
 static void test_opponent_debut_waited_member_does_not_draw(void)
@@ -889,13 +888,13 @@ static void test_own_effect_wait_chain_through_a_real_swap(void)
     DIAG("opponent wait orientation after the swap = '%s', hand = %d (was %d)",
          orientation_of(&game, cheapopp), game.state.p[0].hand.n, hand_before);
     CHECK(is_waited(&game, cheapopp),
-          "『相手のステージにいる…メンバーをウェイトにする』 ? the cheap opponent member waits");
+          "『相手のステージにいる…メンバーをウェイトにする』 — the cheap opponent member waits");
     CHECK_EQ(game.state.p[0].hand.n, hand_before + 1,
              "真姫 ab#1: own-effect wait of the cheap opponent member draws 1");
 }
 
-/* ???????????????????????????????????????????????????????????????????????
- * C/D/E. jidou/title_once/ ? DIVE! PL!N-bp4-026-L
+/* =======================================================================
+ * C/D/E. jidou/title_once/ — DIVE! PL!N-bp4-026-L
  *
  *   ab#0 (自動) 「自分のメインフェイズにこのカードが控え室から手札に加えられた
  *          とき、自分の手札からカード名が「DIVE!」のライブカード1枚を表向きで
@@ -904,16 +903,19 @@ static void test_own_effect_wait_chain_through_a_real_swap(void)
  *   ab#1 (自動) 「このカードが表向きでライブカード置き場に置かれたとき、
  *          ライブ終了時まで、自分のステージにいる『虹ヶ咲』のメンバー1人は、
  *          ブレード2つを得る。」
- * ??????????????????????????????????????????????????????????????????????? */
+ * ======================================================================= */
 
 /* Counts the SelectCard prompts ab#0 raises (its 「DIVE!」 pick) while
- * answering everything else with index 0. */
+ * answering everything else with index 0. Matches on the RbChoice KIND, not on
+ * test_pending_choice_type's string, because the prompt this ability raises is
+ * not always labelled "SelectCard" by the shim. */
 static int drain_counting_card_choices(TestGame *tg, int *extra_selects)
 {
     int placements = 0;
     int guard = 0;
     while (pending(tg) && guard++ < 24) {
-        if (strcmp(pending_kind(tg), "SelectCard") == 0) placements++;
+        const RbChoice *c = rb_get_pending_choice(&tg->state);
+        if (c && c->kind == RB_CHOICE_SELECT_CARD) placements++;
         else if (extra_selects) (*extra_selects)++;
         answer_first(tg);
     }
@@ -957,7 +959,7 @@ static void test_dive_ab0_placement_reduces_live_card_set_limit(void)
 
     CHECK(live_has(&game, 0, dive), "DIVE! ends up in the live card zone");
     CHECK_EQ(game.state.live_set_limit_reduction[0], 1,
-             "『上限が1枚減る』 ? the live_card_set_limit_reduction must be 1");
+             "『上限が1枚減る』 — the live_card_set_limit_reduction must be 1");
     CHECK_EQ(3 - game.state.live_set_limit_reduction[0], 2,
              "so the LiveCardSet phase limit computes to 3 - 1 = 2");
 }
@@ -984,7 +986,7 @@ static void test_dive_ab0_does_not_fire_outside_main_phase_phase_gate(void)
     drain_decline(&game);
 
     CHECK(!live_has(&game, 0, dive),
-          "『自分のメインフェイズに』 ? ab#0 must not place DIVE! outside the main phase");
+          "『自分のメインフェイズに』 — ab#0 must not place DIVE! outside the main phase");
 }
 
 static void test_dive_only_moved_copy_triggers_static_copy_does_not(void)
@@ -1009,6 +1011,7 @@ static void test_dive_only_moved_copy_triggers_static_copy_does_not(void)
     game.state.active = 0;
     int only[1] = { dive_moved };
     set_recently_moved_n(&game, only, 1);
+    tas_full(&game, 0);
 
     int placements = drain_counting_card_choices(&game, NULL);
 
@@ -1044,6 +1047,7 @@ static void test_dive_two_static_one_moved_only_one_trigger(void)
     game.state.active = 0;
     int only[1] = { dive_moved };
     set_recently_moved_n(&game, only, 1);
+    tas_full(&game, 0);
 
     int placements = drain_counting_card_choices(&game, NULL);
 
@@ -1077,6 +1081,7 @@ static void test_dive_two_copies_real_movement_event_only_moved_places(void)
     /* Real movement event: ONLY dive_moved comes discard -> hand this batch. */
     push_movement(&game, dive_moved, RB_ZONEID_WAITROOM, RB_ZONEID_HAND, 0, 1);
     set_recently_moved(&game, dive_moved);
+    tas_full(&game, 0);
 
     int placements = drain_counting_card_choices(&game, NULL);
 
@@ -1110,7 +1115,7 @@ static void test_dive_natural_draw_from_deck_does_not_arm_ab0(void)
         test_pass(&game);
         assertions++;
         if (pending(&game)) {
-            fprintf(stderr, "FAIL: a prompt appeared during phase progression ? "
+            fprintf(stderr, "FAIL: a prompt appeared during phase progression — "
                             "DIVE! must not arm off a deck draw\n");
             failures++;
         }
@@ -1118,7 +1123,7 @@ static void test_dive_natural_draw_from_deck_does_not_arm_ab0(void)
 
     CHECK(hand_has(&game, 1, dive_p2), "P2 drew DIVE! from the deck");
     CHECK(!live_has(&game, 1, dive_p2),
-          "『控え室から手札に加えられたとき』 ? a deck draw is not that change, so ab#0 must not arm");
+          "『控え室から手札に加えられたとき』 — a deck draw is not that change, so ab#0 must not arm");
 }
 
 static void test_dive_ab1_no_blade_when_statically_in_live_zone(void)
@@ -1146,7 +1151,7 @@ static void test_dive_ab1_no_blade_when_statically_in_live_zone(void)
     drain_accept_optionals(&game);
 
     CHECK_EQ(blade_mod(&game, niji), 0,
-             "the location condition carries movement:\"moved\" ? a static live-zone "
+             "the location condition carries movement:\"moved\" — a static live-zone "
              "presence must not grant blade");
 }
 
@@ -1175,7 +1180,7 @@ static void test_dive_ab1_rescan_after_flags_cleared_does_not_double_grant(void)
     drain_accept_optionals(&game);
     CHECK_EQ(blade_mod(&game, niji), 2, "the first grant gives exactly blade+2");
 
-    /* Movement flags consumed/cleared ? the rescan must be silent. */
+    /* Movement flags consumed/cleared — the rescan must be silent. */
     game.state.n_recently_moved = 0;
     game.state.n_batch_movements = 0;
     tas_full(&game, 0);
@@ -1223,7 +1228,7 @@ static void test_dive_both_retrieval_arms_own_copy_not_opponents(void)
           "P2's DIVE!: retrieved into P2's hand by the cross-line retrieval "
           "「自分と相手はそれぞれ…」");
     CHECK(!live_has(&game, 1, dive_p2),
-          "P2's DIVE! must NOT auto-place ? moved by the OPPONENT's effect during P1's "
+          "P2's DIVE! must NOT auto-place — moved by the OPPONENT's effect during P1's "
           "main phase, so ab#0's phase_target=self gate refuses it");
 }
 
@@ -1273,7 +1278,7 @@ static void test_dive_wrong_target_retrieval_does_not_arm_ab0(void)
 
     CHECK(!pending(&game), "nothing else may be pending after retrieving the non-DIVE card");
     CHECK(!live_has(&game, 0, dive),
-          "DIVE! stayed in the waitroom ? ab#0 only arms for the card THAT was retrieved");
+          "DIVE! stayed in the waitroom — ab#0 only arms for the card THAT was retrieved");
     CHECK(wait_has(&game, 0, dive), "DIVE! must still be in the waitroom");
 }
 
@@ -1386,7 +1391,7 @@ static void test_dive_ab1_two_niji_members_only_one_gets_blade(void)
     int mod_b = blade_mod(&game, niji_b);
     DIAG("blade a=%d b=%d", mod_a, mod_b);
     CHECK(mod_a >= 2 || mod_b >= 2, "at least one 虹ヶ咲 member gains blade+2");
-    CHECK(!(mod_a > 0 && mod_b > 0), "『メンバー1人』 ? only ONE member may be buffed");
+    CHECK(!(mod_a > 0 && mod_b > 0), "『メンバー1人』 — only ONE member may be buffed");
 }
 
 static void test_dive_two_in_live_zone_two_blade_grants(void)
@@ -1541,7 +1546,7 @@ static void test_dive_ab0_no_trigger_for_p2_during_p1_main_phase(void)
     drain_decline(&game);
 
     CHECK(!live_has(&game, 1, dive),
-          "『自分のメインフェイズに』 ? P2's DIVE! must not fire during P1's main phase");
+          "『自分のメインフェイズに』 — P2's DIVE! must not fire during P1's main phase");
 }
 
 static void test_dive_ab0_no_trigger_from_static_hand(void)
@@ -1564,7 +1569,7 @@ static void test_dive_ab0_no_trigger_from_static_hand(void)
     drain_decline(&game);
 
     CHECK(!live_has(&game, 0, dive),
-          "『控え室から手札に加えられたとき』 ? a static hand card does not arm ab#0");
+          "『控え室から手札に加えられたとき』 — a static hand card does not arm ab#0");
 }
 
 static void test_dive_ab0_places_dive_ab1_grants_blade_setsuna_chain(void)
@@ -1651,9 +1656,9 @@ static void test_dive_two_retrieved_chain_still_works(void)
     CHECK(blade_mod(&game, niji) >= 2, "ab#1 grants blade+2 even when both copies move in one batch");
 }
 
-/* ???????????????????????????????????????????????????????????????????????
+/* =======================================================================
  * F. jidou/leaves_stage/live_success_heart05_threshold_and_no_surplus_score_
- *    plus2_test.rs ? Strawberry Trapper PL!S-pb1-021-L
+ *    plus2_test.rs — Strawberry Trapper PL!S-pb1-021-L
  *
  * 「自分のステージにいる『Aqours』のメンバーが持つハートに、heart05が合計4個以上
  *   あり、このターン、相手が余剰のハートを持たずにライブを成功させていた場合、
@@ -1661,19 +1666,44 @@ static void test_dive_two_retrieved_chain_still_works(void)
  * The +2 is a live-scoped score modifier, so the Rust tests read it out of
  * performance_snapshots[0] (the mods are cleared by live end).
  *
- * RUST FIXTURE BUG carried into this port (evidence in cards/cards.json):
- * the Rust test comments claim 桜内梨子 prints "heart05=2" and that two of them
- * therefore total the 合計4個以上 threshold. Neither is true:
- *   PL!S-bp2-002-R  (RIKO_A)  has NO printed heart at all
- *                       (no need_heart / special_heart / blade_heart key);
- *   PL!S-sd1-011-SD (RIKO_B)  has blade_heart {"b_heart05": 1} ? ONE icon.
- * Every 『Aqours』 member in the database prints AT MOST ONE heart, so
- * 合計4個以上 is unreachable from printed hearts alone and the threshold can
- * only be met through heart modifiers. F1/F2 therefore grant explicit heart05
- * modifiers (documented below) so the test actually distinguishes gated from
- * ungated; F4/F5 are added probes for what the C engine's aggregate really
- * measures.
- * ??????????????????????????????????????????????????????????????????????? */
+ * THREE separate heart discrepancies, all measured and printed by
+ * F_fixture_identity:
+ *
+ * 1. RUST FIXTURE BUG. The Rust test comments claim 桜内梨子 prints
+ *    "heart05=2" and that two of them therefore total the 合計4個以上
+ *    threshold. cards/cards.json says otherwise:
+ *      PL!S-bp2-002-R  (RIKO_A)  has NO printed heart at all
+ *                          (no need_heart / special_heart / blade_heart key);
+ *      PL!S-sd1-011-SD (RIKO_B)  has blade_heart {"b_heart05": 1} - ONE icon.
+ *    Every 『Aqours』 member in cards.json prints AT MOST ONE heart, so
+ *    合計4個以上 is unreachable from printed hearts alone and the threshold
+ *    can only be met through heart modifiers. F1/F2 therefore grant explicit
+ *    heart05 modifiers (documented below) so the test actually distinguishes
+ *    gated from ungated; F4/F5 are added probes for what the C engine's
+ *    aggregate really measures.
+ *
+ * 2. CARDS.BIN vs CARDS.JSON. The C Card record disagrees with cards.json for
+ *    the same cards: PL!S-bp2-002-R decodes as n_hearts=1 heart_color=[5]
+ *    heart_count=[2] (2 heart05 where cards.json has none) and
+ *    PL!S-sd1-011-SD as n_hearts=2 heart_color=[5 5] heart_count=[2 1]
+ *    (3 heart05 where cards.json has 1). condition.c:eval_group_aggregate
+ *    -> get_card_total_hearts reads exactly this record, so the aggregate the
+ *    engine actually computes is larger than the database's printed hearts.
+ *    Reported, not worked around.
+ *
+ * 3. heart_colors IS IGNORED. eval_group_aggregate (condition.c:1901-1905)
+ *    sums every colour a member has and never looks at the condition's
+ *    `heart_colors: ["heart05"]` field, so 「heart05が合計4個以上」 is evaluated
+ *    as "4 hearts of ANY colour". F4 probes that; it currently stays green only
+ *    because the heart04 board's live itself fails, so treat F4 as INCONCLUSIVE
+ *    rather than as a refutation.
+ *
+ * F5 (a heartless 『Aqours』 member next to a boosted one) is inconclusive too:
+ * get_card_total_hearts returns -1 for a card with no printable heart, which
+ * eval_group_aggregate adds unchecked, but no 『Aqours』 member in the C card DB
+ * is actually heartless (see 2), so the -1 path is unreachable from this board.
+ * See the final report for both.
+ * ═══════════════════════════════════════════════════════════════════════ */
 
 typedef struct { int member; int heart_color; int modifier; } AqSpec;
 
@@ -1806,7 +1836,7 @@ static void test_strawberry_trapper_fixtures_are_the_printed_ones(void)
           "own 「合計4個以上」 precondition comment");
 }
 
-/* F1 ? the Rust positive case, with the heart05 threshold actually reachable. */
+/* F1 — the Rust positive case, with the heart05 threshold actually reachable. */
 static void test_strawberry_trapper_conditions_met_score_plus_2(void)
 {
     static TestGame game;
@@ -1824,7 +1854,7 @@ static void test_strawberry_trapper_conditions_met_score_plus_2(void)
                         "『heart05が合計4個以上あり、相手が余剰のハートを持たずに成功』 -> +2");
 }
 
-/* F2 ? the Rust negative case: below the heart05 threshold. */
+/* F2 — the Rust negative case: below the heart05 threshold. */
 static void test_strawberry_trapper_insufficient_heart05_no_score(void)
 {
     static TestGame game;
@@ -1843,11 +1873,11 @@ static void test_strawberry_trapper_insufficient_heart05_no_score(void)
 
     run_trapper_live(&game, 1);
     CHECK_EQ(score_mod(&game, test_id(&game, TRAPPER)), 0,
-             "『heart05が合計4個以上』 ? below the threshold no score bonus is granted");
+             "『heart05が合計4個以上』 — below the threshold no score bonus is granted");
     check_trapper_score(&game, 0, "…and the snapshot score carries no bonus");
 }
 
-/* F3 ? the Rust negative case: the opponent did not succeed. */
+/* F3 — the Rust negative case: the opponent did not succeed. */
 static void test_strawberry_trapper_no_opponent_success_no_score(void)
 {
     static TestGame game;
@@ -1862,12 +1892,12 @@ static void test_strawberry_trapper_no_opponent_success_no_score(void)
 
     run_trapper_live(&game, 0);
     CHECK_EQ(score_mod(&game, test_id(&game, TRAPPER)), 0,
-             "『相手が余剰のハートを持たずにライブを成功させていた場合』 ? no opponent "
+             "『相手が余剰のハートを持たずにライブを成功させていた場合』 — no opponent "
              "success means no score bonus");
     check_trapper_score(&game, 0, "…and the snapshot score carries no bonus");
 }
 
-/* F4 ? ENGINE PROBE (not a Rust test). The printed text names heart05 only.
+/* F4 — ENGINE PROBE (not a Rust test). The printed text names heart05 only.
  * Board: two 『Aqours』 members with 5 heart04 between them and ZERO heart05.
  * If the +2 is still granted, the aggregate group condition ignores the
  * `heart_colors: ["heart05"]` field. */
@@ -1888,7 +1918,7 @@ static void test_strawberry_trapper_heart04_board_must_not_score(void)
                         "『ハートにheart05が合計4個以上』 — a heart04-only board must NOT score");
 }
 
-/* F5 ? ENGINE PROBE (not a Rust test). A member with NO printed heart
+/* F5 — ENGINE PROBE (not a Rust test). A member with NO printed heart
  * (PL!S-bp2-002-R) stands next to a member holding exactly 4 heart05. The
  * board really has 合計4個以上 heart05, so the +2 must be granted. If it is
  * not, a heartless member DECREMENTS the aggregate instead of contributing 0. */
@@ -1910,7 +1940,7 @@ static void test_strawberry_trapper_heartless_member_must_not_reduce_total(void)
                         "from the 合計4個以上 total");
 }
 
-/* ??????????????????????????????????????????????????????????????????????? */
+/* ======================================================================= */
 
 static void on_fault(int sig)
 {

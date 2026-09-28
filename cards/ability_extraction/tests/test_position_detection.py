@@ -10,11 +10,12 @@ Catches:
 - Spurious "position" field on effects with multi-position activation
 - Icon template detection (leftside/rightside/center)
 
-Run: python -m pytest cards/ability_extraction/tests/test_position_detection.py -v
+Run: python cards/ability_extraction/tests/test_position_detection.py
 """
 
 import sys, os
 
+sys.path.insert(0, os.path.dirname(__file__))
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 from parser import (
     detect_positions,
@@ -181,6 +182,6 @@ class TestParseEffectActivationPosition:
 
 
 if __name__ == "__main__":
-    import pytest
+    from _runner import run_module
 
-    sys.exit(pytest.main([__file__, "-v"]))
+    sys.exit(run_module(globals()))

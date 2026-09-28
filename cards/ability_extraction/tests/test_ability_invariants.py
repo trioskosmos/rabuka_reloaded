@@ -5,7 +5,7 @@ These run against the generated corpus so structural rules are enforced across
 every card, catching regressions like the BP07 self-appearance card_type leak
 without needing a gameplay test.
 
-Run:  cd cards/ability_extraction && python tests/test_ability_invariants.py
+Run:  python cards/ability_extraction/tests/test_ability_invariants.py
 """
 
 import json
@@ -13,6 +13,7 @@ import os
 import sys
 from pathlib import Path
 
+sys.path.insert(0, os.path.dirname(__file__))
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 ABILITIES_JSON = None
@@ -26,19 +27,6 @@ assert ABILITIES_JSON is not None, f"could not locate cards/abilities.json from 
 
 _SELF_APPEARANCE_PATTERNS = ("このメンバーが登場", "このカードが登場")
 _CANONICAL_DURATIONS = {"this_turn", "live_end", "as_long_as", "unless", "permanent"}
-
-passed = 0
-failed = 0
-
-
-def run_check(name, fn):
-    global passed, failed
-    try:
-        fn()
-        passed += 1
-    except Exception as e:
-        failed += 1
-        print(f"  FAIL: {name}: {e}")
 
 
 def walk_nodes(obj):
@@ -147,10 +135,58 @@ def test_appearance_has_trigger_event():
     assert not bad, f"appearance_condition missing trigger_event: {bad[:5]}"
 
 
+# ─── Invariant 4: compound sub-conditions inherit the clause's zone ───
+
+
+def test_compound_subconditions_inherit_location():
+    """A 「AかつB」 clause is read in one zone throughout.
+
+    Whichever sub-condition named the zone names it for the whole clause, so a
+    bare sibling must carry it too. Drop it and a cost comparison silently
+    widens from "a member on stage's cost" to "any card's cost" — the condition
+    still type-checks, still validates, and is simply true far more often.
+
+    The exclusions each mark a sub-condition that already names its own scope,
+    and are the same set parser._propagate_compound_locations honours, plus
+    `source`:
+      - `temporal` — scoped to a turn or a live, not a zone
+      - `resource_type` — the resource reads, not the zone
+      - `comparison_type` of "score" — a score is never zone-scoped
+      - `source` — the card set is already named ("the cards this effect just
+        moved"). Adding a zone would silently narrow it to "moved AND in this
+        zone", which is a different and usually wrong claim.
+    """
+    data = load()
+    bad = []
+    for u in data["unique_abilities"]:
+        eff = u.get("effect")
+        if not isinstance(eff, dict):
+            continue
+        for node in walk_nodes(eff):
+            if node.get("type") != "compound":
+                continue
+            subs = node.get("conditions") or []
+            inherited = next(
+                (s["location"] for s in subs if isinstance(s, dict) and s.get("location")),
+                None,
+            )
+            if not inherited:
+                continue
+            for sub in subs:
+                if not isinstance(sub, dict) or sub.get("location"):
+                    continue
+                if sub.get("temporal") or sub.get("resource_type") or sub.get("source"):
+                    continue
+                if sub.get("comparison_type") == "score":
+                    continue
+                bad.append((u.get("cards", [""])[0], sub.get("text", "")))
+    assert not bad, (
+        "bare sub-conditions of a compound must inherit the clause's location "
+        f"(parser._propagate_compound_locations); missing on: {bad[:5]}"
+    )
+
+
 if __name__ == "__main__":
-    run_check("duration codes are canonical", test_duration_codes_are_canonical)
-    run_check("self-appearance has no card_type", test_self_appearance_has_no_card_type)
-    run_check("or_condition aggregates trigger_event", test_or_condition_aggregates_trigger_event)
-    run_check("appearance_condition has trigger_event", test_appearance_has_trigger_event)
-    print(f"\n{passed} passed, {failed} failed")
-    sys.exit(1 if failed else 0)
+    from _runner import run_module
+
+    sys.exit(run_module(globals()))

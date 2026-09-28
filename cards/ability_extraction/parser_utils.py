@@ -1083,7 +1083,12 @@ class ActionRule(_TextRule):
         if self.condition and action is not None:
             try:
                 return bool(self.condition(text, action))
-            except Exception:
+            except (KeyError, IndexError, AttributeError, TypeError):
+                # A guard that trips over a missing key is a rule that cannot
+                # decide; treat it as "no match" and let the next rule answer.
+                # Anything else (a bad regex, a logic error) is a real bug and
+                # must reach the caller instead of silently selecting a
+                # different rule and producing a plausible wrong parse.
                 return False
         return True
 

@@ -3114,8 +3114,13 @@ void rb_resolver_continue_siblings(GameState *g, int actor, int host,
             rb_effect_free(owned[i]);        /* ownership came to us; we release it */
             if (rb_has_pending_choice(g)) {
                 /* choice.rs:114-119: park the rest back and stamp effect_started
-                   (choice.rs:81-83 writes the same flag on the same event). */
+                   (choice.rs:81-83 writes the same flag on the same event).
+                   rb_queue_repark_pending_actions EXTENDS with deep clones
+                   (ability_queue.c:468, and its own comment says so), exactly
+                   like Rust's `queued.extend(remaining.to_vec())` — so this loop
+                   still owns the originals and must release them itself. */
                 rb_queue_repark_pending_actions(g, owned + i + 1, n - i - 1, 0);
+                for (int k = i + 1; k < n; k++) rb_effect_free(owned[k]);
                 if (g->queue.cur >= 0 && g->queue.cur < g->queue.n_entries)
                     g->queue.entries[g->queue.cur].effect_started = 1;
                 return;
@@ -3711,23 +3716,28 @@ void rb_emit_choice(GameState *g, int actor, RbChoiceKind kind,
        entry's choice_player_id was NEVER filled in — a pending choice left
        `queue.state == 3` with `choice_player_id == ""`, where clearing the
        state and re-pausing the same entry immediately yields "p1"/"p2".
-       Both branches of rb_queue_pause_for_choice set the state themselves
-       (ability_queue.c:310 and :327), so the stamp after it is belt-and-braces
-       for the `n_entries == RB_QUEUE_DEPTH` fallthrough, which sets neither. */
-    int cur_before = g->queue.cur, n_before = g->queue.n_entries;
-    RbChoice ch = g->queue.pending;
-    ch.actor = actor;  /* ensure actor is set for queue entry routing */
-    rb_queue_pause_for_choice(g, &ch);
-    if (g->queue.n_entries > n_before) {
-        /* No live entry to stamp, so the pause minted a placeholder
-           (ability_queue.c:315-327) to give the choice a home. rb_emit_choice
-           never minted one — the state stamp above used to shadow the early
-           return entirely — and callers depend on the queue NOT growing here
-           (a minted placeholder makes `n_entries` outrank the live entry the
-           next resume looks up by `cur`), so retire it again and keep exactly
-           the pre-existing queue shape. */
-        g->queue.n_entries = n_before;
-        g->queue.cur = cur_before;
+       Rust stamps it too: pause_for_choice's "Universal default" arm
+       (ability_queue.rs:345-351) copies player_id into choice_player_id on
+       every pause, and ability_queue.rs:771 asserts it.
+
+       Two C-only side effects of the pause are deliberately neutralized, because
+       neither exists in Rust — Rust's pause_for_choice only touches
+       `state` and `choice_player_id` (ability_queue.rs:303-404):
+
+       (a) Minting a placeholder entry (ability_queue.c:315-327) when there is no
+           live entry. rb_emit_choice never minted one — the state stamp used to
+           shadow the early return — and a minted placeholder makes n_entries
+           outrank the live entry the next resume looks up by `cur`, so the pause
+           is skipped unless there IS a live entry to stamp.
+       (b) `g->queue.actor = g->active` (ability_queue.c:309). This emitter was
+           handed the ANSWERING player and already stored it above; the pause
+           overwriting it with the seat whose turn it is reroutes the answer, so
+           the emitter's value is restored after the pause. */
+    if (g->queue.cur >= 0 && g->queue.cur < g->queue.n_entries) {
+        RbChoice ch = g->queue.pending;
+        ch.actor = actor;  /* ensure actor is set for queue entry routing */
+        rb_queue_pause_for_choice(g, &ch);
+        g->queue.actor = actor;
     }
     g->queue.state = RB_QUEUE_AWAITING_CHOICE;   /* QueueState FSM (ability_queue.rs) */
 }

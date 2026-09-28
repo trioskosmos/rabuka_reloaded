@@ -4,13 +4,14 @@ tests/test_parse_action.py
 Standalone tests for parse_action() action type classification.
 Catches dispatch table ordering bugs, silent misclassifications, and rule shadowing.
 
-Run: python -m pytest cards/ability_extraction/tests/test_parse_action.py -v
-  or: python cards/ability_extraction/tests/test_parse_action.py
+Run: python cards/ability_extraction/tests/test_parse_action.py
 """
 import sys, os
+sys.path.insert(0, os.path.dirname(__file__))
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 import parser as parser_module
 from parser import ActionRule, _ACTION_RULES, parse_ability, parse_action, parse_effect
+from card_overrides import apply_card_overrides
 
 
 def check(text, expected_action, **expected_fields):
@@ -216,11 +217,28 @@ def test_position_change_swap():
 # ─── SEQUENTIAL ───────────────────────────────────────────────────────────────
 
 def test_sequential_draw_then_discard():
+    # At the ACTION level a two-step phrase collapses to its first step: the
+    # 「その後」 split happens one level up, in parse_effect (next test). Pinning
+    # the collapsed form here is deliberate — it is what parse_action callers
+    # actually receive, and a "sequential OR draw_card" assertion would pass
+    # even if the split regressed.
     result = parse_action('カードを1枚引く。その後、手札から1枚を控え室に置く')
-    # Should be sequential or draw (depending on parsing)
-    assert result.get('action') in ('sequential', 'draw_card'), (
-        f"Expected sequential or draw_card, got: {result.get('action')!r}\nFULL: {result}"
+    assert result.get('action') == 'draw_card', (
+        f"Expected draw_card, got: {result.get('action')!r}\nFULL: {result}"
     )
+    assert result.get('source') == 'deck', result
+    assert result.get('destination') == 'hand', result
+    assert result.get('count') == 1, result
+
+
+def test_sequential_draw_then_discard_splits_at_effect_level():
+    result = parse_effect('カードを1枚引く。その後、手札から1枚を控え室に置く')
+    assert result.get('action') == 'sequential', result
+    draw, discard = result['actions']
+    assert draw['action'] == 'draw_card', draw
+    assert (draw['source'], draw['destination']) == ('deck', 'hand'), draw
+    assert discard['action'] == 'move_cards', discard
+    assert (discard['source'], discard['destination']) == ('hand', 'discard'), discard
 
 
 # ─── SILENT RULE SHADOWING REGRESSION TESTS ───────────────────────────────────
@@ -389,10 +407,12 @@ def test_finalizer_phases_are_ordered():
 
 
 def test_card_overrides_do_not_require_fix_stats():
+    # Card-specific fixes used to be gated on a 'fix_stats' entry the parser
+    # never emitted. An ability carrying only the two fields the parser really
+    # produces must be accepted, and must come back untouched.
     data = {'unique_abilities': [{'cards': [], 'triggerless_text': ''}]}
-    parser_module.card_overrides.apply_card_overrides(data) if hasattr(parser_module, 'card_overrides') else None
-    from card_overrides import apply_card_overrides
     apply_card_overrides(data)
+    assert data == {'unique_abilities': [{'cards': [], 'triggerless_text': ''}]}, data
 
 
 def test_resource_loss_keeps_member_card_type():
@@ -402,30 +422,24 @@ def test_resource_loss_keeps_member_card_type():
     assert result.get('card_type') == 'member_card'
 
 
-def test_nested_sequential_normalization_preserves_links():
+def test_nested_sequential_normalization_preserves_nesting():
+    # The second step of this phrase is itself a two-step move, so the
+    # sequential has to stay nested three levels deep rather than being
+    # flattened onto one action list.
     result = parse_effect('カードを1枚選ぶ。その後、選んだカードを手札に加え、控え室に置く')
-    assert result.get('action') in ('sequential', 'select')
-    if result.get('action') == 'sequential':
-        assert result.get('actions')
+    assert result.get('action') == 'sequential', result
+    select, inner = result['actions']
+    assert select['action'] == 'select', select
+    assert select.get('count') == 1, select
+    assert inner.get('action') == 'sequential', inner
+    to_hand, to_discard = inner['actions']
+    assert to_hand['action'] == 'move_cards', to_hand
+    assert to_hand['destination'] == 'hand', to_hand
+    assert to_discard['action'] == 'move_cards', to_discard
+    assert to_discard['destination'] == 'discard', to_discard
 
 
-if __name__ == '__main__':
-    import traceback
-    tests = [(k, v) for k, v in sorted(globals().items()) if k.startswith('test_')]
-    passed, failed = 0, 0
-    for name, t in tests:
-        try:
-            t()
-            print(f'  PASS  {name}')
-            passed += 1
-        except AssertionError as e:
-            print(f'  FAIL  {name}')
-            for line in str(e).splitlines():
-                print(f'        {line}')
-            failed += 1
-        except Exception as e:
-            print(f'  ERROR {name}: {e}')
-            traceback.print_exc()
-            failed += 1
-    print(f'\n{passed} passed, {failed} failed')
-    sys.exit(0 if failed == 0 else 1)
+if __name__ == "__main__":
+    from _runner import run_module
+
+    sys.exit(run_module(globals()))

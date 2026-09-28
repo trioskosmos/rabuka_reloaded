@@ -5,13 +5,13 @@ Property-based regression tests for the effect/condition/action rule registries.
 Verifies every registered rule is triggered by at least one ability in the real
 card corpus — catches dead rules that no longer match anything.
 
-Run: python -m pytest cards/ability_extraction/tests/test_registry_coverage.py -v
-  or: python cards/ability_extraction/tests/test_registry_coverage.py
+Run: python cards/ability_extraction/tests/test_registry_coverage.py
 """
 import json
 import os
 import sys
 
+sys.path.insert(0, os.path.dirname(__file__))
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 from parser import (
@@ -164,21 +164,6 @@ def test_parse_ability_no_crash():
 
 
 if __name__ == "__main__":
-    tests = [
-        test_action_rules_are_normalized,
-        test_all_effect_rules_triggered,
-        test_all_condition_rules_triggered,
-        test_parse_ability_no_crash,
-    ]
-    passed = 0
-    failed = 0
-    for fn in tests:
-        try:
-            fn()
-            print(f"  PASS: {fn.__name__}")
-            passed += 1
-        except Exception as e:
-            print(f"  FAIL: {fn.__name__}: {e}")
-            failed += 1
-    print(f"\n{passed} passed, {failed} failed")
-    sys.exit(1 if failed else 0)
+    from _runner import run_module
+
+    sys.exit(run_module(globals()))

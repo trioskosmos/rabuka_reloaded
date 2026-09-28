@@ -7,6 +7,7 @@ Run: cd cards/ability_extraction && python tests/test_parser_coverage.py
 
 import sys, os
 
+sys.path.insert(0, os.path.dirname(__file__))
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", ".."))
 from parser import (
@@ -31,19 +32,6 @@ from compile_abilities import (
     COND_TO_VARIANT_TAG,
     UNSUPPORTED_CONDITION_VARIANT,
 )
-
-passed = 0
-failed = 0
-
-
-def run_check(name, fn):
-    global passed, failed
-    try:
-        fn()
-        passed += 1
-    except Exception as e:
-        failed += 1
-        print(f"  FAIL: {name}: {e}")
 
 
 # ─── activation_condition_parsed ───────────────────────────────────────────────
@@ -494,12 +482,7 @@ def test_condition_bytecode_maps_custom_to_fail_closed_variant():
 
 # ─── run all ──────────────────────────────────────────────────────────────────
 
-tests = {
-    k: v for k, v in sorted(globals().items()) if k.startswith("test_") and callable(v)
-}
-for name, fn in tests.items():
-    run_check(name, fn)
+if __name__ == "__main__":
+    from _runner import run_module
 
-print(f"\n{passed} passed, {failed} failed")
-if failed:
-    sys.exit(1)
+    sys.exit(run_module(globals()))
