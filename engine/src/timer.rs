@@ -9,6 +9,20 @@ use std::sync::Mutex;
 #[cfg(feature = "profiling")]
 use std::time::Instant;
 
+/// Shared so that inserting into the four per-path maps costs a refcount bump
+/// rather than a fresh `Vec` each time. This matters more than it looks: the
+/// profiler is attributed its own allocations, and with a `Vec` key a single
+/// timer drop allocated four of them, which made the profiler the single
+/// largest allocator in the engine — about 42% of every allocation counted in
+/// a `--features profiling,alloc_tracker` build. One `Arc` slice per drop keeps
+/// the instrumentation from dominating what it is supposed to measure.
+///
+/// `Arc`, not `Rc`: these maps live in statics behind a `Mutex` and are read
+/// by the report path from whichever thread asked for it, and the benchmark
+/// runs games across a thread pool.
+#[cfg(feature = "profiling")]
+type TimerKey = std::sync::Arc<[&'static str]>;
+#[cfg(not(feature = "profiling"))]
 type TimerKey = Vec<&'static str>;
 type TimerValue = (u64, u128);
 type TimerMap = HashMap<TimerKey, TimerValue>;
@@ -84,7 +98,7 @@ fn get_timers() -> std::sync::MutexGuard<'static, Option<TimerMap>> {
 // is its own elapsed minus that sum. Children always drop before their parent,
 // so by the time a parent is popped its children have already reported into it.
 // ---------------------------------------------------------------------------
-type SelfTimerMap = HashMap<Vec<&'static str>, (u64, u128)>;
+type SelfTimerMap = HashMap<TimerKey, (u64, u128)>;
 
 static SELF_TIMERS: Mutex<Option<SelfTimerMap>> = Mutex::new(None);
 
@@ -158,14 +172,16 @@ impl Drop for Timer {
         {
             let elapsed = self.start.elapsed().as_nanos();
 
-            // Reconstruct the full call path (entire stack at this moment)
-            let call_path: Vec<&'static str> = CALL_STACK.with(|stack| {
+            // Reconstruct the full call path (entire stack at this moment).
+            // One `Arc` allocation for the whole drop; the four map inserts
+            // below then share it by refcount.
+            let call_path: TimerKey = CALL_STACK.with(|stack| {
                 let stack = stack.borrow();
                 // Check that we're at the top of the stack
                 if stack.last() == Some(&self.label) {
-                    stack.clone()
+                    stack.as_slice().into()
                 } else {
-                    vec![self.label]
+                    std::sync::Arc::from([self.label])
                 }
             });
 
@@ -295,7 +311,7 @@ pub fn print_results() {
         {
             let guard = get_alloc_timers();
             if let Some(ref map) = *guard {
-                let mut allocs: Vec<(&Vec<&'static str>, &u64)> = map.iter().collect();
+                let mut allocs: Vec<(&TimerKey, &u64)> = map.iter().collect();
                 allocs.sort_by_key(|a| std::cmp::Reverse(*a.1));
                 eprintln!("\n=== Allocations by call path (inclusive, sorted) ===");
                 eprintln!(
@@ -308,7 +324,7 @@ pub fn print_results() {
                     let count = **count;
                     let calls = results
                         .iter()
-                        .find(|(p, _)| *p == path.as_slice())
+                        .find(|(p, _)| p[..] == path[..])
                         .map(|(_, (c, _))| *c)
                         .unwrap_or(0);
                     let per_call = if calls > 0 {
@@ -346,7 +362,7 @@ pub fn print_results() {
 /// `timer_report.txt`. The console table truncates deep call paths at the
 /// terminal width, which hides precisely the rows you need when chasing a
 /// specific region.
-fn write_full_report(results: &[(&Vec<&'static str>, &(u64, u128))]) {
+fn write_full_report(results: &[(&TimerKey, &(u64, u128))]) {
     use std::fmt::Write as _;
     let mut out = String::new();
     writeln!(
@@ -394,7 +410,7 @@ fn write_full_report(results: &[(&Vec<&'static str>, &(u64, u128))]) {
     {
         let guard = get_self_timers();
         if let Some(ref map) = *guard {
-            let mut rows: Vec<(&Vec<&'static str>, &(u64, u128))> = map.iter().collect();
+            let mut rows: Vec<(&TimerKey, &(u64, u128))> = map.iter().collect();
             rows.sort_by_key(|r| std::cmp::Reverse(r.1 .1));
             let self_total: u128 = rows.iter().map(|r| r.1 .1).sum();
             let incl_total: u128 = results.iter().map(|r| r.1 .1).sum();
@@ -437,7 +453,7 @@ fn write_full_report(results: &[(&Vec<&'static str>, &(u64, u128))]) {
     {
         let guard = get_alloc_timers();
         if let Some(ref map) = *guard {
-            let mut allocs: Vec<(&Vec<&'static str>, &u64)> = map.iter().collect();
+            let mut allocs: Vec<(&TimerKey, &u64)> = map.iter().collect();
             allocs.sort_by_key(|a| std::cmp::Reverse(*a.1));
             let total: u64 = allocs.iter().map(|(_, v)| **v).sum();
             writeln!(
@@ -449,7 +465,7 @@ fn write_full_report(results: &[(&Vec<&'static str>, &(u64, u128))]) {
             for (path, count) in allocs {
                 let calls = results
                     .iter()
-                    .find(|(p, _)| *p == path.as_slice())
+                    .find(|(p, _)| p[..] == path[..])
                     .map(|(_, (c, _))| *c)
                     .unwrap_or(0);
                 writeln!(
@@ -486,12 +502,12 @@ fn write_full_report(results: &[(&Vec<&'static str>, &(u64, u128))]) {
                     // dividing allocs by allocs would just print 1.0.
                     let calls = results
                         .iter()
-                        .find(|(p, _)| *p == path.as_slice())
+                        .find(|(p, _)| p[..] == path[..])
                         .map(|(_, (c, _))| *c)
                         .unwrap_or(0);
                     let sum: u64 = buckets.iter().sum();
                     if sum > 0 {
-                        rows.push((path.clone(), *buckets, calls));
+                        rows.push((path.to_vec(), *buckets, calls));
                     }
                 }
             }

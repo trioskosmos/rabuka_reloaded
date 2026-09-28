@@ -60,6 +60,100 @@ static ALLOC_SELF_DEALLOC_SAMPLES: AtomicUsize = AtomicUsize::new(0);
 
 const SELF_TIME_SAMPLE_MASK: usize = 63;
 
+// ---------------------------------------------------------------------------
+// Scoped per-call-site allocation trace.
+//
+// The counters above answer "how many". They cannot answer "where", and that is
+// the question that actually matters when a single action makes 300+
+// allocations: the named timer a call sits under is far too coarse to tell you
+// which line to change. This records the call site of every allocation *while
+// armed*, so one scripted move can be printed as "this line, this many times,
+// this many bytes" and compared against what the move should actually need.
+//
+// The capture is deliberately opt-in and scoped. A backtrace per allocation is
+// far too expensive to leave on, and it allocates, which re-enters this
+// function — hence the re-entrancy flag, which is what stops a traced
+// allocation from tracing itself forever.
+// ---------------------------------------------------------------------------
+static TRACE_ARMED: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
+static TRACE_SITES: std::sync::Mutex<Option<std::collections::HashMap<String, TraceSite>>> =
+    std::sync::Mutex::new(None);
+
+#[derive(Default, Clone, Copy)]
+struct TraceSite {
+    count: u64,
+    bytes: u64,
+}
+
+thread_local! {
+    /// Guards against a backtrace capture allocating and re-entering `alloc`.
+    static IN_TRACE: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
+}
+
+/// One traced allocation's site: the engine frame that asked for it, with the
+/// tracer's own frames and allocator-internal noise filtered out.
+fn trace_frame() -> Option<String> {
+    let bt = std::backtrace::Backtrace::force_capture();
+    let text = format!("{bt}");
+    text.lines()
+        .map(str::trim)
+        // Keep the first engine frame: everything above it is the tracer, the
+        // allocator shim, or core/std.
+        .find(|l| {
+            l.contains("rabuka_reloaded\\engine\\src")
+                || l.contains("rabuka_reloaded/engine/src")
+                || (l.contains("rabuka_engine::") && !l.contains("alloc_counter"))
+        })
+        .map(|l| {
+            l.split("::h")
+                .next()
+                .unwrap_or(l)
+                .trim()
+                .to_string()
+        })
+}
+
+fn record_trace(size: usize) {
+    IN_TRACE.with(|in_trace| {
+        if in_trace.get() {
+            return;
+        }
+        in_trace.set(true);
+        if let Some(site) = trace_frame() {
+            if let Ok(mut guard) = TRACE_SITES.lock() {
+                let map = guard.get_or_insert_with(std::collections::HashMap::new);
+                let e = map.entry(site).or_default();
+                e.count += 1;
+                e.bytes += size as u64;
+            }
+        }
+        in_trace.set(false);
+    });
+}
+
+/// Start recording allocation call sites. Nesting is not supported: a second
+/// arm while armed is ignored.
+pub fn arm_alloc_trace() {
+    TRACE_ARMED.store(true, Ordering::Relaxed);
+    if let Ok(mut guard) = TRACE_SITES.lock() {
+        *guard = Some(std::collections::HashMap::new());
+    }
+}
+
+/// Stop recording and return the sites seen, most-frequent first.
+pub fn disarm_alloc_trace() -> Vec<(String, u64, u64)> {
+    TRACE_ARMED.store(false, Ordering::Relaxed);
+    let taken = TRACE_SITES.lock().ok().and_then(|mut g| g.take());
+    let mut rows: Vec<(String, u64, u64)> = taken
+        .unwrap_or_default()
+        .into_iter()
+        .map(|(k, v)| (k, v.count, v.bytes))
+        .collect();
+    rows.sort_by(|a, b| b.1.cmp(&a.1));
+    rows
+}
+
+
 pub struct CountingAllocator;
 
 unsafe impl GlobalAlloc for CountingAllocator {
@@ -67,7 +161,10 @@ unsafe impl GlobalAlloc for CountingAllocator {
         ALLOC_COUNT.fetch_add(1, Ordering::Relaxed);
         let bucket = size_bucket(layout.size());
         SIZE_BUCKETS[bucket].fetch_add(1, Ordering::Relaxed);
-        let size = layout.size() as isize;
+        if TRACE_ARMED.load(Ordering::Relaxed) {
+            record_trace(layout.size());
+        }
+        let size = layout.size().cast_signed();
         let prev = BYTES_ALLOCATED.fetch_add(size, Ordering::Relaxed);
         TOTAL_BYTES_ALLOCATED.fetch_add(layout.size(), Ordering::Relaxed);
         let current = prev + size;
@@ -94,7 +191,7 @@ unsafe impl GlobalAlloc for CountingAllocator {
 
     unsafe fn dealloc(&self, ptr: *mut u8, layout: Layout) {
         DEALLOC_COUNT.fetch_add(1, Ordering::Relaxed);
-        BYTES_ALLOCATED.fetch_sub(layout.size() as isize, Ordering::Relaxed);
+        BYTES_ALLOCATED.fetch_sub(layout.size().cast_signed(), Ordering::Relaxed);
         let sampled = DEALLOC_COUNT.load(Ordering::Relaxed) & SELF_TIME_SAMPLE_MASK == 0;
         let t0 = if sampled {
             Some(std::time::Instant::now())
@@ -119,7 +216,7 @@ pub fn clock_overhead_ns() -> f64 {
     for _ in 0..N {
         let a = std::time::Instant::now();
         let b = std::time::Instant::now();
-        acc = acc.wrapping_add(b.duration_since(a).as_nanos() as u64);
+        acc = acc.wrapping_add(u64::try_from(b.duration_since(a).as_nanos()).unwrap_or(u64::MAX));
     }
     let total = t0.elapsed().as_nanos() as f64;
     (acc as f64 / N as f64).min(total / N as f64)

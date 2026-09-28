@@ -145,6 +145,17 @@ deep-compares all 2280 cards against JSON and would catch a wire change, but
 one allocation is not worth that diff when the 1.2 KB `EffectFilter` half of
 a clone is already gone. **Do it deliberately, not in passing.**
 
+**Closed: the effect tree is no longer where the allocations are.** The
+`Condition` boxes became `Arc` in the same shape (`Box<T>` → `Arc<T>` is
+wire-transparent, unlike `Option<Box<_>>`, because serde serializes both as
+the inner value). That measured **−683 allocations, 0.007%** — a negative
+result, recorded so nobody later assumes it was a win. The inference is the
+useful part: condition cloning was not on the hot path even before the
+overlay check removed most of it, so the ~40 `effect.clone()` sites are not
+where `use_ability`'s remaining ~380 allocations per call come from. The
+clone path is done; look at what `run_effect` and the action-generation path
+*build*, not at what the effect tree copies.
+
 **A dense `Vec` index beside `CardDatabase.cards`.** The card ids are dense
 and contiguous (0..2280, assigned by a sequential `next_id`), and
 `get_card` is called from 356 sites, each a ~7-line hash probe with one

@@ -266,6 +266,7 @@ fn run_game(
         None
     };
     let mut actions_total = 0u64;
+    let mut advance_count = 0usize;
     let mut end_reason = "iteration_cap";
     let mut last_turn = 0u8;
     let mut stuck = 0u32;
@@ -311,7 +312,42 @@ fn run_game(
 
         let actions = game_setup::generate_possible_actions(&gs);
         if actions.is_empty() {
+            // `advance_phase` is ~a third of engine time and is where the
+            // performance phases run, so it needs its own trace arm: a trace
+            // around `execute_and_settle` never sees any of it.
+            //
+            // NOTE: this arm sits on the empty-actions fallback. The engine
+            // normally reaches `advance_phase` from inside
+            // `execute_and_settle`, so in practice it fires rarely; the
+            // phase-level trace wants the arm inside the engine, or around
+            // the whole settle, which is not done yet.
+            #[cfg(feature = "alloc_tracker")]
+            {
+                let trace_phase = std::env::var("RABUKA_TRACE_PHASE_AT")
+                    .ok()
+                    .and_then(|v| v.parse::<usize>().ok())
+                    .is_some_and(|n| n == advance_count && game == 0);
+                if trace_phase {
+                    rabuka_engine::alloc_counter::arm_alloc_trace();
+                }
+                TurnEngine::advance_phase(&mut gs);
+                if trace_phase {
+                    let rows = rabuka_engine::alloc_counter::disarm_alloc_trace();
+                    let total: u64 = rows.iter().map(|r| r.1).sum();
+                    let bytes: u64 = rows.iter().map(|r| r.2).sum();
+                    eprintln!(
+                        "\n=== ALLOC TRACE: advance_phase #{advance_count} of game {game} ===\n\
+                         {total} allocations, {bytes} bytes, across {} distinct call sites\n",
+                        rows.len()
+                    );
+                    for (site, count, site_bytes) in rows.iter().take(40) {
+                        eprintln!("{count:>6}x {site_bytes:>9}B  {site}");
+                    }
+                }
+            }
+            #[cfg(not(feature = "alloc_tracker"))]
             TurnEngine::advance_phase(&mut gs);
+            advance_count += 1;
             if let Some(trace) = trace.as_mut() {
                 trace.steps.push(Step {
                     operation: "empty_advance".into(),
@@ -384,7 +420,35 @@ fn run_game(
             }
         };
 
+        // Per-action allocation trace. A single action makes ~300 allocations
+        // on this workload, and the aggregate counters cannot say which line
+        // any of them came from. `RABUKA_TRACE_ALLOC_AT=<n>` arms the scoped
+        // tracer around action `n` of game 0 and prints the call sites, so a
+        // move can be compared against what it should actually need.
+        #[cfg(feature = "alloc_tracker")]
+        let trace_alloc = std::env::var("RABUKA_TRACE_ALLOC_AT")
+            .ok()
+            .and_then(|v| v.parse::<usize>().ok())
+            .is_some_and(|n| n == actions_total as usize && game == 0);
+        #[cfg(feature = "alloc_tracker")]
+        if trace_alloc {
+            rabuka_engine::alloc_counter::arm_alloc_trace();
+        }
         let execution_result = bin_common_execute(&mut gs, &chosen);
+        #[cfg(feature = "alloc_tracker")]
+        if trace_alloc {
+            let rows = rabuka_engine::alloc_counter::disarm_alloc_trace();
+            let total: u64 = rows.iter().map(|r| r.1).sum();
+            let bytes: u64 = rows.iter().map(|r| r.2).sum();
+            eprintln!(
+                "\n=== ALLOC TRACE: action {actions_total} of game {game} ===\n\
+                 {total} allocations, {bytes} bytes, across {} distinct call sites\n",
+                rows.len()
+            );
+            for (site, count, site_bytes) in rows.iter().take(40) {
+                eprintln!("{count:>6}x {site_bytes:>9}B  {site}");
+            }
+        }
         if record {
             if let Some(error) = execution_result.as_ref().err() {
                 return Err(format!("game {game} action failed: {error}"));
