@@ -311,10 +311,21 @@ impl AbilityResolver {
     ///
     /// Inside an answer path prefer [`Self::answering_effect`]: `executing`
     /// names whatever ran last, not the effect being continued.
-    pub fn owning_effect(&self, gs: &GameState) -> Option<AbilityEffect> {
-        self.owner.executing
-            .clone()
-            .or_else(|| gs.entry_effect().cloned())
+    /// Borrowed, not owned: an `AbilityEffect` deep clone is ~1.7 KB across
+    /// four allocations plus a pool `Mutex` round-trip, because `compound` is
+    /// an unconditional `Box` and `kind` is a pool box wrapping a ~1.2 KB
+    /// `EffectFilter`. This accessor is on the innermost resolution path and
+    /// is called from the answer-time choice handlers, so returning by value
+    /// paid that cost per read for a value every caller only inspects.
+    ///
+    /// This is the same fix already applied to
+    /// [`ResolverSession::current_ability`], which is why that field is an
+    /// `Arc`; the same reasoning applies here and it was missed.
+    pub fn owning_effect<'a>(&'a self, gs: &'a GameState) -> Option<&'a AbilityEffect> {
+        self.owner
+            .executing
+            .as_ref()
+            .or_else(|| gs.entry_effect())
     }
 
     /// The effect that asked the question now being answered.
@@ -324,9 +335,10 @@ impl AbilityResolver {
     /// not "what is being answered". Once `finalize_choice` runs the snapshot is
     /// gone and [`Self::owning_effect`] is right again, so the two differ only
     /// while a choice is pending.
-    pub fn answering_effect(&self, gs: &GameState) -> Option<AbilityEffect> {
-        self.owner.of_pending_choice
-            .clone()
+    pub fn answering_effect<'a>(&'a self, gs: &'a GameState) -> Option<&'a AbilityEffect> {
+        self.owner
+            .of_pending_choice
+            .as_ref()
             .or_else(|| self.owning_effect(gs))
     }
 

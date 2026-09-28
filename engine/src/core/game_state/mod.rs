@@ -92,7 +92,6 @@ pub struct GameState {
     pub card_database: Arc<CardDatabase>,
     pub mods: GameModifiers,
     pub resolution_zone: ResolutionZone,
-    pub heart_color_decision_phase: String,
     /// Engine-internal loop-detection history. Skipped on the wire: the 3DS
     /// client never runs the engine and it only inflates every state transfer.
     #[cfg_attr(feature = "serde_support", serde(skip))]
@@ -113,7 +112,6 @@ pub struct GameState {
     /// Ability IDs played this turn (turn 2) — CardId + count for limit tracking.
     pub turn2_abilities_played: SmallVec<[(CardId, u8); 8]>,
     /// Live-owned hearts per member — CardId + (color, count) for display/UI.
-    pub live_owned_hearts: SmallVec<[LiveOwnedHearts; 4]>,
     pub temporary_effects: SmallVec<[TemporaryEffect; 4]>,
     pub prohibition_effects: SmallVec<[String; 4]>,
     pub delayed_prohibition_effects: SmallVec<[String; 4]>,
@@ -133,12 +131,9 @@ pub struct GameState {
     pub turn_limited_abilities_used: HashMap<(i16, usize, u8), u8>,
     pub mulligan_selected_indices: SmallVec<[u8; 6]>,
     pub live_card_selected_indices: SmallVec<[u8; 3]>,
-    pub live_start_players_triggered: SmallVec<[String; 2]>,
     /// Auto-ability trigger counts per ability — CardId for zero-allocation.
     pub auto_ability_trigger_counts: SmallVec<[(CardId, u8); 8]>,
     /// Turn-limit usage per ability — CardId for zero-allocation.
-    pub turn_limit_usage: SmallVec<[(CardId, u8); 8]>,
-    pub card_instance_mapping: HashMap<i16, u8>,
     pub areas_placed_this_turn: SmallVec<[String; 8]>,
     pub cards_appeared_this_turn: SmallVec<[i16; 8]>,
     pub card_appearance_source: SmallVec<[(i16, String); 4]>,
@@ -172,7 +167,6 @@ pub struct GameState {
     pub scratch_entry_positions: HashMap<i16, Option<u8>>,
     #[cfg_attr(feature = "serde_support", serde(skip))]
     pub scratch_constant_effect_ids: Vec<(i16, usize)>,
-    pub negated_abilities: SmallVec<[i16; 8]>,
     #[cfg_attr(feature = "serde_support", serde(default))]
     pub ability_invalidations: SmallVec<[AbilityInvalidation; 4]>,
     pub replacement_effects: SmallVec<[ReplacementEffect; 2]>,
@@ -244,11 +238,9 @@ pub struct GameState {
     /// 「このターン、自分の『虹ヶ咲』のカードの効果によってウェイト状態の
     /// 自分のエネルギーをアクティブにしていた場合」(PL!N-pb1-037-L Q203).
     pub turn_state_changes: Vec<(i16, i16, String, String)>,
-    pub debut_ability_triggers: SmallVec<[(String, i16); 4]>,
     pub last_vacated_stage_area: Option<u8>,
     // --- 4-byte aligned (u8, Option<i32>) ---
     pub turn_number: u8,
-    pub live_cheer_count: u8,
     pub player1_cheer_blade_heart_count: u8,
     pub player2_cheer_blade_heart_count: u8,
     pub cheer_checks_required: u8,
@@ -261,11 +253,9 @@ pub struct GameState {
     /// expires. Derived total = max(0, base + Σ deltas for the player).
     pub yell_count_modifiers: SmallVec<[(u8, i32); 4]>,
     pub cheer_checks_done: u8,
-    pub card_instance_counter: u8,
     pub baton_touch_count_p1: u8,
     pub baton_touch_count_p2: u8,
     pub baton_touch_arriving_card_ids: SmallVec<[i16; 2]>,
-    pub effect_creation_counter: u8,
     pub last_state_change_wait_to_active_count: u8,
     /// Members put to wait by the cost currently being paid, in payment order.
     /// Cleared at the start of each cost payment. Two consumers:
@@ -320,11 +310,8 @@ pub struct GameState {
     pub current_turn_phase: TurnPhase,
     pub current_phase: Phase,
     pub game_result: GameResult,
-    pub is_first_turn: bool,
     pub cheer_check_completed: bool,
-    pub turn_order_changed: bool,
     pub baton_touch_zero_cost: bool,
-    pub deck_refresh_pending: bool,
     pub position_change_occurred_this_turn: bool,
     pub opponent_live_success_this_turn: bool,
     pub opponent_live_no_excess_heart_this_turn: bool,
@@ -341,10 +328,7 @@ pub struct GameState {
     pub opponent_live_surplus_count: u8,
     pub self_live_surplus_count: u8,
     pub formation_change_occurred_this_turn: bool,
-    pub opponent_choice_declined: bool,
-    pub live_being_performed: bool,
     pub game_ended: bool,
-    pub draw_state: bool,
     pub loop_detected: bool,
     #[cfg_attr(feature = "serde_support", serde(skip))]
     pub pending_loop_protocol: Option<PermanentLoopProtocol>,
@@ -428,6 +412,26 @@ impl GameState {
     /// Check if the given player (0=P1, 1=P2) can act right now.
     /// Accounts for pending choices (including SelectAutoAbility/SelectLiveSuccess),
     /// phase-specific rules, and active player checks.
+    /// Whether the game is in its first round.
+    ///
+    /// DERIVED, not stored. This used to be a `bool` field initialised `true`
+    /// at construction and never written again, so it was permanently `true`
+    /// for the whole game — a condition reading it could never be false, and
+    /// the web UI's "Is First Turn" row showed `true` on every turn.
+    ///
+    /// Nothing broke only because the `first_turn` spelling is unreachable:
+    /// the parser emits turn-scoped gates as `turn_number: N`, which is
+    /// checked properly in `evaluate_temporal_condition`. Had a card been
+    /// written as `temporal: "first_turn"`, its condition would have been
+    /// permanently true.
+    ///
+    /// Kept as a method so the "is it round 1" question has exactly one
+    /// answer, derived from the same counter everything else uses.
+    #[inline]
+    pub fn is_first_turn(&self) -> bool {
+        self.turn_number == 1
+    }
+
     pub fn can_player_act(&self, player_id: i32) -> bool {
         use crate::ability::types::Choice;
         let pid_str = || if player_id == 0 { "p1" } else { "p2" };
@@ -525,16 +529,7 @@ impl GameState {
                     Phase::Active | Phase::Energy | Phase::Draw | Phase::Main
                 )
             }
-            TurnPhase::Live => {
-                matches!(
-                    self.current_phase,
-                    Phase::LiveCardSetFirstAttacker
-                        | Phase::LiveCardSetSecondAttacker
-                        | Phase::FirstAttackerPerformance
-                        | Phase::SecondAttackerPerformance
-                        | Phase::LiveVictoryDetermination
-                )
-            }
+            TurnPhase::Live => self.current_phase.is_live_phase(),
         }
     }
 
@@ -546,14 +541,12 @@ impl GameState {
             card_database,
             mods: GameModifiers::new(),
             resolution_zone: ResolutionZone::new(),
-            heart_color_decision_phase: "none".to_string(),
             game_state_history: Vec::new(),
             rule_log: Vec::new(),
             structured_log: Vec::new(),
             debug_trace: Vec::new(),
             turn1_abilities_played: SmallVec::new(),
             turn2_abilities_played: SmallVec::new(),
-            live_owned_hearts: SmallVec::new(),
             temporary_effects: SmallVec::new(),
             prohibition_effects: SmallVec::new(),
             delayed_prohibition_effects: SmallVec::new(),
@@ -565,10 +558,7 @@ impl GameState {
             turn_limited_abilities_used: HashMap::default(),
             mulligan_selected_indices: SmallVec::new(),
             live_card_selected_indices: SmallVec::new(),
-            live_start_players_triggered: SmallVec::new(),
             auto_ability_trigger_counts: SmallVec::new(),
-            turn_limit_usage: SmallVec::new(),
-            card_instance_mapping: HashMap::default(),
             areas_placed_this_turn: SmallVec::new(),
             cards_appeared_this_turn: SmallVec::new(),
             card_appearance_source: SmallVec::new(),
@@ -583,8 +573,7 @@ impl GameState {
             scratch_exp_heart: HashMap::default(),
             scratch_entry_positions: HashMap::default(),
             scratch_constant_effect_ids: Vec::new(),
-             negated_abilities: SmallVec::new(),
-             ability_invalidations: SmallVec::new(),
+            ability_invalidations: SmallVec::new(),
              replacement_effects: SmallVec::new(),
 
             constant_ability_statuses: SmallVec::new(),
@@ -613,22 +602,18 @@ impl GameState {
             state_snapshot_before_change: None,
             recently_state_changed: SmallVec::new(),
             turn_state_changes: Vec::new(),
-            debut_ability_triggers: SmallVec::new(),
             last_vacated_stage_area: None,
             // 4-byte aligned
             turn_number: 1,
-            live_cheer_count: 0,
             player1_cheer_blade_heart_count: 0,
             player2_cheer_blade_heart_count: 0,
             cheer_checks_required: 0,
             cheer_check_base: None,
             yell_count_modifiers: SmallVec::new(),
             cheer_checks_done: 0,
-            card_instance_counter: 0,
             baton_touch_count_p1: 0,
             baton_touch_count_p2: 0,
             baton_touch_arriving_card_ids: SmallVec::new(),
-            effect_creation_counter: 0,
             last_state_change_wait_to_active_count: 0,
         last_cost_waited_members: Vec::new(),
             player1_rps_choice: None,
@@ -651,11 +636,8 @@ impl GameState {
             current_turn_phase: TurnPhase::FirstAttackerNormal,
             current_phase: Phase::Active,
             game_result: GameResult::Ongoing,
-            is_first_turn: true,
             cheer_check_completed: false,
-            turn_order_changed: false,
             baton_touch_zero_cost: false,
-            deck_refresh_pending: false,
             position_change_occurred_this_turn: false,
             opponent_live_success_this_turn: false,
             opponent_live_no_excess_heart_this_turn: false,
@@ -667,10 +649,7 @@ impl GameState {
             opponent_live_surplus_count: 0,
             self_live_surplus_count: 0,
             formation_change_occurred_this_turn: false,
-            opponent_choice_declined: false,
-            live_being_performed: false,
             game_ended: false,
-            draw_state: false,
             loop_detected: false,
             pending_loop_protocol: None,
             loop_last_action: None,

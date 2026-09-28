@@ -1398,11 +1398,6 @@ fn commit_constant_results(
             .map(|(_, v)| v.as_str())
     }
 
-    pub fn clear_card_appearance_tracking(&mut self) {
-        self.cards_appeared_this_turn.clear();
-        self.card_appearance_source.clear();
-    }
-
     pub fn clear_auto_ability_trigger_tracking(&mut self) {
         self.auto_ability_trigger_counts.clear();
     }
@@ -1452,6 +1447,85 @@ fn commit_constant_results(
 
     pub fn record_card_movement(&mut self, card_id: i16) {
         self.cards_moved_this_turn.push(card_id);
+    }
+
+    /// Record a stage-area→stage-area position change: the cards that swapped
+    /// slots, the resulting events, and the movement bookkeeping.
+    ///
+    /// Three branches of `execute_position_change` (an explicit
+    /// `source_position`, a named `target_member`, and the `this_member` case)
+    /// each wrote this out in full. The sequencing is load-bearing, which is
+    /// the reason it is one function rather than three copies:
+    ///
+    /// 1. the two `PositionChangeEvent`s are pushed BEFORE `push_movement_event`,
+    ///    because that call consumes the recently-moved snapshot and arms the
+    ///    opponent-caused watcher trigger;
+    /// 2. the source card is pushed unconditionally while the target is
+    ///    guarded, because the source slot is checked non-empty by the caller
+    ///    while the target slot may legitimately be empty.
+    ///
+    /// `source_id` / `target_id` are `-1` when that slot holds no member. Only
+    /// real cards are recorded as moved or given events — the `source_position`
+    /// branch used to push its target id unguarded, so an empty target slot
+    /// recorded a literal `-1` into `cards_moved_this_turn`.
+    pub fn record_stage_position_swap(
+        &mut self,
+        source_id: i16,
+        source_index: u8,
+        target_id: i16,
+        target_index: u8,
+    ) {
+        if target_id != -1 {
+            self.record_card_movement(target_id);
+        }
+        if source_id != -1 {
+            self.record_card_movement(source_id);
+        }
+        let mover_pid = self
+            .ability_queue
+            .current_entry()
+            .map(|e| e.player_id.clone())
+            .unwrap_or_default();
+        if source_id != -1 {
+            self.position_change_events
+                .push(crate::types::PositionChangeEvent {
+                    moved_card_id: source_id,
+                    old_position: source_index,
+                    new_position: target_index,
+                    cause_card_id: self.activating_card,
+                    cause_player_id: mover_pid.clone(),
+                    effect_only: true,
+                });
+        }
+        if target_id != -1 {
+            self.position_change_events
+                .push(crate::types::PositionChangeEvent {
+                    moved_card_id: target_id,
+                    old_position: target_index,
+                    new_position: source_index,
+                    cause_card_id: self.activating_card,
+                    cause_player_id: mover_pid.clone(),
+                    effect_only: true,
+                });
+        }
+        self.push_movement_event(
+            source_id,
+            "stage",
+            "stage",
+            self.activating_card,
+            &mover_pid,
+            true,
+        );
+        if target_id != -1 {
+            self.push_movement_event(
+                target_id,
+                "stage",
+                "stage",
+                self.activating_card,
+                &mover_pid,
+                true,
+            );
+        }
     }
 
     /// Typed wrapper: takes canonical ZoneId variants so alias drift ("energy" vs
@@ -1593,6 +1667,16 @@ fn commit_constant_results(
         self.cards_moved_this_turn.clear();
         self.turn_movements.clear();
         self.cards_appeared_this_turn.clear();
+        // `card_appearance_source` must turn over with `cards_appeared_this_turn`:
+        // the appearance-source condition reads the two as a pair
+        // (`ability/condition/card.rs`, `get_card_appearance_source` compared
+        // against the expected 登場元). It was never cleared, and
+        // `get_card_appearance_source` returns the FIRST match — so once a card
+        // had appeared from one zone anywhere in the game, that zone's source
+        // answered the condition forever, and a later appearance from a
+        // different zone could never match. The C port clears it
+        // (`engine_c_wip/src/core/tracking.c`); Rust never did.
+        self.card_appearance_source.clear();
         self.turn_area_movements.clear();
         // Opponent-cause watcher dedupe is turn-scoped: a given move can arm
         // a marked watcher once, and the set resets with the movement data.

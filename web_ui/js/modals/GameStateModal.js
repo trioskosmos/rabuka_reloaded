@@ -215,8 +215,7 @@ export const GameStateModal = {
         const turnLines = [
             ['Turn', s.turn], ['Phase', s.phase], ['Turn Phase', s.current_turn_phase],
             ['Active Player', s.active_player], ['Game Result', s.game_result],
-            ['Is First Turn', bool(s.is_first_turn)], ['Turn Order Changed', bool(s.turn_order_changed)],
-            ['Heart Color Decision', s.heart_color_decision_phase || 'none'],
+            ['Is First Turn', bool(s.is_first_turn)],
         ];
         c.appendChild(section('Turn', grid(turnLines)));
 
@@ -282,14 +281,9 @@ export const GameStateModal = {
             ['Self Surplus', s.self_live_surplus_count ?? 0],
             ['Live Success Triggered', bool(s.live_success_triggered_this_turn)],
             ['Live Surplus Ready', bool(s.live_surplus_ready_this_turn)],
-            ['Live Being Performed', bool(s.live_being_performed)],
-            ['Deck Refresh', bool(s.deck_refresh_pending)],
             ['Loop Detected', bool(s.loop_detected)],
-            ['Draw State', bool(s.draw_state)],
-            ['Opponent Choice Declined', bool(s.opponent_choice_declined)],
             ['Cheer Checks', `${s.cheer_checks_done ?? 0}/${s.cheer_checks_required ?? 0}`],
             ['Cheer Completed', bool(s.cheer_check_completed)],
-            ['Live Cheer Count', s.live_cheer_count ?? 0],
         ];
         c.appendChild(section('Flags & Live', grid(flagLines)));
 
@@ -542,11 +536,6 @@ export const GameStateModal = {
         }
         gridDiv.insertAdjacentHTML('beforeend', mkBox('Ability Queue', qHtml));
 
-        // Debut triggers
-        const debuts = s.debut_ability_triggers || [];
-        gridDiv.insertAdjacentHTML('beforeend', mkBox('Debut Triggers',
-            debuts.length > 0 ? debuts.map(d => `<div class="gs-track-item">${esc(d.ability_key)} → ${esc(cardName(d.card_id))}</div>`).join('') : '<div class="gs-track-item">none</div>'));
-
         // Turn-limited abilities
         const tla = s.turn_limited_abilities_used || [];
         const tla2 = s.turn2_abilities_played || {};
@@ -560,11 +549,6 @@ export const GameStateModal = {
         const t1ap = s.turn1_abilities_played || [];
         gridDiv.insertAdjacentHTML('beforeend', mkBox('Turn1 Abilities',
             t1ap.length > 0 ? t1ap.map(a => `<div class="gs-track-item">${esc(a)}</div>`).join('') : '<div class="gs-track-item">none</div>'));
-
-        // Turn limit usage
-        const tlu = s.turn_limit_usage || {};
-        gridDiv.insertAdjacentHTML('beforeend', mkBox('Turn Limit Usage',
-            Object.keys(tlu).length > 0 ? trackKV(Object.entries(tlu)) : '<div class="gs-track-item">none</div>'));
 
         // Auto ability triggers
         const aatc = s.auto_ability_trigger_counts || {};
@@ -631,25 +615,12 @@ export const GameStateModal = {
             </div>`).join('') : '<div class="gs-track-item">none</div>';
         gridDiv.insertAdjacentHTML('beforeend', mkBox('Ability Applications', appHtml));
 
-        // Card instance mapping
-        const cim = s.card_instance_mapping || {};
-        gridDiv.insertAdjacentHTML('beforeend', mkBox('Card Instance Mapping',
-            Object.keys(cim).length > 0 ? trackKV(Object.entries(cim).map(([id, inst]) => [`#${id} (${cardName(parseInt(id))})`, inst])) : '<div class="gs-track-item">none</div>'));
-
         // Constant ability statuses
         const cas = s.constant_ability_statuses || [];
         if (cas.length > 0) {
             gridDiv.insertAdjacentHTML('beforeend', mkBox('Constant Ability Statuses',
                 cas.map(a => `<div class="gs-track-item">${esc(a.card_no || '?')} — ${esc(a.ability_text || '')} → ${a.enabled ? '✓ ENABLED' : '✗ DISABLED'}</div>`).join('')));
         }
-
-        // Live owned hearts
-        const loh = s.live_owned_hearts || {};
-        let lohHtml = Object.keys(loh).length > 0
-            ? Object.entries(loh).map(([pid, pairs]) =>
-                `<div class="gs-track-item"><b>${esc(pid)}</b>: ${pairs.map(([c, v]) => `${c}:${v}`).join(', ')}</div>`).join('')
-            : '<div class="gs-track-item">none</div>';
-        gridDiv.insertAdjacentHTML('beforeend', mkBox('Live Owned Hearts', lohHtml));
 
         // Card movement tracking
         const moved = s.recently_moved_cards || [];
@@ -667,10 +638,8 @@ export const GameStateModal = {
         if (s.pending_success_replacement_player_id) psr.push(['Player', s.pending_success_replacement_player_id]);
         if (psr.length > 0) gridDiv.insertAdjacentHTML('beforeend', mkBox('Pending Success Replacement', trackKV(psr)));
 
-        // Card instance counter + effect creation counter
+        // Counters
         gridDiv.insertAdjacentHTML('beforeend', mkBox('Counters', trackKV([
-            ['Card Instance Counter', s.card_instance_counter ?? 0],
-            ['Effect Creation Counter', s.effect_creation_counter ?? 0],
             ['Last State Change Wait→Active', s.last_state_change_wait_to_active_count ?? 0],
         ])));
 
@@ -713,18 +682,6 @@ export const GameStateModal = {
             ? Object.entries(ho).map(([id, arr]) => `<div class="gs-track-item">#${id} (${cardName(parseInt(id))}): ${arr[0]} × ${arr[1]}</div>`).join('')
             : '<div class="gs-track-item">none</div>';
         gridDiv.insertAdjacentHTML('beforeend', mkBox('Heart Override', hoHtml));
-
-        // Heart color decision phase
-        if (s.heart_color_decision_phase) {
-            gridDiv.insertAdjacentHTML('beforeend', mkBox('Heart Color Phase',
-                `<div class="gs-track-item">${esc(s.heart_color_decision_phase)}</div>`));
-        }
-
-        // Opponent choice declined
-        if (s.opponent_choice_declined) {
-            gridDiv.insertAdjacentHTML('beforeend', mkBox('Opponent Choice',
-                `<div class="gs-track-item" style="color:var(--accent-pink);">Opponent choice was declined</div>`));
-        }
 
         const dca = s.delayed_cannot_active || {};
         gridDiv.insertAdjacentHTML('beforeend', mkBox('Delayed Cannot Activate',

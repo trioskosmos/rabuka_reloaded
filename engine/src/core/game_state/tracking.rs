@@ -25,13 +25,13 @@ impl GameState {
         self.reset_change_flags();
         self.cheer_check_completed = false;
         self.reset_loop_detection();
-        self.baton_touch_count_p1 = 0;
-        self.baton_touch_count_p2 = 0;
-        self.baton_touch_arriving_card_ids.clear();
-        self.baton_touch_zero_cost = false;
-        self.baton_touch_replaced_member_cost = None;
-        self.baton_touch_replaced_member_id = None;
-        self.baton_touch_arriving_card_id = None;
+        // These seven were open-coded here while `clear_baton_touch_tracking`
+        // sat uncalled in modifiers.rs — two copies of one reset, free to
+        // drift. Note the split from `clear_play_scoped_baton_touch`, which
+        // deliberately preserves the turn-scoped counts and arriving ids so
+        // 「このターン中にバトンタッチして登場したメンバーが2人以上」 can
+        // accumulate across two plays within one turn.
+        self.clear_baton_touch_tracking();
         self.clear_area_placement_tracking();
     }
 

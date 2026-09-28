@@ -3725,6 +3725,67 @@ fn rise_up_high_turn1_score_and_blade() {
     );
 }
 
+/// Rise Up High! (PL!N-bp4-029-L) must NOT fire on turn 2 or later.
+///
+/// The companion test above only covers turn 1, where the ability firing is the
+/// CORRECT outcome — so it cannot catch a gate that fails open. The card's text
+/// is 「このゲームの1ターン目のライブフェイズの場合」, which the parser emits as
+/// `condition.turn_number = 1`, and `evaluate_temporal_condition` gates on
+/// `turn_number == 1`. This test is the negative half: same board, turn 2.
+#[test]
+fn rise_up_high_does_not_fire_on_turn_2() {
+    let db = load_real_database();
+    let mut game = TestGame::new(db);
+    let live = game.id("PL!N-bp4-029-L");
+    let niji_member = game.id("PL!N-bp1-016-N"); // 朝香果林 (DiverDiva, 虹ヶ咲)
+    let filler = game.id("PL!-sd1-010-SD");
+
+    for _ in 0..10 {
+        game.state.player1.main_deck.cards.push(filler);
+    }
+    for _ in 0..10 {
+        game.state.player2.main_deck.cards.push(filler);
+    }
+
+    // Ride out round 1 WITHOUT setting a live, so nothing from turn 1 can
+    // contribute score or blade to the turn-2 baseline.
+    for _ in 0..60 {
+        if game.state.turn_number >= 2 && game.state.current_phase.to_string() == "Main" {
+            break;
+        }
+        if game.has_pending_choice() {
+            game.drain_auto_ability_choices();
+        }
+        game.pass();
+    }
+    assert_eq!(
+        game.state.turn_number, 2,
+        "expected turn 2 Main, got turn {} phase {}",
+        game.state.turn_number,
+        game.state.current_phase
+    );
+    assert_eq!(game.state.mods.get_score_modifier(live), 0);
+    assert_eq!(game.state.mods.get_blade_modifier(niji_member), 0);
+
+    // Turn 2: the 虹ヶ咲 member is on stage, so the ONLY thing that can stop the
+    // ability is the turn gate.
+    game.state.player1.stage.stage = [-1, niji_member, -1];
+    game.state.player1.hand.cards.push(live);
+    advance_to_live_card_set_p1(&mut game);
+    game.set_live_card(live);
+    advance_to_live_start(&mut game);
+    game.drain_auto_ability_choices();
+
+    assert_eq!(
+        game.state.mods.get_score_modifier(live), 0,
+        "Rise Up High! must not add score on turn 2 (turn gate failed open)"
+    );
+    assert_eq!(
+        game.state.mods.get_blade_modifier(niji_member), 0,
+        "Rise Up High! must not grant a blade on turn 2 (turn gate failed open)"
+    );
+}
+
 // ====================================================================
 // Kosuzu choose number — live_start, reveal top deck, compare cost
 // ====================================================================

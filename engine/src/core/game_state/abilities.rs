@@ -77,10 +77,14 @@ impl GameState {
     }
 
     pub fn is_ability_invalidated(&self, card_id: i16, trigger: &AbilityTrigger) -> bool {
+        // Negation is recorded in `ability_invalidations` (see
+        // `record_ability_invalidation`). This used to OR in a second store,
+        // `negated_abilities`, that nothing ever populated — so the term was
+        // permanently false, and its presence implied negation worked two ways
+        // when it never did.
         self.ability_invalidations
             .iter()
             .any(|entry| entry.card_id == card_id && &entry.trigger == trigger)
-            || self.negated_abilities.contains(&card_id)
     }
 
     pub fn card_has_ability_trigger(&self, card_id: i16, trigger: &AbilityTrigger) -> bool {

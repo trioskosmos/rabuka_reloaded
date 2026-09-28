@@ -167,6 +167,30 @@ impl core::fmt::Display for Phase {
 }
 
 impl Phase {
+    /// The "live window": the two live-card-set phases plus the two
+    /// performances and the victory determination that close them.
+    ///
+    /// This is the single definition of that set. It used to be written out in
+    /// full in six places in the engine — and, worse, hand-NEGATED in a fifth
+    /// shape at `ability/condition/state.rs` (`before_live`, as five separate
+    /// `!matches!` clauses). Add a sixth live phase and the positive sites get
+    /// updated while the negation silently keeps the old answer, so
+    /// `before_live` starts returning the wrong thing with no compiler error.
+    /// Nothing enforced agreement between them.
+    ///
+    /// Use this for both polarities — `p.is_live_phase()` and
+    /// `!p.is_live_phase()` — never by re-listing the variants.
+    pub fn is_live_phase(&self) -> bool {
+        matches!(
+            self,
+            Phase::LiveCardSetFirstAttacker
+                | Phase::LiveCardSetSecondAttacker
+                | Phase::FirstAttackerPerformance
+                | Phase::SecondAttackerPerformance
+                | Phase::LiveVictoryDetermination
+        )
+    }
+
     pub fn label_jp(&self) -> &'static str {
         match self {
             Phase::RockPaperScissors => "ジャンケン",

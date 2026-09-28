@@ -3335,57 +3335,13 @@ pub(crate) fn execute_gain_surplus_heart(
             );
             player.stage.position_change(from_area2, to_area2)?;
             let _ = player;
-            gs.record_card_movement(target_id2);
-            if source_id2 != -1 {
-                gs.record_card_movement(source_id2);
-            }
-            let mover_pid = gs
-                .ability_queue
-                .current_entry()
-                .map(|e| e.player_id.clone())
-                .unwrap_or_default();
-            // Push events BEFORE push_movement_event
-            if source_id2 != -1 {
-                gs.position_change_events
-                    .push(crate::types::PositionChangeEvent {
-                        moved_card_id: source_id2,
-        old_position: source_idx.u8_count(),
-        new_position: target_index.u8_count(),
-                        cause_card_id: gs.activating_card,
-                        cause_player_id: mover_pid.clone(),
-                        effect_only: true,
-                    });
-            }
-            if target_id2 != -1 {
-                gs.position_change_events
-                    .push(crate::types::PositionChangeEvent {
-                        moved_card_id: target_id2,
-        old_position: target_index.u8_count(),
-        new_position: source_idx.u8_count(),
-                        cause_card_id: gs.activating_card,
-                        cause_player_id: mover_pid.clone(),
-                        effect_only: true,
-                    });
-            }
-            gs.push_movement_event(
+            gs.record_stage_position_swap(
                 source_id2,
-                "stage",
-                "stage",
-                gs.activating_card,
-                &mover_pid,
-                true,
+                source_idx.u8_count(),
+                target_id2,
+                target_index.u8_count(),
             );
-            if target_id2 != -1 {
-                gs.push_movement_event(
-                    target_id2,
-                    "stage",
-                    "stage",
-                    gs.activating_card,
-                    &mover_pid,
-                    true,
-                );
-            }
-            gs.trigger_auto_abilities_for_movement(&mover_pid);
+            gs.trigger_auto_abilities_for_movement_current();
             gs.recalculate_constants();
             return Ok(());
         }
@@ -3418,57 +3374,13 @@ pub(crate) fn execute_gain_surplus_heart(
                     );
                     player.stage.position_change(from_area, to_area)?;
                     let _ = player;
-                    gs.record_card_movement(target_id);
-                    if source_id != -1 {
-                        gs.record_card_movement(source_id);
-                    }
-                    let mover_pid = gs
-                        .ability_queue
-                        .current_entry()
-                        .map(|e| e.player_id.clone())
-                        .unwrap_or_default();
-                    // Push events BEFORE push_movement_event
-                    if source_id != -1 {
-                        gs.position_change_events
-                            .push(crate::types::PositionChangeEvent {
-                                moved_card_id: source_id,
-        old_position: current_idx.u8_count(),
-        new_position: target_index.u8_count(),
-                                cause_card_id: gs.activating_card,
-                                cause_player_id: mover_pid.clone(),
-                                effect_only: true,
-                            });
-                    }
-                    if target_id != -1 {
-                        gs.position_change_events
-                            .push(crate::types::PositionChangeEvent {
-                                moved_card_id: target_id,
-        old_position: target_index.u8_count(),
-        new_position: current_idx.u8_count(),
-                                cause_card_id: gs.activating_card,
-                                cause_player_id: mover_pid.clone(),
-                                effect_only: true,
-                            });
-                    }
-                    gs.push_movement_event(
+                    gs.record_stage_position_swap(
                         source_id,
-                        "stage",
-                        "stage",
-                        gs.activating_card,
-                        &mover_pid,
-                        true,
+                        current_idx.u8_count(),
+                        target_id,
+                        target_index.u8_count(),
                     );
-                    if target_id != -1 {
-                        gs.push_movement_event(
-                            target_id,
-                            "stage",
-                            "stage",
-                            gs.activating_card,
-                            &mover_pid,
-                            true,
-                        );
-                    }
-                    gs.trigger_auto_abilities_for_movement(&mover_pid);
+                    gs.trigger_auto_abilities_for_movement_current();
                     gs.recalculate_constants();
                     return Ok(());
                 }
@@ -3497,60 +3409,18 @@ pub(crate) fn execute_gain_surplus_heart(
                     }
                     let from_area3 = util::pos_to_area(current_idx);
                     let to_area3 = util::pos_to_area(target_index);
-                    let (target_id3, source_id3) = (
-                        player.stage.stage[target_index],
-                        player.stage.stage[current_idx],
-                    );
+                    let target_id3 = player.stage.stage[target_index];
                     player.stage.position_change(from_area3, to_area3)?;
                     let _ = player;
-                    gs.record_card_movement(target_id3);
-                    if source_id3 != -1 {
-                        gs.record_card_movement(source_id3);
-                    }
-                    let mover_pid = gs
-                        .ability_queue
-                        .current_entry()
-                        .map(|e| e.player_id.clone())
-                        .unwrap_or_default();
-                    // Push events BEFORE push_movement_event
-                    gs.position_change_events
-                        .push(crate::types::PositionChangeEvent {
-                            moved_card_id: activating_card_id,
-                            old_position: current_idx.u8_count(),
-                            new_position: target_index.u8_count(),
-                            cause_card_id: gs.activating_card,
-                            cause_player_id: mover_pid.clone(),
-                            effect_only: true,
-                        });
-                    if target_id3 != -1 {
-                        gs.position_change_events
-                            .push(crate::types::PositionChangeEvent {
-                                moved_card_id: target_id3,
-        old_position: target_index.u8_count(),
-        new_position: current_idx.u8_count(),
-                                cause_card_id: gs.activating_card,
-                                cause_player_id: mover_pid.clone(),
-                                effect_only: true,
-                            });
-                    }
-                    gs.push_movement_event(
+                    // Source is the activating card, which we just located on
+                    // stage, so it is never -1; the helper's unguarded source
+                    // push matches what this branch did.
+                    gs.record_stage_position_swap(
                         activating_card_id,
-                        "stage",
-                        "stage",
-                        gs.activating_card,
-                        &mover_pid,
-                        true,
+                        current_idx.u8_count(),
+                        target_id3,
+                        target_index.u8_count(),
                     );
-                    if target_id3 != -1 {
-                        gs.push_movement_event(
-                            target_id3,
-                            "stage",
-                            "stage",
-                            gs.activating_card,
-                            &mover_pid,
-                            true,
-                        );
-                    }
                 } else {
                     return Err(format!(
                         "Activating card {} not found on stage",

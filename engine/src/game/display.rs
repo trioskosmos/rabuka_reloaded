@@ -354,8 +354,6 @@ pub struct GameStateDisplay {
     #[cfg_attr(feature = "serde_support", serde(default))]
     pub is_first_turn: bool,
     #[cfg_attr(feature = "serde_support", serde(default))]
-    pub turn_order_changed: bool,
-    #[cfg_attr(feature = "serde_support", serde(default))]
     pub baton_touch_count: u8,
     #[cfg_attr(feature = "serde_support", serde(default))]
     pub baton_touch_zero_cost: bool,
@@ -366,13 +364,7 @@ pub struct GameStateDisplay {
     #[cfg_attr(feature = "serde_support", serde(default))]
     pub baton_touch_arriving_card_id: Option<i16>,
     #[cfg_attr(feature = "serde_support", serde(default))]
-    pub deck_refresh_pending: bool,
-    #[cfg_attr(feature = "serde_support", serde(default))]
     pub loop_detected: bool,
-    #[cfg_attr(feature = "serde_support", serde(default))]
-    pub draw_state: bool,
-    #[cfg_attr(feature = "serde_support", serde(default))]
-    pub live_being_performed: bool,
     #[cfg_attr(feature = "serde_support", serde(default))]
     pub cards_moved_this_turn: Vec<i16>,
     #[cfg_attr(feature = "serde_support", serde(default))]
@@ -439,8 +431,6 @@ pub struct GameStateDisplay {
     #[cfg_attr(feature = "serde_support", serde(default))]
     pub auto_ability_trigger_counts: HashMap<CardId, u8>,
     #[cfg_attr(feature = "serde_support", serde(default))]
-    pub turn_limit_usage: HashMap<CardId, u8>,
-    #[cfg_attr(feature = "serde_support", serde(default))]
     pub non_stackable_effects: Vec<String>,
     #[cfg_attr(feature = "serde_support", serde(default))]
     pub prohibition_effects: Vec<String>,
@@ -493,11 +483,6 @@ pub struct GameStateDisplay {
     pub turn1_abilities_played: Vec<CardId>,
     #[cfg_attr(feature = "serde_support", serde(default))]
     pub turn2_abilities_played: HashMap<CardId, u8>,
-    #[cfg_attr(feature = "serde_support", serde(default))]
-    pub card_instance_mapping: HashMap<String, u8>,
-    #[cfg_attr(feature = "serde_support", serde(default))]
-    pub card_instance_counter: u8,
-
     // Move Tracking
     #[cfg_attr(feature = "serde_support", serde(default))]
     pub recently_moved_cards: Vec<i16>,
@@ -505,12 +490,8 @@ pub struct GameStateDisplay {
     pub recently_moved_from_zone: Option<String>,
     #[cfg_attr(feature = "serde_support", serde(default))]
     pub last_vacated_stage_area: Option<String>,
-    #[cfg_attr(feature = "serde_support", serde(default))]
-    pub debut_ability_triggers: Vec<DebutTriggerDisplay>,
 
     // Live/Cheer
-    #[cfg_attr(feature = "serde_support", serde(default))]
-    pub live_cheer_count: u8,
     #[cfg_attr(feature = "serde_support", serde(default))]
     pub cheer_check_completed: bool,
     #[cfg_attr(feature = "serde_support", serde(default))]
@@ -532,12 +513,6 @@ pub struct GameStateDisplay {
     #[cfg_attr(feature = "serde_support", serde(default))]
     pub revealed_cost_card_info: Vec<RevealedCardDisplay>,
     #[cfg_attr(feature = "serde_support", serde(default))]
-    pub heart_color_decision_phase: String,
-    #[cfg_attr(feature = "serde_support", serde(default))]
-    pub live_owned_hearts: HashMap<CardId, Vec<[String; 2]>>,
-    #[cfg_attr(feature = "serde_support", serde(default))]
-    pub opponent_choice_declined: bool,
-    #[cfg_attr(feature = "serde_support", serde(default))]
     pub pending_success_replacement_card_id: Option<i16>,
     #[cfg_attr(feature = "serde_support", serde(default))]
     pub pending_success_replacement_player_id: Option<String>,
@@ -554,8 +529,6 @@ pub struct GameStateDisplay {
     /// source maps and gained-ability provenance.
     #[cfg_attr(feature = "serde_support", serde(default))]
     pub effect_attribution: HashMap<i16, Vec<BonusSourceDisplay>>,
-    #[cfg_attr(feature = "serde_support", serde(default))]
-    pub effect_creation_counter: u8,
     #[cfg_attr(feature = "serde_support", serde(default))]
     pub last_state_change_wait_to_active_count: u8,
 
@@ -1600,16 +1573,6 @@ pub fn game_state_to_display(game_state: &GameState) -> GameStateDisplay {
         QueueState::Completed { entry_index } => *entry_index as usize,
     };
 
-    // Debut triggers
-    let debut_triggers: Vec<DebutTriggerDisplay> = game_state
-        .debut_ability_triggers
-        .iter()
-        .map(|(key, cid)| DebutTriggerDisplay {
-            ability_key: key.clone(),
-            card_id: *cid,
-        })
-        .collect();
-
     // Ability applications
     let ability_apps: Vec<AbilityApplicationDisplay> = game_state
         .ability_applications
@@ -1693,19 +1656,6 @@ pub fn game_state_to_display(game_state: &GameState) -> GameStateDisplay {
         effect_attribution.len(),
         effect_attribution.values().map(Vec::len).sum::<usize>()
     );
-
-    // Live owned hearts: HashMap<CardId, Vec<(String, u8)>> -> HashMap<CardId, Vec<[String; 2]>>
-    let live_owned: HashMap<CardId, Vec<[String; 2]>> = game_state
-        .live_owned_hearts
-        .iter()
-        .map(|(pid, pairs)| {
-            let converted: Vec<[String; 2]> = pairs
-                .iter()
-                .map(|(color, count)| [color.clone(), count.to_string()])
-                .collect();
-            (*pid, converted)
-        })
-        .collect();
 
     // Constant heart bonuses: HashMap<i16, HashMap<String, i32>>
     let const_heart: HashMap<i16, HashMap<String, i32>> = game_state
@@ -1801,17 +1751,13 @@ pub fn game_state_to_display(game_state: &GameState) -> GameStateDisplay {
         },
         current_turn_phase: turn_phase_str,
         game_result: game_result_str,
-        is_first_turn: game_state.is_first_turn,
-        turn_order_changed: game_state.turn_order_changed,
+        is_first_turn: game_state.is_first_turn(),
         baton_touch_count: game_state.baton_touch_count_p1 + game_state.baton_touch_count_p2,
         baton_touch_zero_cost: game_state.baton_touch_zero_cost,
         baton_touch_replaced_member_cost: game_state.baton_touch_replaced_member_cost,
         baton_touch_replaced_member_id: game_state.baton_touch_replaced_member_id,
         baton_touch_arriving_card_id: game_state.baton_touch_arriving_card_id,
-        deck_refresh_pending: game_state.deck_refresh_pending,
         loop_detected: game_state.loop_detected,
-        draw_state: game_state.draw_state,
-        live_being_performed: game_state.live_being_performed,
         cards_moved_this_turn: game_state.cards_moved_this_turn.iter().copied().collect(),
         cards_appeared_this_turn: game_state
             .cards_appeared_this_turn
@@ -1859,7 +1805,6 @@ pub fn game_state_to_display(game_state: &GameState) -> GameStateDisplay {
             .iter()
             .cloned()
             .collect(),
-        turn_limit_usage: game_state.turn_limit_usage.iter().cloned().collect(),
         non_stackable_effects: game_state.non_stackable_effects.iter().cloned().collect(),
         prohibition_effects: game_state.prohibition_effects.to_vec(),
         delayed_prohibition_effects: game_state.delayed_prohibition_effects.to_vec(),
@@ -1876,10 +1821,9 @@ pub fn game_state_to_display(game_state: &GameState) -> GameStateDisplay {
             .collect(),
         constant_ability_statuses: game_state.constant_ability_statuses.to_vec(),
         negated_abilities: game_state
-            .negated_abilities
+            .ability_invalidations
             .iter()
-            .copied()
-            .chain(game_state.ability_invalidations.iter().map(|entry| entry.card_id))
+            .map(|entry| entry.card_id)
             .collect(),
         temporary_effects: temp_effects,
         replacement_effects: repl_effects,
@@ -1904,12 +1848,6 @@ pub fn game_state_to_display(game_state: &GameState) -> GameStateDisplay {
             .iter()
             .map(|(k, v)| (*k, *v))
             .collect(),
-        card_instance_mapping: game_state
-            .card_instance_mapping
-            .iter()
-            .map(|(k, v)| (k.to_string(), *v))
-            .collect(),
-        card_instance_counter: game_state.card_instance_counter,
         recently_moved_cards: game_state
             .recently_moved_cards
             .clone()
@@ -1917,8 +1855,6 @@ pub fn game_state_to_display(game_state: &GameState) -> GameStateDisplay {
             .to_vec(),
         recently_moved_from_zone: game_state.recently_moved_from_zone.clone(),
         last_vacated_stage_area: last_vacated,
-        debut_ability_triggers: debut_triggers,
-        live_cheer_count: game_state.live_cheer_count,
         cheer_check_completed: game_state.cheer_check_completed,
         player1_cheer_blade_heart_count: game_state.player1_cheer_blade_heart_count,
         player2_cheer_blade_heart_count: game_state.player2_cheer_blade_heart_count,
@@ -1935,9 +1871,6 @@ pub fn game_state_to_display(game_state: &GameState) -> GameStateDisplay {
             .collect(),
         initial_yell_revealed_cards: game_state.initial_yell_revealed_cards.to_vec(),
         re_yell_revealed_cards: game_state.re_yell_revealed_cards.to_vec(),
-        heart_color_decision_phase: game_state.heart_color_decision_phase.clone(),
-        live_owned_hearts: live_owned,
-        opponent_choice_declined: game_state.opponent_choice_declined,
         pending_success_replacement_card_id: game_state.pending_success_replacement_card_id,
         pending_success_replacement_player_id: game_state
             .pending_success_replacement_player_id
@@ -1957,7 +1890,6 @@ pub fn game_state_to_display(game_state: &GameState) -> GameStateDisplay {
             .collect(),
         ability_applications: ability_apps,
         effect_attribution,
-        effect_creation_counter: game_state.effect_creation_counter,
         last_state_change_wait_to_active_count: game_state.last_state_change_wait_to_active_count,
         constant_blade_bonuses: game_state
             .mods

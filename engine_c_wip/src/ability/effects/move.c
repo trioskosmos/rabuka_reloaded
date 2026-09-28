@@ -346,6 +346,111 @@ static const char *move_zone_label(const char *zone) {
     return zone;
 }
 
+/* ── prompt_carry_resume_context ──
+ * Port of the tail of Rust AbilityResolver::prompt_card_selection
+ * (engine/src/ability/move_cards/selection.rs:31-49).
+ *
+ * The prompt is not self-contained: the ANSWER carries indices, and the answer
+ * handler has to map them back through the SAME zone + filter the prompt was
+ * built from, and then move them to the effect's destination. Rust parks all of
+ * that on the Choice itself:
+ *     .card_type(..) .cost_limit(..) .cost_total(..) .group(..)
+ *     .characters(..) .target_player_id(..) .filtered_indices(..)
+ *     .destination(effect.destination) .discard_remaining(..)       (:34-46)
+ * and then `self.in_flight.execution_context =
+ *      ExecutionContext::SingleEffect { effect_index: 0 }`              (:49)
+ * so the resuming handler still knows WHICH effect asked.
+ *
+ * The C prompt carried only card_type / group_names / target, and parked a
+ * resume context for `looked_at` ONLY. So a `hand` or `discard` SelectCard
+ * answer arrived with:
+ *   - no destination. `rb_resolver_handle_discard_selection` (choice.c:2271
+ *     and :2315) resolves it as
+ *     `resume_move_destination ? : pending.target ? : "hand"`, and
+ *     `pending.target` holds the SEAT ("self" / "opponent"), never a zone, so
+ *     the picked card was pushed into a zone literally named "self";
+ *   - no cost_limit / cost_total / characters, so the answer could not re-apply
+ *     the prompt's own filter;
+ *   - no resume context, so `queue.resume_eff` stayed NULL and the
+ *     `g->queue.resume_eff->destination` fallback those two lines already
+ *     guard on could never fire, and the producing effect could not be re-read.
+ * That is why only the looked_at family ever completed.
+ *
+ * `resume_mode` deliberately gets NO new value here. The C dispatch in
+ * rb_resume_with_choice_indices_internal (choice.c:3205-3336) routes on it, and
+ * every existing arm is a DIFFERENT Rust handler (look-resume, position
+ * change, deferred body, optional gate, keep-shuffle, looked_at); minting an arm
+ * for a zone that Rust answers in the generic SelectCard handler would be a
+ * parallel architecture, not a port. `resume_eff` / `resume_actor` are the C
+ * spelling of `ExecutionContext::SingleEffect { effect_index: 0 }` — the C
+ * resume path already carries and reads them (choice.c:1677, :2273, :2317);
+ * they simply have to be set for a hand / discard prompt as well. */
+static void rb_move_prompt_carry_resume_context(GameState *g, int actor,
+                                                const char *zone, AbilityEffect *e) {
+    if (!g) return;
+    if (e) {
+        /* `.destination(effect.destination)` (selection.rs:45). RbChoice has no
+           destination field, so the C slot for it is
+           `queue.resume_move_destination`, which is what the answer handlers
+           read (choice.c:2277, :2321). Rust's `Choice.destination` is an
+           Option and is per-choice: absent means None, and
+           execute_selected_cards_from_zone then falls back to "discard"
+           (move_cards.rs:2573-2583). The C slot is a single sticky queue field
+           shared with the live / success-replacement producers (live.c:1025,
+           choice.c:2449), so it is written UNCONDITIONALLY here — leaving a
+           previous prompt's value in place would give this choice a
+           destination its own effect never named. */
+        if (e->destination && e->destination[0])
+            strncpy(g->queue.resume_move_destination, e->destination,
+                    sizeof(g->queue.resume_move_destination) - 1);
+        else
+            g->queue.resume_move_destination[0] = '\0';
+        /* `.cost_limit(filter.cost_limit, effect.cost_limit_operator_any())` and
+           `.cost_total(filter.cost_total, effect.cost_total_operator_any())`
+           (selection.rs:35-36). */
+        const char *cl = cmf_extra(e, "cost_limit");
+        if (cl) {
+            g->queue.pending.cost_limit = atoi(cl);
+            const char *clo = cmf_extra(e, "cost_limit_operator");
+            if (!clo) clo = cmf_extra(e, "cost_operator");
+            if (clo)
+                strncpy(g->queue.pending.cost_limit_op, clo,
+                        sizeof(g->queue.pending.cost_limit_op) - 1);
+        }
+        const char *ct = cmf_extra(e, "cost_total");
+        if (ct) {
+            g->queue.pending.cost_total = atoi(ct);
+            const char *cto = cmf_extra(e, "cost_total_operator");
+            if (cto)
+                strncpy(g->queue.pending.cost_total_op, cto,
+                        sizeof(g->queue.pending.cost_total_op) - 1);
+        }
+        /* `.characters(filter.characters)` (selection.rs:38) — same
+           comma-splitting idiom as cost.c:660-668. */
+        const char *chars = cmf_extra(e, "characters");
+        if (chars && chars[0] && g->queue.pending.n_characters == 0) {
+            char cbuf[256];
+            strncpy(cbuf, chars, sizeof(cbuf) - 1);
+            cbuf[sizeof(cbuf) - 1] = '\0';
+            char *tok = strtok(cbuf, ",");
+            while (tok && g->queue.pending.n_characters < 16) {
+                strncpy(g->queue.pending.characters[g->queue.pending.n_characters], tok,
+                        sizeof(g->queue.pending.characters[0]) - 1);
+                g->queue.pending.n_characters++;
+                tok = strtok(NULL, ",");
+            }
+        }
+    }
+    /* `looked_at` keeps mode 6: that arm is rb_move_handle_select_cards_looked_at
+       (choice.c:3205 -> move.c), the C twin of Rust's handle_looked_at_selection
+       (choice.rs:1082). Every other zone this prompt is built for is answered by
+       the generic SelectCard dispatch, which reads exactly the resume_eff /
+       resume_actor / destination parked just above. */
+    g->queue.resume_eff = e;
+    g->queue.resume_actor = actor;
+    if (!strcmp(zone, "looked_at")) g->queue.resume_mode = 6;
+}
+
 /* ── prompt_card_selection ── */
 void rb_move_prompt_card_selection(GameState *g, int actor, const char *zone,
                                     int count, int can_skip, AbilityEffect *e) {
@@ -368,11 +473,7 @@ void rb_move_prompt_card_selection(GameState *g, int actor, const char *zone,
         strncpy(g->queue.pending.target, e->target, sizeof(g->queue.pending.target) - 1);
         strncpy(g->queue.pending.target_player_id, e->target, sizeof(g->queue.pending.target_player_id) - 1);
     }
-    if (!strcmp(zone, "looked_at")) {
-        g->queue.resume_eff = e;
-        g->queue.resume_actor = actor;
-        g->queue.resume_mode = 6;
-    }
+    rb_move_prompt_carry_resume_context(g, actor, zone, e);
     rb_choice_set_route(&g->queue.pending, RB_ROUTE_SELECT_CARDS);
 }
 
@@ -602,6 +703,41 @@ int rb_move_resolve_from_under_member(GameState *g, int actor, AbilityEffect *e,
     return n_out;
 }
 
+/* ── prompt_card_selection_with_filtered ─────────────────────────────────────
+ * Rust take_cards_from_standard_zone (move_cards/selection.rs:66-87) builds
+ * `filtered_indices` from the zone and the filter ONCE, classifies with that
+ * same list, and hands it to prompt_card_selection (:85
+ * `.filtered_indices(filtered_indices)`). A returned index is therefore an index
+ * into the candidate list the player was SHOWN, and the answer maps it back
+ * through `ctx.mfi` (choice.rs:51-55, applied at :1172
+ * `let mapped_indices = ctx.mfi(&ctx.indices)`) — the C equivalent is
+ * map_choice_index (choice.c:944-950), which reads
+ * `queue.pending.filtered_indices` / `n_filtered_indices`.
+ *
+ * The C prompt never received that list, so map_choice_index was the identity
+ * and every answer was read as a RAW ZONE index. That is only accidentally
+ * right when all of the zone's cards match the filter: under a card_type /
+ * group_names filter that rejects cards, the player picks from the displayed
+ * candidate list and the engine would lift the wrong card. This wrapper keeps
+ * the two lists identical by construction — `idxs` is the very array the
+ * classification just ran on.
+ *
+ * One deliberate difference from Rust, documented: Rust's `filtered_indices` is
+ * `util::matching_indices` WITHOUT the self-target pinning that the same call's
+ * `resolve_selection` applies (selection.rs:72 vs :74-75). The C `idxs` is
+ * `rb_get_selection_indices(.., self_target_only, ..)`, which DOES pin. The C
+ * list is the strictly tighter one, and it is the one the classification above
+ * was decided on, so it is the list the prompt actually offered. */
+static void rb_move_prompt_card_selection_with_filtered(
+    GameState *g, int actor, const char *zone, int count, int can_skip,
+    AbilityEffect *e, const int *idxs, int n_idxs) {
+    rb_move_prompt_card_selection(g, actor, zone, count, can_skip, e);
+    if (!g || !idxs || n_idxs <= 0) return;
+    if (n_idxs > RB_MAX_ZONE) n_idxs = RB_MAX_ZONE;
+    g->queue.pending.n_filtered_indices = n_idxs;
+    for (int i = 0; i < n_idxs; i++) g->queue.pending.filtered_indices[i] = idxs[i];
+}
+
 /* ── take_cards_from_standard_zone ── */
 int rb_move_take_cards_from_standard_zone(GameState *g, int actor,
                                            const char *zone_name,
@@ -621,7 +757,7 @@ int rb_move_take_cards_from_standard_zone(GameState *g, int actor,
                                        idxs, RB_MAX_ZONE);
     int outcome = rb_classify_selection(idxs, mn, count, is_all);
     if (outcome == 1 && !strcmp(zone_name, "discard") && !is_all) {
-        rb_move_prompt_card_selection(g, actor, zone_name, count, can_skip, e);
+        rb_move_prompt_card_selection_with_filtered(g, actor, zone_name, count, can_skip, e, idxs, mn);
         return -1;
     }
     if (outcome == 1 && can_skip && mn > 0) {
@@ -630,7 +766,7 @@ int rb_move_take_cards_from_standard_zone(GameState *g, int actor,
             for (int i = 0; i < mn && i < max; i++) out_ids[i] = cards[idxs[i]];
             return mn;
         }
-        rb_move_prompt_card_selection(g, actor, zone_name, mn, can_skip, e);
+        rb_move_prompt_card_selection_with_filtered(g, actor, zone_name, mn, can_skip, e, idxs, mn);
         return -1;
     }
     if (outcome == 1) {
@@ -651,11 +787,11 @@ int rb_move_take_cards_from_standard_zone(GameState *g, int actor,
            a licence to auto-resolve: can_skip only decides whether the PROMPT
            may be declined, and it is already threaded into
            rb_move_prompt_card_selection as the choice's optional flag. */
-        rb_move_prompt_card_selection(g, actor, zone_name, count, can_skip, e);
+        rb_move_prompt_card_selection_with_filtered(g, actor, zone_name, count, can_skip, e, idxs, mn);
         return -1;
     }
     if (can_skip && mn > 0) {
-        rb_move_prompt_card_selection(g, actor, zone_name, mn, can_skip, e);
+        rb_move_prompt_card_selection_with_filtered(g, actor, zone_name, mn, can_skip, e, idxs, mn);
         return -1;
     }
     return 0;

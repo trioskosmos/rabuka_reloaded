@@ -390,14 +390,7 @@ impl<'a> ConditionContext<'a> {
         let phase_ok = match phase {
             "main" | "main_phase" => self.game_state.current_phase == Phase::Main,
             "active_phase" => self.game_state.current_phase == Phase::Active,
-            "live_phase" => matches!(
-                self.game_state.current_phase,
-                Phase::LiveCardSetFirstAttacker
-                    | Phase::LiveCardSetSecondAttacker
-                    | Phase::FirstAttackerPerformance
-                    | Phase::SecondAttackerPerformance
-                    | Phase::LiveVictoryDetermination
-            ),
+            "live_phase" => self.game_state.current_phase.is_live_phase(),
             _ => true,
         };
         if !phase_ok {

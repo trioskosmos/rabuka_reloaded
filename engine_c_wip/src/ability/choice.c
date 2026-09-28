@@ -6,6 +6,12 @@ extern int rb_complete_double_baton(GameState *g, int selected_pair);
 #include <stdio.h>
 #include <stdlib.h>
 
+/* Owned pending-action plumbing (ability_queue.c:525 / :555). They are
+   deliberately absent from rabuka.h, so the consumer spells them out here. */
+extern int  rb_queue_take_pending_actions_owned(GameState *g, AbilityEffect **out, int max_out);
+extern void rb_queue_repark_pending_actions(GameState *g, AbilityEffect *const *actions,
+                                            int count, int from);
+
 void rb_move_execute_selected_cards_from_zone(GameState *g, int actor, const char *zone,
     const int *indices, int n_indices, const char *card_type, int cost_limit,
     const char *cost_limit_op, int cost_total, const char *cost_total_op,
@@ -3078,9 +3084,45 @@ static void choice_run_skipped_continuation(GameState *g, AbilityEffect *def, in
 }
 
 /* Continue any remaining sibling effects of the parent ability after a choice
-    resolves (mirrors Rust's parent-effect child continuation in provide_choice_result). */
+    resolves (mirrors Rust's parent-effect child continuation in provide_choice_result).
+
+    TWO PATHS, NEVER BOTH. The remaining steps of a multi-step ability are
+    reachable twice: as the entry's OWNED deep clones, and through the parked
+    `cont` parent tree. Running both executes every remaining step twice.
+
+    1. OWNED PATH — the normal case. A queue entry exists, so the entry owns
+       deep clones of the tail (compound.c `save_remaining` mirrors
+       compound/pause.rs:120-129 `save_remaining_actions`, which lands in
+       ability_queue.rs:521's owned `entry.pending_actions`). Rust consumes
+       that list in exactly one place — `resume_pending_actions` (choice.rs:108-126)
+       — so the C equivalent lives here too. Take the batch, run it in order,
+       free each node as it is consumed, and re-park whatever a sub-prompt
+       interrupts (choice.rs:84-106 `requeue_remaining_after_choice`).
+    2. FALLBACK — the inline 登場 path only. engine.c detaches ab.cost / ab.effect
+       and keeps that tree alive for the frame, but there is no entry to own a
+       clone of the tail, so walking `cont` is the only handle on the remaining
+       siblings. Guarded by the has_pending test above, so the two never run
+       over the same nodes. */
 void rb_resolver_continue_siblings(GameState *g, int actor, int host,
                                           const AbilityEffect *cont, int cont_from) {
+    if (rb_queue_has_pending_actions(g)) {
+        AbilityEffect *owned[RB_ENTRY_PENDING_CAP];
+        int n = rb_queue_take_pending_actions_owned(g, owned, RB_ENTRY_PENDING_CAP);
+        for (int i = 0; i < n; i++) {
+            if (!owned[i]) continue;
+            rb_execute_effect_ex(g, actor, owned[i], host);
+            rb_effect_free(owned[i]);        /* ownership came to us; we release it */
+            if (rb_has_pending_choice(g)) {
+                /* choice.rs:114-119: park the rest back and stamp effect_started
+                   (choice.rs:81-83 writes the same flag on the same event). */
+                rb_queue_repark_pending_actions(g, owned + i + 1, n - i - 1, 0);
+                if (g->queue.cur >= 0 && g->queue.cur < g->queue.n_entries)
+                    g->queue.entries[g->queue.cur].effect_started = 1;
+                return;
+            }
+        }
+        return;                              /* tail consumed; do NOT fall through */
+    }
     if (!cont) return;
     for (int j = cont_from; j < cont->n_child; j++) {
         if (rb_has_pending_choice(g)) break;
@@ -3116,6 +3158,44 @@ static int choice_is_committed_cost_reprompt(const RbChoice *ch)
 {
     return ch && ch->allow_skip == 0 && ch->count > 0 &&
            strstr(ch->description, CHOICE_COST_REPROMPT_TAG) != NULL;
+}
+
+/* ── 「そうした場合」 gate (Rust choice.rs:307-321 `consume_deferred_gate`) ──
+   Rust arms `in_flight.deferred_conditional_gate` when a parent-CONDITIONAL
+   sequential pauses on a step that carries no condition of its own — the
+   `conditional && !action.condition.is_none()==false && condition_failed==None
+   && !is_opponent_action` test at compound/pause.rs:50-60, which compound.c:513
+   already evaluates for the same tree — and on the next answer it DROPS the
+   entry's parked tail when that answer selected nothing
+   (choice.rs:312-320: `if indices.is_empty() { pending_actions.clear() }`).
+
+   百生吟子 (PL!HS-PR-035-PR) is that shape: a `conditional` sequential whose
+   optional first step is 「相手の控え室にあるメンバーカードを3枚選び、相手の
+   デッキの下に好きな順番で置いてもよい。そうした場合、…ウェイトにする」.
+   Declining the optional step must drop the WHOLE tail, not just the
+   placement; the 「そうした場合」 rest is gated on the placement, so running it
+   after a decline rests a member for nothing.
+
+   The C cannot carry the arm across frames: `RbAbilityResolver` (choice.c:49)
+   is memset to 0 at every entry point, and compound.c's
+   `g_deferred_conditional_gate` is file-static and never read by anybody. The
+   arm is therefore re-derived from the state the resume still holds:
+     * the parked parent is a CONDITIONAL `sequential`  (pause.rs:54 `conditional`),
+     * the prompt is the optional step's own allow_skip 「〜てもよい」 prompt,
+     * the answer named no card at all                      (choice.rs:315).
+
+   A SelectCard SKIP is deliberately excluded: Rust routes it to
+   handle_general_skip (result_handlers.rs:225-227), which never reaches
+   consume_deferred_gate — that call sits at choice.rs:1016, INSIDE
+   handle_select_card. Only an empty SELECTION consults the gate. */
+static int choice_deferred_conditional_gate(const RbChoice *ch,
+                                            const AbilityEffect *cont, int n_indices)
+{
+    if (!ch || n_indices > 0) return 0;         /* choice.rs:315 — only an EMPTY answer */
+    if (!ch->allow_skip) return 0;              /* the arm is raised by an optional step */
+    if (!cont || !cont->action) return 0;
+    if (strcmp(cont->action, "sequential") != 0) return 0;
+    return cont->conditional_flag ? 1 : 0;
 }
 
 static int choice_declined_cost_stop(GameState *g, const RbChoice *ch)
@@ -3212,6 +3292,16 @@ static int rb_resume_with_choice_indices_internal(GameState *g, const int *selec
     g->queue.resume_eff = NULL;
     g->queue.auto_ability = 0;
     g->queue.state = RB_QUEUE_RESOLVING;   /* resuming / draining an ability */
+    /* 「そうした場合」 gate: an EMPTY answer to a parent-conditional sequential's
+       optional step drops the parked tail (choice.rs:307-321). Doing it here,
+       once, keeps the tail out of BOTH routes that would otherwise replay it —
+       the owned pending-action batch and the `cont` walk — so `cont` is retired
+       for the rest of this resume instead of only clearing the batch. */
+    if (!(was_skip && kind == RB_CHOICE_SELECT_CARD) &&
+        choice_deferred_conditional_gate(&saved_pending, cont, n_indices)) {
+        rb_queue_take_pending_actions(g);
+        cont = NULL;
+    }
     if (saved_pending.target[0] && !strcmp(saved_pending.target, "success_replacement")) {
         int pl = (replacement_actor >= 0 && replacement_actor <= 1) ? replacement_actor : actor;
         int physical_index = map_choice_index(&saved_pending, selected_idx);
@@ -3313,13 +3403,13 @@ static int rb_resume_with_choice_indices_internal(GameState *g, const int *selec
            from being corrupted — a prompt that is not a pay/skip gate never
            reaches this arm, so its continuation is left exactly as it was. */
         if (declined) choice_record_pay_skip_decline(g);
-        /* continue any remaining sibling effects of the parent ability */
-        if (cont && !declined) {
-            for (int j = cont_from; j < cont->n_child; j++) {
-                if (rb_has_pending_choice(g)) break;
-                rb_execute_effect_ex(g, actor, cont->child[j], host);
-            }
-        }
+        /* Continue the parent ability's remaining steps through the ONE consumer
+           Rust has for the parked tail (choice.rs:108-126). This arm used to
+           re-implement the `cont` walk inline, which ignored the entry's owned
+           clones entirely — the same two-sources defect rb_resolver_continue_
+           siblings now guards. A decline is the exception: the tail is dropped,
+           not replayed. */
+        if (!declined) rb_resolver_continue_siblings(g, actor, host, cont, cont_from);
     } else if (mode == 5) {         /* C6 keep-shuffle-under re-entry */
         if (!was_skip && eff) {
             /* capture the chosen card id (index into the answerer's hand) so the
@@ -3614,11 +3704,20 @@ void rb_emit_choice(GameState *g, int actor, RbChoiceKind kind,
     g->queue.deferred = NULL;
     g->queue.resume_look_owner = -1;
     g->queue.resume_after_look = NULL;
-    g->queue.state = RB_QUEUE_AWAITING_CHOICE;   /* QueueState FSM (ability_queue.rs) */
-    /* Also pause the queue so the choice gets proper actor/player_id routing */
+    /* Also pause the queue so the choice gets proper actor/player_id routing.
+       The pause has to run BEFORE the QueueState stamp: its first line is
+       `if (g->queue.state == RB_QUEUE_AWAITING_CHOICE) return;`
+       (ability_queue.c:275), so stamping first made this call a no-op and the
+       entry's choice_player_id was NEVER filled in — a pending choice left
+       `queue.state == 3` with `choice_player_id == ""`, where clearing the
+       state and re-pausing the same entry immediately yields "p1"/"p2".
+       Both branches of rb_queue_pause_for_choice set the state themselves
+       (ability_queue.c:310 and :327), so the stamp after it is belt-and-braces
+       for the `n_entries == RB_QUEUE_DEPTH` fallthrough, which sets neither. */
     RbChoice ch = g->queue.pending;
     ch.actor = actor;  /* ensure actor is set for queue entry routing */
     rb_queue_pause_for_choice(g, &ch);
+    g->queue.state = RB_QUEUE_AWAITING_CHOICE;   /* QueueState FSM (ability_queue.rs) */
 }
 
 /* ── Type helpers (ported from engine/src/ability/types.rs) ── */

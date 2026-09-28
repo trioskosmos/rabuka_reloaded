@@ -1484,7 +1484,7 @@ impl super::resolver::AbilityResolver {
                 .or_else(|| {
                     gs.ability_queue
                         .current_entry()
-                        .and_then(|entry| entry.ability.effect.as_deref().cloned())
+                        .and_then(|entry| entry.ability.effect.as_deref())
                 })
                 .is_some_and(|effect| util::effect_uses_selected_cards(&effect));
             if keep_selected {

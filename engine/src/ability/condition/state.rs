@@ -195,14 +195,7 @@ impl<'a> ConditionContext<'a> {
                 crate::game_state::Phase::LiveVictoryDetermination
             ),
             "during_live" | "this_live" => {
-                if !matches!(
-                    self.game_state.current_phase,
-                    crate::game_state::Phase::LiveCardSetFirstAttacker
-                        | crate::game_state::Phase::LiveCardSetSecondAttacker
-                        | crate::game_state::Phase::FirstAttackerPerformance
-                        | crate::game_state::Phase::SecondAttackerPerformance
-                        | crate::game_state::Phase::LiveVictoryDetermination
-                ) {
+                if !self.game_state.current_phase.is_live_phase() {
                     log::debug!(
                         "[DURING_LIVE] phase gate failed: phase={:?}",
                         self.game_state.current_phase
@@ -345,25 +338,8 @@ impl<'a> ConditionContext<'a> {
                 }
                 true
             }
-            "before_live" => {
-                !matches!(
-                    self.game_state.current_phase,
-                    crate::game_state::Phase::LiveCardSetFirstAttacker
-                ) && !matches!(
-                    self.game_state.current_phase,
-                    crate::game_state::Phase::LiveCardSetSecondAttacker
-                ) && !matches!(
-                    self.game_state.current_phase,
-                    crate::game_state::Phase::FirstAttackerPerformance
-                ) && !matches!(
-                    self.game_state.current_phase,
-                    crate::game_state::Phase::SecondAttackerPerformance
-                ) && !matches!(
-                    self.game_state.current_phase,
-                    crate::game_state::Phase::LiveVictoryDetermination
-                )
-            }
-            "first_turn" => self.game_state.is_first_turn,
+            "before_live" => !self.game_state.current_phase.is_live_phase(),
+            "first_turn" => self.game_state.is_first_turn(),
             _ => {
                 let turn_ok = match condition.get_turn_number() {
                     Some(tn) => self.game_state.turn_number == tn,
@@ -388,14 +364,7 @@ impl<'a> ConditionContext<'a> {
                             self.game_state.current_phase,
                             crate::game_state::Phase::Active
                         ),
-                        "live_phase" | "live" => matches!(
-                            self.game_state.current_phase,
-                            crate::game_state::Phase::LiveCardSetFirstAttacker
-                                | crate::game_state::Phase::LiveCardSetSecondAttacker
-                                | crate::game_state::Phase::FirstAttackerPerformance
-                                | crate::game_state::Phase::SecondAttackerPerformance
-                                | crate::game_state::Phase::LiveVictoryDetermination
-                        ),
+                        "live_phase" | "live" => self.game_state.current_phase.is_live_phase(),
                         "live_card_set" => matches!(
                             self.game_state.current_phase,
                             crate::game_state::Phase::LiveCardSetFirstAttacker
@@ -1304,15 +1273,16 @@ impl<'a> ConditionContext<'a> {
         true
     }
 
-    pub(crate) fn evaluate_opponent_choice_condition(&self, condition: &Condition) -> bool {
-        let _target = condition.get_target().unwrap_or("opponent");
-        let negation = condition.get_negation().unwrap_or(false);
-        let opponent_declined = self.game_state.opponent_choice_declined;
-        if negation {
-            opponent_declined
-        } else {
-            !opponent_declined
-        }
+    pub(crate) fn evaluate_opponent_choice_condition(&self, _condition: &Condition) -> bool {
+        // Was `self.game_state.opponent_choice_declined`, a field that was
+        // initialised `false` and never written, so this reduced to
+        // `!negation` for every input. Kept as a named constant rather than
+        // deleted because the condition type is still routed here; if the
+        // mechanic is ever implemented, this is the one place that has to
+        // change. Do not reintroduce a stored flag for it — derive from the
+        // choice state that would set it.
+        let negation = _condition.get_negation().unwrap_or(false);
+        !negation
     }
 
     pub(crate) fn evaluate_opponent_live_success_condition(&self, condition: &Condition) -> bool {
