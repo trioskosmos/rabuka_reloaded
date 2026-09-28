@@ -1135,12 +1135,33 @@ int rb_play_member(GameState *g, int pl, int hand_idx, int stage_pos) {
                 rb_drain_ability_queue(g);
                 if (rb_has_pending_choice(g)) {
                     /* A child effect deferred a pending choice; its resume parks
-                        a raw pointer (g->queue.resume_parent) into THIS ability's
-                        cost/effect tree. Detach the trees so rb_free_ability does
-                        not free them out from under the deferred choice (would be
-                        a use-after-free / heap corruption). The trees stay alive
-                        until the choice is answered; the leak is bounded per game
-                        and harmless for the headless harness. */
+                       a raw pointer (g->queue.resume_parent) into THIS ability's
+                       cost/effect tree, so rb_free_ability must not free it out
+                       from under the deferred choice. Detach the trees; they stay
+                       alive until the choice is answered. The leak is bounded per
+                       game and harmless for the headless harness.
+
+                       LEAK STILL OPEN (deliberately not "fixed" here). Deferring
+                       the free to a later moment is NOT safe: closing the prompt
+                       does not release the tree, because the queue keeps raw
+                       pointers into it (g->queue.deferred / resume_eff) and a
+                       later rb_drain_ability_queue walks them. A pool that
+                       released on the next 登場 was measured to SEGFAULT
+                       tests/test_baton_touch.c (use-after-free after the prompt
+                       closed), so the detach-and-leak is kept rather than traded
+                       for a crash.
+
+                       The real fix is Rust's: the 登場 trigger reaches
+                       resolve_ability THROUGH the ability queue
+                       (resolver.rs:1159-1161), so the resolver owns the ability
+                       for the whole resolution and the queue entry frees it when
+                       the resolution completes. That means pushing a real entry
+                       with rb_queue_push_with_trigger instead of resolving inline,
+                       and it also retires the `s_cost_deferred_host` workaround in
+                       cost.c and the `choice_debut_cost_action` reconstruction in
+                       choice.c — both exist only because this loop owns no entry
+                       and therefore has no `activating_card` window. Recommended
+                       to the owner of the queue. */
                     ab.cost = NULL;
                     ab.effect = NULL;
                 }
@@ -1166,7 +1187,7 @@ int rb_play_member(GameState *g, int pl, int hand_idx, int stage_pos) {
     matched ability's cost BEFORE its effect. Falls back to the card's single
     default `ability_idx` when no 起動 ability exists (e.g. debut-only members). */
 int rb_activate_card(GameState *g, int pl, int card_id) {
-    int any = 0, matched = 0;
+    int any = 0, matched = 0, has_activate = 0;
     int n = rb_card_num_abilities((uint32_t)card_id);
     for (int a = 0; a < n; a++) {
         uint32_t aidx;
@@ -1175,6 +1196,36 @@ int rb_activate_card(GameState *g, int pl, int card_id) {
         if (!rb_decode_card_ability((uint32_t)card_id, a, &ab)) continue;
         int is_activate = ab.triggers && strstr(ab.triggers, "起動");
         if (is_activate) {
+            has_activate = 1;
+            /* USE LIMIT — turn/actions/mod.rs:519-528 (handle_use_ability) with
+               ability/util.rs:78-89 (ability_under_use_limit). A 起動 that
+               carries 「{{ターン1回}}」 whose use is already spent THIS turn is
+               not a candidate: Rust `continue`s to the next ability, so no cost
+               is paid and no effect runs. Without this the C accepted a second
+               起動 every turn — PL!SP-bp1-003-P and PL!S-bp3-001-R＋ both
+               granted their live-total-score +1 twice, and rb_use_count stayed 0
+               after the first activation. */
+            if (ab.use_limit > 0 &&
+                rb_use_limit_reached(&g->queue, card_id, a, ab.use_limit, g->turn))
+                continue;
+            /* turn/actions/mod.rs:548-550 — `game_state.activating_card =
+               Some(card_id)` is published BEFORE any cost logic, with the comment
+               "so self-referential filters resolve to this card", and stays
+               published across the cost's choice round-trip
+               (resolver.rs:1161 publishes, resolver.rs:1091 clears at
+               finish_ability_resolution). Save/restore rather than clear: the
+               queue path publishes the same field with a re-entry depth guard
+               (game_state_abilities.c:1919-1928) and a nested resolution inside
+               this one will reset it to -1, so the value must be put back on the
+               way out — a stale card id here would make a LATER, unrelated
+               ability believe it is paying its own self_cost. */
+            int saved_act = g->activating_card;
+            g->activating_card = card_id;
+            /* rb_cost_optional_skipped() (cost.c:47) is a STICKY latch: a
+               decline sets it, the next cost PAYMENT clears it. Sample it before
+               the tree runs so only a 0->1 transition can be attributed to THIS
+               activation's cost. */
+            int pre_skipped = rb_cost_optional_skipped();
             /* Mirror Rust resolver::resolve_ability: cost then effect are one
                 ability resolution. Wrap them in a single heap effect tree so an
                 optional cost that emits a pay/skip choice bridges to the effect via
@@ -1201,12 +1252,40 @@ int rb_activate_card(GameState *g, int pl, int card_id) {
                 free(g->activation_act);
                 g->activation_act = NULL;
             }
+            /* ── USE LIMIT RECORD ── ability/gates.rs:279-335
+               (record_use_limit) / turn/actions/mod.rs:1488-1500
+               (finish_paid_ability). One accepted activation spends exactly one
+               use. The C spends it at RESOLUTION time, not at enqueue
+               (game_state_abilities.c:2001-2032, whose `use_limit_recorded` flag
+               is what stops the resolution-time gate from rejecting the entry
+               that just consumed it), and this inline path owns no queue entry at
+               all, so it has to record for itself.
+
+               A DECLINED optional cost must not spend the activation —
+               finish_paid_ability:1492 guards on
+               `snap.cost_entry_opt_result != Some(false)`. The verdict is only
+               knowable once the prompt is closed, and that is guaranteed here:
+               cost.c's decline path (rb_handle_optional_cost_payment,
+               cost.c:1195-1218) clears has_pending and settles the latch
+               synchronously, so a still-open prompt always means the cost has NOT
+               been declined yet — recording then matches Rust recording at
+               Final/finish_paid_ability once the round-trip completes. */
+            int declined = ab.cost && rb_cost_optional_skipped() && !pre_skipped;
+            if (ab.use_limit > 0 && !declined)
+                rb_record_use(&g->queue, card_id, a, g->turn);
+            g->activating_card = saved_act;
             any = 1;
             matched++;
         }
         /* Don't free ab.cost/ab.effect here - they are owned by act, not by ab */
     }
-    if (matched == 0) {
+    /* Rust reports "No activatable ability found for this card at its current
+       location" (turn/actions/mod.rs:545-546) when every 起動 candidate was
+       refused. The default-ability fallback below must therefore NOT run for a
+       card that HAS 起動 abilities which the use-limit gate turned down —
+       otherwise a refused second 起動 silently re-runs the card's default
+       ability and grants its effect all over again. */
+    if (matched == 0 && !has_activate) {
         /* Fallback: single default ability (debut/auto-only members). */
         Card c;
         if (rb_decode_card_by_index((uint32_t)card_id, &c)) {
@@ -1510,13 +1589,122 @@ const RbDeckList *choose_deck(const RbDeckList *deck_lists, int n_lists, const c
     return &deck_lists[0];
 }
 
-/* ───────────────────────────── i18n self-check (main.rs::i18n_self_check) ───────────────────────────── */
-/* Rust: iterates CHOICE_PROMPT_TEMPLATES_EN, calls translate_choice_prompt_en_to_ja
-   for each, logs a warning for any missing Japanese translation. C mapping: the C port
-   has no i18n template system (no CHOICE_PROMPT_TEMPLATES_EN, no translate fn), and the
-   Rust fn is #[cfg(feature = "server")] — the C port has no server feature. This is a
-   faithful no-op: the C engine never needs to validate i18n parity. Kept for ABI parity. */
+/* ───────────────────────────── i18n self-check (main.rs:295-316) ───────────────────────────── */
+/* Canonical English choice-prompt templates — describe.rs:1053-1064. The C port
+   emits these same strings (choice.c:1420/1449 build "Select up to N ..." and
+   ability/types.c:660/663 set "Repeat effect?" bilingually), so the self-check
+   has a real counterpart here and is not a placeholder. */
+static const char *const s_choice_prompt_templates_en[] = {
+    "Select up to 3 card(s) to keep",
+    "Select up to 3 more card(s) from hand to keep",
+    "Select up to 1 member(s) to change state",
+    "Select up to 3 card(s) from the 5 looked-at cards (or skip)",
+    "Select up to 2 more card(s) from the 4 remaining looked-at cards",
+    "Repeat effect?",
+    "Pay optional cost or skip",
+};
+
+/* describe.rs:1070-1127 translate_choice_prompt_en_to_ja. The parameterized
+   templates ("Select up to N ...", N varying) cannot come from an exact-match
+   table, so the number is parsed out of the string exactly as Rust does. Returns
+   1 and fills `out` for a recognised prompt, 0 for an unrecognised one. */
+static int translate_choice_prompt_en_to_ja(const char *en, char *out, size_t cap) {
+    if (!en || !out || cap == 0) return 0;
+    while (*en == ' ' || *en == '\t') en++;
+
+    /* Which prefix was matched, so the family-specific tails can be told apart. */
+    enum { PFX_NONE, PFX_SELECT, PFX_PLACE, PFX_ADD, PFX_DISCARD } pfx = PFX_NONE;
+    const char *rest = NULL;
+    if (!strncmp(en, "Select up to ",  13)) { pfx = PFX_SELECT;  rest = en + 13; }
+    else if (!strncmp(en, "Place up to ",  12)) { pfx = PFX_PLACE;   rest = en + 12; }
+    else if (!strncmp(en, "Add up to ",    10)) { pfx = PFX_ADD;     rest = en + 10; }
+    else if (!strncmp(en, "Discard up to ", 14)) { pfx = PFX_DISCARD; rest = en + 14; }
+
+    if (pfx != PFX_NONE) {
+        const char *p = rest;
+        while (*p >= '0' && *p <= '9') p++;
+        size_t n = (size_t)(p - rest);
+        char num[16];
+        if (n == 0 || n >= sizeof(num)) return 0;
+        memcpy(num, rest, n);
+        num[n] = '\0';
+        const char *after = p;
+
+        switch (pfx) {
+        case PFX_SELECT:
+            if (strstr(after, "to keep"))
+                snprintf(out, cap, "最大%s枚まで手札に残すカードを選択", num);
+            else if (strstr(after, "member(s) to change state"))
+                snprintf(out, cap, "状態を変更するメンバーを最大%s体選択", num);
+            else if (strstr(after, "looked-at cards"))
+                snprintf(out, cap, "見たカードから最大%s枚を選択（スキップ可）", num);
+            else
+                return 0;
+            return 1;
+        case PFX_PLACE:
+            if (strstr(en, "bottom of deck")) {
+                if (!strcmp(num, "1"))
+                    snprintf(out, cap, "見たカードをデッキの下に置きますか？");
+                else
+                    snprintf(out, cap, "見たカードを最大%s枚までデッキの下に置きますか？", num);
+            } else if (strstr(en, "top of deck")) {
+                if (!strcmp(num, "1"))
+                    snprintf(out, cap, "見たカードをデッキの上に置きますか？");
+                else
+                    snprintf(out, cap, "見たカードを最大%s枚までデッキの上に置きますか？", num);
+            } else {
+                return 0;
+            }
+            return 1;
+        case PFX_ADD:
+            if (!strstr(en, "to hand")) return 0;
+            if (!strcmp(num, "1"))
+                snprintf(out, cap, "見たカードを手札に加えますか？");
+            else
+                snprintf(out, cap, "見たカードを最大%s枚まで手札に加えますか？", num);
+            return 1;
+        case PFX_DISCARD:
+            if (!strstr(en, "looked-at")) return 0;
+            if (!strcmp(num, "1"))
+                snprintf(out, cap, "見たカードを控え室に置きますか？");
+            else
+                snprintf(out, cap, "見たカードを最大%s枚まで控え室に置きますか？", num);
+            return 1;
+        default:
+            return 0;
+        }
+    }
+
+    if (!strcmp(en, "Repeat effect?")) {
+        snprintf(out, cap, "効果を繰り返しますか？");
+        return 1;
+    }
+    if (!strcmp(en, "Pay optional cost or skip")) {
+        snprintf(out, cap, "オプションコストを支払うかスキップ");
+        return 1;
+    }
+    return 0;   /* describe.rs:1125 — unrecognised prompt */
+}
+
+/* main.rs:295-316. Rust guards this with #[cfg(feature = "server")] and calls it
+   once at boot; the C port has no boot-time caller, so it is exported for the
+   same ABI parity. */
 void i18n_self_check(void) {
+    size_t n = sizeof(s_choice_prompt_templates_en) / sizeof(s_choice_prompt_templates_en[0]);
+    int missing = 0;
+    char ja[128];
+    for (size_t i = 0; i < n; i++) {
+        const char *tpl = s_choice_prompt_templates_en[i];
+        if (!translate_choice_prompt_en_to_ja(tpl, ja, sizeof(ja))) {
+            fprintf(stderr, "[i18n] missing Japanese translation for choice prompt template: %s\n", tpl);
+            missing++;
+        }
+    }
+    if (missing > 0)
+        fprintf(stderr, "[i18n] %d choice-prompt template(s) lack Japanese — "
+                        "JA mode will show English for these\n", missing);
+    else
+        fprintf(stderr, "[i18n] all canonical choice-prompt templates have Japanese translations\n");
 }
 
 /* ───────────────────────────── web server (main.rs::run_web_server) ───────────────────────────── */
