@@ -1,7 +1,7 @@
 use crate::card::{BaseHeart, CardDatabase, HeartColor};
 use crate::core::constants::CountCast;
 use crate::core::game_modifiers::ModifierEntry;
-use crate::{HashMap, HashSet};
+use crate::HashMap;
 #[cfg(feature = "serde_support")]
 use serde::{Deserialize, Serialize};
 use smallvec::SmallVec;
@@ -414,26 +414,6 @@ impl Stage {
         Ok(card_id)
     }
 
-    pub fn formation_change(
-        &mut self,
-        assignments: Vec<(MemberArea, MemberArea)>,
-    ) -> Result<(), String> {
-        // Rule 11.11: Formation Change - move all members to specified areas
-        // Rule 11.11.2: Cannot move multiple members to same area
-        let mut target_areas = HashSet::<&MemberArea>::default();
-        for (_, target) in &assignments {
-            if !target_areas.insert(target) {
-                return Err("Cannot move multiple members to same area".to_string());
-            }
-        }
-
-        for (from, to) in assignments.clone() {
-            self.position_change(from, to)?;
-        }
-
-        Ok(())
-    }
-
     // Q133: Weighed members' blades do NOT count toward yell reveal count.
     // Q134: Baton touch with a weighed member is allowed; the new member enters active.
     // Q136: A weighed member moving areas remains weighed.
@@ -504,43 +484,6 @@ impl Stage {
             heart_copy,
             heart_color_multiplier,
             heart_modifiers,
-        )
-    }
-
-    /// Legacy adapter for callers still holding the old i32-valued modifier map
-    /// (e.g. transient test scaffolding). Converts to the canonical ModifierEntry
-    /// form and delegates.
-    pub fn get_available_hearts_i32(
-        &self,
-        card_db: &CardDatabase,
-        heart_override: &HashMap<i16, (HeartColor, u8)>,
-        heart_modifiers_i32: &HashMap<i16, HashMap<HeartColor, i32>>,
-        heart_color_multiplier: &HashMap<i16, HeartColor>,
-        heart_copy: &HashMap<i16, i16>,
-    ) -> BaseHeart {
-        let converted: HashMap<
-            i16,
-            HashMap<HeartColor, crate::core::game_modifiers::ModifierEntry>,
-        > = heart_modifiers_i32
-            .iter()
-            .map(|(&cid, colors)| {
-                let mut m = HashMap::default();
-                for (&col, &delta) in colors {
-                    let e = crate::core::game_modifiers::ModifierEntry {
-                        additive: delta.i16_count(),
-                        ..Default::default()
-                    };
-                    m.insert(col, e);
-                }
-                (cid, m)
-            })
-            .collect();
-        self.get_available_hearts(
-            card_db,
-            heart_override,
-            &converted,
-            heart_color_multiplier,
-            heart_copy,
         )
     }
 }
@@ -774,25 +717,8 @@ impl EnergyZone {
     }
 
     /// Push a WAITED card: appended past the active prefix (no count change).
-    pub fn push_waited(&mut self, card_id: i16) {
-        self.cards.push(card_id);
-    }
-
-    /// Mark the card at `index` waited, preserving the convention by swapping
-    /// it with the last active card. No-op if already waited or out of range.
-    /// Returns true when a state change happened.
     /// NOTE: prefer the batch `set_indices_*` below for multi-index changes —
     /// per-index swaps re-point later indices, which alias under duplicate ids.
-    pub fn mark_waited(&mut self, index: usize) -> bool {
-        let active = self.active_energy_count as usize;
-        if index >= active || index >= self.cards.len() {
-            return false;
-        }
-        let last_active = active - 1;
-        self.cards.swap(index, last_active);
-        self.active_energy_count = self.active_energy_count.saturating_sub(1);
-        true
-    }
 
     /// Set exactly the given INDICES to waited, preserving relative order:
     /// rebuilds as [still-active in order] ++ [rest in order] and recounts.
@@ -832,19 +758,6 @@ impl EnergyZone {
         now_active.extend(rest);
         self.cards = now_active.into_iter().collect();
         self.active_energy_count = new_active.u8_count();
-    }
-
-    /// Mark the card at `index` active, preserving the convention by swapping
-    /// it with the first waited card. No-op if already active or out of range.
-    /// Returns true when a state change happened.
-    pub fn mark_active(&mut self, index: usize) -> bool {
-        let active = self.active_energy_count as usize;
-        if index < active || index >= self.cards.len() {
-            return false;
-        }
-        self.cards.swap(index, active);
-        self.active_energy_count = self.active_energy_count.saturating_add(1);
-        true
     }
 
     /// Remove and return the card at `index`, adjusting the counter only when
@@ -1150,10 +1063,6 @@ impl ResolutionZone {
     pub fn add_card_for_owner(&mut self, card_id: i16, owner: u8) {
         self.cards.push(card_id);
         self.owners.push(owner);
-    }
-
-    pub fn owner_at(&self, index: usize) -> Option<u8> {
-        self.owners.get(index).copied()
     }
 
     pub fn swap_slots(&mut self, left_slot: usize, right_slot: usize) -> Result<(), String> {

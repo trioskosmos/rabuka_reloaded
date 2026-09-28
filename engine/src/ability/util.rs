@@ -1743,20 +1743,6 @@ pub fn matching_ids(
         .collect()
 }
 
-/// B5: shared candidate-pool builder — the 5 sites
-/// (`game_setup.rs:579/:1353`, `choice.rs:402`, `look.rs:356/607`, `state.rs:20`)
-/// previously re-implemented the same filter loop. Centralize here so filter
-/// drift is impossible; callers pass the already-built `CardFilter`.
-pub fn build_candidate_pool(
-    cards: &[i16],
-    db: &CardDatabase,
-    filter: &CardFilter,
-) -> Vec<i16> {
-    let pool = matching_ids(cards, db, filter, true);
-    log::debug!("[POOL] cards={} -> pool={} (filter ct={:?} group={:?})", cards.len(), pool.len(), filter.card_type, filter.group);
-    pool
-}
-
 pub fn matching_ids_filtered(
     cards: &[i16],
     db: &CardDatabase,
@@ -1947,11 +1933,6 @@ pub fn zone_card_ids_occupied(player: &crate::player::Player, zone: &str) -> Vec
 /// menu so offerable sets can't diverge per call site.
 pub fn active_energy_indices(player: &crate::player::Player) -> Vec<usize> {
     (0..player.energy_zone.active_count() as usize).collect()
-}
-
-/// Indices of WAITED energy cards (complement of `active_energy_indices`).
-pub fn waited_energy_indices(player: &crate::player::Player) -> Vec<usize> {
-    (player.energy_zone.active_count() as usize..player.energy_zone.cards.len()).collect()
 }
 
 /// Count cards matching filter in a zone for a given player.

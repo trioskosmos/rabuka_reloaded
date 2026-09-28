@@ -129,6 +129,7 @@ from parser_utils import (
     detect_card_property,
     LOCATION_PATTERNS,
     POSITION_KEYWORDS,
+    heart_id,
     _ALL_KW_RE,
     iter_dict_nodes,
     transform_child_lists,
@@ -290,7 +291,7 @@ def _heart_count(text):
 
 def _heart_id_list(text):
     """Every heart colour named by a rendered icon, in order, duplicates kept."""
-    return [f"heart{n.zfill(2)}" for n in re.findall(HEART_ICON_ID, text)]
+    return [heart_id(n) for n in re.findall(HEART_ICON_ID, text)]
 
 
 def _heart_ids(text):
@@ -331,7 +332,7 @@ def _heart_label_counts(text):
 
 def _heart_ref_ids(text, unique=False):
     """Heart colours from the `heart_NN` ids written in `text`, as `heartNN`."""
-    ids = [f"heart{n.zfill(2)}" for n in re.findall(HEART_REF, text)]
+    ids = [heart_id(n) for n in re.findall(HEART_REF, text)]
     return list(dict.fromkeys(ids)) if unique else ids
 
 
@@ -1362,13 +1363,14 @@ def parse_effect(text: str) -> Dict[str, Any]:
                     cond_parsed = parse_condition(note)
                     if _is_real_condition(cond_parsed):
                         extra_activation_cond = cond_parsed
-                positions = []
-                if "センターエリア" in note:
-                    positions.append("center")
-                if "左サイドエリア" in note or "左サイド" in note:
-                    positions.append("left_side")
-                if "右サイドエリア" in note or "右サイド" in note:
-                    positions.append("right_side")
+                # detect_note_positions is the single owner of the note
+                # position vocabulary. This was an inline re-implementation
+                # whose centre test only matched the FULL form
+                # ("センターエリア"), while its left/right tests accepted both
+                # forms and the helper accepts the short form for all three —
+                # so a note reading 「センターに登場した場合のみ発動する」 set
+                # activation_position here but not at the other two call sites.
+                positions = detect_note_positions(note)
                 if positions:
                     extra_activation_pos = ",".join(positions)
 
@@ -2126,7 +2128,7 @@ def _set_heart_type(t, a, allow_selected=False):
     """
     m = re.search(HEART_ICON_ID, t)
     if m:
-        a["heart_type"] = f"heart{m.group(1)}"
+        a["heart_type"] = heart_id(m.group(1))
     elif allow_selected and "選んだハート" in t:
         a["heart_type"] = "selected"
     else:
@@ -3444,24 +3446,29 @@ def _try_cost_override_condition(text):
     }
 
 
+# The stage-area spellings, derived from the single source of truth rather than
+# re-declared. `POSITION_KEYWORDS` also holds 正面 -> front, which is a
+# different concept and must NOT match this pattern, so the subset is selected by
+# canonical id instead of being a second hand-written list.
+_STAGE_POSITION_IDS = ("center", "left_side", "right_side")
+_STAGE_AREA_KEYWORDS: Tuple[str, ...] = tuple(
+    k for k, v in POSITION_KEYWORDS.items() if v in _STAGE_POSITION_IDS
+)
+_HIGHEST_COST_ON_STAGE_RE = re.compile(
+    "(" + "|".join(_STAGE_AREA_KEYWORDS) + r")(?:エリア)?にいる(?:メンバー|カード)が最も大きいコストを持つ"
+)
+
+
 def _try_highest_cost_on_stage(text):
     """Detect 'positionにいるメンバーが最も大きいコストを持つ' (member at position has the highest cost among stage members)."""
-    m = re.search(
-        r"(センターエリア|センター|左サイドエリア|左サイド|右サイドエリア|右サイド)(?:エリア)?にいる(?:メンバー|カード)が最も大きいコストを持つ",
-        text,
-    )
+    m = _HIGHEST_COST_ON_STAGE_RE.search(text)
     if not m:
         return None
     pos_raw = m.group(1)
-    pos_map = {
-        "センターエリア": "center",
-        "センター": "center",
-        "左サイドエリア": "left_side",
-        "左サイド": "left_side",
-        "右サイドエリア": "right_side",
-        "右サイド": "right_side",
-    }
-    position = pos_map.get(pos_raw.strip())
+    # Lookup via the canonical map. The previous local `pos_map` was a 6-entry
+    # duplicate of POSITION_KEYWORDS that would silently go stale if the real map
+    # changed.
+    position = POSITION_KEYWORDS.get(pos_raw.strip())
     if not position:
         return None
     return {
@@ -7582,7 +7589,7 @@ def _try_character_specific(text):
             resources_text = eff["resources"]
             heart_m = re.search(HEART_REF, resources_text)
             blade_count = resources_text.count("icon_blade.png")
-            heart_color = f"heart{heart_m.group(1)}" if heart_m else None
+            heart_color = heart_id(heart_m.group(1)) if heart_m else None
             if blade_count > 0:
                 char_acts.append(
                     _character_gain(eff, "blade", blade_count)

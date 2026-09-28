@@ -769,24 +769,13 @@ fn experiment_flip_categories(
     (cats, my.main_deck.cards.len())
 }
 
+/// Rule 2.11.3 wildcard-feasibility. Delegates to `v8_model::feasible`, which
+/// was the canonical home: this body was byte-identical to it apart from
+/// naming the scratch variable `bucket_supply` instead of `bucket`. Two bots
+/// deciding "can this requirement be met" from separate copies of the same
+/// rule is how they start disagreeing on a board.
 fn experiment_feasible(pool: &[i32; 8], need: &[i32; 11]) -> bool {
-    let mut wildcard = pool[7];
-    let mut bucket_supply = pool[0];
-    for c in 1..=6 {
-        let have = pool[c];
-        let want = need[c];
-        if have >= want {
-            bucket_supply += have - want;
-        } else {
-            let deficit = want - have;
-            if wildcard < deficit {
-                return false;
-            }
-            wildcard -= deficit;
-        }
-    }
-    bucket_supply += wildcard;
-    bucket_supply >= need[0] + need[7] + need[10]
+    crate::bot::v8_model::feasible(pool, need)
 }
 
 fn experiment_pass_probability(

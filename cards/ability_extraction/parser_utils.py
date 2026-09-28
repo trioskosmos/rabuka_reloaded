@@ -56,6 +56,19 @@ HEART_HAS_REF = r"heart_\d+"
 HEART_LABEL = r"\|(heart\d+)\}"
 
 
+def heart_id(number: str) -> str:
+    """Canonical `heartNN` id for a heart-colour number captured by one of the
+    HEART_* patterns above.
+
+    The captured number comes from an icon FILENAME (`heart3.png`) while the
+    engine's ids are zero-padded (`heart03`). Two call sites forgot the padding
+    and emitted `heart3`, which `HeartColor::from_str` does not recognise — it
+    falls through to `Heart00`, so a heart requirement silently became
+    colourless. Every site must go through this.
+    """
+    return f"heart{number.zfill(2)}"
+
+
 # ======================================================================
 # RESOURCE ICON VOCABULARY (one definition, used by every icon scan)
 # ======================================================================

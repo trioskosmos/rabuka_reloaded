@@ -101,16 +101,6 @@ impl GameState {
         Ok(())
     }
 
-    pub fn check_required_hearts(&self) -> Result<bool, String> {
-        if self.cheer_checks_done < self.cheer_checks_required {
-            return Err(format!(
-                "Cannot check required hearts: {} of {} cheer checks completed",
-                self.cheer_checks_done, self.cheer_checks_required
-            ));
-        }
-        Ok(true)
-    }
-
     pub fn is_action_prohibited(&self, action: &str) -> bool {
         self.prohibition_effects.iter().any(|e| e.contains(action))
     }

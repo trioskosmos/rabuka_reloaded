@@ -1,10 +1,10 @@
 {
   "schema": "compiled_abilities.v1",
   "compiler": "cards/compile_abilities.py",
-  "engine_commit": "fbcea4db",
+  "engine_commit": "d7f910d1",
   "input": {
     "source": "cards/abilities.json",
-    "sha256": "b2a6d4e73ca35744",
+    "sha256": "db56b56e8c9dc837",
     "count": 936
   },
   "output": {

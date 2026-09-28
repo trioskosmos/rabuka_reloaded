@@ -17,7 +17,6 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 from parser import (
     ActionRule,
     parse_ability,
-    parse_action,
     _effect_registry,
     _condition_registry,
     _ACTION_RULES,
@@ -42,47 +41,6 @@ CORPUS_PATH = os.path.join(
 #
 # Investigate a rule here before "fixing" it: check which rule shadows it and
 # whether the shadowing is intended. Removing the loser is usually wrong.
-SHADOWED_ACTION_RULES = {
-    "action_001_position_change",
-    "action_006_move_cards",
-    "action_009_discard_until_count",
-    "action_013_draw_card",
-    "action_017_change_state",
-    "action_019_activate_ability",
-    "action_021_restriction",
-    "action_022_restriction",
-    "action_026_restriction",
-    "action_027_restriction",
-    "action_028_restriction",
-    "action_032_move_cards",
-    "action_036_gain_resource",
-    "action_041_re_yell",
-    "action_043_reveal",
-    "action_045_select_number",
-    "action_049_activate_ability",
-    "action_053_modify_score",
-    "action_054_modify_score",
-    "action_055_modify_score",
-    "action_056_set_blade_type",
-    "action_058_specify_heart_color",
-    "action_059_gain_resource",
-    "action_061_modify_required_hearts",
-    "action_063_repeat_procedure",
-    "action_064_do_nothing",
-    "action_065_do_nothing",
-    "action_066_pay_energy",
-    "action_068_invalidate_ability",
-    "action_071_move_cards",
-    "action_074_gain_ability",
-    "action_075_reduce_live_card_set_limit",
-    "action_076_set_card_identity",
-    "action_077_choose_required_hearts",
-    "action_078_all_blade_timing",
-    "action_081_conditional_alternative",
-    "action_082_gain_resource",
-}
-
-
 def load_ability_texts():
     """Load all unique ability triggerless texts from the extracted corpus."""
     if not os.path.exists(CORPUS_PATH):
@@ -169,73 +127,26 @@ def test_all_condition_rules_triggered():
     assert not dead, f"Condition rules never triggered by corpus: {sorted(dead)}"
 
 
-def _extract_action_texts(texts):
-    """Parse each ability and return the action-clause text the action rules
-    actually dispatch against (after trigger/cost stripping). Falls back to the
-    raw text if parsing yields no action text."""
-    out = []
-    for t in texts:
-        try:
-            ab = parse_ability(t)
-        except Exception:
-            ab = {}
-        act = ab.get("action") if isinstance(ab, dict) else None
-        if isinstance(act, dict) and act.get("text"):
-            out.append(act["text"])
-        else:
-            out.append(t)
-    return out
-
-
-def test_all_action_rules_win_some_ability():
-    """Every rule in _ACTION_RULES should actually WIN at least one ability.
-
-    Unlike the effect/condition registries, _ACTION_RULES is first-match-wins,
-    so "does the rule match" is the wrong question: a rule can match text that
-    an earlier rule already claimed, and it would then be dead while looking
-    alive. That is exactly how `action_047` survived — its condition was a
-    strict subset of `action_039`'s, which sits earlier in the list, so 047
-    could never be reached.
-
-    This walks the REAL dispatch (via parse_action, so the action dict the
-    predicates inspect is the genuine one) and records which rule wins.
-
-    Like the effect/condition versions, this feeds BOTH the raw
-    `triggerless_text` and the action clause that `parse_ability` derived from
-    it. Action rules dispatch on the clause, so testing only the raw text would
-    report a rule as dead merely because the clause it keys off was never
-    handed to it in that form.
-    """
-    texts = load_ability_texts()
-    assert texts, "Corpus is empty — cannot run coverage test"
-
-    inputs = list(dict.fromkeys(texts + _extract_action_texts(texts)))
-
-    winners = set()
-    original_apply = ActionRule.apply
-
-    def recording_apply(self, text, action):
-        winners.add(self.name)
-        return original_apply(self, text, action)
-
-    ActionRule.apply = recording_apply
-    try:
-        for t in inputs:
-            try:
-                parse_action(t)
-            except Exception:
-                pass
-    finally:
-        ActionRule.apply = original_apply
-
-    all_rules = {rule.name for rule in _ACTION_RULES}
-    dead = all_rules - winners
-    assert dead <= SHADOWED_ACTION_RULES, (
-        "New action rules are shadowed (never win dispatch). "
-        f"Newly shadowed: {sorted(dead - SHADOWED_ACTION_RULES)}; "
-        "either fix the shadowing rule or record the new one in "
-        "SHADOWED_ACTION_RULES if it is a deliberate fallback."
-    )
+# NOTE — there is deliberately NO action-registry dead-rule test here.
+#
+# A "does this rule ever WIN dispatch" check looks like the effect/condition
+# versions above, but it is unsound for _ACTION_RULES, which is first-match-wins
+# and is dispatched against many derived clause forms (sequential steps, nested
+# sub-actions, per-effect re-parsing). Whatever text you drive it with, some
+# live rules are never reached. Measured false-positive counts on 2026-09-28:
+# 37 rules when driving `parse_action` per corpus text, 29 when driving the
+# full `parse_ability`, 30 when driving raw ability strings from cards.json.
+# Three inputs, three different wrong answers.
+#
+# Acting on the first number (deleting those 37) removed `modify_limit`,
+# `repeat_procedure` and `draw_until_count` from the emitted corpus — caught by
+# the regenerate + `git diff --numstat cards/abilities.json` gate, not by any
+# test. The rules were restored and the suite is green again.
+#
+# The one provably dead action rule, `action_047`, was removed by reading its
+# predicate: its condition is a strict subset of `action_039`'s, which sits
+# earlier in the list, so 047 is unreachable by construction. That kind of
+# static proof is the only trustworthy way to retire an action rule today.
 
 
 def test_parse_ability_no_crash():
@@ -257,7 +168,6 @@ if __name__ == "__main__":
         test_action_rules_are_normalized,
         test_all_effect_rules_triggered,
         test_all_condition_rules_triggered,
-        test_all_action_rules_win_some_ability,
         test_parse_ability_no_crash,
     ]
     passed = 0

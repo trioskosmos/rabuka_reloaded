@@ -3147,6 +3147,44 @@ impl<'a> ConditionContext<'a> {
         }
     }
 
+    /// The card set an `ability_filter` should be evaluated against.
+    ///
+    /// Shared by `evaluate_ability_filter_condition` and its
+    /// `_with_card_check` twin, which carried byte-identical copies of this
+    /// match.
+    ///
+    /// Deliberately narrow: only the five zones these evaluators have always
+    /// considered. `util::zone_card_ids_occupied` covers a wider set (deck,
+    /// deck_top, success_live_zone) and would read as the obvious helper to
+    /// reach for, but adopting it would CHANGE behaviour — today a filter
+    /// naming any other location falls through to the activating card, and
+    /// silently starting to inspect deck contents is a semantics change, not a
+    /// cleanup. Widening that is a separate decision.
+    ///
+    /// Returns `None` for a location outside the five when there is no
+    /// activating card, which callers treat as "the filter has nothing to
+    /// inspect, so it passes".
+    fn ability_filter_scope(
+        &self,
+        player: &crate::player::Player,
+        location: &str,
+    ) -> Option<Vec<i16>> {
+        Some(match Zone::from_str(location) {
+            Some(Zone::Stage) => player
+                .stage
+                .stage
+                .iter()
+                .filter(|&&id| id != -1)
+                .copied()
+                .collect(),
+            Some(Zone::Hand) => player.hand.cards.to_vec(),
+            Some(Zone::Discard) | Some(Zone::Waitroom) => player.waitroom.cards.to_vec(),
+            Some(Zone::Energy) => player.energy_zone.cards.to_vec(),
+            Some(Zone::LiveCardZone) => player.live_card_zone.cards.to_vec(),
+            _ => return self.game_state.activating_card.map(|id| vec![id]),
+        })
+    }
+
     pub(crate) fn evaluate_ability_filter_condition(&self, condition: &Condition) -> bool {
         log::debug!(
             "[ABILITY_FILTER_EVAL] filter={:?} triggers={:?} location={:?}",
@@ -3162,25 +3200,8 @@ impl<'a> ConditionContext<'a> {
             .unwrap_or(&AbilityFilter::NoAbility);
 
         let location = condition.get_location().unwrap_or(Zone::Stage.to_str());
-        let card_ids: Vec<i16> = match Zone::from_str(location) {
-            Some(Zone::Stage) => player
-                .stage
-                .stage
-                .iter()
-                .filter(|&&id| id != -1)
-                .copied()
-                .collect(),
-            Some(Zone::Hand) => player.hand.cards.to_vec(),
-            Some(Zone::Discard) | Some(Zone::Waitroom) => player.waitroom.cards.to_vec(),
-            Some(Zone::Energy) => player.energy_zone.cards.to_vec(),
-            Some(Zone::LiveCardZone) => player.live_card_zone.cards.to_vec(),
-            _ => {
-                if let Some(card_id) = self.game_state.activating_card {
-                    vec![card_id]
-                } else {
-                    return true;
-                }
-            }
+        let Some(card_ids) = self.ability_filter_scope(player, location) else {
+            return true;
         };
 
         let has_ability = if let Some(card_id) = self.game_state.activating_card {
@@ -3240,25 +3261,8 @@ impl<'a> ConditionContext<'a> {
         let player = self.game_state.resolve_target_player(target);
 
         let location = condition.get_location().unwrap_or(Zone::Stage.to_str());
-        let card_ids: Vec<i16> = match Zone::from_str(location) {
-            Some(Zone::Stage) => player
-                .stage
-                .stage
-                .iter()
-                .filter(|&&id| id != -1)
-                .copied()
-                .collect(),
-            Some(Zone::Hand) => player.hand.cards.to_vec(),
-            Some(Zone::Discard) | Some(Zone::Waitroom) => player.waitroom.cards.to_vec(),
-            Some(Zone::Energy) => player.energy_zone.cards.to_vec(),
-            Some(Zone::LiveCardZone) => player.live_card_zone.cards.to_vec(),
-            _ => {
-                if let Some(card_id) = self.game_state.activating_card {
-                    vec![card_id]
-                } else {
-                    return true;
-                }
-            }
+        let Some(card_ids) = self.ability_filter_scope(player, location) else {
+            return true;
         };
 
         let operator = condition.get_operator().unwrap_or("any");

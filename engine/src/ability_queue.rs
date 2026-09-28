@@ -576,8 +576,8 @@ entry_index: u8::try_from(idx).unwrap(),
     }
 
     /// Move an entry at an absolute index to position 0 and reset current_index.
-    /// Unlike promote_entry which uses relative-from-current_index, this uses
-    /// the direct absolute index in the entries array.
+    /// The only promotion path; it used to have a relative-from-current_index
+    /// twin (`promote_entry`) that nothing called.
     pub fn promote_entry_by_abs(&mut self, absolute: usize) {
         if absolute >= self.entries.len() || absolute == 0 {
             if absolute == 0 {

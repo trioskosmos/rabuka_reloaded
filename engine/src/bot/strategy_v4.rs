@@ -285,15 +285,12 @@ pub(crate) fn passable_count(gs: &GameState, me_player: u8, db: &CardDatabase) -
         .count()
 }
 
-pub(crate) fn lives_in_hand(p: &crate::player::Player, db: &CardDatabase) -> usize {
-    p.hand
-        .cards
-        .iter()
-        .filter(|&&c| {
-            db.get_card(c).is_some_and(|x| x.card_type == CardType::Live)
-        })
-        .count()
-}
+// Re-exported rather than redefined: this body was byte-identical to
+// `v8_model::lives_in_hand`, differing only in the closure parameter name. Four
+// modules import it from here (conductor, strategy_v6, strategy_v7,
+// v7_ismcts) while v8's own main loop imported the other copy, so there were two
+// definitions of "how many Lives are in hand" that could drift.
+pub(crate) use crate::bot::v8_model::lives_in_hand;
 
 // ── Main phase ──────────────────────────────────────────────────────────
 

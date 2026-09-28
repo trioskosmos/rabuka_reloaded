@@ -503,50 +503,19 @@ impl CardDatabase {
         self.cards.get(&card_id)
     }
 
+    /// Look up a card by its printed number.
+    ///
+    /// Thin wrapper over [`Self::get_card_id`], which owns the resolution
+    /// algorithm. This used to be a second, hand-maintained copy of the same
+    /// five steps, and the two drifted: `get_card_id`'s "any rarity of this
+    /// base" and "contains" fallbacks had been fixed to take the LOWEST matching
+    /// key (HashMap iteration order is randomised per process, so first-match
+    /// made the answer non-deterministic), while this copy still returned
+    /// whichever key the HashMap happened to yield first. The same card_no could
+    /// therefore resolve to different cards depending on which accessor was used
+    /// or which run you were in. Delegating makes that divergence impossible.
     pub fn get_card_by_no(&self, card_no: &str) -> Option<&Card> {
-        // 1. Exact match
-        if let Some(&card_id) = self.card_no_to_id.get(card_no) {
-            return self.cards.get(&card_id);
-        }
-        // 2. Normalized (fullwidth→halfwidth, lowercase→uppercase)
-        let normalized = Self::normalize_card_no(card_no);
-        if let Some(&card_id) = self.normalized_no_to_id.get(&normalized) {
-            return self.cards.get(&card_id);
-        }
-        // 3. Parse base + requested rarity, try exact, then equivalents, then any
-        if let Some((base, requested_rarity)) = Self::parse_base_and_rarity(&normalized) {
-            // Try exact base+rarity
-            let exact = format!("{}-{}", base, requested_rarity);
-            if let Some(&card_id) = self.normalized_no_to_id.get(&exact) {
-                return self.cards.get(&card_id);
-            }
-            // Try equivalent rarities
-            for eq in Self::equivalent_rarities(&requested_rarity) {
-                let variant = format!("{}-{}", base, eq);
-                if let Some(&card_id) = self.normalized_no_to_id.get(&variant) {
-                    return self.cards.get(&card_id);
-                }
-            }
-            // Fallback: any rarity for this base
-            for (k, &card_id) in &self.normalized_no_to_id {
-                if k.starts_with(&format!("{}-", base)) {
-                    return self.cards.get(&card_id);
-                }
-            }
-        }
-        // 4. Strip trailing rarity suffixes and retry normalized (legacy)
-        for stripped in Self::strip_rarity_suffixes(&normalized) {
-            if let Some(&card_id) = self.normalized_no_to_id.get(&stripped) {
-                return self.cards.get(&card_id);
-            }
-        }
-        // 5. Contains fallback (last resort)
-        for (k, &card_id) in &self.card_no_to_id {
-            if k.contains(&normalized) || k.contains(&normalized.replace('+', "＋")) {
-                return self.cards.get(&card_id);
-            }
-        }
-        None
+        self.get_card_id(card_no).and_then(|id| self.cards.get(&id))
     }
 
     /// Parse card_no into (base, rarity) where base is everything before last dash.
@@ -2290,15 +2259,6 @@ impl AbilityEffect {
     filter_str_getter!(question_any, question);
 
     filter_u8_getter!(cost_limit_max_any, cost_limit_max);
-
-    pub fn non_stackable_any(&self) -> Option<bool> {
-        self.non_stackable.or_else(|| {
-            self.kind
-                .as_deref()
-                .and_then(|k| k.filter())
-                .and_then(|f| f.non_stackable)
-        })
-    }
 }
 
 impl AbilityEffect {
@@ -3693,10 +3653,6 @@ impl Condition {
 
     pub fn get_delta(&self) -> Option<bool> {
         self.common().and_then(|c| c.delta)
-    }
-
-    pub fn get_shuffle(&self) -> Option<bool> {
-        self.common().and_then(|c| c.shuffle)
     }
 
     pub fn get_action_reference(&self) -> Option<&str> {

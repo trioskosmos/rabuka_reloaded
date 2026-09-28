@@ -133,27 +133,39 @@ effective order. The residual cost is one decision per new clause ("is this an
 action, a condition, an effect, or a cost?"), which is inherent to clause
 grammar and not something a merged table would remove.
 
-### 36 action rules are shadowed — biggest open finding (2026-09-28)
+### There is NO dead action-rule backlog — do not go looking for one (2026-09-28)
 
-Adding the action registry to `test_registry_coverage` surfaced this. The test
-asks whether a rule ever WINS dispatch (not whether it matches — the list is
-first-match-wins, so a rule that always loses is dead while looking alive).
-**36 of 83 rules never win on the current corpus.** The list is recorded in
-`SHADOWED_ACTION_RULES` in the test, and the test fails only if that set GROWS.
+This section previously claimed 36 action rules were "shadowed" and needed
+per-rule review. **That claim was wrong and the work it motivated was reverted.**
+Corrected record:
 
-They are *shadowed*, not unreachable. Worked example: `action_043_reveal`
-(`公開する`) matches 78 corpus texts and loses every one of them —
-`action_029_move_cards` takes 53 (`加える`), `action_035_move_cards` 8,
-`action_012_draw_card` 4. So a clause that both reveals and adds to hand is
-typed as `move_cards` and the reveal is never seen by the action layer.
+A "does this rule ever WIN dispatch" check cannot be made sound for
+`_ACTION_RULES`. The table is first-match-wins and is dispatched against many
+derived clause forms — sequential steps, nested sub-actions, per-effect
+re-parsing — so whichever text you drive it with, live rules go unreached.
+Measured false-positive counts on the same 82 rules:
 
-Do **not** bulk-delete these. Most are broad deliberate fallbacks that are
-still correct for card text this corpus does not contain; removing the loser
-trades a latent fallback for a guaranteed break on any unseen card. The real
-question per rule is whether the shadowing is intended, which needs per-rule
-card-text review. `action_047` was the one case where the shadowing was
-provably wrong (strict subset of `action_039`, which also has a `setter` that
-047 lacks) and it has been deleted.
+| driving input | "dead" rules reported |
+|---|---|
+| `parse_action` per corpus `triggerless_text` | 37 |
+| full `parse_ability` per corpus text | 29 |
+| raw ability strings from `cards.json` | 30 |
+
+Three inputs, three different wrong answers. Acting on the first number meant
+deleting 37 rules, which **removed `modify_limit`, `repeat_procedure` and
+`draw_until_count` from the emitted corpus** (4 decoder warnings, 2 missing
+mechanics, validation 0 → 2 issues, bytecode 93023 → 92509). The regenerate +
+`git diff --numstat cards/abilities.json` gate caught it — no test did. The
+rules were restored verbatim and the suite is green.
+
+There is no dead-rule backlog here. The single provably dead action rule was
+`action_047`, removed by static proof: its condition is a strict subset of
+`action_039`'s and 039 sits earlier in the list. **Retire an action rule by
+proving the shadowing statically, or not at all.** An "apparently dead" action
+rule is almost always live on a clause form the probe did not produce.
+
+`test_registry_coverage.py` carries this as a comment so the test is not
+re-added.
 
 ### Still open (deliberately not done)
 
