@@ -1848,7 +1848,24 @@ int rb_fire_recorded_auto(GameState *g, int pl) {
    (src/ability/choice.c:2979) currently omits that call, which is why the
    SelectAutoAbility prompt stays disabled in rb_process_player_abilities
    below. Exported (declared in include/rabuka.h) so that choice.c can make the
-   call; it has no caller outside this file yet, so this changes no behaviour. */
+   call; it has no caller outside this file yet, so this changes no behaviour.
+
+   The body proper lives in pca_resolve_entry so that the
+   `g->activating_card` publish/clear window (defect 2, below) is provably
+   closed on EVERY exit path: the wrapper is the only place that touches the
+   field, so a future early return added to the body cannot leak it. */
+static int pca_resolve_entry(GameState *g, RbQueueEntry *entry, int cid, int aidx,
+                             Ability *ab, int actor);
+
+/* Re-entry depth of rb_process_current_ability. Rust nests the same way (a
+   process_pending_auto_abilities reached from inside an effect's own drain
+   re-enters process_current_ability), and the inner resolution would clear
+   `activating_card` out from under the outer one. Track the depth so only the
+   OUTERMOST resolution clears to None, exactly as Rust's top-level
+   process_current_ability -> finish_ability_resolution does. */
+static int s_pca_depth = 0;
+static int s_pca_outer_activating = -1;
+
 int rb_process_current_ability(GameState *g) {
     if (!g || g->queue.cur < 0 || g->queue.cur >= g->queue.n_entries) return 0;
 
@@ -1877,6 +1894,49 @@ int rb_process_current_ability(GameState *g) {
         fprintf(stderr, "[PROCESS_CURRENT] cid=%d ab=%d owner=%d queue_actor=%d use=%d\n",
                 cid, aidx, actor, g->queue.actor, ab.use_limit);
 
+    /* abilities.rs:1996-1997 — `self.activating_card = card_id` is published
+       on ENTRY to process_current_ability, and resolver.rs:1161 re-publishes
+       it on entry to resolve_ability. It is NOT a save/restore: the field
+       stays published for the WHOLE resolution, across the cost's choice
+       round-trip (the manual-activation path mirrors this explicitly, clearing
+       at turn/actions/mod.rs:96 and re-publishing the saved value at :1432 so
+       a nested `self_cost` leg still sees the activating member), and the
+       resolution ENDS by CLEARING it —
+         * finish_ability_resolution (resolver.rs:1091) on the success path,
+         * the negated arm (abilities.rs:1950 / :1991),
+         * and, by omission, every early return in resolve_ability — the next
+           process_current_ability unconditionally overwrites the field at
+           abilities.rs:1996, including with None when the entry has no card.
+
+       The C never published it here, so every `self_cost` / `exclude_self`
+       leg the queue path paid resolved against whatever stale value was lying
+       in the field (usually -1); cost.c had to grow a
+       `cost_self_activating_card` fallback to the current entry's card to
+       paper over the gap. Publish here and clear on the way out: a leaked
+       activating_card would make a LATER, unrelated resolution believe it is
+       paying its own self-cost (and test_parity_wait_activation.c:503
+       asserts the cleared value directly). */
+    if (s_pca_depth == 0) s_pca_outer_activating = g->activating_card;
+    s_pca_depth++;
+    g->activating_card = cid;
+
+    int res = pca_resolve_entry(g, entry, cid, aidx, &ab, actor);
+
+    s_pca_depth--;
+    /* Only the outermost resolution clears the field, matching Rust: a nested
+       resolution restores the value its caller had published. */
+    g->activating_card = (s_pca_depth == 0) ? -1 : s_pca_outer_activating;
+    return res;
+}
+
+/* Body of rb_process_current_ability. g->activating_card is already published
+   as the resolving card; the caller clears it on the way out. Owns *ab (freed
+   on every path). Returns 1 when the ability ran (or left a prompt open), 0
+   when the entry was dropped without running its effect. */
+static int pca_resolve_entry(GameState *g, RbQueueEntry *entry, int cid, int aidx,
+                             Ability *abp, int actor) {
+    Ability *ab = abp;
+
     /* Resolution-time turn-limit gate (Rust ability/gates.rs:89-102, via
        GameState::ability_uses_used). Rust records the use at resolution and
        the entry's `use_limit_recorded` flag makes that record happen exactly
@@ -1886,38 +1946,92 @@ int rb_process_current_ability(GameState *g) {
        flagged `use_limit_recorded` has already spent its own use and the gate
        must not reject it — that double count silently dropped every
        「{{ターン1回}}」 自動 effect reached through a TAS scan. */
-    if (ab.use_limit > 0 && !entry->use_limit_recorded) {
-        if (rb_resolver_use_limit_reached(g, cid, aidx, ab.use_limit)) {
-            rb_free_ability(&ab);
+    if (ab->use_limit > 0 && !entry->use_limit_recorded) {
+        if (rb_resolver_use_limit_reached(g, cid, aidx, ab->use_limit)) {
+            rb_free_ability(ab);
             g->queue.cur++;
             return 0;
         }
     }
 
-    if (ab.cost) {
-        if (!rb_pay_cost(g, actor, ab.cost)) {
-            rb_free_ability(&ab);
+    if (ab->cost) {
+        if (!rb_pay_cost(g, actor, ab->cost)) {
+            rb_free_ability(ab);
             g->queue.cur++;
             return 0;
         }
     }
 
-    if (ab.effect) {
-        if (!rb_can_activate_effect(g, actor, ab.effect, cid)) {
-            rb_free_ability(&ab);
+    /* POST_COST_GATE — optional_cost_skip_gate. Rust puts it in
+       POST_COST_GATES (gates.rs:258, body gates.rs:195-213) and runs them at
+       resolver.rs:1193-1199, i.e. AFTER pay_ability_cost but only once the
+       cost's own choice round-trip is over: the handle_pending_choice at
+       resolver.rs:1181-1182 returns Ok(()) while a prompt is still open, and
+       the gate is not reached until the resume re-enters resolve_ability.
+       That ORDER is load-bearing —
+
+         * a still-open prompt means the pay/skip verdict is not in yet
+           (optional_cost_result is still None / -1 in C), and
+         * a stop here would strand that prompt with an entry the caller
+           already considers finished.
+
+       So the gate is only consulted once has_pending is clear. When it fires
+       the gate body is `entry.effect_started = true` followed by a Stop
+       (gates.rs:206-209), which resolve_ability turns into Err(reason)
+       (resolver.rs:1196-1199); process_current_ability answers Err with
+       complete_current() + clear_effect_tracking() and returns
+       (abilities.rs:2043-2052) — the entry is FINISHED, never re-resolved.
+       The verdict is read straight off the entry exactly as the gate reads
+       it; no cost.c latch is needed because this path always has a current
+       entry, unlike engine.c's inline 登場 loop which owns none at all.
+
+       Symptom: PL!-bp3-007-R (cost = move_cards hand->discard count=2
+       optional) on an empty hand. cost.c auto-declines and correctly sets
+       cost_paid=1 / optional_cost_result=0; the C then ran the effect anyway
+       and opened the look prompt. Rust opens no prompt at all. */
+    if (!g->queue.has_pending && entry->optional_cost_result == 0) {
+        entry->effect_started = 1;
+        /* record_use_limit(Early) runs at resolver.rs:1170 — BEFORE the
+           post-cost gates — while the Final recording at resolver.rs:1221 is
+           unreachable after this stop. So a declined optional cost still
+           CONSUMES the activation's use, unless the effect is
+           conditional_on_optional / optional or cannot activate
+           (gates.rs:291-309). Recorded here so the stop does not hand the
+           ability a free second activation in the same turn. */
+        if (ab->use_limit > 0 && !entry->use_limit_recorded && ab->effect &&
+            !ab->effect->is_optional &&
+            !(ab->effect->action &&
+              !strcmp(ab->effect->action, "conditional_on_optional")) &&
+            rb_can_activate_effect(g, actor, ab->effect, cid)) {
+            rb_record_ability_use(g, cid, aidx);
+            entry->use_limit_recorded = 1;
+        }
+        /* The stop leaves the entry DONE, not pending: complete_current()
+           (abilities.rs:2049). effect_started alone stops
+           rb_drain_ability_queue re-running it but would leave the entry
+           "available" to the owner-scoped drain. */
+        entry->completed = 1;
+        rb_free_ability(ab);
+        g->queue.cur++;
+        return 0;
+    }
+
+    if (ab->effect) {
+        if (!rb_can_activate_effect(g, actor, ab->effect, cid)) {
+            rb_free_ability(ab);
             g->queue.cur++;
             return 0;
         }
-        rb_execute_effect_ex(g, actor, ab.effect, cid);
+        rb_execute_effect_ex(g, actor, ab->effect, cid);
     }
 
     /* abilities.rs:203-209 -- one activation consumes one use, never two. */
-    if (ab.use_limit > 0 && !entry->use_limit_recorded) {
+    if (ab->use_limit > 0 && !entry->use_limit_recorded) {
         rb_record_ability_use(g, cid, aidx);
         entry->use_limit_recorded = 1;
     }
 
-    rb_free_ability(&ab);
+    rb_free_ability(ab);
 
     if (g->queue.has_pending) return 1;
 
