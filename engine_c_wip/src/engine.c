@@ -3,6 +3,14 @@
 #include <string.h>
 #include <stdio.h>
 
+/* cost.c's "the optional cost resolved as a skip" latch. It mirrors Rust's
+   `entry.optional_cost_result == Some(false)` + the `optional_cost_skip_gate`
+   POST_COST gate (engine/src/ability/gates.rs:195-213), which stops the
+   resolution BEFORE the ability's effect. Declared here rather than in
+   include/rabuka.h because the value is only meaningful to the resolver loop
+   that just paid the cost. */
+int rb_cost_optional_skipped(void);
+
 /* ───────────────────────────── RNG ───────────────────────────── */
 static uint32_t rng_state = 0;
 void rb_seed(uint32_t s) { rng_state = s; }
@@ -1078,6 +1086,17 @@ int rb_play_member(GameState *g, int pl, int hand_idx, int stage_pos) {
         the abilities (rb_trigger_debut) so a later rb_drain_ability_queue
         cannot double-run them. */
     g->current_is_baton = is_baton;
+    /* Rust's resolver::resolve_ability publishes `gs.activating_card` for the
+       whole resolution (resolver.rs:1161) and clears it in
+       finish_ability_resolution. The 登場 trigger reaches resolve_ability the
+       same way (turn/triggers.rs:119-129 → trigger_auto_ability with the
+       stage card id), so every debut cost that names `self_cost` /
+       `exclude_self` sees the member that was just placed. The inline loop
+       below has no queue entry of its own, so publish and restore it here —
+       without it `self_cost` resolved against -1 and validate_cost dropped the
+       whole bundled 「ウェイトにし、手札を1枚控え室に置いてもよい」 cost. */
+    int saved_activating = g->activating_card;
+    g->activating_card = card;
     {
         int n = rb_card_num_abilities((uint32_t)card);
         for (int ai = 0; ai < n; ai++) {
@@ -1086,8 +1105,16 @@ int rb_play_member(GameState *g, int pl, int hand_idx, int stage_pos) {
             int is_debut = ab.triggers && rb_trigger_is(ab.triggers, "登場");
             int is_baton_tr = ab.triggers && strstr(ab.triggers, "バトンタッチ");
             if (is_debut || (is_baton && is_baton_tr)) {
+                /* resolver.rs:1182 pays the cost with `?`, so a cost that
+                   fails validation aborts the resolution and run_ability_effect
+                   is never reached (resolver.rs:1214). The C discarded the
+                   return value and ran the effect anyway, so an unpayable
+                   debut cost still applied its effect. */
+                int cost_ok = 1;
+                int cost_skipped = 0;
                 if (ab.cost && !rb_has_pending_choice(g)) {
-                    rb_pay_cost(g, pl, ab.cost);
+                    cost_ok = rb_pay_cost(g, pl, ab.cost);
+                    cost_skipped = rb_cost_optional_skipped();
                     if (rb_has_pending_choice(g) && ab.effect) {
                         g->queue.deferred = ab.effect;
                         g->queue.resume_host = card;
@@ -1098,7 +1125,12 @@ int rb_play_member(GameState *g, int pl, int hand_idx, int stage_pos) {
                     }
                 }
                 rb_drain_ability_queue(g);
-                if (ab.effect && !rb_has_pending_choice(g))
+                /* gates.rs:195-213 `optional_cost_skip_gate` is a POST_COST_GATE:
+                   an optional cost that resolved as a skip
+                   (optional_cost_result == Some(false)) stops the resolution
+                   before the effect. The C has no gate table here, so the same
+                   verdict arrives through rb_cost_optional_skipped(). */
+                if (cost_ok && !cost_skipped && ab.effect && !rb_has_pending_choice(g))
                     rb_execute_effect_ex(g, pl, ab.effect, card);
                 rb_drain_ability_queue(g);
                 if (rb_has_pending_choice(g)) {
@@ -1116,6 +1148,7 @@ int rb_play_member(GameState *g, int pl, int hand_idx, int stage_pos) {
             rb_free_ability(&ab);
         }
     }
+    g->activating_card = saved_activating;
     g->current_is_baton = 0;
     /* A member placed on stage is an event that triggers that player's 自動
         (Auto) abilities — mirrors engine/src/turn/actions.rs

@@ -17,6 +17,47 @@ static int s_pending_energy_payment;
 static int s_stage_select_intent;
 static int s_conditional_choice;
 
+/* ── "the optional cost was declined" latch ──
+   Every auto-decline site in this file mirrors Rust's
+   `entry.cost_paid = true; entry.optional_cost_result = Some(false);`
+   (handlers.rs:326/363/520/536/1082/1125). Rust turns that flag into a hard
+   stop: `optional_cost_skip_gate` (engine/src/ability/gates.rs:195-213) is a
+   POST_COST_GATE, so resolve_ability:1193-1199 returns before
+   run_ability_effect and the ability's EFFECT never runs.
+
+   The C records the flag on the current QUEUE entry, but the inline 登場 loop
+   in engine.c resolves the debut cost without an entry of its own — so the
+   verdict vanished there and the effect ran anyway. The same latch is exposed
+   through rb_cost_optional_skipped() so that loop can honour the gate. */
+static int s_cost_optional_skipped;
+
+/* ── host of the in-flight deferred cost batch ──
+   A SequentialCost that defers a binary leg (handlers.rs:980-984) parks a
+   clone in `pending_deferred_costs` and pays it only from the choice epilogue
+   (choice.rs:189 / :880), i.e. AFTER the play action has returned and after
+   engine.c restored g->activating_card. Rust keeps `gs.activating_card`
+   published for that whole window (resolver.rs:1161 sets it,
+   finish_ability_resolution:1091 clears it, and the choice round-trip happens
+   in between), so the deferred 「このメンバーをウェイトにし」 leg still resolves
+   self_cost against the member that was just placed. Capture the card when the
+   batch is opened and republish it around rb_pay_deferred_costs so the C keeps
+   the same window. */
+static int s_cost_deferred_host = -1;
+
+int rb_cost_optional_skipped(void) { return s_cost_optional_skipped; }
+
+/* cost_auto_decline — the single spelling of "this optional cost resolved as a
+   skip": latch it, mark the queue entry when there is one, and report success
+   (Rust returns Ok(()) for a skip; it is NOT a payment failure). */
+static int cost_auto_decline(GameState *g) {
+    s_cost_optional_skipped = 1;
+    if (g->queue.cur >= 0 && g->queue.cur < g->queue.n_entries) {
+        g->queue.entries[g->queue.cur].cost_paid = 1;
+        g->queue.entries[g->queue.cur].optional_cost_result = 0;
+    }
+    return 1;
+}
+
 /* forward: alloc.c owns the effect-tree clone/free pair */
 AbilityEffect *rb_effect_deep_clone(const AbilityEffect *src);
 void rb_effect_free(AbilityEffect *e);
@@ -155,6 +196,31 @@ static int card_matches_any_character(int card_id, const char *chars_csv) {
 }
 
 /* ── Mirror cost.rs: get_change_state_candidates ── */
+
+/* The card a `self_cost` leg resolves against.
+   Rust compares against `gs.activating_card`, which
+   `AbilityResolver::resolve_ability` (resolver.rs:1161) publishes for the whole
+   resolution — including the 登場 path, because trigger_debut_abilities
+   (turn/triggers.rs:108-127) enqueues the debut ability and the drain calls
+   resolve_ability with that card.
+
+   The C never published it on either path: `rb_process_current_ability`
+   (game_state_abilities.c) leaves g->activating_card alone, and engine.c's
+   inline 登場 loop had no queue entry at all. So `self_cost` compared against
+   -1, matched no stage slot, and validate_cost rejected the WHOLE bundled
+   「ウェイトにし、手札を1枚控え室に置いてもよい」 cost. Fall back to the
+   resolving queue entry's card so the self_cost leg finds the member that is
+   actually being placed. `exclude_self` deliberately keeps reading
+   g->activating_card only, so nothing else in this file changes behaviour. */
+static int cost_self_activating_card(const GameState *g) {
+    if (g->activating_card >= 0) return g->activating_card;
+    if (g->queue.cur >= 0 && g->queue.cur < g->queue.n_entries) {
+        int cid = g->queue.entries[g->queue.cur].card_id;
+        if (cid >= 0) return cid;
+    }
+    return s_cost_deferred_host;
+}
+
 static int get_change_state_candidates(const GameState *g, int actor,
                                        const char *target,
                                        const char *card_type,
@@ -165,7 +231,7 @@ static int get_change_state_candidates(const GameState *g, int actor,
                                        const char *state,
                                        int *out_positions, int max) {
     const RbPlayer *P = &g->p[actor];
-    int activating_id = g->activating_card;
+    int activating_id = self_cost ? cost_self_activating_card(g) : g->activating_card;
     int n = 0;
     for (int i = 0; i < RB_STAGE_SIZE && n < max; i++) {
         int id = P->stage[i];
@@ -430,11 +496,7 @@ static int pay_cost_move_cards(GameState *g, int actor, const AbilityEffect *cos
             }
         }
         if (matching < count) {
-            if (g->queue.cur >= 0 && g->queue.cur < g->queue.n_entries) {
-                g->queue.entries[g->queue.cur].cost_paid = 1;
-                g->queue.entries[g->queue.cur].optional_cost_result = 0;
-            }
-            return 1;
+            return cost_auto_decline(g);
         }
         emit_pay_skip_gate(g, actor, cost,
                            "Put members from stage to waitroom (or skip)?",
@@ -447,11 +509,10 @@ static int pay_cost_move_cards(GameState *g, int actor, const AbilityEffect *cos
         int hand_len = P->hand.n;
         int is_optional = (optional || is_any_number) && !is_activation;
         if (hand_len == 0) {
-            if (g->queue.cur >= 0 && g->queue.cur < g->queue.n_entries) {
-                g->queue.entries[g->queue.cur].cost_paid = 1;
-                g->queue.entries[g->queue.cur].optional_cost_result = 0;
-            }
-            return 1;
+            /* Rust offer_all_hand_discard (handlers.rs:326) only offers the
+               yes/no choice when the hand holds cards; an empty hand auto-skips
+               and opens NOTHING. */
+            return cost_auto_decline(g);
         }
         RbChoice *pending = &g->queue.pending;
         memset(pending, 0, sizeof(*pending));
@@ -515,17 +576,20 @@ static int pay_cost_move_cards(GameState *g, int actor, const AbilityEffect *cos
             const char *cost_limit = eff_extra(cost, "cost_limit");
             const char *group_names_cost = eff_extra(cost, "group_names");
             const char *chars = eff_extra(cost, "characters");
+            /* handlers.rs:423-425 hands the filter the LIMIT and the
+               OPERATOR, and util::card_matches_cost_limit defaults to `<=`
+               (util.rs). The C compared `c.cost != atoi(cost_limit)`, i.e. an
+               implicit `=`, so 「コスト4以下」 only ever accepted a card whose
+               printed cost was exactly 4 and rejected every cheaper card. */
+            const char *cost_limit_op = eff_extra(cost, "cost_limit_operator");
+            if (!cost_limit_op || !*cost_limit_op) cost_limit_op = eff_extra(cost, "operator");
             for (int i = 0; i < P->hand.n && n_matching < RB_MAX_HAND; i++) {
                 int cid = P->hand.cards[i];
                 int match = 1;
                 if (card_type && *card_type && !rb_card_matches_type(cid, card_type)) match = 0;
-                if (match && cost_limit && *cost_limit) {
-                    Card c;
-                    if (rb_decode_card_by_index((uint32_t)cid, &c)) {
-                        if (c.cost != atoi(cost_limit)) match = 0;
-                        rb_free_card(&c);
-                    } else match = 0;
-                }
+                if (match && cost_limit && *cost_limit &&
+                    !rb_card_matches_cost_limit(cid, atoi(cost_limit), cost_limit_op))
+                    match = 0;
                 if (match && group_names_cost && *group_names_cost)
                     if (!card_matches_any_group(cid, group_names_cost)) match = 0;
                 if (match && chars && *chars)
@@ -537,23 +601,13 @@ static int pay_cost_move_cards(GameState *g, int actor, const AbilityEffect *cos
         int is_optional = (optional || is_any_number) && !is_activation;
 
         if (!is_any_number && n_matching < count) {
-            if (is_optional) {
-                if (g->queue.cur >= 0 && g->queue.cur < g->queue.n_entries) {
-                    g->queue.entries[g->queue.cur].cost_paid = 1;
-                    g->queue.entries[g->queue.cur].optional_cost_result = 0;
-                }
-                return 1;
-            }
+            /* handlers.rs:513-523 — an optional hand cost short of `count`
+               auto-skips: no prompt, cost_paid=true, result=false. */
+            if (is_optional) return cost_auto_decline(g);
             return 0;
         }
         if (is_any_number && n_matching == 0) {
-            if (is_optional) {
-                if (g->queue.cur >= 0 && g->queue.cur < g->queue.n_entries) {
-                    g->queue.entries[g->queue.cur].cost_paid = 1;
-                    g->queue.entries[g->queue.cur].optional_cost_result = 0;
-                }
-                return 1;
-            }
+            if (is_optional) return cost_auto_decline(g);
             return 1;
         }
 
@@ -584,6 +638,38 @@ static int pay_cost_move_cards(GameState *g, int actor, const AbilityEffect *cos
         const char *group_names_cost = eff_extra(cost, "group_names");
         if (group_names_cost && *group_names_cost)
             strncpy(pending->filter_group, group_names_cost, sizeof(pending->filter_group) - 1);
+        /* handlers.rs:596-613 hands the cost's own filter to the choice. The
+           C prompt carried only card_type + group_names, so the answer side
+           (choice.c rb_resolver_handle_select_card →
+           rb_resolver_execute_selected_cards_from_zone, which reads
+           ch->cost_limit / ch->cost_limit_op / ch->characters) could not see
+           「コスト4以下」 or 「〜のカード」 at all: an over-cost card stayed
+           selectable and a card the cost filter rejects was accepted. */
+        {
+            const char *cl = eff_extra(cost, "cost_limit");
+            if (cl && *cl) {
+                pending->cost_limit = atoi(cl);
+                const char *op = eff_extra(cost, "cost_limit_operator");
+                if (!op) op = eff_extra(cost, "operation");
+                if (op && *op)
+                    strncpy(pending->cost_limit_op, op, sizeof(pending->cost_limit_op) - 1);
+            }
+            const char *chars = eff_extra(cost, "characters");
+            if (chars && *chars) {
+                char cbuf[256];
+                strncpy(cbuf, chars, sizeof(cbuf) - 1);
+                cbuf[sizeof(cbuf) - 1] = '\0';
+                char *tok = strtok(cbuf, ",");
+                while (tok && pending->n_characters < 16) {
+                    strncpy(pending->characters[pending->n_characters], tok,
+                            sizeof(pending->characters[0]) - 1);
+                    pending->n_characters++;
+                    tok = strtok(NULL, ",");
+                }
+            }
+            snprintf(pending->target_player_id, sizeof(pending->target_player_id),
+                     "p%d", tpl + 1);
+        }
         g->queue.has_pending = 1;
         g->queue.pending.route = RB_ROUTE_SELECT_CARDS;
         return 1;
@@ -767,6 +853,16 @@ static int pay_cost_inner(GameState *g, int actor, const AbilityEffect *cost) {
                 if (!deferred) return 0;
                 deferred->is_optional = 0;
                 g->queue.pending_deferred_costs[g->queue.n_pending_deferred_costs++] = deferred;
+                /* Open the batch: remember which card it belongs to so the
+                   deferred `self_cost` leg still finds the member being placed
+                   when the batch is paid from the choice epilogue. */
+                if (g->queue.n_pending_deferred_costs == 1) {
+                    int host = g->activating_card;
+                    if (host < 0 && g->queue.cur >= 0 && g->queue.cur < g->queue.n_entries &&
+                        g->queue.entries[g->queue.cur].card_id >= 0)
+                        host = g->queue.entries[g->queue.cur].card_id;
+                    s_cost_deferred_host = host;
+                }
                 had_binary_auto_pay = 1;
             } else {
                 if (!pay_cost_inner(g, actor, sub)) return 0;
@@ -851,11 +947,8 @@ static int pay_cost_inner(GameState *g, int actor, const AbilityEffect *cost) {
         if (any_number && (optional || !is_activation)) {
             int active_count = rb_energy_active_count(P);
             if (active_count == 0) {
-                if (g->queue.cur >= 0 && g->queue.cur < g->queue.n_entries) {
-                    g->queue.entries[g->queue.cur].cost_paid = 1;
-                    g->queue.entries[g->queue.cur].optional_cost_result = 0;
-                }
-                return 1;
+                /* handlers.rs:1078-1089 — no active energy, treat as skip. */
+                return cost_auto_decline(g);
             }
             RbChoice *pending = &g->queue.pending;
             memset(pending, 0, sizeof(*pending));
@@ -881,11 +974,9 @@ static int pay_cost_inner(GameState *g, int actor, const AbilityEffect *cost) {
         if (optional && !is_activation) {
             int active = rb_energy_active_count(P);
             if (active < energy) {
-                if (g->queue.cur >= 0 && g->queue.cur < g->queue.n_entries) {
-                    g->queue.entries[g->queue.cur].cost_paid = 1;
-                    g->queue.entries[g->queue.cur].optional_cost_result = 0;
-                }
-                return 1;
+                /* handlers.rs:1119-1127 — unaffordable optional energy skips
+                   without opening the pay/skip gate. */
+                return cost_auto_decline(g);
             }
             emit_pay_skip_gate(g, actor, cost,
                                "Pay energy (or skip)?", 1, "OptionalCost");
@@ -1037,6 +1128,7 @@ static int pay_cost_inner(GameState *g, int actor, const AbilityEffect *cost) {
 /* ── Public: rb_pay_cost ── */
 int rb_pay_cost(GameState *g, int actor, const AbilityEffect *cost) {
     if (!cost) return 1;
+    s_cost_optional_skipped = 0;
     int result = pay_cost_inner(g, actor, cost);
     if (result && !g->queue.has_pending) {
         const char *pp = player_prefix(g, g->activating_card);
@@ -1069,17 +1161,26 @@ int rb_pay_deferred_costs(GameState *g, int actor, const AbilityEffect *cost) {
         g->queue.pending_deferred_costs[i] = NULL;
     }
     g->queue.n_pending_deferred_costs = 0;
+    /* Republish the batch's host for the duration of the payment — the play
+       action that deferred it has already restored g->activating_card, while
+       Rust's resolver.rs:1161 window is still open here. */
+    int saved_activating = g->activating_card;
+    int host = s_cost_deferred_host;
+    s_cost_deferred_host = -1;
+    if (host >= 0) g->activating_card = host;
     int result = 1;
     for (int i = 0; i < n; i++) {
         if (result && !rb_pay_cost(g, actor, deferred[i])) result = 0;
         rb_effect_free(deferred[i]);
     }
+    g->activating_card = saved_activating;
     return result;
 }
 
 /* ── Public: rb_cost_clear_deferred ── (skip/decline paths discard the batch) */
 void rb_cost_clear_deferred(GameState *g) {
     if (!g) return;
+    s_cost_deferred_host = -1;
     for (int i = 0; i < g->queue.n_pending_deferred_costs; i++) {
         rb_effect_free(g->queue.pending_deferred_costs[i]);
         g->queue.pending_deferred_costs[i] = NULL;
@@ -1093,6 +1194,10 @@ int rb_handle_optional_cost_payment(GameState *g, int actor, const AbilityEffect
 
     if (!pay) {
         /* ── SKIP path ── */
+        /* handlers.rs:1373-1394 — cost_paid=true, optional_cost_result=false,
+           effect_started=false: the POST_COST optional_cost_skip_gate stops the
+           resolution, so the ability's effect never starts. */
+        s_cost_optional_skipped = 1;
         g->queue.has_pending = 0;
         s_pending_energy_payment = 0;
         if (g->queue.cur >= 0 && g->queue.cur < g->queue.n_entries) {
@@ -1113,6 +1218,7 @@ int rb_handle_optional_cost_payment(GameState *g, int actor, const AbilityEffect
     }
 
     /* ── PAY path ── */
+    s_cost_optional_skipped = 0;
     g->queue.has_pending = 0;
 
     /* Pending energy payment from any_number select */
@@ -1123,6 +1229,10 @@ int rb_handle_optional_cost_payment(GameState *g, int actor, const AbilityEffect
         if (rb_energy_active_count(P) >= ep)
             rb_energy_pay(P, ep);
         else {
+            /* handlers.rs:1404-1409 — the pending energy could not be tapped,
+               so the cost is effectively declined: no prompt of its own is
+               opened and the resolution stops at the skip gate. */
+            s_cost_optional_skipped = 1;
             if (g->queue.cur >= 0 && g->queue.cur < g->queue.n_entries)
                 g->queue.entries[g->queue.cur].pending_actions_n = 0;
             return resume_pending_actions(g);
@@ -1168,9 +1278,18 @@ int rb_handle_optional_cost_payment(GameState *g, int actor, const AbilityEffect
             const AbilityEffect *sub = cost->child[i];
             const char *sc = sub ? eff_extra(sub, "state_change") : NULL;
             if (sub && sc && !strcmp(sc, "wait") && eff_bool(sub, "self_cost", 0)) {
-                /* self_cost wait: set activating card to wait directly */
-                if (g->activating_card >= 0)
-                    rb_mods_set_orientation(&g->mods, g->activating_card, "wait");
+                /* handlers.rs:1455-1478 — Q159: the member must be on stage to
+                   be put to wait; Q137 / Rule 1.3.2.1: an already-waited member
+                   is left alone (the act itself does not happen). */
+                int self_id = cost_self_activating_card(g);
+                if (self_id < 0) return 0;
+                int on_stage = 0;
+                for (int s = 0; s < RB_STAGE_SIZE; s++)
+                    if (g->p[actor].stage[s] == self_id) { on_stage = 1; break; }
+                if (!on_stage) return 0;
+                const char *ori = rb_mods_get_orientation(&g->mods, self_id);
+                if (!ori || strcmp(ori, "wait") != 0)
+                    rb_mods_set_orientation(&g->mods, self_id, "wait");
             } else if (!rb_pay_cost(g, actor, sub)) {
                 /* sub-cost could not be paid; the remaining legs are dropped */
             }
@@ -1211,6 +1330,7 @@ int rb_handle_optional_cost_payment(GameState *g, int actor, const AbilityEffect
 int rb_handle_pay_cost_all_discard(GameState *g, int actor, const char *selected) {
     if (!g) return 0;
     int accepted = selected && strcmp(selected, "skip_optional_cost") && strcmp(selected, "0");
+    s_cost_optional_skipped = accepted ? 0 : 1;
     if (g->queue.cur >= 0 && g->queue.cur < g->queue.n_entries) {
         g->queue.entries[g->queue.cur].cost_paid = 1;
         g->queue.entries[g->queue.cur].optional_cost_result = accepted ? 1 : 0;
