@@ -93,15 +93,21 @@ int rb_trigger_debut(GameState *g, int pl, int card_id) {
         if(ab.triggers && rb_trigger_is(ab.triggers, "登場") &&
            !rb_ability_is_invalidated(g, card_id, "登場")){
              if (!rb_use_limit_reached(&g->queue, card_id, i, ab.use_limit < 0 ? 99 : ab.use_limit, g->turn)) {
-                 rb_queue_push_with_trigger(&g->queue, card_id, i, "登場", NULL, 0);
-                 rb_record_use(&g->queue, card_id, i, g->turn);
-                 queued = 1;
+                 /* Owner-stamped: `pl` is the player who just played `card_id`
+                    (engine.c:944 / ability.c:424 / move.c:1230 all pass the actor
+                    as `pl`), which is the seat Rust's
+                    trigger_auto_ability(..., player_id, ...) stamps. Pushing
+                    un-stamped here made the entry invisible to the owner-scoped
+                    drain. */
+                 if (rb_push_owned_entry(g, pl, card_id, i, "登場")) {
+                     rb_record_use(&g->queue, card_id, i, g->turn);
+                     queued = 1;
+                 }
              }
         }
         rb_free_ability(&ab);
     }
     queued += queue_gained_trigger(g, pl, card_id, "登場");
-    (void)pl;
     return queued;
 }
 
@@ -123,9 +129,16 @@ int rb_trigger_live_start(GameState *g, int pl) {
                     fprintf(stderr, "[LIVE_START_SCAN] pl=%d trigger=%s zone=%s label=%s cid=%d ab=%d queued=1\n",
                             pl, rb_canonical_trigger(ab.triggers), rb_trigger_zone_id(0),
                             rb_trigger_zone_label(0), cid, ai);
-                     rb_queue_push_with_trigger(&g->queue, cid, ai, "ライブ開始時", NULL, 0);
-                    rb_record_use(&g->queue, cid, ai, g->turn);
-                    queued++;
+                     /* Owner-stamped: this loop scans g->p[pl].live, so the card
+                        belongs to `pl`. Rust's live-start scan binds one
+                        player_id_clone for the whole scan
+                        (turn/triggers.rs:180, :309-317) and passes it to every
+                        trigger_auto_ability, for BOTH the live-card zone and the
+                        stage members. */
+                     if (rb_push_owned_entry(g, pl, cid, ai, "ライブ開始時")) {
+                         rb_record_use(&g->queue, cid, ai, g->turn);
+                         queued++;
+                     }
                 } else {
                     fprintf(stderr, "[LIVE_START_SCAN] pl=%d trigger=%s zone=%s label=%s cid=%d ab=%d queued=0 use_limit\n",
                             pl, rb_canonical_trigger(ab.triggers), rb_trigger_zone_id(0),
@@ -149,9 +162,13 @@ int rb_trigger_live_start(GameState *g, int pl) {
                     fprintf(stderr, "[LIVE_START_SCAN] pl=%d trigger=%s zone=%s label=%s cid=%d ab=%d queued=1\n",
                             pl, rb_canonical_trigger(ab.triggers), rb_trigger_zone_id(1),
                             rb_trigger_zone_label(1), cid, i);
-                     rb_queue_push_with_trigger(&g->queue, cid, i, "ライブ開始時", NULL, 0);
-                    rb_record_use(&g->queue, cid, i, g->turn);
-                    queued++;
+                     /* Owner-stamped: same `pl` as the live-card loop above —
+                        g->p[pl].stage, and Rust passes one player_id_clone for the
+                        whole chained live_cards + stage_cards scan. */
+                     if (rb_push_owned_entry(g, pl, cid, i, "ライブ開始時")) {
+                         rb_record_use(&g->queue, cid, i, g->turn);
+                         queued++;
+                     }
                 } else {
                     fprintf(stderr, "[LIVE_START_SCAN] pl=%d trigger=%s zone=%s label=%s cid=%d ab=%d queued=0 use_limit\n",
                             pl, rb_canonical_trigger(ab.triggers), rb_trigger_zone_id(1),
