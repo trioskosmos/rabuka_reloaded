@@ -1303,14 +1303,14 @@ impl super::TurnEngine {
                 // nothing moved and nothing selected is the common path and
                 // printed an all-empty line ~1.9k times per suite, burying the
                 // ~600 resumes that had state worth inspecting.
-                if !r.moved_cards.is_empty() || !r.selected_cards.is_empty() {
+                if !r.selection.moved_cards.is_empty() || !r.selection.cards.is_empty() {
                     log::debug!(
                         "[RWC] took resolver: moved_cards={:?} selected={:?}",
-                        r.moved_cards,
-                        r.selected_cards
+                        r.selection.moved_cards,
+                        r.selection.cards
                     );
                 }
-                r.sub_choice_created = false;
+                r.in_flight.sub_choice_created = false;
                 Ok(r)
             }
             None => Err("No resolver found on queue entry".to_string()),
@@ -1329,13 +1329,13 @@ impl super::TurnEngine {
                 target_player_id: Some(tpid),
                 ..
             } if tpid == "opponent"
-                && resolver.spawn_context.target.as_deref() == Some("opponent") =>
+                && resolver.in_flight.spawn_context.target.as_deref() == Some("opponent") =>
             {
                 true
             }
             crate::ability::types::Choice::SelectPosition { .. }
                 if matches!(
-                    resolver.execution_context,
+                    resolver.in_flight.execution_context,
                     crate::ability::types::ExecutionContext::MoveCardsPosition { ref target, .. }
                     if target == "opponent"
                 ) =>
@@ -1344,7 +1344,7 @@ impl super::TurnEngine {
             }
             crate::ability::types::Choice::SelectTarget { target, .. }
                 if target == "position|destination"
-                    && resolver.spawn_context.target.as_deref() == Some("opponent") =>
+                    && resolver.in_flight.spawn_context.target.as_deref() == Some("opponent") =>
             {
                 true
             }
@@ -1353,7 +1353,7 @@ impl super::TurnEngine {
         log::debug!(
             "[RWC_G1] tpid_opp={} spawn={:?} choice={:?}",
             targets,
-            resolver.spawn_context.target,
+            resolver.in_flight.spawn_context.target,
             sub_choice
         );
         targets
@@ -1541,7 +1541,7 @@ impl super::TurnEngine {
 
         // Take the persistent resolver from the queue entry
         let mut resolver = Self::take_queue_resolver(game_state)?;
-        resolver.pending_choice = Some(choice);
+        resolver.awaiting.choice = Some(choice);
         let res = resolver.provide_choice_result(game_state, result);
 
         if let Err(e) = res {
@@ -1560,14 +1560,14 @@ impl super::TurnEngine {
 
         log::debug!(
             "[RWC] after provide: pending_choice={:?} moved_cards={:?} selected={:?}",
-            resolver.pending_choice.is_some(),
-            resolver.moved_cards,
-            resolver.selected_cards
+            resolver.awaiting.choice.is_some(),
+            resolver.selection.moved_cards,
+            resolver.selection.cards
         );
 
-        if resolver.pending_choice.is_some() {
+        if resolver.awaiting.choice.is_some() {
             // Sub-choice created — store resolver back on entry and pause queue
-            let sub_choice = resolver.pending_choice.clone().unwrap();
+            let sub_choice = resolver.awaiting.choice.clone().unwrap();
             // G1/G3: route pending choice to opponent if it targets opponent
             let targets_opponent = Self::sub_choice_targets_opponent(&resolver, &sub_choice);
             Self::route_sub_choice_player(game_state, &sub_choice, targets_opponent);

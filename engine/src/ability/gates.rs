@@ -95,9 +95,9 @@ pub fn use_limit_gate(
     gs: &mut GameState,
     ability: &Ability,
 ) -> GateResult {
-    let Some(card_id) = resolver.activating_card_id else { return GateResult::Continue };
+    let Some(card_id) = resolver.session.activating_card_id else { return GateResult::Continue };
     let Some(use_limit) = ability.use_limit else { return GateResult::Continue };
-    let ability_index = resolver.current_ability_index.unwrap_or(0);
+    let ability_index = resolver.session.current_ability_index.unwrap_or(0);
     
     if gs.ability_uses_used(card_id, ability_index) >= use_limit {
         let used = gs.ability_uses_used(card_id, ability_index);
@@ -117,7 +117,7 @@ pub fn activation_keywords_gate(
     gs: &mut GameState,
     ability: &Ability,
 ) -> GateResult {
-    let Some(card_id) = resolver.activating_card_id else { return GateResult::Continue };
+    let Some(card_id) = resolver.session.activating_card_id else { return GateResult::Continue };
     let position = gs.find_card_stage_position(card_id);
     
     let binding = vec![];
@@ -155,8 +155,8 @@ pub fn record_use_limit_if_activation(
     ability: &Ability,
 ) {
     if ability.use_limit.is_some() && ability.has_trigger(crate::triggers::TriggerKind::Activation) {
-        if let Some(card_id) = resolver.activating_card_id {
-            let ability_index = resolver.current_ability_index.unwrap_or(0);
+        if let Some(card_id) = resolver.session.activating_card_id {
+            let ability_index = resolver.session.current_ability_index.unwrap_or(0);
             gs.record_ability_use((card_id, ability_index, gs.turn_number));
         }
     }
@@ -169,7 +169,7 @@ pub fn post_cost_position_gate(
     gs: &mut GameState,
     ability: &Ability,
 ) -> GateResult {
-    let Some(card_id) = resolver.activating_card_id else { return GateResult::Continue };
+    let Some(card_id) = resolver.session.activating_card_id else { return GateResult::Continue };
     
     // We need to check position keywords after cost payment
     // Use a simplified check here
@@ -300,7 +300,7 @@ pub fn record_use_limit(
     match phase {
         UseLimitPhase::Early => {
             // Early recording: only for non-conditional, non-optional, no pending choice, cost not paid
-            if cost_already_paid || resolver.pending_choice.is_some() || is_conditional_optional || is_optional_effect {
+            if cost_already_paid || resolver.awaiting.choice.is_some() || is_conditional_optional || is_optional_effect {
                 return;
             }
             let can_activate = ability.effect.as_ref().is_none_or(|e| resolver.can_activate_effect(gs, e));
@@ -350,7 +350,7 @@ pub fn handle_pending_choice(
     // almost always free, so its cost is only interesting when it is not.
     #[cfg(not(feature = "no_std"))]
     let _timer = crate::timer::Timer::start("resolve::handle_pending_choice");
-    if resolver.pending_choice.is_none() {
+    if resolver.awaiting.choice.is_none() {
         return false;
     }
 
@@ -371,7 +371,7 @@ pub fn handle_pending_choice(
 
         // Handle use limit recording for pending choices
         if !cost_already_paid {
-            let choice_target = resolver.pending_choice.as_ref().and_then(|c| match c {
+            let choice_target = resolver.awaiting.choice.as_ref().and_then(|c| match c {
                 Choice::SelectTarget { target, .. } => Some(target.as_str()),
                 _ => None,
             }).map(|s| s.to_string());

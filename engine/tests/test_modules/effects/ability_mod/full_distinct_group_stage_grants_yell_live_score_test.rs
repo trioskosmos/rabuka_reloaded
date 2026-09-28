@@ -536,7 +536,7 @@ fn evaluate_delayed_mari(game: &mut TestGame, card_id: i16) -> bool {
         gained.compound.primary_effect.as_deref()
     };
     let mut resolver = AbilityResolver::new(game.state.card_database.clone(), Some(card_id));
-    resolver.activating_card_id = Some(card_id);
+    resolver.session.activating_card_id = Some(card_id);
     let _ = resolver.execute_effect(&mut game.state, effect_to_apply.unwrap());
     true
 }

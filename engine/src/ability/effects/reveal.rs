@@ -25,7 +25,7 @@ impl AbilityResolver {
 
         if let Some(card_type) = chosen_card_type {
             // Use the existing reveal_until_target functionality
-            self.current_effect = Some(effect.clone());
+            self.owner.executing = Some(effect.clone());
             self.execute_reveal_until_target(
                 gs,
                 effect.target_name(),
@@ -53,7 +53,7 @@ impl AbilityResolver {
         } else if let Some(or_types) = effect.or_card_types_any() {
             // No card type chosen yet — create the type choice prompt.
             let desc = format!("Choose: {}", or_types.join(", or "));
-            self.pending_choice = Some(Choice::SelectTarget {
+            self.awaiting.choice = Some(Choice::SelectTarget {
                 target: "choice_string".to_string(),
                 description: desc,
                 description_en: Some(format!("Choose: {}", or_types.join(", or "))),
@@ -92,7 +92,7 @@ impl AbilityResolver {
                         .collect(),
                 ),
             });
-            self.execution_context = ExecutionContext::SingleEffect { effect_index: 0 };
+            self.in_flight.execution_context = ExecutionContext::SingleEffect { effect_index: 0 };
             // Store the or_card_types so the choice handler can look them up
             if let Some(entry) = gs.ability_queue.current_entry_mut() {
                 entry.conditional_choice = Some(ConditionalChoice::Strings(or_types.to_vec()));
@@ -176,7 +176,7 @@ impl AbilityResolver {
             // sum costs of cards moved by the preceding action,
             // divide by per_unit_count, cap at repeat_limit.
             let total_cost: u8 = self
-                .moved_cards
+                .selection.moved_cards
                 .iter()
                 .filter_map(|&cid| gs.card_database.get_card(cid).and_then(|c| c.cost))
                 .sum();
@@ -350,7 +350,7 @@ impl AbilityResolver {
             let cl = effect.cost_limit_any();
             let co_binding = effect.cost_limit_operator_any();
             let co = co_binding.as_deref();
-            self.current_effect = Some(effect.clone());
+            self.owner.executing = Some(effect.clone());
             return self.execute_reveal_until_target(
                 gs,
                 effect.target_name(),
@@ -359,7 +359,7 @@ impl AbilityResolver {
                 co,
             );
         }
-        self.current_effect = Some(effect.clone());
+        self.owner.executing = Some(effect.clone());
         self.execute_reveal(
             gs,
             effect.source_or(Zone::Hand.to_str()),

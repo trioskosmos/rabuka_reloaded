@@ -37,7 +37,7 @@ impl AbilityResolver {
             if routed.destination.is_none() {
                 routed.destination = Some(Zone::DeckTop.to_str().into());
             }
-            self.current_effect = Some(routed.clone());
+            self.owner.executing = Some(routed.clone());
             return self.execute_move_cards(gs, &routed);
         }
 

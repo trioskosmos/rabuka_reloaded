@@ -119,7 +119,7 @@ pub(super) fn place_card_with_stage_choice(
                     .join(",");
                 log::debug!("[MOVE_PENDING] target={} destination={} reason=position_choice options={}", player_target, destination, pos_str);
                 log::trace!("[MOVE_PENDING_CARD] id={}", card_id);
-                self.pending_choice = Some(Choice::SelectPosition {
+                self.awaiting.choice = Some(Choice::SelectPosition {
                     position: pos_str,
                     description: format!(
                         "Choose position for {}",
@@ -141,7 +141,7 @@ pub(super) fn place_card_with_stage_choice(
                     )),
                     allow_skip: false,
                 });
-                self.execution_context = ExecutionContext::MoveCardsPosition {
+                self.in_flight.execution_context = ExecutionContext::MoveCardsPosition {
                     card_id,
                     state_change,
                     target: pos_target,
@@ -190,14 +190,14 @@ pub(super) fn place_card_with_stage_choice(
                         .get_card(card_id)
                         .map_or("カード", |c| c.name.as_ref())
                 );
-                self.pending_choice = Some(
+                self.awaiting.choice = Some(
                     Choice::select_cards(Zone::Stage.to_str(), 1, desc, false)
                         .description_ja(Some(desc_ja))
                         .destination(Some(Zone::UnderMember.to_str().to_string()))
                         .target_player_id(Some(player_target.to_string()))
                         .build(),
                 );
-                self.execution_context = ExecutionContext::MoveCardsPosition {
+                self.in_flight.execution_context = ExecutionContext::MoveCardsPosition {
                     card_id,
                     state_change: state_change.clone(),
                     target: player_target.to_string(),
@@ -207,12 +207,12 @@ pub(super) fn place_card_with_stage_choice(
             }
             // Use the resolver's stored activating_card_id first (survives choice
             // pauses and ability queue transitions), then fall back to gs.activating_card.
-            let member_card = self.activating_card_id.or(activating_card);
+            let member_card = self.session.activating_card_id.or(activating_card);
             member_card
                 .and_then(|cid| player.stage.stage.iter().position(|&id| id == cid))
                 .or(vacated_area.map(|v| v as usize))
                 .or_else(|| {
-                    self.moved_cards
+                    self.selection.moved_cards
                         .iter()
                         .rev()
                         .find_map(|&cid| player.stage.stage.iter().position(|&id| id == cid))
@@ -302,7 +302,7 @@ pub(super) fn place_card_with_stage_choice(
                 .filtered_indices(Some(filtered_indices))
                 .target_player_id(Some("self".to_string()))
                 .build();
-                self.pending_choice = Some(choice);
+                self.awaiting.choice = Some(choice);
                 return true;
             }
         }
@@ -323,7 +323,7 @@ pub(super) fn place_card_with_stage_choice(
         source_zone: String,
         allow_skip: bool,
     ) {
-        self.pending_choice = Some(Choice::SelectTarget {
+        self.awaiting.choice = Some(Choice::SelectTarget {
             target: "position|destination".to_string(),
             description: "Choose deck top or bottom".to_string(),
             description_en: Some("Choose deck top or bottom".to_string()),
@@ -334,7 +334,7 @@ pub(super) fn place_card_with_stage_choice(
                 Zone::DeckBottom.to_str().to_string(),
             ]),
         });
-        self.execution_context = ExecutionContext::MoveCardsPosition {
+        self.in_flight.execution_context = ExecutionContext::MoveCardsPosition {
             card_id,
             state_change,
             target,
@@ -389,10 +389,10 @@ pub(super) fn place_card_with_stage_choice(
             ) {
                 Ok(true) => {
                     moved.push(card_id);
-                    self.sub_choice_created = true;
+                    self.in_flight.sub_choice_created = true;
                     for &rcid in &card_ids[pos + 1..] {
                         let pl = gs.resolve_target_player_mut(target);
-                        self.pending_stage_cards.push((rcid, target.to_string()));
+                        self.awaiting.stage_cards.push((rcid, target.to_string()));
                         util::remove_card_from_zone(pl, rcid, src_zone, &card_db);
                     }
                     return Ok(moved);

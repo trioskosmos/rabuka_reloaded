@@ -876,7 +876,7 @@ impl super::TurnEngine {
                     if let Some(apply) = effect_to_apply {
                         let mut resolver =
                             AbilityResolver::new(game_state.card_database.clone(), Some(*card_id));
-                        resolver.activating_card_id = Some(*card_id);
+                        resolver.session.activating_card_id = Some(*card_id);
                         let _ = resolver.execute_effect(game_state, apply);
                     }
                 }

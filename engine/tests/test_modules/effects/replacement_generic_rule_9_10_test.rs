@@ -39,7 +39,7 @@ fn add_replacement(
 
 fn answer(resolver: &mut AbilityResolver, game: &mut TestGame, accept: bool) {
     assert!(matches!(
-        resolver.pending_choice,
+        resolver.awaiting.choice,
         Some(Choice::SelectTarget { ref target, .. }) if target == "apply_replacement"
     ));
     resolver

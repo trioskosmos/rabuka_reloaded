@@ -36,7 +36,7 @@ pub(crate) fn execute_conditional_on_result(
             log::debug!("Primary action failed in conditional_on_result: {}", e);
             return Err(e);
         }
-        if resolver.pending_choice.is_some() {
+        if resolver.awaiting.choice.is_some() {
             let mut finish = effect.clone();
             finish.compound.primary_effect = None;
             finish.condition = None;
@@ -49,22 +49,22 @@ pub(crate) fn execute_conditional_on_result(
         .map(|c| {
             if let Some(reference) = c.get_action_reference() {
                 resolver
-                    .last_action_result
+                    .carried.last_action_result
                     .is_some_and(|(action, succeeded)| action.to_str() == reference && succeeded)
             } else {
-                let ctx = ConditionContext::with_moved_cards(gs, &resolver.moved_cards);
+                let ctx = ConditionContext::with_moved_cards(gs, &resolver.selection.moved_cards);
                 ctx.evaluate_condition(c)
             }
         })
         .unwrap_or(true);
     log::debug!(
         "[CONDITIONAL_RESULT] source={:?} action_reference={} action_succeeded={:?} condition_met={}",
-        resolver.activating_card_id,
+        resolver.session.activating_card_id,
         result_condition
             .and_then(|condition| condition.get_action_reference())
             .unwrap_or("none"),
         resolver
-            .last_action_result
+            .carried.last_action_result
             .as_ref()
             .map(|(_, succeeded)| *succeeded),
         condition_met
@@ -72,7 +72,7 @@ pub(crate) fn execute_conditional_on_result(
 
     if condition_met {
         if let Some(followup) = followup_action {
-            resolver.selected_cards.clear();
+            resolver.selection.cards.clear();
             resolver.execute_effect(gs, followup)?;
         }
     } else {
@@ -104,7 +104,7 @@ pub(crate) fn execute_conditional_on_optional(
                     .energy_zone
                     .active_count() as usize;
                 if active < need {
-                    log::debug!("[CONDITION] source={:?} action={} branch=conditional next_action={} reason=insufficient_energy active={} need={} negation={}", resolver.activating_card_id, effect.action, cond.action, active, need, is_negation);
+                    log::debug!("[CONDITION] source={:?} action={} branch=conditional next_action={} reason=insufficient_energy active={} need={} negation={}", resolver.session.activating_card_id, effect.action, cond.action, active, need, is_negation);
                     gs.push_rule_log_fmt(format_args!(
                         "{}: [[log_cost_skip:reason=compound_insufficient_energy,need={},active={}]]",
                         pp, need, active
@@ -125,7 +125,7 @@ pub(crate) fn execute_conditional_on_optional(
         if let Some(cost_was_paid) = result {
             let chose_yes = cost_was_paid;
             let cmd = crate::ability::compound::conditional::route_conditional_branch(effect, chose_yes, is_negation);
-            log::debug!("[CONDITION] source={:?} action={} answer=stored accepted={} negation={} branch={} next_action={:?}", resolver.activating_card_id, effect.action, chose_yes, is_negation, if cmd.is_none() { "none" } else if chose_yes && is_negation { "optional" } else { "conditional" }, cmd.as_ref().map(|a| a.action));
+            log::debug!("[CONDITION] source={:?} action={} answer=stored accepted={} negation={} branch={} next_action={:?}", resolver.session.activating_card_id, effect.action, chose_yes, is_negation, if cmd.is_none() { "none" } else if chose_yes && is_negation { "optional" } else { "conditional" }, cmd.as_ref().map(|a| a.action));
             if let Some(cmd) = cmd {
                 gs.ability_queue.set_pending_actions(vec![*cmd]);
             }
@@ -134,7 +134,7 @@ pub(crate) fn execute_conditional_on_optional(
         if let Some(entry) = gs.ability_queue.current_entry_mut() {
             entry.conditional_choice = Some(ConditionalChoice::Effect(effect.clone()));
         }
-        resolver.pending_choice = Some(Choice::SelectTarget {
+        resolver.awaiting.choice = Some(Choice::SelectTarget {
             target: "conditional_optional".to_string(),
             description: "Pay optional cost or skip".to_string(),
             description_en: Some("Pay optional cost or skip".to_string()),
@@ -168,9 +168,9 @@ pub(crate) fn handle_choice_string_selection(
 ) -> Result<(), String> {
     log::debug!("[HANDLE_CHOICE_STRING_SELECTION] selected={} conditional_choice={:?} parent_effect_or_card_types={:?} current_effect_or_card_types={:?}", 
         selected, conditional_choice, 
-        resolver.parent_effect.as_ref().and_then(|e| e.or_card_types_any()),
-        resolver.current_effect.as_ref().and_then(|e| e.or_card_types_any()));
-    let is_or_card_types = resolver.parent_effect.as_ref().and_then(|e| e.or_card_types_any()).is_some();
+        resolver.owner.parent.as_ref().and_then(|e| e.or_card_types_any()),
+        resolver.owner.executing.as_ref().and_then(|e| e.or_card_types_any()));
+    let is_or_card_types = resolver.owner.parent.as_ref().and_then(|e| e.or_card_types_any()).is_some();
     if let Some(ConditionalChoice::Strings(options)) = conditional_choice {
         log::debug!("[HANDLE_CHOICE_STRING_SELECTION] options={:?}", options);
         if let Ok(idx) = selected.parse::<usize>() {
@@ -196,17 +196,17 @@ pub(crate) fn handle_choice_string_selection(
     if is_or_card_types {
         log::debug!("[HANDLE_CHOICE_STRING_SELECTION] Re-queueing look_and_select effect");
         let mut existing = gs.ability_queue.take_pending_actions();
-        existing.push(resolver.parent_effect.clone().unwrap());
+        existing.push(resolver.owner.parent.clone().unwrap());
         gs.ability_queue.set_pending_actions(existing);
     }
-    resolver.pending_choice = None;
+    resolver.awaiting.choice = None;
     // For or_card_types, preserve conditional_choice for the re-queued effect.
     // Only clear choice_card_no and pending_deferred_costs.
     if is_or_card_types {
         if let Some(entry) = gs.ability_queue.current_entry_mut() {
             entry.choice_card_no = None;
         }
-        resolver.pending_deferred_costs.clear();
+        resolver.awaiting.deferred_costs.clear();
     } else {
         resolver.clear_choice_meta(gs);
     }
@@ -242,7 +242,7 @@ pub(crate) fn handle_choice_string_store(
         }
         log::debug!("[DBG_CHOICE] stored conditional_choice");
     }
-    resolver.pending_choice = None;
+    resolver.awaiting.choice = None;
     resolver.resume_pending_actions(gs)?;
     Ok(())
 }

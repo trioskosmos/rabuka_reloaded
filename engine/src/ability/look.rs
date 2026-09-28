@@ -174,8 +174,8 @@ impl AbilityResolver {
         .characters(select_action.characters_any().cloned())
         .filtered_indices(Some(matching_indices))
         .build();
-        self.pending_choice = Some(choice);
-        self.execution_context = ExecutionContext::LookAndSelect {
+        self.awaiting.choice = Some(choice);
+        self.in_flight.execution_context = ExecutionContext::LookAndSelect {
             step: LookAndSelectStep::Select {
                 count: max_select,
                 max_per_group: select_action.per_group_count_any(),
@@ -190,7 +190,7 @@ impl AbilityResolver {
         gs: &mut GameState,
         effect: &AbilityEffect,
     ) -> Result<(), String> {
-        self.current_effect = Some(effect.clone());
+        self.owner.executing = Some(effect.clone());
 
         if let Some(ref look_action) = effect.compound.look_action {
             self.execute_effect(gs, look_action)?;
@@ -238,29 +238,29 @@ impl AbilityResolver {
             crate::ability::describe::zone_label_ja(Some(source))
         );
         let cost_limit = self
-            .current_effect
+            .owner.executing
             .as_ref()
             .and_then(|e| e.cost_limit_any());
         let cost_limit_operator = self
-            .current_effect
+            .owner.executing
             .as_ref()
             .and_then(|e| e.cost_limit_operator_any())
             .map(|s| s.to_string());
         let group = self
-            .current_effect
+            .owner.executing
             .as_ref()
             .and_then(|e| e.group_names_any())
             .and_then(|v| v.first().cloned());
         let characters = self
-            .current_effect
+            .owner.executing
             .as_ref()
             .and_then(|e| e.characters_any().cloned());
         let picker = self
-            .current_effect
+            .owner.executing
             .as_ref()
             .and_then(|e| e.picker_any())
             .map(|s| s.to_string());
-        self.pending_choice = Some(
+        self.awaiting.choice = Some(
             Choice::select_cards(source.to_string(), choices_count, desc_en, allow_skip)
                 .description_ja(Some(desc_ja))
                 .card_type(card_type.map(|s| s.to_string()))
@@ -273,7 +273,7 @@ impl AbilityResolver {
                 .picker(picker)
                 .build(),
         );
-        self.execution_context = ExecutionContext::SingleEffect { effect_index: 0 };
+        self.in_flight.execution_context = ExecutionContext::SingleEffect { effect_index: 0 };
     }
 
     #[allow(clippy::too_many_arguments)]
@@ -288,13 +288,13 @@ pub fn execute_reveal(
         blind: bool,
     ) -> Result<(), String> {
         let require_all_heart_colors = self
-            .current_effect
+            .owner.executing
             .as_ref()
             .and_then(|e| e.require_all_heart_colors_any())
             .unwrap_or(false);
         let card_db = gs.card_database.clone();
         let any_number = self
-            .current_effect
+            .owner.executing
             .as_ref()
             .is_some_and(|e| e.any_number_any().unwrap_or(false));
         let looked_at_len = gs.looked_at_cards.len();
@@ -314,7 +314,7 @@ pub fn execute_reveal(
             || Zone::from_str(source) == Some(Zone::LookedAt))
             && available > 0
         {
-            let current_effect = self.current_effect.as_ref();
+            let current_effect = self.owner.executing.as_ref();
             let is_max = current_effect.is_some_and(|e| e.max.unwrap_or(false));
             let is_optional = current_effect.is_some_and(|e| e.optional.unwrap_or(false));
 
@@ -601,7 +601,7 @@ pub fn execute_reveal(
             player,
             &gs.looked_at_cards,
             &gs.revealed_cards,
-            &self.selected_cards,
+            &self.selection.cards,
             source,
             count as usize,
         );
@@ -640,9 +640,9 @@ pub fn execute_reveal(
         gs.looked_at_cards
             .retain(|id| filter.matches(&card_db, *id, false));
 
-        if effect.exclude_selected_any().unwrap_or(false) && !self.selected_cards.is_empty() {
+        if effect.exclude_selected_any().unwrap_or(false) && !self.selection.cards.is_empty() {
             gs.looked_at_cards
-                .retain(|id| !self.selected_cards.contains(id));
+                .retain(|id| !self.selection.cards.contains(id));
         }
         if effect.exclude_self_any().unwrap_or(false) {
             if let Some(activating_id) = gs.activating_card {
@@ -659,7 +659,7 @@ pub fn execute_reveal(
         };
         let filtered_indices =
             Self::select_filtered_indices(gs, source, &target, &card_ids, effect.distinct_any().is_some());
-        self.pending_choice = Some(Self::build_select_choice(
+        self.awaiting.choice = Some(Self::build_select_choice(
             source,
             count,
             optional,
@@ -667,9 +667,9 @@ pub fn execute_reveal(
             filtered_indices,
             &target,
         ));
-        self.stage_select_intent =
+        self.awaiting.stage_select_intent =
             Some(crate::ability::types::StageSelectIntent::CollectTargets);
-        self.execution_context = ExecutionContext::SingleEffect { effect_index: 0 };
+        self.in_flight.execution_context = ExecutionContext::SingleEffect { effect_index: 0 };
         Ok(())
     }
     /// Select cards from `gs.looked_at_cards` matching this effect's filter
@@ -683,7 +683,7 @@ pub fn execute_reveal(
         gs: &mut GameState,
         effect: &AbilityEffect,
     ) -> Result<(), String> {
-        self.current_effect = Some(effect.clone());
+        self.owner.executing = Some(effect.clone());
 
         let any_number = effect.any_number_any().unwrap_or(false);
         let count = effect.count.unwrap_or(1) as usize;
@@ -726,7 +726,7 @@ pub fn execute_reveal(
             .characters(effect.characters_any().cloned())
             .destination(effect.destination.map(|s| s.to_string()))
             .build();
-            self.pending_choice = Some(choice);
+            self.awaiting.choice = Some(choice);
             return Ok(());
         }
 
@@ -881,8 +881,8 @@ pub fn execute_reveal(
         .characters(effect.characters_any().cloned())
         .filtered_indices(Some(matching_indices))
         .build();
-        self.pending_choice = Some(choice);
-        self.execution_context = ExecutionContext::LookAndSelect {
+        self.awaiting.choice = Some(choice);
+        self.in_flight.execution_context = ExecutionContext::LookAndSelect {
             step: LookAndSelectStep::Select {
                 count: max_select,
                 max_per_group: effect.per_group_count_any(),
@@ -944,7 +944,8 @@ pub fn execute_reveal(
                 }
             })
             .collect();
-        self.pending_choice = Some(Choice::SelectTarget {
+        self.capture_choice_owner();
+        self.awaiting.choice = Some(Choice::SelectTarget {
             target: "choice_string".to_string(),
             description: format!("Choose: {}", desc_parts.join(", or ")),
             description_en: Some(format!("Choose: {}", desc_parts.join(", or "))),
@@ -952,13 +953,13 @@ pub fn execute_reveal(
             allow_skip: false,
             options: Some(desc_parts.clone()),
         });
-        self.execution_context = ExecutionContext::SingleEffect { effect_index: 0 };
+        self.in_flight.execution_context = ExecutionContext::SingleEffect { effect_index: 0 };
         if let Some(e) = gs.ability_queue.current_entry_mut() {
             e.conditional_choice = Some(ConditionalChoice::Strings(or_types.to_vec()));
             e.choice_card_no = Some(ChoiceRoute::ChoiceString);
         }
         // Preserve the parent effect so or_card_types can be accessed after sub-effects overwrite current_effect
-        self.parent_effect = Some(effect.clone());
+        self.owner.parent = Some(effect.clone());
         Some("offered".to_string())
     }
 
@@ -1081,7 +1082,7 @@ pub fn execute_reveal(
         gs.looked_at_cards = cards.into();
         // Remember where the pool came from: a DECLINED optional move must
         // return the cards here (rule 5.7 — 見る only informs).
-        self.looked_at_origin = Some(source.to_string());
+        self.carried.looked_at_origin = Some(source.to_string());
         let pp = self.player_prefix(gs);
         let act_name = gs
             .activating_card
@@ -1127,7 +1128,7 @@ pub fn execute_reveal(
             }
         }
         gs.looked_at_cards = looked.into();
-        self.looked_at_origin = Some(source.to_string());
+        self.carried.looked_at_origin = Some(source.to_string());
         Ok(())
     }
 

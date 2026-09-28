@@ -1189,7 +1189,7 @@ fn generate_pending_choice_actions(game_state: &GameState, choice: &Choice) -> V
                         .ability_queue
                         .current_entry()
                         .and_then(|e| e.resolver.as_ref())
-                        .map(|r| r.selected_cards.clone())
+                        .map(|r| r.selection.cards.clone())
                         .unwrap_or_default()
                         .into_iter()
                         .enumerate()

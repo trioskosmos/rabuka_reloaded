@@ -25,17 +25,17 @@ pub(crate) fn setup_sequential(
     };
 
     let card_name = resolver
-        .activating_card_id
+        .session.activating_card_id
         .and_then(|cid| gs.card_database.get_card(cid))
         .map(|c| c.name.to_string());
 
-    let seq_node = resolver.debug_trace.then(|| {
+    let seq_node = resolver.session.debug_trace.then(|| {
         AbilityTraceNode::new(seq_label)
             .with_card(card_name.clone())
             .with_before(ZoneSnapshot::from_game_state(gs))
     });
 
-    resolver.step_state.clear();
+    resolver.in_flight.step_state.clear();
 
     let cond_met = {
         let ctx = ConditionContext::new(gs);
@@ -45,7 +45,7 @@ pub(crate) fn setup_sequential(
             .is_none_or(|c| ctx.evaluate_condition(c))
     };
     if !cond_met {
-        log::debug!("[SEQUENCE] source={:?} action={} skipped: sequence condition failed", resolver.activating_card_id, effect.action);
+        log::debug!("[SEQUENCE] source={:?} action={} skipped: sequence condition failed", resolver.session.activating_card_id, effect.action);
         return Err(());
     }
     Ok(seq_node)

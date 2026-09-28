@@ -65,7 +65,7 @@ pub(crate) fn route_sequential_step(
     if is_otherwise {
         match *condition_failed {
             Some(false) => {
-                log::debug!("[SEQUENCE] source={:?} repeat={} step={} action={} skipped: otherwise branch after passed condition", resolver.activating_card_id, repeat_idx + 1, i + 1, action.action);
+                log::debug!("[SEQUENCE] source={:?} repeat={} step={} action={} skipped: otherwise branch after passed condition", resolver.session.activating_card_id, repeat_idx + 1, i + 1, action.action);
                 *condition_failed = None;
                 return StepRoute::Skip;
             }
@@ -77,7 +77,7 @@ pub(crate) fn route_sequential_step(
         }
     }
     if *condition_failed == Some(true) && action.condition.is_none() {
-        log::debug!("[SEQUENCE] source={:?} repeat={} step={} action={} skipped: preceding condition failed", resolver.activating_card_id, repeat_idx + 1, i + 1, action.action);
+        log::debug!("[SEQUENCE] source={:?} repeat={} step={} action={} skipped: preceding condition failed", resolver.session.activating_card_id, repeat_idx + 1, i + 1, action.action);
         return StepRoute::Skip;
     }
     if let Some(cond) = action.condition.as_ref() {
@@ -85,18 +85,18 @@ pub(crate) fn route_sequential_step(
             && repeat_actions[i - 1].condition.as_ref()
                 == action.condition.as_ref();
         if same_as_prev {
-            log::debug!("[SEQUENCE] source={:?} repeat={} step={} action={} decision={} verdict=previous_step condition_failed={:?}", resolver.activating_card_id, repeat_idx + 1, i + 1, action.action, if *condition_failed == Some(true) { "skip" } else { "continue" }, *condition_failed);
+            log::debug!("[SEQUENCE] source={:?} repeat={} step={} action={} decision={} verdict=previous_step condition_failed={:?}", resolver.session.activating_card_id, repeat_idx + 1, i + 1, action.action, if *condition_failed == Some(true) { "skip" } else { "continue" }, *condition_failed);
             if *condition_failed == Some(true) {
                 return StepRoute::Skip;
             }
             return StepRoute::Execute;
         }
-        let moved_cards = resolver.moved_cards.clone();
+        let moved_cards = resolver.selection.moved_cards.clone();
         let passed = ConditionContext::with_moved_cards(gs, &moved_cards).evaluate_condition(cond);
         if !action.optional.unwrap_or(false) {
             *condition_failed = Some(!passed);
         }
-        log::debug!("[SEQUENCE] source={:?} repeat={} step={} action={} decision={} passed={}", resolver.activating_card_id, repeat_idx + 1, i + 1, action.action, if passed { "continue" } else { "skip: condition failed" }, passed);
+        log::debug!("[SEQUENCE] source={:?} repeat={} step={} action={} decision={} passed={}", resolver.session.activating_card_id, repeat_idx + 1, i + 1, action.action, if passed { "continue" } else { "skip: condition failed" }, passed);
         if !passed {
             return StepRoute::Skip;
         }
@@ -212,11 +212,11 @@ pub(crate) fn execute_sequential_effect(
         let (repeat_actions, repeat_max, has_repeat) = split_repeat_actions(actions);
 
         if has_repeat {
-            resolver.pending_repeat_actions.clear();
+            resolver.awaiting.repeat_actions.clear();
         }
         log::debug!(
             "[SEQUENCE] source={:?} action={} steps={} iterations={} conditional={} further={} actions={:?}",
-            resolver.activating_card_id,
+            resolver.session.activating_card_id,
             effect.action,
             repeat_actions.len(),
             repeat_max,
@@ -245,11 +245,11 @@ pub(crate) fn execute_sequential_effect(
                 if action.action == ActionType::OpponentAction
                     || action.action_by() == Some("opponent")
                 {
-                    resolver.spawn_context.target = Some("opponent".to_string());
+                    resolver.in_flight.spawn_context.target = Some("opponent".to_string());
                 }
 
-                let moved_before = resolver.moved_cards.len();
-                let selected_before = resolver.selected_cards.len();
+                let moved_before = resolver.selection.moved_cards.len();
+                let selected_before = resolver.selection.cards.len();
                 if crate::ability::compound::consequence::gate_sequential_consequence(resolver, action, repeat_idx, i) {
                     continue 'action_loop;
                 }
@@ -257,14 +257,14 @@ pub(crate) fn execute_sequential_effect(
                     Ok(_) => {
                         log::debug!(
                             "[SEQUENCE] source={:?} repeat={} step={} action={} result=ok pending={}",
-                            resolver.activating_card_id,
+                            resolver.session.activating_card_id,
                             repeat_idx + 1,
                             i + 1,
                             action.action,
-                            resolver.pending_choice.is_some()
+                            resolver.awaiting.choice.is_some()
                         );
                         crate::ability::compound::post_step::record_step_output(resolver, gs, action, repeat_idx, i);
-                        if resolver.pending_choice.is_some() {
+                        if resolver.awaiting.choice.is_some() {
                             crate::ability::compound::pause::pause_for_sequential_choice(
                                 resolver,
                                 gs,
@@ -294,7 +294,7 @@ pub(crate) fn execute_sequential_effect(
                         }
                     }
                     Err(e) => {
-                        log::debug!("[SEQUENCE] source={:?} repeat={} step={} action={} result=error pending={} error={}", resolver.activating_card_id, repeat_idx + 1, i + 1, action.action, resolver.pending_choice.is_some(), e);
+                        log::debug!("[SEQUENCE] source={:?} repeat={} step={} action={} result=error pending={} error={}", resolver.session.activating_card_id, repeat_idx + 1, i + 1, action.action, resolver.awaiting.choice.is_some(), e);
                         return Err(e);
                     }
                 }
@@ -304,11 +304,11 @@ pub(crate) fn execute_sequential_effect(
             }
         }
     }
-    resolver.execution_context = ExecutionContext::None;
+    resolver.in_flight.execution_context = ExecutionContext::None;
 
     if let Some(mut node) = seq_node {
         node.after = Some(ZoneSnapshot::from_game_state(gs));
-        resolver.pipeline.trace.children.push(node);
+        resolver.in_flight.pipeline.trace.children.push(node);
     }
 
     Ok(())

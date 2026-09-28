@@ -273,13 +273,13 @@ impl AbilityResolver {
         let mut for_self = effect.clone();
         for_self.target = Some("self".into());
         for_self.set_action_by(Some("self".into())); // self makes the choice
-        self.spawn_context.target = Some("self".to_string());
+        self.in_flight.spawn_context.target = Some("self".to_string());
 
-        let had_choice_before = self.pending_choice.is_some();
+        let had_choice_before = self.awaiting.choice.is_some();
         let _ = self.execute_effect(gs, &for_self);
 
         // If self created a NEW pending choice, save opponent for later
-        if self.pending_choice.is_some() && !had_choice_before {
+        if self.awaiting.choice.is_some() && !had_choice_before {
             let mut for_opponent = effect.clone();
             for_opponent.target = Some("opponent".into());
             for_opponent.set_action_by(Some("opponent".into())); // opponent makes the choice
@@ -294,7 +294,7 @@ impl AbilityResolver {
         let mut for_opponent = effect.clone();
         for_opponent.target = Some("opponent".into());
         for_opponent.set_action_by(Some("opponent".into())); // opponent makes the choice
-        self.spawn_context.target = Some("opponent".to_string());
+        self.in_flight.spawn_context.target = Some("opponent".to_string());
         self.execute_effect(gs, &for_opponent)?;
 
         Ok(true)
@@ -688,9 +688,9 @@ pub(crate) fn execute_gain_surplus_heart(
         };
         if debug {
             log::debug!("[GR_SELECTED_CARD] entering branch. selected_cards={:?} target_ids={:?} gs.activating={:?}",
-                self.selected_cards, target_ids, gs.activating_card);
+                self.selection.cards, target_ids, gs.activating_card);
         }
-        if let Some(&selected_id) = self.selected_cards.first() {
+        if let Some(&selected_id) = self.selection.cards.first() {
             if let Some(selected_card) = card_db.get_card(selected_id) {
                 if debug {
                     log::debug!("[GR_SELECTED_BH] selected_id={} has_base_heart={} hearts_count={}",
@@ -921,7 +921,7 @@ pub(crate) fn execute_gain_surplus_heart(
                 &effective_heart_colors,
                 heart_selection,
             )?;
-            if self.pending_choice.is_some() {
+            if self.awaiting.choice.is_some() {
                 return Ok(());
             }
             result.or_else(|| {
@@ -948,7 +948,7 @@ pub(crate) fn execute_gain_surplus_heart(
         };
 
         // Extract accumulated selected card IDs from resolver
-        let all_selected: SmallVec<[i16; 8]> = self.selected_cards.iter().copied().collect();
+        let all_selected: SmallVec<[i16; 8]> = self.selection.cards.iter().copied().collect();
 
         // Pre-filter selected_cards by current character/card_type to prevent
         // cross-character leakage in sequential (e.g. blade for char A leaks
@@ -1098,8 +1098,8 @@ pub(crate) fn execute_gain_surplus_heart(
                 heart_targets.clone()
             };
             for &cid in &selected_targets {
-                if !self.selected_cards.contains(&cid) {
-                    self.selected_cards.push(cid);
+                if !self.selection.cards.contains(&cid) {
+                    self.selection.cards.push(cid);
                 }
             }
         }
@@ -1217,9 +1217,9 @@ pub(crate) fn execute_gain_surplus_heart(
         // include cards whose group name (c.group, card position ②) matches the
         // group of the card that was discarded as cost (tracked in self.moved_cards).
         if effect.group_reference_any() == Some("same_group_name") {
-            log::debug!("[SAME_GROUP] moved_cards={:?}", self.moved_cards);
+            log::debug!("[SAME_GROUP] moved_cards={:?}", self.selection.moved_cards);
             let ref_group: Option<String> = self
-                .moved_cards
+                .selection.moved_cards
                 .first()
                 .and_then(|cid| {
                     let c = gs.card_database.get_card(*cid);
@@ -1584,7 +1584,7 @@ pub(crate) fn execute_gain_surplus_heart(
         // prompt shows only members matching that group name.
         if effect.group_reference_any() == Some("same_group_name") {
             let ref_group: Option<String> = self
-                .moved_cards
+                .selection.moved_cards
                 .first()
                 .and_then(|cid| gs.card_database.get_card(*cid))
                 .map(|c| c.group.to_string());
@@ -1596,7 +1596,7 @@ pub(crate) fn execute_gain_surplus_heart(
         }
         if effect.same_name_any().unwrap_or(false) {
             let ref_names: Vec<String> = self
-                .moved_cards
+                .selection.moved_cards
                 .iter()
                 .filter_map(|&cid| card_db.get_card(cid).map(|c| c.name.to_string()))
                 .collect();
@@ -1635,7 +1635,7 @@ pub(crate) fn execute_gain_surplus_heart(
             .collect();
         let mut saved = effect.clone();
         saved.set_target_count(None);
-        self.selected_count_at_save = Some(self.selected_cards.len().u8_count());
+        self.selection.count_at_save = Some(self.selection.cards.len().u8_count());
         let mut pending = gs.ability_queue.take_pending_actions();
         pending.insert(0, saved);
         gs.ability_queue.set_pending_actions(pending);
@@ -1646,7 +1646,7 @@ pub(crate) fn execute_gain_surplus_heart(
             "リソースを受け取る{}枚のカードを選択（{} {}）",
             tc, count, resource_label
         );
-        self.pending_choice = Some(
+        self.awaiting.choice = Some(
             Choice::select_cards(Zone::Stage.to_str().to_string(), tc, desc_en, false)
                 .description_ja(Some(desc_ja))
                 .card_type(effect.card_type_any().map(|s| s.to_string()))
@@ -1657,12 +1657,12 @@ pub(crate) fn execute_gain_surplus_heart(
                 .is_select_action(true)
                 .build(),
         );
-        self.stage_select_intent =
+        self.awaiting.stage_select_intent =
             Some(crate::ability::types::StageSelectIntent::CollectTargets);
         // Don't call store_pending_choice — keep self.pending_choice set
         // so the caller (e.g. resume_pending_commands) can detect the
         // sub-choice and properly save remaining commands before returning.
-        self.sub_choice_created = true;
+        self.in_flight.sub_choice_created = true;
         Ok(true)
     }
 
@@ -1902,7 +1902,7 @@ pub(crate) fn execute_gain_surplus_heart(
             && effect.distinct_any().is_some()
             && !all_selected.is_empty()
         {
-            let before = selected_before_save(all_selected, self.selected_count_at_save);
+            let before = selected_before_save(all_selected, self.selection.count_at_save);
             (!before.is_empty()).then(|| before.into())
         } else {
             None
@@ -1971,17 +1971,17 @@ pub(crate) fn execute_gain_surplus_heart(
         if effect.same_name_any().unwrap_or(false) {
             log::debug!(
                 "[SAME_NAME] before={} candidates={}",
-                self.moved_cards.len(),
+                self.selection.moved_cards.len(),
                 all_candidates.len()
             );
-            all_candidates = same_name_targets(&card_db, &self.moved_cards, &all_candidates).into();
+            all_candidates = same_name_targets(&card_db, &self.selection.moved_cards, &all_candidates).into();
             log::debug!("[SAME_NAME] after={}", all_candidates.len());
         }
 
         // If target_count is set and more candidates than needed,
         // create a choice for the player (unless already selected via previous choice).
         log::debug!("[GAIN_RESOURCE] res={} is_all={} has_filter={} tc={:?} dn={:?} all_cand={} selected={}",
-            resource, is_all, has_blade_filter, tc, dn, all_candidates.len(), self.selected_cards.len());
+            resource, is_all, has_blade_filter, tc, dn, all_candidates.len(), self.selection.cards.len());
         log::debug!(
             "[GAIN_RESOURCE] blade_targets computation starts ({} candidates)",
             all_candidates.len()
@@ -2023,7 +2023,7 @@ pub(crate) fn execute_gain_surplus_heart(
             // sequential action (e.g. a change_state that activated a member).
             log::debug!(
                 "[TARGET_FROM_SEL] heart: selected_cards={:?} selected_for_current={:?} all_selected={:?}",
-                self.selected_cards, selected_for_current, all_selected
+                self.selection.cards, selected_for_current, all_selected
             );
             selected_for_current.to_vec()
         } else if use_raw && !selected_for_current.is_empty() && effect.distinct_any().is_none() {
@@ -2049,7 +2049,7 @@ pub(crate) fn execute_gain_surplus_heart(
             {
                 // Saved action from distinct choice: target only the
                 // NEWLY selected cards (after the pre-choice save point).
-                selected_after_save(selected_for_current, self.selected_count_at_save)
+                selected_after_save(selected_for_current, self.selection.count_at_save)
             } else if effect.card_type_any().is_none()
                 && effect.group_names_any().is_none()
                 && effect.characters_any().is_none()
@@ -2078,7 +2078,7 @@ pub(crate) fn execute_gain_surplus_heart(
             }
             // same_name: filter heart_targets to same-name members
             if effect.same_name_any().unwrap_or(false) {
-                h = same_name_targets(&card_db, &self.moved_cards, &h);
+                h = same_name_targets(&card_db, &self.selection.moved_cards, &h);
             }
             h
         } else {
@@ -2161,7 +2161,7 @@ pub(crate) fn execute_gain_surplus_heart(
                     options.push(format!("{},{}", name1, name2));
                 }
             }
-            self.pending_choice = Some(Choice::SelectTarget {
+            self.awaiting.choice = Some(Choice::SelectTarget {
                 target: "double_baton_touch".to_string(),
                 description: "Choose 2 occupied areas for double baton touch".to_string(),
                 description_en: Some("Choose 2 occupied areas for double baton touch".to_string()),
@@ -2278,8 +2278,8 @@ pub(crate) fn execute_gain_surplus_heart(
                 effect.cost_limit_any(),
                 effect.cost_limit_operator_any().map(|s| s.to_string()),
             );
-            self.pending_choice = Some(b.build());
-            self.execution_context = ExecutionContext::SingleEffect { effect_index: 0 };
+            self.awaiting.choice = Some(b.build());
+            self.in_flight.execution_context = ExecutionContext::SingleEffect { effect_index: 0 };
             return;
         }
 
@@ -2336,10 +2336,10 @@ pub(crate) fn execute_gain_surplus_heart(
                 if let Some(group) = effect.group_names_any().and_then(|groups| groups.first()) {
                     builder = builder.group(Some(group.clone()));
                 }
-                self.pending_choice = Some(builder.build());
-                self.stage_select_intent =
+                self.awaiting.choice = Some(builder.build());
+                self.awaiting.stage_select_intent =
                     Some(crate::ability::types::StageSelectIntent::PlaceEnergyDeckUnder);
-                self.execution_context = ExecutionContext::SingleEffect { effect_index: 0 };
+                self.in_flight.execution_context = ExecutionContext::SingleEffect { effect_index: 0 };
                 return;
             }
             let idx = eligible[0];
@@ -2375,7 +2375,7 @@ pub(crate) fn execute_gain_surplus_heart(
             } else {
                 all_under.len().min(count as usize)
             };
-            self.pending_choice = Some(
+            self.awaiting.choice = Some(
                 Choice::select_cards(
                     Zone::UnderMember.to_str(),
                     choice_count,
@@ -2389,7 +2389,7 @@ pub(crate) fn execute_gain_surplus_heart(
                 .target_player_id(Some(target.to_string()))
                 .build(),
             );
-            self.execution_context = ExecutionContext::SingleEffect { effect_index: 0 };
+            self.in_flight.execution_context = ExecutionContext::SingleEffect { effect_index: 0 };
             return;
         }
 
@@ -2416,7 +2416,7 @@ pub(crate) fn execute_gain_surplus_heart(
         } else {
             format!("このメンバーの下に置くエネルギーカードを{}枚選択{}", count, state_suffix_ja)
         };
-        self.pending_choice = Some(
+        self.awaiting.choice = Some(
             Choice::select_cards(
                 Zone::Energy.to_str(),
                 count as usize,
@@ -2429,7 +2429,7 @@ pub(crate) fn execute_gain_surplus_heart(
             .description_ja(Some(desc_ja))
             .build(),
         );
-        self.execution_context = ExecutionContext::SingleEffect { effect_index: 0 };
+        self.in_flight.execution_context = ExecutionContext::SingleEffect { effect_index: 0 };
     }
 
     pub fn execute_position_change(
@@ -2489,7 +2489,7 @@ pub(crate) fn execute_gain_surplus_heart(
                     )));
                 }
                 let member_name = self.card_name(triggering_member);
-                self.pending_choice = Some(Choice::SelectTarget {
+                self.awaiting.choice = Some(Choice::SelectTarget {
                     target: "position|destination".to_string(),
                     description: format!(
                         "Choose destination for {} (currently at {})",
@@ -2541,7 +2541,7 @@ pub(crate) fn execute_gain_surplus_heart(
                         "position_change:opponent:front".to_string(),
                     ));
                 }
-                self.pending_choice = Some(Choice::SelectTarget {
+                self.awaiting.choice = Some(Choice::SelectTarget {
                     target: "position|destination".to_string(),
                     description: "Choose which opponent member to move".to_string(),
                     description_en: Some("Choose which opponent member to move".to_string()),
@@ -2611,7 +2611,7 @@ pub(crate) fn execute_gain_surplus_heart(
                     target
                 )));
             }
-            self.pending_choice = Some(Choice::SelectTarget {
+            self.awaiting.choice = Some(Choice::SelectTarget {
                 target: "position|destination".to_string(),
                 description: "Choose which member to move".to_string(),
                 description_en: Some("Choose which member to move".to_string()),
@@ -2633,7 +2633,7 @@ pub(crate) fn execute_gain_surplus_heart(
                 "opponent",
                 target_member,
             )?;
-            if self.pending_choice.is_some() {
+            if self.awaiting.choice.is_some() {
                 let mut self_effect = effect.clone();
                 self_effect.target = Some("self".into());
                 gs.ability_queue.set_pending_actions(vec![self_effect]);
@@ -2678,7 +2678,7 @@ pub(crate) fn execute_gain_surplus_heart(
                 // Initialize formation_plan with all members (no destination yet).
                 // This drives zone exclusion in compute_valid_position_destinations
                 // and tracks which members still need assignment.
-                self.formation_plan = card_ids.iter().map(|&cid| (cid, String::new())).collect();
+                self.carried.formation_plan = card_ids.iter().map(|&cid| (cid, String::new())).collect();
 
                 // First member: create destination choice.
                 let first_card_id = card_ids[0];
@@ -2704,7 +2704,7 @@ pub(crate) fn execute_gain_surplus_heart(
                 let valid_destinations =
                     self.compute_valid_position_destinations(gs, effect, target_m);
                 if valid_destinations.is_empty() {
-                    self.formation_plan.clear();
+                    self.carried.formation_plan.clear();
                     return Ok(());
                 }
                 if let Some(entry) = gs.ability_queue.current_entry_mut() {
@@ -2713,7 +2713,7 @@ pub(crate) fn execute_gain_surplus_heart(
                         first_card_id
                     )));
                 }
-                self.pending_choice = Some(Choice::SelectTarget {
+                self.awaiting.choice = Some(Choice::SelectTarget {
                     target: "position|destination".to_string(),
                     description: format!(
                         "Choose destination for {} (currently at {})",
@@ -2771,7 +2771,7 @@ pub(crate) fn execute_gain_surplus_heart(
                     "right" | "right_side" => "Right",
                     _ => position_str,
                 };
-                self.pending_choice = Some(Choice::SelectTarget {
+                self.awaiting.choice = Some(Choice::SelectTarget {
                     target: "position|destination".to_string(),
                     description: format!(
                         "Choose destination for position change (currently at {})",
@@ -2789,9 +2789,9 @@ pub(crate) fn execute_gain_surplus_heart(
             }
 
             // No position specified: check if a previous area_select stored the destination.
-            let stored_area = self.selected_area.clone();
+            let stored_area = self.selection.area.clone();
             if let Some(ref area) = stored_area {
-                self.selected_area = None;
+                self.selection.area = None;
                 let mut copy = effect.clone();
                 copy.destination = Some(Zone::from_source_str(area));
                 return self.execute_position_change_with_destination(gs, &copy, area);
@@ -2823,7 +2823,7 @@ pub(crate) fn execute_gain_surplus_heart(
             if let Some(entry) = gs.ability_queue.current_entry_mut() {
                 entry.choice_card_no = Some(ChoiceRoute::Raw("position_change:self".to_string()));
             }
-            self.pending_choice = Some(Choice::SelectTarget {
+            self.awaiting.choice = Some(Choice::SelectTarget {
                 target: "position|destination".to_string(),
                 description: format!(
                     "Choose destination for position change (currently at {})",
@@ -2891,7 +2891,7 @@ pub(crate) fn execute_gain_surplus_heart(
                         card_no
                     )));
                 }
-                self.pending_choice = Some(Choice::SelectTarget {
+                self.awaiting.choice = Some(Choice::SelectTarget {
                     target: "position|destination".to_string(),
                     description: format!(
                         "Choose destination for {} (currently at {})",
@@ -3016,7 +3016,7 @@ pub(crate) fn execute_gain_surplus_heart(
 
         // Formation change: exclude zones already assigned to another member.
         let planned_zones: Vec<String> = self
-            .formation_plan
+            .carried.formation_plan
             .iter()
             .map(|(_, d)| d.clone())
             .filter(|d| !d.is_empty())
@@ -3092,7 +3092,7 @@ pub(crate) fn execute_gain_surplus_heart(
     /// via `stage.position_change` and each member's movement is individually
     /// tracked via `push_movement_event`.
     pub(crate) fn finalize_formation_change(&mut self, gs: &mut GameState) -> Result<(), String> {
-        if self.formation_plan.is_empty() {
+        if self.carried.formation_plan.is_empty() {
             return Ok(());
         }
         let (cause_cid, mover_pid) = (
@@ -3122,7 +3122,7 @@ pub(crate) fn execute_gain_surplus_heart(
         // Phase 1: place every planned card at its destination.
         // Track which card got evicted from each destination.
         let mut occupant: [i16; 3] = old_stage; // current occupant of each pos
-        for &(member_id, ref dest) in &self.formation_plan {
+        for &(member_id, ref dest) in &self.carried.formation_plan {
             if member_id == -1 || dest.is_empty() {
                 continue;
             }
@@ -3157,7 +3157,7 @@ pub(crate) fn execute_gain_surplus_heart(
 
         // Phase 2: place evicted cards / stay-in-place.
         // Each evicted card goes to its mover's original position.
-        for &(member_id, ref dest) in &self.formation_plan {
+        for &(member_id, ref dest) in &self.carried.formation_plan {
             if member_id == -1 || dest.is_empty() {
                 continue;
             }
@@ -3186,7 +3186,7 @@ pub(crate) fn execute_gain_surplus_heart(
                 // them here would duplicate one member across two areas.
                 let evicted_id = old_stage[dest_idx];
                 let evicted_is_planned = self
-                    .formation_plan
+                    .carried.formation_plan
                     .iter()
                     .any(|(id, _)| *id == evicted_id);
                 if evicted_id != -1
@@ -3208,7 +3208,7 @@ pub(crate) fn execute_gain_surplus_heart(
         // Phase 3: unplanned cards keep their original slot if free
         for (i, &cid) in old_stage.iter().enumerate() {
             if new_stage[i] == -1 && cid != -1 {
-                let is_planned = self.formation_plan.iter().any(|(id, _)| *id == cid);
+                let is_planned = self.carried.formation_plan.iter().any(|(id, _)| *id == cid);
                 if !is_planned {
                     new_stage[i] = cid;
                     new_under[i] = old_under[i].clone();
@@ -3236,7 +3236,7 @@ pub(crate) fn execute_gain_surplus_heart(
 
         gs.position_change_occurred_this_turn = true;
         gs.recalculate_constants();
-        self.formation_plan.clear();
+        self.carried.formation_plan.clear();
         Ok(())
     }
 
@@ -3269,7 +3269,7 @@ pub(crate) fn execute_gain_surplus_heart(
             target_member,
             source_position,
             destination,
-            self.activating_card_id
+            self.session.activating_card_id
         );
 
         // destination "same_area" means the area that was just vacated by the
@@ -3481,7 +3481,7 @@ pub(crate) fn execute_gain_surplus_heart(
                 target,
                 target_index
             );
-            if let Some(activating_card_id) = self.activating_card_id {
+            if let Some(activating_card_id) = self.session.activating_card_id {
                 let player = gs.resolve_target_player_mut(target);
                 log::debug!("[EPCWD] stage: {:?}", player.stage.stage);
 
@@ -3796,7 +3796,7 @@ pub(crate) fn execute_gain_surplus_heart(
                 opt_en.len(),
                 opt_en
             );
-            self.pending_choice = Some(Choice::SelectTarget {
+            self.awaiting.choice = Some(Choice::SelectTarget {
                 target: "choice".to_string(),
                 description: description.clone(),
                 description_en: Some(opt_en.join(" / ")),
@@ -3808,7 +3808,7 @@ pub(crate) fn execute_gain_surplus_heart(
                 entry.choice_effect_text = Some(effect.text.to_string());
             }
         } else if let Some(string_options) = choice_options {
-            self.pending_choice = Some(Choice::SelectTarget {
+            self.awaiting.choice = Some(Choice::SelectTarget {
                 target: "choice_string".to_string(),
                 description: format!("Choose one: {}", string_options.join(", ")),
                 description_en: Some(format!("Choose one: {}", string_options.join(", "))),
@@ -3817,7 +3817,7 @@ pub(crate) fn execute_gain_surplus_heart(
                 options: None,
             });
         } else if let Some(ct) = choice_type {
-            self.pending_choice = Some(Choice::SelectTarget {
+            self.awaiting.choice = Some(Choice::SelectTarget {
                 target: "choice".to_string(),
                 description: format!("Choose: {}", ct),
                 description_en: Some(format!("Choose: {}", ct)),
@@ -3845,13 +3845,13 @@ pub(crate) fn execute_gain_surplus_heart(
             let player = gs.resolve_target_player(effect.target_name());
             if player.energy_zone.active_count() < count {
                 // Insufficient energy: skip payment and clear remaining actions
-                self.cancel_remaining_commands = true;
+                self.in_flight.cancel_remaining_commands = true;
                 if let Some(entry) = gs.ability_queue.current_entry_mut() {
                     entry.pending_actions.clear();
                 }
                 return Ok(());
             }
-            self.pending_energy_payment = Some(count);
+            self.awaiting.energy_payment = Some(count);
             self.emit_pay_skip_gate(
                 gs,
                 None,
@@ -3900,13 +3900,13 @@ pub(crate) fn execute_gain_surplus_heart(
             "手札から{}枚捨てる（目標: 手札{}枚）",
             cards_to_discard, target_count
         );
-        self.pending_choice = Some(
+        self.awaiting.choice = Some(
             Choice::select_cards(Zone::Hand.to_str(), cards_to_discard, desc_en, false)
                 .description_ja(Some(desc_ja))
                 .target_player_id(Some(target.to_string()))
                 .build(),
         );
-        self.execution_context = ExecutionContext::SingleEffect { effect_index: 0 };
+        self.in_flight.execution_context = ExecutionContext::SingleEffect { effect_index: 0 };
         let pp = self.player_prefix(gs);
         let act_name = gs
             .activating_card
@@ -3965,8 +3965,8 @@ pub(crate) fn execute_gain_surplus_heart(
                 // move-based flow touches that field.
                 // Fall back to the activating card for member "次のターンにアクティブしない"
                 // restrictions where the target is the ability's own member.
-                if !self.changed_state_members.is_empty() {
-                    for &cid in self.changed_state_members.iter() {
+                if !self.selection.changed_state_members.is_empty() {
+                    for &cid in self.selection.changed_state_members.iter() {
                         if cid != -1 {
                             gs.mods.add_delayed_cannot_active(cid, 1);
                             log::debug!(
@@ -3975,7 +3975,7 @@ pub(crate) fn execute_gain_surplus_heart(
                             );
                         }
                     }
-                    self.changed_state_members.clear();
+                    self.selection.changed_state_members.clear();
                 } else if let Some(moved) = gs.recently_moved_cards.as_ref() {
                     for &cid in moved.iter() {
                         if cid != -1 {
@@ -4105,7 +4105,7 @@ pub(crate) fn execute_gain_surplus_heart(
     }
 
     pub(crate) fn execute_choose_required_hearts(&mut self, gs: &mut GameState) {
-        self.pending_choice = Some(Choice::SelectTarget {
+        self.awaiting.choice = Some(Choice::SelectTarget {
             target: "choose_required_hearts".to_string(),
             description: "Choose required hearts".to_string(),
             description_en: Some("Choose required hearts".to_string()),
@@ -4122,12 +4122,12 @@ pub(crate) fn execute_gain_surplus_heart(
         gs: &mut GameState,
         effect: &AbilityEffect,
     ) -> Result<(), String> {
-        self.current_effect = Some(effect.clone());
+        self.owner.executing = Some(effect.clone());
         let options = effect
             .choice_options_any()
             .cloned()
             .unwrap_or_else(|| vec!["自分".to_string(), "相手".to_string()]);
-        self.pending_choice = Some(Choice::SelectTarget {
+        self.awaiting.choice = Some(Choice::SelectTarget {
             target: "self_or_opponent".to_string(),
             description: "Choose self or opponent".to_string(),
             description_en: Some("Choose self or opponent".to_string()),

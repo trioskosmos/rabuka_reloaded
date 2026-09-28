@@ -36,7 +36,7 @@ impl AbilityResolver {
             && effect.card_type_any() == Some(&crate::card::CardType::Member)
             && effect.group_names_any().is_some_and(|g| !g.is_empty());
 
-        if stage_member_targeting && self.selected_cards.is_empty() {
+        if stage_member_targeting && self.selection.cards.is_empty() {
             let card_db = gs.card_database.clone();
             let groups: Vec<String> = effect
                 .group_names_any()
@@ -58,7 +58,7 @@ impl AbilityResolver {
                 .collect();
             if !candidates.is_empty() {
                 let pick = (effect.count_or(1) as usize).min(candidates.len());
-                self.pending_choice = Some(
+                self.awaiting.choice = Some(
                     crate::ability::types::Choice::select_cards(
                         crate::ability::enums::Zone::Stage.to_str(),
                         pick,
@@ -73,9 +73,9 @@ impl AbilityResolver {
                     .is_select_action(true)
                     .build(),
                 );
-                self.stage_select_intent =
+                self.awaiting.stage_select_intent =
                     Some(crate::ability::types::StageSelectIntent::CollectTargets);
-                self.execution_context =
+                self.in_flight.execution_context =
                     crate::ability::types::ExecutionContext::SingleEffect { effect_index: 0 };
                 // Re-apply THIS effect after the choice so the non-empty
                 // selected_cards branch below registers per member.
@@ -84,7 +84,7 @@ impl AbilityResolver {
             }
         }
 
-        let targets: Vec<i16> = if self.selected_cards.is_empty() {
+        let targets: Vec<i16> = if self.selection.cards.is_empty() {
             // 「これによってウェイト状態になったメンバーは…を得る」 — the gain
             // carries no explicit target; the anaphora points at the member(s)
             // put to wait BY THIS ABILITY'S COST, which the engine already
@@ -103,7 +103,7 @@ impl AbilityResolver {
                 gs.activating_card.into_iter().collect()
             }
         } else {
-            core::mem::take(&mut self.selected_cards).to_vec()
+            core::mem::take(&mut self.selection.cards).to_vec()
         };
 
         for target_card in targets {
@@ -152,7 +152,7 @@ impl AbilityResolver {
         // each of their 登場 abilities.
         let use_selected = source_card == Some("previous_selected");
         let card_ids: Vec<i16> = if use_selected {
-            self.selected_cards.iter().copied().collect()
+            self.selection.cards.iter().copied().collect()
         } else {
             let single = source_card.and_then(|sc| match sc {
                 "cost_card" => gs
@@ -235,7 +235,7 @@ impl AbilityResolver {
             Some("ライブ開始時") => crate::game_state::AbilityTrigger::LiveStart,
             Some("ライブ成功時") => crate::game_state::AbilityTrigger::LiveSuccess,
             _ => {
-                self.last_action_result = Some((effect.action, false));
+                self.carried.last_action_result = Some((effect.action, false));
                 return Err("invalidate_ability has no supported target_trigger".to_string());
             }
         };
@@ -243,7 +243,7 @@ impl AbilityResolver {
             Some(code) => match crate::ability::util::parse_duration(code) {
                 Some(duration) => duration,
                 None => {
-                    self.last_action_result = Some((effect.action, false));
+                    self.carried.last_action_result = Some((effect.action, false));
                     return Err(format!("unsupported duration code: {code}"));
                 }
             },
@@ -252,11 +252,11 @@ impl AbilityResolver {
 
         if effect.is_self_target() {
             let Some(card_id) = gs.activating_card else {
-                self.last_action_result = Some((effect.action, false));
+                self.carried.last_action_result = Some((effect.action, false));
                 return Err("no activating card for self-targeted invalidation".to_string());
             };
             let succeeded = gs.try_add_ability_invalidation(card_id, trigger, duration);
-            self.last_action_result = Some((effect.action, succeeded));
+            self.carried.last_action_result = Some((effect.action, succeeded));
             if succeeded {
                 let pp = self.player_prefix(gs);
                 let cn = self.card_name(card_id);
@@ -297,11 +297,11 @@ impl AbilityResolver {
         );
 
         if valid.is_empty() {
-            self.last_action_result = Some((effect.action, false));
+            self.carried.last_action_result = Some((effect.action, false));
             return Ok(());
         }
 
-        if self.selected_cards.is_empty() {
+        if self.selection.cards.is_empty() {
             let filtered_indices: Vec<usize> = player
                 .stage
                 .stage
@@ -309,7 +309,7 @@ impl AbilityResolver {
                 .enumerate()
                 .filter_map(|(index, &card_id)| valid.contains(&card_id).then_some(index))
                 .collect();
-            self.pending_choice = Some(
+            self.awaiting.choice = Some(
                 crate::ability::types::Choice::select_cards(
                     crate::ability::enums::Zone::Stage.to_str(),
                     1,
@@ -328,22 +328,22 @@ impl AbilityResolver {
                 .is_select_action(true)
                 .build(),
             );
-            self.stage_select_intent =
+            self.awaiting.stage_select_intent =
                 Some(crate::ability::types::StageSelectIntent::CollectTargets);
-            self.execution_context = crate::ability::types::ExecutionContext::SingleEffect {
+            self.in_flight.execution_context = crate::ability::types::ExecutionContext::SingleEffect {
                 effect_index: 0,
             };
             gs.ability_queue.set_pending_actions(vec![effect.clone()]);
             return Ok(());
         }
 
-        let selected = self.selected_cards.first().copied();
+        let selected = self.selection.cards.first().copied();
         let succeeded = selected.is_some_and(|card_id| {
             valid.contains(&card_id)
                 && gs.try_add_ability_invalidation(card_id, trigger, duration)
         });
-        self.selected_cards.clear();
-        self.last_action_result = Some((effect.action, succeeded));
+        self.selection.cards.clear();
+        self.carried.last_action_result = Some((effect.action, succeeded));
         if succeeded {
             let pp = self.player_prefix(gs);
             let cn = self.card_name(gs.activating_card.unwrap_or_default());
@@ -491,7 +491,7 @@ pub(crate) fn execute_gain_ability(
             }
             // A gained 常時 changes the constant landscape — make sure the
             // next recalculation picks it up.
-            self.last_gain_effect_data = Some(crate::core::types::EffectData::GainAbility {
+            self.carried.last_gain_effect_data = Some(crate::core::types::EffectData::GainAbility {
                 card_id,
                 amount: i16::from(immediate_val),
                 is_live_total,
@@ -514,7 +514,7 @@ pub(crate) fn execute_gain_ability(
             duration,
             target,
             &format!("Gained ability: {}", ability_text),
-            self.last_gain_effect_data.take(),
+            self.carried.last_gain_effect_data.take(),
         );
         if gained_constant {
             gs.recalculate_constants();

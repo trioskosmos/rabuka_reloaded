@@ -239,7 +239,7 @@ impl AbilityResolver {
         };
 
         let offset = effect.cost_offset_any().unwrap_or(0);
-        let moved = self.moved_cards.last().copied();
+        let moved = self.selection.moved_cards.last().copied();
         let recently = gs
             .recently_moved_cards
             .as_ref()
@@ -248,7 +248,7 @@ impl AbilityResolver {
             "[COST_REF] moved_cards={:?} recently={:?} self.moved={:?}",
             moved,
             recently,
-            self.moved_cards
+            self.selection.moved_cards
         );
         let referenced_id = match reference {
             "previous_moved_card" => moved.or(recently),
@@ -338,10 +338,10 @@ impl AbilityResolver {
             source
         };
         if Zone::from_str(source_str) == Some(Zone::SelectedCards) {
-            let selected: Vec<i16> = if self.selected_cards.is_empty() {
+            let selected: Vec<i16> = if self.selection.cards.is_empty() {
                 gs.revealed_cost_cards.iter().copied().collect()
             } else {
-                self.selected_cards.iter().copied().collect()
+                self.selection.cards.iter().copied().collect()
             };
             for &card_id in &selected {
                 remove_card_from_any_zone(player, &mut gs.last_vacated_stage_area, card_id);
@@ -364,7 +364,7 @@ impl AbilityResolver {
         // sequential's own moves) filtered by the action's character filter.
         if source_str == "preceding_moved" {
             let cards: Vec<i16> = self
-                .moved_cards
+                .selection.moved_cards
                 .iter()
                 .filter(|&&cid| {
                     cid != -1
@@ -639,7 +639,7 @@ impl AbilityResolver {
             .and_then(|e| e.trigger_moved_cards.clone())
             .filter(|c| !c.is_empty())
             .or_else(|| {
-                let own_moves = self.moved_cards.clone();
+                let own_moves = self.selection.moved_cards.clone();
                 (!own_moves.is_empty()).then_some(own_moves)
             });
         log::debug!(
@@ -681,7 +681,7 @@ impl AbilityResolver {
                     // the move adds nothing. Signal this explicitly so a
                     // following "…したとき" modify_score step is skipped, and do
                     // NOT fall through to the discard pile.
-                    self.last_move_moved_any = Some(false);
+                    self.carried.last_move_moved_any = Some(false);
                     return Ok(Some(vec![]));
                 } else if all_matching.len() <= count
                     && (destination == "deck_top_or_bottom"
@@ -709,7 +709,7 @@ impl AbilityResolver {
                             }
                         }
                     }
-                    self.last_move_moved_any = Some(!found.is_empty());
+                    self.carried.last_move_moved_any = Some(!found.is_empty());
                     return Ok(Some(found));
                 } else if destination == "deck_top_or_bottom" {
                     log::debug!("[THOSE_RESOLVE] branch=choice_dtob all_matching={:?}", all_matching);
@@ -730,7 +730,7 @@ impl AbilityResolver {
                         .and(group_name)
                         .map(|g| format!("{g}カードを山札に置く1枚を選択"))
                         .unwrap_or_else(|| "山札に置く1枚を選択".to_string());
-                    self.pending_choice = Some(
+                    self.awaiting.choice = Some(
                         Choice::select_cards(Zone::Discard.to_str(), 1, description, false)
                             .description_ja(Some(description_ja))
                             .card_type(card_type_filter.map(|s| s.to_string()))
@@ -759,7 +759,7 @@ impl AbilityResolver {
                         .and(group_name)
                         .map(|g| format!("{g}カードを{count}枚選択"))
                         .unwrap_or_else(|| "カードを選択".to_string());
-                    self.pending_choice = Some(
+                    self.awaiting.choice = Some(
                         Choice::select_cards(
                             Zone::Discard.to_str(),
                             count,
@@ -1419,13 +1419,13 @@ impl AbilityResolver {
             // (handle_select_cards_looked_at) has no access to this effect, so
             // capture the numeric deck position now and let it ride on the
             // resolver until the selection is answered.
-            self.looked_at_deck_position = effect
+            self.carried.looked_at_deck_position = effect
                 .position_any()
                 .and_then(|pi| pi.get_position())
                 .and_then(|s| s.parse::<usize>().ok())
                 .filter(|&n| n > 0)
                 .filter(|_| effect.destination.as_ref() == Some(&Zone::DeckTop));
-            self.pending_choice = Some(
+            self.awaiting.choice = Some(
                 Choice::select_cards(Zone::LookedAt.to_str(), max_take, description, true)
                     .description_en(description_en)
                     .description_ja(description_ja)
@@ -1447,7 +1447,7 @@ impl AbilityResolver {
                     .discard_remaining(effect.discard_remaining_any())
                     .build(),
             );
-            self.execution_context = ExecutionContext::SingleEffect { effect_index: 0 };
+            self.in_flight.execution_context = ExecutionContext::SingleEffect { effect_index: 0 };
             Ok(vec![])
         } else {
             // For LookedAt, cards are ordered: [0] = matched target,
@@ -1477,7 +1477,7 @@ impl AbilityResolver {
         // a whole-gs borrow.
         let effect = c.effect;
         let count = c.count;
-        let selected = self.selected_cards.clone();
+        let selected = self.selection.cards.clone();
         let idxs: Vec<usize> = (0..selected.len()).collect();
         match util::classify_selection(
             &idxs,
@@ -1501,7 +1501,7 @@ impl AbilityResolver {
                     gs.remove_revealed_card(card_id);
                     gs.remove_revealed_cost_card(card_id);
                 }
-                self.selected_cards.retain(|card_id| !taken.contains(card_id));
+                self.selection.cards.retain(|card_id| !taken.contains(card_id));
                 // Card left any zone → full zone-exit cleanup (rule 4.1.4)
                 gs.on_cards_left_zones(&taken);
                 Ok(taken)
@@ -1631,27 +1631,27 @@ impl AbilityResolver {
         gs: &mut GameState,
         c: &MoveSourceContext,
     ) -> Result<Vec<i16>, String> {
-        log::debug!("[UNDER_MEMBER] called selected={:?} pending={:?}", self.selected_cards, self.pending_choice.is_some());
+        log::debug!("[UNDER_MEMBER] called selected={:?} pending={:?}", self.selection.cards, self.awaiting.choice.is_some());
         let target = c.effect.target.as_deref().unwrap_or("self");
         // If this is a resumed call after the player selected a stage member,
         // self.selected_cards will contain that member's ID.
-        if !self.selected_cards.is_empty() {
-            log::debug!("[UNDER_MEMBER] second call selected={:?}", self.selected_cards);
-            let selected_member_id = self.selected_cards[0];
+        if !self.selection.cards.is_empty() {
+            log::debug!("[UNDER_MEMBER] second call selected={:?}", self.selection.cards);
+            let selected_member_id = self.selection.cards[0];
             let idx_opt = {
 let player = gs.resolve_target_player(target);
                 player.stage.stage.iter().position(|&id| id == selected_member_id)
             };
             if let Some(idx) = idx_opt {
                 let moved = drain_under_cards_to_energy_zone(gs, target, idx);
-                self.last_move_moved_any = Some(!moved.is_empty());
+                self.carried.last_move_moved_any = Some(!moved.is_empty());
                 if !moved.is_empty() {
 gs.set_recently_moved_batch(moved.clone().into(), Some("under_member"));
                 }
-                self.selected_cards.clear();
+                self.selection.cards.clear();
                 return Ok(moved);
             }
-            self.selected_cards.clear();
+            self.selection.cards.clear();
             return Ok(vec![]);
         }
 
@@ -1666,7 +1666,7 @@ gs.set_recently_moved_batch(moved.clone().into(), Some("under_member"));
             })
             .collect();
         if candidates.is_empty() {
-            self.last_move_moved_any = Some(false);
+            self.carried.last_move_moved_any = Some(false);
             return Ok(vec![]);
         }
         if candidates.len() == 1 {
@@ -1674,7 +1674,7 @@ gs.set_recently_moved_batch(moved.clone().into(), Some("under_member"));
                 // Single candidate with optional: prompt Stage selection with skip allowed
                 // so player can choose to move or skip. This mirrors the multiple-candidate
                 // path but with one entry, ensuring skip is possible.
-                self.pending_choice = Some(
+                self.awaiting.choice = Some(
                     crate::ability::types::Choice::select_cards(
                         crate::ability::enums::Zone::Stage.to_str(),
                         1,
@@ -1688,21 +1688,21 @@ gs.set_recently_moved_batch(moved.clone().into(), Some("under_member"));
                     .is_select_action(true)
                     .build(),
                 );
-                self.stage_select_intent =
+                self.awaiting.stage_select_intent =
                     Some(crate::ability::types::StageSelectIntent::UnderMemberMove);
-                self.execution_context = crate::ability::types::ExecutionContext::SingleEffect { effect_index: 0 };
+                self.in_flight.execution_context = crate::ability::types::ExecutionContext::SingleEffect { effect_index: 0 };
                 return Ok(vec![]);
             }
             let idx = candidates[0];
             let moved = drain_under_cards_to_energy_zone(gs, target, idx);
-            self.last_move_moved_any = Some(!moved.is_empty());
+            self.carried.last_move_moved_any = Some(!moved.is_empty());
             if !moved.is_empty() {
 gs.set_recently_moved_batch(moved.clone().into(), Some("under_member"));
             }
             return Ok(moved);
         }
         // Multiple candidates, non-optional: prompt to choose
-        self.pending_choice = Some(
+        self.awaiting.choice = Some(
             crate::ability::types::Choice::select_cards(
                 crate::ability::enums::Zone::Stage.to_str(),
                 1,
@@ -1716,9 +1716,9 @@ gs.set_recently_moved_batch(moved.clone().into(), Some("under_member"));
             .is_select_action(true)
             .build(),
         );
-        self.stage_select_intent =
+        self.awaiting.stage_select_intent =
             Some(crate::ability::types::StageSelectIntent::UnderMemberMove);
-        self.execution_context = crate::ability::types::ExecutionContext::SingleEffect { effect_index: 0 };
+        self.in_flight.execution_context = crate::ability::types::ExecutionContext::SingleEffect { effect_index: 0 };
         Ok(vec![])
     }
 
@@ -1762,7 +1762,7 @@ gs.set_recently_moved_batch(moved.clone().into(), Some("under_member"));
                     .iter()
                     .map(|t| crate::ability::describe::card_type_label(Some(t)).to_string())
                     .collect();
-                self.pending_choice = Some(Choice::SelectTarget {
+                self.awaiting.choice = Some(Choice::SelectTarget {
                     target: "choice_string".to_string(),
                     description: format!("Pick card type: {}", type_labels.join(" / ")),
                     description_en: Some(format!(
@@ -1776,7 +1776,7 @@ gs.set_recently_moved_batch(moved.clone().into(), Some("under_member"));
                     allow_skip: false,
                     options: Some(type_labels),
                 });
-                self.execution_context = ExecutionContext::SingleEffect { effect_index: 0 };
+                self.in_flight.execution_context = ExecutionContext::SingleEffect { effect_index: 0 };
                 if let Some(e) = gs.ability_queue.current_entry_mut() {
                     e.conditional_choice =
                         Some(ConditionalChoice::Strings(or_types.to_vec()));
@@ -1874,7 +1874,7 @@ gs.set_recently_moved_batch(moved.clone().into(), Some("under_member"));
             order_pool
         );
         gs.looked_at_cards = order_pool.into();
-        self.pending_choice = Some(Choice::SelectTarget {
+        self.awaiting.choice = Some(Choice::SelectTarget {
             target: "order".to_string(),
             description: format!("Choose order for cards on deck ({} cards)", taken_count),
             description_en: Some(format!(
@@ -1885,7 +1885,7 @@ gs.set_recently_moved_batch(moved.clone().into(), Some("under_member"));
             allow_skip: false,
             options: None,
         });
-        self.execution_context = ExecutionContext::LookAndSelect {
+        self.in_flight.execution_context = ExecutionContext::LookAndSelect {
             step: LookAndSelectStep::Finalize {
                 destination: Zone::Deck.to_str().to_string(),
                 source_zone: String::new(),
@@ -2125,9 +2125,9 @@ gs.set_recently_moved_batch(moved.clone().into(), Some("under_member"));
         // Store destination for execute_selected_cards_from_zone to read later
         // (needed when the resolve creates a card selection choice and the destination
         // is not accessible via entry_destination, e.g. for sequential sub-actions).
-        self.spawn_context.destination = effect.destination.map(|z| z.to_str().to_string());
-        self.spawn_context.source = effect.source_any().map(|s| s.to_string());
-        self.spawn_context.position = effect.position_any().and_then(|p| match p {
+        self.in_flight.spawn_context.destination = effect.destination.map(|z| z.to_str().to_string());
+        self.in_flight.spawn_context.source = effect.source_any().map(|s| s.to_string());
+        self.in_flight.spawn_context.position = effect.position_any().and_then(|p| match p {
             crate::card::PositionInfo::String(s) => s.parse::<u8>().ok(),
             crate::card::PositionInfo::Struct { position, .. } => {
                 position.as_ref().and_then(|s| s.parse::<u8>().ok())
@@ -2177,7 +2177,7 @@ gs.set_recently_moved_batch(moved.clone().into(), Some("under_member"));
             },
             &card_db,
         )?;
-        if effect.optional.unwrap_or(false) && taken.is_empty() && self.pending_choice.is_none() {
+        if effect.optional.unwrap_or(false) && taken.is_empty() && self.awaiting.choice.is_none() {
             if let Some(entry) = gs.ability_queue.current_entry_mut() {
                 entry.optional_cost_result = Some(false);
             }
@@ -2192,7 +2192,7 @@ gs.set_recently_moved_batch(moved.clone().into(), Some("under_member"));
             .current_entry()
             .and_then(|e| e.optional_moves_all_moved)
             .is_some();
-        if armed && taken.is_empty() && self.pending_choice.is_none() {
+        if armed && taken.is_empty() && self.awaiting.choice.is_none() {
             if let Some(entry) = gs.ability_queue.current_entry_mut() {
                 entry.optional_moves_all_moved = Some(false);
             }
@@ -2236,7 +2236,7 @@ if util::distinct_should_dedupe(distinct) {
         // Record whether this move actually moved any cards. Used by the
         // "…したとき" (when you do so) pattern: a consequence step directly
         // following a move that moved nothing must be skipped.
-        self.last_move_moved_any = Some(!moved_cards.is_empty());
+        self.carried.last_move_moved_any = Some(!moved_cards.is_empty());
         self.finalize_card_movement(
             gs,
             &moved_cards,
@@ -2339,8 +2339,8 @@ if util::distinct_should_dedupe(distinct) {
 
                 gs.mods.clear_all_for_card(card_id);
                 gs.record_card_movement(card_id);
-                if !self.moved_cards.contains(&card_id) {
-                    self.moved_cards.push(card_id);
+                if !self.selection.moved_cards.contains(&card_id) {
+                    self.selection.moved_cards.push(card_id);
                 }
                 if state_change.as_deref() == Some("wait") {
                     gs.mods.add_orientation_modifier(card_id, "wait");
@@ -2356,23 +2356,23 @@ if util::distinct_should_dedupe(distinct) {
         // cost/effect prompts must survive — a blanket clear here silently
         // swallowed them.
         if matches!(
-            self.pending_choice,
+            self.awaiting.choice,
             Some(Choice::SelectPosition { .. })
         ) {
-            self.pending_choice = None;
+            self.awaiting.choice = None;
         }
         log::debug!(
             "[DEPLOY] after position handling: pending={:?}",
-            format!("{:?}", self.pending_choice)
+            format!("{:?}", self.awaiting.choice)
         );
-        self.execution_context = ExecutionContext::None;
+        self.in_flight.execution_context = ExecutionContext::None;
         // Place remaining cards deferred by multi-card stage selection
         // BEFORE resuming pending commands, so deferred cards get their
         // position choices before the re-prompt (if any).
-        if !self.pending_stage_cards.is_empty() {
-            let remaining = core::mem::take(&mut self.pending_stage_cards);
+        if !self.awaiting.stage_cards.is_empty() {
+            let remaining = core::mem::take(&mut self.awaiting.stage_cards);
             for (i, (cid, tgt)) in remaining.iter().enumerate() {
-                let source = self.spawn_context.source.clone().unwrap_or_default();
+                let source = self.in_flight.spawn_context.source.clone().unwrap_or_default();
                 match self.place_card_with_stage_choice(
                     gs,
                     tgt,
@@ -2389,7 +2389,7 @@ if util::distinct_should_dedupe(distinct) {
                 ) {
                     Ok(true) => {
                         if i + 1 < remaining.len() {
-                            self.pending_stage_cards = remaining[i + 1..].into();
+                            self.awaiting.stage_cards = remaining[i + 1..].into();
                         }
                         return Ok(());
                     }
@@ -2405,7 +2405,7 @@ if util::distinct_should_dedupe(distinct) {
         self.resume_pending_actions(gs)?;
         log::debug!(
             "[DEPLOY] after resume_pending_actions: pending={:?}",
-            format!("{:?}", self.pending_choice)
+            format!("{:?}", self.awaiting.choice)
         );
         Ok(())
     }
@@ -2447,7 +2447,7 @@ if util::distinct_should_dedupe(distinct) {
             gs.record_card_movement(*card_id);
         }
 
-        self.moved_cards.extend(moved_cards.iter().copied());
+        self.selection.moved_cards.extend(moved_cards.iter().copied());
         {
             let cause_pid = gs
                 .ability_queue
@@ -2474,7 +2474,7 @@ if util::distinct_should_dedupe(distinct) {
             "[MOVE_TRACKING] requested_destination={} recorded_cards={:?} accumulated_cards={:?}",
             destination,
             moved_cards,
-            self.moved_cards
+            self.selection.moved_cards
         );
 
         // Zone membership changed — energy-count / stage / success-zone
@@ -2504,7 +2504,7 @@ if util::distinct_should_dedupe(distinct) {
     fn fire_debut_side_effects(&self, gs: &mut GameState, card_id: i16, target: &str) {
         let player_id = gs.resolve_target_player(target).id.clone();
 
-        let source = self.spawn_context.source.as_deref().unwrap_or("");
+        let source = self.in_flight.spawn_context.source.as_deref().unwrap_or("");
         gs.record_card_appearance(card_id, source);
 
         let card = gs.card_database.get_card(card_id).cloned();
@@ -2573,7 +2573,7 @@ pub fn execute_selected_cards_from_zone(
         let destination = gs
             .entry_destination()
             .map(|s| s.to_string())
-            .or_else(|| self.spawn_context.destination.clone())
+            .or_else(|| self.in_flight.spawn_context.destination.clone())
             // Sub-action select_cards steps carry their own destination
             // (e.g. 希 bp3-007 「1枚をデッキの上に置き」) — without this
             // fallback they all defaulted to discard.
@@ -2584,7 +2584,7 @@ pub fn execute_selected_cards_from_zone(
         // Target for zone operations (whose zone to read/write) comes from spawn_context.target
         // (set by the effect execution), NOT from target_player_id (who makes the choice).
         let target = self
-            .spawn_context
+            .in_flight.spawn_context
             .target
             .clone()
             .or_else(|| {
@@ -2652,7 +2652,7 @@ pub fn execute_selected_cards_from_zone(
                         util::zone_remove_at_indices(player, zone, &filtered_indices)
                     };
                     gs.on_cards_left_zones(&removed);
-                    self.sub_choice_created = true;
+                    self.in_flight.sub_choice_created = true;
                     return Ok(());
                 }
             }
@@ -2736,7 +2736,7 @@ pub fn execute_selected_cards_from_zone(
                                     }
                                 })
                             })
-                            .or(self.spawn_context.position)
+                            .or(self.in_flight.spawn_context.position)
                             .map(|p| if p > 0 { p - 1 } else { 0 });
                         let player = gs.resolve_target_player_mut(&target);
                         for &cid in &card_ids {
@@ -2762,7 +2762,7 @@ pub fn execute_selected_cards_from_zone(
                                 zone.to_string(),
                                 false,
                             );
-                            self.sub_choice_created = true;
+                            self.in_flight.sub_choice_created = true;
                             return Ok(());
                         }
                     }
@@ -2806,7 +2806,7 @@ pub fn execute_selected_cards_from_zone(
                 let player = gs.resolve_target_player_mut(&target);
                 for &idx in &filtered_indices {
                     if idx < 3 && player.stage.stage[idx] != -1 {
-                        self.selected_cards.push(player.stage.stage[idx]);
+                        self.selection.cards.push(player.stage.stage[idx]);
                     }
                 }
             }
@@ -2814,7 +2814,7 @@ pub fn execute_selected_cards_from_zone(
                 for &idx in filtered_indices.iter().rev() {
                     if idx < gs.revealed_cards.len() {
                         let card_id = gs.revealed_cards.remove(idx);
-                        self.selected_cards.push(card_id);
+                        self.selection.cards.push(card_id);
                     }
                 }
             }
@@ -2823,11 +2823,11 @@ pub fn execute_selected_cards_from_zone(
 
         for cid in &moved {
             gs.mods.clear_all_for_card(*cid);
-            if !self.selected_cards.contains(cid) {
-                self.selected_cards.push(*cid);
+            if !self.selection.cards.contains(cid) {
+                self.selection.cards.push(*cid);
             }
-            if !self.moved_cards.contains(cid) {
-                self.moved_cards.push(*cid);
+            if !self.selection.moved_cards.contains(cid) {
+                self.selection.moved_cards.push(*cid);
             }
         }
 
@@ -2888,7 +2888,7 @@ pub fn execute_selected_cards_from_zone(
         ctx_discard_remaining: Option<bool>,
     ) -> Result<(), String> {
         let target = self
-            .spawn_context
+            .in_flight.spawn_context
             .target
             .clone()
             .or_else(|| {
@@ -2897,7 +2897,7 @@ pub fn execute_selected_cards_from_zone(
             })
             .unwrap_or_else(|| "self".to_string());
         let select_action = self
-            .current_effect
+            .owner.executing
             .as_ref()
             .and_then(|ef| ef.compound.select_action.clone())
             .or_else(|| {
@@ -2907,7 +2907,7 @@ pub fn execute_selected_cards_from_zone(
                     .and_then(|ef| ef.compound.select_action.clone())
             })
             .or_else(|| {
-                self.current_effect.as_ref().and_then(|ef| {
+                self.owner.executing.as_ref().and_then(|ef| {
                     if ef.action == crate::ability::enums::ActionType::SelectCards {
                         Some(Box::new(ef.clone()))
                     } else {
@@ -2915,7 +2915,7 @@ pub fn execute_selected_cards_from_zone(
                     }
                 })
             });
-        let current = self.current_effect.as_ref();
+        let current = self.owner.executing.as_ref();
         let remainder_dest = select_action
             .as_ref()
             .and_then(|sa| sa.remainder_destination_any())
@@ -2949,8 +2949,8 @@ pub fn execute_selected_cards_from_zone(
                 .or_else(|| current.and_then(|c| c.placement_order_any())),
         );
 
-        if gs.looked_at_cards.is_empty() && !self.selected_cards.is_empty() {
-            gs.looked_at_cards = self.selected_cards.iter().copied().collect();
+        if gs.looked_at_cards.is_empty() && !self.selection.cards.is_empty() {
+            gs.looked_at_cards = self.selection.cards.iter().copied().collect();
         }
 
         log::debug!(
@@ -2964,7 +2964,7 @@ pub fn execute_selected_cards_from_zone(
         );
 
         // Extract per-group constraint from execution context
-        let max_per_group = match &self.execution_context {
+        let max_per_group = match &self.in_flight.execution_context {
             ExecutionContext::LookAndSelect {
                 step: LookAndSelectStep::Select { max_per_group, .. },
             } => *max_per_group,
@@ -3038,7 +3038,7 @@ pub fn execute_selected_cards_from_zone(
                 util::place_card_in_zone(player, card_id, dest_zone, None, false, 1);
             }
             let card_count = gs.looked_at_cards.len();
-            self.pending_choice = Some(Choice::SelectTarget {
+            self.awaiting.choice = Some(Choice::SelectTarget {
                 target: "order".to_string(),
                 description: format!("Choose order for cards on deck ({} cards)", card_count),
                 description_en: Some(format!(
@@ -3049,7 +3049,7 @@ pub fn execute_selected_cards_from_zone(
                 allow_skip: false,
                 options: None,
             });
-            self.execution_context = ExecutionContext::LookAndSelect {
+            self.in_flight.execution_context = ExecutionContext::LookAndSelect {
                 step: LookAndSelectStep::Finalize {
                     destination: Zone::Deck.to_str().to_string(),
                     source_zone: String::new(),
@@ -3065,7 +3065,7 @@ pub fn execute_selected_cards_from_zone(
         // position captured when the optional looked_at choice was spawned.
         // The stash is consumed unconditionally so a stale value can never
         // leak into an unrelated later selection.
-        let stashed_deck_pos = self.looked_at_deck_position.take();
+        let stashed_deck_pos = self.carried.looked_at_deck_position.take();
         let numeric_deck_pos = numeric_deck_position(
             select_action.as_deref(),
             current,
@@ -3086,7 +3086,7 @@ pub fn execute_selected_cards_from_zone(
                 util::place_card_in_zone(player, card_id, &destination, None, false, 1);
             }
         }
-        self.moved_cards.extend(selected_cards.iter().copied());
+        self.selection.moved_cards.extend(selected_cards.iter().copied());
 
         let any_number = select_action
             .as_ref()
@@ -3149,7 +3149,7 @@ pub fn execute_selected_cards_from_zone(
                 "[LOOKED_AT_PROMPT] remaining dest=looked_at en={:?} ja={:?}",
                 description, description_ja
             );
-            self.pending_choice = Some(
+            self.awaiting.choice = Some(
                 Choice::select_cards(
                     Zone::LookedAt.to_str(),
                     remaining_selections,
@@ -3193,7 +3193,7 @@ pub fn execute_selected_cards_from_zone(
         // discard or reposition anything.
         if selected_cards.is_empty() && explicit_discard.is_none() && remainder_dest.is_none() {
             let origin = self
-                .looked_at_origin
+                .carried.looked_at_origin
                 .clone()
                 .unwrap_or_else(|| Zone::DeckTop.to_str().to_string());
             for &card_id in &remaining_cards {
@@ -3206,7 +3206,7 @@ pub fn execute_selected_cards_from_zone(
                 origin
             );
             gs.looked_at_cards.clear();
-            self.pending_choice = None;
+            self.awaiting.choice = None;
             return Ok(());
         }
 
@@ -3217,7 +3217,7 @@ pub fn execute_selected_cards_from_zone(
             // Intermediate leg of a multi-destination look split (希 bp3-007):
             // leftovers stay in the pool for the NEXT select step.
             gs.looked_at_cards = remaining_cards;
-            self.pending_choice = None;
+            self.awaiting.choice = None;
             return Ok(());
         }
         let dest_zone = if let Some(rd) = remainder_dest {
@@ -3242,7 +3242,7 @@ pub fn execute_selected_cards_from_zone(
         // original looked_at SelectCard alive through the followup_action
         // pending command, and resume_queue_with_choice re-stages it as a
         // spurious sub-choice prompt.
-        self.pending_choice = None;
+        self.awaiting.choice = None;
 
         Ok(())
     }
@@ -3304,7 +3304,7 @@ pub fn execute_selected_cards_from_zone(
                 gs.mods.clear_all_for_card(cid);
                 gs.record_card_movement(cid);
             }
-            self.moved_cards = cids.into();
+            self.selection.moved_cards = cids.into();
         } else {
             self.execute_selected_energy_zone_cards(gs, indices, count)?;
         }
@@ -3337,7 +3337,7 @@ pub fn execute_selected_cards_from_zone(
                 return;
             }
         } else if let Some(idx) = self
-            .moved_cards
+            .selection.moved_cards
             .iter()
             .rev()
             .find_map(|&cid| player.stage.stage.iter().position(|&id| id == cid))
@@ -3426,32 +3426,32 @@ pub fn execute_selected_cards_from_zone(
         effect: &AbilityEffect,
     ) -> Result<(), String> {
         // Save original spawn_context.target to restore later
-        let original_target = self.spawn_context.target.clone();
+        let original_target = self.in_flight.spawn_context.target.clone();
 
         // Override spawn_context.target before processing opponent — the generic
         // "both" handler in effects.rs may have set it to "self".
-        self.spawn_context.target = Some("opponent".to_string());
+        self.in_flight.spawn_context.target = Some("opponent".to_string());
         let mut opp_eff = effect.clone();
         opp_eff.target = Some("opponent".into());
         self.execute_move_cards(gs, &opp_eff)?;
 
-        if self.pending_choice.is_some() {
+        if self.awaiting.choice.is_some() {
             log::debug!("[MOVE_BOTH] Queueing self effect for later.");
             let mut self_eff = effect.clone();
             self_eff.target = Some("self".into());
             gs.ability_queue.set_pending_actions(vec![self_eff]);
             // Restore original target before returning
-            self.spawn_context.target = original_target;
+            self.in_flight.spawn_context.target = original_target;
             return Ok(());
         }
         log::debug!("[MOVE_BOTH] No choice created. Processing self now.");
         // Reset spawn_context.target for self phase
-        self.spawn_context.target = Some("self".to_string());
+        self.in_flight.spawn_context.target = Some("self".to_string());
         let mut self_eff = effect.clone();
         self_eff.target = Some("self".into());
         let result = self.execute_move_cards(gs, &self_eff);
         // Restore original target
-        self.spawn_context.target = original_target;
+        self.in_flight.spawn_context.target = original_target;
         result
     }
 }

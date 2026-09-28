@@ -31,7 +31,7 @@ impl AbilityResolver {
         if self.can_activate_effect(gs, effect) {
             return false;
         }
-        log::trace!("[EFFECT] source={:?} action={} skipped: activation gate failed", self.activating_card_id, effect.action);
+        log::trace!("[EFFECT] source={:?} action={} skipped: activation gate failed", self.session.activating_card_id, effect.action);
         // Keep verdicts — condition failure info will be captured by push_ability_result
         true
     }
@@ -45,7 +45,7 @@ impl AbilityResolver {
         if stopped {
             log::debug!(
                 "[EFFECT] source={:?} action={} skipped: placement incomplete (Q118)",
-                self.activating_card_id,
+                self.session.activating_card_id,
                 effect.action
             );
         }
@@ -59,7 +59,7 @@ impl AbilityResolver {
         if stopped {
             log::debug!(
                 "[EFFECT] source={:?} action={} skipped: non-stackable effect already active",
-                self.activating_card_id,
+                self.session.activating_card_id,
                 effect.action
             );
         }
@@ -81,7 +81,7 @@ impl AbilityResolver {
             if let Some(opponent_action) = effect.opponent_action() {
                 // G3: tag spawn context so choices created for this
                 // opponent action are routed to the opponent player.
-                self.spawn_context.target = Some("opponent".to_string());
+                self.in_flight.spawn_context.target = Some("opponent".to_string());
                 let mut modified = opponent_action.clone();
                 if modified.target.is_none() || modified.target.as_deref() == Some("self") {
                     modified.target = Some("opponent".into());
@@ -99,7 +99,7 @@ impl AbilityResolver {
         // G3: for non-empty actions with action_by: opponent, tag spawn context
         // so choices created inside are routed to the opponent player.
         if effect.action_by() == Some("opponent") {
-            self.spawn_context.target = Some("opponent".to_string());
+            self.in_flight.spawn_context.target = Some("opponent".to_string());
         }
         Ok(false)
     }
@@ -113,12 +113,12 @@ impl AbilityResolver {
         effect: &AbilityEffect,
     ) -> Result<bool, String> {
         let action_str = effect.action.to_str();
-        if self.resolving_replacement {
+        if self.awaiting.resolving_replacement {
             return Ok(false);
         }
-        if !self.resolving_replacement {
+        if !self.awaiting.resolving_replacement {
             gs.reset_replacement_effect_flags();
-            self.resolving_replacement = true;
+            self.awaiting.resolving_replacement = true;
         }
         let replacement_indices: Vec<usize> = gs
             .replacement_effects
@@ -129,7 +129,7 @@ impl AbilityResolver {
             .collect();
 
         if replacement_indices.is_empty() {
-            self.resolving_replacement = false;
+            self.awaiting.resolving_replacement = false;
             return Ok(false);
         }
         let mut mandatory_effects = Vec::new();
@@ -143,10 +143,10 @@ impl AbilityResolver {
                         self.execute_effect(gs, replacement_effect)?;
                     }
                 }
-                self.pending_replacement = Some((idx, effect.clone()));
+                self.awaiting.replacement = Some((idx, effect.clone()));
                 let description =
                     format!("Apply replacement effect for action '{}'?", action_str);
-                self.pending_choice = Some(Choice::SelectTarget {
+                self.awaiting.choice = Some(Choice::SelectTarget {
                     target: "apply_replacement".to_string(),
                     description: description.clone(),
                     description_en: Some(description.clone()),
@@ -183,7 +183,7 @@ impl AbilityResolver {
                 self.execute_effect(gs, replacement_effect)?;
             }
         }
-        self.resolving_replacement = false;
+        self.awaiting.resolving_replacement = false;
         Ok(true)
     }
 
@@ -256,7 +256,7 @@ impl AbilityResolver {
         log_tag: &str,
     ) -> Result<(), String> {
         self.rule_log_activated(gs, log_tag);
-        self.current_effect = Some(effect.clone());
+        self.owner.executing = Some(effect.clone());
         self.execute_move_cards(gs, effect)
     }
 
@@ -270,7 +270,7 @@ impl AbilityResolver {
         dbg.effect(effect);
         log::trace!(
             "[EFFECT] source={:?} action={} from={} to={} has_steps={} has_actions={}",
-            self.activating_card_id,
+            self.session.activating_card_id,
             effect.action,
             effect.source_or("none"),
             effect.destination.map(|z| z.as_str()).unwrap_or("none"),
@@ -309,8 +309,8 @@ impl AbilityResolver {
             drop(_t);
             return Ok(());
         }
-        if self.replacement_original_suppressed {
-            self.replacement_original_suppressed = false;
+        if self.awaiting.replacement_original_suppressed {
+            self.awaiting.replacement_original_suppressed = false;
             log::debug!(
                 "[REPLACEMENT] action={} original_suppressed=true",
                 effect.action

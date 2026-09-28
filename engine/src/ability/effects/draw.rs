@@ -93,10 +93,10 @@ impl AbilityResolver {
         // dynamic reference.
         gs.resolve_dynamic_count(
             dc,
-            &self.moved_cards,
-            &self.selected_cards,
-            self.step_state.last_draw_count,
-            self.activating_card_id,
+            &self.selection.moved_cards,
+            &self.selection.cards,
+            self.in_flight.step_state.last_draw_count,
+            self.session.activating_card_id,
         )
     }
     pub(crate) fn execute_draw_wrapper(
@@ -122,7 +122,7 @@ impl AbilityResolver {
         let draw_count = if let Some(dc) = effect.dynamic_count_any() {
             self.resolve_dynamic_count(gs, dc)
         } else if effect.count_any() == Some(0) {
-            log::debug!("[DRAW_ZERO] self.moved_cards={:?}", self.moved_cards);
+            log::debug!("[DRAW_ZERO] moved_cards={:?}", self.selection.moved_cards);
             log::debug!(
                 "[DRAW_ZERO] gs.recently_moved_cards={:?}",
                 gs.recently_moved_cards
@@ -131,8 +131,8 @@ impl AbilityResolver {
                 "[DRAW_ZERO] last_cost_discard_count={}",
                 gs.mods.last_cost_discard_count
             );
-            if !self.moved_cards.is_empty() {
-                self.moved_cards.len().u8_count()
+            if !self.selection.moved_cards.is_empty() {
+                self.selection.moved_cards.len().u8_count()
             } else if let Some(ref moved_cards) = gs.recently_moved_cards {
                 moved_cards.len().u8_count()
             } else {
@@ -143,7 +143,7 @@ impl AbilityResolver {
         };
         log::debug!(
             "[DRAW] source={:?} action={} count={} target={} source={} destination={}",
-            self.activating_card_id,
+            self.session.activating_card_id,
             effect.action,
             draw_count,
             effect.target_name(),
@@ -207,7 +207,7 @@ impl AbilityResolver {
             );
             log::debug!(
                 "[SELECT_EFFECT] pending_choice={:?}",
-                self.pending_choice.is_some()
+                self.awaiting.choice.is_some()
             );
             return Ok(());
         }
@@ -241,17 +241,17 @@ impl AbilityResolver {
         effect: &AbilityEffect,
     ) -> Result<(), String> {
         let count = effect.count_or(1);
-        let phase = self.keep_shuffle_under_phase;
+        let phase = self.selection.keep_shuffle_phase;
         if phase == 0 {
-            self.keep_shuffle_under_count = count;
+            self.selection.keep_shuffle_count = count;
             let player = gs.resolve_target_player_mut("self");
-            self.keep_shuffle_under_snapshots.clear();
-            self.keep_shuffle_under_snapshots
+            self.selection.keep_shuffle_snapshots.clear();
+            self.selection.keep_shuffle_snapshots
                 .push(player.hand.cards.to_vec());
             let c = self.make_hand_selection_choice(gs, "self", count, effect);
-            self.keep_shuffle_under_phase = 1;
-            self.pending_choice = Some(c);
-            self.execution_context = ExecutionContext::SingleEffect { effect_index: 0 };
+            self.selection.keep_shuffle_phase = 1;
+            self.awaiting.choice = Some(c);
+            self.in_flight.execution_context = ExecutionContext::SingleEffect { effect_index: 0 };
             return Ok(());
         }
         if phase == 1 {
@@ -260,28 +260,28 @@ impl AbilityResolver {
             // This fallback only runs if choice.rs did not already advance the
             // phase (e.g. legacy path / direct re-entry). Guard against double
             // move by checking snapshot count.
-            if self.keep_shuffle_under_snapshots.len() == 1 {
-                let snapshot = self.keep_shuffle_under_snapshots[0].clone();
+            if self.selection.keep_shuffle_snapshots.len() == 1 {
+                let snapshot = self.selection.keep_shuffle_snapshots[0].clone();
                 self.move_non_selected_hand_to_deck_bottom(gs, "self", &snapshot);
-                self.keep_shuffle_selected.clear();
+                self.selection.keep_shuffle_selected.clear();
                 let player = gs.resolve_target_player_mut("opponent");
-                self.keep_shuffle_under_snapshots
+                self.selection.keep_shuffle_snapshots
                     .push(player.hand.cards.to_vec());
                 let c = self.make_hand_selection_choice(gs, "opponent", count, effect);
-                self.keep_shuffle_under_phase = 2;
-                self.pending_choice = Some(c);
-                self.execution_context = ExecutionContext::SingleEffect { effect_index: 0 };
+                self.selection.keep_shuffle_phase = 2;
+                self.awaiting.choice = Some(c);
+                self.in_flight.execution_context = ExecutionContext::SingleEffect { effect_index: 0 };
             }
             return Ok(());
         }
         // phase == 2: opponent's selection resolved.
-        if self.keep_shuffle_under_snapshots.len() >= 2 {
-            let snapshot = self.keep_shuffle_under_snapshots[1].clone();
+        if self.selection.keep_shuffle_snapshots.len() >= 2 {
+            let snapshot = self.selection.keep_shuffle_snapshots[1].clone();
             self.move_non_selected_hand_to_deck_bottom(gs, "opponent", &snapshot);
         }
-        self.keep_shuffle_under_phase = 0;
-        self.keep_shuffle_under_snapshots.clear();
-        self.keep_shuffle_selected.clear();
+        self.selection.keep_shuffle_phase = 0;
+        self.selection.keep_shuffle_snapshots.clear();
+        self.selection.keep_shuffle_selected.clear();
         Ok(())
     }
 
@@ -319,7 +319,7 @@ impl AbilityResolver {
     ) {
         // hand_snapshot is the player's hand at selection time (unchanged since).
         // Keep snapshot[kept_pos] in hand; move the other positions under deck.
-        let kept_positions = self.keep_shuffle_selected.to_vec();
+        let kept_positions = self.selection.keep_shuffle_selected.to_vec();
         let player = gs.resolve_target_player_mut(player_target);
         // Remove the non-selected cards (the hand equals the snapshot here).
         for (idx, cid) in hand_snapshot.iter().enumerate() {
@@ -381,7 +381,7 @@ pub fn execute_draw(
                     None,
                 )?;
             }
-            self.step_state.last_draw_count = count;
+            self.in_flight.step_state.last_draw_count = count;
             return Ok(());
         }
 
@@ -457,7 +457,7 @@ pub fn execute_draw(
                     &card_db,
                     Some(activating_id),
                 )?;
-                self.step_state.last_draw_count = final_count;
+                self.in_flight.step_state.last_draw_count = final_count;
                 return Ok(());
             }
         }
@@ -467,7 +467,7 @@ pub fn execute_draw(
             if available == 0 {
                 return Ok(());
             }
-            self.pending_choice = Some(Choice::SelectTarget {
+            self.awaiting.choice = Some(Choice::SelectTarget {
                 target: "draw_any_number".to_string(),
                 description: format!("Choose how many cards to draw (0-{})", available),
                 description_en: Some(format!("Choose how many cards to draw (0-{})", available)),
@@ -475,7 +475,7 @@ pub fn execute_draw(
                 allow_skip: effect.optional.unwrap_or(false),
                 options: None,
             });
-            self.execution_context = ExecutionContext::SingleEffect { effect_index: 0 };
+            self.in_flight.execution_context = ExecutionContext::SingleEffect { effect_index: 0 };
             return Ok(());
         }
 
@@ -588,7 +588,7 @@ pub fn execute_draw(
                 log::debug!("Draw from source '{}' not yet implemented", source);
             }
         }
-        self.step_state.last_draw_count = final_count;
+        self.in_flight.step_state.last_draw_count = final_count;
         let dst = if destination.is_empty() {
             "hand"
         } else {
@@ -646,7 +646,7 @@ pub fn execute_draw(
             }
             return;
         }
-        self.pending_choice = Some(Choice::SelectHeartColor {
+        self.awaiting.choice = Some(Choice::SelectHeartColor {
             count: count as usize,
             options: unique_colors,
             description: "Choose a heart color".to_string(),
@@ -692,7 +692,7 @@ pub fn execute_draw(
             entry.choice_card_no = None;
             entry.conditional_choice = Some(ConditionalChoice::Strings(options));
         }
-        self.pending_choice = Some(Choice::SelectTarget {
+        self.awaiting.choice = Some(Choice::SelectTarget {
             target: "choice_string".to_string(),
             description: format!("Choose a number: {}", options_display),
             description_en: Some(format!("Choose a number: {}", options_display)),
@@ -717,7 +717,7 @@ pub fn execute_draw(
     ) -> Result<(), String> {
         let target = effect.target_name();
         let player = gs.resolve_target_player(target);
-        let activating_id = self.activating_card_id;
+        let activating_id = self.session.activating_card_id;
 
         let position_names = ["left", "center", "right"];
         let mut valid = Vec::new();
@@ -736,7 +736,7 @@ pub fn execute_draw(
             return Ok(());
         }
 
-        self.pending_choice = Some(Choice::SelectTarget {
+        self.awaiting.choice = Some(Choice::SelectTarget {
             target: "area_select".to_string(),
             description: "Choose an area".to_string(),
             description_en: Some("Choose an area".to_string()),
@@ -793,7 +793,7 @@ pub fn execute_draw(
             // Don't create a choice — caller will distribute the count across all colors.
             Ok(None)
         } else {
-            self.pending_choice = Some(Choice::SelectHeartColor {
+            self.awaiting.choice = Some(Choice::SelectHeartColor {
                 count: count as usize,
                 options: unique_colors,
                 description: "Choose a heart color".to_string(),

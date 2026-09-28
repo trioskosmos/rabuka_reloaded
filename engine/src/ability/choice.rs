@@ -65,9 +65,9 @@ impl super::resolver::AbilityResolver {
         // Clear the execution context if finalizing a look_and_select — otherwise the
         // caller's saved_ctx check (actions.rs:369) prevents process_current_ability.
         if matches!(context, ExecutionContext::LookAndSelect { .. })
-            && self.pending_choice.is_none()
+            && self.awaiting.choice.is_none()
         {
-            self.execution_context = ExecutionContext::None;
+            self.in_flight.execution_context = ExecutionContext::None;
         }
         Ok(())
     }
@@ -108,9 +108,9 @@ impl super::resolver::AbilityResolver {
     pub fn resume_pending_actions(&mut self, gs: &mut GameState) -> Result<(), String> {
         let pending = gs.ability_queue.take_pending_actions();
         for (idx, effect) in pending.iter().enumerate() {
-            self.spawn_context.target = effect.target.clone().map(|s| s.to_string());
+            self.in_flight.spawn_context.target = effect.target.clone().map(|s| s.to_string());
             self.execute_effect(gs, effect)?;
-            if self.pending_choice.is_some() {
+            if self.awaiting.choice.is_some() {
                 if let Some(entry) = gs.ability_queue.current_entry_mut() {
                     entry.effect_started = true;
                 }
@@ -119,8 +119,8 @@ impl super::resolver::AbilityResolver {
                 }
                 return Ok(());
             }
-            if self.cancel_remaining_commands {
-                self.cancel_remaining_commands = false;
+            if self.in_flight.cancel_remaining_commands {
+                self.in_flight.cancel_remaining_commands = false;
                 return Ok(());
             }
         }
@@ -131,7 +131,7 @@ impl super::resolver::AbilityResolver {
             .current_entry()
             .is_some_and(|e| e.optional_cost_result == Some(false));
         if was_stopped {
-            self.pending_repeat_actions.clear();
+            self.awaiting.repeat_actions.clear();
             // Mark effect as started so RWC goes to cost_was_paid
             // (not effect_ready which restarts from scratch).
             if let Some(entry) = gs.ability_queue.current_entry_mut() {
@@ -139,20 +139,20 @@ impl super::resolver::AbilityResolver {
             }
         }
         // Feed the next repeat action + "Repeat?" prompt, one at a time.
-        if !self.pending_repeat_actions.is_empty() && self.pending_choice.is_none() {
+        if !self.awaiting.repeat_actions.is_empty() && self.awaiting.choice.is_none() {
             log::debug!(
                 "[REPEAT] offering another iteration: source={:?} remaining_actions={}",
-                self.activating_card_id,
-                self.pending_repeat_actions.len()
+                self.session.activating_card_id,
+                self.awaiting.repeat_actions.len()
             );
-            let next = self.pending_repeat_actions.remove(0);
+            let next = self.awaiting.repeat_actions.remove(0);
             gs.ability_queue.set_pending_actions(vec![*next]);
-            self.pending_choice = Some(crate::ability::types::repeat_prompt_choice());
+            self.awaiting.choice = Some(crate::ability::types::repeat_prompt_choice());
         }
         // Set re-prompt choice if one is pending and no other choice was created.
-        if let Some(reprompt) = self.pending_reprompt_choice.take() {
-            if self.pending_choice.is_none() {
-                self.pending_choice = Some(reprompt);
+        if let Some(reprompt) = self.awaiting.reprompt.take() {
+            if self.awaiting.choice.is_none() {
+                self.awaiting.choice = Some(reprompt);
             }
         }
         Ok(())
@@ -165,7 +165,7 @@ impl super::resolver::AbilityResolver {
         context: &ExecutionContext,
     ) -> Result<(), String> {
         let is_actual_looked_at_choice = self
-            .pending_choice
+            .awaiting.choice
             .as_ref()
             .map(|choice| matches!(choice, Choice::SelectCard { zone, .. } if Zone::from_str(zone) == Some(Zone::LookedAt)))
             .unwrap_or(false);
@@ -188,19 +188,19 @@ impl super::resolver::AbilityResolver {
         // that the player confirmed the choice.
         self.pay_deferred_costs(gs)?;
 
-        let sub_choice = self.sub_choice_created;
-        self.sub_choice_created = false;
+        let sub_choice = self.in_flight.sub_choice_created;
+        self.in_flight.sub_choice_created = false;
         // The owner snapshot exists only for the span between storing a choice
         // and answering it, and this epilogue is the end of that span. Clearing
         // it here (rather than at each of the many `pending_choice = None`
         // sites) keeps it from going stale into the next choice.
-        self.pending_choice_owner = None;
+        self.owner.of_pending_choice = None;
         if !should_preserve && !sub_choice {
-            self.pending_choice = None;
+            self.awaiting.choice = None;
         }
         self.resume_execution(gs, context.clone())?;
         let has_pending = gs.ability_queue.has_pending_actions();
-        let was_select_card = matches!(self.pending_choice, Some(Choice::SelectCard { .. }));
+        let was_select_card = matches!(self.awaiting.choice, Some(Choice::SelectCard { .. }));
         let cont = match (sub_choice, has_pending, was_select_card) {
             (true, _, _) => Continuation::Immediate, // sub-choice will handle resume
             (false, true, true) => Continuation::DeferredSelectCard,
@@ -209,11 +209,11 @@ impl super::resolver::AbilityResolver {
         };
         log::debug!(
             "[CHOICE] source={:?} continuation={:?} looked={} preserve={} sub_choice={} queued_actions={} select_card={}",
-            self.activating_card_id, cont, is_actual_looked_at_choice, should_preserve, sub_choice, has_pending, was_select_card
+            self.session.activating_card_id, cont, is_actual_looked_at_choice, should_preserve, sub_choice, has_pending, was_select_card
         );
         match cont {
             Continuation::DeferredSelectCard => {
-                self.pending_choice = None;
+                self.awaiting.choice = None;
                 self.resume_pending_actions(gs)?;
             }
             Continuation::DeferredOther => {
@@ -228,7 +228,7 @@ impl super::resolver::AbilityResolver {
         // If a deferred cost (is_select_action=true stage selection) just had
         // its state change applied during handle_stage_selection, mark the cost
         // as paid so the ability queue can transition to the effect phase.
-        if !sub_choice && self.pending_choice.is_none() {
+        if !sub_choice && self.awaiting.choice.is_none() {
             if let Some(e) = gs.ability_queue.current_entry_mut() {
                 if !e.cost_paid && !e.effect_started {
                     e.cost_paid = true;
@@ -237,9 +237,9 @@ impl super::resolver::AbilityResolver {
         }
         log::trace!(
             "[CHOICE] source={:?} finalized: pending={} selected={:?} context={:?}",
-            self.activating_card_id,
-            self.pending_choice.is_some(),
-            self.selected_cards,
+            self.session.activating_card_id,
+            self.awaiting.choice.is_some(),
+            self.selection.cards,
             context
         );
         Ok(())
@@ -287,8 +287,8 @@ impl super::resolver::AbilityResolver {
         gs: &mut GameState,
         result: ChoiceResult,
     ) -> Result<(), String> {
-        let choice = self.pending_choice.clone();
-        let context = self.execution_context.clone();
+        let choice = self.awaiting.choice.clone();
+        let context = self.in_flight.execution_context.clone();
         let Some(choice) = choice else {
             return Err("No pending choice".to_string());
         };
@@ -309,10 +309,10 @@ impl super::resolver::AbilityResolver {
         gs: &mut GameState,
         indices: &[usize],
     ) {
-        if self.deferred_conditional_gate {
-            self.deferred_conditional_gate = false;
+        if self.in_flight.deferred_conditional_gate {
+            self.in_flight.deferred_conditional_gate = false;
             if indices.is_empty() {
-                log::debug!("[CONDITION] source={:?} deferred gate failed: empty selection, dropping remaining actions", self.activating_card_id);
+                log::debug!("[CONDITION] source={:?} deferred gate failed: empty selection, dropping remaining actions", self.session.activating_card_id);
                 if let Some(entry) = gs.ability_queue.current_entry_mut() {
                     entry.pending_actions.clear();
                 }
@@ -346,7 +346,7 @@ impl super::resolver::AbilityResolver {
         {
             let (card_id, target, source_zone, state_change) =
                 (*card_id, target.clone(), source_zone.clone(), state_change.clone());
-            self.pending_choice = None;
+            self.awaiting.choice = None;
             let player = gs.resolve_target_player_mut(&target);
             let chosen_idx = ctx
                 .mfi(&ctx.indices)
@@ -359,8 +359,8 @@ impl super::resolver::AbilityResolver {
                 player.stage.place_under_card(area, card_id);
                 gs.mods.clear_all_for_card(card_id);
                 gs.record_card_movement(card_id);
-                if !self.moved_cards.contains(&card_id) {
-                    self.moved_cards.push(card_id);
+                if !self.selection.moved_cards.contains(&card_id) {
+                    self.selection.moved_cards.push(card_id);
                 }
                 if state_change.as_deref() == Some("wait") {
                     gs.mods.add_orientation_modifier(card_id, "wait");
@@ -389,21 +389,21 @@ impl super::resolver::AbilityResolver {
     pub(in crate::ability::choice) fn narrow_selected_pool(&mut self, indices: &[usize]) {
         log::trace!(
             "[CHOICE] selection pool={:?} indices={:?}",
-            self.selected_cards,
+            self.selection.cards,
             indices
         );
         let mut cards = SmallVec::new();
         for &i in indices.iter() {
-            if i < self.selected_cards.len() {
-                cards.push(self.selected_cards[i]);
+            if i < self.selection.cards.len() {
+                cards.push(self.selection.cards[i]);
             }
         }
-        self.selected_cards = cards;
+        self.selection.cards = cards;
         log::debug!(
             "[CHOICE] source={:?} selected pool narrowed: indices={:?} cards={:?}",
-            self.activating_card_id,
+            self.session.activating_card_id,
             indices,
-            self.selected_cards
+            self.selection.cards
         );
     }
 
@@ -442,8 +442,8 @@ impl super::resolver::AbilityResolver {
         );
         if moved > 0 {
             for &cid in &card_ids {
-                if !self.selected_cards.contains(&cid) {
-                    self.selected_cards.push(cid);
+                if !self.selection.cards.contains(&cid) {
+                    self.selection.cards.push(cid);
                 }
             }
             gs.set_recently_moved_batch(card_ids.into(), Some(Zone::LiveCardZone.to_str()));
@@ -467,8 +467,8 @@ impl super::resolver::AbilityResolver {
         for &i in mapped_indices.iter() {
             if i < player.live_card_zone.cards.len() {
                 let cid = player.live_card_zone.cards[i];
-                if !self.selected_cards.contains(&cid) {
-                    self.selected_cards.push(cid);
+                if !self.selection.cards.contains(&cid) {
+                    self.selection.cards.push(cid);
                     cards.push(cid);
                 }
             }
@@ -476,7 +476,7 @@ impl super::resolver::AbilityResolver {
         player.live_card_zone.cards.retain(|c| !cards.contains(c));
         log::debug!(
             "[LIVE_CARD_SELECTION] selected_cards={:?} removed from live_card_zone",
-            self.selected_cards
+            self.selection.cards
         );
     }
 
@@ -507,7 +507,7 @@ impl super::resolver::AbilityResolver {
             &tgt,
         )?;
         if !moved.is_empty() {
-            self.moved_cards.extend(moved.iter().copied());
+            self.selection.moved_cards.extend(moved.iter().copied());
             // Accumulate across any_number re-prompts unconditionally
             // (same card ID can appear multiple times under a member).
             gs.accumulate_recently_moved(&moved);
@@ -530,7 +530,7 @@ impl super::resolver::AbilityResolver {
                 }
             }
             if !remaining_idxs.is_empty() {
-                self.pending_choice = Some(
+                self.awaiting.choice = Some(
                     Choice::select_cards(
                         Zone::UnderMember.to_str(),
                         0,
@@ -601,7 +601,7 @@ impl super::resolver::AbilityResolver {
         }
         log::trace!(
             "[COST] source={:?} discard intent: required={} cards={:?}",
-            self.activating_card_id,
+            self.session.activating_card_id,
             count,
             new_card_ids
         );
@@ -634,16 +634,16 @@ impl super::resolver::AbilityResolver {
             .last_cost_moved_card_ids
             .extend(new_card_ids.iter().copied());
         for &cid in &new_card_ids {
-            self.moved_cards.push(cid);
-            if !self.selected_cards.contains(&cid) {
-                self.selected_cards.push(cid);
+            self.selection.moved_cards.push(cid);
+            if !self.selection.cards.contains(&cid) {
+                self.selection.cards.push(cid);
             }
         }
         log::debug!(
             "[COST] source={:?} discarded cards={:?} total_paid={}",
-            self.activating_card_id,
+            self.session.activating_card_id,
             new_card_ids,
-            self.moved_cards.len()
+            self.selection.moved_cards.len()
         );
         new_card_ids
     }
@@ -664,7 +664,7 @@ impl super::resolver::AbilityResolver {
         cost_total: Option<u8>,
         cost_total_operator: Option<String>,
     ) {
-        self.pending_choice = Some(
+        self.awaiting.choice = Some(
             self.build_reprompt(
                 ctx,
                 Zone::Hand.to_str(),
@@ -721,23 +721,23 @@ impl super::resolver::AbilityResolver {
             count,
         );
         if new_card_ids.is_empty() {
-            if !self.moved_cards.is_empty() {
-                log::debug!("[COST] source={:?} hand payment complete: cards={:?} optional_cost_result=true", self.activating_card_id, self.moved_cards);
-                gs.mods.last_cost_discard_count = self.moved_cards.len().u8_count();
-                gs.mods.last_cost_moved_card_ids = self.moved_cards.clone();
-                gs.set_recently_moved_batch(self.moved_cards.clone(), Some("hand"));
+            if !self.selection.moved_cards.is_empty() {
+                log::debug!("[COST] source={:?} hand payment complete: cards={:?} optional_cost_result=true", self.session.activating_card_id, self.selection.moved_cards);
+                gs.mods.last_cost_discard_count = self.selection.moved_cards.len().u8_count();
+                gs.mods.last_cost_moved_card_ids = self.selection.moved_cards.clone();
+                gs.set_recently_moved_batch(self.selection.moved_cards.clone(), Some("hand"));
                 if let Some(entry) = gs.ability_queue.current_entry_mut() {
                     entry.cost_paid = true;
                     entry.optional_cost_result = Some(true);
                 }
             } else if allow_skip {
-                log::debug!("[COST] source={:?} hand payment skipped: no cards moved, optional_cost_result=false", self.activating_card_id);
+                log::debug!("[COST] source={:?} hand payment skipped: no cards moved, optional_cost_result=false", self.session.activating_card_id);
                 if let Some(entry) = gs.ability_queue.current_entry_mut() {
                     entry.cost_paid = true;
                     entry.optional_cost_result = Some(false);
                 }
             }
-            self.pending_choice = None;
+            self.awaiting.choice = None;
             return Ok(());
         }
         // Rule 9.4.2.3: cost must be paid in full. Once a player selects the
@@ -753,7 +753,7 @@ impl super::resolver::AbilityResolver {
                 .and_then(|c| c.same_unit_name_any())
                 .unwrap_or(false);
             let same_unit_filter = if same_unit_name {
-                self.moved_cards
+                self.selection.moved_cards
                     .first()
                     .and_then(|&cid| card_db.get_card(cid))
                     .and_then(|c| c.unit.clone())
@@ -787,7 +787,7 @@ impl super::resolver::AbilityResolver {
             if let Some(cost) = gs.entry_cost() {
                 if cost.same_unit_name_any().unwrap_or(false) {
                     let total_needed = cost.count.unwrap_or(1).usize_count();
-                    let total_moved = self.moved_cards.len();
+                    let total_moved = self.selection.moved_cards.len();
                     if total_moved < total_needed {
                         let remaining = total_needed - total_moved;
                         let hand_now: Vec<i16> = {
@@ -795,7 +795,7 @@ impl super::resolver::AbilityResolver {
                             p.hand.cards.to_vec()
                         };
                         let unit_name = self
-                            .moved_cards
+                            .selection.moved_cards
                             .first()
                             .and_then(|&cid| card_db.get_card(cid))
                             .and_then(|c| c.unit.clone());
@@ -839,8 +839,8 @@ impl super::resolver::AbilityResolver {
             .and_then(|c| c.count)
             .map(usize::from)
             .unwrap_or(usize::MAX);
-        if count == 0 && allow_skip && self.moved_cards.len() < cost_max_cap {
-            log::debug!("[COST] source={:?} choose more cards or finish: added={} paid_cards={:?} cap={}", self.activating_card_id, new_card_ids.len(), self.moved_cards, cost_max_cap);
+        if count == 0 && allow_skip && self.selection.moved_cards.len() < cost_max_cap {
+            log::debug!("[COST] source={:?} choose more cards or finish: added={} paid_cards={:?} cap={}", self.session.activating_card_id, new_card_ids.len(), self.selection.moved_cards, cost_max_cap);
             let hand_now: Vec<i16> = {
                 let p = gs.resolve_target_player_mut(&target);
                 p.hand.cards.to_vec()
@@ -878,19 +878,19 @@ impl super::resolver::AbilityResolver {
         }
         log::debug!(
             "[COST] source={:?} finishing hand payment: cards={} deferred_costs={}",
-            self.activating_card_id,
-            self.moved_cards.len(),
-            self.pending_deferred_costs.len()
+            self.session.activating_card_id,
+            self.selection.moved_cards.len(),
+            self.awaiting.deferred_costs.len()
         );
         self.pay_deferred_costs(gs)?;
-        let final_count = self.moved_cards.len().u8_count();
+        let final_count = self.selection.moved_cards.len().u8_count();
         gs.mods.last_cost_discard_count = final_count;
-        gs.mods.last_cost_moved_card_ids = self.moved_cards.clone();
-        gs.set_recently_moved_batch(self.moved_cards.clone(), Some("hand"));
+        gs.mods.last_cost_moved_card_ids = self.selection.moved_cards.clone();
+        gs.set_recently_moved_batch(self.selection.moved_cards.clone(), Some("hand"));
         if let Some(entry) = gs.ability_queue.current_entry_mut() {
             entry.cost_paid = true;
         }
-        self.pending_choice = None;
+        self.awaiting.choice = None;
         Ok(())
     }
 
@@ -934,7 +934,7 @@ impl super::resolver::AbilityResolver {
             let target = target_player_id
                 .clone()
                 .unwrap_or_else(|| "self".to_string());
-            self.pending_choice = Some(
+            self.awaiting.choice = Some(
                 self.build_reprompt(
                     ctx,
                     Zone::Energy.to_str(),
@@ -972,7 +972,7 @@ impl super::resolver::AbilityResolver {
     ) -> Result<(), String> {
         log::debug!(
             "[CHOICE] source={:?} select cards: zone={} indices={:?} filtered_indices={:?} count={} allow_skip={} reveal={} context={:?}",
-            self.activating_card_id, zone, ctx.indices, ctx.filtered_indices, ctx.count, ctx.allow_skip, ctx.is_reveal, context
+            self.session.activating_card_id, zone, ctx.indices, ctx.filtered_indices, ctx.count, ctx.allow_skip, ctx.is_reveal, context
         );
 
         // Distinguish cost vs effect: cost handler only fires when effect NOT yet started.
@@ -1054,7 +1054,7 @@ impl super::resolver::AbilityResolver {
 
         log::trace!(
             "[CHOICE] selection routing: source={:?} zone={} effect_started={} queued_actions={}",
-            self.activating_card_id, zone, effect_started, gs.ability_queue.has_pending_actions()
+            self.session.activating_card_id, zone, effect_started, gs.ability_queue.has_pending_actions()
         );
         if self.resume_under_member_placement(gs, zone, &ctx, &context) {
             return self.resume_pending_actions(gs);
@@ -1129,10 +1129,10 @@ impl super::resolver::AbilityResolver {
         }
         log::debug!(
             "[CHOICE] source={:?} selection complete: zone={} selected_count={} cards={:?}",
-            self.activating_card_id,
+            self.session.activating_card_id,
             zone,
-            self.selected_cards.len(),
-            self.selected_cards
+            self.selection.cards.len(),
+            self.selection.cards
         );
         self.handle_selection_epilogue(gs, &context)
     }
@@ -1179,7 +1179,7 @@ impl super::resolver::AbilityResolver {
         // moved); the handler later shuffles the non-selected under the deck.
         // Record the chosen card IDs into selected_cards and return — do NOT
         // execute the selection (move) or clear selected_cards.
-        if self.keep_shuffle_under_phase > 0 {
+        if self.selection.keep_shuffle_phase > 0 {
             let target = ctx
                 .target_player_id
                 .as_deref()
@@ -1193,22 +1193,22 @@ impl super::resolver::AbilityResolver {
             // selection, so these absolute positions map onto the snapshot).
             for &idx in hand_idx.iter() {
                 let idx = idx.u8_count();
-                if !self.keep_shuffle_selected.contains(&idx) {
-                    self.keep_shuffle_selected.push(idx);
+                if !self.selection.keep_shuffle_selected.contains(&idx) {
+                    self.selection.keep_shuffle_selected.push(idx);
                 }
             }
-            let count = usize::from(self.keep_shuffle_under_count);
+            let count = usize::from(self.selection.keep_shuffle_count);
             let available_idxs: Vec<usize> = (0..hand_cards.len())
-                .filter(|i| !self.keep_shuffle_selected.contains(&i.u8_count()))
+                .filter(|i| !self.selection.keep_shuffle_selected.contains(&i.u8_count()))
                 .collect();
             if hand_idx.len() < count && !hand_idx.is_empty() && !available_idxs.is_empty() {
-                let remaining = count.saturating_sub(self.keep_shuffle_selected.len().min(count));
+                let remaining = count.saturating_sub(self.selection.keep_shuffle_selected.len().min(count));
                 let fi = Some(available_idxs);
                 let desc = format!(
                     "Select up to {} more card(s) from hand to keep",
                     remaining
                 );
-                self.pending_choice = Some(
+                self.awaiting.choice = Some(
                     self.build_reprompt(
                         ctx,
                         Zone::Hand.to_str(),
@@ -1226,17 +1226,17 @@ impl super::resolver::AbilityResolver {
                 self.store_pending_choice(gs);
                 return Ok(());
             }
-            if self.keep_shuffle_under_phase == 1 {
+            if self.selection.keep_shuffle_phase == 1 {
                 // Self's selection completed (including empty "keep 0" which
                 // correctly shuffles the entire hand under). Move self's
                 // non-selected cards, then prompt opponent.
-                let snapshot = self.keep_shuffle_under_snapshots[0].clone();
+                let snapshot = self.selection.keep_shuffle_snapshots[0].clone();
                 self.move_non_selected_hand_to_deck_bottom(gs, "self", &snapshot);
-                self.keep_shuffle_selected.clear();
+                self.selection.keep_shuffle_selected.clear();
                 // Snapshot opponent hand before prompting
                 let opp_hand = gs.resolve_target_player_mut("opponent").hand.cards.to_vec();
-                self.keep_shuffle_under_snapshots.push(opp_hand);
-                let opp_hand_len = self.keep_shuffle_under_snapshots[1].len();
+                self.selection.keep_shuffle_snapshots.push(opp_hand);
+                let opp_hand_len = self.selection.keep_shuffle_snapshots[1].len();
                 let pick = (count).min(opp_hand_len);
                 let c = crate::ability::types::Choice::select_cards(
                     Zone::Hand.to_str(),
@@ -1250,22 +1250,22 @@ impl super::resolver::AbilityResolver {
                 )))
                 .target_player_id(Some("opponent".to_string()))
                 .build();
-                self.keep_shuffle_under_phase = 2;
-                self.spawn_context.target = Some("opponent".to_string());
-                self.pending_choice = Some(c);
+                self.selection.keep_shuffle_phase = 2;
+                self.in_flight.spawn_context.target = Some("opponent".to_string());
+                self.awaiting.choice = Some(c);
                 self.store_pending_choice(gs);
                 return Ok(());
             }
             // Opponent's selection is recorded (phase 2). The effect does not
             // re-enter at phase 2 (sub-choice resolution), so move opponent's
             // non-selected hand cards under opponent's deck right here.
-            if self.keep_shuffle_under_phase == 2 {
-                let snapshot = self.keep_shuffle_under_snapshots[1].clone();
+            if self.selection.keep_shuffle_phase == 2 {
+                let snapshot = self.selection.keep_shuffle_snapshots[1].clone();
                 self.move_non_selected_hand_to_deck_bottom(gs, "opponent", &snapshot);
-                self.keep_shuffle_under_phase = 0;
-                self.keep_shuffle_under_snapshots.clear();
-                self.keep_shuffle_selected.clear();
-                self.spawn_context.target = None;
+                self.selection.keep_shuffle_phase = 0;
+                self.selection.keep_shuffle_snapshots.clear();
+                self.selection.keep_shuffle_selected.clear();
+                self.in_flight.spawn_context.target = None;
                 // The sequential's second action is "draw 3 for both". The
                 // pending queue may be corrupted (observed n=2 [select,draw]),
                 // so perform the draw directly here and clear any pending draw
@@ -1303,9 +1303,9 @@ impl super::resolver::AbilityResolver {
                     p.hand.cards.to_vec()
                 };
                 let mut all_hand_idxs = hand_idx.to_vec();
-                if !self.selected_cards.is_empty() {
+                if !self.selection.cards.is_empty() {
                     for (hidx, cid) in hand_cards.iter().enumerate() {
-                        if self.selected_cards.contains(cid) && !all_hand_idxs.contains(&hidx) {
+                        if self.selection.cards.contains(cid) && !all_hand_idxs.contains(&hidx) {
                             all_hand_idxs.push(hidx);
                         }
                     }
@@ -1321,8 +1321,8 @@ impl super::resolver::AbilityResolver {
                     })
                     .collect();
                 for cid in new_card_ids {
-                    if !self.selected_cards.contains(&cid) {
-                        self.selected_cards.push(cid);
+                    if !self.selection.cards.contains(&cid) {
+                        self.selection.cards.push(cid);
                     }
                 }
                 let remaining = ctx.count - hand_idx.len();
@@ -1351,7 +1351,7 @@ impl super::resolver::AbilityResolver {
                         ""
                     }
                 );
-                self.pending_choice = Some(
+                self.awaiting.choice = Some(
                     self.build_reprompt(
                         ctx,
                         Zone::Hand.to_str(),
@@ -1399,8 +1399,8 @@ impl super::resolver::AbilityResolver {
                     ctx.target_player_id.as_deref(),
                 )?;
                 for &cid in &moved_ids {
-                    if !self.selected_cards.contains(&cid) {
-                        self.selected_cards.push(cid);
+                    if !self.selection.cards.contains(&cid) {
+                        self.selection.cards.push(cid);
                     }
                 }
                 let hand_cards: Vec<i16> = {
@@ -1415,7 +1415,7 @@ impl super::resolver::AbilityResolver {
                 } else {
                     Some(include_idxs)
                 };
-                self.pending_choice = Some(
+                self.awaiting.choice = Some(
                     self.build_reprompt(
                         ctx,
                         Zone::Hand.to_str(),
@@ -1434,7 +1434,7 @@ impl super::resolver::AbilityResolver {
                 return Ok(());
             }
             let mut all_idxs = hand_idx.to_vec();
-            if !self.selected_cards.is_empty() {
+            if !self.selection.cards.is_empty() {
                 let target = ctx
                     .target_player_id
                     .as_deref()
@@ -1445,7 +1445,7 @@ impl super::resolver::AbilityResolver {
                     p.hand.cards.to_vec()
                 };
                 for (hidx, cid) in hand_cards.iter().enumerate() {
-                    if self.selected_cards.contains(cid) && !all_idxs.contains(&hidx) {
+                    if self.selection.cards.contains(cid) && !all_idxs.contains(&hidx) {
                         all_idxs.push(hidx);
                     }
                 }
@@ -1488,21 +1488,21 @@ impl super::resolver::AbilityResolver {
                 })
                 .is_some_and(|effect| util::effect_uses_selected_cards(&effect));
             if keep_selected {
-                self.selected_cards = selected_hand_ids.into();
+                self.selection.cards = selected_hand_ids.into();
             } else {
-                self.selected_cards.clear();
+                self.selection.cards.clear();
             }
         }
         if ctx.allow_skip {
             if let Some(entry) = gs.ability_queue.current_entry_mut() {
                 entry.optional_cost_result =
-                    Some(!ctx.indices.is_empty() || !self.moved_cards.is_empty());
+                    Some(!ctx.indices.is_empty() || !self.selection.moved_cards.is_empty());
             }
             let is_opponent_action = ctx.target_player_id.as_deref() == Some("opponent");
             if ctx.indices.is_empty()
                 && ctx.count > 0
                 && !is_opponent_action
-                && self.moved_cards.is_empty()
+                && self.selection.moved_cards.is_empty()
             {
                 gs.ability_queue.take_pending_actions();
             }
@@ -1541,14 +1541,14 @@ impl super::resolver::AbilityResolver {
         if !hand_positions.is_empty() && ctx.count > 0 && hand_positions.len() < ctx.count {
             for &hp in &hand_positions {
                 if !self
-                    .selected_cards
+                    .selection.cards
                     .contains(&hp.i16_count())
                 {
-                    self.selected_cards.push(hp.i16_count());
+                    self.selection.cards.push(hp.i16_count());
                 }
             }
             let remaining = ctx.count - hand_positions.len();
-            self.pending_choice = Some(
+            self.awaiting.choice = Some(
                 Choice::select_cards(
                     Zone::Hand.to_str(),
                     remaining,
@@ -1572,7 +1572,7 @@ impl super::resolver::AbilityResolver {
                 .blind(ctx.blind)
                 .is_reveal(true)
                 .filtered_indices(Some(
-                    self.selected_cards
+                    self.selection.cards
             .iter()
             .map(|&i| i.usize_count())
             .collect(),
@@ -1584,11 +1584,11 @@ impl super::resolver::AbilityResolver {
         }
 
         let mut all_indices: Vec<usize> = self
-            .selected_cards
+            .selection.cards
             .iter()
             .map(|&i| i.usize_count())
             .collect();
-        self.selected_cards.clear();
+        self.selection.cards.clear();
         for &hp in &hand_positions {
             if !all_indices.contains(&hp) {
                 all_indices.push(hp);
@@ -1611,7 +1611,7 @@ impl super::resolver::AbilityResolver {
             gs.push_revealed_card(cid, source, false, owner, "ability");
         }
         if revealed_card_ids.is_empty() && ctx.allow_skip && !effect_started {
-            self.selected_cards.clear();
+            self.selection.cards.clear();
             if let Some(entry) = gs.ability_queue.current_entry_mut() {
                 entry.cost_paid = true;
                 entry.optional_cost_result = Some(false);
@@ -1640,11 +1640,11 @@ impl super::resolver::AbilityResolver {
             }
         }
         if selected_effect.is_some() {
-            self.selected_cards = revealed_card_ids.clone().into();
+            self.selection.cards = revealed_card_ids.clone().into();
         }
 
         if ctx.count == 0 && ctx.allow_skip && !effect_started && !all_indices.is_empty() {
-            self.selected_cards = all_indices
+            self.selection.cards = all_indices
             .iter()
             .map(|&i| i.i16_count())
             .collect();
@@ -1656,7 +1656,7 @@ impl super::resolver::AbilityResolver {
                 .filter(|&i| !all_indices.contains(&i))
                 .collect();
             if !remaining_indices.is_empty() {
-                self.pending_choice = Some(
+                self.awaiting.choice = Some(
                     Choice::select_cards(
                         Zone::Hand.to_str(),
                         0,
@@ -1702,25 +1702,25 @@ impl super::resolver::AbilityResolver {
         // sequential actions (e.g. gain_resource with heart_colors_from_selected_card).
         if ctx.is_select_action {
             for &cid in &moved {
-                if !self.selected_cards.contains(&cid) {
-                    self.selected_cards.push(cid);
+                if !self.selection.cards.contains(&cid) {
+                    self.selection.cards.push(cid);
                 }
             }
         }
         // Track moved cards so preceding_moved conditions on the same
         // ability (e.g. conditional_on_result) can see them.
-        self.moved_cards.extend(moved.iter().copied());
+        self.selection.moved_cards.extend(moved.iter().copied());
         // Apply resource_on_select if present — grants resource (e.g. blade)
         // automatically when a card is selected from revealed_cards.
         let res = self
-            .current_effect
+            .owner.executing
             .as_ref()
             .and_then(|e| e.resource_on_select_any().cloned());
         if let Some(ref res) = res {
             self.execute_effect(gs, res)?;
         }
         if self
-            .current_effect
+            .owner.executing
             .as_ref()
             .is_some_and(|e| e.discard_remaining_any().unwrap_or(false))
         {
@@ -1783,7 +1783,7 @@ impl super::resolver::AbilityResolver {
                     &card_db,
                 );
                 if mc > 0 {
-                    self.moved_cards = valid_ids.clone().into();
+                    self.selection.moved_cards = valid_ids.clone().into();
 gs.set_recently_moved_batch(valid_ids.into(), Some(Zone::SuccessLiveZone.to_str()));
                 }
             }
@@ -1844,7 +1844,7 @@ gs.set_recently_moved_batch(valid_ids.into(), Some(Zone::SuccessLiveZone.to_str(
             .collect();
         let count = cost.count.unwrap_or(1).usize_count();
         if card_ids.is_empty() && cost.optional.unwrap_or(false) {
-            self.selected_cards.clear();
+            self.selection.cards.clear();
             if let Some(entry) = gs.ability_queue.current_entry_mut() {
                 entry.cost_paid = true;
                 entry.optional_cost_result = Some(false);
@@ -1891,7 +1891,7 @@ gs.set_recently_moved_batch(valid_ids.into(), Some(Zone::SuccessLiveZone.to_str(
             gs.push_revealed_card(*card_id, cost_source, false, cost_owner, "cost");
             gs.push_revealed_cost_card(*card_id, cost_source, false, cost_owner, "cost");
         }
-        self.selected_cards = card_ids.into();
+        self.selection.cards = card_ids.into();
         let selected_effect = self
             .answering_effect(gs)
             .filter(util::effect_uses_selected_cards);
@@ -1932,7 +1932,7 @@ gs.set_recently_moved_batch(valid_ids.into(), Some(Zone::SuccessLiveZone.to_str(
             .and_then(|e| e.ability.effect.as_ref())
             .and_then(|ef| ef.compound.select_action.clone())
             .or_else(|| {
-                self.current_effect.as_ref().and_then(|ef| {
+                self.owner.executing.as_ref().and_then(|ef| {
                     if ef.action == ActionType::SelectCards {
                         Some(Box::new(ef.clone()))
                     } else {
@@ -1956,7 +1956,7 @@ gs.set_recently_moved_batch(valid_ids.into(), Some(Zone::SuccessLiveZone.to_str(
         if is_select_cards {
             self.handle_select_cards_looked_at(gs, &valid, None, None)?;
 
-            if matches!(self.pending_choice, Some(Choice::SelectTarget { ref target, .. }) if super::enums::SelectTargetKind::from_str(target) == Some(super::enums::SelectTargetKind::Order))
+            if matches!(self.awaiting.choice, Some(Choice::SelectTarget { ref target, .. }) if super::enums::SelectTargetKind::from_str(target) == Some(super::enums::SelectTargetKind::Order))
             {
                 return Ok(());
             }
@@ -1991,7 +1991,8 @@ gs.set_recently_moved_batch(valid_ids.into(), Some(Zone::SuccessLiveZone.to_str(
                             _ => (0..gs.looked_at_cards.len()).collect(),
                         }
                     };
-                    self.pending_choice = Some(
+                    self.capture_choice_owner();
+                    self.awaiting.choice = Some(
                         Choice::select_cards(
                             Zone::LookedAt.to_str(),
                             remaining_max,
@@ -2012,7 +2013,7 @@ gs.set_recently_moved_batch(valid_ids.into(), Some(Zone::SuccessLiveZone.to_str(
                         .filtered_indices(Some(remaining_indices))
                         .build(),
                     );
-                    self.execution_context = context.clone();
+                    self.in_flight.execution_context = context.clone();
                     return Ok(());
                 }
             }
@@ -2036,7 +2037,7 @@ gs.set_recently_moved_batch(valid_ids.into(), Some(Zone::SuccessLiveZone.to_str(
         if ctx.is_select_action {
             if ctx.indices.is_empty() {
                 gs.ability_queue.take_pending_actions();
-                self.selected_cards = SmallVec::new();
+                self.selection.cards = SmallVec::new();
                 // For under_member optional skip, mark no move
                 if gs.ability_queue.current_entry().is_some_and(|e| {
                     e.ability.effect.as_ref().is_some_and(|eff| {
@@ -2054,8 +2055,8 @@ gs.set_recently_moved_batch(valid_ids.into(), Some(Zone::SuccessLiveZone.to_str(
                                 })
                     })
                 }) {
-                    self.last_move_moved_any = Some(false);
-                    self.moved_cards.clear();
+                    self.carried.last_move_moved_any = Some(false);
+                    self.selection.moved_cards.clear();
                     gs.clear_recently_moved_batch();
                 }
             log::trace!("[CHOICE] stage selected: no selection, cleared pending commands");
@@ -2086,8 +2087,8 @@ gs.set_recently_moved_batch(valid_ids.into(), Some(Zone::SuccessLiveZone.to_str(
                 }
             }
             for &cid in &cards {
-                if !self.selected_cards.contains(&cid) {
-                    self.selected_cards.push(cid);
+                if !self.selection.cards.contains(&cid) {
+                    self.selection.cards.push(cid);
                 }
             }
             // Dispatch on the DECLARED intent of this prompt. Every producer
@@ -2095,15 +2096,15 @@ gs.set_recently_moved_batch(valid_ids.into(), Some(Zone::SuccessLiveZone.to_str(
             // guess-based fallback.
             log::debug!(
                 "[CHOICE] source={:?} stage selection: intent={:?} mapped_indices={:?} cards={:?} effect_started={}",
-                self.activating_card_id,
-                self.stage_select_intent,
+                self.session.activating_card_id,
+                self.awaiting.stage_select_intent,
                 stage_indices,
                 cards,
                 gs.ability_queue
                     .current_entry()
                     .is_some_and(|e| e.effect_started)
             );
-            match self.stage_select_intent.take() {
+            match self.awaiting.stage_select_intent.take() {
                 Some(crate::ability::types::StageSelectIntent::ChangeStateWait) => {
                     if !cards.is_empty()
                         && gs
@@ -2144,11 +2145,11 @@ gs.set_recently_moved_batch(valid_ids.into(), Some(Zone::SuccessLiveZone.to_str(
                             }
                         }
                         if !moved.is_empty() {
-                            self.moved_cards.extend(moved.iter().copied());
+                            self.selection.moved_cards.extend(moved.iter().copied());
 gs.set_recently_moved_batch(moved.clone().into(), Some("under_member"));
-                            self.last_move_moved_any = Some(true);
+                            self.carried.last_move_moved_any = Some(true);
                         } else {
-                            self.last_move_moved_any = Some(false);
+                            self.carried.last_move_moved_any = Some(false);
                         }
                         log::debug!(
                             "[UNDER_MEMBER_VIA_STAGE] moved {} energies for members {:?}",
@@ -2200,7 +2201,7 @@ gs.set_recently_moved_batch(moved.clone().into(), Some("under_member"));
                                     false,
                                 );
                             }
-                            self.moved_cards = placed.clone().into();
+                            self.selection.moved_cards = placed.clone().into();
                             gs.set_recently_moved_batch(placed.into(), Some("under_member"));
                             gs.recalculate_constants();
                         }
@@ -2243,8 +2244,8 @@ gs.set_recently_moved_batch(moved.clone().into(), Some("under_member"));
                 if let Some(pos) = last_vacated {
                     gs.last_vacated_stage_area = Some(pos.u8_count());
                 }
-                self.selected_cards = valid_ids.clone().into();
-                self.moved_cards = valid_ids.clone().into();
+                self.selection.cards = valid_ids.clone().into();
+                self.selection.moved_cards = valid_ids.clone().into();
 gs.set_recently_moved_batch(valid_ids.into(), Some("stage"));
             }
         }
@@ -2258,7 +2259,7 @@ gs.set_recently_moved_batch(valid_ids.into(), Some("stage"));
         waitroom_cards: &[i16],
     ) -> (Option<u8>, Vec<usize>) {
         let spent: u8 = self
-            .selected_cards
+            .selection.cards
             .iter()
             .filter_map(|&cid| gs.card_database.get_card(cid).and_then(|c| c.cost))
             .sum();
@@ -2306,13 +2307,13 @@ gs.set_recently_moved_batch(valid_ids.into(), Some("stage"));
             for &i in mapped_indices.iter() {
                 if i < player.waitroom.cards.len() {
                     let cid = player.waitroom.cards[i];
-                    if !self.selected_cards.contains(&cid) {
-                        self.selected_cards.push(cid);
+                    if !self.selection.cards.contains(&cid) {
+                        self.selection.cards.push(cid);
                         cards.push(cid);
                     }
                 }
             }
-            let selected_so_far = self.selected_cards.len();
+            let selected_so_far = self.selection.cards.len();
             if ctx.count > 0 && !mapped_indices.is_empty() && selected_so_far < ctx.count {
                 let remaining = ctx.count - selected_so_far;
                 let waitroom_cards: Vec<i16> = {
@@ -2320,7 +2321,7 @@ gs.set_recently_moved_batch(valid_ids.into(), Some("stage"));
                     p.waitroom.cards.to_vec()
                 };
                 let filtered_idxs: Vec<usize> = (0..waitroom_cards.len())
-                    .filter(|&i| !self.selected_cards.contains(&waitroom_cards[i]))
+                    .filter(|&i| !self.selection.cards.contains(&waitroom_cards[i]))
                     .collect();
                 let remaining_count = filtered_idxs.len();
                 let fi = if filtered_idxs.is_empty() {
@@ -2336,7 +2337,7 @@ gs.set_recently_moved_batch(valid_ids.into(), Some("stage"));
                     "控え室から残り{}枚中さらに{}枚選択",
                     remaining_count, remaining
                 );
-                self.pending_choice = Some(
+                self.awaiting.choice = Some(
                     self.build_reprompt(
                         ctx,
                         Zone::Discard.to_str(),
@@ -2367,7 +2368,7 @@ gs.set_recently_moved_batch(valid_ids.into(), Some("stage"));
                     .target_player_id
                     .clone()
                     .unwrap_or_else(|| "self".to_string());
-                self.pending_choice = Some(
+                self.awaiting.choice = Some(
                     self.build_reprompt(
                         ctx,
                         Zone::Discard.to_str(),
@@ -2399,9 +2400,9 @@ gs.set_recently_moved_batch(valid_ids.into(), Some("stage"));
                     p.waitroom.cards.to_vec()
                 };
                 let mut filtered_idxs: Vec<usize> = Vec::new();
-                if !self.selected_cards.is_empty() {
+                if !self.selection.cards.is_empty() {
                     for (idx, cid) in waitroom_cards.iter().enumerate() {
-                        if self.selected_cards.contains(cid) && !filtered_idxs.contains(&idx) {
+                        if self.selection.cards.contains(cid) && !filtered_idxs.contains(&idx) {
                             filtered_idxs.push(idx);
                         }
                     }
@@ -2417,8 +2418,8 @@ gs.set_recently_moved_batch(valid_ids.into(), Some("stage"));
                     })
                     .collect();
                 for &cid in &current_card_ids {
-                    if !self.selected_cards.contains(&cid) {
-                        self.selected_cards.push(cid);
+                    if !self.selection.cards.contains(&cid) {
+                        self.selection.cards.push(cid);
                     }
                 }
                 self.execute_selected_cards_from_zone(
@@ -2434,8 +2435,8 @@ gs.set_recently_moved_batch(valid_ids.into(), Some("stage"));
                     ctx.characters.as_ref(),
                     ctx.target_player_id.as_deref(),
                 )?;
-                if self.sub_choice_created {
-                    self.sub_choice_created = false;
+                if self.in_flight.sub_choice_created {
+                    self.in_flight.sub_choice_created = false;
                     let remaining = ctx.count - mapped_indices.len();
                     if remaining > 0 {
                         let waitroom_cards: Vec<i16> = {
@@ -2483,7 +2484,7 @@ gs.set_recently_moved_batch(valid_ids.into(), Some("stage"));
                                 )
                                 .build();
                             let pending = gs.ability_queue.take_pending_actions();
-                            self.pending_reprompt_choice = Some(reprompt);
+                            self.awaiting.reprompt = Some(reprompt);
                             gs.ability_queue.set_pending_actions(pending);
                         }
                     }
@@ -2519,7 +2520,7 @@ gs.set_recently_moved_batch(valid_ids.into(), Some("stage"));
                 } else {
                     Some(all_idxs)
                 };
-                self.pending_choice = Some(
+                self.awaiting.choice = Some(
                     self.build_reprompt(
                         ctx,
                         Zone::Discard.to_str(),
@@ -2543,7 +2544,7 @@ gs.set_recently_moved_batch(valid_ids.into(), Some("stage"));
                 .unwrap_or("self")
                 .to_string();
             let mut all_idxs: Vec<usize> = mapped_indices.to_vec();
-            let prev_ids = self.selected_cards.clone();
+            let prev_ids = self.selection.cards.clone();
             if !prev_ids.is_empty() {
                 let waitroom_cards: Vec<i16> = {
                     let p = gs.resolve_target_player_mut(&target);
@@ -2568,8 +2569,8 @@ gs.set_recently_moved_batch(valid_ids.into(), Some("stage"));
                 ctx.characters.as_ref(),
                 ctx.target_player_id.as_deref(),
             )?;
-            self.selected_cards.clear();
-            if self.sub_choice_created {
+            self.selection.cards.clear();
+            if self.in_flight.sub_choice_created {
                 self.store_pending_choice(gs);
             }
         }
@@ -2581,7 +2582,7 @@ gs.set_recently_moved_batch(valid_ids.into(), Some("stage"));
         gs: &mut GameState,
         context: &ExecutionContext,
     ) -> Result<(), String> {
-        if gs.ability_queue.has_pending_actions() && self.pending_choice.is_none() {
+        if gs.ability_queue.has_pending_actions() && self.awaiting.choice.is_none() {
             self.clear_choice_state(gs);
             return self.resume_pending_actions(gs);
         }
@@ -2631,7 +2632,7 @@ gs.set_recently_moved_batch(valid_ids.into(), Some("stage"));
                                 }
                                 if let Some(ref alt_cond) = eff.compound.alternative_condition {
                                     let ctx =
-                                        ConditionContext::with_moved_cards(gs, &self.moved_cards);
+                                        ConditionContext::with_moved_cards(gs, &self.selection.moved_cards);
                                     ctx.evaluate_condition(alt_cond)
                                         && eff.alternative_count_type_any()
                                             == Some("any_number")
@@ -2670,7 +2671,7 @@ gs.set_recently_moved_batch(valid_ids.into(), Some("stage"));
                                 entry.conditional_choice =
                                     Some(ConditionalChoice::Effects(remaining));
                             }
-                            self.pending_reprompt_choice = Some(Choice::SelectTarget {
+                            self.awaiting.reprompt = Some(Choice::SelectTarget {
                                 target: "choice".to_string(),
                                 description: desc.join(" / "),
                                 description_en: Some(desc_en.join(" / ")),
@@ -2680,11 +2681,11 @@ gs.set_recently_moved_batch(valid_ids.into(), Some("stage"));
                             });
                         }
                         gs.ability_queue.set_pending_actions(commands);
-                        self.pending_choice = None; // clear stale
+                        self.awaiting.choice = None; // clear stale
                         return self.resume_pending_actions(gs);
                     }
-                } else if self.pending_choice.is_some() {
-                    self.pending_choice = None;
+                } else if self.awaiting.choice.is_some() {
+                    self.awaiting.choice = None;
                 }
                 return self.resume_pending_actions(gs);
             }
@@ -2762,8 +2763,8 @@ gs.set_recently_moved_batch(valid_ids.into(), Some("stage"));
                     _ => return Err("Invalid choice for SelfOrOpponent".to_string()),
                 };
                 log::debug!("[SELFOR] chosen={}", chosen);
-                self.spawn_context.target = Some(chosen.to_string());
-                if let Some(ref current) = self.current_effect {
+                self.in_flight.spawn_context.target = Some(chosen.to_string());
+                if let Some(ref current) = self.owner.executing {
                     log::debug!(
                         "[SELFOR] current.action={} steps={:?}",
                         current.action,
@@ -2784,12 +2785,12 @@ gs.set_recently_moved_batch(valid_ids.into(), Some("stage"));
                                 modified.compound.look_action.is_some(),
                                 modified.compound.select_action.is_some()
                             );
-                            self.pending_choice = None;
+                            self.awaiting.choice = None;
                             gs.ability_queue.set_pending_actions(vec![*modified]);
                             let res = self.resume_pending_actions(gs);
                             log::debug!(
                                 "[SELFOR] after resume: pending={:?} res={:?}",
-                                self.pending_choice.is_some(),
+                                self.awaiting.choice.is_some(),
                                 res
                             );
                             match res {
@@ -2819,7 +2820,7 @@ gs.set_recently_moved_batch(valid_ids.into(), Some("stage"));
         gs: &mut GameState,
         selected: &str,
     ) -> Result<(), String> {
-        let Some((index, original)) = self.pending_replacement.take() else {
+        let Some((index, original)) = self.awaiting.replacement.take() else {
             self.clear_choice_state(gs);
             return Err("Pending replacement is missing".to_string());
         };
@@ -2842,10 +2843,10 @@ gs.set_recently_moved_batch(valid_ids.into(), Some("stage"));
                 self.execute_effect(gs, effect)?;
             }
         }
-        self.replacement_original_suppressed = accepted;
-        self.resolving_replacement = true;
+        self.awaiting.replacement_original_suppressed = accepted;
+        self.awaiting.resolving_replacement = true;
         let result = self.execute_effect(gs, &original);
-        self.resolving_replacement = false;
+        self.awaiting.resolving_replacement = false;
         result
     }
 
@@ -2884,7 +2885,7 @@ gs.set_recently_moved_batch(valid_ids.into(), Some("stage"));
     }
 
     pub(in crate::ability::choice) fn handle_order_selection(&mut self, gs: &mut GameState, selected: &str) -> Result<(), String> {
-        let mut ordered = match self.execution_context.clone() {
+        let mut ordered = match self.in_flight.execution_context.clone() {
             ExecutionContext::LookAndSelect {
                 step: LookAndSelectStep::Finalize { destination, .. },
             } if Zone::from_str(&destination) == Some(Zone::Deck) => Vec::new(),
@@ -2906,7 +2907,8 @@ gs.set_recently_moved_batch(valid_ids.into(), Some("stage"));
         if gs.looked_at_cards.len() > 1 {
             let count = gs.looked_at_cards.len();
             self.clear_choice_meta(gs);
-            self.pending_choice = Some(Choice::SelectTarget {
+            self.capture_choice_owner();
+            self.awaiting.choice = Some(Choice::SelectTarget {
                 target: "order".to_string(),
                 description: format!("Choose order for cards on deck ({} cards)", count),
                 description_en: Some(format!("Choose order for cards on deck ({} cards)", count)),
@@ -2914,14 +2916,14 @@ gs.set_recently_moved_batch(valid_ids.into(), Some("stage"));
                 allow_skip: false,
                 options: None,
             });
-            self.execution_context = ExecutionContext::LookAndSelect {
+            self.in_flight.execution_context = ExecutionContext::LookAndSelect {
                 step: LookAndSelectStep::Order { ordered },
             };
             return Ok(());
         }
         ordered.extend(gs.looked_at_cards.drain(..));
         let target = self
-            .spawn_context
+            .in_flight.spawn_context
             .target
             .clone()
             .or_else(|| {
@@ -2950,8 +2952,8 @@ gs.set_recently_moved_batch(valid_ids.into(), Some("stage"));
             card_nos,
             player.main_deck.cards
         );
-        self.moved_cards.extend(ordered);
-        self.execution_context = ExecutionContext::None;
+        self.selection.moved_cards.extend(ordered);
+        self.in_flight.execution_context = ExecutionContext::None;
         self.clear_choice_state_and_resume(gs)
     }
 
@@ -2969,13 +2971,13 @@ gs.set_recently_moved_batch(valid_ids.into(), Some("stage"));
             gs.activating_card
         );
         if selected == "skip" {
-            self.formation_plan.clear();
+            self.carried.formation_plan.clear();
             // Clear pending actions so conditional-sequential sub-effects
             // (e.g. gain_resource gated by this position change) don't fire
             // when the player skips.
             gs.ability_queue.set_pending_actions(vec![]);
             self.clear_choice_state_and_resume(gs)?;
-            self.execution_context = ExecutionContext::None;
+            self.in_flight.execution_context = ExecutionContext::None;
             return Ok(());
         }
         if let Some(effect) = gs.entry_effect().cloned() {
@@ -3040,7 +3042,7 @@ gs.set_recently_moved_batch(valid_ids.into(), Some("stage"));
                     .map(|s| s.to_string())
                     .unwrap_or_else(|| "self".to_string());
                 self.clear_choice_meta(gs);
-                self.pending_choice = None;
+                self.awaiting.choice = None;
                 // If the card fixes the destination (e.g. "…をセンターエリアにポジション
                 // チェンジ" → position=center), use it directly — no destination choice.
                 // Otherwise ask the player where to move the chosen member.
@@ -3088,7 +3090,7 @@ modified.destination = Some(Zone::from_source_str(dest));
                     "right" | "right_side" => "Right",
                     _ => "?",
                 };
-                self.pending_choice = Some(Choice::SelectTarget {
+                self.awaiting.choice = Some(Choice::SelectTarget {
                     target: "position|destination".to_string(),
                     description: format!(
                         "Choose destination for position change (currently at {})",
@@ -3108,7 +3110,7 @@ modified.destination = Some(Zone::from_source_str(dest));
 
             // Formation change: store the assignment and either present the next
             // destination choice or finalize the batch once all members are set.
-            if !self.formation_plan.is_empty() {
+            if !self.carried.formation_plan.is_empty() {
                 let target_card_id = choice_card_no.as_ref().and_then(|ccn| match ccn {
                     ChoiceRoute::Raw(s) => s
                         .strip_prefix("position_change:self:")
@@ -3116,14 +3118,14 @@ modified.destination = Some(Zone::from_source_str(dest));
                     _ => None,
                 });
                 let entry_idx = target_card_id
-                    .and_then(|cid| self.formation_plan.iter().position(|(id, _)| *id == cid));
+                    .and_then(|cid| self.carried.formation_plan.iter().position(|(id, _)| *id == cid));
                 if let Some(idx) = entry_idx {
-                    self.formation_plan[idx].1 = dest.to_string();
-                    let next = self.formation_plan.iter().position(|(_, d)| d.is_empty());
+                    self.carried.formation_plan[idx].1 = dest.to_string();
+                    let next = self.carried.formation_plan.iter().position(|(_, d)| d.is_empty());
                     if let Some(next_idx) = next {
-                        let next_cid = self.formation_plan[next_idx].0;
+                        let next_cid = self.carried.formation_plan[next_idx].0;
                         let next_cname = self
-                            .card_database
+                            .session.card_database
                             .get_card(next_cid)
                             .map(|c| c.name.to_string())
                             .unwrap_or_else(|| "member".to_string());
@@ -3153,7 +3155,7 @@ modified.destination = Some(Zone::from_source_str(dest));
                                 next_cid
                             )));
                         }
-                        self.pending_choice = Some(Choice::SelectTarget {
+                        self.awaiting.choice = Some(Choice::SelectTarget {
                             target: "position|destination".to_string(),
                             description: format!(
                                 "Choose destination for {} (currently at {})",
@@ -3194,7 +3196,7 @@ modified.destination = Some(Zone::from_source_str(dest));
                     gs.trigger_auto_abilities_for_movement_current();
                 }
             }
-            self.selected_area = None;
+            self.selection.area = None;
         }
         self.clear_choice_state_and_resume(gs)?;
         Ok(())
@@ -3274,15 +3276,15 @@ modified.destination = Some(Zone::from_source_str(dest));
         gs: &mut GameState,
         selected: &str,
     ) -> Result<(), String> {
-        if self.selected_cards.is_empty() {
+        if self.selection.cards.is_empty() {
             if let Some(&card_id) = gs.revealed_cost_cards.last() {
-                self.selected_cards.push(card_id);
+                self.selection.cards.push(card_id);
             }
         }
         // Check if we have a saved MoveCardsPosition context (card was already taken from source zone).
         // If so, place the card directly instead of re-running the entire effect which would fail
         // because the card is no longer in the source zone.
-        let ctx = core::mem::replace(&mut self.execution_context, ExecutionContext::None);
+        let ctx = core::mem::replace(&mut self.in_flight.execution_context, ExecutionContext::None);
         match ctx {
             ExecutionContext::MoveCardsPosition {
                 card_id,
@@ -3543,7 +3545,7 @@ modified.destination = Some(Zone::from_source_str(dest));
                         payment.set_optional(Some(false));
                         log::debug!(
                             "[CONDITIONAL_OPTIONAL] source={:?} action=pay_energy energy={:?} target={:?}",
-                            self.activating_card_id,
+                            self.session.activating_card_id,
                             payment.energy_count_any(),
                             payment.target
                         );
@@ -3569,7 +3571,7 @@ modified.destination = Some(Zone::from_source_str(dest));
                 super::compound::conditional::route_conditional_branch(&effect, chose_yes, is_negation);
             log::debug!(
                 "[CONDITION] source={:?} action={} answer={:?} accepted={} negation={} branch={} next_action={:?}",
-                self.activating_card_id, effect.action, selected, chose_yes, is_negation,
+                self.session.activating_card_id, effect.action, selected, chose_yes, is_negation,
                 if cmd.is_none() { "none" } else if chose_yes && is_negation { "optional" } else { "conditional" },
                 cmd.as_ref().map(|a| a.action)
             );
@@ -3651,15 +3653,15 @@ modified.destination = Some(Zone::from_source_str(dest));
                 );
                 // Take the pending SelectTarget so we can detect if pay_cost
                 // creates a new sub-choice (e.g., SelectCard for discard from hand).
-                let old_choice = self.pending_choice.take();
+                let old_choice = self.awaiting.choice.take();
                 self.pay_cost(gs, &options[idx])?;
-                if self.pending_choice.is_some() {
+                if self.awaiting.choice.is_some() {
                     // pay_cost created a sub-choice — signal to preserve it
-                    self.sub_choice_created = true;
+                    self.in_flight.sub_choice_created = true;
                 } else {
                     // pay_cost resolved immediately — restore original choice
                     // so clear_choice_state can clean it up properly.
-                    self.pending_choice = old_choice;
+                    self.awaiting.choice = old_choice;
                 }
             }
         }
@@ -3690,8 +3692,8 @@ modified.destination = Some(Zone::from_source_str(dest));
                 entry.conditional_choice = Some(ConditionalChoice::Str(chosen.clone()));
             }
         }
-        self.pending_choice = None;
-        self.finalize_choice(gs, &self.execution_context.clone())
+        self.awaiting.choice = None;
+        self.finalize_choice(gs, &self.in_flight.execution_context.clone())
     }
 
     pub fn clear_choice_meta(&mut self, gs: &mut GameState) {
@@ -3700,14 +3702,14 @@ modified.destination = Some(Zone::from_source_str(dest));
             entry.conditional_choice = None;
         }
         // On skip/clear, drop deferred costs so they aren't paid.
-        self.pending_deferred_costs.clear();
+        self.awaiting.deferred_costs.clear();
     }
 
     pub(in crate::ability::choice) fn clear_choice_state(&mut self, gs: &mut GameState) {
-        if self.sub_choice_created {
-            self.sub_choice_created = false;
+        if self.in_flight.sub_choice_created {
+            self.in_flight.sub_choice_created = false;
         } else {
-            self.pending_choice = None;
+            self.awaiting.choice = None;
         }
         self.clear_choice_meta(gs);
     }

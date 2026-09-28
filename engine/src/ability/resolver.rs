@@ -69,17 +69,81 @@ fn choice_offer_sig(offered: &[String], skip_allowed: bool) -> String {
 ///
 /// Cross-step communication rides on `GameState` (moved/selected cards,
 /// revealed pools, queue entries), never on globals.
+///
+/// # How the fields group
+///
+/// Resolution is a small state machine — *resolving* an effect, *awaiting* a
+/// choice, then *settling* — and these are its parts. They were accumulated one
+/// `pub` field at a time, which is why "which effect is in flight?" had no
+/// single answer and why several fields existed only to remember what a caller
+/// could not pass down.
+///
+/// | group | lifetime | holds |
+/// |---|---|---|
+/// | [`owner`] | per effect step | which effect we act for: `executing`, `parent`, `of_pending_choice` |
+/// | [`session`] | the whole ability | `card_database`, `activating_card_id`, `current_ability(_index)`, `duration_effects`, `debug_trace`, `log_items` |
+/// | `in_flight` | while effects run | `execution_context`, `step_state`, `pipeline`, `spawn_context`, `is_reveal_cost`, `sub_choice_created`, `deferred_conditional_gate`, `cancel_remaining_commands` |
+/// | `awaiting` | while a choice is parked | `choice`, `reprompt`, `stage_cards`, `stage_select_intent`, `energy_payment`, `deferred_costs`, `repeat_actions`, `replacement` |
+/// | `selection` | after an answer | `cards`, `changed_state_members`, `area`, `moved_cards`, `count_at_save`, the `keep_shuffle_*` family |
+/// | `carried` | between steps | `last_*` memos, `formation_plan`, `looked_at_*`, `last_known_members` |
+///
+/// The split is not cosmetic — it is what lets a reader answer "is this
+/// meaningful right now?" instead of guessing. `awaiting.choice` is only
+/// readable while something is parked; `in_flight` is only readable while
+/// effects run; `session` holds nothing that changes. When adding a field, put
+/// it in the group whose lifetime it actually has, and if none fits, that is
+/// usually a sign the value should be passed down rather than stored.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct LastKnownMemberInfo {
     pub blades: u8,
     pub area: MemberArea,
 }
 
+/// Which effect the engine is currently acting on behalf of.
+///
+/// These were three free-floating fields on `AbilityResolver`
+/// (`current_effect`, `parent_effect`, `pending_choice_owner`) with no stated
+/// relationship to each other. That missing relationship was the whole problem:
+/// because nothing said which one was authoritative, answer-time code had to
+/// GUESS which effect a pending choice belonged to, and every call site guessed
+/// slightly differently — the root cause of the picker-routing bug class.
+///
+/// Three lifetimes, one concept. The rule is short:
+///
+///   * asking "what am I executing?"  -> [`executing`]
+///   * asking "whose question is this?" -> [`of_pending_choice`]
+///
+/// `executing` is the second because it is written by *every* executor as it
+/// starts, so while a choice is parked it names whichever effect ran last, not
+/// the one whose question is being answered. `of_pending_choice` is snapshotted
+/// when the choice is offered and cleared when the answer is finalised, so it is
+/// stable across the entire wait.
+#[derive(Clone, Debug, Default)]
+pub struct EffectOwner {
+    /// The effect executing right now. Advances as sub-effects run; NOT stable
+    /// while a choice is pending.
+    pub executing: Option<AbilityEffect>,
+    /// The outer effect when a sub-effect took over [`executing`] — e.g. a
+    /// look_and_select whose `or_card_types` must stay reachable after its own
+    /// sub-effects overwrite it. Set at the nesting point, read by the
+    /// conditional-on handlers.
+    pub parent: Option<AbilityEffect>,
+    /// The effect that built the currently-pending choice, captured when the
+    /// choice is offered (`capture_choice_owner`) and dropped by
+    /// `finalize_choice`. This is the one answer-time lookups want.
+    pub of_pending_choice: Option<AbilityEffect>,
+}
+
+/// Session-scoped facts: set once when an ability starts resolving and valid
+/// for every phase of it.
+///
+/// Separated because none of these change while the ability runs — reading
+/// "which card is activating this?" is not a question about the current effect,
+/// and having it on the same struct as `owner` invited exactly that confusion.
 #[derive(Clone, Debug)]
-pub struct AbilityResolver {
-    pub pending_choice: Option<Choice>,
+pub struct ResolverSession {
     pub card_database: Arc<CardDatabase>,
-    pub duration_effects: SmallVec<[(String, String); 2]>,
+    pub activating_card_id: Option<i16>,
     /// Shared, not owned: `AbilityQueueEntry.ability` is already an
     /// `Arc<Ability>`, so holding a clone of THAT is a refcount bump where
     /// holding an owned `Ability` was a deep copy of the whole effect tree
@@ -89,91 +153,119 @@ pub struct AbilityResolver {
     /// Stored directly (not read from queue) because the queue's current entry
     /// may change during effect execution (e.g. process_pending_auto_abilities).
     pub current_ability_index: Option<usize>,
-    pub activating_card_id: Option<i16>,
+    pub duration_effects: SmallVec<[(String, String); 2]>,
+    pub debug_trace: bool,
+    /// Buffer for structured ability resolution log items.
+    pub log_items: Vec<AbilityLogItem>,
+}
+
+/// What is executing right now.
+///
+/// Only meaningful while the resolver is running effects — not while a choice
+/// is parked on the player, and not after one has been finalised.
+#[derive(Clone, Debug)]
+pub struct InFlight {
     pub execution_context: ExecutionContext,
-    pub current_effect: Option<AbilityEffect>,
-    /// Parent effect that created a nested choice (e.g. look_and_select with or_card_types).
-    /// Preserved so choice handlers can access or_card_types after sub-effects overwrite current_effect.
-    pub parent_effect: Option<AbilityEffect>,
-    /// The effect that BUILT the currently-pending choice, captured by
-    /// `store_pending_choice` and dropped by `finalize_choice`.
-    ///
-    /// A choice pauses execution, and executors keep writing `current_effect`
-    /// while it waits. So at answer time `current_effect` is whatever ran last,
-    /// not necessarily the effect whose question is being answered — which is
-    /// why the handlers used to re-derive the owner from
-    /// `current_effect`/`entry_effect`/`ability.effect` and why those three
-    /// sites did not agree on the chain. Snapshotting the owner once, at the
-    /// one place every choice is stored, removes the guess.
-    ///
-    /// `parent_effect` was an earlier, hand-placed snapshot of the same idea for
-    /// one caller (look_and_select with `or_card_types`); it stays for that
-    /// purpose. This field is the general one.
-    pub pending_choice_owner: Option<AbilityEffect>,
-    pub is_reveal_cost: bool,
-    pub selected_cards: SmallVec<[i16; 4]>,
-    /// Member card IDs actually changed state by the most recent change_state
-    /// member-op step of THIS ability (e.g. members waited). Used by a
-    /// following delayed restriction step ("そのメンバーは次のターンの…アクティブ
-    /// しない") to key the flag on the waited victims instead of falling back
-    /// to recently_moved_cards/activating_card.
-    pub changed_state_members: SmallVec<[i16; 4]>,
-    pub selected_area: Option<String>,
-    pub moved_cards: SmallVec<[i16; 4]>,
-    /// C6 keep-N-shuffle-rest: phase 0=idle, 1=awaiting self's hand selection,
-    /// 2=awaiting opponent's hand selection. Snapshots hold each player's hand
-    /// at selection time so the non-selected cards can be moved under the deck.
-    pub keep_shuffle_under_phase: u8,
-    pub keep_shuffle_under_count: u8,
-    pub keep_shuffle_under_snapshots: SmallVec<[Vec<i16>; 2]>,
-    /// The hand POSITIONS each player chose to KEEP (per keep-shuffle phase).
-    /// Stored as positions, not card ids, because a hand can hold multiple
-    /// copies of the same card id (e.g. test fillers).
-    pub keep_shuffle_selected: SmallVec<[u8; 8]>,
+    /// Cross-step data flow machinery — see `StepState` for the per-step
+    /// output map, last-draw-count, and looked-at-total-count fields.
+    pub step_state: StepState,
+    pub pipeline: EffectPipeline,
     pub spawn_context: EffectSpawnContext,
+    pub is_reveal_cost: bool,
+    /// Set when a nested choice was created, so the answer path knows to hand
+    /// control to the sub-choice rather than resuming the parent effect.
     pub sub_choice_created: bool,
     /// Set when a parent-conditional (そうした場合) sequential defers on a
     /// choice whose outcome decides the gate. The choice answer handler
     /// consumes it: empty/skip answer drops the remaining actions; a real
     /// selection lets them run.
     pub deferred_conditional_gate: bool,
-    /// Snapshot of `selected_cards.len()` taken when a choice is created
-    /// by a distinct/target_count action. Used by the saved action to exclude
-    /// cards selected BEFORE the choice, without excluding the card selected
-    /// BY the choice.
-    pub selected_count_at_save: Option<u8>,
-    pub pending_stage_cards: SmallVec<[(i16, String); 2]>,
-    pub debug_trace: bool,
-    pub pipeline: EffectPipeline,
-    /// Cross-step data flow machinery — see `StepState` for the per-step
-    /// output map, last-draw-count, and looked-at-total-count fields.
-    pub step_state: StepState,
-    pub pending_energy_payment: Option<u8>,
+    pub cancel_remaining_commands: bool,
+}
+
+/// Work that is parked on the player.
+///
+/// Everything here is "offered, waiting for an answer". These fields are read
+/// by answer handlers, which is exactly why they were previously read
+/// defensively (with `or_else` fallbacks): the code had no way to know whether
+/// it was looking at pending work or at a resolver with nothing pending.
+#[derive(Clone, Debug, Default)]
+pub struct AwaitingChoice {
+    /// The question currently on screen, if any.
+    pub choice: Option<Choice>,
+    /// Re-prompt choice (any_number / re-select) set after pending actions finish.
+    pub reprompt: Option<Choice>,
+    pub stage_cards: SmallVec<[(i16, String); 2]>,
+    /// Declared intent of the pending Stage SelectCard choice, if its producer
+    /// declared one. Consumed by handle_stage_selection.
+    pub stage_select_intent: Option<crate::ability::types::StageSelectIntent>,
+    pub energy_payment: Option<u8>,
     /// Binary sub-costs (e.g. change_state self_cost) in a sequential_cost that
     /// were deferred until the choice sub-cost is confirmed by the player.
     /// Paid on confirm, cleared on skip.
-    pub pending_deferred_costs: Vec<Box<AbilityEffect>>,
-    pub cancel_remaining_commands: bool,
+    pub deferred_costs: Vec<Box<AbilityEffect>>,
     /// Repeat actions fed one-at-a-time after each iteration completes.
-    pub pending_repeat_actions: Vec<Box<AbilityEffect>>,
-    /// Re-prompt choice (any_number / re-select) set after pending actions finish.
-    pub pending_reprompt_choice: Option<Choice>,
-    /// Buffer for structured ability resolution log items.
-    pub log_items: Vec<AbilityLogItem>,
+    pub repeat_actions: Vec<Box<AbilityEffect>>,
+    pub replacement: Option<(usize, AbilityEffect)>,
+    pub resolving_replacement: bool,
+    pub replacement_original_suppressed: bool,
+}
+
+/// What the player chose, as recorded by the handler that consumed the answer.
+///
+/// Written when a choice is finalised, read by the steps that run after it.
+#[derive(Clone, Debug, Default)]
+pub struct Selection {
+    pub cards: SmallVec<[i16; 4]>,
+    /// Member card IDs actually changed state by the most recent change_state
+    /// member-op step of THIS ability (e.g. members waited). Used by a
+    /// following delayed restriction step ("そのメンバーは次のターンの…アクティブ
+    /// しない") to key the flag on the waited victims instead of falling back
+    /// to recently_moved_cards/activating_card.
+    pub changed_state_members: SmallVec<[i16; 4]>,
+    pub area: Option<String>,
+    pub moved_cards: SmallVec<[i16; 4]>,
+    /// Snapshot of `cards.len()` taken when a choice is created by a
+    /// distinct/target_count action. Used by the saved action to exclude cards
+    /// selected BEFORE the choice, without excluding the card selected BY it.
+    pub count_at_save: Option<u8>,
+    /// C6 keep-N-shuffle-rest: phase 0=idle, 1=awaiting self's hand selection,
+    /// 2=awaiting opponent's hand selection. Snapshots hold each player's hand
+    /// at selection time so the non-selected cards can be moved under the deck.
+    pub keep_shuffle_phase: u8,
+    pub keep_shuffle_count: u8,
+    pub keep_shuffle_snapshots: SmallVec<[Vec<i16>; 2]>,
+    /// The hand POSITIONS each player chose to KEEP (per keep-shuffle phase).
+    /// Stored as positions, not card ids, because a hand can hold multiple
+    /// copies of the same card id (e.g. test fillers).
+    pub keep_shuffle_selected: SmallVec<[u8; 8]>,
+}
+
+/// Results memoised for the next step or the next choice.
+///
+/// These outlive a single effect step but not the ability. They exist so a
+/// following step can ask "did the move before me do anything?" without
+/// recomputing it.
+#[derive(Clone, Debug, Default)]
+pub struct Carried {
+    /// Signature of the last `choice_offered` structured entry emitted, so the
+    /// same pending choice re-stored (re-prompt, auto-ability interleave) is not
+    /// re-logged as a fresh offer. `None` = never offered yet.
+    pub last_offered_sig: Option<String>,
+    pub last_debug_choice_sig: Option<String>,
     /// Tracks whether the most recent "those_cards" move actually moved any
     /// card. Used by the "…したとき" (when you do so) pattern: a
     /// `modify_score` step directly following a `those_cards`→hand move must
     /// only apply when the move actually added a card.
     pub last_move_moved_any: Option<bool>,
     pub last_action_result: Option<(crate::ability::enums::ActionType, bool)>,
+    /// Structured EffectData produced by the most recent gain_ability
+    /// registration, forwarded to push_temporary_effect so expiry can revert
+    /// by card id instead of text-searching the gained maps.
+    pub last_gain_effect_data: Option<crate::core::types::EffectData>,
     /// Formation change plan: (member_id, chosen_destination) pairs accumulated
     /// across sequential choices.  All swaps execute as a batch at the end.
     pub formation_plan: SmallVec<[(i16, String); 2]>,
-    /// Signature of the last `choice_offered` structured entry emitted, so the
-    /// same pending choice re-stored (re-prompt, auto-ability interleave) is not
-    /// re-logged as a fresh offer. `None` = never offered yet.
-    pub last_offered_sig: Option<String>,
-    last_debug_choice_sig: Option<String>,
     /// Zone the current `looked_at` pool was taken from (rule 5.7: looking at
     /// cards only informs — a DECLINED optional move must return them there,
     /// not to the default remainder destination).
@@ -183,30 +275,31 @@ pub struct AbilityResolver {
     /// is spawned. The answer-time handler has no effect context, so the
     /// position rides here (consumed on first looked_at selection).
     pub looked_at_deck_position: Option<usize>,
-    /// Declared intent of the pending Stage SelectCard choice, if its producer
-    /// declared one. Consumed by handle_stage_selection.
-    pub stage_select_intent: Option<crate::ability::types::StageSelectIntent>,
-    /// Structured EffectData produced by the most recent gain_ability
-    /// registration, forwarded to push_temporary_effect so expiry can revert
-    /// by card id instead of text-searching the gained maps.
-    pub last_gain_effect_data: Option<crate::core::types::EffectData>,
-    pub pending_replacement: Option<(usize, AbilityEffect)>,
-    pub resolving_replacement: bool,
-    pub replacement_original_suppressed: bool,
-    last_known_members: SmallVec<[(i16, LastKnownMemberInfo); 2]>,
+    pub last_known_members: SmallVec<[(i16, LastKnownMemberInfo); 2]>,
+}
+
+#[derive(Clone, Debug)]
+pub struct AbilityResolver {
+    /// Which effect we are acting for. See [`EffectOwner`].
+    pub owner: EffectOwner,
+    /// Valid for the whole ability. See [`ResolverSession`].
+    pub session: ResolverSession,
+    /// Meaningful only while effects are running. See [`InFlight`].
+    pub in_flight: InFlight,
+    /// Work parked on the player. See [`AwaitingChoice`].
+    pub awaiting: AwaitingChoice,
+    /// What the player chose. See [`Selection`].
+    pub selection: Selection,
+    /// Memoised results between steps. See [`Carried`].
+    pub carried: Carried,
 }
 
 impl AbilityResolver {
-    /// The effect that owns the work in flight, for ANSWER-TIME lookups.
-    ///
-    /// A choice pauses execution mid-effect. By the time the player's answer
-    /// comes back, `current_effect` may have been overwritten by a sub-effect
-    /// spawned after the choice was built (that is why `parent_effect` exists),
-    /// so answer-time code asking "which effect am I continuing?" cannot read
-    /// the resolver's current slot and assume it is still the right one.
+    /// The effect that owns the work in flight, for lookups made while an
+    /// effect is RUNNING (not while a choice is parked).
     ///
     /// Resolution order, most specific first:
-    ///   1. `current_effect` — the executor running right now
+    ///   1. `owner.executing` — the executor running right now
     ///   2. `gs.entry_effect()` — the queue entry's root effect
     ///
     /// Deliberately only two links. Several call sites used to open-code this
@@ -215,21 +308,24 @@ impl AbilityResolver {
     /// different answers depending on which site asked it. That one site now
     /// spells its wider chain out explicitly rather than sharing a helper whose
     /// contract overlaps this one.
+    ///
+    /// Inside an answer path prefer [`Self::answering_effect`]: `executing`
+    /// names whatever ran last, not the effect being continued.
     pub fn owning_effect(&self, gs: &GameState) -> Option<AbilityEffect> {
-        self.current_effect
+        self.owner.executing
             .clone()
             .or_else(|| gs.entry_effect().cloned())
     }
 
     /// The effect that asked the question now being answered.
     ///
-    /// Prefer this over `owning_effect` anywhere in an ANSWER path. While a
-    /// choice waits, executors keep overwriting `current_effect`, so the live
-    /// slot answers "what ran last", not "what is being answered". Once
-    /// `finalize_choice` runs the snapshot is gone and `owning_effect` is the
-    /// right accessor again, so the two differ only while a choice is pending.
+    /// This is the answer-time accessor. While a choice waits, executors keep
+    /// overwriting `owner.executing`, so that slot answers "what ran last" —
+    /// not "what is being answered". Once `finalize_choice` runs the snapshot is
+    /// gone and [`Self::owning_effect`] is right again, so the two differ only
+    /// while a choice is pending.
     pub fn answering_effect(&self, gs: &GameState) -> Option<AbilityEffect> {
-        self.pending_choice_owner
+        self.owner.of_pending_choice
             .clone()
             .or_else(|| self.owning_effect(gs))
     }
@@ -238,7 +334,7 @@ impl AbilityResolver {
     /// Single source of truth for the trigger check previously copy-pasted at
     /// every optional-cost site.
     pub(crate) fn current_ability_is_activation(&self) -> bool {
-        self.current_ability
+        self.session.current_ability
             .as_ref()
             .is_some_and(|a| a.has_trigger(crate::triggers::TriggerKind::Activation))
     }
@@ -261,13 +357,13 @@ impl AbilityResolver {
     ) {
         log::debug!(
             "[CHOICE] source={:?} optional payment: {} route={:?} retain_route={} allow_skip={}",
-            self.activating_card_id,
+            self.session.activating_card_id,
             description_en,
             route.as_ref().or_else(|| gs.ability_queue.current_entry().and_then(|e| e.choice_card_no.as_ref())),
             route.is_none(),
             allow_skip
         );
-        self.pending_choice = Some(crate::ability::types::Choice::SelectTarget {
+        self.awaiting.choice = Some(crate::ability::types::Choice::SelectTarget {
             target: crate::ability::types::PAY_SKIP_TARGET.to_string(),
             description: description_en.clone(),
             description_en: Some(description_en),
@@ -284,53 +380,29 @@ impl AbilityResolver {
 
     pub fn new(card_database: Arc<CardDatabase>, activating_card_id: Option<i16>) -> Self {
         AbilityResolver {
-            pending_choice: None,
-            card_database: card_database.clone(),
-            duration_effects: SmallVec::new(),
-            current_ability: None,
-            current_ability_index: None,
-            activating_card_id,
-            execution_context: ExecutionContext::None,
-            current_effect: None,
-            parent_effect: None,
-            pending_choice_owner: None,
-            is_reveal_cost: false,
-            selected_cards: SmallVec::new(),
-            changed_state_members: SmallVec::new(),
-            selected_area: None,
-            moved_cards: SmallVec::new(),
-            keep_shuffle_under_phase: 0,
-            keep_shuffle_under_count: 0,
-            keep_shuffle_under_snapshots: SmallVec::new(),
-            keep_shuffle_selected: SmallVec::new(),
-            spawn_context: EffectSpawnContext::default(),
-            sub_choice_created: false,
-            deferred_conditional_gate: false,
-            selected_count_at_save: None,
-            pending_stage_cards: SmallVec::new(),
-            debug_trace: false,
-            pipeline: { EffectPipeline::new() },
-            step_state: StepState::new(),
-            pending_energy_payment: None,
-            pending_deferred_costs: Vec::new(),
-            cancel_remaining_commands: false,
-            pending_repeat_actions: Vec::new(),
-            pending_reprompt_choice: None,
-            log_items: Vec::new(),
-            formation_plan: SmallVec::new(),
-             last_move_moved_any: None,
-             last_action_result: None,
-             last_offered_sig: None,
-
-            last_debug_choice_sig: None,
-            looked_at_origin: None,
-            looked_at_deck_position: None,
-            stage_select_intent: None,
-            last_gain_effect_data: None,
-            pending_replacement: None,
-            resolving_replacement: false,
-            replacement_original_suppressed: false,
-            last_known_members: SmallVec::new(),
+            owner: EffectOwner::default(),
+            session: ResolverSession {
+                card_database: card_database.clone(),
+                duration_effects: SmallVec::new(),
+                current_ability: None,
+                current_ability_index: None,
+                activating_card_id,
+                debug_trace: false,
+                log_items: Vec::new(),
+            },
+            in_flight: InFlight {
+                execution_context: ExecutionContext::None,
+                step_state: StepState::new(),
+                pipeline: EffectPipeline::new(),
+                spawn_context: EffectSpawnContext::default(),
+                is_reveal_cost: false,
+                sub_choice_created: false,
+                deferred_conditional_gate: false,
+                cancel_remaining_commands: false,
+            },
+            awaiting: AwaitingChoice::default(),
+            selection: Selection::default(),
+            carried: Carried::default(),
         }
     }
 
@@ -343,8 +415,8 @@ impl AbilityResolver {
     ) {
         let entry = blade_modifiers.get(&card_id).copied().unwrap_or_default();
         let blades = crate::core::stats_pipeline::effective_blade(card_db, card_id, entry);
-        self.last_known_members.retain(|entry| entry.0 != card_id);
-        self.last_known_members
+        self.carried.last_known_members.retain(|entry| entry.0 != card_id);
+        self.carried.last_known_members
             .push((card_id, LastKnownMemberInfo { blades, area }));
         log::debug!(
             "[LKI] card={} blades={} area={:?} stored=true",
@@ -363,7 +435,7 @@ impl AbilityResolver {
             .iter()
             .any(|player| player.stage.stage.contains(&card_id));
         let info = self
-            .last_known_members
+            .carried.last_known_members
             .iter()
             .find_map(|&(id, info)| (id == card_id).then_some(info));
         log::debug!(
@@ -376,7 +448,7 @@ impl AbilityResolver {
     }
 
     pub fn get_pending_choice(&self) -> Option<&Choice> {
-        self.pending_choice.as_ref()
+        self.awaiting.choice.as_ref()
     }
 
     /// Cached verdict for a condition marked `cache: true` on the current
@@ -489,14 +561,14 @@ impl AbilityResolver {
     pub fn can_activate_effect(&self, gs: &mut GameState, effect: &AbilityEffect) -> bool {
         log::trace!(
             "[EFFECT] activation check: source={:?} action={} has_condition={}",
-            self.activating_card_id,
+            self.session.activating_card_id,
             effect.action,
             effect.condition.is_some()
         );
         let ctx = super::condition::ConditionContext::with_moved_and_selected(
             gs,
-            &self.moved_cards,
-            &self.selected_cards,
+            &self.selection.moved_cards,
+            &self.selection.cards,
         );
         let mut dbg = AbDebug::new();
         dbg.effect(effect);
@@ -552,7 +624,7 @@ impl AbilityResolver {
                 // Check cache first — avoids re-evaluation against stale state
                 // (e.g. revealed_cards modified by a prior select_cards filter).
                 if let Some(cached) = self.cached_condition_verdict(gs, condition) {
-                    log::debug!("[CONDITION] source={:?} action={} passed={} verdict=cached type={:?}", self.activating_card_id, effect.action, cached, condition.condition_type());
+                    log::debug!("[CONDITION] source={:?} action={} passed={} verdict=cached type={:?}", self.session.activating_card_id, effect.action, cached, condition.condition_type());
                     return cached;
                 }
                 // The code below used to deep-clone the condition on EVERY
@@ -600,7 +672,7 @@ impl AbilityResolver {
                         act, act_pos, ct, loc
                     ));
                     log::debug!("[CONDITION] source={:?} action={} passed=false type={:?} location={:?} group={:?} exclude={:?}",
-                        self.activating_card_id, effect.action, condition.condition_type(), condition.get_location(), condition.get_group_names(), condition.get_exclude_characters());
+                        self.session.activating_card_id, effect.action, condition.condition_type(), condition.get_location(), condition.get_group_names(), condition.get_exclude_characters());
                     return false;
                 }
             }
@@ -713,16 +785,32 @@ impl AbilityResolver {
         true
     }
 
+    /// Snapshot the effect that is building a choice right now.
+    ///
+    /// Every path that puts a choice in front of the player must call this, or
+    /// the answer-time `answering_effect` lookup silently degrades to guessing
+    /// among `current_effect` / `entry_effect()`.
+    ///
+    /// Separate from `store_pending_choice` because most paths assign
+    /// `pending_choice` and *then* store it, but four do not: the reprompt
+    /// restore (which re-offers a choice whose owner was captured — and
+    /// possibly cleared — on the original offer, so it deliberately does NOT
+    /// re-capture), a re-selection offer, the deck-order pick, and the
+    /// choice-string offer in `look.rs`.
+    pub(crate) fn capture_choice_owner(&mut self) {
+        if self.owner.of_pending_choice.is_none() {
+            self.owner.of_pending_choice = self.owner.executing.clone();
+        }
+    }
+
     pub(crate) fn store_pending_choice(&mut self, gs: &mut GameState) {
         gs.ability_queue.snapshot_requested = true;
-        // Snapshot the owner ONCE, here, where every pending choice enters.
+        // Capture the owner ONCE, here, where the pending choice is entered.
         // `current_effect` keeps moving while the choice waits, so capturing it
         // at answer time (as the handlers used to) reports whichever executor
         // ran last instead of the effect that asked the question.
-        if self.pending_choice_owner.is_none() {
-            self.pending_choice_owner = self.current_effect.clone();
-        }
-        if let Some(ref choice) = self.pending_choice {
+        self.capture_choice_owner();
+        if let Some(ref choice) = self.awaiting.choice {
             // Record a `choice_offered` structured entry at presentation time so
             // the log captures what options were actually shown (before the
             // game state may shift ahead of the player's eventual resolution).
@@ -731,25 +819,25 @@ impl AbilityResolver {
             // offer block. Only a genuinely different presentation is a new offer.
             let offered = gs.choice_offered_labels(choice);
             let sig = choice_offer_sig(&offered, choice.allow_skip());
-            let is_new_offer = self.last_offered_sig.as_deref() != Some(sig.as_str());
+            let is_new_offer = self.carried.last_offered_sig.as_deref() != Some(sig.as_str());
             if is_new_offer {
                 gs.push_choice_offered(choice);
-                self.last_offered_sig = Some(sig);
+                self.carried.last_offered_sig = Some(sig);
             }
             let debug_choice_changed = if log::log_enabled!(log::Level::Debug) {
                 let sig = format!("{:?}|{:?}|{:?}|{:?}|{:?}|{:?}", choice,
-                    self.activating_card_id, self.current_ability_index,
+                    self.session.activating_card_id, self.session.current_ability_index,
                     gs.ability_queue.current_entry().and_then(|e| e.choice_card_no.as_ref()),
-                    self.spawn_context, self.execution_context);
-                let changed = is_new_offer || self.last_debug_choice_sig.as_ref() != Some(&sig);
-                self.last_debug_choice_sig = Some(sig);
+                    self.in_flight.spawn_context, self.in_flight.execution_context);
+                let changed = is_new_offer || self.carried.last_debug_choice_sig.as_ref() != Some(&sig);
+                self.carried.last_debug_choice_sig = Some(sig);
                 changed
             } else {
                 false
             };
             if debug_choice_changed {
-                log::debug!("[CHOICE] source={:?} route={:?} context={:?}", self.activating_card_id,
-                    gs.ability_queue.current_entry().and_then(|e| e.choice_card_no.as_ref()), self.execution_context);
+                log::debug!("[CHOICE] source={:?} route={:?} context={:?}", self.session.activating_card_id,
+                    gs.ability_queue.current_entry().and_then(|e| e.choice_card_no.as_ref()), self.in_flight.execution_context);
                 match choice {
                     crate::ability::types::Choice::SelectCard {
                         zone,
@@ -777,7 +865,7 @@ impl AbilityResolver {
                         discard_remaining,
                         ..
                     } => {
-                        log::debug!("[CHOICE] select cards: source={:?} zone={} count={} allow_skip={} group={:?} card_type={:?} select_only={} heart_colors={:?} target_player={:?} picker={:?} destination={:?} indices={:?} prompt={}", self.activating_card_id, zone, count, allow_skip, group, card_type, is_select_action, heart_colors, target_player_id, picker, destination, filtered_indices, description);
+                        log::debug!("[CHOICE] select cards: source={:?} zone={} count={} allow_skip={} group={:?} card_type={:?} select_only={} heart_colors={:?} target_player={:?} picker={:?} destination={:?} indices={:?} prompt={}", self.session.activating_card_id, zone, count, allow_skip, group, card_type, is_select_action, heart_colors, target_player_id, picker, destination, filtered_indices, description);
                         log::debug!("[CHOICE] filters: cost_limit={:?} operator={:?} cost_total={:?} total_operator={:?} cost_values={:?} characters={:?} all_hearts={:?} names={:?} blind={} reveal={} discard_remaining={:?}", cost_limit, cost_limit_operator, cost_total, cost_total_operator, cost_values, characters, require_all_heart_colors, name_fragments, blind, is_reveal, discard_remaining);
                     }
                     crate::ability::types::Choice::SelectHeartColor {
@@ -786,7 +874,7 @@ impl AbilityResolver {
                         description,
                         ..
                     } => {
-                    log::debug!("[CHOICE] source={:?} heart colors: count={} options={:?} prompt={}", self.activating_card_id, count, options, description);
+                    log::debug!("[CHOICE] source={:?} heart colors: count={} options={:?} prompt={}", self.session.activating_card_id, count, options, description);
                     }
                     crate::ability::types::Choice::SelectTarget {
                         target,
@@ -795,10 +883,10 @@ impl AbilityResolver {
                         allow_skip,
                         ..
                     } => {
-                        log::debug!("[CHOICE] source={:?} target: target={} options={:?} allow_skip={} prompt={}", self.activating_card_id, target, options, allow_skip, description);
+                        log::debug!("[CHOICE] source={:?} target: target={} options={:?} allow_skip={} prompt={}", self.session.activating_card_id, target, options, allow_skip, description);
                     }
                     crate::ability::types::Choice::SelectPosition { description, .. } => {
-                        log::debug!("[CHOICE] source={:?} position: prompt={}", self.activating_card_id, description);
+                        log::debug!("[CHOICE] source={:?} position: prompt={}", self.session.activating_card_id, description);
                     }
                     crate::ability::types::Choice::SelectHeartType {
                         count,
@@ -899,14 +987,14 @@ impl AbilityResolver {
             .map(|c| c.name.to_string())
             .unwrap_or_default();
         let raw_trigger = self
-            .current_ability
+            .session.current_ability
             .as_ref()
             .and_then(|a| a.triggers.as_deref())
             .unwrap_or("?");
         // Canonical trigger key (shared with triggers.rs scan + negated-skip).
         let trigger_str = crate::triggers::canonical_trigger(raw_trigger);
         let ability_text = self
-            .current_ability
+            .session.current_ability
             .as_ref()
             .map(|a| a.full_text.clone())
             .unwrap_or_default();
@@ -952,7 +1040,7 @@ impl AbilityResolver {
             gs.commit_or_push_structured(
                 card_id,
                 &trigger_str,
-                self.current_ability_index,
+                self.session.current_ability_index,
                 crate::core::types::LogMetadata::AbilityResolution {
                     result: result.to_string(),
                     trigger: trigger_str.clone(),
@@ -1091,9 +1179,9 @@ impl AbilityResolver {
             "[EFFECT] source={:?} action={} returned: pending={}",
             activating_card,
             effect.action,
-            self.pending_choice.is_some()
+            self.awaiting.choice.is_some()
         );
-        if self.pending_choice.is_none() {
+        if self.awaiting.choice.is_none() {
             dbg.p("RESULT", "effect applied ✓");
             let items = drain_verdicts();
             self.push_ability_result(gs, "success", items, None);
@@ -1108,7 +1196,7 @@ impl AbilityResolver {
             // - "position|destination" for optional effects (may place)
             //   Record after the choice resolves if they actually did it.
             let is_optional_pos = matches!(
-                self.pending_choice,
+                self.awaiting.choice,
                 Some(Choice::SelectTarget { ref target, .. })
                 if target == "position|destination"
             ) && ability
@@ -1116,7 +1204,7 @@ impl AbilityResolver {
                 .as_ref()
                 .is_some_and(|e| e.optional.unwrap_or(false));
             let skip_use_limit = matches!(
-                self.pending_choice,
+                self.awaiting.choice,
                 Some(Choice::SelectTarget { ref target, .. })
                 if target == "conditional_optional"
             ) || is_optional_pos;
@@ -1149,12 +1237,12 @@ impl AbilityResolver {
     /// callers.
     fn finish_ability_resolution(&mut self, gs: &mut GameState) {
         gs.activating_card = None;
-        self.current_ability = None;
-        self.current_ability_index = None;
-        self.last_known_members.clear();
+        self.session.current_ability = None;
+        self.session.current_ability_index = None;
+        self.carried.last_known_members.clear();
 
-        if self.debug_trace {
-            self.pipeline.trace.after = Some(ZoneSnapshot::from_game_state(gs));
+        if self.session.debug_trace {
+            self.in_flight.pipeline.trace.after = Some(ZoneSnapshot::from_game_state(gs));
         }
     }
 
@@ -1166,8 +1254,8 @@ impl AbilityResolver {
         ability_index: usize,
     ) -> Result<(), String> {
         let mut dbg = AbDebug::new();
-        self.last_action_result = None;
-        self.last_known_members.clear();
+        self.carried.last_action_result = None;
+        self.carried.last_known_members.clear();
         // Clear structured verdict buffer from any previous ability
         #[cfg(not(feature = "no_std"))]
         crate::ability::log::clear_verdicts();
@@ -1179,7 +1267,7 @@ impl AbilityResolver {
         // were heap-allocated on every ability resolution and thrown away.
         // `String::new()` does not allocate, so the debug-off path is free.
         let card_data = activating_card.and_then(|id| gs.card_database.get_card(id));
-        let debug_on = self.debug_trace
+        let debug_on = self.session.debug_trace
             || crate::ability::debug::ABILITY_DEBUG.load(core::sync::atomic::Ordering::Relaxed);
         let card_name = if debug_on {
             card_data.map(|c| c.name.to_string()).unwrap_or_default()
@@ -1198,14 +1286,14 @@ impl AbilityResolver {
         };
 
         // Initialize root trace node with ability information
-        if self.debug_trace {
-            self.pipeline.trace.label = format!(
+        if self.session.debug_trace {
+            self.in_flight.pipeline.trace.label = format!(
                 "ability[{}]: {}",
                 ability_index,
                 ability.full_text.chars().take(60).collect::<String>()
             );
-            self.pipeline.trace.card = Some(card_name.to_string());
-            self.pipeline.trace.before = Some(ZoneSnapshot::from_game_state(gs));
+            self.in_flight.pipeline.trace.card = Some(card_name.to_string());
+            self.in_flight.pipeline.trace.before = Some(ZoneSnapshot::from_game_state(gs));
         }
 
         dbg.ability(&card_name, &card_no, &card_id_str, &ability);
@@ -1216,8 +1304,8 @@ impl AbilityResolver {
         // Set these early so push_ability_result can access them on early exits
         // `ability` is already the shared Arc from the queue entry, so this is a
         // refcount bump rather than a deep copy of the ability.
-        self.current_ability = Some(ability.clone());
-        self.current_ability_index = Some(ability_index);
+        self.session.current_ability = Some(ability.clone());
+        self.session.current_ability_index = Some(ability_index);
         gs.activating_card = activating_card;
 
         // Pre-cost gates
@@ -1259,7 +1347,7 @@ impl AbilityResolver {
         }
 
         // Mark cost as paid when it auto-resolved without creating a pending choice.
-        if !cost_already_paid && ability.cost.is_some() && self.pending_choice.is_none() {
+        if !cost_already_paid && ability.cost.is_some() && self.awaiting.choice.is_none() {
             if let Some(entry) = gs.ability_queue.current_entry_mut() {
                 entry.cost_paid = true;
             }
@@ -1374,11 +1462,11 @@ impl AbilityResolver {
     }
 
     pub fn card_db(&self) -> Arc<CardDatabase> {
-        self.card_database.clone()
+        self.session.card_database.clone()
     }
 
     pub fn fmt_card(&self, cid: i16) -> String {
-        self.card_database
+        self.session.card_database
             .get_card(cid)
             .map(|c| c.name.as_ref())
             .unwrap_or("?")

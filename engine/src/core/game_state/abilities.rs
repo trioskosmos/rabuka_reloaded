@@ -2018,20 +2018,20 @@ fn trigger_auto_ability_by_index_refs(
             let mut r = self.ability_queue.take_resolver().unwrap();
             // Don't reset moved_cards/selected_cards -- the effect may need
             // them for cost_reference (e.g. previous_moved_card) or conditions.
-            r.selected_cards.clear();
+            r.selection.cards.clear();
             // G1/G3: preserve spawn_context.target across resolver re-use.
             // When resume_pending_commands sets spawn_context.target via the
             // G3 fix and then process_current_ability is called again, the
             // target must survive the reset so the G1 check can route the
             // pending choice to the opponent player.
-            let saved_target = r.spawn_context.target.clone();
-            r.spawn_context = crate::ability::types::EffectSpawnContext::default();
-            r.spawn_context.target = saved_target;
-            r.pending_stage_cards = SmallVec::new();
-            r.execution_context = crate::ability::types::ExecutionContext::None;
+            let saved_target = r.in_flight.spawn_context.target.clone();
+            r.in_flight.spawn_context = crate::ability::types::EffectSpawnContext::default();
+            r.in_flight.spawn_context.target = saved_target;
+            r.awaiting.stage_cards = SmallVec::new();
+            r.in_flight.execution_context = crate::ability::types::ExecutionContext::None;
             // Clear pending_choice: the previous call stored it in the queue,
             // and it must not block re-execution of the effect on the next pass.
-            r.pending_choice = None;
+            r.awaiting.choice = None;
             r
         } else {
             crate::Box::new(crate::ability::resolver::AbilityResolver::new(
@@ -2040,7 +2040,7 @@ fn trigger_auto_ability_by_index_refs(
             ))
         };
 
-        resolver.debug_trace =
+        resolver.session.debug_trace =
             crate::ability::debug::ABILITY_DEBUG.load(core::sync::atomic::Ordering::Relaxed);
 
         #[cfg(not(feature = "no_std"))]
@@ -2053,7 +2053,7 @@ fn trigger_auto_ability_by_index_refs(
                     "resolve ok card={:?} idx={} pending_choice={}",
                     card_id,
                     ability_index,
-                    resolver.pending_choice.is_some()
+                    resolver.awaiting.choice.is_some()
                 ));
             }
             Err(e) => {
@@ -2072,17 +2072,17 @@ fn trigger_auto_ability_by_index_refs(
                 "[ABILITY_RESOLUTION] card={:?} ability={} status={}",
                 card_id,
                 ability_index,
-                if resolver.pending_choice.is_some() { "waiting_for_choice" } else { "finished" }
+                if resolver.awaiting.choice.is_some() { "waiting_for_choice" } else { "finished" }
             );
         }
 
         // Sync resolver state to GameState before the resolver may be dropped.
         // The condition system and other subsystems read GameState directly.
-        if resolver.debug_trace {
-            self.last_ability_trace = Some(resolver.pipeline.trace.clone());
+        if resolver.session.debug_trace {
+            self.last_ability_trace = Some(resolver.in_flight.pipeline.trace.clone());
         }
 
-        if let Some(ref c) = resolver.pending_choice {
+        if let Some(ref c) = resolver.awaiting.choice {
             let is_choice_type = self
                 .ability_queue
                 .current_entry()
@@ -2127,13 +2127,13 @@ fn trigger_auto_ability_by_index_refs(
                     target_player_id: Some(tpid),
                     ..
                 } if tpid == "opponent"
-                    && resolver.spawn_context.target.as_deref() == Some("opponent") =>
+                    && resolver.in_flight.spawn_context.target.as_deref() == Some("opponent") =>
                 {
                     true
                 }
                 crate::ability::types::Choice::SelectPosition { .. }
                     if matches!(
-                        resolver.execution_context,
+                        resolver.in_flight.execution_context,
                         crate::ability::types::ExecutionContext::MoveCardsPosition { ref target, .. }
                         if target == "opponent"
                     ) =>
@@ -2142,7 +2142,7 @@ fn trigger_auto_ability_by_index_refs(
                 }
                 crate::ability::types::Choice::SelectTarget { target, .. }
                     if target == "position|destination"
-                        && (resolver.spawn_context.target.as_deref() == Some("opponent")
+                        && (resolver.in_flight.spawn_context.target.as_deref() == Some("opponent")
                             || route_targets_opponent) =>
                 {
                     true
@@ -2179,8 +2179,8 @@ fn trigger_auto_ability_by_index_refs(
                     picker,
                     preserved_picker,
                     targets_opponent,
-                    resolver.spawn_context.target,
-                    resolver.current_effect.as_ref().map(|e| e.action)
+                    resolver.in_flight.spawn_context.target,
+                    resolver.owner.executing.as_ref().map(|e| e.action)
                 );
             }
 
@@ -2567,7 +2567,7 @@ fn trigger_auto_ability_by_index_refs(
                             Some(Zone::SelectedCards) => entry
                                 .resolver
                                 .as_ref()
-                                .map(|r| r.selected_cards.to_vec())
+                                .map(|r| r.selection.cards.to_vec())
                                 .unwrap_or_default(),
                             _ => Vec::new(),
                         };

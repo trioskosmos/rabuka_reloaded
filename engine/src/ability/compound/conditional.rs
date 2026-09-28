@@ -40,7 +40,7 @@ pub(crate) fn execute_conditional_alternative(
     let has_alternative = effect.alternative_effect_any().is_some();
 
     if has_primary && has_alternative {
-        let ctx = crate::ability::condition::ConditionContext::with_moved_cards(gs, &resolver.moved_cards);
+        let ctx = crate::ability::condition::ConditionContext::with_moved_cards(gs, &resolver.selection.moved_cards);
 
         if effect.compound.alternative_condition.is_some() && effect.condition.is_some() {
             if let Some(ref alt_cond) = effect.compound.alternative_condition {
@@ -60,7 +60,7 @@ pub(crate) fn execute_conditional_alternative(
             return Ok(());
         }
 
-        let ctx = crate::ability::condition::ConditionContext::with_moved_cards(gs, &resolver.moved_cards);
+        let ctx = crate::ability::condition::ConditionContext::with_moved_cards(gs, &resolver.selection.moved_cards);
         if let Some(ref cond) = effect.condition {
             let cond_passed = ctx.evaluate_condition(cond);
             let is_negation = cond.get_negation().unwrap_or(false);

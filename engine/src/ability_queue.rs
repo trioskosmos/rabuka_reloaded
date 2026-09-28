@@ -326,7 +326,7 @@ impl AbilityQueue {
                     let is_spawn_opponent = entry
                         .resolver
                         .as_ref()
-                        .and_then(|r| r.spawn_context.target.as_deref())
+                        .and_then(|r| r.in_flight.spawn_context.target.as_deref())
                         == Some("opponent");
                     let is_route_opponent = entry.choice_card_no.as_ref().is_some_and(|route| {
                         matches!(route, crate::ability::types::ChoiceRoute::Raw(raw) if raw.starts_with("position_change:opponent:"))

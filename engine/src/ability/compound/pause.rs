@@ -56,16 +56,16 @@ pub(crate) fn pause_for_sequential_choice(
         && condition_failed.is_none()
         && !is_opponent_action
     {
-        resolver.deferred_conditional_gate = true;
+        resolver.in_flight.deferred_conditional_gate = true;
     }
     let completes_in_handler =
-        resolver.pending_choice.as_ref().is_some_and(|c| {
+        resolver.awaiting.choice.as_ref().is_some_and(|c| {
             matches!(
                 c,
                 crate::ability::types::Choice::SelectCard { .. }
             )
         }) || matches!(
-            resolver.pending_choice.as_ref(),
+            resolver.awaiting.choice.as_ref(),
             Some(crate::ability::types::Choice::SelectTarget {
                 target,
                 ..
@@ -110,12 +110,12 @@ pub(crate) fn pause_for_sequential_choice(
                 && repeat_action.optional.unwrap_or(false)
             {
                 for _ in 0..repeats_remaining {
-                    resolver.pending_repeat_actions
+                    resolver.awaiting.repeat_actions
                         .extend(repeat_actions.iter().cloned());
                 }
             }
         }
     }
-    log::debug!("[SEQUENCE] source={:?} repeat={} step={} action={} paused: deferred_gate={} remaining={:?} repeat_actions={}", resolver.activating_card_id, repeat_idx + 1, i + 1, action.action, resolver.deferred_conditional_gate, remaining.iter().map(|a| a.action).collect::<Vec<_>>(), resolver.pending_repeat_actions.len());
+    log::debug!("[SEQUENCE] source={:?} repeat={} step={} action={} paused: deferred_gate={} remaining={:?} repeat_actions={}", resolver.session.activating_card_id, repeat_idx + 1, i + 1, action.action, resolver.in_flight.deferred_conditional_gate, remaining.iter().map(|a| a.action).collect::<Vec<_>>(), resolver.awaiting.repeat_actions.len());
     save_remaining_actions(gs, remaining);
 }

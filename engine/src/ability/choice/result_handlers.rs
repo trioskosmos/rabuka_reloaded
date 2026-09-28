@@ -96,7 +96,7 @@ fn handle_area_select(
         return Err("Choice result does not match pending choice".to_string());
     };
     let Choice::SelectTarget { options: Some(opts), .. } = choice else {
-        resolver.selected_area = Some(selected.clone());
+        resolver.selection.area = Some(selected.clone());
         resolver.clear_choice_state(gs);
         return resolver.resume_pending_actions(gs);
     };
@@ -107,7 +107,7 @@ fn handle_area_select(
     } else {
         opts.first().cloned().unwrap_or_else(|| "left".to_string())
     };
-    resolver.selected_area = Some(area);
+    resolver.selection.area = Some(area);
     resolver.clear_choice_state(gs);
     resolver.resume_pending_actions(gs)
 }

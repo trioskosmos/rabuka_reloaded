@@ -36,7 +36,7 @@ impl AbilityResolver {
             .per_unit_source_any()
             .is_some_and(|s| s.contains("previous_moved"))
         {
-            return (self.moved_cards.len().u8_count() / per_unit_cnt) * count.max(1);
+            return (self.selection.moved_cards.len().u8_count() / per_unit_cnt) * count.max(1);
         }
         let player = gs.resolve_target_player(target);
         let location = effect
@@ -330,8 +330,8 @@ impl AbilityResolver {
             let mut candidates: Vec<(usize, i16)> = Vec::new();
 
             // If we have selected cards from a previous choice, use them
-            if !self.selected_cards.is_empty() {
-                for &card_id in &self.selected_cards {
+            if !self.selection.cards.is_empty() {
+                for &card_id in &self.selection.cards {
                     if let Some(pos) = player.stage.stage.iter().position(|&id| id == card_id) {
                         candidates.push((pos, card_id));
                     }
@@ -346,7 +346,7 @@ impl AbilityResolver {
                 if candidates.is_empty() {
                     log::debug!(
                         "[EXEC_CHANGE_STATE] prior selection {:?} has no card on the target stage; scanning the stage instead",
-                        self.selected_cards
+                        self.selection.cards
                     );
                 }
             }
@@ -395,7 +395,7 @@ impl AbilityResolver {
             // (e.g. "このメンバーをウェイトにする"), filter candidates to only the
             // activating card. If the card is already in the target state, skip.
             if (self_cost || effect.is_self_target())
-                && self.selected_cards.is_empty()
+                && self.selection.cards.is_empty()
             {
                 if let Some(act_id) = gs.activating_card {
                     if candidates.iter().any(|(_, cid)| *cid == act_id) {
@@ -485,7 +485,7 @@ impl AbilityResolver {
                     .activating_card
                     .is_some_and(|act_id| candidates.iter().any(|(_, cid)| *cid == act_id));
             let needs_prompt = !is_self_target
-                && self.selected_cards.is_empty()
+                && self.selection.cards.is_empty()
                 && ((max && !candidates.is_empty())
                     || (!is_change_all && candidates.len() > count as usize));
 
@@ -503,7 +503,7 @@ impl AbilityResolver {
                 let state_label =
                     crate::ability::describe::state_verb_ja(Some(state_change.as_str()));
                 let desc_ja = format!("{}に変更するメンバーを{}体選択", state_label, pick_count);
-                self.pending_choice = Some(
+                self.awaiting.choice = Some(
                     Choice::select_cards(
                         Zone::Stage.to_str(),
                         pick_count,
@@ -520,9 +520,9 @@ impl AbilityResolver {
                     .target_player_id(Some(target.clone()))
                     .build(),
                 );
-                self.stage_select_intent =
+                self.awaiting.stage_select_intent =
                     Some(crate::ability::types::StageSelectIntent::ChangeStateWait);
-                self.execution_context = ExecutionContext::SingleEffect { effect_index: 0 };
+                self.in_flight.execution_context = ExecutionContext::SingleEffect { effect_index: 0 };
                 // Store a re-apply effect so finalize_choice applies the state
                 // change to the selected target after the choice is resolved.
                 gs.ability_queue
@@ -641,16 +641,16 @@ impl AbilityResolver {
                 log::debug!(
                     "[EXEC_CHANGE_STATE] pushing card_id={} to selected_cards (len={})",
                     card_id,
-                    self.selected_cards.len()
+                    self.selection.cards.len()
                 );
-                if !self.selected_cards.contains(card_id) {
-                    self.selected_cards.push(*card_id);
+                if !self.selection.cards.contains(card_id) {
+                    self.selection.cards.push(*card_id);
                 }
             }
             // Record the members this step changed so a following delayed
             // restriction step ("そのメンバーは次のターンのアクティブフェイズに
             // アクティブしない") can key its flags on exactly these victims.
-            self.changed_state_members = actual_targets.iter().map(|(_, cid)| *cid).collect();
+            self.selection.changed_state_members = actual_targets.iter().map(|(_, cid)| *cid).collect();
 
             // Track how many members were actually changed from wait→active
             // (activations blocked by cannot_activate_by_effect don't count)
@@ -903,7 +903,7 @@ pub(crate) fn execute_energy_state_change(
                     effective_count, active_n, waited_n
                 );
                 let desc_ja = format!("待機状態にするエネルギーカードを{}枚選択（アクティブ：{}、ウェイト：{}）", effective_count, active_n, waited_n);
-                self.pending_choice = Some(
+                self.awaiting.choice = Some(
                     Choice::select_cards(
                         Zone::Energy.to_str(),
                         effective_count as usize,
@@ -917,7 +917,7 @@ pub(crate) fn execute_energy_state_change(
                     .target_player_id(Some(target.to_string()))
                     .build(),
                 );
-                self.execution_context = ExecutionContext::SingleEffect { effect_index: 0 };
+                self.in_flight.execution_context = ExecutionContext::SingleEffect { effect_index: 0 };
                 return Ok(());
             }
 
@@ -1194,7 +1194,7 @@ pub(crate) fn execute_energy_state_change(
                 effect.count_or(1) as i32,
                 effect.duration_any(),
             );
-        } else if self.selected_cards.is_empty() {
+        } else if self.selection.cards.is_empty() {
             // Need target selection: find eligible stage members
             let target = effect.target_name();
             let stage_ids: Vec<i16> = {
@@ -1218,8 +1218,8 @@ pub(crate) fn execute_energy_state_change(
             if candidates.len() <= tc {
                 // Auto-select: push to selected_cards and apply
                 for &cid in &candidates {
-                    if !self.selected_cards.contains(&cid) {
-                        self.selected_cards.push(cid);
+                    if !self.selection.cards.contains(&cid) {
+                        self.selection.cards.push(cid);
                     }
                 }
                 self.execute_set_heart_type_applied(
@@ -1246,7 +1246,7 @@ pub(crate) fn execute_energy_state_change(
                 gs.ability_queue.set_pending_actions(pending);
                 let desc_en = format!("Select {} member(s) for heart type conversion", tc);
                 let desc_ja = format!("ハート種類変換のメンバーを{}体選択", tc);
-                self.pending_choice = Some(
+                self.awaiting.choice = Some(
                     Choice::select_cards(Zone::Stage.to_str().to_string(), tc, desc_en, false)
                         .description_ja(Some(desc_ja))
                         .card_type(effect.card_type_any().map(|s| s.to_string()))
@@ -1257,9 +1257,9 @@ pub(crate) fn execute_energy_state_change(
                         .is_select_action(true)
                         .build(),
                 );
-                self.stage_select_intent =
+                self.awaiting.stage_select_intent =
                     Some(crate::ability::types::StageSelectIntent::CollectTargets);
-                self.sub_choice_created = true;
+                self.in_flight.sub_choice_created = true;
             }
         } else {
             // Already have selected target from previous choice resolution
@@ -1310,7 +1310,7 @@ pub(crate) fn execute_energy_state_change(
         // abilities like PL!HS-bp5-021-L), otherwise fall back to activating_card
         // (self-targeting abilities like Kanan PL!S-pb1-003-R).
         let card_id = self
-            .selected_cards
+            .selection.cards
             .first()
             .copied()
             .or(gs.activating_card)
@@ -1348,11 +1348,11 @@ pub(crate) fn execute_energy_state_change(
         // ハートと同じになる" — copy the hearts of the card just placed under this
         // member (from the preceding move_cards sub-action) onto the member.
         let member_card = self
-            .selected_cards
+            .selection.cards
             .first()
             .copied()
             .or(gs.activating_card)
-            .or(self.activating_card_id)
+            .or(self.session.activating_card_id)
             .unwrap_or(-1);
         if member_card == -1 {
             return;
@@ -1374,10 +1374,10 @@ pub(crate) fn execute_energy_state_change(
                 Some(uc) if !uc.is_empty() => uc
                     .iter()
                     .rev()
-                    .find(|&&cid| self.moved_cards.contains(&cid))
+                    .find(|&&cid| self.selection.moved_cards.contains(&cid))
                     .copied()
                     .or_else(|| uc.last().copied()),
-                _ => self.moved_cards.last().copied(),
+                _ => self.selection.moved_cards.last().copied(),
             }
         };
         let Some(source) = source_card else {
@@ -1560,7 +1560,7 @@ pub(crate) fn execute_energy_state_change(
         if choice {
             // Q190 (2025.11.17): ALL heart (heart00) cannot be selected.
             // Present the 6 individual heart colors for the player to choose.
-            self.pending_choice = Some(Choice::SelectHeartColor {
+            self.awaiting.choice = Some(Choice::SelectHeartColor {
                 count: 1,
                 options: vec![
                     "heart01".into(),
@@ -1592,7 +1592,7 @@ pub(crate) fn execute_energy_state_change(
         let identities = effect.identities_any();
         let target = effect.target_name();
         let _target = target;
-        let card_id = self.activating_card_id.or(gs.activating_card);
+        let card_id = self.session.activating_card_id.or(gs.activating_card);
         if let Some(card_id) = card_id {
             if let Some(identities) = identities {
                 for identity in identities {
@@ -1616,7 +1616,7 @@ pub(crate) fn execute_energy_state_change(
         effect: &AbilityEffect,
     ) -> Result<(), String> {
         let value: u8 = effect.value_any().unwrap_or(0);
-        let card_id = self.activating_card_id.or(gs.activating_card);
+        let card_id = self.session.activating_card_id.or(gs.activating_card);
         if let Some(card_id) = card_id {
             gs.mods.set_cost_modifier(card_id, i16::from(value));
         }
@@ -1635,7 +1635,7 @@ pub(crate) fn execute_energy_state_change(
         let timing = timing_binding.unwrap_or("check_required_hearts");
         let treat_as_binding = effect.treat_as_any();
         let treat_as = treat_as_binding.unwrap_or("any_heart_color");
-        let card_id = self.activating_card_id.or(gs.activating_card);
+        let card_id = self.session.activating_card_id.or(gs.activating_card);
         if let Some(card_id) = card_id {
             gs.prohibition_effects.push(format!(
                 "all_blade_timing:{}:{}:{}",
@@ -1768,8 +1768,8 @@ pub(crate) fn execute_energy_state_change(
             // preceding select action stores its target in selected_cards.
             // moved_cards only holds cards physically MOVED (e.g. a discarded
             // cost payment), which would pick the wrong card here.
-            let selected = self.selected_cards.last().copied();
-            let moved = self.moved_cards.last().copied();
+            let selected = self.selection.cards.last().copied();
+            let moved = self.selection.moved_cards.last().copied();
             let recently = gs
                 .recently_moved_cards
                 .as_ref()

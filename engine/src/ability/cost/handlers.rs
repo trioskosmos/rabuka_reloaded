@@ -18,7 +18,7 @@ impl AbilityResolver {
     /// Pay all deferred costs that were stored during sequential_cost handler.
     /// Clears the list after paying. Returns error if any cost cannot be paid.
     pub fn pay_deferred_costs(&mut self, gs: &mut GameState) -> Result<(), String> {
-        let costs = core::mem::take(&mut self.pending_deferred_costs);
+        let costs = core::mem::take(&mut self.awaiting.deferred_costs);
         for cost in &costs {
             self.pay_cost(gs, cost)?;
         }
@@ -364,7 +364,7 @@ let source = cost.source_str().unwrap_or("");
             }
             return;
         }
-        self.pending_choice = Some(Choice::SelectTarget {
+        self.awaiting.choice = Some(Choice::SelectTarget {
             target: "pay_cost_all:discard_all".to_string(),
             description: format!("Discard entire hand ({} cards)?", hand_len),
             description_en: Some(format!("Discard entire hand ({} cards)?", hand_len)),
@@ -593,7 +593,7 @@ let source = cost.source_str().unwrap_or("");
                 if is_optional { "（スキップ可）" } else { "" }
             )
         };
-        self.pending_choice = Some(
+        self.awaiting.choice = Some(
             Choice::select_cards(source.to_string(), effective_count, desc, is_optional)
                 .description_ja(Some(desc_ja))
                 .card_type(card_type.clone())
@@ -669,7 +669,7 @@ let source = cost.source_str().unwrap_or("");
         let is_optional = optional && !is_activation;
         let desc_en = format!("Select 1 card (need {} with the same unit name)", count);
         let desc_ja = format!("同名ユニットが{}枚必要なカードを1枚選択", count);
-        self.pending_choice = Some(
+        self.awaiting.choice = Some(
             Choice::select_cards(Zone::Hand.to_str(), 1, desc_en, is_optional)
                 .description_ja(Some(desc_ja))
                 .card_type(cost.card_type_any().map(|s| s.to_string()))
@@ -921,7 +921,7 @@ let source = cost.source_str().unwrap_or("");
                 }
             } else {
                 let desc_ja = format!("ウェイトにするステージメンバーを{}体選択", count);
-                self.pending_choice = Some(
+                self.awaiting.choice = Some(
                     Choice::select_cards(
                         Zone::Stage.to_str(),
                         count,
@@ -934,7 +934,7 @@ let source = cost.source_str().unwrap_or("");
                     .target_player_id(Some(cost.target.as_deref().unwrap_or("self").to_string()))
                     .build(),
                 );
-                self.stage_select_intent =
+                self.awaiting.stage_select_intent =
                     Some(crate::ability::types::StageSelectIntent::ChangeStateWait);
                 return Ok(());
             }
@@ -980,7 +980,7 @@ let source = cost.source_str().unwrap_or("");
                         if is_binary && has_choice_ahead {
                             let mut auto = sub_cost.clone();
                             auto.set_optional(Some(false));
-                            self.pending_deferred_costs.push(auto);
+                            self.awaiting.deferred_costs.push(auto);
                             had_binary_auto_pay = true;
                         } else {
                             self.pay_cost(gs, sub_cost)?;
@@ -988,7 +988,7 @@ let source = cost.source_str().unwrap_or("");
                         if let Some(entry) = gs.ability_queue.current_entry_mut() {
                             entry.cost_paid_index = (i + 1).u8_count();
                         }
-                        if self.pending_choice.is_some() {
+                        if self.awaiting.choice.is_some() {
                             // If we auto-paid binary costs before this choice, override
                             // the choice description to show the combined cost.
                             if had_binary_auto_pay {
@@ -996,7 +996,7 @@ let source = cost.source_str().unwrap_or("");
                                     crate::ability::describe::describe_sequential_cost_en(costs, i);
                                 let combined_ja =
                                     crate::ability::describe::describe_sequential_cost_ja(costs, i);
-                                if let Some(ref mut choice) = self.pending_choice {
+                                if let Some(ref mut choice) = self.awaiting.choice {
                                     choice.set_description(combined_en.clone());
                                     choice.set_bilingual_descriptions(
                                         Some(combined_en),
@@ -1017,7 +1017,7 @@ let source = cost.source_str().unwrap_or("");
                     .as_ref()
                     .map(|o| o.iter().map(|opt| opt.text.to_string()).collect())
                     .unwrap_or_default();
-                self.pending_choice = Some(Choice::SelectTarget {
+                self.awaiting.choice = Some(Choice::SelectTarget {
                     target: "choice_condition".to_string(),
                     description: format!("Choose cost option: {}", texts.join(" OR ")),
                     description_en: Some(format!("Choose cost option: {}", texts.join(" OR "))),
@@ -1092,7 +1092,7 @@ let source = cost.source_str().unwrap_or("");
                     // Waited cards are never offerable for payment — only the
                     // active prefix (see active_energy_indices).
                     let filtered_indices = util::active_energy_indices(player);
-                    self.pending_choice = Some(
+                    self.awaiting.choice = Some(
                         Choice::select_cards(
                             Zone::Energy.to_str().to_string(),
                             0,
@@ -1267,7 +1267,7 @@ let source = cost.source_str().unwrap_or("");
                             .and_then(|entry| entry.ability.effect.as_deref())
                             .is_some_and(util::effect_uses_selected_cards);
                     if effect_uses_selected {
-                        self.selected_cards = card_ids.into();
+                        self.selection.cards = card_ids.into();
                     }
                     Ok(())
                 } else {
@@ -1275,7 +1275,7 @@ let source = cost.source_str().unwrap_or("");
                         .group_names_any()
                         .as_ref()
                         .and_then(|gn| gn.first().cloned());
-                    self.pending_choice = Some(
+                    self.awaiting.choice = Some(
                         Choice::select_cards(
                             source.to_string(),
                             if has_explicit_count {
@@ -1320,7 +1320,7 @@ let source = cost.source_str().unwrap_or("");
 
     pub fn pay_cost(&mut self, gs: &mut GameState, cost: &AbilityEffect) -> Result<(), String> {
         let result = self.pay_cost_inner(gs, cost);
-        if result.is_ok() && self.pending_choice.is_none() {
+        if result.is_ok() && self.awaiting.choice.is_none() {
             let pp = gs.player_prefix();
             let act_name = gs
                 .activating_card
@@ -1371,8 +1371,8 @@ let source = cost.source_str().unwrap_or("");
         // following effect draws nothing.
         gs.last_cost_waited_members.clear();
         if selected == "skip_optional_cost" || selected == "0" {
-            self.pending_choice = None;
-            self.pending_energy_payment = None;
+            self.awaiting.choice = None;
+            self.awaiting.energy_payment = None;
             if let Some(entry) = gs.ability_queue.current_entry_mut() {
                 entry.cost_paid = true;
                 // If the cost has an alternative_effect ("unless you pay"),
@@ -1393,15 +1393,15 @@ let source = cost.source_str().unwrap_or("");
             return self.resume_pending_actions(gs);
         }
         // "pay_optional_cost" or "1" from select_option(1)
-        self.pending_choice = None;
-        if let Some(count) = self.pending_energy_payment {
-            self.pending_energy_payment = None;
+        self.awaiting.choice = None;
+        if let Some(count) = self.awaiting.energy_payment {
+            self.awaiting.energy_payment = None;
             let player = gs.resolve_target_player_mut("self");
             if player.energy_zone.active_count() >= count {
                 player.energy_zone.pay_energy(count)?;
             } else {
                 // Insufficient energy: clear remaining commands and return
-                self.cancel_remaining_commands = true;
+                self.in_flight.cancel_remaining_commands = true;
                 if let Some(entry) = gs.ability_queue.current_entry_mut() {
                     entry.pending_actions.clear();
                 }
@@ -1510,7 +1510,7 @@ let source = cost.source_str().unwrap_or("");
                             }
                         }
                     } else {
-                        self.pending_choice = Some(
+                        self.awaiting.choice = Some(
                             Choice::select_cards(
                                 crate::ability::enums::Zone::Stage.to_str(),
                                 count,
@@ -1532,7 +1532,7 @@ let source = cost.source_str().unwrap_or("");
                             .is_select_action(true)
                             .build(),
                         );
-                        self.stage_select_intent =
+                        self.awaiting.stage_select_intent =
                             Some(crate::ability::types::StageSelectIntent::ChangeStateWait);
                         return Ok(());
                     }
@@ -1564,7 +1564,7 @@ let source = cost.source_str().unwrap_or("");
                     } else if let Err(e) = self.pay_cost(gs, sub_cost) {
                         log::debug!("Warning: sub-cost payment error: {}", e);
                     }
-                    if self.pending_choice.is_some() {
+                    if self.awaiting.choice.is_some() {
                         return Ok(());
                     }
                 }
@@ -1579,7 +1579,7 @@ let source = cost.source_str().unwrap_or("");
                 self.execute_place_energy_under_member_non_optional(gs, &cost.0);
             }
         }
-        self.pending_choice = None;
+        self.awaiting.choice = None;
         let is_effect_optional = gs.entry_choice_card_no() == Some(ChoiceRoute::OptionalCost);
         log::debug!(
             "[HANDLE_OPT_COST] entry_cost={:?} entry_effect={:?} effect_action={:?}",
@@ -1636,8 +1636,8 @@ let source = cost.source_str().unwrap_or("");
         gs: &mut GameState,
         selected: &str,
     ) -> Result<(), String> {
-        self.pending_choice = None;
-        self.pending_energy_payment = None;
+        self.awaiting.choice = None;
+        self.awaiting.energy_payment = None;
         let accepted = selected != "skip_optional_cost" && selected != "0";
         if let Some(entry) = gs.ability_queue.current_entry_mut() {
             entry.cost_paid = true;
@@ -1672,7 +1672,7 @@ let source = cost.source_str().unwrap_or("");
         // After the optional cost is settled, only execute the ability's effect
         // if the cost was paid. Per the colon-gated pattern ("may discard X:
         // draw Y"), skipping the optional cost means the effect does not run.
-        self.pending_choice = None;
+        self.awaiting.choice = None;
         if accepted {
             let effect_started = gs
                 .ability_queue

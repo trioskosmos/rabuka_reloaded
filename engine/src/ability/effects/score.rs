@@ -438,7 +438,7 @@ impl AbilityResolver {
                         return false;
                     }
                     if self_target {
-                        match self.activating_card_id {
+                        match self.session.activating_card_id {
                             Some(activating_id) => card_id == activating_id,
                             None => false,
                         }

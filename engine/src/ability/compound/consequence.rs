@@ -21,11 +21,11 @@ pub(crate) fn gate_sequential_consequence(
             && action.source_any().is_some_and(|s| {
                 s == "discard" || s == "waitroom"
             }));
-    if is_gated_consequence && resolver.last_move_moved_any == Some(false) {
-        log::debug!("[SEQUENCE] source={:?} repeat={} step={} action={} skipped: preceding move moved no cards", resolver.activating_card_id, repeat_idx + 1, i + 1, action.action);
-        resolver.last_move_moved_any = None;
+    if is_gated_consequence && resolver.carried.last_move_moved_any == Some(false) {
+        log::debug!("[SEQUENCE] source={:?} repeat={} step={} action={} skipped: preceding move moved no cards", resolver.session.activating_card_id, repeat_idx + 1, i + 1, action.action);
+        resolver.carried.last_move_moved_any = None;
         return true;
     }
-    resolver.last_move_moved_any = None;
+    resolver.carried.last_move_moved_any = None;
     false
 }

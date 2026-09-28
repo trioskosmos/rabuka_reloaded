@@ -28,7 +28,7 @@ impl AbilityResolver {
         } else {
             format!("{}から{}枚選択", zone_display_ja, count)
         };
-        self.pending_choice = Some(
+        self.awaiting.choice = Some(
             Choice::select_cards(zone, count, description, can_skip)
                 .description_ja(Some(description_ja))
                 .card_type(filter.card_type.map(|s| s.to_string()))
@@ -46,7 +46,7 @@ impl AbilityResolver {
                 .discard_remaining(effect.discard_remaining_any())
                 .build(),
         );
-        self.execution_context = ExecutionContext::SingleEffect { effect_index: 0 };
+        self.in_flight.execution_context = ExecutionContext::SingleEffect { effect_index: 0 };
     }
 
     #[allow(clippy::too_many_arguments)]
