@@ -842,6 +842,70 @@ static int card_appeared_this_turn(const GameState *g, int cid) {
 static int baton_touch_count_for(const GameState *g, int pl) {
     return pl ? g->baton_touch_count_p2 : g->baton_touch_count_p1;
 }
+/* ── positions_characters ──
+   Mirror engine/src/ability/condition/card.rs:2680-2734
+   (stage_satisfies_positioned_characters).
+
+   The field is a LIST of {character, position} pairs, and the Rust loop is an
+   all-entries-must-hold conjunction: every named position must hold the named
+   card, and the first entry that fails rejects the whole condition. Reading
+   it as "any entry matches" would accept PL!HS-bp2-026-L with only one of its
+   three characters in the right slot, which is the passing-for-the-wrong-reason
+   failure this port has to avoid. The C decoder (vm.c, "positions_characters")
+   flattens each object into the string {"position":"<p>","character":"<c>"},
+   so the two halves are pulled back out of that text here. */
+static int pos_char_field(const char *entry, const char *key, char *out, size_t out_sz) {
+    if (!entry || !key || !out || out_sz == 0) return 0;
+    char pat[32];
+    snprintf(pat, sizeof(pat), "\"%s\":\"", key);
+    const char *p = strstr(entry, pat);
+    if (!p) return 0;
+    p += strlen(pat);
+    size_t w = 0;
+    while (*p && *p != '"') {
+        if (w + 1 < out_sz) out[w++] = *p;
+        p++;
+    }
+    out[w] = '\0';
+    return (*p == '"');
+}
+
+static int stage_satisfies_positioned_characters(const struct GameState *g, int pl,
+                                                 const Condition *c) {
+    const CondValue *pc = find_val(c, "positions_characters");
+    /* Rust: `let Some(pos_chars) = ... else { return true }`. */
+    if (!pc) return 1;
+    if (pc->tag != RB_TAG_ARRAY || !pc->arr || pc->arr_n == 0) return 1;
+    const RbPlayer *P = &g->p[pl];
+    for (uint32_t i = 0; i < pc->arr_n; i++) {
+        /* A malformed entry (not a string, or an empty one) is a requirement
+           the evaluator cannot check, so it is NOT a requirement it may treat
+           as met: the condition is rejected rather than the entry skipped.
+           Skipping would make the whole gate vacuous and award the effect for
+           the wrong reason. Rust cannot produce this state because
+           Vec<PositionCharacter> always has both fields. */
+        if (pc->arr[i].tag != RB_TAG_STR || !pc->arr[i].s) return 0;
+        char pos[64]; char want_raw[192];
+        if (!pos_char_field(pc->arr[i].s, "position", pos, sizeof(pos))) return 0;
+        if (!pos_char_field(pc->arr[i].s, "character", want_raw, sizeof(want_raw))) return 0;
+        int idx = stage_index_of_position(pos);
+        /* Unknown spelling, or an index past the stage: both are Rust's
+           `player.stage.stage.get(pos_idx)` returning None. */
+        if (idx < 0 || idx >= RB_STAGE_SIZE) return 0;
+        int cid = P->stage[idx];
+        if (cid == RB_EMPTY_SLOT) return 0;          /* 「<pos>にカードなし」 */
+        Card cc;
+        if (!rb_decode_card_by_index((uint32_t)cid, &cc)) return 0;
+        char have[192]; char want[192];
+        rb_card_normalize_name(cc.name ? cc.name : "", have, sizeof(have));
+        rb_free_card(&cc);
+        rb_card_normalize_name(want_raw, want, sizeof(want));
+        /* Rust compares normalize_name(card.name).contains(&normalize_name(pc.character)) */
+        if (!strstr(have, want)) return 0;
+    }
+    return 1;
+}
+
 static int eval_appearance_stage(const struct GameState *g, int actor, int host_cid,
                                   const Condition *c, int pl) {
     const RbPlayer *P = &g->p[pl];
@@ -963,6 +1027,26 @@ static int eval_appearance_stage(const struct GameState *g, int actor, int host_
         int idx = stage_index_of_position(pos);
         if (idx < 0) return 0;
         if (idx >= RB_STAGE_SIZE || P->stage[idx] != host_cid) return 0;
+    }
+
+    /* positions_characters: every 「<name>@<position>」 entry must name the card
+       actually standing in that slot. Rust card.rs:2986 calls this right after
+       the `position` gate and before the `characters` gate. */
+    if (!stage_satisfies_positioned_characters(g, pl, c)) return 0;
+
+    /* appearance_source: 「控え室から登場している場合」. Rust card.rs:2997-3006
+       consults it ONLY in the else arm of `if condition.get_characters().is_some()`,
+       so a condition that already names characters keeps its old meaning and
+       the source is not additionally required. The comparison is against the
+       zone recorded for the ACTIVATING card by rb_record_card_appearance; a card
+       with no recorded source (or no activating card at all) fails, which is
+       what separates a WAITROOM debut from a HAND debut for PL!S-bp6-016-N. */
+    if (!chars) {
+        const char *expected = get_str(c, "appearance_source");
+        if (expected) {
+            if (host_cid < 0) return 0;
+            if (!rb_appearance_source_matches(g, host_cid, expected)) return 0;
+        }
     }
     return 1;
 }

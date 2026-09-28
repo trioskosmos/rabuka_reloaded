@@ -1553,6 +1553,35 @@ typedef struct GameState {
        keeps all pre-existing offsets and orderings bit-identical; the only cost is
        that GameState grows by RB_TE_ZONE_SZ bytes. */
     char     recently_moved_from_zone[RB_TE_ZONE_SZ];
+    /* ── card_appearance_source (mirrors GameState.card_appearance_source:
+        SmallVec<[(i16, String); 4]>, engine/src/core/game_state/mod.rs:144) ──
+        The zone a card debuted FROM, appended by rb_record_card_appearance
+        (modifiers.rs:1377-1388) and dropped wholesale by
+        rb_clear_card_appearance_tracking (modifiers.rs:1401-1404). Rust stores
+        the source as a String; the C port stores the RbZone value the caller
+        already passes to rb_record_card_appearance, and
+        rb_get_card_appearance_source + rb_appearance_source_matches translate
+        between the two spellings, so no new string allocation enters the
+        state struct.
+
+        This is what makes a 控え室から登場 gate expressible: the
+        `appearance_source` condition field (decoded from the ability bytecode
+        by vm.c build_appearance, e.g. PL!S-bp6-016-N) is compared against the
+        zone recorded here for the ACTIVATING card. Before this field existed
+        rb_record_card_appearance began with `(void)source;` and a HAND debut
+        opened exactly the same prompt as a WAITROOM debut.
+
+        PLACED AT THE END OF THE STRUCT ON PURPOSE, for the same reason as
+        recently_moved_from_zone above: this list is semantically adjacent to
+        `cards_appeared_this_turn` (line ~1458), but inserting it there would
+        shift the offset of every field after it and silently invalidate any
+        object file compiled against the previous header. Appending keeps all
+        pre-existing offsets and orderings bit-identical. The zero state is
+        "no appearance source recorded", which is also what rb_game_init's
+        memset(g, 0, sizeof(*g)) produces. */
+    int      card_appearance_source_card[32];   /* card_no index per entry */
+    uint8_t  card_appearance_source_zone[32];   /* RbZone the card debuted from */
+    int      n_card_appearance_source;
 } GameState;
 
 /* ── Tracking (engine/src/core/game_state/tracking.rs) ── */
@@ -2314,6 +2343,22 @@ void rb_resolution_add(GameState *g, int card_id);
 int  rb_resolution_clear(GameState *g, int *out, int max);
 int  rb_resolution_len(const GameState *g);
 void rb_record_card_movement(GameState *g, int card_id, int from_zone, int to_zone, int causer, int target);
+
+/* ── card appearance source (engine/src/core/game_state/modifiers.rs:1377-1404) ──
+   `source` is an RbZone value (RB_ZONE_DISCARD for a 控え室/WAITROOM debut,
+   RB_ZONE_HAND for a hand debut); a negative value means "no source" and
+   records nothing, mirroring Rust's `if !source.is_empty()` guard. */
+void rb_record_card_appearance(GameState *g, int card_id, int source);
+int  rb_has_card_appeared_this_turn(GameState *g, int card_id);
+void rb_clear_card_appearance_tracking(GameState *g);
+/* First recorded source zone for `card_id` (Rust get_card_appearance_source,
+   which finds the FIRST match and does not dedupe on push). Returns 0 and
+   leaves *out untouched when the card has no recorded source. */
+int  rb_get_card_appearance_source(const GameState *g, int card_id, RbZone *out);
+/* Does the source recorded for `card_id` satisfy the ability `source` wire
+   string (e.g. "discard" / "waitroom" / "hand")? 0 when nothing was recorded,
+   which is how a never-recorded debut fails an 控え室から登場 gate. */
+int  rb_appearance_source_matches(const GameState *g, int card_id, const char *expected_source);
 
 /* ── Effect execution (public for testing / harness) ── */
 void rb_execute_effect(GameState *g, int actor, AbilityEffect *e);

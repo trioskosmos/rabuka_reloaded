@@ -310,10 +310,19 @@ int rb_modifier_total_entry(const RbModifierEntry *e) {
     return (int)e->set + (int)e->add;
 }
 
-/* -- record_card_appearance -- */
+/* -- record_card_appearance --
+   Mirror modifiers.rs:1377-1388 (GameState::record_card_appearance). Rust
+   appends to three structures:
+     cards_appeared_this_turn -> g->cards_appeared_this_turn[]  (deduped)
+     recently_appeared_cards  -> g->recently_appeared[]         (deduped)
+     card_appearance_source   -> g->card_appearance_source[]    (NOT deduped)
+   The third list is pushed unconditionally and the reader takes the FIRST
+   entry for a card, so a source is kept even for a card that already appeared
+   this turn; that ordering is what makes the 控え室から登場 gate decidable.
+   `source` is an RbZone value; a negative value stands for Rust's empty source
+   string and records nothing. */
 void rb_record_card_appearance(GameState *g, int card_id, int source) {
     if (!g || card_id < 0) return;
-    (void)source;
     int found = 0;
     for (int i = 0; i < g->n_cards_appeared_this_turn; i++) {
         if (g->cards_appeared_this_turn[i] == card_id) { found = 1; break; }
@@ -321,12 +330,67 @@ void rb_record_card_appearance(GameState *g, int card_id, int source) {
     if (!found && g->n_cards_appeared_this_turn < 64) {
         g->cards_appeared_this_turn[g->n_cards_appeared_this_turn++] = card_id;
     }
+    int in_recent = 0;
     for (int i = 0; i < g->n_recently_appeared; i++) {
-        if (g->recently_appeared[i] == card_id) return;
+        if (g->recently_appeared[i] == card_id) { in_recent = 1; break; }
     }
-    if (g->n_recently_appeared < RB_MAX_RECENTLY_MOVED) {
+    if (!in_recent && g->n_recently_appeared < RB_MAX_RECENTLY_MOVED) {
         g->recently_appeared[g->n_recently_appeared++] = card_id;
     }
+    if (source >= 0 && g->n_card_appearance_source <
+                       (int)(sizeof(g->card_appearance_source_card) /
+                             sizeof(g->card_appearance_source_card[0]))) {
+        g->card_appearance_source_card[g->n_card_appearance_source] = card_id;
+        g->card_appearance_source_zone[g->n_card_appearance_source] = (uint8_t)source;
+        g->n_card_appearance_source++;
+    }
+}
+
+/* -- get_card_appearance_source --
+   Mirror modifiers.rs:1394-1399 (GameState::get_card_appearance_source):
+   `find(|(k, _)| k == &card_id).map(|(_, v)| v.as_str())` — the FIRST entry
+   wins and a card with no entry yields None. */
+int rb_get_card_appearance_source(const GameState *g, int card_id, RbZone *out) {
+    if (!g || card_id < 0) return 0;
+    for (int i = 0; i < g->n_card_appearance_source; i++) {
+        if (g->card_appearance_source_card[i] == card_id) {
+            if (out) *out = (RbZone)g->card_appearance_source_zone[i];
+            return 1;
+        }
+    }
+    return 0;
+}
+
+/* RbZone (the movement-side enum) -> RbZoneId (the compact wire enum), so a
+   recorded debut zone can be fed to the same source-string resolver the rest
+   of the engine uses. Kept local: no other translation direction exists yet. */
+static RbZoneId appearance_source_zone_id(RbZone z) {
+    switch (z) {
+        case RB_ZONE_HAND:       return RB_ZONEID_HAND;
+        case RB_ZONE_DECK:       return RB_ZONEID_DECK;
+        case RB_ZONE_STAGE:      return RB_ZONEID_STAGE;
+        case RB_ZONE_DISCARD:    return RB_ZONEID_DISCARD;
+        case RB_ZONE_ENERGY:     return RB_ZONEID_ENERGY;
+        case RB_ZONE_LIVE:       return RB_ZONEID_LIVE_CARD_ZONE;
+        case RB_ZONE_SUCCESS:    return RB_ZONEID_SUCCESS_LIVE_ZONE;
+        case RB_ZONE_RESOLUTION: return RB_ZONEID_RESOLUTION;
+    }
+    return RB_ZONEID_UNKNOWN;
+}
+
+/* -- appearance_source_matches --
+   Rust compares the recorded source STRING with the condition's
+   `appearance_source` string verbatim
+   (condition/card.rs:3000: get_card_appearance_source(cid) == Some(expected)).
+   The C port records the RbZone instead, so the comparison goes through
+   rb_zone_matches_source — the same resolver the rest of the engine uses to
+   turn a wire source string into a zone — which also folds the
+   discard/waitroom spellings the Rust wire uses interchangeably. */
+int rb_appearance_source_matches(const GameState *g, int card_id, const char *expected_source) {
+    RbZone z;
+    if (!expected_source || !*expected_source) return 0;
+    if (!rb_get_card_appearance_source(g, card_id, &z)) return 0;
+    return rb_zone_matches_source(appearance_source_zone_id(z), expected_source);
 }
 
 /* -- has_card_appeared_this_turn -- */
@@ -338,14 +402,15 @@ int rb_has_card_appeared_this_turn(GameState *g, int card_id) {
 }
 
 /* -- clear_card_appearance_tracking --
-   Mirror modifiers.rs:1397-1400 (GameState::clear_card_appearance_tracking).
-   Rust clears BOTH cards_appeared_this_turn and card_appearance_source.
-   RbMods/GameState has no card_appearance_source field (rb_record_card_appearance
-   discards its `source` argument), so the second clear has no C counterpart
-   here — see the field-addition request in the report. */
+   Mirror modifiers.rs:1401-1404 (GameState::clear_card_appearance_tracking):
+   Rust clears BOTH cards_appeared_this_turn and card_appearance_source, so a
+   debut recorded in an earlier turn cannot satisfy a 控え室から登場 gate
+   afterwards. `recently_appeared` is deliberately NOT cleared — that matches
+   Rust, which leaves recently_appeared_cards alone here. */
 void rb_clear_card_appearance_tracking(GameState *g) {
     if (!g) return;
     g->n_cards_appeared_this_turn = 0;
+    g->n_card_appearance_source = 0;
 }
 
 /* -- record_baton_touch -- */
