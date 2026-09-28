@@ -46,6 +46,151 @@ static AbilityEffect clone_effect(const AbilityEffect *src) {
     return out;
 }
 
+/* ── sequential-step keep-alive pool ───────────────────────────────────────
+   execute_sequential_effect runs each step as a MODIFIED COPY of the child:
+   sequential.rs:111-197 prepare_sequential_action strips the already-gated
+   condition and inherits per_unit / self_target / card_names from the parent.
+   In Rust that copy is an owned stack value and execute_effect only ever
+   borrows it, so the borrow checker guarantees it cannot outlive the frame.
+
+   The C executor has no such guarantee.  rb_effect_draw_card parks the
+   pointer it was handed in queue.resume_eff (draw.c:509, plus :672, :698,
+   :751 and :942), and choice.c mode 4 reads it back after this frame is gone
+   (`AbilityEffect eff_copy = *eff;`).  Handing it a stack address was a
+   use-after-free that silently disabled the paid branch of every optional
+   draw — and with it the conditional sibling behind the gate.
+
+   The copies therefore live in this pool instead of on the stack.
+
+   OWNERSHIP — the pool is the SINGLE owner of these structs:
+     * clone_effect() is SHALLOW, so every pointer inside a copy (child[],
+       options[], extra_k[]/extra_v[], condition, …) still aliases the decoded
+       ability tree.  Releasing a slot is therefore a plain free() of the
+       struct; rb_effect_free() would deep-free the tree the rest of the
+       engine is still using.
+     * no other code frees queue.resume_eff (choice.c only NULLs it), so a
+       parked copy can never be double-freed from the outside either.
+     * seq_keep_gc() frees a slot only once NO live pointer in the owning
+       GameState still refers to it, so the copy survives exactly as long as
+       a parked continuation needs it and is reclaimed on the completion path
+       AND on every abandonment path (declined cost, resolver error,
+       rb_queue_clear) without any of those paths having to know about it.
+     * a slot is PINNED while a C frame still holds it as the argument to
+       rb_execute_effect_ex.  Nested sequentials therefore cannot have their
+       parent's in-flight step reclaimed out from under them; the pin is
+       dropped on the way out, and an unpinned slot survives only while a
+       continuation still points at it.
+     * a slot must be observed UNREACHABLE by two consecutive passes before it
+       is freed.  This one-pass grace is load-bearing, not belt-and-braces:
+       rb_resume_with_choice_indices_internal copies queue.resume_eff into a
+       local `eff` and then NULLs the field (choice.c:3064 and :3115), and only
+       dereferences the local later in the mode-4 arm.  Anything that runs in
+       between — rb_drain_ability_queue, which the reveal arm reaches through
+       clear_choice_state_and_resume — can re-enter a sequential and so run a
+       gc.  A single-pass gc would free the slot inside that window and
+       reintroduce the very use-after-free this pool exists to remove.
+     * slots are tagged with their owning GameState so two states in one
+       process cannot reclaim each other's copies.                            */
+
+#define SEQ_KEEP_CAP 64
+static AbilityEffect *g_seq_keep[SEQ_KEEP_CAP];
+static GameState      *g_seq_keep_owner[SEQ_KEEP_CAP];
+static int            g_seq_keep_pinned[SEQ_KEEP_CAP];
+static int            g_seq_keep_stale[SEQ_KEEP_CAP];
+static int g_seq_keep_n = 0;
+
+/* Is this AbilityEffect still reachable from a live continuation slot? */
+static int seq_keep_reachable(const GameState *g, const AbilityEffect *e) {
+    if (!g || !e) return 0;
+    if (g->queue.resume_eff == e) return 1;
+    if (g->queue.deferred == e) return 1;
+    if (g->queue.target_selection_eff == e) return 1;
+    if (g->queue.resume_after_look == e) return 1;
+    for (int i = 0; i < g->queue.n_entries; i++) {
+        const RbQueueEntry *en = &g->queue.entries[i];
+        for (int k = 0; k < en->pending_actions_n; k++)
+            if (en->pending_actions[k] == e) return 1;
+    }
+    for (int i = 0; i < g->queue.pending_repeat_actions_n; i++)
+        if (g->queue.pending_repeat_actions[i] == e) return 1;
+    for (int i = 0; i < g->queue.choice_options_n; i++)
+        if (g->queue.choice_options[i] == e) return 1;
+    for (int i = 0; i < g->queue.n_pending_deferred_costs; i++)
+        if (g->queue.pending_deferred_costs[i] == e) return 1;
+    for (int i = 0; i < g->n_delayed_gained_effects; i++)
+        if (g->delayed_gained_effects[i].effect == e) return 1;
+    return 0;
+}
+
+static void seq_keep_drop(int idx) {
+    free(g_seq_keep[idx]);
+    g_seq_keep[idx] = NULL;
+    g_seq_keep_owner[idx] = NULL;
+    g_seq_keep_pinned[idx] = 0;
+    g_seq_keep_stale[idx] = 0;
+    for (int j = idx; j + 1 < g_seq_keep_n; j++) {
+        g_seq_keep[j] = g_seq_keep[j + 1];
+        g_seq_keep_owner[j] = g_seq_keep_owner[j + 1];
+        g_seq_keep_pinned[j] = g_seq_keep_pinned[j + 1];
+        g_seq_keep_stale[j] = g_seq_keep_stale[j + 1];
+    }
+    g_seq_keep_n--;
+}
+
+/* Reclaim slots that no live pointer needs and that no C frame still holds.
+   A slot must look dead on TWO consecutive passes before it is freed.  That
+   one-pass grace is load-bearing, not belt-and-braces:
+   rb_resume_with_choice_indices_internal copies queue.resume_eff into a local
+   `eff` and only then NULLs the field (choice.c:3064 vs :3115), dereferencing
+   the local further down in the mode-4 arm.  Anything that runs in between —
+   rb_drain_ability_queue, which the reveal arm reaches via
+   clear_choice_state_and_resume — can re-enter a sequential and run a gc.  A
+   single-pass gc frees the slot inside that window and reintroduces the very
+   use-after-free this pool exists to remove. */
+static void seq_keep_gc(GameState *g) {
+    for (int i = 0; i < g_seq_keep_n; ) {
+        if (g_seq_keep_pinned[i]) { i++; continue; }
+        if (g_seq_keep_owner[i] == g && seq_keep_reachable(g, g_seq_keep[i])) {
+            g_seq_keep_stale[i] = 0;
+            i++;
+            continue;
+        }
+        if (!g_seq_keep_stale[i]) { g_seq_keep_stale[i] = 1; i++; continue; }
+        seq_keep_drop(i);
+    }
+}
+
+static AbilityEffect *seq_keep_push(GameState *g, const AbilityEffect *src) {
+    seq_keep_gc(g);
+    if (g_seq_keep_n >= SEQ_KEEP_CAP) {
+        /* Only reachable if a caller held more than SEQ_KEEP_CAP pinned
+           continuations at once; recycle the oldest rather than fail. */
+        for (int i = 0; i < g_seq_keep_n; i++)
+            if (!g_seq_keep_pinned[i]) { seq_keep_drop(i); break; }
+        if (g_seq_keep_n >= SEQ_KEEP_CAP) seq_keep_drop(0);
+    }
+    AbilityEffect *slot = (AbilityEffect *)malloc(sizeof(AbilityEffect));
+    *slot = clone_effect(src);     /* SHALLOW — mirrors action.clone() */
+    g_seq_keep[g_seq_keep_n] = slot;
+    g_seq_keep_owner[g_seq_keep_n] = g;
+    g_seq_keep_pinned[g_seq_keep_n] = 1;   /* held by this C frame */
+    g_seq_keep_stale[g_seq_keep_n] = 0;
+    g_seq_keep_n++;
+    return slot;
+}
+
+static void seq_keep_unpin(AbilityEffect *slot) {
+    if (!slot) return;
+    for (int i = 0; i < g_seq_keep_n; i++)
+        if (g_seq_keep[i] == slot) { g_seq_keep_pinned[i] = 0; return; }
+}
+
+static void seq_keep_release(AbilityEffect *slot) {
+    if (!slot) return;
+    for (int i = 0; i < g_seq_keep_n; i++)
+        if (g_seq_keep[i] == slot) { seq_keep_drop(i); return; }
+}
+
 /* condition helpers */
 static int cond_is_always_true(const Condition *c) {
     return c && c->variant == RB_COND_ALWAYS_TRUE;
@@ -203,6 +348,10 @@ __attribute__((unused)) static const AbilityEffect *rb_on_optional_branch(const 
 /* ── compound_sequential: faithful port of execute_sequential_effect (compound.rs:66-655) ── */
 int rb_compound_sequential(GameState *g, int actor, const AbilityEffect *eff, int host_cid){
     if(!eff) return 0;
+    /* Reclaim step copies abandoned by an earlier resolution (declined cost,
+       resolver error, rb_queue_clear) — no continuation points at them any
+       more, so they would otherwise sit in the pool indefinitely. */
+    seq_keep_gc(g);
     int conditional = eff->conditional_flag ? 1 : 0;
     int is_further = eff->is_further ? 1 : 0;
     if(rb_ability_debug_enabled()){
@@ -263,9 +412,10 @@ int rb_compound_sequential(GameState *g, int actor, const AbilityEffect *eff, in
                     if(!passed) continue;
                 }
             }
-            /* clone and clear condition (compound.rs:257-262) */
-            AbilityEffect action_to_execute_buf = clone_effect(action);
-            AbilityEffect *action_to_execute = &action_to_execute_buf;
+            /* clone and clear condition (compound.rs:257-262) — the copy is
+               owned by the keep-alive pool, not the stack: the executor may
+               park it in queue.resume_eff and read it back after we return. */
+            AbilityEffect *action_to_execute = seq_keep_push(g, action);
             action_to_execute->has_condition = 0;
             action_to_execute->condition = NULL;
             /* per_unit inheritance */
@@ -324,9 +474,13 @@ int rb_compound_sequential(GameState *g, int actor, const AbilityEffect *eff, in
                 const char *src = eff_extra(action,"source");
                 if(st && (!strcmp(st,"true")||!strcmp(st,"1")) && src && (!strcmp(src,"discard")||!strcmp(src,"waitroom"))) is_gated_consequence=1;
             }
-            if(is_gated_consequence && g_last_move_moved_any==0){ g_last_move_moved_any=-1; continue; }
+            if(is_gated_consequence && g_last_move_moved_any==0){ g_last_move_moved_any=-1; seq_keep_release(action_to_execute); continue; }
             g_last_move_moved_any=-1;
-            /* execute */
+            /* execute — the callee may park this pointer (queue.resume_eff) and
+               read it back after this frame is gone, so it must not be a stack
+               address.  Unpin right before the call: from here on the pool
+               decides the copy's lifetime by reachability, not by this frame. */
+            seq_keep_unpin(action_to_execute);
             rb_execute_effect_ex(g,actor,action_to_execute,host_cid);
             /* update last_move_moved_any from moved delta (move_cards sets it; we approximate) */
             if(g->n_recently_moved > moved_before) g_last_move_moved_any=1; else if(action->action && !strcmp(action->action,"move_cards")) g_last_move_moved_any=0;
@@ -375,7 +529,15 @@ int rb_compound_sequential(GameState *g, int actor, const AbilityEffect *eff, in
                 g->queue.resume_child = i;
                 g->queue.resume_host = host_cid;
                 return 1;
-            } else if(g_cancel_remaining_commands){
+            }
+            /* No choice is pending, so no continuation parked the step copy:
+               every retention site in the tree assigns queue.resume_eff only
+               alongside rb_queue_pause_for_choice.  Release the slot now so a
+               long sequential does not accumulate copies.  If a callee DID
+               park it anyway, the copy stays in the pool and seq_keep_gc()
+               reclaims it once the continuation no longer points at it. */
+            if(!seq_keep_reachable(g, action_to_execute)) seq_keep_release(action_to_execute);
+            if(g_cancel_remaining_commands){
                 g_cancel_remaining_commands=0;
                 return 1;
             } else if(action->is_optional){
