@@ -957,10 +957,16 @@ static void cost9_decline_pick_branch(const char *me_no, const char *target_no)
     const char *top[5] = { target_no, FILLER_MUS, FILLER_MUS, FILLER_MUS, FILLER_MUS };
     if (!setup_cost9_prints(me_no, top, 5, &fx)) return;
     int pool[8];
-    int n_pool = rb_looked_at_pool(0, pool, 8);
     CHECK(rb_has_pending_choice(&fx.tg.state), "cost9 look: the cost gate is offered");
     pick(&fx.tg, 0);
     check_choice_is(&fx.tg, "looked_at", 1, 1, "cost9 look: the reveal prompt is offered after paying");
+    /* Read the pool AFTER paying the cost. The look runs as part of the paid
+       effect, so before `pick(&fx.tg, 0)` nothing has been looked at yet.
+       Rust twin, look_five_reveal_cost9_group_member_test.rs:116-119: assert
+       the "hand" cost prompt, select_indices(&[0]), assert the "looked_at"
+       prompt, and only THEN compare state.looked_at_cards against the five
+       looked ids. */
+    int n_pool = rb_looked_at_pool(0, pool, 8);
     CHECK_EQ(n_pool, 5, "cost9 look: all five looked-at cards are in the pool");
     skip(&fx.tg);
     CHECK(!rb_has_pending_choice(&fx.tg.state), "cost9 look: declining the pick closes the prompt");

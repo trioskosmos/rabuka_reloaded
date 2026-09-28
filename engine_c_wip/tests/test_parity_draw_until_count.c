@@ -99,31 +99,19 @@ static void fill_zone(RbBag *bag, int card, int n)
 /* ── 1. End-to-end: the real card, optional cost, then draw to 5 ─────────────
     Mirrors engine/tests/test_modules/rules/targeting/target_selection_test.rs:127
 
-    KNOWN RED (canary, NOT a draw.c bug). Measured 2026-09-28: this test fails
-    on unmodified master, and the failure is upstream of draw_until_count —
-    the effect is never executed at all, so zero cards are drawn (hand stays 2,
-    deck stays 10). RB_ABILITY_DEBUG=1 shows no [DRAW_UNTIL_COUNT] line and
-    RB_DUMP_ABILITY=1 shows the ability decodes correctly
-    (cost=move_cards 2 hand->discard optional, effect=draw_until_count
-    count=5 target_count=5 source=deck destination=hand).
-
-    Root cause, in files this agent does not own:
-      * engine_c_wip/src/ability/choice.c:2438
-        `int selected_idx = n_indices > 0 && selected_indices ? selected_indices[0] : -1;`
-        collapses rb_resume_with_choice_indices() to ONE index, so the Rust
-        twin's `game.select_indices(&[0, 1])` only ever pays one of the two
-        cards and the cost selection re-prompts.
-      * engine_c_wip/src/ability/choice.c:2624-2630 — the SelectCard
-        "general skip" branch calls rb_resolver_clear_choice_state() +
-        rb_resolver_resume_execution() but NEVER runs the captured `def`
-        (= g->queue.deferred, which engine.c:1092 parked as ab.effect). The
-        non-skip branch at choice.c:2671 does run it. So answering the cost
-        prompt in any way (pay or decline) drops the ability's effect.
+    GREEN. It used to be a KNOWN RED canary for three upstream choice/engine
+    defects in files this agent does not own, all of which are now fixed:
+      * engine_c_wip/src/ability/choice.c:2438 collapsed
+        rb_resume_with_choice_indices() to ONE index, so a Rust
+        `select_indices(&[0, 1])` cost only ever paid one card.
+      * choice.c:2624-2630 — the SelectCard "general skip" branch cleared the
+        choice state and resumed execution but never ran the captured deferred
+        effect, so answering the cost prompt dropped the ability's effect.
       * engine_c_wip/src/engine.c:1089-1102 only runs ab.effect inline when no
-        choice is pending at that instant, so the already-parked continuation
-        is the only thing that can finish the ability.
-
-    Keep this test red until those three are fixed; it is the canary. */
+        choice is pending at that instant, so the parked continuation was the
+        only thing that could finish the ability.
+    The same scenario is also asserted in
+    engine_c_wip/tests/test_target_selection.c:135-164 (green, 35 checks). */
 static void test_card_fills_hand_to_target_count(void)
 {
     TestGame game;
@@ -191,14 +179,14 @@ static void test_card_fills_hand_to_target_count(void)
 
 /* ── 1b. Same card, same assertions, answered the way the C choice model eats
       answers (ONE index per resume + re-prompt) ─────────────────────────────
-   Test 1 above proves the two upstream choice.c defects; it is red because of
-   them, not because of draw_until_count. This test isolates the draw_until_count
-   port itself: the identical scenario, the identical Rust assertions
-   (target_selection_test.rs:157-160), driven with one index per resume, which
-   is how every other C suite answers a SelectCard cost prompt
-   (test_select_indices(tg, idx, 1) throughout). Green here = the port is REAL:
-   the effect is reached, the deficit is computed against the resolved target's
-   hand, the cards come off the deck, and nothing is created or destroyed. */
+    Test 1 above drives the Rust twin's single `select_indices(&[0, 1])` call.
+    This test isolates the draw_until_count port itself: the identical scenario,
+    the identical Rust assertions (target_selection_test.rs:157-160), driven
+    with one index per resume, which is how every other C suite answers a
+    SelectCard cost prompt (test_select_indices(tg, idx, 1) throughout). Green
+    here = the port is REAL: the effect is reached, the deficit is computed
+    against the resolved target's hand, the cards come off the deck, and nothing
+    is created or destroyed. */
 static void test_card_fills_hand_to_target_count_stepwise(void)
 {
     TestGame game;
@@ -232,14 +220,19 @@ static void test_card_fills_hand_to_target_count_stepwise(void)
     CHECK_EQ(game.state.p[0].hand.n + game.state.p[0].deck.n + game.state.p[0].discard.n, 12,
              "stepwise: draw_until_count moves cards only (hand + deck + discard = 12)");
     CHECK_EQ(game.state.p[0].stage[1], card, "stepwise: the card stays on the centre stage");
-    CHECK_EQ(game.state.p[0].deck.n, 7, "stepwise: exactly target_count minus hand cards left the deck");
-    /* draw.rs:591 records step_state.last_draw_count = final_count, i.e. the
-       REQUESTED deficit (5 - 2), not the number of cards the deck supplied. The
-       deficit is 3 rather than 5 because the C generic hand-selection cost path
-       (choice.c rb_resolver_handle_hand_selection) records the picks without
-       moving the cards out of hand — a separate upstream gap; the draw_until_count
-       arithmetic below it is exact either way. */
-    CHECK_EQ(game.state.last_draw_count, 3,
+    CHECK_EQ(game.state.p[0].deck.n, 5, "stepwise: exactly target_count minus hand cards left the deck");
+    /* The optional cost really discards BOTH selected hand cards, so the hand is
+       empty (3 in hand - 1 played to stage - 2 paid) when draw_until_count runs
+       and the deficit is the full 5 - 0.
+       Rust: engine/tests/test_modules/rules/targeting/target_selection_test.rs:152
+       pays with `game.select_indices(&[0, 1])` and :156-160 asserts the hand
+       reaches 5 out of a 10-card deck, which is only reachable if the two cost
+       cards left the hand. Same scenario, GREEN, in
+       engine_c_wip/tests/test_target_selection.c:162-163.
+       draw.rs:615 `to_draw = target_count.saturating_sub(current_count)` and
+       draw.rs:591 `step_state.last_draw_count = final_count`, so the recorded
+       count is the requested deficit 5 - 0 = 5. */
+    CHECK_EQ(game.state.last_draw_count, 5,
              "stepwise: last_draw_count is the requested deficit (target_count - hand)");
 }
 

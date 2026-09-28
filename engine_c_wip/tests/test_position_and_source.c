@@ -230,6 +230,24 @@ static void build_appearance_source_condition(Condition *c, const char *expected
     if (expected_source) add_str(c, "appearance_source", expected_source);
 }
 
+/* True when a decoded positions_characters element really carries BOTH
+ * payloads, i.e. it looks like
+ *   {"position":"right_side","character":"大沢瑠璃乃"}
+ * and neither value is the empty string. Used to prove the per-element decode
+ * really read the element's own tag instead of skipping the payload. */
+static int pos_char_entry_is_complete(const char *s)
+{
+    if (!s) return 0;
+    const char *p = strstr(s, "\"position\":\"");
+    const char *c = strstr(s, "\"character\":\"");
+    if (!p || !c) return 0;
+    p += strlen("\"position\":\"");
+    c += strlen("\"character\":\"");
+    if (*p == 0 || *p == '"') return 0;   /* missing / empty position */
+    if (*c == 0 || *c == '"') return 0;   /* missing / empty character */
+    return 1;
+}
+
 static void card_name_of(int cid, char *out, size_t out_sz)
 {
     Card c;
@@ -384,8 +402,9 @@ static void decode_positions_characters_carries_field(void)
 
     int found = 0, tag = 0, usable = 0, empty = 0;
     unsigned long n = 0;
-    char first[PC_ENTRY_W];
-    first[0] = 0;
+    char pairs[8][PC_ENTRY_W];
+    unsigned long n_pairs = 0;
+    for (unsigned long k = 0; k < 8; k++) pairs[k][0] = 0;
     for (int n_ab = 0; n_ab < 8 && !found; n_ab++) {
         Ability ab;
         memset(&ab, 0, sizeof(ab));
@@ -399,9 +418,12 @@ static void decode_positions_characters_carries_field(void)
             for (uint32_t k = 0; k < hit->arr_n; k++) {
                 const char *s = hit->arr[k].s;
                 printf("        PL!HS-bp2-026-L pair[%u] = %s\n", k, s ? s : "(null)");
+                if (k < 8) {
+                    snprintf(pairs[k], PC_ENTRY_W, "%s", s ? s : "");
+                    n_pairs = k + 1;
+                }
                 if (s && *s) {
                     usable++;
-                    if (!first[0]) snprintf(first, sizeof(first), "%s", s);
                 } else {
                     empty++;
                 }
@@ -414,29 +436,26 @@ static void decode_positions_characters_carries_field(void)
     if (!found) return;
     CHECK_EQ(tag, RB_TAG_ARRAY, "positions_characters decodes as an array");
     CHECK(n >= 1, "positions_characters has at least one entry (got %lu)", n);
-    if (first[0]) printf("        PL!HS-bp2-026-L pair[0] = %s\n", first);
+    for (unsigned long k = 0; k < n_pairs; k++)
+        printf("        PL!HS-bp2-026-L decoded pair[%lu] = %s\n", k, pairs[k]);
 
-    /* KNOWN ENGINE GAP, asserted rather than hidden: the evaluator ported in
-     * this file is correct, but it is still starved of input. vm.c:2016 tests
-     * `tag == RB_TAG_OBJVAR || tag == RB_TAG_OBJECT` AFTER line 2009 has
-     * already established that `tag` is the ARRAY tag, so the object branch is
-     * dead and every element falls through to `skip_value(r, tag)` and is
-     * stored as NULL. The field exists with the right length and no payload.
-     *
-     * The C evaluator deliberately REJECTS a NULL entry instead of skipping it
-     * (see stage_satisfies_positioned_characters in condition.c), so today
-     * PL!HS-bp2-026-L still cannot award -- no false award is possible, and
-     * the port starts working the moment vm.c reads the per-element tag.
-     * Fixing vm.c is a one-line change in a file this agent does not own; it
-     * is reported in the wave hand-off. */
-    if (empty > 0) {
-        printf("        KNOWN GAP: %u of %lu decoded positions_characters entries are NULL\n",
-               empty, n);
-        printf("        KNOWN GAP: vm.c:2016 tests the array tag instead of the element tag,\n");
-        printf("        KNOWN GAP: so the {position, character} payload is skipped and dropped.\n");
+    /* The per-element decode is complete: the vm.c decoder reads each array
+     * element's own tag, so every element carries its
+     * {"position":..,"character":..} payload rather than being skipped to NULL.
+     * This is what the evaluator consumes (see
+     * stage_satisfies_positioned_characters in condition.c) and what
+     * positions_characters_all_correct_awards below drives. */
+    CHECK_EQ(usable, 3,
+             "all three positions_characters entries carry their payload");
+    CHECK_EQ(empty, 0,
+             "no positions_characters entry decodes empty or NULL");
+    for (unsigned long k = 0; k < n_pairs; k++) {
+        char msg[128];
+        snprintf(msg, sizeof(msg),
+                 "positions_characters entry %lu decodes a non-empty position and character",
+                 k);
+        CHECK(pos_char_entry_is_complete(pairs[k]), msg);
     }
-    CHECK_EQ(usable, 0,
-             "KNOWN GAP (vm.c decoder): no positions_characters entry currently carries its payload");
 }
 
 static void decode_appearance_source_carries_field(void)
