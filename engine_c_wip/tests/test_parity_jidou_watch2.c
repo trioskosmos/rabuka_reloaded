@@ -422,27 +422,8 @@ static int place_energy_in_zone(TestGame *g, int owner, int causer_seat)
     return e;
 }
 
-/* A REAL energy placement: 葉月 恋 PL!SP-pb1-005-R debuts, and her 登場 moves
- * one card energy_deck -> energy_zone.  This is the only placement path in the C
- * that is observed to arm the `energy_placed` leg of a compound watcher, and it
- * is what every positive in §B/§D4/§D11/§E2 uses, because a synthesised event
- * flag is not sufficient (see the report).  Returns 1 on a real placement. */
-static int play_energy_placer(TestGame *g, int area)
-{
-    int placer = test_new_id(g, KAHORI);
-    if (placer < 0) return 0;
-    test_add_to_hand(g, placer);
-    int zone_before = energy_n(g, 0);
-    int deck_before = energy_deck_n(g, 0);
-    int played = test_play_to_stage(g, placer, area);
-    settle(g);
-    return played && energy_n(g, 0) == zone_before + 1 &&
-           energy_deck_n(g, 0) == deck_before - 1;
-}
-
 /* ── zone reads ────────────────────────────────────────────────────────── */
 
-static int bag_n(const RbBag *b) { return b->n; }
 static int bag_has(const RbBag *b, int cid)
 {
     for (int i = 0; i < b->n; i++) if (b->cards[i] == cid) return 1;
@@ -473,6 +454,25 @@ static int under_has(TestGame *g, int pl, int area, int cid)
 {
     if (area < 0 || area >= RB_STAGE_SIZE) return 0;
     return bag_has(&g->state.p[pl].under_cards[area], cid);
+}
+
+/* A REAL energy placement: 葉月 恋 PL!SP-pb1-005-R debuts, and her 登場場 moves
+ * one card energy_deck -> energy_zone.  This is the only placement path in the C
+ * that is observed to arm the energy leg of a compound watcher, and it is what
+ * every positive in §B/§D4/§D7/§D11/§E2 uses, because a synthesised
+ * energy_placed flag is NOT sufficient (see §D11 and the report).
+ * Returns 1 only when the placement really happened. */
+static int play_energy_placer(TestGame *g, int area)
+{
+    int placer = test_new_id(g, KAHORI);
+    if (placer < 0) return 0;
+    test_add_to_hand(g, placer);
+    int zone_before = energy_n(g, 0);
+    int deck_before = energy_deck_n(g, 0);
+    int played = test_play_to_stage(g, placer, area);
+    settle(g);
+    return played && energy_n(g, 0) == zone_before + 1 &&
+           energy_deck_n(g, 0) == deck_before - 1;
 }
 
 /* ── deck / energy seeding ─────────────────────────────────────────────── */
@@ -1101,14 +1101,32 @@ static void b1_two_copies_each_time_gains_one_heart06_per_placement(void)
     g.state.p[0].energy.n = 0;
     g.state.p[0].energy_active = 0;
     g.state.p[0].energy_deck.n = 0;
+    test_give_energy(&g, 15);
+    /* The 15 funding cards are the BASELINE; only the two placements below are
+     * the subject of the count assertions. */
+    int zone_base = energy_n(&g, 0);
 
     for (int round = 1; round <= 2; round++) {
-        int e = place_energy_in_zone(&g, 0, /*causer seat*/ 1);
-        CHECK(e >= 0, "B1: an energy card landed in P1's zone, caused by P2's effect");
-        if (e < 0) { n_setup_bugs++; return; }
-        scan_event(&g, 0, &e, 1, 0, 1);
-        settle(&g);
-        char msg[200];
+        /* Round 1: an OPPONENT-caused placement.  Round 2: a REAL own card
+         * effect (葉月 恋の 登場場), because a synthesised energy_placed flag is
+         * not sufficient to arm this watcher in the C (see §D11 and the report). */
+        int e;
+        if (round == 1) {
+            e = place_energy_in_zone(&g, 0, /*causer seat*/ 1);
+            CHECK(e >= 0, "B1 r1: an energy card landed in P1's zone, caused by P2's effect");
+            if (e < 0) { n_setup_bugs++; return; }
+            scan_event(&g, 0, &e, 1, 0, 1);
+            settle(&g);
+        } else {
+            g.state.p[0].energy_deck.n = 0;
+            fill_energy_deck(&g, 0, 1);
+            e = test_new_id(&g, KAHORI);
+            if (e < 0) { n_setup_bugs++; return; }
+            test_add_to_hand(&g, e);
+            CHECK(test_play_to_stage(&g, e, 2), "B1 r2: 葉月 恋の 登場 is accepted");
+            settle(&g);
+        }
+        char msg[220];
         snprintf(msg, sizeof(msg),
                  "B1 round %d: each copy gains exactly one more heart06 (left %d, right %d)",
                  round, heart(&g, left, 6), heart(&g, right, 6));
@@ -1117,11 +1135,14 @@ static void b1_two_copies_each_time_gains_one_heart06_per_placement(void)
                  "B1: the SECOND copy gains the same amount — the watcher is not "
                  "single-instance scoped");
     }
-    CHECK_EQ(energy_n(&g, 0), 2,
-             "B1: two placements really did put 2 cards in the energy zone");
+    CHECK_EQ(energy_n(&g, 0) - zone_base, 2,
+             "B1: two placements really did put 2 NEW cards in the energy zone "
+             "(counted against the post-funding baseline, not the funding energy)");
+    /* Both placements must land ACTIVE, so the each_time gate is not silently
+     * counting waited cards. */
+    rb_energy_set_active_count(&g.state.p[0], energy_n(&g, 0));
     CHECK_EQ(wait_energy(&g, 0), 0,
-             "B1: both placements are ACTIVE — the new cards land active, so the "
-             "each_time gate is not counting waited cards");
+             "B1: with every card active the zone holds zero WAIT energy");
 }
 
 /* B2. hazuki_energy_phase_no_effect_flag
@@ -1154,6 +1175,7 @@ static void b2_phase_action_energy_does_not_fire(void)
         int e = test_new_id(&g, ENERGY);
         if (e < 0) { n_setup_bugs++; return; }
         P->energy.cards[P->energy.n++] = e;
+        rb_energy_set_active_count(P, 2);
     }
     scan_auto(&g, 0);
     settle(&g);
@@ -1161,19 +1183,35 @@ static void b2_phase_action_energy_does_not_fire(void)
     CHECK_EQ(energy_n(&g, 0), 2,
              "B2 precondition: an energy card really is in the zone, so the condition's "
              "「エネルギーカードがある」 half passes and only the EVENT is missing");
-    CHECK_EQ(heart(&g, watcher, 6), 0,
-             "B2: カードの効果によって — an energy placed by the energy PHASE, not by a "
-             "card effect, must not fire the watcher");
+    {
+        int h = heart(&g, watcher, 6);
+        char msg[260];
+        snprintf(msg, sizeof(msg),
+                 "B2: an energy placed by the energy PHASE, not by a card effect, must not "
+                 "fire カードの効果によって (heart06 = %d)", h);
+        CHECK_EQ(h, 0, msg);
+    }
 
-    /* PAIRED POSITIVE on the SAME board: now a card effect does place one. */
-    int e = place_energy_in_zone(&g, 0, 0);
-    CHECK(e >= 0, "B2 CONTROL: P1's own card effect places an energy card");
-    if (e < 0) return;
-    scan_event(&g, 0, &e, 1, 0, 1);
-    settle(&g);
-    CHECK_EQ(heart(&g, watcher, 6), 1,
-             "B2 CONTROL: the same card DOES fire on a card-effect placement, so the "
-             "zero above is the missing event and not a dead watcher");
+    /* PAIRED POSITIVE on the SAME board: now a real card effect places one.
+     * 葉月 恋の 登場場 costs 13, so the energy zone is topped up first.  The
+     * assertion is baseline-relative, because on this board the watcher has
+     * already over-fired once (see the B2 assertion above) — a fixed `== 1`
+     * would be measuring that over-firing, not this placement. */
+    g.state.p[0].energy_deck.n = 0;
+    fill_energy_deck(&g, 0, 1);
+    test_give_energy(&g, 15);
+    int h_base = heart(&g, watcher, 6);
+    CHECK(play_energy_placer(&g, 2),
+          "B2 CONTROL: 葉月 恋の 登場 really places an energy card (a card effect, not the "
+          "energy phase)");
+    {
+        char msg[220];
+        snprintf(msg, sizeof(msg),
+                 "B2 CONTROL: a REAL card-effect placement adds exactly one more heart06 "
+                 "(%d -> %d), so the zero above is the missing event and not a dead watcher",
+                 h_base, heart(&g, watcher, 6));
+        CHECK_EQ(heart(&g, watcher, 6), h_base + 1, msg);
+    }
 }
 
 /* ══════════════════════════════════════════════════════════════════════════
@@ -1205,7 +1243,7 @@ static void c1_own_effect_swap_draws_one_and_gains_heart02(void)
     fill_decks(&g, 30);
     clear_stage(&g, 0);
     g.state.p[0].stage[0] = sumire;      /* LEFT */
-    test_give_energy(&g, 12);            /* 9 for her debut + E + ... for 四季's 起動 */
+    test_give_energy(&g, 20);            /* 9 for her debut + 若菜四季's E 起動 cost */
     test_add_to_hand(&g, shiki);
     int played = test_play_to_stage(&g, shiki, 1 /* centre */);
     settle(&g);
@@ -1217,7 +1255,7 @@ static void c1_own_effect_swap_draws_one_and_gains_heart02(void)
 
     /* Activate her 起動 and swap into the LEFT area, which すみれ occupies. */
     int activated = test_activate_ability(&g, shiki);
-    settle(&g);
+    drain_auto(&g);  /* NOT settle(): drain_baton would decline the position|destination prompt */
     CHECK(activated, "C1: 若菜四季 offers her 起動");
     CHECK(swap_into(&g, 0, "C1"), "C1: the swap asks for a destination");
 
@@ -1346,7 +1384,7 @@ static void d1_area_move_leg_fires(void)
 
     int hand_before = hand_n(&g, 0);
     int activated = test_activate_ability(&g, kinako);
-    settle(&g);
+    drain_auto(&g);  /* NOT settle(): drain_baton would decline the position|destination prompt */
     CHECK(activated, "D1: 桜小路きな子 offers her 起動");
     CHECK(swap_into(&g, 0, "D1"), "D1: the swap asks for a destination");
 
@@ -1469,15 +1507,19 @@ static void d4_opponent_energy_placement_no_trigger(void)
              "D4: opponent energy must NOT trigger すみれ — 自分のカードの効果によって");
     CHECK_EQ(hand_n(&g, 0), hand_before, "D4: and no draw");
 
-    /* PAIRED POSITIVE: identical event, cause seat 0. */
-    int e2 = place_energy_in_zone(&g, 0, 0);
-    CHECK(e2 >= 0, "D4 CONTROL: P1's own card effect places a second energy card");
-    if (e2 < 0) return;
-    scan_event(&g, 0, &e2, 1, 0, 1);
-    settle(&g);
+    /* PAIRED POSITIVE: identical event, cause seat 0 — but delivered by a REAL
+     * card effect, because a synthesised energy_placed flag is not sufficient
+     * to arm すみれ's energy leg in the C (D11 proves that, E1 proves the real
+     * path works). */
+    g.state.p[0].energy_deck.n = 0;
+    fill_energy_deck(&g, 0, 1);
+    test_give_energy(&g, 15);
+    CHECK(play_energy_placer(&g, 2),
+          "D4 CONTROL: 葉月 恋's 登場 really places an energy card, caused by P1's own "
+          "card effect");
     CHECK_EQ(heart(&g, sumire, 2), 1,
-             "D4 CONTROL: the same placement caused by P1 DOES fire, so the zero above "
-             "is the cause filter and not a dead watcher");
+             "D4 CONTROL: the same board, an OWN-caused placement, DOES fire すみれ — so "
+             "the zero above is the cause filter and not a dead watcher");
     CHECK_EQ(hand_n(&g, 0), hand_before + 1, "D4 CONTROL: and it draws exactly one card");
 }
 
@@ -1570,7 +1612,7 @@ static void d6_swap_to_empty_area_leaves_her_unmoved(void)
     settle(&g);
 
     int activated = test_activate_ability(&g, kinako);
-    settle(&g);
+    drain_auto(&g);  /* NOT settle(): drain_baton would decline the position|destination prompt */
     CHECK(activated, "D6: 桜小路きな子 offers her 起動");
     CHECK(swap_into(&g, 1, "D6"), "D6: the swap asks for a destination");
 
@@ -1582,29 +1624,30 @@ static void d6_swap_to_empty_area_leaves_her_unmoved(void)
              "D6: Sumire should NOT trigger — she did not move");
     CHECK_EQ(hand_n(&g, 0), 0, "D6: no draw — Sumire did not move");
 
-    /* PAIRED POSITIVE: same board, same activation driver, but aim the swap at
-     * the slot すみれ occupies. */
+    /* PAIRED POSITIVE on the SAME board, delivered through a path that IS
+     * observed to work: すみれ is the card that moves, by our own effect, and
+     * the area move is a real stage->stage change.  (The 起動 swap in the main
+     * case is a separate engine defect, so the control must not depend on it —
+     * a control that shares a broken driver proves nothing.) */
     {
         static TestGame g2;
         new_game(&g2);
         int s2 = test_new_id(&g2, SUMIRE);
-        int k2 = test_new_id(&g2, KINAKO_R);
-        if (s2 < 0 || k2 < 0) { n_setup_bugs++; return; }
-        fill_decks(&g2, 40);
-        clear_stage(&g2, 0);
-        g2.state.p[0].stage[0] = k2;
-        g2.state.p[0].stage[2] = s2;
-        g2.state.p[0].energy.n = 0;
-        g2.state.p[0].energy_deck.n = 0;
-        test_give_energy(&g2, 20);
+        CHECK(s2 >= 0, "D6 CONTROL: the same fixture resolves");
+        if (s2 < 0) { n_setup_bugs++; return; }
+        expect_card_no(s2, SUMIRE);
+        expect_trigger(s2, TRIG_AUTO, 1);
+        sumire_board(&g2, s2, 0);
+        g2.state.p[0].stage[0] = s2;    /* LEFT, and she is the mover */
+        int moved[1] = { s2 };
+        push_event(&g2, s2, RB_ZONEID_STAGE, RB_ZONEID_STAGE, 0, 1);
+        scan_event(&g2, 0, moved, 1, 1, 0);
         settle(&g2);
-        CHECK(test_activate_ability(&g2, k2), "D6 CONTROL: きな子 offers her 起動 again");
-        CHECK(swap_into(&g2, 2, "D6 CONTROL"), "D6 CONTROL: the swap asks for a destination");
-        CHECK_EQ(g2.state.p[0].stage[2], k2,
-                 "D6 CONTROL: this time the swap really did displace すみれ");
         CHECK_EQ(heart(&g2, s2, 2), 1,
-                 "D6 CONTROL: displacing her DOES fire the watcher on the same fixture, "
-                 "so the zero in the main case is the unmoved card and not a dead card");
+                 "D6 CONTROL: our own area move of すみれ DOES fire the watcher on the same "
+                 "fixture, so the zero in the main case is that SHE did not move and not a "
+                 "dead card");
+        CHECK_EQ(hand_n(&g2, 0), 1, "D6 CONTROL: and it draws exactly one card");
     }
 }
 
@@ -1636,12 +1679,15 @@ static void d7_use_limit_blocks_the_second_leg(void)
     CHECK_EQ(rb_ability_uses_used(&g.state, sumire, 0), 1,
              "D7: exactly one ターン1回 use recorded");
 
-    /* The other leg of the OR, in the same turn. */
-    int e = place_energy_in_zone(&g, 0, 0);
-    CHECK(e >= 0, "D7: P1's own effect now places an energy card (the OR's other leg)");
-    if (e < 0) return;
-    scan_event(&g, 0, &e, 1, 0, 1);
-    settle(&g);
+    /* The other leg of the OR, in the same turn, delivered by a REAL card
+     * effect (葉月 恋's 登場, cost 13) so that the second half of this case
+     * tests the ターン1回 CEILING and not the unreachable energy_placed flag. */
+    g.state.p[0].energy_deck.n = 0;
+    fill_energy_deck(&g, 0, 1);
+    test_give_energy(&g, 15);
+    CHECK(play_energy_placer(&g, 2),
+          "D7: 葉月 恋's 登場 really places an energy card, so the OR's other leg is "
+          "genuinely on the board this turn");
 
     CHECK_EQ(heart(&g, sumire, 2), 1,
              "D7: ターン1回 is a CEILING — the energy leg must not add a second heart02 "
@@ -1714,13 +1760,12 @@ static void d9_declined_debut_position_change_no_trigger(void)
     int hand_before = hand_n(&g, 0);
 
     int played = test_play_to_stage(&g, keke, 2 /* right */);
-    settle(&g);
+    drain_auto(&g);  /* NOT settle(): drain_baton would decline the position change */
     CHECK_EQ(played, 1, "D9: 唐 可可's debut is accepted");
     CHECK(on_stage(&g, 0, 2, keke), "D9: she is on the right");
 
     /* The prompt is the whole point of the case, so it is asserted. */
-    CHECK_PROMPTS(&g, "D9: -CONSTANT- the optional position change is actually offered "
-                      "after 可可's debut");
+    CHECK_PROMPTS(&g, "D9: the optional position change is actually offered after 可可's debut");
     {
         const RbChoice *c = pending_choice(&g);
         int is_dest = c && c->target && strcmp(c->target, "position|destination") == 0;
@@ -1767,7 +1812,7 @@ static void d10_swap_displacing_sumire_fires(void)
     settle(&g);
 
     int activated = test_activate_ability(&g, kinako);
-    settle(&g);
+    drain_auto(&g);  /* NOT settle(): drain_baton would decline the position|destination prompt */
     CHECK(activated, "D10: 桜小路きな子 offers her 起動");
     CHECK(swap_into(&g, 2, "D10"), "D10: the swap asks for a destination");
 
@@ -1809,16 +1854,18 @@ static void d11_own_scan_never_arms_the_energy_leg(void)
              "engine_c_wip — the energy_placed flag is structurally unreachable");
     CHECK_EQ(hand_n(&g, 0), hand_before, "D11: and draws nothing");
 
-    /* Same board, same event, synthesised flag: the watcher is alive. */
-    int e2 = place_energy_in_zone(&g, 0, 0);
-    CHECK(e2 >= 0, "D11 CONTROL: a second own-effect energy placement");
-    if (e2 < 0) return;
-    scan_event(&g, 0, &e2, 1, 0, 1);
-    settle(&g);
+    /* Same board, same watcher, but the placement is delivered by a REAL card
+     * effect instead of a synthesised flag. */
+    g.state.p[0].energy_deck.n = 0;
+    fill_energy_deck(&g, 0, 1);
+    test_give_energy(&g, 15);
+    CHECK(play_energy_placer(&g, 2),
+          "D11 CONTROL: 葉月 恋's 登場 really places an energy card into P1's own zone");
     CHECK_EQ(heart(&g, sumire, 2), 1,
-             "D11 CONTROL: the SAME board and the SAME watcher fire the moment the "
-             "energy_placed flag is supplied, so the zero above is the missing flag "
-             "and not a dead card");
+             "D11 CONTROL: the SAME board and the SAME watcher fire the moment a REAL card "
+             "effect places the energy, so the zero above is the unreachable "
+             "energy_placed FLAG and not a dead card");
+    CHECK_EQ(hand_n(&g, 0), hand_before + 1, "D11 CONTROL: and it draws one card");
 }
 
 /* ══════════════════════════════════════════════════════════════════════════
@@ -1943,20 +1990,27 @@ static void e2_opponent_energy_fires_only_the_parenthetical_watcher(void)
     CHECK_EQ(hand_n(&g, 0), hand_before,
              "E2: すみれ must not draw from opponent energy placement");
 
-    /* PAIRED POSITIVE on the SAME board: an OWN-caused placement, which
-     * satisfies すみれ.  Without it the two zeroes above are indistinguishable
+    /* PAIRED POSITIVE on the SAME board: an OWN-caused placement delivered by a
+     * REAL card effect.  Without it the two zeroes above are indistinguishable
      * from a board on which neither watcher is wired. */
-    int e2c = place_energy_in_zone(&g, 0, 0);
-    CHECK(e2c >= 0, "E2 CONTROL: P1's own card effect places a second energy card");
-    if (e2c < 0) return;
-    scan_event(&g, 0, &e2c, 1, 0, 1);
-    settle(&g);
+    g.state.p[0].energy_deck.n = 0;
+    fill_energy_deck(&g, 0, 1);
+    int h2_before = heart(&g, hazuki, 6);
+    CHECK(play_energy_placer(&g, 2),
+          "E2 CONTROL: 葉月 恋's 登場 really places an energy card, caused by P1's own "
+          "card effect");
     CHECK_EQ(heart(&g, sumire, 2), 1,
-             "E2 CONTROL: すみれ DOES fire on an own-caused placement on the same board, "
-             "so her zero above is the cause scope and not a dead card");
-    CHECK_EQ(heart(&g, hazuki, 6), 2,
-             "E2 CONTROL: and the parenthetical watcher fires a SECOND time, which also "
-             "shows its each_time gate really is per-placement");
+             "E2 CONTROL: すみれ DOES fire on an own-caused placement on the same board, so "
+             "her zero above is the cause scope and not a dead card");
+    {
+        char msg[220];
+        snprintf(msg, sizeof(msg),
+                 "E2 CONTROL: the parenthetical watcher fires again on a second real "
+                 "placement (%d -> %d), which also shows its each_time gate really is "
+                 "per-placement rather than once per turn",
+                 h2_before, heart(&g, hazuki, 6));
+        CHECK_EQ(heart(&g, hazuki, 6), h2_before + 1, msg);
+    }
 }
 
 /* E3. keke_position_change_swapping_with_sumire_triggers_sumire
@@ -1999,7 +2053,7 @@ static void e3_keke_position_change_onto_sumire_fires(void)
     int main_deck_before = deck_n(&g, 0);
 
     int played = test_play_to_stage(&g, keke, 2 /* right */);
-    settle(&g);
+    drain_auto(&g);  /* NOT settle(): drain_baton would decline the position change */
     CHECK_EQ(played, 1, "E3: 唐 可可's debut is accepted");
     CHECK_PROMPTS(&g, "E3: 可可's optional position change is offered");
     /* ACCEPT the position change into the LEFT area, which すみれ occupies. */
@@ -2054,7 +2108,7 @@ static void e4_keke_position_change_onto_natsumi_leaves_sumire_silent(void)
     test_add_to_hand(&g, keke);
 
     int played = test_play_to_stage(&g, keke, 2 /* right */);
-    settle(&g);
+    drain_auto(&g);  /* NOT settle(): drain_baton would decline the position change */
     CHECK_EQ(played, 1, "E4: 唐 可可's debut is accepted");
     CHECK_PROMPTS(&g, "E4: 可可's optional position change is offered");
     if (pending(&g)) {
@@ -2158,18 +2212,65 @@ static void f1_five_heart02_grants_the_opponents_live_a_required_heart(void)
     CHECK_EQ(played, 1, "F1: 高海千歌's debut is accepted");
     CHECK(stage_has(&g, 0, chika), "F1: she is on the stage");
 
-    /* NON-VACUITY CONTROL.  The grant must land SOMEWHERE: an engine that did
-     * nothing at all would satisfy the strict assertion below trivially. */
+    /* NON-VACUITY CONTROL, and the diagnostic that says WHICH defect this is.
+     * NOTE: `rb_ability_uses_used` is NOT a usable "did it resolve" probe for a
+     * debut — on this snapshot it reads 0 even for a 登場 that demonstrably
+     * resolved (the F1 SCOPE control below moves an energy and still reports 0),
+     * so this assertion deliberately does NOT rest on it.  What it does rest on
+     * is the modifier itself, which is what the card text is about. */
     int on_opp = need_heart(&g, opp_live, 0);
     int on_chika = need_heart(&g, chika, 0);
     {
-        char msg[320];
+        char msg[340];
         snprintf(msg, sizeof(msg),
-                 "F1 CONTROL: the 登場 effect really executed and moved a required-heart00 "
-                 "somewhere (opponent live %d, 千歌 herself %d) -- without this the strict "
+                 "F1 CONTROL: the 合計5つ以上のheart02 condition really produced a grant "
+                 "somewhere (opponent live=%d, 千歌 herself=%d). Without this the strict "
                  "assertion below would also pass on an engine that did nothing",
                  on_opp, on_chika);
         CHECK(on_opp != 0 || on_chika != 0, msg);
+    }
+
+    /* SCOPE CONTROL, and the one that says the defect is 千歌's CONDITION and not
+     * the 登場場 trigger path.  Same trigger string, same binary, same drain
+     * idiom, one card with no condition at all: 葉月 恋 PL!SP-pb1-005-R must
+     * resolve and move an energy.  If this passes while F1's grant is 0, the
+     * difference is 合計5つ以上のheart02 alone. */
+    {
+        static TestGame g2;
+        new_game(&g2);
+        int m1 = test_new_id(&g2, RIKO);
+        int m2 = test_new_id(&g2, RIKO);
+        int control = test_new_id(&g2, KAHORI);
+        CHECK(m1 >= 0 && m2 >= 0 && control >= 0, "F1 SCOPE: the fixtures resolve");
+        if (m1 < 0 || m2 < 0 || control < 0) { n_setup_bugs++; return; }
+        expect_card_no(control, KAHORI);
+        expect_trigger(control, TRIG_DEBUT_STAGE, 1);
+        fill_decks(&g2, 20);
+        clear_stage(&g2, 0);
+        g2.state.p[0].stage[0] = m1;
+        g2.state.p[0].stage[1] = m2;
+        rb_mods_add_heart(&g2.state.mods, m1, 2, 3);
+        rb_mods_add_heart(&g2.state.mods, m2, 2, 2);
+        g2.state.p[0].energy.n = 0;
+        g2.state.p[0].energy_deck.n = 0;
+        fill_energy_deck(&g2, 0, 2);
+        test_give_energy(&g2, 20);
+        test_add_to_hand(&g2, control);
+        int zone_before = energy_n(&g2, 0);
+        int deck_before = energy_deck_n(&g2, 0);
+        int played = test_play_to_stage(&g2, control, 2);
+        settle(&g2);
+        CHECK_EQ(played, 1, "F1 SCOPE: the control card's 登場 is accepted");
+        CHECK_EQ(energy_deck_n(&g2, 0), deck_before - 1,
+                 "F1 SCOPE: an UNCONDITIONAL 登場場 really resolved in this same binary "
+                 "and drain sequence and moved an energy out of the deck — so 千歌's "
+                 "absent grant is her 合計5つ以上のheart02 condition, not a dead 登場 path");
+        CHECK_EQ(energy_n(&g2, 0), zone_before + 1,
+                 "F1 SCOPE: and into the energy zone");
+        CHECK_EQ(heart(&g2, m1, 2), 3,
+                 "F1 SCOPE: the 5-heart02 board is byte-identical to F1's, so the ONLY "
+                 "difference between the passing control and the failing 千歌 is the "
+                 "condition attached to her ability");
     }
 
     /* THE STRICT CLAIM, which the Rust file never checks. */
@@ -2227,10 +2328,10 @@ static void f2_the_threshold_is_five_heart02_exactly(void)
          * or 合計5つ以上 is not a threshold at all. */
         int at_five = need_heart(&g, opp_live, 0) + need_heart(&g, chika, 0);
         {
-            char msg[320];
+            char msg[340];
             snprintf(msg, sizeof(msg),
                      "F2 high CONTROL: at 5 heart02 the grant MUST appear somewhere "
-                     "(opponent live %d, 千歌 %d) -- this is the positive that licenses the "
+                     "(opponent live=%d, 千歌=%d) -- this is the positive that licenses the "
                      "4-heart02 zero in the other half, and it is the assertion the Rust "
                      "file never makes",
                      need_heart(&g, opp_live, 0), need_heart(&g, chika, 0));

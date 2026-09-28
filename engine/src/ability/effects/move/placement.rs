@@ -2,7 +2,7 @@ use super::{AbilityResolver, CardDatabase, Choice, ExecutionContext, GameState, 
 #[cfg(feature = "no_std")]
 use alloc::{string::{String, ToString}, vec::Vec};
 
-pub(super) fn log_move_result(player: &Player, db: &CardDatabase, card_id: i16, source: &str, requested: &str) {
+pub(crate) fn log_move_result(player: &Player, db: &CardDatabase, card_id: i16, source: &str, requested: &str) {
     if !log::log_enabled!(log::Level::Debug)
         && !log::log_enabled!(target: "rabuka_engine::events", log::Level::Debug)
     {
@@ -55,7 +55,7 @@ pub(super) fn log_move_result(player: &Player, db: &CardDatabase, card_id: i16, 
 impl AbilityResolver {
     /// Returns Ok(true) if a choice was created, Ok(false) if the card was placed immediately.
     #[allow(clippy::too_many_arguments)]
-pub(super) fn place_card_with_stage_choice(
+pub(crate) fn place_card_with_stage_choice(
         &mut self,
         gs: &mut GameState,
         player_target: &str,
@@ -247,7 +247,7 @@ pub(super) fn place_card_with_stage_choice(
     /// ONE construction point — used by `execute_move_cards` and
     /// `execute_selected_cards_from_zone`. Returns true when a pending choice
     /// was created and the caller must stop.
-    pub(super) fn maybe_prompt_success_replacement(
+    pub(crate) fn maybe_prompt_success_replacement(
         &mut self,
         gs: &mut GameState,
         card_id: i16,
@@ -315,7 +315,7 @@ pub(super) fn place_card_with_stage_choice(
     /// Note: when `allow_skip` is set (optional deck placement), the card was
     /// left in the waitroom by resolve_cards_from_source, so a skipped answer
     /// simply leaves it there.
-    pub(super) fn prompt_deck_top_or_bottom(
+    pub(crate) fn prompt_deck_top_or_bottom(
         &mut self,
         card_id: i16,
         state_change: Option<String>,
@@ -342,7 +342,7 @@ pub(super) fn place_card_with_stage_choice(
         };
     }
 
-    pub(super) fn execute_stage_placement_choices(
+    pub(crate) fn execute_stage_placement_choices(
         &mut self,
         gs: &mut GameState,
         card_ids: &[i16],

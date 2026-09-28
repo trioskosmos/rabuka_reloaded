@@ -1278,7 +1278,7 @@ impl super::resolver::AbilityResolver {
                 // to avoid double-draw.
                 let card_db = gs.card_database.clone();
                 for player in [&mut gs.player1, &mut gs.player2] {
-                    let _ = crate::ability::effects::draw::draw_cards_for_player(
+                    let _ = crate::ability::effects::deck::draw_cards_for_player(
                         player,
                         3,
                         "deck",
@@ -2153,7 +2153,7 @@ gs.set_recently_moved_batch(valid_ids.into(), Some(Zone::SuccessLiveZone.to_str(
                                 .iter()
                                 .position(|&id| id == mid)
                             {
-                                let mut m = crate::ability::move_cards::drain_under_cards_to_energy_zone(
+                                let mut m = crate::ability::effects::move_cards::drain_under_cards_to_energy_zone(
                                     gs, &entry_target, idx,
                                 );
                                 moved.append(&mut m);
@@ -3782,4 +3782,3 @@ modified.destination = Some(Zone::from_source_str(dest));
         }
     }
 }
-

@@ -1,3 +1,15 @@
+//! The `ActionType` dispatch table, plus the fallback for ability text the
+//! parser could not turn into a known action.
+//!
+//! 2 of the 936 unique abilities in `cards/abilities.json` parse to no known
+//! action and land on `execute_custom`, so the fallback belongs beside the
+//! table that routes to it rather than in a 24-line file of its own.
+//!
+//! This is the one place in the engine where all 68 `ActionType` variants
+//! meet their executors, which is why it is a file rather than living in
+//! `mod.rs` with the guards that run before it.
+use crate::card::PlacementOrder;
+use super::super::enums::Zone;
 use crate::ability::enums::ActionType;
 use crate::ability::resolver::AbilityResolver;
 use crate::card::AbilityEffect;
@@ -203,4 +215,56 @@ pub fn execute_effect(
     };
     push_effect_verdict(effect);
     result
+}
+
+impl AbilityResolver {
+    pub(crate) fn execute_custom(
+        &mut self,
+        gs: &mut GameState,
+        effect: &AbilityEffect,
+        action_str: &str,
+    ) -> Result<(), String> {
+        // 1) Deck reordering: placement_order=any_order → route as move_cards looked_at→deck_top
+        if effect.placement_order_any() == Some(PlacementOrder::AnyOrder) {
+            let mut routed = effect.clone();
+            routed.action = crate::ability::enums::ActionType::MoveCards;
+            if routed.source.is_none() {
+                routed.source = Some(Zone::LookedAt.to_str().into());
+            }
+            if routed.destination.is_none() {
+                routed.destination = Some(Zone::DeckTop.to_str().into());
+            }
+            self.owner.executing = Some(routed.clone());
+            return self.execute_move_cards(gs, &routed);
+        }
+
+        // 2) Complex conditional scoring / gain_ability: has duration
+        if effect.duration_any().is_some() {
+            let text = if effect.text.is_empty() {
+                action_str
+            } else {
+                &effect.text
+            };
+            return self.execute_gain_ability(
+                gs,
+                text,
+                effect.target_any().unwrap_or("self"),
+                effect.duration_any(),
+                effect.gained_effect_any().cloned().map(Box::new),
+                effect.ability_gain_trigger_any(),
+                gs.activating_card,
+            );
+        }
+
+        // 3) Parse gap: the parser could not type this effect. Nothing to run.
+        log::debug!("Unhandled custom action (parser gap): {}", action_str);
+        let pp = self.player_prefix(gs);
+        let act_name = gs
+            .activating_card
+            .map(|c| self.card_name(c))
+            .unwrap_or_default();
+        gs.rule_log
+            .push(format!("{} {}: [[log_custom_effect]]", pp, act_name));
+        Ok(())
+    }
 }

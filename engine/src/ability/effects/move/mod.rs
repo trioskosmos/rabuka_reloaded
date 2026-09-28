@@ -1,8 +1,8 @@
 use crate::core::constants::CountCast;
-use super::enums::Zone;
-use super::resolver::AbilityResolver;
-use super::types::{Choice, ExecutionContext, LookAndSelectStep};
-use super::util;
+use super::super::enums::Zone;
+use super::super::resolver::AbilityResolver;
+use super::super::types::{Choice, ExecutionContext, LookAndSelectStep};
+use super::super::util;
 use crate::ability::queue::ConditionalChoice;
 use crate::card::{AbilityEffect, CardDatabase, Operator, PlacementOrder};
 use crate::game_state::GameState;
@@ -85,7 +85,7 @@ pub enum MoveCardsTarget {
 /// Bundles the inputs to `resolve_from_zone` so per-zone resolution methods
 /// have a small signature instead of 21 positional arguments. Holds only
 /// borrows / `Copy` values, so the whole struct is freely reconstructable.
-struct MoveSourceContext<'a> {
+pub(crate) struct MoveSourceContext<'a> {
     effective_source: &'a str,
     source_str: &'a str,
     count: usize,
@@ -3502,5 +3502,60 @@ pub fn execute_selected_cards_from_zone(
         self.in_flight.spawn_context.target = original_target;
         result
     }
-}
 
+    pub(crate) fn execute_discard_until_count(
+        &mut self,
+        gs: &mut GameState,
+        effect: &AbilityEffect,
+    ) -> Result<(), String> {
+        let target_count: u8 = effect.target_count_any().unwrap_or(0);
+        let target = effect.target_name();
+        let player = gs.resolve_target_player_mut(target);
+        let current_count = player.hand.cards.len();
+        if current_count <= target_count as usize {
+            return Ok(());
+        }
+        let cards_to_discard = current_count - target_count as usize;
+        let desc_en = format!(
+            "Discard {} cards from hand (target: {} cards in hand)",
+            cards_to_discard, target_count
+        );
+        let desc_ja = format!(
+            "手札から{}枚捨てる（目標: 手札{}枚）",
+            cards_to_discard, target_count
+        );
+        self.awaiting.choice = Some(
+            Choice::select_cards(Zone::Hand.to_str(), cards_to_discard, desc_en, false)
+                .description_ja(Some(desc_ja))
+                .target_player_id(Some(target.to_string()))
+                .build(),
+        );
+        self.in_flight.execution_context = ExecutionContext::SingleEffect { effect_index: 0 };
+        let pp = self.player_prefix(gs);
+        let act_name = gs
+            .activating_card
+            .map(|c| self.card_name(c))
+            .unwrap_or_default();
+        gs.push_rule_log_fmt(format_args!(
+            "{} {}: [[log_discard_until:n={}]]",
+            pp, act_name, target_count
+        ));
+        Ok(())
+    }
+
+    /// Shared MoveCards/DiscardCard tail (rule log + current-effect pinning
+    /// and move execution) — the registry's logged-move arms delegate here so
+    /// the 3-line sequence lives in exactly one place.
+    pub(crate) fn execute_logged_move(
+        &mut self,
+        gs: &mut GameState,
+        effect: &AbilityEffect,
+        log_tag: &str,
+    ) -> Result<(), String> {
+        self.rule_log_activated(gs, log_tag);
+        self.owner.executing = Some(effect.clone());
+        self.execute_move_cards(gs, effect)
+    }
+
+    // Q55: Effects resolve as much as possible; partial resolution required when full is impossible.
+}

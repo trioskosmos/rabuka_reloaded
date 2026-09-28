@@ -1,15 +1,30 @@
-﻿use super::super::resolver::AbilityResolver;
+//! What a card is, and what it can do.
+//!
+//! `gain_ability` (11), `gain_ability_from_source` (2), `invalidate_ability`
+//! (1), `suppress_ability_trigger` (1), `activate_ability` (1) and
+//! `set_card_identity` (1) - 17 of the 936 unique abilities. One group
+//! because they are the actions that change a card's ability set or its
+//! identity, and nothing else in the engine does.
+
+
+use super::super::resolver::AbilityResolver;
+
 use super::super::util;
+
 use crate::card::{Ability, AbilityEffect};
+
 use crate::game_state::GameState;
+
+
+
 #[cfg(feature = "no_std")]
 use alloc::{
-    boxed::Box,
     string::{String, ToString},
     vec::Vec,
 };
 
 impl AbilityResolver {
+
     pub(crate) fn execute_gain_ability_effect(
         &mut self,
         gs: &mut GameState,
@@ -701,5 +716,44 @@ pub(crate) fn execute_gain_ability(
         ));
         Ok(())
     }
-}
 
+    pub(crate) fn execute_set_card_identity(&mut self, gs: &mut GameState, identities: &[String]) {
+        let pp = self.player_prefix(gs);
+        let act_name = gs
+            .activating_card
+            .map(|c| self.card_name(c))
+            .unwrap_or_default();
+        gs.rule_log
+            .push(format!("{} {}: カード同一性変更", pp, act_name));
+        if !identities.is_empty() {
+            gs.prohibition_effects
+                .push(format!("card_identity:{}", identities.join(",")));
+        }
+    }
+
+    pub(crate) fn execute_set_card_identity_all_regions(
+        &mut self,
+        gs: &mut GameState,
+        effect: &AbilityEffect,
+    ) {
+        let identities = effect.identities_any();
+        let target = effect.target_name();
+        let _target = target;
+        let card_id = self.session.activating_card_id.or(gs.activating_card);
+        if let Some(card_id) = card_id {
+            if let Some(identities) = identities {
+                for identity in identities {
+                    gs.prohibition_effects
+                        .push(format!("card_identity:{}:{}", card_id, identity));
+                }
+            }
+        }
+        let pp = self.player_prefix(gs);
+        let act_name = gs
+            .activating_card
+            .map(|c| self.card_name(c))
+            .unwrap_or_default();
+        gs.rule_log
+            .push(format!("{} {}: 全領域カード同一性変更", pp, act_name));
+    }
+}

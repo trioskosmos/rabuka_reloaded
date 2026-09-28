@@ -10,12 +10,10 @@ use alloc::{
     vec::Vec,
 };
 use smallvec::SmallVec;
-
-/// What a 「〜Nにつき」 requirement multiplies its base value by.
 ///
 /// `max` means the requirement is a ceiling rather than an increment, so each
 /// qualifying unit is worth 1 instead of the stated value.
-fn per_unit_base(max: bool, value: u8) -> u8 {
+pub(crate) fn per_unit_base(max: bool, value: u8) -> u8 {
     if max {
         1
     } else {
@@ -25,7 +23,7 @@ fn per_unit_base(max: bool, value: u8) -> u8 {
 
 /// How many units a 「〜Nにつき」 requirement counts, after the per-unit divisor
 /// and the optional repeat cap.
-fn capped_units(total: u8, per_unit_count: u8, repeat_limit: Option<u8>) -> u8 {
+pub(crate) fn capped_units(total: u8, per_unit_count: u8, repeat_limit: Option<u8>) -> u8 {
     let units = total / per_unit_count.max(1);
     match repeat_limit {
         Some(cap) => units.min(cap),
@@ -35,7 +33,7 @@ fn capped_units(total: u8, per_unit_count: u8, repeat_limit: Option<u8>) -> u8 {
 
 /// The zone a per-unit requirement counts cards in. Anything unrecognised means
 /// the stage, which is where members live.
-fn per_unit_source_cards(player: &crate::player::Player, location: Option<&str>) -> Vec<i16> {
+pub(crate) fn per_unit_source_cards(player: &crate::player::Player, location: Option<&str>) -> Vec<i16> {
     match location {
         Some("success_live_zone") | Some("success_live_card_zone") => {
             player.success_live_card_zone.cards.to_vec()
@@ -55,22 +53,22 @@ fn per_unit_source_cards(player: &crate::player::Player, location: Option<&str>)
 ///
 /// The criteria are cumulative and each is optional, which is why they are
 /// gathered once into a value instead of being re-tested at each filter site.
-struct PerUnitFilter<'a> {
+pub(crate) struct PerUnitFilter<'a> {
     /// The activating card never counts against itself.
-    exclude_self: bool,
-    group: Option<&'a str>,
+    pub(crate) exclude_self: bool,
+    pub(crate) group: Option<&'a str>,
     /// Duplicate-named members count once (「名前の異なる『X』のメンバー1人につき」).
-    distinct_names: bool,
+    pub(crate) distinct_names: bool,
     /// `appeared_or_moved_this_turn` requires the card to have moved or appeared.
-    timing_condition: Option<&'a str>,
+    pub(crate) timing_condition: Option<&'a str>,
     /// Members whose ENTIRE printed heart set is in this list do not count.
-    exclude_heart_colors: &'a [String],
+    pub(crate) exclude_heart_colors: &'a [String],
 }
 
 impl PerUnitFilter<'_> {
     /// Does `card_id` count as one unit? `seen_names` carries the
     /// already-counted names across calls for the distinct-names rule.
-    fn accepts(
+    pub(crate) fn accepts(
         &self,
         gs: &GameState,
         card_db: &CardDatabase,
@@ -99,7 +97,7 @@ impl PerUnitFilter<'_> {
     }
 
     /// Claim `card_id`'s name, so a duplicate-named member is counted once.
-    fn claim_distinct_name(
+    pub(crate) fn claim_distinct_name(
         card_db: &CardDatabase,
         card_id: i16,
         seen_names: &mut crate::HashSet<String>,
@@ -118,7 +116,7 @@ impl PerUnitFilter<'_> {
 
     /// A member whose every printed heart is excluded does not count, so a
     /// member with one surviving colour still does.
-    fn heart_set_all_excluded(
+    pub(crate) fn heart_set_all_excluded(
         card_db: &CardDatabase,
         card_id: i16,
         excluded: &[String],
@@ -135,16 +133,16 @@ impl PerUnitFilter<'_> {
 }
 
 /// A 「元のスコアがN以上」 qualifier on a required-heart modification.
-struct OriginalScoreFilter<'a> {
-    enabled: bool,
-    count: Option<u8>,
-    operator: Option<&'a str>,
+pub(crate) struct OriginalScoreFilter<'a> {
+    pub(crate) enabled: bool,
+    pub(crate) count: Option<u8>,
+    pub(crate) operator: Option<&'a str>,
 }
 
 impl OriginalScoreFilter<'_> {
     /// Does `card_id` clear the original-score threshold? A card with no score,
     /// or a threshold the text did not fully state, is not filtered out.
-    fn accepts(&self, db: &CardDatabase, card_id: i16) -> bool {
+    pub(crate) fn accepts(&self, db: &CardDatabase, card_id: i16) -> bool {
         if !self.enabled {
             return true;
         }
@@ -160,6 +158,8 @@ impl OriginalScoreFilter<'_> {
         crate::ability::util::compare_with_operator(op, score, threshold).unwrap_or(true)
     }
 }
+
+
 
 impl AbilityResolver {
     pub fn execute_modify_score(
@@ -546,371 +546,5 @@ impl AbilityResolver {
             ));
         }
         Ok(())
-    }
-
-    pub(crate) fn execute_modify_required_hearts(
-        &mut self,
-        gs: &mut GameState,
-        effect: &AbilityEffect,
-    ) -> Result<(), String> {
-        let operation_binding = effect.operation_any();
-        let operation = operation_binding.unwrap_or("decrease");
-        let mut value: u8 = effect.value_or_count(0);
-        let heart_colors = effect.heart_colors_any();
-        let target = effect.target_name();
-        let per_unit = effect.per_unit_any().unwrap_or(false);
-        let per_unit_count: u8 = effect.per_unit_count_any().unwrap_or(1);
-        let group_name = effect.group_name();
-        let timing_condition_binding = effect.timing_condition_any();
-        let timing_condition = timing_condition_binding;
-        let location_binding = effect.location_any();
-        let location = location_binding;
-        let original_value = effect.original_value_any();
-        let original_count = effect.original_count_any();
-        let original_operator_binding = effect.original_operator_any();
-        let original_operator = original_operator_binding.as_deref();
-        let exclude_self = effect.exclude_self_any().unwrap_or(false);
-        let self_target = effect.is_self_target();
-        let exclude_heart_colors = effect.exclude_heart_colors_any();
-        let max = effect.max.unwrap_or(false);
-        let repeat_limit = effect.repeat_limit_any();
-        let per_unit_heart_colors = effect.per_unit_heart_colors_any();
-        let distinct = effect.distinct_any();
-        let is_distinct_names = matches!(
-            distinct,
-            Some(crate::card::DistinctType::CardName)
-                | Some(crate::card::DistinctType::True)
-                | Some(crate::card::DistinctType::Distinct)
-        );
-        if per_unit {
-            let card_db = &gs.card_database;
-            let player = gs.resolve_target_player(target);
-            // The unit criteria, resolved once. Both per-unit branches below
-            // accept the same set of cards; only how much each is worth differs.
-            let unit_filter = PerUnitFilter {
-                exclude_self,
-                group: group_name,
-                distinct_names: is_distinct_names,
-                timing_condition,
-                exclude_heart_colors,
-            };
-
-            if !per_unit_heart_colors.is_empty() {
-                // Count total heart icon count of specified colors across matching members.
-                // Used for patterns like "そのメンバーが持つheart03 2つにつき" (count heart03 on card).
-                let mut total_hearts = 0u8;
-                let mut seen_names = crate::HashSet::default();
-                let stage_ids: Vec<i16> = player
-                    .stage
-                    .stage
-                    .iter()
-                    .filter(|&&id| id != -1)
-                    .copied()
-                    .collect();
-                for &card_id in &stage_ids {
-                    if !unit_filter.accepts(gs, card_db, card_id, &mut seen_names) {
-                        continue;
-                    }
-                    if let Some(card) = card_db.get_card(card_id) {
-                        if let Some(ref base) = card.base_heart {
-                            for hc_str in per_unit_heart_colors {
-                                let hc: crate::card::HeartColor =
-                                    hc_str.parse().unwrap_or(crate::card::HeartColor::Heart00);
-                                total_hearts += base.hearts.get(&hc).copied().unwrap_or(0);
-                            }
-                        }
-                    }
-                }
-                value = per_unit_base(max, value) * capped_units(total_hearts, per_unit_count, repeat_limit);
-            } else {
-                // Default per-unit: count cards in the specified location.
-                let cards = per_unit_source_cards(player, location);
-                let mut seen_names = crate::HashSet::default();
-                let count = cards
-                    .iter()
-                    .filter(|&&card_id| {
-                        unit_filter.accepts(gs, card_db, card_id, &mut seen_names)
-                    })
-                    .count()
-                    .u8_count();
-                value = per_unit_base(max, value) * capped_units(count, per_unit_count, repeat_limit);
-            }
-        }
-        let card_ids: Vec<i16> = {
-            // Include success_live_card_zone only when the activating card
-            // is in that zone AND has self_target.  This handles LiveStart
-            // triggers from a previously successful card (e.g. EMOTION),
-            // while constant-ability evaluation
-            // (evaluate_success_zone_heart_reductions) only targets
-            // live_card_zone.
-            let activating_in_success = self_target
-                && gs.activating_card.is_some_and(|cid| {
-                    let player_ref = gs.resolve_target_player(target);
-                    player_ref.success_live_card_zone.cards.contains(&cid)
-                });
-            let player = gs.resolve_target_player_mut(target);
-            if activating_in_success {
-                player
-                    .live_card_zone
-                    .cards
-                    .iter()
-                    .chain(player.success_live_card_zone.cards.iter())
-                    .copied()
-                    .collect()
-            } else {
-                player.live_card_zone.cards.to_vec()
-            }
-        };
-        let db = &gs.card_database;
-        let original_score_filter = OriginalScoreFilter {
-            enabled: original_value.unwrap_or(false),
-            count: original_count,
-            operator: original_operator,
-        };
-        let card_ids: Vec<i16> = card_ids
-            .into_iter()
-            .filter(|&card_id| {
-                // When self_target is set, only the activating card receives the
-                // modifier (e.g. ハナムスビ reduces only its own heart requirement).
-                if self_target {
-                    if let Some(act) = gs.activating_card {
-                        if card_id != act {
-                            return false;
-                        }
-                    }
-                }
-                // Filter by group_name (e.g. "μ's")
-                if let Some(gn) = group_name {
-                    if !util::card_matches_group_str(db, card_id, Some(gn)) {
-                        return false;
-                    }
-                }
-                original_score_filter.accepts(db, card_id)
-            })
-            .collect();
-        log::debug!(
-            "[MOD_REQ_HEARTS] op={} value={} colors={:?} self_target={:?} activating={:?} candidates={:?}",
-            operation,
-            value,
-            heart_colors,
-            effect.is_self_target(),
-            gs.activating_card,
-            card_ids
-        );
-        let pp = self.player_prefix(gs);
-        let act_name = gs
-            .activating_card
-            .map(|c| self.card_name(c))
-            .unwrap_or_default();
-        let colors = if heart_colors.is_empty() {
-            vec!["heart00".to_string()]
-        } else {
-            heart_colors.to_vec()
-        };
-        // value is now always per-color count (parser fix: per-color, not total).
-        // Each listed color gets the same per-color value.
-        let per_color_value = value;
-        for hc in &colors {
-            let color = crate::card::parse_heart_color(hc);
-            gs.push_rule_log_fmt(format_args!(
-                "{} {}: [[log_required_hearts:op={},value={},color={}]]",
-                pp, act_name, operation, per_color_value, hc
-            ));
-            for card_id in &card_ids {
-                let (op_kind, delta) = match operation {
-                    "decrease" => ("need_heart_mod", -(value as i16)),
-                    "increase" => ("need_heart_mod", value as i16),
-                    "set" => ("need_heart_set", per_color_value as i16),
-                    _ => return Err(format!("Unknown operation: {}", operation)),
-                };
-                match operation {
-                    "set" => {
-                        gs.mods
-                            .set_need_heart_modifier(*card_id, color, per_color_value as i16);
-                    }
-                    _ => {
-                        gs.mods.add_need_heart_modifier(*card_id, color, delta);
-                    }
-                }
-                gs.record_ability_application(
-                    gs.activating_card.unwrap_or(-1),
-                    effect.text.to_string(),
-                    op_kind,
-                    *card_id,
-                    Some(color.index().u8_count()),
-                    delta,
-                );
-            }
-        }
-        Ok(())
-    }
-
-    pub(crate) fn execute_modify_required_hearts_standard(
-        &mut self,
-        gs: &mut GameState,
-        operation: &str,
-        value: u8,
-        heart_colors: &[String],
-        target: &str,
-        effect_text: &str,
-    ) -> Result<(), String> {
-        let colors = if heart_colors.is_empty() {
-            vec!["heart00".to_string()]
-        } else {
-            heart_colors.to_vec()
-        };
-        let card_ids: Vec<i16> = {
-            let player = gs.resolve_target_player_mut(target);
-            player.live_card_zone.cards.to_vec()
-        };
-        for hc in &colors {
-            let color = crate::card::parse_heart_color(hc);
-            for card_id in &card_ids {
-                let modifier_value = match operation {
-                    "increase" => value as i16,
-                    "decrease" => -(value as i16),
-                    _ => return Err(format!("Unknown operation: {}", operation)),
-                };
-                gs.mods
-                    .add_need_heart_modifier(*card_id, color, modifier_value);
-                gs.record_ability_application(
-                    gs.activating_card.unwrap_or(-1),
-                    effect_text.to_string(),
-                    "need_heart_mod",
-                    *card_id,
-                    Some(color.index().u8_count()),
-                    modifier_value,
-                );
-            }
-        }
-        let pp = self.player_prefix(gs);
-        let act_name = gs
-            .activating_card
-            .map(|c| self.card_name(c))
-            .unwrap_or_default();
-        gs.push_rule_log_fmt(format_args!(
-            "{} {}: [[log_required_hearts_std:op={},value={}]]",
-            pp, act_name, operation, value
-        ));
-        Ok(())
-    }
-
-    pub(crate) fn execute_modify_yell_count(&mut self, gs: &mut GameState, effect: &AbilityEffect) {
-        let operation_binding = effect.operation_any();
-        let operation = operation_binding.unwrap_or("subtract");
-        let count: u8 = effect.count_or(0);
-        let pp = self.player_prefix(gs);
-        let act_name = gs
-            .activating_card
-            .map(|c| self.card_name(c))
-            .unwrap_or_default();
-        gs.push_rule_log_fmt(format_args!(
-            "{} {}: [[log_yell_count:op={},n={}]]",
-            pp, act_name, operation, count
-        ));
-        // Every modifier is registered as data; the required count is derived
-        // from base + Σ deltas at read time (see effective_cheer_checks_required).
-        // Registration order and timing (before/after the base exists) do not
-        // matter — Q111 semantics fall out naturally.
-        let slot: u8 = if pp.contains('2') { 2 } else { 1 };
-        match operation {
-            "add" => gs.add_yell_count_modifier(slot, count as i32),
-            "subtract" => gs.add_yell_count_modifier(slot, -(count as i32)),
-            other => log::debug!("Unknown yell-count operation: {}", other),
-        }
-    }
-
-    pub(crate) fn execute_modify_limit(
-        &mut self,
-        gs: &mut GameState,
-        effect: &AbilityEffect,
-    ) -> Result<(), String> {
-        let operation_binding = effect.operation_any();
-        let operation = operation_binding.unwrap_or("decrease");
-        let count: u8 = effect.count_or(0);
-        let pp = self.player_prefix(gs);
-        let act_name = gs
-            .activating_card
-            .map(|c| self.card_name(c))
-            .unwrap_or_default();
-        gs.push_rule_log_fmt(format_args!(
-            "{} {}: [[log_stage_limit:op={},n={}]]",
-            pp, act_name, operation, count
-        ));
-        match operation {
-            "decrease" => {
-                gs.prohibition_effects
-                    .push(format!("limit_decrease:{}", count));
-            }
-            "increase" => {
-                gs.prohibition_effects
-                    .push(format!("limit_increase:{}", count));
-            }
-            _ => {}
-        }
-        Ok(())
-    }
-
-    pub(crate) fn execute_modify_required_hearts_success(
-        &mut self,
-        gs: &mut GameState,
-        effect: &AbilityEffect,
-    ) {
-        let operation_binding = effect.operation_any();
-        let operation = operation_binding.unwrap_or("increase");
-        let value: u8 = effect.value_any().unwrap_or(0);
-        let target = effect.target_name();
-        let card_type = effect.card_type_any().map(|ct| ct.as_card_str());
-        let heart_colors = effect.heart_colors_any();
-        let pp = self.player_prefix(gs);
-        let act_name = gs
-            .activating_card
-            .map(|c| self.card_name(c))
-            .unwrap_or_default();
-        gs.push_rule_log_fmt(format_args!(
-            "{} {}: [[log_success_hearts:op={},value={}]]",
-            pp, act_name, operation, value
-        ));
-        let player = gs.resolve_target_player_mut(target);
-        let card_ids: Vec<i16> = if let Some("live_card") = card_type {
-            player
-                .success_live_card_zone
-                .cards
-                .iter()
-                .copied()
-                .collect()
-        } else {
-            vec![]
-        };
-        let delta = match operation {
-            "increase" => value as i16,
-            "decrease" => -(value as i16),
-            _ => {
-                log::debug!("Unknown operation: {}", operation);
-                return;
-            }
-        };
-        let color_strs: Vec<&str> = if !heart_colors.is_empty() {
-            heart_colors.iter().map(|s| s.as_str()).collect()
-        } else {
-            vec![
-                "heart00", "heart01", "heart02", "heart03", "heart04", "heart05", "heart06",
-            ]
-        };
-        for card_id in card_ids {
-            for color_str in &color_strs {
-                let color = crate::card::parse_heart_color(color_str);
-                gs.mods
-                    .add_need_heart_modifier(card_id, color, delta as i16);
-                gs.record_ability_application(
-                    gs.activating_card.unwrap_or(-1),
-                    effect.text.to_string(),
-                    "need_heart_mod",
-                    card_id,
-                    Some(color.index().u8_count()),
-                    delta as i16,
-                );
-            }
-        }
     }
 }

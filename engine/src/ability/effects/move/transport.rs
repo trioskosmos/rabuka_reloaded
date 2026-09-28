@@ -38,7 +38,7 @@ pub(crate) fn drain_under_cards_to_energy_zone(
     moved
 }
 
-pub(super) fn remove_card_from_any_zone(
+pub(crate) fn remove_card_from_any_zone(
     player: &mut Player,
     last_vacated_stage_area: &mut Option<u8>,
     card_id: i16,
@@ -56,7 +56,7 @@ pub(super) fn remove_card_from_any_zone(
     }
 }
 
-pub(super) fn matching_waitroom_indices(player: &Player, cards: &[i16]) -> Vec<usize> {
+pub(crate) fn matching_waitroom_indices(player: &Player, cards: &[i16]) -> Vec<usize> {
     let mut indices = Vec::new();
     for &cid in cards {
         for (i, &wc) in player.waitroom.cards.iter().enumerate() {

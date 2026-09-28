@@ -1491,4 +1491,33 @@ impl AbilityResolver {
                 .join(", ")
         }
     }
+
+    pub(crate) fn player_prefix(&self, gs: &GameState) -> String {        if let Some(card_id) = gs.activating_card {
+            if gs.player1.stage.stage.contains(&card_id)
+                || gs.player1.live_card_zone.cards.contains(&card_id)
+                || gs.player1.hand.cards.contains(&card_id)
+            {
+                return "P1".to_string();
+            }
+            if gs.player2.stage.stage.contains(&card_id)
+                || gs.player2.live_card_zone.cards.contains(&card_id)
+                || gs.player2.hand.cards.contains(&card_id)
+            {
+                return "P2".to_string();
+            }
+        }
+        if gs.active_player_index() == 0 {
+            "P1"
+        } else {
+            "P2"
+        }
+        .to_string()
+    }
+
+    pub(crate) fn card_name(&self, card_id: i16) -> String {
+        self.card_db()
+            .get_card(card_id)
+            .map(|c| c.name.to_string())
+            .unwrap_or_else(|| format!("Card#{}", card_id))
+    }
 }

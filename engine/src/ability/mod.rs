@@ -10,19 +10,21 @@
 //!   It was a crate-root `ability_queue.rs`, which read as a peer of `ability`
 //!   when it is really a part of it.
 //! - `effects`: `execute_effect` — guards + the `ActionType` dispatch match.
+//!   Every file here is named for the `action` wire string in
+//!   `cards/abilities.json` that it implements, and holds exactly that
+//!   action's code: `deck.rs` is `draw_card`, `resource.rs` is
+//!   `gain_resource`, `move/` is `move_cards`, and so on. `mod.rs` is what
+//!   runs before dispatch; `dispatch.rs` is the table.
 //! - `cost`: cost payment (`pay_cost` → per-action payers).
 //! - `compound`: `Sequential` / `Conditional*` multi-step execution.
-//! - `choice` + `look` + `move_cards`: player-choice and card-movement
-//!   executors. Choices pause execution (`pending_choice`); answers resume
-//!   via `resume_pending_actions` (choice.rs) / turn/actions.rs.
+//! - `choice`: the answering half of a choice — what a player picks. The
+//!   asking half is `effects/choice.rs`.
 //! - `condition`: gating predicates (`ConditionContext::evaluate_condition`).
 //! - `util`: shared filters, zone helpers, selection primitives.
-//!   Domain submodules live in `util/` (`labels`, `hearts`, `duration`,
-//!   `selection`); game-wide label tables live in `describe`.
+//!   Domain submodules live in `util/`; game-wide label tables live in
+//!   `describe`.
 //! - `vm` / `abilities_gen` / `ability_store`: bytecode decoding + store.
 //! - `describe`: EN/JA rendering of effects, costs and zones.
-//! - `condition/` + `effects/`: per-kind condition/executor submodules.
-//! - `move_cards/`: placement / selection / transport submodules.
 //! - `debug` / `log`: diagnostics and structured verdicts (no game logic).
 pub mod ability_store;
 pub mod choice;
@@ -37,8 +39,6 @@ pub mod enums;
 pub mod gates;
 #[cfg(not(feature = "no_std"))]
 pub mod log;
-pub mod look;
-pub mod move_cards;
 pub mod queue;
 pub mod resolver;
 pub mod types;

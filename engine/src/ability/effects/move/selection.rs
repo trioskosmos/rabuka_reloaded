@@ -3,7 +3,7 @@ use super::{AbilityEffect, AbilityResolver, CardDatabase, Choice, ExecutionConte
 use alloc::{string::{String, ToString}, vec::Vec};
 
 impl AbilityResolver {
-    pub(super) fn prompt_card_selection(
+    pub(crate) fn prompt_card_selection(
         &mut self,
         zone: &str,
         count: usize,
@@ -50,7 +50,7 @@ impl AbilityResolver {
     }
 
     #[allow(clippy::too_many_arguments)]
-pub(super) fn take_cards_from_standard_zone(
+pub(crate) fn take_cards_from_standard_zone(
         &mut self,
         player: &mut Player,
         card_db: &CardDatabase,
@@ -131,7 +131,7 @@ pub(super) fn take_cards_from_standard_zone(
         true
     }
 
-    pub(super) fn gate_optional_source(
+    pub(crate) fn gate_optional_source(
         &mut self,
         gs: &mut GameState,
         c: &MoveSourceContext,

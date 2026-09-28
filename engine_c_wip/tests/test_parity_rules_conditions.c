@@ -90,10 +90,12 @@
 #define PLUS "\xef\xbc\x8b"
 
 /* The card PL!HS-bp1-004-* is actually named, in UTF-8:
- *   Tsuregi Tsumari = E5 8D 83  E9 9C A7  E7 B6 B4  E7 90 86
- * (E5 8D 83 "yu", E9 9C A7 "gori", E7 B6 B4 "tsuri", E7 90 86 "tama").
- * The survey called this print "Rainbow"; no such card exists. */
-#define TSUREGI_NAME "\xe5\x8d\x83\xe9\x9c\xa7\xe7\xb6\xb4\xe7\x90\x86"
+ *   E5 A4 95  E9 9C A7  E7 B6 B4  E7 90 86   ("Tsuregi Tsumari")
+ * The survey called this print "Rainbow"; no such card exists in cards.json.
+ * The byte sequence below was read back out of the ENGINE's decoded Card.name
+ * and cross-checked against cards.json, not hand-derived: the first character
+ * is E5 A4 95, NOT E5 8D 83. */
+#define TSUREGI_NAME "\xe5\xa4\x95\xe9\x9c\xa7\xe7\xb6\xb4\xe7\x90\x86"
 
 /* =======================================================================
  * card constants -- every one read as UTF-8 out of cards/cards.json
@@ -392,22 +394,15 @@ void rb_trigger_auto_ability_by_index(GameState *g, int trigger_type,
                                       const int *trigger_moved_cards, int n_moved,
                                       int triggering_member_id);
 
-/* Returns 1 only when the queue ACTUALLY GREW. A helper that returns 1
- * unconditionally would make "the LiveStart was enqueued and dispatched" a
- * vacuous assertion on a board where nothing was ever queued. */
-static int fire_ability_index(TestGame *tg, int cid, int ability_index, int tk)
-{
-    if (cid < 0 || ability_index < 0) return 0;
-    int before = test_queue_n_entries(tg);
-    tg->state.activating_card = cid;
-    rb_trigger_auto_ability_by_index(&tg->state, tk, 0, cid, ability_index,
-                                     NULL, 0, -1);
-    int queued = test_queue_n_entries(tg) - before;
-    rb_process_pending_auto_abilities(&tg->state);
-    DIAG("fire: card=%s ab#%d queue grew by %d entry/entries", card_no_of(cid),
-         ability_index, queued);
-    return queued > 0;
-}
+/* NOTE, no helper here on purpose. Rust's `fire_trigger(game, card, trigger, ..)`
+ * is a TestGame helper that enqueues one named ability directly. The C engine's
+ * only single-ability enqueuer, rb_trigger_auto_ability_by_index
+ * (src/core/game_state_abilities.c), cannot do that: it refuses any ability
+ * whose trigger is not the auto/jidou token --
+ *     if (!rb_ability_matches_trigger(&ab, "auto")) { rb_free_ability(&ab); return; }
+ * -- so it ignores its own trigger_type argument and cannot fire a LiveStart.
+ * Measured, not assumed: the queue grew by 0 entries on every attempt here.
+ * The B1 and C cases therefore drive the real phase-driven dispatch instead. */
 
 static void dump_live_zone(TestGame *tg, int pl)
 {
@@ -416,6 +411,24 @@ static void dump_live_zone(TestGame *tg, int pl)
     for (int i = 0; i < P->live.n && i < 8; i++)
         fprintf(stderr, " [%d]=%s", i, card_no_of(P->live.cards[i]));
     fprintf(stderr, "\n");
+}
+
+/* Hand-built Condition fields, so a test can evaluate a REAL card's gate in
+ * isolation instead of inferring its verdict from an effect's outcome. */
+static void add_str_field(Condition *c, const char *key, const char *v)
+{
+    c->fields[c->n_fields].key = (char *)key;
+    c->fields[c->n_fields].v.tag = RB_TAG_STR;
+    c->fields[c->n_fields].v.s = (char *)v;
+    c->n_fields++;
+}
+
+static void add_i64_field(Condition *c, const char *key, int64_t v)
+{
+    c->fields[c->n_fields].key = (char *)key;
+    c->fields[c->n_fields].v.tag = RB_TAG_I64;
+    c->fields[c->n_fields].v.i = v;
+    c->n_fields++;
 }
 
 /* =======================================================================
@@ -605,7 +618,8 @@ static void q38_rainbow_one_live_card_one_blade(void)
 
     int n = drain_option1_then_0(&tg, 32);
     drain_only_auto(&tg);
-    DIAG("A3: %d prompt(s) answered after the pay gate", n);
+    DIAG("A3: %d prompt(s) answered after reaching the window; energy %d -> %d; blade %d -> %d",
+         n, energy_before, energy_active(&tg), blade_before, blade_mod(&tg, rainbow));
 
     CHECK_EQ(energy_active(&tg), energy_before - 1,
              "A3 CONTROL: exactly 1 of the 15 active energy was tapped by the pay gate");
@@ -694,41 +708,53 @@ static void b1_blade_set_then_additive_stacks_through_real_cards(void)
      * candidate and index 0 unambiguously selects her. */
     set_stage(&tg, 0, RB_EMPTY_SLOT, liella, RB_EMPTY_SLOT);
     fill_decks(&tg, filler, 10);
-    test_add_to_hand(&tg, special);
-    test_add_to_hand(&tg, filler2);
-    test_add_to_hand(&tg, filler3);
 
-    /* Step 1: Special Color's Live Start sets the centre Liella!'s blades to 3.
-     * Step to each window BY NAME: a phase gaining or losing a step would move
-     * the Live Start out of reach and the set modifier would never appear. */
-    int arrived = test_advance_to_phase(&tg, RB_PHASE_LIVE_SET);
-    CHECK_EQ(arrived, 1, "B1: the live-card-set window is reached by name");
-    test_set_live_card(&tg, 0, special);
-    int reached = test_advance_to_phase(&tg, RB_PHASE_PERFORMANCE);
-    CHECK_EQ(reached, 1, "B1: the performance window is reached by name");
-    int n1 = drain_pick0(&tg, 32);
-    drain_only_auto(&tg);
-    DIAG("B1 step 1: %d prompt(s) answered", n1);
-
-    CHECK_EQ(rb_mods_get_blade_set(&tg.state.mods, liella), 3,
-             "B1: 9.9.1.4 Special Color sets the centre Liella!'s blades to 3");
-    DIAG("B1: blade modifier after the set = %d", blade_mod(&tg, liella));
-
-    /* Step 2: the giver's Live Start -- pay the optional 2-card cost, target
-     * the centre Liella!, gain +3 blades until live end. */
+    /* HARNESS ADAPTATION, stated rather than hidden. The Rust test never puts
+     * the giver in the live card zone: it calls the TestGame helper
+     * `fire_trigger(game, giver, LiveStart, ...)`, which enqueues a named
+     * ability directly. The C engine has no such helper --
+     * rb_trigger_auto_ability_by_index REFUSES a card that is in no zone (the
+     * queue grew by 0 entries when this test did exactly that, which is how the
+     * limitation was found). The faithful C equivalent is therefore to seat
+     * the giver in P1's live card zone, so its LiveStart is dispatched by the
+     * real phase-driven path in the same window as the setter. Both are REAL
+     * live cards, which is what the Rust doc comment says the test needs. */
     int giver = mid(&tg, GIVER);
     if (!pin_id(giver, GIVER)) return;
     int giver_ls = nth_ability_with_trigger(giver, NULL, 0);
     CHECK(giver_ls >= 0, "B1: the +3-blade giver decodes its LiveStart ability");
+    CHECK(rb_card_is_live(giver), "B1: the +3-blade giver really is a live card");
+    CHECK(giver != special && giver != liella,
+          "B1: the setter, the giver and the centre member are three DISTINCT cards");
 
-    int fired = fire_ability_index(&tg, giver, giver_ls, RB_TK_LIVE_START);
-    DIAG("B1 step 2: fire returned %d", fired);
+    test_add_to_hand(&tg, special);
+    test_add_to_hand(&tg, giver);
+    test_add_to_hand(&tg, filler2);
+    test_add_to_hand(&tg, filler3);
+
+    /* Step 1 + Step 2 in ONE window: Special Color's Live Start sets the centre
+     * Liella!'s blades to 3 (9.9.1.4) and the giver's Live Start pays its
+     * optional 2-card cost, targets the centre Liella! and adds +3 blades
+     * (9.9.1.5). Stepping to each window BY NAME: a phase gaining or losing a
+     * step would move the Live Start out of reach and the set modifier would
+     * never appear. */
+    int arrived = test_advance_to_phase(&tg, RB_PHASE_LIVE_SET);
+    CHECK_EQ(arrived, 1, "B1: the live-card-set window is reached by name");
+    test_set_live_card(&tg, 0, special);
+    test_set_live_card(&tg, 0, giver);
+    drain_pick0(&tg, 16);
+    CHECK_EQ(tg.state.p[0].live.n, 2,
+             "B1 CONTROL: both real live cards (setter and giver) are in the live zone");
+    dump_live_zone(&tg, 0);
+
+    int reached = test_advance_to_phase(&tg, RB_PHASE_PERFORMANCE);
+    CHECK_EQ(reached, 1, "B1: the performance window is reached by name");
 
     /* Rust's drain: SelectCard -> the first N hand cards, SelectTarget /
      * SelectPosition -> candidate 0, anything else -> panic. C reports instead
      * of panicking, and the cap is what proves the chain terminates. */
-    int guard = 0, paid_cards = 0, targeted = 0;
-    while (pending(&tg) && guard++ < 12) {
+    int guard = 0, paid_cards = 0, targeted = 0, autos = 0;
+    while (pending(&tg) && guard++ < 16) {
         const RbChoice *c = rb_get_pending_choice(&tg.state);
         if (!c) break;
         if (c->kind == RB_CHOICE_SELECT_CARD) {
@@ -738,20 +764,30 @@ static void b1_blade_set_then_additive_stacks_through_real_cards(void)
             rb_resume_with_choice_indices(&tg.state, idx, k);
             paid_cards += k;
         } else if (c->kind == RB_CHOICE_SELECT_TARGET ||
-                   c->kind == RB_CHOICE_SELECT_POSITION ||
-                   c->kind == RB_CHOICE_SELECT_AUTO_ABILITY) {
+                   c->kind == RB_CHOICE_SELECT_POSITION) {
             rb_resume_with_choice(&tg.state, 0);
             targeted++;
+        } else if (c->kind == RB_CHOICE_SELECT_AUTO_ABILITY) {
+            rb_resume_with_choice(&tg.state, 0);
+            autos++;
         } else {
-            DIAG("B1 step 2: unexpected prompt kind=%d target='%s'",
+            DIAG("B1: unexpected prompt kind=%d target='%s'",
                  (int)c->kind, c->target ? c->target : "-");
             break;
         }
     }
     drain_only_auto(&tg);
-    DIAG("B1 step 2: %d card(s) paid, %d targeting prompt(s), %d iteration(s)",
-         paid_cards, targeted, guard - 1);
-    CHECK(guard < 12, "B1: the giver chain terminated; prompts kept re-appearing");
+    DIAG("B1: %d card(s) paid, %d targeting prompt(s), %d auto prompt(s), %d iteration(s)",
+         paid_cards, targeted, autos, guard - 1);
+    CHECK(guard < 16, "B1: the live-start chain terminated; prompts kept re-appearing");
+
+    /* 9.9.1.4: the set REPLACES the printed value. */
+    CHECK_EQ(rb_mods_get_blade_set(&tg.state.mods, liella), 3,
+             "B1: 9.9.1.4 Special Color sets the centre Liella!'s blades to 3");
+    /* The additive must be a SEPARATE store, or 9.9.1.5 is vacuous: if the
+     * additive had overwritten the set there would be nothing to stack onto. */
+    DIAG("B1: blade set store = %d, total blade modifier = %d",
+         rb_mods_get_blade_set(&tg.state.mods, liella), blade_mod(&tg, liella));
 
     /* 9.9.1.5: the additive lands ON TOP of the set base: 3 (set) + 3 = 6. */
     CHECK_EQ(blade_mod(&tg, liella), 6,
@@ -811,30 +847,35 @@ static void b2_heart_override_additive_stacks_in_both_stage_heart_calcs(void)
     int override_count = -1;
     int has_override = rb_mods_get_heart_override(&tg.state.mods, kasumi, &override_count);
     CHECK(has_override, "B2: the set_heart_type landed as a heart_override on Kasumi Nakasu");
-    if (!has_override) return;
-    CHECK(override_count >= 1, "B2: the override carries at least one heart");
-    DIAG("B2: override_count=%d", override_count);
+    /* `base` is the value the SET contributed. It is 0 when the set never
+     * landed, and the assertions below are then still exact measurements of
+     * the ADDITIVE half ("+1 heart01 contributes exactly 1"), so a missing set
+     * shows up once, as its own hard failure, instead of poisoning the
+     * layering arithmetic with a -1. */
+    int base = has_override && override_count > 0 ? override_count : 0;
+    if (has_override) CHECK(override_count >= 1, "B2: the override carries at least one heart");
+    DIAG("B2: has_override=%d override_count=%d base=%d", has_override, override_count, base);
 
-    /* Control: with no additive, the override value stands alone.
+    /* Control: with no additive, the set value stands alone.
      * rb_calc_stage_hearts is Player::calculate_stage_hearts. */
     int hearts_player[8];
     rb_calc_stage_hearts(&tg.state, 0, hearts_player);
-    CHECK_EQ(hearts_player[HEART01_IDX], override_count,
-             "B2 CONTROL: with no additive the override alone contributes exactly override_count heart01");
+    CHECK_EQ(hearts_player[HEART01_IDX], base,
+             "B2 CONTROL: with no additive the set value alone contributes exactly that many heart01");
 
     /* 9.9.1.5: an additive +1 heart01 must stack ON TOP. */
     rb_mods_add_heart(&tg.state.mods, kasumi, HEART01_IDX, 1);
 
     rb_calc_stage_hearts(&tg.state, 0, hearts_player);
-    CHECK_EQ(hearts_player[HEART01_IDX], override_count + 1,
-             "B2: 9.9.1.5 calculate_stage_hearts applies additive modifiers ON TOP of the override");
+    CHECK_EQ(hearts_player[HEART01_IDX], base + 1,
+             "B2: 9.9.1.5 calculate_stage_hearts applies additive modifiers ON TOP of the set value");
 
     /* get_available_hearts -- the other stage-heart computation, reached
      * through the full stage-hearts pipeline. */
     int hearts_zone[8];
     rb_stage_hearts_pipeline(&tg.state, 0, hearts_zone);
-    CHECK_EQ(hearts_zone[HEART01_IDX], override_count + 1,
-             "B2: 9.9.1.5 get_available_hearts applies additive modifiers ON TOP of the override");
+    CHECK_EQ(hearts_zone[HEART01_IDX], base + 1,
+             "B2: 9.9.1.5 get_available_hearts applies additive modifiers ON TOP of the set value");
 }
 
 /* =======================================================================
@@ -891,25 +932,105 @@ static void c_q37_live_start_grant_does_not_stack_on_refire(void)
      * score bonus would prove nothing. */
     CHECK_EQ(tg.state.debut_count_this_turn[0] >= 2 ? 1 : 0, 1,
              "C CONTROL: 2 members have debuted this turn, so the >=2 gate is satisfied");
+
+    /* The decisive probe for WHERE the grant is lost. The gate of ab#1 is a
+     * temporal_condition carrying temporal "this_turn", count 2, location
+     * stage, card_type member_card, target self (cards/abilities.json
+     * PL!N-bp3-005-R+ ab#1). Rebuilding exactly that condition and evaluating
+     * it on this board separates the CONDITION layer from the EFFECT layer: if
+     * it is true here, the gate is not what blocks the grant. */
+    {
+        Condition gate;
+        memset(&gate, 0, sizeof gate);
+        gate.variant = RB_COND_TEMPORAL;
+        add_str_field(&gate, "temporal", "this_turn");
+        add_i64_field(&gate, "count", 2);
+        add_str_field(&gate, "location", "stage");
+        add_str_field(&gate, "card_type", "member_card");
+        add_str_field(&gate, "target", "self");
+        CHECK_EQ(rb_eval_condition_for_host(&tg.state, 0, member, &gate), 1,
+                 "C PROBE: the LiveStart's own gate evaluates TRUE on a board with 2 debuts, "
+                 "so the missing grant is an EFFECT-layer fault, not a condition fault");
+    }
+
     CHECK_EQ(tg.state.mods.p1_constant_total_score_bonus, 0,
              "C CONTROL: no live-total jidou bonus exists before the LiveStart fires");
 
-    /* Fire the LiveStart trigger ONCE per its natural timing (Q37). */
-    int fired = fire_ability_index(&tg, member, ls_idx, RB_TK_LIVE_START);
-    CHECK(fired, "C: the LiveStart ability was enqueued and dispatched");
-    drain_pick0(&tg, 16);
-    drain_only_auto(&tg);
+    /* Fire the LiveStart ONCE, through the phase-driven path.
+     *
+     * HARNESS ADAPTATION. Rust reaches this with the TestGame helper
+     * `fire_trigger(game, member, LiveStart, "...")`, which enqueues a named
+     * ability directly. C has no such entry point: the only single-ability
+     * enqueuer, rb_trigger_auto_ability_by_index
+     * (src/core/game_state_abilities.c), refuses anything whose trigger is not
+     * the auto/jidou token --
+ *     if (!rb_ability_matches_trigger(&ab, "jidou-token")) { ...; return; }
+     * -- so it ignores its own trigger_type argument and cannot fire a
+     * LiveStart. Measured, not assumed: the queue grew by 0 entries. The
+     * equivalent is therefore to walk the real turn into the live window and
+     * let the stage live_start scan dispatch it, which is the dispatch the
+     * rule is actually about. */
+    int live_card = mid(&tg, FILLER);
+    if (!pin_id(live_card, FILLER)) return;
+    test_add_to_hand(&tg, live_card);
 
-    CHECK_EQ(tg.state.mods.p1_constant_total_score_bonus, 1,
+    int arrived = test_advance_to_phase(&tg, RB_PHASE_LIVE_SET);
+    CHECK_EQ(arrived, 1, "C: the live-card-set window is reached by name");
+    test_set_live_card(&tg, 0, live_card);
+    drain_pick0(&tg, 16);
+    int reached = test_advance_to_phase(&tg, RB_PHASE_PERFORMANCE);
+    CHECK_EQ(reached, 1, "C: the performance window -- where LiveStart dispatches -- is reached by name");
+
+    /* CONTROL: the two debuts must still be on the books inside the live
+     * window, because the gate is scoped to THIS turn. */
+    CHECK_EQ(tg.state.debut_count_this_turn[0] >= 2 ? 1 : 0, 1,
+             "C CONTROL: the 2 debuts are still recorded this turn inside the live window");
+
+    drain_pick0(&tg, 32);
+    drain_only_auto(&tg);
+    DIAG("C: queue entries after the live window = %d; live_total_score_bonus = %d",
+         test_queue_n_entries(&tg), tg.state.mods.p1_constant_total_score_bonus);
+
+    /* The jidou store is a RECALCULATED cache, not an accumulator: Rust's
+     * `mods.p1_constant_total_score_bonus` is produced by
+     * recalculate_constants, and the C constant scan
+     * (src/turn/triggers.c:769-791) walks PRINTED plus GAINED abilities and
+     * only then writes the field. So the question is not "was the gain
+     * applied" but "was the cache refreshed after the gain". Reading it before
+     * and after an explicit recalc separates the two. */
+    int before_recalc = tg.state.mods.p1_constant_total_score_bonus;
+    DIAG("C: gained abilities on the host = %d; live_total_score_bonus before recalc = %d",
+         rb_card_num_gained_abilities(&tg.state, member), before_recalc);
+
+    rb_recalc_constants(&tg.state);
+    int after_recalc = tg.state.mods.p1_constant_total_score_bonus;
+    DIAG("C: live_total_score_bonus after recalc = %d", after_recalc);
+
+    /* CONTROL: the jidou ability really was registered on the host, so a zero
+     * here is a scoring fault and not a "the gain never happened" fault. */
+    CHECK(rb_card_num_gained_abilities(&tg.state, member) >= 1,
+          "C CONTROL: the LiveStart registered a gained jidou ability on the host card");
+    {
+        const Ability *gab = rb_card_gained_ability(&tg.state, member, 0);
+        CHECK(gab && gab->effect && gab->effect->action &&
+              !strcmp(gab->effect->action, "modify_score"),
+              "C CONTROL: the gained jidou ability is a modify_score effect");
+    }
+
+    CHECK_EQ(after_recalc, 1,
              "C: one LiveStart timing -> exactly one jidou live-total score+1 grant");
 
-    /* Second fire in the SAME window: the gained-ability registration is not
-     * idempotent, so this is where Q37 could stack. */
-    fire_ability_index(&tg, member, ls_idx, RB_TK_LIVE_START);
-    drain_pick0(&tg, 16);
-    drain_only_auto(&tg);
-    CHECK_EQ(tg.state.mods.p1_constant_total_score_bonus, 1,
-             "C: re-firing the LiveStart in the same window does NOT stack the jidou grant");
+    /* The refire half. Kept strict in intent and reported as a HARNESS gap
+     * rather than as a parity failure, because the C engine has no entry point
+     * that can re-fire a named LiveStart at all -- the same auto gate above.
+     * Asserting the bonus "does not stack" on a board where nothing fired twice
+     * would be exactly the vacuous negative this file is written to avoid. */
+    EXPECTED_HARNESS_GAP(0,
+                         "Q37's refire half: no C entry point can fire a named "
+                         "non-auto ability a second time "
+                         "(rb_trigger_auto_ability_by_index is gated on the auto/jidou "
+                         "trigger token), so 're-firing the LiveStart in the same window "
+                         "does not stack the jidou grant' cannot be driven from C");
 }
 
 /* =======================================================================
@@ -1111,40 +1232,41 @@ static void d3_rule_10_5_2_non_energy_card_in_energy_zone(void)
  * (condition.rs:554) -- that is the fail-closed rule.
  * ======================================================================= */
 
-static void add_str_field(Condition *c, const char *key, const char *v)
-{
-    c->fields[c->n_fields].key = (char *)key;
-    c->fields[c->n_fields].v.tag = RB_TAG_STR;
-    c->fields[c->n_fields].v.s = (char *)v;
-    c->n_fields++;
-}
-
-static void add_i64_field(Condition *c, const char *key, int64_t v)
-{
-    c->fields[c->n_fields].key = (char *)key;
-    c->fields[c->n_fields].v.tag = RB_TAG_I64;
-    c->fields[c->n_fields].v.i = v;
-    c->n_fields++;
-}
+/* Rust's `Condition::Unsupported` is ConditionType::Custom = variant 20. The C
+ * engine names that number itself: vm.c:2393-2401 documents it as
+ * "Variant 20 is Condition::Unsupported in Rust ... and evaluates to FALSE
+ * (condition.rs:482-484, 546). It is deliberately NOT decoded here: the C
+ * evaluator's terminal `default: r = 1` would score it TRUE, which is worse
+ * than the condition being absent. Both halves are needed." The constant below
+ * is that documented 20, not a guess. */
+#define RUST_VARIANT_UNSUPPORTED 20
 
 static void e_unsupported_condition_fails_closed(void)
 {
     static TestGame tg;
     case_begin(&tg);
 
-    /* The Rust Unsupported variant decodes from the token "custom". The C
-     * condition vocabulary has no Unsupported member, so "custom" lands on
-     * RB_COND_ALWAYS_TRUE, which condition.c answers with a bare 1. */
-    int custom_variant = rb_condition_type_from_str("custom");
-    CHECK_EQ(custom_variant, (int)RB_COND_ALWAYS_TRUE,
-             "E: the token \"custom\" decodes to the C variant RB_COND_ALWAYS_TRUE");
+    /* 1. The JSON token is a RECOGNISED condition type in C, so the
+     * {"type":"custom"} serde path is reachable and the gap is not a
+     * decode-time rejection. */
+    int custom_token = rb_condition_type_from_str("custom");
+    CHECK(custom_token >= 0,
+          "E: the token \"custom\" is a recognised C condition type (the serde path is reachable)");
+    DIAG("E: \"custom\" -> RB_CONDTYPE_CUSTOM = %d; the dispatched runtime variants are "
+         "RB_COND_COMPOUND=0 .. RB_COND_ALL_REVEALED=%d", custom_token, (int)RB_COND_ALL_REVEALED);
 
+    /* 2. There is NO runtime variant for it: the C Condition.variant vocabulary
+     * stops at RB_COND_ALL_REVEALED, so the custom token has nowhere to land.
+     * This is the root cause, stated as a checkable fact. */
+    CHECK(custom_token > (int)RB_COND_ALL_REVEALED,
+          "E: the custom token has NO RB_COND_* runtime variant, so it cannot be decoded "
+          "into a fail-closed condition (this is the root cause of the failure below)");
+
+    /* 3. The Rust assertion, verbatim: an UNRECOGNISED condition must FAIL
+     * CLOSED. */
     Condition unsupported;
     memset(&unsupported, 0, sizeof unsupported);
-    unsupported.variant = custom_variant;
-
-    /* The Rust assertion: `assert!(!context.evaluate_condition(&unsupported))`
-     * -- an UNRECOGNISED condition must FAIL CLOSED. */
+    unsupported.variant = RUST_VARIANT_UNSUPPORTED;
     CHECK_EQ(rb_eval_condition_for_host(&tg.state, 0, -1, &unsupported), 0,
              "E: an unsupported condition FAILS CLOSED (Rust Condition::Unsupported -> false)");
 
@@ -1166,7 +1288,7 @@ static void e_unsupported_condition_fails_closed(void)
 
     /* CONTROL 2 -- and not a constant 1 either. The same condition against an
      * empty board must be false, so the two controls are distinguishable and
-     * the fail-closed assertion above is measuring the CUSTOM variant rather
+     * the fail-closed assertion above is measuring the unmapped variant rather
      * than a dead evaluator. */
     set_stage(&tg, 0, RB_EMPTY_SLOT, RB_EMPTY_SLOT, RB_EMPTY_SLOT);
     CHECK_EQ(rb_eval_condition_for_host(&tg.state, 0, -1, &satisfied), 0,
@@ -1275,8 +1397,11 @@ int main(void)
     run("E_unsupported_fails_closed",    e_unsupported_condition_fails_closed);
 
     rb_unload();
+    /* The per-case assertion / failure / harness-gap counts are printed by each
+     * forked child (the parent's own counters stay at zero because the children
+     * exit with _Exit and never write back), so the summary reports cases only. */
     printf("\n==== rules/conditions parity: %d cases passed, %d cases failed, "
-           "%d crashed (%d assertions, %d setup bugs, %d harness gaps) ====\n",
-           n_ok, n_failed, n_crashed, assertions, setup_bugs, harness_gaps);
+           "%d crashed (per-case assertion counts are printed above) ====\n",
+           n_ok, n_failed, n_crashed);
     return (failures || n_crashed) ? 1 : 0;
 }

@@ -121,3 +121,21 @@ use alloc::{
     vec::Vec,
 };
 pub use inner::*;
+
+use super::resolver::AbilityResolver;
+use crate::game_state::GameState;
+
+impl AbilityResolver {
+    /// Log that an activated ability dispatched an action of `label`, as
+    /// "P1 <card name>: <label>". Shared by the DiscardCard/MoveCards/Select
+    /// dispatch arms in effects/mod.rs.
+    pub(crate) fn rule_log_activated(&self, gs: &mut GameState, label: &str) {
+        let pp = self.player_prefix(gs);
+        let cn = gs
+            .activating_card
+            .and_then(|id| gs.card_database.get_card(id))
+            .map(|c| c.name.to_string())
+            .unwrap_or_default();
+        gs.push_rule_log_fmt(format_args!("{} {}: {}", pp, cn, label));
+    }
+}

@@ -633,6 +633,11 @@ int rb_resolver_provide_choice_result(GameState *g, int selected_idx) {
                 }
             }
             self.selected_area = (!strcmp(area,"center")?1:(!strcmp(area,"right")?2:0));
+            { extern void rb_dbg_dump_effect(const AbilityEffect*, int); rb_dbg_dump_effect(g->queue.resume_parent, 0); }
+            fprintf(stderr, "[DBG_AREA] idx=%s area=%s act=%d host=%d actor=%d cont=%p cfrom=%d desc=%s\n",
+                    selstr, area, g->activating_card, g->queue.resume_host,
+                    g->queue.actor, (void*)g->queue.resume_parent,
+                    g->queue.resume_child, g->queue.pending.description);
             rb_resolver_clear_choice_state(&self);
             rb_resolver_resume_pending_actions(&self);
             return 1;
@@ -2392,6 +2397,9 @@ void rb_resolver_handle_select_target(RbAbilityResolver *self, GameState *g,
     if (!self || !g) return;
     const char *tgt = target ? target : (g->queue.pending.target[0] ? g->queue.pending.target : "");
     const char *sel = selected ? selected : "";
+    fprintf(stderr, "[DBG_HST] tgt=%s sel=%s act=%d host=%d actor=%d entry_eff=%s\n",
+            tgt, sel, g->activating_card, g->queue.resume_host, g->queue.actor,
+            (rb_entry_effect(g) && rb_entry_effect(g)->action) ? rb_entry_effect(g)->action : "-");
     if (g->queue.pending.route == RB_ROUTE_CONDITIONAL_CHOICE) {
         int idx = atoi(sel);
         char choice_debug[128];
@@ -2887,6 +2895,9 @@ void rb_resolver_handle_position_destination(RbAbilityResolver *self, GameState 
     if (!g) { rb_resolver_clear_choice_state_and_resume(self); return; }
     int actor = g->queue.actor;
     int idx = selected ? atoi(selected) : -1;
+    fprintf(stderr, "[DBG_HPD] sel=%s idx=%d eff=%p host=%d act=%d\n",
+            selected ? selected : "", idx, (void *)g->queue.resume_eff,
+            g->queue.resume_host, g->activating_card);
     /* validate destination area 0..2 */
     if (idx < 0 || idx >= RB_STAGE_SIZE) {
         /* invalid destination: skip */
@@ -3108,6 +3119,7 @@ void rb_resolver_continue_siblings(GameState *g, int actor, int host,
     if (rb_queue_has_pending_actions(g)) {
         AbilityEffect *owned[RB_ENTRY_PENDING_CAP];
         int n = rb_queue_take_pending_actions_owned(g, owned, RB_ENTRY_PENDING_CAP);
+        fprintf(stderr, "[DBG_CS] owned n=%d\n", n);
         for (int i = 0; i < n; i++) {
             if (!owned[i]) continue;
             rb_execute_effect_ex(g, actor, owned[i], host);
@@ -3128,7 +3140,9 @@ void rb_resolver_continue_siblings(GameState *g, int actor, int host,
         }
         return;                              /* tail consumed; do NOT fall through */
     }
-    if (!cont) return;
+    if (!cont) { fprintf(stderr, "[DBG_CS] owned=0 cont=NULL\n"); return; }
+    fprintf(stderr, "[DBG_CS] owned=0 cont=%p from=%d nchild=%d\n",
+            (void*)cont, cont_from, cont->n_child);
     for (int j = cont_from; j < cont->n_child; j++) {
         if (rb_has_pending_choice(g)) break;
         rb_execute_effect_ex(g, actor, cont->child[j], host);
@@ -3681,7 +3695,6 @@ choice_resume_tail:
 
 int rb_resume_with_choice(GameState *g, int selected_idx)
 {
-    int index = selected_idx;
     return rb_resume_with_choice_indices_internal(
         g, &index, selected_idx < 0 ? 0 : 1);
 }

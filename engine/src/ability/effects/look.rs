@@ -1,8 +1,8 @@
 use crate::core::constants::CountCast;
-use super::enums::Zone;
-use super::resolver::AbilityResolver;
-use super::types::{Choice, ChoiceRoute, ExecutionContext, LookAndSelectStep};
-use super::util;
+use super::super::enums::Zone;
+use super::super::resolver::AbilityResolver;
+use super::super::types::{Choice, ChoiceRoute, ExecutionContext, LookAndSelectStep};
+use super::super::util;
 use crate::ability::queue::ConditionalChoice;
 use crate::card::AbilityEffect;
 use crate::game_state::GameState;
@@ -1363,6 +1363,164 @@ fn reveal_until_check<F>(
         } else {
             gs.looked_at_cards.clear();
         }
+        Ok(())
+    }
+
+    pub(crate) fn execute_reveal_until_chosen_card(
+        &mut self,
+        gs: &mut GameState,
+        effect: &AbilityEffect,
+    ) -> Result<(), String> {
+        // Get the chosen card type from the effect or from the current ability queue entry
+        let chosen_card_type = gs
+            .ability_queue
+            .current_entry()
+            .and_then(|e| match &e.conditional_choice {
+                Some(ConditionalChoice::Str(s)) => Some(s.clone()),
+                _ => None,
+            })
+            .or_else(|| effect.card_type_any().map(|s| s.to_string()));
+
+        if let Some(card_type) = chosen_card_type {
+            // Use the existing reveal_until_target functionality
+            self.owner.executing = Some(effect.clone());
+            self.execute_reveal_until_target(
+                gs,
+                effect.target_name(),
+                Some(&card_type),
+                None,
+                None,
+            )?;
+
+            // After reveal, we need to move the chosen card to hand and others to discard
+            // The looked_at_cards should contain: [chosen_card, other_revealed_cards...]
+            if !gs.looked_at_cards.is_empty() {
+                let chosen_card = gs.looked_at_cards[0];
+                let other_cards = gs.looked_at_cards[1..].to_vec();
+
+                // Move chosen card to hand
+                let player = gs.resolve_target_player_mut(effect.target_name());
+                player.hand.cards.push(chosen_card);
+
+                // Move other cards to discard
+                player.waitroom.cards.extend(other_cards);
+
+                // Clear looked_at_cards
+                gs.looked_at_cards.clear();
+            }
+        } else if let Some(or_types) = effect.or_card_types_any() {
+            // No card type chosen yet — create the type choice prompt.
+            let desc = format!("Choose: {}", or_types.join(", or "));
+            self.awaiting.choice = Some(Choice::SelectTarget {
+                target: "choice_string".to_string(),
+                description: desc,
+                description_en: Some(format!("Choose: {}", or_types.join(", or "))),
+                description_ja: Some(format!("選択: {}", or_types.join(", or "))),
+                allow_skip: false,
+                options: Some(
+                    or_types
+                        .iter()
+                        .map(|t| {
+                            let label = match t.as_str() {
+                                "live_card" => {
+                                    if effect.cost_limit_any().is_some() {
+                                        format!(
+                                            "Live card (cost {}{})",
+                                            effect
+                                                .cost_limit_operator_any()
+                                                .as_deref()
+                                                .unwrap_or(">="),
+                                            effect.cost_limit_any().unwrap()
+                                        )
+                                    } else {
+                                        "Live card".to_string()
+                                    }
+                                }
+                                "member_card" => {
+                                    format!(
+                                        "Member card (cost {} {})",
+                                        effect.cost_limit_operator_any().as_deref().unwrap_or(">="),
+                                        effect.cost_limit_any().unwrap_or(0)
+                                    )
+                                }
+                                _ => t.clone(),
+                            };
+                            label
+                        })
+                        .collect(),
+                ),
+            });
+            self.in_flight.execution_context = ExecutionContext::SingleEffect { effect_index: 0 };
+            // Store the or_card_types so the choice handler can look them up
+            if let Some(entry) = gs.ability_queue.current_entry_mut() {
+                entry.conditional_choice = Some(ConditionalChoice::Strings(or_types.to_vec()));
+            }
+        } else {
+            // If no card type was chosen and no available types, just clear any looked_at_cards
+            gs.looked_at_cards.clear();
+        }
+
+        Ok(())
+    }
+
+    pub(crate) fn execute_reveal_effect(
+        &mut self,
+        gs: &mut GameState,
+        effect: &AbilityEffect,
+    ) -> Result<(), String> {
+        if effect.multiple_targets_any().unwrap_or(false)
+            && Zone::from_str(effect.source_any().unwrap_or("")) == Some(Zone::DeckTop)
+        {
+            if effect.optional.unwrap_or(false) {
+                self.emit_pay_skip_gate(
+                    gs,
+                    Some(ChoiceRoute::OptionalCost),
+                    "Reveal cards from deck (optional cost)?".to_string(),
+                    "山札からカードを公開（オプションコスト）？".to_string(),
+                    true,
+                    None,
+                );
+                return Ok(());
+            }
+            let chosen = gs
+                .ability_queue
+                .current_entry()
+                .and_then(|e| match &e.conditional_choice {
+                    Some(ConditionalChoice::Str(s)) => Some(s.clone()),
+                    _ => None,
+                })
+                .or_else(|| effect.card_type_any().map(|s| s.to_string()));
+            // cost_limit and operator come from the reveal effect itself if set,
+            // or from the conditional_choice JSON if stored there by select.
+            let cl = effect.cost_limit_any();
+            let co_binding = effect.cost_limit_operator_any();
+            let co = co_binding.as_deref();
+            self.owner.executing = Some(effect.clone());
+            return self.execute_reveal_until_target(
+                gs,
+                effect.target_name(),
+                chosen.as_deref(),
+                cl,
+                co,
+            );
+        }
+        self.owner.executing = Some(effect.clone());
+        self.execute_reveal(
+            gs,
+            effect.source_or(Zone::Hand.to_str()),
+            effect.count_or(1),
+            effect.target_name(),
+            effect.card_type_any().map(|ct| ct.as_card_str()),
+            effect.heart_colors_any(),
+            effect.blind_any().unwrap_or(false),
+        )?;
+
+        // NOTE: "これによりライブカードを公開した場合スコア+1" patterns are parsed
+        // as conditional_on_result (result_condition on revealed_cards +
+        // followup modify_score) and resolved by execute_conditional_on_result.
+        // The old hardcoded reveal→score heuristic here was removed: it fired
+        // even when the card text had no such follow-up.
+
         Ok(())
     }
 }
