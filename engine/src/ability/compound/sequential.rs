@@ -149,7 +149,8 @@ pub(crate) fn prepare_sequential_action(
             if let Some(d) = effect.distinct_any() {
                 if let Some(f) = action_to_execute
                     .kind
-                    .as_deref_mut()
+                    .as_mut()
+                    .map(crate::Arc::make_mut)
                     .and_then(|k| k.filter_mut())
                 {
                     f.distinct = Some(Box::new(d));

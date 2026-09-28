@@ -41,7 +41,13 @@ const REN: &str = "PL!SP-bp5-005-R＋";
 /// ブレード count is 2 (both milled members are Liella!). If these were the same
 /// card id the "recovered card ∈ milled set" assertion could not distinguish the
 /// members from each other.
-const LIELLA_A: &str = "PL!SP-bp1-002-R";
+/// 唐 可可. Was `"PL!SP-bp1-002-R"`, which drops the fullwidth `＋` — the real
+/// print is `PL!SP-bp1-002-R＋`, and the other prints of this card are `-P` and
+/// `-SEC`. `get_card_id`'s lenient fallback silently substituted a different
+/// print, so this staged a bystander member by accident. The assertions still
+/// held (it is only used to make the milled set identifiable by id), which is
+/// why the typo survived.
+const LIELLA_A: &str = "PL!SP-bp1-002-R＋";
 const LIELLA_B: &str = "PL!SP-bp1-004-R";
 /// A non-Liella card, so the mill's 3 = 2 Liella + 1 other and ab#0's count (2)
 /// and ab#1's pool (3) genuinely differ.

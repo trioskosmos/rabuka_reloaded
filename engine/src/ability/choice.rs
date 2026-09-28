@@ -3004,7 +3004,7 @@ gs.set_recently_moved_batch(valid_ids.into(), Some("stage"));
             if let Some(ChoiceRoute::Raw(ref raw)) = choice_card_no {
                 if let Some(tgt) = raw.strip_prefix("position_change:") {
                     if tgt == "opponent:front" {
-                        if let Some(f) = modified.kind.as_deref_mut().and_then(|k| k.filter_mut()) {
+                        if let Some(f) = modified.kind.as_mut().map(crate::Arc::make_mut).and_then(|k| k.filter_mut()) {
                             f.source_position = Some(selected.into());
                         }
                         let pc_ok =

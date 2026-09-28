@@ -2537,46 +2537,64 @@ if util::distinct_should_dedupe(distinct) {
         let source = self.in_flight.spawn_context.source.as_deref().unwrap_or("");
         gs.record_card_appearance(card_id, source);
 
-        let card = gs.card_database.get_card(card_id).cloned();
-        if let Some(card) = card {
-            let card_no = card.card_no.to_string();
-
-            if let Some(player) = gs.try_player_by_id_mut(&player_id) {
-                player.debut_count_this_turn += 1;
+        // Borrowed, not cloned. The loop below needs `&mut gs`, so the borrow of
+        // the card cannot stay live across it — but only the enqueue ids are
+        // actually needed, and collecting those ends the borrow in one place.
+        // `.cloned()` here copied the whole Card (328 B, up to ten heap
+        // allocations for the display strings) on every stage placement.
+        let mut card_no = String::new();
+        let mut known_card = true;
+        let debut_ids: Vec<String> = match gs.card_database.get_card(card_id) {
+            None => {
+                log::debug!("[DEBUT_CHAIN] fire_debut_side_effects: unknown card id {card_id}");
+                known_card = false;
+                Vec::new()
             }
-
-            let mut debut_abilities = 0;
-            for ar in &card.abilities {
-                let ability = ar.resolve();
-                if GameState::ability_matches_trigger(
-                    &ability,
-                    &crate::core::types::AbilityTrigger::Debut,
-                ) {
-                    debut_abilities += 1;
-                    let ability_id = format!("{}_{}", card_no, ability.full_text);
+            Some(card) => {
+                card_no = card.card_no.to_string();
+                let mut ids = Vec::new();
+                for ar in &card.abilities {
+                    let ability = ar.resolve();
+                    if GameState::ability_matches_trigger(
+                        &ability,
+                        &crate::core::types::AbilityTrigger::Debut,
+                    ) {
+                        ids.push(format!("{}_{}", card_no, ability.full_text));
+                    }
+                }
+                if ids.is_empty() {
                     log::debug!(
-                        "[DEBUT_CHAIN] enqueueing debut of {card_no} (id={card_id}, \
-                         controller={player_id}): {ability_id}"
-                    );
-                    gs.trigger_auto_ability(
-                        ability_id,
-                        crate::core::types::AbilityTrigger::Debut,
-                        player_id.as_str(),
-                        Some(card_no.clone()),
-                        Some(card_id),
-                        None,
-                        None,
+                        "[DEBUT_CHAIN] {card_no} (id={card_id}) has no 登場 abilities — \
+                         nothing to enqueue"
                     );
                 }
+                ids
             }
-            if debut_abilities == 0 {
-                log::debug!(
-                    "[DEBUT_CHAIN] {card_no} (id={card_id}) has no 登場 abilities — \
-                     nothing to enqueue"
-                );
-            }
-        } else {
-            log::debug!("[DEBUT_CHAIN] fire_debut_side_effects: unknown card id {card_id}");
+        };
+        if !known_card {
+            gs.trigger_auto_abilities_for_player(&player_id);
+            gs.process_pending_auto_abilities(&player_id);
+            return;
+        }
+
+        if let Some(player) = gs.try_player_by_id_mut(&player_id) {
+            player.debut_count_this_turn += 1;
+        }
+
+        for ability_id in debut_ids {
+            log::debug!(
+                "[DEBUT_CHAIN] enqueueing debut of {card_no} (id={card_id}, \
+                 controller={player_id}): {ability_id}"
+            );
+            gs.trigger_auto_ability(
+                ability_id,
+                crate::core::types::AbilityTrigger::Debut,
+                player_id.as_str(),
+                Some(card_no.clone()),
+                Some(card_id),
+                None,
+                None,
+            );
         }
 
         // Cascade to other stage members that watch for ally debuts.

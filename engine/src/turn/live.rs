@@ -509,7 +509,12 @@ impl super::TurnEngine {
             }
             for i in 0..snap.lives.len() {
                 let lc_id = snap.lives[i].card_id;
-                let Some(card) = game_state.card_database.get_card(lc_id).cloned() else {
+                // Borrowed, not cloned: everything below only reads, and the
+                // borrow of `game_state` is immutable, so it does not conflict
+                // with the `snap` writes. `.cloned()` copied the whole Card
+                // (328 B, up to ten heap allocations) for every live card in
+                // every performance-phase snapshot.
+                let Some(card) = game_state.card_database.get_card(lc_id) else {
                     continue;
                 };
                 snap.lives[i].card_id = lc_id;

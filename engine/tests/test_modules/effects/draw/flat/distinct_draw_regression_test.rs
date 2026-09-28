@@ -1,11 +1,11 @@
 use crate::helpers::*;
 use rabuka_engine::ability::resolver::AbilityResolver;
 use rabuka_engine::card::{AbilityEffect, DistinctType, EffectFilter, EffectKind};
-use rabuka_engine::core::pool::EkBox;
+use std::sync::Arc;
 
 fn draw_effect(distinct: Option<DistinctType>) -> AbilityEffect {
     AbilityEffect {
-        kind: Some(EkBox::new(EffectKind::DrawCards {
+        kind: Some(Arc::new(EffectKind::DrawCards {
             filter: Some(Box::new(EffectFilter {
                 distinct: distinct.map(Box::new),
                 ..Default::default()

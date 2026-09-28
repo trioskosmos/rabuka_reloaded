@@ -13,21 +13,24 @@ use smallvec::SmallVec;
 
 #[cfg(feature = "no_std")]
 use alloc::{boxed::Box, string::String, string::ToString, vec::Vec};
+use crate::Arc;
 
-#[cfg(not(feature = "no_std"))]
-pub(crate) use crate::core::pool::EkBox;
-#[cfg(feature = "no_std")]
-pub(crate) type EkBox = alloc::boxed::Box<EffectKind>;
+// `AbilityEffect.kind` holds the decoded effect payload. It used to be a
+// hand-rolled pool box (`core::pool::EkBox`) on desktop and a plain `Box` on
+// `no_std`. The pool was worse on both counts: `Clone` took two `Mutex`
+// lock/unlock pairs and then deep-copied the `EffectKind` (whose
+// `EffectFilter` is ~1.2 KB) into a *fresh* pool slot, and `Deref`/`DerefMut`
+// were `unsafe` dereferences of pool memory rather than a pointer chase.
+//
+// `Arc` is what the `no_std` side was already missing: `Clone` becomes a
+// refcount bump, reads are an ordinary deref, and the mutation sites use
+// `Arc::make_mut`, which is a no-op clone-free write whenever the effect is
+// uniquely owned (which is the case for every build-time site) and a copy
+// only when it is genuinely shared.
+pub(crate) type EkBox = Arc<EffectKind>;
 
 pub(crate) fn ek_box_new(val: EffectKind) -> EkBox {
-    #[cfg(not(feature = "no_std"))]
-    {
-        crate::core::pool::EkBox::new(val)
-    }
-    #[cfg(feature = "no_std")]
-    {
-        alloc::boxed::Box::new(val)
-    }
+    Arc::new(val)
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
@@ -1780,7 +1783,7 @@ macro_rules! filter_opt_vec_ref_getter {
 macro_rules! filter_setter {
     ($fn:ident, $field:ident: $ty:ty) => {
         pub fn $fn(&mut self, val: Option<$ty>) {
-            if let Some(f) = self.kind.as_deref_mut().and_then(|k| k.filter_mut()) {
+            if let Some(f) = self.kind.as_mut().map(Arc::make_mut).and_then(|k| k.filter_mut()) {
                 f.$field = val;
             }
         }
@@ -2263,23 +2266,23 @@ impl AbilityEffect {
 
 impl AbilityEffect {
     pub fn set_card_names(&mut self, val: Vec<String>) {
-        if let Some(f) = self.kind.as_deref_mut().and_then(|k| k.filter_mut()) {
+        if let Some(f) = self.kind.as_mut().map(Arc::make_mut).and_then(|k| k.filter_mut()) {
             *f.card_names = val;
         }
     }
     pub fn set_group_names(&mut self, val: Option<Box<Vec<String>>>) {
-        if let Some(f) = self.kind.as_deref_mut().and_then(|k| k.filter_mut()) {
+        if let Some(f) = self.kind.as_mut().map(Arc::make_mut).and_then(|k| k.filter_mut()) {
             f.group_names = val;
         }
     }
     pub fn set_action_by(&mut self, val: Option<ArcStr>) {
-        if let Some(f) = self.kind.as_deref_mut().and_then(|k| k.filter_mut()) {
+        if let Some(f) = self.kind.as_mut().map(Arc::make_mut).and_then(|k| k.filter_mut()) {
             f.action_by = val;
         }
     }
     pub fn set_optional(&mut self, val: Option<bool>) {
         self.optional = val;
-        if let Some(f) = self.kind.as_deref_mut().and_then(|k| k.filter_mut()) {
+        if let Some(f) = self.kind.as_mut().map(Arc::make_mut).and_then(|k| k.filter_mut()) {
             f.optional = val;
         }
     }

@@ -26,8 +26,17 @@ use rabuka_engine::core::types::AbilityTrigger;
 
 const WONDERMATES: &str = "PL!N-sd2-025-P";
 /// 虹ヶ咲 — the group the filter names.
-const AZUNASA: &str = "PL!N-bp1-006-R＋";
-const AZUSA: &str = "PL!N-bp1-013-R";
+/// 近江彼方 (Omi Kanato). Named for the CARD, not a guess: the previous const
+/// was called AZUNASA, which is one character off, and nothing in this file
+/// referred to the character by name.
+const IN_GROUP_KANATO: &str = "PL!N-bp1-006-R＋";
+/// 虹ヶ咲, second in-group member. 上原歩夢 (Uehara Ayumu).
+/// The number was `"PL!N-bp1-013-R"`, which is NOT a card in the pool — the
+/// real prints are `PL!N-bp1-013-PR` / `PL!N-bp1-013-N`. `get_card_id`'s lenient
+/// fallback substituted one of those, so the test passed while naming a card
+/// that does not exist. It happened to be the right character, which is exactly
+/// why it was never noticed.
+const IN_GROUP_AYUMU: &str = "PL!N-bp1-013-PR";
 /// μ's — the right zone, the wrong group.
 const OUTSIDER: &str = "PL!-sd1-010-SD";
 const FILLER: &str = "PL!-sd1-010-SD";
@@ -78,8 +87,8 @@ fn is_active(game: &TestGame, cid: i16) -> bool {
 fn wondermates_activates_a_nijigasaki_member_and_never_the_outsider() {
     let mut game = TestGame::new(load_real_database());
     let wondermates = game.id(WONDERMATES);
-    let first = game.id(AZUNASA);
-    let second = game.id(AZUSA);
+    let first = game.id(IN_GROUP_KANATO);
+    let second = game.id(IN_GROUP_AYUMU);
     let outsider = game.id(OUTSIDER);
     game.assert_card_identity(wondermates, WONDERMATES);
     assert_ne!(first, second, "precondition: two DISTINCT 虹ヶ咲 members, or there is no choice to get wrong");
@@ -164,7 +173,7 @@ fn wondermates_activates_nothing_when_no_nijigasaki_member_is_staged() {
 fn wondermates_leaves_an_already_active_nijigasaki_member_alone() {
     let mut game = TestGame::new(load_real_database());
     let wondermates = game.id(WONDERMATES);
-    let niji = game.id(AZUNASA);
+    let niji = game.id(IN_GROUP_KANATO);
     let outsider = game.id(OUTSIDER);
 
     fill_decks(&mut game);

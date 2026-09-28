@@ -1571,7 +1571,8 @@ impl AbilityEffect {
         }
         if let Some(opts) = self
             .kind
-            .as_deref_mut()
+            .as_mut()
+            .map(crate::Arc::make_mut)
             .and_then(|k| k.filter_mut())
             .and_then(|f| f.options.as_mut())
         {
@@ -1585,7 +1586,7 @@ impl AbilityEffect {
         }
         // Nested sub-effects now live on the shared filter, so populate them
         // whenever the JSON provides them (no per-variant match needed).
-        if let Some(f) = self.kind.as_deref_mut().and_then(|k| k.filter_mut()) {
+        if let Some(f) = self.kind.as_mut().map(crate::Arc::make_mut).and_then(|k| k.filter_mut()) {
             if let Some(ref mut ros) = f.resource_on_select {
                 if let Some(ros_json) = json_val.get("resource_on_select") {
                     ros.populate_from_json(ros_json);
