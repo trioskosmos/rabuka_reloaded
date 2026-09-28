@@ -55,8 +55,14 @@ void test_add_to_success(TestGame *tg, int card_id){
     RbPlayer *P=&tg->state.p[0];
     if(P->success.n < RB_MAX_ZONE) P->success.cards[P->success.n++]=card_id;
 }
-void test_add_to_live(TestGame *tg, int card_id){
-    RbPlayer *P=&tg->state.p[0];
+void test_add_to_live(TestGame *tg, int card_id){ test_add_to_live_for(tg, 0, card_id); }
+/* Seat-aware raw live placement (Rust live_card_zone.cards.push with no hand
+   removal). Like test_set_live_card_for this APPENDS, and it appends to `pl`'s
+   OWN live zone. The cap stays RB_MAX_ZONE (the bag capacity test_add_to_live
+   has always used) so this shim's reachability does not change. */
+void test_add_to_live_for(TestGame *tg, int pl, int card_id){
+    if(!tg || pl<0 || pl>1 || card_id < 0) return;
+    RbPlayer *P=&tg->state.p[pl];
     if(P->live.n < RB_MAX_ZONE) P->live.cards[P->live.n++]=card_id;
 }
 void test_add_to_deck(TestGame *tg, int card_id){
@@ -167,10 +173,7 @@ void test_set_opp_stage(TestGame *tg, int area, int card_id){
     tg->state.p[1].stage[area]=card_id;
     tg->state.p[1].stage_wait[area]=0;
 }
-void test_add_to_opp_live(TestGame *tg, int card_id){
-    RbPlayer *P=&tg->state.p[1];
-    if(P->live.n < RB_MAX_ZONE) P->live.cards[P->live.n++]=card_id;
-}
+void test_add_to_opp_live(TestGame *tg, int card_id){ test_add_to_live_for(tg, 1, card_id); }
 void test_add_to_opp_success(TestGame *tg, int card_id){
     RbPlayer *P=&tg->state.p[1];
     if(P->success.n < RB_MAX_ZONE) P->success.cards[P->success.n++]=card_id;
@@ -242,8 +245,16 @@ void test_set_live_card(TestGame *tg, int slot, int card_id){
        live_cards_stuck_in_live_zone_instead_of_discard: "got 1 expected 3").
        Use test_insert_live_card_at for genuine positional placement. */
     (void)slot;
-    if(!tg || card_id < 0) return;
-    RbPlayer *P=&tg->state.p[0];
+    test_set_live_card_for(tg, 0, card_id);
+}
+/* Seat-aware live placement — mirror TestGame::set_live_card_for(Side, card).
+   The live zone it writes is `pl`'s OWN, so a P2-owned live card really lands
+   in p2's live_card_zone (which is what a P2-triggered ability scans) instead
+   of silently landing in P1's zone, where the fixture still looks plausible
+   and measures the wrong thing. Still the APPEND path; never a fixed index. */
+void test_set_live_card_for(TestGame *tg, int pl, int card_id){
+    if(!tg || pl<0 || pl>1 || card_id < 0) return;
+    RbPlayer *P=&tg->state.p[pl];
     for (int i = 0; i < P->hand.n; i++) {
         if (P->hand.cards[i] == card_id) {
             rb_hand_remove_card(P, i);
@@ -253,26 +264,49 @@ void test_set_live_card(TestGame *tg, int slot, int card_id){
     if (P->live.n >= RB_MAX_LIVE_CARDS) return;   /* the live zone holds at most 3 */
     P->live.cards[P->live.n++] = card_id;
 }
-/* Explicit positional live-zone placement: shift the tail right and place the
-   card at `slot`, growing the zone to cover it. Test-only; prefer the append
-   path (test_set_live_card) so a test never has to reason about slot reuse. */
 void test_insert_live_card_at(TestGame *tg, int slot, int card_id){
-    if(!tg || card_id < 0) return;
+    test_insert_live_card_at_for(tg, 0, slot, card_id);
+}
+/* Explicit positional live-zone placement: shift the tail right and place the
+   card at `slot`. Test-only; prefer the append path (test_set_live_card) so a
+   test never has to reason about slot reuse.
+
+   Contract, chosen so a live zone can never contain a hole:
+     slot == n          append at the tail;
+     slot  < n          ordered insert, tail shifts right, and if the 3-card
+                        zone is already full the LAST card falls off the end;
+     slot  > n          refused -- the live zone is an ordered bag, and a gap
+                        there would be read either as a phantom card (the bare
+                        slot still holds whatever the zone had, 0 on a fresh
+                        TestGame, which IS a real card index) or as end-of-zone
+                        by the zone accessors. Neither is a card state the
+                        engine can produce, so the placement is refused
+                        instead of fabricating one. */
+void test_insert_live_card_at_for(TestGame *tg, int pl, int slot, int card_id){
+    if(!tg || pl<0 || pl>1 || card_id < 0) return;
     if(slot<0 || slot>=RB_MAX_LIVE_CARDS) return;
-    RbPlayer *P=&tg->state.p[0];
+    RbPlayer *P=&tg->state.p[pl];
     for (int i = 0; i < P->hand.n; i++) {
         if (P->hand.cards[i] == card_id) {
             rb_hand_remove_card(P, i);
             break;
         }
     }
-    if (P->live.n > slot) {
-        int n = P->live.n;
-        if (n >= RB_MAX_LIVE_CARDS) n = RB_MAX_LIVE_CARDS - 1;
-        for (int i = n; i > slot; i--) P->live.cards[i] = P->live.cards[i-1];
-        P->live.n = n + 1;
-    } else {
+    if (slot > P->live.n) return;            /* would leave a gap: refuse */
+    if (slot == P->live.n) {
         P->live.n = slot + 1;
+    } else {
+        int n = P->live.n;
+        if (n >= RB_MAX_LIVE_CARDS) {
+            /* Full: shift the tail right and let the last card fall off. The
+               previous revision clamped to CAP-1 and then wrote cards[slot]
+               over a live card, silently destroying it. */
+            for (int i = RB_MAX_LIVE_CARDS - 1; i > slot; i--)
+                P->live.cards[i] = P->live.cards[i-1];
+        } else {
+            for (int i = n; i > slot; i--) P->live.cards[i] = P->live.cards[i-1];
+            P->live.n = n + 1;
+        }
     }
     P->live.cards[slot] = card_id;
 }
@@ -522,3 +556,90 @@ int test_advance_to_phase(TestGame *tg, int target){
 
 int test_deck_len(TestGame *tg){ return tg->state.p[0].deck.n; }
 int test_hand_len(TestGame *tg){ return tg->state.p[0].hand.n; }
+
+/* ── queue-entry seat introspection ──────────────────────────────────────
+   A Rust test asserts things like
+       assert_eq!(entry.choice_player_id.as_deref(), Some("p2"));
+   whose C stand-in is `strcmp(game.queue.entries[i].choice_player_id, "p2")`.
+   Two suites hand-rolled exactly that compare, in two different shapes, and
+   neither could report the EMPTY-string case cleanly (an empty token compared
+   equal to "p1" only by accident of never being asserted at all). These
+   accessors give the comparison one typed spelling:
+
+     - test_queue_entry_seat / test_queue_entry_choice_seat  -> 0 (p1), 1 (p2),
+       or -1 for "empty or unrecognised". -1 is a DISTINCT answer from 0, so a
+       test can assert the defect an un-stamped live-start entry causes.
+     - the *_owned_by_seat predicates for the plain "is it this seat?" question.
+     - the *_player_id readers for a test that wants the raw string.
+
+   The long form is normalised here exactly as Rust's
+   build_ability_queue_entry does (engine/src/core/game_state/abilities.rs
+   :240-246: "player1" -> "p1", "player2" -> "p2"), so a test never has to
+   re-implement that mapping. Layout of RbQueueEntry is untouched. */
+const char *test_seat_id(int pl){
+    if (pl == 0) return "p1";
+    if (pl == 1) return "p2";
+    return "";
+}
+/* Map a queue-entry player token onto a seat index. Returns -1 for NULL, "" and
+   anything unrecognised, so "unstamped" and "seat 0" are never confused. */
+static int seat_of_token(const char *tok){
+    if(!tok) return -1;
+    if(!strcmp(tok,"p1")||!strcmp(tok,"player1")) return 0;
+    if(!strcmp(tok,"p2")||!strcmp(tok,"player2")) return 1;
+    return -1;
+}
+int test_queue_n_entries(TestGame *tg){ return tg ? tg->state.queue.n_entries : 0; }
+int test_queue_entry_seat(TestGame *tg, int idx){
+    if(!tg || idx<0 || idx>=tg->state.queue.n_entries) return -1;
+    return seat_of_token(tg->state.queue.entries[idx].player_id);
+}
+int test_queue_entry_choice_seat(TestGame *tg, int idx){
+    if(!tg || idx<0 || idx>=tg->state.queue.n_entries) return -1;
+    return seat_of_token(tg->state.queue.entries[idx].choice_player_id);
+}
+/* Copy the entry's owner token into `buf`. Returns 1 when the index addresses a
+   real entry, 0 otherwise; `buf` is always NUL-terminated and cleared first, so
+   a failed read yields "" rather than a stale value. */
+static int queue_entry_id_copy(TestGame *tg, int idx, const char *field,
+                               char *buf, size_t buf_len){
+    if(!buf || buf_len==0) return 0;
+    buf[0]='\0';
+    if(!tg || !field || idx<0 || idx>=tg->state.queue.n_entries) return 0;
+    snprintf(buf, buf_len, "%s", field);
+    return 1;
+}
+int test_queue_entry_player_id(TestGame *tg, int idx, char *buf, size_t buf_len){
+    if(!tg || idx<0 || idx>=tg->state.queue.n_entries){
+        if(buf && buf_len) buf[0]='\0';
+        return 0;
+    }
+    return queue_entry_id_copy(tg, idx, tg->state.queue.entries[idx].player_id, buf, buf_len);
+}
+int test_queue_entry_choice_player_id(TestGame *tg, int idx, char *buf, size_t buf_len){
+    if(!tg || idx<0 || idx>=tg->state.queue.n_entries){
+        if(buf && buf_len) buf[0]='\0';
+        return 0;
+    }
+    return queue_entry_id_copy(tg, idx, tg->state.queue.entries[idx].choice_player_id, buf, buf_len);
+}
+int test_queue_entry_owned_by_seat(TestGame *tg, int idx, int pl){
+    if(pl<0 || pl>1) return 0;
+    return test_queue_entry_seat(tg, idx) == pl;
+}
+int test_queue_entry_choice_owned_by_seat(TestGame *tg, int idx, int pl){
+    if(pl<0 || pl>1) return 0;
+    return test_queue_entry_choice_seat(tg, idx) == pl;
+}
+
+/* ── distinct-name count ──────────────────────────────────────────────────
+   rb_max_distinct_names is defined in src/ability/util.c but is NOT declared in
+   include/rabuka.h, so a test that wanted Rust's max_distinct_names had to
+   settle for the declared sibling rb_count_distinct_member_name_units and
+   measure something else. The header is not this file's to edit, so declare
+   the symbol here and expose it through the test header instead. */
+extern int rb_max_distinct_names(const int *cards, int n);
+int test_max_distinct_names(const int *cards, int n){
+    if(!cards || n<=0) return 0;
+    return rb_max_distinct_names(cards, n);
+}

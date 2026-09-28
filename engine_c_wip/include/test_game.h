@@ -24,6 +24,9 @@ void test_add_to_stage(TestGame *tg, int area, int card_id); /* area 0=left 1=ce
 void test_place_under(TestGame *tg, int pl, int area, int card_id); /* tuck card under member at area */
 void test_add_to_success(TestGame *tg, int card_id);
 void test_add_to_live(TestGame *tg, int card_id);
+/* Seat-aware raw live placement (append, no hand removal). test_add_to_live is
+   test_add_to_live_for(tg, 0, ...). */
+void test_add_to_live_for(TestGame *tg, int pl, int card_id);
 void test_add_to_deck(TestGame *tg, int card_id);
 void test_add_to_deck_pl(TestGame *tg, int pl, int card_id);
 /* Prepend card to the top of player pl's deck (Rust main_deck.cards.insert(0, x)). */
@@ -65,9 +68,17 @@ int  test_pending_choice_count(TestGame *tg);/* live shim (mirror helpers/mod.rs
    the zone and silently invalidated every transpiled live test. Do not
    reintroduce a positional write here -- use test_insert_live_card_at. */
 void test_set_live_card(TestGame *tg, int slot, int card_id);
+/* Seat-aware live placement (Rust set_live_card_for(Side, card)). Writes `pl`'s
+   OWN live zone and still APPENDS -- a P2-owned live card must land in
+   p2.live_card_zone, or a P2-triggered ability never sees it while the
+   fixture still looks plausible. P1 is the legacy default of
+   test_set_live_card; use this whenever the card belongs to a named seat. */
+void test_set_live_card_for(TestGame *tg, int pl, int card_id);
 /* Explicit positional live-zone placement, for the rare test that needs a
    card at a specific live slot. test_set_live_card is the append path. */
 void test_insert_live_card_at(TestGame *tg, int slot, int card_id);
+/* Seat-aware positional live placement (P1 default above). */
+void test_insert_live_card_at_for(TestGame *tg, int pl, int slot, int card_id);
 const char *test_card_name(int card_id);
 int  test_find_live_by_score(TestGame *tg, int score);
 
@@ -143,5 +154,33 @@ void test_resume_choice(TestGame *tg, int idx);
 void test_select_indices(TestGame *tg, const int *indices, int n);
 int  test_deck_len(TestGame *tg);
 int  test_hand_len(TestGame *tg);
+
+/* ── queue-entry seat introspection ──────────────────────────────────────
+   One typed spelling of what two suites were hand-rolling as a raw
+   strcmp against RbQueueEntry.player_id / .choice_player_id
+   (test_parity_queue_resume.c, and test_p1_helpers.c's own queue block).
+   The seat accessors return 0 (p1), 1 (p2) or -1 for an EMPTY or
+   unrecognised token -- -1 is deliberately distinct from 0, so "the entry was
+   never stamped with an owner" is assertable rather than invisible. The long
+   form is normalised ("player1" -> "p1") as Rust's build_ability_queue_entry
+   does (abilities.rs:240-246). RbQueueEntry's layout is unchanged. */
+#define TEST_SEAT_ID_LEN 16
+const char *test_seat_id(int pl);              /* "p1" / "p2" / ""          */
+int  test_queue_n_entries(TestGame *tg);
+int  test_queue_entry_seat(TestGame *tg, int idx);          /* 0 | 1 | -1     */
+int  test_queue_entry_choice_seat(TestGame *tg, int idx);   /* 0 | 1 | -1     */
+int  test_queue_entry_owned_by_seat(TestGame *tg, int idx, int pl);
+int  test_queue_entry_choice_owned_by_seat(TestGame *tg, int idx, int pl);
+/* Raw readers. Return 1 when `idx` addresses a real entry, 0 otherwise; `buf`
+   is always cleared and NUL-terminated first, so a bad read yields "". */
+int  test_queue_entry_player_id(TestGame *tg, int idx, char *buf, size_t buf_len);
+int  test_queue_entry_choice_player_id(TestGame *tg, int idx, char *buf, size_t buf_len);
+
+/* Distinct-name count. rb_max_distinct_names is defined in
+   src/ability/util.c but not declared in include/rabuka.h (not this file's to
+   edit), so it is declared locally in src/test_game.c and wrapped here;
+   without it a test had to use the declared sibling
+   rb_count_distinct_member_name_units and measure something else. */
+int  test_max_distinct_names(const int *cards, int n);
 
 #endif
