@@ -14,6 +14,11 @@ void rb_move_execute_selected_cards_from_zone(GameState *g, int actor, const cha
 void rb_move_handle_select_cards_looked_at(GameState *g, int actor, const int *indices,
     int n_indices, const char *destination, int discard_remaining);
 
+/* PAY_SKIP_TARGET constant (types.rs `PAY_SKIP_TARGET`; the C global of the
+   same name is types.c:602, this macro is the file-local spelling every
+   pay/skip site in this translation unit compares against). */
+#define RB_PAY_SKIP_TARGET "pay_optional_cost:skip_optional_cost"
+
 /* === Assembled choice resolver (ports engine/src/ability/choice.rs) === */
 typedef RbSelectionContext SelectionContext;
 
@@ -740,8 +745,100 @@ static int choice_cost_opens_hand_prompt(const AbilityEffect *c, const RbChoice 
     if (!any_number && ch->allow_skip == 0 &&
         ch->count > 0 && ch->count <= count &&
         strstr(ch->description, CHOICE_COST_REPROMPT_TAG))
-        return 1;
+    return 1;
     return 0;
+}
+
+/* ── The pay/skip gate is answered by OPTION INDEX, not by skipping ─────────
+   Rust builds the prompt with emit_pay_skip_gate (resolver.rs:201-225):
+   `Choice::SelectTarget { target: PAY_SKIP_TARGET, allow_skip, options }` —
+   a two-option yes/no question. The answer is then read as a STRING by the
+   handler, never as a sentinel:
+     cost/handlers.rs:1373  `if selected == "skip_optional_cost" || selected == "0"`
+     cost/handlers.rs:1641  `accepted = selected != "skip_optional_cost" && selected != "0"`
+     choice.rs:3515         `let chose_yes = selected == "1" || selected == "yes"`
+   so the NO option and an explicit skip are the same refusal, and the YES
+   option is any other answer. A pay/skip prompt therefore has NO way to be
+   "unanswered" that means "paid".
+
+   The C reached the same verdict from the answer's INDEX NEGATIVITY
+   (`was_skip = selected_idx < 0`), which reads option 0 — the printed 「no」 —
+   as a payment. The prompt's target is the discriminator that is actually
+   present in the C, and it is the same string the C's own pay/skip route at
+   the top of this file already matches on. "draw:skip" is the C-only spelling
+   draw.c:525 gives the same gate on the optional-draw path. */
+static int choice_is_pay_skip_prompt(const RbChoice *ch)
+{
+    if (!ch || ch->kind != RB_CHOICE_SELECT_TARGET) return 0;
+    const char *t = ch->target;
+    if (!t[0]) return 0;
+    return !strcmp(t, RB_PAY_SKIP_TARGET) ||
+           strstr(t, "pay_optional") != NULL ||
+           strstr(t, "skip_optional") != NULL ||
+           strstr(t, "draw:skip") != NULL;
+}
+
+/* The ANSWER SHAPE of a pay/skip gate, per the three Rust lines above.
+   Returns 1 = the optional action was PAID, 0 = it was DECLINED, and
+   -1 = this prompt is not a pay/skip gate at all (caller keeps its own
+   skip/pay reading). */
+static int choice_pay_skip_answer(const RbChoice *ch, int selected_idx)
+{
+    if (!choice_is_pay_skip_prompt(ch)) return -1;
+    /* No option picked == the 「skip」 answer == a refusal
+       (cost/handlers.rs:1373 `selected == "skip_optional_cost"`). */
+    if (selected_idx < 0) return 0;
+    /* Option 0 is the printed 「no」: `selected == "0"`. Every other option
+       is an acceptance, whatever its index (handlers.rs:1641 only rejects
+       the literal "0" / "skip_optional_cost"). */
+    return selected_idx == 0 ? 0 : 1;
+}
+
+/* ── POST_COST_GATE stop: drop the commands the ability had parked ──────────
+   gates.rs:195-213 `optional_cost_skip_gate` stops resolution the moment the
+   entry records `optional_cost_result == Some(false)`, so
+   `run_ability_effect` (engine.rs:267-286) is never reached AND the
+   remaining commands of that resolution are never resumed — in Rust they are
+   the entry's OWN `pending_actions` (ability_queue.rs:521 set_pending_actions
+   stores an owned Vec), which the stop simply leaves in place.
+
+   The C parks the same remaining commands as raw pointers on the queue
+   (queue.resume_parent / resume_child for the sibling effects, queue.deferred
+   for the effect the producer published), so "never resumed" has to be spelled
+   as "cleared": leaving them set would let a LATER prompt on the same queue
+   run the abandoned ability's tail. Only ever called once the answer is known
+   to be a refusal, so a NON-cost skip — which legitimately needs its
+   continuation — is untouched. */
+static void choice_stop_decline_drop_continuation(GameState *g)
+{
+    if (!g) return;
+    g->queue.resume_parent = NULL;
+    g->queue.resume_child = -1;
+    g->queue.deferred = NULL;
+}
+
+/* Record a pay/skip DECLINE on the ability's queue entry, exactly as
+   cost/handlers.rs:1373-1392 does, and answer the question the C's
+   choice_declined_cost_stop cannot: that helper deliberately refuses a
+   SelectCard answer once `effect_started` is set (choice.rs:985-1034 only
+   treats a SelectCard as a COST answer before the effect runs), but a
+   SelectTarget pay/skip gate is the effect's OWN gate and is read by
+   optional_cost_skip_gate with no such condition — gates.rs:200-203 tests
+   only `optional_cost_result == Some(false)`. */
+static void choice_record_pay_skip_decline(GameState *g)
+{
+    if (!g) return;
+    int cur = g->queue.cur;
+    if (cur < 0 || cur >= g->queue.n_entries) return;
+    RbQueueEntry *e = &g->queue.entries[cur];
+    if (e->card_id < 0) return;
+    e->cost_paid = 1;              /* handlers.rs:1377 */
+    e->optional_cost_result = 0;   /* handlers.rs:1386 — the gate's input */
+    e->effect_started = 1;         /* gates.rs:206-207 — the gate's stop marker */
+    /* handlers.rs:1390 `entry.pending_actions.clear()`: the alternative_effect
+       branch there is the 「unless you pay」 shape, which has no C counterpart
+       on this path, so dropping the parked continuation is the whole of it. */
+    choice_stop_decline_drop_continuation(g);
 }
 
 /* Rust reacher (engine/src/turn/triggers.rs:119-129) hands the 登場 trigger to
@@ -3163,7 +3260,19 @@ static int rb_resume_with_choice_indices_internal(GameState *g, const int *selec
     } else if (mode == 3) {          /* auto-ability → execute deferred body */
         if (!was_skip && def) rb_execute_effect_ex(g, actor, def, host);
     } else if (mode == 4) {         /* optional draw gate (draw.rs execute_draw_wrapper) */
-        if (!was_skip && eff) {
+        /* DEFECT 1: the gate's verdict comes from the ANSWER SHAPE
+           (choice_pay_skip_answer), never from `selected_idx < 0`. draw.c:524
+           opens a SelectTarget with target "draw:skip" and
+           allow_skip=1, i.e. a two-option yes/no question whose option 0 is the
+           printed 「no」 — Rust's `selected == "0"` refusal
+           (cost/handlers.rs:1373). Reading it through `was_skip` made every
+           decline look like a payment and ran the draw.
+           A prompt that is not a pay/skip gate keeps the old reading, so this
+           arm cannot change the meaning of any other mode-4 producer. */
+        int gate = choice_pay_skip_answer(&saved_pending, selected_idx);
+        int paid = (gate < 0) ? !was_skip : (gate == 1);
+        int declined = (gate == 0);
+        if (paid && eff) {
             /* Re-execute the full draw effect with optional stripped
                (mirrors Rust compound.rs:514 set_optional(None)): effect-level
                routing (distinct dedupe, card_type filter, destination) is
@@ -3171,7 +3280,7 @@ static int rb_resume_with_choice_indices_internal(GameState *g, const int *selec
             AbilityEffect eff_copy = *eff;
             eff_copy.is_optional = 0;
             rb_effect_draw_card(g, actor, &eff_copy, host);
-        } else if (!was_skip) {
+        } else if (paid) {
             int n = 0;
             int t = g->queue.resume_draw_target;
             int self_id = g->queue.resume_draw_self_id;
@@ -3189,8 +3298,23 @@ static int rb_resume_with_choice_indices_internal(GameState *g, const int *selec
             }
             g->last_draw_count = n;
         }
+        /* DEFECT 3: a DECLINED optional cost ends the whole ability, it does
+           not merely skip one step. Rust runs the POST_COST_GATES right after
+           pay_ability_cost (resolver.rs:1182 then :1193-1199) and
+           optional_cost_skip_gate (gates.rs:195-213, registered at gates.rs:258)
+           stops on `optional_cost_result == Some(false)`, so
+           run_ability_effect (engine.rs:267-286) is never reached and the
+           ability's remaining commands are never resumed.
+
+           Ordering matters and is preserved here: the decline is recorded and
+           the parked commands dropped BEFORE anything else runs, exactly as
+           handlers.rs:1373-1392 records the refusal before calling
+           resume_pending_actions. That is what keeps a later, NON-cost skip
+           from being corrupted — a prompt that is not a pay/skip gate never
+           reaches this arm, so its continuation is left exactly as it was. */
+        if (declined) choice_record_pay_skip_decline(g);
         /* continue any remaining sibling effects of the parent ability */
-        if (cont) {
+        if (cont && !declined) {
             for (int j = cont_from; j < cont->n_child; j++) {
                 if (rb_has_pending_choice(g)) break;
                 rb_execute_effect_ex(g, actor, cont->child[j], host);
@@ -3498,9 +3622,6 @@ void rb_emit_choice(GameState *g, int actor, RbChoiceKind kind,
 }
 
 /* ── Type helpers (ported from engine/src/ability/types.rs) ── */
-
-/* PAY_SKIP_TARGET constant. */
-#define RB_PAY_SKIP_TARGET "pay_optional_cost:skip_optional_cost"
 
 /* gained_ability_index — extract the gained index from an encoded ability index. */
 int rb_gained_ability_index(int ability_idx) {
