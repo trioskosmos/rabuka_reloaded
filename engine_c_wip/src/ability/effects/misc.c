@@ -1646,6 +1646,56 @@ static int both_master(const GameState *g, int actor){
     return actor;
 }
 
+/* engine/src/ability/effects/misc.rs:248-259 — the two halves of the
+   multi-target-to-deck exemption, kept as ONE predicate because the exemption
+   is a single `||` over the two.
+
+   BOTH of the Rust conjuncts are required. The previous C copy tested only
+   `action == "move_cards" && multiple_targets`, so it exempted FOUR MORE
+   abilities than Rust — including every multi-target target="both" move_cards
+   (愛♡スクリ～ム！'s shape among them), whose two arms then silently never ran.
+
+   `is_move_cards_both` (the `effect` half) is DEAD in Rust, and correctly so:
+   the guard in rb_misc_handle_both_targets has already required
+   target == "both" and this half requires target == "deck", so the two can
+   never both hold. Only the `primary_effect` half can fire, and that is the
+   shape that keeps a compound wrapper from being split in two when its primary
+   effect already runs opponent-first through execute_move_cards_both
+   (engine/src/ability/move_cards.rs:3411-3445). The dead half is kept anyway:
+   matching Rust's predicate exactly is what makes the live half the only one
+   that can decide, which is the whole point of the check. */
+static int is_multi_target_move_cards_to_deck(const AbilityEffect *e){
+    return e && e->action && !strcmp(e->action,"move_cards") &&
+           extra_true(e,"multiple_targets") &&
+           e->target && !strcmp(e->target,"deck");
+}
+
+/* misc.rs:279 / :298 — `self.execute_effect(gs, &for_self)` and
+   `self.execute_effect(gs, &for_opponent)`. rb_executor_execute (executor.c:303)
+   is the C twin of Rust's execute_effect, and that match is EXHAUSTIVE over
+   ActionType, so re-dispatching BOTH arms through it serves every action kind
+   from one implementation — including `move_cards`, which the misc action table
+   (below) has no arm for at all, so an arm routed there would hit `else r = 0`
+   and move nothing. The arms carry target "self"/"opponent", never "both", so
+   rb_misc_handle_both_targets returns 0 for them and the split cannot recurse.
+
+   The two actions the misc table claims but the executor table does not
+   (gain_surplus_heart, pay_cost_all:discard_all) still go to the misc table:
+   rb_executor_execute would report them through its unsupported arm. */
+static int both_dispatch_arm(GameState *g, int master, AbilityEffect *arm){
+    int host = s_activating_card;
+    int r;
+    if(rb_executor_has_executor(arm->action))
+        r = rb_executor_execute(g, master, arm, host);
+    else
+        r = rb_execute_misc_effect(g, master, &g->p[master], arm, NULL);
+    /* rb_executor_execute's misc arms run through rb_execute_misc_effect_ex,
+       which clears s_activating_card on the way out; the ambient activating card
+       belongs to the OUTER dispatch and has to survive the split. */
+    s_activating_card = host;
+    return r;
+}
+
 /* Mirror AbilityResolver::handle_both_targets (engine/src/ability/effects/
    misc.rs:234-301, invoked from effects/mod.rs:333 BEFORE effect dispatch).
    Rule 9.8 / Q158: an effect with target="both" is executed once with
@@ -1664,19 +1714,27 @@ static int both_master(const GameState *g, int actor){
      - position_change handles "both" internally (misc.rs:240-244, and
        execute_position_change's own both branch at misc.rs:2625-2651).
      - a multi-target move_cards to deck is handled by
-       execute_move_cards_both in opponent-first order (misc.rs:246-270). */
+       execute_move_cards_both in opponent-first order (misc.rs:246-270).
+
+   This is now the ONE implementation of the split, for every action kind.
+   rb_execute_misc_effect calls it for the misc table, and rb_executor_execute's
+   move_cards branch calls it too (the Rust mod.rs:333 seam sits above BOTH
+   dispatch tables, not just one of them), so the `target="both"` split no
+   longer exists twice. Both callers get the same three properties: the arms
+   are non-recursive, the master comes from the queue ENTRY's player_id, and a
+   self arm that opens a choice parks the opponent arm instead of running it. */
 int rb_misc_handle_both_targets(GameState *g, int actor, const AbilityEffect *e){
     if(!g || !e || !e->target || strcmp(e->target,"both")) return 0;
     if(e->action && !strcmp(e->action,"position_change")) return 0;
-    if(e->action && !strcmp(e->action,"move_cards") &&
-       extra_true(e,"multiple_targets")) return 0;
+    if(is_multi_target_move_cards_to_deck(e) ||
+       is_multi_target_move_cards_to_deck(e->primary_effect)) return 0;
 
     AbilityEffect for_self     = both_variant(e, "self");
     AbilityEffect for_opponent = both_variant(e, "opponent");
     int master = both_master(g, actor);
 
     int had_choice_before = g->queue.has_pending;
-    rb_execute_misc_effect(g, master, &g->p[master], &for_self, NULL);
+    both_dispatch_arm(g, master, &for_self);
 
     /* If the self arm opened a NEW choice, the opponent arm is deferred until
        that answer arrives (misc.rs:281-291): keep the already-parked actions
@@ -1705,7 +1763,7 @@ int rb_misc_handle_both_targets(GameState *g, int actor, const AbilityEffect *e)
         return 1;
     }
 
-    rb_execute_misc_effect(g, master, &g->p[master ^ 1], &for_opponent, NULL);
+    both_dispatch_arm(g, master, &for_opponent);
     return 1;
 }
 

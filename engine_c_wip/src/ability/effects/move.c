@@ -639,12 +639,18 @@ int rb_move_take_cards_from_standard_zone(GameState *g, int actor,
         return mn;
     }
     if (outcome == 2) {
-        if (!can_skip) {
-            int take = count < mn ? count : mn;
-            rb_zone_remove_at_indices(g, pl, zone_name, idxs, take);
-            for (int i = 0; i < take && i < max; i++) out_ids[i] = cards[idxs[i]];
-            return take;
-        }
+        /* engine/src/ability/util/selection.rs:48-50 returns Prompt for
+           idxs.len() > count REGARDLESS of `optional` / can_skip, and
+           move_cards/selection.rs:81 consumes it as
+           `SelectionOutcome::Prompt => count` — i.e. it prompts, with `count`
+           cards, on every Prompt outcome. The previous C auto-resolved here
+           whenever `!can_skip`, silently taking min(count, mn) cards off the
+           top of the zone, so a choice Rust raises (愛♡スクリ～ム！'s
+           「自分と相手は手札を1枚控え室に置く」 with 3 cards in hand is the
+           shape that exposed it) never reached the player. `optional` is not
+           a licence to auto-resolve: can_skip only decides whether the PROMPT
+           may be declined, and it is already threaded into
+           rb_move_prompt_card_selection as the choice's optional flag. */
         rb_move_prompt_card_selection(g, actor, zone_name, count, can_skip, e);
         return -1;
     }
@@ -1509,10 +1515,54 @@ void rb_move_execute_move_cards(GameState *g, int actor, AbilityEffect *e) {
     }
 }
 
-/* ── execute_move_cards_both ── */
+/* ── execute_move_cards_both ──
+ *
+ * Port of AbilityResolver::execute_move_cards_both
+ * (engine/src/ability/move_cards.rs:3411-3445). This is the OPPONENT-FIRST
+ * path, and it is deliberately the opposite of rb_misc_handle_both_targets
+ * (misc.c, Rust misc.rs:234-301), which is SELF-FIRST: the two are reached
+ * through different Rust guards, and only the multi-target-to-deck shape gets
+ * here, because execute_move_cards (move_cards.rs:2008-2013) hands it
+ * `multiple_targets && target == "deck"`.
+ *
+ * The previous body just forwarded to rb_move_execute_move_cards, so the
+ * opponent's half never ran and the order was never opponent-first — abilities
+ * 448 and 828 each moved one card instead of two. Rust's clone rewrites only
+ * `target` (no `action_by` rewrite here, unlike misc.rs:283-285), so the clone
+ * below does the same.
+ *
+ * The arms call rb_move_execute_move_cards_ported, NOT the short
+ * rb_move_execute_move_cards above: Rust's execute_move_cards_both re-enters
+ * Rust's execute_move_cards (move_cards.rs:3425/:3441), and
+ * rb_move_execute_move_cards_ported is the C twin of THAT function — it is what
+ * move_missing.c:139-142 dispatches here from, in the same prologue position as
+ * move_cards.rs:2008-2013. The short sibling is a separate, much weaker
+ * implementation with no Rust counterpart on this path, and running the arms
+ * through it would move the wrong cards. Each arm carries target
+ * "opponent"/"self", so that prologue's `target == "deck"` test is false and the
+ * pair cannot recurse. */
 void rb_move_execute_move_cards_both(GameState *g, int actor, AbilityEffect *e) {
-    if (!g) return;
-    rb_move_execute_move_cards(g, actor, e);
+    if (!g || !e) return;
+    /* move_cards.rs:3422-3425 — OPPONENT FIRST. */
+    AbilityEffect opp_eff = *e;
+    opp_eff.target = (char *)"opponent";
+    rb_move_execute_move_cards_ported(g, actor, &opp_eff);
+
+    /* move_cards.rs:3427-3435 — if the opponent half raised a choice, the self
+     * half waits for the answer. Rust REPLACES the pending actions with the one
+     * self clone (set_pending_actions(vec![self_eff])), it does not append, so
+     * rb_queue_store_pending_actions' clear-then-store is the right twin. */
+    if (rb_has_pending_choice(g)) {
+        AbilityEffect self_eff = *e;
+        self_eff.target = (char *)"self";
+        AbilityEffect *parked[1] = { &self_eff };
+        rb_queue_store_pending_actions(g, parked, 1);
+        return;
+    }
+    /* move_cards.rs:3436-3441 — no choice raised, so self runs now. */
+    AbilityEffect self_eff = *e;
+    self_eff.target = (char *)"self";
+    rb_move_execute_move_cards_ported(g, actor, &self_eff);
 }
 
 /* ── execute_selected_cards_from_zone ── */
