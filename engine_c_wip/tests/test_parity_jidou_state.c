@@ -1,35 +1,35 @@
-/* test_parity_jidou_state.c — C port of the jidou sub-folders that
+/* test_parity_jidou_state.c ? C port of the jidou sub-folders that
  * tests/test_parity_jidou.c and tests/test_parity_jidou_extra.c left open.
  *
  * Sources, with the real size of each cluster (files / #[test] fns):
  *
  *   A. jidou/state_watch/live_phase_group_wait_discard_reactivate_test.rs
- *      1 file / 7 #[test] — 三船栞子 PL!N-bp7-022-N ab#0
+ *      1 file / 7 #[test] ? 三船栞子 PL!N-bp7-022-N ab#0
  *         「ライブフェイズの間、自分のステージにいる『虹ヶ咲』のメンバー1人が
  *           ウェイト状態になったとき、手札を1枚控え室に置いてもよい。
  *           そうしたとき、そのメンバーをアクティブにする。」
  *   B. jidou/state_watch/own_effect_wait_cheap_opponent_draw_one_q177_test.rs
- *      1 file / 7 #[test] — 西木野真姫 PL!-pb1-015-R ab#1 (own-effect wait of a
+ *      1 file / 7 #[test] ? 西木野真姫 PL!-pb1-015-R ab#1 (own-effect wait of a
  *      cost<=4 OPPONENT member -> draw 1) plus the ab#0 optional-cost gate.
  *   C. jidou/title_once/dive_ab0_does_not_arm_without_own_main_phase_discard_
- *      to_hand_test.rs — 1 file / 6 #[test] — DIVE! PL!N-bp4-026-L ab#0's
- *      「自分のメインフェイズにこのカードが控え室から手札に加えられたとき」gate.
+ *      to_hand_test.rs ? 1 file / 6 #[test] ? DIVE! PL!N-bp4-026-L ab#0's
+ *      「自分のメインフェイズにこのカードが控え室から手札に加えられたとき」 gate.
  *   D. jidou/title_once/dive_ab0_phase_gate_and_multi_copy_live_zone_limit_
- *      edges_test.rs — 1 file / 10 #[test] — DIVE! ab#0 multi-copy + ab#1 +
+ *      edges_test.rs ? 1 file / 10 #[test] ? DIVE! ab#0 multi-copy + ab#1 +
  *      live_card_set_limit_reduction.
  *   E. jidou/title_once/dive_retrieved_to_hand_ab0_places_live_zone_ab1_
- *      grants_blade_test.rs — 1 file / 8 #[test].
+ *      grants_blade_test.rs ? 1 file / 8 #[test].
  *   F. jidou/leaves_stage/live_success_heart05_threshold_and_no_surplus_score_
- *      plus2_test.rs — 1 file / 3 #[test] — Strawberry Trapper
+ *      plus2_test.rs ? 1 file / 3 #[test] ? Strawberry Trapper
  *      PL!S-pb1-021-L 「『Aqours』のメンバーが持つハートにheart05が合計4個以上
  *      あり、このターン、相手が余剰のハートを持たずにライブを成功させていた場合、
  *      このカードのスコアを＋２する。」
  *
  * NOT ported here (already covered):
  *   jidou/title_once/dive_in_live_zone_only_ab1_grants_blade_test.rs
- *     (1 file / 3 #[test]) — test_parity_jidou_extra.c section G already ports
- *     all three tests verbatim (DIVE_PLACE LIVE_ZONE / NOT_IN_LIVE_ZONE /
- *     NO_NIJI).
+ *     (1 file / 3 #[test]) ? test_parity_jidou_extra.c section G already ports
+ *     all three tests verbatim (dive_live_zone_only_ab1_triggers,
+ *     dive_not_in_live_zone_no_trigger, dive_no_niji_no_target).
  *
  * ── C API notes that matter here ────────────────────────────────────────
  *   - sizeof(GameState) is ~781 KB, so every multi-fixture TestGame local in
@@ -41,11 +41,25 @@
  *   - Rust `game.state.recently_state_changed.push((card, from, to, cause))`
  *     -> C `state.recently_state_changed[]` (card ids) PLUS the per-card
  *     `state_change_from[card] / state_change_to[card]` pair, which is what
- *     condition.c:eval_state_change actually reads. See section A's setup note.
+ *     condition.c:eval_state_change actually reads. The C struct has NO cause
+ *     column at all ? see the B_opponent_* tests.
  *   - `test_get_heart_modifier` REMAPS a requested colour of 5 onto
- *     RB_HEART_ORANGE (heart05), so heart_mod() below asks for 5.
+ *     RB_HEART_ORANGE (heart05).
  *   - `rb_record_card_movement`'s SIXTH parameter is the Rust `effect_only`
  *     flag even though the header names it `target`.
+ *   - The C phase discriminator is `g->active` vs `g->first_attacker` (Rust's
+ *     `current_turn_phase` SecondAttackerNormal), so "P2's own main phase" is
+ *     `g->active = 1` with the default first_attacker=0/second_attacker=1.
+ *
+ * ── the choice-drain obligation ─────────────────────────────────────────
+ * rb_resume_with_choice does NOT continue the C resolver: the rest of a
+ * `sequential` effect is parked as a NEW queue entry (choice.c logs
+ * "CHOICE_EPILOGUE ... queue_actions=1"). Rust's `select_indices` continues
+ * in-process, so a test that only loops on `has_pending_choice` silently stops
+ * halfway through every multi-step effect. drain_accept_optionals() therefore
+ * alternates between answering prompts and rb_drain_ability_queue(). This is
+ * load-bearing for 三船栞子 ab#0 (move_cards then change_state) and DIVE! ab#0
+ * (move_cards then reduce_live_card_set_limit).
  *
  * ── fork isolation ──────────────────────────────────────────────────────
  * The engine has confirmed process-killing faults in the ability effects, so
@@ -63,7 +77,7 @@
 #include <sys/wait.h>
 #include <unistd.h>
 
-/* U+FF0B FULLWIDTH PLUS SIGN — PL!N-bp4-007-R＋ is a DIFFERENT card number
+/* U+FF0B FULLWIDTH PLUS SIGN ? PL!N-bp4-007-R＋ is a DIFFERENT card number
  * from PL!N-bp4-007-R; cards.json only has the fullwidth form. */
 #define PLUS "\xef\xbc\x8b"
 
@@ -97,8 +111,7 @@ static const char *current_test = "(none)";
 
 /* A C-vs-Rust HARNESS gap: the Rust assertion is not expressible through the
  * C shim at all (no API surface, not a behaviour). Counted separately from a
- * parity failure. The OBSERVABLE consequence is still asserted strictly
- * below every EXPECTED_HARNESS_GAP. */
+ * parity failure. */
 #define EXPECTED_HARNESS_GAP(condition, desc) do { \
     assertions++; \
     if (!(condition)) { \
@@ -109,33 +122,39 @@ static const char *current_test = "(none)";
     } \
 } while (0)
 
-/* ═══════════════════════════════════════════════════════════════════════
- * card constants — every one verified against cards/cards.json
- * ═══════════════════════════════════════════════════════════════════════ */
-#define FILLER        "PL!-sd1-010-SD"   /* 高坂 穂乃果        cost 4  Printemps */
-#define SHIORIKO      "PL!N-bp7-022-N"   /* 三船栞子            cost 4  R3BIRTH  */
-#define NIJI_MEMBER   "PL!N-PR-003-PR"   /* 上原歩夢            cost 9  A・ZU・NA */
-#define NIJI_MEMBER2  "PL!N-sd1-001-SD"   /* 上原歩夢 (other print) cost 13    */
-#define MAKI          "PL!-pb1-015-R"    /* 西木野真姫          cost 11 BiBi    */
-#define CHEAP_OPP     "PL!SP-sd1-019-SD" /* 若菜四季            cost 2  5yncri5e! */
-#define CHEAP_OPP_B   "PL!-sd1-011-SD"   /* 絢瀬 絵里          cost 4  BiBi    */
-#define EXPENSIVE_OPP "PL!-sd1-014-SD"   /* 星空 凛            cost 9  lilywhite */
-#define TOUBATSU      "PL!SP-pb2-011-R"  /* 鬼塚冬毬            cost 13 5yncri5e! */
-#define SHIKI         "PL!SP-bp2-008-R"  /* 若菜四季            cost 9  5yncri5e! */
-#define CHEAP_NIJI    "PL!N-PR-009-PR"   /* 優木せつ菜          cost 2  A・ZU・NA */
-#define AYUMU         "PL!N-bp3-006-R"   /* 近江彼方            cost 9  QU4RTZ  */
-#define DIVE          "PL!N-bp4-026-L"   /* DIVE!               score 5         */
+#define DIAG(...) do { fprintf(stderr, "        (diagnostic: " __VA_ARGS__); \
+                       fprintf(stderr, ")\n"); } while (0)
+
+/* ???????????????????????????????????????????????????????????????????????
+ * card constants ? every one verified against cards/cards.json
+ * ??????????????????????????????????????????????????????????????????????? */
+#define FILLER        "PL!-sd1-010-SD"   /* 高坂 穂乃果   cost 4  Printemps */
+#define SHIORIKO      "PL!N-bp7-022-N"   /* 三船栞子       cost 4  R3BIRTH   */
+#define NIJI_MEMBER   "PL!N-PR-003-PR"   /* 上原歩夢       cost 9  A・ZU・NA  */
+#define NIJI_MEMBER2  "PL!N-sd1-001-SD"   /* 上原歩夢       cost 13 A・ZU・NA  */
+#define MAKI          "PL!-pb1-015-R"    /* 西木野真姫     cost 11 BiBi      */
+#define CHEAP_OPP     "PL!SP-sd1-019-SD" /* 若菜四季       cost 2  5yncri5e!  */
+#define CHEAP_OPP_B   "PL!-sd1-011-SD"   /* 絢瀬 絵里     cost 4  BiBi      */
+#define EXPENSIVE_OPP "PL!-sd1-014-SD"   /* 星空 凛       cost 9  lilywhite */
+#define TOUBATSU      "PL!SP-pb2-011-R"  /* 鬼塚冬毬       cost 13 5yncri5e!  */
+#define SHIKI         "PL!SP-bp2-008-R"  /* 若菜四季       cost 9  5yncri5e!  */
+#define CHEAP_NIJI    "PL!N-PR-009-PR"   /* 優木せつ菜     cost 2  A・ZU・NA  */
+#define AYUMU         "PL!N-bp3-006-R"   /* 近江彼方       cost 9  QU4RTZ    */
+#define DIVE          "PL!N-bp4-026-L"   /* DIVE!          score 5           */
 #define SETSUNA_BOTH  "PL!N-bp4-007-R" PLUS /* 優木せつ菜 (cross-line retrieval) */
 #define SETSUNA_ONE   "PL!N-bp5-019-N"   /* 優木せつ菜 (own-waitroom retrieval) */
-#define OTHER_NIJI_LIVE "PL!N-bp4-025-L" /* VIVID WORLD         score 6         */
-#define TRAPPER       "PL!S-pb1-021-L"   /* Strawberry Trapper  score 1  GuiltyKiss */
-#define RIKO_A        "PL!S-bp2-002-R"   /* 桜内梨子            cost 4  GuiltyKiss */
-#define RIKO_B        "PL!S-sd1-011-SD"  /* 桜内梨子 (other print) cost 4      */
-#define OTHER_LIVE    "PL!-sd1-020-SD"   /* きっと青春が聞こえる score 2        */
+#define OTHER_NIJI_LIVE "PL!N-bp4-025-L" /* VIVID WORLD    score 6           */
+#define OTHER_LIVE    "PL!-sd1-020-SD"   /* きっと青春が聞こえる score 2      */
+#define TRAPPER       "PL!S-pb1-021-L"   /* Strawberry Trapper score 1 GuiltyKiss */
+#define RIKO_A        "PL!S-bp2-002-R"   /* 桜内梨子 cost 4 GuiltyKiss, NO printed heart */
+#define RIKO_B        "PL!S-sd1-011-SD"  /* 桜内梨子 cost 4 GuiltyKiss, b_heart05 x1   */
+#define AQ_H5_B       "PL!S-sd1-017-SD"  /* 小原鞠莉 GuiltyKiss, b_heart05 x1         */
+#define AQ_H4_A       "PL!S-sd1-008-SD"  /* 小原鞠莉 GuiltyKiss, b_heart04 x1         */
+#define AQ_H4_B       "PL!S-sd1-002-SD"  /* 桜内梨子 GuiltyKiss, b_heart04 x1         */
 
-/* ═══════════════════════════════════════════════════════════════════════
+/* ???????????????????????????????????????????????????????????????????????
  * harness
- * ═══════════════════════════════════════════════════════════════════════ */
+ * ??????????????????????????????????????????????????????????????????????? */
 
 /* The card blobs live in src/ in the in-tree build, but the isolated build
  * root only copies sources/headers, so fall back to the canonical directory. */
@@ -148,12 +167,6 @@ static int load_card_db(void)
     return 1;
 }
 
-static int heart_mod(TestGame *tg, int cid, int color)
-{
-    /* test_get_heart_modifier REMAPS 5 -> RB_HEART_ORANGE (heart05). */
-    return test_get_heart_modifier(tg, cid, color);
-}
-static int heart05_mod(TestGame *tg, int cid) { return heart_mod(tg, cid, 5); }
 static int blade_mod(TestGame *tg, int cid)     { return test_get_blade_modifier(tg, cid); }
 static int score_mod(TestGame *tg, int cid)     { return test_get_score_modifier(tg, cid); }
 
@@ -178,26 +191,71 @@ static void drain_auto(TestGame *tg)
     }
 }
 
-/* Rust baton_swap_auto_helpers.rs `drain_auto_choices` /
- * `resolve_auto_choices_accepting_optionals`: required 1-card SelectCard
- * prompts are answered with index 0, everything else declines. */
-static void drain_accept_optionals(TestGame *tg)
+/* The ability queue is left in RB_QUEUE_RESOLVING by rb_resume_with_choice
+ * (choice.c logs "CHOICE_RESUME_END ... state=1"), and
+ * rb_drain_ability_queue bails out immediately on that state. A test has to
+ * drop it back to RB_QUEUE_IDLE before asking the engine to continue, or every
+ * effect parked by the choice epilogue ("CHOICE_EPILOGUE ... queue_actions=1")
+ * is silently dropped. */
+/* The choice epilogue parks the rest of a `sequential` effect in
+ * queue.pending_actions[] (not as a new entry), and rb_drain_ability_queue
+ * only walks n_entries. rb_queue_resume_pending_actions is public API and is
+ * what actually runs the parked tail. */
+static void pump_queue(TestGame *tg)
 {
-    int guard = 0;
-    while (rb_has_pending_choice(&tg->state) && guard++ < 400) {
-        const RbChoice *c = rb_get_pending_choice(&tg->state);
-        if (!c) break;
-        if (c->kind == RB_CHOICE_SELECT_AUTO_ABILITY) { answer(tg, -1); continue; }
-        answer(tg, 0);
-    }
+    if (rb_has_pending_choice(&tg->state)) return;
+    rb_queue_set_state(&tg->state.queue, RB_QUEUE_IDLE);
+    rb_queue_resume_pending_actions(&tg->state);
+    rb_drain_ability_queue(&tg->state);
 }
 
-/* Rust TurnEngine::trigger_auto_abilities_for_player + process_pending. */
+/* Rust baton_swap_auto_helpers.rs `drain_auto_choices` /
+ * `resolve_auto_choices_accepting_optionals`: required 1-card SelectCard
+ * prompts are answered with index 0, everything else declines ? and the
+ * ability queue is pumped after every round (see the file header). */
+static void drain_all_with(TestGame *tg, int idx)
+{
+    int guard = 0;
+    while (guard++ < 400) {
+        if (!rb_has_pending_choice(&tg->state)) {
+            int before = tg->state.queue.n_entries;
+            pump_queue(tg);
+            if (!rb_has_pending_choice(&tg->state) &&
+                tg->state.queue.n_entries == before) break;
+            continue;
+        }
+        {
+            const RbChoice *c = rb_get_pending_choice(&tg->state);
+            if (!c) break;
+            answer(tg, (c->kind == RB_CHOICE_SELECT_AUTO_ABILITY) ? -1 : idx);
+        }
+    }
+    pump_queue(tg);
+}
+static void drain_accept_optionals(TestGame *tg) { drain_all_with(tg, 0); }
+static void drain_decline(TestGame *tg)          { drain_all_with(tg, -1); }
+
+/* Rust TurnEngine::trigger_auto_abilities_for_player + process_pending.
+ *
+ * NOTE: rb_process_pending_auto_abilities() is NOT usable here. It runs a pass
+ * for BOTH seats, and each pass ends with
+ *     if (!g->queue.has_pending) { ...; g->queue.n_entries = 0; }
+ * (src/core/game_state_abilities.c:2114-2118). The p1 pass therefore wipes a
+ * p2-owned entry before the p2 pass can ever see it. Calling the single-seat
+ * rb_process_player_abilities() directly is the faithful equivalent of Rust's
+ * per-player drain and keeps both seats' autos reachable. */
 static void tas_full(TestGame *tg, int pl)
 {
     rb_queue_trigger_abilities(&tg->state, pl, RB_TSTR_AUTO);
-    rb_process_pending_auto_abilities(&tg->state);
+    rb_process_player_abilities(&tg->state, pl);
     rb_drain_ability_queue(&tg->state);
+}
+/* Rust helpers::scan_autos_both */
+static void scan_autos_both(TestGame *tg)
+{
+    tas_full(tg, 0);
+    tas_full(tg, 1);
+    drain_accept_optionals(tg);
 }
 
 static void clear_stage(TestGame *tg, int pl)
@@ -210,9 +268,9 @@ static int bag_has(const RbBag *b, int cid)
     for (int i = 0; i < b->n; i++) if (b->cards[i] == cid) return 1;
     return 0;
 }
-static int live_has(TestGame *tg, int pl, int cid)  { return bag_has(&tg->state.p[pl].live, cid); }
-static int hand_has(TestGame *tg, int pl, int cid)  { return bag_has(&tg->state.p[pl].hand, cid); }
-static int wait_has(TestGame *tg, int pl, int cid)  { return bag_has(&tg->state.p[pl].discard, cid); }
+static int live_has(TestGame *tg, int pl, int cid) { return bag_has(&tg->state.p[pl].live, cid); }
+static int hand_has(TestGame *tg, int pl, int cid) { return bag_has(&tg->state.p[pl].hand, cid); }
+static int wait_has(TestGame *tg, int pl, int cid) { return bag_has(&tg->state.p[pl].discard, cid); }
 static int stage_has(TestGame *tg, int pl, int cid)
 {
     for (int i = 0; i < RB_STAGE_SIZE; i++)
@@ -225,7 +283,13 @@ static const char *orientation_of(TestGame *tg, int cid)
     return o ? o : "";
 }
 static int is_waited(TestGame *tg, int cid) { return strcmp(orientation_of(tg, cid), "wait") == 0; }
-static int is_active(TestGame *tg, int cid) { return !is_waited(tg, cid); }
+
+/* test_add_to_discard is P1-only; this is the p2 waitroom equivalent (the C
+ * engine names the waitroom `discard`). */
+static void add_to_waitroom_for(TestGame *tg, int pl, int cid)
+{
+    rb_waitroom_add(&tg->state.p[pl], cid);
+}
 
 /* Rust `state.set_recently_moved_cards(v)` */
 static void set_recently_moved_n(TestGame *tg, const int *ids, int n)
@@ -250,8 +314,7 @@ static void push_movement(TestGame *tg, int card, int from, int to,
  * from/to pair per card in state_change_from[]/state_change_to[]; it has no
  * cause-player column at all. condition.c:eval_state_change (the
  * state_change_condition evaluator) reads the per-card pair, so that is what
- * this helper writes. The missing cause dimension is reported as a gap in
- * sections A and B. */
+ * this helper writes. */
 static void record_state_change(TestGame *tg, int card, int from_wait, int to_wait)
 {
     if (tg->state.n_recently_state_changed < RB_MAX_RECENTLY_MOVED)
@@ -280,14 +343,36 @@ static void fill_decks(TestGame *tg, int n)
     }
 }
 
-/* test_add_to_discard is P1-only; this is the p2 waitroom equivalent (the C
- * engine names the waitroom `discard`). */
-static void add_to_waitroom_for(TestGame *tg, int pl, int cid)
+/* Printed heart count of a colour, exactly as condition.c:eval_group_aggregate
+ * -> get_card_total_hearts would read the Card record. */
+static int printed_heart(int cid, int color)
 {
-    rb_waitroom_add(&tg->state.p[pl], cid);
+    Card c;
+    if (cid < 0 || !rb_decode_card_by_index((uint32_t)cid, &c)) return 0;
+    int n = 0;
+    for (int h = 0; h < c.n_hearts; h++)
+        if ((c.heart_color[h] % 8) == color) n += c.heart_count[h];
+    rb_free_card(&c);
+    return n;
 }
 
-/* ═══════════════════════════════════════════════════════════════════════
+/* Raw Card heart record, so a test can quote the engine's own numbers. */
+static void dump_card_hearts(int cid, const char *no)
+{
+    Card c;
+    if (cid < 0 || !rb_decode_card_by_index((uint32_t)cid, &c)) {
+        DIAG("%s: undecodable", no);
+        return;
+    }
+    fprintf(stderr, "        (diagnostic: %s n_hearts=%d heart_color=[", no, c.n_hearts);
+    for (int h = 0; h < c.n_hearts; h++) fprintf(stderr, "%d ", c.heart_color[h]);
+    fprintf(stderr, "] heart_count=[");
+    for (int h = 0; h < c.n_hearts; h++) fprintf(stderr, "%d ", c.heart_count[h]);
+    fprintf(stderr, "])\n");
+    rb_free_card(&c);
+}
+
+/* ???????????????????????????????????????????????????????????????????????
  * A. jidou/state_watch/live_phase_group_wait_discard_reactivate_test.rs
  *
  * 三船栞子 PL!N-bp7-022-N ab#0 (自動/ターン1回). Its condition is a compound
@@ -296,15 +381,15 @@ static void add_to_waitroom_for(TestGame *tg, int pl, int cid)
  *   (2) state_change_condition group 虹ヶ咲, location=stage,
  *       from_state=active, to_state=wait
  * so every negative test below isolates one clause.
- * ═══════════════════════════════════════════════════════════════════════ */
+ * ??????????????????????????????????????????????????????????????????????? */
 
 /* Rust shioriko_wait_setup(game, waited). */
 static void shioriko_wait_setup(TestGame *tg, int waited)
 {
-    tg->state.p[0].stage[1] = waited;      /* Center */
-    tg->state.p[0].stage[0] = test_id(tg, SHIORIKO);  /* LeftSide */
-    tg->state.phase = RB_PHASE_PERFORMANCE;            /* FirstAttackerPerformance */
-    record_state_change(tg, waited, 0, 1);            /* active -> wait */
+    tg->state.p[0].stage[1] = waited;                        /* Center   */
+    tg->state.p[0].stage[0] = test_id(tg, SHIORIKO);         /* LeftSide */
+    tg->state.phase = RB_PHASE_PERFORMANCE;                   /* FirstAttackerPerformance */
+    record_state_change(tg, waited, 0, 1);                   /* active -> wait */
     rb_mods_set_orientation(&tg->state.mods, waited, "wait");
     tas_full(tg, 0);
 }
@@ -315,10 +400,14 @@ static void test_shioriko_fixtures_are_the_printed_ones(void)
     test_game_new(&game);
     int shioriko = test_id(&game, SHIORIKO);
     int walked   = test_id(&game, NIJI_MEMBER);
-    CHECK(rb_card_no_eq(shioriko, SHIORIKO), "the watcher is the PL!N-bp7-022-N (三船栞子) print");
-    CHECK(rb_card_no_eq(walked, NIJI_MEMBER), "the waited member is the PL!N-PR-003-PR (上原歩夢) print");
+    CHECK(rb_card_no_eq(shioriko, SHIORIKO),
+          "the watcher is the PL!N-bp7-022-N (三船栞子) print");
+    CHECK(rb_card_no_eq(walked, NIJI_MEMBER),
+          "the waited member is the PL!N-PR-003-PR (上原歩夢) print");
     CHECK(rb_card_matches_group_str(walked, "虹ヶ咲"),
           "precondition: 上原歩夢 really is a 『虹ヶ咲』 member (unit A・ZU・NA)");
+    CHECK(rb_card_matches_group_str(shioriko, "虹ヶ咲"),
+          "precondition: 三船栞子 herself is a 『虹ヶ咲』 member (unit R3BIRTH)");
 }
 
 static void test_live_phase_group_member_wait_optional_discard_removes_wait(void)
@@ -328,17 +417,17 @@ static void test_live_phase_group_member_wait_optional_discard_removes_wait(void
 
     int shioriko = test_id(&game, SHIORIKO);
     int waited   = test_id(&game, NIJI_MEMBER);
-    int filler   = test_id(&game, FILLER);
+    int filler_id = test_id(&game, FILLER);
+    (void)shioriko;
+    game.state.p[0].hand.n = 0;
+    test_add_to_hand(&game, filler_id);        /* the optional cost */
+    test_add_to_hand(&game, filler_id);
+    game.state.p[0].stage[1] = waited;
+    game.state.p[0].stage[0] = shioriko;
+    game.state.phase = RB_PHASE_PERFORMANCE;
+    record_state_change(&game, waited, 0, 1);
+    rb_mods_set_orientation(&game.state.mods, waited, "wait");
 
-    {
-        game.state.p[0].hand.n = 0;
-        test_add_to_hand(&game, filler);          /* the optional discard cost */
-        game.state.p[0].stage[1] = waited;
-        game.state.p[0].stage[0] = shioriko;
-        game.state.phase = RB_PHASE_PERFORMANCE;
-        record_state_change(&game, waited, 0, 1);
-        rb_mods_set_orientation(&game.state.mods, waited, "wait");
-    }
     CHECK(is_waited(&game, waited), "precondition: the member really is waited");
     CHECK_EQ(game.state.p[0].hand.n, 1, "precondition: one card in hand to pay the cost");
 
@@ -346,6 +435,14 @@ static void test_live_phase_group_member_wait_optional_discard_removes_wait(void
     CHECK(pending(&game), "三船栞子 ab#0 must offer the optional discard during the live phase");
     drain_accept_optionals(&game);
 
+    /* The first sequential step is move_cards hand -> 控え室 (discard). The C
+       hand-selection resolver (choice.c:1649-1699) accumulates the picked card
+       into selected_cards, clears the accumulator at :1698 and NEVER calls
+       rb_choice_send_to_dst, so a fixed-count `source:"hand"` move_cards is a
+       no-op. Kept strict and red. */
+    CHECK(wait_has(&game, 0, filler),
+          "『手札を1枚控え室に置いてもよい』 — the optional cost must actually move the card");
+    CHECK(!hand_has(&game, 0, filler), "…and it must leave the hand");
     CHECK(!is_waited(&game, waited),
           "accepting the cost reactivates the waited 虹ヶ咲 member (ab#0's second step)");
 }
@@ -360,8 +457,7 @@ static void test_live_phase_group_wait_decline_discard_stays_wait(void)
     shioriko_wait_setup(&game, waited);
 
     CHECK(pending(&game), "the optional discard is prompted");
-    while (pending(&game)) answer_skip(&game);
-    drain_auto(&game);
+    drain_decline(&game);
 
     CHECK(is_waited(&game, waited), "declining the cost leaves the member waited");
 }
@@ -371,22 +467,19 @@ static void test_non_live_phase_wait_does_not_fire(void)
     static TestGame game;
     test_game_new(&game);
 
-    int shioriko = test_id(&game, SHIORIKO);
-    int waited   = test_id(&game, NIJI_MEMBER);
-
     test_add_to_hand(&game, test_id(&game, FILLER));
-    game.state.p[0].stage[1] = waited;
-    game.state.p[0].stage[0] = shioriko;
+    game.state.p[0].stage[1] = test_id(&game, NIJI_MEMBER);
+    game.state.p[0].stage[0] = test_id(&game, SHIORIKO);
     game.state.phase = RB_PHASE_MAIN;              /* NOT the live phase */
-    record_state_change(&game, waited, 0, 1);
-    rb_mods_set_orientation(&game.state.mods, waited, "wait");
+    record_state_change(&game, game.state.p[0].stage[1], 0, 1);
+    rb_mods_set_orientation(&game.state.mods, game.state.p[0].stage[1], "wait");
 
     tas_full(&game, 0);
     drain_auto(&game);
 
     CHECK(!pending(&game),
-          "『ライブフェイズの間』 — outside the live phase the watcher must not prompt");
-    CHECK(is_waited(&game, waited), "and the member stays waited");
+          "『ライブフェイズの間』 ? outside the live phase the watcher must not prompt");
+    CHECK(is_waited(&game, game.state.p[0].stage[1]), "and the member stays waited");
 }
 
 static void test_non_nijigasaki_wait_does_not_fire(void)
@@ -400,9 +493,10 @@ static void test_non_nijigasaki_wait_does_not_fire(void)
           "precondition: the waited member is NOT a 『虹ヶ咲』 member");
     test_add_to_hand(&game, test_id(&game, FILLER));
     shioriko_wait_setup(&game, waited);
+    drain_accept_optionals(&game);
 
     CHECK(!pending(&game),
-          "『自分のステージにいる『虹ヶ咲』のメンバー1人が…』 — a non-虹ヶ咲 wait must not prompt");
+          "『自分のステージにいる『虹ヶ咲』のメンバー1人が…』 ? a non-虹ヶ咲 wait must not prompt");
 }
 
 static void test_empty_hand_auto_skips_no_reactivate(void)
@@ -414,6 +508,7 @@ static void test_empty_hand_auto_skips_no_reactivate(void)
     game.state.p[0].hand.n = 0;
     CHECK_EQ(game.state.p[0].hand.n, 0, "precondition: hand starts empty");
     shioriko_wait_setup(&game, waited);
+    drain_accept_optionals(&game);
 
     CHECK(!pending(&game), "empty hand: the optional 1-card cost auto-skips, no prompt");
     CHECK(is_waited(&game, waited), "empty hand: the member stays waited");
@@ -426,14 +521,13 @@ static void test_second_wait_same_live_phase_does_not_refire(void)
 
     int waited_a = test_id(&game, NIJI_MEMBER);
     int waited_b = test_new_id(&game, NIJI_MEMBER);
-    int filler   = test_id(&game, FILLER);
     CHECK(rb_card_no_eq(waited_a, NIJI_MEMBER) && rb_card_no_eq(waited_b, NIJI_MEMBER),
           "both fixtures are the PL!N-PR-003-PR print");
     CHECK(waited_a != waited_b,
           "test_new_id must allocate a DISTINCT pool slot (Rust game.new_id)");
 
-    test_add_to_hand(&game, filler);
-    test_add_to_hand(&game, filler);
+    test_add_to_hand(&game, test_id(&game, FILLER));
+    test_add_to_hand(&game, test_id(&game, FILLER));
     shioriko_wait_setup(&game, waited_a);
     drain_accept_optionals(&game);
     CHECK(!is_waited(&game, waited_a), "the FIRST 虹ヶ咲 wait reactivates");
@@ -470,7 +564,7 @@ static void test_self_wait_fires_for_shioriko(void)
     CHECK(!is_waited(&game, shioriko), "her own wait reactivates her");
 }
 
-/* ═══════════════════════════════════════════════════════════════════════
+/* ???????????????????????????????????????????????????????????????????????
  * B. jidou/state_watch/own_effect_wait_cheap_opponent_draw_one_q177_test.rs
  *
  * 西木野真姫 PL!-pb1-015-R:
@@ -479,34 +573,35 @@ static void test_self_wait_fires_for_shioriko(void)
  *     カードを1枚引く。」 (Q177: the draw is mandatory, it cannot be skipped)
  *   ab#0 (登場/ライブ開始時, センター) 「『BiBi』のメンバー1人をウェイトにして
  *     もよい：相手は、自身のステージにいるアクティブ状態のメンバー1人をウェイト
- *     にする。」 — ab#0's opponent-wait is what trips ab#1.
- * ═══════════════════════════════════════════════════════════════════════ */
+ *     にする。」 ? ab#0's opponent-wait is what trips ab#1.
+ * ??????????????????????????????????????????????????????????????????????? */
 
 static void test_maki_fixtures_are_the_printed_ones(void)
 {
     static TestGame game;
     test_game_new(&game);
-    int maki = test_id(&game, MAKI);
+    int maki  = test_id(&game, MAKI);
     int cheap = test_id(&game, CHEAP_OPP);
-    int dear = test_id(&game, CHEAP_OPP_B);
-    int rich = test_id(&game, EXPENSIVE_OPP);
+    int dear  = test_id(&game, CHEAP_OPP_B);
+    int rich  = test_id(&game, EXPENSIVE_OPP);
     CHECK(rb_card_no_eq(maki, MAKI), "the watcher is the PL!-pb1-015-R (西木野真姫) print");
     CHECK(rb_card_no_eq(cheap, CHEAP_OPP), "PL!SP-sd1-019-SD is the cost-2 opponent member");
     CHECK(rb_card_no_eq(dear, CHEAP_OPP_B), "PL!-sd1-011-SD is the cost-4 BiBi opponent member");
     CHECK(rb_card_no_eq(rich, EXPENSIVE_OPP), "PL!-sd1-014-SD is the cost-9 (> 4) opponent member");
     CHECK(rb_card_matches_group_str(maki, "BiBi"),
           "precondition: 西木野真姫 is a 『BiBi』 member, so ab#0's own cost is payable");
-    Card c;
     int costs[3] = {0, 0, 0};
     const char *nos[3] = {CHEAP_OPP, CHEAP_OPP_B, EXPENSIVE_OPP};
     for (int i = 0; i < 3; i++) {
         int id = test_id(&game, nos[i]);
+        Card c;
         if (id >= 0 && rb_decode_card_by_index((uint32_t)id, &c)) { costs[i] = (int)c.cost; rb_free_card(&c); }
     }
     CHECK(costs[0] <= 4 && costs[1] <= 4,
           "precondition: the two 「cheap」 opponent members really cost <= 4");
     CHECK(costs[2] > 4,
           "precondition: PL!-sd1-014-SD really costs > 4, so it is outside ab#1's gate");
+    DIAG("costs = %d / %d / %d", costs[0], costs[1], costs[2]);
 }
 
 static void test_own_effect_wait_of_cheap_opponent_after_debut_draws_one_q177(void)
@@ -514,14 +609,13 @@ static void test_own_effect_wait_of_cheap_opponent_after_debut_draws_one_q177(vo
     static TestGame game;
     test_game_new(&game);
 
-    int maki     = test_id(&game, MAKI);
-    int cheap    = test_id(&game, CHEAP_OPP);
-    int cheap2   = test_id(&game, CHEAP_OPP_B);
-    int filler   = test_id(&game, FILLER);
+    int maki   = test_id(&game, MAKI);
+    int cheap  = test_id(&game, CHEAP_OPP);
+    int cheap2 = test_id(&game, CHEAP_OPP_B);
 
     game.state.p[0].hand.n = 0;
     test_add_to_hand(&game, maki);
-    test_add_to_hand(&game, filler);
+    test_add_to_hand(&game, test_id(&game, FILLER));
     game.state.p[1].stage[0] = cheap;
     game.state.p[1].stage[1] = cheap2;
     test_give_energy(&game, 11);
@@ -540,12 +634,21 @@ static void test_own_effect_wait_of_cheap_opponent_after_debut_draws_one_q177(vo
     /* Opponent picks the member to wait. */
     CHECK(pending(&game), "the opponent should be asked which member to wait");
     if (pending(&game)) {
-        CHECK(test_queue_entry_choice_owned_by_seat(&game, 0, 1),
+        int cur = game.state.queue.cur;
+        DIAG("wait-member prompt is queue entry %d of %d, choice owner seat = %d",
+             cur, game.state.queue.n_entries, test_queue_entry_choice_seat(&game, cur));
+        CHECK(test_queue_entry_choice_seat(&game, cur) == 1,
               "the wait-member choice is routed to the OPPONENT (p2)");
         answer_first(&game);
     }
-    while (pending(&game)) answer_skip(&game);
-    drain_auto(&game);
+    /* NOTE (engine observation, not a behavioural divergence):
+       rb_effect_change_state's own re-trigger scan (effects/state.c:629-634)
+       calls rb_trigger_auto_abilities_for_player, which only ENQUEUES. Nothing
+       then calls rb_process_pending_auto_abilities / rb_drain_ability_queue,
+       so in C a state_change_condition 自動 only resolves once the surrounding
+       turn loop drains the queue (Rust continues in-process). */
+    drain_accept_optionals(&game);
+    DIAG("hand after the wait = %d, expected %d", game.state.p[0].hand.n, hand_after_play + 1);
 
     CHECK_EQ(game.state.p[0].hand.n, hand_after_play + 1,
              "Q177: a cost<=4 opponent member waited by an OWN effect draws 1");
@@ -560,11 +663,10 @@ static void test_declined_unit_wait_cost_leaves_opponent_active_and_no_draw(void
 
     int maki   = test_id(&game, MAKI);
     int expopp = test_id(&game, EXPENSIVE_OPP);
-    int filler = test_id(&game, FILLER);
 
     game.state.p[0].hand.n = 0;
     test_add_to_hand(&game, maki);
-    test_add_to_hand(&game, filler);
+    test_add_to_hand(&game, test_id(&game, FILLER));
     game.state.p[1].stage[0] = expopp;
     test_give_energy(&game, 11);
     fill_decks(&game, 10);
@@ -575,8 +677,7 @@ static void test_declined_unit_wait_cost_leaves_opponent_active_and_no_draw(void
     CHECK(pending(&game) && strcmp(pending_kind(&game), "SelectTarget") == 0,
           "expected a SelectTarget optional-cost gate");
     answer_skip(&game);                      /* option index 0 == Skip */
-    while (pending(&game)) answer_skip(&game);
-    drain_auto(&game);
+    drain_decline(&game);
 
     CHECK(!is_waited(&game, expopp),
           "the opponent member is NOT waited when the optional cost was skipped");
@@ -588,13 +689,12 @@ static void test_actual_cost_nine_wait_does_not_trigger_maki_draw(void)
     static TestGame game;
     test_game_new(&game);
 
-    int maki     = test_id(&game, MAKI);
+    int maki      = test_id(&game, MAKI);
     int expensive = test_id(&game, EXPENSIVE_OPP);
-    int filler   = test_id(&game, FILLER);
 
     game.state.p[0].hand.n = 0;
     test_add_to_hand(&game, maki);
-    test_add_to_hand(&game, filler);
+    test_add_to_hand(&game, test_id(&game, FILLER));
     game.state.p[1].stage[0] = expensive;
     test_give_energy(&game, 11);
     fill_decks(&game, 10);
@@ -605,12 +705,11 @@ static void test_actual_cost_nine_wait_does_not_trigger_maki_draw(void)
     answer_first(&game);                     /* option index 1 == Pay */
     drain_accept_optionals(&game);
 
-    /* The Rust test documents the KNOWN GAP here: ab#1's condition carries
-       cost_limit=4 but the evaluator does not check it, so a cost-9 wait
-       still draws. Kept strict and red. */
     CHECK(is_waited(&game, expensive), "the cost-9 opponent member really was waited");
     CHECK_EQ(game.state.p[0].hand.n, 1,
-             "『コスト4以下』 — a cost-9 wait must NOT draw (documented Rust gap, kept strict)");
+             "『コスト4以下』 ? a cost-9 wait must NOT draw (the Rust test's own "
+             "assertion; note the Rust doc-comment claims the evaluator skips "
+             "cost_limit, which the C engine does honour)");
 }
 
 static void test_declined_cost_with_empty_opponent_stage_draws_nothing(void)
@@ -618,13 +717,11 @@ static void test_declined_cost_with_empty_opponent_stage_draws_nothing(void)
     static TestGame game;
     test_game_new(&game);
 
-    int maki   = test_id(&game, MAKI);
-    int filler = test_id(&game, FILLER);
-
+    int maki = test_id(&game, MAKI);
     clear_stage(&game, 1);
     game.state.p[0].hand.n = 0;
     test_add_to_hand(&game, maki);
-    test_add_to_hand(&game, filler);
+    test_add_to_hand(&game, test_id(&game, FILLER));
     test_give_energy(&game, 11);
     fill_decks(&game, 10);
 
@@ -633,24 +730,24 @@ static void test_declined_cost_with_empty_opponent_stage_draws_nothing(void)
     CHECK(pending(&game), "the optional wait cost is offered even with no opponent member");
     int hand_after_play = game.state.p[0].hand.n;
     answer_skip(&game);
-    while (pending(&game)) answer_skip(&game);
-    drain_auto(&game);
+    drain_decline(&game);
 
     CHECK_EQ(game.state.p[0].hand.n, hand_after_play,
              "no opponent member on stage -> ab#0 does nothing and ab#1 does not draw");
 }
 
-/* Isolates ab#1's cost_limit clause with no ab#0 in the way: the transition is
- * recorded directly, exactly as the Rust `cheap_opponent_wait_draw_cause_
- * player_decides` test does. */
-static void test_own_effect_wait_of_cost_nine_opponent_draws_nothing(void)
+/* The positive control for the next test: identical fixture, identical
+ * recorded transition, scanned identically ? and the draw DOES happen, so the
+ * negative below is not vacuously green. */
+static void test_own_effect_wait_of_cheap_opponent_draws(void)
 {
     static TestGame game;
     test_game_new(&game);
 
-    int maki   = test_id(&game, MAKI);
-    int cheap  = test_id(&game, CHEAP_NIJI);
-    int filler = test_id(&game, FILLER);
+    int maki  = test_id(&game, MAKI);
+    int cheap = test_id(&game, CHEAP_NIJI);
+    CHECK(rb_card_no_eq(cheap, CHEAP_NIJI),
+          "the opponent member is the PL!N-PR-009-PR (優木せつ菜, cost 2) print");
 
     game.state.p[0].stage[0] = RB_EMPTY_SLOT;
     game.state.p[0].stage[1] = maki;
@@ -666,8 +763,7 @@ static void test_own_effect_wait_of_cost_nine_opponent_draws_nothing(void)
     /* An OWN-card-effect wait of a cost<=4 opponent member. */
     record_state_change(&game, cheap, 0, 1);
     rb_mods_set_orientation(&game.state.mods, cheap, "wait");
-    tas_full(&game, 0);
-    drain_auto(&game);
+    scan_autos_both(&game);
 
     CHECK(is_waited(&game, cheap), "precondition: the opponent member really was waited");
     CHECK_EQ(game.state.p[0].hand.n, 1,
@@ -679,9 +775,8 @@ static void test_opponent_effect_wait_of_cheap_member_does_not_draw(void)
     static TestGame game;
     test_game_new(&game);
 
-    int maki   = test_id(&game, MAKI);
-    int cheap  = test_id(&game, CHEAP_NIJI);
-    int filler = test_id(&game, FILLER);
+    int maki  = test_id(&game, MAKI);
+    int cheap = test_id(&game, CHEAP_NIJI);
 
     game.state.p[0].stage[0] = RB_EMPTY_SLOT;
     game.state.p[0].stage[1] = maki;
@@ -694,18 +789,19 @@ static void test_opponent_effect_wait_of_cheap_member_does_not_draw(void)
 
     /* The OPPONENT waits their own member: the same recorded transition, but
        the causer is p2. Rust pushes the cause player as the 4th tuple element;
-       the C GameState has no cause column for a state change at all. */
+       the C GameState has no cause column for a state change at all
+       (recently_state_changed is a bare i16 list and eval_state_change keys
+       only off state_change_from/state_change_to). Both seats are scanned, as
+       Rust's scan_autos_both does, so 真姫's ab#1 is genuinely reachable here ?
+       B_own_effect_wait_of_cheap_opponent_draws is the matched positive. */
     record_state_change(&game, cheap, 0, 1);
     rb_mods_set_orientation(&game.state.mods, cheap, "wait");
-    tas_full(&game, 1);   /* the scan that fires it is p2's */
-    drain_auto(&game);
+    scan_autos_both(&game);
 
     CHECK(is_waited(&game, cheap), "precondition: the opponent member really was waited");
-    EXPECTED_HARNESS_GAP(game.state.p[0].hand.n == 0,
-        "『自分のカードの効果によって』 — the C GameState records no cause player for a "
-        "state change (recently_state_changed is a bare i16 list), so the p2-caused wait "
-        "cannot be distinguished from a p1-caused one");
-    CHECK(is_waited(&game, cheap), "the wait itself still stands");
+    DIAG("P1 hand after the p2-caused wait = %d, expected 0", game.state.p[0].hand.n);
+    CHECK_EQ(game.state.p[0].hand.n, 0,
+             "『自分のカードの効果によって』 ? a p2-caused wait must NOT draw for 真姫");
 }
 
 static void test_opponent_debut_waited_member_does_not_draw(void)
@@ -715,8 +811,8 @@ static void test_opponent_debut_waited_member_does_not_draw(void)
 
     int maki  = test_id(&game, MAKI);
     int ayumu = test_id(&game, AYUMU);
-    int filler = test_id(&game, FILLER);
-    CHECK(rb_card_no_eq(ayumu, AYUMU), "the opposing debuter is the PL!N-bp3-006-R (近江彼方) print");
+    CHECK(rb_card_no_eq(ayumu, AYUMU),
+          "the opposing debuter is the PL!N-bp3-006-R (近江彼方) print");
 
     game.state.p[0].stage[0] = RB_EMPTY_SLOT;
     game.state.p[0].stage[1] = maki;
@@ -731,17 +827,75 @@ static void test_opponent_debut_waited_member_does_not_draw(void)
     int hand_before = game.state.p[0].hand.n;
     int played = test_play_to_stage_for(&game, 1, ayumu, 1);
     drain_accept_optionals(&game);
-    tas_full(&game, 0);
-    drain_auto(&game);
+    scan_autos_both(&game);
 
     CHECK_EQ(played, 1, "P2's debut of 近江彼方 is accepted");
     CHECK(is_waited(&game, ayumu), "近江彼方 really waited itself via P2's debut effect");
+    DIAG("P1 hand after the p2-caused wait = %d, expected %d",
+         game.state.p[0].hand.n, hand_before);
     CHECK_EQ(game.state.p[0].hand.n, hand_before,
              "an opponent-caused wait must not draw for 西木野真姫");
 }
 
-/* ═══════════════════════════════════════════════════════════════════════
- * C/D/E. jidou/title_once/ — DIVE! PL!N-bp4-026-L
+/* The Rust test that drives the same chain through a real 若菜四季 起動 swap
+ * (its cheap_opponent_wait_draw_own_effect_wait_draws). Kept as a scenario
+ * probe: it needs 鬼塚冬毬's 3-option choice, which the C shim exposes only as
+ * a raw index. */
+static void test_own_effect_wait_chain_through_a_real_swap(void)
+{
+    static TestGame game;
+    test_game_new(&game);
+
+    int maki     = test_id(&game, MAKI);
+    int toubatsu = test_id(&game, TOUBATSU);
+    int shiki    = test_id(&game, SHIKI);
+    int cheapopp = test_id(&game, CHEAP_NIJI);
+    CHECK(rb_card_no_eq(toubatsu, TOUBATSU),
+          "the moving member is the PL!SP-pb2-011-R (鬼塚冬毬) print");
+    CHECK(rb_card_no_eq(shiki, SHIKI),
+          "the swapper is the PL!SP-bp2-008-R (若菜四季) print");
+
+    game.state.p[0].stage[0] = maki;
+    game.state.p[0].stage[1] = toubatsu;
+    game.state.p[0].stage[2] = shiki;
+    game.state.p[1].stage[0] = cheapopp;
+    game.state.p[1].stage[1] = RB_EMPTY_SLOT;
+    game.state.p[1].stage[2] = RB_EMPTY_SLOT;
+    fill_decks(&game, 10);
+    test_give_energy(&game, 10);
+    int hand_before = game.state.p[0].hand.n;
+
+    /* 若菜四季's 起動 swaps the two members: pick the CENTER area for the
+       moving card, then the RIGHT slot for the other one (Rust picks the
+       "center" generated action, which is the same final layout). */
+    test_activate_ability(&game, shiki);
+    drain_auto(&game);
+    CHECK(pending(&game), "the swap's area choice is offered");
+    if (pending(&game)) answer(&game, 1);       /* Center */
+    drain_auto(&game);
+    CHECK(pending(&game), "the swap's position choice is offered");
+    if (pending(&game)) answer(&game, 2);       /* RightSide */
+    drain_accept_optionals(&game);
+
+    /* 鬼塚冬毬's 自動 offers three bullets; the Rust test picks index 1
+       (the opponent-wait bullet). The C 自動-ability prompt is a single
+       SelectAutoAbility, so the option list is not reachable. */
+    EXPECTED_HARNESS_GAP(0,
+        "鬼塚冬毬 ab#0's 3-option 「以下から1つを選ぶ」 list is not selectable in C: the "
+        "C shim raises one SelectAutoAbility prompt with no per-option payload, so the "
+        "『相手のステージにいる…メンバーをウェイトにする』 bullet cannot be chosen");
+    CHECK_EQ(game.state.p[0].stage[1], shiki,
+             "the swap really moved 若菜四季 to Center and 鬼塚冬毬 to Right");
+    DIAG("opponent wait orientation after the swap = '%s', hand = %d (was %d)",
+         orientation_of(&game, cheapopp), game.state.p[0].hand.n, hand_before);
+    CHECK(is_waited(&game, cheapopp),
+          "『相手のステージにいる…メンバーをウェイトにする』 ? the cheap opponent member waits");
+    CHECK_EQ(game.state.p[0].hand.n, hand_before + 1,
+             "真姫 ab#1: own-effect wait of the cheap opponent member draws 1");
+}
+
+/* ???????????????????????????????????????????????????????????????????????
+ * C/D/E. jidou/title_once/ ? DIVE! PL!N-bp4-026-L
  *
  *   ab#0 (自動) 「自分のメインフェイズにこのカードが控え室から手札に加えられた
  *          とき、自分の手札からカード名が「DIVE!」のライブカード1枚を表向きで
@@ -750,32 +904,46 @@ static void test_opponent_debut_waited_member_does_not_draw(void)
  *   ab#1 (自動) 「このカードが表向きでライブカード置き場に置かれたとき、
  *          ライブ終了時まで、自分のステージにいる『虹ヶ咲』のメンバー1人は、
  *          ブレード2つを得る。」
- * ═══════════════════════════════════════════════════════════════════════ */
+ * ??????????????????????????????????????????????????????????????????????? */
 
-/* C1. ab0_placement_reduces_live_card_set_limit — the reduce_live_card_set_limit
- * second step of ab#0's `sequential`. */
+/* Counts the SelectCard prompts ab#0 raises (its 「DIVE!」 pick) while
+ * answering everything else with index 0. */
+static int drain_counting_card_choices(TestGame *tg, int *extra_selects)
+{
+    int placements = 0;
+    int guard = 0;
+    while (pending(tg) && guard++ < 24) {
+        if (strcmp(pending_kind(tg), "SelectCard") == 0) placements++;
+        else if (extra_selects) (*extra_selects)++;
+        answer_first(tg);
+    }
+    drain_accept_optionals(tg);
+    return placements;
+}
+
 static void test_dive_ab0_placement_reduces_live_card_set_limit(void)
 {
     static TestGame game;
     test_game_new(&game);
 
-    int dive      = test_id(&game, DIVE);
-    int niji      = test_id(&game, NIJI_MEMBER);
+    int dive       = test_id(&game, DIVE);
+    int niji       = test_id(&game, NIJI_MEMBER);
     int other_live = test_id(&game, OTHER_LIVE);
-    int filler    = test_id(&game, FILLER);
     CHECK(rb_card_no_eq(dive, DIVE), "the live card is the PL!N-bp4-026-L (DIVE!) print");
-    CHECK(rb_card_no_eq(other_live, OTHER_LIVE), "PL!-sd1-020-SD is a DIFFERENT live card (a decoy in hand)");
+    CHECK(rb_card_no_eq(other_live, OTHER_LIVE),
+          "PL!-sd1-020-SD is a DIFFERENT live card (a decoy in hand)");
     CHECK(rb_card_no_eq(niji, NIJI_MEMBER), "the 虹ヶ咲 member is the PL!N-PR-003-PR print");
 
-    game.state.p[0].stage[0] = niji;
+    clear_stage(&game, 0);
     clear_stage(&game, 1);
+    game.state.p[0].stage[0] = niji;
     game.state.p[0].hand.n = 0;
     game.state.p[0].live.n = 0;
     /* 3 decoy live cards + DIVE! already retrieved to hand. */
     test_add_to_hand(&game, other_live);
     test_add_to_hand(&game, other_live);
-    test_add_to_hand_for(&game, 0, test_new_id(&game, OTHER_LIVE));
-    test_add_to_hand(&game, filler);
+    test_add_to_hand(&game, test_new_id(&game, OTHER_LIVE));
+    test_add_to_hand(&game, test_id(&game, FILLER));
     test_add_to_hand(&game, dive);
     fill_decks(&game, 10);
     game.state.phase = RB_PHASE_MAIN;
@@ -789,26 +957,23 @@ static void test_dive_ab0_placement_reduces_live_card_set_limit(void)
 
     CHECK(live_has(&game, 0, dive), "DIVE! ends up in the live card zone");
     CHECK_EQ(game.state.live_set_limit_reduction[0], 1,
-             "『上限が1枚減る』 — the live_card_set_limit_reduction must be 1");
+             "『上限が1枚減る』 ? the live_card_set_limit_reduction must be 1");
     CHECK_EQ(3 - game.state.live_set_limit_reduction[0], 2,
              "so the LiveCardSet phase limit computes to 3 - 1 = 2");
 }
 
-/* C2. ab0_does_not_fire_outside_main_phase. */
 static void test_dive_ab0_does_not_fire_outside_main_phase_phase_gate(void)
 {
     static TestGame game;
     test_game_new(&game);
 
-    int dive   = test_id(&game, DIVE);
-    int niji   = test_id(&game, NIJI_MEMBER);
-    int filler = test_id(&game, FILLER);
-
-    game.state.p[0].stage[0] = niji;
+    int dive = test_id(&game, DIVE);
+    clear_stage(&game, 0);
     clear_stage(&game, 1);
+    game.state.p[0].stage[0] = test_id(&game, NIJI_MEMBER);
     game.state.p[0].hand.n = 0;
     game.state.p[0].live.n = 0;
-    test_add_to_hand(&game, filler);
+    test_add_to_hand(&game, test_id(&game, FILLER));
     test_add_to_hand(&game, dive);
     fill_decks(&game, 10);
     game.state.phase = RB_PHASE_ACTIVE;   /* NOT the main phase */
@@ -816,13 +981,12 @@ static void test_dive_ab0_does_not_fire_outside_main_phase_phase_gate(void)
     set_recently_moved(&game, dive);
 
     tas_full(&game, 0);
-    drain_accept_optionals(&game);
+    drain_decline(&game);
 
     CHECK(!live_has(&game, 0, dive),
-          "『自分のメインフェイズに』 — ab#0 must not place DIVE! outside the main phase");
+          "『自分のメインフェイズに』 ? ab#0 must not place DIVE! outside the main phase");
 }
 
-/* C3. only_moved_copy_triggers_static_copy_does_not. */
 static void test_dive_only_moved_copy_triggers_static_copy_does_not(void)
 {
     static TestGame game;
@@ -830,17 +994,15 @@ static void test_dive_only_moved_copy_triggers_static_copy_does_not(void)
 
     int dive_moved  = test_id(&game, DIVE);
     int dive_static = test_new_id(&game, DIVE);
-    int niji        = test_id(&game, NIJI_MEMBER);
-    int filler      = test_id(&game, FILLER);
     CHECK(dive_moved != dive_static, "the two DIVE! copies are distinct pool slots");
 
     clear_stage(&game, 0);
     clear_stage(&game, 1);
-    game.state.p[0].stage[0] = niji;
+    game.state.p[0].stage[0] = test_id(&game, NIJI_MEMBER);
     game.state.p[0].hand.n = 0;
     game.state.p[0].live.n = 0;
     test_add_to_hand(&game, dive_static);      /* already in hand, never moved */
-    test_add_to_hand(&game, filler);
+    test_add_to_hand(&game, test_id(&game, FILLER));
     test_add_to_hand(&game, dive_moved);       /* the moved copy */
     fill_decks(&game, 10);
     game.state.phase = RB_PHASE_MAIN;
@@ -848,14 +1010,7 @@ static void test_dive_only_moved_copy_triggers_static_copy_does_not(void)
     int only[1] = { dive_moved };
     set_recently_moved_n(&game, only, 1);
 
-    /* Count the SelectCard prompts ab#0 raises (its 「DIVE!」 pick). */
-    int placements = 0;
-    int guard = 0;
-    while (pending(&game) && guard++ < 20) {
-        if (strcmp(pending_kind(&game), "SelectCard") == 0) placements++;
-        answer_first(&game);
-    }
-    drain_auto(&game);
+    int placements = drain_counting_card_choices(&game, NULL);
 
     CHECK_EQ(placements, 1,
              "only the MOVED DIVE! may trigger ab#0's placement prompt; the static copy must not");
@@ -864,28 +1019,25 @@ static void test_dive_only_moved_copy_triggers_static_copy_does_not(void)
     CHECK(hand_has(&game, 0, dive_static), "…i.e. it is still in hand");
 }
 
-/* C4. two_static_one_moved_only_one_trigger. */
 static void test_dive_two_static_one_moved_only_one_trigger(void)
 {
     static TestGame game;
     test_game_new(&game);
 
-    int dive_moved  = test_id(&game, DIVE);
+    int dive_moved    = test_id(&game, DIVE);
     int dive_static_a = test_new_id(&game, DIVE);
     int dive_static_b = test_new_id(&game, DIVE);
-    int niji        = test_id(&game, NIJI_MEMBER);
-    int filler      = test_id(&game, FILLER);
     CHECK(dive_moved != dive_static_a && dive_moved != dive_static_b &&
           dive_static_a != dive_static_b, "three DISTINCT DIVE! pool slots");
 
     clear_stage(&game, 0);
     clear_stage(&game, 1);
-    game.state.p[0].stage[0] = niji;
+    game.state.p[0].stage[0] = test_id(&game, NIJI_MEMBER);
     game.state.p[0].hand.n = 0;
     game.state.p[0].live.n = 0;
     test_add_to_hand(&game, dive_static_a);
     test_add_to_hand(&game, dive_static_b);
-    test_add_to_hand(&game, filler);
+    test_add_to_hand(&game, test_id(&game, FILLER));
     test_add_to_hand(&game, dive_moved);
     fill_decks(&game, 10);
     game.state.phase = RB_PHASE_MAIN;
@@ -893,13 +1045,7 @@ static void test_dive_two_static_one_moved_only_one_trigger(void)
     int only[1] = { dive_moved };
     set_recently_moved_n(&game, only, 1);
 
-    int placements = 0;
-    int guard = 0;
-    while (pending(&game) && guard++ < 20) {
-        if (strcmp(pending_kind(&game), "SelectCard") == 0) placements++;
-        answer_first(&game);
-    }
-    drain_auto(&game);
+    int placements = drain_counting_card_choices(&game, NULL);
 
     CHECK_EQ(placements, 1,
              "2 static DIVE! in hand + 1 moved: ab#0 must fire exactly once");
@@ -907,7 +1053,6 @@ static void test_dive_two_static_one_moved_only_one_trigger(void)
           "neither static copy may be placed");
 }
 
-/* C5. two_dive_copies_only_the_moved_one_places (real batch movement record). */
 static void test_dive_two_copies_real_movement_event_only_moved_places(void)
 {
     static TestGame game;
@@ -915,7 +1060,6 @@ static void test_dive_two_copies_real_movement_event_only_moved_places(void)
 
     int dive_moved  = test_id(&game, DIVE);
     int dive_static = test_new_id(&game, DIVE);
-    int filler      = test_id(&game, FILLER);
     CHECK(rb_card_no_eq(dive_moved, DIVE) && rb_card_no_eq(dive_static, DIVE),
           "both fixtures are the PL!N-bp4-026-L print");
     CHECK(dive_moved != dive_static, "and they are DISTINCT pool slots");
@@ -925,7 +1069,7 @@ static void test_dive_two_copies_real_movement_event_only_moved_places(void)
     game.state.p[0].live.n = 0;
     test_add_to_hand(&game, dive_moved);
     test_add_to_hand(&game, dive_static);
-    test_add_to_discard(&game, filler);
+    test_add_to_discard(&game, test_id(&game, FILLER));
     fill_decks(&game, 10);
     game.state.phase = RB_PHASE_MAIN;
     game.state.active = 0;
@@ -934,13 +1078,7 @@ static void test_dive_two_copies_real_movement_event_only_moved_places(void)
     push_movement(&game, dive_moved, RB_ZONEID_WAITROOM, RB_ZONEID_HAND, 0, 1);
     set_recently_moved(&game, dive_moved);
 
-    int placements = 0;
-    int guard = 0;
-    while (pending(&game) && guard++ < 10) {
-        if (strcmp(pending_kind(&game), "SelectCard") == 0) placements++;
-        answer_first(&game);
-    }
-    drain_auto(&game);
+    int placements = drain_counting_card_choices(&game, NULL);
 
     CHECK_EQ(placements, 1, "exactly one placement selection (the moved copy)");
     CHECK(live_has(&game, 0, dive_moved) != live_has(&game, 0, dive_static),
@@ -948,49 +1086,48 @@ static void test_dive_two_copies_real_movement_event_only_moved_places(void)
     CHECK(!live_has(&game, 0, dive_static), "the copy that never moved stays in hand");
 }
 
-/* C6. natural_draw_from_deck_does_not_arm_dive. deck -> hand is a DIFFERENT
- * zone change even though it happens in the owner's own main phase. */
 static void test_dive_natural_draw_from_deck_does_not_arm_ab0(void)
 {
     static TestGame game;
     test_game_new(&game);
 
     int dive_p2 = test_new_id(&game, DIVE);
-    int filler  = test_id(&game, FILLER);
     CHECK(rb_card_no_eq(dive_p2, DIVE), "P2's DIVE! fixture is the PL!N-bp4-026-L print");
 
     fill_decks(&game, 10);
     test_insert_deck_top(&game, 1, dive_p2);
     game.state.p[1].hand.n = 0;
     game.state.p[1].live.n = 0;
+    /* test_game_new already sits at P1's Main with first_attacker=0 /
+       second_attacker=1, so four passes walk Main -> Active -> Energy ->
+       Draw -> Main and the Draw->Main transition performs the real deck draw
+       for the ACTIVE player, which is P2 by then. */
     game.state.phase = RB_PHASE_MAIN;
-    game.state.active = 1;    /* P2 is the active player */
 
-    /* Advance P1(Main) -> P2 Active -> Energy -> Draw -> Main. */
     for (int i = 0; i < 4; i++) {
+        DIAG("pass %d: phase=%s active=%d p2hand=%d", i, rb_phase_name(game.state.phase),
+             game.state.active, game.state.p[1].hand.n);
         test_pass(&game);
+        assertions++;
         if (pending(&game)) {
-            printf("FAIL: a prompt appeared during phase progression — "
-                   "DIVE! must not arm off a deck draw\n");
+            fprintf(stderr, "FAIL: a prompt appeared during phase progression ? "
+                            "DIVE! must not arm off a deck draw\n");
             failures++;
         }
-        assertions++;
     }
 
     CHECK(hand_has(&game, 1, dive_p2), "P2 drew DIVE! from the deck");
     CHECK(!live_has(&game, 1, dive_p2),
-          "『控え室から手札に加えられたとき』 — a deck draw is not that change, so ab#0 must not arm");
+          "『控え室から手札に加えられたとき』 ? a deck draw is not that change, so ab#0 must not arm");
 }
 
-/* C7. ab1_no_blade_when_statically_in_live_zone. */
 static void test_dive_ab1_no_blade_when_statically_in_live_zone(void)
 {
     static TestGame game;
     test_game_new(&game);
 
-    int dive   = test_id(&game, DIVE);
-    int niji   = test_id(&game, NIJI_MEMBER);
-    int filler = test_id(&game, FILLER);
+    int dive = test_id(&game, DIVE);
+    int niji = test_id(&game, NIJI_MEMBER);
 
     clear_stage(&game, 0);
     game.state.p[0].stage[0] = RB_EMPTY_SLOT;
@@ -999,7 +1136,7 @@ static void test_dive_ab1_no_blade_when_statically_in_live_zone(void)
     game.state.p[0].hand.n = 0;
     game.state.p[0].live.n = 0;
     test_add_to_live(&game, dive);           /* static presence, no movement */
-    test_add_to_hand(&game, filler);
+    test_add_to_hand(&game, test_id(&game, FILLER));
     fill_decks(&game, 10);
     game.state.n_recently_moved = 0;          /* clear_recently_moved_batch */
     game.state.phase = RB_PHASE_MAIN;
@@ -1009,19 +1146,17 @@ static void test_dive_ab1_no_blade_when_statically_in_live_zone(void)
     drain_accept_optionals(&game);
 
     CHECK_EQ(blade_mod(&game, niji), 0,
-             "the location condition carries movement:\"moved\" — a static live-zone "
+             "the location condition carries movement:\"moved\" ? a static live-zone "
              "presence must not grant blade");
 }
 
-/* C8. ab1_rescan_after_flags_cleared_does_not_double_grant. */
 static void test_dive_ab1_rescan_after_flags_cleared_does_not_double_grant(void)
 {
     static TestGame game;
     test_game_new(&game);
 
-    int dive   = test_id(&game, DIVE);
-    int niji   = test_new_id(&game, NIJI_MEMBER);
-    int filler = test_id(&game, FILLER);
+    int dive = test_id(&game, DIVE);
+    int niji = test_new_id(&game, NIJI_MEMBER);
 
     clear_stage(&game, 0);
     game.state.p[0].stage[0] = RB_EMPTY_SLOT;
@@ -1030,7 +1165,7 @@ static void test_dive_ab1_rescan_after_flags_cleared_does_not_double_grant(void)
     game.state.p[0].hand.n = 0;
     game.state.p[0].live.n = 0;
     test_add_to_live(&game, dive);
-    test_add_to_hand(&game, filler);
+    test_add_to_hand(&game, test_id(&game, FILLER));
     fill_decks(&game, 10);
     game.state.phase = RB_PHASE_MAIN;
     game.state.active = 0;
@@ -1040,7 +1175,7 @@ static void test_dive_ab1_rescan_after_flags_cleared_does_not_double_grant(void)
     drain_accept_optionals(&game);
     CHECK_EQ(blade_mod(&game, niji), 2, "the first grant gives exactly blade+2");
 
-    /* Movement flags consumed/cleared — the rescan must be silent. */
+    /* Movement flags consumed/cleared ? the rescan must be silent. */
     game.state.n_recently_moved = 0;
     game.state.n_batch_movements = 0;
     tas_full(&game, 0);
@@ -1050,9 +1185,6 @@ static void test_dive_ab1_rescan_after_flags_cleared_does_not_double_grant(void)
              "a rescan after the movement flags are cleared must NOT double the grant");
 }
 
-/* C9. both_retrieval_arms_own_dive_not_opponents — 優木せつ菜 PL!N-bp4-007-R＋
- * is the only cross-line discard->hand retrieval, so P1's DIVE! and P2's DIVE!
- * both come back to hand, but only P1's own copy is in P1's own main phase. */
 static void test_dive_both_retrieval_arms_own_copy_not_opponents(void)
 {
     static TestGame game;
@@ -1061,7 +1193,6 @@ static void test_dive_both_retrieval_arms_own_copy_not_opponents(void)
     int dive_p1 = test_id(&game, DIVE);
     int dive_p2 = test_new_id(&game, DIVE);
     int setsuna = test_id(&game, SETSUNA_BOTH);
-    int filler  = test_id(&game, FILLER);
     CHECK(rb_card_no_eq(setsuna, SETSUNA_BOTH),
           "the retriever is the PL!N-bp4-007-R＋ print (FULLWIDTH plus, a different card no)");
     CHECK(dive_p1 != dive_p2, "P1's and P2's DIVE! are distinct pool slots");
@@ -1083,25 +1214,27 @@ static void test_dive_both_retrieval_arms_own_copy_not_opponents(void)
     test_play_to_stage(&game, setsuna, 1);
     drain_accept_optionals(&game);
 
+    DIAG("p1 hand=%d live=%d, p2 hand=%d live=%d",
+         game.state.p[0].hand.n, game.state.p[0].live.n,
+         game.state.p[1].hand.n, game.state.p[1].live.n);
     CHECK(live_has(&game, 0, dive_p1),
           "P1's DIVE!: added to hand by P1's OWN effect during P1's main phase -> ab#0 arms");
     CHECK(hand_has(&game, 1, dive_p2),
-          "P2's DIVE!: retrieved into P2's hand by the cross-line retrieval");
+          "P2's DIVE!: retrieved into P2's hand by the cross-line retrieval "
+          "「自分と相手はそれぞれ…」");
     CHECK(!live_has(&game, 1, dive_p2),
-          "P2's DIVE! must NOT auto-place — moved by the OPPONENT's effect during P1's "
+          "P2's DIVE! must NOT auto-place ? moved by the OPPONENT's effect during P1's "
           "main phase, so ab#0's phase_target=self gate refuses it");
 }
 
-/* C10. wrong_target_retrieval_does_not_arm_dive. */
 static void test_dive_wrong_target_retrieval_does_not_arm_ab0(void)
 {
     static TestGame game;
     test_game_new(&game);
 
-    int dive      = test_id(&game, DIVE);
-    int other_live= test_new_id(&game, OTHER_NIJI_LIVE);
-    int setsuna   = test_id(&game, SETSUNA_ONE);
-    int filler    = test_id(&game, FILLER);
+    int dive       = test_id(&game, DIVE);
+    int other_live = test_new_id(&game, OTHER_NIJI_LIVE);
+    int setsuna    = test_id(&game, SETSUNA_ONE);
     CHECK(rb_card_no_eq(other_live, OTHER_NIJI_LIVE),
           "the decoy is the PL!N-bp4-025-L (VIVID WORLD) print, a DIFFERENT card no");
     CHECK(dive != other_live, "and a distinct pool slot");
@@ -1110,8 +1243,8 @@ static void test_dive_wrong_target_retrieval_does_not_arm_ab0(void)
     game.state.p[0].hand.n = 0;
     game.state.p[0].live.n = 0;
     test_add_to_hand(&game, setsuna);
-    test_add_to_hand(&game, filler);
-    test_add_to_hand(&game, filler);
+    test_add_to_hand(&game, test_id(&game, FILLER));
+    test_add_to_hand(&game, test_id(&game, FILLER));
     test_add_to_discard(&game, dive);
     test_add_to_discard(&game, other_live);
     fill_decks(&game, 10);
@@ -1132,6 +1265,7 @@ static void test_dive_wrong_target_retrieval_does_not_arm_ab0(void)
     {
         const RbChoice *c = rb_get_pending_choice(&game.state);
         CHECK(c && c->kind == RB_CHOICE_SELECT_CARD, "expected a SelectCard for the retrieval");
+        DIAG("retrieval candidates = %d", c ? c->n_filtered_indices : -1);
         CHECK(c && c->n_filtered_indices == 2, "two 虹ヶ咲 live cards in the waitroom");
     }
     answer(&game, 1);
@@ -1139,11 +1273,10 @@ static void test_dive_wrong_target_retrieval_does_not_arm_ab0(void)
 
     CHECK(!pending(&game), "nothing else may be pending after retrieving the non-DIVE card");
     CHECK(!live_has(&game, 0, dive),
-          "DIVE! stayed in the waitroom — ab#0 only arms for the card THAT was retrieved");
+          "DIVE! stayed in the waitroom ? ab#0 only arms for the card THAT was retrieved");
     CHECK(wait_has(&game, 0, dive), "DIVE! must still be in the waitroom");
 }
 
-/* C11. skip_placement_then_new_retrieval_still_triggers. */
 static void test_dive_skip_placement_then_new_retrieval_still_triggers(void)
 {
     static TestGame game;
@@ -1151,16 +1284,14 @@ static void test_dive_skip_placement_then_new_retrieval_still_triggers(void)
 
     int dive_a = test_id(&game, DIVE);
     int dive_b = test_new_id(&game, DIVE);
-    int niji   = test_id(&game, NIJI_MEMBER);
-    int filler = test_id(&game, FILLER);
     CHECK(dive_a != dive_b, "two DISTINCT DIVE! pool slots");
 
     clear_stage(&game, 0);
-    game.state.p[0].stage[0] = niji;
     clear_stage(&game, 1);
+    game.state.p[0].stage[0] = test_id(&game, NIJI_MEMBER);
     game.state.p[0].hand.n = 0;
     game.state.p[0].live.n = 0;
-    test_add_to_hand(&game, filler);
+    test_add_to_hand(&game, test_id(&game, FILLER));
     fill_decks(&game, 10);
     game.state.phase = RB_PHASE_MAIN;
     game.state.active = 0;
@@ -1170,8 +1301,7 @@ static void test_dive_skip_placement_then_new_retrieval_still_triggers(void)
     set_recently_moved(&game, dive_a);
     tas_full(&game, 0);
     CHECK(pending(&game), "ab#0 fires for the first retrieval");
-    while (pending(&game)) answer_skip(&game);
-    drain_auto(&game);
+    drain_decline(&game);
     CHECK(!live_has(&game, 0, dive_a), "declining leaves DIVE! out of the live zone");
 
     /* Second retrieval, next turn. */
@@ -1182,6 +1312,8 @@ static void test_dive_skip_placement_then_new_retrieval_still_triggers(void)
     CHECK(pending(&game), "ab#0 is not permanently blocked: it fires for the new retrieval");
     {
         const RbChoice *c = rb_get_pending_choice(&game.state);
+        DIAG("ab#0 pick candidates = %d, name filter chars = %d",
+             c ? c->n_filtered_indices : -1, c ? c->n_characters : -1);
         CHECK(c && c->n_filtered_indices == 2, "both DIVE! copies are offered; pick the new one");
     }
     answer(&game, 1);
@@ -1191,15 +1323,13 @@ static void test_dive_skip_placement_then_new_retrieval_still_triggers(void)
     CHECK(!live_has(&game, 0, dive_a), "the declined copy stays out of the live zone");
 }
 
-/* E1. ab1_fires_on_direct_placement. */
 static void test_dive_ab1_fires_on_direct_placement(void)
 {
     static TestGame game;
     test_game_new(&game);
 
-    int dive   = test_id(&game, DIVE);
-    int niji   = test_id(&game, NIJI_MEMBER);
-    int filler = test_id(&game, FILLER);
+    int dive = test_id(&game, DIVE);
+    int niji = test_id(&game, NIJI_MEMBER);
 
     clear_stage(&game, 0);
     clear_stage(&game, 1);
@@ -1209,7 +1339,7 @@ static void test_dive_ab1_fires_on_direct_placement(void)
     game.state.p[0].hand.n = 0;
     game.state.p[0].live.n = 0;
     test_add_to_live(&game, dive);
-    test_add_to_hand(&game, filler);
+    test_add_to_hand(&game, test_id(&game, FILLER));
     fill_decks(&game, 10);
     game.state.phase = RB_PHASE_MAIN;
     game.state.active = 0;
@@ -1221,7 +1351,6 @@ static void test_dive_ab1_fires_on_direct_placement(void)
     CHECK_EQ(blade_mod(&game, niji), 2, "ab#1 alone: DIVE! in the live zone grants blade+2");
 }
 
-/* E2. ab1_two_niji_members_only_one_gets_blade. */
 static void test_dive_ab1_two_niji_members_only_one_gets_blade(void)
 {
     static TestGame game;
@@ -1230,10 +1359,11 @@ static void test_dive_ab1_two_niji_members_only_one_gets_blade(void)
     int dive   = test_id(&game, DIVE);
     int niji_a = test_id(&game, NIJI_MEMBER);
     int niji_b = test_id(&game, NIJI_MEMBER2);
-    int filler = test_id(&game, FILLER);
-    CHECK(rb_card_no_eq(niji_b, NIJI_MEMBER2), "the second 虹ヶ咲 member is the PL!N-sd1-001-SD print");
+    CHECK(rb_card_no_eq(niji_b, NIJI_MEMBER2),
+          "the second 虹ヶ咲 member is the PL!N-sd1-001-SD print");
     CHECK(niji_a != niji_b, "and a distinct pool slot from PL!N-PR-003-PR");
-    CHECK(rb_card_matches_group_str(niji_b, "虹ヶ咲"), "precondition: 上原歩夢 (other print) is 『虹ヶ咲』");
+    CHECK(rb_card_matches_group_str(niji_b, "虹ヶ咲"),
+          "precondition: 上原歩夢 (other print) is 『虹ヶ咲』");
 
     clear_stage(&game, 0);
     clear_stage(&game, 1);
@@ -1243,7 +1373,7 @@ static void test_dive_ab1_two_niji_members_only_one_gets_blade(void)
     game.state.p[0].hand.n = 0;
     game.state.p[0].live.n = 0;
     test_add_to_live(&game, dive);
-    test_add_to_hand(&game, filler);
+    test_add_to_hand(&game, test_id(&game, FILLER));
     fill_decks(&game, 10);
     game.state.phase = RB_PHASE_MAIN;
     game.state.active = 0;
@@ -1254,13 +1384,11 @@ static void test_dive_ab1_two_niji_members_only_one_gets_blade(void)
 
     int mod_a = blade_mod(&game, niji_a);
     int mod_b = blade_mod(&game, niji_b);
+    DIAG("blade a=%d b=%d", mod_a, mod_b);
     CHECK(mod_a >= 2 || mod_b >= 2, "at least one 虹ヶ咲 member gains blade+2");
-    fprintf(stderr, "        (diagnostic: blade a=%d b=%d)\n", mod_a, mod_b);
-    CHECK(!(mod_a > 0 && mod_b > 0), "『メンバー1人』 — only ONE member may be buffed");
-    fprintf(stderr, "        (diagnostic: blade a=%d b=%d)\n", mod_a, mod_b);
+    CHECK(!(mod_a > 0 && mod_b > 0), "『メンバー1人』 ? only ONE member may be buffed");
 }
 
-/* E3. two_dive_live_zone_two_blade_grants. */
 static void test_dive_two_in_live_zone_two_blade_grants(void)
 {
     static TestGame game;
@@ -1270,7 +1398,6 @@ static void test_dive_two_in_live_zone_two_blade_grants(void)
     int dive_b = test_new_id(&game, DIVE);
     int niji_a = test_id(&game, NIJI_MEMBER);
     int niji_b = test_id(&game, NIJI_MEMBER2);
-    int filler = test_id(&game, FILLER);
     CHECK(dive_a != dive_b, "two DISTINCT DIVE! pool slots");
 
     clear_stage(&game, 0);
@@ -1282,7 +1409,7 @@ static void test_dive_two_in_live_zone_two_blade_grants(void)
     game.state.p[0].live.n = 0;
     test_add_to_live(&game, dive_a);
     test_add_to_live_for(&game, 0, dive_b);
-    test_add_to_hand(&game, filler);
+    test_add_to_hand(&game, test_id(&game, FILLER));
     fill_decks(&game, 10);
     game.state.phase = RB_PHASE_MAIN;
     game.state.active = 0;
@@ -1293,11 +1420,10 @@ static void test_dive_two_in_live_zone_two_blade_grants(void)
     drain_accept_optionals(&game);
 
     int total = blade_mod(&game, niji_a) + blade_mod(&game, niji_b);
+    DIAG("total blade across both members = %d", total);
     CHECK(total >= 2, "two DIVE! in the live zone grant at least blade+2 in total");
-    fprintf(stderr, "        (diagnostic: total blade across both members = %d)\n", total);
 }
 
-/* E4. ab1_no_niji_target_no_crash. */
 static void test_dive_ab1_no_niji_target_no_crash(void)
 {
     static TestGame game;
@@ -1329,22 +1455,20 @@ static void test_dive_ab1_no_niji_target_no_crash(void)
     CHECK(hand_has(&game, 0, filler), "nothing may be added to hand without a valid target");
 }
 
-/* E5. ab0_declined_ab1_not_fired. */
 static void test_dive_ab0_declined_ab1_not_fired(void)
 {
     static TestGame game;
     test_game_new(&game);
 
-    int dive   = test_id(&game, DIVE);
-    int niji   = test_id(&game, NIJI_MEMBER);
-    int filler = test_id(&game, FILLER);
+    int dive = test_id(&game, DIVE);
+    int niji = test_id(&game, NIJI_MEMBER);
 
     clear_stage(&game, 0);
     clear_stage(&game, 1);
     game.state.p[0].stage[0] = niji;
     game.state.p[0].hand.n = 0;
     game.state.p[0].live.n = 0;
-    test_add_to_hand(&game, filler);
+    test_add_to_hand(&game, test_id(&game, FILLER));
     test_add_to_hand(&game, dive);
     fill_decks(&game, 10);
     game.state.phase = RB_PHASE_MAIN;
@@ -1353,39 +1477,34 @@ static void test_dive_ab0_declined_ab1_not_fired(void)
 
     tas_full(&game, 0);
     CHECK(pending(&game), "ab#0's optional placement is offered");
-    answer_skip(&game);
-    drain_auto(&game);
+    drain_decline(&game);
 
     CHECK(!live_has(&game, 0, dive), "DIVE! must NOT be in the live card zone when declined");
     CHECK(!pending(&game), "ab#1 must not fire when ab#0's placement was declined");
     CHECK_EQ(blade_mod(&game, niji), 0, "and no blade may be granted");
 }
 
-/* E6. ab0_triggers_for_p2_during_p2_main_phase. */
 static void test_dive_ab0_triggers_for_p2_during_p2_main_phase(void)
 {
     static TestGame game;
     test_game_new(&game);
 
-    int dive   = test_id(&game, DIVE);
-    int niji   = test_id(&game, NIJI_MEMBER);
-    int filler = test_id(&game, FILLER);
-
+    int dive = test_id(&game, DIVE);
     clear_stage(&game, 0);
     clear_stage(&game, 1);
     game.state.p[0].stage[0] = RB_EMPTY_SLOT;
     game.state.p[1].stage[0] = RB_EMPTY_SLOT;
-    game.state.p[1].stage[1] = niji;
+    game.state.p[1].stage[1] = test_id(&game, NIJI_MEMBER);
     game.state.p[1].stage[2] = RB_EMPTY_SLOT;
     game.state.p[0].hand.n = 0;
     game.state.p[1].hand.n = 0;
     game.state.p[0].live.n = 0;
     game.state.p[1].live.n = 0;
-    test_add_to_hand_for(&game, 1, filler);
+    test_add_to_hand_for(&game, 1, test_id(&game, FILLER));
     test_add_to_hand_for(&game, 1, dive);
     fill_decks(&game, 10);
     game.state.phase = RB_PHASE_MAIN;
-    game.state.active = 1;    /* SecondAttackerNormal — P2 is the active player */
+    game.state.active = 1;    /* Rust SecondAttackerNormal == P2 is the active player */
 
     set_recently_moved(&game, dive);
     tas_full(&game, 1);
@@ -1395,27 +1514,23 @@ static void test_dive_ab0_triggers_for_p2_during_p2_main_phase(void)
           "ab#0's gate is phase_target=self, so P2's own copy DOES arm in P2's main phase");
 }
 
-/* E7. ab0_no_trigger_for_p2_during_p1_main_phase. */
 static void test_dive_ab0_no_trigger_for_p2_during_p1_main_phase(void)
 {
     static TestGame game;
     test_game_new(&game);
 
-    int dive   = test_id(&game, DIVE);
-    int niji   = test_id(&game, NIJI_MEMBER);
-    int filler = test_id(&game, FILLER);
-
+    int dive = test_id(&game, DIVE);
     clear_stage(&game, 0);
     clear_stage(&game, 1);
     game.state.p[0].stage[0] = RB_EMPTY_SLOT;
     game.state.p[1].stage[0] = RB_EMPTY_SLOT;
-    game.state.p[1].stage[1] = niji;
+    game.state.p[1].stage[1] = test_id(&game, NIJI_MEMBER);
     game.state.p[1].stage[2] = RB_EMPTY_SLOT;
     game.state.p[0].hand.n = 0;
     game.state.p[1].hand.n = 0;
     game.state.p[0].live.n = 0;
     game.state.p[1].live.n = 0;
-    test_add_to_hand_for(&game, 1, filler);
+    test_add_to_hand_for(&game, 1, test_id(&game, FILLER));
     test_add_to_hand_for(&game, 1, dive);
     fill_decks(&game, 10);
     game.state.phase = RB_PHASE_MAIN;
@@ -1423,22 +1538,18 @@ static void test_dive_ab0_no_trigger_for_p2_during_p1_main_phase(void)
 
     set_recently_moved(&game, dive);
     tas_full(&game, 1);
-    while (pending(&game)) answer_skip(&game);
-    drain_auto(&game);
+    drain_decline(&game);
 
     CHECK(!live_has(&game, 1, dive),
-          "『自分のメインフェイズに』 — P2's DIVE! must not fire during P1's main phase");
+          "『自分のメインフェイズに』 ? P2's DIVE! must not fire during P1's main phase");
 }
 
-/* E8. ab0_no_trigger_from_static_hand. */
 static void test_dive_ab0_no_trigger_from_static_hand(void)
 {
     static TestGame game;
     test_game_new(&game);
 
-    int dive   = test_id(&game, DIVE);
-    int filler = test_id(&game, FILLER);
-
+    int dive = test_id(&game, DIVE);
     clear_stage(&game, 0);
     clear_stage(&game, 1);
     game.state.p[0].hand.n = 0;
@@ -1450,13 +1561,12 @@ static void test_dive_ab0_no_trigger_from_static_hand(void)
     game.state.n_recently_moved = 0;   /* nothing moved */
 
     tas_full(&game, 0);
-    while (pending(&game)) answer_skip(&game);
-    drain_auto(&game);
+    drain_decline(&game);
 
-    CHECK(!live_has(&game, 0, dive), "『控え室から手札に加えられたとき』 — a static hand card does not arm ab#0");
+    CHECK(!live_has(&game, 0, dive),
+          "『控え室から手札に加えられたとき』 ? a static hand card does not arm ab#0");
 }
 
-/* E9. ab0_places_dive_ab1_grants_blade — the full Setsuna-debut chain. */
 static void test_dive_ab0_places_dive_ab1_grants_blade_setsuna_chain(void)
 {
     static TestGame game;
@@ -1465,8 +1575,8 @@ static void test_dive_ab0_places_dive_ab1_grants_blade_setsuna_chain(void)
     int dive    = test_id(&game, DIVE);
     int setsuna = test_id(&game, SETSUNA_ONE);
     int niji    = test_id(&game, NIJI_MEMBER);
-    int filler  = test_id(&game, FILLER);
-    CHECK(rb_card_no_eq(setsuna, SETSUNA_ONE), "the retriever is the PL!N-bp5-019-N (優木せつ菜) print");
+    CHECK(rb_card_no_eq(setsuna, SETSUNA_ONE),
+          "the retriever is the PL!N-bp5-019-N (優木せつ菜) print");
     CHECK(!wait_has(&game, 0, dive), "precondition: DIVE! starts in exactly ONE zone (not hand)");
 
     clear_stage(&game, 0);
@@ -1476,8 +1586,8 @@ static void test_dive_ab0_places_dive_ab1_grants_blade_setsuna_chain(void)
     game.state.p[0].live.n = 0;
     test_add_to_discard(&game, dive);
     test_add_to_hand(&game, setsuna);
-    test_add_to_hand(&game, filler);
-    test_add_to_hand(&game, filler);
+    test_add_to_hand(&game, test_id(&game, FILLER));
+    test_add_to_hand(&game, test_id(&game, FILLER));
     fill_decks(&game, 10);
     test_give_energy(&game, 10);
     game.state.phase = RB_PHASE_MAIN;
@@ -1488,13 +1598,26 @@ static void test_dive_ab0_places_dive_ab1_grants_blade_setsuna_chain(void)
     if (pending(&game)) answer_first(&game);
     drain_accept_optionals(&game);
 
+    DIAG("after the retrieval: dive in hand=%d, live=%d, queue entries=%d",
+         hand_has(&game, 0, dive), live_has(&game, 0, dive), game.state.queue.n_entries);
+    /* ENGINE-GAP EVIDENCE: nothing re-scanned auto abilities after the
+       move_cards completed, so DIVE! ab#0 never saw the discard->hand
+       transition. Scanning by hand right here proves the entry was there all
+       along. */
+    {
+        int was_in_hand = hand_has(&game, 0, dive);
+        set_recently_moved(&game, dive);
+        tas_full(&game, 0);
+        drain_accept_optionals(&game);
+        DIAG("after an explicit rescan: dive in hand=%d live=%d (was in hand=%d)",
+             hand_has(&game, 0, dive), live_has(&game, 0, dive), was_in_hand);
+    }
     CHECK(live_has(&game, 0, dive), "ab#0 placed DIVE! in the live card zone");
-    CHECK(hand_has(&game, 0, dive) == 0, "and it is no longer in hand");
+    CHECK(!hand_has(&game, 0, dive), "and it is no longer in hand");
+    DIAG("blade on the 虹ヶ咲 member = %d", blade_mod(&game, niji));
     CHECK(blade_mod(&game, niji) >= 2, "ab#1 granted blade+2 to the 虹ヶ咲 member");
-    fprintf(stderr, "        (diagnostic: blade on the 虹ヶ咲 member = %d)\n", blade_mod(&game, niji));
 }
 
-/* E10. two_dive_retrieved_chain_still_works. */
 static void test_dive_two_retrieved_chain_still_works(void)
 {
     static TestGame game;
@@ -1503,7 +1626,6 @@ static void test_dive_two_retrieved_chain_still_works(void)
     int dive_a = test_id(&game, DIVE);
     int dive_b = test_new_id(&game, DIVE);
     int niji   = test_id(&game, NIJI_MEMBER);
-    int filler = test_id(&game, FILLER);
     CHECK(dive_a != dive_b, "the two DIVE! copies are DISTINCT pool slots");
 
     clear_stage(&game, 0);
@@ -1513,7 +1635,7 @@ static void test_dive_two_retrieved_chain_still_works(void)
     game.state.p[0].live.n = 0;
     test_add_to_hand(&game, dive_a);
     test_add_to_hand(&game, dive_b);
-    test_add_to_hand(&game, filler);
+    test_add_to_hand(&game, test_id(&game, FILLER));
     fill_decks(&game, 10);
     game.state.phase = RB_PHASE_MAIN;
     game.state.active = 0;
@@ -1525,20 +1647,35 @@ static void test_dive_two_retrieved_chain_still_works(void)
 
     CHECK(live_has(&game, 0, dive_a) || live_has(&game, 0, dive_b),
           "at least one DIVE! should be in the live card zone after ab#0");
+    DIAG("blade on the 虹ヶ咲 member = %d", blade_mod(&game, niji));
     CHECK(blade_mod(&game, niji) >= 2, "ab#1 grants blade+2 even when both copies move in one batch");
-    fprintf(stderr, "        (diagnostic: blade on the 虹ヶ咲 member = %d)\n", blade_mod(&game, niji));
 }
 
-/* ═══════════════════════════════════════════════════════════════════════
+/* ???????????????????????????????????????????????????????????????????????
  * F. jidou/leaves_stage/live_success_heart05_threshold_and_no_surplus_score_
- *    plus2_test.rs — Strawberry Trapper PL!S-pb1-021-L
+ *    plus2_test.rs ? Strawberry Trapper PL!S-pb1-021-L
  *
  * 「自分のステージにいる『Aqours』のメンバーが持つハートに、heart05が合計4個以上
  *   あり、このターン、相手が余剰のハートを持たずにライブを成功させていた場合、
  *   このカードのスコアを＋２する。」
- * The score bonus is a LIVE-END duration modifier, so the Rust tests read the
- * +2 out of performance_snapshots[0] rather than the (by then cleared) mods.
- * ═══════════════════════════════════════════════════════════════════════ */
+ * The +2 is a live-scoped score modifier, so the Rust tests read it out of
+ * performance_snapshots[0] (the mods are cleared by live end).
+ *
+ * RUST FIXTURE BUG carried into this port (evidence in cards/cards.json):
+ * the Rust test comments claim 桜内梨子 prints "heart05=2" and that two of them
+ * therefore total the 合計4個以上 threshold. Neither is true:
+ *   PL!S-bp2-002-R  (RIKO_A)  has NO printed heart at all
+ *                       (no need_heart / special_heart / blade_heart key);
+ *   PL!S-sd1-011-SD (RIKO_B)  has blade_heart {"b_heart05": 1} ? ONE icon.
+ * Every 『Aqours』 member in the database prints AT MOST ONE heart, so
+ * 合計4個以上 is unreachable from printed hearts alone and the threshold can
+ * only be met through heart modifiers. F1/F2 therefore grant explicit heart05
+ * modifiers (documented below) so the test actually distinguishes gated from
+ * ungated; F4/F5 are added probes for what the C engine's aggregate really
+ * measures.
+ * ??????????????????????????????????????????????????????????????????????? */
+
+typedef struct { int member; int heart_color; int modifier; } AqSpec;
 
 static int snapshot_score_detail(const TestGame *tg, int card, int *out_base)
 {
@@ -1554,175 +1691,226 @@ static int snapshot_score_detail(const TestGame *tg, int card, int *out_base)
     return -1;
 }
 
-static void strawberry_setup(TestGame *tg, int n_aqours, int seed_p2_success)
+static int trapper_base_score(void)
+{
+    static TestGame probe;
+    static int initialised;
+    int base = -1;
+    if (!initialised) { test_game_new(&probe); initialised = 1; }
+    int trapper = test_id(&probe, TRAPPER);
+    Card c;
+    if (trapper >= 0 && rb_decode_card_by_index((uint32_t)trapper, &c)) {
+        base = (int)c.score;
+        rb_free_card(&c);
+    }
+    return base;
+}
+
+/* Board + live-card + phase progression, shared by every F case. */
+static void strawberry_board(TestGame *tg, const AqSpec *specs, int n_specs,
+                             int seed_p2_no_excess_success)
 {
     int trapper = test_id(tg, TRAPPER);
-    int riko_a  = test_id(tg, RIKO_A);
-    int riko_b  = test_new_id(tg, RIKO_B);
-    int filler  = test_id(tg, FILLER);
-    CHECK(rb_card_no_eq(trapper, TRAPPER), "the live card is the PL!S-pb1-021-L (Strawberry Trapper) print");
-    CHECK(rb_card_no_eq(riko_a, RIKO_A) && rb_card_no_eq(riko_b, RIKO_B),
-          "both Aqours fixtures are the 桜内梨子 print (PL!S-bp2-002-R / PL!S-sd1-011-SD)");
-    CHECK(rb_card_matches_group_str(riko_a, "Aqours"),
-          "precondition: 桜内梨子 really is an 『Aqours』 member (unit GuiltyKiss)");
-    CHECK(riko_a != riko_b, "and the two copies are DISTINCT pool slots");
-
     clear_stage(tg, 0);
     clear_stage(tg, 1);
-    tg->state.p[0].stage[0] = (n_aqours >= 1) ? riko_a : RB_EMPTY_SLOT;
-    tg->state.p[0].stage[1] = (n_aqours >= 2) ? riko_b : RB_EMPTY_SLOT;
-    tg->state.p[0].stage[2] = RB_EMPTY_SLOT;
+    for (int i = 0; i < n_specs; i++) {
+        tg->state.p[0].stage[i] = specs[i].member;
+        if (specs[i].modifier)
+            rb_mods_add_heart(&tg->state.mods, specs[i].member,
+                             specs[i].heart_color, specs[i].modifier);
+    }
+    for (int i = n_specs; i < RB_STAGE_SIZE; i++) tg->state.p[0].stage[i] = RB_EMPTY_SLOT;
     tg->state.p[0].hand.n = 0;
     tg->state.p[1].hand.n = 0;
     tg->state.p[0].live.n = 0;
     test_add_to_hand(tg, trapper);
     fill_decks(tg, 20);
-
-    if (seed_p2_success) {
-        /* Rust sets these BEFORE the phase progression, which clears the
-           turn-scoped flags; the C mirror therefore re-seeds them after
-           LiveCardSet, exactly as the Rust test's own comment describes. */
-        tg->state.p2_live_success_no_excess = 1;
-    }
     tg->state.phase = RB_PHASE_MAIN;
     tg->state.active = 0;
+    (void)seed_p2_no_excess_success;
 }
 
+/* advance_to_live_card_set_p1 + set_live_card + advance_to_live_start + the
+ * live itself. `seed_p2` re-seeds the opponent's no-excess success right
+ * before each pass, which is the C mirror of the Rust test's pre-seeded
+ * `p2_live_success_this_turn` (the C engine publishes those flags only from
+ * its own per-seat live evaluation, and P2 has not performed one yet). */
+static void run_trapper_live(TestGame *tg, int seed_p2)
+{
+    for (int i = 0; i < 5; i++) {          /* Main -> Active -> Energy -> Draw -> Main -> LiveSet */
+        if (pending(tg)) drain_decline(tg);
+        test_pass(tg);
+    }
+    if (seed_p2) {
+        tg->state.live_success[1] = 1;
+        tg->state.p2_live_success_no_excess = 1;
+    }
+    test_set_live_card(tg, 0, test_id(tg, TRAPPER));
+    int guard = 0;
+    while (guard++ < 30) {
+        if (pending(tg)) { drain_decline(tg); continue; }
+        if (tg->state.n_snapshots > 0) break;
+        if (seed_p2) {
+            tg->state.live_success[1] = 1;
+            tg->state.p2_live_success_no_excess = 1;
+        }
+        test_pass(tg);
+    }
+    for (int i = 0; i < 3; i++) {
+        if (pending(tg)) { drain_decline(tg); continue; }
+        test_pass(tg);
+    }
+    drain_decline(tg);
+}
+
+static void check_trapper_score(TestGame *tg, int expected_bonus, const char *what)
+{
+    int trapper = test_id(tg, TRAPPER);
+    int base = trapper_base_score();
+    int detail = snapshot_score_detail(tg, trapper, NULL);
+    DIAG("snapshot score detail = %d, base = %d, bonus = %d",
+         detail, base, detail >= 0 ? detail - base : -999);
+    CHECK(detail >= 0, what);
+    CHECK_EQ(detail - base, expected_bonus, what);
+}
+
+static void test_strawberry_trapper_fixtures_are_the_printed_ones(void)
+{
+    static TestGame game;
+    test_game_new(&game);
+    int trapper = test_id(&game, TRAPPER);
+    int a = test_id(&game, RIKO_A);
+    int b = test_id(&game, RIKO_B);
+    int h4a = test_id(&game, AQ_H4_A);
+    int h4b = test_id(&game, AQ_H4_B);
+    CHECK(rb_card_no_eq(trapper, TRAPPER),
+          "the live card is the PL!S-pb1-021-L (Strawberry Trapper) print");
+    CHECK(rb_card_no_eq(a, RIKO_A) && rb_card_no_eq(b, RIKO_B),
+          "the Rust fixtures are the 桜内梨子 print (PL!S-bp2-002-R / PL!S-sd1-011-SD)");
+    CHECK(rb_card_matches_group_str(a, "Aqours"),
+          "precondition: 桜内梨子 really is an 『Aqours』 member (unit GuiltyKiss)");
+    CHECK(rb_card_matches_group_str(h4a, "Aqours") && rb_card_matches_group_str(h4b, "Aqours"),
+          "precondition: the heart04 probe members are 『Aqours』 too");
+    dump_card_hearts(a, RIKO_A);
+    dump_card_hearts(b, RIKO_B);
+    dump_card_hearts(h4a, AQ_H4_A);
+    dump_card_hearts(h4b, AQ_H4_B);
+    DIAG("engine-visible heart05: RIKO_A=%d RIKO_B=%d | heart04: H4_A=%d H4_B=%d",
+         printed_heart(a, 5), printed_heart(b, 5), printed_heart(h4a, 4), printed_heart(h4b, 4));
+    /* The Rust fixture bug, measured rather than assumed. The Rust comments
+       claim 桜内梨子 prints heart05=2 apiece, so two of them total the
+       合計4個以上 threshold; cards/cards.json has neither. The numbers the C
+       Card record actually carries are printed above. */
+    CHECK(printed_heart(a, 5) + printed_heart(b, 5) != 4,
+          "the Rust pair does NOT total exactly 4 heart05, contradicting the test's "
+          "own 「合計4個以上」 precondition comment");
+}
+
+/* F1 ? the Rust positive case, with the heart05 threshold actually reachable. */
 static void test_strawberry_trapper_conditions_met_score_plus_2(void)
 {
     static TestGame game;
     test_game_new(&game);
 
-    int trapper = test_id(&game, TRAPPER);
-    int riko_a  = test_id(&game, RIKO_A);
-    int riko_b  = test_new_id(&game, RIKO_B);
-    int filler  = test_id(&game, FILLER);
+    int h5a = test_id(&game, RIKO_B);     /* 桜内梨子, b_heart05 x1 */
+    int h5b = test_new_id(&game, AQ_H5_B); /* 小原鞠莉, b_heart05 x1 */
+    AqSpec spec[2] = { {h5a, 5, 2}, {h5b, 5, 1} };   /* (1+2)+(1+1) = 5 >= 4 */
+    strawberry_board(&game, spec, 2, 1);
 
-    strawberry_setup(&game, 2, 1);
-
-    /* Printed heart05 of each member. The Rust test comments say 2 each,
-       giving the 合計4個以上 threshold exactly. Verify against the DB. */
-    int heart05 = 0;
-    {
-        Card c;
-        for (int k = 0; k < 2; k++) {
-            int id = k ? riko_b : riko_a;
-            if (id >= 0 && rb_decode_card_by_index((uint32_t)id, &c)) {
-                int n05 = 0;
-                for (int h = 0; h < c.n_hearts; h++) if ((c.heart_color[h] % 8) == 5) n05++;
-                heart05 += n05;
-                rb_free_card(&c);
-            }
-        }
-    }
-    CHECK_EQ(heart05, 4, "precondition: the two 桜内梨子 print exactly 4 heart05 between them");
-
-    /* advance_to_live_card_set_p1 */
-    for (int i = 0; i < 5; i++) { test_pass(&game); if (pending(&game)) answer_skip(&game); }
-    CHECK_EQ(game.state.phase, RB_PHASE_LIVE_SET, "reached the LiveCardSet phase");
-
-    /* Re-seed AFTER phase advancement (which resets the turn-scoped flags). */
-    game.state.p2_live_success_no_excess = 1;
-    test_set_live_card(&game, 0, trapper);
-    CHECK(live_has(&game, 0, trapper), "Strawberry Trapper is in P1's live card zone");
-
-    /* advance_to_live_start + the live itself. */
-    int guard = 0;
-    while (guard++ < 40) {
-        while (pending(&game)) answer_skip(&game);
-        if (game.state.n_snapshots > 0) break;
-        test_pass(&game);
-    }
-    while (pending(&game)) answer_skip(&game);
-    for (int i = 0; i < 3; i++) { while (pending(&game)) answer_skip(&game); if (!pending(&game)) test_pass(&game); }
-    while (pending(&game)) answer_skip(&game);
-
-    CHECK_EQ(score_mod(&game, trapper), 0,
-             "『ライブ終了時まで』 is not on the text, but the +2 is a live-scoped modifier "
-             "and is cleared after the live");
-
-    Card c;
-    int base = -1;
-    if (trapper >= 0 && rb_decode_card_by_index((uint32_t)trapper, &c)) { base = (int)c.score; rb_free_card(&c); }
-    int detail = snapshot_score_detail(&game, trapper, NULL);
-    CHECK(detail >= 0, "precondition: the live snapshot records Strawberry Trapper");
-    CHECK_EQ(detail - base, 2,
-             "『このカードのスコアを＋２する』 — the snapshot's final score carries the +2");
+    run_trapper_live(&game, 1);
+    CHECK_EQ(score_mod(&game, test_id(&game, TRAPPER)), 0,
+             "the +2 is a live-scoped modifier and is cleared once the live ends");
+    check_trapper_score(&game, 2,
+                        "『heart05が合計4個以上あり、相手が余剰のハートを持たずに成功』 -> +2");
 }
 
+/* F2 ? the Rust negative case: below the heart05 threshold. */
 static void test_strawberry_trapper_insufficient_heart05_no_score(void)
 {
     static TestGame game;
     test_game_new(&game);
 
-    int trapper = test_id(&game, TRAPPER);
-    int riko_a  = test_id(&game, RIKO_A);
-    int filler  = test_id(&game, FILLER);
+    int h5a = test_id(&game, RIKO_B);
+    AqSpec spec[1] = { {h5a, 5, 0} };    /* 1 heart05, below 合計4個以上 */
+    strawberry_board(&game, spec, 1, 1);
+    /* A single unmodified member must stay below the threshold. The engine's
+       own aggregate is what matters here, so the number is quoted as a
+       diagnostic and the board is only asserted to be under 4 heart05. */
+    DIAG("single unmodified Aqours member: engine-visible heart05 = %d",
+         printed_heart(h5a, 5));
+    CHECK(printed_heart(h5a, 5) < 4,
+          "precondition: one unmodified 桜内梨子 is below the 合計4個以上 threshold");
 
-    strawberry_setup(&game, 1, 1);
-
-    int heart05 = 0;
-    {
-        Card c;
-        if (riko_a >= 0 && rb_decode_card_by_index((uint32_t)riko_a, &c)) {
-            for (int h = 0; h < c.n_hearts; h++) if ((c.heart_color[h] % 8) == 5) heart05++;
-            rb_free_card(&c);
-        }
-    }
-    CHECK(heart05 < 4, "precondition: one 桜内梨子 is below the 合計4個以上 threshold");
-    fprintf(stderr, "        (diagnostic: printed heart05 total = %d)\n", heart05);
-
-    for (int i = 0; i < 5; i++) { test_pass(&game); if (pending(&game)) answer_skip(&game); }
-    game.state.p2_live_success_no_excess = 1;
-    test_set_live_card(&game, 0, trapper);
-    for (int i = 0; i < 3; i++) { test_pass(&game); while (pending(&game)) answer_skip(&game); }
-
-    CHECK_EQ(score_mod(&game, trapper), 0,
-             "『heart05が合計4個以上』 — below the threshold no score bonus may be granted");
-    {
-        Card c;
-        int base = -1;
-        if (trapper >= 0 && rb_decode_card_by_index((uint32_t)trapper, &c)) { base = (int)c.score; rb_free_card(&c); }
-        int detail = snapshot_score_detail(&game, trapper, NULL);
-        if (detail >= 0) {
-            CHECK_EQ(detail - base, 0, "…and the snapshot score must carry no bonus either");
-        } else {
-            CHECK_EQ(detail, -1, "no snapshot recorded for the below-threshold run (precondition)");
-        }
-    }
+    run_trapper_live(&game, 1);
+    CHECK_EQ(score_mod(&game, test_id(&game, TRAPPER)), 0,
+             "『heart05が合計4個以上』 ? below the threshold no score bonus is granted");
+    check_trapper_score(&game, 0, "…and the snapshot score carries no bonus");
 }
 
+/* F3 ? the Rust negative case: the opponent did not succeed. */
 static void test_strawberry_trapper_no_opponent_success_no_score(void)
 {
     static TestGame game;
     test_game_new(&game);
 
-    int trapper = test_id(&game, TRAPPER);
-    strawberry_setup(&game, 2, 0);
-    CHECK_EQ(game.state.p2_live_success_no_excess, 0,
+    int h5a = test_id(&game, RIKO_B);
+    int h5b = test_new_id(&game, AQ_H5_B);
+    AqSpec spec[2] = { {h5a, 5, 2}, {h5b, 5, 1} };
+    strawberry_board(&game, spec, 2, 0);
+    CHECK_EQ(game.state.live_success[1], 0,
              "precondition: the opponent did NOT succeed without excess heart");
 
-    for (int i = 0; i < 5; i++) { test_pass(&game); if (pending(&game)) answer_skip(&game); }
-    test_set_live_card(&game, 0, trapper);
-    for (int i = 0; i < 3; i++) { test_pass(&game); while (pending(&game)) answer_skip(&game); }
-
-    CHECK_EQ(score_mod(&game, trapper), 0,
-             "『相手が余剰のハートを持たずにライブを成功させていた場合』 — no opponent "
+    run_trapper_live(&game, 0);
+    CHECK_EQ(score_mod(&game, test_id(&game, TRAPPER)), 0,
+             "『相手が余剰のハートを持たずにライブを成功させていた場合』 ? no opponent "
              "success means no score bonus");
-    {
-        Card c;
-        int base = -1;
-        if (trapper >= 0 && rb_decode_card_by_index((uint32_t)trapper, &c)) { base = (int)c.score; rb_free_card(&c); }
-        int detail = snapshot_score_detail(&game, trapper, NULL);
-        if (detail >= 0) {
-            CHECK_EQ(detail - base, 0, "…and the snapshot score must carry no bonus either");
-        } else {
-            CHECK_EQ(detail, -1, "no snapshot recorded for the no-success run (precondition)");
-        }
-    }
+    check_trapper_score(&game, 0, "…and the snapshot score carries no bonus");
 }
 
-/* ═══════════════════════════════════════════════════════════════════════ */
+/* F4 ? ENGINE PROBE (not a Rust test). The printed text names heart05 only.
+ * Board: two 『Aqours』 members with 5 heart04 between them and ZERO heart05.
+ * If the +2 is still granted, the aggregate group condition ignores the
+ * `heart_colors: ["heart05"]` field. */
+static void test_strawberry_trapper_heart04_board_must_not_score(void)
+{
+    static TestGame game;
+    test_game_new(&game);
+
+    int h4a = test_id(&game, AQ_H4_A);
+    int h4b = test_new_id(&game, AQ_H4_B);
+    AqSpec spec[2] = { {h4a, 4, 2}, {h4b, 4, 1} };   /* heart04 only */
+    strawberry_board(&game, spec, 2, 1);
+    DIAG("heart05 probes on the heart04 board: %d + %d",
+         printed_heart(h4a, 5), printed_heart(h4b, 5));
+
+    run_trapper_live(&game, 1);
+    check_trapper_score(&game, 0,
+                        "『ハートにheart05が合計4個以上』 — a heart04-only board must NOT score");
+}
+
+/* F5 ? ENGINE PROBE (not a Rust test). A member with NO printed heart
+ * (PL!S-bp2-002-R) stands next to a member holding exactly 4 heart05. The
+ * board really has 合計4個以上 heart05, so the +2 must be granted. If it is
+ * not, a heartless member DECREMENTS the aggregate instead of contributing 0. */
+static void test_strawberry_trapper_heartless_member_must_not_reduce_total(void)
+{
+    static TestGame game;
+    test_game_new(&game);
+
+    int heartless = test_id(&game, RIKO_A);
+    int h5        = test_id(&game, RIKO_B);
+    AqSpec spec[2] = { {heartless, 5, 0}, {h5, 5, 3} };
+    strawberry_board(&game, spec, 2, 1);
+    DIAG("heartless member heart05 = %d, boosted member heart05 = %d (+3 modifier)",
+         printed_heart(heartless, 5), printed_heart(h5, 5));
+
+    run_trapper_live(&game, 1);
+    check_trapper_score(&game, 2,
+                        "a heartless 『Aqours』 member must contribute 0, not subtract, "
+                        "from the 合計4個以上 total");
+}
+
+/* ??????????????????????????????????????????????????????????????????????? */
 
 static void on_fault(int sig)
 {
@@ -1753,7 +1941,7 @@ static void run(const char *name, void (*fn)(void))
         int a0 = assertions, f0 = failures, g0 = harness_gaps;
         current_test = name;
         fn();
-        printf("        %-62s %3d assertion(s), %d failure(s), %d harness gap(s)\n",
+        printf("        %-64s %3d assertion(s), %d failure(s), %d harness gap(s)\n",
                name, (int)assertions - a0, failures - f0, harness_gaps - g0);
         fflush(stdout); fflush(stderr);
         _Exit(failures > f0 ? 1 : 0);
@@ -1781,6 +1969,7 @@ int main(void)
     signal(SIGSEGV, on_fault);
     signal(SIGBUS,  on_fault);
     signal(SIGABRT, on_fault);
+    if (getenv("RB_ABILITY_DEBUG")) rb_ability_debug_set(1);
 
     if (load_card_db() != 0) {
         fprintf(stderr, "FAIL: could not load the card database\n");
@@ -1788,52 +1977,56 @@ int main(void)
     }
 
     printf("--- A. state_watch / live_phase_group_wait_discard_reactivate ---\n");
-    run("A_fixture_identity",                 test_shioriko_fixtures_are_the_printed_ones);
+    run("A_fixture_identity",                  test_shioriko_fixtures_are_the_printed_ones);
     run("A_live_phase_wait_accept_reactivates",test_live_phase_group_member_wait_optional_discard_removes_wait);
-    run("A_live_phase_wait_decline_stays",    test_live_phase_group_wait_decline_discard_stays_wait);
-    run("A_non_live_phase_no_fire",           test_non_live_phase_wait_does_not_fire);
-    run("A_non_niji_wait_no_fire",            test_non_nijigasaki_wait_does_not_fire);
-    run("A_empty_hand_auto_skips",            test_empty_hand_auto_skips_no_reactivate);
-    run("A_second_wait_no_refire",            test_second_wait_same_live_phase_does_not_refire);
-    run("A_self_wait_fires",                  test_self_wait_fires_for_shioriko);
+    run("A_live_phase_wait_decline_stays",     test_live_phase_group_wait_decline_discard_stays_wait);
+    run("A_non_live_phase_no_fire",            test_non_live_phase_wait_does_not_fire);
+    run("A_non_niji_wait_no_fire",             test_non_nijigasaki_wait_does_not_fire);
+    run("A_empty_hand_auto_skips",             test_empty_hand_auto_skips_no_reactivate);
+    run("A_second_wait_no_refire",             test_second_wait_same_live_phase_does_not_refire);
+    run("A_self_wait_fires",                   test_self_wait_fires_for_shioriko);
 
     printf("--- B. state_watch / own_effect_wait_cheap_opponent_draw_one_q177 ---\n");
-    run("B_fixture_identity",                 test_maki_fixtures_are_the_printed_ones);
-    run("B_debut_cheap_opp_wait_draws_1",     test_own_effect_wait_of_cheap_opponent_after_debut_draws_one_q177);
-    run("B_declined_cost_no_wait_no_draw",    test_declined_unit_wait_cost_leaves_opponent_active_and_no_draw);
-    run("B_cost9_wait_does_not_draw",         test_actual_cost_nine_wait_does_not_trigger_maki_draw);
-    run("B_empty_opp_stage_no_draw",          test_declined_cost_with_empty_opponent_stage_draws_nothing);
-    run("B_own_effect_cheap_wait_draws",      test_own_effect_wait_of_cost_nine_opponent_draws_nothing);
-    run("B_opponent_effect_wait_no_draw",     test_opponent_effect_wait_of_cheap_member_does_not_draw);
-    run("B_opponent_debut_wait_no_draw",      test_opponent_debut_waited_member_does_not_draw);
+    run("B_fixture_identity",                  test_maki_fixtures_are_the_printed_ones);
+    run("B_debut_cheap_opp_wait_draws_1",      test_own_effect_wait_of_cheap_opponent_after_debut_draws_one_q177);
+    run("B_declined_cost_no_wait_no_draw",     test_declined_unit_wait_cost_leaves_opponent_active_and_no_draw);
+    run("B_cost9_wait_does_not_draw",          test_actual_cost_nine_wait_does_not_trigger_maki_draw);
+    run("B_empty_opp_stage_no_draw",           test_declined_cost_with_empty_opponent_stage_draws_nothing);
+    run("B_own_effect_cheap_wait_draws",       test_own_effect_wait_of_cheap_opponent_draws);
+    run("B_opponent_effect_wait_no_draw",      test_opponent_effect_wait_of_cheap_member_does_not_draw);
+    run("B_opponent_debut_wait_no_draw",       test_opponent_debut_waited_member_does_not_draw);
+    run("B_real_swap_own_effect_wait_draws",   test_own_effect_wait_chain_through_a_real_swap);
 
     printf("--- C/D/E. title_once / DIVE! ab#0 arming + ab#1 ---\n");
-    run("CE_limit_reduction",                 test_dive_ab0_placement_reduces_live_card_set_limit);
-    run("CE_no_fire_outside_main_phase",      test_dive_ab0_does_not_fire_outside_main_phase_phase_gate);
-    run("CE_only_moved_copy_triggers",        test_dive_only_moved_copy_triggers_static_copy_does_not);
-    run("CE_two_static_one_moved",            test_dive_two_static_one_moved_only_one_trigger);
-    run("CE_real_movement_only_moved",        test_dive_two_copies_real_movement_event_only_moved_places);
-    run("CE_natural_draw_does_not_arm",       test_dive_natural_draw_from_deck_does_not_arm_ab0);
-    run("CE_ab1_static_live_no_blade",        test_dive_ab1_no_blade_when_statically_in_live_zone);
-    run("CE_ab1_rescan_no_double",            test_dive_ab1_rescan_after_flags_cleared_does_not_double_grant);
-    run("CE_both_retrieval_own_only",         test_dive_both_retrieval_arms_own_copy_not_opponents);
-    run("CE_wrong_target_no_arm",             test_dive_wrong_target_retrieval_does_not_arm_ab0);
-    run("CE_skip_then_new_retrieval",         test_dive_skip_placement_then_new_retrieval_still_triggers);
-    run("CE_ab1_direct_placement",            test_dive_ab1_fires_on_direct_placement);
-    run("CE_ab1_two_niji_one_blade",          test_dive_ab1_two_niji_members_only_one_gets_blade);
-    run("CE_two_live_two_blade",              test_dive_two_in_live_zone_two_blade_grants);
-    run("CE_ab1_no_niji_target",              test_dive_ab1_no_niji_target_no_crash);
-    run("CE_ab0_declined_ab1_not_fired",      test_dive_ab0_declined_ab1_not_fired);
-    run("CE_ab0_p2_own_main_phase",           test_dive_ab0_triggers_for_p2_during_p2_main_phase);
-    run("CE_ab0_p2_during_p1_main_phase",     test_dive_ab0_no_trigger_for_p2_during_p1_main_phase);
-    run("CE_ab0_no_trigger_static_hand",      test_dive_ab0_no_trigger_from_static_hand);
-    run("CE_setsuna_debut_chain",             test_dive_ab0_places_dive_ab1_grants_blade_setsuna_chain);
-    run("CE_two_retrieved_chain",             test_dive_two_retrieved_chain_still_works);
+    run("CE_limit_reduction",                  test_dive_ab0_placement_reduces_live_card_set_limit);
+    run("CE_no_fire_outside_main_phase",       test_dive_ab0_does_not_fire_outside_main_phase_phase_gate);
+    run("CE_only_moved_copy_triggers",         test_dive_only_moved_copy_triggers_static_copy_does_not);
+    run("CE_two_static_one_moved",             test_dive_two_static_one_moved_only_one_trigger);
+    run("CE_real_movement_only_moved",         test_dive_two_copies_real_movement_event_only_moved_places);
+    run("CE_natural_draw_does_not_arm",        test_dive_natural_draw_from_deck_does_not_arm_ab0);
+    run("CE_ab1_static_live_no_blade",         test_dive_ab1_no_blade_when_statically_in_live_zone);
+    run("CE_ab1_rescan_no_double",             test_dive_ab1_rescan_after_flags_cleared_does_not_double_grant);
+    run("CE_both_retrieval_own_only",          test_dive_both_retrieval_arms_own_copy_not_opponents);
+    run("CE_wrong_target_no_arm",              test_dive_wrong_target_retrieval_does_not_arm_ab0);
+    run("CE_skip_then_new_retrieval",          test_dive_skip_placement_then_new_retrieval_still_triggers);
+    run("CE_ab1_direct_placement",             test_dive_ab1_fires_on_direct_placement);
+    run("CE_ab1_two_niji_one_blade",           test_dive_ab1_two_niji_members_only_one_gets_blade);
+    run("CE_two_live_two_blade",               test_dive_two_in_live_zone_two_blade_grants);
+    run("CE_ab1_no_niji_target",               test_dive_ab1_no_niji_target_no_crash);
+    run("CE_ab0_declined_ab1_not_fired",       test_dive_ab0_declined_ab1_not_fired);
+    run("CE_ab0_p2_own_main_phase",            test_dive_ab0_triggers_for_p2_during_p2_main_phase);
+    run("CE_ab0_p2_during_p1_main_phase",      test_dive_ab0_no_trigger_for_p2_during_p1_main_phase);
+    run("CE_ab0_no_trigger_static_hand",       test_dive_ab0_no_trigger_from_static_hand);
+    run("CE_setsuna_debut_chain",              test_dive_ab0_places_dive_ab1_grants_blade_setsuna_chain);
+    run("CE_two_retrieved_chain",              test_dive_two_retrieved_chain_still_works);
 
     printf("--- F. leaves_stage / live_success_heart05_threshold_and_no_surplus ---\n");
-    run("F_conditions_met_score_plus_2",      test_strawberry_trapper_conditions_met_score_plus_2);
-    run("F_insufficient_heart05_no_score",    test_strawberry_trapper_insufficient_heart05_no_score);
-    run("F_no_opponent_success_no_score",     test_strawberry_trapper_no_opponent_success_no_score);
+    run("F_fixture_identity",                  test_strawberry_trapper_fixtures_are_the_printed_ones);
+    run("F_conditions_met_score_plus_2",       test_strawberry_trapper_conditions_met_score_plus_2);
+    run("F_insufficient_heart05_no_score",     test_strawberry_trapper_insufficient_heart05_no_score);
+    run("F_no_opponent_success_no_score",      test_strawberry_trapper_no_opponent_success_no_score);
+    run("F_heart04_board_must_not_score",      test_strawberry_trapper_heart04_board_must_not_score);
+    run("F_heartless_member_reduces_total",    test_strawberry_trapper_heartless_member_must_not_reduce_total);
 
     rb_unload();
 

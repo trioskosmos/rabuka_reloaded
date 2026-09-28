@@ -719,7 +719,6 @@ impl EnergyZone {
     /// Push a WAITED card: appended past the active prefix (no count change).
     /// NOTE: prefer the batch `set_indices_*` below for multi-index changes —
     /// per-index swaps re-point later indices, which alias under duplicate ids.
-
     /// Set exactly the given INDICES to waited, preserving relative order:
     /// rebuilds as [still-active in order] ++ [rest in order] and recounts.
     /// Fully positional — duplicate ids are harmless. Indices out of range

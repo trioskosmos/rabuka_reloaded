@@ -1486,7 +1486,7 @@ impl super::resolver::AbilityResolver {
                         .current_entry()
                         .and_then(|entry| entry.ability.effect.as_deref())
                 })
-                .is_some_and(|effect| util::effect_uses_selected_cards(&effect));
+                .is_some_and(util::effect_uses_selected_cards);
             if keep_selected {
                 self.selection.cards = selected_hand_ids.into();
             } else {
@@ -1629,9 +1629,12 @@ impl super::resolver::AbilityResolver {
                 revealed_card_ids.len()
             ));
         }
-        let selected_effect = self
+        // Reduced to a bool here: the borrow of the effect tree would
+        // otherwise stay live across the `&mut gs` work below. Where the
+        // effect itself is needed (re-queueing it) it is re-read then.
+        let selected_effect_uses_chosen = self
             .answering_effect(gs)
-            .filter(util::effect_uses_selected_cards);
+            .is_some_and(util::effect_uses_selected_cards);
         if !effect_started {
             let cost_source = gs.current_ability_source_card_id();
             let cost_owner = util::target_player_index(&target, gs.ability_master_id().as_deref());
@@ -1639,7 +1642,7 @@ impl super::resolver::AbilityResolver {
                 gs.push_revealed_cost_card(cid, cost_source, false, cost_owner, "cost");
             }
         }
-        if selected_effect.is_some() {
+        if selected_effect_uses_chosen {
             self.selection.cards = revealed_card_ids.clone().into();
         }
 
@@ -1678,12 +1681,14 @@ impl super::resolver::AbilityResolver {
         }
 
         self.clear_choice_state(gs);
-        if let Some(effect) = selected_effect {
-            if !effect_started {
-                if let Some(entry) = gs.ability_queue.current_entry_mut() {
-                    entry.effect_started = true;
-                }
-                gs.ability_queue.set_pending_actions(vec![effect]);
+        if !effect_started && selected_effect_uses_chosen {
+            if let Some(entry) = gs.ability_queue.current_entry_mut() {
+                entry.effect_started = true;
+            }
+            // Storing the effect needs ownership; borrowing it for the test
+            // above does not.
+            if let Some(effect) = self.answering_effect(gs) {
+                gs.ability_queue.set_pending_actions(vec![effect.clone()]);
             }
         }
         self.resume_pending_actions(gs)
@@ -1892,14 +1897,18 @@ gs.set_recently_moved_batch(valid_ids.into(), Some(Zone::SuccessLiveZone.to_str(
             gs.push_revealed_cost_card(*card_id, cost_source, false, cost_owner, "cost");
         }
         self.selection.cards = card_ids.into();
-        let selected_effect = self
+        if self
             .answering_effect(gs)
-            .filter(util::effect_uses_selected_cards);
-        if let Some(effect) = selected_effect {
+            .is_some_and(util::effect_uses_selected_cards)
+        {
             if let Some(entry) = gs.ability_queue.current_entry_mut() {
                 entry.effect_started = true;
             }
-            gs.ability_queue.set_pending_actions(vec![effect]);
+            // Storing the effect needs ownership; borrowing it for the test
+            // above does not.
+            if let Some(effect) = self.answering_effect(gs) {
+                gs.ability_queue.set_pending_actions(vec![effect.clone()]);
+            }
         }
         self.resume_pending_actions(gs)
     }

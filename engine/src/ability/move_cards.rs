@@ -7,6 +7,29 @@ use crate::ability_queue::ConditionalChoice;
 use crate::card::{AbilityEffect, CardDatabase, Operator, PlacementOrder};
 use crate::game_state::GameState;
 
+/// The two owning-effect fields `maybe_prompt_deck_order` reads.
+///
+/// Passed by value rather than as `&AbilityEffect` so the caller can read them
+/// off the effect and then take `&mut self` for the call, which it cannot do
+/// while a borrow of the effect tree is live. The effect is a decoded tree that
+/// other steps re-point, so the borrow did not survive the call.
+#[derive(Clone, Copy, Default)]
+pub(crate) struct DeckOrderHint {
+    /// 「〜すべて〜」 — the move takes every matching card, not a chosen count.
+    pub all_any: Option<bool>,
+    /// Explicit deck-placement order; only `AnyOrder` reaches the prompt.
+    pub placement_order: Option<PlacementOrder>,
+}
+
+impl DeckOrderHint {
+    pub(crate) fn of(effect: &AbilityEffect) -> Self {
+        Self {
+            all_any: effect.all_any(),
+            placement_order: effect.placement_order_any(),
+        }
+    }
+}
+
 /// Where a move's cards come from and go to, and for which side.
 ///
 /// These three are the routing decision itself: which zone to read, where the
@@ -1821,7 +1844,7 @@ gs.set_recently_moved_batch(moved.clone().into(), Some("under_member"));
     pub(crate) fn maybe_prompt_deck_order(
         &mut self,
         gs: &mut GameState,
-        effect: &AbilityEffect,
+        hint: DeckOrderHint,
         taken: &[i16],
         source: &str,
         destination: &str,
@@ -1833,7 +1856,7 @@ gs.set_recently_moved_batch(moved.clone().into(), Some("under_member"));
             || Zone::from_str(source) == Some(Zone::SelectedCards)
             || Zone::from_str(source) == Some(Zone::Hand)
             || (Zone::from_str(source) == Some(Zone::LookedAt)
-                && effect.all_any().unwrap_or(false));
+                && hint.all_any.unwrap_or(false));
         // This line answers one question: "does this move reach the deck-order
         // prompt?". Log it only when the source/destination pair can, i.e. a
         // multi-card take out of an eligible zone into the deck. Logging it for
@@ -1845,13 +1868,13 @@ gs.set_recently_moved_batch(moved.clone().into(), Some("under_member"));
                 "[ORDER_CHECK] source={} destination={} placement={:?} taken_len={}",
                 source,
                 destination,
-                effect.placement_order_any(),
+                hint.placement_order,
                 taken.len()
             );
         }
         if !(is_eligible_source
             && is_deck_dest
-            && effect.placement_order_any() == Some(PlacementOrder::AnyOrder)
+            && hint.placement_order == Some(PlacementOrder::AnyOrder)
             && taken.len() > 1)
         {
             return false;
@@ -1860,7 +1883,7 @@ gs.set_recently_moved_batch(moved.clone().into(), Some("under_member"));
         log::debug!(
             "[ORDER_BEGIN] source={} all={} cards={:?}",
             source,
-            effect.all_any().unwrap_or(false),
+            hint.all_any.unwrap_or(false),
             taken
         );
         moved_cards.extend(taken.iter().copied());
@@ -2197,7 +2220,14 @@ gs.set_recently_moved_batch(moved.clone().into(), Some("under_member"));
                 entry.optional_moves_all_moved = Some(false);
             }
         }
-        if self.maybe_prompt_deck_order(gs, effect, &taken, &source, &destination, &mut moved_cards) {
+        if self.maybe_prompt_deck_order(
+            gs,
+            DeckOrderHint::of(effect),
+            &taken,
+            &source,
+            &destination,
+            &mut moved_cards,
+        ) {
             return Ok(());
         }
 
@@ -2641,7 +2671,7 @@ pub fn execute_selected_cards_from_zone(
                 let mut order_moved = Vec::new();
                 if self.maybe_prompt_deck_order(
                     gs,
-                    &effect,
+                    DeckOrderHint::of(effect),
                     &order_card_ids,
                     zone,
                     dest,

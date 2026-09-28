@@ -1,17 +1,10 @@
-import json, sys
-path = sys.argv[1]
-want = set(sys.argv[2:])
-db = json.load(open(path, encoding="utf-8"))
+import json
+db = json.load(open(r"C:\Users\trios\OneDrive\Documents\rabuka_reloaded\cards\abilities.json", encoding="utf-8"))
 ua = db["unique_abilities"]
-if isinstance(ua, dict):
-    items = list(ua.items())
-else:
-    items = [(i, v) for i, v in enumerate(ua)]
+items = list(ua.items()) if isinstance(ua, dict) else list(enumerate(ua))
 for cid, c in items:
     txt = json.dumps(c, ensure_ascii=False)
-    for w in want:
-        if w in txt:
-            print("=== idx", cid)
-            print(json.dumps(c, ensure_ascii=False, indent=1))
-            print()
-            break
+    if "PL!N-bp4-026-L" in txt or "PL!N-bp7-022-N" in txt or "PL!N-bp5-019-N" in txt:
+        print("=== idx", cid)
+        print(json.dumps(c, ensure_ascii=False, indent=1))
+        print()

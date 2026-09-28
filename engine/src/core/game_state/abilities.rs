@@ -3306,8 +3306,6 @@ fn trigger_auto_ability_by_index_refs(
             return;
         }
         self.pending_loop_protocol = Some(PermanentLoopProtocol {
-            state_hash: hash,
-            repetition_count,
             choice: crate::ability::types::Choice::SelectTarget {
                 target: "rule_12_1".to_string(),
                 description: "Stop the repeated action and draw the game?".to_string(),

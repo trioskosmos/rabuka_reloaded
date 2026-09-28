@@ -63,8 +63,9 @@ pub use crate::types::{
 
 #[derive(Debug, Clone)]
 pub struct PermanentLoopProtocol {
-    pub state_hash: u64,
-    pub repetition_count: u8,
+    /// Only `choice` is ever read: the repetition count and state hash that
+    /// gated its creation are used while building it and then discarded. The
+    /// struct exists purely to hold the pending rules prompt.
     pub choice: crate::ability::types::Choice,
 }
 

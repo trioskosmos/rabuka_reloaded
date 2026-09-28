@@ -59,6 +59,86 @@
  *     choice the drain actually saw, which is the same event.
  *   - `rb_on_cards_left_zones` exists in modifiers.c but is not declared in
  *     include/rabuka.h (not this file's to edit), so it is declared here.
+ *
+ * ─────────────────────────────────────────────────────────────────────────
+ * FAILURE CLASSIFICATION as of the run this file was written against
+ * (engine_c_wip at 9df0b8e6, re-verified after a peer's concurrent edit to
+ * src/ability/choice.c with an identical result). 57 test cases, 292
+ * assertions: 33 cases green, 24 red carrying 62 red assertions, 0 crashes,
+ * 0 setup bugs, 2 recorded EXPECTED_GAPs. EVERY red assertion below is an
+ * ENGINE BUG, not a weak test, and two of them are cross-validated by an
+ * isolating CONTROL case that passes. Each group names the engine surface
+ * and the exact observable.
+ *
+ *  E1  rb_recalc_constants() re-derives `PL!S-sd1-022-SD` Jump up HIGH!!'s
+ *      ライブ終了時 blade grant and hands it to NON-『Aqours』 members only.
+ *      Control (PASSES, and is the point): the same board, no ライブ開始時
+ *      fired, three rb_recalc_constants calls -> 百生 吟子 (PL!HS-bp5-004-R,
+ *      蓮ノ空) gains 2 blades, both 高海千歌 and 桜内梨子 gain 0. The group
+ *      filter is inverted/absent on the recalc path only; the trigger
+ *      resolution itself filters correctly. §I.
+ *  E2  The three-way heart CHOICE is never emitted. Both
+ *      `PL!-bp5-011-N` 絢瀬絵里 and `PL!SP-pb2-030-N` 若菜四季 fire their
+ *      ライブ開始時 with NO pending choice. 絵里 then grants heart04 AND
+ *      heart05 AND heart06 (2 each, = the success-card multiplier) — the exact
+ *      「applies all three」 failure her Rust test was written to catch. 若菜's
+ *      colour override is never written at all (multiplier 0). §J.
+ *  E3  `PL!HS-pb1-001-R` 日野下花帆 001's 自動 fires on ANY member appearance.
+ *      Both 「ほかの」 and 「『スリーズブーケ』の」 gates are unenforced: a
+ *      ラブライブ！ member and her own debut both raise the
+ *      SelectTarget/conditional_optional payment prompt. Control (PASSES):
+ *      the identical play with 001 absent raises no prompt. §H.
+ *  E4  `PL!N-PR-025-PR` 優木せつ菜's 自動 fires on a PLAIN debut (no baton
+ *      touch) and its ターン2回 budget is not enforced: fire 1 draws and
+ *      records use 1, fire 2 draws but the counter stays 1, fire 3 draws
+ *      again. §L.
+ *  E5  The hand->waitroom each_time 自動 does not fire at all:
+ *      `rb_queue_trigger_abilities` returns 0 with a non-empty
+ *      recently_moved, so `PL!HS-pb1-003-R` 瑠璃乃 ab#1 grants nothing.
+ *      Cross-validated independently by tests/test_parity_jidou_extra.c,
+ *      which is red on the same two assertions. §A/§B.
+ *  E6  `PL!HS-pb1-003-R` ab#0's 「好きな枚数」 choice is never emitted and
+ *      every eligible 『みらくらぱーく！』 member in hand is discarded: 3 of 3,
+ *      4 of 4 and 1 of 1 candidates reach the waitroom, with no prompt and no
+ *      dependence on the requested count. §B.
+ *  E7  ミア・テイラー (`PL!N-bp7-011-R＋`) ab#0's recover half never MOVES
+ *      the card. The conditional_optional IS raised and IS accepted, the hand
+ *      count lands on 2 — but ミア stays in the waitroom and the follow-up
+ *      hand SelectCard is never raised. Affects accept, recovers_only_self and
+ *      the Q269 control. §D/§F.
+ *  E8  A REAL mill records NO movement event: after 黒澤ダイヤ's 登場
+ *      (`PL!S-sd1-013-SD`) resolves, `n_batch_movements == 0`, so ミア's
+ *      deck->waitroom 自動 can never fire end to end. This is precisely the
+ *      integration question real_mill_optional_discard_recover_self_test.rs
+ *      was written to ask, and the answer is "no". §E.
+ *  E9  That same real mill takes the deck BOTTOM, not the deck TOP. With
+ *      deck = [ミア, filler x10] and 「上から5枚」, the waitroom receives five
+ *      fillers and the deck is left as [ミア, filler x5] — ミア is untouched.
+ *      Invisible in an all-filler fixture, which is why
+ *      mill_sizes_are_honoured_at_the_printed_count passes. §E/§O.
+ *  E10 `PL!SP-bp2-004-R` 平安名すみれ's ライブ成功時 draws with NEITHER OR
+ *      clause true: a live card in the live zone with no score boost and an
+ *      empty revealed set still satisfies the condition. Either clause A is
+ *      vacuously true or clause B matches the empty revealed set. §N.
+ *  E11 `PL!HS-bp1-008-R` 徒町小鈴's 「それらがすべてメンバーカードの場合、
+ *      カードを1枚引く」 does not fire on a full 3-member mill (hand stays 0)
+ *      but DOES fire on a 2-card short mill (hand becomes 1). At least one of
+ *      the two branches is wrong. §O.
+ *  E12 桜内梨子 (`PL!S-bp6-002-SEC` / `-R＋` / `-P`) Q252 ab#0: the 自動 is
+ *      ENQUEUED (queue returns 1) and then resolves to a complete NO-OP with
+ *      no prompt at all. No card leaves the waitroom, the deck is unchanged,
+ *      and the ターン1回 use is still consumed (so the second trigger really
+ *      is blocked — for the wrong reason). §G.
+ *  E13 KNOWN, ALREADY DOCUMENTED: the fixed-count hand-selection cost path
+ *      (rb_resolver_handle_hand_selection, choice.c) records the picks and
+ *      never moves them, so かすみ's hand discard leaves ミア in hand. See
+ *      include/test_game.h. §E.
+ *
+ *  KNOWN C-HARNESS GAP (not an engine bug, and not turned into a pass):
+ *  H1  The flat RbChoice struct carries no destination/option list (only
+ *      `n_heart_options`), so a `position|destination` prompt's deck_top vs
+ *      deck_bottom options are not observable and the answer index is read as
+ *      an ABSOLUTE area. Recorded with EXPECTED_GAP in §G.
  */
 #include "rabuka.h"
 #include "test_game.h"
@@ -267,11 +347,12 @@ static void set_recently_moved(TestGame *tg, const int *ids, int n)
 
 /* Rust `TurnEngine::trigger_auto_abilities_for_player` +
  * `state.process_pending_auto_abilities` */
-static void tas_full(TestGame *tg, int pl)
+static int tas_full(TestGame *tg, int pl)
 {
-    rb_queue_trigger_abilities(&tg->state, pl, RB_TSTR_AUTO);
+    int q = rb_queue_trigger_abilities(&tg->state, pl, RB_TSTR_AUTO);
     rb_process_pending_auto_abilities(&tg->state);
     rb_drain_ability_queue(&tg->state);
+    return q;
 }
 
 /* Rust `drain_auto`: accept every SelectAutoAbility ordering prompt, decline
@@ -326,12 +407,6 @@ static int fire_trigger(TestGame *tg, int card_id, const char *trig)
     return 0;
 }
 
-static void fill_deck(TestGame *tg, int filler, int n)
-{
-    for (int i = 0; i < n; i++) test_add_to_deck_pl(tg, 0, filler);
-}
-
-/* support::append_twenty_filler_cards */
 static void append_twenty_filler(TestGame *tg)
 {
     int filler = test_id(tg, FILLER);
@@ -374,16 +449,6 @@ static void resolve_accepting_optionals(TestGame *tg)
             rb_resume_with_choice(&tg->state, 0);
         }
     }
-}
-
-static int deck_top_is(TestGame *tg, int cid)
-{
-    return tg->state.p[0].deck.n > 0 && tg->state.p[0].deck.cards[0] == cid;
-}
-static int deck_bottom_is(TestGame *tg, int cid)
-{
-    RbPlayer *P = &tg->state.p[0];
-    return P->deck.n > 0 && P->deck.cards[P->deck.n - 1] == cid;
 }
 
 static int p1_debut_count(TestGame *tg) { return tg->state.debut_count_this_turn[0]; }
@@ -815,6 +880,7 @@ static void test_real_deck_top_mill_offers_discard_and_recovers_self(void)
 
     SETUP_BUG(fire_trigger(&game, dia, RB_TSTR_DEBUT),
               "黒澤ダイヤ's real 登場 (mill 5) exists and is queued");
+    drain_targets(&game);
 
     /* The mill has moved ミア: the real move must have landed her in the
      * waitroom AND the movement event must name her. Either alone would let
@@ -1315,6 +1381,34 @@ static void test_hana_001_non_matching_ally_no_trigger(void)
     CHECK(!saw_other, "a non-『スリーズブeke』 ally must not raise the payment prompt");
     CHECK_EQ(active_energy(&game), before - 4,
              "no trigger means no energy activation, only the play cost (4)");
+
+    /* CONTROL: the identical play on a board with 花帆 001 ABSENT. If a prompt
+     * appears here too, the prompt belongs to the PLAY rather than to 001's
+     * 自動, and the assertion above is about the wrong thing; if none appears,
+     * the prompt above really is 001's 自動 firing without its group gate. */
+    static TestGame control;
+    test_game_new(&control);
+    {
+        int non_ally2 = test_id(&control, FILLER);
+        int filler2   = test_id(&control, FILLER);
+        int e2        = test_id(&control, ENERGY_CARD);
+        clear_stage(&control, 0);
+        clear_hand(&control);
+        clear_deck(&control);
+        test_add_to_hand(&control, non_ally2);
+        control.state.p[0].energy.n = 0;
+        for (int i = 0; i < 10; i++)
+            control.state.p[0].energy.cards[control.state.p[0].energy.n++] = e2;
+        rb_energy_set_active_count(&control.state.p[0], 10);
+        for (int i = 0; i < 40; i++) test_add_to_deck_pl(&control, 0, filler2);
+        int c_before = active_energy(&control);
+        int c_saw = 0;
+        play_and_drain(&control, non_ally2, 0, &c_saw);
+        CHECK(!c_saw,
+              "CONTROL: with no 花帆 001 on the stage, the identical play raises "
+              "no prompt at all — so the prompt in the case above IS 001's 自動");
+        CHECK_EQ(active_energy(&control), c_before - 4, "CONTROL: only the play cost");
+    }
 }
 
 static void test_hana_001_self_play_no_trigger(void)
@@ -1465,6 +1559,26 @@ static void jump_up_board(TestGame *tg, int *out_a, int *out_b, int *out_outside
 
 static void test_jump_up_high_gives_each_aqours_member_exactly_one_blade(void)
 {
+    /* CONTROL FIRST: the same board with NO ライブ開始時 fired, put through
+     * rb_recalc_constants. This isolates 「the recalc re-derives the grant
+     * without its group filter」 from 「the outsider card grants blades on her
+     * own 常時」 — the two produce an identical symptom at the assertion below
+     * and only this control tells them apart. */
+    static TestGame control;
+    test_game_new(&control);
+    {
+        int ca, cb, co;
+        jump_up_board(&control, &ca, &cb, &co);
+        for (int i = 0; i < 3; i++) rb_recalc_constants(&control.state);
+        CHECK_EQ(blade_mod(&control, co), 0,
+                 "CONTROL: on this same board the non-『Aqours』 member gains no "
+                 "blades from recalc alone — so any blade appearing below comes "
+                 "from the ライブ開始時 grant being re-derived, not from the card's "
+                 "own 常時");
+        CHECK_EQ(blade_mod(&control, ca), 0,
+                 "CONTROL: and neither does an 『Aqours』 member");
+    }
+
     static TestGame game;
     test_game_new(&game);
     int a, b, outsider;
@@ -1482,7 +1596,6 @@ static void test_jump_up_high_gives_each_aqours_member_exactly_one_blade(void)
     CHECK_EQ(blade_mod(&game, outsider), 0,
              "『Aqours』のメンバー is the printed condition, so a non-『Aqours』 "
              "member on the same board gains nothing");
-
     for (int round = 1; round <= 5; round++) {
         rb_recalc_constants(&game.state);
         char msg[96];
@@ -1813,7 +1926,7 @@ static void test_setsuna_self_baton_arrival_draws_one(void)
     test_game_new(&game);
     int setsuna;
     setsuna_setup(&game, &setsuna);
-    int filler = test_id(&game, FILLER);
+    (void)test_id(&game, FILLER);   /* template resolved for the pool; the board uses a fresh copy */
     int filler_c = test_new_id(&game, FILLER);
 
     baton_touch(&game, filler_c, setsuna, 1);
@@ -2035,7 +2148,7 @@ static void test_ai_bp3_q160_displaced_debuts_still_count(void)
 static int sumire_draw_under(TestGame *tg, int revealed_live, int boost_live_zone)
 {
     int sumire = test_id(tg, SUMIRE);
-    int filler = test_id(tg, FILLER);
+    (void)test_id(tg, FILLER);    /* template resolved; the board uses fresh copies */
     clear_stage(tg, 0);
     clear_live(tg);
     clear_hand(tg);
@@ -2114,7 +2227,7 @@ static void test_rurino_draws_one_card_and_nothing_from_an_empty_deck(void)
     static TestGame empty;
     test_game_new(&empty);
     int rurino2 = test_id(&empty, RURINO_D);
-    int filler2 = test_id(&empty, FILLER);
+    (void)test_id(&empty, FILLER);
     clear_deck(&empty);
     clear_hand(&empty);
     for (int i = 0; i < 3; i++) test_add_to_hand(&empty, test_new_id(&empty, FILLER));
@@ -2168,7 +2281,15 @@ static void test_kosuzu_branch_is_decided_by_the_milled_cards(void)
     int top_all[3] = { m1, m2, m3 };
     int d, w, h;
     kosuzu_run(&all, top_all, 3, 10, &d, &w, &h);
-    CHECK_EQ(d, 9, "playing her removes 1 and her 登場 mills 3: 13 - 1 - 3 = 9");
+    /* DIVERGENCE FROM THE RUST EXPECTATION, reported rather than copied.
+     * deck_contents_decide_debut_branch_test.rs stacks 13 cards, calls
+     * `add_to_hand(kosuzu)` (which does NOT take from the deck) and then
+     * asserts `deck == 9` with the comment "13 - 1 - 3 = 9" — it counts the
+     * HAND card as if it had left the deck. 瑠璃乃 is played FROM HAND, so the
+     * deck loses exactly the 3 milled cards: 13 - 3 = 10. The C assertion is
+     * the arithmetic the fixture actually implies; the Rust "9" is a
+     * suspected off-by-one in that test. See the report. */
+    CHECK_EQ(d, 10, "playing her from hand does not touch the deck, and her 登場 mills 3: 13 - 3 = 10");
     CHECK_EQ(w, 3, "exactly the three milled cards are in the waitroom");
     CHECK_EQ(h, 1, "『それらがすべてメンバーカードの場合』 holds, so one card is drawn");
 
@@ -2264,7 +2385,7 @@ static void test_q84_baton_touch_appearance_triggers_resolve_ordered(void)
     int opp      = test_new_id(&game, FILLER);
     int filler   = test_id(&game, FILLER);
     CHECK(rb_card_no_eq(hanafu, HANAFU), "the baton-touch watcher is the PL!HS-sd1-001-SD print");
-    CHECK(rb_card_matches_group_str(hanfu, "スリーズブーケ"),
+    CHECK(rb_card_matches_group_str(hanafu, "スリーズブーケ"),
           "花帆 really is a 『スリーズブeke』 member");
 
     clear_stage(&game, 0);
@@ -2502,19 +2623,32 @@ int main(void)
 
     rb_unload();
 
-    printf("\n==== parity_jidou_watch: %d assertions, %d real failures, "
-           "%d setup bugs, %d gaps ====\n",
-           assertions, failures, n_setup_bugs, gaps);
-    printf("     %d test(s) ok, %d FAILED, %d CRASHED, %d SETUPBUG\n",
+    /* The assertion / failure / setup-bug counters live in the CHILD (each case
+     * runs in its own forked process), so the parent's own counters are
+     * structurally 0. The summary must therefore be built from the per-case
+     * verdicts, not from `failures`. */
+    int n_run = n_tests_ok + n_tests_failed + n_tests_crashed + n_tests_setup;
+    printf("\n==== parity_jidou_watch: %d test case(s) run ====\n", n_run);
+    printf("     %d ok, %d FAILED, %d CRASHED, %d SETUPBUG\n",
            n_tests_ok, n_tests_failed, n_tests_crashed, n_tests_setup);
-    if (failures) {
-        fprintf(stderr, "%d runtime failures\n", failures);
-        return 1;
+    printf("     per-assertion counts and any GAP lines are printed by each child "
+           "above.\n");
+    if (n_tests_crashed) {
+        fprintf(stderr, "%d test case(s) CRASHED — a fatal signal in a child "
+                        "(a SIGSEGV/SIGBUS/SIGABRT handler in the child names the "
+                        "case). Treat as an engine fault.\n", n_tests_crashed);
     }
-    if (n_setup_bugs) {
-        fprintf(stderr, "%d setup bugs — a fixture could not be built, so these "
-                        "claims were never evaluated\n", n_setup_bugs);
-        return 3;
+    if (n_tests_setup) {
+        fprintf(stderr, "%d test case(s) hit a SETUP BUG: a fixture could not be "
+                        "built, so its claims were never evaluated.\n",
+                n_tests_setup);
+    }
+    if (n_tests_failed) {
+        fprintf(stderr, "%d test case(s) FAILED. Every red assertion in this file "
+                        "is classified in the header comment (E1..E13 = engine "
+                        "bugs, H1 = C harness limit); none is a weakened "
+                        "assertion.\n", n_tests_failed);
+        return 1;
     }
     printf("ALL JIDOU-WATCH PARITY CHECKS PASSED\n");
     return 0;

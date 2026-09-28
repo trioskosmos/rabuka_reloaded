@@ -203,6 +203,12 @@ static void set_stage(TestGame *tg, int pl, int area, int cid)
     tg->state.p[pl].stage_wait[area] = 0;
 }
 
+static int survey_trace_on(void)
+{
+    const char *dbg = getenv("SURVEY_DEBUG");
+    return dbg && *dbg && strcmp(dbg, "0") != 0;
+}
+
 static int pending(TestGame *tg) { return rb_has_pending_choice(&tg->state); }
 
 static void answer(TestGame *tg, int idx)
@@ -247,12 +253,6 @@ static int drain_traced(TestGame *tg, int guard_max)
         guard++;
     }
     return guard;
-}
-
-static int survey_trace_on(void)
-{
-    const char *dbg = getenv("SURVEY_DEBUG");
-    return dbg && *dbg && strcmp(dbg, "0") != 0;
 }
 
 /* Rust `advance_to_live_card_set_p1` = 5 passes. */
@@ -361,8 +361,14 @@ static void test_issue12_proof_cost_20plus(void)
     advance_to_live_card_set_p1(&tg_a);
     test_set_live_card(&tg_a, 0, b.proof);
     advance_to_live_start(&tg_a);
-    drain_traced(&tg_a, 64);
+    int prompts_a = drain_traced(&tg_a, 64);
 
+    /* Control: the >=20 rung MUST have raised the look-and-select prompt. The
+     * heart assertion alone is vacuous on a board where the effect is a
+     * complete no-op, because then need_heart is 0 whether or not the ability
+     * fired. This is the assertion that makes the arm meaningful. */
+    CHECK(prompts_a > 0,
+          "12a control: stage cost 28 >= 20 -> the look-and-select prompt fired");
     /* 12a: cost < 30 -> no heart reduction. */
     CHECK_EQ(need_heart_h00(&tg_a, b.proof), 0,
              "12a: stage cost 28 < 30 -> Proof keeps its printed need_heart heart00");
@@ -388,8 +394,10 @@ static void test_issue12_proof_cost_30plus(void)
     advance_to_live_card_set_p1(&tg_b);
     test_set_live_card(&tg_b, 0, b.proof);
     advance_to_live_start(&tg_b);
-    drain_traced(&tg_b, 64);
+    int prompts_b = drain_traced(&tg_b, 64);
 
+    CHECK(prompts_b > 0,
+          "12b control: stage cost 30 >= 20 -> the look-and-select prompt fired");
     /* 12b: cost >= 30 -> heart00 -2 ("reduce required hearts by 2x heart00"). */
     CHECK_EQ(need_heart_h00(&tg_b, b.proof), -2,
              "12b: stage cost 30 >= 30 -> Proof's need_heart heart00 is reduced by 2");
@@ -428,12 +436,19 @@ static void test_proof_cost_below_20_no_effect(void)
     advance_to_live_card_set_p1(&tg_c);
     test_set_live_card(&tg_c, 0, proof);
     advance_to_live_start(&tg_c);
-    drain_traced(&tg_c, 64);
+    int prompts_c = drain_traced(&tg_c, 64);
+    int deck_before_c = tg_c.state.p[0].deck.n;
 
     /* Rust asserts hand.cards.len() == 1, i.e. only Proof itself. The C hand
      * holds no other card by construction, so the same claim is hand.n == 1. */
     CHECK_EQ(tg_c.state.p[0].hand.n, 1,
              "Proof: Hasunosora stage cost 9 < 20 -> the ability draws nothing");
+    CHECK_EQ(tg_c.state.p[0].deck.n, deck_before_c,
+             "Proof: Hasunosora stage cost 9 < 20 -> the deck is untouched");
+    /* The gate control. A working threshold raises NOTHING below 20. */
+    CHECK_EQ(prompts_c, 0,
+             "Proof: Hasunosora stage cost 9 < 20 -> no prompt at all "
+             "(the >=20 gate must not open)");
     CHECK_EQ(need_heart_h00(&tg_c, proof), 0,
              "Proof: Hasunosora stage cost 9 < 20 -> no need_heart reduction");
 }

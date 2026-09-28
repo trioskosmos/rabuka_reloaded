@@ -1564,8 +1564,6 @@ mod tests {
         assert!(search(&gs, &actions, 0, &scores, &cfg).is_none());
         // Rule 12-1 is a rules prompt, never a rollout question.
         gs.pending_loop_protocol = Some(crate::core::game_state::PermanentLoopProtocol {
-            state_hash: 0,
-            repetition_count: 3,
             choice: crate::ability::types::Choice::SelectTarget {
                 target: "rule_12_1".into(),
                 description: String::new(),

@@ -153,10 +153,7 @@ pub struct ResolverSession {
     /// Stored directly (not read from queue) because the queue's current entry
     /// may change during effect execution (e.g. process_pending_auto_abilities).
     pub current_ability_index: Option<usize>,
-    pub duration_effects: SmallVec<[(String, String); 2]>,
     pub debug_trace: bool,
-    /// Buffer for structured ability resolution log items.
-    pub log_items: Vec<AbilityLogItem>,
 }
 
 /// What is executing right now.
@@ -171,7 +168,6 @@ pub struct InFlight {
     pub step_state: StepState,
     pub pipeline: EffectPipeline,
     pub spawn_context: EffectSpawnContext,
-    pub is_reveal_cost: bool,
     /// Set when a nested choice was created, so the answer path knows to hand
     /// control to the sub-choice rather than resuming the parent effect.
     pub sub_choice_created: bool,
@@ -395,19 +391,16 @@ impl AbilityResolver {
             owner: EffectOwner::default(),
             session: ResolverSession {
                 card_database: card_database.clone(),
-                duration_effects: SmallVec::new(),
                 current_ability: None,
                 current_ability_index: None,
                 activating_card_id,
                 debug_trace: false,
-                log_items: Vec::new(),
             },
             in_flight: InFlight {
                 execution_context: ExecutionContext::None,
                 step_state: StepState::new(),
                 pipeline: EffectPipeline::new(),
                 spawn_context: EffectSpawnContext::default(),
-                is_reveal_cost: false,
                 sub_choice_created: false,
                 deferred_conditional_gate: false,
                 cancel_remaining_commands: false,

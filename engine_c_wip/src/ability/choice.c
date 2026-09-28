@@ -3714,9 +3714,21 @@ void rb_emit_choice(GameState *g, int actor, RbChoiceKind kind,
        Both branches of rb_queue_pause_for_choice set the state themselves
        (ability_queue.c:310 and :327), so the stamp after it is belt-and-braces
        for the `n_entries == RB_QUEUE_DEPTH` fallthrough, which sets neither. */
+    int cur_before = g->queue.cur, n_before = g->queue.n_entries;
     RbChoice ch = g->queue.pending;
     ch.actor = actor;  /* ensure actor is set for queue entry routing */
     rb_queue_pause_for_choice(g, &ch);
+    if (g->queue.n_entries > n_before) {
+        /* No live entry to stamp, so the pause minted a placeholder
+           (ability_queue.c:315-327) to give the choice a home. rb_emit_choice
+           never minted one — the state stamp above used to shadow the early
+           return entirely — and callers depend on the queue NOT growing here
+           (a minted placeholder makes `n_entries` outrank the live entry the
+           next resume looks up by `cur`), so retire it again and keep exactly
+           the pre-existing queue shape. */
+        g->queue.n_entries = n_before;
+        g->queue.cur = cur_before;
+    }
     g->queue.state = RB_QUEUE_AWAITING_CHOICE;   /* QueueState FSM (ability_queue.rs) */
 }
 
