@@ -31,7 +31,7 @@ macro_rules! tdbg {
 /// UI-only provenance string: empty (no alloc) when training has logs off.
 #[inline]
 fn ui_text(s: &str) -> String {
-    if crate::game_setup::logging_enabled() {
+    if crate::core::runtime_flags::logging_enabled() {
         s.to_string()
     } else {
         String::new()
@@ -461,7 +461,7 @@ fn commit_constant_results(
                         // name/owner only now that the condition passed).
                         // Skipped under `headless` — display-only summary data.
                         #[cfg(not(feature = "headless"))]
-                        if crate::game_setup::logging_enabled() {
+                        if crate::core::runtime_flags::logging_enabled() {
                             let status_card_name = card_db
                                 .get_card(card_id)
                                 .map(|c| c.name.to_string())

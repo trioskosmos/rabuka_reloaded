@@ -31,7 +31,7 @@ impl super::TurnEngine {
     /// No-op under the `headless` feature (bot playouts never render these).
     #[cfg(not(feature = "headless"))]
     fn log_phase(game_state: &mut GameState, marker_key: &str) {
-        if !crate::game_setup::logging_enabled() {
+        if !crate::core::runtime_flags::logging_enabled() {
             return;
         }
         let text = format!("[[{}]]", marker_key);
@@ -54,7 +54,7 @@ impl super::TurnEngine {
     /// Log the start of a new turn.
     /// Uses [[turn_start:turn=N]] translatable marker.
     fn log_turn_start(game_state: &mut GameState) {
-        if !crate::game_setup::logging_enabled() {
+        if !crate::core::runtime_flags::logging_enabled() {
             return;
         }
         let text = format!("[[turn_start:turn={}]]", game_state.turn_number);
@@ -1734,7 +1734,7 @@ impl super::TurnEngine {
     }
 
     fn push_rps_log(game_state: &mut GameState, p1: u8, p2: u8, winner_str: &str) {
-        if !crate::game_setup::logging_enabled() {
+        if !crate::core::runtime_flags::logging_enabled() {
             return;
         }
         let p1_name = Self::rps_choice_name(p1);

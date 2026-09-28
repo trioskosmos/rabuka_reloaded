@@ -827,7 +827,7 @@ impl AbilityResolver {
         // Strings inside LogMetadata — then discarded all of them. That is
         // ~7 allocations per resolution on a path disabled for every bench,
         // rollout and training run.
-        if !crate::game_setup::logging_enabled()
+        if !crate::core::runtime_flags::logging_enabled()
             && !crate::ability::debug::ABILITY_DEBUG.load(core::sync::atomic::Ordering::Relaxed)
         {
             return;

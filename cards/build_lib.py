@@ -5,7 +5,6 @@ import struct
 import hashlib
 import zlib
 from pathlib import Path
-from typing import Any
 
 
 def write_len(out: bytearray, n: int) -> None:
@@ -137,101 +136,8 @@ def write_generation_manifest(
     )
 
 
-def generate_rust_include_bytes(blob_path: Path, const_name: str, relative_to: str = "build") -> str:
-    """Generate Rust include_bytes! const declaration."""
-    return f'pub const {const_name}: &[u8] = include_bytes!("../../../cards/{relative_to}/{blob_path.name}");'
-
-
 def sha256_short(path: Path) -> str:
     return hashlib.sha256(path.read_bytes()).hexdigest()[:16]
-
-
-def load_json(path: Path) -> Any:
-    return json.loads(path.read_text(encoding="utf-8"))
-
-
-def save_json(path: Path, data: Any) -> None:
-    path.write_text(json.dumps(data, indent=2) + "\n", encoding="utf-8")
-
-
-class BinaryEncoder:
-    """Generic binary JSON encoder with interned strings."""
-
-    TAG_NULL = 0x00
-    TAG_FALSE = 0x01
-    TAG_TRUE = 0x02
-    TAG_INT = 0x03
-    TAG_FLOAT = 0x04
-    TAG_STR = 0x06
-    TAG_ARRAY = 0x07
-    TAG_OBJECT = 0x08
-    TAG_OBJECT_VARIANT = 0x09
-
-    def __init__(self, strings: StringTable):
-        self.strings = strings
-        self.data = bytearray()
-
-    def encode(self, v: Any, in_effect_vec: bool = False, is_condition: bool = False) -> None:
-        if v is None:
-            self.data.append(self.TAG_NULL)
-        elif isinstance(v, bool):
-            self.data.append(self.TAG_TRUE if v else self.TAG_FALSE)
-        elif isinstance(v, int):
-            self.data.append(self.TAG_INT)
-            self._encode_int(v)
-        elif isinstance(v, float):
-            self.data.append(self.TAG_FLOAT)
-            self.data.extend(struct.pack("<d", v))
-        elif isinstance(v, str):
-            self.data.append(self.TAG_STR)
-            self.data.extend(struct.pack("<H", self.strings.intern(v)))
-        elif isinstance(v, list):
-            self.data.append(self.TAG_ARRAY)
-            write_len(self.data, len(v))
-            for item in v:
-                self.encode(item, in_effect_vec, is_condition)
-        elif isinstance(v, dict):
-            self._encode_dict(v, in_effect_vec, is_condition)
-        else:
-            self.data.append(self.TAG_NULL)
-
-    def _encode_int(self, v: int) -> None:
-        if v < 0:
-            self.data.append(0xFF)
-            self.data.extend(struct.pack("<I", v & 0xFFFFFFFF))
-        elif v <= 0xFD:
-            self.data.append(v & 0xFF)
-        elif v <= 0xFFFF:
-            self.data.append(0xFE)
-            self.data.extend(struct.pack("<H", v))
-        else:
-            self.data.append(0xFF)
-            self.data.extend(struct.pack("<I", v))
-
-    def _encode_dict(
-        self,
-        v: dict,
-        in_effect_vec: bool,
-        is_condition: bool,
-        variant_tag: int = None,
-        skip_keys: set = None,
-    ) -> None:
-        skip_keys = skip_keys or set()
-        filtered = {k: val for k, val in v.items() if k not in skip_keys}
-
-        if variant_tag is not None:
-            self.data.append(self.TAG_OBJECT_VARIANT)
-            self.data.append(variant_tag)
-        else:
-            self.data.append(self.TAG_OBJECT)
-
-        write_len(self.data, len(filtered))
-        for k, val in filtered.items():
-            self.data.extend(struct.pack("<H", self.strings.intern(str(k))))
-            self.encode(val, in_effect_vec, is_condition)
-
-    def bytes(self) -> bytes:
-        return bytes(self.data)
 
 
 def delta_encode_offsets(offsets: list[int]) -> list[int]:

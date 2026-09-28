@@ -13,6 +13,14 @@ use alloc::{
 
 impl AbilityResolver {
     /// Handles "custom" actions that could not be parsed into a standard action type.
+    ///
+    /// `Custom` is the parser's escape hatch, and it is reached in two shapes:
+    /// a recognised pattern that only needs re-routing (cases 1 and 2 below),
+    /// or a genuine parse gap (the fallthrough at the end). A parse gap is a
+    /// bug, not a supported action — `run_all::test_no_custom_actions` fails the
+    /// build if `cards/abilities.json` still emits any, so the fallthrough is a
+    /// diagnostic sink for a gap that slipped through, not a code path to
+    /// design around.
     pub(crate) fn execute_custom(
         &mut self,
         gs: &mut GameState,
@@ -51,7 +59,8 @@ impl AbilityResolver {
             );
         }
 
-        log::debug!("Unhandled custom action: {}", action_str);
+        // 3) Parse gap: the parser could not type this effect. Nothing to run.
+        log::debug!("Unhandled custom action (parser gap): {}", action_str);
         let pp = self.player_prefix(gs);
         let act_name = gs
             .activating_card

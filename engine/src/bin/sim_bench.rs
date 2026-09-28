@@ -710,8 +710,8 @@ fn real_main() -> Result<(), String> {
     let logs = std::env::var("RABUKA_LOGS")
         .map(|v| v == "1" || v.eq_ignore_ascii_case("true"))
         .unwrap_or(false);
-    game_setup::set_action_display(display);
-    game_setup::set_logging_enabled(logs);
+    rabuka_engine::core::runtime_flags::set_action_display(display);
+    rabuka_engine::core::runtime_flags::set_logging_enabled(logs);
 
     // ── Setup (outside the timed region) ────────────────────────────────
     let setup_t0 = Instant::now();

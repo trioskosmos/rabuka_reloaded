@@ -1416,8 +1416,8 @@ fn main() -> ArenaResult<()> {
     let args: Vec<String> = std::env::args().skip(1).collect();
     let env_games = std::env::var("ARENA_GAMES").ok();
     let options = Options::parse(&args, env_games.as_deref())?;
-    rabuka_engine::game_setup::set_action_display(false);
-    rabuka_engine::game_setup::set_logging_enabled(options.logs || options.audit.is_some());
+    rabuka_engine::core::runtime_flags::set_action_display(false);
+    rabuka_engine::core::runtime_flags::set_logging_enabled(options.logs || options.audit.is_some());
     if let Some(path) = &options.compare {
         return compare_path(path);
     }

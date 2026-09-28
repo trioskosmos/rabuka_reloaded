@@ -21,6 +21,7 @@ import re
 from typing import Any, Dict
 
 from parser import (
+    TRIGGER_GATE_SEPARATORS,
     categorize_quoted_text,
     extract_all_quoted_names,
     parse_action,
@@ -92,7 +93,7 @@ def _apply_mari_gain_ability(ability, ctx):
     # parse_action's gain_ability early return skips condition extraction.
     # Re-extract condition from the triggerless text (scan for 場合、 etc.)
     if not fixed.get("condition"):
-        for sep in ["とき、", "場合、", "たび、", "なら、"]:
+        for sep in TRIGGER_GATE_SEPARATORS:
             idx = tt.find(sep)
             if idx >= 0:
                 ct = tt[: idx + 2]

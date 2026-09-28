@@ -1449,7 +1449,7 @@ impl super::TurnEngine {
             // hoisting the guard above it is behaviour-preserving. Measured
             // 10,848,527 -> 10,794,138 allocations over a 78,036-action run
             // (139.02 -> 138.33 per action), deterministically.
-            if !crate::game_setup::logging_enabled() {
+            if !crate::core::runtime_flags::logging_enabled() {
                 return;
             }
             let p1_sum = summarize(game_state, &player1_id);

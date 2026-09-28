@@ -857,7 +857,7 @@ impl super::TurnEngine {
         // Record a structured `choice_resolved` entry: what was offered vs chosen.
         // Skipped under `headless`  Ethe label computation itself allocates.
         #[cfg(not(feature = "headless"))]
-        if crate::game_setup::logging_enabled() {
+        if crate::core::runtime_flags::logging_enabled() {
             game_state.push_choice_resolved(
                 &choice,
                 Self::profile_chosen_labels(game_state, &choice, card_id, card_indices.as_deref()),

@@ -512,8 +512,6 @@ pub const NUM_ABILITIES: usize = {len(offsets) - 1};
 
 #[cfg(all(not(feature = "snes"), not(feature = "gba")))]
 pub const COMPRESSED_BYTECODE: &[u8] = include_bytes!("../../../cards/build/abilities.bin.z");
-#[cfg(all(not(feature = "snes"), not(feature = "gba")))]
-pub const DECOMPRESSED_LEN: usize = {len(bytecode)};
 #[cfg(feature = "gba")]
 pub const BYTECODE: &[u8] = include_bytes!("../../../cards/build/abilities.bin");
 
@@ -545,7 +543,7 @@ pub fn bytecode_slice(ci: u8, start: usize, len: usize) -> &'static [u8] {{
 
 /// Interned strings: object keys and string values. Stored as a single blob
 /// with u32 offsets to save the 16-byte per-entry fat pointer overhead of
-/// `&[&str]` (saves ~68KB for 5695 strings). Indexed by the 2-byte `u16`
+/// `&[&str]` (saves ~68KB for {len(strings)} strings). Indexed by the 2-byte `u16`
 /// references inside `BYTECODE` via `get_string(idx)`.
 pub const STRINGS_BLOB: &[u8] = include_bytes!("../../../cards/build/abilities_strings.bin");
 pub const STRINGS_OFFSETS: &[u32] = &[{offsets_hex_str}];
@@ -591,7 +589,6 @@ def main():
     build_dir = root / "build"
     build_dir.mkdir(parents=True, exist_ok=True)
 
-    (build_dir / "abilities.bin").write_bytes(bytecode)
     MAGIC = b"RBKA"
     VERSION = 1
     header = MAGIC + VERSION.to_bytes(4, "little")
@@ -611,21 +608,8 @@ def main():
     abilities_hash = sha256_short(abilities_json_path)
     bytecode_hash = hashlib.sha256(bytecode).hexdigest()[:16]
 
-    git_hash = "unknown"
-    try:
-        import subprocess
-        result = subprocess.run(
-            ["git", "rev-parse", "--short", "HEAD"],
-            capture_output=True,
-            text=True,
-            cwd=str(root.parent),
-            timeout=5,
-        )
-        if result.returncode == 0:
-            git_hash = result.stdout.strip()
-    except Exception:
-        pass
-
+    # engine_commit is stamped by write_generation_manifest, which resolves it
+    # itself; do not compute a second copy here.
     write_generation_manifest(
         build_dir,
         "compiled_abilities.v1",

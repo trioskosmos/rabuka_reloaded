@@ -95,6 +95,8 @@ pub fn execute_effect(
             resolver.execute_modify_cost(gs, effect);
             Ok(())
         }
+        // Not an executor: this variant's effect is applied by the constant
+        // modifier scan in core::game_state::modifiers, not by dispatch.
         ActionType::ModifyYellSource => Ok(()),
         ActionType::SetCost => {
             resolver.execute_set_cost(gs, effect);
@@ -144,6 +146,7 @@ pub fn execute_effect(
         ActionType::Custom => resolver.execute_custom(gs, effect, effect.action.to_str()),
         ActionType::DoNothing => Ok(()),
         ActionType::Choice => resolver.execute_choice(gs, effect),
+        // Repeat marker: expanded by compound::sequential into concrete steps.
         ActionType::RepeatProcedure => Ok(()),
         ActionType::DiscardUntilCount => resolver.execute_discard_until_count(gs, effect),
         ActionType::AllBladeTiming => {
@@ -181,6 +184,16 @@ pub fn execute_effect(
             Ok(())
         }
         ActionType::ConditionalOptional => resolver.execute_conditional_on_optional(gs, effect),
+        // Markers and costs, not executors. Reaching this arm means the effect
+        // was already unwrapped or consumed upstream, so there is nothing left
+        // for dispatch to do:
+        //   OpponentAction   - unwrapped in effects::prepare_opponent_routing
+        //   SequentialCost / ChoiceCondition / EnergyCondition
+        //                    - sub-cost forms, paid in cost::handlers
+        //   RepeatProcedure  - expanded by compound::sequential before this
+        //   CompoundAction / ActionBy
+        //                    - structural tags only (see push_effect_verdict,
+        //                      and effect.action_by for the tag itself)
         ActionType::CompoundAction
         | ActionType::OpponentAction
         | ActionType::ActionBy

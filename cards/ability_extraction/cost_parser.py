@@ -7,6 +7,7 @@ from parser_utils import (
     FieldContext,
     COST_CARD_FIELDS_POLICY,
     COST_REVEAL_FIELDS_POLICY,
+    SPLIT_LIMIT,
     extract_all_groups,
     extract_cost_limit,
     extract_cost_values,
@@ -26,7 +27,6 @@ from parser_fields import (
 )
 
 
-SPLIT_LIMIT = 1
 _COST_HANDLERS: List[Any] = []
 _COST_FLAG_RULES = [
     ("同じグループ名", "group_reference", "same_group_name"),

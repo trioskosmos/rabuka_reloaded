@@ -1954,7 +1954,7 @@ fn trigger_auto_ability_by_index_refs(
                 })
                 .unwrap_or("?");
             // Push ability_resolution entry
-            if crate::game_setup::logging_enabled()
+            if crate::core::runtime_flags::logging_enabled()
                 || crate::ability::debug::ABILITY_DEBUG.load(core::sync::atomic::Ordering::Relaxed)
             {
                 let log_text = format!(

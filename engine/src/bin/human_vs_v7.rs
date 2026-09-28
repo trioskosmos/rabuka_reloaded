@@ -87,8 +87,8 @@ fn main() {
         i += 1;
     }
 
-    game_setup::set_action_display(false);
-    game_setup::set_logging_enabled(false);
+    rabuka_engine::core::runtime_flags::set_action_display(false);
+    rabuka_engine::core::runtime_flags::set_logging_enabled(false);
 
     let mut db: Arc<CardDatabase> = fresh_database();
     let nums = load_deck(&deck);

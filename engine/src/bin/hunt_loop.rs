@@ -48,7 +48,7 @@ fn dump_state(out: &mut String, label: &str, gs: &GameState) {
 }
 
 fn main() {
-    game_setup::set_training_mode(true);
+    rabuka_engine::core::runtime_flags::set_training_mode(true);
     let db = fresh_database();
     let nums = load_deck("fade deck");
     let mut db_mut = Arc::clone(&db);

@@ -23,6 +23,12 @@ COUNT_PATTERN, PEOPLE_PATTERN, COUNTER_PATTERN, ITEM_PATTERN = (
 GROUP_PATTERN = re.compile(r"『(.+?)』")
 QUOTED_NAME_PATTERN = re.compile(r"「(.+?)」")
 
+# Max split count for the clause separators (CHOICE_MARKER, DURATION_MARKER,
+# "、相手は、", "その後、", "か、"). Every use splits on a first-occurrence
+# clause delimiter, so this is always 1 — it lives here so parser.py and
+# cost_parser.py cannot drift into disagreeing about the delimiter contract.
+SPLIT_LIMIT = 1
+
 # ======================================================================
 # HEART ICON VOCABULARY (one definition, used by every heart scan)
 # ======================================================================
@@ -1050,8 +1056,6 @@ class ActionRule(_TextRule):
     condition: Optional[Callable] = None  # complex predicate (text, action) → bool
     setter: Optional[Callable] = None  # complex setter (text, action) → None
     extract_optional: bool = False  # auto-detect optional from "もよい"
-    priority: Optional[int] = None
-    order: int = 0
     name: str = ""
 
     def __post_init__(self):

@@ -455,18 +455,6 @@ def extract_all_abilities(cards_file: Path) -> dict:
     }
 
 
-def test_parsing():
-    test_ability = "{{kidou.png|起動}}このメンバーをステージから控え室に置く：自分の控え室からライブカードを1枚手札に加える。"
-    triggers, use_limit, effect = extract_trigger(test_ability)
-
-    print("=== Test Parsing ===")
-    print(f"Original: {test_ability}")
-    print(f"Triggers: {triggers}")
-    print(f"Use Limit: {use_limit}")
-    print(f"Effect: {effect}")
-    print()
-
-
 def _count_issues(semantic_issues, group_filter_issues):
     """Per-rule issue counts for baseline comparison."""
     counts = {}
@@ -497,8 +485,6 @@ def main():
         "regenerating bytecode/decoders (for CI round-trip checks)",
     )
     args = ap.parse_args()
-
-    test_parsing()
 
     cards_file = Path(__file__).parent.parent / "cards.json"
     output_file = Path(__file__).parent.parent / "abilities.json"
@@ -573,22 +559,24 @@ def main():
     if args.validate_only:
         return
 
-    # Auto-regenerate bytecode so abilities_gen.rs stays in sync
+    # Auto-regenerate bytecode so abilities_gen.rs stays in sync.
+    # compile_abilities.py unconditionally rewrites build/abilities.bin, so
+    # there is nothing to invalidate first. Do NOT delete it afterwards: the
+    # `gba` feature include_bytes!s that path, so removing it breaks the build.
     compile_script = Path(__file__).parent.parent / "compile_abilities.py"
     if compile_script.exists():
-        bin_file = compile_script.parent / "build" / "abilities.bin"
-        if bin_file.exists():
-            bin_file.unlink()
         result = subprocess.run(
             [sys.executable, str(compile_script)],
             cwd=compile_script.parent,
         )
-        if result.returncode == 0:
-            print("Bytecode regenerated.")
-            if bin_file.exists():
-                bin_file.unlink()
-            for line in (result.stdout or "").splitlines()[-5:]:
-                print(f"  {line}")
+        if result.returncode != 0:
+            sys.exit(
+                f"ERROR: compile_abilities.py failed ({result.returncode}); "
+                "bytecode and decoders are now stale."
+            )
+        print("Bytecode regenerated.")
+        for line in (result.stdout or "").splitlines()[-5:]:
+            print(f"  {line}")
 
     # Auto-regenerate the Rust decoders so a NEW field added to
     # engine/src/core/card.rs is picked up without a separate manual step.

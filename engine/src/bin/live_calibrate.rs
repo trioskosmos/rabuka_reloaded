@@ -286,12 +286,12 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let k1 = BotKind::parse(&p1);
     let k2 = BotKind::parse(&p2);
 
-    game_setup::set_action_display(false);
+    rabuka_engine::core::runtime_flags::set_action_display(false);
     // Deliberately OFF. Section 8.4: turning engine logging on changes outcomes
     // for the same seed. This harness reports MODEL QUALITY, not win rate, and
     // it reads engine state rather than log lines - but keeping logs off means
     // even the recorded numbers match an untraced run.
-    game_setup::set_logging_enabled(false);
+    rabuka_engine::core::runtime_flags::set_logging_enabled(false);
 
     let mut db: Arc<rabuka_engine::card::CardDatabase> = fresh_database();
     let nums = load_deck(&deck);
