@@ -697,25 +697,132 @@ int rb_resolver_build_reprompt_full(RbAbilityResolver *self, GameState *g, const
     return 0;
 }
 
+/* extra-flag reader with the same "true"/"1" spelling cost.c's eff_bool uses */
+static int choice_cost_flag(const AbilityEffect *e, const char *key, int dflt)
+{
+    const char *v = choice_effect_extra(e, key);
+    if (!v || !*v) return dflt;
+    return !strcmp(v, "true") || !strcmp(v, "1");
+}
+
+/* The two hand-cost re-prompt descriptions in this file both carry this tag, so a
+   cost re-prompt is recognisable by structure rather than by re-deriving the
+   prompt text cost.c builds. */
+#define CHOICE_COST_REPROMPT_TAG "from hand for cost"
+
+/* Does this cost node produce EXACTLY the hand SelectCard prompt `ch`?
+   Mirrors the arm selection of pay_cost_move_cards (cost.c:450-676): a
+   hand-sourced move_cards cost that is not a whole-hand discard, not a
+   same-unit cost and not a bare self-discard opens
+   SelectCard{zone:"hand", count: any_number ? 0 : count,
+              allow_skip: is_optional || any_number}. `is_activation` is 0 on
+   every path this fallback is consulted from, so the C's is_activation
+   exclusion (cost.c:601) cannot apply. Sequential costs carry the hand leg as
+   a child, so the search recurses exactly like Rust's own cost tree walk. */
+static int choice_cost_opens_hand_prompt(const AbilityEffect *c, const RbChoice *ch, int depth)
+{
+    if (!c || !ch || depth > 8) return 0;
+    for (int i = 0; i < c->n_child; i++)
+        if (choice_cost_opens_hand_prompt(c->child[i], ch, depth + 1)) return 1;
+    if (!c->source || strcmp(c->source, "hand") != 0) return 0;
+    if (choice_cost_flag(c, "same_unit_name", 0)) return 0;
+    if (choice_cost_flag(c, "all", 0)) return 0;
+    int any_number = choice_cost_flag(c, "any_number", 0);
+    int count = c->count > 0 ? c->count : 1;
+    int skippable = (c->is_optional || any_number) ? 1 : 0;
+    /* the prompt the cost opens for its first answer */
+    if (ch->count == (any_number ? 0 : count) && ch->allow_skip == skippable) return 1;
+    /* the fixed-count re-prompt for the cards still owed (choice.rs:738-777
+       reprompt_hand_cost, Rule 9.4.2.3: "no bail-out once committed", so it is
+       never skippable whatever the cost's own optional-ness). It carries the
+       REMAINDER, not the cost's own count, and the shared tag is what keeps an
+       effect-level hand prompt with a coincidentally smaller count out. */
+    if (!any_number && ch->allow_skip == 0 &&
+        ch->count > 0 && ch->count <= count &&
+        strstr(ch->description, CHOICE_COST_REPROMPT_TAG))
+        return 1;
+    return 0;
+}
+
+/* Rust reacher (engine/src/turn/triggers.rs:119-129) hands the 登場 trigger to
+   trigger_auto_ability, which pushes a queue entry — so on the Rust side
+   gs.entry_cost() (core/game_state/abilities.rs:2295) ALWAYS has an entry and
+   handle_select_card can route on `gs.entry_cost().is_some() && !effect_started`
+   (choice.rs:985-1034). The C port's inline 登場 loop (engine.c:1100-1150)
+   deliberately resolves the debut ability WITHOUT pushing one, so entry_cost()
+   has nothing to read there and the pick fell through to the generic
+   hand-SELECTION arm: the cost card was never moved to the waitroom.
+
+   Reconstruct the entry the loop skipped. The loop publishes the ability's
+   EFFECT as the choice's continuation and the card as g->queue.resume_host
+   (engine.c:1118-1121), so the ability being resolved is the 登場/バトンタッチ
+   ability of resume_host — the same ability index the reacher would have
+   queued. Require that the pending choice is a hand SelectCard that this
+   ability's COST opened, so the ability's own EFFECT-level hand prompt on the
+   same card is never mistaken for the cost. */
+static int choice_debut_cost_action(GameState *g, const RbChoice *ch, char *out_act, int outlen)
+{
+    int host = g->queue.resume_host;
+    if (host < 0 || !ch) return 0;
+    if (ch->kind != RB_CHOICE_SELECT_CARD) return 0;
+    if (!ch->zone[0] || strcmp(ch->zone, "hand") != 0) return 0;
+    int n = rb_card_num_abilities((uint32_t)host);
+    for (int i = 0; i < n; i++) {
+        Ability ab;
+        if (!rb_decode_card_ability((uint32_t)host, i, &ab)) continue;
+        int is_debut = ab.triggers && (strstr(ab.triggers, "登場") ||
+                                       strstr(ab.triggers, "バトンタッチ"));
+        if (is_debut && ab.cost && choice_cost_opens_hand_prompt(ab.cost, ch, 0)) {
+            if (out_act && outlen > 0) {
+                const char *a = ab.cost->action ? ab.cost->action : "";
+                strncpy(out_act, a, outlen - 1); out_act[outlen - 1] = '\0';
+            }
+            rb_free_ability(&ab);
+            return 1;
+        }
+        rb_free_ability(&ab);
+    }
+    return 0;
+}
+
 /* Mirror Rust GameState::entry_cost() — the cost AbilityEffect of the ability
     currently being resolved (queue.entries[cur]). Copies the cost action into
-    out_act (e.g. "discard"/"reveal"/"pay_energy") and returns 1 if a cost exists. */
-static int rb_queue_current_cost_action(GameState *g, char *out_act, int outlen) {
+    out_act (e.g. "discard"/"reveal"/"pay_energy") and returns 1 if a cost exists.
+    `ch` is the choice being answered; it is the current pending choice except
+    in the resume epilogue, which answers it after rb_clear_pending_choice.
+    *out_from_debut reports the reconstructed (no queue entry) resolution. */
+static int rb_queue_cost_action_for_choice(GameState *g, const RbChoice *ch,
+                                           char *out_act, int outlen,
+                                           int *out_from_debut)
+{
     if (out_act && outlen > 0) out_act[0] = '\0';
+    if (out_from_debut) *out_from_debut = 0;
     if (!g) return 0;
     int cur = g->queue.cur;
-    if (cur < 0 || cur >= RB_QUEUE_DEPTH) return 0;
-    RbQueueEntry *e = &g->queue.entries[cur];
-    if (e->card_id < 0) return 0;
-    Ability ab;
-    if (!rb_decode_card_ability((uint32_t)e->card_id, e->ability_idx, &ab)) return 0;
-    int has = (ab.cost != NULL);
-    if (has && out_act && outlen > 0) {
-        const char *a = ab.cost->action ? ab.cost->action : "";
-        strncpy(out_act, a, outlen - 1); out_act[outlen - 1] = '\0';
+    if (cur >= 0 && cur < RB_QUEUE_DEPTH) {
+        RbQueueEntry *e = &g->queue.entries[cur];
+        if (e->card_id >= 0) {
+            Ability ab;
+            if (rb_decode_card_ability((uint32_t)e->card_id, e->ability_idx, &ab)) {
+                int has = (ab.cost != NULL);
+                if (has && out_act && outlen > 0) {
+                    const char *a = ab.cost->action ? ab.cost->action : "";
+                    strncpy(out_act, a, outlen - 1); out_act[outlen - 1] = '\0';
+                }
+                rb_free_ability(&ab);
+                if (has) return 1;
+            }
+        }
     }
-    rb_free_ability(&ab);
-    return has;
+    int from_debut = choice_debut_cost_action(g, ch, out_act, outlen);
+    if (out_from_debut) *out_from_debut = from_debut;
+    return from_debut;
+}
+
+static int rb_queue_current_cost_action(GameState *g, char *out_act, int outlen)
+{
+    return rb_queue_cost_action_for_choice(g, g && g->queue.has_pending ? &g->queue.pending : NULL,
+                                          out_act, outlen, NULL);
 }
 
 /* helper: build a reprompt SelectCard pending choice (mirrors Rust build_reprompt) */
@@ -805,9 +912,17 @@ static int choice_handle_hand_indices(RbAbilityResolver *self, GameState *g,
         if (n_picked > 0 && cur >= 0) g->queue.entries[cur].optional_cost_result = 1;
         for (int i = 0; i < n_picked; i++) {
             int cid = ids[picked[i]];
+            /* choice.rs:603-611 discard_hand_cost_selection lifts the card out of
+               the hand with util::move_cards(Hand -> Discard); rb_choice_send_to_dst
+               only pushes the waitroom copy. Highest index first so the remaining
+               positions stay valid. */
+            for (int k = n_picked - 1; k >= i; k--)
+                if (picked[k] >= 0 && picked[k] < g->p[actor].hand.n)
+                    rb_hand_remove_card(&g->p[actor], picked[k]);
             rb_choice_send_to_dst(g, actor, cid, "waitroom");
+            /* moved_cards only — see the single-index arm's note on why a cost
+               pick never belongs in selected_cards. */
             if (self->n_moved_cards < RB_MAX_RECENTLY_MOVED) self->moved_cards[self->n_moved_cards++] = cid;
-            if (self->n_selected_cards < RB_MAX_RECENTLY_MOVED) self->selected_cards[self->n_selected_cards++] = cid;
             if (g->n_recently_moved < RB_MAX_RECENTLY_MOVED) g->recently_moved[g->n_recently_moved++] = cid;
         }
         g->mods.last_cost_discard_count = self->n_moved_cards;
@@ -966,9 +1081,22 @@ int rb_resolver_handle_select_card(RbAbilityResolver *self, GameState *g, const 
             int n = rb_zone_cards(g, actor, "hand", ids, RB_MAX_ZONE);
             if (idx >= 0 && idx < n) {
                 int cid = ids[idx];
+                /* choice.rs:603-611 discard_hand_cost_selection moves the card
+                   with util::move_cards(player, ids, Hand, Discard, ..), which
+                   is what lifts it OUT of the hand. rb_choice_send_to_dst only
+                   pushes the waitroom copy, so without this the paid cost card
+                   was simultaneously in hand and in the waitroom. */
+                rb_hand_remove_card(&g->p[actor], idx);
                 rb_choice_send_to_dst(g, actor, cid, "waitroom");
+                /* choice.rs:502,522,720: handle_hand_cost_payment records the pick
+                   in `moved_cards` and then set_recently_moved_batch(.., "hand")
+                   — never in `ctx.selected_cards`, which Rust only fills for an
+                   EFFECT selection (choice.rs:1167). Recording it here published
+                   the cost card through publish_selected_cards into
+                   g->selected_cards, and a following effect (state.c:314
+                   `g->n_selected_cards == 0`) then read the cost card as a prior
+                   selection and auto-applied instead of prompting. */
                 if (self->n_moved_cards < RB_MAX_RECENTLY_MOVED) self->moved_cards[self->n_moved_cards++] = cid;
-                if (self->n_selected_cards < RB_MAX_RECENTLY_MOVED) self->selected_cards[self->n_selected_cards++] = cid;
                 if (g->n_recently_moved < RB_MAX_RECENTLY_MOVED) g->recently_moved[g->n_recently_moved++] = cid;
                 /* also push movement event for tracking (choice.rs:522 push_movement_event) */
             }
@@ -2636,6 +2764,64 @@ void rb_resolver_continue_siblings(GameState *g, int actor, int host,
     }
 }
 
+/* Did the answer being applied decline the ability's COST?
+   Rust decides this in `optional_cost_skip_gate` (gates.rs:195-213), a
+   POST_COST_GATE (gates.rs:258) that runs right after the cost is paid and
+   STOPS the resolution with `effect_started = true` when
+   `entry.optional_cost_result == Some(false)`, so run_ability_effect
+   (engine.rs:267-286) is never reached. handle_general_skip itself
+   (result_handlers.rs:79-87) only clears state and resumes — the stop lives in
+   the gate, which is why a skip handler must not carry the effect forward.
+
+   The C has no gate table, so the decision belongs at the skip site. The skip
+   must first be established as a COST skip: a skip on an ordinary
+   any_number/looked_at prompt leaves the ability alone and must keep its
+   deferred continuation. rb_queue_cost_action_for_choice answers exactly the
+   question entry_cost() answers — "is the choice being answered the prompt
+   this ability's cost opened?" — for both the queued and the inline 登場 path,
+   so the check is false for every non-cost skip and the continuation is left
+   untouched. On the queued path the same verdict is readable straight off the
+   entry, which is where Rust reads it. */
+/* Is `ch` the fixed-count re-prompt for a cost that is already partly paid
+   (choice.c choice_build_reprompt, choice.rs:765-777 Rule 9.4.2.3)? Answering
+   it with a skip is NOT a bail-out: handle_general_skip (result_handlers.rs:79-87)
+   only clears state and resumes and never touches optional_cost_result, which
+   the partial payment already recorded as Some(true) (choice.rs:696-700). The
+   gate therefore does not stop and the effect still runs. */
+static int choice_is_committed_cost_reprompt(const RbChoice *ch)
+{
+    return ch && ch->allow_skip == 0 && ch->count > 0 &&
+           strstr(ch->description, CHOICE_COST_REPROMPT_TAG) != NULL;
+}
+
+static int choice_declined_cost_stop(GameState *g, const RbChoice *ch)
+{
+    if (!g) return 0;
+    if (choice_is_committed_cost_reprompt(ch)) return 0;
+    int cur = g->queue.cur;
+    if (cur >= 0 && cur < RB_QUEUE_DEPTH) {
+        RbQueueEntry *e = &g->queue.entries[cur];
+        /* choice.rs:985-1034 only treats a SelectCard answer as a COST answer
+           while `!effect_started && gs.entry_cost().is_some()`: the effect cannot
+           run before its cost resolves, so a skip that clears both is a cost
+           refusal, and a skip taken after effect_started belongs to the effect. */
+        if (e->card_id >= 0 && e->effect_started) return 0;
+    }
+    char act[48]; act[0] = '\0';
+    if (!rb_queue_cost_action_for_choice(g, ch, act, sizeof(act), NULL)) return 0;
+    if (cur >= 0 && cur < RB_QUEUE_DEPTH) {
+        RbQueueEntry *e = &g->queue.entries[cur];
+        if (e->card_id >= 0) {
+            /* choice.rs:728-733: handle_hand_cost_payment records the refusal on
+               the entry as cost_paid = true / optional_cost_result = false. */
+            e->cost_paid = 1;
+            e->optional_cost_result = 0;
+            e->effect_started = 1;   /* gates.rs:210 — the gate's stop marker */
+        }
+    }
+    return 1;
+}
+
 void rb_move_handle_select_cards_looked_at(GameState *g, int actor,
     const int *indices, int n_indices, const char *destination, int discard_remaining);
 
@@ -2848,15 +3034,25 @@ static int rb_resume_with_choice_indices_internal(GameState *g, const int *selec
            optional SelectCard cost drops the ability's effect entirely. */
         if (was_skip && kind == RB_CHOICE_SELECT_CARD &&
             !(saved_pending.count == 0 && saved_pending.allow_skip)) {
+            /* gates.rs:195-213 `optional_cost_skip_gate` — a POST_COST_GATE
+               (gates.rs:258) that STOPS resolution with `effect_started = true`
+               the moment `entry.optional_cost_result == Some(false)`, so
+               run_ability_effect (engine.rs:267-286) never runs. A skip on a
+               cost SelectCard is exactly that refusal, so the parked
+               continuation must not be carried forward: this is the C
+               counterpart of the engine.c fix that latched the skip. */
+            int stop = choice_declined_cost_stop(g, &saved_pending);
             rb_queue_take_pending_actions(g);
             rb_resolver_clear_choice_state(&self);
-            choice_run_skipped_continuation(g, def, is_cost, actor, host, cont, cont_from);
+            if (!stop)
+                choice_run_skipped_continuation(g, def, is_cost, actor, host, cont, cont_from);
             rb_resolver_resume_execution(&self);
             goto choice_resume_tail;
         }
         if (was_skip && kind == RB_CHOICE_SELECT_CARD) {
             /* handle_any_number_skip (result_handlers.rs:67-72) */
-            choice_run_skipped_continuation(g, def, is_cost, actor, host, cont, cont_from);
+            if (!choice_declined_cost_stop(g, &saved_pending))
+                choice_run_skipped_continuation(g, def, is_cost, actor, host, cont, cont_from);
             rb_resolver_clear_choice_state_and_resume(&self);
             goto choice_resume_tail;
         }
@@ -2882,9 +3078,19 @@ static int rb_resume_with_choice_indices_internal(GameState *g, const int *selec
             int cur = g->queue.cur;
             int eff_started = (cur >= 0 && cur < RB_QUEUE_DEPTH) ? g->queue.entries[cur].effect_started : 0;
             char ca[48]; ca[0] = '\0';
-            int hc = rb_queue_current_cost_action(g, ca, sizeof(ca));
+            int from_debut = 0;
+            int hc = rb_queue_cost_action_for_choice(g, &saved_pending, ca, sizeof(ca), &from_debut);
             int rev = (ptarget && strstr(ptarget, "reveal")) || (pzone && strstr(pzone, "reveal"));
-            int cost_hand = (!eff_started && hc && !strcmp(pzone, "hand"));
+            /* `cost_hand` means the handler just paid a hand COST, so the ability
+               must not be resolved twice. A QUEUED ability carries itself in
+               queue.entries[cur] and advances cost -> effect inside
+               rb_drain_ability_queue, which is why the deferred continuation was
+               skipped there. The inline 登場 loop has no entry at all, so
+               queue.deferred IS its only execution context and Rust's
+               `run_ability_effect` (engine.rs:267-286, reached once
+               run_effect_gates has no gate left to stop it) is exactly this
+               `rb_execute_effect_ex`. */
+            int cost_hand = (!eff_started && hc && !strcmp(pzone, "hand") && !from_debut);
             int sel_before = g->n_selected_cards;
             /* Rust dispatches the WHOLE answer (result_handlers.rs:41-65 copies
                `indices.to_vec()`), so an answer naming more than one card must
