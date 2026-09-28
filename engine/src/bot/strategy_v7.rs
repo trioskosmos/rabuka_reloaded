@@ -496,23 +496,43 @@ pub fn choose_live_set_v7(gs: &GameState, actions: &[Action], db: &CardDatabase)
     let is_second = gs.current_phase == Phase::LiveCardSetSecondAttacker;
     let opp_committed = !opp.live_card_zone.cards.is_empty();
 
-    // Contested / match-point: owned by v7, not rented from v6.
+    // OPPONENT-COMMITMENT RESPONSE.
     //
-    // This used to be an unconditional `return choose_live_set_v6(...)` on
-    // `(is_second && opp_committed) || opp_succ >= 2`. That is not an
-    // experiment gate — it handed v7's live set to an older version for the
-    // whole contested class, which is most of the decisive moments in a game,
-    // and it is the same class where the research is unambiguous: score
-    // comparison and initiative decide this game, and v6's score-max EV is
-    // not a model of either.
+    // This is the axis v7 never modelled. When the opponent has committed
+    // lives, v7's own behaviour collapses into `safest_portfolio` — "pick the
+    // single life most likely to pass" — which is the correct answer to *my*
+    // check and a non-answer to theirs. The guides are explicit that this is
+    // where the game is decided: a 2-live is described as mandatory play
+    // because it DENIES the opponent's 1-live, and score lead is called the
+    // dominant axis ("1点リードしているだけで…次のターン確実に点とるためにライブカード温存できる").
+    // v7's own experiments could not see that, which is the most likely reason
+    // the documented "allow 2 lives when contested" change measured as worse
+    // (354 vs 364): neither bot was pricing the denial, so it looked like a
+    // pure cost.
     //
-    // v7 already has the right model for it and was not using it here:
-    // `live_payoff` / `expected_live_value` price the four-outcome payoff
-    // table (win / tie / loss / failed check, conditioned on both success
-    // counts) that the contested case actually needs. That model previously
-    // regressed when it was applied *broadly*; it was never applied *only
-    // here*, which is where it belongs. `V7_LEASE_V6=1` restores the old
-    // delegation so the two can be compared directly.
+    // `expected_live_value` is already written and already correct — a
+    // four-outcome payoff table (I pass/they fail, I fail/they pass, and both
+    // pass resolved by score comparison with the one-card-set tie rule), worth
+    // ±1 or a success lead. It is pure structure: no coefficient, nothing to
+    // fit. What was missing is its two opponent arguments, so those are what
+    // this computes, from PUBLIC information only:
+    //
+    //   opp_pass  — from the opponent's public active blades against the size
+    //               of the set they committed. Blades are the draw count, and
+    //               the check is exactly that: more blades, more of the colour
+    //               pool, more chance the requirement is met.
+    //   opp_score — the printed score of the set they committed.
+    //
+    // Nothing here reads the opponent's hand or deck, so it is response
+    // modelling, not cheating. `V7_RESPONSE=0` restores today's behaviour.
+    if response_model_enabled() && ((is_second && opp_committed) || opp_succ >= 2) {
+        let response = best_response_set(gs, me, db);
+        if !response.is_empty() {
+            return crate::bot::strategy_common::emit_live_set(gs, actions, &response);
+        }
+    }
+
+    // Contested / match-point fallback, opt-in only.
     let lease_v6 = std::env::var_os("V7_LEASE_V6").is_some();
     if lease_v6 && ((is_second && opp_committed) || opp_succ >= 2) {
         return crate::bot::strategy_v6::choose_live_set_v6(gs, actions, db);
@@ -1263,6 +1283,157 @@ impl AbilityEffect {
 
 /// Measure an ability by its resolved delta. `sim` is the state after
 /// execution, `root` the state before — both already built by `score_actions`.
+/// What KIND of trade an ability is, read from the ability's own printed text.
+///
+/// The aggregate-delta classifier below turned out to be nearly useless: of 71
+/// ability uses measured in one run, 63 read as "produces nothing" and 30 as
+/// "removal", so any policy that simply "uses more abilities" walks v7 into
+/// member-consumption loops and Rule 12-1 draws (measured: draws scale
+/// linearly with the ability weight, 187 -> 267, win rate 816 -> 737). The
+/// delta was blind because most of what these abilities do is not a change to
+/// six aggregate counters — a search that fetches the 4 that completes the
+/// ladder, a permanent modifier on a card, a score change all read as
+/// "other".
+///
+/// So classify from the text instead. This is the printed card, i.e. exactly
+/// the information a human player has, so it is not cheating; and it is per
+/// ability, so a 2-draw, an energy refresh, +2 blades and a point of score are
+/// four different trades rather than one discount.
+///
+/// `Inactive` covers everything not recognised, and the default policy treats
+/// it as do-not-use. That is the conservative direction on purpose: an ability
+/// we cannot read is an ability whose loop risk we cannot price.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) enum AbilityClass {
+    /// Not a recognised productive trade — do not use it speculatively.
+    Inactive,
+    /// Card acquisition: a draw, or a search.
+    Tempo,
+    /// Board power: hearts, or blades. Blades are the check's draw count and so
+    /// the most valuable thing an ability can move.
+    Power,
+    /// More energy to spend this turn.
+    Energy,
+    /// Comparison power: score, or a live-success modifier.
+    Score,
+    /// Discards, bounces, or otherwise removes a card — a disposal channel,
+    /// which the guide treats as junk-fill and hand hygiene, not as gain.
+    Disposal,
+    /// Resolves by itself: 常時 / 自動 / 常駐. Not a player choice, and the
+    /// engine does not charge for it. Treating one as a Main-phase spend is a
+    /// category error and a repetition hazard.
+    Automatic,
+}
+
+impl AbilityClass {
+    pub fn label(&self) -> &'static str {
+        match self {
+            AbilityClass::Inactive => "inactive",
+            AbilityClass::Tempo => "tempo",
+            AbilityClass::Power => "power",
+            AbilityClass::Energy => "energy",
+            AbilityClass::Score => "score",
+            AbilityClass::Disposal => "disposal",
+            AbilityClass::Automatic => "automatic",
+        }
+    }
+}
+
+/// Classify one ability by its printed text.
+///
+/// The keywords are the words that actually appear on these cards. `ブレード`
+/// and `フリップ` are blades/flips, which is the check's randomness;
+/// `ドロー` is a draw; `探`/`検索` is a search; `スコア` is comparison score;
+/// `サクセス` touches the success zone. Ordering matters: disposal is checked
+/// before tempo because 「捨てる」 (discard) reads as a card operation and would
+/// otherwise be swallowed by the ドロー branch.
+/// Classify one ability by its printed text AND its trigger marker.
+///
+/// The trigger marker is the part that matters most, and getting it wrong is
+/// what made every earlier ability attempt fail. The cards are printed with
+/// explicit markers: `{{起動}}` is an ACTIVATION — the one kind a player
+/// chooses and pays for. `{{常時}}` (always), `{{自動}}` (automatic) and
+/// `{{常駐}}` (resident) resolve on their own: they are not choices, and the
+/// engine does not charge for them. Offering to "use" one, or paying its
+/// member for one, is a category error.
+///
+/// It is also the loop mechanism. A repeated no-op activation, or an
+/// "automatic" ability re-triggered with no state change, is the same action
+/// type on the same state hash — which is exactly what Rule 12-1 detects, and
+/// draws scaled with the ability weight (187 -> 267).
+pub(crate) fn classify_ability(text: &str, triggers: &str) -> AbilityClass {
+    // Not a choosable trigger: automatic resolution, never a Main-phase spend.
+    for marker in ["常時", "自動", "常駐", "jyouji", "toujyou", "jidou"] {
+        if triggers.contains(marker) {
+            return AbilityClass::Automatic;
+        }
+    }
+    // 起動 = activation: the only kind worth spending a member for.
+    if triggers.contains("起動") || triggers.contains("kidou") || text.contains("起動") {
+        const TEMPO: [&str; 5] = ["ドロー", "探した", "検索", "手札", "山札から"];
+        const POWER: [&str; 5] = ["ブレード", "フリップ", "ハート", "ハートマーク", "ブレードマーク"];
+        const ENERGY: [&str; 3] = ["エネルギー", "E{E}", "icon_energy"];
+        const SCORE: [&str; 3] = ["スコア", "サクセス", "先取"];
+        const DISPOSAL: [&str; 4] = ["捨てる", "廃棄", "手札を", "デッキから"];
+        if DISPOSAL.iter().any(|k| text.contains(k)) {
+            return AbilityClass::Disposal;
+        }
+        if POWER.iter().any(|k| text.contains(k)) {
+            return AbilityClass::Power;
+        }
+        if ENERGY.iter().any(|k| text.contains(k)) {
+            return AbilityClass::Energy;
+        }
+        if SCORE.iter().any(|k| text.contains(k)) {
+            return AbilityClass::Score;
+        }
+        if TEMPO.iter().any(|k| text.contains(k)) {
+            return AbilityClass::Tempo;
+        }
+        return AbilityClass::Power;
+    }
+    AbilityClass::Inactive
+}
+
+/// The best class any ability on this card offers, preferring the strongest
+/// trade, and the text of the ability that provides it.
+pub(crate) fn best_ability_class(db: &CardDatabase, card_id: i16) -> AbilityClass {
+    let Some(card) = db.get_card(card_id) else {
+        return AbilityClass::Inactive;
+    };
+    let mut best = AbilityClass::Inactive;
+    for ability_ref in &card.abilities {
+        let ability = ability_ref.resolve();
+        if ability.is_null || ability.use_limit.unwrap_or(u8::MAX) == 0 {
+            continue;
+        }
+        let text = ability
+            .triggerless_text
+            .clone()
+            .unwrap_or_else(|| ability.full_text.clone());
+        let triggers = ability.triggers.clone().unwrap_or_default();
+        let class = classify_ability(&text, &triggers);
+        if rank(class) > rank(best) {
+            best = class;
+        }
+    }
+    best
+}
+
+/// Power over tempo over score/energy over disposal, all above inactive. Used
+/// to pick the best ability on a card; the caller weights classes separately.
+fn rank(class: AbilityClass) -> u8 {
+    match class {
+        AbilityClass::Inactive => 0,
+        AbilityClass::Automatic => 0,
+        AbilityClass::Disposal => 1,
+        AbilityClass::Score => 2,
+        AbilityClass::Energy => 3,
+        AbilityClass::Tempo => 4,
+        AbilityClass::Power => 5,
+    }
+}
+
 pub(crate) fn measure_ability(
     sim: &GameState,
     root: &GameState,
@@ -1677,8 +1848,51 @@ pub(crate) fn live_set_plan(gs: &GameState, db: &CardDatabase) -> Vec<usize> {
     let is_second = gs.current_phase == Phase::LiveCardSetSecondAttacker;
     let opp_committed = !opp.live_card_zone.cards.is_empty();
     let floor = live_reliability_floor(gs, me);
+    // Opponent-commitment response model. Binary switch, no coefficient: the
+    // payoff table is worth ±1, not a fitted number. `V7_RESPONSE=0` restores
+    // today's "safest single life, opponent ignored" behaviour.
+    let response_model = std::env::var("V7_RESPONSE")
+        .as_deref()
+        .map(|value| value != "0")
+        .unwrap_or(true);
 
     let mut desired: Vec<usize> = Vec::new();
+
+    // CONTESTED: answer the opponent, not just your own check.
+    //
+    // This has to live HERE, not in `choose_live_set_v7` below the
+    // `V7_LIVE_LEGACY` guard — that code is behind an env opt-in and the
+    // default path returns at `choose_live_set_experiment` before reaching it.
+    // An earlier version of this work was wired into the legacy branch and
+    // therefore measured 0 discordant games in 2000: it had never executed
+    // once. Same for the v6-contested-delegation change — it was never on the
+    // default path either, so "v7 no longer rents v6 there" was true only of
+    // code that does not run.
+    //
+    // When the opponent has committed, v7's normal answer is "the single life
+    // most likely to pass", which is a non-answer to them. The guides make
+    // this the decisive class of decision: a 2-live is described as mandatory
+    // because it DENIES the opponent's 1-live, and score lead is called the
+    // dominant axis. `best_response_set` prices the choice with the payoff
+    // table that was already written and never called, using the opponent's
+    // PUBLIC blades and committed set size.
+    if response_model_enabled() {
+        let opp_set_size = opp.live_card_zone.cards.len();
+        if (is_second && opp_set_size > 0) || opp_succ >= 2 {
+            let response = best_response_set(gs, me, db);
+            if !response.is_empty() {
+                log::debug!(
+                    "v7 response t{} me{} opp_set={} opp_succ={} -> {:?}",
+                    gs.turn_number,
+                    me,
+                    opp_set_size,
+                    opp_succ,
+                    response
+                );
+                return response;
+            }
+        }
+    }
 
     if my.live_card_set_limit_reduction >= 3 || gs.cannot_live_players.contains(&my.id) {
         return desired;
@@ -2199,6 +2413,166 @@ fn choose_mulligan_curve(gs: &GameState, actions: &[Action], db: &CardDatabase) 
 /// The guide's version of this is an opening-quality evaluation that enumerates
 /// the first three Main turns; that is `choose_mulligan_curve` above, still
 /// opt-in. What this removes is the dependency, not the ambition.
+/// Choose a set as a RESPONSE to the opponent's committed set, using the
+/// payoff table that was already written and never called.
+///
+/// Both opponent arguments are estimated from PUBLIC information only:
+///
+///   * `opp_pass` — the opponent committed `n` cards and the count is visible
+///     (the rules have the responding player see how many were set, which is
+///     why going second is described as advantageous). A check is
+///     all-or-nothing across the whole set (the engine's `any_requirement_failed`),
+///     so a bigger commitment raises the bar rather than the reward. Modelling
+///     that directly means a small opponent set is valued as beatable and a
+///     large one as not — the "deny the 1-live" pressure the guides describe,
+///     falling out of the check model instead of being a rule written to
+///     imitate it.
+///   * `opp_score` — printed score of the committed set, from card data.
+pub(crate) fn best_response_set(gs: &GameState, me: u8, db: &CardDatabase) -> Vec<usize> {
+    let opp = gs.seat_player(1 - me);
+    let opp_set = opp.live_card_zone.cards.len();
+    let dbg = std::env::var_os("V7_RESPONSE_DEBUG").is_some();
+    if dbg { eprintln!("V7RESP enter opp_set={opp_set} phase={:?}", gs.current_phase); }
+    if opp_set == 0 {
+        if dbg { eprintln!("V7RESP exit: opponent not committed"); }
+        return Vec::new();
+    }
+    let (cats, deck_len) = experiment_flip_categories(gs, me, db);
+    let blades = experiment_blades(gs, me, db);
+    let board = experiment_board_pool(gs, me, db);
+    if blades <= 0 || deck_len == 0 {
+        if dbg { eprintln!("V7RESP exit: blades={blades} deck_len={deck_len}"); }
+        return Vec::new();
+    }
+    let pools = experiment_sample_pools(&cats, deck_len, blades, &board);
+    let opp_blades = opp.stage.total_blades(
+        db,
+        &gs.mods.blade_modifiers,
+        &gs.mods.orientation_modifiers,
+        false,
+    ) as f64;
+    let opp_pass = (opp_blades / (1.0 + 0.75 * opp_set as f64)).clamp(0.0, 1.0) * 0.9;
+    let opp_score: i32 = opp
+        .live_card_zone
+        .cards
+        .iter()
+        .filter_map(|&cid| db.get_card(cid))
+        .filter_map(|card| card.score)
+        .map(i32::from)
+        .sum();
+    let my_succ = gs.seat_player(me).success_live_card_zone.cards.len();
+    let opp_succ = opp.success_live_card_zone.cards.len();
+
+    let lives = experiment_lives(gs, me, db);
+    if dbg { eprintln!("V7RESP lives_in_hand={} max_slots={}", lives.len(), usize::from(3u8.saturating_sub(gs.seat_player(me).live_card_set_limit_reduction))); }
+    if lives.is_empty() {
+        if dbg { eprintln!("V7RESP exit: no lives in hand"); }
+        return Vec::new();
+    }
+    let max_slots = usize::from(3u8.saturating_sub(
+        gs.seat_player(me).live_card_set_limit_reduction,
+    ));
+    let floor = live_reliability_floor(gs, me);
+
+    // Enumerate sets up to `max_slots` and price each as a RESPONSE rather
+    // than as an attempt. This is what lets a deliberately unpassable
+    // multi-card set enter a comparison the single-life search would refuse
+    // — the 2-live denial play — with no coefficient telling it to.
+    let mut best: Option<(f64, Vec<usize>)> = None;
+    let n = lives.len().min(8);
+    for mask in 1u32..(1u32 << n) {
+        let size = mask.count_ones() as usize;
+        if size > max_slots {
+            continue;
+        }
+        let mut need = [0i32; 11];
+        let mut idxs = Vec::new();
+        for (bit, (hi, _, n)) in lives.iter().enumerate() {
+            if mask >> bit & 1 == 1 {
+                for k in 0..11 {
+                    need[k] += n[k];
+                }
+                idxs.push(*hi);
+            }
+        }
+        if need[8] > 0 || need[9] > 0 {
+            continue;
+        }
+        let pass = experiment_pass_probability_pools(&pools, &need);
+        // A single life nobody can pass is not a response, it is handing the
+        // check over. Multi-card sets are allowed through precisely because
+        // winning a comparison on score is a real outcome for them.
+        if size == 1 && pass < floor {
+            continue;
+        }
+        let score: i32 = idxs
+            .iter()
+            .filter_map(|hi| {
+                lives
+                    .iter()
+                    .find(|(h, _, _)| h == hi)
+                    .and_then(|(_, cid, _)| db.get_card(*cid))
+                    .and_then(|card| card.score)
+                .map(i32::from)
+            })
+            .sum();
+        let value = expected_live_value(
+            pass, score, size, my_succ, opp_succ, opp_pass, opp_score, opp_set,
+        );
+        if best.as_ref().is_none_or(|(current, _)| value > *current) {
+            best = Some((value, idxs));
+        }
+    }
+    // Return the argmax, unconditionally.
+    //
+    // First attempt gated this on `value > 0.0` and produced ZERO discordant
+    // games in 2000 — it never fired. That is a bug in the gate, not a null
+    // result: `live_payoff` scales the non-terminal case by 0.1 (a success
+    // lead is worth 0.1, not 1.0), so with both players on equal successes
+    // almost every set scores ~0 and was discarded. The payoff table is a
+    // RANKING, so it has to choose among sets — not be asked to clear an
+    // absolute threshold that its own scaling guarantees it will not.
+    //
+    // Returning the argmax also makes this a genuine replacement for
+    // `safest_portfolio` in the contested case rather than an overlay on top
+    // of it, which is what the guides say is needed: the single safest life
+    // answers "what can I pass" and never "what should I do about them".
+    match best {
+        Some((_, idxs)) if !idxs.is_empty() => idxs,
+        _ => Vec::new(),
+    }
+}
+
+/// Is the opponent-commitment response model active? OFF by default.
+///
+/// MEASURED, and it is the worst result in this whole line of work: with the
+/// model actually executing (see the `V7_LIVE_LEGACY` note below — the first
+/// version of it was wired behind that guard and had never run), v7 goes
+/// 1157-843 -> 997-1003 against v6. Exact McNemar p = 0.00000, 434 discordant
+/// games out of 2000. A loss of eight points from a model that is supposed to
+/// be a strict improvement on "pick my safest life".
+///
+/// The cause is my own licence, not the payoff table. I let multi-card sets
+/// through with no reliability floor, specifically so the guides' "2-live to
+/// deny the opponent's 1-live" play could be chosen, and with a crude
+/// opponent-pass estimate the argmax is a large set the bot cannot pass —
+/// which folds the check AND loses the comparison it was meant to win. So the
+/// 2-live denial needs a payoff model that also respects feasibility, and a
+/// real opponent-pass estimate, neither of which exists yet.
+///
+/// This also retrospectively vindicates the documented "allow 2 lives when
+/// contested" result (354 vs 364): that measurement was right, and my attempt
+/// to overturn it was missing a constraint rather than uncovering a rule.
+///
+/// Kept, wired, and off — so the next attempt starts from a real measurement
+/// instead of the 0-discordant no-op that dead code produces.
+fn response_model_enabled() -> bool {
+    std::env::var("V7_RESPONSE")
+        .as_deref()
+        .map(|value| value != "0")
+        .unwrap_or(false)
+}
+
 pub fn choose_mulligan_v7(gs: &GameState, actions: &[Action], db: &CardDatabase) -> Action {
     if std::env::var("V7_MULLIGAN_CURVE").is_ok() || std::env::var("V7_MULLIGAN_REACHABLE").is_ok()
     {

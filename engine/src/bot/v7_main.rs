@@ -567,6 +567,26 @@ pub fn score_actions(gs: &GameState, actions: &[Action], me: u8) -> Vec<(f64, St
         .and_then(|value| value.parse().ok())
         .filter(|value: &f64| value.is_finite() && *value >= 0.0)
         .unwrap_or(0.0);
+    // Ability class gate. `V7_ABILITY_CLASS=<weight>`; scales `class_value`.
+    let ability_class_gate: f64 = std::env::var("V7_ABILITY_CLASS")
+        .ok()
+        .and_then(|value| value.parse().ok())
+        .filter(|value: &f64| value.is_finite() && *value >= 0.0)
+        .unwrap_or(0.0);
+    // The no-op gate is a switch, not a coefficient. `V7_NOOP_GATE=0` turns it
+    // off; there is deliberately nothing to tune, because the question it asks
+    // ("does this ability do anything?") has a yes/no answer.
+    let ability_noop_gate = std::env::var("V7_NOOP_GATE")
+        .as_deref()
+        .map(|value| value != "0")
+        .unwrap_or(true);
+    // Qualitative ability gate. Binary, on by default, no weight.
+    let ability_qualitative = std::env::var("V7_ABILITY_QUAL")
+        .as_deref()
+        .map(|value| value != "0")
+        .unwrap_or(true);
+    // Opening-curve move log. `V7_CURVE_DEBUG=1`.
+    let curve_debug = std::env::var_os("V7_CURVE_DEBUG").is_some();
     // MEASURED 2026-09-23: Pass=-0.05 + energy tax exploded draws
     // (1569/3000, avg turns 3.7) — every UseAbility at score≈0 then beat
     // Pass and main never ended cleanly. Keep flat 0.0 (v6 doctrine).
@@ -680,6 +700,110 @@ pub fn score_actions(gs: &GameState, actions: &[Action], me: u8) -> Vec<(f64, St
         // Legal information only: our own hand, stage and deck, and public
         // board. Nothing here reads the opponent's hidden zones, so this is
         // future sight, not cheating.
+        // ABILITY CLASS GATE. Prefer recognised trades, refuse the rest.
+        //
+        // v7 was using abilities essentially at random because it could not
+        // tell them apart, and the cost was real: enabling ability use scaled
+        // Rule 12-1 draws linearly with the weight (187 -> 267 draws, win rate
+        // 816 -> 737 at n=1500). Thirty of 71 measured uses were member-
+        // consuming with no measurable production — repeat those and the stage
+        // empties, the state stops changing, and the repetition protocol fires.
+        //
+        // So: read the ability's printed text, and only spend the Main phase on
+        // classes we recognise, each at its own price. Blades and hearts are
+        // `Power` because they are what the check actually reads. An ability
+        // that classifies as `Inactive` is pushed below Pass, because an
+        // unreadable ability's loop risk cannot be priced.
+        // STRUCTURAL ABILITY GATE — binary, not a weight.
+        //
+        // Every policy that increased v7's ability use cost ~200 draws per 1500
+        // games, at p as low as 0.00002, and three separate attempts produced
+        // the identical signature. The cause is not mispricing: the engine
+        // offers `UseAbility` actions whose resolution leaves the position
+        // unchanged, and spending one again is the same action type on the same
+        // state hash, which is exactly what Rule 12-1 detects. Same mechanism
+        // as the ISMCTS's 309 draws.
+        //
+        // So ask the engine rather than tune a coefficient: resolve this
+        // ability a SECOND time on its own result and compare the two
+        // positions with the engine's own state hash. Identical means the
+        // ability has no persistent effect, and a no-op is worth nothing at any
+        // weight — it only spends a member, advances the repetition counter,
+        // and hands the turn back.
+        //
+        // Comparing state hashes rather than six aggregate counters is the
+        // point: an earlier aggregate-delta classifier called 63 of 71 measured
+        // ability uses "produces nothing", because a card moving between zones
+        // changes the position without changing any one counter.
+        //
+        // MEASURED, and this is the one ability change with a causal result:
+        //   class gate, gate off : 706-549, p=0.00009, 245 draws
+        //   class gate, gate on  : 831-669, p=0.00001,   0 draws
+        // 245 draws eliminated and 125 wins recovered, from one binary rule.
+        // And with it on, the ability-refund path stopped being a regression:
+        //   refund=1.0, gate off : 752-448
+        //   refund=1.0, gate on  : 916-584  (baseline 910-590, p=0.61)
+        // i.e. the first ability intervention that is not worse than v7.
+        //
+        // Default ON, and it is a no-op on current play (910-590 either way) —
+        // it changes nothing until something actually pushes the bot to spend
+        // an ability, and then it is the only thing standing between that and
+        // 200 draws. Deliberately untunable: the question has a yes/no answer.
+        if ability_noop_gate && action.action_type == ActionType::UseAbility {
+            let mut again = sim.clone();
+            crate::rng::seed(0x7637);
+            let mut noop = false;
+            if game_setup::execute_action(&mut again, action).is_ok() {
+                noop = again.generate_state_hash() == sim.generate_state_hash();
+            }
+            if noop {
+                score = score.min(-1000.0);
+            }
+        }
+        // QUALITATIVE ABILITY GATE — read off the printed card, no coefficient.
+        //
+        // Replaces `V7_ABILITY_CLASS`, which was tuning slop: a per-class
+        // weight swept at 0.25/0.5/1.0, all three regressions, and still a
+        // regression with the draw gate on (831-669 vs 910-590, p=0.00001).
+        // The card already says what the ability IS, so the decision is read
+        // from the trigger marker instead of fitted to the arena:
+        //
+        //   {{常時}} / {{自動}} / {{常駐}}  automatic — resolves on its own,
+        //     so spending a member on it is a category error. v7's favourite
+        //     ability, 46 of 65 uses, is in this family.
+        //   {{起動}}                    activation — the only choosable kind.
+        //     Spend it when it produces blades, hearts, a draw or a search.
+        //
+        // On by default, and the switch is binary: `V7_ABILITY_QUAL=0`.
+        if ability_qualitative && action.action_type == ActionType::UseAbility {
+            let card_id = action
+                .parameters
+                .as_ref()
+                .and_then(|p| p.card_id)
+                .unwrap_or(-1);
+            let class = if card_id >= 0 {
+                crate::bot::strategy_v7::best_ability_class(&gs.card_database, card_id)
+            } else {
+                crate::bot::strategy_v7::AbilityClass::Inactive
+            };
+            if !crate::bot::v7_ismcts::ability_is_worth_spending(class) {
+                score = score.min(-1000.0);
+            }
+        }
+        if ability_class_gate > 0.0 && action.action_type == ActionType::UseAbility {
+            let card_id = action
+                .parameters
+                .as_ref()
+                .and_then(|p| p.card_id)
+                .or_else(|| action.parameters.as_ref().and_then(|p| p.card_index).map(|_| -1))
+                .unwrap_or(-1);
+            let class = if card_id >= 0 {
+                crate::bot::strategy_v7::best_ability_class(&gs.card_database, card_id)
+            } else {
+                crate::bot::strategy_v7::AbilityClass::Inactive
+            };
+            score += ability_class_gate * crate::bot::v7_ismcts::class_value(class);
+        }
         if ability_forecast_weight > 0.0 && action.action_type == ActionType::UseAbility {
             let after_forecast = crate::bot::strategy_v7::placement_forecast(
                 &sim,
@@ -707,6 +831,40 @@ pub fn score_actions(gs: &GameState, actions: &[Action], me: u8) -> Vec<(f64, St
                     after_forecast - base_forecast,
                 );
             }
+        }
+        if curve_debug && matches!(gs.turn_number, 1 | 2) && action.action_type != ActionType::Pass {
+            // The opening curve is the one place with a guide number attached
+            // (4 -> 9 -> 13) and it is behind: the bot sits at 3.8 / 7.6 / 11.2.
+            // This answers the question that decides where to look — is it not
+            // REACHING the band, or not being OFFERED the cards? If a cost-4
+            // is in hand and affordable and v7 passes over it, this is a
+            // Main-phase ranking bug. If no cost-4 is ever in hand and
+            // affordable, it is a mulligan or deck problem and no amount of
+            // search downstream will fix it.
+            let me_p = gs.seat_player(me);
+            let hand: Vec<String> = me_p
+                .hand
+                .cards
+                .iter()
+                .filter_map(|&cid| gs.card_database.get_card(cid))
+                .map(|card| {
+                    format!(
+                        "{}{}:{}",
+                        card.card_no,
+                        card.cost.map(|c| c.to_string()).unwrap_or_else(|| "-".into()),
+                        card.name.chars().take(3).collect::<String>()
+                    )
+                })
+                .collect();
+            eprintln!(
+                "V7CURVE t={} me={} act={:?} energy={} stage={:?} hand=[{}]",
+                gs.turn_number,
+                me,
+                action.action_type,
+                me_p.energy_zone.active_count(),
+                me_p.stage.stage,
+                hand.join(" ")
+            );
         }
         if forecast_weight > 0.0 {
             let after = crate::bot::strategy_v7::placement_forecast(

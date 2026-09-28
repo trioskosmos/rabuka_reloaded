@@ -129,10 +129,25 @@ pub struct ActionEncoding {
     pub target_zone: u8,
     pub position: u8,
     pub ability_index: u8,
+    // `card_index` indexes a hand / choice option list, so it is bounded by the
+    // hand size (a deck is 60 cards, well inside a `u8`) and this struct is
+    // built once per candidate action inside the MCTS rollout loop.
+    //
+    // Its "absent" sentinel is checked for below, which is what makes the
+    // narrowing safe: the guard maps absent to 0.0 BEFORE the divide, so the
+    // feature value is identical in both widths.
+    //
+    // `choice_option` deliberately stays `u16`. Unlike `card_index` it is
+    // pushed into the feature vector UNGUARDED, so its absent case feeds
+    // `u16::MAX / 16.0` ≈ 4095.9 into the network. Narrowing it to `u8` would
+    // silently change that to `255 / 16.0` ≈ 15.9 for every action with no
+    // choice option — a change to what the model is being asked, not a change
+    // to how the number is stored. If that ever needs to change it is a
+    // re-tuning decision, not a width decision.
     pub choice_option: u16,
     pub flags: u8,
     pub final_cost: u8,
-    pub card_index: u16,
+    pub card_index: u8,
     pub card_indices_count: u8,
 }
 
@@ -206,7 +221,7 @@ impl ActionEncoding {
             card_index: params
                 .and_then(|p| p.card_index)
                 .unwrap_or(usize::MAX)
-                .u16_count(),
+                .u8_count(),
             card_indices_count: params
                 .and_then(|p| p.card_indices.as_ref())
                 .map_or(0, |indices| indices.len().u8_count()),
@@ -249,7 +264,10 @@ impl ActionEncoding {
         v.push(0.0);
         v.push(self.ability_index as f32 / 8.0);
         v.push(self.choice_option as f32 / 16.0);
-        v.push(if self.card_index == u16::MAX {
+        // Guarded, so the `u8` width is invisible in the feature value: an
+        // absent index contributes 0.0 here, and a present one is a hand
+        // position that was always inside a byte.
+        v.push(if self.card_index == u8::MAX {
             0.0
         } else {
             self.card_index as f32 / 16.0
@@ -427,7 +445,7 @@ mod tests {
             choice_option: u16::MAX,
             flags: 0,
             final_cost: u8::MAX,
-            card_index: u16::MAX,
+            card_index: u8::MAX,
             card_indices_count: 0,
         };
         let encoded = action.encode(

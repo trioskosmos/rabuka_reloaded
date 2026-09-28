@@ -344,13 +344,6 @@ static int bag_has(const RbBag *bag, int cid)
     return 0;
 }
 
-static int bag_count(const RbBag *bag, int cid)
-{
-    int n = 0;
-    for (int i = 0; i < bag->n; i++) if (bag->cards[i] == cid) n++;
-    return n;
-}
-
 static int hand_has(const TestGame *tg, int cid) { return bag_has(&tg->state.p[0].hand, cid); }
 static int wait_has(const TestGame *tg, int cid) { return bag_has(&tg->state.p[0].discard, cid); }
 static int deck_has(const TestGame *tg, int cid) { return bag_has(&tg->state.p[0].deck, cid); }
@@ -535,14 +528,6 @@ static void md_fill_decks(TestGame *tg, int filler)
     }
 }
 
-/* Rust main_deck.cards = vec![...] (direct assignment, index 0 == top). */
-static void set_deck_exact(TestGame *tg, int pl, const int *cards, int n)
-{
-    RbPlayer *P = &tg->state.p[pl];
-    P->deck.n = 0;
-    for (int i = 0; i < n; i++) P->deck.cards[P->deck.n++] = cards[i];
-}
-
 /* Rust cards.insert(0, x) == C PREPEND (test_insert_deck_top). */
 static void put_on_deck_top(TestGame *tg, int pl, int cid)
 {
@@ -563,14 +548,7 @@ static void push_to_discard(TestGame *tg, int pl, int cid)
     if (P->discard.n < RB_MAX_ZONE) P->discard.cards[P->discard.n++] = cid;
 }
 
-static void push_to_hand(TestGame *tg, int pl, int cid)
-{
-    test_add_to_hand_for(tg, pl, cid);
-}
-
 /* Rust `for m in ids { main_deck.cards.insert(0, m) }` == C PREPEND, so after
- * the loop the deck's head is ids[n-1], NOT ids[0]. Every deck pin below goes
- * through this helper precisely because "insert(0) vs push" is the mistake this
  * file exists to catch. */
 static void rust_insert0_loop(TestGame *tg, int pl, const int *ids, int n)
 {
@@ -589,6 +567,8 @@ static struct { long long fp; int mark; const char *what; } g_guards[MAX_GUARDS]
 static int g_n_guards;
 
 static void md_reset_copy_pool(void);
+
+static void md_reset_copy_pool(void);   /* defined just below, after board_begin */
 
 static void board_begin(TestGame *tg)
 {
@@ -623,10 +603,10 @@ static long long state_fingerprint(const TestGame *tg)
         f += (long long)P->deck.n        * 1LL;
         f += (long long)P->hand.n        * 1000000LL;
         f += (long long)P->discard.n     * 1000000000000LL;
-        f += (long long)P->live.n        * 1000000000000000000LL;
-        f += (long long)P->success.n     * 1000000000000000000000LL;
+        f += (long long)P->live.n        * 1000000000000000LL;
+        f += (long long)P->success.n     * 1000000000000000000LL;
     }
-    f += (long long)tg->state.n_batch_movements * 1000000000000000000000000LL;
+    f += (long long)tg->state.n_batch_movements * 100000000000000000LL;
     return f;
 }
 
@@ -646,6 +626,7 @@ static void effect_guard(long long fp, int mark, const char *what)
 
 /* The effect offered a prompt, so this case's control is that the prompt
  * appeared - for abilities whose whole point is that they ask. */
+static void prompt_guard(int mark, const char *what) __attribute__((unused));
 static void prompt_guard(int mark, const char *what)
 {
     if (g_n_guards < MAX_GUARDS) {
@@ -736,12 +717,14 @@ static int pending_allow_skip(TestGame *tg)
     return c ? c->allow_skip : -1;
 }
 
+static void drain_pick0(TestGame *tg, int guard_max) __attribute__((unused));
 static void drain_pick0(TestGame *tg, int guard_max)
 {
     int guard = 0;
     while (rb_has_pending_choice(&tg->state) && guard++ < guard_max) pick(tg, 0);
 }
 
+static void drain_skip(TestGame *tg, int guard_max) __attribute__((unused));
 static void drain_skip(TestGame *tg, int guard_max)
 {
     int guard = 0;
@@ -846,16 +829,16 @@ static int n_movements(const TestGame *tg) { return tg->state.n_batch_movements;
 
 /* ===================================================================== */
 /* 2. effects/mill - debut_fixed_count_mill_test.rs                       */
-/*      PL!S-bp5-015-N 登場「デッキの上からカードを10枚控え室に置く」        */
+/*      PL!S-bp5-015-N debut: "put the TOP 10 cards of the deck into the   */
 /*    A 12-card deck of one filler print. 10 leave, 2 stay. The COUNT is the */
 /*    assertion; the deck-order pin below proves the fixture itself is sane.  */
 /* ===================================================================== */
 
 #define S_BP5_015_N  "PL!S-bp5-015-N"
-#define FILLER      "PL!-sd1-010-SD"   /* 高坂 穂乃果, μ's member, no ability */
-#define LIVE_FILLER "PL!-sd1-019-SD"   /* a μ's LIVE card (not a member)       */
+#define FILLER      "PL!-sd1-010-SD"   /* Takasaka Honoka: a mu's member with no ability */
+#define LIVE_FILLER "PL!-sd1-019-SD"   /* a mu's LIVE card (not a member)       */
 #define AQ_MEMBER   "PL!S-sd1-001-SD"   /* Aqours member                        */
-#define MU_MEMBER   "PL!N-bp3-006-R"   /* μ's member                           */
+#define MU_MEMBER   "PL!N-bp3-006-R"   /* a mu's member                        */
 #define LIELLA_M1   "PL!SP-sd4-022-N"  /* see note in the liella block below   */
 
 static void test_sbp5_015_twelve_card_deck_mills_ten_keeps_two(void)
@@ -877,7 +860,7 @@ static void test_sbp5_015_twelve_card_deck_mills_ten_keeps_two(void)
     for (int i = 0; i < 12; i++) push_to_deck(&tg, 0, filler);
 
     int mark = prompt_mark();
-    long long fp = state_fingerprint(&tg);
+    long long fp = state_fingerprint(&tg); (void)fp; (void)mark;
     md_play_to_stage(&tg, nico, 1, 0);
     CHECK_EQ(tg.state.p[0].stage[1], nico, "nico is on the centre stage");
     /* The printed effect is a plain count, so it must not open a prompt. If one
@@ -910,10 +893,10 @@ static void test_sbp5_015_twelve_card_deck_mills_ten_keeps_two(void)
 
 /* ===================================================================== */
 /* 3. effects/mill - debut_mill_and_all_member_draw_test.rs                 */
-/*      PL!HS-bp1-008-R 高砂みゆき 登場「デッキの上からカードを3枚控え室に */
-/*      置く。これにより控え室に置いた『メンバー』カードが3枚なら1枚、引ける」*/
+/*      PL!HS-bp1-008-R debut: "put the TOP 3 cards of the deck into the    */
+/*      waitroom. If the 3 cards put there are all MEMBER cards, draw 1".   */
 /*    Distinct behaviour: a CONDITIONAL draw gated on "all three milled cards */
-/*    are members", plus the plain top-5 mill of PL!HS-bp2-011-PR.            */
+/*    are members", plus the plain top-5 mill of PL!HS-bp2-011-PR.           */
 /* ===================================================================== */
 
 #define KOSUZU   "PL!HS-bp1-008-R"
@@ -956,10 +939,10 @@ static void test_kosuzu_mill_three_all_members_draws_one(void)
     int hand_before = tg.state.p[0].hand.n;
     int wait_before = tg.state.p[0].discard.n;
     int mark = prompt_mark();
-    long long fp = state_fingerprint(&tg);
+    long long fp = state_fingerprint(&tg); (void)fp; (void)mark;
 
     int fired = md_fire_debut(&tg, suzuki);
-    CHECK(fired, "kosuzu: the card exposes a 登場 ability that the engine accepts");
+    CHECK(fired, "kosuzu: the card exposes a debut ability that the engine accepts");
     drain_choices(&tg);
 
     CHECK_EQ(tg.state.p[0].hand.n, hand_before + 1,
@@ -989,7 +972,7 @@ static void test_kosuzu_mill_three_with_live_card_skips_draw(void)
     int hand_before = tg.state.p[0].hand.n;
     int wait_before = tg.state.p[0].discard.n;
     int mark = prompt_mark();
-    long long fp = state_fingerprint(&tg);
+    long long fp = state_fingerprint(&tg); (void)fp; (void)mark;
 
     md_fire_debut(&tg, suzuki);
     drain_choices(&tg);
@@ -1024,7 +1007,7 @@ static void test_sayaka_debut_mills_top_five_to_waitroom(void)
     int deck_before = tg.state.p[0].deck.n;
     int wait_before = tg.state.p[0].discard.n;
     int mark = prompt_mark();
-    long long fp = state_fingerprint(&tg);
+    long long fp = state_fingerprint(&tg); (void)fp; (void)mark;
 
     md_fire_debut(&tg, sayaka);
     drain_choices(&tg);
@@ -1046,8 +1029,8 @@ static void test_sayaka_debut_mills_top_five_to_waitroom(void)
 
 /* ===================================================================== */
 /* 4. effects/mill - all_members_blades_pl_hs_bp5_013_n_test.rs             */
-/*      PL!HS-bp5-013-N ライブ開始時「デッキの上からカードを3枚控え室に置く。 */
-/*      これにより控え室に置いた『メンバー』カードが3枚なら、ブレードを2得る」*/
+/*      PL!HS-bp5-013-N live-start: "put the TOP 3 cards of the deck into   */
+/*      the waitroom. If all 3 are MEMBER cards, gain 2 blades".             */
 /*      This is the CASE THAT EXPOSES "milled the wrong end": the deck's top */
 /*      three are three DISTINCT member prints and everything under them is  */
 /*      one identical filler. Milling the top gives 3 members -> +2 blades;  */
@@ -1096,7 +1079,7 @@ static void test_bp5_013_mill_three_all_members_two_blades(void)
     bp5_013_board(&tg, top3, &me);
     int deck_before = tg.state.p[0].deck.n;
     int mark = prompt_mark();
-    long long fp = state_fingerprint(&tg);
+    long long fp = state_fingerprint(&tg); (void)fp; (void)mark;
 
     md_fire_live_start(&tg, me);
     drain_choices(&tg);
@@ -1126,7 +1109,7 @@ static void test_bp5_013_milled_live_card_no_blades(void)
     int me = 0;
     bp5_013_board(&tg, top3, &me);
     int mark = prompt_mark();
-    long long fp = state_fingerprint(&tg);
+    long long fp = state_fingerprint(&tg); (void)fp; (void)mark;
 
     md_fire_live_start(&tg, me);
     drain_choices(&tg);
@@ -1143,12 +1126,13 @@ static void test_bp5_013_milled_live_card_no_blades(void)
 
 /* ===================================================================== */
 /* 5. effects/mill - bottom_aqours_required_heart_pl_s_bp7_020_l_test.rs    */
-/*      PL!S-bp7-020-L ライブ開始時 (2nd)「デッキの下からカードを1枚控え室に */
-/*      置く…控え室に置いたカードが『Aqours』のメンバーなら、必要ハートを−1」 */
-/*      This is the BOTTOM-end mirror of section 4: the same convention, the */
+/*      PL!S-bp7-020-L live-start (2nd ability): "put 1 card from the deck    */
+/*      BOTTOM into the waitroom; if that card is an Aqours MEMBER,          */
+/*      need heart -1".                                                      */
+/*      This is the BOTTOM-end mirror of section 4: the same convention, the  */
 /*      other direction. Deck = [filler, aqours] and the assertion is on the  */
-/*      aqours card specifically, so a top-mill is impossible to confuse with   */
-/*      a bottom-mill.                                                          */
+/*      aqours card specifically, so a top-mill is impossible to confuse with  */
+/*      a bottom-mill.                                                        */
 /* ===================================================================== */
 
 #define S_BP7_020_L "PL!S-bp7-020-L"
@@ -1184,9 +1168,9 @@ static void test_bp7_020_bottom_aqours_member_reduces_required_heart(void)
                       "bottom mill cannot be a top mill");
 
     int mark = prompt_mark();
-    long long fp = state_fingerprint(&tg);
+    long long fp = state_fingerprint(&tg); (void)fp; (void)mark;
     int fired = md_fire_trigger(&tg, hpt, TRIG_LIVE_START, TRIG_LIVE_START, 1);
-    CHECK(fired, "bp7_020: the 2nd ライブ開始時 ability was found and fired");
+    CHECK(fired, "bp7_020: the 2nd live-start ability was found and fired");
     drain_choices(&tg);
 
     CHECK(wait_has(&tg, aq), "bp7_020: the BOTTOM card was milled to the waitroom");
@@ -1207,32 +1191,32 @@ static void test_bp7_020_bottom_non_aqours_member_does_not_reduce(void)
     board_begin(&tg);
 
     int hpt = bp7_020_live_in_zone(&tg);
-    int mus = md_id(&tg, FILLER);   /* μ's member */
+    int mus = md_id(&tg, FILLER);   /* a mu's member */
     push_to_deck(&tg, 0, mus);
-    check_deck_bottom_is(&tg, 0, mus, "bp7_020b fixture pin: μ's member is the bottom");
+    check_deck_bottom_is(&tg, 0, mus, "bp7_020b fixture pin: the mu's member is the bottom");
 
     int mark = prompt_mark();
-    long long fp = state_fingerprint(&tg);
+    long long fp = state_fingerprint(&tg); (void)fp; (void)mark;
     md_fire_trigger(&tg, hpt, TRIG_LIVE_START, TRIG_LIVE_START, 1);
     drain_choices(&tg);
 
-    CHECK(wait_has(&tg, mus), "bp7_020b: the bottom μ's member was milled");
+    CHECK(wait_has(&tg, mus), "bp7_020b: the bottom mu's member was milled");
     CHECK_EQ(rb_mods_get_need_heart(&tg.state.mods, hpt, RB_HEART_PINK), 0,
-             "bp7_020b: μ's member milled -> NO heart00 reduction");
+             "bp7_020b: mu's member milled -> NO heart00 reduction");
     /* VACUITY CONTROL: the zero above would also hold on a board where the
      * ability did nothing. The positive on the same board is the waitroom. */
-    CHECK(!deck_has(&tg, mus), "bp7_020b vacuity control: the card really left the deck");
+    CHECK(!deck_has(&tg, mus), "bp7_020b vacuity control: the mu's member really left the deck");
     effect_guard(fp, mark, "bp7_020b's bottom mill must reach the frontend");
 }
 
 /* ===================================================================== */
 /* 6. effects/mill - bottom_member_tiers_pl_s_bp7_021_l_test.rs             */
-/*      PL!S-bp7-021-L ライブ開始時「自分のステージのメンバーが3人なら、     */
-/*      デッキの下からカードを5枚控え室に置く…5枚すべてが『メンバー』なら     */
-/*      スコア+1、3枚以上なら1枚引く」                                       */
+/*      PL!S-bp7-021-L live-start: "if you have 3 or more members on stage,  */
+/*      put 5 cards from the deck BOTTOM into the waitroom; if all 5 are    */
+/*      MEMBER cards score+1, and if 3 or more are MEMBER cards draw 1".     */
 /*      Four tier boundaries of ONE ability: 2 members, 3 members, 5 members, */
 /*      and the stage-count gate failing. The deck is built from DISTINCT      */
-/*      prints (μ's member / Aqours member / live filler) so "milled the       */
+/*      prints (mu's member / Aqours member / live filler) so "milled the     */
 /*      bottom five" is observable by identity.                                */
 /* ===================================================================== */
 
@@ -1273,9 +1257,9 @@ static void test_bp7_021_bottom_mill_two_members_no_draw_or_score(void)
     check_deck_bottom_is(&tg, 0, m1, "bp7_021 fixture pin: m1 is the deck bottom");
 
     int mark = prompt_mark();
-    long long fp = state_fingerprint(&tg);
+    long long fp = state_fingerprint(&tg); (void)fp; (void)mark;
     int fired = md_fire_live_start(&tg, live);
-    CHECK(fired, "bp7_021: the ライブ開始時 ability was found and fired");
+    CHECK(fired, "bp7_021: the live-start ability was found and fired");
     drain_choices(&tg);
 
     CHECK_EQ(tg.state.p[0].discard.n, 5, "bp7_021: five cards milled to the waitroom");
@@ -1308,7 +1292,7 @@ static void test_bp7_021_bottom_mill_three_members_draw_only(void)
     push_to_deck(&tg, 0, l);
 
     int mark = prompt_mark();
-    long long fp = state_fingerprint(&tg);
+    long long fp = state_fingerprint(&tg); (void)fp; (void)mark;
     md_fire_live_start(&tg, live);
     drain_choices(&tg);
 
@@ -1337,13 +1321,13 @@ static void test_bp7_021_bottom_mill_five_members_draw_and_score(void)
     }
 
     int mark = prompt_mark();
-    long long fp = state_fingerprint(&tg);
+    long long fp = state_fingerprint(&tg); (void)fp; (void)mark;
     md_fire_live_start(&tg, live);
     drain_choices(&tg);
 
     CHECK_EQ(tg.state.p[0].hand.n, 1, "bp7_021: all five members -> draw fired");
     CHECK_EQ(rb_mods_get_score(&tg.state.mods, live), 1,
-             "bp7_021: all five were members -> スコア+1");
+             "bp7_021: all five were members -> score+1");
     /* The score gate is "all five", so the SCORE is the assertion that proves
      * the bottom five - and only those five - were examined. */
     check_bag_set_is(&tg.state.p[0].discard, five, 5,
@@ -1370,7 +1354,7 @@ static void test_bp7_021_two_staged_members_no_bottom_mill(void)
     int deck_before = tg.state.p[0].deck.n;
 
     int mark = prompt_mark();
-    long long fp = state_fingerprint(&tg);
+    long long fp = state_fingerprint(&tg); (void)fp; (void)mark;
     md_fire_live_start(&tg, live);
     drain_choices(&tg);
 
@@ -1397,8 +1381,8 @@ static void test_bp7_021_two_staged_members_no_bottom_mill(void)
 
 /* ===================================================================== */
 /* 7. effects/mill - bp7_q267_rinna_mill_refresh_test.rs                    */
-/*      PL!N-bp7-009-R 登場「自身と相手はそれぞれ、自身のデッキの上から     */
-/*      カードを7枚控え室に置く」                                            */
+/*      PL!N-bp7-009-R debut: "each player puts the TOP 7 cards of THEIR    */
+/*      OWN deck into the waitroom".                                         */
 /*      The Rule 10.2.2.1 mid-effect REFRESH boundary, and it is a genuinely  */
 /*      distinct behaviour from everything above: the mill can RESUME after a  */
 /*      shuffle, so the count is not simply "how many cards were there".      */
@@ -1438,7 +1422,7 @@ static void test_q267_deck_exhausts_mid_mill_refreshes_and_completes(void)
     board_begin(&tg);
 
     int mark = prompt_mark();
-    long long fp = state_fingerprint(&tg);
+    long long fp = state_fingerprint(&tg); (void)fp; (void)mark;
     rina_setup_and_trigger(&tg, 3, 7, 30, 0);
 
     CHECK(tg.state.p[0].deck_refreshed_this_turn,
@@ -1467,7 +1451,7 @@ static void test_q267_deck_exactly_seven_no_refresh(void)
     board_begin(&tg);
 
     int mark = prompt_mark();
-    long long fp = state_fingerprint(&tg);
+    long long fp = state_fingerprint(&tg); (void)fp; (void)mark;
     rina_setup_and_trigger(&tg, 7, 3, 30, 0);
 
     CHECK(!tg.state.p[0].deck_refreshed_this_turn,
@@ -1488,7 +1472,7 @@ static void test_q267_deck_five_refresh_completes_to_seven(void)
     board_begin(&tg);
 
     int mark = prompt_mark();
-    long long fp = state_fingerprint(&tg);
+    long long fp = state_fingerprint(&tg); (void)fp; (void)mark;
     rina_setup_and_trigger(&tg, 5, 3, 30, 0);
 
     CHECK(tg.state.p[0].deck_refreshed_this_turn,
@@ -1510,7 +1494,7 @@ static void test_q267_both_players_refresh_their_own_deck(void)
     board_begin(&tg);
 
     int mark = prompt_mark();
-    long long fp = state_fingerprint(&tg);
+    long long fp = state_fingerprint(&tg); (void)fp; (void)mark;
     rina_setup_and_trigger(&tg, 3, 7, 3, 7);
 
     CHECK(tg.state.p[0].deck_refreshed_this_turn, "q267: p1 deck hit 0 -> refresh");
@@ -1521,7 +1505,7 @@ static void test_q267_both_players_refresh_their_own_deck(void)
     CHECK_EQ(tg.state.p[0].deck.n, 6, "q267: p1 deck");
     CHECK_EQ(tg.state.p[1].deck.n, 6, "q267: p2 deck");
     /* VACUITY CONTROL: p2's four waitroom cards are the OPPONENT side of the
-     * same それぞれ effect, so they prove the second half ran too. */
+     * same  effect, so they prove the second half ran too. */
     CHECK_EQ(tg.state.p[1].discard.n + tg.state.p[1].deck.n, 10,
              "q267: p2 conservation - its own 3 + 7 were its own");
     effect_guard(fp, mark, "rina's both-players mill must reach the frontend");
@@ -1529,8 +1513,8 @@ static void test_q267_both_players_refresh_their_own_deck(void)
 
 /* ===================================================================== */
 /* 8. effects/mill - discard_cost_mill_then_arise_recovery_test.rs           */
-/*      PL!-bp5-010-N ライブ開始時「（コスト）…デッキの上からカードを3枚   */
-/*      控え室に置く。…『A-RISE』のメンバーカード1枚を手札に加える。」        */
+/*      PL!-bp5-010-N live-start: "(cost) ... put the TOP 3 cards of the    */
+/*      deck into the waitroom ... recover 1 A-RISE MEMBER card to hand".    */
 /*      Distinct behaviour: a mill behind an OPTIONAL hand-discard cost, and  */
 /*      a SECOND clause that recovers a card from the WAITROOM afterwards.    */
 /*      The deck top three are three distinct member prints.                   */
@@ -1576,7 +1560,7 @@ static void test_honoka_mills_three_then_recovers_arise(void)
 
     int deck_before = tg.state.p[0].deck.n;
     int mark = prompt_mark();
-    long long fp = state_fingerprint(&tg);
+    long long fp = state_fingerprint(&tg); (void)fp; (void)mark;
 
     md_fire_live_start(&tg, me);
     /* Rust: select_indices(&[0]) to accept the optional hand-discard cost, then
@@ -1609,7 +1593,7 @@ static void test_honoka_without_arise_still_mills_three(void)
 
     int deck_before = tg.state.p[0].deck.n;
     int mark = prompt_mark();
-    long long fp = state_fingerprint(&tg);
+    long long fp = state_fingerprint(&tg); (void)fp; (void)mark;
 
     md_fire_live_start(&tg, me);
     pick(&tg, 0);
@@ -1626,13 +1610,13 @@ static void test_honoka_without_arise_still_mills_three(void)
 
 /* ===================================================================== */
 /* 9. effects/mill - liella_milled_per_unit_blades_test.rs                  */
-/*      PL!SP-bp5-005-R＋ 葉月 恋                                          */
-/*      ab#0 起動「デッキの上からカードを3枚控え室に置く。…『Liella!』の     */
-/*           メンバーカード1枚につきブレード」  (PER-UNIT, scoped to the       */
+/*      PL!SP-bp5-005-R+  Hazuki Koi                                          */
+/*      ab#0 activate: "put the TOP 3 cards of the deck into the waitroom;   */
+/*           1 blade per Liella! MEMBER card" (PER-UNIT, scoped to the      */
 /*           cards THIS cost placed)                                          */
-/*      ab#1 自動「自分のカードが控え室に置かれるたび、Eを支払ってもよい。   */
-/*           それらのカードの中から1枚手札に加える。」  (a movement-triggered */
-/*           optional recovery over the cards JUST milled)                     */
+/*      ab#1 auto: "when your cards go to the waitroom you may pay E to      */
+/*           recover 1 of them to hand" (a movement-triggered               */
+/*           optional recovery over the cards JUST milled)                   */
 /*      Four distinct behaviours here: the per-unit blade formula, its        */
 /*      `those_cards` scoping, the optional cost, and the re-trigger window.  */
 /* ===================================================================== */
@@ -1681,9 +1665,9 @@ static void test_ren_mill_liella_blade_two_liella_among_three(void)
     int wait_before = tg.state.p[0].discard.n;
 
     int mark = prompt_mark();
-    long long fp = state_fingerprint(&tg);
+    long long fp = state_fingerprint(&tg); (void)fp; (void)mark;
     int r = md_activate(&tg, ren);
-    CHECK(r, "ren: ab#0 (起動) is offered and executed");
+    CHECK(r, "ren: ab#0 (activate) is offered and executed");
     drain_choices(&tg);
 
     CHECK_EQ(tg.state.p[0].discard.n, wait_before + 3,
@@ -1708,7 +1692,7 @@ static void test_ren_mill_liella_blade_no_liella_no_blade(void)
     int wait_before = tg.state.p[0].discard.n;
 
     int mark = prompt_mark();
-    long long fp = state_fingerprint(&tg);
+    long long fp = state_fingerprint(&tg); (void)fp; (void)mark;
     md_activate(&tg, ren);
     drain_choices(&tg);
 
@@ -1730,7 +1714,7 @@ static void test_ren_mill_liella_blade_all_three_liella(void)
     for (int i = 0; i < 3; i++) put_on_deck_top(&tg, 0, liella);
 
     int mark = prompt_mark();
-    long long fp = state_fingerprint(&tg);
+    long long fp = state_fingerprint(&tg); (void)fp; (void)mark;
     md_activate(&tg, ren);
     drain_choices(&tg);
 
@@ -1759,7 +1743,7 @@ static void test_ren_preexisting_liella_in_discard_does_not_inflate(void)
     check_deck_top_is(&tg, 0, liella, "ren-scoping fixture pin: one Liella! at the head");
 
     int mark = prompt_mark();
-    long long fp = state_fingerprint(&tg);
+    long long fp = state_fingerprint(&tg); (void)fp; (void)mark;
     md_activate(&tg, ren);
     drain_choices(&tg);
 
@@ -1801,7 +1785,7 @@ static void test_ren_optional_pay_recovery_after_mill_recovers_one(void)
 
     int hand_before = tg.state.p[0].hand.n;
     int mark = prompt_mark();
-    long long fp = state_fingerprint(&tg);
+    long long fp = state_fingerprint(&tg); (void)fp; (void)mark;
 
     md_activate(&tg, ren);
     /* Rust: has_pending_choice() must be a SelectTarget (the optional E cost). */
@@ -1837,7 +1821,7 @@ static void test_ren_optional_pay_recovery_recovers_the_first_milled_card(void)
     check_deck_top_is(&tg, 0, chisato, "ren-ab1b fixture pin: chisato is the deck's head");
 
     int mark = prompt_mark();
-    long long fp = state_fingerprint(&tg);
+    long long fp = state_fingerprint(&tg); (void)fp; (void)mark;
     md_activate(&tg, ren);
     expect_pending(rb_has_pending_choice(&tg.state),
                    "ren ab#1b: the optional cost prompt is offered");
@@ -1876,7 +1860,7 @@ static void test_ren_optional_pay_recovery_decline_recovers_nothing(void)
     int hand_before = tg.state.p[0].hand.n;
     int wait_before = tg.state.p[0].discard.n;
     int mark = prompt_mark();
-    long long fp = state_fingerprint(&tg);
+    long long fp = state_fingerprint(&tg); (void)fp; (void)mark;
 
     md_activate(&tg, ren);
     expect_pending(rb_has_pending_choice(&tg.state),
@@ -1907,7 +1891,7 @@ static void test_ren_optional_pay_recovery_only_trigger_cards_not_whole_discard(
     int wait_before = tg.state.p[0].discard.n;
 
     int mark = prompt_mark();
-    long long fp = state_fingerprint(&tg);
+    long long fp = state_fingerprint(&tg); (void)fp; (void)mark;
     md_activate(&tg, ren);
     expect_pending(rb_has_pending_choice(&tg.state),
                    "ren ab#1d: the optional cost prompt is offered");
@@ -1939,7 +1923,7 @@ static void test_ren_decline_retrigger_same_turn(void)
     test_add_to_discard(&tg, filler);
     test_add_to_discard(&tg, filler);
     int mark = prompt_mark();
-    long long fp = state_fingerprint(&tg);
+    long long fp = state_fingerprint(&tg); (void)fp; (void)mark;
     ren_trigger_movement_ability(&tg, ren, (int[3]){ filler, filler, filler }, 3);
     drain_choices(&tg);
     CHECK_EQ(tg.state.p[0].hand.n, 0, "Q233: declined -> no card recovered");
@@ -1974,7 +1958,7 @@ static void test_ren_card_type_catch_all_recovers_any_card(void)
     test_add_to_discard(&tg, energy);
 
     int mark = prompt_mark();
-    long long fp = state_fingerprint(&tg);
+    long long fp = state_fingerprint(&tg); (void)fp; (void)mark;
     ren_trigger_movement_ability(&tg, ren, (int[3]){ energy, energy, energy }, 3);
     {
         int guard = 0;
@@ -2014,7 +1998,7 @@ static void test_ren_two_copies_one_pays_one_declines(void)
 
     int hand_before = tg.state.p[0].hand.n;
     int mark = prompt_mark();
-    long long fp = state_fingerprint(&tg);
+    long long fp = state_fingerprint(&tg); (void)fp; (void)mark;
     md_activate(&tg, ren1);
     /* First prompt -> ren1 pays, second -> ren2 declines. */
     int pay_count = 0;
@@ -2039,8 +2023,8 @@ static void test_ren_two_copies_one_pays_one_declines(void)
 
 /* ===================================================================== */
 /* 10. effects/deck_order/restore - optional_waitroom_to_deck_top_test.rs  */
-/*      PL!SP-bp2-013-N 登場「控え室のカードを1枚まで、デッキの上に置いて     */
-/*      もよい」and PL!N-bp4-021-N 登場 (same shape, the accepted/skipped    */
+/*      PL!SP-bp2-013-N debut: "you may put 1 waitroom card onto the deck    */
+/*      TOP" and PL!N-bp4-021-N debut (same shape, the accepted/skipped    */
 /*      pair).                                                                */
 /*      THE PURE DECK-TOP CASE: a card is moved from the waitroom onto the    */
 /*      deck's index 0. This is the one place where "prepend vs append" is   */
@@ -2077,7 +2061,7 @@ static void test_sp_bp2_013_debut_places_waitroom_card_on_deck_top(void)
     int bottom_id = tg.state.p[0].deck.cards[bottom_before];
 
     int mark = prompt_mark();
-    long long fp = state_fingerprint(&tg);
+    long long fp = state_fingerprint(&tg); (void)fp; (void)mark;
     md_play_to_stage(&tg, card, 1, 0);
 
     CHECK(strcmp(pending_type(&tg), "SelectCard") == 0,
@@ -2122,7 +2106,7 @@ static void test_sp_bp2_013_debut_can_place_zero_cards(void)
 
     int deck_before = tg.state.p[0].deck.n;
     int mark = prompt_mark();
-    long long fp = state_fingerprint(&tg);
+    long long fp = state_fingerprint(&tg); (void)fp; (void)mark;
     md_play_to_stage(&tg, card, 1, 0);
     expect_pending(rb_has_pending_choice(&tg.state),
                    "sp_bp2_013b: the optional waitroom pick is offered");
@@ -2166,7 +2150,7 @@ static void test_n_bp4_021_debut_accept_puts_waitroom_card_on_deck_top(void)
     test_give_energy(&tg, 12);
 
     int mark = prompt_mark();
-    long long fp = state_fingerprint(&tg);
+    long long fp = state_fingerprint(&tg); (void)fp; (void)mark;
     md_play_to_stage(&tg, kasumi, 1, 0);
     expect_pending(rb_has_pending_choice(&tg.state),
                    "n_bp4_021: the optional move must be prompted");
@@ -2203,7 +2187,7 @@ static void test_n_bp4_021_debut_skip_keeps_card_in_waitroom(void)
 
     int deck_before = tg.state.p[0].deck.n;
     int mark = prompt_mark();
-    long long fp = state_fingerprint(&tg);
+    long long fp = state_fingerprint(&tg); (void)fp; (void)mark;
     md_play_to_stage(&tg, kasumi, 1, 0);
     expect_pending(rb_has_pending_choice(&tg.state),
                    "n_bp4_021b: the optional move must be prompted");
@@ -2222,11 +2206,12 @@ static void test_n_bp4_021_debut_skip_keeps_card_in_waitroom(void)
 
 /* ===================================================================== */
 /* 11. effects/deck_order/restore - clean_members_energy_pl_n_bp7_008_r    */
-/*      PL!N-bp7-008-R 登場「控え室の自分の『ブレードの数が0』のメンバー      */
-/*      カード1枚をattention…デッキの下に置き、待った做任何能源を1つ激活"     */
-/*      (Emma).  Distinct: a DECK-BOTTOM placement (the opposite end from the   */
-/*      previous section, on the same harness) plus a card_type/cost FILTER    */
-/*      over the waitroom and an energy side effect.                          */
+/*      PL!N-bp7-008-R debut: "put 1 of your waitroom MEMBER cards whose     */
+/*      blade count is 0 under your deck, then activate 1 energy" (a         */
+/*      deck-bottom placement plus an energy side effect).                   */
+/*      (Emma). Distinct: a DECK-BOTTOM placement - the opposite end from the */
+/*      previous section, on the same harness - plus a card_type/cost FILTER  */
+/*      over the waitroom and an energy side effect.                         */
 /* ===================================================================== */
 
 #define N_BP7_008_R   "PL!N-bp7-008-R"
@@ -2265,7 +2250,7 @@ static void test_n_bp7_008_bottoms_only_non_blade_heart_members_and_activates(vo
      * KOTORI_CLEAN "the blade-0 member" and the two fillers the blade holders,
      * but cards.json gives PL!-pb1-021-PR a PRINTED blade of 1 - the same as
      * both fillers. Nothing in the test adjusts any blade count, so the printed
-     * 「ブレードの数が0のメンバー」 filter has NO eligible card in this fixture.
+     * 0 filter has NO eligible card in this fixture.
      * Reported as a RUST FIXTURE BUG, not an engine failure: the engine is being
      * asked a question the fixture cannot answer. */
     printf("DBG fixture blades: %s blade=%d | %s blade=%d | %s blade=%d\n",
@@ -2274,7 +2259,7 @@ static void test_n_bp7_008_bottoms_only_non_blade_heart_members_and_activates(vo
            card_no_of(bladefill2), card_blade(bladefill2));
     if (card_blade(clean) != 0)
         printf("RUST FIXTURE BUG: %s prints blade %d, not 0, so the "
-               "「ブレードの数が0のメンバー」 filter has no eligible card and this "
+               "0 filter has no eligible card and this "
                "case cannot distinguish 'filter rejected it' from 'filter matched "
                "nothing'.\n", KOTORI_CLEAN, card_blade(clean));
     pin_id(clean, KOTORI_CLEAN);
@@ -2294,9 +2279,9 @@ static void test_n_bp7_008_bottoms_only_non_blade_heart_members_and_activates(vo
     int active_before = rb_energy_active_count(&tg.state.p[0]);
 
     int mark = prompt_mark();
-    long long fp = state_fingerprint(&tg);
+    long long fp = state_fingerprint(&tg); (void)fp; (void)mark;
     int fired = md_fire_debut(&tg, emma);
-    CHECK(fired, "n_bp7_008: the 登場 ability was found and fired");
+    CHECK(fired, "n_bp7_008: the live-start ability was found and fired");
     expect_pending(rb_has_pending_choice(&tg.state),
                    "n_bp7_008: a waitroom selection is offered");
     pick(&tg, 0);
@@ -2335,7 +2320,7 @@ static void test_n_bp7_008_empty_waitroom_is_a_noop(void)
     int active_before = rb_energy_active_count(&tg.state.p[0]);
 
     int mark = prompt_mark();
-    long long fp = state_fingerprint(&tg);
+    long long fp = state_fingerprint(&tg); (void)fp; (void)mark;
     md_fire_debut(&tg, emma);
 
     expect_pending(!rb_has_pending_choice(&tg.state),
@@ -2351,18 +2336,18 @@ static void test_n_bp7_008_empty_waitroom_is_a_noop(void)
      * on the same card, so the zero here is a filter result and not a no-op
      * engine. The card's ability is also proven to exist. */
     CHECK(card_prints_trigger(emma, TRIG_DEBUT),
-          "n_bp7_008b vacuity control: the card does print a 登場 ability, so the "
+          "n_bp7_008b vacuity control: the card does print a debut ability, so the "
           "no-op is the empty-waitroom gate and not a missing effect");
 
 }
 
 /* ===================================================================== */
 /* 12. effects/deck_order/restore - aqours_bottom_pl_s_bp7_019_l_test.rs     */
-/*      PL!S-bp7-019-L ライブ成功時「控え室の自分の『Aqours』のメンバーカード */
-/*      2枚を你喜欢の順番でデッキの下に置く」                                  */
-/*      「好きな順番」 - the ORDER of a two-card return to the deck bottom, plus */
-/*      a group filter over the waitroom. This is the test the C API cannot    */
-/*      fully observe (see the placement_order note in section 16).             */
+/*      PL!S-bp7-019-L live-success: "put 2 of your waitroom Aqours MEMBER    */
+/*      cards under your deck in the order you like" - the ORDER of a        */
+/*      two-card return to the deck bottom, plus a group filter over the      */
+/*      waitroom. This is the test the C API cannot fully observe (see the   */
+/*      placement_order note in section 12).                                 */
 /* ===================================================================== */
 
 #define S_BP7_019_L  "PL!S-bp7-019-L"
@@ -2397,9 +2382,9 @@ static void test_bp7_019_places_two_aqours_cards_under_deck(void)
     check_deck_bottom_is(&tg, 0, filler, "bp7_019 fixture pin: deck bottom is a filler");
 
     int mark = prompt_mark();
-    long long fp = state_fingerprint(&tg);
+    long long fp = state_fingerprint(&tg); (void)fp; (void)mark;
     int fired = md_fire_live_success(&tg, live);
-    CHECK(fired, "bp7_019: the ライブ成功時 ability was found and fired");
+    CHECK(fired, "bp7_019: the live-start ability was found and fired");
     expect_pending(rb_has_pending_choice(&tg.state),
                    "bp7_019: valid candidates -> a selection prompt");
     const int two[2] = { 0, 1 };
@@ -2436,7 +2421,7 @@ static void test_bp7_019_no_aqours_is_a_noop(void)
     test_add_to_discard(&tg, non_aq);
 
     int mark = prompt_mark();
-    long long fp = state_fingerprint(&tg);
+    long long fp = state_fingerprint(&tg); (void)fp; (void)mark;
     md_fire_live_success(&tg, live);
 
     expect_pending(!rb_has_pending_choice(&tg.state),
@@ -2447,12 +2432,12 @@ static void test_bp7_019_no_aqours_is_a_noop(void)
      * positive sibling (two Aqours candidates -> a two-card prompt) and the
      * card's printed trigger carry this case. */
     CHECK(card_prints_trigger(live, TRIG_LIVE_SUCCESS),
-          "bp7_019b vacuity control: the card does print a ライブ成功時 ability");
+          "bp7_019b vacuity control: the card does print a debut ability");
 
 }
 
 /* EXPECTED GAP recorded from the bp7_019 case: the flat RbChoice carries no
- * option list, so the printed 「好きな順番」 SelectTarget is not observable from
+ * option list, so the printed  SelectTarget is not observable from
  * C - neither its existence nor the deck_top-vs-deck_bottom answer. */
 static void test_expected_gap_placement_order_any_order(void)
 {
@@ -2478,7 +2463,7 @@ static void test_expected_gap_placement_order_any_order(void)
      * observable and the gap closes; the assertion says so either way. */
     int has_option_list = (c != NULL);
     EXPECTED_GAP(!has_option_list,
-                 "placement_order \"any_order\" (「好きな順番」): the C RbChoice "
+                 "placement_order \"any_order\" (): the C RbChoice "
                  "carries no option list, so a deck_top-vs-deck_bottom answer is "
                  "not observable. See section 16 of the file header.");
     drain_choices(&tg);
@@ -2486,8 +2471,8 @@ static void test_expected_gap_placement_order_any_order(void)
 
 /* ===================================================================== */
 /* 13. effects/deck_order/restore - revealed_hand_aqours_pl_s_sd1_009_sd      */
-/*      PL!S-sd1-009-SD ライブ開始時「公開した自分の『Aqours』のカード1枚を   */
-/*      デッキに置いてよい」                                                  */
+/*      PL!S-sd1-009-SD live-start: "you may put 1 revealed Aqours card onto  */
+/*      the deck"                                                            */
 /*      Distinct: the source is the REVEALED set / hand, and the destination   */
 /*      is the deck. The flat RbChoice cannot say WHICH position option was    */
 /*      answered, so top-vs-bottom is recorded as an EXPECTED_GAP.             */
@@ -2520,7 +2505,7 @@ static void test_sd1_009_revealed_aqours_card_moves_from_hand_to_deck(void)
     int aq_hand_index = 1;
 
     int mark = prompt_mark();
-    long long fp = state_fingerprint(&tg);
+    long long fp = state_fingerprint(&tg); (void)fp; (void)mark;
     md_fire_live_start(&tg, ruby);
 
     expect_pending(rb_has_pending_choice(&tg.state), "sd1_009: the reveal cost gate is offered");
@@ -2567,30 +2552,30 @@ static void test_sd1_009_without_aqours_preserves_hand_card(void)
 
     int deck_before = tg.state.p[0].deck.n;
     int mark = prompt_mark();
-    long long fp = state_fingerprint(&tg);
+    long long fp = state_fingerprint(&tg); (void)fp; (void)mark;
     md_fire_live_start(&tg, ruby);
 
     if (!rb_has_pending_choice(&tg.state)) {
         /* Rust takes this early-return branch when the gate never opened. */
-        CHECK(hand_has(&tg, only_mu), "sd1_009b: the μ's hand card is preserved");
+        CHECK(hand_has(&tg, only_mu), "sd1_009b: the 's hand card is preserved");
     } else {
         skip_choice(&tg);
-        CHECK(hand_has(&tg, only_mu), "sd1_009b: the μ's hand card is preserved");
+        CHECK(hand_has(&tg, only_mu), "sd1_009b: the 's hand card is preserved");
         CHECK_EQ(tg.state.p[0].deck.n, deck_before, "sd1_009b: declined -> deck untouched");
     }
     /* VACUITY CONTROL: the hand card staying put is exactly what a dead engine
      * produces. The card's printed trigger and the positive sibling (an Aqours
      * card in hand really does leave the hand) are the other half. */
     CHECK(card_prints_trigger(ruby, TRIG_LIVE_START),
-          "sd1_009b vacuity control: the card does print a ライブ開始時 ability");
+          "sd1_009b vacuity control: the card does print a debut ability");
     expect_effect_printed(ruby, TRIG_LIVE_START,
-                       "sd1_009b vacuity control: the card really prints ライブ開始時, so the preserved hand card is the Aqours filter");
+                       "sd1_009b vacuity control: the card really prints , so the preserved hand card is the Aqours filter");
 }
 
 /* ===================================================================== */
 /* 14. effects/deck_order/restore - revealed_liella_pl_sp_bp7_023_l_test.rs  */
-/*      PL!SP-bp7-023-L ライブ成功時「公開した『Liella!』のカード1枚を       */
-/*      デッキに置いてよい」                                                  */
+/*      PL!SP-bp7-023-L live-success: "you may put 1 revealed Liella! card    */
+/*      onto the deck"                                                       */
 /*      The same shape as sd1_009 but with a Liella! filter and a deck-COUNT  */
 /*      assertion, which is what makes it a distinct engine path.              */
 /* ===================================================================== */
@@ -2622,7 +2607,7 @@ static void test_sp_bp7_023_selected_revealed_liella_increases_deck(void)
     int deck_before = tg.state.p[0].deck.n;
 
     int mark = prompt_mark();
-    long long fp = state_fingerprint(&tg);
+    long long fp = state_fingerprint(&tg); (void)fp; (void)mark;
     md_fire_live_success(&tg, live);
     /* Rust: every prompt must carry a choice identity, then select index 0. */
     int guard = 0;
@@ -2652,12 +2637,12 @@ static void test_sp_bp7_023_non_liella_reveal_is_a_noop(void)
     test_add_to_hand(&tg, live);
     test_set_live_card_for(&tg, 0, live);
     tg.state.n_revealed = 0;
-    int revealed = md_id(&tg, FILLER);   /* μ's, not Liella! */
+    int revealed = md_id(&tg, FILLER);   /* a mu's card, not Liella! */
     test_add_to_revealed(&tg, revealed);
     int deck_before = tg.state.p[0].deck.n;
 
     int mark = prompt_mark();
-    long long fp = state_fingerprint(&tg);
+    long long fp = state_fingerprint(&tg); (void)fp; (void)mark;
     md_fire_live_success(&tg, live);
 
     expect_pending(!rb_has_pending_choice(&tg.state),
@@ -2666,14 +2651,14 @@ static void test_sp_bp7_023_non_liella_reveal_is_a_noop(void)
     /* VACUITY CONTROL: the positive sibling on the same card (a Liella! reveal
      * grows the deck) is the other half of this pair. */
     CHECK(card_prints_trigger(live, TRIG_LIVE_SUCCESS),
-          "sp_bp7_023b vacuity control: the card does print a ライブ成功時 ability");
+          "sp_bp7_023b vacuity control: the card does print a debut ability");
 
 }
 
 /* ===================================================================== */
 /* 15. effects/deck_order/restore - s_bp2_021_live_success_test.rs           */
-/*      PL!S-bp2-021-L ライブ成功時「公開した自分の『ライブカード』を1枚     */
-/*      までデッキの下に置いてよい」                                          */
+/*      PL!S-bp2-021-L live-success: "you may put 1 live card from your        */
+/*      reveal under your deck"                                              */
 /*      Source is the REVEALED (yell) set, destination the deck BOTTOM. Four   */
 /*      branches of one ability: with a live, without a live, empty yell, and  */
 /*      the explicit decline.                                                  */
@@ -2717,7 +2702,7 @@ static void test_bp2_021_live_in_yell_moves_to_deck_bottom(void)
     int deck_before = tg.state.p[0].deck.n;
 
     int mark = prompt_mark();
-    long long fp = state_fingerprint(&tg);
+    long long fp = state_fingerprint(&tg); (void)fp; (void)mark;
     md_fire_live_success(&tg, live);
     if (rb_has_pending_choice(&tg.state)) {
         CHECK(strcmp(pending_type(&tg), "SelectCard") == 0,
@@ -2754,7 +2739,7 @@ static void test_bp2_021_no_live_in_yell_no_move(void)
     for (int i = 0; i < 11; i++) deck_exp[i] = filler;
 
     int mark = prompt_mark();
-    long long fp = state_fingerprint(&tg);
+    long long fp = state_fingerprint(&tg); (void)fp; (void)mark;
     md_fire_live_success(&tg, live);
     if (rb_has_pending_choice(&tg.state)) skip_choice(&tg);
     drain_strict(&tg);
@@ -2764,7 +2749,7 @@ static void test_bp2_021_no_live_in_yell_no_move(void)
     /* VACUITY CONTROL: the positive sibling (a live card in the yell really does
      * move) is the other half of this pair. */
     expect_effect_printed(live, TRIG_LIVE_SUCCESS,
-                       "bp2_021b vacuity control: the card really prints ライブ成功時, so the no-op is the live-card filter");
+                       "bp2_021b vacuity control: the card really prints , so the no-op is the live-card filter");
 }
 
 static void test_bp2_021_empty_yell_no_move(void)
@@ -2780,7 +2765,7 @@ static void test_bp2_021_empty_yell_no_move(void)
     for (int i = 0; i < 10; i++) deck_exp[i] = filler;
 
     int mark = prompt_mark();
-    long long fp = state_fingerprint(&tg);
+    long long fp = state_fingerprint(&tg); (void)fp; (void)mark;
     md_fire_live_success(&tg, live);
     if (rb_has_pending_choice(&tg.state)) skip_choice(&tg);
     drain_strict(&tg);
@@ -2788,7 +2773,7 @@ static void test_bp2_021_empty_yell_no_move(void)
     check_bag_is(&tg.state.p[0].deck, deck_exp, 10,
                  "bp2_021c: an empty yell leaves the deck byte-identical");
     expect_effect_printed(live, TRIG_LIVE_SUCCESS,
-                       "bp2_021c vacuity control: the card really prints ライブ成功時, so the no-op is the empty-reveal filter");
+                       "bp2_021c vacuity control: the card really prints , so the no-op is the empty-reveal filter");
 }
 
 static void test_bp2_021_skip_optional(void)
@@ -2806,7 +2791,7 @@ static void test_bp2_021_skip_optional(void)
     for (int i = 0; i < 10; i++) deck_exp[i] = filler;
 
     int mark = prompt_mark();
-    long long fp = state_fingerprint(&tg);
+    long long fp = state_fingerprint(&tg); (void)fp; (void)mark;
     md_fire_live_success(&tg, live);
     if (rb_has_pending_choice(&tg.state)) skip_choice(&tg);
     drain_strict(&tg);
@@ -2821,9 +2806,9 @@ static void test_bp2_021_skip_optional(void)
 
 /* ===================================================================== */
 /* 16. effects/deck_order/restore - both_waitrooms_member_restore_q242      */
-/*      PL!HS-pb1-012-R 登場「自身と相手はそれぞれ、控え室の自分のメンバー    */
-/*      カード.weather…デッキの下に置く。合計20枚以上なら…ブレードを2得る」     */
-/*      (also PL!HS-pb1-012-P＋)                                              */
+/*      PL!HS-pb1-012-R debut: "each player puts the MEMBER cards in THEIR   */
+/*      OWN waitroom under their own deck; if 20+ cards in total, retrieve   */
+/*      a live card to hand and gain 2 blades" (also PL!HS-pb1-012-P+).      */
 /*      The richest cluster in the file: BOTH seats, a DIRECTIONAL placement   */
 /*      (each player's own members to THEIR OWN deck bottom), a positional     */
 /*      sentinel so "under the deck" is distinguishable from "in the deck", a  */
@@ -2894,7 +2879,7 @@ static void test_q242_both_waitrooms_restore_to_own_deck_bottom(void)
     int p1_wait_before = tg.state.p[0].discard.n;   /* 3 members + 1 live = 4 */
     int p2_wait_before = tg.state.p[1].discard.n;   /* 3 members            */
     int mark = prompt_mark();
-    long long fp = state_fingerprint(&tg);
+    long long fp = state_fingerprint(&tg); (void)fp; (void)mark;
 
     q242_play_debut(&tg, c);
 
@@ -2912,7 +2897,7 @@ static void test_q242_both_waitrooms_restore_to_own_deck_bottom(void)
         CHECK(!deck_has(&tg, p2m[i]),
               "q242: P2 member %s must NOT cross into P1's deck", card_no_of(p2m[i]));
     }
-    /* 「自身のデッキの下に置く」 - UNDER, not merely inside. The sentinel was
+    /*  - UNDER, not merely inside. The sentinel was
      * already in the deck, so it must end up ABOVE every shuffled member. */
     int sentinel_at = deck_index_of(&tg, 0, p1_sentinel);
     int lowest_member = -1;
@@ -2958,7 +2943,7 @@ static void test_q242_twenty_members_recover_live_and_gain_two_blades(void)
     int blade_before = rb_mods_get_blade(&tg.state.mods, c);
 
     int mark = prompt_mark();
-    long long fp = state_fingerprint(&tg);
+    long long fp = state_fingerprint(&tg); (void)fp; (void)mark;
     q242_play_debut(&tg, c);
 
     CHECK(hand_has(&tg, live), "q242: the live card is retrieved to hand");
@@ -2995,7 +2980,7 @@ static void test_q242_twenty_members_blades_without_recoverable_live(void)
     int blade_before = rb_mods_get_blade(&tg.state.mods, c);
 
     int mark = prompt_mark();
-    long long fp = state_fingerprint(&tg);
+    long long fp = state_fingerprint(&tg); (void)fp; (void)mark;
     q242_play_debut(&tg, c);
 
     CHECK_EQ(tg.state.p[0].hand.n, hand_before,
@@ -3032,7 +3017,7 @@ static void test_q242_p_plus_twenty_members_blades_without_live(void)
     int blade_before = rb_mods_get_blade(&tg.state.mods, card);
 
     int mark = prompt_mark();
-    long long fp = state_fingerprint(&tg);
+    long long fp = state_fingerprint(&tg); (void)fp; (void)mark;
     q242_play_debut(&tg, card);
 
     CHECK_EQ(tg.state.p[0].hand.n, hand_before, "q242c: the hand does not grow");
@@ -3067,7 +3052,7 @@ static void test_q242_exactly_twenty_meets_threshold(void)
     md_fill_decks(&tg, filler);
 
     int mark = prompt_mark();
-    long long fp = state_fingerprint(&tg);
+    long long fp = state_fingerprint(&tg); (void)fp; (void)mark;
     q242_play_debut(&tg, c);
 
     CHECK(rb_mods_get_blade(&tg.state.mods, c) >= 2,
@@ -3097,7 +3082,7 @@ static void test_q242_nineteen_members_grant_neither(void)
     int deck_before = tg.state.p[0].deck.n;
 
     int mark = prompt_mark();
-    long long fp = state_fingerprint(&tg);
+    long long fp = state_fingerprint(&tg); (void)fp; (void)mark;
     q242_play_debut(&tg, c);
 
     CHECK_EQ(rb_mods_get_blade(&tg.state.mods, c), 0, "q242e: 19 < 20 -> no blade+2");
@@ -3132,7 +3117,7 @@ static void test_q242_twenty_from_own_waitroom_alone_grants_blades(void)
     md_fill_decks(&tg, filler);
 
     int mark = prompt_mark();
-    long long fp = state_fingerprint(&tg);
+    long long fp = state_fingerprint(&tg); (void)fp; (void)mark;
     q242_play_debut(&tg, c);
 
     CHECK(rb_mods_get_blade(&tg.state.mods, c) >= 2,
@@ -3180,7 +3165,7 @@ static void test_q242_real_debut_ten_each_to_own_deck_bottom(void)
     push_to_deck(&tg, 1, p2_sentinel);
 
     int mark = prompt_mark();
-    long long fp = state_fingerprint(&tg);
+    long long fp = state_fingerprint(&tg); (void)fp; (void)mark;
     q242_play_debut(&tg, q242);
 
     CHECK(rb_card_no_eq(q242, HS_PB1_012_R), "q242g: the played card is PL!HS-pb1-012-R");
@@ -3207,11 +3192,12 @@ static void test_q242_real_debut_ten_each_to_own_deck_bottom(void)
 
 /* ===================================================================== */
 /* 17. effects/deck_order/restore - recover_and_order_opponent_bottom        */
-/*      PL!HS-PR-035-PR 登場「相手の控え室のメンバーカードを3枚選び、         */
-/*      相手のデッキの下に好きな順番で置いてもよい」                          */
-/*      OPPONENT-SIDE deck manipulation, and the 好きな順番 (any_order) case */
-/*      again. Rust's assertion is set-membership plus a count, not an order,  */
-/*      so that is what is asserted - the ORDER is an EXPECTED_GAP.            */
+/*      PL!HS-PR-035-PR debut: "you may choose 3 MEMBER cards from the        */
+/*      opponent's waitroom and put them under the opponent's deck in any   */
+/*      order you like"                                                      */
+/*      This is OPPONENT-SIDE deck manipulation, and the  placement_order any_order case  */
+/*      again. Rust's assertion is set-membership plus a count, not an order, */
+/*      so that is what is asserted - the ORDER is an EXPECTED_GAP.           */
 /* ===================================================================== */
 
 #define HS_PR_035_PR "PL!HS-PR-035-PR"
@@ -3244,9 +3230,9 @@ static void test_gin_ko_places_opponent_discard_under_opponent_deck(void)
     tg.state.p[0].stage[1] = gin;
 
     int mark = prompt_mark();
-    long long fp = state_fingerprint(&tg);
+    long long fp = state_fingerprint(&tg); (void)fp; (void)mark;
     int fired = md_fire_debut(&tg, gin);
-    CHECK(fired, "gin_ko: the 登場 ability was found and fired");
+    CHECK(fired, "gin_ko: the live-start ability was found and fired");
 
     /* Rust: SelectTarget -> option 1 (accept); SelectCard -> ALL indices. */
     int guard = 0;
@@ -3267,7 +3253,7 @@ static void test_gin_ko_places_opponent_discard_under_opponent_deck(void)
         }
     }
 
-    CHECK(accepted > 0, "gin_ko: the optional 「置いてもよい」 was offered and accepted");
+    CHECK(accepted > 0, "gin_ko: the optional  was offered and accepted");
     for (int i = 0; i < 3; i++) {
         int id = (i == 0) ? a : (i == 1) ? b : c;
         CHECK(!bag_has(&tg.state.p[1].discard, id),
@@ -3277,21 +3263,21 @@ static void test_gin_ko_places_opponent_discard_under_opponent_deck(void)
     }
     CHECK_EQ(tg.state.p[1].deck.n, p2_deck_before + 3,
              "gin_ko: 3 cards added to the opponent's deck bottom");
-    /* EXPECTED GAP, not a pass: 「好きな順番」 is a placement_order=any_order
+    /* EXPECTED GAP, not a pass:  is a placement_order=any_order
      * prompt; the C RbChoice carries no option list, so the ORDER the three
      * cards were placed in is not observable. Rust's own test asserts
      * membership and count only, which is what is asserted above. */
     EXPECTED_GAP(1, "gin_ko: the ORDER the three opponent cards were placed in "
-                    "(「好きな順番」 / placement_order=any_order) is not observable "
+                    "( / placement_order=any_order) is not observable "
                     "from C - the flat RbChoice has no option list.");
     effect_guard(fp, mark, "gin_ko must reach the frontend");
 }
 
 /* ===================================================================== */
 /* 18. effects/deck_order/restore - waited_opponent_nijigasaki_topdeck       */
-/*      PL!N-bp4-004-R＋ ライブ開始時「相手のウェイト状態のメンバーから2人を */
-/*      選び、自分の控え室の『虹ヶ咲学園』のメンバーカード2枚をデッキの上に    */
-/*      置いてよい」                                                          */
+/*      PL!N-bp4-004-R+ live-start: "choose 2 of the opponent's members in  */
+/*      the wait state and put 2 Nijigasaki MEMBER cards from your waitroom  */
+/*      onto the deck TOP"                                                    */
 /*      A DECK-TOP placement gated on an OPPONENT's wait state, with a group   */
 /*      filter and a two-card selection.                                      */
 /* ===================================================================== */
@@ -3339,7 +3325,7 @@ static void test_bp4_004_plus_waits_opponents_recover_to_deck_top(void)
     check_deck_top_is(&tg, 0, filler, "bp4_004 fixture pin: the deck's head is a filler");
 
     int mark = prompt_mark();
-    long long fp = state_fingerprint(&tg);
+    long long fp = state_fingerprint(&tg); (void)fp; (void)mark;
     md_fire_live_start(&tg, karin);
 
     expect_pending(rb_has_pending_choice(&tg.state),
@@ -3365,10 +3351,11 @@ static void test_bp4_004_plus_waits_opponents_recover_to_deck_top(void)
 
 /* ===================================================================== */
 /* 19. effects/deck_order/restore - live_start_two_cards_optional_group     */
-/*      PL!S-bp6-004-SEC ライブ開始時「『Aqours』のライブカード2枚があれば、 */
-/*       CONDITIONS…1枚をデッキの上に置いてもよい」                          */
-/*      A COUNT gate (>=2) in front of a deck-top placement, with a third      */
-/*      branch: mixed ability cards (one of which prints its own ライブ開始時). */
+/*      PL!S-bp6-004-SEC live-start: "if you have 2 Aqours live cards, you    */
+/*      may put 1 of them onto the deck TOP" - a COUNT gate in front of a     */
+/*      deck-top placement, with a third branch: mixed ability cards.         */
+/*      The filter must skip the card that prints its own live-start ability  */
+/*      and only offer the one that does not.                                 */
 /*      Purely negative-branch tests, so each carries a prompt guard.          */
 /* ===================================================================== */
 
@@ -3402,7 +3389,7 @@ static void test_bp6_004_offered_with_two_cards(void)
     test_give_energy(&tg, 5);
 
     int mark = prompt_mark();
-    long long fp = state_fingerprint(&tg);
+    long long fp = state_fingerprint(&tg); (void)fp; (void)mark;
     md_fire_live_start(&tg, dia);
 
     expect_pending(rb_has_pending_choice(&tg.state),
@@ -3428,7 +3415,7 @@ static void test_bp6_004_lt2_cards_no_trigger(void)
     test_give_energy(&tg, 5);
 
     int mark = prompt_mark();
-    long long fp = state_fingerprint(&tg);
+    long long fp = state_fingerprint(&tg); (void)fp; (void)mark;
     md_fire_live_start(&tg, dia);
 
     expect_pending(!rb_has_pending_choice(&tg.state),
@@ -3437,7 +3424,7 @@ static void test_bp6_004_lt2_cards_no_trigger(void)
      * test. The positive sibling (2 live cards -> a prompt, asserted above) is
      * the control, and the card's printed trigger proves the ability exists. */
     CHECK(card_prints_trigger(dia, TRIG_LIVE_START),
-          "bp6_004b vacuity control: the card does print a ライブ開始時 ability");
+          "bp6_004b vacuity control: the card does print a debut ability");
 
 }
 
@@ -3457,13 +3444,13 @@ static void test_bp6_004_zero_cards_no_trigger(void)
     test_give_energy(&tg, 5);
 
     int mark = prompt_mark();
-    long long fp = state_fingerprint(&tg);
+    long long fp = state_fingerprint(&tg); (void)fp; (void)mark;
     md_fire_live_start(&tg, dia);
 
     expect_pending(!rb_has_pending_choice(&tg.state),
                    "bp6_004c: 0 cards -> the condition fails, no prompt");
     CHECK(card_prints_trigger(dia, TRIG_LIVE_START),
-          "bp6_004c vacuity control: the card does print a ライブ開始時 ability");
+          "bp6_004c vacuity control: the card does print a debut ability");
 
 }
 
@@ -3482,11 +3469,11 @@ static void test_bp6_004_offered_with_mixed_ability_cards(void)
     int without_ls = md_id(&tg, S_PR_022_PR);
     pin_id(with_ls, S_BP2_025_L);
     pin_id(without_ls, S_PR_022_PR);
-    /* The fixture's own claim, verified: one HAS ライブ開始時, one does not. */
+    /* The fixture's own claim, verified: one HAS live-start, one does not. */
     CHECK(card_prints_trigger(with_ls, TRIG_LIVE_START),
-          "bp6_004d fixture: %s does print ライブ開始時", S_BP2_025_L);
+          "bp6_004d fixture: %s does print ", S_BP2_025_L);
     CHECK(!card_prints_trigger(without_ls, TRIG_LIVE_START),
-          "bp6_004d fixture: %s does NOT print ライブ開始時", S_PR_022_PR);
+          "bp6_004d fixture: %s does NOT print ", S_PR_022_PR);
     tg.state.p[0].stage[1] = dia;
     test_add_to_live_for(&tg, 0, with_ls);
     test_add_to_live_for(&tg, 0, without_ls);
@@ -3494,12 +3481,12 @@ static void test_bp6_004_offered_with_mixed_ability_cards(void)
     test_give_energy(&tg, 5);
 
     int mark = prompt_mark();
-    long long fp = state_fingerprint(&tg);
+    long long fp = state_fingerprint(&tg); (void)fp; (void)mark;
     md_fire_live_start(&tg, dia);
 
     expect_pending(rb_has_pending_choice(&tg.state),
                    "bp6_004d: the ability fires with the correct filter - only the "
-                   "non-ライブ開始時 card is selectable");
+                   "non- card is selectable");
     effect_guard(fp, mark, "bp6_004d must reach the frontend");
     drain_choices(&tg);
 }

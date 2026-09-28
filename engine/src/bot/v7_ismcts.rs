@@ -1358,6 +1358,67 @@ fn action_label(actions: &[Action], index: usize) -> String {
 /// check, and no ability sequencing beyond "does this ability move v7's
 /// feature vector right now". It is a much weaker player than the bot it is
 /// being used to overrule.
+/// Per-class value of an ability, in v7's own score units where a good member
+/// deploy is worth roughly 50-165 and `Pass` is 0.0.
+///
+/// Blades and hearts are the most valuable because they are the currency the
+/// check reads (blades are the deck draws the check gets to see), so `Power`
+/// is priced above tempo. `Inactive` is negative on purpose: an ability we
+/// could not read is one whose repetition risk we cannot price, and refusing
+/// it is the safe side of that.
+pub(crate) fn class_value(class: crate::bot::strategy_v7::AbilityClass) -> f64 {
+    use crate::bot::strategy_v7::AbilityClass;
+    match class {
+        AbilityClass::Power => 120.0,
+        AbilityClass::Tempo => 80.0,
+        AbilityClass::Energy => 55.0,
+        AbilityClass::Score => 45.0,
+        AbilityClass::Disposal => 15.0,
+        AbilityClass::Inactive => -40.0,
+        // Automatic abilities are free and unavoidable; they are not a
+        // decision, so they must not buy a Main-phase action.
+        AbilityClass::Automatic => -60.0,
+    }
+}
+
+/// Should v7 spend a Main-phase action on this ability at all?
+///
+/// Binary, per ability, with no coefficient anywhere — replacing a per-class
+/// weight that was pure tuning slop and measured as a regression even with the
+/// draw gate on (831-669 vs a 910-590 baseline, p=0.00001). A coefficient on
+/// "Power is worth 120" is a number fitted to the arena; the printed card
+/// already says what the ability IS, so the decision should be read off it.
+///
+/// The two rules, from the card markers:
+///
+/// 1. `{{常時}}` / `{{自動}}` / `{{常駐}}` — always / automatic / resident.
+///    These resolve on their own. Spending a member (or a Main-phase turn) to
+///    "use" one is a category error: the effect happens whether or not anyone
+///    decides anything. v7's favourite ability — 46 of 65 uses in one run — is
+///    in this family. Refuse.
+///
+/// 2. `{{起動}}` — activation. The only kind a player chooses. Spend it only if
+///    it produces something the check or the curve cares about: blades (the
+///    check's draw count), hearts, a draw, or a search. An activation that
+///    resolves to no recognisable production is the Rule 12-1 hazard the
+///    no-op gate also catches, but this catches it *before* execution.
+///
+/// `Disposal` is allowed but not encouraged: discarding a dead card is hygiene
+/// that the live-zone junk fill already does for free under 8.3.4, so spending
+/// a member for it is strictly worse.
+pub fn ability_is_worth_spending(class: crate::bot::strategy_v7::AbilityClass) -> bool {
+    use crate::bot::strategy_v7::AbilityClass;
+    match class {
+        // Never: it resolves on its own.
+        AbilityClass::Automatic => false,
+        // Never: no recognisable production, and the live zone already disposes
+        // of dead cards without costing a member.
+        AbilityClass::Inactive | AbilityClass::Disposal => false,
+        // Yes: each of these produces something the game reads.
+        AbilityClass::Power | AbilityClass::Tempo | AbilityClass::Energy | AbilityClass::Score => true,
+    }
+}
+
 pub fn choose_rollout_policy(gs: &GameState, actions: &[Action], me: u8) -> Action {
     rollout_action(gs, actions, me, true)
 }

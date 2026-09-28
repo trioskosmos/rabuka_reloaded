@@ -139,19 +139,34 @@ pub struct CardDisplay {
     // ── Additive bonuses (ModifyBlade, GainResource blade) ──
     // Shows icon_blade.png with "+N" or "-N"
     //
-    // Every numeric field from here to `set_cost` is an `i16` for one shared
-    // reason: each is a projected `ModifierEntry` total or set value, so the
-    // engine's own storage width is the exact width. They were `i32` because
-    // `ModifierEntry::total()` used to widen, and the type stuck after the
-    // value stopped needing it. On the wire they are unchanged — serde emits
-    // the same JSON number for an i16 as for an i32.
+    // Every numeric badge field from here down is an `i8`, for one shared
+    // reason: each is a projected `ModifierEntry` total or set value — a delta
+    // on a printed stat, not a computed total. They were `i32` because
+    // `ModifierEntry::total()` used to widen, and then `i16` because that is
+    // the engine's storage width. `i8` is the width the VALUE actually has:
+    // the largest single modifier anywhere in `abilities.json` is 17, and
+    // these are render-only figures for a badge on one card.
+    //
+    // The narrowing is CLAMPING, never `as`. An `as i8` on a value past 127
+    // would wrap to a negative number and render as e.g. "-129 Blade"; the
+    // `i8_count()` used when building these clamps to 127 instead, so the
+    // badge shows the largest meaningful figure. The engine's own i16 values
+    // are untouched, so nothing about the rules depends on this.
+    //
+    // On the wire they are unchanged — serde emits the same JSON number for an
+    // i8 as for an i32.
     #[cfg_attr(feature = "serde_support", serde(default))]
-    pub bonus_blade: i16,
+    pub bonus_blade: i8,
 
     // ── Additive heart bonuses (ModifyHeart, GainResource heart) ──
     // Shows per-color heart icons with "+N" or "-N"
+    //
+    // `Vec<i8>` rather than `Vec<i16>`: a heart requirement is 0..=6, so
+    // these halve the per-card heap for the same reason the scalars above
+    // are `i8`. This vector is allocated per card, per zone, per display
+    // refresh — it is the hottest allocation in the display path.
     #[cfg_attr(feature = "serde_support", serde(default))]
-    pub bonus_hearts: Vec<i16>,
+    pub bonus_hearts: Vec<i8>,
 
     // ── Additive score bonus (ModifyScore, GainAbility score) ──
     // Shows icon_score.png with "+N" or "-N"
@@ -159,34 +174,34 @@ pub struct CardDisplay {
     // recalculate_constants → score_modifier, but does NOT add a
     // jyouji.png trigger icon. The trigger type is in bonus_triggers.
     #[cfg_attr(feature = "serde_support", serde(default))]
-    pub bonus_score: i16,
+    pub bonus_score: i8,
 
     // ── Additive cost modifier (ModifyCost) ──
     // Shows icon_energy.png with "+N" or "-N"
     #[cfg_attr(feature = "serde_support", serde(default))]
-    pub bonus_cost: i16,
+    pub bonus_cost: i8,
 
     // ── Set/override blade (SetBladeCount, SetBladeType) ──
     // Shows icon_blade.png with plain "N" (no +/-)
     // Separate from bonus_blade so both can appear simultaneously:
     // e.g. set_blade=5 (base) + bonus_blade=+2 (modifier)
     #[cfg_attr(feature = "serde_support", serde(default))]
-    pub set_blade: i16,
+    pub set_blade: i8,
 
     // ── Set/override hearts (SetHeartType) ──
     // Shows per-color heart icons with plain "N" (no +/-)
     #[cfg_attr(feature = "serde_support", serde(default))]
-    pub set_hearts: Vec<i16>,
+    pub set_hearts: Vec<i8>,
 
     // ── Set/override score (SetScore) ──
     // Shows icon_score.png with plain "N" (no +/-)
     #[cfg_attr(feature = "serde_support", serde(default))]
-    pub set_score: i16,
+    pub set_score: i8,
 
     // ── Set/override cost (SetCost, SetCostToUse) ──
     // Shows icon_energy.png with plain "N" (no +/-)
     #[cfg_attr(feature = "serde_support", serde(default))]
-    pub set_cost: i16,
+    pub set_cost: i8,
 
     // ── Gained ability trigger texticons (GainAbility) ──
     // Populated from gained_card_abilities in game_state_to_display.
@@ -244,22 +259,25 @@ pub struct PlayerDisplay {
     pub gained_abilities: Vec<String>,
     #[cfg_attr(feature = "serde_support", serde(default))]
     pub active_restrictions: Vec<String>,
+    // Same reasoning as the per-card badge fields on `CardDisplay`: these are
+    // projected modifier values rendered as figures, so they are `i8` and are
+    // clamped (never `as`-truncated) at the point they are built.
     #[cfg_attr(feature = "serde_support", serde(default))]
-    pub need_heart_modifiers: HashMap<String, Vec<i16>>,
+    pub need_heart_modifiers: HashMap<String, Vec<i8>>,
     #[cfg_attr(feature = "serde_support", serde(default))]
     pub mulligan_selection: Option<Vec<usize>>,
     #[cfg_attr(feature = "serde_support", serde(default))]
     pub live_card_selection: Option<Vec<usize>>,
     #[cfg_attr(feature = "serde_support", serde(default))]
-    pub blade_buffs: Vec<i16>,
+    pub blade_buffs: Vec<i8>,
     #[cfg_attr(feature = "serde_support", serde(default))]
-    pub heart_buffs: Vec<Vec<i16>>,
+    pub heart_buffs: Vec<Vec<i8>>,
     #[cfg_attr(feature = "serde_support", serde(default))]
-    pub cost_reduction: i16,
+    pub cost_reduction: i8,
     #[cfg_attr(feature = "serde_support", serde(default))]
-    pub prevent_baton_touch: i16,
+    pub prevent_baton_touch: i8,
     #[cfg_attr(feature = "serde_support", serde(default))]
-    pub prevent_baton: i16,
+    pub prevent_baton: i8,
     #[cfg_attr(feature = "serde_support", serde(default))]
     pub deployed_this_turn: Vec<i16>,
     #[cfg_attr(feature = "serde_support", serde(default))]
@@ -585,6 +603,7 @@ pub fn card_to_display(
     orientation: Option<Orientation>,
     blade_modifier: i16,
 ) -> Option<CardDisplay> {
+    use crate::constants::CountCast;
     card_db.get_card(card_id).map(|card| {
         let base_heart = card.base_heart.as_ref().map(|bh| {
             bh.hearts
@@ -611,7 +630,7 @@ pub fn card_to_display(
             },
             id: card_id,
             ability_text: Some(card.ability_text().to_string()),
-            bonus_blade: blade_modifier,
+            bonus_blade: blade_modifier.i8_count(),
             bonus_hearts: Vec::new(),
             bonus_score: 0,
             bonus_cost: 0,
@@ -671,23 +690,25 @@ pub fn card_to_display(
 /// card absent from a table yields an empty map, and a borrow of that
 /// temporary would not outlive the call.
 ///
-/// Every figure is `i16`, because every figure here IS a `ModifierEntry`
-/// total or set value pulled straight out of the modifier tables. Widening
-/// them to `i32` on the way out only bought a `try_from` on the way into JSON.
+/// Every figure is `i8`: each one IS a `ModifierEntry` total or set value
+/// pulled straight out of the modifier tables, and the largest single modifier
+/// in `abilities.json` is 17. The maps stay `i16` (the engine's own width) —
+/// this struct is the CLAMPING point, so a pathological accumulated value
+/// saturates at ±127 here instead of wrapping into a wrong-signed badge.
 pub struct CardFigures {
     /// Additive modifiers (accumulated via `add_*` / `+=`) — shown with a
     /// +/- prefix.
-    pub blade: i16,
-    pub score: i16,
-    pub heart: HashMap<crate::card::HeartColor, i16>,
-    pub cost: i16,
+    pub blade: i8,
+    pub score: i8,
+    pub heart: HashMap<crate::card::HeartColor, i8>,
+    pub cost: i8,
     /// Absolute set/override modifiers (set via `set_*`) — shown without a
     /// +/- prefix. A non-zero value replaces the printed figure outright
     /// rather than adjusting it.
-    pub blade_set: i16,
-    pub score_set: i16,
-    pub heart_set: HashMap<crate::card::HeartColor, i16>,
-    pub cost_set: i16,
+    pub blade_set: i8,
+    pub score_set: i8,
+    pub heart_set: HashMap<crate::card::HeartColor, i8>,
+    pub cost_set: i8,
     /// 「ハートをXに変える」 — the whole heart set becomes this colour.
     pub heart_transform: Option<crate::card::HeartColor>,
     /// Trigger texticon badges for gained abilities (e.g. "jyouji").
@@ -712,19 +733,43 @@ pub struct DisplayModifiers<'a> {
     pub bonus_triggers: &'a HashMap<i16, Vec<String>>,
 }
 
+/// Clamp a per-colour heart modifier table from the engine's `i16` to the
+/// `i8` the display renders. An absent card yields an empty map, which is what
+/// "no heart modifiers" means.
+fn clamp_heart_map(
+    src: Option<&HashMap<crate::card::HeartColor, i16>>,
+) -> HashMap<crate::card::HeartColor, i8> {
+    use crate::constants::CountCast;
+    src.map(|m| {
+        m.iter()
+            .map(|(&c, &v)| (c, v.i8_count()))
+            .collect()
+    })
+    .unwrap_or_default()
+}
+
 impl DisplayModifiers<'_> {
     /// The figures for `card_id`. A card absent from every table gets zeros,
     /// which is exactly what having no modifiers means.
+    ///
+    /// This is THE narrowing point from the engine's `i16` modifier tables to
+    /// the `i8` figures `CardFigures` carries for rendering. Every value
+    /// crosses here and nowhere else, which is what makes the saturating
+    /// behaviour a property of one function instead of a property to check at
+    /// each of a dozen assignment sites. `i8_count` clamps; an `as i8` would
+    /// wrap, and a wrapped modifier flips the SIGN of a badge — a 200-point
+    /// blade bonus rendering as "-56 Blade", which reads as a penalty.
     fn of(&self, card_id: i16) -> CardFigures {
+        use crate::constants::CountCast;
         CardFigures {
-            blade: self.blade_additive.get(&card_id).copied().unwrap_or(0),
-            score: self.score_additive.get(&card_id).copied().unwrap_or(0),
-            heart: self.heart_additive.get(&card_id).cloned().unwrap_or_default(),
-            cost: self.cost_additive.get(&card_id).copied().unwrap_or(0),
-            blade_set: self.blade_set.get(&card_id).copied().unwrap_or(0),
-            score_set: self.score_set.get(&card_id).copied().unwrap_or(0),
-            heart_set: self.heart_set.get(&card_id).cloned().unwrap_or_default(),
-            cost_set: self.cost_set.get(&card_id).copied().unwrap_or(0),
+            blade: self.blade_additive.get(&card_id).copied().unwrap_or(0).i8_count(),
+            score: self.score_additive.get(&card_id).copied().unwrap_or(0).i8_count(),
+            heart: clamp_heart_map(self.heart_additive.get(&card_id)),
+            cost: self.cost_additive.get(&card_id).copied().unwrap_or(0).i8_count(),
+            blade_set: self.blade_set.get(&card_id).copied().unwrap_or(0).i8_count(),
+            score_set: self.score_set.get(&card_id).copied().unwrap_or(0).i8_count(),
+            heart_set: clamp_heart_map(self.heart_set.get(&card_id)),
+            cost_set: self.cost_set.get(&card_id).copied().unwrap_or(0).i8_count(),
             heart_transform: self.heart_color_multiplier.get(&card_id).copied(),
             bonus_triggers: self
                 .bonus_triggers
@@ -762,14 +807,14 @@ pub fn card_to_display_full(
                 .collect()
         });
         // Additive hearts (shown with +/-)
-        let mut bonus_hearts = vec![0i16; 8];
+        let mut bonus_hearts = vec![0i8; 8];
         for (color, val) in heart_additive {
             if let Some(idx) = heart_color_index(color) {
                 bonus_hearts[idx] = bonus_hearts[idx].saturating_add(*val);
             }
         }
         // Set/override hearts (shown without +/-)
-        let mut set_hearts = vec![0i16; 8];
+        let mut set_hearts = vec![0i8; 8];
         for (color, val) in heart_set {
             if let Some(idx) = heart_color_index(color) {
                 set_hearts[idx] = set_hearts[idx].saturating_add(*val);
@@ -778,10 +823,15 @@ pub fn card_to_display_full(
         // A non-zero set replaces the printed blade outright, so the two are
         // selected rather than added — otherwise a set of 5 plus a +2 additive
         // would report 7 blades instead of 5.
+        //
+        // `CardFigures` is already clamped to `i8`, so widening back to `i16`
+        // here is lossless and `i16::from` is exact. The helpers stay typed on
+        // the engine's width.
+        let (blade_set_i16, blade_additive_i16) = (i16::from(blade_set), i16::from(blade_additive));
         let total_blade = if blade_set != 0 {
-            crate::constants::overridden_stat(blade_set, blade_additive)
+            crate::constants::overridden_stat(blade_set_i16, blade_additive_i16)
         } else {
-            crate::constants::effective_stat(card.blade, blade_additive)
+            crate::constants::effective_stat(card.blade, blade_additive_i16)
         };
         let transform_str = heart_transform.map(|hc| hc.as_str().to_string());
         CardDisplay {
@@ -1136,10 +1186,11 @@ pub fn player_to_display(
             || player.success_live_card_zone.cards.contains(&cid)
         {
             if let Some(card) = card_db.get_card(cid) {
-                let mut arr = vec![0i16; 8];
+                use crate::constants::CountCast;
+                let mut arr = vec![0i8; 8];
                 for (color, &val) in colors {
                     if let Some(idx) = heart_color_index(color) {
-                        arr[idx] = val;
+                        arr[idx] = val.i8_count();
                     }
                 }
                 nh_mods.insert(card.card_no.to_string(), arr);
@@ -1265,13 +1316,21 @@ pub fn player_to_display(
         mulligan_selection: mulligan_selection.map(|v| v.to_vec()),
         live_card_selection: live_card_selection.map(|v| v.to_vec()),
         // Derive display fields from existing modifier data
+        //
+        // Both clamp from the engine's `i16` tables into the `i8` the display
+        // renders, via `i8_count`. The per-colour Heart01..Heart06 → index
+        // mapping is spelled out rather than calling `heart_color_index`,
+        // because this vec is 6 wide (six real colours) while the badge
+        // vectors above are 8 (including Heart00 and All) — a shared helper
+        // would silently index the wrong array.
         blade_buffs: player
             .stage
             .stage
             .iter()
             .map(|&cid| {
+                use crate::constants::CountCast;
                 if cid != -1 {
-                    *blade_modifiers.get(&cid).unwrap_or(&0)
+                    blade_modifiers.get(&cid).copied().unwrap_or(0).i8_count()
                 } else {
                     0
                 }
@@ -1282,10 +1341,11 @@ pub fn player_to_display(
             .stage
             .iter()
             .map(|&cid| {
+                use crate::constants::CountCast;
                 if cid == -1 {
-                    return vec![0i16; 6];
+                    return vec![0i8; 6];
                 }
-                let mut arr = vec![0i16; 6];
+                let mut arr = vec![0i8; 6];
                 if let Some(card_hm) = heart_modifiers.get(&cid) {
                     for (color, modifier) in card_hm {
                         let idx = match color {
@@ -1297,7 +1357,7 @@ pub fn player_to_display(
                             crate::card::HeartColor::Heart06 => 5,
                             _ => continue,
                         };
-                        arr[idx] = *modifier;
+                        arr[idx] = (*modifier).i8_count();
                     }
                 }
                 arr

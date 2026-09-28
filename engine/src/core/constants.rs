@@ -131,6 +131,15 @@ pub trait CountCast {
     fn u64_count(self) -> u64;
     fn i32_count(self) -> i32;
     fn i16_count(self) -> i16;
+    /// Narrow to the width a render-only badge actually needs.
+    ///
+    /// Added for the display layer, where a projected modifier is drawn as a
+    /// figure and so does not need the engine's `i16`. It CLAMPS at both
+    /// ends. That distinction is the whole point of the method: `x as i8`
+    /// would wrap a value past 127 into a negative number and render, say,
+    /// "-129 Blade" — a wrong sign, not a wrong magnitude. Clamping degrades
+    /// to "127", which is still a truthful badge.
+    fn i8_count(self) -> i8;
     fn usize_count(self) -> usize;
 }
 
@@ -158,6 +167,12 @@ impl CountCast for usize {
     #[inline]
     fn i16_count(self) -> i16 {
         i16::try_from(self).unwrap_or(i16::MAX)
+    }
+    #[inline]
+    fn i8_count(self) -> i8 {
+        // A `usize` has no sign, so the lower clamp is a no-op and only the
+        // upper one can bite.
+        i8::try_from(self.min(usize::from(u8::MAX))).unwrap_or(i8::MAX)
     }
     #[inline]
     fn usize_count(self) -> usize {
@@ -191,6 +206,10 @@ impl CountCast for i32 {
         i16::try_from(self.clamp(i32::from(i16::MIN), i32::from(i16::MAX))).unwrap()
     }
     #[inline]
+    fn i8_count(self) -> i8 {
+        i8::try_from(self.clamp(i32::from(i8::MIN), i32::from(i8::MAX))).unwrap()
+    }
+    #[inline]
     fn usize_count(self) -> usize {
         usize::try_from(self).unwrap_or(0)
     }
@@ -220,6 +239,10 @@ impl CountCast for i16 {
     #[inline]
     fn i16_count(self) -> i16 {
         self
+    }
+    #[inline]
+    fn i8_count(self) -> i8 {
+        self.clamp(i16::from(i8::MIN), i16::from(i8::MAX)) as i8
     }
     #[inline]
     fn usize_count(self) -> usize {
@@ -253,6 +276,14 @@ impl CountCast for u8 {
         i16::from(self)
     }
     #[inline]
+    fn i8_count(self) -> i8 {
+        // A `u8` spans 0..=255 but an `i8` only reaches 127, so this DOES have
+        // to clamp at the top — values above 127 saturate rather than wrapping
+        // to a negative. There is no `From<u8> for i8` precisely because that
+        // conversion is not always valid.
+        i8::try_from(self.min(u8::try_from(i8::MAX).unwrap())).unwrap_or(i8::MAX)
+    }
+    #[inline]
     fn usize_count(self) -> usize {
         usize::from(self)
     }
@@ -282,6 +313,10 @@ impl CountCast for i64 {
     #[inline]
     fn i16_count(self) -> i16 {
         i16::try_from(self.clamp(i64::from(i16::MIN), i64::from(i16::MAX))).unwrap()
+    }
+    #[inline]
+    fn i8_count(self) -> i8 {
+        i8::try_from(self.clamp(i64::from(i8::MIN), i64::from(i8::MAX))).unwrap()
     }
     #[inline]
     fn usize_count(self) -> usize {
@@ -340,6 +375,10 @@ impl CountCast for u32 {
         i16::try_from(self).unwrap_or(i16::MAX)
     }
     #[inline]
+    fn i8_count(self) -> i8 {
+        i8::try_from(self.min(u32::from(u8::MAX))).unwrap_or(i8::MAX)
+    }
+    #[inline]
     fn usize_count(self) -> usize {
         usize::try_from(self).unwrap_or(usize::MAX)
     }
@@ -372,6 +411,10 @@ impl CountCast for u64 {
     #[inline]
     fn i16_count(self) -> i16 {
         i16::try_from(self).unwrap_or(i16::MAX)
+    }
+    #[inline]
+    fn i8_count(self) -> i8 {
+        i8::try_from(self.min(u64::from(u8::MAX))).unwrap_or(i8::MAX)
     }
     #[inline]
     fn usize_count(self) -> usize {
@@ -424,6 +467,13 @@ impl CountCast for f64 {
         self.clamp(i16::MIN as f64, i16::MAX as f64) as i16
     }
     #[inline]
+    fn i8_count(self) -> i8 {
+        if self.is_nan() {
+            return 0;
+        }
+        self.clamp(i8::MIN as f64, i8::MAX as f64) as i8
+    }
+    #[inline]
     fn usize_count(self) -> usize {
         if self.is_nan() || self <= 0.0 {
             return 0;
@@ -449,5 +499,61 @@ pub fn f32_count(v: f64) -> f32 {
         f32::MAX
     } else {
         f32::MIN
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// `i8_count` is the narrowing boundary between the engine's `i16`
+    /// modifier tables and the `i8` figures the display renders. Its whole
+    /// contract is "clamp, never wrap", and the sign is the part a test has
+    /// to pin: a wrapped value does not merely lose magnitude, it becomes the
+    /// OPPOSITE sign, so a large blade bonus would render as a penalty.
+    #[test]
+    fn i8_count_clamps_instead_of_wrapping() {
+        // In range: exact, and symmetric.
+        assert_eq!(0i16.i8_count(), 0);
+        assert_eq!(17i16.i8_count(), 17);
+        assert_eq!(-17i16.i8_count(), -17);
+        assert_eq!(i16::from(i8::MAX).i8_count(), i8::MAX);
+        assert_eq!(i16::from(i8::MIN).i8_count(), i8::MIN);
+
+        // Out of range: saturates at the bound, keeping the sign.
+        assert_eq!(i16::from(i8::MAX).saturating_add(1).i8_count(), i8::MAX);
+        assert_eq!(i16::from(i8::MIN).saturating_sub(1).i8_count(), i8::MIN);
+        assert_eq!(i16::MAX.i8_count(), i8::MAX);
+        assert_eq!(i16::MIN.i8_count(), i8::MIN);
+
+        // The specific failure this exists to prevent. A truncating cast here
+        // would yield -49, i.e. a +200 bonus shown as "-49 Blade".
+        assert_eq!(200i16.i8_count(), i8::MAX);
+        assert_eq!((-200i16).i8_count(), i8::MIN);
+    }
+
+    /// The unsigned impls share that contract, and the `u8` one is the
+    /// non-obvious case: a `u8` always FITS in an `i8` in the reader's head,
+    /// but only up to 127. There is deliberately no `From<u8> for i8`.
+    #[test]
+    fn i8_count_clamps_for_unsigned_sources() {
+        assert_eq!(0u8.i8_count(), 0);
+        assert_eq!(127u8.i8_count(), 127);
+        assert_eq!(200u8.i8_count(), i8::MAX);
+        assert_eq!(255u8.i8_count(), i8::MAX);
+        assert_eq!(u32::MAX.i8_count(), i8::MAX);
+        assert_eq!(u64::MAX.i8_count(), i8::MAX);
+        assert_eq!(usize::MAX.i8_count(), i8::MAX);
+    }
+
+    /// `f64` is the one source that can be NaN, and NaN has no place in the
+    /// range at all — every comparison against it is false, so an unclamped
+    /// cast would reach the integer conversion as 0 on some paths and as an
+    /// arbitrary value on others.
+    #[test]
+    fn i8_count_treats_nan_as_zero() {
+        assert_eq!(f64::NAN.i8_count(), 0);
+        assert_eq!(f64::INFINITY.i8_count(), i8::MAX);
+        assert_eq!(f64::NEG_INFINITY.i8_count(), i8::MIN);
     }
 }

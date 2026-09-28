@@ -3337,7 +3337,7 @@ fn trigger_auto_ability_by_index_refs(
         self.loop_detected = false;
     }
 
-    fn generate_state_hash(&self) -> u64 {
+    pub fn generate_state_hash(&self) -> u64 {
         use core::hash::{Hash, Hasher};
         struct SimpleHasher(u64);
         impl Hasher for SimpleHasher {
