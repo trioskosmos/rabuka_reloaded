@@ -92,7 +92,12 @@ static int resource_kind(const char *s){
 /* Threaded by rb_execute_misc_effect_ex; -1 when unknown. */
 static int s_activating_card = -1;
 
-/* "both" resolves to self at this level (deferred to rb_misc_handle_both_targets). */
+/* Single-player view of a `target` string. `rb_misc_handle_both_targets` (below)
+   rewrites "both" into "self"/"opponent" before any handler runs, so by the
+   time a handler asks for its target the string is always one of the two real
+   players. The "both" -> self fallback here only mirrors Rust's
+   `GameState::resolve_target_player` (core/game_state/abilities.rs:2727-2746),
+   which logs a WARN and returns player1 for "both" as a last resort. */
 static int misc_target_player(int actor, const AbilityEffect *e){
     if(e->target && !strcmp(e->target,"opponent")) return actor ^ 1;
     return actor;
@@ -1264,9 +1269,11 @@ static int h_execute_position_change(GameState *g, int actor, const AbilityEffec
 
 /* ─────────────────────── h_rotation ─────────────────────────────────────────── */
 static int h_rotation(GameState *g, int actor, const AbilityEffect *e){
-    (void)e;
-    /* Normalize "both" to self */
-    int tgt = actor;
+    /* Rust execute_rotation (misc.rs:3570-3582) takes a LIST of targets —
+       `vec!["self", "opponent"]` for "both", otherwise the single target. The
+       "both" expansion happens in rb_misc_handle_both_targets, so here the
+       target is always one real player. */
+    int tgt = misc_target_player(actor, e);
     RbPlayer *P=&g->p[tgt];
 
     /* Snapshot current stage */
@@ -1322,9 +1329,16 @@ static int h_choice(GameState *g, int actor, const AbilityEffect *e){
     }
     g->queue.choice_options_n = 0;
     g->queue.choice_reprompt_pending = 0;
+    /* Options are stored in PRINTED order, exactly as Rust does:
+       misc.rs:3738-3743 builds `ConditionalChoice::Effects(opts.to_vec())`
+       from the decoded `options` slice in wire order, and choice.rs:2606-2612
+       resolves the answer with `all_options[idx]` — the SAME index the player
+       picked. This used to walk the array backwards
+       (`source_index = n_options - 1 - i`), so option 0 reached the player as
+       the LAST printed option and every multi-option `choice` ability resolved
+       the wrong branch. */
     for (int i = 0; i < e->n_options && i < RB_ENTRY_PENDING_CAP; i++) {
-        int source_index = e->n_options - 1 - i;
-        g->queue.choice_options[i] = rb_effect_deep_clone(e->options[source_index]);
+        g->queue.choice_options[i] = rb_effect_deep_clone(e->options[i]);
         if (g->queue.choice_options[i]) g->queue.choice_options_n++;
     }
 
@@ -1386,8 +1400,16 @@ void rb_effect_gain_surplus_heart(GameState *g, int actor, const AbilityEffect *
         if(is_member && (target_is_self||!strcmp(e->target?e->target:"","opponent")) && tc<0)
             is_all=1;
     }
-    int surplus=0;
-    for(int i=g->n_snapshots-1;i>=0;i--){
+    /* Rust misc.rs:504-516: `performance_snapshots.iter().find(|s| s.player_id
+       == pid)` — the FIRST snapshot for that player, forward, with
+       `unwrap_or(self_live_surplus_count / opponent_live_surplus_count)` as
+       the fallback when there is none. This used to walk the array BACKWARDS
+       and take the LAST matching snapshot, silently reporting a previous
+       turn's surplus when a player had more than one, and defaulted to 0
+       instead of the recorded surplus. */
+    int surplus = (pl==0) ? g->self_live_surplus_count
+                          : g->opponent_live_surplus_count;
+    for(int i=0;i<g->n_snapshots;i++){
         if(g->snapshots[i].player==pl){
             int s=g->snapshots[i].surplus_hearts;
             surplus = (s>=0)?s:0;
@@ -1586,11 +1608,104 @@ int rb_position_change_with_destination(GameState *g, int actor,
 }
 
 /* ─────────────────────── handle_both_targets ────────────────────────────────── */
+
+/* Shallow copy of `e` with `target` (and, when present, the `action_by` extra)
+   retargeted. Rust's handle_both_targets (misc.rs:272-298) clones the effect
+   and rewrites exactly those two bindings, so the copy is the faithful
+   analogue; nothing in the dispatch path frees it.
+
+   The copy lives on the caller's stack, so a handler that RETAINS the effect
+   pointer across a pause must not be reached through here. The only such
+   handler is h_play_baton_touch (`queue.resume_eff = e`), and no card in
+   cards/abilities.json pairs action=play_baton_touch with target="both" (the
+   only "both" effects are position_change x2, restriction x2,
+   discard_until_count x1 and gain_resource x1). */
+static AbilityEffect both_variant(const AbilityEffect *e, const char *target){
+    AbilityEffect c = *e;
+    c.target = (char *)target;
+    for (int i = 0; i < e->n_extra; i++)
+        if (e->extra_k[i] && !strcmp(e->extra_k[i], "action_by"))
+            c.extra_v[i] = (char *)target;
+    return c;
+}
+
+/* The player index "self" is measured FROM (Rust's `resolve_target_player`,
+   core/game_state/abilities.rs:2675-2702, takes its master from
+   `ability_master_id()` = the queue entry's `player_id`, NOT from whoever is
+   answering the prompt in flight). The C parks the ANSWERER in `queue.actor`
+   (h_choice:1311-1313, because `choice_maker="opponent"`), so a both-arm that
+   trusted the caller's `actor` would read target="self" as the answerer's
+   side. Resolve the master from the entry, falling back to `actor`. */
+static int both_master(const GameState *g, int actor){
+    int cur = g->queue.cur;
+    if(cur >= 0 && cur < g->queue.n_entries){
+        const char *pid = g->queue.entries[cur].player_id;
+        if(pid && !strcmp(pid,"p1")) return 0;
+        if(pid && !strcmp(pid,"p2")) return 1;
+    }
+    return actor;
+}
+
+/* Mirror AbilityResolver::handle_both_targets (engine/src/ability/effects/
+   misc.rs:234-301, invoked from effects/mod.rs:333 BEFORE effect dispatch).
+   Rule 9.8 / Q158: an effect with target="both" is executed once with
+   target="self" and once with target="opponent" — never once for a single
+   collapsed player. Rust rewrites `target` (and `action_by`, so the right
+   human makes any resulting choice) on a clone for each arm; because the
+   rewrite makes `target` "self"/"opponent", the downstream `is_all` test
+   (misc.rs:859-877) and the `take(final_count)` clamp in the blade applier
+   (misc.rs:1760-1768) both see a plain single-player effect and credit every
+   member of that stage, which is what 「自分のステージにいるメンバー」 means.
+
+   Returns 1 when the effect was fully handled here, 0 when the caller must
+   dispatch it normally.
+
+   Exclusion list copied verbatim from Rust:
+     - position_change handles "both" internally (misc.rs:240-244, and
+       execute_position_change's own both branch at misc.rs:2625-2651).
+     - a multi-target move_cards to deck is handled by
+       execute_move_cards_both in opponent-first order (misc.rs:246-270). */
 int rb_misc_handle_both_targets(GameState *g, int actor, const AbilityEffect *e){
-    if(!e || !e->target || strcmp(e->target,"both")) return 0;
-    s_activating_card = -1;
-    rb_execute_misc_effect(g, actor,   &g->p[actor],   e, NULL);
-    rb_execute_misc_effect(g, actor^1, &g->p[actor^1], e, NULL);
+    if(!g || !e || !e->target || strcmp(e->target,"both")) return 0;
+    if(e->action && !strcmp(e->action,"position_change")) return 0;
+    if(e->action && !strcmp(e->action,"move_cards") &&
+       extra_true(e,"multiple_targets")) return 0;
+
+    AbilityEffect for_self     = both_variant(e, "self");
+    AbilityEffect for_opponent = both_variant(e, "opponent");
+    int master = both_master(g, actor);
+
+    int had_choice_before = g->queue.has_pending;
+    rb_execute_misc_effect(g, master, &g->p[master], &for_self, NULL);
+
+    /* If the self arm opened a NEW choice, the opponent arm is deferred until
+       that answer arrives (misc.rs:281-291): keep the already-parked actions
+       and append ours so the opponent's half runs right after. */
+    if(g->queue.has_pending && !had_choice_before){
+        AbilityEffect *actions[RB_ENTRY_PENDING_CAP];
+        int n = 0;
+        int cur = g->queue.cur;
+        if(cur >= 0 && cur < g->queue.n_entries){
+            RbQueueEntry *en = &g->queue.entries[cur];
+            for(int i = 0; i < en->pending_actions_n; i++){
+                AbilityEffect *p = en->pending_actions[i];
+                en->pending_actions[i] = NULL;   /* detach: store_pending_actions frees the slot */
+                if(!p) continue;
+                if(n < RB_ENTRY_PENDING_CAP) actions[n++] = p;
+                else rb_effect_free(p);
+            }
+            en->pending_actions_n = 0;
+        }
+        if(n < RB_ENTRY_PENDING_CAP){
+            actions[n++] = rb_effect_deep_clone(&for_opponent);
+        }
+        rb_queue_store_pending_actions(g, actions, n);
+        /* store_pending_actions took its own deep clones; drop ours. */
+        for(int i = 0; i < n; i++) rb_effect_free(actions[i]);
+        return 1;
+    }
+
+    rb_execute_misc_effect(g, master, &g->p[master ^ 1], &for_opponent, NULL);
     return 1;
 }
 
@@ -1670,6 +1785,17 @@ static const char *card_name(int card_id, char *buf, size_t cap){
 int rb_execute_misc_effect(GameState *g, int actor, const RbPlayer *self,
                             const AbilityEffect *e, int *resolved){
     if(!e) return 0;
+    /* Rule 9.8 / Q158 — engine/src/ability/effects/mod.rs:327-335 runs
+       handle_both_targets BEFORE the action dispatch, so every misc action with
+       target="both" is executed for self and then for opponent. This C
+       dispatcher is the same seam, so the split happens here. Without it a
+       "both" effect collapsed onto the actor and every per-player fan-out
+       (members on BOTH stages, both hands, both decks) silently applied to
+       exactly one player. */
+    if(rb_misc_handle_both_targets(g, actor, e)){
+        if(resolved) *resolved = 1;
+        return 1;
+    }
     const char *name = e->action;
     int r=1;
     if(name){
