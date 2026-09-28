@@ -127,8 +127,16 @@ fn rurino_q241_multiple_cards_discarded_fires_once() {
 }
 
 /// Use-limit (turn2): first trigger fires, second trigger in same turn
-/// is blocked by the use_limit (checked at enqueue time by
-/// trigger_auto_abilities_for_player's turn_limited_abilities_used guard).
+/// ターン2回: the second qualifying event in the same turn grants again, and a
+/// third is refused.
+///
+/// This test previously set up two events and then asserted NOTHING about the
+/// second ("heart01 may be 1 or 2 ... the important thing is no crash"), which
+/// is exactly the window the re-scan-guard leak lived in: 瑠璃乃's second
+/// ターン2回 allowance was silently vetoed and no assertion noticed. The tight
+/// three-observable version now lives in
+/// `jidou/combination/hs_pb1_003_turn2_second_discard_event_grants_again_test.rs`;
+/// this entry keeps the smoke-level check and points there.
 #[test]
 fn rurino_use_limit_blocks_second_same_turn() {
     let db = load_real_database();
@@ -140,15 +148,17 @@ fn rurino_use_limit_blocks_second_same_turn() {
     trigger_auto(&mut v);
     assert_eq!(heart01_mod(&v, rurino), 1, "first: heart01=1");
 
-    // Second trigger — use_limit=2 blocks enqueue at scan time
+    // Second trigger — ターン2回 allows it, and the post-resolution re-scan guard
+    // must not veto it. Assert the real number, not "no crash".
     v.state.set_recently_moved_cards(vec![v.id("PL!-sd1-010-SD")]);
-    // The scan's trigger_auto_ability function checks the use_limit
-    // before enqueuing. With 1 use consumed, 1 remains. Second trigger
-    // from a different pending_commands source should still work.
-    // This is a basic check that the use_limit doesn't crash.
     trigger_auto(&mut v);
-    // heart01 may be 1 or 2 depending on post-resolve re-enqueue.
-    // The important thing is no crash.
+    assert_eq!(
+        heart01_mod(&v, rurino),
+        2,
+        "second qualifying event in the same turn grants again (ターン2回). The \
+         full three-observable version is in \
+         jidou/combination/hs_pb1_003_turn2_second_discard_event_grants_again_test.rs"
+    );
 }
 
 /// Real cross-card test: Play Rurino Ozora (PL!HS-bp2-005-R+) whose debut

@@ -27,25 +27,40 @@ fn jidou_watching_live_start_resolve_triggers() {
 
 #[test]
 fn jidou_effect_cause_both_sides() {
-    // PL!SP-bp7-005-R＋ has two jidou: one on登場/energy deck→energy, one on energy placed by own effect
+    // PL!SP-bp7-005-R＋ has two jidou: one on 登場/energy deck→energy, one on
+    // energy placed by own effect.
     let db = load_real_database();
     let mut game = TestGame::new(db.clone());
     let jidou = game.id("PL!SP-bp7-005-R＋");
     let filler = game.new_id("PL!-sd1-010-SD");
     fill_decks(&mut game, filler);
+    fill_energy_deck(&mut game, 0, 3);
     game.state.player1.stage.stage = [jidou, -1, -1];
-    // First jidou:登場 — recalculate_constants already applied? We trigger via movement
-    let before_blades = game.state.player1.stage.total_blades(&db, &game.state.mods.blade_modifiers, &game.state.mods.orientation_modifiers, true);
-    // Simulate area move caused by own effect (should trigger turn1 jidou)
-    game.state.push_movement_event(jidou, "stage", "stage", Some(jidou), "p1", true);
-    game.state.trigger_auto_abilities_for_player("p1");
-    game.state.process_pending_auto_abilities("p1");
-    let after_blades = game.state.player1.stage.total_blades(&db, &game.state.mods.blade_modifiers, &game.state.mods.orientation_modifiers, true);
-    assert!(after_blades >= before_blades, "jidou effect-cause trigger should not reduce blades");
-    // Second jidou: energy placed by own effect → blade until live end
+
+    // The event that actually arms the energy-placed jidou: an energy card
+    // placed by our own effect.
+    let blades_before = game.state.mods.blade_modifiers.len();
+    let energy_zone_before = game.state.player1.energy_zone.cards.len();
     game.state.push_movement_event(-1, "energy_deck", "energy", Some(jidou), "p1", true);
     game.state.trigger_auto_abilities_for_player("p1");
     game.state.process_pending_auto_abilities("p1");
+
+    // A DELTA, not a comparison. The previous assertion here was
+    // `after_blades >= before_blades`, which a jidou that grants nothing — or
+    // worse, one that is not wired at all — satisfies trivially. The sibling test
+    // `jidou_paired_with_other_ability_both_fire` gets this right with
+    // `len - before == 1`; this one did not, so its own doc claim ("effect-cause
+    // gating") was never actually checked.
+    assert_eq!(
+        game.state.mods.blade_modifiers.len() - blades_before,
+        1,
+        "an own-effect energy placement must grant exactly this card's one blade"
+    );
+    assert_eq!(
+        game.state.player1.energy_zone.cards.len(),
+        energy_zone_before,
+        "the blade jidou does not itself move energy into the zone"
+    );
     assert!(game.state.player1.stage.stage.contains(&jidou));
 }
 
@@ -107,12 +122,26 @@ fn jidou_distinct_from_constant_and_activation() {
     let after_const = game.state.mods.blade_modifiers.clone();
     // Constant recalc should be idempotent for pure jidou card (no constant on this card)
     assert_eq!(before.len(), after_const.len(), "constant recalc should be idempotent for jidou");
-    game.state.push_movement_event(m, "stage", "stage", Some(m), "p1", true);
+
+    // The point of the test is that the 自動 path is DISTINCT from the constant
+    // path: recalculating constants must not absorb a jidou, and driving the
+    // jidou must actually move the modifier set.
+    //
+    // The previous final assertion was
+    // `after_jidou.len() >= after_const.len() || after_jidou.len() == after_const.len()`,
+    // which is a tautology — `a >= b || a == b` holds for every pair — so this
+    // test asserted nothing at all about the jidou path, while its own comment
+    // conceded "may or may not add blade depending on trigger".
+    game.state.push_movement_event(-1, "energy_deck", "energy", Some(m), "p1", true);
     game.state.trigger_auto_abilities_for_player("p1");
     game.state.process_pending_auto_abilities("p1");
     let after_jidou = game.state.mods.blade_modifiers.clone();
-    // Jidou trigger path is separate — may or may not add blade depending on trigger, but must not crash
-    assert!(after_jidou.len() >= after_const.len() || after_jidou.len() == after_const.len());
+    assert_eq!(
+        after_jidou.len() - after_const.len(),
+        1,
+        "driving the 自動 must add exactly this card's blade, and it must not be \
+         folded into the constant path (recalculate_constants alone added nothing)"
+    );
 }
 
 #[test]
@@ -132,6 +161,8 @@ fn jidou_both_on_same_card_coexist_and_fire_separately() {
     game.state.trigger_auto_abilities_for_player("p1");
     game.state.process_pending_auto_abilities("p1");
     let after_first = game.state.player1.energy_zone.cards.len();
+    // Baseline for the second trigger's blade delta.
+    let blade_mods_before_second = game.state.mods.blade_modifiers.len();
     // Fire second jidou via energy placed by own effect
     game.state.push_movement_event(-1, "energy_deck", "energy", Some(card), "p1", true);
     game.state.trigger_auto_abilities_for_player("p1");
@@ -145,8 +176,14 @@ fn jidou_both_on_same_card_coexist_and_fire_separately() {
         after_first,
         "neither jidou moves cards into the energy zone"
     );
-    assert!(
-        !game.state.mods.blade_modifiers.is_empty(),
-        "the turn2 jidou grants its blade on the second sensor"
+    // A DELTA against the pre-second-trigger baseline. The previous check was
+    // `!blade_modifiers.is_empty()`, which 葉月恋 satisfies from her OWN printed
+    // blades whether or not the jidou ever fired — so the assertion could not
+    // distinguish "granted" from "not wired at all". The sibling test in this
+    // file already uses the correct delta form.
+    assert_eq!(
+        game.state.mods.blade_modifiers.len() - blade_mods_before_second,
+        1,
+        "the energy-placed jidou added exactly its one blade on the second trigger"
     );
 }

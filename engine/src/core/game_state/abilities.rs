@@ -261,6 +261,15 @@ impl GameState {
             pending_actions: Vec::new(),
             resolver: None,
             trigger_moved_cards,
+            // Enqueue-time snapshot of the appearance batch. This is the single
+            // central capture point: every ability queue entry is built here, so
+            // the snapshot always reflects the event that triggered THIS entry.
+            // A card played to stage records an appearance but no movement, and
+            // the effect-time condition re-check runs after the live appearance
+            // batch is consumed — so this is what lets a self-referential
+            // 「このメンバーが登場」 condition still see its own event. See
+            // docs/JIDOU_COMBINATION_WORK.md §6.
+            trigger_appeared_cards: self.recently_appeared_cards.clone(),
             triggering_member_id,
             snapshot_movements: SmallVec::new(),
             choice_effect_text: None,
@@ -1824,6 +1833,11 @@ fn trigger_auto_ability_by_index_refs(
             self.this_batch_triggered_ability_ids.clear();
         }
         } // end while batch_rerun
+        // Bug B: the re-scan guard's scope is ONE batch. Once drained, the key
+        // must not survive into the next player action, or it vetoes that
+        // action's fresh event. See docs/JIDOU_COMBINATION_WORK.md §6.
+        self.just_completed_ability_key = None;
+        self.just_completed_moved.clear();
     }
 
     pub fn process_pending_auto_abilities(&mut self, raw_player_id: &str) {
@@ -2330,6 +2344,17 @@ fn trigger_auto_ability_by_index_refs(
         self.ability_queue
             .current_entry()
             .and_then(|e| e.trigger_moved_cards.clone())
+    }
+
+    /// Read `trigger_appeared_cards` from the current queue entry (the enqueue-time
+    /// appearance snapshot). The appearance mirror of `entry_trigger_moved_cards`:
+    /// a self-referential 登場/移動 condition re-evaluated at effect time finds the
+    /// live appearance batch already consumed, so it falls back to this snapshot to
+    /// decide which card appeared to trigger the ability.
+    pub fn entry_trigger_appeared_cards(&self) -> Option<SmallVec<[i16; 4]>> {
+        self.ability_queue
+            .current_entry()
+            .map(|e| e.trigger_appeared_cards.clone())
     }
 
     /// Check whether energy was placed by an effect, using the entry's snapshot

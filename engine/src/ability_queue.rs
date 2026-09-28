@@ -117,6 +117,14 @@ pub struct AbilityQueueEntry {
     /// recently_moved_cards at enqueue time). Used by source:"those_cards"
     /// to resolve to only the trigger cards, not the full discard pile.
     pub trigger_moved_cards: Option<SmallVec<[i16; 4]>>,
+    /// Snapshot of `recently_appeared_cards` at enqueue time. The mirror of
+    /// `trigger_moved_cards` for APPEARANCE events: a card played to stage
+    /// records an appearance but NO movement, so `trigger_moved_cards` is empty
+    /// for it. An effect-time condition re-check runs after the live appearance
+    /// batch has been consumed, so a self-referential 「このメンバーが登場」
+    /// condition needs this snapshot to still see its own event. Mirrors the
+    /// `entry_trigger_moved_cards` fallback pattern.
+    pub trigger_appeared_cards: SmallVec<[i16; 4]>,
     /// Snapshot of batch_movements at enqueue time so the "moves" and energy
     /// conditions can see what triggered the ability even after
     /// clear_effect_tracking() clears the global batch_movements.
@@ -378,6 +386,7 @@ entry_index: u8::try_from(idx).unwrap(),
                     pending_actions: Vec::new(),
                     resolver: None,
                     trigger_moved_cards: None,
+                    trigger_appeared_cards: SmallVec::new(),
                     triggering_member_id: None,
                     snapshot_movements: SmallVec::new(),
             choice_effect_text: None,
@@ -475,6 +484,7 @@ entry_index: u8::try_from(idx).unwrap(),
             pending_actions: Vec::new(),
             resolver: None,
             trigger_moved_cards: None,
+            trigger_appeared_cards: SmallVec::new(),
             triggering_member_id: None,
             snapshot_movements: SmallVec::new(),
             choice_effect_text: None,
@@ -664,6 +674,7 @@ mod tests {
             optional_cost_result: None,
             choice_player_id: None,
             trigger_moved_cards: None,
+            trigger_appeared_cards: SmallVec::new(),
             pending_actions: Vec::new(),
             resolver: None,
             triggering_member_id: None,

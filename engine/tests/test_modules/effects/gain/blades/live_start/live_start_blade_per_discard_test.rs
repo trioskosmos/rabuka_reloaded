@@ -270,17 +270,29 @@ fn two_copies_on_stage_both_gain_blades() {
         .blade_modifiers
         .get(&stage2)
         .map_or(0, rabuka_engine::core::game_modifiers::ModifierEntry::total);
-    assert!(
-        blade1 > 0 && blade2 > 0,
-        "Both copies should gain blades: copy1={} copy2={}",
-        blade1,
+    // Each copy discards ONE card and gains EXACTLY 1 blade, per the steps above.
+    //
+    // This was `assert!(blade1 > 0 && blade2 > 0)` — a presence check, so it also
+    // passed at 2, 3, 4. A copy whose ability fired TWICE (the multi-copy
+    // re-entrancy this file exists to guard) sailed through a test whose entire
+    // point is that the two copies fire independently, once each. The same
+    // permissive-bound defect as mymai_tonight_test.rs; assert the exact count.
+    assert_eq!(
+        blade1, 1,
+        "copy 1: one cost discard -> exactly 1 ブレード (got {}). `> 0` could not \
+         detect a double-fire.",
+        blade1
+    );
+    assert_eq!(
+        blade2, 1,
+        "copy 2: one cost discard -> exactly 1 ブレード (got {}). Both copies must \
+         fire independently and once each.",
         blade2
     );
-    assert!(
-        blade1 + blade2 >= 2,
-        "Total blades should be at least 2: copy1={} copy2={}",
-        blade1,
-        blade2
+    assert_eq!(
+        blade1 + blade2,
+        2,
+        "total across both copies is exactly 2 — one per copy, no more"
     );
 }
 

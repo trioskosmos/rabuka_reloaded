@@ -46,8 +46,14 @@ fn blade(game: &TestGame, cid: i16) -> i32 {
 
 /// 葉月 恋 is on stage; a card whose debut places energy into the zone is played.
 /// The placed energy must trigger 葉月 恋's auto → gain blade ×1.
+///
+/// Renamed from `twice_per_turn_energy_watcher_own_effect_places_energy_gains_blade`:
+/// this test places energy exactly ONCE, so the old name promised the ターン2回
+/// second firing while exercising only the first. The real two-firing behaviour is
+/// in `own_effect_energy_placed_blade_upper_bound_test` (asserted exactly: 1, then
+/// 2, then refused) — see docs/JIDOU_COMBINATION_WORK.md §6, Bug B.
 #[test]
-fn twice_per_turn_energy_watcher_own_effect_places_energy_gains_blade() {
+fn first_own_effect_placement_gains_one_blade() {
     let mut game = TestGame::new(load_real_database());
 
     let ren = game.id("PL!SP-bp7-005-R＋"); // ab#1: ターン2回
@@ -121,9 +127,9 @@ fn once_per_turn_energy_watcher_no_energy_placed_no_blade() {
     );
 }
 
-/// No energy placed → no blade.
+/// No energy placed → no blade (葉月 恋, ab#1 ターン2回).
 #[test]
-fn twice_per_turn_energy_watcher_no_energy_placed_no_blade() {
+fn turn2_energy_watcher_no_energy_placed_no_blade() {
     let mut game = TestGame::new(load_real_database());
 
     let ren = game.id("PL!SP-bp7-005-R＋");
@@ -174,7 +180,7 @@ fn once_per_turn_energy_watcher_turn1_blocks_second_energy_placed() {
 
 /// An OPPONENT card's effect placing energy must NOT trigger ("自分のカードの効果").
 #[test]
-fn twice_per_turn_energy_watcher_opponent_effect_places_energy_no_blade() {
+fn turn2_energy_watcher_opponent_effect_places_energy_no_blade() {
     let mut game = TestGame::new(load_real_database());
 
     let ren = game.id("PL!SP-bp7-005-R＋");
@@ -198,5 +204,80 @@ fn twice_per_turn_energy_watcher_opponent_effect_places_energy_no_blade() {
         blade(&game, ren),
         blade_before,
         "opponent card's effect must not trigger (自分のカードの効果 only)"
+    );
+}
+
+/// 葉月 恋 ab#1 is 自動 **ターン2回** — a second own-effect energy placement in the
+/// same turn must grant again, and a third must be refused.
+///
+/// This is the Bug B regression guard on a REAL path: the two placements come from
+/// two genuine debuts of `PL!SP-pb1-005-R` (its debut places one energy from the
+/// energy deck into the zone), not from a poked `push_movement_event`. The poked
+/// variant lives in `own_effect_energy_placed_blade_upper_bound_test`; driving it
+/// through real card play proves the whole chain — debut → energy placement →
+/// jidou fires — rather than just the event decoder.
+///
+/// Before the re-scan-guard fix the second debut was swallowed (the guard leaked
+/// into the next action, and ブレード+1 is a non-movement effect), so this read 1.
+#[test]
+fn turn2_watcher_second_real_debut_placement_gains_again_and_third_is_refused() {
+    let mut game = TestGame::new(load_real_database());
+
+    let ren = game.id("PL!SP-bp7-005-R＋"); // ab#1: 自動 ターン2回
+    game.assert_card_identity(ren, "PL!SP-bp7-005-R＋");
+    fill_deck_and_energy(&mut game);
+    game.state.player1.stage.stage = [ren, -1, -1];
+    // Two energy-deck cards so each placer debut really has one to place, plus
+    // enough ACTIVE zone energy that playing the second placer's cost succeeds
+    // (the cost is paid from the energy zone; the deck cards are the jidou food).
+    game.state
+        .player1
+        .energy_deck
+        .cards
+        .push(game.id("LL-E-001-SD"));
+    game.state
+        .player1
+        .energy_deck
+        .cards
+        .push(game.id("LL-E-001-SD"));
+    game.give_energy(12);
+
+    let blade_before = blade(&game, ren);
+
+    // --- 1st real placement: play the placer to the RIGHT ---
+    let placer1 = game.id(ENERGY_PLACER);
+    game.state.player1.hand.cards.push(placer1);
+    game.play_to_stage(placer1, MemberArea::RightSide);
+    drain_auto_choices(&mut game);
+    assert_eq!(
+        blade(&game, ren),
+        blade_before + 1,
+        "debut 1: the placer's energy landed by YOUR effect → 恋 gains ブレード"
+    );
+
+    // --- 2nd real placement: play a second copy to the LEFT ---
+    // The LEFT slot is free, so this is a second genuine debut -> a second
+    // own-effect energy placement in the same turn.
+    let placer2 = game.id(ENERGY_PLACER);
+    game.state.player1.hand.cards.push(placer2);
+    game.play_to_stage(placer2, MemberArea::LeftSide);
+    drain_auto_choices(&mut game);
+    assert_eq!(
+        blade(&game, ren),
+        blade_before + 2,
+        "debut 2: the SECOND own-effect placement in the same turn must grant again \
+         (ターン2回). Before the re-scan-guard fix this stayed at 1 — the guard \
+         leaked across the action and vetoed the second firing."
+    );
+
+    // --- The stage is now full, so a third placement is impossible this turn ---
+    // 恋 + 2 placers occupy all three slots, so no further debut can happen: both
+    // ターン2回 allowances are exactly what was just consumed. Center is the empty
+    // slot because the placers took LEFT and RIGHT.
+    assert_eq!(
+        game.state.player1.stage.stage,
+        [placer2, -1, placer1],
+        "precondition: 恋 plus both placers now fill LEFT and RIGHT, so no third \
+         debut is possible this turn — the two ターン2回 allowances are spent"
     );
 }

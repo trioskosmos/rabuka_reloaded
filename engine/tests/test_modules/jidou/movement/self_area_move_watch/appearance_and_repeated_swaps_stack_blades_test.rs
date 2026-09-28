@@ -60,6 +60,19 @@ fn appearance_and_three_swaps_stack_eight_blades() {
     game.state.player1.stage.stage = [kinako_watcher, kinako_mover, -1];
     game.state.record_card_appearance(kinako_watcher, "hand");
     game.state.record_card_movement(kinako_watcher);
+    // Scan NOW so the watcher's 自動 arms on its own appearance, exactly as a
+    // real debut would. Previously this test recorded the appearance and then
+    // relied on the NEXT unrelated action's scan (the 起動 swap below) to pick it
+    // up — i.e. it depended on the appearance staying "live" across a separate
+    // action, which is the turn-lenient behaviour the event-scoped appearance
+    // fix (docs/JIDOU_COMBINATION_WORK.md §6, Bug C) deliberately removes. The
+    // arming scan is the realistic path; the +2 for the appearance is unchanged.
+    {
+        let pid = game.state.player1.id.clone();
+        game.state.trigger_auto_abilities_for_player(&pid);
+        game.state.process_pending_auto_abilities(&pid);
+    }
+    game.drain_auto_ability_choices();
 
     // === Move 1: 起動 きな子 swaps with watcher ===
     game.activate_ability(kinako_mover);

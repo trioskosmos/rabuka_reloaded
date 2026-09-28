@@ -19,6 +19,10 @@
 
 /* ── Forward helpers from other subsystems ── */
 int rb_ability_debug_enabled(void);
+/* ability_queue.c: the queue entry's pending_actions are OWNED clones, and
+   save_remaining extends them (Rust ability_queue.rs:521). Declared here
+   rather than in rabuka.h because the queue header is not this file's. */
+void rb_queue_extend_pending_actions(GameState *g, AbilityEffect *const *actions, int count);
 /* cost.c owns energy_count_any(): the Rust decoder folds both wire keys
    "energy_count" and "energy" onto one field
    (engine/src/ability/effect_decoder_gen.rs:164 and :226). */
@@ -108,6 +112,11 @@ static int seq_keep_reachable(const GameState *g, const AbilityEffect *e) {
     if (g->queue.resume_after_look == e) return 1;
     for (int i = 0; i < g->queue.n_entries; i++) {
         const RbQueueEntry *en = &g->queue.entries[i];
+        /* pending_actions hold DEEP CLONES (rb_queue_extend_pending_actions),
+           never these pool copies, so this never matches — the clone is what
+           keeps the tail alive now that the decoded tree does not. Kept in the
+           scan because a future store that adopts a pointer instead of
+           cloning it would silently reintroduce the dangling tail. */
         for (int k = 0; k < en->pending_actions_n; k++)
             if (en->pending_actions[k] == e) return 1;
     }
@@ -305,13 +314,21 @@ static void save_remaining(GameState *g, AbilityEffect **remaining, int n_remain
     if(rb_ability_debug_enabled()) {
         /* log::debug!("[SAVE_REMAINING] count={} actions={:?}", remaining.len(), ...) */
     }
-    int cur = g->queue.cur;
-    if(cur<0||cur>=g->queue.n_entries) return;
-    /* C queue stores count; merge is via rb_queue_save_pending_actions which sets count.
-       For fidelity we accumulate. */
-    int existing = g->queue.entries[cur].pending_actions_n;
-    g->queue.entries[cur].pending_actions_n = existing + n_remaining;
-    (void)remaining;
+    /* ability_queue.rs:521 `entry.pending_actions = remaining.clone()` — Rust
+       CLONES the tail into the entry's owned Vec. The C used to bump
+       pending_actions_n by n_remaining and drop `remaining` on the floor,
+       which left pen_n = 2 with two NULL slots: at resume time there was
+       nothing owned to run, so every multi-step ability silently lost the
+       steps after the one that opened the prompt.
+
+       The pointers in `remaining` are the compound.c sequential-step pool
+       copies (shallow, aliasing the decoded ability tree) and are owned by
+       that pool — hence clone, never adopt. rb_queue_extend_pending_actions
+       EXTENDS rather than replaces, preserving the accumulate semantics the
+       count bump had, and hands the entry a deep clone it owns outright, so
+       the continuation no longer depends on the source tree outliving this
+       frame. */
+    rb_queue_extend_pending_actions(g, remaining, n_remaining);
 }
 
 /* public save_remaining by count (header ABI) */

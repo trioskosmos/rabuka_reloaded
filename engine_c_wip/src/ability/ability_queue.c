@@ -437,6 +437,47 @@ int rb_queue_has_pending_actions(const GameState *g) {
     return g->queue.entries[cur].pending_actions_n > 0;
 }
 
+/* APPEND owned deep clones of `actions` to the current entry's pending list.
+
+   Mirrors Rust ability_queue.rs:521 `entry.pending_actions = remaining.clone()`
+   reached from compound.rs `save_remaining`. EXTEND, not replace: Rust extends
+   the existing Vec, so a pause that parks a tail on top of actions an earlier
+   pause already parked must keep both batches, in order.
+
+   The clone is what makes the continuation survive.  Rust's `remaining` is a
+   slice into the live `AbilityEffect` tree, but Rust keeps that tree alive for
+   the whole resolution (the resolver owns the Ability; ability_queue.rs:521
+   only has to *copy* the tail).  The C decodes the ability into a local
+   `Ability ab` inside rb_drain_ability_queue, so the source nodes die with
+   that frame.  Storing the pointers — which is what this function used to do,
+   see compound.c save_remaining — parks a continuation into memory that is
+   about to be freed; storing a deep clone parks an independent copy the entry
+   owns outright.
+
+   OWNERSHIP: every non-NULL slot in entry.pending_actions is owned by the
+   queue.  It is released by exactly one of
+     - entry_clear_pending_actions  (rb_queue_store_pending_actions replaces,
+                                     rb_queue_clear tears the queue down)
+     - rb_queue_take_pending_actions_owned  (ownership handed to the caller,
+                                     which MUST rb_effect_free each one)
+     - rb_queue_resume_pending_actions       (executed, then freed)
+   Nothing else may free a pending action, and the producer never frees its
+   argument: `actions` stays owned by whoever built it (the compound.c
+   sequential-step pool, or the source tree).  On allocation failure the slot
+   is simply not taken, so pending_actions_n always counts real pointers. */
+void rb_queue_extend_pending_actions(GameState *g, AbilityEffect *const *actions, int count) {
+    if (!g || !actions || count <= 0) return;
+    int cur = g->queue.cur;
+    if (cur < 0 || cur >= g->queue.n_entries) return;
+    RbQueueEntry *e = &g->queue.entries[cur];
+    for (int i = 0; i < count && e->pending_actions_n < RB_ENTRY_PENDING_CAP; i++) {
+        if (!actions[i]) continue;
+        AbilityEffect *owned = rb_effect_deep_clone(actions[i]);
+        if (!owned) continue;              /* OOM: keep the count honest */
+        e->pending_actions[e->pending_actions_n++] = owned;
+    }
+}
+
 /* Replace the current entry's pending list with deep clones of `actions`
     (mirrors Rust entry.set_pending_actions(vec)). */
 void rb_queue_store_pending_actions(GameState *g, AbilityEffect *const *actions, int count) {
@@ -513,14 +554,8 @@ int rb_queue_take_pending_actions(GameState *g) {
     merge step, choice.rs:86-105): used when a sub-action paused mid-batch. */
 void rb_queue_repark_pending_actions(GameState *g, AbilityEffect *const *actions,
                                      int count, int from) {
-    if (!g) return;
-    int cur = g->queue.cur;
-    if (cur < 0 || cur >= g->queue.n_entries) return;
-    RbQueueEntry *e = &g->queue.entries[cur];
-    for (int i = from; i < count && e->pending_actions_n < RB_ENTRY_PENDING_CAP; i++) {
-        if (!actions[i]) continue;
-        e->pending_actions[e->pending_actions_n++] = rb_effect_deep_clone(actions[i]);
-    }
+    if (!g || !actions || from < 0 || from >= count) return;
+    rb_queue_extend_pending_actions(g, actions + from, count - from);
 }
 
 /* Execute parked pending actions one at a time (choice.rs:75-113): stops and
@@ -736,13 +771,27 @@ int rb_drain_ability_queue(GameState *g) {
             rb_execute_effect_ex(g, actor, ab.effect, e->card_id);
             g->n_recently_moved = 0;
         }
-        rb_free_ability(&ab);
         g->just_completed_ability_key = (e->card_id << 16) | (e->ability_idx & 0xFFFF);
         ran++;
+        /* The open-prompt guard has to come BEFORE rb_free_ability.  Executing
+           this effect parked raw pointers into THIS ability's tree
+           (g->queue.resume_parent set by compound.c save_remaining's tail,
+           g->queue.resume_eff / g->queue.deferred set by the prompt
+           emitters), and the prompt is still open at this point — freeing the
+           tree here left resume_parent->n_child readable while
+           resume_parent->child[i] was already freed bytes, so the sibling
+           continuation that resumes on the answer walked freed memory.  This
+           is the same hazard engine.c:1136-1167 detaches around on the inline
+           登場 path; there the cost/effect trees are detached before
+           rb_free_ability and stay alive until the prompt closes. */
         if (rb_has_pending_choice(g)) {
             rb_queue_set_state(&g->queue, RB_QUEUE_AWAITING_CHOICE);
+            ab.cost = NULL;
+            ab.effect = NULL;
+            rb_free_ability(&ab);   /* frees the decoded text buffers only */
             break;
         }
+        rb_free_ability(&ab);
     }
     if (rb_queue_state(&g->queue) == RB_QUEUE_RESOLVING)
         rb_queue_set_state(&g->queue, RB_QUEUE_DRAINING);

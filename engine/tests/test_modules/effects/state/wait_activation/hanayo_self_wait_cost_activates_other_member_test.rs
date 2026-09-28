@@ -149,21 +149,73 @@ fn q248_hanayo_use_limit_blocks_second_activation() {
         game.state.player1.main_deck.cards.push(filler);
     }
 
+    // 葉乃's 起動 makes ANOTHER member active, so it needs a second member to
+    // target. Without one, the second activation was refused for want of a
+    // target — not because of the use_limit — and the old four-way disjunction
+    // accepted "No activatable ability" as a pass. With a real target present,
+    // the only thing that can refuse the second activation is the ターン1回.
+    game.state.player1.stage.stage = [
+        hanayo,
+        game.new_id("PL!-sd1-002-SD"),
+        -1,
+    ];
+
     game.add_to_hand(hanayo);
     game.give_energy(8);
 
     game.play_to_stage(hanayo, MemberArea::Center);
     game.activate_ability(hanayo); // first activation succeeds
 
-    // Second activation should fail (use_limit=1)
-    let err = game.try_activate_ability(hanayo).unwrap_err();
+    // The first activation asks WHICH member to make active. That choice must be
+    // answered before a second activation can be attempted at all — while it is
+    // pending, every activation is refused with "Cannot activate ability while
+    // another choice is pending", which is yet a third reason this test could
+    // pass without touching the use_limit.
+    let mut guard = 0;
+    while game.has_pending_choice() {
+        guard += 1;
+        assert!(guard < 10, "runaway choice prompts after the first activation");
+        game.select_indices(&[0]);
+    }
+
+    // The first activation must have COMPLETED before the refusal below means
+    // anything. Its cost is 「このメンバーをウェイトにする」, so 葉乃 herself
+    // sitting in wait is this codebase's idiom for "the activation resolved and
+    // paid" — the same check `q248_hanayo_activate_no_other_members` uses.
+    assert_eq!(
+        game.state.mods.get_orientation_modifier(hanayo),
+        Some("wait"),
+        "the first 起動 must have completed (its self→wait cost paid) — otherwise \
+         the second activation's refusal is not evidence of the use_limit"
+    );
+
+    // Second activation is refused: the 起動 is ターン1回 and is already spent.
+    //
+    // Three things were wrong with this test before, and all three let it pass
+    // without ever reaching the use_limit:
+    //   1. the stage held no second member, so the first 起動 (which makes
+    //      ANOTHER member active) had no target;
+    //   2. the first activation's "which member?" choice was never answered, so
+    //      every later activation was refused with "another choice is pending";
+    //   3. the assertion accepted any of four error strings, including
+    //      "No activatable ability" — which is not a use_limit message at all.
+    //
+    // The engine reports an exhausted 起動 as the GENERIC "No activatable ability
+    // found for this card at its current location": `find_gained_activation`
+    // `continue`s past an ability that is `ability_under_use_limit`-exhausted
+    // (turn/actions/mod.rs:521-527), and when nothing qualifies the `.ok_or(..)`
+    // at :546 surfaces that message. So the refusal string cannot distinguish
+    // "used up" from "no target" — what makes the refusal meaningful is the
+    // precondition above: a target existed, the first activation demonstrably
+    // took effect, and so the only thing left to refuse the second is the limit.
+    let err = game
+        .try_activate_ability(hanayo)
+        .expect_err("the second activation must be refused once the 起動 is ターン1回");
     assert!(
-        err.contains("use_limit")
-            || err.contains("already used")
-            || err.contains("限界")
-            || err.contains("No activatable ability"),
-        "Second activation should be blocked by use_limit, got: {:?}",
-        err
+        !err.is_empty(),
+        "the refusal should carry the engine's reason; got an empty error. \
+         (For a used-up 起動 that reason is the generic 'No activatable ability \
+         found ...' — see the note above.)"
     );
 }
 

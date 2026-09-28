@@ -2441,13 +2441,31 @@ impl<'a> ConditionContext<'a> {
         let count = condition.get_count().unwrap_or(1);
         let operator = condition.get_operator();
         let source = condition.get_source().unwrap_or("selected_cards");
-        let cards: &[i16] = match source {
+        let mut cards: &[i16] = match source {
             "selected_cards" => self.selected_card_ids,
             "preceding_moved" => self.moved_cards,
             _ => self.selected_card_ids,
         };
+        // 「このメンバーが持つブレードの数がN以上」 is a SELF-referential reading:
+        // the subject is the member whose ability is resolving, not a card the
+        // player picked. An auto-triggered ability (ライブ開始時, 自動, …) never
+        // runs a selection prompt, so `selected_cards` is empty and the
+        // condition had no subject at all — it returned false unconditionally,
+        // making every 「このメンバーが持つ〜」 gate dead in a real game.
+        //
+        // The parser routes that wording here with `source: selected_cards`, so
+        // the empty selection IS the self-reference. Fall back to the activating
+        // card. A genuinely selection-scoped condition ("選んだカードの〜") is
+        // unaffected: its selection is non-empty by the time it is evaluated.
+        let owned;
         if cards.is_empty() {
-            return false;
+            match self.activating_card_id {
+                Some(cid) => {
+                    owned = [cid];
+                    cards = &owned;
+                }
+                None => return false,
+            }
         }
         let card_db = &self.game_state.card_database;
         // A2: unified effective_blade
@@ -2513,21 +2531,38 @@ impl<'a> ConditionContext<'a> {
 
     /// Did `cid` appear in the CURRENT movement batch?
     ///
-    /// Batch-scoped rather than turn-scoped: a stale turn-level record must not
-    /// re-trigger a rescan on an unrelated event. `recently_appeared_cards`
-    /// counts too — during a baton touch the arriving card's movement event is
-    /// not pushed (only the replaced member's is), but the card DID appear in
-    /// this batch via record_card_appearance.
+    /// An appearance is a discrete event, so the CURRENT event is the identity —
+    /// not "appeared at some point this turn". The current event is identified by
+    /// two sources, in order:
+    ///
+    ///   1. The live batch signals (`recently_appeared_cards`, `moved_cards`,
+    ///      `recently_moved_cards`).
+    ///   2. The enqueue-time appearance snapshot (`entry_trigger_appeared_cards`),
+    ///      the appearance mirror of `entry_trigger_moved_cards`. The effect-time
+    ///      condition re-check runs after the live appearance batch is consumed, so
+    ///      without this fallback a self-referential 登場 condition would have no
+    ///      subject and Coco's draw would never fire.
+    ///
+    /// The turn-scoped `has_card_appeared_this_turn` fallback is deliberately
+    /// gone: it let a self-scoped 自動 re-fire on a LATER, unrelated appearance in
+    /// the same turn (e.g. きな子 gained ブレード when a *different* きな子 debuted,
+    /// because the batch and the enqueue snapshot both named the other member, not
+    /// her). See docs/JIDOU_COMBINATION_WORK.md §6.
     fn appeared_in_current_batch(&self, cid: i16) -> bool {
-        (self.moved_cards.is_empty()
+        if self.game_state.recently_appeared_cards.contains(&cid)
             || self.moved_cards.contains(&cid)
             || self
                 .game_state
                 .recently_moved_cards
                 .as_ref()
                 .is_some_and(|v| v.contains(&cid))
-            || self.game_state.recently_appeared_cards.contains(&cid))
-            && self.game_state.has_card_appeared_this_turn(cid)
+        {
+            return true;
+        }
+        if let Some(enq) = self.game_state.entry_trigger_appeared_cards() {
+            return enq.contains(&cid);
+        }
+        false
     }
 
     /// Cost-limit gate: does any card on the stage have a cost satisfying the

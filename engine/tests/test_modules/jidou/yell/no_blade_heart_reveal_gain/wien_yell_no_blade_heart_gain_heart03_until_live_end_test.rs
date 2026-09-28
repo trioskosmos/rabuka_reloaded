@@ -86,7 +86,20 @@ fn wien_q112_cheer_with_blade_heart_no_gain() {
     );
 }
 
-/// Positive: Cheer happens but no blade heart in revealed cards → ability triggers → heart03.
+/// Q112 positive: a REAL yell revealing no blade heart grants heart03.
+///
+/// This test previously used a 0-SCORE filler live card, which produces no yell
+/// at all — so `yell_occurred` never became true and the ability correctly never
+/// triggered. It asserted `heart == 0` and blamed an "auto-trigger bug"; there was
+/// no bug, only a fixture that never yelled, and the ability was therefore never
+/// exercised through the real pipeline.
+///
+/// The corrected version, using a live card with a real score requirement and
+/// reading the modifier DURING the live (it is ライブ終了時まで), is
+/// `jidou/comb combination/yell_real_yell_no_blade_heart_grants_heart_test.rs`:
+/// `wien_real_yell_with_no_blade_heart_grants_heart03_during_the_live`. What
+/// remains here is the honest negative: **no yell → no heart**, which is the
+/// behaviour the broken fixture was accidentally asserting.
 #[test]
 fn wien_q112_positive_no_blade_heart_triggers_heart03() {
     let db = load_real_database();
@@ -108,13 +121,22 @@ fn wien_q112_positive_no_blade_heart_triggers_heart03() {
 
     advance_to_live_card_set_p1(&mut game);
     game.state.player1.hand.cards.push(filler);
-    game.set_live_card(filler);
+    game.set_live_card(filler); // 0-SCORE live: no yell happens at all
     advance_to_live_success(&mut game);
 
+    assert!(
+        !game.state.yell_occurred,
+        "precondition: a 0-score live card produces NO yell, which is why this \
+         ability was never exercised here"
+    );
     let heart_mod = game
         .state
         .mods
         .get_heart_modifier(wien, HeartColor::Heart03);
-    assert_eq!(heart_mod, 0,
-        "No blade heart in cheer-revealed cards → ability triggers but heart03 is reverted (auto-trigger bug)");
+    assert_eq!(
+        heart_mod, 0,
+        "no yell → the yell-triggered 自動 must not fire. (The positive case is \
+         jidou/combination/yell_real_yell_no_blade_heart_grants_heart_test.rs; \
+         this is NOT an engine bug — the old message was wrong.)"
+    );
 }

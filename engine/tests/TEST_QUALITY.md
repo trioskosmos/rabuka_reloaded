@@ -24,7 +24,7 @@ _trigger event hand-pushed with no real ability resolution in the same fn (weake
 
 None.
 
-## pendency_only (2)
+## pendency_only (3)
 
 _has_pending_choice asserted without choice identity (pending_choice_type/summary/answer) or outcome asserts_
 
@@ -32,6 +32,7 @@ _has_pending_choice asserted without choice identity (pending_choice_type/summar
 | --- | --- | --- | --- |
 | `engine/tests/test_modules/effects/gain/hearts/color_choice/chosen_colour_is_a_replacement_not_a_grant_test.rs` | `kasumi_colour_override_does_not_survive_the_live_that_set_it` | 198 |  |
 | `engine/tests/test_modules/jidou/debut_watch/three_way_choices_and_look_at_three_test.rs` | `wakana_the_chosen_heart_replaces_her_printed_hearts` | 159 |  |
+| `engine/tests/test_modules/jidou/yell/no_blade_heart_reveal_gain/no_blade_heart_reveal_two_watchers_modifier_bounds_test.rs` | `yell_two_no_blade_heart_watchers_are_covered_by_the_real_yell_test` | 31 |  |
 
 ## assert_only_negative (0)
 
@@ -135,7 +136,7 @@ _a fixed `for _ in 0..N { pass() }` walk through the turn — a phase gaining or
 
 None.
 
-## similar_cards (25)
+## similar_cards (26)
 
 _confusable card numbers (bp2 vs pb2) staged in one file AND the file pins card identity (assert_card_identity / compares card_no), so a transposition would fail loudly_
 
@@ -160,6 +161,7 @@ _confusable card numbers (bp2 vs pb2) staged in one file AND the file pins card 
 | `engine/tests/test_modules/integration/full_round/real_card_phase_walkthrough_and_ability_suite_test.rs` | `<file>` | 1 | PL!S-bp2-009-R, PL!S-bp5-009-R |
 | `engine/tests/test_modules/integration/per_card/live_end_expiry_rollover_and_dual_trigger_window_gates_test.rs` | `<file>` | 1 | PL!HS-bp5-004-R, PL!HS-bp6-004-R |
 | `engine/tests/test_modules/jidou/ability_watch/copied_ability_registration_lifecycle_test.rs` | `<file>` | 1 | PL!N-bp4-007-R＋, PL!N-bp5-007-R＋ |
+| `engine/tests/test_modules/jidou/combination/rurino_stage_to_waitroom_watcher_baseline_test.rs` | `<file>` | 1 | PL!HS-bp6-019-N, PL!HS-pb1-019-N |
 | `engine/tests/test_modules/jidou/movement/self_area_move_watch/appearance_and_repeated_swaps_stack_blades_test.rs` | `<file>` | 1 | PL!SP-bp5-006-R, PL!SP-pb1-006-R |
 | `engine/tests/test_modules/jidou/movement/under_member_placement/live_success_or_self_move_place_discard_group_member_under_self_test.rs` | `<file>` | 1 | PL!SP-bp5-006-R, PL!SP-pb2-006-R |
 | `engine/tests/test_modules/jidou/yell/yell_reveal_threshold_resources/distinct_blade_heart_types_three_and_six_gain_heart01_test.rs` | `<file>` | 1 | PL!S-PR-015-PR, PL!S-bp2-015-PR |
@@ -185,10 +187,11 @@ _every assertion is an INEQUALITY on a count and there is no assert_eq anywhere 
 
 None.
 
-## unresolvable_card_id (1)
+## unresolvable_card_id (2)
 
 _a card-number literal that is not in the database — either written inline in a `game.id("…")` or bound to a name (`const X: &str = "…"` / `let x: &str = "…"`), because const-bound card numbers are the dominant idiom here and the call-site form alone cannot see them. get_card_id's lenient fallback silently substitutes a DIFFERENT PRINT of the same card, so the test stages the wrong card and passes: `PL!SP-bp1-014-PR` resolved to `PL!SP-bp1-014-N` and left a "three DISTINCT names" premise unpinned_
 
 | file | test | line | detail |
 | --- | --- | --- | --- |
 | `engine/tests/test_modules/effects/state/wait_activation/wondermates_group_filter_negatives_test.rs` | `<literal>` | 30 | PL!N-bp1-013-R |
+| `engine/tests/test_modules/jidou/combination/sp_bp5_005_mill_arms_jidou_recover_test.rs` | `<literal>` | 44 | PL!SP-bp1-002-R |

@@ -15,8 +15,24 @@ fn advance_to_live(game: &mut TestGame) {
     game.advance_to_phase(rabuka_engine::game_state::Phase::FirstAttackerPerformance);
 }
 
+/// Two yell-triggered watchers share one yell: Sumire (heart06) and Wien
+/// (heart03) each grant their own colour, because the condition is
+/// "the yelLED set contains no blade heart" — true for both.
+///
+/// This test previously asserted `h == 0 || h == 1` for each watcher, which is
+/// true for every value, and drove the live with a 0-SCORE live card, so **no
+/// yell occurred at all** and both were trivially 0. It proved nothing.
+///
+/// The corrected real-pipeline test — a live card with a real score requirement,
+/// reading each watcher during the live — is
+/// `jidou/combination/yell_real_yell_no_blade_heart_grants_heart_test.rs`
+/// (`wien_real_yell_...` and `sumire_real_yell_...`, plus the no-yell negative).
+/// This file keeps only the phase-advance helper it shares.
 #[test]
-fn yell_two_no_blade_heart_watchers_have_zero_or_one_heart_modifier() {
+fn yell_two_no_blade_heart_watchers_are_covered_by_the_real_yell_test() {
+    // Intentionally does not assert a grant: a 0-score live cannot yell, so the
+    // only honest statement here is that this fixture cannot exercise the
+    // abilities. See the module note above for where the real coverage lives.
     let db = load_real_database();
     let mut game = TestGame::new(db);
     let sumire = game.id("PL!SP-bp2-015-N");
@@ -25,18 +41,21 @@ fn yell_two_no_blade_heart_watchers_have_zero_or_one_heart_modifier() {
     let filler = game.id("PL!-sd1-010-SD");
     let energy = game.id("LL-E-001-SD");
     game.state.player1.stage.stage = [bladed, sumire, wien];
-    for _ in 0..30 { game.state.player1.main_deck.cards.push(energy); game.state.player2.main_deck.cards.push(filler); }
+    for _ in 0..30 {
+        game.state.player1.main_deck.cards.push(energy);
+        game.state.player2.main_deck.cards.push(filler);
+    }
     game.state.player1.hand.cards.push(filler);
     advance_to_live(&mut game);
-    game.set_live_card(filler);
+    game.set_live_card(filler); // 0-SCORE live => no yell
     game.advance_to_phase(rabuka_engine::game_state::Phase::LiveVictoryDetermination);
     while game.has_pending_choice() {
         game.select_indices(&[]);
     }
-    // Both should have triggered (each has its own heart color)
-    // At least one should have heart
-    let h_sumire = game.state.mods.get_heart_modifier(sumire, HeartColor::Heart06);
-    let h_wien = game.state.mods.get_heart_modifier(wien, HeartColor::Heart03);
-    assert!(h_sumire == 0 || h_sumire == 1);
-    assert!(h_wien == 0 || h_wien == 1);
+    assert!(
+        !game.state.yell_occurred,
+        "a 0-score live card produces no yell, so this fixture cannot exercise \
+         these watchers — the real coverage is in \
+         jidou/combination/yell_real_yell_no_blade_heart_grants_heart_test.rs"
+    );
 }

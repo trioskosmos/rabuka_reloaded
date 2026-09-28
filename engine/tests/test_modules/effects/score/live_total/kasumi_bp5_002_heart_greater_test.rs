@@ -66,17 +66,43 @@ fn kasumi_with_own_side_lower_still_checks_both() {
     assert_eq!(game.state.mods.p1_constant_total_score_bonus, 1, "Kasumi still highest among own side + empty opponent");
 }
 
+/// A higher member on her OWN side disqualifies her, exactly as a higher member
+/// on the opponent's side does (`kasumi_lower_than_opponent_no_gain`).
+///
+/// `scope: both`, `all: true`, `exclude_self: true` — she must be strictly higher
+/// than every other member across **both** stages, so the comparison member must
+/// NOT be another 未来.
+///
+/// This test previously staged a second `PL!N-bp5-002-R` as the higher own-side
+/// member and asserted `bonus == 0 || bonus == 1` "to document as permissive".
+/// That was wrong twice over: the disjunction is over the same variable (true
+/// for any outcome — the `or-equal-self` shape
+/// `python cards/jidou_test_audit.py --sweep c` reports), and the fixture made
+/// the "higher" member a 未来 herself, who is then the highest on the board and
+/// legitimately grants her own +1. The engine was right throughout; the +1
+/// belonged to the second 未来, not to the one under test.
+///
+/// The comparison member here is a non-未来 card, so nobody else can grant and
+/// the total is attributable to her alone.
 #[test]
 fn kasumi_with_own_side_higher_no_gain() {
     let db = load_real_database();
     let mut game = TestGame::new(db);
     let kasumi = kasumi_id(&game);
-    let high = game.new_id("PL!N-bp5-002-R");
-    game.state.mods.add_heart_modifier(high, rabuka_engine::card::HeartColor::Heart03, 3);
+    let high = filler_id(&game); // a non-未来 member, so only kasumi can grant
+    game.state
+        .mods
+        .add_heart_modifier(high, rabuka_engine::card::HeartColor::Heart03, 6);
     game.state.player1.stage.stage = [kasumi, high, -1];
     game.state.player2.stage.stage = [-1, -1, -1];
     game.state.recalculate_constants();
-    // Current engine: same-side higher still yields bonus 1 (scope both checks opponent only when is_both?); document as permissive.
     let bonus = game.state.mods.p1_constant_total_score_bonus;
-    assert!(bonus == 0 || bonus == 1, "bonus {}", bonus);
+    assert_eq!(
+        bonus, 0,
+        "a member on her OWN side with more hearts disqualifies her: the condition \
+         is 'strictly more hearts than every other member across BOTH stages', not \
+         'more than every opponent'. `high` is a non-未来 card, so nothing else can \
+         grant and this total is hers alone. The old fixture used a second 未来 as \
+         the higher member, who then legitimately granted the +1 itself."
+    );
 }

@@ -185,12 +185,17 @@ fn mymai_two_copies_plus_aqours_live_both_fire() {
 
     advance_to_performance(&mut game);
 
-    // Each MY舞 fires → each adds +1 blade → total should be at least 2
+    // Each MY舞 fires once → +1 blade each → EXACTLY 2. This was
+    // `assert!(blade >= 2)`, a permissive bound: it also passes at 3, 4, 5, so
+    // an engine that fired each copy TWICE (or an extra copy) would sail
+    // through a test whose whole point is that each live-start instance fires
+    // exactly once. The per-instance count is the claim; assert it exactly.
     let blade = game.state.mods.get_blade_modifier(member_a);
-    assert!(
-        blade >= 2,
-        "2 copies of MY舞 should each grant blade, got {}",
-        blade
+    assert_eq!(
+        blade, 2,
+        "two MY舞 copies must each fire ONCE and grant +1 ブレード, so the total \
+         is exactly 2. `>= 2` could not detect over-firing — the permissive \
+         mirror of a turn-limit under-counting."
     );
 }
 
