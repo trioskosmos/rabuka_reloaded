@@ -40,6 +40,19 @@ int rb_translated_execute_gain_ability_effect(GameState *g, int actor,
                                                 AbilityEffect *effect, int host_cid)
 {
     if (!g || !effect) return 0;
+    /* DEBUG TRACING, NOT PARITY. The Rust twin
+     * (engine/src/ability/effects/ability_effects.rs) has no [DBG_GAIN] /
+     * [DBG_GAIN_INNER] output at all; the closest analogue is its
+     * `card_type={:?}` debug at ability_effects.rs:289, which formats the
+     * WHOLE CardType, never its first byte. So the C field is passed whole.
+     *
+     * `card_type_field` / `self_target_field` are `char[24]` / `char[8]`
+     * ARRAYS (include/rabuka.h:136-137), not pointers. Passing `[0]` promotes
+     * a char to int and printf dereferences the printed BYTE as an address:
+     * "member_card"[0] == 'm' == 0x6d, so the call read address 109 and the
+     * process died. The decoder (vm.c:746-766) always NUL-terminates both
+     * arrays and effect_new() calloc's them, so the whole array is a valid C
+     * string. Never reintroduce the `[0]` here. */
     fprintf(stderr, "[DBG_GAIN] actor=%d host=%d act=%s ag=%s gat=%s ge=%s ge_act=%s ge_tgt=%s ge_cnt=%d src=%s ct=%s gn=%s self_tgt=%s nsel=%d cond=%d\n",
             actor, host_cid, effect->action?effect->action:"-",
             effect_extra(effect,"ability_gain")?:"-",
@@ -48,16 +61,19 @@ int rb_translated_execute_gain_ability_effect(GameState *g, int actor,
             (effect->gained_effect&&effect->gained_effect->action)?effect->gained_effect->action:"-",
             (effect->gained_effect&&effect->gained_effect->target)?effect->gained_effect->target:"-",
             effect->gained_effect?effect->gained_effect->count:-99,
-            effect->source, effect->card_type_field[0],
-            effect_extra(effect,"group_names"),
-            effect->self_target_field[0],
+            effect->source?effect->source:"-", effect->card_type_field,
+            effect_extra(effect,"group_names")?:"-",
+            effect->self_target_field,
             g->n_selected_cards, effect->has_condition);
     if (effect->gained_effect) {
         const AbilityEffect *gi = effect->gained_effect;
         fprintf(stderr, "[DBG_GAIN_INNER] count=%d target=%s action=%s value=%s nex=%d\n",
-                gi->count, gi->target, gi->action, effect_extra(gi, "value"), gi->n_extra);
+                gi->count, gi->target?gi->target:"-", gi->action?gi->action:"-",
+                effect_extra(gi, "value")?:"-", gi->n_extra);
         for (int i = 0; i < gi->n_extra; i++)
-            fprintf(stderr, "[DBG_GAIN_INNER_KV] %s = %s\n", gi->extra_k[i], gi->extra_v[i]);
+            fprintf(stderr, "[DBG_GAIN_INNER_KV] %s = %s\n",
+                    gi->extra_k[i]?gi->extra_k[i]:"-",
+                    gi->extra_v[i]?gi->extra_v[i]:"-");
     }
     if (effect->source && strcmp(effect->source, "stage") == 0 &&
         effect->card_type_field[0] && !strcmp(effect->card_type_field, "member_card") &&
@@ -208,12 +224,15 @@ int rb_translated_execute_invalidate_ability(GameState *g, int actor,
                                               AbilityEffect *effect)
 {
     if (!g || !effect) return 0;
+    /* See the [DBG_GAIN] note above: the arrays are printed WHOLE, never as
+     * `[0]`. Printing `[0]` handed printf an int and it dereferenced the byte
+     * as a pointer ('m' -> address 0x6d -> access violation). */
     fprintf(stderr, "[DBG_INVAL] actor=%d act=%d tt=%s dur=%s tgt=%s ct=%s gn=%s self=%s\n",
-            actor, g->activating_card, effect_extra(effect,"target_trigger"),
-            effect_extra(effect,"duration"), effect->target,
-            effect->card_type_field[0],
-            effect_extra(effect,"group_names"),
-            effect->self_target_field[0]);
+            actor, g->activating_card, effect_extra(effect,"target_trigger")?:"-",
+            effect_extra(effect,"duration")?:"-", effect->target?effect->target:"-",
+            effect->card_type_field,
+            effect_extra(effect,"group_names")?:"-",
+            effect->self_target_field);
     const char *trigger = effect_extra(effect, "target_trigger");
     if (!trigger || !*trigger) return 0;
     /* Rust (ability_effects.rs:242-251) runs the duration code through
@@ -352,7 +371,8 @@ int rb_translated_execute_gain_ability_from_source(GameState *g, int actor,
     if (!g || !effect) return 0;
     int target_card = g->activating_card >= 0 ? g->activating_card : host_cid;
     if (target_card < 0) return 0;
-    fprintf(stderr, "[DBG_FROM_SRC] actor=%d target=%d host=%d ct=%s cost_limit=%s op=%s group=%s tf=%s n=%d\n", actor, target_card, host_cid, effect->card_type_field[0]?effect->card_type_field:"-", effect_extra(effect,"cost_limit")?:"-", effect_extra(effect,"cost_limit_operator")?:"-", effect_extra(effect,"group_names")?:"-", effect_extra(effect,"trigger_filter")?:"-", g->n_selected_cards);    while (rb_card_num_gained_abilities(g, target_card) > 0)
+    fprintf(stderr, "[DBG_FROM_SRC] actor=%d target=%d host=%d ct=%s cost_limit=%s op=%s group=%s tf=%s n=%d\n", actor, target_card, host_cid, effect->card_type_field[0]?effect->card_type_field:"-", effect_extra(effect,"cost_limit")?:"-", effect_extra(effect,"cost_limit_operator")?:"-", effect_extra(effect,"group_names")?:"-", effect_extra(effect,"trigger_filter")?:"-", g->n_selected_cards);
+    while (rb_card_num_gained_abilities(g, target_card) > 0)
         rb_remove_gained_ability(g, target_card, 0);
 
     int owner = rb_owner_of_card(g, target_card);
