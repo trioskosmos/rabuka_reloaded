@@ -1524,6 +1524,7 @@ impl<'a> CardFilter<'a> {
                 "has_blade_heart" => db.get_card(id).is_some_and(|c| c.has_blade_heart()),
                 "has_score_icon" => db.get_card(id).is_some_and(|c| c.has_score_icon()),
                 "has_all_blade" => db.get_card(id).is_some_and(|c| c.has_all_blade()),
+                "has_draw_icon" => db.get_card(id).is_some_and(|c| c.has_draw_icon()),
                 _ => false,
             };
             let passes = if self.negation {

@@ -1,4 +1,4 @@
-//! 小泉花陽 `PL!-pb2-007-PP` (起動)
+﻿//! 小泉花陽 `PL!-pb2-007-PP` (起動)
 //!
 //! Text, with the icon markup rendered as plain labels:
 //!
@@ -24,7 +24,7 @@ const FILLER: &str = "PL!-sd1-010-SD";
 const MUS_LIVE: &str = "PL!-pb1-029-SRL"; // 知らないLove, lily white
 const MUS_LIVE2: &str = "PL!-bp4-025-SRL"; // 微熱からMystery, lily white
 /// A μ's LIVE that is not a μ's-group live — must not be recovered or counted.
-const NON_MUS_LIVE: &str = "LL-PR-004-PR";
+const NON_MUS_LIVE: &str = "LL-PR-004-PR"; // 愛♡スクリ～ム！, AiScReam — a live that is NOT 『μ's』
 
 /// Stand HANAYOME with `waitroom` and `success` seeded; pay the cost by activating.
 /// Returns (energy activated, whether she reached the waitroom, hand size).

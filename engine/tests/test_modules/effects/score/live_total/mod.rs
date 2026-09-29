@@ -9,5 +9,6 @@ pub mod live_success_self_effect_move_live_total_score_test;
 pub mod opponent_success_score_six_constant_total_bonus_test;
 pub mod opponent_surplus_constant_total_score_test;
 pub mod optional_discard_named_members_live_total_score_test;
+pub mod pl_pb2_001_pp_icon_gated_live_start_test;
 pub mod side_member_original_blade_gated_constant_score_test;
 pub mod twelve_energy_pl_sp_pb1_002_r_test;

@@ -318,6 +318,26 @@ fn log_factorials(n: u64) -> Vec<f64> {
 
 /// Exact two-sided McNemar p-value. Under H0 (the two policies are
 /// interchangeable) the discordant pairs split Binomial(b + c, 1/2).
+///
+/// ## The bug this had, and why it mattered more than any bot change
+///
+/// It computed `C(n, k)` as `(lf[n] - lf[k] - lf[n-k]).exp()` and only divided
+/// by `2^n` afterwards. `C(n, k)` for `k` near `n/2` grows like `2^n`, so the
+/// exponential overflows `f64` (which tops out around `exp(709)`) once
+/// `n * ln 2` exceeds it — roughly **`n > 1020` discordant pairs**. Past that
+/// every term is `inf`, the tail is `inf`, and `(2.0 * inf).min(1.0)` is
+/// **exactly 1.0**.
+///
+/// So the p-value was not wrong for large samples, it was *structurally unable
+/// to be anything but 1.0*, and it reported that with no warning. Observed
+/// directly: a run with 933 baseline-only and 1259 candidate-only discordant
+/// pairs — about as lopsided as a paired test gets — printed
+/// `exact McNemar two-sided p = 1.00000`. Any conclusion of the form "no
+/// significant difference" drawn at n >= ~2000 from this function was a
+/// statement about the arithmetic, not about the bots.
+///
+/// Fixed by staying in log space: the exponent carries `-n*ln2` so each term
+/// is the probability itself, bounded by 1, and only the sum is formed.
 fn mcnemar_exact_p(b: u64, c: u64) -> f64 {
     let n = b + c;
     if n == 0 {
@@ -325,11 +345,14 @@ fn mcnemar_exact_p(b: u64, c: u64) -> f64 {
     }
     let lf = log_factorials(n);
     let m = b.min(c);
+    let ln2 = std::f64::consts::LN_2;
     let mut tail = 0.0f64;
     for k in 0..=m {
         let k = k as usize;
-        let coeff = (lf[n as usize] - lf[k] - lf[n as usize - k]).exp();
-        tail += coeff / 2f64.powi(n as i32);
+        // ln C(n,k) - n*ln2 == ln P(X = k) under Binomial(n, 1/2). Never
+        // exponentiate the coefficient alone: that is the overflow.
+        let log_term = lf[n as usize] - lf[k] - lf[n as usize - k] - (n as f64) * ln2;
+        tail += log_term.exp();
     }
     (2.0 * tail).min(1.0)
 }
@@ -587,13 +610,41 @@ fn report_paired(baseline: &[GameOutcome], candidate: &[GameOutcome], base_label
         );
     }
 
+    // The verdict's SIGN has to come from the paired win count, not from the
+    // decisive-rate swing.
+    //
+    // It used the swing, and the swing is the fraction of games that were
+    // decisive. When both runs are fully decisive — no draws anywhere, which is
+    // the normal case for a mirror matchup — the swing is exactly 0.0 for any
+    // change at all, so the sign test fell through to the else branch and
+    // printed "SIGNIFICANT REGRESSION" for a large win. Observed: a config that
+    // took v8 from 44% to 53.9% (228 candidate-only wins against 105
+    // baseline-only, p = 0.00000) was announced as a regression. Decisive rate
+    // measures draw frequency, which is a property of the rules and the matchup,
+    // not of whether the bot got better — it is a control, not a scoreboard.
+    let base_wins = (both_win + b_only) as f64;
+    let cand_wins = (both_win + c_only) as f64;
+    let win_swing = if joined > 0 {
+        100.0 * (cand_wins - base_wins) / joined as f64
+    } else {
+        0.0
+    };
+    println!(
+        "  paired win rate {}: baseline {:.1}% -> candidate {:.1}%  ({:+.2} pp)",
+        if brief { "P1" } else { "P1" },
+        100.0 * base_wins / joined.max(1) as f64,
+        100.0 * cand_wins / joined.max(1) as f64,
+        win_swing,
+    );
     println!(
         "  VERDICT: {}",
         if p < 0.05 {
-            if swing > 0.0 {
+            if win_swing > 0.0 {
                 "SIGNIFICANT IMPROVEMENT"
-            } else {
+            } else if win_swing < 0.0 {
                 "SIGNIFICANT REGRESSION"
+            } else {
+                "SIGNIFICANT BUT NO WIN-RATE CHANGE (the p-value moved on a different set of games; treat as noise)"
             }
         } else {
             "no significant difference (do not ship a change on this evidence)"
@@ -2175,13 +2226,23 @@ fn main() -> ArenaResult<()> {
 
     let secs = t0.elapsed().as_secs_f64();
     if std::env::var_os("ARENA_BRIEF").is_some() {
+        // `nocontest` is on this line, not buried in the draw-types block,
+        // because a bot can break the game rather than lose it. A configuration
+        // that ends 71% of games in an engine-terminated 0-0 still prints a
+        // plausible win/loss line over the remaining 29% — and that line is
+        // what a sweep reads. It was measured doing exactly that: a config
+        // scoring a healthy-looking 191-209 at n=400 while 2130 of 3000 games
+        // at n=3000 were no-contests at a median of two turns. The n=400 cell
+        // was clean and the n=3000 cell was not, on the same switch, and the
+        // only way to have known at the time was this number.
         println!(
-            "RESULT {} vs {} | {} - {} | {} draws | {} actions | {:.2} turns",
+            "RESULT {} vs {} | {} - {} | {} draws ({:.1}% nocontest) | {} actions | {:.2} turns",
             kind_name(p1_kind),
             kind_name(p2_kind),
             wins[0],
             wins[1],
             draws,
+            100.0 * stall_draws as f64 / games.max(1) as f64,
             total_actions,
             total_turns as f64 / games.max(1) as f64,
         );
@@ -2392,6 +2453,42 @@ mod tests {
     }
 
     /// A paired test is only meaningful on a fixed game count.
+    #[test]
+    fn mcnemar_survives_more_than_a_thousand_discordant_pairs() {
+        // The counts that produced `p = 1.00000` on 2192 discordant pairs.
+        // A lopsided split like this is a difference of many standard errors;
+        // returning 1.0 is not a conservative answer, it is a broken one, and it
+        // fails in the dangerous direction: it hides a real effect.
+        let p = mcnemar_exact_p(933, 1259);
+        assert!(
+            p < 1e-6,
+            "933 vs 1259 discordant must be overwhelmingly significant, got {p}"
+        );
+        // And the symmetric case is exactly 1.0, which is the boundary check.
+        assert!((mcnemar_exact_p(500, 500) - 1.0).abs() < 1e-12);
+        // A near-tie stays non-significant, so the fix did not overcorrect into
+        // "everything is significant".
+        assert!(mcnemar_exact_p(700, 720) > 0.05);
+        // No discordance at all.
+        assert_eq!(mcnemar_exact_p(0, 0), 1.0);
+        // Agreement on every pair cannot be significant either.
+        assert!(mcnemar_exact_p(0, 0) >= 1.0);
+    }
+
+    #[test]
+    fn mcnemar_agrees_with_the_closed_form_at_small_n() {
+        // b=1, c=6: n=7, tail = C(7,0)+C(7,1) = 8, two-sided p = 2*8/2^7 =
+        // 0.125 exactly. (The commonly quoted 0.21875 for this split is the
+        // continuity-corrected chi-square, not the exact test — worth pinning
+        // here, because "the textbook value" for a paired test is often not the
+        // paired test.)
+        let p = mcnemar_exact_p(1, 6);
+        assert!((p - 0.125).abs() < 1e-9, "small-n exact value drifted: {p}");
+        assert!((mcnemar_exact_p(3, 3) - 1.0).abs() < 1e-12);
+        // b=2, c=8: n=10, tail = 1+10+45 = 56, p = 2*56/1024 = 0.109375.
+        assert!((mcnemar_exact_p(2, 8) - 0.109375).abs() < 1e-9);
+    }
+
     #[test]
     fn paired_mode_requires_a_fixed_game_count() {
         let Err(err) = Options::parse(&args(&["v8", "v7", "10", "--vs", "base.csv"]), None) else {

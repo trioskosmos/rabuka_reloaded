@@ -1,4 +1,4 @@
-﻿//! 東條 希 `PL!-pb2-026-N` (起動, ターン1回)
+﻿//! 小泉花陽 `PL!-pb2-026-N` (起動, ターン1回)
 //!
 //! Text, with the icon markup rendered as plain labels:
 //!
@@ -101,40 +101,52 @@ fn resolve_with_top(top: &[&str]) -> (Pools, Pools, TestGame) {
     (at_activation, after, game)
 }
 
-/// The cost: one hand card is discarded, and the self-wait half is RECORDED rather
-/// than asserted.
+/// The cost: she goes to wait, and a hand card is discarded.
 ///
-/// Paying the cost reliably discards a hand card, but her orientation reads back as
-/// active rather than waited. Under rule 9.4.2.2 the binary self-wait sub-cost is
-/// DEFERRED until the choice sub-cost resolves, and it is not being applied when that
-/// happens. Recorded here so the defect is visible in the suite; see
-/// docs/PBLL02_ABILITY_REVIEW.md 8.3.
-/// The cost step, recorded rather than asserted on a delta.
+/// This test previously carried a confident claim that the self-wait sub-cost is NOT
+/// applied — "under rule 9.4.2.2 the binary self-wait sub-cost is DEFERRED until the
+/// choice sub-cost resolves, and it is not being applied when that happens" — and then
+/// measured two things without asserting either of them. The claim is **false**: paying
+/// the cost does put her into wait.
 ///
-/// Two things are measured and neither is asserted:
+/// The confusion is understandable and worth recording. A `sequential_cost` resolves its
+/// elements in order, so the hand-selection prompt for the discard comes FIRST and the
+/// orientation is still `active` while that prompt is up; only once the discard has been
+/// answered does the deferred self-wait land. Sampling at the wrong moment reads as "not
+/// applied".
 ///
-///   * her orientation reads back ACTIVE, not waited. Under rule 9.4.2.2 the binary
-///     self-wait sub-cost is DEFERRED until the choice sub-cost resolves, and it is
-///     not being applied when that happens. See docs/PBLL02_ABILITY_REVIEW.md §8.3.
-///   * the hand DELTA cannot witness the cost's discard, because the look's take
-///     moves a card in the opposite direction on the same counter. A hand-delta
-///     assertion here would be a measurement claim dressed as a behaviour claim.
+/// The contrast that settles it: `PL!-pb2-008-PP` carries the SAME self-wait as a
+/// STANDALONE `change_state` cost and applies it; this card carries it as the first
+/// element of a `sequential_cost` and also applies it. Neither form is broken, which is
+/// why the "008 / 018 / 026 are all broken by their optional costs" pattern this file
+/// once asserted does not survive contact with the cards.
 #[test]
-fn paying_the_cost_resolves_and_the_look_banks() {
+fn paying_the_cost_waits_her_and_discards_a_hand_card() {
     let (before, after, game) = resolve_with_top(&[P_MEMBER]);
-    println!(
-        "orientation after paying the cost = {:?}; hand {} -> {}; waitroom {} -> {}",
-        game.state.mods.get_orientation_modifier(game.id(NOZOMI)),
-        before.hand,
-        after.hand,
-        before.waitroom,
-        after.waitroom
+
+    // The card that is IN PLAY, not a fresh instance. `id()` hands out a new pooled
+    // instance per call, so asking about `game.id(NOZOMI)` here would inspect a card
+    // that was never played and always read back as unwaited. That is precisely what the
+    // previous version of this test did inside its `println!`, and it is where the
+    // "self-wait is not applied" claim came from — the same error as the vacuous
+    // assertion in `PL!-pb2-015-P＋`.
+    let her = game.state.player1.stage.stage[MemberArea::Center as usize];
+    assert_ne!(her, -1, "precondition: she is on the centre stage");
+    assert_eq!(
+        game.state.mods.get_orientation_modifier(her),
+        Some("wait"),
+        "このメンバーをウェイトにし — the self-wait half of the 起動 cost DOES apply, once \
+         the discard prompt that precedes it has been answered"
     );
     assert!(
         after.waitroom >= before.waitroom,
         "残りを控え室に置く — the look banks its unselected cards, so the waitroom does \
          not shrink"
     );
+    // A hand-delta assertion is deliberately NOT made here: the look's take moves a card
+    // in the opposite direction on the same counter, so a delta conflates the discard
+    // with the take. That is a measurement claim dressed as a behaviour claim, which is
+    // what this test used to be.
 }
 
 /// The look offers exactly the Printemps members among the top 3.

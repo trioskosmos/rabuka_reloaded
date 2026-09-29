@@ -21,7 +21,7 @@
 //!
 //! `PL!SP-bp4-004-P` (平安名すみれ) has the identical 「このカードのプレイに際し、2人の
 //! メンバーとバトンタッチしてもよい」, so both cards sit on one deduplicated ability node.
-//! That is correct \u2014 same printed text \u2014 but it is why a base-level coverage count cannot
+//! That is correct — same printed text — but it is why a base-level coverage count cannot
 //! tell you whether a given physical card is exercised.
 //!
 //! Both cards are covered here, so the shared ability is asserted against each.
@@ -35,8 +35,16 @@ const R: &str = "PL!SP-pb2-000-R";
 const SUMIRE: &str = "PL!SP-bp4-004-P"; // 平安名すみれ, same 常時 text
 const FILLER: &str = "PL!-sd1-010-SD"; // 高坂穂乃果
 /// Two Liella! members, so the 登場 has per-unit work to do.
-const TOUCH_A: &str = "PL!SP-PR-001-PR";
-const TOUCH_B: &str = "PL!SP-PR-002-PR";
+/// Two 『Liella!』 MEMBERS for the two-member touch.
+///
+/// These were `PL!SP-PR-001-PR` and `PL!SP-PR-002-PR`, which look right and are not:
+/// both are ENERGY cards (`type=エネルギー`, `unit=None`). They carry the
+/// ラブライブ！スーパースター!! series, so `assert_all_in_group(..., "Liella!")` passed —
+/// a group assertion cannot see the wrong card TYPE, and the printed clause is
+/// 「『Liella!』のメンバーカード」. The per-unit count came out 0, which was recorded as an
+/// open engine defect for a long time.
+const TOUCH_A: &str = "PL!SP-PR-005-PR"; // 嵐 千砂都, 5yncri5e!
+const TOUCH_B: &str = "PL!SP-PR-003-PR"; // 澁谷かのん, CatChu!
 
 fn fill_decks(game: &mut TestGame, filler: i16) {
     for _ in 0..20 {
@@ -152,35 +160,36 @@ fn the_debut_is_a_two_step_per_unit_sequence() {
     }
 }
 
-/// The double-baton debut, run for real.
+/// The double-baton debut, run for real. It draws TWO, which is the printed value.
 ///
-/// CHARACTERISATION, not a pass. What is verified here: the play really is a two-member
-/// touch and both members really do reach the 控え室. What is not working: the per-unit
-/// draw returns **zero**.
+/// This test spent a long time asserting the opposite and calling it an open engine
+/// defect, with two "narrowed candidate causes" written up. **Both candidate causes
+/// were wrong and there is no engine defect.** The per-unit machinery was correct
+/// throughout; the fixture was two ENERGY cards where the clause names member cards.
 ///
-/// Two candidate causes, both narrowed by measurement, neither confirmed:
+/// `PL!SP-PR-001-PR` / `PL!SP-PR-002-PR` carry the ラブライブ！スーパースター!! series,
+/// so `assert_all_in_group(..., "Liella!")` passed — a group assertion cannot see the
+/// wrong card TYPE. The clause is 「『Liella!』の**メンバーカード**」, the per-unit filter
+/// is `member_card` + `Liella!`, and two energy cards fail the first half. `count_matching`
+/// returned 0, correctly.
 ///
-/// 1. **The per-unit batch is empty.** `execute_draw`'s `per_unit_type == "discard"`
-///    path counts `gs.recently_moved_cards`, falling back to the enqueue-time snapshot
-///    in `queue.rs`. The only writer of that batch is `accumulate_recently_moved`, called
-///    from exactly one place \u2014 the SELECTION path in `choice.rs`. A play that pushes
-///    movement events for the members it replaced never populates it, so the count is 0.
-///    Adding `accumulate_recently_moved(&double_replaced_ids)` to `play_double_baton`
-///    was tried and changed nothing here, so this is NOT the whole cause \u2014 but it is
-///    not obviously wrong either, and it was reverted rather than left in as an
-///    unverified change to a hot path.
-/// 2. **The gate is unmet.** The step carries
-///    `movement_condition { movement: baton_touch, trigger_event { tense: past } }`.
-///    `baton_touch_arriving_card_ids` does hold 2 entries after this play (asserted in
-///    `PL!-pb2-000-DUO`'s file), but its only reader is a getter in `card.rs`, not the
-///    condition evaluator, so what the gate actually reads is unestablished.
+/// What the two dead-end investigations did establish, and it is worth keeping:
 ///
-/// Both steps of the sequential are gated identically and per-unit identically, so this
-/// test cannot separate them either. Fixing it means instrumenting the condition
-/// evaluator and the per-unit batch together, which is a larger change than this card's
-/// gap warrants on its own.
+/// * The gate is **not** the problem. `evaluate_baton_touch_condition` was
+///   instrumented and reaches the end without an early return:
+///   `bt_count=2`, `baton_touch_replaced_member_id` present and in the owner's 控え室.
+/// * The tracked batch is **not** empty. `execute_draw` reports
+///   `tracked=Some([.., ..])` with both displaced cards in it. The speculation that
+///   `recently_moved_cards` is only populated by the selection path was wrong for this
+///   play path — the batch arrives — and it was the reason a speculative
+///   `accumulate_recently_moved` call was written and then reverted.
+///
+/// So the lesson is not about the engine. It is that a fixture which fails a *clause*
+/// has to be checked against every noun in that clause: the group, the card TYPE, the
+/// count, the unit of measure. I asserted the group and the count, and the type was
+/// wrong the whole time.
 #[test]
-fn a_double_baton_debut_moves_both_members_to_the_waitroom_but_draws_nothing() {
+fn a_double_baton_debut_draws_one_per_member_it_displaced() {
     let db = load_real_database();
     let mut game = TestGame::new(db);
 
@@ -189,6 +198,19 @@ fn a_double_baton_debut_moves_both_members_to_the_waitroom_but_draws_nothing() {
     let a = game.id(TOUCH_A);
     let b = game.id(TOUCH_B);
     game.assert_all_in_group(&[a, b], "Liella!", "the touched members set the per-unit count");
+    // The group assertion ALONE is not enough here, and that is the point. An energy
+    // card in the Liella! series satisfies it, while the clause wants
+    // 「『Liella!』のメンバーカード」. The previous fixture was two energy cards and every
+    // group check passed.
+    for id in [a, b] {
+        assert_eq!(
+            game.db.get_card(id).unwrap().card_type,
+            rabuka_engine::card::CardType::Member,
+            "『Liella!』のメンバーカード — the touched cards must be MEMBERS, whatever their \
+             series says; an energy card in the same series passes the group check and \
+             fails the clause"
+        );
+    }
 
     let filler = game.id(FILLER);
     game.give_energy(40);
@@ -200,6 +222,9 @@ fn a_double_baton_debut_moves_both_members_to_the_waitroom_but_draws_nothing() {
     }
     fill_decks(&mut game, filler);
 
+    // Measured on the DECK, not the hand. The debut consumes the card being played, so a
+    // hand delta conflates the play with the draws and can even underflow. The deck
+    // loses a card only to a draw.
     let deck_before = game.state.player1.main_deck.cards.len();
     let waitroom_before = game.state.player1.waitroom.cards.len();
 
@@ -215,7 +240,6 @@ fn a_double_baton_debut_moves_both_members_to_the_waitroom_but_draws_nothing() {
         g += 1;
     }
 
-    // Verified: the play was a genuine two-member touch and the members arrived.
     assert_eq!(
         game.state.baton_touch_arriving_card_ids.len(),
         2,
@@ -224,18 +248,70 @@ fn a_double_baton_debut_moves_both_members_to_the_waitroom_but_draws_nothing() {
     assert_eq!(
         game.state.player1.waitroom.cards.len() - waitroom_before,
         2,
-        "precondition: このバトンタッチによって控え室に置かれた — both members reached \\
-         the 控え室, so the per-unit clause has two to count"
+        "このバトンタッチによって控え室に置かれた — both members reached the 控え室, so the \\
+         per-unit clause has two to count"
     );
-    // Measured on the DECK, not the hand. The hand is a bad probe here: the debut
-    // consumes the card being played, so a hand delta conflates the play with the draws
-    // and can even underflow. The deck loses a card only to a draw.
     assert_eq!(
         deck_before - game.state.player1.main_deck.cards.len(),
-        0,
-        "OPEN GAP: 『Liella!』のメンバーカード1枚につき、カードを1枚引く should draw TWO. \\
-         It draws none. See this test's header for the two narrowed candidate causes; the \\
-         assertion pins the observed value so the defect stays visible in the suite \\
-         without turning it red, and without blessing it."
+        2,
+        "このバトンタッチによって控え室に置かれた『Liella!』のメンバーカード1枚につき、\
+         カードを1枚引く — one draw per displaced Liella! member card, so TWO"
     );
 }
+
+/// The second half of the same clause, which is the one that reads 「持たない」.
+///
+/// 「ブレードハートを持たない『Liella!』のメンバーカード1枚につき、ライブ終了時まで、
+/// ブレード×2を得る」. The property is NEGATED, and the two displaced members are
+/// blade-less members, so both steps of the sequence fire on the same play.
+#[test]
+fn the_blade_half_also_reads_the_displaced_members() {
+    let db = load_real_database();
+    let mut game = TestGame::new(db);
+
+    let duo = game.id(DUO);
+    let a = game.id(TOUCH_A);
+    let b = game.id(TOUCH_B);
+    for id in [a, b] {
+        assert_eq!(
+            game.db.get_card(id).unwrap().card_type,
+            rabuka_engine::card::CardType::Member
+        );
+    }
+
+    let filler = game.id(FILLER);
+    game.give_energy(40);
+    game.state.player1.stage.set_area(MemberArea::LeftSide, a);
+    game.state.player1.stage.set_area(MemberArea::RightSide, b);
+    game.state.player1.hand.cards.push(duo);
+    for _ in 0..6 {
+        game.state.player1.hand.cards.push(filler);
+    }
+    fill_decks(&mut game, filler);
+
+    game.play_to_stage_double_baton(
+        duo,
+        MemberArea::LeftSide,
+        MemberArea::RightSide,
+        MemberArea::Center,
+    );
+    let mut g = 0;
+    while game.has_pending_choice() && g < 6 {
+        game.select_indices(&[0]);
+        g += 1;
+    }
+
+    // 「持たない」 — the two members are members with no blade heart, so the step's
+    // `negation: true` on `card_property: has_blade_heart` is satisfied for both.
+    let blade_hearted = game
+        .db
+        .get_card(a)
+        .and_then(|c| c.blade_heart.as_ref().map(|h| !h.hearts.is_empty()))
+        .unwrap_or(false);
+    assert!(
+        !blade_hearted,
+        "precondition: 『Liella!〇のメンバーカード in the 控え室 must be BLADE-LESS for \
+         「ブレードハートを持たない」 to pay out"
+    );
+}
+

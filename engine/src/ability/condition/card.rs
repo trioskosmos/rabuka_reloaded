@@ -98,6 +98,13 @@ impl<'a> ConditionContext<'a> {
             Some(CardProperty::HasBladeHeart) => "has_blade_heart",
             Some(CardProperty::HasScoreIcon) => "has_score_icon",
             Some(CardProperty::HasAllBlade) => "has_all_blade",
+            Some(CardProperty::HasDrawIcon) => "has_draw_icon",
+            // `_ => return true` is a trap for a new variant. A property that reaches
+            // here unmapped is treated as "no restriction", so the clause fires on
+            // every card in the zone. That is exactly what happened to
+            // 「…{{icon_draw}}を持つカードがある場合」
+            // (PL!-pb2-001-PP): the variant existed, the parser emitted it, and this
+            // arm swallowed it.
             _ => return true,
         };
         let card_db = &self.game_state.card_database;
@@ -147,6 +154,7 @@ impl<'a> ConditionContext<'a> {
                     }
                 }
                 "has_score_icon" => c.is_some_and(|c| c.has_score_icon()),
+                "has_draw_icon" => c.is_some_and(|c| c.has_draw_icon()),
                 "has_all_blade" => {
                     let effective_override = self
                         .game_state
@@ -2966,6 +2974,7 @@ impl<'a> ConditionContext<'a> {
                     CardProperty::HasBladeHeart => c.has_blade_heart(),
                     CardProperty::HasScoreIcon => c.has_score_icon(),
                     CardProperty::HasAllBlade => c.has_all_blade(),
+                    CardProperty::HasDrawIcon => c.has_draw_icon(),
                 })
         });
         let negated = condition.get_negation().unwrap_or(false);

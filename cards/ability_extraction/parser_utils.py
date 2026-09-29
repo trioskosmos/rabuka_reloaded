@@ -81,6 +81,7 @@ ALL_HEART_ICON = "{{icon_all.png|ハート}}"
 SCORE_ICON = "{{icon_score.png|スコア}}"
 ALL_BLADE_ICON = "{{icon_b_all.png|ALLブレード}}"
 HAS_ALL_BLADE_ICON = f"{ALL_BLADE_ICON}を持つ"
+DRAW_ICON = "{{icon_draw.png|ドロー}}"
 
 # The same icons as match patterns, for the few scans that need a regex rather
 # than a substring test.
@@ -89,6 +90,19 @@ BLADE_ICON_HELD_RE = re.compile(r"{{icon_blade\.png\|ブレード}}[^得]*持つ
 
 # 「{{icon_score.png|スコア}}を持つ」 — the one fragment these sites test for.
 HAS_SCORE_ICON = f"{SCORE_ICON}を持つ"
+
+# 「{{icon_draw.png|ドロー}}を持つ」 — the same shape for the draw icon.
+#
+# This was MISSING, and it is not cosmetic. `PL!-pb2-001-PP` reads
+# 「…ドローを持つカードがある場合、自分の控え室から『μ's』のカードを1枚手札に加える」,
+# and with no phrase to match, that clause parsed as a bare
+# `location_condition` — so it fired on ANY live card in the
+# 成功ライブカード置き場. The parser recognised 「スコアを持つ」 and 「ALLブレードを持つ」
+# on either side of it and silently dropped the requirement in the middle. The test that
+# caught it is `a_card_with_none_of_the_icons_fires_nothing`: an empty zone correctly does
+# nothing, but a zone holding a live with no icon does, which is only explicable by a
+# missing property test.
+HAS_DRAW_ICON = f"{DRAW_ICON}を持つ"
 
 
 def count_icons(text, icons):

@@ -579,6 +579,25 @@ impl<'a> ConditionContext<'a> {
     /// qualifier (group_names / cost_limit / card_property) applies to depends
     /// on where that member ended up: replaced members sit in a waitroom, so a
     /// waitroom `location` means the qualifier describes the ARRIVING member,
+    /// `true` only when `ABILITY_DEBUG_BATON_TOUCH` is set.
+    ///
+    /// These traces are load-bearing for whoever is debugging the baton-touch
+    /// condition and must not be removed — but they cannot be left on by
+    /// default. `evaluate_baton_touch_condition` runs from the condition
+    /// evaluator, so an unconditional `eprintln!` here fires on every ability
+    /// check in every game and dumps the entire waitroom each time. That makes
+    /// the engine **UNTRACED**: `BOT_STRATEGY.md` section 8.4 records that
+    /// logging perturbs allocation layout and changes outcomes, and a harness
+    /// that measured a run with this on was measuring the logging. It is
+    /// roughly 40 lines of stderr per game, which also buries the `--brief`
+    /// verdict line the sweeps read.
+    ///
+    /// So: off unless asked for, and the flag is in the `ARENA --env` form so a
+    /// run that needs it can record that it used it.
+    fn baton_touch_trace() -> bool {
+        std::env::var_os("ABILITY_DEBUG_BATON_TOUCH").is_some()
+    }
+
     /// while a stage `location` means it describes the REPLACED one.
     fn evaluate_baton_touch_condition(
         &self,
@@ -588,13 +607,20 @@ impl<'a> ConditionContext<'a> {
         player: &crate::player::Player,
     ) -> bool {
             let triggered = condition.get_baton_touch_trigger().unwrap_or(false);
+            let trace = Self::baton_touch_trace();
+            if trace {
+            }
             if !triggered {
                 return false;
             }
             // Check per-player baton touch count
             let player_id = player.id.as_str();
             let bt_count = self.game_state.get_baton_touch_count(player_id);
+            if trace {
+            }
             if bt_count == 0 {
+                if trace {
+                }
                 return false;
             }
             if let Some(min_count) = condition
@@ -607,7 +633,11 @@ impl<'a> ConditionContext<'a> {
             }
             let replaced_id = match self.game_state.baton_touch_replaced_member_id {
                 Some(id) => id,
-                None => return false,
+                None => {
+                    if trace {
+                    }
+                    return false;
+                }
             };
             // Verify the baton touch belongs to this player: the replaced
             // card must be in this player's waitroom (baton touch always

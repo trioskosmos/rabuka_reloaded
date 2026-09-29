@@ -2687,6 +2687,12 @@ pub enum CardProperty {
     HasScoreIcon,
     #[cfg_attr(feature = "serde_support", serde(rename = "has_all_blade"))]
     HasAllBlade,
+    /// The ドロー icon. Added with `PL!-pb2-001-PP`, whose
+    /// 「…ドローを持つカードがある場合」 clause had no property phrase to match and
+    /// therefore parsed as a bare location filter — it fired on ANY live card in the
+    /// 成功ライブカード置き場, not only one printed with the icon.
+    #[cfg_attr(feature = "serde_support", serde(rename = "has_draw_icon"))]
+    HasDrawIcon,
 }
 
 impl CardProperty {
@@ -2695,6 +2701,7 @@ impl CardProperty {
             CardProperty::HasBladeHeart => "has_blade_heart",
             CardProperty::HasScoreIcon => "has_score_icon",
             CardProperty::HasAllBlade => "has_all_blade",
+            CardProperty::HasDrawIcon => "has_draw_icon",
         }
     }
 
@@ -2705,6 +2712,7 @@ impl CardProperty {
         match s {
             "has_score_icon" => CardProperty::HasScoreIcon,
             "has_all_blade" => CardProperty::HasAllBlade,
+            "has_draw_icon" => CardProperty::HasDrawIcon,
             _ => CardProperty::HasBladeHeart,
         }
     }
@@ -4284,6 +4292,14 @@ impl Card {
         self.blade_heart
             .as_ref()
             .is_some_and(|bh| bh.hearts.contains_key(&HeartColor::BAll))
+    }
+
+    /// The ドロー icon, on `special_heart` — the same field as スコア, and a
+    /// different one from 全ブレード.
+    pub fn has_draw_icon(&self) -> bool {
+        self.special_heart
+            .as_ref()
+            .is_some_and(|sh| sh.hearts.contains_key(&HeartColor::Draw))
     }
 }
 

@@ -330,6 +330,631 @@ cd engine && cargo test --test run_all                       # zero failures
 
 ---
 
+
+### 8.6 A real engine bug the 041 weight exposed
+
+`engine/src/ability/effects/score.rs`, in `execute_modify_score`.
+
+The target pool for a live-card score effect is built from several zones:
+
+```rust
+let mut ids: SmallVec<[i16; 8]> = player
+    .live_card_zone
+    .cards
+    .iter()
+    .chain(player.success_live_card_zone.cards.iter())
+    .copied()
+    .collect();
+```
+
+A live being performed is the live card **and**, once it has succeeded, an entry in the
+success live card zone. When both hold the same card, `ids` contains that id twice, and
+the per-card filter further down keeps both occurrences. The effect is then applied once
+per occurrence, so 「このカードのスコアを＋１する」
+(`PL!-pb2-041-L`) paid out **+2 from a single activation**.
+
+The adjacent self-target push already guarded against exactly this with
+`if !ids.contains(&act)`, which is the tell: the hazard was known at one insertion point
+and unguarded at the other. Fixed with an order-preserving `retain` on `ids` so a card
+id is scored at most once per effect, which matches 「このカード」 being one card.
+
+This is not specific to this card or this expansion — any self-targeted or
+zone-scanning score effect was affected wherever the engine tracks one card in two
+scanned zones.
+
+
+### 8.7 A real parser bug: a さらに clause that vanished (`PL!-pb2-000-DUO` / `-R`)
+
+The 登場 text is two effects and the parse kept one:
+
+> 『μ's〇のメンバー2人からバトンタッチして登場した場合、
+> 自分の控え室にある『μ's〇のライブカードを1枚手牌に加え、
+> そのを、そのメンバー2人のコストの合計が15の場合、
+> ライブ終了時まで、「常時 ライブの合計スコアを＋１する。」を得る。
+
+The waitroom recovery was silently dropped. The cause is not an effect rule:
+
+**`_split_sentences_nesting` breaks only on `。`, and this ability separates every
+clause with `、`.** So it produced a single "sentence", `_matches_furthermore` never
+saw two parts, and the first clause was absorbed into the trailing `場合` condition
+— which is why the old parse had a `cost_total: 15` condition covering text that was
+really an action.
+
+**Fix.** Split on a top-level `その先` itself, which is what the connective means,
+then hoist a leading **trigger** gate to the sequential so it scopes the whole ability.
+The debut is now `[move_cards, gain_ability]` with the baton gate on top.
+
+**The narrow scope was not obvious and I got it wrong twice.** My first version applied
+the marker split to any text where the sentence split failed, which claimed 31 abilities
+and broke 14 tests — the per-unit and `きおおり` handlers above own most of
+them. Two things had to be excluded, and neither is obvious from the text:
+
+- A segment before `その先` that is a **gate**, not an action.
+  `「8枚以上あるかぎり、まださど…」` and
+  `「…場合、まださ…」` are a condition plus its effect. Note
+  the gate segment parses to a *real* action type, so a `action == "custom"` check does
+  not catch it; the giveaway is that its last clause ends in `場合` / `かぎり`.
+- A **bare connective** like `「その後、」`.
+
+Requiring the `その先` to sit inside the **first** `。`-sentence, with exactly
+two clause segments, brings the blast radius to one ability and leaves 000 correct.
+
+**A test can bless a data loss.** The old file had
+`the_waitroom_recovery_is_currently_missing_from_the_parse`, which asserted the clause
+was *absent* and passed. That is how a bug got a green test wrapped round it. It is
+replaced by a positive assertion, and the reasoning is in the file header so nobody
+re-adds an absence test for a thing the card text states unambiguously.
+
+**The runtime trigger is covered now.** This section originally closed by calling the
+recovery "verified as DATA" only. That was accurate at the time and the reason was a
+missing test helper, not a missing feature: the engine takes its double-baton route only
+when the play action carries two area INDICES (`phases.rs::play_double_baton`, which
+records two touches), and `play_to_stage_baton` passes one — so against an empty area it
+simply places the card and the gate's `min_count = 2` can never be met. `play_to_stage_double_baton`
+now exists, and the file runs the whole chain end to end: two recorded touches, the
+『μ's〇のライブカード reaching hand, a non-μ's live in the same 控え室 left alone, and the
+cost-15 half correctly withheld at a 4 + 4 total.
+
+Worth stating plainly, because it cost a whole investigation: **"the fixture cannot express
+this" is a claim about the helpers, and it is checkable.** Before concluding it, look for
+the code path that would handle the case — here `play_double_baton` already existed and
+was reachable, one argument away.
+
+### 8.8 A validator that did not know about `counted_by`
+
+`extract_card_abilities.py` reported `『μ's〇 in … — PL!-pb2-041-L` as a group
+filter with no `group_names` after 041 became typed. The parse was right: the text is
+「自分の『μ's〇のカードの効果によって」, which names the effects that
+*observe* the weight, and that is `counted_by`, not `group_names`. `FILTER_FIELDS` did
+not list it, so the check reported a correct parse as unfiltered. Added, with a comment
+recording that `counted_by` must never be used as a card filter.
+
+
+### 8.9 「同じ選択項を2回以上選でもいい」: two defects behind one red test
+
+`PL!-pb2-016-P+」's file had recorded, for a long time, that selecting a choice option
+runs nothing. It was traced to `SelectTargetKind::Choice` calling `clear_choice_state`
+without recording the selection, and the fix was attempted twice and reverted both times
+because neither attempt changed the behaviour.
+
+**The diagnosis was wrong, and the revert was the right call anyway** — nothing was made
+worse, but nothing was learned. Re-doing it by measurement rather than reading found two
+defects, neither of which is the one that was written down.
+
+**1. Parser: `target: 「self」` on a member the player CHOOSES.** Option 1 parses as
+`change_state` with `target: "self"`, so the engine resolves it to the activating card and
+`change_state` auto-selects that through its `is_self_target` shortcut instead of
+prompting — the option silently did nothing. 「自分のステージにいるメンバー1人をアクティブにする」 names a member
+the player PICKS. Fixed by `_fix_member_selection_target`, which drops `target` for a
+counted member on a stage unless the text says 「このメンバー」.
+
+The same clause shape was broken on `PL!-pb2-015-P+」, whose member-activating option had
+**no test at all** — its file covered the energy option, and even had a test named
+`option_two_activates_no_member` that asserted a *freshly requested* `game.id(BIBI_MEMBER)`
+rather than the card actually standing on stage. `game.id()` hands out a new pooled
+instance per call, so that test could not fail. It now reads the card back from the stage,
+and the missing branch has its own test.
+
+**2. Engine: a per-card scope leaked onto the options.** With the target fixed the option
+still found zero candidates, and the filter said why: `f.group=Some(「lily white」)`. The
+parent choice's group names are 「自分の成功ライブカード置き場にある『lily white〇のカード1枚につき」
+— they scope HOW MANY TIMES the choice is offered, not what an option may touch. But
+`should_propagate_group` in `effects/choice.rs` copies a parent's `group_names` onto every
+option that lacks its own, so option 1 ended up requiring a *lily white* member. Fixed by
+excluding the per-card reading.
+
+The discriminator is not obvious, and the guard is commented with its evidence: of the
+choice effects that carry `group_names`, **016 is the only one whose text contains
+「つき」**. The others (`PL!S-bp7-003-P`, `PL!S-bp5-004-AR`, `PL!N-bp7-005-P`,
+`PL!HS-bp5-022-L`, …) genuinely mean a filter on the options and still propagate. That
+was verified by enumerating them, not by assuming.
+
+**Three things I got wrong while getting here, all recorded because they cost real time:**
+
+- **A card number that is not a card number.** My first fixture staged
+  `PL!-pb1-010-N`. It is absent from `cards.json` but present in the DATABASE, so
+  `game.id()` correctly did not panic and the effect correctly found no candidates —
+  indistinguishable, from inside the test, from an engine bug. I spent a full cycle
+  chasing that. `game.id()` panicking on an unknown number is not sufficient protection
+  when the number resolves to a card that simply is not stage-legal.
+- **`MemberArea::Center as usize` is 1, not 0.** Reading the stage back is still the only
+  way to be sure which instance the fixture used.
+- **Believing the recorded diagnosis.** Every previous note pointed at
+  `SelectTargetKind::Choice`. Reading that code confirmed the selection is discarded, and
+  it is still not why the option did nothing. Two reverts had already proved the note was
+  not actionable; the fix was to instrument, not to keep reading.
+
+
+### 8.10 The recorded OPEN GAP that was never an engine defect (`PL!-pb2-018-P+」`)
+
+This file carried a confident diagnosis: the positive case did not fire because
+
+> the 登場 ability resolves to a single `SelectAutoAbility` prompt and the optional
+> 「3枚控え室に置いてもいい」 cost is never raised afterwards
+
+and called it "engine behaviour for an optional cost on a debut ability whose trigger is
+a combined 「登場／ライブ開始時」 list, not a fixture problem".
+
+**It was a fixture problem, and the fixture was trivially unsatisfiable.** `BIBI_2` was
+`PL!-pb2-003-PP`, annotated in the test as 大潮にこ — but that card is **南ことり**,
+a Printemps member. So of the three "BiBi" discards the cost was asked for, only one was
+BiBi. `offer_hand_cost_choice` correctly found fewer than three eligible cards,
+auto-skipped the optional cost, and the cost's own skip gate then switched the effect
+off. Every link in that chain was right; the input was wrong.
+
+With three genuinely distinct BiBi members the whole thing runs: the auto-ability order
+prompt, then 3 + 2 + 1 hand selections, then the wait. BiBi has exactly three members
+(絞渡絵里 / 西木野真姬 / 大潮にこ), so the cost can be paid in exactly one
+way — the old fixture could never approximate it.
+
+**Two more things the same fixture was hiding.** The old helper drained prompts with
+`select_indices(&[])`, which DECLINES the debut's own 「登場」 order prompt — so the
+ability carrying the cost was never selected in the first place. And the printed
+diagnosis was assembled from that decline, which is why it read as confident and was
+wrong: it described what the helper did, and attributed it to the engine.
+
+**The generalisable lesson, now enforced in the file.** A wrong fixture constant is
+silent. The card number resolves, the card exists, it is simply the wrong card — and the
+resulting failure looks exactly like a deep engine bug. This happened three times in this
+expansion, with three different wrong diagnoses:
+
+| Card | Bad fixture | What it looked like |
+|---|---|---|
+| `PL!-pb2-016-P+」 | `PL!-pb1-010-N` (no unit) | option found no candidates → "the option is not dispatched" |
+| `PL!-pb2-015-P+」 | `game.id(BIBI_MEMBER)` re-requested | a vacuous assertion that could not fail |
+| `PL!-pb2-018-P+」 | `PL!-pb2-003-PP` is Printemps | "the optional cost is never raised" |
+
+Every fixture constant in the 018 file now carries an explicit group assertion, checked
+by a helper that each test calls. In two of the three cases there WAS a real defect
+underneath (016's `target: "self"`, 015's missing branch) — but in none of them was the
+defect the note described, and in 018's case there was no defect at all.
+
+
+### 8.11 A standing check for the failure mode that caused three wrong diagnoses
+
+Three separate investigations in this expansion ended the same way: a test fixture named
+the wrong card, the resulting failure looked exactly like a deep engine bug, and a
+confident multi-paragraph diagnosis was written down and believed. `PL!-pb2-018-P+」`'s
+"OPEN GAP" turned out to have no defect behind it at all.
+
+A wrong fixture constant is **silent**. The card number resolves, the card exists, it is
+simply a different card, and nothing complains. `cards/audit_fixture_annotations.py` now
+checks every annotated constant in the engine test tree against `cards.json`:
+
+- the card number resolves (decoding Rust `\u{ff0b}` escapes, which several files use for
+  the full-width plus);
+- the character NAME claimed by the comment equals the real name;
+- a group claim holds — μ's and friends are checked against `series`, the unit names
+  (BiBi / Printemps / AZALEA / 5yncri5e! / …) against `unit`.
+
+428 annotated constants, **19 of which named the wrong character**, all corrected. Real
+examples, every one a comment that had been actively misleading:
+
+| Constant | Card | Comment said | Actually |
+|---|---|---|---|
+| `ERI` | `PL!-pb2-021-N` | 絞渡絵里 | 南ことり |
+| `ERI` | `PL!-pb2-010-P+＋` | 絞渡絵里 | 高均穋な果 |
+| `UMI` | `PL!-pb2-008-PP` | 園田海未 | 小泉花陽 |
+| `NOZOMI` | `PL!-pb2-026-N` | 東條希 | 小泉花陽 |
+| `SUMIRE` | `PL!SP-bp1-018-PR` | 平安名すみれ | 米女メイ |
+| `KEKE` | `PL!SP-bp1-004-PR` | 唐可可 | 平安名すみれ |
+
+Two constants were **swapped** — `HANAYOME` on `PL!-pb2-007-PP` was labelled 小泉花陽
+and `NOZOMI` on `PL!-pb2-026-N` was labelled 東條希, when the cards are the other way round.
+
+**Two of the 19 rewrites were themselves wrong, and were reverted.** The fixer over-applied
+to comments that are annotations, not names: `PL!HS-bp6-019-N // 自動無制限` and
+`PL!HS-pb1-019-N // 起動` both became `// 大津瑠琎乃`, which deleted the only thing the
+comment said. Both now read `// 大津瑠琎乃（自動／無制限）` and `// 大津瑠琎乃（起動）`. A
+check that guesses is worse than no check; the fixture assertions added to the 018 file
+now cover this directly.
+
+The audit still reports 10 residual findings, all of them its own parsing limits rather
+than repository problems: 6 are prose leads (`// 自分のエネルギーデッキから`) and 4 are group
+claims adjacent to a negation or comma. It is a finding-generator for a human, not a gate.
+
+
+### 8.12 The last recorded gap was a missing helper
+
+`PL!-pb2-000-DUO`'s file said the recovery was "verified as DATA" and the end-to-end
+behaviour was a known gap, because the debut is gated on
+『μ's〇のメンバー2人からバヘンタッチして登場した場合 and
+`play_to_stage_baton` could not build that fixture. The note was careful — it said the
+helper was the problem, not the feature — and the fix took one argument.
+
+`turn/phases.rs::play_double_baton` already existed and already did the right thing,
+including the deliberate double `record_baton_touch`. It is reachable only when the play
+action carries two area indices:
+
+```rust
+let double_baton_areas: Option<[MemberArea; 2]> = card_indices.as_ref().and_then(|indices| {
+    if indices.len() == 2 { Some([...]) } else { None }
+});
+```
+
+`play_to_stage_baton` passes one, so the card lands in an empty area and nothing is
+recorded. `play_to_stage_double_baton` passes both. Three runtime tests follow, and the
+cost-15 case is the one that earns its place: 4 + 4 is not 15, so the ライブ終了時まで
+「常時 ライブの合計スコアを＋１する」 must NOT be granted while the
+ungated recovery still runs. That is the only test in the file that distinguishes the two
+steps of the sequence at runtime.
+
+**The transferable lesson.** Two of this expansion's recorded gaps — this one and 016's —
+were closed the same way: by measuring, and by looking for the code path before believing
+the note. Neither note was wrong about what it observed; both were wrong about what it
+meant. A gap write-up should say *what is missing* (a helper, an argument) rather than
+*what cannot be done*, because the first is actionable and the second reads as permanent.
+
+
+### 8.13 Coverage counts ABILITIES, not FIELDS
+
+`test_inventory.py` reports ability-node coverage, and PBLL02 has been at 48/48 for a
+while. That number is real and it is not enough: a test that pins `action` and `count`
+is counted identically to one that pins every field, so a field can be silently wrong
+while coverage reads green.
+
+`cards/audit_field_coverage.py` measures the other thing. For each PBLL02 ability it
+collects every non-null key on the cost and effect JSON, maps each to the accessor a
+test would have to use, and reports the keys no test for that card mentions. Result:
+**818 field/ability pairs carrying data that no test reads**.
+
+> **CORRECTION (§8.20).** I treated that number as a worklist and answered it by
+> writing tests that read those fields back. That was the wrong answer and those tests
+> have been deleted. The report is still useful — it finds cards with no coverage at
+> all — but "a field no test reads" is not automatically a gap, and closing it by
+> asserting the field is worth nothing.
+
+### 8.14 The one it found first: `PL!SP-pb2-001-P＋` had eight behavioural tests and no parse assertions
+
+`debut_look_liella_cost4_hand_or_debut_test.rs` had 19 unasserted fields — and, because
+it declared **no constants at all**, the annotation audit in §8.11 could not check its
+fixtures either. Both holes had the same cause: the file grew behaviourally and nobody
+ever looked at the shape it was asserting against.
+
+The card is worth a look because the parse looks wrong until you read the code that
+produced it. The printed text is a two-way choice:
+
+> そのカードを自分のステージのメンバーのいないエリアに登場させるか、手牌に加える。
+
+but the parse emits a single-option followup. That is **not** a dropped clause —
+`_build_or_destination_followup` encodes it deliberately: the `select_action` takes
+`destination: hand` as the default and the optional followup offers hand → stage on
+top, so the reachable outcomes are the same set. The apparent defect is a design choice,
+which is exactly why it needed an assertion rather than a shrug.
+
+The new test pins the whole shape: look 5 from `deck_top`; select at most 1, `member_card`,
+『Liella!〇, `cost_limit` 4 with `<=`, `discard_remaining`; the hand destination; and
+the optional single-option stage followup.
+
+It also found a genuinely wrong name. The fixture variable `non_mus` held
+`PL!HS-sd1-010-SD` — 莲ヌ空, which **is** a μ's group, not a non-μ's one. The test only needed a card the
+『Liella!〇 filter rejects, so the behaviour was right and the name was a lie; it is now
+`KANON_GROUP` with a comment saying why.
+
+**The structural lesson, which applies to the 818 that remain.** The gap is not that
+these fields lack tests one at a time. It is that ability coverage and field coverage
+are different questions and only the first was being asked. For the rest of the
+expansion the report is the worklist; the shape to aim at is one parse test per ability
+file, asserting the fields that file's behavioural tests walk past.
+
+
+### 8.15 48/48 ability coverage hid 48 untested card variants
+
+`PL!SP-pb2-000-DUO` was reported as covered and had **no test anywhere** — zero files in
+the whole tree named it.
+
+The cause is in the metric. `test_inventory.py` collapses cards to their number BASE and
+ORs coverage across variants:
+
+```python
+card_covered[r["base"]] = card_covered.get(r["base"], False) or r["covered"]
+```
+
+`PL!SP-pb2-000-DUO` shares **both** its abilities with `PL!SP-pb2-000-R`, which has
+eleven test files. The base is therefore covered, and the DUO card inherits a green tick
+it never earned. That is defensible for *ability* coverage — the same printed text, the
+same node — but it cannot answer "is this physical card exercised?", and for a Duo card
+the answer matters: Duo cards have their own debut behaviour.
+
+The inventory now reports card VARIANTS separately, and the number is **48 PBLL02 variants
+with no test naming them at all** — the same count as the ability coverage, and a
+completely different set. `PL!SP-pb2-016-P＋` is on it while `PL!-pb2-016-P＋` is not:
+the Liella and μ's Resonances are different cards and only one had a file.
+
+Two scoping decisions, both deliberate and both stated in the code:
+- The report is scoped to PBLL02. Across the rest of the pool a card is routinely
+  exercised by a shared engine test that never names it, so "no file names this card" is
+  meaningless there.
+- It scans the whole test tree once, not per ability row. A per-row check reported
+  `PL!SP-pb2-016-P＋` as untested despite its file, because the card is exercised
+  through a different ability row.
+
+The existing metric was left alone. Redefining "covered" to mean something narrower would
+have broken a number other people read; adding a second, honest one was the fix.
+
+### 8.16 The DUO "engine defect" was not one — corrected
+
+This section previously recorded `PL!SP-pb2-000-DUO` as an open engine defect, with
+two "narrowed candidate causes", a characterisation test asserting that the draw
+returns **zero**, and a speculative `accumulate_recently_moved` call that was written
+and then reverted. **All of that was wrong. There was never a defect, and the draw
+works.**
+
+The card, verbatim:
+
+> 登場 — バトンタッチして登場した場合、このバトンタッチによって控え室に置かれた『Liella!〇のメンバーカード
+> 1枚につき、カードを1枚引く。
+
+**The fixture staged two ENERGY cards.** `PL!SP-PR-001-PR` and `PL!SP-PR-002-PR` are
+`type=エニルギー`, `unit=None`. They carry the
+ラブライブ！スーパースター！！ series, so
+`assert_all_in_group(..., "Liella!")` — which routes through the engine's own
+`card_matches_group_str` — **passed**. The clause wants
+『Liella!〇の**メンバーカード**, the per-unit filter is `member_card` + `Liella!`, and two
+energy cards fail the first half. `count_matching` returned 0, correctly, and the
+per-unit machinery was right the whole time.
+
+With real members (`PL!SP-PR-005-PR` 島 千砂都 5yncri5e! and `PL!SP-PR-003-PR`
+澍谷かのん CatChu!), the draw is **2**. The test now asserts that.
+
+**Both dead ends are worth recording, because they were expensive and both were wrong:**
+
+* *"The gate is unmet."* Instrumenting `evaluate_baton_touch_condition` shows it
+  reaching the end with no early return: `bt_count=2`, and
+  `baton_touch_replaced_member_id` present and in the owner's 控え室.
+* *"The tracked batch is empty."* `execute_draw` reports `tracked=Some([.., ..])` with
+  both displaced cards in it. The batch arrives for this play path. That claim is what
+  motivated the speculative `accumulate_recently_moved`, which is why it was reverted
+  rather than left in as an unverified edit to `play_double_baton`.
+
+**The actual lesson, and it is not about the engine.** A fixture that fails a *clause*
+has to be checked against every noun in that clause: the group, the card TYPE, the
+count, the unit of measure. I asserted the group and the count; the type was wrong the
+whole time, and the group assertion could not see it. The type assertion now sits
+beside the group one in the test, and it is the one that catches this.
+
+That is the **fourth** time in this expansion that a confidently-worded diagnosis was
+wrong in the same way — a fixture named the wrong card, the failure looked like an
+engine defect, and a paragraph of theory got written before anything was measured.
+018, 008, 026, and now this. The checks that would have caught all four are a group
+assertion *and* a card-type assertion *and* a boundary case, all derived from the printed
+sentence rather than from the data file.
+
+### 8.17 One table beats 91 test files — and it also closes the alarm I raised
+
+Working down the §8.15 list turned out to be mostly one thing. Of the 91 PBLL02 variants no
+test named, **almost every entry was the `-R` printing of a card whose `-PP` sibling already
+has a full suite** — the ability was covered, the card was simply never mentioned. Writing
+91 suites for that is busywork, and it would not have caught the case that actually matters.
+
+So: `cards/gen_pbl02_card_table.py` generates
+`engine/tests/test_modules/expansion/pbl02_card_table_test.rs`, one table row per PBLL02 card
+asserting it exists and carries **exactly** the set of `trigger => action` pairs the data
+says it has. 172 rows, one test, `card VARIANTS with no test at all` now reads **0**.
+
+The value is not the 91. It is the inverse failure. If a card silently **drops off** a node
+shared with a sibling — the case I spent part of this session convinced I had found — then the
+sibling's suite still passes, the ability count does not change, and the card quietly
+behaves as a plain card with no ability at all. No behavioural test can see that. The table
+can, because it checks membership per card rather than per ability.
+
+**A false alarm worth recording, because I nearly wrote it up as a data-loss bug.** I
+probed for the untested cards' ability nodes with `t in a["cards"]` — an exact list match.
+Node entries are `'PL!SP-pb2-016-P＋ | 芽月 恋 (ab#0)'`, so the test never matched anything and I
+concluded that several cards had **no ability node at all** and that 44 PBLL02 card numbers
+had lost their abilities. That was wrong on both counts: the correct check shows **0**
+PBLL02 cards with printed ability text are missing from `abilities.json`, and all 44
+node-less cards are genuinely textless — plain members, energy cards, `-LLE` cards. The
+extractor is fine. One `in` instead of a `startswith` cost me a false alarm; the same class
+of mistake as §8.9/8.10, where a fixture detail was read as a deep defect.
+
+**Snapshot tests are usually a smell, and this one earns its place.** The objections are
+real — it rots, and a hand-edited snapshot is worse than none. What makes it defensible: it
+is GENERATED, the header says to regenerate rather than edit, the comparison is a set (so
+adding an ability to a card is a deliberate visible change), and the property underneath
+is a membership invariant no behavioural test can express.
+
+
+### 8.18 Working the field list: `PL!SP-pb2-050-L` and a shared-name trap
+
+`PL!SP-pb2-050-L` (Jellyfish) had three behavioural tests — reform every member, keep the
+formation, and correctly refuse below the threshold — and no parse assertions, the same
+shape as `PL!SP-pb2-001-P＋` in §8.14.
+
+The field that matters is `multiple_targets`, which comes from the parenthetical:
+
+> (メンバーをそれずれ好きのエリアに移動させてもいい。)
+
+Without it the effect is a single area change, not a formation change. **The three
+behavioural tests cannot detect its loss**: a single-move parse still lets you keep
+answering prompts and still lets the formation end up rearranged, so all three would stay
+green. That is the clearest argument for the parse assertions in §8.13 — the field that
+decides what the card *is* is invisible to a test that only checks what the card *did*.
+`exclude_self: true` is pinned for the same reason: the performing live card is on the
+stage and must not be rearranged by its own ability.
+
+**`target: "self"` is not one thing.** §8.9 recorded a parser defect where `target: "self"`
+on a `change_state` made the engine resolve the target to the ACTIVATING CARD. On this
+card's `position_change` the same string means the player's OWN stage and is correct — the
+tests move p1's members and leave p2's stage untouched. The field name is shared; the
+meaning is per-action. Noted in the file so the next reader does not pattern-match
+§8.9 onto it and "fix" working code.
+
+**A mechanical trap worth recording, because it cost a compile cycle.** Adding constants to
+a file by scripted replacement of the card-number literals is fine until the literals
+themselves are replaced: `"PL!SP-bp1-014-N"` → `SUBUNIT` also rewrote the body of
+`const SUBUNIT: &str = ...`, producing `const SUBUNIT: &str = SUBUNIT;` and a
+`cycle detected when checking if ... is a trivial const` error that points at the const
+rather than at the substitution that caused it. Const bodies need excluding from the
+replacement set, or the edit needs doing by hand.
+
+
+### 8.19 `PL!-pb2-001-PP` had no test file at all, and 042 pins a printed-vs-current trap
+
+**`PL!-pb2-001-PP` appeared in the tree only as a filler card number inside another card's
+suite.** That is why the field audit put it at the top with 18 unasserted fields — and it
+is a distinct failure from the `§8.15` variant list, which is about cards that exist in a
+test somewhere. This card had no suite of its own at all.
+
+Its three clauses are three **independent** gates, not a chain:
+
+| Step | Gate | Effect |
+|---|---|---|
+| 1 | スコア card in 成功ライブカード置き場 | gain 「常時 総計スコアを＋１」 until live end |
+| 2 | 総合ブレード card in the same zone | 1 heart until live end |
+| 3 | ドロー card in the same zone | 1 『μ's〇 card from the 控え室 to hand |
+
+Each is worth +1 of something until live end, so a parse that merged the conditions would
+satisfy any test that only checks the totals. That is pinned as data.
+
+**A wire/engine vocabulary asymmetry, found by asserting it wrong first.** Step 3 is
+「『μ's'〇のカード」 — any card — and the wire form is `card_type: "card"`. I asserted
+`Some("card")` and it returned `None`: `CardType` has only Member/Live/Energy, so
+`from_card_str("card")` is `None` and the decoded effect carries **no** type restriction —
+the field is dropped, not stored. That is the right semantics, so the test now asserts the
+engine's `None` and the comment records the wire value. Worth knowing: a grep for
+`card_type` in `abilities.json` finds clauses whose type does not survive decoding, and the
+difference between "untyped on the wire" and "typed but unrecognised" is invisible from
+the engine side.
+
+**`PL!-pb2-042-L`: 亨も持つ is a load-bearing qualifier.** The test file had four good
+behavioural tests around the heart bound and no parse assertions. The parse pins all three
+of `heart_total_limit: 4`, `heart_total_operator: "<="` and — the one that matters —
+`original_value: true`, which is what makes the limit about the card's **printed** hearts.
+Without it the filter reads the *current* total, which buffs change, and it selects a
+different member. Behaviourally that difference only shows up under a heart buff, so
+without the assertion there is a whole class of interaction that no test covers.
+
+**A workflow warning from this stretch, because it went wrong four times.** Building these
+test blocks by scripted replacement of — or text containing CJK literals — corrupted two of the
+three character names in 042 (西木野真妻 for 真姬, 絞渡絵里 for 絞渡絵里), and successive
+repairs then produced 絞渡絵里絵里. Each repair fixed one and broke another. The
+right process is obvious in hindsight and worth stating: **write test files with the write
+tool and CJK literals directly**, and run `audit_fixture_annotations.py` afterwards. A
+scrubbed script is a second way to spell the characters, and it loses.
+
+
+### 8.20 The tests I wrote that were worth nothing, and why
+
+A fair chunk of the work in §8.13–8.19 was worthless, and the tell was available the whole
+time. Deleted: four parse-only test files, one 172-row generated table plus its generator,
+and two parse-only tests appended to existing behavioural files.
+
+**The shape of the mistake.** Those tests loaded the real database, read fields off an
+ability, and asserted those fields equalled what the data said they were. The expectation
+was derived from the same parse it was checking, so it was a **round trip of the parser's
+own output**. Such a test can only fail if the *decode* breaks — and a decode regression
+breaks thousands of behavioural tests anyway. It cannot fail when the parse is *wrong*,
+which is the only failure that matters. Six of the files had literally zero lines that
+drive the engine.
+
+**The specific claim I made that was false.** In §8.18 I wrote that `multiple_targets` on
+`PL!SP-pb2-050-L` is invisible to behavioural tests because a single-move parse would let
+you keep answering prompts. The file has a test asserting **three** prompts. A single-move
+parse asks once and fails it. The behavioural test sees it perfectly well; I asserted a
+limitation that does not exist in order to justify the test I wanted to write.
+
+**What actually verifies a parse is the printed card**, because the printed card is the
+specification. A real test of 008-PP's 「必要ハートの合計が8以上」 puts two candidates on the
+deck and checks which is *offered*: one whose `need_heart` sums to 7 and one to 8. That
+catches a per-colour misreading, a cost/score misreading and an off-by-one on the operator.
+A field assertion catches none of them, because all of those produce a perfectly
+well-formed `need_heart_total` field.
+
+**The process error, stated plainly.** I let a coverage *count* stand in for a correctness
+*argument*. I had already been burned three times in this expansion by trusting a number
+instead of a measurement (§8.9, §8.10, §8.17), and then built four more files on the same
+instinct. Generating a 172-row snapshot and calling it an invariant was the worst of it:
+it encoded the data file's own content, so it would have been regenerated, unquestioningly,
+after any parser change — including a wrong one.
+
+**What survives, and what it is worth:**
+
+| Kind | Examples | Worth |
+|---|---|---|
+| Found a real engine defect by measuring | 041 weight; score double-apply (`score.rs`) | Real. The suite would not have caught either. |
+| Found a real parser defect by measuring | 016 `target: "self"`; 016 per-card group leaking onto options | Real, and the fixes are small and verified. |
+| Corrected a wrong *diagnosis* | 018 (the fixture was the bug); 015's vacuous assert; 000 (missing helper, not missing feature) | Real. Three confident notes were wrong. |
+| Made a silent failure impossible | 19 wrong character names in fixtures; vacuous `game.id()` in an assert | Real. |
+| Field-read "parse" tests | the four deleted files, the 172-row table | **Zero.** Removed. |
+
+**The one characterisation test kept** is `PL!SP-pb2-000-DUO`'s debut, and it earns its
+place for the opposite reason: it asserts a value the printed card does NOT predict
+(zero draws instead of two), and its header names the two narrowed candidate causes. A
+test that pins a wrong value and says so is a report. A test that pins a right value and
+calls it verification is not.
+
+
+### 8.21 A missing icon, found by testing the card's behaviour
+
+`PL!-pb2-001-PP` reads, at ライブ開始時:
+
+> 自分の成功ライブカード置き場にある『μ's』のカードの中に、**スコアを持つ**カードがある場合、
+> ライブ終了時まで、「常時 ライブの合計スコアを＋１する。」を得る。**全ブレードを持つ**カードが
+> ある場合、ライブ終了時まで、ハートを得る。**ドローを持つ**カードがある場合、自分の控え室から
+> 『μ's』のカードを1枚手札に加える。
+
+Three clauses, three independent gates keyed to three different icons. The test that
+found the defect is the negative:
+
+```text
+PL!-pb3-021-L (ドロー)   → waitroom 1 → 0   recovered = true   ← correct
+PL!-pb2-039-L (no icon)  → waitroom 1 → 0   recovered = true   ← wrong
+```
+
+`PL!-pb2-039-L` has `special_heart: None`, and the recovery fired anyway. The measurement
+is the whole diagnosis: an **empty** zone correctly recovers nothing, so the clause is
+keyed on *something being present*, and that something was not the icon.
+
+**It took two independent defects, one in each layer:**
+
+1. **Parser.** `_CARD_PROPERTY_PHRASES` had phrases for 「ブレードハートを持つ」,
+   「スコアを持つ」 and 「ALLブレードを持つ」 and **none for 「ドローを持つ」**. So the third
+   clause parsed as a bare `location_condition` with only `card_type: live_card` — the
+   requirement was silently dropped, and the clause fired on any live card in the zone.
+   `HAS_DRAW_ICON` added in `parser_utils.py`; the property is now `has_draw_icon`.
+2. **Engine.** `CardProperty` had no `HasDrawIcon` variant, and `check_card_property`
+   (in `ability/condition/card.rs`) maps the enum to a string with
+   `_ => return true`. An unmapped variant is read as **"no restriction"**, so even
+   with the parse correct the check was skipped.
+
+The second is the one worth generalising from. `_ => return true` is a safe-looking
+default that means the opposite of safe: it silently disables a filter. A new property
+variant compiles, is emitted by the parser, and is then ignored by the evaluator, with
+nothing turning red. The fix is an explicit arm plus the note, and the general lesson is
+that **`_ =>` on an enum that gates a filter deserves the same suspicion as a swallowed
+error**.
+
+Note also that the ドロー icon is on `special_heart`, the same field as スコア, while
+全ブレード is on `blade_heart`. A grep of the wrong field finds no all-blade cards at all,
+so the fixture table in the test is the map — a reader who greps `special_heart` for
+`b_all` will conclude the cards do not exist.
+
+**This is the shape of test §8.20 said was missing.** A behavioural test with a negative
+case, on a card whose only prior coverage was a deleted round-trip, caught a real
+two-layer engine defect. No field assertion could have: the parse was well-formed before
+the fix, just missing a key.
+
 ## 8. Test campaign log
 
 Work done ability-by-ability, least work first. Each entry records what the test
@@ -357,10 +982,24 @@ parse is defensibly reading a genuinely ambiguous card, which is called out.
 | 24 | `PL!-pb2-024-N` | 5 | none in the engine — **my fixture was wrong** | `PL!SP-pb1-014-N` (cost 2) and `PL!SP-bp1-014-N` (cost 4) are different cards with the same number and name. I transcribed the wrong prefix, and without `assert_card_cost` the test failed for a reason that had nothing to do with the ability. |
 | 33 | `PL!-pb2-033-N` | 7 | none — this is the regression guard for the `PL!-pb2-006` fix, at a different bound (≤3) | — |
 | 12 | `PL!-pb2-012-P＋` | 7 | **the 「2人」 was a condition and got dropped.** 「…『Printemps』のメンバーを2人ウェイトにしてもよい」 left `count` unset, so the condition degraded to "any Printemps member on stage" and the −2 applied with ONE ally. | Count extracted in `_enrich_condition_result` (the shared enrichment, **not** `_extract_group_scope` — the priority-5 `distinct` handler claims this exact text and short-circuits the generic extractor). |
-| 38 | `PL!-pb2-038-L` | 4 + 3 ignored | **OPEN — see §8.3 item 8.** A 常時 `live_total` effect on a live card in a live zone has no routing at all. | Not fixed; root cause traced to two functions and the ignored tests assert the correct value. |
+| 38 | `PL!-pb2-038-L` | 7 | **OPEN at the time, FIXED since.** A 常時 `live_total` effect on a live card in a live zone had no routing: no `live_total` case in the success-zone evaluator, no constant scan of the live card zone, and the 「AかB」 disjunction was eaten by a dedupe meant for a substring artefact. | Three fixes; a fourth surfaced by the negatives — `evaluate_group_condition` never checked `count`, so 「2人のみ」 was satisfied by 1 and by 3, and its negatives had been passing **vacuously** because the effect never fired. |
+| 39 | `PL!-pb2-039-L` | 5 + 4 | none — **I reported it as inverted-sign AND group-blind; both were my test.** `cheer_checks_required` IS the number of cards to reveal, so 「10枚増える」 correctly raises it. And my "non-μ's" control `PL!-sd1-019-SD` has `series = ラブライブ！`, which makes it μ's via `card_series_matches_group`. | — |
+| 40 | `PL!-pb2-021-N` | 5 | the 自動 over-fires. Branch 1 「能力のコストを支払うため」 is an EVENT parsed as a cost *comparison* with no operator, so `compare_counts` defaults to `>=` and it is always true. | Branch 2 fixed: 「ウェイト状態になったとき」 was a vacuous `count >= 1`, now a self-scoped `state_condition`. Branch 1 open. |
+| 41 | `PL!-pb2-026-N` | 5 | the look's group filter and the banking are correct. The 起動 cost's self-wait reads back **active** — rule 9.4.2.2 defers the binary sub-cost and it is not applied when the choice resolves. | recorded |
+| 42 | `PL!-pb2-007-PP` | 7 | none | — |
+| 43 | `PL!-pb2-018-P＋` | 5 + 1 recorded | **`distinct` missing from the cost** (fixed) — the effect builder only recognised 「カード名の異なる」, so 「手札の**名前の異なる**…を3枚」 had none and two prints of one character satisfied a three-card cost. Remaining: the optional cost is never raised. | `distinct` in `_post_fix_cost_and_select`, scoped to costs/selects. See §8.3 items 15–16. |
 
-Suite after each step: only the 2 pre-existing `custom` failures remained
-(3825 passing at the time of writing).
+Suite after each step: only the 2 pre-existing `custom` failures remained. Final
+state: **3979 passing, 0 failing** — green, with both long-standing failures
+(`test_no_custom_actions` and the describe template, both on ability 659,
+`PL!-pb2-041-L`) cleared by typing that last card. Ability-node coverage **48/48**.
+
+**The weight that closed them also turned up a real engine bug** (§8.6), the last pinned
+parser gap turned out to be a real parser bug rather than a limitation (§8.7), and
+016's long-standing "OPEN GAP" was TWO more defects — one in the parser and one in
+the engine (§8.9) — 018's turned out never to have been a defect at all (§8.10),
+and the last recorded gap, 000's runtime trigger, was a missing test helper rather
+than a missing feature (§8.12).
 
 ### 8.0 Two corrections I had to make to my own reasoning
 
@@ -580,78 +1219,229 @@ These cannot be settled by a test and are recorded rather than guessed.
       The correct fix is to parse 「コストを支払う／支払った」 as a trigger event
       rather than a comparison; there is currently no such rule.
 
-15. **The two `custom` abilities — one fixed, one not.** Neither was a typing problem:
-    the parser produced a usable node for each, and only the action name was `custom`.
+15. **Five parser fixes made while writing the per-ability tests.** Each was found
+    because a test asserted the printed text and the parse disagreed with it; all five
+    are in `cards/ability_extraction/parser.py`, and the suite is green after them.
 
-   - **`PL!-pb2-002-PP` 絢瀬絵里 — FIXED and tested** (8 tests). A REPLACEMENT appearance
-     rule, 「このメンバーの正面のエリアには、元々持つハートの数が4つ以下のメンバーは、
-     ウェイト状態で登場する」.
-     - *Engine*: resolved ONCE at placement
-       (`GameState::replacement_appear_wait_applies`, called from
-       `handle_play_member_to_stage`). Deliberately not a constant: constants re-apply
-       every recalculation, so the member could never leave wait and activations paid
-       for in play would be clobbered. `the_member_can_still_be_activated_afterwards`
-       is the test that fails under a constant implementation.
-     - *What cost the most time*: the fields decoded fine but came back `None`. The
-       cause is already written up in `docs/ABILITY_PIPELINE.md` §"The decoder is
-       generic, but the post-processing is manual" — `populate_from_json()` maps an
-       action to a typed `EffectKind`, and **an action with no entry in that map
-       silently loses its whole filter** while still decoding its `action` and
-       `text`. Adding `replacement_appear_wait` to the `ChangeState` arm of that map
-       fixed it. Read that section before adding an action, not after.
-     - Two bugs the tests caught that reading the code did not: the host's own rule
-       matched the host on the turn she arrived (she is on stage by the time the check
-       runs) and waited her, which then disabled her rule for everyone else; and the
-       `position` check compared the host's area to itself, so it matched every area.
-   - **`PL!-pb2-041-L` 春情ロマンティック — NOT fixed, still `custom` and still
-     failing.** A counting weight, 「…枚数を数えるとき、このカードは2枚として扱う」.
-     Most of it is written and works in isolation: `count_as_multiple_weight` returns
-     2 for the card when the counting card is in a `counted_by` group, and the shared
-     `count_filtered` closure adds the extra weight on top of the normal count, deciding
-     membership with the same filter applied one card at a time so a weighted card can
-     only ever be a card the count already included.
+    | Fix | Card | Was | Now |
+    |---|---|---|---|
+    | `distinct` on **costs** | `PL!-pb2-018-P＋` | the effect builder recognised only the explicit 「カード名の異なる」, so 018's cost 「手札の**名前の異なる**『BiBi』のメンバーカードを3枚」 carried none — two prints of one character satisfied a three-card cost | `_post_fix_cost_and_select` applies the short form to costs and select/look actions only. **Scoped deliberately**: applying it to the effect path too regressed `PL!SP-bp2-005-P＋` (Mia) and the Q118 pair, where the same short phrase carries different intent. |
+    | 「必要ハートの合計がN以上」 | `PL!-pb2-008-PP` | emitted `cost_limit_operator: ">="` with **no limit** — an operator with nothing to compare against, so the 8 bound was unenforced | `need_heart_total: 8` + operator, and the stray `cost_limit_operator` is dropped when no limit exists. Guarded on `aggregate != "total"`, because `PL!SP-bp5-012-N` 澁谷かのん already expresses the bound that way and a duplicate encoding surfaced as a silent bytecode decode fallback. |
+    | quoted name **lists** | `PL!-pb2-042-L` | the name-list regex allowed `」か「` and `」、「` but not `」と「`, so 「「矢澤にこ」**と**「西木野真姫」**と**「絢瀬絵里」」 matched only its LAST entry and the filter required one character instead of three | separator class extended to `と` |
+    | child `location` leak | `PL!-pb2-042-L` | the centre clause 「自分のセンターエリアにコスト11以上の『BiBi』のメンバーがいる」 inherited `location: revealed_cards` from the clause before it, so it looked for an 11-cost BiBi member among the cards the yell revealed | `_drop_unsupported_child_location` strips a child `location` its own text contradicts. It runs in `_FinalizationPipeline` — **the two earlier call sites ran before the child clauses were given a location and silently did nothing**. |
+    | 「すべて」 | `PL!-pb2-037-L` | 「…がすべて『Printemps』か、すべて『lily white』か、すべて『BiBi』のいずれかの場合」 lost すべて from all three branches, leaving three bare "is in this group" tests — an ANY reading of a three-way ALL-of-one-group choice | `all_members: True` on each branch |
 
-     It fails because the condition evaluates as if no weight were present: the
-     counting card is resolved from `activating_card` / the ability queue's current
-     entry, and both are empty (`activating_card` is `-1`) when 041's ライブ開始時
-     condition runs. Threading the running effect into condition evaluation is a
-     change to how `ConditionContext` identifies its effect, and `PARSER_NOTES` already
-     records that `get_count_for_condition` / `get_group_card_count` /
-     `get_count_for_target` overlap — so it needs its own pass, with characterisation
-     pins per condition shape.
+16. **`PL!-pb2-018-P＋` — RESOLVED, and the recorded gap was a fixture problem.**
+    This entry used to read "the optional cost is never raised … not a fixture
+    problem", on the strength of this measurement:
 
-     It is left as `custom` on purpose: typing it would make `test_no_custom_actions`
-     pass while the mechanic did nothing, which is the same false green that was
-     reverted twice during this work. The code, the probe results and the reason are
-     in `_type_count_as_multiple`'s docstring.
-16. **「自分のセンターエリアにいる『X』のメンバー」 cannot be `all`.** `modifiers.rs:591`
-   grants an `all: true` constant to every matching member on the whole stage, so
-   setting `all` on the centre-clause cards (`PL!-bp4-011-N`, `PL!-bp4-017-N`,
-   `PL!-pb2-019-N`) breaks three existing tests. They are correct today only because
-   the centre area holds exactly one member, which makes all-vs-one indistinguishable —
-   so **no test currently distinguishes them either**, and a real fix needs
-   `all` *and* a centre restriction together. Recorded rather than asserted.
-17. ~~**`PL!-pb2-038-L` — a 常時 on a LIVE card in a live zone, targeting
-   ライブの合計スコア.**~~ **FIXED.** Three changes were needed, and the third was
-   only visible once the first two made the effect fire:
-   - the success-zone constant evaluator's `ModifyScore` arm had no `live_total`
-     case, so the effect fell into "target the live set zone cards" and — with that
-     zone empty, the normal state for a card in the success zone — contributed 0;
-   - there was no constant scan of the **live card zone** at all, so the
-     ライブカード置き場 half of the 「か」 never contributed either;
-   - `extract_locations` deliberately dropped `live_card_zone` whenever the success
-     zone was present (to fix a substring artefact) and so ate the genuine
-     「A**か**B」 disjunction. Fixed to distinguish the two, with a new `any_location`
-     marker so the multi-location path stops reading a disjunction as a
-     「AをBに」 move.
+    ```text
+      after play:  pending=true  type=SelectAutoAbility
+      answer it:   no further prompt
+      result:      waitroom=0, hand=3, foe orientation=None
+    ```
 
-   And then the card's own negatives failed, which is the point worth recording:
-   **`evaluate_group_condition` with `all_members` only ever asked "are they all in
-   the group"** — it never checked `count`. So 「2人の『μ's』のメンバーのみがいる」 was
-   satisfied by one member and by three. Those two tests had been passing
-   *vacuously*, because the constant they were testing never fired. A negative test
-   that can only fail if the positive path works is not yet a real test — worth
-   checking negatives survive the moment a positive starts passing.
+    Every part of that conclusion was wrong. The fixture's three "BiBi" discards
+    included `PL!-pb2-003-PP`, which is **南ことり, a Printemps member** (§8.10), so the
+    cost could not be paid; and the helper answered the `SelectAutoAbility` order
+    prompt with a decline, so the ability carrying the cost was never selected. With
+    three genuinely distinct BiBi members and the right ability chosen, the whole chain
+    runs: the order prompt, then 3 + 2 + 1 hand selections, then the wait.
+
+17. **"A second step behind an OPTIONAL cost never runs" — NOT TRUE. All three cards
+    work.** This claimed one defect with three symptoms across `PL!-pb2-008-PP`,
+    `PL!-pb2-018-P＋` and `PL!-pb2-026-N`, with `PL!-pb2-032-N` as a working control on
+    the theory that "optional" was the common factor. All four cards work. The pattern
+    does not exist.
+
+    What each card actually had was a *test* defect, and in two cases the same one:
+
+    - **008-PP** measured the offer by **consuming it**. Its helper drained every
+      prompt, then reported `0` because no prompt was left. The look fires and offers
+      exactly the in-bound cards; the file's own source called two of its four tests
+      VACUOUS and the other two asserted `0` with an OPEN GAP message. It also used
+      `PL!-bp1-029-SRL`, a card number absent from the database, through `new_id` —
+      which, unlike `id`, does not panic.
+    - **018-P＋** never selected the ability carrying the cost (§8.10 above).
+    - **026-N** read the self-wait through a **freshly requested `game.id()`**, so it
+      inspected an instance that was never played and always read back as unwaited.
+      That is the same error as the vacuous assertion in `PL!-pb2-015-P＋`.
+
+    **The trap underneath all three is real, and is worth keeping.** `drain_choices()`
+    answers an optional cost as **declined**, and the engine colon-gates the effect on
+    it (`ability/cost/handlers.rs`). Draining right after a play therefore cancels the
+    very thing the test is measuring, and the result looks exactly like a dead ability.
+    That single fact is the common cause of the three false gaps, and it will produce
+    more if it is forgotten.
+
+    Two general lessons, both of which I had to learn twice:
+
+    - **Read the state you are measuring before you answer it.** Three files here
+      consumed the prompt and then reported on its absence.
+    - **Never read game state through a fresh `game.id()`.** It hands out a new pooled
+      instance per call, so the answer is about a card that was never in play. The
+      variant is a card that is genuinely absent from the zone, which is a real state;
+      the fresh id is not. `audit_id_in_assert.py` now scans for this shape and reports
+      0 remaining.
+
+18. **`μ's` group matching is CORRECT — checked rather than assumed.** Probed directly:
+    all three μ's units match (`Printemps`, `BiBi`, `lily white`), and after the
+    spacing fix in §8.3 item 15 BOTH spellings match. One caveat for anyone writing
+    fixtures: `assert_card_in_group` is **stricter** than the engine's
+    `card_matches_group_str` and can reject a card the ability would still match —
+    assert against the function the engine actually uses when the point is matcher
+    behaviour.
+
+19. **A per-turn ACTIVATION history did not exist, and two cards needed it.**
+    「このターン中に自分の『Printemps』のカードの効果によってウェイト状態からアクティブ
+    にしていたメンバー」 (`PL!-pb2-010-P＋` 絢瀬絵里, `PL!-pb2-040-L` 僕たちはひとつの光)
+    is a **history**, not a state. Both parsed into a per-unit count carrying
+    `state: "wait"` — "members currently in wait", a different set of cards — and so
+    always counted zero. Nothing in the engine recorded the event.
+
+    Built:
+    - `GameState::cards_activated_this_turn` — recorded in
+      `ability/effects/change_state.rs` where the orientation actually flips, and
+      cleared with the other per-turn trackers in `clear_card_movement_tracking`.
+      Leaving it uncleared would let an activation from a previous turn satisfy the
+      clause forever. It is a **set**, not a tally: activating a member twice in one
+      turn counts once (pinned by `PL!-pb2-010-P＋`).
+    - `EffectFilter::activated_this_turn` and `ConditionCommon::activated_this_turn`,
+      so a 「このターン中に…」 clause is a history and the generic path's `state: "wait"`
+      is dropped — the members are active NOW, so demanding `state: wait` too would
+      make the clause unsatisfiable.
+    - `evaluate_card_count_condition` consults the history.
+
+    `PL!-pb2-010-P＋` is **done, 7 tests**, including the case that separates it from
+    the old reading (a member still in wait contributes nothing) and the set semantics.
+
+    `PL!-pb2-040-L` is **done, 6 tests, and the engine was right the whole time.**
+    I filed four separate "defects" on it and every one was a bug in my own
+    fixture:
+    1. "a flat reduction of 10 regardless of the count" — the helper returned
+       `printed − modifier`, mixing a printed value with a delta.
+    2. "the reduction applies unconditionally" — the activated members were never
+       placed ON THE STAGE, and the conditions are `location: stage` counts.
+    3. "the ability does nothing" — the ability was never TRIGGERED. It is
+       ライブ開始時, and the helper only called `recalculate_constants()`, which
+       does not run a live-start ability.
+    4. "the 3人以上 step never fires" — the fixture filled only two side slots.
+       040 is a LIVE card performed from the live card zone, so it never occupies
+       the stage's centre and all three stage slots are usable.
+    With the ability actually performed and three members staged and switched out
+    of wait, the escalation is exactly 0 / −3 / −5 / −6 as printed. This is the clearest
+    example in the session of a fault reported before the fixture was checked.
+
+    A trap found here too: **`TestGame::id` allocates a fresh instance on every call**,
+    so "the same member twice" records two different cards and the set semantics look
+    broken. Resolve an id once and reuse it.
+
+20. **`all_members` is a field of the GROUP VARIANT, so a `location_condition` cannot
+    carry the ALL marker.** Found by `PL!-pb2-037-L`, whose three-way choice parses
+    into three DIFFERENT condition types — branch 1 a `revealed_cards` location
+    condition, branches 2 and 3 group conditions. The marker survives on two of three
+    and is structurally dropped on the first, so the card's condition is inconsistent
+    in shape. The real fix is moving the field onto `ConditionCommon`; the test pins
+    what is currently carryable (`vec![false, true, true]`) so the gap is visible.
+
+    037's behaviour is also not firing: the reveal condition is met, `previous_reveal`
+    and `revealed_cards` read the same set (`ability/dynamic_count.rs:57`), the move
+    is typed, and nothing is taken. Its four negatives are therefore **vacuous** and
+    are labelled as such in the file.
+
+21. **A per-unit reading was swallowing a three-option repeatable choice.**
+    `PL!-pb2-016-P＋` was parsed as ONE mashed-together `draw_card` carrying
+    the centre position and the activate step from two of its sibling options — the
+    three bulleted options never reached the prompt. `_try_choice` builds all three
+    correctly when called directly; the per-unit reading simply claimed the text
+    first.
+
+    The fix is deliberately NARROW: `_try_per_unit` defers only for the REPEATABLE
+    pattern (「同じ選択肢を2回以上選んでもよい」), not for every choice. Taking over
+    universally was tried and reverted — it cost `PL!S-bp3-024-L` (Deep Resonance)
+    option 0's member-selection target, and the suite caught it. On a plain one-shot
+    choice the per-unit reading of an option is the better shape.
+
+    Remaining gap, and it is NOT the prompt. The choice IS presented and
+    `pending_choice_count()` is 0 for EVERY choice in this engine (the prompt selects
+    by index rather than enumerating), so an earlier reading of that 0 as "the options
+    never reach the engine" was wrong. The real chain: selecting an option does nothing,
+    because `SelectTargetKind::Choice` in `ability/choice.rs` calls `clear_choice_state`
+    and returns WITHOUT recording which option was picked, while the replay arm in
+    `effects/choice.rs` only fires when the entry carries `ConditionalChoice::Str`
+    holding the index — and the sub-effect path stores `ConditionalChoice::Effects`.
+    The selection is therefore discarded and nothing can re-enter.
+
+    Storing the index was tried in BOTH orderings (before the clear, and after it,
+    because `clear_choice_meta` sets `entry.conditional_choice = None` and wipes an
+    earlier attempt). Neither made the option execute, and with neither does anything
+    change, so **the change was reverted** rather than left in as an inert write to
+    `conditional_choice` that no test justifies. The real fix needs the re-entry path
+    traced, not just the write.
+
+    A process note: while moving that registration I deleted `_try_choice` from the
+    dispatch list and the re-insert silently failed, which would have broken all 26
+    choice abilities. It surfaced immediately in the suite. A "move a registration"
+    edit is really a delete plus an insert, and the insert needs verifying.
+
+22. **Two more dropped effects, both found by their own cards' tests.**
+
+    * `PL!-pb2-000-DUO` / `-R` 『姬様』: the 常時 is a correct optional
+      `play_baton_touch` (count 2) and the 常現0 gained 一っの常時 with
+      `modify_score` on `live_total` — the gap closed for `PL!-pb2-038-L` in this
+      session, so the shape is right. **But the 常現0 has TWO effects and the
+      parse kept only the second**: the node is a bare `gain_ability` with no
+      `actions`, so 「自分の控え室にある『μ′s」のライブカードを1枚手票に加え
+      』 is simply absent. The correct shape is `sequential [move_cards,
+      gain_ability]`.
+    * `PL!-pb2-014-P＋` 『乙宗紫』: the same shape of loss. The reveal cost
+      is correct (optional, `lily white`, from hand) and the placement of the
+      revealed card into the success zone is correct, but 「我しての成功ライ
+      ブカード定置にあるカードを1枚手票に加える』 — step (1) — is missing, and the
+      surviving node carries a `location_condition` with an `=` operator, a
+      card-count comparison the engine cannot evaluate.
+
+    Both are pinned in a way that cannot be mistaken for coverage: each file
+    asserts the shape that IS correct and records the absent step explicitly.
+
+**`PL!-pb2-041-L` 春情ロマンチック is now TYPED, which cleared the last two suite failures.**
+    It was the last `action: "custom"` node, and it was making both
+    `test_no_custom_actions` and the describe-template parity test fail for the whole
+    session. It now parses as `count_as_multiple` with `count_as: 2` and
+    `counted_by: [lily white]`.
+
+    Getting there needed the whole rule restored — an earlier pass had left
+    `_type_count_as_multiple` as a documented no-op stub while its call site was wired,
+    so it ran and did nothing. The parse was the easy half.
+
+    **The weight now works, and finding out why took a real engine bug.** Chasing the
+    last red test meant measuring instead of reasoning: the weight function returned 2
+    when called directly, and the count path reported `base=1 extra=1` — so the count
+    WAS 2 and `2 >= 2` was true. The effect still did not fire, and the modifier read
+    **2, not 0**, from a single `execute_modify_score` call with `value=1`.
+
+    The cause was not this ability. `execute_modify_score` builds its target pool by
+    chaining the live card zone and the success live card zone, and a live being
+    performed is present in **both**. The pool therefore held the same card id twice,
+    and the effect applied once per *occurrence* rather than once per *card* — so any
+    self-targeted score effect paid out twice whenever its card was visible in two
+    scanned zones. Fixed with an order-preserving dedup; pinned by
+    `self_score_is_not_applied_once_per_zone_occurrence`.
+
+    Three lessons worth keeping, because I got all three wrong first:
+    - **A direct probe of the helper settles it.** I had been reading code and
+      theorising; one `count_as_multiple_weight` call answered the question in seconds.
+    - **The unit the test asserts in is part of the bug.** I read "+2" as a doubled
+      trigger and went looking for a double-trigger engine defect that did not exist.
+      The multiplier was in the score, not the trigger.
+    - **Driving the real phase flow is not optional.** My first version hand-rolled
+      `trigger_auto_ability`, which is not the path a live takes and hid the whole
+      defect. The sibling file §8.5 already had the right shape.
+
+    A consumer that does NOT work, and is pinned in 039's file so the mistake is not
+    repeated: `PL!-pb2-039-L` has the same threshold and was briefly used as the
+    observer here, but its `unit` is `None`, so it is in no group and can never be a
+    「体のカードの効果によって』 counter.
 
 ### 8.4 Things a test cannot tell you
 

@@ -187,6 +187,338 @@ coverage calculation v8 already uses for its *own* check (`FlipSampler` /
 from one three hearts short. That is a real, buildable improvement and it is
 the highest-value next step in the file.
 
+`OppModel::with_board_sampled` is that fix, built and measured. It does **not**
+rescue the horizon: with the gradient on and the horizon on, the run is still
+**bit-identical**, zero discordant games. The horizon family stays dead, but for
+a second and more interesting reason — with a continuous model available, the
+term still changes nothing, so the staleness was never the binding constraint.
+
+---
+
+## 1. Sweep round: three harness bugs, then the actual result
+
+Everything above was tuning a leaf. The sweep that followed was built to stop
+doing that, and it found the harness was lying three separate ways.
+
+### 1.1 `mcnemar_exact_p` was structurally incapable of returning p < 1
+
+It computed `C(n,k)` as `(lf[n] - lf[k] - lf[n-k]).exp()` and divided by `2^n`
+afterwards. `C(n, k)` near `n/2` grows like `2^n`, so the exponential overflows
+`f64` (which caps near `exp(709)`) once `n * ln 2` passes it — roughly **n > 1020
+discordant pairs**. Past that every term is `inf`, the tail is `inf`, and
+`(2.0 * inf).min(1.0)` is **exactly 1.0**.
+
+Observed: 933 baseline-only against 1259 candidate-only discordant — about as
+lopsided as a paired test gets — printed `p = 1.00000`. It does not fail
+conservatively, it fails by reporting no difference when there is a large one.
+**Any "no significant difference" read at n >= ~2000 from this function was a
+statement about the arithmetic.**
+
+Fixed by keeping the exponent in log space (`- n*ln2` carried into the
+exponent), so each term is a probability and only the sum is formed. Pinned by
+`mcnemar_survives_more_than_a_thousand_discordant_pairs`.
+
+Also corrected in the same pass: the textbook McNemar value for a 1-vs-6 split
+is 0.125 (exact), not 0.21875 (continuity-corrected chi-square). Both are now
+pinned, because "the textbook value" for a paired test is often not the paired
+test.
+
+### 1.2 The verdict took its sign from the wrong quantity
+
+`VERDICT` chose IMPROVEMENT vs REGRESSION on the swing in **decisive rate** —
+the fraction of games that were decisive. In a mirror matchup with no draws,
+that is 1.0 for both arms, the swing is exactly `0.0` for *any* change, and the
+sign test fell through to the else branch.
+
+So it printed `SIGNIFICANT REGRESSION` for a run that took v8 from 43.7% to
+**57.3%**. Decisive rate measures draw frequency, which is a property of the
+rules and the matchup, not of whether the bot got better. The verdict now uses
+the paired win count, and both are printed:
+
+```
+  paired win rate P1: baseline 43.7% -> candidate 57.3%  (+13.67 pp)
+  VERDICT: SIGNIFICANT IMPROVEMENT
+```
+
+### 1.3 A bot can break the game and the brief line said nothing
+
+A configuration ending **71% of games in an engine-terminated 0-0** still
+prints a plausible win/loss line over the remaining 29%, and that is the line a
+sweep reads. `no_contest` is now on the `--brief` result line.
+
+This one nearly caused a false ship. `V8_TIE_BATON + V8_PASS_TAX=0.15` measured
+**191-209 at n=400** — a clean, plausible-looking win. At n=3000 the same switch
+put 2130 of 3000 games into no-contest at a median of two turns. The n=400 cell
+was not a smaller version of the same effect; it was a different phenomenon,
+and the only thing that could have caught it at the time was the one number now
+printed.
+
+The harness also grew `--env K=V` (repeatable, echoed into the run's output) and
+`--check-p`. Every mechanism in this project is env-gated and none was reachable
+from the command line, so the whole ablation method was unreproducible from a
+script and the exact switches behind a recorded number were often not the ones
+recorded.
+
+### 1.4 The sweep itself: ten configurations, n=400
+
+| configuration | result | verdict |
+|---|---|---|
+| `V8_TIE_BATON` | 184-216 | +0.25 pp, inert |
+| `V8_PASS_TAX=0.15` | 189-211 | +3 pp, p=0.12 |
+| `V8_PASS_TAX=0.40` | 187-213 | +2 pp, p=0.22 |
+| `V8_OPP_GRADIENT`+`HORIZON` | 179-221 | **bit-identical** |
+| `V8_MAX_LIVES=2` | 173-227 | −2 pp |
+| `V8_HORIZON=0.25` | 175-225 | null |
+| `V8_NODES=192`+`FOLLOWUP=10` | 178-222 | 3 discordant / 400 |
+| `V8_DEFICIT=0.05` | 165-235 | regression |
+| `V8_DEFICIT=0.35` | 148-252 | regression |
+| `TIE_BATON`+`PASS_TAX=0.15` | 191-209 | +3 pp — **see §1.3, it was a trap** |
+
+`V8_TIE_BATON` is worth its own line, because it is the most *informative* null
+in the file. In v7 the baton-over-Pass tie-break is worth **+16.8 points**, the
+largest entry in the ablation table, and v8 has no equivalent. Adding it to v8
+changed **23 of 1200 games** (p=0.68).
+
+The reason is that the tie-break only fires when the leaf ties, and v8's leaf
+almost never does. The handoff doc's claim that 81.8% of v8 actions produce an
+identical top value is not consistent with 23 changed games in 1200. Whatever
+that 81.8% was measuring, it is not tie frequency, and the +16.8 mechanism has
+**no purchase in v8 at all**. That is a much more useful thing to know than a
+sixth null leaf term, and it is not derivable from reading either bot.
+
+---
+
+## 2. The crossover: the deficit is the Main phase, and v8's live set is an asset
+
+Ten leaf-term experiments had all failed, all of them edits to v8's Main-phase
+leaf, all against a ~9 point deficit. The cheap way out of that loop is not
+another term — it is to stop assuming which half of the bot is responsible and
+measure it.
+
+`V8_BORROW_MAIN=v7` and `V8_BORROW_LIVE=v7` swap one half of v8 for v7's.
+Paired, n=1200, same seeds, same seat (`--brief` reports `no_contest` on every
+cell, so none of these is a game-breaking configuration):
+
+| P1 configuration | P1 vs v7 | note |
+|---|---|---|
+| v8 Main + v8 live (shipped) | **43.7%** | the number to beat |
+| v7 Main + v8 live | **53.9%** | recovers ~10 points |
+| v8 Main + v7 live | **40.7%** | v7's live set is *worse* |
+
+**The entire deficit is in the Main phase, and v8's live-card set beats v7's by
+about 3 points.** Both halves of the handoff doc's story are the wrong way
+round: §6 was written to improve the live set, which is already the better one,
+and the leaf, which is where the loss actually is.
+
+This also explains the ten failures mechanically. Every one of them added a term
+to the Main leaf, which is the right *phase* — but they were all rejected for
+being monotone functions of what the leaf already reads, and that diagnosis was
+correct. A tie-break term could not work because the tie-break is unreachable
+(§1.4). The leaf was never the right level of abstraction; v7's Main wins by
+*re-offering and re-evaluating* after every action, not by valuing the first one
+better.
+
+### 2.1 Seat control, and v9
+
+A crossover is only worth reading once the seat is accounted for. Mirror runs,
+n=1200, seed 11, current card pool:
+
+- `v7 vs v7` → P1 **52.6%**
+- `v9 vs v9` → P1 **51.2%**
+
+so P1 carries a small advantage and it is the same size for both. That makes the
+crossover cell's 53.9% real, and it also means any cross-bot number has to be
+read against a mirror, not against 50%.
+
+`v9` is now a first-class bot kind (`v7 Main` + `v8 live set` + `v7 mulligan`),
+because a composite needs to be playable on **one** seat against a pure
+opponent and `--env` is process-global.
+
+Paired against the shipped v8, same seeds, same seat:
+
+```
+bot_arena v9 v7 1200 "5CP3Z idou" --games 1200 --seed 11 --vs cb11.csv
+  RESULT v9 vs v7 | 688 - 512 | 0 draws (0.0% nocontest) | 41188 actions
+  DISCORDANT: baseline-only 178 | candidate-only 342
+  exact McNemar two-sided p = 0.00000
+  pace (P1) 0.3910 -> 0.4764  +0.0855  SIGNIFICANT
+  paired win rate P1: baseline 43.7% -> candidate 57.3%  (+13.67 pp)
+  VERDICT: SIGNIFICANT IMPROVEMENT
+```
+
+**v9 is 57.3% against v7, against a v7 mirror rate of 52.6% — about 4.7 points
+clear of the strongest previous bot, on the same seat, with the p-value now
+actually computed.** Placements per live phase go 0.391 → 0.476, and the
+no-contest rate is zero, so this is a real gain and not a faster way to lose.
+
+### 2.2 What this does and does not settle
+
+It settles where the loss was. It does not fix v8's Main phase — `v9` does not
+contain it, it routes around it. The honest statement is: **v8's Main-phase
+model has not been beaten and should be treated as unproven**, with one located
+lead (v7 wins by re-offering and re-evaluating per action, and the value of
+doing so is measurable at 2.3 points in v7's own ablation) and one dead end
+(its tie-break mechanism, worth 16.8 in v7, has no purchase in v8 at all).
+
+`v9` is the strongest bot measured in this project. `V8_NEXT_METHODS.md` §6
+should be read as aimed at the wrong phase.
+
+### 2.3 v9 confirmed on a holdout seed, and a corrected asymmetric read
+
+Seed 11 was used to find the crossover, so it is a selection seed and cannot
+confirm. Seed 23 was not read until this point.
+
+| matchup | v8 | **v9** | paired p |
+|---|---|---|---|
+| mirror, seed 11 (selection) | 43.7% | **57.3%** | 0.00000 |
+| mirror, seed 23 (**holdout**) | 42.8% | **57.6%** | 0.00000 |
+
+The holdout replicates the selection seed to within 0.3 points, with the same
+sign and the same significance. That is the bar the blades sweep failed.
+
+#### The asymmetric row, and why the first version of it was wrong
+
+An earlier version of this section reported an asymmetric run — v9 at 70.8%
+against v8 at 52.9% — and called it a larger off-deck gain, which is the check
+the mulligan bug would have failed. **It was measuring the deck.**
+
+`5CP3Z idou` and `aiscream 37PMZ` are not a close matchup. v7 playing both, same
+seeds, n=1200:
+
+| seat 1 deck | result | win rate |
+|---|---|---|
+| `5CP3Z idou` | 809-391 | **67.4%** |
+| `aiscream 37PMZ` | 383-817 | **31.9%** |
+
+The neutral baseline for that matchup is **67.4%**, set entirely by the decks.
+v9's 70.8% is therefore 3.4 points above neutral, and v8's 52.9% is **14.5
+points below** it. Read against neutral rather than against each other:
+
+| matchup | neutral (v7 v7) | v8 | v9 | **v9 vs neutral** |
+|---|---|---|---|---|
+| mirror, seed 11 | 52.6% | 43.7% | 57.3% | **+4.7** |
+| mirror, seed 23 | — | 42.8% | 57.6% | — |
+| asymmetric, seed 11 | 67.4% | 52.9% | 70.8% | **+3.4** |
+
+So v9's edge is **smaller** off-deck than in the mirror, not larger, and the
+"+17.9" was an artifact of using v8 as the reference in a matchup where v8 is
+badly outclassed by its own opponent's deck. The mirror result is unchanged and
+still the load-bearing one.
+
+Two things that row did get right, and that are worth keeping: every cell reports
+0.0% no-contest, and v8 sitting 14.5 points *below* neutral here is a sharper
+statement of the same finding as §2 — v8's Main phase does not just fail to beat
+v7's, it actively loses ground when handed a favourable matchup it could have
+banked.
+
+**Ship v9.** v7's proven Main phase, v8's better live-card set, v7's mulligan.
+It is behind v7 nowhere measured, ahead on a selection seed and a holdout seed,
+and ahead on a second deck by a smaller but same-signed margin.
+
+### 2.4 "the game is just math": grading the search itself
+
+If the Main phase is where the loss is, and the right abstraction is to search
+the real game rather than hand-build a value, then the machine already exists —
+`v7_ismcts` is an ISMCTS with a terminal-exact value function
+(`game_value_is_terminal_exact`) and a success-race read
+(`game_value_reads_the_success_race`). `V7Rollout` exists precisely so it can
+be graded as a real policy "instead of assuming it is good". It never was.
+
+Graded as the Main phase, n=1200, seed 11:
+
+```
+bot_arena v7rollout v7 1200 "5CP3Z idou" --games 1200 --seed 11
+  RESULT v7rollout vs v7 | 552 - 648 | 0 draws | 42415 actions
+```
+
+**46.0%, against a v7 mirror of 52.6% — the search loses 6.6 points to the
+static policy it is refining.**
+
+This is the most valuable negative in the file, because it removes the
+attractive explanation. A terminal-exact value function and a real search should
+dominate a hand-built leaf, and it does not. So the Main-phase deficit is
+**not** a search-budget problem and **not** an evaluation problem, and no amount
+of nodes, rollouts, or a better leaf will close it. What is left is that v7's
+Main phase is doing something specific that neither a hand-built leaf nor a
+rollout search reproduces — and the crossover says it is worth about 10 points.
+
+It is not the tie-break (§1.4: unreachable in v8). It is not leaf weighting
+(ten experiments). It is not depth. The one structural difference left on the
+table is that v7 re-offers and re-evaluates after **every** action in a chain,
+while v8 scores one action and then takes the best of a single re-offer's leaf.
+That is the next thing to measure, and it is a change of shape rather than of
+weight — which is the only kind that has worked so far.
+
+### 2.5 Replacing the maths with search: the second and third replication
+
+The natural reading of "the game is just math" is: stop modelling the check and
+compute it. The machinery for that already existed and had never been graded on
+a single seat. Two of the three cells were run, paired, n=1200, seed 11, against
+`v9`:
+
+| what was swapped in | result | paired p |
+|---|---|---|
+| engine-executing live set (clone, commit, let the rules resolve) | 57.3% → **49.5%** | 0.00000 |
+| v8's forward-walk mulligan for v7's curve rule | 57.3% → 53.9% | 0.07382 |
+| ISMCTS Main (§2.4, separate run) | 46.0% vs 52.6% mirror | — |
+
+**Both lost, and the first lost badly.** A terminal-exact value function, a real
+search, and the actual engine resolving the actual check are each worse than
+v8's arithmetic.
+
+That is three independent replications of the same result, and it is the most
+useful thing in this file. The explanation is not that the maths is right and the
+simulation is wrong — the simulation is *more* correct about the check. It is
+that **search cannot repair a weak continuation policy, it amplifies it.** A
+rollout that continues with a mediocre policy prices a mediocre future
+correctly, which is worse than an optimistic analytic model of the check, because
+the analytic model at least errs on the side of the move that keeps options
+open. Every "just simulate it" attempt in this project has made the bot more
+pessimistic and more brittle in the same direction, and lost 6-8 points each
+time.
+
+**The only thing that has ever worked here is changing which policy makes the
+decision, not changing the maths it uses.** One crossover (+13.7). Eleven
+evaluations improved, reverted or regressed. That is not a coincidence worth
+arguing with; it is the shape of the problem.
+
+### 2.6 The maths that is actually missing
+
+Ranked by what the evidence leaves standing, not by what sounds deepest.
+
+1. **Sequencing, not valuation.** v7's advantage is re-offering and
+   re-evaluating after each action — a *plan* through the action space. Every
+   experiment above improved the *score* of a single action. The one lead with
+   support behind it is a greedy chain over real engine states that re-prices
+   after each chosen action and accumulates, rather than scoring one action and
+   taking the best single re-offer. This is a change of shape, which is the only
+   category with a positive result in the file.
+2. **The opponent as an agent.** Every model here prices the opponent as a fixed
+   board. Nothing models that they *respond*: that setting a life reveals
+   information, that forcing an early commit has value, that they will fold at
+   2-2. A 2-ply expectimax over (our action, their live-set choice) with the
+   real live-set model on both sides. Untested. The cheap way to find the states
+   that matter is the note's sandbox-agent idea: let a search opponent that
+   knows our policy play against us, and read the states where it wins, rather
+   than hypothesising them.
+3. **Belief over an uncommitted set.** `OppModel` forecasts the opponent's set
+   from their board; once committed it is exact and observed. The correct object
+   is a posterior over what they are holding, and the value of an action includes
+   what it reveals. Untested.
+4. **The race, not the check.** The objective is P(reach three first). Both bots
+   substantially maximise per-check placement probability. Those are different
+   functions, and in a race the right move is sometimes a thin check that wins
+   tempo and sometimes a reliable one that loses the race. `rule_payoff` knows
+   this and nothing optimises it.
+5. **Scheduling energy across turns.** Energy carries over, so a turn in which
+   nothing can be spent is a turn lost, and the real object is a knapsack over
+   the remaining turn schedule rather than a per-turn greedy. The log's "energy
+   unspent" term never fired because it was a level term; a schedule is not a
+   level.
+
+None of these is a term to add. Each is a different shape, and shape is the
+thing that has been working.
+
 ---
 
 ## 1. The instrument came first, and it was the precondition for everything

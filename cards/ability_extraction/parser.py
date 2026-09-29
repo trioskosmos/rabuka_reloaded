@@ -115,6 +115,7 @@ from parser_utils import (
     ENERGY_ICON,
     HAS_SCORE_ICON,
     HAS_ALL_BLADE_ICON,
+    HAS_DRAW_ICON,
     count_icons,
     extract_count,
     extract_source,
@@ -6472,6 +6473,7 @@ _CARD_PROPERTY_PHRASES = (
     (("ブレードハートを持つ",), "has_blade_heart", False),
     ((HAS_SCORE_ICON,), "has_score_icon", False),
     ((HAS_ALL_BLADE_ICON,), "has_all_blade", False),
+    ((HAS_DRAW_ICON,), "has_draw_icon", False),
 )
 
 # 「メンバーのいないエリアに登場」 — a stage slot with no member in it.

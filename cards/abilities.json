@@ -1,9 +1,9 @@
 {
   "schema": "extracted_abilities.v1",
-  "generated_at": "2026-09-30T03:01:55.689992",
+  "generated_at": "2026-09-30T06:49:52.996335",
   "generated_by": "cards/ability_extraction/extract_card_abilities.py",
   "source_file": "cards/cards.json",
-  "engine_commit": "034b2011",
+  "engine_commit": "be5abcd9",
   "parser_version": "1.0",
   "input_hash": null,
   "statistics": {
@@ -13307,7 +13307,8 @@
               "text": "{{icon_draw.png|ドロー}}を持つカードがある場合",
               "type": "location_condition",
               "location": "success_live_card_zone",
-              "card_type": "live_card"
+              "card_type": "live_card",
+              "card_property": "has_draw_icon"
             },
             "source": "discard",
             "destination": "hand",

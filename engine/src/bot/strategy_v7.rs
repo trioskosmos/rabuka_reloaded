@@ -480,6 +480,18 @@ pub fn score_actions(gs: &GameState, actions: &[Action], me: u8) -> Vec<(f64, St
 /// "safe" sets even as second attacker, measured -3pp; strict closeout
 /// beats — the ceiling estimate is not their set, measured -3pp with the
 /// above confounded in.)
+/// v7's live set, but the engine-executing one: clone the state, commit the
+/// candidate set, let the rules resolve it.
+///
+/// Normally only reachable through the `V7_ROLLOUT` env var on
+/// `choose_live_set_v7`, which is a process-wide switch and therefore cannot
+/// select it for ONE seat. `v9` needs to be able to field "v7 Main + one live
+/// set" against a pure opponent on a single seat, so the rollout is also
+/// reachable by name.
+pub fn choose_live_set_rollout(gs: &GameState, actions: &[Action], db: &CardDatabase) -> Action {
+    crate::bot::rollout::choose_live_set_v7(gs, actions, db)
+}
+
 pub fn choose_live_set_v7(gs: &GameState, actions: &[Action], db: &CardDatabase) -> Action {
     if std::env::var("V7_LIVE_V6").is_ok() {
         return crate::bot::strategy_v6::choose_live_set_v6(gs, actions, db);

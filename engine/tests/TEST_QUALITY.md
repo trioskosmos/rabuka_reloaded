@@ -6,7 +6,7 @@ Fn-level static signals over `engine/tests/**/*.rs`. Coverage counts (TEST_COVER
 answer “does it fire”; this answers “would the test notice if the trigger were wrong”.
 Report-only: rows are review prompts, not failures.
 
-## no_assert (2)
+## no_assert (4)
 
 _test never asserts (smoke at best — cannot pin behavior)_
 
@@ -14,12 +14,16 @@ _test never asserts (smoke at best — cannot pin behavior)_
 | --- | --- | --- | --- |
 | `engine/tests/test_modules/characterization/group_name_spacing_normalisation_test.rs` | `a_spaced_card_matches_the_unspaced_group_name` | 58 |  |
 | `engine/tests/test_modules/characterization/group_name_spacing_normalisation_test.rs` | `an_unspaced_card_matches_the_spaced_group_name` | 46 |  |
+| `engine/tests/test_modules/characterization/zz_probe_026b.rs` | `zz_probe_026_self_wait_in_sequential_cost` | 13 |  |
+| `engine/tests/test_modules/effects/state/wait_activation/pb2_discard_three_distinct_bibi_waits_foe_pl_pb2_018_p_plus_test.rs` | `two_prints_are_one_name` | 237 |  |
 
-## no_drive (0)
+## no_drive (1)
 
 _trigger-context test that mutates state and asserts but never drives the engine (no scan/activate/play/fire): vacuous negatives/positives_
 
-None.
+| file | test | line | detail |
+| --- | --- | --- | --- |
+| `engine/tests/test_modules/effects/state/wait_activation/pb2_double_baton_debut_recover_and_score_pl_pb2_000_duo_test.rs` | `the_debut_recovers_a_mus_live_card_from_the_waitroom` | 97 |  |
 
 ## synthetic_only (0)
 
@@ -43,18 +47,21 @@ _every assertion is a bare is_err()/is_none() — some guard fired, but nothing 
 | --- | --- | --- | --- |
 | `engine/tests/test_modules/effects/auto/pb2_self_wait_or_cost_paid_activates_and_gains_blade_pl_pb2_021_n_test.rs` | `the_cost_paid_branch_is_still_a_vacuous_comparison` | 205 |  |
 
-## assert_only_counts (0)
+## assert_only_counts (1)
 
 _every assertion is about a count/size (len/count/>=1) — '3 options were offered' can hold while the 3 are the wrong 3_
 
-None.
+| file | test | line | detail |
+| --- | --- | --- | --- |
+| `engine/tests/test_modules/effects/recover/to_hand/pb2_kidou_self_to_waitroom_recover_mus_live_then_energy_per_mus_pl_pb2_007_pp_test.rs` | `a_mus_live_is_recovered_from_the_waitroom` | 85 |  |
 
-## live_success_no_premise (1)
+## live_success_no_premise (2)
 
 _file CALLS trigger_live_success_abilities but never asserts the state of the ライブ成功時 window it dispatches through. That path checks `should_trigger_live_success`, so a live which failed silently dispatches nothing — and a NEGATIVE assertion in such a file then passes whether or not the ability does anything. The remedy is NOT always 'assert the window is open': a test of the heart requirement itself depends on the window being CLOSED, so each site must assert the state it actually relies on. Files built on `fire_trigger` are NOT flagged: it calls `trigger_auto_ability` directly and forces the dispatch, so there is no window to state. The fix is to assert `should_trigger_live_success` (or the performance snapshot) for the state the test depends on. See the comment above for the four scopings that were wrong first, and note that a live's `heart0` requirement is a COLORLESS WILDCARD satisfied by any colour, not a literal colour_
 
 | file | test | line | detail |
 | --- | --- | --- | --- |
+| `engine/tests/test_modules/effects/recover/to_hand/pb2_live_success_take_member_when_reveal_is_all_one_group_pl_pb2_037_l_test.rs` | `<file>` | 1 |  |
 | `engine/tests/test_modules/effects/score/card_score/pb2_live_success_plus_one_per_distinct_mus_member_pl_pb2_039_l_test.rs` | `<file>` | 1 |  |
 
 ## live_success_impossible_live (4)
@@ -68,7 +75,7 @@ _file CALLS trigger_live_success_abilities on a live whose printed need_heart no
 | `engine/tests/test_modules/effects/score/card_score/pb2_live_success_plus_one_per_distinct_mus_member_pl_pb2_039_l_test.rs` | `PL!-pb2-039-L` | 1 | heart01 needs 9, best single member prints 6; heart03 needs 9, best single member prints 3; heart06 needs 9, best single member prints 5 |
 | `engine/tests/test_modules/integration/full_round/real_card_phase_walkthrough_and_ability_suite_test.rs` | `PL!-bp3-026-L` | 1 | heart03 needs 5, best single member prints 3 |
 
-## drain_zero_may_decline (49)
+## drain_zero_may_decline (51)
 
 _file drains a prompt with index [0] AND asserts an absence, while naming a card whose select_cards is `optional`. On a skippable prompt [0] is NOT reliably 'take' and NOT reliably 'skip' — it depends on the PROMPT KIND and the harness does not say which. An optional-COST prompt takes the card on [0] (look_at_deck_top_optional_discard_test.rs proves it: two tests differing only in [0] vs []); a `looked_at` selection behaves differently again. So the hazard is AMBIGUITY: a test intending to take and instead declines passes silently when its assertion is an absence, which a positive assertion would have caught. `assert_select_card(zone, n, allow_skip)` states the prompt. EXPECTED YIELD IS LOW and measured, not hoped: 30 of these files assert absence directly about a look or selection, and the two read to check are both exemplars that state the prompt before answering and pair every absence with a positive twin. Read a row as 'spend five minutes here', not as 49 problems_
 
@@ -92,6 +99,7 @@ _file drains a prompt with index [0] AND asserts an absence, while naming a card
 | `engine/tests/test_modules/effects/look_select/look_and_filter/per_group_take_one_from_look_five_test.rs` | `PL!SP-bp5-007-R` | 1 |  |
 | `engine/tests/test_modules/effects/look_select/look_and_filter/success_score_gated_look_fetches_musume_test.rs` | `PL!-bp4-006-R` | 1 |  |
 | `engine/tests/test_modules/effects/look_select/optional_look_and_select_negative_branches_test.rs` | `PL!-pb1-016-R,PL!-sd1-004-SD` | 1 |  |
+| `engine/tests/test_modules/effects/look_select/pb2_kidou_look_three_take_printemps_member_pl_pb2_026_n_test.rs` | `PL!-pb2-008-PP,PL!-pb2-026-N` | 1 |  |
 | `engine/tests/test_modules/effects/look_select/per_card/live_success_revealed_cards_extra_yells_test.rs` | `PL!S-bp3-009-R` | 1 |  |
 | `engine/tests/test_modules/effects/look_select/reveal/debut_group_look_three_reveal_test.rs` | `PL!N-sd2-009-SD2` | 1 |  |
 | `engine/tests/test_modules/effects/look_select/reveal/look_five_reveal_cost9_group_member_test.rs` | `PL!-bp5-002-R,PL!HS-bp5-008-R,PL!N-bp5-009-R` | 1 |  |
@@ -108,6 +116,7 @@ _file drains a prompt with index [0] AND asserts an absence, while naming a card
 | `engine/tests/test_modules/effects/look_select/unit_filter_look_and_live_only_cost_test.rs` | `PL!SP-pb1-015-N` | 1 |  |
 | `engine/tests/test_modules/effects/recover/to_discard/live_start_discard_two_from_unit_with_two_or_more_cards_gain_heart04_and_blade_test.rs` | `PL!-sd1-004-SD` | 1 |  |
 | `engine/tests/test_modules/effects/recover/to_hand/optional_discard_two_split_group_recovery_ginko_test.rs` | `PL!HS-sd1-002-SD` | 1 |  |
+| `engine/tests/test_modules/effects/state/wait_activation/pb2_discard_three_distinct_bibi_waits_foe_pl_pb2_018_p_plus_test.rs` | `PL!SP-bp2-005-P` | 1 |  |
 | `engine/tests/test_modules/integration/full_round/live_each_time_victory_road_through_real_live_rounds_test.rs` | `PL!S-sd1-003-SD` | 1 |  |
 | `engine/tests/test_modules/integration/full_round/real_card_phase_walkthrough_and_ability_suite_test.rs` | `PL!-sd1-015-SD,PL!SP-bp2-002-P` | 1 |  |
 | `engine/tests/test_modules/integration/parser_e2e/parser_issues_e2e_part2_test.rs` | `PL!N-PR-003-PR` | 1 |  |

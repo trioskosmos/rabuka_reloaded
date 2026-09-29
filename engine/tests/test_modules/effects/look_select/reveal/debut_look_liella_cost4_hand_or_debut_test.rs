@@ -1,4 +1,4 @@
-﻿//! 澎谷かのん `PL!SP-pb2-001-P＋` / `PL!SP-pb2-001-R` — 登場 look-and-select
+﻿//! 澁谷かのん `PL!SP-pb2-001-P＋` / `PL!SP-pb2-001-R` — 登場 look-and-select
 //!
 //! Text, with the icon markup rendered as plain labels:
 //!
@@ -27,11 +27,11 @@ use crate::helpers::*;
 use rabuka_engine::turn::TurnEngine;
 use rabuka_engine::zones::MemberArea;
 
-const KANON: &str = "PL!SP-pb2-001-R"; // 澎谷かのん
-const FILLER: &str = "PL!-sd1-010-SD"; // 高均穋な果
-const LIELLA_A: &str = "PL!SP-PR-003-PR"; // 中古希睫大和
-const LIELLA_B: &str = "PL!SP-PR-004-PR"; // 山納之徽得
-const NOT_LIELLA: &str = "PL!-sd1-008-SD"; // 一江歜 — μ's, so 『Liella!〇 excludes it
+const KANON: &str = "PL!SP-pb2-001-R"; // 澁谷かのん
+const FILLER: &str = "PL!-sd1-010-SD"; // 高坂穂乃果
+const LIELLA_A: &str = "PL!SP-PR-003-PR"; // 澁谷かのん
+const LIELLA_B: &str = "PL!SP-PR-004-PR"; // 唐可可
+const NOT_LIELLA: &str = "PL!-sd1-008-SD"; // 小泉花陽 — μ's, so 『Liella!〇 excludes it
 /// 莲ヌ空 — also μ's, and likewise excluded by 『Liella!〇. The old name
 /// `non_mus` was simply wrong: 莲ヌ空 IS a μ's group.
 const KANON_GROUP: &str = "PL!HS-sd1-010-SD";

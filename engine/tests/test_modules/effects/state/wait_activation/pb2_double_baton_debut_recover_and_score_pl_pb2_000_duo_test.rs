@@ -36,12 +36,12 @@ const DUO: &str = "PL!-pb2-000-DUO";
 const R: &str = "PL!-pb2-000-R";
 const FILLER: &str = "PL!-sd1-010-SD";
 /// A μ's live (series ラブライブ！) already in the 控え室, waiting to be recovered.
-const MUS_LIVE: &str = "PL!-bp3-019-L"; // 傷らのLIVE
+const MUS_LIVE: &str = "PL!-bp3-019-L"; // 僕らのLIVE
 /// A non-μ's live in the same 控え室, which the 『μ's』 group filter must exclude.
 const NON_MUS_LIVE: &str = "PL!-sd1-021-SD";
 /// Two μ's members for the two-member touch the 登場 gate requires.
-const MUS_MEMBER_1: &str = "PL!-PR-001-PR"; // 高均穋な果, Printemps
-const MUS_MEMBER_2: &str = "PL!-PR-002-PR"; // 絞渡絵里, BiBi
+const MUS_MEMBER_1: &str = "PL!-PR-001-PR"; // 高坂穂乃果, Printemps
+const MUS_MEMBER_2: &str = "PL!-PR-002-PR"; // 絢瀬絵里, BiBi
 
 /// The 登場 effect, for `card`.
 fn debut_effect(game: &TestGame, card: &str) -> rabuka_engine::card::AbilityEffect {

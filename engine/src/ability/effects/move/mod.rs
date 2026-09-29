@@ -193,6 +193,9 @@ impl SelectionFilter<'_> {
                         "has_all_blade" => {
                             self.db.get_card(cid).is_some_and(|c| c.has_all_blade())
                         }
+                        "has_draw_icon" => {
+                            self.db.get_card(cid).is_some_and(|c| c.has_draw_icon())
+                        }
                         _ => false,
                     };
                     if self.property_negation {
