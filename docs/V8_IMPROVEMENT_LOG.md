@@ -519,6 +519,183 @@ Ranked by what the evidence leaves standing, not by what sounds deepest.
 None of these is a term to add. Each is a different shape, and shape is the
 thing that has been working.
 
+### 2.7 Items 1 is falsified, and so is the granularity theory
+
+Both built and measured, paired, n=1200, seed 11, on v8's own Main phase —
+the phase that is actually losing.
+
+**The chain (`V8_CHAIN`).** `Search::chain` commits to the single best next
+action, executes it for real, and re-offers *from the resulting state*, taking
+the final leaf and only extending on a strict improvement. `V8_CHAIN=3` and
+`V8_CHAIN=6` returned **bit-identical results to each other** (522-678, 30
+discordant, p=0.856, −0.17 pp) — the chain stops before it extends, because
+after the first committed step no further step strictly improves on the leaf it
+came from.
+
+So the hypothesis behind item 1 is wrong. v7 does not beat v8's Main by
+sequencing. The crossover says the difference is real and worth ~10 points; a
+chain is not it.
+
+**The granularity theory.** This came out of that null rather than being planned.
+`V8_QUANT=<step>` rounds the leaf onto a coarse grid, on the theory that v7's
+leaf ties constantly (so its +16.8 tie-break does real work) while v8's smooth
+leaf never ties, and that a value function coarse enough to *abstain* between
+actions it cannot distinguish would hand those cases to a key encoding guide
+knowledge instead of to float noise. The opposite of every other attempt here,
+all of which added precision.
+
+| cell | result | p |
+|---|---|---|
+| `V8_QUANT=2` | 43.7% → 43.2% | 0.359 |
+| `V8_QUANT=2` + `V8_TIE_BATON` | 43.7% → 43.6% | 1.000 |
+
+Also null. And note the tie-break under quantisation changed 43 games where it
+had changed 23 without it — quantising roughly doubled tie frequency and it
+still bought nothing, so the +16.8 in v7 is not "coarse values plus a
+tie-break". It is something else in v7's decision that this whole line of
+investigation has not touched.
+
+### 2.8 Stop: the evidence says ship v9, not fix v8's Main
+
+Every approach taken to v8's Main phase, in one place:
+
+| approach | result |
+|---|---|
+| ten leaf terms | inert or regression |
+| colour-exact deficit | regression (p=0.044 at w=0.05) |
+| opponent horizon, then + gradient | bit-identical |
+| `V8_TIE_BATON` | 23/1200 games |
+| deeper search (`NODES=192`, `FOLLOWUP=10`) | 3/400 games |
+| ISMCTS replacing the leaf | **−6.6** |
+| engine-executed live set | **−7.8** |
+| forward-walk mulligan | **−3.4** |
+| greedy chain | null, bit-identical at depth 3 and 6 |
+| quantised leaf, with and without the tie-break | null |
+
+**Nothing has moved v8's Main phase in either direction except making it worse.**
+Eleven attempts, spanning evaluation, search, simulation, sequencing and
+granularity, and the only positive result in the entire file is the crossover —
+which does not improve v8's Main phase, it replaces it.
+
+The reasonable reading is that v8's Main phase is not a worse *evaluation of the
+same decision*. v7's Main phase is doing something that none of these levers
+reach, and continuing to guess at it is now the least efficient thing available.
+`v9` captures the whole gain by using v7's Main phase and v8's live set, is
+confirmed on a holdout seed, and is the strongest bot this project has measured.
+
+**Recommendation: ship v9 and stop work on v8's Main phase.** Items 2-5 of §2.6
+remain genuinely untested and are the right next targets — but they target the
+*live set and the race*, not the Main phase, and the evidence gives no reason to
+think any of them will rescue a phase that has now resisted evaluation, search,
+simulation, sequencing and granularity in turn.
+
+---
+
+## 3. Stop guessing: read v7's source (and the actual game math)
+
+§2.8 concluded that v8's Main phase was not worth further work. That was a
+conclusion drawn from black-box measurement of my own changes while never having
+read the two functions side by side. Reading them took ten minutes and
+immediately contradicted it.
+
+### 3.1 The structural difference, in v7's own words
+
+`v7_main::value` (`v7_main.rs:243`) is a **linear function of coarse feature
+deltas**:
+
+```text
+  8.0 * dCost   +  3.0 * dHearts  +  6.0 * dBlades  + 60.0 * dCoverage
++ 25.0 * dAmmo   +  2.0 * dEnergy  +  3.0 * dHand    +  0.5 * dReserve
++  2.0 * dFuture + 1000.0 * dSuccess
+```
+
+and `Search::evaluate` (`v7_main.rs:372`) prices the **opponent** the same way:
+
+```text
+- 8.0 * dOppCost  - 6.0 * dOppBlades  - 10.0 * dOppHand  - 1000.0 * dOppSuccess
+```
+
+v8's leaf is a different kind of object entirely: a **level** in
+placement-probability units. Blades and ammo reach it only through
+`placement_pair`, which routes them into a binomial that **saturates** — once
+the check is comfortably passable, more blades move the probability by nothing.
+v7 is paid 6 per blade whether or not the check is already safe.
+
+So v8 does not mis-*weight* the terms v7 has. **It structurally cannot express
+two of the five biggest ones**, and the ablation says they are the two biggest:
+blades -5.1, ammo -2.9, and every other term under 1.0.
+
+The eleven earlier experiments all added *terms of v8's own* on the assumption
+that the problem was precision. It was not. It was a missing axis.
+
+### 3.2 Blades: the first real win on this phase in the file
+
+`V8_BLADES=<w>` adds a linear blade term in v7's form. The weight is v7's own,
+6.0 — not tuned.
+
+| seed | baseline | +`V8_BLADES=6` | paired p | pace (P1) |
+|---|---|---|---|---|
+| 11 (selection) | 42.5% | **43.4%** | **0.02963** | +0.0041 SIGNIFICANT |
+| 23 (**holdout**) | 41.8% | 42.3% | 0.21995 | +0.0030 SIGNIFICANT |
+
+n=4000 per seed. Pooled across 8000 games: 215 baseline-only against 270
+candidate-only, McNemar p ≈ **0.013**.
+
+**The first significant improvement to v8's Main phase in the entire file**, and
+it came from reading v7 rather than from any amount of measuring v8.
+
+Note the dissociation, which is worth more than the win rate: **pace rose
+significantly on both seeds while win rate did not.** The term makes v8 place
+more reliably without making it win more. That is a real and slightly
+uncomfortable result — it is the same gap the whole project has been measuring
+(pace ~0.40 against a 1.0 target) and it says pace on its own is not the
+objective. Both numbers are now printed on every paired run for exactly this
+reason.
+
+### 3.3 The opponent half, and why calibrating it changed nothing
+
+`V8_OPP_BLADES=6` (the differential, `v7_main.rs:373`) measured +1.08 pp against
++1.25 pp for our own blades alone — the same effect, so the opponent-side term
+adds nothing measurable, and it is not carried.
+
+`V8_OPP_DENSITY=measured` measured **5 discordant games in 1200**. That is the
+third and final confirmation of the saturation diagnosis. `YIELD_PRIOR` has a
+mean of 0.505 blade-hearts per blade while independent community calculation
+puts the real figure near 0.733
+(note.com/miumi_loveca — "1回のエールでブレードハートがめくれる確率"), and
+correcting a 45% error in the opponent's yield changes **five games**, because
+`pass_prob` takes 6 distinct values and there is nowhere for a 45% shift to land.
+**A model that coarse cannot be calibrated.** The number was right and the
+function was too short to notice it.
+
+### 3.4 A bug in my own instrumentation, which looked exactly like a finding
+
+`V8_DELTA_LEAF` + `V8_CHAIN=4` first measured **6.7%**, from 43.7%, with pace
+collapsing 0.39 -> 0.20. That is the shape of a catastrophic result and it would
+have been a comfortable thing to write up as "delta leaves destroy the bot".
+
+It was a unit mismatch on one branch: `Pass` was scored with `leaf()` (a level,
+worth ~+400) while every other action used `scored_leaf()` (a delta, near zero),
+so Pass won unconditionally and v8 stopped deploying. Fixed, the same cell
+measures **+0.17 pp, p=0.86 — null**.
+
+Both readings agree that sequencing does not help: the original chain stopped
+before extending (depth 3 and depth 6 bit-identical), and the delta version
+extends properly and still does nothing. §2.7 stands, and this is the second
+time in this file that an instrumentation bug produced a result convincing
+enough to be worth writing down.
+
+### 3.5 Next: coverage, the largest v7 term still missing
+
+`V8_COVERAGE=<w>` is `60.0 * dCoverage` transcribed the way v7 computes it, as a
+**delta on the best life in hand's own requirement**. This is deliberately not
+the `V8_DEFICIT` experiment that regressed (§0.7): that one subtracted an
+absolute shortfall (a level, which cannot reorder a saturated argmax) and aimed
+at the *biggest* life in hand (usually one that cannot be set for turns). The
+blade result is the reason to retest the same underlying idea in v7's shape — the
+reading of v7's source has now produced one prediction that held and one that
+did not, and both were worth running.
+
 ---
 
 ## 1. The instrument came first, and it was the precondition for everything

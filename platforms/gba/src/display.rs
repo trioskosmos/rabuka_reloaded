@@ -12,7 +12,7 @@ use agb::display::object::{
 use agb::display::{busy_wait_for_vblank, Graphics, Palette16, Priority, Rgb15, Rgb};
 
 use crate::board::{BoardFrame, Slot};
-use crate::card_art_gen::{CardArt, CardFront, BACK_FRONT, BOARD_UI, CARD_ART, CARD_FRONTS, LIVE_FRONTS, MASTER_PAL, STAGE_FRONTS, WAITED_FRONTS, lz77_decompress_wram};
+use crate::card_art_gen::{CardArt, CardFront, BACK_FRONT, BOARD_UI, CARD_ART, CARD_FRONTS, LIVE_FRONTS, MASTER_PAL, STAGE_FRONTS, WAITED_FRONTS};
 use crate::font_tiles_gen::{FONT_GLYPHS, FONT_TILES};
 use crate::texticons_gen::{TEXTICON_GLYPHS, TEXTICON_TILES};
 
@@ -459,7 +459,7 @@ impl CardSpriteCache {
                         TILE_SCRATCH_LEN,
                     )
                 };
-                decompress_lz77(tiles, &mut scratch[..expected]);
+                decompress_art(tiles, &mut scratch[..expected]);
                 &scratch[..expected]
             } else {
                 tiles
@@ -659,12 +659,12 @@ static mut TILE_SCRATCH: [u8; TILE_SCRATCH_LEN] = [0; TILE_SCRATCH_LEN];
 static mut UI_TILES_BUF: [u8; 192] = [0; 192];
 static mut UI_TILES_READY: bool = false;
 
-/// Board UI tiles, decompressed on first use. See [`decompress_lz77`].
+/// Board UI tiles, decompressed on first use. See [`decompress_art`].
 fn board_ui_tiles() -> &'static [u8] {
     unsafe {
         if !UI_TILES_READY {
             let mut dst = [0u8; 192];
-            decompress_lz77(BOARD_UI, &mut dst);
+            decompress_art(BOARD_UI, &mut dst);
             UI_TILES_BUF = dst;
             UI_TILES_READY = true;
         }
@@ -672,15 +672,24 @@ fn board_ui_tiles() -> &'static [u8] {
     }
 }
 
-/// Fill `dst` from one baked `.bin` stream via BIOS SWI 0x11.
+/// Fill `dst` from one baked `.bin` blob.
 ///
-/// Uniform contract (enforced by `tools/bake_card_art.py`): EVERY .bin is
-/// a standard stream (`0x10` + 3-byte LE size), even when larger than raw —
-/// so there is deliberately no format sniffing here. `dst` must fit the
-/// declared size; callers size it from the grid (`tiles * 64`).
-fn decompress_lz77(src: &[u8], dst: &mut [u8]) {
-    log::debug!("[ART] lz77 {}B -> {}B", src.len(), dst.len());
-    lz77_decompress_wram(src, dst);
+/// Uniform contract (enforced by `tools/bake_card_art.py`): EVERY `.bin` is a
+/// zlib stream, so there is deliberately no format sniffing here. `dst` must
+/// fit the decompressed size; callers size it from the grid (`tiles * 64`).
+///
+/// zlib/DEFLATE rather than the BIOS LZ77 (SWI 0x11) this used to call. On the
+/// 8bpp dithered indexed art in `baked/card_art` the two measure 25.9MB vs
+/// 18.9MB across all 1809 cards — the BIOS window is 4KB and per-blob, so no
+/// card can match another, while deflate's entropy stage is what actually
+/// handles a near-flat 6.4-bit/symbol distribution. miniz_oxide is already
+/// linked in for the ability bytecode, so this adds no new code to the ROM.
+fn decompress_art(src: &[u8], dst: &mut [u8]) {
+    log::debug!("[ART] inflate {}B -> {}B", src.len(), dst.len());
+    let raw = miniz_oxide::inflate::decompress_to_vec_zlib(src)
+        .expect("[ART] baked blob is not a valid zlib stream");
+    debug_assert_eq!(raw.len(), dst.len());
+    dst.copy_from_slice(&raw);
 }
 
 impl<'a> Display<'a> {

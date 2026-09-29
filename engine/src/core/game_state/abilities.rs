@@ -2056,6 +2056,7 @@ fn trigger_auto_ability_by_index_refs(
         #[cfg(not(feature = "no_std"))]
         let _t = crate::timer::Timer::start("resolve::resolve_ability_total");
         let resolve_result = resolver.resolve_ability(self, ability.clone(), card_id, ability_index);
+        #[cfg(not(feature = "no_std"))]
         drop(_t);
         match resolve_result {
             Ok(()) => {

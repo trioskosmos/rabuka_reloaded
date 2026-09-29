@@ -150,7 +150,7 @@ fn numeric_deck_position(
 /// the activating effect. Same shape as the other selection filters in the
 /// engine: build once, then ask `accepts` about each candidate.
 struct SelectionFilter<'a> {
-    db: std::sync::Arc<CardDatabase>,
+    db: crate::compat::Arc<CardDatabase>,
     card_type: Option<&'a str>,
     cost_limit: Option<u8>,
     cost_operator: Option<&'a str>,

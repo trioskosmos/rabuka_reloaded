@@ -2,30 +2,52 @@
 """Bake GBA card art from original WebP sources — using include_bytes! binary files.
 
 For each card:
-- Detail view: 8bpp per-card 240-colour palette (96x144 = 13824 bytes tiles + 480 palette)
+- Detail view: 8bpp tiles (96x144 = 13824 bytes) against the shared MASTER_PAL
 - Fronts (hand/stage/live/waited): 8bpp shared 240-colour MASTER_PAL
+
+Every blob is written as a ZLIB (RFC1950/deflate) stream and inflated at
+runtime by miniz_oxide, which the engine already links in for the ability
+bytecode. This replaced the BIOS LZ77 (SWI 0x11) format the bake used to emit.
+
+=== WHY DEFLATE, NOT BIOS LZ77 ===
+Measured over all 1809 baked cards (baked/card_art, before this change):
+
+    kind   raw            BIOS LZ77    deflate-9    zstd-19
+    tiles  25,007,616     18,240,121   13,834,806   13,285,852
+    stage   3,473,280      3,222,938    2,430,153    2,421,124
+    front   1,389,312      1,413,043    1,066,393    1,062,393
+    wait    1,389,312      1,375,317    1,056,608    1,052,477
+    live      694,656        642,496      515,717      503,306
+    pal       868,320        985,905        (dropped)  (dropped)
+    TOTAL   32,822,496     25,879,820   18,904,157   18,325,632
+
+Two independent reasons LZ77 lost:
+
+1. The art is dithered, so its order-0 entropy is 6.41 bits/symbol — nearly
+   flat. LZ77 is a dictionary matcher with no entropy stage, so it has nothing
+   to work with. (BIOS Huffman would be worse still: at 6.41 bits/symbol its
+   floor is ~512KB for 553KB of input, i.e. an expansion.) Deflate pairs LZ77
+   with Huffman, which is exactly the stage the data needs.
+2. The BIOS window is 4KB and applied per blob, so no card can ever match
+   another even though all 1809 share one 240-colour palette.
+
+zstd-19 is ~3% better than deflate but needs a new ~40KB no_std decoder
+(ruzstd) and is ~3.5x slower to decode on a 16.78MHz ARM7. deflate reuses
+miniz_oxide, which is already in this ROM. That trade is worth 570KB.
+
+=== PALETTES ===
+`pal_*.bin` used to be written once per card — 1809 byte-identical copies of
+MASTER_PAL, 985,905 bytes of ROM, and the runtime never read `CardArt.palette`
+at all (it builds all 16 OBJ palettes from MASTER_PAL in display.rs). The field
+and the blobs are gone; the struct keeps only what is read.
 
 Emits platforms/gba/src/card_art_gen.rs with:
     pub static MASTER_PAL: [u8; 480] = *include_bytes!("../baked/card_art/master_pal.bin");
-    pub static CARD_ART: &[CardArt] = &[ CardArt { card_no: "PL!-BP1-001-R", 
-        palette: include_bytes!("../baked/card_art/pal_PL!-BP1-001-R.bin"),
+    pub static CARD_ART: &[CardArt] = &[ CardArt { card_no: "PL!-BP1-001-R",
         tiles: include_bytes!("../baked/card_art/tiles_PL!-BP1-001-R.bin") }, ... ];
     pub static CARD_FRONTS: &[CardFront] = &[ CardFront { card_no: "...", tiles: include_bytes!(...) }, ... ];
 
 Run:  py -3 tools/bake_card_art.py
-
-=== ROM SIZE CONSTRAINTS ===
-GBA cartridge sizes: 4MB, 8MB, 16MB, 32MB (common). Our target: 32MB max.
-Per-card art cost (detail + 4 fronts):
-  - Detail: 13824 (tiles) + 480 (palette) = 14.3 KB
-  - Fronts (4 variants): ~2-4 KB each = 8-16 KB
-  - Total per card: ~22-30 KB
-  
-2526 non-energy cards × ~25 KB = ~63 MB (exceeds 32MB cart)
-337 deck-used cards × ~25 KB = ~8.4 MB (fits with engine + headroom)
-
-Energy cards are NOT baked — they are handled by the engine at runtime
-(card type Energy gets auto-generated energy art, no WebP source needed).
 """
 
 import json
@@ -34,6 +56,7 @@ import random
 import re
 import sys
 import time
+import zlib
 from concurrent.futures import ProcessPoolExecutor, as_completed
 from pathlib import Path
 from functools import lru_cache
@@ -48,157 +71,16 @@ from bake_deck_cards import normalize  # noqa: E402
 RE_COUNT_X = re.compile(r"^(\d+)\s*x\s*(.+)$")
 RE_X_COUNT = re.compile(r"^(.*?)\s*x\s*(\d+)$")
 
-# GBA BIOS LZ77 (LZSS) compression - hash-based for speed
-# Header: 32-bit little-endian
-#   bits 0-3: reserved (0)
-#   bits 4-7: compression type (1 = LZ77/LZ10)
-#   bits 8-31: decompressed size
-# Data: LZSS format with 4096-byte sliding window, min match 3, max match 18
-# Flag byte: 1 bit per item (1=literal, 0=match), 8 items per flag byte
 
-def lz77_compress_bios(data: bytes) -> bytes:
-    """Compress data to GBA BIOS LZ77 (LZSS) format using hash-based search.
-    
-    Returns: header (4 bytes) + compressed data
-    Header: type=1 (LZ77) in bits 4-7, decompressed size in bits 8-31
+def compress_blob(data: bytes) -> bytes:
+    """Compress one blob to a zlib stream (level 9).
+
+    Level 9 over the default 6: this runs once per blob at bake time and
+    measured ~1.5% smaller on the art, which is ~270KB of a 32MB cart.
     """
     if not data:
-        return b'\x10\x00\x00\x00'  # type=1, size=0
-    
-    window_size = 4096
-    min_match = 3
-    max_match = 18
-    
-    # Hash table for 3-byte sequences - use array for speed
-    HASH_BITS = 16
-    HASH_SIZE = 1 << HASH_BITS
-    HASH_MASK = HASH_SIZE - 1
-    
-    # Use array for hash chain (stores previous index for each position)
-    import array
-    hash_chain = array.array('H', [0xFFFF] * len(data))
-    # Use array of ints for hash table - initialize with 0xFFFF (sentinel for -1)
-    hash_table = array.array('H', [0xFFFF] * HASH_SIZE)
-    
-    def hash3(pos: int) -> int:
-        """Hash 3 bytes at position."""
-        if pos + 3 > len(data):
-            return 0
-        return ((data[pos] << 8) | (data[pos + 1] << 4) | data[pos + 2]) & HASH_MASK
-    
-    output = bytearray()
-    # Pre-allocate approximate size (worst case: all literals + flag bytes)
-    output.extend(b'\x00' * (len(data) * 2 + 100))
-    i = 0
-    flag_byte = 0
-    flag_bit = 0
-    # BIOS layout: flag byte FIRST, then its 8 items. The placeholder
-    # lives at index 0 (a previous revision started items at index 2,
-    # leaving a stray zero that shifted the whole stream).
-    flag_pos = 0
-    output[0] = 0  # placeholder for first flag byte
-    output_len = 1
-    
-    while i < len(data):
-        # Search for best match using hash table
-        best_len = 0
-        best_dist = 0
-        
-        if i + min_match <= len(data):
-            h = hash3(i)
-            # Walk hash chain to find matches
-            j = hash_table[h]
-            search_end = max(0, i - 4096)
-            
-            while j != 0xFFFF and j >= search_end:
-                # Quick check: first 3 bytes match (hash collision handled by verification)
-                match_len = 0
-                # Unroll loop for common case
-                max_possible = min(max_match, len(data) - i)
-                while match_len < max_possible and data[j + match_len] == data[i + match_len]:
-                    match_len += 1
-                
-                if match_len >= 3 and match_len > best_len:
-                    best_len = match_len
-                    best_dist = i - j
-                    if best_len == 18:  # max match, stop searching
-                        break
-                
-                # Move to next in chain
-                j = hash_chain[j] if j < len(hash_chain) and hash_chain[j] != 0xFFFF else 0xFFFF
-        
-        # Add current position to hash table
-        if i + min_match <= len(data):
-            h = hash3(i)
-            hash_chain[i] = hash_table[h]  # Store previous index
-            hash_table[h] = i
-        
-        if best_len >= 3:
-            # Match: flag bit 1 (MSB-first), then the 2-byte token with
-            # length in the HIGH nibble: ((len-3) << 4) | ((dist-1) >> 8),
-            # ((dist-1) & 0xFF). (A previous revision had the nibbles
-            # swapped AND the polarity inverted — BIOS decoded garbage.)
-            flag_byte |= (1 << (7 - flag_bit))
-            dist_minus1 = best_dist - 1
-            len_minus3 = best_len - 3
-            output[output_len] = ((len_minus3 & 0xF) << 4) | ((dist_minus1 >> 8) & 0xF)
-            output[output_len + 1] = dist_minus1 & 0xFF
-            output_len += 2
-            i += best_len
-        else:
-            # Literal: flag bit stays 0, raw byte follows.
-            output[output_len] = data[i]
-            output_len += 1
-            i += 1
-        
-        flag_bit += 1
-        if flag_bit == 8:
-            output[flag_pos] = flag_byte
-            flag_pos = output_len
-            output[output_len] = 0  # placeholder for next flag byte
-            output_len += 1
-            flag_byte = 0
-            flag_bit = 0
-    
-    if flag_bit > 0:
-        output[flag_pos] = flag_byte
-    
-    # Truncate to actual length
-    output = output[:output_len]
-    
-    decompressed_size = len(data)
-    # Standard BIOS header: type byte 0x10 exactly, then the full 24-bit
-    # LE size. (A previous revision OR-ed the size low byte into the type
-    # byte, producing 0x90/0xD0 headers the BIOS rejects — every file
-    # whose size wasn't a multiple of 256 decoded as garbage.)
-    assert decompressed_size < (1 << 24), "LZ77 size must fit 24 bits"
-    header = bytes([
-        0x10,
-        decompressed_size & 0xFF,
-        (decompressed_size >> 8) & 0xFF,
-        (decompressed_size >> 16) & 0xFF,
-    ])
-    
-    return header + bytes(output)
-
-
-def lz77_compress_bios_if_smaller(data: bytes) -> bytes:
-    """Compress with LZ77, ALWAYS returning a standard BIOS stream.
-
-    Historical note: this used to return the input raw (with a 4-byte LE
-    length header) when compression didn't pay, and the LZ77 header OR-ed
-    the size low byte into the type byte. Both broke the runtime, which
-    feeds every .bin straight to BIOS SWI 0x11: files whose size low byte
-    wasn't zero (stage/live/back/UI) have an invalid type byte, and raw
-    files decode as garbage. The uniform contract now: every .bin written
-    by write_compressed is a standard stream (0x10 + 3-byte LE size), even
-    when a few bytes larger than raw. Costs ~tens of KB of ROM; buys a
-    runtime with zero format sniffing.
-    """
-    if len(data) == 0:
-        return b'\x10\x00\x00\x00'
-    return lz77_compress_bios(data)
-
+        return zlib.compress(b"", 9)
+    return zlib.compress(data, 9)
 
 ART_W = 96
 ART_H = 144
@@ -539,12 +421,18 @@ def build_master_palette(card_nos: list[str], sample_size: int = 500) -> tuple:
 
 
 def process_card(card_no: str, master_q, master_pal_bytes):
-    """Process a single card - returns all baked data."""
+    """Process a single card - returns all baked data.
+
+    No per-card palette is returned or written: every card quantizes against
+    the one shared MASTER_PAL, so the old `pal_<card>.bin` files were 1809
+    byte-identical copies of it (985,905 bytes of ROM) and nothing ever read
+    `CardArt.palette` — display.rs builds all 16 OBJ palettes from MASTER_PAL.
+    """
     img = load_image_cached(card_no)
     if img is None:
         return card_no, None
     up, rotated = maybe_upright(img)
-    pal, tiles = bake_detail(img, master_q, master_pal_bytes)
+    _pal, tiles = bake_detail(img, master_q, master_pal_bytes)
     ftiles = bake_with_palette(up, FRONT_W, FRONT_H, master_q, FRONT_GRID, dither=Image.Dither.FLOYDSTEINBERG, sharpen=True)
     stiles = bake_with_palette(up, STAGE_W, STAGE_H, master_q, STAGE_GRID, dither=Image.Dither.FLOYDSTEINBERG)
     ltiles = bake_with_palette(img, LIVE_W, LIVE_H, master_q, LIVE_GRID, dither=Image.Dither.ORDERED, sharpen=True)
@@ -553,11 +441,11 @@ def process_card(card_no: str, master_q, master_pal_bytes):
     # 32x24 slot. (Contain-fitting the unrotated portrait here used to bake
     # a shrunken upright card floating in padding — no visible wait state.)
     wtiles = bake_with_palette(up.rotate(90, expand=True), WAIT_W, WAIT_H, master_q, WAIT_GRID, dither=Image.Dither.ORDERED, sharpen=True)
-    return card_no, (pal, tiles, ftiles, stiles, ltiles, wtiles, rotated)
+    return card_no, (tiles, ftiles, stiles, ltiles, wtiles, rotated)
 
 
 def write_gen(entries, fronts, stage_fronts, live_fronts, waited_fronts, back_front, ui_tiles, master_pal_bytes):
-    """Generate card_art_gen.rs with include_bytes! references (LZ77 compressed)."""
+    """Generate card_art_gen.rs with include_bytes! references (zlib deflate)."""
     BIN_DIR.mkdir(parents=True, exist_ok=True)
 
     # Helper to write compressed data (records sizes for the 4-aligned
@@ -566,7 +454,7 @@ def write_gen(entries, fronts, stage_fronts, live_fronts, waited_fronts, back_fr
     blob_sizes = {}
 
     def write_compressed(path: Path, data: bytes):
-        compressed = lz77_compress_bios_if_smaller(data)
+        compressed = compress_blob(data)
         with open(path, "wb") as f:
             f.write(compressed)
         written.add(path.name)
@@ -581,9 +469,8 @@ def write_gen(entries, fronts, stage_fronts, live_fronts, waited_fronts, back_fr
         f.write(master_pal_bytes)
     written.add("master_pal.bin")
 
-    for card_no, pal, tiles, _f, _s, _l, _w in entries:
+    for card_no, tiles, _f, _s, _l, _w in entries:
         safe = sanitize_filename(card_no)
-        write_compressed(BIN_DIR / f"pal_{safe}.bin", pal)
         write_compressed(BIN_DIR / f"tiles_{safe}.bin", tiles)
 
     for card_no, tiles in fronts:
@@ -608,9 +495,12 @@ def write_gen(entries, fronts, stage_fronts, live_fronts, waited_fronts, back_fr
     # Generate Rust source with include_bytes! + runtime decompression
     with open(OUT_RS, "w", encoding="utf-8") as f:
         f.write("// Auto-generated by tools/bake_card_art.py -- do not edit.\n")
-        f.write("// CardArt: 8bpp detail art (96x144 = 13824 bytes) + 240-colour rgb15 palette\n")
+        f.write("// CardArt: 8bpp detail art (96x144 = 13824 bytes), shared MASTER_PAL\n")
         f.write("// Card fronts: 8bpp shared MASTER_PAL (4bpp on GBA via palette bank)\n")
-        f.write("// All binary data LZ77-compressed (GBA BIOS SWI 0x11/0x12)\n")
+        f.write("// Every .bin is a zlib (deflate) stream, inflated by miniz_oxide in\n")
+        f.write("// display.rs::decompress_art. This replaced the BIOS LZ77 (SWI 0x11)\n")
+        f.write("// format; see the module docstring in tools/bake_card_art.py for the\n")
+        f.write("// measured 25.9MB -> 18.9MB across all baked cards.\n")
         f.write("#![allow(non_upper_case_globals)]\n")
         f.write("// (AL_* statics mirror card numbers in mixed case so art\n")
         f.write("// blobs stay grep-able from panic messages and debug logs.)\n\n")
@@ -619,7 +509,6 @@ def write_gen(entries, fronts, stage_fronts, live_fronts, waited_fronts, back_fr
 
         f.write("pub struct CardArt {\n")
         f.write("    pub card_no: &'static str,\n")
-        f.write("    pub palette: &'static [u8],\n")
         f.write("    pub tiles: &'static [u8],\n")
         f.write("}\n\n")
 
@@ -628,81 +517,21 @@ def write_gen(entries, fronts, stage_fronts, live_fronts, waited_fronts, back_fr
         f.write("    pub tiles: &'static [u8],\n")
         f.write("}\n\n")
 
-        f.write("/// 4-byte alignment wrapper: `include_bytes!` aligns to 1,\n")
-        f.write("/// but the BIOS word-loads its SWI source and faults on\n")
-        f.write("/// unaligned addresses. Every blob below lives in one of\n")
-        f.write("/// these, so `lz77_decompress_wram` takes the aligned fast\n")
-        f.write("/// path and never needs its staging copy (kept as fallback).\n")
+        f.write("/// Alignment wrapper kept for the blob statics. inflate reads the\n")
+        f.write("/// stream byte-wise so it has no alignment requirement, but the\n")
+        f.write("/// BIOS no longer word-loads these and 4-byte alignment still\n")
+        f.write("/// keeps each blob's address a round number in panic/debug output.\n")
         f.write("#[repr(align(4))]\n")
         f.write("pub struct AlignedBlob<const N: usize>(pub [u8; N]);\n\n")
-
-        # Runtime decompression helper
-        f.write("/// Staging for SWI sources: fallback for any blob that is not\n")
-        f.write("/// 4-aligned (all baked blobs use AlignedBlob now, so this\n")
-        f.write("/// path should stay quiet — see the [ART] staged debug line).\n")
-        f.write("/// The BIOS word-loads its source and faults on unaligned\n")
-        f.write("/// addresses. Sized past the largest baked stream (~12.9 KiB).\n")
-        f.write("static mut SWI_SRC_STAGE: [u8; 16384] = [0; 16384];\n\n")
-        f.write("pub fn lz77_decompress_wram(src: &[u8], dst: &mut [u8]) {\n")
-        f.write("    let src_ptr = if src.as_ptr() as u32 & 3 == 0 {\n")
-        f.write("        src.as_ptr() as u32\n")
-        f.write("    } else {\n")
-        f.write("        assert!(src.len() <= 16384, \"stream exceeds SWI staging\");\n")
-        f.write("        unsafe {\n")
-        f.write("            let stage = &mut SWI_SRC_STAGE[..src.len()];\n")
-        f.write("            stage.copy_from_slice(src);\n")
-        f.write("            log::debug!(\"[ART] staged unaligned src {}B\", src.len());\n")
-        f.write("            stage.as_mut_ptr() as u32\n")
-        f.write("        }\n")
-        f.write("    };\n")
-        f.write("    let dst_ptr = dst.as_mut_ptr() as u32;\n")
-        f.write("    unsafe {\n")
-        f.write("        core::arch::asm!(\n")
-        f.write("            \"swi 0x11\",\n")
-        f.write("            in(\"r0\") src_ptr,\n")
-        f.write("            in(\"r1\") dst_ptr,\n")
-        f.write("            lateout(\"r0\") _,\n")
-        f.write("            lateout(\"r1\") _,\n")
-        f.write("            lateout(\"r2\") _,\n")
-        f.write("            lateout(\"r3\") _,\n")
-        f.write("            lateout(\"r12\") _,\n")
-        f.write("            lateout(\"lr\") _,\n")
-        f.write("            options(nostack, preserves_flags)\n")
-        f.write("        );\n")
-        f.write("    }\n")
-        f.write("    // The asm has no memory operands: without this fence the\n")
-        f.write("    // optimizer may hoist reads of `dst` above the SWI call.\n")
-        f.write("    core::sync::atomic::compiler_fence(core::sync::atomic::Ordering::SeqCst);\n")
-        f.write("}\n\n")
-
-        f.write("pub fn lz77_decompress_vram(src: &[u8], dst: &mut [u8]) {\n")
-        f.write("    let src_ptr = src.as_ptr() as u32;\n")
-        f.write("    let dst_ptr = dst.as_mut_ptr() as u32;\n")
-        f.write("    unsafe {\n")
-        f.write("        core::arch::asm!(\n")
-        f.write("            \"swi 0x12\",\n")
-        f.write("            in(\"r0\") src_ptr,\n")
-        f.write("            in(\"r1\") dst_ptr,\n")
-        f.write("            lateout(\"r0\") _,\n")
-        f.write("            lateout(\"r1\") _,\n")
-        f.write("            lateout(\"r2\") _,\n")
-        f.write("            lateout(\"r3\") _,\n")
-        f.write("            lateout(\"r12\") _,\n")
-        f.write("            lateout(\"lr\") _,\n")
-        f.write("            options(nostack, preserves_flags)\n")
-        f.write("        );\n")
-        f.write("    }\n")
-        f.write("}\n\n")
 
         # 4-aligned blob statics (one per .bin; tables below borrow `&AL_x.0`).
         def emit_blob(var: str, name: str):
             n = blob_sizes[name]
             f.write(f"pub static {var}: AlignedBlob<{n}> = AlignedBlob(*include_bytes!(\"../baked/card_art/{name}\"));\n")
 
-        for card_no, _pal, _tiles, _f, _s, _l, _w in entries:
+        for card_no, _tiles, _f, _s, _l, _w in entries:
             safe = sanitize_filename(card_no)
             ident = sanitize_ident(card_no)
-            emit_blob(f"AL_pal_{ident}", f"pal_{safe}.bin")
             emit_blob(f"AL_tiles_{ident}", f"tiles_{safe}.bin")
         for card_no, _tiles in fronts:
             safe = sanitize_filename(card_no)
@@ -726,11 +555,10 @@ def write_gen(entries, fronts, stage_fronts, live_fronts, waited_fronts, back_fr
 
         # CARD_ART
         f.write("pub static CARD_ART: &[CardArt] = &[\n")
-        for card_no, _pal, _tiles, _f, _s, _l, _w in entries:
+        for card_no, _tiles, _f, _s, _l, _w in entries:
             ident = sanitize_ident(card_no)
             f.write(f"    CardArt {{\n")
             f.write(f'        card_no: "{card_no}",\n')
-            f.write(f'        palette: &AL_pal_{ident}.0,\n')
             f.write(f'        tiles: &AL_tiles_{ident}.0,\n')
             f.write("    },\n")
         f.write("];\n\n")
@@ -784,6 +612,24 @@ def write_gen(entries, fronts, stage_fronts, live_fronts, waited_fronts, back_fr
         if stale.name not in written:
             stale.unlink()
 
+    # Print the number this bake exists to control. A 32MB cart is the hard
+    # ceiling and the art is ~95% of the ROM, so a silent regression here is
+    # the difference between a bootable ROM and one that will not fit. Broken
+    # out per kind because detail art is 73% of it and is the thing that
+    # moves when the card count changes.
+    per_kind: dict[str, int] = {}
+    for name, size in blob_sizes.items():
+        kind = name.split("_", 1)[0]
+        per_kind[kind] = per_kind.get(kind, 0) + size
+    total = sum(per_kind.values()) + len(master_pal_bytes)
+    budget = 32 * 1024 * 1024
+    print("baked art size (this is what embeds into the ROM):")
+    for kind, size in sorted(per_kind.items(), key=lambda kv: -kv[1]):
+        print(f"    {kind:<10} {size:>12,}B")
+    print(f"    {'masterpal':<10} {len(master_pal_bytes):>12,}B")
+    print(f"    {'TOTAL':<10} {total:>12,}B  ({total/1024/1024:.2f} MB, "
+          f"{total/budget:.1%} of a 32MB cart)")
+
 
 def _process_card_worker(args):
     """Worker function for multiprocessing - takes tuple of (card_no, master_q, master_pal_bytes)"""
@@ -831,10 +677,10 @@ def main():
             if result is None:
                 missing.append(card_no)
                 continue
-            pal, tiles, ftiles, stiles, ltiles, wtiles, rotated = result
+            tiles, ftiles, stiles, ltiles, wtiles, rotated = result
             if rotated:
                 print(f"  upright: {card_no}")
-            entries.append((card_no, pal, tiles, ftiles, stiles, ltiles, wtiles))
+            entries.append((card_no, tiles, ftiles, stiles, ltiles, wtiles))
             fronts.append((card_no, ftiles))
             stage_fronts.append((card_no, stiles))
             live_fronts.append((card_no, ltiles))
@@ -849,7 +695,7 @@ def main():
     # to 0 renders as a hole. With magenta reserved at 0 this must be ~0
     # everywhere; print the worst offenders either way.
     worst = []
-    for card_no, _pal, tiles, f, s, li, w in entries:
+    for card_no, tiles, f, s, li, w in entries:
         total = len(tiles) + len(f) + len(s) + len(li) + len(w)
         zeros = tiles.count(0) + f.count(0) + s.count(0) + li.count(0) + w.count(0)
         if zeros:

@@ -1,4 +1,4 @@
-//! 深層共鳴 `PL!-pb2-016-P＋` (ライブ開始時)
+//! 東條 希 `PL!-pb2-016-P＋` (ライブ開始時)
 //!
 //! Text, with the icon markup rendered as plain labels:
 //!

@@ -1320,6 +1320,7 @@ impl AbilityResolver {
         #[cfg(not(feature = "no_std"))]
         let _t = crate::timer::Timer::start("resolve::pre_gates");
         let pre_gate_result = check_ability_gates(PRE_COST_GATES, self, gs, &ability);
+        #[cfg(not(feature = "no_std"))]
         drop(_t);
         if pre_gate_result.is_stop() {
             let (reason, result_type) = pre_gate_result.unwrap_stop();
@@ -1336,6 +1337,7 @@ impl AbilityResolver {
         #[cfg(not(feature = "no_std"))]
         let _t = crate::timer::Timer::start("resolve::pay_cost");
         self.pay_ability_cost(gs, &ability, cost_already_paid, &mut dbg)?;
+        #[cfg(not(feature = "no_std"))]
         drop(_t);
 
         // Early use limit recording
@@ -1368,9 +1370,11 @@ impl AbilityResolver {
         #[cfg(not(feature = "no_std"))]
         let _t = crate::timer::Timer::start("resolve::run_effect");
         if self.run_ability_effect(gs, &ability, ability_key, activating_card, cost_already_paid, &mut dbg)? {
+            #[cfg(not(feature = "no_std"))]
             drop(_t);
             return Ok(());
         }
+        #[cfg(not(feature = "no_std"))]
         drop(_t);
 
         // Final use limit recording

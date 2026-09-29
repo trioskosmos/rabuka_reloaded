@@ -1,4 +1,4 @@
-//! 絢瀬絵里 `PL!-pb2-010-P＋` (ライブ開始時)
+//! 高坂穂乃果 `PL!-pb2-010-P＋` (ライブ開始時)
 //!
 //! Text, with the icon markup rendered as plain labels:
 //!

@@ -11,9 +11,14 @@ use crate::core::constants::CountCast;
 use crate::card::CardState;
 use crate::card::Condition;
 use crate::game_state::Phase;
+// `String` is used by ungated describe helpers, so it is imported for every
+// `no_std` target. `ToString`/`Vec` here are only reached from the serde-gated
+// debug describe paths, so they keep the narrower gate.
+#[cfg(feature = "no_std")]
+use alloc::string::String;
 #[cfg(all(feature = "no_std", feature = "serde_support"))]
 use alloc::{
-    string::{String, ToString},
+    string::ToString,
     vec::Vec,
 };
 #[cfg(feature = "serde_support")]
@@ -656,7 +661,7 @@ impl<'a> ConditionContext<'a> {
         let matching = cards
             .iter()
             .filter(|&&cid| {
-                crate::ability::util::card_matches_heart_colors(card_db, cid, std::slice::from_ref(&color))
+                crate::ability::util::card_matches_heart_colors(card_db, cid, core::slice::from_ref(&color))
             })
             .count()
             .u8_count();

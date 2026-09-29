@@ -314,13 +314,209 @@ fn leaf_value(gs: &GameState, me: u8, db: &CardDatabase, opp: &OppModel) -> f64 
         0.0 => 0.0,
         w => w * -(v8_model::colour_shortfall(gs, me, db) as f64),
     };
-    SCALE
-        * ((our_now - their_now)
-            + horizon_weight() * (our_later - their_later)
-            + PLACEMENT_CREDIT * (ammo + initiative)
-            + dev_ceiling_weight() * ceiling
-            + dev_band_weight() * v8_model::band_progress(gs, me, db)
-            + deficit)
+    quantise(
+        SCALE
+            * ((our_now - their_now)
+                + horizon_weight() * (our_later - their_later)
+                + PLACEMENT_CREDIT * (ammo + initiative)
+                + dev_ceiling_weight() * ceiling
+                + dev_band_weight() * v8_model::band_progress(gs, me, db)
+                + deficit)
+            + blade_delta_weight() * v8_model::active_blades(gs, me, db) as f64
+            + ammo_delta_weight() * ammo
+            + opp_blade_delta_weight() * v8_model::active_blades(gs, 1 - me, db) as f64,
+    )
+}
+
+/// `V8_OPP_BLADES=<w>`: the other half of the blade term, and the half v8 has
+/// no way to express at all.
+///
+/// `v7_main::Search::evaluate` prices **both** sides with linear deltas:
+///
+/// ```text
+/// - 8.0 * (opp_cost   - base.opp_cost)
+/// - 6.0 * (opp_blades - base.opp_blades)
+/// - 10.0 * (opp_hand   - base.opp_hand)
+/// - 1000.0 * (opp_success - base.opp_success)
+/// ```
+///
+/// So v7 is paid for a blade **differential**, not just for our own blades. That
+/// is the mechanism by which developing a blade is worth more when they are
+/// behind and worth less when they are ahead — the whole point of a race.
+///
+/// v8 cannot represent that. The opponent enters its leaf only through
+/// `OppModel::pass_prob`, which is a hard threshold and takes **6 distinct
+/// values** across 369 board/blade combinations
+/// (`the_opponent_pass_model_has_only_a_handful_of_states`). A function that
+/// coarse cannot express a marginal rate of change, so no amount of work on our
+/// own side substitutes for it. This term is the missing opponent-side
+/// differential, transcribed from v7's source rather than guessed at.
+/// `V8_COVERAGE=<w>`: v7's second-largest term (60.0), transcribed properly.
+///
+/// ## This is not the failed `V8_DEFICIT` experiment
+///
+/// `colour_shortfall` measured as a **regression** (p=0.044 at w=0.05,
+/// p=0.00015 at w=0.35). Two things were different, and the difference is the
+/// point:
+///
+/// 1. **Delta, not level.** `v7_main::value` scores `60.0 * (now.coverage -
+///    base.coverage)` — the *change* in coverage this action causes. The
+///    shortfall term subtracted an absolute shortfall, which is a level, and a
+///    level in a saturated leaf cannot reorder anything. A delta can, because
+///    it is measured on the same axis for every candidate action.
+/// 2. **v7's target, not mine.** v7's coverage is "how much of the life in
+///    hand's requirement does the board already cover", evaluated per action.
+///    The shortfall term aimed at the *biggest* life in hand, which early in a
+///    game is usually one that cannot be set for turns — so it bought colours
+///    for an unaffordable card and pace fell. That is a target-selection error
+///    and it was mine, not the maths'.
+///
+/// ## Why it is worth another cell
+///
+/// v7's ablation gives coverage -0.5 on its own, which is why it was in the
+/// "seven minor terms" bucket that the log was careful not to call decorative.
+/// But the blade result is the reason to retest it: `6.0 * dBlades` was worth
+/// **-5.1** in v7 and moving it into v8 produced the only significant win on
+/// this phase in the whole file. The reading of v7's source is producing
+/// predictions that hold, and coverage is the largest term still missing.
+///
+/// Off by default, measured on its own.
+fn coverage_delta(gs: &GameState, me: u8, db: &CardDatabase) -> i32 {
+    // How much of the best life in hand's coloured requirement the board
+    // already satisfies. Mirrors v7's `coverage` feature rather than inventing
+    // a second definition of it.
+    let board = v8_model::board_pool(gs, me, db);
+    let mut best: i32 = 0;
+    let mut found = false;
+    for &cid in &gs.seat_player(me).hand.cards {
+        if !db
+            .get_card(cid)
+            .is_some_and(|c| c.card_type == crate::card::CardType::Live)
+        {
+            continue;
+        }
+        let need = v8_model::life_need(gs, cid);
+        if v8_model::has_unpassable_icon(&need) {
+            continue;
+        }
+        let mut covered = 0i32;
+        for c in 0..=6usize {
+            covered += i32::from(need[c]).min(i32::from(board[c]));
+        }
+        covered += i32::from(need[7]);
+        if !found || covered > best {
+            best = covered;
+            found = true;
+        }
+    }
+    if !found {
+        0
+    } else {
+        best
+    }
+}
+
+fn coverage_weight() -> f64 {
+    std::env::var("V8_COVERAGE")
+        .ok()
+        .and_then(|v| v.parse::<f64>().ok())
+        .filter(|w: &f64| w.is_finite() && *w >= 0.0)
+        .unwrap_or(0.0)
+}
+
+fn opp_blade_delta_weight() -> f64 {
+    std::env::var("V8_OPP_BLADES")
+        .ok()
+        .and_then(|v| v.parse::<f64>().ok())
+        .filter(|w: &f64| w.is_finite() && *w >= 0.0)
+        .unwrap_or(0.0)
+}
+
+/// `V8_BLADES=<w>`: a linear blade term, in v7's own units.
+///
+/// ## Why v8 structurally cannot express this today
+///
+/// `v7_main::value` scores an action as a linear function of coarse feature
+/// **deltas**: `6.0 * dBlades`, `25.0 * dAmmo`, `60.0 * dCoverage`. The
+/// ablation map records blades at **-5.1** and ammo at **-2.9** — together the
+/// two largest leaf terms v7 has, and the only two that survive being zeroed
+/// individually.
+///
+/// v8's leaf is a different kind of object: a *level* in placement-probability
+/// units. Blades reach it only through `placement_pair`, which routes them into
+/// a binomial that **saturates** — once the check is comfortably passable, more
+/// blades move the probability by nothing, so v8 is paid nothing for them.
+/// v7 is paid 6 per blade whether or not the check is already safe.
+///
+/// That is not a weight difference, it is a difference in what the two functions
+/// are able to say. No reweighting of v8's existing terms can recover a term
+/// whose information the function has already thrown away, which is the same
+/// reason the ten earlier term additions were inert. This one is not an
+/// addition of *information*; it is an addition of a *term that was always
+/// missing*, read out of v7's source rather than guessed at.
+///
+/// ## It is a level here on purpose
+///
+/// v7 uses a delta because it is scoring one action against one base inside a
+/// chain. v8 evaluates each action independently and argmaxes, so a delta
+/// against the pre-action board is available at the same place and is the
+/// quantity v7's weight was fitted against. Using the post-action blade count as
+/// a level would double-count against `band_progress`, which already reads
+/// blades. Kept behind a switch, off by default, and measured on its own.
+fn blade_delta_weight() -> f64 {
+    std::env::var("V8_BLADES")
+        .ok()
+        .and_then(|v| v.parse::<f64>().ok())
+        .filter(|w: &f64| w.is_finite() && *w >= 0.0)
+        .unwrap_or(0.0)
+}
+
+/// `V8_AMMO=<w>`: the same idea for the second-largest v7 term (25.0, -2.9).
+///
+/// Ammo already appears in v8's leaf through `PLACEMENT_CREDIT`, but only as
+/// part of a saturated `p_place`, so a deployment that adds ammo without
+/// crossing a probability threshold is invisible to it. v7 pays 25 per ammo
+/// unconditionally.
+fn ammo_delta_weight() -> f64 {
+    std::env::var("V8_AMMO")
+        .ok()
+        .and_then(|v| v.parse::<f64>().ok())
+        .filter(|w: &f64| w.is_finite() && *w >= 0.0)
+        .unwrap_or(0.0)
+}
+
+/// `V8_QUANT=<step>`: round the leaf onto a coarse grid, in `SCALE` units.
+///
+/// ## Why coarsen a value function that is already right
+///
+/// v7's leaf is coarse and ties constantly; the baton-over-Pass tie-break is
+/// worth **+16.8 points** to it, the largest entry in the ablation table. v8's
+/// leaf is a smooth sum of many continuous terms and essentially never ties —
+/// `V8_TIE_BATON` changed 23 games in 1200 — so v8 does not merely lack the
+/// tie-break's value, it lacks the mechanism the tie-break works through.
+///
+/// That reframes the whole Main-phase gap. It may not be that v7 scores actions
+/// better; it may be that v7's value function is **granular enough to abstain**,
+/// and its tie-break then supplies the decision. Between two near-equal actions a
+/// continuous leaf emits a small real-number difference that is mostly noise, and
+/// a 0.3-point perturbation wins or loses on nothing. A quantised leaf refuses
+/// to distinguish what it cannot actually know, and hands those cases to a key
+/// that encodes guide knowledge (cost, ceiling, baton) instead of to float noise.
+///
+/// This is the inverse of every other attempt in the file, all of which added
+/// precision. It is also falsifiable in one run: if the gap is really about
+/// *which* actions are preferred, quantising cannot recover it and this goes
+/// null like the chain did.
+fn quantise(value: f64) -> f64 {
+    let step = std::env::var("V8_QUANT")
+        .ok()
+        .and_then(|v| v.parse::<f64>().ok())
+        .filter(|s| s.is_finite() && *s > 0.0)
+        .unwrap_or(0.0);
+    if step <= 0.0 {
+        return value;
+    }
+    (value / step).round() * step
 }
 
 /// `V8_DEFICIT` is OFF by default, and it is staying off.
@@ -503,9 +699,46 @@ struct Search<'a> {
     opp: OppModel,
     nodes: usize,
     budget: usize,
+    /// The state the decision started from, for `V8_DELTA_LEAF`.
+    root: GameState,
+    /// The root's own leaf value, so `scored_leaf` does not recompute it.
+    root_value: f64,
 }
 
 impl Search<'_> {
+    /// `V8_DELTA_LEAF=1`: score the leaf as a change from the root rather than
+    /// as a level.
+    ///
+    /// ## Why this is coupled to the chain and not a separate idea
+    ///
+    /// `V8_CHAIN` measured null, and the chain is the reason. `with_followup`
+    /// takes `max(base, followup)` and my `chain` committed on a *strict
+    /// improvement*, so a depth-3 and a depth-6 chain returned bit-identical
+    /// results — it stopped before extending.
+    ///
+    /// The cause is the shape of the leaf. `v7_main::value` is linear in feature
+    /// **deltas**, so along a path the deltas compose additively and taking a max
+    /// at each level is a real backup: a move that looks neutral on its own can
+    /// be correct because of what it enables next. v8's leaf is a **level** in
+    /// placement-probability units, so every node's value already contains
+    /// everything before it, the max is nearly the level, and "strictly better
+    /// than the state I came from" is almost never true after one step.
+    ///
+    /// So the chain and the leaf are one change, not two. Subtracting the root's
+    /// value makes the leaf additive along the path, which is the property the
+    /// search actually needs. The root's own placement level is a constant
+    /// across all candidate actions, so it cannot change the argmax — this is
+    /// the same argument as `V8_NEXT_METHODS` §6.4, and unlike the eleven
+    /// earlier attempts this one is not adding information, it is putting
+    /// existing information in the form the search can use.
+    fn scored_leaf(&mut self, gs: &GameState) -> f64 {
+        let value = self.leaf(gs);
+        if !delta_leaf_enabled() {
+            return value;
+        }
+        value - self.root_value
+    }
+
     fn leaf(&mut self, gs: &GameState) -> f64 {
         self.nodes += 1;
         leaf_value(gs, self.me, self.db, &self.opp)
@@ -552,6 +785,107 @@ impl Search<'_> {
         }
         best
     }
+
+    /// `V8_CHAIN=<depth>`: walk a greedy chain instead of one breadth step.
+    ///
+    /// ## What is different, structurally
+    ///
+    /// `with_followup` is a **breadth** step: from the state the root action
+    /// produced, it scores every follow-up's leaf and takes the maximum. It
+    /// never commits to one, so the line it reports is "the best single next
+    /// move", and two moves that only pay off together are invisible to it.
+    ///
+    /// v7's Main phase wins by re-offering and re-evaluating after **every**
+    /// action. That is a different object: at each step it picks one action,
+    /// commits to the real resulting state, and re-offers *from there*. The
+    /// point is not depth — §2.4 ruled that out, and `V8_NODES=192` measured
+    /// 3 discordant games in 400. The point is that the choice at step 2 is made
+    /// knowing what step 1 actually did, which a max-of-leaves cannot do
+    /// because it throws the chosen line away.
+    ///
+    /// ## Why the value is the END state, not a sum
+    ///
+    /// Summing per-step leaves double-counts: step 2's leaf already contains
+    /// step 1's development. The chain therefore reports the leaf of the final
+    /// state it committed to, and only commits to a step that *strictly*
+    /// improves on the state it came from, so a chain that has run out of good
+    /// moves stops rather than wandering. That makes it a strictly better search
+    /// than the breadth step at equal node cost, not a different weighting of
+    /// the same one.
+    ///
+    /// ## The budget is shared
+    ///
+    /// `self.nodes` is shared with the root expansion, so a chain that asks for
+    /// depth 4 simply runs out of budget and returns what it has. Depth is
+    /// therefore a ceiling, not a request, which is the right failure mode.
+    fn chain(&mut self, sim: &GameState) -> f64 {
+        let depth = chain_depth();
+        let mut value = self.scored_leaf(sim);
+        let mut cur = sim.clone();
+        for _ in 0..depth {
+            if self.nodes >= self.budget {
+                break;
+            }
+            if cur.current_phase != Phase::Main
+                || cur.has_pending_choice()
+                || !cur.can_player_act(self.me as i32)
+            {
+                break;
+            }
+            let mut followups: Vec<Action> = game_setup::generate_possible_actions(&cur)
+                .into_iter()
+                .filter(|a| a.parameters.as_ref().and_then(|p| p.disabled) != Some(true))
+                .filter(|a| a.action_type != ActionType::Pass)
+                .collect();
+            followups.sort_by_key(|a| {
+                u8::from(a.action_type == ActionType::PlayMemberToStage) * 2
+                    + u8::from(is_baton(&cur, self.me, a))
+            });
+            followups.truncate(followup_width());
+
+            // Commit to the single best next state, then re-offer from it.
+            let mut chosen: Option<(GameState, f64)> = None;
+            for action in followups {
+                if self.nodes >= self.budget {
+                    break;
+                }
+                let _guard = RngGuard::new();
+                let mut next = cur.clone();
+                if game_setup::execute_action(&mut next, &action).is_err() {
+                    continue;
+                }
+                game_setup::settle_single_player_state(&mut next);
+                let v = self.scored_leaf(&next);
+                if chosen.as_ref().is_none_or(|(_, best)| v > *best) {
+                    chosen = Some((next, v));
+                }
+            }
+            // Strict improvement only: a step that does not help is where the
+            // line stops being worth extending.
+            match chosen {
+                Some((next, v)) if v > value => {
+                    value = v;
+                    cur = next;
+                }
+                _ => break,
+            }
+        }
+        value
+    }
+}
+
+/// `V8_DELTA_LEAF=1`. See `Search::scored_leaf`.
+fn delta_leaf_enabled() -> bool {
+    std::env::var_os("V8_DELTA_LEAF").is_some()
+}
+
+/// `V8_CHAIN=<depth>`. 0 (the default) leaves the breadth step exactly as it
+/// was; 1 reproduces `with_followup`; 2 and up are the chain.
+fn chain_depth() -> usize {
+    std::env::var("V8_CHAIN")
+        .ok()
+        .and_then(|v| v.parse::<usize>().ok())
+        .unwrap_or(0)
 }
 
 /// One action's evaluation.
@@ -590,7 +924,16 @@ pub(crate) fn evaluate_actions(gs: &GameState, actions: &[Action], me: u8) -> Ve
         opp,
         nodes: 0,
         budget: node_budget(),
+        root: gs.clone(),
+        root_value: 0.0,
     };
+    if delta_leaf_enabled() {
+        // Charged to the budget like any other node: the root is evaluated once
+        // per decision and its value is a constant across all candidate actions,
+        // so it cannot change the argmax — but it must not be free either, or
+        // `V8_DELTA_LEAF` silently buys depth.
+        search.root_value = search.leaf(gs);
+    }
 
     let mut scores = Vec::with_capacity(actions.len());
     for action in actions {
@@ -604,7 +947,18 @@ pub(crate) fn evaluate_actions(gs: &GameState, actions: &[Action], me: u8) -> Ve
         // Pass tax that exploded draws, and a baton tie-break that was a bug
         // fix); neither exists in v8.
         if action.action_type == ActionType::Pass && !pending {
-            let value = search.leaf(gs) - pass_tax();
+            // `scored_leaf`, not `leaf`, and the distinction is load-bearing
+            // under `V8_DELTA_LEAF`: every other action is scored as a change
+            // from the root, so scoring Pass as a LEVEL would hand it a value of
+            // `root_value` (a large positive number) while every deploy scored
+            // near zero. Pass then wins unconditionally.
+            //
+            // It is easy to miss because the bug looks like a finding: v8 drops
+            // from 43.7% to **6.7%** with pace 0.39 -> 0.20, which reads as
+            // "delta leaves are catastrophic" until you notice the bot stopped
+            // deploying entirely. It is a unit mismatch on one branch, not a
+            // property of the idea.
+            let value = search.scored_leaf(gs) - pass_tax();
             scores.push(ActionScore {
                 value,
                 tie: tie_key(gs, me, db, action),
@@ -636,9 +990,23 @@ pub(crate) fn evaluate_actions(gs: &GameState, actions: &[Action], me: u8) -> Ve
                 }
                 _ => -SCALE * 3.0,
             }
+        } else if chain_depth() > 0 {
+            // The chain replaces the breadth step, it does not add to it: the
+            // node budget is shared, so running both would only halve the depth
+            // each gets. `V8_CHAIN=1` is exactly `with_followup` and exists so
+            // the two can be compared at equal cost.
+            search.chain(&sim)
         } else {
             search.with_followup(&sim)
-        };
+        }
+        // `V8_COVERAGE` is a DELTA, so it cannot live in `leaf_value` — that
+        // function only ever sees a post-action state and has no base to
+        // subtract from. Applying it here, where both `gs` and `sim` are in
+        // hand, is the only place the difference is defined. The delta is
+        // constant across the action's own search subtree, so it does not
+        // distort anything the search chose; it only ranks the root actions,
+        // which is what a tie-break term is for.
+        + coverage_weight() * (coverage_delta(&sim, me, db) - coverage_delta(gs, me, db)) as f64;
         let nodes = search.nodes;
         let tie = tie_key(&sim, me, db, action);
         scores.push(ActionScore {

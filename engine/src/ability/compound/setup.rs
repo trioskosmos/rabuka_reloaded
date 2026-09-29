@@ -5,6 +5,8 @@ use crate::ability::resolver::AbilityResolver;
 use crate::ability::types::{AbilityTraceNode, ZoneSnapshot};
 use crate::card::AbilityEffect;
 use crate::game_state::GameState;
+#[cfg(feature = "no_std")]
+use alloc::string::ToString;
 
 /// Setup for a sequential run: trace label/node, step-state reset, and the
 /// top-level sequence condition gate. `Err(())` means "skipped — caller

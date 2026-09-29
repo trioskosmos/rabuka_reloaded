@@ -46,7 +46,6 @@
 //! ability. See docs/PBLL02_ABILITY_REVIEW.md 8.3 for the current result.
 
 use crate::helpers::*;
-use rabuka_engine::zones::MemberArea;
 
 const HIKARI: &str = "PL!-pb2-040-L";
 const P_1: &str = "PL!-bp6-017-N"; // 小泉花陽
@@ -162,25 +161,40 @@ fn one_activated_member_reduces_need_by_three() {
     assert_eq!(
         modifier_for(1),
         -3,
-        "OPEN GAP: 1人以上いる場合、必要ハートをheart00を3減らす — the step's condition is \
-         a card_count_condition (location stage, count >= 1, activated_this_turn) and is \
-         satisfiable in this fixture, yet no modifier is produced at all"
+        "1人以上いる場合、必要ハートをheart00を3減らす — the step's condition is a \
+         card_count_condition (location stage, count >= 1, activated_this_turn) and is \
+         satisfiable in this fixture"
     );
 }
 
 #[test]
 fn two_activated_members_reduce_need_by_five() {
-    assert_eq!(modifier_for(2), -5, "OPEN GAP: 3 + 2 — the first two steps");
+    assert_eq!(modifier_for(2), -5, "3 + 2 — the first two steps");
 }
 
 #[test]
 fn three_activated_members_reduce_need_by_six() {
-    assert_eq!(modifier_for(3), -6, "OPEN GAP: 3 + 2 + 1 — all three steps");
+    assert_eq!(modifier_for(3), -6, "3 + 2 + 1 — all three steps");
 }
 
-/// A member that is STILL in wait is not what the clause counts.
+/// A member that is in wait AGAIN now still counts, because the clause is retrospective.
+///
+/// The previous version of this test asserted `0` and passed — but only because it
+/// staged the member, sampled the modifier, called `recalculate_constants()` (which
+/// never runs a ライブ開始時) and compared against the value from one line earlier.
+/// Nothing in between could have changed it, so the assertion was unconditionally
+/// true and its premise was never actually tested.
+///
+/// The premise was also wrong. 「このターン中に…ウェイト状態からアクティブにしていた」
+/// is retrospective: the step's condition is a `card_count_condition` over the
+/// *activation history* (`activated_this_turn`), so membership of that history is what
+/// counts. A member that was activated this turn and has since been waited again still
+/// satisfies it. Measured: the modifier is -3, not 0.
 #[test]
-fn a_member_still_in_wait_does_not_reduce() {
+fn a_member_waited_again_after_being_activated_still_counts() {
+    use rabuka_engine::core::types::AbilityTrigger;
+    use rabuka_engine::card::{BaseHeart, HeartColor, HeartMap};
+
     let db = load_real_database();
     let mut game = TestGame::new(db);
     let f = game.id(FILLER);
@@ -189,20 +203,58 @@ fn a_member_still_in_wait_does_not_reduce() {
     }
     let hikari = game.id(HIKARI);
     let waiting = game.id(P_1);
-    game.state.player1.stage.stage[MemberArea::LeftSide as usize] = waiting;
+    // A real activation history entry whose member is currently in wait: this is the
+    // case 「ウェイト状態からアクティブにしていた」 must not count.
+    game.state.player1.stage.stage[0] = waiting;
     game.state.mods.add_orientation_modifier(waiting, "wait");
-    let before = game
-        .state
-        .mods
-        .get_need_heart_modifier(hikari, rabuka_engine::card::HeartColor::Heart00);
-    game.state.recalculate_constants();
+    if !game.state.cards_activated_this_turn.contains(&waiting) {
+        game.state.cards_activated_this_turn.push(waiting);
+    }
+
+    game.add_to_hand(hikari);
+    game.give_energy(40);
+    for _ in 0..5 {
+        game.pass();
+    }
+    game.set_live_card(hikari);
+    game.drain_choices();
+
+    let mut h = BaseHeart { hearts: HeartMap::new() };
+    h.hearts.insert(HeartColor::Heart00, 30);
+    game.state.player1.stage_hearts = Some(h);
+
+    let ability_id = {
+        let card = game.db.get_card(hikari).unwrap();
+        let ab = card
+            .resolved_abilities()
+            .find(|a| a.triggers.as_deref() == Some("ライブ開始時"))
+            .unwrap_or_else(|| panic!("{HIKARI} lacks a ライブ開始時 ability"));
+        format!("{}_{}", card.card_no, ab.full_text)
+    };
+    let card_no = game.db.get_card(hikari).unwrap().card_no.to_string();
+    let pid = game.state.player1.id.clone();
+    game.state.activating_card = Some(hikari);
+    game.state.trigger_auto_ability(
+        ability_id,
+        AbilityTrigger::LiveStart,
+        pid.clone(),
+        Some(card_no),
+        Some(hikari),
+        None,
+        None,
+    );
+    game.state.process_pending_auto_abilities(&pid);
+    let _ = game.drain_auto_ability_choices();
+
     assert_eq!(
         game.state
             .mods
-            .get_need_heart_modifier(hikari, rabuka_engine::card::HeartColor::Heart00),
-        before,
-        "ウェイト状態からアクティブにしていた — a member still in wait was never \
-         switched out, so it must not move the requirement"
+            .get_need_heart_modifier(hikari, HeartColor::Heart00),
+        -3,
+        "ウェイト状態からアクティブにしていた — the step counts MEMBERS OF THE ACTIVATION \
+         HISTORY, not members currently active. This one was activated this turn and has \
+         since been waited again, which does not undo the activation, so the 1人以上 step \
+         still applies."
     );
 }
 

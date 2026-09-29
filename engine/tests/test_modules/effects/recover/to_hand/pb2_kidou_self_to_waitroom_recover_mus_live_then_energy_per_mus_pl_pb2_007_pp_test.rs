@@ -1,4 +1,4 @@
-﻿//! 小泉花陽 `PL!-pb2-007-PP` (起動)
+﻿//! 東條 希 `PL!-pb2-007-PP` (起動)
 //!
 //! Text, with the icon markup rendered as plain labels:
 //!
@@ -17,7 +17,7 @@
 use crate::helpers::*;
 use rabuka_engine::zones::MemberArea;
 
-const HANAYOME: &str = "PL!-pb2-007-PP"; // 東條希, lily white
+const HANAYOME: &str = "PL!-pb2-007-PP"; // 東條 希, lily white
 const ENERGY: &str = "LL-E-001-SD";
 const FILLER: &str = "PL!-sd1-010-SD";
 /// μ's lives for the waitroom and the success zone.

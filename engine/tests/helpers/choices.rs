@@ -435,6 +435,37 @@ impl TestGame {
         }
     }
 
+    /// The number of CANDIDATES the player may actually pick from.
+    ///
+    /// **Do not confuse this with [`Self::pending_choice_count`].** For a
+    /// `SelectCard` the engine sets `count` to `max_select`, i.e.
+    /// `min(requested_count, matching_count)`
+    /// (`engine/src/ability/effects/look.rs:110,154-176`). So for a 「1枚」 look
+    /// `pending_choice_count()` returns **1 whether one card or five qualify** — it
+    /// cannot detect a dropped group or property filter. An assertion of the form
+    /// `pending_choice_count() == 1` paired with a comment like "dropping either
+    /// filter would offer 2 or 3" is therefore unfounded.
+    ///
+    /// The candidate count lives in `filtered_indices`, and this returns its length
+    /// (mirroring `GameState::choice_option_count`,
+    /// `engine/src/core/game_state/mod.rs:1355-1363`). `None` means the prompt is
+    /// unfiltered, in which case every card in the zone is a candidate and `None`
+    /// is returned rather than a fabricated number.
+    ///
+    /// Note also that `pending_selection_cards()` is NOT the answer either: when
+    /// `filtered_indices` is set, `selection_cards` deliberately lists **all**
+    /// looked-at cards so the UI can grey the non-matching ones
+    /// (`engine/src/core/game_state/abilities.rs:2584-2588`).
+    pub fn pending_choice_option_count(&self) -> Option<usize> {
+        match self.pending_choice_view() {
+            PendingChoiceView::Live(Choice::SelectCard {
+                filtered_indices, ..
+            }) => filtered_indices.as_ref().map(|v| v.len()),
+            PendingChoiceView::Live(_) => None,
+            PendingChoiceView::Json(_) | PendingChoiceView::None => None,
+        }
+    }
+
     pub fn pending_choice_summary(&self) -> String {
         match self.pending_choice_view() {
             PendingChoiceView::Live(choice) => match choice {

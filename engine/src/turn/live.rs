@@ -844,7 +844,7 @@ impl super::TurnEngine {
         }
         let saved_revealed = core::mem::take(&mut game_state.revealed_cards);
         let saved_activating_card = game_state.activating_card;
-        let saved_queue = std::mem::take(&mut game_state.ability_queue);
+        let saved_queue = core::mem::take(&mut game_state.ability_queue);
         let delayed = core::mem::take(&mut game_state.delayed_gained_effects);
         for (card_id, gained) in &delayed {
             let Some(owner) = game_state.owner_of_card(*card_id) else {

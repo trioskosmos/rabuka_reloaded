@@ -4,6 +4,8 @@ use crate::ability::resolver::AbilityResolver;
 use crate::ability::queue::ConditionalChoice;
 use crate::card::AbilityEffect;
 use crate::game_state::GameState;
+#[cfg(feature = "no_std")]
+use alloc::string::String;
 
 impl AbilityResolver {
     /// Execute sequential effect.

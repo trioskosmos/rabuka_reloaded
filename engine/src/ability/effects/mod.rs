@@ -204,11 +204,13 @@ impl AbilityResolver {
         #[cfg(not(feature = "no_std"))]
         let _t = crate::timer::Timer::start("effect::gates");
         if self.prepare_opponent_routing(gs, effect)? {
+            #[cfg(not(feature = "no_std"))]
             drop(_t);
             return Ok(());
         }
 
         if self.run_replacement_effects(gs, effect)? {
+            #[cfg(not(feature = "no_std"))]
             drop(_t);
             return Ok(());
         }
@@ -218,11 +220,13 @@ impl AbilityResolver {
                 "[REPLACEMENT] action={} original_suppressed=true",
                 effect.action
             );
+            #[cfg(not(feature = "no_std"))]
             drop(_t);
             return Ok(());
         }
 
         if self.register_replacement_effect(gs, effect) {
+            #[cfg(not(feature = "no_std"))]
             drop(_t);
             return Ok(());
         }

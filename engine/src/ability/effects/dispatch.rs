@@ -16,7 +16,7 @@ use crate::card::AbilityEffect;
 use crate::game_state::GameState;
 
 #[cfg(feature = "no_std")]
-use alloc::string::String;
+use alloc::{boxed::Box, string::String};
 
 pub fn push_effect_verdict(effect: &AbilityEffect) {
     let is_structural = matches!(

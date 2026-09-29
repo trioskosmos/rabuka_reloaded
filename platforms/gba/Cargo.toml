@@ -9,6 +9,12 @@ description = "Rabuka Reloaded for the Game Boy Advance (via agb)"
 agb = "0.25.0"
 log = "0.4"
 rabuka_engine = { path = "../../engine", default-features = false, features = ["gba"] }
+# Card art is stored zlib-deflated rather than in the BIOS LZ77 format the baker
+# used to emit. miniz_oxide is already in the ROM for the ability bytecode
+# (engine/src/ability/vm.rs), so inflate costs no extra code here, and deflate
+# is ~1.4x smaller than BIOS LZ77 on 8bpp dithered indexed art. Pinned to the
+# same version/features as the engine so there is exactly one copy.
+miniz_oxide = { version = "0.7", default-features = false, features = ["with-alloc"] }
 # agb requires portable-atomic's unsafe-assume-single-core, which 1.14+ dropped
 # support for on thumbv4t (ARMv4T). Pin to the last version that supports it.
 portable-atomic = { version = "=1.13.1", default-features = false, features = ["unsafe-assume-single-core", "fallback"] }

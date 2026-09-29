@@ -12,10 +12,8 @@
 //! suite are unaffected. Training and headless benches turn them OFF via
 //! `set_training_mode`.
 
-#[cfg(feature = "no_std")]
-use core::sync::atomic::{AtomicBool, Ordering};
-#[cfg(not(feature = "no_std"))]
-use std::sync::atomic::{AtomicBool, Ordering};
+use crate::compat::atomic::AtomicBool;
+use core::sync::atomic::Ordering;
 
 /// Runtime display gate for action-generation UI strings (EN/JA descriptions,
 /// card_name/card_no/source_ability copies, existing_member_name labels).

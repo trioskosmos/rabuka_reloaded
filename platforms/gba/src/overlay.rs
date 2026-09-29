@@ -230,7 +230,12 @@ fn hearts_icon_for(player: &rabuka_engine::player::Player, gs: &GameState) -> St
         if !player.stage.stage.contains(cid) { continue; }
         for (col, val) in mp {
             if let Some(idx) = heart_idx(col) {
-                counts[idx] = (counts[idx] as i32 + val.total()).max(0) as u32;
+                // `ModifierEntry::total()` is the engine's natural i16 (set +
+                // additive); widen at the point of accumulation with
+                // `i32::from` rather than `as`, which the crate denies for
+                // sign loss and which would be wrong for a negative modifier
+                // anyway. Same widening the 3DS port uses in compute_card_stats.
+                counts[idx] = (counts[idx] as i32 + i32::from(val.total())).max(0) as u32;
             }
         }
     }
@@ -256,7 +261,7 @@ fn blade_total_for(player: &rabuka_engine::player::Player, gs: &GameState) -> i3
             let is_wait = gs.mods.orientation_modifiers.get(&cid).map(|o| o.as_str()=="wait").unwrap_or(false);
             if is_wait { continue; }
             let bm = gs.mods.blade_modifiers.get(&cid).map(|m| m.total()).unwrap_or(0);
-            total += (card.blade as i32 + bm).max(0);
+            total += (card.blade as i32 + i32::from(bm)).max(0);
         }
     }
     total

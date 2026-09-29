@@ -3,6 +3,8 @@
 // Extracted from `ability/util.rs` so expiry semantics live in one place.
 
 use crate::game_state::Duration;
+#[cfg(feature = "no_std")]
+use alloc::string::ToString;
 
 pub fn parse_duration(s: &str) -> Option<Duration> {
     match s {

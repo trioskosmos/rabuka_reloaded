@@ -1,3 +1,5 @@
+// Only the std verdict buffer reads the gate; the `no_std` buffer is inert.
+#[cfg(not(feature = "no_std"))]
 use crate::ability::debug::ABILITY_DEBUG;
 #[cfg(feature = "serde_support")]
 use serde::Serialize;
@@ -35,6 +37,7 @@ pub enum AbilityLogItem {
 #[cfg(feature = "no_std")]
 mod inner {
     use super::AbilityLogItem;
+    use alloc::vec::Vec;
     pub fn push_verdict(_item: AbilityLogItem) {}
     pub fn drain_verdicts() -> Vec<AbilityLogItem> {
         Vec::new()

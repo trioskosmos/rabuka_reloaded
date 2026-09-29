@@ -5,6 +5,7 @@ use crate::game_state::GameState;
 use crate::game_state::Phase;
 #[cfg(feature = "no_std")]
 use alloc::{
+    boxed::Box,
     string::{String, ToString},
     vec::Vec,
 };

@@ -594,8 +594,19 @@ impl<'a> ConditionContext<'a> {
     ///
     /// So: off unless asked for, and the flag is in the `ARENA --env` form so a
     /// run that needs it can record that it used it.
+    #[cfg(not(feature = "no_std"))]
     fn baton_touch_trace() -> bool {
         std::env::var_os("ABILITY_DEBUG_BATON_TOUCH").is_some()
+    }
+
+    /// `no_std` console targets have no process environment to probe, so the
+    /// trace gate is hard-wired off there. Every `if trace { .. }` body in
+    /// `evaluate_baton_touch_condition` is empty, so returning `false` here is
+    /// behaviourally identical to a host build run without the flag set — the
+    /// debug block is simply gated out on the targets that cannot reach it.
+    #[cfg(feature = "no_std")]
+    fn baton_touch_trace() -> bool {
+        false
     }
 
     /// while a stage `location` means it describes the REPLACED one.

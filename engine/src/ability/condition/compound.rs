@@ -3,7 +3,7 @@ use super::ConditionContext;
 use crate::ability::debug::AbDebug;
 use crate::card::Condition;
 #[cfg(feature = "no_std")]
-use alloc::boxed::Box;
+use alloc::{boxed::Box, vec::Vec};
 
 impl<'a> ConditionContext<'a> {
     pub(crate) fn evaluate_condition_list(

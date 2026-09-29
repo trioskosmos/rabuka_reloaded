@@ -435,7 +435,17 @@ impl AbilityResolver {
                     // self-targeted effect applies once per occurrence:
                     // 「このカードのスコアを＋１する」 (PL!-pb2-041-L) scored +2 from a
                     // single activation. Order-preserving dedup keeps the first hit.
-                    let mut seen = std::collections::HashSet::with_capacity(ids.len());
+                    // `crate::HashSet` is `hashbrown::HashSet<_, PspHasher>` on
+                    // `no_std` targets, which has no hasher-free constructor.
+                    // `with_capacity_and_hasher(n, Default::default())` is the
+                    // one spelling that is the same call in both
+                    // configurations: on std it is exactly `with_capacity(n)`
+                    // (`RandomState::default() == RandomState::new()`), so the
+                    // capacity — and therefore the iteration order the engine
+                    // depends on — is unchanged.
+                    let cap = ids.len();
+                    let mut seen: crate::HashSet<i16> =
+                        crate::HashSet::with_capacity_and_hasher(cap, Default::default());
                     ids.retain(|id| seen.insert(*id));
                     ids
                 }

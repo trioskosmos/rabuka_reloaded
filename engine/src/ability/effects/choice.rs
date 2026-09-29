@@ -17,6 +17,7 @@ use crate::game_state::GameState;
 
 #[cfg(feature = "no_std")]
 use alloc::{
+    boxed::Box,
     string::{String, ToString},
     vec::Vec,
 };

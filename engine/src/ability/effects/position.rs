@@ -14,10 +14,14 @@ use crate::game_state::GameState;
 
 
 
+// `Cow` is the borrow-vs-own split for the "front" destination string below —
+// a plain `&str` optimisation with no std dependency, so it comes from `alloc`
+// on `no_std` and from `std` (the same type) on host builds.
 #[cfg(not(feature = "no_std"))]
 use std::borrow::Cow;
 #[cfg(feature = "no_std")]
 use alloc::{
+    borrow::Cow,
     string::{String, ToString},
     vec::Vec,
 };

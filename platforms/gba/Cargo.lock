@@ -533,6 +533,7 @@ version = "0.1.0"
 dependencies = [
  "agb",
  "log",
+ "miniz_oxide 0.7.4",
  "portable-atomic",
  "rabuka_engine",
 ]

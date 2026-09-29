@@ -62,7 +62,16 @@ pub fn score_to_i32_rounded(v: f64) -> i32 {
     if v.is_nan() {
         return 0;
     }
-    v.round().clamp(i32::MIN as f64, i32::MAX as f64) as i32
+    // `f64::round` is a libm method: `core` has no float intrinsics to fall
+    // back on, so a `no_std` target (the GBA's ARMv4T has no FPU at all) has
+    // nothing to call. Adding a half with the value's sign and then letting
+    // the truncating cast do the rest IS round-half-away-from-zero, which is
+    // the rule `f64::round` implements, and the addition is exact across the
+    // whole i32 range this clamps to (an f64 ulp below 2^31 is far smaller
+    // than 0.5). Out-of-range and infinite inputs still land on the same
+    // clamps the `f64::round` version reached.
+    let half_away = if v >= 0.0 { v + 0.5 } else { v - 0.5 };
+    half_away.clamp(i32::MIN as f64, i32::MAX as f64) as i32
 }
 
 /// Effective value of a printed u8 stat plus its modifier, saturating to u8.

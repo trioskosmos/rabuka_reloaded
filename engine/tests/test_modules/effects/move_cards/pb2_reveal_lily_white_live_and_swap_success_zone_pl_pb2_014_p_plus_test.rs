@@ -1,4 +1,4 @@
-//! 乙宗 紫 `PL!-pb2-014-P＋` (登場)
+//! 星空 凛 `PL!-pb2-014-P＋` (登場)
 //!
 //! Text, with the icon markup rendered as plain labels:
 //!

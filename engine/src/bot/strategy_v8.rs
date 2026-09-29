@@ -88,7 +88,97 @@ pub fn choose_action_v8_entry(gs: &GameState, actions: &[Action], me: u8) -> Act
     // So the divergence is specific to the harness path and is not a v8 defect
     // on the measured path. Reverted rather than shipped as a change that
     // cannot be shown to do anything.
+    probe_main_against_v7(gs, actions, me);
     super::v8_main::choose_action_v8(gs, actions, me)
+}
+
+/// `V8_PROBE_V7=1`: run BOTH Main-phase policies on the same state and log every
+/// disagreement.
+///
+/// This exists because eleven leaf-term experiments and a crossover told me
+/// *that* v8's Main phase is worse and roughly *how much*, and nothing at all
+/// about *which decisions* are wrong. Aggregate win rates cannot localise a
+/// defect: the same +9 point gap is consistent with v8 losing many small
+/// decisions, a few catastrophic ones, or one systematic rule, and those need
+/// different fixes. Every one of the earlier experiments was chosen by
+/// hypothesising which of those it was.
+///
+/// Each line carries the state features the two policies actually read, so a
+/// disagreement can be attributed rather than merely counted:
+///
+/// ```text
+/// PROBE t=3 me=0 bl=4 cost=9 h=7 ammo=2 hand=4 opp:bl=3 h=6 | v8=Play(5) v7=Play(6)
+/// ```
+///
+/// UNTRACED by construction — it is an `eprintln!` in the hot path, and
+/// `BOT_STRATEGY.md` section 8.4 records that logging changes outcomes. Diagnosis
+/// only; never a reported number.
+pub fn probe_main_against_v7(gs: &GameState, actions: &[Action], me: u8) {
+    if !flag("V8_PROBE_V7") {
+        return;
+    }
+    // Only the states both policies are actually asked about.
+    if gs.current_phase != crate::types::Phase::Main || gs.has_pending_choice() {
+        return;
+    }
+    let db = &gs.card_database;
+    let ours = crate::bot::strategy_v8::score_actions_v8(gs, actions, me);
+    let theirs = crate::bot::v7_main::score_actions(gs, actions, me);
+    // Compare the ACTIONS, not the two bots' own score labels. v8 labels Pass
+    // "end-main" and v7 labels it "end-main=0", so comparing notes reported a
+    // disagreement on every single pass — which is most of a game. The labels
+    // are for humans reading one bot's trace and are not a shared vocabulary.
+    let mut ours_actions: Vec<Action> = vec![];
+    let mut their_actions: Vec<Action> = vec![];
+    for a in crate::bot::v8_main::evaluate_actions(gs, actions, me, db) {
+        if let Some(index) = a.index {
+            if let Some(action) = actions.get(index) {
+                ours_actions.push(action.clone());
+            }
+        }
+    }
+    for a in crate::bot::v7_main::evaluate_actions(gs, actions, me) {
+        if let Some(index) = a.index {
+            if let Some(action) = actions.get(index) {
+                their_actions.push(action.clone());
+            }
+        }
+    }
+    let (Some(a), Some(b)) = (ours_actions.first(), their_actions.first()) else {
+        return;
+    };
+    if a.action_type == b.action_type && a.card_id == b.card_id {
+        return;
+    }
+    let describe = |x: &Action| {
+        format!(
+            "{:?}{}",
+            x.action_type,
+            x.card_id
+                .filter(|c| *c != 0)
+                .map(|c| format!("({c})"))
+                .unwrap_or_default()
+        )
+    };
+    let blades = super::v8_model::active_blades(gs, me, db);
+    let opp = 1 - me;
+    eprintln!(
+        "PROBE t={} me={} bl={} cost={} h={} ammo={} hand={} | ours: bl={} h={} | v8={} v7={} \
+         | v8top={:.1} v7top={:.1}",
+        gs.turn_number,
+        me,
+        blades,
+        super::v8_model::stage_cost(gs, me, db),
+        super::v8_model::supply_hearts(gs, me, db),
+        super::v8_model::lives_in_hand(gs.seat_player(me), db),
+        gs.seat_player(me).hand.cards.len(),
+        super::v8_model::active_blades(gs, opp, db),
+        super::v8_model::supply_hearts(gs, opp, db),
+        describe(a),
+        describe(b),
+        ours.first().map(|(v, _)| *v).unwrap_or(0.0),
+        theirs.first().map(|(v, _)| *v).unwrap_or(0.0),
+    );
 }
 
 pub fn score_actions_v8(gs: &GameState, actions: &[Action], me: u8) -> Vec<(f64, String)> {

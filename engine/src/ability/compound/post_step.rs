@@ -5,6 +5,8 @@ use crate::ability::resolver::AbilityResolver;
 use crate::ability::types::StepOutput;
 use crate::card::AbilityEffect;
 use crate::game_state::GameState;
+#[cfg(feature = "no_std")]
+use alloc::{boxed::Box, string::ToString};
 
 /// Post-step tracking for non-choice steps. Returns true when the caller
 /// must `return Ok(())` (cancelled remainder / optional no-target stop).

@@ -9,8 +9,11 @@ use crate::ability::debug::ABILITY_DEBUG;
 use crate::ability::queue::ConditionalChoice;
 use crate::card::AbilityEffect;
 use crate::game_state::GameState;
+#[cfg(not(feature = "no_std"))]
+use std::borrow::Cow;
 #[cfg(feature = "no_std")]
 use alloc::{
+    borrow::Cow,
     boxed::Box,
     string::{String, ToString},
     vec::Vec,
@@ -437,9 +440,9 @@ impl super::resolver::AbilityResolver {
         // fallback has to read through `gs`, and that one copy is what
         // releases the borrow for the mutable player lookup below.
         let tgt = target_player_id.as_deref().unwrap_or("self");
-        let dst_str: std::borrow::Cow<'_, str> = match ctx.destination.as_deref() {
-            Some(d) => std::borrow::Cow::Borrowed(d),
-            None => std::borrow::Cow::Owned(
+        let dst_str: Cow<'_, str> = match ctx.destination.as_deref() {
+            Some(d) => Cow::Borrowed(d),
+            None => Cow::Owned(
                 gs.entry_destination()
                     .unwrap_or_else(|| Zone::Discard.to_str())
                     .to_string(),

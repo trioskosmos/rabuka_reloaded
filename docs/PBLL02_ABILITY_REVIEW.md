@@ -955,6 +955,57 @@ case, on a card whose only prior coverage was a deleted round-trip, caught a rea
 two-layer engine defect. No field assertion could have: the parse was well-formed before
 the fix, just missing a key.
 
+
+### 8.22 Audited card by card against the official site — `cards/audit_vs_official.py`
+
+`cards/audit_vs_official.py` reads the official list and detail endpoints and checks the
+import four ways: every official card number is held, every ability has a node, the
+ability text matches, and every clause of that text is represented.
+
+**Verdict:**
+
+| check | result |
+|---|---|
+| official PBLL02 card numbers held | **113 / 113** |
+| parallel printings held (`parallel_param` on the API) | **70 / 70** |
+| cards with ability text but no ability node | **0** |
+| clauses genuinely unrepresented | **0** (5 remain, all normalisation artifacts, below) |
+| ability-text differences | **2** — see below |
+
+So **no PR/parallel card is missing**, and no ability is missing. The `parallel_param`
+field is the API's own parallel marking, which is a better answer to that question than
+inferring it from a card-number suffix.
+
+**The one real difference, and it is not a mechanic.** `PL!-pb2-001-PP` / `-R`: the
+official site writes `【ALLフレード】を得る` and our `cards.json` writes
+`{{icon_all.png|ハート}}を得る` — the scraper wrote the icon's visible word as 「ハート」
+where the official alt text is 「ALLハート」. 26 cards / 35 occurrences use `icon_all.png`.
+
+**It changes nothing mechanically.** Both spellings parse to `gain_resource`,
+`resource: heart`, no `heart_colors`, `count: 1` — verified by running the parser on
+both. So this is a transcription-fidelity gap in the scraper, not a behaviour gap. It is
+left unfixed deliberately: changing the scraper means regenerating 2639 cards to alter
+text that parses identically, which is churn for no behavioural change. The one-line fix
+belongs with whoever next re-scrapes.
+
+**The five residual clause findings, and why they are not gaps:**
+
+* `PL!-pb2-000-DUO` — the official text begins with a stray `"` before
+  `常時`, which blocks the anchored trigger strip. The node exists and its text is correct
+  (§8.16 works on this card's sibling). The stray quote is itself a scraper artefact.
+* `PL!-pb2-018-P＋` / `-R` and `PL!-pb2-029-N` — the clause is colon-joined cost
+  and effect (`「…置いてもいい：…」`), so its two halves live in `cost.text` and
+  `effect.text` respectively and no single field holds the joined string. Both halves
+  are present and tested.
+
+**Four normalisation bugs in the audit itself, each of which inflated the report, are
+documented at the point they bit:** `【trigger】` vs `{{icon|trigger}}`; `[word]` vs
+`{{file.png|word}}`; `-` meaning "no ability" being truthy; and matching clauses against
+`triggerless_text` (which keeps the trigger gate) rather than the effect's own `text`.
+A fifth — splitting only on `。` when the official separates two trigger sections with a
+newline — reported 105 false gaps at one point. **An audit that cries wolf gets ignored,
+so each of these had to be fixed before the number could be believed.**
+
 ## 8. Test campaign log
 
 Work done ability-by-ability, least work first. Each entry records what the test

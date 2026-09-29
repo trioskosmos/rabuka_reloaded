@@ -324,16 +324,19 @@ pub fn compute_card_stats(card: &Card, cid: i16, gs: &GameState) -> CardDisplayS
     };
     // Engine score pipeline (mirrors live.rs verdicts): set replaces printed
     // base, additive stacks on top.
-    let set_score = gs.mods.get_score_set_modifier(cid);
-    let additive =
-        gs.mods.get_score_modifier(cid) - set_score;
+    // `get_score_*_modifier` returns the ModifierEntry's natural i16 (set +
+    // additive). These feed `saturate_u8(i32)`, so widen at the point of use
+    // with `i32::from` rather than widening the engine type — the modifier map
+    // stays 4 bytes per entry and the single widening stays visible here.
+    let set_score = i32::from(gs.mods.get_score_set_modifier(cid));
+    let additive = i32::from(gs.mods.get_score_modifier(cid)) - set_score;
     let base_score = card.score.unwrap_or(0) as i32;
     let effective_base = if set_score != 0 { set_score } else { base_score };
     let score = rabuka_engine::constants::saturate_u8(effective_base + additive) as i32;
     // Engine cost pipeline: set replaces printed base, additive stacks.
     let printed_cost = card.cost.unwrap_or(0) as i32;
-    let cost_total = gs.mods.get_cost_modifier(cid);
-    let cost_set = gs.mods.get_cost_modifier_set(cid);
+    let cost_total = i32::from(gs.mods.get_cost_modifier(cid));
+    let cost_set = gs.mods.get_cost_modifier_set(cid).map(i32::from);
     let cost = if let Some(s) = cost_set {
         rabuka_engine::constants::saturate_u8(s + (cost_total - s))
     } else {

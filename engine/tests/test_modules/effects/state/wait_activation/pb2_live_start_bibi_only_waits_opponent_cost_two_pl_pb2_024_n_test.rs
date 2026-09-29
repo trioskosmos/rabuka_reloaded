@@ -137,10 +137,23 @@ fn a_non_bibi_ally_blocks_the_effect() {
     );
 }
 
-/// An empty own stage satisfies のみ vacuously — the case the card does not
-/// settle. Recorded, not blessed.
+/// のみ over a genuinely EMPTY own stage: vacuously true, so the wait happens.
+///
+/// This test previously asserted `observed || !observed`, which is `assert!(true)`
+/// and could not fail under any engine — and it did not even build the scenario its
+/// name claimed, because it staged MAKI in slot 0, leaving a one-BiBi-member stage.
+/// The stage really is empty here: MAKI lives in the live card zone for a
+/// ライブ開始時, and the ability is triggered directly.
+///
+/// The reading is pinned as `true` because のみ is a universal and the repository
+/// already works this way: see `pb2_debut_wait_opponent_blade_two_or_less_pl_pb2_029_n_test.rs::an_empty_ally_slot_still_satisfies_exclusivity`,
+/// which pins the same vacuous reading for 「『μ's』のみ」.
+///
+/// **If the rules are ever ruled the other way this test goes red, and that is the
+/// point** — it is a report on an open question, not a shrug. See
+/// docs/PBLL02_ABILITY_REVIEW.md §8.3 item 1.
 #[test]
-fn empty_own_stage_is_vacuously_bibi_only() {
+fn an_empty_own_stage_satisfies_bibi_only_vacuously() {
     let db = load_real_database();
     let mut game = TestGame::new(db);
     let filler = game.new_id("PL!-sd1-010-SD");
@@ -148,34 +161,49 @@ fn empty_own_stage_is_vacuously_bibi_only() {
     let opp = game.id(OPP_CHEAP);
     game.state.player2.stage.stage[0] = opp;
     let maki = game.id(MAKI);
-    game.state.player1.stage.stage[0] = maki;
+    assert_eq!(
+        game.state.player1.stage.stage,
+        [-1, -1, -1],
+        "precondition: our own stage is genuinely empty, which is the case this test is about"
+    );
     fire_live_start(&mut game, maki);
     if game.has_pending_choice() {
         game.select_indices(&[0]);
     }
-    let observed = game.state.mods.get_orientation_modifier(opp) == Some("wait");
-    assert!(
-        observed || !observed,
-        "empty own stage must resolve deterministically (observed waited={observed})",
-        observed = observed
+    assert_eq!(
+        game.state.mods.get_orientation_modifier(opp),
+        Some("wait"),
+        "『のみ』 is a universal, so an empty stage satisfies it vacuously and the cost-2 \
+         opponent member is waited"
     );
-    // See docs/PBLL02_ABILITY_REVIEW.md §8.3: 「のみ」 over an empty stage is
-    // vacuously true, so `true` is the defensible reading. Not tightened.
 }
 
+/// The cost ceiling is a real gate: an opponent member ABOVE コスト2 is not waited.
+///
+/// This previously asserted that MAKI — our own card — had no orientation
+/// modifier. The ability targets the OPPONENT, so it could never have touched her
+/// and the assertion said nothing about the engine. The negative now breaks the
+/// cost gate on a card the ability actually selects.
 #[test]
-fn no_opponent_member_is_harmless() {
+fn an_opponent_member_above_the_cost_bound_is_not_waited() {
     let db = load_real_database();
     let mut game = TestGame::new(db);
     let filler = game.new_id("PL!-sd1-010-SD");
     fill_decks(&mut game, filler);
-    game.state.player1.stage.stage[0] = game.id(BIBI_A);
+    let bibi_a = game.id(BIBI_A);
+    let opp = game.id(OPP_DEAR);
+    game.assert_card_cost(opp, 4);
+    game.state.player1.stage.stage[0] = bibi_a;
+    game.state.player2.stage.stage[0] = opp;
     let maki = game.id(MAKI);
-    game.state.player1.stage.stage[1] = maki;
     fire_live_start(&mut game, maki);
+    if game.has_pending_choice() {
+        game.select_indices(&[0]);
+    }
     assert_eq!(
-        game.state.mods.get_orientation_modifier(maki),
+        game.state.mods.get_orientation_modifier(opp),
         None,
-        "no opponent members on stage, so nothing can be waited"
+        "コスト2以下 — 嵐 千砂都 (cost 4) is above the bound, so she is not waited even \
+         though our stage is exclusively BiBi"
     );
 }

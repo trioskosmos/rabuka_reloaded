@@ -1,4 +1,4 @@
-//! 絢瀬絵里 `PL!-pb2-018-P＋` (登場／ライブ開始時)
+//! 矢澤にこ `PL!-pb2-018-P＋` (登場／ライブ開始時)
 //!
 //! Text, with the icon markup rendered as plain labels:
 //!

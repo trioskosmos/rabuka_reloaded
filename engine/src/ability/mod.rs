@@ -37,7 +37,11 @@ pub mod dynamic_count;
 pub mod effects;
 pub mod enums;
 pub mod gates;
-#[cfg(not(feature = "no_std"))]
+// `log` is NOT gated out on `no_std`: `ability/log.rs` carries its own
+// `#[cfg(feature = "no_std")] mod inner` with no-op verdict recording, and its
+// `impl AbilityResolver` block is called from the action dispatch table
+// (`effects/dispatch.rs`, `effects/move/mod.rs`), which every target compiles.
+// Gating the module left those two call sites with no method to resolve to.
 pub mod log;
 pub mod queue;
 pub mod resolver;

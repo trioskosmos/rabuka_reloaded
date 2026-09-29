@@ -147,6 +147,35 @@ pub(crate) mod atomic {
     #[cfg(not(target_has_atomic = "ptr"))]
     unsafe impl Sync for AtomicUsize {}
 
+    /// `AtomicBool` for targets without 8-bit atomics (GBA ARMv4T has no
+    /// atomic instructions at all). Same single-threaded `Cell`-based drop-in
+    /// as [`AtomicU32`] above, used by the process-global runtime gates in
+    /// `core::runtime_flags`.
+    #[cfg(target_has_atomic = "8")]
+    pub use core::sync::atomic::AtomicBool;
+
+    #[cfg(not(target_has_atomic = "8"))]
+    #[derive(Debug)]
+    pub struct AtomicBool(core::cell::Cell<bool>);
+
+    #[cfg(not(target_has_atomic = "8"))]
+    impl AtomicBool {
+        pub const fn new(v: bool) -> Self {
+            AtomicBool(core::cell::Cell::new(v))
+        }
+        pub fn load(&self, _order: core::sync::atomic::Ordering) -> bool {
+            self.0.get()
+        }
+        pub fn store(&self, v: bool, _order: core::sync::atomic::Ordering) {
+            self.0.set(v);
+        }
+    }
+
+    // Console ports are single-threaded; these flags are only ever touched from
+    // the single game thread, so exposing them as Sync is safe.
+    #[cfg(not(target_has_atomic = "8"))]
+    unsafe impl Sync for AtomicBool {}
+
     /// `AtomicU8` for targets without 8-bit atomics (GBA ARMv4T). Used by the
     /// bytecode-cache init state machine, which on a single-core console only
     /// ever runs from the game thread.

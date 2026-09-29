@@ -9,7 +9,12 @@ pub mod constants;
 pub mod game_modifiers;
 pub mod game_state;
 pub mod player;
-#[cfg(not(feature = "no_std"))]
+// Not gated on `no_std`: the module selects core::sync::atomic or
+// std::sync::atomic itself, and the hot paths that read these gates
+// (game_state log materialization, turn::phases, turn::live, the resolver)
+// are compiled on every target. Gating the declaration off under `no_std`
+// left those call sites pointing at a module that did not exist, which is
+// what broke every no_std port (gba/ds/psp/wii/dc/jaguar/wasm/cdi/genesis).
 pub mod runtime_flags;
 pub mod stats_pipeline;
 pub mod types;

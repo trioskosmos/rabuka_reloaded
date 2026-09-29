@@ -11,6 +11,7 @@ use crate::core::constants::CountCast;
 use crate::{HashMap, HashSet};
 #[cfg(feature = "no_std")]
 use alloc::{
+    borrow::ToOwned,
     string::{String, ToString},
     vec::Vec,
 };

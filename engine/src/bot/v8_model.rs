@@ -443,6 +443,50 @@ pub fn commitment_of(gs: &GameState, me: u8) -> Commitment {
 /// opponents_public_board` asserts the step version against the engine, and
 /// that test is the thing this has to be measured against before it can be
 /// trusted.
+/// The yield distribution to price the opponent with, recentred on a measured
+/// density when `V8_OPP_DENSITY=measured`.
+///
+/// ## Why this exists
+///
+/// `YIELD_PRIOR` above is a hand-picked distribution with a mean of **0.505**
+/// blade-hearts per blade. Independent community calculation puts the real
+/// figure at about **0.733** per yell
+/// (note.com/miumi_loveca, "1回のエールでブレードハートがめくれる確率"), so the
+/// prior is low by roughly 45%.
+///
+/// That matters more than a 45% error in a prior usually would, because of an
+/// asymmetry this file created and never questioned: **v8 prices its own check
+/// exactly**, by sampling the actual deck through `FlipSampler`, while pricing
+/// the opponent's from this prior. So v8 knows its yield to the card and
+/// guesses theirs to a constant, and in a mirror — the measurement configuration
+/// this whole project runs in — the two answers describe the same deck.
+///
+/// The spread is kept and only the mean is moved, so the uncertainty the prior
+/// encodes (a dense list and an empty one still differ) survives the
+/// calibration. Rescaling every quantile by the same factor does that without
+/// inventing a new shape, and the weights are untouched.
+fn yield_prior(density: Option<f64>) -> Vec<(f64, f64)> {
+    let prior_mean: f64 = YIELD_PRIOR.iter().map(|(y, w)| y * w).sum();
+    match density {
+        Some(d) if d.is_finite() && d > 0.0 && prior_mean > 0.0 => {
+            let k = d / prior_mean;
+            YIELD_PRIOR.iter().map(|(y, w)| (y * k, *w)).collect()
+        }
+        _ => YIELD_PRIOR.to_vec(),
+    }
+}
+
+/// The measured blade density of the deck actually in play, or `None` when the
+/// switch is off. Falls back to `None` (i.e. the prior) if the deck cannot be
+/// read, so this can only ever make the model *less* wrong, never crash a turn.
+fn measured_opp_density(gs: &GameState, me: u8, db: &CardDatabase) -> Option<f64> {
+    if std::env::var("V8_OPP_DENSITY").as_deref() != Ok("measured") {
+        return None;
+    }
+    let (_, density) = crate::bot::strategy_v4::flip_stats(gs, me, db);
+    (density.is_finite() && density > 0.0).then_some(density)
+}
+
 fn opp_gradient_enabled() -> bool {
     std::env::var_os("V8_OPP_GRADIENT").is_some()
 }
@@ -523,6 +567,7 @@ impl OppModel {
             observed
         };
         let success = opp.success_live_card_zone.cards.len();
+        let yield_source = measured_opp_density(gs, me, db);
 
         let hearts = stats_pipeline::stage_hearts(
             &opp.stage.stage,
@@ -531,8 +576,7 @@ impl OppModel {
             &gs.mods.heart_copy,
             &gs.mods.heart_color_multiplier,
             &gs.mods.heart_modifiers,
-        );
-        let board_total: i32 = hearts.hearts.values().map(|v| i32::from(*v)).sum();
+        );        let board_total: i32 = hearts.hearts.values().map(|v| i32::from(*v)).sum();
         let blades = i32::from(opp.stage.total_blades(
             db,
             &gs.mods.blade_modifiers,
@@ -546,7 +590,7 @@ impl OppModel {
         // nothing, so total supply is an upper bound and the quantile spread
         // carries the color risk.
         let mut score_dist = [0.0f64; SCORE_SLOTS];
-        for (yield_hearts, weight) in YIELD_PRIOR {
+        for (yield_hearts, weight) in yield_prior(yield_source) {
             let supply = board_total + crate::constants::score_to_i32_rounded(blades as f64 * yield_hearts);
             for score in 0..SCORE_SLOTS {
                 if supply >= SCORE_MAX[score] {
@@ -577,7 +621,7 @@ impl OppModel {
         // board commits more reliably than one with an empty stage.
         let target = (2 * set_size).clamp(1, SCORE_SLOTS - 1).i32_count();
         let bar = score_median_hearts(target);
-        let clears = YIELD_PRIOR
+        let clears = yield_prior(yield_source)
             .iter()
             .filter(|(yield_hearts, _)| {
                 board_total + crate::constants::score_to_i32_rounded(blades as f64 * yield_hearts) >= bar
@@ -643,8 +687,20 @@ impl OppModel {
     /// will set, and inventing one would be a second assumption stacked on the
     /// first.
     pub fn with_board(&self, board_total: i32, blades: i32) -> Self {
+        // The horizon projection has no game state of its own to measure a
+        // density from, so it keeps the uncalibrated prior. `build_with` is
+        // where the measured density enters.
+        self.with_board_calibrated(board_total, blades, None)
+    }
+
+    pub fn with_board_calibrated(
+        &self,
+        board_total: i32,
+        blades: i32,
+        yield_source: Option<f64>,
+    ) -> Self {
         let mut score_dist = [0.0f64; SCORE_SLOTS];
-        for (yield_hearts, weight) in YIELD_PRIOR {
+        for (yield_hearts, weight) in yield_prior(yield_source) {
             let supply =
                 board_total + crate::constants::score_to_i32_rounded(blades as f64 * yield_hearts);
             for score in 0..SCORE_SLOTS {

@@ -22,8 +22,19 @@
 // genuinely incidental rather than definitional. See
 // docs/CODE_AUDIT_2026-08-23.md.
 
-#[cfg(feature = "no_std")]
-#[macro_use]
+// `#[macro_use]` is load-bearing: it is what puts `format!`/`vec!` in scope
+// crate-wide under `no_std`, where there is no `std` prelude to supply them.
+// Do NOT ungate this declaration to make an ungated `use alloc::…` resolve —
+// `alloc` is in the extern prelude in both configurations, so the `use` works
+// either way, and ungating the declaration puts `alloc`'s no-op `println!`
+// into the macro_use prelude where it would shadow the real one on std builds.
+// `alloc` is in the sysroot on every target, so the declaration is
+// unconditional — modules below name `alloc::borrow::Cow` and friends
+// directly, and gating the declaration off under std left those paths
+// unresolvable in the host/test build. `#[macro_use]` stays no_std-only:
+// std's prelude already exports vec!/format!, and importing alloc's copies
+// as well would make every one of those macro calls ambiguous.
+#[cfg_attr(feature = "no_std", macro_use)]
 extern crate alloc;
 
 // PSP stubs for std macros
@@ -74,7 +85,16 @@ static ALLOC: pool_alloc::PoolAllocator = pool_alloc::PoolAllocator;
 #[global_allocator]
 static ALLOC: alloc_counter::CountingAllocator = alloc_counter::CountingAllocator;
 
-#[cfg(not(any(feature = "fast_alloc", feature = "alloc_tracker")))]
+// std builds have no platform to satisfy, so the system allocator is the
+// default. `no_std` targets have no `std` at all: the port owns the slot and
+// declares its own `#[global_allocator]` (PicolibcAlloc on DS, the vendored
+// sce heap on PSP, a bump heap on the rest) — the same split the other
+// allocator arms above already use. GBA is the exception: agb 0.25 declares
+// its own `BlockAllocator` inside `agb::agb_alloc`, so the port adds nothing.
+#[cfg(all(
+    not(feature = "no_std"),
+    not(any(feature = "fast_alloc", feature = "alloc_tracker"))
+))]
 #[global_allocator]
 static ALLOC: std::alloc::System = std::alloc::System;
 

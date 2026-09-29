@@ -1,4 +1,4 @@
-﻿//! 絢瀬絵里 `PL!-pb2-015-P＋` (自動, ターン1回)
+﻿//! 西木野真姫 `PL!-pb2-015-P＋` (自動, ターン1回)
 //!
 //! Text, with the icon markup rendered as plain labels:
 //!
