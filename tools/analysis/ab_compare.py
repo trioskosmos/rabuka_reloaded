@@ -3,9 +3,9 @@
 The project's own validation protocol (docs/BOT_STRATEGY.md) says to run at
 least 3000 games per seat pairing and to report a confidence interval, because
 a 200-game run cannot resolve the 1-2pp effects being chased. Every recorded
-result in docs/V7_GUIDE_GAP_ANALYSIS.md was assembled by hand from arena output
-instead, which is why the corpus script died with the mega-corpus and why the
-tables there cannot be regenerated.
+result in docs/archive/V7_GUIDE_GAP_ANALYSIS.md was assembled by hand from
+arena output instead, which is why the corpus script died with the mega-corpus
+and why the tables there cannot be regenerated.
 
 This tool runs the protocol:
 

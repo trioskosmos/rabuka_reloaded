@@ -269,8 +269,35 @@ fn leaf_value(gs: &GameState, me: u8, db: &CardDatabase, opp: &OppModel) -> f64 
     // more Main phases, developed by the same forward walk the doctrine
     // describes rather than by an assumed best case.
     let (future_hearts, future_blades) = v8_model::forward_supply(gs, me, 2, db);
+    // ...priced against the opponent advancing by the same two turns. Both
+    // players draw the same cards and gain the same energy each turn (3.2), so
+    // holding them at their current board inside a term whose job is to see
+    // the race in two turns systematically flatters us, and flatters us most
+    // on the actions that develop hardest. Their hand and deck are hidden and
+    // are not read; the growth is ours, applied to them, and that symmetry is
+    // an assumption stated rather than a forecast.
+    let opp_later = if opp_horizon_enabled() {
+        let opp_seat = 1 - me;
+        let their_now_total: i32 = v8_model::board_pool(gs, opp_seat, db)
+            .iter()
+            .map(|&v| i32::from(v))
+            .sum();
+        let their_now_blades = v8_model::active_blades(gs, opp_seat, db);
+        let our_now_total: i32 = supply.iter().map(|&v| i32::from(v)).sum();
+        let our_now_blades = v8_model::active_blades(gs, me, db);
+        opp.with_board_sampled(
+            gs,
+            me,
+            db,
+            their_now_total
+                + (future_hearts.iter().map(|&v| i32::from(v)).sum::<i32>() - our_now_total),
+            their_now_blades + (future_blades - our_now_blades),
+        )
+    } else {
+        opp.clone()
+    };
     let (our_later, their_later) =
-        placement_pair(gs, me, db, opp, &future_hearts, future_blades, density);
+        placement_pair(gs, me, db, &opp_later, &future_hearts, future_blades, density);
 
     let ammo = v8_model::lives_in_hand(gs.seat_player(me), db) as f64;
     let initiative = if gs.seat_player(me).is_first_attacker {
@@ -279,12 +306,80 @@ fn leaf_value(gs: &GameState, me: u8, db: &CardDatabase, opp: &OppModel) -> f64 
         0.0
     };
     let ceiling = v8_model::score_ceiling(gs, me, db) as f64;
+    // Guarded, not multiplied: `colour_shortfall` walks the hand and calls
+    // `life_need` per card, and `leaf_value` runs once per search node (up to
+    // 96 per decision), so evaluating it to multiply by 0.0 would tax the
+    // default path to support a switch nobody is holding.
+    let deficit = match deficit_weight() {
+        0.0 => 0.0,
+        w => w * -(v8_model::colour_shortfall(gs, me, db) as f64),
+    };
     SCALE
         * ((our_now - their_now)
             + horizon_weight() * (our_later - their_later)
             + PLACEMENT_CREDIT * (ammo + initiative)
             + dev_ceiling_weight() * ceiling
-            + dev_band_weight() * v8_model::band_progress(gs, me, db))
+            + dev_band_weight() * v8_model::band_progress(gs, me, db)
+            + deficit)
+}
+
+/// `V8_DEFICIT` is OFF by default, and it is staying off.
+///
+/// The other terms in `leaf_value` are colour-blind: they read total supply,
+/// total blades, and an interpolation of the same. Two actions that put three
+/// hearts on stage score identically whether those hearts are the colours the
+/// life in hand needs or the colours it does not — and the log's nine failed
+/// leaf-term experiments are all that: each was a monotone function of
+/// quantities `band_progress` already reads, so none could reorder the argmax
+/// no matter how it was weighted.
+///
+/// This term is NOT one of those. `colour_shortfall` is a function of the
+/// board's colour VECTOR against one card's requirement, and
+/// `colour_shortfall_sees_the_vector_not_the_total` pins that as an arithmetic
+/// property: two equal-total boards in different colours get different values.
+/// So the usual defence of the dead ends — "it was colour-blind too" — does not
+/// apply, and the term was measured on its own.
+///
+/// It is a regression, and worse at a larger weight:
+///
+///     w=0.35  148-252 vs 179-221  McNemar p=0.00015  pace 0.403 -> 0.366
+///     w=0.05  165-235 vs 179-221  McNemar p=0.04356  pace 0.403 -> 0.384
+///
+/// Monotone in the harmful direction across a 7x range, so this is a gradient
+/// pointing at zero rather than a surface with a peak the sweep missed. See
+/// V8_IMPROVEMENT_LOG.md §0.7 for why the target life is the likely culprit.
+/// `V8_OPP_HORIZON` is off by default.
+///
+/// The horizon term runs our forward walk two turns ahead and then prices the
+/// opponent at the board they have *now*. Both players draw the same cards and
+/// gain the same energy each turn, so inside a term whose entire purpose is to
+/// see the race in two turns, the opponent never grows. That does not bias
+/// every action equally: it flatters the actions that develop hardest, because
+/// their measured gain is the only side of the race that moves.
+///
+/// `V8_NEXT_METHODS.md` §6.5 asks for the opponent model to be "refreshed
+/// through the search". As written that is a no-op and worth saying why: during
+/// our own Main phase the opponent's board cannot change, so re-reading it at
+/// each node returns an identical model. The staleness is in the horizon, not
+/// the depth.
+///
+/// The correction advances their public board by the same amount ours advanced.
+/// Their hand and deck are hidden and are never read; this is our growth
+/// applied to them, and the symmetry is an assumption being made explicit
+/// rather than one being made silently.
+fn opp_horizon_enabled() -> bool {
+    std::env::var_os("V8_OPP_HORIZON").is_some()
+}
+
+fn deficit_weight() -> f64 {
+    if std::env::var_os("V8_DEFICIT").is_some() {
+        std::env::var("V8_DEFICIT_W")
+            .ok()
+            .and_then(|v| v.parse::<f64>().ok())
+            .unwrap_or(0.35)
+    } else {
+        0.0
+    }
 }
 
 /// Baton detection from the generated action's own destination data. The
@@ -346,13 +441,56 @@ pub(crate) fn is_baton(gs: &GameState, me: u8, action: &Action) -> bool {
 /// here and flattened into the note for debug output.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub(crate) struct TieKey {
+    /// `V8_TIE_BATON`: prefer a baton over ending the phase at equal value.
+    ///
+    /// First in the key, and zero for every action unless the switch is on, so
+    /// the default ordering is bit-for-bit what it was. When enabled it is 1
+    /// for a baton and 0 for everything else INCLUDING Pass, which is the whole
+    /// mechanism.
+    ///
+    /// `Pass` is scored by the same leaf on the same state, so it wins on the
+    /// tiebreak alone — and it wins every one, because ending the phase leaves
+    /// `cost_now` at the current stage cost and every deploy raises it. So the
+    /// leaf is free to believe ending the phase is as good as playing, and it
+    /// is, and the phase ends. In v7 that single tie-break is worth **+16.8
+    /// points**, the largest entry in the ablation table, and the comment on
+    /// this type records that v8 has neither it nor the Pass tax. This is that
+    /// fix, on a switch, to be measured rather than assumed.
+    baton_over_pass: u8,
     cost_now: i32,
     ceiling: i32,
     baton: u8,
 }
 
+/// `V8_PASS_TAX`: charge for ending the Main phase. In `SCALE` units, and
+/// applied to Pass's value only.
+///
+/// v7 has one of these. The comment above `TieKey` says it "exploded draws"
+/// there, which is a warning about the *sign* of the earlier fix rather than
+/// about the idea, and §0.3 of the improvement log is the reason to retry it:
+/// v7 and v8 were scoring a junk-only zone as 1.000 and 0.000 respectively,
+/// which means the two "committed p" figures that the fold policy was tuned
+/// against were not measuring the same thing. Now that both report 0.0 for a
+/// zone with no life in it, the fold decision is being made on a consistent
+/// number and a tax on it can be re-measured on its merits.
+///
+/// Default 0 (off). The value is in `SCALE` units, so 0.05 is half a point of
+/// a three-point game.
+fn pass_tax() -> f64 {
+    std::env::var("V8_PASS_TAX")
+        .ok()
+        .and_then(|v| v.parse().ok())
+        .filter(|w: &f64| w.is_finite() && *w >= 0.0)
+        .unwrap_or(0.0)
+}
+
+fn tie_baton_over_pass_enabled() -> bool {
+    std::env::var_os("V8_TIE_BATON").is_some()
+}
+
 fn tie_key(sim: &GameState, me: u8, db: &CardDatabase, action: &Action) -> TieKey {
     TieKey {
+        baton_over_pass: u8::from(tie_baton_over_pass_enabled() && is_baton(sim, me, action)),
         cost_now: v8_model::stage_cost(sim, me, db),
         ceiling: v8_model::reachable_ceiling(sim, me, 2, db),
         baton: u8::from(is_baton(sim, me, action)),
@@ -429,6 +567,7 @@ impl ActionScore {
         Self {
             value: f64::NEG_INFINITY,
             tie: TieKey {
+                baton_over_pass: 0,
                 cost_now: i32::MIN,
                 ceiling: i32::MIN,
                 baton: 0,
@@ -465,7 +604,7 @@ pub(crate) fn evaluate_actions(gs: &GameState, actions: &[Action], me: u8) -> Ve
         // Pass tax that exploded draws, and a baton tie-break that was a bug
         // fix); neither exists in v8.
         if action.action_type == ActionType::Pass && !pending {
-            let value = search.leaf(gs);
+            let value = search.leaf(gs) - pass_tax();
             scores.push(ActionScore {
                 value,
                 tie: tie_key(gs, me, db, action),

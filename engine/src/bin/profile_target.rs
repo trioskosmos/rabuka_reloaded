@@ -6,7 +6,11 @@ use rabuka_engine::game_state::{GameResult, GameState};
 use rabuka_engine::turn::TurnEngine;
 use std::sync::Arc;
 
-fn run_game_to_completion(gs: &mut GameState, _trace: bool) -> u64 {
+fn run_game_to_completion(
+    gs: &mut GameState,
+    _trace: bool,
+    rng: &mut u64,
+) -> u64 {
     let mut actions = 0u64;
     let mut last_turn = 0u8;
     let mut stuck = 0u32;
@@ -41,8 +45,14 @@ fn run_game_to_completion(gs: &mut GameState, _trace: bool) -> u64 {
             continue;
         }
 
-        use rand::seq::SliceRandom;
-        let action = action_list.choose(&mut rand::thread_rng()).unwrap();
+        // Self-contained xorshift64* so the run is reproducible without pulling
+        // rand's `std_rng` feature into the binary. The action list is short,
+        // so the modulo bias is irrelevant to what this tool measures.
+        *rng ^= *rng >> 12;
+        *rng ^= *rng << 25;
+        *rng ^= *rng >> 27;
+        let idx = ((*rng).wrapping_mul(0x2545_F491_4F6C_DD1D) >> 33) as usize;
+        let action = &action_list[idx % action_list.len()];
 
         let _ = TurnEngine::execute_main_phase_action(
             gs,
@@ -107,6 +117,19 @@ fn main() {
     let mut outcomes: std::collections::HashMap<String, u32> = std::collections::HashMap::default();
     let mut p1_first_count = 0u32;
     let num_games = 5000;
+    // SEEDED. This used to call `rand::thread_rng()` unseeded, so every run
+    // played a different set of games and its wall-clock numbers were not
+    // comparable to the previous run's — which makes the tool useless for the
+    // one thing it is for. Two runs that differ only in the code under test
+    // now play identical games, so a before/after timing is a real
+    // measurement. Override with PROFILE_SEED to sample a different batch.
+    let mut rng: u64 = std::env::var("PROFILE_SEED")
+        .ok()
+        .and_then(|s| s.parse().ok())
+        .unwrap_or(0x5EED_0BA5_1EED_0BA5);
+    if rng == 0 {
+        rng = 0x9E37_79B9_7F4A_7C15;
+    }
     for _ in 0..num_games {
         let mut gs = rabuka_engine::bin_common::deal_game(
             &card_database,
@@ -117,7 +140,7 @@ fn main() {
             "player2",
             "Player 2",
         );
-        total_actions += run_game_to_completion(&mut gs, false);
+        total_actions += run_game_to_completion(&mut gs, false, &mut rng);
         // Record who is first attacker at game end
         if gs.player1.is_first_attacker {
             p1_first_count += 1;

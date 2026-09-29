@@ -59,6 +59,7 @@ struct Options {
     trace: bool,
     logs: bool,
     check_p: bool,
+    env: Vec<(String, String)>,
 }
 
 impl Options {
@@ -75,11 +76,37 @@ impl Options {
         let mut trace = false;
         let mut logs = false;
         let mut check_p = false;
+        let mut env: Vec<(String, String)> = Vec::new();
         let mut args = args.iter();
         while let Some(arg) = args.next() {
             match arg.as_str() {
                 "--trace" => trace = true,
                 "--logs" => logs = true,
+                // Sets `KEY=VALUE` in this process's environment before any
+                // game runs. Repeatable.
+                //
+                // Every mechanism in this project is env-gated — `V8_MAX_LIVES`,
+                // `V8_P_FIRST`, `V8_NO_JUNK`, `V8_CONTESTED_WIDE`, `V7_ROLLOUT`,
+                // `V8_DEFICIT` and dozens more — and until now the only way to
+                // reach one was to export it in the caller's shell. That makes
+                // the project's whole ablation method unreproducible from the
+                // command line and impossible to put in a script, and it is the
+                // reason the exact command behind a recorded number is often
+                // not the one recorded. The setting is part of the experiment,
+                // so it belongs next to the experiment.
+                //
+                // A bare `--env KEY` sets it to `1`, which is the convention
+                // every gate in the tree already uses (`var_os(...).is_some()`).
+                "--env" => {
+                    let value = args
+                        .next()
+                        .filter(|v| !v.starts_with("--"))
+                        .ok_or_else(|| "missing KEY[=VALUE] for --env".to_string())?;
+                    match value.split_once('=') {
+                        Some((k, v)) => env.push((k.to_string(), v.to_string())),
+                        None => env.push((value.to_string(), "1".to_string())),
+                    }
+                }
                 // Turns on the per-check `V7CHK` / `V8CHK` lines. This exists
                 // as a flag rather than only as the env var because the lines
                 // are the only way to read the live-set decision, and a
@@ -176,6 +203,7 @@ impl Options {
             trace,
             logs,
             check_p,
+            env,
         })
     }
 
@@ -377,6 +405,12 @@ fn read_outcomes(path: &PathBuf) -> ArenaResult<Vec<GameOutcome>> {
 /// Prints the discordant table, the exact test, and an interval on the
 /// decisive-rate difference. This is the number a change should be judged on.
 fn report_paired(baseline: &[GameOutcome], candidate: &[GameOutcome], base_label: &str) {
+    // `--brief` is set by the caller when a run is one cell of a sweep: the
+    // score histogram, draw-type breakdown, stage-cost curve and telemetry
+    // banner are all still computed and still valid, but twenty configurations
+    // read one after another is 400 lines of scroll for two numbers each. The
+    // win/loss/pace/verdict block is the part that decides anything.
+    let brief = std::env::var_os("ARENA_BRIEF").is_some();
     let by_seed: std::collections::HashMap<u32, &GameOutcome> =
         baseline.iter().map(|r| (r.engine_seed, r)).collect();
     let mut joined = 0u64;
@@ -436,25 +470,33 @@ fn report_paired(baseline: &[GameOutcome], candidate: &[GameOutcome], base_label
     let (clo, chi) = wilson_interval(cand_decisive, joined);
 
     println!("PAIRED A/B (joined on engine seed = identical deal)");
-    println!("  baseline : {base_label}");
+    if !brief {
+        println!("  baseline : {base_label}");
+    }
     println!(
         "  joined games {joined} | unpaired (seed absent from baseline) {seed_mismatch}"
     );
-    println!("  concordant: both win {both_win} | both lose {both_lose} | both draw {both_draw}");
+    if !brief {
+        println!("  concordant: both win {both_win} | both lose {both_lose} | both draw {both_draw}");
+    }
     println!("  DISCORDANT: baseline-only {b_only} | candidate-only {c_only}");
-    println!(
-        "  decisive rate  baseline {:.1}% [{:.1}, {:.1}]   candidate {:.1}% [{:.1}, {:.1}]",
-        100.0 * base_decisive as f64 / joined.max(1) as f64,
-        100.0 * blo,
-        100.0 * bhi,
-        100.0 * cand_decisive as f64 / joined.max(1) as f64,
-        100.0 * clo,
-        100.0 * chi
-    );
+    if !brief {
+        println!(
+            "  decisive rate  baseline {:.1}% [{:.1}, {:.1}]   candidate {:.1}% [{:.1}, {:.1}]",
+            100.0 * base_decisive as f64 / joined.max(1) as f64,
+            100.0 * blo,
+            100.0 * bhi,
+            100.0 * cand_decisive as f64 / joined.max(1) as f64,
+            100.0 * clo,
+            100.0 * chi
+        );
+    }
     let swing = 100.0
         * (cand_decisive as f64 - base_decisive as f64)
         / joined.max(1) as f64;
-    println!("  decisive-rate swing: {:+.2} pp", swing);
+    if !brief {
+        println!("  decisive-rate swing: {:+.2} pp", swing);
+    }
     println!("  exact McNemar two-sided p = {p:.5}");
 
     // The pace metric, paired. Win rate is a race outcome and hides why; the
@@ -532,6 +574,13 @@ fn report_paired(baseline: &[GameOutcome], candidate: &[GameOutcome], base_label
         deltas.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
         let (lo, hi) = (deltas[deltas.len() / 40], deltas[deltas.len() * 39 / 40]);
         let significant = lo > 0.0 || hi < 0.0;
+        if brief {
+            println!(
+                "  pace ({label}) {base_rate:.4} -> {cand_rate:.4}  {observed:+.4} [{lo:+.4}, {hi:+.4}]{}",
+                if significant { "  SIGNIFICANT" } else { "" }
+            );
+            continue;
+        }
         println!(
             "  pace ({label}) baseline {base_rate:.4} -> candidate {cand_rate:.4}  delta {observed:+.4} [{lo:+.4}, {hi:+.4}]{}",
             if significant { "  SIGNIFICANT" } else { "" }
@@ -1439,6 +1488,21 @@ fn main() -> ArenaResult<()> {
         // SAFETY: single-threaded, and set before any game state exists.
         unsafe { std::env::set_var("V7_CHECK_P", "1") };
     }
+    for (key, value) in &options.env {
+        // SAFETY: single-threaded, and set before any game state exists.
+        unsafe { std::env::set_var(key, value) };
+    }
+    // Echo what is actually set, so a run's report carries the switches that
+    // produced it. A number whose mechanism is unrecoverable from the log is a
+    // number that cannot be checked later.
+    if !options.env.is_empty() {
+        let pairs: Vec<String> = options
+            .env
+            .iter()
+            .map(|(k, v)| format!("{k}={v}"))
+            .collect();
+        eprintln!("ARENA env: {}", pairs.join(" "));
+    }
     rabuka_engine::core::runtime_flags::set_action_display(false);
     rabuka_engine::core::runtime_flags::set_logging_enabled(options.logs || options.audit.is_some());
     if let Some(path) = &options.compare {
@@ -2110,61 +2174,80 @@ fn main() -> ArenaResult<()> {
     }
 
     let secs = t0.elapsed().as_secs_f64();
-    println!(
-        "{} vs {}  E{} games in {:.1}s ({:.1} gps)\nP1({}) {} - P2({}) {} - draws {}\ntotal actions {} | avg turns/game {:.1}",
-        kind_name(p1_kind),
-        kind_name(p2_kind),
-        games,
-        secs,
-        games as f64 / secs,
-        kind_name(p1_kind),
-        wins[0],
-        kind_name(p2_kind),
-        wins[1],
-        draws,
-        total_actions,
-        total_turns as f64 / games.max(1) as f64,
-    );
-    let mut hist_lines: Vec<String> = final_hist
-        .iter()
-        .map(|((a, b), c)| format!("    final success {a}-{b}: {c} game(s)"))
-        .collect();
-    hist_lines.sort();
-    println!(
-        "DRAW TYPES: real 3-3 draws={} | stall/no-contest draws={} | stuck/timeout ends={}",
-        real_draws, stall_draws, stuck_ends,
-    );
-    println!("FINAL SCORE HISTOGRAM (success_p1-success_p2 : count):");
-    for l in hist_lines {
-        println!("{l}");
+    if std::env::var_os("ARENA_BRIEF").is_some() {
+        println!(
+            "RESULT {} vs {} | {} - {} | {} draws | {} actions | {:.2} turns",
+            kind_name(p1_kind),
+            kind_name(p2_kind),
+            wins[0],
+            wins[1],
+            draws,
+            total_actions,
+            total_turns as f64 / games.max(1) as f64,
+        );
+    } else {
+        println!(
+            "{} vs {}  E{} games in {:.1}s ({:.1} gps)\nP1({}) {} - P2({}) {} - draws {}\ntotal actions {} | avg turns/game {:.1}",
+            kind_name(p1_kind),
+            kind_name(p2_kind),
+            games,
+            secs,
+            games as f64 / secs,
+            kind_name(p1_kind),
+            wins[0],
+            kind_name(p2_kind),
+            wins[1],
+            draws,
+            total_actions,
+            total_turns as f64 / games.max(1) as f64,
+        );
     }
-    let empty_main_rate = if main_phase_count > 0 {
-        empty_main_count as f64 / main_phase_count as f64
-    } else {
-        0.0
-    };
-    let live_fold_rate = if live_decisions > 0 {
-        live_folds as f64 / live_decisions as f64
-    } else {
-        0.0
-    };
-    println!(
-        "DO-NOTHING telemetry: empty Main phases {}/{} = {:.1}% | live-set fold {}/{} = {:.1}%",
-        empty_main_count,
-        main_phase_count,
-        empty_main_rate * 100.0,
-        live_folds,
-        live_decisions,
-        live_fold_rate * 100.0,
-    );
-    report_health(
-        &outcome_rows,
-        live_phases_p1,
-        live_phases_p2,
-        &curve_p1,
-        &curve_p2,
-        (end_cost_p1, end_cost_p2),
-    );
+    // Everything below is descriptive context for a human reading one run.
+    // In a sweep each cell is one line and this is forty. Skipped under
+    // `--brief`; the numbers are still collected, just not printed, so a
+    // follow-up run without the flag can still report them.
+    if std::env::var_os("ARENA_BRIEF").is_none() {
+        let mut hist_lines: Vec<String> = final_hist
+            .iter()
+            .map(|((a, b), c)| format!("    final success {a}-{b}: {c} game(s)"))
+            .collect();
+        hist_lines.sort();
+        println!(
+            "DRAW TYPES: real 3-3 draws={} | stall/no-contest draws={} | stuck/timeout ends={}",
+            real_draws, stall_draws, stuck_ends,
+        );
+        println!("FINAL SCORE HISTOGRAM (success_p1-success_p2 : count):");
+        for l in hist_lines {
+            println!("{l}");
+        }
+        let empty_main_rate = if main_phase_count > 0 {
+            empty_main_count as f64 / main_phase_count as f64
+        } else {
+            0.0
+        };
+        let live_fold_rate = if live_decisions > 0 {
+            live_folds as f64 / live_decisions as f64
+        } else {
+            0.0
+        };
+        println!(
+            "DO-NOTHING telemetry: empty Main phases {}/{} = {:.1}% | live-set fold {}/{} = {:.1}%",
+            empty_main_count,
+            main_phase_count,
+            empty_main_rate * 100.0,
+            live_folds,
+            live_decisions,
+            live_fold_rate * 100.0,
+        );
+        report_health(
+            &outcome_rows,
+            live_phases_p1,
+            live_phases_p2,
+            &curve_p1,
+            &curve_p2,
+            (end_cost_p1, end_cost_p2),
+        );
+    }
     if let Some(path) = &options.outcomes {
         write_outcomes(path, &outcome_rows)?;
         eprintln!("outcomes written to {}", path.display());

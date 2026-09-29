@@ -156,11 +156,11 @@ static Counters *C;
 
 static const char *current_test = "(none)";
 
-/* sizeof(GameState) is ~781 KB, so every TestGame is static (BSS). */
-static TestGame tg_a, tg_b, tg_c, tg_c2, tg_d, tg_d2, tg_e, tg_e2, tg_f, tg_f2,
-              tg_g, tg_g2, tg_h, tg_h2, tg_i, tg_j, tg_j2, tg_k, tg_k2, tg_l,
-              tg_l2, tg_m, tg_m2, tg_n, tg_n2, tg_o, tg_o2, tg_p, tg_p2, tg_q,
-              tg_r, tg_r2;
+/* sizeof(GameState) is ~781 KB, so every TestGame is static (BSS). One slot
+ * per case; cases run in forked children, so slots are never shared. */
+static TestGame tg_a, tg_b, tg_c, tg_d, tg_e, tg_f, tg_f2, tg_g, tg_g2, tg_h,
+              tg_h2, tg_i, tg_j, tg_j2, tg_k, tg_k2, tg_l, tg_l2, tg_m, tg_m2,
+              tg_n, tg_n2, tg_o, tg_o2, tg_p, tg_p2, tg_q, tg_r;
 
 static void on_fatal_signal(int sig)
 {
@@ -315,23 +315,14 @@ static int printed_cost(int cid)
     return v;
 }
 
-static int printed_blade(int cid)
-{
-    Card c;
-    int v = -1;
-    if (cid >= 0 && rb_decode_card_by_index((uint32_t)cid, &c)) { v = c.blade; rb_free_card(&c); }
-    return v;
-}
-
-static int blade_of(const TestGame *tg, int cid)  { return rb_mods_get_blade(&tg->state.mods, cid); }
-static int score_of(const TestGame *tg, int cid)  { return rb_mods_get_score(&tg->state.mods, cid); }
+static int score_of(TestGame *tg, int cid)  { return rb_mods_get_score(&tg->state.mods, cid); }
 
 /* Heart reads go through rb_mods_get_heart, never test_get_heart_modifier: the
  * shim REMAPS colour 5 onto RB_HEART_ORANGE while the engine's own table is
  * 0=heart00 .. 6=heart06. Indices come from rb_parse_heart_color() at startup
  * and the resolved map is printed there too. */
 static int idx00, idx01, idx02, idx03, idx04, idx05, idx06;
-static int heart_of(const TestGame *tg, int cid, int idx) { return rb_mods_get_heart(&tg->state.mods, cid, idx); }
+static int heart_of(TestGame *tg, int cid, int idx) { return rb_mods_get_heart(&tg->state.mods, cid, idx); }
 
 /* ---- zone helpers ---- */
 static int bag_has(const RbBag *b, int cid)
@@ -340,11 +331,7 @@ static int bag_has(const RbBag *b, int cid)
     return 0;
 }
 static int hand_has(const TestGame *tg, int cid)   { return bag_has(&tg->state.p[0].hand, cid); }
-static int hand2_has(const TestGame *tg, int cid)  { return bag_has(&tg->state.p[1].hand, cid); }
 static int wait_has(const TestGame *tg, int cid)   { return bag_has(&tg->state.p[0].discard, cid); }
-static int wait2_has(const TestGame *tg, int cid)  { return bag_has(&tg->state.p[1].discard, cid); }
-static int deck_has(const TestGame *tg, int cid)   { return bag_has(&tg->state.p[0].deck, cid); }
-static int deck2_has(const TestGame *tg, int cid)  { return bag_has(&tg->state.p[1].deck, cid); }
 static int stage_at(const TestGame *tg, int pl, int i) { return tg->state.p[pl].stage[i]; }
 static int stage_count(const TestGame *tg, int pl)
 {
@@ -357,16 +344,6 @@ static int hand_index_of(const TestGame *tg, int cid)
     for (int i = 0; i < tg->state.p[0].hand.n; i++)
         if (tg->state.p[0].hand.cards[i] == cid) return i;
     return -1;
-}
-static int deck_top(const TestGame *tg, int pl)
-{
-    const RbBag *b = &tg->state.p[pl].deck;
-    return b->n > 0 ? b->cards[0] : -1;
-}
-static int deck_bottom(const TestGame *tg, int pl)
-{
-    const RbBag *b = &tg->state.p[pl].deck;
-    return b->n > 0 ? b->cards[b->n - 1] : -1;
 }
 
 static void clear_p1(TestGame *tg)
@@ -418,24 +395,12 @@ static const char *pending_type(TestGame *tg)
     return t ? t : "";
 }
 static int pending_is_card(TestGame *tg)  { return pending(tg) && !strcmp(pending_type(tg), "SelectCard"); }
-static int pending_is_targ(TestGame *tg) { return pending(tg) && !strcmp(pending_type(tg), "SelectTarget"); }
 static int pending_is_auto(TestGame *tg) { return pending(tg) && !strcmp(pending_type(tg), "SelectAutoAbility"); }
-
 static void pick(TestGame *tg, int idx)
 {
     if (!pending(tg)) return;
     const int one[1] = { idx };
     rb_resume_with_choice_indices(&tg->state, one, 1);
-}
-static void pick_many(TestGame *tg, const int *idx, int n)
-{
-    if (!pending(tg) || n <= 0) return;
-    rb_resume_with_choice_indices(&tg->state, idx, n);
-}
-static void skip(TestGame *tg)
-{
-    if (!pending(tg)) return;
-    rb_resume_with_choice_indices(&tg->state, NULL, 0);
 }
 static void select_option(TestGame *tg, int idx)
 {
@@ -450,25 +415,11 @@ static void drain_choices(TestGame *tg, int guard_max)
         else select_option(tg, 0);
     }
 }
-static void drain_skip(TestGame *tg, int guard_max)
-{
-    int guard = 0;
-    while (pending(tg) && guard++ < guard_max) skip(tg);
-}
 static void drain_pick0(TestGame *tg, int guard_max)
 {
     int guard = 0;
     while (pending(tg) && guard++ < guard_max) pick(tg, 0);
 }
-static void drain_auto(TestGame *tg)
-{
-    int guard = 0;
-    while (pending(tg) && guard++ < 32) {
-        if (pending_is_auto(tg)) pick(tg, 0);
-        else skip(tg);
-    }
-}
-
 static int play_to_stage(TestGame *tg, int cid, int area)
 {
     int r = test_play_to_stage(tg, cid, area);
@@ -479,18 +430,6 @@ static int play_to_stage(TestGame *tg, int cid, int area)
         r = test_play_to_stage(tg, cid, area);
     }
     return r;
-}
-
-/* Fire ONE named trigger on ONE card (Rust helpers fire_trigger). The C shim
- * scans the zones, so callers keep other trigger-printing cards off the board. */
-static int fire_trigger(TestGame *tg, int cid, const char *trig)
-{
-    if (!card_prints_trigger(cid, trig)) return 0;
-    tg->state.activating_card = cid;
-    int queued = rb_queue_trigger_abilities(&tg->state, 0, trig);
-    if (queued <= 0) return 0;
-    rb_process_pending_auto_abilities(&tg->state);
-    return 1;
 }
 
 /* Rust advance_to_live_card_set_p1: five passes, Main -> Active -> Energy ->
@@ -507,20 +446,63 @@ static void advance_to_live_start(TestGame *tg)
     test_pass(tg);
 }
 
-/* Rust advance_to_live_success: five more passes, which for the FIRST attacker
- * carries PERFORMANCE -> VICTORY. Stepped one at a time and stopped on the
- * VICTORY phase so a standing prompt is never auto-answered by a blind pass.
+/* Walks forward until the ライブ成功時 dispatch is on screen or p1's success is
+ * already recorded. It STOPS on a standing prompt, never past it.
+ * (test_advance_to_phase(RB_PHASE_PERFORMANCE_SECOND) is deliberately NOT used:
+ * it destroys the yell window and answers every standing prompt with index 0.) */
+/* Walks forward until the ライブ成功時 dispatch is actually ON SCREEN. It STOPS
+ * on the prompt, never past it, and it deliberately does NOT treat
+ * state.live_success[] as terminal: measured, that flag is already 1 one pass
+ * BEFORE the ability's choice is raised, so returning on it makes the caller's
+ * "the choice is offered" check silently vacuous.
  * (test_advance_to_phase(RB_PHASE_PERFORMANCE_SECOND) is deliberately NOT used:
  * it destroys the yell window and answers every standing prompt with index 0.) */
 static int advance_to_live_success(TestGame *tg)
 {
-    for (int i = 0; i < 8; i++) {
-        if (tg->state.phase == RB_PHASE_VICTORY) return 1;
+    for (int i = 0; i < 10; i++) {
+        if (pending(tg)) return 1;
         test_pass(tg);
-        if (pending(tg)) break;
+        if (pending(tg)) return 1;
         drain_choices(tg, 4);
     }
-    return tg->state.phase == RB_PHASE_VICTORY;
+    return pending(tg);
+}
+
+/* What the engine actually put on screen, so an assertion about a prompt
+ * survives a walk that had to ANSWER it to keep the phase machine moving. */
+typedef struct {
+    int seen;
+    int n_prompts;
+    char type[32];
+    char zone[32];
+    int count;
+} SeenChoice;
+
+static void note_choice(TestGame *tg, SeenChoice *s)
+{
+    const RbChoice *c = rb_get_pending_choice(&tg->state);
+    s->seen = 1;
+    s->n_prompts++;
+    snprintf(s->type, sizeof s->type, "%s", pending_type(tg));
+    if (c) { snprintf(s->zone, sizeof s->zone, "%s", c->zone); s->count = c->count; }
+}
+
+/* `passes` phase steps, answering each non-SelectCard prompt with option 0 and
+ * STOPPING dead on the first SelectCard, which only the test may answer.
+ * The option-0 answer is deliberate: for a ライブ開始時 multi-option choice it
+ * is the first printed option, so the walk is faithful rather than a shortcut. */
+static int walk_passes(TestGame *tg, int passes, SeenChoice *s)
+{
+    for (int i = 0; i < passes; i++) {
+        test_pass(tg);
+        int guard = 0;
+        while (pending(tg) && guard++ < 8) {
+            note_choice(tg, s);
+            if (pending_is_card(tg)) return s->seen;
+            select_option(tg, 0);
+        }
+    }
+    return s->seen;
 }
 
 /* ========================================================================
@@ -1075,12 +1057,26 @@ static void test_b1_keke_with_blade_heart_chooses_exactly_one(void)
     pin_id(withbh, KEKE_BH);
     if (withbh < 0) return;
     CHECK(rb_card_matches_group_str(withbh, "Liella!"), "b1: the discarded card really is a Liella! member");
-    /* Informational, not an assertion: the Rust twin's comment claims
-     * "b_heart03=1" for this print, and whether the C decode agrees decides
-     * which branch any_number takes. Measured, printed, not asserted, so the
-     * card data cannot masquerade as an engine verdict. */
-    fprintf(stderr, "  [CARD DATA] b1: PL!SP-PR-003-PR printed blade = %d (Rust twin's comment says b_heart03=1)\n",
-            printed_blade(withbh));
+    /* The Rust twin's premise: 「控え室に置いたカードがブレードハートを持たない
+     * メンバーカードの場合」 -- this print HAS a blade heart, so count stays 1.
+     * Card.blade is the card's blade COUNT (a top-level cards.json `blade`
+     * field PL!SP-PR-003-PR does not even carry); the blade HEART is a separate
+     * `blade_heart` entry, so rb_card_has_blade_heart() is the right reader and
+     * reading Card.blade here would be a harness artefact, not a finding. */
+    {
+        Card c;
+        int has_bh = 0, blade_count = -1;
+        memset(&c, 0, sizeof c);
+        if (rb_decode_card_by_index((uint32_t)withbh, &c)) {
+            has_bh = rb_card_has_blade_heart(&c);
+            blade_count = c.blade;
+        }
+        rb_free_card(&c);
+        CHECK(has_bh,
+              "b1 PREMISE: PL!SP-PR-003-PR really carries a blade heart, so the "
+              "「ブレードハートを持たない」 branch must NOT be taken (Card.blade=%d is a "
+              "different field and reads %d here)", blade_count, blade_count);
+    }
 
     test_add_to_hand(tg, withbh);
     int energy_before = tg->state.p[0].energy.n;
@@ -1362,8 +1358,7 @@ static int mermaid_setup(TestGame *tg, int *mermaid_out)
     advance_to_live_set(tg);
     test_set_live_card(tg, 0, mermaid);
     advance_to_live_start(tg);
-    CHECK(advance_to_live_success(tg),
-          "c: the walk reached the VICTORY phase (phase=%d)", tg->state.phase);
+    advance_to_live_success(tg);
     return mermaid;
 }
 
@@ -1434,8 +1429,7 @@ static void test_c3_mermaid_recover_option_adds_exactly_one_member(void)
     advance_to_live_set(tg);
     test_set_live_card(tg, 0, mermaid);
     advance_to_live_start(tg);
-    CHECK(advance_to_live_success(tg),
-          "c3: the walk reached the VICTORY phase (phase=%d)", tg->state.phase);
+    advance_to_live_success(tg);
 
     PROMPT_PRESENT(tg, 1, "c3: the ライブ成功時 choice appears (got %s)", pending_type(tg));
     CHECK_PROMPTS(1, "c3: the two-option choice must be answered");
@@ -1451,13 +1445,19 @@ static void test_c3_mermaid_recover_option_adds_exactly_one_member(void)
                      "c3: the pick is over the WAITROOM (C spells the zone \"discard\")");
         CHECK_EQ(c->count, 1, "c3: 「メンバーカードを1枚手札に加える」 -- exactly one");
     }
+    int wait_before_pick = tg->state.p[0].discard.n;
     pick(tg, 0);
     drain_pick0(tg, 6);
 
     CHECK_EQ(tg->state.p[0].hand.n, hand_before + 1,
              "c3: exactly ONE member joined the hand; 'the hand grew' would also pass "
              "if every filtered member had been recovered");
-    CHECK_EQ(tg->state.p[0].discard.n, 7, "c3: exactly one member left the waitroom");
+    /* Relative, not absolute: the performance walk legitimately moves cards into
+     * the waitroom, so only the DELTA across the pick is a claim about the
+     * effect. Measured at the pick site, not at setup. */
+    CHECK_EQ(wait_before_pick - tg->state.p[0].discard.n, 1,
+             "c3: exactly one member left the waitroom across the pick (%d -> %d)",
+             wait_before_pick, tg->state.p[0].discard.n);
 }
 
 /* ========================================================================
@@ -1588,19 +1588,47 @@ static int bouken_setup(TestGame *tg, int *bouken_out)
     clear_p2(tg);
     rb_card_copy_pool_reset();
     int bouken = mid(tg, BOUKEN);
-    int aqours = mid(tg, AQOURS_A);
     int filler = test_new_id(tg, FILLER);
+    /* The STAGE, not the energy deck, is the supply: adding energy cards left
+     * filled=[0,0,1,6,2,1,0,0] unchanged (measured). Bouken's printed need is
+     * [4,0,2,0,2,2,0,0] = 12, two members supply 10, so EARLY_SEAT computed
+     * surplus=-1 and p1 LOST -- the ライブ成功時 window never opened. A third
+     * member closes the gap, which is what the mermaid board gets for free from
+     * its cheaper 8-heart need. */
+    int stage_h06 = mid(tg, H06);
+    int stage_h05 = mid(tg, H05);
+    int stage_filler = test_new_id(tg, FILLER);
+    int energy = mid(tg, ENERGY);
     pin_id(bouken, BOUKEN);
     *bouken_out = bouken;
-    if (bouken < 0 || aqours < 0 || filler < 0) return -1;
+    if (bouken < 0 || filler < 0 || stage_h06 < 0 || stage_h05 < 0 ||
+        stage_filler < 0 || energy < 0) return -1;
+    CHECK(!card_prints_trigger(stage_filler, RB_TSTR_LIVE_START),
+          "e CONTROL: the third member does not open the LiveStart window either");
     CHECK(card_prints_trigger(bouken, RB_TSTR_LIVE_START), "e: Bouken really prints ライブ開始時");
-    CHECK(!card_prints_trigger(aqours, RB_TSTR_LIVE_START) &&
+    CHECK(!card_prints_trigger(stage_h06, RB_TSTR_LIVE_START) &&
+          !card_prints_trigger(stage_h05, RB_TSTR_LIVE_START) &&
           !card_prints_trigger(filler, RB_TSTR_LIVE_START),
           "e CONTROL: the staged members do not open the LiveStart window themselves");
-    tg->state.p[0].stage[AREA_LEFT]   = aqours;
-    tg->state.p[0].stage[AREA_CENTER] = filler;
+    /* The SAME two stage members the mermaid board uses. With any other pair p1
+     * collects no yell hearts, loses the live, and the ライブ成功時 dispatch in
+     * e2 is vacuous -- that was measured, not assumed. */
+    tg->state.p[0].stage[AREA_LEFT]   = stage_h06;
+    tg->state.p[0].stage[AREA_CENTER] = stage_h05;
+    tg->state.p[0].stage[AREA_RIGHT]  = stage_filler;
+    /* Bouken's printed need is [4,0,2,0,2,2,0,0] -- it has NO wildcard column,
+     * so leftover hearts cannot absorb the shortfall the way they do for
+     * mermaid's [4,0,0,0,0,1,3,0]. Two more members still left colour2 and
+     * colour5 one short (EARLY_SEAT surplus=-1, p1 loses, the ライブ成功時
+     * window never opens), so the two short columns are topped up on the
+     * third member through the engine's own modifier path. */
+    rb_mods_add_heart_with_trace(&tg->state.mods, stage_filler, RB_HEART_YELLOW, 4,
+                                 stage_filler, "e2 supply: cover need[2]");
+    rb_mods_add_heart_with_trace(&tg->state.mods, stage_filler, RB_HEART_PURPLE, 3,
+                                 stage_filler, "e2 supply: cover need[5]");
     test_add_to_hand(tg, bouken);
-    fill_decks(tg, 20);
+    fill_decks(tg, 15);
+    for (int i = 0; i < 5; i++) test_add_to_energy_deck(tg, 0, energy);
     return bouken;
 }
 
@@ -1627,9 +1655,17 @@ static void test_e1_bouken_three_options(void)
     }
 
     advance_to_live_set(tg);
-    PROMPT_PRESENT(tg, 1, "e1: the three-option LiveStart choice is offered (got %s)",
-                   pending_type(tg));
-    CHECK_PROMPTS(1, "e1: the choice must be answered");
+    test_set_live_card(tg, 0, bouken);
+    {
+        SeenChoice sc;
+        memset(&sc, 0, sizeof sc);
+        walk_passes(tg, 2, &sc);
+        CHECK(sc.seen && !strcmp(sc.type, "SelectTarget"),
+              "e1: the three-option LiveStart choice is offered (prompts seen=%d, "
+              "last type \"%s\")", sc.n_prompts, sc.type);
+        CHECK_PROMPTS(sc.seen ? 1 : 0,
+                      "e1: the choice must be answered, not skipped");
+    }
     {
         const RbChoice *c = rb_get_pending_choice(&tg->state);
         int has_list = (c != NULL);
@@ -1639,9 +1675,10 @@ static void test_e1_bouken_three_options(void)
             "has no faithful C entry point -- the parse-layer count above is the "
             "strongest available check");
     }
-    if (pending(tg)) select_option(tg, 0);
     drain_pick0(tg, 6);
     CHECK(!pending(tg), "e1: no prompt survives option 0");
+    CHECK(rb_card_num_gained_abilities(&tg->state, bouken) >= 1,
+          "e1: option 0 registered the runtime ability on the live card");
 }
 
 /* E2. bouken_gain_ability_draws_on_live_success -- option 0 registers a
@@ -1653,12 +1690,18 @@ static void test_e2_bouken_gained_ability_draws_on_live_success(void)
     TestGame *tg = &tg_q;
     int bouken;
     if (bouken_setup(tg, &bouken) < 0) return;
-    int hand_initial = tg->state.p[0].hand.n;
 
     advance_to_live_set(tg);
-    PROMPT_PRESENT(tg, 1, "e2: the three-option choice is offered (got %s)", pending_type(tg));
-    CHECK_PROMPTS(1, "e2: the choice must be answered");
-    if (pending(tg)) select_option(tg, 0);
+    test_set_live_card(tg, 0, bouken);
+    {
+        SeenChoice sc;
+        memset(&sc, 0, sizeof sc);
+        walk_passes(tg, 2, &sc);
+        CHECK(sc.seen && !strcmp(sc.type, "SelectTarget"),
+              "e2: the three-option choice is offered (prompts seen=%d, last type \"%s\")",
+              sc.n_prompts, sc.type);
+        CHECK_PROMPTS(sc.seen ? 1 : 0, "e2: the choice must be answered");
+    }
     drain_pick0(tg, 6);
 
     int n_gained = rb_card_num_gained_abilities(&tg->state, bouken);
@@ -1669,24 +1712,29 @@ static void test_e2_bouken_gained_ability_draws_on_live_success(void)
               "e2: the gained ability's trigger is ライブ成功時 (got \"%s\")",
               (g && g->triggers) ? g->triggers : "(null)");
     }
-    CHECK_EQ(tg->state.p[0].hand.n, hand_initial, "e2: no draw at LiveStart");
+    int hand_at_live_start = tg->state.p[0].hand.n;
 
-    /* PRECONDITION: hearts make the ライブ成功時 window OPEN. */
-    tg->state.phase = RB_PHASE_VICTORY;
-    tg->state.live_success[0] = 1;
-    tg->state.stage_hearts[0][idx00] = 20;
-    CHECK(rb_should_trigger_live_success(&tg->state, 0),
-          "e2 PRECONDITION: hearts were injected so the ライブ成功時 window must be OPEN, "
-          "or the dispatch below does nothing");
-
-    int hand_before = tg->state.p[0].hand.n;
-    tg->state.activating_card = bouken;
-    rb_trigger_live_success(&tg->state, 0);
-    rb_process_pending_auto_abilities(&tg->state);
+    /* PRECONDITION: the window is opened by the ENGINE's own victory
+     * determination, not by a hand-injected stage_hearts array. The Rust twin
+     * injects `BaseHeart{Heart00: 20}` and asserts should_trigger_live_success;
+     * in the C port rb_should_trigger_live_success() does NOT open on
+     * stage_hearts alone (measured: it returns 0 with 20 wildcard hearts set),
+     * so the real walk is used and the OPEN window is read off the state the
+     * engine itself produced. A closed window here would make the draw
+     * assertion vacuous, which is why it is asserted. */
+    advance_to_live_success(tg);
+    /* PRECONDITION, on the engine's OWN signal and not on a prompt: the gained
+     * ability is a plain draw, so the dispatch resolves with nothing left on
+     * screen and `pending()` would be a false premise. p1's live must have
+     * actually succeeded, which is what the engine records in live_success[]. */
+    CHECK(tg->state.live_success[0] != 0,
+          "e2 PRECONDITION: p1's live SUCCEEDED, so the ライブ成功時 dispatch below is "
+          "not vacuous (phase=%d success=%d)", tg->state.phase, tg->state.live_success[0]);
     drain_pick0(tg, 6);
 
-    CHECK_EQ(tg->state.p[0].hand.n, hand_before + 1,
-             "e2: 「ライブ成功時カードを1枚引く。」 -- the GAINED ability drew 1");
+    CHECK_EQ(tg->state.p[0].hand.n, hand_at_live_start + 1,
+             "e2: 「ライブ成功時カードを1枚引く。」 -- the GAINED ability drew exactly 1 "
+             "(hand %d -> %d)", hand_at_live_start, tg->state.p[0].hand.n);
     CHECK(rb_card_num_gained_abilities(&tg->state, bouken) >= 1,
           "e2: the gained ability persists after the LiveSuccess dispatch");
 }
@@ -1699,20 +1747,31 @@ static void test_e3_bouken_no_draw_on_failed_live(void)
     TestGame *tg = &tg_r;
     int bouken;
     if (bouken_setup(tg, &bouken) < 0) return;
-    int hand_initial = tg->state.p[0].hand.n;
 
     advance_to_live_set(tg);
-    PROMPT_PRESENT(tg, 1, "e3: the three-option choice is offered (got %s)", pending_type(tg));
-    CHECK_PROMPTS(1, "e3: the choice must be answered");
-    if (pending(tg)) select_option(tg, 0);
+    test_set_live_card(tg, 0, bouken);
+    {
+        SeenChoice sc;
+        memset(&sc, 0, sizeof sc);
+        walk_passes(tg, 2, &sc);
+        CHECK(sc.seen && !strcmp(sc.type, "SelectTarget"),
+              "e3: the three-option choice is offered (prompts seen=%d, last type \"%s\")",
+              sc.n_prompts, sc.type);
+        CHECK_PROMPTS(sc.seen ? 1 : 0, "e3: the choice must be answered");
+    }
     drain_pick0(tg, 6);
     CHECK(rb_card_num_gained_abilities(&tg->state, bouken) >= 1,
           "e3: the gained ability is stored regardless of the outcome");
+    int hand_at_live_start = tg->state.p[0].hand.n;
 
-    /* PRECONDITION: no hearts, so the ライブ成功時 window is SHUT. */
+    /* PRECONDITION: no hearts on either stage, so the ライブ成功時 window is
+     * SHUT. This is the deliberate OPPOSITE of e2's premise, and it is what
+     * makes the negative below mean anything -- an unstated premise is exactly
+     * what lets a closed window masquerade as the requirement working. */
     tg->state.phase = RB_PHASE_VICTORY;
     tg->state.live_success[0] = 0;
     for (int i = 0; i < 8; i++) tg->state.stage_hearts[0][i] = 0;
+    for (int i = 0; i < 8; i++) tg->state.stage_hearts[1][i] = 0;
     CHECK(!rb_should_trigger_live_success(&tg->state, 0),
           "e3 PRECONDITION: with no hearts the ライブ成功時 window must be SHUT, "
           "which is what this test's negative rests on");
@@ -1724,7 +1783,7 @@ static void test_e3_bouken_no_draw_on_failed_live(void)
     drain_pick0(tg, 6);
 
     CHECK_EQ(tg->state.p[0].hand.n, hand_before, "e3: no draw on a failed live");
-    CHECK_EQ(hand_before, hand_initial, "e3: p1's hand is back to where the window found it");
+    CHECK_EQ(hand_before, hand_at_live_start, "e3: p1's hand is back to where the window found it");
 }
 
 /* ========================================================================

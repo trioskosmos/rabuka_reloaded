@@ -246,6 +246,16 @@ pub struct FlipSampler {
 
 impl FlipSampler {
     pub fn build(gs: &GameState, me: u8, db: &CardDatabase) -> Self {
+        Self::build_with_draws(gs, me, db, usize::try_from(active_blades(gs, me, db)).unwrap_or(0))
+    }
+
+    /// The same deck, with the draw count supplied rather than read.
+    ///
+    /// Used to price the OPPONENT's check. Their deck is hidden, so this samples
+    /// ours and calls it theirs — an assumption, but one that produces a
+    /// gradient, where sampling nothing produces a constant. `draws` is their
+    /// blade count, which is public (it is on their stage).
+    pub fn build_with_draws(gs: &GameState, me: u8, db: &CardDatabase, draws: usize) -> Self {
         let p = gs.seat_player(me);
         let override_color = p.stage.stage.iter().find_map(|cid| {
             gs.mods
@@ -279,14 +289,24 @@ impl FlipSampler {
         }
         cats.sort_unstable_by_key(|(vector, _)| *vector);
         let deck_len = p.main_deck.cards.len();
-        let draws = usize::try_from(active_blades(gs, me, db))
-            .unwrap_or(usize::MAX)
-            .min(deck_len);
+        let draws = draws.min(deck_len);
         Self {
             cats,
             deck_len,
             draws,
         }
+    }
+
+    /// Per-colour totals across the whole deck, for spreading a heart
+    /// requirement over the colours actually available.
+    pub fn deck_colour_totals(&self) -> [i32; 8] {
+        let mut out = [0i32; 8];
+        for (vector, count) in &self.cats {
+            for c in 0..8 {
+                out[c] += i32::from(vector[c]) * i32::try_from(*count).unwrap_or(0);
+            }
+        }
+        out
     }
 
     /// Shared, deterministic sample pools: `samples` board-plus-yell pools.
@@ -409,6 +429,24 @@ pub fn commitment_of(gs: &GameState, me: u8) -> Commitment {
 /// measured instead of asserted. The defaults are the measured ones: over 1762
 /// first-attacker phases the second attacker committed on 48% of them, and a
 /// committed second attacker is overwhelmingly a single life.
+/// `V8_OPP_GRADIENT` is off by default.
+///
+/// The opponent's pass probability is a hard threshold over `YIELD_PRIOR` and
+/// takes 6 distinct values across 369 board/blade combinations, which is why
+/// every opponent-horizon method in `V8_NEXT_METHODS.md` §6 measures nothing:
+/// the model cannot express a rate of change. `with_board_sampled` replaces
+/// that threshold with the same coverage sampler v8 uses for its own check, so
+/// the value varies with the board.
+///
+/// Off until it is measured. The saturation is a defect, but so is a model that
+/// was only ever validated as a step function — `the_forecast_rises_with_the_
+/// opponents_public_board` asserts the step version against the engine, and
+/// that test is the thing this has to be measured against before it can be
+/// trusted.
+fn opp_gradient_enabled() -> bool {
+    std::env::var_os("V8_OPP_GRADIENT").is_some()
+}
+
 fn assume_commitment_enabled() -> bool {
     std::env::var_os("V8_NO_ASSUME_COMMIT").is_none()
 }
@@ -578,6 +616,171 @@ impl OppModel {
             commitment,
             commit_rate,
         }
+    }
+
+    /// The same model, re-evaluated as if the opponent's public board had
+    /// reached `board_total` hearts and `blades` blades.
+    ///
+    /// `build_with` reads the opponent's board once, and during our own Main
+    /// phase that board cannot change — so re-reading it per search node would
+    /// return an identical model. That is why "refresh the opponent model
+    /// through the search" (V8_NEXT_METHODS.md §6.5) is a no-op as written: it
+    /// is aimed at depth, and the staleness is in the *horizon*, not the depth.
+    ///
+    /// The horizon term in `v8_main::leaf_value` runs our forward walk two
+    /// turns ahead and then prices the opponent at their CURRENT board, so the
+    /// opponent never grows in a term whose whole purpose is to see the race
+    /// two turns out. Both players draw the same cards and gain the same
+    /// energy each turn (section 3.2), so the fair correction is to advance
+    /// theirs by the same amount ours advanced. This is a symmetry ASSUMPTION,
+    /// not a forecast of them: their hand and deck are hidden and are never
+    /// read. It is worth stating that plainly, because the alternative — the
+    /// status quo — is also an assumption, and it is the one that says the
+    /// opponent stands still while we race.
+    ///
+    /// The set size, commitment and success count are carried over unchanged:
+    /// a two-turn projection of their board is not a projection of what they
+    /// will set, and inventing one would be a second assumption stacked on the
+    /// first.
+    pub fn with_board(&self, board_total: i32, blades: i32) -> Self {
+        let mut score_dist = [0.0f64; SCORE_SLOTS];
+        for (yield_hearts, weight) in YIELD_PRIOR {
+            let supply =
+                board_total + crate::constants::score_to_i32_rounded(blades as f64 * yield_hearts);
+            for score in 0..SCORE_SLOTS {
+                if supply >= SCORE_MAX[score] {
+                    score_dist[score] += weight;
+                } else if supply >= SCORE_MEDIAN[score] {
+                    score_dist[score] += weight * 0.5;
+                }
+            }
+        }
+        let total: f64 = score_dist.iter().sum();
+        if total > 0.0 {
+            for value in score_dist.iter_mut() {
+                *value /= total;
+            }
+        } else {
+            score_dist[0] = 1.0;
+        }
+
+        let target = (2 * self.set_size).clamp(1, SCORE_SLOTS - 1).i32_count();
+        let bar = score_median_hearts(target);
+        let clears = YIELD_PRIOR
+            .iter()
+            .filter(|(yield_hearts, _)| {
+                board_total
+                    + crate::constants::score_to_i32_rounded(blades as f64 * yield_hearts)
+                    >= bar
+            })
+            .map(|(_, weight)| *weight)
+            .sum::<f64>()
+            .min(1.0);
+        let pass_prob = if self.set_size == 0 {
+            0.0
+        } else {
+            clears * self.commit_rate
+        };
+        Self {
+            set_size: self.set_size,
+            success: self.success,
+            score_dist,
+            pass_prob,
+            commitment: self.commitment,
+            commit_rate: self.commit_rate,
+        }
+    }
+
+    /// Re-evaluate the model against a projected board, using the coverage
+    /// sampler instead of the hard threshold.
+    ///
+    /// ## Why this exists
+    ///
+    /// `build_with` decides whether the opponent clears their bar with a step
+    /// function: `clears` sums `YIELD_PRIOR` weights gated on `supply >= bar`
+    /// and clamps to 1.0. Across 369 board/blade combinations covering the
+    /// guides' entire real range the resulting `pass_prob` takes **6 distinct
+    /// values**. `V8_OPP_HORIZON` — which re-evaluates this model against their
+    /// board two turns further along — consequently produced **zero discordant
+    /// games in 400**: p=1.00, every one of 16163 actions identical. Not a small
+    /// effect under the noise floor; the model was handed a question it is
+    /// structurally unable to answer, because "the opponent is catching up" is
+    /// not a thing a six-valued step function can say.
+    ///
+    /// ## The replacement
+    ///
+    /// Price their check the way v8 prices its own: sample the deck, draw
+    /// `blades` cards, ask whether the pool covers the requirement. That
+    /// returns a continuous value, so a board one heart short of the bar scores
+    /// differently from one three hearts short.
+    ///
+    /// Two things are honest limitations, not oversights. The bar is a *count*
+    /// (`score_median_hearts`) and we spread it across colours using our own
+    /// deck's distribution, because their deck is hidden and ours is the only
+    /// card pool available; and we draw from ours rather than theirs. Both are
+    /// assumptions that the threshold version was also making — it assumed a
+    /// hard yield and ignored colour entirely — and this one at least varies
+    /// with the board.
+    pub fn with_board_sampled(
+        &self,
+        gs: &GameState,
+        me: u8,
+        db: &CardDatabase,
+        board_total: i32,
+        blades: i32,
+    ) -> Self {
+        if !opp_gradient_enabled() {
+            return self.with_board(board_total, blades);
+        }
+        let mut projected = self.with_board(board_total, blades);
+        if self.set_size == 0 || blades <= 0 {
+            return projected;
+        }
+        let target = (2 * self.set_size).clamp(1, SCORE_SLOTS - 1).i32_count();
+        let bar = score_median_hearts(target);
+        if bar <= 0 {
+            projected.pass_prob *= self.commit_rate;
+            return projected;
+        }
+        // Spread the bar across the colours a deck actually holds, in the
+        // proportions this deck holds them. Their deck is hidden; ours is the
+        // only card pool available, and a bare count would be satisfied by any
+        // cards at all, which is the same colour-blindness the old threshold
+        // had.
+        let sampler = FlipSampler::build_with_draws(gs, me, db, usize::try_from(blades).unwrap_or(0));
+        let totals = sampler.deck_colour_totals();
+        let total_in_deck: i32 = totals.iter().sum();
+        if total_in_deck <= 0 {
+            return projected;
+        }
+        let mut need: Acc = [0; 11];
+        for c in 0..8usize {
+            need[c] = (bar * totals[c]).div_euclid(total_in_deck) as i16;
+        }
+        // Rounding down leaves the pooled requirement short of the bar, which
+        // would make the opponent look better than a whole-heart count says.
+        let placed: i32 = need[0..8].iter().map(|&v| i32::from(v)).sum();
+        if placed < bar {
+            let biggest = (0..8usize).max_by_key(|&c| i32::from(need[c])).unwrap_or(0);
+            need[biggest] += (bar - placed) as i16;
+        }
+        let board: Pool = {
+            let mut b = [0i16; 8];
+            let mut left = board_total;
+            for c in 0..8usize {
+                if left <= 0 {
+                    break;
+                }
+                let take = left.min(i32::from(need[c]));
+                b[c] = take as i16;
+                left -= take;
+            }
+            b
+        };
+        let pools = sampler.sample_pools(&board, flip_samples());
+        let sampled = pass_probability(&pools, &need);
+        projected.pass_prob = (sampled * self.commit_rate).min(1.0);
+        projected
     }
 
     /// Placement masses inside a contested check, from rules 8.4.6 / 8.4.7.1.
@@ -754,6 +957,93 @@ pub fn largest_clearable(supply: i32) -> i32 {
 }
 
 /// Total heart supply on our board, buff-aware, in hearts (not per-colour).
+/// Per-colour shortfall of the biggest life in hand: how many hearts the board
+/// still cannot supply, colour by colour, after wildcards are applied.
+///
+/// ## Why this and not another leaf term
+///
+/// Everything the leaf already reads — `supply_hearts`, `active_blades`,
+/// `board_supply`'s total, `band_progress` — is colour-blind. Two boards with
+/// the same total hearts and the same blades are therefore *indistinguishable*
+/// to the current leaf, and the log's nine failed leaf-term experiments are
+/// explained by exactly that: each one was a monotone function of quantities
+/// `band_progress` already reads, so none of them could ever reorder the argmax
+/// (V8_IMPROVEMENT_LOG.md §0, and the dead-end table in §8).
+///
+/// This is a different function of the state, not another reading of the same
+/// one. It is a function of the board's colour VECTOR against the requirement
+/// of a specific card. Two actions that add three hearts each get identical
+/// leaf values today and different ones here — the colour-matching one is
+/// strictly better, which is the claim that has never been tested.
+///
+/// ## Which life
+///
+/// The biggest one in hand, by total coloured requirement — the same choice
+/// `strategy_v7::best_life_deficit` makes, and for the same reason: a
+/// minimum-over-lives version collapses. The easiest life in hand is usually
+/// nearly covered already, so the minimum sits near zero whatever the board
+/// does, and the term goes inert for the same reason the previous eight did.
+/// The biggest life is the one worth building a board for, and it cannot be
+/// satisfied by accident.
+///
+/// ## Units
+///
+/// Hearts, unclamped, and deliberately NOT a probability. Every attempt to
+/// convert this into one has had to invent a conversion constant, and the
+/// result then inherits the inventedness. The caller scales it; a probability
+/// would smuggle in a claim about the deck this function has not looked at.
+pub fn colour_shortfall(gs: &GameState, me: u8, db: &CardDatabase) -> i32 {
+    let board = board_pool(gs, me, db);
+    let mut worst: Option<Acc> = None;
+    let mut worst_size = 0i32;
+    for &cid in &gs.seat_player(me).hand.cards {
+        if !lives_in_hand_card(db, cid) {
+            continue;
+        }
+        let need = life_need(gs, cid);
+        // A Draw or Score icon requirement is not a heart check at all, and a
+        // life carrying one cannot be priced here. Same filter the live set
+        // applies; without it a 0.0 shortfall would be a false "already
+        // covered" and would make a bad life look like the best one.
+        if has_unpassable_icon(&need) {
+            continue;
+        }
+        let size: i32 = need[0..=6].iter().map(|&v| i32::from(v)).sum();
+        if worst.is_none() || size > worst_size {
+            worst = Some(need);
+            worst_size = size;
+        }
+    }
+    let Some(need) = worst else {
+        // No life we could price. Not "zero shortfall" — there is no target,
+        // so the term must not reward or punish any board.
+        return 0;
+    };
+    shortfall_for(&board, &need)
+}
+
+/// The pure arithmetic, split out so the property that matters can be tested
+/// without a board: **the shortfall depends on the colour VECTOR, not the
+/// total.** Equal totals, different distributions, different answers — which is
+/// the entire reason this function exists, and the thing every colour-blind
+/// term in the leaf cannot do.
+fn shortfall_for(board: &Pool, need: &Acc) -> i32 {
+    let mut residual = 0i32;
+    for c in 0..=6 {
+        residual += (i32::from(need[c]) - i32::from(board[c])).max(0);
+    }
+    // `need[7]` is the any-colour wildcard: it can stand in for one missing
+    // heart of whichever colour is short, so it cancels shortfall one-for-one
+    // and cannot take the total below zero.
+    residual -= i32::from(need[7]);
+    residual.max(0)
+}
+
+fn lives_in_hand_card(db: &CardDatabase, cid: i16) -> bool {
+    db.get_card(cid)
+        .is_some_and(|c| c.card_type == crate::card::CardType::Live)
+}
+
 pub fn supply_hearts(gs: &GameState, me: u8, db: &CardDatabase) -> i32 {
     stats_pipeline::stage_hearts(
         &gs.seat_player(me).stage.stage,
@@ -1421,6 +1711,142 @@ mod tests {
 
     /// Common random numbers: pools are reproducible, and on a fixed sample a
     /// strictly easier requirement is never ranked below a harder one.
+    /// The colour shortfall must depend on the colour VECTOR, not the total.
+    ///
+    /// This is the whole justification for the term, so it is pinned as an
+    /// arithmetic property rather than left to an arena run. The leaf's other
+    /// terms read total supply, total blades and an interpolation of the same
+    /// — so two boards below with identical totals are *identical* to the
+    /// current leaf, and any weight on any of them cannot change the argmax.
+    /// That is the shape of all nine leaf-term experiments the log records as
+    /// inert. This function must not share that shape.
+    #[test]
+    fn colour_shortfall_sees_the_vector_not_the_total() {
+        // A life needing three blue and three green.
+        let need: Acc = {
+            let mut n = [0i16; 11];
+            n[0] = 3;
+            n[3] = 3;
+            n
+        };
+        // Two boards, same total (six), different distribution.
+        let matching: Pool = {
+            let mut b = [0i16; 8];
+            b[0] = 3;
+            b[3] = 3;
+            b
+        };
+        let mismatched: Pool = {
+            let mut b = [0i16; 8];
+            b[1] = 3;
+            b[4] = 3;
+            b
+        };
+        assert_eq!(
+            matching.iter().map(|v| i32::from(*v)).sum::<i32>(),
+            mismatched.iter().map(|v| i32::from(*v)).sum::<i32>(),
+            "the two boards must have equal totals for this test to mean anything"
+        );
+
+        assert_eq!(shortfall_for(&matching, &need), 0, "a colour-matched board is covered");
+        assert_eq!(
+            shortfall_for(&mismatched, &need),
+            6,
+            "an equal-total board in the wrong colours is not covered at all"
+        );
+    }
+
+    /// Wildcards cancel shortfall and cannot drive it negative.
+    #[test]
+    fn a_wildcard_cancels_one_missing_colour() {
+        let need: Acc = {
+            let mut n = [0i16; 11];
+            n[0] = 4;
+            n[7] = 2; // two any-colour wildcards
+            n
+        };
+        let none: Pool = [0i16; 8];
+        assert_eq!(shortfall_for(&none, &need), 2, "4 needed, 2 wildcarded");
+        // A board covering more than the wildcards can absorb must clamp at 0,
+        // not go negative - a negative shortfall would be a bonus for having
+        // surplus, which is not what "shortfall" means.
+        let all_blue: Pool = {
+            let mut b = [0i16; 8];
+            b[0] = 9;
+            b
+        };
+        assert_eq!(shortfall_for(&all_blue, &need), 0);
+    }
+
+    /// A board with no life in hand to aim at must not be rewarded or punished.
+    /// Returning a bare 0 that reads as "fully covered" would silently bias
+    /// every late-game leaf, where the hand has run out of lives but the term
+    /// is still in the sum.
+    #[test]
+    fn no_life_in_hand_is_neither_covered_nor_short() {
+        let db = real_db();
+        let gs = bare_state(&db);
+        // `bare_state` has an empty hand, so there is nothing to aim at.
+        assert!(gs.seat_player(0).hand.cards.is_empty());
+        assert_eq!(colour_shortfall(&gs, 0, &db), 0);
+    }
+
+    /// Pins the measured resolution of the opponent's pass model, and the reason
+    /// the horizon term cannot work on top of it.
+    ///
+    /// `V8_OPP_HORIZON` re-evaluates the opponent's `pass_prob` against their
+    /// board projected two turns further, and measured **zero** discordant games
+    /// over 400 paired — p=1.00, every game bit-identical. Not "too small an
+    /// effect to see": the term never changed a single decision, in 16163
+    /// actions.
+    ///
+    /// The cause is here. `clears` sums `YIELD_PRIOR` weights gated on
+    /// `supply >= bar` and is clamped to 1.0, so it is a hard threshold: across
+    /// 369 board/blade combinations spanning the guides' whole real range
+    /// (T1~4 to T7~26 hearts) the model takes **6 distinct values**. Advancing
+    /// their board therefore lands on the same step almost every time, and
+    /// "the opponent is catching up" is not a statement this model is capable
+    /// of making.
+    ///
+    /// This test asserts the measured saturation, not the desired behaviour, and
+    /// that is deliberate. The wanted property — a continuous gradient — is
+    /// false today, and pinning it as `>= 8` would leave the suite red. Pinning
+    /// the actual number instead means that any future change which gives the
+    /// model a real gradient has to come here deliberately and raise it, rather
+    /// than passing unnoticed.
+    ///
+    /// The fix is not a weight. It is replacing the hard threshold with the same
+    /// coverage calculation v8 already uses for its own check
+    /// (`FlipSampler` / `pass_probability`), so a board one heart short of the
+    /// bar scores differently from one three hearts short. Until that exists,
+    /// every opponent-horizon method in V8_NEXT_METHODS.md is measuring noise.
+    #[test]
+    fn the_opponent_pass_model_has_only_a_handful_of_states() {
+        let db = real_db();
+        let gs = bare_state(&db);
+        let opp = OppModel::build(&gs, 0, &db);
+        let mut seen = std::collections::BTreeSet::new();
+        for total in 0..=40i32 {
+            for blades in 0..=8i32 {
+                let p = opp.with_board(total, blades).pass_prob;
+                assert!(
+                    (0.0..=1.0).contains(&p),
+                    "pass_prob out of range: {p} at board={total} blades={blades}"
+                );
+                seen.insert((p * 1000.0).round() as i64);
+            }
+        }
+        assert_eq!(
+            seen.len(),
+            6,
+            "the opponent pass model changed resolution: it now takes {} distinct values \
+             where it took 6. If this is the continuous gradient the horizon term needs, \
+             re-measure V8_OPP_HORIZON - it was inert purely because the model could not \
+             express a rate of change",
+            seen.len()
+        );
+    }
+
     #[test]
     fn shared_pools_are_deterministic_and_monotone() {
         let sampler = FlipSampler {

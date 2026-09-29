@@ -1,215 +1,214 @@
 === TIMING (inclusive per call path; a nested path is ALSO counted
     inside its parent's row, so these do NOT sum to wall time) ===
   calls     total_ms      avg_us  depth  call path
-1313749     14071.95       10.71      1  execute_main_phase_action
-1313749      7531.55        5.73      1  generate_possible_actions
- 601913      7024.30       11.67      1  advance_phase
- 423520      5785.80       13.66      2  generate_possible_actions -> generate_main_phase_actions
- 212855      4542.36       21.34      2  execute_main_phase_action -> exec::play_member_to_stage
- 171256      4260.96       24.88      2  execute_main_phase_action -> exec::resume_with_choice
-  77249      3075.90       39.82      2  execute_main_phase_action -> exec::use_ability
- 365618      2309.86        6.32      3  execute_main_phase_action -> exec::play_member_to_stage -> trig::process_pending
-  77249      2260.50       29.26      3  execute_main_phase_action -> exec::use_ability -> trig::process_pending
-  77249      2136.73       27.66      4  execute_main_phase_action -> exec::use_ability -> trig::process_pending -> resolve::current_ability
-  81504      1988.74       24.40      4  execute_main_phase_action -> exec::play_member_to_stage -> trig::process_pending -> resolve::current_ability
- 200124      1818.26        9.09      2  execute_main_phase_action -> advance_phase
-  66708      1660.13       24.89      2  advance_phase -> advance_phase::first_performance
-  66708      1630.12       24.44      3  advance_phase -> advance_phase::first_performance -> execute_performance_phase
-  66708      1629.92       24.43      3  execute_main_phase_action -> advance_phase -> advance_phase::live_card_set
-  41052      1612.59       39.28      5  execute_main_phase_action -> exec::use_ability -> trig::process_pending -> resolve::current_ability -> resolve::resolve_ability_total
-  68249      1489.85       21.83      2  advance_phase -> advance_phase::live_victory
-  62174      1383.30       22.25      5  execute_main_phase_action -> exec::play_member_to_stage -> trig::process_pending -> resolve::current_ability -> resolve::resolve_ability_total
-  66708      1373.69       20.59      2  advance_phase -> advance_phase::second_performance
-  66708      1345.77       20.17      3  advance_phase -> advance_phase::second_performance -> execute_performance_phase
- 133416      1295.14        9.71      2  advance_phase -> advance_phase::active
-  39040      1062.13       27.21      3  execute_main_phase_action -> exec::resume_with_choice -> resolve::current_ability
-  41052      1044.55       25.44      6  execute_main_phase_action -> exec::use_ability -> trig::process_pending -> resolve::current_ability -> resolve::resolve_ability_total -> resolve::run_effect
- 133416       841.30        6.31      2  advance_phase -> advance_phase::draw
-  42979       836.80       19.47      6  execute_main_phase_action -> exec::play_member_to_stage -> trig::process_pending -> resolve::current_ability -> resolve::resolve_ability_total -> resolve::run_effect
-  36124       814.92       22.56      4  execute_main_phase_action -> exec::resume_with_choice -> resolve::current_ability -> resolve::resolve_ability_total
- 133416       803.34        6.02      3  advance_phase -> advance_phase::active -> check_timing
-  36124       709.28       19.63      5  execute_main_phase_action -> exec::resume_with_choice -> resolve::current_ability -> resolve::resolve_ability_total -> resolve::run_effect
- 133416       667.68        5.00      3  advance_phase -> advance_phase::draw -> check_timing
- 109659       652.73        5.95      4  execute_main_phase_action -> advance_phase -> advance_phase::live_card_set -> trig::process_pending
- 629083       626.15        1.00      2  generate_possible_actions -> generate_live_card_set_actions
- 141528       601.86        4.25      3  execute_main_phase_action -> exec::resume_with_choice -> trig::process_pending
-  37950       581.70       15.33      5  execute_main_phase_action -> advance_phase -> advance_phase::live_card_set -> trig::process_pending -> resolve::current_ability
- 731236       529.99        0.72      3  execute_main_phase_action -> exec::play_member_to_stage -> trig::auto_scan
- 171256       504.67        2.95      2  generate_possible_actions -> generate_pending_choice_actions
-  66708       493.53        7.40      4  advance_phase -> advance_phase::first_performance -> execute_performance_phase -> check_timing
-  29066       480.36       16.53      6  execute_main_phase_action -> advance_phase -> advance_phase::live_card_set -> trig::process_pending -> resolve::current_ability -> resolve::resolve_ability_total
-  66708       451.89        6.77      4  execute_main_phase_action -> advance_phase -> advance_phase::live_card_set -> check_timing
-  66708       439.20        6.58      4  advance_phase -> advance_phase::second_performance -> execute_performance_phase -> check_timing
- 212855       432.61        2.03      3  execute_main_phase_action -> exec::play_member_to_stage -> recalculate_constants
-  23930       431.80       18.04      4  execute_main_phase_action -> exec::resume_with_choice -> trig::process_pending -> resolve::current_ability
-  41052       420.10       10.23      6  execute_main_phase_action -> exec::use_ability -> trig::process_pending -> resolve::current_ability -> resolve::resolve_ability_total -> resolve::pay_cost
- 133416       391.33        2.93      4  advance_phase -> advance_phase::active -> check_timing -> check_timing::recalculate_constants
-  29066       378.40       13.02      7  execute_main_phase_action -> advance_phase -> advance_phase::live_card_set -> trig::process_pending -> resolve::current_ability -> resolve::resolve_ability_total -> resolve::run_effect
-  32799       356.45       10.87      6  execute_main_phase_action -> exec::resume_with_choice -> resolve::current_ability -> resolve::resolve_ability_total -> resolve::run_effect -> effect::gates
-  23930       355.09       14.84      5  execute_main_phase_action -> exec::resume_with_choice -> trig::process_pending -> resolve::current_ability -> resolve::resolve_ability_total
- 133416       310.98        2.33      5  advance_phase -> advance_phase::active -> check_timing -> check_timing::recalculate_constants -> recalculate_constants
- 133416       305.77        2.29      4  advance_phase -> advance_phase::draw -> check_timing -> check_timing::recalculate_constants
-  42979       297.57        6.92      7  execute_main_phase_action -> exec::play_member_to_stage -> trig::process_pending -> resolve::current_ability -> resolve::resolve_ability_total -> resolve::run_effect -> effect::gates
-  41052       280.51        6.83      7  execute_main_phase_action -> exec::use_ability -> trig::process_pending -> resolve::current_ability -> resolve::resolve_ability_total -> resolve::run_effect -> effect::gates
-  23923       277.31       11.59      6  execute_main_phase_action -> exec::resume_with_choice -> trig::process_pending -> resolve::current_ability -> resolve::resolve_ability_total -> resolve::run_effect
-  66708       264.02        3.96      4  advance_phase -> advance_phase::first_performance -> execute_performance_phase -> player_perform_live
- 212855       255.16        1.20      3  execute_main_phase_action -> exec::play_member_to_stage -> trig::debut
-  41052       247.14        6.02      8  execute_main_phase_action -> exec::use_ability -> trig::process_pending -> resolve::current_ability -> resolve::resolve_ability_total -> resolve::run_effect -> effect::gates -> effect::dispatch
-1212286       246.28        0.20      3  generate_possible_actions -> generate_main_phase_actions -> gen::cost_reduction
- 105153       241.14        2.29      6  execute_main_phase_action -> exec::play_member_to_stage -> trig::process_pending -> resolve::current_ability -> resolve::resolve_ability_total -> resolve::handle_pending_choice
-  26543       240.07        9.04      3  execute_main_phase_action -> exec::resume_with_choice -> effect::gates
- 133416       232.94        1.75      5  advance_phase -> advance_phase::draw -> check_timing -> check_timing::recalculate_constants -> recalculate_constants
-  66708       219.96        3.30      4  advance_phase -> advance_phase::second_performance -> execute_performance_phase -> player_perform_live
-  66708       215.85        3.24      5  execute_main_phase_action -> advance_phase -> advance_phase::live_card_set -> check_timing -> check_timing::recalculate_constants
-  24408       208.57        8.55      8  execute_main_phase_action -> advance_phase -> advance_phase::live_card_set -> trig::process_pending -> resolve::current_ability -> resolve::resolve_ability_total -> resolve::run_effect -> effect::gates
-  66708       191.46        2.87      5  advance_phase -> advance_phase::first_performance -> execute_performance_phase -> check_timing -> check_timing::recalculate_constants
-  39652       176.43        4.45      7  execute_main_phase_action -> exec::resume_with_choice -> resolve::current_ability -> resolve::resolve_ability_total -> resolve::run_effect -> effect::gates -> effect::gates
-  66708       173.45        2.60      5  advance_phase -> advance_phase::second_performance -> execute_performance_phase -> check_timing -> check_timing::recalculate_constants
-  18825       170.49        9.06      4  execute_main_phase_action -> exec::resume_with_choice -> effect::gates -> effect::dispatch
-  66708       170.04        2.55      6  execute_main_phase_action -> advance_phase -> advance_phase::live_card_set -> check_timing -> check_timing::recalculate_constants -> recalculate_constants
- 233024       162.94        0.70      4  advance_phase -> advance_phase::first_performance -> execute_performance_phase -> trig::auto_scan
-  20272       153.33        7.56      7  execute_main_phase_action -> exec::resume_with_choice -> trig::process_pending -> resolve::current_ability -> resolve::resolve_ability_total -> resolve::run_effect -> effect::gates
-  66708       147.10        2.21      6  advance_phase -> advance_phase::first_performance -> execute_performance_phase -> check_timing -> check_timing::recalculate_constants -> recalculate_constants
-  39652       146.95        3.71      8  execute_main_phase_action -> exec::resume_with_choice -> resolve::current_ability -> resolve::resolve_ability_total -> resolve::run_effect -> effect::gates -> effect::gates -> effect::dispatch
-  66708       129.75        1.94      6  advance_phase -> advance_phase::second_performance -> execute_performance_phase -> check_timing -> check_timing::recalculate_constants -> recalculate_constants
- 133416       127.11        0.95      2  advance_phase -> advance_phase::energy
-  33022       123.69        3.75      8  execute_main_phase_action -> exec::play_member_to_stage -> trig::process_pending -> resolve::current_ability -> resolve::resolve_ability_total -> resolve::run_effect -> effect::gates -> effect::dispatch
- 137811       123.29        0.89      3  execute_main_phase_action -> exec::resume_with_choice -> trig::auto_scan
- 272822       122.78        0.45      3  advance_phase -> advance_phase::live_victory -> trig::process_pending
-1212286       122.06        0.10      3  generate_possible_actions -> generate_main_phase_actions -> gen::area_candidates
- 232963       116.40        0.50      4  advance_phase -> advance_phase::second_performance -> execute_performance_phase -> trig::auto_scan
-  47698       115.47        2.42      3  execute_main_phase_action -> exec::resume_with_choice -> recalculate_constants
- 212855       106.01        0.50      4  execute_main_phase_action -> exec::play_member_to_stage -> trig::process_pending -> trig::auto_scan
-  62174       101.46        1.63      6  execute_main_phase_action -> exec::play_member_to_stage -> trig::process_pending -> resolve::current_ability -> resolve::resolve_ability_total -> resolve::pay_cost
-  10167        96.19        9.46      4  advance_phase -> advance_phase::live_victory -> trig::process_pending -> resolve::current_ability
-  66708        95.46        1.43      5  advance_phase -> advance_phase::first_performance -> execute_performance_phase -> check_timing -> check_timing::process_pending_auto_abilities
-  16931        91.14        5.38      9  execute_main_phase_action -> advance_phase -> advance_phase::live_card_set -> trig::process_pending -> resolve::current_ability -> resolve::resolve_ability_total -> resolve::run_effect -> effect::gates -> effect::dispatch
-   9957        90.78        9.12      8  execute_main_phase_action -> exec::play_member_to_stage -> trig::process_pending -> resolve::current_ability -> resolve::resolve_ability_total -> resolve::run_effect -> effect::gates -> effect::gates
-  41052        87.33        2.13      7  execute_main_phase_action -> exec::use_ability -> trig::process_pending -> resolve::current_ability -> resolve::resolve_ability_total -> resolve::pay_cost -> recalculate_constants
-   7655        81.64       10.67      5  advance_phase -> advance_phase::live_victory -> trig::process_pending -> resolve::current_ability -> resolve::resolve_ability_total
-   9957        81.30        8.17      9  execute_main_phase_action -> exec::play_member_to_stage -> trig::process_pending -> resolve::current_ability -> resolve::resolve_ability_total -> resolve::run_effect -> effect::gates -> effect::gates -> effect::dispatch
-  66708        78.59        1.18      5  advance_phase -> advance_phase::second_performance -> execute_performance_phase -> check_timing -> check_timing::process_pending_auto_abilities
- 133416        76.42        0.57      4  advance_phase -> advance_phase::active -> check_timing -> check_timing::process_pending_auto_abilities
-  14977        75.95        5.07      8  execute_main_phase_action -> exec::resume_with_choice -> trig::process_pending -> resolve::current_ability -> resolve::resolve_ability_total -> resolve::run_effect -> effect::gates -> effect::dispatch
- 133416        70.77        0.53      4  advance_phase -> advance_phase::draw -> check_timing -> check_timing::process_pending_auto_abilities
- 136720        66.69        0.49      3  advance_phase -> advance_phase::live_victory -> trig::auto_scan
-  12188        65.91        5.41      7  execute_main_phase_action -> exec::resume_with_choice -> resolve::current_ability -> resolve::resolve_ability_total -> resolve::run_effect -> effect::gates -> effect::dispatch
-  66708        57.40        0.86      6  advance_phase -> advance_phase::first_performance -> execute_performance_phase -> check_timing -> check_timing::process_pending_auto_abilities -> trig::process_pending
-  12672        57.11        4.51      9  execute_main_phase_action -> advance_phase -> advance_phase::live_card_set -> trig::process_pending -> resolve::current_ability -> resolve::resolve_ability_total -> resolve::run_effect -> effect::gates -> effect::gates
-   7655        54.90        7.17      6  advance_phase -> advance_phase::live_victory -> trig::process_pending -> resolve::current_ability -> resolve::resolve_ability_total -> resolve::run_effect
-  12672        45.46        3.59     10  execute_main_phase_action -> advance_phase -> advance_phase::live_card_set -> trig::process_pending -> resolve::current_ability -> resolve::resolve_ability_total -> resolve::run_effect -> effect::gates -> effect::gates -> effect::dispatch
-  66708        45.36        0.68      5  execute_main_phase_action -> advance_phase -> advance_phase::live_card_set -> check_timing -> check_timing::process_pending_auto_abilities
-  94862        43.90        0.46      4  execute_main_phase_action -> exec::resume_with_choice -> trig::process_pending -> trig::auto_scan
-  66708        42.45        0.64      6  advance_phase -> advance_phase::second_performance -> execute_performance_phase -> check_timing -> check_timing::process_pending_auto_abilities -> trig::process_pending
- 233024        37.71        0.16      4  advance_phase -> advance_phase::first_performance -> execute_performance_phase -> trig::process_pending
-   8807        37.46        4.25      8  execute_main_phase_action -> exec::resume_with_choice -> trig::process_pending -> resolve::current_ability -> resolve::resolve_ability_total -> resolve::run_effect -> effect::gates -> effect::gates
-  13190        36.08        2.74      5  execute_main_phase_action -> exec::resume_with_choice -> effect::gates -> effect::dispatch -> recalculate_constants
- 232963        34.35        0.15      4  advance_phase -> advance_phase::second_performance -> execute_performance_phase -> trig::process_pending
-   7718        32.18        4.17      4  execute_main_phase_action -> exec::resume_with_choice -> effect::gates -> effect::gates
-  41052        30.58        0.74      4  execute_main_phase_action -> exec::use_ability -> trig::process_pending -> trig::auto_scan
-   8807        29.93        3.40      9  execute_main_phase_action -> exec::resume_with_choice -> trig::process_pending -> resolve::current_ability -> resolve::resolve_ability_total -> resolve::run_effect -> effect::gates -> effect::gates -> effect::dispatch
-  66708        29.03        0.44      5  advance_phase -> advance_phase::first_performance -> execute_performance_phase -> check_timing -> check_timing::check_invalid_live_cards
-  30581        27.32        0.89      7  advance_phase -> advance_phase::first_performance -> execute_performance_phase -> check_timing -> check_timing::process_pending_auto_abilities -> trig::process_pending -> trig::auto_scan
-   7718        25.38        3.29      5  execute_main_phase_action -> exec::resume_with_choice -> effect::gates -> effect::gates -> effect::dispatch
-  66708        24.83        0.37      5  advance_phase -> advance_phase::second_performance -> execute_performance_phase -> check_timing -> check_timing::check_invalid_live_cards
-  10944        16.96        1.55      5  execute_main_phase_action -> exec::resume_with_choice -> effect::gates -> effect::dispatch -> trig::auto_scan
-  30213        14.88        0.49      7  advance_phase -> advance_phase::second_performance -> execute_performance_phase -> check_timing -> check_timing::process_pending_auto_abilities -> trig::process_pending -> trig::auto_scan
-  18048        11.99        0.66      5  advance_phase -> advance_phase::first_performance -> execute_performance_phase -> trig::process_pending -> trig::auto_scan
- 133416        10.47        0.08      4  advance_phase -> advance_phase::active -> check_timing -> check_timing::check_invalid_live_cards
-   1575        10.47        6.65      7  advance_phase -> advance_phase::live_victory -> trig::process_pending -> resolve::current_ability -> resolve::resolve_ability_total -> resolve::run_effect -> effect::gates
- 133416         9.95        0.07      5  advance_phase -> advance_phase::active -> check_timing -> check_timing::process_pending_auto_abilities -> trig::process_pending
-   1575         8.62        5.47      8  advance_phase -> advance_phase::live_victory -> trig::process_pending -> resolve::current_ability -> resolve::resolve_ability_total -> resolve::run_effect -> effect::gates -> effect::dispatch
- 133416         8.41        0.06      4  advance_phase -> advance_phase::draw -> check_timing -> check_timing::check_invalid_live_cards
- 133416         8.18        0.06      5  advance_phase -> advance_phase::draw -> check_timing -> check_timing::process_pending_auto_abilities -> trig::process_pending
-  17905         7.76        0.43      5  advance_phase -> advance_phase::second_performance -> execute_performance_phase -> trig::process_pending -> trig::auto_scan
-   7835         6.14        0.78      5  execute_main_phase_action -> exec::use_ability -> trig::process_pending -> resolve::current_ability -> trig::auto_scan
-  66708         5.82        0.09      6  execute_main_phase_action -> advance_phase -> advance_phase::live_card_set -> check_timing -> check_timing::process_pending_auto_abilities -> trig::process_pending
-   3220         5.20        1.62      9  execute_main_phase_action -> exec::use_ability -> trig::process_pending -> resolve::current_ability -> resolve::resolve_ability_total -> resolve::run_effect -> effect::gates -> effect::dispatch -> recalculate_constants
- 133416         4.73        0.04      4  advance_phase -> advance_phase::active -> check_timing -> check_timing::check_victory_condition
- 133416         4.69        0.04      4  advance_phase -> advance_phase::draw -> check_timing -> check_timing::check_victory_condition
-  62174         4.64        0.07      6  execute_main_phase_action -> exec::play_member_to_stage -> trig::process_pending -> resolve::current_ability -> resolve::resolve_ability_total -> resolve::pre_gates
-   3689         4.51        1.22      5  execute_main_phase_action -> exec::play_member_to_stage -> trig::process_pending -> resolve::current_ability -> trig::auto_scan
-  66708         3.80        0.06      5  execute_main_phase_action -> advance_phase -> advance_phase::live_card_set -> check_timing -> check_timing::check_invalid_live_cards
-  41052         3.40        0.08      6  execute_main_phase_action -> exec::use_ability -> trig::process_pending -> resolve::current_ability -> resolve::resolve_ability_total -> resolve::pre_gates
-   2488         3.07        1.23      9  execute_main_phase_action -> exec::play_member_to_stage -> trig::process_pending -> resolve::current_ability -> resolve::resolve_ability_total -> resolve::run_effect -> effect::gates -> effect::dispatch -> trig::auto_scan
-  82104         2.87        0.04      6  execute_main_phase_action -> exec::use_ability -> trig::process_pending -> resolve::current_ability -> resolve::resolve_ability_total -> resolve::handle_pending_choice
-   1247         2.78        2.23      9  execute_main_phase_action -> exec::play_member_to_stage -> trig::process_pending -> resolve::current_ability -> resolve::resolve_ability_total -> resolve::run_effect -> effect::gates -> effect::dispatch -> recalculate_constants
-   2807         2.72        0.97      5  execute_main_phase_action -> exec::resume_with_choice -> trig::process_pending -> resolve::current_ability -> trig::auto_scan
-  72248         2.50        0.03      5  execute_main_phase_action -> exec::resume_with_choice -> resolve::current_ability -> resolve::resolve_ability_total -> resolve::handle_pending_choice
-  66708         2.41        0.04      5  advance_phase -> advance_phase::first_performance -> execute_performance_phase -> check_timing -> check_timing::check_victory_condition
-  29066         2.39        0.08      7  execute_main_phase_action -> advance_phase -> advance_phase::live_card_set -> trig::process_pending -> resolve::current_ability -> resolve::resolve_ability_total -> resolve::pre_gates
-  66708         2.35        0.04      5  execute_main_phase_action -> advance_phase -> advance_phase::live_card_set -> check_timing -> check_timing::check_victory_condition
-  36124         2.34        0.06      5  execute_main_phase_action -> exec::resume_with_choice -> resolve::current_ability -> resolve::resolve_ability_total -> resolve::pre_gates
-  66708         2.33        0.03      5  advance_phase -> advance_phase::second_performance -> execute_performance_phase -> check_timing -> check_timing::check_victory_condition
-  58132         2.03        0.03      7  execute_main_phase_action -> advance_phase -> advance_phase::live_card_set -> trig::process_pending -> resolve::current_ability -> resolve::resolve_ability_total -> resolve::handle_pending_choice
-  47846         1.80        0.04      6  execute_main_phase_action -> exec::resume_with_choice -> trig::process_pending -> resolve::current_ability -> resolve::resolve_ability_total -> resolve::handle_pending_choice
-  36124         1.75        0.05      5  execute_main_phase_action -> exec::resume_with_choice -> resolve::current_ability -> resolve::resolve_ability_total -> resolve::pay_cost
-  29066         1.51        0.05      7  execute_main_phase_action -> advance_phase -> advance_phase::live_card_set -> trig::process_pending -> resolve::current_ability -> resolve::resolve_ability_total -> resolve::pay_cost
-  23930         1.29        0.05      6  execute_main_phase_action -> exec::resume_with_choice -> trig::process_pending -> resolve::current_ability -> resolve::resolve_ability_total -> resolve::pre_gates
-  23923         1.00        0.04      6  execute_main_phase_action -> exec::resume_with_choice -> trig::process_pending -> resolve::current_ability -> resolve::resolve_ability_total -> resolve::pay_cost
-   1652         0.76        0.46      4  advance_phase -> advance_phase::live_victory -> trig::process_pending -> trig::auto_scan
-    255         0.60        2.36      9  execute_main_phase_action -> exec::resume_with_choice -> trig::process_pending -> resolve::current_ability -> resolve::resolve_ability_total -> resolve::run_effect -> effect::gates -> effect::dispatch -> recalculate_constants
-      9         0.55       60.81      6  advance_phase -> advance_phase::active -> check_timing -> check_timing::recalculate_constants -> recalculate_constants -> vm::get_ability
-  15310         0.52        0.03      6  advance_phase -> advance_phase::live_victory -> trig::process_pending -> resolve::current_ability -> resolve::resolve_ability_total -> resolve::handle_pending_choice
-   7655         0.51        0.07      6  advance_phase -> advance_phase::live_victory -> trig::process_pending -> resolve::current_ability -> resolve::resolve_ability_total -> resolve::pre_gates
-    342         0.49        1.42      9  execute_main_phase_action -> exec::resume_with_choice -> trig::process_pending -> resolve::current_ability -> resolve::resolve_ability_total -> resolve::run_effect -> effect::gates -> effect::dispatch -> trig::auto_scan
-   7655         0.39        0.05      6  advance_phase -> advance_phase::live_victory -> trig::process_pending -> resolve::current_ability -> resolve::resolve_ability_total -> resolve::pay_cost
-      3         0.05       16.80      3  generate_possible_actions -> generate_main_phase_actions -> vm::get_ability
-      2         0.03       16.35      7  execute_main_phase_action -> advance_phase -> advance_phase::live_card_set -> check_timing -> check_timing::recalculate_constants -> recalculate_constants -> vm::get_ability
-      2         0.02        8.05      4  execute_main_phase_action -> exec::resume_with_choice -> trig::auto_scan -> vm::get_ability
-      5         0.01        2.58      8  execute_main_phase_action -> exec::resume_with_choice -> resolve::current_ability -> resolve::resolve_ability_total -> resolve::run_effect -> effect::gates -> effect::dispatch -> recalculate_constants
-      6         0.01        1.13      8  execute_main_phase_action -> exec::resume_with_choice -> resolve::current_ability -> resolve::resolve_ability_total -> resolve::run_effect -> effect::gates -> effect::dispatch -> trig::auto_scan
-      1         0.00        4.60      6  advance_phase -> advance_phase::draw -> check_timing -> check_timing::recalculate_constants -> recalculate_constants -> vm::get_ability
-      3         0.00        1.23      4  execute_main_phase_action -> exec::resume_with_choice -> resolve::current_ability -> trig::auto_scan
+1326729     11666.84        8.79      1  execute_main_phase_action
+1326729      6126.43        4.62      1  generate_possible_actions
+ 607686      5781.99        9.51      1  advance_phase
+ 427987      4690.59       10.96      2  generate_possible_actions -> generate_main_phase_actions
+ 214237      3770.05       17.60      2  execute_main_phase_action -> exec::play_member_to_stage
+ 171745      3590.60       20.91      2  execute_main_phase_action -> exec::resume_with_choice
+  79042      2531.06       32.02      2  execute_main_phase_action -> exec::use_ability
+ 368567      1936.24        5.25      3  execute_main_phase_action -> exec::play_member_to_stage -> trig::process_pending
+  79042      1889.59       23.91      3  execute_main_phase_action -> exec::use_ability -> trig::process_pending
+  79042      1787.43       22.61      4  execute_main_phase_action -> exec::use_ability -> trig::process_pending -> resolve::current_ability
+  82415      1669.38       20.26      4  execute_main_phase_action -> exec::play_member_to_stage -> trig::process_pending -> resolve::current_ability
+ 202062      1464.21        7.25      2  execute_main_phase_action -> advance_phase
+  67354      1363.77       20.25      2  advance_phase -> advance_phase::first_performance
+  40784      1342.11       32.91      5  execute_main_phase_action -> exec::use_ability -> trig::process_pending -> resolve::current_ability -> resolve::resolve_ability_total
+  67354      1337.79       19.86      3  advance_phase -> advance_phase::first_performance -> execute_performance_phase
+  67354      1316.86       19.55      3  execute_main_phase_action -> advance_phase -> advance_phase::live_card_set
+  68854      1230.49       17.87      2  advance_phase -> advance_phase::live_victory
+  62311      1160.52       18.62      5  execute_main_phase_action -> exec::play_member_to_stage -> trig::process_pending -> resolve::current_ability -> resolve::resolve_ability_total
+  67354      1148.96       17.06      2  advance_phase -> advance_phase::second_performance
+  67354      1124.42       16.69      3  advance_phase -> advance_phase::second_performance -> execute_performance_phase
+ 134708      1035.58        7.69      2  advance_phase -> advance_phase::active
+  39335       891.52       22.66      3  execute_main_phase_action -> exec::resume_with_choice -> resolve::current_ability
+  40784       873.76       21.42      6  execute_main_phase_action -> exec::use_ability -> trig::process_pending -> resolve::current_ability -> resolve::resolve_ability_total -> resolve::run_effect
+  43170       701.21       16.24      6  execute_main_phase_action -> exec::play_member_to_stage -> trig::process_pending -> resolve::current_ability -> resolve::resolve_ability_total -> resolve::run_effect
+ 134708       699.41        5.19      2  advance_phase -> advance_phase::draw
+  36395       677.34       18.61      4  execute_main_phase_action -> exec::resume_with_choice -> resolve::current_ability -> resolve::resolve_ability_total
+ 134708       628.89        4.67      3  advance_phase -> advance_phase::active -> check_timing
+  36395       584.95       16.07      5  execute_main_phase_action -> exec::resume_with_choice -> resolve::current_ability -> resolve::resolve_ability_total -> resolve::run_effect
+ 134708       561.69        4.17      3  advance_phase -> advance_phase::draw -> check_timing
+ 636669       542.97        0.85      2  generate_possible_actions -> generate_live_card_set_actions
+ 110913       533.49        4.81      4  execute_main_phase_action -> advance_phase -> advance_phase::live_card_set -> trig::process_pending
+ 141633       506.42        3.58      3  execute_main_phase_action -> exec::resume_with_choice -> trig::process_pending
+  38243       477.66       12.49      5  execute_main_phase_action -> advance_phase -> advance_phase::live_card_set -> trig::process_pending -> resolve::current_ability
+ 737134       428.61        0.58      3  execute_main_phase_action -> exec::play_member_to_stage -> trig::auto_scan
+ 171745       420.29        2.45      2  generate_possible_actions -> generate_pending_choice_actions
+  67354       411.78        6.11      4  advance_phase -> advance_phase::first_performance -> execute_performance_phase -> check_timing
+  28874       394.96       13.68      6  execute_main_phase_action -> advance_phase -> advance_phase::live_card_set -> trig::process_pending -> resolve::current_ability -> resolve::resolve_ability_total
+  67354       367.45        5.46      4  advance_phase -> advance_phase::second_performance -> execute_performance_phase -> check_timing
+  67354       367.04        5.45      4  execute_main_phase_action -> advance_phase -> advance_phase::live_card_set -> check_timing
+  24056       357.90       14.88      4  execute_main_phase_action -> exec::resume_with_choice -> trig::process_pending -> resolve::current_ability
+ 214237       352.30        1.64      3  execute_main_phase_action -> exec::play_member_to_stage -> recalculate_constants
+  40784       343.81        8.43      6  execute_main_phase_action -> exec::use_ability -> trig::process_pending -> resolve::current_ability -> resolve::resolve_ability_total -> resolve::pay_cost
+  28874       308.08       10.67      7  execute_main_phase_action -> advance_phase -> advance_phase::live_card_set -> trig::process_pending -> resolve::current_ability -> resolve::resolve_ability_total -> resolve::run_effect
+  24055       292.40       12.16      5  execute_main_phase_action -> exec::resume_with_choice -> trig::process_pending -> resolve::current_ability -> resolve::resolve_ability_total
+  32989       284.98        8.64      6  execute_main_phase_action -> exec::resume_with_choice -> resolve::current_ability -> resolve::resolve_ability_total -> resolve::run_effect -> effect::gates
+ 134708       282.07        2.09      4  advance_phase -> advance_phase::active -> check_timing -> check_timing::recalculate_constants
+ 134708       250.66        1.86      4  advance_phase -> advance_phase::draw -> check_timing -> check_timing::recalculate_constants
+  43170       241.86        5.60      7  execute_main_phase_action -> exec::play_member_to_stage -> trig::process_pending -> resolve::current_ability -> resolve::resolve_ability_total -> resolve::run_effect -> effect::gates
+  40784       239.09        5.86      7  execute_main_phase_action -> exec::use_ability -> trig::process_pending -> resolve::current_ability -> resolve::resolve_ability_total -> resolve::run_effect -> effect::gates
+  24052       225.49        9.38      6  execute_main_phase_action -> exec::resume_with_choice -> trig::process_pending -> resolve::current_ability -> resolve::resolve_ability_total -> resolve::run_effect
+ 134708       214.83        1.59      5  advance_phase -> advance_phase::active -> check_timing -> check_timing::recalculate_constants -> recalculate_constants
+  67354       211.53        3.14      4  advance_phase -> advance_phase::first_performance -> execute_performance_phase -> player_perform_live
+  40784       209.13        5.13      8  execute_main_phase_action -> exec::use_ability -> trig::process_pending -> resolve::current_ability -> resolve::resolve_ability_total -> resolve::run_effect -> effect::gates -> effect::dispatch
+1221145       208.20        0.17      3  generate_possible_actions -> generate_main_phase_actions -> gen::cost_reduction
+ 105481       206.15        1.95      6  execute_main_phase_action -> exec::play_member_to_stage -> trig::process_pending -> resolve::current_ability -> resolve::resolve_ability_total -> resolve::handle_pending_choice
+ 214237       202.80        0.95      3  execute_main_phase_action -> exec::play_member_to_stage -> trig::debut
+  26773       198.94        7.43      3  execute_main_phase_action -> exec::resume_with_choice -> effect::gates
+ 134708       188.47        1.40      5  advance_phase -> advance_phase::draw -> check_timing -> check_timing::recalculate_constants -> recalculate_constants
+  67354       177.47        2.63      4  advance_phase -> advance_phase::second_performance -> execute_performance_phase -> player_perform_live
+  24236       168.05        6.93      8  execute_main_phase_action -> advance_phase -> advance_phase::live_card_set -> trig::process_pending -> resolve::current_ability -> resolve::resolve_ability_total -> resolve::run_effect -> effect::gates
+  67354       167.54        2.49      5  execute_main_phase_action -> advance_phase -> advance_phase::live_card_set -> check_timing -> check_timing::recalculate_constants
+  67354       158.75        2.36      5  advance_phase -> advance_phase::first_performance -> execute_performance_phase -> check_timing -> check_timing::recalculate_constants
+  40141       142.90        3.56      7  execute_main_phase_action -> exec::resume_with_choice -> resolve::current_ability -> resolve::resolve_ability_total -> resolve::run_effect -> effect::gates -> effect::gates
+  18857       140.57        7.45      4  execute_main_phase_action -> exec::resume_with_choice -> effect::gates -> effect::dispatch
+  67354       138.76        2.06      5  advance_phase -> advance_phase::second_performance -> execute_performance_phase -> check_timing -> check_timing::recalculate_constants
+ 235751       130.78        0.55      4  advance_phase -> advance_phase::first_performance -> execute_performance_phase -> trig::auto_scan
+  67354       128.67        1.91      6  execute_main_phase_action -> advance_phase -> advance_phase::live_card_set -> check_timing -> check_timing::recalculate_constants -> recalculate_constants
+  20405       120.94        5.93      7  execute_main_phase_action -> exec::resume_with_choice -> trig::process_pending -> resolve::current_ability -> resolve::resolve_ability_total -> resolve::run_effect -> effect::gates
+  67354       120.03        1.78      6  advance_phase -> advance_phase::first_performance -> execute_performance_phase -> check_timing -> check_timing::recalculate_constants -> recalculate_constants
+  40141       116.85        2.91      8  execute_main_phase_action -> exec::resume_with_choice -> resolve::current_ability -> resolve::resolve_ability_total -> resolve::run_effect -> effect::gates -> effect::gates -> effect::dispatch
+ 137579       105.06        0.76      3  execute_main_phase_action -> exec::resume_with_choice -> trig::auto_scan
+  67354       101.45        1.51      6  advance_phase -> advance_phase::second_performance -> execute_performance_phase -> check_timing -> check_timing::recalculate_constants -> recalculate_constants
+  33094        99.75        3.01      8  execute_main_phase_action -> exec::play_member_to_stage -> trig::process_pending -> resolve::current_ability -> resolve::resolve_ability_total -> resolve::run_effect -> effect::gates -> effect::dispatch
+ 134708        99.28        0.74      2  advance_phase -> advance_phase::energy
+ 235125        97.57        0.41      4  advance_phase -> advance_phase::second_performance -> execute_performance_phase -> trig::auto_scan
+  47514        96.37        2.03      3  execute_main_phase_action -> exec::resume_with_choice -> recalculate_constants
+ 275314        94.62        0.34      3  advance_phase -> advance_phase::live_victory -> trig::process_pending
+1221145        91.84        0.08      3  generate_possible_actions -> generate_main_phase_actions -> gen::area_candidates
+ 214237        86.58        0.40      4  execute_main_phase_action -> exec::play_member_to_stage -> trig::process_pending -> trig::auto_scan
+  62311        81.34        1.31      6  execute_main_phase_action -> exec::play_member_to_stage -> trig::process_pending -> resolve::current_ability -> resolve::resolve_ability_total -> resolve::pay_cost
+  67354        80.36        1.19      5  advance_phase -> advance_phase::first_performance -> execute_performance_phase -> check_timing -> check_timing::process_pending_auto_abilities
+  10076        74.04        7.35      8  execute_main_phase_action -> exec::play_member_to_stage -> trig::process_pending -> resolve::current_ability -> resolve::resolve_ability_total -> resolve::run_effect -> effect::gates -> effect::gates
+  10144        72.14        7.11      4  advance_phase -> advance_phase::live_victory -> trig::process_pending -> resolve::current_ability
+  16887        71.13        4.21      9  execute_main_phase_action -> advance_phase -> advance_phase::live_card_set -> trig::process_pending -> resolve::current_ability -> resolve::resolve_ability_total -> resolve::run_effect -> effect::gates -> effect::dispatch
+  40784        69.27        1.70      7  execute_main_phase_action -> exec::use_ability -> trig::process_pending -> resolve::current_ability -> resolve::resolve_ability_total -> resolve::pay_cost -> recalculate_constants
+  67354        67.90        1.01      5  advance_phase -> advance_phase::second_performance -> execute_performance_phase -> check_timing -> check_timing::process_pending_auto_abilities
+ 134708        66.37        0.49      4  advance_phase -> advance_phase::active -> check_timing -> check_timing::process_pending_auto_abilities
+  10076        65.37        6.49      9  execute_main_phase_action -> exec::play_member_to_stage -> trig::process_pending -> resolve::current_ability -> resolve::resolve_ability_total -> resolve::run_effect -> effect::gates -> effect::gates -> effect::dispatch
+ 134708        62.07        0.46      4  advance_phase -> advance_phase::draw -> check_timing -> check_timing::process_pending_auto_abilities
+   7582        59.92        7.90      5  advance_phase -> advance_phase::live_victory -> trig::process_pending -> resolve::current_ability -> resolve::resolve_ability_total
+  15187        56.66        3.73      8  execute_main_phase_action -> exec::resume_with_choice -> trig::process_pending -> resolve::current_ability -> resolve::resolve_ability_total -> resolve::run_effect -> effect::gates -> effect::dispatch
+ 137988        54.80        0.40      3  advance_phase -> advance_phase::live_victory -> trig::auto_scan
+  12116        48.98        4.04      7  execute_main_phase_action -> exec::resume_with_choice -> resolve::current_ability -> resolve::resolve_ability_total -> resolve::run_effect -> effect::gates -> effect::dispatch
+  67354        47.62        0.71      6  advance_phase -> advance_phase::first_performance -> execute_performance_phase -> check_timing -> check_timing::process_pending_auto_abilities -> trig::process_pending
+  12413        47.50        3.83      9  execute_main_phase_action -> advance_phase -> advance_phase::live_card_set -> trig::process_pending -> resolve::current_ability -> resolve::resolve_ability_total -> resolve::run_effect -> effect::gates -> effect::gates
+  67354        38.47        0.57      5  execute_main_phase_action -> advance_phase -> advance_phase::live_card_set -> check_timing -> check_timing::process_pending_auto_abilities
+   7582        38.02        5.01      6  advance_phase -> advance_phase::live_victory -> trig::process_pending -> resolve::current_ability -> resolve::resolve_ability_total -> resolve::run_effect
+  95000        37.15        0.39      4  execute_main_phase_action -> exec::resume_with_choice -> trig::process_pending -> trig::auto_scan
+  12413        36.95        2.98     10  execute_main_phase_action -> advance_phase -> advance_phase::live_card_set -> trig::process_pending -> resolve::current_ability -> resolve::resolve_ability_total -> resolve::run_effect -> effect::gates -> effect::gates -> effect::dispatch
+  67354        35.33        0.52      6  advance_phase -> advance_phase::second_performance -> execute_performance_phase -> check_timing -> check_timing::process_pending_auto_abilities -> trig::process_pending
+ 235751        31.17        0.13      4  advance_phase -> advance_phase::first_performance -> execute_performance_phase -> trig::process_pending
+   8775        30.69        3.50      8  execute_main_phase_action -> exec::resume_with_choice -> trig::process_pending -> resolve::current_ability -> resolve::resolve_ability_total -> resolve::run_effect -> effect::gates -> effect::gates
+  13306        30.19        2.27      5  execute_main_phase_action -> exec::resume_with_choice -> effect::gates -> effect::dispatch -> recalculate_constants
+   7916        28.23        3.57      4  execute_main_phase_action -> exec::resume_with_choice -> effect::gates -> effect::gates
+ 235125        27.55        0.12      4  advance_phase -> advance_phase::second_performance -> execute_performance_phase -> trig::process_pending
+  40784        25.74        0.63      4  execute_main_phase_action -> exec::use_ability -> trig::process_pending -> trig::auto_scan
+  67354        24.41        0.36      5  advance_phase -> advance_phase::first_performance -> execute_performance_phase -> check_timing -> check_timing::check_invalid_live_cards
+   8775        24.38        2.78      9  execute_main_phase_action -> exec::resume_with_choice -> trig::process_pending -> resolve::current_ability -> resolve::resolve_ability_total -> resolve::run_effect -> effect::gates -> effect::gates -> effect::dispatch
+  31153        22.13        0.71      7  advance_phase -> advance_phase::first_performance -> execute_performance_phase -> check_timing -> check_timing::process_pending_auto_abilities -> trig::process_pending -> trig::auto_scan
+   7916        21.89        2.76      5  execute_main_phase_action -> exec::resume_with_choice -> effect::gates -> effect::gates -> effect::dispatch
+  67354        21.76        0.32      5  advance_phase -> advance_phase::second_performance -> execute_performance_phase -> check_timing -> check_timing::check_invalid_live_cards
+  10780        14.18        1.32      5  execute_main_phase_action -> exec::resume_with_choice -> effect::gates -> effect::dispatch -> trig::auto_scan
+  30485        12.64        0.41      7  advance_phase -> advance_phase::second_performance -> execute_performance_phase -> check_timing -> check_timing::process_pending_auto_abilities -> trig::process_pending -> trig::auto_scan
+ 134708        10.23        0.08      4  advance_phase -> advance_phase::active -> check_timing -> check_timing::check_invalid_live_cards
+  18415         9.25        0.50      5  advance_phase -> advance_phase::first_performance -> execute_performance_phase -> trig::process_pending -> trig::auto_scan
+ 134708         8.30        0.06      4  advance_phase -> advance_phase::draw -> check_timing -> check_timing::check_invalid_live_cards
+ 134708         8.20        0.06      5  advance_phase -> advance_phase::active -> check_timing -> check_timing::process_pending_auto_abilities -> trig::process_pending
+   1561         8.16        5.23      7  advance_phase -> advance_phase::live_victory -> trig::process_pending -> resolve::current_ability -> resolve::resolve_ability_total -> resolve::run_effect -> effect::gates
+   1561         6.78        4.34      8  advance_phase -> advance_phase::live_victory -> trig::process_pending -> resolve::current_ability -> resolve::resolve_ability_total -> resolve::run_effect -> effect::gates -> effect::dispatch
+  18043         6.72        0.37      5  advance_phase -> advance_phase::second_performance -> execute_performance_phase -> trig::process_pending -> trig::auto_scan
+ 134708         6.60        0.05      5  advance_phase -> advance_phase::draw -> check_timing -> check_timing::process_pending_auto_abilities -> trig::process_pending
+   7675         5.36        0.70      5  execute_main_phase_action -> exec::use_ability -> trig::process_pending -> resolve::current_ability -> trig::auto_scan
+ 134708         5.10        0.04      4  advance_phase -> advance_phase::active -> check_timing -> check_timing::check_victory_condition
+ 134708         4.63        0.03      4  advance_phase -> advance_phase::draw -> check_timing -> check_timing::check_victory_condition
+   3220         4.42        1.37      9  execute_main_phase_action -> exec::use_ability -> trig::process_pending -> resolve::current_ability -> resolve::resolve_ability_total -> resolve::run_effect -> effect::gates -> effect::dispatch -> recalculate_constants
+  67354         4.29        0.06      6  execute_main_phase_action -> advance_phase -> advance_phase::live_card_set -> check_timing -> check_timing::process_pending_auto_abilities -> trig::process_pending
+  62311         4.28        0.07      6  execute_main_phase_action -> exec::play_member_to_stage -> trig::process_pending -> resolve::current_ability -> resolve::resolve_ability_total -> resolve::pre_gates
+  67354         3.70        0.06      5  execute_main_phase_action -> advance_phase -> advance_phase::live_card_set -> check_timing -> check_timing::check_invalid_live_cards
+   3624         3.48        0.96      5  execute_main_phase_action -> exec::play_member_to_stage -> trig::process_pending -> resolve::current_ability -> trig::auto_scan
+  40784         3.23        0.08      6  execute_main_phase_action -> exec::use_ability -> trig::process_pending -> resolve::current_ability -> resolve::resolve_ability_total -> resolve::pre_gates
+  81568         2.87        0.04      6  execute_main_phase_action -> exec::use_ability -> trig::process_pending -> resolve::current_ability -> resolve::resolve_ability_total -> resolve::handle_pending_choice
+   2502         2.76        1.10      9  execute_main_phase_action -> exec::play_member_to_stage -> trig::process_pending -> resolve::current_ability -> resolve::resolve_ability_total -> resolve::run_effect -> effect::gates -> effect::dispatch -> trig::auto_scan
+  72790         2.50        0.03      5  execute_main_phase_action -> exec::resume_with_choice -> resolve::current_ability -> resolve::resolve_ability_total -> resolve::handle_pending_choice
+   2758         2.36        0.86      5  execute_main_phase_action -> exec::resume_with_choice -> trig::process_pending -> resolve::current_ability -> trig::auto_scan
+  67354         2.35        0.03      5  advance_phase -> advance_phase::first_performance -> execute_performance_phase -> check_timing -> check_timing::check_victory_condition
+  67354         2.35        0.03      5  execute_main_phase_action -> advance_phase -> advance_phase::live_card_set -> check_timing -> check_timing::check_victory_condition
+  67354         2.35        0.03      5  advance_phase -> advance_phase::second_performance -> execute_performance_phase -> check_timing -> check_timing::check_victory_condition
+   1251         2.27        1.82      9  execute_main_phase_action -> exec::play_member_to_stage -> trig::process_pending -> resolve::current_ability -> resolve::resolve_ability_total -> resolve::run_effect -> effect::gates -> effect::dispatch -> recalculate_constants
+  36395         2.08        0.06      5  execute_main_phase_action -> exec::resume_with_choice -> resolve::current_ability -> resolve::resolve_ability_total -> resolve::pre_gates
+  28874         2.05        0.07      7  execute_main_phase_action -> advance_phase -> advance_phase::live_card_set -> trig::process_pending -> resolve::current_ability -> resolve::resolve_ability_total -> resolve::pre_gates
+  57748         2.00        0.03      7  execute_main_phase_action -> advance_phase -> advance_phase::live_card_set -> trig::process_pending -> resolve::current_ability -> resolve::resolve_ability_total -> resolve::handle_pending_choice
+  48104         1.72        0.04      6  execute_main_phase_action -> exec::resume_with_choice -> trig::process_pending -> resolve::current_ability -> resolve::resolve_ability_total -> resolve::handle_pending_choice
+  36395         1.67        0.05      5  execute_main_phase_action -> exec::resume_with_choice -> resolve::current_ability -> resolve::resolve_ability_total -> resolve::pay_cost
+  28874         1.32        0.05      7  execute_main_phase_action -> advance_phase -> advance_phase::live_card_set -> trig::process_pending -> resolve::current_ability -> resolve::resolve_ability_total -> resolve::pay_cost
+  24055         1.19        0.05      6  execute_main_phase_action -> exec::resume_with_choice -> trig::process_pending -> resolve::current_ability -> resolve::resolve_ability_total -> resolve::pre_gates
+  24052         0.98        0.04      6  execute_main_phase_action -> exec::resume_with_choice -> trig::process_pending -> resolve::current_ability -> resolve::resolve_ability_total -> resolve::pay_cost
+   1640         0.62        0.38      4  advance_phase -> advance_phase::live_victory -> trig::process_pending -> trig::auto_scan
+     10         0.56       56.31      6  advance_phase -> advance_phase::active -> check_timing -> check_timing::recalculate_constants -> recalculate_constants -> vm::get_ability
+  15164         0.51        0.03      6  advance_phase -> advance_phase::live_victory -> trig::process_pending -> resolve::current_ability -> resolve::resolve_ability_total -> resolve::handle_pending_choice
+   7582         0.46        0.06      6  advance_phase -> advance_phase::live_victory -> trig::process_pending -> resolve::current_ability -> resolve::resolve_ability_total -> resolve::pre_gates
+    243         0.44        1.82      9  execute_main_phase_action -> exec::resume_with_choice -> trig::process_pending -> resolve::current_ability -> resolve::resolve_ability_total -> resolve::run_effect -> effect::gates -> effect::dispatch -> recalculate_constants
+    340         0.41        1.19      9  execute_main_phase_action -> exec::resume_with_choice -> trig::process_pending -> resolve::current_ability -> resolve::resolve_ability_total -> resolve::run_effect -> effect::gates -> effect::dispatch -> trig::auto_scan
+   7582         0.32        0.04      6  advance_phase -> advance_phase::live_victory -> trig::process_pending -> resolve::current_ability -> resolve::resolve_ability_total -> resolve::pay_cost
+      5         0.05       10.48      6  advance_phase -> advance_phase::draw -> check_timing -> check_timing::recalculate_constants -> recalculate_constants -> vm::get_ability
+      7         0.02        2.40      8  execute_main_phase_action -> exec::resume_with_choice -> resolve::current_ability -> resolve::resolve_ability_total -> resolve::run_effect -> effect::gates -> effect::dispatch -> recalculate_constants
+     14         0.02        1.18      8  execute_main_phase_action -> exec::resume_with_choice -> resolve::current_ability -> resolve::resolve_ability_total -> resolve::run_effect -> effect::gates -> effect::dispatch -> trig::auto_scan
+      1         0.01       10.00      3  generate_possible_actions -> generate_main_phase_actions -> vm::get_ability
+      1         0.01        6.40      7  execute_main_phase_action -> advance_phase -> advance_phase::live_card_set -> check_timing -> check_timing::recalculate_constants -> recalculate_constants -> vm::get_ability
+      1         0.00        0.50      4  execute_main_phase_action -> exec::resume_with_choice -> resolve::current_ability -> trig::auto_scan
 
-depth-1 (top level) instrumented total: 28627.79 ms
+depth-1 (top level) instrumented total: 23575.25 ms
 
 
 === SELF TIME (exclusive; sums exactly, unlike the inclusive table) ===
-total self: 28627.79 ms  of 93598.06 ms inclusive (30.6%)
+total self: 23575.25 ms  of 77102.17 ms inclusive (30.6%)
   calls     self_ms    self_us  depth  call path
- 423520     5417.41      12.79      2  generate_possible_actions -> generate_main_phase_actions
- 171256     2118.14      12.37      2  execute_main_phase_action -> exec::resume_with_choice
-  68249     1300.38      19.05      2  advance_phase -> advance_phase::live_victory
- 212855     1014.75       4.77      2  execute_main_phase_action -> exec::play_member_to_stage
-  77249      815.41      10.56      2  execute_main_phase_action -> exec::use_ability
-  41052      764.04      18.61      6  execute_main_phase_action -> exec::use_ability -> trig::process_pending -> resolve::current_ability -> resolve::resolve_ability_total -> resolve::run_effect
-  66708      671.91      10.07      3  advance_phase -> advance_phase::first_performance -> execute_performance_phase
- 629083      626.15       1.00      2  generate_possible_actions -> generate_live_card_set_actions
-1313749      614.93       0.47      1  generate_possible_actions
-  81504      600.93       7.37      4  execute_main_phase_action -> exec::play_member_to_stage -> trig::process_pending -> resolve::current_ability
-  42979      539.23      12.55      6  execute_main_phase_action -> exec::play_member_to_stage -> trig::process_pending -> resolve::current_ability -> resolve::resolve_ability_total -> resolve::run_effect
-  66708      535.85       8.03      3  advance_phase -> advance_phase::second_performance -> execute_performance_phase
- 731236      529.99       0.72      3  execute_main_phase_action -> exec::play_member_to_stage -> trig::auto_scan
-  66708      525.30       7.87      3  execute_main_phase_action -> advance_phase -> advance_phase::live_card_set
-  77249      517.99       6.71      4  execute_main_phase_action -> exec::use_ability -> trig::process_pending -> resolve::current_ability
- 171256      504.67       2.95      2  generate_possible_actions -> generate_pending_choice_actions
- 133416      491.79       3.69      2  advance_phase -> advance_phase::active
- 212855      432.61       2.03      3  execute_main_phase_action -> exec::play_member_to_stage -> recalculate_constants
-1313749      374.46       0.29      1  execute_main_phase_action
-  36124      352.83       9.77      5  execute_main_phase_action -> exec::resume_with_choice -> resolve::current_ability -> resolve::resolve_ability_total -> resolve::run_effect
-  41052      332.77       8.11      6  execute_main_phase_action -> exec::use_ability -> trig::process_pending -> resolve::current_ability -> resolve::resolve_ability_total -> resolve::pay_cost
- 133416      320.39       2.40      3  advance_phase -> advance_phase::active -> check_timing
- 133416      310.43       2.33      5  advance_phase -> advance_phase::active -> check_timing -> check_timing::recalculate_constants -> recalculate_constants
- 133416      278.03       2.08      3  advance_phase -> advance_phase::draw -> check_timing
-  66708      264.02       3.96      4  advance_phase -> advance_phase::first_performance -> execute_performance_phase -> player_perform_live
- 212855      255.16       1.20      3  execute_main_phase_action -> exec::play_member_to_stage -> trig::debut
-  39040      247.21       6.33      3  execute_main_phase_action -> exec::resume_with_choice -> resolve::current_ability
-1212286      246.28       0.20      3  generate_possible_actions -> generate_main_phase_actions -> gen::cost_reduction
-  41052      241.94       5.89      8  execute_main_phase_action -> exec::use_ability -> trig::process_pending -> resolve::current_ability -> resolve::resolve_ability_total -> resolve::run_effect -> effect::gates -> effect::dispatch
- 105153      241.14       2.29      6  execute_main_phase_action -> exec::play_member_to_stage -> trig::process_pending -> resolve::current_ability -> resolve::resolve_ability_total -> resolve::handle_pending_choice
- 601913      237.09       0.39      1  advance_phase
- 133416      232.94       1.75      5  advance_phase -> advance_phase::draw -> check_timing -> check_timing::recalculate_constants -> recalculate_constants
-  66708      219.96       3.30      4  advance_phase -> advance_phase::second_performance -> execute_performance_phase -> player_perform_live
- 365618      215.12       0.59      3  execute_main_phase_action -> exec::play_member_to_stage -> trig::process_pending
-  62174      199.26       3.20      5  execute_main_phase_action -> exec::play_member_to_stage -> trig::process_pending -> resolve::current_ability -> resolve::resolve_ability_total
- 200124      188.34       0.94      2  execute_main_phase_action -> advance_phase
-  66708      184.54       2.77      4  execute_main_phase_action -> advance_phase -> advance_phase::live_card_set -> check_timing
-  66708      175.16       2.63      4  advance_phase -> advance_phase::first_performance -> execute_performance_phase -> check_timing
- 133416      173.62       1.30      2  advance_phase -> advance_phase::draw
-  66708      170.01       2.55      6  execute_main_phase_action -> advance_phase -> advance_phase::live_card_set -> check_timing -> check_timing::recalculate_constants -> recalculate_constants
-  29066      169.83       5.84      7  execute_main_phase_action -> advance_phase -> advance_phase::live_card_set -> trig::process_pending -> resolve::current_ability -> resolve::resolve_ability_total -> resolve::run_effect
- 233024      162.94       0.70      4  advance_phase -> advance_phase::first_performance -> execute_performance_phase -> trig::auto_scan
-  66708      160.00       2.40      4  advance_phase -> advance_phase::second_performance -> execute_performance_phase -> check_timing
-  66708      147.10       2.21      6  advance_phase -> advance_phase::first_performance -> execute_performance_phase -> check_timing -> check_timing::recalculate_constants -> recalculate_constants
-  39652      146.95       3.71      8  execute_main_phase_action -> exec::resume_with_choice -> resolve::current_ability -> resolve::resolve_ability_total -> resolve::run_effect -> effect::gates -> effect::gates -> effect::dispatch
+ 427987     4390.54      10.26      2  generate_possible_actions -> generate_main_phase_actions
+ 171745     1792.29      10.44      2  execute_main_phase_action -> exec::resume_with_choice
+  68854     1081.08      15.70      2  advance_phase -> advance_phase::live_victory
+ 214237      850.10       3.97      2  execute_main_phase_action -> exec::play_member_to_stage
+  79042      641.47       8.12      2  execute_main_phase_action -> exec::use_ability
+  40784      634.67      15.56      6  execute_main_phase_action -> exec::use_ability -> trig::process_pending -> resolve::current_ability -> resolve::resolve_ability_total -> resolve::run_effect
+  67354      552.53       8.20      3  advance_phase -> advance_phase::first_performance -> execute_performance_phase
+ 636669      542.97       0.85      2  generate_possible_actions -> generate_live_card_set_actions
+  82415      505.38       6.13      4  execute_main_phase_action -> exec::play_member_to_stage -> trig::process_pending -> resolve::current_ability
+1326729      472.59       0.36      1  generate_possible_actions
+  43170      459.35      10.64      6  execute_main_phase_action -> exec::play_member_to_stage -> trig::process_pending -> resolve::current_ability -> resolve::resolve_ability_total -> resolve::run_effect
+  67354      454.38       6.75      3  advance_phase -> advance_phase::second_performance -> execute_performance_phase
+  79042      439.96       5.57      4  execute_main_phase_action -> exec::use_ability -> trig::process_pending -> resolve::current_ability
+ 737134      428.61       0.58      3  execute_main_phase_action -> exec::play_member_to_stage -> trig::auto_scan
+ 171745      420.29       2.45      2  generate_possible_actions -> generate_pending_choice_actions
+  67354      416.33       6.18      3  execute_main_phase_action -> advance_phase -> advance_phase::live_card_set
+ 134708      406.68       3.02      2  advance_phase -> advance_phase::active
+ 214237      352.30       1.64      3  execute_main_phase_action -> exec::play_member_to_stage -> recalculate_constants
+1326729      310.91       0.23      1  execute_main_phase_action
+  36395      299.97       8.24      5  execute_main_phase_action -> exec::resume_with_choice -> resolve::current_ability -> resolve::resolve_ability_total -> resolve::run_effect
+  40784      274.53       6.73      6  execute_main_phase_action -> exec::use_ability -> trig::process_pending -> resolve::current_ability -> resolve::resolve_ability_total -> resolve::pay_cost
+ 134708      265.12       1.97      3  advance_phase -> advance_phase::active -> check_timing
+ 134708      236.02       1.75      3  advance_phase -> advance_phase::draw -> check_timing
+ 134708      214.27       1.59      5  advance_phase -> advance_phase::active -> check_timing -> check_timing::recalculate_constants -> recalculate_constants
+  39335      214.18       5.45      3  execute_main_phase_action -> exec::resume_with_choice -> resolve::current_ability
+  67354      211.53       3.14      4  advance_phase -> advance_phase::first_performance -> execute_performance_phase -> player_perform_live
+1221145      208.20       0.17      3  generate_possible_actions -> generate_main_phase_actions -> gen::cost_reduction
+ 105481      206.15       1.95      6  execute_main_phase_action -> exec::play_member_to_stage -> trig::process_pending -> resolve::current_ability -> resolve::resolve_ability_total -> resolve::handle_pending_choice
+  40784      204.71       5.02      8  execute_main_phase_action -> exec::use_ability -> trig::process_pending -> resolve::current_ability -> resolve::resolve_ability_total -> resolve::run_effect -> effect::gates -> effect::dispatch
+ 607686      204.50       0.34      1  advance_phase
+ 214237      202.80       0.95      3  execute_main_phase_action -> exec::play_member_to_stage -> trig::debut
+ 134708      188.42       1.40      5  advance_phase -> advance_phase::draw -> check_timing -> check_timing::recalculate_constants -> recalculate_constants
+ 368567      180.28       0.49      3  execute_main_phase_action -> exec::play_member_to_stage -> trig::process_pending
+  67354      177.47       2.63      4  advance_phase -> advance_phase::second_performance -> execute_performance_phase -> player_perform_live
+  62311      167.55       2.69      5  execute_main_phase_action -> exec::play_member_to_stage -> trig::process_pending -> resolve::current_ability -> resolve::resolve_ability_total
+  67354      154.98       2.30      4  execute_main_phase_action -> advance_phase -> advance_phase::live_card_set -> check_timing
+ 202062      147.36       0.73      2  execute_main_phase_action -> advance_phase
+  67354      145.90       2.17      4  advance_phase -> advance_phase::first_performance -> execute_performance_phase -> check_timing
+  28874      140.03       4.85      7  execute_main_phase_action -> advance_phase -> advance_phase::live_card_set -> trig::process_pending -> resolve::current_ability -> resolve::resolve_ability_total -> resolve::run_effect
+ 134708      137.72       1.02      2  advance_phase -> advance_phase::draw
+  67354      136.69       2.03      4  advance_phase -> advance_phase::second_performance -> execute_performance_phase -> check_timing
+ 235751      130.78       0.55      4  advance_phase -> advance_phase::first_performance -> execute_performance_phase -> trig::auto_scan
+  67354      128.67       1.91      6  execute_main_phase_action -> advance_phase -> advance_phase::live_card_set -> check_timing -> check_timing::recalculate_constants -> recalculate_constants
+  67354      120.03       1.78      6  advance_phase -> advance_phase::first_performance -> execute_performance_phase -> check_timing -> check_timing::recalculate_constants -> recalculate_constants
+  40784      118.43       2.90      5  execute_main_phase_action -> exec::use_ability -> trig::process_pending -> resolve::current_ability -> resolve::resolve_ability_total

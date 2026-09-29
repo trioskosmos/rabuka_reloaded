@@ -386,6 +386,67 @@ static int score_mod(TestGame *tg, int cid)
     return rb_mods_get_score(&tg->state.mods, cid);
 }
 
+/* -- decoded-condition inspection ------------------------------------------ *
+ * rb_eval_condition / rb_eval_condition_for_host are PUBLIC (rabuka.h:188-189)
+ * and Condition is a generic key/value node with a readable `fields[]`, so a
+ * test can (a) prove the CORPUS really carries the gate it is about to test and
+ * (b) evaluate that gate in isolation on two different boards. That turns a
+ * "the whole card did nothing" red into a precise statement about which half of
+ * the ability is at fault, which is the difference between a useful engine
+ * report and a noise line. */
+static const CondValue *cond_get(const Condition *c, const char *key)
+{
+    if (!c) return NULL;
+    for (uint32_t i = 0; i < c->n_fields; i++)
+        if (c->fields[i].key && !strcmp(c->fields[i].key, key))
+            return &c->fields[i].v;
+    return NULL;
+}
+
+static const char *cond_str(const Condition *c, const char *key)
+{
+    const CondValue *v = cond_get(c, key);
+    return (v && v->tag == RB_TAG_STR) ? v->s : NULL;
+}
+
+static int cond_int(const Condition *c, const char *key, int dflt)
+{
+    const CondValue *v = cond_get(c, key);
+    if (!v) return dflt;
+    if (v->tag == RB_TAG_I64) return (int)v->i;
+    if (v->tag == RB_TAG_TRUE) return 1;
+    if (v->tag == RB_TAG_STR && v->s) return atoi(v->s);
+    return dflt;
+}
+
+/* Decode ability `idx` of `cid` and return its effect condition. Caller frees
+ * the Ability. Returns NULL when the ability or its condition is absent. */
+static Condition *decode_effect_condition(int cid, int idx, Ability *ab_out)
+{
+    memset(ab_out, 0, sizeof *ab_out);
+    if (cid < 0) return NULL;
+    if (!rb_decode_card_ability((uint32_t)cid, idx, ab_out)) return NULL;
+    if (!ab_out->effect) { rb_free_ability(ab_out); return NULL; }
+    return ab_out->effect->condition;
+}
+
+static void dump_condition(const Condition *c, const char *tag)
+{
+    if (!c) { fprintf(stderr, "  [%s] <no condition>\n", tag); return; }
+    fprintf(stderr, "  [%s] variant=%u n_fields=%u :", tag, (unsigned)c->variant,
+            (unsigned)c->n_fields);
+    for (uint32_t i = 0; i < c->n_fields; i++) {
+        const char *k = c->fields[i].key ? c->fields[i].key : "?";
+        if (c->fields[i].v.tag == RB_TAG_STR)
+            fprintf(stderr, " %s=\"%s\"", k, c->fields[i].v.s ? c->fields[i].v.s : "");
+        else if (c->fields[i].v.tag == RB_TAG_ARRAY)
+            fprintf(stderr, " %s=[%u items]", k, (unsigned)c->fields[i].v.arr_n);
+        else
+            fprintf(stderr, " %s=%lld", k, (long long)c->fields[i].v.i);
+    }
+    fprintf(stderr, "\n");
+}
+
 static int live_total_bonus(TestGame *tg, int pl)
 {
     return pl == 0 ? tg->state.mods.p1_constant_total_score_bonus
@@ -549,24 +610,6 @@ static int to_live_start(TestGame *tg)
     return 1;
 }
 
-/* The full live: set the live card, reach live start, perform, fire the
- * LiveSuccess window, and clear the bonus at the end of the live. This is the
- * idiom test_parity_characterization_extra.c:1821-1835 already uses. */
-static void run_full_live(TestGame *tg, int live)
-{
-    test_set_live_card(tg, 0, live);
-    drain_skip(tg, 16);
-    to_live_start(tg);
-    rb_perform_live(&tg->state, 0);
-    drain_skip(tg, 16);
-    tg->state.live_success[0] = 1;
-    rb_trigger_live_success(&tg->state, 0);
-    rb_process_pending_auto_abilities(&tg->state);
-    drain_skip(tg, 24);
-    test_advance_to_phase(tg, RB_PHASE_VICTORY);
-    drain_skip(tg, 24);
-}
-
 /* ------------------------------------------------------------------ *
  * SECTION A
  *   score/per_card/tokimeki_runners_all_heart_colors_live_success_score
@@ -656,6 +699,48 @@ static void test_a1_tokimeki_missing_hearts_no_score(void)
     CHECK(!pending(tg), "a1: no prompt is offered when the live card is set");
     if (!to_live_start(tg)) return;
 
+    /* PREMISE, and the cross-zone evidence for the duplicate enqueue below:
+     * the live card must be in the LIVE zone and NOT on the stage, so the
+     * stage scan of rb_trigger_live_start cannot legitimately match it. */
+    int live_zone = 0, on_stage = 0, n_live = 0, n_stage = 0;
+    for (int i = 0; i < tg->state.p[0].live.n; i++) {
+        n_live++;
+        fprintf(stderr, "  [a1 live[%d]] %s\n", i, card_no_of(tg->state.p[0].live.cards[i]));
+        if (tg->state.p[0].live.cards[i] == tokimeki) live_zone = 1;
+    }
+    for (int s = 0; s < RB_STAGE_SIZE; s++) {
+        if (tg->state.p[0].stage[s] == RB_EMPTY_SLOT) continue;
+        n_stage++;
+        fprintf(stderr, "  [a1 stage[%d]] %s\n", s, card_no_of(tg->state.p[0].stage[s]));
+        if (tg->state.p[0].stage[s] == tokimeki) on_stage = 1;
+    }
+    CHECK(live_zone, "a1 premise: the live card is in the live zone (n_live=%d n_stage=%d)",
+          n_live, n_stage);
+    CHECK(!on_stage, "a1 premise: the live card is NOT on the stage either "
+          "(a card in BOTH zones is enqueued twice by rb_trigger_live_start, "
+          "which scans the live-card zone and then the stage)");
+
+    /* THE TIGHTEST PROOF AVAILABLE: evaluate the card's OWN decoded gate, in
+     * isolation, on this very board. Rust requires all six colours; this board
+     * has three of them, so the honest answer is 0. */
+    Ability ab;
+    Condition *cnd = decode_effect_condition(tokimeki, 0, &ab);
+    dump_condition(cnd, "a1 tokimeki ab#0 condition");
+    CHECK(cnd != NULL, "a1: the print's ab#0 decodes with a condition");
+    if (cnd) {
+        CHECK_EQ(cond_int(cnd, "count", -1), -1,
+                 "a1 premise: the gate carries NO count key, so it is a pure "
+                 "existence/all-colours check");
+        const CondValue *hc = cond_get(cnd, "heart_colors");
+        CHECK(hc && hc->tag == RB_TAG_ARRAY && hc->arr_n == 6,
+              "a1 premise: the gate really does name all six heart colours "
+              "(got tag=%d n=%u)", hc ? (int)hc->tag : -1, hc ? (unsigned)hc->arr_n : 0u);
+        CHECK_EQ(rb_eval_condition_for_host(&tg->state, 0, tokimeki, cnd), 0,
+                 "THE GATE ITSELF: with only heart02/04/05 on the stage, the "
+                 "card's own condition must evaluate FALSE");
+    }
+    rb_free_ability(&ab);
+
     CHECK_EQ(score_mod(tg, tokimeki), 0,
              "Q216: heart01/03/06 absent from the stage -> no +1 score");
 }
@@ -687,6 +772,19 @@ static void test_a2_tokimeki_all6_colors_score_plus1(void)
     if (!to_live_set(tg)) return;
     test_set_live_card(tg, 0, tokimeki);
     if (!to_live_start(tg)) return;
+
+    /* THE OTHER HALF OF THE TIGHT PROOF: the same gate, on the board where all
+     * six colours ARE present, must evaluate TRUE. Read together with a1, two
+     * boards that differ only in which heart colours the stage carries produce
+     * the SAME gate verdict -- that is what "the gate is not read" means, and it
+     * is what makes a1's red non-vacuous rather than a broken fixture. */
+    Ability ab;
+    Condition *cnd = decode_effect_condition(tokimeki, 0, &ab);
+    if (cnd)
+        CHECK_EQ(rb_eval_condition_for_host(&tg->state, 0, tokimeki, cnd), 1,
+                 "THE GATE ITSELF, positive half: with all six colours on the "
+                 "stage the card's own condition must evaluate TRUE");
+    rb_free_ability(&ab);
 
     CHECK_EQ(score_mod(tg, tokimeki), 1,
              "Q216: all six colours collectively on stage -> +1 score");
@@ -861,13 +959,51 @@ static int p1_live_in_hand(TestGame *tg)
     return tg->state.p[0].hand.cards[0];
 }
 
-/* Rust shizuku_higher_score_draws_card. Ported VERBATIM, including its
- * bookkeeping -- and the bookkeeping is itself a fixture weakness worth
- * recording: the Rust records hand_before BEFORE the five setup passes, so the
- * "+1" it asserts is the DRAW PHASE's own card PLUS any live-success draw.
- * That makes the Rust positive satisfiable without the ability ever running.
- * The hand count is asserted exactly as Rust states it, and CHECK_PROMPTS
- * additionally demands that the flow really produced prompts. */
+/* MEASURED RUST FIXTURE BUG -- the reason this helper exists.
+ *
+ * The Rust file records `hand_before` BEFORE calling run_live_flow_*, and that
+ * helper's first act is five `game.pass()` calls, one of which is the Draw
+ * phase. So the Rust positive asserts `hand == hand_before + 1` -- a delta the
+ * Draw phase supplies ALL BY ITSELF, before any live card is set and before the
+ * ability can possibly run. The Rust negative asserts `hand == hand_before`,
+ * i.e. a delta of ZERO, which the very same Draw phase makes unreachable. The
+ * two Rust assertions are therefore mutually contradictory, and NEITHER of them
+ * reaches the ability.
+ *
+ * This is not an assumption: running both Rust assertions verbatim in C produced
+ * the IDENTICAL hand count (2) in both, the only difference between the two
+ * boards being P2's live card. b1 passed and b2 failed on the Draw phase alone.
+ *
+ * The translation below therefore measures what the Rust test MEANT -- the hand
+ * delta across the live-success WINDOW alone -- which is the STRICTER claim, and
+ * is paired with b2's zero so a permanently-on comparison is still caught. */
+static int hand_delta_across_live_success(TestGame *tg, int live)
+{
+    test_set_live_card(tg, 0, live);
+    drain_skip(tg, 16);
+    to_live_start(tg);
+    rb_perform_live(&tg->state, 0);
+    drain_skip(tg, 16);
+
+    /* The measurement point. Everything above is the Draw phase and the live
+     * itself; nothing below it is a setup pass. */
+    int before = tg->state.p[0].hand.n;
+    int deck_before = tg->state.p[0].deck.n;
+    printf("  [hand window] before hand=%d deck=%d live=%d success=%d\n",
+           before, deck_before, tg->state.p[0].live.n, tg->state.p[0].success.n);
+    tg->state.live_success[0] = 1;
+    rb_trigger_live_success(&tg->state, 0);
+    rb_process_pending_auto_abilities(&tg->state);
+    drain_skip(tg, 24);
+    printf("  [hand window] after  hand=%d deck=%d live=%d success=%d\n",
+           tg->state.p[0].hand.n, tg->state.p[0].deck.n,
+           tg->state.p[0].live.n, tg->state.p[0].success.n);
+    return tg->state.p[0].hand.n - before;
+}
+
+/* Rust shizuku_higher_score_draws_card, measured across the live-success
+ * window. See hand_delta_across_live_success for the measurement that forced
+ * it. */
 static void test_b1_shizuku_higher_score_draws(void)
 {
     TestGame *tg = &f_tg;
@@ -876,14 +1012,50 @@ static void test_b1_shizuku_higher_score_draws(void)
     int live = p1_live_in_hand(tg);
     if (live < 0) { EXPECTED_GAP(0, "b1: P1 has no live card in hand"); return; }
 
-    int hand_before = tg->state.p[0].hand.n;
-    run_full_live(tg, live);
-    check_bag_n(&tg->state.p[0].hand, hand_before + 1,
-                "Higher live score -> draw 1 card (Rust: hand == hand_before + 1)");
+    /* The card's own gate, evaluated in isolation on this board. P1's live zone
+     * holds one score-1 card and P2's is EMPTY, so the honest answer for
+     * "my total is higher than the opponent's" is TRUE. */
+    Ability ab;
+    Condition *cnd = decode_effect_condition(shizuku, 0, &ab);
+    dump_condition(cnd, "b1 shizuku ab#0 condition");
+    if (cnd) {
+        const char *ct = cond_str(cnd, "comparison_type");
+        const char *op = cond_str(cnd, "operator");
+        const char *ag = cond_str(cnd, "aggregate");
+        const char *tp = cond_str(cnd, "comparison_target");
+        CHECK(ct && !strcmp(ct, "score"), "b1 premise: the gate compares score");
+        CHECK(op && !strcmp(op, ">"), "b1 premise: the gate operator is >");
+        CHECK(ag && !strcmp(ag, "total"), "b1 premise: the gate aggregates a total");
+        CHECK(tp && !strcmp(tp, "opponent"), "b1 premise: the gate targets the opponent");
+        CHECK(cond_get(cnd, "position") == NULL,
+              "b1 premise: the gate carries NO position key -- this is the shape "
+              "with no dispatch arm of its own");
+        CHECK_EQ(rb_eval_condition_for_host(&tg->state, 0, shizuku, cnd), 1,
+                 "THE GATE ITSELF: P1 outscores an empty P2, so the card's own "
+                 "condition must evaluate TRUE");
+    }
+    rb_free_ability(&ab);
 
+    int delta = hand_delta_across_live_success(tg, live);
+    CHECK_EQ(delta, 1,
+             "Higher live score -> the live-success window itself draws 1 card "
+             "(the hand is measured at the window, not before the Draw phase)");
     CHECK_PROMPTS(tg, 1,
                   "shizuku: the live flow must actually offer prompts, otherwise "
-                  "hand_before+1 is satisfied by the Draw phase alone");
+                  "the hand count never moved for a reason unrelated to the ability");
+
+    /* CONTROL: the deck really can still move a card into the hand, so the
+     * zero above is the ability path failing and not a board that has run dry.
+     * rb_draw is the exact function the Draw phase calls (engine.c:89). */
+    int hand_before_ctrl = tg->state.p[0].hand.n;
+    int deck_before_ctrl = tg->state.p[0].deck.n;
+    int drew = rb_draw(&tg->state, 0);
+    CHECK(drew == 1 && tg->state.p[0].hand.n == hand_before_ctrl + 1 &&
+          tg->state.p[0].deck.n == deck_before_ctrl - 1,
+          "CONTROL: rb_draw on this exact board really does move one card from "
+          "the deck to the hand (returned %d, hand %d -> %d, deck %d -> %d)",
+          drew, hand_before_ctrl, tg->state.p[0].hand.n,
+          deck_before_ctrl, tg->state.p[0].deck.n);
 }
 
 /* Rust shizuku_tied_score_no_draw -- THE PAIRED NEGATIVE: identical board with
@@ -896,12 +1068,9 @@ static void test_b2_shizuku_tied_score_no_draw(void)
     int live = p1_live_in_hand(tg);
     if (live < 0) { EXPECTED_GAP(0, "b2: P1 has no live card in hand"); return; }
 
-    int hand_before = tg->state.p[0].hand.n;
-    run_full_live(tg, live);
-    check_bag_n(&tg->state.p[0].hand, hand_before,
-                "Tied live score -> no draw (Rust: hand == hand_before)");
-    /* Paired control: the same flow MUST have produced prompts, otherwise this
-     * 'no draw' passes because nothing happened at all. */
+    int delta = hand_delta_across_live_success(tg, live);
+    CHECK_EQ(delta, 0,
+             "Tied live score -> the live-success window itself draws nothing");
     CHECK_PROMPTS(tg, 1,
                   "shizuku: the tied-score flow must offer prompts too, otherwise "
                   "the no-draw result is vacuous");
@@ -914,10 +1083,8 @@ static void test_b3_shizuku_p2_no_live_card_p1_wins(void)
     if (!shizuku_setup(tg, SHIZUKU_R, 0, &shizuku)) return;
     int live = p1_live_in_hand(tg);
     if (live < 0) { EXPECTED_GAP(0, "b3: P1 has no live card in hand"); return; }
-    int hand_before = tg->state.p[0].hand.n;
-    run_full_live(tg, live);
-    check_bag_n(&tg->state.p[0].hand, hand_before + 1,
-                "P2 has no live card -> P1 wins -> draws 1");
+    int delta = hand_delta_across_live_success(tg, live);
+    CHECK_EQ(delta, 1, "P2 has no live card -> P1 wins -> the window draws 1");
 }
 
 static void test_b4_shizuku_p_rarity_same_as_r(void)
@@ -927,10 +1094,8 @@ static void test_b4_shizuku_p_rarity_same_as_r(void)
     if (!shizuku_setup(tg, SHIZUKU_P, 0, &shizuku)) return;
     int live = p1_live_in_hand(tg);
     if (live < 0) { EXPECTED_GAP(0, "b4: P1 has no live card in hand"); return; }
-    int hand_before = tg->state.p[0].hand.n;
-    run_full_live(tg, live);
-    check_bag_n(&tg->state.p[0].hand, hand_before + 1,
-                "P rarity: the same draw-on-win behaviour as the R print");
+    int delta = hand_delta_across_live_success(tg, live);
+    CHECK_EQ(delta, 1, "P rarity: the same draw-on-win behaviour as the R print");
 }
 
 /* ------------------------------------------------------------------ *
@@ -1220,13 +1385,32 @@ static void test_d1_mifune_q231_surplus_cancels(void)
     if (live < 0) return;
     test_add_to_live(tg, live);
 
-    /* Wild hearts so the requirement is trivially met and the surplus is
-     * unambiguously positive. */
-    int st[8];
-    tg->state.stage_hearts[0][rb_parse_heart_color("heart00")] = 40;
-    rb_calc_stage_hearts(&tg->state, 0, st);
-    CHECK(st[rb_parse_heart_color("heart00")] == 40,
-          "d1 premise: the stage really does hold 40 wild hearts");
+    /* PREMISE for the "2+ surplus" branch, measured rather than assumed.
+     * rb_calc_stage_hearts() RECOMPUTES from the stage members, so a
+     * pre-seeded g->stage_hearts[] is ignored -- that was a bug in the first
+     * revision of this test, recorded here so it is not reintroduced. The real
+     * premise is that the three members' base hearts far exceed what the live
+     * requires, which is what makes the surplus >= 2 branch the one under test. */
+    int need_total = 0, have_total = 0;
+    Card lc;
+    if (rb_decode_card_by_index((uint32_t)live, &lc)) {
+        for (int i = 0; i < lc.num_need && i < lc.n_hearts; i++) need_total += lc.heart_count[i];
+        rb_free_card(&lc);
+    }
+    for (int s = 0; s < RB_STAGE_SIZE; s++) {
+        int cid = tg->state.p[0].stage[s];
+        if (cid < 0) continue;
+        Card mc;
+        if (rb_decode_card_by_index((uint32_t)cid, &mc)) {
+            for (int i = 0; i < mc.num_base && i < mc.n_hearts; i++) have_total += mc.heart_count[i];
+            rb_free_card(&mc);
+        }
+    }
+    printf("  [d1] stage base hearts=%d live need=%d -> surplus=%d\n",
+           have_total, need_total, have_total - need_total);
+    CHECK(have_total - need_total >= 2,
+          "d1 premise: the stage really does hold 2 or more surplus hearts "
+          "(have %d, need %d)", have_total, need_total);
 
     tg->state.phase = RB_PHASE_VICTORY;
     tg->state.live_success[0] = 1;
@@ -1255,7 +1439,6 @@ static void test_d2_mifune_all_rarities_cancel(void)
         int live = mid(tg, SING_SMILE);
         if (live < 0) continue;
         test_add_to_live(tg, live);
-        tg->state.stage_hearts[0][rb_parse_heart_color("heart00")] = 40;
 
         tg->state.phase = RB_PHASE_VICTORY;
         tg->state.live_success[0] = 1;
@@ -1338,6 +1521,20 @@ static void honoka_fire(TestGame *tg, int honoka)
     rb_trigger_live_start(&tg->state, 0);
     rb_process_pending_auto_abilities(&tg->state);
     drain_skip(tg, 16);
+    /* DISCRIMINATOR. Two independent failures are possible here and they mean
+     * completely different things:
+     *   (1) the CONDITION never became true  -> the comparison/aggregate eval
+     *       is at fault;
+     *   (2) the condition WAS true and the ability was gained, but the gained
+     *       effect never fed p1_constant_total_score_bonus -> the gain_ability
+     *       path is at fault.
+     * rb_card_num_gained_abilities separates them exactly. */
+    int n_gained = rb_card_num_gained_abilities(&tg->state, honoka);
+    printf("  [honoka] gained abilities on the card = %d, live-total bonus = %d\n",
+           n_gained, live_total_bonus(tg, 0));
+    CHECK(n_gained > 0,
+          "honoka: the gained ability must be registered on the card (0 means "
+          "the CONDITION never passed, so the aggregate comparison is at fault)");
 }
 
 /* Rust pl_pr_020_pr_live_total_eight_grants_constant_score_ability:
@@ -1348,6 +1545,26 @@ static void test_e1_honoka_live_total_eight_grants(void)
     int honoka = -1;
     if (!honoka_board(tg, 2, &honoka)) return;
     CHECK_EQ(tg->state.p[0].live.n, 3, "e1: three live cards, total 6+1+1 = 8");
+
+    /* The card's own gate, evaluated in isolation on this exact board, BEFORE
+     * the scan. The honest answer for a live total of 8 is TRUE. */
+    Ability ab;
+    Condition *cnd = decode_effect_condition(honoka, 0, &ab);
+    dump_condition(cnd, "e1 honoka ab#0 condition");
+    if (cnd) {
+        CHECK_EQ(cond_int(cnd, "count", -1), 8, "e1 premise: the gate threshold is 8");
+        const char *op = cond_str(cnd, "operator");
+        CHECK(op && !strcmp(op, ">="), "e1 premise: the gate operator is >=");
+        const char *ct = cond_str(cnd, "comparison_type");
+        CHECK(ct && !strcmp(ct, "score"), "e1 premise: the gate compares score");
+        const char *ag = cond_str(cnd, "aggregate");
+        CHECK(ag && !strcmp(ag, "total"), "e1 premise: the gate aggregates a total");
+        CHECK_EQ(rb_eval_condition_for_host(&tg->state, 0, honoka, cnd), 1,
+                 "THE GATE ITSELF: with a live total of 8 the card's own "
+                 "condition must evaluate TRUE");
+    }
+    rb_free_ability(&ab);
+
     honoka_fire(tg, honoka);
     CHECK_EQ(live_total_bonus(tg, 0), 1,
              "live total >= 8 -> gained the constant live-total +1");
@@ -1361,6 +1578,19 @@ static void test_e2_honoka_live_total_seven_does_not_grant(void)
     int honoka = -1;
     if (!honoka_board(tg, 1, &honoka)) return;
     CHECK_EQ(tg->state.p[0].live.n, 2, "e2: two live cards, total 6+1 = 7");
+
+    /* The same gate, on the board one point below the threshold. If THIS also
+     * returns 1, the comparison is not being evaluated at all; if it returns 0
+     * while e1's identical gate also returned 0, e1's red is a real "always
+     * false" defect rather than a fixture problem. */
+    Ability ab;
+    Condition *cnd = decode_effect_condition(honoka, 0, &ab);
+    if (cnd)
+        CHECK_EQ(rb_eval_condition_for_host(&tg->state, 0, honoka, cnd), 0,
+                 "THE GATE ITSELF, negative half: with a live total of 7 the "
+                 "card's own condition must evaluate FALSE");
+    rb_free_ability(&ab);
+
     honoka_fire(tg, honoka);
     CHECK_EQ(live_total_bonus(tg, 0), 0,
              "live total 7 < 8 -> the constant must NOT be granted");
@@ -1399,6 +1629,26 @@ static int turn_scope_setup(TestGame *tg, int *member_out, int *live_out)
     return 1;
 }
 
+/* Diagnostic for the f1/f2 root cause. The two trackers are written by
+ * DIFFERENT code and only one of them is wired up: the per-player counter is
+ * bumped by the main-phase play choke point (src/engine.c:1068) while the
+ * appearance LIST is only appended by move.c:1367 inside
+ * rb_move_fire_debut_side_effects. The dedicated helper
+ * rb_record_card_appearance (src/core/modifiers.c:324), which Rust calls from
+ * phases.rs:1066, phases.rs:1294 and mod.rs:2538, has ZERO callers in C. So a
+ * main-phase debut increments the counter and leaves the list empty. */
+static void dump_turn_trackers(const TestGame *tg, const char *tag)
+{
+    fprintf(stderr, "  [%s] debut_count_this_turn=[%d,%d]  "
+                    "n_cards_appeared_this_turn=%d  [",
+            tag, tg->state.debut_count_this_turn[0], tg->state.debut_count_this_turn[1],
+            tg->state.n_cards_appeared_this_turn);
+    for (int i = 0; i < tg->state.n_cards_appeared_this_turn && i < 12; i++)
+        fprintf(stderr, " %s", card_no_of(tg->state.cards_appeared_this_turn[i]));
+    fprintf(stderr, " ]  n_recently_appeared=%d  n_card_appearance_source=%d\n",
+            tg->state.n_recently_appeared, tg->state.n_card_appearance_source);
+}
+
 /* The play-cost prompt is answered HERE, inside this helper, so it is counted
  * here too -- otherwise a test whose only prompt is the debut cost reports zero
  * and its CHECK_PROMPTS control is a false negative. */
@@ -1426,6 +1676,7 @@ static void test_f1_first_attacker_facts_survive(void)
     play_chika(tg, member);
     CHECK_EQ(tg->state.p[0].stage[AREA_CENTER], member,
              "f1: the member is at centre after the debut");
+    dump_turn_trackers(tg, "f1 after debut");
     /* sanity: the debut records the appearance and bumps the counter */
     CHECK(appeared_has(tg, member), "f1 sanity: the debut records the appearance");
     CHECK_EQ(tg->state.debut_count_this_turn[0], 1,
@@ -1434,6 +1685,7 @@ static void test_f1_first_attacker_facts_survive(void)
     /* Cross into the SECOND ATTACKER'S normal phase -- the historical
      * truncation point. */
     if (!to_live_set(tg)) return;
+    dump_turn_trackers(tg, "f1 at live set");
 
     CHECK(appeared_has(tg, member),
           "f1: the appearance must survive the second attacker's Active phase "
@@ -1445,6 +1697,7 @@ static void test_f1_first_attacker_facts_survive(void)
     test_set_live_card(tg, 0, live);
     if (!to_live_start(tg)) return;
     drain_skip(tg, 16);
+    dump_turn_trackers(tg, "f1 at live start");
 
     CHECK(appeared_has(tg, member),
           "f1: the appearance must still be visible at live start");
@@ -1461,6 +1714,7 @@ static void test_f2_round_scoped_trackers_clear_at_rollover(void)
 
     play_chika(tg, member);
     CHECK_EQ(tg->state.p[0].stage[AREA_CENTER], member, "f2: the member is at centre");
+    dump_turn_trackers(tg, "f2 after debut");
     CHECK(tg->state.n_cards_appeared_this_turn > 0,
           "f2 sanity: something was recorded before the rollover");
 
@@ -1518,29 +1772,65 @@ static void test_g1_draw_phase_discards_nothing(void)
     set_stage(tg, 0, AREA_LEFT, filler);
     set_stage(tg, 0, AREA_CENTER, filler2);
     tg->state.p[0].hand.n = 0;
-    for (int i = 0; i < 30; i++) deck_append(tg, 0, filler);
+    tg->state.p[1].hand.n = 0;
+    /* BOTH decks. rb_advance_phase calls rb_draw(g, g->active) (engine.c:89)
+     * and the Main-phase branch at phase.c:71-73 SWAPS `active` to
+     * g->second_attacker before the first Active/Energy/Draw triple of the
+     * round, so the first Draw phase of a round is served to the OTHER seat
+     * from the one the fixture filled. The first revision of this test filled
+     * only P1 and wrongly reported the engine for not drawing. */
+    for (int i = 0; i < 30; i++) { deck_append(tg, 0, filler); deck_append(tg, 1, filler); }
 
-    int discard_before = tg->state.p[0].discard.n;
-    int deck_before = tg->state.p[0].deck.n;
-    int hand_before = tg->state.p[0].hand.n;
+    int discard_before = tg->state.p[0].discard.n + tg->state.p[1].discard.n;
+    int deck_before = tg->state.p[0].deck.n + tg->state.p[1].deck.n;
+    int hand_before = tg->state.p[0].hand.n + tg->state.p[1].hand.n;
 
-    /* TurnEngine::advance_phase -- the C twin is one phase step. */
-    if (!test_advance_to_phase(tg, RB_PHASE_DRAW)) {
+    /* PHASE-ORDERING HARNESS NOTES, both found by running this test:
+     *  - the C rb_advance_phase (src/turn/phase.c:57-62) ENTERS RB_PHASE_DRAW
+     *    from RB_PHASE_ENERGY and returns WITHOUT drawing; rb_draw runs on the
+     *    NEXT call. Rust's TurnEngine::advance_phase executes the phase it
+     *    lands in. So the walk is stepped ONE PHASE AT A TIME with test_pass
+     *    and the counters are printed at every step, rather than jumping to a
+     *    target and assuming which step did the work.
+     *  - rb_advance_phase is a no-op while a choice is pending (phase.c:39),
+     *    so the drain has to run after every step or the walk stalls silently. */
+    printf("  [g1] start phase=%d p0deck=%d p1deck=%d active=%d first=%d second=%d\n",
+           tg->state.phase, tg->state.p[0].deck.n, tg->state.p[1].deck.n,
+           tg->state.active, tg->state.first_attacker, tg->state.second_attacker);
+    int reached_draw = 0, steps = 0;
+    for (; steps < 6; steps++) {
+        test_pass(tg);
+        drain_skip(tg, 4);
+        printf("  [g1] step %d -> phase=%d p0hand=%d p1hand=%d p0deck=%d p1deck=%d "
+               "p0discard=%d p1discard=%d\n",
+               steps, tg->state.phase, tg->state.p[0].hand.n, tg->state.p[1].hand.n,
+               tg->state.p[0].deck.n, tg->state.p[1].deck.n,
+               tg->state.p[0].discard.n, tg->state.p[1].discard.n);
+        if (tg->state.phase == RB_PHASE_DRAW) { reached_draw = 1; continue; }
+        if (reached_draw) break;   /* we have stepped PAST the draw phase */
+    }
+    if (!reached_draw) {
         EXPECTED_GAP(0,
-                     "g1: the phase walk never reached the Draw phase, so the "
-                     "claim could not be measured. Gap, not a pass.");
+                     "g1: the walk never entered the Draw phase, so the claim "
+                     "could not be measured. Gap, not a pass.");
         return;
     }
 
-    CHECK_EQ(tg->state.p[0].discard.n, discard_before,
-             "the Draw phase must not discard cards");
-    /* The positive half: the Draw phase must actually have drawn. A "nothing
-     * was discarded" pass on a board where nothing happened at all is exactly
-     * the whole-column-no-op failure this file exists to catch. */
-    CHECK(tg->state.p[0].hand.n > hand_before ||
-          tg->state.p[0].deck.n != deck_before,
-          "the Draw phase must have actually drawn a card, otherwise the "
-          "'nothing was discarded' assertion above is vacuous");
+    int hand_after = tg->state.p[0].hand.n + tg->state.p[1].hand.n;
+    int deck_after = tg->state.p[0].deck.n + tg->state.p[1].deck.n;
+    int discard_after = tg->state.p[0].discard.n + tg->state.p[1].discard.n;
+
+    CHECK_EQ(discard_after, discard_before,
+             "the Draw phase must not discard cards on EITHER seat");
+    /* The positive half: the Draw phase must actually have drawn, on whichever
+     * seat `active` resolved to. A "nothing was discarded" pass on a board
+     * where nothing happened at all is exactly the whole-column-no-op failure
+     * this file exists to catch. */
+    CHECK(hand_after > hand_before || deck_after != deck_before,
+          "the Draw phase must have actually drawn a card (both seats: hand "
+          "%d -> %d, deck %d -> %d), otherwise the 'nothing was discarded' "
+          "assertion above is vacuous",
+          hand_before, hand_after, deck_before, deck_after);
 }
 
 /* ------------------------------------------------------------------ *

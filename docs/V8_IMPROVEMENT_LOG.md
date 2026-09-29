@@ -11,6 +11,184 @@ engineering record. What to do next — the located causes and 25 ranked methods
 
 ---
 
+## 0. Second audit round (2026-09-29): two of the located causes were mislocated
+
+This round started by trying to re-diagnose the v7/v8 live-set divergence before
+building anything against it, because `V8_NEXT_METHODS.md` §4.2 and §6.1 name a
+cause that turned out to be wrong, and the headline number behind it is an
+artifact. Both are recorded here because both had been load-bearing.
+
+### 0.1 "v7 sees live-start abilities because its live set rolls out" — false
+
+§4.2 attributes v7's advantage on the live set to a rollout that executes the
+live start for real. v7's default live path does not roll out.
+`choose_live_set_v7` returns at `strategy_v7.rs:489` into
+`choose_live_set_experiment` → `live_set_plan` (`:2145`), which is a static
+analytic model: `experiment_portfolio_rank` (`:2022`) and `best_response_set`
+(`:2917`) both compute pass probability from sampled board pools and printed
+scores. The rollout is reachable only behind `V7_ROLLOUT` (`:486`) or
+`V7_ROLLOUT_ASSIST` (`:2478`), neither set in a default run. **Both bots are
+blind to `{{live_start}}`.**
+
+### 0.2 The has-live-start split has no contrast to measure
+
+`V7CHK`/`V8CHK` now emit `lcand` (lives in hand) and `lscand` (how many carry a
+`{{live_start}}` ability). Measured over 200 paired games, `lscand == lcand` on
+**every single line** — 100% of the lives this deck puts in hand carry a
+live-start ability.
+
+So the planned test (split `v7-chosen` vs `v8-chosen` by has-live-start) has no
+negative class and cannot separate the two candidate causes. The MIRACLE NE
+12-vs-0 split cannot be about live-start *presence*, because presence is
+universal here. Any future live-start work has to discriminate on **which**
+ability and **how much** it adds, not on whether one exists.
+
+### 0.3 The "v7 commits at 0.924, v8 at 0.485" comparison was two definitions
+
+This is the important one, and it is the number §6.1 and the burn-price
+arithmetic are built on.
+
+`chosen_set_pass_probability` returned **1.000** for a zone holding only junk.
+`desired` holds hand *indices* and `experiment_junk_fill` fills spare slots with
+junk, so a junk-only zone has a non-empty `desired` and an all-zero pooled
+`need`, which every sampled pool trivially satisfies. v8's equivalent takes an
+explicit `if chosen.is_empty() { 0.0 }` branch and reported **0.000** for the
+same physical decision.
+
+So v7's mean committed p was inflated toward 1.0 by every junk-only zone and
+v8's was pushed toward 0.0 by every one of its own, and the reported gap
+between them is substantially measurement artifact rather than a difference
+between the bots. Folding is not a check passed — it is a check handed over.
+
+Both sides now report 0.0 for a zone with no life in it, and `ppass` is named
+apart from `p` (`p_place`) on both lines. The old claim should be treated as
+unmeasured, not as evidence.
+
+### 0.4 A correction to the earlier note in this file
+
+This log previously recorded the belief that v7's live set rolls out and
+therefore sees abilities, and built on it. It does not, and the belief was never
+tested. The lesson generalises past this case: a mechanism attributed to
+another bot's *architecture* should be confirmed by reading that bot's default
+path, not inferred from the fact that the mechanism exists in the file.
+
+### 0.5 Instrument fixes that were bugs, not improvements
+
+- `best_available` was bound in the `V7_CHECK_P` block and never formatted. The
+  compiler confirmed it (`unused variable: best_available`): that headroom
+  number has never reached a capture. It now prints, and the set-aware version
+  is a separate function from the decision-facing one — see §0.6.
+- v8's `V8CHK` printed `p_place` where v7's printed pass probability, under a
+  comment calling the two lines "paired" and "comparable at the same blade
+  count". Different quantities; a `p` difference between those lines was being
+  read as a development difference.
+- `best_available_pass_probability` is a **v7 decision input** (`live_set_plan`
+  feeds it to `expected_live_value` as `mine_p`), not only telemetry. Making it
+  set-aware to match the headroom question would have silently changed the
+  reference bot mid-audit. The decision-facing function is untouched; the
+  set-aware one is new and telemetry-only.
+
+### 0.6 Two correctness fixes in the live-set candidate enumeration
+
+- `1 << lives.len().min(16)` silently made every life past the 16th
+  unreachable, with no counter and no log. Replaced with a bounded-width
+  generator over `C(n,1..=3)` — correct at any hand size, cheaper at every size,
+  and order-identical at the shipped default width of 1. Pinned by
+  `candidate_enumeration_sees_every_life_whatever_the_hand_size`.
+- The `V8_NO_FOLD` ablation is not broken, contrary to an earlier reading: the
+  dead `entry.value = f64::NEG_INFINITY` line is overwritten by design and the
+  mechanism is the overwrite onto the fold entry. Moving that line to "fix" it
+  would delete the candidate the switch exists to promote.
+
+**Baseline preserved.** After all of the above, `bot_arena v8 v7 400 "5CP3Z
+idou" --seed 11` is bit-identical to before the round: 179-221, 16163 actions,
+placements 0.403 / 0.451. Nothing in this section changes how either bot plays.
+
+### 0.7 The colour-exact Main leaf: a real dead end, and the tenth
+
+`V8_NEXT_METHODS.md` §6.4 and the comment on `best_life_deficit` both argue
+that the v8 Main leaf is colour-blind and that this costs a lot. The argument
+is correct about the leaf and wrong about the remedy.
+
+`v8_model::colour_shortfall` prices the per-colour shortfall of the biggest
+life in hand, and `v8_main::leaf_value` takes it behind `V8_DEFICIT`. Unlike
+the previous nine attempts it is **not** a monotone function of what
+`band_progress` already reads: `colour_shortfall_sees_the_vector_not_the_total`
+pins that two equal-total boards in different colours get different values. So
+the standard defence of the dead ends does not apply and it had to be measured.
+
+It is a regression, and worse at a larger weight:
+
+| weight | paired result | McNemar p | pace (P1) |
+|---|---|---|---|
+| off (baseline) | 179-221 | — | 0.403 |
+| 0.05 | 165-235 | 0.04356 | 0.384 |
+| 0.35 | 148-252 | 0.00015 | 0.366 |
+
+Monotone in the harmful direction across a 7x range. That is a gradient
+pointing at zero, not a surface with a peak the sweep missed, so it is not
+worth spending a large-n run on the way the blades sweep was spent.
+
+**The likely reason, and it is a target-selection error rather than a
+colour-blindness one.** The term aims at the *biggest* life in hand. Early in a
+game the biggest life is usually one we cannot set for several turns, so the
+term rewards colouring the board toward a card that is not yet payable and
+pulls development away from the raw growth the opening actually needs. The
+signatures match: pace falls monotonically with the weight, and stage cost
+rises while placements fall — more board, fewer conversions, which is the
+opposite of what the term was supposed to buy.
+
+So the open question is not "is colour-blindness bad" — the dead ends already
+covered that, twice over. It is **which life to aim at**: a fixed big target is
+worse than no target. A term that prices the best life we could actually set
+*now* is a different proposition and is not refuted by this.
+
+Kept behind the switch, off by default, rather than deleted, so the ablation
+stays reproducible. The default path is also guarded so it does not pay for a
+term nobody is holding.
+
+### 0.8 The opponent horizon: zero effect, and the reason is a step function
+
+§6.5 asks for the opponent model to be "refreshed through the search". As
+written that is a no-op and it is worth saying why: during our own Main phase
+the opponent's board cannot change, so re-reading it at each node returns an
+identical model. The staleness is in the **horizon**, not the depth — the
+horizon term runs our forward walk two turns and then prices the opponent at
+the board they have *now*, so inside a term whose whole job is to see the race
+in two turns, the opponent never grows.
+
+`OppModel::with_board` re-evaluates `pass_prob` and `score_dist` against a
+projected board, and `V8_OPP_HORIZON` advances their public board by the same
+amount ours advanced (both players draw the same cards and gain the same
+energy — 3.2; their hand and deck are never read).
+
+Measured over 400 paired games: **zero discordant pairs.** p=1.00, every one of
+16163 actions identical. Not a small effect below the noise floor — the term
+never changed a single decision.
+
+The cause is that the opponent's pass model is a hard threshold. `clears` sums
+`YIELD_PRIOR` weights gated on `supply >= bar` and clamps to 1.0, so across 369
+board/blade combinations spanning the guides' entire real range (T1~4 to T7~26
+hearts) the model takes **6 distinct values**. Advancing their board lands on
+the same step almost every time. "The opponent is catching up" is not a
+statement this model is able to make.
+
+Pinned by `the_opponent_pass_model_has_only_a_handful_of_states`, which
+asserts the measured 6 rather than a hoped-for gradient — so a future change
+that gives the model a real gradient has to come to that test deliberately and
+raise it, instead of passing unnoticed.
+
+**This invalidates a whole family of planned methods, not one instance.** Every
+opponent-horizon idea in §6 — the refresh, and anything else that wants the
+opponent's threat to grow over time — is measuring noise until the model has a
+gradient. The fix is not a weight. It is replacing the threshold with the same
+coverage calculation v8 already uses for its *own* check (`FlipSampler` /
+`pass_probability`), so a board one heart short of the bar scores differently
+from one three hearts short. That is a real, buildable improvement and it is
+the highest-value next step in the file.
+
+---
+
 ## 1. The instrument came first, and it was the precondition for everything
 
 `bot_arena` emitted a bare win/loss tally. It now emits per-game outcomes

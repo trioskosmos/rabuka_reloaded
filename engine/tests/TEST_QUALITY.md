@@ -24,15 +24,13 @@ _trigger event hand-pushed with no real ability resolution in the same fn (weake
 
 None.
 
-## pendency_only (3)
+## pendency_only (1)
 
 _has_pending_choice asserted without choice identity (pending_choice_type/summary/answer) or outcome asserts_
 
 | file | test | line | detail |
 | --- | --- | --- | --- |
-| `engine/tests/test_modules/effects/gain/hearts/color_choice/chosen_colour_is_a_replacement_not_a_grant_test.rs` | `kasumi_colour_override_does_not_survive_the_live_that_set_it` | 198 |  |
 | `engine/tests/test_modules/jidou/debut_watch/three_way_choices_and_look_at_three_test.rs` | `wakana_the_chosen_heart_replaces_her_printed_hearts` | 159 |  |
-| `engine/tests/test_modules/jidou/yell/no_blade_heart_reveal_gain/no_blade_heart_reveal_two_watchers_modifier_bounds_test.rs` | `yell_two_no_blade_heart_watchers_are_covered_by_the_real_yell_test` | 30 |  |
 
 ## assert_only_negative (0)
 
@@ -58,9 +56,9 @@ _file CALLS trigger_live_success_abilities on a live whose printed need_heart no
 
 | file | test | line | detail |
 | --- | --- | --- | --- |
-| `engine/tests/test_modules/characterization/zero_tested_action_types_test.rs` | `PL!SP-bp2-024-L` | 1 | heart03 needs 4, best single member prints 3 |
+| `engine/tests/test_modules/characterization/zero_tested_action_types_test.rs` | `PL!N-bp4-025-L` | 1 | heart05 needs 8, best single member prints 4 |
 | `engine/tests/test_modules/effects/gain/blades/constants/success_pile_difference_pl_s_bp6_009_r_plus_test.rs` | `PL!S-bp2-026-L` | 1 | heart04 needs 6, best single member prints 5 |
-| `engine/tests/test_modules/integration/full_round/real_card_phase_walkthrough_and_ability_suite_test.rs` | `PL!S-bp2-026-L` | 1 | heart04 needs 6, best single member prints 5 |
+| `engine/tests/test_modules/integration/full_round/real_card_phase_walkthrough_and_ability_suite_test.rs` | `PL!-bp3-026-L` | 1 | heart03 needs 5, best single member prints 3 |
 
 ## drain_zero_may_decline (49)
 

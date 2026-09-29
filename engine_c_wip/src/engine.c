@@ -228,6 +228,15 @@ void rb_execute_effect_ex(GameState *g, int actor, AbilityEffect *e, int host_ci
         fprintf(stderr, "[EXEC_EFFECT_ENTER] action=%s host=%d pending=%d depth=%d ptr=%p\n",
                 e->action ? e->action : "-", host_cid, rb_has_pending_choice(g), s_exec_depth, (void *)e);
     g->queue.resume_host = host_cid;
+    /* Park guard (see the resume_parent block below). The continuation parked by
+        a DEEPER frame of this same effect tree must survive the return path here,
+        so remember what resume_parent held when this frame was entered: if a
+        descendant changed it, this frame is NOT the innermost one and must not
+        claim the park. Comparing against the entry value (rather than testing
+        `resume_parent != NULL`) is what makes this safe: rb_clear_pending_choice
+        does not clear resume_parent, so a stale pointer from an ALREADY-ANSWERED
+        prompt would otherwise suppress a legitimate park forever. */
+    const AbilityEffect *entry_park = g->queue.resume_parent;
     /* Bound recursion: a deeply-nested effect tree (or a chain of ability effects
         that move/activate members) can recurse through this fn and overflow the
         stack. Headless caps the depth; effects past the cap are skipped (the same
@@ -272,16 +281,25 @@ void rb_execute_effect_ex(GameState *g, int actor, AbilityEffect *e, int host_ci
                                       !strcmp(ch->action, "select_cards") ||
                                       !strcmp(ch->action, "select") ||
                                       !strcmp(ch->action, "look_and_select"));
-                    if (is_choice) {
-                        /* Mirror Rust pending_actions: the choice's remaining body
-                            (the sibling effects that follow it in the parent, e.g. the
-                            gain_resource that follows a heart-color select) runs AFTER
-                            the player answers. Park the parent + the choice's child
-                            index so resume executes the later siblings. */
-                        g->queue.resume_parent = e;
-                        g->queue.resume_child = i;
-                        g->queue.resume_host = host_cid;
-                    } else if (is_gate) {
+                    /* Mirror Rust pending_actions: the choice's remaining body
+                        (the sibling effects that follow it in the parent, e.g. the
+                        gain_resource that follows a heart-color select) runs AFTER
+                        the player answers. Park the parent + the choice's child
+                        index so resume executes the later siblings — but only if
+                        no DEEPER frame already parked. Without that guard the
+                        OUTER loop re-entered here after the grandchild's prompt
+                        was raised, saw rb_has_pending_choice, and overwrote the
+                        grandchild's (parent=e_inner, child=i_inner) with its own
+                        (parent=e_outer, child=i_outer) — so answering the prompt
+                        resumed the OUTER frame's remaining siblings and the inner
+                        frame's own remaining siblings were orphaned and never ran.
+                        Rust keeps a per-resolution pending_actions LIST
+                        (ability_queue.rs:521), so the innermost frame's
+                        continuation is the one that survives; this single-slot
+                        queue must therefore let the first (innermost) writer win.
+                        The `is_gate` arm had the same overwrite hazard, so both
+                        arms share the one guard. */
+                    if ((is_choice || is_gate) && g->queue.resume_parent == entry_park) {
                         g->queue.resume_parent = e;
                         g->queue.resume_child = i;
                         g->queue.resume_host = host_cid;
@@ -941,6 +959,21 @@ int rb_complete_double_baton(GameState *g, int selected_pair) {
     g->baton_touch_arriving_card_id = card;
     g->recently_moved[0] = old1;
     if (g->n_recently_moved < 1) g->n_recently_moved = 1;
+    /* Mirror phases.rs:1065-1066 (the double-baton completion arm of
+        handle_play_member_to_stage):
+
+            game_state.active_player_mut().debut_count_this_turn += 1;
+            game_state.record_card_appearance(card_id, "hand");
+
+        This is the SECOND of the two play-path record_card_appearance call
+        sites, and it is a distinct placement from the one in rb_play_member (a
+        double baton vacates two areas and the arriving card is placed into the
+        vacated one), so it needs its own record. Same source token, "hand".
+
+        (Rust's `debut_count_this_turn += 1` on the adjacent line is NOT
+        reproduced here: this function never bumped the counter, and adding it is
+        a separate defect outside the scope of this fix. Reported, not changed.) */
+    rb_record_card_appearance(g, card, RB_ZONE_HAND);
     rb_fire_debut(g, actor, card);
     rb_fire_auto(g, actor);
     rb_drain_ability_queue(g);
@@ -1066,6 +1099,29 @@ int rb_play_member(GameState *g, int pl, int hand_idx, int stage_pos) {
     /* Mirror GameState::debut_count_this_turn — a member debuted (登場) on this
         turn; bump the per-player counter so temporal conditions gate on it. */
     g->debut_count_this_turn[pl]++;
+    /* Mirror phases.rs:1293-1294 (handle_play_member_to_stage, "Phase 2: record
+        appearance and debut triggers"):
+
+            game_state.active_player_mut().debut_count_this_turn += 1;
+            game_state.record_card_appearance(card_id, "hand");
+
+        rb_record_card_appearance is the ONLY writer of
+        cards_appeared_this_turn / recently_appeared / card_appearance_source
+        (modifiers.rs:1401-1412) and until this call it had ZERO callers, so
+        every reader of the appearance list saw it permanently empty:
+        condition.c:838/928/938/989, modifiers.c:327/399, score.c:733,
+        misc.c:229 — i.e. the whole 「このターン中に登場した場合」 family could
+        never fire. The source token is the literal "hand" Rust passes; the C
+        recorder stores the RbZone the caller already has, so RB_ZONE_HAND is
+        the same value, and rb_appearance_source_matches resolves it back
+        through the same wire spellings.
+
+        Idempotence: rb_record_card_appearance already dedupes BOTH list
+        structures (modifiers.c:326-339 mirrors the two `contains` guards), and
+        card_appearance_source is pushed UNCONDITIONALLY exactly as Rust does
+        (the reader takes the FIRST match), so a card that debuts twice records
+        one list entry and two source entries — which is what Rust produces. */
+    rb_record_card_appearance(g, card, RB_ZONE_HAND);
     /* Mirror Rust set_recently_moved_batch: the played (or baton-replaced) member
         is now "recently moved" so movement-condition gates and auto-abilities-for-
         movement (trigger_auto_abilities_for_movement) see it during this resolution. */
@@ -1457,6 +1513,19 @@ static void rollover(GameState *g) {
     for(int i=0;i<RB_MAX_CARD_IDS;i++) g->moved_this_turn[i]=0;
     g->debut_count_this_turn[0]=g->debut_count_this_turn[1]=0;
     g->position_change_occurred_this_turn=0;
+    /* Mirror phases.rs:309 (the victory / turn-rollover arm of advance_phase):
+        `game_state.clear_card_movement_tracking();` clears cards_appeared_this_turn
+        AND card_appearance_source (modifiers.rs:1690-1708). The 「このターン中に
+        登場した場合」 family is turn-scoped on BOTH halves: without the clear a card
+        that appeared on turn N keeps satisfying has_card_appeared_this_turn on turn
+        N+1, and — because rb_get_card_appearance_source takes the FIRST match — a
+        控え室から登場 gate stays answerable from a source recorded in an earlier
+        turn forever.
+
+        This call was harmless-but-missing while the appearance list was never
+        written at all (rb_record_card_appearance had no callers); it became
+        load-bearing as soon as the play choke point started recording. */
+    rb_clear_card_appearance_tracking(g);
     check_victory(g);
     if (g->winner != -1) { g->phase = RB_PHASE_DONE; return; }
     g->active = g->active ^ 1;

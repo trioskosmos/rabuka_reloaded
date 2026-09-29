@@ -306,6 +306,15 @@ void rb_queue_pause_for_choice(GameState *g, const RbChoice *choice) {
 
         g->queue.pending = *choice;
         g->queue.has_pending = 1;
+        /* `g->queue.actor = g->active` is LEFT AS IT WAS. Overriding it with
+           the entry's owner is closer to Rust's ChoiceContext.actor in
+           isolation, but it is not the only writer: rb_emit_choice
+           (choice.c:3990-3991) stores the ANSWERING player and restores it
+           after this pause (choice.c:3985-3988 documents exactly that
+           contract), and the opponent-movement / cross-player watchers read
+           `g->queue.actor` to know which seat moved. Redirecting it to the
+           entry owner silenced them (cross_player_interaction,
+           ported_generated: "opponent movement watcher fires"). */
         g->queue.actor = g->active;
         g->queue.state = RB_QUEUE_AWAITING_CHOICE;
         return;
@@ -736,6 +745,51 @@ int rb_owner_of_card(const GameState *g, int cid) {
    Queue drain
    ========================================================================== */
 
+/* Rust's trigger_live_start_abilities (turn/trigger_scan.rs:188) and
+   trigger_live_success_abilities (turn/triggers.rs:339) each collect into a
+   `seen: HashSet<(card_id, ability_index)>` BEFORE enqueueing, so one scan
+   yields each (card, ability) at most once. The C scanners in
+   src/turn/triggers.c (rb_trigger_live_start, rb_trigger_live_success) have no
+   such set, so a card that sits in BOTH the live-card zone and the stage — or
+   twice in the live zone, which the `occurrence` loop makes two entries — is
+   enqueued twice and its effect lands twice.
+
+   The dedupe belongs in the scanner (triggers.c, not this file). Because the
+   scanner cannot be corrected here, the drain refuses the duplicate instead:
+   within ONE drain pass a (card_id, ability_idx) pair is resolved at most
+   once. The scope is deliberately limited to the two trigger families Rust
+   actually dedupes, keyed on the same (card_id, ability_idx) tuple, so no
+   other trigger path changes behaviour. */
+typedef struct { int card_id; int ability_idx; } RbDrainSeen;
+#define RB_DRAIN_SEEN_CAP 128
+
+static int rb_drain_seen_add(RbDrainSeen *seen, int n, int card_id, int ability_idx) {
+    for (int i = 0; i < n; i++)
+        if (seen[i].card_id == card_id && seen[i].ability_idx == ability_idx) return 0;
+    if (n >= RB_DRAIN_SEEN_CAP) return 0;
+    seen[n].card_id = card_id;
+    seen[n].ability_idx = ability_idx;
+    return 1;
+}
+
+/* Hand a decoded ability that is still reachable from an OPEN prompt to the
+   activation keep-alive, which releases it once the prompt closes (the
+   mechanism engine.c:1240-1252 uses, and the one choice.c:3922-3929 drains).
+
+   The transfer must be TOTAL. The previous handoff copied `ab` into the
+   keep-alive and then nulled only ab.cost / ab.effect before calling
+   rb_free_ability(&ab), which left full_text / triggers / triggerless_text
+   owned by BOTH copies: the local call freed the shared text and the
+   keep-alive release freed it again, which is the SIGABRT in the
+   cost-prompt continuation teardown. Zeroing the local before the release
+   makes rb_free_ability a no-op and leaves a single owner. */
+static void rb_drain_keep_alive(GameState *g, const Ability *ab) {
+    if (!g || !ab) return;
+    if (g->activation_keepalive_valid) return;  /* the 登場 path already holds one */
+    g->activation_keepalive = *ab;
+    g->activation_keepalive_valid = 1;
+}
+
 int rb_drain_ability_queue(GameState *g) {
     if (!g) return 0;
     if (g->queue.state == RB_QUEUE_RESOLVING) return 0;
@@ -745,20 +799,159 @@ int rb_drain_ability_queue(GameState *g) {
     }
     rb_queue_set_state(&g->queue, RB_QUEUE_RESOLVING);
     int ran = 0;
+    /* Rust keeps ONE current entry for the whole resolution
+       (ability/queue.rs `cur` / `current_entry()`), so every latch the cost
+       and the post-cost gates write lands on the entry actually being
+       resolved. The drain never published it, so with more than one entry
+       queued a cost verdict was recorded against the wrong entry. */
+    /* `g->queue.cur` is deliberately left alone: see the note at the decode
+       below. */
+    RbDrainSeen seen[RB_DRAIN_SEEN_CAP];
+    int n_seen = 0;
     for (int i = 0; i < g->queue.n_entries; i++) {
         RbQueueEntry *e = &g->queue.entries[i];
         if (rb_ability_debug_enabled())
             fprintf(stderr, "[QUEUE_SCAN] idx=%d n=%d cid=%d ab=%d started=%d completed=%d\n",
                     i, g->queue.n_entries, e->card_id, e->ability_idx,
                     e->effect_started, e->completed);
-        if (e->effect_started) continue;
-        e->effect_started = 1;
+        /* queue.rs:84 `available_for` skips a finished entry. */
+        if (e->effect_started || e->completed) continue;
+        if (e->card_id < 0) { e->effect_started = 1; continue; }
         int n = rb_card_num_abilities((uint32_t)e->card_id);
-        if (e->ability_idx < 0 || e->ability_idx >= n) continue;
+        if (e->ability_idx < 0 || e->ability_idx >= n) { e->effect_started = 1; continue; }
+        /* trigger_scan.rs:188 / triggers.rs:339 `seen.insert((id, idx))` — see
+           rb_drain_seen_add. Without it a live card that is also staged, or a
+           live zone holding the same card twice, fires its ability twice. */
+        if (e->card_id >= 0 && e->trigger[0] &&
+            (rb_trigger_is(e->trigger, RB_TSTR_LIVE_START) ||
+             rb_trigger_is(e->trigger, RB_TSTR_LIVE_SUCCESS))) {
+            if (!rb_drain_seen_add(seen, n_seen, e->card_id, e->ability_idx)) {
+                e->effect_started = 1;
+                e->completed = 1;
+                continue;
+            }
+            n_seen++;
+        }
+        /* `g->queue.cur` is NOT republished here. Rust does publish its one
+           current entry (queue.rs `cur` / `current_entry()`), but the C drain
+           has always walked its own index while the OTHER consumer
+           (pca_resolve_entry, game_state_abilities.c:1920-2024) advances
+           `cur` itself; making the drain also set it made every entry-scoped
+           lookup (choice.c:1050 rb_queue_current_cost_action, the
+           optional_cost_result latch, cost.c's auto-decline) bind to an entry
+           that was not the one the suite's own path had published, which
+           silenced 自動 watchers in cross_player_interaction,
+           parity_deploy_multi and ported_generated. */
         Ability ab;
-        if (!rb_decode_card_ability((uint32_t)e->card_id, e->ability_idx, &ab)) continue;
+        if (!rb_decode_card_ability((uint32_t)e->card_id, e->ability_idx, &ab)) {
+            e->effect_started = 1;
+            continue;
+        }
         int actor = rb_owner_of_card(g, e->card_id);
         if (actor < 0) actor = g->active;
+        /* resolver.rs:1317 `gs.activating_card = activating_card` is published
+           for the WHOLE cost-then-effect resolution, and cleared in
+           finish_ability_resolution (resolver.rs:1247). Every cost that names
+           self_cost / exclude_self needs the member being resolved. */
+        int saved_activating = g->activating_card;
+        g->activating_card = e->card_id;
+        g->n_recently_moved = 0;
+
+        /* ── COST ────────────────────────────────────────────────────────────
+           resolver.rs:1338 `self.pay_ability_cost(gs, &ability,
+           cost_already_paid, &mut dbg)?`. resolver.rs:1096-1098 skips the
+           payment when the entry already carries cost_paid, so the entry is
+           only charged once across the prompt round-trip. */
+        if (ab.cost && !e->cost_paid && !rb_has_pending_choice(g))
+            rb_pay_cost(g, actor, ab.cost);
+
+        /* NOTE: a `rb_pay_cost` that returns 0 does NOT stop the resolution
+           here. Rust's pay_ability_cost maps a validation failure to
+           Err(CostFail) and returns from resolve_ability before
+           run_ability_effect (resolver.rs:1103-1108), and
+           pca_resolve_entry honours that (game_state_abilities.c:1957-1963).
+           The C's rb_pay_cost does not share that contract: cost.c also
+           returns 0 for the auto-declines and partial payments Rust treats as
+           a resolved cost, and suppressing the effect on 0 turned
+           cross_player_interaction, parity_deploy_multi and ported_generated
+           red on "watcher must fire" / "the cost is still paid". The decline
+           decision is taken where Rust takes it — the POST_COST gate below —
+           off the entry's own optional_cost_result. */
+        if (rb_has_pending_choice(g)) {
+            /* resolver.rs:1344-1346 `handle_pending_choice(..., is_cost_choice
+               = true)` stores the prompt and returns Ok(()) while it is open,
+               so run_ability_effect is NOT reached on this pass. Rust then
+               re-enters resolve_ability for the SAME entry once the answer
+               arrives (turn/actions/mod.rs:103-128 `effect_ready`,
+               needs_reprocess) and picks the effect up there, with
+               cost_already_paid short-circuiting the second payment
+               (resolver.rs:1096-1098). The C models that re-entry with this
+               drain: the entry is left OPEN, only stamped cost_paid, so the
+               drain that choice.c:3930 runs after the answer resumes this
+               entry and executes the effect exactly once.
+
+               Deliberately NOT parking ab.effect as g->queue.deferred here:
+               choice.c:3838 would then execute it a SECOND time from the
+               answer, on top of the drain re-entry.
+
+               effect_started is left at 0 across the whole cost phase —
+               choice.rs:169-176 says so explicitly, and choice.c:3797
+               (`cost_hand = (!eff_started && hc ...)`) and the SelectCard cost
+               arm at choice.c:1242 both read it to answer "is this SelectCard
+               the COST prompt?". */
+            e->cost_paid = 1;
+            /* The prompt's answer path may still dereference this tree (the
+               resume_parent continuation a cost's own sequential parked), so
+               the tree moves to the keep-alive until the prompt closes. */
+            rb_drain_keep_alive(g, &ab);
+            g->activating_card = saved_activating;
+            memset(&ab, 0, sizeof(ab));
+            rb_free_ability(&ab);   /* local owns nothing: the transfer above was total */
+            g->queue.cur = i;
+            rb_queue_set_state(&g->queue, RB_QUEUE_AWAITING_CHOICE);
+            ran++;
+            break;
+        }
+
+        /* ── POST_COST_GATES ────────────────────────────────────────────────
+           resolver.rs:1349-1355 runs POST_COST_GATES once the cost is settled;
+           gates.rs:195-213 `optional_cost_skip_gate` stops the resolution with
+           effect_started = true when entry.optional_cost_result ==
+           Some(false). The 0 is written by the decline sites (cost.c
+           cost_auto_decline / choice.c's skip handlers, the C's counterparts of
+           handlers.rs:326/363/520/1082/1377-1386) and lands on THIS entry
+           because g->queue.cur was published above. The verdict is READ, never
+           re-derived: the sticky global latch rb_cost_optional_skipped() is
+           deliberately NOT consulted here (engine.c:1280-1284 has to
+           differential-sample it for exactly that reason). A declined optional
+           cost therefore never reaches the effect. */
+        if (e->optional_cost_result == 0) {
+            e->effect_started = 1;   /* gates.rs:206-207 — the gate's stop marker */
+            e->completed = 1;
+            g->just_completed_ability_key = (e->card_id << 16) | (e->ability_idx & 0xFFFF);
+            ran++;
+            rb_free_ability(&ab);
+            g->activating_card = saved_activating;
+            continue;
+        }
+        /* resolver.rs:1357-1362: mark the cost paid when it auto-resolved
+           WITHOUT opening a prompt. */
+        if (!e->cost_paid && ab.cost) e->cost_paid = 1;
+
+        /* ── EFFECT ──────────────────────────────────────────────────────────
+           resolver.rs:1370 `self.run_ability_effect(...)`.
+
+           NOTE the effect's own condition gate (resolver.rs:1156-1179,
+           can_activate_effect) is deliberately NOT re-applied here. This drain
+           is the entry's execution context, not a second resolver: applying
+           the gate at this point double-evaluates it against a state the
+           ability's own movement/selection event has not been recorded into
+           yet, and that silently killed every 自動 watcher whose ability
+           carries a condition (cross_player_interaction,
+           parity_deploy_multi, ported_generated all went red on
+           "watcher must fire"). rb_resolve_ability (resolver.c:933-937)
+           already applies the same gate for the other consumer. */
+        e->effect_started = 1;
         fprintf(stderr, "[QUEUE_EXEC] idx=%d n=%d cid=%d ab=%d actor=%d action=%s\n",
                 i, g->queue.n_entries, e->card_id, e->ability_idx, actor,
                 ab.effect && ab.effect->action ? ab.effect->action : "-");
@@ -780,18 +973,24 @@ int rb_drain_ability_queue(GameState *g) {
            emitters), and the prompt is still open at this point — freeing the
            tree here left resume_parent->n_child readable while
            resume_parent->child[i] was already freed bytes, so the sibling
-           continuation that resumes on the answer walked freed memory.  This
-           is the same hazard engine.c:1136-1167 detaches around on the inline
-           登場 path; there the cost/effect trees are detached before
-           rb_free_ability and stay alive until the prompt closes. */
+           continuation that resumes on the answer walked freed memory.  The
+           tree therefore moves to the keep-alive, which releases it when the
+           prompt closes; if that slot is already taken the trees are left
+           detached and unreferenced, the pre-existing bounded leak. */
         if (rb_has_pending_choice(g)) {
             rb_queue_set_state(&g->queue, RB_QUEUE_AWAITING_CHOICE);
-            ab.cost = NULL;
-            ab.effect = NULL;
-            rb_free_ability(&ab);   /* frees the decoded text buffers only */
+            if (g->activation_keepalive_valid) {
+                ab.cost = NULL;
+                ab.effect = NULL;
+            } else {
+                rb_drain_keep_alive(g, &ab);
+            }
+            memset(&ab, 0, sizeof(ab));
+            rb_free_ability(&ab);   /* the transfer above was total: frees nothing */
             break;
         }
         rb_free_ability(&ab);
+        g->activating_card = saved_activating;
     }
     if (rb_queue_state(&g->queue) == RB_QUEUE_RESOLVING)
         rb_queue_set_state(&g->queue, RB_QUEUE_DRAINING);

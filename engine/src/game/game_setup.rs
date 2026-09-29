@@ -1741,17 +1741,17 @@ fn generate_main_phase_actions(game_state: &GameState) -> Vec<Action> {
             .collect();
 
         // `cannot_baton_touch` restrictions on the three stage members,
-        // decoded ONCE per call rather than once per hand card.
+        // resolved ONCE per call rather than once per hand card.
         //
-        // `has_cannot_baton_touch_protection` walks `resolved_abilities()`, and
-        // each step DECODES the ability from bytecode and allocates an
-        // `Arc<Ability>`. Inside the hand-card loop that was up to 3 ×
-        // (hand size) full decodes per call, all to answer a question that
-        // depends on the incoming card only through a group-membership test.
-        // Hoisting it to the stage (which does not change while this loop
-        // runs) turns that into 3 decodes plus a cheap group test per card.
-        // Most members carry no such restriction at all, and `is_empty()`
-        // short-circuits those without touching the card database at all.
+        // `has_cannot_baton_touch_protection` walks `resolved_abilities()`,
+        // and each step is an `Arc::clone` of a cached `Ability` plus a walk of
+        // its effect fields (a full re-decode on `no_std`). Inside the
+        // hand-card loop that was up to 3 × (hand size) walks per call, all to
+        // answer a question that depends on the incoming card only through a
+        // group-membership test. Hoisting it to the stage — which cannot change
+        // while this loop runs — turns that into 3 walks plus a cheap group
+        // test per card. Most members carry no such restriction at all, and
+        // `is_empty()` short-circuits those without touching the card database.
         let baton_protections: [crate::ability::util::BatonTouchProtection; 3] =
             core::array::from_fn(|slot| {
                 stage_cards[slot].map_or_else(
@@ -1781,7 +1781,7 @@ fn generate_main_phase_actions(game_state: &GameState) -> Vec<Action> {
                     let active_energy_count = active_player.energy_zone.active_count();
 
                     // Per-area baton-touch protection. The restriction walk is
-                    // pre-decoded above; this is only the group test, which is
+                    // pre-resolved above; this is only the group test, which is
                     // the part that genuinely depends on the hand card.
                     let baton_touch_protected: [bool; 3] = core::array::from_fn(|slot| {
                         stage_card_ids[slot] != -1

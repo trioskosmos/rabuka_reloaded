@@ -680,18 +680,29 @@ pub fn activation_position_index(p: &str) -> Option<usize> {
 
 /// A stage member's `cannot_baton_touch` restrictions, resolved once.
 ///
-/// `has_cannot_baton_touch_protection` walks `resolved_abilities()`, and every
-/// step of that iterator DECODES the ability from bytecode and allocates an
-/// `Arc<Ability>`. Action generation asked that question once per (hand card ×
-/// stage slot) — up to 180 full decodes per `generate_main_phase_actions`
-/// call — even though the answer depends on the incoming card only through a
-/// group-membership test. This type splits the two halves: the ability walk
-/// runs once per stage slot, and the per-hand-card step is a group lookup
-/// against pre-decoded strings.
+/// `has_cannot_baton_touch_protection` walks `resolved_abilities()`, and each
+/// step calls `AbilityRef::resolve()`. On std builds that hits the per-slot
+/// `OnceLock<Arc<Ability>>` cache, so a warm ability is an `Arc::clone` — but
+/// that is still an atomic refcount bump plus a walk of the effect's fields,
+/// and action generation paid it once per (hand card × stage slot). On `no_std`
+/// builds there is no cache at all, so each step re-decodes the ability and
+/// this hoist is worth more there.
 ///
-/// The group names are copied out of the decoded ability because the `Arc`
-/// dies with the walk; a card carries a handful of restrictions, so copying
-/// them is far cheaper than re-decoding.
+/// Either way the question depends on the incoming card only through a
+/// group-membership test, so the ability walk has no business being inside the
+/// hand-card loop. This type splits the two halves: the walk runs once per
+/// stage slot, and the per-hand-card step is a group lookup against pre-decoded
+/// strings.
+///
+/// The group names are copied out because the `Arc` is dropped when the walk
+/// ends; a card carries a handful of restrictions, so copying them is far
+/// cheaper than re-walking.
+///
+/// Measured on `profile_target` (5000 seeded games, min of 3): 25.57 s → 24.57 s,
+/// about 4% of total runtime. A `bench_micro` run on a single fixed state shows
+/// a far larger ratio (~1203 ns → 807 ns on `generate_possible_actions`), but
+/// that state is unrepresentative — it has an unusually small share of the work
+/// — so the whole-program number is the one to believe.
 #[derive(Debug, Clone, Default)]
 pub struct BatonTouchProtection {
     /// A restriction with no `exclude_group_names` blocks every incoming card.
