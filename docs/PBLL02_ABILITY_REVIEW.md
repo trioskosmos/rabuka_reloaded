@@ -488,32 +488,100 @@ These cannot be settled by a test and are recorded rather than guessed.
    Triaging the 137 is the outstanding work: each is either a deliberate swap (rename
    to `play_to_stage_baton`) or a setup that no longer matches what the assertions
    describe. Until that is done the hazard stays silent for those tests.
-7. **`PL!-pb2-039-L` — `modify_yell_count` is inverted, and its count ignores the
-   group.** Two independent defects, both found by a base-30 cheer check (more cards
-   revealed should mean FEWER checks required):
+9. **`PL!-pb2-015-P＋` — branch 1 is untested; I first blamed the engine and was
+   wrong.** I reported this card as applying BOTH branches of
+   「以下から1つを選ぶ」. That was my test, twice over:
 
-   - **Direction.** Two cards in the success zone give
-     `cheer_checks_required == 40` — *more* than the 30 seen with 0 or 1 cards. The
-     +10 yell bonus raises the requirement instead of lowering it, so the sign or the
-     target is wrong between the `modify_yell_count` node and `perform_cheer_check`.
-   - **Group filter.** Two **non**-μ's lives give exactly the same 40 as two μ's
-     lives, so 「『μ's』のカードが2枚以上」 counts any card in the zone and the
-     `group_names` on that `card_count_condition` is not applied at all.
+   - activation is recorded as the orientation modifier `"active"`, **not** as the
+     absence of one — `get_orientation_modifier` returns `Some("active")`;
+   - a blind `drain_auto_ability_choices()` after the choice was answering branch 1's
+     「どのメンバー」 follow-up prompt on the *branch-2* run, which is what made the
+     member appear to activate either way.
 
-   The two cases that do hold are pinned: below the threshold the cheer is
-   unmodified, and the opponent's success zone does not count.
-8. **`lily white` and `lilywhite` are the same group and the matcher disagrees.** The
-   corpus spells it both ways — `lily white` on 4 lives (incl. `PL!-pb1-029-SRL`,
-   `PL!-pb2-041-L`) and `lilywhite` on members incl. `PL!-PR-004-PR` 園田海未,
-   `PL!-PR-005-PR` 星空 凛, `PL!-PR-007-PR` 東條 希. A `『lily white』` filter
-   silently excludes every unspaced member, so any ability gated on a lily white
-   group under-triggers. Found while fixing 039-L's fixtures: a μ's card was rejected
-   not because it was the wrong group but because it lacked a space. Not fixed here —
-   the change is whitespace normalisation in `card_matches_group_str`, and it needs
-   characterisation first, because a blanket space-strip would also merge group names
-   that legitimately differ.
-6. **The two `custom` abilities — one fixed, one not.** Neither was a typing problem:
-   the parser produced a usable node for each, and only the action name was `custom`.
+   With the prompts answered deliberately, branch 2 is correct end to end (exactly two
+   energy cards activate, no follow-up prompt, no member activated) and that is
+   pinned. Branch 1 is **not** pinned: it needs a BiBi member in wait, and a member
+   written into the stage with `add_orientation_modifier(..., "wait")` reads back with
+   no orientation modifier by the time the ability fires, so the fixture could not be
+   built reliably.
+
+   The mechanism itself is shared with 19 other cards (all `action: choice` with N
+   sub-effects; `PL!S-bp6-020-L` and `PL!SP-pb2-011-PP` have 3) and works — a claim
+   worth not making twice.
+10. **`PL!-pb2-009-PP` works; the ABSOLUTE value is the trap.** The ability is correct
+    and pinned (4 tests), but only after two measurement mistakes that are worth
+    recording because they make a correct ability look broken:
+
+    - *Comparing different incoming cards conflates cost with effect.* Paying for the
+      play draws from the energy zone, so a cost-22 baton left 29 active against 40
+      for a cost-9 one. Fixed by playing the SAME card twice — once displacing the
+      subject, once into an empty centre — so the cost cancels.
+    - *The absolute is still wrong.* Displacing 矢澤にこ yields **9** energy by
+      itself; the qualifying case yields **11**. 「エネルギーを2枚」 is the **margin**
+      over that baseline, not the absolute. Reading 11 against a written 2 is what
+      made this look like a bug.
+
+    Generalisable: when an effect is measured through a shared resource, pin the
+    baseline and assert the **difference**, and check whether a same-setup control
+    already moves that resource before concluding the effect did nothing.
+11. ~~**`PL!-pb2-039-L` — `modify_yell_count` inverted, count group-blind.**~~
+    **NEITHER WAS REAL. Both were my test; both are now pinned (5 tests).**
+    - *Direction.* `cheer_checks_required` **is** the number of cards the player must
+      reveal — `perform_cheer_check` draws one card per check and completes the cheer
+      when `cheer_checks_done >= cheer_checks_required` (tracking.rs). So
+      「10枚増える」 means the requirement goes **up** by 10, which is what the engine
+      does. I had assumed "more revealed" must mean fewer required checks and asserted
+      the opposite sign. The convention matches `PL!SP-bp2-010-R＋` Wien, whose
+      「8枚減る」 lowers the requirement by 8.
+    - *Group filter.* My "non-μ's" control, `PL!-sd1-019-SD`, has `unit = None` but
+      `series = ラブライブ！`, and `card_series_matches_group` therefore makes it a μ's
+      card. A card with no series (`LL-PR-004-PR`, AiScReam) is the real control, and
+      with it the filter behaves correctly.
+12. ~~**`lily white` and `lilywhite` are the same group and the matcher disagrees.**~~
+    **FIXED.** The corpus spells it both ways — `lily white` on 4 lives (incl.
+    `PL!-pb1-029-SRL`, `PL!-pb2-041-L`) and `lilywhite` on members incl.
+    `PL!-PR-004-PR` 園田海未, `PL!-PR-005-PR` 星空 凛, `PL!-PR-007-PR` 東條 希 — and a
+    raw `==` in `card_matches_group_str` made a `『lily white』` filter skip every
+    unspaced card, so any ability gated on that group under-triggered.
+    `CardDatabase::normalize_name` already stripped whitespace; it was simply not used
+    on that path. Now compared with an allocation-free `eq_ignoring_whitespace`,
+    applied to the unit, the `group` field and the name substrings. Pinned by 5 tests
+    that also fix what must NOT merge: a different group, and a group that is a
+    substring of another (`lil` must not match `BiBi`) — the comparison is
+    equality-after-stripping, not `contains`.
+13. **`modify_score` + `per_unit` does not fire — a general gap, not one card.**
+    `PL!-pb2-039-L`'s ライブ成功時 parses correctly (`modify_score` +1, `per_unit`,
+    `人`, `group_names: ["μ's"]`, `distinct: card_name`) and returns **+0** for every
+    positive case — one μ's member or three, on stage or revealed. The nearest
+    pre-existing analogue, `PL!HS-bp2-020-L` (蓮ノ空, ライブ開始時, identical shape
+    `人` + group + `distinct: card_name`), also returns **+0** — so this is a gap in the
+    per-unit SCORE path, not a parser or fixture problem, and it is untested on both
+    cards. `modify_score` combined with `per_unit` occurs **11 times** in the corpus
+    and none of the group-filtered instances is covered. Only the over-firing cases
+    (empty pool, non-μ's staged, non-μ's revealed) are pinned, so a future
+    over-firing regression is caught while the under-firing gap stays open.
+14. **`PL!-pb2-021-N` — the 自動 over-fires; one of its two `or` branches is a
+    vacuous comparison. Parser half FIXED, runtime half open.**
+    「このメンバーが、自分のカードの能力のコストを支払うため**か**、自分のカードの効果に
+    よってウェイト状態になったとき」 — the wait branch works (she is activated and
+    gains a blade, pinned), but the ability fires even with her active, having paid
+    nothing and never been waited.
+
+    - *FIXED.* Branch 2 was parsed as a bare `comparison_condition` with `count >= 1`
+      and no type or location — vacuous. It is now a self-scoped `state_condition`
+      (`state: wait`, `target: self`, `self_target: true`) via a new
+      `self_became_wait` condition pattern. Blast radius checked: 11 `state_condition`
+      nodes exist in the corpus and **none carries heart colours**, so all 11 were
+      previously decided by an unrelated path; the suite stays green.
+    - *OPEN.* Branch 1, 「…能力のコストを支払うため」, is an EVENT ("she paid a cost")
+      but is parsed as a cost **comparison** with no operator and no count.
+      `compare_counts` defaults to `>=` (util.rs:2128), so it evaluates as
+      `cost >= 0` — **always true**. With one branch vacuous the `or` always passes.
+      The correct fix is to parse 「コストを支払う／支払った」 as a trigger event
+      rather than a comparison; there is currently no such rule.
+
+15. **The two `custom` abilities — one fixed, one not.** Neither was a typing problem:
+    the parser produced a usable node for each, and only the action name was `custom`.
 
    - **`PL!-pb2-002-PP` 絢瀬絵里 — FIXED and tested** (8 tests). A REPLACEMENT appearance
      rule, 「このメンバーの正面のエリアには、元々持つハートの数が4つ以下のメンバーは、
@@ -556,14 +624,14 @@ These cannot be settled by a test and are recorded rather than guessed.
      pass while the mechanic did nothing, which is the same false green that was
      reverted twice during this work. The code, the probe results and the reason are
      in `_type_count_as_multiple`'s docstring.
-7. **「自分のセンターエリアにいる『X』のメンバー」 cannot be `all`.** `modifiers.rs:591`
+16. **「自分のセンターエリアにいる『X』のメンバー」 cannot be `all`.** `modifiers.rs:591`
    grants an `all: true` constant to every matching member on the whole stage, so
    setting `all` on the centre-clause cards (`PL!-bp4-011-N`, `PL!-bp4-017-N`,
    `PL!-pb2-019-N`) breaks three existing tests. They are correct today only because
    the centre area holds exactly one member, which makes all-vs-one indistinguishable —
    so **no test currently distinguishes them either**, and a real fix needs
    `all` *and* a centre restriction together. Recorded rather than asserted.
-8. ~~**`PL!-pb2-038-L` — a 常時 on a LIVE card in a live zone, targeting
+17. ~~**`PL!-pb2-038-L` — a 常時 on a LIVE card in a live zone, targeting
    ライブの合計スコア.**~~ **FIXED.** Three changes were needed, and the third was
    only visible once the first two made the effect fire:
    - the success-zone constant evaluator's `ModifyScore` arm had no `live_total`

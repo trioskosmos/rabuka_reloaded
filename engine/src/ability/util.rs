@@ -612,6 +612,28 @@ fn norm_group_name(s: &str) -> Cow<'_, str> {
     }
 }
 
+/// Compare two names ignoring whitespace, without allocating.
+///
+/// The corpus spells one unit group two ways — `lily white` on some cards and
+/// `lilywhite` on others (e.g. `PL!-pb1-029-SRL` vs `PL!-PR-004-PR` 園田海未) — so a
+/// raw `==` silently excluded every card with the unspaced spelling from any
+/// `『lily white』` filter. `CardDatabase::normalize_name` already strips whitespace;
+/// this is the allocation-free form of the same rule, for a hot path.
+///
+/// Full-width spaces and the `！`/`µ` variants are handled separately by
+/// `norm_group_name`; this only covers spacing.
+fn eq_ignoring_whitespace(a: &str, b: &str) -> bool {
+    let mut ai = a.chars().filter(|c| !c.is_whitespace());
+    let mut bi = b.chars().filter(|c| !c.is_whitespace());
+    loop {
+        match (ai.next(), bi.next()) {
+            (None, None) => return true,
+            (Some(x), Some(y)) if x == y => {}
+            _ => return false,
+        }
+    }
+}
+
 pub fn card_matches_group_str(
     card_db: &CardDatabase,
     card_id: i16,
@@ -625,9 +647,14 @@ pub fn card_matches_group_str(
                 .map(|c| {
                     let unit = c.unit.as_deref().unwrap_or("");
                     let unit_match = unit == gn.as_ref()
+                        // Spacing-insensitive: the corpus spells some units both ways
+                        // (`lily white` / `lilywhite`), and a raw == made a
+                        // `『lily white』` filter skip every unspaced card.
+                        || eq_ignoring_whitespace(unit, gn.as_ref())
                         || ((unit.contains('\u{FF01}') || unit.contains('\u{00B5}')) && norm_group_name(unit).as_ref() == gn.as_ref());
                     unit_match
                 || c.group.as_ref() == g
+                || !c.group.is_empty() && eq_ignoring_whitespace(&c.group, g)
                 || card_db.get_card_names(card_id).iter().any(|n| n.contains(gn.as_ref())
                     || ((n.contains('\u{FF01}') || n.contains('\u{00B5}')) && norm_group_name(n).as_ref().contains(gn.as_ref())))
                 // Multi-name cards (e.g. 渡辺曜&鬼塚夏美&大沢瑠璃乃) should match

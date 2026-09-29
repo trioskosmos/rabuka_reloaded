@@ -1,35 +1,35 @@
 ﻿//! 僕たちはひとつの光 `PL!-pb2-039-L` (ライブ開始時)
 //!
-//! 自分の成功ライブカード置き場に『μ's』のカードが2枚以上ある場合、ライブ終了時まで、
-//! エールによって公開される自分のカードの枚数が10枚増える。
+//! Text, with the icon markup rendered as plain labels:
 //!
-//! A threshold plus a flat +10 to the yell size, observed the way the engine models a
-//! yell bonus: more cards revealed means FEWER cheer checks required to complete the
-//! cheer, so `cheer_checks_required` should fall by the bonus.
+//!   ライブ開始時 — 自分の成功ライブカード置き場に『μ's』のカードが2枚以上ある場合、
+//!   ライブ終了時まで、エールによって公開される自分のカードの枚数が10枚増える。
 //!
-//! # Two defects found by this file — not asserted
+//! In English: while two or more μ's cards sit in your success live zone, the cheer
+//! requires 10 more cards to be revealed for the rest of the live.
 //!
-//! With a base of 30 blade, a zone holding 2 cards (μ's or otherwise) produces
-//! `cheer_checks_required == 40` — MORE than the 30 with 0 or 1 card. Two things are
-//! wrong, and they are independent:
+//! # What the number means, and a correction
 //!
-//! 1. **Direction.** The +10 yell bonus makes the cheer require MORE checks instead
-//!    of fewer, so the effect's sign or its target is inverted somewhere between the
-//!    `modify_yell_count` node and `perform_cheer_check`.
-//! 2. **Group filter.** Two NON-μ's lives produce exactly the same 40 as two μ's
-//!    lives, so the `『μ's』のカードが2枚以上` threshold is not filtering on
-//!    `group_names` at all — it is counting any card in the zone.
+//! `cheer_checks_required` IS the number of cards the player must reveal:
+//! `perform_cheer_check` draws one card per check and completes the cheer when
+//! `cheer_checks_done >= cheer_checks_required`. So 「10枚増える」 means the
+//! requirement goes UP by 10, which is what the engine does.
 //!
-//! Neither has a correct value to assert yet, so the two cases that DO hold are the
-//! ones pinned below. See docs/PBLL02_ABILITY_REVIEW.md §8.3.
+//! I previously reported this card as applying the bonus with an inverted sign, and
+//! as ignoring the 『μ's』 filter. Both were my test:
+//!   * I assumed "more cards revealed" must mean FEWER required checks, and asserted
+//!     the requirement should fall. It should rise.
+//!   * my "non-μ's" control, `PL!-sd1-019-SD`, has `unit = None` but
+//!     `series = ラブライブ！`, and `card_series_matches_group` therefore makes it a
+//!     μ's card. A card with no series (`LL-PR-004-PR`, AiScReam) is the real
+//!     non-μ's control.
 //!
-//! # Fixture note
+//! The convention is confirmed against the existing precedent
+//! `PL!SP-bp2-010-R＋` Wien: 「8枚減る」 lowers the requirement by 8, so 「N枚増える」
+//! raises it by N.
 //!
-//! The corpus spells one group two ways — `lily white` (4 lives) and `lilywhite`
-//! (several members, e.g. `PL!-PR-004-PR` 園田海未) — and
-//! `card_matches_group_str` does not equate them, so a 『lily white』 filter silently
-//! excludes the unspaced members. Every μ's fixture here is the SPACED spelling for
-//! that reason. The mismatch itself is a defect, recorded separately.
+//! Group-name spacing is pinned separately, in
+//! `tests/test_modules/characterization/group_name_spacing_normalisation_test.rs`.
 
 use crate::helpers::*;
 use rabuka_engine::core::types::AbilityTrigger;
@@ -38,10 +38,11 @@ const HIKARI: &str = "PL!-pb2-039-L";
 /// μ's lives — both the spaced `lily white` spelling.
 const MUS_A: &str = "PL!-pb1-029-SRL"; // 知らないLove
 const MUS_B: &str = "PL!-bp4-025-SRL"; // 微熱からMystery
-/// Not μ's (no unit at all).
-const NON_MUS: &str = "PL!-sd1-019-SD";
+/// Not μ's: AiScReam, and crucially with NO `series`, so it cannot match μ's
+/// through `card_series_matches_group` the way `PL!-sd1-019-SD` does.
+const NON_MUS: &str = "LL-PR-004-PR";
 const FILLER: &str = "PL!-sd1-010-SD";
-/// Blade high enough that a 10-card reduction is visible.
+/// Blade high enough that the +10 is visible.
 const BASE_BLADE: u8 = 30;
 
 fn fill_decks(game: &mut TestGame) {
@@ -53,7 +54,7 @@ fn fill_decks(game: &mut TestGame) {
 }
 
 /// Load `zone` into our success live zone, run ライブ開始時, then a cheer check.
-/// Returns the cheer checks required — LOWER means a bigger yell.
+/// Returns the number of cards the cheer requires the player to reveal.
 fn cheer_checks_with(zone: &[&str]) -> u8 {
     let db = load_real_database();
     let mut game = TestGame::new(db);
@@ -105,18 +106,50 @@ fn cheer_checks_with(zone: &[&str]) -> u8 {
     game.state.cheer_checks_required
 }
 
-/// Below the threshold the effect must not fire, so the cheer is unmodified.
+/// The threshold crossing, and the exact amount.
 #[test]
-fn zero_or_one_card_in_the_zone_leaves_the_cheer_unmodified() {
-    let none = cheer_checks_with(&[]);
-    let one = cheer_checks_with(&[MUS_A]);
+fn two_mus_lives_in_the_success_zone_add_ten_yell_cards() {
     assert_eq!(
-        none, BASE_BLADE,
-        "no cards — 2枚以上 is unmet, so the yell is unchanged"
+        cheer_checks_with(&[MUS_A]),
+        BASE_BLADE,
+        "『μ's』のカードが2枚以上 — one live is below the threshold, so the cheer is \
+         unmodified"
     );
     assert_eq!(
-        one, BASE_BLADE,
-        "『μ's』のカードが2枚以上 — one card is below the threshold, so the yell is unchanged"
+        cheer_checks_with(&[MUS_A, MUS_B]),
+        BASE_BLADE + 10,
+        "公開される自分のカードの枚数が10枚増える — the cheer needs ten more cards \
+         revealed than the blade alone would require"
+    );
+}
+
+/// The filter is 『μ's』, so a non-μ's live must not count toward the threshold.
+#[test]
+fn two_non_mus_lives_do_not_cross_the_threshold() {
+    assert_eq!(
+        cheer_checks_with(&[NON_MUS, NON_MUS]),
+        BASE_BLADE,
+        "『μ's』のカードが2枚以上 — two non-μ's lives must not satisfy a μ's threshold"
+    );
+}
+
+/// One of each: the non-μ's card does not count, so still only one μ's.
+#[test]
+fn a_mixed_zone_counts_only_the_mus_cards() {
+    assert_eq!(
+        cheer_checks_with(&[MUS_A, NON_MUS]),
+        BASE_BLADE,
+        "only the μ's card counts toward 『μ's』のカードが2枚以上"
+    );
+}
+
+/// An empty zone is the same below-threshold case.
+#[test]
+fn an_empty_zone_leaves_the_cheer_unmodified() {
+    assert_eq!(
+        cheer_checks_with(&[]),
+        BASE_BLADE,
+        "no cards in the success live zone"
     );
 }
 
@@ -145,6 +178,6 @@ fn the_opponents_success_zone_does_not_count() {
     assert_eq!(
         game.state.cheer_checks_required, BASE_BLADE,
         "自分の成功ライブカード置き場 — two μ's lives on the OPPONENT's side must not \
-         satisfy the condition"
+         trigger the bonus"
     );
 }

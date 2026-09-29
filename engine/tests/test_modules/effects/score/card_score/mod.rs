@@ -23,6 +23,7 @@ pub mod mirakura_stage_threshold_pl_hs_bp5_021_l_test;
 pub mod opponent_energy_gated_score_test;
 pub mod optional_energy_return_comparison_pl_sp_bp7_027_l_test;
 pub mod own_energy_ahead_live_success_live_score_test;
+pub mod pb2_live_success_plus_one_per_distinct_mus_member_pl_pb2_039_l_test;
 pub mod pb2_two_mus_members_live_or_success_zone_score_pl_pb2_038_l_test;
 pub mod return_energy_deficit_score_pl_s_bp7_023_l_test;
 pub mod revealed_distinct_liella_score_test;

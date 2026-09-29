@@ -6,6 +6,7 @@ pub mod deck_bottom_reposition_and_conditional_second_draw_test;
 pub mod heart_colour_choice_and_optional_banking_test;
 pub mod look_and_filter;
 pub mod optional_look_and_select_negative_branches_test;
+pub mod pb2_kidou_look_three_take_printemps_member_pl_pb2_026_n_test;
 pub mod per_card;
 pub mod pin_top;
 pub mod recruit_stage;

@@ -6,11 +6,14 @@ Fn-level static signals over `engine/tests/**/*.rs`. Coverage counts (TEST_COVER
 answer “does it fire”; this answers “would the test notice if the trigger were wrong”.
 Report-only: rows are review prompts, not failures.
 
-## no_assert (0)
+## no_assert (2)
 
 _test never asserts (smoke at best — cannot pin behavior)_
 
-None.
+| file | test | line | detail |
+| --- | --- | --- | --- |
+| `engine/tests/test_modules/characterization/group_name_spacing_normalisation_test.rs` | `a_spaced_card_matches_the_unspaced_group_name` | 58 |  |
+| `engine/tests/test_modules/characterization/group_name_spacing_normalisation_test.rs` | `an_unspaced_card_matches_the_spaced_group_name` | 46 |  |
 
 ## no_drive (0)
 
@@ -32,11 +35,13 @@ _has_pending_choice asserted without choice identity (pending_choice_type/summar
 | --- | --- | --- | --- |
 | `engine/tests/test_modules/jidou/debut_watch/three_way_choices_and_look_at_three_test.rs` | `wakana_the_chosen_heart_replaces_her_printed_hearts` | 159 |  |
 
-## assert_only_negative (0)
+## assert_only_negative (1)
 
 _every assertion is a bare is_err()/is_none() — some guard fired, but nothing says which, so a regression tripping a different guard still passes_
 
-None.
+| file | test | line | detail |
+| --- | --- | --- | --- |
+| `engine/tests/test_modules/effects/auto/pb2_self_wait_or_cost_paid_activates_and_gains_blade_pl_pb2_021_n_test.rs` | `the_cost_paid_branch_is_still_a_vacuous_comparison` | 205 |  |
 
 ## assert_only_counts (0)
 
@@ -44,13 +49,15 @@ _every assertion is about a count/size (len/count/>=1) — '3 options were offer
 
 None.
 
-## live_success_no_premise (0)
+## live_success_no_premise (1)
 
 _file CALLS trigger_live_success_abilities but never asserts the state of the ライブ成功時 window it dispatches through. That path checks `should_trigger_live_success`, so a live which failed silently dispatches nothing — and a NEGATIVE assertion in such a file then passes whether or not the ability does anything. The remedy is NOT always 'assert the window is open': a test of the heart requirement itself depends on the window being CLOSED, so each site must assert the state it actually relies on. Files built on `fire_trigger` are NOT flagged: it calls `trigger_auto_ability` directly and forces the dispatch, so there is no window to state. The fix is to assert `should_trigger_live_success` (or the performance snapshot) for the state the test depends on. See the comment above for the four scopings that were wrong first, and note that a live's `heart0` requirement is a COLORLESS WILDCARD satisfied by any colour, not a literal colour_
 
-None.
+| file | test | line | detail |
+| --- | --- | --- | --- |
+| `engine/tests/test_modules/effects/score/card_score/pb2_live_success_plus_one_per_distinct_mus_member_pl_pb2_039_l_test.rs` | `<file>` | 1 |  |
 
-## live_success_impossible_live (3)
+## live_success_impossible_live (4)
 
 _file CALLS trigger_live_success_abilities on a live whose printed need_heart no stage in the pool can satisfy — a requirement above what ANY single member prints, and only three members fit on a stage. Such a live's ライブ成功時 is unreachable, so the test is vacuous BY CONSTRUCTION, which is strictly stronger than a missing premise: adding a should_trigger_live_success assertion here would just fail. The remedy is to inject synthetic hearts deliberately (a heart00 wildcard, which the engine treats as an unbounded wildcard in the PROVIDED hearts, as the files in live_success_no_premise do) or to pick a live the pool can satisfy. The card set itself is worth reviewing: 46 of the 291 lives carrying a need_heart (15.8%) are provably unplayable, which is a card-DATA observation and not a harness one. The check is a LOWER BOUND — necessary, not sufficient, since three slots can still conflict across colours — so 'not reported' means 'not provably unplayable'_
 
@@ -58,6 +65,7 @@ _file CALLS trigger_live_success_abilities on a live whose printed need_heart no
 | --- | --- | --- | --- |
 | `engine/tests/test_modules/characterization/zero_tested_action_types_test.rs` | `PL!N-bp4-025-L` | 1 | heart05 needs 8, best single member prints 4 |
 | `engine/tests/test_modules/effects/gain/blades/constants/success_pile_difference_pl_s_bp6_009_r_plus_test.rs` | `PL!S-bp2-026-L` | 1 | heart04 needs 6, best single member prints 5 |
+| `engine/tests/test_modules/effects/score/card_score/pb2_live_success_plus_one_per_distinct_mus_member_pl_pb2_039_l_test.rs` | `PL!-pb2-039-L` | 1 | heart01 needs 9, best single member prints 6; heart03 needs 9, best single member prints 3; heart06 needs 9, best single member prints 5 |
 | `engine/tests/test_modules/integration/full_round/real_card_phase_walkthrough_and_ability_suite_test.rs` | `PL!-bp3-026-L` | 1 | heart03 needs 5, best single member prints 3 |
 
 ## drain_zero_may_decline (49)
@@ -128,11 +136,14 @@ _prompts answered by ORDINAL position (if step <= 2 { select 2 cards }) instead 
 
 None.
 
-## blind_phase_stepping (0)
+## blind_phase_stepping (2)
 
 _a fixed `for _ in 0..N { pass() }` walk through the turn — a phase gaining or losing a step silently shifts the window the test thinks it is standing in; step to the phase by name instead_
 
-None.
+| file | test | line | detail |
+| --- | --- | --- | --- |
+| `engine/tests/test_modules/effects/invalidate/live_success/pb2_invalidate_live_success_gains_heart03_pl_pb2_003_pp_test.rs` | `our_own_live_success_abilities_are_not_invalidated` | 132 |  |
+| `engine/tests/test_modules/effects/yell/pb2_yell_plus_ten_when_two_mus_success_pl_pb2_039_l_test.rs` | `the_opponents_success_zone_does_not_count` | 157 |  |
 
 ## similar_cards (27)
 

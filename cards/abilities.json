@@ -1,9 +1,9 @@
 {
   "schema": "extracted_abilities.v1",
-  "generated_at": "2026-09-29T17:45:07.449070",
+  "generated_at": "2026-09-29T21:46:48.892331",
   "generated_by": "cards/ability_extraction/extract_card_abilities.py",
   "source_file": "cards/cards.json",
-  "engine_commit": "fef2bf1f",
+  "engine_commit": "6341ced6",
   "parser_version": "1.0",
   "input_hash": null,
   "statistics": {
@@ -21988,7 +21988,6 @@
           {
             "text": "自分の控え室にある、カード名の異なるライブカードを2枚選ぶ。",
             "source": "discard",
-            "distinct": "card_name",
             "count": 2,
             "card_type": "live_card",
             "target": "self",
@@ -26916,11 +26915,11 @@
               "type": "comparison_condition"
             },
             {
-              "text": "自分のカードの効果によってウェイト状態になったとき",
+              "type": "state_condition",
+              "state": "wait",
               "target": "self",
-              "count": 1,
-              "operator": ">=",
-              "type": "comparison_condition"
+              "text": "自分のカードの効果によってウェイト状態になったとき",
+              "self_target": true
             }
           ],
           "text": "このメンバーが、自分のカードの能力のコストを支払うためか、自分のカードの効果によってウェイト状態になったとき"
@@ -27660,6 +27659,8 @@
               "text": "自分がエールしたとき、エールにより公開された自分のカードの中に「矢澤にこ」と「西木野真姫」と「絢瀬絵里」のメンバーカードがあり、",
               "card_type": "member_card",
               "characters": [
+                "矢澤にこ",
+                "西木野真姫",
                 "絢瀬絵里"
               ]
             },
@@ -27690,6 +27691,8 @@
             "BiBi"
           ],
           "characters": [
+            "矢澤にこ",
+            "西木野真姫",
             "絢瀬絵里"
           ],
           "yell_trigger": true
@@ -27705,6 +27708,8 @@
         "heart_total_operator": "<=",
         "position": "center",
         "characters": [
+          "矢澤にこ",
+          "西木野真姫",
           "絢瀬絵里"
         ]
       }
@@ -31105,6 +31110,7 @@
           },
           {
             "text": "そのメンバーとは名前の異なる『EdelNote』のメンバー1人は、{{heart_06.png|heart06}}{{heart_06.png|heart06}}を得る",
+            "distinct": "card_name",
             "count": 2,
             "card_type": "member_card",
             "group_names": [
@@ -31117,7 +31123,6 @@
               "heart06",
               "heart06"
             ],
-            "distinct": "card_name",
             "duration": "live_end"
           }
         ],

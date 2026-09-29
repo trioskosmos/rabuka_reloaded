@@ -9,7 +9,7 @@ exit /b
 param(
     [int]$IntervalMinutes = 8,
     [string]$WindowTitle = "",
-    [string]$Message = "continue. keep adding edge cases ensure the parser engine and tests express the full range of the ability."
+    [string]$Message = "continue. keep adding edge cases ensure the parser engine and tests express the full range of the abilities. actually properly audit each step and json entry of existing tests and abilities if you are done. again, actually rewrite bullshit that can be written better/merged etc. don't just immediately give up."
 )
 
 Add-Type -AssemblyName System.Windows.Forms

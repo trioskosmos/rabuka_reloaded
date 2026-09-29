@@ -2786,8 +2786,12 @@ def parse_action(text: str) -> Dict[str, Any]:
         action["name_constraint"] = "contains_all"
         action["name_constraint_source"] = "revealed_card"
 
-    # Check for distinct card name constraints (Q118)
-    if "カード名の異なる" in text:
+    # Check for distinct card name constraints (Q118).
+    # `名前の異なる` covers both the explicit `カード名の異なる` and the bare form used
+    # on costs — 「手札の名前の異なる『BiBi』のメンバーカードを3枚控え室に置いてもよい」
+    # (PL!-pb2-018-P＋). Matching only the explicit form left that cost with no
+    # `distinct`, so two prints of one character satisfied a three-card cost.
+    if "名前の異なる" in text or "名が異なる" in text:
         action["distinct"] = "card_name"
 
     if state_change:
@@ -3584,6 +3588,38 @@ def _try_both(text):
     if "それらが両方ある" not in text:
         return None
     return {"type": "both_condition", "text": text}
+
+
+def _try_self_became_wait(text):
+    """"[このメンバーが,]自分のカードの効果によってウェイト状態になったとき".
+
+    A 自動 condition on a state CHANGE, not a count. PL!-pb2-021-N 絢瀬絵里 reads
+    「このメンバーが、自分のカードの能力のコストを支払うため**か**、自分のカードの効果
+    によってウェイト状態になったとき」 — the two branches of the `or_condition` are
+    "paid a cost" and "became wait". Only the second is handled here; the first is
+    left to the generic comparison path.
+
+    Emitting this as a `state_condition` is what stops the `or` from being vacuous.
+    """
+    if "ウェイト状態になった" not in text:
+        return None
+    if not any(marker in text for marker in ("自分のカード", "このカード")):
+        return None
+    result = {
+        "type": "state_condition",
+        "state": "wait",
+        "target": "self",
+        "text": text,
+    }
+    # The subject is the card itself in both phrasings: 「このメンバーが…」 states it
+    # outright, and 「自分のカードの効果によって…」 refers to the same card. Without
+    # `self_target` the clause is read as "SOME stage member is waited", so a 自動
+    # would fire for a wait it had nothing to do with.
+    if "このメンバー" in text or "このカード" in text or "自分のカード" in text:
+        result["self_target"] = True
+    if "このメンバー" in text:
+        result["card_type"] = "member_card"
+    return result
 
 
 def _try_temporal_this_turn(text):
@@ -4786,6 +4822,12 @@ CONDITION_PATTERNS = [
     ConditionPattern("cost_override_condition", 3, _try_cost_override_condition),
     ConditionPattern("both", 3, _try_both),
     ConditionPattern("temporal_this_turn", 4, _try_temporal_this_turn),
+    # 「自分のカードの効果によってウェイト状態になったとき」 — a STATE CHANGE, not a
+    # count. Without this it fell through to a bare `comparison_condition` with
+    # `count >= 1` and no type or location, which is VACUOUS: the enclosing
+    # `or_condition` was therefore always satisfied, and PL!-pb2-021-N granted its
+    # blade even when the member had neither paid a cost nor been waited.
+    ConditionPattern("self_became_wait", 3, _try_self_became_wait),
     ConditionPattern("phase_gate", 4, _try_phase_gate),
     ConditionPattern("temporal_turn_phase", 4, _try_temporal_turn_phase),
     ConditionPattern("baton_touch", 4, _try_baton_touch),
@@ -6810,6 +6852,21 @@ def _fill_need_heart(action, text):
     if nh2:
         # Total heart icon count threshold (any colors)
         action["need_heart_total"] = as_int(nh2.group(1))
+
+    # 「必要ハートの合計がN以上」 — the total REQUIRED-heart cost of a candidate card.
+    # This is a threshold on a card's own `need_heart`, not a heart-colour filter, so
+    # it lands on `need_heart_total`. Without it the bound was dropped entirely and
+    # only the operator survived: PL!-pb2-008-PP 「必要ハートの合計が8以上の『μ's』の
+    # ライブカード」 came out as `cost_limit_operator: ">="` with no limit, making the
+    # 8 bound unenforced.
+    nht = re.search(r"必要ハートの合計が(\d+)以上", text)
+    if nht:
+        action["need_heart_total"] = as_int(nht.group(1))
+        action["need_heart_operator"] = ">="
+        # A bare `cost_limit_operator` with no limit is a parse artefact; drop it so
+        # nothing downstream reads a comparison against a missing bound.
+        if action.get("cost_limit") is None:
+            action.pop("cost_limit_operator", None)
         action["need_heart_operator"] = ">="
 
 
@@ -12039,6 +12096,8 @@ def _normalize_parsed_effect(effect, original_text=None):
     effect = _walk_split_mixed(effect)
     effect = _walk_split_look(effect)
     _enrich_characters(effect)
+    _drop_unsupported_child_location(effect)
+    _post_fix_cost_and_select(ability)
     _clean_gain_resource(effect)
     _fix_select_self_and_other(effect)
     _fix_energy_difference_dynamic_count(effect)
@@ -12373,6 +12432,72 @@ def _enrich_gain_abilities(effect):
             node["gained_effect"] = gained
 
 
+def _post_fix_cost_and_select(ability):
+    """Fixes that must reach every node — effect steps, costs and select_actions alike.
+
+    Three clauses were being dropped because the relevant builder is not the one the
+    text flows through, so the fixes are applied as a post-pass over the whole ability:
+
+    * 「名前の異なる」 on a COST. `PL!-pb2-018-P＋` pays 「手札の名前の異なる『BiBi』の
+      メンバーカードを3枚控え室に置いてもよい」; the effect builder set `distinct` but
+      the cost builder did not, so two prints of one character satisfied a three-card
+      cost.
+    * 「必要ハートの合計がN以上」. `PL!-pb2-008-PP` produced an operator with no limit —
+      `cost_limit_operator: ">="` and nothing to compare against — so the 8 bound was
+      unenforced and the bare operator had to go.
+    """
+    for root in (ability.get("effect"), ability.get("cost")):
+        if not isinstance(root, dict):
+            continue
+        for node in iter_dict_nodes(root):
+            text = node.get("text")
+            if not isinstance(text, str) or not text:
+                continue
+            if not node.get("distinct") and ("名前の異なる" in text or "名が異なる" in text):
+                node["distinct"] = "card_name"
+            nht = re.search(r"必要ハートの合計が(\d+)以上", text)
+            if nht:
+                node["need_heart_total"] = as_int(nht.group(1))
+                node["need_heart_operator"] = ">="
+                if node.get("cost_limit") is None:
+                    node.pop("cost_limit_operator", None)
+
+
+def _drop_unsupported_child_location(effect):
+    """A compound's child must not inherit a `location` its own text contradicts.
+
+    PL!-pb2-042-L reads 「…「矢澤にこ」と「西木野真姫」と「絢瀬絵里」のメンバーカード
+    があり、**かつ自分のセンターエリアに**コスト11以上の『BiBi』のメンバーがいる場合」.
+    The first clause names the revealed cards; the second names the CENTRE. The
+    revealed-card location was being carried onto the centre clause, which then looked
+    for an 11-cost BiBi member among the cards the yell revealed rather than on the
+    stage — a condition that is not what the card says and is satisfied by the wrong
+    cards.
+
+    Narrow by design: only a child that names a stage area is stripped, and only of a
+    location it does not itself mention.
+    """
+    zone_markers = ("センター", "左サイド", "右サイド", "ステージ")
+    for node in iter_dict_nodes(effect):
+        if node.get("type") not in (
+            "compound",
+            "compound_condition",
+            "or_condition",
+            "and_condition",
+        ):
+            continue
+        for child in node.get("conditions") or []:
+            if not isinstance(child, dict):
+                continue
+            loc = child.get("location")
+            if not loc:
+                continue
+            text = child.get("text") or ""
+            names_a_stage_area = any(m in text for m in zone_markers)
+            if names_a_stage_area and loc not in ("stage",):
+                child.pop("location", None)
+
+
 def _enrich_characters(d):
     for current in iter_dict_nodes(d):
         if current.get("action") in (
@@ -12392,8 +12517,13 @@ def _enrich_characters(d):
                 and current.get("operation") == "set"
                 and ("このカード" in text or "このメンバーカード" in text)
             )
+            # Names can be joined by 「と」 as well as 「か」/「、」:
+            # 「「矢澤にこ」と「西木野真姫」と「絢瀬絵里」のメンバーカード」(PL!-pb2-042-L).
+            # The old pattern allowed only か/、, so a と-joined list matched only its
+            # LAST entry and the filter silently required one character instead of all
+            # three.
             cm = re.search(
-                r"((?:「[^」]+」[か、]? ?)+)の(?:メンバーカード|ライブカード)", text
+                r"((?:「[^」]+」\s*(?:と|か|、)?\s*)+)の(?:メンバーカード|ライブカード)", text
             )
             if cm and not is_self_cost_set:
                 names = _quoted_names(cm.group(1))
