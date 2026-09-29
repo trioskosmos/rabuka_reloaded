@@ -58,6 +58,7 @@ struct Options {
     deck2: Option<String>,
     trace: bool,
     logs: bool,
+    check_p: bool,
 }
 
 impl Options {
@@ -73,11 +74,24 @@ impl Options {
         let mut deck2 = None;
         let mut trace = false;
         let mut logs = false;
+        let mut check_p = false;
         let mut args = args.iter();
         while let Some(arg) = args.next() {
             match arg.as_str() {
                 "--trace" => trace = true,
                 "--logs" => logs = true,
+                // Turns on the per-check `V7CHK` / `V8CHK` lines. This exists
+                // as a flag rather than only as the env var because the lines
+                // are the only way to read the live-set decision, and a
+                // diagnostic that can only be reached by exporting a variable
+                // in the caller's shell is a diagnostic that stops being run.
+                //
+                // It is a DIAGNOSTIC mode and nothing produced under it is a
+                // reportable number: the eprintln traffic perturbs allocation
+                // layout, and `BOT_STRATEGY.md` section 8.4 records that this
+                // changes outcomes. Use it to locate a cause, then leave it off
+                // and measure the fix on a clean run.
+                "--check-p" => check_p = true,
                 "--games" | "--seed" | "--audit" | "--snapshots" | "--compare" | "--outcomes"
                 | "--vs" | "--deck2" => {
                     let value = args
@@ -161,6 +175,7 @@ impl Options {
             deck2,
             trace,
             logs,
+            check_p,
         })
     }
 
@@ -1416,6 +1431,14 @@ fn main() -> ArenaResult<()> {
     let args: Vec<String> = std::env::args().skip(1).collect();
     let env_games = std::env::var("ARENA_GAMES").ok();
     let options = Options::parse(&args, env_games.as_deref())?;
+    // `--check-p` is a front-end for the `V7_CHECK_P` gate the live-set
+    // telemetry reads. Set it here, before any game runs, so the flag and the
+    // env var cannot disagree: a run that asked for the lines and did not get
+    // them would otherwise look like a run where nothing was decided.
+    if options.check_p {
+        // SAFETY: single-threaded, and set before any game state exists.
+        unsafe { std::env::set_var("V7_CHECK_P", "1") };
+    }
     rabuka_engine::core::runtime_flags::set_action_display(false);
     rabuka_engine::core::runtime_flags::set_logging_enabled(options.logs || options.audit.is_some());
     if let Some(path) = &options.compare {

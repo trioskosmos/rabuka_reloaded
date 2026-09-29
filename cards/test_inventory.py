@@ -44,6 +44,7 @@ QA_JSON = ROOT / "cards" / "qa_data.json"
 TESTS_DIR = ROOT / "engine" / "tests"
 OUT_COVERAGE = ROOT / "engine" / "tests" / "TEST_COVERAGE.md"
 OUT_MATRIX = ROOT / "docs" / "ABILITY_MATRIX.md"
+OUT_FAMILIES = ROOT / "docs" / "ABILITY_FAMILIES.md"
 OUT_JSON = ROOT / "engine" / "tests" / "TEST_INVENTORY.json"
 OUT_MD = ROOT / "engine" / "tests" / "TEST_INVENTORY.md"
 # (OUT_QUALITY is defined in the test-quality section below.)
@@ -2798,12 +2799,19 @@ def main():
 
     if args.families:
         families = build_families(inv)
-        OUT_FAMILIES = ROOT / "docs" / "ABILITY_FAMILIES.md"
         OUT_FAMILIES.write_text(render_families(inv, families), encoding="utf-8")
         print(f"Wrote {OUT_FAMILIES.relative_to(ROOT)} ({len(families)} families)")
         for fam in families[:15]:
             print(f"  {fam['total']:4} abilities  {len(fam['variants']):3} variants  {fam['name']}")
         return 0
+
+    # `docs/ABILITY_FAMILIES.md` is committed (JIDOU_COMBINATION_WORK.md and
+    # TEST_AUDIT_PLAN.md both link to it), so it has to be checked like every
+    # other generated artifact. It used to be written only under `--families`,
+    # which returns above the `--check` block entirely -- so nothing caught it
+    # drifting, and the per-card test counts silently went stale.
+    families = build_families(inv)
+    families_text = render_families(inv, families)
 
     # render
     coverage_text = render_coverage(inv)
@@ -2901,7 +2909,7 @@ def main():
             # ignore volatile timestamp for check
             return re.sub(r'"generated_at":\s*"[^"]*"', '"generated_at": "CHECK"', text)
         ok = True
-        checked = [(OUT_COVERAGE, coverage_text), (OUT_MATRIX, matrix_text), (OUT_MD, inventory_md_text), (OUT_QUALITY, quality_text)]
+        checked = [(OUT_COVERAGE, coverage_text), (OUT_MATRIX, matrix_text), (OUT_MD, inventory_md_text), (OUT_QUALITY, quality_text), (OUT_FAMILIES, families_text)]
         if args.check_json:
             checked.append((OUT_JSON, json_text))
         for path, new_text in checked:

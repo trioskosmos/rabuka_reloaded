@@ -34,6 +34,26 @@ use crate::player::Player;
 /// of five, and removes four copies that could drift from this one.
 pub type Acc = [i16; 11];
 
+/// An 8-bucket heart pool: indices 0..=6 are Heart01..06, 7 is the ALL
+/// wildcard.
+///
+/// `i16`, not `i32`: **32 bytes → 16.** A pool entry is a per-colour heart
+/// total, and the hottest container of these is `sample_pools`, which builds
+/// `SAMPLES` (256) of them per live-candidate set — so at `i32` that one
+/// vector is 8 KB of heap and at `i16` it is 4 KB, halved again for the
+/// `Vec`s of categories that hold them.
+///
+/// The bound is generous: a pool sums at most `blades` (≤ 30) yell-revealed
+/// cards' blade-hearts into each colour, each card contributing single digits,
+/// so a per-colour total is well inside 127 even in the worst case. `i8` would
+/// not be, which is why this is `i16`.
+///
+/// The engine's own counterpart — `turn::live::process_yell_revealed_card_icons`
+/// — takes `&mut [u8; 8]`. This is where that `u8` array gets widened for
+/// sampling, and the width is now named in one place rather than spelled
+/// `[i32; 8]` at a dozen call sites that could each drift.
+pub type Pool = [i16; 8];
+
 pub fn hc_index(c: HeartColor) -> usize {
     match c {
         HeartColor::Heart00 => 0,

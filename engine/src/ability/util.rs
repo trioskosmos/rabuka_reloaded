@@ -678,29 +678,96 @@ pub fn activation_position_index(p: &str) -> Option<usize> {
     }
 }
 
+/// A stage member's `cannot_baton_touch` restrictions, resolved once.
+///
+/// `has_cannot_baton_touch_protection` walks `resolved_abilities()`, and every
+/// step of that iterator DECODES the ability from bytecode and allocates an
+/// `Arc<Ability>`. Action generation asked that question once per (hand card ×
+/// stage slot) — up to 180 full decodes per `generate_main_phase_actions`
+/// call — even though the answer depends on the incoming card only through a
+/// group-membership test. This type splits the two halves: the ability walk
+/// runs once per stage slot, and the per-hand-card step is a group lookup
+/// against pre-decoded strings.
+///
+/// The group names are copied out of the decoded ability because the `Arc`
+/// dies with the walk; a card carries a handful of restrictions, so copying
+/// them is far cheaper than re-decoding.
+#[derive(Debug, Clone, Default)]
+pub struct BatonTouchProtection {
+    /// A restriction with no `exclude_group_names` blocks every incoming card.
+    unconditional: bool,
+    /// Each conditional restriction's exclude groups. Such a restriction does
+    /// NOT block an incoming card that matches its own groups.
+    exclude_groups: Vec<Vec<String>>,
+}
+
+impl BatonTouchProtection {
+    /// Decode this member's restrictions. The expensive step — call it once
+    /// per stage slot, not once per candidate incoming card.
+    pub fn of(existing_card: &crate::card::Card) -> Self {
+        let mut unconditional = false;
+        let mut exclude_groups = Vec::new();
+        for ability in existing_card.resolved_abilities() {
+            let Some(ef) = ability.effect.as_ref() else {
+                continue;
+            };
+            if ef.restriction_type_any() != Some("cannot_baton_touch") {
+                continue;
+            }
+            match ef.exclude_group_names_any() {
+                Some(groups) => exclude_groups.push(groups.to_vec()),
+                None => unconditional = true,
+            }
+        }
+        Self {
+            unconditional,
+            exclude_groups,
+        }
+    }
+
+    /// The empty set — for an empty stage slot, which cannot block anything.
+    #[inline]
+    pub fn none() -> Self {
+        Self::default()
+    }
+
+    /// True when this member carries no `cannot_baton_touch` restriction at
+    /// all, which is the common case. Lets a caller skip the per-card test
+    /// without touching `card_db`.
+    #[inline]
+    pub fn is_empty(&self) -> bool {
+        !self.unconditional && self.exclude_groups.is_empty()
+    }
+
+    /// Does this member block an incoming card?
+    ///
+    /// Equivalent to `any(ability: is cannot_baton_touch ∧ incoming not in that
+    /// ability's exclude groups)`, just with the ability walk hoisted out.
+    #[inline]
+    pub fn blocks(&self, card_db: &CardDatabase, incoming_card_id: i16) -> bool {
+        if self.unconditional {
+            return true;
+        }
+        self.exclude_groups
+            .iter()
+            .any(|groups| !card_matches_any_group(card_db, incoming_card_id, groups))
+    }
+}
+
 /// Returns true if `existing_card` (the member already on the stage area)
 /// prevents a baton touch by `incoming_card_id` — i.e. it has a
 /// `cannot_baton_touch` restriction that is not excluded by the incoming
 /// card's groups. Single source of truth shared by hand-play validation,
 /// double-baton play, and action generation.
+///
+/// Callers that test many incoming cards against the SAME member should build
+/// a [`BatonTouchProtection`] once instead — see its docs for why.
 pub fn has_cannot_baton_touch_protection(
     card_db: &CardDatabase,
     incoming_card_id: i16,
     existing_card: &crate::card::Card,
 ) -> bool {
-    existing_card.resolved_abilities().any(|ability| {
-        ability.effect.as_ref().is_some_and(|ef| {
-            if ef.restriction_type_any() != Some("cannot_baton_touch") {
-                return false;
-            }
-            if let Some(exclude_groups) = ef.exclude_group_names_any() {
-                if card_matches_any_group(card_db, incoming_card_id, exclude_groups) {
-                    return false;
-                }
-            }
-            true
-        })
-    })
+    BatonTouchProtection::of(existing_card).blocks(card_db, incoming_card_id)
 }
 
 /// Canonical group list — exactly the groups recognized by

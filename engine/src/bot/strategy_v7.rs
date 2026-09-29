@@ -1551,15 +1551,21 @@ pub(crate) struct AbilityFeatures {
 /// model the chooser uses. For telemetry only: it answers "was the set we
 /// committed to actually any good", which is a different question from "did
 /// we pick the best one".
-/// The best pass probability reachable by ANY set from the lives in hand,
-/// ignoring the reliability floor.
+/// The best pass probability reachable by any SINGLE life in hand, ignoring the
+/// reliability floor. This is a **v7 decision input** — `live_set_plan` feeds it
+/// to `expected_live_value` as `mine_p` — so its shape is load-bearing and
+/// changing it changes how v7 plays.
 ///
-/// This is the headroom measurement. `chosen_set_pass_probability` says what
-/// v7 committed to; this says what it could have had. A large gap means the
-/// floor is binding and the fix is a threshold. A small gap with a low chosen
-/// p means the board genuinely cannot support a check and the fix is upstream
-/// (curve, blades, life quality). Those are opposite conclusions and the
-/// chosen-p line alone cannot tell them apart.
+/// Do not "fix" this to enumerate sets without reading the call site first. The
+/// set-aware version is [`best_available_set_pass_probability`], which exists
+/// beside it precisely because this one is load-bearing and the measurement
+/// question is different from the decision question. See that function for why
+/// the two disagree.
+///
+/// Note what this is NOT: it is not "the best set", so a set this cannot
+/// express is invisible to it. As a `mine_p` fed to a payoff table that is a
+/// deliberate, if optimistic, upper bound on what a commit could be worth — the
+/// table then decides whether the bound is actually reachable.
 pub(crate) fn best_available_pass_probability(gs: &GameState, me: u8, db: &CardDatabase) -> f64 {
     let lives = experiment_lives(gs, me, db);
     if lives.is_empty() {
@@ -1577,6 +1583,67 @@ pub(crate) fn best_available_pass_probability(gs: &GameState, me: u8, db: &CardD
         .filter(|(_, _, need)| need[8] == 0 && need[9] == 0)
         .map(|(_, _, need)| experiment_pass_probability_pools(&pools, need))
         .fold(0.0f64, f64::max)
+}
+
+/// The best pass probability reachable by any SET of up to `max_slots` lives.
+///
+/// **Telemetry only.** The decision-facing `best_available_pass_probability`
+/// stays single-life so that measuring v8 does not silently move v7; this is the
+/// version the headroom line prints, because the headroom line is asking a
+/// different question: not "how good could one commit be" but "did a check
+/// exist that we could have committed to".
+///
+/// The two disagree, and reading singles for the second question is wrong in a
+/// way that hides the answer. A zone pools its requirements (8.3.15), so a
+/// set's probability is a property of the POOLED need and is not reachable by
+/// pricing any one member. The chooser can and does commit multi-life sets —
+/// `best_response_set` returns them, and `live_set_plan` returns a `ranked`
+/// set on the non-contested path — so a two-life set the board could have
+/// passed registers as unavailable under a single-life max, and the headroom
+/// gap comes out too small. Too small in the direction that makes the board
+/// look like the problem, which is the conclusion that sends you off to fix
+/// development instead of fixing the live set.
+pub(crate) fn best_available_set_pass_probability(
+    gs: &GameState,
+    me: u8,
+    db: &CardDatabase,
+) -> f64 {
+    let lives = experiment_lives(gs, me, db);
+    if lives.is_empty() {
+        return 0.0;
+    }
+    let (cats, deck_len) = experiment_flip_categories(gs, me, db);
+    let blades = experiment_blades(gs, me, db);
+    let board = experiment_board_pool(gs, me, db);
+    if blades <= 0 || deck_len == 0 {
+        return 0.0;
+    }
+    let max_slots = usize::from(3u8.saturating_sub(
+        gs.seat_player(me).live_card_set_limit_reduction,
+    ));
+    let pools = experiment_sample_pools(&cats, deck_len, blades, &board);
+    let n = lives.len().min(8);
+    let mut best = 0.0f64;
+    for mask in 1u32..(1u32 << n) {
+        if mask.count_ones() as usize > max_slots {
+            continue;
+        }
+        let mut need: Acc = [0; 11];
+        for (bit, (_, _, member_need)) in lives.iter().enumerate() {
+            if mask >> bit & 1 == 1 {
+                for k in 0..11 {
+                    need[k] = need[k].saturating_add(member_need[k]);
+                }
+            }
+        }
+        // Draw/Score icons are not a heart check we can price, and a zone
+        // containing one is not a set the engine would let us commit.
+        if need[8] > 0 || need[9] > 0 {
+            continue;
+        }
+        best = best.max(experiment_pass_probability_pools(&pools, &need));
+    }
+    best
 }
 
 /// The colour deficit of the best life in hand: what the board cannot cover,
@@ -1821,25 +1888,50 @@ pub(crate) fn opponent_response_inputs(
     ))
 }
 
+/// Pass probability of the set v7 actually committed to. **Telemetry only** —
+/// the decision path uses `best_available_pass_probability` and the payoff table,
+/// never this.
+///
+/// ## A zone with no life in it is not a check, and used to score 1.0
+///
+/// `desired` holds hand INDICES, and `experiment_junk_fill` fills the remaining
+/// slots with junk, so a zone holding only junk has a non-empty `desired` and
+/// an all-zero pooled `need` — which every sampled pool trivially satisfies, so
+/// this returned 1.000. v8's equivalent takes an explicit `if chosen.is_empty()
+/// { 0.0 }` branch and reported the same physical decision as 0.000.
+///
+/// That is the same decision priced two ways, and it lands squarely on the
+/// headline comparison: v7's mean committed p is pulled UP by every junk-only
+/// zone it folds into, v8's is pulled DOWN by every one of its own, and the gap
+/// between the two reported means is therefore part measurement artifact. The
+/// number this line was cited for — "v7 0.924 vs v8 0.485" — is a comparison of
+/// incompatible definitions, not a finding about the bots.
+///
+/// Folding is not a check passed; it is a check handed over. 0.0 is the honest
+/// reading and it is also what makes `chosen_p` and v8's `ppass` joinable, which
+/// is the only reason to print either.
 pub(crate) fn chosen_set_pass_probability(
     gs: &GameState,
     me: u8,
     db: &CardDatabase,
     desired: &[usize],
 ) -> f64 {
-    if desired.is_empty() {
-        return 0.0;
-    }
+    let lives = experiment_lives(gs, me, db);
     let mut need: Acc = [0i16; 11];
+    let mut held = 0usize;
     for &hi in desired {
-        if let Some((_, _, n)) = experiment_lives(gs, me, db)
-            .iter()
-            .find(|(h, _, _)| *h == hi)
-        {
+        if let Some((_, _, n)) = lives.iter().find(|(h, _, _)| *h == hi) {
             for k in 0..11 {
                 need[k] += n[k];
             }
+            held += 1;
         }
+    }
+    // No life in the zone: junk, or nothing at all. Either way there is no
+    // check to pass, so the probability is 0 rather than the 1.0 an empty
+    // requirement earns. See the note above.
+    if held == 0 {
+        return 0.0;
     }
     if need[8] > 0 || need[9] > 0 {
         return 0.0;
@@ -2579,20 +2671,69 @@ pub(crate) fn live_set_plan(gs: &GameState, db: &CardDatabase) -> Vec<usize> {
         // between this and `chosen_p` is the headroom: it is the difference
         // between "the board cannot support a check" and "v7 declined the
         // check it could have made", and those call for opposite fixes.
-        let best_available = best_available_pass_probability(gs, me, db);
+        //
+        // It was bound here and then never formatted, so the compiler warned
+        // `unused variable: best_available` and NO capture has ever contained
+        // it. The whole point of computing it is that it reaches a file.
+        // Set-aware, because this is the headroom question (was there a check
+        // we could have made), not the decision question (how good could one
+        // commit be). The decision-facing single-life version stays exactly
+        // where it was so that measuring v8 does not move v7.
+        let best_available = best_available_set_pass_probability(gs, me, db);
+        // How many of the lives we are considering carry a `{{live_start}}`
+        // ability, and how many we committed. The handoff doc attributes the
+        // v7/v8 life-choice split to v7 being able to see those abilities; it
+        // cannot (see `best_available_pass_probability`'s neighbours — the
+        // default live path is static), so this column is the direct test of
+        // that claim: if v7's committed sets are not enriched for live-start
+        // cards, the abilities explanation is dead.
+        let candidate_lives = experiment_lives(gs, me, db);
+        let (cand_live_start, chosen_live_start) = {
+            let is_live_start = |cid: i16| {
+                db.get_card(cid).is_some_and(|card| {
+                    card.abilities.iter().any(|a| {
+                        a.resolve()
+                            .has_trigger(crate::triggers::TriggerKind::LiveStart)
+                    })
+                })
+            };
+            let all = candidate_lives
+                .iter()
+                .filter(|(_, _, need)| need[8] == 0 && need[9] == 0)
+                .filter(|&(_, cid, _)| is_live_start(*cid))
+                .count();
+            let chosen = desired
+                .iter()
+                .filter_map(|&hi| my.hand.cards.get(hi).copied())
+                .filter(|&cid| db.get_card(cid).is_some_and(|c| c.card_type == CardType::Live))
+                .filter(|&cid| is_live_start(cid))
+                .count();
+            (all, chosen)
+        };
+        // The label is `ppass`, not `p`, and v7 has no `p_place` column to
+        // print: v7's live set never computes a placement probability at all —
+        // it ranks on pass probability and printed score, and leaves the
+        // comparison outcome to the payoff table. v8's line carries both. The
+        // asymmetric column set is itself a finding, not an oversight: it is
+        // why a `p` difference between the two lines could be read as a
+        // development difference when it was a modelling difference.
         eprintln!(
-            "V7CHK t={} me={} blades={} set={} p={:.3} succ={} need={} boardcovers={} deck={}",
+            "V7CHK t={} me={} blades={} set={} ppass={:.3} best={:.3} succ={} need={} \
+             boardcovers={} deck={} lcand={} lscand={} lschosen={}",
             gs.turn_number,
             me,
             experiment_blades(gs, me, db),
             n_lives,
             chosen_p,
+            best_available,
             my_succ,
             deficit_total(gs, me, db) as usize,
             board_cover_of_best_life(gs, me, db) as usize,
             my.main_deck.cards.len(),
-        );
-    }
+            candidate_lives.len(),
+            cand_live_start,
+            chosen_live_start,
+        );    }
     log::debug!(
         "v7 experiment t{} me{} n={} lives={} junk={} contested={} floor={:.2} my{} opp{}",
         gs.turn_number,

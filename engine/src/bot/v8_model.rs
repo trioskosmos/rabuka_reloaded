@@ -36,7 +36,7 @@ use crate::core::stats_pipeline;
 use crate::game_state::GameState;
 use crate::player::Player;
 
-use super::strategy_common::{acc_add, Acc};
+use super::strategy_common::{acc_add, Acc, Pool};
 
 /// Shared shuffle realisations per live-set decision. Every candidate
 /// portfolio is scored on the SAME realisations, so `p_pass` differences are
@@ -119,7 +119,7 @@ pub fn score_median_hearts(score: i32) -> i32 {
 /// (`Heart00..Heart06`, `BAll`), buff-aware: `get_available_hearts` already
 /// folds in `heart_override` / `heart_modifiers` / `heart_color_multiplier` /
 /// `heart_copy`, so live-granted buffs are priced.
-pub fn board_pool(gs: &GameState, me: u8, db: &CardDatabase) -> [i32; 8] {
+pub fn board_pool(gs: &GameState, me: u8, db: &CardDatabase) -> Pool {
     let p = gs.seat_player(me);
     let hearts = p.stage.get_available_hearts(
         db,
@@ -128,11 +128,11 @@ pub fn board_pool(gs: &GameState, me: u8, db: &CardDatabase) -> [i32; 8] {
         &gs.mods.heart_color_multiplier,
         &gs.mods.heart_copy,
     );
-    let mut pool = [0i32; 8];
+    let mut pool: Pool = [0; 8];
     for (color, count) in &hearts.hearts {
         let idx = color.index();
         if idx < 8 {
-            pool[idx] += i32::from(*count);
+            pool[idx] = pool[idx].saturating_add(i16::from(*count));
         }
     }
     pool
@@ -190,7 +190,7 @@ pub fn printed_score(db: &CardDatabase, cid: i16) -> i32 {
 /// Semantics follow rules 2.11.3 / 2.1: specific colors are met exactly, BAll
 /// (a blade heart) and All act as wildcards for ONE specific color each, and
 /// the Heart00 bucket absorbs colorless hearts plus every leftover.
-pub fn feasible(pool: &[i16; 8], need: &Acc) -> bool {
+pub fn feasible(pool: &Pool, need: &Acc) -> bool {
     let mut wildcard = pool[7];
     let mut bucket = pool[0];
     for c in 1..=6 {
@@ -235,11 +235,11 @@ pub fn life_need(gs: &GameState, cid: i16) -> Acc {
 
 // -- Yell flip sampling (own side, exact) ----------------------------------
 
-/// Own-deck flip content collapsed into distinct `[i32; 8]` categories with
+/// Own-deck flip content collapsed into distinct [`Pool`] categories with
 /// multiplicities. Built ONCE per decision and reused by every candidate, so
 /// candidate comparison never pays the deck-scan cost twice.
 pub struct FlipSampler {
-    cats: Vec<([i32; 8], u32)>,
+    cats: Vec<(Pool, u32)>,
     deck_len: usize,
     draws: usize,
 }
@@ -254,7 +254,7 @@ impl FlipSampler {
                 .copied()
                 .map(crate::turn::live::blade_color_to_heart)
         });
-        let mut cats: Vec<([i32; 8], u32)> = Vec::new();
+        let mut cats: Vec<(Pool, u32)> = Vec::new();
         for &cid in &p.main_deck.cards {
             let mut total = [0u8; 8];
             if let Some(card) = db.get_card(cid) {
@@ -270,7 +270,7 @@ impl FlipSampler {
                     &mut cheer,
                 );
             }
-            let vector = total.map(i32::from);
+            let vector = total.map(i16::from);
             if let Some((_, count)) = cats.iter_mut().find(|(v, _)| *v == vector) {
                 *count += 1;
             } else {
@@ -294,7 +294,7 @@ impl FlipSampler {
     /// One private PRNG stream with a fixed seed, independent of engine RNG and
     /// of how many candidates the caller evaluates, so a decision is
     /// reproducible and every portfolio sees the same shuffles.
-    pub fn sample_pools(&self, board: &[i32; 8], samples: usize) -> Vec<[i32; 8]> {
+    pub fn sample_pools(&self, board: &Pool, samples: usize) -> Vec<Pool> {
         let samples = samples.max(1);
         if self.draws == 0 || self.cats.is_empty() || self.deck_len == 0 {
             return vec![*board; samples];
@@ -323,7 +323,7 @@ impl FlipSampler {
         k + (rng.wrapping_mul(0x2545_F491_4F6C_DD1D) % span.u64_count()).usize_count();
                 sampled.swap(k, index);
                 for (have, extra) in pool.iter_mut().zip(sampled[k]) {
-                    *have += extra;
+                    *have = have.saturating_add(extra);
                 }
             }
             pools.push(pool);
@@ -333,7 +333,7 @@ impl FlipSampler {
 }
 
 /// `P(need satisfied)` over pre-sampled pools.
-pub fn pass_probability(pools: &[[i16; 8]], need: &Acc) -> f64 {
+pub fn pass_probability(pools: &[Pool], need: &Acc) -> f64 {
     if pools.is_empty() {
         return 0.0;
     }
@@ -1428,21 +1428,17 @@ mod tests {
             deck_len: 12,
             draws: 3,
         };
-        let board = [0i32; 8];
+        let board: Pool = [0; 8];
         let a = sampler.sample_pools(&board, 64);
         let b = sampler.sample_pools(&board, 64);
         assert_eq!(a, b);
 
-        let mut easy = [0i16; 11];
+        let mut easy: Acc = [0; 11];
         easy[3] = 1;
-        let mut hard = [0i16; 11];
+        let mut hard: Acc = [0; 11];
         hard[3] = 5;
-        // `sample_pools` accumulates flip draws in `i32` buckets; the model
-        // takes the narrowed pools, exactly as the live path does.
-        let a: Vec<[i16; 8]> = a
-            .into_iter()
-            .map(|pool| std::array::from_fn(|i| crate::bot::strategy_common::narrow_hearts(pool[i])))
-            .collect();
+        // `sample_pools` returns `Pool` directly, so there is no narrowing step
+        // between the sampler and the model any more.
         for pool in &a {
             if feasible(pool, &hard) {
                 assert!(feasible(pool, &easy));

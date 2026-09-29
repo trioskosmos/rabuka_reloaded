@@ -1,8 +1,25 @@
 # QR Code Deck Sharing
 
+> **Corrected 2026-09-29.** The "How it works" section below previously claimed
+> decks are exported as plain `card_no x QTY` text. That is no longer true and
+> has not been for some time: the web UI now exports a **compact binary
+> encoding, base64-wrapped** for the QR payload. The plain-text format is still
+> accepted on *import* only. The QR-version arithmetic lower down was also wrong
+> (see "Compression analysis"); the 3DS camera/quirc half of this document is
+> accurate and unchanged.
+
 ## How it works
 
-A deck of 72 cards (48 members + 12 live + 12 energy) is encoded as plain text in `card_no x QTY` format:
+A deck of 72 cards (48 members + 12 live + 12 energy) is encoded as a compact
+**binary** blob — one byte per card, indexed into the card registry, with a small
+header — and then base64-encoded for QR safety. A 30-line deck goes from ~580
+bytes of plain text to ~91 bytes of raw binary. See `card_browser.html` around
+the `Show QR code for current deck (binary index format)` handler, and
+`cards/deck_compression.py` for the capacity model.
+
+The payload is packed into a QR code, displayed on screen (web UI) or scanned by
+the 3DS rear camera. The legacy plain-text `card_no x QTY` format remains valid
+as an *import* format:
 
 ```
 Pl!-sd1-001-SD x 4
@@ -10,13 +27,11 @@ Pl!-sd1-002-SD x 3
 ...
 ```
 
-This text is packed into a QR code. The QR is displayed on screen (web UI) or scanned by the 3DS rear camera.
-
 ## Web UI — Generate QR from a deck
 
 **File:** `web_ui/card_browser.html` → "Show QR" button
 
-The deck is exported as text, then passed to `qrcode.min.js` (local JS library) which renders it as a QR code in a modal window. The QR is 200×200px, version ~7, error correction level M.
+The deck is exported in the binary format above, then passed to `qrcode.min.js` (local JS library) which renders it as a QR code in a modal window. The QR is 200×200px, error correction level M. The version is now a function of the binary payload size, not of a 500-byte text estimate — see the corrected table under "Compression analysis".
 
 ### Import methods (all supported)
 
@@ -84,7 +99,17 @@ web_ui/
 
 ## Binary data format
 
-A deck is 72 cards × 2 bytes (u16 database index) = 144 bytes. In QR version 4 (33×33). The text format (`card_no x QTY`) is ~500 bytes, fitting QR version 7 (45×45). Both are easily scannable by the 3DS camera.
+> The prose below previously claimed the text format was "~500 bytes, fitting QR
+> version 7 (45×45)" and that a 144-byte payload is "version 4 (33×33)". Both
+> were wrong. At error-correction level M, v7 capacity is **196 bytes**, not 500,
+> and a 33×33 module grid is **version 3**, not 4. The auto-generated table
+> immediately below was always right; the prose contradicted it.
+
+A deck is 72 cards × 2 bytes (u16 database index) = 144 bytes, which needs
+roughly QR version 5–6 at level M. The shipped web UI actually uses the tighter
+binary-index format (~91–93 bytes for a typical deck), landing at version 4.
+The legacy text format (`card_no x QTY`, ~500 bytes) needs version **13** at
+level M, per the generated table. All of these are scannable by the 3DS camera.
 
 ### Compression analysis (auto-generated)
 

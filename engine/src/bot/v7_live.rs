@@ -1,4 +1,4 @@
-use crate::bot::strategy_common::emit_live_set;
+use crate::bot::strategy_common::{emit_live_set, Acc, Pool};
 use crate::card::{BaseHeart, CardDatabase, CardType, HeartMap};
 use crate::game_setup::Action;
 use crate::game_state::{GameState, Phase};
@@ -8,8 +8,12 @@ const SAMPLES: usize = 256;
 #[derive(Clone, Debug, PartialEq)]
 pub(crate) struct LiveCandidate {
     pub hand_indices: Vec<usize>,
-    pub need: [i32; 11],
-    pub board: [i32; 8],
+    /// `Acc` and `Pool`, not `[i32; 11]` / `[i32; 8]`. Candidates are held in a
+    /// `Vec` and sorted by score, so shrinking the struct shrinks the sort's
+    /// working set: `LiveCandidate` drops from 108 to 62 bytes on these two
+    /// fields alone.
+    pub need: Acc,
+    pub board: Pool,
     pub blades: usize,
     pub sampled_draws: usize,
     pub samples: usize,
@@ -20,27 +24,31 @@ pub(crate) struct LiveCandidate {
     pub placement_upper_bound: f64,
 }
 
-fn feasible(pool: &[i32; 8], need: &[i32; 11]) -> bool {
+fn feasible(pool: &Pool, need: &Acc) -> bool {
     if need[8] > 0 || need[9] > 0 {
         return false;
     }
+    // `saturating_*` throughout: every term is a per-colour heart total, and a
+    // wrapping addition here would turn a shortfall into a surplus and report
+    // an unsatisfiable live set as passable.
     let mut wild = pool[7];
     let mut bucket = pool[0];
     for color in 1..=6 {
-        let surplus = pool[color] - need[color];
+        let surplus = pool[color].saturating_sub(need[color]);
         if surplus >= 0 {
-            bucket += surplus;
+            bucket = bucket.saturating_add(surplus);
         } else {
-            wild += surplus;
+            wild = wild.saturating_add(surplus);
             if wild < 0 {
                 return false;
             }
         }
     }
-    bucket + wild >= need[0] + need[7] + need[10]
+    bucket.saturating_add(wild)
+        >= need[0].saturating_add(need[7]).saturating_add(need[10])
 }
 
-fn sample_pools(mut deck: Vec<[i32; 8]>, blades: usize, board: [i32; 8]) -> Vec<[i32; 8]> {
+fn sample_pools(mut deck: Vec<Pool>, blades: usize, board: Pool) -> Vec<Pool> {
     deck.sort_unstable();
     let draws = blades.min(deck.len());
     if draws == 0 {
@@ -59,7 +67,7 @@ fn sample_pools(mut deck: Vec<[i32; 8]>, blades: usize, board: [i32; 8]) -> Vec<
                 .expect("sample offset fits deck length");
             sampled.swap(k, k + offset);
             for (have, extra) in pool.iter_mut().zip(sampled[k]) {
-                *have += extra;
+                *have = have.saturating_add(extra);
             }
         }
         pools.push(pool);
@@ -73,14 +81,14 @@ pub(crate) fn candidate_metrics(gs: &GameState, db: &CardDatabase) -> Vec<LiveCa
     if max_slots == 0 || gs.cannot_live_players.contains(&my.id) {
         return Vec::new();
     }
-    let mut board = [0; 8];
+    let mut board: Pool = [0; 8];
     let hearts = my.stage.get_available_hearts(
         db, &gs.mods.heart_override, &gs.mods.heart_modifiers,
         &gs.mods.heart_color_multiplier, &gs.mods.heart_copy,
     );
     for (color, count) in &hearts.hearts {
         if color.index() < board.len() {
-            board[color.index()] += i32::from(*count);
+            board[color.index()] = board[color.index()].saturating_add(i16::from(*count));
         }
     }
     let blades = usize::from(my.stage.total_blades(
@@ -90,8 +98,9 @@ pub(crate) fn candidate_metrics(gs: &GameState, db: &CardDatabase) -> Vec<LiveCa
         gs.mods.blade_type_modifiers.get(cid).copied()
             .map(crate::turn::live::blade_color_to_heart)
     });
-    let deck: Vec<[i32; 8]> = my.main_deck.cards.iter().map(|&cid| {
-        let mut total = [0; 8];
+    let deck: Vec<Pool> = my.main_deck.cards.iter().map(|&cid| {
+        // `process_yell_revealed_card_icons` writes `[u8; 8]`; widen once, here.
+        let mut total = [0u8; 8];
         if let Some(card) = db.get_card(cid) {
             let mut scratch = BaseHeart { hearts: HeartMap::new() };
             let mut cheer = 0;
@@ -99,22 +108,23 @@ pub(crate) fn candidate_metrics(gs: &GameState, db: &CardDatabase) -> Vec<LiveCa
                 card, override_color, &mut scratch, &mut total, &mut cheer,
             );
         }
-        total.map(i32::from)
+        total.map(i16::from)
     }).collect();
     let sampled_draws = blades.min(deck.len());
     let pools = sample_pools(deck, blades, board);
-    let lives: Vec<(usize, i32, [i32; 11])> = my.hand.cards.iter().enumerate()
+    let lives: Vec<(usize, i32, Acc)> = my.hand.cards.iter().enumerate()
         .filter_map(|(hi, &cid)| {
             let card = db.get_card(cid)?;
             if card.card_type != CardType::Live {
                 return None;
             }
-            let mut need = [0; 11];
+            let mut need: Acc = [0; 11];
             if let Some(effective) = crate::core::stats_pipeline::effective_need_heart(
                 card.need_heart.as_ref(), cid, &gs.mods.need_heart_modifiers,
             ) {
                 for (color, count) in &effective.hearts {
-                    need[color.index()] += i32::from(*count);
+                    need[color.index()] =
+                        need[color.index()].saturating_add(i16::from(*count));
                 }
             }
             Some((hi, i32::from(card.score.unwrap_or(0)), need))
@@ -250,9 +260,10 @@ mod tests {
 
     #[test]
     fn wrong_color_total_approximation_and_joint_allocation() {
-        let wrong = [0, 0, 2, 0, 0, 0, 0, 0];
-        let need = [1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0];
-        assert!(wrong.iter().sum::<i32>() >= need.iter().sum::<i32>());
+        let wrong: Pool = [0, 0, 2, 0, 0, 0, 0, 0];
+        let need: Acc = [1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0];
+        assert!(wrong.iter().map(|&v| i32::from(v)).sum::<i32>()
+            >= need.iter().map(|&v| i32::from(v)).sum::<i32>());
         assert!(!feasible(&wrong, &need));
         assert!(feasible(&[0, 2, 0, 0, 0, 0, 0, 0], &need));
         assert!(feasible(&[1, 0, 0, 0, 0, 0, 0, 1], &need));
@@ -266,28 +277,28 @@ mod tests {
     fn real_double_grey_icon_uses_engine_conversion() {
         let (_, db) = fixture();
         let cid = card(&db, "PL!S-bp7-022-L");
-        let mut total = [0; 8];
+        let mut total = [0u8; 8];
         let mut scratch = BaseHeart { hearts: HeartMap::new() };
         let mut cheer = 0;
         crate::turn::live::process_yell_revealed_card_icons(
             db.get_card(cid).unwrap(), None, &mut scratch, &mut total, &mut cheer,
         );
         assert_eq!(total, [2, 0, 0, 0, 0, 0, 0, 0]);
-        let pools = sample_pools(vec![total.map(i32::from)], 1, [0; 8]);
-        let grey_need = [2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
+        let pools = sample_pools(vec![total.map(i16::from)], 1, [0; 8]);
+        let grey_need: Acc = [2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
         assert!(pools.iter().all(|p| feasible(p, &grey_need)));
         assert!(!feasible(&[1, 0, 0, 0, 0, 0, 0, 0], &grey_need));
-        assert!(!feasible(&total.map(i32::from), &[0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0]));
+        assert!(!feasible(&total.map(i16::from), &[0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0]));
         println!("PL!S-bp7-022-L one b_heart07: old one-unit approximation fails need2; authoritative two-grey passes need2, cannot satisfy specific color");
     }
 
     #[test]
     fn sampling_matches_without_replacement_probability() {
-        let red = [0, 1, 0, 0, 0, 0, 0, 0];
-        let blue = [0, 0, 0, 0, 0, 0, 1, 0];
+        let red: Pool = [0, 1, 0, 0, 0, 0, 0, 0];
+        let blue: Pool = [0, 0, 0, 0, 0, 0, 1, 0];
         let deck = vec![red, red, red, blue, blue, blue];
         let pools = sample_pools(deck.clone(), 2, [0; 8]);
-        let need = [0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0];
+        let need: Acc = [0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0];
         let p = pools.iter().filter(|pool| feasible(pool, &need)).count() as f64 / SAMPLES as f64;
         assert!((p - 0.8).abs() < 0.08, "exact hypergeometric probability=.8 sampled={p}");
         let mut reversed = deck;

@@ -25,7 +25,7 @@
 //!   cards whose loss costs least, and the cost is computed from each card's
 //!   actual next-turn contribution rather than from its printed cost.
 
-use crate::bot::strategy_common::{acc_add, emit_live_set, narrow_hearts, Acc};
+use crate::bot::strategy_common::{acc_add, emit_live_set, Acc};
 use crate::card::{CardDatabase, CardType};
 use crate::game_setup::Action;
 use crate::game_state::{GameState, Phase};
@@ -507,8 +507,48 @@ fn enumerate_candidates(
     }
 
     let mut out = Vec::new();
-    let subsets = 1usize << lives.len().min(16);
-    for mask in 0..subsets {
+    // Which subsets of the lives in hand are worth pricing.
+    //
+    // This used to be `for mask in 0..(1 << lives.len().min(16))`, which is
+    // wrong twice over. It walked all 2^n masks and then threw away every one
+    // over `width_cap`, so the work was exponential in a quantity nothing uses;
+    // and the `.min(16)` silently made every life past the 16th unreachable
+    // with no counter and no log, so a 17-card hand had four lives v8 could
+    // not see at all. Silent truncation of the candidate set is exactly the
+    // class of bug this file's comments keep warning about elsewhere.
+    //
+    // `width_cap` is `max_lives` or `contested_lives`, and `max_lives` is
+    // filtered into `1..=max_slots` where `max_slots` is `3 - set_limit`, so
+    // the cap is at most 3 and the useful masks are C(n,1..=3) — polynomial.
+    // Enumerating only those makes the 16-bit ceiling unnecessary rather than
+    // merely larger, and it is cheaper than the old loop at every hand size.
+    //
+    // Order: the empty set first, then by highest set bit ascending. For the
+    // shipped default (`max_lives = 1`) that is bitmask order, so the
+    // candidate list — and therefore every tie broken by iteration order — is
+    // unchanged. The wider widths are `V8_MAX_LIVES`/`V8_CONTESTED_WIDE`
+    // ablations, and there the order can differ from raw mask order; ties are
+    // broken by `better()`'s min-index clause in either case.
+    let cap = max_lives.max(contested_lives);
+    let n = lives.len();
+    let mut masks: Vec<u32> = Vec::with_capacity(n + 1);
+    masks.push(0);
+    for h in 0..n {
+        if cap >= 1 {
+            masks.push(1u32 << h);
+        }
+        for g in 0..h {
+            if cap >= 2 {
+                masks.push((1u32 << h) | (1u32 << g));
+            }
+            for f in 0..g {
+                if cap >= 3 {
+                    masks.push((1u32 << h) | (1u32 << g) | (1u32 << f));
+                }
+            }
+        }
+    }
+    for mask in masks {
         let chosen: Vec<&Life> = lives
             .iter()
             .enumerate()
@@ -557,6 +597,19 @@ fn enumerate_candidates(
     // `V8_NO_FOLD` is the ablation floor: the argmax is the decision, this is
     // the hand-tuned constant v7 needed, and shipping requires showing the
     // argmax does not need it.
+    //
+    // The mechanism is the OVERWRITE, not the score. It copies the best
+    // non-empty candidate onto the fold entry, so the one entry that used to
+    // mean "commit nothing" now carries a set instead, and with it gone there
+    // is nothing left for the argmax to choose when it wants to fold.
+    //
+    // There used to be a `entry.value = f64::NEG_INFINITY` line between the
+    // two assignments, which the compiler kept as dead code and which read as
+    // though the mechanism were broken. It is not, and it must not be
+    // "repaired" by moving it below `entry.value = value`: NEG_INFINITY is
+    // what a later argmax would treat as a loser, so reordering would delete
+    // the very candidate this switch exists to promote, and the ablation would
+    // silently measure nothing.
     if std::env::var_os("V8_NO_FOLD").is_some() {
         if let Some(best_lives) = out
             .iter()
@@ -566,7 +619,6 @@ fn enumerate_candidates(
             let lives = best_lives.lives.clone();
             let value = best_lives.value;
             if let Some(entry) = out.iter_mut().find(|c| c.lives.is_empty()) {
-                entry.value = f64::NEG_INFINITY;
                 entry.lives = lives;
                 entry.value = value;
             }
@@ -679,14 +731,11 @@ pub(crate) fn score_candidates(
 ) -> (Vec<Candidate>, OppModel) {
     let board = v8_model::board_pool(gs, me, db);
     let sampler = v8_model::FlipSampler::build(gs, me, db);
-    // The sampler accumulates flip draws in `i32` buckets; `pass_probability`
-    // takes the narrowed pools. Clamp once, at the producer, rather than in the
-    // candidate loop.
-    let pools: Vec<[i16; 8]> = sampler
-        .sample_pools(&board, v8_model::flip_samples())
-        .into_iter()
-        .map(|pool| std::array::from_fn(|i| narrow_hearts(pool[i])))
-        .collect();
+    // `FlipSampler::sample_pools` already accumulates in `Pool` (`[i16; 8]`)
+    // and clamps as it goes, so the pools pass straight through to
+    // `pass_probability` — which used to need a re-clamp here because the
+    // sampler used to produce `i32` buckets.
+    let pools = sampler.sample_pools(&board, v8_model::flip_samples());
     let opp = OppModel::build(gs, me, db);
     let draw_credit = draw_value(gs, me, db);
     let candidates = enumerate_candidates(gs, me, db, &pools, &opp, draw_credit);
@@ -696,22 +745,76 @@ pub(crate) fn score_candidates(
     // forcing fewer folds made it WORSE, so the fold is not the cause. The
     // live candidate for that: v8 grows cost without colour match, so more
     // board buys less conversion. This line says whether that is true.
+    //
+    // The doc calls these two lines "paired" and comparable at the same blade
+    // count. They were not comparable: this one printed `p_place` (placement
+    // probability) where v7's prints `p_pass` (the probability the check is
+    // passed at all). Placement probability is the one the score comparison
+    // moves and the board does not, so reading a "p" gap between the two lines
+    // attributed a development difference to a quantity that does not measure
+    // development. Both are now printed on both lines, named apart.
     if std::env::var_os("V7_CHECK_P").is_some() {
         let chosen = candidates
             .iter()
             .filter(|c| !c.lives.is_empty())
             .max_by(|a, b| a.value.partial_cmp(&b.value).unwrap_or(std::cmp::Ordering::Equal));
+        // Headroom, v8-side. `best_available` for v7 enumerates sets itself;
+        // here every candidate is already enumerated and already carries its
+        // own `p_pass`, so the best available set is a max over the list rather
+        // than a second search. `chosen_p` vs `best_p` is the gap that
+        // separates "the board cannot support a check" (small gap) from "the
+        // argmax declined one it could have made" (large gap).
+        let best_p = candidates
+            .iter()
+            .map(|c| c.outcome.p_pass)
+            .fold(0.0f64, f64::max);
+        let p = gs.seat_player(me);
+        let is_live_start = |cid: i16| {
+            db.get_card(cid).is_some_and(|card| {
+                card.abilities.iter().any(|a| {
+                    a.resolve()
+                        .has_trigger(crate::triggers::TriggerKind::LiveStart)
+                })
+            })
+        };
+        let all_lives: Vec<i16> = p
+            .hand
+            .cards
+            .iter()
+            .copied()
+            .filter(|&cid| {
+                db.get_card(cid)
+                    .is_some_and(|c| c.card_type == CardType::Live)
+            })
+            .collect();
+        let lcand = all_lives.len();
+        let lscand = all_lives.iter().filter(|&&cid| is_live_start(cid)).count();
+        let lschosen = chosen
+            .map(|c| {
+                c.lives
+                    .iter()
+                    .filter_map(|&i| p.hand.cards.get(i).copied())
+                    .filter(|&cid| is_live_start(cid))
+                    .count()
+            })
+            .unwrap_or(0);
         eprintln!(
-            "V8CHK t={} me={} blades={} set={} p={:.3} succ={} need={} boardcovers={} deck={}",
+            "V8CHK t={} me={} blades={} set={} p={:.3} ppass={:.3} best={:.3} succ={} \
+             need={} boardcovers={} deck={} lcand={} lscand={} lschosen={}",
             gs.turn_number,
             me,
             super::strategy_v4::flip_stats(gs, me, db).0,
             chosen.map(|c| c.lives.len()).unwrap_or(0),
             chosen.map(|c| c.outcome.p_place).unwrap_or(0.0),
-            gs.seat_player(me).success_live_card_zone.cards.len(),
+            chosen.map(|c| c.outcome.p_pass).unwrap_or(0.0),
+            best_p,
+            p.success_live_card_zone.cards.len(),
             super::strategy_v7::deficit_total(gs, me, db) as usize,
             super::strategy_v7::board_cover_of_best_life(gs, me, db) as usize,
-            gs.seat_player(me).main_deck.cards.len(),
+            p.main_deck.cards.len(),
+            lcand,
+            lscand,
+            lschosen,
         );
     }
     (candidates, opp)
@@ -994,6 +1097,70 @@ mod tests {
         assert!(better(&one, &three), "equal value must prefer fewer lives");
         let worth_more = mk(&[3], 0.50);
         assert!(better(&worth_more, &three), "value must dominate the tiebreak");
+    }
+
+    /// The candidate enumeration must not silently drop lives.
+    ///
+    /// It used to be `for mask in 0..(1 << lives.len().min(16))`. That made
+    /// every life past the 16th unreachable — a 17-card hand lost four of its
+    /// candidates with no counter and no log, and because `better()` can only
+    /// rank what it is given, a life the bot would have committed to became
+    /// invisible and the zone folded instead. The regression is invisible from
+    /// the outside: fold rate and pace both stay plausible, which is the same
+    /// reason the per-card `V8CHK` line exists.
+    ///
+    /// Pinned directly against the generator so a re-introduced `.min(N)` fails
+    /// here rather than in a run.
+    #[test]
+    fn candidate_enumeration_sees_every_life_whatever_the_hand_size() {
+        // Duplicated shape of the mask list in `enumerate_candidates`; if the
+        // two ever drift this test is not protecting anything, so it names the
+        // contract rather than the function.
+        let masks_for = |n: usize, cap: usize| -> Vec<u32> {
+            let mut masks = vec![0u32];
+            for h in 0..n {
+                if cap >= 1 {
+                    masks.push(1u32 << h);
+                }
+                for g in 0..h {
+                    if cap >= 2 {
+                        masks.push((1u32 << h) | (1u32 << g));
+                    }
+                    for f in 0..g {
+                        if cap >= 3 {
+                            masks.push((1u32 << h) | (1u32 << g) | (1u32 << f));
+                        }
+                    }
+                }
+            }
+            masks
+        };
+
+        for &n in &[0usize, 1, 5, 16, 17, 20, 31] {
+            for &cap in &[1usize, 2, 3] {
+                let masks = masks_for(n, cap);
+                // Every life index must appear in at least one affordable set.
+                // This is the assertion the `.min(16)` failed for n > 16.
+                for bit in 0..n {
+                    assert!(
+                        masks.iter().any(|m| m & (1u32 << bit) != 0),
+                        "n={n} cap={cap}: life {bit} is unreachable"
+                    );
+                }
+                // And no set may exceed the width cap.
+                for m in &masks {
+                    assert!(
+                        m.count_ones() as usize <= cap,
+                        "n={n} cap={cap}: mask {m:b} is wider than the cap"
+                    );
+                }
+            }
+        }
+
+        // The shipped default is a width cap of 1, where the list is the empty
+        // set plus one set per life — which is bitmask order, so the candidate
+        // order that breaks ties is unchanged from the pre-fix loop.
+        assert_eq!(masks_for(4, 1), vec![0b0000, 0b0001, 0b0010, 0b0100, 0b1000]);
     }
 
     /// The D2b trade-off, priced. Against an opponent who is NOT one

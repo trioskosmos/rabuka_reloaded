@@ -45,7 +45,14 @@ that fixed the arena stall and rewrote the live-set portfolio doctrine (§8).
 
 ---
 
-## 0. BOT GENERATIONS AT A GLANCE (updated 2026-08-27)
+## 0. BOT GENERATIONS AT A GLANCE
+
+> **This table was stale until 2026-09-29.** It stopped at v6 and still called v6
+> "the current strongest heuristic bot" while v7 and v8 were both shipping. The
+> §1–§9 doctrine below it is current and is the reason this file is cited from a
+> dozen source files; only this table had rotted. v7/v8 are documented in
+> [`V8_IMPROVEMENT_LOG.md`](V8_IMPROVEMENT_LOG.md) (what was measured) and
+> [`V8_NEXT_METHODS.md`](V8_NEXT_METHODS.md) (what is still open).
 
 | Bot | Main phase | Live set | Fair? | Head-to-head vs v5 |
 |---|---|---|---|---|
@@ -54,11 +61,20 @@ that fixed the arena stall and rewrote the live-set portfolio doctrine (§8).
 | v3 | archetype + clone-eval | archetype | yes | ~parity |
 | v4 | hearts fundamentalism | deterministic pass | yes | loses ~43% |
 | v5 | v4 delegate | binomial + gamble + junk | yes | baseline (100%) |
-| **v6** | **tempo: deploy while useful, else Pass** | **binomial + gamble + junk (reused)** | **yes** | **wins ~76% (217–68 / 300)** |
+| v6 | **tempo: deploy while useful, else Pass** | binomial + gamble + junk (reused) | yes | wins ~76% (217–68 / 300) |
+| v7 | ISMCTS rollout + payoff model | v7 live-set (not registered) | yes | ~55.8% |
+| v8 | neural `v8_model` (band-progress term) | flat `0.5 * PLACEMENT_CREDIT` per ability-bearing card — **known-flat, being replaced** | determinized | ~43.9–44.2% |
 
-v6 is the current strongest heuristic bot. It keeps v5's binomial-aware live
-set (the part that actually places cards) and replaces only the Main-phase
-policy, which was the source of the "do-nothing" turns. See §8.5.
+v6 remains the strongest *heuristic* bot and is the baseline the neural line is
+measured against. v7 and v8 are lower win-rate but are the active development
+line. v8 is the current top policy: ~44% against v5, measured over 2400 games
+across 3 seeds and both seats.
+
+Note the three "current v8 win rate" figures that were in circulation — 43.9%
+(here), 44.2% (`V8_NEXT_METHODS.md` §7) and an internally split 43.0%/44.2%
+(`V8_IMPROVEMENT_LOG.md` §9). The canonical figure is **44.2%**, from the
+2400-game run; the 43.0% table predates it. The v7 figure likewise predates the
+`v7_ismcts` work and should be read as historical.
 
 ## 1. EXPECTED GAME LENGTH (guide data — re-researched 2026-08-22)
 
