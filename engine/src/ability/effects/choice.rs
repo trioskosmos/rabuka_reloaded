@@ -94,10 +94,20 @@ impl AbilityResolver {
         let options_have_own_groups = options
             .map(|opts| opts.iter().any(|o| o.group_names_any().is_some()))
             .unwrap_or(false);
+        // 「…のカードN枚につき、以下から1つを選ぶ」 (PL!-pb2-016-P＋) also carries
+        // group_names, but there they scope HOW MANY TIMES the choice is offered, not
+        // what each option may touch. Propagating them made option 1
+        // (「自分のステージにいるメンバー1人をアクティブにする」) require a *lily white*
+        // member, so it found no candidates and silently did nothing. The per-card
+        // reading is the one in this codebase where the choice text carries につき, so
+        // that is the discriminator — the other choice effects with group_names
+        // (PL!S-bp7-003-P, PL!S-bp5-004-AR, PL!N-bp7-005-P, PL!HS-bp5-022-L, …) all
+        // genuinely mean a filter on the options and still propagate.
         let should_propagate_group = effect.group_names_any().is_some()
             && effect.alternative_count_type_any().is_none()
             && effect.compound.alternative_condition.is_none()
-            && !options_have_own_groups;
+            && !options_have_own_groups
+            && !effect.text.contains("につき");
         let propagated_options: Option<Vec<Box<AbilityEffect>>> = if should_propagate_group {
             options.map(|opts| {
                 opts.iter()

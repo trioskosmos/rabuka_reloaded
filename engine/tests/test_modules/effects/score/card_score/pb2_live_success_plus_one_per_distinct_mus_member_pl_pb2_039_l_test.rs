@@ -41,7 +41,7 @@ const HIKARI: &str = "PL!-pb2-039-L";
 /// μ's members with three DIFFERENT names, across two units.
 const ERI: &str = "PL!-pb2-002-PP"; // 絢瀬絵里, BiBi
 const HANAYOME: &str = "PL!-bp6-017-N"; // 小泉花陽, Printemps
-const NICO: &str = "PL!-pb2-003-PP"; // 矢澤にこ, BiBi
+const NICO: &str = "PL!-pb2-003-PP"; // 南ことり, BiBi
 /// Not μ's.
 const AZALEA: &str = "PL!S-bp5-012-N"; // 松浦果南
 

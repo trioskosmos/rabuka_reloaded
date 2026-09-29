@@ -1,4 +1,4 @@
-//! `change_state` - put a member active or wait.
+﻿//! `change_state` - put a member active or wait.
 //!
 //! Home of `ActionType::ChangeState`: 59 of the 936 unique abilities in
 //! `cards/abilities.json` (`docs/ABILITY_MATRIX.md`, "change active/wait
@@ -360,7 +360,7 @@ impl AbilityResolver {
                 // 元々…ブレード3つ以下のメンバー1人をウェイトにする」
                 // (百生吟子 PL!HS-PR-035-PR, whose select/move steps populate
                 // selected_cards from the DISCARD) still resolve correctly.
-                if candidates.is_empty() {
+            if candidates.is_empty() {
                     log::debug!(
                         "[EXEC_CHANGE_STATE] prior selection {:?} has no card on the target stage; scanning the stage instead",
                         self.selection.cards
@@ -553,8 +553,7 @@ impl AbilityResolver {
                 return Ok(());
             }
 
-            let change_count = if is_change_all {
-                candidates.len()
+            let change_count = if is_change_all {                candidates.len()
             } else {
                 count.min(candidates.len().u8_count()) as usize
             };
@@ -640,6 +639,13 @@ impl AbilityResolver {
                     card_id,
                     gs.mods.get_orientation_modifier(*card_id)
                 );
+                // Record wait -> active so the per-turn history clause can see it:
+                // 「このターン中に…ウェイト状態からアクティブにしていたメンバー」. A
+                // card already in the list is left alone, so the history is a SET and
+                // not a tally — activating a card twice in one turn still counts once.
+                if state_change == "active" && !gs.cards_activated_this_turn.contains(card_id) {
+                    gs.cards_activated_this_turn.push(*card_id);
+                }
             }
 
             // Conditional constants read wait/active orientations, so they must be

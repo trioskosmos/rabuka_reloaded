@@ -2511,7 +2511,7 @@ gs.set_recently_moved_batch(valid_ids.into(), Some("stage"));
                                     Some("<=".to_string()),
                                 )
                                 .build();
-                            let pending = gs.ability_queue.take_pending_actions();
+        let pending = gs.ability_queue.take_pending_actions();
                             self.awaiting.reprompt = Some(reprompt);
                             gs.ability_queue.set_pending_actions(pending);
                         }

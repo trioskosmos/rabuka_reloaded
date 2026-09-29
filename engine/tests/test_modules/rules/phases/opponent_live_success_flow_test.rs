@@ -33,7 +33,7 @@ use rabuka_engine::card::HeartColor;
 const P1_MEMBER: &str = "PL!-sd1-007-SD"; // 東條希: exactly fills START:DASH!!
 const P1_LIVE: &str = "PL!-sd1-019-SD"; // need {01:1,03:1,06:1}, score=1
 const TRAPPER: &str = "PL!S-pb1-021-L";
-const P2_MEMBER: &str = "PL!S-bp2-001-R"; // 千歌: {02:1,04:1,05:1} + injected 05s fill Trapper
+const P2_MEMBER: &str = "PL!S-bp2-001-R"; // 高海千歌: {02:1,04:1,05:1} + injected 05s fill Trapper
 
 #[test]
 fn p2_owned_trapper_scores_from_p1_success_in_real_round() {

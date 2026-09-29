@@ -15,7 +15,7 @@ use rabuka_engine::card::HeartColor;
 use rabuka_engine::core::types::AbilityTrigger;
 
 const HPT: &str = "PL!S-bp7-020-L";
-const AQOURS_M: &str = "PL!S-sd1-001-SD"; // 千歌: heart02=3, heart04=2, heart05=2, Aqours
+const AQOURS_M: &str = "PL!S-sd1-001-SD"; // 高海千歌: heart02=3, heart04=2, heart05=2, Aqours
 const FILLER: &str = "PL!-sd1-010-SD"; // μ's member (non-Aqours mill)
 
 fn fire_trigger_nth(

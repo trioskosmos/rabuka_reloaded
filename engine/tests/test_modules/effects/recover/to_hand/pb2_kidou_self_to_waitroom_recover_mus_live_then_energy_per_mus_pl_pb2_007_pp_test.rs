@@ -17,7 +17,7 @@
 use crate::helpers::*;
 use rabuka_engine::zones::MemberArea;
 
-const HANAYOME: &str = "PL!-pb2-007-PP"; // 小泉花陽, lily white
+const HANAYOME: &str = "PL!-pb2-007-PP"; // 東條希, lily white
 const ENERGY: &str = "LL-E-001-SD";
 const FILLER: &str = "PL!-sd1-010-SD";
 /// μ's lives for the waitroom and the success zone.

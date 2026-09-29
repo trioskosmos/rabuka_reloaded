@@ -2357,6 +2357,38 @@ impl<'a> ConditionContext<'a> {
         let player = self.resolve_condition_player(target);
         let card_db = &self.game_state.card_database;
 
+        // Per-turn activation history: count the members switched OUT of wait this
+        // turn, not the members currently in wait.
+        // PL!-pb2-040-L. Without this the clause degenerated to "some member is in
+        // wait", which is a different set and made the reduction unconditional.
+        if condition.get_activated_this_turn() == Some(true) {
+            let group_names = condition.get_group_names();
+            let n = self
+                .game_state
+                .cards_activated_this_turn
+                .iter()
+                .copied()
+                .filter(|cid| {
+                    card_db.get_card(*cid).is_some_and(|card| {
+                        if card_type == "member_card" && !card.is_member() {
+                            return false;
+                        }
+                        group_names.is_none_or(|gs| {
+                            gs.is_empty()
+                                || gs.iter().any(|g| {
+                                    crate::ability::util::card_matches_group_str(
+                                        card_db,
+                                        *cid,
+                                        Some(g),
+                                    )
+                                })
+                        })
+                    })
+                })
+                .count();
+            return n >= count as usize;
+        }
+
         let location = condition.get_location().unwrap_or("");
         let group_names_owned: Option<Vec<String>> =
             condition.get_group_names().map(|g| g.to_vec()).or_else(|| {
@@ -2442,8 +2474,7 @@ impl<'a> ConditionContext<'a> {
         // self is `count` more than the opponent → self_count >= opp_count + count.
         // When comparison_target is opponent, the effective comparison is the
         // DIFFERENCE between self and opponent, not a fixed threshold.
-        if condition.get_comparison_target() == Some(ComparisonTarget::Opponent) {
-            let opp_count = self.get_count_for_target(condition, "opponent");
+        if condition.get_comparison_target() == Some(ComparisonTarget::Opponent) {            let opp_count = self.get_count_for_target(condition, "opponent");
             let threshold = opp_count.saturating_add(count);
             let op = condition
                 .get_operator()

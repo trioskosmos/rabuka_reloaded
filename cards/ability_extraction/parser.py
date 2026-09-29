@@ -1294,6 +1294,15 @@ def parse_ability(triggerless_text: str) -> Dict[str, Any]:
 
     _demote_partial_group_names(effect)
 
+    # Both halves are attached by this point, so the cost/select_action fixes — which
+    # the effect-only normalisers cannot reach — can run over the whole ability. The
+    # child-location strip must also run here: earlier, the child clauses had not yet
+    # been given their location, so it silently did nothing.
+    _post_fix_cost_and_select(ability)
+    _fix_member_selection_target(ability)
+    _drop_unsupported_child_location(ability)
+
+
     # Merge phase gate into effect["condition"] (not ability["condition"])
     # so the Rust Ability struct picks it up via AbilityEffect.condition.
     if phase_gate and ability.get("effect") and isinstance(ability["effect"], dict):
@@ -2786,12 +2795,12 @@ def parse_action(text: str) -> Dict[str, Any]:
         action["name_constraint"] = "contains_all"
         action["name_constraint_source"] = "revealed_card"
 
-    # Check for distinct card name constraints (Q118).
-    # `名前の異なる` covers both the explicit `カード名の異なる` and the bare form used
-    # on costs — 「手札の名前の異なる『BiBi』のメンバーカードを3枚控え室に置いてもよい」
-    # (PL!-pb2-018-P＋). Matching only the explicit form left that cost with no
-    # `distinct`, so two prints of one character satisfied a three-card cost.
-    if "名前の異なる" in text or "名が異なる" in text:
+    # Check for distinct card name constraints (Q118). Deliberately still the
+    # explicit form: broadening this to bare `名前の異なる` changed the effect path for
+    # existing cards (`PL!SP-bp2-005-P＋` Mia, the Q118 pair) whose text uses the
+    # shorter phrase with different intent. The cost/select form is handled separately
+    # in _post_fix_cost_and_select, which is where PL!-pb2-018-P＋ actually needs it.
+    if "カード名の異なる" in text:
         action["distinct"] = "card_name"
 
     if state_change:
@@ -3588,6 +3597,24 @@ def _try_both(text):
     if "それらが両方ある" not in text:
         return None
     return {"type": "both_condition", "text": text}
+
+
+def _mark_activated_this_turn(result, text):
+    """Tag 「このターン中に…アクティブにしていた」 as a per-turn HISTORY clause.
+
+    Not a state filter: those members were IN WAIT and have been ACTIVATED earlier
+    this turn, by one of my named cards' effects. Left to the generic path it
+    degraded to `state: "wait"` on a per-unit count — "members currently in wait",
+    a different set of cards — which is why PL!-pb2-010-P＋ and PL!-pb2-040-L always
+    counted zero. The marker is what the engine reads
+    `GameState::cards_activated_this_turn` against.
+    """
+    if "このターン中に" in text and "アクティブにしていた" in text:
+        result["activated_this_turn"] = True
+        # The members are ACTIVE now, so the `state: wait` the generic path attached
+        # would make the clause unsatisfiable. Drop it.
+        result.pop("state", None)
+    return result
 
 
 def _try_self_became_wait(text):
@@ -7256,6 +7283,17 @@ def _per_unit_filters(result, text, per_text):
 
 
 def _try_per_unit(text):
+    # Defer to the choice handler for the REPEATABLE choice pattern. The marker
+    # 「以下からつを選ぶ」 on its own does not justify taking over: on a plain one-shot
+    # choice the per-unit reading of an option is the better shape —
+    # PL!S-bp3-024-L (Deep Resonance) loses option 0's member-selection target when
+    # the choice handler wins. What makes PL!-pb2-016-P＋ different is
+    # 「同じ選択肢を2回以上選んでもいい」: the same option may be taken repeatedly, so the three
+    # bulleted options ARE the whole effect and must not be read as a per-unit clause
+    # (which collapsed all three into one mashed-together draw_card).
+    if CHOICE_MARKER in text and "同じ選択肢" in text:
+        return None
+
     """Check for per-unit scaling (Xにつき) effects."""
     excludes = (
         "各グループ名につき",
@@ -9099,23 +9137,112 @@ _try_reveal_until_live = EffectPattern(
 )
 
 
-def _set_furthermore(text, result):
-    actions = []
-    for part in _split_sentences_nesting(text):
-        part = part.strip()
-        if not part:
+def _split_furthermore_depth0(text: str) -> List[str]:
+    """Split on top-level さらに, dropping the connective itself.
+
+    Sentence splitting only breaks on 。, so an ability whose clauses are all
+    「、」-separated — the shape 星空 凛&小泉花陽 (PL!-pb2-000-DUO) uses, e.g.
+    「自分の控え室にある『μ's』のライブカードを1枚手札に加え、さらに、…」 —
+    produced a single part, さらに never split anything, and the first clause was
+    swallowed into the trailing condition. Splitting on the connective itself is what
+    the rule means and works regardless of the separating punctuation.
+    """
+    parts: List[str] = []
+    start = 0
+    marker = "さらに"
+    for i, ch, depth in _ir_depth_scan(text):
+        if depth != 0 or ch != marker[0]:
             continue
-        if "さらに" in part:
-            part = part.replace("さらに", "", 1).strip()
-        actions.append(parse_effect(part))
-    result["actions"] = actions
+        if not text.startswith(marker, i):
+            continue
+        seg = text[start:i].strip()
+        if seg:
+            parts.append(seg)
+        start = i + len(marker)
+    seg = text[start:].strip()
+    if seg:
+        parts.append(seg)
+    return parts
+
+
+def _furthermore_parts(text: str):
+    """Return the clause list to parse for a さらに rule, or None.
+
+    Sentence splitting (on 。) is tried first and kept when it applies, so cards that
+    already split cleanly are unaffected. Otherwise split on a top-level さらに — the
+    connective itself, since a 、-separated sentence never splits (PL!-pb2-000-DUO).
+
+    The marker split is only used when EVERY segment parses to a real action. A segment
+    that does not is a bare gate rather than a clause — 「30以上の場合、さらに…」 in
+    Proof (PL!HS-bp6-029-L) — and the gate needs the surrounding context (group,
+    location) to build its condition, which only the unsplit parse has. Splitting there
+    would replace a correct single node with an action-less step.
+    """
+    parts = _split_sentences_nesting(text)
+    if len(parts) >= 2 and any("さらに" in part for part in parts[1:]):
+        return parts
+    # Narrow scope. The marker path is only for a さらに that sits INSIDE the first
+    # 。-sentence, where a 、-separated clause list is the whole effect — the shape
+    # PL!-pb2-000-DUO uses, whose waitroom clause was being swallowed whole. A さらに
+    # in any later sentence is already reachable through the sentence split, and
+    # taking it here instead re-binds clauses that the per-unit and follow-up handlers
+    # above already own.
+    first_stop = text.find("。")
+    first_furthermore = text.find("さらに")
+    if first_furthermore < 0:
+        return None
+    if 0 <= first_stop < first_furthermore:
+        return None
+    marker_parts = _split_furthermore_depth0(text)
+    if len(marker_parts) != 2:
+        return None
+    stripped = [p.replace("さらに", "", 1).strip() for p in marker_parts]
+
+    # The clause BEFORE さらに must be an action, not a gate or a bare connective.
+    # 「8枚以上あるかぎり、さらに…」 and 「…場合、さらに…」 are a condition plus its
+    # effect, and 「その後、…」 is a lead-in: splitting those turns a condition into a
+    # sibling step and the engine applies the effect unconditionally. The final clause
+    # of the pre-さらに segment decides which it is.
+    head = stripped[0].rstrip("、,。 ").rstrip()
+    gate_tail = ("場合", "かぎり", "なら", "とき", "時", "的话", "その後", "その場合")
+    if any(head.endswith(t) for t in gate_tail):
+        return None
+    if len(head) <= 2:
+        return None
+
+    for part in stripped:
+        if not part:
+            return None
+        if parse_effect(part).get("action") in (None, "custom"):
+            return None
+    return stripped
+
+
+def _set_furthermore(text, result):
+    parts = _furthermore_parts(text)
+    if parts is None:
+        return
+    result["actions"] = [parse_effect(part) for part in parts if part.strip()]
+
+    # A leading trigger gate scopes the WHOLE ability, not just the first clause.
+    # 「『μ's』のメンバー2人からバトンタッチして登場した場合、A、さらに、B」 is read
+    # as "if you debuted this way, do A and B", so the gate belongs on the sequential.
+    # Only a real trigger gate is hoisted: a plain 「〜場合」 in front of the first
+    # clause can just as legitimately gate that clause alone, and moving it would
+    # silently widen it.
+    if result["actions"]:
+        first_cond = result["actions"][0].get("condition")
+        # Safe to hoist unconditionally here: the marker path above only fires for a
+        # さらに inside the first 。-sentence with exactly two clause-action segments, so
+        # a leading trigger gate is the sentence's own gate, not a sibling's. A later
+        # 「〜場合」 in the second segment is an ADDITIONAL gate under さらに, and leaving
+        # the two stacked is the printed structure.
+        if isinstance(first_cond, dict) and first_cond.get("trigger_event"):
+            result["condition"] = result["actions"][0].pop("condition")
 
 
 def _matches_furthermore(text):
-    parts = _split_sentences_nesting(text)
-    return "さらに" in text and len(parts) >= 2 and any(
-        "さらに" in part for part in parts[1:]
-    )
+    return _furthermore_parts(text) is not None
 
 
 _try_furthermore = EffectPattern(
@@ -12084,6 +12211,7 @@ def _normalize_parsed_effect(effect, original_text=None):
                     current.pop("group_names", None)
     _strip_leaked_draw_g(effect)
     _type_replacement_appearance(effect)
+    _type_count_as_multiple(effect)
     # _type_count_as_multiple is NOT wired — see its docstring. Typing PL!-pb2-041-L
     # without a working weight would turn `test_no_custom_actions` green while the
     # mechanic did nothing, so it keeps failing loudly instead.
@@ -12096,8 +12224,7 @@ def _normalize_parsed_effect(effect, original_text=None):
     effect = _walk_split_mixed(effect)
     effect = _walk_split_look(effect)
     _enrich_characters(effect)
-    _drop_unsupported_child_location(effect)
-    _post_fix_cost_and_select(ability)
+    _mark_activated_this_turn_nodes(effect)
     _clean_gain_resource(effect)
     _fix_select_self_and_other(effect)
     _fix_energy_difference_dynamic_count(effect)
@@ -12355,33 +12482,34 @@ def _unleak_gain_ability_target(effect):
 
 
 def _type_count_as_multiple(effect):
-    """NOT WIRED — deliberately not called.
+    """Type 「…の植物の数を数えるとき、このカードはN枚として扱う」.
 
-    PL!-pb2-041-L 春情ロマンティック — 「自分の『lily white』のカードの効果によって、
-    自分の成功ライブカード置き場にあるカードの枚数を数えるとき、このカードは2枚として
-    扱う」 — still parses to `action: "custom"`.
+    PL!-pb2-041-L 春情ロマンチック is a counting WEIGHT: it changes
+    how another card's effect computes a number, which is why no action pattern claims
+    it and it fell through to `custom`.
 
-    Most of the implementation exists and is correct in isolation:
-      * `GameState::count_as_multiple_weight` returns 2 for the card when the counting
-        card is in a `counted_by` group, and 1 otherwise (verified by probe);
-      * `count_filtered` in `condition/card.rs` adds the extra weight on top of the
-        normal count, deciding membership with the SAME filter applied one card at a
-        time, so a weighted card can only be a card the count already included.
-
-    What is NOT working: the condition still evaluates as if the weight were absent.
-    The counting card is resolved from `activating_card` / the ability queue's current
-    entry, and the probe shows `activating_card` is `-1` and the queue has no current
-    entry at the moment 041's ライブ開始時 condition is evaluated. Threading the
-    counting card into condition evaluation properly is a real change to how
-    `ConditionContext` identifies the running effect — and `PARSER_NOTES` already
-    records that `get_count_for_condition` / `get_group_card_count` /
-    `get_count_for_target` overlap, which is why this needs its own pass.
-
-    Two zone spellings bit during this work and are worth keeping in mind:
-    `success_live_card_zone` (conditions) vs `success_live_zone` (the enum) — an `==`
-    check between them never fires, and `Zone::from_str` accepts both.
+    `counted_by` are the effects that SEE the weight (「自分の『体のカードの効果によって」), not a
+    filter on the card being counted, so the node's own `group_names` moves to
+    `counted_by` and the group is cleared — otherwise the engine reads it as a card
+    filter. `count_as` is the weight, read by
+    `GameState::count_as_multiple_weight`.
     """
-    return None
+    for node in iter_dict_nodes(effect):
+        if node.get("action") != "custom":
+            continue
+        text = node.get("text") or ""
+        if "枚として扱う" not in text:
+            continue
+        weight = re.search(r"(\d+)\s*枚として扱う", text)
+        node["action"] = "count_as_multiple"
+        node["count_as"] = as_int(weight.group(1)) if weight else 2
+        if node.get("group_names"):
+            node["counted_by"] = list(node["group_names"])
+            node.pop("group_names", None)
+        # The weight only applies while the card is in the zone it counts.
+        if node.get("location"):
+            node["card_property"] = None
+            node.pop("card_property", None)
 
 
 def _type_replacement_appearance(effect):
@@ -12432,6 +12560,48 @@ def _enrich_gain_abilities(effect):
             node["gained_effect"] = gained
 
 
+def _fix_member_selection_target(ability):
+    """A 「〜ステージにいる〜メンバーN人を〜にする」 target is a CHOSEN member.
+
+    「自分のステージにいる『BiBi』のメンバー1人をアクティブにする」 names a member
+    the player picks, so `target: "self"` is wrong twice over: the engine resolves
+    "self" to the activating card, and `change_state` then auto-selects it via its
+    `is_self_target` shortcut instead of prompting. The effect silently applies to the
+    wrong card (PL!-pb2-015-P＋, PL!-pb2-016-P＋).
+
+    「このメンバー」 really is the activating card and is left alone. Dropping `target`
+    entirely lets the engine prompt over the stage, which is the printed behaviour.
+    """
+    effects = []
+
+    def walk(node):
+        if isinstance(node, dict):
+            if node.get("action") == "change_state":
+                effects.append(node)
+            for v in node.values():
+                walk(v)
+        elif isinstance(node, list):
+            for v in node:
+                walk(v)
+
+    walk(ability.get("effect"))
+
+    for eff in effects:
+        if eff.get("target") != "self":
+            continue
+        text = eff.get("text") or ""
+        if "このメンバー" in text or "このカード" in text:
+            continue
+        # A counted member is being changed: 「メンバー1人」/「メンバー2人」, and the
+        # clause locates them on a stage. A bare 「〜メンバーをウェイトにする」 with no
+        # count is the whole-stage reading and is left as-is.
+        if not re.search(r"メンバー[0-9０-９一二三四五六七八九十]+人", text):
+            continue
+        if "ステージ" not in text:
+            continue
+        eff.pop("target", None)
+
+
 def _post_fix_cost_and_select(ability):
     """Fixes that must reach every node — effect steps, costs and select_actions alike.
 
@@ -12453,14 +12623,40 @@ def _post_fix_cost_and_select(ability):
             text = node.get("text")
             if not isinstance(text, str) or not text:
                 continue
-            if not node.get("distinct") and ("名前の異なる" in text or "名が異なる" in text):
+            # Scoped to COSTS and select/look actions only. The effect builder keeps
+            # its stricter `カード名の異なる` rule, because the bare `名前の異なる`
+            # phrase appears on effect steps of existing cards with different intent.
+            cost_like = root is ability.get("cost") or node.get("action") in (
+                "select_cards",
+                "look_and_select",
+                "move_cards",
+            )
+            if (
+                cost_like
+                and not node.get("distinct")
+                and ("名前の異なる" in text or "名が異なる" in text)
+            ):
                 node["distinct"] = "card_name"
             nht = re.search(r"必要ハートの合計が(\d+)以上", text)
-            if nht:
+            # Skip when the bound is ALREADY expressed the existing way.
+            # `PL!SP-bp5-012-N` 澁谷かのん reads 「必要ハートの合計が8以上の『Liella!』の
+            # ライブカード」 and already carries `aggregate: total` + `count: 8` +
+            # `operator: ">="`. Adding `need_heart_total` there is a duplicate encoding
+            # the condition decoder does not recognise, which showed up as a silent
+            # decode fallback. `PL!-pb2-008-PP` has no `aggregate`, so it still gets
+            # the field, which is the case that needed it.
+            if nht and node.get("aggregate") != "total":
                 node["need_heart_total"] = as_int(nht.group(1))
                 node["need_heart_operator"] = ">="
                 if node.get("cost_limit") is None:
                     node.pop("cost_limit_operator", None)
+
+
+def _mark_activated_this_turn_nodes(effect):
+    """Apply the per-turn-history tag to every condition node in the tree."""
+    for node in iter_dict_nodes(effect):
+        if "text" in node and isinstance(node.get("text"), str):
+            _mark_activated_this_turn(node, node["text"])
 
 
 def _drop_unsupported_child_location(effect):
@@ -12489,10 +12685,18 @@ def _drop_unsupported_child_location(effect):
         for child in node.get("conditions") or []:
             if not isinstance(child, dict):
                 continue
+            text = child.get("text") or ""
+            # 「〜がすべて『X』」 … ALL of the named group, not any. PL!-pb2-037-L
+            # reads 「…がすべて『Printemps』か、すべて『lily white』か、すべて『BiBi』
+            # のいずれかの場合」 and the すべて was dropped from every branch, leaving
+            # three bare "is in this group" tests — an ANY reading of what the card
+            # states as a three-way ALL-of-one-group choice. Checked BEFORE the
+            # location guard so a branch with no location is not skipped.
+            if "すべて" in text:
+                child.setdefault("all_members", True)
             loc = child.get("location")
             if not loc:
                 continue
-            text = child.get("text") or ""
             names_a_stage_area = any(m in text for m in zone_markers)
             if names_a_stage_area and loc not in ("stage",):
                 child.pop("location", None)
@@ -13592,6 +13796,12 @@ class _FinalizationPipeline:
             "DO NOT EDIT THIS MANUALLY. Run cards/ability_extraction/parser.py to regenerate."
         )
         _clean_per_unit_source(data["unique_abilities"])
+        # Run last, over the FINAL tree, so no later pass can re-add what it strips.
+        # PL!-pb2-042-L's centre clause had inherited `location: revealed_cards`
+        # from the clause before it; the earlier in-parse call sites ran before the
+        # child clauses were given their location and so did nothing.
+        for ability in data["unique_abilities"]:
+            _drop_unsupported_child_location(ability)
 
     def run(self, data):
         for ability in data["unique_abilities"]:

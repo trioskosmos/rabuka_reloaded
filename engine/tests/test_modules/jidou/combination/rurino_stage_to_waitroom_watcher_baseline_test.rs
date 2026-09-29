@@ -58,8 +58,8 @@ use crate::test_modules::support::baton_swap_auto_helpers::*;
 use rabuka_engine::ability::types::Choice;
 use rabuka_engine::zones::MemberArea;
 
-const RURINO: &str = "PL!HS-bp6-019-N"; // 自動 無制限: draw 2, discard 2
-const REENTRY: &str = "PL!HS-pb1-019-N"; // 起動: self→waitroom, recover a member to hand
+const RURINO: &str = "PL!HS-bp6-019-N"; // 大沢瑠璃乃（自動／無制限）: draw 2, discard 2
+const REENTRY: &str = "PL!HS-pb1-019-N"; // 大沢瑠璃乃（起動）: self→waitroom, recover a member to hand
 const ARRIVER: &str = "PL!-sd1-002-SD";
 const FILLER: &str = "PL!-sd1-010-SD";
 

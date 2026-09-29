@@ -155,6 +155,14 @@ pub struct GameState {
     /// Turn-limit usage per ability — CardId for zero-allocation.
     pub areas_placed_this_turn: SmallVec<[String; 8]>,
     pub cards_appeared_this_turn: SmallVec<[i16; 8]>,
+    /// Members that were in WAIT and were ACTIVATED earlier in this turn.
+    ///
+    /// 「このターン中に自分の『X』のカードの効果によってウェイト状態からアクティブに
+    /// していたメンバー」 (PL!-pb2-010-P＋ 絢瀬絵里, PL!-pb2-040-L 僕たちはひとつの光).
+    /// The clause is neither "members in wait" nor "members in play" — it is a
+    /// per-turn history, and the engine had no such record, which is why both cards
+    /// parsed into a `state: "wait"` per-unit count that could never be right.
+    pub cards_activated_this_turn: SmallVec<[i16; 8]>,
     pub card_appearance_source: SmallVec<[(i16, String); 4]>,
     pub cards_moved_this_turn: SmallVec<[i16; 16]>,
     pub gained_abilities: HashMap<i16, Vec<String>>,
@@ -580,6 +588,7 @@ impl GameState {
             auto_ability_trigger_counts: SmallVec::new(),
             areas_placed_this_turn: SmallVec::new(),
             cards_appeared_this_turn: SmallVec::new(),
+        cards_activated_this_turn: SmallVec::new(),
             card_appearance_source: SmallVec::new(),
             cards_moved_this_turn: SmallVec::new(),
             gained_abilities: HashMap::default(),

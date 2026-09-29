@@ -1151,6 +1151,13 @@ pub struct EffectFilter {
     pub ref_offset: Option<i8>,
     pub id: Option<ArcStr>,
     pub opponent_action: Option<Box<AbilityEffect>>,
+
+    /// 「このターン中に…アクティブにしていた」 — a per-turn HISTORY clause, not a
+    /// state filter. The counted set is GameState::cards_activated_this_turn (members
+    /// that were in wait and have been activated this turn), filtered to location
+    /// and group_names — NOT the set of members currently in wait.
+    /// PL!-pb2-010-P＋ 綎滄絵針.
+    pub activated_this_turn: Option<bool>,
 }
 
 /// Tagged union of effect action types. Every field lives on the shared
@@ -1537,6 +1544,7 @@ impl AbilityEffect {
                 card_type: None,
                 counted_by: None,
                 count_as: None,
+                activated_this_turn: None,
                 exclude_self: bool_field!("exclude_self"),
                 same_name: bool_field!("same_name"),
                 same_unit_name: bool_field!("same_unit_name"),
@@ -2085,6 +2093,7 @@ impl AbilityEffect {
     filter_str_getter!(heart_total_operator_any, heart_total_operator);
 
     filter_u8_getter!(count_as_any, count_as);
+    filter_bool_getter!(activated_this_turn_any, activated_this_turn);
     filter_box_vec_ref_getter!(counted_by_any, counted_by);
 
     filter_u8_getter!(per_group_count_any, per_group_count);
@@ -3175,6 +3184,12 @@ pub struct ConditionCommon {
     /// executor tracks success structurally.
     #[cfg_attr(feature = "serde_support", serde(default))]
     pub action_reference: Option<ArcStr>,
+
+    /// Per-turn activation history. The members were IN WAIT and have been
+    /// ACTIVATED this turn -- a history, not a state. Counted against
+    /// GameState::cards_activated_this_turn.
+    /// PL!-pb2-040-L.
+    pub activated_this_turn: Option<bool>,
 }
 
 /// The distinct Condition type as a serde internally-tagged enum.
@@ -4039,10 +4054,22 @@ impl Condition {
     }
 
     pub fn get_all_members(&self) -> Option<bool> {
+        // NOTE: `all_members` is a field of the GROUP VARIANT, not of
+        // ConditionCommon, so a `location_condition` cannot carry it. That is not
+        // hypothetical: PL!-pb2-037-L's first branch is a `revealed_cards` location
+        // condition, so the 「すべて」 on that branch is dropped at decode. Moving the
+        // field onto ConditionCommon is the real fix and would wire every variant.
         match self {
             Condition::Group { all_members, .. } => *all_members,
             _ => None,
         }
+    }
+
+    /// Per-turn activation history. Mirrors the EffectFilter field: the members were
+    /// IN WAIT and have been ACTIVATED this turn. Read via `self.common()` so it
+    /// works for every condition variant, not just one.
+    pub fn get_activated_this_turn(&self) -> Option<bool> {
+        self.common().and_then(|c| c.activated_this_turn)
     }
 
     pub fn get_comparison_target(&self) -> Option<ComparisonTarget> {

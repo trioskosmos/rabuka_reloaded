@@ -15,9 +15,9 @@ use rabuka_engine::zones::MemberArea;
 
 const SHIZUKU: &str = "PL!N-bp7-003-R＋";
 const AYUMU: &str = "PL!N-bp1-001-R"; // 上原歩夢
-const KANON: &str = "PL!SP-bp1-001-R"; // 澁谷か乃ん
-const HANABO: &str = "PL!HS-bp1-001-R"; // 日下花帆
-const JOINT: &str = "LL-bp1-001-R＋"; // 歩高&澁谷の全&日賀下花帆 (multi-name)
+const KANON: &str = "PL!SP-bp1-001-R"; // 澁谷かのん
+const HANABO: &str = "PL!HS-bp1-001-R"; // 日野下花帆
+const JOINT: &str = "LL-bp1-001-R＋"; // 上原歩夢&澁谷かのん&日野下花帆(multi-name)
 
 fn seed_deck(game: &mut TestGame) {
     let filler = game.id("PL!-sd1-010-SD");

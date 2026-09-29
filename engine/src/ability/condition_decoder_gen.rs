@@ -22,6 +22,7 @@ struct ConditionLocals {
     pub ability_filter: Option<ArcStr>,
     pub ability_filter_triggers: Option<Vec<String>>,
     pub action_reference: Option<ArcStr>,
+    pub activated_this_turn: Option<bool>,
     pub activation_position: Option<ArcStr>,
     pub aggregate: Option<ArcStr>,
     pub all: Option<bool>,
@@ -126,6 +127,7 @@ fn decode_condition_field(
             "ability_filter" => { l.ability_filter = bc.read_arc_str_value(); Some(true) }
             "ability_filter_triggers" => { l.ability_filter_triggers = bc.read_opt_str_vec_value().map(|b| *b); Some(true) }
             "action_reference" => { l.action_reference = bc.read_arc_str_value(); Some(true) }
+            "activated_this_turn" => { l.activated_this_turn = bc.read_bool_value(); Some(true) }
             "activation_position" => { l.activation_position = bc.read_arc_str_value(); Some(true) }
             "aggregate" => { l.aggregate = bc.read_arc_str_value(); Some(true) }
             "all" => { l.all = bc.read_bool_value(); Some(true) }
@@ -227,6 +229,7 @@ fn build_compound(l: &ConditionLocals) -> Condition {
         common: Box::new(ConditionCommon {
             ability_filter_triggers: l.ability_filter_triggers.clone().map(Box::new),
             action_reference: l.action_reference.clone(),
+            activated_this_turn: l.activated_this_turn,
             activation_position: l.activation_position.clone(),
             aggregate: l.aggregate.clone(),
             all: l.all,
@@ -298,6 +301,7 @@ fn build_location(l: &ConditionLocals) -> Condition {
         common: Box::new(ConditionCommon {
             ability_filter_triggers: l.ability_filter_triggers.clone().map(Box::new),
             action_reference: l.action_reference.clone(),
+            activated_this_turn: l.activated_this_turn,
             activation_position: l.activation_position.clone(),
             aggregate: l.aggregate.clone(),
             all: l.all,
@@ -373,6 +377,7 @@ fn build_comparison(l: &ConditionLocals) -> Condition {
         common: Box::new(ConditionCommon {
             ability_filter_triggers: l.ability_filter_triggers.clone().map(Box::new),
             action_reference: l.action_reference.clone(),
+            activated_this_turn: l.activated_this_turn,
             activation_position: l.activation_position.clone(),
             aggregate: l.aggregate.clone(),
             all: l.all,
@@ -449,6 +454,7 @@ fn build_movement(l: &ConditionLocals) -> Condition {
         common: Box::new(ConditionCommon {
             ability_filter_triggers: l.ability_filter_triggers.clone().map(Box::new),
             action_reference: l.action_reference.clone(),
+            activated_this_turn: l.activated_this_turn,
             activation_position: l.activation_position.clone(),
             aggregate: l.aggregate.clone(),
             all: l.all,
@@ -525,6 +531,7 @@ fn build_group(l: &ConditionLocals) -> Condition {
         common: Box::new(ConditionCommon {
             ability_filter_triggers: l.ability_filter_triggers.clone().map(Box::new),
             action_reference: l.action_reference.clone(),
+            activated_this_turn: l.activated_this_turn,
             activation_position: l.activation_position.clone(),
             aggregate: l.aggregate.clone(),
             all: l.all,
@@ -596,6 +603,7 @@ fn build_appearance(l: &ConditionLocals) -> Condition {
         common: Box::new(ConditionCommon {
             ability_filter_triggers: l.ability_filter_triggers.clone().map(Box::new),
             action_reference: l.action_reference.clone(),
+            activated_this_turn: l.activated_this_turn,
             activation_position: l.activation_position.clone(),
             aggregate: l.aggregate.clone(),
             all: l.all,
@@ -671,6 +679,7 @@ fn build_temporal(l: &ConditionLocals) -> Condition {
         common: Box::new(ConditionCommon {
             ability_filter_triggers: l.ability_filter_triggers.clone().map(Box::new),
             action_reference: l.action_reference.clone(),
+            activated_this_turn: l.activated_this_turn,
             activation_position: l.activation_position.clone(),
             aggregate: l.aggregate.clone(),
             all: l.all,
@@ -744,6 +753,7 @@ fn build_state(l: &ConditionLocals) -> Condition {
         common: Box::new(ConditionCommon {
             ability_filter_triggers: l.ability_filter_triggers.clone().map(Box::new),
             action_reference: l.action_reference.clone(),
+            activated_this_turn: l.activated_this_turn,
             activation_position: l.activation_position.clone(),
             aggregate: l.aggregate.clone(),
             all: l.all,
@@ -816,6 +826,7 @@ fn build_resource(l: &ConditionLocals) -> Condition {
         common: Box::new(ConditionCommon {
             ability_filter_triggers: l.ability_filter_triggers.clone().map(Box::new),
             action_reference: l.action_reference.clone(),
+            activated_this_turn: l.activated_this_turn,
             activation_position: l.activation_position.clone(),
             aggregate: l.aggregate.clone(),
             all: l.all,
@@ -886,6 +897,7 @@ fn build_abilityfilter(l: &ConditionLocals) -> Condition {
         common: Box::new(ConditionCommon {
             ability_filter_triggers: l.ability_filter_triggers.clone().map(Box::new),
             action_reference: l.action_reference.clone(),
+            activated_this_turn: l.activated_this_turn,
             activation_position: l.activation_position.clone(),
             aggregate: l.aggregate.clone(),
             all: l.all,
@@ -957,6 +969,7 @@ fn build_scorethreshold(l: &ConditionLocals) -> Condition {
         common: Box::new(ConditionCommon {
             ability_filter_triggers: l.ability_filter_triggers.clone().map(Box::new),
             action_reference: l.action_reference.clone(),
+            activated_this_turn: l.activated_this_turn,
             activation_position: l.activation_position.clone(),
             aggregate: l.aggregate.clone(),
             all: l.all,
@@ -1027,6 +1040,7 @@ fn build_choice(l: &ConditionLocals) -> Condition {
         common: Box::new(ConditionCommon {
             ability_filter_triggers: l.ability_filter_triggers.clone().map(Box::new),
             action_reference: l.action_reference.clone(),
+            activated_this_turn: l.activated_this_turn,
             activation_position: l.activation_position.clone(),
             aggregate: l.aggregate.clone(),
             all: l.all,
@@ -1098,6 +1112,7 @@ fn build_complex(l: &ConditionLocals) -> Condition {
         common: Box::new(ConditionCommon {
             ability_filter_triggers: l.ability_filter_triggers.clone().map(Box::new),
             action_reference: l.action_reference.clone(),
+            activated_this_turn: l.activated_this_turn,
             activation_position: l.activation_position.clone(),
             aggregate: l.aggregate.clone(),
             all: l.all,
@@ -1170,6 +1185,7 @@ fn build_positioncond(l: &ConditionLocals) -> Condition {
         common: Box::new(ConditionCommon {
             ability_filter_triggers: l.ability_filter_triggers.clone().map(Box::new),
             action_reference: l.action_reference.clone(),
+            activated_this_turn: l.activated_this_turn,
             activation_position: l.activation_position.clone(),
             aggregate: l.aggregate.clone(),
             all: l.all,
@@ -1240,6 +1256,7 @@ fn build_opponentchoice(l: &ConditionLocals) -> Condition {
         common: Box::new(ConditionCommon {
             ability_filter_triggers: l.ability_filter_triggers.clone().map(Box::new),
             action_reference: l.action_reference.clone(),
+            activated_this_turn: l.activated_this_turn,
             activation_position: l.activation_position.clone(),
             aggregate: l.aggregate.clone(),
             all: l.all,
@@ -1310,6 +1327,7 @@ fn build_opponentlivesuccess(l: &ConditionLocals) -> Condition {
         common: Box::new(ConditionCommon {
             ability_filter_triggers: l.ability_filter_triggers.clone().map(Box::new),
             action_reference: l.action_reference.clone(),
+            activated_this_turn: l.activated_this_turn,
             activation_position: l.activation_position.clone(),
             aggregate: l.aggregate.clone(),
             all: l.all,
@@ -1380,6 +1398,7 @@ fn build_noexcessheart(l: &ConditionLocals) -> Condition {
         common: Box::new(ConditionCommon {
             ability_filter_triggers: l.ability_filter_triggers.clone().map(Box::new),
             action_reference: l.action_reference.clone(),
+            activated_this_turn: l.activated_this_turn,
             activation_position: l.activation_position.clone(),
             aggregate: l.aggregate.clone(),
             all: l.all,
@@ -1450,6 +1469,7 @@ fn build_alwaystrue(l: &ConditionLocals) -> Condition {
         common: Box::new(ConditionCommon {
             ability_filter_triggers: l.ability_filter_triggers.clone().map(Box::new),
             action_reference: l.action_reference.clone(),
+            activated_this_turn: l.activated_this_turn,
             activation_position: l.activation_position.clone(),
             aggregate: l.aggregate.clone(),
             all: l.all,
@@ -1520,6 +1540,7 @@ fn build_anyof(l: &ConditionLocals) -> Condition {
         common: Box::new(ConditionCommon {
             ability_filter_triggers: l.ability_filter_triggers.clone().map(Box::new),
             action_reference: l.action_reference.clone(),
+            activated_this_turn: l.activated_this_turn,
             activation_position: l.activation_position.clone(),
             aggregate: l.aggregate.clone(),
             all: l.all,
@@ -1591,6 +1612,7 @@ fn build_allrevealedmatchheartcolor(l: &ConditionLocals) -> Condition {
         common: Box::new(ConditionCommon {
             ability_filter_triggers: l.ability_filter_triggers.clone().map(Box::new),
             action_reference: l.action_reference.clone(),
+            activated_this_turn: l.activated_this_turn,
             activation_position: l.activation_position.clone(),
             aggregate: l.aggregate.clone(),
             all: l.all,
@@ -1661,6 +1683,7 @@ fn build_unsupported(l: &ConditionLocals) -> Condition {
         common: Box::new(ConditionCommon {
             ability_filter_triggers: l.ability_filter_triggers.clone().map(Box::new),
             action_reference: l.action_reference.clone(),
+            activated_this_turn: l.activated_this_turn,
             activation_position: l.activation_position.clone(),
             aggregate: l.aggregate.clone(),
             all: l.all,

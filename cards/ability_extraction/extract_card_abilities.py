@@ -601,6 +601,11 @@ FILTER_FIELDS = {
     "characters",
     "exclude_characters",
     "card_names",
+    # `counted_by` names the groups whose effects observe a `count_as_multiple`
+    # weight — 「自分の『lily white』のカードの効果によって」 (PL!-pb2-041-L). It is not
+    # a card filter, so it must never be used as one, but a 『X』 in the text IS
+    # accounted for by it and the validator below should not report it as unfiltered.
+    "counted_by",
 }
 
 

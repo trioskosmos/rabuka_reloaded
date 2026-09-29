@@ -24,7 +24,7 @@
 use crate::helpers::*;
 use rabuka_engine::zones::MemberArea;
 
-const NOZOMI: &str = "PL!-pb2-026-N"; // 東條 希, Printemps
+const NOZOMI: &str = "PL!-pb2-026-N"; // 小泉花陽, Printemps
 const FILLER: &str = "PL!-sd1-010-SD";
 /// A Printemps member — the only kind the look may take.
 const P_MEMBER: &str = "PL!-bp6-017-N"; // 小泉花陽

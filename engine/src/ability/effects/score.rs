@@ -428,6 +428,15 @@ impl AbilityResolver {
                             }
                         }
                     }
+                    // A card id names ONE physical card, but the chain above can see
+                    // the same id twice — a live being performed is both the live card
+                    // and, once it has succeeded, an entry in the success live card
+                    // zone. Without this the pool holds that card twice and a
+                    // self-targeted effect applies once per occurrence:
+                    // 「このカードのスコアを＋１する」 (PL!-pb2-041-L) scored +2 from a
+                    // single activation. Order-preserving dedup keeps the first hit.
+                    let mut seen = std::collections::HashSet::with_capacity(ids.len());
+                    ids.retain(|id| seen.insert(*id));
                     ids
                 }
             };

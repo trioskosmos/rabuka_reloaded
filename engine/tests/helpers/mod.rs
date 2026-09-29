@@ -406,6 +406,34 @@ impl TestGame {
             .expect("play_to_stage_baton failed");
     }
 
+    /// Play a member as a TWO-member baton touch, replacing the members in `area_a` and
+    /// `area_b` and landing in `land_in`.
+    ///
+    /// The engine takes the double-baton route only when the action carries two area
+    /// INDICES (`card_indices`); with one index, or none, it takes the single-play path
+    /// and a "baton touch" against an empty area just places the card. That is why
+    /// `play_to_stage_baton` pointed at an empty slot cannot build the two-member debut
+    /// that `PL!-pb2-000-DUO` is gated on — the gate needs `trigger_event.min_count = 2`
+    /// recorded touches, and only this path records two.
+    pub fn play_to_stage_double_baton(
+        &mut self,
+        card_id: i16,
+        area_a: MemberArea,
+        area_b: MemberArea,
+        land_in: MemberArea,
+    ) {
+        let indices = vec![area_a.to_index(), area_b.to_index()];
+        TurnEngine::execute_main_phase_action(
+            &mut self.state,
+            &ActionType::PlayMemberToStage,
+            Some(card_id),
+            Some(indices),
+            Some(land_in),
+            Some(false),
+        )
+        .expect("play_to_stage_double_baton failed");
+    }
+
     /// The card currently in `area` of OUR stage, if it is not the card being played.
     /// Lets a test assert its own setup, which is what would have caught §8.3's
     /// vacuous negative.

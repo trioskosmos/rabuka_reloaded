@@ -2253,6 +2253,33 @@ def build_inventory():
     covered_cards = sum(card_covered.values())
     abilities_on_covered = sum(1 for r in rows if r["covered"])
 
+    # Per-VARIANT coverage. `card_covered` ORs by card-number BASE, so a base is
+    # covered when ANY variant is — which is right for ability coverage (the same
+    # ability on the same printed text) but hides a card that no test ever names.
+    # `PL!SP-pb2-000-DUO` is exactly that: it shares both of its abilities with
+    # `PL!SP-pb2-000-R`, which has eleven test files, and had ZERO of its own while
+    # the report read 48/48. Report the variants separately rather than redefining
+    # the existing metric.
+    variants_without_tests = []
+    # One pass over the whole test tree, not per-ability-row: a card can be exercised
+    # by a test that covers a DIFFERENT ability on it, and a per-row check reported
+    # `PL!SP-pb2-016-P＋` (which has its own file) as untested.
+    tests_root = Path(__file__).resolve().parents[1] / "engine" / "tests"
+    all_test_text = "\n".join(
+        f.read_text(encoding="utf-8", errors="replace")
+        for f in sorted(tests_root.rglob("*.rs"))
+    )
+    for r in rows:
+        for c in r["cards"]:
+            # Scoped to PBLL02 on purpose. Elsewhere in the pool a card is routinely
+            # exercised by a shared engine test that never names it, so "no file names
+            # this card" is meaningless there; the PBLL02 convention is one test file
+            # per card, which makes the signal exact.
+            if not c or "-pb2-" not in c or c in variants_without_tests:
+                continue
+            if c not in all_test_text:
+                variants_without_tests.append(c)
+
     # jidou (自動) multi-ability partners: same base card carries >=1 other ability
     idxs_by_base = defaultdict(set)
     for r in rows:
@@ -2296,6 +2323,8 @@ def build_inventory():
         "untested": untested,
         "total_cards": total_cards,
         "covered_cards": covered_cards,
+        # Card VARIANTS (not bases) that no covering test file names at all.
+        "variants_without_tests": variants_without_tests,
         "abilities_on_covered": abilities_on_covered,
         "specific_requirements_total": sum(
             1 for r in rows
@@ -2959,6 +2988,10 @@ def main():
     print(f"depth: {dict(inv['depth_counts'])}")
     print(f"jidou interaction: watchers+cause+multi = {sum(1 for r in inv['abilities'] if r['watches_abilities'])}+{sum(1 for r in inv['abilities'] if r['effect_cause'])}+{sum(1 for r in inv['abilities'] if '自動' in r['trigger_list'] and r['jidou_partners'])}; specific-requirement thin: {len(inv['specific_requirements_thin'])}/{inv['specific_requirements_total']}")
     print(f"lifecycle gaps: {len(inv['lifecycle_gaps'])}/{inv['lifecycle_total']} stateful-registration abilities missing a transition")
+    vwt = inv.get("variants_without_tests", [])
+    print(f"card VARIANTS with no test at all: {len(vwt)}")
+    for v in vwt[:12]:
+        print(f"    {v}")
     stale = inv["stale_bases"]
     if stale:
         print(f"REPORT INTEGRITY: {len(stale)} ability rows name a card that is not in the pool: {stale[:6]}")

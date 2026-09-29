@@ -1,7 +1,7 @@
 use crate::helpers::*;
 
 const LIVE: &str = "PL!-sd1-019-SD"; // START:DASH!!, score 1, needs h01/h03/h06
-const MEMBER: &str = "PL!-sd1-001-SD"; // 穂乃果: h01=1, h03=2, h06=1
+const MEMBER: &str = "PL!-sd1-001-SD"; // 高坂穂乃果: h01=1, h03=2, h06=1
 
 #[test]
 fn tie_with_two_card_live_zones_allows_selection() {

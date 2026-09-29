@@ -135,11 +135,50 @@ fn option_two_activates_two_energy() {
     );
 }
 
+/// Branch 1: the 『BiBi』 member on the stage is activated.
+///
+/// This branch had no test at all. Its option parses as `change_state` on a counted
+/// stage member, which is the shape `_fix_member_selection_target` corrected: it used
+/// to carry `target: "self"`, so the engine resolved it to the activating card and
+/// auto-selected that instead of the member, and the branch silently did nothing.
+#[test]
+fn option_one_activates_the_bibi_member() {
+    let mut game = fired();
+    let bibi = game.state.player1.stage.stage[MemberArea::Center as usize];
+    assert_ne!(bibi, -1, "precondition: a member stands on the centre stage");
+    game.state.mods.add_orientation_modifier(bibi, "wait");
+    assert_eq!(
+        game.state.mods.get_orientation_modifier(bibi),
+        Some("wait"),
+        "precondition: the member is waited, so activating it is observable"
+    );
+
+    game.select_option(0);
+    let mut g = 0;
+    while game.has_pending_choice() && g < 5 {
+        game.select_indices(&[0]);
+        g += 1;
+    }
+
+    assert_ne!(
+        game.state.mods.get_orientation_modifier(bibi),
+        Some("wait"),
+        "自分のステージにいる『BiBi』のメンバー1人をアクティブにする — the member named by \
+         the clause is the object of the effect"
+    );
+}
+
 /// Choosing branch 2 must not activate a member — that is branch 1's job.
+///
+/// Note the staged card is read back from the stage rather than re-requested with
+/// `game.id(BIBI_MEMBER)`. `id()` hands out a FRESH pooled instance per call, so the
+/// old version of this test asserted on a card that was never in play and passed for
+/// the wrong reason.
 #[test]
 fn option_two_activates_no_member() {
     let mut game = fired();
-    let bibi = game.id(BIBI_MEMBER);
+    let bibi = game.state.player1.stage.stage[MemberArea::Center as usize];
+    assert_ne!(bibi, -1, "precondition: a member stands on the centre stage");
     game.select_option(1);
 
     assert_ne!(

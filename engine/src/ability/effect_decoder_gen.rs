@@ -235,6 +235,7 @@ fn decode_effect_field(bc: &mut BcReader, key: &str,
             "ref_offset" => { ek.ref_offset = bc.read_i8_value(); Some(true) }
             "id" => { ek.id = bc.read_arc_str_value(); Some(true) }
             "opponent_action" => { ek.opponent_action = bc.read_effect_value(); Some(true) }
+            "activated_this_turn" => { ek.activated_this_turn = bc.read_bool_value(); Some(true) }
             "energy" => { ek.energy_count = bc.read_u8_value(); Some(true) }
             "max_repeats" => { ek.repeat_limit = bc.read_u8_value(); Some(true) }
             "zone" => { ek.location = bc.read_arc_str_value(); Some(true) }
@@ -258,6 +259,7 @@ pub(crate) struct EffectKindLocals {
     pub ability_gain_trigger: Option<ArcStr>,
     pub ability_text: Option<ArcStr>,
     pub action_by: Option<ArcStr>,
+    pub activated_this_turn: Option<bool>,
     pub activation_condition_parsed: Option<Box<Condition>>,
     pub activation_position: Option<ArcStr>,
     pub all: Option<bool>,
@@ -594,6 +596,7 @@ fn build_filter(ek: &EffectKindLocals) -> Option<Box<EffectFilter>> {
         ref_offset: ek.ref_offset,
         id: ek.id.clone(),
         opponent_action: ek.opponent_action.clone(),
+        activated_this_turn: ek.activated_this_turn,
     };
     if f == EffectFilter::default() {
         None

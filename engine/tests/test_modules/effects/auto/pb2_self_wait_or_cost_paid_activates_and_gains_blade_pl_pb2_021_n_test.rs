@@ -43,7 +43,7 @@ use crate::helpers::*;
 use rabuka_engine::core::types::AbilityTrigger;
 use rabuka_engine::zones::MemberArea;
 
-const ERI: &str = "PL!-pb2-021-N"; // 絢瀬絵里, Printemps, cost 4
+const ERI: &str = "PL!-pb2-021-N"; // 南ことり, Printemps, cost 4
 const FILLER: &str = "PL!-sd1-010-SD";
 
 /// Stage ERI, optionally in wait, fire the 自動, and return (orientation, blade).

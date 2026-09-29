@@ -10,7 +10,7 @@
 use crate::helpers::*;
 
 const AQUARIUM: &str = "PL!S-bp7-022-L";
-const DECK_TOP: &str = "PL!S-sd1-001-SD"; // 渡辺曜 (Aqours member) — top filler
+const DECK_TOP: &str = "PL!S-sd1-001-SD"; // 高海千歌(Aqours member) — top filler
 const DECK_BOTTOM: &str = "PL!N-bp1-001-R"; // 上原歩夢 (虹ヶ咲) — bottom filler
 
 /// The reveal pool is set-based — the yell must reveal the bottom N cards

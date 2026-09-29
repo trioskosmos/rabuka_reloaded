@@ -468,7 +468,38 @@ pub(crate) fn execute_gain_surplus_heart(
         // the same zone is walked but the cards' printed scores are summed. Same
         // zone resolution and same filter as the tally path, so both agree on which
         // cards are in scope.
-        let mut matching_count = if effect.per_unit_aggregate_any().as_deref() == Some("score") {
+        // 「このターン中に…アクティブにしていたメンバー」 is a per-turn HISTORY
+        // clause, not a state filter. Counting members currently IN WAIT is a
+        // different set of cards and is what this used to do, which is why
+        // PL!-pb2-010-P＋ always granted nothing. The counted set is the
+        // activation history, filtered to the same zone and group.
+        let mut matching_count = if effect.activated_this_turn_any() == Some(true) {
+            let card_db = self.card_db();
+            gs.cards_activated_this_turn
+                .iter()
+                .copied()
+                .filter(|cid| match effective_per_unit_type {
+                    Some("member") | Some("members") | Some("人") | None => {
+                        card_db.get_card(*cid).is_some_and(|c| c.is_member())
+                    }
+                    _ => true,
+                })
+                .filter(|cid| {
+                    effect
+                        .group_names_any()
+                        .is_none_or(|gs_| gs_.is_empty())
+                        || effect.group_names_any().is_some_and(|gs_| {
+                            gs_.iter().any(|g| {
+                                crate::ability::util::card_matches_group_str(
+                                    &card_db,
+                                    *cid,
+                                    Some(g),
+                                )
+                            })
+                        })
+                })
+                .count() as u8
+        } else if effect.per_unit_aggregate_any().as_deref() == Some("score") {
             util::resolve_per_unit_score_sum(
                 effective_per_unit_type,
                 player,

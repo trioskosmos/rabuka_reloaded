@@ -1921,6 +1921,10 @@ fn commit_constant_results(
         self.cards_moved_this_turn.clear();
         self.turn_movements.clear();
         self.cards_appeared_this_turn.clear();
+        // 「このターン中に…」 is a per-turn history, so it turns over with the other
+        // per-turn trackers. Left uncleared, an activation from a previous turn would
+        // keep satisfying PL!-pb2-010-P＋ and PL!-pb2-040-L forever.
+        self.cards_activated_this_turn.clear();
         // `card_appearance_source` must turn over with `cards_appeared_this_turn`:
         // the appearance-source condition reads the two as a pair
         // (`ability/condition/card.rs`, `get_card_appearance_source` compared

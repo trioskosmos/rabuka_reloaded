@@ -181,3 +181,37 @@ fn the_opponents_success_zone_does_not_count() {
          trigger the bonus"
     );
 }
+
+/// A CORRECTION to a test that used to live here, recorded because it is a trap.
+///
+/// 春情ロマンティック `PL!-pb2-041-L` carries a counting weight —
+/// 「みつの成功ライブカード置き場にあるカードの数を数えるとき、このカードは
+/// 2枚として扱う」 — and this card was originally used as the CONSUMER to observe it,
+/// because its threshold is also 『『μ′s」のカードが2枚以上ある場合」.
+///
+/// That is wrong: **039's `unit` is `None`**, so it is not a lily white card and
+/// 「自分の『体のカードの効果によって』 can never match it. A card with no unit
+/// is not part of any group, so the weight is correctly invisible to it.
+///
+/// 041′s own ライブ成功時 is the right consumer and has its own test file.
+#[test]
+fn this_card_is_not_a_lily_white_card_and_cannot_observe_the_weight() {
+    let db = load_real_database();
+    let game = TestGame::new(db);
+    let card = game.db.get_card(game.id("PL!-pb2-039-L")).unwrap();
+    assert_eq!(
+        card.unit.as_ref().map(|s| s.to_string()),
+        None,
+        "039 has NO unit, so it is in no group and can never be a 『lily white』 counter. \
+         An earlier version of this file used it as the observer for PL!-pb2-041-L\'s \
+         weight, which could never have worked."
+    );
+    assert!(
+        !rabuka_engine::ability::util::card_matches_group_str(
+            &game.db,
+            game.id("PL!-pb2-039-L"),
+            Some("lily white")
+        ),
+        "and the group matcher agrees: 039 is not a lily white card"
+    );
+}

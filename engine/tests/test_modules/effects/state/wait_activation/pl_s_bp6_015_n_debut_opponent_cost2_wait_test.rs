@@ -8,7 +8,7 @@
 use crate::helpers::*;
 use rabuka_engine::zones::MemberArea;
 
-const YOSHIKO: &str = "PL!S-bp6-015-N"; // 西木野真姫 — the 登場 source
+const YOSHIKO: &str = "PL!S-bp6-015-N"; // 津島善子— the 登場 source
 const OPP_COST_2: &str = "PL!N-bp7-017-N"; // cost 2 → inside the gate
 const OPP_COST_13: &str = "PL!-sd1-003-SD"; // cost 13 → outside the gate
 

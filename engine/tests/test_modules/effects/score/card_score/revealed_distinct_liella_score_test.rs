@@ -2,9 +2,9 @@ use crate::helpers::*;
 use rabuka_engine::core::types::AbilityTrigger;
 
 const KANON: &str = "PL!SP-pb1-001-PR"; // 澁谷かのん
-const KEKE: &str = "PL!SP-bp1-004-PR"; // 唐可可
-const REN: &str = "PL!SP-bp1-016-PR"; // 葉月 凛? (distinct name)
-const SUMIRE: &str = "PL!SP-bp1-018-PR"; // 平安名すみれ
+const KEKE: &str = "PL!SP-bp1-004-PR"; // 平安名すみれ
+const REN: &str = "PL!SP-bp1-016-PR"; // 葉月恋(distinct name)
+const SUMIRE: &str = "PL!SP-bp1-018-PR"; // 米女メイ
 const WIEN: &str = "PL!SP-PR-017-PR"; // ウィーン・マルガレーテ
 
 #[test]
