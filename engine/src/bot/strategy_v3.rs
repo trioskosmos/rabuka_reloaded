@@ -21,6 +21,10 @@
 //! Fairness: same rules as v2  Eown deck/hand is known, opponent info is
 //! public-only.
 
+use crate::bot::strategy_common::{
+    acc_add as acc_add_hearts, hc_index as heart_index, narrow_hearts,
+    requirements_met as reqs_met, stage_base_hearts, Acc,
+};
 use crate::card::{CardDatabase, CardType};
 use crate::core::constants::CountCast;
 use crate::game_setup::{self, Action};
@@ -51,70 +55,14 @@ cfg_if::cfg_if! {
 // 0: live-set calls, 1: dump selects made, 2: held-line confirms,
 // 3: mulligan calls, 4: mulligan discards chosen
 
-// ── Local heart-accounting helpers (kept private to v3 so v2 stays
-//    untouched) ────────────────────────────────────────────────────────────
-
-type HeartAcc = [i32; 11];
-
-fn heart_index(c: crate::card::HeartColor) -> usize {
-    use crate::card::HeartColor as H;
-    match c {
-        H::Heart00 => 0,
-        H::Heart01 => 1,
-        H::Heart02 => 2,
-        H::Heart03 => 3,
-        H::Heart04 => 4,
-        H::Heart05 => 5,
-        H::Heart06 => 6,
-        H::BAll => 7,
-        H::Draw => 8,
-        H::Score => 9,
-        H::All => 10,
-    }
-}
-
-fn acc_add_hearts(acc: &mut HeartAcc, hearts: &crate::card::HeartMap) {
-    for (c, v) in hearts.iter() {
-        acc[heart_index(*c)] += i32::from(*v);
-    }
-}
-
-/// Sum of stage members' base hearts.
-fn stage_base_hearts(p: &crate::player::Player, db: &CardDatabase) -> HeartAcc {
-    let mut acc = [0i32; 11];
-    for &cid in p.stage.stage.iter() {
-        if cid < 0 {
-            continue;
-        }
-        if let Some(card) = db.get_card(cid) {
-            if let Some(bh) = &card.base_heart {
-                acc_add_hearts(&mut acc, &bh.hearts);
-            }
-        }
-    }
-    acc
-}
-
-/// Heart requirement check (rule 2.1.1.2 / 2.11.3): specific colors must be
-/// met exactly; All supply and BAll blade-hearts are wildcards; Heart00 is
-/// the any-color bucket filled by colorless hearts and leftovers.
-fn reqs_met(have: &HeartAcc, need: &HeartAcc) -> bool {
-    let mut wildcard = have[10] + have[7]; // All + BAll
-    let mut specific_surplus = 0i32;
-    for c in 1..=6 {
-        let deficit = need[c] - have[c];
-        if deficit > 0 {
-            wildcard -= deficit;
-            if wildcard < 0 {
-                return false;
-            }
-        } else {
-            specific_surplus += -deficit;
-        }
-    }
-    let leftover = specific_surplus + wildcard.max(0) + have[0];
-    leftover >= need[0]
-}
+// ── Heart accounting ──────────────────────────────────────────────────────
+//
+// `Acc`, `hc_index`, `acc_add` and `stage_base_hearts` used to be defined here,
+// byte-identical to the copies in `strategy_v2`, `strategy_v4` and
+// `bin/calibrate`, and `reqs_met` was a byte-identical copy of
+// `requirements_met` apart from one `saturating_add`. All of them now come
+// from `strategy_common`, so the accumulator's element width is decided in
+// exactly one place.
 
 /// Stage-total-cost milestones per turn (index 0 = turn 1). Derived from the
 /// competitive guides' standard development: T1 opener, T2 baton to ~9,
@@ -432,9 +380,9 @@ fn plan_score_portfolio(
         .count() as f64
         / deck_len.max(1) as f64;
     let expected_hits = crate::constants::score_to_i32_rounded(blades as f64 * density);
-    pool[10] += expected_hits;
+    pool[10] += narrow_hearts(expected_hits);
 
-    let mut candidates: Vec<(usize, i32, [i32; 11])> = Vec::new();
+    let mut candidates: Vec<(usize, i32, Acc)> = Vec::new();
     for (hand_index, &cid) in my.hand.cards.iter().enumerate() {
         let Some(card) = db.get_card(cid) else {
             continue;
@@ -442,7 +390,7 @@ fn plan_score_portfolio(
         if !matches!(card.card_type, CardType::Live) {
             continue;
         }
-        let mut need = [0i32; 11];
+        let mut need: Acc = [0i16; 11];
         if let Some(nh) = &card.need_heart {
             acc_add_hearts(&mut need, &nh.hearts);
         }
@@ -576,12 +524,16 @@ pub fn estimate_max_score(
 /// Mirrors 8.3.15: specific colors first, wildcards (All/BAll) cover
 /// deficits, grey bucket takes colorless + leftovers. Returns false if the
 /// life can't be satisfied from what remains.
-fn allocate_life(pool: &mut HeartAcc, need: &HeartAcc) -> bool {
+fn allocate_life(pool: &mut Acc, need: &Acc) -> bool {
     // Work on a copy; commit only if fully satisfiable.
     let mut p = *pool;
 
     // 1) Specific colors Heart01–06: own color first, wildcards (All + BAll)
     //    cover deficits.
+    //
+    // `wildcard` is bounded by the pool so it stays in the `i16` element type;
+    // `wildcard_used` accumulates the deficits over all six specific colors,
+    // so it stays `i32` and its terms widen out of the `i16` `Acc`.
     let mut wildcard_used = 0i32;
     let mut wildcard = p[7] + p[10];
     for c in 1..=6 {
@@ -594,14 +546,14 @@ fn allocate_life(pool: &mut HeartAcc, need: &HeartAcc) -> bool {
             if deficit > wildcard {
                 return false;
             }
-            wildcard_used += deficit;
+            wildcard_used += i32::from(deficit);
             wildcard -= deficit;
             p[c] = 0;
         }
     }
-    let from_ball = wildcard_used.min(p[7]);
-    p[7] -= from_ball;
-    p[10] -= wildcard_used - from_ball;
+    let from_ball = wildcard_used.min(i32::from(p[7]));
+    p[7] -= narrow_hearts(from_ball);
+    p[10] -= narrow_hearts(wildcard_used - from_ball);
 
     // 2) Grey bucket (Heart00): colorless hearts + any leftover specific or
     //    wildcard hearts (rule 8.3.15 order-aware leftovers).
@@ -638,12 +590,14 @@ fn confirm_live_set(actions: &[Action]) -> Action {
 /// How many heart icons short `pool` is of satisfying `need` (rough, for
 /// fallback gambles): specific-color shortfalls beyond wildcards, plus grey
 /// bucket shortfall after colorless+leftovers.
-fn requirement_deficit(pool: &HeartAcc, need: &HeartAcc) -> i32 {
-    let mut wildcard = pool[10] + pool[7];
+fn requirement_deficit(pool: &Acc, need: &Acc) -> i32 {
+    // Every total here spans all eleven colors, so the accumulators stay `i32`
+    // and the per-color `i16` terms widen on the way in.
+    let mut wildcard = i32::from(pool[10]) + i32::from(pool[7]);
     let mut deficit = 0i32;
     let mut leftover = 0i32;
     for c in 1..=6 {
-        let d = need[c] - pool[c];
+        let d = i32::from(need[c] - pool[c]);
         if d > 0 {
             if d > wildcard {
                 deficit += d - wildcard;
@@ -654,9 +608,10 @@ fn requirement_deficit(pool: &HeartAcc, need: &HeartAcc) -> i32 {
         }
     }
     // Grey bucket: colorless + leftovers + unused wildcards.
-    let available_grey = pool[0] + leftover + wildcard.max(0);
-    if need[0] > available_grey {
-        deficit += need[0] - available_grey;
+    let available_grey = i32::from(pool[0]) + leftover + wildcard.max(0);
+    let need0 = i32::from(need[0]);
+    if need0 > available_grey {
+        deficit += need0 - available_grey;
     }
     deficit
 }
@@ -695,7 +650,7 @@ pub fn analyze_hand(gs: &GameState, me_player: u8, db: &CardDatabase) -> HandUse
         if !matches!(card.card_type, CardType::Live) {
             continue;
         }
-        let mut need = [0i32; 11];
+        let mut need: Acc = [0i16; 11];
         if let Some(nh) = &card.need_heart {
             acc_add_hearts(&mut need, &nh.hearts);
         }

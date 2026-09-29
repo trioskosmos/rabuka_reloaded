@@ -20,7 +20,19 @@ use crate::player::Player;
 
 /// Per-color heart accumulator. Index space matches `HeartColor` variant
 /// order (Heart00..Heart06, BAll, Draw, Score, All).
-pub type Acc = [i32; 11];
+///
+/// `i16`, not `i32`: **44 bytes → 22**. A per-colour heart total, summed over
+/// a stage of at most 3 members or a multi-turn supply ladder, never needs 32
+/// bits — and `Acc` is carried by value in `LiveCandidate`, `HandContext`
+/// (`board` + `best_need: Option<Acc>`), `Forward.hearts`, and several `Vec`s`,
+/// so every holder halves.
+///
+/// It was `[i32; 11]` — and defined in FOUR other places besides this one
+/// (`strategy_v2`, `strategy_v3`, `strategy_v4`, `bin/calibrate`), each with
+/// its own byte-identical copy of `hc_index` and `acc_add`. Those four now
+/// import from here, which is what makes the narrowing a one-line edit instead
+/// of five, and removes four copies that could drift from this one.
+pub type Acc = [i16; 11];
 
 pub fn hc_index(c: HeartColor) -> usize {
     match c {
@@ -40,14 +52,14 @@ pub fn hc_index(c: HeartColor) -> usize {
 
 pub fn acc_add(acc: &mut Acc, hearts: &HeartMap) {
     for (c, v) in hearts.iter() {
-        acc[hc_index(*c)] += *v as i32;
+        acc[hc_index(*c)] = acc[hc_index(*c)].saturating_add(i16::from(*v));
     }
 }
 
 /// Sum of stage members' base hearts (all members; wait state only affects
 /// blades per Q133).
 pub fn stage_base_hearts(p: &Player, db: &CardDatabase) -> Acc {
-    let mut acc = [0i32; 11];
+    let mut acc = [0i16; 11];
     for &cid in p.stage.stage.iter() {
         if cid < 0 {
             continue;
@@ -68,8 +80,8 @@ pub fn stage_base_hearts(p: &Player, db: &CardDatabase) -> Acc {
 ///   2.11.3): filled by colorless hearts and any leftover hearts.
 /// - Draw/Score icons are not heart requirements.
 pub fn requirements_met(have: &Acc, need: &Acc) -> bool {
-    let mut wildcard = have[10] + have[7]; // All + BAll
-    let mut specific_surplus = 0i32;
+    let mut wildcard = have[10].saturating_add(have[7]); // All + BAll
+    let mut specific_surplus = 0i16;
     for c in 1..=6 {
         let deficit = need[c] - have[c];
         if deficit > 0 {
@@ -84,6 +96,19 @@ pub fn requirements_met(have: &Acc, need: &Acc) -> bool {
     // Heart00 bucket: colorless hearts, plus any leftover specific/wild hearts.
     let leftover = specific_surplus + wildcard.max(0) + have[0];
     leftover >= need[0]
+}
+
+/// Narrow a wide `i32` heart term to an [`Acc`] element.
+///
+/// Same clamping contract as `core::constants::score_to_i32`, one level down:
+/// per-colour heart terms are single-digit units in every reachable state, and
+/// clamping beats a wrapping `as` cast if one ever is not. Used by the call
+/// sites that compute a term in `i32` (f64 truncation, summed modifiers) and
+/// then fold it into an `i16` accumulator.
+#[allow(clippy::cast_possible_truncation, clippy::cast_possible_wrap)]
+#[inline]
+pub fn narrow_hearts(v: i32) -> i16 {
+    v.clamp(i16::MIN as i32, i16::MAX as i32) as i16
 }
 
 /// Graceful replacement for the old `.expect("… actions non-empty")`.

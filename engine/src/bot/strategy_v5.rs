@@ -141,7 +141,10 @@ pub(crate) fn best_portfolio_scored(gs: &GameState, me: u8, db: &CardDatabase) -
     //   Pool B (board hearts only) passing ⇁Edeterministic;
     //   otherwise shortfall units must come from yell flips ⇁Ebinomial.
     let pool_board = crate::bot::strategy_v4::heart_pool_inner(gs, me, db, 0.0);
-    let board_supply: i32 = (0..=7).chain(std::iter::once(10)).map(|i| pool_board[i]).sum();
+    let board_supply: i32 = (0..=7)
+        .chain(std::iter::once(10))
+        .map(|i| i32::from(pool_board[i]))
+        .sum();
 
     let mut best: Option<(f64, usize, i32, Vec<usize>)> = None;
     // TEMP ANALYSIS (V5_LIVE_DEBUG): collect top candidates for the dump.
@@ -164,7 +167,10 @@ pub(crate) fn best_portfolio_scored(gs: &GameState, me: u8, db: &CardDatabase) -
                     Some(next) => {
                         p = next;
                         score += i32::from(db.get_card(cid).and_then(|c| c.score).unwrap_or(0));
-                        total_req += (0..=7).chain(std::iter::once(10)).map(|i| need[i]).sum::<i32>();
+                        total_req += (0..=7)
+                            .chain(std::iter::once(10))
+                            .map(|i| i32::from(need[i]))
+                            .sum::<i32>();
                         idxs.push(hi);
                     }
                     None => {
@@ -204,7 +210,10 @@ pub(crate) fn best_portfolio_scored(gs: &GameState, me: u8, db: &CardDatabase) -
         let hand_desc: Vec<String> = lives
             .iter()
             .map(|(hi, cid, need)| {
-                let req: i32 = (0..=7).chain(std::iter::once(10)).map(|k| need[k]).sum();
+                let req: i32 = (0..=7)
+                    .chain(std::iter::once(10))
+                    .map(|k| i32::from(need[k]))
+                    .sum();
                 format!(
                     "hi{}:{}s:req{}",
                     hi,
@@ -403,22 +412,24 @@ pub(crate) fn nearest_miss_life(gs: &GameState, me: u8, db: &CardDatabase) -> Op
         let mut p = 1.0f64;
         let mut deficit = 0i32;
         for c in 1..=6 {
-            let d = need[c] - board[c];
+            let d = i32::from(need[c] - board[c]);
             if d > 0 {
                 deficit += d;
                 p *= binom_ge(blades, d, dens[c]);
             }
         }
         // Grey bucket: colorless + leftover specifics + wildcards.
-        let grey_have = board[0]
+        let grey_have = i32::from(board[0])
             + (1..=6)
-                .map(|c| board[c].max(0))
+                .map(|c| i32::from(board[c].max(0)))
                 .sum::<i32>()
-            + board[7]
-            + board[10];
-        let specific_used: i32 = (1..=6).map(|c| need[c].min(board[c])).sum::<i32>();
-        let grey_short =
-            need[0] - (grey_have - specific_used).min(need[0]);
+            + i32::from(board[7])
+            + i32::from(board[10]);
+        let specific_used: i32 = (1..=6)
+            .map(|c| i32::from(need[c].min(board[c])))
+            .sum::<i32>();
+        let need0 = i32::from(need[0]);
+        let grey_short = need0 - (grey_have - specific_used).min(need0);
         if grey_short > 0 {
             deficit += grey_short;
             p *= binom_ge(blades, grey_short, dens_any);

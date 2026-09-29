@@ -1,7 +1,7 @@
 use crate::core::constants::CountCast;
 use crate::bot::determinization::DeterminizationSampler;
 use crate::bot::observation::PublicObservation;
-use crate::bot::strategy_common::{acc_add, requirements_met, Acc};
+use crate::bot::strategy_common::{acc_add, narrow_hearts, requirements_met, Acc};
 use crate::card::CardType;
 use crate::core::stats_pipeline;
 use crate::game_setup::{self, Action, ActionParameters, ActionType};
@@ -181,10 +181,9 @@ pub(crate) fn features(gs: &GameState, me: u8) -> Features {
         }
     }
     for i in 0..11 {
-        mean[i] +=
-            crate::constants::score_to_i32(
+        mean[i] += narrow_hearts(crate::constants::score_to_i32(
             (units[i] * blades as f64 / p.main_deck.cards.len().max(1) as f64).floor(),
-        );
+        ));
     }
     let mut ammo = 0;
     let mut coverage = 0.0;
@@ -200,7 +199,7 @@ pub(crate) fn features(gs: &GameState, me: u8) -> Features {
                 id,
                 &gs.mods.need_heart_modifiers,
             );
-            let mut required = [0; 11];
+            let mut required: Acc = [0i16; 11];
             if let Some(need) = need {
                 acc_add(&mut required, &need.hearts);
             }
@@ -217,7 +216,7 @@ pub(crate) fn features(gs: &GameState, me: u8) -> Features {
             .iter()
             .enumerate()
             .filter(|(i, _)| *i != 8 && *i != 9)
-            .map(|(_, v)| v)
+            .map(|(_, v)| i32::from(*v))
             .sum(),
         blades,
         cost,

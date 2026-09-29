@@ -4,7 +4,7 @@ This document specifies **replacements, not verifications.** It says what each
 subsystem becomes. It does not argue about whether the new version is safe —
 the 3,000+ tests answer that, and they are the only gate.
 
-Read `docs/REFACTORING_APPROACH.md` for the measurements. This is what to do
+Read `docs/PERF_ENGINE_COMBINED.md` for the measurements. This is what to do
 about them.
 
 ---
@@ -1008,8 +1008,8 @@ type.
 **Not in this plan.** `game/web_server.rs` — transport, already feature-gated.
 `kind_from_action` (`card.rs:1467`, 287 lines) — it looks like an if-ladder and
 is a 282-line `match` with one shared filter over 60 heterogeneous variants; a
-table cannot help, measured before editing per
-`REFACTORING_APPROACH.md:116-118`. Leaving it alone is a decision. There is no
-commented-out code to find in either subsystem; both were cleaned, and the "129
-findings, 2 real" figure in `REFACTORING_APPROACH.md:83` was a bad heuristic
-rather than a code problem.
+table cannot help, measured before editing (the measurement is carried forward in
+`PERF_ENGINE_COMBINED.md` §5). Leaving it alone is a decision. There is no
+commented-out code to find in either subsystem; both were cleaned, and the
+"129 findings, 2 real" figure from the original refactoring analysis was a bad
+heuristic rather than a code problem.

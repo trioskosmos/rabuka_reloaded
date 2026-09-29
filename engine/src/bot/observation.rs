@@ -382,10 +382,10 @@ fn math_features(state: &GameState, perspective_player: u8) -> [f32; MATH_FEATUR
         }
         let mut shortfall = 0i32;
         for color in 1..=6 {
-            shortfall += (required[color] - pool_board[color]).max(0);
+            shortfall += i32::from((required[color] - pool_board[color]).max(0));
         }
         if required[0] > 0 {
-            shortfall += required[0];
+            shortfall += i32::from(required[0]);
         }
         let probability = crate::constants::f32_count(strategy_v5::binom_ge(blades, shortfall, density));
         best_live_prob = best_live_prob.max(probability);

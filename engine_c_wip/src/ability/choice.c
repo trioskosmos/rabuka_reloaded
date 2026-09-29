@@ -582,6 +582,195 @@ void rb_resolver_reveal_selected_looked_at(GameState *g, const int *indices, int
     }
 }
 
+/* ═══════════════════════════════════════════════════════════════════════════
+   「〜たらポジションチェンジ」 — the position-change answer plumbing.
+
+   Rust carries the whole thing on the AbilityResolver:
+     * result_handlers.rs:89-113 `handle_area_select` stores the picked area in
+       `self.selection.area`;
+     * position.rs:447-454 `execute_position_change` CONSUMES it
+       (`self.selection.area = None`) and routes straight to
+       `execute_position_change_with_destination`, so no second prompt is ever
+       raised;
+     * choice.rs:2710-2717 routes a `position|destination` answer to
+       `handle_position_change_choice` when the entry's `choice_card_no` is
+       `Raw("position_change…")`, which then calls
+       `execute_position_change_with_destination` (position.rs:899-1094).
+
+   Two C facts forced the shape below.
+   1. `RbAbilityResolver` is a STACK LOCAL at every entry point (choice.c:588,
+      :3262), so `self.selected_area` could not outlive the frame that wrote it
+      — it was a write-only field, and `rb_resolver_provide_choice_result`, the
+      only function that wrote it, has no callers at all. The live answer path
+      is `rb_resume_with_choice_indices_internal` -> `case RB_CHOICE_SELECT_TARGET`
+      -> `rb_resolver_handle_select_target`, which had no `area_select` arm, so
+      the answer fell through to the "record chosen target then clear" default.
+      The area therefore lives in a file-static, which is the C's only carrier
+      that survives the prompt frame, and is written AND read below.
+   2. The prompt a position change raises is `SelectTarget("position|destination")`
+      (misc.c `h_execute_position_change`, the port of position.rs:91), and the C
+      handler it used to reach required `g->queue.resume_eff`, which
+      `rb_resume_with_choice_indices_internal` NULLs (choice.c:3297) BEFORE
+      dispatching the answer. The whole move therefore sat behind a condition
+      that is false on every prompt, and the prompt was re-raised forever.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/* `self.selection.area` (choice.rs:3214 / position.rs:448-450). */
+static char s_selection_area[16];
+static int  s_has_selection_area;
+
+static void choice_set_selection_area(const char *area)
+{
+    if (!area) return;
+    strncpy(s_selection_area, area, sizeof(s_selection_area) - 1);
+    s_selection_area[sizeof(s_selection_area) - 1] = '\0';
+    s_has_selection_area = 1;
+}
+/* position.rs:450 — consuming the area clears it, so a later position change
+   does not reuse a stale answer. Returns 1 when an area was pending. */
+static int choice_take_selection_area(char *out, size_t outsz)
+{
+    if (!s_has_selection_area) return 0;
+    if (out && outsz) {
+        strncpy(out, s_selection_area, outsz - 1);
+        out[outsz - 1] = '\0';
+    }
+    s_selection_area[0] = '\0';
+    s_has_selection_area = 0;
+    return 1;
+}
+
+/* The answer to a position prompt is an area INDEX in the C (see
+   test_parity_area_move.c's drain_areas: "The area index is what
+   rb_resume_position_change consumes"), while Rust's is the area NAME from the
+   option list (choice.rs:3000-3008 normalises "0"/"left"/"left_side" to one
+   name). Both spellings are accepted. */
+static int choice_area_index_from_answer(const char *sel)
+{
+    if (!sel || !*sel) return -1;
+    if (sel[1] == '\0' && sel[0] >= '0' && sel[0] <= '2') return sel[0] - '0';
+    return rb_stage_position_index(sel);
+}
+
+/* The list `execute_area_select` offered (selection.rs:182-193): every area
+   except the activating member's own. RbChoice carries no option list, so the
+   answer index is resolved against this recomputation — the same loop, over the
+   same stage, so the resulting order is identical. */
+static int choice_offered_areas(const GameState *g, int pl, int activating_id,
+                                char valid[3][8])
+{
+    static const char *const names[3] = { "left", "center", "right" };
+    int nv = 0;
+    if (!g || pl < 0 || pl > 1) return 0;
+    for (int i = 0; i < 3; i++) {
+        if (activating_id >= 0 && g->p[pl].stage[i] == activating_id) continue;
+        strncpy(valid[nv], names[i], sizeof(valid[0]) - 1);
+        valid[nv][sizeof(valid[0]) - 1] = '\0';
+        nv++;
+    }
+    return nv;
+}
+
+/* position.rs:1046-1089 — the `this_member` arm of
+   execute_position_change_with_destination: locate the moving member on the
+   target player's stage, and swap only when it is not already in the chosen
+   area. `rb_resume_position_change` (state.c:1489) is the C's
+   `record_stage_position_swap` + `trigger_auto_abilities_for_movement_current`
+   pair and takes the member id as `host_cid`, exactly as position.rs:1074-1079
+   names the activating card explicitly. The C has no `session.activating_card_id`
+   that survives the prompt, so the resolver's host — the same value
+   `rb_effect_area_select` used to build its list (draw.c:963) and the same
+   value the sibling `opponent:front` arm uses to find the host's area
+   (choice.c:2641) — stands in for it. */
+static void choice_apply_position_destination(GameState *g, int actor,
+                                              int host_cid, int dst_idx)
+{
+    if (!g || dst_idx < 0 || dst_idx >= RB_STAGE_SIZE) return;
+    if (host_cid < 0) return;
+    rb_resume_position_change(g, actor, NULL, host_cid, dst_idx);
+}
+
+/* Is the step that is about to run a `position_change`? Rust reaches it through
+   the entry's owned `pending_actions` (choice.rs:108-126). The C's two
+   carriers are `queue.pending_actions` (handled by the owned path in
+   rb_resolver_continue_siblings) and the parked parent/child index
+   (engine.c:281-287), which is what this walks. Two shapes occur:
+     OWNED      the prompt came from cont->child[from-1], so the tail is
+                cont->child[from .. n_child).
+     CLOBBERED  the prompt came from a GRANDchild: the inner frame parked
+                (engine.c:281-287) and returned, then the outer loop saw the
+                pending choice and re-parked ITSELF over that (engine.c:256-292),
+                so the live tail is cont->child[from-1]->child[1 .. n_child).
+   A node that already carries a destination is skipped: it does not consume
+   `selection.area` (position.rs:447-454 tests the field before the
+   destination arm, and only the destination-less step reads it). */
+static const AbilityEffect *choice_next_position_change(const AbilityEffect *cont,
+                                                         int from)
+{
+    if (!cont) return NULL;
+    for (int j = from; j < cont->n_child; j++) {
+        const AbilityEffect *c = cont->child[j];
+        if (c && c->action && !strcmp(c->action, "position_change") &&
+            !(c->destination && *c->destination))
+            return c;
+    }
+    if (from - 1 >= 0 && from - 1 < cont->n_child) {
+        const AbilityEffect *mid = cont->child[from - 1];
+        if (mid) {
+            for (int k = 1; k < mid->n_child; k++) {
+                const AbilityEffect *c = mid->child[k];
+                if (c && c->action && !strcmp(c->action, "position_change") &&
+                    !(c->destination && *c->destination))
+                    return c;
+            }
+        }
+    }
+    return NULL;
+}
+
+/* result_handlers.rs:89-113 `handle_area_select`, plus the consumption half of
+   position.rs:447-454. The answer is stored on the resolver AND on the
+   file-static that outlives the frame; then, if the continuation really does
+   still owe a destination-less `position_change`, that step is resolved HERE
+   with the stored area, which is what Rust does inside the step itself. The C
+   cannot defer it into the step because the step's executor lives in misc.c and
+   has no access to `selection.area`; resolving it at the only frame that
+   survives the prompt is the faithful relocation, and the step's own later run
+   becomes the no-op Rust's `source == target -> NOOP` already is
+   (position.rs:983-985). */
+static void choice_store_area_select(RbAbilityResolver *self, GameState *g,
+                                     const char *sel)
+{
+    if (!g) return;
+    int pl = g->queue.actor >= 0 ? g->queue.actor : 0;
+    int activating = g->queue.resume_host;
+    char valid[3][8];
+    int nv = choice_offered_areas(g, pl, activating, valid);
+    int idx = -1;
+    if (sel && *sel) {
+        if (sel[1] == '\0' && sel[0] >= '0' && sel[0] <= '9')
+            idx = atoi(sel);
+        else
+            for (int i = 0; i < nv; i++) if (!strcmp(sel, valid[i])) { idx = i; break; }
+    }
+    /* result_handlers.rs:104-109 — an unparseable or out-of-range answer takes
+       the first offered area, and an empty list falls back to "left". */
+    if (nv > 0) idx = (idx >= 0 && idx < nv) ? idx : 0;
+    const char *area = (nv > 0) ? valid[idx] : "left";
+    if (self) {
+        self->selected_area = (!strcmp(area, "center") ? 1 : (!strcmp(area, "right") ? 2 : 0));
+    }
+    choice_set_selection_area(area);
+
+    const AbilityEffect *cont = g->queue.resume_parent;
+    int from = g->queue.resume_child + 1;
+    if (!choice_next_position_change(cont, from)) return;
+    char taken[16];
+    if (!choice_take_selection_area(taken, sizeof(taken))) return;
+    choice_apply_position_destination(g, pl, activating,
+                                      choice_area_index_from_answer(taken));
+}
+
 /* --- provide_choice_result (choice.rs:267) : dispatch pending choice --- */
 int rb_resolver_provide_choice_result(GameState *g, int selected_idx) {
     if (!g || !g->queue.has_pending) return 0;
@@ -621,23 +810,12 @@ int rb_resolver_provide_choice_result(GameState *g, int selected_idx) {
     if (kind == RB_CHOICE_SELECT_TARGET && !was_skip) {
         const char *tgt = g->queue.pending.target[0] ? g->queue.pending.target : "";
         if (!strcmp(tgt,"area_select") || strstr(tgt,"area_select")) {
-            /* area_select: numeric index or area name — map to left/center/right */
-            const char *area = "left";
-            if (selstr) {
-                char *end=NULL; long idx=strtol(selstr,&end,10);
-                if (end!=selstr && *end=='\0') {
-                    if (idx==0) area="left"; else if(idx==1) area="center"; else if(idx==2) area="right";
-                    else area="left";
-                } else {
-                    if (!strcmp(selstr,"left")||!strcmp(selstr,"center")||!strcmp(selstr,"right")) area=selstr;
-                }
-            }
-            self.selected_area = (!strcmp(area,"center")?1:(!strcmp(area,"right")?2:0));
-            { extern void rb_dbg_dump_effect(const AbilityEffect*, int); rb_dbg_dump_effect(g->queue.resume_parent, 0); }
-            fprintf(stderr, "[DBG_AREA] idx=%s area=%s act=%d host=%d actor=%d cont=%p cfrom=%d desc=%s\n",
-                    selstr, area, g->activating_card, g->queue.resume_host,
-                    g->queue.actor, (void*)g->queue.resume_parent,
-                    g->queue.resume_child, g->queue.pending.description);
+            /* The index is resolved against the offered list, not against the
+               absolute area order: execute_area_select (selection.rs:182-193)
+               omits the activating member's own area, so on a centre host
+               option 1 is "right", not "center". The old fixed 0/1/2 mapping
+               read straight off the answer index. */
+            choice_store_area_select(&self, g, selstr);
             rb_resolver_clear_choice_state(&self);
             rb_resolver_resume_pending_actions(&self);
             return 1;
@@ -2397,9 +2575,6 @@ void rb_resolver_handle_select_target(RbAbilityResolver *self, GameState *g,
     if (!self || !g) return;
     const char *tgt = target ? target : (g->queue.pending.target[0] ? g->queue.pending.target : "");
     const char *sel = selected ? selected : "";
-    fprintf(stderr, "[DBG_HST] tgt=%s sel=%s act=%d host=%d actor=%d entry_eff=%s\n",
-            tgt, sel, g->activating_card, g->queue.resume_host, g->queue.actor,
-            (rb_entry_effect(g) && rb_entry_effect(g)->action) ? rb_entry_effect(g)->action : "-");
     if (g->queue.pending.route == RB_ROUTE_CONDITIONAL_CHOICE) {
         int idx = atoi(sel);
         char choice_debug[128];
@@ -2515,7 +2690,30 @@ void rb_resolver_handle_select_target(RbAbilityResolver *self, GameState *g,
         return;
     }
     if (!strcmp(tgt, "position|destination") || !strcmp(tgt, "position_destination")) {
-        rb_resolver_handle_position_destination(self, g, sel);
+        /* choice.rs:2710-2717 — a `position|destination` answer whose entry
+           carries `ChoiceRoute::Raw("position_change…")` is routed to
+           handle_position_change_choice BEFORE the SelectTargetKind match, and
+           handle_position_change_choice is what calls
+           execute_position_change_with_destination (choice.rs:3208). The C
+           stores no choice_card_no, but misc.c `h_execute_position_change` is
+           the ONLY producer of this target string and it is the port of
+           position.rs:91 `execute_position_change`, which always stamps
+           `Raw("position_change…")` on the entry before raising the prompt
+           (position.rs:143/197/266/367/419/480/546). So the route is
+           unconditional here, and "position_change:self" is the spelling
+           position.rs:480 writes for the destination-less step. */
+        rb_resolver_handle_position_change_choice(self, g, "position_change:self", sel);
+        return;
+    }
+    /* area_select (result_handlers.rs:89-113). This arm was ABSENT here — the
+       only copy of it lived in rb_resolver_provide_choice_result, which has no
+       callers, so on the live path the answer fell through to the
+       "record chosen target then clear" default below and the picked area was
+       thrown away. */
+    if (!strcmp(tgt, "area_select")) {
+        choice_store_area_select(self, g, sel);
+        rb_resolver_clear_choice_state(self);
+        rb_resolver_resume_pending_actions(self);
         return;
     }
     if (!strcmp(tgt, "heart_color") || !strcmp(tgt, "heart_colour")) {
@@ -2824,16 +3022,34 @@ int rb_resolver_handle_position_change_choice(RbAbilityResolver *self, GameState
             return 0;
         }
     }
-    /* Execute position change with the selected destination */
+    /* choice.rs:3202-3213 — the ANSWER is the destination. Which member moves
+       depends on what the prompt already named:
+         * explicit_source_pos — the source-selection prompt already picked the
+           member, so apply the swap from that position (Rust's
+           apply_selected_position_change, choice.rs:3220-3248);
+         * otherwise — this_member, i.e. the activating member, located on the
+           target player's stage (position.rs:1046-1089).
+       The C used `sel` for BOTH ends, so a plain destination answer made
+       source == destination and the swap was skipped every time. */
     int actor = g->queue.actor;
-    int pl = rb_resolve_target_player(g, target_str);
-    if (pl < 0) pl = actor;
-    RbPlayer *P = &g->p[pl];
-    const char *src_pos = explicit_source_pos ? explicit_source_pos : sel;
-    int src_idx = rb_stage_position_index(src_pos);
-    int dst_idx = rb_stage_position_index(sel);
-    if (src_idx >= 0 && dst_idx >= 0 && src_idx < RB_STAGE_SIZE && dst_idx < RB_STAGE_SIZE
-        && P->stage[src_idx] >= 0) {
+    /* position.rs:982 — `target` is "self" on the destination-less step, and
+       "self" is the RESOLVER's own player, i.e. the seat the prompt was raised
+       for. rb_resolve_target_player("self") hard-codes seat 0, which is wrong
+       for the second leg of a `target="both"` step (misc.c emits that leg to
+       actor^1), so the prompt's own seat wins whenever the route says "self". */
+    int pl = (target_str && !strcmp(target_str, "self") && actor >= 0 && actor <= 1)
+           ? actor
+           : rb_resolve_target_player(g, target_str);
+    if (pl < 0 || pl > 1) pl = actor;
+    int dst_idx = choice_area_index_from_answer(sel);
+    if (dst_idx < 0 || dst_idx >= RB_STAGE_SIZE) {
+        rb_resolver_clear_choice_state_and_resume(self);
+        return 0;
+    }
+    if (explicit_source_pos) {
+        RbPlayer *P = &g->p[pl];
+        int src_idx = rb_stage_position_index(explicit_source_pos);
+        if (src_idx >= 0 && src_idx < RB_STAGE_SIZE && P->stage[src_idx] >= 0) {
                 int a = P->stage[src_idx], b = P->stage[dst_idx];
                 P->stage[src_idx] = b; P->stage_wait[src_idx] = P->stage_wait[dst_idx];
                 P->stage[dst_idx] = a; P->stage_wait[dst_idx] = P->stage_wait[src_idx];
@@ -2845,8 +3061,18 @@ int rb_resolver_handle_position_change_choice(RbAbilityResolver *self, GameState
                 if (b >= 0) rb_record_card_movement(g, b, RB_ZONEID_STAGE, RB_ZONEID_STAGE, 0, 0);
                 rb_trigger_auto_abilities_for_movement_current(g);
             }
-            rb_resolver_clear_choice_state_and_resume(self);
-            return 0;
+    } else {
+        /* position.rs:1090-1092 — the flag and the two follow-ups are set by
+           rb_resume_position_change itself (state.c:1489-1503). */
+        char pending_area[16];
+        int had_area = choice_take_selection_area(pending_area, sizeof(pending_area));
+        (void)had_area;
+        choice_apply_position_destination(g, pl, g->queue.resume_host, dst_idx);
+    }
+    /* choice.rs:3214 — the stored area is spent. */
+    choice_take_selection_area(NULL, 0);
+    rb_resolver_clear_choice_state_and_resume(self);
+    return 0;
 }
 
 void rb_resolver_apply_effect_modification(RbAbilityResolver *self, GameState *g,
@@ -2895,9 +3121,6 @@ void rb_resolver_handle_position_destination(RbAbilityResolver *self, GameState 
     if (!g) { rb_resolver_clear_choice_state_and_resume(self); return; }
     int actor = g->queue.actor;
     int idx = selected ? atoi(selected) : -1;
-    fprintf(stderr, "[DBG_HPD] sel=%s idx=%d eff=%p host=%d act=%d\n",
-            selected ? selected : "", idx, (void *)g->queue.resume_eff,
-            g->queue.resume_host, g->activating_card);
     /* validate destination area 0..2 */
     if (idx < 0 || idx >= RB_STAGE_SIZE) {
         /* invalid destination: skip */
@@ -2913,6 +3136,18 @@ void rb_resolver_handle_position_destination(RbAbilityResolver *self, GameState 
         rb_resume_position_change(g, actor, g->queue.resume_eff, g->queue.resume_host, idx);
         /* if more position changes remain, keep pending */
         if (g->queue.has_pending) return;
+    } else {
+        /* The parked effect is gone: rb_resume_with_choice_indices_internal
+           NULLs queue.resume_eff (choice.c:3297) BEFORE dispatching the answer,
+           so the `if` above is false on EVERY prompt that arrives here, and the
+           move was skipped while the prompt was re-raised. Rust has no such
+           dead branch — choice.rs:2710-2717 sends this answer to
+           handle_position_change_choice, which resolves it through
+           execute_position_change_with_destination. Fall back to the same
+           move, with the resolver's host standing in for
+           `session.activating_card_id` (position.rs:1074-1079). */
+        if (self->n_formation_plan < RB_STAGE_SIZE) self->formation_plan[self->n_formation_plan++] = idx;
+        choice_apply_position_destination(g, actor, g->queue.resume_host, idx);
     }
     rb_resolver_clear_choice_state_and_resume(self);
 }
@@ -3119,7 +3354,6 @@ void rb_resolver_continue_siblings(GameState *g, int actor, int host,
     if (rb_queue_has_pending_actions(g)) {
         AbilityEffect *owned[RB_ENTRY_PENDING_CAP];
         int n = rb_queue_take_pending_actions_owned(g, owned, RB_ENTRY_PENDING_CAP);
-        fprintf(stderr, "[DBG_CS] owned n=%d\n", n);
         for (int i = 0; i < n; i++) {
             if (!owned[i]) continue;
             rb_execute_effect_ex(g, actor, owned[i], host);
@@ -3140,11 +3374,16 @@ void rb_resolver_continue_siblings(GameState *g, int actor, int host,
         }
         return;                              /* tail consumed; do NOT fall through */
     }
-    if (!cont) { fprintf(stderr, "[DBG_CS] owned=0 cont=NULL\n"); return; }
-    fprintf(stderr, "[DBG_CS] owned=0 cont=%p from=%d nchild=%d\n",
-            (void*)cont, cont_from, cont->n_child);
+    if (!cont) return;
     for (int j = cont_from; j < cont->n_child; j++) {
         if (rb_has_pending_choice(g)) break;
+        /* Park the continuation ON the step about to run, exactly as
+           engine.c:281-287 parks it when a step stalls. Without this the
+           fallback walk restarts at the same `cont_from` after every answer,
+           so a step that raises a prompt is re-entered forever. Rust consumes
+           the parked tail from the front (compound/pause.rs:120-129
+           `save_remaining_actions`), so an answered step is never re-run. */
+        g->queue.resume_child = j;
         rb_execute_effect_ex(g, actor, cont->child[j], host);
     }
 }
@@ -3695,6 +3934,7 @@ choice_resume_tail:
 
 int rb_resume_with_choice(GameState *g, int selected_idx)
 {
+    int index = selected_idx;
     return rb_resume_with_choice_indices_internal(
         g, &index, selected_idx < 0 ? 0 : 1);
 }

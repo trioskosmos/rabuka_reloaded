@@ -34,6 +34,7 @@ use crate::bot::strategy_v4::{
     alloc, flip_stats, hand_lives, heart_pool, heart_pool_buffed, heart_pool_inner, lives_in_hand,
     stage_buff_hearts,
 };
+use crate::bot::strategy_common::{narrow_hearts, Acc};
 use crate::core::constants::CountCast;
 use crate::bot::strategy_v5::binom_ge;
 use crate::card::{CardDatabase, CardType};
@@ -68,7 +69,7 @@ fn stage_hearts_of(p: &Player, gs: &GameState, me: u8, db: &CardDatabase) -> i32
     let buffs = stage_buff_hearts(gs, me);
     // Draw/Score buffs (idx 8/9) never feed checks; stage_buff_hearts already
     // skips them, so a plain sum is in heart units.
-    base + buffs.iter().sum::<i32>()
+    base + buffs.iter().map(|&v| i32::from(v)).sum::<i32>()
 }
 
 /// Active blades + blade modifiers (waiting members contribute 0, Q133).
@@ -638,7 +639,10 @@ fn safest_portfolio(gs: &GameState, me: u8, db: &CardDatabase) -> Vec<usize> {
         0.45
     };
     let (blades, density) = flip_stats(gs, me, db);
-    let board_supply: i32 = (0..=7).chain(std::iter::once(10)).map(|i| board[i]).sum();
+    let board_supply: i32 = (0..=7)
+        .chain(std::iter::once(10))
+        .map(|i| i32::from(board[i]))
+        .sum();
 
     // Score every single life: pass probability under the calibrated model.
     let mut ranked: Vec<(f64, i32, usize)> = Vec::new();
@@ -646,7 +650,10 @@ fn safest_portfolio(gs: &GameState, me: u8, db: &CardDatabase) -> Vec<usize> {
         if alloc(&pool, need).is_none() {
             continue;
         }
-        let req: i32 = (0..=7).chain(std::iter::once(10)).map(|k| need[k]).sum();
+        let req: i32 = (0..=7)
+            .chain(std::iter::once(10))
+            .map(|k| i32::from(need[k]))
+            .sum();
         let shortfall = (req - board_supply.min(req)).max(0);
         let p = if shortfall == 0 {
             1.0
@@ -670,7 +677,10 @@ fn safest_portfolio(gs: &GameState, me: u8, db: &CardDatabase) -> Vec<usize> {
         let hand_desc: Vec<String> = lives
             .iter()
             .map(|(hi, cid, need)| {
-                let req: i32 = (0..=7).chain(std::iter::once(10)).map(|k| need[k]).sum();
+                let req: i32 = (0..=7)
+                    .chain(std::iter::once(10))
+                    .map(|k| i32::from(need[k]))
+                    .sum();
                 format!(
                     "hi{}:{}s:req{}",
                     hi,
@@ -701,7 +711,7 @@ fn safest_portfolio(gs: &GameState, me: u8, db: &CardDatabase) -> Vec<usize> {
     // bundle stays reliable (≥0.85). Extra reliable score wins the rare
     // both-pass comparison for free; anything flakier is left for later.
     let mut desired = vec![ranked[0].2];
-    let mut need_total = [0i32; 11];
+    let mut need_total: Acc = [0i16; 11];
     {
         let (_, _, first_hi) = ranked[0];
         if let Some((_, _, need)) = lives.iter().find(|(hi, _, _)| *hi == first_hi) {
@@ -723,7 +733,10 @@ fn safest_portfolio(gs: &GameState, me: u8, db: &CardDatabase) -> Vec<usize> {
         if alloc(&pool, &grown).is_none() {
             continue;
         }
-        let req: i32 = (0..=7).chain(std::iter::once(10)).map(|k| grown[k]).sum();
+        let req: i32 = (0..=7)
+            .chain(std::iter::once(10))
+            .map(|k| i32::from(grown[k]))
+            .sum();
         let shortfall = (req - board_supply.min(req)).max(0);
         let p = if shortfall == 0 {
             1.0
@@ -760,7 +773,7 @@ fn cheapest_deterministic_life(gs: &GameState, me: u8, db: &CardDatabase) -> Opt
 const EXPERIMENT_SAMPLES: usize = 256;
 
 type ExperimentPortfolio = (f64, i32, Vec<usize>);
-type ExperimentSingle = (f64, i32, usize, [i32; 11]);
+type ExperimentSingle = (f64, i32, usize, Acc);
 
 /// Outranks any stat utility the junk loop can build, so a card with a live
 /// ability is never the first thing binned from hand.
@@ -817,8 +830,12 @@ fn experiment_flip_categories(
 /// naming the scratch variable `bucket_supply` instead of `bucket`. Two bots
 /// deciding "can this requirement be met" from separate copies of the same
 /// rule is how they start disagreeing on a board.
-fn experiment_feasible(pool: &[i32; 8], need: &[i32; 11]) -> bool {
-    crate::bot::v8_model::feasible(pool, need)
+fn experiment_feasible(pool: &[i32; 8], need: &Acc) -> bool {
+    // The 8-bucket pool family (`cats`, sampled `pools`, `board_pool`) is
+    // still `i32` — it is a sampling histogram, not an `Acc`. `feasible` takes
+    // the narrowed `&[i16; 8]`, so clamp the buckets across at the boundary.
+    let pool8: [i16; 8] = std::array::from_fn(|i| narrow_hearts(pool[i]));
+    crate::bot::v8_model::feasible(&pool8, need)
 }
 
 fn experiment_pass_probability(
@@ -826,7 +843,7 @@ fn experiment_pass_probability(
     deck_len: usize,
     blades: i32,
     board: &[i32; 8],
-    need: &[i32; 11],
+    need: &Acc,
 ) -> f64 {
     if blades <= 0 || cats.is_empty() || deck_len == 0 {
         return if experiment_feasible(board, need) {
@@ -944,7 +961,7 @@ fn experiment_sample_pools(
     pools
 }
 
-fn experiment_pass_probability_pools(pools: &[[i32; 8]], need: &[i32; 11]) -> f64 {
+fn experiment_pass_probability_pools(pools: &[[i32; 8]], need: &Acc) -> f64 {
     if pools.is_empty() {
         return 0.0;
     }
@@ -997,12 +1014,12 @@ fn experiment_expected_yell_score(gs: &GameState, me: u8, db: &CardDatabase, bla
     (score_icons * draws / deck_len).i32_count()
 }
 
-fn experiment_lives(gs: &GameState, me: u8, db: &CardDatabase) -> Vec<(usize, i16, [i32; 11])> {
+fn experiment_lives(gs: &GameState, me: u8, db: &CardDatabase) -> Vec<(usize, i16, Acc)> {
     let (my, _) = gs.seated_pair(me);
     hand_lives(my, db)
         .into_iter()
         .map(|(hi, cid, _)| {
-            let mut need = [0; 11];
+            let mut need: Acc = [0i16; 11];
             let base = db.get_card(cid).and_then(|card| card.need_heart.as_ref());
             if let Some(effective) = crate::core::stats_pipeline::effective_need_heart(
                 base,
@@ -1010,7 +1027,7 @@ fn experiment_lives(gs: &GameState, me: u8, db: &CardDatabase) -> Vec<(usize, i1
                 &gs.mods.need_heart_modifiers,
             ) {
                 for (color, count) in &effective.hearts {
-                    need[color.index()] += i32::from(*count);
+                    need[color.index()] += i16::from(*count);
                 }
             }
             (hi, cid, need)
@@ -1247,15 +1264,28 @@ pub(crate) fn placement_forecast(gs: &GameState, me: u8, db: &CardDatabase, dept
 /// and a member that leaves the stage are five different trades. Classifying
 /// them lets the caller price each in its own currency, and lets `V7_DEBUG`
 /// print *why* an ability was taken instead of a bare number.
+/// 7 × `i8` = **7 bytes**, down from 28.
+///
+/// Every field is a *delta between two states* (`after.x - before.x`), never an
+/// accumulated total and never merged — the only producer is `measure_ability`,
+/// and the only consumer is a `V7_DEBUG` print plus `classify`. Card data's
+/// largest single value is 17, so a net change from one ability is far inside
+/// `i8`.
+///
+/// The construction clamps rather than narrowing: `after`/`before` are
+/// `AbilityFeatures`, which stays `i16` because `hearts` there is an ABSOLUTE
+/// per-colour sum over a whole stage, not a delta. Taking that to `i8` would
+/// risk an overflow in the intermediate, and the debug field is not worth a
+/// panic in the middle of a rollout.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub(crate) struct AbilityEffect {
-    pub draws: i32,
-    pub energy: i32,
-    pub blades: i32,
-    pub hearts: i32,
-    pub ammo: i32,
-    pub stage_cost: i32,
-    pub hand: i32,
+    pub draws: i8,
+    pub energy: i8,
+    pub blades: i8,
+    pub hearts: i8,
+    pub ammo: i8,
+    pub stage_cost: i8,
+    pub hand: i8,
 }
 
 impl AbilityEffect {
@@ -1441,23 +1471,27 @@ pub(crate) fn measure_ability(
     db: &CardDatabase,
 ) -> AbilityEffect {
     let (after, before) = (v7_features(sim, me), v7_features(root, me));
-    let blades_after = stage_blades(sim, me, db) as i32;
-    let blades_before = stage_blades(root, me, db) as i32;
-    let cost_after = stage_cost_total(sim, me, db) as i32;
-    let cost_before = stage_cost_total(root, me, db) as i32;
+    let blades_after = i16::from(stage_blades(sim, me, db));
+    let blades_before = i16::from(stage_blades(root, me, db));
+    let cost_after = stage_cost_total(sim, me, db);
+    let cost_before = stage_cost_total(root, me, db);
+    // `saturating_sub` into `i8_count`: the operands are `i16` absolutes, so
+    // the subtraction is done at the wider width and only the RESULT — a net
+    // change from one ability — is clamped to the byte `AbilityEffect` stores.
+    let d = |a: i16, b: i16| a.saturating_sub(b).i8_count();
     AbilityEffect {
         // `hand` counts cards in hand, so a net draw is the rise in hand.
-        draws: after.hand - before.hand,
-        energy: after.energy - before.energy,
-        blades: blades_after - blades_before,
-        hearts: after.hearts - before.hearts,
-        ammo: after.ammo - before.ammo,
-        stage_cost: cost_after - cost_before,
-        hand: after.hand - before.hand,
+        draws: d(after.hand, before.hand),
+        energy: d(after.energy, before.energy),
+        blades: d(blades_after, blades_before),
+        hearts: d(after.hearts, before.hearts),
+        ammo: d(after.ammo, before.ammo),
+        stage_cost: d(cost_after, cost_before),
+        hand: d(after.hand, before.hand),
     }
 }
 
-fn stage_blades(gs: &GameState, me: u8, db: &CardDatabase) -> i32 {
+fn stage_blades(gs: &GameState, me: u8, db: &CardDatabase) -> u8 {
     gs.seat_player(me)
         .stage
         .total_blades(
@@ -1465,17 +1499,17 @@ fn stage_blades(gs: &GameState, me: u8, db: &CardDatabase) -> i32 {
             &gs.mods.blade_modifiers,
             &gs.mods.orientation_modifiers,
             false,
-        ) as i32
+        )
 }
 
-fn stage_cost_total(gs: &GameState, me: u8, db: &CardDatabase) -> i32 {
+fn stage_cost_total(gs: &GameState, me: u8, db: &CardDatabase) -> i16 {
     gs.seat_player(me)
         .stage
         .stage
         .iter()
         .filter(|&&cid| cid >= 0)
         .filter_map(|&cid| db.get_card(cid).and_then(|c| c.cost))
-        .map(i32::from)
+        .map(i16::from)
         .sum()
 }
 
@@ -1494,20 +1528,23 @@ fn v7_features(gs: &GameState, me: u8) -> AbilityFeatures {
             &gs.mods.heart_copy,
         )
         .hearts
-        .values_sum() as i32;
+        .values_sum() as i16;
     AbilityFeatures {
         hearts,
-        energy: p.energy_zone.active_count() as i32,
-        hand: p.hand.cards.len() as i32,
-        ammo: p.live_card_zone.cards.len() as i32,
+        energy: i16::from(p.energy_zone.active_count()),
+        hand: i16::try_from(p.hand.cards.len()).unwrap_or(i16::MAX),
+        ammo: i16::try_from(p.live_card_zone.cards.len()).unwrap_or(i16::MAX),
     }
 }
 
 pub(crate) struct AbilityFeatures {
-    pub hearts: i32,
-    pub energy: i32,
-    pub hand: i32,
-    pub ammo: i32,
+    /// `i16`, not `i8`: this is an ABSOLUTE per-colour heart total for the
+    /// whole stage, and a stage of three large members can exceed 127. Only
+    /// the DELTA built from it in `measure_ability` is small enough for `i8`.
+    pub hearts: i16,
+    pub energy: i16,
+    pub hand: i16,
+    pub ammo: i16,
 }
 
 /// Pass probability of an already-chosen set, under the same exact 256-draw
@@ -1555,26 +1592,30 @@ pub(crate) fn best_available_pass_probability(gs: &GameState, me: u8, db: &CardD
 /// essentially the same board, v7's committed sets pass at 0.918 and v8's at
 /// 0.485, with v8 having MORE active blades (5.81 vs 4.95). Blades are only
 /// worth having if the deck contains the colours the held life needs.
-pub(crate) fn best_life_deficit(gs: &GameState, me: u8, db: &CardDatabase) -> [i32; 11] {
-    let mut best = [0i32; 11];
+pub(crate) fn best_life_deficit(gs: &GameState, me: u8, db: &CardDatabase) -> Acc {
+    let mut best: Acc = [0i16; 11];
     let mut found = false;
     for (_, _, need) in experiment_lives(gs, me, db) {
         if need[8] > 0 || need[9] > 0 {
             continue;
         }
-        if !found || need.iter().sum::<i32>() > best.iter().sum::<i32>() {
+        let need_total: i32 = need.iter().map(|&v| i32::from(v)).sum();
+        let best_total: i32 = best.iter().map(|&v| i32::from(v)).sum();
+        if !found || need_total > best_total {
             best = need;
             found = true;
         }
     }
     if !found {
-        return [0i32; 11];
+        return [0i16; 11];
     }
-    // Reduce by what the board already provides.
+    // Reduce by what the board already provides. `board` is the 8-bucket
+    // `i32` pool, so the difference is taken wide and clamped into the `i16`
+    // deficit element.
     let board = experiment_board_pool(gs, me, db);
-    let mut deficit = [0i32; 11];
+    let mut deficit: Acc = [0i16; 11];
     for c in 1..=6 {
-        deficit[c] = (best[c] - board[c]).max(0);
+        deficit[c] = narrow_hearts((i32::from(best[c]) - board[c]).max(0));
     }
     deficit[0] = best[0];
     deficit[7] = best[7];
@@ -1599,7 +1640,8 @@ pub(crate) fn useful_blades(gs: &GameState, me: u8, db: &CardDatabase, blades: i
         return 0.0;
     }
     let deficit = best_life_deficit(gs, me, db);
-    let needed: i32 = deficit[1..=6].iter().sum::<i32>() + deficit[0];
+    let needed: i32 = deficit[1..=6].iter().map(|&v| i32::from(v)).sum::<i32>()
+        + i32::from(deficit[0]);
     if needed <= 0 {
         // The board already covers the life. Extra blades only add pool we do
         // not need, so they are worth the same as any other stat and no more.
@@ -1622,7 +1664,7 @@ pub(crate) fn useful_blades(gs: &GameState, me: u8, db: &CardDatabase, blades: i
         let mut fills = 0i32;
         for c in 1..=6 {
             if deficit[c] > 0 {
-                fills += vector[c].min(deficit[c]);
+                fills += vector[c].min(i32::from(deficit[c]));
             }
         }
         if vector[7] > 0 && deficit[1..=6].iter().any(|d| *d > 0) {
@@ -1647,7 +1689,7 @@ pub(crate) fn useful_blades(gs: &GameState, me: u8, db: &CardDatabase, blades: i
 /// has been unable to make.
 pub(crate) fn deficit_total(gs: &GameState, me: u8, db: &CardDatabase) -> i32 {
     let deficit = best_life_deficit(gs, me, db);
-    deficit[1..=6].iter().sum::<i32>() + deficit[0]
+    deficit[1..=6].iter().map(|&v| i32::from(v)).sum::<i32>() + i32::from(deficit[0])
 }
 
 /// How many of the best held life's coloured requirement the board meets.
@@ -1660,13 +1702,13 @@ pub(crate) fn board_cover_of_best_life(gs: &GameState, me: u8, db: &CardDatabase
         if need[8] > 0 || need[9] > 0 {
             continue;
         }
-        let total: i32 = need[1..=6].iter().sum();
+        let total: i32 = need[1..=6].iter().map(|&v| i32::from(v)).sum();
         if total <= best_need {
             continue;
         }
         let mut cover = 0i32;
         for c in 1..=6 {
-            cover += need[c].min(board[c]);
+            cover += i32::from(need[c]).min(board[c]);
         }
         best_need = total;
         best_cover = cover;
@@ -1692,7 +1734,7 @@ pub(crate) fn opponent_pass_probability(gs: &GameState, me: u8, db: &CardDatabas
     if opp.live_card_zone.cards.is_empty() {
         return None;
     }
-    let mut need = [0i32; 11];
+    let mut need: Acc = [0i16; 11];
     let mut any = false;
     for &cid in &opp.live_card_zone.cards {
         let base = db.get_card(cid).and_then(|card| card.need_heart.as_ref());
@@ -1705,7 +1747,7 @@ pub(crate) fn opponent_pass_probability(gs: &GameState, me: u8, db: &CardDatabas
         };
         any = true;
         for (color, count) in &effective.hearts {
-            need[color.index()] += i32::from(*count);
+            need[color.index()] += i16::from(*count);
         }
     }
     if !any {
@@ -1741,7 +1783,7 @@ pub(crate) fn opponent_response_inputs(
     if opp.live_card_zone.cards.is_empty() {
         return None;
     }
-    let mut need = [0i32; 11];
+    let mut need: Acc = [0i16; 11];
     let mut score = 0i32;
     let mut any = false;
     for &cid in &opp.live_card_zone.cards {
@@ -1757,7 +1799,7 @@ pub(crate) fn opponent_response_inputs(
         };
         any = true;
         for (color, count) in &effective.hearts {
-            need[color.index()] += i32::from(*count);
+            need[color.index()] += i16::from(*count);
         }
     }
     if !any {
@@ -1788,7 +1830,7 @@ pub(crate) fn chosen_set_pass_probability(
     if desired.is_empty() {
         return 0.0;
     }
-    let mut need = [0i32; 11];
+    let mut need: Acc = [0i16; 11];
     for &hi in desired {
         if let Some((_, _, n)) = experiment_lives(gs, me, db)
             .iter()
@@ -1876,8 +1918,10 @@ fn experiment_junk_fill(gs: &GameState, me: u8, db: &CardDatabase, desired: &mut
         let pools = experiment_sample_pools(&cats, deck_len, blades, &board);
         experiment_lives(gs, me, db)
             .into_iter()
-            .filter(|(_, _, need)| {
-                need[8] == 0 && need[9] == 0 && need.iter().sum::<i32>() > 0
+        .filter(|(_, _, need)| {
+            need[8] == 0
+                && need[9] == 0
+                && need.iter().map(|&v| i32::from(v)).sum::<i32>() > 0
             })
             .filter(|(_, _, need)| {
                 experiment_pass_probability_pools(&pools, need) < floor
@@ -2043,7 +2087,7 @@ fn experiment_portfolio_rank(
     } else {
         0
     };
-    let mut needs: Vec<[i32; 11]> = Vec::with_capacity(n);
+    let mut needs: Vec<Acc> = Vec::with_capacity(n);
     let mut scores: Vec<i32> = Vec::with_capacity(n);
     for &(_, cid, ref need) in lives.iter().take(n) {
         needs.push(*need);
@@ -2074,7 +2118,7 @@ fn experiment_portfolio_rank(
         if cnt > max_slots {
             continue;
         }
-        let mut need_total = [0i32; 11];
+        let mut need_total: Acc = [0i16; 11];
         let mut score = yell_score;
         let mut idxs = Vec::with_capacity(cnt);
         let mut unpassable = false;
@@ -2454,7 +2498,7 @@ pub(crate) fn live_set_plan(gs: &GameState, db: &CardDatabase) -> Vec<usize> {
             .iter()
             .find(|(h, _, _)| *h == first_hi)
             .map(|(_, _, n)| *n)
-            .unwrap_or([0i32; 11]);
+            .unwrap_or([0i16; 11]);
         let cats = experiment_flip_categories(gs, me, db);
         let blades = experiment_blades(gs, me, db);
         let board = experiment_board_pool(gs, me, db);
@@ -2971,7 +3015,7 @@ pub(crate) fn best_response_set(gs: &GameState, me: u8, db: &CardDatabase) -> Ve
         if size > max_slots {
             continue;
         }
-        let mut need = [0i32; 11];
+        let mut need: Acc = [0i16; 11];
         let mut idxs = Vec::new();
         for (bit, (hi, _, n)) in lives.iter().enumerate() {
             if mask >> bit & 1 == 1 {

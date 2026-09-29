@@ -17,34 +17,15 @@
 use crate::card::{CardDatabase, CardType, HeartColor};
 use crate::core::constants::CountCast;
 use crate::game_setup::{self, Action};
+use crate::bot::strategy_common::{acc_add, hc_index, narrow_hearts, Acc};
 use crate::game_state::GameState;
 
 // ── Heart accounting (self-contained; mirrors rule 8.3.15 allocation) ──
-
-type Acc = [i32; 11];
-
-fn hc_index(c: crate::card::HeartColor) -> usize {
-    use crate::card::HeartColor as H;
-    match c {
-        H::Heart00 => 0,
-        H::Heart01 => 1,
-        H::Heart02 => 2,
-        H::Heart03 => 3,
-        H::Heart04 => 4,
-        H::Heart05 => 5,
-        H::Heart06 => 6,
-        H::BAll => 7,
-        H::Draw => 8,
-        H::Score => 9,
-        H::All => 10,
-    }
-}
-
-fn acc_add(acc: &mut Acc, hearts: &crate::card::HeartMap) {
-    for (c, v) in hearts.iter() {
-        acc[hc_index(*c)] += i32::from(*v);
-    }
-}
+//
+// `Acc`, `hc_index` and `acc_add` used to be defined here, byte-identical to
+// the copies in `strategy_v2`, `strategy_v3` and `bin/calibrate`. All four
+// now share the `strategy_common` definitions, so the accumulator's element
+// width is decided in exactly one place.
 
 /// Active blades and own-deck blade-heart density (fair info). Yell hits are
 /// a BINOMIAL draw, not a guarantee — portfolio sizing must budget variance.
@@ -127,7 +108,7 @@ pub(crate) fn expected_flip_units(
 /// time (binomial variance around the hit count).
 pub(crate) fn heart_pool_inner(gs: &GameState, me_player: u8, db: &CardDatabase, confidence: f64) -> Acc {
     let p = if me_player == 0 { &gs.player1 } else { &gs.player2 };
-    let mut acc = [0i32; 11];
+    let mut acc: Acc = [0i16; 11];
     for &cid in p.stage.stage.iter() {
         if cid < 0 {
             continue;
@@ -139,10 +120,13 @@ pub(crate) fn heart_pool_inner(gs: &GameState, me_player: u8, db: &CardDatabase,
         }
     }
     // Expected yell hits, per printed color (Draw/Score icons don't feed checks).
+    // The term is a truncated f64 and is computed wide; it is folded into the
+    // `i16` accumulator through `narrow_hearts`.
     let expected = expected_flip_units(gs, me_player, db);
     for idx in (0..=7).chain(std::iter::once(10)) {
-        acc[idx] +=
-            crate::constants::score_to_i32((expected[idx] * confidence).floor());
+        acc[idx] += narrow_hearts(crate::constants::score_to_i32(
+            (expected[idx] * confidence).floor(),
+        ));
     }
     acc
 }
@@ -173,7 +157,7 @@ const ALL_COLORS: [HeartColor; 11] = [
 /// (or negative, when granting the buff waits a member and costs blades).
 pub(crate) fn stage_buff_hearts(gs: &GameState, me_player: u8) -> Acc {
     let p = if me_player == 0 { &gs.player1 } else { &gs.player2 };
-    let mut acc = [0i32; 11];
+    let mut acc: Acc = [0i16; 11];
     for &cid in p.stage.stage.iter() {
         if cid < 0 {
             continue;
@@ -184,9 +168,10 @@ pub(crate) fn stage_buff_hearts(gs: &GameState, me_player: u8) -> Acc {
             if idx == 8 || idx == 9 {
                 continue;
             }
-            // `i32` because `Acc` sums per-colour totals across every member;
-            // the per-term modifier is an i16 and widens here.
-            acc[idx] += i32::from(gs.mods.get_heart_modifier(cid, *color));
+            // The per-term modifier is an `i16` but a per-colour buff total
+            // accumulates across stage members, so the term is widened to
+            // `i32` and clamped back into the `i16` `Acc` element.
+            acc[idx] += narrow_hearts(i32::from(gs.mods.get_heart_modifier(cid, *color)));
         }
     }
     acc
@@ -212,6 +197,10 @@ pub(crate) fn heart_pool_buffed(
 /// bucket takes colorless + leftovers (rule 2.11.3).
 pub(crate) fn alloc(pool: &Acc, need: &Acc) -> Option<Acc> {
     let mut p = *pool;
+    // `wildcard_used`/`take` stay `i32`: they accumulate the deficits over all
+    // six specific colors, so the terms widen out of the `i16` `Acc` and only
+    // clamp back in at the two `-=` sites below (both are `min`-bounded, so
+    // the result is always in range).
     let mut wildcard_used = 0i32;
     for c in 1..=6 {
         let have = p[c];
@@ -220,18 +209,18 @@ pub(crate) fn alloc(pool: &Acc, need: &Acc) -> Option<Acc> {
             p[c] = have - want;
         } else {
             let deficit = want - have;
-            wildcard_used += deficit;
-            if wildcard_used > p[7] + p[10] {
+            wildcard_used += i32::from(deficit);
+            if wildcard_used > i32::from(p[7]) + i32::from(p[10]) {
                 return None;
             }
             p[c] = 0;
         }
     }
     let mut take = wildcard_used;
-    let b = take.min(p[7]);
-    p[7] -= b;
+    let b = take.min(i32::from(p[7]));
+    p[7] -= narrow_hearts(b);
     take -= b;
-    p[10] -= take.min(p[10]);
+    p[10] -= narrow_hearts(take.min(i32::from(p[10])));
     // Grey bucket: colorless + leftover specifics + remaining wildcards.
     let mut grey = need[0];
     let g0 = grey.min(p[0]);
@@ -267,7 +256,7 @@ pub(crate) fn hand_lives(
             if !matches!(card.card_type, CardType::Live) {
                 continue;
             }
-            let mut need = [0i32; 11];
+            let mut need: Acc = [0i16; 11];
             if let Some(nh) = &card.need_heart {
                 acc_add(&mut need, &nh.hearts);
             }
@@ -499,7 +488,7 @@ pub fn choose_live_set_v4(gs: &GameState, actions: &[Action], db: &CardDatabase)
     // passing — so among lives that all pass deterministically, prefer the
     // highest scores. Count-maximization stays implicit (everything that
     // fits gets set until slots run out).
-    let mut candidates: Vec<(usize, i32, [i32; 11])> = Vec::new();
+    let mut candidates: Vec<(usize, i32, Acc)> = Vec::new();
     for &(hi, cid, ref need) in &hand_lives(my, db) {
         if let Some(card) = db.get_card(cid) {
             candidates.push((hi, i32::from(card.score.unwrap_or(0)), *need));

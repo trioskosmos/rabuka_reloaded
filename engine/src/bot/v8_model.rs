@@ -190,24 +190,24 @@ pub fn printed_score(db: &CardDatabase, cid: i16) -> i32 {
 /// Semantics follow rules 2.11.3 / 2.1: specific colors are met exactly, BAll
 /// (a blade heart) and All act as wildcards for ONE specific color each, and
 /// the Heart00 bucket absorbs colorless hearts plus every leftover.
-pub fn feasible(pool: &[i32; 8], need: &Acc) -> bool {
+pub fn feasible(pool: &[i16; 8], need: &Acc) -> bool {
     let mut wildcard = pool[7];
     let mut bucket = pool[0];
     for c in 1..=6 {
         let have = pool[c];
         let want = need[c];
         if have >= want {
-            bucket += have - want;
+            bucket = bucket.saturating_add(have.saturating_sub(want));
         } else {
-            let deficit = want - have;
+            let deficit = want.saturating_sub(have);
             if wildcard < deficit {
                 return false;
             }
-            wildcard -= deficit;
+            wildcard = wildcard.saturating_sub(deficit);
         }
     }
-    bucket += wildcard;
-    bucket >= need[0] + need[7] + need[10]
+    bucket = bucket.saturating_add(wildcard);
+    bucket >= need[0].saturating_add(need[7]).saturating_add(need[10])
 }
 
 /// A live whose requirement includes a Draw or Score icon is not something we
@@ -218,7 +218,7 @@ pub fn has_unpassable_icon(need: &Acc) -> bool {
 
 /// Effective heart requirement of a live card, modifier-aware.
 pub fn life_need(gs: &GameState, cid: i16) -> Acc {
-    let mut need = [0i32; 11];
+    let mut need = [0i16; 11];
     let printed = gs
         .card_database
         .get_card(cid)
@@ -227,7 +227,7 @@ pub fn life_need(gs: &GameState, cid: i16) -> Acc {
         stats_pipeline::effective_need_heart(printed, cid, &gs.mods.need_heart_modifiers)
     {
         for (color, count) in &effective.hearts {
-            need[hc_index(*color)] += i32::from(*count);
+            need[hc_index(*color)] = need[hc_index(*color)].saturating_add(i16::from(*count));
         }
     }
     need
@@ -333,7 +333,7 @@ impl FlipSampler {
 }
 
 /// `P(need satisfied)` over pre-sampled pools.
-pub fn pass_probability(pools: &[[i32; 8]], need: &Acc) -> f64 {
+pub fn pass_probability(pools: &[[i16; 8]], need: &Acc) -> f64 {
     if pools.is_empty() {
         return 0.0;
     }
@@ -1161,14 +1161,18 @@ pub fn reachable_ceiling(gs: &GameState, me: u8, turns: u8, db: &CardDatabase) -
 /// the PURE board (`confidence = 0.0`) keeps the binomial from double-counting
 /// the flips `heart_pool_inner` would otherwise fold into the mean.
 pub fn pass_estimate_from_supply(board: &Acc, blades: i32, density: f64, need: &Acc) -> f64 {
+    // `i32` accumulator: `deficit` is a sum over six specific colours plus the
+    // grey bucket and both wildcards — up to nine terms — before the wildcard
+    // credit is subtracted. The terms are `i16`; the running total is widened
+    // once here rather than saturating at every step.
     let mut deficit = 0i32;
     for c in 1..=6 {
-        deficit += (need[c] - board[c]).max(0);
+        deficit += i32::from(need[c].saturating_sub(board[c]).max(0));
     }
-    deficit += (need[0] - board[0]).max(0);
-    deficit += need[7].max(0) + need[10].max(0);
-    let wildcard = board[7] + board[10];
-    let shortfall = deficit - wildcard;
+    deficit += i32::from(need[0].saturating_sub(board[0]).max(0));
+    deficit += i32::from(need[7].max(0)) + i32::from(need[10].max(0));
+    let wildcard = i32::from(board[7]) + i32::from(board[10]);
+    let shortfall = deficit.saturating_sub(wildcard);
     if shortfall <= 0 {
         return 1.0;
     }
@@ -1262,46 +1266,46 @@ mod tests {
     #[test]
     fn feasibility_matches_engine_bucket_semantics() {
         // A specific color is met only by the same color.
-        let mut pool = [0i32; 8];
+        let mut pool = [0i16; 8];
         pool[3] = 2;
-        let mut need = [0i32; 11];
+        let mut need = [0i16; 11];
         need[3] = 2;
         assert!(feasible(&pool, &need));
         need[3] = 3;
         assert!(!feasible(&pool, &need));
 
         // A blade heart (BAll) is a wildcard for ONE specific color.
-        let mut pool = [0i32; 8];
+        let mut pool = [0i16; 8];
         pool[7] = 2;
-        let mut need = [0i32; 11];
+        let mut need = [0i16; 11];
         need[5] = 2;
         assert!(feasible(&pool, &need));
         need[5] = 3;
         assert!(!feasible(&pool, &need));
 
         // Colorless hearts fill ONLY the grey bucket, never a specific color.
-        let mut pool = [0i32; 8];
+        let mut pool = [0i16; 8];
         pool[0] = 3;
-        let mut need = [0i32; 11];
+        let mut need = [0i16; 11];
         need[2] = 1;
         assert!(!feasible(&pool, &need));
-        need = [0i32; 11];
+        need = [0i16; 11];
         need[0] = 3;
         assert!(feasible(&pool, &need));
         need[0] = 4;
         assert!(!feasible(&pool, &need));
 
         // Leftover specific hearts are absorbed by the total-count bucket.
-        let mut pool = [0i32; 8];
+        let mut pool = [0i16; 8];
         pool[1] = 3;
-        let mut need = [0i32; 11];
+        let mut need = [0i16; 11];
         need[0] = 2;
         assert!(feasible(&pool, &need));
 
         // A specific-color deficit is never paid by the grey bucket.
-        let mut pool = [0i32; 8];
+        let mut pool = [0i16; 8];
         pool[0] = 5;
-        let mut need = [0i32; 11];
+        let mut need = [0i16; 11];
         need[4] = 1;
         assert!(!feasible(&pool, &need));
     }
@@ -1311,13 +1315,13 @@ mod tests {
     /// `has_unpassable_icon`.
     #[test]
     fn draw_and_score_icons_are_never_check_requirements() {
-        let mut need = [0i32; 11];
+        let mut need = [0i16; 11];
         need[9] = 1;
         assert!(has_unpassable_icon(&need));
         // The heart question itself ignores the icon, so a life whose ONLY
         // requirement is a Score icon is still "feasible" as a heart check -
         // which is exactly why it must be filtered out upstream.
-        assert!(feasible(&[0i32; 8], &need));
+        assert!(feasible(&[0i16; 8], &need));
     }
 
     #[test]
@@ -1429,10 +1433,16 @@ mod tests {
         let b = sampler.sample_pools(&board, 64);
         assert_eq!(a, b);
 
-        let mut easy = [0i32; 11];
+        let mut easy = [0i16; 11];
         easy[3] = 1;
-        let mut hard = [0i32; 11];
+        let mut hard = [0i16; 11];
         hard[3] = 5;
+        // `sample_pools` accumulates flip draws in `i32` buckets; the model
+        // takes the narrowed pools, exactly as the live path does.
+        let a: Vec<[i16; 8]> = a
+            .into_iter()
+            .map(|pool| std::array::from_fn(|i| crate::bot::strategy_common::narrow_hearts(pool[i])))
+            .collect();
         for pool in &a {
             if feasible(pool, &hard) {
                 assert!(feasible(pool, &easy));
@@ -1536,7 +1546,7 @@ mod tests {
              member's {fresh_blades} count toward the yell"
         );
         assert_eq!(
-            walk.hearts.iter().copied().sum::<i32>(),
+            walk.hearts.iter().copied().map(i32::from).sum::<i32>(),
             sent_hearts + fresh_hearts,
             "3.2: the heart pool is ALL members, so the sent member's {sent_hearts} hearts stay in \
              it alongside the arriving member's {fresh_hearts}"

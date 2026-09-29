@@ -55,9 +55,8 @@ impl Clone for V2Policy {
     }
 }
 
-/// Per-color heart accumulator. Index space matches `HeartColor` variant
-/// order (Heart00..Heart06, BAll, Draw, Score, All).
-type Acc = [i32; 11];
+/// Per-color heart accumulator. Alias of `strategy_common::Acc`.
+type Acc = sc::Acc;
 
 /// Active-member blade count for yell flips (Q133: waited members don't yell).
 fn yell_flips(gs: &GameState, p: &Player, db: &CardDatabase) -> usize {
@@ -104,7 +103,7 @@ fn pass_probability(
         .map(|&cid| {
             db.get_card(cid).and_then(|c| c.blade_heart.as_ref()).map(
                 |bh| {
-                    let mut a = [0i32; 11];
+                    let mut a = [0i16; 11];
                     sc::acc_add(&mut a, &bh.hearts);
                     a
                 },
@@ -117,7 +116,7 @@ fn pass_probability(
     let mut idx: Vec<usize> = (0..n).collect();
     for _ in 0..trials {
         // Partial Fisher-Yates: draw `flips` distinct cards.
-        let mut flipped = [0i32; 11];
+        let mut flipped = [0i16; 11];
         for i in 0..flips {
             let j = (rng.next() % (n - i).u64_count()).usize_count() + i;
             idx.swap(i, j);
@@ -127,7 +126,7 @@ fn pass_probability(
                 }
             }
         }
-        let mut total = [0i32; 11];
+        let mut total = [0i16; 11];
         for k in 0..11 {
             total[k] = own[k] + flipped[k];
         }
@@ -151,7 +150,7 @@ fn hand_live_candidates(p: &Player, db: &CardDatabase) -> Vec<LiveCandidate> {
             if !matches!(card.card_type, CardType::Live) {
                 continue;
             }
-            let mut need = [0i32; 11];
+            let mut need = [0i16; 11];
             if let Some(nh) = &card.need_heart {
                 sc::acc_add(&mut need, &nh.hearts);
             }
@@ -225,7 +224,7 @@ pub fn choose_live_set_action_v2(
                 continue;
             }
             let mut score_sum = 0i32;
-            let mut need = [0i32; 11];
+            let mut need = [0i16; 11];
             let mut indices = Vec::with_capacity(count);
             for (bit, c) in candidates.iter().enumerate().take(n) {
                 if mask & (1 << bit) != 0 {
@@ -430,7 +429,7 @@ pub fn evaluate_state_v2(gs: &GameState, me: u8, w: &crate::bot::strategy::Strat
     if need_by_color.iter().sum::<i32>() > 0 {
         let have = sc::stage_base_hearts(my, db);
         let covered = (0..7)
-            .map(|i| have[i].min(need_by_color[i]))
+            .map(|i| i32::from(have[i]).min(need_by_color[i]))
             .sum::<i32>()
             .max(0);
         let total = need_by_color.iter().sum::<i32>().max(1);

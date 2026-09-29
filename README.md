@@ -162,7 +162,7 @@ Console build scripts are provided (each lives in its platform folder): `platfor
 
 The engine targets retro consoles with as little as 288 KB (GBA) and 2 MB (PS1). A bytecode VM and struct compaction have reduced runtime RAM from ~3 MB to ~130-170 KB, enabling full game flow on both platforms.
 
-For the current memory/bytecode optimization state, see [docs/memory_optimization_combined.md](docs/memory_optimization_combined.md).
+For the current memory/bytecode optimization state, see [docs/PERF_ENGINE_COMBINED.md](docs/PERF_ENGINE_COMBINED.md) §8.
 
 ## Testing
 
@@ -195,7 +195,7 @@ cargo bench                         # Criterion benchmarks
 | [engine/PORTS.md](engine/PORTS.md) | 450-line console port feasibility analysis for 15+ consoles |
 | [platforms/gba/output/GBA_PORT_NOTES.md](platforms/gba/output/GBA_PORT_NOTES.md) | GBA port build/toolchain + object-text rendering + VRAM crash fix |
 | [engine/3DS_CROSS_COMPILE_GUIDE.md](engine/3DS_CROSS_COMPILE_GUIDE.md) | 3DS porting guide, plan, and progress |
-| [docs/memory_optimization_combined.md](docs/memory_optimization_combined.md) | Unified memory & bytecode optimization guide (supersedes the older memory docs) |
+| [docs/PERF_ENGINE_COMBINED.md](docs/PERF_ENGINE_COMBINED.md) | The single engine-performance document: measurement contract, landed work, parallelism, RAM |
 | [engine/tests/WRITING_TESTS.md](engine/tests/WRITING_TESTS.md) | 530-line guide for writing card tests |
 | [cards/ABILITY_DOCUMENTATION.md](cards/ABILITY_DOCUMENTATION.md) | Ability system reference |
 | [ai_design/rabuka_bot_design.md](ai_design/rabuka_bot_design.md) | Consolidated neural architecture and bot design |

@@ -86,56 +86,73 @@ impl StrategyWeights {
 
 /// Public-ish view of one side used by the evaluator. Only fields a real
 /// player may see are populated from the opponent.
+///
+/// **48 bytes → 12.** `view_of` builds two of these on every call to
+/// `evaluate_state`, the most-called function in the bot, so the size of this
+/// struct is on the hottest allocation path in search.
+///
+/// The three counts are `u8` rather than `usize`: a deck is 60 cards and the
+/// success zone holds at most 8, so three `usize` fields were carrying 24 bytes
+/// of pointer-width padding around values that fit in one. The three stage
+/// totals are sums over at most 3 slots, comfortably inside `i16`.
 pub struct SideView {
-    pub success_count: usize,
-    pub stage_total_cost: i32,
-    pub stage_hearts: i32,
-    pub stage_blades: i32,
-    pub active_energy: i32,
-    pub hand_size: usize,
-    pub hand_live_cards: usize,
+    pub success_count: u8,
+    pub stage_total_cost: i16,
+    pub stage_hearts: i16,
+    pub stage_blades: i16,
+    pub active_energy: u8,
+    pub hand_size: u8,
+    pub hand_live_cards: u8,
     pub is_first_attacker: bool,
 }
 
 fn view_of(p: &Player, db: &CardDatabase, public_only: bool) -> SideView {
-    let mut stage_total_cost = 0i32;
-    let mut stage_hearts = 0i32;
-    let mut stage_blades = 0i32;
+    let mut stage_total_cost = 0i16;
+    let mut stage_hearts = 0i16;
+    let mut stage_blades = 0i16;
     for &cid in p.stage.stage.iter() {
         if cid < 0 {
             continue;
         }
         if let Some(card) = db.get_card(cid) {
-            stage_total_cost += card.cost.unwrap_or(0) as i32;
-            stage_blades += card.blade as i32;
+            stage_total_cost += i16::from(card.cost.unwrap_or(0));
+            stage_blades += i16::from(card.blade);
             if let Some(bh) = &card.base_heart {
-                stage_hearts += bh.hearts.values_sum() as i32;
+                stage_hearts += i16::from(bh.hearts.values_sum());
             }
         }
     }
 
     // Hand contents are only visible for our own side.
-    let mut hand_live_cards = 0usize;
+    let mut hand_live_cards = 0u8;
     if !public_only {
         for &cid in p.hand.cards.iter() {
             if let Some(card) = db.get_card(cid) {
                 if matches!(card.card_type, CardType::Live) {
-                    hand_live_cards += 1;
+                    hand_live_cards = hand_live_cards.saturating_add(1);
                 }
             }
         }
     }
 
     SideView {
-        success_count: p.success_live_card_zone.cards.len(),
+        success_count: u8_count(p.success_live_card_zone.cards.len()),
         stage_total_cost,
         stage_hearts,
         stage_blades,
-        active_energy: p.energy_zone.active_count() as i32,
-        hand_size: p.hand.cards.len(),
+        active_energy: p.energy_zone.active_count(),
+        hand_size: u8_count(p.hand.cards.len()),
         hand_live_cards,
         is_first_attacker: p.is_first_attacker,
     }
+}
+
+/// A count that is bounded by the deck. `saturating_add` rather than a plain
+/// increment, so a pathological state clamps at 255 instead of wrapping the
+/// `u8` count to zero and reporting an empty hand.
+#[inline]
+fn u8_count(n: usize) -> u8 {
+    u8::try_from(n).unwrap_or(u8::MAX)
 }
 
 /// Heuristic evaluation of the position from `me`'s perspective (0 or 1).

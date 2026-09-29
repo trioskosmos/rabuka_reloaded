@@ -10,41 +10,22 @@
 
 use rabuka_engine::bin_common::{deal_default_game, fresh_database, load_deck};
 use rabuka_engine::bot::{strategy_v2, strategy_v3, strategy_v4};
-use rabuka_engine::card::{CardDatabase, HeartColor, HeartMap, CardType};
+use rabuka_engine::card::{CardDatabase, CardType};
 use rabuka_engine::player::Player;
 use rabuka_engine::game_setup;
 use rabuka_engine::game_state::{GameResult, GameState, Phase};
 use rabuka_engine::rng::Lcg;
 use rabuka_engine::turn::TurnEngine;
 
-type Acc = [i32; 11];
-
-fn hc_index(c: HeartColor) -> usize {
-    use HeartColor as H;
-    match c {
-        H::Heart00 => 0,
-        H::Heart01 => 1,
-        H::Heart02 => 2,
-        H::Heart03 => 3,
-        H::Heart04 => 4,
-        H::Heart05 => 5,
-        H::Heart06 => 6,
-        H::BAll => 7,
-        H::Draw => 8,
-        H::Score => 9,
-        H::All => 10,
-    }
-}
-
-fn acc_add(acc: &mut Acc, hearts: &HeartMap) {
-    for (c, v) in hearts.iter() {
-        acc[hc_index(*c)] += *v as i32;
-    }
-}
+// `Acc`, `hc_index` and `acc_add` used to be defined here, byte-identical to
+// the copies in `strategy_v2`, `strategy_v3` and `strategy_v4`. They now come
+// from `strategy_common`, so the accumulator's element width is decided in
+// exactly one place.
+use rabuka_engine::bot::strategy_common::{acc_add, narrow_hearts, Acc};
 
 fn heart_pool(gs: &GameState, me_player: u8, db: &CardDatabase, confidence: f64) -> Acc {
     let p = if me_player == 0 { &gs.player1 } else { &gs.player2 };
-    let mut acc = [0i32; 11];
+    let mut acc: Acc = [0i16; 11];
     let mut blades = 0i32;
     for &cid in p.stage.stage.iter() {
         if cid < 0 {
@@ -68,7 +49,7 @@ fn heart_pool(gs: &GameState, me_player: u8, db: &CardDatabase, confidence: f64)
         .filter(|&&cid| db.get_card(cid).is_some_and(|c| c.blade_heart.is_some()))
         .count() as f64
         / deck_len as f64;
-    acc[10] += ((blades as f64 * density) * confidence).floor() as i32;
+    acc[10] += narrow_hearts(((blades as f64 * density) * confidence).floor() as i32);
     acc
 }
 
@@ -79,7 +60,7 @@ fn hand_lives(p: &Player, db: &CardDatabase) -> Vec<(usize, Acc)> {
             if !matches!(card.card_type, CardType::Live) {
                 continue;
             }
-            let mut need = [0i32; 11];
+            let mut need: Acc = [0i16; 11];
             if let Some(nh) = &card.need_heart {
                 acc_add(&mut need, &nh.hearts);
             }
@@ -99,18 +80,18 @@ fn alloc_probe(pool: &mut Acc, need: &Acc) -> bool {
             p[c] = have - want;
         } else {
             let deficit = want - have;
-            wildcard_used += deficit;
-            if wildcard_used > p[7] + p[10] {
+            wildcard_used += i32::from(deficit);
+            if wildcard_used > i32::from(p[7]) + i32::from(p[10]) {
                 return false;
             }
             p[c] = 0;
         }
     }
     let mut take = wildcard_used;
-    let b = take.min(p[7]);
-    p[7] -= b;
+    let b = take.min(i32::from(p[7]));
+    p[7] -= narrow_hearts(b);
     take -= b;
-    p[10] -= take.min(p[10]);
+    p[10] -= narrow_hearts(take.min(i32::from(p[10])));
     let mut grey = need[0];
     let g0 = grey.min(p[0]);
     p[0] -= g0;
@@ -374,7 +355,7 @@ fn main() {
                                     "g{game} t{} life#{} need_sum={} predC={} predF={} placed={}/{}",
                                     gs.turn_number,
                                     hi,
-                                    need.iter().sum::<i32>(),
+                                    need.iter().map(|&v| i32::from(v)).sum::<i32>(),
                                     pc_cons,
                                     pc_full,
                                     placed_n,

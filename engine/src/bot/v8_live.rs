@@ -25,7 +25,7 @@
 //!   cards whose loss costs least, and the cost is computed from each card's
 //!   actual next-turn contribution rather than from its printed cost.
 
-use crate::bot::strategy_common::{acc_add, emit_live_set, Acc};
+use crate::bot::strategy_common::{acc_add, emit_live_set, narrow_hearts, Acc};
 use crate::card::{CardDatabase, CardType};
 use crate::game_setup::Action;
 use crate::game_state::{GameState, Phase};
@@ -35,7 +35,7 @@ use super::v8_model::{self, CheckOutcome, OppModel, RngGuard, PLACEMENT_CREDIT};
 /// A life in hand, priced once.
 struct Life {
     index: usize,
-    need: [i32; 11],
+    need: Acc,
     score: i32,
 }
 
@@ -429,7 +429,7 @@ fn enumerate_candidates(
     gs: &GameState,
     me: u8,
     db: &CardDatabase,
-    pools: &[[i32; 8]],
+    pools: &[[i16; 8]],
     opp: &OppModel,
     draw_credit: f64,
 ) -> Vec<Candidate> {
@@ -515,7 +515,7 @@ fn enumerate_candidates(
             .filter(|(bit, _)| mask & (1 << bit) != 0)
             .map(|(_, life)| life)
             .collect();
-        let mut need = [0i32; 11];
+        let mut need: Acc = [0i16; 11];
         let mut score = yell_score;
         for life in &chosen {
             for (need_k, life_need) in need.iter_mut().zip(life.need.iter()) {
@@ -679,7 +679,14 @@ pub(crate) fn score_candidates(
 ) -> (Vec<Candidate>, OppModel) {
     let board = v8_model::board_pool(gs, me, db);
     let sampler = v8_model::FlipSampler::build(gs, me, db);
-    let pools = sampler.sample_pools(&board, v8_model::flip_samples());
+    // The sampler accumulates flip draws in `i32` buckets; `pass_probability`
+    // takes the narrowed pools. Clamp once, at the producer, rather than in the
+    // candidate loop.
+    let pools: Vec<[i16; 8]> = sampler
+        .sample_pools(&board, v8_model::flip_samples())
+        .into_iter()
+        .map(|pool| std::array::from_fn(|i| narrow_hearts(pool[i])))
+        .collect();
     let opp = OppModel::build(gs, me, db);
     let draw_credit = draw_value(gs, me, db);
     let candidates = enumerate_candidates(gs, me, db, &pools, &opp, draw_credit);
@@ -860,11 +867,18 @@ pub fn predict_live_set(gs: &GameState, db: &CardDatabase) -> Option<LivePredict
         .iter()
         .filter_map(|&i| p.hand.cards.get(i).copied())
         .map(|cid| v8_model::life_need(gs, cid))
-        .map(|need| need.iter().copied().filter(|&n| n > 0).sum::<i32>())
+        .map(|need| {
+            need.iter()
+                .copied()
+                .filter(|&n| n > 0)
+                .map(i32::from)
+                .sum::<i32>()
+        })
         .sum();
     let board_hearts: i32 = v8_model::board_supply(gs, me, db)
         .iter()
         .filter(|&&n| n > 0)
+        .map(|&n| i32::from(n))
         .sum();
     Some(LivePrediction {
         lives: best.lives.clone(),

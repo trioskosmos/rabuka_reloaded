@@ -1,5 +1,5 @@
 # tools/baseline.ps1 — Phase-0 performance baseline suite.
-# See docs/PERF_BASELINE_PLAN.md. Run from repo root:
+# See docs/PERF_ENGINE_COMBINED.md. Run from repo root:
 #   pwsh tools/baseline.ps1 [-Games 500] [-Repeat 3] [-SkipBench] [-SkipFlame] [-Quick]
 #
 # Produces: test_output/baseline_<date>.md + raw logs under test_output/baseline_<date>/

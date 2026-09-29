@@ -431,7 +431,7 @@ pub fn enumerate_candidates(gs: &GameState, me: u8, db: &CardDatabase) -> Vec<Ve
                             score += db.get_card(cid).and_then(|c| c.score).unwrap_or(0) as i32;
                             total_req += (0..=7)
                                 .chain(std::iter::once(10))
-                                .map(|i| need[i])
+                                .map(|i| i32::from(need[i]))
                                 .sum::<i32>();
                             idxs.push(hi);
                         }
