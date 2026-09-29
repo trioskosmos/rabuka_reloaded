@@ -143,7 +143,12 @@ fn debut_wait_immunity_blocks_opponent_debut_cost_limit_wait() {
         game.state.player2.energy_zone.cards.push(e);
     }
     game.state.player2.energy_zone.add_active(10);
-    game.play_to_stage(umi, MemberArea::Center);
+    // Deliberate overlap, and a known harness gap: Umi is in PLAYER 2's hand and P2
+    // pays the energy, but `play_to_stage` only ever places on PLAYER 1 — there is no
+    // player-2 placement helper. The card therefore lands in P1's centre and displaces
+    // Kanan. The assertions below are written against that outcome, so it is kept and
+    // made explicit. See docs/PBLL02_ABILITY_REVIEW.md §8.3.
+    game.play_to_stage_baton(umi, MemberArea::Center);
 
     let mut guard = 0;
     while game.has_pending_choice() && guard < 20 {

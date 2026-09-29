@@ -334,7 +334,16 @@ impl AbilityResolver {
                 exclude_self: exclude_self_id,
                 ..Default::default()
             };
-            let filter = filter.original_blade_limit(blade_limit, blade_limit_operator);
+            let filter = filter
+                .original_blade_limit(blade_limit, blade_limit_operator)
+                // 「元々持つハートの数がNつ以下」 — e.g. PL!-pb2-006 西木野真姫
+                // 「相手のステージにいる元々持つハートの数が1つ以下のメンバー1人を
+                // ウェイトにする」. Without this the clause degrades to "any member"
+                // and the selection offers over-budget members too.
+                .original_heart_total(
+                    effect.heart_total_limit_any(),
+                    effect.heart_total_operator_any().or(Some("<=")),
+                );
             let mut candidates: Vec<(usize, i16)> = Vec::new();
 
             // If we have selected cards from a previous choice, use them

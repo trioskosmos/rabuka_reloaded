@@ -22,4 +22,5 @@ pub mod moved_right_side_pl_sp_bp4_020_n_test;
 pub mod mymai_tonight_test;
 pub mod optional_discard_other_member_blades_honoka_pb1_010_r_test;
 pub mod optional_discard_success_zone_blades_maki_bp3_006_r_test;
+pub mod pb2_live_start_paid_self_wait_centre_mus_two_blades_pl_pb2_019_n_test;
 pub mod triggerless_live_other_member_pl_bp4_014_n_test;

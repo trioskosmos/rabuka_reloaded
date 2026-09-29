@@ -317,7 +317,7 @@ fn miyamiya_baton_touch_cost15_newcomer_full_payoff() {
     // Playing onto the occupied center slot performs the baton touch
     // (rules 9.6.2.3.2): Ai -> waitroom, newcomer arrives; net payment =
     // newcomer cost - Ai's printed cost.
-    g.play_to_stage(newcomer, rabuka_engine::zones::MemberArea::Center);
+    g.play_to_stage_baton(newcomer, rabuka_engine::zones::MemberArea::Center);
     // Answer what cannot be declined, decline what can: a mandatory
     // prompt left parked mid-ability produces exactly the absence
     // the next assertion checks, so nothing fails.
@@ -367,7 +367,7 @@ fn miyamiya_baton_touch_cost13_newcomer_energy_only() {
     let active_before = g.state.player1.energy_zone.active_count();
     let hand_before = g.state.player1.hand.cards.len();
 
-    g.play_to_stage(newcomer, rabuka_engine::zones::MemberArea::Center);
+    g.play_to_stage_baton(newcomer, rabuka_engine::zones::MemberArea::Center);
     // Answer what cannot be declined, decline what can: a mandatory
     // prompt left parked mid-ability produces exactly the absence
     // the next assertion checks, so nothing fails.
@@ -449,7 +449,7 @@ fn miyamiya_baton_touch_blade_heart_newcomer_nothing() {
     let active_before = g.state.player1.energy_zone.active_count();
     let hand_before = g.state.player1.hand.cards.len();
 
-    g.play_to_stage(newcomer, rabuka_engine::zones::MemberArea::Center);
+    g.play_to_stage_baton(newcomer, rabuka_engine::zones::MemberArea::Center);
     // Answer what cannot be declined, decline what can: a mandatory
     // prompt left parked mid-ability produces exactly the absence
     // the next assertion checks, so nothing fails.

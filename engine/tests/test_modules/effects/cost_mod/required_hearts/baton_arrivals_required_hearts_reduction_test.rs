@@ -62,9 +62,9 @@ fn pl_hs_bp2_023_l_two_hasunosora_baton_arrivals_reduce_only_heart05() {
     game.add_to_hand(b);
     game.add_to_hand(c);
     game.give_energy(40);
-    game.play_to_stage(b, MemberArea::LeftSide);
+    game.play_to_stage_baton(b, MemberArea::LeftSide);
     drain(&mut game);
-    game.play_to_stage(c, MemberArea::Center);
+    game.play_to_stage_baton(c, MemberArea::Center);
     drain(&mut game);
     fire_live_start(&mut game, live);
     assert_eq!(
@@ -95,7 +95,7 @@ fn pl_hs_bp2_023_l_one_baton_arrival_does_not_reduce_required_heart() {
     let b = game.new_id(HNS_B);
     game.add_to_hand(b);
     game.give_energy(40);
-    game.play_to_stage(b, MemberArea::LeftSide);
+    game.play_to_stage_baton(b, MemberArea::LeftSide);
     drain(&mut game);
     fire_live_start(&mut game, live);
     assert_eq!(
@@ -121,9 +121,9 @@ fn pl_hs_bp2_023_l_non_hasunosora_arrivals_do_not_reduce_required_heart() {
     game.add_to_hand(b);
     game.add_to_hand(c);
     game.give_energy(40);
-    game.play_to_stage(b, MemberArea::LeftSide);
+    game.play_to_stage_baton(b, MemberArea::LeftSide);
     drain(&mut game);
-    game.play_to_stage(c, MemberArea::RightSide);
+    game.play_to_stage_baton(c, MemberArea::RightSide);
     drain(&mut game);
     fire_live_start(&mut game, live);
     assert_eq!(
@@ -168,9 +168,9 @@ fn pl_hs_bp2_025_l_two_hasunosora_baton_arrivals_reduce_only_heart01() {
     game.add_to_hand(b);
     game.add_to_hand(c);
     game.give_energy(40);
-    game.play_to_stage(b, MemberArea::LeftSide);
+    game.play_to_stage_baton(b, MemberArea::LeftSide);
     drain(&mut game);
-    game.play_to_stage(c, MemberArea::Center);
+    game.play_to_stage_baton(c, MemberArea::Center);
     drain(&mut game);
     fire_live_start(&mut game, live);
     assert_eq!(

@@ -12,7 +12,7 @@ fn pl_hs_bp2_009_r_baton_cheaper_mirakura_fire_wrong_group_or_cost_no_fire() {
         g.state.player1.stage.stage[1] = non_mirakura;
         g.state.player1.hand.cards.push(himeno);
         g.give_energy(20);
-        g.play_to_stage(himeno, MemberArea::Center);
+        g.play_to_stage_baton(himeno, MemberArea::Center);
         assert!(
             g.has_pending_choice(),
             "Test1: Should have optional cost prompt"
@@ -35,7 +35,7 @@ fn pl_hs_bp2_009_r_baton_cheaper_mirakura_fire_wrong_group_or_cost_no_fire() {
         g.state.player1.stage.stage[1] = mirakura_low;
         g.state.player1.hand.cards.push(himeno);
         g.give_energy(20);
-        g.play_to_stage(himeno, MemberArea::Center);
+        g.play_to_stage_baton(himeno, MemberArea::Center);
         assert!(
             g.has_pending_choice(),
             "Test2: Should have optional cost prompt"
@@ -57,7 +57,7 @@ fn pl_hs_bp2_009_r_baton_cheaper_mirakura_fire_wrong_group_or_cost_no_fire() {
         g.state.player1.stage.stage[1] = mirakura_high;
         g.state.player1.hand.cards.push(himeno);
         g.give_energy(20);
-        g.play_to_stage(himeno, MemberArea::Center);
+        g.play_to_stage_baton(himeno, MemberArea::Center);
         assert!(
             g.has_pending_choice(),
             "Test3: Should have optional cost prompt"

@@ -657,6 +657,8 @@ impl Choice {
                 exclude_self: None,
                 original_blade_limit: None,
                 original_blade_operator: None,
+                original_heart_total: None,
+                original_heart_total_operator: None,
                 current_blade_limit: None,
                 current_blade_operator: None,
                 exclude_cards: None,

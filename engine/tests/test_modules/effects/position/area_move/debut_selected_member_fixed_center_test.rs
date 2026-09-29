@@ -428,7 +428,7 @@ fn fixed_center_full_stage_choose_any_member() {
     // Debut ruby to the CENTER (replacing the center filler — play_to_stage with
     // an occupied slot moves the occupant to waitroom). Then choose the RIGHT
     // member to move to center.
-    game.play_to_stage(ruby, MemberArea::Center);
+    game.play_to_stage_baton(ruby, MemberArea::Center);
     let mut guard = 0;
     while game.has_pending_choice() && guard < 20 {
         guard += 1;

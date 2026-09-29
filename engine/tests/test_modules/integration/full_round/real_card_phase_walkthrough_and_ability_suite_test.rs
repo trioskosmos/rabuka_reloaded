@@ -1910,7 +1910,10 @@ fn nico_prompt_path_direct_placement_wait_state() {
     // First play Nico to center
     let filler_copy2 = game.new_id("PL!-sd1-010-SD");
     game.state.player1.stage.stage = [filler, -1, filler_copy2];
-    game.play_to_stage(nico, rabuka_engine::zones::MemberArea::Center);
+    // Deliberate overlap: this play targets an occupied slot (see the guard in
+    // TestGame::play_to_stage). Kept as-is so the behaviour under test is
+    // unchanged; the explicit variant keeps the swap from being silent.
+    game.play_to_stage_baton(nico, rabuka_engine::zones::MemberArea::Center);
     // Now [filler, nico, filler] — full — then play_to_stage makes [filler, nico, -]
     // Actually, let's set up properly before playing Nico:
     // Reset: fresh game for precise setup
@@ -1929,7 +1932,7 @@ fn nico_prompt_path_direct_placement_wait_state() {
     let filler2 = game2.id("PL!-sd1-010-SD");
     let filler2_copy2 = game2.new_id("PL!-sd1-010-SD");
     game2.state.player1.stage.stage = [filler2, filler2_copy2, -1];
-    game2.play_to_stage(nico2, rabuka_engine::zones::MemberArea::Center);
+    game2.play_to_stage_baton(nico2, rabuka_engine::zones::MemberArea::Center);
     // After playing Nico: [filler2, nico2, -] → 1 empty slot for the effect
 
     // P1: 2 eligible cards in discard → SelectCard prompt

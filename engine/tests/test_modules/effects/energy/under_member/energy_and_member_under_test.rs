@@ -1008,7 +1008,7 @@ fn baton_touch_recycles_owner_under_energy() {
     game.give_energy(4);
     let energy_deck_before = game.state.player1.energy_deck.cards.len();
 
-    game.play_to_stage(arriver, MemberArea::Center);
+    game.play_to_stage_baton(arriver, MemberArea::Center);
 
     assert_eq!(game.state.player1.stage.stage[1], arriver);
     assert!(game.state.player1.waitroom.cards.contains(&target));

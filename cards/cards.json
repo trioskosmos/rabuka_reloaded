@@ -708,7 +708,6 @@
       "heart02": 1,
       "heart0": 3
     },
-    "special_heart": {},
     "rare": "L",
     "ability": "{{live_success.png|ライブ成功時}}エールにより公開された自分のカードの中にライブカードが2枚以上あるか、自分のステージにいるメンバーが持つハートの中に{{heart_01.png|heart01}}、{{heart_04.png|heart04}}、{{heart_05.png|heart05}}、{{heart_02.png|heart02}}、{{heart_03.png|heart03}}、{{heart_06.png|heart06}}のうち合計5種類以上あるか、このターンに自分のステージにいるメンバーがエリアを移動している場合、このカードのスコアを＋１する。",
     "faq": [
@@ -730,7 +729,10 @@
         "name": "Live with a smile!"
       }
     ],
-    "_img": "img/cards/BP05/LL-bp5-001-L.png"
+    "_img": "img/cards/BP05/LL-bp5-001-L.png",
+    "special_heart": {
+      "score": 1
+    }
   },
   "LL-bp5-002-L": {
     "card_no": "LL-bp5-002-L",
@@ -2983,7 +2985,6 @@
       "heart01": 1,
       "heart06": 1
     },
-    "special_heart": {},
     "rare": "L",
     "ability": "{{live_start.png|ライブ開始時}}自分のライブ中の『μ's』のカードが2枚以上ある場合、このカードのスコアを＋１する。",
     "faq": [
@@ -3005,7 +3006,10 @@
         "name": "僕らのLIVE 君とのLIFE"
       }
     ],
-    "_img": "img/cards/BP03/PL!-bp3-L-019-L.png"
+    "_img": "img/cards/BP03/PL!-bp3-L-019-L.png",
+    "special_heart": {
+      "score": 1
+    }
   },
   "PL!-bp3-019-SRL": {
     "card_no": "PL!-bp3-019-SRL",
@@ -3020,7 +3024,6 @@
       "heart01": 1,
       "heart06": 1
     },
-    "special_heart": {},
     "ability": "{{live_start.png|ライブ開始時}}自分のライブ中の『μ's』のカードが2枚以上ある場合、このカードのスコアを＋１する。",
     "faq": [],
     "_img": "img/cards/PBLL02/PL!-bp3-019-SRL.png",
@@ -3029,7 +3032,10 @@
         "card_no": "PL!-bp3-019-SRL",
         "name": "僕らのLIVE 君とのLIFE"
       }
-    ]
+    ],
+    "special_heart": {
+      "score": 1
+    }
   },
   "PL!-bp3-020-L": {
     "card_no": "PL!-bp3-020-L",
@@ -3175,7 +3181,6 @@
     "blade_heart": {
       "b_heart06": 1
     },
-    "special_heart": {},
     "rare": "L",
     "faq": [],
     "rare_list": [
@@ -3184,7 +3189,10 @@
         "name": "愛してるばんざーい!"
       }
     ],
-    "_img": "img/cards/BP03/PL!-bp3-L-021-L.png"
+    "_img": "img/cards/BP03/PL!-bp3-L-021-L.png",
+    "special_heart": {
+      "draw": 1
+    }
   },
   "PL!-bp3-021-SRL": {
     "card_no": "PL!-bp3-021-SRL",
@@ -3203,7 +3211,6 @@
     "blade_heart": {
       "b_heart06": 1
     },
-    "special_heart": {},
     "faq": [],
     "_img": "img/cards/PBLL02/PL!-bp3-021-SRL.png",
     "rare_list": [
@@ -3211,7 +3218,10 @@
         "card_no": "PL!-bp3-021-SRL",
         "name": "愛してるばんざーい!"
       }
-    ]
+    ],
+    "special_heart": {
+      "draw": 1
+    }
   },
   "PL!-bp3-022-L": {
     "card_no": "PL!-bp3-022-L",
@@ -3230,7 +3240,6 @@
     "blade_heart": {
       "b_heart01": 1
     },
-    "special_heart": {},
     "rare": "L",
     "ability": "{{live_start.png|ライブ開始時}}自分のデッキの上から、自分と相手のステージにいるメンバー1人につき、1枚公開する。それらの中にあるライブカード1枚につき、このカードのスコアを＋１する。その後、これにより公開したカードを控え室に置く。",
     "faq": [],
@@ -3240,7 +3249,10 @@
         "name": "ユメノトビラ"
       }
     ],
-    "_img": "img/cards/BP03/PL!-bp3-L-022-L.png"
+    "_img": "img/cards/BP03/PL!-bp3-L-022-L.png",
+    "special_heart": {
+      "draw": 1
+    }
   },
   "PL!-bp3-022-SECL": {
     "card_no": "PL!-bp3-022-SECL",
@@ -3260,7 +3272,6 @@
     "blade_heart": {
       "b_heart01": 1
     },
-    "special_heart": {},
     "ability": "{{live_start.png|ライブ開始時}}自分のデッキの上から、自分と相手のステージにいるメンバー1人につき、1枚公開する。それらの中にあるライブカード1枚につき、このカードのスコアを＋１する。その後、これにより公開したカードを控え室に置く。",
     "faq": [],
     "_img": "img/cards/PBLL02/PL!-bp3-022-SECL.png",
@@ -3273,7 +3284,10 @@
         "card_no": "PL!-bp3-022-SRL",
         "name": "ユメノトビラ"
       }
-    ]
+    ],
+    "special_heart": {
+      "draw": 1
+    }
   },
   "PL!-bp3-022-SRL": {
     "card_no": "PL!-bp3-022-SRL",
@@ -3293,7 +3307,6 @@
     "blade_heart": {
       "b_heart01": 1
     },
-    "special_heart": {},
     "ability": "{{live_start.png|ライブ開始時}}自分のデッキの上から、自分と相手のステージにいるメンバー1人につき、1枚公開する。それらの中にあるライブカード1枚につき、このカードのスコアを＋１する。その後、これにより公開したカードを控え室に置く。",
     "faq": [],
     "_img": "img/cards/PBLL02/PL!-bp3-022-SRL.png",
@@ -3306,7 +3319,10 @@
         "card_no": "PL!-bp3-022-SRL",
         "name": "ユメノトビラ"
       }
-    ]
+    ],
+    "special_heart": {
+      "draw": 1
+    }
   },
   "PL!-bp3-023-L": {
     "card_no": "PL!-bp3-023-L",
@@ -5313,7 +5329,6 @@
     "blade_heart": {
       "b_heart03": 1
     },
-    "special_heart": {},
     "rare": "L",
     "ability": "{{live_start.png|ライブ開始時}}自分の成功ライブカード置き場にあるカードのスコアの合計が６以上の場合、このカードを成功させるための必要ハートを{{heart_00.png|heart0}}減らす。スコアの合計が９以上の場合、さらにこのカードのスコアを＋１する。",
     "faq": [],
@@ -5323,7 +5338,10 @@
         "name": "?←HEARTBEAT"
       }
     ],
-    "_img": "img/cards/BP04/PL!-bp4-021-L.png"
+    "_img": "img/cards/BP04/PL!-bp4-021-L.png",
+    "special_heart": {
+      "draw": 1
+    }
   },
   "PL!-bp4-021-SRL": {
     "card_no": "PL!-bp4-021-SRL",
@@ -5343,7 +5361,6 @@
     "blade_heart": {
       "b_heart03": 1
     },
-    "special_heart": {},
     "ability": "{{live_start.png|ライブ開始時}}自分の成功ライブカード置き場にあるカードのスコアの合計が６以上の場合、このカードを成功させるための必要ハートを{{heart_00.png|heart0}}減らす。スコアの合計が９以上の場合、さらにこのカードのスコアを＋１する。",
     "faq": [],
     "_img": "img/cards/PBLL02/PL!-bp4-021-SRL.png",
@@ -5352,7 +5369,10 @@
         "card_no": "PL!-bp4-021-SRL",
         "name": "?←HEARTBEAT"
       }
-    ]
+    ],
+    "special_heart": {
+      "draw": 1
+    }
   },
   "PL!-bp4-022-L": {
     "card_no": "PL!-bp4-022-L",
@@ -5368,7 +5388,6 @@
       "heart06": 3,
       "heart0": 9
     },
-    "special_heart": {},
     "rare": "L",
     "ability": "{{live_start.png|ライブ開始時}}自分のセンターエリアに{{icon_blade.png|ブレード}}を9つ以上持つ『μ's』のメンバーがいる場合、このカードのスコアを＋２する。",
     "faq": [],
@@ -5382,7 +5401,10 @@
         "name": "No brand girls"
       }
     ],
-    "_img": "img/cards/BP04/PL!-bp4-022-L.png"
+    "_img": "img/cards/BP04/PL!-bp4-022-L.png",
+    "special_heart": {
+      "score": 1
+    }
   },
   "PL!-bp4-022-SECL": {
     "card_no": "PL!-bp4-022-SECL",
@@ -5431,7 +5453,6 @@
       "heart06": 3,
       "heart0": 9
     },
-    "special_heart": {},
     "ability": "{{live_start.png|ライブ開始時}}自分のセンターエリアに{{icon_blade.png|ブレード}}を9つ以上持つ『μ's』のメンバーがいる場合、このカードのスコアを＋２する。",
     "faq": [],
     "_img": "img/cards/PBLL02/PL!-bp4-022-SRL.png",
@@ -5440,7 +5461,10 @@
         "card_no": "PL!-bp4-022-SRL",
         "name": "No brand girls"
       }
-    ]
+    ],
+    "special_heart": {
+      "score": 1
+    }
   },
   "PL!-bp4-023-L": {
     "card_no": "PL!-bp4-023-L",
@@ -5571,7 +5595,6 @@
     "blade_heart": {
       "b_heart01": 1
     },
-    "special_heart": {},
     "rare": "L",
     "faq": [],
     "rare_list": [
@@ -5580,7 +5603,10 @@
         "name": "微熱からMystery"
       }
     ],
-    "_img": "img/cards/BP04/PL!-bp4-025-L.png"
+    "_img": "img/cards/BP04/PL!-bp4-025-L.png",
+    "special_heart": {
+      "draw": 1
+    }
   },
   "PL!-bp4-025-SRL": {
     "card_no": "PL!-bp4-025-SRL",
@@ -5600,7 +5626,6 @@
     "blade_heart": {
       "b_heart01": 1
     },
-    "special_heart": {},
     "faq": [],
     "_img": "img/cards/PBLL02/PL!-bp4-025-SRL.png",
     "rare_list": [
@@ -5608,7 +5633,10 @@
         "card_no": "PL!-bp4-025-SRL",
         "name": "微熱からMystery"
       }
-    ]
+    ],
+    "special_heart": {
+      "draw": 1
+    }
   },
   "PL!-bp4-026-L": {
     "card_no": "PL!-bp4-026-L",
@@ -5624,7 +5652,6 @@
       "heart06": 1,
       "heart0": 1
     },
-    "special_heart": {},
     "rare": "L",
     "faq": [],
     "rare_list": [
@@ -5633,7 +5660,10 @@
         "name": "ダイヤモンドプリンセスの憂鬱"
       }
     ],
-    "_img": "img/cards/BP04/PL!-bp4-026-L.png"
+    "_img": "img/cards/BP04/PL!-bp4-026-L.png",
+    "special_heart": {
+      "score": 1
+    }
   },
   "PL!-bp4-026-SRL": {
     "card_no": "PL!-bp4-026-SRL",
@@ -5650,7 +5680,6 @@
       "heart06": 1,
       "heart0": 1
     },
-    "special_heart": {},
     "faq": [],
     "_img": "img/cards/PBLL02/PL!-bp4-026-SRL.png",
     "rare_list": [
@@ -5658,7 +5687,10 @@
         "card_no": "PL!-bp4-026-SRL",
         "name": "ダイヤモンドプリンセスの憂鬱"
       }
-    ]
+    ],
+    "special_heart": {
+      "score": 1
+    }
   },
   "PL!-bp4-027-SECE": {
     "card_no": "PL!-bp4-027-SECE",
@@ -7918,7 +7950,6 @@
     "blade_heart": {
       "b_heart01": 1
     },
-    "special_heart": {},
     "rare": "L",
     "ability": "{{live_start.png|ライブ開始時}}自分の成功ライブカード置き場にあるカード1枚につき、このカードのスコアを＋２し、必要ハートを{{heart_01.png|heart01}}{{heart_03.png|heart03}}{{heart_06.png|heart06}}{{heart_00.png|heart0}}増やす。",
     "faq": [],
@@ -7928,7 +7959,10 @@
         "name": "A song for You! You? You!!"
       }
     ],
-    "_img": "img/cards/BP05/PL!-bp5-022-L.png"
+    "_img": "img/cards/BP05/PL!-bp5-022-L.png",
+    "special_heart": {
+      "draw": 1
+    }
   },
   "PL!-bp5-022-SRL": {
     "card_no": "PL!-bp5-022-SRL",
@@ -7948,7 +7982,6 @@
     "blade_heart": {
       "b_heart01": 1
     },
-    "special_heart": {},
     "ability": "{{live_start.png|ライブ開始時}}自分の成功ライブカード置き場にあるカード1枚につき、このカードのスコアを＋２し、必要ハートを{{heart_01.png|heart01}}{{heart_03.png|heart03}}{{heart_06.png|heart06}}{{heart_00.png|heart0}}増やす。",
     "faq": [],
     "_img": "img/cards/PBLL02/PL!-bp5-022-SRL.png",
@@ -7957,7 +7990,10 @@
         "card_no": "PL!-bp5-022-SRL",
         "name": "A song for You! You? You!!"
       }
-    ]
+    ],
+    "special_heart": {
+      "draw": 1
+    }
   },
   "PL!-bp5-023-L": {
     "card_no": "PL!-bp5-023-L",
@@ -12293,7 +12329,6 @@
     "blade_heart": {
       "b_heart03": 1
     },
-    "special_heart": {},
     "rare": "L",
     "ability": "{{live_start.png|ライブ開始時}}自分のステージにいる『Printemps』のメンバーをアクティブにする。これによりウェイト状態のメンバーが3人以上アクティブ状態になったとき、このカードのスコアを＋１する。",
     "faq": [
@@ -12326,7 +12361,10 @@
         "name": "WAO-WAO Powerful day!"
       }
     ],
-    "_img": "img/cards/PBLL/PL!-pb1-L-028-L.png"
+    "_img": "img/cards/PBLL/PL!-pb1-L-028-L.png",
+    "special_heart": {
+      "draw": 1
+    }
   },
   "PL!-pb1-028-SRL": {
     "card_no": "PL!-pb1-028-SRL",
@@ -12346,7 +12384,6 @@
     "blade_heart": {
       "b_heart03": 1
     },
-    "special_heart": {},
     "ability": "{{live_start.png|ライブ開始時}}自分のステージにいる『Printemps』のメンバーをアクティブにする。これによりウェイト状態のメンバーが3人以上アクティブ状態になったとき、このカードのスコアを＋１する。",
     "faq": [],
     "_img": "img/cards/PBLL02/PL!-pb1-028-SRL.png",
@@ -12355,7 +12392,10 @@
         "card_no": "PL!-pb1-028-SRL",
         "name": "WAO-WAO Powerful day!"
       }
-    ]
+    ],
+    "special_heart": {
+      "draw": 1
+    }
   },
   "PL!-pb1-029-L": {
     "card_no": "PL!-pb1-029-L",
@@ -12370,7 +12410,6 @@
       "heart01": 2,
       "heart06": 1
     },
-    "special_heart": {},
     "rare": "L",
     "ability": "{{live_start.png|ライブ開始時}}自分の成功ライブカード置き場のカードが0枚で、かつ自分のステージにいるメンバーが『lilywhite』のみの場合、このカードのスコアを＋１する。",
     "faq": [],
@@ -12380,7 +12419,10 @@
         "name": "知らないLove＊教えてLove"
       }
     ],
-    "_img": "img/cards/PBLL/PL!-pb1-L-029-L.png"
+    "_img": "img/cards/PBLL/PL!-pb1-L-029-L.png",
+    "special_heart": {
+      "score": 1
+    }
   },
   "PL!-pb1-029-SRL": {
     "card_no": "PL!-pb1-029-SRL",
@@ -12396,7 +12438,6 @@
       "heart01": 2,
       "heart06": 1
     },
-    "special_heart": {},
     "ability": "{{live_start.png|ライブ開始時}}自分の成功ライブカード置き場のカードが0枚で、かつ自分のステージにいるメンバーが『lily white』のみの場合、このカードのスコアを＋１する。",
     "faq": [],
     "_img": "img/cards/PBLL02/PL!-pb1-029-SRL.png",
@@ -12405,7 +12446,10 @@
         "card_no": "PL!-pb1-029-SRL",
         "name": "知らないLove＊教えてLove"
       }
-    ]
+    ],
+    "special_heart": {
+      "score": 1
+    }
   },
   "PL!-pb1-030-L": {
     "card_no": "PL!-pb1-030-L",
@@ -12424,7 +12468,6 @@
     "blade_heart": {
       "b_heart06": 1
     },
-    "special_heart": {},
     "rare": "L",
     "ability": "{{live_start.png|ライブ開始時}}相手のステージにウェイト状態のメンバーがいる場合、このカードを成功させるための必要ハートを{{heart_00.png|heart0}}{{heart_00.png|heart0}}減らす。\n{{live_success.png|ライブ成功時}}自分のステージに名前の異なる『BiBi』のメンバーが2人以上いる場合、自分の控え室から『BiBi』のメンバーカードを1枚手札に加える。",
     "faq": [
@@ -12610,7 +12653,10 @@
         "name": "Cutie Panther"
       }
     ],
-    "_img": "img/cards/PBLL/PL!-pb1-L-030-L.png"
+    "_img": "img/cards/PBLL/PL!-pb1-L-030-L.png",
+    "special_heart": {
+      "draw": 1
+    }
   },
   "PL!-pb1-030-SRL": {
     "card_no": "PL!-pb1-030-SRL",
@@ -12630,7 +12676,6 @@
     "blade_heart": {
       "b_heart06": 1
     },
-    "special_heart": {},
     "ability": "{{live_start.png|ライブ開始時}}相手のステージにウェイト状態のメンバーがいる場合、このカードを成功させるための必要ハートを{{heart_00.png|heart0}}{{heart_00.png|heart0}}減らす。\n{{live_success.png|ライブ成功時}}自分のステージに名前の異なる『BiBi』のメンバーが2人以上いる場合、自分の控え室から『BiBi』のメンバーカードを1枚手札に加える。",
     "faq": [],
     "_img": "img/cards/PBLL02/PL!-pb1-030-SRL.png",
@@ -12639,7 +12684,10 @@
         "card_no": "PL!-pb1-030-SRL",
         "name": "Cutie Panther"
       }
-    ]
+    ],
+    "special_heart": {
+      "draw": 1
+    }
   },
   "PL!-pb1-031-L": {
     "card_no": "PL!-pb1-031-L",
@@ -13152,7 +13200,6 @@
     "blade_heart": {
       "b_heart01": 1
     },
-    "special_heart": {},
     "rare": "L",
     "faq": [],
     "rare_list": [
@@ -13161,7 +13208,10 @@
         "name": "KiRa-KiRa Sensation!"
       }
     ],
-    "_img": "img/cards/PBLL/PL!-pb1-L-033-L.png"
+    "_img": "img/cards/PBLL/PL!-pb1-L-033-L.png",
+    "special_heart": {
+      "draw": 1
+    }
   },
   "PL!-pb1-033-SRL": {
     "card_no": "PL!-pb1-033-SRL",
@@ -13181,7 +13231,6 @@
     "blade_heart": {
       "b_heart01": 1
     },
-    "special_heart": {},
     "faq": [],
     "_img": "img/cards/PBLL02/PL!-pb1-033-SRL.png",
     "rare_list": [
@@ -13189,7 +13238,10 @@
         "card_no": "PL!-pb1-033-SRL",
         "name": "KiRa-KiRa Sensation!"
       }
-    ]
+    ],
+    "special_heart": {
+      "draw": 1
+    }
   },
   "PL!-pb1-034-PE": {
     "card_no": "PL!-pb1-034-PE",
@@ -15745,7 +15797,6 @@
     "blade_heart": {
       "b_heart03": 1
     },
-    "special_heart": {},
     "ability": "{{jyouji.png|常時}}このカードが自分のライブカード置き場か成功ライブカード置き場にあり、かつ自分のステージに2人の『μ's』のメンバーのみがいる場合、ライブの合計スコアを＋１する。この効果は重複しない。",
     "faq": [],
     "_img": "img/cards/PBLL02/PL!-pb2-038-L.png",
@@ -15754,7 +15805,10 @@
         "card_no": "PL!-pb2-038-L",
         "name": "嵐のなかの恋だから"
       }
-    ]
+    ],
+    "special_heart": {
+      "draw": 1
+    }
   },
   "PL!-pb2-039-L": {
     "card_no": "PL!-pb2-039-L",
@@ -15827,7 +15881,6 @@
       "heart06": 2,
       "heart0": 8
     },
-    "special_heart": {},
     "ability": "{{jyouji.png|常時}}このカードが自分の成功ライブカード置き場にあるかぎり、自分の『lily white』のカードの効果によって、自分の成功ライブカード置き場にあるカードの枚数を数えるとき、このカードは2枚として扱う。\n{{live_start.png|ライブ開始時}}自分の成功ライブカード置き場に『lily white』のカードが2枚以上ある場合、このカードのスコアを＋１する。",
     "faq": [],
     "_img": "img/cards/PBLL02/PL!-pb2-041-L.png",
@@ -15836,7 +15889,10 @@
         "card_no": "PL!-pb2-041-L",
         "name": "春情ロマンティック"
       }
-    ]
+    ],
+    "special_heart": {
+      "score": 1
+    }
   },
   "PL!-pb2-042-L": {
     "card_no": "PL!-pb2-042-L",
@@ -17268,7 +17324,6 @@
       "heart03": 1,
       "heart06": 1
     },
-    "special_heart": {},
     "ability": "{{live_success.png|ライブ成功時}}自分のデッキの上からカードを3枚見る。その中から好きな枚数を好きな順番でデッキの上に置き、残りを控え室に置く。",
     "faq": [],
     "_img": "img/cards/PBLL02/PL!-sd1-019-SRL.png",
@@ -17277,7 +17332,10 @@
         "card_no": "PL!-sd1-019-SRL",
         "name": "START:DASH!!"
       }
-    ]
+    ],
+    "special_heart": {
+      "score": 1
+    }
   },
   "PL!-sd1-020-SD": {
     "card_no": "PL!-sd1-020-SD",
@@ -17468,7 +17526,6 @@
     "blade_heart": {
       "b_heart03": 1
     },
-    "special_heart": {},
     "ability": "{{live_start.png|ライブ開始時}}自分の成功ライブカード置き場にあるカード1枚につき、このカードを成功させるための必要ハートは{{heart_00.png|heart0}}{{heart_00.png|heart0}}少なくなる。",
     "faq": [],
     "_img": "img/cards/PBLL02/PL!-sd1-022-SRL.png",
@@ -17477,7 +17534,10 @@
         "card_no": "PL!-sd1-022-SRL",
         "name": "僕らは今のなかで"
       }
-    ]
+    ],
+    "special_heart": {
+      "draw": 1
+    }
   },
   "PL!-sd1-023-P": {
     "card_no": "PL!-sd1-023-P",
@@ -20805,7 +20865,6 @@
     "need_heart": {
       "heart0": 4
     },
-    "special_heart": {},
     "rare": "SECL",
     "faq": [],
     "rare_list": [
@@ -20818,7 +20877,10 @@
         "name": "Dream Believers"
       }
     ],
-    "_img": "img/cards/BP05/PL!HS-bp1-019-SECL.png"
+    "_img": "img/cards/BP05/PL!HS-bp1-019-SECL.png",
+    "special_heart": {
+      "score": 1
+    }
   },
   "PL!HS-bp1-020-L": {
     "card_no": "PL!HS-bp1-020-L",
@@ -23785,7 +23847,6 @@
     "blade_heart": {
       "b_heart01": 1
     },
-    "special_heart": {},
     "rare": "L+",
     "ability": "{{live_start.png|ライブ開始時}}自分のステージの右サイドエリアに「大沢瑠璃乃」が、左サイドエリアに「安養寺姫芽」が、センターエリアに「藤島慈」がそれぞれ登場している場合、このカードのスコアを＋２する。",
     "faq": [],
@@ -23799,7 +23860,10 @@
         "name": "みらくりえーしょん"
       }
     ],
-    "_img": "img/cards/PBHS/PL!HS-bp2-026-L2.png"
+    "_img": "img/cards/PBHS/PL!HS-bp2-026-L2.png",
+    "special_heart": {
+      "draw": 1
+    }
   },
   "PL!HS-bp2-027-SECE": {
     "card_no": "PL!HS-bp2-027-SECE",
@@ -25864,7 +25928,6 @@
       "heart05": 2,
       "heart0": 1
     },
-    "special_heart": {},
     "rare": "L",
     "ability": "{{live_start.png|ライブ開始時}}自分のステージにコスト10以上の『蓮ノ空』のメンバーが2人以上いる場合、このカードのスコアを＋１する。",
     "faq": [],
@@ -25874,7 +25937,10 @@
         "name": "バアドケージ"
       }
     ],
-    "_img": "img/cards/BP05/PL!HS-bp5-020-L.png"
+    "_img": "img/cards/BP05/PL!HS-bp5-020-L.png",
+    "special_heart": {
+      "score": 1
+    }
   },
   "PL!HS-bp5-021-L": {
     "card_no": "PL!HS-bp5-021-L",
@@ -25921,7 +25987,6 @@
     "blade_heart": {
       "b_heart06": 1
     },
-    "special_heart": {},
     "rare": "L",
     "ability": "{{live_start.png|ライブ開始時}}{{icon_energy.png|E}}{{icon_energy.png|E}}支払ってもよい：自分のステージにコスト9以上の『EdelNote』のメンバーがいる場合、以下から1つを選ぶ。\n・自分の控え室からコスト4以下の『EdelNote』のメンバーカードを1枚、メンバーのいないエリアに登場させる。\n・このカードの必要ハートを{{heart_06.png|heart06}}減らす。",
     "faq": [],
@@ -25931,7 +25996,10 @@
         "name": "Retrofuture"
       }
     ],
-    "_img": "img/cards/BP05/PL!HS-bp5-022-L.png"
+    "_img": "img/cards/BP05/PL!HS-bp5-022-L.png",
+    "special_heart": {
+      "draw": 1
+    }
   },
   "PL!HS-bp5-E01-PE": {
     "card_no": "PL!HS-bp5-E01-PE",
@@ -28354,7 +28422,6 @@
     "blade_heart": {
       "b_heart01": 1
     },
-    "special_heart": {},
     "rare": "CL",
     "ability": "{{live_success.png|ライブ成功時}}{{icon_energy.png|E}}支払ってもよい：以下から1つを選ぶ。\n・自分の控え室からメンバーカードを1枚手札に加える。\n・自分のライブカード置き場にカードが2枚以上ある場合、自分の控え室から『蓮ノ空』のライブカードを1枚手札に加える。",
     "faq": [],
@@ -28364,7 +28431,10 @@
         "name": "ド！ド！ド！"
       }
     ],
-    "_img": "img/cards/CLHS01/PL!HS-cl1-011-CL.png"
+    "_img": "img/cards/CLHS01/PL!HS-cl1-011-CL.png",
+    "special_heart": {
+      "draw": 1
+    }
   },
   "PL!HS-cl1-012-CL": {
     "card_no": "PL!HS-cl1-012-CL",
@@ -29883,7 +29953,10 @@
         "name": "ユメワズライ"
       }
     ],
-    "_img": "img/cards/PBHS/PL!HS-pb1-027-L.png"
+    "_img": "img/cards/PBHS/PL!HS-pb1-027-L.png",
+    "special_heart": {
+      "score": 1
+    }
   },
   "PL!HS-pb1-028-L": {
     "card_no": "PL!HS-pb1-028-L",
@@ -29903,7 +29976,6 @@
     "blade_heart": {
       "b_heart05": 1
     },
-    "special_heart": {},
     "rare": "L",
     "ability": "{{live_start.png|ライブ開始時}}自分のステージにいるコスト10以上の『DOLLCHESTRA』のメンバー1人を選ぶ。そのメンバーの{{live_start.png|ライブ開始時}}能力1つを発動させてもよい。\n（{{live_start.png|ライブ開始時}}能力がコストを持つ場合、支払って発動させる。）",
     "faq": [],
@@ -29913,7 +29985,10 @@
         "name": "COMPASS"
       }
     ],
-    "_img": "img/cards/PBHS/PL!HS-pb1-028-L.png"
+    "_img": "img/cards/PBHS/PL!HS-pb1-028-L.png",
+    "special_heart": {
+      "draw": 1
+    }
   },
   "PL!HS-pb1-029-L": {
     "card_no": "PL!HS-pb1-029-L",
@@ -31250,7 +31325,6 @@
     "blade_heart": {
       "b_heart01": 1
     },
-    "special_heart": {},
     "rare": "SD",
     "faq": [],
     "rare_list": [
@@ -31259,7 +31333,10 @@
         "name": "アイドゥーミー！"
       }
     ],
-    "_img": "img/cards/HSSD01/PL!HS-sd1-019-SD.png"
+    "_img": "img/cards/HSSD01/PL!HS-sd1-019-SD.png",
+    "special_heart": {
+      "draw": 1
+    }
   },
   "PL!HS-sd1-020-SD": {
     "card_no": "PL!HS-sd1-020-SD",
@@ -31275,7 +31352,6 @@
       "heart05": 2,
       "heart0": 8
     },
-    "special_heart": {},
     "rare": "SD",
     "ability": "{{jyouji.png|常時}}すべての領域にあるこのカードは『スリーズブーケ』、『DOLLCHESTRA』、『みらくらぱーく！』として扱う。\n{{live_start.png|ライブ開始時}}手札の『蓮ノ空』のメンバーカードを3枚まで控え室に置いてもよい：ライブ終了時まで、自分のステージのメンバー1人は、これにより控え室に置いたカード1枚につき、{{icon_blade.png|ブレード}}を得る。",
     "faq": [],
@@ -31285,7 +31361,10 @@
         "name": "Link to the FUTURE（104期Ver.）"
       }
     ],
-    "_img": "img/cards/HSSD01/PL!HS-sd1-020-SD.png"
+    "_img": "img/cards/HSSD01/PL!HS-sd1-020-SD.png",
+    "special_heart": {
+      "score": 1
+    }
   },
   "PL!HS-sd1-021-P": {
     "card_no": "PL!HS-sd1-021-P",
@@ -38897,7 +38976,6 @@
     "blade_heart": {
       "b_heart02": 1
     },
-    "special_heart": {},
     "rare": "L",
     "ability": "{{live_start.png|ライブ開始時}}自分のステージにいるメンバー1人の下にあるエネルギーカードを、好きな枚数エネルギーデッキに置いてもよい。そうした場合、ライブ終了時まで、そのメンバーは、これによって置いたエネルギーカード1枚につき、［赤ハート］［赤ハート］［赤ハート］を得る。",
     "faq": [],
@@ -38907,7 +38985,10 @@
         "name": "Awakening Promise"
       }
     ],
-    "_img": "img/cards/BP03/PL!N-bp3-L-025-L.png"
+    "_img": "img/cards/BP03/PL!N-bp3-L-025-L.png",
+    "special_heart": {
+      "draw": 1
+    }
   },
   "PL!N-bp3-026-L": {
     "card_no": "PL!N-bp3-026-L",
@@ -39514,7 +39595,6 @@
     "blade_heart": {
       "b_heart04": 1
     },
-    "special_heart": {},
     "rare": "L",
     "ability": "{{live_success.png|ライブ成功時}}自分のステージにいるウェイト状態のメンバー1人につき、このカードのスコアを＋１する。",
     "faq": [
@@ -39700,7 +39780,10 @@
         "name": "MONSTER GIRLS"
       }
     ],
-    "_img": "img/cards/BP03/PL!N-bp3-L-031-L.png"
+    "_img": "img/cards/BP03/PL!N-bp3-L-031-L.png",
+    "special_heart": {
+      "draw": 1
+    }
   },
   "PL!N-bp3-032-L": {
     "card_no": "PL!N-bp3-032-L",
@@ -41464,7 +41547,6 @@
     "blade_heart": {
       "b_heart05": 1
     },
-    "special_heart": {},
     "rare": "L",
     "ability": "{{live_start.png|ライブ開始時}}ライブ終了時まで、エールによって公開される自分のカードが持つ[桃ブレード]、[赤ブレード]、[黄ブレード]、[緑ブレード]、[紫ブレード]、{{icon_b_all.png|ALLブレード}}は、すべて[青ブレード]になる。\n{{live_success.png|ライブ成功時}}エールにより公開された自分の『虹ヶ咲』のメンバーカードが持つハートの中に{{heart_01.png|heart01}}、{{heart_02.png|heart02}}、{{heart_03.png|heart03}}、{{heart_04.png|heart04}}、{{heart_05.png|heart05}}、{{heart_06.png|heart06}}がある場合、このカードのスコアを＋１する。",
     "faq": [
@@ -41494,7 +41576,10 @@
         "name": "VIVID WORLD"
       }
     ],
-    "_img": "img/cards/BP04/PL!N-bp4-025-L.png"
+    "_img": "img/cards/BP04/PL!N-bp4-025-L.png",
+    "special_heart": {
+      "draw": 1
+    }
   },
   "PL!N-bp4-026-L": {
     "card_no": "PL!N-bp4-026-L",
@@ -41512,7 +41597,6 @@
     "blade_heart": {
       "b_heart02": 1
     },
-    "special_heart": {},
     "rare": "L",
     "ability": "{{jidou.png|自動}}自分のメインフェイズにこのカードが控え室から手札に加えられたとき、自分の手札からカード名が「DIVE!」のライブカード1枚を表向きでライブカード置き場に置いてもよい。そうした場合、次のライブカードセットフェイズで自分がライブカード置き場に置けるカード枚数の上限が1枚減る。\n{{jidou.png|自動}}このカードが表向きでライブカード置き場に置かれたとき、ライブ終了時まで、自分のステージにいる『虹ヶ咲』のメンバー1人は、{{icon_blade.png|ブレード}}{{icon_blade.png|ブレード}}を得る。",
     "faq": [],
@@ -41522,7 +41606,10 @@
         "name": "DIVE!"
       }
     ],
-    "_img": "img/cards/BP04/PL!N-bp4-026-L.png"
+    "_img": "img/cards/BP04/PL!N-bp4-026-L.png",
+    "special_heart": {
+      "draw": 1
+    }
   },
   "PL!N-bp4-027-L": {
     "card_no": "PL!N-bp4-027-L",
@@ -41660,7 +41747,6 @@
       "heart06": 1,
       "heart0": 12
     },
-    "special_heart": {},
     "rare": "L",
     "ability": "{{live_start.png|ライブ開始時}}自分のステージのエリアすべてに『虹ヶ咲』のメンバーがいて、かつそれらのコストの合計が20以上の場合、カードを3枚引き、自分の手札を3枚好きな順番でデッキの上に置く。",
     "faq": [],
@@ -41670,7 +41756,10 @@
         "name": "NEO SKY, NEO MAP!"
       }
     ],
-    "_img": "img/cards/BP04/PL!N-bp4-031-L.png"
+    "_img": "img/cards/BP04/PL!N-bp4-031-L.png",
+    "special_heart": {
+      "score": 1
+    }
   },
   "PL!N-bp4-032-L": {
     "card_no": "PL!N-bp4-032-L",
@@ -44365,7 +44454,6 @@
     "blade_heart": {
       "b_heart05": 1
     },
-    "special_heart": {},
     "rare": "L",
     "ability": "{{live_start.png|ライブ開始時}}自分か相手の成功ライブカード置き場にカードが2枚以上あり、かつ自分のステージに名前の異なるメンバーが3人以上いる場合、このカードのスコアを＋１する。",
     "faq": [
@@ -44430,7 +44518,10 @@
         "name": "ミラクル STAY TUNE！"
       }
     ],
-    "_img": "img/cards/BP05/PL!N-bp5-027-L.png"
+    "_img": "img/cards/BP05/PL!N-bp5-027-L.png",
+    "special_heart": {
+      "draw": 1
+    }
   },
   "PL!N-bp5-028-L": {
     "card_no": "PL!N-bp5-028-L",
@@ -44444,7 +44535,6 @@
       "heart02": 2,
       "heart05": 1
     },
-    "special_heart": {},
     "rare": "L",
     "ability": "{{live_start.png|ライブ開始時}}自分のステージに{{heart_02.png|heart02}}を4つ以上持つメンバーがいる場合、このカードのスコアを＋２し、必要ハートは{{heart_02.png|heart02}}{{heart_02.png|heart02}}{{heart_02.png|heart02}}{{heart_02.png|heart02}}{{heart_02.png|heart02}}になる。",
     "faq": [],
@@ -44454,7 +44544,10 @@
         "name": "CHASE!"
       }
     ],
-    "_img": "img/cards/BP05/PL!N-bp5-028-L.png"
+    "_img": "img/cards/BP05/PL!N-bp5-028-L.png",
+    "special_heart": {
+      "score": 1
+    }
   },
   "PL!N-bp5-029-L": {
     "card_no": "PL!N-bp5-029-L",
@@ -44471,7 +44564,6 @@
       "heart06": 1,
       "heart0": 10
     },
-    "special_heart": {},
     "rare": "L",
     "ability": "{{live_start.png|ライブ開始時}}自分のステージに「中須かすみ」がいる場合、自分のデッキの上からカードを4枚公開する。自分はそれらの中から「中須かすみ」のカードを1枚選ぶ。ライブ終了時まで、自分のステージにいる「中須かすみ」1人は、これにより選んだカードが持つ色のハートを1つずつ得る。公開したカードをすべて控え室に置く。",
     "faq": [],
@@ -44481,7 +44573,10 @@
         "name": "無敵級*ビリーバー"
       }
     ],
-    "_img": "img/cards/BP05/PL!N-bp5-029-L.png"
+    "_img": "img/cards/BP05/PL!N-bp5-029-L.png",
+    "special_heart": {
+      "score": 1
+    }
   },
   "PL!N-bp5-030-L": {
     "card_no": "PL!N-bp5-030-L",
@@ -46903,7 +46998,6 @@
     "blade_heart": {
       "b_heart06": 1
     },
-    "special_heart": {},
     "rare": "L",
     "ability": "{{live_start.png|ライブ開始時}}手札を2枚まで控え室に置いてもよい：自分のステージにいる『虹ヶ咲』のメンバーを、これにより控え室に置いたカードの枚数に等しい数まで選ぶ。ライブ終了時まで、それらは{{icon_blade.png|ブレード}}を得る。\n{{live_success.png|ライブ成功時}}エールにより公開された自分のカードの中に、ブレードハートを持たないメンバーカードが2枚以上ある場合、このカードのスコアを＋１する。",
     "faq": [
@@ -46933,7 +47027,10 @@
         "name": "Just Believe!!!"
       }
     ],
-    "_img": "img/cards/BP07/PL!N-bp7-026-L.png"
+    "_img": "img/cards/BP07/PL!N-bp7-026-L.png",
+    "special_heart": {
+      "draw": 1
+    }
   },
   "PL!N-bp7-026-SECL": {
     "card_no": "PL!N-bp7-026-SECL",
@@ -46952,7 +47049,6 @@
     "blade_heart": {
       "b_heart06": 1
     },
-    "special_heart": {},
     "rare": "SECL",
     "ability": "{{live_start.png|ライブ開始時}}手札を2枚まで控え室に置いてもよい：自分のステージにいる『虹ヶ咲』のメンバーを、これにより控え室に置いたカードの枚数に等しい数まで選ぶ。ライブ終了時まで、それらは{{icon_blade.png|ブレード}}を得る。\n{{live_success.png|ライブ成功時}}エールにより公開された自分のカードの中に、ブレードハートを持たないメンバーカードが2枚以上ある場合、このカードのスコアを＋１する。",
     "faq": [
@@ -46982,7 +47078,10 @@
         "name": "Just Believe!!!"
       }
     ],
-    "_img": "img/cards/BP07/PL!N-bp7-026-SECL.png"
+    "_img": "img/cards/BP07/PL!N-bp7-026-SECL.png",
+    "special_heart": {
+      "draw": 1
+    }
   },
   "PL!N-bp7-027-L": {
     "card_no": "PL!N-bp7-027-L",
@@ -47025,7 +47124,6 @@
       "heart06": 5,
       "heart0": 4
     },
-    "special_heart": {},
     "rare": "L",
     "ability": "{{live_start.png|ライブ開始時}}自分の控え室に『虹ヶ咲』のライブカードと、ブレードハートを持たない『虹ヶ咲』のメンバーカードがある場合、自分の控え室にあるすべてのカードをシャッフルし、デッキの下に置いてもよい。そうしたとき、ライブ終了時まで、自分のステージにいるすべての『虹ヶ咲』のメンバーは{{heart_01.png|heart01}}を得る。",
     "faq": [],
@@ -47035,7 +47133,10 @@
         "name": "Cooking with Love"
       }
     ],
-    "_img": "img/cards/BP07/PL!N-bp7-028-L.png"
+    "_img": "img/cards/BP07/PL!N-bp7-028-L.png",
+    "special_heart": {
+      "score": 1
+    }
   },
   "PL!N-bp7-029-L": {
     "card_no": "PL!N-bp7-029-L",
@@ -47118,7 +47219,6 @@
     "blade_heart": {
       "b_heart03": 1
     },
-    "special_heart": {},
     "rare": "L",
     "ability": "{{live_success.png|ライブ成功時}}自分のデッキの上からカードを3枚控え室に置く。\n{{jidou.png|自動}}{{turn1.png|ターン1回}}自分の{{live_success.png|ライブ成功時}}能力によって、カードが自分のデッキから自分の控え室に置かれるたび、それらのカードの中から『虹ヶ咲』のライブカードを1枚手札に加えてもよい。そうしたとき、このカードのスコアを＋１する。",
     "faq": [],
@@ -47128,7 +47228,10 @@
         "name": "Like a Treasure"
       }
     ],
-    "_img": "img/cards/BP07/PL!N-bp7-031-L.png"
+    "_img": "img/cards/BP07/PL!N-bp7-031-L.png",
+    "special_heart": {
+      "draw": 1
+    }
   },
   "PL!N-bp7-E01-SECE": {
     "card_no": "PL!N-bp7-E01-SECE",
@@ -49785,7 +49888,6 @@
     "blade_heart": {
       "b_heart04": 1
     },
-    "special_heart": {},
     "rare": "L",
     "ability": "{{live_start.png|ライブ開始時}}このターン、自分の『虹ヶ咲』のカードの効果によってウェイト状態の自分のエネルギーをアクティブにしていた場合、このカードのスコアを＋１する。さらに、自分の『虹ヶ咲』のカードの効果によって自分のステージにいるウェイト状態のメンバーもアクティブにしていた場合、代わりにスコアを＋２する。",
     "faq": [
@@ -49807,7 +49909,10 @@
         "name": "Cara Tesoro"
       }
     ],
-    "_img": "img/cards/PBnj/PL!N-pb1-037-L.png"
+    "_img": "img/cards/PBnj/PL!N-pb1-037-L.png",
+    "special_heart": {
+      "draw": 1
+    }
   },
   "PL!N-pb1-038-L": {
     "card_no": "PL!N-pb1-038-L",
@@ -49853,7 +49958,6 @@
     "blade_heart": {
       "b_heart01": 1
     },
-    "special_heart": {},
     "rare": "L",
     "ability": "{{live_start.png|ライブ開始時}}自分の成功ライブカード置き場かライブ中のライブカードの中に、必要ハートに含まれる{{heart_01.png|heart01}}が3の『虹ヶ咲』のライブカードがある場合、ライブ終了時まで、自分のステージにいる{{heart_06.png|heart06}}を持つ『虹ヶ咲』のメンバー1人は{{heart_06.png|heart06}}{{heart_06.png|heart06}}{{heart_06.png|heart06}}{{heart_06.png|heart06}}を得る。",
     "faq": [],
@@ -49863,7 +49967,10 @@
         "name": "Stellar Stream"
       }
     ],
-    "_img": "img/cards/PBnj/PL!N-pb1-039-L.png"
+    "_img": "img/cards/PBnj/PL!N-pb1-039-L.png",
+    "special_heart": {
+      "draw": 1
+    }
   },
   "PL!N-pb1-040-L": {
     "card_no": "PL!N-pb1-040-L",
@@ -49878,7 +49985,6 @@
       "heart05": 1,
       "heart0": 1
     },
-    "special_heart": {},
     "rare": "L",
     "faq": [],
     "rare_list": [
@@ -49887,7 +49993,10 @@
         "name": "どこにいても君は君"
       }
     ],
-    "_img": "img/cards/PBnj/PL!N-pb1-040-L.png"
+    "_img": "img/cards/PBnj/PL!N-pb1-040-L.png",
+    "special_heart": {
+      "score": 1
+    }
   },
   "PL!N-pb1-041-L": {
     "card_no": "PL!N-pb1-041-L",
@@ -61936,7 +62045,6 @@
       "heart04": 1,
       "heart05": 1
     },
-    "special_heart": {},
     "rare": "L",
     "ability": "{{jidou.png|自動}}［ターン1回］エールにより自分のカードを1枚以上公開したとき、それらのカードの中にブレードハートを持つカードが2枚以下の場合、それらのカードをすべて控え室に置いてもよい。そのエールで得たブレードハートを失い、もう一度エールを行う。",
     "faq": [
@@ -61958,7 +62066,10 @@
         "name": "ダイスキだったらダイジョウブ！"
       }
     ],
-    "_img": "img/cards/BP03/PL!S-bp3-L-020-L.png"
+    "_img": "img/cards/BP03/PL!S-bp3-L-020-L.png",
+    "special_heart": {
+      "score": 1
+    }
   },
   "PL!S-bp3-021-L": {
     "card_no": "PL!S-bp3-021-L",
@@ -62004,7 +62115,6 @@
     "blade_heart": {
       "b_heart05": 1
     },
-    "special_heart": {},
     "rare": "L",
     "faq": [],
     "rare_list": [
@@ -62013,7 +62123,10 @@
         "name": "Fantastic Departure!"
       }
     ],
-    "_img": "img/cards/BP03/PL!S-bp3-L-022-L.png"
+    "_img": "img/cards/BP03/PL!S-bp3-L-022-L.png",
+    "special_heart": {
+      "draw": 1
+    }
   },
   "PL!S-bp3-023-L": {
     "card_no": "PL!S-bp3-023-L",
@@ -62084,7 +62197,6 @@
     "blade_heart": {
       "b_heart02": 1
     },
-    "special_heart": {},
     "rare": "L",
     "ability": "{{live_start.png|ライブ開始時}}自分のステージにいる『Aqours』のメンバー1人を選ぶ。そのメンバーが持つ{{icon_blade.png|ブレード}}が6つ以上の場合、このカードのスコアを＋１する。",
     "faq": [],
@@ -62094,7 +62206,10 @@
         "name": "SUKI for you, DREAM for you!"
       }
     ],
-    "_img": "img/cards/BP03/PL!S-bp3-L-025-L.png"
+    "_img": "img/cards/BP03/PL!S-bp3-L-025-L.png",
+    "special_heart": {
+      "draw": 1
+    }
   },
   "PL!S-bp3-026-SECE": {
     "card_no": "PL!S-bp3-026-SECE",
@@ -63765,7 +63880,6 @@
     "blade_heart": {
       "b_heart05": 1
     },
-    "special_heart": {},
     "rare": "L",
     "ability": "{{live_success.png|ライブ成功時}}自分か相手の成功ライブカード置き場にカードが2枚以上ある場合、エールにより公開された自分のカードの中から、メンバーカードを2枚まで手札に加える。",
     "faq": [],
@@ -63775,7 +63889,10 @@
         "name": "not ALONE not HITORI"
       }
     ],
-    "_img": "img/cards/BP05/PL!S-bp5-019-L.png"
+    "_img": "img/cards/BP05/PL!S-bp5-019-L.png",
+    "special_heart": {
+      "draw": 1
+    }
   },
   "PL!S-bp5-020-L": {
     "card_no": "PL!S-bp5-020-L",
@@ -63908,7 +64025,6 @@
       "heart06": 2,
       "heart0": 5
     },
-    "special_heart": {},
     "rare": "L",
     "ability": "{{live_start.png|ライブ開始時}}自分のステージに『Aqours』のメンバーと『SaintSnow』のメンバーがいて、かつそれらのメンバーのコストが合計20以上の場合、自分の控え室にある『Aqours』と『SaintSnow』のライブカードを4枚まで好きな順番でデッキの上に置いてもよい。",
     "faq": [],
@@ -63918,7 +64034,10 @@
         "name": "Awaken the power"
       }
     ],
-    "_img": "img/cards/BP05/PL!S-bp5-023-L.png"
+    "_img": "img/cards/BP05/PL!S-bp5-023-L.png",
+    "special_heart": {
+      "score": 1
+    }
   },
   "PL!S-bp5-111-P＋": {
     "card_no": "PL!S-bp5-111-P＋",
@@ -67323,7 +67442,6 @@
     "blade_heart": {
       "b_heart05": 1
     },
-    "special_heart": {},
     "rare": "L",
     "ability": "{{live_start.png|ライブ開始時}}自分のステージにメンバーが3人以上いる場合、自分のデッキの下からカードを5枚控え室に置く。それらの中にメンバーカードが3枚以上ある場合、カードを1枚引く。それらがすべてメンバーカードの場合、さらにこのカードのスコアを＋１する。",
     "faq": [],
@@ -67333,7 +67451,10 @@
         "name": "僕らの旅は終わらない"
       }
     ],
-    "_img": "img/cards/BP07/PL!S-bp7-021-L.png"
+    "_img": "img/cards/BP07/PL!S-bp7-021-L.png",
+    "special_heart": {
+      "draw": 1
+    }
   },
   "PL!S-bp7-022-L": {
     "card_no": "PL!S-bp7-022-L",
@@ -73003,7 +73124,6 @@
       "heart04": 1,
       "heart05": 1
     },
-    "special_heart": {},
     "rare": "SD",
     "ability": "{{live_success.png|ライブ成功時}}エールにより公開された自分のカードの中から、『Aqours』のライブカードを1枚手札に加える。",
     "faq": [],
@@ -73013,7 +73133,10 @@
         "name": "未来の僕らは知ってるよ"
       }
     ],
-    "_img": "img/cards/SSD01/PL!S-sd1-019-SD.png"
+    "_img": "img/cards/SSD01/PL!S-sd1-019-SD.png",
+    "special_heart": {
+      "score": 1
+    }
   },
   "PL!S-sd1-020-SD": {
     "card_no": "PL!S-sd1-020-SD",
@@ -73060,7 +73183,6 @@
     "blade_heart": {
       "b_heart05": 1
     },
-    "special_heart": {},
     "rare": "SD",
     "faq": [],
     "rare_list": [
@@ -73069,7 +73191,10 @@
         "name": "永久hours"
       }
     ],
-    "_img": "img/cards/SSD01/PL!S-sd1-021-SD.png"
+    "_img": "img/cards/SSD01/PL!S-sd1-021-SD.png",
+    "special_heart": {
+      "draw": 1
+    }
   },
   "PL!S-sd1-022-SD": {
     "card_no": "PL!S-sd1-022-SD",
@@ -73085,7 +73210,6 @@
       "heart05": 2,
       "heart0": 9
     },
-    "special_heart": {},
     "rare": "SD",
     "ability": "{{live_start.png|ライブ開始時}}ライブ終了時まで、自分のステージにいる『Aqours』のメンバーは{{icon_blade.png|ブレード}}を得る。",
     "faq": [],
@@ -73095,7 +73219,10 @@
         "name": "Jump up HIGH!!"
       }
     ],
-    "_img": "img/cards/SSD01/PL!S-sd1-022-SD.png"
+    "_img": "img/cards/SSD01/PL!S-sd1-022-SD.png",
+    "special_heart": {
+      "score": 1
+    }
   },
   "PL!S-sd1-023-P": {
     "card_no": "PL!S-sd1-023-P",
@@ -76654,7 +76781,6 @@
       "heart06": 1,
       "heart0": 1
     },
-    "special_heart": {},
     "rare": "SRL",
     "ability": "{{live_success.png|ライブ成功時}}ライブの合計スコアが相手より高い場合、自分のエネルギーデッキから、エネルギーカードを1枚ウェイト状態で置く。",
     "faq": [],
@@ -76668,7 +76794,10 @@
         "name": "START!! True dreams"
       }
     ],
-    "_img": "img/cards/PBSP02/PL!SP-bp1-023-SRL.png"
+    "_img": "img/cards/PBSP02/PL!SP-bp1-023-SRL.png",
+    "special_heart": {
+      "score": 1
+    }
   },
   "PL!SP-bp1-024-L": {
     "card_no": "PL!SP-bp1-024-L",
@@ -77286,7 +77415,6 @@
     "blade_heart": {
       "b_heart03": 1
     },
-    "special_heart": {},
     "rare": "SRL",
     "ability": "{{live_start.png|ライブ開始時}}自分のエネルギーが12枚以上ある場合、このカードのスコアを＋１する。",
     "faq": [],
@@ -77300,7 +77428,10 @@
         "name": "Sing！Shine！Smile！"
       }
     ],
-    "_img": "img/cards/PBSP02/PL!SP-bp1-027-SRL.png"
+    "_img": "img/cards/PBSP02/PL!SP-bp1-027-SRL.png",
+    "special_heart": {
+      "draw": 1
+    }
   },
   "PL!SP-bp1-028-SECE": {
     "card_no": "PL!SP-bp1-028-SECE",
@@ -81190,7 +81321,6 @@
       "heart06": 1,
       "heart0": 1
     },
-    "special_heart": {},
     "rare": "SRL",
     "ability": "{{live_start.png|ライブ開始時}}自分の成功ライブカード置き場のカード枚数が相手より少ない場合、このカードのスコアを＋１する。",
     "faq": [],
@@ -81204,7 +81334,10 @@
         "name": "Go!! リスタート"
       }
     ],
-    "_img": "img/cards/PBSP02/PL!SP-bp2-023-SRL.png"
+    "_img": "img/cards/PBSP02/PL!SP-bp2-023-SRL.png",
+    "special_heart": {
+      "score": 1
+    }
   },
   "PL!SP-bp2-024-L": {
     "card_no": "PL!SP-bp2-024-L",
@@ -81499,7 +81632,6 @@
     "blade_heart": {
       "b_heart03": 1
     },
-    "special_heart": {},
     "rare": "SRL",
     "ability": "{{live_success.png|ライブ成功時}}自分の手札の枚数が相手より多い場合、このカードのスコアを＋１する。",
     "faq": [],
@@ -81517,7 +81649,10 @@
         "name": "ビタミンSUMMER!"
       }
     ],
-    "_img": "img/cards/PBSP02/PL!SP-bp2-024-SRL.png"
+    "_img": "img/cards/PBSP02/PL!SP-bp2-024-SRL.png",
+    "special_heart": {
+      "draw": 1
+    }
   },
   "PL!SP-bp2-025-L": {
     "card_no": "PL!SP-bp2-025-L",
@@ -81864,7 +81999,6 @@
     "blade_heart": {
       "b_heart02": 1
     },
-    "special_heart": {},
     "rare": "SRL",
     "faq": [],
     "rare_list": [
@@ -81877,7 +82011,10 @@
         "name": "UNIVERSE!!"
       }
     ],
-    "_img": "img/cards/PBSP02/PL!SP-bp2-027-SRL.png"
+    "_img": "img/cards/PBSP02/PL!SP-bp2-027-SRL.png",
+    "special_heart": {
+      "draw": 1
+    }
   },
   "PL!SP-bp2-028-SECE": {
     "card_no": "PL!SP-bp2-028-SECE",
@@ -83575,7 +83712,6 @@
       "heart06": 11,
       "heart0": 8
     },
-    "special_heart": {},
     "rare": "L",
     "ability": "{{live_start.png|ライブ開始時}}ライブ終了時まで、自分のステージにいる、「澁谷かのん」「ウィーン・マルガレーテ」「鬼塚冬毬」のうちのメンバー1人と、これにより選んだメンバー以外の『Liella!』のメンバー1人は、{{icon_blade.png|ブレード}}を得る。\n{{live_start.png|ライブ開始時}}ライブ終了時まで、エールによって公開される自分のカードが持つ[桃ブレード]、[赤ブレード]、[黄ブレード]、[緑ブレード]、[青ブレード]、{{icon_b_all.png|ALLブレード}}は、すべて[紫ブレード]になる。",
     "faq": [
@@ -83620,7 +83756,10 @@
         "name": "Dazzling Game"
       }
     ],
-    "_img": "img/cards/BP04/PL!SP-bp4-023-L.png"
+    "_img": "img/cards/BP04/PL!SP-bp4-023-L.png",
+    "special_heart": {
+      "score": 1
+    }
   },
   "PL!SP-bp4-023-SRL": {
     "card_no": "PL!SP-bp4-023-SRL",
@@ -83634,7 +83773,6 @@
       "heart06": 11,
       "heart0": 8
     },
-    "special_heart": {},
     "rare": "SRL",
     "ability": "{{live_start.png|ライブ開始時}}ライブ終了時まで、自分のステージにいる、「澁谷かのん」「ウィーン・マルガレーテ」「鬼塚冬毬」のうちのメンバー1人と、これにより選んだメンバー以外の『Liella!』のメンバー1人は、{{icon_blade.png|ブレード}}を得る。\n{{live_start.png|ライブ開始時}}ライブ終了時まで、エールによって公開される自分のカードが持つ[桃ブレード]、[赤ブレード]、[黄ブレード]、[緑ブレード]、[青ブレード]、{{icon_b_all.png|ALLブレード}}は、すべて[紫ブレード]になる。",
     "faq": [],
@@ -83648,7 +83786,10 @@
         "name": "Dazzling Game"
       }
     ],
-    "_img": "img/cards/PBSP02/PL!SP-bp4-023-SRL.png"
+    "_img": "img/cards/PBSP02/PL!SP-bp4-023-SRL.png",
+    "special_heart": {
+      "score": 1
+    }
   },
   "PL!SP-bp4-024-L": {
     "card_no": "PL!SP-bp4-024-L",
@@ -83666,7 +83807,6 @@
     "blade_heart": {
       "b_heart03": 1
     },
-    "special_heart": {},
     "rare": "L",
     "ability": "{{live_start.png|ライブ開始時}}自分のセンターエリアにいる『Liella!』のメンバーのコストが、相手のセンターエリアにいるメンバーより高い場合、このカードのスコアを＋１する。\n{{live_start.png|ライブ開始時}}自分のステージの左サイドエリアにいる『Liella!』のメンバーが{{heart_02.png|heart02}}を3つ以上持つ場合、そのメンバーは、ライブ終了時まで、{{icon_blade.png|ブレード}}{{icon_blade.png|ブレード}}を得る。",
     "faq": [],
@@ -83684,7 +83824,10 @@
         "name": "ノンフィクション!!"
       }
     ],
-    "_img": "img/cards/BP04/PL!SP-bp4-024-L.png"
+    "_img": "img/cards/BP04/PL!SP-bp4-024-L.png",
+    "special_heart": {
+      "draw": 1
+    }
   },
   "PL!SP-bp4-024-SECL": {
     "card_no": "PL!SP-bp4-024-SECL",
@@ -83702,7 +83845,6 @@
     "blade_heart": {
       "b_heart03": 1
     },
-    "special_heart": {},
     "rare": "L",
     "ability": "{{live_start.png|ライブ開始時}}自分のセンターエリアにいる『Liella!』のメンバーのコストが、相手のセンターエリアにいるメンバーより高い場合、このカードのスコアを＋１する。\n{{live_start.png|ライブ開始時}}自分のステージの左サイドエリアにいる『Liella!』のメンバーが{{heart_02.png|heart02}}を3つ以上持つ場合、そのメンバーは、ライブ終了時まで、{{icon_blade.png|ブレード}}{{icon_blade.png|ブレード}}を得る。",
     "faq": [],
@@ -83720,7 +83862,10 @@
         "name": "ノンフィクション!!"
       }
     ],
-    "_img": "img/cards/PBSP02/PL!SP-bp4-024-SECL.png"
+    "_img": "img/cards/PBSP02/PL!SP-bp4-024-SECL.png",
+    "special_heart": {
+      "draw": 1
+    }
   },
   "PL!SP-bp4-024-SRL": {
     "card_no": "PL!SP-bp4-024-SRL",
@@ -83738,7 +83883,6 @@
     "blade_heart": {
       "b_heart03": 1
     },
-    "special_heart": {},
     "rare": "SRL",
     "ability": "{{live_start.png|ライブ開始時}}自分のセンターエリアにいる『Liella!』のメンバーのコストが、相手のセンターエリアにいるメンバーより高い場合、このカードのスコアを＋１する。\n{{live_start.png|ライブ開始時}}自分のステージの左サイドエリアにいる『Liella!』のメンバーが{{heart_02.png|heart02}}を3つ以上持つ場合、そのメンバーは、ライブ終了時まで、{{icon_blade.png|ブレード}}{{icon_blade.png|ブレード}}を得る。",
     "faq": [],
@@ -83756,7 +83900,10 @@
         "name": "ノンフィクション!!"
       }
     ],
-    "_img": "img/cards/PBSP02/PL!SP-bp4-024-SRL.png"
+    "_img": "img/cards/PBSP02/PL!SP-bp4-024-SRL.png",
+    "special_heart": {
+      "draw": 1
+    }
   },
   "PL!SP-bp4-025-L": {
     "card_no": "PL!SP-bp4-025-L",
@@ -83968,7 +84115,6 @@
     "blade_heart": {
       "b_heart02": 1
     },
-    "special_heart": {},
     "rare": "L",
     "ability": "{{live_start.png|ライブ開始時}}アクティブ状態の自分のエネルギーがある場合、このカードのスコアを＋１する。",
     "faq": [],
@@ -83982,7 +84128,10 @@
         "name": "DAISUKI FULL POWER"
       }
     ],
-    "_img": "img/cards/BP04/PL!SP-bp4-028-L.png"
+    "_img": "img/cards/BP04/PL!SP-bp4-028-L.png",
+    "special_heart": {
+      "draw": 1
+    }
   },
   "PL!SP-bp4-028-SRL": {
     "card_no": "PL!SP-bp4-028-SRL",
@@ -84000,7 +84149,6 @@
     "blade_heart": {
       "b_heart02": 1
     },
-    "special_heart": {},
     "rare": "SRL",
     "ability": "{{live_start.png|ライブ開始時}}アクティブ状態の自分のエネルギーがある場合、このカードのスコアを＋１する。",
     "faq": [],
@@ -84014,7 +84162,10 @@
         "name": "DAISUKI FULL POWER"
       }
     ],
-    "_img": "img/cards/PBSP02/PL!SP-bp4-028-SRL.png"
+    "_img": "img/cards/PBSP02/PL!SP-bp4-028-SRL.png",
+    "special_heart": {
+      "draw": 1
+    }
   },
   "PL!SP-bp4-029-L": {
     "card_no": "PL!SP-bp4-029-L",
@@ -84032,7 +84183,6 @@
     "blade_heart": {
       "b_heart06": 1
     },
-    "special_heart": {},
     "rare": "L",
     "faq": [],
     "rare_list": [
@@ -84045,7 +84195,10 @@
         "name": "追いかける夢の先で"
       }
     ],
-    "_img": "img/cards/BP04/PL!SP-bp4-029-L.png"
+    "_img": "img/cards/BP04/PL!SP-bp4-029-L.png",
+    "special_heart": {
+      "draw": 1
+    }
   },
   "PL!SP-bp4-029-SRL": {
     "card_no": "PL!SP-bp4-029-SRL",
@@ -84063,7 +84216,6 @@
     "blade_heart": {
       "b_heart06": 1
     },
-    "special_heart": {},
     "rare": "SRL",
     "faq": [],
     "rare_list": [
@@ -84076,7 +84228,10 @@
         "name": "追いかける夢の先で"
       }
     ],
-    "_img": "img/cards/PBSP02/PL!SP-bp4-029-SRL.png"
+    "_img": "img/cards/PBSP02/PL!SP-bp4-029-SRL.png",
+    "special_heart": {
+      "draw": 1
+    }
   },
   "PL!SP-bp4-030-L": {
     "card_no": "PL!SP-bp4-030-L",
@@ -86747,7 +86902,6 @@
     "blade_heart": {
       "b_heart06": 1
     },
-    "special_heart": {},
     "rare": "L",
     "ability": "{{live_success.png|ライブ成功時}}自分か相手の成功ライブカード置き場にカードが2枚以上あり、かつエールにより公開された自分のカードの中に{{icon_score.png|スコア}}を持つライブカードが1枚以上ある場合、このカードのスコアを＋２する。",
     "faq": [],
@@ -86757,7 +86911,10 @@
         "name": "Shooting Voice!!"
       }
     ],
-    "_img": "img/cards/BP05/PL!SP-bp5-023-L.png"
+    "_img": "img/cards/BP05/PL!SP-bp5-023-L.png",
+    "special_heart": {
+      "draw": 1
+    }
   },
   "PL!SP-bp5-024-L": {
     "card_no": "PL!SP-bp5-024-L",
@@ -86773,7 +86930,6 @@
       "heart06": 4,
       "heart0": 5
     },
-    "special_heart": {},
     "rare": "L",
     "ability": "{{live_start.png|ライブ開始時}}{{heart_01.png|heart01}}か{{heart_02.png|heart02}}か{{heart_06.png|heart06}}のうち、1つを選ぶ。ライブ終了時まで、自分のステージにいる、このターン中にエリアを移動しているすべてのメンバーは、選んだハートを1つ得る。",
     "faq": [],
@@ -86783,7 +86939,10 @@
         "name": "MIRACLE NEW STORY"
       }
     ],
-    "_img": "img/cards/BP05/PL!SP-bp5-024-L.png"
+    "_img": "img/cards/BP05/PL!SP-bp5-024-L.png",
+    "special_heart": {
+      "score": 1
+    }
   },
   "PL!SP-bp5-025-L": {
     "card_no": "PL!SP-bp5-025-L",
@@ -86802,7 +86961,6 @@
     "blade_heart": {
       "b_heart02": 1
     },
-    "special_heart": {},
     "rare": "L",
     "ability": "{{live_success.png|ライブ成功時}}{{icon_energy.png|E}}を好きな数支払ってもよい：これにより支払った{{icon_energy.png|E}}4つにつき、このカードのスコアを＋１する。",
     "faq": [],
@@ -86812,7 +86970,10 @@
         "name": "常夏☆サンシャイン"
       }
     ],
-    "_img": "img/cards/BP05/PL!SP-bp5-025-L.png"
+    "_img": "img/cards/BP05/PL!SP-bp5-025-L.png",
+    "special_heart": {
+      "draw": 1
+    }
   },
   "PL!SP-bp5-026-L": {
     "card_no": "PL!SP-bp5-026-L",
@@ -86827,7 +86988,6 @@
       "heart03": 1,
       "heart06": 1
     },
-    "special_heart": {},
     "rare": "L",
     "ability": "{{live_start.png|ライブ開始時}}自分のステージにいる『Liella!』のメンバーが持つハートの総数が11以上の場合、このカードのスコアを＋１する。",
     "faq": [],
@@ -86837,7 +86997,10 @@
         "name": "Let's be ONE"
       }
     ],
-    "_img": "img/cards/BP05/PL!SP-bp5-026-L.png"
+    "_img": "img/cards/BP05/PL!SP-bp5-026-L.png",
+    "special_heart": {
+      "score": 1
+    }
   },
   "PL!SP-bp5-027-L": {
     "card_no": "PL!SP-bp5-027-L",
@@ -88972,7 +89135,6 @@
     "blade_heart": {
       "b_heart02": 1
     },
-    "special_heart": {},
     "rare": "L",
     "ability": "{{live_start.png|ライブ開始時}}エネルギー置き場にあるエネルギー1枚をエネルギーデッキに置いてもよい：自分のエネルギーが相手より多い場合、このカードのスコアを＋１する。\n{{live_success.png|ライブ成功時}}自分のエネルギーデッキから、エネルギーカードを1枚ウェイト状態で置く。そのエネルギーカードは、次のターンのアクティブフェイズにアクティブしない。",
     "faq": [],
@@ -88982,7 +89144,10 @@
         "name": "What a Wonderful Dream!!"
       }
     ],
-    "_img": "img/cards/BP07/PL!SP-bp7-027-L.png"
+    "_img": "img/cards/BP07/PL!SP-bp7-027-L.png",
+    "special_heart": {
+      "draw": 1
+    }
   },
   "PL!SP-bp7-028-L": {
     "card_no": "PL!SP-bp7-028-L",
@@ -91938,7 +92103,6 @@
     "blade_heart": {
       "b_heart06": 1
     },
-    "special_heart": {},
     "rare": "L",
     "ability": "{{live_start.png|ライブ開始時}}自分のステージに名前の異なる『KALEIDOSCORE』のメンバーが2人以上いる場合、このカードのスコアを＋１する。",
     "faq": [],
@@ -91952,7 +92116,10 @@
         "name": "ニュートラル"
       }
     ],
-    "_img": "img/cards/PBSP/PL!SP-pb1-024-L.png"
+    "_img": "img/cards/PBSP/PL!SP-pb1-024-L.png",
+    "special_heart": {
+      "draw": 1
+    }
   },
   "PL!SP-pb1-024-SRL": {
     "card_no": "PL!SP-pb1-024-SRL",
@@ -91970,7 +92137,6 @@
     "blade_heart": {
       "b_heart06": 1
     },
-    "special_heart": {},
     "rare": "SRL",
     "ability": "{{live_start.png|ライブ開始時}}自分のステージに名前の異なる『KALEIDOSCORE』のメンバーが2人以上いる場合、このカードのスコアを＋１する。",
     "faq": [],
@@ -91984,7 +92150,10 @@
         "name": "ニュートラル"
       }
     ],
-    "_img": "img/cards/PBSP02/PL!SP-pb1-024-SRL.png"
+    "_img": "img/cards/PBSP02/PL!SP-pb1-024-SRL.png",
+    "special_heart": {
+      "draw": 1
+    }
   },
   "PL!SP-pb1-025-L": {
     "card_no": "PL!SP-pb1-025-L",
@@ -92133,7 +92302,6 @@
     "blade_heart": {
       "b_heart06": 1
     },
-    "special_heart": {},
     "rare": "L",
     "faq": [],
     "rare_list": [
@@ -92150,7 +92318,10 @@
         "name": "Jump Into the New World"
       }
     ],
-    "_img": "img/cards/PBSP/PL!SP-pb1-026-L.png"
+    "_img": "img/cards/PBSP/PL!SP-pb1-026-L.png",
+    "special_heart": {
+      "draw": 1
+    }
   },
   "PL!SP-pb1-026-L＋": {
     "card_no": "PL!SP-pb1-026-L＋",
@@ -92168,7 +92339,6 @@
     "blade_heart": {
       "b_heart06": 1
     },
-    "special_heart": {},
     "rare": "L+",
     "faq": [],
     "rare_list": [
@@ -92185,7 +92355,10 @@
         "name": "Jump Into the New World"
       }
     ],
-    "_img": "img/cards/PBSP/PL!SP-pb1-026-L2.png"
+    "_img": "img/cards/PBSP/PL!SP-pb1-026-L2.png",
+    "special_heart": {
+      "draw": 1
+    }
   },
   "PL!SP-pb1-026-SRL": {
     "card_no": "PL!SP-pb1-026-SRL",
@@ -92203,7 +92376,6 @@
     "blade_heart": {
       "b_heart06": 1
     },
-    "special_heart": {},
     "rare": "SRL",
     "faq": [],
     "rare_list": [
@@ -92220,7 +92392,10 @@
         "name": "Jump Into the New World"
       }
     ],
-    "_img": "img/cards/PBSP02/PL!SP-pb1-026-SRL.png"
+    "_img": "img/cards/PBSP02/PL!SP-pb1-026-SRL.png",
+    "special_heart": {
+      "draw": 1
+    }
   },
   "PL!SP-pb1-027-PE": {
     "card_no": "PL!SP-pb1-027-PE",
@@ -97246,7 +97421,6 @@
       "heart06": 1,
       "heart0": 1
     },
-    "special_heart": {},
     "rare": "SRL",
     "faq": [],
     "rare_list": [
@@ -97259,7 +97433,10 @@
         "name": "WE WILL!!"
       }
     ],
-    "_img": "img/cards/PBSP02/PL!SP-sd1-023-SRL.png"
+    "_img": "img/cards/PBSP02/PL!SP-sd1-023-SRL.png",
+    "special_heart": {
+      "score": 1
+    }
   },
   "PL!SP-sd1-024-P": {
     "card_no": "PL!SP-sd1-024-P",
@@ -97541,7 +97718,6 @@
     "blade_heart": {
       "b_heart02": 1
     },
-    "special_heart": {},
     "rare": "SRL",
     "ability": "{{live_start.png|ライブ開始時}}自分のエネルギーが9枚以上ある場合、このカードのスコアを＋１する。",
     "faq": [],
@@ -97555,7 +97731,10 @@
         "name": "私のSymphony 〜澁谷かのんVer.〜"
       }
     ],
-    "_img": "img/cards/PBSP02/PL!SP-sd1-026-SRL.png"
+    "_img": "img/cards/PBSP02/PL!SP-sd1-026-SRL.png",
+    "special_heart": {
+      "draw": 1
+    }
   },
   "PL!SP-sd1-027-P": {
     "card_no": "PL!SP-sd1-027-P",

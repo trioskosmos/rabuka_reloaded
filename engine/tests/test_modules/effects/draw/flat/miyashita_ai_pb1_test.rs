@@ -62,7 +62,7 @@ fn miyashita_ai_q197_baton_touch_replaced_does_not_trigger() {
     game.state.player1.hand.cards.push(filler);
     game.give_energy(12);
 
-    game.play_to_stage(cost10, rabuka_engine::zones::MemberArea::LeftSide);
+    game.play_to_stage_baton(cost10, rabuka_engine::zones::MemberArea::LeftSide);
     while game.has_pending_choice() {
         game.select_indices(&[0]);
     }

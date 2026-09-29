@@ -41,7 +41,7 @@ fn kinako_baton_touch_recovers_the_displaced_liella_member() {
     );
 
     game.state.player1.hand.cards.push(kinako);
-    game.play_to_stage(kinako, MemberArea::Center);
+    game.play_to_stage_baton(kinako, MemberArea::Center);
     drain_choices(&mut game);
 
     assert_eq!(game.state.player1.stage.stage[1], kinako);
@@ -60,7 +60,7 @@ fn kinako_baton_touch_does_not_recover_a_non_liella_member() {
     let (kinako, _) = setup(&mut game, Some(target));
 
     game.state.player1.hand.cards.push(kinako);
-    game.play_to_stage(kinako, MemberArea::Center);
+    game.play_to_stage_baton(kinako, MemberArea::Center);
     drain_choices(&mut game);
 
     assert_eq!(game.state.player1.stage.stage[1], kinako);
@@ -80,7 +80,7 @@ fn kinako_normal_debut_does_not_recover_a_hand_card() {
 
     game.state.player1.hand.cards.push(kinako);
     game.state.player1.hand.cards.push(target);
-    game.play_to_stage(kinako, MemberArea::Center);
+    game.play_to_stage_baton(kinako, MemberArea::Center);
     drain_choices(&mut game);
 
     assert_eq!(game.state.player1.stage.stage[1], kinako);

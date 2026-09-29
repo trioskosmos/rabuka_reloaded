@@ -47,7 +47,7 @@ fn baton_touch_group_hand_reset_source(game: &mut TestGame) -> i16 {
     game.add_to_stage(MemberArea::Center, chika);
     let dia = game.id("PL!S-bp7-004-P");
     game.state.player1.hand.cards.push(dia);
-    game.play_to_stage(dia, MemberArea::Center);
+    game.play_to_stage_baton(dia, MemberArea::Center);
     dia
 }
 
@@ -71,7 +71,7 @@ fn baton_both_hands_non_aqours_baton_touch_does_not_fire() {
     game.add_to_stage(MemberArea::Center, honoka);
     let dia = game.id("PL!S-bp7-004-P");
     game.state.player1.hand.cards.push(dia);
-    game.play_to_stage(dia, MemberArea::Center);
+    game.play_to_stage_baton(dia, MemberArea::Center);
     // Answer what cannot be declined, decline what can: a mandatory
     // prompt left parked mid-ability produces exactly the absence
     // the next assertion checks, so nothing fails.

@@ -186,7 +186,20 @@ impl super::resolver::AbilityResolver {
 
         // Pay any deferred costs (from sequential_cost binary sub-costs) now
         // that the player confirmed the choice.
-        self.pay_deferred_costs(gs)?;
+        //
+        // …unless the choice was DECLINED. Rule 9.4.2.2 skips the whole cost in
+        // that case, so the binary steps deferred ahead of the choice are dropped
+        // rather than paid. Paying them would make 「このメンバーをウェイトにし、手札を
+        // 1枚控え室に置いてもよい」 wait the member even when no card was discarded.
+        if gs
+            .ability_queue
+            .current_entry()
+            .is_some_and(|e| e.optional_cost_result == Some(false))
+        {
+            self.discard_deferred_costs();
+        } else {
+            self.pay_deferred_costs(gs)?;
+        }
 
         let sub_choice = self.in_flight.sub_choice_created;
         self.in_flight.sub_choice_created = false;

@@ -1,4 +1,4 @@
-use crate::core::types::ArcStr;
+﻿use crate::core::types::ArcStr;
 #[cfg(feature = "serde_support")]
 use serde::ser::Serializer;
 
@@ -321,6 +321,23 @@ pub enum ActionType {
     GainAbility,
     GainAbilityFromSource,
     InvalidateAbility,
+    /// A REPLACEMENT rule that changes how a card APPEARS, rather than firing on an
+    /// event: 「このメンバーの正面のエリアには、…のメンバーは、ウェイト状態で登場
+    /// する」 (PL!-pb2-002-PP 絢瀬絵里).
+    ///
+    /// This must NOT be a constant. Constants are re-applied on every
+    /// recalculation, so a member held in wait by the rule could never leave it and
+    /// activations paid for during play would be clobbered. It is resolved once, at
+    /// the moment the card is placed, by `GameState::replacement_appear_wait_applies`.
+    ReplacementAppearWait,
+    /// A counting WEIGHT: 「…枚の枚数を数えるとき、このカードはN枚として扱う」
+    /// (PL!-pb2-041-L 春情ロマンティック). Changes how another card's effect computes
+    /// a number, rather than doing anything itself.
+    ///
+    /// `counted_by` names the groups whose effects see the weight — it is NOT a
+    /// filter on the card being counted. Applied in
+    /// `ConditionContext::weighted_zone_count`.
+    CountAsMultiple,
     SuppressAbilityTrigger,
     ActivateAbility,
 
@@ -419,6 +436,8 @@ impl ActionType {
         GainAbility => "gain_ability",
         GainAbilityFromSource => "gain_ability_from_source",
         InvalidateAbility => "invalidate_ability",
+        ReplacementAppearWait => "replacement_appear_wait",
+        CountAsMultiple => "count_as_multiple",
         SuppressAbilityTrigger => "suppress_ability_trigger",
         ActivateAbility => "activate_ability",
         // Cost modifications
@@ -500,6 +519,8 @@ impl ActionType {
             ActionType::GainAbility => "Gain Ability",
             ActionType::GainAbilityFromSource => "Gain Ability from Source",
             ActionType::InvalidateAbility => "Invalidate Ability",
+            ActionType::ReplacementAppearWait => "Replacement: Appear Wait",
+            ActionType::CountAsMultiple => "Count As Multiple",
             ActionType::SuppressAbilityTrigger => "Suppress Ability Trigger",
             ActionType::ActivateAbility => "Activate Ability",
             ActionType::ModifyScore => "Modify Score",

@@ -46,7 +46,7 @@ fn baton_touch_live_recovery_source(game: &mut TestGame, ginko: i16) {
     let filler = game.id("PL!-sd1-010-SD");
     game.state.player1.hand.cards.push(ginko);
     game.state.player1.hand.cards.push(filler);
-    game.play_to_stage(ginko, MemberArea::Center);
+    game.play_to_stage_baton(ginko, MemberArea::Center);
     let mut guard = 0;
     while game.has_pending_choice() && guard < 10 {
         game.select_indices(&[0]);

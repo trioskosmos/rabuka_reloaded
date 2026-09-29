@@ -1,4 +1,4 @@
-/// Tests for 安養寺 姫芽 (PL!HS-sd1-006-SD) debut ability.
+﻿/// Tests for 安養寺 姫芽 (PL!HS-sd1-006-SD) debut ability.
 ///
 /// Ability text:
 ///   登場: 自分のステージに「大沢瑠璃乃」か「百生吟子」か「徒町小鈴」が
@@ -11,11 +11,24 @@ use crate::helpers::*;
 use rabuka_engine::core::types::LogMetadata;
 use rabuka_engine::zones::MemberArea;
 
-fn play_himeno(game: &mut TestGame, left: i16, center: i16, right: i16) {
+/// Stage the two witness members in the CENTRE and RIGHT slots, then debut Himeno
+/// into the LEFT slot.
+///
+/// The helper takes only the two slots that survive: Himeno always plays to
+/// `LeftSide`, so a witness placed there would be silently baton-touched away —
+/// which is what the previous three-slot signature did, leaving a stage that no
+/// longer matched what the assertions described.
+fn play_himeno(game: &mut TestGame, center: i16, right: i16) {
     let himeno = game.id("PL!HS-sd1-006-SD");
     let filler = game.id("PL!-sd1-013-SD");
 
-    game.state.player1.stage.stage = [left, center, right];
+    assert_eq!(
+        game.state.player1.stage.stage[MemberArea::LeftSide as usize],
+        -1,
+        "the left slot must be empty: Himeno plays there and would replace its occupant"
+    );
+    game.state.player1.stage.stage[MemberArea::Center as usize] = center;
+    game.state.player1.stage.stage[MemberArea::RightSide as usize] = right;
     game.add_to_hand(himeno);
     game.add_to_hand(filler);
     game.give_energy(15);
@@ -60,7 +73,7 @@ fn condition_passes_with_sd_osawa() {
     let mut g = TestGame::new(db);
     let f = g.id("PL!-sd1-013-SD");
     let o = g.id("PL!HS-sd1-003-SD");
-    play_himeno(&mut g, f, f, o);
+    play_himeno(&mut g, f, o);
     let (r, _) = debut_result_and_actions(&g);
     assert_eq!(r, "success");
 }
@@ -71,7 +84,7 @@ fn condition_passes_with_bp1_osawa() {
     let mut g = TestGame::new(db);
     let f = g.id("PL!-sd1-013-SD");
     let o = g.id("PL!HS-bp1-005-PR");
-    play_himeno(&mut g, f, f, o);
+    play_himeno(&mut g, f, o);
     let (r, _) = debut_result_and_actions(&g);
     assert_eq!(r, "success");
 }
@@ -82,7 +95,7 @@ fn condition_passes_with_bp5_osawa() {
     let mut g = TestGame::new(db);
     let f = g.id("PL!-sd1-013-SD");
     let o = g.id("PL!HS-bp5-003-P");
-    play_himeno(&mut g, f, f, o);
+    play_himeno(&mut g, f, o);
     let (r, _) = debut_result_and_actions(&g);
     assert_eq!(r, "success");
 }
@@ -93,7 +106,7 @@ fn condition_passes_with_momoo() {
     let mut g = TestGame::new(db);
     let f = g.id("PL!-sd1-013-SD");
     let o = g.id("PL!HS-sd1-004-SD");
-    play_himeno(&mut g, f, f, o);
+    play_himeno(&mut g, f, o);
     let (r, _) = debut_result_and_actions(&g);
     assert_eq!(r, "success");
 }
@@ -104,7 +117,7 @@ fn condition_passes_with_kodomo() {
     let mut g = TestGame::new(db);
     let f = g.id("PL!-sd1-013-SD");
     let o = g.id("PL!HS-sd1-005-SD");
-    play_himeno(&mut g, f, f, o);
+    play_himeno(&mut g, f, o);
     let (r, _) = debut_result_and_actions(&g);
     assert_eq!(r, "success");
 }
@@ -115,7 +128,7 @@ fn condition_passes_with_two_bp_osawa() {
     let mut g = TestGame::new(db);
     let o1 = g.id("PL!HS-bp1-005-PR");
     let o2 = g.id("PL!HS-bp5-003-P");
-    play_himeno(&mut g, -1, o1, o2);
+    play_himeno(&mut g, o1, o2);
     let (r, _) = debut_result_and_actions(&g);
     assert_eq!(r, "success");
 }
@@ -130,7 +143,7 @@ fn condition_fails_with_no_match() {
     let mut g = TestGame::new(db);
     let f = g.id("PL!-sd1-013-SD");
     let n = g.id("PL!-sd1-010-SD");
-    play_himeno(&mut g, n, f, f);
+    play_himeno(&mut g, f, f);
     let (r, _) = debut_result_and_actions(&g);
     assert_eq!(r, "failure");
 }
@@ -145,7 +158,7 @@ fn both_effects_execute() {
     let mut g = TestGame::new(db);
     let f = g.id("PL!-sd1-013-SD");
     let o = g.id("PL!HS-sd1-003-SD");
-    play_himeno(&mut g, f, f, o);
+    play_himeno(&mut g, f, o);
     let (r, actions) = debut_result_and_actions(&g);
     assert_eq!(r, "success");
     assert!(
@@ -166,7 +179,7 @@ fn no_effects_without_match() {
     let mut g = TestGame::new(db);
     let f = g.id("PL!-sd1-013-SD");
     let n = g.id("PL!-sd1-010-SD");
-    play_himeno(&mut g, n, f, f);
+    play_himeno(&mut g, f, f);
     let (r, actions) = debut_result_and_actions(&g);
     assert_eq!(r, "failure");
     assert!(

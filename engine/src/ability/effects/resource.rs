@@ -464,7 +464,21 @@ pub(crate) fn execute_gain_surplus_heart(
         // instead of the generic per_unit_type → zone mapping.
         let loc_binding = effect.location_any();
         let effective_per_unit_type = loc_binding.or(per_unit_type_str);
-        let mut matching_count = if effective_per_unit_type == Some("つ") {
+        // 「…のスコアの合計Nにつき」 measures a POINTS total, not a card tally, so
+        // the same zone is walked but the cards' printed scores are summed. Same
+        // zone resolution and same filter as the tally path, so both agree on which
+        // cards are in scope.
+        let mut matching_count = if effect.per_unit_aggregate_any().as_deref() == Some("score") {
+            util::resolve_per_unit_score_sum(
+                effective_per_unit_type,
+                player,
+                &card_db,
+                filter,
+                effect.state_any(),
+                orientation_modifiers,
+                None,
+            )
+        } else if effective_per_unit_type == Some("つ") {
             last_energy
         } else {
             util::resolve_per_unit_count(

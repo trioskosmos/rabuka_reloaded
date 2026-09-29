@@ -517,8 +517,15 @@ fn fuyumari_real_play_to_stage_triggers_appearance() {
     game.state.player1.hand.cards.push(fuyumari);
     game.give_energy(15);
 
-    // Real play_to_stage through Main phase
-    game.play_to_stage(fuyumari, MemberArea::LeftSide);
+    // Real play_to_stage through Main phase.
+    //
+    // Deliberate overlap, and a known harness gap: the test intends PLAYER 2 to play
+    // Fuyumari (it sits in P2's hand and P2 is given energy), but `play_to_stage`
+    // only ever places on PLAYER 1 — there is no player-2 placement helper. The card
+    // therefore lands on P1's left slot and displaces P1's `target`. Kept as-is so the
+    // behaviour under test is unchanged; the explicit variant keeps the swap visible.
+    // See docs/PBLL02_ABILITY_REVIEW.md §8.3 for the missing helper.
+    game.play_to_stage_baton(fuyumari, MemberArea::LeftSide);
 
     // Drain all pending choices (auto abilities, etc.)
     // Answer what cannot be declined, decline what can: a mandatory
@@ -595,7 +602,14 @@ fn fuyumari_p2_play_to_stage_triggers_appearance() {
         "P2's Main must be reached for the 登場 below to be P2's turn"
     );
 
-    game.play_to_stage(fuyumari, MemberArea::LeftSide);
+    // Deliberate overlap, and a known harness gap: the test intends PLAYER 2 to play
+    // Fuyumari (P2's Main is reached first, for exactly that reason), but
+    // `play_to_stage` only ever places on PLAYER 1 — there is no player-2 placement
+    // helper. The card therefore lands in P1's left slot, which P1's `target`
+    // occupies, and displaces it. Kept as-is so the behaviour under test is
+    // unchanged; the explicit variant keeps the swap visible.
+    // See docs/PBLL02_ABILITY_REVIEW.md §8.3 for the missing helper.
+    game.play_to_stage_baton(fuyumari, MemberArea::LeftSide);
     // Answer what cannot be declined, decline what can: a mandatory
     // prompt left parked mid-ability produces exactly the absence
     // the next assertion checks, so nothing fails.
@@ -634,7 +648,7 @@ fn fuyumari_baton_touch_triggers_area_move() {
     game.give_energy(15);
 
     // Baton touch: play Fuyumari to occupied Center → existing goes to waitroom
-    game.play_to_stage(fuyumari, MemberArea::Center);
+    game.play_to_stage_baton(fuyumari, MemberArea::Center);
     // Answer what cannot be declined, decline what can: a mandatory
     // prompt left parked mid-ability produces exactly the absence
     // the next assertion checks, so nothing fails.
@@ -690,7 +704,7 @@ fn fuyumari_baton_touch_left_to_center_triggers() {
     // Baton touch Fuyumari to LeftSide (empty, not a baton touch — just appearance)
     // Actually to trigger baton touch, we need to play to an OCCUPIED area.
     // Let's baton touch to Center: existing goes to waitroom
-    game.play_to_stage(fuyumari, MemberArea::Center);
+    game.play_to_stage_baton(fuyumari, MemberArea::Center);
     // Answer what cannot be declined, decline what can: a mandatory
     // prompt left parked mid-ability produces exactly the absence
     // the next assertion checks, so nothing fails.

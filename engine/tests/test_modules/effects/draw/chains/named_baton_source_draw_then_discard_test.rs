@@ -21,7 +21,7 @@ fn run_baton_draw_flow(db: std::sync::Arc<rabuka_engine::card::CardDatabase>, me
     let deck_before = game.state.player1.main_deck.cards.len();
     let waitroom_before = game.state.player1.waitroom.cards.len();
 
-    game.play_to_stage(me, MemberArea::LeftSide);
+    game.play_to_stage_baton(me, MemberArea::LeftSide);
 
     // NOTE: the draw+discard resolves fully inside the play action —
     // no pending choice reaches the caller for this ability shape.
@@ -73,7 +73,7 @@ fn n_pb1_019_debut_baton_over_other_name_no_draw() {
 
     let deck_before = game.state.player1.main_deck.cards.len();
 
-    game.play_to_stage(me, MemberArea::LeftSide);
+    game.play_to_stage_baton(me, MemberArea::LeftSide);
 
     assert_eq!(
         game.state.player1.main_deck.cards.len(),

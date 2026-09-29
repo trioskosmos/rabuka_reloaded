@@ -345,7 +345,7 @@ fn hanabiko_replaced_by_new_card_on_same_position_triggers() {
     g.give_energy(20);
 
     // Play replacement to center (baton-touch: Hanabiko goes to waitroom)
-    g.play_to_stage(replacement, rabuka_engine::zones::MemberArea::Center);
+    g.play_to_stage_baton(replacement, rabuka_engine::zones::MemberArea::Center);
     // Answer what cannot be declined, decline what can: a mandatory
     // prompt left parked mid-ability produces exactly the absence
     // the next assertion checks, so nothing fails.
@@ -401,7 +401,7 @@ fn hanabiko_baton_touch_replaced_triggers() {
     g.give_energy(20);
 
     // Baton touch: play arriver to occupied center → Hanabiko goes to waitroom
-    g.play_to_stage(baton_arriver, rabuka_engine::zones::MemberArea::Center);
+    g.play_to_stage_baton(baton_arriver, rabuka_engine::zones::MemberArea::Center);
 
     // Shioriko's debut: draw 2, then mandatory discard 1 from hand.
     // Must be offered — mandatory discard after draw.

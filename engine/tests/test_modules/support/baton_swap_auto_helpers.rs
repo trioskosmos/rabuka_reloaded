@@ -49,7 +49,7 @@ pub fn replace_member_by_baton_touch(game: &mut TestGame, replaced: i16, arriver
     game.give_energy(30);
     game.state.player1.stage.set_area(area, replaced);
     game.state.player1.hand.cards.push(arriver);
-    game.play_to_stage(arriver, area);
+    game.play_to_stage_baton(arriver, area);
 }
 
 pub fn append_twenty_filler_cards(game: &mut TestGame) {

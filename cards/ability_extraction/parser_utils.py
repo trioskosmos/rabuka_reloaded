@@ -79,6 +79,8 @@ BLADE_ICON = "{{icon_blade.png|ブレード}}"
 ENERGY_ICON = "{{icon_energy.png|E}}"
 ALL_HEART_ICON = "{{icon_all.png|ハート}}"
 SCORE_ICON = "{{icon_score.png|スコア}}"
+ALL_BLADE_ICON = "{{icon_b_all.png|ALLブレード}}"
+HAS_ALL_BLADE_ICON = f"{ALL_BLADE_ICON}を持つ"
 
 # The same icons as match patterns, for the few scans that need a regex rather
 # than a substring test.
@@ -626,6 +628,14 @@ _CARD_TYPE_LONGEST_FIRST: List[Tuple[str, str]] = sorted(
 
 # ============== PRE-COMPILED REGEXES ==============
 _ALL_KW_RE = re.compile(r"すべての|全ての|全部の|全て|全員|全体|カードをすべて")
+
+# The plural, unquantified subject of a resource clause: 「〜のメンバーは、〜を得る」.
+# Distinct from 「1人」/「N人」, which quantify, and from 「すべて」, which _ALL_KW_RE
+# already catches.
+_PLURAL_MEMBER_SUBJECT_RE = re.compile(r"の(?:メンバー|メンバーカード|カード)は")
+# An explicit member count in the clause. Any number counts, including kanji, so
+# 「1人」 and 「１人」 and 「三人」 are all excluded from the plural reading.
+_MEMBER_QUANTIFIER_RE = re.compile(r"[0-9０-９一二三四五六七八九十]+\s*人")
 _SHUFFLE_RE = re.compile(r"シャッフル")
 _OPTIONAL_RE = re.compile(r"もよい|てもよい")
 

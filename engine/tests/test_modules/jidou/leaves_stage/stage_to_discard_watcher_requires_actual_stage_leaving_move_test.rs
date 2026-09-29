@@ -31,7 +31,7 @@ fn stage_to_discard_ability_triggers_only_on_baton_touch() {
     // ---- Step 1: Play Honoka to LeftSide (debut, empty area) ----
     game.state.player1.hand.cards.push(honoka);
     game.state.player1.stage.stage = [-1, -1, -1];
-    game.play_to_stage(honoka, MemberArea::LeftSide);
+    game.play_to_stage_baton(honoka, MemberArea::LeftSide);
 
     // Should NOT trigger: card is on stage, not in discard
     assert!(
@@ -41,7 +41,7 @@ fn stage_to_discard_ability_triggers_only_on_baton_touch() {
 
     // ---- Step 2: Play filler to Center (debut, empty area) ----
     game.state.player1.hand.cards.push(filler);
-    game.play_to_stage(filler, MemberArea::Center);
+    game.play_to_stage_baton(filler, MemberArea::Center);
 
     // Should NOT trigger
     assert!(
@@ -54,7 +54,7 @@ fn stage_to_discard_ability_triggers_only_on_baton_touch() {
 
     // ---- Step 4: Baton touch - play arriver to LeftSide (Honoka's area) ----
     game.state.player1.hand.cards.push(arriver);
-    game.play_to_stage(arriver, MemberArea::LeftSide);
+    game.play_to_stage_baton(arriver, MemberArea::LeftSide);
 
     // Honoka was replaced from stage to waitroom → her auto ability fires.
     // The ability offers to activate 1 member. Since neither the filler nor
@@ -146,7 +146,7 @@ fn kohaku_baton_touch_triggers_ability() {
     g.state.player1.hand.cards.push(filler);
 
     // Baton touch: play arriver to Center (Kohaku's area)
-    g.play_to_stage(arriver, MemberArea::Center);
+    g.play_to_stage_baton(arriver, MemberArea::Center);
 
     // Kohaku was replaced by baton touch → her auto ability should fire
     assert!(
@@ -186,7 +186,7 @@ fn kohaku_baton_touch_selects_member_from_deck() {
     g.state.player1.hand.cards.push(arriver);
     g.state.player1.hand.cards.push(filler);
 
-    g.play_to_stage(arriver, MemberArea::Center);
+    g.play_to_stage_baton(arriver, MemberArea::Center);
 
     assert!(
         g.has_pending_choice(),

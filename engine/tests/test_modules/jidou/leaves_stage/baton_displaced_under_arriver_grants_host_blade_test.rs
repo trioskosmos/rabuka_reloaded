@@ -4,7 +4,7 @@ use rabuka_engine::zones::MemberArea;
 fn baton_touch_over(game: &mut TestGame, kanon: i16, arriver: i16) {
     let _ = kanon;
     game.state.player1.hand.cards.push(arriver);
-    game.play_to_stage(arriver, MemberArea::Center);
+    game.play_to_stage_baton(arriver, MemberArea::Center);
     while game.has_pending_choice() {
         // Default: skip any optional choice; required discards pick the first card.
         let required = game.state.get_pending_choice().is_some_and(|c| {

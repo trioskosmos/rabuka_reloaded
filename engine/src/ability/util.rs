@@ -1,4 +1,4 @@
-use crate::core::constants::CountCast;
+﻿use crate::core::constants::CountCast;
 use super::enums::{ActionType, Zone};
 use crate::card::{
     parse_heart_color, Ability, AbilityEffect, AbilityFilter, Card, CardDatabase, DistinctType,
@@ -1158,6 +1158,12 @@ pub struct CardFilter<'a> {
     /// "元々持つブレード" — printed/base blade value filter (checked in matches()).
     pub original_blade_limit: Option<u8>,
     pub original_blade_operator: Option<&'a str>,
+    /// 「元々持つハートの数がN以下」 — the SUM of the card's printed (base) hearts,
+    /// compared against a bound. Printed hearts are static card data, so unlike the
+    /// current-blade bound this is checkable in matches(). Used by
+    /// 「相手のステージにいる元々持つハートの数が1つ以下のメンバー」 (PL!-pb2-006).
+    pub original_heart_total: Option<u8>,
+    pub original_heart_total_operator: Option<&'a str>,
     /// "ブレードをNつ以上持つ" (no 元々) — CURRENT blade total filter (base or
     /// set + additive modifiers). Cannot be evaluated in matches() (no mods
     /// access), so it is applied as a post-filter by the caller via
@@ -1241,6 +1247,11 @@ impl<'a> CardFilter<'a> {
         self.original_blade_operator = obo;
         self
     }
+    pub fn original_heart_total(mut self, oht: Option<u8>, oho: Option<&'a str>) -> Self {
+        self.original_heart_total = oht;
+        self.original_heart_total_operator = oho;
+        self
+    }
     pub fn exclude_self(mut self, id: i16) -> Self {
         self.exclude_self = Some(id);
         self
@@ -1266,6 +1277,7 @@ impl<'a> CardFilter<'a> {
             || self.need_heart_color.is_some()
             || self.name_fragments.is_some()
             || self.original_blade_limit.is_some()
+            || self.original_heart_total.is_some()
             || self.ability_filter.is_some()
             || self.ability_filter_triggers.is_some()
             || self.or_ability_filters.is_some()
@@ -1576,6 +1588,18 @@ impl<'a> CardFilter<'a> {
                 return false;
             }
         }
+        // 「元々持つハートの数がN以下/つ以上」 — total PRINTED hearts. A member with
+        // no printed hearts totals 0 and so satisfies 「1つ以下」.
+        if let Some(hl) = self.original_heart_total {
+            let total = db
+                .get_card(id)
+                .and_then(|c| c.base_heart.as_ref())
+                .map(|bh| bh.hearts.values().fold(0u8, |acc, n| acc.saturating_add(*n)))
+                .unwrap_or(0);
+            if !compare_counts(self.original_heart_total_operator, total, hl) {
+                return false;
+            }
+        }
         // Per-card cost_total check — each individual card's cost must
         // satisfy the total-budget comparison (e.g. card.cost <= 4).
         if let Some(ct) = self.cost_total {
@@ -1680,6 +1704,10 @@ impl<'a> CardFilter<'a> {
             } else {
                 effect.blade_limit_any()
             },
+            // 「元々持つハート」 only ever means the printed total, so this is not
+            // gated on `original_value` the way the blade bounds are.
+            original_heart_total: effect.heart_total_limit_any(),
+            original_heart_total_operator: effect.heart_total_operator_any().or(Some("<=")),
             exclude_cards: None,
             exclude_names: None,
             ability_filter,
@@ -2435,24 +2463,9 @@ pub fn resolve_per_unit_count(
         return colors_found.len().u8_count();
     }
 
-    let zone = match per_unit_type {
-        Some("stage") | Some("member") | Some("人") | Some("members") => Zone::Stage.to_str(),
-        Some("hand") | Some("card") => Zone::Hand.to_str(),
-        Some("under_member") => Zone::UnderMember.to_str(),
-        Some("枚") => {
-            let has_member_ct = filter.card_type == Some("member_card");
-            if has_member_ct {
-                Zone::UnderMember.to_str()
-            } else {
-                Zone::Hand.to_str()
-            }
-        }
-        Some("discard") => Zone::Waitroom.to_str(),
-        Some("live_card_zone") => Zone::LiveCardZone.to_str(),
-        Some("success_live_zone") | Some("success_live_card_zone") => {
-            Zone::SuccessLiveZone.to_str()
-        }
-        _ => return 1,
+    let zone = match per_unit_zone(per_unit_type, filter) {
+        Some(z) => z,
+        None => return 1,
     };
     if Zone::from_str(zone) == Some(Zone::UnderMember) {
         let cards = under_member_cards(player, host_card_id);
@@ -2473,6 +2486,76 @@ pub fn resolve_per_unit_count(
         }
         count_filtered(&cards, card_db, filter, heart_colors, is_stage)
     }
+}
+
+/// Which zone a per-unit clause counts over. `None` means the clause names no zone
+/// this engine can count, and the caller treats the count as 1.
+fn per_unit_zone(per_unit_type: Option<&str>, filter: &CardFilter) -> Option<&'static str> {
+    Some(match per_unit_type {
+        Some("stage") | Some("member") | Some("人") | Some("members") => Zone::Stage.to_str(),
+        Some("hand") | Some("card") => Zone::Hand.to_str(),
+        Some("under_member") => Zone::UnderMember.to_str(),
+        Some("枚") => {
+            if filter.card_type == Some("member_card") {
+                Zone::UnderMember.to_str()
+            } else {
+                Zone::Hand.to_str()
+            }
+        }
+        Some("discard") => Zone::Waitroom.to_str(),
+        Some("live_card_zone") => Zone::LiveCardZone.to_str(),
+        Some("success_live_zone") | Some("success_live_card_zone") => Zone::SuccessLiveZone.to_str(),
+        _ => return None,
+    })
+}
+
+/// The SUM of the printed scores of the cards a per-unit clause matches, for
+/// 「…のスコアの合計Nにつき」.
+///
+/// This is a different quantity from a card tally: four score-1 lives are 4 cards
+/// but only 4 points, and 「合計5につき」 must not fire on them. Reuses the same zone
+/// resolution and the same filter as the tally so the two agree on WHICH cards.
+pub fn resolve_per_unit_score_sum(
+    per_unit_type: Option<&str>,
+    player: &crate::player::Player,
+    card_db: &CardDatabase,
+    filter: &CardFilter,
+    state_filter: Option<&str>,
+    orientation_modifiers: &HashMap<i16, crate::core::game_modifiers::CardOrientation>,
+    host_card_id: Option<i16>,
+) -> u8 {
+    let Some(zone) = per_unit_zone(per_unit_type, filter) else {
+        return 0;
+    };
+    let cards: Vec<i16> = if Zone::from_str(zone) == Some(Zone::UnderMember) {
+        under_member_cards(player, host_card_id)
+    } else {
+        let mut cards: Vec<i16> = zone_cards(player, zone).to_vec();
+        if Zone::from_str(zone) == Some(Zone::Stage) {
+            if let Some(state) = state_filter {
+                cards.retain(|&cid| {
+                    orientation_matches_state(
+                        orientation_modifiers.get(&cid).map(|o| o.as_str()),
+                        state,
+                    )
+                });
+            }
+        }
+        cards
+    };
+    let matching: Vec<i16> = cards
+        .iter()
+        .copied()
+        .filter(|&cid| filter.matches(card_db, cid, Zone::from_str(zone) == Some(Zone::Stage)))
+        .collect();
+    let total: u32 = matching
+        .iter()
+        .filter_map(|&cid| card_db.get_card(cid).and_then(|c| c.score))
+        .map(u32::from)
+        .sum();
+    // A score total across a live's worth of cards cannot overflow u8, but clamp
+    // rather than wrap: a wrapped small number would silently grant fewer blades.
+    total.min(u32::from(u8::MAX)) as u8
 }
 
 /// The cards sitting under a member: one member's under-cards when the caller

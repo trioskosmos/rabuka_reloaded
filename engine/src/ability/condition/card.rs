@@ -101,6 +101,12 @@ impl<'a> ConditionContext<'a> {
             _ => return true,
         };
         let card_db = &self.game_state.card_database;
+        // Every zone has to contribute its cards, not just the two that were
+        // special-cased. The old fallback was `vec![]`, and the empty case below
+        // returns TRUE, so a `card_property` on a condition naming any other zone
+        // — 「自分の成功ライブカード置き場に{{icon_score}}を持つ『μ's』のカードが
+        // ある場合」 (PL!-pb2-005) — was silently never checked, and the ability
+        // fired off cards that do not carry the icon.
         let check_cards: Vec<i16> = match Zone::from_str(location) {
             Some(Zone::RevealedCards) => self.game_state.revealed_cards.to_vec(),
             Some(Zone::Stage) => player
@@ -110,7 +116,11 @@ impl<'a> ConditionContext<'a> {
                 .filter(|&&id| id != -1)
                 .copied()
                 .collect(),
-            _ => vec![],
+            _ => crate::ability::util::zone_cards(player, location)
+                .iter()
+                .copied()
+                .filter(|&id| id != -1)
+                .collect(),
         };
         let neg = condition.get_negation().unwrap_or(false);
         if check_cards.is_empty() {
@@ -1285,6 +1295,17 @@ impl<'a> ConditionContext<'a> {
         };
 
         if condition.get_self_target().unwrap_or(false) && locs.len() == 2 {
+            // A 「AかB」 disjunction (PL!-pb2-038-L: 「自分のライブカード置き場**か**
+            // 成功ライブカード置き場にあり」) is satisfied by EITHER zone. Without the
+            // marker this branch assumes the 「AをBに」 move shape and checks only
+            // locs[1], so the card qualified from exactly one of the two zones named.
+            if condition.get_any_location().unwrap_or(false) {
+                return locs.iter().any(|loc| {
+                    let cards = util::zone_cards(player, loc.as_str());
+                    self.activating_card_id
+                        .is_some_and(|cid| cards.contains(&cid))
+                });
+            }
             let dest_zone = &locs[1];
             let dest_cards = util::zone_cards(player, dest_zone);
             return self
@@ -1414,24 +1435,39 @@ impl<'a> ConditionContext<'a> {
                         .iter()
                         .any(|g| crate::ability::util::card_matches_group_str(card_db, id, Some(g)))
             };
+            // 「2人の『μ's』のメンバーのみがいる」 is a COUNT as well as a group test:
+            // exactly two, all of them μ's. The all_members branch below only ever
+            // asked "are they all in the group", so one member and three members both
+            // satisfied it. That went unnoticed because PL!-pb2-038-L — the card that
+            // needs it — had no working code path at all, so its negatives passed
+            // vacuously. With an explicit `count` and no operator the reading is
+            // equality; an operator, if present, still governs.
+            let exact_count = match (condition.get_count(), condition.get_operator()) {
+                (Some(n), None) => Some(u8::try_from(n).unwrap_or(0)),
+                _ => None,
+            };
+            let count_ok = |cards: &[i16]| match exact_count {
+                Some(want) => cards.len() == usize::from(want),
+                None => true,
+            };
             match Zone::from_str(location) {
                 Some(Zone::Stage) => {
-                    return player
+                    let cards: Vec<i16> = player
                         .stage
                         .stage
                         .iter()
-                        .filter(|&&id| id != -1)
-                        .all(|&id| matches(id));
+                        .copied()
+                        .filter(|&id| id != -1)
+                        .collect();
+                    return count_ok(&cards) && cards.iter().all(|&id| matches(id));
                 }
                 Some(Zone::LiveCardZone) => {
-                    return player.live_card_zone.cards.iter().all(|&id| matches(id));
+                    let cards: Vec<i16> = player.live_card_zone.cards.to_vec();
+                    return count_ok(&cards) && cards.iter().all(|&id| matches(id));
                 }
                 Some(Zone::SuccessLiveZone) => {
-                    return player
-                        .success_live_card_zone
-                        .cards
-                        .iter()
-                        .all(|&id| matches(id));
+                    let cards: Vec<i16> = player.success_live_card_zone.cards.to_vec();
+                    return count_ok(&cards) && cards.iter().all(|&id| matches(id));
                 }
                 _ => return false,
             }
@@ -1990,7 +2026,7 @@ impl<'a> ConditionContext<'a> {
                     group_names,
                 ) as usize
             } else {
-                self.count_cards_with_filters(
+                let base = self.count_cards_with_filters(
                     zone_source,
                     Some(ct),
                     group_names,
@@ -2003,7 +2039,40 @@ impl<'a> ConditionContext<'a> {
                     // card (「元々持つハートの数より多い…メンバー」).
                     true,
                     condition,
-                ) as usize
+                ) as u32;
+                // A card can be worth more than one when something counts it:
+                // 「このカードは2枚として扱う」 (PL!-pb2-041-L). Membership is decided
+                // by the SAME filter above, applied one card at a time, so a weighted
+                // card can only ever be a card this count would already have included
+                // — the weight changes the total, never which cards qualify.
+                //
+                // The weight is a property of the card, not of a zone, so it applies
+                // on every path through this closure rather than only the success live
+                // zone. That is safe because the rule's own condition scopes it: a
+                // card outside the success live zone has no active weight.
+                let extra: u32 = zone_source
+                    .iter()
+                    .filter(|&&cid| {
+                        cid != -1
+                            && self.count_cards_with_filters(
+                                &[cid],
+                                Some(ct),
+                                group_names,
+                                hc,
+                                condition.get_cost_limit(),
+                                condition.get_cost_limit_operator().map(|o| o.as_str()),
+                                None,
+                                true,
+                                condition,
+                            ) == 1
+                    })
+                    .map(|&cid| {
+                        self.game_state
+                            .count_as_multiple_weight(cid, activating_id)
+                            .saturating_sub(1)
+                    })
+                    .sum();
+                (base + extra) as usize
             }
         };
 
@@ -2146,6 +2215,12 @@ impl<'a> ConditionContext<'a> {
                     } else {
                         p1 + p2
                     }
+                } else if Zone::from_str(location) == Some(Zone::SuccessLiveZone) {
+                    // Counting weights are applied inside `count_filtered` above, so
+                    // this is the plain path. Kept explicit so the success live zone
+                    // is visibly covered: it is the zone 「このカードは2枚として扱う」
+                    // applies in.
+                    count_filtered(util::zone_cards(player, location), card_type)
                 } else {
                     count_filtered(util::zone_cards(player, location), card_type)
                 }

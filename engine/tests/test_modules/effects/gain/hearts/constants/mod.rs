@@ -11,6 +11,7 @@ pub mod energy_threshold_two_hearts_at_eight_test;
 pub mod group_live_need_heart_eight_constant_heart03_test;
 pub mod opponent_energy_ahead_constant_heart_test;
 pub mod other_subunit_member_heart05_constant_test;
+pub mod pb2_success_score_sum_nine_constant_hearts_pl_pb2_020_n_test;
 pub mod per_other_group_member_constant_heart_test;
 pub mod per_under_member_energy_constant_heart_test;
 pub mod per_waited_opponent_member_constant_heart_test;

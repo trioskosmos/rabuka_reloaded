@@ -9,7 +9,7 @@ exit /b
 param(
     [int]$IntervalMinutes = 8,
     [string]$WindowTitle = "",
-    [string]$Message = "keep experimenting. keep playing games. keep researching the internet too. keep going to the move level in experimentation. also make abilities useful. they do different things. don't just make it tuning slop make it as qualitative as possible. also make the versions be independent of one another."
+    [string]$Message = "continue. keep adding edge cases ensure the parser engine and tests express the full range of the ability."
 )
 
 Add-Type -AssemblyName System.Windows.Forms

@@ -134,7 +134,7 @@ _a fixed `for _ in 0..N { pass() }` walk through the turn — a phase gaining or
 
 None.
 
-## similar_cards (26)
+## similar_cards (27)
 
 _confusable card numbers (bp2 vs pb2) staged in one file AND the file pins card identity (assert_card_identity / compares card_no), so a transposition would fail loudly_
 
@@ -156,6 +156,7 @@ _confusable card numbers (bp2 vs pb2) staged in one file AND the file pins card 
 | `engine/tests/test_modules/effects/score/card_score/success_count_revealed_score_live_pl_sp_bp5_023_l_test.rs` | `<file>` | 1 | PL!SP-bp1-023-L, PL!SP-bp5-023-L |
 | `engine/tests/test_modules/effects/score/per_card/aurora_flower_set_card_identity_group_match_test.rs` | `<file>` | 1 | PL!HS-bp1-021-L, PL!HS-bp2-021-L |
 | `engine/tests/test_modules/effects/state/per_card/either_or_state_change_test.rs` | `<file>` | 1 | PL!N-bp4-008-R, PL!N-pb1-008-R |
+| `engine/tests/test_modules/effects/state/wait_activation/pb2_live_start_bibi_only_waits_opponent_cost_two_pl_pb2_024_n_test.rs` | `<file>` | 1 | PL!SP-bp1-014-N, PL!SP-pb1-014-N |
 | `engine/tests/test_modules/integration/full_round/real_card_phase_walkthrough_and_ability_suite_test.rs` | `<file>` | 1 | PL!S-bp2-009-R, PL!S-bp5-009-R |
 | `engine/tests/test_modules/integration/per_card/live_end_expiry_rollover_and_dual_trigger_window_gates_test.rs` | `<file>` | 1 | PL!HS-bp5-004-R, PL!HS-bp6-004-R |
 | `engine/tests/test_modules/jidou/ability_watch/copied_ability_registration_lifecycle_test.rs` | `<file>` | 1 | PL!N-bp4-007-R＋, PL!N-bp5-007-R＋ |

@@ -88,14 +88,14 @@ fn appearance_and_three_swaps_stack_eight_blades() {
     // === Move 2: Keke debut → swap with watcher ===
     let keke1 = game.id("PL!SP-bp4-013-N");
     game.state.player1.hand.cards.push(keke1);
-    game.play_to_stage(keke1, MemberArea::RightSide);
+    game.play_to_stage_baton(keke1, MemberArea::RightSide);
     game.drain_auto_ability_choices();
     accept_position_swap(&mut game, "center");
 
     // === Move 3: Mei debut → swap with watcher ===
     let mei = game.id("PL!SP-sd2-007-SD2");
     game.state.player1.hand.cards.push(mei);
-    game.play_to_stage(mei, MemberArea::LeftSide);
+    game.play_to_stage_baton(mei, MemberArea::LeftSide);
     game.drain_auto_ability_choices();
     accept_position_swap(&mut game, "right");
 

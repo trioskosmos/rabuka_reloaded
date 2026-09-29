@@ -1,9 +1,9 @@
 {
   "schema": "extracted_abilities.v1",
-  "generated_at": "2026-09-29T12:52:40.020254",
+  "generated_at": "2026-09-29T17:45:07.449070",
   "generated_by": "cards/ability_extraction/extract_card_abilities.py",
   "source_file": "cards/cards.json",
-  "engine_commit": "89854f70",
+  "engine_commit": "fef2bf1f",
   "parser_version": "1.0",
   "input_hash": null,
   "statistics": {
@@ -2548,6 +2548,7 @@
             "source": "stage",
             "destination": "discard"
           },
+          "any_location": true,
           "card_type": "member_card",
           "self_target": true,
           "source": "stage",
@@ -3877,8 +3878,8 @@
             "condition": {
               "type": "location_condition",
               "card_type": "member_card",
-              "location": "stage",
               "text": "コスト15以上のブレードハートを持たない『虹ヶ咲』のメンバーの場合",
+              "location": "stage",
               "negation": true,
               "cost_limit": 15,
               "cost_limit_operator": ">=",
@@ -3907,6 +3908,7 @@
             "source": "stage",
             "destination": "discard"
           },
+          "any_location": true,
           "card_type": "member_card",
           "self_target": true,
           "source": "stage",
@@ -4485,6 +4487,7 @@
             "source": "deck",
             "destination": "discard"
           },
+          "any_location": true,
           "self_target": true,
           "source": "deck",
           "destination": "discard"
@@ -4866,7 +4869,7 @@
         "type": "change_state"
       },
       "effect": {
-        "text": "これによってウェイト状態になったメンバーは、「{{jyouji.png|常時}}ライブの合計スコアを+1する。」を得る",
+        "text": "これによってウェイト状態になったメンバーは、",
         "duration": "live_end",
         "card_type": "member_card",
         "action": "gain_ability",
@@ -5286,6 +5289,7 @@
             "Aqours"
           ],
           "target": "self",
+          "any_location": true,
           "card_type": "live_card",
           "source": "live_card_zone",
           "destination": "discard"
@@ -5651,7 +5655,6 @@
         ],
         "action": "gain_resource",
         "resource": "blade",
-        "count": 1,
         "all": true,
         "requires_under_card": true
       }
@@ -7122,6 +7125,7 @@
                 "destination": "energy_deck"
               },
               "target": "self",
+              "any_location": true,
               "resource_type": "energy",
               "source": "energy_zone",
               "destination": "energy_deck"
@@ -7264,6 +7268,7 @@
             "destination": "energy_deck"
           },
           "target": "self",
+          "any_location": true,
           "resource_type": "energy",
           "temporal": "this_turn",
           "temporal_scope": "this_turn",
@@ -8585,8 +8590,8 @@
         "condition": {
           "type": "location_condition",
           "card_type": "member_card",
-          "location": "stage",
           "text": "自分と相手のステージの中で、このメンバーがほかのすべてのメンバーより多くのハートを持つかぎり",
+          "location": "stage",
           "exclude_self": true,
           "scope": "both",
           "all": true,
@@ -9037,7 +9042,7 @@
         ],
         "action": "gain_resource",
         "resource": "blade",
-        "count": 1
+        "all": true
       }
     },
     {
@@ -10344,6 +10349,7 @@
             "source": "stage",
             "destination": "discard"
           },
+          "any_location": true,
           "card_type": "member_card",
           "self_target": true,
           "source": "stage",
@@ -12381,7 +12387,7 @@
         "text": "自分の成功ライブカード置き場に{{icon_score.png|スコア}}を持つ『μ's』のカードが1枚ある場合、ライブ終了時まで、「{{jyouji.png|常時}}ライブの合計スコアを+1する。」を得る。2枚以上ある場合、代わりに「{{jyouji.png|常時}}ライブの合計スコアを+2する。」を得る",
         "action": "conditional_alternative",
         "alternative_effect": {
-          "text": "「{{jyouji.png|常時}}ライブの合計スコアを+2する。」を得る",
+          "text": "「",
           "action": "gain_ability",
           "ability_gain_trigger": "常時",
           "ability_gain": "【常時】ライブの合計スコアを+2する。",
@@ -12424,7 +12430,7 @@
           "position": "center"
         },
         "primary_effect": {
-          "text": "「{{jyouji.png|常時}}ライブの合計スコアを+1する。」を得る",
+          "text": "「",
           "duration": "live_end",
           "action": "gain_ability",
           "ability_gain_trigger": "常時",
@@ -12823,7 +12829,7 @@
           "type": "location_condition"
         },
         "followup_action": {
-          "text": "ライブ終了時まで、このメンバーは「{{jyouji.png|常時}}ライブの合計スコアを+1する。」を得る",
+          "text": "ライブ終了時まで、このメンバーは",
           "duration": "live_end",
           "card_type": "member_card",
           "action": "gain_ability",
@@ -13269,12 +13275,13 @@
             "text": "自分の成功ライブカード置き場にある『μ's』のカードの中に、{{icon_score.png|スコア}}を持つカードがある場合、ライブ終了時まで、「{{jyouji.png|常時}}ライブの合計スコアを+1する。」を得る",
             "condition": {
               "type": "location_condition",
-              "card_type": "member_card",
-              "location": "stage",
+              "location": "success_live_card_zone",
               "text": "自分の成功ライブカード置き場にある『μ's』のカードの中に、{{icon_score.png|スコア}}を持つカードがある場合",
+              "card_type": "live_card",
               "group_names": [
                 "μ's"
               ],
+              "card_property": "has_score_icon",
               "target": "self"
             },
             "action": "gain_ability",
@@ -13296,11 +13303,11 @@
           {
             "text": "{{icon_b_all.png|ALLブレード}}を持つカードがある場合、ライブ終了時まで、{{icon_all.png|ハート}}を得る",
             "condition": {
-              "type": "location_condition",
-              "card_type": "member_card",
-              "location": "stage",
               "text": "{{icon_b_all.png|ALLブレード}}を持つカードがある場合",
-              "target": "self"
+              "type": "location_condition",
+              "location": "success_live_card_zone",
+              "card_type": "live_card",
+              "card_property": "has_all_blade"
             },
             "action": "gain_resource",
             "resource": "heart",
@@ -13311,11 +13318,10 @@
           {
             "text": "{{icon_draw.png|ドロー}}を持つカードがある場合、自分の控え室から『μ's』のカードを1枚手札に加える",
             "condition": {
-              "type": "location_condition",
-              "card_type": "member_card",
-              "location": "stage",
               "text": "{{icon_draw.png|ドロー}}を持つカードがある場合",
-              "target": "self"
+              "type": "location_condition",
+              "location": "success_live_card_zone",
+              "card_type": "live_card"
             },
             "source": "discard",
             "destination": "hand",
@@ -13346,9 +13352,12 @@
         "text": "このメンバーの正面のエリアには、元々持つハートの数が4つ以下のメンバーは、ウェイト状態で登場する",
         "count": 4,
         "card_type": "member_card",
-        "position": "front",
-        "action": "custom",
-        "original_value": true
+        "position": "center",
+        "action": "replacement_appear_wait",
+        "original_value": true,
+        "heart_total_limit": 4,
+        "heart_total_operator": "<=",
+        "replacement": "appear_wait"
       }
     },
     {
@@ -13422,7 +13431,8 @@
           "μ's"
         ],
         "location": "success_live_zone",
-        "target": "self"
+        "target": "self",
+        "card_property": "has_score_icon"
       }
     },
     {
@@ -13455,7 +13465,8 @@
           "yell_trigger": true,
           "card_property": "has_score_icon"
         },
-        "target": "self"
+        "target": "self",
+        "card_property": "has_score_icon"
       }
     },
     {
@@ -13474,14 +13485,14 @@
         "text": "自分の成功ライブカード置き場に{{icon_score.png|スコア}}を持つ『μ's』のカードがある場合、ライブ終了時まで、「{{jyouji.png|常時}}自分のステージにいる『μ's』のメンバーは、{{icon_blade.png|ブレード}}を得る。」を得る",
         "condition": {
           "type": "location_condition",
-          "card_type": "member_card",
-          "location": "stage",
+          "location": "success_live_card_zone",
           "text": "自分の成功ライブカード置き場に{{icon_score.png|スコア}}を持つ『μ's』のカードがある場合",
+          "card_type": "live_card",
           "group_names": [
             "μ's"
           ],
-          "target": "self",
-          "card_property": "has_score_icon"
+          "card_property": "has_score_icon",
+          "target": "self"
         },
         "source": "stage",
         "card_type": "member_card",
@@ -13493,7 +13504,19 @@
         "ability_gain_trigger": "常時",
         "ability_gain": "【常時】自分のステージにいる『μ's』のメンバーは、【ブレード】を得る。",
         "count": 1,
-        "duration": "live_end"
+        "duration": "live_end",
+        "gained_effect": {
+          "text": "自分のステージにいる『μ's』のメンバーは、{{icon_blade.png|ブレード}}を得る",
+          "card_type": "member_card",
+          "target": "self",
+          "group_names": [
+            "μ's"
+          ],
+          "action": "gain_resource",
+          "resource": "blade",
+          "all": true,
+          "duration": "live_end"
+        }
       }
     },
     {
@@ -13536,7 +13559,9 @@
         "card_type": "member_card",
         "target": "opponent",
         "action": "change_state",
-        "original_value": true
+        "original_value": true,
+        "heart_total_limit": 1,
+        "heart_total_operator": "<="
       }
     },
     {
@@ -13582,7 +13607,9 @@
         "card_type": "member_card",
         "target": "opponent",
         "action": "change_state",
-        "original_value": true
+        "original_value": true,
+        "heart_total_limit": 1,
+        "heart_total_operator": "<="
       }
     },
     {
@@ -13859,7 +13886,9 @@
           "location": "stage",
           "group_names": [
             "Printemps"
-          ]
+          ],
+          "count": 2,
+          "operator": ">="
         },
         "action": "modify_cost",
         "operation": "subtract",
@@ -18580,6 +18609,7 @@
             "destination": "discard"
           },
           "target": "self",
+          "any_location": true,
           "card_type": "member_card",
           "negation": true,
           "card_property": "has_blade_heart",
@@ -19693,6 +19723,7 @@
             "source": "stage",
             "destination": "discard"
           },
+          "any_location": true,
           "card_type": "member_card",
           "self_target": true,
           "source": "stage",
@@ -21168,7 +21199,7 @@
               "action": "do_nothing"
             },
             "conditional_action": {
-              "text": "「{{jyouji.png|常時}}ライブの合計スコアを+1する。」を得る",
+              "text": "「",
               "duration": "live_end",
               "action": "gain_ability",
               "ability_gain_trigger": "常時",
@@ -24928,7 +24959,7 @@
         "type": "move_cards"
       },
       "effect": {
-        "text": "「{{jyouji.png|常時}}ライブの合計スコアを+3する。」を得る",
+        "text": "「",
         "duration": "live_end",
         "action": "gain_ability",
         "ability_gain_trigger": "常時",
@@ -27154,10 +27185,11 @@
         "resource": "blade",
         "count": 1,
         "per_unit": true,
+        "per_unit_count": 5,
         "per_unit_type": "card",
+        "per_unit_aggregate": "score",
         "location": "success_live_zone",
-        "target": "self",
-        "per_unit_count": 1
+        "target": "self"
       }
     },
     {
@@ -27262,6 +27294,8 @@
         "target": "opponent",
         "action": "change_state",
         "original_value": true,
+        "heart_total_limit": 3,
+        "heart_total_operator": "<=",
         "parenthetical": [
           "ウェイト状態のメンバーが持つ{{icon_blade.png|ブレード}}は、エールで公開する枚数を増やさない。"
         ]
@@ -27349,6 +27383,11 @@
               "text": "このカードが自分のライブカード置き場か成功ライブカード置き場にあり、",
               "target": "self",
               "location": "success_live_card_zone",
+              "locations": [
+                "live_card_zone",
+                "success_live_card_zone"
+              ],
+              "any_location": true,
               "card_type": "live_card",
               "self_target": true,
               "type": "location_condition"
@@ -27662,6 +27701,8 @@
         "target": "opponent",
         "action": "change_state",
         "original_value": true,
+        "heart_total_limit": 4,
+        "heart_total_operator": "<=",
         "position": "center",
         "characters": [
           "絢瀬絵里"
@@ -28105,8 +28146,8 @@
         "condition": {
           "type": "location_condition",
           "card_type": "member_card",
-          "location": "stage",
           "text": "自分のステージに、元々持つハートの数より多い数のハートを持つメンバーがいる場合",
+          "location": "stage",
           "original_value": true,
           "operator": ">",
           "count": 1,
@@ -28392,6 +28433,7 @@
             "source": "stage",
             "destination": "discard"
           },
+          "any_location": true,
           "card_type": "member_card",
           "self_target": true,
           "source": "stage",
@@ -28440,6 +28482,7 @@
             "source": "stage",
             "destination": "discard"
           },
+          "any_location": true,
           "card_type": "member_card",
           "self_target": true,
           "source": "stage",
@@ -28520,6 +28563,7 @@
             "source": "stage",
             "destination": "discard"
           },
+          "any_location": true,
           "card_type": "member_card",
           "self_target": true,
           "source": "stage",
@@ -29700,6 +29744,7 @@
             "source": "stage",
             "destination": "discard"
           },
+          "any_location": true,
           "card_type": "member_card",
           "self_target": true,
           "source": "stage",
@@ -29775,6 +29820,7 @@
             "source": "stage",
             "destination": "discard"
           },
+          "any_location": true,
           "card_type": "member_card",
           "self_target": true,
           "source": "stage",
@@ -29808,6 +29854,7 @@
             "source": "stage",
             "destination": "discard"
           },
+          "any_location": true,
           "card_type": "member_card",
           "self_target": true,
           "source": "stage",
@@ -32641,6 +32688,7 @@
                 "source": "discard",
                 "destination": "hand"
               },
+              "any_location": true,
               "self_target": true,
               "source": "discard",
               "destination": "hand"
@@ -33351,8 +33399,8 @@
             {
               "type": "location_condition",
               "card_type": "member_card",
-              "location": "stage",
               "text": "そのメンバーが{{icon_all.png|ハート}}を持たない場合",
+              "location": "stage",
               "negation": true,
               "heart_type": "all",
               "target": "self"
@@ -33458,6 +33506,7 @@
             "source": "stage",
             "destination": "discard"
           },
+          "any_location": true,
           "card_type": "member_card",
           "self_target": true,
           "source": "stage",
@@ -33816,15 +33865,17 @@
           {
             "text": "そのメンバーが、自分と相手のステージにいるほかのすべてのメンバーより多くの{{icon_blade.png|ブレード}}を持つ場合、このカードのスコアを+1する",
             "condition": {
-              "type": "location_condition",
-              "card_type": "member_card",
-              "location": "stage",
               "text": "そのメンバーが、自分と相手のステージにいるほかのすべてのメンバーより多くの{{icon_blade.png|ブレード}}を持つ場合",
+              "target": "both",
+              "location": "stage",
+              "card_type": "member_card",
+              "comparison_target": "opponent",
+              "operator": ">",
               "exclude_self": true,
-              "scope": "both",
               "blade_greater_than_all": true,
-              "all": true,
-              "target": "self"
+              "scope": "both",
+              "type": "comparison_condition",
+              "all": true
             },
             "action": "modify_score",
             "value": 1,
@@ -34123,6 +34174,7 @@
             "destination": "discard"
           },
           "target": "self",
+          "any_location": true,
           "source": "deck",
           "destination": "discard"
         },
@@ -37639,7 +37691,7 @@
         ],
         "action": "gain_resource",
         "resource": "blade",
-        "count": 1
+        "all": true
       }
     },
     {
@@ -40467,7 +40519,7 @@
       "is_null": false,
       "cost": null,
       "effect": {
-        "text": "「{{jyouji.png|常時}}ライブの合計スコアを+1する。」を得る",
+        "text": "「",
         "duration": "live_end",
         "action": "gain_ability",
         "ability_gain_trigger": "常時",

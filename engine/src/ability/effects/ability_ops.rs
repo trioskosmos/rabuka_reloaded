@@ -46,8 +46,20 @@ impl AbilityResolver {
         // targets chosen STAGE members, not the activating card. Mirror the
         // change_state flow: prompt once (deferred via pending_actions), then
         // register the gained ability on each selection.
-        let stage_member_targeting = effect.source
-            == Some(crate::ability::enums::Zone::Stage)
+        //
+        // The node carries `source`/`card_type`/`group_names` describing whichever
+        // clause named a stage member group, and a CONDITION is not a usable
+        // discriminator: PL!S-bp6-007-R is conditioned and still a member choice.
+        // The exact test is whether the text being GRANTED names stage members
+        // itself. In PL!-pb2-005 星空凛 — 「…場合、ライブ終了時まで、「{{jyouji}}自分の
+        // ステージにいる『μ's』のメンバーは、{{icon_blade}}を得る。」を得る」 — the
+        // stage/group vocabulary belongs to the gained 常時, the real subject is
+        // herself, and treating it as a member choice made her gain nothing.
+        let gained_text = effect.ability_gain_any().unwrap_or("");
+        let gained_names_stage_members = gained_text.contains("ステージ")
+            && (gained_text.contains("メンバー") || gained_text.contains("メンバーカード"));
+        let stage_member_targeting = !gained_names_stage_members
+            && effect.source == Some(crate::ability::enums::Zone::Stage)
             && effect.card_type_any() == Some(&crate::card::CardType::Member)
             && effect.group_names_any().is_some_and(|g| !g.is_empty());
 

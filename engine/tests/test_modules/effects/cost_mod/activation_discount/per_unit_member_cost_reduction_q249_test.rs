@@ -128,7 +128,7 @@ fn three_unit_members_reduce_cost_before_baton_touch_q249() {
     // Play the card via baton touch (all 3 slots occupied).
     // Replacing Center (mk2, cost 10): cost = 20 - 6 - 10 = 4
     game.give_energy(4);
-    game.play_to_stage(himeno, rabuka_engine::zones::MemberArea::Center);
+    game.play_to_stage_baton(himeno, rabuka_engine::zones::MemberArea::Center);
     assert_eq!(
         game.state.player1.energy_zone.active_count(),
         0,

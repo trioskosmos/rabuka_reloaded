@@ -250,7 +250,11 @@ fn mei_mirror_standoff_each_side_rests_own_opponent() {
     set_active_seat(&mut game, false);
     give_p2_energy(&mut game, 20);
     game.state.player2.hand.cards.push(mei_p2);
-    game.play_to_stage(mei_p2, rabuka_engine::zones::MemberArea::Center);
+    // Deliberate overlap: `play_to_stage` always places on PLAYER 1, so playing the
+    // player-2 Mei lands on the centre slot Mei-1 already occupies. The test is a
+    // mirror standoff and passes with that placement; the explicit variant keeps the
+    // swap visible instead of silent.
+    game.play_to_stage_baton(mei_p2, rabuka_engine::zones::MemberArea::Center);
     game.drain_auto_ability_choices();
 
     assert_eq!(

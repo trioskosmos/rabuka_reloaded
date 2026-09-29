@@ -26,7 +26,7 @@ fn shioriko_bp4_basic_swap_one_niji_one_niji() {
     game.state.player1.success_live_card_zone.cards.push(niji_a);
     game.state.player1.waitroom.cards.push(niji_b);
 
-    game.play_to_stage(shioriko, MemberArea::Center);
+    game.play_to_stage_baton(shioriko, MemberArea::Center);
 
     game.select_indices(&[0]);
     assert!(
@@ -77,7 +77,7 @@ fn shioriko_bp4_skip_optional_nothing_moves() {
 
     game.state.player1.success_live_card_zone.cards.push(niji);
 
-    game.play_to_stage(shioriko, MemberArea::Center);
+    game.play_to_stage_baton(shioriko, MemberArea::Center);
 
     game.select_indices(&[]);
 
@@ -113,7 +113,7 @@ fn shioriko_bp4_two_niji_in_success_choose_one() {
     game.state.player1.success_live_card_zone.cards.push(niji_b);
     game.state.player1.waitroom.cards.push(niji_c);
 
-    game.play_to_stage(shioriko, MemberArea::Center);
+    game.play_to_stage_baton(shioriko, MemberArea::Center);
 
     game.select_indices(&[0]);
     assert!(
@@ -185,7 +185,7 @@ fn shioriko_bp4_non_niji_in_success_not_offered() {
         .push(non_niji);
     game.state.player1.waitroom.cards.push(niji_b);
 
-    game.play_to_stage(shioriko, MemberArea::Center);
+    game.play_to_stage_baton(shioriko, MemberArea::Center);
 
     game.select_indices(&[0]);
     assert!(
@@ -244,7 +244,7 @@ fn shioriko_bp4_non_niji_in_discard_not_offered() {
     game.state.player1.waitroom.cards.push(non_niji);
     game.state.player1.waitroom.cards.push(niji_b);
 
-    game.play_to_stage(shioriko, MemberArea::Center);
+    game.play_to_stage_baton(shioriko, MemberArea::Center);
 
     game.select_indices(&[0]);
     assert!(
@@ -305,7 +305,7 @@ fn shioriko_bp4_no_niji_in_success_skips_entirely() {
         .push(non_niji);
     game.state.player1.waitroom.cards.push(niji);
 
-    game.play_to_stage(shioriko, MemberArea::Center);
+    game.play_to_stage_baton(shioriko, MemberArea::Center);
 
     assert!(
         !game.has_pending_choice(),
@@ -340,7 +340,7 @@ fn shioriko_bp4_no_niji_in_discard_after_move_swaps_same_card_back() {
 
     game.state.player1.success_live_card_zone.cards.push(niji);
 
-    game.play_to_stage(shioriko, MemberArea::Center);
+    game.play_to_stage_baton(shioriko, MemberArea::Center);
 
     game.select_indices(&[0]);
     // Observed: no Nijigasaki in the waitroom → the retrieval leg has zero
@@ -376,7 +376,7 @@ fn shioriko_bp4_both_zones_empty_skips() {
     game.add_to_hand(shioriko);
     game.give_energy(10);
 
-    game.play_to_stage(shioriko, MemberArea::Center);
+    game.play_to_stage_baton(shioriko, MemberArea::Center);
 
     assert!(
         !game.has_pending_choice(),

@@ -24,6 +24,17 @@ impl AbilityResolver {
         }
         Ok(())
     }
+
+    /// Drop deferred costs without paying them.
+    ///
+    /// Rule 9.4.2.2, as the `SequentialCost` arm above already documents: the
+    /// binary sub-costs deferred ahead of a choice sub-cost are skipped as a WHOLE
+    /// when that choice is declined. Paying them anyway would apply
+    /// 「このメンバーをウェイトにし」 on a cost the player refused, so the member
+    /// ends up waited for a discard that never happened.
+    pub fn discard_deferred_costs(&mut self) {
+        self.awaiting.deferred_costs.clear();
+    }
 }
 
 /// Returns true if the given cost type creates a "pay or skip" prompt.

@@ -19,7 +19,7 @@ fn run_flow(db: std::sync::Arc<rabuka_engine::card::CardDatabase>, replaced_no: 
 
     let deck_before = game.state.player1.main_deck.cards.len();
 
-    game.play_to_stage(me, MemberArea::LeftSide);
+    game.play_to_stage_baton(me, MemberArea::LeftSide);
     if should_draw {
         assert!(
             game.has_pending_choice(),

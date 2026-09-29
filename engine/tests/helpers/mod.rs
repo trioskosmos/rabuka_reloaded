@@ -373,9 +373,46 @@ impl TestGame {
         r
     }
 
+    /// Play a member to a stage area.
+    ///
+    /// CAUTION: the stage has three slots, so a test that stages a member and then
+    /// plays into the same area gets a BATON TOUCH — the occupant is replaced and
+    /// sent to the waitroom. That is easy to do by accident and produces a *passing
+    /// but wrong* test: a negative whose setup no longer holds the state it was
+    /// written for. It happened in this suite, in `PL!-pb2-029-N`'s "stage is not
+    /// all μ's" case, which passed vacuously because playing to centre baton-touched
+    /// the very AZALEA member the test had staged.
+    ///
+    /// 137 tests were found to do this, so an assertion here was measured and
+    /// reverted rather than landed unreviewed — see
+    /// docs/PBLL02_ABILITY_REVIEW.md §8.3. Use `play_to_stage_baton` to say the
+    /// overlap is intended.
     pub fn play_to_stage(&mut self, card_id: i16, area: MemberArea) {
+        if let Some(occupant) = self.stage_occupant(card_id, area) {
+            panic!(
+                "BATON-TOUCH: play_to_stage into {area:?} already held {}. \
+                 Use play_to_stage_baton if the swap is intended.",
+                trace::ref_of(self, occupant)
+            );
+        }
         self.try_play_to_stage(card_id, area)
             .expect("play_to_stage failed");
+    }
+
+    /// Play a member into an area that may already be occupied, for tests that
+    /// deliberately exercise a baton touch. Prefer `play_to_stage` everywhere else.
+    pub fn play_to_stage_baton(&mut self, card_id: i16, area: MemberArea) {
+        self.try_play_to_stage(card_id, area)
+            .expect("play_to_stage_baton failed");
+    }
+
+    /// The card currently in `area` of OUR stage, if it is not the card being played.
+    /// Lets a test assert its own setup, which is what would have caught §8.3's
+    /// vacuous negative.
+    pub fn stage_occupant(&self, card_id: i16, area: MemberArea) -> Option<i16> {
+        let idx = area.to_index();
+        let slot = *self.state.player1.stage.stage.get(idx)?;
+        (slot != -1 && slot != card_id).then_some(slot)
     }
 
     pub fn try_play_to_stage(&mut self, card_id: i16, area: MemberArea) -> Result<(), String> {

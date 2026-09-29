@@ -1,4 +1,4 @@
-use crate::helpers::*;
+﻿use crate::helpers::*;
 use rabuka_engine::zones::MemberArea;
 
 /// PL!S-bp5-010-N 高海千歌 — 登場: if stage has total heart02 ≥5, opponent's next live global +1 heart00
@@ -16,7 +16,7 @@ fn s_bp5_010_with_5_heart02_triggers_global() {
     game.state.player1.hand.cards.push(chika);
     game.give_energy(15);
     for _ in 0..5 { let f=game.id("PL!-sd1-010-SD"); game.state.player1.main_deck.cards.push(f); }
-    game.play_to_stage(chika, MemberArea::Center);
+    game.play_to_stage(chika, MemberArea::RightSide);
     while game.has_pending_choice() { game.select_indices(&[]); }
     assert!(game.state.player1.stage.stage.contains(&chika));
 }
@@ -30,7 +30,7 @@ fn s_bp5_010_without_5_heart02_no_global() {
     game.state.player1.hand.cards.push(chika);
     game.give_energy(15);
     for _ in 0..5 { let f=game.id("PL!-sd1-010-SD"); game.state.player1.main_deck.cards.push(f); }
-    game.play_to_stage(chika, MemberArea::Center);
+    game.play_to_stage(chika, MemberArea::RightSide);
     assert!(game.state.player1.stage.stage.contains(&chika));
 }
 #[test]
@@ -46,7 +46,7 @@ fn s_bp5_010_exact_5_heart02_triggers() {
     game.state.player1.hand.cards.push(chika);
     game.give_energy(15);
     for _ in 0..5 { let f=game.id("PL!-sd1-010-SD"); game.state.player1.main_deck.cards.push(f); }
-    game.play_to_stage(chika, MemberArea::Center);
+    game.play_to_stage(chika, MemberArea::RightSide);
     assert!(game.state.player1.stage.stage.contains(&chika));
 }
 #[test]
@@ -62,6 +62,6 @@ fn s_bp5_010_4_heart02_no_trigger() {
     game.state.player1.hand.cards.push(chika);
     game.give_energy(15);
     for _ in 0..5 { let f=game.id("PL!-sd1-010-SD"); game.state.player1.main_deck.cards.push(f); }
-    game.play_to_stage(chika, MemberArea::Center);
+    game.play_to_stage(chika, MemberArea::RightSide);
     assert!(game.state.player1.stage.stage.contains(&chika));
 }

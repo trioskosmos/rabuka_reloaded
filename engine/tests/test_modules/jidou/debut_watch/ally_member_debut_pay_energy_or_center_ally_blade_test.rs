@@ -172,7 +172,9 @@ fn hana_009_not_center_no_trigger() {
     let ally = v.id("PL!HS-sd1-012-SD"); // 闢ｮ繝守ｩｺ member
     let filler = v.id("PL!-sd1-010-SD");
 
-    v.state.player1.stage.stage = [hana_center, filler, -1]; // 009 at LEFT (not center)
+    // 009 at LEFT (not center); Centre is left empty because the ally is played there
+    // below and would otherwise displace `filler`.
+    v.state.player1.stage.stage = [hana_center, -1, filler];
     v.state.player1.hand.cards.clear();
     v.state.player1.hand.cards.push(ally);
     v.give_energy(15);

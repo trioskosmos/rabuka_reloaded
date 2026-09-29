@@ -1,4 +1,4 @@
-/// Regression tests for character name condition fixes.
+﻿/// Regression tests for character name condition fixes.
 ///
 /// Fix 1 (condition/card.rs): location_condition now respects condition.characters
 ///   - 安養寺 姫芽 (PL!HS-sd1-006-SD): debut check for specific characters on stage
@@ -24,13 +24,21 @@ use rabuka_engine::zones::MemberArea;
 // Tests: the condition must correctly gate on the character names.
 // ====================================================================
 
-/// Helper: set up stage with characters at center+right, himeno+extra energy,
-/// play himeno to left_side, drain all choices.
-fn setup_and_trigger_himeno(game: &mut TestGame, left: i16, center: i16, right: i16) {
+/// Helper: stage the two witness characters at centre+right, then debut Himeno into
+/// the empty left slot. Only the two surviving slots are parameters: Himeno always
+/// plays to `LeftSide`, so a character placed there was silently baton-touched away,
+/// leaving a stage that no longer matched what the assertions described.
+fn setup_and_trigger_himeno(game: &mut TestGame, center: i16, right: i16) {
     let himeno = game.id("PL!HS-sd1-006-SD");
     let filler = game.id("PL!-sd1-013-SD");
 
-    game.state.player1.stage.stage = [left, center, right];
+    assert_eq!(
+        game.state.player1.stage.stage[MemberArea::LeftSide as usize],
+        -1,
+        "the left slot must be empty: Himeno plays there and would replace its occupant"
+    );
+    game.state.player1.stage.stage[MemberArea::Center as usize] = center;
+    game.state.player1.stage.stage[MemberArea::RightSide as usize] = right;
     game.add_to_hand(himeno);
     game.add_to_hand(filler);
     game.give_energy(99);
@@ -54,7 +62,7 @@ fn himeno_no_matching_character_does_not_trigger() {
     let non_matching = game.id("PL!-sd1-010-SD");
     let filler = game.id("PL!-sd1-013-SD");
 
-    setup_and_trigger_himeno(&mut game, filler, non_matching, filler);
+    setup_and_trigger_himeno(&mut game, non_matching, filler);
 
     let en = game.state.player1.energy_zone.active_count();
     assert!(en > 0, "Energy is from setup");
@@ -72,7 +80,7 @@ fn himeno_osawa_on_stage_triggers() {
     let osawa = game.id("PL!HS-sd1-003-SD");
     let filler = game.id("PL!-sd1-013-SD");
 
-    setup_and_trigger_himeno(&mut game, filler, filler, osawa);
+    setup_and_trigger_himeno(&mut game, filler, osawa);
 
     // The ability activates 1 energy + retrieves a live card from waitroom.
     // Live cards have no abilities, so no extra triggers.
@@ -92,7 +100,7 @@ fn himeno_momoo_on_stage_triggers() {
     let momoo = game.id("PL!HS-sd1-004-SD");
     let filler = game.id("PL!-sd1-013-SD");
 
-    setup_and_trigger_himeno(&mut game, filler, filler, momoo);
+    setup_and_trigger_himeno(&mut game, filler, momoo);
 
     let en = game.state.player1.energy_zone.active_count();
     assert!(en > 0, "Energy should be >0");
@@ -107,7 +115,7 @@ fn himeno_kodomo_on_stage_triggers() {
     let kodomo = game.id("PL!HS-sd1-005-SD");
     let filler = game.id("PL!-sd1-013-SD");
 
-    setup_and_trigger_himeno(&mut game, filler, filler, kodomo);
+    setup_and_trigger_himeno(&mut game, filler, kodomo);
 
     let en = game.state.player1.energy_zone.active_count();
     assert!(en > 0, "Energy should be >0");
@@ -122,7 +130,7 @@ fn himeno_all_three_on_stage_triggers() {
     let momoo = game.id("PL!HS-sd1-004-SD");
     let kodomo = game.id("PL!HS-sd1-005-SD");
 
-    setup_and_trigger_himeno(&mut game, -1, momoo, kodomo);
+    setup_and_trigger_himeno(&mut game, momoo, kodomo);
 
     let en = game.state.player1.energy_zone.active_count();
     assert!(en > 0, "Energy should be >0");
@@ -137,7 +145,7 @@ fn himeno_mixed_characters_triggers() {
     let osawa = game.id("PL!HS-sd1-003-SD");
     let non_matching = game.id("PL!-sd1-010-SD");
 
-    setup_and_trigger_himeno(&mut game, -1, non_matching, osawa);
+    setup_and_trigger_himeno(&mut game, non_matching, osawa);
 
     let en = game.state.player1.energy_zone.active_count();
     assert!(en > 0, "Energy should be >0");
@@ -149,7 +157,7 @@ fn himeno_empty_stage_does_not_trigger() {
     let db = load_real_database();
     let mut game = TestGame::new(db);
 
-    setup_and_trigger_himeno(&mut game, -1, -1, -1);
+    setup_and_trigger_himeno(&mut game, -1, -1);
 
     let en = game.state.player1.energy_zone.active_count();
     assert!(en > 0, "Energy is from setup");

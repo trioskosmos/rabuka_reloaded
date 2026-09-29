@@ -83,7 +83,9 @@ fn try_baton_strict(replaced_no: &str) -> bool {
     g.state.player1.main_deck.cards.push(d1);
     g.state.player1.main_deck.cards.push(d2);
     let before = g.state.player1.main_deck.cards.len();
-    g.play_to_stage(me, MemberArea::LeftSide);
+    // Deliberate: `replaced` occupies the left slot and this play swaps it out. The
+    // behaviour under test is the cost-gated draw that a baton touch produces.
+    g.play_to_stage_baton(me, MemberArea::LeftSide);
     let had = g.has_pending_choice();
     if had { g.select_indices(&[0]); }
     let after = g.state.player1.main_deck.cards.len();

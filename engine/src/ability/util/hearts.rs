@@ -59,17 +59,33 @@ pub fn constant_per_unit_units(
     let zone = constant_per_unit_zone(effect);
     let mut filter = effect.filter_subset();
     filter.exclude_self = Some(host_card_id);
-    let per_count = super::resolve_per_unit_count(
-        true,
-        Some(zone),
-        player,
-        card_db,
-        &filter,
-        &[],
-        effect.state_any(),
-        orientation_modifiers,
-        Some(host_card_id),
-    );
+    // 「…のスコアの合計Nにつき」 counts a POINTS total, not a card tally: four
+    // score-1 lives are 4 cards but only 4 points, and 「合計5につき」 must not fire
+    // on them. Same zone, same filter, same host scoping as the tally below, so the
+    // two always agree on WHICH cards are in scope.
+    let per_count = if effect.per_unit_aggregate_any().as_deref() == Some("score") {
+        super::resolve_per_unit_score_sum(
+            Some(zone),
+            player,
+            card_db,
+            &filter,
+            effect.state_any(),
+            orientation_modifiers,
+            Some(host_card_id),
+        )
+    } else {
+        super::resolve_per_unit_count(
+            true,
+            Some(zone),
+            player,
+            card_db,
+            &filter,
+            &[],
+            effect.state_any(),
+            orientation_modifiers,
+            Some(host_card_id),
+        )
+    };
     // `i16` because this is a unit COUNT feeding a modifier product, not a
     // score. The divisor is `.max(1)` so it can never be zero, and both
     // operands are `u8`, so the quotient is always in `i16` range — the

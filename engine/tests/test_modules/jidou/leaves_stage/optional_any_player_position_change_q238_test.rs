@@ -283,7 +283,7 @@ fn baton_leaves_stage_offers_arriver_position_change_q238() {
     g.give_energy(20);
 
     // Baton touch: play arriver to Center (Rino's area)
-    g.play_to_stage(arriver, rabuka_engine::zones::MemberArea::Center);
+    g.play_to_stage_baton(arriver, rabuka_engine::zones::MemberArea::Center);
 
     // Rino was replaced from stage to waitroom → her auto ability should fire
     // offering a position change for a member on stage
@@ -326,7 +326,7 @@ fn baton_leaves_stage_lone_arriver_still_offers_position_change_q238() {
     g.give_energy(20);
 
     // Baton touch: play arriver to Center (Rino's area)
-    g.play_to_stage(arriver, rabuka_engine::zones::MemberArea::Center);
+    g.play_to_stage_baton(arriver, rabuka_engine::zones::MemberArea::Center);
 
     // After baton touch: Rino is in waitroom, arriver is on stage:center
     // The arriver IS on stage, so there IS a valid target.
@@ -357,7 +357,7 @@ fn baton_leaves_stage_offers_own_and_opponent_position_change_q238() {
     g.give_energy(20);
 
     // Baton touch: play arriver to Center
-    g.play_to_stage(arriver, rabuka_engine::zones::MemberArea::Center);
+    g.play_to_stage_baton(arriver, rabuka_engine::zones::MemberArea::Center);
 
     // Rino replaced → auto fires
     assert!(

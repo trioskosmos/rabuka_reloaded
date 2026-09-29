@@ -38,7 +38,7 @@ fn cheaper_baton_hand_reset_q229_baton_touch_triggers_discard_then_draw() {
 
     game.state.player1.stage.stage[1] = cheap;
     game.give_energy(13);
-    game.play_to_stage(nozomi, rabuka_engine::zones::MemberArea::Center);
+    game.play_to_stage_baton(nozomi, rabuka_engine::zones::MemberArea::Center);
 
     // P1 must discard down to 3 (mandatory SelectCard from hand).
     assert!(
@@ -83,7 +83,7 @@ fn cheaper_baton_hand_reset_q229_both_at_3_no_discard_draw_3() {
 
     game.state.player1.stage.stage[1] = cheap;
     game.give_energy(13);
-    game.play_to_stage(nozomi, rabuka_engine::zones::MemberArea::Center);
+    game.play_to_stage_baton(nozomi, rabuka_engine::zones::MemberArea::Center);
 
     assert_eq!(game.state.player1.hand.cards.len(), 6, "P1: 4-1+3 = 6");
     assert_eq!(game.state.player2.hand.cards.len(), 6, "P2: 3+3 = 6");
@@ -111,7 +111,7 @@ fn cheaper_baton_hand_reset_q229_both_at_3_all_rarities() {
 
         game.state.player1.stage.stage[1] = cheap;
         game.give_energy(13);
-        game.play_to_stage(nozomi, rabuka_engine::zones::MemberArea::Center);
+        game.play_to_stage_baton(nozomi, rabuka_engine::zones::MemberArea::Center);
 
         assert_eq!(game.state.player1.hand.cards.len(), 6, "{card_no}: P1 draw");
         assert_eq!(game.state.player2.hand.cards.len(), 6, "{card_no}: P2 draw");
@@ -139,7 +139,7 @@ fn cheaper_baton_hand_reset_edge_equal_cost_baton_touch_no_trigger() {
 
     // Stage has a cost-13 card at Center
     game.state.player1.stage.stage[1] = same_cost;
-    game.play_to_stage(nozomi, rabuka_engine::zones::MemberArea::Center);
+    game.play_to_stage_baton(nozomi, rabuka_engine::zones::MemberArea::Center);
 
     // Baton touch occurs (equal cost → cost_paid = 13-13 = 0)
     // But the ability's operator is "<" (replaced < new)
@@ -167,7 +167,7 @@ fn cheaper_baton_hand_reset_edge_play_to_empty_no_trigger() {
     game.give_energy(13);
 
     game.state.player1.stage.stage[1] = -1;
-    game.play_to_stage(nozomi, rabuka_engine::zones::MemberArea::Center);
+    game.play_to_stage_baton(nozomi, rabuka_engine::zones::MemberArea::Center);
 
     assert_eq!(
         game.state.player1.hand.cards.len(),
@@ -202,7 +202,7 @@ fn cheaper_baton_hand_reset_q229_both_over_3_discard_in_order_then_draw() {
 
     game.state.player1.stage.stage[1] = cheap;
     game.give_energy(13);
-    game.play_to_stage(nozomi, rabuka_engine::zones::MemberArea::Center);
+    game.play_to_stage_baton(nozomi, rabuka_engine::zones::MemberArea::Center);
 
     assert_eq!(game.state.player1.stage.stage[1], nozomi);
     assert_eq!(

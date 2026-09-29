@@ -69,7 +69,7 @@ fn baton_touch_activates_energy() {
     let e_before = active_energy(&game);
 
     game.state.player1.hand.cards.push(replacer);
-    game.play_to_stage(replacer, MemberArea::Center);
+    game.play_to_stage_baton(replacer, MemberArea::Center);
     drain_all(&mut game);
 
     let e_after = active_energy(&game);
@@ -139,7 +139,7 @@ fn q84_both_triggers_in_baton_touch_resolve_ordered() {
     let e_before = active_energy(&game);
 
     game.state.player1.hand.cards.push(edelnote);
-    game.play_to_stage(edelnote, MemberArea::Center);
+    game.play_to_stage_baton(edelnote, MemberArea::Center);
     drain_all(&mut game);
 
     let e_after = active_energy(&game);

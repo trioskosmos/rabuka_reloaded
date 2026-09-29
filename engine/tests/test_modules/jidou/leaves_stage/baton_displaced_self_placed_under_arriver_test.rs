@@ -34,7 +34,7 @@ fn setup_deck_and_energy(game: &mut TestGame) {
 /// any auto-ability prompts (borrowed from bp7_kanon_under_member_blade_test).
 fn baton_touch_over(game: &mut TestGame, arriver: i16) {
     game.state.player1.hand.cards.push(arriver);
-    game.play_to_stage(arriver, MemberArea::Center);
+    game.play_to_stage_baton(arriver, MemberArea::Center);
     while game.has_pending_choice() {
         let required = game.state.get_pending_choice().is_some_and(|c| {
             matches!(
@@ -127,7 +127,7 @@ fn baton_displaced_self_as_arriver_not_displaced() {
 
     let kanon = game.id(KANON);
     game.state.player1.hand.cards.push(kanon);
-    game.play_to_stage(kanon, MemberArea::Center);
+    game.play_to_stage_baton(kanon, MemberArea::Center);
     // Answer what cannot be declined, decline what can: a mandatory
     // prompt left parked mid-ability produces exactly the absence
     // the next assertion checks, so nothing fails.

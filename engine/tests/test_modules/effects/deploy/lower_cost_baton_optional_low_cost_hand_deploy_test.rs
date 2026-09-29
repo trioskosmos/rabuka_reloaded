@@ -118,7 +118,7 @@ fn lower_cost_baton_hand_deploy_no_baton_touch_no_appear() {
     game.state.player1.hand.cards.push(cheap);
     game.give_energy(17);
 
-    game.play_to_stage(maki, MemberArea::Center);
+    game.play_to_stage_baton(maki, MemberArea::Center);
 
     assert!(
         game.state.player1.hand.cards.contains(&cheap),

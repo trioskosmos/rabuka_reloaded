@@ -85,7 +85,7 @@ fn setsuna_turn2_budget_two_draws_third_refused() {
     // Fire 2 (other): arriver takes occupied left while Setsuna watches.
     game.state.player1.stage.set_area(MemberArea::LeftSide, filler_l);
     game.state.player1.hand.cards.push(arr2);
-    game.play_to_stage(arr2, MemberArea::LeftSide);
+    game.play_to_stage_baton(arr2, MemberArea::LeftSide);
     resolve_auto_choices_accepting_optionals(&mut game);
     assert_eq!(
         game.state.player1.hand.cards.len(),
@@ -97,7 +97,7 @@ fn setsuna_turn2_budget_two_draws_third_refused() {
     // Fire 3: budget exhausted — arrival happens, no draw.
     game.state.player1.stage.set_area(MemberArea::RightSide, filler_r);
     game.state.player1.hand.cards.push(arr3);
-    game.play_to_stage(arr3, MemberArea::RightSide);
+    game.play_to_stage_baton(arr3, MemberArea::RightSide);
     resolve_auto_choices_accepting_optionals(&mut game);
     assert_eq!(
         game.state.player1.hand.cards.len(),
@@ -117,7 +117,7 @@ fn setsuna_normal_debut_does_not_fire() {
     // Left occupied, right EMPTY: arrival to right is a plain debut.
     game.state.player1.stage.set_area(MemberArea::LeftSide, filler);
     game.state.player1.hand.cards.push(setsuna);
-    game.play_to_stage(setsuna, MemberArea::RightSide);
+    game.play_to_stage_baton(setsuna, MemberArea::RightSide);
     resolve_auto_choices_accepting_optionals(&mut game);
 
     assert!(

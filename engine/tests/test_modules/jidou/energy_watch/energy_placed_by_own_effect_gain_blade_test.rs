@@ -1,4 +1,4 @@
-/// BP07 CLEAN-G17: 葉月 恋 "energy placed into your energy zone by your card's
+﻿/// BP07 CLEAN-G17: 葉月 恋 "energy placed into your energy zone by your card's
 /// effect → gain blade ×1 until live end."
 ///
 /// D25: PL!SP-bp7-005-R＋ 葉月 恋 ab#1 (自動, ターン2回)
@@ -256,11 +256,13 @@ fn turn2_watcher_second_real_debut_placement_gains_again_and_third_is_refused() 
     );
 
     // --- 2nd real placement: play a second copy to the LEFT ---
-    // The LEFT slot is free, so this is a second genuine debut -> a second
-    // own-effect energy placement in the same turn.
+    // Deliberate swap, despite the comment above: 恋 is still in the LEFT slot, and
+    // the precondition assertion further down requires the two placers to end up
+    // occupying LEFT and RIGHT — which only holds if this play displaces her. Marked
+    // explicitly so the swap is not silent.
     let placer2 = game.id(ENERGY_PLACER);
     game.state.player1.hand.cards.push(placer2);
-    game.play_to_stage(placer2, MemberArea::LeftSide);
+    game.play_to_stage_baton(placer2, MemberArea::LeftSide);
     drain_auto_choices(&mut game);
     assert_eq!(
         blade(&game, ren),

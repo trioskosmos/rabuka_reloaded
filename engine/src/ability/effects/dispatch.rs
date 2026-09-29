@@ -110,6 +110,15 @@ pub fn execute_effect(
         // Not an executor: this variant's effect is applied by the constant
         // modifier scan in core::game_state::modifiers, not by dispatch.
         ActionType::ModifyYellSource => Ok(()),
+        // Also not an executor, and deliberately NOT a constant either: a
+        // replacement rule is resolved once, at the moment the card is placed, by
+        // `GameState::replacement_appear_wait_applies` (called from
+        // turn::phases::handle_play_member_to_stage). Dispatching it would apply it a
+        // second time at an unrelated trigger.
+        ActionType::ReplacementAppearWait => Ok(()),
+        // A counting weight, consumed by the count path
+        // (`GameState::weighted_zone_count`), never by dispatch.
+        ActionType::CountAsMultiple => Ok(()),
         ActionType::SetCost => {
             resolver.execute_set_cost(gs, effect);
             Ok(())

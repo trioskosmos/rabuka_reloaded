@@ -1266,6 +1266,17 @@ impl super::TurnEngine {
         game_state.baton_touch_replaced_member_cost = replaced_member_cost;
         game_state.baton_touch_replaced_member_id = replaced_member_id;
 
+        // Replacement appearance rules (PL!-pb2-002-PP 絢瀬絵里): resolved ONCE, here,
+        // as the card lands. Deliberately not a constant — see
+        // GameState::replacement_appear_wait_applies. Checked after
+        // move_card_from_hand_to_stage so the card is on the stage (the rule is
+        // about the area) and before any ability trigger can observe the orientation.
+        if game_state.replacement_appear_wait_applies(card_id, area as usize) {
+            game_state
+                .mods
+                .add_orientation_modifier(card_id, "wait");
+        }
+
         // Per Q24, baton touch step 2 (old card → waitroom) happens before step 4
         // (new card → stage). Enqueue movement-based triggers BEFORE appearance
         // triggers so they resolve first when process_pending runs below.

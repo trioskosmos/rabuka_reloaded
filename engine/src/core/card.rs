@@ -946,6 +946,12 @@ pub struct EffectFilter {
     pub same_name: Option<bool>,
     pub same_unit_name: Option<bool>,
     pub group_names: Option<Box<Vec<String>>>,
+    /// The groups whose effects see a `count_as_multiple` weight
+    /// (PL!-pb2-041-L: 「自分の『lily white』のカードの効果によって…」). This is the
+    /// OPPOSITE direction to `group_names` and must never be used as a card filter.
+    pub counted_by: Option<Box<Vec<String>>>,
+    /// The weight itself for `count_as_multiple` — 「このカードは2枚として扱う」.
+    pub count_as: Option<u8>,
     pub self_target: Option<bool>,
     /// "Under THIS member" for under_member placement (e.g. "…をこのメンバーの
     /// 下に置く"). Distinct from `self_target` (which has source-filtering
@@ -962,10 +968,21 @@ pub struct EffectFilter {
     pub exclude_group_names: Option<Box<Vec<String>>>,
     pub activation_position: Option<ArcStr>,
     pub original_value: Option<bool>,
+    /// 「元々持つハートの数がNつ以下」 — bound on the SUM of a card's printed hearts.
+    /// Static card data, so unlike a current-blade bound it is evaluated inside
+    /// `CardFilter::matches`. Defaults to `<=` when the operator is absent, since
+    /// 「Nつ以下」 is the phrasing this exists for.
+    pub heart_total_limit: Option<u8>,
+    pub heart_total_operator: Option<ArcStr>,
     pub target_count: Option<u8>,
     pub per_unit: Option<bool>,
     pub per_unit_count: Option<u8>,
     pub per_unit_type: Option<ArcStr>,
+    /// When set, the per-unit count is an aggregate over the matching cards rather
+    /// than a tally of them. `"score"` = the sum of the cards' printed scores, for
+    /// 「…のスコアの合計Nにつき」. `per_unit_type` still names the zone; only the
+    /// measured quantity changes, so the two are kept apart.
+    pub per_unit_aggregate: Option<ArcStr>,
     /// What the per-unit count is measured against (e.g. "previous_moved_cards"
     /// = cards moved by the preceding action step). Without this the generic
     /// per-unit branch wrongly counts the default location instead.
@@ -1267,7 +1284,19 @@ impl EffectKind {
             | "modify_required_hearts_global"
             | "modify_required_hearts_success" => EffectKind::ModifyHearts { filter },
             "gain_resource" | "pay_energy" => EffectKind::GainResource { filter },
-            "change_state" | "set_card_identity" | "set_card_identity_all_regions" => {
+            "change_state"
+            | "set_card_identity"
+            | "set_card_identity_all_regions"
+            // A replacement appearance rule is a state change TO WAIT carrying the
+            // same filters (card_type, position, heart/blade bound), so it reuses the
+            // ChangeState variant. Without an entry here the filter is dropped during
+            // `populate_from_json`, and the rule silently matches nothing — the
+            // ability still decodes and still reports its action, so nothing errors.
+            | "replacement_appear_wait"
+            // A counting weight carries the same filter shape (its own zone condition
+            // and the `counted_by` group list), so it rides the same variant. Neither
+            // action is dispatched — both are consumed elsewhere.
+            | "count_as_multiple" => {
                 EffectKind::ChangeState { filter }
             }
             "gain_ability"
@@ -1506,6 +1535,8 @@ impl AbilityEffect {
         let filter = || {
             let f = EffectFilter {
                 card_type: None,
+                counted_by: None,
+                count_as: None,
                 exclude_self: bool_field!("exclude_self"),
                 same_name: bool_field!("same_name"),
                 same_unit_name: bool_field!("same_unit_name"),
@@ -1522,10 +1553,13 @@ impl AbilityEffect {
                 exclude_group_names: opt_str_vec_field!("exclude_group_names"),
                 activation_position: str_field!("activation_position"),
                 original_value: bool_field!("original_value"),
+                heart_total_limit: u8_field!("heart_total_limit"),
+                heart_total_operator: str_field!("heart_total_operator"),
                 target_count: u8_field!("target_count"),
                 per_unit: bool_field!("per_unit"),
                 per_unit_count: u8_field!("per_unit_count"),
                 per_unit_type: str_field!("per_unit_type"),
+                per_unit_aggregate: str_field!("per_unit_aggregate"),
                 per_unit_source: str_field!("per_unit_source"),
                 group_reference: str_field!("group_reference"),
                 state: obj
@@ -2047,6 +2081,11 @@ impl AbilityEffect {
     filter_copy_getter!(original_operator_any, Operator, original_operator);
 
     filter_bool_getter!(original_value_any, original_value);
+    filter_u8_getter!(heart_total_limit_any, heart_total_limit);
+    filter_str_getter!(heart_total_operator_any, heart_total_operator);
+
+    filter_u8_getter!(count_as_any, count_as);
+    filter_box_vec_ref_getter!(counted_by_any, counted_by);
 
     filter_u8_getter!(per_group_count_any, per_group_count);
 
@@ -2065,6 +2104,8 @@ impl AbilityEffect {
     filter_str_getter!(per_unit_location_any, per_unit_location);
 
     filter_str_getter!(per_unit_type_any, per_unit_type);
+
+    filter_str_getter!(per_unit_aggregate_any, per_unit_aggregate);
 
     filter_str_getter!(per_unit_source_any, per_unit_source);
 
@@ -2290,6 +2331,7 @@ impl AbilityEffect {
     filter_setter!(set_per_unit, per_unit: bool);
     filter_setter!(set_per_unit_count, per_unit_count: u8);
     filter_setter!(set_per_unit_type, per_unit_type: ArcStr);
+    filter_setter!(set_per_unit_aggregate, per_unit_aggregate: ArcStr);
     filter_setter!(set_self_target, self_target: bool);
     filter_setter!(set_target_count, target_count: u8);
     filter_setter!(set_target_member, target_member: ArcStr);
@@ -2363,6 +2405,11 @@ impl AbilityEffect {
             } else {
                 None
             },
+            // 「元々持つハート」 can only ever mean the printed total, so this one is
+            // not gated on `original` — there is no current-heart variant of the
+            // phrase to disambiguate from.
+            original_heart_total: self.heart_total_limit_any(),
+            original_heart_total_operator: self.heart_total_operator_any().or(Some("<=")),
             current_blade_limit: if original {
                 None
             } else {
@@ -3060,6 +3107,11 @@ pub struct ConditionCommon {
     pub location: Option<ArcStr>,
     #[cfg_attr(feature = "serde_support", serde(default))]
     pub locations: Option<Box<Vec<String>>>,
+    /// A 「AかB」 pair of `locations` is a symmetric disjunction: being in EITHER
+    /// zone satisfies the condition. Without this the multi-location path reads it
+    /// as the 「AをBに」 move shape, where only `locations[1]` counts.
+    #[cfg_attr(feature = "serde_support", serde(default))]
+    pub any_location: Option<bool>,
     #[cfg_attr(feature = "serde_support", serde(default))]
     pub min_baton_touch_count: Option<u8>,
     /// Movement gate on ANY condition variant (「…されたとき」 placement/
@@ -3471,6 +3523,12 @@ impl Condition {
         self.common()
             .and_then(|c| c.locations.as_deref())
             .map(|v| v.as_slice())
+    }
+
+    /// Whether a multi-`locations` condition is a 「AかB」 disjunction (either zone
+    /// qualifies) rather than a 「AをBに」 move (only `locations[1]`).
+    pub fn get_any_location(&self) -> Option<bool> {
+        self.common().and_then(|c| c.any_location)
     }
 
     pub fn get_target(&self) -> Option<&str> {

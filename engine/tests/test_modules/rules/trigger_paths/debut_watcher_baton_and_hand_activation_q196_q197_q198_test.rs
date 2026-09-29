@@ -43,11 +43,11 @@ fn cost11_baton_replacement_moves_debut_watcher_to_waitroom_q198() {
     }
 
     // Play Ranju to stage
-    game.play_to_stage(ranju, MemberArea::Center);
+    game.play_to_stage_baton(ranju, MemberArea::Center);
     game.state.player1.deployed_this_turn.clear();
 
     // Baton-touch: play cost11 to same area (Center)
-    game.play_to_stage(cost11, MemberArea::Center);
+    game.play_to_stage_baton(cost11, MemberArea::Center);
 
     // Auto should NOT fire — Ranju was replaced before cost11 appeared.
     // Ranju is now in waitroom, so the condition "location: stage" fails.
@@ -87,11 +87,11 @@ fn cost11_debut_with_watcher_retains_nonempty_energy_zone_q198() {
     }
 
     // Play Ranju to stage (cost 11) → LeftSide, leaving Center open for cost11
-    game.play_to_stage(ranju, MemberArea::LeftSide);
+    game.play_to_stage_baton(ranju, MemberArea::LeftSide);
     game.state.player1.deployed_this_turn.clear();
 
     // Play cost11 member to Center — Ranju is still on stage at Left
-    game.play_to_stage(cost11, MemberArea::Center);
+    game.play_to_stage_baton(cost11, MemberArea::Center);
 
     // Auto should fire: energy deck → place 1 energy in wait state
     // Answer what cannot be declined, decline what can: a mandatory
@@ -130,7 +130,7 @@ fn cost10_baton_replacement_does_not_draw_from_departed_watcher_q197() {
     }
 
     // Play Miyashita to stage (cost 2)
-    game.play_to_stage(miya, MemberArea::Center);
+    game.play_to_stage_baton(miya, MemberArea::Center);
     game.state.player1.deployed_this_turn.clear();
 
     // Count hand before baton touch
@@ -138,7 +138,7 @@ fn cost10_baton_replacement_does_not_draw_from_departed_watcher_q197() {
     let deck_before = game.state.player1.main_deck.cards.len();
 
     // Baton-touch: play cost10 to same area
-    game.play_to_stage(cost10, MemberArea::Center);
+    game.play_to_stage_baton(cost10, MemberArea::Center);
 
     // Auto should NOT fire
     // Answer what cannot be declined, decline what can: a mandatory
@@ -190,13 +190,13 @@ fn cost10_debut_with_watcher_draws_to_replace_played_card_q197() {
     }
 
     // Play Miyashita to LeftSide (cost 2)
-    game.play_to_stage(miya, MemberArea::LeftSide);
+    game.play_to_stage_baton(miya, MemberArea::LeftSide);
     game.state.player1.deployed_this_turn.clear();
 
     let hand_before = game.state.player1.hand.cards.len();
 
     // Play cost10 member to Center — Miya still on stage
-    game.play_to_stage(cost10, MemberArea::Center);
+    game.play_to_stage_baton(cost10, MemberArea::Center);
 
     // Auto should fire: draw 1 card
     // Answer what cannot be declined, decline what can: a mandatory

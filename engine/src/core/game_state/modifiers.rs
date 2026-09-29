@@ -167,8 +167,238 @@ impl GameState {
         }
     }
 
-    fn collect_reusable_constant_stage_effect_ids(&self, ids: &mut Vec<(i16, usize)>) {
-        for cid in self
+    /// How many cards `counted` is worth when a card counted by `counting_card`'s
+    /// effect is counted — normally 1.
+    ///
+    /// PL!-pb2-041-L 春情ロマンティック: 「自分の『lily white』のカードの効果によって、
+    /// 自分の成功ライブカード置き場にあるカードの枚数を数えるとき、このカードは2枚と
+    /// して扱う」. The weight applies only to effects in a listed group, and only while
+    /// the rule's own condition holds (the card is in the success live zone — which,
+    /// when counting that zone, it is by definition).
+    pub fn count_as_multiple_weight(&self, counted: i16, counting_card: Option<i16>) -> u32 {
+        // "Which card is counting" is the card whose ability is running. Read it from
+        // the ability queue first: `activating_card` is frequently unset while a
+        // condition is evaluated, and the count belongs to the effect, not to
+        // whatever card happens to be marked active.
+        let counting_card = counting_card
+            .filter(|&c| c != -1)
+            .or_else(|| {
+                self.ability_queue
+                    .current_entry()
+                    .and_then(|e| e.card_id)
+                    .filter(|&c| c != -1)
+            })
+            .or(self.activating_card)
+            .filter(|&c| c != -1);
+        let Some(counting) = counting_card else {
+            return 1;
+        };
+        let card = match self.card_database.get_card(counted) {
+            Some(c) => c,
+            None => return 1,
+        };
+        for ar in &card.abilities {
+            let ability = ar.resolve();
+            if !ability
+                .triggers
+                .as_ref()
+                .is_some_and(|t| t.contains(crate::triggers::CONSTANT))
+            {
+                continue;
+            }
+            let Some(effect) = ability.effect.as_ref() else {
+                continue;
+            };
+            if effect.action != crate::ability::enums::ActionType::CountAsMultiple {
+                continue;
+            }
+            // The rule's own condition — for this card, "is in the success live zone".
+            let cond_met = {
+                use crate::ability::condition::ConditionContext;
+                let owner = self.owner_of_card(counted);
+                let ctx = ConditionContext::new_with_self(self, owner);
+                effect
+                    .condition
+                    .as_ref()
+                    .is_none_or(|c| ctx.evaluate_condition(c))
+            };
+            if !cond_met {
+                continue;
+            }
+            // `counted_by` is the list of groups whose effects SEE the weight. An
+            // empty list means any effect sees it.
+            let seen_by = effect
+                .counted_by_any()
+                .map(|v| v.to_vec())
+                .unwrap_or_default();
+            if !seen_by.is_empty() {
+                let ok = seen_by
+                    .iter()
+                    .any(|g| crate::ability::util::card_matches_group_str(
+                        &self.card_database,
+                        counting,
+                        Some(g),
+                    ));
+                if !ok {
+                    continue;
+                }
+            }
+            return u32::from(effect.count_as_any().unwrap_or(2).max(1));
+        }
+        1
+    }
+
+    /// Count of a zone, honouring any `count_as_multiple` weights on the cards in it.
+    ///
+    /// `counting_card` is the card whose effect is asking — the weight only applies to
+    /// the groups that card belongs to. `group_names` filters which cards are counted
+    /// at all, exactly as the unweighted path does.
+    pub fn weighted_zone_count(
+        &self,
+        cards: &[i16],
+        card_type: Option<&str>,
+        group_names: Option<&[String]>,
+        counting_card: Option<i16>,
+    ) -> u32 {
+        let card_db = &self.card_database;
+        // An empty card_type means "any", not "matches the empty type" — passing
+        // Some("") through would match nothing and silently count zero cards.
+        let ct = card_type.filter(|c| !c.is_empty());
+        cards
+            .iter()
+            .filter(|&&cid| {
+                if cid == -1 {
+                    return false;
+                }
+                if let Some(ct) = ct {
+                    if !crate::ability::util::card_matches_type(card_db, cid, Some(ct)) {
+                        return false;
+                    }
+                }
+                if let Some(groups) = group_names {
+                    if !groups.is_empty()
+                        && !groups.iter().any(|g| {
+                            crate::ability::util::card_matches_group_str(card_db, cid, Some(g))
+                        })
+                    {
+                        return false;
+                    }
+                }
+                true
+            })
+            .map(|&cid| self.count_as_multiple_weight(cid, counting_card))
+            .sum()
+    }
+
+    /// Does an on-stage `replacement_appear_wait` rule hold `incoming` in wait as it
+    /// appears in `area_idx`?
+    ///
+    /// PL!-pb2-002-PP 絢瀬絵里 — 「このメンバーの正面のエリアには、元々持つハートの数が
+    /// 4つ以下のメンバーは、ウェイト状態で登場する」. It is a REPLACEMENT rule, so it is
+    /// resolved once here at placement rather than in the constant scan: a constant
+    /// would re-apply on every recalculation and the member could never leave wait.
+    ///
+    /// 「正面のエリア」 is read as the CENTRE area for every stage slot, which is the
+    /// reading recorded in docs/PBLL02_ABILITY_REVIEW.md — the card does not say
+    /// which area 正面 is for a member standing in a side slot, and this is the
+    /// conservative reading of the printed text.
+    ///
+    /// The rule applies to ANY member appearing there, on either side, so both stages
+    /// are scanned.
+    pub fn replacement_appear_wait_applies(&self, incoming: i16, area_idx: usize) -> bool {
+        let Some(card) = self.card_database.get_card(incoming) else {
+            return false;
+        };
+        if !card.is_member() {
+            return false;
+        }
+        let printed_hearts: u8 = card
+            .base_heart
+            .as_ref()
+            .map(|bh| bh.hearts.values().fold(0u8, |a, n| a.saturating_add(*n)))
+            .unwrap_or(0);
+        // 正面 resolves to the centre area for every stage slot. See the doc comment.
+        const FRONT_SLOT: usize = 1;
+        let _ = FRONT_SLOT;
+
+        for player in [&self.player1, &self.player2] {
+            for &stage_id in player.stage.stage.iter() {
+                if stage_id == -1 {
+                    continue;
+                }
+                // The card being placed cannot be its own host. Without this, the
+                // host's own rule matched her on the very turn she arrived (she is on
+                // the stage by the time the check runs) and she entered in wait —
+                // which then disabled her rule for every other member afterwards.
+                // A member is never in front of itself.
+                if stage_id == incoming {
+                    continue;
+                }
+                let Some(host) = self.card_database.get_card(stage_id) else {
+                    continue;
+                };
+                for ar in &host.abilities {
+                    let ability = ar.resolve();
+                    if !ability
+                        .triggers
+                        .as_ref()
+                        .is_some_and(|t| t.contains(crate::triggers::CONSTANT))
+                    {
+                        continue;
+                    }
+                    let Some(effect) = ability.effect.as_ref() else {
+                        continue;
+                    };
+                    if effect.action
+                        != crate::ability::enums::ActionType::ReplacementAppearWait
+                    {
+                        continue;
+                    }
+                    // Host must still be active: a waited host's rule does not apply.
+                    if self.mods.get_orientation_modifier(stage_id) == Some("wait") {
+                        continue;
+                    }
+                    if let Some(pos) = effect.position_any() {
+                        let pos_str = pos.get_position().unwrap_or("?");
+                        let Some(slot) = crate::ability::util::stage_position_index(pos_str)
+                        else {
+                            continue;
+                        };
+                        // The rule governs the AREA the incoming member is entering.
+                        // Comparing the host's own position against the host's own
+                        // position is always true, so without comparing it to
+                        // `area_idx` the rule applied to every area.
+                        if slot != area_idx {
+                            continue;
+                        }
+                    }
+                    if let Some(ct) = effect.card_type_any() {
+                        if *ct != crate::card::CardType::Member {
+                            continue;
+                        }
+                    }
+                    let limit = effect.heart_total_limit_any();
+                    if let Some(limit) = limit {
+                        let op = effect.heart_total_operator_any().unwrap_or("<=");
+                        if !crate::ability::util::compare_counts(
+                            Some(op),
+                            printed_hearts,
+                            limit,
+                        ) {
+                            continue;
+                        }
+                    } else if effect.blade_limit_any().is_some() {
+                        // A blade-bounded variant is not modelled; do not guess.
+                        continue;
+                    }
+                    return true;
+                }
+            }
+        }
+        false
+    }
+
+    fn collect_reusable_constant_stage_effect_ids(&self, ids: &mut Vec<(i16, usize)>) {        for cid in self
             .player1
             .stage
             .stage
@@ -1886,10 +2116,19 @@ fn commit_constant_results(
         // Track non-stackable effects locally so they are reset each evaluation
         let mut local_non_stackable: HashSet<String> = HashSet::default();
 
-        // Collect all (cid, player_index, effect) pairs upfront to avoid borrow conflicts
+        // Collect all (cid, player_index, effect) pairs upfront to avoid borrow conflicts.
+        //
+        // BOTH live zones are scanned, not just the success one. 「自分のライブカード
+        // 置き場**か**成功ライブカード置き場にあり」 (PL!-pb2-038-L) is a single
+        // disjunction, and the live card zone half had no scanner at all, so a card
+        // being PERFORMED contributed nothing while the same card in the success zone
+        // did. `live_card_zone` holds the card currently performing, so the same
+        // effect must be evaluated there too.
         let mut entries: Vec<(i16, usize, crate::card::AbilityEffect)> = Vec::new();
         for (player_idx, zone_cards) in [
+            (0usize, &self.player1.live_card_zone.cards),
             (0usize, &self.player1.success_live_card_zone.cards),
+            (1, &self.player2.live_card_zone.cards),
             (1, &self.player2.success_live_card_zone.cards),
         ] {
             for cid in zone_cards {
@@ -2155,6 +2394,31 @@ fn commit_constant_results(
                 let value = i16::from(effect.value_or_count(1));
                 let op_binding = effect.operation_any();
                 let op = op_binding.unwrap_or("add");
+                // 「ライブの合計スコアを＋１する」 on a card in a live zone modifies the
+                // OWNER'S live total, not any one card. This arm previously had only
+                // `self_target` (per-card, how Angelic Angel works) and "target the
+                // cards in the live set zone", so a `live_total` effect fell into the
+                // second case and — with an empty live set zone, which is the normal
+                // state for a card sitting in the SUCCESS zone — targeted nothing and
+                // silently contributed 0. The stage-constant path has had a
+                // `live_total` case all along (see the `belongs_to_p1` routing in
+                // recalculate_constants); this is the same routing for live zones.
+                if effect.target_any() == Some("live_total") {
+                    let delta = if op == "set" { value } else { value };
+                    if player_idx == 0 {
+                        self.mods.p1_constant_total_score_bonus =
+                            self.mods.p1_constant_total_score_bonus.saturating_add(delta);
+                    } else {
+                        self.mods.p2_constant_total_score_bonus =
+                            self.mods.p2_constant_total_score_bonus.saturating_add(delta);
+                    }
+                    self.mods.constant_score_sources.push((
+                        cid,
+                        ui_text(&effect.text),
+                        delta,
+                    ));
+                    return;
+                }
                 // When self_target is true, apply the score modifier to the
                 // success zone card itself (e.g. Angelic Angel's +5 self buff).
                 // Otherwise, target cards in the live set zone.

@@ -163,7 +163,10 @@ fn q248_hanayo_use_limit_blocks_second_activation() {
     game.add_to_hand(hanayo);
     game.give_energy(8);
 
-    game.play_to_stage(hanayo, MemberArea::Center);
+    // Deliberate overlap: this play targets an occupied slot (see the guard in
+    // TestGame::play_to_stage). Kept as-is so the behaviour under test is
+    // unchanged; the explicit variant keeps the swap from being silent.
+    game.play_to_stage_baton(hanayo, MemberArea::Center);
     game.activate_ability(hanayo); // first activation succeeds
 
     // The first activation asks WHICH member to make active. That choice must be

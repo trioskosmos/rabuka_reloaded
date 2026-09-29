@@ -173,9 +173,12 @@ fn step4_turn2_reset() {
     game.state.player1.hand.cards.push(watcher);
     game.state.player1.hand.cards.push(filler);
     game.state.player1.hand.cards.push(live_card);
-    game.play_to_stage(mover, MemberArea::LeftSide);
-    game.play_to_stage(watcher, MemberArea::Center);
-    game.play_to_stage(filler, MemberArea::RightSide);
+    // Deliberate overlap: these plays target occupied slots (see the guard in
+    // TestGame::play_to_stage). Kept as-is so the behaviour under test is
+    // unchanged; the explicit variant keeps the swap from being silent.
+    game.play_to_stage_baton(mover, MemberArea::LeftSide);
+    game.play_to_stage_baton(watcher, MemberArea::Center);
+    game.play_to_stage_baton(filler, MemberArea::RightSide);
     game.state.player2.stage.stage = [p2_mover, p2_watcher, -1];
 
     // T1 P1 Main
@@ -190,7 +193,7 @@ fn step4_turn2_reset() {
     pass_phase(&mut game);
     let p2_filler = game.id("PL!-sd1-010-SD");
     game.state.player2.hand.cards.push(p2_filler);
-    game.play_to_stage(p2_filler, MemberArea::RightSide);
+    game.play_to_stage_baton(p2_filler, MemberArea::RightSide);
     let p2e = energy_p2(&game);
     activate_and_drain(&mut game, p2_mover, "t1p2");
     assert_eq!(energy_p2(&game) - p2e, 2);

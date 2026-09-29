@@ -222,8 +222,17 @@ def build_entry(card, product):
         blade_hearts = parse_blade_heart(card.get("attack"))
         if blade_hearts:
             entry["blade_heart"] = blade_hearts
+        # A live card's スコア / ドロー icon is a printed property of the card, not
+        # part of any ability, so the engine stores it as data. `Card::has_score_icon`
+        # (core/card.rs) is the ONLY implementation, and it returns false for every
+        # card whose special_heart lacks the Score key — so an empty dict here makes
+        # every 「スコアを持つ」 filter silently match nothing, and the yell prints no
+        # icon (turn/live.rs credits Score to note_icons/cheer_count and Draw to
+        # draw_icons). The API's `cost` field is exactly this icon; verified to agree
+        # with the 43 correctly-populated pre-existing cards, 42/42, zero conflicts.
         if card.get("cost") in ("スコア", "ドロー"):
-            entry["special_heart"] = {}
+            icon_key = "score" if card["cost"] == "スコア" else "draw"
+            entry["special_heart"] = {icon_key: 1}
 
     ability = to_ability(card.get("text"))
     if ability:

@@ -26,7 +26,7 @@ fn play_himeno(game: &mut TestGame) {
     game.add_to_hand(himeno);
     game.add_to_hand(filler);
     game.give_energy(15);
-    game.play_to_stage(himeno, MemberArea::LeftSide);
+    game.play_to_stage_baton(himeno, MemberArea::LeftSide);
     // Answer what cannot be declined, decline what can: a mandatory
     // prompt left parked mid-ability produces exactly the absence
     // the next assertion checks, so nothing fails.
@@ -294,8 +294,8 @@ fn real_choice_flow_emits_offered_and_resolved() {
     g.add_to_hand(aq);
     g.add_to_hand(ss);
     g.give_energy(30);
-    g.play_to_stage(aq, MemberArea::LeftSide);
-    g.play_to_stage(ss, MemberArea::Center);
+    g.play_to_stage_baton(aq, MemberArea::LeftSide);
+    g.play_to_stage_baton(ss, MemberArea::Center);
     g.add_to_discard(aq_live);
     g.add_to_hand(awaken);
     // Live phase setup, mirroring awaken_the_power_test's known-good sequence.

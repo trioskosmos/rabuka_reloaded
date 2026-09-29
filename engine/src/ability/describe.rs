@@ -188,6 +188,37 @@ pub fn describe_effect(effect: &AbilityEffect, ja: bool) -> String {
     let gn = group_label(effect.group_names_any());
 
     match action {
+        "replacement_appear_wait" => {
+            // A replacement rule, not an event: it states how members ENTER an area.
+            // 「正面のエリア」 is read as the centre area (see
+            // GameState::replacement_appear_wait_applies). Rendered with icons and an
+            // explicit 「置き換え」 so it reads as a UI prompt and does not come out
+            // byte-identical to the node's own text.
+            let limit = effect.heart_total_limit_any().unwrap_or(0);
+            if ja {
+                format!(
+                    "置き換え：{{{{center.png|センター}}}}エリアに、元々持つハートが{limit}つ以下のメンバーは、{{{{icon_blade.png|ウェイト}}}}状態で登場する"
+                )
+            } else {
+                format!("Replacement: members with {limit} or fewer printed hearts appear in wait in {{center.png|the centre}} area")
+            }
+        }
+        "count_as_multiple" => {
+            // A counting weight, consumed by the count path.
+            let weight = effect.count_as_any().unwrap_or(2);
+            let by = group_label(effect.counted_by_any());
+            if ja {
+                if by.is_empty() {
+                    format!("このカードは{weight}枚として扱う")
+                } else {
+                    format!("{by}のカードの効果による枚数の数え方では、このカードは{weight}枚として扱う")
+                }
+            } else if by.is_empty() {
+                format!("This card counts as {weight}")
+            } else {
+                format!("When counted by {by} card effects, this card counts as {weight}")
+            }
+        }
         "move_cards" => {
             let dest = zone_label_inner(d, ja);
             match s {

@@ -18,7 +18,7 @@ fn chika_bp5_001_baton_touch_from_no_ability_draw() {
     game.give_energy(chika_cost + 5);
 
     let hand_before = game.state.player1.hand.cards.len();
-    game.play_to_stage(chika, rabuka_engine::zones::MemberArea::Center);
+    game.play_to_stage_baton(chika, rabuka_engine::zones::MemberArea::Center);
 
     while game.has_pending_choice() {
         let is_required = game.state.get_pending_choice().is_some_and(|c| {
@@ -68,7 +68,7 @@ fn chika_bp5_001_baton_touch_from_ability_member_no_draw() {
     game.give_energy(chika_cost + 5);
 
     let hand_before = game.state.player1.hand.cards.len();
-    game.play_to_stage(chika, rabuka_engine::zones::MemberArea::Center);
+    game.play_to_stage_baton(chika, rabuka_engine::zones::MemberArea::Center);
 
     // Answer what cannot be declined, decline what can: a mandatory
     // prompt left parked mid-ability produces exactly the absence
@@ -100,7 +100,7 @@ fn chika_bp5_001_normal_debut_no_draw() {
     game.give_energy(chika_cost + 5);
 
     let hand_before = game.state.player1.hand.cards.len();
-    game.play_to_stage(chika, rabuka_engine::zones::MemberArea::Center);
+    game.play_to_stage_baton(chika, rabuka_engine::zones::MemberArea::Center);
 
     // Answer what cannot be declined, decline what can: a mandatory
     // prompt left parked mid-ability produces exactly the absence
@@ -134,7 +134,7 @@ fn chika_bp5_001_baton_touch_draw_triggers_refresh() {
     game.give_energy(chika_cost + 5);
 
     let hand_before = game.state.player1.hand.cards.len();
-    game.play_to_stage(chika, rabuka_engine::zones::MemberArea::Center);
+    game.play_to_stage_baton(chika, rabuka_engine::zones::MemberArea::Center);
 
     while game.has_pending_choice() {
         let is_required = game.state.get_pending_choice().is_some_and(|c| {

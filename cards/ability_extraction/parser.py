@@ -1,4 +1,4 @@
-"""
+﻿"""
 Parser for ability extraction -- converts raw Japanese card ability text into
 structured JSON consumed by the Rust engine and analysis tooling.
 
@@ -114,6 +114,7 @@ from parser_utils import (
     BLADE_ICON_RE,
     ENERGY_ICON,
     HAS_SCORE_ICON,
+    HAS_ALL_BLADE_ICON,
     count_icons,
     extract_count,
     extract_source,
@@ -131,6 +132,8 @@ from parser_utils import (
     POSITION_KEYWORDS,
     heart_id,
     _ALL_KW_RE,
+    _PLURAL_MEMBER_SUBJECT_RE,
+    _MEMBER_QUANTIFIER_RE,
     iter_dict_nodes,
     transform_child_lists,
     walk_dict_tree,
@@ -421,6 +424,28 @@ def extract_location(text: str) -> Optional[str]:
     return extract_by_pattern(text, LOCATION_PATTERNS)
 
 
+def is_zone_disjunction(text: str) -> bool:
+    """True when two zone names in `text` are joined by 「か」/「または」…
+
+    Distinguishes 「AかBにあり」 (either zone satisfies the condition) from
+    「AをBに」 (a move, where only the destination counts). Both name two zones and
+    both populate `locations`, so the caller has to mark which one it is.
+    """
+    markers = []
+    for pattern, _name in LOCATION_PATTERNS:
+        pos = text.find(pattern)
+        if pos >= 0:
+            markers.append((pos, len(pattern)))
+    if len(markers) < 2:
+        return False
+    markers.sort()
+    (lo, lo_len), (hi, _hi_len) = markers[0], markers[1]
+    if lo_len == 0 or hi <= lo:
+        return False
+    between = text[lo + lo_len : hi]
+    return any(w in between for w in ("か", "または", "もしくは", "いずれ", "及び", "および"))
+
+
 def extract_locations(text: str) -> Optional[List[str]]:
     """Extract multiple locations connected by 'と' (e.g. 'ステージと控え室')."""
     locs = []
@@ -428,7 +453,31 @@ def extract_locations(text: str) -> Optional[List[str]]:
         if pattern in text:
             locs.append(loc_name)
     if "success_live_card_zone" in locs and "live_card_zone" in locs:
-        locs = [l for l in locs if l != "live_card_zone"]
+        # Two ways to see both zones here, and they must be told apart.
+        #
+        # Artefact: 成功ライブカード置き場 CONTAINS the substring ライブカード置き場, so a
+        # single mention matches both patterns. Dropping the bare zone is right.
+        #
+        # Real disjunction: 「自分のライブカード置き場**か**成功ライブカード置き場にあり」
+        # (PL!-pb2-038-L) genuinely names two zones joined by 「か」. The old
+        # unconditional drop discarded it, so the effect only ever fired from the
+        # success zone and never from the live card zone — the first half of a 「か」.
+        pos_success = text.find("成功ライブカード置き場")
+        pos_live = text.find("ライブカード置き場")
+        joined = False
+        if pos_success >= 0 and pos_live >= 0 and pos_success != pos_live:
+            lo, hi = sorted((pos_success, pos_live))
+            between = text[lo : hi + len("ライブカード置き場")]
+            joined = any(
+                w in between for w in ("か", "または", "もしくは", "いずれ", "及び", "および")
+            )
+        if joined:
+            # Mark it so the engine does not read this as a move (source→destination),
+            # where only locs[1] counts. 「AかB」 is symmetric: being in EITHER zone
+            # satisfies it.
+            locs = sorted(set(locs))
+        else:
+            locs = [l for l in locs if l != "live_card_zone"]
     if len(locs) >= 2:
         return locs
     return None
@@ -1476,6 +1525,18 @@ def _enrich_condition_result(result: Dict[str, Any], text: str) -> Dict[str, Any
     _enrich_condition_common(result, text)
     if "より多くの" in text and "ブレード" in text and "持つ" in text:
         result["blade_greater_than_all"] = True
+    # 「『X』のメンバーをN人ウェイトにしてもよい」 — N is a PRECONDITION on the
+    # clause, not a count of the effect. This lives in the shared enrichment rather
+    # than `_extract_group_scope` because high-priority handlers (`distinct` claims
+    # this exact text) short-circuit the generic extractor, where group scope is
+    # normally read. Without the count the condition degrades to "any X member is
+    # present": PL!-pb2-012-P＋ 南ことり granted its −2 with ONE Printemps ally on
+    # stage, and the 2人 and 名前の異なる filters were never actually checked.
+    if result.get("group_names") and result.get("count") is None:
+        headcount = re.search(r"『[^』]+』の(?:メンバー|メンバーカード)を(\d+)人", text)
+        if headcount:
+            result["count"] = as_int(headcount.group(1))
+            result.setdefault("operator", ">=")
     return result
 
 
@@ -2421,6 +2482,11 @@ def _extract_per_unit_info_from_text(text):
         info["negation"] = True
     elif "ブレードハートを持つ" in per_unit_text:
         info["card_property"] = "has_blade_heart"
+    elif HAS_SCORE_ICON in per_unit_text:
+        # 「{{icon_score}}を持つ『μ's』のカード1枚につき」 — the per-unit clause also
+        # filters on the スコア icon, exactly as the blade-heart clauses filter on
+        # their own icon. Without this the count takes every card in the zone.
+        info["card_property"] = "has_score_icon"
     _per_unit_effect(text, info)
     cleaned = text.replace(per_unit_match.group(0), "").strip()
     return info, cleaned
@@ -2456,7 +2522,39 @@ def _check_ability_gain_from_text(text, action):
         elif categorized["characters"]:
             if len(categorized["characters"]) == 1:
                 action["quoted_text"] = {"text": categorized["characters"][0], "quoted_type": "character"}
-    _fill_defaults(action, text)
+    # Fill defaults from the OUTER clause only. The quoted text is the ability being
+    # GAINED, not this action's own target, so running _fill_defaults over the full
+    # string leaks the inner clause's vocabulary onto the outer gain_ability node:
+    # 「…{{center}}ライブ終了時まで、「{{jyouji}}自分のステージにいる『μ's』のメンバーは、
+    # {{icon_blade}}を得る。」を得る」 (PL!-pb2-005) gave the OUTER node
+    # source=stage / card_type=member_card / group_names=[μ's], and the engine reads
+    # exactly that combination as "grant to chosen stage members" — so it prompted
+    # for targets instead of granting the ability to the card that gained it. The
+    # inner text is where those fields belong, and `gained_effect` carries them.
+    outer_text = text
+    for quoted in quoted_text:
+        outer_text = outer_text.replace(quoted, "")
+    _fill_defaults(action, outer_text)
+    # The node's own `text` is the outer clause, and stays that way: later
+    # normalisation passes read it to derive the node's target/filter fields, and
+    # with the quoted ability still in place they pick up the INNER clause's
+    # vocabulary. For PL!-pb2-005 that meant `source: stage` + `card_type:
+    # member_card` on the outer gain_ability, which the engine reads as "prompt to
+    # pick stage members to gain this" (ability_ops.rs `stage_member_targeting`)
+    # instead of granting the ability to the card that gained it.
+    #
+    # Cut at the opening bracket rather than stripping the quoted text out, so the
+    # 「…」 delimiters and the trailing 「…を得る」 go with it. Nothing is lost: the
+    # quoted text is preserved verbatim in `ability_gain` and structured in
+    # `gained_effect`.
+    quoted_ability = (categorized["abilities"] or [None])[0]
+    if quoted_ability:
+        cut = text.find(quoted_ability)
+        if cut > 0:
+            bracket = text.rfind("「", 0, cut)
+            head = text[: bracket if bracket > 0 else cut]
+            if head.strip():
+                action["text"] = head
     return True
 
 
@@ -4509,19 +4607,101 @@ def _try_otherwise(text):
     return {"type": "otherwise_condition", "text": text}
 
 
+def _card_property_from_icons(text):
+    """Map 「…{{icon}}を持つ」 onto `(card_property, negated)`, or None.
+
+    Thin wrapper over _CARD_PROPERTY_PHRASES so the icon table keeps exactly one
+    definition.
+    """
+    for phrases, prop, negated in _CARD_PROPERTY_PHRASES:
+        if any(phrase in text for phrase in phrases):
+            return (prop, negated)
+    return None
+
+
+# A heart icon immediately before を持つ / 持たない. Covers the bare
+# `{{heart_04.png|heart04}}` form, the `{{icon_heart_03.png|…}}` form, and the
+# ALL-hearts `{{icon_all.png|ハート}}` form — and deliberately NOT
+# `{{icon_score.png|スコア}}` or `{{icon_b_all.png|ALLブレード}}`.
+_HEART_ICON_HELD_RE = re.compile(
+    r"(?:{{[^}]*heart_\d\d[^}]*}}|{{icon_all\.png\|[^}]*}})(?:[^持]*)(?:持たない|を持つ)"
+)
+
+
+def _try_zone_card_property(text):
+    """"<zone>にある…カードの中に、{{icon_X}}を持つ" — a card in a named zone, further
+    filtered by a printed icon.
+
+    Covers 「自分の成功ライブカード置き場に{{icon_score.png|スコア}}を持つ『μ's』の
+    カードがある場合」 (PL!-pb2-004 園田海未) and the 「…の中に…」 phrasing on
+    PL!-pb2-001 高坂穂乃果. Previously this text fell through to the generic
+    extractor, which produced an unsupported `custom` type and — via
+    _try_heart_possession — a member_card/stage condition that could never be true.
+    """
+    if "{{" not in text or "を持つ" not in text:
+        return None
+    prop = _card_property_from_icons(text)
+    if not prop:
+        return None
+    card_property, negated = prop
+    location = extract_location(text)
+    if not location:
+        return None
+    result: Dict[str, Any] = {
+        "type": "location_condition",
+        "location": location,
+        "text": text,
+    }
+    if "ライブカード" in text:
+        result["card_type"] = "live_card"
+    elif "メンバーカード" in text or "メンバー" in text:
+        result["card_type"] = "member_card"
+    groups = extract_all_groups(text)
+    if groups:
+        result["group_names"] = groups
+    result["card_property"] = card_property
+    if negated:
+        result["negation"] = True
+    return result
+
+
 def _try_heart_possession(text):
     if "余剰ハート" in text:
         return None
-    if not re.search(
-        r"{{icon_([^}]+)\.png\|[^}}]+}}(?:[^持]*)(持たない|を持つ)", text
-    ) and not ("ハート" in text and ("持たない" in text or "を持つ" in text)):
+    # 「それらがすべて{{heart_04.png|heart04}}を持つメンバーカードの場合」 (PL!HS-PR-019
+    # 銀子) is ANAPHORIC: それら refers to the cards a preceding step moved, so the
+    # test belongs to the generic extractor, which builds the `preceding_moved`
+    # `card_count_condition` it needs. Claiming it here froze the subject to the
+    # stage and the condition went true for the wrong reason.
+    if re.search(r"それら|それらの|それがすべて|それらが", text):
+        return None
+    # The icon branch must name a HEART icon specifically.
+    #
+    # It used to accept any `{{icon_*}}` marker, so 「{{icon_score.png|スコア}}を
+    # 持つ『μ's』のカード」 was claimed here and frozen into
+    # `card_type: member_card, location: stage` — a condition that can never be
+    # true, because a member card carries no スコア icon and the text names the
+    # SUCCESS LIVE ZONE. That silently disabled PL!-pb2-005 星空凛, whose gained
+    # 常時 is gated on exactly that clause.
+    #
+    # Heart icons print as `{{heart_04.png|heart04}}` (no `icon_` prefix) or
+    # `{{icon_heart_03.png|…}}`, and ALL-hearts as `{{icon_all.png|ハート}}`. The
+    # pattern has to keep covering all three: dropping the prefix coverage
+    # regressed PL!HS-PR-019 銀子, whose 「それらがすべて{{heart_04.png|heart04}}
+    # を持つメンバーカードの場合」 is an anaphoric `card_count_condition` over the
+    # previously moved cards and must NOT be claimed here.
+    if not _HEART_ICON_HELD_RE.search(text) and not (
+        "ハート" in text and ("持たない" in text or "を持つ" in text)
+    ):
         return None
     result = {
         "type": "location_condition",
         "card_type": "member_card",
-        "location": "stage",
         "text": text,
     }
+    # Prefer the location the text actually names. "stage" is the right guess for a
+    # bare 「ハートを持つ」, but not for 「成功ライブカード置き場にあるハートを持つ」.
+    result["location"] = extract_location(text) or "stage"
     if text.strip().startswith("それが") and not extract_location(text):
         result.pop("location")
         result.update(
@@ -4625,6 +4805,7 @@ CONDITION_PATTERNS = [
     ConditionPattern("position", 7, _try_position),
     ConditionPattern("ability_filter", 7, _try_ability_filter),
     ConditionPattern("otherwise", 7, _try_otherwise),
+    ConditionPattern("zone_card_property", 7, _try_zone_card_property),
     ConditionPattern("heart_possession", 7, _try_heart_possession),
     ConditionPattern("live_mid", 7, _try_live_mid),
 ]
@@ -5307,6 +5488,11 @@ def _extract_target_location(condition, text):
     locs = extract_locations(text)
     if locs:
         condition["locations"] = locs
+        # A 「か」-joined pair of zones is a symmetric disjunction, not a move. The
+        # engine's multi-location path otherwise treats locs[1] as the sole
+        # destination (the 「AをBに」 move shape) and would accept only that one.
+        if is_zone_disjunction(text):
+            condition["any_location"] = True
 
     # If location mentions "公開" (revealed cards), prefer revealed_cards
     # over default "stage" that some handlers set
@@ -5403,6 +5589,16 @@ def _extract_group_scope(condition, text):
             and ("ステージ" in text or "メンバー" in text or "カードが" in text)
         ):
             condition["all_members"] = True
+    # 「『X』のメンバーをN人ウェイトにしてもよい」 — the N is a PRECONDITION on the
+    # clause, not a count of the effect. Without it the condition reads as "any X
+    # member is present", so a single staged member already qualifies: PL!-pb2-012-P
+    # 南ことり granted its −2 with one Printemps ally on stage, and the
+    # differently-named / group filters were never actually checked.
+    if gns and condition.get("count") is None:
+        headcount = re.search(r"『[^』]+』の(?:メンバー|メンバーカード)を(\d+)人", text)
+        if headcount:
+            condition["count"] = as_int(headcount.group(1))
+            condition["operator"] = ">="
 
 
 def _extract_generic_fields(condition, text):
@@ -6053,6 +6249,31 @@ def _fill_defaults_count_and_refine(action, text, action_text, a):
         action["non_stackable"] = True
     if not action.get("all") and _ALL_KW_RE.search(text):
         action["all"] = True
+    # An unquantified plural subject on a group constant —
+    # 「自分のステージにいる『μ's』のメンバーは、{{icon_blade.png|ブレード}}を得る」 —
+    # means EVERY matching member, not one. Without this the clause carries neither
+    # `all` nor a meaningful count and the engine grants the blade to nobody
+    # (PL!-pb2-005 星空凛 gains exactly this shape as a 登場 ability).
+    #
+    # Scoped to WHOLE-STAGE clauses on purpose. 「自分のセンターエリアにいる『μ's』の
+    # メンバー」 (PL!-bp4-011-N, PL!-bp4-017-N, PL!-pb2-019-N) is the same plural
+    # subject but is confined to the centre area; setting `all` on those makes the
+    # engine grant stage-wide (modifiers.rs:591 iterates every slot) and breaks the
+    # existing centre tests. Those cards already behave correctly via `count: 1`,
+    # because the centre area holds exactly one member — all-vs-one is
+    # indistinguishable there. Turning a centre clause into a real `all` needs
+    # `all` AND a centre restriction together; see docs/PBLL02_ABILITY_REVIEW.md.
+    if (
+        not action.get("all")
+        and not action.get("per_unit")
+        and action.get("group_names")
+        and action.get("resource")
+        and "ステージにいる" in text
+        and "センターエリア" not in text
+        and _PLURAL_MEMBER_SUBJECT_RE.search(text)
+        and not _MEMBER_QUANTIFIER_RE.search(text)
+    ):
+        action["all"] = True
     if (
         action.get("all")
         and action.get("action") == "invalidate_ability"
@@ -6181,6 +6402,7 @@ _CARD_PROPERTY_PHRASES = (
     (("ブレードハートを持たない",), "has_blade_heart", True),
     (("ブレードハートを持つ",), "has_blade_heart", False),
     ((HAS_SCORE_ICON,), "has_score_icon", False),
+    ((HAS_ALL_BLADE_ICON,), "has_all_blade", False),
 )
 
 # 「メンバーのいないエリアに登場」 — a stage slot with no member in it.
@@ -6698,6 +6920,21 @@ def _fill_defaults(action, text, _cached_source=_UNSET, _cached_dest=_UNSET):
         op = extract_operator(text)
         if op:
             action["original_operator"] = op
+    # 「元々持つハートの数がNつ以下」 — a bound on a card's PRINTED heart total, e.g.
+    # 「相手のステージにいる元々持つハートの数が1つ以下のメンバー1人をウェイトにする」
+    # (PL!-pb2-006). `original_value` alone carries no bound, so without these the
+    # clause degrades to "any member" and waits over-budget members too.
+    heart_total = re.search(
+        r"ハートの数が\s*(\d+)\s*(?:つ|個)?\s*(以下|以上|より多い|より少ない)", text
+    )
+    if heart_total and "ハートの数が" in text:
+        action["heart_total_limit"] = as_int(heart_total.group(1))
+        action["heart_total_operator"] = {
+            "以下": "<=",
+            "以上": ">=",
+            "より多い": ">",
+            "より少ない": "<",
+        }[heart_total.group(2)]
     if a == "select" and "のどちらか" in text:
         _fill_or_card_types(action, text, pop_card_type=True)
     if action.get("per_unit") and "dynamic_count" not in action:
@@ -6826,6 +7063,31 @@ def _per_unit_count_type(result, text, per_text):
     # → count from recently_moved_cards (energy_deck destination)
     if "これによって置いた" in per_text and "エネルギーカード" in per_text:
         result["per_unit_type"] = "energy_deck"
+
+    # 「…のスコアの合計Nにつき」 — the unit is a POINTS total, not a card count.
+    # 「合計5」 matches none of the 人/枚/つ/コスト patterns above, so per_unit_count
+    # stays at its default of 1 and the effect silently becomes "one blade per card
+    # in the zone" regardless of what those cards are worth. The zone the per-unit
+    # clause names is unchanged; only the measured quantity differs, so the
+    # aggregate is recorded separately from per_unit_type (which stays the zone
+    # selector the keyword loop above already resolved).
+    score_total = re.search(r"スコアの合計\s*(\d+)", per_text or text)
+    if score_total:
+        result["per_unit_count"] = as_int(score_total.group(1))
+        result["per_unit_aggregate"] = "score"
+
+    # 「元々持つハートの数がNつ以下/つ以上」 — a bound on a card's PRINTED heart
+    # total. The phrase is only ever about printed hearts, so it always pairs with
+    # original_value and needs no current-heart counterpart.
+    heart_total = re.search(r"ハートの数が\s*(\d+)\s*(つ|個)?\s*(以下|以上|より多い|より少ない)", per_text or text)
+    if heart_total:
+        result["heart_total_limit"] = as_int(heart_total.group(1))
+        result["heart_total_operator"] = {
+            "以下": "<=",
+            "以上": ">=",
+            "より多い": ">",
+            "より少ない": "<",
+        }[heart_total.group(3)]
 
 
 def _per_unit_filters(result, text, per_text):
@@ -7153,7 +7415,10 @@ _PROPAGATE_FIELDS = (
     "per_unit",
     "per_unit_count",
     "per_unit_type",
+    "per_unit_aggregate",
     "per_unit_heart_colors",
+    "heart_total_limit",
+    "heart_total_operator",
     "per_unit_source",
     "card_type",
     "group_names",
@@ -11761,7 +12026,12 @@ def _normalize_parsed_effect(effect, original_text=None):
                 if not any(g in txt for g in current["group_names"]):
                     current.pop("group_names", None)
     _strip_leaked_draw_g(effect)
+    _type_replacement_appearance(effect)
+    # _type_count_as_multiple is NOT wired — see its docstring. Typing PL!-pb2-041-L
+    # without a working weight would turn `test_no_custom_actions` green while the
+    # mechanic did nothing, so it keeps failing loudly instead.
     _enrich_gain_abilities(effect)
+    _propagate_elided_condition_location(effect)
     _mark_live_total_score(effect)
     _mark_live_total_clamp(effect, original_text or effect.get("text", "") or "")
     _mark_success_pile_difference(effect)
@@ -11869,15 +12139,238 @@ def _collect_gain(d, nodes):
     )
 
 
+# The icon labels that can appear inside a gained ability, and the `{{file|label}}`
+# form each becomes. `ability_gain` is built by `_strip_icon_annotations`, which
+# collapses `{{file|label}}` down to 【label】 for display, so re-parsing it needs this
+# to walk the icons back. Only the labels a nested ability can actually print are
+# listed; anything unrecognised is left as bare text rather than guessed at.
+_GAIN_ICON_LABELS = {
+    "ブレード": "{{icon_blade.png|ブレード}}",
+    "ハート": "{{icon_all.png|ハート}}",
+    "スコア": "{{icon_score.png|スコア}}",
+    "ドロー": "{{icon_draw.png|ドロー}}",
+    "E": "{{icon_energy.png|E}}",
+    "ALLブレード": "{{icon_b_all.png|ALLブレード}}",
+    "センター": "{{center.png|センター}}",
+    "左サイド": "{{leftside.png|左サイド}}",
+    "右サイド": "{{rightside.png|右サイド}}",
+    "ターン1回": "{{turn1.png|ターン1回}}",
+    "ターン2回": "{{turn2.png|ターン2回}}",
+}
+
+
+def _propagate_elided_condition_location(effect):
+    """Carry a zone from a sibling condition to branches that elide it.
+
+    PL!-pb2-001 高坂穂乃果 states its ライブ開始時 as one sentence with three
+    branches, and only the FIRST names the subject:
+
+        自分の成功ライブカード置き場にある『μ's』のカードの中に、{{icon_score}}を持つ
+        カードがある場合、…／{{icon_b_all}}を持つカードがある場合、…／
+        {{icon_draw}}を持つカードがある場合、…
+
+    The second and third drop the subject entirely, so their conditions carry no
+    location at all and used to end up as an unsupported `custom` type. They mean
+    "…also among those same cards", so the zone and group are inherited.
+
+    Deliberately narrow: only a condition whose own text names NO zone, and whose
+    subject is the elided 「…を持つカード」 form, inherits — and only from a
+    sibling. Two     independently-worded conditions are left alone.
+    """
+
+    def fix_siblings(nodes):
+        donor = None
+        for node in nodes:
+            cond = node.get("condition") if isinstance(node, dict) else None
+            if (
+                isinstance(cond, dict)
+                and cond.get("type") == "location_condition"
+                and cond.get("location")
+            ):
+                donor = cond
+                break
+        if not donor:
+            return
+        inherited_loc = donor["location"]
+        inherited_ct = donor.get("card_type")
+        for node in nodes:
+            cond = node.get("condition") if isinstance(node, dict) else None
+            if not isinstance(cond, dict):
+                continue
+            txt = cond.get("text") or ""
+            if "を持つカード" not in txt:
+                continue
+            if cond.get("type") == "custom":
+                # An elided branch parses to `custom` because the sentence names no
+                # zone of its own. It is the same subject as the donor, so adopt the
+                # donor's shape rather than leaving an unsupported type behind.
+                cond["type"] = "location_condition"
+            elif cond.get("type") != "location_condition":
+                continue
+            if cond.get("location"):
+                continue
+            # ONLY the zone is inherited. Each branch filters on its OWN icon —
+            # PL!-pb2-001's three branches test {{icon_score}}, {{icon_b_all}} and
+            # {{icon_draw}} respectively — so copying `card_property` from the donor
+            # would make all three branches test the first branch's icon.
+            cond["location"] = inherited_loc
+            if inherited_ct and not cond.get("card_type"):
+                cond["card_type"] = inherited_ct
+            own = _card_property_from_icons(txt)
+            if own and not cond.get("card_property"):
+                cond["card_property"] = own[0]
+                if own[1]:
+                    cond["negation"] = True
+
+    def walk(node):
+        if isinstance(node, list):
+            for item in node:
+                walk(item)
+            return
+        if not isinstance(node, dict):
+            return
+        for key in ("actions", "options", "sequential", "conditions", "effects"):
+            value = node.get(key)
+            if isinstance(value, list):
+                fix_siblings(value)
+                walk(value)
+            elif isinstance(value, dict):
+                walk(value)
+        for value in node.values():
+            if isinstance(value, (dict, list)):
+                walk(value)
+
+    walk(effect)
+
+
+def _unleak_gain_ability_target(effect):
+    """Stop a gain_ability node inheriting the GAINED ability's target/filter.
+
+    The quoted clause 「「{{jyouji}}自分のステージにいる『μ's』のメンバーは、
+    {{icon_blade}}を得る。」を得る」 is the ability being granted, not the outer
+    action's own subject. Several parse paths build the gain_ability node and then
+    run `_fill_defaults` over the FULL text, so the inner clause's vocabulary lands
+    on the outer node as `source: stage` + `card_type: member_card`. The engine reads
+    exactly that pair as "prompt the player to pick stage members to gain this"
+    (ability_ops.rs `stage_member_targeting`) rather than granting the ability to
+    the card that gained it, so PL!-pb2-005 星空凛 gained nothing.
+
+    `_check_ability_gain_from_text` already derives these fields from the outer
+    clause, but it is not the only path that produces a gain_ability node, so this
+    runs as a post-pass over every such node. Only fields the OUTER clause cannot
+    account for are dropped: a zone word, or a card noun.
+    """
+    for node in iter_dict_nodes(effect):
+        if node.get("action") != "gain_ability" or not node.get("ability_gain"):
+            continue
+        text = node.get("text") or ""
+        trigger = node.get("ability_gain_trigger") or ""
+        # Locate the trigger icon that opens the gained ability. Reconstructing the
+        # inner text from `ability_gain` does not work: it is stored in display form
+        # (【常時】…【ブレード】…) while `text` still carries the {{icon}} form, so
+        # stripping the brackets yields a string that appears nowhere in the text.
+        anchor = None
+        if trigger:
+            for m in re.finditer(r"\{\{[^|]+\|([^}]+)\}\}", text):
+                if m.group(1).strip() == trigger.strip():
+                    anchor = m.start()
+                    break
+        if anchor is None or anchor <= 0:
+            continue
+        bracket = text.rfind("「", 0, anchor)
+        head = text[: bracket if bracket > 0 else anchor]
+        node["text"] = head
+        if not head.strip():
+            continue
+        outer_loc = extract_location(head)
+        # Only correct a LEAK. When the outer clause genuinely names the stage —
+        # 「…自分のステージにいる『Aqours』のメンバー2人までは…」 (PL!S-bp6-007-R) —
+        # `source: stage` is the real subject and must survive. A leaked value shows
+        # up as `source: stage` on a node whose own clause names a different zone.
+        if node.get("source") == "stage" and outer_loc and outer_loc != "stage":
+            node["source"] = outer_loc
+        elif not node.get("source") and not outer_loc:
+            node.pop("destination", None)
+        if not re.search(r"メンバー|カード", head):
+            node.pop("card_type", None)
+
+
+def _type_count_as_multiple(effect):
+    """NOT WIRED — deliberately not called.
+
+    PL!-pb2-041-L 春情ロマンティック — 「自分の『lily white』のカードの効果によって、
+    自分の成功ライブカード置き場にあるカードの枚数を数えるとき、このカードは2枚として
+    扱う」 — still parses to `action: "custom"`.
+
+    Most of the implementation exists and is correct in isolation:
+      * `GameState::count_as_multiple_weight` returns 2 for the card when the counting
+        card is in a `counted_by` group, and 1 otherwise (verified by probe);
+      * `count_filtered` in `condition/card.rs` adds the extra weight on top of the
+        normal count, deciding membership with the SAME filter applied one card at a
+        time, so a weighted card can only be a card the count already included.
+
+    What is NOT working: the condition still evaluates as if the weight were absent.
+    The counting card is resolved from `activating_card` / the ability queue's current
+    entry, and the probe shows `activating_card` is `-1` and the queue has no current
+    entry at the moment 041's ライブ開始時 condition is evaluated. Threading the
+    counting card into condition evaluation properly is a real change to how
+    `ConditionContext` identifies the running effect — and `PARSER_NOTES` already
+    records that `get_count_for_condition` / `get_group_card_count` /
+    `get_count_for_target` overlap, which is why this needs its own pass.
+
+    Two zone spellings bit during this work and are worth keeping in mind:
+    `success_live_card_zone` (conditions) vs `success_live_zone` (the enum) — an `==`
+    check between them never fires, and `Zone::from_str` accepts both.
+    """
+    return None
+
+
+def _type_replacement_appearance(effect):
+    """Type 「このメンバーの正面のエリアには、…のメンバーは、ウェイト状態で登場する」.
+
+    A REPLACEMENT rule: it changes how other cards APPEAR rather than firing on an
+    event, so no action pattern claims it and it fell through to `custom`.
+
+    PL!-pb2-002-PP 絢瀬絵里 is 「このメンバーの正面のエリアには、元々持つハートの数が
+    4つ以下のメンバーは、ウェイト状態で登場する」. The heart bound is already on the
+    node (`heart_total_limit`, from the shared rule), so only the action name is
+    missing. Guarded on `custom` so a real rule's claim is never overridden.
+    """
+    for node in iter_dict_nodes(effect):
+        if node.get("action") != "custom":
+            continue
+        text = node.get("text") or ""
+        if "ウェイト状態で登場する" not in text:
+            continue
+        if not node.get("heart_total_limit") and not node.get("blade_limit"):
+            continue
+        node["action"] = "replacement_appear_wait"
+        node["replacement"] = "appear_wait"
+        if "正面のエリア" in text and node.get("position") in (None, "front"):
+            # 正面 is the area in front of this member. The engine reads it as the
+            # CENTRE slot; see docs/PBLL02_ABILITY_REVIEW.md for why that reading is
+            # recorded rather than assumed silently.
+            node["position"] = "center"
+
+
 def _enrich_gain_abilities(effect):
     gain_nodes = []
     _collect_gain(effect, gain_nodes)
     for node in gain_nodes:
-        if "gained_effect" not in node:
-            clean_gain = re.sub(r"【[^】]+】", "", node["ability_gain"]).strip()
-            gained = parse_effect(clean_gain)
-            if gained and gained.get("action") and _is_real_action(gained):
-                node["gained_effect"] = gained
+        if "gained_effect" in node:
+            continue
+        raw = node["ability_gain"]
+        # Strip only the LEADING trigger bracket (【常時】 / 【ライブ開始時】 …).
+        # The previous code removed every 【…】, which also deleted resource icons
+        # and turned 「【常時】…【ブレード】を得る。」 into 「…、を得る。」 — a
+        # `custom` action that was then rejected, so the card gained an ability the
+        # engine could not execute and no `gained_effect` was ever written.
+        clean_gain = re.sub(r"^【[^】]+】", "", raw).strip()
+        for label, template in _GAIN_ICON_LABELS.items():
+            clean_gain = clean_gain.replace(f"【{label}】", template)
+        gained = parse_effect(clean_gain)
+        if gained and gained.get("action") and _is_real_action(gained):
+            node["gained_effect"] = gained
 
 
 def _enrich_characters(d):
@@ -12335,9 +12828,14 @@ def _fix_condition_enrichment(eff, t):
                     cond["count"] = as_int(cm.group(1))
                     changed = True
     if HAS_SCORE_ICON in t:
-        if eff.get("action") in ("move_cards", "select") and not eff.get(
-            "card_property"
-        ):
+        # The スコア icon filters any effect that picks or counts cards: a move, a
+        # selection, or a per-unit 「〜につき」 count. A per-unit count is the case
+        # that reads as a bare location filter without this, and then every card in
+        # the zone is counted instead of only the ones carrying the icon.
+        counts_cards = eff.get("action") in ("move_cards", "select") or bool(
+            eff.get("per_unit")
+        )
+        if counts_cards and not eff.get("card_property"):
             eff["card_property"] = "has_score_icon"
         cond = eff.get("condition")
         if isinstance(cond, dict) and not cond.get("card_property"):
@@ -13123,6 +13621,8 @@ _KNOWN_ACTIONS = {
     "change_state",
     "choose_target_player",
     "conditional_on_optional",
+    "replacement_appear_wait",
+    "count_as_multiple",
     "conditional_on_result",
     "discard_until_count",
     "do_nothing",

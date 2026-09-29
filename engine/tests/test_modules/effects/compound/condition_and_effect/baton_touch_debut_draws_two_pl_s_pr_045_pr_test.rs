@@ -22,7 +22,7 @@ fn try_baton(replaced_no: &str) -> (bool, usize, usize) {
     g.state.player1.main_deck.cards.push(d1);
     g.state.player1.main_deck.cards.push(d2);
     let deck_before = deck_len(&g);
-    g.play_to_stage(me, MemberArea::LeftSide);
+    g.play_to_stage_baton(me, MemberArea::LeftSide);
     let had_choice = g.has_pending_choice();
     if had_choice {
         // Should be hand discard 1
@@ -74,7 +74,7 @@ fn pr045_non_baton_no_draw_even_with_cost7_on_stage() {
     g.state.player1.main_deck.cards.push(d2);
     let deck_before = deck_len(&g);
     // Play to empty RightSide, not LeftSide where cost7 sits -> no baton
-    g.play_to_stage(me, MemberArea::RightSide);
+    g.play_to_stage_baton(me, MemberArea::RightSide);
     // Should have no pending choice (no draw)
     assert!(!g.has_pending_choice(), "non-baton debut should not trigger draw");
     assert_eq!(deck_len(&g), deck_before, "deck should not shrink");
@@ -101,7 +101,7 @@ fn pr045_hand_size_after_draw_discard_net_plus1() {
     g.state.player1.main_deck.cards.push(d1);
     g.state.player1.main_deck.cards.push(d2);
     let hand_before = hand_len(&g); // 1 (me)
-    g.play_to_stage(me, MemberArea::LeftSide);
+    g.play_to_stage_baton(me, MemberArea::LeftSide);
     assert!(g.has_pending_choice());
     g.select_indices(&[0]);
     // Net: drew 2, discarded 1, played 1 -> hand should be before (1) -1 (played) +2 (draw) -1 (discard) = hand_before

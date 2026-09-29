@@ -37,7 +37,7 @@ fn serasu_played_to_stage_triggers_self() {
     game.add_to_hand(filler);
     game.give_energy(15);
 
-    game.play_to_stage(serasu, MemberArea::Center);
+    game.play_to_stage_baton(serasu, MemberArea::Center);
 
     // Serasu's own appearance IS an EdelNote member appearing → ability fires.
     // Opponent has exactly 1 active member → auto-selects, no prompt.
@@ -98,7 +98,7 @@ fn serasu_on_stage_non_edelnote_appears_no_trigger() {
     game.add_to_hand(filler);
     game.give_energy(12);
 
-    game.play_to_stage(non_edelnote, MemberArea::LeftSide);
+    game.play_to_stage_baton(non_edelnote, MemberArea::LeftSide);
 
     assert!(
         !game.has_pending_choice(),
@@ -129,7 +129,7 @@ fn serasu_edelnote_appears_fires_once() {
     game.add_to_hand(filler);
     game.give_energy(10);
 
-    game.play_to_stage(edelnote_member, MemberArea::LeftSide);
+    game.play_to_stage_baton(edelnote_member, MemberArea::LeftSide);
 
     // Opponent should get exactly one choice prompt
     assert!(
@@ -191,7 +191,7 @@ fn serasu_edelnote_appears_with_non_edelnote_on_stage() {
     game.add_to_hand(filler);
     game.give_energy(10);
 
-    game.play_to_stage(edelnote_member, MemberArea::RightSide);
+    game.play_to_stage_baton(edelnote_member, MemberArea::RightSide);
 
     assert!(
         game.has_pending_choice(),
@@ -236,7 +236,7 @@ fn hanaho_played_to_stage_no_baton_touch_does_not_trigger() {
 
     let energy_before = game.state.player1.energy_zone.active_count();
 
-    game.play_to_stage(hanaho, MemberArea::Center);
+    game.play_to_stage_baton(hanaho, MemberArea::Center);
 
     // Answer what cannot be declined, decline what can: a mandatory prompt
 
@@ -276,7 +276,7 @@ fn hanaho_play_no_baton_touch_queue_stays_empty() {
     game.add_to_hand(filler);
     game.give_energy(9);
 
-    game.play_to_stage(hanaho, MemberArea::Center);
+    game.play_to_stage_baton(hanaho, MemberArea::Center);
 
     // After play_to_stage processes everything, the queue must be idle
     // (Hanaho's discard-location ability must not be enqueued from stage)
@@ -304,7 +304,7 @@ fn hanaho_baton_touch_triggers_activates_energy() {
 
     game.state.player1.hand.cards.push(arriver);
     game.state.player1.hand.cards.push(filler);
-    game.play_to_stage(arriver, MemberArea::Center);
+    game.play_to_stage_baton(arriver, MemberArea::Center);
     // Answer what cannot be declined, decline what can: a mandatory prompt
     // left parked mid-ability, and the absence assertion that usually
     // follows is exactly what a wrong answer produces.
@@ -345,7 +345,7 @@ fn hanaho_baton_touch_low_cost_no_trigger() {
 
     game.state.player1.hand.cards.push(low_cost);
     game.state.player1.hand.cards.push(filler);
-    game.play_to_stage(low_cost, MemberArea::Center);
+    game.play_to_stage_baton(low_cost, MemberArea::Center);
     // Answer what cannot be declined, decline what can: a mandatory prompt
     // left parked mid-ability, and the absence assertion that usually
     // follows is exactly what a wrong answer produces.
@@ -379,7 +379,7 @@ fn hanaho_baton_touch_wrong_group_no_trigger() {
     game.state.player1.hand.cards.push(wrong_group);
     game.state.player1.hand.cards.push(filler);
     // Play to an occupied area triggers auto baton touch
-    game.play_to_stage(wrong_group, MemberArea::Center);
+    game.play_to_stage_baton(wrong_group, MemberArea::Center);
     // Answer what cannot be declined, decline what can: a mandatory prompt
     // left parked mid-ability, and the absence assertion that usually
     // follows is exactly what a wrong answer produces.
@@ -410,7 +410,7 @@ fn hanaho_baton_touch_triggers_exactly_once() {
 
     game.state.player1.hand.cards.push(arriver);
     game.state.player1.hand.cards.push(filler);
-    game.play_to_stage(arriver, MemberArea::Center);
+    game.play_to_stage_baton(arriver, MemberArea::Center);
     // Answer what cannot be declined, decline what can: a mandatory prompt
     // left parked mid-ability, and the absence assertion that usually
     // follows is exactly what a wrong answer produces.
@@ -465,7 +465,7 @@ fn baton_touch_cleared_between_actions() {
     game.give_energy(30);
     game.state.player1.hand.cards.push(arriver);
     game.state.player1.hand.cards.push(filler);
-    game.play_to_stage(arriver, MemberArea::Center);
+    game.play_to_stage_baton(arriver, MemberArea::Center);
     // Answer what cannot be declined, decline what can: a mandatory prompt
     // left parked mid-ability, and the absence assertion that usually
     // follows is exactly what a wrong answer produces.
@@ -474,7 +474,7 @@ fn baton_touch_cleared_between_actions() {
     // Action 2: play a plain card to an empty area (no baton touch)
     game.add_to_hand(fresh_card);
     let energy_before = game.state.player1.energy_zone.active_count();
-    game.play_to_stage(fresh_card, MemberArea::LeftSide);
+    game.play_to_stage_baton(fresh_card, MemberArea::LeftSide);
     // Answer what cannot be declined, decline what can: a mandatory prompt
     // left parked mid-ability, and the absence assertion that usually
     // follows is exactly what a wrong answer produces.
@@ -540,7 +540,7 @@ fn serasu_double_trigger_regression() {
     game.add_to_hand(filler);
     game.give_energy(10);
 
-    game.play_to_stage(edelnote_member, MemberArea::LeftSide);
+    game.play_to_stage_baton(edelnote_member, MemberArea::LeftSide);
 
     // Drain any pending choices (single opponent = auto-resolve)
     // Answer what cannot be declined, decline what can: a mandatory prompt

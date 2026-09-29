@@ -249,7 +249,7 @@ fn kanon_stage_full_falls_back_to_hand() {
     let filler_copy3 = game.new_id("PL!-sd1-010-SD");
     game.state.player1.stage.stage = [filler, filler_copy2, filler_copy3];
 
-    game.play_to_stage(kanon, MemberArea::Center);
+    game.play_to_stage_baton(kanon, MemberArea::Center);
     pay_optional_cost(&mut game);
     game.select_indices(&[0]);
 

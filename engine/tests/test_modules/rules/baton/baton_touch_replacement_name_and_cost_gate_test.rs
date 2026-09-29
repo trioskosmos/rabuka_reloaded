@@ -20,7 +20,7 @@ fn pl_n_pb1_014_r_baton_own_name_fire_draw_two_discard_one() {
         let f = game.new_id(FILLER);
         game.state.player1.main_deck.cards.push(f);
     }
-    game.play_to_stage(me, MemberArea::LeftSide);
+    game.play_to_stage_baton(me, MemberArea::LeftSide);
     assert!(
         game.state.player1.hand.cards.contains(&d1) && game.state.player1.hand.cards.contains(&d2),
         "both drawn cards are in hand"
@@ -60,7 +60,7 @@ fn pl_n_pb1_014_r_baton_other_name_no_fire_no_draw() {
     game.state.player1.hand.cards.push(me);
     game.give_energy(20);
     let deck_before = game.state.player1.main_deck.cards.len();
-    game.play_to_stage(me, MemberArea::LeftSide);
+    game.play_to_stage_baton(me, MemberArea::LeftSide);
     assert_eq!(
         game.state.player1.main_deck.cards.len(),
         deck_before,
@@ -77,7 +77,7 @@ fn pl_hs_bp2_008_r_baton_cheaper_dollchestra_fire_two_blades() {
     let me = game.new_id("PL!HS-bp2-008-R");
     game.state.player1.hand.cards.push(me);
     game.give_energy(20);
-    game.play_to_stage(me, MemberArea::LeftSide);
+    game.play_to_stage_baton(me, MemberArea::LeftSide);
     assert_eq!(
         game.state.mods.get_blade_modifier(me),
         2,
@@ -94,7 +94,7 @@ fn pl_hs_bp2_008_r_baton_expensive_dollchestra_no_fire_no_blades() {
     let me = game.new_id("PL!HS-bp2-008-R");
     game.state.player1.hand.cards.push(me);
     game.give_energy(25);
-    game.play_to_stage(me, MemberArea::LeftSide);
+    game.play_to_stage_baton(me, MemberArea::LeftSide);
     assert_eq!(
         game.state.mods.get_blade_modifier(me),
         0,

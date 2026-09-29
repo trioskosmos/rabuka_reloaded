@@ -26,7 +26,7 @@ fn baton_touch_moves_replaced_member_to_waitroom() {
     // Baton touch: play arriver to occupied center
     game.state.player1.hand.cards.push(arriver);
     game.state.player1.hand.cards.push(filler);
-    game.play_to_stage(arriver, rabuka_engine::zones::MemberArea::Center);
+    game.play_to_stage_baton(arriver, rabuka_engine::zones::MemberArea::Center);
     // Handle debut "draw 2, discard 1" choice (required, can't skip)
     while game.has_pending_choice() {
         let is_required_discard = game.state.get_pending_choice().is_some_and(|c| {
@@ -71,7 +71,7 @@ fn q134_baton_touch_waited_occupant_and_arriver_orientation() {
     game.state.player1.hand.cards.push(arriver);
     game.give_energy(4);
 
-    game.play_to_stage(arriver, MemberArea::Center);
+    game.play_to_stage_baton(arriver, MemberArea::Center);
 
     assert!(
         game.state.player1.waitroom.cards.contains(&target),
@@ -104,7 +104,7 @@ fn baton_touch_does_not_lock_all_full_lanes() {
     game.state.player1.hand.cards.push(first_arriver);
     game.state.player1.hand.cards.push(second_arriver);
 
-    game.play_to_stage(first_arriver, MemberArea::Center);
+    game.play_to_stage_baton(first_arriver, MemberArea::Center);
     // Answer what cannot be declined, decline what can: a mandatory
     // prompt left parked mid-ability produces exactly the absence
     // the next assertion checks, so nothing fails.
@@ -155,7 +155,7 @@ fn baton_touch_hanaho_auto_ability_triggers() {
 
     game.state.player1.hand.cards.push(arriver);
     game.state.player1.hand.cards.push(filler);
-    game.play_to_stage(arriver, rabuka_engine::zones::MemberArea::Center);
+    game.play_to_stage_baton(arriver, rabuka_engine::zones::MemberArea::Center);
     // Answer what cannot be declined, decline what can: a mandatory
     // prompt left parked mid-ability produces exactly the absence
     // the next assertion checks, so nothing fails.
@@ -203,7 +203,7 @@ fn baton_touch_count_per_player() {
         "p2 count starts at 0"
     );
 
-    game.play_to_stage(arriver, rabuka_engine::zones::MemberArea::Center);
+    game.play_to_stage_baton(arriver, rabuka_engine::zones::MemberArea::Center);
     // Answer what cannot be declined, decline what can: a mandatory
     // prompt left parked mid-ability produces exactly the absence
     // the next assertion checks, so nothing fails.
@@ -241,7 +241,7 @@ fn baton_touch_arriving_card_ids_tracked() {
         "starts empty"
     );
 
-    game.play_to_stage(arriver, rabuka_engine::zones::MemberArea::Center);
+    game.play_to_stage_baton(arriver, rabuka_engine::zones::MemberArea::Center);
     // Answer what cannot be declined, decline what can: a mandatory
     // prompt left parked mid-ability produces exactly the absence
     // the next assertion checks, so nothing fails.
@@ -281,7 +281,7 @@ fn opponent_baton_touch_discard_does_not_trigger() {
     let p2_energy_before = game.state.player2.energy_zone.active_count();
 
     // Perform baton touch from P1's hand
-    game.play_to_stage(arriver, rabuka_engine::zones::MemberArea::Center);
+    game.play_to_stage_baton(arriver, rabuka_engine::zones::MemberArea::Center);
     // Answer what cannot be declined, decline what can: a mandatory
     // prompt left parked mid-ability produces exactly the absence
     // the next assertion checks, so nothing fails.

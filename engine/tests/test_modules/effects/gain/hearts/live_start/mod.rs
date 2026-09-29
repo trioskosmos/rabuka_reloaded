@@ -16,3 +16,5 @@ pub mod live_start_lone_group_member_hearts_become_heart04_test;
 pub mod live_start_paid_discard_other_member_heart01_test;
 pub mod live_start_paid_energy_heart01_gain_test;
 pub mod live_start_same_group_pair_cost_heart01_test;
+pub mod pb2_optional_discard_mu_s_heart06_pl_pb2_031_n_test;
+pub mod pb2_optional_self_wait_heart03_pl_pb2_028_n_test;

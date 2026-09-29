@@ -405,7 +405,7 @@ fn chisato_natsumi_normal_debut_without_baton_touch_fires_nothing() {
     let deck_before = game.state.player1.main_deck.cards.len();
 
     // Normal play onto an EMPTY area — no baton touch happens at all.
-    game.play_to_stage(card, MemberArea::Center);
+    game.play_to_stage_baton(card, MemberArea::Center);
     drain_auto_prompts(&mut game);
 
     assert!(

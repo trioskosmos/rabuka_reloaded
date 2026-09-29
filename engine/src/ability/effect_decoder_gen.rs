@@ -83,6 +83,8 @@ fn decode_effect_field(bc: &mut BcReader, key: &str,
             "same_name" => { ek.same_name = bc.read_bool_value(); Some(true) }
             "same_unit_name" => { ek.same_unit_name = bc.read_bool_value(); Some(true) }
             "group_names" => { ek.group_names = bc.read_opt_str_vec_value().map(|b| *b); Some(true) }
+            "counted_by" => { ek.counted_by = bc.read_opt_str_vec_value().map(|b| *b); Some(true) }
+            "count_as" => { ek.count_as = bc.read_u8_value(); Some(true) }
             "self_target" => { ek.self_target = bc.read_bool_value(); Some(true) }
             "under_self" => { ek.under_self = bc.read_bool_value(); Some(true) }
             "location" => { ek.location = bc.read_arc_str_value(); Some(true) }
@@ -92,10 +94,13 @@ fn decode_effect_field(bc: &mut BcReader, key: &str,
             "exclude_group_names" => { ek.exclude_group_names = bc.read_opt_str_vec_value().map(|b| *b); Some(true) }
             "activation_position" => { ek.activation_position = bc.read_arc_str_value(); Some(true) }
             "original_value" => { ek.original_value = bc.read_bool_value(); Some(true) }
+            "heart_total_limit" => { ek.heart_total_limit = bc.read_u8_value(); Some(true) }
+            "heart_total_operator" => { ek.heart_total_operator = bc.read_arc_str_value(); Some(true) }
             "target_count" => { ek.target_count = bc.read_u8_value(); Some(true) }
             "per_unit" => { ek.per_unit = bc.read_bool_value(); Some(true) }
             "per_unit_count" => { ek.per_unit_count = bc.read_u8_value(); Some(true) }
             "per_unit_type" => { ek.per_unit_type = bc.read_arc_str_value(); Some(true) }
+            "per_unit_aggregate" => { ek.per_unit_aggregate = bc.read_arc_str_value(); Some(true) }
             "per_unit_source" => { ek.per_unit_source = bc.read_arc_str_value(); Some(true) }
             "group_reference" => { ek.group_reference = bc.read_arc_str_value(); Some(true) }
             "state" => { ek.state = bc.read_effect_state_value(); Some(true) }
@@ -293,6 +298,8 @@ pub(crate) struct EffectKindLocals {
     pub cost_total_operator: Option<Operator>,
     pub cost_values: Option<Vec<u8>>,
     pub count: Option<u8>,
+    pub count_as: Option<u8>,
+    pub counted_by: Option<Vec<String>>,
     pub custom_type: Option<ArcStr>,
     pub delayed: Option<bool>,
     pub destination: Option<Zone>,
@@ -319,6 +326,8 @@ pub(crate) struct EffectKindLocals {
     pub heart_colors: Vec<String>,
     pub heart_colors_from_selected_card: Option<bool>,
     pub heart_selection: Option<bool>,
+    pub heart_total_limit: Option<u8>,
+    pub heart_total_operator: Option<ArcStr>,
     pub heart_type: Option<ArcStr>,
     pub id: Option<ArcStr>,
     pub identities: Option<Vec<String>>,
@@ -350,6 +359,7 @@ pub(crate) struct EffectKindLocals {
     pub per_group: Option<bool>,
     pub per_group_count: Option<u8>,
     pub per_unit: Option<bool>,
+    pub per_unit_aggregate: Option<ArcStr>,
     pub per_unit_count: Option<u8>,
     pub per_unit_heart_colors: Vec<String>,
     pub per_unit_location: Option<ArcStr>,
@@ -425,6 +435,8 @@ fn build_filter(ek: &EffectKindLocals) -> Option<Box<EffectFilter>> {
         same_name: ek.same_name,
         same_unit_name: ek.same_unit_name,
         group_names: ek.group_names.clone().map(Box::new),
+        counted_by: ek.counted_by.clone().map(Box::new),
+        count_as: ek.count_as,
         self_target: ek.self_target,
         under_self: ek.under_self,
         location: ek.location.clone(),
@@ -437,10 +449,13 @@ fn build_filter(ek: &EffectKindLocals) -> Option<Box<EffectFilter>> {
         exclude_group_names: ek.exclude_group_names.clone().map(Box::new),
         activation_position: ek.activation_position.clone(),
         original_value: ek.original_value,
+        heart_total_limit: ek.heart_total_limit,
+        heart_total_operator: ek.heart_total_operator.clone(),
         target_count: ek.target_count,
         per_unit: ek.per_unit,
         per_unit_count: ek.per_unit_count,
         per_unit_type: ek.per_unit_type.clone(),
+        per_unit_aggregate: ek.per_unit_aggregate.clone(),
         per_unit_source: ek.per_unit_source.clone(),
         group_reference: ek.group_reference.clone(),
         state: ek.state.clone(),

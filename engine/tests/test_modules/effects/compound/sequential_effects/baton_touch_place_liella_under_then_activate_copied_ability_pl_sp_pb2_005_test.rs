@@ -31,7 +31,7 @@ fn hazuki_baton_touch_places_liella_under() {
     fill_decks(&mut game);
     game.give_energy(25);
 
-    game.play_to_stage(hazuki, MemberArea::Center);
+    game.play_to_stage_baton(hazuki, MemberArea::Center);
 
     // Answer what cannot be declined, decline what can: a mandatory
     // prompt left parked mid-ability produces exactly the absence
@@ -64,7 +64,7 @@ fn hazuki_baton_touch_non_liella_places_nothing() {
     fill_decks(&mut game);
     game.give_energy(25);
 
-    game.play_to_stage(hazuki, MemberArea::Center);
+    game.play_to_stage_baton(hazuki, MemberArea::Center);
 
     // Answer what cannot be declined, decline what can: a mandatory
     // prompt left parked mid-ability produces exactly the absence
@@ -95,7 +95,7 @@ fn hazuki_full_workflow_gains_abilities_from_under() {
     fill_decks(&mut game);
     game.give_energy(25);
 
-    game.play_to_stage(hazuki, MemberArea::Center);
+    game.play_to_stage_baton(hazuki, MemberArea::Center);
 
     // Answer what cannot be declined, decline what can: a mandatory
     // prompt left parked mid-ability produces exactly the absence

@@ -159,6 +159,15 @@ def compile_all(abilities):
         "perform_yell": 13,
         "modify_yell_count": 13,
         "modify_yell_source": 14,
+        # Replacement rules are a state change TO WAIT plus the same filters
+        # (card_type, position, heart/blade bound), so they share the change_state
+        # opcode. This is not cosmetic: the bytecode rewriter keeps a fixed key set
+        # per opcode, and the no-op bucket keeps only text/count/action — under it the
+        # filters were silently dropped and the rule could never match a card.
+        "replacement_appear_wait": 8,
+        # Counting weight: a filter-only action, consumed by the count path rather
+        # than by dispatch, so it shares the change_state bucket for the same reason.
+        "count_as_multiple": 8,
         "custom": 14,
         "do_nothing": 14,
         "action_by": 14,

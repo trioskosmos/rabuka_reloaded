@@ -474,7 +474,7 @@ fn deploy_stage_full_graceful() {
     game.state.player1.hand.cards.push(filler);
     game.give_energy(16);
 
-    game.play_to_stage(yoshiko, MemberArea::Center);
+    game.play_to_stage_baton(yoshiko, MemberArea::Center);
 
     // Hard chain: optional cost offered → both discard selections appear.
     // A guard here would let the whole graceful scenario silently no-op.

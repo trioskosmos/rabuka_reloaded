@@ -54,7 +54,13 @@ fn run_ceras_forced_wait(game: &mut TestGame, select: usize) -> (Vec<usize>, usi
         game.state.player2.energy_zone.cards.push(e);
     }
     game.state.player2.energy_zone.add_active(20);
-    game.play_to_stage(ceras, MemberArea::Center);
+    // Deliberate overlap, and a known harness gap: Ceras is in PLAYER 2's hand and
+    // P2 pays the energy, but `play_to_stage` only ever places on PLAYER 1 — there is
+    // no player-2 placement helper. The card therefore lands in P1's centre and
+    // displaces whatever the caller staged there. The callers' assertions are written
+    // against that outcome, so it is kept and made explicit rather than changed.
+    // See docs/PBLL02_ABILITY_REVIEW.md §8.3 for the missing helper.
+    game.play_to_stage_baton(ceras, MemberArea::Center);
 
     let mut offered: Vec<usize> = Vec::new();
     let mut selected: usize = usize::MAX;

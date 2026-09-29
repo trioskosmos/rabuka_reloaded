@@ -16,7 +16,7 @@ fn pl_n_pb1_022_p_plus_baton_shioriko_fire_kasumi_no_fire() {
     game.state.player1.main_deck.cards.push(filler);
     game.state.player1.main_deck.cards.push(filler);
     let _hand_before = game.state.player1.hand.cards.len();
-    game.play_to_stage(mia, MemberArea::Center);
+    game.play_to_stage_baton(mia, MemberArea::Center);
     assert!(
         game.has_pending_choice(),
         "Mia should trigger and wait for discard choice after drawing 2"
@@ -43,7 +43,7 @@ fn pl_n_pb1_022_p_plus_baton_shioriko_fire_kasumi_no_fire() {
     game.state.player1.hand.cards.push(mia2);
     game.state.player1.main_deck.cards.push(filler);
     game.state.player1.main_deck.cards.push(filler);
-    game.play_to_stage(mia2, MemberArea::Center);
+    game.play_to_stage_baton(mia2, MemberArea::Center);
     assert!(
         !game.has_pending_choice(),
         "Mia should NOT trigger because she did not replace Shioriko"
