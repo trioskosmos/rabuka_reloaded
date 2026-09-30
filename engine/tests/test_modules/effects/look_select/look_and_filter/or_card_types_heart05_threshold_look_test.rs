@@ -255,6 +255,158 @@ fn yoshiko_look_select_skip_cost() {
     );
 }
 
+/// The LIVE branch's threshold. 津島善子's text reads
+/// 「ハートにheart05を2個以上持つメンバーカード**か、**必要ハートにheart05を2以上含む
+/// ライブカードを…」 — two branches, two different heart SOURCES, and both carry a count
+/// of 2.
+///
+/// The member branch has a below-threshold test (`yoshiko_look_select_heart05_1_rejected`,
+/// 渡辺 曜 with base heart05=1). The live branch had none: its only fixture,
+/// `PL!S-PR-023-PR`, sits well above the bound, so a live printing need-heart05 = 1 would
+/// wrongly qualify and nothing in the tree would notice. `PL!HS-bp2-019-L` Bloom the smile,
+/// Bloom the dream! prints need heart05 = 1.
+#[test]
+fn yoshiko_look_select_live_with_need_heart05_one_is_rejected() {
+    let db = load_real_database();
+    let mut game = TestGame::new(db);
+
+    // Pin the premise from the card data: this live's REQUIRED heart05 is 1, so it sits
+    // one below the printed 「必要ハートにheart05を2以上」.
+    let low_need_live = game.id("PL!HS-bp2-019-L");
+    game.assert_card_identity(low_need_live, "PL!HS-bp2-019-L");
+    assert_eq!(
+        game.db
+            .get_card(low_need_live)
+            .and_then(|c| c.need_heart.as_ref())
+            .and_then(|h| h.hearts.get(&rabuka_engine::card::parse_heart_color("heart05")))
+            .copied(),
+        Some(1),
+        "precondition: Bloom the smile must print need heart05 = 1, one below the threshold, \
+         or this test would pass on a card that should have qualified anyway"
+    );
+
+    let cost_fodder = game.id("PL!-sd1-010-SD");
+    game.give_energy(4);
+    game.state.player1.stage.stage = [-1, -1, -1];
+    let card = setup_yoshiko_test(&mut game, vec![low_need_live]);
+    game.state.player1.hand.cards.push(cost_fodder);
+    game.play_to_stage(card, MemberArea::Center);
+    pay_optional_cost(&mut game);
+
+    assert!(
+        game.has_pending_choice(),
+        "the or_card_types prompt precedes the filter, so it opens even with nothing eligible"
+    );
+    // Pick the LIVE branch (index 0).
+    game.select_option(0);
+    assert!(
+        !game.has_pending_choice(),
+        "必要ハートにheart05を2以上含む — a live printing need heart05 = 1 is below the bound, \
+         so the live branch has no candidate and must resolve without a selection"
+    );
+    assert!(
+        !game.state.player1.hand.cards.contains(&low_need_live),
+        "the sub-threshold live must not reach hand (hand={:?})",
+        game.state.player1.hand.cards
+    );
+    assert!(
+        game.state.player1.waitroom.cards.contains(&low_need_live),
+        "残りを控え室に置く — the looked-at live that could not be taken must still be \
+         accounted for, not silently lost (hand={:?} waitroom={:?})",
+        game.state.player1.hand.cards, game.state.player1.waitroom.cards
+    );
+}
+
+/// A card that fails the filter must be *accounted for*, not merely absent from hand.
+///
+/// `yoshiko_look_select_no_eligible_auto_skip` and `yoshiko_look_select_heart05_1_rejected`
+/// only assert that no prompt remains. A regression that DROPPED the looked-at card
+/// altogether — vanishing it from every zone rather than routing it to the waitroom —
+/// would satisfy both. The printed text commits the card to 控え室, so that is asserted here.
+#[test]
+fn yoshiko_look_select_ineligible_looked_at_card_is_routed_to_the_waitroom_not_lost() {
+    let db = load_real_database();
+    let mut game = TestGame::new(db);
+
+    // 渡辺 曜: base heart05 = 1, one below the member branch's 2.
+    let below = game.id("PL!S-PR-017-PR");
+    let cost_fodder = game.id("PL!-sd1-010-SD");
+
+    game.give_energy(4);
+    game.state.player1.stage.stage = [-1, -1, -1];
+    let card = setup_yoshiko_test(&mut game, vec![below]);
+    game.state.player1.hand.cards.push(cost_fodder);
+    game.play_to_stage(card, MemberArea::Center);
+    pay_optional_cost(&mut game);
+    game.select_option(1); // member branch
+    assert!(
+        !game.has_pending_choice(),
+        "precondition: nothing meets 2個以上, so the look resolves without a selection"
+    );
+
+    assert!(
+        !game.state.player1.hand.cards.contains(&below),
+        "the sub-threshold member must not be taken (hand={:?})",
+        game.state.player1.hand.cards
+    );
+    assert!(
+        game.state.player1.waitroom.cards.contains(&below),
+        "残りを控え室に置く — the looked-at card must land in the waitroom, not disappear. \
+         (hand={:?} waitroom={:?} deck_len={})",
+        game.state.player1.hand.cards,
+        game.state.player1.waitroom.cards,
+        game.state.player1.main_deck.cards.len()
+    );
+}
+
+/// Declining the optional cost must not fire the ability at all.
+///
+/// `yoshiko_look_select_skip_cost` only checks that no prompt is left. If the ability ran
+/// anyway and auto-resolved — a qualifying member going straight to hand with no prompt to
+/// decline — the test would still pass. 「〜てもよい」 declined means the look never happens,
+/// so the deck must be untouched.
+#[test]
+fn yoshiko_declining_the_optional_cost_leaves_the_deck_untouched() {
+    let db = load_real_database();
+    let mut game = TestGame::new(db);
+
+    // 桜内梨子: base heart05 = 2, so it WOULD qualify if the ability ran.
+    let qualifying = game.id("PL!S-PR-014-PR");
+    let cost_fodder = game.id("PL!-sd1-010-SD");
+
+    game.give_energy(4);
+    game.state.player1.stage.stage = [-1, -1, -1];
+    let card = setup_yoshiko_test(&mut game, vec![qualifying]);
+    game.state.player1.hand.cards.push(cost_fodder);
+    game.play_to_stage(card, MemberArea::Center);
+
+    let deck_before = game.state.player1.main_deck.cards.len();
+    assert!(game.has_pending_choice(), "the optional cost is offered first");
+    game.select_indices(&[]); // decline
+
+    assert!(
+        !game.has_pending_choice(),
+        "declining the cost must end the ability with nothing further to answer"
+    );
+    assert!(
+        !game.state.player1.hand.cards.contains(&qualifying),
+        "declining 「〜てもよい」 means the look never happens, so the qualifying member must \
+         stay in the deck (hand={:?})",
+        game.state.player1.hand.cards
+    );
+    assert!(
+        game.state.player1.main_deck.cards.contains(&qualifying),
+        "the card must still be in the deck, undealt (deck_len {} vs {} before)",
+        game.state.player1.main_deck.cards.len(),
+        deck_before
+    );
+    assert_eq!(
+        game.state.player1.main_deck.cards.len(),
+        deck_before,
+        "a declined optional cost must not move a single card"
+    );
+}
+
 /// Non-selected looked-at cards go to waitroom.
 #[test]
 fn yoshiko_look_select_discard_remaining() {

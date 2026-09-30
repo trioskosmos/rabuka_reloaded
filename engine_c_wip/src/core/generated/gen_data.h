@@ -4,4 +4,8 @@
 #define RBKA_NUM_STRING_OFFSETS 6033
 #define RBKA_NUM_ABILITIES_C 985
 #define RBKA_NUM_CARD_ABILITY_PAIRS 2116
+/* Self-check entry point, defined in src/ability/vm.c. See the comment
+   there for what it validates and why it exists. */
+int rb_verify_generated_tables(int *out_bad_strings, int *out_bad_keys,
+                              char *msg, unsigned long msg_sz);
 #endif

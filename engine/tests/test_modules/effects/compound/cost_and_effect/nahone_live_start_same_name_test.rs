@@ -83,7 +83,7 @@ fn discard_member_gives_heart04_and_blade_to_same_name() {
 
     assert!(game.state.player1.waitroom.cards.contains(&nahone_hand));
     assert_eq!(get_heart04(&game, nahone_stage), 1);
-    assert!(get_blade(&game, nahone_stage) >= 1);
+    assert_eq!(get_blade(&game, nahone_stage), 1);
 }
 
 // =========================================================================
@@ -226,7 +226,7 @@ fn discard_member_different_name_than_activating() {
 
     assert!(game.state.player1.waitroom.cards.contains(&other_member));
     assert_eq!(get_heart04(&game, nahone_stage), 1);
-    assert!(get_blade(&game, nahone_stage) >= 1);
+    assert_eq!(get_blade(&game, nahone_stage), 1);
 }
 
 // =========================================================================
@@ -263,7 +263,7 @@ fn discard_same_name_as_activating_card() {
     game.drain_choices();
 
     assert_eq!(get_heart04(&game, nahone_stage), 1);
-    assert!(get_blade(&game, nahone_stage) >= 1);
+    assert_eq!(get_blade(&game, nahone_stage), 1);
 }
 
 // =========================================================================
@@ -516,7 +516,7 @@ fn p_variant_works() {
     game.drain_choices();
 
     assert_eq!(get_heart04(&game, nahone_stage), 1);
-    assert!(get_blade(&game, nahone_stage) >= 1);
+    assert_eq!(get_blade(&game, nahone_stage), 1);
 }
 
 // =========================================================================
@@ -553,7 +553,7 @@ fn p_plus_variant_works() {
     game.drain_choices();
 
     assert_eq!(get_heart04(&game, nahone_stage), 1);
-    assert!(get_blade(&game, nahone_stage) >= 1);
+    assert_eq!(get_blade(&game, nahone_stage), 1);
 }
 
 // =========================================================================
@@ -590,7 +590,7 @@ fn sec_variant_works() {
     game.drain_choices();
 
     assert_eq!(get_heart04(&game, nahone_stage), 1);
-    assert!(get_blade(&game, nahone_stage) >= 1);
+    assert_eq!(get_blade(&game, nahone_stage), 1);
 }
 
 // =========================================================================
@@ -629,7 +629,7 @@ fn discard_from_non_contiguous_hand() {
 
     assert!(game.state.player1.waitroom.cards.contains(&nahone_hand));
     assert_eq!(get_heart04(&game, nahone_stage), 1);
-    assert!(get_blade(&game, nahone_stage) >= 1);
+    assert_eq!(get_blade(&game, nahone_stage), 1);
 }
 
 // =========================================================================
@@ -694,7 +694,7 @@ fn nahone_at_left_position() {
     game.drain_choices();
 
     assert_eq!(get_heart04(&game, nahone_stage), 1);
-    assert!(get_blade(&game, nahone_stage) >= 1);
+    assert_eq!(get_blade(&game, nahone_stage), 1);
 }
 
 // =========================================================================
@@ -731,7 +731,7 @@ fn nahone_at_right_position() {
     game.drain_choices();
 
     assert_eq!(get_heart04(&game, nahone_stage), 1);
-    assert!(get_blade(&game, nahone_stage) >= 1);
+    assert_eq!(get_blade(&game, nahone_stage), 1);
 }
 
 // =========================================================================
@@ -770,7 +770,7 @@ fn hand_mixed_cards_discard_member_only() {
 
     assert!(game.state.player1.waitroom.cards.contains(&nahone_hand));
     assert_eq!(get_heart04(&game, nahone_stage), 1);
-    assert!(get_blade(&game, nahone_stage) >= 1);
+    assert_eq!(get_blade(&game, nahone_stage), 1);
     assert!(
         game.state.player1.hand.cards.contains(&filler),
         "Non-discarded card should remain in hand"
@@ -927,5 +927,5 @@ fn effect_tracked_as_temporary_live_end() {
     );
 
     assert_eq!(get_heart04(&game, nahone_stage), 1);
-    assert!(get_blade(&game, nahone_stage) >= 1);
+    assert_eq!(get_blade(&game, nahone_stage), 1);
 }

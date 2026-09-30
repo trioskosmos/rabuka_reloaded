@@ -105,8 +105,42 @@ def _has_shuffle(text):
     return _SHUFFLE_RE.search(text) is not None
 
 
+# 「『X』以外」 excludes a GROUP and 「「X」以外」 excludes a CHARACTER. Neither is about
+# the activating card: they are handled by apply_group_exclusions and
+# _split_include_exclude_chars respectively. They are blanked out before the self-exclusion
+# patterns are tested, so a bare `以外` test cannot turn a group exclusion into a bogus
+# exclude_self — which is exactly what one call site did.
+_GROUP_OR_CHARACTER_EXCLUSION = re.compile(r"[『「][^『」「」]*[』」]以外")
+
+# The one place 「does this printed clause exclude the activating card?」 is decided.
+# Every form any call site ever recognised is listed here, so a clause resolves the same
+# way no matter which builder processes it. The previous arrangement spread these eight
+# forms across eleven call sites with six different widenings; five of seven sample clauses
+# resolved differently depending on the path, and they failed in BOTH directions — the
+# broad site invented exclude_self for 「『μ's』以外のメンバー」 and missed 「これを除く
+# メンバー」. See docs/PARSER_CONSOLIDATION_SWEEP.md §F1.
+_SELF_EXCLUSION_PATTERNS = (
+    re.compile(r"この(?:メンバー|カード)以外"),
+    re.compile(r"自分以外"),
+    re.compile(r"これを除く"),
+    re.compile(r"ほかの.*?(?:メンバー|カード)"),
+    re.compile(r"他の.*?(?:メンバー|カード)"),
+    re.compile(r"ほかの"),
+    re.compile(r"他の"),
+)
+
+
 def detect_exclude_self(text: str) -> bool:
-    return "このメンバー以外" in text or re.search(r"ほかの.*?(?:メンバー|カード)", text) is not None
+    """True when the printed clause excludes the activating card.
+
+    Recognises このメンバー以外 / このカード以外 / 自分以外 / これを除く / ほかの… /
+    他の… , in both the 「ほかのメンバー」 and bare 「ほかの」 spellings.
+
+    Deliberately NOT recognised, because they name something other than the activator:
+    「『X』以外」 (a group) and 「「X」以外」 (a character).
+    """
+    candidate = _GROUP_OR_CHARACTER_EXCLUSION.sub("", text)
+    return any(p.search(candidate) for p in _SELF_EXCLUSION_PATTERNS)
 
 
 def apply_character_filters(target, text):

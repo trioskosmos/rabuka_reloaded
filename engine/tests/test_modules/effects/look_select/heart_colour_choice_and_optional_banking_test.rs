@@ -16,17 +16,27 @@
 //! true of the suite before this file: the card's single existing coverage took the
 //! 「置いてよい」 branch.
 //!
-//! ## Also in this family, still uncovered here
+//! ## Also in this family
 //!
 //! 宮下愛 `PL!N-sd2-005-SD2` and 中須かすみ `PL!N-bp3-002-R` both open with
 //! 「好きなハートの色を1つ指定する」, a six-way pick feeding a counted `gain_resource`
-//! (2 for 愛, 1 to ANOTHER 『虹ヶ咲』 member for かすみ). Those are the strongest
-//! available CHOICE-IDENTITY tests — a run that picks two different options and
-//! asserts two different colours granted cannot be satisfied by an implementation
-//! that always applies the first. Drafts of them are not included because
-//! `specify_heart_color` did not present its prompt under `fire_trigger` with the
-//! card staged directly, and shipping a test whose failure is a fixture artefact
-//! would be worse than leaving the gap visible.
+//! (2 for 愛, 1 to ANOTHER 『虹ヶ咲』 member for かすみ).
+//!
+//! **These are now covered, and the gap recorded here was real but was reported in the wrong
+//! place.** An earlier version of this comment said the tests were not written because
+//! `specify_heart_color` "did not present its prompt under `fire_trigger`". That was a
+//! fixture artefact: both abilities put an OPTIONAL COST prompt first, and the colour choice
+//! only appears once that cost is answered.
+//!
+//! The coverage lives in
+//! `tests/test_modules/effects/gain/hearts/color_choice/paid_discard_color_choice_heart_test.rs`
+//! (愛) and `paid_heart_color_choice_test.rs` (かすみ). Both select two DIFFERENT options in
+//! paired tests and name the expected colour, so an engine that ignored the selection and
+//! applied a fixed colour would fail. Until those were added, both files asserted only
+//! "exactly one colour was granted" — which such an implementation satisfies — and
+//! かすみ's carried a comment claiming its identity was checked below when it was not.
+//! `nico_bp3_009_activation_self_wait_cost_grants_only_chosen_heart` in that same file had
+//! always pinned its colour, which is what showed the pattern was achievable.
 
 use crate::helpers::*;
 use rabuka_engine::core::types::AbilityTrigger;

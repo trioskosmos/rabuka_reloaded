@@ -75,9 +75,16 @@ fn group_gated_debut_saintsnow_stage_formation_change_grants_blade() {
         }
     }
 
-    assert!(
-        total_blade(&game) >= 2,
-        "moving a SaintSnow member should grant blade×2, total_blade={}",
+    // 「この効果によって『SaintSnow』のメンバーが移動した場合、ライブ終了時まで、ブレード×2を
+    // 得る」 — exactly ×2, once, for the effect as a whole. `>= 2` also passed at 4, 6 or 8,
+    // so it could not tell "gained ×2 once" from "gained ×2 per moved SaintSnow member" —
+    // and this fixture moves a SaintSnow member, so two were in reach. The two negatives in
+    // this file already assert `== 0`; the positive now matches them.
+    assert_eq!(
+        total_blade(&game),
+        2,
+        "moving a SaintSnow member grants exactly ブレード×2 — a per-member reading would \
+         give 4 or more (total_blade={})",
         total_blade(&game)
     );
 }

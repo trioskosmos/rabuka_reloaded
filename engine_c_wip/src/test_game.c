@@ -26,7 +26,61 @@ int test_new_id(TestGame *tg, const char *card_no){
     (void)tg;
     int template_id = rb_find_card_by_no(card_no);
     if (template_id < 0) return -1;
-    return rb_create_card_copy(template_id);
+    int copy = rb_create_card_copy(template_id);
+    if (copy < 0) {
+        /* LOUD, on purpose. rb_create_card_copy draws from a process-global
+           monotonic pool (data.c:285 g_next_copy_id) that NOTHING in the
+           corpus resets between cases, so it runs dry after
+           RB_MAX_CARD_IDS - num_cards (= 4096 - 2639 = 1457) allocations --
+           and rb_build_deck_from_card_numbers (deck_builder.c:63,71) eats
+           from the SAME pool. A caller that ignored this -1 and went on to
+           place the card got a silently-wrong fixture: several exhausted
+           calls all yield -1, so two different prints resolve to the same id
+           and every "these are distinct instances" / "this is that print"
+           assertion after it becomes vacuously true. Say so on stderr. */
+        fprintf(stderr,
+                "[TEST_POOL_EXHAUSTED] test_new_id(\"%s\"): the card-copy pool "
+                "is full (%d ids). Call test_card_copy_pool_reset() between "
+                "cases, or this id is invalid and identity assertions on it "
+                "prove nothing.\n",
+                card_no ? card_no : "(null)", RB_MAX_CARD_IDS);
+    }
+    return copy;
+}
+/* Drop every card-copy id back into the pool (data.c:279). MUST be called
+   between independent cases by any suite that leans on test_new_id /
+   test_id_exact / rb_build_deck_from_card_numbers: the pool is process
+   global and monotonic, so without this a long file runs dry and every
+   later test_new_id returns -1. Only call it when no live card copy from
+   before the reset is still in play -- the ids themselves are invalidated,
+   the underlying card records are not. */
+void test_card_copy_pool_reset(void){ rb_card_copy_pool_reset(); }
+
+/* Strict card_no lookup: EXACT match only, or -1.
+   rb_find_card_by_no (data.c:529) is deliberately forgiving -- after the
+   exact hit it falls through to a base+rarity rebuild, then to
+   card_no_folded_prefix_lowest, and finally to a *substring* search
+   (card_no_contains_lowest, data.c:446). That chain is what the engine's
+   own UI needs, but in a test it means a typo'd or truncated card number
+   resolves to SOME real card instead of failing: "PL!SP-PR-004-R" has no
+   exact match, base "PL!SP-PR-004" + rarity "R" does not match, the prefix
+   arm picks the lowest "PL!SP-PR-004-*" key, and the fixture is quietly the
+   -PR print. test_id keeps that forgiving behaviour because most of the
+   corpus relies on it; use test_id_exact when the print itself is the thing
+   under test. */
+int test_id_exact(TestGame *tg, const char *card_no){
+    (void)tg;
+    if(!card_no) return -1;
+    uint32_t n = rb_num_cards();
+    for(uint32_t i=0;i<n;i++){
+        Card c;
+        if(!rb_decode_card_by_index(i,&c)) continue;
+        const char *cn = rb_card_string(c.card_no_idx);
+        int eq = (cn && strcmp(cn, card_no)==0);
+        rb_free_card(&c);
+        if(eq) return (int)i;
+    }
+    return -1;
 }
 void test_add_to_hand_for(TestGame *tg, int pl, int card_id){
     if(!tg || pl<0 || pl>1) return;
@@ -366,9 +420,23 @@ const char *test_pending_choice_type(TestGame *tg){
 int test_get_blade_modifier(TestGame *tg, int cid){ return rb_mods_get_blade(&tg->state.mods, cid); }
 int test_get_score_modifier(TestGame *tg, int cid){ return rb_mods_get_score(&tg->state.mods, cid); }
 int test_get_cost_modifier(TestGame *tg, int cid){ return rb_mods_get_cost(&tg->state.mods, cid); }
+/* Mirrors Rust GameModifiers::get_heart_modifier(card, color): the colour
+   index goes straight into rb_mods_get_heart (modifiers.c:64), which uses it
+   as the raw slot 0..7. The engine's own colour map is
+ *     0=heart00 1=heart01 2=heart02 3=heart03 4=heart04 5=heart05 6=heart06 7=all
+   (state.c:2002 rb_heart_color_index, rb_heart_color_short_label), so in the
+   RbHeartColor enum RB_HEART_PURPLE == 5 is heart05 and RB_HEART_ORANGE == 6
+   is heart06.
+
+   This shim used to carry `if (color == 5) color = RB_HEART_ORANGE;`. That
+   made every heart05 read return the heart06 slot, so a suite asking for
+   heart05 while heart06 happened to hold the value got a clean green, and a
+   suite asking for heart05 while heart05 held it got a red it could not
+   explain (test_target_selection.c:77, test_trigger_paths.c:449,
+   test_tp_zone_change_gate.c:252 are the call sites that were silently
+   measuring the wrong slot). The remap is gone: this is a passthrough. */
 int test_get_heart_modifier(TestGame *tg, int cid, int color){
-    if (color == 5) color = RB_HEART_ORANGE;
-    int value = rb_mods_get_heart(&tg->state.mods, cid, color);
+     int value = rb_mods_get_heart(&tg->state.mods, cid, color);
     fprintf(stderr, "[TEST_HEART_READ] cid=%d color=%d value=%d\n", cid, color, value);
     return value;
 }
@@ -472,12 +540,19 @@ int test_total_card_count(TestGame *tg){
     }
     return total;
 }
+/* EXACT card-number comparison -- never the forgiving rb_find_card_by_no
+   chain. The comparison itself was always an exact strcmp; the only hole was
+   the empty string. rb_card_string returns the SHARED "" literal for an
+   out-of-range index (data.c:328), so rb_card_no_eq(id, "") answered "yes"
+   for every card in the database -- a permanent false green for any
+   "this zone holds no card numbered X" assertion written with X empty.
+   Refused explicitly. */
 int rb_card_no_eq(int card_id, const char *no){
-    if(!no || card_id<0) return 0;
+    if(!no || !no[0] || card_id<0) return 0;
     Card c;
     if(!rb_decode_card_by_index((uint32_t)card_id,&c)) return 0;
     const char *cn = rb_card_string(c.card_no_idx);
-    int eq = (cn && strcmp(cn, no)==0);
+    int eq = (cn && cn[0] && strcmp(cn, no)==0);
     rb_free_card(&c);   /* the decoded Card is heap-owned */
     return eq;
 }
@@ -538,9 +613,286 @@ int test_move_ids_to_waitroom(TestGame *tg, int pl, const int *ids, int n){
     return moved;
 }
 
-/* Mirror TestGame::advance_to_phase: step the turn until `target` is current.
-   A prompt raised by the arriving step is deliberately NOT answered here — the
-   caller is usually there to inspect it. Returns 1 on arrival, 0 on timeout. */
+/* ═══════════════════════════════════════════════════════════════════════════
+ * PHASE ADVANCE
+ * ═══════════════════════════════════════════════════════════════════════════ */
+
+/* Why there is more than one advance helper
+ * -----------------------------------------
+ * rb_advance_phase (src/turn/phase.c:37) is ONE step, and it is a no-op in
+ * three situations the caller must know about:
+ *   1. `if (rb_has_pending_choice(g)) return;`            phase.c:39
+ *      A standing prompt FREEZES the phase machine. This is Rust-faithful
+ *      (the engine is mid-question), and it is why "just pass 8 times" is
+ *      not a phase advance: 3 of those 8 passes did nothing.
+ *   2. ENERGY -> DRAW does NOT draw. phase.c:52-56 runs rb_draw_energy and
+ *      only *sets* RB_PHASE_DRAW; the rb_draw(g, g->active) that gives the
+ *      seat its card runs on the NEXT call, from the DRAW arm (phase.c:57).
+ *      So "advance to Draw" and "the seat has its card" are two different
+ *      numbers of passes apart, and a test that assumes otherwise measures
+ *      the deck one step early.
+ *   3. MAIN flips `active` to `second_attacker` and goes back to ACTIVE
+ *      (phase.c:71-73). The Active/Energy/Draw triple that follows is
+ *      therefore served to the OTHER seat -- the first draw of a round lands
+ *      on second_attacker, not on first_attacker. Any helper that quietly
+ *      "fixed" this would be lying about the engine, so it is REPORTED
+ *      instead (TestPhaseAdvance.in_swap_window), never papered over.
+ *
+ * And the phase enum does not line up with Rust's. Rust's `Phase`
+ * (engine/src/core/types.rs:137) names FOUR phases inside the live window:
+ * LiveCardSetFirstAttacker, LiveCardSetSecondAttacker,
+ * FirstAttackerPerformance, SecondAttackerPerformance. The C `RbPhase`
+ * (include/rabuka.h) keeps ONE value per PAIR: the LIVE_SET arm flips
+ * `active` and returns without touching `phase` (phase.c:87-90), and the
+ * first performance reuses RB_PHASE_PERFORMANCE for the second window
+ * (phase.c:1070). RB_PHASE_LIVE_SET_SECOND and RB_PHASE_PERFORMANCE_SECOND
+ * are therefore NEVER STORED in g->phase -- a literal `g->phase == target`
+ * against them can never fire, which is exactly why the old helper below
+ * ran 16 passes and answered the yell window on its way past. phase_is()
+ * resolves each pair by which seat is active.
+ */
+
+/* Is the game currently standing at the Rust phase `target` names?
+   Handles the four paired values the C machine folds together; everything
+   else is a literal g->phase compare. */
+static int phase_is(TestGame *tg, int target){
+    switch (target) {
+        case RB_PHASE_PERFORMANCE_SECOND:
+            return tg->state.phase == RB_PHASE_PERFORMANCE &&
+                   tg->state.active == tg->state.second_attacker;
+        case RB_PHASE_LIVE_SET_SECOND:
+            return tg->state.phase == RB_PHASE_LIVE_SET &&
+                   tg->state.active == tg->state.second_attacker;
+        /* The C machine folds RPS and OPENING into one arm and treats both
+           as a step straight to ACTIVE (phase.c:41-44); the mulligan phases
+           are documented no-ops for a headless host. Compare against the
+           stored value so a caller asking for OPENING still finds it. */
+        case RB_PHASE_MULLIGAN_FIRST:
+        case RB_PHASE_MULLIGAN_SECOND:
+            return tg->state.phase == RB_PHASE_MULLIGAN_FIRST ||
+                   tg->state.phase == RB_PHASE_MULLIGAN_SECOND ||
+                   tg->state.phase == RB_PHASE_OPENING;
+        default:
+            return tg->state.phase == target;
+    }
+}
+
+/* Rust Phase Display names (types.rs:153-171), plus the C RbPhase spellings,
+   so a transpiled `advance_to_phase(Phase::SecondAttackerPerformance)` and a
+   hand-written one resolve to the same value. Returns -1 for unknown. */
+int test_phase_from_name(const char *name){
+    if(!name) return -1;
+    static const struct { const char *n; int v; } tbl[] = {
+        {"RPS", RB_PHASE_RPS}, {"RockPaperScissors", RB_PHASE_RPS},
+        {"ChooseFirstAttacker", RB_PHASE_RPS},
+        {"Opening", RB_PHASE_OPENING}, {"OPENING", RB_PHASE_OPENING},
+        {"MulliganFirstAttacker", RB_PHASE_MULLIGAN_FIRST},
+        {"MulliganSecondAttacker", RB_PHASE_MULLIGAN_SECOND},
+        {"Active", RB_PHASE_ACTIVE}, {"ACTIVE", RB_PHASE_ACTIVE},
+        {"Energy", RB_PHASE_ENERGY}, {"ENERGY", RB_PHASE_ENERGY},
+        {"Draw", RB_PHASE_DRAW}, {"DRAW", RB_PHASE_DRAW},
+        {"Main", RB_PHASE_MAIN}, {"MAIN", RB_PHASE_MAIN},
+        {"LiveCardSetFirstAttacker", RB_PHASE_LIVE_SET},
+        {"LiveCardSet", RB_PHASE_LIVE_SET}, {"LIVE_SET", RB_PHASE_LIVE_SET},
+        {"LiveCardSetSecondAttacker", RB_PHASE_LIVE_SET_SECOND},
+        {"FirstAttackerPerformance", RB_PHASE_PERFORMANCE},
+        {"Performance", RB_PHASE_PERFORMANCE}, {"PERFORMANCE", RB_PHASE_PERFORMANCE},
+        {"SecondAttackerPerformance", RB_PHASE_PERFORMANCE_SECOND},
+        {"LiveVictoryDetermination", RB_PHASE_VICTORY},
+        {"Victory", RB_PHASE_VICTORY}, {"VICTORY", RB_PHASE_VICTORY},
+        {"Done", RB_PHASE_DONE}, {"DONE", RB_PHASE_DONE},
+    };
+    for(size_t i=0;i<sizeof(tbl)/sizeof(tbl[0]);i++)
+        if(!strcmp(name, tbl[i].n)) return tbl[i].v;
+    return -1;
+}
+
+/* Rust Display name for the phase the game is in right now, resolving the
+   folded pairs the way phase_is() does. For logs and FAIL messages only. */
+const char *test_phase_name_now(TestGame *tg){
+    if(!tg) return "?";
+    int p = tg->state.phase;
+    if (p == RB_PHASE_LIVE_SET)
+        return (tg->state.active == tg->state.second_attacker)
+             ? "LiveCardSetSecondAttacker" : "LiveCardSetFirstAttacker";
+    if (p == RB_PHASE_PERFORMANCE)
+        return (tg->state.active == tg->state.second_attacker)
+             ? "SecondAttackerPerformance" : "FirstAttackerPerformance";
+    switch (p) {
+        case RB_PHASE_RPS: return "RPS";
+        case RB_PHASE_OPENING: return "Opening";
+        case RB_PHASE_MULLIGAN_FIRST: return "MulliganFirstAttacker";
+        case RB_PHASE_MULLIGAN_SECOND: return "MulliganSecondAttacker";
+        case RB_PHASE_ACTIVE: return "Active";
+        case RB_PHASE_ENERGY: return "Energy";
+        case RB_PHASE_DRAW: return "Draw";
+        case RB_PHASE_MAIN: return "Main";
+        case RB_PHASE_VICTORY: return "LiveVictoryDetermination";
+        case RB_PHASE_DONE: return "Done";
+        default: return "?";
+    }
+}
+
+static void phase_advance_snapshot(TestGame *tg, TestPhaseAdvance *r){
+    r->active         = tg->state.active;
+    r->first_attacker = tg->state.first_attacker;
+    r->second_attacker= tg->state.second_attacker;
+    r->winner         = tg->state.winner;
+    /* The seat-swap landmine, surfaced rather than hidden: after the first
+       MAIN of a round `active` has become second_attacker, so the next
+       Active/Energy/Draw triple -- including the round's first draw -- is
+       served to the OTHER seat. Assert on this flag if a test cares whose
+       deck was drawn. */
+    r->in_swap_window = (tg->state.active != tg->state.first_attacker);
+}
+
+/* THE helper. Steps the turn toward `target` ONE PHASE AT A TIME and STOPS
+   THE MOMENT A CHOICE IS STANDING. It never answers a prompt.
+
+   Why it stops instead of answering: the phase being stepped INTO is
+   usually the window whose effects raise the prompt (a ライブ開始時 position
+   change, a ライブ成功時 draw), so draining it here would consume the exact
+   choice the test came to inspect. Rust says the same thing in as many words
+   (engine/tests/helpers/mod.rs:545-551): "hand any prompt raised by this
+   step to the CALLER ... draining it here would consume the very choice the
+   test came to inspect."
+
+   Returns one of the TestPhaseStop codes and fills `*out` when asked. */
+int test_advance_to_phase_strict_ex(TestGame *tg, int target, int max_passes,
+                                    TestPhaseAdvance *out){
+    TestPhaseAdvance r;
+    memset(&r,0,sizeof(r));
+    if(!tg){ if(out) *out = r; return TEST_PHASE_STOPPED_BAD_TARGET; }
+
+    if(max_passes <= 0) max_passes = 16;   /* Rust's own bound (mod.rs:539) */
+
+    if(phase_is(tg, target)){ r.reached = 1; goto done; }
+
+    for(int i=0;i<max_passes;i++){
+        int phase_before = tg->state.phase;
+        int active_before= tg->state.active;
+        rb_advance_phase(&tg->state);
+        r.passes++;
+        if(tg->state.phase==phase_before && tg->state.active==active_before)
+            r.noops++;
+        if(phase_is(tg, target)){ r.reached = 1; break; }
+        /* A prompt raised by the step we just took is the CALLER's. Stop. */
+        if(rb_has_pending_choice(&tg->state)) break;
+        /* A decided game stops advancing (phase.c:38). Anything further would
+           spin to max_passes reporting a stuck machine. */
+        if(tg->state.winner != -1) break;
+    }
+done:
+    /* Both flags can be true: a single step can arrive at the target AND
+       leave a prompt standing. That is the Rust "Arrived: hand any prompt
+       raised by this step to the CALLER" case, not a contradiction. */
+    r.prompt = rb_has_pending_choice(&tg->state) ? 1 : 0;
+    phase_advance_snapshot(tg, &r);
+    if(out) *out = r;
+    if(r.reached)      return TEST_PHASE_STOPPED_REACHED;
+    if(r.prompt)       return TEST_PHASE_STOPPED_PROMPT;
+    if(r.winner != -1) return TEST_PHASE_STOPPED_GAME_OVER;
+    return TEST_PHASE_STOPPED_TIMEOUT;
+}
+
+int test_advance_to_phase_strict(TestGame *tg, int target){
+    return test_advance_to_phase_strict_ex(tg, target, 0, NULL) == TEST_PHASE_STOPPED_REACHED;
+}
+
+/* Same walk, addressed by Rust's phase NAME. */
+int test_advance_to_phase_named(TestGame *tg, const char *phase_name){
+    int target = test_phase_from_name(phase_name);
+    if(target < 0){
+        fprintf(stderr, "[TEST_PHASE] unknown phase name \"%s\"\n",
+                phase_name ? phase_name : "(null)");
+        return 0;
+    }
+    return test_advance_to_phase_strict(tg, target);
+}
+
+/* Value -> the canonical Rust Phase name, the inverse of
+   test_phase_from_name(). "?" for a value that names no phase. */
+const char *test_phase_to_name(int phase){
+    switch (phase) {
+        case RB_PHASE_RPS: return "RPS";
+        case RB_PHASE_OPENING: return "Opening";
+        case RB_PHASE_MULLIGAN_FIRST: return "MulliganFirstAttacker";
+        case RB_PHASE_MULLIGAN_SECOND: return "MulliganSecondAttacker";
+        case RB_PHASE_ACTIVE: return "Active";
+        case RB_PHASE_ENERGY: return "Energy";
+        case RB_PHASE_DRAW: return "Draw";
+        case RB_PHASE_MAIN: return "Main";
+        case RB_PHASE_LIVE_SET: return "LiveCardSetFirstAttacker";
+        case RB_PHASE_LIVE_SET_SECOND: return "LiveCardSetSecondAttacker";
+        case RB_PHASE_PERFORMANCE: return "FirstAttackerPerformance";
+        case RB_PHASE_PERFORMANCE_SECOND: return "SecondAttackerPerformance";
+        case RB_PHASE_VICTORY: return "LiveVictoryDetermination";
+        case RB_PHASE_DONE: return "Done";
+        default: return "?";
+    }
+}
+
+/* Diagnostics for a failed advance. Always prints -- a caller that ignores
+   the return value still gets told WHERE it stopped and whether the seat it
+   is looking at is the swapped-in one. */
+void test_advance_report(TestGame *tg, const char *what, int target,
+                         int stop){
+    if(!tg) return;
+    fprintf(stderr,
+            "[TEST_PHASE] %s: stop=%d (%s%s%s%s) now=%s want=%s "
+            "phase=%d active=%d first=%d second=%d swap_window=%d pending=%d "
+            "winner=%d\n",
+            what ? what : "advance", stop,
+            stop==TEST_PHASE_STOPPED_REACHED ? "reached" : "",
+            stop==TEST_PHASE_STOPPED_PROMPT ? "prompt" : "",
+            stop==TEST_PHASE_STOPPED_TIMEOUT ? "timeout" : "",
+            stop==TEST_PHASE_STOPPED_GAME_OVER ? "game-over" : "",
+            test_phase_name_now(tg), test_phase_to_name(target),
+            tg->state.phase, tg->state.active, tg->state.first_attacker,
+            tg->state.second_attacker,
+            tg->state.active != tg->state.first_attacker,
+            rb_has_pending_choice(&tg->state) ? 1 : 0, tg->state.winner);
+}
+
+/* Faithful port of Rust TestGame::advance_to_phase
+   (engine/tests/helpers/mod.rs:538-561), for the ported tests whose setup
+   genuinely depends on the auto-drain. It is NOT the default and it is
+   genuinely destructive:
+
+     while has_pending_choice() { select_indices(&[0]) }        mod.rs:553-555
+
+   answers EVERY prompt raised mid-walk with option 0. Inside the live window
+   that eats the YELL: rb_performance runs yell, 自動, allocation, score,
+   live-success and victory inside a single pass (phase.c:112-124 ->
+   rb_execute_performance_phase -> rb_perform_live), so option 0 is not "the
+   obvious answer", it is an answer to a question the test never saw. Prefer
+   test_advance_to_phase_strict() unless you are transcribing a Rust test
+   whose assertions were written against the drained walk. */
+int test_advance_to_phase_rust(TestGame *tg, int target){
+    if(!tg) return 0;
+    for(int i=0;i<16;i++){
+        if(phase_is(tg, target)) return 1;
+        test_pass(tg);
+        if(phase_is(tg, target)) return 1;   /* mod.rs:544-552, prompt kept */
+        int guard=0;
+        while(rb_has_pending_choice(&tg->state) && guard++<64){
+            int zero = 0;
+            rb_resume_with_choice_indices(&tg->state, &zero, 1);
+        }
+    }
+    return 0;
+}
+
+/* LEGACY, and the reason the strict helpers above exist. Kept
+   bit-for-bit in behaviour so no shipped suite moves; DO NOT BUILD ON IT.
+
+   test_advance_to_phase(RB_PHASE_PERFORMANCE_SECOND) can never arrive --
+   RB_PHASE_PERFORMANCE_SECOND is never stored in g->phase (phase.c:1070
+   reuses RB_PHASE_PERFORMANCE for both windows) -- so it fell through all
+   16 iterations, auto-answering EVERY prompt it met on the way, yell
+   included. That is a live false-red generator for any suite that steps to
+   the second performance, and it is why ~20 ported tests were parked rather
+   than written. Use test_advance_to_phase_strict(). */
 int test_advance_to_phase(TestGame *tg, int target){
     if(!tg) return 0;
     for(int i=0;i<16;i++){

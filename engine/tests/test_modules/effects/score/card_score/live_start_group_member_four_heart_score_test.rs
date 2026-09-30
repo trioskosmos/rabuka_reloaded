@@ -45,17 +45,19 @@ fn zettai_lover_heart4_member_gets_score_one_heart3_does_not() {
     // Only Kanon (4 hearts) qualifies → score +1 total.
     let live_id = game.state.player1.live_card_zone.cards[0];
     let score_mod = game.state.mods.get_score_modifier(live_id);
-    assert!(
-        score_mod >= 1,
-        "Live card should have at least +1 score from 1 qualifying member (got {})",
-        score_mod
-    );
-    // Keke (3 hearts) should NOT qualify — but this is harder to assert directly.
-    // We can verify the total is only +1, not +2.
-    assert!(
-        score_mod <= 1,
-        "Live card should have at most +1 score (only 1 member with 4+ hearts, got {})",
-        score_mod
+    // 「自分のステージにいるハートを4つ以上持つ『Liella!』のメンバー1人につき、このカードの
+    // スコアを＋１する」 — one qualifying member × 1, so the answer is exactly +1.
+    //
+    // This was two separate inequalities, `>= 1` and `<= 1`, with a comment conceding the
+    // bound "is harder to assert directly". Splitting an exact value into two inequalities
+    // means each defect is caught by exactly one arm: a double-grant (2) passes the first
+    // and is stopped by the second, while a no-grant (0) passes the second and is stopped by
+    // the first. One `assert_eq` says the same thing and cannot be half-satisfied.
+    assert_eq!(
+        score_mod, 1,
+        "exactly +1: one 『Liella!』 member has 4+ hearts, and 唐可可 with 3 does not qualify. \
+         A value of 2 means both members counted or the effect applied per heart-colour; \
+         a value of 0 means the qualifying member was missed (got {score_mod})"
     );
 }
 

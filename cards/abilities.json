@@ -1,9 +1,9 @@
 {
   "schema": "extracted_abilities.v1",
-  "generated_at": "2026-09-30T13:08:57.492488",
+  "generated_at": "2026-09-30T15:35:12.572933",
   "generated_by": "cards/ability_extraction/extract_card_abilities.py",
   "source_file": "cards/cards.json",
-  "engine_commit": "08199946",
+  "engine_commit": "dc44ccf1",
   "parser_version": "1.0",
   "input_hash": null,
   "statistics": {
@@ -8480,8 +8480,8 @@
           "count": 1,
           "card_type": "live_card",
           "optional": true,
-          "text": "自分のステージにほかのメンバーがおり、かつこれにより公開した手札の中にライブカードがない場合、自分のデッキの上からカードを5枚見る。その中からライブカードを1枚公開して手札に加えてもよい。残りを控え室に置く",
-          "exclude_self": true
+          "exclude_self": true,
+          "text": "自分のステージにほかのメンバーがおり、かつこれにより公開した手札の中にライブカードがない場合、自分のデッキの上からカードを5枚見る。その中からライブカードを1枚公開して手札に加えてもよい。残りを控え室に置く"
         },
         "exclude_self": true
       }
@@ -9309,15 +9309,16 @@
           "heart_colors": [
             "heart04"
           ],
-          "heart_color_count": 2,
           "optional": true,
           "cost_limit_operator": ">=",
+          "heart_color_count": 2,
           "text": "自分のデッキの上からカードを4枚見る。その中からハートに{{heart_04.png|heart04}}を2つ以上持つメンバーカードを1枚公開して手札に加えてもよい。残りを控え室に置く"
         },
         "optional": true,
         "heart_colors": [
           "heart04"
-        ]
+        ],
+        "heart_color_count": 2
       }
     },
     {
@@ -12225,9 +12226,9 @@
             "source": "deck_top",
             "count": 1,
             "multiple_targets": true,
+            "exclude_self": true,
             "cost_limit": 10,
             "cost_limit_operator": ">=",
-            "exclude_self": true,
             "activation_position": "center",
             "text": "ライブカードかコスト10以上のメンバーカードのどちらか1つを選ぶ。選んだカードが公開されるまで、自分のデッキの一番上からカードを1枚ずつ公開する。そのカードを手札に加え、これにより公開されたほかのすべてのカードを控え室に置く"
           },
@@ -16870,6 +16871,7 @@
             "action": "reveal_until_live_card",
             "source": "deck_top",
             "target": "self",
+            "exclude_self": true,
             "all": true,
             "text": "ライブカードが公開されるまで、自分のデッキの一番上のカードを公開し続ける。そのライブカードを手札に加え、これにより公開されたほかのすべてのカードを控え室に置く"
           },
@@ -27354,6 +27356,8 @@
           "text": "自分のデッキの上からカードを5枚見る。その中からブレードハートを持たない『μ's』のメンバーカードを1枚公開して手札に加えてもよい。残りを控え室に置く"
         },
         "optional": true,
+        "card_property": "has_blade_heart",
+        "negation": true,
         "group_names": [
           "μ's"
         ]
@@ -31311,11 +31315,11 @@
           "text": "自分のデッキの上からカードを5枚見る。その中からメンバーカードを1枚公開して手札に加えてもよい。残りを控え室に置く。これにより『蓮ノ空』のカードを手札に加えた場合、ライブ終了時まで、{{heart_05.png|heart05}}{{icon_blade.png|ブレード}}を得る"
         },
         "optional": true,
-        "group_names": [
-          "蓮ノ空"
-        ],
         "heart_colors": [
           "heart05"
+        ],
+        "group_names": [
+          "蓮ノ空"
         ]
       }
     },
@@ -33693,6 +33697,8 @@
           "text": "自分のデッキの上からカードを5枚見る。その中からブレードハートを持たない『虹ヶ咲』のメンバーカードを1枚公開して手札に加えてもよい。残りを控え室に置く"
         },
         "optional": true,
+        "card_property": "has_blade_heart",
+        "negation": true,
         "group_names": [
           "虹ヶ咲"
         ]
@@ -37124,7 +37130,8 @@
         "optional": true,
         "heart_colors": [
           "heart04"
-        ]
+        ],
+        "heart_color_count": 2
       }
     },
     {
@@ -37176,7 +37183,8 @@
         "optional": true,
         "heart_colors": [
           "heart02"
-        ]
+        ],
+        "heart_color_count": 2
       }
     },
     {
@@ -37228,7 +37236,8 @@
         "optional": true,
         "heart_colors": [
           "heart05"
-        ]
+        ],
+        "heart_color_count": 2
       }
     },
     {
@@ -38527,6 +38536,7 @@
           "text": "自分のデッキの上からカードを5枚見る。その中から『SunnyPassion』のメンバーカードかブレードハートを持つ『Liella!』のメンバーカードを1枚公開して手札に加えてもよい。残りを控え室に置く"
         },
         "optional": true,
+        "card_property": "has_blade_heart",
         "group_names": [
           "SunnyPassion",
           "Liella!"

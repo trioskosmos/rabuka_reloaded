@@ -2550,3 +2550,241 @@ int rb_decode_fallback_abilities(uint32_t *out, int max) {
     }
     return n;
 }
+
+/* ══════════════════════════════════════════════════════════════════════════
+   Generated-table integrity self-check.
+
+   WHY THIS EXISTS. The ability string pool (`abilities_strings.bin`) is a
+   GITIGNORED build artifact, but the offsets that index it
+   (RBKA_STRINGS_OFFSETS, in the COMMITTED src/core/generated/gen_data.c) are
+   not. The two were allowed to drift, and on 2026-09-30 they did: a peer
+   rebuilt the .bin from cards/abilities.json and the committed offsets were
+   left 227 slots stale, up to 311 bytes wrong. The interned pool is
+   UNSEPARATED, so a small drift does not fail — it splices. `cost_limit`
+   decoded as `cost_limitc`, `left_side` as `eft_side`, `invalidate_ability`
+   as `stiming_conditioni`, and 156 of 6032 strings carried a U+FFFD.
+
+   Critically, the pool's TOTAL LENGTH was unchanged (726731 bytes before and
+   after), so a length check alone would have stayed silent. The check that
+   does catch it is the per-string FNV-1a digest emitted alongside the offsets
+   by tools/gen_from_rs.py: it is read from the same commit as the offsets, so
+   regenerating the .bin without regenerating gen_data.c is now detectable.
+
+   Three layers, cheapest first:
+     1. offsets monotonic, and the sentinel equals the generator-recorded table
+        length  -> catches a truncated or grown table;
+     2. every interned string's FNV-1a matches  -> catches ANY content drift,
+        including drift too small to change the length;
+     3. semantic plausibility: no U+FFFD, no C0 control, valid UTF-8, and every
+        key operand reachable from the bytecode non-empty  -> catches a table
+        that is internally consistent but simply not this game's data.
+
+   Layer 3 alone would NOT have caught the 2026-09-30 incident: `cost_limitc`
+   and `eft_side` are perfectly well-formed identifiers. Layer 1 alone would
+   not either. Layer 2 is the load-bearing one.
+
+   Must be called after rb_load(); tests/test_decode_skew.c is the caller.
+   ══════════════════════════════════════════════════════════════════════════ */
+
+#include "gen_data.h"
+extern const uint32_t RBKA_STRINGS_OFFSETS[];
+extern const uint32_t RBKA_STRINGS_FNV[];
+extern const uint32_t RBKA_STRINGS_TABLE_LEN;
+extern uint32_t *g_strings_offsets;
+
+/* FNV-1a 32. MUST stay bit-identical to fnv1a() in tools/gen_from_rs.py. */
+static uint32_t rb_fnv1a32(const unsigned char *p, size_t n) {
+    uint32_t h = 0x811C9DC5u;
+    for (size_t i = 0; i < n; i++) {
+        h ^= (uint32_t)p[i];
+        h *= 0x01000193u;
+    }
+    return h;
+}
+
+/* Why a decoded string cannot be trusted. 0 = plausible.
+ *
+ * `allow_empty` matters: the pool legitimately contains empty strings (an
+ * absent optional value interns to ""), and several AbilityEffect fields are
+ * fixed char[] that stay "" when the wire key was absent. rb_get_string also
+ * returns a shared "" literal for an out-of-range index, so "" is only a
+ * defect when the caller is asking about a value that must be present. */
+static int rb_string_defect(const char *s, size_t *bad_off, int allow_empty) {
+    const unsigned char *p = (const unsigned char *)s;
+    size_t n = 0;
+    if (!s || !*s) return allow_empty ? 0 : 1;
+    while (p[n]) {
+        unsigned char c = p[n];
+        if (c == 0xEF && p[n+1] == 0xBF && p[n+2] == 0xBD) { *bad_off = n; return 2; } /* U+FFFD */
+        if (c < 0x20 && c != '\t' && c != '\n' && c != '\r') { *bad_off = n; return 3; }
+        if (c == 0x7F) { *bad_off = n; return 3; }
+        n++;
+    }
+    /* strict UTF-8 walk: a truncated tail is what a mid-character offset
+       splice produces, and it is the mechanism behind every U+FFFD above */
+    size_t i = 0;
+    while (i < n) {
+        unsigned char c = p[i];
+        int extra;
+        unsigned int cp;
+        if (c < 0x80) { i++; continue; }
+        else if ((c & 0xE0) == 0xC0) { extra = 1; cp = c & 0x1F; }
+        else if ((c & 0xF0) == 0xE0) { extra = 2; cp = c & 0x0F; }
+        else if ((c & 0xF8) == 0xF0) { extra = 3; cp = c & 0x07; }
+        else { *bad_off = i; return 4; }        /* BAD_UTF8: stray continuation */
+        if (i + (size_t)extra >= n) { *bad_off = i; return 4; }
+        for (int k = 1; k <= extra; k++) {
+            unsigned char cc = p[i + (size_t)k];
+            if ((cc & 0xC0) != 0x80) { *bad_off = i; return 4; }
+            cp = (cp << 6) | (cc & 0x3F);
+        }
+        if ((extra == 1 && cp < 0x80) || (extra == 2 && cp < 0x800) ||
+            (extra == 3 && cp < 0x10000) || cp > 0x10FFFF ||
+            (cp >= 0xD800 && cp <= 0xDFFF)) { *bad_off = i; return 4; }
+        i += (size_t)extra + 1;
+    }
+    return 0;
+}
+
+/* Walk one value, reporting every string reference whose decoded text is
+ * defective. `ks->n_bad` counts them; `ks->n_keys` counts the key-position
+   ones. Returns 0 if the bytecode itself failed to walk. */
+typedef struct { int n_bad, n_keys; } KeyScan;
+static int scan_refs(Rdr *r, KeyScan *ks, int depth) {
+    uint32_t len, i;
+    int64_t v;
+    uint8_t b, tag;
+    if (depth > 24) return 0;
+    if (!rd_u8(r, &tag)) return 0;
+    switch (tag) {
+    case RB_TAG_NULL: case RB_TAG_FALSE: case RB_TAG_TRUE: return 1;
+    case RB_TAG_I64: return rd_int(r, &v);
+    case RB_TAG_F64:
+        if (r->p + 8 > r->end) return 0;
+        r->p += 8; return 1;
+    case RB_TAG_STR: {
+        uint32_t idx;
+        if (!rd_idx(r, &idx)) return 0;
+        size_t off = 0;
+        if (rb_string_defect(rb_get_string(idx), &off, 1)) ks->n_bad++;
+        return 1;
+    }
+    case RB_TAG_ARRAY:
+        if (!rd_len(r, &len)) return 0;
+        for (i = 0; i < len; i++) if (!scan_refs(r, ks, depth + 1)) return 0;
+        return 1;
+    case RB_TAG_OBJECT: case RB_TAG_OBJVAR:
+        if (tag == RB_TAG_OBJVAR) { if (!rd_u8(r, &b)) return 0; }
+        if (!rd_len(r, &len)) return 0;
+        for (i = 0; i < len; i++) {
+            uint32_t key;
+            size_t off = 0;
+            if (!rd_idx(r, &key)) return 0;
+            if (rb_string_defect(rb_get_string(key), &off, 0)) { ks->n_bad++; ks->n_keys++; }
+            if (!scan_refs(r, ks, depth + 1)) return 0;   /* the value */
+        }
+        return 1;
+    default: return 0;
+    }
+}
+
+int rb_verify_generated_tables(int *out_bad_strings, int *out_bad_keys,
+                               char *msg, unsigned long msg_sz) {
+    uint32_t n = RBKA_NUM_STRING_OFFSETS ? (RBKA_NUM_STRING_OFFSETS - 1) : 0;
+    int bad_len = 0, bad_order = 0, bad_digest = 0, bad_text = 0;
+    size_t msz = msg ? (size_t)msg_sz : 0, mn = 0;
+    if (msg && msz) msg[0] = 0;
+#define VMSG(...) do { if (msg && mn < msz) { \
+        int _w = snprintf(msg + mn, msz - mn, __VA_ARGS__); \
+        if (_w > 0) mn += (size_t)_w; } } while (0)
+
+    if (RBKA_NUM_STRING_OFFSETS == 0) {
+        VMSG("FATAL: RBKA_NUM_STRING_OFFSETS == 0 (gen_data.h is stale)\n");
+        if (out_bad_strings) *out_bad_strings = 0;
+        if (out_bad_keys) *out_bad_keys = 0;
+        return -1;
+    }
+
+    /* ── layer 1: offsets must be monotonic and end at the recorded length ── */
+    if (g_strings_offsets[0] != 0) bad_order = 1;
+    for (uint32_t i = 0; i < n; i++)
+        if (g_strings_offsets[i] > g_strings_offsets[i + 1]) bad_order = 1;
+    if (g_strings_offsets[n] != RBKA_STRINGS_TABLE_LEN) {
+        bad_len = 1;
+        VMSG("FATAL: string table length skew: offsets end at %u but the "
+             "generator recorded %u.\n"
+             "       cards/build/abilities_strings.bin was regenerated without "
+             "regenerating src/core/generated/gen_data.c.\n"
+             "       FIX: bash tools/regen_all.sh\n",
+             g_strings_offsets[n], RBKA_STRINGS_TABLE_LEN);
+    }
+    if (bad_order)
+        VMSG("FATAL: RBKA_STRINGS_OFFSETS is not monotonic / does not start at 0.\n");
+
+    /* ── layer 2: per-string FNV-1a. The load-bearing check. ──
+       Counted for reporting, but the first six offenders are named so the
+       failure names a card-relevant string rather than an index. */
+    int named = 0;
+    for (uint32_t i = 0; i < n; i++) {
+        uint32_t a = g_strings_offsets[i], b = g_strings_offsets[i + 1];
+        if (b > RBKA_STRINGS_TABLE_LEN || a > b) { bad_digest++; continue; }
+        const char *s = rb_get_string(i);
+        size_t slen = strlen(s ? s : "");
+        if (slen != (size_t)(b - a) ||
+            rb_fnv1a32((const unsigned char *)(s ? s : ""), slen) != RBKA_STRINGS_FNV[i]) {
+            bad_digest++;
+            if (named < 6) {
+                named++;
+                VMSG("FATAL: string #%u digest mismatch (offsets %u..%u). "
+                     "Decodes to \"%s\".\n", i, a, b, s ? s : "");
+            }
+        }
+    }
+    if (bad_digest)
+        VMSG("       %d of %u interned strings do not match the digest recorded "
+             "in gen_data.c (showing %d).\n"
+             "       cards/build/abilities_strings.bin and "
+             "src/core/generated/gen_data.c are from different generator runs.\n"
+             "       FIX: bash tools/regen_all.sh\n", bad_digest, n, named);
+
+    /* ── layer 3: semantic plausibility of every string, and of every string
+       reference the bytecode actually makes. ── */
+    for (uint32_t i = 0; i < n; i++) {
+        size_t off = 0;
+        if (rb_string_defect(rb_get_string(i), &off, 1)) {
+            bad_text++;
+            if (bad_text <= 6) {
+                const char *s = rb_get_string(i);
+                VMSG("FATAL: string #%u is not decodable text (byte %zu): \"%s\"\n",
+                     i, off, s ? s : "");
+            }
+        }
+    }
+
+    int bad_refs = 0, bad_ref_keys = 0, abil_bad = 0;
+    for (uint32_t a = 0; a < RBKA_NUM_ABILITIES; a++) {
+        uint32_t len;
+        const unsigned char *slice = rb_bc_slice(a, &len);
+        if (!slice || len == 0) continue;
+        Rdr r = { slice, slice + len, (int)a };
+        KeyScan ks = { 0, 0 };
+        if (!scan_refs(&r, &ks, 0)) continue;
+        if (ks.n_bad) { abil_bad++; bad_refs += ks.n_bad; bad_ref_keys += ks.n_keys; }
+    }
+    if (bad_refs)
+        VMSG("       %d defective string reference(s) (%d in key position) across "
+             "%d of %u abilities.\n", bad_refs, bad_ref_keys, abil_bad, RBKA_NUM_ABILITIES);
+    if (bad_text)
+        VMSG("       %d of %u interned strings are not decodable text.\n", bad_text, n);
+
+    if (out_bad_strings) *out_bad_strings = bad_text > bad_digest ? bad_text : bad_digest;
+    if (out_bad_keys) *out_bad_keys = bad_ref_keys;
+
+    int rc = (bad_len || bad_order || bad_digest || bad_text || bad_refs) ? -1 : 0;
+    if (rc == 0)
+        VMSG("gen_data self-check OK: %u abilities, %u interned strings, table "
+             "%u bytes, offsets and digests consistent.\n",
+             RBKA_NUM_ABILITIES, n, RBKA_STRINGS_TABLE_LEN);
+#undef VMSG
+    return rc;
+}

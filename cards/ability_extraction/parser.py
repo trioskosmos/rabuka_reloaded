@@ -1391,6 +1391,7 @@ def _finalize_effect(
     # zone qualified. Routed through the central finalizer rather than each builder —
     # see docs/ABILITY_AUDIT_2026-09-30.md §A2.
     _add_score_threshold(result, result.get("text") or prefix_effect.get("text") or "")
+    _enrich_card_pool_filters(result)
     return result
 
 
@@ -1497,12 +1498,14 @@ def parse_effect(text: str) -> Dict[str, Any]:
         elif "引く" in fallback_text:
             effect["action"] = "draw_card"
 
-    # Fallback-path twin of the hook in _finalize_effect. This clause
+    # Fallback-path twin of the hooks in _finalize_effect. This clause
     # (「スコアN以上のライブカードを1枚手札に加える」) reaches the engine through
     # parse_action, not the handler registry, so it never sees _finalize_effect.
     # See docs/ABILITY_AUDIT_2026-09-30.md §A2.
     _add_score_threshold(effect, effect.get("text") or fallback_text)
-    return _strip_coo_child_optional(effect)
+    effect = _strip_coo_child_optional(effect)
+    _enrich_card_pool_filters(effect)
+    return effect
 
 
 def _enrich_condition_common(d: Dict[str, Any], text: str) -> None:
@@ -3338,7 +3341,7 @@ def _enrich_card_count_condition(result, text):
     if u == "人":
         result["card_type"] = "member_card"
     # Extract exclude_self for "このメンバー以外" pattern
-    if detect_exclude_self(text) or "このカード以外" in text:
+    if detect_exclude_self(text):
         result["exclude_self"] = True
         result["card_type"] = "member_card"
     # Detect negation
@@ -4328,7 +4331,7 @@ def _try_appearance(text):
     if "エリアすべて" in text:
         result["all_areas"] = True
     # Exclude self
-    if detect_exclude_self(text) or "このカード以外" in text:
+    if detect_exclude_self(text):
         result["exclude_self"] = True
     gns = extract_all_groups(text)
     if gns:
@@ -4828,7 +4831,7 @@ def _try_heart_possession(text):
         result["operator"] = ">"
         result["count"] = 1
     # Exclude self
-    if detect_exclude_self(text) or "このカード以外" in text:
+    if detect_exclude_self(text):
         result["exclude_self"] = True
     return result
 
@@ -5792,7 +5795,7 @@ def _extract_generic_fields(condition, text):
         condition["all_areas"] = True
 
     # Exclude self
-    if detect_exclude_self(text) or "このカード以外" in text:
+    if detect_exclude_self(text):
         condition["exclude_self"] = True
 
     # Exclude specific card names (e.g. 「MY舞☆TONIGHT」以外)
@@ -7257,14 +7260,9 @@ def _per_unit_filters(result, text, per_text):
     elif "ブレードハートを持つ" in per_text:
         result["card_property"] = "has_blade_heart"
 
-    # Extract exclude_self from per_text (self-referential "other" patterns)
-    if (
-        detect_exclude_self(per_text)
-        or "このカード以外" in per_text
-        or "自分以外" in per_text
-        or re.search(r"他の.*?(?:メンバー|カード)", per_text)
-        or "これを除く" in per_text
-    ):
+    # Extract exclude_self from per_text ("other" self-referential patterns). All the
+    # forms it used to enumerate inline are now in detect_exclude_self.
+    if detect_exclude_self(per_text):
         result["exclude_self"] = True
 
     # Extract cost_limit from per-text (e.g., "コスト4以上")
@@ -8105,8 +8103,10 @@ def _try_cost_modification(text):
                 "target": "self",
                 "text": "手札にある",
             }
-    # Exclude self: "このカード以外" or "ほかの"
-    if "以外" in text or "ほかの" in text or "他の" in text:
+    # Exclude self. Uses the shared detector so this site cannot invent exclude_self for a
+    # 『X』以外 group exclusion the way a bare `"以外" in text` test did, and cannot miss
+    # これを除く the way that same test did.
+    if detect_exclude_self(text):
         result["exclude_self"] = True
     # Per-unit scaling: "X枚につき" or "X人につき"
     unit_match = re.search(r"(\d+)(枚|人)につき", text)
@@ -8404,7 +8404,14 @@ def _build_reveal_add_discard(fp, sa_text, select_text):
         # discard」 card silently accepted a card printing one heart04. Only this path
         # omits it; _enrich_from_text has always called it. See
         # docs/ABILITY_AUDIT_2026-09-30.md §A1.
-        _add_heart_color_threshold(result, select_text)
+        # 「ハートにheart04を2つ以上持つ」 is a COUNT filter, not mere colour presence, and this
+        # builder used not to extract it at all — every 「reveal → add → discard」 card silently
+        # accepted a card printing one heart04 (defect A1, PL!S-bp5-007-AR). It no longer
+        # extracts it HERE: _enrich_card_pool_filters walks the finished tree and applies
+        # heart_color_count to this node from the inherited parent text, so there is one
+        # place that does it instead of one per builder. Verified by deleting the call and
+        # confirming the parse is unchanged. See docs/ABILITY_AUDIT_2026-09-30.md §A1 and
+        # docs/PARSER_CONSOLIDATION_SWEEP.md §F4.
         if detect_require_all_hearts(select_text):
             result["require_all_heart_colors"] = True
     if extract_max(select_text):
@@ -8572,6 +8579,73 @@ def _add_score_threshold(d, text):
         digits = "".join(ch for ch in m.group(0) if ch.isdigit())
         d["cost_limit"] = int(digits.translate({ord(c): str(i) for i, c in enumerate("０１２３４５６７８９")}))
         d["cost_limit_operator"] = "<="
+
+
+# Actions whose candidate pool is a SET OF CARDS, so any printed 「〜のカード」 clause in
+# the node's own text is a filter on that pool. Nodes outside this set (move_cards from a
+# known zone, position_change, gain_resource, ...) are left alone: their `text` is prose
+# and running a card filter over it invents constraints the card never printed.
+_CARD_POOL_ACTIONS = frozenset({
+    "select", "select_cards", "look_and_select", "reveal", "reveal_until_live_card",
+})
+
+
+def _enrich_card_pool_filters(node, inherited_text=None):
+    """Fill in card filters the node's text prints but its builder did not extract.
+
+    Clause extraction used to be opt-in per builder: `_add_heart_color_threshold` had 4
+    call sites, `_apply_card_property_filter` 4, `_add_or_card_types_if_needed` 4,
+    `_enrich_from_text` 6 — all clustered in one family of look/select builders — while
+    roughly fifty other effect rules built their own `select`/`reveal` nodes and got no
+    clause extraction at all. That opt-in-ness is the structural cause of two real defects
+    found on 2026-09-30: a heart-count threshold dropped on PL!S-bp5-007-AR because
+    `_build_reveal_add_discard` never called the helper, and a score threshold dropped
+    everywhere because the clause had no extractor until it was added at two separate
+    exits. See docs/ABILITY_AUDIT_2026-09-30.md §A1/§A2 and
+    docs/PARSER_CONSOLIDATION_SWEEP.md §F4.
+
+    Walking the finished tree once removes the choice: a new clause goes in here, and every
+    card-pool node gets it regardless of which rule built it.
+
+    `inherited_text` matters. A nested pool node usually does NOT repeat the clause in its
+    own `text` — the printed prose is split once and the filter is stated once, on the
+    parent, with the child carrying only the mechanics. PL!S-bp5-007-AR is exactly that
+    shape: the `look_and_select` node holds the full 「ハートにheart04を2つ以上持つ…」 text
+    and its `select_action` child has NO `text` at all. Reading only a node's own text
+    therefore skips precisely the nodes that need the help most, so a node with no text of
+    its own falls back to the nearest ancestor's.
+
+    Conservative by construction — a field is only ever ADDED, never overwritten, and only
+    when the effective text actually contains the clause:
+
+      * `heart_colors` / `heart_color_count` — 「ハートにheartNNを…持つ」
+      * `card_property`            — from コストN / ブレードハート etc.
+      * `exclude_self`             — via the single shared detector
+      * `cost_limit`               — スコアN以上 on a live card, via _add_score_threshold
+    """
+    if not isinstance(node, dict):
+        return
+    own_text = node.get("text") or ""
+    effective = own_text or (inherited_text or "")
+    if node.get("action") in _CARD_POOL_ACTIONS and effective:
+        if "heart_colors" not in node:
+            hc = _heart_ref_ids(effective, unique=True)
+            if hc:
+                node["heart_colors"] = hc
+        if "heart_color_count" not in node:
+            _add_heart_color_threshold(node, effective)
+        if "card_property" not in node:
+            _apply_card_property_filter(node, effective)
+        if "exclude_self" not in node and detect_exclude_self(effective):
+            node["exclude_self"] = True
+        _add_score_threshold(node, effective)
+    for value in list(node.values()):
+        if isinstance(value, dict):
+            _enrich_card_pool_filters(value, effective)
+        elif isinstance(value, list):
+            for item in value:
+                if isinstance(item, dict):
+                    _enrich_card_pool_filters(item, effective)
 
 
 def _apply_or_select_criteria(result, select_text):

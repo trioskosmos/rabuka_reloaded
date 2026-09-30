@@ -930,7 +930,26 @@ int rb_place_card_in_zone(GameState *g, int pl, int card_id, const char *zone,
     RbPlayer *P = &g->p[pl];
     if (!strcmp(zone, "stage") || !strcmp(zone, "empty_area")) {
         int area = vacated_area >= 0 ? vacated_area : rb_stage_first_empty(P->stage);
-        if (area < 0 || area >= RB_STAGE_SIZE) return 0;
+        if (area < 0 || area >= RB_STAGE_SIZE) {
+            /* util.rs:2354-2368 — a FULL stage is NOT a failure. Rust's
+             * `Some(Zone::Stage) | Some(Zone::EmptyArea)` arm parks the card in
+             * the WAITROOM ("Stage full — return card to discard instead of
+             * hand") and still returns `true`.
+             *
+             * Returning 0 here is the second card-destroying defect of the day
+             * (the first was zone_bag() below missing deck_top/deck_bottom):
+             * EVERY caller of this function has already lifted the card out of
+             * its source zone — rb_move_card at util.c:976 removes first, and
+             * the three choice.c call sites (choice.c:962 send_to_dst, :1732
+             * hand-cost, :4276 energy-zone) all call rb_waitroom_remove_card
+             * first — so a "not placed" verdict leaves the card in no zone at
+             * all. Measured on the nico family: board census 12 -> 11 and
+             * 14 -> 13 with an `empty_area` destination onto a full stage.
+             * Only a whole-board census distinguishes "moved" from "destroyed";
+             * a zone count reads the same either way. */
+            if (P->discard.n < RB_MAX_ZONE) P->discard.cards[P->discard.n++] = card_id;
+            return 1;
+        }
         P->stage[area] = card_id; P->stage_wait[area] = 0;
         return 1;
     }

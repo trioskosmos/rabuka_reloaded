@@ -329,7 +329,199 @@ Per the rule above, these are the good kind and should not be "cleaned up":
 
 ---
 
-## Suggested order
+# Execution log — 2026-09-30 (later session)
+
+Same day, second pass. The rule applied throughout: **the ~4000 Rust tests are the guard, and
+the work is to make them sensitive.** A green suite that cannot detect a defect is the defect.
+
+## Done
+
+### F1 — one `exclude_self` answer (was 9 sites, 5 of 7 sample clauses disagreed)
+
+`detect_exclude_self` rewritten in `parser_fields.py` to hold the **union** of every form any
+call site recognised, minus two that name something other than the activator: `『X』以外`
+(a group, handled by `apply_group_exclusions`) and `「X」以外` (a character, handled by
+`_split_include_exclude_chars`). The nine per-site widenings collapsed to plain calls.
+
+The nine-clause table now resolves correctly, including the two the old code failed in
+**opposite** directions: `『μ's』以外のメンバーを1人選ぶ` used to get a bogus `exclude_self`
+from the bare `"以外" in text` site, and `これを除くメンバーを1人選ぶ` used to be missed by it.
+
+**Honest outcome: latent.** I checked the corpus — zero cards exercise the shapes where the
+sites disagreed, so no gameplay test can be made to fail. This is a robustness refactor, not a
+bug fix, and the 4011 tests were green before and after.
+
+### F4 — one central enrichment walk (root cause of A1 and A2)
+
+`_enrich_card_pool_filters(node, inherited_text)` runs once over the finished tree at both
+`parse_effect` exits and applies `heart_colors` / `heart_color_count` / `card_property` /
+`exclude_self` / `cost_limit` to card-pool nodes, adding only what is absent.
+
+**The design detail that made it work.** A first attempt read only each node's own `text` and
+changed nothing. Tracing showed why: on `PL!S-bp5-007-AR` the nested `select_action` has
+**no `text` at all** (`text_len=0`) — the printed clause lives once on the parent
+`look_and_select` node. A walk that reads each node's own text therefore skips exactly the
+nodes that need help most. `inherited_text` carries the nearest ancestor's prose down.
+
+Verified as a genuine consolidation, not a wrapper: the per-builder
+`_add_heart_color_threshold` call in `_build_reveal_add_discard` (the A1 fix) was **deleted**,
+regenerated, and the discriminating test still passes with an unchanged parse. One place, not
+four.
+
+## Test sensitivity added — each proven red without its clause
+
+| Card | Gap found by reading the test | Proof |
+|---|---|---|
+| `PL!-pb1-001-R` 高坂穂乃果 | The live branch of 「ライブカード**か**コスト10以上のメンバーカード」 had no below-threshold test. Every member fixture cost **exactly 10** (the bound) and the only live fixture is score 1, so no fixture ever contradicted the filter. | Deleting the `コスト(\d+)以上` extraction turns exactly **one** test red and leaves the other 10 green. |
+| `PL!S-pb1-015-N` 津島善子 | The live branch's `必要ハートにheart05を2以上` threshold had **no** negative test — its only live fixture sits well above the bound. | Added `PL!HS-bp2-019-L` (need heart05 = **1**). Also added: rejected looked-at cards must reach the **waitroom**, not merely be absent from hand; and declining the optional cost must leave the deck **untouched**. |
+| `PL!-bp6-002-R` 絢瀬絵里 | 「能力を持たない『μ's』**か**常時能力を持つ『μ's』」 — the group governs **both** branches, but the only non-μ's fixture had *no* ability, so it was rejected by branch 1 and branch 2's group check was never exercised. | Added `PL!HS-bp1-003-R＋` (蓮ノ空, with a 常時) beside a qualifying μ's card, asserting the exact `filtered_indices` **and** its index. |
+| `PL!N-sd2-005-SD2` 宮下愛 / `PL!N-bp3-002-R` 中須かすみ | Six-way 「好きなハートの色を1つ指定する」, but both tests read `boosted[0]` — *whatever* colour won — so an engine that ignored the selection and applied a fixed colour passed. かすみ's carried a comment claiming its identity was checked when it was not. | Now pinned by name, with **paired** tests selecting two different options. |
+| `PL!-bp6-016-N` 東條 希 (reorder) | A deck holding **fewer than 3** cards reached no test; `live_success_look_three_deck_size_q36_test` stages 15 but drives a different card's live. | Added deck sizes 0/1/2, reversing the block so a no-op cannot pass. |
+| `PL!-bp3-007-R` 東條 希 (three-way split) | The test asserted two counts and **`hand_now <= 3`**, which passes for 0, 1, 2 or 3 — so a routing bug that sent the hand card nowhere passed. Nothing located *which* card went where, which is the whole content of the text. | Rewritten to select by card identity and assert each card's destination, plus a swap test. |
+| `LL-bp5-001-L` Live with a smile! | 「5種類以上」 collectively — the suite staged **5** types (qualifies) and **3** (does not), so `>= 4`, `>= 5` and `> 4` all pass. | Added exactly **4** types (`PL!S-PR-015-PR` h02+h04 with `PL!-sd1-010-SD` h01+h03, disjoint), with the union asserted as a precondition. |
+| `PL!-bp5-002-R` 絢瀬絵里 | 「コスト9以上のμのメンバー」 — every negative used `PL!-sd1-010-SD`, which fails **both** halves at once (not μ's *and* cost 4), so no test distinguished the cost bound from the group clause. | Added `PL!-bp4-012-N` (μ's, cost **7**, no ability) beside a cost-9 card: the below-bound cards pass 『μの』 and fail only on cost. There is **no cost-8 μ's member** — the μ's cost histogram is 2,4,5,7,9,10,11,13,15,17,22 — so 7 is the closest reachable card below 9. |
+| `PL!S-bp7-010-N` 高海千歌 | The **decline** test pushed a **one-card deck** and then asserted `deck.contains(&x)` and `deck.last() == x` — both trivially true, since the deck held exactly one card and it was `x`. Nothing about "stays at the bottom" was checked. The accept test confirmed `get(3) == x` but never that the deck kept its length, its other cards, or their order. | Decline now asserts the deck is **byte-for-byte identical** to a 7-card pre-state. Accept asserts length, the three cards above the insertion point, the shifted tail, and that `x` appears exactly once. Added a test pinning that the card that moves is specifically the **bottom** one, with a distinct top card. |
+| `PL!S-bp7-008-R` 小原鞠莉 | 「好きな枚数を好きな順番で」 — 好きな枚数 includes **zero**, and the two tests only pick 1 and 2. | Added the 0 case. The real behaviour is a **third** outcome, discovered by observation after two wrong guesses: declining applies 残りを…デッキの下に置く to all three at once, in look order, with **no** ordering prompt — not a cancelled ability, and not an ordering choice. |
+
+### An engine question this sweep turned up: `has_blade_heart()` is true for every live
+
+Found while auditing `PL!N-bp7-018-N` 近江彼方's
+「ブレードハートを持たない『虹ヶ咲』のメンバーカード」. I wanted a fixture isolating the
+メンバーカード clause — a 虹ヶNash live would serve, since a live prints no ブレードハート.
+No such fixture exists, and the reason is in the engine
+(`engine/src/core/card.rs:4311-4317`):
+
+```rust
+pub fn has_blade_heart(&self) -> bool {
+    self.blade_heart.is_some()
+        || self.special_heart.as_ref().is_some_and(|sh| !sh.hearts.is_empty())
+}
+```
+
+`special_heart` is where a **live card's printed heart icons** are stored, so the predicate is
+`true` for every live. Two consequences:
+
+* **Untestable today.** A live is rejected by the 持たない clause before メンバーカード is
+  consulted, so no card in the corpus can separate those two clauses. Confirmed by trying both
+  candidates: my precondition assertion caught `PL!N-pb1-040-L` and `PL!N-sd1-025-SD` both
+  "having" a blade heart. The new test pins the conflation as a fact rather than pretending
+  to isolate the clause.
+* **Potentially observable.** 49 cards print 「ブレードハートを持たない」. 45 of them pair it
+  with メンバーカード explicitly, so a live is excluded either way and the conflation is
+  invisible. The 4 that do **not** name a member are where it can matter, and two of those are
+  live-facing:
+  * `PL!S-bp3-019-L` MIRACLE WAVE — counts ブレードハートを持たないカード over **everything
+    yelled this turn** (members *and* lives) and sets its own score to 4 when that count is 0.
+    Yell only a live and the two readings diverge: the live has no ブレードハート, so a strict
+    reading counts it as blade-less and the score stays 7; the current `has_blade_heart()`
+    counts it as having one, the count is 0, and the score becomes 4. **Its only test
+    exercises the other OR branch** (excess hearts), so this path is uncovered either way.
+  * `PL!HS-bp6-027-L` 月夜見海月 — 「ブレードハートを持たない『蓮ノ空』のカード」, no member
+    scope, and 蓮ノ空 has lives.
+
+  **Not changed.** Whether a live's heart icons should read as a ブレードハート is a rules
+  question, not a refactor, and both readings are defensible on the printed text. It needs a
+  decision and then a test on each of those two cards. Recorded, not silently resolved.
+
+### A missing OR branch, found in the same place
+
+`PL!S-bp3-019-L`'s condition is an **OR** — 「ブレードハートを持たないカードが0枚の場合**か**、
+または自分が余剰ハートを2つ以上持っている場合」. The single existing test
+(`live_success_no_blade_heart_or_two_excess_hearts_scores_four_test.rs`) drives only the
+second branch, and its two cheered cards are `PL!S-sd1-001-SD` 高海千歌, who prints **no**
+blade heart — so the first branch is *already false* in that test and the score of 4 comes
+entirely from excess hearts. Nothing tests the first branch, and nothing tests the OR being
+false.
+
+### Twice I guessed the interaction instead of tracing it
+
+Both cost a red run and both were resolved by observing, not by reasoning:
+
+* **`PL!-bp3-007-R`** I assumed the engine offers a destination prompt, so I asserted one
+  appears. It never does. Traced output: two `SelectCard` prompts over `looked_at` with 3 then
+  2 options, no `SelectTarget` at all. The previous file's `Some("SelectTarget") =>
+  game.select_option(1)` branch was therefore **dead code that had never run**.
+* **`PL!S-bp7-008-R`** I first expected declining to place the three at the bottom *with an
+  ordering prompt*, then expected it to cancel the ability and restore the deck. Only the
+  third attempt — the actual behaviour, no prompt at all — was right.
+
+The lesson generalises: on an unfamiliar ability, dump the prompt sequence first. A wrong
+guess about the shape produces a test that looks rigorous and asserts nothing, which is worse
+than the `<= 3` it replaced.
+
+### A third recurring class: an inequality standing in for an exact value
+
+Three separate files asserted a bound with `<=` where the arithmetic fixes the answer:
+
+| file | assertion | why it was vacuous |
+|---|---|---|
+| `paid_look_three_splits_hand_top_and_waitroom_test.rs` | `hand_now <= 3` | paying 2 of 2 and taking 1 back leaves exactly 1; 0, 1 and 2 all pass |
+| `sequential_cost_look_five_take_cost9_member_test.rs` | `hand.len() == 0` with the note "'<= 1' passed both" | already hardened by an earlier pass |
+| `live_success_look_three_deck_size_q36_test.rs` | `deck_after <= deck_before`, message "should draw cards" | a *different card's* live is driven; the reorder ability is never exercised, and `<=` cannot detect the deck growing when it should not |
+
+The third is the worst of the three: the filename says `look_three` and the assertion is about
+START:DASH!!'s draw, so the file named for one ability tests another.
+
+### The dominant gap class, now quantified
+
+Nine of the eleven sensitivities added this session were the **same shape**: a printed bound with
+its two ends staged and the boundary between them never staged. `N-1`-or-below is what
+separates `>= N` from `>= N-1`, and it is exactly what a test suite skips, because the
+interesting positive case is the one that satisfies the bound and the interesting negative is
+the one that obviously fails everything at once.
+
+The second recurring class is a **negative fixture failing several clauses at once**, so
+rejection proves nothing about any single clause — the 絢瀬絵里 cost case above, and the same
+pattern in `look_four_take_member_with_double_heart04_test.rs` (§B1 of the ability audit).
+
+## Two of my own wrong calls, corrected
+
+* I listed `PL!S-bp3-008-R` as "unhandled". It is handled and had 6 tests; only the exact-6
+  boundary was missing (now added).
+* I claimed `PL!-bp1-001-R` had a live-branch cost bug. The parse *looks* wrong —
+  `(live OR member) AND cost>=10` — but the engine applies the clause per branch, so it is
+  correct. The real gap was only that nothing tested it.
+
+## Notable engine reading
+
+`check_ability_filter` (`ability/util.rs:1582-1597`) gates **only** the ability branches; the
+group is a separate `CardFilter` field, so the combination is group AND (branch₁ OR branch₂) —
+which is why 絢瀬絵里's new test verifies a real structural property rather than an accident.
+Both the `or_ability_filters` check and the single `ability_filter` check are wrapped in
+`if let Some(card) = db.get_card(id)`, so a card id absent from the database **fails open**.
+Not reachable in real play; noted, not changed.
+
+## Still open
+
+* **F2** — 37 `sequential` producers. Untouched; highest regression risk, needs a golden diff.
+* **F3** — four output shapes for the reveal-and-take mechanic. Partly addressed by F4 (filter
+  extraction is now central); the four shapes themselves remain.
+* **F5** — four cost-comparison implementations, two operator vocabularies. Latent: the forms
+  they disagree on appear on **0** cards, and the one real card using a divergent form parses
+  correctly.
+* **F6** — `_count_from_cards` returns its default `1` for 人-counts. Latent: all five cards in
+  that family print `1枚`, where both extractors agree.
+* `group_names` is set at **25** `extract_all_groups` call sites; dropping one changed nothing,
+  which is how the per-branch group test in 絢瀬絵里's file proved inconclusive. Worth folding
+  into the same one-place treatment as F1.
+
+## State
+
+**engine 4026 passed / 0 failed** · **parser 124 passed / 0 failed**.
+`cards/test_inventory.py` regenerated. The 13 `--check` ratchet failures remain in files this
+work never touched (concurrent bot/C-port work).
+
+## New open item from this pass
+
+**`Card::has_blade_heart()` returns `true` for every live card** (`core/card.rs:4311-4317`),
+because a live's printed heart icons live in `special_heart`. It makes 「ブレードハートを
+持たない」 untestable in isolation (a live is rejected before メンバーカード is consulted) and
+potentially wrong on the 4 of 49 such clauses that do not name a member — notably
+`PL!S-bp3-019-L` MIRACLE WAVE, whose only test drives the *other* OR branch, and
+`PL!HS-bp6-027-L` 月夜見海月. Both readings of the printed text are defensible, so this needs a
+**rules decision**, then a test on each card. Left unchanged deliberately.
+
+---
 
 | # | Item | Why first |
 |---|---|---|

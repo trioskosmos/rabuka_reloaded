@@ -209,3 +209,80 @@ fn kanata_no_eligible_among_looked_discards_all() {
     assert!(!in_hand(&game, live));
     assert!(!in_hand(&game, filler));
 }
+
+/// 「メンバーカード」 cannot be isolated on its own, and the reason is worth recording.
+///
+/// 近江彼方's filter has three independent requirements: ブレードハートを持たない, 『虹ヶ咲』の,
+/// and メンバーカード. The obvious way to isolate the third is a 虹ヶ咲 live — a live has no
+/// ブレードハート printed, so it would satisfy the negation and the group and fail only on
+/// メンバーカード. **That fixture does not exist in a usable form**, and the reason is
+/// `Card::has_blade_heart` (`engine/src/core/card.rs:4311-4317`):
+///
+/// ```rust
+/// pub fn has_blade_heart(&self) -> bool {
+///     self.blade_heart.is_some()
+///         || self.special_heart.as_ref().is_some_and(|sh| !sh.hearts.is_empty())
+/// }
+/// ```
+///
+/// `special_heart` is where a **live card's printed heart icons** live, so `has_blade_heart()`
+/// is `true` for *every* live card. A live is therefore rejected by the 持たない clause before
+/// メンバーカード is ever consulted, and no card in the corpus can separate the two.
+///
+/// This test pins that fact instead of pretending to isolate the clause: both 虹ヶ咲 lives
+/// reachable here are rejected, and the member is the only thing selected. The 45 of 49
+/// 「ブレードハートを持たない」 cards that print メンバーカード explicitly are unaffected — a
+/// live is excluded either way — so the conflation is not observable on them. It IS reachable
+/// on the 4 that do not name a member, notably `PL!S-bp3-019-L` MIRACLE WAVE, which counts
+/// ブレードハートを持たないカード over **everything yelled** and sets its own score to 4 when
+/// that count is 0. Recorded in docs/PARSER_CONSOLIDATION_SWEEP.md as an open engine question.
+#[test]
+fn kanata_a_nijigasaki_live_is_rejected_because_a_live_counts_as_having_a_blade_heart() {
+    let db = load_real_database();
+    let mut game = TestGame::new(db.clone());
+
+    let nijigasaki_live = game.id("PL!N-sd1-025-SD");
+    let eligible = game.id(ELIGIBLE);
+    let filler = game.id(FILLER);
+    setup(
+        &mut game,
+        vec![nijigasaki_live, eligible, filler, filler, filler],
+    );
+
+    let kanata = place_kanata_on_stage(&mut game);
+    let cost_fodder = game.id(FILLER);
+    game.state.player1.hand.cards.push(cost_fodder);
+
+    // Pin the premise: the engine really does treat a live as having a blade heart, even
+    // though the live prints no ブレードハート of its own.
+    let live_card = game.db.get_card(nijigasaki_live).unwrap();
+    assert_eq!(live_card.card_type, rabuka_engine::card::CardType::Live);
+    assert!(
+        live_card.blade_heart.is_none(),
+        "precondition: the live prints no blade heart of its own"
+    );
+    assert!(
+        live_card.has_blade_heart(),
+        "precondition: has_blade_heart() is nonetheless TRUE for a live, because a live's \
+         printed hearts live in special_heart — this is the conflation that makes the clause \
+         untestable in isolation"
+    );
+
+    trigger_debut(&mut game, kanata, true);
+
+    assert!(
+        in_hand(&game, eligible),
+        "the 虹ヶ咲 member without a blade heart is the one eligible card and is taken"
+    );
+    assert!(
+        !in_hand(&game, nijigasaki_live),
+        "a 虹ヶ咲 live is not a メンバーカード and additionally counts as having a blade heart, \
+         so it is rejected either way (hand={:?})",
+        game.state.player1.hand.cards
+    );
+    assert!(
+        in_waitroom(&game, nijigasaki_live),
+        "残りを控え室に置く — the rejected live is banked, not lost (waitroom={:?})",
+        game.state.player1.waitroom.cards
+    );
+}

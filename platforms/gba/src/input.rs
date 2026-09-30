@@ -27,6 +27,18 @@ impl Input {
 
     pub fn poll(&mut self) {
         self.ctrl.update();
+        // SELECT+L toggles the card-art kill switch. This is the only place the
+        // port polls input every frame regardless of which screen the engine
+        // has put us on, so the toggle works in a match without the port having
+        // to know anything about the engine's loop. See `diag::ART_ENABLED`.
+        if self.ctrl.is_just_pressed(GbaButton::L) && self.ctrl.is_pressed(GbaButton::Select) {
+            crate::diag::toggle_art();
+        }
+    }
+
+    /// True while SELECT is held — the modifier for the diagnostic hotkeys.
+    pub fn select_held(&self) -> bool {
+        self.ctrl.is_pressed(GbaButton::Select)
     }
 
     pub fn just_pressed(&self, btn: Button) -> bool {

@@ -66,3 +66,32 @@ pub fn level_tag() -> &'static str {
 pub fn note(args: core::fmt::Arguments<'_>) {
     agb::println!("[diag] {args}");
 }
+
+// --- Card-art kill switch (SELECT+L) -------------------------------------
+//
+// The board is misrendering and four separate theories about why have all been
+// wrong, none of them verifiable from the build host. This isolates the fault
+// in a single run: with art off the board still draws its zone fills, labels
+// and badges. A clean board with art OFF means the fault is in the sprite path
+// (upload/blit/placement); a broken board with art OFF means it is in the BG/UI
+// or engine layer and has nothing to do with card art at all.
+
+static mut ART_ENABLED: Cell<bool> = Cell::new(true);
+
+/// Whether card sprites should be drawn.
+pub fn art_enabled() -> bool {
+    // SAFETY: single-threaded; only toggled from `Input::poll`.
+    unsafe { (*core::ptr::addr_of!(ART_ENABLED)).get() }
+}
+
+/// Flip the card-art kill switch; returns the new state.
+pub fn toggle_art() -> bool {
+    // SAFETY: as `art_enabled()`.
+    let next = unsafe {
+        let cell = &mut *core::ptr::addr_of_mut!(ART_ENABLED);
+        cell.set(!cell.get());
+        cell.get()
+    };
+    agb::println!("[diag] card art {}", if next { "ON" } else { "OFF (isolation mode)" });
+    next
+}

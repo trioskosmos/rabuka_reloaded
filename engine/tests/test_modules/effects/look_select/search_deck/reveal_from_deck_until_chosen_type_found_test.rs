@@ -262,9 +262,79 @@ fn reveal_until_chosen_type_center_requirement_left_side_fails() {
     );
 }
 
+/// 「**コスト10以上の**メンバーカード」 is a real constraint, and nothing in this file
+/// tests it.
+///
+/// Every member test above uses `PL!SP-bp2-006-P`, which costs **exactly 10** — the bound —
+/// so it satisfies `>= 10` and can never contradict the filter. The live tests use
+/// `PL!-sd1-019-SD` (START:DASH!!), a live printing **score 1**; the cost clause does not
+/// apply to the live branch at all, so those tests never exercised the filter either.
+/// Between them the fixtures sit on the safe side of every line, which is why a dropped
+/// `コスト10以上` went unnoticed.
+///
+/// This stages a deck of sub-10 members and nothing else, so no arrangement of the deck can
+/// accidentally produce a qualifying card: the chosen card cannot be found, the deck is
+/// exhausted, and hand gains no member.
 #[test]
-fn reveal_until_chosen_type_use_limit_blocks_second_activation() {
+fn reveal_until_chosen_type_a_member_below_cost_ten_does_not_satisfy_the_cost_clause() {
     let db = load_real_database();
+    let mut game = TestGame::new(db.clone());
+    let honoka = game.id("PL!-pb1-001-R");
+
+    // 高坂 穂乃果 — a メンバー of cost 4, two below the printed コスト10以上.
+    let cheap = game.id("PL!-sd1-010-SD");
+    game.assert_card_identity(cheap, "PL!-sd1-010-SD");
+    game.assert_card_cost(cheap, 4);
+
+    setup_honoka_deck(&mut game, honoka, vec![cheap; 6]);
+    activate_and_choose_type(&mut game, honoka, 1);
+
+    assert!(
+        !game.state.player1.hand.cards.contains(&cheap),
+        "コスト10以上のメンバーカード — a メンバー of cost 4 is below the bound, so the \
+         reveal must not stop on it and it must not reach hand (hand={:?})",
+        game.state.player1.hand.cards
+    );
+    assert_eq!(
+        game.state.player1.main_deck.cards.len(),
+        0,
+        "every card was revealed looking for a qualifying card, so the deck empties without \
+         a match — this proves the deck really was searched rather than the effect being \
+         skipped"
+    );
+}
+
+/// The live branch carries no cost clause at all: 「ライブカード**か** コスト10以上の
+/// メンバーカード」 makes the 10 constrain only the member branch.
+///
+/// START:DASH!! prints score 1, so it is exactly the live that a `cost_limit: 10` applied
+/// to both branches would wrongly reject. This pins that the live branch is unconstrained.
+#[test]
+fn reveal_until_chosen_type_the_cost_clause_does_not_constrain_the_live_branch() {
+    let db = load_real_database();
+    let mut game = TestGame::new(db.clone());
+    let honoka = game.id("PL!-pb1-001-R");
+    let low_score_live = game.id("PL!-sd1-019-SD");
+
+    // Pin the premise: score 1 is well under 10, so a filter spanning both branches would
+    // reject this card and the test would be meaningless.
+    game.assert_card_identity(low_score_live, "PL!-sd1-019-SD");
+    game.assert_card_score(low_score_live, 1);
+
+    let member = game.id("PL!SP-bp2-006-P");
+    setup_honoka_deck(&mut game, honoka, vec![member, member, low_score_live]);
+    activate_and_choose_type(&mut game, honoka, 0);
+
+    assert!(
+        game.state.player1.hand.cards.contains(&low_score_live),
+        "ライブカード — the live branch has no コスト10以上 clause, so a live printing \
+         score 1 still qualifies and the reveal must stop on it (hand={:?})",
+        game.state.player1.hand.cards
+    );
+}
+
+#[test]
+fn reveal_until_chosen_type_use_limit_blocks_second_activation() {    let db = load_real_database();
     let mut game = TestGame::new(db.clone());
     let honoka = game.id("PL!-pb1-001-R");
     let filler = game.id("PL!-sd1-019-SD");

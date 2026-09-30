@@ -277,6 +277,90 @@ fn ayase_both_match_only_one_selectable() {
     );
 }
 
+/// The group constrains BOTH branches, not just the first.
+///
+/// 絢瀬絵里 prints
+/// 「能力を持たない『μ's』のカード**か**{{jyouji.png|常時}}能力を持つ『μ's』のカード」 —
+/// 『μ's』 is named once per branch, so a card qualifies only if it is μ's **and** (has no
+/// ability **or** has a 常時 ability). The group is not a property of the first branch alone.
+///
+/// Every other test in this file uses `PL!HS-sd1-010-SD` as its non-μ's card, and that card
+/// has **no ability at all** — so it is rejected by the no-ability branch's group check and
+/// never exercises the 常時 branch. A filter that applied 『μ's』 to branch 1 only would pass
+/// every one of them, and a 蓮ノ空 card with a 常時 ability would wrongly reach hand.
+///
+/// 乙宗 梢 (`PL!HS-bp1-003-R＋`, 蓮ノ空) has a `{{jyouji.png|常時}}` ability, which is
+/// exactly the card that separates the two readings. 矢澤にこ (`PL!-bp6-018-N`, μ's, no
+/// ability) sits alongside so the prompt still opens and the selectability count is exact.
+#[test]
+fn ayase_rejects_a_non_mus_card_even_when_it_has_the_required_constant_ability() {
+    let db = load_real_database();
+    let mut game = TestGame::new(db);
+    let ayase = game.id("PL!-bp6-002-R");
+
+    // 乙宗 梢: 蓮ノ空, and its first ability is a 常時.
+    let non_mus_with_jyouji = game.id("PL!HS-bp1-003-R＋");
+    // 矢澤にこ: μ's with no ability — qualifies via the FIRST branch.
+    let mus_no_ability = game.id("PL!-bp6-018-N");
+
+    game.state.player1.hand.cards.push(ayase);
+    game.give_energy(2);
+    game.state.player1.main_deck.cards.clear();
+    game.state.player1.main_deck.cards.push(non_mus_with_jyouji);
+    game.state.player1.main_deck.cards.push(mus_no_ability);
+    game.state.player1.stage.stage = [-1, -1, -1];
+
+    game.play_to_stage(ayase, MemberArea::Center);
+
+    assert!(
+        game.has_pending_choice(),
+        "precondition: 矢澤にこ qualifies, so the selection prompt must open"
+    );
+    let looked_at = game.state.looked_at_cards.clone();
+    assert_eq!(
+        looked_at.len(),
+        2,
+        "precondition: both looked-at cards stay visible, only their selectability differs"
+    );
+    let pending = game.state.get_pending_choice_json();
+    let filtered = pending
+        .as_ref()
+        .and_then(|v| v.get("filtered_indices"))
+        .and_then(|v| v.as_array())
+        .cloned()
+        .expect("the SelectCard choice must carry filtered_indices");
+    assert_eq!(
+        filtered.len(),
+        1,
+        "『μ's』のカード governs BOTH branches: a 蓮ノ空 card is not a μ's card even though it \
+         has the required 常時 ability, so only 矢澤にこ is selectable (filtered={filtered:?})"
+    );
+    assert_eq!(
+        filtered[0], 1,
+        "the selectable card must be the μ's no-ability one, i.e. index 1, not the 常時 card"
+    );
+
+    game.select_indices(&[0]);
+    game.drain_choices();
+
+    assert!(
+        game.state.player1.hand.cards.contains(&mus_no_ability),
+        "the qualifying μ's card reaches hand"
+    );
+    assert!(
+        !game.state.player1.hand.cards.contains(&non_mus_with_jyouji),
+        "常時能力を持つ『μ's』のカード — the ability branch still requires μ's, so a 蓮ノ空 \
+         常時 card must not be taken (hand={:?})",
+        game.state.player1.hand.cards
+    );
+    assert!(
+        game.state.player1.waitroom.cards.contains(&non_mus_with_jyouji),
+        "残りを控え室に置く — the rejected card is routed to the waitroom, not lost \
+         (hand={:?} waitroom={:?})",
+        game.state.player1.hand.cards, game.state.player1.waitroom.cards
+    );
+}
+
 /// Neither card matches → no choice, auto-discard both.
 #[test]
 fn ayase_neither_matches_auto_discard() {

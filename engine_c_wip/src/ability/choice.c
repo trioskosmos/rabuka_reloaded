@@ -953,13 +953,19 @@ int rb_resolver_provide_choice_result(GameState *g, int selected_idx) {
     and the energy cost arm). Route it to the faithful Rule 4.5.5 landing
     instead: placement.rs:208-219 for the host area and util.rs:2341-2358 for
     the place itself. */
-static void rb_choice_send_to_dst(GameState *g, int pl, int cid, const char *dst) {
-    if (!dst || !strcmp(dst, "waitroom") || !strcmp(dst, "discard"))
+static int rb_choice_send_to_dst(GameState *g, int pl, int cid, const char *dst) {
+    /* Returns a verdict because every caller has already lifted the card out of
+     * its source, so "not placed" is not neutral — it is the card deleted. Rust's
+     * `place_card_in_zone` (util.rs:2337) returns true for every destination it
+     * can name and parks an unplaceable stage card in the WAITROOM rather than
+     * dropping it, so a caller that cannot place must put the card back itself. */
+    if (!dst || !strcmp(dst, "waitroom") || !strcmp(dst, "discard")) {
         rb_waitroom_add(&g->p[pl], cid);
-    else if (!strcmp(dst, "under_member"))
-        rb_move_place_card_under_member(g, pl, cid, rb_move_under_member_pos(g, pl));
-    else
-        rb_place_card_in_zone(g, pl, cid, dst, -1);
+        return 1;
+    }
+    if (!strcmp(dst, "under_member"))
+        return rb_move_place_card_under_member(g, pl, cid, rb_move_under_member_pos(g, pl)) ? 1 : 0;
+    return rb_place_card_in_zone(g, pl, cid, dst, -1);
 }
 
 void rb_resolver_build_reprompt(RbAbilityResolver *self, GameState *g) {
@@ -2540,14 +2546,301 @@ int rb_resolver_filter_discard_by_budget(RbAbilityResolver *self, GameState *g, 
     (void)rem; return n;
 }
 
+/* ── handle_discard_selection helpers ───────────────────────────────────
+ *
+ * choice.rs:2326-2613 (handle_discard_selection) threads FOUR things through
+ * every arm of this function that the C collapsed onto `g->queue.actor` and a
+ * hand-rolled remove-then-place pair:
+ *
+ *   1. `ctx.target_player_id.as_deref().unwrap_or("self")` — the SEAT the
+ *      effect names, resolved with `gs.resolve_target_player` (G6). Every
+ *      waitroom read (:2340, :2355, :2433, :2477, :2529, :2584) and every
+ *      write (execute_selected_cards_from_zone's own `&target` argument,
+ *      :2471, :2605) goes through it. The C used the seat that ANSWERED, so a
+ *      target="opponent" prompt read the answering player's discard and wrote
+ *      the answering player's stage. Compounded with the placement failure
+ *      below, that made an opponent-labelled prompt DELETE the answering
+ *      player's card.
+ *   2. `self.awaiting.choice.destination` / `ctx.destination` — the effect's
+ *      own destination (selection.rs:45). `queue.resume_move_destination` is
+ *      the C spelling of it; `rb_move_prompt_carry_resume_context` (move.c:493)
+ *      writes it from the same effect, unconditionally.
+ *   3. `self.finalize_card_movement(..., state_change, ...)`
+ *      (move/mod.rs:2490-2572) — the post-move side effects. Skipping it is why
+ *      `queue.resume_move_state` had two writers and no reader, so an appeared
+ *      member was never in wait and its own 登場 never fired.
+ *   4. `execute_selected_cards_from_zone`'s filter pass — the answer is
+ *      re-validated against the PROMPT's card_type / cost_limit / cost_total /
+ *      group / characters, not accepted blindly.
+ */
+
+/* move.c's twin of Rust move_cards.rs:2490 finalize_card_movement. Declared
+ * here rather than in rabuka.h because move.c owns it and this file only
+ * started calling it once the choice path had to run the real finalizer. */
+void rb_move_finalize_card_movement(GameState *g, int actor,
+                                    const int *moved_cards, int n_moved,
+                                    const char *destination, const char *source,
+                                    const char *state_change, const char *target);
+
+/* The SEAT a discard/waitroom SelectCard names. `target_player_id` is the
+ * Choice field Rust's `prompt_card_selection` fills from
+ * `effect.action_by` (selection.rs:39-43) and `rb_resolver_handle_select_target`'s
+ * emitter mirrors into `target`; `target` alone is the fallback for producers
+ * that only stamp the seat there. "self" is the MASTER seat
+ * (game_state_abilities.c:827 `rb_resolve_master_id` = g->active), NOT seat 0 —
+ * `rb_resolve_target_player` hard-codes "self" to 0 and is therefore wrong for
+ * the second leg of a target="both" effect resolved on P2's turn. */
+static int choice_effect_target_seat(const GameState *g, int answering_seat)
+{
+    const char *t = NULL;
+    if (g) {
+        if (g->queue.pending.target_player_id[0]) t = g->queue.pending.target_player_id;
+        else if (g->queue.pending.target[0])     t = g->queue.pending.target;
+    }
+    int master = g ? g->active : 0;
+    if (master < 0 || master > 1)
+        master = (answering_seat >= 0 && answering_seat <= 1) ? answering_seat : 0;
+    if (!t || !t[0]) return master;
+    if (!strcmp(t, "opponent") || !strcmp(t, "p2") || !strcmp(t, "player2")) return master ^ 1;
+    if (!strcmp(t, "self")    || !strcmp(t, "p1") || !strcmp(t, "player1")) return master;
+    int pl = rb_resolve_target_player(g, t);
+    return (pl >= 0 && pl <= 1) ? pl : master;
+}
+
+/* `Choice.destination` (selection.rs:45). `queue.resume_move_destination` is
+ * the C slot for it and the move-side producer writes it from the very same
+ * effect, so it is always this prompt's own destination.
+ *
+ * The old code preferred `g->queue.resume_eff->destination` over it. That
+ * pointer is the producing AbilityEffect (move.c:539 `resume_eff = e`) and on
+ * the inline 登場 path the effect tree is a `Ability ab` LOCAL of
+ * `rb_play_member` (engine.c:1159-1190) that has already returned by the time
+ * the answer arrives — a use-after-return read on every discard answer. When no
+ * destination is named, Rust falls back to the DISCARD (move_cards.rs:2573-2583,
+ * as documented in move.c:486-492); the C fell back to `pending.target`, which
+ * holds the SEAT ("self"/"opponent"), i.e. it asked for a zone literally named
+ * "self", which `zone_bag` cannot resolve — the third way this path could lose a
+ * card. */
+static const char *choice_effect_destination(const GameState *g)
+{
+    if (g->queue.resume_move_destination[0]) return g->queue.resume_move_destination;
+    return "discard";
+}
+
+/* `state_change` (Rust's `finalize_card_movement` third-from-last argument).
+ * `queue.resume_move_state` is the queue's own copy of it and is what the
+ * emitters stamp (choice.c's conditional-choice emitter at :2790 reads the
+ * effect's `state_change` extra into it); it had TWO writers and NO reader,
+ * which is why no appeared member was ever in wait. When the writer that
+ * produced this particular prompt did not run, fall back to the effect the
+ * queue parked — the same read the old destination lookup performed — and
+ * MEMOISE it into resume_move_state so a re-prompt keeps it. */
+static const char *choice_effect_state_change(GameState *g)
+{
+    if (g->queue.resume_move_state[0]) return g->queue.resume_move_state;
+    const char *sc = NULL;
+    if (g->queue.resume_eff) sc = choice_effect_extra(g->queue.resume_eff, "state_change");
+    if (sc && sc[0])
+        strncpy(g->queue.resume_move_state, sc, sizeof(g->queue.resume_move_state) - 1);
+    return sc;
+}
+
+/* execute_selected_cards_from_zone's filter pass (move_cards.rs:2700-2772 in
+ * Rust; the C twin of the same pass is move.c:1852-1865). The picked card is
+ * re-validated against the PROMPT's own filter rather than trusted, so an
+ * answer that slips past the displayed candidate list cannot move a card the
+ * ability is not allowed to touch. */
+static int choice_discard_pick_legal(const RbChoice *ch, int cid)
+{
+    if (ch->card_type[0] && !rb_card_matches_type(cid, ch->card_type)) return 0;
+    /* Rust's `ctx.cost_limit` is an `Option<u8>` and the C's RbChoice cannot
+     * represent None distinctly from Some(0): rb_emit_choice zeroes the struct
+     * and the producer only writes the field when the ability carries the extra
+     * (move.c:501-509), so "0 with no operator" is the ABSENT case. Read as a
+     * limit it demands "cost <= 0" and rejects every card in the zone, which
+     * turns a perfectly good answer into "no legal pick" and silently drops the
+     * move — measured as 3 bp7 cases (wien x2, kanon_one_per_group) going from
+     * ok to FAILED. */
+    if (ch->cost_limit > 0 || ch->cost_limit_op[0]) {
+        if (!rb_card_matches_cost_limit(cid, ch->cost_limit,
+                                        ch->cost_limit_op[0] ? ch->cost_limit_op : "<="))
+            return 0;
+    }
+    /* Rust's `ctx.cost_total` is an `Option<u8>`; the C's RbChoice cannot
+     * represent None distinctly from Some(0) because rb_emit_choice zeroes the
+     * whole struct and the producer only writes the field when the ability
+     * carries the extra (move.c:510-517). So "0 with no operator" is the ABSENT
+     * case, and reading it as a budget of 0 rejects every card in the zone. */
+    if ((ch->cost_total > 0 || ch->cost_total_op[0]) && ch->cost_total >= 0) {
+        Card c;
+        if (rb_decode_card_by_index((uint32_t)cid, &c)) {
+            int ok = 1;
+            char op = ch->cost_total_op[0] ? ch->cost_total_op[0] : '=';
+            if (op == '>') ok = c.cost >  ch->cost_total;
+            else if (op == '<') ok = c.cost < ch->cost_total;
+            else if (op == '=') ok = c.cost == ch->cost_total;
+            rb_free_card(&c);
+            if (!ok) return 0;
+        }
+    }
+    if (ch->filter_group[0] && !rb_card_matches_group_str(cid, ch->filter_group)) return 0;
+    if (ch->n_characters > 0) {
+        const char *names[16];
+        for (int i = 0; i < ch->n_characters && i < 16; i++) names[i] = ch->characters[i];
+        if (!rb_card_matches_characters(cid, names, ch->n_characters)) return 0;
+    }
+    return 1;
+}
+
+/* choice.rs:2594-2606 execute_selected_cards_from_zone, then move_cards.rs:2490
+ * finalize_card_movement. Returns 1 when the card reached its destination.
+ *
+ * THE CARD MUST NOT BE DESTROYED. Rust's `place_card_in_zone` returns true for
+ * every destination (util.rs:2345-2399) and parks an unplaceable stage card in
+ * the waitroom (util.rs:2363-2367), so a "not placed" outcome does not exist on
+ * this path. The C lifted the card out of the waitroom first and then IGNORED
+ * the verdict, so `empty_area` onto a full stage ended with the card in no zone
+ * at all: board census 12 -> 11 and 14 -> 13 on the nico family. The rollback
+ * below is the belt to util.c's braces; both are needed because the other two
+ * rb_choice_send_to_dst destinations (under_member, an unresolvable zone name)
+ * can still fail. */
+static int choice_discard_move_card(RbAbilityResolver *self, GameState *g, int seat,
+                                    int cid, const char *dst, const char *state_change,
+                                    const char *target)
+{
+    rb_waitroom_remove_card(&g->p[seat], cid);
+    if (!rb_choice_send_to_dst(g, seat, cid, dst)) {
+        rb_waitroom_add(&g->p[seat], cid);
+        fprintf(stderr, "[DISCARD_PLACE_FAILED] cid=%d seat=%d dst='%s' — returned to the waitroom\n",
+                cid, seat, dst ? dst : "-");
+        return 0;
+    }
+    int moved[1]; moved[0] = cid;
+    /* move_cards.rs:2490-2572 — zone-exit cleanup, `state_change="wait"`,
+     * record_card_movement, recalculate_constants and the placed card's own
+     * 登場. Rust's `Zone::Stage | Zone::EmptyArea | Zone::SameArea` are ONE
+     * dispatch arm (move_cards.rs:2807-2818) and that arm fires the debut
+     * (placement.rs:400-403), so the finalizer is told the canonical "stage"
+     * for all three: without it an appeared member never debuts (N13). */
+    const char *fin_dst = (!strcmp(dst, "empty_area") || !strcmp(dst, "same_area")) ? "stage" : dst;
+    rb_move_finalize_card_movement(g, seat, moved, 1, fin_dst, "discard", state_change, target);
+    /* `stage_wait` is the C-only mirror of the orientation modifier
+     * (condition.c:1520-1531 documents that the two are the same fact in Rust).
+     * The modifier alone leaves every C reader of the raw per-slot flag — live.c
+     * :128, dynamic_count.c:168, phase.c:23 — reporting the member as active. */
+    if (state_change && !strcmp(state_change, "wait")) {
+        RbPlayer *P = &g->p[seat];
+        for (int i = 0; i < RB_STAGE_SIZE; i++)
+            if (P->stage[i] == cid) P->stage_wait[i] = 1;
+    }
+    if (self) {
+        if (self->n_moved_cards < RB_MAX_RECENTLY_MOVED) self->moved_cards[self->n_moved_cards++] = cid;
+        if (self->n_selected_cards < RB_MAX_RECENTLY_MOVED) self->selected_cards[self->n_selected_cards++] = cid;
+    }
+    if (g->n_recently_moved < RB_MAX_RECENTLY_MOVED) g->recently_moved[g->n_recently_moved++] = cid;
+    return 1;
+}
+
+/* choice.rs:1168-1190 `build_reprompt` — the twin of choice_build_reprompt for
+ * the WAITROOM path, which unlike the hand-cost re-prompts must carry the
+ * whole selection context. The hand twin drops `filtered_indices`,
+ * `target_player_id`, `cost_total` and the filters, and the discard path used it
+ * anyway, so every re-prompt of a budgeted discard-selection came back
+ * UNFILTERED and UNLABELLED: a cost-9 card reappeared as a candidate and the
+ * opponent's half lost its seat. */
+static void choice_build_discard_reprompt(GameState *g, const RbChoice *ctx, int seat,
+                                          int remaining, const char *en, int allow_skip,
+                                          const int *fi, int n_fi)
+{
+    RbChoice ch = *ctx;                 /* keep zone / description / filters / cost_total */
+    ch.kind = RB_CHOICE_SELECT_CARD;
+    if (!ch.zone[0]) strncpy(ch.zone, "discard", sizeof(ch.zone) - 1);
+    ch.count = remaining > 0 ? remaining : 0;
+    ch.allow_skip = allow_skip;
+    if (en) strncpy(ch.description, en, sizeof(ch.description) - 1);
+    ch.route = RB_ROUTE_SELECT_CARDS;
+    ch.n_filtered_indices = 0;
+    if (fi && n_fi > 0) {
+        if (n_fi > RB_MAX_ZONE) n_fi = RB_MAX_ZONE;
+        ch.n_filtered_indices = n_fi;
+        for (int i = 0; i < n_fi; i++) ch.filtered_indices[i] = fi[i];
+    }
+    if (ctx->target_player_id[0]) strncpy(ch.target_player_id, ctx->target_player_id,
+                                          sizeof(ch.target_player_id) - 1);
+    if (ctx->target_player_id[0]) strncpy(ch.target, ctx->target_player_id,
+                                          sizeof(ch.target) - 1);
+    ch.actor = seat;
+    g->queue.pending = ch;
+    g->queue.has_pending = 1;
+    g->queue.actor = seat;
+    g->queue.state = RB_QUEUE_AWAITING_CHOICE;
+}
+
+/* choice.rs:2290-2324 `filter_discard_by_budget` — the re-prompt's candidate
+ * list. THREE things were wrong with the call the C made:
+ *   - it was fed `pending.count` (how many cards to pick) where Rust reads
+ *     `ctx.cost_total` (the cost budget), so "cost 2 or below" became "cost 1 or
+ *     below" and a re-prompt filtered on the wrong number entirely;
+ *   - it read `g->queue.actor`'s waitroom, so a target="opponent" re-prompt
+ *     listed the answering player's cards;
+ *   - its `use_budget` test was `op == "<=" || !op`, which is Rust's
+ *     `Some(op) => op == "<=", None => cost_total.is_some()` only by accident.
+ * Returns the number of surviving indices; *out_remaining is the leftover
+ * budget (Rust's `Option<u8>` flattened to -1 when no cost_total is set). */
+static int choice_filter_discard_by_budget(RbAbilityResolver *self, GameState *g, int seat,
+                                           int cost_total, const char *cost_total_op,
+                                           int *out, int max_out, int *out_remaining)
+{
+    int spent = 0;
+    if (self) {
+        for (int i = 0; i < self->n_selected_cards; i++) {
+            Card c;
+            if (rb_decode_card_by_index((uint32_t)self->selected_cards[i], &c) == 0) {
+                spent += c.cost;
+                rb_free_card(&c);
+            }
+        }
+    }
+    /* `cost_total > 0 || cost_total_op[0]` is the C's spelling of Rust's
+     * `Some(tb)`: rb_emit_choice zeroes the field and the producer only writes
+     * it when the ability carries the extra (move.c:510-517), so a bare 0 is the
+     * ABSENT case, not a budget of zero. */
+    int remaining = -1;
+    int use_budget = 0;
+    if (cost_total >= 0 && (cost_total > 0 || (cost_total_op && cost_total_op[0]))) {
+        use_budget = (cost_total_op && cost_total_op[0]) ? (strcmp(cost_total_op, "<=") == 0) : 1;
+        remaining = cost_total - spent;
+        if (remaining < 0) remaining = 0;
+    }
+    if (out_remaining) *out_remaining = remaining;
+    int ids[RB_MAX_ZONE];
+    int n = rb_zone_cards(g, seat, "waitroom", ids, RB_MAX_ZONE);
+    int out_n = 0;
+    for (int i = 0; i < n && out_n < max_out; i++) {
+        if (use_budget) {
+            Card c;
+            if (rb_decode_card_by_index((uint32_t)ids[i], &c) != 0) continue;
+            int cost = c.cost; rb_free_card(&c);
+            if (cost > remaining) continue;
+        }
+        out[out_n++] = i;
+    }
+    return out_n;
+}
+
 /* ── handle_discard_selection (choice.rs:2074) — faithful ──
    is_select_action = collect IDs into selected_cards and reprompt;
    otherwise move from discard/waitroom to dst with budget filtering and
    sub_choice handling. Mirrors Rust branching exactly. */
 void rb_resolver_handle_discard_selection(RbAbilityResolver *self, GameState *g, const char *selected) {
     if (!g) { rb_resolver_clear_choice_state_and_resume(self); return; }
-    fprintf(stderr, "[DISCARD_RESULT] selected=%s count=%d reprompt=%d\n",
-            selected ? selected : "skip", g->queue.pending.count, g->queue.choice_reprompt_pending);
+    fprintf(stderr, "[DISCARD_RESULT] selected=%s count=%d reprompt=%d pz='%s' pt='%s' ptp='%s' pdesc='%s' nf=%d cl=%d clo='%s' ctot=%d ctoto='%s' grp='%s' ct='%s' route=%d\n",
+            selected ? selected : "skip", g->queue.pending.count, g->queue.choice_reprompt_pending,
+            g->queue.pending.zone, g->queue.pending.target, g->queue.pending.target_player_id,
+            g->queue.pending.description, g->queue.pending.n_filtered_indices,
+            g->queue.pending.cost_limit, g->queue.pending.cost_limit_op,
+            g->queue.pending.cost_total, g->queue.pending.cost_total_op,
+            g->queue.pending.filter_group, g->queue.pending.card_type, (int)g->queue.pending.route);
     int actor = g->queue.actor;
     int sel_idx = selected ? atoi(selected) : -1;
     int is_skip = (sel_idx < 0);
@@ -2587,83 +2880,98 @@ void rb_resolver_handle_discard_selection(RbAbilityResolver *self, GameState *g,
         rb_resolver_finalize_choice(self);
         return;
     } else {
-        /* non-select_action: move from discard (choice.rs:2143-2360) */
-        if (is_skip && !allow_skip) {
-            /* MANDATORY empty pick must re-offer same choice (choice.rs:2149) */
-            char en[64]; snprintf(en,sizeof(en),"Select %d card(s) from the waiting room", pending_count);
-            RbChoice ch; memset(&ch,0,sizeof(ch));
-            ch.kind=RB_CHOICE_SELECT_CARD; strncpy(ch.zone,"discard",sizeof(ch.zone)-1);
-            ch.count=pending_count; ch.allow_skip=0; strncpy(ch.description,en,sizeof(ch.description)-1);
-            g->queue.pending=ch; g->queue.has_pending=1; g->queue.actor=actor;
+        /* non-select_action — choice.rs:2395-2612. SEAT, DESTINATION, FILTER and
+         * FINALIZER are all threaded the way Rust threads them; see the block
+         * comment above the helpers. */
+        RbChoice ctx = g->queue.pending;          /* the prompt as it was answered */
+        int seat    = choice_effect_target_seat(g, actor);   /* G6 */
+        const char *dst  = choice_effect_destination(g);
+        const char *sc   = choice_effect_state_change(g);    /* G3 */
+        const char *tpid = ctx.target_player_id[0] ? ctx.target_player_id
+                       : (ctx.target[0] ? ctx.target : "self");
+        int ids[RB_MAX_ZONE];
+        int n = rb_zone_cards(g, seat, "waitroom", ids, RB_MAX_ZONE);
+
+        /* choice.rs:2401-2426 — an empty pick must NEVER satisfy a MANDATORY
+         * selection: re-offer the SAME choice (count, filters, seat and budget
+         * included) so the player can pick a legal target. The re-offer used to
+         * be built from a zeroed RbChoice, so the retry lost the card_type /
+         * cost_limit / group filter AND the seat label. */
+        if ((is_skip || sel_idx < 0 || sel_idx >= n) && !allow_skip) {
+            char en[64];
+            snprintf(en, sizeof(en), "Select %d card(s) from the waiting room", pending_count);
+            choice_build_discard_reprompt(g, &ctx, seat, pending_count, en, 0,
+                                          NULL, 0);
             return;
         }
-        if (!is_skip && pending_count>0 && sel_idx>=0) {
-            /* partial pick handling when mapped < count (choice.rs:2175-2322) */
-            int ids[RB_MAX_ZONE]; int n = rb_zone_cards(g, actor, "waitroom", ids, RB_MAX_ZONE);
-            int mapped = (sel_idx < n) ? 1 : 0; /* simplified: single pick */
-            fprintf(stderr, "[DISCARD_PICK] actor=%d active=%d selected=%d available=%d count=%d mapped=%d sub_choice=%d p0_discard=%d p1_discard=%d\n",
-                    actor, g->active, sel_idx, n, pending_count, mapped, self->sub_choice_created,
-                    g->p[0].discard.n, g->p[1].discard.n);
-            if (mapped < pending_count) {
-                /* First execute the move for the current pick */
-                if (sel_idx>=0 && sel_idx<n) {
-                    int cid = ids[sel_idx];
-                    rb_waitroom_remove_card(&g->p[actor], cid);
-                    const char *dst = g->queue.resume_move_destination[0] ? g->queue.resume_move_destination :
-                        (g->queue.pending.target[0] ? g->queue.pending.target : "hand");
-                    if (g->queue.resume_eff && g->queue.resume_eff->destination) dst = g->queue.resume_eff->destination;
-                    rb_choice_send_to_dst(g, actor, cid, dst);
-                    if(self->n_moved_cards < RB_MAX_RECENTLY_MOVED) self->moved_cards[self->n_moved_cards++]=cid;
-                    if(self->n_selected_cards < RB_MAX_RECENTLY_MOVED) self->selected_cards[self->n_selected_cards++]=cid;
-                    if(g->n_recently_moved<RB_MAX_RECENTLY_MOVED) g->recently_moved[g->n_recently_moved++]=cid;
-                }
-                if (self->sub_choice_created) {
-                    self->sub_choice_created=0;
-                    int remaining = pending_count - mapped;
-                    if (remaining>0) {
-                        int out[16]; int rem; int out_n = rb_resolver_filter_discard_by_budget_full(self,g, g->queue.pending.count, "<=", &rem, out, 16);
-                        if (out_n>0 || allow_skip) {
-                            char en[64]; snprintf(en,sizeof(en),"Select %d more card(s) from discard%s", remaining, allow_skip?" (or skip to finish)":"");
-                            RbChoice ch; memset(&ch,0,sizeof(ch));
-                            ch.kind=RB_CHOICE_SELECT_CARD; strncpy(ch.zone,"discard",sizeof(ch.zone)-1);
-                            ch.count=remaining; ch.allow_skip=allow_skip; strncpy(ch.description,en,sizeof(ch.description)-1);
-                            int pend = rb_queue_take_pending_actions(g);
-                            self->has_pending_reprompt_choice=1; /* store reprompt */
-                            rb_queue_set_pending_actions(g, pend);
-                            return;
-                        }
+
+        /* choice.rs:2427-2574 / :2576-2606. `mapped_indices` is the answered
+         * index after `ctx.mfi` (map_choice_index, already applied by
+         * rb_resolver_handle_select_card), and `mapped_indices.len()` is how
+         * Rust decides partial-vs-complete. The C's `mapped = (sel_idx < n) ? 1
+         * : 0` is that same test spelled as a count, and it is the only reason
+         * the two arms below could be kept apart at all. */
+        int mapped = 0;
+        int cid = -1;
+        if (!is_skip && sel_idx >= 0 && sel_idx < n) {
+            cid = ids[sel_idx];
+            /* execute_selected_cards_from_zone's filter pass — a pick the
+             * prompt's own filter rejects is not a legal answer. */
+            if (choice_discard_pick_legal(&ctx, cid)) mapped = 1;
+            else fprintf(stderr, "[DISCARD_PICK_REJECTED] cid=%d idx=%d — fails the prompt's filter\n",
+                         cid, sel_idx);
+        }
+        fprintf(stderr, "[DISCARD_PICK] answering=%d seat=%d selected=%d available=%d count=%d mapped=%d "
+                "sub_choice=%d dst='%s' state_change='%s' p0_discard=%d p1_discard=%d\n",
+                actor, seat, sel_idx, n, pending_count, mapped, self->sub_choice_created,
+                dst ? dst : "-", sc ? sc : "-", g->p[0].discard.n, g->p[1].discard.n);
+
+        if (pending_count > 0 && mapped > 0 && mapped < pending_count) {
+            /* PARTIAL pick — choice.rs:2427-2527. Move what was picked, then
+             * re-offer for the remainder out of the BUDGET-filtered remainder of
+             * the TARGET seat's waitroom. */
+            int done = choice_discard_move_card(self, g, seat, cid, dst, sc, tpid);
+            int remaining = pending_count - mapped;
+            if (self->sub_choice_created) {
+                self->sub_choice_created = 0;
+                if (remaining > 0) {
+                    int out[RB_MAX_ZONE], rem = -1;
+                    int out_n = choice_filter_discard_by_budget(self, g, seat,
+                                    ctx.cost_total, ctx.cost_total_op, out, RB_MAX_ZONE, &rem);
+                    if (out_n > 0 || allow_skip) {
+                        char en[96];
+                        snprintf(en, sizeof(en), "Select %d more card(s) from discard%s",
+                                 remaining, allow_skip ? " (or skip to finish)" : "");
+                        /* choice.rs:2507-2523 parks this as `awaiting.reprompt`
+                         * and leaves the pending actions alone. */
+                        choice_build_discard_reprompt(g, &ctx, seat, remaining, en,
+                                                      allow_skip, out, out_n);
+                        self->has_pending_reprompt_choice = 1;
                     }
-                    return;
                 }
-                /* budget-filtered reprompt (choice.rs:2276-2320) */
-                int out[16]; int rem;
-                rb_resolver_filter_discard_by_budget_full(self,g, g->queue.pending.count, "<=", &rem, out, 16);
-                int remaining = pending_count - mapped;
-                char en[64]; snprintf(en,sizeof(en),"Select %d more card(s) from discard%s", remaining, allow_skip?" (or skip to finish)":"");
-                RbChoice ch; memset(&ch,0,sizeof(ch));
-                ch.kind=RB_CHOICE_SELECT_CARD; strncpy(ch.zone,"discard",sizeof(ch.zone)-1);
-                ch.count=remaining; ch.allow_skip=allow_skip; strncpy(ch.description,en,sizeof(ch.description)-1);
-                g->queue.pending=ch; g->queue.has_pending=1; g->queue.actor=actor;
+                (void)done;
                 return;
             }
-        }
-        if (!is_skip) {
-            int ids[RB_MAX_ZONE]; int n = rb_zone_cards(g, actor, "waitroom", ids, RB_MAX_ZONE);
-            int moved = 0;
-            if (sel_idx>=0 && sel_idx<n){
-                int cid=ids[sel_idx];
-                rb_waitroom_remove_card(&g->p[actor], cid);
-                const char *dst = g->queue.resume_move_destination[0] ? g->queue.resume_move_destination :
-                    (g->queue.pending.target[0] ? g->queue.pending.target : "hand");
-                if (g->queue.resume_eff && g->queue.resume_eff->destination) dst = g->queue.resume_eff->destination;
-                rb_choice_send_to_dst(g, actor, cid, dst);
-                if(self->n_moved_cards < RB_MAX_RECENTLY_MOVED) self->moved_cards[self->n_moved_cards++]=cid;
-                if(g->n_recently_moved<RB_MAX_RECENTLY_MOVED) g->recently_moved[g->n_recently_moved++]=cid;
-                moved = 1;
+            /* choice.rs:2528-2574 — the budget-filtered re-prompt. */
+            {
+                int out[RB_MAX_ZONE], rem = -1;
+                int out_n = choice_filter_discard_by_budget(self, g, seat,
+                                ctx.cost_total, ctx.cost_total_op, out, RB_MAX_ZONE, &rem);
+                char en[96];
+                snprintf(en, sizeof(en), "Select %d more card(s) from discard%s",
+                         remaining, allow_skip ? " (or skip to finish)" : "");
+                choice_build_discard_reprompt(g, &ctx, seat, remaining, en, allow_skip, out, out_n);
             }
-            fprintf(stderr, "[DISCARD_MOVE] selected=%d available=%d moved=%d destination=%s reprompt=%d\n",
-                    sel_idx, n, moved, g->queue.resume_move_destination, g->queue.choice_reprompt_pending);
-            if (self->sub_choice_created) { self->sub_choice_created=0; /* store pending reprompt */ }
+            return;
+        }
+
+        /* COMPLETE (or empty) pick — choice.rs:2576-2611. */
+        if (mapped > 0) {
+            int done = choice_discard_move_card(self, g, seat, cid, dst, sc, tpid);
+            fprintf(stderr, "[DISCARD_MOVE] selected=%d available=%d moved=%d destination=%s "
+                    "state_change=%s seat=%d\n",
+                    sel_idx, n, done, dst ? dst : "-", sc ? sc : "-", seat);
+            if (self->sub_choice_created) self->sub_choice_created = 0;
         }
         rb_resolver_handle_selection_epilogue(self, g);
     }

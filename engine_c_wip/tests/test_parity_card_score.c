@@ -1,10 +1,33 @@
-/* Parity suite for engine/tests/test_modules/effects/score/card_score/ --
- * 24 of the 26 cluster files, against the C engine.
+/* Parity suite for engine/tests/test_modules/effects/score/card_score/ against
+ * the C engine.
  *
- * test_parity_score_effects.c already owns the *direct* rb_execute_modify_score
- * level for PL!SP-pb2-045-L (LOVER) and PL!HS-bp2-020-L (Link to the FUTURE),
- * so those two cluster files are deliberately NOT re-ported here; every other
- * card_score file is.
+ * COVERAGE -- verified against the Rust on 2026-09-30, and the earlier claim in
+ * this header ("24 of the 26 cluster files ... every other card_score file is")
+ * was WRONG on its denominator and on its justification. The truth:
+ *
+ *   - the cluster is 31 .rs files = 30 test modules + mod.rs, 115 #[test] fns.
+ *     There is no "26"; the number was never derived from the tree.
+ *   - 24 of the 30 modules are ported here, covering 83 of the 115 tests.
+ *   - SIX modules are NOT ported (32 tests): live_start_distinct_group_member (3),
+ *     live_start_empty_zone_all_lily_white_pl_pb1_029_srl (8),
+ *     live_start_group_member_four_heart_score (3),
+ *     live_start_lily_white_success_zone_count_pl_pb2_041_l (6),
+ *     pb2_live_success_plus_one_per_distinct_mus_member_pl_pb2_039_l (4),
+ *     pb2_two_mus_members_live_or_success_zone_score_pl_pb2_038_l (8).
+ *   - The old note claiming PL!SP-pb2-045-L (LOVER) and PL!HS-bp2-020-L (Link to
+ *     the FUTURE) were "deliberately NOT re-ported" named a reason that does not
+ *     hold: "bp2-045" appears in NO file in this cluster at all, and
+ *     success_count_revealed_score_live_pl_sp_bp5_023_l -- one of the files this
+ *     suite DOES port -- itself uses PL!HS-bp2-020-L as its revealed-card
+ *     fixture. The six modules listed above are the real gap.
+ *
+ * Two Rust cases are covered by a DIFFERENT C file on purpose:
+ * `stellar_stream_chooses_one_of_multiple_members` lives in
+ * test_ported_generated.c (generated_target_selection). Two more are self-declared
+ * duplicates of a sibling case and are noted inline below
+ * (solitude_rain_members_no_matching_colors,
+ *  both_in_live_zone_check_success_zone_condition). Counting those, the semantic
+ * coverage is 85/115.
  *
  * HARNESS NOTE (deliberate divergence from the Rust helpers, documented so the
  * numbers are not misread): the Rust `fire_trigger(game, cid, trigger, trig)`
@@ -18,21 +41,79 @@
  * g->live_success[pl]; the Rust helper bypasses that gate by dispatching the
  * ability directly, so the C helper sets live_success[pl] = 1 first, which is
  * the same bypass expressed through the C surface.
+ *
+ * PROCESS MODEL: every test function runs in its own fork()ed child (see
+ * run_case). The engine keeps process-global state -- rb_create_card_copy's
+ * monotonic card-copy pool above all -- and without the fork a case's leftover
+ * copies change the ids a later case sees. That is not hypothetical: with a
+ * single process this suite produced 35 failures in one run and 39 in the next
+ * with no source change, and the extra four were all cases that assert "no
+ * score" on a board a previous case had perturbed.
  */
+/* The Makefile compiles with -std=c11, which defines __STRICT_ANSI__ and hides
+ * every POSIX declaration this harness needs (sigaction, fork, waitpid, mmap,
+ * MAP_ANONYMOUS). _GNU_SOURCE must be set before the first include. */
+#ifndef _GNU_SOURCE
+#define _GNU_SOURCE 1
+#endif
 #include "rabuka.h"
 #include "test_game.h"
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
+#include <signal.h>
+#include <unistd.h>
+#include <sys/mman.h>
+#include <sys/wait.h>
+
+/* Counters live in a MAP_SHARED|MAP_ANONYMOUS mapping, not in globals, so a
+ * child that dies on SIGSEGV half way through an assertion still reports every
+ * assertion it reached. */
+typedef struct {
+    volatile int assertions;
+    volatile int failures;
+    volatile int signal;          /* fatal signal number, 0 if none */
+    volatile int exited_ok;       /* child reached the end of the case */
+    char          name[96];       /* case in flight, written before each run */
+} SharedCounters;
+
+static SharedCounters *g_shared;
 
 static int failures;
 static int assertions;
+
+static volatile sig_atomic_t g_case_signal;
+static char g_case_name[96];
+
+/* The running failure count is published on every failure, and the final totals
+ * once, at the end of the case. A child killed by a fatal signal therefore still
+ * reports the assertions and failures it had already reached, which is the whole
+ * point of keeping them in shared memory rather than in process locals. */
+static void publish_counts(void)
+{
+    if (g_shared) g_shared->failures = failures;
+}
+
+static void fatal_handler(int sig)
+{
+    g_case_signal = sig;
+    if (g_shared) {
+        g_shared->signal = sig;
+        g_shared->failures = failures;
+        /* snprintf is not async-signal-safe; write the name by hand. */
+        size_t i = 0;
+        for (; i + 1 < sizeof g_shared->name && g_case_name[i]; i++)
+            g_shared->name[i] = g_case_name[i];
+        g_shared->name[i] = 0;
+    }
+    _exit(0);
+}
 
 #define CHECK(condition, message) do { \
     assertions++; \
     if (!(condition)) { \
         fprintf(stderr, "FAIL: %s\n", message); \
-        failures++; \
+        failures++; publish_counts(); \
     } else { \
         printf("ok: %s\n", message); \
     } \
@@ -44,11 +125,12 @@ static int assertions;
     int expected_value = (expected); \
     if (actual_value != expected_value) { \
         fprintf(stderr, "FAIL: %s (got %d expected %d)\n", message, actual_value, expected_value); \
-        failures++; \
+        failures++; publish_counts(); \
     } else { \
         printf("ok: %s\n", message); \
     } \
 } while (0)
+
 
 /* -- helpers -------------------------------------------------------------- */
 
@@ -137,14 +219,120 @@ static int score_of(TestGame *tg, int cid)
     return test_get_score_modifier(tg, cid);
 }
 
-/* ---- TEMPORARY DIAGNOSTIC (removed before commit) ---- */
+/* ---- Diagnostics ------------------------------------------------------- */
+/* dbg_card/dbg_stage print board state. dbg_ability prints the COMPILED ability
+ * of a card: the only way to tell "the fixture is wrong" from "the engine
+ * mis-evaluates this condition" without re-reading cards.bin by hand.
+ * Card.ability is NOT populated by rb_decode_card_by_index, so this must go
+ * through rb_card_num_abilities + rb_decode_card_ability. */
+/* A decoded string that is not pure ASCII is re-printed as \xNN escapes. The
+ * console on this toolchain transcodes UTF-8 output, so a Japanese wire value
+ * comes back as mojibake and cannot be identified; the escapes are exact. */
+static const char *dbg_escape(const char *s)
+{
+    static char buf[4][512];
+    static int which;
+    char *out = buf[which = (which + 1) & 3];
+    size_t n = 0;
+    for (const unsigned char *p = (const unsigned char *)s; *p && n + 5 < sizeof buf[0]; p++) {
+        if (*p >= 0x20 && *p < 0x7f) out[n++] = (char)*p;
+        else n += (size_t)snprintf(out + n, sizeof buf[0] - n, "\\x%02X", *p);
+    }
+    out[n] = 0;
+    return out;
+}
+static void dbg_cond(const char *pfx, const Condition *c, int depth)
+{
+    if (!c) { printf("%s<no condition>\n", pfx); return; }
+    printf("%svariant=%d", pfx, (int)c->variant);
+    for (uint32_t i = 0; i < c->n_fields; i++) {
+        const CondField *f = &c->fields[i];
+        if (f->v.s) printf(" %s=\"%s\"", f->key, dbg_escape(f->v.s));
+        else if (f->v.arr) {
+            printf(" %s=[", f->key);
+            for (uint32_t k = 0; k < f->v.arr_n; k++) {
+                const CondValue *e = &f->v.arr[k];
+                if (k) printf(",");
+                if (e->tag == RB_TAG_STR && e->s) printf("\"%s\"", dbg_escape(e->s));
+                else if (e->tag == RB_TAG_OBJVAR && e->cond) printf("<cond>");
+                else if (e->tag == RB_TAG_ARRAY) printf("<array>");
+                else printf("%lld", (long long)e->i);
+            }
+            printf("]");
+        }
+        else printf(" %s=%lld", f->key, (long long)f->v.i);
+    }
+    printf("\n");
+    for (uint32_t i = 0; i < c->n_fields; i++)
+        if (c->fields[i].v.arr)
+            for (uint32_t k = 0; k < c->fields[i].v.arr_n; k++)
+                if (c->fields[i].v.arr[k].tag == RB_TAG_OBJVAR && c->fields[i].v.arr[k].cond
+                    && depth < 3) {
+                    char sub[256];
+                    snprintf(sub, sizeof sub, "%s  .%s[%u]>", pfx, c->fields[i].key, k);
+                    dbg_cond(sub, c->fields[i].v.arr[k].cond, depth + 1);
+                }
+}
+static void dbg_effect(const char *pfx, const AbilityEffect *e, int depth)
+{
+    if (!e || depth > 3) return;
+    printf("%seffect action=%s target=%s count=%d optional=%d further=%d\n", pfx,
+           e->action ? e->action : "-", e->target ? e->target : "-",
+           e->count, e->is_optional, e->is_further);
+    for (int i = 0; i < e->n_extra; i++)
+        printf("%s  extra %s=%s\n", pfx, e->extra_k[i], e->extra_v[i]);
+    char sub[256];
+    if (e->has_condition || e->condition) {
+        snprintf(sub, sizeof sub, "%s  cond>", pfx);
+        dbg_cond(sub, e->condition, 0);
+    }
+    if (e->activation_condition) {
+        snprintf(sub, sizeof sub, "%s  activation>", pfx);
+        dbg_cond(sub, e->activation_condition, 0);
+    }
+    if (e->result_condition) {
+        snprintf(sub, sizeof sub, "%s  result>", pfx);
+        dbg_cond(sub, e->result_condition, 0);
+    }
+    if (e->alternative_condition) {
+        snprintf(sub, sizeof sub, "%s  alt>", pfx);
+        dbg_cond(sub, e->alternative_condition, 0);
+    }
+    for (int i = 0; i < e->n_child; i++) {
+        snprintf(sub, sizeof sub, "%s  c%d>", pfx, i);
+        dbg_effect(sub, e->child[i], depth + 1);
+    }
+}
+static void dbg_ability(const char *tag, int cid)
+{
+    int n = rb_card_num_abilities((uint32_t)cid);
+    printf("DBG %s: cid=%d abilities=%d\n", tag, cid, n);
+    for (int k = 0; k < n; k++) {
+        Ability ab;
+        if (!rb_decode_card_ability((uint32_t)cid, k, &ab)) continue;
+        printf("DBG %s[%d]: triggers=%s\n", tag, k, ab.triggers ? ab.triggers : "-");
+        dbg_effect("DBG   ", ab.effect, 0);
+        if (ab.cost) {
+            printf("DBG   cost:\n");
+            dbg_effect("DBG     ", ab.cost, 1);
+        }
+        rb_free_ability(&ab);
+    }
+    fflush(stdout);
+}
 static void dbg_card(const char *tag, int cid)
 {
     Card c;
     if (cid < 0 || cid == RB_EMPTY_SLOT) { printf("DBG %s: <empty>\n", tag); return; }
     if (!rb_decode_card_by_index((uint32_t)cid, &c)) { printf("DBG %s: <nodecode %d>\n", tag, cid); return; }
-    printf("DBG %s: cid=%d no=%s name=%s group=%s cost=%d blade=%d score=%d\n",
-           tag, cid, c.card_no, c.name, c.group, (int)c.cost, (int)c.blade, (int)c.score);
+    /* card_no_idx / group_idx are STRING-TABLE INDICES, not values: they must be
+       resolved through rb_card_string() or the diagnostic prints an integer as a
+       pointer. group_idx is 0xFFFF (empty) for all 2,639 records, so the derived
+       accessors are the only meaningful source -- see rabuka.h:2153-2164. */
+    printf("DBG %s: cid=%d no=%s name=%s unit=%s group=%s cost=%d blade=%d score=%d\n",
+           tag, cid, rb_card_string(c.card_no_idx), c.name,
+           rb_card_unit_name(cid), rb_card_group_name(cid),
+           (int)c.cost, (int)c.blade, (int)c.score);
     rb_free_card(&c);
 }
 static void dbg_stage(TestGame *tg, int pl, const char *tag)
@@ -152,21 +340,27 @@ static void dbg_stage(TestGame *tg, int pl, const char *tag)
     printf("DBG %s: pl=%d stage=[%d,%d,%d] wait=%d disc=%d under=%d deck=%d live=%d succ=%d\n",
            tag, pl,
            tg->state.p[pl].stage[0], tg->state.p[pl].stage[1], tg->state.p[pl].stage[2],
-           tg->state.p[pl].waitroom.n, tg->state.p[pl].discard.n,
+           tg->state.p[pl].discard.n, tg->state.p[pl].discard.n,
            0, tg->state.p[pl].deck.n, tg->state.p[pl].live.n, tg->state.p[pl].success.n);
     for (int i = 0; i < 3; i++) {
         char t[32]; snprintf(t, sizeof t, "%s.stage[%d]", tag, i);
         dbg_card(t, tg->state.p[pl].stage[i]);
     }
-    for (int i = 0; i < tg->state.p[pl].waitroom.n; i++) {
+    for (int i = 0; i < tg->state.p[pl].discard.n; i++) {
         char t[32]; snprintf(t, sizeof t, "%s.wait[%d]", tag, i);
-        dbg_card(t, tg->state.p[pl].waitroom.cards[i]);
+        dbg_card(t, tg->state.p[pl].discard.cards[i]);
     }
     for (int i = 0; i < tg->state.p[pl].live.n; i++) {
         char t[32]; snprintf(t, sizeof t, "%s.live[%d]", tag, i);
         dbg_card(t, tg->state.p[pl].live.cards[i]);
     }
 }
+
+/* dbg_ability is not called by any case: it is the tool for the next person who
+ * finds a condition that misbehaves. Referenced here so -Wunused-function does
+ * not fire and so the intent is on the record. */
+static void (*const dbg_ability_ref)(const char *, int) __attribute__((unused)) = dbg_ability;
+
 #define DBG(...) do { printf(__VA_ARGS__); fflush(stdout); } while (0)
 
 static int base_score_of(int cid)
@@ -234,13 +428,17 @@ static int snapshot_index_of(TestGame *tg, int cid)
     return -1;
 }
 
-/* Rust TestGame::assert_card_identity -- pins a staged card to its card_no. */
+/* Rust TestGame::assert_card_identity -- pins a staged card to its card_no.
+ * These three helpers predate the shared-counter harness, so they publish their
+ * failure count the same way CHECK does: a child killed between here and the
+ * next CHECK must not lose a failure that already happened. */
 static void assert_identity(TestGame *tg, int cid, const char *no, const char *what)
 {
     assertions++;
     if (!rb_card_no_eq(cid, no)) {
         fprintf(stderr, "FAIL: %s: card identity is not %s (id=%d)\n", what, no, cid);
         failures++;
+        publish_counts();
     } else {
         printf("ok: %s: card identity is %s\n", what, no);
     }
@@ -253,6 +451,7 @@ static void assert_distinct_names(TestGame *tg, int a, int b, const char *what)
     if (strcmp(test_card_name(a), test_card_name(b)) == 0) {
         fprintf(stderr, "FAIL: %s: fixtures must be differently-named cards\n", what);
         failures++;
+        publish_counts();
     } else {
         printf("ok: %s: fixtures are differently-named cards\n", what);
     }
@@ -264,6 +463,7 @@ static void assert_same_names(TestGame *tg, int a, int b, const char *what)
     if (strcmp(test_card_name(a), test_card_name(b)) != 0) {
         fprintf(stderr, "FAIL: %s: fixtures must be the same card name\n", what);
         failures++;
+        publish_counts();
     } else {
         printf("ok: %s: fixtures share a card name\n", what);
     }
@@ -336,6 +536,16 @@ static void nonfiction_p1(int p1_center, int p2_center, int expected, const char
        fire the same ability twice and double the score. */
     finish_live_setup(&tg);
     drain_skip(&tg);
+    /* CONTROL, at the assertion site. The condition is a COMPARISON of the two
+     * CENTRE costs, and an empty centre reads as cost 0, so every row -- in
+     * particular the "equal cost -> 0" and "not Liella! -> 0" negatives -- is
+     * only about the comparison if the two centre slots still hold exactly the
+     * cards the case names. Without this, "0 vs 0" would satisfy a negative for
+     * the wrong reason. */
+    CHECK_EQ(tg.state.p[0].stage[1], p1_center < 0 ? RB_EMPTY_SLOT : p1_center,
+             "PL!SP-bp4-024-L control: P1's centre slot holds the card the case names");
+    CHECK_EQ(tg.state.p[1].stage[1], p2_center < 0 ? RB_EMPTY_SLOT : p2_center,
+             "PL!SP-bp4-024-L control: P2's centre slot holds the card the case names");
     CHECK_EQ(score_of(&tg, nonfiction), expected, what);
 }
 
@@ -364,6 +574,13 @@ static void nonfiction_p2(int p1_center, int p2_center, int expected, const char
     DBG("DBG nonfiction_p2 p1c=%d p2c=%d exp=%d got=%d\n", p1_center, p2_center, expected, score_of(&tg, nonfiction));
     dbg_card("nfp2 p1.center", tg.state.p[0].stage[1]);
     dbg_card("nfp2 p2.center", tg.state.p[1].stage[1]);
+    /* Same centre-slot control as nonfiction_p1, at the assertion site: the
+     * negatives in this helper would otherwise also be satisfied by an empty
+     * centre on both sides. */
+    CHECK_EQ(tg.state.p[0].stage[1], p1_center < 0 ? RB_EMPTY_SLOT : p1_center,
+             "PL!SP-bp4-024-L control: P1's centre slot holds the card the case names");
+    CHECK_EQ(tg.state.p[1].stage[1], p2_center < 0 ? RB_EMPTY_SLOT : p2_center,
+             "PL!SP-bp4-024-L control: P2's centre slot holds the card the case names");
     CHECK_EQ(score_of(&tg, nonfiction), expected, what);
 }
 static void test_nonfiction_center_cost_comparison(void)
@@ -468,11 +685,19 @@ static void niji_stage(TestGame *tg, int member)
     tg->state.p[0].stage[0] = RB_EMPTY_SLOT;
     tg->state.p[0].stage[1] = member;
     tg->state.p[0].stage[2] = RB_EMPTY_SLOT;
-    /* heart01=7, heart02=2, heart06=6, heart00=10 (Rust HeartMap) */
-    tg->state.stage_hearts[0][RB_HEART_PINK] = 7;
-    tg->state.stage_hearts[0][RB_HEART_RED] = 2;
-    tg->state.stage_hearts[0][RB_HEART_ORANGE] = 6;
-    tg->state.stage_hearts[0][RB_HEART_ALL] = 10;
+    /* Rust (live_start_reciprocal_live_heart01_threshold_live_score_test.rs:18-22):
+     *   heart01=7, heart02=2, heart06=6, heart00=10.
+     * The engine's indices are 0=heart00 .. 6=heart06, so heart01 is
+     * RB_HEART_RED(1), heart02 is RB_HEART_YELLOW(2) and heart06 is
+     * RB_HEART_ORANGE(6) -- heart00 is RB_HEART_PINK(0). This used to write
+     * RB_HEART_PINK=7, RB_HEART_RED=2 and RB_HEART_ALL=10, i.e. heart00=7,
+     * heart01=2, heart02=0 and a value at index 7, which is not a heart colour
+     * at all. main() now prints the mapping from rb_parse_heart_color so this
+     * cannot silently drift again. */
+    tg->state.stage_hearts[0][RB_HEART_RED]    = 7;   /* heart01 */
+    tg->state.stage_hearts[0][RB_HEART_YELLOW] = 2;   /* heart02 */
+    tg->state.stage_hearts[0][RB_HEART_ORANGE] = 6;   /* heart06 */
+    tg->state.stage_hearts[0][RB_HEART_PINK]   = 10;  /* heart00 */
     tg->state.phase = RB_PHASE_LIVE_SET;
 }
 
@@ -545,6 +770,7 @@ static void test_phoenix_stellar_reciprocal(void)
         int member = test_id(&tg, "PL!N-PR-003-PR");
         int phoenix = test_id(&tg, "PL!N-pb1-038-L");
         int filler_live = test_id(&tg, "PL!-sd1-019-SD");
+        assert_identity(&tg, filler_live, "PL!-sd1-019-SD", "non-Nijigasaki live fixture");
         niji_stage(&tg, member);
         test_add_to_live(&tg, phoenix);
         test_add_to_live(&tg, filler_live);
@@ -552,6 +778,21 @@ static void test_phoenix_stellar_reciprocal(void)
         drain_first(&tg);
         dbg_card("phoenix filler_live", filler_live);
         dbg_stage(&tg, 0, "phoenixneg");
+        /* CONTROLS. This negative says "the group filter rejects the other live
+         * card". It is only that, if (a) the live zone really does hold two cards
+         * at the assertion site, so the result cannot be "nothing to look at",
+         * and (b) the second card really is outside the group. The Japanese is
+         * written as escapes because the Write path on this toolchain can emit
+         * CP932: 虹ヶ咲 is E8 99 B9 E3 83 B6 E5 92 B2 -- note 99 B9, not 99 B1
+         * (U+8671 is a different character and would never match). */
+        CHECK_EQ(tg.state.p[0].live.n, 2,
+                 "PHOENIX negative control: the live zone really holds two cards");
+        CHECK_EQ(tg.state.p[0].success.n, 0,
+                 "PHOENIX negative control: the success zone is empty, so only "
+                 "the LIVE half of the condition can fire");
+        CHECK(!rb_card_matches_group_str(filler_live, "\xE8\x99\xB9\xE3\x83\xB6\xE5\x92\xB2"),
+              "PHOENIX negative control: the second live card is really not in "
+              "the Nijigasaki group (checked through rb_card_matches_group_str)");
         CHECK_EQ(score_of(&tg, phoenix), 0,
                  "PHOENIX gets no score: the other live card is not Nijigasaki");
         CHECK_EQ(test_get_heart_modifier(&tg, member, RB_HEART_ORANGE), 0,
@@ -623,8 +864,17 @@ static void test_aurora_distinct_name_and_cost(void)
     {
         TestGame tg; test_game_new(&tg);
         int m_a = test_id(&tg, "PL!HS-sd1-007-SD");
-        int m_b = test_id(&tg, "PL!HS-bp1-020-N");
+        /* TRANSCRIPTION FIX. This was "PL!HS-bp1-020-N", which is not a card:
+         * cards.json has no such card_no, rb_find_card_by_no returns -1 and
+         * test_id returns 0, so stage[1] held no member at all. The Rust
+         * fixture (live_start_distinct_member_name_and_cost_score_test.rs:71) and
+         * this file's own assertion message both say PL!HS-pb1-023-N, which is
+         * the 錦野真姫 card named 鬼灯 with cost 15 -- the same name as
+         * PL!HS-sd1-007-SD at cost 4, i.e. the same-name/colliding-cost pair the
+         * case is about. The assertion is unchanged in strength. */
+        int m_b = test_id(&tg, "PL!HS-pb1-023-N");
         int m_c = test_id(&tg, "PL!HS-bp5-010-N");
+        assert_identity(&tg, m_b, "PL!HS-pb1-023-N", "AURORA same-name fixture");
         assert_same_names(&tg, m_a, m_b, "AURORA same-name fixture");
         Card a, b;
         rb_decode_card_by_index((uint32_t)m_a, &a);
@@ -639,6 +889,11 @@ static void test_aurora_distinct_name_and_cost(void)
         TestGame tg; test_game_new(&tg);
         int m_a = test_id(&tg, "PL!HS-bp1-012-PR");
         int m_c = test_id(&tg, "PL!HS-bp5-010-N");
+        /* CONTROL: this negative is only about member COUNT, so the two members
+         * it does put down must really be on the stage at the assertion site --
+         * otherwise it would also pass on an empty board. */
+        CHECK(m_a != 0 && m_c != 0,
+              "AURORA 2-member control: both fixtures resolved to real cards");
         aurora_flower(m_a, RB_EMPTY_SLOT, m_c, 0,
                       "AURORA: only 2 members on stage -> +0");
     }
@@ -672,6 +927,31 @@ static void test_dream_with_you_total_blade(void)
         finish_live_setup(&tg);
         drain_skip(&tg);
         dbg_stage(&tg, 0, "dream12");
+        /* CONTROL for the aggregate: the condition sums BLADE, not member COUNT.
+         * Both boards below have 3 occupied slots, so the two readings are
+         * distinguishable only if the blade total itself is asserted. The
+         * 6+6+1 = 13 board gives +1 with a count of 3, the 6+1+1 = 8 board
+         * gives 0 -- the same member count, a different blade sum. */
+        {
+            int blade_total = 0;
+            for (int i = 0; i < RB_STAGE_SIZE; i++) {
+                if (tg.state.p[0].stage[i] == RB_EMPTY_SLOT) continue;
+                Card m;
+                if (!rb_decode_card_by_index((uint32_t)tg.state.p[0].stage[i], &m)) continue;
+                blade_total += m.blade;
+                rb_free_card(&m);
+            }
+            int occupied = 0;
+            for (int i = 0; i < RB_STAGE_SIZE; i++)
+                if (tg.state.p[0].stage[i] != RB_EMPTY_SLOT) occupied++;
+            CHECK_EQ(occupied, 3,
+                     "Dream with You control: three members are staged, so member "
+                     "count and blade sum are different quantities on this board");
+            CHECK(blade_total >= 10,
+                  "Dream with You control: the staged blade total really clears 10");
+            fprintf(stderr, "DIAG Dream with You: occupied=%d blade_total=%d\n",
+                    occupied, blade_total);
+        }
         CHECK_EQ(score_of(&tg, dream), 1,
                  "Dream with You: total stage blade 12 >= 10 -> +1");
     }
@@ -695,6 +975,27 @@ static void test_dream_with_you_total_blade(void)
         test_set_live_card(&tg, 0, dream);
         finish_live_setup(&tg);
         drain_skip(&tg);
+        /* CONTROL: same three occupied slots as the case above, so the +0 can
+         * only come from the blade SUM falling under 10, never from a member
+         * count that happened to be smaller. */
+        {
+            int blade_total = 0, occupied = 0;
+            for (int i = 0; i < RB_STAGE_SIZE; i++) {
+                if (tg.state.p[0].stage[i] == RB_EMPTY_SLOT) continue;
+                occupied++;
+                Card m;
+                if (!rb_decode_card_by_index((uint32_t)tg.state.p[0].stage[i], &m)) continue;
+                blade_total += m.blade;
+                rb_free_card(&m);
+            }
+            CHECK_EQ(occupied, 3,
+                     "Dream with You control: three members staged here too, so the "
+                     "member count is identical to the +1 case");
+            CHECK(blade_total < 10,
+                  "Dream with You control: the staged blade total really is under 10");
+            fprintf(stderr, "DIAG Dream with You low: occupied=%d blade_total=%d\n",
+                    occupied, blade_total);
+        }
         CHECK_EQ(score_of(&tg, dream), 0,
                  "Dream with You: total stage blade 7 < 10 -> +0");
     }
@@ -745,6 +1046,14 @@ static void test_solitude_rain_unique_heart_color(void)
         TestGame tg; test_game_new(&tg);
         int rain = test_id(&tg, "PL!N-bp1-027-L");
         solitude_rain_stage(&tg, rain, RB_EMPTY_SLOT, RB_EMPTY_SLOT, RB_EMPTY_SLOT);
+        /* DISCRIMINATOR / CONTROL: "empty stage -> 0" is only about the member
+         * set if the live card really is in the live zone at the assertion site.
+         * Without this, a live card that never left the hand would also give 0.
+         * The paired positives below are on the same card and same helper. */
+        CHECK_EQ(tg.state.p[0].live.n, 1,
+                 "Solitude Rain control: the live card is in the LIVE zone");
+        CHECK_EQ(tg.state.p[0].stage[0], RB_EMPTY_SLOT,
+                 "Solitude Rain control: the stage really is empty");
         CHECK_EQ(score_of(&tg, rain), 0, "Solitude Rain: empty stage -> +0");
     }
     {   /* PL!N-sd1-019-PR: heart02 + heart06 */
@@ -789,8 +1098,18 @@ static void test_solitude_rain_unique_heart_color(void)
         int a = test_id(&tg, "PL!N-bp1-017-N");
         int b = test_new_id(&tg, "PL!N-bp1-017-N");
         assert_identity(&tg, a, "PL!N-bp1-017-N", "Solitude Rain identical-colour fixture");
+        /* DISCRIMINATOR. This case is the one that could be vacuous by
+         * construction: if the score were simply the member COUNT, two members
+         * would also give +2 and this negative would prove nothing. The case
+         * above it puts 2 members on the stage and expects +3, so member count
+         * and distinct-colour count are demonstrably different quantities on
+         * this board. */
         CHECK(a != b, "Solitude Rain identical-colour fixture uses two distinct copies");
         solitude_rain_stage(&tg, rain, a, b, RB_EMPTY_SLOT);
+        CHECK_EQ(tg.state.p[0].stage[0], a,
+                 "Solitude Rain control: two cards really are on the stage here");
+        CHECK_EQ(tg.state.p[0].stage[1], b,
+                 "Solitude Rain control: the second card really is on the stage here");
         CHECK_EQ(score_of(&tg, rain), 2,
                  "Solitude Rain: two members with identical heart02+heart05 -> +2");
     }
@@ -832,6 +1151,13 @@ static void test_note_mermaid_two_distinct(void)
         tg.state.p[0].stage[1] = ren2;
         fire_live_start(&tg, 0, live);
         drain_skip(&tg);
+        /* CONTROL: two members really are on the stage, so this "+0" is about
+         * the names being identical and not about an empty stage. The case above
+         * is the paired positive with the same member count. */
+        CHECK_EQ(tg.state.p[0].stage[0], ren1,
+                 "NOTE: Mermaid control: two members really are staged here");
+        CHECK_EQ(tg.state.p[0].stage[1], ren2,
+                 "NOTE: Mermaid control: the second member really is staged here");
         CHECK_EQ(score_of(&tg, live), 0,
                  "NOTE: Mermaid: duplicate names are not distinct -> +0");
     }
@@ -904,6 +1230,12 @@ static void test_mirakura_stage_threshold(void)
         test_set_live_card(&tg, 0, live_card);
         finish_live_setup(&tg);
         drain_first(&tg);
+        /* CONTROL for this negative: the single mirakura member must still be on
+         * the stage at the assertion site, or "+0 because one member" would also
+         * be satisfied by "+0 because none". The 3-member case in the same
+         * function is the paired positive. */
+        CHECK_EQ(tg.state.p[0].stage[1], mirakura,
+                 "PL!HS-bp5-021-L control: the one mirakura member is still on stage");
         CHECK_EQ(score_of(&tg, live_card), 0,
                  "PL!HS-bp5-021-L: +0 with only 1 mirakura member");
     }
@@ -935,6 +1267,12 @@ static void test_aqours_heart04_threshold(void)
         int a1 = test_id(&tg, "PL!S-bp5-007-R");
         test_add_to_live(&tg, live);
         tg.state.p[0].stage[0] = a1;
+        /* CONTROL: this negative is about the heart04 TOTAL crossing 10, so the
+         * stage must hold exactly the one member at the assertion site -- not
+         * zero, which would also give +0 for the wrong reason. The two-member
+         * case above is the paired positive on the same card. */
+        CHECK_EQ(tg.state.p[0].stage[0], a1,
+                 "PL!S-pb1-020-L control: the one Aqours member is on the stage");
         fire_live_start(&tg, 0, live);
         drain_skip(&tg);
         CHECK_EQ(score_of(&tg, live), 0,
@@ -1057,6 +1395,12 @@ static void test_energy_threshold(void)
         int live = test_id(&tg, "PL!SP-sd1-026-SD");
         test_add_to_live(&tg, live);
         test_give_energy(&tg, 8);
+        /* CONTROL: the threshold is 9 and this negative says 8 is not enough, so
+         * the energy must really be there and be exactly 8 -- an empty energy
+         * zone would give +0 for the wrong reason. The 9 case above is the
+         * paired positive. */
+        CHECK_EQ(tg.state.p[0].energy_active, 8,
+                 "PL!SP-sd1-026-SD control: exactly 8 active energy, one short of 9");
         fire_live_start(&tg, 0, live);
         drain_skip(&tg);
         CHECK_EQ(score_of(&tg, live), 0, "own energy 8 at LiveStart -> +0 score");
@@ -1084,10 +1428,21 @@ static void test_waited_members_optional_cost(void)
     tg.state.p[0].stage[2] = c;
 
     fire_live_start(&tg, 0, live);
-    CHECK(test_has_pending_choice(&tg), "PL!N-sd2-027-P: the optional wait-cost must be offered");
+    /* PROMPT-COUNT CONTROL, at the assertion site: the first half of this case
+     * is a NEGATIVE ("waited nobody -> +0") and it is only meaningful if a cost
+     * prompt was actually on screen to decline. */
+    int prompts_first = test_has_pending_choice(&tg) ? 1 : 0;
+    CHECK_EQ(prompts_first, 1,
+             "PL!N-sd2-027-P: a cost prompt is on screen at the assertion site");
     decline_optional_cost(&tg);
     drain_skip(&tg);
     CHECK(!test_has_pending_choice(&tg), "declining the optional cost ends the ability");
+    /* CONTROL: nothing was waited, so all three members must still read ACTIVE
+     * (i.e. no orientation) -- "+0" cannot be explained by them having been
+     * waited for a different reason. */
+    CHECK(rb_mods_get_orientation(&tg.state.mods, a) == NULL ||
+          strcmp(rb_mods_get_orientation(&tg.state.mods, a), "wait") != 0,
+          "PL!N-sd2-027-P control: declining left member 1 active");
     CHECK_EQ(score_of(&tg, live), 0, "PL!N-sd2-027-P: waited nobody -> +0");
 
     fire_live_start(&tg, 0, live);
@@ -1119,6 +1474,15 @@ static int we_will(int p1_energy, int p2_energy)
     test_set_energy_active(&tg, 0, p1_energy);
     for (int i = 0; i < p2_energy; i++) test_add_to_energy(&tg, 1, e);
     test_set_energy_active(&tg, 1, p2_energy);
+    /* CONTROL, at the assertion site and not only at setup time: the condition
+     * is a DIFFERENCE between the two active-energy counts, so every case -- and
+     * especially the three negatives -- is only about the difference if both
+     * counts are really what the case claims. Without this a negative could pass
+     * with both seats at zero. */
+    CHECK_EQ(tg.state.p[0].energy_active, p1_energy,
+             "WE WILL!! control: P1's active energy is the count the case names");
+    CHECK_EQ(tg.state.p[1].energy_active, p2_energy,
+             "WE WILL!! control: P2's active energy is the count the case names");
     fire_live_success(&tg, 0, ww);
     drain_skip(&tg);
     return score_of(&tg, ww);
@@ -1150,6 +1514,12 @@ static void test_opponent_energy_gated(void)
         test_give_energy(&tg, 1);
         for (int i = 0; i < 3; i++) test_add_to_energy(&tg, 1, e);
         test_set_energy_active(&tg, 1, 3);
+        /* CONTROL: the equality case below is the paired negative, and it is only
+         * about "not more" if the two counts really are what the cases claim. */
+        CHECK_EQ(tg.state.p[0].energy_active, 1,
+                 "PL!S-bp6-022-L control: P1 has exactly 1 active energy");
+        CHECK_EQ(tg.state.p[1].energy_active, 3,
+                 "PL!S-bp6-022-L control: P2 has exactly 3 active energy");
         fire_live_success(&tg, 0, live);
         drain_skip(&tg);
         CHECK_EQ(score_of(&tg, live), 1, "PL!S-bp6-022-L: opponent 3 > self 1 -> +1");
@@ -1162,6 +1532,12 @@ static void test_opponent_energy_gated(void)
         test_give_energy(&tg, 2);
         for (int i = 0; i < 2; i++) test_add_to_energy(&tg, 1, e);
         test_set_energy_active(&tg, 1, 2);
+        /* CONTROL: the counts must be TIED and non-zero, so "+0" can only come
+         * from "not more" and not from an empty board. */
+        CHECK_EQ(tg.state.p[0].energy_active, 2,
+                 "PL!S-bp6-022-L control: P1 has exactly 2 active energy");
+        CHECK_EQ(tg.state.p[1].energy_active, 2,
+                 "PL!S-bp6-022-L control: P2 has exactly 2 active energy, tied with P1");
         fire_live_success(&tg, 0, live);
         drain_skip(&tg);
         CHECK_EQ(score_of(&tg, live), 0, "PL!S-bp6-022-L: opponent 2 vs self 2 is not more -> +0");
@@ -1189,6 +1565,10 @@ static void test_wish_song_revealed_distinct_liella(void)
                                    test_id(&tg, MEMBERS[i ? i - 1 : 4]),
                                    "Wish Song revealed member fixture");
         for (int i = 0; i < n; i++) test_add_to_revealed(&tg, test_id(&tg, MEMBERS[i]));
+        /* CONTROL: the n=4 row is a NEGATIVE and only means "below 5" if the
+         * revealed zone really holds 4 cards at the assertion site, not zero. */
+        CHECK_EQ(tg.state.n_revealed, n,
+                 "PL!SP-bp4-026-L control: the revealed zone holds the count the case names");
         fire_live_success(&tg, 0, live);
         drain_skip(&tg);
         char what[160];
@@ -1220,6 +1600,13 @@ static void bp5023_case(int n_success, int expected, const char *what)
     int revealed = test_new_id(&tg, "PL!SP-bp1-023-L");
     assert_identity(&tg, revealed, "PL!SP-bp1-023-L", "revealed-card fixture");
     test_add_to_revealed(&tg, revealed);
+    /* CONTROL: the n_success=1 row is a NEGATIVE, and it is only about the
+     * success-zone COUNT being below 2 if the zone really holds the count the
+     * case names and the specific revealed card really is revealed. */
+    CHECK_EQ(tg.state.p[0].success.n, n_success,
+             "PL!SP-bp5-023-L control: the success zone holds the count the case names");
+    CHECK_EQ(tg.state.n_revealed, 1,
+             "PL!SP-bp5-023-L control: exactly the one specific card is revealed");
     fire_live_success(&tg, 0, live);
     drain_skip(&tg);
     CHECK_EQ(score_of(&tg, live), expected, what);
@@ -1239,10 +1626,15 @@ static void test_success_count_revealed_score(void)
 static int aquarium_setup(TestGame *tg)
 {
     int live = test_new_id(tg, "PL!S-bp7-022-L");
-    tg->state.stage_hearts[0][RB_HEART_RED] = 3;
-    tg->state.stage_hearts[0][RB_HEART_GREEN] = 3;
-    tg->state.stage_hearts[0][RB_HEART_BLUE] = 3;
-    tg->state.stage_hearts[0][RB_HEART_ALL] = 10;
+    /* Rust (live_success_group_heart_gated_live_score_test.rs:11-14):
+     *   heart02=3, heart04=3, heart05=3, heart00=10.
+     * Same off-by-one family as niji_stage(): these used to be written as
+     * heart01/heart03/heart04 plus RB_HEART_ALL, so every one of the three
+     * colours the condition reads was the wrong colour. */
+    tg->state.stage_hearts[0][RB_HEART_YELLOW] = 3;   /* heart02 */
+    tg->state.stage_hearts[0][RB_HEART_BLUE]   = 3;   /* heart04 */
+    tg->state.stage_hearts[0][RB_HEART_PURPLE] = 3;   /* heart05 */
+    tg->state.stage_hearts[0][RB_HEART_PINK]   = 10;  /* heart00 */
     test_add_to_live(tg, live);
     tg->state.phase = RB_PHASE_VICTORY;
     tg->state.live_success[0] = 1;
@@ -1274,6 +1666,18 @@ static void test_aquarium_live_success_group_hearts(void)
         test_add_to_revealed(&tg, rika);
         CHECK(rb_should_trigger_live_success(&tg.state, 0) == 1,
               "precondition: the LiveSuccess window is OPEN for the negative case too");
+        /* DISCRIMINATOR: the negative says "two revealed cards, neither of them
+         * Aqours", so the revealed zone must really hold TWO cards. Both the
+         * count (2 vs the positive's 1) and the group membership are then
+         * exercised independently on the same card. */
+        CHECK_EQ(tg.state.n_revealed, 2,
+                 "PL!S-bp7-022-L control: the negative board reveals 2 cards, the "
+                 "positive board 1, so a +0 cannot come from an empty zone");
+        CHECK(!rb_card_matches_group_str(rina, "\x41\x75\xE3\x82\xAF\xE3\x83\xBC\xE3\x83\xAB\x21")
+                  && !rb_card_matches_group_str(rika, "\x41\x75\xE3\x82\xAF\xE3\x83\xBC\xE3\x83\xAB\x21"),
+              "PL!S-bp7-022-L control: neither revealed card is in the Aqours! group "
+              "(\x41\x75... is the UTF-8 of the unit name, written in escapes "
+              "because the Write path here can emit CP932)");
         fire_live_success(&tg, 0, live);
         drain_skip(&tg);
         CHECK_EQ(score_of(&tg, live), 0, "PL!S-bp7-022-L: non-Aqours revealed members -> +0");
@@ -1317,7 +1721,11 @@ static void test_monster_girls_per_waited_member(void)
         tg.state.p[0].stage[2] = RB_EMPTY_SLOT;
         rb_mods_set_orientation(&tg.state.mods, m1, "wait");
         rb_mods_set_orientation(&tg.state.mods, m2, "wait");
-        rb_mods_add_heart(&tg.state.mods, m1, RB_HEART_GREEN, 8);
+        /* Rust (live_success_score_per_waited_member_test.rs:79):
+         *   add_heart_modifier(m1, HeartColor::Heart04, 8).
+         * heart04 is RB_HEART_BLUE(4); this used to add 8 heart03 (RB_HEART_GREEN),
+         * so the modifier was on a colour the card's need_heart never reads. */
+        rb_mods_add_heart(&tg.state.mods, m1, RB_HEART_BLUE, 8);
         test_add_to_hand(&tg, live);
         fill_decks(&tg, filler, 20);
         test_give_energy(&tg, 10);
@@ -1399,14 +1807,35 @@ static void test_love_u_q192_all_blade(void)
         TestGame tg; test_game_new(&tg);
         int love_u = test_new_id(&tg, "PL!N-bp3-030-L");
         int b_all = test_new_id(&tg, "PL!-sd1-020-SD");
-        int stage_member = test_new_id(&tg, "PL!HS-bp1-020-N");
+        /* Rust (all_blade_yell_live_success_live_score_q192_test.rs:89) uses
+         * PL!HS-pb1-023-N. "PL!HS-bp1-020-N" is not a card at all, so test_new_id
+         * returned 0 and the stage slot silently held no member -- which is why
+         * this negative also needed the discriminator below. */
+        int stage_member = test_new_id(&tg, "PL!HS-pb1-023-N");
+        assert_identity(&tg, stage_member, "PL!HS-pb1-023-N", "Q192 stage member fixture");
         assert_identity(&tg, b_all, "PL!-sd1-020-SD", "recoloured b_all fixture");
         tg.state.p[0].stage[0] = stage_member;
         tg.state.p[0].stage[1] = RB_EMPTY_SLOT;
         tg.state.p[0].stage[2] = RB_EMPTY_SLOT;
-        for (int c = RB_HEART_PINK; c <= RB_HEART_ORANGE; c++) tg.state.stage_hearts[0][c] = 1;
+        /* Rust sets heart01..heart06 = 1 each; the engine's 0 is heart00, so the
+         * range starts at RB_HEART_RED(1), not RB_HEART_PINK(0). */
+        for (int c = RB_HEART_RED; c <= RB_HEART_ORANGE; c++) tg.state.stage_hearts[0][c] = 1;
         test_add_to_live(&tg, love_u);
         test_add_to_revealed(&tg, b_all);
+        /* DISCRIMINATOR. The positive case in this function scores +1 on this very
+         * card, so "the recolour is what breaks it" is only meaningful if the card
+         * really does carry the ALL blade to begin with. Without this the
+         * assertion is vacuous by construction: a b_all-less card would also
+         * score 0, and so would an empty revealed zone. */
+        {
+            Card bc;
+            int ok = rb_decode_card_by_index((uint32_t)b_all, &bc);
+            CHECK(ok && rb_card_has_all_blade(&bc),
+                  "Q192: the revealed card really does carry the ALL blade before recolouring");
+            rb_free_card(&bc);
+        }
+        CHECK_EQ(tg.state.n_revealed, 1,
+                 "Q192: exactly one card is among the yell-revealed cards");
         rb_mods_set_blade_type(&tg.state.mods, b_all, RB_HEART_PURPLE);
         CHECK_EQ(rb_mods_get_blade_type(&tg.state.mods, b_all), RB_HEART_PURPLE,
                  "Q192: the b_all card really is recoloured purple");
@@ -1504,10 +1933,35 @@ static void bp7023_case(int opponent_energy, int expected, const char *what)
     for (int i = 0; i < opponent_energy; i++) test_add_to_energy(&tg, 1, e);
     test_set_energy_active(&tg, 1, opponent_energy);
 
+    /* CONTROLS. The tied-energy case is a NEGATIVE whose expected 0 is only
+     * meaningful if the energy counts the alternative branch reads are real and
+     * non-zero, and the two positive cases are only meaningful if the two
+     * Aqours members the gate counts are on the stage. Asserted before the
+     * ability fires so a failure here names the fixture, not the engine. */
+    CHECK_EQ(tg.state.p[0].energy_active, 1,
+             "PL!S-bp7-023-L control: P1 has exactly 1 active energy to return");
+    CHECK_EQ(tg.state.p[1].energy_active, opponent_energy,
+             "PL!S-bp7-023-L control: P2 has the active energy count the case names");
+    CHECK_EQ(tg.state.p[0].stage[0], chika_a, "PL!S-bp7-023-L control: Aqours member 1 staged");
+    CHECK_EQ(tg.state.p[0].stage[1], chika_b, "PL!S-bp7-023-L control: Aqours member 2 staged");
+
     fire_live_start(&tg, 0, live);
+    /* PROMPT CONTROL: this is a negative-shaped case ("no energy was returned"),
+     * so the number of prompts offered AT the assertion site has to be recorded,
+     * not just checked at answer time. accept_optional_cost returns 0 when there
+     * is no SelectTarget cost prompt to answer, which is how the "no prompt"
+     * defect below shows up. */
+    int prompts = 0;
     int guard = 0;
-    while (test_has_pending_choice(&tg) && guard++ < 10) accept_optional_cost(&tg);
+    while (test_has_pending_choice(&tg) && guard++ < 10) {
+        prompts++;
+        accept_optional_cost(&tg);
+    }
+    fprintf(stderr, "DIAG PL!S-bp7-023-L opp=%d prompts_offered=%d\n", opponent_energy, prompts);
     drain_skip(&tg);
+    CHECK(prompts > 0,
+          "PL!S-bp7-023-L: the optional energy-return cost is actually offered "
+          "(a +0 here must be the gate, not an absent prompt)");
     CHECK_EQ(tg.state.p[0].energy_active, 0,
              "PL!S-bp7-023-L: our energy was returned to the energy deck");
     CHECK_EQ(score_of(&tg, live), expected, what);
@@ -1567,10 +2021,25 @@ static void test_optional_energy_return_comparison(void)
         for (int i = 0; i < 2; i++) test_add_to_energy_deck(&tg, 0, e);
         for (int i = 0; i < 2; i++) test_add_to_energy(&tg, 1, e);
         test_set_energy_active(&tg, 1, 2);
+        /* CONTROLS: this is a NEGATIVE ("declining changes nothing"), so the
+         * energy counts the comparison reads must be present and P1 must really
+         * be ahead. Without them a +0 would also be produced by an empty board
+         * and by an engine that never evaluated the condition. */
+        CHECK_EQ(tg.state.p[0].energy_active, 5,
+                 "PL!SP-bp7-027-L control: P1 has 5 active energy, ahead of P2");
+        CHECK_EQ(tg.state.p[1].energy_active, 2,
+                 "PL!SP-bp7-027-L control: P2 has 2 active energy");
         fire_live_start(&tg, 0, live);
-        CHECK(test_has_pending_choice(&tg), "PL!SP-bp7-027-L: the optional energy cost is prompted");
+        /* PROMPT-COUNT CONTROL, taken at the assertion site and not only at
+         * answer time: declining only means something if a prompt was actually
+         * on screen to decline. */
+        int prompts_on_screen = test_has_pending_choice(&tg) ? 1 : 0;
+        CHECK_EQ(prompts_on_screen, 1,
+                 "PL!SP-bp7-027-L control: a cost prompt is on screen to decline");
         decline_optional_cost(&tg);
         drain_skip(&tg);
+        CHECK_EQ(tg.state.p[0].energy_active, 5,
+                 "PL!SP-bp7-027-L control: declining leaves our energy at 5");
         CHECK_EQ(score_of(&tg, live), 0, "PL!SP-bp7-027-L: declined -> no score bonus");
     }
     {   /* accept while behind -> no immediate bonus */
@@ -1581,6 +2050,13 @@ static void test_optional_energy_return_comparison(void)
         for (int i = 0; i < 2; i++) test_add_to_energy_deck(&tg, 0, e);
         for (int i = 0; i < 5; i++) test_add_to_energy(&tg, 1, e);
         test_set_energy_active(&tg, 1, 5);
+        /* CONTROL: this is a NEGATIVE and the whole point is that P1 is BEHIND
+         * by 2. If the counts were not what the case claims, "+0" would carry no
+         * information. */
+        CHECK_EQ(tg.state.p[0].energy_active, 3,
+                 "PL!SP-bp7-027-L control: P1 has 3 active energy, behind P2");
+        CHECK_EQ(tg.state.p[1].energy_active, 5,
+                 "PL!SP-bp7-027-L control: P2 has 5 active energy");
         fire_live_start(&tg, 0, live);
         CHECK(test_has_pending_choice(&tg),
               "PL!SP-bp7-027-L: the optional energy-pay cost prompt is expected");
@@ -1622,6 +2098,14 @@ static void test_angelic_angel_success_zone_constant(void)
         TestGame tg; test_game_new(&tg);
         int angel = test_id(&tg, "PL!-bp4-019-L");
         test_add_to_success(&tg, angel);
+        /* CONTROL: this negative is about the mu's-on-stage half only. The card
+         * must really be in the success zone, or "+0" would also be produced by
+         * the other half failing. The case above is the paired positive on the
+         * same board minus one member. */
+        CHECK_EQ(tg.state.p[0].success.n, 1,
+                 "PL!-bp4-019-L control: the card IS in the success zone");
+        CHECK_EQ(tg.state.p[0].stage[0], RB_EMPTY_SLOT,
+                 "PL!-bp4-019-L control: the stage really is empty");
         test_recalc(&tg);
         CHECK_EQ(score_of(&tg, angel), 0, "PL!-bp4-019-L: no mu's member on stage -> +0");
     }
@@ -1681,10 +2165,110 @@ static void test_angelic_angel_success_zone_constant(void)
         TestGame tg; test_game_new(&tg);
         int angel = test_id(&tg, "PL!-bp4-019-L");
         test_add_to_success(&tg, angel);
+        /* CONTROL: "both halves are required" is only demonstrated if exactly
+         * ONE half is broken. The card is in the success zone (half one holds)
+         * and the stage is empty (half two does not). */
+        CHECK_EQ(tg.state.p[0].success.n, 1,
+                 "PL!-bp4-019-L control: the success-zone half of the AND holds");
+        CHECK_EQ(tg.state.p[0].stage[0], RB_EMPTY_SLOT,
+                 "PL!-bp4-019-L control: the mu's-on-stage half is the one broken");
         test_recalc(&tg);
         CHECK_EQ(score_of(&tg, angel), 0,
                  "PL!-bp4-019-L: both halves of the condition are required");
     }
+}
+
+typedef void (*CaseFn)(void);
+
+typedef struct { const char *name; CaseFn fn; } Case;
+
+/* Fork one case. The child gets a private address space, so the engine's
+ * process-global card-copy pool and any heap left behind by an earlier case
+ * cannot leak in; the parent reads the child's progress out of the shared
+ * mapping afterwards, so a child that dies on a fatal signal still contributes
+ * every assertion it reached. */
+static void run_case(const Case *c)
+{
+    g_shared->assertions = 0;
+    g_shared->failures   = 0;
+    g_shared->signal     = 0;
+    g_shared->exited_ok  = 0;
+    g_shared->name[0]    = 0;
+    snprintf(g_case_name, sizeof g_case_name, "%s", c->name);
+    memcpy(g_shared->name, g_case_name, sizeof g_case_name);
+
+    fflush(stdout);
+    fflush(stderr);
+    pid_t pid = fork();
+    if (pid < 0) {
+        fprintf(stderr, "FAIL: fork() failed for %s\n", c->name);
+        assertions++; failures++;
+        return;
+    }
+    if (pid == 0) {
+        struct sigaction sa;
+        memset(&sa, 0, sizeof sa);
+        sa.sa_handler = fatal_handler;
+        sigemptyset(&sa.sa_mask);
+        sa.sa_flags = SA_NODEFER | SA_RESETHAND;
+        sigaction(SIGSEGV, &sa, NULL);
+        sigaction(SIGBUS,  &sa, NULL);
+        sigaction(SIGABRT, &sa, NULL);
+        sigaction(SIGFPE,  &sa, NULL);
+        /* The counters are process globals and the parent has been accumulating
+         * them across cases, so the child must start from zero or it reports the
+         * running total plus its own. */
+        assertions = 0;
+        failures   = 0;
+        /* The card-copy pool is process-global and monotonic and nothing in the
+         * engine resets it; a case must not inherit the previous case's copies. */
+        rb_card_copy_pool_reset();
+        c->fn();
+        g_shared->assertions = assertions;
+        g_shared->failures   = failures;
+        g_shared->exited_ok  = 1;
+        fflush(stdout);
+        fflush(stderr);
+        _exit(0);
+    }
+
+    int status = 0;
+    if (waitpid(pid, &status, 0) < 0) status = -1;
+
+    assertions += g_shared->assertions;
+    failures   += g_shared->failures;
+
+    if (g_shared->signal) {
+        const char *nm = NULL;
+        switch (g_shared->signal) {
+            case SIGSEGV: nm = "SIGSEGV"; break;
+            case SIGBUS:  nm = "SIGBUS";  break;
+            case SIGABRT: nm = "SIGABRT"; break;
+            case SIGFPE:  nm = "SIGFPE";  break;
+            default:      nm = "signal";  break;
+        }
+        fprintf(stderr, "FAIL: %s: fatal %s (%d) in child; %d assertion(s) reached, %d failing\n",
+                g_shared->name[0] ? g_shared->name : c->name, nm, g_shared->signal,
+                g_shared->assertions, g_shared->failures);
+        failures++;
+        assertions++;
+    } else if (!g_shared->exited_ok) {
+        fprintf(stderr, "FAIL: %s: child terminated abnormally (wait status %d) after %d assertion(s)\n",
+                c->name, status, g_shared->assertions);
+        failures++;
+        assertions++;
+    }
+    printf("== case %-42s assertions=%d failures=%d\n",
+           c->name, g_shared->assertions, g_shared->failures);
+    if (g_shared->failures > g_shared->assertions) {
+        fprintf(stderr, "FAIL: %s: shared counters inconsistent "
+                        "(%d failures > %d assertions) -- the shared mapping is "
+                        "not coherent on this toolchain and the per-case totals "
+                        "below cannot be trusted\n",
+                c->name, g_shared->failures, g_shared->assertions);
+        failures++;
+    }
+    fflush(stdout);
 }
 
 int main(void)
@@ -1695,34 +2279,68 @@ int main(void)
     }
     setvbuf(stdout, NULL, _IONBF, 0);
 
-    test_liella_heart_total_score();
-    test_nonfiction_center_cost_comparison();
-    test_phoenix_stellar_reciprocal();
-    test_aurora_distinct_name_and_cost();
-    test_dream_with_you_total_blade();
-    test_solitude_rain_unique_heart_color();
-    test_note_mermaid_two_distinct();
-    test_mirakura_stage_threshold();
-    test_aqours_heart04_threshold();
-    test_swc_distinct_waitroom_lives();
-    test_go_master_fewer_success();
-    test_energy_threshold();
-    test_waited_members_optional_cost();
-    test_own_energy_ahead_live_success();
-    test_opponent_energy_gated();
-    test_wish_song_revealed_distinct_liella();
-    test_success_count_revealed_score();
-    test_aquarium_live_success_group_hearts();
-    test_monster_girls_per_waited_member();
-    test_love_u_q192_all_blade();
-    test_awake_q36_group_cheer_count();
-    test_return_energy_deficit_score();
-    test_optional_energy_return_comparison();
-    test_angelic_angel_success_zone_constant();
+    /* The engine's colour indices are 0=heart00 .. 6=heart06, which is NOT the
+     * RB_HEART_* enum order a reader would assume from the names. Print the real
+     * mapping, derived through rb_parse_heart_color (the port of Rust's
+     * card.rs::parse_heart_color) rather than assumed, because a test that
+     * asserts heart06 through the wrong enum constant is silently vacuous. */
+    printf("== heart colour mapping (rb_parse_heart_color)\n");
+    {
+        static const char *const NAMES[7] = {
+            "heart00", "heart01", "heart02", "heart03", "heart04", "heart05", "heart06"
+        };
+        for (int i = 0; i < 7; i++)
+            printf("   %s -> %d\n", NAMES[i], (int)rb_parse_heart_color(NAMES[i]));
+        printf("   RB_HEART_PINK=%d RB_HEART_RED=%d RB_HEART_YELLOW=%d RB_HEART_GREEN=%d "
+               "RB_HEART_BLUE=%d RB_HEART_PURPLE=%d RB_HEART_ORANGE=%d RB_HEART_ALL=%d\n",
+               (int)RB_HEART_PINK, (int)RB_HEART_RED, (int)RB_HEART_YELLOW, (int)RB_HEART_GREEN,
+               (int)RB_HEART_BLUE, (int)RB_HEART_PURPLE, (int)RB_HEART_ORANGE, (int)RB_HEART_ALL);
+    }
 
-    rb_unload();
-    printf("\n%d assertions, %d failures\n", assertions, failures);
-    if (failures) return 1;
+    g_shared = mmap(NULL, sizeof *g_shared, PROT_READ | PROT_WRITE,
+                    MAP_SHARED | MAP_ANONYMOUS, -1, 0);
+    if (g_shared == MAP_FAILED) {
+        fprintf(stderr, "FAIL: mmap(MAP_SHARED|MAP_ANONYMOUS) for the shared "
+                        "counters failed; running without crash isolation\n");
+        g_shared = NULL;
+    }
+
+    static const Case CASES[] = {
+        { "liella_heart_total_score",                 test_liella_heart_total_score },
+        { "nonfiction_center_cost_comparison",        test_nonfiction_center_cost_comparison },
+        { "phoenix_stellar_reciprocal",               test_phoenix_stellar_reciprocal },
+        { "aurora_distinct_name_and_cost",             test_aurora_distinct_name_and_cost },
+        { "dream_with_you_total_blade",                test_dream_with_you_total_blade },
+        { "solitude_rain_unique_heart_color",          test_solitude_rain_unique_heart_color },
+        { "note_mermaid_two_distinct",                 test_note_mermaid_two_distinct },
+        { "mirakura_stage_threshold",                  test_mirakura_stage_threshold },
+        { "aqours_heart04_threshold",                  test_aqours_heart04_threshold },
+        { "swc_distinct_waitroom_lives",               test_swc_distinct_waitroom_lives },
+        { "go_master_fewer_success",                   test_go_master_fewer_success },
+        { "energy_threshold",                          test_energy_threshold },
+        { "waited_members_optional_cost",              test_waited_members_optional_cost },
+        { "own_energy_ahead_live_success",             test_own_energy_ahead_live_success },
+        { "opponent_energy_gated",                     test_opponent_energy_gated },
+        { "wish_song_revealed_distinct_liella",        test_wish_song_revealed_distinct_liella },
+        { "success_count_revealed_score",              test_success_count_revealed_score },
+        { "aquarium_live_success_group_hearts",        test_aquarium_live_success_group_hearts },
+        { "monster_girls_per_waited_member",          test_monster_girls_per_waited_member },
+        { "love_u_q192_all_blade",                     test_love_u_q192_all_blade },
+        { "awake_q36_group_cheer_count",               test_awake_q36_group_cheer_count },
+        { "return_energy_deficit_score",               test_return_energy_deficit_score },
+        { "optional_energy_return_comparison",         test_optional_energy_return_comparison },
+        { "angelic_angel_success_zone_constant",       test_angelic_angel_success_zone_constant },
+    };
+
+    for (unsigned i = 0; i < sizeof CASES / sizeof CASES[0]; i++)
+        run_case(&CASES[i]);
+
+    printf("\n%d cases, %d assertions, %d failures\n",
+           (int)(sizeof CASES / sizeof CASES[0]), assertions, failures);
+    if (failures) {
+        printf("CARD SCORE PARITY: RED\n");
+        return 1;
+    }
     printf("ALL CARD SCORE PARITY CHECKS PASSED\n");
     return 0;
 }
