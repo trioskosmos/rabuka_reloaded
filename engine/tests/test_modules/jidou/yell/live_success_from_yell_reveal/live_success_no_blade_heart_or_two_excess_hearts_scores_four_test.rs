@@ -150,13 +150,25 @@ fn miracle_wave_with_exact_hearts(game: &mut TestGame, blade: bool) -> i16 {
     wave
 }
 
-/// Condition **A** alone: every card yelled has a blade heart, so the count of
-/// ブレードハートを持たないカード is 0, and the score becomes 4 with excess at 0.
+/// Condition **A** on its own, with 余剰ハート pinned at 0 so B cannot fire.
 ///
-/// The two tests below use cards with identical hearts, differing only in blade heart, so
-/// whichever clause moves the score must be the blade one.
+/// ## What actually happens here, stated precisely
+///
+/// Both fixtures in `miracle_wave_with_exact_hearts` print **no score**
+/// (`PL!S-bp3-001-P` and `PL!S-bp2-011-N` both have `score: None`), so this board **cannot
+/// produce a yell** — a performance only yells when it over-performs, and a zero-score live
+/// never does. `yell_occurred` is `false` and `revealed_cards` is empty at the moment the
+/// condition is evaluated.
+///
+/// So this test does **not** isolate "every card yelled has a blade heart". It covers the
+/// vacuous case: with **zero** cards revealed, the count of ブレードハートを持たない cards is 0
+/// and A is satisfied — which is Q182's exact question, and its answer of 4 is pinned here.
+///
+/// The non-vacuous case (a real yell revealing cards) is a **different** setup and is not
+/// covered by this file. An earlier version of this test claimed to cover it; a probe showed
+/// it never happened, and the message was corrected rather than the claim left standing.
 #[test]
-fn miracle_wave_a_lone_no_blade_heart_count_of_zero_scores_four_with_no_excess() {
+fn miracle_wave_zero_revealed_cards_satisfies_the_no_blade_heart_condition_q182() {
     let mut game = TestGame::new(load_real_database());
     let wave = miracle_wave_with_exact_hearts(&mut game, true);
 
@@ -167,21 +179,27 @@ fn miracle_wave_a_lone_no_blade_heart_count_of_zero_scores_four_with_no_excess()
         .unwrap();
     assert_eq!(
         l.score, 4,
-        "ブレードハートを持たないカードが0枚 — the only cards yelled both have blade hearts, \
-         so the count is 0 and the OR's first branch alone must set the score to 4. 余剰ハート \
-         is 0 here, so the second branch cannot explain it. (score={})",
+        "Q182 — no card is revealed by this yell, so the count of ブレードハートを持たない cards \
+         is 0 and the first branch of the OR is satisfied on its own. 余剰ハート is 0 here, so \
+         the excess-hearts branch cannot explain the 4. (score={})",
         l.score
     );
 }
 
-/// Condition **A** false and condition **B** false — the OR is false, so the printed score
-/// stands.
+/// The OR is false, so the printed score of 7 stands — 余剰ハート is 0 and the first branch
+/// does not fire.
 ///
-/// This is the branch nothing covered. The existing test stages two blade-less 千歌 for an
-/// excess of 2, so B fires and the score is 4 whether or not A is ever evaluated. Here both
-/// members are blade-less (A false) and the hearts match exactly (B false). An implementation
-/// that treated the OR as always-true, or that read 「0枚」 as 「any number of cards」, fails
-/// here and passes everything else.
+/// Corrected premise, because the original message was wrong. This does **not** work by
+/// "two blade-less cards were yelled". A probe of `initial_yell_revealed_cards` and
+/// `revealed_cards` shows the revealed set in this board is **`[14772, 14772, 14772, 14772,
+/// 14772, 14772, 14772]` — one card id repeated seven times**, not two distinct members.
+/// The count of blade-less cards among them is therefore non-zero, A is false, and the score
+/// is left alone.
+///
+/// The duplicate id is itself unexplained and is recorded in
+/// `docs/EDGE_CASE_FINDINGS.md` — if the yell really can put repeated ids into a revealed set,
+/// it reaches every `revealed_cards` condition in the corpus. What this test pins is the
+/// printed consequence: A false and B false ⇒ the card keeps its printed 7.
 #[test]
 fn miracle_wave_when_both_conditions_are_false_the_printed_score_stands() {
     let mut game = TestGame::new(load_real_database());

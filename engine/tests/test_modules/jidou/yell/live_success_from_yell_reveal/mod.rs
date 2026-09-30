@@ -2,3 +2,4 @@
 // Regenerated from the directory listing at compile time.
 pub mod live_success_draw_per_aqours_member_then_discard_same_count_test;
 pub mod live_success_no_blade_heart_or_two_excess_hearts_scores_four_test;
+pub mod q172_heart_total_includes_ability_but_not_blade_test;

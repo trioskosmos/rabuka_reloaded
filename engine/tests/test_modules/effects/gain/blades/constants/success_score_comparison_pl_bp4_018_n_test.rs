@@ -104,9 +104,17 @@ fn pl_bp4_018_n_success_score_changes_update_blades_strictly_greater() {
         .cards
         .push(own_live_a);
     game.state.recalculate_constants();
-    assert!(
-        game.state.mods.get_blade_modifier(card) >= 2,
-        "Own score 1 > opp score 0 should give blade ×2"
+    // 「…スコアの合計が相手より高いかぎり、{{icon_blade.png|ブレード}}{{icon_blade.png|ブレード}}を
+    // 得る」 — TWO blade icons, printed side by side, so the grant is exactly 2 and not a
+    // per-point-of-lead total. This was `>= 2`, which accepts 3 or 4, so a modifier scaled by
+    // the score difference would have passed. The equal-score case above already asserts `== 0`,
+    // so the pair now brackets the value exactly.
+    assert_eq!(
+        game.state.mods.get_blade_modifier(card),
+        2,
+        "ブレード×2 — exactly two blade icons are printed, so a lead of 1 grants 2 and not a \
+         multiple of it (got {})",
+        game.state.mods.get_blade_modifier(card)
     );
     game.state
         .player2

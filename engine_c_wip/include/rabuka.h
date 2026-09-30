@@ -1811,6 +1811,22 @@ int  rb_try_add_ability_invalidation(GameState *g, int card_id, const char *trig
                                      const char *duration);
 int  rb_card_num_gained_abilities(const GameState *g, int card_id);
 const Ability *rb_card_gained_ability(const GameState *g, int card_id, int index);
+
+/* Condition-scalar / group-filter readers used by the constant scans. Both   live in src/core/game_state_abilities.c and are declared here so the
+   under-card constant pass in src/turn/triggers.c reads the same fields the
+   TAS scan does. `rb_condition_tree_group_names` mirrors
+   abilities.rs::condition_tree_group_names — the first non-empty group filter
+   anywhere in the condition tree, `group_names` arriving as a string ARRAY. */
+const char *rb_cond_get_str(const Condition *c, const char *key);
+int  rb_condition_tree_group_names(const Condition *c, const char **out, int max);
+
+/* Gained-aware (card_id, ability_idx) resolution. Printed index below
+   RB_GAINED_ABILITY_INDEX_BASE, gained index at or above it. `out` is a
+   caller-owned Ability (release with rb_free_ability). The queue processor
+   (src/ability/ability_queue.c) must use this, not rb_decode_card_ability,
+   or a queued GAINED ability silently resolves to nothing. */
+int  rb_resolve_card_ability_at(const GameState *g, int card_id, int ability_idx,
+                                Ability *out);
 void rb_check_expired_effects(GameState *g, int which);
 void rb_advance_phase(GameState *g);
 
@@ -2753,6 +2769,28 @@ int rb_modifier_total_entry(const RbModifierEntry *e);
 
 /* ── types.rs: Constants ─────────────────────────────────────────────── */
 extern const char *RB_PAY_SKIP_TARGET;
+
+/* engine/src/ability/types.rs:379-392 —
+ *     /// Ability-index offset addressing RUNTIME-GAINED abilities instead of
+ *     /// printed card abilities. Encoded as `GAINED_ABILITY_INDEX_BASE +
+ *     /// gained_idx` in every (card_id, ability_index) pair that outlives the
+ *     /// resolution that produced it — constant scans, trigger scans, and queue
+ *     /// entries all share this single encoding.
+ *     pub const GAINED_ABILITY_INDEX_BASE: usize = 10_000;
+ *
+ * THIS IS THE ONE BASE. A gained ability is addressed as
+ * RB_GAINED_ABILITY_INDEX_BASE + gained_idx and nowhere else; every producer
+ * (queue_gained_trigger, rb_collect_constant_ids_for, the gain_ability_from_source
+ * bridge in rb_trigger_auto_ability) and every consumer (rb_resolve_constant_ability,
+ * the live-success enqueue branch in rb_trigger_live_success_faithful,
+ * rb_gained_ability_index) tests against this one macro. There must never be a
+ * second, translation-unit-private copy of the value: the port once had
+ * `GAINED_ABILITY_INDEX_BASE 0x8000` private to game_state_abilities.c beside
+ * this 10000, and the two index spaces did not intersect, so a pair minted on
+ * one side was unreadable on the other.
+ *
+ * The derived index must also stay < the base (RB_GAINED_PER_SLOT is 4, far
+ * below it), which is what makes the `>= base` gained test unambiguous. */
 #define RB_GAINED_ABILITY_INDEX_BASE 10000
 
 /* ── types.rs: ChoiceRoute helpers ───────────────────────────────────── */

@@ -1406,6 +1406,44 @@ and `compact` to hide hidden state. Both proxy attempts at "better mulligan
 maths" failed, which is itself the argument for this one: a proxy of the
 objective failed twice, and the objective is exactly computable here.
 
+### 11.8 The zone's full width: a real bug, correctly diagnosed, and the fix is a no-op
+
+`check_outcome` (`v8_model.rs:929-932`) credits **exactly one** success in every
+branch — `rule_payoff(our_success + 1, opp.success)` — and takes `p_pass` as the
+probability that the *whole set* is satisfied. So a three-life set is modelled as
+"one success, with lower probability than one good life", which is why the live
+set never commits more than one card.
+
+That is a genuine modelling error. `MAX_LIVE_CARDS` is 3, the win condition is
+three successes, and each card is checked and moved independently
+(`move_live_to_success_and_handle_wins` sends winners to success and failures to
+the waitroom, per card). Three good lives can bank three successes in one live
+phase and win outright at 2-2. The model cannot price any of that.
+
+`V8_JOINT` prices it: `zone_success_distribution` resolves a set one card at a
+time against a shared supply and returns `P(k successes)`, and
+`joint_success_value` pays for the 2nd and 3rd successes with the same race
+payoff. It is a real fix to a real defect.
+
+**It changes nothing: 0 discordant games out of 1200, with `V8_JOINT`, again
+with `V8_JOINT + V8_MAX_LIVES=3 + V8_ZONE_ORDER`, and again with width alone.**
+
+That is not a null result about the fix, it is a fact about the game. Hearts
+come from a **shared** pool: the first card draws until its requirement is met
+and the second gets what is left. Two lives therefore rarely both pass, so
+`P(k >= 2)` is close to zero across every candidate the live set ever considers,
+the joint term is worth approximately nothing, and **setting one good life
+genuinely beats setting two mediocre ones**.
+
+So the live set is not leaving anything on the table by committing a single card.
+The "the zone is underused" reading was wrong, and it was wrong in a way worth
+having measured: three separate mechanisms all landed on the same bit-identical
+result, which is a much stronger statement than any one of them alone.
+
+The defect is real and the fix is correct. It is a no-op **for this deck and
+this format**, and it should stay switched off — a switch whose effect is
+identically zero is a switch that will be misread as load-bearing later.
+
 ### 11.2 The probe is a localiser, not a rule generator
 
 `PROBE=v9` put v9's Main (v7's) against v8's on the same states. Four games,

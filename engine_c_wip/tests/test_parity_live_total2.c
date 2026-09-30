@@ -512,6 +512,15 @@ static int live_start_score_mod(TestGame *tg, int live, int filler,
     if (!advance_named(tg, "LiveCardSetFirstAttacker")) {
         fprintf(stderr, "FAIL: live-start driver: never reached the live-card set phase "
                         "(stopped at %s)\n", test_phase_name_now(tg));
+        fprintf(stderr, "     live-start driver zone dump: hand=%d deck=%d energy=%d "
+                        "energy_deck=%d waitroom=%d live=%d success=%d stage=%d "
+                        "active=%d first=%d second=%d turn=%d pending=%d\n",
+                test_zone_len(tg, 0, "hand"), test_zone_len(tg, 0, "main_deck"),
+                test_zone_len(tg, 0, "energy"), test_zone_len(tg, 0, "energy_deck"),
+                test_zone_len(tg, 0, "waitroom"), test_zone_len(tg, 0, "live"),
+                test_zone_len(tg, 0, "success"), test_zone_len(tg, 0, "stage"),
+                tg->state.active, tg->state.first_attacker, tg->state.second_attacker,
+                tg->state.turn, test_pending_choice_count(tg));
         failures++; publish_counts();
         return -999;
     }
@@ -1152,6 +1161,27 @@ static void test_three_lily_white_success_cards_still_score_one(void)
     CHECK_EQ(live_start_score_mod(&tg, rom, filler, NULL, 0, sz, 3), 1,
              "2枚以上 gates the effect on once -- three qualifying cards must still be "
              "+1, not +2");
+
+    /* DIAGNOSTIC for the walk failure above (if any). The same board with the
+     * third card swapped for a NON-lily-white card separates "three cards in
+     * the zone" from "this particular print", and the decoded shape of the
+     * third card says whether it carries anything that could interfere with
+     * the phase walk. Reported, not asserted. */
+    {
+        static TestGame dg;
+        rb_card_copy_pool_reset();
+        test_game_new(&dg);
+        int r2 = test_id_exact(&dg, ROMANTIC);
+        int c2 = test_id_exact(&dg, LW_CHEAP), m2 = test_id_exact(&dg, LW_MID),
+            s2 = test_id_exact(&dg, SRL_FILLER);
+        int f2 = mid(&dg, FILLER);
+        dbg_card("LW_THIRD", third);
+        dbg_ability("LW_THIRD", third);
+        int sz2[3]; sz2[0] = c2; sz2[1] = m2; sz2[2] = s2;
+        printf("     041 three-cards DIAGNOSTIC: 2 lily white + 1 NON-lily-white in the "
+               "zone, same walk -> %d (-999 = the walk stalled again)\n",
+               live_start_score_mod(&dg, r2, f2, NULL, 0, sz2, 3));
+    }
 }
 
 static void test_lily_white_cards_in_hand_do_not_count(void)

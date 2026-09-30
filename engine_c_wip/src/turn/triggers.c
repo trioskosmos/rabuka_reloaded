@@ -38,7 +38,45 @@ static int rb_push_owned_entry(GameState *g, int pl, int card_id, int ability_id
     return 1;
 }
 
+/* Per-scan (card_id, ability_idx) dedupe set — the C stand-in for Rust's
+   `HashSet<(i16, usize)>`, which is scoped to ONE seat's ONE scan in every
+   place the Rust uses it (turn/trigger_scan.rs:188 for live_start,
+   turn/triggers.rs for the live-success seen set). A fixed array plus a linear
+   probe is the port's idiom for it; the cap only bounds pathological inputs. */
+#define RB_TRIGGER_SEEN_MAX 64
+typedef struct { int card_id; int ability_idx; } RbTriggerSeen;
+
+/* Returns 1 when the pair was NOT already present (and records it), 0 when it
+   was a duplicate. Mirrors `seen.insert(pair)` — 0 means "already there". */
+static int rb_trigger_seen_add(RbTriggerSeen *seen, int *n, int card_id, int ability_idx) {
+    if (!seen || !n) return 1;
+    for (int i = 0; i < *n; i++)
+        if (seen[i].card_id == card_id && seen[i].ability_idx == ability_idx) return 0;
+    if (*n >= RB_TRIGGER_SEEN_MAX) return 0;
+    seen[*n].card_id = card_id;
+    seen[*n].ability_idx = ability_idx;
+    (*n)++;
+    return 1;
+}
+
+static int queue_gained_trigger_seen(GameState *g, int pl, int card_id,
+                                     const char *trigger,
+                                     RbTriggerSeen *seen, int *n_seen);
+
 static int queue_gained_trigger(GameState *g, int pl, int card_id, const char *trigger)
+{
+    return queue_gained_trigger_seen(g, pl, card_id, trigger, NULL, NULL);
+}
+
+/* Same as queue_gained_trigger, but with an optional caller-owned dedupe set.
+   engine/src/turn/trigger_scan.rs:188 declares `seen: HashSet<(i16, usize)>`
+   INSIDE trigger_live_start_abilities and inserts at :252-256, i.e. the set is
+   scoped to ONE seat's one scan, and the gained arm of that scan shares it
+   (a gained ability lives on a card, so the same (card_id, BASE+gidx) pair
+   that the printed loop already claimed must not be claimed twice either). */
+static int queue_gained_trigger_seen(GameState *g, int pl, int card_id,
+                                     const char *trigger,
+                                     RbTriggerSeen *seen, int *n_seen)
 {
     if (!g || card_id < 0 || !trigger) return 0;
     int queued = 0;
@@ -49,6 +87,7 @@ static int queue_gained_trigger(GameState *g, int pl, int card_id, const char *t
         if (rb_ability_is_invalidated(g, card_id, trigger)) continue;
         int limit = ability->use_limit < 0 ? 99 : ability->use_limit;
         int ability_idx = RB_GAINED_ABILITY_INDEX_BASE + i;
+        if (seen && !rb_trigger_seen_add(seen, n_seen, card_id, ability_idx)) continue;
         if (rb_use_limit_reached(&g->queue, card_id, ability_idx, limit, g->turn)) continue;
         if (rb_push_owned_entry(g, pl, card_id, ability_idx, trigger)) {
             rb_record_use(&g->queue, card_id, ability_idx, g->turn);
@@ -114,6 +153,20 @@ int rb_trigger_debut(GameState *g, int pl, int card_id) {
 int rb_trigger_live_start(GameState *g, int pl) {
     if (rb_is_trigger_suppressed(g, pl, "live_start")) return 0;
     int queued=0;
+    /* engine/src/turn/trigger_scan.rs:186-188 --
+         // Track (card_id, ability_idx) to prevent the same card's ability from
+         // firing twice when the card is both a stage member AND a live card.
+         let mut seen: HashSet<(i16, usize)> = HashSet::default();
+       Declared INSIDE this per-seat function and consulted at :252-256, so it
+       is seat-scoped: it collapses the live_cards.chain(stage_cards) double
+       visit of one card instance and nothing else. The C scan had no set at
+       all, so a card sitting in BOTH the live-card zone and stage[0] queued
+       its ライブ開始時 twice -- a printed +1 became 2, a +2 became 4 (and the
+       gained arm below had the same hole). `seen.insert` happens only when the
+       trigger actually matches, so the set records FIRED pairs, not visited
+       cards, exactly as in Rust. */
+    RbTriggerSeen seen[RB_TRIGGER_SEEN_MAX];
+    int n_seen = 0;
     /* Live cards in the live-card zone — mirrors Rust's scan of
        player.live_card_zone.cards before the stage scan. Many LiveStart
        autos (e.g. sd1-022) live on the live card, not on a stage member. */
@@ -125,7 +178,8 @@ int rb_trigger_live_start(GameState *g, int pl) {
             Ability ab; if(!rb_decode_card_ability((uint32_t)cid, ai, &ab)) continue;
             if (ab.triggers && rb_trigger_is(ab.triggers,"ライブ開始時") &&
                 !rb_ability_is_invalidated(g, cid, "ライブ開始時")) {
-                if (!rb_use_limit_reached(&g->queue, cid, ai, ab.use_limit<0?99:ab.use_limit, g->turn)) {
+                if (rb_trigger_seen_add(seen, &n_seen, cid, ai) &&
+                    !rb_use_limit_reached(&g->queue, cid, ai, ab.use_limit<0?99:ab.use_limit, g->turn)) {
                     fprintf(stderr, "[LIVE_START_SCAN] pl=%d trigger=%s zone=%s label=%s cid=%d ab=%d queued=1\n",
                             pl, rb_canonical_trigger(ab.triggers), rb_trigger_zone_id(0),
                             rb_trigger_zone_label(0), cid, ai);
@@ -147,7 +201,7 @@ int rb_trigger_live_start(GameState *g, int pl) {
             }
             rb_free_ability(&ab);
         }
-        queued += queue_gained_trigger(g, pl, cid, "ライブ開始時");
+        queued += queue_gained_trigger_seen(g, pl, cid, "ライブ開始時", seen, &n_seen);
     }
     /* Stage members — mirrors Rust's scan of player.stage. */
     for(int s=0;s<RB_STAGE_SIZE;s++){
@@ -158,7 +212,8 @@ int rb_trigger_live_start(GameState *g, int pl) {
             Ability ab; if(!rb_decode_card_ability((uint32_t)cid,i,&ab)) continue;
             if(ab.triggers && rb_trigger_is(ab.triggers,"ライブ開始時") &&
                !rb_ability_is_invalidated(g, cid, "ライブ開始時")){
-                if(!rb_use_limit_reached(&g->queue, cid, i, ab.use_limit<0?99:ab.use_limit,g->turn)){
+                if(rb_trigger_seen_add(seen, &n_seen, cid, i) &&
+                   !rb_use_limit_reached(&g->queue, cid, i, ab.use_limit<0?99:ab.use_limit,g->turn)){
                     fprintf(stderr, "[LIVE_START_SCAN] pl=%d trigger=%s zone=%s label=%s cid=%d ab=%d queued=1\n",
                             pl, rb_canonical_trigger(ab.triggers), rb_trigger_zone_id(1),
                             rb_trigger_zone_label(1), cid, i);
@@ -180,7 +235,8 @@ int rb_trigger_live_start(GameState *g, int pl) {
     }
     for (int s = 0; s < RB_STAGE_SIZE; s++) {
         int cid = g->p[pl].stage[s];
-        if (cid != RB_EMPTY_SLOT) queued += queue_gained_trigger(g, pl, cid, "ライブ開始時");
+        if (cid != RB_EMPTY_SLOT)
+            queued += queue_gained_trigger_seen(g, pl, cid, "ライブ開始時", seen, &n_seen);
     }
     /* Process the queued abilities so their effects resolve (e.g., position change) */
     if (queued > 0) {
@@ -621,6 +677,31 @@ static void apply_constant_effect(GameState *g, int pl, int host_cid,
             if(!acc) g->mods.constant_heart[tgt_cid][7]+=1;
             if(acc) acc->heart[7]+=1;
         }
+    } else if (!strcmp(e->action,"gain_ability_from_source")) {
+        /* engine/src/core/game_state/modifiers.rs:1148-1154 (ActionType::
+           GainAbilityFromSource inside the constant dispatch). The 常時 scan
+           never reached this arm: `rb_gain_ability_from_source` is fully
+           implemented and is called from the ability path (src/engine.c:621),
+           but the constant path simply had no case for the action, so a card
+           whose PRINTED 常時 was 「このメンバーの下にあるカードから能力を得る」
+           re-derived nothing on every recalculation and its
+           `gained_card_abilities` slot stayed empty forever.
+
+           s_gain_ability_from_source (src/ability/effects/ability.c:465) reads
+           the target from `g->activating_card` and returns immediately when it
+           is < 0, so the call only works because rb_recalc_constants publishes
+           activating_card around the apply (see below) -- the same published
+           field the Rust reads at modifiers.rs:662 / ability_ops.rs:572.
+
+           rb_gain_ability_from_source is used rather than
+           rb_translated_execute_gain_ability_from_source (executor.c:429)
+           because the translated one calls rb_recalc_constants itself
+           (ability_effects.c:423) -- calling it from inside the scan would
+           re-enter the scan, re-clear the slot and re-copy forever. Rust has
+           the same shape: the single recalculation pass owns the whole
+           gained-set rebuild (modifiers.rs:1268-1308) and
+           execute_gain_ability_from_source itself never recalculates. */
+        rb_gain_ability_from_source(g, pl, e, host_cid);
     }
     else if (!strcmp(e->action,"draw") || !strcmp(e->action,"draw_card") ||
                !strcmp(e->action,"draw_until_count")) {
@@ -809,6 +890,21 @@ void rb_recalc_constants(GameState *g) {
 
         for (int z = 0; z < zn; z++) {
             int cid = zone_cids[z];
+            /* engine/src/core/game_state/modifiers.rs:659-662 --
+                 // Set activating_card so condition evaluators (e.g. exclude_self
+                 // in location_condition) know which card is "self" for this entry.
+                 let prev_activating = self.activating_card;
+                 self.activating_card = Some(card_id);
+               and restored at modifiers.rs:1265-1266. The C scan published
+               NOTHING here, so every effect that resolves its host from
+               `g->activating_card` instead of from the scan's own `cid` --
+               s_gain_ability_from_source most of all -- saw a stale or
+               unset value and bailed on its first line. Publishing it around
+               the whole per-card apply (and restoring on the way out, because
+               rb_recalc_constants re-enters) is what makes the scan-driven
+               grant agree with the directly-driven one. */
+            int prev_activating = g->activating_card;
+            g->activating_card = cid;
             int n = rb_card_num_abilities((uint32_t)cid);
             for (int ai = 0; ai < n; ai++) {
                 Ability ab;
@@ -843,23 +939,93 @@ void rb_recalc_constants(GameState *g) {
                 rb_free_ability(&ab);
             }
 
-            if (!is_stage[z]) continue;
-            int ng = rb_card_num_gained_abilities(g, cid);
-            for (int gi = 0; gi < ng; gi++) {
-                const Ability *gab = rb_card_gained_ability(g, cid, gi);
-                if (!gab || !gab->effect || !rb_trigger_is(gab->triggers, "常時") ||
-                    rb_ability_is_invalidated(g, cid, "常時")) continue;
-                int cond_ok = effect_position_matches(g, pl, cid, gab->effect) &&
-                              (!gab->effect->has_condition || !gab->effect->condition ||
-                               rb_eval_condition_for_host(g, pl, cid, gab->effect->condition));
-                /* Same gate as the printed-ability branch above
-                   (modifiers.rs:681-689): failure applies NOTHING. */
-                if (cond_ok) {
-                    apply_constant_effect(g, pl, cid, gab->effect, NULL, &total_p1, &total_p2);
+            if (is_stage[z]) {
+                int ng = rb_card_num_gained_abilities(g, cid);
+                for (int gi = 0; gi < ng; gi++) {
+                    const Ability *gab = rb_card_gained_ability(g, cid, gi);
+                    if (!gab || !gab->effect || !rb_trigger_is(gab->triggers, "常時") ||
+                        rb_ability_is_invalidated(g, cid, "常時")) continue;
+                    int cond_ok = effect_position_matches(g, pl, cid, gab->effect) &&
+                                  (!gab->effect->has_condition || !gab->effect->condition ||
+                                   rb_eval_condition_for_host(g, pl, cid, gab->effect->condition));
+                    /* Same gate as the printed-ability branch above
+                       (modifiers.rs:681-689): failure applies NOTHING. */
+                    if (cond_ok) {
+                        apply_constant_effect(g, pl, cid, gab->effect, NULL, &total_p1, &total_p2);
+                    }
+                }
+            }
+            /* modifiers.rs:1265-1266 -- restore the caller's activating_card. */
+            g->activating_card = prev_activating;
+        }
+    }
+    /* Under-card constant blade abilities (engine/src/core/game_state/
+       modifiers.rs:101-168 grant_under_card_constant_blades, called at
+       modifiers.rs:1319 -- after the stage/live main loop and BEFORE
+       commit_constant_results, because it accumulates into the same
+       exp_blade map).
+
+       Rust does NOT put under-cards into the main entries list: a card that is
+       not on stage has no stage position, so the main loop's position/owner
+       logic does not apply to it. It runs one narrow pass instead, and the
+       C equivalent is exactly that -- the under-card's 常時 blade grant is
+       routed to the HOST member it is stacked under, never to the under-card
+       itself (which is not on the board).
+
+       The three Rust filters, all of which are `continue`s:
+         * action must be GainResource with resource == "blade"
+         * the ability must carry a condition, and its location must be
+           "under_member" -- "Only under-member-scoped grants route to the
+           host; a generic constant gain on an under-card has no such
+           meaning" (modifiers.rs:137-140)
+         * the HOST must match one of the condition's group_names
+       and the amount is resource_icon_count, else count, else 1. */
+    for (int pl = 0; pl < 2; pl++) {
+        const RbPlayer *P = &g->p[pl];
+        for (int area = 0; area < RB_STAGE_SIZE; area++) {
+            int host = P->stage[area];
+            if (host == RB_EMPTY_SLOT) continue;
+            const RbBag *under = &P->under_cards[area];
+            for (int u = 0; u < under->n; u++) {
+                int under_cid = under->cards[u];
+                if (under_cid < 0) continue;
+                int nab = rb_card_num_abilities((uint32_t)under_cid);
+                for (int a = 0; a < nab; a++) {
+                    Ability ab;
+                    if (!rb_decode_card_ability((uint32_t)under_cid, a, &ab)) continue;
+                    const AbilityEffect *e = ab.effect;
+                    if (e && e->action && ab.triggers && rb_trigger_is(ab.triggers, "常時") &&
+                        !rb_ability_is_invalidated(g, under_cid, "常時") &&
+                        !strcmp(e->action, "gain_resource")) {
+                        const char *res = cextra(e, "resource");
+                        if (res && (!strcmp(res, "blade") || !strcmp(res, "ブレード")) &&
+                            e->condition) {
+                            const char *loc = rb_cond_get_str(e->condition, "location");
+                            if (loc && !strcmp(loc, "under_member")) {
+                                const char *groups[8];
+                                int n_groups = rb_condition_tree_group_names(e->condition, groups, 8);
+                                if (n_groups > 0) {
+                                    int host_ok = 0;
+                                    for (int gi = 0; gi < n_groups && !host_ok; gi++)
+                                        if (rb_card_matches_group_str(host, groups[gi])) host_ok = 1;
+                                    if (host_ok) {
+                                        int cnt = e->count;
+                                        const char *ric = cextra(e, "resource_icon_count");
+                                        if (ric) cnt = atoi(ric);
+                                        else if (cnt < 0) cnt = 1;
+                                        rb_mods_add_blade(&g->mods, host, (int16_t)cnt);
+                                        g->mods.constant_blade[host] += (int16_t)cnt;
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    rb_free_ability(&ab);
                 }
             }
         }
     }
+
     g->mods.p1_constant_total_score_bonus = total_p1;
     g->mods.p2_constant_total_score_bonus = total_p2;
     rb_refresh_yell_sources(g);

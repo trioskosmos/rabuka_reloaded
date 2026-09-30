@@ -18,14 +18,69 @@ fn sp_pr_022_pr_constant_hearts_at_six_combined_members() {
     game.state.recalculate_constants();
 
     const H02: rabuka_engine::card::HeartColor = rabuka_engine::card::HeartColor::Heart02;
-    const H03: rabuka_engine::card::HeartColor = rabuka_engine::card::HeartColor::Heart03;
-    assert!(
-        game.state.mods.get_heart_modifier(me, H02) > 0,
-        "6 combined members -> heart02"
+const H03: rabuka_engine::card::HeartColor = rabuka_engine::card::HeartColor::Heart03;
+    // 「自分と相手のステージにメンバーが合計6人いるかぎり、{{heart_02}}{{heart_03}}を得る」
+    // — ONE of each colour, two single icons side by side. `> 0` accepted 2 or 3, so a modifier
+    // applied twice was invisible. Each colour is now pinned to exactly 1.
+    assert_eq!(
+        game.state.mods.get_heart_modifier(me, H02),
+        1,
+        "{{heart_02}} is printed once, so exactly +1 (got {})",
+        game.state.mods.get_heart_modifier(me, H02)
     );
-    assert!(
-        game.state.mods.get_heart_modifier(me, H03) > 0,
-        "6 combined members -> heart03"
+    assert_eq!(
+        game.state.mods.get_heart_modifier(me, H03),
+        1,
+        "{{heart_03}} is printed once, so exactly +1 (got {})",
+        game.state.mods.get_heart_modifier(me, H03)
+    );
+}
+
+/// The bound: 合計**6人**いるかぎり — and five is never staged.
+///
+/// Both tests in this file stage 3 + 3 = exactly 6, so they sit ON the bound and can only
+/// prove the inclusive side. A `>= 5` reading, or a sum that counts the acting member twice,
+/// passes both. Five members is the only value that separates them.
+///
+/// 2 on p1 + 3 on p2 = 5.
+#[test]
+fn sp_pr_022_pr_five_combined_members_is_one_short_of_the_bound() {
+    let db = load_real_database();
+    let mut game = TestGame::new(db);
+    let me = game.id("PL!SP-PR-022-PR");
+    let f1 = game.new_id(FILLER);
+    let f2 = game.new_id(FILLER);
+    // TWO of ours (me + f1), so 2 + 3 = 5. f2 is deliberately left off the stage.
+    game.state.player1.stage.stage = [me, f1, -1];
+    let _ = f2;
+    for i in 0..3usize {
+        let m = game.new_id(FILLER);
+        game.state.player2.stage.stage[i] = m;
+    }
+
+    game.state.recalculate_constants();
+
+    const H02: rabuka_engine::card::HeartColor = rabuka_engine::card::HeartColor::Heart02;
+    const H03: rabuka_engine::card::HeartColor = rabuka_engine::card::HeartColor::Heart03;
+    let total = (0..3).filter(|i| game.state.player1.stage.stage[*i] != -1).count()
+        + (0..3)
+            .filter(|i| game.state.player2.stage.stage[*i] != -1)
+            .count();
+    assert_eq!(
+        total, 5,
+        "precondition: five members must be staged — one short of the printed 合計6人 bound"
+    );
+    assert_eq!(
+        game.state.mods.get_heart_modifier(me, H02),
+        0,
+        "合計6人いるかぎり — 5 is one short, so no heart02 (got {})",
+        game.state.mods.get_heart_modifier(me, H02)
+    );
+    assert_eq!(
+        game.state.mods.get_heart_modifier(me, H03),
+        0,
+        "合計6人いるかぎり — 5 is one short, so no heart03 (got {})",
+        game.state.mods.get_heart_modifier(me, H03)
     );
 }
 

@@ -98,3 +98,73 @@ fn pl_s_bp7_023_l_tied_energy_after_return_grants_no_score() {
         "tied energy counts -> no score bonus"
     );
 }
+
+/// 「『Aqours』のメンバーが2人以上いる場合」 in isolation — the gate never binds in the
+/// tests above.
+///
+/// `setup_pl_s_bp7_023_l_energy_return_score` always stages 高海千歌 + 松浦果南, both
+/// ラブライブ！サンシャイン!!, so the gate is satisfied in every existing case. An
+/// implementation that ignored the group clause entirely — scoring purely off the energy
+/// comparison — would pass all three, because none of them ever has fewer than two Aqours
+/// members on stage.
+///
+/// This stages **one** Aqours member plus one ラブライブ！(μ's) member and reproduces the
+/// +2 energy situation verbatim. The energy branch is identical to
+/// `pl_s_bp7_023_l_return_energy_opponent_two_ahead_grants_two_score`; the only difference is
+/// the gate. Expect **0**, so a defect that dropped the gate would give 2 and fail here only.
+#[test]
+fn pl_s_bp7_023_l_one_aqours_member_fails_the_two_member_gate() {
+    let db = load_real_database();
+    let mut game = TestGame::new(db);
+    let filler = game.new_id(FILLER);
+    fill_decks(&mut game, filler);
+
+    let live = game.id("PL!S-bp7-023-L");
+    game.assert_card_identity(live, "PL!S-bp7-023-L");
+    game.add_to_hand(live);
+    game.set_live_card(live);
+
+    // One サンシャイン!! (Aqours) and one ラブライブ！ (not Aqours).
+    let aqours = game.new_id("PL!S-sd1-001-SD"); // 高海千歌 — サンシャイン!!
+    let outsider = game.new_id("PL!-sd1-010-SD"); // 高坂 穂乃果 — ラブライブ！, NOT Aqours
+    game.state.player1.stage.stage[0] = aqours;
+    game.state.player1.stage.stage[1] = outsider;
+
+    // Pin the premise from card data: exactly one of the two is in the Aqours group, so the
+    // 「2人以上」 gate fails on group membership and not on head count.
+    let aq_card = game.db.get_card(aqours).unwrap();
+    let out_card = game.db.get_card(outsider).unwrap();
+    assert!(
+        format!("{:?}", aq_card.series).contains("サンシャイン"),
+        "precondition: 高海千歌 must be a サンシャイン!! (Aqours) member"
+    );
+    assert!(
+        !format!("{:?}", out_card.series).contains("サンシャイン"),
+        "precondition: 高坂 穂乃果 must NOT be サンシャイン!!, or the gate would hold and this \
+         would duplicate the +2 test (series={:?})",
+        out_card.series
+    );
+
+    let e = game.id("LL-E-001-SD");
+    game.state.player1.energy_zone.cards.push(e);
+    game.state.player1.energy_zone.add_active(1);
+
+    // Same energy situation as the +2 test: opponent two ahead after our energy returns.
+    give_pl_s_bp7_023_l_opponent_active_energy(&mut game, 2);
+
+    fire_trigger(&mut game, live, AbilityTrigger::LiveStart, LIVE_START);
+    let mut guard = 0;
+    while game.has_pending_choice() && guard < 10 {
+        guard += 1;
+        game.select_option(1);
+    }
+
+    assert_eq!(
+        game.state.mods.get_score_modifier(live),
+        0,
+        "自分のステージに『Aqours』のメンバーが2人以上いる場合 — only ONE of these two members is \
+         『Aqours』, so the whole clause is inert and no score bonus applies even though the \
+         energy branch alone would have given +2. A modifier of 2 here means the group gate is \
+         not being enforced."
+    );
+}

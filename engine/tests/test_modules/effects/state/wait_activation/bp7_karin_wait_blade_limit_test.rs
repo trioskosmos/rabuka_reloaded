@@ -205,9 +205,63 @@ fn karin_two_eligible_members_offers_selection_choice() {
     );
 }
 
-/// The ENERGY card selection for the cost must offer the actual energy zone
-/// cards as a selectable choice (not auto-pick the first). Here we seed two
-/// energy cards and choose the second one to place under 朝香果林.
+/// The bound itself: at limit 5, a member whose ORIGINAL blade count is **exactly 5**.
+///
+/// `karin_dynamic_limit_scales_with_energy_under` puts 4 energy under her (3 pre-seeded + the
+/// cost), so the limit is `energy_under + 1 = 5`, and it uses a blade-**4** member. That proves
+/// the limit rises with the energy, but it never puts a card ON the limit, so `<= 5` and
+/// `< 5` are indistinguishable — the same shape of gap as every other missing boundary in this
+/// sweep.
+///
+/// `PL!-PR-018-PR` 藤澤 朋花 is `blade: 5` in `cards.json`.
+///
+/// The premise asserts `card.blade` rather than `card.blade_heart`, deliberately. The two are
+/// **independent fields** — `blade` is the COUNT the comparison reads, `blade_heart` is the
+/// blade TYPE — and this file's `ENEMY_BLADE4` fixture is `blade: 4` with `blade_heart: None`,
+/// which is exactly the combination that makes reading the wrong field produce a confident false
+/// conclusion. Asserting `blade` here is the check that prevents that.
+#[test]
+fn karin_waits_a_member_whose_blade_is_exactly_the_limit() {
+    let db = load_real_database();
+    let mut game = TestGame::new(db.clone());
+
+    let karin = setup(&mut game, 3); // 3 pre-seeded + 1 cost = 4 under → limit 5
+    let exact = game.id("PL!-PR-018-PR");
+
+    // Premise, from the data: this member's ORIGINAL blade count is exactly the limit.
+    let c = game.db.get_card(exact).unwrap();
+    assert_eq!(
+        c.blade, 5,
+        "precondition: 藤澤 朋花 must print blade = 5, the exact 5-card limit under this setup \
+         (blade_heart is a different field and reads {:?} here)",
+        c.blade_heart
+    );
+    game.state.player2.stage.stage = [exact, -1, -1];
+
+    game.activate_ability(karin);
+    pay_cost(&mut game);
+
+    // Premise re-checked AFTER the cost: the limit is energy_under + 1, and the cost is what
+    // takes energy_under from 3 to 4. Measuring it before paying would compare blade 5 against
+    // a limit of 4 and prove nothing.
+    assert_eq!(
+        energy_under_center(&game),
+        4,
+        "precondition: 3 pre-seeded + 1 paid = 4 energy under her"
+    );
+    assert_eq!(
+        energy_under_center(&game) + 1,
+        5,
+        "precondition: the limit is energy_under + 1 = 5, so blade 5 sits exactly ON it"
+    );
+
+    assert!(
+        opponent_waited(&game, exact),
+        "元々持つブレードの数が…以下 — blade 5 satisfies `<= 5` exactly, so she must be waited. \
+         A failure here means the comparison is exclusive (`< 5`). Note `change_state.rs:156-158` \
+         rewrites the operator to `<` when the limit is unreachable, which is untested elsewhere."
+    );
+}
 #[test]
 fn karin_cost_energy_choice_selects_chosen_card() {
     let db = load_real_database();

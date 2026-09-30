@@ -586,7 +586,20 @@ fn enumerate_candidates(
             .iter()
             .map(|j| draw_credit - j.keep_value)
             .sum();
-        let value = candidate_value_zone(outcome, p_pass, filter_value, !chosen.is_empty());
+        let value = candidate_value_zone(outcome, p_pass, filter_value, !chosen.is_empty())
+            // `V8_JOINT`: the shipped value pays for ONE success whatever the
+            // set size. A zone that can bank two or three is worth more and the
+            // model has no way to say so, which is why it never sets more than
+            // one card. See `zone_success_distribution`.
+            + joint_success_value(
+                &zone_success_distribution(
+                    &pools,
+                    &v8_model::board_pool(gs, me, db),
+                    &chosen,
+                ),
+                my_success,
+                opp.success,
+            );
         out.push(Candidate {
             lives: chosen.iter().map(|life| life.index).collect(),
             junk: filler.iter().map(|j| j.index).collect(),
@@ -727,6 +740,117 @@ fn zone_ordered_pass_probability(pools: &[Pool], chosen: &[&Life]) -> f64 {
         }
     }
     0.0
+}
+
+/// `V8_JOINT`: how many cards in a set SUCCEED, not whether the set survives.
+///
+/// Returns `P(k successes)` for `k = 0..=chosen.len()`.
+///
+/// ## Why this exists
+///
+/// `check_outcome` credits **exactly one** success in every branch —
+/// `rule_payoff(our_success + 1, opp.success)` — and takes `p_pass` as the
+/// probability that the whole set is satisfied. So under the shipped model a
+/// three-life set is "one success, with lower probability than one good life",
+/// and is therefore never better than setting one life. That is not a
+/// preference; it is arithmetic, and it is why the live set **never commits
+/// more than one card, even when the zone is explicitly allowed three** — the
+/// `V8_ZONE_ORDER` and `V8_MAX_LIVES=3` cells returned **0 discordant games**,
+/// which is a model that cannot express width rather than a width that loses.
+///
+/// The game disagrees. `MAX_LIVE_CARDS` is 3 and the win condition is three
+/// successes. Each card in the zone is checked separately
+/// (`move_live_to_success_and_handle_wins` sends winners to the success zone and
+/// failures to the waitroom, per card), so three good lives can bank three
+/// successes in one live phase — which wins the game outright at 2-2. A model
+/// that caps the payoff at one success cannot price that, and `V8_NO_JUNK`
+/// costing **15.08 points** says how much the zone's real contents are worth
+/// compared to what the model thinks they are.
+///
+/// ## The resolution rule
+///
+/// A card that cannot be satisfied fails, and the others still resolve: the
+/// engine moves them independently. Cards are therefore counted one at a time
+/// against a shared supply — stage hearts plus the sampled draw — and a card
+/// consumes what it takes. Wildcards (`need[7]`, the any-colour bucket) stand in
+/// for one missing heart of any colour, and can only help the card that
+/// declares them, which is what the zone-order note above already worked out.
+fn zone_success_distribution(pools: &[Pool], board: &Pool, chosen: &[&Life]) -> [f64; 4] {
+    let mut out = [0.0f64; 4];
+    if chosen.is_empty() {
+        return out;
+    }
+    let n = chosen.len().min(3);
+    for pool in pools {
+        let mut avail = [0i32; 8];
+        for c in 0..8usize {
+            avail[c] = i32::from(board[c]) + i32::from(pool[c]);
+        }
+        let mut successes = 0usize;
+        for life in chosen.iter().take(n) {
+            let mut wild = i32::from(life.need[7]);
+            let mut ok = true;
+            for c in 0..7usize {
+                let want = i32::from(life.need[c]);
+                if want == 0 {
+                    continue;
+                }
+                let take = want.min(avail[c]);
+                avail[c] -= take;
+                let deficit = want - take;
+                if deficit > 0 {
+                    if deficit <= wild {
+                        wild -= deficit;
+                    } else {
+                        ok = false;
+                        break;
+                    }
+                }
+            }
+            if ok {
+                successes += 1;
+            }
+        }
+        out[successes.min(3)] += 1.0;
+    }
+    let total: f64 = out.iter().sum();
+    if total > 0.0 {
+        for slot in out.iter_mut() {
+            *slot /= total;
+        }
+    }
+    out
+}
+
+/// Extra value a set earns by being able to bank MORE than one success, in
+/// `PLACEMENT_CREDIT` units, relative to the shipped one-success model.
+///
+/// The shipped `check_outcome` adds `p_place * PLACEMENT_CREDIT` and
+/// `rule_payoff(our_success + 1, ...)` — one success. This adds the shortfall:
+/// for each `k > 1`, the probability of `k` successes times the value of the
+/// 2nd..kth success, priced by the same race payoff. It is deliberately
+/// additive and gated, so the null case is the shipped behaviour exactly and
+/// the interaction with `check_outcome` is visible rather than buried.
+fn joint_success_value(dist: &[f64; 4], our_success: usize, opp_success: usize) -> f64 {
+    if std::env::var_os("V8_JOINT").is_none() {
+        return 0.0;
+    }
+    let weight = std::env::var("V8_JOINT_W")
+        .ok()
+        .and_then(|v| v.parse::<f64>().ok())
+        .filter(|w: &f64| w.is_finite() && *w >= 0.0)
+        .unwrap_or(1.0);
+    // The shipped model already pays for k = 1. This pays for k >= 2.
+    let mut value = 0.0;
+    for k in 2..=3usize {
+        if k >= dist.len() {
+            break;
+        }
+        let pay = v8_model::rule_payoff(our_success + k, opp_success)
+            - v8_model::rule_payoff(our_success + 1, opp_success);
+        value += dist[k] * (pay + PLACEMENT_CREDIT);
+    }
+    weight * value
 }
 
 fn better(a: &Candidate, b: &Candidate) -> bool {

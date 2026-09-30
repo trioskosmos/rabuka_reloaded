@@ -101,7 +101,20 @@ static int constant_pair_matches(const Ability *ab) {
 
 /* ── Gained-ability storage ─────────────────────────────────────────── */
 
-#define GAINED_ABILITY_INDEX_BASE 0x8000
+/* The encoded ability index for a runtime-gained ability is
+ * RB_GAINED_ABILITY_INDEX_BASE + gained_idx, ONE constant, shared by every
+ * producer and consumer: engine/src/ability/types.rs:384
+ *     pub const GAINED_ABILITY_INDEX_BASE: usize = 10_000;
+ * and the C spelling of the same value is include/rabuka.h's
+ * RB_GAINED_ABILITY_INDEX_BASE. This file used to carry a SECOND, private
+ *     #define GAINED_ABILITY_INDEX_BASE 0x8000
+ * which nothing else could see, so every pair (card_id, ability_idx) minted
+ * here was minted in a different index space from the one src/turn/triggers.c
+ * queued into. A 0x8000 index therefore fell into the "printed ability index"
+ * arm of every decoder and addressed a nonexistent printed ability, while a
+ * 10000 index fell into every `>= GAINED_ABILITY_INDEX_BASE` gained test and
+ * was read as gained index 32768 -- past the end of the slot. All three
+ * spellings now name rabuka.h's single base. */
 #define RB_GAINED_SLOTS 64
 #define RB_GAINED_PER_SLOT 4
 
@@ -143,7 +156,34 @@ static int rb_add_gained_ability(GameState *g, uint32_t cid, const Ability *ab) 
     if (s < 0) return -1;
     int idx = g->gained_card_n[s];
     if (idx >= RB_GAINED_PER_SLOT) return -1;
-    g->gained_card_abilities[s][idx] = *ab;
+    /* DEEP copy, and the slot OWNS the result.
+
+       This is the store's ownership contract and it was being violated. Every
+       producer treats a successful rb_register_gained_ability as a TRANSFER:
+       src/ability/effects/ability.c:284-287 and :448-450 free the source
+       struct only on FAILURE, and s_gain_ability_from_source (ability.c:503)
+       does `rb_register_gained_ability(...); rb_free_ability(&ability);`
+       unconditionally. The consumers agree -- rb_remove_gained_ability and
+       rb_clear_gained_abilities below call rb_free_ability on the STORED copy.
+       A shallow `= *ab` therefore left the slot pointing at strings and effect
+       trees the caller had already freed: the first read of a registered gained
+       ability was a use-after-free. It stayed hidden only because nothing ever
+       managed to register one (the constant scan never dispatched
+       gain_ability_from_source); the moment the scan did, a granted ability
+       aborted the process with SIGABRT. */
+    Ability *dst = &g->gained_card_abilities[s][idx];
+    memset(dst, 0, sizeof(*dst));
+    dst->full_text       = rb_strdup2(ab->full_text);
+    dst->triggerless_text = rb_strdup2(ab->triggerless_text);
+    dst->triggers        = rb_strdup2(ab->triggers);
+    dst->use_limit       = ab->use_limit;
+    dst->is_null         = ab->is_null;
+    dst->has_keywords    = ab->has_keywords;
+    dst->n_keywords      = ab->n_keywords;
+    if (ab->n_keywords > RB_MAX_ABILITY_KEYWORDS) dst->n_keywords = RB_MAX_ABILITY_KEYWORDS;
+    memcpy(dst->keywords, ab->keywords, sizeof(dst->keywords));
+    dst->cost   = ab->cost   ? rb_effect_deep_clone(ab->cost)   : NULL;
+    dst->effect = ab->effect ? rb_effect_deep_clone(ab->effect) : NULL;
     g->gained_card_n[s] = idx + 1;
     return idx;
 }
@@ -184,6 +224,45 @@ int rb_card_num_gained_abilities(const GameState *g, int card_id) {
 const Ability *rb_card_gained_ability(const GameState *g, int card_id, int index) {
     if (!g || card_id < 0) return NULL;
     return rb_card_gained_ability_internal(g, (uint32_t)card_id, index);
+}
+
+/* The ONE gained-aware "what ability does this (card_id, ability_idx) name?"
+   entry point. `ability_idx` below RB_GAINED_ABILITY_INDEX_BASE addresses a
+   PRINTED ability (rb_decode_card_ability); at or above it, it addresses
+   RB_GAINED_ABILITY_INDEX_BASE + gained_idx in the gained store. `out` must be
+   a zeroed Ability and the caller owns it (rb_free_ability), so the result can
+   be held across a prompt exactly like a decoded one -- which matters, because
+   a gained slot is DEEP-copied into the store (see rb_add_gained_ability) and
+   mutating the store's copy in place would corrupt every later reader.
+
+   This exists because the two halves of the port disagreed on the index space,
+   and the disagreement was invisible at every call site: a caller that reached
+   for a gained ability by encoding the index got a silent 0 ("no such
+   printed ability") rather than an error. src/ability/ability_queue.c:872 is
+   the load-bearing caller and still uses the printed-only decoder; see the
+   report. */
+int rb_resolve_card_ability_at(const GameState *g, int card_id, int ability_idx,
+                               Ability *out) {
+    if (!g || !out || card_id < 0) return 0;
+    if (ability_idx >= RB_GAINED_ABILITY_INDEX_BASE) {
+        int gidx = ability_idx - RB_GAINED_ABILITY_INDEX_BASE;
+        if (gidx < 0 || gidx >= RB_GAINED_PER_SLOT) return 0;
+        const Ability *src = rb_card_gained_ability_internal(g, (uint32_t)card_id, gidx);
+        if (!src) return 0;
+        memset(out, 0, sizeof(*out));
+        out->full_text       = rb_strdup2(src->full_text);
+        out->triggerless_text = rb_strdup2(src->triggerless_text);
+        out->triggers        = rb_strdup2(src->triggers);
+        out->use_limit       = src->use_limit;
+        out->is_null         = src->is_null;
+        out->has_keywords    = src->has_keywords;
+        out->n_keywords      = src->n_keywords;
+        memcpy(out->keywords, src->keywords, sizeof(out->keywords));
+        out->cost   = src->cost   ? rb_effect_deep_clone(src->cost)   : NULL;
+        out->effect = src->effect ? rb_effect_deep_clone(src->effect) : NULL;
+        return 1;
+    }
+    return rb_decode_card_ability((uint32_t)card_id, ability_idx, out);
 }
 
 static int trigger_text_matches(const char *a, const char *b)
@@ -271,7 +350,7 @@ static int rb_collect_constant_ids_for(const GameState *g,
             if (gab && constant_pair_matches(gab) && gab->effect) {
                 if (count < max) {
                     out[count].card_id = cid;
-                    out[count].ability_idx = GAINED_ABILITY_INDEX_BASE + gidx;
+                    out[count].ability_idx = RB_GAINED_ABILITY_INDEX_BASE + gidx;
                     count++;
                 }
             }
@@ -306,8 +385,8 @@ int rb_collect_constant_stage_effect_ids(const GameState *g,
 
 const AbilityEffect *rb_resolve_constant_ability(const GameState *g, int card_id, int ability_idx) {
     if (!g || card_id < 0) return NULL;
-    if (ability_idx >= GAINED_ABILITY_INDEX_BASE) {
-        int gidx = ability_idx - GAINED_ABILITY_INDEX_BASE;
+    if (ability_idx >= RB_GAINED_ABILITY_INDEX_BASE) {
+        int gidx = ability_idx - RB_GAINED_ABILITY_INDEX_BASE;
         const Ability *gab = rb_card_gained_ability_internal(g, (uint32_t)card_id, gidx);
         if (gab && constant_pair_matches(gab)) return gab->effect;
         return NULL;
@@ -409,15 +488,6 @@ void rb_process_with_completed_key(GameState *g, int key) {
 }
 
 /* ── Condition helpers ──────────────────────────────────────────────── */
-
-static const char *rb_cond_get_str(const Condition *c, const char *key) {
-    if (!c) return NULL;
-    for (uint32_t i = 0; i < c->n_fields; i++)
-        if (c->fields[i].key && !strcmp(c->fields[i].key, key)
-            && c->fields[i].v.tag == RB_TAG_STR)
-            return c->fields[i].v.s;
-    return NULL;
-}
 
 /* Integer-valued condition field (wire tag I64), with a fallback for the
    string-encoded numbers some conditions carry. `def` is returned when the
@@ -622,7 +692,17 @@ int rb_queue_yell_auto_abilities(GameState *g, int pl) {
    filter. `group_names` arrives on the wire as an ARRAY of strings, so the
    scalar `rb_cond_get_str` never sees it; collect the members instead. */
 #define RB_MAX_GROUP_NAMES 8
-static int rb_condition_tree_group_names(const Condition *c, const char **out, int max) {
+/* Condition-field scalar getter (RB_TAG_STR), also needed by the
+   under-card constant pass in src/turn/triggers.c. */
+const char *rb_cond_get_str(const Condition *c, const char *key) {
+    if (!c) return NULL;
+    for (uint32_t i = 0; i < c->n_fields; i++)
+        if (c->fields[i].key && !strcmp(c->fields[i].key, key)
+            && c->fields[i].v.tag == RB_TAG_STR)
+            return c->fields[i].v.s;
+    return NULL;
+}
+int rb_condition_tree_group_names(const Condition *c, const char **out, int max) {
     if (!c || !out || max <= 0) return 0;
     for (uint32_t i = 0; i < c->n_fields; i++) {
         const CondField *f = &c->fields[i];
@@ -1239,18 +1319,32 @@ void rb_trigger_auto_ability(GameState *g, const char *ability_id,
             if (rb_ability_is_invalidated(g, cid, trigger_type ? trigger_type : "自動")) continue;
             char expected_id[1024];
             snprintf(expected_id, sizeof(expected_id), "%s_gained_%d", card_no, gidx);
-            if (strcmp(expected_id, ability_id) == 0) {                int idx = g->queue.n_entries;
+            if (strcmp(expected_id, ability_id) == 0) {
+                int idx = g->queue.n_entries;
                 if (idx < RB_QUEUE_DEPTH) {
                     RbQueueEntry *e = &g->queue.entries[idx];
                     memset(e, 0, sizeof(*e));
                     e->card_id = cid;
-                    e->ability_idx = GAINED_ABILITY_INDEX_BASE + gidx;
+                    e->ability_idx = RB_GAINED_ABILITY_INDEX_BASE + gidx;
                     e->completed = 0;
                     e->cost_paid = 0;
                     e->optional_cost_result = -1;
                     e->triggering_member_id = triggering_member_id;
                     e->use_limit_recorded = 0;
                     e->choice_player_id[0] = '\0';
+                    /* Owner-stamped. abilities.rs:1074 passes `player_id` into
+                       AbilityQueueEntry::player_id, and the C drain path
+                       (rb_process_player_abilities) selects entries whose
+                       player_id equals the seat being drained. The inline
+                       builder below was writing every other field EXCEPT
+                       player_id, so a gained ability enqueued through the
+                       string key was owner-less: the drain found no match and
+                       cleared the queue, and the gained copy resolved on no
+                       path at all. Same convention as
+                       rb_build_ability_queue_entry (above) and as the three
+                       sites in src/turn/triggers.c that now use
+                       rb_push_owned_entry. */
+                    snprintf(e->player_id, sizeof(e->player_id), "%s", pid_str);
                     g->queue.n_entries++;
                 }
                 return;
@@ -1739,8 +1833,22 @@ void rb_trigger_each_time_for_member(GameState *g, int pl,
                     }
                 if (!member_matches) { rb_free_ability(&ab); continue; }
             }
+            /* abilities.rs:1616-1631 routes every collected pair through
+               trigger_auto_ability_by_index_refs, which lands in
+               enqueue_printed_ability -- and THAT is where Rust applies
+               `ability_has_remaining_uses` before it records the use. The C
+               body built the entry straight from rb_build_ability_queue_entry
+               and then recorded a use unconditionally, so a spent once-per-turn
+               each_time watcher was re-queued (and re-burned) on every call
+               instead of being gated. Mirror the gate. */
+            int limit = ab.use_limit < 0 ? 99 : ab.use_limit;
+            if (rb_use_limit_reached(&g->queue, cid, a, limit, g->turn)) {
+                rb_free_ability(&ab);
+                continue;
+            }
             int each_time_entry_base = g->queue.n_entries;
             rb_build_ability_queue_entry(g, cid, a, "", (pl == 0) ? "p1" : "p2", "自動", NULL, 0, member_card_id);
+            if (g->queue.n_entries <= each_time_entry_base) { rb_free_ability(&ab); continue; }
             rb_record_use(&g->queue, cid, a, g->turn);
             rb_mark_entries_use_limit_recorded(g, each_time_entry_base);
             rb_free_ability(&ab);
@@ -2321,6 +2429,10 @@ void rb_build_ability_queue_entry_public_full(GameState *g, int card_id, int abi
     e->completed = 0;
     e->cost_paid = 0;
     e->optional_cost_result = -1;
+    /* Same owner-stamp rule as rb_build_ability_queue_entry and the gained arm
+       of rb_trigger_auto_ability above: `player_id` is a parameter here but was
+       never written, so the entry was invisible to the owner-scoped drain. */
+    snprintf(e->player_id, sizeof(e->player_id), "%s", player_id == 0 ? "p1" : "p2");
     g->queue.n_entries++;
 }
 

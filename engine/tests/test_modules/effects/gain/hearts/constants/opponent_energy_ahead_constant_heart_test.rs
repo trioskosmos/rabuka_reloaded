@@ -20,9 +20,16 @@ fn s_bp7_014_constant_opponent_energy_ahead_grants_heart02() {
     game.state.recalculate_constants();
 
     const H02: rabuka_engine::card::HeartColor = rabuka_engine::card::HeartColor::Heart02;
-    assert!(
-        game.state.mods.get_heart_modifier(me, H02) > 0,
-        "opponent energy ahead -> heart02 granted"
+    // 「相手のエネルギーが自分より多いかぎり、heart02を得る」 — heart02 is worth exactly ONE, and
+    // this was `> 0`, which accepted 2 or 3. A per-unit or double-counting defect on a
+    // 「かぎり」 constant was invisible. The tied case below already asserted `== 0`, so the two
+    // now bracket the value exactly.
+    assert_eq!(
+        game.state.mods.get_heart_modifier(me, H02),
+        1,
+        "相手のエネルギーが自分より多いかぎり — exactly ONE heart02, not a positive amount \
+         (got {})",
+        game.state.mods.get_heart_modifier(me, H02)
     );
 }
 

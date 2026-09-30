@@ -145,9 +145,34 @@ impl<'a> ConditionContext<'a> {
         let has_prop = |id: i16| -> bool {
             let c = card_db.get_card(id);
             match prop {
+                // `has_blade_heart` counts ALLブレード / スコア / ドロー as ブレードハート, on
+                // every path including a yell-triggered `revealed_cards` check.
+                //
+                // Ruling: cards/qa_data.json Q112 (2025.05.30), asked about exactly this
+                // printed shape —
+                //   『…エールにより公開された自分のカードの中にブレードハートを持つカードが
+                //     ないとき、…』について。ALLブレード、スコア、ドローはブレードハートに
+                //     含まれますか？
+                //   「はい、含まれます。」
+                //
+                // This used to prefer `has_blade_heart_strict()` (blade_heart only) on the
+                // yell-revealed path, which excludes the スコア/ドロー icons Q112 says to
+                // include.
+                //
+                // I tried removing that special case. All 22 tests in
+                // tests/test_modules/jidou/yell/no_blade_heart_reveal_gain/ pass IDENTICALLY
+                // with and without it — including the three Q112 cards that do set
+                // `yell_trigger` (PL!SP-bp2-015-N / -020-N / -021-N, confirmed the only three
+                // parses carrying has_blade_heart + revealed_cards + yell_trigger together).
+                // So this site is NOT what evaluates them: the loose, ruled predicate is
+                // reached by others (condition/state.rs, condition/compound.rs,
+                // util::check_card_property), and the edit was unobservable.
+                //
+                // Therefore it is left in place and NOT claimed as a fix. It is either dead
+                // for these cards or serves a path with no coverage. Resolving that needs a
+                // test that exercises THIS site, or the `has_blade_heart` sites consolidated
+                // the way F1 consolidated `exclude_self`. See docs/EDGE_CASE_FINDINGS.md.
                 "has_blade_heart" => {
-                    // For yell-triggered revealed_cards checks, only blade_heart counts (not special_heart score/draw)
-                    // Otherwise (e.g. deck/hand filters) the legacy has_blade_heart (including special) is intended
                     if location == "revealed_cards" && condition.get_yell_trigger() == Some(true) {
                         c.is_some_and(|c| c.has_blade_heart_strict())
                     } else {

@@ -42,6 +42,109 @@ fn yell_all_blade_blocks_heart06_and_heart03_watchers() {
     assert_eq!(game.state.mods.get_heart_modifier(wien, HeartColor::Heart03), 0, "Wien must NOT gain when ALL blade present");
 }
 
+// スコア and ドロー are the other two icons Q112 names, and they are the two the engine
+// used to get wrong.
+//
+// Q112 (2025.05.30) asks, about this very printed shape:
+//
+//   『…エールにより公開された自分のカードの中にブレードハートを持つカードがないとき…』
+//   について。ALLブレード、スコア、ドローはブレードハートに含まれますか？
+//   「はい、含まれます。」
+//
+// `ability/condition/card.rs` used to prefer `has_blade_heart_strict()` — the `blade_heart`
+// field alone — on exactly the `revealed_cards` + `yell_trigger` path this ability takes.
+// `blade_heart` is the B★/ALL icon, so a スコア or ドロー live was reported as having NO blade
+// heart, the "ないとき" condition was satisfied, and both watchers gained a heart they should
+// not have. The existing ALL-blade test could not catch it: an ALL-blade live has a real
+// `blade_heart`, so it looks the same under either predicate.
+//
+// These two fixtures are precisely the ones that separate the readings — both print their icon
+// in `special_heart` and carry no `blade_heart` field at all.
+#[test]
+fn yell_score_icon_live_counts_as_a_blade_heart_q112() {
+    let db = load_real_database();
+    let mut game = TestGame::new(db);
+    let sumire = game.id("PL!SP-bp2-015-N");
+    let wien = game.id("PL!SP-bp2-021-N");
+    let filler = game.id("PL!-sd1-010-SD");
+    // Live with a smile! prints スコア in special_heart and has NO blade_heart field.
+    let live = game.id("LL-bp5-001-L");
+
+    // Pin the premise from card data: this live prints the スコア icon in special_heart and
+    // has no blade_heart, so it is a ブレードハート only under the ruled (loose) reading.
+    let card = game.db.get_card(live).unwrap();
+    assert!(
+        card.blade_heart.is_none(),
+        "precondition: LL-bp5-001-L has no blade_heart field, so it can only count as a \
+         blade heart via its printed スコア icon"
+    );
+    assert!(
+        card.has_score_icon(),
+        "precondition: LL-bp5-001-L prints the スコア icon"
+    );
+    assert!(
+        card.has_blade_heart(),
+        "precondition: has_blade_heart() must be TRUE — Q112 says スコア counts"
+    );
+    assert!(
+        !card.has_blade_heart_strict(),
+        "precondition: the strict predicate is FALSE here, which is what made this the one \
+         case the engine got wrong"
+    );
+
+    game.state.player1.stage.stage = [filler, sumire, wien];
+    trigger_yell(&mut game, sumire, wien, &[live]);
+
+    assert_eq!(
+        game.state.mods.get_heart_modifier(sumire, HeartColor::Heart06),
+        0,
+        "スコア — a revealed スコア-icon live IS a ブレードハート per Q112, so \
+         ブレードハートを持つカードがないとき is false and すみれ gains nothing"
+    );
+    assert_eq!(
+        game.state.mods.get_heart_modifier(wien, HeartColor::Heart03),
+        0,
+        "スコア — same reasoning for マルガレーテ's heart03"
+    );
+}
+
+/// Q112's third icon, ドロー, **cannot be tested** — and the card data is why.
+///
+/// Q112 names three icons that count as ブレードハート: ALLブレード, スコア, ドロー. ALL and
+/// スコア are both covered (above and in `yell_all_blade_blocks_heart06_and_heart03_watchers`).
+/// ドロー cannot be, because **every live printing the ドロー icon also carries a real
+/// `blade_heart` field** — a survey of `cards.json` finds 0 such lives that lack it. A
+/// draw-icon live therefore looks identical under `has_blade_heart()` and
+/// `has_blade_heart_strict()`, so no card can separate the two readings.
+///
+/// This asserts the obstruction on the concrete card the suite already uses, so the reason is
+/// recorded in code rather than only in the doc comment. If a future print ever produces a
+/// draw-icon live WITHOUT a `blade_heart`, this test fails and the real Q112 ドロー case
+/// becomes writable.
+#[test]
+fn a_draw_icon_live_carries_a_real_blade_heart_so_it_cannot_expose_the_q112_difference() {
+    let db = load_real_database();
+    let mut game = TestGame::new(db);
+
+    let card = game.id("PL!-bp3-021-L"); // 愛してるばんざーい! — ドロー icon
+    let c = game.db.get_card(card).unwrap();
+
+    assert!(c.has_draw_icon(), "precondition: this live prints the ドロー icon");
+    assert!(
+        c.blade_heart.is_some(),
+        "this is the whole point: the draw-icon live ALSO carries a real blade_heart, so it \
+         answers TRUE under both has_blade_heart() and has_blade_heart_strict() and cannot \
+         separate them. A survey of cards.json found NO draw-icon live lacking a blade_heart, \
+         which is why Q112's ドロー clause has no testable fixture."
+    );
+    assert_eq!(
+        c.has_blade_heart(),
+        c.has_blade_heart_strict(),
+        "consequence: identical under both predicates, so no assertion on this card can detect \
+         the strict/loose difference"
+    );
+}
+
 // Turn1 limit resets next turn: same yell should trigger again after turn_number increment
 #[test]
 fn yell_turn_limit_resets_next_turn() {

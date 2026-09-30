@@ -74,10 +74,61 @@ fn setup(watcher: i16) -> TestGame {
     game
 }
 
+/// Diagnostic — RETAINED as the counter-example to a bug I wrongly reported.
+///
+/// Chasing Q182 I saw a yelLED set of `[11329, 11329, 11329, 11329, 11329]` — one id five
+/// times — and wrote it up as "the widest issue in the sweep". **It was a harness artefact**,
+/// and the mechanism is documented on the id helpers themselves (`tests/helpers/mod.rs:234`):
+/// instances past the 11-copy pool alias to the template id, and this file's `setup()` fills
+/// the deck by pushing **one** id sixty times. So the deck really does hold sixty entries all
+/// equal to 11329, and drawing five of them correctly yields five copies of 11329.
+///
+/// Kept because it is the cheapest possible demonstration of the rule it taught: **before
+/// concluding anything about the contents of a revealed / drawn / selected set, confirm the
+/// deck was built from distinct instances.** Bulk filler aliases by design.
+#[test]
+#[ignore = "diagnostic: shows an aliased revealed set; the reason it is not a bug is in the doc"]
+fn real_yell_revealed_set_contents() {
+    let db = load_real_database();
+    let mut game = TestGame::new(db);
+
+    // Three DISTINCT members, at least one with a score so the performance yells.
+    let scored = game.id("PL!S-sd1-003-SD");
+    let second = game.id("PL!S-PR-015-PR");
+    let third = game.id("PL!-sd1-010-SD");
+    game.state.player1.stage.stage = [scored, second, third];
+
+    let no_bh = game.id(NO_BLADE_HEART_CARD);
+    let filler = game.id(FILLER);
+    for _ in 0..60 {
+        // NOTE: one id, pushed repeatedly — this is the aliasing that produces the repeated
+        // entries below. It is the file's existing idiom, not something introduced here.
+        game.state.player1.main_deck.cards.push(no_bh);
+        game.state.player2.main_deck.cards.push(filler);
+    }
+    game.give_energy(15);
+
+    advance_into_performance(&mut game, LIVE_CARD);
+
+    let yelled = &game.state.initial_yell_revealed_cards;
+    let mut distinct: Vec<i16> = yelled.to_vec();
+    distinct.sort_unstable();
+    distinct.dedup();
+    println!("stage members      = [{scored}, {second}, {third}]");
+    println!("yell_occurred      = {}", game.state.yell_occurred);
+    println!("initial_yell (raw) = {yelled:?}");
+    println!(
+        "initial_yell len={} distinct={} -> {:?}   (repeated because the deck is 60x one id)",
+        yelled.len(),
+        distinct.len(),
+        distinct
+    );
+    println!("revealed_cards     = {:?}", game.state.revealed_cards);
+}
+
 #[test]
 fn wien_real_yell_with_no_blade_heart_grants_heart03_during_the_live() {
-    let game = TestGame::new(load_real_database());
-    let wien = game.id("PL!SP-bp2-021-N");
+    let game = TestGame::new(load_real_database());    let wien = game.id("PL!SP-bp2-021-N");
     game.assert_card_identity(wien, "PL!SP-bp2-021-N");
     let mut game = setup(wien);
 

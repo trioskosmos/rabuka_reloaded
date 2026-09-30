@@ -121,6 +121,53 @@ fn position_change_one_member() {
     assert!(!game.has_pending_choice());
 }
 
+use rabuka_engine::types::AbilityTrigger;
+
+/// Diagnostic — blast radius of the Jellyfish decline defect (`PL!SP-pb2-050-L`).
+///
+/// `live_start_subunit_threshold_formation_test` shows that DECLINING the optional
+/// フォーメーションチェンジ on that card leaves the stage as `[live, -1, -1]`: both members
+/// are gone from every zone while `cards_moved_this_turn` records them as moved. That test was
+/// the only decline path anywhere in the tree, so the defect's reach is unmeasured.
+///
+/// `PL!SP-sd1-001-SD2` 澁谷かのん is one of the same five whole-stage formation changes, so
+/// the same decline is run here. If her members also disappear the fault is in the shared
+/// `position_change` executor rather than in Jellyfish's parse, which widens it to all five
+/// (`PL!SP-bp4-027-L`, `PL!SP-pb2-014-P＋`, `PL!S-bp7-012-N`, `PL!SP-pb2-050-L`,
+/// `PL!SP-sd2-001-SD2`).
+#[test]
+#[ignore = "diagnostic: does declining the formation change destroy members on a second card?"]
+fn formation_change_decline_blast_radius_probe() {
+    let db = load_real_database();
+    let mut game = TestGame::new(db);
+    let kanono = game.id("PL!SP-sd2-001-SD2");
+    let filler = game.id("PL!-sd1-010-SD");
+
+    let other = game.id("PL!SP-bp1-014-N");
+    game.state.player1.stage.stage = [other, kanono, -1];
+
+    let before = game.state.player1.stage.stage;
+    println!("kanono stage BEFORE decline = {before:?}");
+
+    fire_trigger(&mut game, kanono, AbilityTrigger::LiveStart, "ライブ開始時");
+    assert!(
+        game.has_pending_choice(),
+        "precondition: her フォーメーションチェンジ must be offered"
+    );
+
+    let declined = game.decline_all_remaining();
+    let after = game.state.player1.stage.stage;
+    println!("declined prompts = {declined:?}");
+    println!("kanono stage AFTER  decline = {after:?}");
+    println!(
+        "hand={:?} waitroom={:?} deck_len={} cards_moved={:?}",
+        game.state.player1.hand.cards,
+        game.state.player1.waitroom.cards,
+        game.state.player1.main_deck.cards.len(),
+        game.state.cards_moved_this_turn,
+    );
+}
+
 /// Play 慈 alone on empty stage → only 1 member → 1 choice.
 /// Options should show left, center, right (empty slots are valid destinations).
 /// This test has NO group_names filter, so empty slots are valid.

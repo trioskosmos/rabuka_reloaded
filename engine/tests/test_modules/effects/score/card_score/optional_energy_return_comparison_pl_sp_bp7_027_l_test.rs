@@ -67,9 +67,16 @@ fn wwd_pl_sp_bp7_027_l_accept_energy_return_while_ahead_grants_score_bonus() {
         zone_before - 1,
         "zone lost exactly the moved card"
     );
-    assert!(
-        game.state.mods.get_score_modifier(live) >= 1,
-        "energy still ahead after paying -> score +1"
+    // 「自分のエネルギーが相手より多い場合、このカードのスコアを＋１する」 — a flat +1, not a
+    // per-unit modifier, and the printed card score is 5. This was `>= 1`, so applying the
+    // bonus twice on one LiveStart passed a card whose text says ＋１. The decline test
+    // below already asserts `== 0`, so the pair now brackets the value exactly.
+    assert_eq!(
+        game.state.mods.get_score_modifier(live),
+        1,
+        "このカードのスコアを＋１する — exactly +1, not 'at least one'. A value of 2 means the \
+         LiveStart gate applied twice (got {})",
+        game.state.mods.get_score_modifier(live)
     );
 }
 
