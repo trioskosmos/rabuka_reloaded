@@ -1,6 +1,6 @@
 {
   "generated_by": "cards/test_inventory.py",
-  "generated_at": "2026-09-30T02:47:48.175431+00:00",
+  "generated_at": "2026-09-30T03:12:31.691002+00:00",
   "stats": {
     "total_cards": 2639,
     "cards_with_abilities": 1650,
@@ -8,7 +8,7 @@
     "unique_abilities": 985
   },
   "n_files": 991,
-  "n_tests": 4018,
+  "n_tests": 4020,
   "total_cards": 809,
   "covered_cards": 809,
   "abilities_on_covered": 985,
@@ -321,8 +321,8 @@
     ]
   },
   "depth_counts": {
-    "L2+choice": 845,
-    "L2": 108,
+    "L2+choice": 846,
+    "L2": 107,
     "L1+choice": 31,
     "L1": 1
   },
@@ -1065,7 +1065,7 @@
       "rows": []
     }
   },
-  "n_test_fns_parsed": 4018,
+  "n_test_fns_parsed": 4020,
   "abilities": [
     {
       "idx": 0,
@@ -1671,7 +1671,7 @@
         "edelnote_single_member",
         "edelnote_three_members_two_same_name"
       ],
-      "covering_test_count": 152,
+      "covering_test_count": 153,
       "direct_tests": [
         "ability_filter_live_with_livestart_no_gain",
         "ability_filter_mixed_one_null_one_livestart_gains",
@@ -24404,6 +24404,7 @@
         "formation_change_destination_excludes_already_claimed_area",
         "formation_change_still_offers_all_positions",
         "formation_change_with_group_names_and_empty_slots",
+        "kanono_formation_change_keeps_one_member_per_area_and_may_move_itself",
         "non_optional_pc_excludes_self_from_center",
         "non_optional_pc_excludes_self_from_left",
         "non_optional_pc_excludes_self_from_right",
@@ -24418,10 +24419,9 @@
         "own_move_or_energy_draw_heart02_energy_effect_triggers",
         "own_move_or_energy_draw_heart02_energy_phase_no_trigger",
         "own_move_or_energy_draw_heart02_formation_change_triggers",
-        "own_move_or_energy_draw_heart02_no_event_no_trigger",
-        "own_move_or_energy_draw_heart02_opponent_effect_move_no_trigger"
+        "own_move_or_energy_draw_heart02_no_event_no_trigger"
       ],
-      "covering_test_count": 52,
+      "covering_test_count": 53,
       "direct_tests": [
         "all_three_move_counts",
         "chisato_non_liella_move_no_bonus",
@@ -24494,6 +24494,7 @@
         "formation_change_destination_excludes_already_claimed_area",
         "formation_change_still_offers_all_positions",
         "formation_change_with_group_names_and_empty_slots",
+        "kanono_formation_change_keeps_one_member_per_area_and_may_move_itself",
         "non_optional_pc_excludes_self_from_center",
         "non_optional_pc_excludes_self_from_left",
         "non_optional_pc_excludes_self_from_right",
@@ -24508,10 +24509,9 @@
         "own_move_or_energy_draw_heart02_energy_effect_triggers",
         "own_move_or_energy_draw_heart02_energy_phase_no_trigger",
         "own_move_or_energy_draw_heart02_formation_change_triggers",
-        "own_move_or_energy_draw_heart02_no_event_no_trigger",
-        "own_move_or_energy_draw_heart02_opponent_effect_move_no_trigger"
+        "own_move_or_energy_draw_heart02_no_event_no_trigger"
       ],
-      "covering_test_count": 52,
+      "covering_test_count": 53,
       "direct_tests": [
         "all_three_move_counts",
         "chisato_non_liella_move_no_bonus",
@@ -25982,6 +25982,7 @@
         "formation_change_destination_excludes_already_claimed_area",
         "formation_change_still_offers_all_positions",
         "formation_change_with_group_names_and_empty_slots",
+        "kanono_formation_change_keeps_one_member_per_area_and_may_move_itself",
         "live_start_unit_swap_no_valid_destinations_skips",
         "live_start_unit_swap_one_mirakura_one_position_change",
         "live_start_unit_swap_skip_no_resources",
@@ -26003,7 +26004,7 @@
         "position_change_two_members",
         "position_change_with_swap"
       ],
-      "covering_test_count": 25,
+      "covering_test_count": 26,
       "direct_tests": [
         "live_start_unit_swap_no_valid_destinations_skips",
         "live_start_unit_swap_one_mirakura_one_position_change",
@@ -31742,20 +31743,22 @@
         "live_recovery_is_mandatory_and_excludes_members_pl_s_bp3_008_r",
         "recovered_live_activates_only_available_energy_candidates_pl_s_bp3_008_r",
         "recovering_aqours_live_below_six_skips_energy_activation_pl_s_bp3_008_r",
+        "recovering_aqours_live_scoring_exactly_six_still_activates_pl_s_bp3_008_r",
         "recovering_wrong_group_live_skips_energy_activation_pl_s_bp3_008_r",
         "self_to_waitroom_cost_paid_without_recoverable_live_pl_s_bp3_008_r",
         "self_to_waitroom_recovers_high_score_aqours_live_and_activates_four_pl_s_bp3_008_r"
       ],
-      "covering_test_count": 6,
+      "covering_test_count": 7,
       "direct_tests": [
         "live_recovery_is_mandatory_and_excludes_members_pl_s_bp3_008_r",
         "recovered_live_activates_only_available_energy_candidates_pl_s_bp3_008_r",
         "recovering_aqours_live_below_six_skips_energy_activation_pl_s_bp3_008_r",
+        "recovering_aqours_live_scoring_exactly_six_still_activates_pl_s_bp3_008_r",
         "recovering_wrong_group_live_skips_energy_activation_pl_s_bp3_008_r",
         "self_to_waitroom_cost_paid_without_recoverable_live_pl_s_bp3_008_r",
         "self_to_waitroom_recovers_high_score_aqours_live_and_activates_four_pl_s_bp3_008_r"
       ],
-      "direct_test_count": 6,
+      "direct_test_count": 7,
       "is_null": false,
       "use_limit": null,
       "watches_abilities": false,
@@ -35249,6 +35252,7 @@
       "covering_tests": [
         "formation_change_destination_excludes_already_claimed_area",
         "formation_change_with_group_names_and_empty_slots",
+        "kanono_formation_change_keeps_one_member_per_area_and_may_move_itself",
         "position_change_filters_by_group_names",
         "position_change_group_names_excludes_self",
         "position_change_no_other_members",
@@ -35260,7 +35264,7 @@
         "position_change_two_members",
         "position_change_with_swap"
       ],
-      "covering_test_count": 12,
+      "covering_test_count": 13,
       "direct_tests": [
         "formation_change_destination_excludes_already_claimed_area",
         "formation_change_with_group_names_and_empty_slots"
@@ -47873,7 +47877,7 @@
         "hanaho_played_to_stage_no_baton_touch_does_not_trigger",
         "himeno_all_three_on_stage_triggers"
       ],
-      "covering_test_count": 79,
+      "covering_test_count": 80,
       "direct_tests": [
         "baton_touch_arriving_card_ids_tracked",
         "baton_touch_cleared_between_actions",
@@ -48086,6 +48090,7 @@
       "covering_tests": [
         "formation_change_destination_excludes_already_claimed_area",
         "formation_change_with_group_names_and_empty_slots",
+        "kanono_formation_change_keeps_one_member_per_area_and_may_move_itself",
         "live_start_unit_swap_no_valid_destinations_skips",
         "live_start_unit_swap_one_mirakura_one_position_change",
         "live_start_unit_swap_skip_no_resources",
@@ -48101,7 +48106,7 @@
         "position_change_two_members",
         "position_change_with_swap"
       ],
-      "covering_test_count": 16,
+      "covering_test_count": 17,
       "direct_tests": [
         "live_start_unit_swap_one_mirakura_one_position_change",
         "live_start_unit_swap_skip_no_resources",
@@ -48882,7 +48887,7 @@
         "mebius_does_not_fire_on_untied_scores",
         "mebius_no_block_when_scores_untied_both_succeed"
       ],
-      "covering_test_count": 57,
+      "covering_test_count": 58,
       "direct_tests": [
         "butterfly_to_butterfly_wing_matches",
         "butterfly_wing_to_butterfly_no_match",
@@ -48900,10 +48905,11 @@
         "recover_with_heart06_ge3",
         "recovered_live_activates_only_available_energy_candidates_pl_s_bp3_008_r",
         "recovering_aqours_live_below_six_skips_energy_activation_pl_s_bp3_008_r",
+        "recovering_aqours_live_scoring_exactly_six_still_activates_pl_s_bp3_008_r",
         "recovering_wrong_group_live_skips_energy_activation_pl_s_bp3_008_r",
         "self_to_waitroom_recovers_high_score_aqours_live_and_activates_four_pl_s_bp3_008_r"
       ],
-      "direct_test_count": 18,
+      "direct_test_count": 19,
       "is_null": false,
       "use_limit": null,
       "watches_abilities": false,
@@ -55290,23 +55296,32 @@
       ],
       "base": "PL!S-pb1-020",
       "covered": true,
-      "depth": "L2",
+      "depth": "L2+choice",
       "has_assert": true,
-      "has_choice": false,
+      "has_choice": true,
       "has_negative": true,
       "covering_files": [
+        "engine/tests/test_modules/effects/recover/to_hand/self_to_waitroom_live_recovery_energy_activation_test.rs",
         "engine/tests/test_modules/effects/score/card_score/aqours_heart04_threshold_score_pl_s_pb1_020_l_test.rs"
       ],
       "covering_tests": [
+        "live_recovery_is_mandatory_and_excludes_members_pl_s_bp3_008_r",
         "pl_s_pb1_020_l_aqours_heart04_total_five_grants_no_score",
-        "pl_s_pb1_020_l_aqours_heart04_total_ten_grants_two_score"
+        "pl_s_pb1_020_l_aqours_heart04_total_ten_grants_two_score",
+        "recovered_live_activates_only_available_energy_candidates_pl_s_bp3_008_r",
+        "recovering_aqours_live_below_six_skips_energy_activation_pl_s_bp3_008_r",
+        "recovering_aqours_live_scoring_exactly_six_still_activates_pl_s_bp3_008_r",
+        "recovering_wrong_group_live_skips_energy_activation_pl_s_bp3_008_r",
+        "self_to_waitroom_cost_paid_without_recoverable_live_pl_s_bp3_008_r",
+        "self_to_waitroom_recovers_high_score_aqours_live_and_activates_four_pl_s_bp3_008_r"
       ],
-      "covering_test_count": 2,
+      "covering_test_count": 9,
       "direct_tests": [
         "pl_s_pb1_020_l_aqours_heart04_total_five_grants_no_score",
-        "pl_s_pb1_020_l_aqours_heart04_total_ten_grants_two_score"
+        "pl_s_pb1_020_l_aqours_heart04_total_ten_grants_two_score",
+        "recovering_aqours_live_scoring_exactly_six_still_activates_pl_s_bp3_008_r"
       ],
-      "direct_test_count": 2,
+      "direct_test_count": 3,
       "is_null": false,
       "use_limit": null,
       "watches_abilities": false,
@@ -60209,13 +60224,17 @@
       "has_choice": true,
       "has_negative": true,
       "covering_files": [
+        "engine/tests/test_modules/effects/position/area_move/position_change_multi_test.rs",
         "engine/tests/test_modules/integration/multi_card/round5_seat_relative_live_success_and_live_start_cross_player_test.rs"
       ],
       "covering_tests": [
+        "formation_change_destination_excludes_already_claimed_area",
+        "formation_change_with_group_names_and_empty_slots",
         "ginko_accept_places_then_rests_blade_gate_member",
         "ginko_decline_moves_and_rests_nothing",
         "hot_passion_empty_energy_deck_no_prompt_no_draw",
         "hot_passion_waited_energy_flips_opponent_score_comparison",
+        "kanono_formation_change_keeps_one_member_per_area_and_may_move_itself",
         "mei_cost_gate_and_already_waited_target",
         "mei_mirror_standoff_each_side_rests_own_opponent",
         "mirror_copies_each_evaluate_against_own_opponent",
@@ -60224,13 +60243,24 @@
         "p2_owned_copy_no_bonus_when_p1_not_strictly_ahead",
         "p2_owned_ginko_targets_p1_board_from_p2_seat",
         "p2_owned_rina_mills_both_decks_from_p2_seat",
+        "position_change_filters_by_group_names",
+        "position_change_group_names_excludes_self",
+        "position_change_no_other_members",
+        "position_change_one_member",
+        "position_change_skip_optional",
+        "position_change_skip_when_no_valid_destinations",
+        "position_change_three_members_all_move",
+        "position_change_tracks_card_movement",
+        "position_change_two_members",
+        "position_change_with_swap",
         "waited_energy_still_counts_for_comparison"
       ],
-      "covering_test_count": 13,
+      "covering_test_count": 26,
       "direct_tests": [
-        "ginko_accept_places_then_rests_blade_gate_member"
+        "ginko_accept_places_then_rests_blade_gate_member",
+        "kanono_formation_change_keeps_one_member_per_area_and_may_move_itself"
       ],
-      "direct_test_count": 1,
+      "direct_test_count": 2,
       "is_null": false,
       "use_limit": null,
       "watches_abilities": false,

@@ -935,20 +935,33 @@ impl Search<'_> {
                 // whose weights are 8/3/6/60/25/1000: a step measured against its
                 // parent reports only that step's contribution and the total
                 // never grows, so the chain sees a flat landscape.
-                // `V8_CHAIN_ROOT` (not wired): the idea is to score the v7
-                // feature deltas against the DECISION ROOT rather than this
-                // step, because a linear delta composes and a saturated level
-                // does not — which is why `V8_CHAIN` was null (§2.7) and why
-                // chain-plus-terms is not covered by that result.
+                // `V8_CHAIN_ROOT`: score this node against the DECISION ROOT,
+                // not against its parent, so the chain becomes a real backup.
                 //
-                // Blocked on structure, not on the idea: `v7_term_score` is
-                // currently a nested item inside `evaluate_actions` (Rust allows
-                // items inside functions, and a line at column 0 inside a body
-                // is still inside it), so it does not resolve from `impl Search`.
-                // Un-nesting it is a mechanical cleanup of this file, and it is
-                // not worth risking a confirmed +5.4 configuration to do it
-                // mid-measurement. §11.3.
-                let v = self.scored_leaf(&next);
+                // §2.7 measured `V8_CHAIN` null and the diagnosis was the leaf's
+                // SHAPE. On a saturated level every node already contains
+                // everything that led there, so the max over children is nearly
+                // the level, no step ever "strictly improves", and depth 3 and
+                // depth 6 returned bit-identical results. A linear delta has the
+                // opposite property and COMPOSES: a node scored from the root
+                // carries the value of the whole line so far, so a move that
+                // pays nothing by itself is still visible when it enables a later
+                // one. That is the property a backup needs.
+                //
+                // The scorer is `v8_model::v7_delta_score` rather than the copy
+                // in this file, because that copy is a nested item inside
+                // `evaluate_actions` and cannot be reached from here. Coverage
+                // is added here because `coverage_delta` is module-level in this
+                // file (it sits above `Search`, not inside anything).
+                let v = self.scored_leaf(&next)
+                    + if std::env::var_os("V8_CHAIN_ROOT").is_some() {
+                        super::v8_model::v7_delta_score(root, &next, self.me, self.db)
+                            + v8_model::v7_term_weight("COVERAGE", 60.0)
+                                * (coverage_delta(&next, self.me, self.db)
+                                    - coverage_delta(root, self.me, self.db)) as f64
+                    } else {
+                        0.0
+                    };
                 if chosen.as_ref().is_none_or(|(_, best)| v > *best) {
                     chosen = Some((next, v));
                 }
@@ -1263,6 +1276,67 @@ impl V7TermWeights {
             || self.opp_hand != 0.0
             || self.opp_success != 0.0
     }
+}
+
+/// Module-level scorer for the v7 feature deltas.
+///
+/// This exists beside the nested `v7_term_score` for one reason: that function
+/// is a nested item inside `evaluate_actions` (Rust permits items inside
+/// function bodies, and a line at column 0 inside a body is still inside it),
+/// so it does not resolve from `impl Search` — which is where the chain needs
+/// it. `v7_term_weights` IS at module level, so this is written here, and the
+/// two share it.
+///
+/// The measurement that motivated §11.3 is that a **delta composes and a level
+/// does not**. `leaf_value` is a saturated placement-probability level, so at
+/// every node of a search the value already contains everything that led there;
+/// the max over children is nearly the level, no step ever "strictly improves",
+/// and depth 3 and depth 6 returned bit-identical results. A linear delta has
+/// the opposite property: measured against `base` — the state before the ROOT
+/// action — each node carries the value of the whole line so far, so a move that
+/// pays nothing by itself is still visible when it enables a later one. That is
+/// the property a backup needs, and it is the one v7's depth-8 chain has.
+fn v7_term_score_from(
+    base: &GameState,
+    after: &GameState,
+    me: u8,
+    db: &CardDatabase,
+) -> f64 {
+    let w = v7_term_weights();
+    if !w.any() {
+        return 0.0;
+    }
+    let d = |f: fn(&GameState, u8, &CardDatabase) -> i32, seat: u8| {
+        (f(after, seat, db) - f(base, seat, db)) as f64
+    };
+    let opp = 1 - me;
+    w.cost * d(v8_model::stage_cost, me)
+        + w.hearts * d(v8_model::supply_hearts, me)
+        + w.blades * d(v8_model::active_blades, me)
+        + w.coverage * (coverage_delta(after, me, db) - coverage_delta(base, me, db)) as f64
+        + w.ammo
+            * (v8_model::lives_in_hand(after.seat_player(me), db)
+                - v8_model::lives_in_hand(base.seat_player(me), db)) as f64
+        + w.energy
+            * (after.seat_player(me).energy_zone.active_count() as i32
+                - base.seat_player(me).energy_zone.active_count() as i32) as f64
+        + w.hand
+            * (after.seat_player(me).hand.cards.len() as i32
+                - base.seat_player(me).hand.cards.len() as i32) as f64
+        + w.reserve
+            * (after.seat_player(me).main_deck.cards.len() as i32
+                - base.seat_player(me).main_deck.cards.len() as i32) as f64
+        + w.success
+            * (after.seat_player(me).success_live_card_zone.cards.len() as i32
+                - base.seat_player(me).success_live_card_zone.cards.len() as i32) as f64
+        - w.opp_cost * d(v8_model::stage_cost, opp)
+        - w.opp_blades * d(v8_model::active_blades, opp)
+        - w.opp_hand
+            * (after.seat_player(opp).hand.cards.len() as i32
+                - base.seat_player(opp).hand.cards.len() as i32) as f64
+        - w.opp_success
+            * (after.seat_player(opp).success_live_card_zone.cards.len() as i32
+                - base.seat_player(opp).success_live_card_zone.cards.len() as i32) as f64
 }
 
 fn v7_term_weights() -> &'static V7TermWeights {

@@ -2944,6 +2944,7 @@ def parse_action(text: str) -> Dict[str, Any]:
         and "source_position" not in action
         and not action.get("exclude_self")
         and "それぞれ" not in text
+        and not _is_whole_stage_formation_change(text)
         and not ("メンバー" in text and ("1人" in text or "N人" in text))
     ):
         action["exclude_self"] = True
@@ -4573,12 +4574,41 @@ def _handle_position_change_fields(text, action):
     # Exclude the member's current position for single-target moves.
     # NOT for "メンバー1人を" (where the player selects a target first)
     # and NOT for formation change ("それぞれ" / multiple_targets).
+    #
+    # The "それぞれ" guard alone is not enough: on
+    # 「自分のステージにいるメンバーをフォーメーションチェンジしてよい」 the only
+    # 「それぞれ」 sits inside the parenthesised gloss, and parse_effect strips
+    # parentheticals (line ~1407) BEFORE this rule runs. So the check passed and
+    # exclude_self was set on 5 formation-change cards whose text never excludes
+    # anyone. _is_whole_stage_formation_change recognises the printed shape directly.
     if (
         "それぞれ" not in text
+        and not _is_whole_stage_formation_change(text)
         and "source_position" not in action
         and not ("メンバー" in text and ("1人" in text or "N人" in text))
     ):
         action["exclude_self"] = True
+
+
+def _is_whole_stage_formation_change(text: str) -> bool:
+    """True for a 「フォーメーションチェンジ」 — a reorder of your WHOLE stage.
+
+    A formation change covers every member you control, which necessarily INCLUDES the
+    activating card, so such an effect never excludes itself. Keying on the phrase alone
+    is deliberate: the earlier attempt required 「自分のステージにいる」 and missed
+    PL!S-bp7-012-N, whose text reads 「自分のステージに『Aqours』か『SaintSnow』の
+    メンバーのみがいる場合、フォーメーションチェンジしてもよい」 — a whole-stage
+    reordering stated only as 「フォーメーションチェンジ」.
+
+    Distinct from 「このメンバーをポジションチェンジ」, which is single-target and keeps the
+    exclude_self default. (ポジションチェンジ and フォーメーションチェンジ are separate
+    strings; neither contains the other.)
+    """
+    if "フォーメーションチェンジ" not in text:
+        return False
+    if "このメンバー以外" in text or "このカード以外" in text:
+        return False
+    return True
 
 
 def _try_position(text):

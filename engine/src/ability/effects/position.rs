@@ -675,6 +675,25 @@ impl AbilityResolver {
         let mut valid = Vec::new();
 
         // Formation change: exclude zones already assigned to another member.
+        //
+        // THIS is where the printed restriction lives:
+        // 「この効果で1つのエリアに2人以上のメンバーを移動させることはできない。」
+        // — the parenthetical gloss on the whole-stage フォーメーションチェンジ cards
+        // (PL!SP-sd2-001-SD2 澁谷かのん, PL!SP-bp4-027-L, PL!SP-pb2-014-P＋,
+        // PL!S-bp7-012-N, PL!SP-pb2-050-L).
+        //
+        // The rule is NOT read from `parenthetical` — nothing in the engine reads that
+        // field, and it is deliberately not turned into a `max_per_area` field. It holds
+        // structurally instead: a stage is a fixed [i16; 3] of one member per area, and
+        // each member claims a distinct zone here before the next one is prompted.
+        //
+        // Consequences worth respecting when refactoring:
+        //  * relaxing the `planned_zones` skip, or making the stage hold N per area,
+        //    would silently permit 2-in-an-area with nothing to catch it except the
+        //    test at tests/test_modules/effects/position/area_move/position_change_multi_test.rs
+        //    ::formation_change_destination_excludes_already_claimed_area;
+        //  * do NOT add a second, parenthetical-driven exclusion on top of this one —
+        //    the two would compound and lock members out of their own area.
         let planned_zones: Vec<String> = self
             .carried.formation_plan
             .iter()

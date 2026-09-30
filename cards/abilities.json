@@ -1,9 +1,9 @@
 {
   "schema": "extracted_abilities.v1",
-  "generated_at": "2026-09-30T12:43:45.366560",
+  "generated_at": "2026-09-30T13:08:57.492488",
   "generated_by": "cards/ability_extraction/extract_card_abilities.py",
   "source_file": "cards/cards.json",
-  "engine_commit": "b2ba64c9",
+  "engine_commit": "08199946",
   "parser_version": "1.0",
   "input_hash": null,
   "statistics": {
@@ -22732,7 +22732,6 @@
         "optional": true,
         "action": "position_change",
         "multiple_targets": true,
-        "exclude_self": true,
         "parenthetical": [
           "メンバーをそれぞれ好きなエリアに移動させる。この効果で1つのエリアに2人以上のメンバーを移動させることはできない。"
         ]
@@ -24552,7 +24551,6 @@
         "optional": true,
         "action": "position_change",
         "multiple_targets": true,
-        "exclude_self": true,
         "parenthetical": [
           "メンバーをそれぞれ好きなエリアに移動させてもよい。"
         ]
@@ -36560,7 +36558,6 @@
           "optional": true,
           "action": "position_change",
           "multiple_targets": true,
-          "exclude_self": true,
           "location": "stage"
         },
         "result_condition": {
@@ -40548,7 +40545,6 @@
         "optional": true,
         "action": "position_change",
         "multiple_targets": true,
-        "exclude_self": true,
         "parenthetical": [
           "メンバーをそれぞれ好きなエリアに移動させてもよい。"
         ]
@@ -40796,8 +40792,7 @@
             "target": "self",
             "optional": true,
             "action": "position_change",
-            "multiple_targets": true,
-            "exclude_self": true
+            "multiple_targets": true
           }
         ],
         "parenthetical": [

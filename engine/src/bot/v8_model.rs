@@ -1100,6 +1100,98 @@ fn lives_in_hand_card(db: &CardDatabase, cid: i16) -> bool {
         .is_some_and(|c| c.card_type == crate::card::CardType::Live)
 }
 
+/// v7's linear feature-delta value function, as a scoreable delta between two
+/// states. Lives here rather than beside `v8_main::v7_term_score` because that
+/// one is a nested item inside `evaluate_actions` and cannot be reached from
+/// `Search::chain`; this module is clean and both callers can see it.
+///
+/// Coverage is applied by the caller, because `coverage_delta` needs the best
+/// life in hand and lives in `v8_main`. Everything else is a zone count, which
+/// is what this module is for.
+///
+/// The reason a *delta* scorer is wanted at all is §11.3: a saturated level does
+/// not compose, so a search over one cannot see two moves that only pay off
+/// together, and a linear delta does. Weights are v7's own, read from
+/// `V8_ALL_TERMS` / `V8_TERM_*`; all zero means "no terms on".
+pub fn v7_delta_score(base: &GameState, after: &GameState, me: u8, db: &CardDatabase) -> f64 {
+    let all = std::env::var_os("V8_ALL_TERMS").is_some();
+    let weight = |name: &str, default: f64| -> f64 {
+        let key = format!("V8_TERM_{name}");
+        if !all && std::env::var_os(&key).is_none() {
+            return 0.0;
+        }
+        std::env::var(&key)
+            .ok()
+            .and_then(|v| v.parse::<f64>().ok())
+            .filter(|w: &f64| w.is_finite())
+            .unwrap_or(default)
+    };
+    // Read once per call rather than per term: this runs inside a search loop.
+    let w_cost = weight("COST", 8.0);
+    let w_hearts = weight("HEARTS", 3.0);
+    let w_blades = weight("BLADES", 6.0);
+    let w_ammo = weight("AMMO", 25.0);
+    let w_energy = weight("ENERGY", 2.0);
+    let w_hand = weight("HAND", 3.0);
+    let w_reserve = weight("RESERVE", 0.5);
+    let w_success = weight("SUCCESS", 1000.0);
+    let w_opp_cost = weight("OPP_COST", 8.0);
+    let w_opp_blades = weight("OPP_BLADES", 6.0);
+    let w_opp_hand = weight("OPP_HAND", 10.0);
+    let w_opp_success = weight("OPP_SUCCESS", 1000.0);
+    if w_cost == 0.0
+        && w_hearts == 0.0
+        && w_blades == 0.0
+        && w_ammo == 0.0
+        && w_energy == 0.0
+        && w_hand == 0.0
+        && w_reserve == 0.0
+        && w_success == 0.0
+        && w_opp_cost == 0.0
+        && w_opp_blades == 0.0
+        && w_opp_hand == 0.0
+        && w_opp_success == 0.0
+    {
+        return 0.0;
+    }
+    let opp = 1 - me;
+    let a = after.seat_player(me);
+    let b = base.seat_player(me);
+    let oa = after.seat_player(opp);
+    let ob = base.seat_player(opp);
+    let zone = |x: &crate::player::Player, y: &crate::player::Player, f: fn(&crate::player::Player) -> usize| {
+        (f(x) as i32 - f(y) as i32) as f64
+    };
+    w_cost * (stage_cost(after, me, db) - stage_cost(base, me, db)) as f64
+        + w_hearts * (supply_hearts(after, me, db) - supply_hearts(base, me, db)) as f64
+        + w_blades * (active_blades(after, me, db) - active_blades(base, me, db)) as f64
+        + w_ammo * (lives_in_hand(a, db) - lives_in_hand(b, db)) as f64
+        + w_energy * (i32::from(a.energy_zone.active_count()) - i32::from(b.energy_zone.active_count())) as f64
+        + w_hand * zone(a, b, |p| p.hand.cards.len())
+        + w_reserve * zone(a, b, |p| p.main_deck.cards.len())
+        + w_success * zone(a, b, |p| p.success_live_card_zone.cards.len())
+        - w_opp_cost * (stage_cost(after, opp, db) - stage_cost(base, opp, db)) as f64
+        - w_opp_blades * (active_blades(after, opp, db) - active_blades(base, opp, db)) as f64
+        - w_opp_hand * zone(oa, ob, |p| p.hand.cards.len())
+        - w_opp_success * zone(oa, ob, |p| p.success_live_card_zone.cards.len())
+}
+
+/// v7's own weight for a named term, or 0 when it is off. Shared so the caller
+/// can add the one term this module cannot compute (coverage) under the same
+/// gate and the same weight.
+pub fn v7_term_weight(name: &str, default: f64) -> f64 {
+    let all = std::env::var_os("V8_ALL_TERMS").is_some();
+    let key = format!("V8_TERM_{name}");
+    if !all && std::env::var_os(&key).is_none() {
+        return 0.0;
+    }
+    std::env::var(&key)
+        .ok()
+        .and_then(|v| v.parse::<f64>().ok())
+        .filter(|w: &f64| w.is_finite())
+        .unwrap_or(default)
+}
+
 pub fn supply_hearts(gs: &GameState, me: u8, db: &CardDatabase) -> i32 {
     stats_pipeline::stage_hearts(
         &gs.seat_player(me).stage.stage,

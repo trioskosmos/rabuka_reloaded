@@ -32,10 +32,11 @@ it names · **C** = missing edge case on an otherwise-correct ability · **D** =
 | B1 | A1's only test passes for a wrong reason | **FIXED** — the discriminating test goes red without the fix |
 | C1 | `PL!N-bp4-028-L` never pinned 5 distinct names | **FIXED** — 5 → +1, engine already correct |
 | C2 | `PL!-pb2-038-L` non-stackable tested in one zone only | **FIXED** — one per zone still +1, engine already correct |
-| D1 | `parenthetical` decoded then never read | open, engine |
-| D2 | `exclude_self: true` inert on the formation change; parser wrong | open, parser |
+| C3 | `PL!S-bp3-008-R` 「スコア6以上」 bound never staged at 6 | **FIXED** — score 6 activates, engine already correct |
+| D1 | Formation-change area capacity | **misdiagnosed by me** — it is enforced by `planned_zones` and already tested; see §D1 |
+| D2 | `exclude_self: true` on 5 whole-stage formation changes, text excludes nobody | **FIXED** (parser), proven both directions |
 
-Verification: **engine 4004 passed / 0 failed**; **parser 124 passed / 0 failed**
+Verification: **engine 4006 passed / 0 failed**; **parser 124 passed / 0 failed**
 (`47 + 24 + 4 + 44 + 5` across the five suites in `cards/ability_extraction/tests`);
 `cards/test_inventory.py` regenerated.
 
@@ -262,48 +263,73 @@ configuration scores **+2** against a printed +1, and nothing in the tree would 
 
 ---
 
-## D1 — `parenthetical` is decoded and then never read
-
-Every hit in `engine/src`: declared `core/card.rs:1148`, JSON reader `core/card.rs:1752`,
-bytecode decode `effect_decoder_gen.rs:232`, mirror struct `:359`, clone into `EffectFilter`
-`:593`. **No accessor, no reader, no executor.** The field is a pass-through from
-`abilities.json` to dead.
-
-The one parenthetical the engine *does* honour — 「(対戦相手のカードの効果でも発動する。)」 —
-is handled by a dedicated `fires_on_opponent_effects` bool precisely so the JP text need not
-be re-matched. Restrictions that land in `parenthetical` get no such treatment.
+## D1 — formation-change area capacity: enforced and already tested (I got this wrong first)
 
 `PL!SP-sd2-001-SD2` 澁谷かのん is the live case:
 
 > (メンバーをそれぞれ好きなエリアに移動させる。**この効果で1つのエリアに2人以上のメンバーを
 > 移動させることはできない。**)
 
-The capacity clause is parked verbatim in `parenthetical`. Nothing enforces it. The
-restriction currently *holds* — but incidentally, from two structural facts, not from the
-rule: the stage is a fixed `[i16; 3]`, and `planned_zones` removes an already-claimed zone
-before each subsequent member's prompt (`effects/position.rs:689`). Any refactor that relaxes
-`planned_zones` or widens the stage silently permits 2-in-an-area, with no test to catch it.
+The capacity clause is parked verbatim in `parenthetical`, and every hit in `engine/src` is
+declared / JSON-read / bytecode-decoded / cloned — with **no reader**. My first pass called
+this "enforced only incidentally, with nothing to catch it". **That was wrong on both counts**:
+
+1. it *is* already pinned by a test —
+   `position_change_multi_test.rs::formation_change_destination_excludes_already_claimed_area`,
+   on `PL!SP-bp4-027-L` Chance Day, which carries the identical parenthetical;
+2. the mechanism is not incidental. The stage is a fixed `[i16; 3]` — one member per area, by
+   construction — and `planned_zones` (`position.rs:677-691`) removes each claimed area
+   before the next member is prompted. Both are deliberate.
+
+The real residual risk runs the **opposite** way to what I first wrote. Nothing reads
+`parenthetical`, so a maintainer looking for the rule finds only a dead field, and may
+"fix" it by adding a second parenthetical-driven exclusion — which would compound with
+`planned_zones` and lock members out of their own area. So the fix here is documentation at
+the enforcing site, not a second mechanism: the block at `position.rs:677` now names the
+printed text it implements, lists the five cards, states that `parenthetical` is deliberately
+not read, and says what breaks if either half is refactored.
+
+I also drove the same restriction through 澁谷かのん herself (new test), because Chance Day's
+test cannot discriminate the D2 defect — see below.
 
 ---
 
-## D2 — `exclude_self: true` on that same formation change is inert, and the parser is wrong
+## D2 — `exclude_self` on 5 whole-stage formation changes, where the text excludes nobody
 
-The parse carries `exclude_self: true`, but `execute_position_change`'s `multiple_targets`
-collection loop (`effects/position.rs:328-332`) pushes **every** occupied slot
-unconditionally:
+The parse carried `exclude_self: true` on:
 
-```rust
-for i in 0..3 { if player.stage.stage[i] != -1 { card_ids.push(player.stage.stage[i]); } }
+```
+PL!SP-bp4-027-L   PL!SP-pb2-014-P＋   PL!S-bp7-012-N
+PL!SP-pb2-050-L   PL!SP-sd2-001-SD2
 ```
 
-Nothing consults `exclude_self`. Here the engine and the card text agree by accident, because
-the printed clause is 「自分のステージにいるメンバー」 — with no 「このメンバー以外」 — so
-self *should* move. **The parser is the wrong one**: it added an exclusion the text does not
-state, and the engine's failure to honour it is the only reason the card behaves correctly.
+all of the shape 「自分のステージにいるメンバー…をフォーメーションチェンジしてもよい」, with
+**no** 「このメンバー以外」 anywhere. `position_change` effects carrying the flag went 21 → 16,
+and afterwards **no** `multiple_targets` formation change carries it.
 
-Recorded because the pair (wrong parse + engine ignoring the field) means this
-`exclude_self` is dead weight; if the engine ever starts honouring it on this path, 澁谷かのん
-will silently stop moving herself and no test covers that card.
+**Why it was set.** The default at `parser.py:2949` and `_try_position:4576` both guard on
+`"それぞれ" not in text` — and the only 「それぞれ」 in these cards lives inside the
+parenthetical, which `parse_effect` strips (line ~1407) *before* those rules run. The guard
+passed and the flag was set. A first attempt keyed on 「自分のステージにいる」 and fixed 4 of 5;
+`PL!S-bp7-012-N` says only 「フォーメーションチェージ」, so the guard now keys on that phrase
+alone — a formation change covers your whole stage, which necessarily includes the activator.
+
+**Why it looked fine.** The multi-target *collection* loop (`position.rs:328-332`) pushes every
+occupied slot and ignores the field, so the board came out right. But the *destination* helper
+does honour it (`position.rs:711-714`), dropping the activating card's own area — so each of
+these 5 cards was, in truth, forbidding the activator from keeping or reclaiming her own area.
+Wrong, and invisible.
+
+**Proven.** New test `kanono_formation_change_keeps_one_member_per_area_and_may_move_itself`,
+with Kanono on stage at Center so she is the activator. With the fix reverted, regenerated and
+recompiled, the first member's options are `["left", "right"]` — **her Center is gone** — and
+the test fails on `first_opts.len() == 3`. With the fix, all three areas are offered and the
+capacity rule still holds.
+
+The pre-existing Chance Day test cannot catch this, and the reason is instructive: Chance Day
+is the LIVE card, not a stage member, so no stage area holds the activator and
+`exclude_self` filters nothing. The defect only bites when the activating member is itself on
+the stage being reorganised.
 
 ---
 
@@ -370,7 +396,32 @@ Two smaller self-corrections, both caught by preconditions rather than by readin
 
 ---
 
-## 8. Fix order
+## C3 — `PL!S-bp3-008-R` bound never staged at 6 (I misdiagnosed this as unhandled first)
+
+I listed this card as "still unhandled". **Wrong** — the parse is correct and the engine
+evaluates it. `PL!S-bp3-008-P/-R` 小原鞠莉 prints:
+
+> …自分の控え室からライブカードを1枚手札に加える。**それがスコア6以上の『Aqours』のライブ
+> カードの場合、**エネルギーを4枚アクティブにする。
+
+and the parse is a well-formed `comparison_condition` with `comparison_type: "score"`,
+`source: "preceding_moved"`, `count: 6`, `operator: ">="`, plus `group_names` and
+`card_type`. The engine has `count_for_preceding_moved_score` (`condition/card.rs:3858`) and
+the card already has 6 tests — including a legitimate score-5 negative that passes the group
+filter and fails only the score.
+
+The real gap was narrower: the qualifying fixture `PL!S-pb1-023-L` prints score **9**, and the
+failing one 5. **Nothing sat on 6**, so `>= 6` (correct), `> 6`, `>= 7` and `>= 9` all passed
+identically. Added `recovering_aqours_live_scoring_exactly_six_still_activates` with
+`PL!S-pb1-020-L` トリコリコPLEASE!! (Aqours, score exactly 6, pinned) — it activates 4 energy,
+so the bound is inclusive.
+
+This is the same shape as A1 and C1, third time: **the two ends are staged and the boundary
+is not.**
+
+---
+
+## 9. Fix order
 
 | # | Item | Kind | State |
 |---|---|---|---|
@@ -379,6 +430,11 @@ Two smaller self-corrections, both caught by preconditions rather than by readin
 | 3 | heart04×1 discriminating test for `PL!S-bp5-007-R` | B1 | **done** |
 | 4 | 5-distinct boundary case for `PL!N-bp4-028-L` | C1 | **done** |
 | 5 | one-copy-per-zone non-stackable case for `PL!-pb2-038-L` | C2 | **done** |
-| 6 | `PL!S-bp3-008-P/-R` 「それがスコア6以上の場合」 — effect gate on the recovered card | new | open |
-| 7 | `parenthetical` consumption / area-capacity enforcement | D1 | open, engine |
-| 8 | drop the bogus `exclude_self` from `PL!SP-sd2-001-SD2` | D2 | open, parser |
+| 6 | exactly-6 boundary case for `PL!S-bp3-008-R` | C3 | **done** |
+| 7 | `exclude_self` off the 5 whole-stage formation changes | D2 parser | **done**, 21 → 16 |
+| 8 | document the capacity rule at its enforcing site | D1 engine | **done**, comment only |
+
+Every one of the three originally-open items is closed. Nothing was needed from the
+`parenthetical` field, and no new effect field was added — in both cases because the
+behaviour was already correct and the real problem was that the *parse* and the *tests* were
+not describing it.

@@ -715,6 +715,101 @@ fn formation_change_destination_excludes_already_claimed_area() {
     assert_eq!(st[1], -1, "center ends empty — no collision occurred");
 }
 
+/// The same printed restriction, driven through 澁谷かのん — the card the audit actually
+/// flagged (docs/ABILITY_AUDIT_2026-09-30.md §D1), rather than through Chance Day.
+///
+/// Also pins the other half of that card, which the parse used to get wrong: her target
+/// set is 「自分のステージにいるメンバー」, which includes HER, so the parse must not
+/// carry `exclude_self`. Before the fix the field was set (the only 「それぞれ」 lives in
+/// the parenthetical, which `parse_effect` strips before the rule runs), and the
+/// destination helper honours `exclude_self` at position.rs:712 — so her own area was
+/// being filtered out of her own move. The multi-target COLLECTION loop ignores the field,
+/// which is why the board still came out right and nothing caught it.
+#[test]
+fn kanono_formation_change_keeps_one_member_per_area_and_may_move_itself() {
+    use rabuka_engine::core::types::AbilityTrigger;
+
+    let db = load_real_database();
+    let mut game = TestGame::new(db.clone());
+
+    let kanono = game.id("PL!SP-sd2-001-SD2");
+    let filler = game.id("PL!-sd1-010-SD");
+    // EXACTLY one card in the deck: カードを1枚引く then resolves without a prompt, so the
+    // only choice this test has to answer is the formation change's destination.
+    game.state.player1.main_deck.cards.push(filler);
+
+    // Kanono Center, a second member Left, Right empty.
+    let other = game.id("PL!SP-bp1-014-N");
+    game.state.player1.stage.stage = [other, kanono, -1];
+
+    // Her ability is ライブ開始時, NOT ライブ成功時 like Chance Day above.
+    fire_trigger(
+        &mut game,
+        kanono,
+        AbilityTrigger::LiveStart,
+        "ライブ開始時",
+    );
+
+    // First member sees all three areas. This assertion is also the D2 discriminator:
+    // the destination helper honours `exclude_self` (position.rs:712) by dropping the
+    // activating card's OWN area, so with the bogus flag still on the parse this is 2, not
+    // 3 — Kanono's Center would be missing from her own formation change.
+    assert!(
+        game.has_pending_choice(),
+        "precondition: the draw resolved on its own and the formation change is now asking \
+         for a destination"
+    );
+    let first_opts = pending_target_options(&game);
+    assert_eq!(
+        first_opts.len(),
+        3,
+        "precondition: 自分のステージにいるメンバーをフォーメーションチェンジ includes the \
+         activating card, so Kanono's own Center must be offered. Seeing 2 here means the \
+         parse regained exclude_self and she cannot keep or reclaim her own area. \
+         (options={first_opts:?})"
+    );
+    assert!(
+        first_opts.contains(&"center".to_string()),
+        "precondition: the activating card's own area is among the choices (options={first_opts:?})"
+    );
+
+    // Claim the EMPTY area first, so the interesting assertion is about the two occupied
+    // ones rather than about emptiness.
+    let right_idx = first_opts.iter().position(|o| o == "right").unwrap();
+    game.select_option(right_idx as i16);
+
+    // Second member must not be offered the area the first just claimed.
+    assert!(game.has_pending_choice(), "second destination choice");
+    let second_opts = pending_target_options(&game);
+    assert!(
+        !second_opts.contains(&"right".to_string()),
+        "この効果で1つのエリアに2人以上のメンバーを移動させることはできない — the area \
+         claimed by the first member must not be offered again (options={second_opts:?})"
+    );
+    assert_eq!(
+        second_opts.len(),
+        2,
+        "exactly the two unclaimed areas remain (options={second_opts:?})"
+    );
+
+    game.select_option(0);
+    let st = game.state.player1.stage.stage;
+    assert!(
+        !st.contains(&-1) || st.iter().filter(|&&c| c != -1).count() == 2,
+        "still exactly 2 members on stage, one per area (stage={st:?})"
+    );
+    assert_eq!(
+        st.iter().filter(|&&c| c != -1).count(),
+        2,
+        "no member was lost or duplicated by the formation change (stage={st:?})"
+    );
+    assert_eq!(
+        st.iter().filter(|&&c| c != -1).collect::<std::collections::HashSet<_>>().len(),
+        2,
+        "no card occupies two areas at once (stage={st:?})"
+    );
+}
+
 fn game_state_ref(
     game: &mut crate::helpers::TestGame,
 ) -> &mut rabuka_engine::game_state::GameState {

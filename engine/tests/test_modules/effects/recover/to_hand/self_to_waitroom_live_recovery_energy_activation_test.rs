@@ -2,6 +2,9 @@ use crate::helpers::*;
 use rabuka_engine::zones::MemberArea;
 
 const FILLER: &str = "PL!-sd1-010-SD";
+/// Aqours, printed score **exactly 6** — the bound 「スコア6以上の」 names.
+/// This is the only class of fixture that separates `>= 6` from `> 6`.
+const AQOURS_EXACTLY_6: &str = "PL!S-pb1-020-L";
 
 fn live_recovery_energy_activation_board_pl_s_bp3_008_r(game: &mut TestGame, active: u8) -> (i16, i16, i16) {
     let mari = game.id("PL!S-bp3-008-R");
@@ -106,6 +109,55 @@ fn recovering_aqours_live_below_six_skips_energy_activation_pl_s_bp3_008_r() {
         game.state.player1.energy_zone.active_count(),
         2,
         "スコア6以上 fails at exactly-below boundary → NO activation"
+    );
+}
+
+/// The bound itself: 「スコア6以上」 must fire at exactly 6.
+///
+/// The suite's qualifying case uses `PL!S-pb1-023-L` at printed score **9**, and its
+/// failing case uses score 5. Nothing sat on 6, so these implementations all passed
+/// identically: `>= 6` (correct), `> 6`, `>= 7`, `>= 9`. Only a card printing exactly 6
+/// separates them.
+#[test]
+fn recovering_aqours_live_scoring_exactly_six_still_activates_pl_s_bp3_008_r() {
+    let db = load_real_database();
+    let mut game = TestGame::new(db);
+    let (mari, aqours_high, niji_low) = live_recovery_energy_activation_board_pl_s_bp3_008_r(&mut game, 2);
+
+    // Replace the board with only the exactly-6 live, and pin its printed score AND group.
+    // Both matter: the clause is 『Aqours』のライブカード AND スコア6以上, and the suite
+    // otherwise pins the group with the score-9 card and the score with the score-5 card,
+    // never both on one card.
+    let exact = game.id(AQOURS_EXACTLY_6);
+    game.assert_card_identity(exact, AQOURS_EXACTLY_6);
+    game.assert_card_score(exact, 6);
+    game.state
+        .player1
+        .waitroom
+        .cards
+        .retain(|c| !(*c == aqours_high || *c == niji_low));
+    game.state.player1.waitroom.cards.push(exact);
+
+    game.activate_ability(mari);
+    // Only one live is in the waitroom and the clause matches it, so the mandatory fetch
+    // resolves on the spot and opens NO prompt. Answering nothing is therefore the correct
+    // interaction here — a prompt would mean a second card had wrongly qualified.
+    assert!(
+        !game.has_pending_choice(),
+        "precondition: exactly one live matches スコア6以上 + 『Aqours』, so count:1 resolves \
+         without asking. A prompt here means some other card was offered too."
+    );
+
+    assert!(
+        game.state.player1.hand.cards.contains(&exact),
+        "precondition: the score-6 live was recovered"
+    );
+    assert_eq!(
+        game.state.player1.energy_zone.active_count(),
+        6,
+        "スコア6以上 — an Aqours live printing EXACTLY 6 satisfies the bound, so 4 energy \
+         activate (2+4=6). A value of 2 means the comparison is reading the bound as \
+         exclusive (`> 6`) or as 7/9; the rest of this file only ever stages 9 and 5."
     );
 }
 

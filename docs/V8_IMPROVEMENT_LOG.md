@@ -1307,6 +1307,60 @@ Worth recording on its own: a term that cannot be evaluated inside a search
 should not be put in the search, and the symptom was a timeout rather than a
 wrong number, which is a much less obvious failure than a wrong number is.
 
+### 11.6 The chain is null too, and that is the last of it
+
+Wired at last, via `v8_model::v7_delta_score` (see §11.5 for why the scorer had
+to move modules). Chain depth 4, node budget 600, term vector on:
+
+```text
+bot_arena v8 v7 4000 "5CP3Z idou" --games 4000 --seed 11 --vs b11big.csv \
+  --env V8_ALL_TERMS --env V8_CHAIN_ROOT --env V8_CHAIN=4 --env V8_NODES=600
+  RESULT v8 vs v7 | 1921 - 2079 | 0 draws
+  DISCORDANT: baseline-only 275 | candidate-only 496   p = 0.00000
+  pace (P1) 0.3735 -> 0.3969  +0.0234  SIGNIFICANT
+  pace (P2) 0.4378 -> 0.4237  -0.0141  SIGNIFICANT
+  42.5% -> 48.0%  (+5.53)
+```
+
+**+5.53 against +5.40 for the term vector alone — a 0.13 difference.** The chain
+does nothing, and §2.7's diagnosis of *why* it did nothing was wrong.
+
+The diagnosis was "a saturated level does not compose, so no step ever
+improves". Making the leaf compose too (root-relative, `V8_CHAIN_ROOT`) should
+have fixed exactly that, and it changed nothing. So the real reason is not the
+leaf's shape.
+
+**Everything tried against v8's Main phase, in one place:**
+
+| axis | result |
+|---|---|
+| eleven leaf terms | inert or regression |
+| colour-exact shortfall | regression |
+| opponent horizon, then + a gradient | bit-identical |
+| opponent density calibration | 5 games in 1200 |
+| tie-break, alone and with a quantised leaf | 23/1200, then null |
+| deeper nodes / wider follow-ups | 3/400 |
+| ISMCTS replacing the leaf | -6.6 |
+| engine-executed live set | -7.8 |
+| forward-walk mulligan | -3.4, then -5.8 |
+| greedy chain, level leaf | null, bit-identical at depth 3 and 6 |
+| greedy chain, **delta** leaf, root-relative | **+0.13** |
+| **v7's whole delta vector** | **+5.40 / +5.67** |
+
+One intervention has ever worked, and it was not a search and not a term — it
+was giving v8 **the value function v7 already had**, all thirteen terms at once.
+The remaining ~4.5 points are not in the leaf's shape, the search, the depth, the
+granularity, or the opponent model. They are in something about the content of
+v7's `Search::complete` — which differs from `with_followup` in that it re-offers
+after **every** action to a depth-8 node budget, and v8 still evaluates each
+root action with a single breadth step.
+
+That is a real, located, unmeasured lead. It is not a leaf term and it is not a
+depth change; it is the difference between "score each action once" and "score
+each action and then actually play it out". Closing it means making the ROOT
+expansion a backup rather than a breadth step, which is a larger change than
+this file's current structure makes cheap.
+
 ### 11.2 The probe is a localiser, not a rule generator
 
 `PROBE=v9` put v9's Main (v7's) against v8's on the same states. Four games,
