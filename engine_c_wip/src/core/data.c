@@ -334,7 +334,7 @@ const char *rb_card_string(uint16_t idx) {
    cards), which is exactly the None that card_binary.rs builds. Before this
    accessor the only ways to reach the unit were `Card.unit_idx` +
    `rb_card_string` — which silently yields "" for both "absent" and "index
-   0xFFFF", and which callers in ability/*.c were not using consistently.
+   0xFFFF", and which callers under ability/ were not using consistently.
 
    Unlike `group` (which is the EMPTY STRING for every one of the 2,639 cards
    and is therefore only usable through rb_card_group_name, the series-derived

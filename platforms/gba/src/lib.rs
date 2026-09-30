@@ -13,6 +13,7 @@ extern crate alloc;
 mod board;
 mod card_art_gen;
 pub mod deck_builder;
+pub mod diag;
 mod display;
 mod font_tiles_gen;
 mod overlay;

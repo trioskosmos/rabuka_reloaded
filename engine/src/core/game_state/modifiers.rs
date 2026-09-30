@@ -412,12 +412,33 @@ impl GameState {
         {
             if let Some(card) = self.card_database.get_card(cid) {
                 for (idx, ar) in card.abilities.iter().enumerate() {
-                    let ability = ar.resolve();
-                    if Self::ability_matches_trigger(
-                        &ability,
-                        &crate::game_state::AbilityTrigger::Constant,
-                    ) && ability.effect.is_some()
-                    {
+                    // `peek()` first: this is a read-only predicate over ~6 stage
+                    // cards x ~3 abilities on every `recalculate_constants`, and
+                    // `resolve()` would cost an `Arc::clone` (an atomic RMW on a
+                    // line shared across all worker threads) per ability. The
+                    // `resolve()` arm is the fallback for a not-yet-decoded slot
+                    // on std, and the only path on `no_std` (no slot cache).
+                    //
+                    // Both arms compute the boolean rather than binding a
+                    // reference: the `Arc` from `resolve()` is a temporary that
+                    // dies at the end of the `let`, so `&*ar.resolve()` would
+                    // dangle.
+                    let constant_ability = match ar.peek() {
+                        Some(a) => {
+                            Self::ability_matches_trigger(
+                                a,
+                                &crate::game_state::AbilityTrigger::Constant,
+                            ) && a.effect.is_some()
+                        }
+                        None => {
+                            let a = ar.resolve();
+                            Self::ability_matches_trigger(
+                                &a,
+                                &crate::game_state::AbilityTrigger::Constant,
+                            ) && a.effect.is_some()
+                        }
+                    };
+                    if constant_ability {
                         ids.push((cid, idx));
                     }
                 }

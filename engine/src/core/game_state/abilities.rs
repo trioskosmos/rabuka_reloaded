@@ -156,12 +156,21 @@ impl GameState {
     /// and the resolution-time gate (see `resolver.rs`): keeping them in sync is what
     /// prevents a once-per-turn each_time watcher from being re-queued forever.
     pub fn ability_has_remaining_uses(&self, card_id: i16, ability_index: usize) -> bool {
-        let Some(limit) = self
+        // `peek()` rather than `resolve()`: this reads a single `u8`, and
+        // `resolve()` would pay an `Arc::clone` (an atomic RMW on a line shared
+        // by every worker thread) for it. Both arms copy the `u8` out rather
+        // than binding a reference, because the `Arc` from `resolve()` is a
+        // temporary that dies at the end of the statement. On `no_std` `peek()`
+        // always returns `None`, so the `resolve()` arm is the only live path.
+        let limit = self
             .card_database
             .get_card(card_id)
             .and_then(|c| c.abilities.get(ability_index))
-            .and_then(|ar| ar.resolve().use_limit)
-        else {
+            .and_then(|ar| match ar.peek() {
+                Some(a) => a.use_limit,
+                None => ar.resolve().use_limit,
+            });
+        let Some(limit) = limit else {
             return true;
         };
         self.ability_uses_used(card_id, ability_index) < limit

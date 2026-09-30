@@ -61,6 +61,29 @@ impl AbilityRef {
         }
     }
 
+    /// Borrowed form of [`Self::resolve`] for callers that only READ the ability.
+    ///
+    /// `resolve()` returns an owned `Arc`, and an `Arc::clone` is an atomic
+    /// read-modify-write on a cache line that is shared by every worker thread
+    /// (the decode slots are process-global). There are ~50 `.resolve()` call
+    /// sites, many inside per-card loops, so the engine was doing on the order
+    /// of a few hundred atomic RMWs per action purely to extend a lifetime for a
+    /// field read like `use_limit: u8`. This costs nothing.
+    ///
+    /// Returns `None` only before the slot has been decoded; on `no_std` there
+    /// is no slot cache at all, so callers there must keep using `resolve()`.
+    #[inline]
+    pub fn peek(&self) -> Option<&Ability> {
+        #[cfg(not(feature = "no_std"))]
+        {
+            decoded_slots()[self.0 as usize].get().map(|a| &**a)
+        }
+        #[cfg(feature = "no_std")]
+        {
+            None
+        }
+    }
+
     fn decode(&self) -> Ability {
         match crate::ability::vm::get_ability(self.0 as usize) {
             Ok(ability) => ability,

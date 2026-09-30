@@ -580,17 +580,26 @@ impl<'a> ConditionContext<'a> {
             }
         };
 
-        let is_plain_location =
-            matches!(condition, Condition::Location { .. }) && condition.get_count().is_none();
+        // One `common()` bind for the whole post-dispatch guard. Every
+        // `condition.get_X()` is `self.common().and_then(|c| c.X)`, and
+        // `common()` is a 21-arm match on the discriminant followed by a `Box`
+        // deref — so the guard below used to re-match the same discriminant it
+        // had just matched in the dispatch `match`, once per field read.
+        // `get_heart_type` and `get_ability_filter` are variant-specific and
+        // still go through their own accessors.
+        let common = condition.common();
 
-        let final_result = if condition.get_negation().unwrap_or(false)
+        let is_plain_location =
+            matches!(condition, Condition::Location { .. }) && common.and_then(|c| c.count).is_none();
+
+        let final_result = if common.and_then(|c| c.negation).unwrap_or(false)
             && !(matches!(condition, Condition::Location { .. })
-                && condition.get_card_property().is_some())
+                && common.and_then(|c| c.card_property.as_ref()).is_some())
             && !(matches!(condition, Condition::Movement { .. })
-                && condition.get_card_property().is_some())
+                && common.and_then(|c| c.card_property.as_ref()).is_some())
             && !(is_plain_location && condition.get_heart_type() == Some("all"))
             && !(is_plain_location
-                && condition.get_location() == Some("revealed_cards")
+                && common.and_then(|c| c.location.as_deref()) == Some("revealed_cards")
                 && self.game_state.revealed_cards.is_empty())
         {
             !result

@@ -544,35 +544,42 @@ impl super::TurnEngine {
         // BOTH players before the first performance phase; consuming all at once would
         // leave the second player's snapshot empty. Only enrich apps whose source or
         // target card belongs to the current performer.
-        let performer_owned_ids: crate::HashSet<i16> = {
+        // The performer's three zones hold ~7 cards total, and this membership
+        // test is used for at most two `contains` lookups per ability
+        // application. Building a `HashSet` for that meant an allocation, a table
+        // probe and N SipHash computations per performance — and this function
+        // is one of the two top cost centres in the engine. Same transformation
+        // already applied to `recalculate_constants`' per-call ownership sets.
+        //
+        // `all_apps` is taken FIRST so the immutable player borrow below does
+        // not overlap the `&mut` needed to put `other_apps` back.
+        let all_apps = core::mem::take(&mut game_state.ability_applications);
+        let mut apps = Vec::new();
+        let mut other_apps = Vec::new();
+        {
             let p = if perf_player_id == game_state.player1.id {
                 &game_state.player1
             } else {
                 &game_state.player2
             };
-            p.stage
-                .stage
-                .iter()
-                .chain(p.live_card_zone.cards.iter())
-                .chain(p.success_live_card_zone.cards.iter())
-                .copied()
-                .filter(|&cid| cid != -1)
-                .collect()
-        };
-        let all_apps = core::mem::take(&mut game_state.ability_applications);
-        let mut apps = Vec::new();
-        let mut other_apps = Vec::new();
-        for app in all_apps {
-            let belongs = (app.target_card_id != -1
-                && performer_owned_ids.contains(&app.target_card_id))
-                || (app.source_card_id != -1 && performer_owned_ids.contains(&app.source_card_id));
-            if belongs {
-                apps.push(app);
-            } else {
-                other_apps.push(app);
+            // Callers below always test `!= -1` first, so the old set's
+            // `.filter(|&cid| cid != -1)` needs no counterpart here.
+            let performer_owns = |cid: i16| -> bool {
+                p.stage.stage.contains(&cid)
+                    || p.live_card_zone.cards.contains(&cid)
+                    || p.success_live_card_zone.cards.contains(&cid)
+            };
+            for app in all_apps {
+                let belongs = (app.target_card_id != -1 && performer_owns(app.target_card_id))
+                    || (app.source_card_id != -1 && performer_owns(app.source_card_id));
+                if belongs {
+                    apps.push(app);
+                } else {
+                    other_apps.push(app);
+                }
             }
+            game_state.ability_applications = other_apps.into();
         }
-        game_state.ability_applications = other_apps.into();
         crate::turn::live::enrich_from_applications(
             &mut mc,
             &mut bd,

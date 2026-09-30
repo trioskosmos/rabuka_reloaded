@@ -470,6 +470,7 @@ int rb_card_matches_any_group(int card_id, const char **groups, int n) {
     return 0;
 }
 
+
 /* ── Card predicate helpers ───────────────────────────────────────────── */
 
 /* Mirror util.rs::card_matches_characters (util.rs:789-801) — the query name is

@@ -197,10 +197,15 @@ impl<'a> ConditionContext<'a> {
             );
             return property_cards.is_empty();
         }
+        // `filter_subset()` is loop-invariant here: it reads only `condition`
+        // (21-arm `common()` match + 9 field reads + a 40-field `CardFilter`
+        // construction), so building it per candidate card meant rebuilding the
+        // same filter up to `check_cards.len()` times. Only `heart_colors` was
+        // actually varying, and it is now set once alongside.
+        let mut filter = condition.filter_subset();
+        filter.heart_colors = condition.get_heart_colors().unwrap_or(&[]);
         let mut matching = Vec::new();
         for &id in &check_cards {
-            let mut filter = condition.filter_subset();
-            filter.heart_colors = condition.get_heart_colors().unwrap_or(&[]);
             let other_filters_match = filter.matches(card_db, id, true)
                 && self.check_original_blade_filter(condition, id)
                 && self.check_original_heart_filter(condition, id)
@@ -901,6 +906,28 @@ impl<'a> ConditionContext<'a> {
                 .and_then(|g| g.first().map(|s| s.as_str()))
         });
 
+        // Hoisted above the scan: the operator and threshold decide whether the
+        // scan can stop at the first match (see `monotone_exists` below). Both
+        // are pure functions of `condition`.
+        //
+        // Operator ownership: when original_value=true WITHOUT a blade_limit,
+        // the condition operator belongs to the PER-CARD heart comparison
+        // consumed by check_original_heart_filter below
+        // (「元々持つハートの数より多い数のハートを持つメンバー」). Reusing it
+        // for the outer member-count would demand N+1 boosted members instead
+        // of N. The outer clause (「メンバーがいる/N人以上」) is a plain
+        // existence/count threshold -> >=.
+        let thresh = condition.get_count().unwrap_or(1);
+        let effective_op = predicates::member_count_operator(condition, thresh);
+        // `compare_counts(Some(">="), n, 1)` is `n >= 1`, i.e. `n > 0`, i.e.
+        // `any`. For that case a full `.count()` traversal is wasted work: the
+        // corpus has 69 such `location_condition` clauses out of 100, and the
+        // zones involved run 30-64 cards (deck 64, waitroom 30). Gated on
+        // `!debug_enabled()` so the verdict's `actual` field still reports the
+        // true count in debug sessions.
+        let monotone_exists =
+            effective_op == Some(">=") && thresh <= 1 && !crate::ability::log::debug_enabled();
+
         let count = {
             let mut filter = condition.filter_subset();
             if let Some(grp) = group_override {
@@ -914,17 +941,18 @@ impl<'a> ConditionContext<'a> {
             // the two per-side match counts so a threshold >1 can never be met
             // by combining partial matches across both players' zones.
             let count_side = |zone_cards: &[i16]| -> u8 {
-                zone_cards
-                    .iter()
-                    .filter(|&&id| {
-                        id != -1
-                            && filter.matches(card_db, id, true)
-                            && self.check_original_blade_filter(condition, id)
-                            && self.check_original_heart_filter(condition, id)
-                            && self.check_heart_type_all_per_card(condition, card_db, id)
-                    })
-                    .count()
-                    .u8_count()
+                let matches_one = |&id: &i16| {
+                    id != -1
+                        && filter.matches(card_db, id, true)
+                        && self.check_original_blade_filter(condition, id)
+                        && self.check_original_heart_filter(condition, id)
+                        && self.check_heart_type_all_per_card(condition, card_db, id)
+                };
+                if monotone_exists {
+                    if zone_cards.iter().any(matches_one) { 1u8 } else { 0u8 }
+                } else {
+                    zone_cards.iter().filter(|id| matches_one(id)).count().u8_count()
+                }
             };
             let is_either = condition.get_target() == Some("either")
                 && Zone::from_str(location) != Some(Zone::RevealedCards);
@@ -1006,15 +1034,6 @@ impl<'a> ConditionContext<'a> {
                 return false;
             }
         }
-        let thresh = condition.get_count().unwrap_or(1);
-        // Operator ownership: when original_value=true WITHOUT a blade_limit,
-        // the condition operator belongs to the PER-CARD heart comparison
-        // consumed by check_original_heart_filter above
-        // (「元々持つハートの数より多い数のハートを持つメンバー」). Reusing it
-        // for the outer member-count would demand N+1 boosted members
-        // instead of N. The outer clause (「メンバーがいる/N人以上」) is a
-        // plain existence/count threshold -> >=.
-        let effective_op = predicates::member_count_operator(condition, thresh);
         compare_counts(effective_op, count, thresh)
     }
 

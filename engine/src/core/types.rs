@@ -35,7 +35,11 @@ impl From<String> for ArcStr {
 
 impl From<&str> for ArcStr {
     fn from(s: &str) -> Self {
-        ArcStr(Arc::from(s.to_string()))
+        // `Arc::<str>::from(s)` directly, NOT `Arc::from(s.to_string())`:
+        // the latter allocates a String, then allocates an Arc header and
+        // memcpys the bytes into it, then frees the String — two allocations
+        // and two copies where one of each suffices.
+        ArcStr(Arc::from(s))
     }
 }
 

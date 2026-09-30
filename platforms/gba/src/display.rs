@@ -176,26 +176,26 @@ struct CachedPlacement {
 
 /// OBJ VRAM budget for cached card art.
 ///
-/// The GBA has 32KB of OBJ character VRAM and agb allocates sprites out of it
-/// with no paging. Card art must be 8bpp — MASTER_PAL holds 240 colours and a
-/// 4bpp OBJ palette bank holds 16 — and an 8bpp tile is 64 bytes, double a
-/// 4bpp one. That fixes the cost per placement:
+/// The GBA has 32,768 B of sprite character VRAM and agb's sprite allocator
+/// owns exactly that (`SPRITE_ALLOCATOR` = 0x06010000 + 32KB); there is no
+/// paging. Card art must be 8bpp — MASTER_PAL is 240 colours and a 4bpp OBJ
+/// bank holds 16 — and an 8bpp tile is 64 B, double a 4bpp one.
 ///
-///     stage  4 parts = 36 tiles = 2304B
-///     hand   2 parts = 16 tiles = 1024B
-///     live   1 part  =  8 tiles =  512B
-///     detail 9 parts = 72 tiles = 4608B
+/// Measured worst case for a full 1v1 board (verified against `BoardFrame` in
+/// board.rs, not estimated):
 ///
-/// A 1v1 board showing both players' hands is 6 stage + 8 live + 14 hand =
-/// 32,256B against 32,768B of VRAM — the visible set alone is ~98% of the
-/// hardware. So `SPRITE_CACHE_CAP` (which counts KEYS) bounded the wrong
-/// quantity entirely, and the only pressure response was to clear every
-/// placement and retry, which made a full board re-upload itself every frame.
+///     6 stage   4 parts/ 36 tiles = 2304B each = 13,824
+///     6 live    1 part /  8 tiles =  512B each =  3,072
+///     6 live-set (face-down)         512B each =  3,072
+///     10 hand   2 parts/ 16 tiles = 1024B each = 10,240
+///                                          total = 30,208B
 ///
-/// Budget 28KB: the visible set fits, and the ~4.7KB of slack absorbs the
-/// transient placements a transition needs (a card mid-draw, a deck back)
-/// without a mass re-upload.
-const SPRITE_VRAM_BUDGET: usize = 28 * 1024;
+/// So the board FITS, with 2,560B spare — and the detail portrait
+/// (9 parts / 216 tiles = 13,824B) is structurally exclusive with it, since
+/// `render_board_frame` evicts `detail:` and `render_card_detail` retains only
+/// that one key. The budget exists to keep the transient overlap of consecutive
+/// frames bounded, not because the board overruns.
+const SPRITE_VRAM_BUDGET: usize = 30 * 1024;
 
 /// OBJ VRAM a placement's parts will occupy. 8bpp: 64 bytes per tile.
 fn placement_bytes(parts: &[(Size, usize, usize)]) -> usize {
@@ -349,10 +349,12 @@ impl CardSpriteCache {
     }
 
     /// Upload one sprite part: sample the baked tile grid (centred in the
-    /// card box, optionally rotated 180°, optionally 90° CCW for the
-    /// wait-state, and dither-dimmed) via `set_pixel` so rectangular sizes
-    /// use the correct OBJ 1D-mapping layout.
+    /// card box, optionally 90° CCW for the wait-state, and dither-dimmed) via
+    /// `set_pixel` so rectangular sizes use the correct OBJ 1D-mapping layout.
     /// Gutter pixels (sprite area outside the card box) stay index 0.
+    ///
+    /// The 180° opponent-side turn is deliberately absent: it is an OAM
+    /// hflip+vflip, so rasterising it here would only duplicate VRAM.
     #[allow(clippy::too_many_arguments)]
     fn upload_part(
         tiles: &[u8],
@@ -360,7 +362,6 @@ impl CardSpriteCache {
         grid_h: usize,
         box_w: usize,
         box_h: usize,
-        flipped: bool,
         dimmed: bool,
         rot_ccw: bool,
         size: Size,
@@ -392,13 +393,11 @@ impl CardSpriteCache {
                     continue;
                 }
                 // Box pixel -> art pixel (art is centred in the box via ox/oy).
-                // 180° rotation mirrors in BOX space first, then offsets
-                // into art space, so centred art stays centred.
-                let (fx, fy) = if flipped {
-                    (box_w as i32 - 1 - bx as i32, box_h as i32 - 1 - by as i32)
-                } else {
-                    (bx as i32, by as i32)
-                };
+                // A 180-degree turn is NOT rasterised here: it is an OAM
+                // hflip+vflip applied in `push_card`, which costs nothing and
+                // lets the flipped placement share the unflipped one's VRAM.
+                // Only the genuine 90-degree wait rotation needs pixels here.
+                let (fx, fy) = (bx as i32, by as i32);
                 // 90° CCW (wait-state, like 3DS tapped): the rotated frame
                 // pixel (fx-ox, fy-oy) samples unrotated (W-1-y, x), i.e.
                 // art top-left lands at box bottom-left.
@@ -470,15 +469,14 @@ impl CardSpriteCache {
         // Box dims are part of the key: the board stage box (48px, with the
         // wait gap) and the menu stage box (40px) share tag/art but centre
         // differently — aliasing them shifts art by the gap.
-        let flip_c = if flipped { 'f' } else { 'n' };
-        let dim_c = if dimmed { 'd' } else { 'n' };
+        // `flipped` is deliberately NOT part of the key: a 180-degree turn is
+        // an OAM hflip+vflip, so the flipped and unflipped placements are the
+        // same VRAM tile block. Keying on it (and rasterising it) minted a
+        // private duplicate of every opponent-side card's art.
         self.touched = true;
         self.key_buf.clear();
-        let _ = write!(
-            self.key_buf,
-            "{}:{}:{}x{}:{}:{}",
-            tag, card_no, box_w, box_h, flip_c, dim_c
-        );
+        let dim_c = if dimmed { 'd' } else { 'n' };
+        let _ = write!(self.key_buf, "{}:{}:{}x{}:{}", tag, card_no, box_w, box_h, dim_c);
         if let Some(p) = self.sprites.get_mut(self.key_buf.as_str()) {
             p.last_used = self.frame;
         } else {
@@ -514,8 +512,8 @@ impl CardSpriteCache {
                 self.twin_buf.clear();
                 let _ = write!(
                     self.twin_buf,
-                    "{}:{}:{}x{}:{}:{}",
-                    tt, card_no, box_w, box_h, flip_c, dim_c
+                    "{}:{}:{}x{}:{}",
+                    tt, card_no, box_w, box_h, dim_c
                 );
                 // Miss path only: clone the twin key out to end the buffer
                 // borrow before mutating the map.
@@ -547,7 +545,6 @@ impl CardSpriteCache {
                     grid_h,
                     box_w,
                     box_h,
-                    flipped,
                     dimmed,
                     rot_ccw,
                     size,
@@ -585,7 +582,7 @@ impl CardSpriteCache {
     /// Evict least-recently-used placements until the cache holds fewer than
     /// `cap` keys. A count-based backstop for a pathological number of tiny
     /// placements; the byte budget is the real bound, since keys differ in
-    /// cost by 9x (live 512B .. detail 4608B) and so a count says nothing
+    /// cost by 27x (live 512B .. detail 13824B) and so a count says nothing
     /// about whether the art fits in VRAM.
     fn evict_over_cap(&mut self, cap: usize) {
         while self.sprites.len() > cap {
@@ -1190,6 +1187,17 @@ impl<'a> Display<'a> {
                 for (vram, &(_, dx, dy)) in vrams.iter().zip(parts.iter()) {
                     let mut obj = Object::new(vram.clone());
                     obj.set_pos((px + dx as i32, py + dy as i32));
+                    // A 180-degree rotation is hflip|vflip in OAM attributes,
+                    // not pixels. Rasterising it (which this used to do)
+                    // cost a separate VRAM upload for every opponent-side
+                    // slot: 3 stage + 6 live = 9,984B of byte-for-byte
+                    // duplicates, and because `flipped` was also in the cache
+                    // key the flipped copy could never share the unflipped
+                    // placement's VRAM. The hardware does it for free.
+                    if flipped {
+                        obj.set_hflip(true);
+                        obj.set_vflip(true);
+                    }
                     obj.set_priority(SPRITE_PRIO);
                     self.active_sprites.push(obj);
                 }
@@ -1214,6 +1222,35 @@ impl<'a> Display<'a> {
         let e0 = TileEffect::new(false, false, 15);
 
         self.clear_layers(&ui_ts, e0);
+
+        // Live sprite-VRAM readout, bottom-left. OBJ VRAM is this port's
+        // binding constraint (see `vram_stats`), and when the board degrades
+        // the number that explains it is the one the hardware is actually
+        // out of. `!(!!)` doubles a digit into an ASCII glyph without an
+        // integer formatter.
+        {
+            let (bytes, keys) = self.vram_stats();
+            let mut line = String::with_capacity(24);
+            line.push_str("v");
+            for d in [bytes / 1024, (bytes % 1024) / 100] {
+                line.push(char::from(b'0' + (d / 10) as u8));
+                line.push(char::from(b'0' + (d % 10) as u8));
+                if d == bytes / 1024 {
+                    line.push('.');
+                }
+            }
+            line.push('k');
+            for d in [keys / 10, keys % 10] {
+                line.push(char::from(b'0' + d as u8));
+            }
+            // Over budget is the interesting state, so mark it in text.
+            if bytes > SPRITE_VRAM_BUDGET {
+                line.push('!');
+            }
+            line.push(' ');
+            line.push_str(crate::diag::level_tag());
+            Self::blit_line(&mut self.ui_front, &font_ts, &icon_ts, e0, &line, 0, ROWS - 2);
+        }
 
         Self::blit_line(&mut self.ui_front, &font_ts, &icon_ts, e0, &frame.header, 0, 0);
         Self::blit_line(&mut self.ui_front, &font_ts, &icon_ts, e0, &frame.action_count, COLS - 6, 0);
@@ -1361,9 +1398,15 @@ impl<'a> Display<'a> {
             }
         };
         let (box_w, box_h) = kind.px();
+        // Face-down slots all draw the SAME `BACK_FRONT` art, but keying them
+        // on their own card_no minted one 512B placement per slot — six copies
+        // of identical pixels. Key them on a constant instead: the cache then
+        // holds one entry (or two, for the flipped opponent row) and the win
+        // is handed straight back as VRAM headroom.
+        let key_card_no = if slot.hidden { "" } else { card_no };
         self.push_card(
             tag,
-            card_no,
+            key_card_no,
             tiles,
             gw,
             gh,
@@ -1556,6 +1599,18 @@ impl<'a> Display<'a> {
     /// real present.
     pub fn reset_vram(&mut self) {
         self.sprite_cache.clear();
+    }
+
+    /// `(bytes of OBJ VRAM held, cached placement count)`.
+    ///
+    /// OBJ VRAM is the binding constraint on this port: card art is 8bpp
+    /// (64 B/tile) because MASTER_PAL is 240 colours, and the GBA has only
+    /// 32,768 B of sprite character VRAM with no paging. A 1v1 board showing
+    /// both players' hands needs ~32,256 B of that, so this number going over
+    /// `SPRITE_VRAM_BUDGET` is the single most useful thing to watch while
+    /// the board misbehaves. Surfaced on screen by the board view.
+    pub fn vram_stats(&self) -> (usize, usize) {
+        (self.sprite_cache.vram_bytes, self.sprite_cache.sprites.len())
     }
 
     /// Queue a card image for the next [`Display::swap_buffers`]. Called by

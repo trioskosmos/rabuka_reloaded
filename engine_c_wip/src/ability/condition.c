@@ -2463,16 +2463,26 @@ static int check_distinct_names(const struct GameState *g, int actor, const Cond
         return nd == n;
     }
     if (!strcmp(dtype, "group_name")) {
-        int ng = 0;
+        /* card.rs:630-644 — DISTINCT `card.group` values over the pool. The C
+           read the RAW `group` record index, which is the empty string on all
+           2,639 cards, so this branch counted 0 and every 「異なるグループ名」
+           `distinct: group_name` condition was unsatisfiable. Rust keys the
+           set on the SERIES-DERIVED group, so rb_card_group_name() is the
+           right source; cards whose derived group is empty are skipped, not
+           counted (card.rs:634). With a `count`, the gate is seen.len() >= n;
+           without one, seen.len() == cards.len() (a collision-free pool). */
+        const char *seen[64]; int nseen = 0;
         for (int i = 0; i < n; i++) {
+            if (ids[i] < 0) continue;
             if (group && !rb_card_matches_group_str(ids[i], group)) continue;
-            Card cc; if (!rb_decode_card_by_index((uint32_t)ids[i], &cc)) continue;
-            const char *gn = rb_card_string(cc.group_idx);
-            rb_free_card(&cc);
-            if (gn && *gn) ng++;
+            const char *gn = rb_card_group_name(ids[i]);
+            if (!gn || !*gn) continue;
+            int dup = 0;
+            for (int k = 0; k < nseen; k++) if (!strcmp(seen[k], gn)) { dup = 1; break; }
+            if (!dup && nseen < 64) seen[nseen++] = gn;
         }
-        if (has_thr) return eval_operator(ng, get_str(c, "operator"), thr);
-        return ng == n;
+        if (has_thr) return eval_operator(nseen, get_str(c, "operator"), thr);
+        return nseen == n;
     }
     /* card_name distinct: DISTINCT card names. Rust card.rs:600-603 first
        narrows the pool to the named group, then card.rs:640-658 dedupes; the
