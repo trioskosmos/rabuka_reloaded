@@ -672,24 +672,87 @@ fn board_ui_tiles() -> &'static [u8] {
     }
 }
 
+/// Reused inflate state.
+///
+/// `miniz_oxide::inflate::core::DecompressorOxide` is ~10.4KB (three 3456-byte
+/// Huffman tables), so it cannot be a local — the GBA stack is a few KB. It
+/// lives in .bss and is re-`init`ed per call, so nothing carries between blobs.
+///
+/// Do NOT replace this with `inflate::decompress_to_vec_zlib`. That helper
+/// allocates `Box::<DecompressorOxide>::default()` — this 10.4KB struct — plus
+/// an output Vec on EVERY call (`inflate/mod.rs:191-193`). The sprite cache
+/// misses often (it is VRAM-bounded and LRU-evicts), so that churn exhausts
+/// the 256KB EWRAM heap within seconds of play and the render state falls
+/// apart. The low-level `decompress()` below allocates nothing at all.
+///
+/// `None` until first use, because `DecompressorOxide::new()` is not a `const
+/// fn` and so cannot appear in a `static` initializer. The `UnsafeCell` is
+/// what lets the GBA's single thread mutate it; a bare `static mut` would need
+/// a `&mut` to a mutable static, which is the UB the compiler warns about.
+struct ArtInflaterCell(core::cell::UnsafeCell<Option<ArtInflater>>);
+
+// Safe: the GBA is single-threaded and every access is a short, non-reentrant
+// borrow that ends before `decompress_art` returns.
+unsafe impl Sync for ArtInflaterCell {}
+
+static ART_INFLATE: ArtInflaterCell = ArtInflaterCell(core::cell::UnsafeCell::new(None));
+
+type ArtInflater = miniz_oxide::inflate::core::DecompressorOxide;
+
 /// Fill `dst` from one baked `.bin` blob.
 ///
 /// Uniform contract (enforced by `tools/bake_card_art.py`): EVERY `.bin` is a
 /// zlib stream, so there is deliberately no format sniffing here. `dst` must
-/// fit the decompressed size; callers size it from the grid (`tiles * 64`).
+/// be exactly the decompressed size; callers size it from the grid
+/// (`tiles * 64`).
 ///
 /// zlib/DEFLATE rather than the BIOS LZ77 (SWI 0x11) this used to call. On the
 /// 8bpp dithered indexed art in `baked/card_art` the two measure 25.9MB vs
-/// 18.9MB across all 1809 cards — the BIOS window is 4KB and per-blob, so no
-/// card can match another, while deflate's entropy stage is what actually
-/// handles a near-flat 6.4-bit/symbol distribution. miniz_oxide is already
-/// linked in for the ability bytecode, so this adds no new code to the ROM.
+/// 18.9MB across all cards. LZ77 lost for two independent reasons: its 4KB
+/// window is applied per blob so no card can match another, and it is a pure
+/// dictionary matcher with no entropy stage, which is the wrong tool for art
+/// whose order-0 entropy is 6.4 bits/symbol (measured — near-flat, because
+/// Floyd-Steinberg dithering injects high-frequency noise). Deflate is LZ77
+/// plus exactly the Huffman stage this data needs. Dropping the dithering was
+/// measured as an alternative and recovers only 16% of the gap, so the format
+/// is what mattered, not the data.
 fn decompress_art(src: &[u8], dst: &mut [u8]) {
-    log::debug!("[ART] inflate {}B -> {}B", src.len(), dst.len());
-    let raw = miniz_oxide::inflate::decompress_to_vec_zlib(src)
-        .expect("[ART] baked blob is not a valid zlib stream");
-    debug_assert_eq!(raw.len(), dst.len());
-    dst.copy_from_slice(&raw);
+    use miniz_oxide::inflate::core::inflate_flags::{
+        TINFL_FLAG_PARSE_ZLIB_HEADER, TINFL_FLAG_USING_NON_WRAPPING_OUTPUT_BUF,
+    };
+    use miniz_oxide::inflate::core::decompress;
+    use miniz_oxide::inflate::TINFLStatus;
+
+    let d: &mut ArtInflater = unsafe {
+        let slot = &mut *ART_INFLATE.0.get();
+        slot.get_or_insert_with(ArtInflater::new)
+    };
+    // The state is reused across calls, so it must not carry a half-finished
+    // block from the previous blob into this one.
+    d.init();
+
+    // TINFL_FLAG_USING_NON_WRAPPING_OUTPUT_BUF is required: without it inflate
+    // demands a power-of-two output buffer, and none of our grid sizes are.
+    let (status, _in_consumed, out_written) = decompress(
+        d,
+        src,
+        dst,
+        0,
+        TINFL_FLAG_PARSE_ZLIB_HEADER | TINFL_FLAG_USING_NON_WRAPPING_OUTPUT_BUF,
+    );
+
+    // A malformed blob leaves `dst` as whatever was there. The BIOS LZ77 path
+    // this replaced also had no integrity check (it silently produced garbage),
+    // so this is no worse — but it must not panic: a panic in this no_std
+    // build halts the machine, and one bad blob should cost one blank sprite,
+    // not the game.
+    if status != TINFLStatus::Done || out_written != dst.len() {
+        agb::println!(
+            "[ART] inflate FAILED {:?} {}B -> {}B (got {}B); sprite left blank",
+            status, src.len(), dst.len(), out_written
+        );
+        dst.fill(0);
+    }
 }
 
 impl<'a> Display<'a> {

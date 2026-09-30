@@ -1024,15 +1024,23 @@ impl AbilityResolver {
                 .and_then(|act_id| player.stage.stage.iter().position(|&id| id == act_id))
                 .ok_or_else(|| "Activating card not found at stage".to_string())?;
             gs.last_vacated_stage_area = Some(idx.u8_count());
+            log::debug!(
+                "[STAGE_BRANCH_SET] activating={:?} idx={} last_vacated={:?} dest={}",
+                c.activating_card_id,
+                idx,
+                gs.last_vacated_stage_area,
+                c.destination
+            );
+
             if c.destination != "same_area" {
                 Ok(player
                     .remove_member_from_stage_with_recycling(idx, card_db)
                     .into_iter()
                     .collect())
             } else {
-                gs.last_vacated_stage_area = None;
                 Ok(vec![player.stage.stage[idx]])
             }
+
         } else {
             let filter = util::filter_from_parts_full(
                 c.card_type_filter,
@@ -2077,6 +2085,15 @@ gs.set_recently_moved_batch(moved.clone().into(), Some("under_member"));
         let card_db = gs.card_database.clone();
         let activating_card_id = gs.activating_card;
         let mut vacated_stage_area = gs.last_vacated_stage_area;
+        log::debug!(
+            "[MOVE_EFFECT_READ] activating={:?} dest={:?} source={:?} last_vacated={:?} \
+             stage={:?}",
+            gs.activating_card,
+            effect.destination,
+            effect.source,
+            vacated_stage_area,
+            gs.resolve_target_player("self").stage.stage
+        );
 
         // Character name filter from the effect
         let character_filter: Option<Vec<String>> = effect.characters_any().cloned();
@@ -2146,7 +2163,32 @@ gs.set_recently_moved_batch(moved.clone().into(), Some("under_member"));
                 vacated_stage_area,
             );
         }
-        gs.last_vacated_stage_area = None;
+        // A `same_area` destination CONSUMES the vacated area, and the consuming
+        // placement can happen after this frame has suspended: the effect raises a
+        // selection prompt and returns early, and on resume `execute_selected_cards_from_zone`
+        // (move/mod.rs:2666) reads `gs.last_vacated_stage_area` to forward it through
+        // `execute_stage_placement_choices` (move/placement.rs:381).
+        //
+        // Clearing unconditionally here destroyed the value on exactly that path.
+        // PL!HS-bp1-002-RM 「…このメンバーがいたエリアに登場させる」 placed the card in the
+        // FIRST FREE SLOT (the centre) whenever its waitroom held two candidates and the
+        // player was prompted, but placed it correctly in the vacated area when there was
+        // a single candidate and no prompt was raised — the same card, same effect, one
+        // behavioural difference with one cause.
+        //
+        // So clear unless THIS move is the consumer. Everything else keeps the staleness
+        // guard the unconditional clear was there for.
+        let consumes_vacated_area = effect.destination == Some(Zone::SameArea);
+        log::debug!(
+            "[VACATED_CLEAR] dest={:?} vacated={:?} consuming={} -> keep={}",
+            effect.destination,
+            vacated_stage_area,
+            consumes_vacated_area,
+            consumes_vacated_area
+        );
+        if !consumes_vacated_area {
+            gs.last_vacated_stage_area = None;
+        }
 
         // Store destination for execute_selected_cards_from_zone to read later
         // (needed when the resolve creates a card selection choice and the destination

@@ -1751,15 +1751,17 @@ void rb_move_execute_move_cards(GameState *g, int actor, AbilityEffect *e) {
     /* move_cards.rs:2023 resolves pos_to_use ONCE and place_taken_cards
        (:2335-2343) then hands the same area to every card of the batch. */
     int dest_pl = use_p2 ? 1 : actor;
-    int um_pos = (destination && !strcmp(destination, "under_member"))
-                     ? rb_move_under_member_pos(g, dest_pl) : -1;
+    int dest_is_under_member = destination && !strcmp(destination, "under_member");
+    int um_pos = dest_is_under_member ? rb_move_under_member_pos(g, dest_pl) : -1;
     for (int i = 0; i < n; i++) {
         int cid = out_ids[i];
         find_and_remove_card(P, cid);
         /* util.rs:2341-2359 has a real Zone::UnderMember arm; the C twin
            (util.c:836) does not, so route the placement here instead of
-           through rb_place_card_in_zone, which would drop the card. */
-        if (um_pos >= 0 || (destination && !strcmp(destination, "under_member")))
+           through rb_place_card_in_zone, which would drop the card. Note
+           um_pos == -1 is still a valid under_member landing: the helper
+           then falls back to center -> left -> right -> waitroom. */
+        if (dest_is_under_member)
             rb_move_place_card_under_member(g, dest_pl, cid, um_pos);
         else
             rb_place_card_in_zone(g, actor, cid, destination, -1);

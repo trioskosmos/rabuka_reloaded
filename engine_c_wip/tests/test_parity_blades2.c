@@ -1,12 +1,13 @@
 /* test_parity_blades2.c -- C parity suite for the Rust clusters
- *   engine/tests/test_modules/effects/gain/blades/per_card/   (14 .rs / 56 #[test])
- *   engine/tests/test_modules/effects/ability_mod/            (14 .rs / 69 #[test])
+ *   engine/tests/test_modules/effects/gain/blades/per_card/   (14 .rs)
+ *   engine/tests/test_modules/effects/ability_mod/           (14 .rs)
  *
- * COVERAGE BOUNDARY, established from the BODIES of the peer files (not from
- * their header claims -- a header claim has been wrong four times in this
- * project):
+ * COVERAGE BOUNDARY, established from the BODIES of the peer files and from a
+ * card-number scan of every tests/*.c in this tree (a header claim has been
+ * wrong four times in this project, once listing a covered file as "NOT
+ * COVERED", so every claim below was re-checked against code, not comments):
  *
- *   test_parity_blades_live_start.c  (Part A = gain/blades/constants/,
+ *   test_parity_blades_live_start.c (Part A = gain/blades/constants/,
  *   Part B = gain/blades/live_start/) contains NO fixture card from any of the
  *   14 gain/blades/per_card .rs files.  The only names it shares are
  *   "kanon"/"ayumu" as LOCAL VARIABLE NAMES for different prints
@@ -17,30 +18,35 @@
  *   test_parity_blade_under.c covers gain/blades/under_member/ only.  Its
  *   PL!S-bp7-005-R＋ usage is the under-card constant (ab#1) and her 登場
  *   (ab#0), NOT ab#2 (the 起動 that fires other members' 登場 with their costs
- *   paid) that q273_fired_debut_ability_cost_paid_test.rs exercises.
+ *   paid) that q273_fired_debut_ability_cost_paid_test.rs exercises.  The
+ *   decode dump below (RB2_DUMP=1) confirms 渡辺 曜 has exactly 3 abilities,
+ *   ab#0 登場 / ab#1 常時 / ab#2 起動, so ab#2 is reached only from here.
  *
  *   test_parity_ability_mod.c + test_parity_ability_mod_extra.c together
- *   cover ALL 14 ability_mod files.  Three cases I had provisionally targeted
- *   from a card-number grep are ALREADY IN extra.c's RUN list and bodies --
- *   test_chisato_turn1_blocks_second_activation,
- *   test_nozomi_p_rarity_same_behaviour and
- *   test_condition_loss_removes_delayed_registration (which already loops
- *   changed_area 0 and 2 and already does the restore) -- so section H was
- *   WRITTEN and then REMOVED rather than shipped as a duplicate.  The only
- *   genuine remaining ability_mod gap is the four run_live_through_victory
- *   cases of full_distinct_group_stage_grants_yell_live_score_test.rs; see
- *   NOT TAKEN.
+ *   cover 13 of the 14 ability_mod files.  The three cases a previous pass had
+ *   provisionally targeted from a card-number grep are ALREADY IN extra.c's
+ *   bodies and RUN list -- test_chisato_turn1_blocks_second_activation
+ *   (extra.c:735, RUN at 1243), test_nozomi_p_rarity_same_behaviour
+ *   (extra.c:776, RUN at 1244) and test_condition_loss_removes_delayed_
+ *   registration (extra.c:912, RUN at 1248) -- so section H was WRITTEN and
+ *   then REMOVED rather than shipped as a duplicate.
+ *
+ *   CORRECTION to the previous pass's header, which claimed "ALL 14 ability_mod
+ *   files" are covered: they are not.  PL!S-BP2-012-N -- a fixture of
+ *   full_distinct_group_stage_grants_yell_live_score_test.rs -- appears in NO
+ *   tests/*.c in this tree (scanned by card number, case- and fullwidth-plus
+ *   normalised).  That file's remaining gap is NOT TAKEN, below.
  *
  * TAKEN (this file)
  *   A  activate_change_state_wait_grants_live_end_blade_test.rs   2 tests
  *   B  per_unit_discard_count_regression_test.rs                  1 test
  *   C  hazuki_activate_discard_per_liella_member_blade_test.rs    3 of 4
  *   D  q46_kanako_all_heart_timing_test.rs                        7 tests
- *   E  q271_colorful_dreams_test.rs                               9 tests
+ *   E  q271_colorful_dreams_test.rs                               9 + 1 EXTRA
  *   F  q148_waited_member_blade_total_test.rs                     3 tests
  *   G  q273_fired_debut_ability_cost_paid_test.rs                 2 tests
  *   ------------------------------------------------------------------
- *                                                    27 tests
+ *                                                    28 run() cases
  *   (section H, an ability_mod section, was written and then removed as a
  *    duplicate of test_parity_ability_mod_extra.c -- see the note above)
  *
@@ -51,25 +57,84 @@
  *   eri_debut_up_to_two_opponent_members_to_wait_test.rs (3)
  *   kanon_debut_one_per_group_deck_bottom_edge_test.rs (3)
  *       both are 起動 that SELECT from a zone and then move, i.e. the
- *       select-then-move resolver path; they deserve their own file.
+ *       select-then-move resolver path -- the same path section G shows to be
+ *       broken -- so porting them now would produce three more copies of one
+ *       red, not three new behaviours.
  *   modifier_layer_characterization_test.rs (3)   needs
  *       rb_constant_per_unit_units, which is compiled but has no declaration in
- *       include/rabuka.h and I may not edit include/.
+ *       include/rabuka.h and that header is owned by another agent.
  *   ren_baton_touch_group_check_test.rs (3)      BATON TOUCH turn-2 walk.
  *   turn_scope_regression_test.rs (2)            turn-rollover tracker walk.
  *   yell_same_group_members_multi_color_hearts_test.rs (3)
- *       the 3 fixtures are PL!S-PR-015/016/019/040-PR, none of which appear in
- *       ANY C test file; unknown behaviour, would be exploratory not parity.
+ *       PL!S-PR-040-PR appears in NO C test file; the other fixtures are
+ *       PL!S-PR-015/016/019-PR, so the behaviour is unknown here and would be
+ *       exploratory rather than parity.
  *   hazuki q233_declined_optional_energy_allows_second_trigger_same_turn (1)
  *       a 4-rarity loop over the 自動 trigger with a recently_moved relay.
- *   ability_mod full_distinct: the four run_live_through_victory cases
- *       (score_bonus_applied_with_revealed_live_cards,
- *       successful_owners_use_their_own_zero_one_or_three_live_reveals,
- *       failed_owner_gets_no_bonus_even_with_three_live_reveals,
- *       owner_without_live_gets_no_bonus_from_opponents_reveals) are a 25-case
+ *   ability_mod full_distinct: PL!S-BP2-012-N is absent from the whole C corpus
+ *       and the file's four run_live_through_victory cases are a 25-case
  *       two-seat live-through-victory matrix built on the documented
  *       test_advance_to_phase(RB_PHASE_PERFORMANCE_SECOND) yell-window landmine.
  *       Out of budget; documented, not half-done.
+ *
+ * ENGINE GAPS FOUND BY THIS SUITE -- all four are CONFIRMED against the C
+ * sources, and every assertion that exposes them is left STRICT AND RED.  Run
+ * with RB2_DUMP=1 to print the engine's own decoded shape for each fixture;
+ * each root cause below was read out of the C source, not inferred from the
+ * red.
+ *
+ *  1. per_unit over a moved/discarded set counts the RAW MOVED SET, never the
+ *     printed 『Liella!』 member subset.  src/ability/effects/misc.c:279-307
+ *     (calculate_gain_multiplier) short-circuits on `per_unit_type == "discard"`
+ *     to `matching = g->n_recently_moved` (or last_cost_discard_count) and
+ *     never applies the effect's CardFilter; `per_unit_source` is not read at
+ *     all, and the effect's `card_type: member_card` did not survive decoding
+ *     into extras (see the RB2_DUMP output for 葉月 恋).  Rust
+ *     util.rs::resolve_per_unit_count filters the moved set.
+ *     葉月 恋 PL!SP-bp5-005-R＋: 2 『Liella!』 + 1 filler -> 3 blades (Rust 2);
+ *     3 fillers -> 3 blades (Rust 0).
+ *     src/ability/dynamic_count.c:272-330 has NO "discard" arm either, so a
+ *     per-unit zone of "discard" collapses to units = 1 there.
+ *
+ *  2. A 常時 (constant) ability whose top-level condition FAILS still applies
+ *     its children.  src/turn/triggers.c:754-763: when `cond_ok` is 0 the code
+ *     falls into the ELSE arm and calls apply_constant_effect on each child
+ *     whose OWN condition is absent -- and the children of a `sequential` never
+ *     carry one.  鐘 嵐珠 PL!N-bp1-012-R＋ therefore grants +2 blade and +2 ALL
+ *     hearts on every board where her compound condition is false (0 live cards,
+ *     2 live cards, 3 live cards with no 『虹ヶ咲』 live).  Non-vacuous: the
+ *     same file's paired positive on the met-condition board returns 2, and
+ *     q46_kanako_not_on_stage_no_constant (host off stage) returns 0.
+ *
+ *  3. `unit: "types"` on a card_count condition is unimplemented, and the
+ *     heart-colour filter matches BLADE hearts.  src/ability/condition.c:3121
+ *     (eval_card_count) calls count_cards_with_filters and never reads `unit`,
+ *     so 「3種類以上」 (three KINDS) is evaluated as three CARDS; and the flat
+ *     decoded heart table includes the blade block, so 桃/青/ALL blade-hearts
+ *     count as colours.  Colorful Dreams! PL!N-bp7-025-L: one revealed card with
+ *     heart01+heart03+heart06 -> 0 (Rust 1); three blade-only lives -> +1
+ *     (Rust 0); three heart01-only cards -> +1 (Rust 0, the new EXTRA case).
+ *     Every Rust case in this file is one where card count == colour count, so
+ *     none of them can see this; the EXTRA case can, and does.
+ *
+ *  4. `aggregate: "total"` on a location_condition can never reach BLADE.
+ *     src/ability/condition.c:2051-2102 (rb_check_aggregate_total) sums only the
+ *     heart colours named in the condition's own `heart_colors` list;
+ *     ミはμ'sicのミ's condition (aggregate total, count 10, stage, member_card)
+ *     names none, so `total` is 0 for every board and 0 >= 10 is never true --
+ *     and eval_card_count's CARD reading (2 < 10) is false too, so the ability
+ *     is dead on every board.  One staged member carrying 27 blades (sum 27 >=
+ *     10, card count 1 < 10) still yields need_heart00 = 0, which discriminates
+ *     the two readings.
+ *
+ *  5. After a 起動's cost raises a CHOICE on the inline rb_activate_card path,
+ *     the effect half of the activation is dropped.  src/engine.c:1290-1310
+ *     builds one tree act = [cost, effect] and relies on the resume
+ *     continuation; the run log shows the cost's SelectCard answered and then
+ *     `CHOICE_EPILOGUE ... queue_actions=0` with no follow-up, so 渡辺 曜's
+ *     ab#2 sequential[select(stage,2), activate_ability(previous_selected,
+ *     登場)] never raises its first child.  ADJACENT TO AN IN-FLIGHT FIX: the
+ *     same continuation is what drops `sequential_cost` on this path.
  *
  * NO JAPANESE IN A FUNCTIONAL POSITION, ON PURPOSE.  The editor can emit CP932
  * and silently corrupt Japanese literals, which would break group/series
@@ -118,7 +183,9 @@
  * must produce the effect -- or (b) a zone/prompt control proving the mechanism
  * really ran (the cost really moved N cards, at least one prompt was offered,
  * the use was really recorded).  CHECK_PROMPTS counts the prompt still ON SCREEN
- * at the assertion site, not only at answer time.
+ * at the assertion site, not only at answer time.  Section E's Rust cases were
+ * audited for this and THREE of them were found VACUOUS (card count == colour
+ * count by construction); the EXTRA case added here is the fix.
  *
  * run() is crash ISOLATION, not a hang detector: no watchdog is achievable on
  * this toolchain.  Every drain is capped.  The counters live in a

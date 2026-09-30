@@ -134,7 +134,7 @@ int rb_effect_answers_any(const AbilityEffect *effect)
  * the candidate set came back EMPTY, the prompt was never raised and the
  * effect silently no-opped. Split the list and accept ANY entry, which is what
  * 「『A』と『B』の…」 means and a strict superset of single-group matching. */
-int choice_card_matches_group_csv(int card_id, const char *group_csv)
+static int choice_card_matches_group_csv(int card_id, const char *group_csv)
 {
     if (!group_csv || !*group_csv) return 1;
     const char *names[16];

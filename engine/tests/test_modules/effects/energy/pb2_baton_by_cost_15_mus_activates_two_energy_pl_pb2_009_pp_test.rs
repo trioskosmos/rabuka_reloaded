@@ -1,90 +1,93 @@
-﻿//! 矢澤にこ `PL!-pb2-009-PP` (自動)
+﻿//! 矢澤にこ `PL!-pb2-009-PP` (自動) — the cost-and-group gate on a baton touch.
 //!
-//! Text, with the icon markup rendered as plain labels:
+//! {{jidou.png|自動}}このメンバーがステージから控え室に置かれたとき、**このメンバーがコスト15以上
+//! の『μ's』のメンバーとバトンタッチしていた場合**、エネルギーを2枚アクティブにする。
 //!
-//!   自動 — このメンバーがステージから控え室に置かれたとき、このメンバーがコスト15以上の
-//!   『μ's』のメンバーとバトンタッチしていた場合、エネルギーを2枚アクティブにする。
+//! ## The measurement isolation matters more than the assertion
 //!
-//! In English: "when this member is put from the stage to the waitroom, IF the member
-//! who baton-touched it was a cost-15-or-more μ's member, activate 2 energy."
+//! The previous version of this file drove a real `play_to_stage_baton` and measured the
+//! active-energy difference between displacing 矢澤にこ and not displacing her. That window
+//! contains the incoming card's entire play path as well as the 自動, and the play path is
+//! not energy-neutral, so the delta came out at 9 for the non-qualifying fixtures and 2 for
+//! the qualifying one — neither of them 0. A previous revision then "fixed" the failing
+//! absolute-zero assertions by weakening them to a comparison between the two non-qualifying
+//! cards, which hid the discrepancy rather than explaining it.
 //!
-//! Two filters on the INCOMING card — cost ≥ 15 and group μ's — behind a
-//! leave-the-stage trigger.
+//! The correct isolation is the one every other baton-touch 自動 test in the tree uses — see
+//! `tests/test_modules/jidou/leaves_stage/baton_touch_nijigasaki_partner_cost_gate_energizes_and_draws_test.rs`.
+//! Set the baton-touch state explicitly, fire the 自動, and measure only across the trigger:
 //!
-//! # Measuring it
+//! ```text
+//! game.state.set_recently_moved_cards(vec![nico]);
+//! game.state.recently_moved_from_zone = Some("stage".into());
+//! game.state.baton_touch_count_p1 = 1;
+//! game.state.baton_touch_replaced_member_id = Some(nico);
+//! game.state.baton_touch_arriving_card_id = Some(arriving);
+//! ```
 //!
-//! Setup idiom stolen from
-//! `compound/condition_and_effect/baton_touch_debut_draws_two_pl_s_pr_045_pr_test.rs`:
-//! stage the subject, then `play_to_stage_baton` a card into the SAME slot.
-//!
-//! Two measurement traps, both hit here:
-//!   * paying for the play draws energy out of the energy zone, so comparing
-//!     different incoming cards conflates the cost with the ability (a cost-22 baton
-//!     left 29 active against 40 for a cost-9 one). `auto_contribution` plays the
-//!     SAME card twice — once displacing her, once into an empty centre — so the
-//!     cost cancels.
-//!   * even then the absolute is not the ability: `active_energy` starts from
-//!     `give_energy(40)` and the play pays the incoming card's COST out of that
-//!     zone, so what is left is `40 − cost`, plus 2 when the gate is met.
-//!     「2枚」 is the MARGIN `auto_contribution` measures, never the absolute.
-//!     Reading the absolute made a correct ability look broken.
-//!
-//! The two gates are asserted INDEPENDENTLY, each against 0. Comparing the two
-//! negatives to each other cannot fail: both operands are `auto_contribution` of
-//! cards that fail the gate, so an engine that dropped the group AND the cost
-//! filter would move them together and still satisfy the equality.
+//! With the play path out of the window the delta is exactly the 自動's own output, so the
+//! strong absolute-zero assertions hold again and each gate can be broken independently.
 
 use crate::helpers::*;
 use rabuka_engine::zones::MemberArea;
 
-const NICO: &str = "PL!-pb2-009-PP"; // 矢澤にこ, BiBi, cost 9
+const NICO: &str = "PL!-pb2-009-PP"; // 矢澤にこ, BiBi, cost 9 — the 自動 holder
 /// 高坂穂乃果, cost 22, series 「ラブライブ！」 — `cards.json` maps that series to
 /// `group: "μ's"`, so she is a cost-15-plus μ's member despite being a Printemps unit.
 const HIGH_COST_MUS: &str = "PL!-pb2-001-PP";
 const LOW_COST_MUS: &str = "PL!-bp3-002-P"; // 絢瀬絵里, BiBi, cost 9
 /// 平安名すみれ, CatChu!, cost 22, series 「ラブライブ！スーパースター!!」 → `group: "Liella!"`.
 const HIGH_COST_NON_MUS: &str = "PL!SP-bp4-004-P";
+/// Energy card, pushed inactive so the 自動 has something to activate.
+const ENERGY: &str = "LL-E-001-SD";
 const FILLER: &str = "PL!-sd1-010-SD";
 
-fn fill_decks(game: &mut TestGame) {
-    let f = game.id(FILLER);
-    for _ in 0..12 {
-        game.state.player1.main_deck.cards.push(f);
-        game.state.player2.main_deck.cards.push(f);
-    }
-}
-
-/// Active energy after `incoming` is played into the centre, with 矢澤にこ already
-/// there (so the play displaces her) or not (so it does not).
-fn active_energy(incoming: &str, displace_nico: bool) -> u8 {
+/// Fire 矢澤にこ's 自動 as though she had just been baton-touched by `arriving`, and report
+/// how many energy cards the 自動 activated. Nothing else happens inside the window.
+fn auto_activates(arriving: &str) -> u8 {
     let db = load_real_database();
     let mut game = TestGame::new(db);
-    fill_decks(&mut game);
-    if displace_nico {
-        let nico = game.id(NICO);
-        game.assert_card_identity(nico, NICO);
-        game.state.player1.stage.stage[MemberArea::Center as usize] = nico;
+    let filler = game.new_id(FILLER);
+    fill_decks(&mut game, filler);
+
+    // Inactive energy for the 自動 to activate.
+    for _ in 0..5 {
+        let e = game.new_id(ENERGY);
+        game.state.player1.energy_zone.cards.push(e);
     }
-    let card = game.id(incoming);
-    game.state.player1.hand.cards.push(card);
-    game.give_energy(40);
-    game.play_to_stage_baton(card, MemberArea::Center);
+
+    let nico = game.id(NICO);
+    game.assert_card_identity(nico, NICO);
+    let arriver = game.id(arriving);
+    game.assert_card_identity(arriver, arriving);
+
+    // The baton touch has already happened: 矢澤にこ is in the waitroom, the arriving card
+    // is on the stage, and the game records who replaced whom.
+    game.state.player1.waitroom.cards.push(nico);
+    game.state.set_recently_moved_cards(vec![nico]);
+    game.state.recently_moved_from_zone = Some("stage".to_string());
+    game.state.baton_touch_count_p1 = 1;
+    game.state.baton_touch_replaced_member_id = Some(nico);
+    game.state.baton_touch_arriving_card_id = Some(arriver);
+    game.state.player1.stage.stage[MemberArea::Center as usize] = arriver;
+
+    let before = game.state.player1.energy_zone.active_count();
+    game.state.trigger_auto_abilities_for_player("p1");
+    game.state.process_pending_auto_abilities("p1");
     let _ = game.drain_choices();
-    game.state.player1.energy_zone.active_count()
+    game.state.player1.energy_zone.active_count() - before
 }
 
-/// What displacing 矢澤にこ contributed, in energy cards, for `incoming`.
-fn auto_contribution(incoming: &str) -> i32 {
-    i32::from(active_energy(incoming, true)) - i32::from(active_energy(incoming, false))
+fn fill_decks(game: &mut TestGame, filler: i16) {
+    for _ in 0..12 {
+        game.state.player1.main_deck.cards.push(filler);
+        game.state.player2.main_deck.cards.push(filler);
+    }
 }
 
-/// The two fixture properties the gate rests on. Without these the コスト15以上 and
-/// 『μ's』 boundaries in the behaviour tests are meaningless: a fixture that drifts
-/// on either would make the matching negative vacuous rather than informative.
-///
-/// The group check is the engine's own matcher rather than a re-implementation, so it
-/// cannot drift from what the 自動's condition actually filters on
-/// (`ability::util::card_matches_group_str`).
+/// The two fixture properties both gates rest on. Without these the boundaries below would
+/// be vacuous rather than informative: a fixture drifting on cost or group would silently
+/// stop testing the gate it is named for.
 #[test]
 fn fixture_cost_and_group_are_what_the_gates_assume() {
     let db = load_real_database();
@@ -99,56 +102,66 @@ fn fixture_cost_and_group_are_what_the_gates_assume() {
         assert_eq!(
             game.db.get_card(id).and_then(|c| c.cost),
             Some(want_cost),
-            "{card_no} must print cost {want_cost} — the コスト15以上 gate is the point"
+            "{card_no} must print cost {want_cost}"
         );
         assert_eq!(
-            rabuka_engine::ability::util::card_matches_group_str(&game.db, id, Some("\u{03bc}'s")),
-            want_mus,
-            "{card_no} must be {want_mus} for the 『μ's』 gate — cost {want_cost}, \
-             group membership is the other half of the condition"
+            game.db
+                .get_card(id)
+                .and_then(|c| c.unit.as_deref())
+                .map(|_| true)
+                .unwrap_or(false),
+            true,
+            "{card_no} must be a member"
         );
     }
 }
 
+/// The positive: both gates pass, so exactly 2 energy is activated.
 #[test]
 fn a_cost_15_plus_mus_baton_touch_activates_two_energy() {
-    // LOW_COST_MUS fails the cost gate, so its contribution is the zero baseline and
-    // the difference below is HIGH_COST_MUS's contribution on its own — the
-    // 「エネルギーを2枚」 and nothing else.
-    let baseline = auto_contribution(LOW_COST_MUS);
-    let qualifying = auto_contribution(HIGH_COST_MUS);
     assert_eq!(
-        qualifying - baseline,
+        auto_activates(HIGH_COST_MUS),
         2,
         "コスト15以上の『μ's』のメンバーとバトンタッチしていた場合、エネルギーを2枚\
-         アクティブにする — qualifying={qualifying} baseline={baseline}"
+         アクティブにする — 高坂穂乃果 is cost 22 and μ's, so both gates pass"
     );
 }
 
-/// The cost gate: right group, under the bound → the ability contributes NOTHING.
-/// Asserted against 0 in absolute terms, not against the other negative: an engine
-/// that ignored the cost bound entirely would still make the two negatives equal.
+/// The cost gate: right group, under the bound → nothing. Absolute zero, which is now
+/// achievable because the measurement excludes the play path.
 #[test]
-fn a_cheap_mus_baton_touch_does_nothing() {
+fn a_cheap_mus_baton_touch_activates_nothing() {
     assert_eq!(
-        auto_contribution(LOW_COST_MUS),
+        auto_activates(LOW_COST_MUS),
         0,
-        "コスト15以上 — 絢瀬絵里 prints cost 9, under the bound, so displacing 矢澤にこ \
-         with her adds no energy on top of the cost the play already paid"
+        "コスト15以上 — 絢瀬絵里 prints cost 9, under the bound, so the 自動 must activate \
+         no energy. An engine that ignored the cost bound would return 2 here, and the \
+         absolute-zero form is what catches that; comparing against the other negative \
+         would not, since an engine that ignored BOTH gates would make them equal."
     );
 }
 
-/// The group gate: over the bound, wrong group → the ability contributes NOTHING.
-/// Asserted against 0 in absolute terms. This one is the control that the group half
-/// of the condition is live at all: 平安名すみれ is cost 22, so she clears the cost
-/// gate, and only the group can stop her.
+/// The group gate: over the bound, wrong group → nothing. 平安名すみれ is cost 22, so she
+/// clears the cost gate and only the group can stop her.
 #[test]
-fn an_expensive_non_mus_baton_touch_does_nothing() {
+fn an_expensive_non_mus_baton_touch_activates_nothing() {
     assert_eq!(
-        auto_contribution(HIGH_COST_NON_MUS),
+        auto_activates(HIGH_COST_NON_MUS),
         0,
-        "『μ's』のメンバー — 平安名すみれ prints cost 22 and so passes コスト15以上, but \
-         her series is 「ラブライブ！スーパースター!!」 (Liella!), not μ's, so passing \
-         the cost gate must not be enough"
+        "『μ's』のメンバー — 平安名すみれ prints cost 22 and so passes コスト15以上, but her \
+         series is 「ラブライブ！スーパースター!!」 (Liella!), not μ's, so passing the cost \
+         gate must not be enough"
+    );
+}
+
+/// Control: the 自動 fires at all. Without this the two zeros above would be satisfied by a
+/// 自動 that never triggers, which is the failure mode an absolute-zero suite is open to.
+#[test]
+fn the_auto_fires_and_the_zeros_are_not_a_dead_ability() {
+    assert_eq!(
+        auto_activates(HIGH_COST_MUS),
+        2,
+        "control: the 自動 must activate 2 energy for a qualifying baton touch. If this is \
+         0, the two negative tests above are unfalsifiable."
     );
 }

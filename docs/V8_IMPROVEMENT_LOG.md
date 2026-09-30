@@ -1184,3 +1184,116 @@ tiebreak convenience; it is most of what the live set does.
 **The forward-walk mulligan is worse from v9 too** (-5.83, against -3.4 from
 v8). Replicated on a different base bot, which is the strongest evidence in this
 file that it is the walk itself and not the context v8 put it in.
+
+---
+
+## 11. The v7 term vector: +5.40, and a probe-derived rule that cost 20
+
+### 11.1 The whole vector at once
+
+`v7_term_score` drops v7's entire linear-delta feature vector into v8's leaf,
+each of the thirteen terms behind its own `V8_TERM_*` switch, defaulting to v7's
+own weight. Paired, n=4000, seed 11, v8 baseline 42.5%:
+
+| config | win rate | p | pace (P1) | pace (P2) |
+|---|---|---|---|---|
+| baseline | 42.5% | — | 0.3735 | 0.4378 |
+| **all 13 v7 terms** | **47.9% (+5.40)** | **0.00000** | +0.0229 sig | -0.0137 sig |
+| all 13 + `V8_ABILITY_VALUE=1` | 47.7% (+5.22) | 0.00000 | +0.0219 sig | -0.0134 sig |
+
+**The largest single improvement to v8 in the project**, and it is the whole
+vector or nothing: the two changes that worked individually (§3.2 blades +0.88,
+§3.8 abilities +1.00) are both inside it, and the ability term adds nothing on
+top — they are the same signal seen at two resolutions.
+
+This is `V7_LEAN` vindicated from the other side. Zeroing v7's seven minor
+terms together costs it 14 points while each is worth under 1.0 alone, and the
+log's own note is that single-term ablation measures dominance rather than
+dispensability. The eleven v8 attempts each added ONE term to a leaf whose
+*shape* was wrong; this replaces the shape. The gap to v7 goes from ~10 points to
+~4.
+
+**Not yet shipped.** The holdout run failed on a stale `b23big.csv` and was not
+re-run, so this is a **selection-seed result and unconfirmed**. It is the
+largest effect in the file and the one most likely to be partly fitted to seed
+11. A fresh seed-23 baseline and a re-run is required before any of these terms
+go near a default.
+
+### 11.1b Confirmed on a holdout seed
+
+Re-captured a fresh seed-23 baseline and re-ran. n=4000 per seed.
+
+| seed | baseline | + all 13 v7 terms | paired p | pace (P1) | pace (P2) |
+|---|---|---|---|---|---|
+| 11 (selection) | 42.5% | **47.9% (+5.40)** | **0.00000** | +0.0229 sig | -0.0137 sig |
+| 23 (**holdout**) | 41.8% | **47.5% (+5.67)** | **0.00000** | +0.0220 sig | -0.0163 sig |
+
+**+5.40 and +5.67 on two seeds that share no shuffles**, with every health
+interval in the same direction. This is the first result in the file that clears
+the bar the blades sweep failed (§1.4: shallow peak on two seeds, p=0.944 at
+n=6000) and it is the one worth building on. v8's deficit to v7 goes from ~10
+points to ~4.5.
+
+The opponent's pace falling significantly on **both** seeds is the strongest
+statement available: v7 is placing *less* against this v8, so the gain is not
+v8 getting lucky in a few games but v7 being genuinely outplayed into worse
+boards.
+
+### 11.3 The next experiment, and why the earlier null does not cover it
+
+`V8_CHAIN` measured null (§2.7) and the diagnosis was the leaf's shape: on a
+saturated LEVEL every node already contains everything before it, so the max is
+nearly the level and no step ever "strictly improves" — which is why depth 3 and
+depth 6 returned bit-identical results.
+
+`v7_term_score` is the opposite kind of quantity. A linear function of coarse
+deltas **composes**: the score of a state is the sum of what got it there, so a
+node measured against the **decision root** rather than against its parent
+carries the value of the whole line. That is the property a backup needs, and it
+is the one v7's depth-8 chain has and v8's single breadth step does not.
+
+So `V8_CHAIN` **with the term vector, scored root-relative** is a combination
+the earlier null does not cover: the value function is the new part, and the
+search is what the value function makes possible. Written up and left unwired —
+`v7_term_score` is declared below the `impl Search` block in a file whose brace
+nesting took several edits this session, and it was not worth fighting the
+compiler while §11.1 was still unconfirmed.
+
+This is the one remaining idea in the file that is both grounded in a measured
+result and untested.
+
+### 11.2 The probe is a localiser, not a rule generator
+
+`PROBE=v9` put v9's Main (v7's) against v8's on the same states. Four games,
+four disagreements, three of them v9 passing where v8 kept developing:
+
+```text
+t=2 bl=4 cost=9  h=4 lives=3  v9=Pass v8=PlayMemberToStage
+t=2 bl=6 cost=9  h=4 lives=1  v9=Pass v8=PlayMemberToStage
+t=3 bl=8 cost=15 h=6 lives=0  v9=Pass v8=PlayMemberToStage
+t=4 bl=8 cost=21 h=8 lives=2  v9=UseAbility v8=Pass
+```
+
+and the health metrics said v9 was right to: **4-0, pace 0.800, stage-cost curve
+4.0 / 9.0 / 14.0** — on the guide's band of 4 / 9 / 13. v8 on the same seeds
+reaches cost 30 and loses.
+
+So I wrote the rule down — `V8_CONVERT_GATE`: refuse a deploy that closes no
+part of the shortfall it is aimed at. Stated directly, it reads like the thing a
+player does.
+
+**It costs 20.48 points** (47.9% → 22.0%, p=0.00000) and drops pace to 0.235,
+worse than any configuration in this file.
+
+The probe was *right* — v9 really does pass more, and stopping at the curve
+really is what wins. The **rule was wrong**. A per-action gate cannot see that a
+deploy is unconvertible *now* but still correct, because v7's depth-8 chain sees
+several plies out while the gate sees one. It fires on members kept for their
+hearts next turn, on batons that book a blade, and on development toward a life
+not yet in hand. The observation was 3 disagreements in 4 UNTRACED games.
+
+The distinction worth keeping: a decision-level probe tells you **where** two
+policies differ, which is what located the ability defect (§3.6) and was worth
++1.00. It does not tell you the **rule** that would produce the better decision
+in every state, and turning a three-observation pattern into a hard gate is how
+a correct observation becomes a 20-point regression.

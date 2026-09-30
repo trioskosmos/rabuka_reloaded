@@ -2356,10 +2356,11 @@ pub fn place_card_in_zone(
         }
         Some(Zone::SameArea) => {
             log::debug!(
-                "[TRACE_SAME_AREA] card={} vacated={:?} stage_before={:?}",
+                "[TRACE_SAME_AREA] card={} vacated={:?} stage_before={:?} first_empty={:?}",
                 card_id,
                 vacated_stage_area,
-                player.stage.stage
+                player.stage.stage,
+                stage_first_empty(&player.stage.stage)
             );
             if let Some(pos) = vacated_stage_area {
                 if pos < 3 && player.stage.stage[pos] == -1 {

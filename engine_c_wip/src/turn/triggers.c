@@ -341,10 +341,42 @@ static int effect_position_matches(const GameState *g, int pl, int card_id,
 }
 
 static int card_on_stage(const GameState *g, int pl, int card_id) {
-    for (int i = 0; i < RB_STAGE_SIZE; i++) {
+    for (int i = 0; i < RB_STAGE_SIZE; i++)
         if (g->p[pl].stage[i] == card_id) return 1;
-    }
     return 0;
+}
+
+/* Last occurrence wins, matching eff_extra (ability/util.c). */
+static const char *cextra(const AbilityEffect *e, const char *key) {
+    if (!e || !key) return NULL;
+    for (int i = 0; i < e->n_extra; i++)
+        if (e->extra_k[i] && !strcmp(e->extra_k[i], key)) return e->extra_v[i];
+    return NULL;
+}
+
+/* Mirror AbilityEffect::per_unit_any (engine/src/ability/types.rs): the
+   decoded `per_unit` field, or a `per_unit: "true"` extra. */
+static int ceff_per_unit(const AbilityEffect *e) {
+    if (!e) return 0;
+    if (e->per_unit > 0) return 1;
+    {
+        const char *v = cextra(e, "per_unit");
+        return v && !strcmp(v, "true");
+    }
+}
+
+/* Per-unit UNIT COUNT for a constant gain, mirroring
+   engine/src/core/game_state/modifiers.rs:736-765 (blade) and :886-913 (heart):
+     let player = match effect.target_any() { Some("opponent") => other side, _ => host's own side };
+     let units  = constant_per_unit_units(effect, player, ..., card_id);
+   `pl` is the seat the host is on (rb_recalc_constants iterates both sides), so
+   "the host's own side" is `pl` and `target: "opponent"` flips it. */
+static int constant_gain_per_unit_units(const GameState *g, int pl, int host_cid,
+                                        const AbilityEffect *e) {
+    int units_pl = pl;
+    const char *tgt = cextra(e, "target");
+    if (tgt && !strcmp(tgt, "opponent")) units_pl = 1 - pl;
+    return rb_constant_per_unit_units(e, g, units_pl, host_cid);
 }
 
 static void apply_constant_effect(GameState *g, int pl, int host_cid,
@@ -419,9 +451,29 @@ static void apply_constant_effect(GameState *g, int pl, int host_cid,
     } else if (!strcmp(e->action,"gain_resource")) {
         const char *res=NULL;
         for(int i=0;i<e->n_extra;i++) if(e->extra_k[i] && !strcmp(e->extra_k[i],"resource")) res=e->extra_v[i];
-        int cnt=e->count>=0?e->count:1;
-        for(int i=0;i<e->n_extra;i++) if(e->extra_k[i] && !strcmp(e->extra_k[i],"sign") && e->extra_v[i] && !strcmp(e->extra_v[i],"negative")) cnt=-cnt;
+        /* "失う" (lose) is sign:negative -- modifiers.rs:785-797 applies the sign
+           to the RESOLVED amount, after the dynamic_count / per_unit / plain
+           choice, so keep it out of the base count. */
+        int sign_neg = 0;
+        for(int i=0;i<e->n_extra;i++) if(e->extra_k[i] && !strcmp(e->extra_k[i],"sign") && e->extra_v[i] && !strcmp(e->extra_v[i],"negative")) sign_neg = 1;
+        int per_unit = ceff_per_unit(e);
         if (res && (!strcmp(res,"blade")||!strcmp(res,"ブレード"))) {
+            /* modifiers.rs:728-782: dynamic_count, else per_unit, else the
+               printed icon count.  per_unit is `units * base` with base = 1
+               under `max`, else resource_icon_count (defaulting to count). */
+            int cnt = e->count>=0?e->count:1;
+            {
+                const char *ric = cextra(e, "resource_icon_count");
+                if (ric) cnt = atoi(ric);
+            }
+            if (per_unit) {
+                const char *mx = cextra(e, "max");
+                int is_max = mx && !strcmp(mx, "true");
+                int base = is_max ? 1 : cnt;
+                if (base < 0) base = 0;
+                cnt = constant_gain_per_unit_units(g, pl, host_cid, e) * base;
+            }
+            if (sign_neg) cnt = -cnt;
             if (pos && !strcmp(pos,"front")) {
                 int source_idx = 0;
                 for (int q = 0; q < RB_STAGE_SIZE; q++)
@@ -447,6 +499,12 @@ static void apply_constant_effect(GameState *g, int pl, int host_cid,
             if(!acc) g->mods.constant_blade[tgt_cid]+=cnt;
             if(acc) acc->blade+=cnt;
         } else if (res && (!strcmp(res,"heart")||!strcmp(res,"ハート"))) {
+            /* modifiers.rs:875-916: per_unit yields the RAW unit tally (no
+               printed-count multiplier -- unlike the blade arm), the plain
+               branch is `count`. */
+            int cnt = per_unit ? constant_gain_per_unit_units(g, pl, host_cid, e)
+                               : (e->count>=0?e->count:1);
+            if (sign_neg) cnt = -cnt;
             const char *hc=NULL;
             for(int i=0;i<e->n_extra;i++) if(e->extra_k[i] && !strcmp(e->extra_k[i],"heart_color")) hc=e->extra_v[i];
             int col=0;
@@ -598,8 +656,22 @@ static void apply_constant_effect(GameState *g, int pl, int host_cid,
     } else if (!strcmp(e->action,"energy_state_change")) {
         rb_effect_energy_state_change(g, pl, e);
     }
-    /* sequential children: walk them (q127_wien leaves_stage_modifier_removed etc.) */
-    for(int i=0;i<e->n_child;i++) apply_constant_effect(g, pl, host_cid, e->child[i], acc, total_p1, total_p2);
+    /* Sequential children: walk them (q127_wien leaves_stage_modifier_removed etc.).
+       Each sub-effect is gated by its OWN condition, exactly as
+       engine/src/core/game_state/modifiers.rs:1176-1185 does:
+           ActionType::Sequential => for sub in actions {
+               let sub_cond = sub.condition.as_ref().is_none_or(|c| ctx.evaluate_condition(c));
+               if !sub_cond { continue; }
+               ...
+           }
+       The PARENT's gate is the caller's (rb_recalc_constants); a compound whose
+       parent condition fails is not walked at all. */
+    for(int i=0;i<e->n_child;i++) {
+        AbilityEffect *ch = e->child[i];
+        if (ch && (ch->has_condition || ch->condition) &&
+            !rb_eval_condition_for_host(g, pl, host_cid, ch->condition)) continue;
+        apply_constant_effect(g, pl, host_cid, ch, acc, total_p1, total_p2);
+    }
 }
 
 /* Fire a card's 登場 (Debut) abilities by queuing them and draining the queue,
@@ -751,15 +823,21 @@ void rb_recalc_constants(GameState *g) {
                         fprintf(stderr, "[recalc] cid=%d pl=%d cond_ok=%d act=%s\n",
                                 cid, pl, cond_ok, e->action ? e->action : "-");
                     }
+                    /* Faithful port of modifiers.rs:681-689 --
+                         if pos_ok {
+                             let cond_met = effect.condition.as_ref()
+                                 .is_none_or(|c| ctx.evaluate_condition(c));
+                             if cond_met { ...apply... }
+                         }
+                       There is NO else arm: a 常時 whose position gate or
+                       condition gate fails applies NOTHING, its `sequential`
+                       children included.  The previous else here walked the
+                       children whose own condition was absent, which turned
+                       every condition FAILURE into a GRANT (鐘 嵐珠
+                       PL!N-bp1-012-R＋ granted +2 blade and +2 ALL hearts on
+                       0/2 live cards and on 3 live cards with no 『虹ヶ咲』). */
                     if (cond_ok) {
                         apply_constant_effect(g, pl, cid, e, NULL, &total_p1, &total_p2);
-                    } else {
-                        for (int i = 0; i < e->n_child; i++) {
-                            AbilityEffect *ch = e->child[i];
-                            int ch_ok = !ch->has_condition || !ch->condition ||
-                                        rb_eval_condition_for_host(g, pl, cid, ch->condition);
-                            if (ch_ok) apply_constant_effect(g, pl, cid, ch, NULL, &total_p1, &total_p2);
-                        }
                     }
                 }
                 rb_free_ability(&ab);
@@ -774,15 +852,10 @@ void rb_recalc_constants(GameState *g) {
                 int cond_ok = effect_position_matches(g, pl, cid, gab->effect) &&
                               (!gab->effect->has_condition || !gab->effect->condition ||
                                rb_eval_condition_for_host(g, pl, cid, gab->effect->condition));
+                /* Same gate as the printed-ability branch above
+                   (modifiers.rs:681-689): failure applies NOTHING. */
                 if (cond_ok) {
                     apply_constant_effect(g, pl, cid, gab->effect, NULL, &total_p1, &total_p2);
-                } else {
-                    for (int i = 0; i < gab->effect->n_child; i++) {
-                        AbilityEffect *ch = gab->effect->child[i];
-                        int ch_ok = !ch->has_condition || !ch->condition ||
-                                    rb_eval_condition_for_host(g, pl, cid, ch->condition);
-                        if (ch_ok) apply_constant_effect(g, pl, cid, ch, NULL, &total_p1, &total_p2);
-                    }
                 }
             }
         }

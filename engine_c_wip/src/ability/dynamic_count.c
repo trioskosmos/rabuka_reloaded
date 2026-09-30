@@ -321,6 +321,19 @@ int rb_effect_count(const struct GameState *g, int actor, int host_cid, const Ab
             /* No per-unit counter in Rust covers the main deck; keep the raw
                length so the count does not silently collapse to 1. */
             units = g->p[actor].deck.n;
+        } else if (!strcmp(loc, "discard") || !strcmp(loc, "waitroom") ||
+                   !strcmp(loc, "waitroom_card")) {
+            /* engine/src/ability/util.rs:2576 --
+                 Some("discard") => Zone::Waitroom.to_str(),
+             so the per-unit set for a "discard"/waitroom clause is the
+             player's WAITROOM (the C `discard` bag), counted through the
+             effect's CardFilter by resolve_per_unit_count:2544-2558.  It is
+             NOT the raw moved set: 葉月 恋 PL!SP-bp5-005-R＋ with 2
+             『Liella!』 + 1 filler must yield 2 units (Rust), which the
+             unfiltered moved count of 3 cannot produce. */
+            int pl = (host_cid >= 0) ? rb_owner_of_card((GameState *)g, host_cid) : actor;
+            if (pl < 0) pl = actor;
+            units = dc_count_matching(g->p[pl].discard.cards, g->p[pl].discard.n, ct, grp);
         } else {
             units = 1;
         }

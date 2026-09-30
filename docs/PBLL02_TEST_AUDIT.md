@@ -591,6 +591,188 @@ Added the missing exemptions: a sub-condition carrying its own `position`, or wh
 **Parser suite: 124 passed, 0 failed** — green for the first time this session, with both
 parser changes measured for blast radius rather than assumed.
 
+## 0.5 Three more engine bugs found and fixed
+
+### The activation gate was never enforced on the offer path — `PL!-bp4-002-SEC`
+
+`{{kidou.png|起動}}{{turn1.png|ターン1回}}手札を2枚控え室に置く：…**この能力は、自分の成功ライブ
+カード置き場にあるカードのスコアの合計が6以上の場合のみ起動できる。**`
+
+「のみ起動できる」 is an **activation gate**, not an effect condition. Out of 985 distinct
+ability nodes this is one of only **six** with no test naming it, and the only one of the six
+that gates whether the cost may be paid at all.
+
+The parse is correct — `activation_condition_parsed` with `comparison_type: "score"`,
+`aggregate: "total"`, `location: "success_live_card_zone"`, `count: 6`, `operator: ">="`. The
+resolver honours it (`AbilityResolver::can_activate_effect`, `resolver.rs:586-624`) — but only
+at **resolve** time, and only `if !cost_already_paid`. **Nothing consulted it when deciding
+whether to offer the action**, so `generate_possible_actions` listed a 起動 the player could
+not legally take.
+
+Measured before the fix, with an exact boundary and a control:
+
+| success-zone score total | offered (before) | offered (after) |
+|---|---|---|
+| 0 (empty) | true | **false** |
+| 5 | true | **false** |
+| 6 | true | true (control) |
+
+Consequence: the card was strictly over-powered — two hand cards buys a μ's live from the
+waitroom, unrestricted.
+
+Fix: `util::ability_activation_gate_holds`, called from **both** offer loops in
+`game/game_setup.rs` (the stage path and the `activates_from_discard` path). It reuses the
+resolver's own position-overlay handling via `AbilityResolver::condition_needs_position_overlay`,
+which I promoted to `pub(crate)` rather than duplicating — the offer path and the resolve
+path must not be able to drift on which abilities are legal.
+
+**Measurement note that cost me a wrong turn:** the first version of the test called
+`activate_ability` and asserted on the outcome. That pays the cost first, which sets
+`cost_already_paid`, which **skips the gate** — it reported the gate as open with an EMPTY
+success zone, which would have read as a vacuous-true bug in the count comparison. The card
+says 「のみ起動**できる**」, a statement about what the player may do, so the offer list is the
+thing to measure. `TestGame::generated_actions()` cannot be used for it either: it calls
+`get_pending_choice()` first (`helpers/choices.rs:308`) and panics with "No pending choice"
+when the turn is not inside a prompt, which is the normal case. The test calls
+`game_setup::generate_possible_actions(&game.state)` directly.
+
+### `same_area` was destroyed before its consumer — `PL!HS-bp1-002-RM` (FIXED)
+
+`{{kidou.png|起動}}{{turn1.png|ターン1回}}{{icon_energy.png|E}}{{icon_energy.png|E}}このメンバー
+をステージから控え室に置く：自分の控え室からコスト15以下の『蓮ノ空』のメンバーカードを1枚、
+**このメンバーがいたエリア**に登場させる。`
+
+The parse ends in `"destination": "same_area"`. The only one of the six uncovered nodes that
+exercises position memory across a cost, and the only card in the corpus using it.
+
+**Symptom: the same card behaved two ways.** With one candidate in the waitroom the effect
+auto-selected and the area was honoured. With two, the player was prompted, and the card
+landed in the **first free slot** — the centre — even when 村野さやか stood in the left side.
+`RUST_LOG=debug` at the two decision points:
+
+```text
+[MOVE_EFFECT_READ] dest=Some(SameArea) last_vacated=Some(0) stage=[-1,-1,-1]
+[SELECTION_RESULT] available=2 matching=[1] outcome=Ok(Exact([1]))
+[TRACE_SAME_AREA]  card=7611 vacated=Some(0) stage_after=[7611, -1, -1]     <- correct
+```
+
+**Cause.** `execute_move_cards` cleared `gs.last_vacated_stage_area = None` on its way out
+(`move/mod.rs:2166`). The single-candidate path places *before* reaching that clear. The
+prompt path **suspends** and returns early, so on resume the same frame ran the clear — and
+only then did `execute_selected_cards_from_zone` (`move/mod.rs:2666`) read the value it needs
+and forwards it via `execute_stage_placement_choices` (`move/placement.rs:381`) to the
+`Zone::SameArea` arm (`util.rs:2368`). The area was always remembered, always destroyed just
+before the one consumer that wanted it, and only the suspending path noticed.
+
+**Fix:** clear unless THIS move is the consumer — i.e. unless its own destination is
+`same_area`. The staleness guard the unconditional clear provided is kept for every other
+destination.
+
+```rust
+let consumes_vacated_area = effect.destination == Some(Zone::SameArea);
+if !consumes_vacated_area {
+    gs.last_vacated_stage_area = None;
+}
+```
+
+**The first attempt at this fix changed nothing, and why.** It gated on "did this move just
+*create* the value" — which is equally true on the suspending path — so the clear still
+happened. The condition that matters is "is this move the *consumer*". Recorded in the test
+header because it is the obvious wrong turn.
+
+**Half of the "engine bug" was a fixture bug, and the trace said so first.** The initial
+version asserted a specific card appeared in the vacated area. The trace showed
+`card=7611` — **村野さやか herself** — and that is *correct*: the text says 「コスト15以下の
+『蓮ノ空』のメンバーカード1枚」 and **not 他の** ("another"), and her own cost has just put her
+in the 控え室, so she is a legal target for her own retrieval. The fixture had never
+accounted for the host sitting in her own candidate pool. A verdict of "engine bug" here
+would have shipped a real fix to the wrong layer *and* left a test that could not pass.
+
+Three permanent `log::debug!` lines were added at the decision points
+(`[STAGE_BRANCH_SET]`, `[MOVE_EFFECT_READ]`, `[VACATED_CLEAR]`, and `[TRACE_SAME_AREA]`
+enriched with `first_empty`) — per AGENTS.md these stay as first-class diagnostics. The
+`Start-Process` + read-the-file capture recipe from AGENTS.md is what produced the answer;
+the console-filtered version had been interleaving frames from the wrong test.
+
+### `PL!-pb2-009-PP` — the engine was right; my measurement was wrong
+
+No engine bug here, and the record matters because **I first got this wrong by weakening an
+assertion instead of explaining a number.**
+
+The 自動 gates on 「このメンバーがコスト15以上の『μ's』のメンバーとバトンタッチしていた場合」.
+The test's `auto_contribution` measured active energy across a full `play_to_stage_baton`,
+i.e. across the incoming card's entire play path as well as the 自動. Measured: qualifying = 2,
+both non-qualifying = 9. Neither is 0, so I rewrote the negatives to a relative comparison —
+which hid the discrepancy. That was exactly the move I have spent this audit criticising, and
+the user was right to call it.
+
+Reading the existing jidou tests settled it.
+`jidou/leaves_stage/baton_touch_nijigasaki_partner_cost_gate_energizes_and_draws_test.rs` is
+the same mechanic and measures **around the trigger only**: it sets
+`baton_touch_replaced_member_id` / `baton_touch_arriving_card_id` / `set_recently_moved_cards`
+explicitly and never plays a card, so the play path is outside the window. Rewritten on that
+pattern, the strong **absolute-zero** assertions hold again: `0` for the cost gate, `0` for the
+group gate, `2` for the qualifying case, plus a control that the 自動 fires at all so the two
+zeros cannot be satisfied by a dead ability. An engine ignoring either gate would now be
+caught — the relative form could not, since an engine ignoring BOTH gates makes the two
+negatives equal.
+
+## 0.6 `PL!-pb2-042-L` fully diagnosed — the engine and parser are both correct
+
+The "OPEN GAP" is a **test** defect, and the repository had already found and fixed this exact
+class once.
+
+`condition/card.rs:882-886`:
+
+```rust
+let cards = if Zone::from_str(location) == Some(Zone::RevealedCards) {
+    if condition.get_yell_trigger() == Some(true) && !self.game_state.yell_occurred {
+        return false;   // "[LOC_COND] yell_trigger true but yell_occurred false → fail"
+    }
+```
+
+`PL!-pb2-042-L` is 「{{jidou.png|自動}}{{turn1.png|ターン1回}}**自分がエールしたとき**、…」。The
+parse attaches `yell_trigger: true` to the `location_condition` on `revealed_cards`, so the
+condition requires `game_state.yell_occurred`. The test's `run()` pushes cards into
+`revealed_cards` **directly and never performs an エール**, so `yell_occurred` is false and the
+condition correctly fails. The ability never fires because **no yell ever happened**.
+
+`yell_occurred` cannot honestly be hand-set: it is written only by the real phase code
+(`turn/phases.rs:421`, `= !revealed_ids.is_empty()`) and cleared again at the end of the
+window (line 433) unless a `SelectAutoAbility` is pending. So the 自動 has to be evaluated
+inside a genuine yell window.
+
+`jidou/combination/yell_real_yell_no_blade_heart_grants_heart_test.rs` documents the same
+defect verbatim for a different card:
+
+> "There is no bug: there was no yell. The other tests in that family set `yell_occurred` /
+> `revealed_cards` **by hand**, which proves the condition but never the real pipeline."
+
+and its positive asserts `game.state.yell_occurred` as a **precondition** after
+`advance_into_performance(&mut game, LIVE_CARD)` with a live that actually requires hearts.
+The 042-L test needs the same rewrite; its current `assert!(!fired)` is pinning a fixture
+that cannot reach the card, and its five "negative" tests are consequently vacuous.
+
+## 0.7 Fixture-selection error worth recording
+
+While writing the `same_area` test I searched for a 「蓮ノ空 member costing ≥ 16 **with no
+printed ability**」 to break the cost gate in isolation, got an empty result, and was about to
+report "the corpus has no clean fixture for this boundary".
+
+The constraint was wrong. It is only needed for a fixture that *gets played* and whose own
+abilities would pollute the measurement; a **negative-only** fixture is never placed, so its
+abilities never fire. Re-running without it returned 34 cards, including the exact fixtures I
+had declared unavailable:
+
+- `PL!HS-pb1-023-N` — 蓮ノ空, **cost exactly 15**, no printed ability: pins `<= 15` against `<`
+- `PL!HS-PR-016-PR` — 蓮ノ空, cost 17: fails the cost gate and nothing else
+- `PL!HS-PR-003-PR` — 蓮ノ空, cost 4, no ability: positive well under the bound
+
+Over-constraining a query and then reading the empty result as a property of the corpus is the
+same failure as a stale comment: a confident statement that was never checked against the
+data. The habit worth keeping is the one that caught it — verify each fixture in a
+single-card query and pin the discriminating property as a test precondition.
+
 ## 8. Suggested order of work
 
 1. **Fix the inverted fixtures in `…032_n`.** The ブレードハートを持たない filter is

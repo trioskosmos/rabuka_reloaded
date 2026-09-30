@@ -8397,10 +8397,18 @@ def _add_or_card_types_if_needed(d, text):
 
 def _add_heart_color_threshold(d, text):
     """Extract heart color count threshold from patterns like 'heart05を2個以上' or 'heart05を2以上'.
-    Stores as heart_color_count on the dict."""
+
+    The corpus spells the counter word three ways for this one clause — 個, つ, and 枚, with
+    the counter optional ('heart05を2以上'). Accepting only 個 silently dropped the count on
+    every 「〜をNつ以上持つ」 card, degrading the filter to mere colour PRESENCE: a member
+    printing one heart04 satisfied 「ハートにheart04を2つ以上持つ」. See
+    docs/ABILITY_AUDIT_2026-09-30.md §A1.
+
+    Stores as heart_color_count on the dict.
+    """
     if "heart_color_count" in d or "heart_colors" not in d:
         return
-    m = re.search(rf"{HEART_ICON_ID}を(\d+)(?:個)?以上", text)
+    m = re.search(rf"{HEART_ICON_ID}を(\d+)(?:個|つ|枚)?以上", text)
     if m:
         count = as_int(m.group(2))
         if count > 0:

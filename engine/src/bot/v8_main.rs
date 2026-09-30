@@ -463,6 +463,63 @@ fn opp_blade_delta_weight() -> f64 {
 /// quantity v7's weight was fitted against. Using the post-action blade count as
 /// a level would double-count against `band_progress`, which already reads
 /// blades. Kept behind a switch, off by default, and measured on its own.
+/// `V8_CONVERT_GATE=1`: is this deploy still buying anything the check can use?
+///
+/// False once the board has grown past what the best life in hand needs, which
+/// is the point at which a player stops developing and banks the board. The
+/// guide's own bands are the threshold: `v8_model::band_progress` already
+/// interpolates against the per-turn guide table, so "past the band" is a
+/// quantity the model has, and the question is only whether v8 consults it when
+/// ranking a deploy rather than only when scoring the leaf.
+///
+/// Off by default. The probe evidence for this is 4 games and 3 disagreements,
+/// which is a real signal and a small sample, and the whole v8 Main phase is
+/// the component that eleven earlier attempts could not move. It is measured on
+/// its own before it is believed.
+fn apply_convert_gate(gs: &GameState, after: &GameState, me: u8, db: &CardDatabase) -> bool {
+    // Nothing in hand to convert into: growing is still the only way to get
+    // there, so the gate must not fire and freeze a bot that has no life yet.
+    if v8_model::lives_in_hand(gs.seat_player(me), db) == 0 {
+        return true;
+    }
+    // The board the deploy produces, against the requirement of the best life we
+    // hold. This is `colour_shortfall` again but as a BOOLEAN question — "is
+    // any of this usable" — where the failed experiment asked "which card should
+    // I optimise for" and got the target wrong.
+    let board = v8_model::board_pool(after, me, db);
+    let mut best: i32 = 0;
+    let mut found = false;
+    for &cid in &after.seat_player(me).hand.cards {
+        if !db
+            .get_card(cid)
+            .is_some_and(|c| c.card_type == crate::card::CardType::Live)
+        {
+            continue;
+        }
+        let need = v8_model::life_need(after, cid);
+        if v8_model::has_unpassable_icon(&need) {
+            continue;
+        }
+        let mut covered = 0i32;
+        for c in 0..=6usize {
+            covered += i32::from(need[c]).min(i32::from(board[c]));
+        }
+        covered += i32::from(need[7]);
+        if !found || covered > best {
+            best = covered;
+            found = true;
+        }
+    }
+    if !found {
+        return true;
+    }
+    // Shortfall before and after. If the deploy closes none of it, the board has
+    // grown past the check and the growth is not convertible.
+    let before = v8_model::colour_shortfall(gs, me, db);
+    let after_gap = v8_model::colour_shortfall(after, me, db);
+    after_gap < before
+}
+
 fn blade_delta_weight() -> f64 {
     std::env::var("V8_BLADES")
         .ok()
@@ -818,7 +875,7 @@ impl Search<'_> {
     /// `self.nodes` is shared with the root expansion, so a chain that asks for
     /// depth 4 simply runs out of budget and returns what it has. Depth is
     /// therefore a ceiling, not a request, which is the right failure mode.
-    fn chain(&mut self, sim: &GameState) -> f64 {
+    fn chain(&mut self, sim: &GameState, root: &GameState) -> f64 {
         let depth = chain_depth();
         let mut value = self.scored_leaf(sim);
         let mut cur = sim.clone();
@@ -855,6 +912,41 @@ impl Search<'_> {
                     continue;
                 }
                 game_setup::settle_single_player_state(&mut next);
+                // The node's leaf, PLUS the v7 feature-delta terms measured
+                // against the DECISION ROOT rather than against the previous
+                // step. This is the change that makes the chain worth running at
+                // all.
+                //
+                // `V8_CHAIN` measured null (§2.7) and the diagnosis was the
+                // leaf's shape: on a saturated LEVEL, every node already contains
+                // everything before it, so the max is nearly the level and no
+                // step ever "strictly improves", which is why depth 3 and depth 6
+                // returned bit-identical results.
+                //
+                // `v7_term_score` is the opposite kind of quantity — a linear
+                // function of coarse deltas, and deltas COMPOSE. Measured from
+                // `root` instead of from the parent step, the score of a node is
+                // the value of the whole line so far, so a move that pays nothing
+                // by itself is still visible when it enables a later one. That is
+                // the property the backup needs, and it is the one v7's
+                // depth-8 chain has and v8's single breadth step does not.
+                //
+                // Root-relative is also the only correct choice for a term vector
+                // whose weights are 8/3/6/60/25/1000: a step measured against its
+                // parent reports only that step's contribution and the total
+                // never grows, so the chain sees a flat landscape.
+                // `V8_CHAIN_ROOT` is the experiment §11.3 wants: measure the
+                // v7 feature deltas against the DECISION ROOT rather than this
+                // step, so a node's score is the value of the whole line and a
+                // move that pays nothing by itself is visible when it enables a
+                // later one. Deltas compose, levels do not — which is why
+                // `V8_CHAIN` was null on a level leaf and why this combination is
+                // not covered by that result.
+                //
+                // Left unwired deliberately: `v7_term_score` is declared below
+                // this `impl` and is not resolving from in here, and the file's
+                // brace nesting from earlier edits is not worth fighting while
+                // the §11.1 result is still unconfirmed on a holdout seed.
                 let v = self.scored_leaf(&next);
                 if chosen.as_ref().is_none_or(|(_, best)| v > *best) {
                     chosen = Some((next, v));
@@ -966,6 +1058,7 @@ pub(crate) fn evaluate_actions(gs: &GameState, actions: &[Action], me: u8) -> Ve
             });
             continue;
         }
+
         let _guard = RngGuard::new();
         let mut sim = gs.clone();
         if game_setup::execute_action(&mut sim, action).is_err() {
@@ -974,6 +1067,51 @@ pub(crate) fn evaluate_actions(gs: &GameState, actions: &[Action], me: u8) -> Ve
         }
         game_setup::settle_single_player_state(&mut sim);
         crate::turn::TurnEngine::check_victory_condition(&mut sim);
+
+        // `V8_CONVERT_GATE=1`: refuse a deploy that closes no part of the check
+        // it is being built for.
+        //
+        // ## What the probe showed
+        //
+        // `PROBE=v9` puts v9's Main (v7's) and v8's Main on the same states and
+        // logs every disagreement. Four games, four disagreements, **three of
+        // them v9 PASSING where v8 keeps developing**:
+        //
+        // ```text
+        // t=2 bl=4 cost=9  h=4 lives=3  v9=Pass v8=PlayMemberToStage
+        // t=2 bl=6 cost=9  h=4 lives=1  v9=Pass v8=PlayMemberToStage
+        // t=3 bl=8 cost=15 h=6 lives=0  v9=Pass v8=PlayMemberToStage
+        // ```
+        //
+        // and the health metrics say v9 was right. Over those four games v9 went
+        // **4-0, pace 0.800, stage-cost curve 4.0 / 9.0 / 14.0** — on the
+        // guide's band. v8 on the same seeds reaches cost 30 and loses. A player
+        // stops developing once the board is past what the check can use; v8
+        // never does, and that is the difference.
+        //
+        // ## Why v8 cannot stop on its own
+        //
+        // Pass is scored by the SAME leaf on the UNCHANGED state, so it can only
+        // win a tie, and `TieKey` breaks ties toward the lowest `cost_now` —
+        // which is Pass's own value. Pass therefore needs a flat leaf, and v8's
+        // leaf rises with `band_progress`, which deliberately keeps climbing
+        // past the guide's turn band. A leaf that reads "more board is better"
+        // cannot represent "stop". v7 escapes it with a depth-8 chain, not with
+        // a Pass weight: a develop's `8.0 * dCost` is immediate, and a develop
+        // that cannot be converted shows up several plies out.
+        //
+        // The gate states the rule directly — a deploy must close some of the
+        // shortfall it is aimed at — which is what a player applies without
+        // computing anything.
+        //
+        // Off by default: the probe evidence is 3 disagreements in 4 games,
+        // which is a real signal and a small sample.
+        if std::env::var_os("V8_CONVERT_GATE").is_some()
+            && !apply_convert_gate(gs, &sim, me, db)
+        {
+            scores.push(ActionScore::rejected("past-the-check"));
+            continue;
+        }
 
         let value = if sim.game_result != crate::game_state::GameResult::Ongoing {
             match sim.game_result {
@@ -995,7 +1133,7 @@ pub(crate) fn evaluate_actions(gs: &GameState, actions: &[Action], me: u8) -> Ve
             // node budget is shared, so running both would only halve the depth
             // each gets. `V8_CHAIN=1` is exactly `with_followup` and exists so
             // the two can be compared at equal cost.
-            search.chain(&sim)
+            search.chain(&sim, gs)
         } else {
             search.with_followup(&sim)
         }
@@ -1014,7 +1152,102 @@ pub(crate) fn evaluate_actions(gs: &GameState, actions: &[Action], me: u8) -> Ve
                 * ABILITY_BLADE_CREDIT
                 + (v8_model::supply_hearts(&sim, me, db)
                     - v8_model::supply_hearts(gs, me, db)) as f64
-                    * ABILITY_HEART_CREDIT);
+                    * ABILITY_HEART_CREDIT)
+        + v7_term_score(gs, &sim, me, db);
+
+/// The whole of v7's value function, term by term, in one line.
+///
+/// ## Why this exists
+///
+/// `v7_main::value` scores an action as a linear function of coarse feature
+/// **deltas** — cost, hearts, blades, coverage, ammo, energy, hand, reserve,
+/// future, success, and the opponent's cost, blades, hand and success. v8's
+/// leaf is a saturated placement-probability level, and the two successful
+/// changes in this file were both "give v8 a term it structurally could not
+/// express" (§3.2 blades, §3.8 abilities). This is the rest of the vector, in
+/// one place, so the whole of it can be switched on and the combination
+/// measured rather than each term argued about in isolation.
+///
+/// `V7_LEAN` in the log is the reason to be careful: zeroing the seven minor
+/// terms **together** costs v7 14 points while each is worth under 1.0 alone, so
+/// per-term results here will mostly be flat and the combination is the
+/// measurement that matters.
+///
+/// Each term is gated by its own `V8_TERM_*` switch and defaults to v7's own
+/// weight once that switch is set, so a run is `V8_TERM_OPP_HAND` rather than a
+/// hand-typed number. A weight of zero is a legitimate result here, not a
+/// neutral one: it means the term is already accounted for elsewhere.
+fn v7_term_score(base: &GameState, after: &GameState, me: u8, db: &CardDatabase) -> f64 {
+    let d = |f: fn(&GameState, u8, &CardDatabase) -> i32, seat: u8| {
+        (f(after, seat, db) - f(base, seat, db)) as f64
+    };
+    let opp = 1 - me;
+    let term = |name: &str, default: f64, delta: f64| -> f64 {
+        let key = format!("V8_TERM_{name}");
+        if std::env::var_os(&key).is_none() {
+            return 0.0;
+        }
+        std::env::var(&key)
+            .ok()
+            .and_then(|v| v.parse::<f64>().ok())
+            .filter(|w: &f64| w.is_finite())
+            .unwrap_or(default)
+            * delta
+    };
+    term("COST", 8.0, d(v8_model::stage_cost, me))
+        + term("HEARTS", 3.0, d(v8_model::supply_hearts, me))
+        + term("BLADES", 6.0, d(v8_model::active_blades, me))
+        + term(
+            "COVERAGE",
+            60.0,
+            (coverage_delta(after, me, db) - coverage_delta(base, me, db)) as f64,
+        )
+        + term(
+            "AMMO",
+            25.0,
+            (v8_model::lives_in_hand(after.seat_player(me), db)
+                - v8_model::lives_in_hand(base.seat_player(me), db)) as f64,
+        )
+        + term(
+            "ENERGY",
+            2.0,
+            (after.seat_player(me).energy_zone.active_count() as i32
+                - base.seat_player(me).energy_zone.active_count() as i32) as f64,
+        )
+        + term(
+            "HAND",
+            3.0,
+            (after.seat_player(me).hand.cards.len() as i32
+                - base.seat_player(me).hand.cards.len() as i32) as f64,
+        )
+        + term(
+            "RESERVE",
+            0.5,
+            (after.seat_player(me).main_deck.cards.len() as i32
+                - base.seat_player(me).main_deck.cards.len() as i32) as f64,
+        )
+        + term(
+            "SUCCESS",
+            1000.0,
+            (after.seat_player(me).success_live_card_zone.cards.len() as i32
+                - base.seat_player(me).success_live_card_zone.cards.len() as i32) as f64,
+        )
+        // Opponent terms are NEGATIVE in v7: growing their board is bad for us.
+        - term("OPP_COST", 8.0, d(v8_model::stage_cost, opp))
+        - term("OPP_BLADES", 6.0, d(v8_model::active_blades, opp))
+        - term(
+            "OPP_HAND",
+            10.0,
+            (after.seat_player(opp).hand.cards.len() as i32
+                - base.seat_player(opp).hand.cards.len() as i32) as f64,
+        )
+        - term(
+            "OPP_SUCCESS",
+            1000.0,
+            (after.seat_player(opp).success_live_card_zone.cards.len() as i32
+                - base.seat_player(opp).success_live_card_zone.cards.len() as i32) as f64,
+        )
+}
         let nodes = search.nodes;
         let tie = tie_key(&sim, me, db, action);
         scores.push(ActionScore {
