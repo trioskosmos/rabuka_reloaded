@@ -196,11 +196,12 @@ impl AbilityResolver {
             ));
         }
         let pp = self.player_prefix(gs);
-        let act_name = gs
-            .activating_card
-            .map(|c| self.card_name(c))
-            .unwrap_or_default();
-        gs.rule_log
-            .push(format!("{} {}: 全ブレードタイミング", pp, act_name));
+        if crate::core::runtime_flags::logging_enabled() {
+            let act_name = gs
+                .activating_card
+                .map(|c| self.card_name(c))
+                .unwrap_or_default();
+            gs.push_rule_log_fmt(format_args!("{} {}: 全ブレードタイミング", pp, act_name));
+        }
     }
 }

@@ -242,7 +242,7 @@ pub(crate) fn execute_energy_state_change(
                             .find(|(m, _)| *m == cid)
                             .map(|(_, o)| o.as_str())
                             .unwrap_or_default();
-                        controller.as_deref().is_some_and(|c| c != owner)
+                        controller.is_some_and(|c| c != owner)
                     })
                     .copied()
                     .collect();
@@ -583,13 +583,17 @@ pub(crate) fn execute_energy_state_change(
             // are live state — re-evaluate right after the payment.
             gs.recalculate_constants();
         }
-        let pp = self.player_prefix(gs);
-        let act_name = gs
-            .activating_card
-            .map(|c| self.card_name(c))
-            .unwrap_or_default();
-        gs.rule_log
-            .push(format!("{} {}: {}エネルギー支払", pp, act_name, count));
+        if crate::core::runtime_flags::logging_enabled() {
+            let pp = self.player_prefix(gs);
+            let act_name = gs
+                .activating_card
+                .map(|c| self.card_name(c))
+                .unwrap_or_default();
+            gs.push_rule_log_fmt(format_args!(
+                "{} {}: {}エネルギー支払",
+                pp, act_name, count
+            ));
+        }
         Ok(())
     }
 }

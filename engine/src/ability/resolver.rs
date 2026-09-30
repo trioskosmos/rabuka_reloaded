@@ -753,9 +753,7 @@ impl AbilityResolver {
                 Keyword::Debut => {
                     if let Some(pos) = card_position {
                         let master = gs.ability_master_id();
-                        let stage = if master.as_deref() == Some("player2")
-                            || master.as_deref() == Some("p2")
-                        {
+                        let stage = if master == Some("player2") || master == Some("p2") {
                             &gs.player2.stage.stage
                         } else {
                             &gs.player1.stage.stage
@@ -1102,30 +1100,38 @@ impl AbilityResolver {
         let Some(ref cost) = ability.cost else {
             return Ok(());
         };
-        let cost = self.apply_modify_cost_to_ability_cost(gs, cost, ability);
-        if let Err(e) = self.pay_cost(gs, &cost) {
+        // Only materialise a modified cost when one actually applies; otherwise
+        // pay the borrowed original. See `adjusted_cost_after_modify`.
+        let adjusted_cost = self.adjusted_cost_after_modify(gs, cost, ability);
+        let cost = adjusted_cost.as_ref().unwrap_or(cost);
+        if let Err(e) = self.pay_cost(gs, cost) {
             dbg.p("RESULT", format_args!("COST FAILED: {}", e));
             let items = drain_verdicts();
             self.push_ability_result(gs, "cost_fail", items, Some(&e));
             return Err(e);
         }
         dbg.p("RESULT", "cost paid ✓");
+        // Gated on the verdict gate, not on `not(no_std)`: `push_verdict` is
+        // itself gated, but these two `String`s (and the formatting of the
+        // source/destination/count fields) were built on every costed ability
+        // resolution and then discarded.
         #[cfg(not(feature = "no_std"))]
-        let cost_desc = format!(
-            "{}: {}→{} {}",
-            cost.action,
-            cost.source.map(|z| z.as_str()).unwrap_or("?"),
-            cost.destination.map(|z| z.as_str()).unwrap_or("?"),
-            cost.count.unwrap_or(cost.energy_count_any().unwrap_or(1))
-        );
-        #[cfg(not(feature = "no_std"))]
-        push_verdict(AbilityLogItem::Cost {
-            text: cost.text.to_string(),
-            expectation: cost_desc,
-            actual: "支払済".into(),
-            passed: true,
-            optional: cost.optional.unwrap_or(false),
-        });
+        if crate::ability::log::debug_enabled() {
+            let cost_desc = format!(
+                "{}: {}→{} {}",
+                cost.action,
+                cost.source.map(|z| z.as_str()).unwrap_or("?"),
+                cost.destination.map(|z| z.as_str()).unwrap_or("?"),
+                cost.count.unwrap_or(cost.energy_count_any().unwrap_or(1))
+            );
+            push_verdict(AbilityLogItem::Cost {
+                text: cost.text.to_string(),
+                expectation: cost_desc,
+                actual: "支払済".into(),
+                passed: true,
+                optional: cost.optional.unwrap_or(false),
+            });
+        }
         Ok(())
     }
 
@@ -1389,23 +1395,27 @@ impl AbilityResolver {
 
     /// Walk the ability's effect tree to find modify_cost sub-actions and adjust the cost.
     /// Handles patterns like "コストはグループ名1種類につきE減る" (cost reduced per group name).
-    fn apply_modify_cost_to_ability_cost(
+    ///
+    /// Returns `Some(adjusted)` ONLY when a per-unit `modify_cost` actually
+    /// applies; `None` means "use the original cost as-is". A `cost.clone()` is
+    /// ~4 allocations plus ~1.7 KB of memcpy (an `AbilityEffect` deep clone —
+    /// see the size breakdown in `docs/PERF_ENGINE_OPTIMIZATION_CATALOG.md` §5.1),
+    /// and the overwhelming majority of abilities carry no `modify_cost`, so the
+    /// clone used to be paid unconditionally on every costed resolution.
+    fn adjusted_cost_after_modify(
         &self,
         gs: &mut GameState,
         cost: &AbilityEffect,
         ability: &Ability,
-    ) -> AbilityEffect {
-        let mut cost = cost.clone();
-        if let Some(ref effect) = ability.effect {
-            if let Some(mod_cost) = util::find_modify_cost(effect, None, None) {
-                if mod_cost.operation_any() == Some("subtract")
-                    && mod_cost.per_unit_any().unwrap_or(false)
-                {
-                    self.apply_per_unit_cost_reduction(gs, &mut cost, mod_cost);
-                }
-            }
+    ) -> Option<AbilityEffect> {
+        let effect = ability.effect.as_ref()?;
+        let mod_cost = util::find_modify_cost(effect, None, None)?;
+        if mod_cost.operation_any() != Some("subtract") || !mod_cost.per_unit_any().unwrap_or(false) {
+            return None;
         }
-        cost
+        let mut adjusted = cost.clone();
+        self.apply_per_unit_cost_reduction(gs, &mut adjusted, mod_cost);
+        Some(adjusted)
     }
 
     /// Per-unit cost reduction: `(units / per_unit_count) * amount`.

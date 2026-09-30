@@ -297,6 +297,13 @@ fn describe_card_type_label(ct: &str) -> String {
 
 /// Push a condition verdict to the structured log buffer.
 /// `actual_label` overrides the auto-generated actual string; use "" to auto-generate.
+///
+/// The `debug_enabled()` gate lives HERE, not in the callers, because this
+/// function builds 3-5 `String`s (`describe_condition_expectation` is
+/// `format!`-heavy) that `push_verdict` discards when debug is off. Gating here
+/// makes it impossible for a call site to forget — which is how this cost
+/// survived in four places after the equivalent gate was added to
+/// `describe_condition_actual`.
 #[cfg(not(feature = "no_std"))]
 pub fn push_cond_verdict(
     condition: &Condition,
@@ -304,6 +311,9 @@ pub fn push_cond_verdict(
     passed: bool,
     children: Vec<crate::ability::log::AbilityLogItem>,
 ) {
+    if !crate::ability::log::debug_enabled() {
+        return;
+    }
     use crate::ability::log::{push_verdict, AbilityLogItem};
     let condition_type = match condition {
         Condition::Appearance { .. } => "appearance_condition",
@@ -327,20 +337,21 @@ pub fn push_cond_verdict(
         Condition::AlwaysTrue { .. } => "otherwise_condition",
         Condition::AllRevealedMatchHeartColor { .. } => "all_revealed_match_heart_color",
         Condition::Unsupported { .. } => "custom",
-    }
-    .to_string();
+    };
 
+    // Rendered ONCE. It used to be rendered three times per verdict (once for
+    // `expectation`, once for `actual` when no override was supplied, and once
+    // for `text`); `text` and `expectation` are the same string here.
     let expectation = describe_condition_expectation(condition);
-
     let actual = if !extra_actual.is_empty() {
         extra_actual.to_string()
     } else {
-        describe_condition_expectation(condition)
+        expectation.clone()
     };
 
     push_verdict(AbilityLogItem::Condition {
-        text: describe_condition_expectation(condition),
-        condition_type,
+        text: expectation.clone(),
+        condition_type: condition_type.to_string(),
         expectation,
         actual,
         passed,

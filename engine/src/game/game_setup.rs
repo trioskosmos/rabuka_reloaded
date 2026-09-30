@@ -1111,7 +1111,7 @@ fn generate_pending_choice_actions(game_state: &GameState, choice: &Choice) -> V
             let target = target_player_id.as_deref().unwrap_or("self");
             let master = game_state.ability_master_id();
             let card_ids: Vec<(usize, i16)> = {
-                let player = match (target, master.as_deref()) {
+                let player = match (target, master) {
                     ("self", Some("player2") | Some("p2")) => &game_state.player2,
                     ("self", _) => &game_state.player1,
                     ("opponent", Some("player2") | Some("p2")) => &game_state.player1,
@@ -1729,7 +1729,10 @@ fn generate_main_phase_actions(game_state: &GameState) -> Vec<Action> {
         // of the STAGE, not of the hand card being considered, so it is built
         // once per call rather than once per hand card (it was a per-card Vec
         // allocation + rescan of all three slots, 34k+ times a bench run).
-        let waited_stage_cards: Vec<i16> = active_player
+        // `SmallVec` because the stage is exactly 3 slots, so this never spills:
+        // the callee takes `&[i16]`, which `&SmallVec` derefs to, so no
+        // signature anywhere changes.
+        let waited_stage_cards: smallvec::SmallVec<[i16; 3]> = active_player
             .stage
             .stage
             .iter()

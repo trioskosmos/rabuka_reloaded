@@ -663,7 +663,13 @@ impl CardDatabase {
 
     /// Strip all whitespace from a card name so that inconsistent spacing
     /// (e.g. "南 ことり" vs "南ことり") does not break ability conditions.
-    /// Avoids allocation when no whitespace is present.
+    ///
+    /// NOTE: this always returns an owned `String` — the "fast path" below
+    /// returns `name.to_string()`, so it is not allocation-free despite what an
+    /// earlier version of this comment claimed. Callers on a hot path should use
+    /// `ability::util::card_name_matches_group` (via `card_matches_group_str`),
+    /// which reproduces this function's output without allocating whenever the
+    /// name has no whitespace.
     pub fn normalize_name(name: &str) -> String {
         if name.bytes().all(|b| !b.is_ascii_whitespace()) {
             // Fast path: no ASCII whitespace — but still check for Unicode whitespace.

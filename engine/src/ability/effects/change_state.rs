@@ -461,7 +461,7 @@ impl AbilityResolver {
                 let controller = gs.ability_master_id();
                 candidates.retain(|(_, cid)| {
                     !gs.wait_immune_members.iter().any(|(m, owner)| {
-                        *m == *cid && controller.as_deref().is_some_and(|c| c != owner)
+                        *m == *cid && controller.is_some_and(|c| c != owner)
                     })
                 });
             }
@@ -579,7 +579,7 @@ impl AbilityResolver {
                     .into_iter()
                     .filter(|(_, cid)| {
                         !gs.wait_immune_members.iter().any(|(m, owner)| {
-                            *m == *cid && controller.as_deref().is_some_and(|c| c != owner)
+                            *m == *cid && controller.is_some_and(|c| c != owner)
                         })
                     })
                     .collect()
@@ -756,13 +756,17 @@ impl AbilityResolver {
             gs.trigger_auto_abilities_for_player(&p1);
             gs.trigger_auto_abilities_for_player(&p2);
 
-            let pp = self.player_prefix(gs);
-            let act_name = gs
-                .activating_card
-                .map(|c| self.card_name(c))
-                .unwrap_or_default();
-            gs.rule_log
-                .push(format!("{} {}: 状態変更→{}", pp, act_name, state_change));
+            if crate::core::runtime_flags::logging_enabled() {
+                let pp = self.player_prefix(gs);
+                let act_name = gs
+                    .activating_card
+                    .map(|c| self.card_name(c))
+                    .unwrap_or_default();
+                gs.push_rule_log_fmt(format_args!(
+                    "{} {}: 状態変更→{}",
+                    pp, act_name, state_change
+                ));
+            }
             return Ok(());
         }
 

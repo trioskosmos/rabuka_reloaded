@@ -4,6 +4,7 @@ pub mod baton;
 pub mod concession_rule_1_2_3_test;
 pub mod conditions;
 pub mod deck_construction_test;
+pub mod group_name_equivalence;
 pub mod permanent_loop_rule_12_1_test;
 pub mod phases;
 pub mod scoring;

@@ -2150,6 +2150,13 @@ int  rb_resolve_indices_to_ids(const GameState *g, int pl, const char *zone, con
 /* card_property predicates (card.rs::has_blade_heart/has_score_icon/has_all_blade) */
 int  rb_orientation_matches_state(const char *orientation, const char *state);
 int  rb_card_matches_group_str(int card_id, const char *group_name);
+/* Card::unit per card_binary.rs:175-182 — THE canonical unit accessor.
+   cards.json carries `unit` on 2,198 of 2,639 cards (0xFFFF in cards.bin marks
+   the 441 with no unit), and it is what the 『X』 names in group_names /
+   exclude_group_names / counted_by actually name. Use this, never a bare
+   rb_card_string(card->unit_idx), which silently yields "" for both "absent"
+   and "index 0xFFFF". Returns "" when the card has no unit. */
+const char *rb_card_unit_name(int card_id);
 /* Card::group per card_binary.rs:153-174. The blob's group string is empty for
    every record, so this derives the group from the series like Rust does.
    Use this, never rb_card_string(card->group_idx), which resolves to "". */

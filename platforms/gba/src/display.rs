@@ -165,15 +165,49 @@ struct PendingArt {
 ///   evicts its unrotated twin first), so transitions never exceed steady
 ///   state even mid-frame.
 /// One cached card placement: all parts plus the frame stamp for the
-/// end-of-frame retention sweep.
+/// end-of-frame retention sweep, and the OBJ-VRAM bytes the parts occupy.
 struct CachedPlacement {
     vrams: Vec<SpriteVram>,
     last_used: u32,
+    /// `vrams.len()` is a part count, not a byte count — the sizes differ per
+    /// kind (stage is 4 parts, live is 1). Budgeting needs the real bytes.
+    bytes: usize,
+}
+
+/// OBJ VRAM budget for cached card art.
+///
+/// The GBA has 32KB of OBJ character VRAM and agb allocates sprites out of it
+/// with no paging. Card art must be 8bpp — MASTER_PAL holds 240 colours and a
+/// 4bpp OBJ palette bank holds 16 — and an 8bpp tile is 64 bytes, double a
+/// 4bpp one. That fixes the cost per placement:
+///
+///     stage  4 parts = 36 tiles = 2304B
+///     hand   2 parts = 16 tiles = 1024B
+///     live   1 part  =  8 tiles =  512B
+///     detail 9 parts = 72 tiles = 4608B
+///
+/// A 1v1 board showing both players' hands is 6 stage + 8 live + 14 hand =
+/// 32,256B against 32,768B of VRAM — the visible set alone is ~98% of the
+/// hardware. So `SPRITE_CACHE_CAP` (which counts KEYS) bounded the wrong
+/// quantity entirely, and the only pressure response was to clear every
+/// placement and retry, which made a full board re-upload itself every frame.
+///
+/// Budget 28KB: the visible set fits, and the ~4.7KB of slack absorbs the
+/// transient placements a transition needs (a card mid-draw, a deck back)
+/// without a mass re-upload.
+const SPRITE_VRAM_BUDGET: usize = 28 * 1024;
+
+/// OBJ VRAM a placement's parts will occupy. 8bpp: 64 bytes per tile.
+fn placement_bytes(parts: &[(Size, usize, usize)]) -> usize {
+    parts.iter().map(|(size, _, _)| size.size_bytes_256()).sum()
 }
 
 struct CardSpriteCache {
     sprites: BTreeMap<String, CachedPlacement>,
     palette: PaletteVramMulti,
+    /// Sum of every cached placement's `bytes`. Maintained on insert/remove so
+    /// the budget check is O(1).
+    vram_bytes: usize,
     /// Current frame id. Entries stamp it on every touch (hit or upload);
     /// `end_frame` drops everything older.
     frame: u32,
@@ -251,6 +285,7 @@ impl CardSpriteCache {
         log::debug!("front index built for {} cards", front_order.len());
         Self {
             sprites: BTreeMap::new(),
+            vram_bytes: 0,
             palette,
             frame: 1,
             touched: false,
@@ -284,6 +319,7 @@ impl CardSpriteCache {
         self.frame = self.frame.wrapping_add(1);
         if self.frame == 0 {
             self.sprites.clear();
+            self.vram_bytes = 0;
             self.frame = 1;
         }
         self.touched = false;
@@ -301,11 +337,13 @@ impl CardSpriteCache {
         let frame = self.frame;
         let before = self.sprites.len();
         self.sprites.retain(|_, p| p.last_used == frame);
+        self.recount_bytes();
         if self.sprites.len() != before {
             log::debug!(
-                "sprite retain: {} -> {} keys",
+                "sprite retain: {} -> {} keys ({}B vram)",
                 before,
-                self.sprites.len()
+                self.sprites.len(),
+                self.vram_bytes
             );
         }
     }
@@ -486,13 +524,22 @@ impl CardSpriteCache {
             }
             if self.sprites.len() >= SPRITE_CACHE_CAP {
                 log::debug!(
-                    "sprite cache over cap ({} keys), evicting all",
+                    "sprite cache over cap ({} keys), evicting LRU",
                     self.sprites.len()
                 );
-                self.sprites.clear();
+                self.evict_over_cap(SPRITE_CACHE_CAP / 2);
+            }
+            // The parts this placement needs, and what they will cost. The
+            // budget is enforced BEFORE uploading: discovering the overrun
+            // from a failed `try_to_vram` means the whole placement has to be
+            // torn down and reattempted.
+            let cost = placement_bytes(parts);
+            let key: String = self.key_buf.as_str().into();
+            if !self.evict_for(cost, &key) {
+                log::debug!("no sprite VRAM for {} ({}B)", key, cost);
+                return None;
             }
             let mut vrams = Vec::with_capacity(parts.len());
-            let mut oom = false;
             for &(size, dx, dy) in parts {
                 match Self::upload_part(
                     tiles,
@@ -509,60 +556,79 @@ impl CardSpriteCache {
                     &self.palette,
                 ) {
                     Some(v) => vrams.push(v),
+                    // Budgeted up front, so this is now genuinely unexpected
+                    // (the real visible set is larger than the budget allows).
+                    // Drop just this card; a mass clear here is what made a
+                    // full board look like noise.
                     None => {
-                        oom = true;
-                        break;
+                        log::debug!("sprite upload OOM for {} ({}B)", key, cost);
+                        return None;
                     }
                 }
             }
-            // Miss path only: clone the key out to end the buffer borrow.
-            let key: String = self.key_buf.as_str().into();
-            if oom {
-                // OBJ VRAM exhausted (e.g. stale screen still cached):
-                // drop everything and retry once in the freed space.
-                log::debug!("sprite upload OOM for {}, evicting and retrying", key);
-                self.sprites.clear();
-                let mut vrams = Vec::with_capacity(parts.len());
-                for &(size, dx, dy) in parts {
-                    match Self::upload_part(
-                        tiles,
-                        grid_w,
-                        grid_h,
-                        box_w,
-                        box_h,
-                        flipped,
-                        dimmed,
-                        rot_ccw,
-                        size,
-                        dx,
-                        dy,
-                        &self.palette,
-                    ) {
-                        Some(v) => vrams.push(v),
-                        None => return None,
-                    }
-                }
-                self.sprites.insert(
-                    key,
-                    CachedPlacement {
-                        vrams,
-                        last_used: self.frame,
-                    },
-                );
-            } else {
-                self.sprites.insert(
-                    key,
-                    CachedPlacement {
-                        vrams,
-                        last_used: self.frame,
-                    },
-                );
-            }
+            self.vram_bytes += cost;
+            self.sprites.insert(
+                key,
+                CachedPlacement {
+                    vrams,
+                    last_used: self.frame,
+                    bytes: cost,
+                },
+            );
         }
         // Both shared borrows of disjoint fields — no clone needed.
         self.sprites
             .get(self.key_buf.as_str())
             .map(|p| p.vrams.as_slice())
+    }
+
+    /// Evict least-recently-used placements until the cache holds fewer than
+    /// `cap` keys. A count-based backstop for a pathological number of tiny
+    /// placements; the byte budget is the real bound, since keys differ in
+    /// cost by 9x (live 512B .. detail 4608B) and so a count says nothing
+    /// about whether the art fits in VRAM.
+    fn evict_over_cap(&mut self, cap: usize) {
+        while self.sprites.len() > cap {
+            let Some(oldest) = self.sprites.values().map(|p| p.last_used).min() else {
+                return;
+            };
+            self.sprites.retain(|_, p| p.last_used > oldest);
+            self.recount_bytes();
+        }
+    }
+
+    /// Evict least-recently-used placements until `need` more bytes fit under
+    /// `SPRITE_VRAM_BUDGET`, or until only `keep` remains. Returns false if
+    /// it could not free enough, in which case the caller must drop the
+    /// placement it was trying to add.
+    ///
+    /// Allocation-free: `last_used` is a frame id, so "oldest" is a MIN over
+    /// values and a single `retain` drops every tie. That is what we want —
+    /// evicting a whole frame's worth at once is what actually clears the
+    /// pressure, where one-at-a-time would only make `active_sprites` grow
+    /// again next frame.
+    fn evict_for(&mut self, need: usize, keep: &str) -> bool {
+        while self.vram_bytes + need > SPRITE_VRAM_BUDGET {
+            let Some(oldest) = self
+                .sprites
+                .iter()
+                .filter(|(k, _)| k.as_str() != keep)
+                .map(|(_, p)| p.last_used)
+                .min()
+            else {
+                return false;
+            };
+            self.sprites.retain(|k, p| k == keep || p.last_used > oldest);
+            self.recount_bytes();
+        }
+        true
+    }
+
+    /// Recompute the cached byte total. Only runs on the transition paths
+    /// (retain/clear/evict), never per frame, so the O(n) walk is cheaper than
+    /// the risk of the incremental counter drifting.
+    fn recount_bytes(&mut self) {
+        self.vram_bytes = self.sprites.values().map(|p| p.bytes).sum();
     }
 
     /// Keep exactly one cached placement, drop everything else. Used by the
@@ -576,6 +642,7 @@ impl CardSpriteCache {
         }
         log::debug!("retaining sprite key {}", keep);
         self.sprites.retain(|k, _| k == keep);
+        self.recount_bytes();
     }
 
     /// Drop cached placements whose key starts with `prefix` (e.g. detail
@@ -593,6 +660,7 @@ impl CardSpriteCache {
         if dead > 0 {
             log::debug!("evicting {} sprite keys ({})", dead, prefix);
         }
+        self.recount_bytes();
     }
 
     fn clear(&mut self) {
@@ -600,6 +668,7 @@ impl CardSpriteCache {
             log::debug!("clearing {} sprite keys", self.sprites.len());
             self.sprites.clear();
         }
+        self.vram_bytes = 0;
     }
 }
 

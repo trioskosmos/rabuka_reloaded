@@ -676,6 +676,46 @@ fn eq_ignoring_whitespace(a: &str, b: &str) -> bool {
     }
 }
 
+/// Allocation-free form of
+/// `card_db.get_card_names(card_id).iter().any(|n| n.contains(gn) || <full-width fold>)`.
+///
+/// `get_card_names` costs 4+ heap allocations (a `String` from `normalize_name`, a
+/// `String` from `.replace('＆', "&")`, a `Vec`, and one `String` per name part),
+/// and this predicate sits in the FOURTH disjunct of `card_matches_group_str` —
+/// so it is reached precisely when the cheaper unit/group/whitespace checks
+/// missed, i.e. on the common scan path.
+///
+/// `get_card_names` computes `normalize_name(name).replace('＆', "&").split('&')`.
+/// `normalize_name` returns the name UNCHANGED when it contains no whitespace,
+/// and `.replace` is a no-op when there is no full-width '＆'. So whenever the
+/// name has neither, the parts are exactly `name.split('&')` and the whole
+/// construction collapses to a borrow. Anything else takes the original
+/// allocating path so the semantics stay byte-identical.
+///
+/// `card` is passed in because the caller has already looked it up — this used
+/// to be a second `get_card` hash probe per call.
+#[inline]
+pub fn card_name_matches_group(
+    card_db: &CardDatabase,
+    card: &crate::core::card::Card,
+    card_id: i16,
+    gn: &str,
+) -> bool {
+    let name = card.name.as_ref();
+    if !name.contains(char::is_whitespace) && !name.contains('＆') {
+        return name.split('&').any(|n| {
+            n.contains(gn)
+                || ((n.contains('\u{FF01}') || n.contains('\u{00B5}'))
+                    && norm_group_name(n).as_ref().contains(gn))
+        });
+    }
+    card_db.get_card_names(card_id).iter().any(|n| {
+        n.contains(gn)
+            || ((n.contains('\u{FF01}') || n.contains('\u{00B5}'))
+                && norm_group_name(n).as_ref().contains(gn))
+    })
+}
+
 pub fn card_matches_group_str(
     card_db: &CardDatabase,
     card_id: i16,
@@ -697,8 +737,7 @@ pub fn card_matches_group_str(
                     unit_match
                 || c.group.as_ref() == g
                 || !c.group.is_empty() && eq_ignoring_whitespace(&c.group, g)
-                || card_db.get_card_names(card_id).iter().any(|n| n.contains(gn.as_ref())
-                    || ((n.contains('\u{FF01}') || n.contains('\u{00B5}')) && norm_group_name(n).as_ref().contains(gn.as_ref())))
+                || card_name_matches_group(card_db, c, card_id, gn.as_ref())
                 // Multi-name cards (e.g. 渡辺曜&鬼塚夏美&大沢瑠璃乃) should match
                 // group names through any of their constituent series (Q105).
                 // Example: LL-bp2-001-R+ matches "Aqours" via ラブライブ！サンシャイン!!

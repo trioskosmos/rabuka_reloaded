@@ -39,6 +39,14 @@ mod inner {
     use super::AbilityLogItem;
     use alloc::vec::Vec;
     pub fn push_verdict(_item: AbilityLogItem) {}
+    /// The `no_std` buffer is inert (`push_verdict` is a no-op), so the
+    /// verdict-recording gate is always false. Callers gate on this BEFORE
+    /// building their `String` arguments, so it has to exist here too — not
+    /// just in the std module — or the console builds skip the gate entirely.
+    #[inline]
+    pub fn debug_enabled() -> bool {
+        false
+    }
     pub fn drain_verdicts() -> Vec<AbilityLogItem> {
         Vec::new()
     }
@@ -133,6 +141,13 @@ impl AbilityResolver {
     /// "P1 <card name>: <label>". Shared by the DiscardCard/MoveCards/Select
     /// dispatch arms in effects/mod.rs.
     pub(crate) fn rule_log_activated(&self, gs: &mut GameState, label: &str) {
+        // Gated HERE, not by the caller: `push_rule_log_fmt` is itself gated, but
+        // the two `String` locals below (one of which does a card-database lookup)
+        // are evaluated before that call, so on a training/headless run they were
+        // two allocations per logged action for a line nobody reads.
+        if !crate::core::runtime_flags::logging_enabled() {
+            return;
+        }
         let pp = self.player_prefix(gs);
         let cn = gs
             .activating_card

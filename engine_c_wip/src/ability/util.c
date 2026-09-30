@@ -6,12 +6,20 @@
    These are shared by the condition evaluators and the effect executors; keeping
    them in one place mirrors the Rust single-source layout.
 
-   rb_card_matches_group_str is a faithful port of util.rs:602-643: exact unit
-   match, the '！'(U+FF01)/'µ'(U+00B5) normalized fallback, the exact comparison
-   against the card's DERIVED group (rb_card_group_name — the stored group
-   string is "" for every record in cards.bin, so it must never be read
-   directly), per-name containment over the '&'/'＆'-separated name list, series
-   membership, then the constant set_card_identity memberships. */
+   rb_card_matches_group_str is a faithful port of util.rs:679-725: exact unit
+   match (via the canonical rb_card_unit_name accessor), the spacing-insensitive
+   and '！'(U+FF01)/'µ'(U+00B5) normalized fallbacks, the comparison against the
+   card's DERIVED group (rb_card_group_name — the stored group string is "" for
+   every record in cards.bin, so it must never be read directly),
+   per-name containment over the '&'/'＆'-separated name list, series
+   membership, then the constant set_card_identity memberships.
+
+   WHY UNIT IS THE LOAD-BEARING TERM: cards.json has no `group` key on any of
+   its 2,639 cards, but it does carry `unit` on 2,198 of them, and every name in
+   abilities.json's group_names / exclude_group_names / counted_by lists is a
+   UNIT name (CatChu!, KALEIDOSCORE, 5yncri5e!, Printemps, …) or one of the
+   five series-derived names (μ's, Aqours, 虹ヶ咲, Liella!, 蓮ノ空). Both are
+   therefore live: term 1 reads unit, term 2 reads the series-derived group. */
 
 #include "rabuka.h"
 #include <string.h>
@@ -143,6 +151,27 @@ static int str_ieq(const char *a, const char *b) {
         a++; b++;
     }
     return *a == *b;
+}
+
+/* Mirror util.rs::eq_ignoring_whitespace (util.rs:667-677).
+   The corpus spells one unit group two ways — `lily white` on 25 cards and
+   `lilywhite` on 106 — and cards.json `unit` keeps both, so a raw `==` made a
+   `『lily white』` filter skip every unspaced card and a `『lilywhite』` filter
+   skip every spaced one. Rust added this term explicitly for that reason; the C
+   had no equivalent, so both spellings were half-dead here. Allocation free;
+   the ！/µ variants are handled separately by norm_str. */
+static int str_eq_ignoring_ws(const char *a, const char *b) {
+    if (!a || !b) return 0;
+    while (*a && *b) {
+        while (*a == ' ' || *a == '\t' || *a == '\n' || *a == '\r') a++;
+        while (*b == ' ' || *b == '\t' || *b == '\n' || *b == '\r') b++;
+        if (!*a || !*b) break;
+        if (*a != *b) return 0;
+        a++; b++;
+    }
+    while (*a == ' ' || *a == '\t' || *a == '\n' || *a == '\r') a++;
+    while (*b == ' ' || *b == '\t' || *b == '\n' || *b == '\r') b++;
+    return *a == '\0' && *b == '\0';
 }
 
 /* ── Effect-field reader ─────────────────────────────────────────────── */
@@ -332,10 +361,35 @@ static int card_identity_ability_matches(int card_id, const char *gn) {
 
 /* Mirror util.rs::card_matches_group_str — group/unit/name/series + set_card_identity.
 
-   Faithful to util.rs:589-630. The previous body tested raw bidirectional
+   Faithful to util.rs:679-725. The previous body tested raw bidirectional
    substrings (strstr(group_name, g) with an empty card group is always
    non-NULL), so EVERY card matched EVERY group filter and every 「『X』の…」
-   ability in the engine silently did nothing. */
+   ability in the engine silently did nothing.
+
+   TERM ORDER (each term is Rust's, in Rust's order):
+     1. unit        — util.rs:691-696. Exact against the NORMALISED query, then
+                       whitespace-insensitive, then the ！/µ-normalised form.
+                       This is the term the 「『CatChu!』」 style filters live on:
+                       cards.json carries `unit` on 2,198 cards and it is the
+                       only card field the data actually populates (the `group`
+                       key is absent from all 2,639).
+     2. group       — util.rs:698-699. rb_card_group_name() is the DERIVED
+                       (series→group) accessor from core/card.c, because the
+                       stored `group` index resolves to "" for every record.
+     3. names       — util.rs:700-701, containment over the '&'/U+FF06 split.
+     4. series      — util.rs:705.
+     5. identities  — util.rs:710-717, the constant set_card_identity list.
+
+   NORMALISATION: norm_str maps U+FF01 '！' → ASCII '!' and U+00B5 'µ' →
+   U+03BC 'μ', and is applied to the QUERY unconditionally. The card side is
+   only re-normalised when it actually contains one of those two characters,
+   which is what Rust does (util.rs:696) and is what makes the corpus's split
+   spellings work: `unit` holds BOTH 'みらくらぱーく！' (51 cards, U+FF01) and
+   'みらくらぱーく!' (45 cards, ASCII), while group_names holds only the U+FF01
+   form — either one matches either filter. U+FF0B '＋' is deliberately NOT
+   folded: Rust's norm_group_name folds only U+FF01 and U+00B5, and no unit or
+   group_names string in cards.json / abilities.json contains it, so folding it
+   would only make the C diverge from the reference. */
 int rb_card_matches_group_str(int card_id, const char *group_name) {
     if (!group_name) return 1;
 
@@ -345,28 +399,37 @@ int rb_card_matches_group_str(int card_id, const char *group_name) {
     Card c;
     if (!rb_decode_card_by_index((uint32_t)card_id, &c)) { rb_free(gn); return 0; }
 
-    const char *u = rb_card_string(c.unit_idx);
+    /* Canonical unit accessor — never Card.unit_idx + rb_card_string, which
+       cannot tell "no unit" from "index 0xFFFF". */
+    const char *u = rb_card_unit_name(card_id);
     const char *s = rb_card_string(c.series_idx);
 
-    /* util.rs:600-603 — unit == gn, plus the ！/µ exact-normalized fallback. */
+    /* util.rs:691-696 — unit == gn || eq_ignoring_whitespace(unit, gn)
+       || (unit has ！/µ && norm(unit) == gn). */
     int match = 0;
-    if (u && !strcmp(u, gn)) {
-        match = 1;
-    } else if (u && (strstr(u, "！") || strstr(u, "µ"))) {
-        char *unorm = norm_str(u);
-        if (unorm) { match = !strcmp(unorm, gn); rb_free(unorm); }
+    if (u && *u) {
+        if (!strcmp(u, gn)) {
+            match = 1;
+        } else if (str_eq_ignoring_ws(u, gn)) {
+            match = 1;
+        } else if (strstr(u, "！") || strstr(u, "µ")) {
+            char *unorm = norm_str(u);
+            if (unorm) { match = !strcmp(unorm, gn); rb_free(unorm); }
+        }
     }
 
-    /* util.rs:604 — c.group == g, an exact comparison against the raw input.
-       The group must come from rb_card_group_name(): the stored group index
-       resolves to "" for every record in cards.bin, so reading it directly
-       makes this term dead (and made the old body match everything). */
+    /* util.rs:698-699 — c.group == g, then the same whitespace-insensitive
+       form. The group must come from rb_card_group_name(): the stored group
+       index resolves to "" for every record in cards.bin, so reading it
+       directly makes this term dead (and made the old body match everything).
+       Compared against the RAW query, as Rust does. */
     if (!match) {
         const char *g = rb_card_group_name(card_id);
-        if (g && *g && !strcmp(g, group_name)) match = 1;
+        if (g && *g && (!strcmp(g, group_name) || str_eq_ignoring_ws(g, group_name)))
+            match = 1;
     }
 
-    /* util.rs:605-606 — any of the card's names contains gn, with the same
+    /* util.rs:700-701 — any of the card's names contains gn, with the same
        ！/µ normalized fallback. Names are '&'/U+FF06 separated. */
     if (!match) {
         char names[1024];
@@ -384,10 +447,10 @@ int rb_card_matches_group_str(int card_id, const char *group_name) {
         }
     }
 
-    /* util.rs:610 — multi-series joint cards match via any constituent line. */
+    /* util.rs:705 — multi-series joint cards match via any constituent line. */
     if (!match && s && rb_card_series_matches_group(s, gn)) match = 1;
 
-    /* util.rs:615-622 — constant set_card_identity ("treated as") memberships:
+    /* util.rs:710-717 — constant set_card_identity ("treated as") memberships:
        the ability-declared list first, then the runtime registry the C port
        records when the ability has actually fired. */
     if (!match) match = card_identity_ability_matches(card_id, gn);
@@ -794,9 +857,26 @@ int rb_count_in_zone_filtered(const GameState *g, int pl, const char *zone,
 
 /* ── Zone move / place helpers ─────────────────────────────────────────── */
 
+/* Resolve a zone STRING to the bag that physically holds it.
+ *
+ * Mirror engine/src/ability/util.rs:2066-2088 `zone_cards`, which maps
+ * `Deck | DeckTop | DeckBottom` onto the SAME `main_deck` slice and falls into
+ * the `_ => &[]` arm for `Zone::EnergyDeck` -- so energy_deck counts as EMPTY
+ * there and must keep resolving to NULL below (rb_count_in_zone shares this
+ * helper). The deck_top/deck_bottom arms were simply absent, which made
+ * rb_place_card_in_zone() report "not placed" for them AFTER the caller had
+ * already lifted the card out of its source: the card was DELETED from the
+ * game. Proof: test_parity_bp7 kanon_selects_each_group_to_deck_bottom_and_draws
+ * measured CENSUS 44->41, three cards gone while the deck length looked merely
+ * unchanged. A zone count cannot tell "never moved" from "destroyed"; only a
+ * whole-board census can.
+ *
+ * placement (util.rs:2330-2348) is the only operation Rust performs on
+ * energy_deck, and it is handled by its own arm in rb_place_card_in_zone. */
 static RbBag *zone_bag(RbPlayer *P, const char *zone) {
     if (!strcmp(zone, "hand")) return &P->hand;
-    if (!strcmp(zone, "deck") || !strcmp(zone, "main_deck")) return &P->deck;
+    if (!strcmp(zone, "deck") || !strcmp(zone, "main_deck") ||
+        !strcmp(zone, "deck_top") || !strcmp(zone, "deck_bottom")) return &P->deck;
     if (!strcmp(zone, "waitroom") || !strcmp(zone, "discard")) return &P->discard;
     if (!strcmp(zone, "energy") || !strcmp(zone, "energy_zone")) return &P->energy;
     if (!strcmp(zone, "live") || !strcmp(zone, "live_card_zone")) return &P->live;
@@ -823,6 +903,17 @@ int rb_remove_card_from_zone(GameState *g, int pl, int card_id, const char *zone
         }
         return 0;
     }
+    /* Rust's remove_card_from_zone (util.rs:2181-2241) matches Zone::Deck and
+     * nothing else among the deck spellings: `deck_top`, `deck_bottom` and
+     * `energy_deck` fall to the `_ => {}` arm and remove NOTHING. zone_bag()
+     * above deliberately maps deck_top/deck_bottom onto main_deck, because that
+     * is what zone_cards does (util.rs:2073) and place_card_in_zone needs it;
+     * this guard is what keeps the two Rust functions' differing scopes from
+     * being merged into one. Without it a src of "deck_bottom" would start
+     * removing cards the Rust engine leaves in the deck. */
+    if (!strcmp(zone, "deck_top") || !strcmp(zone, "deck_bottom") ||
+        !strcmp(zone, "energy_deck"))
+        return 0;
     RbBag *b = zone_bag(P, zone);
     if (!b) return 0;
     for (int i = 0; i < b->n; i++)
@@ -840,6 +931,37 @@ int rb_place_card_in_zone(GameState *g, int pl, int card_id, const char *zone,
         int area = vacated_area >= 0 ? vacated_area : rb_stage_first_empty(P->stage);
         if (area < 0 || area >= RB_STAGE_SIZE) return 0;
         P->stage[area] = card_id; P->stage_wait[area] = 0;
+        return 1;
+    }
+    /* util.rs:2330-2336 `Zone::Deck | Zone::DeckTop` -- INSERT at
+     * vacated_stage_area (defaulting to 0, i.e. the top of the bag, which is
+     * index 0 because the C deck bag is top-first), clamped to the deck
+     * length. util.rs:2337-2340 `Zone::DeckBottom` -- push, i.e. the end of
+     * the bag. util.rs:2345-2348 `Zone::EnergyDeck` -- push onto the energy
+     * deck bag.
+     *
+     * These three were the card-destroying gap: zone_bag() could not name
+     * deck_bottom, so every caller that had ALREADY removed the card from its
+     * source zone got a 0 back and the card ended up in no zone at all. The
+     * CHOICE-driven path is the one that measured it (CENSUS 44->41 in
+     * test_parity_bp7); move.c's plain path already appended for deck_bottom. */
+    if (!strcmp(zone, "deck") || !strcmp(zone, "deck_top")) {
+        int idx = vacated_area >= 0 ? vacated_area : 0;
+        if (idx > P->deck.n) idx = P->deck.n;
+        if (P->deck.n < RB_MAX_ZONE) {
+            for (int k = P->deck.n; k > idx; k--) P->deck.cards[k] = P->deck.cards[k - 1];
+            P->deck.cards[idx] = card_id;
+            P->deck.n++;
+        }
+        return 1;
+    }
+    if (!strcmp(zone, "deck_bottom")) {
+        if (P->deck.n < RB_MAX_ZONE) P->deck.cards[P->deck.n++] = card_id;
+        return 1;
+    }
+    if (!strcmp(zone, "energy_deck")) {
+        if (P->energy_deck.n < RB_MAX_ZONE)
+            P->energy_deck.cards[P->energy_deck.n++] = card_id;
         return 1;
     }
     RbBag *b = zone_bag(P, zone);
@@ -1797,9 +1919,24 @@ int rb_constant_per_unit_units(const AbilityEffect *effect, const GameState *g, 
         int matched[RB_MAX_ZONE];
         per_count = rb_matching_ids(&f, ids, n, matched, RB_MAX_ZONE);
     } else if (!strcmp(zone, "under_member") || !strcmp(zone, "under")) {
+        /* engine/src/ability/util.rs:2638-2646 `under_member_cards`: the clause
+         * 「このメンバーの下に置かれているカード」 counts ONE member's
+         * under-cards -- the host's own slot when the host is on stage, the
+         * whole field only when the host is unknown. Walking every bag
+         * multiplied the gain by every member on stage: test_parity_hearts
+         * _constants reported 2 for "1 other A-RISE member grants exactly 1
+         * heart05", 3 for "two others -> +2", and 2 for "energy under a
+         * DIFFERENT area plus a member under center -> still 0". Same shape
+         * and same fix as dynamic_count.c's per-unit arm. */
         int ids[RB_MAX_ZONE];
         int n = 0;
-        for (int s = 0; s < RB_STAGE_SIZE; s++)
+        int host_slot = -1;
+        if (host_card_id >= 0)
+            for (int s = 0; s < RB_STAGE_SIZE; s++)
+                if (P->stage[s] == host_card_id) { host_slot = s; break; }
+        int lo = (host_slot >= 0) ? host_slot : 0;
+        int hi = (host_slot >= 0) ? host_slot + 1 : RB_STAGE_SIZE;
+        for (int s = lo; s < hi; s++)
             for (int i = 0; i < P->under_cards[s].n && n < RB_MAX_ZONE; i++)
                 ids[n++] = P->under_cards[s].cards[i];
         int matched[RB_MAX_ZONE];

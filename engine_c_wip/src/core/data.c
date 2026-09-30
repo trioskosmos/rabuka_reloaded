@@ -328,6 +328,29 @@ const char *rb_card_string(uint16_t idx) {
     return "";
 }
 
+/* ── CANONICAL UNIT ACCESSOR (Card::unit, card_binary.rs:175-182) ───────────
+   compile_cards.py writes the card's `unit` field at record offset 8 and uses
+   0xFFFF as the "absent" marker (cards.json has no `unit` key for 441 of 2,639
+   cards), which is exactly the None that card_binary.rs builds. Before this
+   accessor the only ways to reach the unit were `Card.unit_idx` +
+   `rb_card_string` — which silently yields "" for both "absent" and "index
+   0xFFFF", and which callers in ability/*.c were not using consistently.
+
+   Unlike `group` (which is the EMPTY STRING for every one of the 2,639 cards
+   and is therefore only usable through rb_card_group_name, the series-derived
+   accessor in core/card.c), `unit` is real data on 2,198 cards and names the
+   unit the printed text brackets as 『X』. Every group-name comparison must be
+   reachable from here. Returns a pointer into the card string table (or the
+   shared "" literal), so it is stable for the process lifetime. */
+const char *rb_card_unit_name(int card_id) {
+    if (card_id < 0) return "";
+    const unsigned char *r = rb_card_record((uint32_t)card_id);
+    if (!r || rb_card_record_len((uint32_t)card_id) < 10) return "";
+    uint16_t unit_idx = le16(r + 8);
+    if (unit_idx == 0xFFFF) return "";       /* compile_cards.py's "no unit" */
+    return rb_card_string(unit_idx);
+}
+
 /* ability slice access for vm.c */
 const unsigned char *rb_bc_slice(uint32_t idx, uint32_t *out_len) {
     if (idx >= RBKA_NUM_ABILITIES) return NULL;

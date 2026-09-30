@@ -964,7 +964,7 @@ impl super::TurnEngine {
         let hand_count = game_state.active_player().hand.cards.len();
         let stage = &game_state.active_player().stage;
         let success_zone = &game_state.active_player().success_live_card_zone.cards;
-        let waited_stage_cards: Vec<i16> = stage
+        let waited_stage_cards: smallvec::SmallVec<[i16; 3]> = stage
             .stage
             .iter()
             .copied()
@@ -1239,7 +1239,7 @@ impl super::TurnEngine {
         let played_card_cost_mod = played_card_id
             .and_then(|cid| game_state.mods.get_cost_modifier_set(cid))
             .unwrap_or(0);
-        let waited_stage_cards: Vec<i16> = game_state
+        let waited_stage_cards: smallvec::SmallVec<[i16; 3]> = game_state
             .active_player()
             .stage
             .stage

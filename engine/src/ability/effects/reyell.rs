@@ -51,12 +51,13 @@ impl AbilityResolver {
         gs.re_yell_occurred = true;
         gs.prohibition_effects.push("re_yell".to_string());
         let pp = self.player_prefix(gs);
-        let act_name = gs
-            .activating_card
-            .map(|c| self.card_name(c))
-            .unwrap_or_default();
-        gs.rule_log
-            .push(format!("{} {}: [[log_re_yell]]", pp, act_name));
+        if crate::core::runtime_flags::logging_enabled() {
+            let act_name = gs
+                .activating_card
+                .map(|c| self.card_name(c))
+                .unwrap_or_default();
+            gs.push_rule_log_fmt(format_args!("{} {}: [[log_re_yell]]", pp, act_name));
+        }
     }
 
     /// Perform N additional yells.
@@ -126,7 +127,7 @@ impl AbilityResolver {
             let reyell_source = gs.current_ability_source_card_id();
             let reyell_owner = crate::ability::util::target_player_index(
                 target,
-                gs.ability_master_id().as_deref(),
+                gs.ability_master_id(),
             );
             for cid in &total_blade {
                 gs.push_revealed_card(*cid, reyell_source, false, reyell_owner, "re_yell");

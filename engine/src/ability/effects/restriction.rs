@@ -36,12 +36,13 @@ impl AbilityResolver {
         let target = effect.target_name();
         let delayed = effect.delayed_any().unwrap_or(false);
         let pp = self.player_prefix(gs);
-        let act_name = gs
-            .activating_card
-            .map(|c| self.card_name(c))
-            .unwrap_or_default();
-        gs.rule_log
-            .push(format!("{} {}: [[log_restriction]]", pp, act_name));
+        if crate::core::runtime_flags::logging_enabled() {
+            let act_name = gs
+                .activating_card
+                .map(|c| self.card_name(c))
+                .unwrap_or_default();
+            gs.push_rule_log_fmt(format_args!("{} {}: [[log_restriction]]", pp, act_name));
+        }
         let restriction_str = format!(
             "restriction:{}:{}",
             restriction_type.unwrap_or("unknown"),
@@ -112,7 +113,7 @@ impl AbilityResolver {
         if restriction_type == Some("cannot_wait_by_effect") {
             let master = gs.ability_master_id();
             let owner_is_p2 = matches!(
-                master.as_deref(),
+                master,
                 Some("player2") | Some("p2")
             );
             let (owner_stage, owner_id): (Vec<i16>, String) = if owner_is_p2 {

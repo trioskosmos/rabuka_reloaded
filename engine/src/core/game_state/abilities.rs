@@ -1246,7 +1246,11 @@ pub fn trigger_auto_ability(
                 && requested_text == Some(resolved_ability.full_text.as_str())
                 && !self.is_ability_invalidated(cid, trigger_type)
             {
-                return Some((ability_index, ability.to_arc()));
+                // `resolved_ability` is already the `Arc<Ability>`; calling
+                // `ability.to_arc()` here re-ran the decode-slot lookup and a
+                // second `Arc::clone` (an atomic increment) for a value already
+                // in hand. One refcount bump per enqueue, removed.
+                return Some((ability_index, resolved_ability));
             }
         }
         None
@@ -2676,27 +2680,33 @@ fn trigger_auto_ability_by_index_refs(
 
     /// Resolve which player "self" refers to based on the ability master's player_id.
     /// The ability queue entry stores which player activated this ability.
-    pub fn ability_master_id(&self) -> Option<String> {
+    ///
+    /// Borrows rather than returning `Option<String>`. Every caller used the
+    /// value only to compare it against `"player2"`/`"p2"`, so the old owned
+    /// return was one heap allocation per call across ~20 call sites — and
+    /// `resolve_target_player` below re-ran it on all 199 of its call sites.
+    #[inline]
+    pub fn ability_master_id(&self) -> Option<&str> {
         self.ability_queue
             .current_entry()
-            .map(|e| e.player_id.clone())
+            .map(|e| e.player_id.as_str())
     }
 
     /// Shared master-player resolution — used by both mut/non-mut variants.
     /// Checks the queue entry (ability_master_id) first, then falls back to the
     /// owning player of the activating card. This makes the two arms identical
     /// (previously mut lacked the owner fallback and diverged on "both").
-    fn resolve_master_id(&self) -> Option<String> {
+    fn resolve_master_id(&self) -> Option<&str> {
         self.ability_master_id().or_else(|| {
             self.activating_card
                 .and_then(|cid| self.owner_of_card(cid))
-                .map(|p| p.id.to_string())
+                .map(|p| p.id.as_str())
         })
     }
 
     pub fn resolve_target_player_mut(&mut self, target: &str) -> &mut Player {
         let master = self.resolve_master_id();
-        match (target, master.as_deref()) {
+        match (target, master) {
             ("self", Some("player2") | Some("p2")) => &mut self.player2,
             ("self", _) => &mut self.player1,
             ("opponent", Some("player2") | Some("p2")) => &mut self.player1,
@@ -2740,7 +2750,7 @@ fn trigger_auto_ability_by_index_refs(
 
     pub fn resolve_target_player(&self, target: &str) -> &Player {
         let master = self.resolve_master_id();
-        match (target, master.as_deref()) {
+        match (target, master) {
             ("self", Some("player2") | Some("p2")) => &self.player2,
             ("self", _) => &self.player1,
             ("opponent", Some("player2") | Some("p2")) => &self.player1,

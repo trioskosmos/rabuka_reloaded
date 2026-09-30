@@ -286,10 +286,14 @@ impl AbilityResolver {
             let succeeded = gs.try_add_ability_invalidation(card_id, trigger, duration);
             self.carried.last_action_result = Some((effect.action, succeeded));
             if succeeded {
-                let pp = self.player_prefix(gs);
-                let cn = self.card_name(card_id);
-                gs.rule_log
-                    .push(format!("{} {}: [[log_negate_ability_self]]", pp, cn));
+                if crate::core::runtime_flags::logging_enabled() {
+                    let pp = self.player_prefix(gs);
+                    let cn = self.card_name(card_id);
+                    gs.push_rule_log_fmt(format_args!(
+                        "{} {}: [[log_negate_ability_self]]",
+                        pp, cn
+                    ));
+                }
             }
             return Ok(());
         }
@@ -373,10 +377,11 @@ impl AbilityResolver {
         self.selection.cards.clear();
         self.carried.last_action_result = Some((effect.action, succeeded));
         if succeeded {
-            let pp = self.player_prefix(gs);
-            let cn = self.card_name(gs.activating_card.unwrap_or_default());
-            gs.rule_log
-                .push(format!("{} {}: [[log_negate_ability]]", pp, cn));
+            if crate::core::runtime_flags::logging_enabled() {
+                let pp = self.player_prefix(gs);
+                let cn = self.card_name(gs.activating_card.unwrap_or_default());
+                gs.push_rule_log_fmt(format_args!("{} {}: [[log_negate_ability]]", pp, cn));
+            }
         }
         Ok(())
     }
@@ -731,13 +736,14 @@ pub(crate) fn execute_gain_ability(
     }
 
     pub(crate) fn execute_set_card_identity(&mut self, gs: &mut GameState, identities: &[String]) {
-        let pp = self.player_prefix(gs);
-        let act_name = gs
-            .activating_card
-            .map(|c| self.card_name(c))
-            .unwrap_or_default();
-        gs.rule_log
-            .push(format!("{} {}: カード同一性変更", pp, act_name));
+        if crate::core::runtime_flags::logging_enabled() {
+            let pp = self.player_prefix(gs);
+            let act_name = gs
+                .activating_card
+                .map(|c| self.card_name(c))
+                .unwrap_or_default();
+            gs.push_rule_log_fmt(format_args!("{} {}: カード同一性変更", pp, act_name));
+        }
         if !identities.is_empty() {
             gs.prohibition_effects
                 .push(format!("card_identity:{}", identities.join(",")));
@@ -761,12 +767,16 @@ pub(crate) fn execute_gain_ability(
                 }
             }
         }
-        let pp = self.player_prefix(gs);
-        let act_name = gs
-            .activating_card
-            .map(|c| self.card_name(c))
-            .unwrap_or_default();
-        gs.rule_log
-            .push(format!("{} {}: 全領域カード同一性変更", pp, act_name));
+        if crate::core::runtime_flags::logging_enabled() {
+            let pp = self.player_prefix(gs);
+            let act_name = gs
+                .activating_card
+                .map(|c| self.card_name(c))
+                .unwrap_or_default();
+            gs.push_rule_log_fmt(format_args!(
+                "{} {}: 全領域カード同一性変更",
+                pp, act_name
+            ));
+        }
     }
 }

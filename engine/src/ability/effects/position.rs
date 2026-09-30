@@ -86,9 +86,10 @@ impl AbilityResolver {
         }
         gs.prohibition_effects
             .push(format!("baton_touch_allowed:{}", count));
-        let pp = self.player_prefix(gs);
-        gs.rule_log
-            .push(format!("{}: バトンタッチ {}回", pp, count));
+        if crate::core::runtime_flags::logging_enabled() {
+            let pp = self.player_prefix(gs);
+            gs.push_rule_log_fmt(format_args!("{}: バトンタッチ {}回", pp, count));
+        }
         Ok(())
     }
 
@@ -101,12 +102,16 @@ impl AbilityResolver {
         target_member: &str,
     ) -> Result<(), String> {
         let pp = self.player_prefix(gs);
-        let act_name = gs
-            .activating_card
-            .map(|c| self.card_name(c))
-            .unwrap_or_default();
-        gs.rule_log
-            .push(format!("{} {}: [[log_position_change]]", pp, act_name));
+        if crate::core::runtime_flags::logging_enabled() {
+            let act_name = gs
+                .activating_card
+                .map(|c| self.card_name(c))
+                .unwrap_or_default();
+            gs.push_rule_log_fmt(format_args!(
+                "{} {}: [[log_position_change]]",
+                pp, act_name
+            ));
+        }
 
         // Each-time resolution watchers (「…能力が解決したとき、そのメンバーを
         // ポジションチェンジする」): the member to move is the RESOLVER carried

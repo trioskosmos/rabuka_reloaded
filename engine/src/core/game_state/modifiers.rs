@@ -226,18 +226,21 @@ impl GameState {
                 continue;
             }
             // `counted_by` is the list of groups whose effects SEE the weight. An
-            // empty list means any effect sees it.
-            let seen_by = effect
-                .counted_by_any()
-                .map(|v| v.to_vec())
-                .unwrap_or_default();
+            // empty list means any effect sees it. Borrowed, not cloned: this runs
+            // once per card in the zone on the count path, and the deep copy
+            // (a Vec plus one String per group) was pure waste — `effect` borrows
+            // `card_database`, not `self`, so the borrow lives for the whole block.
+            let seen_by: &[String] = match effect.counted_by_any() {
+                Some(v) => v.as_slice(),
+                None => &[],
+            };
             if !seen_by.is_empty() {
                 let ok = seen_by
                     .iter()
                     .any(|g| crate::ability::util::card_matches_group_str(
                         &self.card_database,
                         counting,
-                        Some(g),
+                        Some(g.as_str()),
                     ));
                 if !ok {
                     continue;

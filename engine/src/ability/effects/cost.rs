@@ -59,12 +59,13 @@ impl AbilityResolver {
             .into();
         }
         let pp = self.player_prefix(gs);
-        let act_name = gs
-            .activating_card
-            .map(|c| self.card_name(c))
-            .unwrap_or_default();
-        gs.rule_log
-            .push(format!("{} {}: [[log_set_cost]]", pp, act_name));
+        if crate::core::runtime_flags::logging_enabled() {
+            let act_name = gs
+                .activating_card
+                .map(|c| self.card_name(c))
+                .unwrap_or_default();
+            gs.push_rule_log_fmt(format_args!("{} {}: [[log_set_cost]]", pp, act_name));
+        }
         for card_id in card_ids {
             gs.mods.set_cost_modifier(card_id, i16::from(value));
             gs.record_ability_application(
@@ -368,12 +369,13 @@ impl AbilityResolver {
             gs.mods.set_cost_modifier(card_id, i16::from(value));
         }
         let pp = self.player_prefix(gs);
-        let act_name = gs
-            .activating_card
-            .map(|c| self.card_name(c))
-            .unwrap_or_default();
-        gs.rule_log
-            .push(format!("{} {}: 使用コスト設定", pp, act_name));
+        if crate::core::runtime_flags::logging_enabled() {
+            let act_name = gs
+                .activating_card
+                .map(|c| self.card_name(c))
+                .unwrap_or_default();
+            gs.push_rule_log_fmt(format_args!("{} {}: 使用コスト設定", pp, act_name));
+        }
         Ok(())
     }
 }

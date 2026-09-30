@@ -19,6 +19,14 @@ use crate::game_state::GameState;
 use alloc::{boxed::Box, string::String};
 
 pub fn push_effect_verdict(effect: &AbilityEffect) {
+    // Gated HERE rather than in the callers: this builds 3-4 `String`s that
+    // `push_verdict` discards when debug is off, and it runs once per effect
+    // dispatch. Four ActionTypes that do nothing at all (ModifyYellSource,
+    // ReplacementAppearWait, CountAsMultiple, RepeatProcedure) are not in the
+    // `is_structural` list below, so they paid the full build too.
+    if !crate::ability::log::debug_enabled() {
+        return;
+    }
     let is_structural = matches!(
         effect.action,
         ActionType::CompoundAction
@@ -267,13 +275,14 @@ impl AbilityResolver {
 
         // 3) Parse gap: the parser could not type this effect. Nothing to run.
         log::debug!("Unhandled custom action (parser gap): {}", action_str);
-        let pp = self.player_prefix(gs);
-        let act_name = gs
-            .activating_card
-            .map(|c| self.card_name(c))
-            .unwrap_or_default();
-        gs.rule_log
-            .push(format!("{} {}: [[log_custom_effect]]", pp, act_name));
+        if crate::core::runtime_flags::logging_enabled() {
+            let pp = self.player_prefix(gs);
+            let act_name = gs
+                .activating_card
+                .map(|c| self.card_name(c))
+                .unwrap_or_default();
+            gs.push_rule_log_fmt(format_args!("{} {}: [[log_custom_effect]]", pp, act_name));
+        }
         Ok(())
     }
 }

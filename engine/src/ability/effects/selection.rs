@@ -161,12 +161,13 @@ impl AbilityResolver {
             options: Some(choice_options),
         });
         let pp = self.player_prefix(gs);
-        let act_name = gs
-            .activating_card
-            .map(|c| self.card_name(c))
-            .unwrap_or_default();
-        gs.rule_log
-            .push(format!("{} {}: [[log_number_select]]", pp, act_name));
+        if crate::core::runtime_flags::logging_enabled() {
+            let act_name = gs
+                .activating_card
+                .map(|c| self.card_name(c))
+                .unwrap_or_default();
+            gs.push_rule_log_fmt(format_args!("{} {}: [[log_number_select]]", pp, act_name));
+        }
         Ok(())
     }
 
@@ -225,9 +226,10 @@ impl AbilityResolver {
             allow_skip: false,
             options: Some(options.to_vec()),
         });
-        let pp = self.player_prefix(gs);
-        gs.rule_log
-            .push(format!("{}: ターゲットプレイヤー選択", pp));
+        if crate::core::runtime_flags::logging_enabled() {
+            let pp = self.player_prefix(gs);
+            gs.push_rule_log_fmt(format_args!("{}: ターゲットプレイヤー選択", pp));
+        }
         Ok(())
     }
 

@@ -2114,11 +2114,11 @@ gs.set_recently_moved_batch(moved.clone().into(), Some("under_member"));
         let target = effect.target.as_deref().unwrap_or("self");
         let use_p2 = match target {
             "self" => matches!(
-                gs.ability_master_id().as_deref(),
+                gs.ability_master_id(),
                 Some("player2") | Some("p2")
             ),
             "opponent" => !matches!(
-                gs.ability_master_id().as_deref(),
+                gs.ability_master_id(),
                 Some("player2") | Some("p2")
             ),
             _ => false,

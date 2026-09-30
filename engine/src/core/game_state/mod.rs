@@ -1001,7 +1001,7 @@ impl GameState {
     }
 
     pub fn cheer_revealed_cards(&self) -> &SmallVec<[i16; 8]> {
-        match self.ability_master_id().as_deref() {
+        match self.ability_master_id() {
             Some("player2") | Some("p2") => &self.player2_cheer_revealed_cards,
             _ => &self.player1_cheer_revealed_cards,
         }

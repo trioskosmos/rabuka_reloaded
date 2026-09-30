@@ -434,12 +434,19 @@ static int eval_location(const struct GameState *g, int actor, int host_cid, con
     const CondValue *gv = find_val(c, "group_names");
     if (gv && gv->tag == RB_TAG_ARRAY && gv->arr_n>0 && gv->arr[0].tag==RB_TAG_STR) group = gv->arr[0].s;
     /* group_reference=="same_group_name" overrides the filter group with the
-       ACTIVATING card's own group (card.rs: `group_override`). */
+       ACTIVATING card's own group (card.rs: `group_override`).
+       card.rs:872-880 takes `c.group` — the SERIES-DERIVED group, not the
+       unit. The C used to read the RAW `group` record index here, which is the
+       empty string for all 2,639 cards, so the guard below never fired and
+       every 「同じグループ名のメンバー」 filter degraded into "no filter at
+       all": PL!S-PR-040-PR (国木田花丸, series ラブライブ！サンシャイン!!
+       → group "Aqours") granted heart01/heart04 off three revealed μ's
+       members. rb_card_group_name() is the same derivation card_binary.rs
+       :153-174 performs. */
     const char *gref = get_str(c, "group_reference");
-    Card hostc; int have_hostc = 0;
-    if (gref && !strcmp(gref, "same_group_name") && host_cid >= 0 &&
-        rb_decode_card_by_index((uint32_t)host_cid, &hostc)) {
-        const char *hg = rb_card_string(hostc.group_idx);
+    int have_hostc = 0;
+    if (gref && !strcmp(gref, "same_group_name") && host_cid >= 0) {
+        const char *hg = rb_card_group_name(host_cid);
         if (hg && *hg) group = hg;
         have_hostc = 1;
     }
@@ -484,7 +491,7 @@ static int eval_location(const struct GameState *g, int actor, int host_cid, con
     else if (distinct) actual = count_distinct_in_zone(g, pl, loc);
     else if (exclude_cid >= 0) actual = zone_count_filtered_ex(g, pl, loc, NULL, NULL, exclude_cid);
     else actual = count_in_zone(g, pl, loc);
-    if (have_hostc) rb_free_card(&hostc);
+    (void)have_hostc;
 
     /* Rust card.rs:782-785 — check_distinct_names runs AFTER the zone filters
        and BEFORE the count comparison, and a failure returns false outright.
@@ -799,27 +806,72 @@ static int eval_comparison_inner(const struct GameState *g, int actor, int host_
                          comparison_target_count(g, actor, c, ctype));
 }
 /* ── movement (variant 3) ── */
+
+/* Mirror util.rs's group_names read: the wire field is an ARRAY, and Rust's
+   `get_group_names()` therefore yields None for a condition that carries none.
+   The C used get_str(), which returns NULL for an array — so the filter was
+   silently absent rather than merely empty. */
+static const CondValue *cond_group_names(const Condition *c) {
+    const CondValue *v = find_val(c, "group_names");
+    if (!v || v->tag != RB_TAG_ARRAY || v->arr_n == 0) return NULL;
+    for (uint32_t i = 0; i < v->arr_n; i++)
+        if (v->arr[i].tag == RB_TAG_STR && v->arr[i].s) return v;
+    return NULL;
+}
+static int cond_group_names_match(int card_id, const CondValue *gn) {
+    if (!gn || card_id < 0) return 0;
+    for (uint32_t i = 0; i < gn->arr_n; i++) {
+        const char *t = (gn->arr[i].tag == RB_TAG_STR) ? gn->arr[i].s : NULL;
+        if (t && rb_card_matches_group_str(card_id, t)) return 1;
+    }
+    return 0;
+}
+
+/* state.rs:696-707 — which card a baton-touch condition's group/cost filter
+   describes. `location` decides: if SELF is in the discard/waitroom then SELF is
+   the replaced member and the filter names the ARRIVING member; otherwise SELF
+   is arriving and the filter names the REPLACED member. */
+static int baton_touch_check_card(const struct GameState *g, const char *location) {
+    int loc_discard = location && (!strcmp(location, "discard") || !strcmp(location, "waitroom"));
+    return loc_discard ? g->baton_touch_arriving_card_id
+                       : g->baton_touch_replaced_member_id;
+}
+
 static int eval_movement(const struct GameState *g, int actor, int host_cid, const Condition *c) {
     (void)host_cid;
     const char *mv = get_str(c, "movement");
     if (!mv) mv = get_str(c, "source"); /* some use source */
+
+    /* movement=="baton_touch" routes to state.rs::evaluate_baton_touch_condition,
+       whose group_names gate is the discriminator on PL!SP-bp4-005-R＋ (Ren):
+       「『Liella!』のメンバーからバトンタッチして登場しており」. Applied HERE, in
+       addition to whatever has_any resolves to, so the existing (looser)
+       recently-moved behaviour is preserved for every condition that does not
+       name a group. */
+    const CondValue *bt_groups = cond_group_names(c);
+    if (mv && !strcmp(mv, "baton_touch") && bt_groups) {
+        int check_id = baton_touch_check_card(g, get_str(c, "location"));
+        if (check_id < 0) return 0;               /* state.rs:722 — no such card → fail */
+        if (!cond_group_names_match(check_id, bt_groups)) return 0;  /* state.rs:718 */
+    }
+
     int has_any = g->n_recently_moved > 0;
-    /* If condition specifies a card filter (e.g. group), check if any recently moved matches */
+    /* If condition specifies a card filter (e.g. group), check if any recently
+       moved matches. The group goes through rb_card_matches_group_str, the
+       canonical unit-first / series-derived matcher: the raw `group` record
+       index this used to read is "" for all 2,639 cards, so the test rejected
+       every card unconditionally. */
     if (has_any) {
-        const char *group = get_str(c, "group_names");
+        const char *group = NULL;
+        const CondValue *gn = cond_group_names(c);
+        if (gn) group = gn->arr[0].s;
         const char *ctype = get_str(c, "card_type");
         if (group || ctype) {
             has_any = 0;
             for(int i=0;i<g->n_recently_moved;i++){
                 int cid=g->recently_moved[i];
                 if(ctype && !card_matches_card_type_filter(cid, ctype)) continue;
-                if(group){
-                    Card cc; if(!rb_decode_card_by_index((uint32_t)cid,&cc)) continue;
-                    const char *gn=rb_card_string(cc.group_idx);
-                    int ok= gn && (strstr(gn,group)||!strcmp(gn,group));
-                    rb_free_card(&cc);
-                    if(!ok) continue;
-                }
+                if(group && !rb_card_matches_group_str(cid, group)) continue;
                 has_any=1; break;
             }
         }
@@ -944,8 +996,11 @@ static int eval_group(const struct GameState *g, int actor, int host_cid, const 
     if (!gn || gn->tag != RB_TAG_ARRAY || gn->arr_n == 0) return 0;
     for(int i=0;i<n;i++){
         Card card; if(!rb_decode_card_by_index((uint32_t)ids[i],&card)) continue;
-        const char *gname = rb_card_string(card.group_idx);
-        const char *uname = rb_card_string(card.unit_idx);
+        /* Diagnostic only: both strings come from the canonical accessors. The
+           raw `group` record index is "" for all 2,639 cards, so printing it
+           told a reader the card had no group when in fact it had a series. */
+        const char *gname = rb_card_group_name(ids[i]);
+        const char *uname = rb_card_unit_name(ids[i]);
         if (rb_ability_debug_enabled() && gname && (strstr(gname,"XX")||strstr(gname,"YY"))) {
             for(uint32_t gi=0;gi<gn->arr_n;gi++) if(gn->arr[gi].tag==RB_TAG_STR && gn->arr[gi].s)
                 fprintf(stderr,"[grp] card=%s gname=%s uname=%s target=%s\n",

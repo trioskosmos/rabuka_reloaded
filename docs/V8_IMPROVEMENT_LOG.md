@@ -1361,6 +1361,51 @@ each action and then actually play it out". Closing it means making the ROOT
 expansion a backup rather than a breadth step, which is a larger change than
 this file's current structure makes cheap.
 
+### 11.7 Three things checked and ruled out, and one that stands
+
+**The live zone does NOT accumulate.** The obvious hypothesis from the 15-point
+junk result was that the zone is a growing portfolio re-checked every turn, and
+that v8's live set — which prices only the newly-set subset — was modelling a
+fraction of the payoff. Read the engine: `phases.rs:826` pushes into
+`live_card_zone` and never clears it during a phase, but
+`move_live_to_success_and_handle_wins` (`live.rs:1644`) sends every resolved
+card on — winners to the success zone, failures to the **waitroom**. The zone
+empties each turn. Hypothesis dead, and worth having killed before building on
+it. It is also why junk fill is worth 15 points: a junk card that passes is
+still a success toward three, and `live.rs:474-486` awards the live outright if
+one player places and the other places nothing, regardless of score.
+
+**The mulligan's missing term is not convertibility.** The competitive write-up
+is explicit that cards with no blade-heart are the central resource, and
+`V8_MULL_BH` implements exactly that as a penalty on the post-mulligan deck. On
+v9, n=1200, seed 11, against v9's 57.3%:
+
+| mulligan | result |
+|---|---|
+| v7's curve rule (shipped) | **57.3%** |
+| v8's forward walk | 53.5% (-3.8) |
+| v8's forward walk + `V8_MULL_BH=1` | 51.5% (-5.8) |
+
+The budget makes it **worse**, not better. So either the advice does not
+transfer to this list through this mechanism, or penalising no-blade-heart
+cards in the opening is the wrong way to spend the budget — a card kept in hand
+is paid for on a specific turn, not in aggregate. The point stands that nothing
+in `bot/` counts these cards; the point does **not** stand that counting them
+and penalising them is the fix.
+
+**The forward-walk mulligan is worse, twice, on two base bots** (-3.4 from v8,
+-3.8 from v9, replicated across different live sets and therefore not a context
+effect). Whatever it is optimising, it is not the objective.
+
+**The one thing that still stands.** The mulligan is the highest-leverage
+decision in the game — five cards, once, the deck fully known, the game
+deterministic given both policies — and it is decided by a static cost-ladder
+rule. A full-game rollout is the correct evaluation and the machinery already
+exists: `v7_ismcts::play_out` drives a real game forward with `auto_advance_one`
+and `compact` to hide hidden state. Both proxy attempts at "better mulligan
+maths" failed, which is itself the argument for this one: a proxy of the
+objective failed twice, and the objective is exactly computable here.
+
 ### 11.2 The probe is a localiser, not a rule generator
 
 `PROBE=v9` put v9's Main (v7's) against v8's on the same states. Four games,

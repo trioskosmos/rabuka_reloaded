@@ -91,10 +91,17 @@ impl super::resolver::AbilityResolver {
         remaining: &[AbilityEffect],
     ) {
         let mut queued = gs.ability_queue.take_pending_actions();
-        let mut tail: Vec<AbilityEffect> = remaining.to_vec();
+        // Append first, then strip the condition from ONLY the newly-appended
+        // actions. The original built an intermediate `tail: Vec<AbilityEffect>`
+        // via `to_vec()` to mutate it in isolation; slicing `queued[start..]`
+        // marks the same span, so the strip still applies to the remaining
+        // actions and NOT to whatever was already pending — and the separate
+        // `tail` Vec (one allocation plus its buffer) is gone.
+        let appended_from = queued.len();
+        queued.extend_from_slice(remaining);
         if let Some(cond) = effect.condition.as_ref() {
             let disc = core::mem::discriminant(cond.as_ref());
-            for action in &mut tail {
+            for action in &mut queued[appended_from..] {
                 if action
                     .condition
                     .as_ref()
@@ -104,7 +111,6 @@ impl super::resolver::AbilityResolver {
                 }
             }
         }
-        queued.extend(tail);
         gs.ability_queue.set_pending_actions(queued);
     }
 
@@ -266,7 +272,6 @@ impl super::resolver::AbilityResolver {
         let source = gs.current_ability_source_card_id();
         let looked_owner = gs
             .ability_master_id()
-            .as_deref()
             .and_then(|m| crate::ability::util::target_player_index("self", Some(m)));
         for &idx in indices.iter() {
             if idx < gs.looked_at_cards.len() {
@@ -1628,7 +1633,7 @@ impl super::resolver::AbilityResolver {
         };
 
         let source = gs.current_ability_source_card_id();
-        let owner = util::target_player_index(&target, gs.ability_master_id().as_deref());
+        let owner = util::target_player_index(&target, gs.ability_master_id());
         for &cid in &revealed_card_ids {
             gs.push_revealed_card(cid, source, false, owner, "ability");
         }
@@ -1641,8 +1646,7 @@ impl super::resolver::AbilityResolver {
             return self.finalize_choice(gs, context);
         }
         if !revealed_card_ids.is_empty() {
-            let player_label =
-                super::util::target_player_label(&target, gs.ability_master_id().as_deref());
+            let player_label = super::util::target_player_label(&target, gs.ability_master_id());
             let turn = gs.turn_number;
             gs.push_rule_log_fmt(format_args!(
                 "[Turn {}] {} [[log_reveal_hand:n={}]]",
@@ -1659,7 +1663,7 @@ impl super::resolver::AbilityResolver {
             .is_some_and(util::effect_uses_selected_cards);
         if !effect_started {
             let cost_source = gs.current_ability_source_card_id();
-            let cost_owner = util::target_player_index(&target, gs.ability_master_id().as_deref());
+            let cost_owner = util::target_player_index(&target, gs.ability_master_id());
             for &cid in &revealed_card_ids {
                 gs.push_revealed_cost_card(cid, cost_source, false, cost_owner, "cost");
             }

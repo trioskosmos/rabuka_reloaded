@@ -374,7 +374,7 @@ pub fn execute_reveal(
         };
 
         let reveal_src = gs.current_ability_source_card_id();
-        let owner = util::target_player_index(target, gs.ability_master_id().as_deref());
+        let owner = util::target_player_index(target, gs.ability_master_id());
         for card_id in &card_ids {
             gs.push_revealed_card(*card_id, reveal_src, false, owner, "ability");
         }
@@ -387,7 +387,7 @@ pub fn execute_reveal(
                 .collect();
             let turn = gs.turn_number;
             let master = gs.ability_master_id();
-            let player_label = super::util::target_player_label(target, master.as_deref());
+            let player_label = super::util::target_player_label(target, master);
             gs.push_rule_log_fmt(format_args!(
                 "[Turn {}] {} [[log_reveal_zone:source={}]] » {}",
                 turn,
@@ -888,13 +888,14 @@ pub fn execute_reveal(
                 max_per_group: effect.per_group_count_any(),
             },
         };
-        let pp = self.player_prefix(gs);
-        let act_name = gs
-            .activating_card
-            .map(|c| self.card_name(c))
-            .unwrap_or_default();
-        gs.rule_log
-            .push(format!("{} {}: カード選択 {}枚", pp, act_name, count));
+        if crate::core::runtime_flags::logging_enabled() {
+            let pp = self.player_prefix(gs);
+            let act_name = gs
+                .activating_card
+                .map(|c| self.card_name(c))
+                .unwrap_or_default();
+            gs.push_rule_log_fmt(format_args!("{} {}: カード選択 {}枚", pp, act_name, count));
+        }
         Ok(())
     }
 
@@ -1083,13 +1084,14 @@ pub fn execute_reveal(
         // Remember where the pool came from: a DECLINED optional move must
         // return the cards here (rule 5.7 — 見る only informs).
         self.carried.looked_at_origin = Some(source.to_string());
-        let pp = self.player_prefix(gs);
-        let act_name = gs
-            .activating_card
-            .map(|c| self.card_name(c))
-            .unwrap_or_default();
-        gs.rule_log
-            .push(format!("{} {}: 確認 {}枚", pp, act_name, count));
+        if crate::core::runtime_flags::logging_enabled() {
+            let pp = self.player_prefix(gs);
+            let act_name = gs
+                .activating_card
+                .map(|c| self.card_name(c))
+                .unwrap_or_default();
+            gs.push_rule_log_fmt(format_args!("{} {}: 確認 {}枚", pp, act_name, count));
+        }
         Ok(())
     }
 
@@ -1172,7 +1174,7 @@ pub fn execute_reveal(
         }
 
         let pg_source = gs.current_ability_source_card_id();
-        let pg_owner = util::target_player_index(target, gs.ability_master_id().as_deref());
+        let pg_owner = util::target_player_index(target, gs.ability_master_id());
         for members in by_group.values() {
             for &card_id in members {
                 gs.push_revealed_card(card_id, pg_source, false, pg_owner, "ability");
@@ -1182,7 +1184,7 @@ pub fn execute_reveal(
         if !card_ids.is_empty() {
             let turn = gs.turn_number;
             let master = gs.ability_master_id();
-            let player_label = super::util::target_player_label(target, master.as_deref());
+            let player_label = super::util::target_player_label(target, master);
             gs.push_rule_log_fmt(format_args!(
                 "[Turn {}] {} [[log_reveal_group:n={},source=zone_{}]]",
                 turn,
@@ -1234,7 +1236,7 @@ fn reveal_until_check<F>(
         let mut all_revealed = Vec::new();
         let mut matched_idx = None;
         let ru_source = gs.current_ability_source_card_id();
-        let ru_owner = util::target_player_index(target, gs.ability_master_id().as_deref());
+        let ru_owner = util::target_player_index(target, gs.ability_master_id());
 
         loop {
             let card_id = {
@@ -1291,7 +1293,7 @@ fn reveal_until_check<F>(
         if !all_revealed.is_empty() {
             let turn = gs.turn_number;
             let master = gs.ability_master_id();
-            let player_label = super::util::target_player_label(target, master.as_deref());
+            let player_label = super::util::target_player_label(target, master);
             let found = matched_idx.is_some();
             let names: Vec<String> = all_revealed
                 .iter()
