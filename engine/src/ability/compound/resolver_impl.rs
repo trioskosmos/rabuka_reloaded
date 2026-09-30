@@ -4,17 +4,32 @@ use crate::ability::resolver::AbilityResolver;
 use crate::ability::queue::ConditionalChoice;
 use crate::card::AbilityEffect;
 use crate::game_state::GameState;
+// `crate::Box` is the compat alias: `alloc::boxed::Box` under `no_std`,
+// `std::boxed::Box` on host, so the signature below compiles on both.
+use crate::Box;
 #[cfg(feature = "no_std")]
 use alloc::string::String;
 
 impl AbilityResolver {
-    /// Execute sequential effect.
+    /// Execute sequential effect. The step list is supplied by the caller so the
+    /// routing path can pass a borrowed slice instead of deep-cloning the effect
+    /// tree to hang the steps off a synthetic parent.
     pub fn execute_sequential_effect(
         &mut self,
         gs: &mut GameState,
         effect: &AbilityEffect,
     ) -> Result<(), String> {
-        crate::ability::compound::sequential::execute_sequential_effect(self, gs, effect)
+        let steps: &[Box<AbilityEffect>] = match effect.compound.actions.as_deref() {
+            Some(actions) => actions,
+            None => &[],
+        };
+        crate::ability::compound::sequential::execute_sequential_effect(
+            self,
+            gs,
+            effect,
+            steps,
+            effect.action,
+        )
     }
 
     /// Execute conditional alternative effect.

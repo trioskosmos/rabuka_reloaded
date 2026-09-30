@@ -104,16 +104,107 @@ pub(crate) fn route_sequential_step(
     StepRoute::Execute
 }
 
-/// Clone a step for execution: strip the already-gated condition and
-/// inherit per_unit / self_target / card_names from the parent effect.
-/// Only inherit per_unit properties for actions that support them —
-/// discard/move_cards actions must not inherit per_unit multipliers.
-pub(crate) fn prepare_sequential_action(
+/// A sequential step prepared for dispatch.
+///
+/// The point of this type is to avoid the unconditional `action.clone()` that
+/// used to happen for EVERY step of EVERY repeat. `AbilityEffect::clone` is a
+/// deep clone: an `Option<Arc<EffectKind>>` wrapping a ~1.2 KB `EffectFilter`
+/// with 26 `Box`es, i.e. ~4 allocations plus ~1.7 KB of memcpy, and it was paid
+/// even though `prepare_sequential_action`'s entire job is to strip one field
+/// and inherit at most five others — and on the overwhelming majority of steps
+/// none of the inheritance branches fire.
+///
+/// `Borrowed` is therefore the common case: the step is used as-is. It is only
+/// chosen when the step has no condition to strip, because the strip is a
+/// mutation and `execute_effect` takes `&AbilityEffect`.
+pub(crate) enum PreparedStep<'a> {
+    /// Nothing to strip and nothing to inherit — use the step directly.
+    Borrowed(&'a AbilityEffect),
+    /// A condition had to be stripped, or a parent field was inherited.
+    Owned(AbilityEffect),
+}
+
+/// Would `prepare_sequential_action` change anything about this step?
+///
+/// Mirrors the guards inside the function exactly. A step that needs no
+/// condition strip and no inheritance is returned borrowed.
+fn sequential_step_needs_patch(
     effect: &AbilityEffect,
     action: &AbilityEffect,
     i: usize,
     first: &AbilityEffect,
-) -> AbilityEffect {
+) -> bool {
+    // The condition strip is a mutation, so a step that carries one always
+    // needs an owned copy.
+    if action.condition.is_some() {
+        return true;
+    }
+    let supports_per_unit = matches!(
+        action.action,
+        ActionType::DrawCard
+            | ActionType::GainResource
+            | ActionType::ModifyScore
+            | ActionType::ModifyRequiredHearts
+            | ActionType::GainAbility
+            | ActionType::SetBladeCount
+            | ActionType::LookAt
+    );
+    if supports_per_unit
+        && ((action.per_unit_any().is_none() && effect.per_unit_any().is_some())
+            || (action.per_unit_count_any().is_none() && effect.per_unit_count_any().is_some())
+            || (action.per_unit_type_any().is_none() && effect.per_unit_type_any().is_some())
+            || (action.action == ActionType::ModifyRequiredHearts
+                && action.distinct_any().is_none()
+                && effect.distinct_any().is_some()))
+    {
+        return true;
+    }
+    if action.self_target_any().is_none() {
+        let inheritable = if i > 0 {
+            !(first.card_type_any() != Some(&crate::card::CardType::Member)
+                && action.card_type_any() == Some(&crate::card::CardType::Member))
+        } else {
+            true
+        };
+        if inheritable {
+            let supports_self = matches!(
+                action.action,
+                ActionType::ModifyScore
+                    | ActionType::ModifyRequiredHearts
+                    | ActionType::GainResource
+                    | ActionType::ChangeState
+            );
+            if effect.self_target_any().is_some() && supports_self {
+                return true;
+            }
+            if i > 0 && supports_self && first.self_target_any().is_some() {
+                return true;
+            }
+        }
+    }
+    if action.card_names_any().is_none_or(|v| v.is_empty())
+        && !effect.card_names_any().is_none_or(|v| v.is_empty())
+    {
+        return true;
+    }
+    false
+}
+
+/// Clone a step for execution: strip the already-gated condition and
+/// inherit per_unit / self_target / card_names from the parent effect.
+/// Only inherit per_unit properties for actions that support them —
+/// discard/move_cards actions must not inherit per_unit multipliers.
+///
+/// Returns [`PreparedStep::Borrowed`] when the step needs no change at all.
+pub(crate) fn prepare_sequential_action<'a>(
+    effect: &'a AbilityEffect,
+    action: &'a AbilityEffect,
+    i: usize,
+    first: &'a AbilityEffect,
+) -> PreparedStep<'a> {
+    if !sequential_step_needs_patch(effect, action, i, first) {
+        return PreparedStep::Borrowed(action);
+    }
     let mut action_to_execute = action.clone();
     action_to_execute.condition = None;
     let supports_per_unit = matches!(
@@ -194,14 +285,26 @@ pub(crate) fn prepare_sequential_action(
             action_to_execute.set_card_names(names.clone());
         }
     }
-    action_to_execute
+    PreparedStep::Owned(action_to_execute)
 }
 
 /// Execute sequential effect (Rule 9.2.1.1).
+///
+/// `steps` is the normalized step list, passed separately from `effect` so the
+/// caller does not have to build a synthetic parent effect. Previously the
+/// routing path deep-cloned the whole effect tree (~4 allocations and ~1.7 KB
+/// per element) purely to set `compound.actions` on the copy — and nothing in
+/// here or in `setup_sequential` / `prepare_sequential_action` ever read that
+/// field back off the parent: they read `conditional`, `is_further`, `condition`
+/// and the per-unit/self-target/card-names fields, none of which the clone
+/// changed. `effect.action` is used only in a debug log, so `action_for_log`
+/// carries it explicitly to keep that output byte-identical.
 pub(crate) fn execute_sequential_effect(
     resolver: &mut AbilityResolver,
     gs: &mut GameState,
     effect: &AbilityEffect,
+    steps: &[Box<AbilityEffect>],
+    action_for_log: ActionType,
 ) -> Result<(), String> {
     let conditional = effect.conditional.unwrap_or(false);
     let seq_node = match crate::ability::compound::setup::setup_sequential(resolver, gs, effect) {
@@ -209,8 +312,8 @@ pub(crate) fn execute_sequential_effect(
         Err(()) => return Ok(()),
     };
 
-    if let Some(ref actions) = effect.compound.actions {
-        let (repeat_actions, repeat_max, has_repeat) = split_repeat_actions(actions);
+    if !steps.is_empty() {
+        let (repeat_actions, repeat_max, has_repeat) = split_repeat_actions(steps);
 
         if has_repeat {
             resolver.awaiting.repeat_actions.clear();
@@ -218,7 +321,7 @@ pub(crate) fn execute_sequential_effect(
         log::debug!(
             "[SEQUENCE] source={:?} action={} steps={} iterations={} conditional={} further={} actions={:?}",
             resolver.session.activating_card_id,
-            effect.action,
+            action_for_log,
             repeat_actions.len(),
             repeat_max,
             conditional,
@@ -242,6 +345,10 @@ pub(crate) fn execute_sequential_effect(
                     i,
                     &repeat_actions[0],
                 );
+                let action_to_execute: &AbilityEffect = match &action_to_execute {
+                    PreparedStep::Borrowed(a) => a,
+                    PreparedStep::Owned(a) => a,
+                };
 
                 if action.action == ActionType::OpponentAction
                     || action.action_by() == Some("opponent")
@@ -254,7 +361,7 @@ pub(crate) fn execute_sequential_effect(
                 if crate::ability::compound::consequence::gate_sequential_consequence(resolver, action, repeat_idx, i) {
                     continue 'action_loop;
                 }
-                match resolver.execute_effect(gs, &action_to_execute) {
+                match resolver.execute_effect(gs, action_to_execute) {
                     Ok(_) => {
                         log::debug!(
                             "[SEQUENCE] source={:?} repeat={} step={} action={} result=ok pending={}",
@@ -270,7 +377,7 @@ pub(crate) fn execute_sequential_effect(
                                 resolver,
                                 gs,
                                 repeat_actions,
-                                actions,
+                                steps,
                                 i,
                                 action,
                                 conditional,
@@ -300,7 +407,7 @@ pub(crate) fn execute_sequential_effect(
                     }
                 }
             }
-            if crate::ability::compound::post_step::maybe_prompt_repeat_continue(resolver, gs, actions, repeat_actions, repeats_remaining) {
+            if crate::ability::compound::post_step::maybe_prompt_repeat_continue(resolver, gs, steps, repeat_actions, repeats_remaining) {
                 return Ok(());
             }
         }

@@ -42,9 +42,17 @@ pub(crate) use dispatch::execute_effect as execute_effect_dispatch;
 use super::debug::AbDebug;
 use super::enums::ActionType;
 use super::resolver::AbilityResolver;
+// `crate::Box` is the compat alias: `alloc::boxed::Box` under `no_std`,
+// `std::boxed::Box` on host. The `Cow<[Box<AbilityEffect>]>` signature below
+// needs it in scope on every target.
+use crate::Box;
 
 use super::util;
 use crate::card::AbilityEffect;
+#[cfg(not(feature = "no_std"))]
+use std::borrow::Cow;
+#[cfg(feature = "no_std")]
+use alloc::borrow::Cow;
 use crate::game_state::GameState;
 #[cfg(feature = "no_std")]
 use alloc::{
@@ -135,12 +143,20 @@ impl AbilityResolver {
 
     /// Rule 9.2.1 compound routing: Sequential and LookAndSelect carrying
     /// `effect_steps` collapse into the generic sequential pipeline
-    /// ([look, select, move] in order). Returns the normalized Sequential
-    /// effect when this route applies.
-    fn normalized_sequential_route(
+    /// ([look, select, move] in order).
+    ///
+    /// Returns the normalized step list, borrowed whenever the effect already
+    /// holds it. It used to return a synthetic `AbilityEffect` built by
+    /// deep-cloning the parent and attaching a cloned step list — ~4
+    /// allocations and ~1.7 KB of memcpy per step, ~128 for a typical 3-step
+    /// ability — and the only three fields that clone actually changed
+    /// (`effect_steps`, `compound.actions`, `action`) are either never read back
+    /// or are read only by a debug log, which the caller reproduces via
+    /// `action_for_log`.
+    fn normalized_sequential_steps(
         effect: &AbilityEffect,
         action_type: ActionType,
-    ) -> Option<AbilityEffect> {
+    ) -> Option<Cow<'_, [Box<AbilityEffect>]>> {
         // Rule 9.8.1 / Q85 / Q86: Sequential/LookAndSelect routing
         //
         // Q85: LookAndSelect with insufficient deck → refresh mid-look
@@ -152,15 +168,11 @@ impl AbilityResolver {
         if action_type != ActionType::Sequential && action_type != ActionType::LookAndSelect {
             return None;
         }
-        let steps = effect.normalized_steps();
+        let steps = effect.normalized_steps_cow();
         if steps.is_empty() {
             return None;
         }
-        let mut normalized = effect.clone();
-        normalized.effect_steps = None;
-        normalized.compound.actions = Some(steps);
-        normalized.action = ActionType::Sequential;
-        Some(normalized)
+        Some(steps)
     }
 
     // Q55: Effects resolve as much as possible; partial resolution required when full is impossible.
@@ -246,8 +258,17 @@ impl AbilityResolver {
 
         // Compound routing: Sequential and LookAndSelect both route through
         // the generic sequential pipeline when they carry `effect_steps`.
-        if let Some(normalized) = Self::normalized_sequential_route(effect, action_type) {
-            return self.execute_sequential_effect(gs, &normalized);
+        if let Some(steps) = Self::normalized_sequential_steps(effect, action_type) {
+            return crate::ability::compound::sequential::execute_sequential_effect(
+                self,
+                gs,
+                effect,
+                &steps,
+                // The old synthetic parent had `action` forced to Sequential, so
+                // that is what the `[SEQUENCE]` debug line printed for routed
+                // effects. Keep the output byte-identical.
+                ActionType::Sequential,
+            );
         }
 
         #[cfg(not(feature = "no_std"))]

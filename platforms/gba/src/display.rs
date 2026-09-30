@@ -188,14 +188,16 @@ struct CachedPlacement {
 ///     6 live    1 part /  8 tiles =  512B each =  3,072
 ///     6 live-set (face-down)         512B each =  3,072
 ///     10 hand   2 parts/ 16 tiles = 1024B each = 10,240
-///                                          total = 30,208B
+///                                          total = 30,208
 ///
-/// So the board FITS, with 2,560B spare — and the detail portrait
-/// (9 parts / 216 tiles = 13,824B) is structurally exclusive with it, since
-/// `render_board_frame` evicts `detail:` and `render_card_detail` retains only
-/// that one key. The budget exists to keep the transient overlap of consecutive
-/// frames bounded, not because the board overruns.
-const SPRITE_VRAM_BUDGET: usize = 30 * 1024;
+/// plus one extra face-down placement for the flipped opponent row (1024
+/// above once deduped to one key) gives a measured steady state of 31,232B
+/// against 32,768B of VRAM. That is the whole game in 95% of the arena, so the
+/// budget is set just under the hardware ceiling: `evict_for` then only trims a
+/// genuine overflow, and the ~1KB of slack is what absorbs a transition — agb
+/// holds `previous_frame_sprites` alive across a commit, so for one frame the
+/// old and new placements coexist.
+const SPRITE_VRAM_BUDGET: usize = 31 * 1024;
 
 /// OBJ VRAM a placement's parts will occupy. 8bpp: 64 bytes per tile.
 fn placement_bytes(parts: &[(Size, usize, usize)]) -> usize {

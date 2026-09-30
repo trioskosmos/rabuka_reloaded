@@ -12,6 +12,87 @@
 
 ## 0. What this document is, and how to read it
 
+> **STATUS UPDATE (2026-09-30).** Phase 1 and part of Phase 2 have been
+> implemented and landed; the full suite is green at **4,009 tests** and
+> `total_actions` is **unchanged at 29,182** across every measurement, which is
+> the trajectory gate §1.1 requires. See §19 for what landed, what was
+> deliberately skipped, and **two places where this catalogue turned out to be
+> wrong** — one of them a safety bug it recommended.
+
+### 19.1 Landed
+
+| Item | What changed |
+| --- | --- |
+| §3.1 | `push_cond_verdict` gates internally; `describe_condition_expectation` rendered once, not three times |
+| §3.2 | `push_effect_verdict` gates internally; `debug_enabled()` added to the `no_std` log module so console builds get the gate too |
+| §3.3 | `pay_ability_cost`'s `cost_desc` gated on the verdict gate |
+| §3.5 | `rule_log_activated` gated before building its two `String`s |
+| §3.6 | **All 21** direct `gs.rule_log` writes converted to the gated `push_rule_log_fmt` |
+| §3.7 | *not landed* — see §19.3 |
+| §4.5 | *not landed* — see §19.2, it is unsafe |
+| §4.6 | `waited_stage_cards` → `SmallVec<[i16; 3]>` at all 3 sites; callee signature unchanged |
+| §4.7 | `performer_owned_ids` `HashSet` → three-zone scan |
+| §4.13 | `condition.common()` bound once for the post-dispatch negation guard |
+| §5.2 | `normalized_steps_cow` added; routing passes a borrowed step slice instead of a synthetic cloned parent |
+| §5.3 | `prepare_sequential_action` returns `PreparedStep` — borrowed when the step needs no strip and no inheritance |
+| §5.5 | `apply_modify_cost_to_ability_cost` → `adjusted_cost_after_modify`, clones only when a per-unit `modify_cost` applies |
+| §5.8 | `find_printed_ability` no longer re-resolves; `requeue_remaining_after_choice` drops the intermediate `tail` Vec |
+| §6.6 | `ArcStr::from(&str)` allocates once instead of twice |
+| §6.5 | `AbilityRef::peek()` added; applied at the two hottest read-only sites |
+| §6.4 | `normalize_name`'s doc comment corrected — it never avoided allocation |
+| §7.10 | `.count()` → `.any()` for monotone `location_condition`, gated on `!debug_enabled()` so the verdict still logs the true count |
+| §7.1 | `card_name_matches_group`: allocation-free fast path replacing `get_card_names`, with a new corpus-wide equivalence test |
+| §9.1 | `ability_master_id()` → `Option<&str>`; 22 call sites migrated |
+| §3.24 | `counted_by_any()` borrowed instead of deep-cloned |
+
+### 19.2 Correction — §4.5 would have been a gameplay bug
+
+§4.5 recommended an early-exit guard on `trigger_auto_abilities_for_player`,
+reasoning that the `TriggerEvent` build (a `SmallVec` clone plus an
+`Option<String>` clone, ~4 allocations per card play) was "usually discarded".
+
+**That is wrong.** `trigger_auto_abilities_for_player_with_event` scans the
+board and enqueues AUTO-triggered abilities **regardless of the event's
+contents**. A default `TriggerEvent` is not a no-op, so the guard would have
+silently suppressed real triggers. The catalogue's stated justification — that
+the predicate is a "known-correct guard already in this codebase" — is a
+misreading: the identical predicate at `turn/actions/mod.rs:1464` guards a
+*different* call.
+
+**Skipped.** The allocation cost is real, but removing it needs the `TriggerEvent`
+to borrow from `GameState`, which the current `&mut self` design cannot express.
+
+### 19.3 Correction — §5.2/§5.3 were worth ~10× less than estimated
+
+§5.2/§5.3 predicted **~128 allocations per sequential ability**. Measured across
+the two changes, together they removed **34,624 allocations out of 5.5M (~0.6%)**
+on the standard 200-game bench — not the ~1.5% the per-resolution figures implied.
+
+Likely cause, and it is checkable: `PreparedStep::Borrowed` is only chosen when
+the step carries **no** condition, because the condition strip is a mutation and
+`execute_effect` takes `&AbilityEffect`. If most sequential steps do carry a
+condition, the owned path still fires and the win evaporates. The fix for that
+is to thread a "condition already evaluated" flag down `execute_effect` so a
+borrowed step skips re-evaluation — that also overlaps §8.2's redundant
+`can_activate_effect` calls, so it is worth doing as one piece.
+
+**The lesson for the rest of this catalogue:** the per-call-site `Scale` figures
+in §5 are the least trustworthy numbers here. A `Box<AbilityEffect>` deep clone
+really is ~4 allocations, but the *frequency* of reaching a site is what
+dominates, and frequency was inferred from source structure rather than counted.
+Any Phase 2/3 item in this document whose case rests on a per-call frequency
+should get a counter before the refactor, not after.
+
+### 19.4 Still open
+
+§3.7 display-accumulator gate (needs the `DisplaySources<T>` enum plumbing),
+§3.8 the unfinished `recalculate_constants` scratch set, §3.9/§3.10/§3.11 the
+remaining log-argument bindings, §4.1/§4.3/§4.4/§4.8/§4.9/§4.10/§4.11/§4.12/§4.14/§4.15,
+§5.4 `EffectOwner` provenance, §6.1/§6.2/§6.3/§6.8/§6.9/§6.11/§6.12, §7.3–§7.13,
+§8.2 the verdict token, §9.2–§9.9, §10.x, §11.2/§11.3, §13 build config,
+§14 threading, §15 the deliberate projects.
+
+
 Every item below carries the same six fields:
 
 | Field | Meaning |

