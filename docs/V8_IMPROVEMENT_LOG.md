@@ -1262,6 +1262,51 @@ compiler while §11.1 was still unconfirmed.
 This is the one remaining idea in the file that is both grounded in a measured
 result and untested.
 
+### 11.4 v10, and the honest bottom line
+
+`v10` = v8's Main **with the term vector on** + v8's live set + v7's mulligan. It
+exists because the two best components were in different bots and neither
+combination obviously dominated.
+
+`bot_arena v10 v9 4000 "5CP3Z idou" --games 4000 --seed 11 --env V8_ALL_TERMS`
+→ **1859-2141 (46.5%)**.
+
+**v9 is still the stronger bot.** The term vector is a large, replicated,
+confirmed improvement to v8's Main phase — the first in the file — and it is
+still ~7 points behind v7's Main phase in a head-to-head. So the honest summary
+is:
+
+| bot | composition | vs v7 |
+|---|---|---|
+| v8 | v8 Main (level leaf) | 42.5% |
+| v8 + terms | v8 Main + v7 delta vector | 47.9% / 47.5% holdout |
+| **v9** | **v7 Main + v8 live** | **57.3% / 57.6% holdout** |
+| v10 | v8 Main + v7 delta vector + v8 live | 46.5% vs v9 |
+
+**v7's Main phase is still the best in the project, and the +5.4 does not change
+that.** What the term vector established is narrower and still worth having: the
+eleven prior failures were shape failures, not weight failures, and roughly half
+of the deficit is now closed by transcribing what v7 already does. The other
+half is the depth-8 chain against v8's single breadth step — which §11.3 says
+is now worth retrying with a delta leaf, and which is the one lead in this file
+with a measured precedent and no measurement.
+
+### 11.5 A performance bug the experiment found
+
+`v7_term_score` originally read the environment on every call and built each key
+with `format!` — thirteen `String` allocations per action evaluation, inside the
+search node loop, so roughly 13 x 10 x 96 per decision. It was correct, and it
+made `v10` so slow the arena could not finish 4000 games in reasonable time.
+
+The weights are now read once into a `OnceLock<V7TermWeights>`. The environment
+is fixed for the process (the arena sets it before any game and never changes
+it), so this is not a staleness risk, and `OnceLock` is the only thread-safe
+option here because a policy call can run on a worker.
+
+Worth recording on its own: a term that cannot be evaluated inside a search
+should not be put in the search, and the symptom was a timeout rather than a
+wrong number, which is a much less obvious failure than a wrong number is.
+
 ### 11.2 The probe is a localiser, not a rule generator
 
 `PROBE=v9` put v9's Main (v7's) against v8's on the same states. Four games,

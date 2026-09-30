@@ -935,18 +935,19 @@ impl Search<'_> {
                 // whose weights are 8/3/6/60/25/1000: a step measured against its
                 // parent reports only that step's contribution and the total
                 // never grows, so the chain sees a flat landscape.
-                // `V8_CHAIN_ROOT` is the experiment §11.3 wants: measure the
-                // v7 feature deltas against the DECISION ROOT rather than this
-                // step, so a node's score is the value of the whole line and a
-                // move that pays nothing by itself is visible when it enables a
-                // later one. Deltas compose, levels do not — which is why
-                // `V8_CHAIN` was null on a level leaf and why this combination is
-                // not covered by that result.
+                // `V8_CHAIN_ROOT` (not wired): the idea is to score the v7
+                // feature deltas against the DECISION ROOT rather than this
+                // step, because a linear delta composes and a saturated level
+                // does not — which is why `V8_CHAIN` was null (§2.7) and why
+                // chain-plus-terms is not covered by that result.
                 //
-                // Left unwired deliberately: `v7_term_score` is declared below
-                // this `impl` and is not resolving from in here, and the file's
-                // brace nesting from earlier edits is not worth fighting while
-                // the §11.1 result is still unconfirmed on a holdout seed.
+                // Blocked on structure, not on the idea: `v7_term_score` is
+                // currently a nested item inside `evaluate_actions` (Rust allows
+                // items inside functions, and a line at column 0 inside a body
+                // is still inside it), so it does not resolve from `impl Search`.
+                // Un-nesting it is a mechanical cleanup of this file, and it is
+                // not worth risking a confirmed +5.4 configuration to do it
+                // mid-measurement. §11.3.
                 let v = self.scored_leaf(&next);
                 if chosen.as_ref().is_none_or(|(_, best)| v > *best) {
                     chosen = Some((next, v));
@@ -1178,75 +1179,127 @@ pub(crate) fn evaluate_actions(gs: &GameState, actions: &[Action], me: u8) -> Ve
 /// hand-typed number. A weight of zero is a legitimate result here, not a
 /// neutral one: it means the term is already accounted for elsewhere.
 fn v7_term_score(base: &GameState, after: &GameState, me: u8, db: &CardDatabase) -> f64 {
+    let w = v7_term_weights();
+    if !w.any() {
+        return 0.0;
+    }
     let d = |f: fn(&GameState, u8, &CardDatabase) -> i32, seat: u8| {
         (f(after, seat, db) - f(base, seat, db)) as f64
     };
     let opp = 1 - me;
-    let term = |name: &str, default: f64, delta: f64| -> f64 {
-        let key = format!("V8_TERM_{name}");
-        if std::env::var_os(&key).is_none() {
-            return 0.0;
+    w.cost * d(v8_model::stage_cost, me)
+        + w.hearts * d(v8_model::supply_hearts, me)
+        + w.blades * d(v8_model::active_blades, me)
+        + w.coverage
+            * (coverage_delta(after, me, db) - coverage_delta(base, me, db)) as f64
+        + w.ammo
+            * (v8_model::lives_in_hand(after.seat_player(me), db)
+                - v8_model::lives_in_hand(base.seat_player(me), db)) as f64
+        + w.energy
+            * (after.seat_player(me).energy_zone.active_count() as i32
+                - base.seat_player(me).energy_zone.active_count() as i32) as f64
+        + w.hand
+            * (after.seat_player(me).hand.cards.len() as i32
+                - base.seat_player(me).hand.cards.len() as i32) as f64
+        + w.reserve
+            * (after.seat_player(me).main_deck.cards.len() as i32
+                - base.seat_player(me).main_deck.cards.len() as i32) as f64
+        + w.success
+            * (after.seat_player(me).success_live_card_zone.cards.len() as i32
+                - base.seat_player(me).success_live_card_zone.cards.len() as i32) as f64
+        - w.opp_cost * d(v8_model::stage_cost, opp)
+        - w.opp_blades * d(v8_model::active_blades, opp)
+        - w.opp_hand
+            * (after.seat_player(opp).hand.cards.len() as i32
+                - base.seat_player(opp).hand.cards.len() as i32) as f64
+        - w.opp_success
+            * (after.seat_player(opp).success_live_card_zone.cards.len() as i32
+                - base.seat_player(opp).success_live_card_zone.cards.len() as i32) as f64
+}
+
+/// The thirteen weights, read from the environment ONCE.
+///
+/// The first version read the environment inside the scoring function and built
+/// each key with `format!`, which meant thirteen `String` allocations per action
+/// evaluation — inside the search node loop, so roughly 13 * 10 * 96 per
+/// decision. It was correct and it made `v10` so slow the arena could not finish
+/// 4000 games in a reasonable time, which is its own kind of evidence: a term
+/// that cannot be evaluated inside a search should not be in the search.
+///
+/// The environment is fixed for the process (the arena sets it before any game
+/// and never changes it), so caching is not a staleness risk. `OnceLock` also
+/// makes it the only thread-safe thing here, which matters because a policy
+/// call can run on a worker.
+#[derive(Clone, Copy, Default)]
+struct V7TermWeights {
+    cost: f64,
+    hearts: f64,
+    blades: f64,
+    coverage: f64,
+    ammo: f64,
+    energy: f64,
+    hand: f64,
+    reserve: f64,
+    success: f64,
+    opp_cost: f64,
+    opp_blades: f64,
+    opp_hand: f64,
+    opp_success: f64,
+}
+
+impl V7TermWeights {
+    fn any(&self) -> bool {
+        self.cost != 0.0
+            || self.hearts != 0.0
+            || self.blades != 0.0
+            || self.coverage != 0.0
+            || self.ammo != 0.0
+            || self.energy != 0.0
+            || self.hand != 0.0
+            || self.reserve != 0.0
+            || self.success != 0.0
+            || self.opp_cost != 0.0
+            || self.opp_blades != 0.0
+            || self.opp_hand != 0.0
+            || self.opp_success != 0.0
+    }
+}
+
+fn v7_term_weights() -> &'static V7TermWeights {
+    static WEIGHTS: std::sync::OnceLock<V7TermWeights> = std::sync::OnceLock::new();
+    WEIGHTS.get_or_init(|| {
+        // `V8_ALL_TERMS` turns the whole vector on at v7's own weights, which is
+        // what the confirmed +5.40 / +5.67 runs used. One switch instead of
+        // thirteen, and `v10` — which exists to carry exactly this configuration
+        // — does not need a second copy of the weights.
+        let all = std::env::var_os("V8_ALL_TERMS").is_some();
+        let weight = |name: &str, default: f64| -> f64 {
+            let key = format!("V8_TERM_{name}");
+            if !all && std::env::var_os(&key).is_none() {
+                return 0.0;
+            }
+            std::env::var(&key)
+                .ok()
+                .and_then(|v| v.parse::<f64>().ok())
+                .filter(|w: &f64| w.is_finite())
+                .unwrap_or(default)
+        };
+        V7TermWeights {
+            cost: weight("COST", 8.0),
+            hearts: weight("HEARTS", 3.0),
+            blades: weight("BLADES", 6.0),
+            coverage: weight("COVERAGE", 60.0),
+            ammo: weight("AMMO", 25.0),
+            energy: weight("ENERGY", 2.0),
+            hand: weight("HAND", 3.0),
+            reserve: weight("RESERVE", 0.5),
+            success: weight("SUCCESS", 1000.0),
+            opp_cost: weight("OPP_COST", 8.0),
+            opp_blades: weight("OPP_BLADES", 6.0),
+            opp_hand: weight("OPP_HAND", 10.0),
+            opp_success: weight("OPP_SUCCESS", 1000.0),
         }
-        std::env::var(&key)
-            .ok()
-            .and_then(|v| v.parse::<f64>().ok())
-            .filter(|w: &f64| w.is_finite())
-            .unwrap_or(default)
-            * delta
-    };
-    term("COST", 8.0, d(v8_model::stage_cost, me))
-        + term("HEARTS", 3.0, d(v8_model::supply_hearts, me))
-        + term("BLADES", 6.0, d(v8_model::active_blades, me))
-        + term(
-            "COVERAGE",
-            60.0,
-            (coverage_delta(after, me, db) - coverage_delta(base, me, db)) as f64,
-        )
-        + term(
-            "AMMO",
-            25.0,
-            (v8_model::lives_in_hand(after.seat_player(me), db)
-                - v8_model::lives_in_hand(base.seat_player(me), db)) as f64,
-        )
-        + term(
-            "ENERGY",
-            2.0,
-            (after.seat_player(me).energy_zone.active_count() as i32
-                - base.seat_player(me).energy_zone.active_count() as i32) as f64,
-        )
-        + term(
-            "HAND",
-            3.0,
-            (after.seat_player(me).hand.cards.len() as i32
-                - base.seat_player(me).hand.cards.len() as i32) as f64,
-        )
-        + term(
-            "RESERVE",
-            0.5,
-            (after.seat_player(me).main_deck.cards.len() as i32
-                - base.seat_player(me).main_deck.cards.len() as i32) as f64,
-        )
-        + term(
-            "SUCCESS",
-            1000.0,
-            (after.seat_player(me).success_live_card_zone.cards.len() as i32
-                - base.seat_player(me).success_live_card_zone.cards.len() as i32) as f64,
-        )
-        // Opponent terms are NEGATIVE in v7: growing their board is bad for us.
-        - term("OPP_COST", 8.0, d(v8_model::stage_cost, opp))
-        - term("OPP_BLADES", 6.0, d(v8_model::active_blades, opp))
-        - term(
-            "OPP_HAND",
-            10.0,
-            (after.seat_player(opp).hand.cards.len() as i32
-                - base.seat_player(opp).hand.cards.len() as i32) as f64,
-        )
-        - term(
-            "OPP_SUCCESS",
-            1000.0,
-            (after.seat_player(opp).success_live_card_zone.cards.len() as i32
-                - base.seat_player(opp).success_live_card_zone.cards.len() as i32) as f64,
-        )
+    })
 }
         let nodes = search.nodes;
         let tie = tie_key(&sim, me, db, action);

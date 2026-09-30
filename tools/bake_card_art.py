@@ -72,18 +72,190 @@ RE_COUNT_X = re.compile(r"^(\d+)\s*x\s*(.+)$")
 RE_X_COUNT = re.compile(r"^(.*?)\s*x\s*(\d+)$")
 
 
-def compress_blob(data: bytes) -> bytes:
-    """Compress one blob to a zlib stream (level 9).
+def compress_detail(data: bytes) -> bytes:
+    """Detail portrait (96x144) -> zlib (RFC1950/deflate) stream, level 9.
 
-    Level 9 rather than zlib's default 6: this runs once per blob at bake
-    time and never on the console, so the extra CPU is free. Measured on 300
-    real detail tiles, 9 is 3.41% smaller than 6 (79,503 B on that sample),
-    which extrapolates to roughly 500KB across all 1905 cards — worth having
-    on a 32MB cart. Level 1 for reference is 37% larger than 9.
+    Detail art is 13,824 B/card and 73% of the ROM, so this is where the
+    compression actually has to pay. Level 9 rather than zlib's default 6: it
+    runs once per blob at bake time and never on the console, so the extra CPU
+    is free. Measured on 300 real detail tiles, 9 is 3.41% smaller than 6
+    (79,503 B on that sample), ~500KB across all 1905 cards. Level 1 for
+    reference is 37% larger than 9.
     """
     if not data:
         return zlib.compress(b"", 9)
     return zlib.compress(data, 9)
+
+
+def compress_front(data: bytes) -> bytes:
+    """Board/menu fronts and UI -> BIOS LZ77 (SWI 0x11), not deflate.
+
+    These are drawn on EVERY frame (a board is ~28 placements, redrawn after
+    `clear_layers` wipes the BGs), so decode cost is on the frame budget, and
+    the BIOS SWI is native ARM assembly while miniz_oxide inflate is software
+    running at 16.78MHz. Measured cost of getting this wrong: the all-deflate
+    build could not finish a main-phase frame and presented half-drawn BGs
+    after the mulligan screen, which is light enough to keep up.
+
+    LZ77 is a bad *ratio* choice (see the module docstring) but these blobs are
+    small (384-1920 B) so the absolute loss is modest, and they are the ones
+    that must be fast. Detail art, which is huge but only decompressed when a
+    card is actually opened, takes the good ratio and pays the slow decode
+    once.
+    """
+    return lz77_compress_bios_if_smaller(data)
+
+
+# GBA BIOS LZ77 (LZSS) compression - hash-based for speed
+# Header: 32-bit little-endian
+#   bits 0-3: reserved (0)
+#   bits 4-7: compression type (1 = LZ77/LZ10)
+#   bits 8-31: decompressed size
+# Data: LZSS format with 4096-byte sliding window, min match 3, max match 18
+# Flag byte: 1 bit per item (1=literal, 0=match), 8 items per flag byte
+
+def lz77_compress_bios(data: bytes) -> bytes:
+    """Compress data to GBA BIOS LZ77 (LZSS) format using hash-based search.
+    
+    Returns: header (4 bytes) + compressed data
+    Header: type=1 (LZ77) in bits 4-7, decompressed size in bits 8-31
+    """
+    if not data:
+        return b'\x10\x00\x00\x00'  # type=1, size=0
+    
+    window_size = 4096
+    min_match = 3
+    max_match = 18
+    
+    # Hash table for 3-byte sequences - use array for speed
+    HASH_BITS = 16
+    HASH_SIZE = 1 << HASH_BITS
+    HASH_MASK = HASH_SIZE - 1
+    
+    # Use array for hash chain (stores previous index for each position)
+    import array
+    hash_chain = array.array('H', [0xFFFF] * len(data))
+    # Use array of ints for hash table - initialize with 0xFFFF (sentinel for -1)
+    hash_table = array.array('H', [0xFFFF] * HASH_SIZE)
+    
+    def hash3(pos: int) -> int:
+        """Hash 3 bytes at position."""
+        if pos + 3 > len(data):
+            return 0
+        return ((data[pos] << 8) | (data[pos + 1] << 4) | data[pos + 2]) & HASH_MASK
+    
+    output = bytearray()
+    # Pre-allocate approximate size (worst case: all literals + flag bytes)
+    output.extend(b'\x00' * (len(data) * 2 + 100))
+    i = 0
+    flag_byte = 0
+    flag_bit = 0
+    # BIOS layout: flag byte FIRST, then its 8 items. The placeholder
+    # lives at index 0 (a previous revision started items at index 2,
+    # leaving a stray zero that shifted the whole stream).
+    flag_pos = 0
+    output[0] = 0  # placeholder for first flag byte
+    output_len = 1
+    
+    while i < len(data):
+        # Search for best match using hash table
+        best_len = 0
+        best_dist = 0
+        
+        if i + min_match <= len(data):
+            h = hash3(i)
+            # Walk hash chain to find matches
+            j = hash_table[h]
+            search_end = max(0, i - 4096)
+            
+            while j != 0xFFFF and j >= search_end:
+                # Quick check: first 3 bytes match (hash collision handled by verification)
+                match_len = 0
+                # Unroll loop for common case
+                max_possible = min(max_match, len(data) - i)
+                while match_len < max_possible and data[j + match_len] == data[i + match_len]:
+                    match_len += 1
+                
+                if match_len >= 3 and match_len > best_len:
+                    best_len = match_len
+                    best_dist = i - j
+                    if best_len == 18:  # max match, stop searching
+                        break
+                
+                # Move to next in chain
+                j = hash_chain[j] if j < len(hash_chain) and hash_chain[j] != 0xFFFF else 0xFFFF
+        
+        # Add current position to hash table
+        if i + min_match <= len(data):
+            h = hash3(i)
+            hash_chain[i] = hash_table[h]  # Store previous index
+            hash_table[h] = i
+        
+        if best_len >= 3:
+            # Match: flag bit 1 (MSB-first), then the 2-byte token with
+            # length in the HIGH nibble: ((len-3) << 4) | ((dist-1) >> 8),
+            # ((dist-1) & 0xFF). (A previous revision had the nibbles
+            # swapped AND the polarity inverted — BIOS decoded garbage.)
+            flag_byte |= (1 << (7 - flag_bit))
+            dist_minus1 = best_dist - 1
+            len_minus3 = best_len - 3
+            output[output_len] = ((len_minus3 & 0xF) << 4) | ((dist_minus1 >> 8) & 0xF)
+            output[output_len + 1] = dist_minus1 & 0xFF
+            output_len += 2
+            i += best_len
+        else:
+            # Literal: flag bit stays 0, raw byte follows.
+            output[output_len] = data[i]
+            output_len += 1
+            i += 1
+        
+        flag_bit += 1
+        if flag_bit == 8:
+            output[flag_pos] = flag_byte
+            flag_pos = output_len
+            output[output_len] = 0  # placeholder for next flag byte
+            output_len += 1
+            flag_byte = 0
+            flag_bit = 0
+    
+    if flag_bit > 0:
+        output[flag_pos] = flag_byte
+    
+    # Truncate to actual length
+    output = output[:output_len]
+    
+    decompressed_size = len(data)
+    # Standard BIOS header: type byte 0x10 exactly, then the full 24-bit
+    # LE size. (A previous revision OR-ed the size low byte into the type
+    # byte, producing 0x90/0xD0 headers the BIOS rejects — every file
+    # whose size wasn't a multiple of 256 decoded as garbage.)
+    assert decompressed_size < (1 << 24), "LZ77 size must fit 24 bits"
+    header = bytes([
+        0x10,
+        decompressed_size & 0xFF,
+        (decompressed_size >> 8) & 0xFF,
+        (decompressed_size >> 16) & 0xFF,
+    ])
+    
+    return header + bytes(output)
+
+
+def lz77_compress_bios_if_smaller(data: bytes) -> bytes:
+    """Compress with LZ77, ALWAYS returning a standard BIOS stream.
+
+    Historical note: this used to return the input raw (with a 4-byte LE
+    length header) when compression didn't pay, and the LZ77 header OR-ed
+    the size low byte into the type byte. Both broke the runtime, which
+    feeds every .bin straight to BIOS SWI 0x11: files whose size low byte
+    wasn't zero (stage/live/back/UI) have an invalid type byte, and raw
+    files decode as garbage. The uniform contract now: every .bin written
+    by write_compressed is a standard stream (0x10 + 3-byte LE size), even
+    when a few bytes larger than raw. Costs ~tens of KB of ROM; buys a
+    runtime with zero format sniffing.
+    """
+    if len(data) == 0:
+        return b'\x10\x00\x00\x00'
+    return lz77_compress_bios(data)
 
 ART_W = 96
 ART_H = 144
@@ -456,8 +628,8 @@ def write_gen(entries, fronts, stage_fronts, live_fronts, waited_fronts, back_fr
     written = set()
     blob_sizes = {}
 
-    def write_compressed(path: Path, data: bytes):
-        compressed = compress_blob(data)
+    def write_compressed(path: Path, data: bytes, fn=compress_front):
+        compressed = fn(data)
         with open(path, "wb") as f:
             f.write(compressed)
         written.add(path.name)
@@ -474,7 +646,9 @@ def write_gen(entries, fronts, stage_fronts, live_fronts, waited_fronts, back_fr
 
     for card_no, tiles, _f, _s, _l, _w in entries:
         safe = sanitize_filename(card_no)
-        write_compressed(BIN_DIR / f"tiles_{safe}.bin", tiles)
+        # Detail only: deflate. See compress_detail/compress_front for why
+        # the two kinds take different codecs.
+        write_compressed(BIN_DIR / f"tiles_{safe}.bin", tiles, compress_detail)
 
     for card_no, tiles in fronts:
         safe = sanitize_filename(card_no)
@@ -500,10 +674,18 @@ def write_gen(entries, fronts, stage_fronts, live_fronts, waited_fronts, back_fr
         f.write("// Auto-generated by tools/bake_card_art.py -- do not edit.\n")
         f.write("// CardArt: 8bpp detail art (96x144 = 13824 bytes), shared MASTER_PAL\n")
         f.write("// Card fronts: 8bpp shared MASTER_PAL (4bpp on GBA via palette bank)\n")
-        f.write("// Every .bin is a zlib (deflate) stream, inflated by miniz_oxide in\n")
-        f.write("// display.rs::decompress_art. This replaced the BIOS LZ77 (SWI 0x11)\n")
-        f.write("// format; see the module docstring in tools/bake_card_art.py for the\n")
-        f.write("// measured 25.9MB -> 18.9MB across all baked cards.\n")
+        f.write("//\n")
+        f.write("// TWO CODECS, deliberately:\n")
+        f.write("//   front/stage/wait/live/back/board_ui -> BIOS LZ77, decoded by SWI\n")
+        f.write("//       0x11 (native ARM asm). Drawn every frame, so decode cost is on\n")
+        f.write("//       the frame budget.\n")
+        f.write("//   tiles_* (the detail portrait)          -> zlib deflate, inflated by\n")
+        f.write("//       miniz_oxide. 13,824B/card and 73% of the art, so this is where\n")
+        f.write("//       the ratio has to win; decompressed only when a card is opened,\n")
+        f.write("//       not once per frame.\n")
+        f.write("// Compressing everything as deflate reached 18.9MB but the main-phase\n")
+        f.write("// frame could not finish decoding it at 16.78MHz and presented\n")
+        f.write("// half-drawn BGs after the (light) mulligan screen.\n")
         f.write("#![allow(non_upper_case_globals)]\n")
         f.write("// (AL_* statics mirror card numbers in mixed case so art\n")
         f.write("// blobs stay grep-able from panic messages and debug logs.)\n\n")
@@ -521,11 +703,40 @@ def write_gen(entries, fronts, stage_fronts, live_fronts, waited_fronts, back_fr
         f.write("}\n\n")
 
         f.write("/// Alignment wrapper kept for the blob statics. inflate reads the\n")
-        f.write("/// stream byte-wise so it has no alignment requirement, but the\n")
-        f.write("/// BIOS no longer word-loads these and 4-byte alignment still\n")
-        f.write("/// keeps each blob's address a round number in panic/debug output.\n")
+        f.write("/// stream byte-wise so it has no alignment requirement, but the BIOS\n")
+        f.write("/// word-loads its LZ77 SWI source and faults on unaligned addresses.\n")
         f.write("#[repr(align(4))]\n")
         f.write("pub struct AlignedBlob<const N: usize>(pub [u8; N]);\n\n")
+
+        # LZ77 decompressor for the per-frame art (SWI 0x11).
+        f.write("/// Decompress a BIOS LZ77 stream (SWI 0x11) from WRAM to WRAM.\n")
+        f.write("///\n")
+        f.write("/// Every front/UI blob is written by tools/bake_card_art.py as a\n")
+        f.write("/// standard stream (0x10 + 3-byte LE size), so there is no format\n")
+        f.write("/// sniffing here. `src` must be 4-aligned — every blob is wrapped in\n")
+        f.write("/// an AlignedBlob below so the fast path always holds.\n")
+        f.write("pub fn lz77_decompress_wram(src: &[u8], dst: &mut [u8]) {\n")
+        f.write("    debug_assert_eq!(src.as_ptr() as usize % 4, 0, \"LZ77 src must be 4-aligned\");\n")
+        f.write("    let src_ptr = src.as_ptr() as u32;\n")
+        f.write("    let dst_ptr = dst.as_mut_ptr() as u32;\n")
+        f.write("    unsafe {\n")
+        f.write("        core::arch::asm!(\n")
+        f.write("            \"swi 0x11\",\n")
+        f.write("            in(\"r0\") src_ptr,\n")
+        f.write("            in(\"r1\") dst_ptr,\n")
+        f.write("            lateout(\"r0\") _,\n")
+        f.write("            lateout(\"r1\") _,\n")
+        f.write("            lateout(\"r2\") _,\n")
+        f.write("            lateout(\"r3\") _,\n")
+        f.write("            lateout(\"r12\") _,\n")
+        f.write("            lateout(\"lr\") _,\n")
+        f.write("            options(nostack, preserves_flags)\n")
+        f.write("        );\n")
+        f.write("    }\n")
+        f.write("    // The asm has no memory operands: without this fence the\n")
+        f.write("    // optimizer may hoist reads of `dst` above the SWI call.\n")
+        f.write("    core::sync::atomic::compiler_fence(core::sync::atomic::Ordering::SeqCst);\n")
+        f.write("}\n\n")
 
         # 4-aligned blob statics (one per .bin; tables below borrow `&AL_x.0`).
         def emit_blob(var: str, name: str):

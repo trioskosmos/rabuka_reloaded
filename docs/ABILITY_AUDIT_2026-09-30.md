@@ -23,6 +23,25 @@ Findings are graded:
 **A** = ability does not work as printed · **B** = test passes but cannot detect the defect
 it names · **C** = missing edge case on an otherwise-correct ability · **D** = latent.
 
+## Outcome
+
+| # | Finding | Status |
+|---|---|---|
+| A1 | 「heart04を**2つ以上**持つ」 count dropped — `_build_reveal_add_discard` never called `_add_heart_color_threshold` | **FIXED** (parser), 1 node, proven both directions |
+| A2 | 「**スコア6以上**のライブカード」 filter dropped entirely | **FIXED** (parser), 1 node, proven both directions, 4 new tests |
+| B1 | A1's only test passes for a wrong reason | **FIXED** — the discriminating test goes red without the fix |
+| C1 | `PL!N-bp4-028-L` never pinned 5 distinct names | **FIXED** — 5 → +1, engine already correct |
+| C2 | `PL!-pb2-038-L` non-stackable tested in one zone only | **FIXED** — one per zone still +1, engine already correct |
+| D1 | `parenthetical` decoded then never read | open, engine |
+| D2 | `exclude_self: true` inert on the formation change; parser wrong | open, parser |
+
+Verification: **engine 4004 passed / 0 failed**; **parser 124 passed / 0 failed**
+(`47 + 24 + 4 + 44 + 5` across the five suites in `cards/ability_extraction/tests`);
+`cards/test_inventory.py` regenerated.
+
+`test_inventory.py --check` reports **13 soft-guard ratchet failures**, none in a file
+touched by this audit (they are concurrent bot/C-port work).
+
 ---
 
 ## A1 — 「ハートにheartNNをNつ以上持つ」 is dropped by the parser (13 card prints)
@@ -79,6 +98,25 @@ never a count. **A member printing exactly one heart04 is offered.** And the str
 `cost_limit_operator` is inert: `card_matches_cost_limit_op` (`util.rs:929-953`) returns
 `true` unconditionally on `cost_limit: None` and never reads the operator.
 
+### A1 — the actual bug site, and why my first fix did nothing
+
+My first attempt changed the regex in `_add_heart_color_threshold` to accept `つ`. Regenerating
+produced a **zero-line** diff. That was the useful signal: the counter word was never the
+problem on this card.
+
+The clause is built by `_build_reveal_add_discard` (`parser.py:8345`), the 「1枚公開して手札に
+加えてもよい」 builder. It sets `heart_colors` at `:8359-8363` and **never calls
+`_add_heart_color_threshold` at all** — `_enrich_from_text` has always called it, which is
+exactly why `PL!S-pb1-013-N` (「2個以上」, same builder family, different route) kept its
+`heart_color_count` while `PL!S-bp5-007-AR` (「2つ以上」) did not. Two independent omissions:
+the route and the counter word.
+
+Both are fixed. The regex accepts `個|つ|枚` (defence in depth for the other route), and
+`_build_reveal_add_discard` now calls the helper.
+
+**Blast radius, measured not assumed** — the entire `cards/abilities.json` diff is
+`+ "heart_color_count": 2` on the 国木田花丸 `select_action`, plus the two stamps.
+
 ---
 
 ## A2 — 「スコアN以上のライブカード」 is dropped entirely (2 card prints), no engine support
@@ -109,6 +147,39 @@ engine field is needed.
 
 **No test anywhere names `PL!-PR-018-PR`.** The ability has never been driven.
 
+### A2 — the fix, and why it needed no engine change
+
+`_add_score_threshold` maps 「スコアN以上/以下の<live card>」 onto `cost_limit` +
+`cost_limit_operator`. For a live card `cost_limit` *is* the score, because
+`card_matches_cost_limit_op` (`util.rs:968-996`) compares `c.cost.or(c.score)` and a live card
+carries no cost. Traced end-to-end through
+`execute_move_cards → resolve_cards_from_source → resolve_from_standard_zone →
+take_cards_from_standard_zone → matching_indices → matches → card_matches_cost_limit_op`,
+with the filter re-applied at answer time (`choice.rs:1034-1036`) and again in the executor
+(`move/mod.rs:1697-1711`). No bypass on the non-interactive path.
+
+Hooked in **twice, and the first hook alone did nothing** — the same trap as A1:
+
+* `_finalize_effect` (the registry-handler path) — **zero-line diff**;
+* the `parse_action` fallback tail of `parse_effect` — **this is the one that bites**.
+
+This clause reaches the engine through `parse_action`, not the handler registry. A single
+central post-pass in each of the two exits is more robust than teaching each builder.
+
+Guards, so the rule cannot misfire:
+
+* negative lookahead `(?!の合計)` keeps 「スコアの**合計**が6以上」 (an aggregate over a zone)
+  out — different quantity, handled by `comparison_condition`;
+* only fires when `card_type` is a live card, because a member has a cost and no score;
+* never overwrites an existing `cost_limit`.
+
+Blast radius: `+ "cost_limit": 6, + "cost_limit_operator": ">="` on that one node.
+
+The sibling `PL!S-bp3-008-P/-R` 小原鞠莉 prints 「それがスコア6以上の『Aqours』のライブカードの
+場合」 — the score there gates the *effect* on the already-recovered card, not the selection.
+Different shape, still unhandled, **not fixed here**; recorded so it is not mistaken for
+covered.
+
 ---
 
 ## B1 — the only test for A1's card passes for a wrong reason
@@ -130,6 +201,25 @@ Kotori and `PL!-sd1-010-SD`, asserts nothing reaches hand, and its message reads
 The 「2つ以上」 clause — the entire point of the test name — is never evaluated, and the
 assertion would still pass with the count parser bug present (it is passing right now). A
 card printing exactly **one** heart04 would be offered and no test in the tree would notice.
+
+**Proven, not argued.** With the parser fix disabled and the bytecode recompiled, the two
+existing tests still report `ok`. That is the blindness. The new test, same build:
+
+```
+..._the_two_heart_threshold_excludes_a_single_heart04_member ... FAILED
+  left: Some(2)   right: Some(1)
+```
+
+— the engine offered both the 2-heart04 and the 1-heart04 member. With the fix restored, all
+three pass. `PL!HS-bp5-009-N` 日野下花帆 (`base_heart: {heart04: 1, heart06: 1}`, no abilities)
+is the fixture; 281 members in the corpus print exactly one heart04, so the boundary is
+reachable. The test pins both fixtures' printed counts as preconditions, because a substituted
+printing could put a card on the qualifying side.
+
+There is a second, quieter reason the file was blind: it never reads `filtered_indices`. It
+drains with `select_indices(&[0])`, which indexes the *filtered* list, so "how many candidates
+were offered" is never measured. `pending_choice_option_count()` exists for exactly this and
+was unused.
 
 ---
 
@@ -240,14 +330,55 @@ an_expensive_non_mus_baton_touch_does_nothing}` and all 3 in
 
 ---
 
-## 6. Fix order
+## 7. My own new test had the disease it was written to detect
 
-| # | Item | Kind |
-|---|---|---|
-| 1 | `parser.py:8403` — accept `つ` alongside `個` and `枚` | A1 parser, blast radius measured |
-| 2 | `PL!-PR-018-PR` スコア6以上 — emit `cost_limit`/`cost_limit_operator`; **needs an engine path first** | A2 parser + engine |
-| 3 | `look_four_take_member_with_double_heart04_test.rs` — add a heart04×1 member to the negative deck so the clause is reachable | B1 |
-| 4 | `distinct_waitroom_lives_pl_n_bp4_028_l_test.rs` — add the 5-distinct case | C1 |
-| 5 | `pb2_two_mus_members_live_or_success_zone_score_pl_pb2_038_l_test.rs` — one copy per zone | C2 |
-| 6 | `parenthetical` consumption / area-capacity enforcement | D1, engine |
-| 7 | drop the bogus `exclude_self` from `PL!SP-sd2-001-SD2` | D2, parser |
+`a_live_of_score_five_is_below_the_bound_and_is_not_taken` asserted that hand was unchanged
+and the waitroom still held both non-qualifying lives. Run against the **unfixed** parse it
+**passed**.
+
+Why: with the score clause dropped, both score-5 lives become candidates, `count: 1` with two
+candidates raises a `SelectCard`, and `drain_auto_ability_choices` breaks on anything that is
+not a `SelectAutoAbility` — so the prompt is never answered. **Nothing moved not because the
+filter refused, but because the selection is still pending.** Both assertions are satisfied by
+a pending prompt.
+
+Three of the four new tests went red on the unfixed parse; this one did not, and it was the
+one that looked most obviously correct. Fixed by asserting the thing that actually
+discriminates:
+
+```rust
+assert!(!game.has_pending_choice(),
+    "zero candidates qualify, so the recovery must resolve SILENTLY. A pending choice here \
+     means the score-5 lives were offered as candidates.");
+```
+
+Zero qualifying cards *is* a silent no-op (`SelectionOutcome::Skip`), so no prompt may
+survive. With that added, all four go red without the fix and green with it.
+
+The general lesson is the one this audit keeps hitting: **an assertion on an ABSENCE is
+satisfied by a stalled prompt as readily as by a correct refusal.** Pair every absence with
+either a positive twin or a statement of the prompt state.
+
+Two smaller self-corrections, both caught by preconditions rather than by reading:
+
+* my first 028-L premise check allocated fresh ids *inside* its own comparison loop
+  (`TestGame::id` hands out a new instance per call) and failed on a correct card;
+* `PL!S-pb2-019-L` is in `cards.json` but **not in the engine's baked database**, so
+  `game.id` panics on it. Swapped for `PL!N-bp5-029-L`, which existing tests prove present.
+  Worth knowing generally: `cards.json` ⊃ the baked DB, so a card number is not proof the
+  engine can resolve it.
+
+---
+
+## 8. Fix order
+
+| # | Item | Kind | State |
+|---|---|---|---|
+| 1 | `parser.py` `_build_reveal_add_discard` → call `_add_heart_color_threshold`; regex accepts `個\|つ\|枚` | A1 parser | **done**, 1 node |
+| 2 | `PL!-PR-018-PR` スコア6以上 → `cost_limit`/`cost_limit_operator` | A2 parser | **done**, 1 node, 4 tests |
+| 3 | heart04×1 discriminating test for `PL!S-bp5-007-R` | B1 | **done** |
+| 4 | 5-distinct boundary case for `PL!N-bp4-028-L` | C1 | **done** |
+| 5 | one-copy-per-zone non-stackable case for `PL!-pb2-038-L` | C2 | **done** |
+| 6 | `PL!S-bp3-008-P/-R` 「それがスコア6以上の場合」 — effect gate on the recovered card | new | open |
+| 7 | `parenthetical` consumption / area-capacity enforcement | D1 | open, engine |
+| 8 | drop the bogus `exclude_self` from `PL!SP-sd2-001-SD2` | D2 | open, parser |

@@ -234,8 +234,39 @@ static int count_distinct_in_zone(const struct GameState *g, int pl, const char 
     }
     return distinct;
 }
-static int zone_count_filtered_ex(const struct GameState *g, int pl, const char *loc, const char *card_type, const char *group, int exclude_cid){
-    if(!card_type && !group && exclude_cid < 0) return count_in_zone(g,pl,loc);
+/* count_distinct_heart_types: 「ハートの種類がN種類以上」.
+ * Rust card.rs:2020-2064 (count_distinct_heart_types), reached from
+ * card.rs:2090 and :2440 when `unit == "types"` and the zone is the stage.
+ * The count is DISTINCT COLOURS across the zone's cards, not cards and not
+ * hearts: one member printing heart02/heart04/heart05 contributes 3, and
+ * three copies of that same member still contribute 3. The previous port had
+ * no `unit` arm at all, so 「3種類以上」 was evaluated as "3 CARDS", which
+ * turned a single multi-colour member into a failing gate and three identical
+ * members into a passing one. */
+static int count_distinct_heart_types(const struct GameState *g, int pl, const char *loc) {
+    if (!loc) return 0;
+    int ids[RB_MAX_ZONE];
+    int n = zone_ids(g, pl, loc, ids, RB_MAX_ZONE);
+    int seen[RB_MAX_HEARTS];
+    memset(seen, 0, sizeof seen);
+    int distinct = 0;
+    for (int i = 0; i < n; i++) {
+        if (ids[i] < 0) continue;
+        Card cc;
+        if (!rb_decode_card_by_index((uint32_t)ids[i], &cc)) continue;
+        /* BASE hearts only: base_heart.hearts is the printed heart map, and
+         * Card.num_base is the length of that first heart section. */
+        for (int k = 0; k < cc.num_base && k < cc.n_hearts; k++) {
+            int col = (int)cc.heart_color[k];
+            if (col < 0 || col >= RB_MAX_HEARTS) continue;
+            if (!seen[col]) { seen[col] = 1; distinct++; }
+        }
+        rb_free_card(&cc);
+    }
+    (void)g;
+    return distinct;
+}
+static int zone_count_filtered_ex(const struct GameState *g, int pl, const char *loc, const char *card_type, const char *group, int exclude_cid){    if(!card_type && !group && exclude_cid < 0) return count_in_zone(g,pl,loc);
     /* filter: live_card vs member_card vs energy_card (+ optional group_names,
        + CardFilter.exclude_self). Mirror card.rs:evaluate_location_condition's
        `count_side` closure  Eit filters util::zone_cards(player, location) for
@@ -416,6 +447,12 @@ static int eval_location(const struct GameState *g, int actor, int host_cid, con
        (card.rs: `filter.exclude_self = self.activating_card_id`). */
     int excl = 0; get_bool(c, "exclude_self", &excl);
     int exclude_cid = (excl && host_cid >= 0) ? host_cid : -1;
+    /* `unit: "types"` counts DISTINCT heart colours, not cards. Rust gates this
+       on the stage specifically (card.rs:2440-2441), and only when NO card_type
+       or group filter is present — the filter arms above take precedence there
+       too, because Rust resolves those through resolve_zone_card_count. */
+    const char *unit = get_str(c, "unit");
+    int unit_is_types = (unit && !strcmp(unit, "types")) && !strcmp(loc, "stage");
     int actual = 0;
     int baton_filter = 0; get_bool(c, "baton_touch_trigger", &baton_filter);
     if (baton_filter && !strcmp(loc, "stage")) {
@@ -443,6 +480,7 @@ static int eval_location(const struct GameState *g, int actor, int host_cid, con
         }
     }
     else if (ctype || group) actual = zone_count_filtered_ex(g, pl, loc, ctype, group, exclude_cid);
+    else if (unit_is_types) actual = count_distinct_heart_types(g, pl, loc);
     else if (distinct) actual = count_distinct_in_zone(g, pl, loc);
     else if (exclude_cid >= 0) actual = zone_count_filtered_ex(g, pl, loc, NULL, NULL, exclude_cid);
     else actual = count_in_zone(g, pl, loc);

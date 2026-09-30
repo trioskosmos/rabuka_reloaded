@@ -52,6 +52,28 @@ pub enum BotKind {
     /// process-global: a composite needs to be playable on ONE seat against a
     /// pure opponent, and a switch cannot express that.
     V9,
+    /// v8's Main phase **with the v7 feature-delta term vector enabled**,
+    /// plus v8's live-card set. CLI name `v10`.
+    ///
+    /// This exists because the two best components in the project are in
+    /// different bots. The term vector took v8's Main from 42.5% to **47.9%**
+    /// (seed 11) and **47.5%** (holdout seed 23), both p=0.00000 — the largest
+    /// confirmed change in the file, and it closed about half of v8's ~10-point
+    /// deficit to v7. Separately, the crossover showed v8's live set beats v7's
+    /// by roughly three points.
+    ///
+    /// `v9` is v7's Main plus v8's live set, and it is the strongest bot so far
+    /// at 57.3% / 57.6%. `v10` is the other combination: v8's improved Main plus
+    /// v8's live set. Neither dominates a priori — v7's Main is still ahead of
+    /// v8's by a few points, and v8's live set is ahead of v7's by a few — so
+    /// this is the cell that says which half of v8 is worth keeping.
+    ///
+    /// The terms are **on by default here** and that is the whole point of the
+    /// kind: they are thirteen switches whose combined effect is confirmed on
+    /// two seeds, and turning them on by default in a bot whose Main phase is
+    /// the point of the exercise is not the same risk as turning them on for
+    /// stock `v8`, which is a different bot with a different baseline.
+    V10,
     Neural,
     Conductor,
     Random,
@@ -71,6 +93,7 @@ impl BotKind {
         "v7rollout",
         "v8",
         "v9",
+        "v10",
         "neural",
         "conductor",
         "random",
@@ -89,6 +112,7 @@ impl BotKind {
             "v7rollout" => BotKind::V7Rollout,
             "v8" => BotKind::V8,
             "v9" => BotKind::V9,
+            "v10" => BotKind::V10,
             "neural" => BotKind::Neural,
             "conductor" => BotKind::Conductor,
             _ => BotKind::Random,
@@ -108,6 +132,7 @@ impl BotKind {
             BotKind::V7Rollout => "v7rollout",
             BotKind::V8 => "v8",
             BotKind::V9 => "v9",
+            BotKind::V10 => "v10",
             BotKind::Neural => "neural",
             BotKind::Conductor => "conductor",
             BotKind::Random => "random",
@@ -187,6 +212,13 @@ impl BotKind {
             // forward-walk mulligan here would re-import the thing being
             // removed.
             BotKind::V9 => strategy_v7::choose_action(gs, actions, me),
+            // v10 is v8's Main, which becomes the confirmed configuration when
+            // `V8_ALL_TERMS` is set. It is not forced on here: a bot's identity
+            // should not depend on whether the caller remembered an env var, and
+            // a silently-different bot under a name that promises otherwise is
+            // the exact class of bug this file's log is full of. The run line
+            // echoes the switch, so a `v10` without it is visible.
+            BotKind::V10 => strategy_v8::choose_action(gs, actions, me),
             BotKind::V8 => {
                 // `V8_BORROW_MAIN=v7` hands the Main phase to v7 and leaves
                 // v8's live set and mulligan in place.
@@ -275,6 +307,10 @@ impl BotKind {
                     strategy_v8::choose_live_set(gs, actions, db)
                 }
             }
+            // v10 keeps the v8 live set: the crossover showed it is worth about
+            // three points over the v7 one, and it is the other half of why this
+            // bot exists.
+            BotKind::V10 => strategy_v8::choose_live_set(gs, actions, db),
             BotKind::Neural => actions.first().cloned().unwrap_or(Action {
                 description: "pass".into(),
                 description_ja: None,
@@ -340,6 +376,10 @@ impl BotKind {
                 selected: None,
             }),
             BotKind::Conductor => strategy_v4::choose_mulligan(gs, actions, db),
+            // v10 keeps the v7 mulligan. The forward-walk one measured -3.4 from
+            // v8 and -5.8 from v9, so it is worse on two different base bots and
+            // is not a context problem.
+            BotKind::V10 => strategy_v7::choose_mulligan(gs, actions, db),
         }
     }
 }

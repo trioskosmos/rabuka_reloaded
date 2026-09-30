@@ -311,9 +311,20 @@ int rb_effect_count(const struct GameState *g, int actor, int host_cid, const Ab
             units = dc_count_matching(g->p[actor].energy.cards, g->p[actor].energy.n, ct, grp);
         } else if (!strcmp(loc, "under_member") || !strcmp(loc, "under") ||
                    !strcmp(loc, "下")) {
+            /* engine/src/ability/util.rs:2638-2646 `under_member_cards`:
+               「このメンバーの下に置かれているカード」 counts ONE member's
+               under-cards -- the host's own slot when the host is on stage,
+               the whole field only when it is not.  Walking every bag
+               multiplies the effect by every member on stage. */
             int ids[RB_MAX_ZONE];
             int n = 0;
-            for (int s = 0; s < RB_STAGE_SIZE; s++)
+            int host_slot = -1;
+            if (host_cid >= 0)
+                for (int s = 0; s < RB_STAGE_SIZE; s++)
+                    if (g->p[actor].stage[s] == host_cid) { host_slot = s; break; }
+            int lo = (host_slot >= 0) ? host_slot : 0;
+            int hi = (host_slot >= 0) ? host_slot + 1 : RB_STAGE_SIZE;
+            for (int s = lo; s < hi; s++)
                 for (int k = 0; k < g->p[actor].under_cards[s].n && n < RB_MAX_ZONE; k++)
                     ids[n++] = g->p[actor].under_cards[s].cards[k];
             units = dc_count_matching(ids, n, ct, grp);

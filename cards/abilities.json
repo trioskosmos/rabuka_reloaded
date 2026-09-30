@@ -1,9 +1,9 @@
 {
   "schema": "extracted_abilities.v1",
-  "generated_at": "2026-09-30T10:55:52.204377",
+  "generated_at": "2026-09-30T12:43:45.366560",
   "generated_by": "cards/ability_extraction/extract_card_abilities.py",
   "source_file": "cards/cards.json",
-  "engine_commit": "32eafdc8",
+  "engine_commit": "b2ba64c9",
   "parser_version": "1.0",
   "input_hash": null,
   "statistics": {
@@ -9309,6 +9309,7 @@
           "heart_colors": [
             "heart04"
           ],
+          "heart_color_count": 2,
           "optional": true,
           "cost_limit_operator": ">=",
           "text": "自分のデッキの上からカードを4枚見る。その中からハートに{{heart_04.png|heart04}}を2つ以上持つメンバーカードを1枚公開して手札に加えてもよい。残りを控え室に置く"
@@ -10411,7 +10412,9 @@
         "count": 1,
         "card_type": "live_card",
         "target": "self",
-        "action": "move_cards"
+        "action": "move_cards",
+        "cost_limit": 6,
+        "cost_limit_operator": ">="
       }
     },
     {

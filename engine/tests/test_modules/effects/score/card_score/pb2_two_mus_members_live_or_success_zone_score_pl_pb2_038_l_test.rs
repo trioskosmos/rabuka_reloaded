@@ -150,3 +150,34 @@ fn two_copies_do_not_stack() {
         "この効果は重複しない — a second copy must not raise the total to 2"
     );
 }
+
+/// The configuration the previous test does not build: one copy in EACH zone.
+///
+/// 「この効果は重複しない」 is about the *ability*, not the zone, and the card's own zone
+/// clause is a disjunction (「ライブカード置き場**か**成功ライブカード置き場」). One copy
+/// performing now and a second already succeeded is a real board state, so the two copies sit
+/// in different zones — the only arrangement where a de-dup keyed per-zone instead of
+/// per-ability would quietly pay twice.
+#[test]
+fn one_copy_in_each_live_zone_still_scores_only_one() {
+    let db = load_real_database();
+    let mut game = TestGame::new(db);
+    game.state.player1.stage.stage[0] = game.id(MUS_A);
+    game.state.player1.stage.stage[1] = game.id(MUS_B);
+
+    let performing = game.id(LOVE);
+    game.assert_card_identity(performing, LOVE);
+    let succeeded = game.new_id(LOVE);
+    game.state.player1.live_card_zone.cards.push(performing);
+    game.state.player1.success_live_card_zone.cards.push(succeeded);
+
+    game.state.recalculate_constants();
+
+    assert_eq!(
+        game.state.mods.p1_constant_total_score_bonus,
+        1,
+        "one copy in ライブカード置き場 and one in 成功ライブカード置き場 — both satisfy the \
+         zone disjunction, but この効果は重複しない, so the total must stay at +1. A value of \
+         2 means non_stackable is de-duplicating per zone rather than per ability."
+    );
+}

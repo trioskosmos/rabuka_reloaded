@@ -1386,6 +1386,11 @@ def _finalize_effect(
             result["activation_position"] = activation_position
     _propagate_optional(result)
     _strip_coo_child_optional(result)
+    # 「スコアN以上のライブカード」 filters a card by its printed score. No handler used
+    # to carry that clause, so the filter was simply dropped and any live card in the
+    # zone qualified. Routed through the central finalizer rather than each builder —
+    # see docs/ABILITY_AUDIT_2026-09-30.md §A2.
+    _add_score_threshold(result, result.get("text") or prefix_effect.get("text") or "")
     return result
 
 
@@ -1492,6 +1497,11 @@ def parse_effect(text: str) -> Dict[str, Any]:
         elif "引く" in fallback_text:
             effect["action"] = "draw_card"
 
+    # Fallback-path twin of the hook in _finalize_effect. This clause
+    # (「スコアN以上のライブカードを1枚手札に加える」) reaches the engine through
+    # parse_action, not the handler registry, so it never sees _finalize_effect.
+    # See docs/ABILITY_AUDIT_2026-09-30.md §A2.
+    _add_score_threshold(effect, effect.get("text") or fallback_text)
     return _strip_coo_child_optional(effect)
 
 
@@ -8359,6 +8369,12 @@ def _build_reveal_add_discard(fp, sa_text, select_text):
     hc = _heart_ref_ids(select_text, unique=True)
     if hc:
         result["heart_colors"] = hc
+        # 「ハートにheart04を2つ以上持つ」 is a COUNT filter, not mere colour presence. This
+        # builder set heart_colors but never the threshold, so every 「reveal → add →
+        # discard」 card silently accepted a card printing one heart04. Only this path
+        # omits it; _enrich_from_text has always called it. See
+        # docs/ABILITY_AUDIT_2026-09-30.md §A1.
+        _add_heart_color_threshold(result, select_text)
         if detect_require_all_hearts(select_text):
             result["require_all_heart_colors"] = True
     if extract_max(select_text):
@@ -8489,7 +8505,43 @@ def _enrich_from_text(d, text):
         d["cost_from_revealed"] = True
         if "以下" in text and "cost_limit_operator" not in d:
             d["cost_limit_operator"] = "<="
+    _add_score_threshold(d, text)
     _apply_ability_filter(d, text)
+
+
+# 「スコアN以上の…カード」 filters a LIVE CARD by its printed score. The engine has no
+# score filter of its own, but CardFilter's cost_limit is compared against
+# `c.cost.or(c.score)` (ability/util.rs), and a live card has no cost — so cost_limit is
+# exactly the score comparison for a live card. Negative lookahead on 合計 keeps
+# 「スコアの合計が6以上」 (an aggregate over a ZONE) out of this: that is a different
+# quantity and is handled by comparison_condition, not by a per-card filter.
+_SCORE_THRESHOLD_RE = re.compile(r"スコア(?!の合計)(?:[０-９]|\d)+の?以上")
+_SCORE_THRESHOLD_RE_BELOW = re.compile(r"スコア(?!の合計)(?:[０-９]|\d)+の?以下")
+
+
+def _add_score_threshold(d, text):
+    """Map 「スコアN以上の/以下の<live card>」 onto cost_limit + cost_limit_operator.
+
+    Only for a card_type that is a live card: a member has a cost and no score, so
+    routing a スコア clause into cost_limit on a member filter would compare the wrong
+    quantity. See docs/ABILITY_AUDIT_2026-09-30.md §A2.
+    """
+    if "cost_limit" in d:
+        return
+    ct = d.get("card_type") or d.get("card_types")
+    if not (isinstance(ct, str) and "live" in ct):
+        return
+    m = _SCORE_THRESHOLD_RE.search(text)
+    if m:
+        digits = "".join(ch for ch in m.group(0) if ch.isdigit())
+        d["cost_limit"] = int(digits.translate({ord(c): str(i) for i, c in enumerate("０１２３４５６７８９")}))
+        d["cost_limit_operator"] = ">="
+        return
+    m = _SCORE_THRESHOLD_RE_BELOW.search(text)
+    if m:
+        digits = "".join(ch for ch in m.group(0) if ch.isdigit())
+        d["cost_limit"] = int(digits.translate({ord(c): str(i) for i, c in enumerate("０１２３４５６７８９")}))
+        d["cost_limit_operator"] = "<="
 
 
 def _apply_or_select_criteria(result, select_text):

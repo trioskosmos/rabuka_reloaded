@@ -14,7 +14,7 @@ _test never asserts (smoke at best — cannot pin behavior)_
 | --- | --- | --- | --- |
 | `engine/tests/test_modules/characterization/group_name_spacing_normalisation_test.rs` | `a_spaced_card_matches_the_unspaced_group_name` | 58 |  |
 | `engine/tests/test_modules/characterization/group_name_spacing_normalisation_test.rs` | `an_unspaced_card_matches_the_spaced_group_name` | 46 |  |
-| `engine/tests/test_modules/characterization/zz_probe_026b.rs` | `zz_probe_026_self_wait_in_sequential_cost` | 13 |  |
+| `engine/tests/test_modules/effects/gain/blades/live_start/pb2_blade_per_member_activated_from_wait_this_turn_pl_pb2_010_p_plus_test.rs` | `the_history_is_a_set_NOT_YET_PINNED` | 180 |  |
 | `engine/tests/test_modules/effects/state/wait_activation/pb2_discard_three_distinct_bibi_waits_foe_pl_pb2_018_p_plus_test.rs` | `two_prints_are_one_name` | 237 |  |
 
 ## no_drive (1)
@@ -75,7 +75,7 @@ _file CALLS trigger_live_success_abilities on a live whose printed need_heart no
 | `engine/tests/test_modules/effects/score/card_score/pb2_live_success_plus_one_per_distinct_mus_member_pl_pb2_039_l_test.rs` | `PL!-pb2-039-L` | 1 | heart01 needs 9, best single member prints 6; heart03 needs 9, best single member prints 3; heart06 needs 9, best single member prints 5 |
 | `engine/tests/test_modules/integration/full_round/real_card_phase_walkthrough_and_ability_suite_test.rs` | `PL!-bp3-026-L` | 1 | heart03 needs 5, best single member prints 3 |
 
-## drain_zero_may_decline (51)
+## drain_zero_may_decline (53)
 
 _file drains a prompt with index [0] AND asserts an absence, while naming a card whose select_cards is `optional`. On a skippable prompt [0] is NOT reliably 'take' and NOT reliably 'skip' — it depends on the PROMPT KIND and the harness does not say which. An optional-COST prompt takes the card on [0] (look_at_deck_top_optional_discard_test.rs proves it: two tests differing only in [0] vs []); a `looked_at` selection behaves differently again. So the hazard is AMBIGUITY: a test intending to take and instead declines passes silently when its assertion is an absence, which a positive assertion would have caught. `assert_select_card(zone, n, allow_skip)` states the prompt. EXPECTED YIELD IS LOW and measured, not hoped: 30 of these files assert absence directly about a look or selection, and the two read to check are both exemplars that state the prompt before answering and pair every absence with a positive twin. Read a row as 'spend five minutes here', not as 49 problems_
 
@@ -89,6 +89,7 @@ _file drains a prompt with index [0] AND asserts an absence, while naming a card
 | `engine/tests/test_modules/effects/gain/blades/under_member/shizuku_under_member_heart_copy_test.rs` | `PL!N-sd1-001-SD` | 1 |  |
 | `engine/tests/test_modules/effects/gain/hearts/live_start/live_start_discard_distinct_heart_colors_q246_test.rs` | `PL!S-bp3-004-R` | 1 |  |
 | `engine/tests/test_modules/effects/gain/hearts/live_start/live_start_lone_group_member_hearts_become_heart04_test.rs` | `PL!S-bp5-007-R` | 1 |  |
+| `engine/tests/test_modules/effects/look_select/debut_look_five_take_blade_heart_less_mus_member_pl_pb2_032_n_test.rs` | `PL!-pb2-032-N` | 1 |  |
 | `engine/tests/test_modules/effects/look_select/look_and_filter/all_or_any_three_heart_member_filter_look_test.rs` | `PL!S-bp6-005-R` | 1 |  |
 | `engine/tests/test_modules/effects/look_select/look_and_filter/card_filter_test.rs` | `PL!-bp6-002-R,PL!-bp6-004-R` | 1 |  |
 | `engine/tests/test_modules/effects/look_select/look_and_filter/look_at_deck_top_optional_discard_test.rs` | `PL!-sd1-015-SD` | 1 |  |
@@ -108,6 +109,7 @@ _file drains a prompt with index [0] AND asserts an absence, while naming a card
 | `engine/tests/test_modules/effects/look_select/reveal/sequential_cost_look_five_take_cost9_member_test.rs` | `PL!-bp5-002-R` | 1 |  |
 | `engine/tests/test_modules/effects/look_select/reveal/sequential_cost_look_five_take_group_member_test.rs` | `PL!HS-bp5-008-R` | 1 |  |
 | `engine/tests/test_modules/effects/look_select/search_deck/look_five_take_group_live_card_test.rs` | `PL!-sd1-004-SD` | 1 |  |
+| `engine/tests/test_modules/effects/look_select/search_deck/look_four_take_member_with_double_heart04_test.rs` | `PL!S-bp5-007-R` | 1 |  |
 | `engine/tests/test_modules/effects/look_select/search_deck/look_two_reveal_named_member_to_hand_test.rs` | `PL!N-pb1-016-R,PL!N-pb1-018-R,PL!N-pb1-021-R` | 1 |  |
 | `engine/tests/test_modules/effects/look_select/search_deck/optional_discard_look_five_take_unit_live_test.rs` | `PL!HS-bp1-009-R` | 1 |  |
 | `engine/tests/test_modules/effects/look_select/search_deck/paid_discard_look_fetches_named_subunit_test.rs` | `PL!-pb1-016-R,PL!HS-pb1-018-N,PL!SP-pb1-017-N` | 1 |  |
@@ -145,13 +147,14 @@ _prompts answered by ORDINAL position (if step <= 2 { select 2 cards }) instead 
 
 None.
 
-## blind_phase_stepping (2)
+## blind_phase_stepping (3)
 
 _a fixed `for _ in 0..N { pass() }` walk through the turn — a phase gaining or losing a step silently shifts the window the test thinks it is standing in; step to the phase by name instead_
 
 | file | test | line | detail |
 | --- | --- | --- | --- |
 | `engine/tests/test_modules/effects/invalidate/live_success/pb2_invalidate_live_success_gains_heart03_pl_pb2_003_pp_test.rs` | `our_own_live_success_abilities_are_not_invalidated` | 132 |  |
+| `engine/tests/test_modules/effects/modify_need_heart/pb2_need_heart_minus_3_minus_2_minus_1_per_activated_pl_pb2_040_l_test.rs` | `a_member_waited_again_after_being_activated_still_counts` | 247 |  |
 | `engine/tests/test_modules/effects/yell/pb2_yell_plus_ten_when_two_mus_success_pl_pb2_039_l_test.rs` | `the_opponents_success_zone_does_not_count` | 157 |  |
 
 ## similar_cards (27)

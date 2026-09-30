@@ -3,6 +3,7 @@
 pub mod baton_touch_cheaper_unit_recovers_hasunosora_live_to_hand_test;
 pub mod debut_character_condition_energy_recover_live_test;
 pub mod debut_recovers_one_live_card_from_waitroom_to_hand_test;
+pub mod debut_score6_plus_recover_live_from_waitroom_pl_pr_018_pr_test;
 pub mod discard_cost_group_live_recovery_q209_test;
 pub mod discard_cost_mill_then_member_recovery_test;
 pub mod discard_member_cost_then_recover_cheaper_member_test;

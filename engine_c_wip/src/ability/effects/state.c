@@ -1453,6 +1453,11 @@ static void rb_pos_change_for_player(GameState *g, int who, AbilityEffect *e, in
         if(src < 0 || src == dst) return;
         if(P->stage[src] < 0) return;
         int a = P->stage[src], b = P->stage[dst];
+        /* Rule 4.5.5.3 / Q139: under-cards belong to the MEMBER, not the slot,
+           so they travel with it. Mirrors zones.rs:396-400 (mem::take both
+           sides, then write back swapped) and misc.c's stage_swap. */
+        RbBag au = P->under_cards[src], bu = P->under_cards[dst];
+        P->under_cards[src] = bu; P->under_cards[dst] = au;
         P->stage[src] = b; P->stage_wait[src] = P->stage_wait[dst];
         P->stage[dst] = a; P->stage_wait[dst] = P->stage_wait[src];
         rb_record_movement(g, a);
@@ -1467,6 +1472,9 @@ static void rb_pos_change_for_player(GameState *g, int who, AbilityEffect *e, in
         for(int i=0;i<RB_STAGE_SIZE;i++) if(P->stage[i] == cid){ cur = i; break; }
         if(cur < 0 || cur == dst) return;
         int a = P->stage[cur], b = P->stage[dst];
+        /* Rule 4.5.5.3 / Q139: under-cards follow their member. */
+        RbBag au = P->under_cards[cur], bu = P->under_cards[dst];
+        P->under_cards[cur] = bu; P->under_cards[dst] = au;
         P->stage[cur] = b; P->stage_wait[cur] = P->stage_wait[dst];
         P->stage[dst] = a; P->stage_wait[dst] = P->stage_wait[cur];
         rb_record_movement(g, a);
@@ -1495,6 +1503,14 @@ void rb_resume_position_change(GameState *g, int actor, const AbilityEffect *e, 
     for(int i=0;i<RB_STAGE_SIZE;i++) if(P->stage[i] == host_cid){ src = i; break; }
     if(src < 0 || src == dst) return;
     int a = P->stage[src], b = P->stage[dst];
+    /* Rule 4.5.5.3 / Q139: under-cards travel WITH the member on a position
+       change. Mirrors Rust Stage::position_change, engine/src/core/zones.rs:
+       396-400, which `mem::take`s both under-card stacks and writes them back
+       crossed over BEFORE the stage swap -- so the stack is carried even when
+       the destination area is empty. Same shape as rb_effect_rotation below,
+       which snapshots under_cards[i] alongside stage[i]/stage_wait[i]. */
+    RbBag au = P->under_cards[src], bu = P->under_cards[dst];
+    P->under_cards[src] = bu; P->under_cards[dst] = au;
     P->stage[src] = b; P->stage_wait[src] = P->stage_wait[dst];
     P->stage[dst] = a; P->stage_wait[dst] = P->stage_wait[src];
     rb_record_movement(g, a);

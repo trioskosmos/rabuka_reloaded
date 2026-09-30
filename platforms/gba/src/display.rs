@@ -12,7 +12,7 @@ use agb::display::object::{
 use agb::display::{busy_wait_for_vblank, Graphics, Palette16, Priority, Rgb15, Rgb};
 
 use crate::board::{BoardFrame, Slot};
-use crate::card_art_gen::{CardArt, CardFront, BACK_FRONT, BOARD_UI, CARD_ART, CARD_FRONTS, LIVE_FRONTS, MASTER_PAL, STAGE_FRONTS, WAITED_FRONTS};
+use crate::card_art_gen::{CardArt, CardFront, BACK_FRONT, BOARD_UI, CARD_ART, CARD_FRONTS, LIVE_FRONTS, MASTER_PAL, STAGE_FRONTS, WAITED_FRONTS, lz77_decompress_wram};
 use crate::font_tiles_gen::{FONT_GLYPHS, FONT_TILES};
 use crate::texticons_gen::{TEXTICON_GLYPHS, TEXTICON_TILES};
 
@@ -459,7 +459,15 @@ impl CardSpriteCache {
                         TILE_SCRATCH_LEN,
                     )
                 };
-                decompress_art(tiles, &mut scratch[..expected]);
+                // Codec follows the blob kind, and "detail" is the only tag the
+                // detail portrait is ever pushed with (render_card_detail). The
+                // per-frame art takes the BIOS SWI; see decompress_art for why
+                // the split is on this boundary and not somewhere cheaper.
+                if tag == "detail" {
+                    decompress_art(tiles, &mut scratch[..expected]);
+                } else {
+                    decompress_lz77(tiles, &mut scratch[..expected]);
+                }
                 &scratch[..expected]
             } else {
                 tiles
@@ -659,12 +667,12 @@ static mut TILE_SCRATCH: [u8; TILE_SCRATCH_LEN] = [0; TILE_SCRATCH_LEN];
 static mut UI_TILES_BUF: [u8; 192] = [0; 192];
 static mut UI_TILES_READY: bool = false;
 
-/// Board UI tiles, decompressed on first use. See [`decompress_art`].
+/// Board UI tiles, decompressed on first use. See [`decompress_lz77`].
 fn board_ui_tiles() -> &'static [u8] {
     unsafe {
         if !UI_TILES_READY {
             let mut dst = [0u8; 192];
-            decompress_art(BOARD_UI, &mut dst);
+            decompress_lz77(BOARD_UI, &mut dst);
             UI_TILES_BUF = dst;
             UI_TILES_READY = true;
         }
@@ -699,23 +707,23 @@ static ART_INFLATE: ArtInflaterCell = ArtInflaterCell(core::cell::UnsafeCell::ne
 
 type ArtInflater = miniz_oxide::inflate::core::DecompressorOxide;
 
-/// Fill `dst` from one baked `.bin` blob.
+/// Fill `dst` from a baked DETAIL blob (a zlib stream).
 ///
-/// Uniform contract (enforced by `tools/bake_card_art.py`): EVERY `.bin` is a
-/// zlib stream, so there is deliberately no format sniffing here. `dst` must
-/// be exactly the decompressed size; callers size it from the grid
-/// (`tiles * 64`).
+/// Deliberately the ONLY thing that goes through software inflate. The detail
+/// portrait is 13,824B and 73% of the art, so it is the one blob where the
+/// better ratio is worth a slow decode — and it is only decompressed when a
+/// card is actually opened, after which `retain_key` keeps it cached and
+/// scrolling is a pure cache hit.
 ///
-/// zlib/DEFLATE rather than the BIOS LZ77 (SWI 0x11) this used to call. On the
-/// 8bpp dithered indexed art in `baked/card_art` the two measure 25.9MB vs
-/// 18.9MB across all cards. LZ77 lost for two independent reasons: its 4KB
-/// window is applied per blob so no card can match another, and it is a pure
-/// dictionary matcher with no entropy stage, which is the wrong tool for art
-/// whose order-0 entropy is 6.4 bits/symbol (measured — near-flat, because
-/// Floyd-Steinberg dithering injects high-frequency noise). Deflate is LZ77
-/// plus exactly the Huffman stage this data needs. Dropping the dithering was
-/// measured as an alternative and recovers only 16% of the gap, so the format
-/// is what mattered, not the data.
+/// Everything drawn every frame (board stage/live/wait/hand fronts, menu
+/// cards, UI) goes through [`decompress_lz77`] and the BIOS SWI instead. An
+/// earlier revision ran miniz_oxide on those too, and the main-phase frame
+/// could not finish decoding in time and presented half-drawn BGs: the
+/// mulligan screen (a handful of placements) kept up, the board (~28) did not.
+///
+/// LZ77 is the worse *ratio* choice (see tools/bake_card_art.py) but the
+/// front blobs are small (384-1920B), so the absolute loss is modest, and
+/// they are the ones that must be fast.
 fn decompress_art(src: &[u8], dst: &mut [u8]) {
     use miniz_oxide::inflate::core::inflate_flags::{
         TINFL_FLAG_PARSE_ZLIB_HEADER, TINFL_FLAG_USING_NON_WRAPPING_OUTPUT_BUF,
@@ -753,6 +761,15 @@ fn decompress_art(src: &[u8], dst: &mut [u8]) {
         );
         dst.fill(0);
     }
+}
+
+/// Fill `dst` from a baked FRONT/UI blob (a BIOS LZ77 stream).
+///
+/// The per-frame path: native ARM via SWI 0x11, zero allocation, zero software
+/// work. `dst` must fit the declared size; callers size it from the grid
+/// (`tiles * 64`).
+fn decompress_lz77(src: &[u8], dst: &mut [u8]) {
+    lz77_decompress_wram(src, dst);
 }
 
 impl<'a> Display<'a> {
