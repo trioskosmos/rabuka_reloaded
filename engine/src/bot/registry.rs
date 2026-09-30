@@ -126,6 +126,51 @@ impl BotKind {
         plan: &strategy_v3::V3Plan,
     ) -> Action {
         let _ = v2_policy;
+        // `PROBE=<bot>` runs this bot's Main-phase policy and v8's on the same
+        // state and logs every disagreement. It lives here rather than inside a
+        // strategy so it works for **any** bot — the first version sat in
+        // `strategy_v8`'s entry, so it never fired for `v9`, the bot that
+        // actually gets played, because v9's Main phase *is* v7's. An
+        // instrument that cannot see the shipping bot points at a research
+        // branch.
+        //
+        // Comparing v9 against v8 is the useful comparison at the current
+        // state: v9 borrows v7's Main, so it inherits v7's decisions wholesale
+        // and any divergence is in the LIVE SET, which is the one component v9
+        // still owns. Against v7 the Main phases agree by construction and only
+        // the reference's own second opinion is visible.
+        //
+        // UNTRACED by construction — an `eprintln!` in the policy path, and
+        // `BOT_STRATEGY.md` section 8.4 records that logging changes outcomes.
+        // It finds defects; it never reports numbers.
+        if std::env::var("PROBE").as_deref() == Ok(self.name()) {
+            if gs.current_phase == crate::types::Phase::Main && !gs.has_pending_choice() {
+                let db = &gs.card_database;
+                let ours = strategy_v7::choose_action_v7(gs, actions, me);
+                let theirs = super::v8_main::choose_action_v8(gs, actions, me);
+                if ours.action_type != theirs.action_type
+                    || ours.description != theirs.description
+                {
+                    eprintln!(
+                        "PROBE t={} me={} bl={} cost={} h={} lives={} hand={} deck={} | \
+                         opp: bl={} h={} | {}(main)={:?} v8={:?}",
+                        gs.turn_number,
+                        me,
+                        super::v8_model::active_blades(gs, me, db),
+                        super::v8_model::stage_cost(gs, me, db),
+                        super::v8_model::supply_hearts(gs, me, db),
+                        super::v8_model::lives_in_hand(gs.seat_player(me), db),
+                        gs.seat_player(me).hand.cards.len(),
+                        gs.seat_player(me).main_deck.cards.len(),
+                        super::v8_model::active_blades(gs, 1 - me, db),
+                        super::v8_model::supply_hearts(gs, 1 - me, db),
+                        self.name(),
+                        ours.action_type,
+                        theirs.action_type,
+                    );
+                }
+            }
+        }
         match self {
             BotKind::V1 => strategy::choose_action_heuristic(gs, actions, me),
             BotKind::V2 => strategy_v2::choose_action_heuristic_v2(gs, actions, me),
@@ -145,15 +190,6 @@ impl BotKind {
             BotKind::V8 => {
                 // `V8_BORROW_MAIN=v7` hands the Main phase to v7 and leaves
                 // v8's live set and mulligan in place.
-                //
-                // This is the crossover experiment. Ten leaf-term attempts have
-                // failed to close a ~10-point gap, which is what you would
-                // expect if the deficit is not in the leaf at all. Swapping one
-                // HALF of v8 for v7's localises the deficit in two runs: if
-                // borrowing v7's Main recovers most of the gap, the leaf and
-                // the search are the problem and v8's live set is innocent; if
-                // it recovers nothing, the live set is where the ten points
-                // went, and the leaf is a distraction.
                 if std::env::var("V8_BORROW_MAIN").as_deref() == Ok("v7") {
                     strategy_v7::choose_action(gs, actions, me)
                 } else {

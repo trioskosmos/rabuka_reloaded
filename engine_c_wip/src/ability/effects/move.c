@@ -96,12 +96,50 @@ static int cmf_has_heart(const Card *c, int hc){
     for(int k=0;k<c->n_hearts;k++) if(c->heart_color[k]==(uint8_t)hc) return 1;
     return 0;
 }
+
+/* ── CSV group lists (engine/src/core/card.rs:2007 `group_names_any`) ─────
+ *
+ * Rust models `group_names` as a Vec<String> and `group_name()` (card.rs:2446)
+ * takes one entry. The C bytecode decoder flattens the whole list into ONE
+ * comma-joined extra value (e.g. "Aqours,SaintSnow" — 24 decoded effects carry
+ * such a value, see PL!S-bp5-004-R ab#0 and PL!HS-bp2-020-L ab#0), and
+ * rb_card_matches_group_str (util.c:339) compares that whole string as ONE
+ * exact token against the card's unit / group / name. No card is called
+ * "Aqours,SaintSnow", so every multi-group filter matched NOTHING: the
+ * candidate set came back empty, no prompt was raised, and the effect
+ * silently no-opped.
+ *
+ * cost.c:163 already has the working split_csv twin for exactly this and
+ * util.c:403 rb_card_matches_any_group is the working matcher. This is the
+ * same split feeding the same matcher, applied on the move.c paths. */
+static int move_split_csv(const char *s, char out[][64], int max){
+    if(!s||!*s) return 0;
+    int n=0; const char *p=s;
+    while(*p && n<max){
+        const char *comma=strchr(p,',');
+        size_t len=comma?(size_t)(comma-p):strlen(p);
+        if(len>=64) len=63;
+        memcpy(out[n],p,len); out[n][len]='\0'; n++;
+        if(!comma) break;
+        p=comma+1;
+    }
+    return n;
+}
+/* Pass if the CSV is empty or the card matches ANY of its entries. */
+static int move_card_matches_group_csv(int card_idx, const char *group_csv){
+    if(!group_csv||!*group_csv) return 1;
+    char groups[16][64];
+    int ng=move_split_csv(group_csv,groups,16);
+    const char *names[16];
+    for(int i=0;i<ng;i++) names[i]=groups[i];
+    return rb_card_matches_any_group(card_idx,names,ng);
+}
 static int card_matches_filter(int card_idx, AbilityEffect *e){
     const char *ctype = cmf_extra(e,"card_type");
     if(!ctype && e->card_type_field[0]) ctype = e->card_type_field;
     if(ctype && !card_matches_card_type_filter(card_idx, ctype)) return 0;
     const char *gn = cmf_extra(e,"group_names");
-    if(gn && !rb_card_matches_group_str(card_idx, gn)) return 0;
+    if(gn && !move_card_matches_group_csv(card_idx, gn)) return 0;
     const char *cnames = cmf_extra(e,"card_names");
     if(cnames){
         Card c; if(!rb_decode_card_by_index((uint32_t)card_idx,&c)) return 0;
@@ -155,9 +193,9 @@ static int card_matches_filter(int card_idx, AbilityEffect *e){
         rb_free_card(&c); if(!ok) return 0;
     }
     const char *chars = cmf_extra(e,"characters");
-    if(chars && !rb_card_matches_group_str(card_idx, chars)) return 0;
+    if(chars && !move_card_matches_group_csv(card_idx, chars)) return 0;
     const char *exch = cmf_extra(e,"exclude_characters");
-    if(exch && rb_card_matches_group_str(card_idx, exch)) return 0;
+    if(exch && move_card_matches_group_csv(card_idx, exch)) return 0;
     const char *cp = cmf_extra(e,"card_property");
     if(cp){
         const char *ng = cmf_extra(e,"negation");
@@ -232,6 +270,58 @@ int rb_drain_under_cards_to_energy_zone(GameState *g, const char *target, int st
     P->under_cards[stage_idx].n = 0;
     rb_recalc_constants(g);
     return moved;
+}
+
+/* ── under_member placement (Rule 4.5.5) ───────────────────────────────
+ *
+ * Two Rust steps that the C had collapsed into "the card disappears":
+ *
+ *   placement.rs:208-219  pos_to_use = the area of the ACTIVATING member,
+ *                         else the vacated area, else the last
+ *                         self.selection.moved_cards entry still on stage.
+ *   util.rs:2341-2358     place_card_in_zone(Zone::UnderMember, pos_to_use):
+ *                         that area if pos_to_use is Some, else
+ *                         center -> left -> right, and — if the stage is
+ *                         completely empty — the WAITROOM.
+ *
+ * rb_place_card_in_zone (util.c:836) has no under_member arm, and the
+ * zone_bag() it dispatches through (util.c:797) returns NULL for the zone,
+ * so every move_cards(destination="under_member") removed the card from its
+ * source and then dropped it: under_cards stayed [0 0 0] for all three areas
+ * and the card was in no zone at all. That is the confirmed "card vanishes
+ * into no zone" class; this is the landing that was missing. */
+
+int rb_move_under_member_pos(GameState *g, int pl) {
+    if (!g) return -1;
+    RbPlayer *P = &g->p[pl];
+    int act = g->activating_card;
+    if (act < 0) act = g->queue.resume_host;
+    /* placement.rs:210-215 — the activating card's own area wins. */
+    if (act >= 0)
+        for (int i = 0; i < RB_STAGE_SIZE; i++)
+            if (P->stage[i] == act) return i;
+    /* placement.rs:216 — else the last recently-moved card still on stage. */
+    for (int m = g->n_recently_moved - 1; m >= 0; m--)
+        for (int i = 0; i < RB_STAGE_SIZE; i++)
+            if (P->stage[i] == g->recently_moved[m]) return i;
+    return -1;
+}
+
+int rb_move_place_card_under_member(GameState *g, int pl, int cid, int pos_to_use) {
+    if (!g) return 0;
+    RbPlayer *P = &g->p[pl];
+    int target_idx = -1;
+    if (pos_to_use >= 0 && pos_to_use < RB_STAGE_SIZE) target_idx = pos_to_use;
+    /* util.rs:2344-2355 — vacated_stage_area, else center, left, right. */
+    if (target_idx < 0 && P->stage[1] != RB_EMPTY_SLOT) target_idx = 1;
+    if (target_idx < 0 && P->stage[0] != RB_EMPTY_SLOT) target_idx = 0;
+    if (target_idx < 0 && P->stage[2] != RB_EMPTY_SLOT) target_idx = 2;
+    /* util.rs:2352-2354 — an entirely empty stage takes the card to the
+       waitroom; Rule 10.5.4's energy-deck case is place_energy_under_member_
+       selected's own fallback, not this one. */
+    if (target_idx < 0) { rb_waitroom_add(P, cid); return 1; }
+    rb_stage_place_under_card(P, target_idx, cid);
+    return 1;
 }
 
 /* ── remove_card_from_any_zone ── */
@@ -837,7 +927,7 @@ int rb_move_resolve_cards_from_source(GameState *g, int actor, AbilityEffect *e,
             for (int i = 0; i < under->n && n < wanted; i++) {
                 int cid = under->cards[i];
                 if (ctype && !rb_card_matches_type(cid, ctype)) continue;
-                if (group && !rb_card_matches_group_str(cid, group)) continue;
+                if (group && !move_card_matches_group_csv(cid, group)) continue;
                 out_ids[n++] = cid;
                 for (int k = i; k < under->n - 1; k++) under->cards[k] = under->cards[k + 1];
                 under->n--;
@@ -1601,10 +1691,31 @@ void rb_move_handle_energy_zone_selection(
             }
         }
 
-        P->energy_active = P->energy_active > nc ? P->energy_active - nc : 0;
+        /* Rust EnergyZone::remove_at (core/zones.rs:346-355) decrements
+           `active_energy_count` only for a card that occupied an ACTIVE SLOT,
+           and that positional rule is not expressible here: the C energy zone
+           is an UNORDERED bag (rb_energy_add_card, zones.c:271) plus a
+           separate count. For the under_member placement the C model keeps the
+           count — Q184, an energy card tucked under a member still counts as
+           your energy — and that is pinned strictly by
+           test_parity_cce_gaps.c:2720 (h5: "the active energy count is
+           UNCHANGED"). Every other destination is an energy SPEND and does
+           consume the count. */
+        int is_under_member = !strcmp(destination, "under_member");
+        if (!is_under_member)
+            P->energy_active = P->energy_active > nc ? P->energy_active - nc : 0;
 
-        if (!strcmp(destination, "under_member")) {
-            if (nc > 0) {
+        if (is_under_member) {
+            /* move/mod.rs:3336-3347 — an empty selection drops the pending
+               「そうした場合」 actions and records the decline; the landing
+               itself is place_energy_under_member_selected (:3370), whose
+               Rule 10.5.3/10.5.4 host resolution and energy-deck fallback
+               live in rb_move_place_energy_under_member_selected. */
+            if (nc == 0) {
+                rb_queue_take_pending_actions(g);
+                if (g->queue.cur >= 0 && g->queue.cur < g->queue.n_entries)
+                    g->queue.entries[g->queue.cur].optional_cost_result = 0;
+            } else {
                 rb_move_place_energy_under_member_selected(g, actor, cids, nc);
             }
         } else {
@@ -1637,10 +1748,21 @@ void rb_move_execute_move_cards(GameState *g, int actor, AbilityEffect *e) {
     if (n <= 0) return;
 
     RbPlayer *P = use_p2 ? &g->p[1] : &g->p[actor];
+    /* move_cards.rs:2023 resolves pos_to_use ONCE and place_taken_cards
+       (:2335-2343) then hands the same area to every card of the batch. */
+    int dest_pl = use_p2 ? 1 : actor;
+    int um_pos = (destination && !strcmp(destination, "under_member"))
+                     ? rb_move_under_member_pos(g, dest_pl) : -1;
     for (int i = 0; i < n; i++) {
         int cid = out_ids[i];
         find_and_remove_card(P, cid);
-        rb_place_card_in_zone(g, actor, cid, destination, -1);
+        /* util.rs:2341-2359 has a real Zone::UnderMember arm; the C twin
+           (util.c:836) does not, so route the placement here instead of
+           through rb_place_card_in_zone, which would drop the card. */
+        if (um_pos >= 0 || (destination && !strcmp(destination, "under_member")))
+            rb_move_place_card_under_member(g, dest_pl, cid, um_pos);
+        else
+            rb_place_card_in_zone(g, actor, cid, destination, -1);
         rb_mods_clear_card(&g->mods, cid);
         mc_record_movement(g, cid);
     }
@@ -1755,6 +1877,9 @@ void rb_move_execute_selected_cards_from_zone(
        never reaches the `_` arm, and a `deck` SOURCE never reaches the stage arm. */
     int source_is_deck = !strcmp(zone, "deck") || !strcmp(zone, "main_deck");
     int dest_is_deck = !strcmp(destination, "deck") || !strcmp(destination, "main_deck");
+    int dest_is_under_member = !strcmp(destination, "under_member");
+    /* move_cards.rs:2023 — pos_to_use is resolved once for the batch. */
+    int um_pos = dest_is_under_member ? rb_move_under_member_pos(g, pl) : -1;
 
     int moved[RB_MAX_RECENTLY_MOVED];
     int nm = 0;
@@ -1779,7 +1904,13 @@ void rb_move_execute_selected_cards_from_zone(
             return;
         rb_zone_remove_at_indices(g, pl, zone, filtered, nf);
         for (int i = 0; i < n_ids; i++) {
-            rb_place_card_in_zone(g, pl, card_ids[i], destination, -1);
+            /* util.rs:2341-2359 — placement.rs:307-309, used in place of
+               rb_place_card_in_zone, which has no under_member arm and would
+               drop the card on the floor between the source and under_cards. */
+            if (dest_is_under_member)
+                rb_move_place_card_under_member(g, pl, card_ids[i], um_pos);
+            else
+                rb_place_card_in_zone(g, pl, card_ids[i], destination, -1);
             moved[nm++] = card_ids[i];
         }
     }

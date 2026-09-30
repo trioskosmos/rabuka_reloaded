@@ -2377,7 +2377,11 @@ _ACTION_RULES: List[ActionRule] = [
     ActionRule(name='action_050_invalidate_ability', match='無効に', exclude='無効にできない', action='invalidate_ability', setter=_set_action_050),
     ActionRule(name='action_051_suppress_ability_trigger', match='能力は発動しない', action='suppress_ability_trigger', setter=_set_action_051),
     ActionRule(name='action_052_modify_required_hearts', match_any=['必要ハート', 'ハートを増やす', 'ハートを減らす', '増やす', '減らす', '減らし'], action='modify_required_hearts'),
-    ActionRule(name='action_053_modify_score', match='追加', exclude='エール', action='modify_score', defaults={'operation': 'add'}),
+    # 「追加」 must be about スコア. Matching the bare word fired on any sentence
+    # containing it, including the connective 「この能力を起動するための追加コストとして」
+    # on PL!-pb2-012-P＋'s 起動, which produced an operandless `modify_score` (the
+    # `modify_score` missing-`value` validation warning) in the middle of a cost.
+    ActionRule(name='action_053_modify_score', match_all=['スコア', '追加'], exclude='エール', action='modify_score', defaults={'operation': 'add'}),
     ActionRule(name='action_054_modify_score', match_any=['スコアを1プラス', 'スコアをプラス'], action='modify_score', defaults={'operation': 'add', 'value': 1}),
     ActionRule(name='action_055_modify_score', match='スコアを1マイナス', action='modify_score', defaults={'operation': 'remove', 'value': 1}),
     ActionRule(name='action_056_set_blade_type', match='ブレードの色を', action='set_blade_type'),
@@ -12659,6 +12663,65 @@ def _mark_activated_this_turn_nodes(effect):
     for node in iter_dict_nodes(effect):
         if "text" in node and isinstance(node.get("text"), str):
             _mark_activated_this_turn(node, node["text"])
+    _inherit_elliptical_history_steps(effect)
+
+
+def _is_elliptical_count_step(txt):
+    """True for a bare 「N以上…」 continuation clause that names no subject of its own.
+
+    Matches the shape used by PL!-pb2-040-L: 「2人以上いる場合」. The subject was given
+    once, by the step before it, and the continuation does not repeat it.
+    """
+    t = (txt or "").strip()
+    return bool(t) and t[0].isdigit() and "以上" in t
+
+
+def _inherit_elliptical_history_steps(effect):
+    """Carry the per-turn-history tag across an elliptical 「N以上いる場合」 step.
+
+    `_mark_activated_this_turn` only tags a node whose OWN text contains
+    「このターン中に」 and 「アクティブにしていた」. PL!-pb2-040-L reads:
+
+        …が1人以上いる場合、-3。2人以上いる場合、さらに-2。3人以上いる場合、さらに-1。
+
+    Only the first clause states the population; the 2人/3人 clauses are elliptical and
+    name no subject, so they were left untagged. That is not cosmetic: the engine reads
+    the tag per condition, with no inheritance from the parent `sequential`
+    (`core/card.rs:4079-4081` — `self.common().and_then(|c| c.activated_this_turn)`), so
+    those steps fell through to the location-count branch at
+    `ability/condition/card.rs:2401` and counted ANY members on the stage. Staging three
+    Printemps and activating none produced the full -6, where the printed card gives 0.
+
+    ONLY `activated_this_turn` is carried. `group_names` is deliberately not: on a
+    continuation step the group can legitimately belong to the branch ACTION (the target)
+    rather than to the count condition — see
+    `tests/test_parser_coverage.py::test_sunny_day_song_group_filter_stays_on_mus_branch`,
+    where 「さらに自分のステージにいる『μ's』のメンバー1人は…」 needs the group on the
+    action and not on the count. Copying it onto the condition would silently add a
+    group filter to that count and change the card. The group half of this population is
+    therefore left alone on purpose.
+    """
+    for node in iter_dict_nodes(effect):
+        actions = node.get("actions")
+        if not isinstance(actions, list) or len(actions) < 2:
+            continue
+        prev_cond = None
+        for act in actions:
+            if not isinstance(act, dict):
+                prev_cond = None
+                continue
+            cond = act.get("condition")
+            if not isinstance(cond, dict):
+                prev_cond = None
+                continue
+            if (
+                prev_cond is not None
+                and prev_cond.get("activated_this_turn") is True
+                and _is_elliptical_count_step(cond.get("text"))
+                and cond.get("activated_this_turn") is not True
+            ):
+                cond["activated_this_turn"] = True
+            prev_cond = cond
 
 
 def _drop_unsupported_child_location(effect):

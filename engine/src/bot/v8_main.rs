@@ -1006,7 +1006,15 @@ pub(crate) fn evaluate_actions(gs: &GameState, actions: &[Action], me: u8) -> Ve
         // constant across the action's own search subtree, so it does not
         // distort anything the search chose; it only ranks the root actions,
         // which is what a tie-break term is for.
-        + coverage_weight() * (coverage_delta(&sim, me, db) - coverage_delta(gs, me, db)) as f64;
+        + coverage_weight() * (coverage_delta(&sim, me, db) - coverage_delta(gs, me, db)) as f64
+        // ...and the same for the features an ABILITY produced, which is where
+        // more than half of v8's disagreements with v7 actually are.
+        + ability_value_weight()
+            * ((v8_model::active_blades(&sim, me, db) - v8_model::active_blades(gs, me, db)) as f64
+                * ABILITY_BLADE_CREDIT
+                + (v8_model::supply_hearts(&sim, me, db)
+                    - v8_model::supply_hearts(gs, me, db)) as f64
+                    * ABILITY_HEART_CREDIT);
         let nodes = search.nodes;
         let tie = tie_key(&sim, me, db, action);
         scores.push(ActionScore {
@@ -1035,6 +1043,45 @@ pub(crate) fn evaluate_actions(gs: &GameState, actions: &[Action], me: u8) -> Ve
         }
     }
     scores
+}
+
+/// What a `UseAbility` is paid, per unit of what it actually produced.
+///
+/// ## The located defect
+///
+/// `V8_PROBE_V7` put the same states to both policies and found that of 14
+/// disagreements in three games, **8 were v7 activating an ability and v8
+/// playing something else or passing**. Not a close split: more than half.
+///
+/// The cause is in §3.1 of the log. `v7_main::value` is linear in feature
+/// deltas, so an ability that resolves into a blade scores `6.0 * dBlades`
+/// immediately, and one that resolves into a heart scores `3.0 * dHearts`.
+/// v8's leaf is a saturated placement-probability level, so the identical
+/// ability scores **zero** unless it happens to cross a probability threshold —
+/// and most do not, because a single blade rarely moves a binomial that is
+/// already comfortable. v8 is not discouraged from activating. It cannot see
+/// what activating did.
+///
+/// ## Why this is not the "encourage abilities" experiment
+///
+/// That one is recorded null: a turn-window bonus for activating was worth
+/// +0.086 at T3 and +0.147 at T6, but that is *encouragement* — a bonus for the
+/// act. This is *pricing* — the same treatment the board's own blades already
+/// get from `V8_BLADES`, applied to the blades an ability creates. Paying a
+/// move for the state change it produces is an intervention that has already
+/// worked once in this file; paying it for being a move is the one that
+/// measured null.
+///
+/// The credits are v7's own weights, not tuned.
+const ABILITY_BLADE_CREDIT: f64 = 6.0;
+const ABILITY_HEART_CREDIT: f64 = 3.0;
+
+fn ability_value_weight() -> f64 {
+    std::env::var("V8_ABILITY_VALUE")
+        .ok()
+        .and_then(|v| v.parse::<f64>().ok())
+        .filter(|w: &f64| w.is_finite() && *w >= 0.0)
+        .unwrap_or(0.0)
 }
 
 pub fn score_actions_v8(gs: &GameState, actions: &[Action], me: u8) -> Vec<(f64, String)> {

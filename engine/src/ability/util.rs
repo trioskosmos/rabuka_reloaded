@@ -65,6 +65,48 @@ enum Unconstrained {
 // (turn/actions). ONE definition — the engine must never offer an action
 // it would then refuse to execute (or vice versa).
 
+/// Whether a 「…場合のみ起動できる」 activation gate is satisfied right now.
+///
+/// The parser emits this as `effect.activation_condition_parsed`, and the RESOLVER already
+/// honours it — `AbilityResolver::can_activate_effect`
+/// (`ability/resolver.rs:586-624`) refuses to run the effect when the gate fails, and only
+/// while the cost is still unpaid. Nothing consulted it when deciding whether to *offer*
+/// the action, so `PL!-bp4-002-SEC` was listed as activatable against an EMPTY success
+/// live card zone and its printed restriction did nothing. The card was strictly
+/// over-powered: 手札を2枚控え室に置く buys a μ's live from the waitroom, unrestricted.
+///
+/// Returns true when the ability has no activation gate, or when it has one and it holds.
+///
+/// The position overlay is merged exactly as the resolver does it, via the shared
+/// `condition_needs_position_overlay` predicate, so the offer path and the resolve path
+/// cannot drift into disagreeing about which abilities are legal.
+pub fn ability_activation_gate_holds(
+    game_state: &crate::game_state::GameState,
+    ability: &Ability,
+) -> bool {
+    let Some(effect) = ability.effect.as_deref() else {
+        return true;
+    };
+    let Some(activation_condition) = effect.activation_condition_parsed_any() else {
+        return true;
+    };
+    let ctx = crate::ability::condition::ConditionContext::new(game_state);
+    if crate::ability::resolver::AbilityResolver::condition_needs_position_overlay(
+        activation_condition,
+        effect,
+    ) {
+        let mut merged_cond = crate::Arc::new(activation_condition.clone());
+        let merged_cond = crate::Arc::make_mut(&mut merged_cond);
+        if let Some(pos) = effect.position_any() {
+            merged_cond.set_position(pos.clone());
+        } else if let Some(act_pos) = effect.activation_position_any() {
+            merged_cond.set_activation_position(act_pos.to_string());
+        }
+        return ctx.evaluate_condition(&merged_cond);
+    }
+    ctx.evaluate_condition(activation_condition)
+}
+
 /// Main/Activation/Auto-with-cost/BatonTouch triggers make an ability
 /// activatable in the main phase.
 pub fn ability_trigger_can_activate(ability: &Ability) -> bool {

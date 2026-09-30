@@ -528,7 +528,10 @@ impl AbilityResolver {
     /// The two overlay rules are separate: this one is top-level only, and
     /// applies to both the activation-condition pre-check and the main
     /// condition gate.
-    fn condition_needs_position_overlay(cond: &Condition, effect: &AbilityEffect) -> bool {
+    /// `pub(crate)` so the offer path in `game::game_setup` can apply the SAME rule when
+    /// it gates a 「…のみ起動できる」 ability. Duplicating this predicate there would let
+    /// the two paths drift and silently disagree about which abilities are legal.
+    pub(crate) fn condition_needs_position_overlay(cond: &Condition, effect: &AbilityEffect) -> bool {
         cond.get_position().is_none()
             && cond.get_positions_characters().is_none()
             && (effect.position_any().is_some() || effect.activation_position_any().is_some())

@@ -164,6 +164,44 @@ void rb_advance_phase(GameState *g) {
         if(g->p[0].success.n>=RB_VICTORY_CARD_COUNT && g->p[1].success.n>=RB_VICTORY_CARD_COUNT) g->winner=2;
         if(g->winner!=-1){ g->phase=RB_PHASE_DONE; return; }
         g->turn++;
+        /* Mirror engine/src/turn/phases.rs:309 — the last statement of the
+           victory / turn-rollover arm of advance_phase:
+
+               game_state.clear_card_movement_tracking();
+
+           Rust's clear_card_movement_tracking (modifiers.rs:1920-1942) is what
+           turns the whole 「このターン中に…」 family over, and its appearance
+           half is exactly the two lists this block left alone:
+           `self.cards_appeared_this_turn.clear();`  (:1923) and
+           `self.card_appearance_source.clear();`    (:1937).
+           rb_clear_card_appearance_tracking is the C fold of precisely that
+           pair, so calling it here is the same clear at the same point.
+
+           The call was MISSING, which left every turn-scoped appearance fact
+           alive across the rollover: the hand-rolled memset below cleared
+           moved_this_turn and the debut counters, but never
+           cards_appeared_this_turn or card_appearance_source.
+
+           That was invisible while rb_record_card_appearance had no callers;
+           it became a real, silent, cross-turn leak the moment the play choke
+           point started recording debuts. A 「このターン中に登場した場合」 gate
+           stayed satisfiable from the turn the card debuted, forever, and —
+           because rb_get_card_appearance_source takes the FIRST match — a
+           控え室から登場 gate could never again be answered by a genuinely
+           different later debut.
+
+           NOTE: this rollover is DUPLICATED in the C. The other one lives in
+           rb_end_turn (engine.c:1510-1528) and already made this exact call;
+           the tests reach THIS one.
+
+           FAITHFULNESS NOTE for the rabuka.h owner: Rust's single call here
+           also drops cards_activated_this_turn, turn_movements and
+           mods.opp_cause_fired_keys. The C's single fold of all four is
+           rb_clear_card_movement_tracking (modifiers.c:548), which ALSO drops
+           n_batch_movements — so calling THAT here would be the exact Rust
+           line. It has no prototype in include/rabuka.h, hence the narrower
+           call. See the field-addition request in the handover report. */
+        rb_clear_card_appearance_tracking(g);
         /* Clear per-turn temporal-condition tracking (mirrors GameState reset of
             moved_this_turn / debut_count_this_turn / position_change_occurred_this_turn). */
         for(int i=0;i<RB_MAX_CARD_IDS;i++) g->moved_this_turn[i]=0;

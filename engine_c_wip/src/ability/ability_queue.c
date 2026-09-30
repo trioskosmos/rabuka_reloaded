@@ -746,7 +746,7 @@ int rb_owner_of_card(const GameState *g, int cid) {
    ========================================================================== */
 
 /* Rust's trigger_live_start_abilities (turn/trigger_scan.rs:188) and
-   trigger_live_success_abilities (turn/triggers.rs:339) each collect into a
+   trigger_live_success_abilities (turn/trigger_scan.rs:339) each collect into a
    `seen: HashSet<(card_id, ability_index)>` BEFORE enqueueing, so one scan
    yields each (card, ability) at most once. The C scanners in
    src/turn/triggers.c (rb_trigger_live_start, rb_trigger_live_success) have no
@@ -759,16 +759,40 @@ int rb_owner_of_card(const GameState *g, int cid) {
    within ONE drain pass a (card_id, ability_idx) pair is resolved at most
    once. The scope is deliberately limited to the two trigger families Rust
    actually dedupes, keyed on the same (card_id, ability_idx) tuple, so no
-   other trigger path changes behaviour. */
-typedef struct { int card_id; int ability_idx; } RbDrainSeen;
+   other trigger path changes behaviour.
+
+   SCOPE: Rust's `seen` is a LOCAL HashSet, created fresh inside one scan call
+   for ONE player (trigger_scan.rs:184-188, :337-339) — the scan of
+   `player_id_clone`'s live-card zone followed by that same player's stage. It
+   is never shared between the two seats, and never outlives the scan. This
+   drain's `seen` array DOES outlive a single scan, because one drain can walk
+   entries pushed by several scans, so the key carries the entry's owning seat
+   as well: `player_id` is stamped "p1"/"p2" by rb_push_owned_entry
+   (turn/triggers.c:30-39), which is the only pusher for both families.
+
+   Keying on (card_id, ability_idx) alone would be WRONG and would swallow a
+   legitimate trigger: card ids are card-definition ids reused across instances
+   (turn/triggers.c:251-254 counts the same cid appearing twice in one live
+   zone), so a cid owned by BOTH seats yields one entry per seat. Rust fires
+   both; a seat-blind key resolves only the first and silently drops the
+   other player's activation.
+
+   Capacity: the loop below runs at most RB_QUEUE_DEPTH (16) iterations, so
+   n_seen can never approach RB_DRAIN_SEEN_CAP. The overflow branch therefore
+   ALLOWS the entry rather than refusing it — a memory bound must never be able
+   to drop a first-time trigger. */
+typedef struct { int card_id; int ability_idx; char player_id[16]; } RbDrainSeen;
 #define RB_DRAIN_SEEN_CAP 128
 
-static int rb_drain_seen_add(RbDrainSeen *seen, int n, int card_id, int ability_idx) {
+static int rb_drain_seen_add(RbDrainSeen *seen, int n, const char *player_id,
+                             int card_id, int ability_idx) {
     for (int i = 0; i < n; i++)
-        if (seen[i].card_id == card_id && seen[i].ability_idx == ability_idx) return 0;
-    if (n >= RB_DRAIN_SEEN_CAP) return 0;
+        if (seen[i].card_id == card_id && seen[i].ability_idx == ability_idx &&
+            strcmp(seen[i].player_id, player_id) == 0) return 0;
+    if (n >= RB_DRAIN_SEEN_CAP) return 1;   /* unreachable; allow rather than drop */
     seen[n].card_id = card_id;
     seen[n].ability_idx = ability_idx;
+    snprintf(seen[n].player_id, sizeof(seen[n].player_id), "%s", player_id);
     return 1;
 }
 
@@ -819,13 +843,15 @@ int rb_drain_ability_queue(GameState *g) {
         if (e->card_id < 0) { e->effect_started = 1; continue; }
         int n = rb_card_num_abilities((uint32_t)e->card_id);
         if (e->ability_idx < 0 || e->ability_idx >= n) { e->effect_started = 1; continue; }
-        /* trigger_scan.rs:188 / triggers.rs:339 `seen.insert((id, idx))` — see
+        /* trigger_scan.rs:188 / :339 `seen.insert((id, idx))` — see
            rb_drain_seen_add. Without it a live card that is also staged, or a
-           live zone holding the same card twice, fires its ability twice. */
+           live zone holding the same card twice, fires its ability twice. The
+           seat is part of the key because Rust's `seen` is per-scan, per
+           player, and one drain can span entries from both seats. */
         if (e->card_id >= 0 && e->trigger[0] &&
             (rb_trigger_is(e->trigger, RB_TSTR_LIVE_START) ||
              rb_trigger_is(e->trigger, RB_TSTR_LIVE_SUCCESS))) {
-            if (!rb_drain_seen_add(seen, n_seen, e->card_id, e->ability_idx)) {
+            if (!rb_drain_seen_add(seen, n_seen, e->player_id, e->card_id, e->ability_idx)) {
                 e->effect_started = 1;
                 e->completed = 1;
                 continue;

@@ -6,31 +6,31 @@
 // is the first web_ui/decks/*.txt when sorted by name.
 
 pub static DECK_CARD_BLOBS: &[&[u8]] = &[
-    // 5CP3Z idou: 72 cards, 1426 bytes
+    // 5CP3Z idou: 72 cards, 1428 bytes
     include_bytes!("../baked/decks/5CP3Z idou.bin"),
-    // 5ZNN5 sakkakubibi: 72 cards, 8868 bytes
+    // 5ZNN5 sakkakubibi: 72 cards, 8870 bytes
     include_bytes!("../baked/decks/5ZNN5 sakkakubibi.bin"),
-    // aiscream 37PMZ: 72 cards, 17066 bytes
+    // aiscream 37PMZ: 72 cards, 17070 bytes
     include_bytes!("../baked/decks/aiscream 37PMZ.bin"),
-    // aqours_cup: 72 cards, 26701 bytes
+    // aqours_cup: 72 cards, 26703 bytes
     include_bytes!("../baked/decks/aqours_cup.bin"),
-    // bp7_abilities_PL!N: 60 cards, 45580 bytes
+    // bp7_abilities_PL!N: 60 cards, 45588 bytes
     include_bytes!("../baked/decks/bp7_abilities_PL!N.bin"),
-    // bp7_abilities_PL!S: 60 cards, 32095 bytes
+    // bp7_abilities_PL!S: 60 cards, 32097 bytes
     include_bytes!("../baked/decks/bp7_abilities_PL!S.bin"),
-    // bp7_abilities_PL!SP: 60 cards, 61397 bytes
+    // bp7_abilities_PL!SP: 60 cards, 61399 bytes
     include_bytes!("../baked/decks/bp7_abilities_PL!SP.bin"),
-    // bp7_unique_abilities: 60 cards, 82591 bytes
+    // bp7_unique_abilities: 60 cards, 82599 bytes
     include_bytes!("../baked/decks/bp7_unique_abilities.bin"),
-    // fade deck: 60 cards, 81760 bytes
+    // fade deck: 60 cards, 81766 bytes
     include_bytes!("../baked/decks/fade deck.bin"),
     // hasunosora_cup: 72 cards, 74651 bytes
     include_bytes!("../baked/decks/hasunosora_cup.bin"),
-    // liella_cup: 72 cards, 87470 bytes
+    // liella_cup: 72 cards, 87472 bytes
     include_bytes!("../baked/decks/liella_cup.bin"),
-    // muse_cup: 72 cards, 95713 bytes
+    // muse_cup: 72 cards, 89939 bytes
     include_bytes!("../baked/decks/muse_cup.bin"),
-    // nijigaku_cup: 72 cards, 89528 bytes
+    // nijigaku_cup: 72 cards, 95784 bytes
     include_bytes!("../baked/decks/nijigaku_cup.bin"),
     // slot13: 0 cards, 8 bytes
     include_bytes!("../baked/decks/slot13.bin"),

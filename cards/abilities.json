@@ -1,9 +1,9 @@
 {
   "schema": "extracted_abilities.v1",
-  "generated_at": "2026-09-30T06:49:52.996335",
+  "generated_at": "2026-09-30T09:57:18.260966",
   "generated_by": "cards/ability_extraction/extract_card_abilities.py",
   "source_file": "cards/cards.json",
-  "engine_commit": "be5abcd9",
+  "engine_commit": "4c8446ed",
   "parser_version": "1.0",
   "input_hash": null,
   "statistics": {
@@ -13915,11 +13915,6 @@
             "action": "sequential",
             "actions": [
               {
-                "text": "この能力を起動するための追加コストとして",
-                "action": "modify_score",
-                "operation": "add"
-              },
-              {
                 "text": "手札を2枚控え室に置くか",
                 "source": "hand",
                 "destination": "discard",
@@ -27622,6 +27617,7 @@
               "text": "2人以上いる場合",
               "unit": "人",
               "card_type": "member_card",
+              "activated_this_turn": true,
               "location": "stage"
             },
             "action": "modify_required_hearts",
@@ -27643,6 +27639,7 @@
               "text": "3人以上いる場合",
               "unit": "人",
               "card_type": "member_card",
+              "activated_this_turn": true,
               "location": "stage"
             },
             "action": "modify_required_hearts",

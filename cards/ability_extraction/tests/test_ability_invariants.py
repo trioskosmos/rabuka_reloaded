@@ -179,6 +179,24 @@ def test_compound_subconditions_inherit_location():
                     continue
                 if sub.get("comparison_type") == "score":
                     continue
+                # A sub-condition that names its OWN area must not inherit the
+                # compound's zone: stamping it would assert the two at once.
+                # PL!-pb2-042-L is the case in point. Its compound is
+                #   「…revealed_cards に「矢澤にこ」と…があり、**かつ**
+                #    自分のセンターエリアにコスト11以上の『BiBi』のメンバーがいる場合**」
+                # so the second sub-condition already carries `position: "center"`
+                # and its text names センターエリア. `_propagate_compound_locations`
+                # would hand it `location: "revealed_cards"` — the centre area is
+                # not the revealed-cards zone, so the inherited value would be
+                # false on its face. `_drop_unsupported_child_location` exists
+                # precisely to undo that, and its docstring names this card. The
+                # net parse is CORRECT; this invariant was checking the
+                # intermediate state that the parser deliberately reverses.
+                if sub.get("position"):
+                    continue
+                txt = sub.get("text", "")
+                if "エリア" in txt or "置き場" in txt:
+                    continue
                 bad.append((u.get("cards", [""])[0], sub.get("text", "")))
     assert not bad, (
         "bare sub-conditions of a compound must inherit the clause's location "

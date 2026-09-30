@@ -102,7 +102,14 @@ fn offered_count(top: &[&str]) -> usize {
             // The pay/skip gate. Option 1 is "pay", and paying is what lets the look run.
             Some("SelectTarget") => game.select_option(1),
             // The look. THIS is the prompt under test: read it, do not answer it.
-            Some("SelectCard") => return game.pending_choice_count(),
+            //
+            // `pending_choice_option_count()`, NOT `pending_choice_count()`. The latter
+            // is `max_select = min(requested, matching)` (`ability/effects/look.rs:110,156`),
+            // so for a 「1枚」 take it is 1 whether one card or five qualify — the number
+            // of cards you may PICK, not the number you may pick FROM. With it, this
+            // helper returned 1 for any non-empty prompt and the bound assertions below
+            // could not fail. The candidate count is `filtered_indices.len()`.
+            Some("SelectCard") => return game.pending_choice_option_count().unwrap_or(0),
             _ => game.select_indices(&[0]),
         }
         guard += 1;

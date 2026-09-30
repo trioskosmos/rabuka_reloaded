@@ -14,7 +14,112 @@ harness claim.
 
 ---
 
-## 1. What is genuinely solid
+## 0. An engine bug found and FIXED: `PL!-pb2-040-L` over-fires
+
+**The bug.** The printed text is
+
+> 自分のステージに、**このターン中に**自分の『Printemps』のカードの効果によってウェイト状態から
+> アクティブにしていたメンバーが1人以上いる場合、−3。2人以上いる場合、**さらに**−2。
+> 3人以上いる場合、**さらに**−1。
+
+Only the first clause states the population; the 2人/3人 clauses are elliptical. But
+`_mark_activated_this_turn` (`cards/ability_extraction/parser.py:3613`) tags a node only when
+that node's **own** text contains 「このターン中に」 and 「アクティブにしていた」. So steps 2
+and 3 parsed as a bare count of the stage, and the engine reads the tag per condition with
+**no inheritance** (`core/card.rs:4079-4081`), falling through to the location-count branch
+at `ability/condition/card.rs:2401`.
+
+Measured: staging three Printemps members and activating **none** produced **−6**, where the
+card requires **0**. The reduction was reachable by a board that did nothing.
+
+**Why no test caught it.** Every test in that file used a `modifier_for(count)` helper that
+staged `count` members **and** activated the same `count`, and its negative used `count = 0`
+— zero staged *and* zero activated. The two quantities were never varied independently, so
+"counts the activation history" and "counts anything on the stage" were indistinguishable.
+
+**The fix.** Added `_inherit_elliptical_history_steps` to the parser, called from
+`_mark_activated_this_turn_nodes`, which carries `activated_this_turn` from a step's
+condition into a following step whose condition is a bare 「N以上」 continuation.
+
+It carries **only** `activated_this_turn`, deliberately **not** `group_names`: on a
+continuation step the group can legitimately belong to the branch **action** (the target)
+rather than to the count condition — the repo's own
+`test_sunny_day_song_group_filter_stays_on_mus_branch` depends on exactly that. Copying the
+group onto the condition would silently add a group filter to that count and change the
+card. The group half of the 040 population is therefore left alone on purpose.
+
+**Blast radius, measured rather than assumed** — the whole diff of `cards/abilities.json`:
+
+```
+-  "generated_at": ...          (timestamp)
+-  "engine_commit": ...         (stamp)
++  "activated_this_turn": true  (040-L step 2)
++  "activated_this_turn": true  (040-L step 3)
+```
+
+Two functional lines in a 27,000-line file, on the intended card. No other card moved, so the
+`action_047` failure mode the doc warns about did not occur.
+
+**Verification.** Engine suite **3985 passed, 0 failed**. New regression test
+`a_staged_member_that_was_never_activated_reduces_nothing` asserts `0` and would read `-6`
+against the old parse. The 040 test file also gained `modifier_with(staged, activated)`.
+
+Parser suite: **123 passed, 1 failed** — and the failure is **pre-existing, not caused by
+this change**, proven by restoring HEAD's `parser.py` and re-running: it fails identically.
+See §0.1.
+
+## 0.1 A pre-existing red test that explains the 042-L "OPEN GAP"
+
+`cards/ability_extraction/tests/test_ability_invariants.py::test_compound_subconditions_inherit_location`
+fails on `PL!-pb2-042-L` (PSYCHIC FIRE):
+
+> bare sub-conditions of a compound must inherit the clause's location
+> (`parser._propagate_compound_locations`); missing on:
+> `[('PL!-pb2-042-L | PSYCHIC FIRE (ab#0)', '自分のセンターエリアにコスト11以上の『BiBi』のメンバーがいる場合')]`
+
+This is the mechanism behind the `042_l` test file's recorded OPEN GAP — the ability never
+fires because a compound sub-condition never inherits its `location`. **The repo's own
+invariant test is already red on it and the engine suite is green anyway**, because
+`pb2_psychic_fire_four_clauses_pl_pb2_042_l_test.rs` pins `assert!(!fired)`.
+
+So the `042-L` gap is not open-ended: it is diagnosed, the failing test names the cause, and
+the fix is in `_propagate_compound_locations`. It was never chased because the "test" for it
+asserts the broken behaviour and therefore passes forever.
+
+### 0.2 …but the red invariant test is a FALSE POSITIVE, and 042-L is still genuinely broken
+
+I checked that claim rather than repeating it, and it needs correcting in two places.
+
+**The parser is right; the test is wrong.** The invariant wants the compound's bare
+sub-condition stamped with `revealed_cards`. That sub-condition is
+「自分のセンターエリアにコスト11以上の『BiBi』のメンバーがいる場合」 — it already carries
+`position: "center"` and its own text names the **centre area**, which is not the revealed-cards
+zone. Stamping it would be wrong, and `_drop_unsupported_child_location` exists precisely to
+prevent it — its docstring names `PL!-pb2-042-L`. The test checks an intermediate state that
+the parser deliberately undoes. The invariant's exemption list is missing the
+text-contradicts case, so it should be amended, not the parser.
+
+**The ability is still genuinely broken, for a different reason.** I tested this empirically:
+inverting the assertion in `all_clauses_met_waits_the_foe` shows the ability does **not** fire
+with all four clauses satisfied, while all five negatives still hold. So it is a missing
+positive, not an over-firing engine — the compound evaluates false somewhere.
+
+The parse is correct, so the fault is in evaluation. Two live suspects:
+
+* **`yell_trigger`** — the condition carries a top-level `yell_trigger: true` (「自分が
+  エールしたとき」), and the test fixture never performs an actual エール; it pushes cards into
+  the revealed-cards list directly. If the engine evaluates `yell_trigger` against real yell
+  state, the condition can never be true in this fixture — and **the test may be wrong rather
+  than the engine**, which would be a different defect from the one the header records.
+* **`position: "center"` inside a nested `comparison_condition`** — the centre restriction is
+  carried as a bare `position` field, not as a `location`. A generic evaluation path that
+  reads only `location` would see no zone and could reject.
+
+Discriminating between those needs a fixture that performs a real エール, which is the next
+piece of work. The test header now records both suspects rather than "which clause is failing
+is still unknown".
+
+
 
 Stated first so the rest is read in proportion.
 
@@ -414,6 +519,78 @@ What the rewrite changed:
 
 `…032_n` is now 3 tests, all passing. Suite total moved 3983 → **3984**.
 
+### Verified in the third pass — the same two traps, two more files
+
+Both of these are the §2.1 and §2.2 traps again, so they are worth stating as a pattern:
+**the look-and-select shape is the single most broken test idiom in this suite**, because it
+is the only shape with two `SelectCard` prompts in a row (the mandatory cost, then the look)
+and only one number that looks like a count.
+
+* **`…026_n`** — three separate defects, all now fixed and green.
+  1. It measured the **cost**, not the look. The 起動 cost is a `sequential_cost` of
+     `change_state(self→wait)` + `move_cards(hand→discard, 1)`, and that sub-cost raises its
+     own `SelectCard` (`ability/cost/handlers.rs:608`). The loop broke on the first
+     `SelectCard`, which is the cost. Since both are `SelectCard`, matching on the prompt
+     type cannot separate them — the test now identifies the cost by **the hand shrinking**.
+  2. It read `pending_choice_count()` (the `max_select` trap).
+  3. **Its expected value was wrong.** `FILLER = PL!-sd1-010-SD` is 高坂 穂乃果, whose unit
+     is **Printemps**, so it satisfies 「『Printemps』のメンバーカード」 and must be offered.
+     The correct candidate count is **2**, not the asserted 1. The group filter is in fact
+     working correctly: it admits both Printemps cards and excludes only 絢瀬絵里 (BiBi).
+     The old test passed with a wrong number for a wrong reason.
+* **`…008_pp`** — `offered_count` returned `pending_choice_count()`, so for a 「1枚」 take it
+  was 1 for any non-empty prompt. Now uses `pending_choice_option_count()`. The consequence
+  is that `the_bound_separates_the_seven_from_the_eight` — the file's self-declared "one
+  that actually pins the bound" — is now pinned for the first time: adding the 7-total live
+  to the pool would give a count of 2, and it does not.
+
+Suite after both: **3983 passed, 0 failed** (the 3984→3983 delta is a concurrent session,
+not these edits — neither added nor removed a test).
+
+## 0.4 Two more parser fixes — E3 and E7 closed, parser suite fully green
+
+### E3: `action_053` fired on the bare word 「追加」
+
+`PL!-pb2-012-P＋` (南ことり) 起動 carried a junk node inside its cost:
+
+```json
+{ "text": "この能力を起動するための追加コストとして",
+  "action": "modify_score", "operation": "add" }
+```
+
+An operandless `modify_score` — exactly the `modify_score` missing-`value` validation
+warning the old doc listed as open P7, still emitted on every run.
+
+Cause: `ActionRule(name='action_053_modify_score', match='追加', …)` (parser.py:2380) fires
+on **any** sentence containing 「追加」 that is not 「エール」. 「追加コスト」 is a connective,
+not a score operation.
+
+**I was wrong first here**, and it is worth recording: I read the parse's cost text and
+concluded the parser had **fabricated** a cost clause. It had not — `cards/cards.json` shows
+the printed 起動 really does say 「…この能力を起動するための追加コストとして、手札を2枚控え室に
+置くか、『Printemps』のメンバーを2人ウェイトにする。」 The defect is the stray node, not a
+fabricated cost. I had the right instinct to check `cards.json` before editing the parser.
+
+Fix: require スコア alongside 追加 — `match_all=['スコア', '追加']`. Blast radius, the whole
+`abilities.json` diff: the two stamps, the 5 junk lines removed, and the two
+`activated_this_turn` lines from the 040-L fix. Nothing else in the corpus moved.
+
+### E7: the red invariant was a false positive — amended, not the parser
+
+`test_compound_subconditions_inherit_location` demanded that `042-L`'s second sub-condition
+inherit `location: "revealed_cards"`. That sub-condition is
+「自分のセンターエリアにコスト11以上の『BiBi』のメンバーがいる場合」 — it carries
+`position: "center"` and names センターエリア, which is not the revealed-cards zone. Stamping
+it would assert both at once, and `_drop_unsupported_child_location` exists to undo exactly
+that (its docstring names this card). The net parse is correct; the invariant was checking an
+intermediate state the parser deliberately reverses.
+
+Added the missing exemptions: a sub-condition carrying its own `position`, or whose text names
+エリア/置き場, is not a candidate for zone inheritance.
+
+**Parser suite: 124 passed, 0 failed** — green for the first time this session, with both
+parser changes measured for blast radius rather than assumed.
+
 ## 8. Suggested order of work
 
 1. **Fix the inverted fixtures in `…032_n`.** The ブレードハートを持たない filter is
@@ -431,7 +608,130 @@ What the rewrite changed:
    their own" claim.
 7. Rewrite this doc's §3/§8 to match §6 above.
 
-## 9. Not audited
+### 0.3 A fabricated "KNOWN GAP" eliminated — SP-013 was never broken
+
+`under_card_and_success_live_conditions_test.rs::kaleidoscore_optional_branches` recorded a
+KNOWN GAP in the engine and pinned the absence as expected behaviour, in three assertions:
+the discard prompt never appears, the card stays in hand, the energy never leaves the energy
+deck (that last one written as `<=`, so it is satisfied by an unchanged state and cannot fail
+on any of the behaviour it names).
+
+**The gap was the test's own fixture.** It used `PL!SP-bp1-004-P` as the card to discard.
+That card is 平安名すみれ, `unit: "CatChu!"`. The cost filters on
+`group_names: ["KALEIDOSCORE"]` and `card_matches_group_str`
+(`engine/src/ability/util.rs:637-659`) matches on `unit`, so **the cost was unpayable and no
+prompt could ever be raised.**
+
+It was also *fictional*, which is what makes it worth recording: `keke_discard_blade_heart_no_draw`
+in `debut_discard_blade_heart_draw_test.rs` exercises the same card with a KALEIDOSCORE
+discard and asserts the **opposite** of all three. Both tests were green simultaneously,
+claiming the prompt appears and does not appear.
+
+Replaced with `kaleidoscore_blade_heart_discard_is_paid_and_draws_nothing`, using
+`PL!SP-sd1-010-SD` (KALEIDOSCORE, `blade_heart {b_heart02: 1}`) — the same fixture the
+sibling test proves works. It asserts the real behaviour: the cost **is** paid, the energy
+**is** placed from the energy deck, and nothing is drawn because the discarded card has a
+blade heart. Both premises are pinned (`unit == "KALEIDOSCORE"`, blade heart present) so a
+wrong unit can never make this vacuous again. It passes; the engine was correct throughout.
+
+**On my own two errors here, since both were caught by the tree and not by me:**
+
+1. I first picked `PL!SP-bp1-021-N` as the blade-bearing KALEIDOSCORE card, from an earlier
+   multi-card data dump. The `has_blade_heart_strict()` precondition I wrote **failed**, which
+   is the point of writing it. `cards.json` confirms `PL!SP-bp1-021-N` has
+   `blade_heart: None`; I had misattributed a line from the previous card in the dump. The
+   engine agreed with the data both times.
+2. The fixture-selection lesson is now the general one: **check the data file directly for
+   each fixture, in a single-card query, and pin the discriminating property as a test
+   precondition.** A card's properties read out of a multi-record dump are as error-prone as a
+   test's comment, and the failure mode is identical — a confident test that cannot fail.
+
+
+Ordered by "can this lie to me", not by effort. `A` = the assertion is wrong or cannot fail,
+`B` = the assertion is right but the fixture cannot reach it, `C` = mechanism untested,
+`D` = metadata/comment rot.
+
+### A — assertions that cannot fail, or that contradict the printed card
+
+| # | Item | Card | State |
+|---|---|---|---|
+| A1 | `pl_pb2_001_pp` — the ALLブレード half asserts `p1_constant_total_score_bonus` for a clause that grants a **heart** (`gain_resource`/`heart`/`heart_type: all`). Cannot fail. The スコア half pins `0` where the card prints 「＋１する」 | 001-PP | open |
+| A2 | `all_clauses_met_waits_the_foe` — name says the foe is waited, body pins `!fired` | 042-L | diagnosed, see §0.2 |
+| A3 | `all_printemps_qualifies_and_the_member_is_taken` / `all_lily_white_qualifies` / `all_bibi_qualifies` — names say taken, bodies pin nothing taken | 037-L | open |
+| A4 | `every_branch_carries_the_all_marker` — pins `vec![false, true, true]`, blessing a `get_all_members()` decode loss the parse actually carries | 037-L | open |
+| A5 | `the_score_and_all_blade_clauses…` absence assertions, same file as A1 | 001-PP | open |
+| A6 | `the_cost_paid_branch_is_still_a_vacuous_comparison` — asserts the parser defect is present; fails on a correct engine | 021-N | open |
+| A7 | `empty_own_stage_is_vacuously_bibi_only` — `assert!(x \|\| !x)` | 024-N | **FIXED** |
+| A8 | `an_empty_setup_grants_nothing` / `it_does_not_fire_for_another_cards_ability` — assert on a card in no zone | 021-N | open |
+| A9 | `the_prompt_does_not_enumerate_its_options` — `pending_choice_count()==0`, hardcoded 0 for `SelectTarget` | 016-P＋ | open |
+| A10 | `an_empty_history_gives_nothing` — `inner(&[]) - inner(&[])` | 010-P＋ | open |
+| A11 | `a_cheap_mus_baton_touch_does_nothing` / `an_expensive_non_mus_baton_touch_does_nothing` — same equality, operands swapped; neither asserts `== 0` | 009-PP | open |
+| A12 | `the_optional_take_cancel_test` — asserts the hand is unchanged "because the two cancel"; passes if either never fires | 032-N | removed in rewrite |
+| A13 | `under_self` assertion where the other member has no under-card ability | 017-P＋ | open |
+| A14 | `our_own_live_success_abilities_are_not_invalidated` — stages an ally, asserts `0`; the ability targets the opponent's (empty) stage | 003-PP | open |
+| A15 | hand-contains assertion satisfied with or without the mandatory cost | 036-N | open |
+| A16 | `no_opponent_member_is_harmless` — asserts on our own card | 024-N | **FIXED** |
+| A17 | `kaleidoscore_optional_branches` — three absence assertions incl. an `<=` that cannot fail, against a fixture that cannot pay the cost | SP-013 | open, see B7 |
+| A18 | `the_clause_parses_as_a_history_not_a_state` — whole-blob `contains("activated_this_turn")`; passes while 2 of 3 steps lack the tag | 040-L | open (tag now inherited; assert per-step) |
+| A19 | `the_same_member_twice_counts_once` — asserts the test's own dedup helper | 010-P＋ | open |
+
+### B — fixture cannot reach what is claimed
+
+| # | Item | Card | State |
+|---|---|---|---|
+| B1 | **Both blade fixtures inverted** — `PL!-bp6-017-N` *has* a blade heart, `PL!-pb2-002-PP` has none, so the 「持たない」 filter was never tested | 032-N | **FIXED** |
+| B2 | `PL!SP-bp1-004-P` is **CatChu!**, but the cost is 「『KALEIDOSCORE』」 — unpayable, so the "KNOWN GAP" is the fixture | SP-013 | **FIXED** |
+| B3 | `FILLER` is **Printemps**, so it qualifies under 「『Printemps』のメンバー」 — expected value 1 was wrong, correct is 2 | 026-N | **FIXED** |
+| B4 | `PL!SP-pb2-002-R` called a "live card"; it is a `メンバー` | SP-002 | open |
+| B5 | `P_5 = PL!-pb2-030-N` called "no abilities of their own"; it prints a 常時 blade ability | 017-P＋ | open |
+| B6 | `MUS_LIVE` documented as both "NOT lily white" and "lily white — qualifies" | 014-P＋ | open |
+| B7 | `offered_count` read `pending_choice_count()`, so the 7-vs-8 heart bound was never pinned | 008-PP | **FIXED** |
+| B8 | `select_option(1)` on a one-card `SelectCard` — the cost was never paid | 019-N | open |
+| B9 | Two "copies" share one `i16`, so "paid only once" is unproven | SP-002 | open |
+| B10 | `game.id(OPPONENT)` staged and a *different* instance waited — the 自動's trigger state is on an unplayed card | 015-P＋ | open |
+| B11 | Deck built with `push` after `fill_decks` — the look saw only fillers | 032-N, 026-N | **FIXED** (032), 026 was already front-loaded |
+| B12 | `advance_to_live_start` uses blind `game.pass()` counts | SP-048 | open |
+| B13 | `P_1` is a **live** being queried for a member-side modifier, unstaged | 040-L | open |
+
+### C — mechanism untested
+
+| # | Item | Card | State |
+|---|---|---|---|
+| C1 | **`cards_activated_this_turn` writer/reader contract has NO test.** 3 hand-written writers in the test tree; no test drives a real wait→active through the engine. Regressions that would ship green: writer stops firing, writer over-fires (loses the `!contains` dedup), writer records the wrong id, the turn-boundary clear stops working | 010-P＋, 040-L | **FIXED the 040 half**; the contract test is the top open item |
+| C2 | **`の`-style historical/live-end duration never tested** — `duration: live_end` read with no live entered and no rollover | 010-P＋ | open |
+| C3 | Copy of the **same** 起動 twice from two under-cards: `ability_ops.rs:673-716` has no dedup, and whether 「すべて得る」 means once or twice is unpinned either way | SP-005 | open |
+| C4 | Copy survival across a **turn boundary** | SP-005 | open |
+| C5 | `heart06`×2 option, `このメンバー以外`, and `ライブ終了時まで` on the choice branch — zero coverage in the whole tree | SP-002 | open |
+| C6 | `card_property`+`negation` never exercised, and **arithmetically blind**: 6 cards→3→cap 2, flip one→5→cap 2 (same); 2→1, add one→3→1 (same) | SP-008 | open |
+| C7 | 『Liella!』 group filter on that same ability | SP-008 | open |
+| C8 | `コスト2以下` probed only at exactly 2; `<`, `<=` and `<= 3` all pass | SP-047 | open |
+| C9 | `してもよい` decline paths (047, 050, 013) | several | open |
+| C10 | 右サイド/左サイド restriction — never played on the wrong side | SP-036/037 | open |
+| C11 | Options 0 and 2; the per-card scaling; the repeatable clause | 016-P＋ | open |
+| C12 | The real 自動 trigger — no `state_condition` for ウェイト状態, `target: "both"` | 015-P＋ | open |
+| C13 | The 「ウェイトにしてもよい」 half — parse has no wait action or prompt at all | 012-P＋ | open |
+| C14 | 13 printed abilities with no test anywhere (§5.1) | various | open |
+| C15 | μ's filter on the **waitroom** recovery (only the success-zone half has a negative) | 007-PP | open |
+| C16 | 行動 ordering 「その後」 — the only genuinely strong sequential assertion in the set | SP-048 | done, keep as the model |
+
+### D — metadata rot
+
+18 wrong-character headers (**12 FIXED**); remaining: `…014_p_plus` (乙宗 紫 → 星空 凛), `…032_n` (→ 星空 凛, done in rewrite), `…003_pp` (→ 南ことり, done). Dead helpers: `stage_and_total` (020-N), `NICO_NAME`/`MAKI_NAME`/`ERI_NAME` (042-L), `ENERGY` (009-PP), `FILLER`/`LW_LIVE` (014-P＋). Misnamed tests: `score_sum_eight_does_not_cross_the_threshold` (tests 6 and 9), `…024_n` duplicated pair. Duplicated header block in 040-L. `048-L` header cites the wrong `abilities.json` idx (867 vs 965) and documents an already-fixed parser bug. 05-compound calls `PL!SP-sd1-006-SD` 若菜四季 (it is 桜小路きな子) and pins group `5yncri5e!` for a filter that reads 『Liella!』.
+
+### E — still-open engine work
+
+| # | Item | State |
+|---|---|---|
+| E1 | `040-L` steps 2/3 not history-gated → −6 reachable | **FIXED** (parser), blast radius measured |
+| E2 | `042-L` compound never fires | diagnosed to two suspects, **not** separated — see §0.2 |
+| E3 | `012-P＋` 起動: stray operandless `{"action":"modify_score","operation":"add"}`; the `modify_score` missing-`value` warning still emitted every run | open |
+| E4 | `018-P＋` `distinct_name` still reported by the extractor despite the doc's "fixed" | open |
+| E5 | New `per_unit` mismatch on `016-P＋` appeared after the doc was written | open |
+| E6 | `015-P＋` lost its trigger condition entirely in the parse | open |
+| E7 | Red parser invariant `test_compound_subconditions_inherit_location` — **false positive**; amend the test's exemption list, not the parser | open |
+| E8 | The extractor still reports 4 missing mechanics; doc §3 lists a different 4 | open |
+
+## 11. Not audited
 
 The 36 reprint prints (correctly, per your ruling), the `PL!HS-pb1-*` starter cards, and
 any ability whose node is shared with a tested card. The `v8_*` bot files are being edited

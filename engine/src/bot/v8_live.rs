@@ -25,7 +25,7 @@
 //!   cards whose loss costs least, and the cost is computed from each card's
 //!   actual next-turn contribution rather than from its printed cost.
 
-use crate::bot::strategy_common::{acc_add, emit_live_set, Acc};
+use crate::bot::strategy_common::{acc_add, emit_live_set, Acc, Pool};
 use crate::card::{CardDatabase, CardType};
 use crate::game_setup::Action;
 use crate::game_state::{GameState, Phase};
@@ -577,7 +577,7 @@ fn enumerate_candidates(
         let p_pass = if chosen.is_empty() {
             0.0
         } else {
-            v8_model::pass_probability(pools, &need)
+            zone_ordered_pass_probability(&pools, &chosen)
         };
         let outcome = v8_model::check_outcome(p_pass, score, chosen.len(), my_success, opp);
         let spare = max_slots - chosen.len();
@@ -655,6 +655,80 @@ fn enumerate_candidates(
 /// So the ranking key, not the commit rule and not the board, is the deficit.
 /// v8's own `V8_NO_FOLD` experiment agrees: forcing MORE commits made it
 /// worse (896-1104 -> 752-1248), because its extra commits are coin flips.
+/// `V8_ZONE_ORDER=1`: price the check the way the engine actually resolves it.
+///
+/// ## The rule this corrects (8.3.15)
+///
+/// A zone is resolved **in order, one card at a time**. Each card draws from
+/// the pool until its own requirement is met, then the next draws from what is
+/// left. The hearts the first card does not need are still available to the
+/// second — but the first card cannot borrow the second's wildcards, and a card
+/// that cannot be satisfied fails the zone outright.
+///
+/// `v8_model::pass_probability` prices the **pooled** requirement instead: one
+/// vector with every life added, satisfied or failed as a whole. That is
+/// strictly more generous than the engine whenever one card is nearly
+/// satisfiable and the rest are hopeless, because pooling lets the surplus of a
+/// card that needs nothing cover a card that needs everything.
+///
+/// It only differs at set size >= 2, and the shipped default is width 1, so this
+/// is inert at the default — which is exactly the point. It is the reason width
+/// has to be *earned* rather than assumed, and no cell in this file has measured
+/// width with a correct model behind it.
+///
+/// Off by default because the pooled model is what every previous live-set
+/// result was measured under, and switching it changes what those mean.
+fn zone_ordered_pass_probability(pools: &[Pool], chosen: &[&Life]) -> f64 {
+    if std::env::var_os("V8_ZONE_ORDER").is_none() || chosen.len() <= 1 {
+        let mut need: Acc = [0i16; 11];
+        for life in chosen {
+            for (k, v) in need.iter_mut().zip(life.need.iter()) {
+                *k += *v;
+            }
+        }
+        return if chosen.is_empty() {
+            0.0
+        } else {
+            v8_model::pass_probability(pools, &need)
+        };
+    }
+    // A zone succeeds only if EVERY card in it is satisfied, and a card that is
+    // not satisfied takes nothing and fails the zone. So the sequential model
+    // is a conjunction, and the only thing order changes is whether a later
+    // card could have been satisfied by what an earlier one left behind.
+    let wildcards: i32 = chosen.iter().map(|l| i32::from(l.need[7])).sum();
+    for pool in pools {
+        let mut wildcards_left = wildcards;
+        let mut all_ok = true;
+        for life in chosen {
+            let mut ok = true;
+            for c in 0..7usize {
+                let want = i32::from(life.need[c]);
+                if want == 0 {
+                    continue;
+                }
+                let deficit = want - i32::from(pool[c]);
+                if deficit > 0 {
+                    if deficit <= wildcards_left {
+                        wildcards_left -= deficit;
+                    } else {
+                        ok = false;
+                        break;
+                    }
+                }
+            }
+            if !ok {
+                all_ok = false;
+                break;
+            }
+        }
+        if all_ok {
+            return 1.0;
+        }
+    }
+    0.0
+}
+
 fn better(a: &Candidate, b: &Candidate) -> bool {
     const EPS: f64 = 1e-9;
     // AMMUNITION FLOOR. Refuse to commit a set this unlikely to be won.

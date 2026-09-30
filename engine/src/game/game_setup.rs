@@ -2118,6 +2118,14 @@ fn generate_main_phase_actions(game_state: &GameState) -> Vec<Action> {
                 if !crate::ability::util::ability_trigger_can_activate(&ability) {
                     continue;
                 }
+                // 「…場合のみ起動できる」 — withhold the action when the gate does not hold.
+                // The resolver enforces this too, but only at resolve time and only while
+                // the cost is unpaid, so without this the player was offered an action that
+                // could not be taken. See `ability_activation_gate_holds`.
+                if !crate::ability::util::ability_activation_gate_holds(game_state, &ability)
+                {
+                    continue;
+                }
                 if !crate::zones::check_trigger_position(ability.triggers.as_deref(), card_position)
                 {
                     continue;
@@ -2248,6 +2256,11 @@ fn generate_main_phase_actions(game_state: &GameState) -> Vec<Action> {
                     continue;
                 }
                 if !crate::ability::util::ability_trigger_can_activate(&ability) {
+                    continue;
+                }
+                // Same 「…のみ起動できる」 gate as the stage path above.
+                if !crate::ability::util::ability_activation_gate_holds(game_state, &ability)
+                {
                     continue;
                 }
 

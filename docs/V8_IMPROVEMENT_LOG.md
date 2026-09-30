@@ -696,6 +696,114 @@ blade result is the reason to retest the same underlying idea in v7's shape — 
 reading of v7's source has now produced one prediction that held and one that
 did not, and both were worth running.
 
+### 3.6 The decision-level study: what v8 actually gets wrong
+
+Everything above measured aggregates. `V8_PROBE_V7=1` puts the same state to
+both policies — both choosers are pure, so no clone is needed — and logs only
+where the chosen `Action` differs. Three games, 14 disagreements:
+
+| disagreement | count |
+|---|---|
+| **v7 = `UseAbility`, v8 plays a member or Passes** | **8** |
+| v7 = Pass, v8 plays a member | 4 |
+| both play, different member | 2 |
+
+**More than half of every disagreement v8 loses is an ability it never takes.**
+
+Two earlier findings now have a single cause, and the third is new:
+
+1. **v8 never activates an ability, and the reason is the leaf, not a gate.**
+   The engine offers them (the doc's "use_ability counts as zero" was about a
+   *scoring* filter, not the action set). v7 takes them because its value
+   function is linear in feature deltas: an ability that adds a blade scores
+   `6.0 * dBlades` the instant it resolves. v8's leaf is a saturated
+   placement-probability level, so the same ability scores **zero** unless it
+   happens to cross a probability threshold. It is not that v8 is discouraged
+   from activating — it is that v8 cannot see what activating did.
+2. **The blade term was this fix, partially.** `V8_BLADES=6` pays for blades
+   already on the board. It does not pay for blades an ability would *produce*,
+   which is why it was worth +0.88 and not more.
+3. **Development was never the constraint.** In the traced games v8 reached
+   `bl=10 cost=30 h=13` against `bl=5 h=4`, and the two placed **identically**
+   (0.438 per live phase each), and v7 won 2-1. Every leaf term in the file
+   was tuning a quantity that was already not binding.
+
+This is the localisation eleven aggregate experiments could not produce. The
+earlier note that abilities "measured as null" was measured as *encouragement* —
+a turn-window bonus for activating — which is a different intervention from
+paying for what the activation produces. Encouraging a move that scores zero is
+encouraging noise; pricing the feature it adds is the same intervention that
+already worked for blades.
+
+### 3.7 What the research said, and what it changed
+
+`note.com/kasiwamoti_y` — "for people who want to get seriously strong at
+Loveca" — is strategy rather than engineering, and two of its claims bear
+directly on the code:
+
+- **Cards with no blade-heart are the central resource.** Growth needs
+  high-cost members, those have no blade-heart, and every one lowers the check
+  rate. Worked numbers for having 6 / 7 / 8 of them and still drawing the
+  cost-9 by turn 2: **89% / 93% / 95%**. The sixth is worth +4 points and the
+  eighth +2, so the marginal card is nearly dead by seven. `grep` over
+  `engine/src/bot/` finds **no code that counts them** — the mulligan scores the
+  check and never sees what the hand costs in growth fuel. Now
+  `V8_MULL_BH` / `V8_MULL_BH_BUDGET`, off by default.
+- **The per-deck per-turn score target is a deck property** (their example:
+  2 → 3 → 6(7) → 7(8)). `band_progress` uses the *generic* guide band table.
+  `curve_prob` already computes a list's own reachability and no bot calls it.
+
+The measured per-yell blade rate, ~0.733 against `YIELD_PRIOR`'s 0.505, is the
+same article's companion calculation — and §3.3 showed that correcting it moves
+**five games in 1200**, because the opponent's model is a six-valued step
+function with nowhere for a 45% correction to land. A number can be right and
+the function still be too short to notice.
+
+### 3.8 Pricing abilities, and what it says about the blade "win"
+
+`V8_ABILITY_VALUE=<w>` pays a `UseAbility` for the features it actually
+produces, in v7's own credits: `6.0 * dBlades`, `3.0 * dHearts`. Paired,
+n=4000, seed 11:
+
+| config | win rate | paired p | pace (P1) |
+|---|---|---|---|
+| baseline | 42.5% | — | 0.3735 |
+| `V8_ABILITY_VALUE=1` | **43.5% (+1.00)** | **0.01424** | +0.0044 SIGNIFICANT |
+| `V8_BLADES=6` (§3.2) | 43.4% (+0.88) | 0.02963 | +0.0041 SIGNIFICANT |
+| both | 43.5% (+1.02) | 0.01244 | +0.0044 SIGNIFICANT |
+
+**Ability alone ≈ blades alone, and together they add 0.02.** They are the same
+effect, and the blade term was a proxy for it: paying 6 per blade on the board
+happens to reward the states abilities create, so `V8_BLADES` was measuring the
+ability bug without knowing it. The precise version — paying for the *change*,
+which only fires on actions that change it — is worth the same and is the one
+that is actually about the defect.
+
+This also settles the "abilities are settled negative" note in this file. That
+measurement was turn-window *encouragement*: a bonus for activating, worth
++0.086 at T3 and +0.147 at T6, and null because a move that scores zero cannot
+be rescued by a bonus that is also about zero. Pricing the state change is a
+different intervention and it is the one v7 was already doing.
+
+The decision-level probe says the remaining disagreement profile should now be
+re-measured: 8 of 14 traced disagreements were an ability v8 never took, and
+that class should be largely gone. `V8_PROBE_V7` is the instrument for checking
+it, and re-running it is the next step rather than another term.
+
+**Holdout.** n=4000, seed 23, never read before this point:
+
+| seed | baseline | +`V8_ABILITY_VALUE=1` | paired p | pace (P1) |
+|---|---|---|---|---|
+| 11 (selection) | 42.5% | 43.5% (+1.00) | **0.01424** | +0.0044 sig |
+| 23 (**holdout**) | 41.8% | 42.5% (+0.65) | 0.11511 | +0.0035 sig |
+
+Pooled across 8000 games: 220 baseline-only against 286 candidate-only, McNemar
+p ≈ **0.0034**. Same sign on both seeds, significant on the selection seed and
+on the pooled, and the holdout's own pace interval excludes zero. On the holdout
+the *opponent's* pace also falls significantly (-0.0023) — v7 places less
+against this v8, which is the first time any v8 change has moved the other
+bot's behaviour rather than only its own.
+
 ---
 
 ## 1. The instrument came first, and it was the precondition for everything
@@ -1035,3 +1143,44 @@ reproduced inside v8 and all were inert. What is left:
 3. **The live set sets lives v7 declines** (133 divergences in 30 games).
 4. **Measure everything asymmetrically from now on.** A mirror hid a
    hand-corrupting engine bug for the project's entire life.
+
+---
+
+## 10. The twenty, and what working from v9 did to the list
+
+The productive direction stopped being new terms and became **transcribing what
+v7 actually does**, plus the rules nobody implements: eleven leaf terms of v8's
+own measured inert or worse, and the two that worked were both transcriptions
+read out of `v7_main.rs`.
+
+**Working from v9 changes what the list is for.** v9 already contains v7's
+Main, so the thirteen v7-term transcriptions are redundant for v9 by
+construction — the ability fix is in v9 for free. The only version of the list
+that can move v9 is the one aimed at v9's own surface: its live set (v8's) and
+its mulligan (v7's). Four cells, paired, n=1200, seed 11, v9 baseline 57.3%:
+
+| cell | result | p |
+|---|---|---|
+| `V8_ZONE_ORDER` (rule 8.3.15) | 57.3% | 1.000 — **0 discordant** |
+| `V8_ZONE_ORDER` + `V8_MAX_LIVES=3` | 57.3% | 1.000 — **0 discordant** |
+| `V8_NO_JUNK` | 42.2% (**-15.08**) | 0.00000 |
+| `V9_MULLIGAN=v8` + `V8_MULL_BH=2` | 51.5% (-5.83) | 0.00165 |
+
+**Zone-order allocation is correct and has no purchase.** The engine resolves a
+zone in order with surplus feeding the next card; `pass_probability` pools
+them. The fix is right, and it is bit-identical even when the zone is explicitly
+allowed three cards. So the live set never commits two lives, ever, at any width
+it is given — the ammunition floor and the "prefer fewer lives" tiebreak settle
+it before width matters. That is a fact about the live set rather than about the
+model, and it means 8.3.15 stays a dormant correctness fix until something ever
+commits width 2. It also reads the doc's "live zone always exactly 1" from the
+other side: not "width is effectively 1" but "width is 1 and no setting moves it".
+
+**Junk fill is worth 15 points** — the largest verified mechanism in v9.
+`V8_NO_JUNK` costs 15.08 pp and hands the pace straight to the opponent
+(+0.042). Filling spare zone slots with the weakest cards available is not a
+tiebreak convenience; it is most of what the live set does.
+
+**The forward-walk mulligan is worse from v9 too** (-5.83, against -3.4 from
+v8). Replicated on a different base bot, which is the strongest evidence in this
+file that it is the walk itself and not the context v8 put it in.

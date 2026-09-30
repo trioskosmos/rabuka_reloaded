@@ -2359,6 +2359,22 @@ static int decode_condition_field(Rdr *r, const char *key, ConditionLocals *l) {
 /* ── decode_condition_direct: direct decoder for TAG_OBJECT_VARIANT conditions ──
    Mirrors Rust decode_condition_direct. Reads variant byte, then all fields into
    ConditionLocals, then dispatches to the appropriate build_* function. */
+/* build_unsupported: variant 20 — Condition::Unsupported.
+   Rust condition_decoder_gen.rs:1738 maps variant 20 to build_unsupported, and
+   the evaluator scores it FALSE at condition.rs:495-497 and again at :559.
+   The C vocabulary in include/rabuka.h stops at RB_COND_ALL_REVEALED (19), so
+   the value is spelled out as 20 here and matched literally in the condition.c
+   dispatch; rabuka.h's owner should add `RB_COND_UNSUPPORTED` and both sites
+   should switch to it. Carries no field beyond ConditionCommon — card.rs's
+   `Unsupported { common }` is exactly that. */
+Condition *build_unsupported(const ConditionLocals *l) {
+    Condition *c = calloc(1, sizeof(Condition));
+    if (!c) return NULL;
+    c->variant = 20;
+    cond_copy_common(c, l);
+    return c;
+}
+
 Condition *decode_condition_direct(Rdr *r, uint8_t variant) {
     uint32_t count;
     if (!rd_len(r, &count)) return NULL;
@@ -2392,13 +2408,18 @@ Condition *decode_condition_direct(Rdr *r, uint8_t variant) {
         case 19: return build_allrevealedmatchheartcolor(&l);
         /* Variant 20 is Condition::Unsupported in Rust
            (condition_decoder_gen.rs:1738 -> build_unsupported) and evaluates to
-           FALSE (condition.rs:482-484, 546). It is deliberately NOT decoded here:
-           the C evaluator's terminal `default: r = 1` (condition.c, the
-           evaluate_condition dispatch) would score it TRUE, which is worse than
-           the condition being absent. Both halves are needed:
-             - vm.c:  case 20: return build_unsupported(&l);
-             - condition.c: add `case 20: r = 0; break;` to the variant switch
-           (rbuka.h would also need an RB_COND_UNSUPPORTED enumerator). */
+           FALSE (condition.rs:482-484, 546). It used to be deliberately NOT
+           decoded here, because the C evaluator's terminal `default: r = 1`
+           (condition.c, the evaluate_condition dispatch) would score it TRUE,
+           which is worse than the condition being absent. Both halves are now
+           in place:
+             - vm.c:     case 20: return build_unsupported(&l);   (above)
+             - condition.c: `case 20: r = 0; break;` plus `default: r = 0;`
+           in the variant switch, so an unmapped shape fails closed instead of
+           leaving a bonus permanently on.
+           STILL OUTSTANDING: include/rabuka.h needs an `RB_COND_UNSUPPORTED`
+           enumerator so 20 can be named rather than spelled out. */
+        case 20: return build_unsupported(&l);
         default: {
             char value[16];
             snprintf(value, sizeof(value), "%u", variant);

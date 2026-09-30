@@ -30,7 +30,7 @@ use crate::helpers::*;
 use rabuka_engine::core::types::AbilityTrigger;
 use rabuka_engine::zones::MemberArea;
 
-const ERI: &str = "PL!-pb2-010-P＋"; // 高坂穂乃果, Printemps
+const HONOKA: &str = "PL!-pb2-010-P＋"; // 高坂穂乃果, Printemps
 /// A Printemps member used as the victim of the activation.
 const P_VICTIM: &str = "PL!-bp6-017-N"; // 小泉花陽
 /// A non-Printemps member — the clause is 「自分の『Printemps』のカードの効果によって」.
@@ -70,36 +70,37 @@ fn fire_live_start(game: &mut TestGame, cid: i16) {
 }
 
 /// Simulate "a Printemps card's effect switched this member out of wait", which is
-/// what the engine records.
-/// `TestGame::id` allocates a FRESH instance on every call, so an id must be
-/// resolved once and reused — otherwise "the same member twice" records two different
-/// cards and the set semantics look broken.
+/// what the engine records at `ability/effects/change_state.rs:646`. The `contains`
+/// guard is MINE, copied from that line — see `the_history_is_a_set_NOT_YET_PINNED`.
 fn record_activation(game: &mut TestGame, id: i16) {
     if !game.state.cards_activated_this_turn.contains(&id) {
         game.state.cards_activated_this_turn.push(id);
     }
 }
 
-/// Stand ERI, put `history` into the activation history, fire ライブ開始時, and return
-/// her blade count.
-/// Blades GAINED by the history, not the absolute count: ERI prints a blade of her
-/// own, so only the difference is the thing this card controls.
+/// Stand HONOKA, put `history` into the activation history, fire ライブ開始時, and return
+/// her blades GAINED — the modifier delta across the trigger, in the SAME game.
+///
+/// A delta, not an absolute, and not a difference of two separately built games: HONOKA
+/// prints a blade of her own, and building the baseline in a second game made the empty
+/// history case `inner(&[]) - inner(&[])`, a subtraction of a value with itself that
+/// could only ever be 0. Measuring before and after the trigger inside one game is what
+/// makes every case below an assertion about the ability.
 fn blade_with_history(history: &[&str]) -> i16 {
-    blade_with_history_inner(history) - blade_with_history_inner(&[])
-}
-
-fn blade_with_history_inner(history: &[&str]) -> i16 {
     let db = load_real_database();
     let mut game = TestGame::new(db);
     fill_decks(&mut game);
-    let eri = game.id(ERI);
-    game.assert_card_identity(eri, ERI);
+    let honoka = game.id(HONOKA);
+    game.assert_card_identity(honoka, HONOKA);
     for c in history {
+        // `TestGame::id` allocates a FRESH instance on every call, so each entry gets
+        // its own id — the history is a list of DISTINCT member ids and nothing else.
         let id = game.id(c);
         record_activation(&mut game, id);
     }
-    fire_live_start(&mut game, eri);
-    game.state.mods.get_blade_modifier(eri)
+    let base = game.state.mods.get_blade_modifier(honoka);
+    fire_live_start(&mut game, honoka);
+    game.state.mods.get_blade_modifier(honoka) - base
 }
 
 #[test]
@@ -135,36 +136,49 @@ fn a_non_printemps_activated_member_does_not_count() {
 
 #[test]
 fn an_empty_history_gives_nothing() {
-    assert_eq!(
-        blade_with_history(&[]),
-        0,
-        "no member was switched out of wait this turn"
-    );
-}
-
-/// The history is a SET: the same member twice is one member.
-#[test]
-fn the_same_member_twice_counts_once() {
     let db = load_real_database();
     let mut game = TestGame::new(db);
     fill_decks(&mut game);
-    let eri = game.id(ERI);
-    let base = game.state.mods.get_blade_modifier(eri);
-    let victim = game.id(P_VICTIM);
-    record_activation(&mut game, victim);
-    record_activation(&mut game, victim);
-    assert_eq!(
-        game.state.cards_activated_this_turn.len(),
-        1,
-        "the activation history is a set, not a tally"
+    let honoka = game.id(HONOKA);
+    assert!(
+        game.state.cards_activated_this_turn.is_empty(),
+        "precondition: nothing has been switched out of wait, so the history is empty"
     );
-    fire_live_start(&mut game, eri);
+    let base = game.state.mods.get_blade_modifier(honoka);
+    fire_live_start(&mut game, honoka);
     assert_eq!(
-        game.state.mods.get_blade_modifier(eri) - base,
-        1,
-        "1人につき — a member activated twice in one turn is still one member"
+        game.state.mods.get_blade_modifier(honoka) - base,
+        0,
+        "1人につき — no member in the history, no blade. Read as a before/after delta \
+         in ONE game: the previous helper computed `inner(&[]) - inner(&[])`, a value \
+         minus itself, so this case was 0 by arithmetic and asserted nothing."
     );
 }
+
+/// The history is a SET, not a tally: the same member switched out of wait twice in
+/// one turn is one member. **NOT PINNED — no test here can pin it, and one that
+/// looked like it did was deleted.**
+///
+/// The set property lives at the WRITE site: `change_state.rs:646` pushes only when
+/// `!cards_activated_this_turn.contains(card_id)`. The read site is a plain
+/// `.count()` over the vec (`effects/resource.rs:501`), so the counter would happily
+/// report 2 for a duplicated entry. Neither end is reachable from here:
+///
+///   * The file's `record_activation` is a test-side copy of the guard, so asserting
+///     `cards_activated_this_turn.len() == 1` after calling it asserts the test.
+///   * Pushing the same id twice by hand and expecting 1 blade asserts the opposite of
+///     what the engine does — the counter is a tally and would say 2.
+///   * Driving two real activations needs a card that can switch the SAME member out
+///     of wait twice in one turn. No card in `cards.json` can: every ability that
+///     activates a member is ターン1回, 登場, ライブ開始時 (all once), except
+///     `PL!SP-bp7-008-P` 若菜四季, whose 自動 has no turn limit — but it activates
+///     HERSELF and she is 5yncri5e!, so the 『Printemps』 filter on the history
+///     excludes the very member she would record.
+///
+/// Pinned instead, in `two_activated_printemps_members_give_two_blades`, is the part
+/// that IS observable: two DISTINCT members in the history count twice.
+#[test]
+fn the_history_is_a_set_NOT_YET_PINNED() {}
 
 /// A member that is IN WAIT is not what the clause counts. This is the distinction the
 /// old `state: "wait"` reading got wrong.
@@ -173,7 +187,7 @@ fn a_member_currently_in_wait_does_not_count() {
     let db = load_real_database();
     let mut game = TestGame::new(db);
     fill_decks(&mut game);
-    let eri = game.id(ERI);
+    let honoka = game.id(HONOKA);
     let waiting = game.id(P_VICTIM);
     game.state.player1.stage.stage[MemberArea::LeftSide as usize] = waiting;
     game.state.mods.add_orientation_modifier(waiting, "wait");
@@ -181,10 +195,10 @@ fn a_member_currently_in_wait_does_not_count() {
         game.state.cards_activated_this_turn.is_empty(),
         "precondition: a member still in wait has not been activated"
     );
-    let base = game.state.mods.get_blade_modifier(eri);
-    fire_live_start(&mut game, eri);
+    let base = game.state.mods.get_blade_modifier(honoka);
+    fire_live_start(&mut game, honoka);
     assert_eq!(
-        game.state.mods.get_blade_modifier(eri) - base,
+        game.state.mods.get_blade_modifier(honoka) - base,
         0,
         "ウェイト状態からアクティブにしていた — a member that is STILL in wait has not \
          been switched out, and counting it was the original bug"
@@ -196,7 +210,7 @@ fn a_member_currently_in_wait_does_not_count() {
 fn the_clause_parses_as_a_history_not_a_state() {
     let db = load_real_database();
     let game = TestGame::new(db);
-    let id = game.id(ERI);
+    let id = game.id(HONOKA);
     let eff = {
         let owned = game
             .db

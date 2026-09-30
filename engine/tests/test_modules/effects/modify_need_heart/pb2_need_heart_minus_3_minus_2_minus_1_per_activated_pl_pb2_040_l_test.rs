@@ -67,6 +67,17 @@ const FILLER: &str = "PL!-sd1-010-SD";
 /// a live-start ability at all, and the modifier was trivially 0. That, not the engine,
 /// is why it read as "the ability does nothing".
 fn modifier_for(count: usize) -> i16 {
+    modifier_with(count, count)
+}
+
+/// The heart00 modifier with `staged` Printemps members on the stage and `activated` of
+/// them switched out of wait this turn — the two varied INDEPENDENTLY.
+///
+/// `modifier_for(n)` stages n and activates n, so it cannot tell "counts the activation
+/// history" from "counts anything on the stage": every positive moves both together, and
+/// the negative moves both to zero. Splitting them is the only way to see what the step
+/// conditions actually read.
+fn modifier_with(staged: usize, activated: usize) -> i16 {
     use rabuka_engine::core::types::AbilityTrigger;
     use rabuka_engine::card::{BaseHeart, HeartColor, HeartMap};
 
@@ -77,16 +88,14 @@ fn modifier_for(count: usize) -> i16 {
         game.state.player1.main_deck.cards.push(f);
     }
 
-    // The activated members must be on the stage AND in the activation history: the
-    // step conditions are `location: stage` card counts over the history.
-    for (i, card_no) in [P_1, P_2, P_3].iter().take(count).enumerate() {
+    // Stage `staged` members and put the first `activated` of them into the activation
+    // history. The two counts are independent so the step conditions can be probed
+    // separately. All three stage slots are usable: 040 is a LIVE card and is performed
+    // from the live card zone, so it never occupies the stage's centre slot.
+    for (i, card_no) in [P_1, P_2, P_3].iter().take(staged).enumerate() {
         let id = game.id(card_no);
-        // All three stage slots are usable: 040 is a LIVE card and is performed from
-        // the live card zone, so it never occupies the stage's centre slot. Alternating
-        // between two side slots (as an earlier version did) made a third member
-        // overwrite the first, so the 3人以上 step could never be met.
         game.state.player1.stage.stage[i] = id;
-        if !game.state.cards_activated_this_turn.contains(&id) {
+        if i < activated && !game.state.cards_activated_this_turn.contains(&id) {
             game.state.cards_activated_this_turn.push(id);
         }
     }
@@ -135,7 +144,7 @@ fn modifier_for(count: usize) -> i16 {
         .mods
         .get_need_heart_modifier(hikari, HeartColor::Heart00);
     println!(
-        "  count={count} printed={} modifier={m}",
+        "  staged={staged} activated={activated} printed={} modifier={m}",
         game.db
             .get_card(hikari)
             .and_then(|c| c.need_heart.as_ref())
@@ -177,7 +186,52 @@ fn three_activated_members_reduce_need_by_six() {
     assert_eq!(modifier_for(3), -6, "3 + 2 + 1 — all three steps");
 }
 
-/// A member that is in wait AGAIN now still counts, because the clause is retrospective.
+/// The two later steps must be gated on the activation history too — FIXED, this is the
+/// regression guard for it.
+///
+/// The printed text is
+/// 「自分のステージに、**このターン中に**自分の『Printemps』のカードの効果によってウェイト
+///   状態からアクティブにしていたメンバーが1人以上いる場合、−3。2人以上いる場合、さらに−2。
+///   3人以上いる場合、さらに−1。」
+/// Every 「N人以上」 refers back to the same population, so all three steps must be
+/// history-gated. Only the first states it; the 2人/3人 clauses are elliptical.
+///
+/// They used not to be gated, and the reduction over-fired. `_mark_activated_this_turn`
+/// (`cards/ability_extraction/parser.py`) only tagged a node whose OWN text contained
+/// 「このターン中に」, so steps 2 and 3 parsed as a bare count of the stage — and the
+/// engine reads the tag per condition with no inheritance (`core/card.rs:4079-4081`),
+/// falling through to the location-count branch at `ability/condition/card.rs:2401`.
+/// Measured before the fix: staging three Printemps and activating none gave **−6**
+/// where the card requires **0**.
+///
+/// This could not be caught before `modifier_with` split staged from activated: every
+/// other test here moves both together, and its negative moves both to zero.
+#[test]
+fn a_staged_member_that_was_never_activated_reduces_nothing() {
+    assert_eq!(
+        modifier_with(3, 0),
+        0,
+        "このターン中に…アクティブにしていた — three Printemps are staged but NONE was \
+         switched out of wait this turn, so no step may apply. The 2人/3人 clauses are \
+         elliptical and inherit the history gate from the 1人 clause; before the parser \
+         fix they parsed without it and this read -6."
+    );
+}
+
+/// The converse probe, which DOES work: members activated but not on the stage. Step 1 is
+/// history-gated, so this is 0 today — and it is the control that shows the harness can
+/// reach a non-zero result at all.
+#[test]
+fn a_staged_member_that_was_activated_and_stayed_counts_once() {
+    assert_eq!(
+        modifier_with(1, 1),
+        -3,
+        "control: one staged member, one activated — step 1 (-3) applies and steps 2/3 do \
+         not, because 1 < 2. This is the same reading the other tests in this file cover, \
+         and it is the baseline the OPEN GAP test above is measured against."
+    );
+}
+
 ///
 /// The previous version of this test asserted `0` and passed — but only because it
 /// staged the member, sampled the modifier, called `recalculate_constants()` (which

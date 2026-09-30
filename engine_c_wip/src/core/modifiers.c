@@ -363,7 +363,7 @@ int rb_get_card_appearance_source(const GameState *g, int card_id, RbZone *out) 
 
 /* RbZone (the movement-side enum) -> RbZoneId (the compact wire enum), so a
    recorded debut zone can be fed to the same source-string resolver the rest
-   of the engine uses. Kept local: no other translation direction exists yet. */
+   of the engine uses. */
 static RbZoneId appearance_source_zone_id(RbZone z) {
     switch (z) {
         case RB_ZONE_HAND:       return RB_ZONEID_HAND;
@@ -376,6 +376,49 @@ static RbZoneId appearance_source_zone_id(RbZone z) {
         case RB_ZONE_RESOLUTION: return RB_ZONEID_RESOLUTION;
     }
     return RB_ZONEID_UNKNOWN;
+}
+
+/* RbZoneId (the compact wire enum) -> RbZone (the movement-side enum): the
+   INVERSE of appearance_source_zone_id, and the only such inverse in the tree.
+   Exported because the effect-driven placement sites need it.
+
+   Why it is needed: Rust records the debut source as a WIRE STRING taken
+   straight off the effect —
+     ability/effects/move/mod.rs:2537-2538
+       `let source = self.in_flight.spawn_context.source.as_deref().unwrap_or("")`
+   — and hands that string to record_card_appearance, which stores it verbatim
+   (modifiers.rs:1638-1641). The C port stores an RbZone instead, so an
+   effect-driven placement that only has a zone NAME must be translated here
+   before it reaches rb_record_card_appearance.
+
+   Rust's "no source" case is that EMPTY string, guarded by
+   `if !source.is_empty()`. The C spells the same thing as a NEGATIVE RbZone
+   (rb_record_card_appearance's `source >= 0` guard, modifiers.c:340), so
+   every zone id with no RbZone counterpart — and RB_ZONEID_UNKNOWN itself —
+   returns -1 here. The wire spellings that only ever appear as a SOURCE (a
+   movement event's destination, or a selector) collapse onto the nearest
+   real zone, matching appearance_source_zone_id's own aliases: both
+   energy_zone/energy -> RB_ZONE_ENERGY, and success_zone/success_live_zone
+   -> RB_ZONE_SUCCESS. */
+int rb_zone_id_to_movement_zone(RbZoneId zid) {
+    switch (zid) {
+        case RB_ZONEID_HAND:             return RB_ZONE_HAND;
+        case RB_ZONEID_DECK:
+        case RB_ZONEID_DECK_TOP:
+        case RB_ZONEID_DECK_BOTTOM:
+        case RB_ZONEID_DECK_TOP_OR_BOTTOM: return RB_ZONE_DECK;
+        case RB_ZONEID_STAGE:            return RB_ZONE_STAGE;
+        case RB_ZONEID_DISCARD:
+        case RB_ZONEID_WAITROOM:         return RB_ZONE_DISCARD;
+        case RB_ZONEID_ENERGY:
+        case RB_ZONEID_ENERGY_ZONE:
+        case RB_ZONEID_ENERGY_DECK:      return RB_ZONE_ENERGY;
+        case RB_ZONEID_LIVE_CARD_ZONE:   return RB_ZONE_LIVE;
+        case RB_ZONEID_SUCCESS_ZONE:
+        case RB_ZONEID_SUCCESS_LIVE_ZONE: return RB_ZONE_SUCCESS;
+        case RB_ZONEID_RESOLUTION:       return RB_ZONE_RESOLUTION;
+        default:                         return -1;
+    }
 }
 
 /* -- appearance_source_matches --
@@ -486,27 +529,41 @@ void rb_record_card_movement(GameState *g, int card_id, int from_zone, int to_zo
 }
 
 /* -- clear_card_movement_tracking --
-   Mirror modifiers.rs:1588-1596 (GameState::clear_card_movement_tracking).
-   Rust clears five turn-scoped structures:
+   Mirror modifiers.rs:1920-1942 (GameState::clear_card_movement_tracking).
+   Rust clears seven turn-scoped structures:
      cards_moved_this_turn  -> g->moved_this_turn[]            (held)
      turn_movements         -> g->batch_movements[]            (held; C folds
                               push_movement_event into
                               rb_record_card_movement, so the event log and
                               the per-card flag share one entry point)
      cards_appeared_this_turn-> g->cards_appeared_this_turn[]  (held)
+     cards_activated_this_turn-> (no C field)
+     card_appearance_source  -> g->card_appearance_source[]    (held)
      turn_area_movements    -> (no C field)
      mods.opp_cause_fired_keys -> (no C field; the C engine dedupes
-                              opponent-cause watchers per move batch via
-                              g->batch_triggered_keys instead, which is a
-                              different — and weaker — scope)
+                               opponent-cause watchers per move batch via
+                               g->batch_triggered_keys instead, which is a
+                               different — and weaker — scope)
    NOT cleared, matching Rust: g->recently_moved / recently_appeared.
-   Call site in Rust: engine/src/turn/phases.rs:310, inside the victory /
+   Call site in Rust: engine/src/turn/phases.rs:309, inside the victory /
    turn-rollover arm of advance_phase, immediately after turn_number += 1. */
 void rb_clear_card_movement_tracking(GameState *g) {
     if (!g) return;
     memset(g->moved_this_turn, 0, sizeof(g->moved_this_turn));
     g->n_batch_movements = 0;
     g->n_cards_appeared_this_turn = 0;
+    /* modifiers.rs:1937 — `self.card_appearance_source.clear();`
+
+       card_appearance_source is the SECOND HALF of the 「このターン中に登場した場合」
+       condition and it MUST turn over with cards_appeared_this_turn. The
+       condition reads the pair together (ability/condition/card.rs compares
+       has_card_appeared_this_turn against get_card_appearance_source), and
+       rb_get_card_appearance_source returns the FIRST matching entry — so
+       without this, a source recorded on turn N stays answerable on turn
+       N+1, N+2, ... forever, and a genuinely different later debut could never
+       match because the stale turn-N entry is the one found. This is Rust's
+       own reasoning, verbatim, at the clear site. */
+    g->n_card_appearance_source = 0;
 }
 
 /* -- remove_revealed_card --

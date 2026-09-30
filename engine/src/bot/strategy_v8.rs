@@ -122,49 +122,28 @@ pub fn probe_main_against_v7(gs: &GameState, actions: &[Action], me: u8) {
         return;
     }
     let db = &gs.card_database;
-    let ours = crate::bot::strategy_v8::score_actions_v8(gs, actions, me);
-    let theirs = crate::bot::v7_main::score_actions(gs, actions, me);
-    // Compare the ACTIONS, not the two bots' own score labels. v8 labels Pass
-    // "end-main" and v7 labels it "end-main=0", so comparing notes reported a
-    // disagreement on every single pass — which is most of a game. The labels
-    // are for humans reading one bot's trace and are not a shared vocabulary.
-    let mut ours_actions: Vec<Action> = vec![];
-    let mut their_actions: Vec<Action> = vec![];
-    for a in crate::bot::v8_main::evaluate_actions(gs, actions, me, db) {
-        if let Some(index) = a.index {
-            if let Some(action) = actions.get(index) {
-                ours_actions.push(action.clone());
-            }
-        }
-    }
-    for a in crate::bot::v7_main::evaluate_actions(gs, actions, me) {
-        if let Some(index) = a.index {
-            if let Some(action) = actions.get(index) {
-                their_actions.push(action.clone());
-            }
-        }
-    }
-    let (Some(a), Some(b)) = (ours_actions.first(), their_actions.first()) else {
-        return;
-    };
-    if a.action_type == b.action_type && a.card_id == b.card_id {
+    // Both choosers are pure — they return an `Action` and touch neither the
+    // state nor the RNG (each seeds its own scratch) — so the same state can be
+    // put to both policies and the two answers compared directly. Comparing
+    // their SCORE LABELS instead was the first version and it was useless: v8
+    // calls Pass "end-main" and v7 calls it "end-main=0", so every pass in the
+    // game logged as a disagreement.
+    let ours = super::v8_main::choose_action_v8(gs, actions, me);
+    let theirs = crate::bot::strategy_v7::choose_action_v7(gs, actions, me);
+    // `Action` carries no top-level `card_id`; the target lives in
+    // `parameters`, whose rendering is not stable across the two bots, so the
+    // comparison is on `action_type` plus the engine's own `description`, which
+    // both share because it is produced by the action generator rather than by
+    // either policy.
+    if ours.action_type == theirs.action_type && ours.description == theirs.description {
         return;
     }
-    let describe = |x: &Action| {
-        format!(
-            "{:?}{}",
-            x.action_type,
-            x.card_id
-                .filter(|c| *c != 0)
-                .map(|c| format!("({c})"))
-                .unwrap_or_default()
-        )
-    };
+    let describe = |x: &Action| format!("{:?} {}", x.action_type, x.description);
     let blades = super::v8_model::active_blades(gs, me, db);
     let opp = 1 - me;
     eprintln!(
-        "PROBE t={} me={} bl={} cost={} h={} ammo={} hand={} | ours: bl={} h={} | v8={} v7={} \
-         | v8top={:.1} v7top={:.1}",
+        "PROBE t={} me={} bl={} cost={} h={} ammo={} hand={} deck={} | opp: bl={} h={} | \
+         v8={} v7={}",
         gs.turn_number,
         me,
         blades,
@@ -172,12 +151,11 @@ pub fn probe_main_against_v7(gs: &GameState, actions: &[Action], me: u8) {
         super::v8_model::supply_hearts(gs, me, db),
         super::v8_model::lives_in_hand(gs.seat_player(me), db),
         gs.seat_player(me).hand.cards.len(),
+        gs.seat_player(me).main_deck.cards.len(),
         super::v8_model::active_blades(gs, opp, db),
         super::v8_model::supply_hearts(gs, opp, db),
-        describe(a),
-        describe(b),
-        ours.first().map(|(v, _)| *v).unwrap_or(0.0),
-        theirs.first().map(|(v, _)| *v).unwrap_or(0.0),
+        describe(&ours),
+        describe(&theirs),
     );
 }
 
@@ -284,7 +262,71 @@ fn opening_value(
     // `v8_main::leaf_value`, so the opening and the play agree on units.
     let place_3 = snapshots[3];
     let place_4 = snapshots[4];
-    SCALE * (place_3 + (place_4 - place_3)) + SCALE * PLACEMENT_CREDIT * opening.lives as f64
+    SCALE * (place_3 + (place_4 - place_3))
+        + SCALE * PLACEMENT_CREDIT * opening.lives as f64
+        - blade_budget_penalty(db, gs, me, keep, discarded)
+}
+
+/// Cards in the deck carrying no blade-heart: the growth/convertibility budget.
+///
+/// This is the resource competitive play turns on, and nothing in `bot/` counts
+/// it. The community write-up is explicit about the trade: a deck grows fast by
+/// running high-cost members, those are the ones with no blade-heart, and every
+/// one of them lowers the check rate. Their worked numbers for having 6 / 7 / 8
+/// of them and still drawing the cost-9 by turn 2 are **89% / 93% / 95%** — so
+/// the sixth is worth +4 points and the eighth only +2, and the marginal card is
+/// already nearly dead by the time there are seven.
+///
+/// `opening_place` prices the *check*, so the opening is currently scored with
+/// no view of what it costs in growth fuel. That is a one-sided evaluation: it
+/// can see why a hand is good and never why it is unaffordable. A hand that
+/// keeps two more no-blade-heart members than the budget allows is being paid
+/// for a curve the deck cannot actually cash.
+///
+/// ## Why the penalty is on the post-mulligan deck
+///
+/// A discarded member goes back and is redrawn from the top, so what matters is
+/// the count in the deck the game is played with, not the count in hand. Both
+/// are counted here, because a no-blade-heart member kept in hand is a card
+/// that will be played; one discarded is a card that will be drawn again later
+/// and can wait. Penalising both is the conservative reading and the switch
+/// exists so the two can be separated if the first measurement disagrees.
+fn blade_budget_penalty(
+    db: &CardDatabase,
+    gs: &GameState,
+    me: u8,
+    keep: &[i16],
+    discarded: &[i16],
+) -> f64 {
+    let weight: f64 = std::env::var("V8_MULL_BH")
+        .ok()
+        .and_then(|v| v.parse().ok())
+        .filter(|w: &f64| w.is_finite() && *w >= 0.0)
+        .unwrap_or(0.0);
+    if weight == 0.0 {
+        return 0.0;
+    }
+    let budget: i32 = std::env::var("V8_MULL_BH_BUDGET")
+        .ok()
+        .and_then(|v| v.parse().ok())
+        .unwrap_or(7);
+    let no_blade = |cid: i16| {
+        db.get_card(cid)
+            .is_some_and(|c| c.card_type == CardType::Member && c.blade_heart.is_none())
+    };
+    let in_deck = gs
+        .seat_player(me)
+        .main_deck
+        .cards
+        .iter()
+        .filter(|&&cid| no_blade(cid))
+        .count() as i32;
+    // Kept fuel is spent early; discarded fuel is still drawable, so it counts
+    // at half. The hand is where the cost is actually paid.
+    let kept = keep.iter().filter(|&&cid| no_blade(cid)).count() as i32;
+    let drawn = discarded.iter().filter(|&&cid| no_blade(cid)).count() as i32;
+    let total = in_deck + kept + drawn / 2;
+    weight * (total - budget).max(0) as f64
 }
 
 /// Which hand indices to DISCARD. The engine permits zero through six

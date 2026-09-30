@@ -135,9 +135,27 @@ fn fixtures_are_what_the_clauses_assume() {
     }
 }
 
-/// The positive. OPEN GAP, recorded: the effect does not fire even with every clause
-/// satisfied, so which clause is failing is still unknown. Not a decode problem — the
-/// bytecode validator reports no silent fallback for this ability.
+/// The positive. **REAL BUG, diagnosed — the ability does not fire even with every clause
+/// satisfied.** Re-verified 2026-09-30 by inverting this assertion: with the three
+/// characters revealed, a 17-cost BiBi in the centre, and a 2-printed-heart foe, the
+/// ability still does not wait the foe, and the five negatives in this file all still hold.
+/// So this is a missing POSITIVE, not an over-firing engine — the compound condition is
+/// evaluated to false somewhere.
+///
+/// The parse is NOT the problem: `cards/abilities.json` gives this node a correct compound —
+/// a `location_condition` on `revealed_cards` naming 矢澤にこ/西木野真姫/絢瀬絵里, ANDed with
+/// a `comparison_condition` carrying `position: "center"`, `cost_limit: 11` (`>=`),
+/// `group_names: ["BiBi"]`, plus a top-level `yell_trigger: true`.
+///
+/// The two remaining suspects are in the ENGINE, not the data:
+///   * `yell_trigger` — the compound is gated on having yelled, and nothing in this fixture
+///     drives an actual エール. The parse attaches it, but whether the engine evaluates it
+///     against real yell state is unverified.
+///   * `position: "center"` inside a `comparison_condition` nested in a compound — the
+///     centre restriction is carried as a bare field rather than a `location`, so a
+///     generic path that reads only `location` would see no zone and could reject.
+///
+/// Not a decode problem: the bytecode validator reports no silent fallback for this ability.
 #[test]
 fn all_clauses_met_waits_the_foe() {
     let fired = run(CENTRE_DEAR, &[NICO, MAKI, ERI], OPP_2);

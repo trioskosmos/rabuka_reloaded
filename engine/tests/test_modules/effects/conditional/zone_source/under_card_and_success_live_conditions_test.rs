@@ -127,32 +127,71 @@ fn umi_conditional_alternative_0_1_2() {
 // fails loudly instead of quietly starting to check the right thing. Fixing the
 // engine is a separate change; it needs a test that first demonstrates the
 // missing prompt.
+/// 唐 可可 `PL!SP-pb2-013-R` 登場: the optional 『KALEIDOSCORE』 discard, and the
+/// blade-heart follow-up.
+///
+/// ## The "KNOWN GAP" in this test was its own fixture
+///
+/// The previous version used `PL!SP-bp1-004-P` as the card to discard and recorded a
+/// KNOWN GAP: the 手札の『KALEIDOSCORE』のカードを1枚控え室に置いてもよい prompt "does not
+/// currently offer its prompt", with the discard, the energy placement and the deck draw
+/// all pinned as not happening.
+///
+/// `PL!SP-bp1-004-P` is 平安名すみれ, `unit: "CatChu!"` — verified in `cards/cards.json`.
+/// The cost filters on `group_names: ["KALEIDOSCORE"]` and `card_matches_group_str`
+/// (`engine/src/ability/util.rs:637-659`) matches on `unit`. **CatChu! is not
+/// KALEIDOSCORE, so the cost was unpayable and no prompt could ever be raised.** The gap
+/// was the test's own fixture, and the assertions blessed it.
+///
+/// Worse, the gap was fictional: `keke_discard_blade_heart_no_draw` in
+/// `effects/conditional/zone_source/debut_discard_blade_heart_draw_test.rs` exercises the
+/// same card with a KALEIDOSCORE discard and asserts the OPPOSITE of all three — that the
+/// prompt appears, the card is discarded, and the energy is placed. Both tests were green
+/// at once, asserting opposites.
+///
+/// `PL!SP-sd1-010-SD` is ウィーン・マルガレーテ, `unit: "KALEIDOSCORE"`, with
+/// `blade_heart {b_heart02: 1}` — payable AND blade-bearing, which is the combination
+/// this branch is about. It is the same fixture
+/// `keke_discard_blade_heart_no_draw` in
+/// `effects/conditional/zone_source/debut_discard_blade_heart_draw_test.rs` uses for the
+/// blade-bearing case, so the two tests are directly comparable and cannot both be wrong
+/// about the same thing.
 #[test]
-fn kaleidoscore_optional_branches() {
+fn kaleidoscore_blade_heart_discard_is_paid_and_draws_nothing() {
     use rabuka_engine::zones::MemberArea;
 
     let db = load_real_database();
     let mut g = TestGame::new(db);
     let keke = g.id("PL!SP-pb2-013-R");
     g.assert_card_identity(keke, "PL!SP-pb2-013-R");
-    // 平安名すみれ carries a blade heart. The `id` helper normalises a trailing
-    // ＋, so `PL!SP-bp1-004-P` resolves to the `P` print — pinned against what
-    // actually comes back rather than what was typed.
-    let blade_card = g.id("PL!SP-bp1-004-P");
-    g.assert_card_identity(blade_card, "PL!SP-bp1-004-P");
-    assert!(
-        g.db.get_card(blade_card).unwrap().has_blade_heart(),
-        "the blade-bearing branch needs a card that HAS a blade heart"
+
+    // The cost requires a 『KALEIDOSCORE』 card, and this branch needs one that HAS a
+    // blade heart. Both are pinned, because a wrong unit makes the whole test vacuous —
+    // that is exactly what happened here before.
+    let blade_card = g.id("PL!SP-sd1-010-SD");
+    g.assert_card_identity(blade_card, "PL!SP-sd1-010-SD");
+    let card = g.db.get_card(blade_card).unwrap();
+    assert_eq!(
+        card.unit.as_deref(),
+        Some("KALEIDOSCORE"),
+        "precondition: the cost filters on 『KALEIDOSCORE』. A non-KALEIDOSCORE card makes \
+         the cost unpayable and the test vacuous — see the header."
     );
+    assert!(
+        card.has_blade_heart_strict(),
+        "precondition: this branch is ブレードハートを持たない場合 -> draw, so the \
+         discarded card must HAVE a blade heart"
+    );
+
     let energy = g.id("LL-E-001-SD");
     g.state.player1.energy_deck.cards.push(energy);
     g.add_to_hand(keke);
     g.add_to_hand(blade_card);
     g.give_energy(10);
-    // The energy zone already holds the 10 given above; the printed step would
-    // add ONE more from the energy deck.
+
     let energy_zone_before = g.state.player1.energy_zone.cards.len();
     let energy_deck_before = g.state.player1.energy_deck.cards.len();
+    let hand_before = g.state.player1.hand.cards.len();
 
     g.play_to_stage(keke, MemberArea::LeftSide);
     g.drain_auto_ability_choices();
@@ -163,30 +202,28 @@ fn kaleidoscore_optional_branches() {
         keke,
         "唐 可可 is on the stage"
     );
+    // The cost IS payable, and paying it is the whole point of the branch.
     assert!(
-        g.state.player1.hand.cards.contains(&blade_card),
-        "KNOWN GAP: 手札の『KALEIDOSCORE』のカードを1枚控え室に置いてもよい does not \
-         currently offer its prompt, so the card is still in hand \
-         (waitroom={:?})",
-        g.state
-            .player1
-            .waitroom
-            .cards
-            .iter()
-            .map(|&c| g.db.get_card(c).map(|x| x.card_no.to_string()).unwrap_or_default())
-            .collect::<Vec<_>>()
+        !g.state.player1.hand.cards.contains(&blade_card),
+        "手札の『KALEIDOSCORE』のカードを1枚控え室に置いてもよい — the prompt appears and the \
+         cost is paid, so the KALEIDOSCORE card must have left the hand"
     );
+    assert!(
+        g.state.player1.hand.cards.len() <= hand_before,
+        "…and nothing was drawn: ブレードハートを持つ card was discarded, so \
+         これにより控え室に置いたカードがブレードハートを持たない場合 does not apply"
+    );
+    // 自分のエネルギーデッキから、エネルギーカードを1枚ウェイト状態で置く
     assert_eq!(
         g.state.player1.energy_zone.cards.len(),
-        energy_zone_before,
-        "KNOWN GAP: the エネルギーカードを1枚ウェイト状態で置く step is gated on \
-         that discard, so no energy joined the zone either (was {energy_zone_before})"
+        energy_zone_before + 1,
+        "エネルギーカードを1枚ウェイト状態で置く — the cost places exactly one energy \
+         from the energy deck into the zone"
     );
-    assert!(
-        g.state.player1.energy_deck.cards.len() <= energy_deck_before,
-        "…and nothing left the energy deck either, so the whole step is skipped \
-         (was {energy_deck_before}, now {})",
-        g.state.player1.energy_deck.cards.len()
+    assert_eq!(
+        g.state.player1.energy_deck.cards.len(),
+        energy_deck_before - 1,
+        "…and exactly one left the energy deck to do it"
     );
 }
 

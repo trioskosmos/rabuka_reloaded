@@ -14,6 +14,7 @@ pub mod draw;
 pub mod energy;
 pub mod gain;
 pub mod invalidate;
+pub mod kidou;
 pub mod live_start;
 pub mod look_select;
 pub mod mill;

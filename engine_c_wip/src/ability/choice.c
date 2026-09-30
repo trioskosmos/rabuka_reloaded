@@ -19,6 +19,17 @@ void rb_move_execute_selected_cards_from_zone(GameState *g, int actor, const cha
     const char *target_player_id);
 void rb_move_handle_select_cards_looked_at(GameState *g, int actor, const int *indices,
     int n_indices, const char *destination, int discard_remaining);
+/* move.c:1672 — the faithful port of move/mod.rs:3302
+   handle_energy_zone_selection, reached from choice.rs:1116-1123 for a
+   SelectCard over Zone::Energy whose `destination` is set. Declared HERE, at
+   the top of the translation unit, because rb_resolver_handle_select_card
+   calls it far above the body of this file. */
+void rb_move_handle_energy_zone_selection(GameState *g, int actor, const int *indices,
+    int n_indices, int count, const char *destination, int (*validate_card)(int));
+/* move.c:294/:310 — the Rule 4.5.5 under-member landing (placement.rs:208-219
+   + util.rs:2341-2358) that rb_place_card_in_zone (util.c) is missing. */
+int rb_move_under_member_pos(GameState *g, int pl);
+int rb_move_place_card_under_member(GameState *g, int pl, int cid, int pos_to_use);
 
 /* PAY_SKIP_TARGET constant (types.rs `PAY_SKIP_TARGET`; the C global of the
    same name is types.c:602, this macro is the file-local spelling every
@@ -111,6 +122,38 @@ int rb_effect_answers_any(const AbilityEffect *effect)
     return effect && effect->alternative_condition != NULL;
 }
 
+/* ── CSV group matching on the choice path ──
+ *
+ * Rust models `group_names` as a Vec<String> (core/card.rs:2007 group_names_any)
+ * and reads one entry at a time; the C bytecode decoder flattens the whole list
+ * into ONE comma-joined extra value. cost.c:163 already carries the working
+ * split_csv twin for exactly this shape, and util.c:403
+ * rb_card_matches_any_group is the working matcher — neither was applied here,
+ * so `filter_group` was compared as ONE EXACT token by
+ * rb_card_matches_group_str (util.c:339), no card matched a multi-group value,
+ * the candidate set came back EMPTY, the prompt was never raised and the
+ * effect silently no-opped. Split the list and accept ANY entry, which is what
+ * 「『A』と『B』の…」 means and a strict superset of single-group matching. */
+int choice_card_matches_group_csv(int card_id, const char *group_csv)
+{
+    if (!group_csv || !*group_csv) return 1;
+    const char *names[16];
+    char groups[16][64];
+    int ng = 0;
+    const char *p = group_csv;
+    while (*p && ng < 16) {
+        const char *comma = strchr(p, ',');
+        size_t len = comma ? (size_t)(comma - p) : strlen(p);
+        if (len >= 64) len = 63;
+        memcpy(groups[ng], p, len);
+        groups[ng][len] = '\0';
+        names[ng++] = groups[ng - 1];
+        if (!comma) break;
+        p = comma + 1;
+    }
+    return rb_card_matches_any_group(card_id, names, ng);
+}
+
 int rb_effect_resource_on_select(const AbilityEffect *effect)
 {
     const char *resource = choice_effect_extra(effect, "resource");
@@ -131,6 +174,22 @@ int rb_entry_conditional_choice_effect(const GameState *g)
            (g->queue.pending.route == RB_ROUTE_CONDITIONAL_CHOICE && g->queue.has_pending);
 }
 
+/* The SelectCard choice's own `characters` list, as the (names, count) pair
+   rb_move_execute_selected_cards_from_zone expects. Rust puts the same list
+   on the Choice (move/selection.rs:38 `.characters(filter.characters)`) and
+   execute_selected_cards_from_zone applies it
+   (move_cards.rs:2716-2723: `!card_matches_characters(...) => continue`), so
+   leaving the C argument at NULL meant 桜坂しずく's 「手札からコスト4以下の
+   「桜坂しずく」のメンバーカードを1枚」 (PL!N-pb1-015-R) deployed the `mu's`
+   filler instead of the named member. */
+static int choice_characters_arg(const RbChoice *ch, const char **names, int max) {
+    int n = 0;
+    if (!ch) return 0;
+    for (int i = 0; i < ch->n_characters && n < max; i++)
+        if (ch->characters[i][0]) names[n++] = ch->characters[i];
+    return n;
+}
+
 int rb_resolver_build_choice_select_cards(RbAbilityResolver *self, GameState *g)
 {
     if (!self || !g) return -1;
@@ -144,8 +203,39 @@ int rb_resolver_build_choice_select_cards(RbAbilityResolver *self, GameState *g)
     if (effect->source) strncpy(choice.zone, effect->source, sizeof(choice.zone) - 1);
     if (effect->card_type_field[0]) strncpy(choice.card_type, effect->card_type_field, sizeof(choice.card_type) - 1);
     if (effect->text) strncpy(choice.description, effect->text, sizeof(choice.description) - 1);
+    /* `group_names` is a Vec<String> in Rust (core/card.rs:2007) and the
+       bytecode decoder flattens the whole list into ONE comma-joined extra
+       value — "Aqours,SaintSnow" is PL!S-bp5-004-R ab#0, "DiverDiva,虹ヶ咲"
+       is PL!N-bp7-005-P ab#0; 24 decoded effects carry such a value. The raw
+       CSV is kept verbatim here (as before) and every CONSUMER in this file
+       matches it with choice_card_matches_group_csv, which splits it and
+       accepts ANY entry — the working split_csv twin (cost.c:163) feeding the
+       working rb_card_matches_any_group matcher (util.c:403). Matching it as
+       ONE exact token (rb_card_matches_group_str, util.c:339) matched nothing
+       at all, the candidate set came back empty, no prompt was raised and the
+       effect silently no-opped. */
     const char *group = choice_effect_extra(effect, "group_names");
     if (group) strncpy(choice.filter_group, group, sizeof(choice.filter_group) - 1);
+    /* The name filter. Rust carries it as `characters` on the Choice
+       (move/selection.rs:38, fed from filter_from_parts_full, util.rs:535);
+       the C decoder emits the same list as the `characters` extra
+       (PL!N-pb1-015-R's cost leg is `characters = 桜坂しずく`). It was not
+       copied onto the choice at all, so paying 桜坂しずく's optional 2E
+       deployed a `mu's` filler instead of the named one. */
+    const char *chars = choice_effect_extra(effect, "characters");
+    if (chars) {
+        const char *p = chars;
+        while (*p && choice.n_characters < (int)(sizeof(choice.characters) / sizeof(choice.characters[0]))) {
+            const char *comma = strchr(p, ',');
+            size_t len = comma ? (size_t)(comma - p) : strlen(p);
+            if (len >= sizeof(choice.characters[0])) len = sizeof(choice.characters[0]) - 1;
+            memcpy(choice.characters[choice.n_characters], p, len);
+            choice.characters[choice.n_characters][len] = '\0';
+            choice.n_characters++;
+            if (!comma) break;
+            p = comma + 1;
+        }
+    }
     if (effect->target) strncpy(choice.target_player_id, effect->target, sizeof(choice.target_player_id) - 1);
     choice.route = RB_ROUTE_SELECT_CARDS;
     choice.actor = g->queue.actor;
@@ -852,10 +942,22 @@ int rb_resolver_provide_choice_result(GameState *g, int selected_idx) {
    when relevant, then clears the choice state and resumes the queue. */
 
 /* Move `cid` to `dst` for a choice handler — waitroom/discard use the waitroom
-    bag, every other zone uses the generic zone placement helper. */
+    bag, every other zone uses the generic zone placement helper.
+
+    "under_member" is the one destination rb_place_card_in_zone (util.c:836)
+    has no arm for: its zone_bag() (util.c:797) returns NULL for the zone, so
+    the call returned 0 having moved nothing and the card ended up in NO zone
+    at all after leaving its source — the confirmed
+    move_cards(destination="under_member") "reports the move and populates
+    nothing" defect (test_parity_int_gaps.c c1, test_parity_cce_gaps.c H1/H5,
+    and the energy cost arm). Route it to the faithful Rule 4.5.5 landing
+    instead: placement.rs:208-219 for the host area and util.rs:2341-2358 for
+    the place itself. */
 static void rb_choice_send_to_dst(GameState *g, int pl, int cid, const char *dst) {
     if (!dst || !strcmp(dst, "waitroom") || !strcmp(dst, "discard"))
         rb_waitroom_add(&g->p[pl], cid);
+    else if (!strcmp(dst, "under_member"))
+        rb_move_place_card_under_member(g, pl, cid, rb_move_under_member_pos(g, pl));
     else
         rb_place_card_in_zone(g, pl, cid, dst, -1);
 }
@@ -1318,11 +1420,13 @@ static int choice_handle_hand_indices(RbAbilityResolver *self, GameState *g,
         if (n_picked > 0 && count == 0 && allow_skip) {
             /* any_number batch: apply it, then re-offer with skip
                (choice.rs:1369-1430). */
+            const char *ch_chars[16]; int n_ch_chars = choice_characters_arg(ch, ch_chars, 16);
             rb_resolver_execute_selected_cards_from_zone(self, g, "hand", picked, n_picked,
                 ch->card_type[0] ? ch->card_type : NULL, ch->cost_limit,
                 ch->cost_limit_op[0] ? ch->cost_limit_op : NULL, ch->cost_total,
                 ch->cost_total_op[0] ? ch->cost_total_op : NULL,
-                ch->filter_group[0] ? ch->filter_group : NULL, NULL, 0,
+                ch->filter_group[0] ? ch->filter_group : NULL,
+                n_ch_chars ? ch_chars : NULL, n_ch_chars,
                 ch->target_player_id[0] ? ch->target_player_id : NULL);
             if (rb_has_pending_choice(g)) return 1;   /* a sub-choice took over */
             char en[96]; char ja[96];
@@ -1336,11 +1440,13 @@ static int choice_handle_hand_indices(RbAbilityResolver *self, GameState *g,
                selection through execute_selected_cards_from_zone, which is
                where the zone move happens, then drops selected_cards unless
                the effect consumes them. */
+            const char *ch_chars[16]; int n_ch_chars = choice_characters_arg(ch, ch_chars, 16);
             rb_resolver_execute_selected_cards_from_zone(self, g, "hand", picked, n_picked,
                 ch->card_type[0] ? ch->card_type : NULL, ch->cost_limit,
                 ch->cost_limit_op[0] ? ch->cost_limit_op : NULL, ch->cost_total,
                 ch->cost_total_op[0] ? ch->cost_total_op : NULL,
-                ch->filter_group[0] ? ch->filter_group : NULL, NULL, 0,
+                ch->filter_group[0] ? ch->filter_group : NULL,
+                n_ch_chars ? ch_chars : NULL, n_ch_chars,
                 ch->target_player_id[0] ? ch->target_player_id : NULL);
             self->n_selected_cards = 0;
         }
@@ -1662,6 +1768,44 @@ int rb_resolver_handle_select_card(RbAbilityResolver *self, GameState *g, const 
                 return 0;
             }
             g->queue.has_pending = 0;
+            return 0;
+        }
+        /* choice.rs:1116-1123 — a SelectCard over Zone::Energy hands the
+           choice's OWN `destination` to move/mod.rs:3302
+           handle_energy_zone_selection, whose `dst == Zone::UnderMember` arm
+           (:3336-3347) is the 「エネルギー置き場にあるエネルギー1枚をこの
+           メンバーの下に置く」 placement. This arm had NO such case, so the
+           selected energy was unconditionally routed to the WAITROOM: no
+           under_cards entry was ever created and the chained effect after the
+           cost never ran. `target` is where the C stores that destination
+           (rb_resolver_store_pending_choice, the `target` field of the flat
+           RbChoice, the same field the `energy_state_change` branch above
+           already tests). */
+        if (target && !strcmp(target, "under_member")) {
+            if (was_skip || idx < 0) {
+                /* move/mod.rs:3337-3344 — an empty selection drops the pending
+                   「そうした場合」 actions and records the decline, so the
+                   chained effect does not still fire. */
+                rb_queue_take_pending_actions(g);
+                if (cur >= 0 && cur < RB_QUEUE_DEPTH)
+                    g->queue.entries[cur].optional_cost_result = 0;
+                rb_resolver_clear_choice_state_and_resume(self);
+                return 0;
+            }
+            int eids[RB_MAX_ZONE];
+            int en = rb_zone_cards(g, actor, "energy", eids, RB_MAX_ZONE);
+            if (idx >= en) { rb_resolver_handle_selection_epilogue(self, g); return 0; }
+            int eidx[1] = { idx };
+            rb_move_handle_energy_zone_selection(g, actor, eidx, 1, pending_count,
+                                                "under_member", NULL);
+            /* move/mod.rs:3358 — self.selection.moved_cards = cids. */
+            if (idx < en && self->n_moved_cards < RB_MAX_RECENTLY_MOVED)
+                self->moved_cards[self->n_moved_cards++] = eids[idx];
+            /* The standard epilogue every other arm ends on, so the chained
+               「そうした場合」 effect still runs and a pending reprompt is
+               honoured (choice.rs:1116-1123 returns straight into the outer
+               answer loop, not a bespoke teardown). */
+            rb_resolver_handle_selection_epilogue(self, g);
             return 0;
         }
         if (!was_skip) {
@@ -2242,19 +2386,27 @@ static void stage_build_filtered_slots(GameState *g, int pl) {
         int cid = g->p[pl].stage[slot];
         if (cid == RB_EMPTY_SLOT || cid < 0) continue;
         if (ch->card_type[0] && !rb_card_matches_type(cid, ch->card_type)) continue;
-        if (ch->filter_group[0] && !rb_card_matches_group_str(cid, ch->filter_group)) continue;
+        if (ch->filter_group[0] && !choice_card_matches_group_csv(cid, ch->filter_group)) continue;
         ch->filtered_indices[n++] = slot;
     }
     if (n > 0) ch->n_filtered_indices = n;
 }
 
 /* Rust choice.rs:1006-1008 — `validate_card` is `choice.as_filter().matches`, i.e. the
-   SelectCard choice's own card_type + group_names. Applied per picked card exactly like
-   the Rust handler does before pushing it onto the selection pool. */
+   SelectCard choice's own card_type + group_names + characters. Applied per picked card
+   exactly like the Rust handler does before pushing it onto the selection pool. The
+   group is matched CSV-aware (choice_card_matches_group_csv) and the name list
+   through rb_card_matches_characters, both of which Rust reaches via
+   util::matching_indices (util.rs:1274) on the same filter. */
 static int stage_choice_accepts(const GameState *g, int cid) {
     const RbChoice *ch = &g->queue.pending;
     if (ch->card_type[0] && !rb_card_matches_type(cid, ch->card_type)) return 0;
-    if (ch->filter_group[0] && !rb_card_matches_group_str(cid, ch->filter_group)) return 0;
+    if (ch->filter_group[0] && !choice_card_matches_group_csv(cid, ch->filter_group)) return 0;
+    if (ch->n_characters > 0) {
+        const char *names[16];
+        for (int i = 0; i < ch->n_characters && i < 16; i++) names[i] = ch->characters[i];
+        if (!rb_card_matches_characters(cid, names, ch->n_characters)) return 0;
+    }
     return 1;
 }
 
@@ -3483,9 +3635,6 @@ static int choice_declined_cost_stop(GameState *g, const RbChoice *ch)
     }
     return 1;
 }
-
-void rb_move_handle_select_cards_looked_at(GameState *g, int actor,
-    const int *indices, int n_indices, const char *destination, int discard_remaining);
 
 static int rb_resume_with_choice_indices_internal(GameState *g, const int *selected_indices,
                                                    int n_indices) {

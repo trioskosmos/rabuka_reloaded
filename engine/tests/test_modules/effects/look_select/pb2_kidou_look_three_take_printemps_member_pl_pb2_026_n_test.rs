@@ -150,6 +150,23 @@ fn paying_the_cost_waits_her_and_discards_a_hand_card() {
 }
 
 /// The look offers exactly the Printemps members among the top 3.
+///
+/// ## What was wrong with the previous version
+///
+/// 1. **It measured the COST.** The 起動 cost is a `sequential_cost` of
+///    `change_state(self→wait)` + `move_cards(hand→discard, 1)`, and the move_cards
+///    sub-cost raises its own `Choice::select_cards(Hand, 1, …)`
+///    (`ability/cost/handlers.rs:608`). The loop broke on the FIRST `SelectCard`, which
+///    is that cost prompt, so the look was never observed. Both are `SelectCard`, so
+///    matching on the type alone cannot tell them apart — see `resolve_look_prompt` below,
+///    which separates them by whether the hand shrinks.
+/// 2. **It read the wrong number.** `pending_choice_count()` is
+///    `max_select = min(requested, matching)` (`ability/effects/look.rs:110,156`), so for
+///    a 「1枚」 take it is 1 whenever a prompt exists.
+/// 3. **The expected value was wrong.** `FILLER = PL!-sd1-010-SD` is 高坂 穂乃果, whose
+///    unit is **Printemps** — it satisfies 「『Printemps』のメンバーカード」 and must be
+///    offered. The correct count for this pool is **2**, not 1. Only 絢瀬絵里 (BiBi) is
+///    excluded, by the group filter.
 #[test]
 fn only_printemps_members_are_offered_from_the_look() {
     let db = load_real_database();
@@ -159,7 +176,9 @@ fn only_printemps_members_are_offered_from_the_look() {
     game.state.player1.hand.cards.clear();
     game.state.player1.waitroom.cards.clear();
     game.state.player1.main_deck.cards.clear();
-    // One Printemps, one BiBi, one filler: only the first qualifies.
+    // 小泉花陽 (Printemps), 絢瀬絵里 (BiBi), 高坂穂乃果 (Printemps).
+    // main_deck was cleared first, so these sit at index 0..2 and the deck — which draws
+    // from the FRONT via `cards.remove(0)` (`core/zones.rs:818`) — looks at exactly them.
     for card_no in [P_MEMBER, LW_MEMBER, FILLER] {
         game.state
             .player1
@@ -183,26 +202,35 @@ fn only_printemps_members_are_offered_from_the_look() {
     game.drain_choices();
     game.activate_ability(me);
 
-    // Step the single prompt: the cost, then the look's offer.
-    let mut offered: Option<usize> = None;
-    let mut guard = 0;
-    while game.has_pending_choice() && guard < 6 {
-        if let Some(n) = game.pending_choice_count().checked_sub(0) {
-            if game.pending_choice_type().as_deref() == Some("SelectCard")
-            {
-                offered = Some(n);
-                break;
-            }
-        }
-        game.select_indices(&[0]);
-        guard += 1;
-    }
-
+    // Pay 手札を1枚控え室に置く. Identified by the hand shrinking, not by the prompt
+    // type — the cost and the look are both SelectCard.
+    let hand_before_cost = game.state.player1.hand.cards.len();
     assert_eq!(
-        offered,
-        Some(1),
-        "その中から『Printemps』のメンバーカードを1枚 — of 小泉花陽 (Printemps), \
-         絢瀬絵里 (BiBi) and a filler, only the Printemps member is offered"
+        game.pending_choice_type().as_deref(),
+        Some("SelectCard"),
+        "the 起動 cost discards a hand card, so a SelectCard over the hand is pending"
+    );
+    game.select_indices(&[0]);
+    assert_eq!(
+        game.state.player1.hand.cards.len(),
+        hand_before_cost - 1,
+        "precondition: this was the COST prompt (hand shrank), not the look"
+    );
+
+    // Now the look prompt. 「その中から『Printemps』のメンバーカードを1枚」 — count the
+    // CANDIDATES, not the pick count.
+    assert_eq!(
+        game.pending_choice_type().as_deref(),
+        Some("SelectCard"),
+        "precondition: the cost is paid and the LOOK prompt is pending"
+    );
+    assert_eq!(
+        game.pending_choice_option_count(),
+        Some(2),
+        "その中から『Printemps』のメンバーカードを1枚 — of the three cards looked at, \
+         小泉花陽 (Printemps) and 高坂 穂乃果 (Printemps, the FILLER) both qualify; only \
+         絢瀬絵里 (BiBi) is excluded, by the group filter. The old expected value of 1 \
+         was wrong: the filler is a Printemps member and does qualify."
     );
 }
 
