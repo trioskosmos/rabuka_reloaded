@@ -8,19 +8,19 @@ actually present in C.
 ## Summary
 
 - C files audited (mapped to a Rust twin): 28
-- Total C lines (non-blank/comment): 32708   Total Rust lines: 31456
-- Total C functions: 1635   Total Rust functions (all): 965
+- Total C lines (non-blank/comment): 32743   Total Rust lines: 31507
+- Total C functions: 1636   Total Rust functions (all): 965
 - Total Rust **port-target** functions (excl. constructors/trait glue): 761
-- **Function-count gap (Rust port-targets − C, summed): -874** (approx. unported functions)
+- **Function-count gap (Rust port-targets − C, summed): -875** (approx. unported functions)
 - Best-effort unmatched Rust function names: 34 (heuristic)
 
 ## Per-file gap (sorted by missing-function count, worst first)
 
 | C file | C lines | Rust lines | C/Rust % | C fns | Rust port fns | missing ≈ | Rust twin(s) |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: | --- |
-| `src/ability/vm.c` | 2398 | 3840 | 62% | 99 | 82 | -17 | vm.rs, effect_decoder_gen.rs, condition_decoder_gen.rs |
+| `src/ability/vm.c` | 2433 | 3840 | 63% | 100 | 82 | -18 | vm.rs, effect_decoder_gen.rs, condition_decoder_gen.rs |
 | `src/ability/condition.c` | 3134 | 6107 | 51% | 134 | 103 | -31 | condition.rs, card.rs, compound.rs, state.rs |
-| `src/ability/choice.c` | 3410 | 3465 | 98% | 123 | 47 | -76 | choice.rs |
+| `src/ability/choice.c` | 3410 | 3515 | 97% | 123 | 47 | -76 | choice.rs |
 | `src/ability/ability_queue.c` | 673 | 69 | 975% | 57 | 3 | -54 | ability_queue.rs, triggers.rs |
 | `src/ability/dynamic_count.c` | 308 | 158 | 194% | 10 | 2 | -8 | dynamic_count.rs |
 | `src/ability/util.c` | 1991 | 2247 | 88% | 104 | 102 | -2 | util.rs |
@@ -39,7 +39,7 @@ actually present in C.
 | `src/core/alloc.c` | 177 | 0 | -1% | 15 | 0 | -15 | pool.rs |
 | `src/core/modifiers.c` | 566 | 432 | 131% | 71 | 23 | -48 | game_modifiers.rs, modifiers.rs |
 | `src/core/stats_pipeline.c` | 184 | 223 | 82% | 14 | 8 | -6 | stats_pipeline.rs |
-| `src/core/game_state_abilities.c` | 1830 | 2704 | 67% | 117 | 88 | -29 | abilities.rs |
+| `src/core/game_state_abilities.c` | 1830 | 2705 | 67% | 117 | 88 | -29 | abilities.rs |
 | `src/core/tracking.c` | 142 | 73 | 194% | 11 | 5 | -6 | tracking.rs |
 | `src/core/zones.c` | 648 | 1280 | 50% | 74 | 47 | -27 | zones.rs, player.rs |
 | `src/turn/phase.c` | 948 | 1496 | 63% | 55 | 37 | -18 | phases.rs |

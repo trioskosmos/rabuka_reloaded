@@ -31,7 +31,6 @@
 //! the options. Nothing counts the qualifying cards or re-offers the choice.
 
 use crate::helpers::*;
-use rabuka_engine::ability::enums::ActionType;
 use rabuka_engine::core::types::AbilityTrigger;
 use rabuka_engine::zones::MemberArea;
 
@@ -179,45 +178,46 @@ fn one_lily_white_card_offers_the_choice_exactly_once() {
     );
 }
 
-/// The parse must express the multiplier, not just carry the clause in its text.
+/// THE distinction from 「1つ以上を選ぶ」: here the SAME option stays selectable.
 ///
-/// The validator's `per_unit` rule reads 「1枚につき」 and requires a `per_unit` /
-/// `dynamic_count` structure; the current parse has neither, only `count: 1`.
+/// This card prints 「同じ選択肢を2回以上選んでもよい」, so the repeat must restore the
+/// FULL option list. The `any_number` path used by `PL!N-bp4-030-L` does the opposite —
+/// it removes the chosen option — and that is right THERE, because Bandai's own FAQ for
+/// that card answers 「ライブ成功時効果が発動した際、同じ効果を２回選ぶことができますか？」
+/// with 「いいえ。できません。」 (`PL!N-bp4-030-L` carries that FAQ in cards/cards.json).
+///
+/// So the two shapes are deliberately asymmetric, and this pins the half that is easy to
+/// break: collapsing the per-card repeat onto the `any_number` path would silently take
+/// the repeat clause away from this card.
 #[test]
-fn the_parse_expresses_the_per_card_multiplier() {
-    let db = load_real_database();
-    let game = TestGame::new(db);
-    let id = game.id(RESONANCE);
-    let eff = {
-        let owned = game
-            .db
-            .get_card(id)
-            .unwrap()
-            .resolved_abilities()
-            .find(|a| a.triggers.as_deref() == Some("ライブ開始時"));
-        owned
-            .and_then(|a| a.effect.as_ref().map(|e| (**e).clone()))
-            .expect("ライブ開始時 ability has an effect")
-    };
-    assert_eq!(eff.action, ActionType::Choice, "以下から1つを選ぶ");
+fn the_same_option_stays_selectable_on_the_repeat() {
+    let mut game = fired_with_lily_white_count(2);
+    assert!(game.has_pending_choice(), "precondition: the choice is offered");
 
-    assert_eq!(
-        eff.per_unit_any(),
-        Some(true),
-        "『lily white』のカード1枚につき — the choice count scales with the qualifying card \
-         count, so the effect must carry per_unit. It currently carries only `count: 1`, \
-         which is indistinguishable from a one-shot choice."
+    // Option 0 = 「自分のセンターエリアにいるメンバーは、ライブ終了時まで、ブレードを得る。」
+    const OPTION_0: &str = "センターエリア";
+    game.select_option(0);
+    let mut guard = 0;
+    while guard < 10 && !is_option_choice(&game) && game.has_pending_choice() {
+        game.select_indices(&[0]);
+        guard += 1;
+    }
+
+    assert!(
+        is_option_choice(&game),
+        "precondition: the per-card repeat is offered again"
     );
-    assert_eq!(
-        eff.group_names_any(),
-        Some(&vec!["lily white".to_string()]),
-        "the qualifying set is 成功ライブカード置き場にある『lily white』のカード"
-    );
-    assert_eq!(
-        eff.location_any(),
-        Some("success_live_zone"),
-        "the cards being counted live in the 成功ライブカード置き場. This must be `location`, \
-         not a bare per_unit_type 枚 — the engine resolves the counted zone as \
-         `location.or(per_unit_type)` and a bare 枚 falls back to the hand"
+    let desc = match game.get_pending_choice() {
+        rabuka_engine::ability::types::Choice::SelectTarget { description, .. } => {
+            description.clone()
+        }
+        other => panic!("expected a SelectTarget option prompt, got {other:?}"),
+    };
+    assert!(
+        desc.contains(OPTION_0),
+        "同じ選択肢を2回以上選んでもよい — the option just taken must STILL be offered on \
+         the repeat. The `any_number` path (PL!N-bp4-030-L) removes it, but that card's FAQ \
+         answers 「いいえ。できません。」 to the same question; THIS card prints the opposite, \
+         so the per-card repeat must restore the full option list. Repeat prompt was: {desc}"
     );
 }

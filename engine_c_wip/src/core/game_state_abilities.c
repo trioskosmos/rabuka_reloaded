@@ -34,8 +34,18 @@ int rb_ability_uses_used(const GameState *g, int cid, int idx) {
 /* Mirror abilities.rs::ability_has_remaining_uses */
 int rb_ability_has_remaining_uses(const GameState *g, int cid, int idx) {
     if (!g) return 0;
+    /* abilities.rs:165-176 reads the use_limit off
+       `card_database.get_card(card_id)?.abilities.get(ability_index)`. A
+       GAINED index (>= RB_GAINED_ABILITY_INDEX_BASE) does not name a printed
+       ability slot, so the lookup misses and Rust's
+       `let Some(limit) = limit else { return true }` arm answers TRUE. The C
+       range check answered FALSE for every gained index, which is a
+       use_limit-independent veto: the trigger-time gate in the TAS scan then
+       dropped every runtime-granted 自動/常時 unconditionally, so a gained
+       watcher could never fire at all. */
+    if (idx >= RB_GAINED_ABILITY_INDEX_BASE) return 1;
     int nab = rb_card_num_abilities((uint32_t)cid);
-    if (idx < 0 || idx >= nab) return 0;
+    if (idx < 0 || idx >= nab) return 1;
     Ability ab;
     if (!rb_decode_card_ability((uint32_t)cid, idx, &ab)) return 1;
     int limit = ab.use_limit < 0 ? 99 : ab.use_limit;
@@ -188,13 +198,80 @@ static int rb_add_gained_ability(GameState *g, uint32_t cid, const Ability *ab) 
     return idx;
 }
 
-static void rb_clear_gained_abilities(GameState *g, uint32_t cid) {
-    int s = find_gained_slot(g, cid);
-    if (s < 0) return;
+/* Mirror GameState::clear_gained_abilities_for_card
+   (engine/src/core/game_state/abilities.rs — the function whose C twin was
+   `rb_clear_gained_abilities`, `static` and therefore dead): drop EVERY
+   runtime-gained ability registered against `card_id`, freeing each one, and
+   release the slot.
+
+   The `static`/unused shape was the bug, not a style nit: the store has three
+   independent registration paths (rb_gain_ability, s_gain_ability_from_source,
+   s_execute_activate_ability in src/ability/effects/ability.c) and only the
+   FIRST records a temp effect, so only it can be unwound by index. The other
+   two leave permanent registrations that no expiry pass could ever reach — the
+   "granted ability that never expires" class. Rust funnels every one of them
+   through clear_gained_abilities_for_card; this is that function, now
+   reachable from outside the translation unit so the three duplicated teardown
+   loops (ability.c:352, ability.c:472, ability_effects.c:375) and the fourth in
+   src/core/modifiers.c:796-805 (rb_on_cards_left_zones) can route through one
+   owner. See the CROSS-FILE REQUESTS in the porting report.
+
+   `card_id` is taken as an int (not the internal uint32_t) so the signature
+   matches its callers. Returns the number of abilities dropped. */
+int rb_clear_gained_abilities_for_card(GameState *g, int card_id) {
+    if (!g || card_id < 0) return 0;
+    int s = find_gained_slot(g, (uint32_t)card_id);
+    if (s < 0) return 0;
+    int dropped = g->gained_card_n[s];
     for (int i = 0; i < g->gained_card_n[s]; i++)
         rb_free_ability(&g->gained_card_abilities[s][i]);
+    memset(g->gained_card_abilities[s], 0, sizeof(g->gained_card_abilities[s]));
     g->gained_card_n[s] = 0;
     g->gained_card_ids[s] = -1;
+    return dropped;
+}
+
+/* Mirror the `s if s.starts_with("gain_ability:")` arm of
+   GameState::revert_expired_effect (abilities.rs:3127-3152) together with the
+   `expired_gain_ability` bookkeeping of check_expired_effects
+   (abilities.rs:3211-3249).
+
+   Rust, per expiring gained-ability effect:
+     * reverts the immediately-applied per-card score modifier (a live_total
+       gain was never applied per card — it lives in the
+       p*_constant_total_score_bonus accumulator and dies with the entry), and
+     * calls clear_gained_abilities_for_card(card_id) — PER CARD, not per index,
+       which is what unwinds the paths that register several abilities at once;
+     * sets the `expired_gain_ability` flag, and check_expired_effects finishes
+       with `if expired_gain_ability { self.recalculate_constants() }` so the
+       cached 常時 total is re-derived AFTER the registration is gone.
+
+   `which` is the C expiry class already used by rb_check_expired_effects:
+   0 = everything, RB_TEMP_LIVE_END = live-scoped, RB_TEMP_TURN_END = turn-scoped.
+   Returns 1 when a registration was dropped (i.e. constants were re-derived). */
+int rb_expire_gained_abilities(GameState *g, int which) {
+    if (!g) return 0;
+    int changed = 0;
+    /* Reverse order, like Rust's `expired_indices.into_iter().rev()`, so an
+       index stays valid while earlier entries are removed. */
+    for (int i = g->n_temp_effects - 1; i >= 0; i--) {
+        const RbTempEffect *te = &g->temp_effects[i];
+        if (te->gained_card_id < 0) continue;
+        int expire = (which == 0) ||
+                     (which == 1 && te->dur == RB_TEMP_LIVE_END) ||
+                     (which == 2 && te->dur == RB_TEMP_TURN_END);
+        if (!expire) continue;
+        /* abilities.rs:3141-3148 — undo the immediate per-card application.
+           `score` is the amount the registration applied (ability.c:302 stores
+           gain_value(inner), zeroed for a live_total grant), so reverting it is
+           symmetric with the apply and is a no-op for live_total grants. */
+        if (te->score != 0 && te->card_id >= 0)
+            rb_mods_add_score(&g->mods, te->card_id, -te->score);
+        if (rb_clear_gained_abilities_for_card(g, te->gained_card_id) > 0)
+            changed = 1;
+    }
+    if (changed) rb_recalc_constants(g);
+    return changed;
 }
 
 int rb_register_gained_ability(GameState *g, int card_id, const Ability *ability) {
@@ -577,6 +654,217 @@ static int rb_effect_is_ability_resolution_watcher(const AbilityEffect *e);
    abilities.rs:506-545); the stage TAS scan needs it earlier. */
 static int rb_hooked_by_foreign_cause(const GameState *g, const AbilityEffect *e,
                                       int card_id, int player);
+static void rb_set_just_completed(GameState *g, int key);
+static int rb_just_completed_batch_matches(const GameState *g,
+                                           const int *moved, int n_moved);
+
+/* Number of entries in the condition's `locations` filter, or -1 when the field
+   is absent. Mirrors Rust's `Option<&[String]> cond.get_locations()`: the TAS
+   movement gate needs to tell "no location filter" (len < 2 holds vacuously)
+   from "two locations" (the gate must NOT fire). Collapsing the two — which is
+   what the previous movement gate did by never looking at `locations` at all —
+   is what suppressed every 「このメンバーがX/Yに移動したとき」-shaped watcher
+   whose card was not in the current batch. */
+static int rb_cond_locations_count(const Condition *c) {
+    if (!c) return -1;
+    for (uint32_t i = 0; i < c->n_fields; i++) {
+        const CondField *f = &c->fields[i];
+        if (!f->key || strcmp(f->key, "locations")) continue;
+        if (f->v.tag == RB_TAG_ARRAY) {
+            int n = 0;
+            for (uint32_t j = 0; j < f->v.arr_n; j++)
+                if (f->v.arr[j].tag == RB_TAG_STR && f->v.arr[j].s && f->v.arr[j].s[0])
+                    n++;
+            if (n > 0) return n;
+        }
+        if (f->v.tag == RB_TAG_STR && f->v.s && f->v.s[0]) return 1;
+        if (f->v.tag == RB_TAG_OBJVAR && f->v.cond) {
+            int n = rb_cond_locations_count(f->v.cond);
+            if (n > 0) return n;
+        }
+    }
+    return -1;
+}
+
+/* `condition.get_trigger_event().and_then(|t| t.location)` — the nested
+   location Rust falls back to in is_stale_discard_condition
+   (abilities.rs:492-497). A trigger_event arrives on the wire as a nested
+   condition object under the "trigger_event" key. */
+static const char *rb_cond_trigger_event_location(const Condition *c) {
+    if (!c) return NULL;
+    for (uint32_t i = 0; i < c->n_fields; i++) {
+        const CondField *f = &c->fields[i];
+        if (!f->key || strcmp(f->key, "trigger_event")) continue;
+        if (f->v.tag == RB_TAG_OBJVAR && f->v.cond) {
+            const char *loc = rb_cond_get_str(f->v.cond, "location");
+            if (loc && loc[0]) return loc;
+        }
+        if (f->v.tag == RB_TAG_STR && f->v.s && f->v.s[0]) return f->v.s;
+    }
+    return NULL;
+}
+
+/* Mirror GameState::is_stale_discard_condition (abilities.rs:486-501).
+   Return 1 when the condition can never be satisfied by a card that is not in
+   the discard, so the TAS scan must not queue it.
+
+        if condition.get_source() == Some("preceding_moved") || card_is_in_discard {
+            return false;
+        }
+        let location = condition.get_location()
+            .or_else(|| condition.get_trigger_event().and_then(|t| t.location.as_deref()))
+            .unwrap_or("");
+        Zone::from_str(location) == Some(Zone::Discard)
+            && (condition.get_card_type().as_deref() == Some("member_card")
+                || condition.get_target() == Some("self"))
+
+   Two arms were missing from the C copy and both change which abilities get
+   gathered:
+
+   * the `source == "preceding_moved"` EXEMPTION. A 「〜が控え室に入ったとき」
+     watcher with `source: preceding_moved` watches OTHER cards reaching the
+     discard; the card carrying it is on stage by construction, so the stale-
+     discard test fired and the TAS dropped it — permanently, from every scan.
+     This is the whole discard_watch watcher family.
+   * the `get_trigger_event().location` fallback, for the conditions that carry
+     the zone there rather than on a `location` key.
+
+   The parenthesisation of the final conjunction is Rust's and is reproduced
+   literally: `zone_is_discard && (card_type == member_card || target ==
+   "self")`. (The previous C spelling happened to bind the same way, but it was
+   an unparenthesised `&&`/`||` mix inside an enclosing `&&` — exactly the
+   shape that silently changes meaning the next time an arm is added.) */
+static int rb_is_stale_discard_condition(const Condition *c, int card_is_in_discard) {
+    if (!c) return 0;
+    const char *src = rb_cond_get_str(c, "source");
+    if ((src && !strcmp(src, "preceding_moved")) || card_is_in_discard) return 0;
+    const char *loc = rb_cond_get_str(c, "location");
+    if (!loc || !loc[0]) loc = rb_cond_trigger_event_location(c);
+    if (!loc || strcmp(loc, "discard")) return 0;
+    const char *ct = rb_cond_get_str(c, "card_type");
+    const char *tgt = rb_cond_get_str(c, "target");
+    return ((ct && !strcmp(ct, "member_card")) || (tgt && !strcmp(tgt, "self"))) ? 1 : 0;
+}
+
+/* Mirror GameState::requires_this_move (abilities.rs:570-575):
+
+        cond.get_self_target().unwrap_or(false)
+            && cond.get_movement() == Some("moved")
+            && cond.get_locations().is_none_or(|l| l.len() < 2)
+            && !moved_cards.contains(&card_id)
+
+   i.e. true means "a 「置かれた」 trigger, and this card is NOT among this
+   event's moves" — the caller then skips the ability. */
+static int rb_requires_this_move(const Condition *c, int card_id,
+                                 const int *moved_cards, int n_moved) {
+    if (!c) return 0;
+    if (!rb_cond_get_bool(c, "self_target", 0)) return 0;
+    const char *mov = rb_cond_get_str(c, "movement");
+    if (!mov || strcmp(mov, "moved")) return 0;
+    int nloc = rb_cond_locations_count(c);
+    if (nloc >= 2) return 0;
+    for (int i = 0; i < n_moved; i++)
+        if (moved_cards && moved_cards[i] == card_id) return 0;
+    return 1;
+}
+
+/* Mirror GameState::just_completed_batch_matches (abilities.rs:195-200) plus
+   GameState::set_just_completed (:183-186).
+
+   Rust snapshots the movement batch ALONGSIDE the just-completed key, and the
+   re-scan guard only vetoes the just-completed ability when the scan shows the
+   SAME batch (a stale re-scan) or when either side is empty. A scan with a
+   DIFFERENT non-empty batch is a fresh event and MAY re-fire the ability — that
+   is the turn-2+ budget case (`rurino_use_limit_blocks_second_same_turn`:
+   「the second qualifying event in the same turn grants again」).
+
+   The C kept only the key, so `key == just_completed_ability_key` vetoed
+   unconditionally and every second event of a turn was swallowed.
+
+   The batch snapshot lives in a per-(game, key) side table because
+   include/rabuka.h — which carries `just_completed_ability_key` — is owned by
+   another agent. The `key` field on the record is what makes this safe against
+   the two writers of `just_completed_ability_key` that bypass this setter
+   (src/ability/ability_queue.c:957 and :993): a key this file never recorded
+   leaves the snapshot untrusted and the predicate falls back to Rust's
+   legacy-caution arm (true = veto), which is the pre-existing behaviour. */
+#define RB_JUST_COMPLETED_SLOTS 8
+typedef struct {
+    const GameState *g;
+    int turn;
+    int key;
+    int n;
+    int moved[RB_MAX_RECENTLY_MOVED];
+} RbJustCompletedBatch;
+static RbJustCompletedBatch s_just_completed[RB_JUST_COMPLETED_SLOTS];
+static int s_n_just_completed;
+
+static void rb_set_just_completed(GameState *g, int key) {
+    if (!g) return;
+    g->just_completed_ability_key = key;
+    if (key < 0) return;
+    int slot = -1, dead = -1;
+    for (int i = 0; i < s_n_just_completed; i++) {
+        if (s_just_completed[i].g == g && s_just_completed[i].key == key) { slot = i; break; }
+        if (slot < 0 && dead < 0 && s_just_completed[i].g != g) dead = i;
+    }
+    if (slot < 0) {
+        if (s_n_just_completed < RB_JUST_COMPLETED_SLOTS) slot = s_n_just_completed++;
+        else slot = (dead >= 0) ? dead : 0;
+    }
+    s_just_completed[slot].g = g;
+    s_just_completed[slot].turn = g->turn;
+    s_just_completed[slot].key = key;
+    int n = g->n_recently_moved;
+    if (n < 0) n = 0;
+    if (n > RB_MAX_RECENTLY_MOVED) n = RB_MAX_RECENTLY_MOVED;
+    for (int i = 0; i < n; i++) s_just_completed[slot].moved[i] = g->recently_moved[i];
+    s_just_completed[slot].n = n;
+}
+
+static void rb_clear_just_completed(GameState *g) {
+    if (!g) return;
+    g->just_completed_ability_key = -1;
+    for (int i = 0; i < s_n_just_completed; i++)
+        if (s_just_completed[i].g == g) { s_just_completed[i].g = NULL; s_just_completed[i].n = 0; }
+}
+
+static int rb_just_completed_batch_matches(const GameState *g,
+                                          const int *moved, int n_moved) {
+    if (!g) return 1;
+    int key = g->just_completed_ability_key;
+    if (key < 0) return 1;
+    int snap_n = 0;
+    const int *snap = NULL;
+    for (int i = 0; i < s_n_just_completed; i++)
+        if (s_just_completed[i].g == g && s_just_completed[i].key == key) {
+            snap = s_just_completed[i].moved;
+            snap_n = s_just_completed[i].n;
+            break;
+        }
+    if (!snap) return 1;               /* untrusted snapshot -> legacy caution */
+    if (snap_n == 0 || n_moved == 0) return 1;
+    if (snap_n != n_moved) return 0;
+    for (int i = 0; i < snap_n; i++)
+        if (snap[i] != moved[i]) return 0;
+    return 1;
+}
+
+/* Mirror GameState::claim_batch_slot (abilities.rs:510-524). Two guards that
+   the stage scan, the live-card scan and the moved-card scan all share, and
+   which must not drift: the just-completed ability re-fires only on a FRESH
+   batch, and nothing already claimed in THIS batch may re-enqueue. Returns 1
+   when the caller may enqueue. */
+static int rb_claim_batch_slot(GameState *g, int num_key, int skip_key,
+                               int same_batch_as_completed) {
+    if (skip_key == num_key && same_batch_as_completed) return 0;
+    for (int i = 0; i < g->n_batch_triggered_keys; i++)
+        if (g->batch_triggered_keys[i] == num_key) return 0;
+    int cap = (int)(sizeof(g->batch_triggered_keys) / sizeof(g->batch_triggered_keys[0]));
+    if (g->n_batch_triggered_keys >= cap) return 0;
+    g->batch_triggered_keys[g->n_batch_triggered_keys++] = num_key;
+    return 1;
+}
 
 /* ── Enqueue-time use-limit consumption ─────────────────────────────────
    Rust records a turn-limited ability's use at RESOLUTION, and guards it with
@@ -1232,6 +1520,25 @@ static void rb_build_ability_queue_entry(GameState *g, int card_id, int ability_
     e->triggering_member_id = triggering_member_id;
     e->use_limit_recorded = 0;
     e->choice_player_id[0] = '\0';
+    /* abilities.rs:249-289 (build_ability_queue_entry) — the entry records
+       BOTH the trigger type and the movement batch that armed it, and
+       rb_entry_trigger_moved_cards / the "those_cards" batch conditions read
+       them back. The C builder took `trigger_type` / `trigger_moved_cards` as
+       parameters and then dropped them on the floor: `entry.trigger` was never
+       written anywhere in the port, and `trigger_moved_cards` stayed zeroed
+       even though the RbQueueEntry has the array (include/rabuka.h:978-979).
+       Any watcher whose condition reads the trigger batch therefore saw an
+       empty list — including every 「それらのカード」 batch condition. */
+    if (trigger_type)
+        snprintf(e->trigger, sizeof(e->trigger), "%s", trigger_type);
+    e->n_trigger_moved_cards = 0;
+    if (trigger_moved_cards && n_moved > 0) {
+        int n = n_moved;
+        if (n > (int)(sizeof(e->trigger_moved_cards) / sizeof(e->trigger_moved_cards[0])))
+            n = (int)(sizeof(e->trigger_moved_cards) / sizeof(e->trigger_moved_cards[0]));
+        for (int i = 0; i < n; i++) e->trigger_moved_cards[i] = trigger_moved_cards[i];
+        e->n_trigger_moved_cards = n;
+    }
     if (player_id) {
         const char *canonical = player_id;
         if (!strcmp(player_id, "player1"))      canonical = "p1";
@@ -1320,33 +1627,19 @@ void rb_trigger_auto_ability(GameState *g, const char *ability_id,
             char expected_id[1024];
             snprintf(expected_id, sizeof(expected_id), "%s_gained_%d", card_no, gidx);
             if (strcmp(expected_id, ability_id) == 0) {
-                int idx = g->queue.n_entries;
-                if (idx < RB_QUEUE_DEPTH) {
-                    RbQueueEntry *e = &g->queue.entries[idx];
-                    memset(e, 0, sizeof(*e));
-                    e->card_id = cid;
-                    e->ability_idx = RB_GAINED_ABILITY_INDEX_BASE + gidx;
-                    e->completed = 0;
-                    e->cost_paid = 0;
-                    e->optional_cost_result = -1;
-                    e->triggering_member_id = triggering_member_id;
-                    e->use_limit_recorded = 0;
-                    e->choice_player_id[0] = '\0';
-                    /* Owner-stamped. abilities.rs:1074 passes `player_id` into
-                       AbilityQueueEntry::player_id, and the C drain path
-                       (rb_process_player_abilities) selects entries whose
-                       player_id equals the seat being drained. The inline
-                       builder below was writing every other field EXCEPT
-                       player_id, so a gained ability enqueued through the
-                       string key was owner-less: the drain found no match and
-                       cleared the queue, and the gained copy resolved on no
-                       path at all. Same convention as
-                       rb_build_ability_queue_entry (above) and as the three
-                       sites in src/turn/triggers.c that now use
-                       rb_push_owned_entry. */
-                    snprintf(e->player_id, sizeof(e->player_id), "%s", pid_str);
-                    g->queue.n_entries++;
-                }
+                /* abilities.rs:1361-1375 (enqueue_gained_ability) routes the
+                   matched gained ability through the SAME builder as the
+                   printed arm, so the entry carries the owner stamp, the
+                   trigger type and the enqueue-time movement batch. The C built
+                   a bare struct literal here, so a gained 自動 queued by string
+                   key arrived with no trigger, no batch snapshot, and (before
+                   the builder fix) no owner — invisible to the drain and to every
+                   batch condition. */
+                rb_build_ability_queue_entry(g, cid,
+                                             RB_GAINED_ABILITY_INDEX_BASE + gidx,
+                                             card_no, pid_str, trigger_type,
+                                             trigger_moved_cards, n_moved,
+                                             triggering_member_id);
                 return;
             }
         }

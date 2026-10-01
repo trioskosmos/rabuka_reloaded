@@ -2974,6 +2974,82 @@ fn live_need_vector(db: &CardDatabase, cid: i16) -> Option<[i32; 8]> {
     Some(vector)
 }
 
+/// Per-colour ceiling on what one board can ever supply, from OUR OWN deck.
+///
+/// The player is holding 6 and face-up, so their decklist is fair information
+/// (`strategy_v8.rs` uses it the same way for `FlipSampler`). We take the STAGE
+/// cap's worth of members with the most hearts in each colour, plus every
+/// blade-heart the whole deck can yell, which is an upper bound no board
+/// exceeds.
+fn colour_supply_ceiling(db: &CardDatabase, gs: &GameState, me: u8) -> [i32; 8] {
+    let stage_cap = crate::core::constants::STAGE_SIZE.max(1);
+    let deck: Vec<i16> = gs.seat_player(me).main_deck.cards.iter().copied().collect();
+
+    let mut by_colour: Vec<Vec<i32>> = vec![Vec::new(); 8];
+    for &cid in &deck {
+        let Some(card) = db.get_card(cid) else { continue };
+        if card.card_type != CardType::Member {
+            continue;
+        }
+        let Some(base) = &card.base_heart else { continue };
+        for (color, count) in &base.hearts {
+            let idx = color.index();
+            if idx < 8 {
+                by_colour[idx].push(i32::from(*count));
+            }
+        }
+    }
+
+    // Yell supply: every blade-heart anywhere in the deck, since a blade can
+    // only be drawn once per card but this is a ceiling, not an estimate.
+    let mut yelled = [0i32; 8];
+    for &cid in &deck {
+        let Some(card) = db.get_card(cid) else { continue };
+        let Some(blades) = &card.blade_heart else { continue };
+        for (color, count) in &blades.hearts {
+            let idx = color.index();
+            if idx < 8 {
+                yelled[idx] += i32::from(*count);
+            }
+        }
+    }
+
+    let mut ceiling = [0i32; 8];
+    for idx in 0..8 {
+        by_colour[idx].sort_unstable_by(|a, b| b.cmp(a));
+        let best: i32 = by_colour[idx].iter().take(stage_cap).sum();
+        ceiling[idx] = best + yelled[idx];
+    }
+    ceiling
+}
+
+/// `kept_live_requirement`, with impossible demands removed.
+///
+/// A requirement no board in this deck can ever satisfy is not a requirement,
+/// it is a dead card. Summing it in makes `V7_MULLIGAN_COVERAGE` rank every
+/// member in hand as useless against a colour nothing can produce, which is how
+/// a coverage-scoring mulligan came to measure 54.8% against a 57.0% baseline:
+/// the -2.25pp was the implementation, not the idea.
+///
+/// Concretely, in `5CP3Z idou` `MIRACLE NEW STORY` needs 2x heart01 while the
+/// deck's entire heart01 supply is one base heart plus ZERO blade-hearts - the
+/// only route to a second is MIRACLE's own live-start. Holding it therefore
+/// injected 2 into `want[1]`, a colour no member can serve, and every member
+/// scored as if it were needed for nothing.
+fn kept_live_requirement_achievable(
+    gs: &GameState,
+    db: &CardDatabase,
+    me: u8,
+) -> [i32; 8] {
+    let ceiling = colour_supply_ceiling(db, gs, me);
+    let raw = kept_live_requirement(gs, db);
+    let mut want = [0i32; 8];
+    for c in 0..8 {
+        want[c] = raw[c].min(ceiling[c]);
+    }
+    want
+}
+
 fn choose_mulligan_curve(gs: &GameState, actions: &[Action], db: &CardDatabase) -> Action {
     let costs: Vec<Option<u8>> = gs
         .active_player()
@@ -3031,7 +3107,7 @@ fn choose_mulligan_curve(gs: &GameState, actions: &[Action], db: &CardDatabase) 
         // naturally on the default deck, which is 24x cost-2 — dumping the
         // most EXPENSIVE members there means binning the scarce big-colour
         // cards and keeping a wall of duplicates.
-        let wanted = kept_live_requirement(gs, db);
+        let wanted = kept_live_requirement_achievable(gs, db, gs.active_player_index());
         let mut supply = [0i32; 8];
         for (index, _) in &members {
             if let Some(vector) = member_heart_vector(db, gs.active_player().hand.cards[*index]) {
@@ -3314,7 +3390,7 @@ pub fn choose_mulligan_v7(gs: &GameState, actions: &[Action], db: &CardDatabase)
         // cost alone is a question about a resource the check never reads. On
         // the default deck — 24x cost-2 — it means binning the scarce
         // big-colour cards and keeping a wall of duplicates.
-        let wanted = kept_live_requirement(gs, db);
+        let wanted = kept_live_requirement_achievable(gs, db, gs.active_player_index());
         let mut supply = [0i32; 8];
         for (index, _) in &members {
             if let Some(vector) = member_heart_vector(db, me.hand.cards[*index]) {

@@ -1473,6 +1473,280 @@ static int choice_handle_hand_indices(RbAbilityResolver *self, GameState *g,
     return 1;
 }
 
+/* The multi-index core of handle_discard_selection (defined far below, next to
+   its single-index wrapper). Declared here because the multi-index dispatcher
+   below reaches it. */
+static void choice_discard_selection_indices(RbAbilityResolver *self, GameState *g,
+                                            const int *sel, int n_sel);
+
+/* ── Resolve a whole answer to card IDs, in ONE pass over the zone ──────────
+   Rust collects the card for every index of `mapped_indices` BEFORE it mutates
+   anything (`handle_discard_selection` choice.rs:2338-2355 snapshots
+   `waitroom_cards` then indexes it once per answer index; `util::
+   resolve_indices_to_ids` is the same shape). Resolving index i+1 after
+   index i's removal has already shifted the zone would read the wrong card, so
+   the snapshot is taken here, once, and every arm below mutates from it. */
+static int choice_resolve_zone_ids(GameState *g, int actor, const char *zone,
+                                   const int *sel, int n_sel,
+                                   int *out, int max_out)
+{
+    int ids[RB_MAX_ZONE];
+    int n = rb_zone_cards(g, actor, zone, ids, RB_MAX_ZONE);
+    int m = 0;
+    for (int i = 0; i < n_sel && m < max_out; i++) {
+        int idx = sel[i];
+        if (idx >= 0 && idx < n) out[m++] = ids[idx];
+    }
+    return m;
+}
+
+/* ── SelectCard answered with N > 1 indices, for ANY zone ───────────────────
+   Rust hands the WHOLE answer to the zone handler and every arm of
+   `handle_select_card` acts on the whole `indices` vec at once:
+     * hand      choice.rs:1204  `let mapped_indices = ctx.mfi(&ctx.indices)`
+     * deck      choice.rs:1098-1110 execute_selected_cards_from_zone(indices)
+     * discard   choice.rs:2338 / :2465 / :2599 (mapped_indices throughout)
+     * energy    choice.rs:938   `let count_paid = indices.len()`
+     * energy    choice.rs:1132  handle_energy_zone_selection(gs, indices, ..)
+     * under_member / live / stage / looked_at / revealed_cards — the same
+       `for &i in indices` / `ctx.mfi(&ctx.indices)` shape.
+   The C's arms are per-index, and the resume path used to hand them only
+   `selected_indices[0]`, so an answer naming N cards applied exactly one of
+   them and the rest were dropped. This dispatcher applies the whole answer for
+   the zones whose C arm is a per-index mutation, which is the same thing Rust
+   does for those zones. The hand arms live in choice_handle_hand_indices
+   (above) and are reached through here unchanged.
+
+   `sel` is ALREADY ctx.mfi-mapped (map_choice_index, applied by the caller),
+   exactly as the single-index path's `idx` is. Returns 1 when it consumed the
+   answer, 0 when this dispatcher does not cover the prompt so the caller falls
+   back to the single-index handler unchanged, and -1 for Rust's Err(..). */
+static int choice_handle_multi_indices(RbAbilityResolver *self, GameState *g,
+                                       const RbChoice *ch,
+                                       const int *sel, int n_sel)
+{
+    if (!self || !g || !ch || !sel || n_sel <= 0) return 0;
+    int actor = g->queue.actor;
+    const char *zone = ch->zone[0] ? ch->zone : "hand";
+    const char *target = ch->target[0] ? ch->target : NULL;
+    int cur = g->queue.cur;
+    int count = ch->count > 0 ? ch->count : 1;
+    int effect_started = (cur >= 0 && cur < RB_QUEUE_DEPTH)
+                            ? g->queue.entries[cur].effect_started : 0;
+
+    if (!strcmp(zone, "hand"))
+        return choice_handle_hand_indices(self, g, ch, sel, n_sel);
+
+    if (!strcmp(zone, "discard") || !strcmp(zone, "waitroom")) {
+        choice_discard_selection_indices(self, g, sel, n_sel);
+        return 1;
+    }
+
+    if (!strcmp(zone, "energy")) {
+        /* choice.rs:1073-1085 — the ENERGY COST arm. `destination` ==
+           "under_member" is excluded upstream (that is a placement, not a
+           payment) and so is the energy_state_change form, exactly as the
+           single-index arm excludes them. choice.rs:938-952 pays
+           `indices.len()` cards in ONE step, so an answer naming N cards pays
+           N; the old per-index `pay = 1` charged one and re-prompted. */
+        if (!effect_started &&
+            !(target && !strcmp(target, "energy_state_change")) &&
+            !(target && !strcmp(target, "under_member"))) {
+            int pay = n_sel;
+            g->p[actor].energy_active -= pay;
+            if (g->p[actor].energy_active < 0) g->p[actor].energy_active = 0;
+            g->mods.last_cost_discard_count += pay;
+            if (cur >= 0) {
+                g->queue.entries[cur].cost_paid = 1;
+                g->queue.entries[cur].optional_cost_result = 1;
+            }
+            int energy_left = g->p[actor].energy_active;
+            if (energy_left > 0) {
+                char en[80];
+                snprintf(en, sizeof(en),
+                         "Select energy card to pay (active: %d). Skip when done", energy_left);
+                choice_build_reprompt(g, actor, "energy", 0, en, en, 1, NULL, 0);
+                return 1;
+            }
+            rb_resolver_clear_choice_state(self);
+            rb_resolver_resume_pending_actions(self);
+            return 1;
+        }
+        /* energy_state_change: every named card joins the selection and the
+           outstanding count drops by the size of the ANSWER, not by one. */
+        if (target && !strcmp(target, "energy_state_change")) {
+            int cids[RB_MAX_ZONE];
+            int nc = choice_resolve_zone_ids(g, actor, "energy", sel, n_sel,
+                                             cids, RB_MAX_ZONE);
+            for (int i = 0; i < nc; i++) {
+                int already = 0;
+                for (int j = 0; j < g->n_selected_cards; j++)
+                    if (g->selected_cards[j] == cids[i]) { already = 1; break; }
+                if (!already && g->n_selected_cards < RB_MAX_RECENTLY_MOVED)
+                    g->selected_cards[g->n_selected_cards++] = cids[i];
+                already = 0;
+                for (int j = 0; j < self->n_selected_cards; j++)
+                    if (self->selected_cards[j] == cids[i]) { already = 1; break; }
+                if (!already && self->n_selected_cards < RB_MAX_RECENTLY_MOVED)
+                    self->selected_cards[self->n_selected_cards++] = cids[i];
+            }
+            int left = g->queue.pending.count - nc;
+            if (left > 0) {
+                g->queue.pending.count = left;
+                int w = 0;
+                for (int i = 0; i < g->queue.pending.n_filtered_indices; i++) {
+                    int drop = 0;
+                    for (int j = 0; j < n_sel; j++)
+                        if (g->queue.pending.filtered_indices[i] == sel[j]) { drop = 1; break; }
+                    if (!drop) g->queue.pending.filtered_indices[w++] = g->queue.pending.filtered_indices[i];
+                }
+                g->queue.pending.n_filtered_indices = w;
+                return 1;
+            }
+            g->queue.has_pending = 0;
+            return 1;
+        }
+        /* THE PLACEMENT ARM — 「置き場にあるエネルギー1枚をこのメンバーの下に
+           置く」. choice.rs:1132 hands the WHOLE `indices` vec to
+           handle_energy_zone_selection, which is the C's
+           rb_move_handle_energy_zone_selection: it handles N indices, sorts
+           them high-to-low so the removals do not shift each other, and
+           reverses the batch back into the order the player picked
+           (move.c:2119-2146). The C was handing it a one-element array built
+           from indices[0] alone (`int eidx[1] = { idx };`), so a two-card pick
+           placed one card and removed one from the zone. */
+        if (target && !strcmp(target, "under_member")) {
+            int eids[RB_MAX_ZONE];
+            int en = rb_zone_cards(g, actor, "energy", eids, RB_MAX_ZONE);
+            /* Snapshot the picked IDs BEFORE the call: the function removes the
+               cards from the zone, so eids is stale afterwards. Rust's
+               `self.selection.moved_cards = cids.into()` is the batch, in
+               selection order. */
+            int batch[RB_MAX_ZONE];
+            int nb = 0;
+            for (int i = 0; i < n_sel && nb < RB_MAX_ZONE; i++)
+                if (sel[i] >= 0 && sel[i] < en) batch[nb++] = eids[sel[i]];
+            if (nb == 0) { rb_resolver_handle_selection_epilogue(self, g); return 1; }
+            rb_move_handle_energy_zone_selection(g, actor, sel, n_sel, count,
+                                                "under_member", NULL);
+            for (int i = 0; i < nb; i++)
+                if (self->n_moved_cards < RB_MAX_RECENTLY_MOVED)
+                    self->moved_cards[self->n_moved_cards++] = batch[i];
+            rb_resolver_handle_selection_epilogue(self, g);
+            return 1;
+        }
+        /* default energy destination (the waitroom): one send per named card. */
+        {
+            int cids[RB_MAX_ZONE];
+            int nc = choice_resolve_zone_ids(g, actor, "energy", sel, n_sel,
+                                             cids, RB_MAX_ZONE);
+            for (int i = 0; i < nc; i++) {
+                rb_choice_send_to_dst(g, actor, cids[i], "waitroom");
+                if (self->n_moved_cards < RB_MAX_RECENTLY_MOVED)
+                    self->moved_cards[self->n_moved_cards++] = cids[i];
+            }
+            rb_resolver_handle_selection_epilogue(self, g);
+            return 1;
+        }
+    }
+
+    if (!strcmp(zone, "deck")) {
+        int cids[RB_MAX_ZONE];
+        int nc = choice_resolve_zone_ids(g, actor, "deck", sel, n_sel, cids, RB_MAX_ZONE);
+        const char *dst = target ? target : "hand";
+        for (int i = 0; i < nc; i++) {
+            rb_choice_send_to_dst(g, actor, cids[i], dst);
+            if (self->n_moved_cards < RB_MAX_RECENTLY_MOVED)
+                self->moved_cards[self->n_moved_cards++] = cids[i];
+        }
+        rb_resolver_handle_selection_epilogue(self, g);
+        return 1;
+    }
+
+    if (!strcmp(zone, "energy_deck")) {
+        int cids[RB_MAX_ZONE];
+        int nc = choice_resolve_zone_ids(g, actor, "energy_deck", sel, n_sel, cids, RB_MAX_ZONE);
+        const char *dst = g->queue.resume_move_destination[0]
+                            ? g->queue.resume_move_destination : "energy_zone";
+        for (int i = 0; i < nc; i++) {
+            int cid = cids[i];
+            rb_waitroom_remove_card(&g->p[actor], cid);
+            rb_place_card_in_zone(g, actor, cid, dst, -1);
+            if (self->n_moved_cards < RB_MAX_RECENTLY_MOVED)
+                self->moved_cards[self->n_moved_cards++] = cid;
+            if (self->n_selected_cards < RB_MAX_RECENTLY_MOVED)
+                self->selected_cards[self->n_selected_cards++] = cid;
+            if (g->n_recently_moved < RB_MAX_RECENTLY_MOVED)
+                g->recently_moved[g->n_recently_moved++] = cid;
+        }
+        rb_resolver_handle_selection_epilogue(self, g);
+        return 1;
+    }
+
+    if (!strcmp(zone, "under_member")) {
+        /* The C's under-member bag is three per-area lists, flattened in area
+           order — the same order the single-index arm reads. */
+        int flat[RB_MAX_ZONE];
+        int n = 0;
+        for (int i = 0; i < RB_STAGE_SIZE; i++)
+            for (int j = 0; j < g->p[actor].under_cards[i].n; j++)
+                flat[n++] = g->p[actor].under_cards[i].cards[j];
+        for (int i = 0; i < n_sel; i++) {
+            int idx = sel[i];
+            if (idx < 0 || idx >= n) continue;
+            int cid = flat[idx];
+            rb_choice_send_to_dst(g, actor, cid, "energy");
+            if (self->n_moved_cards < RB_MAX_RECENTLY_MOVED)
+                self->moved_cards[self->n_moved_cards++] = cid;
+        }
+        rb_resolver_handle_selection_epilogue(self, g);
+        return 1;
+    }
+
+    if (!strcmp(zone, "live_card_zone")) {
+        /* `select_live_success` is a single-seat verdict question, not a card
+           pick; leave it to the single-index handler. */
+        if (target && !strcmp(target, "select_live_success")) return 0;
+        int cids[RB_MAX_ZONE];
+        int nc = choice_resolve_zone_ids(g, actor, "live", sel, n_sel, cids, RB_MAX_ZONE);
+        for (int i = 0; i < nc; i++) {
+            int cid = cids[i];
+            if (self->n_selected_cards < RB_MAX_RECENTLY_MOVED)
+                self->selected_cards[self->n_selected_cards++] = cid;
+            /* remove from the live zone BY CARD, not by index: the earlier
+               removals of this same answer have already shifted the positions. */
+            RbPlayer *P = &g->p[actor];
+            for (int j = 0; j < P->live.n; j++) {
+                if (P->live.cards[j] != cid) continue;
+                for (int k = j; k < P->live.n - 1; k++) P->live.cards[k] = P->live.cards[k + 1];
+                if (P->live.n > 0) P->live.n--;
+                break;
+            }
+        }
+        rb_resolver_handle_selection_epilogue(self, g);
+        return 1;
+    }
+
+    if (!strcmp(zone, "selected_cards")) {
+        /* choice.rs:1134-1136 `narrow_selected_pool(indices)` — keep exactly
+           the named cards, in the order they were named. */
+        int keep[RB_MAX_ZONE];
+        int nk = 0;
+        for (int i = 0; i < n_sel && nk < RB_MAX_ZONE; i++) {
+            int idx = sel[i];
+            if (idx >= 0 && idx < self->n_selected_cards) keep[nk++] = self->selected_cards[idx];
+        }
+        for (int i = 0; i < nk; i++) self->selected_cards[i] = keep[i];
+        self->n_selected_cards = nk;
+        rb_resolver_handle_selection_epilogue(self, g);
+        return 1;
+    }
+
+    /* Not one of the arms above: the caller restores the pending choice and
+       runs the single-index handler exactly as before. */
+    return 0;
+}
+
 int rb_resolver_handle_select_card(RbAbilityResolver *self, GameState *g, const char *selected) {
     if (!g || !g->queue.has_pending) return -1;
     int actor = g->queue.actor;
@@ -2828,38 +3102,54 @@ static int choice_filter_discard_by_budget(RbAbilityResolver *self, GameState *g
     return out_n;
 }
 
-/* ── handle_discard_selection (choice.rs:2074) — faithful ──
+/* ── handle_discard_selection (choice.rs:2331) — faithful ──
    is_select_action = collect IDs into selected_cards and reprompt;
    otherwise move from discard/waitroom to dst with budget filtering and
-   sub_choice handling. Mirrors Rust branching exactly. */
-void rb_resolver_handle_discard_selection(RbAbilityResolver *self, GameState *g, const char *selected) {
-    if (!g) { rb_resolver_clear_choice_state_and_resume(self); return; }
-    fprintf(stderr, "[DISCARD_RESULT] selected=%s count=%d reprompt=%d pz='%s' pt='%s' ptp='%s' pdesc='%s' nf=%d cl=%d clo='%s' ctot=%d ctoto='%s' grp='%s' ct='%s' route=%d\n",
-            selected ? selected : "skip", g->queue.pending.count, g->queue.choice_reprompt_pending,
+   sub_choice handling. Mirrors Rust branching exactly.
+
+   `sel` / `n_sel` are the WHOLE answer, already ctx.mfi-mapped, exactly as the
+   single-index path's `idx` is; n_sel == 0 is the skip. Rust's arm is written
+   against `mapped_indices` throughout — `mapped_indices.is_empty()` is the
+   empty-pick test (choice.rs:2406), `mapped_indices.len() < ctx.count` is the
+   partial test (:2432) and `execute_selected_cards_from_zone(.., &mapped_indices,
+   ..)` is the move (:2465, :2599) — so the C's `sel_idx`/`mapped` (a 0-or-1
+   stand-in for a count) is what collapsed a count>1 discard pick to one card
+   (the "Select 4 card(s) from the waiting room" case: the answer {0,1,2,3}
+   placed ONE card and the other three stayed in the waitroom). */
+static void choice_discard_selection_indices(RbAbilityResolver *self, GameState *g,
+                                             const int *sel, int n_sel) {
+    char selbuf[32];
+    if (n_sel > 0) snprintf(selbuf, sizeof(selbuf), "%d", sel[0]);
+    else selbuf[0] = '\0';
+    fprintf(stderr, "[DISCARD_RESULT] selected=%s n=%d count=%d reprompt=%d pz='%s' pt='%s' ptp='%s' pdesc='%s' nf=%d cl=%d clo='%s' ctot=%d ctoto='%s' grp='%s' ct='%s' route=%d\n",
+            n_sel > 0 ? selbuf : "skip", n_sel,
+            g->queue.pending.count, g->queue.choice_reprompt_pending,
             g->queue.pending.zone, g->queue.pending.target, g->queue.pending.target_player_id,
             g->queue.pending.description, g->queue.pending.n_filtered_indices,
             g->queue.pending.cost_limit, g->queue.pending.cost_limit_op,
             g->queue.pending.cost_total, g->queue.pending.cost_total_op,
             g->queue.pending.filter_group, g->queue.pending.card_type, (int)g->queue.pending.route);
     int actor = g->queue.actor;
-    int sel_idx = selected ? atoi(selected) : -1;
-    int is_skip = (sel_idx < 0);
+    int is_skip = (n_sel <= 0);
     int pending_count = g->queue.pending.count;
     int allow_skip = g->queue.pending.allow_skip;
     int treat_as_select = g->queue.resume_eff && g->queue.resume_eff->action &&
         !strcmp(g->queue.resume_eff->action,"select_cards");
     if (treat_as_select) {
-        /* is_select_action branch (choice.rs:2082-2142) */
+        /* is_select_action branch (choice.rs:2339-2399) — every index of the
+           answer joins `selection.cards`, then the count decides between the
+           re-prompt and finalize_choice. */
         if (!is_skip) {
             int ids[RB_MAX_ZONE]; int n = rb_zone_cards(g, actor, "waitroom", ids, RB_MAX_ZONE);
-            int mapped = sel_idx;
-            if (mapped >=0 && mapped < n) {
+            for (int a = 0; a < n_sel; a++) {
+                int mapped = sel[a];
+                if (mapped < 0 || mapped >= n) continue;
                 int cid = ids[mapped];
                 int dup=0; for(int i=0;i<self->n_selected_cards;i++) if(self->selected_cards[i]==cid) dup=1;
                 if(!dup && self->n_selected_cards < RB_MAX_RECENTLY_MOVED) self->selected_cards[self->n_selected_cards++]=cid;
             }
             int selected_so_far = self->n_selected_cards;
-            if (pending_count>0 && !is_skip && selected_so_far < pending_count) {
+            if (pending_count>0 && selected_so_far < pending_count) {
                 int remaining = pending_count - selected_so_far;
                 int wait_n = rb_zone_cards(g, actor, "waitroom", ids, RB_MAX_ZONE);
                 int out[RB_MAX_ZONE]; int out_n=0;
@@ -2892,12 +3182,18 @@ void rb_resolver_handle_discard_selection(RbAbilityResolver *self, GameState *g,
         int ids[RB_MAX_ZONE];
         int n = rb_zone_cards(g, seat, "waitroom", ids, RB_MAX_ZONE);
 
-        /* choice.rs:2401-2426 — an empty pick must NEVER satisfy a MANDATORY
+        /* choice.rs:2401-2431 — an empty pick must NEVER satisfy a MANDATORY
          * selection: re-offer the SAME choice (count, filters, seat and budget
          * included) so the player can pick a legal target. The re-offer used to
          * be built from a zeroed RbChoice, so the retry lost the card_type /
-         * cost_limit / group filter AND the seat label. */
-        if ((is_skip || sel_idx < 0 || sel_idx >= n) && !allow_skip) {
+         * cost_limit / group filter AND the seat label. Rust's test is
+         * `mapped_indices.is_empty()`; the C's per-index spelling of it was
+         * "this one index is out of range". */
+        int any_in_range = 0;
+        if (!is_skip)
+            for (int a = 0; a < n_sel; a++)
+                if (sel[a] >= 0 && sel[a] < n) { any_in_range = 1; break; }
+        if (!any_in_range && !allow_skip) {
             char en[64];
             snprintf(en, sizeof(en), "Select %d card(s) from the waiting room", pending_count);
             choice_build_discard_reprompt(g, &ctx, seat, pending_count, en, 0,
@@ -2905,32 +3201,39 @@ void rb_resolver_handle_discard_selection(RbAbilityResolver *self, GameState *g,
             return;
         }
 
-        /* choice.rs:2427-2574 / :2576-2606. `mapped_indices` is the answered
-         * index after `ctx.mfi` (map_choice_index, already applied by
+        /* choice.rs:2432-2611. `mapped_indices` is the answered index list
+         * after `ctx.mfi` (map_choice_index, already applied by
          * rb_resolver_handle_select_card), and `mapped_indices.len()` is how
-         * Rust decides partial-vs-complete. The C's `mapped = (sel_idx < n) ? 1
-         * : 0` is that same test spelled as a count, and it is the only reason
-         * the two arms below could be kept apart at all. */
+         * Rust decides partial-vs-complete AND how many cards the move takes.
+         * The C's `mapped = (sel_idx < n) ? 1 : 0` was that same test spelled as
+         * a 0-or-1 count, which is the whole reason a count>1 discard pick
+         * placed exactly one card. Every named card is resolved against the
+         * waitroom snapshot FIRST (the moves below shrink it), and a pick the
+         * prompt's own filter rejects is not a legal answer. */
+        int picked[RB_MAX_ZONE];
         int mapped = 0;
-        int cid = -1;
-        if (!is_skip && sel_idx >= 0 && sel_idx < n) {
-            cid = ids[sel_idx];
-            /* execute_selected_cards_from_zone's filter pass — a pick the
-             * prompt's own filter rejects is not a legal answer. */
-            if (choice_discard_pick_legal(&ctx, cid)) mapped = 1;
-            else fprintf(stderr, "[DISCARD_PICK_REJECTED] cid=%d idx=%d — fails the prompt's filter\n",
-                         cid, sel_idx);
+        if (!is_skip) {
+            for (int a = 0; a < n_sel && mapped < RB_MAX_ZONE; a++) {
+                int idx = sel[a];
+                if (idx < 0 || idx >= n) continue;
+                int cid = ids[idx];
+                if (choice_discard_pick_legal(&ctx, cid)) picked[mapped++] = cid;
+                else fprintf(stderr, "[DISCARD_PICK_REJECTED] cid=%d idx=%d — fails the prompt's filter\n",
+                             cid, idx);
+            }
         }
-        fprintf(stderr, "[DISCARD_PICK] answering=%d seat=%d selected=%d available=%d count=%d mapped=%d "
+        fprintf(stderr, "[DISCARD_PICK] answering=%d n_answered=%d seat=%d first=%d available=%d count=%d mapped=%d "
                 "sub_choice=%d dst='%s' state_change='%s' p0_discard=%d p1_discard=%d\n",
-                actor, seat, sel_idx, n, pending_count, mapped, self->sub_choice_created,
+                actor, n_sel, seat, (mapped > 0 ? sel[0] : -1), n, pending_count, mapped, self->sub_choice_created,
                 dst ? dst : "-", sc ? sc : "-", g->p[0].discard.n, g->p[1].discard.n);
 
         if (pending_count > 0 && mapped > 0 && mapped < pending_count) {
-            /* PARTIAL pick — choice.rs:2427-2527. Move what was picked, then
-             * re-offer for the remainder out of the BUDGET-filtered remainder of
-             * the TARGET seat's waitroom. */
-            int done = choice_discard_move_card(self, g, seat, cid, dst, sc, tpid);
+            /* PARTIAL pick — choice.rs:2432-2579. Move everything the answer
+             * named (Rust hands `&mapped_indices` to
+             * execute_selected_cards_from_zone as one batch), then re-offer for
+             * the remainder out of the BUDGET-filtered remainder of the TARGET
+             * seat's waitroom. */
+            for (int a = 0; a < mapped; a++) choice_discard_move_card(self, g, seat, picked[a], dst, sc, tpid);
             int remaining = pending_count - mapped;
             if (self->sub_choice_created) {
                 self->sub_choice_created = 0;
@@ -2949,7 +3252,6 @@ void rb_resolver_handle_discard_selection(RbAbilityResolver *self, GameState *g,
                         self->has_pending_reprompt_choice = 1;
                     }
                 }
-                (void)done;
                 return;
             }
             /* choice.rs:2528-2574 — the budget-filtered re-prompt. */
@@ -2965,16 +3267,29 @@ void rb_resolver_handle_discard_selection(RbAbilityResolver *self, GameState *g,
             return;
         }
 
-        /* COMPLETE (or empty) pick — choice.rs:2576-2611. */
+        /* COMPLETE (or empty) pick — choice.rs:2581-2611. */
         if (mapped > 0) {
-            int done = choice_discard_move_card(self, g, seat, cid, dst, sc, tpid);
-            fprintf(stderr, "[DISCARD_MOVE] selected=%d available=%d moved=%d destination=%s "
-                    "state_change=%s seat=%d\n",
-                    sel_idx, n, done, dst ? dst : "-", sc ? sc : "-", seat);
+            for (int a = 0; a < mapped; a++) {
+                int done = choice_discard_move_card(self, g, seat, picked[a], dst, sc, tpid);
+                fprintf(stderr, "[DISCARD_MOVE] selected=%d of %d available=%d moved=%d destination=%s "
+                        "state_change=%s seat=%d\n",
+                        picked[a], mapped, n, done, dst ? dst : "-", sc ? sc : "-", seat);
+            }
             if (self->sub_choice_created) self->sub_choice_created = 0;
         }
         rb_resolver_handle_selection_epilogue(self, g);
     }
+}
+
+/* Single-index entry point, kept for the exported signature rabuka.h declares
+   (and for the one caller in this file that only ever has one index). It is a
+   thin wrapper: `sel_idx` is already ctx.mfi-mapped by
+   rb_resolver_handle_select_card, exactly as the multi-index caller's list is. */
+void rb_resolver_handle_discard_selection(RbAbilityResolver *self, GameState *g, const char *selected) {
+    if (!g) { rb_resolver_clear_choice_state_and_resume(self); return; }
+    int sel_idx = selected ? atoi(selected) : -1;
+    choice_discard_selection_indices(self, g, sel_idx >= 0 ? &sel_idx : NULL,
+                                     sel_idx >= 0 ? 1 : 0);
 }
 
 static void clear_choice_options(GameState *g) {
@@ -4257,18 +4572,20 @@ static int rb_resume_with_choice_indices_internal(GameState *g, const int *selec
                `indices.to_vec()`), so an answer naming more than one card must
                not be collapsed to indices[0]. `selbuf`/`selected` above only
                ever carry the first pick, which is what makes the single-index
-               handler below re-prompt for the remainder. Give the multi-index
-               port the mapped list first; it declines (returns 0) for the zones
-               it does not cover, and then the single-index path runs exactly as
-               before. */
+               handler below re-prompt for the remainder — or, on the arms that
+               do not re-prompt at all (the energy placements), silently drop
+               every pick but the first. Give the multi-index port the mapped
+               list first; it declines (returns 0) for the zones it does not
+               cover, and then the single-index path runs exactly as before. */
             int multi = 0;
             if (!was_skip && n_indices > 1) {
-                multi = choice_handle_hand_indices(&self, g, &saved_pending,
-                                                   sel_multi, n_sel_multi);
+                multi = choice_handle_multi_indices(&self, g, &saved_pending,
+                                                    sel_multi, n_sel_multi);
                 if (multi) {
                     if (multi < 0) { fprintf(stderr, "[SELECT_CARD_MULTI] required hand selection was empty\n"); }
-                    else fprintf(stderr, "[SELECT_CARD_MULTI] n=%d count=%d zone=%s\n",
-                                 n_sel_multi, saved_pending.count, saved_pending.zone);
+                    else fprintf(stderr, "[SELECT_CARD_MULTI] n=%d count=%d zone=%s target=%s\n",
+                                 n_sel_multi, saved_pending.count, saved_pending.zone,
+                                 saved_pending.target);
                 } else {
                     /* not one of the arms it covers: restore the pending choice
                        for the single-index handler. */

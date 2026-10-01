@@ -2158,6 +2158,531 @@ rather than four games, because a one-ply leaf with no turn term is the largest
 structural gap the audit has found, and every switch aimed elsewhere has now
 been exhausted.
 
+---
+
+## 16. Attacker order: two derivations disagree, and the disagreement is the finding
+
+A subagent was asked whether attacker order (先攻/後攻) is an unexplored axis.
+It answered no, on a measurement: `P(place | first attacker) = 0.5447` vs
+`P(place | second attacker) = 0.5408` over ~11400 checks, "z ≈ 0.6, not
+significant", **0.39pp — close the axis.**
+
+That is the basis for declaring a whole direction dead, so it got re-derived
+from the raw trace (`tools/analysis\attacker_order_value.ps1`).
+
+### 16.1 The re-derivation does not replicate it
+
+| | subagent | independent re-derivation |
+|---|---|---|
+| P(place \| first attacker) | 54.47% | **35.97%** |
+| P(place \| second attacker) | 54.08% | **50.23%** |
+| difference | +0.39pp | **−14.26pp** |
+| z | ≈ 0.6 | **−21.9** |
+
+Both derive attacker order the same way (rule 8.4.13: whoever solely placed
+becomes first attacker for the next check, `live.rs:1313-1319`), from the same
+5000-game trace, 22600 checks with a reconstructable order. They disagree by
+two orders of magnitude. **One of them is a measurement error**, and the trace
+format is a plausible culprit: the header line is positional
+(`game,turn,phase,...,live_p1`) but every data line uses trailing `key=value`
+pairs, so any positional parse silently reads `sel=[4+2+0]` as a column index.
+My first two attempts failed exactly that way (0 games; then a cast exception),
+which is the same class of bug as §14.1 — a convenient adjacent field trusted
+instead of the right one.
+
+**Do not record either number until the disagreement is resolved.** A z of −21.9
+and a z of +0.6 cannot both be true of the same quantity.
+
+### 16.2 Settled causally instead
+
+Rather than argue about which parse is right, the harness was made to assign
+attacker order directly (`ARENA_ATTACKER_ORDER` in `bot_arena.rs`, default
+unchanged). This does not depend on any trace parsing, any reconstruction of
+8.4.13, or any confounder:
+
+| `ARENA_ATTACKER_ORDER` | result | discordant | p | win rate |
+|---|---|---|---|---|
+| baseline (S6: RPS winner takes 2nd) | 684-516 | — | — | **57.0%** |
+| `first` (both forced first) | 696-504 | 213 / 225 | 0.599 | 58.0% |
+| `second` (both forced second) | 690-510 | 62 / 68 | 0.661 | 57.5% |
+| `random` (uniform, RPS ignored) | 697-503 | 62 / 75 | 0.305 | 58.1% |
+| `flip` (RPS winner takes 1st) | 688-512 | 209 / 213 | 0.884 | 57.3% |
+
+**All four null**, spanning +0.33 to +1.08pp with every p ≥ 0.30, while `flip`
+rewrites 422 games and `first` rewrites 438. The reordering is large; the win
+rate does not move. This is the §15.4 pattern for the fourth time, now on an
+axis where the intervention is causal and unmistakable.
+
+The conclusion the subagent reached is therefore **right on the substance and
+should be kept** — attacker order is not worth anything here — but its stated
+evidence was a z-statistic that does not replicate, and a 0.39pp number must not
+be cited. `V8_INITIATIVE_WEIGHT`'s docstring asked for exactly this
+("measure it rather than argue about it"); it has now been measured, causally,
+and the answer is no.
+
+### 16.3 Two corrections that are not about attacker order
+
+**A test comment asserted a rule is immutable when it is re-assigned every
+turn.** `phase_machine_rules_test.rs:13-15` read "`is_first_attacker` NEVER
+flips — it records who won RPS". Rule 8.4.13 re-assigns it every turn, and the
+tests two files over (`attacker_order_performance_test.rs`) assert exactly that
+in their names. Anyone reading the comment would have dismissed this axis on
+the strength of a statement that is false. Corrected, with a pointer to the
+tests that actually pin the rule.
+
+**Adding the switch nearly corrupted the project's headline number.** The first
+version of `ARENA_ATTACKER_ORDER` collapsed the RPS-loser's uniform random pick
+into a deterministic `ChooseFirstAttacker`, which moved the default baseline
+from **57.0% to 58.25%** — a 1.25pp silent shift in the number every
+measurement in this document is quoted against. Caught only because the default
+was re-run after the change and did not reproduce 684-516 / 40898 actions. The
+default path now restores the original random pick, verified bit-identical
+(684-516, 40898 actions).
+
+That is the third time in this audit that a harness-level edit threatened a
+recorded baseline, and it argues for a standing guard: any change to
+`bot_arena.rs`'s decision interception must be re-verified against the frozen
+684-516 / 40898 signature before its results are recorded.
+
+### 16.4 The live-set axes are now exhausted
+
+Fourteen interventions, twelve null, one significant regression, one partial
+confirmation. Every one of them touched the live set, the opponent model, the
+fold threshold, the mulligan, or the attacker order. Two subagent headline
+claims were refuted against the engine (MIRACLE is placeable — 3 set, 3 passed,
+score 7; `始まり` scores 1-3 at two successes, not 6), and two of my own
+readings were wrong (§13.3's field misread, §14.1).
+
+The consistent explanation across all of it: **these decisions do not determine
+this game.** The one measurement pointing elsewhere has been pointing at the
+same place since §13: placements per live phase **0.452 against a target of
+~1.0**, with committed checks passing 91-100%. A bot that passes almost every
+check it takes and still places in under half its phases is losing the game
+before the check, in the turns spent assembling a board — which is the Main
+leaf, which §15.2-A found to be one-ply, colour-blind in its `hearts` term, and
+threshold-only in its `coverage` term with no turn-awareness to express when to
+stop.
+
+---
+
+## 17. Card hygiene: are unwanted cards cycled out? Measured in both phases
+
+The question worth asking is not "is the live-set decision right" — fourteen
+interventions say it is — but **whether cards the bot does not want ever leave
+its hand.** Two phases can do it, and neither had been measured.
+
+### 17.1 Live phase: hand filtering is measurably OFF
+
+`junk_keep_value` (`v8_live.rs:94-160`) prices every non-live hand card and the
+spare live-zone slots are filled with the cheapest, so there is machinery for
+this. The source records the metric it was tuned against and flags the failure
+mode by name:
+
+> pricing it at a full ticket made every engine unburnable, which silenced hand
+> filtering entirely (measured **0.07 junk cards per set** against v7's 1.08)
+
+Measured from `V8_CAL`'s chosen candidate across 150 games:
+
+| | |
+|---|---|
+| sets where v9 committed | 136 |
+| sets with ≥1 non-life burned | **0** |
+| **junk cards burned per set** | **0.00** (source recorded 0.07) |
+
+And the reason is not subtle — **148 of 148 committed sets put exactly ONE card
+in the zone, every time.** Three slots exist. Two are never used, so there is no
+junk to burn because there is no room to burn it in. The filtering is not
+mispriced; the enumerator simply never proposes a multi-card set.
+
+This is consistent with `V8_MAX_LIVES` defaulting to 1 and with the log's own
+account of `V8_ZONE_ORDER` + `V8_MAX_LIVES=3` measuring **0 discordant** — the
+width cap was tested as a flag and never moved a decision. The spare slots are
+a real, unexercised part of the rules (8.2.2 allows 3; each card resolves
+independently) and the bot leaves all of it on the table.
+
+**But note the discipline this demands.** §14.7 proved the opponent model is
+inert; §15.4 proved decision churn is uncorrelated with outcomes. Before
+treating "use all 3 slots" as an opportunity, the honest prediction is that it
+is another null — the width cap is a leaf-level constant like every other, and
+the one time it was tested in combination it changed nothing. It is the last
+untested structural knob, not a promising lead.
+
+### 17.2 Mulligan: a real bug, fixed, and the fix changed nothing
+
+The deck audit found a genuine defect. `kept_live_requirement`
+(`strategy_v7.rs:2925`) sums the heart requirements of the **first three lives
+in hand**, regardless of whether they are settable. In `5CP3Z idou`,
+`MIRACLE NEW STORY` needs 2× heart01 while the deck's entire heart01 supply is
+one base heart and **zero blade-hearts** — the only route to a second is
+MIRACLE's own live-start. Holding MIRACLE therefore injected `2` into
+`want[1]`, a colour **no member in the deck can serve**, and
+`V7_MULLIGAN_COVERAGE` scored every member in hand as useless against an
+impossible requirement.
+
+That is a real bug and it is now fixed, in a way that generalises rather than
+special-casing MIRACLE: `colour_supply_ceiling` computes, from our own decklist
+(fair information — we are holding 6 face-up), an upper bound per colour on what
+any board can supply (best `STAGE_SIZE` members by that colour, plus every
+blade-heart the deck can yell), and `kept_live_requirement_achievable` clamps the
+demand to it. **A requirement no board can ever meet is not a requirement; it is
+a dead card.**
+
+Baseline re-verified unchanged with the fix in place and the switch off:
+684-516 / 40898 actions, bit-identical.
+
+**And the result is bit-identical to the buggy version:**
+
+| | result | discordant | p |
+|---|---|---|---|
+| `V7_MULLIGAN_COVERAGE=1`, before the fix | 657-543 | 141 / 114 | 0.103 |
+| `V7_MULLIGAN_COVERAGE=1`, after the fix | **657-543** | **141 / 114** | **0.103** |
+
+Same games, same count, same p. So the `heart01` corruption was real and
+irrelevant: the coverage mulligan loses for some other reason. The fix is kept
+because it is correct and costs nothing, not because it earned its place here.
+
+### 17.3 And the seed variance, which is the actual lesson
+
+One seed said **+3.33pp, p=0.014, SIGNIFICANT IMPROVEMENT** — the first
+significant positive in the whole audit. It did not survive:
+
+| seed | baseline | coverage mulligan | delta | p |
+|---|---|---|---|---|
+| 11 | 57.0% | 54.8% | **−2.25pp** | 0.103 |
+| 12 | 53.5% | 56.8% | **+3.33pp** | **0.014** |
+| 13 | 54.6% | 55.5% | +0.92pp | 0.542 |
+
+Mean +0.67pp, and note the **baselines themselves swing 57.0 / 53.5 / 54.6**
+across seeds — a 3.5pp spread in the control. That is the same magnitude as
+every effect in §15 and §16.
+
+**This is the most important number in this section.** The whole document reasons
+from seed 11, where the baseline reads 57.0%. On other seeds the same bot reads
+53.5-54.6%. A single-seed ±3pp swing is larger than any live-set effect measured
+in §12-§17. It means **every single-seed result in this log, including the ones
+already recorded as confirmed, is within seed noise of being null** — and it
+means a p=0.014 on one seed should be read as a seed effect until reproduced.
+
+The fix to the method is cheap and should be applied before any further claim:
+the confirmed `V8_ALL_TERMS` result (+5.40/+5.67 on "two seeds") needs re-running
+across the seed set, and no single-seed p should be quoted without its neighbours.
+`--outcomes` already exists to make this paired; what is missing is a habit of
+running the seed set, not a tool.
+
+### 17.4 The seed spread, measured properly
+
+The same v9 build, `V8_ALL_TERMS` on, 1200 games per seed, seed 11 the only
+seed this document has ever used:
+
+| seed | result | win rate |
+|---|---|---|
+| 11 | 684-516 | **57.0%** |
+| 12 | — | 53.5% |
+| 13 | — | 54.6% |
+| 14 | 662-538 | 55.2% |
+| 15 | 696-504 | 58.0% |
+| 16 | 659-541 | 54.9% |
+| 17 | 687-513 | 57.3% |
+
+**Range 53.5-58.0%, a 4.5pp spread in the control condition.** Seed 11, the seed
+every result in this log is quoted on, sits at the top of that range.
+
+Two consequences, and the second is uncomfortable:
+
+1. **Any single-seed effect below ~4.5pp is uninterpretable on its own.** Every
+   null in §14-§17 was already null; the one significant *positive* in §17.3
+   (+3.33pp, p=0.014) is inside the noise band and did not replicate.
+2. **The seed-11 baseline of 57.0% is a favourable draw, not the bot's level.**
+   The honest central estimate from seven seeds is **55.7%**, and the honest
+   range is 53.5-58.0%.
+
+This does not make the work wrong, but it does mean the document's headline
+number is the top of a range rather than its middle, and that "0.3-0.5pp null"
+results have been read against the noisiest possible control.
+
+The method fix is small and worth doing before anything else ships: run the seed
+set, report mean and range, and quote a paired delta only when the *same seed*
+comparison is available on both arms. `--outcomes` already exists for the paired
+test; the gap is a standing seed sweep.
+
+---
+
+## 18. The measurement bug underneath every number in this document
+
+Re-running the confirmed result across seeds produced something that stopped
+the audit cold.
+
+### 18.1 `V8_ALL_TERMS` is bit-identical to OFF, on every seed
+
+The whole document runs v9 **with `V8_ALL_TERMS` set**, on the strength of the
+earliest confirmed result in the log. v9 with and without the flag:
+
+| seed | `V8_ALL_TERMS` OFF | ON | identical? |
+|---|---|---|---|
+| 11 | 684-516 / 40898 | 684-516 / 40898 | **yes** |
+| 12 | 642-558 / 41311 | 642-558 / 41311 | **yes** |
+| 13 | 655-545 / 41567 | 655-545 / 41567 | **yes** |
+| 14 | 662-538 / 41654 | 662-538 / 41654 | **yes** |
+
+Not "same win rate" — the same record, to the action count, on every seed tried.
+Every A/B in §13-§17 was run against a control that is the treatment.
+
+### 18.2 Why: the flag is not on v9's path
+
+All four `V8_ALL_TERMS` sites are `v8_main.rs:1372` and `v8_model.rs:1133,
+1199, 1205`. The only consumer of the weights they gate is `v7_term_score`,
+which is called from exactly one place — `v8_main.rs:1192` — inside **v8's own
+Main leaf**. And `registry.rs:214` routes v9 to `strategy_v7::choose_action`,
+i.e. **v7's Main leaf**. So for v9, none of the four sites is reachable.
+
+The registry says so itself, at `registry.rs:215-216`:
+
+> v10 is v8's Main, which becomes the confirmed configuration when
+> `V8_ALL_TERMS` is set.
+
+**v10 is the bot the flag was written for. v9 never had it.** Confirmed
+behaviourally — for v10 the flag is very much alive:
+
+| | result | actions |
+|---|---|---|
+| v10, flag OFF | 273-327 | 22828 |
+| v10, flag ON | **284-316** | **22398** |
+
+### 18.3 What this does and does not invalidate
+
+**First, a correction to this section.** An earlier draft of §18.3 claimed the
++5.40/+5.67 was "credited to a flag v9 does not read" and that the attribution
+was wrong. Reading §11.4 again, **the original entry is correct** and this
+section was wrong: the table at line 1279-1283 records the term vector as
+`v8 (42.5%) -> v8 + terms (47.9% / 47.5% holdout)`, and separately `v9 (57.3%)`
+and `v10 (46.5%)`. The +5.4 was always measured **on v8's Main leaf**, and v10
+is the bot built to carry it. Nothing was mis-attributed, and no confirmed
+result in this log is retracted by §18.
+
+The relationships are also consistent rather than contradictory: the term vector
+*is* v7's delta weights, and v9's Main leaf **already is** that delta leaf —
+which is precisely why v9 (57.3%) sits far above v8+terms (47.9%) and why v10,
+which pays for v8's Main and then adds v7's vector, lands between them. Setting
+the flag on a v9 run was redundant, not wrong.
+
+**What remains true and worth keeping:**
+
+1. **`V8_ALL_TERMS` is a no-op for v9** (proved four ways: bit-identical records
+   on four seeds; all four flag sites unreachable; `registry.rs:214` routing v9
+   to v7's leaf; and v10 responding strongly to the same flag). Every A/B in
+   §13-§17 set it, so every control in this document was, in that one respect,
+   the treatment. Harmless — it did nothing — but it means those runs are not
+   what their command lines imply.
+2. **The check was never run.** A switch that changes no action count on the bot
+   under test is a comment, not a switch. It is the cheapest possible test of a
+   confirmed result and it would have caught this in one run.
+
+### 18.4 The generalisable lesson
+
+A flag that no code path reads produces a distinctive signature: a run line that
+*looks* configured, and a difference between arms that is zero to the action
+count. This project's arena help text even warns about the same class
+("a silently-different bot under a name that promises otherwise"), and the
+registry comment at `registry.rs:216-220` says `V8_ALL_TERMS` belongs to **v10**
+— so the information needed to avoid this was already in the source, next to
+every measurement taken without it.
+
+Standing rule, alongside the §16.3 guard: before recording any result as
+confirmed, verify (a) that the bot under test actually reads the switch — one
+action-count check is enough — and (b) treatment-off vs treatment-on **for the
+bot the switch was written for**, to confirm the switch still works at all.
+
+The status of the project after §18 is unchanged from §17.4: **v9 is a real bot
+at ~55.7% (53.5-58.0 across seven seeds), its live-set machinery is sound, and
+the +5.4 belongs to v8's Main leaf, where it was measured.**
+
+---
+
+## 19. What the CCG-AI literature says is missing here
+
+Every finding in §13-§18 was arrived at by reading this repository. Read against
+the published work on collectible card game agents, the shape of the problem
+changes — several results are not surprises but *known failure modes with known
+names*, and the standard fixes are ones this project has partly tried and
+partly missed.
+
+### 19.1 The inverted opponent model is a textbook determinization failure
+
+§14.7 measured `opp_pass` as inverted and flat: realized 86.2-88.3% in every
+predicted bucket, including the bucket asserting a fold. That is precisely the
+failure determinization is known to produce, and it has a name — **strategy
+fusion** (Frank & Basin), the first of the two canonical defects, where a
+single guess about hidden information is treated as truth and dominates the
+search around it.
+
+The standard remedy is **ensemble determinization** (Cowling, Ward & Powley,
+*Ensemble Determinization in MCTS for the Imperfect Information Card Game Magic:
+The Gathering*, IEEE TCIAIG 4(4), 2012): instead of guessing the opponent's
+hidden state once, sample *many* consistent states, run one search per sample,
+and aggregate. Kruse & Bartels report it beating plain determinization and
+other MCTS variants across deck matchups, and note that even a perfect
+prediction yields only a *slight* further gain — i.e. most of the available
+benefit comes from not trusting a single guess, which is exactly v9's position.
+
+`clears` is a 5-scenario enumeration over `YIELD_PRIOR`, so it is *already* a
+form of ensemble — but over **yield**, not over the check itself, and collapsed
+through a hard `supply >= bar` threshold. The literature's version ensembles the
+simulation of the opponent's actual check, which is why it degrades gracefully
+when the prior is wrong. **This is the first borrowed idea with a mechanism that
+matches a measured defect**, and it is a code change to `OppModel::build_with`
+rather than a new term to weight.
+
+### 19.2 One-ply Main is why §14-§18 found so many nulls
+
+The Main leaf evaluates one action, scores it once, and returns. §15.2-A
+established `V7_BEAM` is off, so the depth-8 chain and the depth-1 beam are
+unreachable, and `V7_ISMCTS` ships off after measuring as a consistent
+regression at every setting (p as low as 0.003).
+
+The literature is more encouraging than this project has been, and identifies
+*why* the project has been getting nulls rather than gains:
+
+- Ward et al. (reduced Magic) found the best configuration was **MCTS for
+  playing cards with a rule-based attacker/blocker**, i.e. search where the
+  action space is combinatorial and heuristics do not scale.
+- Van Rijn's Hearthstone thesis records that **naive UCT scored at most 26%**
+  while determinized bots scored far better, and specifically that a **binary
+  action tree** (execute-this-action-or-not per node) beat the standard n-ary
+  tree. This is the shape of §17.1's finding that width is never used: a tree
+  over *which cards to also put in the zone* is precisely a binary tree.
+- Non-locality — the second determinization defect — is the mirror image of
+  strategy fusion: a locally-imperfect guess poisons an entire subtree rather
+  than one decision. With §14.7's flat curve, **every** simulated continuation
+  downstream of an opponent model is poisoned equally, which is a plausible
+  mechanical explanation for §15.4: interventions that change hundreds of
+  decisions (404 discordant) moving the win rate 0.33pp. If the continuations
+  are noise, churning them is free.
+
+None of that argues for more search *depth* bolted onto a bad model. It argues
+for **fixing the model, then adding search** — the order this project has
+inverted, which is also the order its own history recommends.
+
+### 19.3 The SOTA does not use search at all, and that is the uncomfortable part
+
+The strongest published CCG agents — **ByteRL** (ByteDance, COG 2022 double
+championship) and the **OSFP** Hearthstone agent that beat a top-10 Chinese
+league player in full games — train **end-to-end with no lookahead search in
+either training or inference**. Both use Optimistic Smooth Fictitious Play over
+a single shared policy function, and ByteRL is explicitly *not* a search agent.
+The 2024 exploitability paper (arXiv 2404.16689) then showed ByteRL is highly
+exploitable, and that **plain behaviour cloning of its policy is nearly on par
+with it** — the policy, not the search or the RL fine-tuning, is carrying the
+strength.
+
+That reframes this document's entire method. Fourteen interventions here were
+hand-transcribed scalar terms in a delta leaf, tuned against single-seed win
+rates. The published evidence says the productive object is a **learned policy
+or value function over state features**, and that rule-based term engineering
+has a poor track record in exactly this genre. It also explains the audit's own
+central puzzle better than any switch did: fourteen hand-built terms, twelve
+null, because hand-built terms are not where the signal is.
+
+### 19.4 What this project already does that the literature endorses
+
+Not everything here is behind the field, and it is worth knowing before acting on
+the above:
+
+- **Deterministic simulation with an engine that can be cloned exactly.** The
+  116-test suite and the bit-identical paired methodology are the precondition
+  for every measurement in this log, and are stronger than most published
+  evaluations.
+- **A real hidden-information model.** `OppModel` reads zone *count* and public
+  board, which is the correct information set under 8.2.2 — the literature's
+  determinization target is well chosen.
+- **A paired, seed-joined A/B harness** (§7). The 4.5pp seed spread in §17.4 is
+  something this project's method was well placed to detect and had not been
+  run.
+
+### 19.5 Ranked, with what each would actually cost
+
+| # | borrowed idea | source | cost | expected |
+|---|---|---|---|---|
+| 1 | **Ensemble determinization** for `pass_prob` — sample many opponent states, simulate their checks, average | Cowling 2012; Kruse 2018 | moderate, `OppModel::build_with` | the only idea matching a *measured* defect (§14.7) |
+| 2 | **Feature-based value function fitted to game outcomes** — replace the delta leaf's weights with regression on arena results | ByteRL; Li 2023 (CC feature repr beats ID ranking) | high, needs an outcome-labelled corpus | attacks §15.4 directly; the field's actual answer |
+| 3 | **Binary action tree over live-zone width** (set-2nd-card or not) | Ward; van Rijn | low, `V8_MAX_LIVES` as a real decision | §17.1's unused 2 slots; historically 0 discordant, so expect null |
+| 4 | Multi-seed evaluation as standard practice | §17.4 here; standard in all cited work | trivial, one script | protects every other number |
+| 5 | Self-play / exploitability harness — an adversary trained to beat *this* bot | arXiv 2404.16689 | very high | would find what 14 manual hypotheses missed |
+
+**Recommendation.** Do 4 first (it is a script and it protects everything else),
+then 1 (the only idea grounded in a defect this audit actually measured), then
+2 if the project wants to compete on the field's terms rather than by rule
+transcription. Do **not** spend more effort on hand-weighted leaf terms: this
+document now contains fourteen measurements saying they do not move the win
+rate, and the literature says why.
+
+### 19.6 Ensemble determinization: implemented, measured, and nearly inert
+
+`V8_OPP_ENSEMBLE` / `V8_OPP_ENSEMBLE_N` (default 64) implement #1 above:
+sample many `(yield, board-jitter)` states consistent with the opponent's
+public information, ask each whether it clears the bar, and average — instead
+of gating one aggregate supply through one threshold. Sampling walks the
+existing prior with a private LCG, so a policy call leaves the game RNG
+untouched and stays reproducible.
+
+| seed | discordant | p | delta |
+|---|---|---|---|
+| 11 | 2 / 1 | 1.000 | −0.08pp |
+| 12 | 2 / 0 | 0.500 | −0.17pp |
+| 13 | 3 / 3 | 1.000 | +0.00pp |
+
+**7 decisions changed across 3600 games.** The published remedy for the exact
+defect §14.7 measured is implemented and moves nothing.
+
+That is the third independent probe of the same quantity, and together they are
+consistent:
+
+| probe | §14.7 measured | §15.1 flat constant | §19.6 ensemble |
+|---|---|---|---|
+| effect | curve is flat & inverted | 9 / 7 discordant | **2 / 1** discordant |
+
+Replacing `clears` with a constant moved 16 games; replacing it with a properly
+ensembled version moves 7. The step function and its ensemble are nearly the
+same function, because on this deck the supply almost always lands on the same
+side of the bar either way.
+
+**Conclusion: the opponent's pass probability is not merely mis-modelled — it is
+irrelevant to v9's decisions.** The literature's diagnosis was right and its
+remedy does not apply, because the problem was never the *form* of the
+determinization. v9's live set does not turn on it.
+
+This closes the opponent-model thread for good, and it is the strongest
+statement the audit supports: **the bot's ~55.7% is determined by its own board
+and its own check, and essentially nothing about modelling the opponent moves
+it.** Any future work on the opponent side should be assumed inert until proven
+otherwise by a change that alters decisions by more than ~10 games in 1200.
+
+### 19.7 Final state
+
+**Fifteen interventions. Thirteen null, one significant regression
+(`V8_NO_FOLD`, −4.75pp, p=0.00095), one partial confirmation.** Every one
+targeted the live set, the opponent model, the fold threshold, the mulligan,
+attacker order, or a hand-fitted leaf term.
+
+What is solid:
+- The live-set decision procedure is sound — passes 91-100%, folds only when
+  the commit cannot pass, argmax self-consistent over 120 games (0 misranks).
+- The deck is not the ceiling: 3 successes in 3 turns is achievable, and 2 of 3
+  live slots are never used.
+- Measurement infrastructure is good: paired seed-joined A/B, deterministic
+  engine, 116 tests, and a frozen baseline signature that caught two harness
+  regressions.
+
+What was wrong and is now fixed or documented: the live-start projection's
+missing `process_pending_auto_abilities` (§13.2), a `kept_live_requirement`
+bug that scored members against unsatisfiable colours (§17.2), and a test
+comment asserting a rule that 8.4.13 re-assigns every turn (§16.3).
+
+What remains open, honestly: v9 is a one-ply, colour-blind, hand-weighted delta
+leaf at ~55.7% (53.5-58.0), and the published evidence says the way past that
+is a learned policy or value function over state features — not more
+hand-transcribed terms. That is a large change, and nothing in §13-§19
+suggests a cheap switch will do it.
+
 
 
 

@@ -1941,18 +1941,55 @@ fn main() -> ArenaResult<()> {
             }
 
             // S6: when this side won RPS, take second attacker.
+            //
+            // `ARENA_ATTACKER_ORDER` exists because "which side should attack
+            // first" is otherwise untestable in this harness. The default keeps
+            // the historical S6 behaviour (RPS winner takes second) for BOTH
+            // seats, which is symmetric but NOT random: order is then a
+            // deterministic function of an RPS draw that both bots make blind,
+            // so any first/second asymmetry is entangled with the draw.
+            //
+            //   `first`  - both sides always take first (isolates the other
+            //               rules; the second slot is then unreachable)
+            //   `second` - both sides always take second
+            //   `flip`   - RPS winner takes FIRST (the S6 rule inverted)
+            //   `random` - uniform over both actions, ignoring RPS
+            //
+            // A measured asymmetry under the default is therefore not evidence
+            // about the order's value until re-run under `random`.
             if gs.current_phase == Phase::ChooseFirstAttacker {
-                let won_rps = gs.rps_winner == Some(if policy_is_p1 { 1 } else { 2 });
-                let a = if won_rps {
-                    actions
-                        .iter()
-                        .find(|a| {
-                            a.action_type
-                                == rabuka_engine::game_setup::ActionType::ChooseSecondAttacker
-                        })
-                        .unwrap_or(&actions[0])
-                } else {
-                    &actions[rng.range(actions.len())]
+                // The DEFAULT path must stay bit-identical to the historical
+                // S6 rule: RPS winner takes second, and the LOSER picks
+                // UNIFORMLY at random over both actions. Collapsing that random
+                // pick into a deterministic ChooseFirstAttacker changes the
+                // baseline win rate (it moved 57.0% -> 58.25% when tried), which
+                // would silently invalidate every measurement recorded against
+                // it. Only the explicit ARENA_ATTACKER_ORDER modes may override.
+                let mode = std::env::var("ARENA_ATTACKER_ORDER").unwrap_or_default();
+                let pick = |want_second: bool| {
+                    let target = if want_second {
+                        rabuka_engine::game_setup::ActionType::ChooseSecondAttacker
+                    } else {
+                        rabuka_engine::game_setup::ActionType::ChooseFirstAttacker
+                    };
+                    actions.iter().find(|a| a.action_type == target).unwrap_or(&actions[0])
+                };
+                let a = match mode.as_str() {
+                    "first" => pick(false),
+                    "second" => pick(true),
+                    "random" => &actions[rng.range(actions.len())],
+                    "flip" => {
+                        let won_rps = gs.rps_winner == Some(if policy_is_p1 { 1 } else { 2 });
+                        pick(!won_rps)
+                    }
+                    _ => {
+                        let won_rps = gs.rps_winner == Some(if policy_is_p1 { 1 } else { 2 });
+                        if won_rps {
+                            pick(true)
+                        } else {
+                            &actions[rng.range(actions.len())]
+                        }
+                    }
                 };
                 decisions.execute(&mut audit, &mut gs, &actions, a)?;
                 continue;

@@ -1015,19 +1015,28 @@ int main(void)
           "live_card_zone destination conserves the census" },
         { "place_success_live_zone",    test_place_success_live_zone,    0,
           "success_live_zone destination conserves the census" },
-        { "place_same_area",            test_place_same_area,            1,
-          "ENGINE BUG (src/ability/util.c, not owned by this audit): no SameArea "
-          "arm in rb_place_card_in_zone" },
-        { "place_deck_top_or_bottom",   test_place_deck_top_or_bottom,   1,
-          "ENGINE BUG (src/ability/util.c): an unresolvable destination returns "
-          "0 after the source was emptied" },
-        { "place_front",                test_place_front,                1,
-          "ENGINE BUG (src/ability/util.c): same, for Zone::Front" },
-        { "place_under_member",         test_place_under_member,         1,
-          "ENGINE BUG (src/ability/util.c): no UnderMember arm on the generic "
-          "route" },
-        { "place_empty_destination",    test_place_empty_destination,    1,
-          "ENGINE BUG (src/ability/util.c): the empty destination also deletes" },
+        { "place_same_area",            test_place_same_area,            0,
+          "GREEN since util.c gained a dedicated SameArea arm (util.c:1035), "
+          "mirroring Rust util.rs:2453-2478: vacated_area if that slot is empty, "
+          "else the Rust-order first empty slot, else the HAND. It never "
+          "returns false, so no destination can delete a card" },
+        { "place_deck_top_or_bottom",   test_place_deck_top_or_bottom,   0,
+          "GREEN: Zone::DeckTopOrBottom has no place_card_in_zone arm in Rust "
+          "either, so it takes the catch-all (util.rs:2499-2506) which parks the "
+          "card in the HAND and returns true. The C zone_bag miss now lands on "
+          "the same catch-all (util.c:1092-1121) and returns 1" },
+        { "place_front",                test_place_front,                0,
+          "GREEN: Zone::Front likewise takes the Rust catch-all and lands in the "
+          "hand with true; the C catch-all matches" },
+        { "place_under_member",         test_place_under_member,         0,
+          "GREEN since util.c gained a dedicated UnderMember arm (util.c:1063), "
+          "mirroring Rust util.rs:2480-2498: vacated_area, else an OCCUPIED "
+          "slot centre/left/right, else the WAITROOM -- returning true in every "
+          "branch" },
+        { "place_empty_destination",    test_place_empty_destination,    0,
+          "GREEN: the C catch-all special-cases the empty destination to the "
+          "WAITROOM and returns 1 (util.c:1114-1121), exactly as Rust does at "
+          "util.rs:2500-2502" },
         { "live_zone_has_no_c_invented_capacity",
           test_live_zone_has_no_c_invented_capacity, 0,
           "src/core/zones.c fix: rb_live_can_place_card/add_card mirror Rust" },
@@ -1056,8 +1065,11 @@ int main(void)
         { "group_literal_bytes",        test_group_literal_bytes,        0,
           "the derived group uses U+30F6; a U+8671 literal is a silent no-op" },
         { "recently_moved_from_zone_is_written",
-          test_recently_moved_from_zone_is_written, 1,
-          "ENGINE BUG: GameState.recently_moved_from_zone has no writer in src/" },
+          test_recently_moved_from_zone_is_written, 0,
+          "GREEN since rb_move_card (util.c:1150-1152) records the SOURCE zone, "
+          "mirroring Rust push_movement_event (modifiers.rs:1927) which sets "
+          "recently_moved_from_zone = Some(source_zone) on every recorded "
+          "movement -- that is what populates TriggerEvent.moved_from_zone" },
         { "appearance_source_recording_is_bounded",
           test_appearance_source_recording_is_bounded, 1,
           "ENGINE BUG (rabuka.h, not owned by this audit): the appearance-source "

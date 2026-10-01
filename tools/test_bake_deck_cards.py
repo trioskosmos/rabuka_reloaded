@@ -1,11 +1,37 @@
-import struct
+﻿import struct
+import sys
 import unittest
 from concurrent.futures import ThreadPoolExecutor
+from pathlib import Path
+
+# `from tools import ...` only resolves when the repo root is importable, which it is
+# not by default when this file is run directly (`python tools/test_bake_deck_cards.py`).
+# Put the repo root on sys.path so the test runs the same way the other suites do.
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from tools import bake_deck_cards
+from cards import compile_cards
 
 
 FIELDS = ("card_no", "name", "series", "group", "unit", "img", "product", "rare", "ability")
+
+
+def bake_one(cards_by_no: dict, card_nos: list[str]) -> bytes:
+    """Bake one deck with its OWN StringTable.
+
+    `make_deck_blob` takes a caller-supplied `StringTable` and writes
+    `st.get_strings()` — the WHOLE table — into the blob, because the per-card records hold
+    indices into that same table. Sharing one table across decks therefore leaks every deck's
+    strings into every blob, which is how the production baker uses it for speed
+    (`bake_deck_cards.py` builds one shared table for all 16 slots).
+
+    These tests assert each blob's exact string list, so each bake gets a fresh table. That
+    is also what makes the parallel-isolation test meaningful: nothing is shared between
+    calls, so any cross-talk would have to come from `make_deck_blob` itself.
+    """
+    return bake_deck_cards.make_deck_blob(
+        cards_by_no, card_nos, compile_cards.StringTable()
+    )
 
 
 class DeckBlobTests(unittest.TestCase):
@@ -50,14 +76,14 @@ class DeckBlobTests(unittest.TestCase):
         card["blade_heart"] = {"b_all": 1}
         card["need_heart"] = {"heart01": 3}
         card["special_heart"] = {"score": 1}
-        blob = bake_deck_cards.make_deck_blob({"TEST-A": card}, ["test-a"])
+        blob = bake_one({"TEST-A": card}, ["test-a"])
         strings, decoded = self.decode_blob(blob)
         self.assertEqual(decoded, [{field: card[field] for field in FIELDS}])
         self.assertEqual(set(strings), {"", *(card[field] for field in FIELDS)})
 
     def test_deduplication_missing_cards_and_optional_strings(self):
         cards = {"TEST-A": {"card_no": "TEST-A"}, "TEST-B": {"card_no": "TEST-B"}}
-        blob = bake_deck_cards.make_deck_blob(cards, ["test-b", "TEST-B", "missing", "test-a"])
+        blob = bake_one(cards, ["test-b", "TEST-B", "missing", "test-a"])
         strings, decoded = self.decode_blob(blob)
         self.assertEqual(strings, ["", "TEST-B", "TEST-A"])
         self.assertEqual([card["card_no"] for card in decoded], ["TEST-B", "TEST-A"])
@@ -65,7 +91,7 @@ class DeckBlobTests(unittest.TestCase):
             self.assertIsNone(card["unit"])
             self.assertIsNone(card["ability"])
             self.assertEqual(card["group"], "")
-        self.assertEqual(self.decode_blob(bake_deck_cards.make_deck_blob(cards, [])), ([""], []))
+        self.assertEqual(self.decode_blob(bake_one(cards, [])), ([""], []))
 
     def test_parallel_decks_are_isolated_and_deterministic(self):
         cards = {
@@ -75,12 +101,12 @@ class DeckBlobTests(unittest.TestCase):
         for card_no, card in cards.items():
             card["card_no"] = card_no
         expected = {
-            card_no: bake_deck_cards.make_deck_blob(cards, [card_no])
+            card_no: bake_one(cards, [card_no])
             for card_no in cards
         }
         for order in (list(cards), list(reversed(cards)), list(cards)[::2] + list(cards)[1::2]):
             with ThreadPoolExecutor(max_workers=4) as executor:
-                futures = [(card_no, executor.submit(bake_deck_cards.make_deck_blob, cards, [card_no]))
+                futures = [(card_no, executor.submit(bake_one, cards, [card_no]))
                            for card_no in order * 3]
                 for card_no, future in futures:
                     blob = future.result()

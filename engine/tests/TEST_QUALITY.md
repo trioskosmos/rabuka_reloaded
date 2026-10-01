@@ -40,13 +40,11 @@ _has_pending_choice asserted without choice identity (pending_choice_type/summar
 | --- | --- | --- | --- |
 | `engine/tests/test_modules/jidou/debut_watch/three_way_choices_and_look_at_three_test.rs` | `wakana_the_chosen_heart_replaces_her_printed_hearts` | 159 |  |
 
-## assert_only_negative (1)
+## assert_only_negative (0)
 
 _every assertion is a bare is_err()/is_none() — some guard fired, but nothing says which, so a regression tripping a different guard still passes_
 
-| file | test | line | detail |
-| --- | --- | --- | --- |
-| `engine/tests/test_modules/effects/auto/pb2_self_wait_or_cost_paid_activates_and_gains_blade_pl_pb2_021_n_test.rs` | `the_cost_paid_branch_is_still_a_vacuous_comparison` | 257 |  |
+None.
 
 ## assert_only_counts (1)
 
@@ -210,8 +208,11 @@ _every assertion is an INEQUALITY on a count and there is no assert_eq anywhere 
 
 None.
 
-## unresolvable_card_id (0)
+## unresolvable_card_id (2)
 
 _a card-number literal that is not in the database — either written inline in a `game.id("…")` or bound to a name (`const X: &str = "…"` / `let x: &str = "…"`), because const-bound card numbers are the dominant idiom here and the call-site form alone cannot see them. get_card_id's lenient fallback silently substitutes a DIFFERENT PRINT of the same card, so the test stages the wrong card and passes: `PL!SP-bp1-014-PR` resolved to `PL!SP-bp1-014-N` and left a "three DISTINCT names" premise unpinned_
 
-None.
+| file | test | line | detail |
+| --- | --- | --- | --- |
+| `engine/tests/test_modules/perf/alloc_profile.rs` | `<literal>` | 102 | PL!N-bp1-002-R |
+| `engine/tests/test_modules/perf/alloc_profile.rs` | `<literal>` | 288 | PL!N-bp1-002-R |

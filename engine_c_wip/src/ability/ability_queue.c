@@ -5,14 +5,71 @@
 #include <ctype.h>
 
 /* ==========================================================================
-   Port of engine/src/ability_queue.rs
+   Port of engine/src/ability/queue.rs
    ==========================================================================
    The Rust AbilityQueue owns Vec<AbilityQueueEntry> + QueueState + resolver.
    The C port stores the queue in GameState::queue (RbAbilityQueue / RbQueueEntry)
    and keeps resolver transient state in the queue's resume_* fields.  Fields
    that have no C equivalent (AbilityId, ConditionalChoice, Arc<Ability>,
    SmallVec, Box<AbilityResolver>) are either mapped to existing C fields or
-   omitted with a comment.  */
+   omitted with a comment.
+
+   --------------------------------------------------------------------------
+   OWNERSHIP CONTRACT for entry.pending_actions
+   --------------------------------------------------------------------------
+   The park/take/resume trio (rb_queue_store_pending_actions,
+   rb_queue_extend_pending_actions, rb_queue_repark_pending_actions,
+   rb_queue_take_pending_actions[_owned], rb_queue_resume_pending_actions) is
+   the translation of Rust's `entry.pending_actions: Vec<AbilityEffect>` and of
+   its single Rust consumer, `AbilityResolver::resume_pending_actions`
+   (choice.rs:75-127).
+
+   THE INVARIANT, in one sentence because every producer and consumer depends on
+   it: `pending_actions[]` holds ONLY owned deep clones — never a NULL marker,
+   never a borrowed pointer — and `pending_actions_n` is exactly the number of
+   live entries in that array. A consequence worth stating: a Rust
+   `Vec<AbilityEffect>`'s len IS its contents, so "the entry has N pending
+   actions" is a claim about real commands. Parking NULLs made that claim false
+   while `has_pending_actions()` still reported true, which is why the
+   continuation silently never ran.
+
+   Given that, an entry's parked actions are released by EXACTLY ONE of three
+   owners, so no path can both double-free and leak:
+     * entry_clear_pending_actions — the entry is being dropped: queue clear,
+       a completed entry dropped by clear_completed, a constant-context pop, or a
+       vacated slot left behind by compaction / promotion (those last three wipe
+       the slot AFTER clearing it, so the moved entry's pointers are never live
+       in two slots at once);
+     * rb_queue_take_pending_actions_owned — ownership moves to the caller's
+       array, which MUST rb_effect_free each element (choice.c:3816-3835 does);
+     * rb_queue_resume_pending_actions — executed in place, then freed.
+
+   Producers (store / extend / repark / set / save) NEVER free their argument:
+   `actions` belongs to whoever built it (the compound.c sequential-step pool, or
+   the source effect tree). Consumers never adopt an individual slot pointer;
+   they take the whole batch and let the count drop to 0.
+
+   The count-only entry points (rb_queue_set_pending_actions,
+   rb_queue_save_pending_actions) cannot express "these N commands" — the count
+   signature is fixed in include/rabuka.h, which this file does not own. They
+   therefore resolve the commands from the queue's own continuation state
+   (queue_resolve_continuation_effects) and deep-clone them, and they leave the
+   list EMPTY rather than inflated when no real command exists. An honest zero
+   lets the caller's `cont` fallback execute the remaining siblings, which is
+   what Rust does; a fabricated N would suppress that fallback and lose the
+   effects permanently. See CROSS-FILE note: choice.c:554 is the one callsite
+   that should pass real effects rather than a count.
+
+   --------------------------------------------------------------------------
+   The "choice-resume continuation" block (resume_eff, resume_parent,
+   resume_actor, deferred, pending_deferred_costs) and the fallback loop in
+   rb_drain_ability_queue are NOT Rust queue state. Rust keeps that machinery in
+   choice.rs / resolver.rs; it is folded into the C queue so choice.c,
+   compound.c and the effect executors have one continuation to park into, and
+   each block says so where it is declared. The FSM transitions at the top of
+   rb_drain_ability_queue, however, do mirror Rust's `AbilityResolver::drain`
+   entry/exit conditions plus QueueState, and they are exercised by
+   test_p1_helpers.c. */
 
 /* ── Forward declarations ── */
 static int rb_queue_spawn_targets_opponent(const GameState *g, int cur);
@@ -81,8 +138,16 @@ int rb_queue_is_idle(const GameState *g) {
     return g && g->queue.state == RB_QUEUE_IDLE;
 }
 
+/* queue.rs:200-206 `is_waiting_for_choice`.
+
+   Rust returns `Some(&choice)` for WaitingForAutoAbilityChoice (which always
+   carries one) and `choice.as_ref()` for WaitingForChoice — i.e. None when that
+   variant's `choice` is None. The C models "a choice is stored" with the
+   `has_pending` flag rather than an Option inside the state, so both waiting
+   variants must test it; testing only the state reported a waiting choice for a
+   queue that had already handed its choice out. */
 int rb_queue_is_waiting_for_choice(const GameState *g) {
-    return g && g->queue.state == RB_QUEUE_AWAITING_CHOICE;
+    return g && g->queue.state == RB_QUEUE_AWAITING_CHOICE && g->queue.has_pending;
 }
 
 RbQueueState rb_queue_state(const RbAbilityQueue *q) {
@@ -188,6 +253,11 @@ int rb_queue_push(RbAbilityQueue *q, int card_id, int ability_idx) {
     e->pending_actions_n = 0;
     e->n_cond_cache = 0;
     e->player_id[0] = '\0';
+    /* Rust `triggering_member_id: Option<i16>` defaults to None. memset leaves 0,
+       which is a VALID card id, so an entry that never recorded a member id
+       would read as "member 0 fired this". rb_queue_enqueue already seeds -1;
+       this path did not. */
+    e->triggering_member_id = -1;
     if (card_id >= 0 && ability_idx >= 0) {
         Ability ab;
         if (rb_decode_card_ability((uint32_t)card_id, ability_idx, &ab)) {
@@ -293,6 +363,21 @@ void rb_queue_pause_for_choice(GameState *g, const RbChoice *choice) {
                     is_opp = rb_queue_spawn_targets_opponent(g, cur);
                 }
             }
+            /* queue.rs:340-345 names a SECOND opponent trigger:
+               `is_route_opponent`, true when the entry's choice_card_no is
+               ChoiceRoute::Raw("position_change:opponent:..."). The C cannot
+               evaluate it: RbQueueEntry.choice_card_no is an int route tag
+               (RB_CHOICE_ROUTE_*), and the "position_change:opponent:" PREFIX
+               that Rust matches on is not carried anywhere in the C entry — the
+               raw route string survives only on the RbChoice (`route` /
+               RB_ROUTEK_RAW), which is not in scope on the entry.
+
+               So only the spawn-context trigger (rb_queue_spawn_targets_opponent
+               above) is live here. Implementing the second trigger needs the raw
+               route string stored on the entry, which means a new field in
+               include/rabuka.h — see the CROSS-FILE REQUESTS in the port report.
+               Inventing an int comparison here would look like the port while
+               matching nothing. */
             if (is_opp) {
                 snprintf(e->choice_player_id, sizeof(e->choice_player_id),
                          "%s", (e->player_id[0] == 'p' && e->player_id[1] == '1') ? "p2" : "p1");
@@ -328,6 +413,7 @@ void rb_queue_pause_for_choice(GameState *g, const RbChoice *choice) {
         e->card_id = -1;
         e->ability_idx = -1;
         e->optional_cost_result = -1;
+        e->triggering_member_id = -1;   /* Option::None; 0 is a valid card id */
         g->queue.n_entries++;
         g->queue.cur = idx;
         g->queue.pending = *choice;
@@ -337,8 +423,25 @@ void rb_queue_pause_for_choice(GameState *g, const RbChoice *choice) {
     }
 }
 
+/* queue.rs:416-419 `pause_for_auto_ability_choice`.
+
+   Rule 9.5.3: the player is asked which standby ability resolves first, and the
+   queue parks that prompt WITHOUT touching `entries` (Rust's
+   WaitingForAutoAbilityChoice variant carries only the Choice). The C models
+   that variant as RB_QUEUE_AWAITING_CHOICE plus the `auto_ability` flag, which
+   is what `rb_queue_current_entry_mut` / `rb_queue_has_resolver` test to
+   reproduce Rust's "WaitingForAutoAbilityChoice yields no current_entry".
+
+   The C body was missing `snapshot_requested = true`, the FIRST of Rust's two
+   statements and the one with an observable effect outside the queue: Rust sets
+   it so the web handler can push an extra history snapshot at the choice
+   boundary, and resolver.c:322-326 (the other setter of that flag) relies on the
+   flag existing at all. Without it the auto-ability prompt was taken with no
+   snapshot, so a player answering "which standby ability first?" saw a state
+   jump they could not rewind. */
 void rb_queue_pause_for_auto_ability_choice(GameState *g, const RbChoice *choice) {
     if (!g || !choice) return;
+    g->queue.snapshot_requested = 1;
     g->queue.pending = *choice;
     g->queue.has_pending = 1;
     g->queue.auto_ability = 1;
@@ -346,8 +449,23 @@ void rb_queue_pause_for_auto_ability_choice(GameState *g, const RbChoice *choice
     g->queue.state = RB_QUEUE_AWAITING_CHOICE;
 }
 
+/* queue.rs:422-434 `resume_with_choice`.
+
+   Rust matches on the state and the `_ => {}` arm is the whole story: ONLY the
+   two waiting states transition. From Idle the call does nothing, and from
+   PayingCost / ExecutingEffect it does nothing either -- the resolution is
+   already in flight and must not be re-entered.
+
+   The C body was an if/else on `auto_ability` alone, so BOTH waiting variants
+   were covered but every other state was rewritten: a resume issued while Idle
+   put the queue into RESOLVING with no entry to resolve (an empty queue in a
+   non-idle state, which `rb_queue_is_idle` then denies and
+   `rb_drain_ability_queue` treats as "already resolving" and refuses to run), and
+   a resume issued mid-cost silently advanced the cost phase to the effect phase.
+   Gate on the state, exactly as Rust does. */
 void rb_queue_resume_with_choice(GameState *g) {
     if (!g) return;
+    if (g->queue.state != RB_QUEUE_AWAITING_CHOICE) return;  /* Rust's `_ => {}` */
     if (g->queue.auto_ability) {
         g->queue.auto_ability = 0;
         g->queue.has_pending = 0;
@@ -362,14 +480,51 @@ void rb_queue_resume_with_choice(GameState *g) {
    Queue maintenance
    ========================================================================== */
 
+/* queue.rs:455-460 `clear_completed` — `entries.retain(|e| !e.completed)` plus
+   the out-of-range `current_index` reset.
+
+   `Vec::retain` DROPS every entry it removes, and an entry owns its
+   `pending_actions` Vec, so a completed entry's parked deep clones are freed
+   here in Rust. The C compaction did neither: it copied surviving structs down
+   and only lowered `n_entries`.
+
+   Two consequences, both real:
+     1. LEAK. Every completed entry left its owned pending actions unreachable.
+     2. ALIASING DOUBLE-FREE. `entries[write] = entries[i]` copies the struct,
+        so `pending_actions[]` (an array of heap pointers) is now live in two
+        slots. The stale high slot is outside [0, n_entries) so the *next*
+        clear_completed could not see it, but the next PUSH into that slot
+        memsets it, silently orphaning the clones; and if a later compact ever
+        shifted the high slot back into range the same effect tree would be
+        freed twice.
+
+   So: free the dropped entries' actions, MOVE (not copy) the survivors, and
+   zero every vacated slot so the array never holds an entry that n_entries
+   excludes. The vacated slots read back as card_id 0, which is what
+   test_parity_queue_resume.c:398 asserts. */
 void rb_queue_clear_completed(GameState *g) {
     if (!g) return;
     int write = 0;
     for (int i = 0; i < g->queue.n_entries; i++) {
-        if (!g->queue.entries[i].completed) {
-            if (write != i) g->queue.entries[write] = g->queue.entries[i];
-            write++;
+        RbQueueEntry *e = &g->queue.entries[i];
+        if (e->completed) {
+            entry_clear_pending_actions(e);   /* Rust: the retained-drop frees the Vec */
+            continue;
         }
+        if (write != i) {
+            /* MOVE, not copy: transfer the whole struct, then wipe the source so
+               the two slots never alias the same owned pointer. */
+            g->queue.entries[write] = *e;
+            memset(e, 0, sizeof(*e));
+        }
+        write++;
+    }
+    /* Vacated tail: no entry may remain visible at an index >= n_entries. */
+    for (int i = write; i < g->queue.n_entries; i++) {
+        entry_clear_pending_actions(&g->queue.entries[i]);
+        memset(&g->queue.entries[i], 0, sizeof(RbQueueEntry));
+        g->queue.entries[i].optional_cost_result = -1;
+        g->queue.entries[i].triggering_member_id = -1;
     }
     g->queue.n_entries = write;
     if (g->queue.cur > g->queue.n_entries) g->queue.cur = 0;
@@ -383,6 +538,7 @@ void rb_queue_push_constant_context(GameState *g, const char *player_id) {
     e->card_id = -1;
     e->ability_idx = -1;
     e->optional_cost_result = -1;
+    e->triggering_member_id = -1;   /* Option::None; 0 is a valid card id */
     if (player_id)
         snprintf(e->player_id, sizeof(e->player_id), "%s", player_id);
     g->queue.n_entries++;
@@ -390,10 +546,17 @@ void rb_queue_push_constant_context(GameState *g, const char *player_id) {
     g->queue.state = RB_QUEUE_RESOLVING;
 }
 
+/* queue.rs:510-513 `pop_constant_context` — `entries.pop()` DROPS the popped
+   entry, so its owned pending_actions are freed. The C only decremented
+   n_entries, orphaning them at a slot the queue still writes on the next push. */
 void rb_queue_pop_constant_context(GameState *g) {
     if (!g) return;
     if (g->queue.n_entries > 0) {
         g->queue.n_entries--;
+        entry_clear_pending_actions(&g->queue.entries[g->queue.n_entries]);
+        memset(&g->queue.entries[g->queue.n_entries], 0, sizeof(RbQueueEntry));
+        g->queue.entries[g->queue.n_entries].optional_cost_result = -1;
+        g->queue.entries[g->queue.n_entries].triggering_member_id = -1;
     }
     rb_queue_set_state(&g->queue, RB_QUEUE_IDLE);
 }
@@ -402,6 +565,10 @@ void rb_queue_pop_constant_context(GameState *g) {
    Promotion / reordering
    ========================================================================== */
 
+/* queue.rs:566-578 `promote_entry` — same MOVE discipline as
+   promote_entry_by_abs: shift the tail up, wipe the vacated slot at `absolute`
+   (it held `entry`'s old position, and copying the neighbour over it aliased the
+   neighbour's owned pending_actions into two slots), then seat `entry` at 0. */
 void rb_queue_promote_entry(GameState *g, int from_index) {
     if (!g) return;
     int absolute = (int)g->queue.cur + from_index;
@@ -409,6 +576,9 @@ void rb_queue_promote_entry(GameState *g, int from_index) {
     RbQueueEntry tmp = g->queue.entries[absolute];
     for (int i = absolute; i > 0; i--)
         g->queue.entries[i] = g->queue.entries[i - 1];
+    memset(&g->queue.entries[absolute], 0, sizeof(RbQueueEntry));
+    g->queue.entries[absolute].optional_cost_result = -1;
+    g->queue.entries[absolute].triggering_member_id = -1;
     g->queue.entries[0] = tmp;
     if ((int)g->queue.cur > absolute)
         g->queue.cur--;
@@ -416,11 +586,33 @@ void rb_queue_promote_entry(GameState *g, int from_index) {
         g->queue.cur = 0;
 }
 
+/* queue.rs:592-602 `promote_entry_by_abs`.
+
+   The `absolute == 0` arm is not a no-op in Rust: it falls into the early-return
+   block that still runs `current_index = 0`. Promoting the head to the head is
+   order-preserving but re-seats the current index on position 0, so a caller that
+   asked for the head to become current gets it. The C returned before that, so
+   `promote_entry_by_abs(0)` left `current_index` wherever it was.
+
+   The move is a MOVE: `entries.remove(absolute)` in Rust leaves a hole and
+   `insert(0, entry)` fills it, so the removed entry exists in exactly one slot.
+   The C's shift loop overwrote the high slot with a copy of its neighbour, which
+   left that neighbour's owned `pending_actions` pointers live in two slots —
+   the same aliasing hazard clear_completed has, and a double free waiting for the
+   next release path. Shift, then wipe the vacated slot. */
 void rb_queue_promote_entry_by_abs(GameState *g, int absolute) {
-    if (!g || absolute >= g->queue.n_entries) return;
+    if (!g) return;
+    if (absolute >= g->queue.n_entries) return;
+    if (absolute == 0) {          /* Rust: the early-return arm still reseats cur */
+        g->queue.cur = 0;
+        return;
+    }
     RbQueueEntry tmp = g->queue.entries[absolute];
     for (int i = absolute; i > 0; i--)
         g->queue.entries[i] = g->queue.entries[i - 1];
+    memset(&g->queue.entries[absolute], 0, sizeof(RbQueueEntry));
+    g->queue.entries[absolute].optional_cost_result = -1;
+    g->queue.entries[absolute].triggering_member_id = -1;
     g->queue.entries[0] = tmp;
     g->queue.cur = 0;
 }
@@ -488,7 +680,12 @@ void rb_queue_extend_pending_actions(GameState *g, AbilityEffect *const *actions
 }
 
 /* Replace the current entry's pending list with deep clones of `actions`
-    (mirrors Rust entry.set_pending_actions(vec)). */
+    (mirrors Rust entry.set_pending_actions(vec), ability_queue.rs:532-536).
+
+    INVARIANT (see the file header): on return, pending_actions_n counts exactly
+    as many OWNED deep clones as the array holds. The OOM guard used to be
+    missing here, so a failed clone parked a NULL and inflated the count — the
+    NULL-slot hole this file used to have. Skip the slot instead. */
 void rb_queue_store_pending_actions(GameState *g, AbilityEffect *const *actions, int count) {
     if (!g) return;
     int cur = g->queue.cur;
@@ -497,42 +694,110 @@ void rb_queue_store_pending_actions(GameState *g, AbilityEffect *const *actions,
     entry_clear_pending_actions(e);
     for (int i = 0; i < count && e->pending_actions_n < RB_ENTRY_PENDING_CAP; i++) {
         if (!actions[i]) continue;
-        e->pending_actions[e->pending_actions_n++] = rb_effect_deep_clone(actions[i]);
+        AbilityEffect *owned = rb_effect_deep_clone(actions[i]);
+        if (!owned) continue;              /* OOM: keep the count honest */
+        e->pending_actions[e->pending_actions_n++] = owned;
     }
 }
 
+/* Real effects to satisfy a count-only set/save request.
+
+   Rust's set_pending_actions / save_pending_actions both take a `Vec<AbilityEffect>`
+   — the caller hands over the actual commands. The C exposes a count-only
+   signature (fixed in include/rabuka.h, not this file's to change), so the
+   effects have to be recovered from the queue's OWN continuation state, which is
+   the same tree those callsites are standing on:
+
+     1. `resume_eff`'s children — choice.c:3205-3209 pauses with
+        `resume_eff->n_child > 0` precisely because Rust's `effect_steps[0]`
+        (ability_queue.rs:532's argument) is that child's tail. This is the
+        direct counterpart of Rust's `effect_steps` and is the common case.
+     2. `deferred` — compound.c parks the sequential remainder here when a cost
+        pay_skip gate stops the resolution, and that remainder is the next
+        command the continuation must run.
+
+   Returns the number of real effects written into `out` (at most `max_out`).
+   Returns 0 when the queue holds no continuation, which is the signal that the
+   count-only request cannot be satisfied with real commands. */
+static int queue_resolve_continuation_effects(const GameState *g, AbilityEffect **out, int max_out) {
+    if (!g || !out || max_out <= 0) return 0;
+    int n = 0;
+    if (g->queue.resume_eff) {
+        for (int i = 0; i < g->queue.resume_eff->n_child && n < max_out; i++) {
+            if (g->queue.resume_eff->child[i]) out[n++] = g->queue.resume_eff->child[i];
+        }
+    }
+    if (n < max_out && g->queue.deferred) out[n++] = g->queue.deferred;
+    return n;
+}
+
+/* queue.rs:532-536 `set_pending_actions(actions)` — REPLACE the current entry's
+    pending list.
+
+    The count-only C signature cannot express "these N commands"; it can only say
+    "park N commands". Previously that was satisfied by writing N NULLs, which is
+    the fabrication this function exists to remove: the entry then reported
+    `pending_actions_n == N` while owning nothing, so
+    rb_queue_resume_pending_actions skipped N slots executing nothing and
+    rb_resolver_continue_siblings took the OWNED path and ran nothing — the
+    continuation silently never happened.
+
+    Now the count is satisfied with real deep clones of the queue's own
+    continuation (queue_resolve_continuation_effects), routed through
+    rb_queue_store_pending_actions so the deep clone happens in one place. If the
+    queue holds no continuation, the list is left EMPTY rather than inflated with
+    markers: a truthful zero lets the caller's `cont` fallback run the remaining
+    siblings, which is what Rust does, whereas a fake N would suppress that
+    fallback and lose the effects for good.
+
+    count <= 0 clears, which is Rust's `set_pending_actions(Vec::new())` and is
+    what choice.c:3282 (a position-change skip) and the parity test rely on. */
 void rb_queue_set_pending_actions(GameState *g, int count) {
     if (!g) return;
     int cur = g->queue.cur;
     if (cur < 0 || cur >= g->queue.n_entries) return;
-    /* Legacy count-only callers (e.g. conditional-choice re-entry that passes a
-        flag) park N placeholder markers; keep semantics but never exceed cap. */
-    RbQueueEntry *e = &g->queue.entries[cur];
-    if (count > e->pending_actions_n) {
-        for (int i = e->pending_actions_n; i < count && e->pending_actions_n < RB_ENTRY_PENDING_CAP; i++)
-            e->pending_actions[e->pending_actions_n++] = NULL;
-    } else if (count < e->pending_actions_n) {
-        for (int i = count; i < e->pending_actions_n; i++) {
-            rb_effect_free(e->pending_actions[i]);
-            e->pending_actions[i] = NULL;
-        }
+    if (count <= 0) {
+        rb_queue_store_pending_actions(g, NULL, 0);
+        return;
     }
-    e->pending_actions_n = count > 0 ? count : 0;
+    if (count > RB_ENTRY_PENDING_CAP) count = RB_ENTRY_PENDING_CAP;
+    AbilityEffect *src[RB_ENTRY_PENDING_CAP];
+    int n = queue_resolve_continuation_effects(g, src, count);
+    if (n <= 0) {
+        rb_queue_store_pending_actions(g, NULL, 0);
+        return;
+    }
+    rb_queue_store_pending_actions(g, src, n);
 }
 
+/* queue.rs:539-546 `save_pending_actions(actions)` — APPEND to the current
+    entry's pending list, and return early when there is nothing to append.
+
+    The early return is Rust's `if actions.is_empty() { return; }` and it is
+    load-bearing, not a micro-optimisation: save must never CLEAR a batch that is
+    already parked. The count-only C form keeps that shape, and — unlike the
+    previous body — appends real deep clones rather than NULL markers. */
 void rb_queue_save_pending_actions(GameState *g, int count) {
-    if (!g || count <= 0) return;
+    if (!g || count <= 0) return;            /* Rust: actions.is_empty() -> return */
     int cur = g->queue.cur;
     if (cur < 0 || cur >= g->queue.n_entries) return;
-    RbQueueEntry *e = &g->queue.entries[cur];
-    for (int i = 0; i < count && e->pending_actions_n < RB_ENTRY_PENDING_CAP; i++)
-        e->pending_actions[e->pending_actions_n++] = NULL;
+    if (count > RB_ENTRY_PENDING_CAP) count = RB_ENTRY_PENDING_CAP;
+    AbilityEffect *src[RB_ENTRY_PENDING_CAP];
+    int n = queue_resolve_continuation_effects(g, src, count);
+    if (n <= 0) return;                      /* nothing real to append; keep the batch */
+    rb_queue_extend_pending_actions(g, src, n);
 }
 
 /* Take the pending list out (Rust take_pending_actions returns Vec). Returns
-    the count; the caller takes ownership of the popped effect pointers. */
+    the count; the caller takes ownership of the popped effect pointers.
+
+    OWNERSHIP: this is the second of the three release paths. The slots are
+    NULLed as they are handed out and `pending_actions_n` drops to 0, so the entry
+    no longer references them and cannot free them again. Anything past `max_out`
+    cannot be returned to the caller, so it is freed HERE rather than leaked; the
+    caller is told only about the `max_out` it can actually hold. */
 int rb_queue_take_pending_actions_owned(GameState *g, AbilityEffect **out, int max_out) {
-    if (!g) return 0;
+    if (!g || !out || max_out <= 0) return 0;
     int cur = g->queue.cur;
     if (cur < 0 || cur >= g->queue.n_entries) return 0;
     RbQueueEntry *e = &g->queue.entries[cur];
@@ -579,20 +844,33 @@ int rb_queue_resume_pending_actions(GameState *g) {
     int host = g->queue.resume_host;
     int executed = 0;
     while (e->pending_actions_n > 0 && !rb_has_pending_choice(g)) {
+        /* The tail is compacted down over the slot being consumed, and the
+           vacated high slot is NULLed. The old body left the popped pointer
+           duplicated in the slot above, so the entry held one owned effect in two
+           slots: entry_clear_pending_actions and any later take would each reach
+           it, and the shift dropped the count without releasing it. */
         AbilityEffect *cmd = e->pending_actions[0];
         for (int i = 1; i < e->pending_actions_n; i++)
             e->pending_actions[i - 1] = e->pending_actions[i];
         e->pending_actions[e->pending_actions_n - 1] = NULL;
         e->pending_actions_n--;
-        if (!cmd) continue;
+        if (!cmd) continue;   /* unreachable under the ownership invariant */
         if (g->queue.cancel_remaining_commands) {
             g->queue.cancel_remaining_commands = 0;
             rb_effect_free(cmd);
             break;
         }
+        /* `e` is a pointer INTO the entries array, and the executed effect may
+           re-enter the queue (a sub-prompt's answer path can clear or compact it).
+           Re-derive the entry after every execution so effect_started below is
+           written to the entry that is still current, not through a stale
+           pointer. Rust has no equivalent hazard: `entries` is a Vec whose
+           borrows the resolver cannot invalidate mid-resolution. */
         rb_execute_effect_ex(g, actor, cmd, host);
         rb_effect_free(cmd);
         executed++;
+        int c2 = g->queue.cur;
+        if (c2 >= 0 && c2 < g->queue.n_entries) e = &g->queue.entries[c2];
         if (rb_has_pending_choice(g)) {
             e->effect_started = 1;   /* Rust: entry.effect_started = true (choice.rs:81-83) */
             break;

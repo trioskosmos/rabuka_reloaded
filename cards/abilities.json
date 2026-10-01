@@ -1,9 +1,9 @@
 {
   "schema": "extracted_abilities.v1",
-  "generated_at": "2026-10-01T14:11:42.836069",
+  "generated_at": "2026-10-01T16:18:15.410563",
   "generated_by": "cards/ability_extraction/extract_card_abilities.py",
   "source_file": "cards/cards.json",
-  "engine_commit": "07f1d0e8",
+  "engine_commit": "4b6d5484",
   "parser_version": "1.0",
   "input_hash": null,
   "statistics": {
@@ -4291,8 +4291,6 @@
             }
           ],
           "text": "これにより控え室に置いたカードの中に『虹ヶ咲』のライブカードかブレードハートを持たない『虹ヶ咲』のメンバーカードがある場合",
-          "card_property": "has_blade_heart",
-          "negation": true,
           "group_names": [
             "虹ヶ咲"
           ]
@@ -24032,8 +24030,7 @@
             }
           ],
           "text": "自分のライブカード置き場の中に元々のスコアより高いスコアのライブカードがあるか、エールにより公開された自分のカードの中に{{icon_score.png|スコア}}を持つライブカードがある場合",
-          "original_value": true,
-          "card_property": "has_score_icon"
+          "original_value": true
         },
         "action": "draw_card",
         "count": 1,
@@ -35423,9 +35420,7 @@
               "type": "comparison_condition"
             }
           ],
-          "text": "このターン、エールにより公開された自分のカードの中にブレードハートを持たないカードが0枚の場合か、または自分が余剰ハートを2つ以上持っている場合",
-          "card_property": "has_blade_heart",
-          "negation": true
+          "text": "このターン、エールにより公開された自分のカードの中にブレードハートを持たないカードが0枚の場合か、または自分が余剰ハートを2つ以上持っている場合"
         },
         "action": "modify_score",
         "operation": "set",
@@ -38793,8 +38788,7 @@
           "text": "自分か相手の成功ライブカード置き場にカードが2枚以上あり、かつエールにより公開された自分のカードの中に{{icon_score.png|スコア}}を持つライブカードが1枚以上ある場合",
           "target": "both",
           "location": "success_live_card_zone",
-          "card_type": "live_card",
-          "card_property": "has_score_icon"
+          "card_type": "live_card"
         },
         "action": "modify_score",
         "value": 2,

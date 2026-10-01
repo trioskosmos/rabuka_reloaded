@@ -491,6 +491,21 @@ fn opp_gradient_enabled() -> bool {
     std::env::var_os("V8_OPP_GRADIENT").is_some()
 }
 
+/// Ensemble determinization over the opponent's unknown heart composition.
+/// See the `V8_OPP_ENSEMBLE` block in `build_with` for why §14.7's measured
+/// inversion calls for it.
+fn opp_ensemble_enabled() -> bool {
+    std::env::var_os("V8_OPP_ENSEMBLE").is_some()
+}
+
+fn opp_ensemble_samples() -> usize {
+    std::env::var("V8_OPP_ENSEMBLE_N")
+        .ok()
+        .and_then(|v| v.parse::<usize>().ok())
+        .filter(|&n: &usize| (1..=4096).contains(&n))
+        .unwrap_or(64)
+}
+
 fn assume_commitment_enabled() -> bool {
     std::env::var_os("V8_NO_ASSUME_COMMIT").is_none()
 }
@@ -621,14 +636,73 @@ impl OppModel {
         // board commits more reliably than one with an empty stage.
         let target = (2 * set_size).clamp(1, SCORE_SLOTS - 1).i32_count();
         let bar = score_median_hearts(target);
-        let clears = yield_prior(yield_source)
-            .iter()
-            .filter(|(yield_hearts, _)| {
-                board_total + crate::constants::score_to_i32_rounded(blades as f64 * yield_hearts) >= bar
-            })
-            .map(|(_, weight)| *weight)
-            .sum::<f64>()
-            .min(1.0);
+        // `V8_OPP_ENSEMBLE`: ensemble determinization over the opponent's
+        // UNKNOWN heart composition, replacing the single hard threshold.
+        //
+        // §14.7 measured `clears` to be inverted and flat - realized 86.2-88.3%
+        // in every predicted bucket, including the bucket that asserts they
+        // fold - which is the textbook **strategy fusion** defect (Frank &
+        // Basin): one guess about hidden information treated as truth. The
+        // published remedy is to sample MANY consistent opponent states and
+        // aggregate (Cowling/Ward/Powley, IEEE TCIAIG 2012; Kruse & Bartels,
+        // IPMU 2018), and they report most of the available gain comes from
+        // declining to trust a single guess.
+        //
+        // The distinction from the step function: instead of gating one
+        // aggregate `supply >= bar`, this draws many (board, yield) pairs and
+        // asks each one independently whether it clears, so a wrong prior
+        // degrades the average smoothly instead of switching the whole term
+        // to zero at a threshold. The yield values remain the one hand-fitted
+        // input -- their decklist is hidden -- but they are now summed over a
+        // distribution of boards rather than compared against one.
+        let clears = if opp_ensemble_enabled() {
+            let samples = opp_ensemble_samples();
+            let prior = yield_prior(yield_source);
+            let total: f64 = prior.iter().map(|(_, w)| *w).sum();
+            let mut acc = 0.0;
+            let mut rng = 0x9E37_79B9_7F4A_7C15u64;
+            let mut unit = || {
+                rng = rng
+                    .wrapping_mul(6364136223846793005)
+                    .wrapping_add(1442695040888963407);
+                (rng >> 11) as f64 / (1u64 << 53) as f64
+            };
+            for _ in 0..samples {
+                // Walk the prior once per sample. `prior` is an already
+                // renormalised weighted case list, so walking it IS sampling it.
+                let mut pick = unit() * total.max(1e-9);
+                let mut yield_hearts = prior.first().map(|p| p.0).unwrap_or(0.0);
+                for (y, w) in &prior {
+                    if pick <= *w {
+                        yield_hearts = *y;
+                        break;
+                    }
+                    pick -= *w;
+                }
+                // Spread the observed board by the uncertainty in what is on
+                // their stage: a fraction of the prior yield spread, since we
+                // cannot see member identities (8.2.2 hides contents).
+                let jitter = (unit() - 0.5) * 2.0;
+                let eff_yield = (yield_hearts + jitter * 0.35).max(0.0);
+                let supply =
+                    board_total + crate::constants::score_to_i32_rounded(blades as f64 * eff_yield);
+                if supply >= bar {
+                    acc += 1.0;
+                }
+            }
+            (acc / samples as f64).min(1.0)
+        } else {
+            yield_prior(yield_source)
+                .iter()
+                .filter(|(yield_hearts, _)| {
+                    board_total
+                        + crate::constants::score_to_i32_rounded(blades as f64 * yield_hearts)
+                        >= bar
+                })
+                .map(|(_, weight)| *weight)
+                .sum::<f64>()
+                .min(1.0)
+        };
         let commit_rate = if forecast {
             assume_commit_rate()
         } else {

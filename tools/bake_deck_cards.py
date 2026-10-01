@@ -105,7 +105,17 @@ def make_deck_blob(cards_by_no: dict, card_nos: list[str], st: compile_cards.Str
             if isinstance(v, str):
                 st.intern(v)
 
-    strtab = compile_cards.encode_strtab(st.get_strings())
+    # Encode the records BEFORE snapshotting the string table.
+    #
+    # `encode_card` interns ALL nine string fields (`group`, `img`, `product`, `rare` and
+    # `ability` included), while the loop above only pre-interns four. Snapshotting `strtab`
+    # first therefore emitted records whose indices pointed PAST the end of the blob's own
+    # string table, for any card with a group/product/rare or an ability string — the engine
+    # reading such a blob indexes out of range. `test_bake_deck_cards.py` caught this via
+    # its `assertLess(index, len(strings))` in decode_blob.
+    #
+    # The pre-intern loop above is kept because it fixes the index ORDER of those four
+    # fields, which keeps already-baked blobs byte-comparable.
     lengths = []
     records = bytearray()
     for _, card in wanted:
@@ -113,6 +123,7 @@ def make_deck_blob(cards_by_no: dict, card_nos: list[str], st: compile_cards.Str
         records.extend(compile_cards.encode_card(card, st))
         lengths.append(len(records) - before)
 
+    strtab = compile_cards.encode_strtab(st.get_strings())
     n = len(wanted)
     header = struct.pack("<4sHI", b"CARD", n, len(strtab))
     return header + strtab + struct.pack(f"<{n}B", *lengths) + bytes(records)

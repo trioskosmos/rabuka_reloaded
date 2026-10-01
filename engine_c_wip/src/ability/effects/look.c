@@ -91,11 +91,167 @@ static int look_bool(const AbilityEffect *effect, const char *key)
     return value && (!strcmp(value, "true") || !strcmp(value, "1"));
 }
 
+/* ── util::card_plural (engine/src/ability/util/labels.rs:8-10) ───────────
+   "card" for count==1, "cards" otherwise. Used by every choice description
+   look.rs builds. */
+static const char *look_card_plural(int count)
+{
+    return count == 1 ? "card" : "cards";
+}
+
+/* ── describe::zone_label / zone_label_ja (engine/src/ability/describe.rs:22)
+   Prompt text only. `None` renders "unknown" / 「不明」 exactly as Rust does. */
+static const char *look_zone_label(const char *zone)
+{
+    if (!zone) return "unknown";
+    if (!strcmp(zone, "hand")) return "hand";
+    if (!strcmp(zone, "discard")) return "the waiting room";
+    if (!strcmp(zone, "deck")) return "deck";
+    if (!strcmp(zone, "deck_top")) return "top of deck";
+    if (!strcmp(zone, "deck_bottom")) return "bottom of deck";
+    if (!strcmp(zone, "stage")) return "stage";
+    if (!strcmp(zone, "energy")) return "energy";
+    if (!strcmp(zone, "energy_deck")) return "energy deck";
+    if (!strcmp(zone, "energy_zone")) return "energy zone";
+    if (!strcmp(zone, "waitroom")) return "wait room";
+    if (!strcmp(zone, "success_zone")) return "success zone";
+    if (!strcmp(zone, "live_card_zone")) return "live card zone";
+    if (!strcmp(zone, "under_member")) return "under this member";
+    if (!strcmp(zone, "revealed_cards")) return "revealed cards";
+    if (!strcmp(zone, "those_cards")) return "those cards";
+    if (!strcmp(zone, "all_selected")) return "selected cards";
+    if (!strcmp(zone, "looked_at")) return "looked_at";
+    return zone;
+}
+
+static const char *look_zone_label_ja(const char *zone)
+{
+    if (!zone) return "\xE6\x9C\xAA\xE6\x98\x8E"; /* 不明 */
+    if (!strcmp(zone, "hand")) return "\xE6\x89\x8B\xE7\xAE\x8D"; /* 手札 */
+    if (!strcmp(zone, "discard") || !strcmp(zone, "waitroom"))
+        return "\xE6\x82\x9A\xE3\x81\x88\xE5\xAE\xA4"; /* 控え室 */
+    if (!strcmp(zone, "deck")) return "\xE3\x83\x87\xE3\x83\x83\xE3\x82\xAD"; /* デッキ */
+    if (!strcmp(zone, "deck_top"))
+        return "\xE3\x83\x87\xE3\x83\x83\xE3\x82\xAD\xE3\x81\xAE\xE4\xB8\x8A";
+    if (!strcmp(zone, "deck_bottom"))
+        return "\xE3\x83\x87\xE3\x83\x83\xE3\x82\xAD\xE3\x81\xAE\xE4\xB8\x8B";
+    if (!strcmp(zone, "stage"))
+        return "\xE3\x82\xB9\xE3\x83\x86\xE3\x83\xBC\xE3\x82\xB8"; /* ステージ */
+    if (!strcmp(zone, "energy")) return "\xE3\x82\xA8\xE3\x83\x8D\xE3\x83\xAB\xE3\x82\xAE\xE3\x83\xBC";
+    if (!strcmp(zone, "energy_zone"))
+        return "\xE3\x82\xA8\xE3\x83\x8D\xE3\x83\xAB\xE3\x82\xAE\xE3\x83\xBC\xE3\x82\xBE\xE3\x83\xBC\xE3\x83\xB3";
+    if (!strcmp(zone, "live_card_zone"))
+        return "\xE3\x83\xA9\xE3\x82\xA4\xE3\x83\x96\xE3\x82\xAB\xE3\x83\xBC\xE3\x83\x89\xE3\x82\xBE\xE3\x83\xBC\xE3\x83\xB3";
+    if (!strcmp(zone, "revealed_cards"))
+        return "\xE5\x85\xAC\xE9\x96\x8B\xE3\x81\x95\xE3\x82\x8C\xE3\x81\x9F\xE3\x82\xAB\xE3\x83\xBC\xE3\x83\x89";
+    if (!strcmp(zone, "success_zone"))
+        return "\xE6\x88\x90\xE5\x8A\x9F\xE3\x83\xA9\xE3\x82\xA4\xE3\x83\x96\xE3\x82\xAB\xE3\x83\xBC\xE3\x83\x89\xE7\xBD\xAE\xE3\x81\x8D\xE5\xA0\xB4";
+    return zone;
+}
+
+/* util::target_player_label (engine/src/ability/util/labels.rs consumers) —
+   "P1"/"P2" for the resolving seat, used by the reveal rule log. */
+static const char *look_player_label(const GameState *g, int who)
+{
+    if (!g) return "P1";
+    return (who == 1) ? "P2" : "P1";
+}
+
+/* ── look.rs:355-398 rule log: "[Turn N] P? [[log_reveal_zone:source=Z]] » names" */
+static void look_push_reveal_log(const GameState *g, int who, const char *source,
+                                 const char *names)
+{
+    char line[224];
+    snprintf(line, sizeof(line), "[Turn %d] %s [[log_reveal_zone:source=%s]] \xC2\xBB %s",
+             g ? g->turn : 0, look_player_label(g, who), source ? source : "", names);
+    rb_log_push_verdict(line, "rule_log", 1);
+}
+
+/* look.rs:1188-1194 rule log for the per-group reveal. */
+static void look_push_reveal_group_log(const GameState *g, int who, const char *source, int n)
+{
+    char line[224];
+    snprintf(line, sizeof(line), "[Turn %d] %s [[log_reveal_group:n=%d,source=zone_%s]]",
+             g ? g->turn : 0, look_player_label(g, who), n, source ? source : "");
+    rb_log_push_verdict(line, "rule_log", 1);
+}
+
+/* look.rs:1303-1309 rule log for the reveal-until walk. */
+static void look_push_reveal_until_log(const GameState *g, int who, const char *names, int found)
+{
+    char line[224];
+    snprintf(line, sizeof(line), "[Turn %d] %s [[log_reveal_deck_until:found=%s]]: %s",
+             g ? g->turn : 0, look_player_label(g, who), found ? "true" : "false", names);
+    rb_log_push_verdict(line, "rule_log", 1);
+}
+
+/* util::player_prefix (engine/src/ability/util.rs:490-502) — which seat owns
+   the activating card; used by the 「確認 N枚」 / 「カード選択 N枚」 logs. */
+static const char *look_player_prefix(const GameState *g, int card_id)
+{
+    if (g && card_id >= 0) {
+        for (int pl = 0; pl < 2; pl++) {
+            const RbPlayer *P = &g->p[pl];
+            for (int q = 0; q < RB_STAGE_SIZE; q++) if (P->stage[q] == card_id) return pl == 0 ? "P1" : "P2";
+            for (int i = 0; i < P->live.n; i++) if (P->live.cards[i] == card_id) return pl == 0 ? "P1" : "P2";
+            for (int i = 0; i < P->hand.n; i++) if (P->hand.cards[i] == card_id) return pl == 0 ? "P1" : "P2";
+        }
+    }
+    return (g && g->active == 1) ? "P2" : "P1";
+}
+
+static const char *look_activating_card_name(const GameState *g, char *out, size_t out_sz)
+{
+    out[0] = '\0';
+    if (!g || g->activating_card < 0) return out;
+    Card c;
+    if (rb_decode_card_by_index((uint32_t)g->activating_card, &c)) {
+        if (c.name) strncpy(out, c.name, out_sz - 1);
+        out[out_sz - 1] = '\0';
+        rb_free_card(&c);
+    }
+    return out;
+}
+
+/* look.rs:1087-1094 / :891-898 — the 「確認 N枚」 and 「カード選択 N枚」 logs. */
+static void look_push_look_log(const GameState *g, int count)
+{
+    char act[64];
+    char line[160];
+    look_activating_card_name(g, act, sizeof(act));
+    snprintf(line, sizeof(line), "%s %s: \xE7\xA4\xBA\xE8\xAA\x8D %d\xE6\x9E\x9A",
+             look_player_prefix(g, g ? g->activating_card : -1), act, count);
+    rb_log_push_verdict(line, "rule_log", 1);
+}
+
+static void look_push_select_log(const GameState *g, int count)
+{
+    char act[64];
+    char line[160];
+    look_activating_card_name(g, act, sizeof(act));
+    snprintf(line, sizeof(line), "%s %s: \xE3\x82\xAB\xE3\x83\xBC\xE3\x83\x89\xE9\x81\xB8\xE6\x8A\x9E %d\xE6\x9E\x9A",
+             look_player_prefix(g, g ? g->activating_card : -1), act, count);
+    rb_log_push_verdict(line, "rule_log", 1);
+}
+
+/* ── or_card_types (look.rs::handle_or_card_types) ──────────────────────────
+   Rust parks `ConditionalChoice::Str` on the queue entry so the re-executed
+   effect reads the answer back. `RbQueueEntry` has no such field, so the port
+   keeps the issued-gate marker and the resolved answer in this file; the answer
+   itself arrives as `queue.choice_result`, which choice.c sets from the picked
+   index before dispatching (choice.c:3992). */
+static int  g_look_or_gate_issued;      /* 1 between the gate and its answer */
+static char g_look_or_answer[32];       /* resolved type, e.g. "member_card"  */
+
+/* Split the comma-separated `or_card_types` extra (defined after
+   look_split_list). */
+
 /* Defined further down (they need the look_* filter helpers); forward-declared
    so the earlier executors can reuse them. */
 static int look_filter_matches(GameState *g, const AbilityEffect *effect, int cid);
 static int look_select_matches(GameState *g, const AbilityEffect *select, int cid);
 static void look_discard_unmatched(GameState *g, int owner, AbilityEffect *parent);
+static const char *look_filter_card_type(const AbilityEffect *effect);
 
 static int look_target_player(const GameState *g, int actor, const AbilityEffect *effect)
 {
@@ -142,6 +298,13 @@ static int look_split_list(const char *value, const char **out, int max, char *b
         token = strtok(NULL, ",");
     }
     return n;
+}
+
+/* Split the comma-separated `or_card_types` extra. */
+static int look_or_card_types(const AbilityEffect *effect, const char **out, int max,
+                              char *buffer, size_t cap)
+{
+    return look_split_list(look_extra(effect, "or_card_types"), out, max, buffer, cap);
 }
 
 /* look.rs::filter_select_candidates (look.rs:443-465) — the card-type plus

@@ -10,8 +10,15 @@
 //! - 7.6.2 + Q267: exactly ONE card drawn per Draw phase; an empty main deck
 //!   refreshes first and the draw still happens.
 //!
-//! Identity note (empirical): `is_first_attacker` NEVER flips — it records
-//! who won RPS. Whose turn it is derives from `current_turn_phase`
+//! Identity note (empirical): `is_first_attacker` is set by RPS at game start,
+//! but rule 8.4.13 RE-ASSIGNS it every turn from whoever solely placed on the
+//! previous check, so it does flip during a game and cannot be read as "who won
+//! RPS". A tie (both place) or a double fold leaves it unchanged. See
+//! `attacker_order_performance_test.rs::sole_winner_becomes_first_attacker_for_next_turn`
+//! and `::tied_success_keeps_current_first_attacker`, which are the tests that
+//! actually pin the rule. An earlier version of this note read "NEVER flips";
+//! that was wrong and it has been read as grounds to dismiss the axis.
+//! Whose turn it is derives from `current_turn_phase`
 //! (FirstAttackerNormal / SecondAttackerNormal).
 
 use crate::helpers::*;

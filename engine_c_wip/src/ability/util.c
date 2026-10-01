@@ -743,9 +743,13 @@ static int  g_ident_n[RB_MAX_CARD_IDS];
 
 /* Forward declarations for mutually-recursive helpers. */
 static RbBag *zone_bag(RbPlayer *P, const char *zone);
-static int rb_get_selection_indices_filter(const int *cards, int n, const RbCardFilter *filter,
-                                            int self_target_only, int activating_card,
-                                            int *out_idx, int max);
+/* External linkage on purpose: the definition at ~line 1801 is non-static and
+   move.c calls this across translation units. Declaring it `static` here fixed
+   the linkage to internal, so the whole tree failed to link with "undefined
+   reference" from move.c. Do not re-add `static`. */
+int rb_get_selection_indices_filter(const int *cards, int n, const RbCardFilter *filter,
+                                    int self_target_only, int activating_card,
+                                    int *out_idx, int max);
 static int rb_resolve_selection_filter(const int *cards, int n, const RbCardFilter *filter,
                                         int count, int is_all, int self_target_only,
                                         int activating_card);

@@ -873,16 +873,51 @@ static const struct {
     {RB_ZONEID_UNKNOWN, "unknown"}
 };
 
+/* ── ZoneId::from_str ALIAS table (types.rs:755-786) ─────────────────────────
+   Every wire string Rust's `ZoneId::from_str` accepts that is NOT itself the
+   canonical `as_str()` of the variant it decodes to.
+
+   These MUST be consulted before rb_zone_names, because `energy_zone` is
+   simultaneously
+     * the canonical as_str() of ZoneId::EnergyZone, and
+     * an alias arm of ZoneId::Energy ("energy" | "energy_zone"),
+   and Rust's match resolves the alias: `"energy" | "energy_zone" => ZoneId::Energy`
+   (types.rs:765). A single table walked in declaration order would hand
+   `energy_zone` to whichever row came first; keeping the five alias rows in
+   their own table makes the precedence a property of the data instead of a
+   property of the order two `if`s happen to be written in.
+
+   The five rows below are the complete alias set — one per `"a" | "b"` arm in
+   Rust's from_str:
+     "stage" | "ステージ"              -> Stage
+     "energy" | "energy_zone"           -> Energy
+     "success_live_zone" | "success_live_card_zone" -> SuccessLiveZone
+     "under_member" | "under"           -> UnderMember
+     "resolution" | "resolution_zone"   -> Resolution
+   A sixth alias arm would be a silent mis-decode here exactly as it would be
+   in Rust: the string would fall through to the `_ => Unknown` arm. */
+static const struct {
+    const char *alias;
+    RbZoneId    id;
+} rb_zone_id_aliases[] = {
+    { "ステージ",                RB_ZONEID_STAGE },
+    { "energy_zone",             RB_ZONEID_ENERGY },
+    { "success_live_card_zone",  RB_ZONEID_SUCCESS_LIVE_ZONE },
+    { "under",                   RB_ZONEID_UNDER_MEMBER },
+    { "resolution_zone",         RB_ZONEID_RESOLUTION }
+};
+#define N_RB_ZONE_ID_ALIASES (sizeof(rb_zone_id_aliases) / sizeof(rb_zone_id_aliases[0]))
+
 RbZoneId rb_zone_id_from_str(const char *s) {
     if (!s) return RB_ZONEID_UNKNOWN;
-    if (!strcmp(s, "ステージ")) return RB_ZONEID_STAGE;
-    if (!strcmp(s, "energy_zone")) return RB_ZONEID_ENERGY;
-    if (!strcmp(s, "success_live_card_zone")) return RB_ZONEID_SUCCESS_LIVE_ZONE;
-    if (!strcmp(s, "under")) return RB_ZONEID_UNDER_MEMBER;
-    if (!strcmp(s, "resolution_zone")) return RB_ZONEID_RESOLUTION;
+    for (size_t i = 0; i < N_RB_ZONE_ID_ALIASES; ++i) {
+        if (!strcmp(s, rb_zone_id_aliases[i].alias)) return rb_zone_id_aliases[i].id;
+    }
     for (size_t i = 0; i < sizeof(rb_zone_names) / sizeof(rb_zone_names[0]); ++i) {
         if (!strcmp(s, rb_zone_names[i].name)) return rb_zone_names[i].id;
     }
+    /* Rust's `_ => ZoneId::Unknown` arm (types.rs:784). Total by design: this
+       is a decode table with a deliberate default, not a fallible parser. */
     return RB_ZONEID_UNKNOWN;
 }
 
@@ -907,11 +942,55 @@ int rb_zone_matches_source(RbZoneId zone, const char *source) {
         case RB_ZONEID_DECK:
             return zone == RB_ZONEID_DECK || zone == RB_ZONEID_DECK_TOP ||
                    zone == RB_ZONEID_DECK_BOTTOM;
+        case RB_ZONEID_DECK_TOP:
+            return zone == RB_ZONEID_DECK_TOP;
+        case RB_ZONEID_DECK_BOTTOM:
+            return zone == RB_ZONEID_DECK_BOTTOM;
         case RB_ZONEID_DISCARD:
         case RB_ZONEID_WAITROOM:
             return zone == RB_ZONEID_DISCARD || zone == RB_ZONEID_WAITROOM;
         default:
             return zone == requested;
+    }
+}
+
+/* ZoneId::matches_dest (types.rs:899-901) -- the DESTINATION twin of
+   rb_zone_matches_source, and deliberately NOT the same rule.
+
+   The asymmetry is the whole point of the pair being two functions:
+   matches_source widens the generic `deck` to its subzones (a card milled off
+   the top of the deck is still "placed from the deck"), but matches_dest must
+   NOT, because a condition asking to place a card INTO the deck must not fire
+   for a move into one specific subzone. So this is a plain
+   `equivalent(from_str(dest))` with no per-zone widening at all.
+
+   Returns 0 (false) for a NULL destination, matching Rust's
+   `ZoneId::from_str(dest)` on a `&str` — a NULL cannot name a zone, so it
+   cannot be equivalent to one. */
+int rb_zone_matches_dest(RbZoneId zone, const char *dest) {
+    if (!dest) return 0;
+    return rb_zone_equivalent(zone, rb_zone_id_from_str(dest));
+}
+
+/* Phase::is_live_phase (types.rs:187-196) -- the single definition of the
+   "live window": both live-card-set phases, both performances, and the victory
+   determination that closes them.
+
+   Rust keeps this as ONE `matches!` precisely because the negation was
+   hand-written out in full at ability/condition/state.rs (`before_live`, as
+   five separate `!matches!` clauses) and drifted when a sixth live phase was
+   added: the positive sites got updated and the silent negation kept the old
+   answer. Use this for BOTH polarities; never re-list the variants. */
+int rb_phase_is_live_phase(int phase) {
+    switch (phase) {
+        case RB_PHASE_LIVE_SET:
+        case RB_PHASE_LIVE_SET_SECOND:
+        case RB_PHASE_PERFORMANCE:
+        case RB_PHASE_PERFORMANCE_SECOND:
+        case RB_PHASE_VICTORY:
+            return 1;
+        default:
+            return 0;
     }
 }
 
@@ -927,5 +1006,111 @@ int rb_effect_data_amount(const RbEffectData *d, int16_t *out_amount) {
         default:
             return 0;
     }
+}
+
+/* ══════════════════════════════════════════════════════════════════════════
+   engine/src/core/constants.rs — the numeric helpers that did NOT survive the
+   port as inline header macros.
+
+   rb_saturate_u8 / rb_saturate_i16 already exist as `static inline` in
+   rabuka.h; everything below was simply absent, so every call site spelled the
+   arithmetic out longhand and the two failure modes the Rust doc comments call
+   out by name were live: a truncating cast that wraps past a bound, and an
+   out-of-range score that becomes an arbitrary number and then WINS a
+   comparison it should have lost.
+   ══════════════════════════════════════════════════════════════════════════ */
+
+/* score_to_i32 (constants.rs:46-51) — narrow a score-space f64 to i32 by
+   TRUNCATION, saturating out-of-range and non-finite inputs.
+
+   The NaN guard comes first and is not redundant with the clamp: every
+   comparison against NaN is false, so an unclamped NaN would slip past a
+   range check and then land on 0 on one path and an arbitrary value on
+   another. Rust's `as i32` is saturating; a C cast is undefined, so the
+   clamp has to happen in f64 space before the narrowing. */
+int rb_score_to_i32(double v) {
+    if (v != v) return 0;                       /* NaN */
+    if (v >= 2147483647.0) return 2147483647;
+    if (v <= -2147483648.0) return -2147483647 - 1;
+    return (int)v;                              /* truncates toward zero */
+}
+
+/* score_to_i32_rounded (constants.rs:61-75) — same contract, round-to-nearest
+   first, and DISTINCT from rb_score_to_i32 on purpose.
+
+   The crate has two different narrowing idioms, `(x * f).round() as i32` and a
+   bare `x as i32`, and they disagree on half-values. Pick the one that
+   matches the call site; this is the `round()` one. Rust spells it
+   round-half-away-from-zero (`f64::round`), which is sign-symmetric add-0.5
+   followed by the truncating cast — so -0.5 goes to -1, not to 0. */
+int rb_score_to_i32_rounded(double v) {
+    if (v != v) return 0;                       /* NaN */
+    double half_away = (v >= 0.0) ? (v + 0.5) : (v - 0.5);
+    if (half_away >= 2147483647.0) return 2147483647;
+    if (half_away <= -2147483648.0) return -2147483647 - 1;
+    return (int)half_away;
+}
+
+/* effective_stat (constants.rs:87-89) — a PRINTED u8 stat plus its modifier,
+   saturating to u8. The `printed + modifier` chain that condition evaluation
+   and cost math all spell out. */
+uint8_t rb_effective_stat(uint8_t printed, int16_t modifier) {
+    return rb_saturate_u8((int)printed + (int)modifier);
+}
+
+/* overridden_stat (constants.rs:102-104) — the SIBLING of rb_effective_stat for
+   the other case: a figure that already has an absolute set-override standing
+   in for its printed value.
+
+   Kept separate rather than folded in because the two inputs are not the same
+   kind of number. A printed stat is a u8 — it came off the card. A set
+   override is a modifier i16: 「ブレードの値が5になる」 stores whatever the
+   ability said, and it stacks additively on top like any other modifier. */
+uint8_t rb_overridden_stat(int16_t set, int16_t modifier) {
+    return rb_saturate_u8((int)set + (int)modifier);
+}
+
+/* floored_cost (constants.rs:116-118) — effective playable cost with the
+   floor-at-1 of the baton-touch price formula: `(base + modifier).max(1)`.
+
+   The canonical home for a formula that core/player.rs (the payment itself),
+   game_setup.rs (the estimates) and turn/phases.rs (the double-baton path)
+   previously each spelled three different ways, with `as u8` wrapping in one
+   and `try_from(..).unwrap_or(0)` in another. Saturates rather than wraps. */
+uint8_t rb_floored_cost(uint8_t base, int16_t modifier) {
+    uint8_t v = rb_saturate_u8((int)base + (int)modifier);
+    return v < 1 ? 1 : v;
+}
+
+/* count_u32 (constants.rs:347-349) — widen a count to u32, saturating at the
+   top. The old `as u32` on a huge count produced a value that then collided
+   with nothing and silently failed to match its own entry. */
+uint32_t rb_count_u32(size_t v) {
+    return (v > (size_t)UINT32_MAX) ? UINT32_MAX : (uint32_t)v;
+}
+
+/* id_u32 (constants.rs:357-359) — widen an i16 identifier to u32 for hash
+   keys, FLOORING at zero.
+
+   Card and ability indices are non-negative by construction; the old `as u32`
+   on a negative value produced a huge key instead, which then matched nothing. */
+uint32_t rb_id_u32(int16_t v) {
+    return (v < 0) ? 0u : (uint32_t)v;
+}
+
+/* f32_count (constants.rs:501-512) — saturating f64 -> f32.
+
+   A plain `(float)` cast turns an out-of-range density into an infinity, which
+   then propagates through the feature vector as a NaN rather than as a
+   saturated 1.0. */
+float rb_f32_count(double v) {
+    float narrowed = (float)v;
+    if (narrowed == narrowed && narrowed <= 3.40282346638528859812e+38f &&
+        narrowed >= -3.40282346638528859812e+38f) {
+        return narrowed;
+    }
+    if (v != v) return 0.0f;                    /* NaN */
+    return (v > 0.0) ? 3.40282346638528859812e+38f
+                     : -3.40282346638528859812e+38f;
 }
 

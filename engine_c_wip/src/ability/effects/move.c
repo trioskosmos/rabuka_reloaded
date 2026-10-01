@@ -74,6 +74,92 @@ int rb_move_place_card_with_stage_choice(GameState *g, int actor, int host_cid,
 void rb_move_execute_move_cards_ported(GameState *g, int actor, AbilityEffect *e);
 /* Defined in src/core/modifiers.c; not declared in rabuka.h. */
 void rb_on_cards_left_zones(GameState *g, int card_id);
+void rb_remove_revealed_card(GameState *g, int card_id);
+/* Defined in src/ability/util.c; not declared in rabuka.h. */
+int  rb_dedupe_by_normalized_name(const int *items, int n, int *out, int max);
+/* Defined in src/core/zones.c; not declared in rabuka.h. Mirrors
+ * Player::remove_member_from_stage_with_recycling (player.rs) — the ONLY twin
+ * that recycles the departing member's under-cards (energy -> energy deck,
+ * members -> waitroom, Rule 10.5.3-10.5.4) and clears its deployment lock. */
+int  rb_player_remove_member_from_stage_with_recycling(GameState *g, int pl, int index);
+
+/* ── shared helpers (Rust twins named in the comments) ─────────────────── */
+
+/* `effect.foo_any()` — Rust reads the wire key anywhere on the effect tree's
+ * own fields; the C bytecode decoder flattens them into extra_k/extra_v, so
+ * cmf_extra IS the lookup. `optional` / `max` / `all` / `self_cost` /
+ * `exclude_self` are named fields in Rust and `is_optional` here, so they need
+ * their own accessors for the optional-family keys that ARE flattened. */
+/* Forward declaration: cmf_extra is defined at ~line 151 but first used at the
+ * line below. Without this the compiler saw an implicit declaration and then a
+ * conflicting-type error, which blocked the entire tree from building. */
+static const char *cmf_extra(const AbilityEffect *e, const char *k);
+
+/* Defined in src/ability/util.c and used in two places in this file. Declared
+ * here at file scope because the first use precedes any visible declaration -
+ * a block-scope declaration inside the calling function is NOT visible to the
+ * second call site, which is what produced the remaining build error. Note
+ * util.c's own forward declaration must NOT be static; that mismatch broke
+ * tree-wide linking once already. */
+int rb_get_selection_indices_filter(const int *cards, int n, const RbCardFilter *filter,
+                                    int self_target_only, int activating_card,
+                                    int *out_idx, int max);
+
+static int cmf_extra_true(const AbilityEffect *e, const char *k) {
+    const char *v = cmf_extra(e, k);
+    return v && (!strcmp(v, "true") || !strcmp(v, "1"));
+}
+/* selection.rs:71 `effect.is_self_target()` — the ONLY writer of the prompt's
+ * target_player_id besides action_by (selection.rs:40-43). */
+static int cmf_is_self_target(const AbilityEffect *e) {
+    return e && e->self_target_field[0] && !strcmp(e->self_target_field, "true");
+}
+
+/* The C home of Rust `self.selection.moved_cards` (the resolver-local list of
+ * cards THIS activation moved). `g->those_cards` is documented in rabuka.h as
+ * "cards moved by the immediately preceding move_cards action", which is the
+ * same lifetime, and every reader below (the under-member host fallback,
+ * `preceding_moved`, `those_cards`) wants that list. See CROSS-FILE REQUESTS
+ * for the field-addition request. */
+static int mc_sel_moved_count(const GameState *g) { return g->n_those_cards; }
+static const int *mc_sel_moved(const GameState *g) { return g->those_cards; }
+static void mc_sel_moved_push(GameState *g, int cid) {
+    if (cid < 0) return;
+    for (int i = 0; i < g->n_those_cards; i++) if (g->those_cards[i] == cid) return;
+    if (g->n_those_cards < RB_MAX_RECENTLY_MOVED)
+        g->those_cards[g->n_those_cards++] = cid;
+}
+/* transport.rs / mod.rs `set_recently_moved_batch` — REPLACES the batch, it
+ * does not append (mod.rs:1683 `gs.set_recently_moved_batch(moved, ...)`). */
+static void mc_set_recently_moved_batch(GameState *g, const int *cards, int n) {
+    g->n_recently_moved = 0;
+    for (int i = 0; i < n && i < RB_MAX_RECENTLY_MOVED; i++)
+        g->recently_moved[g->n_recently_moved++] = cards[i];
+}
+/* mod.rs:2527-2533 — the CURRENT entry's player id ("p1"/"p2") as an index. */
+static int mc_cause_player(const GameState *g) {
+    if (!g) return 0;
+    if (g->queue.cur >= 0 && g->queue.cur < g->queue.n_entries) {
+        const char *pid = g->queue.entries[g->queue.cur].player_id;
+        if (pid && pid[0] == 'p' && pid[1] >= '1' && pid[1] <= '2')
+            return pid[1] - '1';
+    }
+    return 0;
+}
+/* mod.rs:2499-2547 `finalize_card_movement`'s and mod.rs:2947-2952
+ * `execute_selected_cards_from_zone`'s `gs.push_movement_event(...)`.
+ * rb_record_card_movement is the folded twin (modifiers.c:496-529): it writes
+ * batch_movements, turn_movements, recently_moved_cards AND cards_moved_this_turn,
+ * so it REPLACES the local mc_record_movement rather than following it. */
+static void mc_push_movement_event(GameState *g, const int *cards, int n,
+                                   const char *source, const char *dest) {
+    if (!g || !cards || n <= 0) return;
+    int src = (int)rb_zone_id_from_str(source);
+    int dst = (int)rb_zone_id_from_str(dest);
+    int pid = mc_cause_player(g);
+    for (int i = 0; i < n; i++)
+        rb_record_card_movement(g, cards[i], src, dst, pid, 1);
+}
 
 
 /* ── card_matches_filter: full effect filter (static for this TU) ── */
@@ -94,6 +180,49 @@ static int cmf_cmp(const char *op, int a, int b){
 static int cmf_has_heart(const Card *c, int hc){
     if(hc<0||hc>7) return 0;
     for(int k=0;k<c->n_hearts;k++) if(c->heart_color[k]==(uint8_t)hc) return 1;
+    return 0;
+}
+
+/* ── Zone::from_str alias table ─────────────────────────────────────────
+ *
+ * placement.rs and mod.rs gate on `Zone::from_str(x) == Some(Zone::V)`, and
+ * enums.rs:92-122 is a WIRE-NAME table in which several names fold onto one
+ * variant: "energy" | "energy_zone" -> Energy, "waitroom" is its OWN variant
+ * (not an alias of Discard), "success_live_zone" | "success_live_card_zone" ->
+ * SuccessLiveZone, "under_member" | "under" -> UnderMember. The C has no Zone
+ * enum, and the previous code compared raw strings, so an alias took the wrong
+ * branch (most visibly: destination="energy_zone" never reached the
+ * state_change=active counter bump, and dest="success_live_card_zone" was
+ * special-cased by hand at each site instead of once, here). */
+static int move_zone_is(const char *z, const char *variant) {
+    if (!z || !variant) return 0;
+    struct { const char *v; const char *names[5]; } T[] = {
+        {"hand",          {"hand", NULL}},
+        {"stage",         {"stage", NULL}},
+        {"discard",       {"discard", NULL}},
+        {"waitroom",      {"waitroom", NULL}},
+        {"energy",        {"energy", "energy_zone", NULL}},
+        {"deck",          {"deck", NULL}},
+        {"deck_top",      {"deck_top", NULL}},
+        {"deck_bottom",   {"deck_bottom", NULL}},
+        {"energy_deck",   {"energy_deck", NULL}},
+        {"live_card_zone",{"live_card_zone", NULL}},
+        {"success_live_zone", {"success_live_zone", "success_live_card_zone", NULL}},
+        {"success_zone",  {"success_zone", NULL}},
+        {"empty_area",    {"empty_area", NULL}},
+        {"same_area",     {"same_area", NULL}},
+        {"under_member",  {"under_member", "under", NULL}},
+        {"looked_at",     {"looked_at", NULL}},
+        {"revealed_cards",{"revealed_cards", NULL}},
+        {"selected_cards",{"selected_cards", NULL}},
+        {NULL, {NULL}}
+    };
+    for (int i = 0; T[i].v; i++) {
+        if (strcmp(T[i].v, variant)) continue;
+        for (int k = 0; k < 5 && T[i].names[k]; k++)
+            if (!strcmp(T[i].names[k], z)) return 1;
+        return 0;
+    }
     return 0;
 }
 
@@ -666,27 +795,123 @@ int rb_move_resolve_from_energy_deck(GameState *g, int pl, int count, int *out_i
     return n;
 }
 
-/* ── resolve_from_stage ── */
+/* ── resolve_from_stage ────────────────────────────────────────────────────
+ * Rust mod.rs:1007-1140. The previous C body walked the three stage slots,
+ * nulled the matching ones and returned: it never recycled the departing
+ * member's under-cards, never set last_vacated_stage_area, had no is_self_cost
+ * arm at all, and could never raise a prompt. The missing recycling is the
+ * measured "Q139: 2 under-cards follow kasumi to LeftSide (got 0 expected 2)"
+ * / "Center keeps no under-cards afterwards (got 2 expected 0)"
+ * (parity_under_member.log:25-26) and "the displaced member's under-energy
+ * returns to the energy deck (got 0 expected 2)" (:141); the missing prompt is
+ * "PROMPT CONTROL: exactly one member should be selected (got -1 expected 1)"
+ * (:444). */
 int rb_move_resolve_from_stage(GameState *g, int actor, AbilityEffect *e, int use_p2,
-                                int count, int *out_ids, int max) {
+                               int count, int *out_ids, int max) {
     if (!g || !out_ids) return 0;
-    int pl = use_p2 ? 1 : actor;
+    /* mod.rs:1014-1019 — the player is p2 iff use_p2, else p1. The C used
+     * `use_p2 ? 1 : actor`, which read p1's stage whenever a p2-led
+     * activation resolved against its own stage. */
+    int pl = use_p2 ? 1 : 0;
+    if (pl < 0 || pl > 1) pl = 0;
     RbPlayer *P = &g->p[pl];
+    const char *destination = e && e->destination ? e->destination : "";
+
+    /* mod.rs:1021-1042 — the is_self_cost arm: the ACTIVATING member itself is
+     * the card being paid, so its area is published as last_vacated_stage_area
+     * (which every later placement step reads) and the member leaves with its
+     * under-cards recycled. `same_area` does NOT remove it (mod.rs:1035-1038)
+     * — the destination repositions it in place instead. */
+    if (e && cmf_extra_true(e, "self_cost")) {
+        int act = g->activating_card;
+        int idx = -1;
+        for (int i = 0; i < RB_STAGE_SIZE; i++) if (P->stage[i] == act) { idx = i; break; }
+        if (idx < 0) return -1;  /* Err("Activating card not found at stage") */
+        g->baton_last_vacated_area[pl] = idx;
+        if (strcmp(destination, "same_area") != 0) {
+            int cid = rb_player_remove_member_from_stage_with_recycling(g, pl, idx);
+            if (cid >= 0 && max > 0) out_ids[0] = cid;
+            return cid >= 0 ? 1 : 0;
+        }
+        int cid = P->stage[idx];
+        if (max > 0) out_ids[0] = cid;
+        return 1;
+    }
+
+    /* mod.rs:1044-1071 — build the filter, then resolve the selection over the
+     * RAW stage array (Rust indexes `&player.stage.stage`, so a returned index
+     * IS a stage position, which is what the answer handler reads back). */
     const char *ctype = cmf_extra(e, "card_type");
     const char *gn = cmf_extra(e, "group_names");
-    int n = 0;
-    int wanted = count < 0 ? RB_STAGE_SIZE : count;
-    for (int area = 0; area < RB_STAGE_SIZE && n < wanted; area++) {
-        int cid = P->stage[area];
-        if (cid < 0) continue;
-        if (ctype && !rb_card_matches_type(cid, ctype)) continue;
-        if (gn && !rb_card_matches_group_str(cid, gn)) continue;
-        out_ids[n++] = cid;
-        P->stage[area] = -1;
-        P->stage_wait[area] = 0;
-        g->baton_last_vacated_area[pl] = area;
+    RbCardFilter f;
+    memset(&f, 0, sizeof f);
+    if (ctype) strncpy(f.card_type, ctype, sizeof f.card_type - 1);
+    if (gn && gn[0]) { strncpy(f.group, gn, sizeof f.group - 1); f.has_group = 1; }
+    const char *clo = cmf_extra(e, "cost_limit_operator");
+    if (!clo) clo = cmf_extra(e, "cost_operator");
+    int limit = rb_move_resolve_cost_limit_reference(g, e);
+    if (limit >= 0) { f.has_cost_limit = 1; f.cost_limit = limit;
+                      if (clo) strncpy(f.cost_op, clo, sizeof f.cost_op - 1); }
+    const char *cto = cmf_extra(e, "cost_total");
+    if (cto) { f.has_cost_total = 1; f.cost_total = atoi(cto); }
+    const char *ctoo = cmf_extra(e, "cost_total_operator");
+    if (ctoo) strncpy(f.cost_total_op, ctoo, sizeof f.cost_total_op - 1);
+    const char *chars = cmf_extra(e, "characters");
+    if (chars && chars[0]) { strncpy(f.characters, chars, sizeof f.characters - 1); f.has_characters = 1; }
+    const char *exch = cmf_extra(e, "exclude_characters");
+    if (exch && exch[0]) { strncpy(f.exclude_characters, exch, sizeof f.exclude_characters - 1); f.has_exclude_characters = 1; }
+    const char *cp = cmf_extra(e, "card_property");
+    if (cp) { strncpy(f.ability_filter, cp, sizeof f.ability_filter - 1); }
+    f.negation = cmf_extra_true(e, "negation");
+    if (e && cmf_extra_true(e, "exclude_self")) {
+        f.has_exclude_self = 1; f.exclude_self_id = g->activating_card;
     }
-    return n;
+    f.has_filter = f.has_group || f.has_cost_limit || f.has_cost_total ||
+                   f.has_characters || f.has_exclude_characters ||
+                   f.ability_filter[0] || f.has_exclude_self || (ctype && ctype[0]);
+
+    int stage_ids[RB_STAGE_SIZE];
+    for (int i = 0; i < RB_STAGE_SIZE; i++) stage_ids[i] = P->stage[i];
+    int idxs[RB_STAGE_SIZE];
+    int mn = rb_get_selection_indices_filter(stage_ids, RB_STAGE_SIZE, &f,
+                                             cmf_is_self_target(e),
+                                             g->activating_card, idxs, RB_STAGE_SIZE);
+    int is_all = e && cmf_extra_true(e, "all");
+    int outcome = rb_classify_selection(idxs, mn, count < 0 ? 0 : count, is_all);
+
+    if (outcome == 1) {
+        /* mod.rs:1073-1102 — take in REVERSE index order and publish the area
+         * of the LAST removal as last_vacated_stage_area (`vacated = Some(...)`
+         * inside the loop over `.rev()`). */
+        int n = 0;
+        int vacated = -1;
+        for (int i = mn - 1; i >= 0; i--) {
+            int si = idxs[i];
+            if (si < 0 || si >= RB_STAGE_SIZE) continue;
+            int cid = rb_player_remove_member_from_stage_with_recycling(g, pl, si);
+            if (cid >= 0) {
+                vacated = si;
+                if (n < max) out_ids[n++] = cid;
+            }
+        }
+        g->baton_last_vacated_area[pl] = vacated;
+        return n;
+    }
+    if (outcome == 2) {
+        /* mod.rs:1104-1136 — 「最大で」 optional stage moves MUST be declinable
+         * (mod.rs:1128-1130), and the offered list is the stage POSITIONS that
+         * pass the filter. */
+        rb_move_prompt_card_selection(g, actor, "stage", count,
+                                      e && e->is_optional, e);
+        if (!rb_has_pending_choice(g) && mn > 0) {
+            g->queue.pending.n_filtered_indices = mn > RB_STAGE_SIZE ? RB_STAGE_SIZE : mn;
+            for (int i = 0; i < g->queue.pending.n_filtered_indices; i++)
+                g->queue.pending.filtered_indices[i] = idxs[i];
+        }
+        return 0;
+    }
+    /* mod.rs:1137 — SelectionOutcome::Skip */
+    return 0;
 }
 
 /* ── resolve_from_recently_moved ── */
@@ -710,6 +935,10 @@ int rb_move_resolve_from_recently_moved(GameState *g, int use_p2,
         if (last_vacated >= 0)
             g->baton_last_vacated_area[pl] = last_vacated;
     }
+    /* mod.rs:497-498 — "Card left any zone → full zone-exit cleanup (rule
+     * 4.1.4)": gs.on_cards_left_zones(&cards). Without it a baton-touched /
+     * cost-paid card kept its runtime-gained abilities into the new zone. */
+    for (int i = 0; i < n; i++) rb_on_cards_left_zones(g, out_ids[i]);
     if (n > 0) rb_recalc_constants(g);
     return n;
 }
@@ -828,63 +1057,227 @@ static void rb_move_prompt_card_selection_with_filtered(
     for (int i = 0; i < n_idxs; i++) g->queue.pending.filtered_indices[i] = idxs[i];
 }
 
-/* ── take_cards_from_standard_zone ── */
+/* ── take_cards_from_standard_zone ─────────────────────────────────────────
+ * Rust move/selection.rs:53-87, consuming mod.rs:1142-1367
+ * `resolve_from_standard_zone`'s per-source-zone decisions (can_skip,
+ * pass_is_all, which optional filters are meaningful, the is_self_cost hand
+ * shortcut, and the InsufficientBehaviour for the live-card zone).
+ *
+ * The previous C body hard-coded `can_skip = 1` for every zone and dropped the
+ * whole per-zone filter assembly, so a 「手札から〜枚」 move that Rust refuses to
+ * auto-resolve was auto-resolved, and a live-card-zone move that Rust reports
+ * as an error resolved silently. Returns the number of cards written, or -1
+ * when a prompt was raised (the caller must stop). */
 int rb_move_take_cards_from_standard_zone(GameState *g, int actor,
                                            const char *zone_name,
                                            AbilityEffect *e,
                                            int count, int is_all,
                                            int can_skip, int *out_ids, int max) {
     if (!g || !out_ids) return 0;
+    /* mod.rs:1147 / 1183-1197 — resolve against the ability master (p1 unless
+     * use_p2), and derive can_skip / pass_is_all from the SOURCE zone. */
     int pl = actor;
-    if (e->target && !strcmp(e->target, "opponent")) pl = actor ^ 1;
-    const char *ctype = cmf_extra(e, "card_type");
-    const char *gn = cmf_extra(e, "group_names");
+    if (e && e->target && !strcmp(e->target, "opponent")) pl = actor ^ 1;
+    if (pl < 0 || pl > 1) pl = 0;
+    RbPlayer *P = &g->p[pl];
+    int is_discard = move_zone_is(zone_name, "discard");
+    int is_hand    = move_zone_is(zone_name, "hand");
+    int is_lcz     = move_zone_is(zone_name, "live_card_zone");
+    int is_success = move_zone_is(zone_name, "success_live_zone");
+
+    /* mod.rs:1153-1177 — 「このカード自体をコストに」 out of hand: the
+     * activating card leaves hand (or the waitroom, where a revealed cost
+     * card already sits) and nothing is filtered. */
+    if (e && cmf_extra_true(e, "self_cost") && is_hand) {
+        int act = g->activating_card;
+        if (act < 0) return 0;  /* Err("Self hand cost card is not in hand or waitroom") */
+        for (int i = 0; i < P->hand.n; i++) if (P->hand.cards[i] == act) {
+            for (int k = i; k < P->hand.n - 1; k++) P->hand.cards[k] = P->hand.cards[k + 1];
+            P->hand.n--;
+            if (max > 0) out_ids[0] = act;
+            return 1;
+        }
+        for (int i = 0; i < P->discard.n; i++) if (P->discard.cards[i] == act) {
+            for (int k = i; k < P->discard.n - 1; k++) P->discard.cards[k] = P->discard.cards[k + 1];
+            P->discard.n--;
+            if (max > 0) out_ids[0] = act;
+            return 1;
+        }
+        return 0;
+    }
+
+    /* mod.rs:1190-1197 */
+    int any_number = e && cmf_extra_true(e, "any_number");
+    if (is_discard)       can_skip = cmf_extra_true(e, "max") || (e && e->is_optional);
+    else if (is_hand)     can_skip = (e && e->is_optional) || any_number;
+    else if (is_success)  can_skip = (e && e->is_optional);
+    else                  can_skip = 0;
+    if (e && cmf_extra_true(e, "max")) can_skip = 1;
+    /* mod.rs:1199-1202 — only hand/discard/energy honour 「すべて」. */
+    if (!(is_hand || is_discard || move_zone_is(zone_name, "energy"))) is_all = 0;
+
+    /* mod.rs:1209-1274 — which optional filters are meaningful for THIS source.
+     * A live-card-zone move is always a live card; an energy-zone move carries
+     * no group or cost filter at all; only hand/discard can be narrowed by
+     * name fragments or a total cost. */
+    const char *ctype_raw = e ? cmf_extra(e, "card_type") : NULL;
+    const char *gn_raw    = e ? cmf_extra(e, "group_names") : NULL;
+    const char *frag_raw  = e ? cmf_extra(e, "name_fragments") : NULL;
+    const char *ct_raw    = e ? cmf_extra(e, "cost_total") : NULL;
+    const char *cto_raw   = e ? cmf_extra(e, "cost_total_operator") : NULL;
+    const char *clo_raw   = e ? cmf_extra(e, "cost_limit_operator") : NULL;
+    if (!clo_raw) clo_raw = e ? cmf_extra(e, "cost_operator") : NULL;
+    const char *exch_raw  = e ? cmf_extra(e, "exclude_characters") : NULL;
+    const char *cp_raw    = e ? cmf_extra(e, "card_property") : NULL;
+    int is_energy = move_zone_is(zone_name, "energy");
+    int from_hand_or_discard = is_hand || is_discard;
+    int is_live_zone_move = is_lcz || (is_success && ctype_raw != NULL);
+    int has_effect_groups = gn_raw && gn_raw[0];
+
+    RbCardFilter f;
+    memset(&f, 0, sizeof f);
+    if (is_live_zone_move)       strncpy(f.card_type, "live_card", sizeof f.card_type - 1);
+    else if (is_success)         f.card_type[0] = '\0';
+    else if (ctype_raw && ctype_raw[0]) strncpy(f.card_type, ctype_raw, sizeof f.card_type - 1);
+    if (!(has_effect_groups || is_energy) && gn_raw && gn_raw[0]) {
+        strncpy(f.group, gn_raw, sizeof f.group - 1);
+        f.has_group = 1;
+    }
+    /* mod.rs:1266-1268 — effect.group_names_any() ALSO rides the `groups`
+     * list when present, so a multi-group name list filters correctly. */
+    int limit = rb_move_resolve_cost_limit_reference(g, e);
+    if (!is_energy && limit >= 0) {
+        f.has_cost_limit = 1; f.cost_limit = limit;
+        if (clo_raw) strncpy(f.cost_op, clo_raw, sizeof f.cost_op - 1);
+    }
+    if (from_hand_or_discard && ct_raw) {
+        f.has_cost_total = 1; f.cost_total = atoi(ct_raw);
+        if (cto_raw) strncpy(f.cost_total_op, cto_raw, sizeof f.cost_total_op - 1);
+    }
+    if (from_hand_or_discard && frag_raw && frag_raw[0]) {
+        /* CSV split into the fixed name_fragments array. */
+        char buf[256];
+        strncpy(buf, frag_raw, sizeof buf - 1);
+        buf[sizeof buf - 1] = '\0';
+        char *tok = strtok(buf, ",");
+        while (tok && f.n_name_fragments < 8) {
+            strncpy(f.name_fragments[f.n_name_fragments], tok,
+                    sizeof f.name_fragments[0] - 1);
+            f.n_name_fragments++;
+            tok = strtok(NULL, ",");
+        }
+    }
+    { const char *ch = e ? cmf_extra(e, "characters") : NULL;
+      if (ch && ch[0]) { strncpy(f.characters, ch, sizeof f.characters - 1); f.has_characters = 1; } }
+    if (exch_raw && exch_raw[0]) {
+        strncpy(f.exclude_characters, exch_raw, sizeof f.exclude_characters - 1);
+        f.has_exclude_characters = 1;
+    }
+    if (cp_raw && cp_raw[0]) strncpy(f.ability_filter, cp_raw, sizeof f.ability_filter - 1);
+    f.negation = e && cmf_extra_true(e, "negation");
+    const char *nht = e ? cmf_extra(e, "need_heart_total") : NULL;
+    if (nht) { f.has_need_heart_total = 1; f.need_heart_total = atoi(nht); }
+    const char *nho = e ? cmf_extra(e, "need_heart_operator") : NULL;
+    if (nho) strncpy(f.need_heart_operator, nho, sizeof f.need_heart_operator - 1);
+    const char *nhc = e ? cmf_extra(e, "need_heart_color") : NULL;
+    if (nhc) strncpy(f.need_heart_color, nhc, sizeof f.need_heart_color - 1);
+    f.has_filter = f.card_type[0] || f.has_group || f.has_cost_limit || f.has_cost_total ||
+                   f.has_characters || f.has_exclude_characters || f.ability_filter[0] ||
+                   f.n_name_fragments || f.has_need_heart_total || f.need_heart_color[0];
+
+    /* mod.rs:1301-1333 — group_reference "different_group_names" on a discard
+     * move excludes every discard card whose group matches ANY stage member's
+     * group (Q89/Q105/Q208). Skipped when the CONDITION already carries the
+     * same reference (Mia option 1 — the condition does the counting, so
+     * excluding again over-filters). RbCardFilter has no exclude_group_names
+     * field, so the exclusion is applied to the candidate list below. */
+    const char *gref = e ? cmf_extra(e, "group_reference") : NULL;
+    char stage_groups[8][64];
+    int nsg = 0;
+    if (gref && !strcmp(gref, "different_group_names") && is_discard) {
+        for (int i = 0; i < RB_STAGE_SIZE && nsg < 8; i++) {
+            int cid = P->stage[i];
+            if (cid < 0) continue;
+            char cand[64];
+            cand[0] = '\0';
+            const char *grp = rb_card_group_name(cid);
+            if (grp && grp[0]) {
+                snprintf(cand, sizeof cand, "%s", grp);
+            } else {
+                static const char *known[] = {
+                    "Aqours", "Liella!", "Nijigasaki", "A-RISE",
+                    "Saint Snow", "Hasunosora", NULL};
+                for (int k = 0; known[k]; k++)
+                    if (rb_card_matches_group_str(cid, known[k])) {
+                        snprintf(cand, sizeof cand, "%s", known[k]);
+                        break;
+                    }
+            }
+            if (!cand[0]) continue;
+            int dup = 0;
+            for (int k = 0; k < nsg; k++)
+                if (!strcmp(stage_groups[k], cand)) { dup = 1; break; }
+            if (!dup) {
+                strncpy(stage_groups[nsg], cand, sizeof stage_groups[0] - 1);
+                stage_groups[nsg][sizeof stage_groups[0] - 1] = '\0';
+                nsg++;
+            }
+        }
+    }
+
+    /* mod.rs:66-84 — the body proper. */
     int cards[RB_MAX_ZONE];
     int n = rb_zone_cards(g, pl, zone_name, cards, RB_MAX_ZONE);
-    int idxs[RB_MAX_ZONE];
-    int mn = rb_get_selection_indices(cards, n, ctype, gn,
-                                       e->self_target_field[0] && !strcmp(e->self_target_field, "true"), -1,
-                                       idxs, RB_MAX_ZONE);
-    int outcome = rb_classify_selection(idxs, mn, count, is_all);
-    if (outcome == 1 && !strcmp(zone_name, "discard") && !is_all) {
-        rb_move_prompt_card_selection_with_filtered(g, actor, zone_name, count, can_skip, e, idxs, mn);
-        return -1;
-    }
-    if (outcome == 1 && can_skip && mn > 0) {
-        if (is_all) {
-            rb_zone_remove_at_indices(g, pl, zone_name, idxs, mn);
-            for (int i = 0; i < mn && i < max; i++) out_ids[i] = cards[idxs[i]];
-            return mn;
+    int filtered[RB_MAX_ZONE];
+    int nf = rb_get_selection_indices_filter(cards, n, &f, cmf_is_self_target(e),
+                                              g->activating_card, filtered, RB_MAX_ZONE);
+    if (nsg > 0) {
+        const char *names[8];
+        for (int i = 0; i < nsg; i++) names[i] = stage_groups[i];
+        int w = 0;
+        for (int i = 0; i < nf; i++) {
+            int cid = cards[filtered[i]];
+            int blocked = 0;
+            for (int k = 0; k < nsg && !blocked; k++)
+                if (rb_card_matches_group_str(cid, stage_groups[k])) blocked = 1;
+            if (blocked) continue;
+            filtered[w++] = filtered[i];
         }
-        rb_move_prompt_card_selection_with_filtered(g, actor, zone_name, mn, can_skip, e, idxs, mn);
-        return -1;
+        nf = w;
     }
-    if (outcome == 1) {
-        rb_zone_remove_at_indices(g, pl, zone_name, idxs, mn);
-        for (int i = 0; i < mn && i < max; i++) out_ids[i] = cards[idxs[i]];
-        return mn;
+    int outcome = rb_classify_selection(filtered, nf, count, is_all);
+    int prompt_count = 0;
+    switch (outcome) {
+    case 1:  /* Exact */
+        if (can_skip && !is_all && nf > 0) {
+            /* mod.rs:77 — 「〜均可」 with EXACTLY `count` available: the choice
+             * is still raised, offering exactly that many. */
+            prompt_count = nf;
+            break;
+        }
+        rb_zone_remove_at_indices(g, pl, zone_name, filtered, nf);
+        for (int i = 0; i < nf && i < max; i++) out_ids[i] = cards[filtered[i]];
+        return nf;
+    case 2:  /* Prompt */
+        prompt_count = count;
+        break;
+    default: /* Skip */
+        /* mod.rs:82-83 */
+        if (can_skip && nf > 0) {
+            prompt_count = nf;
+            break;
+        }
+        return 0;   /* Ok(Some(vec![])) */
     }
-    if (outcome == 2) {
-        /* engine/src/ability/util/selection.rs:48-50 returns Prompt for
-           idxs.len() > count REGARDLESS of `optional` / can_skip, and
-           move_cards/selection.rs:81 consumes it as
-           `SelectionOutcome::Prompt => count` — i.e. it prompts, with `count`
-           cards, on every Prompt outcome. The previous C auto-resolved here
-           whenever `!can_skip`, silently taking min(count, mn) cards off the
-           top of the zone, so a choice Rust raises (愛♡スクリ～ム！'s
-           「自分と相手は手札を1枚控え室に置く」 with 3 cards in hand is the
-           shape that exposed it) never reached the player. `optional` is not
-           a licence to auto-resolve: can_skip only decides whether the PROMPT
-           may be declined, and it is already threaded into
-           rb_move_prompt_card_selection as the choice's optional flag. */
-        rb_move_prompt_card_selection_with_filtered(g, actor, zone_name, count, can_skip, e, idxs, mn);
-        return -1;
+    /* mod.rs:85 — prompt_card_selection(zone_name, prompt_count, can_skip,
+     * effect, filter, Some(filtered_indices)) and Ok(None). */
+    rb_move_prompt_card_selection(g, actor, zone_name, prompt_count, can_skip, e);
+    if (nf > 0) {
+        g->queue.pending.n_filtered_indices = nf > RB_MAX_ZONE ? RB_MAX_ZONE : nf;
+        for (int i = 0; i < g->queue.pending.n_filtered_indices; i++)
+            g->queue.pending.filtered_indices[i] = filtered[i];
     }
-    if (can_skip && mn > 0) {
-        rb_move_prompt_card_selection_with_filtered(g, actor, zone_name, mn, can_skip, e, idxs, mn);
-        return -1;
-    }
-    return 0;
+    return -1;
 }
 
 /* ── resolve_cards_from_source ── */
@@ -1414,14 +1807,29 @@ void rb_move_finalize_card_movement(GameState *g, int actor,
                                      const char *destination, const char *source,
                                      const char *state_change, const char *target) {
     if (!g || !moved_cards || n_moved <= 0) return;
-    (void)source;
-    /* Rust move_cards.rs:2278 calls `gs.on_cards_left_zones(moved_cards)`, the
-       single zone-exit choke point (engine/src/core/game_state/modifiers.rs:1677)
-       that clears BOTH the modifier tables AND any runtime-gained abilities.
-       Calling `rb_mods_clear_card` alone left constant 「能力付与」 grants alive
-       on a card that had just changed zones. `rb_on_cards_left_zones` is defined
-       in src/core/modifiers.c:599 but was previously declared in no header and
-       called from nowhere. */
+    /* Rust move/mod.rs:2490-2572 `finalize_card_movement`, in order:
+     *   2499  gs.on_cards_left_zones(moved_cards)   — the single zone-exit
+     *        choke point (modifiers.rs:1677) that clears BOTH the modifier
+     *        tables AND any runtime-gained abilities. rb_mods_clear_card alone
+     *        left constant 「能力付与」 grants alive on a card that changed zones.
+     *   2501-2519  state_change wait / active, plus the Zone::Energy
+     *        active_energy_count bump for "active".
+     *   2521-2523  gs.record_card_movement per card.
+     *   2525       self.selection.moved_cards.extend(moved_cards)
+     *   2535-2546  gs.push_movement_event per card, SKIPPED for "same_area"
+     *        ("same_area is an internal repositioning mechanic, not a zone
+     *        transition" — mod.rs:2533-2534).
+     *   2558-2560  gs.recalculate_constants()
+     *   2566-2571  fire_debut_side_effects per card, Zone::Stage only.
+     *
+     * The MISSING piece was 2521-2546: `source` was `(void)`-cast and neither
+     * the per-card movement record nor the movement EVENT was pushed, so
+     * `g->moved_this_turn` stayed clear and `g->batch_movements` stayed empty
+     * for every mill / deck->waitroom / hand->discard move. That is the
+     * measured failure "a real mill must record at least one movement event
+     * (n_batch_movements > 0)" (parity_mill_deck.log:1, :20) and the reason
+     * every 「〜が控え室に置かれたとき」 watcher on a milled card stayed silent.
+     */
     for (int i = 0; i < n_moved; i++)
         rb_on_cards_left_zones(g, moved_cards[i]);
     if (state_change && *state_change) {
@@ -1431,7 +1839,7 @@ void rb_move_finalize_card_movement(GameState *g, int actor,
         } else if (!strcmp(state_change, "active")) {
             for (int i = 0; i < n_moved; i++)
                 rb_mods_set_orientation(&g->mods, moved_cards[i], "active");
-            if (destination && !strcmp(destination, "energy")) {
+            if (move_zone_is(destination, "energy")) {
                 int pl = actor;
                 if (target && *target) { int t = rb_resolve_target_player(g, target); if (t >= 0) pl = t; }
                 int sum = (int)g->p[pl].energy_active + n_moved;
@@ -1439,10 +1847,20 @@ void rb_move_finalize_card_movement(GameState *g, int actor,
             }
         }
     }
+    /* mod.rs:2525 — the resolver's accumulated move list, which the next
+     * sequential step's `preceding_moved` / `those_cards` source reads. */
     for (int i = 0; i < n_moved; i++)
-        mc_record_movement(g, moved_cards[i]);
+        mc_sel_moved_push(g, moved_cards[i]);
+    if (move_zone_is(destination, "same_area")) {
+        /* mod.rs:2533-2535 — same_area records the card as moved but emits NO
+         * movement event, so watcher triggers do not fire for a reposition. */
+        for (int i = 0; i < n_moved; i++)
+            mc_record_movement(g, moved_cards[i]);
+    } else {
+        mc_push_movement_event(g, moved_cards, n_moved, source, destination);
+    }
     rb_recalc_constants(g);
-    if (destination && !strcmp(destination, "stage")) {
+    if (move_zone_is(destination, "stage")) {
         for (int i = 0; i < n_moved; i++)
             rb_move_fire_debut_side_effects(g, actor, moved_cards[i],
                                             target ? target : "self", NULL);
@@ -1593,52 +2011,77 @@ int rb_move_from_under_member(GameState *g, int actor, const int *indices, int n
     return n_indices;
 }
 
-/* ── place_energy_under_member_selected ── */
+/* ── place_energy_under_member_selected ────────────────────────────────────
+ * Rust mod.rs:3412-3489 (「このメンバーの下」 energy placement, Rule 10.5.3,
+ * with the Rule 10.5.4 energy-deck fallback). */
 void rb_move_place_energy_under_member_selected(GameState *g, int actor,
                                                 const int *cids, int n_cids) {
     if (!g || !cids || n_cids <= 0) return;
-    int activating = g->activating_card;
-    int pl = actor;
+    /* mod.rs:3420-3422 — Rust resolves against "self" (the ability master),
+     * NOT against the effect target, so the host member is always the acting
+     * player's own stage. The C previously used the raw `actor` index, which
+     * is p2 whenever a p2-led activation ran the effect. */
+    int pl = rb_resolve_target_player(g, "self");
+    if (pl < 0 || pl > 1) pl = (actor >= 0 && actor <= 1) ? actor : 0;
     RbPlayer *P = &g->p[pl];
-    int target_index = -1;
+    int activating = g->activating_card;
+    int activating_pos = -1;
     if (activating >= 0) {
         for (int i = 0; i < RB_STAGE_SIZE; i++)
-            if (P->stage[i] == activating && P->stage[i] != RB_EMPTY_SLOT)
-                { target_index = i; break; }
+            if (P->stage[i] == activating) { activating_pos = i; break; }
     }
-    if (target_index < 0) {
-        for (int i = g->n_recently_moved - 1; i >= 0; i--) {
+    int target_index = -1;
+    if (activating_pos >= 0) {
+        /* mod.rs:3424-3431 — the activating member vacated its slot between the
+         * prompt and the answer, so Rule 10.5.4 sends the energy to the energy
+         * deck (NOT to the vacated slot, which now holds someone else). */
+        if (P->stage[activating_pos] == RB_EMPTY_SLOT) {
+            for (int i = 0; i < n_cids; i++)
+                if (P->energy_deck.n < RB_MAX_ZONE)
+                    P->energy_deck.cards[P->energy_deck.n++] = cids[i];
+            return;
+        }
+        target_index = activating_pos;
+    } else {
+        /* mod.rs:3432-3438 — `self.selection.moved_cards` searched in reverse
+         * (the most recently moved card still on stage wins). */
+        const int *mv = mc_sel_moved(g);
+        for (int i = mc_sel_moved_count(g) - 1; i >= 0; i--) {
             for (int j = 0; j < RB_STAGE_SIZE; j++)
-                if (P->stage[j] == g->recently_moved[i] && P->stage[j] != RB_EMPTY_SLOT)
-                    { target_index = j; break; }
+                if (P->stage[j] == mv[i]) { target_index = j; break; }
             if (target_index >= 0) break;
         }
     }
+    if (target_index < 0 && P->stage[1] != RB_EMPTY_SLOT) target_index = 1;
+    if (target_index < 0 && P->stage[0] != RB_EMPTY_SLOT) target_index = 0;
+    if (target_index < 0 && P->stage[2] != RB_EMPTY_SLOT) target_index = 2;
+    /* mod.rs:3445-3450 — no member anywhere on stage: Rule 10.5.4 energy deck. */
     if (target_index < 0) {
-        if (P->stage[1] != RB_EMPTY_SLOT) target_index = 1;
-        else if (P->stage[0] != RB_EMPTY_SLOT) target_index = 0;
-        else if (P->stage[2] != RB_EMPTY_SLOT) target_index = 2;
-    }
-    if (target_index < 0 || P->stage[target_index] == RB_EMPTY_SLOT) {
         for (int i = 0; i < n_cids; i++)
-            if (P->energy_deck.n < RB_MAX_ZONE) P->energy_deck.cards[P->energy_deck.n++] = cids[i];
+            if (P->energy_deck.n < RB_MAX_ZONE)
+                P->energy_deck.cards[P->energy_deck.n++] = cids[i];
+        return;
+    }
+    /* mod.rs:3451-3456 — re-check the resolved slot. */
+    if (target_index < 0 || target_index >= RB_STAGE_SIZE ||
+        P->stage[target_index] == RB_EMPTY_SLOT) {
+        for (int i = 0; i < n_cids; i++)
+            if (P->energy_deck.n < RB_MAX_ZONE)
+                P->energy_deck.cards[P->energy_deck.n++] = cids[i];
         return;
     }
     int area = target_index;
     for (int i = 0; i < n_cids; i++)
         rb_stage_place_under_card(P, area, cids[i]);
-    int cause_pid = 0;
-    if (g->queue.cur >= 0 && g->queue.cur < RB_QUEUE_DEPTH)
-        cause_pid = g->queue.entries[g->queue.cur].player_id[0] - '0';
-    int cause_cid = g->activating_card;
-    for (int i = 0; i < n_cids; i++) {
-        g->batch_movements[g->n_batch_movements].moved_card_id = cids[i];
-        g->batch_movements[g->n_batch_movements].source_zone = RB_ZONEID_ENERGY_ZONE;
-        g->batch_movements[g->n_batch_movements].dest_zone = RB_ZONEID_UNDER_MEMBER;
-        g->batch_movements[g->n_batch_movements].cause_player_id = cause_pid;
-        g->batch_movements[g->n_batch_movements].effect_only = 1;
-        if (g->n_batch_movements < 16) g->n_batch_movements++;
-    }
+    /* mod.rs:3461-3478 — record the placement as a MOVEMENT EVENT so
+     * 「エネルギーがメンバーの下に置かれたとき」 watchers fire. The C built a
+     * RbBatchMovement by hand here, which (a) computed `cause_cid` and threw it
+     * away — the single field the event exists to carry — and (b) never set
+     * `moved_this_turn` or appended to `recently_moved`, so a following
+     * `preceding_moved` / `those_cards` step saw an empty batch. That is the
+     * measured "the displaced member's under-energy returns to the energy deck
+     * (got 0 expected 2)" (parity_under_member.log:141). */
+    mc_push_movement_event(g, cids, n_cids, "energy_zone", "under_member");
     rb_recalc_constants(g);
 }
 
@@ -1660,16 +2103,22 @@ void rb_effect_selected_energy_zone_cards(GameState *g, int actor, const int *in
     }
 }
 
-/* ── handle_energy_zone_selection ── */
+/* ── handle_energy_zone_selection ──────────────────────────────────────────
+ * Rust mod.rs:3344-3405. */
 void rb_move_handle_energy_zone_selection(
     GameState *g, int actor, const int *indices, int n_indices,
     int count, const char *destination, int (*validate_card)(int)) {
     if (!g || !indices || n_indices <= 0) return;
 
-    int pl = actor;
+    /* mod.rs:3360-3362 — Rust resolves the energy zone against "self" (the
+     * ability master), never the effect target. */
+    int pl = rb_resolve_target_player(g, "self");
+    if (pl < 0 || pl > 1) pl = (actor >= 0 && actor <= 1) ? actor : 0;
     RbPlayer *P = &g->p[pl];
 
     if (destination && *destination) {
+        /* mod.rs:3363-3376 — High→low so earlier removals do not shift later
+         * indices, then reverse back into selection order. */
         int sorted_idx[RB_MAX_RECENTLY_MOVED];
         int ns = n_indices < RB_MAX_RECENTLY_MOVED ? n_indices : RB_MAX_RECENTLY_MOVED;
         for (int i = 0; i < ns; i++) sorted_idx[i] = indices[i];
@@ -1690,6 +2139,11 @@ void rb_move_handle_energy_zone_selection(
                 P->energy.n--;
             }
         }
+        /* REVERSE back to the order the indices were given in (mod.rs:3375),
+         * so the batch lands in the order the player saw. */
+        for (int i = 0, j = nc - 1; i < j; i++, j--) {
+            int t = cids[i]; cids[i] = cids[j]; cids[j] = t;
+        }
 
         /* Rust EnergyZone::remove_at (core/zones.rs:346-355) decrements
            `active_energy_count` only for a card that occupied an ACTIVE SLOT,
@@ -1701,14 +2155,14 @@ void rb_move_handle_energy_zone_selection(
            test_parity_cce_gaps.c:2720 (h5: "the active energy count is
            UNCHANGED"). Every other destination is an energy SPEND and does
            consume the count. */
-        int is_under_member = !strcmp(destination, "under_member");
+        int is_under_member = move_zone_is(destination, "under_member");
         if (!is_under_member)
             P->energy_active = P->energy_active > nc ? P->energy_active - nc : 0;
 
         if (is_under_member) {
-            /* move/mod.rs:3336-3347 — an empty selection drops the pending
+            /* mod.rs:3378-3389 — an empty selection drops the pending
                「そうした場合」 actions and records the decline; the landing
-               itself is place_energy_under_member_selected (:3370), whose
+               itself is place_energy_under_member_selected (:3388), whose
                Rule 10.5.3/10.5.4 host resolution and energy-deck fallback
                live in rb_move_place_energy_under_member_selected. */
             if (nc == 0) {
@@ -1719,16 +2173,31 @@ void rb_move_handle_energy_zone_selection(
                 rb_move_place_energy_under_member_selected(g, actor, cids, nc);
             }
         } else {
-            for (int i = 0; i < nc; i++) {
+            /* mod.rs:3390-3395 */
+            for (int i = 0; i < nc; i++)
                 rb_place_card_in_zone(g, pl, cids[i], destination, -1);
-            }
         }
 
+        /* mod.rs:3396-3400 — clear modifiers, record the movement, then
+         * REPLACE the resolver's moved-card list with this batch
+         * (`self.selection.moved_cards = cids.into()` is an assignment, not
+         * an extend). Rust calls `gs.record_card_movement`, which is ONLY
+         * `cards_moved_this_turn.push` (modifiers.rs:1932-1934) — it does NOT
+         * touch recently_moved_cards and does NOT emit an event. The C was
+         * appending the whole turn's history into recently_moved here, so a
+         * following `preceding_moved` / `those_cards` step read every card the
+         * activation had moved instead of this batch. (For the under_member
+         * arm the movement EVENT is emitted by place_energy_under_member_selected,
+         * mod.rs:3461-3478, exactly as Rust does.) */
         for (int i = 0; i < nc; i++) {
             rb_mods_clear_card(&g->mods, cids[i]);
-            mc_record_movement(g, cids[i]);
+            if (cids[i] >= 0 && cids[i] < RB_MAX_CARD_IDS) g->moved_this_turn[cids[i]] = 1;
         }
+        g->n_those_cards = 0;
+        for (int i = 0; i < nc && i < RB_MAX_RECENTLY_MOVED; i++)
+            g->those_cards[g->n_those_cards++] = cids[i];
     } else {
+        /* mod.rs:3401-3403 */
         rb_effect_selected_energy_zone_cards(g, actor, indices, n_indices);
     }
     rb_clear_pending_choice(g);

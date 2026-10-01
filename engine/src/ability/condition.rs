@@ -524,14 +524,42 @@ impl<'a> ConditionContext<'a> {
         // Snapshot buffer before compound/or so children can be collected
         #[cfg(not(feature = "no_std"))]
         let before = crate::ability::log::buffer_len();
-        // Handle compound/or first — they push their own verdicts with children
+        // Handle compound/or first — they push their own verdicts with children.
+        //
+        // These paths must NOT bypass the negation post-processing further down, unlike the
+        // other early returns here. A `compound`/`or_condition` can legitimately print a
+        // negated disjunction, and returning here dropped that `negation` silently: the field
+        // parsed, sat in abilities.json, and never ran. Honouring it here removes that trap.
+        //
+        // The parser must NOT put leg-level qualifiers on the parent for this to be safe —
+        // `detect_card_property` used to lift one leg's 「ブレードハートを持たない」 onto the
+        // parent of a plain 「AかB」, which would invert the whole OR once negation starts
+        // being honoured. It no longer does, and
+        // `test_ability_invariants.py::test_or_condition_has_no_hoisted_qualifiers` guards it.
         if let Condition::Compound { .. } = condition {
-            if condition.get_operator() == Some("or") {
-                let r = self.evaluate_or_condition(condition);
-                return r;
+            let is_or = condition.get_operator() == Some("or");
+            let result = if is_or {
+                self.evaluate_or_condition(condition)
+            } else {
+                self.evaluate_compound_condition(condition)
+            };
+            if condition.get_negation().unwrap_or(false) {
+                let result = !result;
+                #[cfg(not(feature = "no_std"))]
+                {
+                    if crate::ability::log::debug_enabled()
+                        && crate::ability::log::buffer_len() <= before
+                    {
+                        let actual = self.describe_condition_actual(condition);
+                        push_cond_verdict(condition, &actual, result, vec![]);
+                    }
+                }
+                if ABILITY_DEBUG.load(Ordering::Relaxed) {
+                    dbg.condition(condition, u8::from(!result), 1, result);
+                }
+                return result;
             }
-            let r = self.evaluate_compound_condition(condition);
-            return r;
+            return result;
         }
         // Phase gate: check phase/phase_target restrictions. This must run
         // BEFORE individual type evaluators so the gate applies universally.

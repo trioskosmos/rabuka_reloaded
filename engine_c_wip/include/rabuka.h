@@ -962,6 +962,15 @@ typedef struct {
     int  optional_cost_result;
     int  cost_paid_index;
     int  choice_card_no;
+    /* Rust's `entry.choice_card_no` is `Option<ChoiceRoute>`, and ChoiceRoute has a
+       `Raw(String)` variant (types.rs:55-62) used for dynamic routes — e.g. a
+       position_change route that carries the opponent target. An int tag cannot
+       represent that string, so the raw text is kept here alongside the tag.
+       queue.rs:340-345 matches `is_route_opponent` on this prefix:
+           "position_change:opponent:"
+       `has_choice_route_raw` distinguishes "no Raw route" from "empty Raw route". */
+    char choice_route_raw[64];
+    int  has_choice_route_raw;
     int  pending_actions_n;
     /* owned pending-action snapshots (mirrors Rust entry.pending_actions):
         deep-cloned AbilityEffect trees parked across a pause, executed by
@@ -2958,5 +2967,87 @@ int rb_translated_execute_set_card_identity_effect(GameState *g, int actor, Abil
 int rb_translated_execute_gain_ability_from_source(GameState *g, int actor, AbilityEffect *effect, int host_cid);
 int rb_translated_execute_custom_effect(GameState *g, int actor, AbilityEffect *effect, const char *action_str);
 int rb_execute_custom_effect(GameState *g, int actor, AbilityEffect *effect, const char *action_str);
+
+/* ── Ability description renderer (engine/src/ability/describe.rs) ─────────
+ * Ported into src/ability/describe.c. Verified against the real Rust golden
+ * test_output/describe_dump.json (936 rows) at 931/936 byte-identical before
+ * the vm.c decoder gaps were fixed.
+ *
+ * OWNERSHIP: every char* returned by rb_desc_effect / rb_desc_cost and their
+ * _en/_ja variants is rb_malloc'd — free it with rb_desc_free. The label
+ * helpers (rb_desc_zone_label, rb_desc_card_type_label, rb_desc_state_verb,
+ * rb_desc_resource_label, rb_desc_duration_label, rb_desc_choice_prompt_
+ * templates_en) return BORROWED pointers — a literal or the caller's own
+ * string. Never free those. */
+void  rb_desc_free(char *s);
+char *rb_desc_effect(const AbilityEffect *effect, int ja);
+char *rb_desc_effect_en(const AbilityEffect *effect);
+char *rb_desc_effect_ja(const AbilityEffect *effect);
+char *rb_desc_cost(const AbilityEffect *cost, int ja);
+char *rb_desc_cost_en(const AbilityEffect *cost);
+char *rb_desc_cost_ja(const AbilityEffect *cost);
+char *rb_desc_sequential_cost(const AbilityEffect *const *costs, int n_costs, int choice_index, int ja);
+char *rb_desc_sequential_cost_en(const AbilityEffect *const *costs, int n_costs, int choice_index);
+char *rb_desc_sequential_cost_ja(const AbilityEffect *const *costs, int n_costs, int choice_index);
+const char *rb_desc_zone_label(const char *zone);
+const char *rb_desc_zone_label_ja(const char *zone);
+const char *rb_desc_card_type_label(const char *ct);
+const char *rb_desc_card_type_label_ja(const char *ct);
+const char *rb_desc_state_verb(const char *state, int ja);
+const char *rb_desc_state_verb_ja(const char *state);
+const char *rb_desc_resource_label(const char *resource, int ja);
+const char *rb_desc_resource_label_ja(const char *resource);
+const char *rb_desc_duration_label(const char *duration, int ja);
+const char *rb_desc_duration_label_ja(const char *duration);
+void  rb_desc_apply_bilingual(RbFullChoice *ch, const AbilityEffect *effect, int ja_first);
+char *rb_desc_translate_choice_prompt_en_to_ja(const char *en); /* NULL == Rust's None */
+extern const char *const rb_desc_choice_prompt_templates_en[];
+extern const int rb_desc_choice_prompt_templates_en_count;
+
+/* ── Selection-grid renderer (engine/src/choice_renderer.rs) ────────────────
+ * NOTE: choice_renderer.rs is the 3DS graphical card-choice-grid front-end
+ * built on the PlatformUi trait. It never reads RbChoice; its option list
+ * arrives as caller-supplied slices. Ported into
+ * src/ability/choice_renderer.c. The UI backend is a NULL-able callback
+ * table — an all-NULL table degrades to Rust's text-only default. */
+typedef struct RbRendUi {
+    void (*clear_screen)(void);
+    void (*println)(const char *s);
+    void (*swap_buffers)(void);
+    void (*poll_input)(void);
+    void (*wait_vblank)(void);
+    int  (*just_pressed_a)(void);
+    int  (*just_pressed_b)(void);
+    int  (*just_pressed_l)(void);
+    int  (*just_pressed_r)(void);
+    int  (*just_pressed_up)(void);
+    int  (*just_pressed_down)(void);
+    int  (*just_pressed_left)(void);
+    int  (*just_pressed_right)(void);
+    void (*draw_card_image)(const char *card_no, int x, int y);
+    void (*show_board_overlay)(const GameState *gs);
+    void (*show_detail_screen)(const char *title, const char *body);
+    void (*reset_vram)(void);
+    void (*open_start_menu)(void);
+} RbRendUi;
+int rb_rend_render_card_choice_grid(const RbRendUi *ui, const GameState *gs,
+                                    const char *title,
+                                    const char *const *items, int n_items,
+                                    const char *const *card_nos, int n_card_nos,
+                                    int allow_skip,
+                                    const unsigned char *dimmed, int n_dimmed);
+
+/* ── Cross-file symbols that exist and are exported but were never declared ──
+ * Hoisted here from private externs that several files had been duplicating. */
+const RbQueueEntry *rb_queue_get_entry(const GameState *g, int idx);
+int rb_heartmap_len(const Card *c, int from, int len);
+int rb_heartmap_key_at(const Card *c, int from, int len, int i);
+int rb_heartmap_value_at(const Card *c, int from, int len, int i);
+
+/* ── Core GameState impl (engine/src/core/game_state/mod.rs) ────────────────
+ * Ported into src/core/game_state_core.c as 40 rb_gsc_* functions. */
+typedef struct { const char *key; int count; } RbGscZoneSnapshot;
+#define RB_GSC_ZONE_SNAPSHOT_KEYS 16
+int rb_gsc_zone_snapshot(const GameState *g, RbGscZoneSnapshot *out);
 
 #endif /* RABUKA_H */

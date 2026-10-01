@@ -464,6 +464,21 @@ let source = cost.source_str().unwrap_or("");
                 .map(|(i, _)| i)
                 .collect()
         };
+
+        // 「名前の異なる…のメンバーカード」 — the COST compares printed NAMES, not card
+        // numbers, so two prints of one character count once. `PL!-pb2-018-P＋`
+        // (手札の名前の異なる『BiBi』のメンバーカードを3枚控え室に置いてもよい) otherwise paid
+        // 絢瀬絵里 -P and 絢瀬絵里 -R as two of its three cards, which 名前の異なる forbids.
+        //
+        // Deduping the CANDIDATE SET (rather than filtering after the selection) also means
+        // the duplicate is never offered, so the player cannot select it. `move_cards` already
+        // dedupes the effect path at `effects/move/mod.rs:2281`; this is the cost path.
+        let indices = if crate::ability::util::distinct_should_dedupe(cost.distinct_any()) {
+            crate::ability::util::dedupe_by_normalized_name(&indices, |&i| pl.hand.cards[i], card_db)
+        } else {
+            indices
+        };
+
         (indices, is_same_group_name)
     }
 

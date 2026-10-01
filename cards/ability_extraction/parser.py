@@ -1537,7 +1537,22 @@ def _enrich_condition_result(result: Dict[str, Any], text: str) -> Dict[str, Any
         cost_limit = extract_cost_limit_with_operator(text)
         if cost_limit:
             result["cost_limit"], result["cost_limit_operator"] = cost_limit
-    if "card_property" not in result:
+    # A 「AかB」 disjunction owns its qualifiers PER LEG, so `detect_card_property` must
+    # not lift one leg's qualifier onto the parent. Both cards below printed a plain OR
+    # whose leg-level negation carried the whole meaning, yet the hoist put an equivalent
+    # `card_property` + `negation` on the parent too — and the engine's Compound path
+    # returns before its negation post-processing, so that parent copy was dead weight
+    # that would have inverted the entire OR if the early return were ever fixed:
+    #   * PL!S-bp3-019-L MIRACLE WAVE
+    #     「…ブレードハートを持たないカードが0枚の場合**か**、または余剰ハートを2つ以上…」
+    #   * PL!N-bp7-006-P 近江彼方
+    #     「…『虹ヶ咲』のライブカード**か**ブレードハートを持たない『虹ヶ咲』のメンバー…」
+    # Keeping the qualifier on the leg it belongs to is also what lets the engine honour a
+    # genuine top-level negation on a compound if one is ever printed.
+    if "card_property" not in result and result.get("type") not in (
+        "compound",
+        "or_condition",
+    ):
         card_property = detect_card_property(text)
         if card_property:
             result["card_property"] = card_property[0]
@@ -13613,7 +13628,21 @@ def _fix_condition_enrichment(eff, t):
         if counts_cards and not eff.get("card_property"):
             eff["card_property"] = "has_score_icon"
         cond = eff.get("condition")
-        if isinstance(cond, dict) and not cond.get("card_property"):
+        # Only a LEAF condition can take the icon from the sentence as a whole. On a
+        # compound the icon belongs to one leg — PL!SP-pb2-004-PP 平安名すみれ stamps
+        # `has_score_icon` onto an `or_condition` whose other leg is 「元々のスコアより高い
+        # スコアのライブカードがある」 and has no icon at all, and PL!SP-bp5-023-L
+        # Shooting Voice!! does the same to an `and` whose first leg is a bare count. Read
+        # on the parent it asserts the icon for every leg, which is the opposite of the
+        # printed 「AかB」 / 「AかつB」 split. Guarded by
+        # `test_ability_invariants.py::test_or_condition_has_no_hoisted_qualifiers`.
+        if (
+            isinstance(cond, dict)
+            and not cond.get("card_property")
+            and not (
+                isinstance(cond.get("conditions"), list) and len(cond["conditions"]) >= 2
+            )
+        ):
             cond["card_property"] = "has_score_icon"
     if (
         eff.get("per_unit")
@@ -14876,8 +14905,15 @@ def _validate_semantic(abilities):
         SemanticRule(
             "distinct_name",
             r"(カード名の異なる|カード名が異なる|名前の異なる|名前が異なる|異なるカード名)",
-            lambda e, eff: _json_has_field(eff, "distinct", "card_name"),
-            "Distinct card names required but no distinct field",
+            # 「名前の異なる」 frequently modifies the COST, not the effect:
+            # PL!-pb2-018-P＋ 矢澤にこ is
+            # 「手札の名前の異なる『BiBi』のメンバーカードを3枚控え室に置いてもよい：…」 — the
+            # `distinct: "card_name"` lives on the cost node and the effect is the 「…」 that
+            # follows. Reading only the effect reported a missing mechanic that was in fact
+            # expressed (and unenforced) on the cost.
+            lambda e, eff: _json_has_field(eff, "distinct", "card_name")
+            or _json_has_field(e.get("cost") or {}, "distinct", "card_name"),
+            "Distinct card names required but no distinct field on the effect or cost",
         ),
         SemanticRule(
             "reveal_until",
@@ -15061,11 +15097,18 @@ def _validate_semantic(abilities):
         SemanticRule(
             "or_location",
             r"(?:成功)?ライブカード置き場(?:か(?!ら)|又は)",
-            lambda e, eff: len(
-                (eff.get("condition") or {}).get("locations", [])
-            )
-            >= 2,
-            "OR location pattern but fewer than 2 locations in condition",
+            # Search the WHOLE condition tree, not just the top level. A 「AかB」 zone
+            # clause is very often one leg of an AND — PL!-pb2-038-L 嵐のなかの恋だから is
+            # 「このカードが自分のライブカード置き場か成功ライブカード置き場にあり、**かつ**
+            # 自分のステージに2人の『μ's』のメンバーがいる場合」 — so the `locations` array
+            # lives on a sub-condition and a top-level-only read reports a false positive.
+            lambda e, eff: _json_has(
+                eff.get("condition") or {},
+                lambda d: isinstance(d, dict)
+                and isinstance(d.get("locations"), list)
+                and len(d["locations"]) >= 2,
+            ),
+            "OR location pattern but fewer than 2 locations anywhere in the condition",
         ),
         # ═══ Types, identity and conversion ═══
         SemanticRule(
@@ -15084,10 +15127,17 @@ def _validate_semantic(abilities):
         SemanticRule(
             "card_identity",
             r"(としても扱|として扱う|同一として扱|として見な)",
+            # `count_as_multiple` is the correct mechanic for 「このカードは2枚として扱う」 —
+            # it states the counting weight AND the card set it weights, where
+            # `set_card_identity` would only swap group/heart identity. PL!-pb2-041-L
+            # 春情ロマンティック parses to `count_as_multiple` with
+            # `counted_by: ["lily white"]`, which is strictly more precise than the
+            # alternative, so demanding `set_card_identity` here reports a false positive.
             lambda e, eff: _json_has_action(eff, "set_card_identity")
             or _json_has_action(eff, "all_blade_timing")
-            or _json_has_action(eff, "set_heart_type"),
-            "Card identity/card name treated as but no set_card_identity",
+            or _json_has_action(eff, "set_heart_type")
+            or _json_has_action(eff, "count_as_multiple"),
+            "Card identity/card name treated as but no set_card_identity/count_as_multiple",
         ),
         SemanticRule(
             "all_blade",
