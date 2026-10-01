@@ -2326,6 +2326,14 @@ fn trigger_auto_ability_by_index_refs(
         self.pending_loop_protocol.is_some() || self.ability_queue.is_waiting_for_choice().is_some()
     }
 
+    /// Pending ability-queue depth. Exposed so the bot's `project_live_start`
+    /// can tell "the live-start scan queued nothing" apart from "it queued
+    /// abilities that resolved to nothing" — the two are indistinguishable from
+    /// the projected board alone, and both look like a bit-identical null.
+    pub fn ability_queue_len(&self) -> usize {
+        self.ability_queue.len()
+    }
+
     pub fn entry_effect(&self) -> Option<&crate::card::AbilityEffect> {
         self.ability_queue
             .current_entry()

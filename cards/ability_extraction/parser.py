@@ -5072,6 +5072,93 @@ _CONDITION_DISPATCH_ORDER.insert(
     ),
 )
 
+def _try_paid_own_ability_cost(text):
+    """「…コストを支払うためか、…ウェイト状態になったとき」 — two EVENT branches.
+
+    PL!-pb2-021-N 南ことり ab#0. Both halves are per-turn histories, and both used to parse
+    into vacuous comparisons, which made the `or_condition` permanently true and had her 自動
+    firing every turn for a free blade.
+
+    **This rule must build the WHOLE `or` itself, and that is the subtle part.** It is
+    registered at the front of the dispatch order, so it sees the full clause text before the
+    「〜か、〜」 splitter gets a chance to break it apart. A rule that only recognised the cost
+    half would therefore claim the entire sentence and silently drop the wait half — which is
+    exactly what happened the first time this was written: the result was a single
+    `comparison_condition` whose text was the whole 「Aか、B」, and the wait trigger vanished.
+
+    The shape produced here is byte-for-byte the one the splitter used to produce, with both
+    branches replaced by their event forms:
+
+      * branch 1 -> `paid_cost_this_turn: true`, self-scoped, backed by
+        `GameState::cards_paid_cost_this_turn`;
+      * branch 2 -> a turn-scoped active→wait transition read from
+        `GameState::turn_state_changes`.
+
+    A standalone 「…コストを支払う」 clause with no 「か、」 is handled too, so the rule works on
+    the branch text as well as the whole.
+    """
+    if "コストを支払う" not in text:
+        return None
+
+    def _cost_branch(t: str) -> dict:
+        return {
+            "type": "comparison_condition",
+            "paid_cost_this_turn": True,
+            "self_target": True,
+            "card_type": "member_card",
+            "target": "self",
+            "text": t,
+        }
+
+    def _wait_branch(t: str) -> dict:
+        # `from_state` / `to_state` are the field names the engine reads — the getters are
+        # `get_from_state` / `get_to_state` over `ConditionCommon::from_state` /
+        # `to_state`. Emitting `from` / `to` instead parses cleanly, validates cleanly, and
+        # is silently IGNORED, which leaves the clause as the static 「is in wait」 state.
+        return {
+            "type": "state_condition",
+            "state": "wait",
+            "from_state": "active",
+            "to_state": "wait",
+            "temporal": "this_turn",
+            "temporal_scope": "this_turn",
+            "card_type": "member_card",
+            "self_target": True,
+            "target": "self",
+            "text": t,
+        }
+
+    # Whole-clause form: the two branches are still joined.
+    joined = re.search(
+        r"^(?P<a>[^か]*コストを支払うため)か、(?P<b>.+)$", text
+    )
+    if joined:
+        return {
+            "type": "or_condition",
+            "operator": "or",
+            "conditions": [
+                _cost_branch(joined.group("a")),
+                _wait_branch(joined.group("b")),
+            ],
+            "text": text,
+        }
+
+    if not re.search(r"この(メンバー|カード)", text):
+        return None
+    return _cost_branch(text)
+
+
+# Ahead of the generic numeric tier: this clause is an EVENT, and the generic extractor's
+# cost-comparison fallback turns it into a tautology. Inserted at the front alongside the
+# discard and existence handlers above, for the same reason.
+_CONDITION_DISPATCH_ORDER.insert(
+    0,
+    (
+        "paid_own_ability_cost",
+        ConditionPattern(handler=_try_paid_own_ability_cost),
+    ),
+)
+
 # The one place conditions are registered. Registration index IS the priority.
 _condition_registry = PriorityRegistry("condition_rules")
 for _ci, (_name, _rule) in enumerate(_CONDITION_DISPATCH_ORDER):

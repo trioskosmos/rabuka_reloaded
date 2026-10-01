@@ -1166,6 +1166,12 @@ pub struct EffectFilter {
     /// and group_names — NOT the set of members currently in wait.
     /// PL!-pb2-010-P＋ 綎滄絵針.
     pub activated_this_turn: Option<bool>,
+    /// 「このメンバーが、自分のカードの能力のコストを支払うため」 — also a per-turn HISTORY
+    /// clause. The set is GameState::cards_paid_cost_this_turn: the members that have PAID
+    /// the cost of one of their own abilities this turn. It is not a comparison on cost, and
+    /// not a state — which is why the parser emitting a bare `comparison_condition` here made
+    /// it a tautology. PL!-pb2-021-N 南ことり.
+    pub paid_cost_this_turn: Option<bool>,
 }
 
 /// Tagged union of effect action types. Every field lives on the shared
@@ -1553,6 +1559,7 @@ impl AbilityEffect {
                 counted_by: None,
                 count_as: None,
                 activated_this_turn: None,
+            paid_cost_this_turn: None,
                 exclude_self: bool_field!("exclude_self"),
                 same_name: bool_field!("same_name"),
                 same_unit_name: bool_field!("same_unit_name"),
@@ -2102,6 +2109,7 @@ impl AbilityEffect {
 
     filter_u8_getter!(count_as_any, count_as);
     filter_bool_getter!(activated_this_turn_any, activated_this_turn);
+    filter_bool_getter!(paid_cost_this_turn_any, paid_cost_this_turn);
     filter_box_vec_ref_getter!(counted_by_any, counted_by);
 
     filter_u8_getter!(per_group_count_any, per_group_count);
@@ -3236,6 +3244,12 @@ pub struct ConditionCommon {
     /// GameState::cards_activated_this_turn.
     /// PL!-pb2-040-L.
     pub activated_this_turn: Option<bool>,
+
+    /// Per-turn cost-payment history. The member PAID the cost of one of its own
+    /// abilities this turn -- a history, not a state. Counted against
+    /// GameState::cards_paid_cost_this_turn.
+    /// PL!-pb2-021-N.
+    pub paid_cost_this_turn: Option<bool>,
 }
 
 /// The distinct Condition type as a serde internally-tagged enum.
@@ -4116,6 +4130,13 @@ impl Condition {
     /// works for every condition variant, not just one.
     pub fn get_activated_this_turn(&self) -> Option<bool> {
         self.common().and_then(|c| c.activated_this_turn)
+    }
+
+    /// Per-turn cost-payment history. Mirrors `get_activated_this_turn`: the member PAID the
+    /// cost of one of its own abilities this turn. Read via `self.common()` so it works for
+    /// every condition variant, not just one.
+    pub fn get_paid_cost_this_turn(&self) -> Option<bool> {
+        self.common().and_then(|c| c.paid_cost_this_turn)
     }
 
     pub fn get_comparison_target(&self) -> Option<ComparisonTarget> {

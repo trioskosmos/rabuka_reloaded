@@ -1,4 +1,4 @@
-//! V8 live-card-set decision: ONE argmax over the shared check model.
+﻿//! V8 live-card-set decision: ONE argmax over the shared check model.
 //!
 //! v7 built this decision as a chain of mutually exclusive special cases —
 //! free win, ceiling fold, minimum-win, strict closeout, desperation life,
@@ -27,10 +27,15 @@
 
 use crate::bot::strategy_common::{acc_add, emit_live_set, Acc, Pool};
 use crate::card::{CardDatabase, CardType};
-use crate::game_setup::Action;
+use crate::game_setup::{self, Action};
 use crate::game_state::{GameState, Phase};
 
 use super::v8_model::{self, CheckOutcome, OppModel, RngGuard, PLACEMENT_CREDIT};
+
+/// Shorthand for the blade count used on the un-projected path.
+fn active_blades(gs: &GameState, me: u8, db: &CardDatabase) -> i32 {
+    v8_model::active_blades(gs, me, db)
+}
 
 /// A life in hand, priced once.
 struct Life {
@@ -574,10 +579,40 @@ fn enumerate_candidates(
         if chosen.len() > width_cap {
             continue;
         }
+        // The board the check is resolved against, and the blade count that draws
+        // from the deck. With the projection off this is the board as it stands
+        // at set time; with it on, it is the board after every live-start
+        // ability has fired and been answered.
+        let projected = project_live_start(gs, me, db, &chosen);
+        let (check_pools, board, blades_now) = match &projected {
+            Some((board, blades)) => (
+                v8_model::FlipSampler::build_with_draws(
+                    gs,
+                    me,
+                    db,
+                    usize::try_from(*blades).unwrap_or(0),
+                )
+                .sample_pools(board, v8_model::flip_samples()),
+                *board,
+                *blades,
+            ),
+            // No projection: the board as it stands at set time, and the blades it
+            // would draw from the deck. Both come from the same model helpers the
+            // projected arm uses, so the two arms stay comparable.
+            //
+            // `pools` is a `&Vec<Pool>` borrowed from the enclosing sampler, so
+            // `pools.clone()` would clone the REFERENCE and leave this arm
+            // `&[Pool]` where the other arm is `Vec<Pool>`. `to_vec()` is the copy.
+            None => (
+                pools.to_vec(),
+                v8_model::board_pool(gs, me, db),
+                v8_model::active_blades(gs, me, db),
+            ),
+        };
         let p_pass = if chosen.is_empty() {
             0.0
         } else {
-            zone_ordered_pass_probability(&pools, &chosen)
+            zone_ordered_pass_probability(&check_pools, &chosen)
         };
         let outcome = v8_model::check_outcome(p_pass, score, chosen.len(), my_success, opp);
         let spare = max_slots - chosen.len();
@@ -853,6 +888,134 @@ fn joint_success_value(dist: &[f64; 4], our_success: usize, opp_success: usize) 
     weight * value
 }
 
+/// `V8_LIVE_START_PROJECTION=1`: price the check against the board the
+/// live-start abilities will actually produce, rather than the board that
+/// exists when the zone is set.
+///
+/// ## What is wrong without it, from the deck's own cards
+///
+/// Every live in `5CP3Z idou` is ライブ開始時, and the four do large, different
+/// things:
+///
+/// - `Aspire` `PL!SP-sd2-025-sd2` x4 — +1 blade to every Liella member that
+///   moved this turn. Up to ~5 blades against an 11-heart requirement.
+/// - `MIRACLE NEW STORY` `PL!SP-bp5-024-l` x1 — +1 heart of a chosen colour to
+///   every member that moved this turn. Up to 5 hearts against a **15-heart**
+///   requirement: a third of what the check needs, and the deck's finisher.
+/// - `Special Color` `PL!SP-bp4-025-l` x4 — centre Liella members' printed
+///   blade count becomes 3.
+/// - `始まりは君の空` `PL!SP-sd2-023-sd2` x3 — at 2+ successes rewrites its own
+///   requirement to 12 hearts; the FAQ confirms the trigger cannot be declined.
+///
+/// The live set prices a life against the board as it stands at set time, so
+/// MIRACLE reads as a 15-heart card the board cannot reach — which is why a card
+/// the deck runs as its win condition is treated as uncashable.
+///
+/// ## This is not the idea §0.2 refuted
+///
+/// That refutation was "`lscand == lcand` on every line, so presence has no
+/// contrast". Presence is the wrong discriminator. The contrast is **how much
+/// this ability adds to this board**, and the four above differ by an order of
+/// magnitude and act on different quantities — blades, hearts, centre blades,
+/// and its own requirement. No null in the log bears on that question.
+///
+/// ## Generic, not a four-card table
+///
+/// It runs the engine. Clone at set time, commit the candidate, fire
+/// `TurnEngine::trigger_live_start_abilities`, then answer whatever it asks
+/// using **the bot's own `evaluate_actions`** — so MIRACLE's colour choice and
+/// `澁谷かのん`'s formation change are resolved by the policy that would resolve
+/// them in a real game, and a card this file has never seen still projects.
+/// Hard-coding the four IDs would be fragile and would misdescribe what the
+/// code knows.
+///
+/// `RngGuard` is mandatory: the engine draws while resolving, and a policy call
+/// that perturbs the game RNG is a policy call that changes the game.
+fn project_live_start(
+    gs: &GameState,
+    me: u8,
+    db: &CardDatabase,
+    lives: &[&Life],
+) -> Option<(Pool, i32)> {
+    if std::env::var_os("V8_LIVE_START_PROJECTION").is_none() || lives.is_empty() {
+        return None;
+    }
+    let _guard = v8_model::RngGuard::new();
+    let mut sim = gs.clone();
+    let me_id = sim.seat_player(me).id.clone();
+    for life in lives {
+        // `Life` carries a hand SLOT, not a card id.
+        if let Some(&cid) = sim.seat_player(me).hand.cards.get(life.index) {
+            let _ = sim.seat_player_mut(me).live_card_zone.add_card(cid, db);
+        }
+    }
+let queued_before = sim.ability_queue_len();
+    crate::turn::TurnEngine::trigger_live_start_abilities(&mut sim, &me_id);
+    let queued = sim.ability_queue_len().saturating_sub(queued_before);
+    // The scan only ENQUEUES. The real engine resolves the queue immediately
+    // after it — `phases.rs` calls `process_pending_auto_abilities` on the very
+    // next statement after both players' scans — and without this line the entry
+    // sits at `PayingCost`, `has_pending_choice()` is false, the answer loop
+    // below breaks on iteration 0, and the "projection" returns the untouched
+    // set-time board. That is the whole reason the switch measured
+    // bit-identically: it was firing and throwing the result away.
+    sim.process_pending_auto_abilities(&me_id);
+    // Bounded, and a projection that cannot converge degrades to "no
+    // projection" rather than hanging a turn.
+    for _ in 0..8 {
+        if !sim.has_pending_choice() {
+            break;
+        }
+        let actions = crate::game_setup::generate_possible_actions(&sim);
+        if actions.is_empty() {
+            break;
+        }
+        // `evaluate_actions` pushes one score per input action in order, so the
+        // two zip; `ActionScore` has no index of its own. A rejected action scores
+        // `NEG_INFINITY` (`ActionScore::rejected`), so it can never win this
+        // comparison and needs no separate filter.
+        //
+        // `max_by` on a `zip` gets each element by reference, so the closure
+        // takes TWO arguments — each a `&(&ActionScore, &Action)` — not one
+        // destructured pair.
+        let scores = super::v8_main::evaluate_actions(&sim, &actions, me);
+        let best = scores
+            .iter()
+            .zip(actions.iter())
+            .max_by(|(a, _), (b, _)| {
+                a.value
+                    .partial_cmp(&b.value)
+                    .unwrap_or(std::cmp::Ordering::Equal)
+            })
+            .map(|(_, action)| action);
+        let Some(action) = best else { break };
+        if crate::game_setup::execute_action(&mut sim, action).is_err() {
+            break;
+        }
+crate::game_setup::settle_auto(&mut sim);
+    }
+    let board = v8_model::board_pool(&sim, me, db);
+    let blades = v8_model::active_blades(&sim, me, db);
+    // The two discriminating measurements §13.1 could not make. A projection
+    // that queues nothing and a projection that queues abilities which all
+    // resolve to zero produce the same bit-identical result, so "no effect" is
+    // ambiguous until the queue depth and the blade delta are visible.
+    if std::env::var_os("V8_LSP_DIAG").is_some() {
+        let (base_board, base_blades) =
+            (v8_model::board_pool(gs, me, db), v8_model::active_blades(gs, me, db));
+        eprintln!(
+            "LSPDIAG lives={} queued={} blades {}->{} board {:?}->{:?}",
+            lives.len(),
+            queued,
+            base_blades,
+            blades,
+            base_board,
+            board
+        );
+    }
+    Some((board, blades))
+}
+
 fn better(a: &Candidate, b: &Candidate) -> bool {
     const EPS: f64 = 1e-9;
     // AMMUNITION FLOOR. Refuse to commit a set this unlikely to be won.
@@ -1059,6 +1222,26 @@ pub fn choose_live_set_v8(gs: &GameState, actions: &[Action], db: &CardDatabase)
         opp_player.success_live_card_zone.cards.len(),
         opp.set_size,
     );
+// `V8_CAL`: one machine-parseable line per live-set decision, carrying the
+    // turn and the seat so a post-hoc pass can join this prediction against the
+    // engine's own verdict in the arena's per-game log. Without the turn key the
+    // model's `p_pass` and the realized pass/fail cannot be lined up, which is
+    // why every previous calibration read in this project had to be eyeballed.
+    if std::env::var_os("V8_CAL").is_some() {
+        eprintln!(
+            "V8CAL t={} me={} second={} set={} ppass={:.4} pplace={:.4} opp_pass={:.4} opp_set={} mysucc={} opsucc={}",
+            gs.turn_number,
+            me,
+            gs.current_phase == Phase::LiveCardSetSecondAttacker,
+            if best.lives.is_empty() { 0 } else { 1 },
+            best.outcome.p_pass,
+            best.outcome.p_place,
+            opp.pass_prob,
+            opp.set_size,
+            p.success_live_card_zone.cards.len(),
+            opp_player.success_live_card_zone.cards.len(),
+        );
+    }
     if std::env::var_os("V8_DEBUG").is_some() {
         let describe = |idx: &[usize]| -> String {
             idx.iter()
@@ -1460,3 +1643,4 @@ mod tests {
         assert!(energy.keep_value > draw_credit);
     }
 }
+

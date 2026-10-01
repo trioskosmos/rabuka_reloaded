@@ -149,34 +149,42 @@ fn proof_cost_total_of_exactly_twenty_triggers_the_look() {
     game.drain_choices();
 }
 
-/// Threshold sweep, kept as a permanent record of where the 「合計20以上」 gate sits.
+/// Threshold sweep across seven stage-cost totals, asserting where the 「合計20以上」 gate sits.
 ///
-/// Result, read from the prompt BEFORE it is answered:
-///   6 → no prompt      10 → no prompt     12 → no prompt     13 → no prompt
-///   27 → SelectCard(2)  21 → queued behind an auto prompt     19 → queued behind one
+/// This started as an `#[ignore]`d `println!` sweep, and the reason it was ignored is now
+/// gone. The old version snapshotted the prompt immediately, so the 19 and 21 rows read as
+/// "queued behind a `SelectAutoAbility`" — Proof's own 自動 fires on the same phase — and a
+/// single snapshot could not separate a gated look from an un-answered one. Declining the
+/// stage's auto abilities first (the same thing `drain_choices` does for them) leaves the
+/// look's own prompt as the next one, and then the rows separate cleanly.
 ///
-/// So the gate is correct: nothing below 20 opens the look, and 27 does. Printed rather than
-/// asserted because the 19 and 21 rows land on a `SelectAutoAbility` prompt first (Proof's own
-/// 自動), so a single snapshot cannot separate them — `proof_cost_total_of_nineteen_…` and
-/// `proof_cost_total_of_exactly_twenty_…` drain those and make the assertion properly.
+/// It is asserted rather than printed now, which is the whole point: a `println!` diagnostic
+/// cannot fail, so the sweep documented the gate while being incapable of noticing the gate
+/// moving.
 ///
-/// Kept because a future change to the gate should be able to see this table rather than
-/// re-derive it.
+/// The result is the table the prose always claimed, and it is unchanged:
+/// ```text
+///   6 → no look    10 → no look    12 → no look    13 → no look    19 → no look
+///  21 → look       27 → look
+/// ```
+/// with the 19/20 bracket additionally pinned on its own by
+/// `proof_cost_total_of_nineteen_does_not_trigger_the_look` and
+/// `proof_cost_total_of_exactly_twenty_…`, so any off-by-one of size 1 is caught twice.
 #[test]
-#[ignore = "diagnostic sweep; the assertions either side are the real tests"]
-fn proof_threshold_diagnostic() {
+fn proof_threshold_table_across_seven_totals() {
     // 蓮ノ空 member costs available (from cards.json): 2, 4, 9, 11, 13, 15.
-    let triples: [&[&str]; 7] = [
-        &["PL!HS-sd1-009-SD", "PL!HS-sd1-009-SD", "PL!HS-sd1-009-SD"], // 2+2+2 = 6
-        &["PL!HS-sd1-009-SD", "PL!HS-sd1-011-SD", "PL!HS-sd1-011-SD"], // 2+4+4 = 10
-        &["PL!HS-sd1-011-SD", "PL!HS-sd1-011-SD", "PL!HS-sd1-011-SD"], // 4+4+4 = 12
-        &["PL!HS-sd1-009-SD", "PL!HS-sd1-009-SD", "PL!HS-sd1-001-SD"], // 2+2+9 = 13
-        &["PL!HS-sd1-001-SD", "PL!HS-sd1-001-SD", "PL!HS-sd1-001-SD"], // 9+9+9 = 27
-        &["PL!HS-sd1-008-SD", "PL!HS-sd1-011-SD", "PL!HS-sd1-011-SD"], // 13+4+4 = 21
-        &["PL!HS-sd1-008-SD", "PL!HS-sd1-011-SD", "PL!HS-sd1-009-SD"], // 13+4+2 = 19
+    // `expect_look` is the gate: the look opens at a combined stage cost of 20 or more.
+    let cases: [(&[&str], i32, bool); 7] = [
+        (&["PL!HS-sd1-009-SD", "PL!HS-sd1-009-SD", "PL!HS-sd1-009-SD"], 6, false), // 2+2+2
+        (&["PL!HS-sd1-009-SD", "PL!HS-sd1-011-SD", "PL!HS-sd1-011-SD"], 10, false), // 2+4+4
+        (&["PL!HS-sd1-011-SD", "PL!HS-sd1-011-SD", "PL!HS-sd1-011-SD"], 12, false), // 4+4+4
+        (&["PL!HS-sd1-009-SD", "PL!HS-sd1-009-SD", "PL!HS-sd1-001-SD"], 13, false), // 2+2+9
+        (&["PL!HS-sd1-009-SD", "PL!HS-sd1-011-SD", "PL!HS-sd1-008-SD"], 19, false), // 2+4+13
+        (&["PL!HS-sd1-008-SD", "PL!HS-sd1-011-SD", "PL!HS-sd1-011-SD"], 21, true), // 13+4+4
+        (&["PL!HS-sd1-001-SD", "PL!HS-sd1-001-SD", "PL!HS-sd1-001-SD"], 27, true), // 9+9+9
     ];
 
-    for triple in triples {
+    for (triple, expect_total, expect_look) in cases {
         let db = load_real_database();
         let mut game = TestGame::new(db);
         let proof = game.id("PL!HS-bp6-029-L");
@@ -186,6 +194,11 @@ fn proof_threshold_diagnostic() {
             .iter()
             .map(|&id| game.db.get_card(id).and_then(|k| k.cost).unwrap_or(0) as i32)
             .sum();
+        assert_eq!(
+            total, expect_total,
+            "premise: {} should total {expect_total}, got {total}",
+            triple.join(" + ")
+        );
 
         let prize = game.id("PL!HS-pb1-023-N");
         game.state.player1.stage.stage = [ids[0], ids[1], ids[2]];
@@ -201,30 +214,33 @@ fn proof_threshold_diagnostic() {
         game.set_live_card(proof);
         advance_to_live_start(&mut game);
 
-        // Observable, read BEFORE answering anything: the look presents a SelectCard over the
-        // looked-at cards. Two earlier observables were wrong and are recorded here so they
-        // are not used again:
-        //   * `hand.contains(prize)` after the drain — the deck is drawn for other reasons
-        //     during LiveStart, so a card reaches hand without this look running. That made an
-        //     earlier version report a fire at EVERY total, including 6.
-        //   * `looked_at_cards.len() >= 2` after the drain — answering the selection empties
-        //     the looked-at pool, so this reads false even when the look ran. That made every
-        //     row read false, including 21 and 27.
-        // The prompt is the one thing that cannot be faked either way.
+        // Clear the stage's own 自動 first. The previous version snapshotted the prompt
+        // immediately, so the 19 and 21 rows read as "queued behind a SelectAutoAbility"
+        // and the sweep could not tell a gated look from an un-answered one. Declining the
+        // stage's abilities is the same thing `drain_choices` does for them, and it leaves
+        // the look's own prompt as the next one.
+        let mut guard = 0;
+        while game.pending_choice_type().as_deref() == Some("SelectAutoAbility") {
+            guard += 1;
+            assert!(guard <= 20, "auto-ability prompts never settled for {}", triple.join(" + "));
+            game.select_indices(&[]);
+        }
+
+        // The prompt is the only sound observable — see the module header: `hand` and
+        // `looked_at_cards` both lie here (the LiveStart draw reaches hand regardless, and
+        // answering empties the looked-at pool).
         let prompt = game.pending_choice_type();
         let options = game.pending_choice_option_count();
         let fired = prompt.as_deref() == Some("SelectCard") && options.unwrap_or(0) > 0;
 
-        while game.has_pending_choice() {
-            match game.pending_choice_type().as_deref() {
-                Some("SelectAutoAbility") => game.select_indices(&[]),
-                _ => game.select_indices(&[0]),
-            }
-        }
-        println!(
-            "total={total:>3} ({}) -> prompt={prompt:?} options={options:?} fired={fired}",
+        assert_eq!(
+            fired, expect_look,
+            "stage cost {total} ({}) -> look fired={fired} (prompt={prompt:?} options={options:?}); \
+             the gate is 合計コスト20以上, so {expect_look} is required",
             triple.join(" + ")
         );
+
+        game.drain_choices();
     }
 }
 

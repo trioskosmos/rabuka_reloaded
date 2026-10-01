@@ -42,6 +42,32 @@ impl<'a> ConditionContext<'a> {
         if let Some(v) = self.evaluate_check_self_condition(condition) {
             return v;
         }
+        // Per-turn cost-payment history: 「このメンバーが、自分のカードの能力のコストを
+        // 支払うため」. PL!-pb2-021-N 南ことり.
+        //
+        // This lives HERE, in the comparison evaluator, and that placement is the whole point.
+        // The clause is a per-turn history of who PAID a cost, so the parser emits a
+        // `comparison_condition` carrying only the `paid_cost_this_turn` flag — no
+        // `comparison_type`, no operator, no bound. Without this branch it fell straight
+        // through to the numeric path below, where `compare_counts` reads a missing operator
+        // as `>=` and there was nothing to compare against: `cost >= 0`. True for every
+        // card, every turn, so the enclosing `or_condition` was permanently satisfied and her
+        // 自動 fired unconditionally, granting a blade for free.
+        //
+        // The clause is about the PAYER, so membership is tested on the activating card — the
+        // member whose 自動/起動 is resolving — and not on anything scanned off the board. The
+        // tracker is a set, so a second payment does not read as a different member.
+        if condition.get_paid_cost_this_turn() == Some(true) {
+            let payer = self
+                .activating_card_id
+                .or_else(|| self.game_state.ability_queue.current_entry().and_then(|e| e.card_id));
+            let paid = match payer {
+                Some(cid) => self.game_state.cards_paid_cost_this_turn.contains(&cid),
+                None => false,
+            };
+            let need = condition.get_count().unwrap_or(1).max(1) as usize;
+            return usize::from(paid) >= need;
+        }
         if condition.get_comparison_type() == Some("energy_relative") {
             return self.evaluate_relative_energy(condition);
         }

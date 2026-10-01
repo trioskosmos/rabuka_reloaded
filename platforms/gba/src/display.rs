@@ -16,8 +16,30 @@ use crate::card_art_gen::{CardArt, CardFront, BACK_FRONT, BOARD_UI, CARD_ART, CA
 use crate::font_tiles_gen::{FONT_GLYPHS, FONT_TILES};
 use crate::texticons_gen::{TEXTICON_GLYPHS, TEXTICON_TILES};
 
+/// Diagnostic line that actually reaches an emulator console.
+///
+/// Do NOT use `log::debug!` here. Nothing in this port installs a logger
+/// (`log`'s `set_logger`/`set_max_level` are gated behind
+/// `target_has_atomic = "ptr"`, which ARMv4T does not have, so they are
+/// compiled out entirely), and with no logger the `log` facade's
+/// `max_level()` is `Off`. Every `log::debug!` therefore expanded to a
+/// no-op: the sprite cache, the VRAM budget and every "missing front"
+/// fallback were silently invisible, which is why the card-art fault
+/// could not be localised from a build.
+///
+/// `agb::println!` does transmit, but one line per call blocks on the
+/// mgba debug port, so these stay behind the diag level (`SELECT`-held
+/// verbose, see `diag::set_verbose`) rather than spraying per frame.
+macro_rules! dlog {
+    ($($arg:tt)*) => {
+        if $crate::diag::want_debug() {
+            $crate::diag::note(format_args!($($arg)*));
+        }
+    };
+}
+
 /// Screen is 240x160 = 30 cols x 20 rows of 8px tiles. Text glyphs are
-/// 16x16 (2x2 tiles, 12px font)  Eeach text line is 2 tile-rows.
+/// 16x16 (2x2 tiles, 12px font) 窶・each text line is 2 tile-rows.
 pub const COLS: i32 = 30;
 pub const ROWS: i32 = 20;
 const FONT_ROWS: i32 = 2;
@@ -37,8 +59,8 @@ const HAND_H: i32 = HAND_CARD.1; // 4
 const BAR_H: i32 = FONT_ROWS; // single-line action bar
 
 /// Stage pitch is one tile wider than the 40px art: the 48px box leaves a
-/// 4px gap each side, so tapped (wait-state) cards rotated 90° to 48px wide
-/// exactly fill their box without touching neighbours  Elike the 3DS square
+/// 4px gap each side, so tapped (wait-state) cards rotated 90ﾂｰ to 48px wide
+/// exactly fill their box without touching neighbours 窶・like the 3DS square
 /// stage slots. Even all-waited rows never overlap.
 const STAGE_PITCH: i32 = STAGE_CARD.0 + 1; // 6 tiles = 48px box
 const HAND_PITCH: i32 = HAND_CARD.0;
@@ -73,7 +95,7 @@ const UI_BADGE_EDGE: u16 = 5; // gold diamond nudged right, for badges placed
 const SPRITE_PRIO: Priority = Priority::P1;
 
 /// Card pixel boxes (on-screen footprint; art is centred inside).
-/// Stage is 48px wide (not 40): the gap fits tapped cards rotated 90°.
+/// Stage is 48px wide (not 40): the gap fits tapped cards rotated 90ﾂｰ.
 const HAND_PX: (usize, usize) = (24, 32);
 const STAGE_PX: (usize, usize) = (48, 48);
 const LIVE_PX: (usize, usize) = (24, 16);
@@ -116,7 +138,7 @@ const SPRITE_CACHE_CAP: usize = 96;
 ///
 /// * `ui_back` (P2): opaque zone fill, always behind cards.
 /// * card sprites (P1): all card fronts/backs, multi-Object per card.
-/// * `ui_front` (P0): text, badges, cursors  Etransparent elsewhere so
+/// * `ui_front` (P0): text, badges, cursors 窶・transparent elsewhere so
 ///   cards show through. No punching needed: it is cleared with UI_TRANS.
 pub struct Display<'a> {
     gfx: Graphics<'a>,
@@ -157,7 +179,7 @@ struct PendingArt {
 ///
 /// OBJ VRAM is only 32KB (agb `SPRITE_ALLOCATOR`) and a full board already
 /// needs ~30KB, so a rotated/duplicate entry (e.g. a waited card alongside
-/// its unrotated self) does NOT fit  Eits upload fails and the card would
+/// its unrotated self) does NOT fit 窶・its upload fails and the card would
 /// vanish instead of rotating. Two rules keep the budget exact:
 /// - `begin_frame`/`end_frame` retain only placements shown this frame;
 ///   stale variants die at the frame edge, never accumulate.
@@ -169,7 +191,7 @@ struct PendingArt {
 struct CachedPlacement {
     vrams: Vec<SpriteVram>,
     last_used: u32,
-    /// `vrams.len()` is a part count, not a byte count  Ethe sizes differ per
+    /// `vrams.len()` is a part count, not a byte count 窶・the sizes differ per
     /// kind (stage is 4 parts, live is 1). Budgeting needs the real bytes.
     bytes: usize,
 }
@@ -178,8 +200,8 @@ struct CachedPlacement {
 ///
 /// The GBA has 32,768 B of sprite character VRAM and agb's sprite allocator
 /// owns exactly that (`SPRITE_ALLOCATOR` = 0x06010000 + 32KB); there is no
-/// paging. Card art must be 8bpp  EMASTER_PAL is 240 colours and a 4bpp OBJ
-/// bank holds 16  Eand an 8bpp tile is 64 B, double a 4bpp one.
+/// paging. Card art must be 8bpp 窶・MASTER_PAL is 240 colours and a 4bpp OBJ
+/// bank holds 16 窶・and an 8bpp tile is 64 B, double a 4bpp one.
 ///
 /// Measured worst case for a full 1v1 board (verified against `BoardFrame` in
 /// board.rs, not estimated):
@@ -194,7 +216,7 @@ struct CachedPlacement {
 /// above once deduped to one key) gives a measured steady state of 31,232B
 /// against 32,768B of VRAM. That is the whole game in 95% of the arena, so the
 /// budget is set just under the hardware ceiling: `evict_for` then only trims a
-/// genuine overflow, and the ~1KB of slack is what absorbs a transition  Eagb
+/// genuine overflow, and the ~1KB of slack is what absorbs a transition 窶・agb
 /// holds `previous_frame_sprites` alive across a commit, so for one frame the
 /// old and new placements coexist.
 const SPRITE_VRAM_BUDGET: usize = 31 * 1024;
@@ -225,10 +247,56 @@ struct CardSpriteCache {
     /// `card_no`. All baked tables (`CARD_ART`, `CARD_FRONTS`, `STAGE_FRONTS`,
     /// `LIVE_FRONTS`, `WAITED_FRONTS`) are appended in the same completion
     /// order by `tools/bake_card_art.py`, so a single order serves every
-    /// table  E1809 x u16 (~3.6KB once) instead of a ~1800-entry linear
+    /// table 窶・1809 x u16 (~3.6KB once) instead of a ~1800-entry linear
     /// string scan per card per frame (~22 scans/frame on the board).
     /// If the baker ever emits per-table orders, build one order per table.
     front_order: Vec<u16>,
+}
+
+/// 16-bit FNV-1a of a card number, used only by the `diag-cardid` build to
+/// give every card a distinguishable on-screen identity.
+fn card_fnv16(card_no: &str) -> u16 {
+    let mut h: u16 = 0x811c;
+    for b in card_no.as_bytes() {
+        h ^= *b as u16;
+        h = h.wrapping_mul(0x0193);
+    }
+    h
+}
+
+/// Write the sprite-cache key for one placement into `buf`.
+///
+/// Single source of truth for the key format. `get_or_upload`, its
+/// twin-eviction path and `render_card_detail`'s `retain_key` must all
+/// agree: they used to format the key separately and drifted, so the
+/// detail key carried a spurious trailing `:n`, never matched anything,
+/// and `retain_key` wiped the cache every frame instead of retaining the
+/// portrait (a full 13,824B re-inflate + re-upload per frame while
+/// scrolling). Format in one place so it cannot drift again.
+fn write_placement_key(
+    buf: &mut String,
+    tag: &str,
+    card_no: &str,
+    box_w: usize,
+    box_h: usize,
+    dimmed: bool,
+) {
+    use core::fmt::Write as _;
+    let dim_c = if dimmed { 'd' } else { 'n' };
+    let _ = write!(buf, "{}:{}:{}x{}:{}", tag, card_no, box_w, box_h, dim_c);
+}
+
+/// Owned [`write_placement_key`], for the off-hot-path callers.
+fn placement_key(
+    tag: &str,
+    card_no: &str,
+    box_w: usize,
+    box_h: usize,
+    dimmed: bool,
+) -> String {
+    let mut k = String::new();
+    write_placement_key(&mut k, tag, card_no, box_w, box_h, dimmed);
+    k
 }
 
 /// Binary search for `card_no` in a baked table via the shared
@@ -256,7 +324,7 @@ impl CardSpriteCache {
         // emits zero index-0 pixels; gutters are filled with 0 here).
         // PaletteMulti is 16 Palette16 entries (16*16=256 colours).
         // Use Box::leak to get 'static lifetime for PaletteMulti::new.
-        log::debug!(
+        dlog!(
             "sprite palette master[0]={:02x}{:02x} (expect magenta 1f7c)",
             MASTER_PAL[0],
             MASTER_PAL[1]
@@ -264,10 +332,29 @@ impl CardSpriteCache {
         let palettes: Box<[Palette16; 16]> = Box::new(core::array::from_fn(|_| Palette16::new([Rgb15::BLACK; 16])));
         let mut palettes = palettes;
         for i in 0..240 {
-            let v = MASTER_PAL[i * 2] as u16 | ((MASTER_PAL[i * 2 + 1] as u16) << 8);
+            // `diag-spriteraw` replaces the ramp with a colour that reads the
+            // 8bpp palette index straight back off the screen: the low 3 bits
+            // of the index go to red, the next 3 to green, the top 2 to blue.
+            // Two pixels look identical on the baseline ROM, but here their
+            // colours differ exactly when their indices differ, which is what
+            // separates "the tile data is wrong" from "the palette is wrong".
+            #[cfg(feature = "diag-spriteraw")]
+            let v = if i == 0 {
+                Rgb::new(255, 0, 255).to_rgb15()
+            } else {
+                let idx = i as u8;
+                Rgb::new(
+                    (idx & 0x07).wrapping_mul(36),
+                    ((idx >> 3) & 0x07).wrapping_mul(36),
+                    ((idx >> 6) & 0x03).wrapping_mul(85),
+                )
+                .to_rgb15()
+            };
+            #[cfg(not(feature = "diag-spriteraw"))]
+            let v = Rgb15::new(MASTER_PAL[i * 2] as u16 | ((MASTER_PAL[i * 2 + 1] as u16) << 8));
             let palette_idx = i / 16;
             let colour_idx = i % 16;
-            palettes[palette_idx].update_colour(colour_idx, Rgb15::new(v));
+            palettes[palette_idx].update_colour(colour_idx, v);
         }
         let palette_multi = Box::leak(Box::new(PaletteMulti::new(Box::leak(palettes))));
         let palette = PaletteVramMulti::new(palette_multi);
@@ -284,7 +371,7 @@ impl CardSpriteCache {
         debug_assert_eq!(CARD_FRONTS.len(), CARD_ART.len());
         let mut front_order: Vec<u16> = (0..CARD_FRONTS.len().min(u16::MAX as usize) as u16).collect();
         front_order.sort_by(|&a, &b| CARD_FRONTS[a as usize].card_no.cmp(&CARD_FRONTS[b as usize].card_no));
-        log::debug!("front index built for {} cards", front_order.len());
+        dlog!("front index built for {} cards", front_order.len());
         Self {
             sprites: BTreeMap::new(),
             vram_bytes: 0,
@@ -301,7 +388,7 @@ impl CardSpriteCache {
     fn find_front(&self, table: &'static [CardFront], card_no: &str) -> Option<&'static CardFront> {
         let hit = find_in_table(&self.front_order, table, card_no, |f| f.card_no);
         if hit.is_none() {
-            log::debug!("missing front for {}", card_no);
+            dlog!("missing front for {}", card_no);
         }
         hit
     }
@@ -310,7 +397,7 @@ impl CardSpriteCache {
     fn find_art(&self, card_no: &str) -> Option<&'static CardArt> {
         let hit = find_in_table(&self.front_order, CARD_ART, card_no, |a| a.card_no);
         if hit.is_none() {
-            log::debug!("missing detail art for {}", card_no);
+            dlog!("missing detail art for {}", card_no);
         }
         hit
     }
@@ -341,7 +428,7 @@ impl CardSpriteCache {
         self.sprites.retain(|_, p| p.last_used == frame);
         self.recount_bytes();
         if self.sprites.len() != before {
-            log::debug!(
+            dlog!(
                 "sprite retain: {} -> {} keys ({}B vram)",
                 before,
                 self.sprites.len(),
@@ -351,11 +438,11 @@ impl CardSpriteCache {
     }
 
     /// Upload one sprite part: sample the baked tile grid (centred in the
-    /// card box, optionally 90° CCW for the wait-state, and dither-dimmed) via
+    /// card box, optionally 90ﾂｰ CCW for the wait-state, and dither-dimmed) via
     /// `set_pixel` so rectangular sizes use the correct OBJ 1D-mapping layout.
     /// Gutter pixels (sprite area outside the card box) stay index 0.
     ///
-    /// The 180° opponent-side turn is deliberately absent: it is an OAM
+    /// The 180ﾂｰ opponent-side turn is deliberately absent: it is an OAM
     /// hflip+vflip, so rasterising it here would only duplicate VRAM.
     #[allow(clippy::too_many_arguments)]
     fn upload_part(
@@ -370,11 +457,12 @@ impl CardSpriteCache {
         dx: usize,
         dy: usize,
         palette: &PaletteVramMulti,
+        id_pattern: Option<u16>,
     ) -> Option<SpriteVram> {
         let art_w = grid_w * 8;
         let art_h = grid_h * 8;
         // Rotated (wait-state) footprint: dimensions swap, like the 3DS
-        // tapped path which rotates 90° CCW to fill the slot.
+        // tapped path which rotates 90ﾂｰ CCW to fill the slot.
         let (rw, rh) = if rot_ccw { (art_h, art_w) } else { (art_w, art_h) };
         // Centre the art inside the card box. Negative only if art overflows
         // the box, in which case the outer pixels clip to transparent.
@@ -394,13 +482,38 @@ impl CardSpriteCache {
                 if bx >= box_w || by >= box_h {
                     continue;
                 }
+                // `diag-cardid`: paint a per-card-number pattern instead of
+                // the art, so the reported "five different card numbers,
+                // five identical flowers" becomes a direct read of whether
+                // the upload/placement path is handing every card the same
+                // tile block. The pattern is derived from a 16-bit FNV hash
+                // of the card number, split so both halves are visible:
+                // bits 8..16 pick the base colour, bits 0..8 are an 8-row
+                // barcode across the top-left of every part. Two cards look
+                // alike on screen only if they agree in both, which a 16-bit
+                // hash makes vanishingly unlikely across a 1905-card set.
+                //
+                // Rotation is deliberately ignored here: an ID tag that
+                // rotates with the card would be unreadable when compared
+                // against a neighbouring placement.
+                if let Some(h) = id_pattern {
+                    let base = (1 + ((h >> 8) % 119)) as u8;
+                    let alt = (121 + ((h >> 8) % 119)) as u8;
+                    let bit = (h >> (by / 3).min(7)) & 1;
+                    let v = if bx < 8 && by < 24 && bit != 0 { alt } else { base };
+                    if dimmed && (bx + by) % 2 == 0 {
+                        continue;
+                    }
+                    sprite.set_pixel(sx, sy, v);
+                    continue;
+                }
                 // Box pixel -> art pixel (art is centred in the box via ox/oy).
                 // A 180-degree turn is NOT rasterised here: it is an OAM
                 // hflip+vflip applied in `push_card`, which costs nothing and
                 // lets the flipped placement share the unflipped one's VRAM.
                 // Only the genuine 90-degree wait rotation needs pixels here.
                 let (fx, fy) = (bx as i32, by as i32);
-                // 90° CCW (wait-state, like 3DS tapped): the rotated frame
+                // 90ﾂｰ CCW (wait-state, like 3DS tapped): the rotated frame
                 // pixel (fx-ox, fy-oy) samples unrotated (W-1-y, x), i.e.
                 // art top-left lands at box bottom-left.
                 let (ax, ay) = if rot_ccw {
@@ -436,7 +549,7 @@ impl CardSpriteCache {
         match sprite.try_to_vram(palette.clone()) {
             Ok(vram) => Some(vram),
             Err(_) => {
-                log::debug!("sprite VRAM full, will evict and retry");
+                dlog!("sprite VRAM full, will evict and retry");
                 None
             }
         }
@@ -447,7 +560,7 @@ impl CardSpriteCache {
     /// `stagew`): on a miss the twin is dropped FIRST, since there is no
     /// room to hold both twins.
     ///
-    /// Allocation discipline: cache HITS allocate nothing  Ethe key formats
+    /// Allocation discipline: cache HITS allocate nothing 窶・the key formats
     /// into a reused buffer and looks up as `&str`. Only misses allocate
     /// (owned key insert + VRAM upload), and those happen on screen
     /// transitions, never in steady frames.
@@ -467,21 +580,19 @@ impl CardSpriteCache {
         rot_ccw: bool,
         twin_tag: Option<&str>,
     ) -> Option<&[SpriteVram]> {
-        use core::fmt::Write as _;
         // Box dims are part of the key: the board stage box (48px, with the
         // wait gap) and the menu stage box (40px) share tag/art but centre
-        // differently  Ealiasing them shifts art by the gap.
+        // differently  Ealiasing them shifts art by the gap.
         // `flipped` is deliberately NOT part of the key: a 180-degree turn is
         // an OAM hflip+vflip, so the flipped and unflipped placements are the
         // same VRAM tile block. Keying on it (and rasterising it) minted a
         // private duplicate of every opponent-side card's art.
         self.touched = true;
         self.key_buf.clear();
-        let dim_c = if dimmed { 'd' } else { 'n' };
-        let _ = write!(self.key_buf, "{}:{}:{}x{}:{}", tag, card_no, box_w, box_h, dim_c);
+        write_placement_key(&mut self.key_buf, tag, card_no, box_w, box_h, dimmed);
         if let Some(p) = self.sprites.get_mut(self.key_buf.as_str()) {
             p.last_used = self.frame;
-} else {
+        } else {
             // REMOVED: was `agb::println!("SPRITE miss ...")`, a TEMP crash
             // trace. It fired on every cache miss and `agb::println!` blocks
             // on the mgba debug port per character, so it throttled the frame
@@ -516,18 +627,14 @@ impl CardSpriteCache {
             };
             if let Some(tt) = twin_tag {
                 self.twin_buf.clear();
-                let _ = write!(
-                    self.twin_buf,
-                    "{}:{}:{}x{}:{}",
-                    tt, card_no, box_w, box_h, dim_c
-                );
+                write_placement_key(&mut self.twin_buf, tt, card_no, box_w, box_h, dimmed);
                 // Miss path only: clone the twin key out to end the buffer
                 // borrow before mutating the map.
                 let twin: String = self.twin_buf.as_str().into();
                 self.sprites.remove(&twin);
             }
             if self.sprites.len() >= SPRITE_CACHE_CAP {
-                log::debug!(
+                dlog!(
                     "sprite cache over cap ({} keys), evicting LRU",
                     self.sprites.len()
                 );
@@ -540,10 +647,19 @@ impl CardSpriteCache {
             let cost = placement_bytes(parts);
             let key: String = self.key_buf.as_str().into();
             if !self.evict_for(cost, &key) {
-                log::debug!("no sprite VRAM for {} ({}B)", key, cost);
+                dlog!("no sprite VRAM for {} ({}B)", key, cost);
                 return None;
             }
             let mut vrams = Vec::with_capacity(parts.len());
+            // `diag-cardid`: the pattern is a property of the card number, so
+            // it is computed once per placement (not per part) and every part
+            // of a card gets the same one, which is what makes a duplicated
+            // or aliased tile block obvious.
+            let id_pattern = if cfg!(feature = "diag-cardid") {
+                Some(card_fnv16(card_no))
+            } else {
+                None
+            };
             for &(size, dx, dy) in parts {
                 match Self::upload_part(
                     tiles,
@@ -557,6 +673,7 @@ impl CardSpriteCache {
                     dx,
                     dy,
                     &self.palette,
+                    id_pattern,
                 ) {
                     Some(v) => vrams.push(v),
                     // Budgeted up front, so this is now genuinely unexpected
@@ -564,7 +681,7 @@ impl CardSpriteCache {
                     // Drop just this card; a mass clear here is what made a
                     // full board look like noise.
                     None => {
-                        log::debug!("sprite upload OOM for {} ({}B)", key, cost);
+                        dlog!("sprite upload OOM for {} ({}B)", key, cost);
                         return None;
                     }
                 }
@@ -579,7 +696,7 @@ impl CardSpriteCache {
                 },
             );
         }
-        // Both shared borrows of disjoint fields  Eno clone needed.
+        // Both shared borrows of disjoint fields 窶・no clone needed.
         self.sprites
             .get(self.key_buf.as_str())
             .map(|p| p.vrams.as_slice())
@@ -606,7 +723,7 @@ impl CardSpriteCache {
     /// placement it was trying to add.
     ///
     /// Allocation-free: `last_used` is a frame id, so "oldest" is a MIN over
-    /// values and a single `retain` drops every tie. That is what we want  E    /// evicting a whole frame's worth at once is what actually clears the
+    /// values and a single `retain` drops every tie. That is what we want 窶・    /// evicting a whole frame's worth at once is what actually clears the
     /// pressure, where one-at-a-time would only make `active_sprites` grow
     /// again next frame.
     fn evict_for(&mut self, need: usize, keep: &str) -> bool {
@@ -642,7 +759,7 @@ impl CardSpriteCache {
         if self.sprites.len() == 1 && self.sprites.contains_key(keep) {
             return;
         }
-        log::debug!("retaining sprite key {}", keep);
+        dlog!("retaining sprite key {}", keep);
         self.sprites.retain(|k, _| k == keep);
         self.recount_bytes();
     }
@@ -660,14 +777,14 @@ impl CardSpriteCache {
             !drop_it
         });
         if dead > 0 {
-            log::debug!("evicting {} sprite keys ({})", dead, prefix);
+            dlog!("evicting {} sprite keys ({})", dead, prefix);
         }
         self.recount_bytes();
     }
 
     fn clear(&mut self) {
         if !self.sprites.is_empty() {
-            log::debug!("clearing {} sprite keys", self.sprites.len());
+            dlog!("clearing {} sprite keys", self.sprites.len());
             self.sprites.clear();
         }
         self.vram_bytes = 0;
@@ -675,7 +792,7 @@ impl CardSpriteCache {
 }
 
 /// 4bpp text/board palette (bank 15). Entries 7..=15 are the texticon colours,
-/// mirrored by `tools/bake_texticon_tiles.py` PALETTE_TARGETS  Ekeep in sync.
+/// mirrored by `tools/bake_texticon_tiles.py` PALETTE_TARGETS 窶・keep in sync.
 static TEXT_PALETTE: Palette16 = const {
     let mut palette = [Rgb15::BLACK; 16];
     palette[0] = Rgb15::BLACK;
@@ -697,6 +814,54 @@ static TEXT_PALETTE: Palette16 = const {
     Palette16::new(palette)
 };
 
+/// Speckle-hunt palette for the `diag-bgspeck` ROM.
+///
+/// `tools/bake_font_tiles.py` only ever emits palette indices **1 and 2**
+/// inside a font tile: `pack_4bpp_tile` fills the tile with `0x22` (both
+/// nibbles = index 2, the zone fill) and sets foreground pixels to index 1
+/// (white). So *any* index 3..=15 appearing inside a glyph is foreign data
+/// written by something else.
+///
+/// This palette keeps 1 = white and 2 = black (so real glyphs read as
+/// white-on-black and stay legible) and paints everything else screaming
+/// magenta. That turns the reported "rainbow speckles inside individual
+/// glyphs" from a subtle colour judgement into an unambiguous marker: if a
+/// glyph has a magenta pixel in it, the font tile's VRAM was clobbered, and
+/// its neighbours' worth of magenta tells you which other tile took the hit.
+#[cfg(feature = "diag-bgspeck")]
+static BG_SPECKLE_PALETTE: Palette16 = {
+    let mut p = [Rgb15::BLACK; 16];
+    p[1] = Rgb15::WHITE;
+    for i in 3..16 {
+        p[i] = Rgb::new(255, 0, 255).to_rgb15();
+    }
+    Palette16::new(p)
+};
+
+/// Palette bank 15 for the board and free-form menu screens.
+fn text_pal() -> &'static Palette16 {
+    #[cfg(feature = "diag-bgspeck")]
+    {
+        &BG_SPECKLE_PALETTE
+    }
+    #[cfg(not(feature = "diag-bgspeck"))]
+    {
+        &TEXT_PALETTE
+    }
+}
+
+/// Palette bank 15 for the card-detail view.
+fn detail_pal() -> &'static Palette16 {
+    #[cfg(feature = "diag-bgspeck")]
+    {
+        &BG_SPECKLE_PALETTE
+    }
+    #[cfg(not(feature = "diag-bgspeck"))]
+    {
+        &DETAIL_TEXT_PALETTE
+    }
+}
+
 /// Text palette for the card-detail view, on bank 15 (the OBJ sprite palette
 /// lives in a separate hardware block, so the two never collide). Matches
 /// 3DS COL_CARD_OPAQUE dark panel + white text. Entries 7..=15 mirror
@@ -708,7 +873,7 @@ static DETAIL_TEXT_PALETTE: Palette16 = const {
     palette[2] = Rgb::new(26, 35, 50).to_rgb15(); // zone fill behind text
     // Entries 3/4/5 mirror TEXT_PALETTE: baked texticons use gold (4) and
     // green (5), and without these any such pixel renders BLACK on detail
-    // screens (the "black lines" in ability text  Ee.g. green hearts).
+    // screens (the "black lines" in ability text 窶・e.g. green hearts).
     palette[3] = Rgb::new(42, 58, 90).to_rgb15(); // card back
     palette[4] = Rgb::new(245, 158, 11).to_rgb15(); // gold
     palette[5] = Rgb::new(46, 204, 113).to_rgb15(); // green
@@ -727,7 +892,7 @@ static DETAIL_TEXT_PALETTE: Palette16 = const {
 
 /// Scratch for normalizing baked tiles on sprite-cache misses (see
 /// `get_or_upload`). Sized for the largest grid (detail 12x18x64).
-/// Single-threaded GBA, synchronous use only  Eno reentrancy.
+/// Single-threaded GBA, synchronous use only 窶・no reentrancy.
 const TILE_SCRATCH_LEN: usize = 13824;
 static mut TILE_SCRATCH: [u8; TILE_SCRATCH_LEN] = [0; TILE_SCRATCH_LEN];
 
@@ -754,11 +919,11 @@ fn board_ui_tiles() -> &'static [u8] {
 /// Reused inflate state.
 ///
 /// `miniz_oxide::inflate::core::DecompressorOxide` is ~10.4KB (three 3456-byte
-/// Huffman tables), so it cannot be a local  Ethe GBA stack is a few KB. It
+/// Huffman tables), so it cannot be a local 窶・the GBA stack is a few KB. It
 /// lives in .bss and is re-`init`ed per call, so nothing carries between blobs.
 ///
 /// Do NOT replace this with `inflate::decompress_to_vec_zlib`. That helper
-/// allocates `Box::<DecompressorOxide>::default()`  Ethis 10.4KB struct  Eplus
+/// allocates `Box::<DecompressorOxide>::default()` 窶・this 10.4KB struct 窶・plus
 /// an output Vec on EVERY call (`inflate/mod.rs:191-193`). The sprite cache
 /// misses often (it is VRAM-bounded and LRU-evicts), so that churn exhausts
 /// the 256KB EWRAM heap within seconds of play and the render state falls
@@ -782,7 +947,7 @@ type ArtInflater = miniz_oxide::inflate::core::DecompressorOxide;
 ///
 /// Deliberately the ONLY thing that goes through software inflate. The detail
 /// portrait is 13,824B and 73% of the art, so it is the one blob where the
-/// better ratio is worth a slow decode  Eand it is only decompressed when a
+/// better ratio is worth a slow decode 窶・and it is only decompressed when a
 /// card is actually opened, after which `retain_key` keeps it cached and
 /// scrolling is a pure cache hit.
 ///
@@ -822,7 +987,7 @@ fn decompress_art(src: &[u8], dst: &mut [u8]) {
 
     // A malformed blob leaves `dst` as whatever was there. The BIOS LZ77 path
     // this replaced also had no integrity check (it silently produced garbage),
-    // so this is no worse  Ebut it must not panic: a panic in this no_std
+    // so this is no worse 窶・but it must not panic: a panic in this no_std
     // build halts the machine, and one bad blob should cost one blank sprite,
     // not the game.
     if status != TINFLStatus::Done || out_written != dst.len() {
@@ -849,9 +1014,14 @@ impl<'a> Display<'a> {
         // card palette lives in OBJ palette RAM via PaletteVramMulti (a
         // separate hardware block), so no per-frame BG palette writes are
         // needed and the backdrop never flashes.
-        gfx.set_background_palette(15, &TEXT_PALETTE);
+        gfx.set_background_palette(15, text_pal());
         // Wait one VBlank to ensure palette is active before first frame.
         busy_wait_for_vblank();
+        // Identify the ROM in the log before anything else, so a capture is
+        // never mistaken for the baseline. Diagnostic builds differ from the
+        // control in exactly one way each; this line is how you tell them
+        // apart on a screenshot.
+        crate::diag::announce();
         let sprite_cache = CardSpriteCache::new(&mut gfx);
         Display {
             gfx,
@@ -987,14 +1157,14 @@ impl<'a> Display<'a> {
             // A 2x2 glyph occupies (tx..tx+2, ty..ty+2), so a glyph whose
             // origin sits on the last column or row still writes one tile
             // past the visible map. That used to be unmitigated on Y: only X
-            // was checked, so the `wrap` path in `swap_buffers` — the
-            // free-form screen that renders the whole action log — could walk
+            // was checked, so the `wrap` path in `swap_buffers` 窶・the
+            // free-form screen that renders the whole action log 窶・could walk
             // `ty` off the bottom of the 32x32 map. A BG map entry's tile
             // number is 10 bits (GBATEK), so index 1024 and up does not
             // bounds-check anywhere: it aliases into the following
             // screenblock and silently rewrites the other background's
             // tilemap and whatever tile blocks sit after it. No panic, no
-            // log line — just progressive screen corruption that worsens as
+            // log line 窶・just progressive screen corruption that worsens as
             // the log grows.
             if ty < 0 || ty + 1 >= ROWS {
                 return cols as i32;
@@ -1094,7 +1264,7 @@ impl<'a> Display<'a> {
             // Split into atomic units: whole tokens or single chars.
             let mut i = 0usize;
             // After a soft wrap, separator spaces belong to the previous
-            // line's end  Eemitting them starts the new line indented (the
+            // line's end 窶・emitting them starts the new line indented (the
             // old blade-count "tab"). Skip them; hard-newline indentation
             // (leading spaces right after '\n') is preserved.
             let mut skip_ws = false;
@@ -1163,7 +1333,7 @@ impl<'a> Display<'a> {
 
     /// Commit the current layers: back fill, then card sprites (P1) in
     /// deterministic order, then front text (P0). Sprites not shown this
-    /// frame are simply absent from OAM  Eno manual clearing, no ghosts.
+    /// frame are simply absent from OAM 窶・no manual clearing, no ghosts.
     /// Placements nothing showed are evicted from the cache here, so VRAM
     /// holds exactly the visible set.
     fn present(&mut self) {
@@ -1233,7 +1403,7 @@ impl<'a> Display<'a> {
                 }
             }
             None => {
-                log::debug!("dropping card {} (no sprite VRAM)", card_no);
+                dlog!("dropping card {} (no sprite VRAM)", card_no);
             }
         }
     }
@@ -1245,7 +1415,7 @@ impl<'a> Display<'a> {
         // Detail portraits are large (9 parts); evict them before the board
         // re-uploads so the two never share the 32KB OBJ VRAM budget.
         self.sprite_cache.evict_prefix("detail:");
-        self.gfx.set_background_palette(15, &TEXT_PALETTE);
+        self.gfx.set_background_palette(15, text_pal());
         let font_ts = unsafe { TileSet::new(&FONT_TILES.0, TileFormat::FourBpp) };
         let icon_ts = unsafe { TileSet::new(&TEXTICON_TILES.0, TileFormat::FourBpp) };
         let ui_ts = unsafe { TileSet::new(board_ui_tiles(), TileFormat::FourBpp) };
@@ -1256,7 +1426,7 @@ impl<'a> Display<'a> {
         Self::blit_line(&mut self.ui_front, &font_ts, &icon_ts, e0, &frame.header, 0, 0);
         Self::blit_line(&mut self.ui_front, &font_ts, &icon_ts, e0, &frame.action_count, COLS - 6, 0);
 
-        // Stage rows: opponent (rotated 180°) then player, with live success
+        // Stage rows: opponent (rotated 180ﾂｰ) then player, with live success
         // + live set stacked on the right.
         for (row, y) in STAGE_YS.iter().enumerate() {
             let y = *y;
@@ -1322,7 +1492,7 @@ impl<'a> Display<'a> {
         self.present();
     }
 
-    /// [`Display::draw_slot`] with an explicit 180° flag (opponent rows).
+    /// [`Display::draw_slot`] with an explicit 180ﾂｰ flag (opponent rows).
     fn draw_slot_flipped(
         &mut self,
         font_ts: &TileSet,
@@ -1338,7 +1508,7 @@ impl<'a> Display<'a> {
         let Some(card_no) = slot.card_no.as_deref() else {
             return;
         };
-        // Resolve art. Waited stage cards rotate the full stage front 90°
+        // Resolve art. Waited stage cards rotate the full stage front 90ﾂｰ
         // CCW to fill the 48px box (like 3DS tapped cards fill their slot);
         // waited hand/live slots keep the small pre-rotated front centred.
         let (tiles, gw, gh, tag, rot_ccw): (&[u8], usize, usize, &str, bool) = if slot.hidden {
@@ -1348,9 +1518,9 @@ impl<'a> Display<'a> {
                 Some(f) => (f.tiles, kind.grid_w(), kind.grid_h(), "stagew", true),
                 None => {
                     // Missing baked art must degrade to text, never to an
-                    // invisible slot  Ea silent `return` here once hid
+                    // invisible slot 窶・a silent `return` here once hid
                     // waited cards entirely.
-                    log::debug!("missing stage front for waited {}", card_no);
+                    dlog!("missing stage front for waited {}", card_no);
                     Self::blit_line(
                         &mut self.ui_front,
                         font_ts,
@@ -1367,7 +1537,7 @@ impl<'a> Display<'a> {
             match self.sprite_cache.find_front(WAITED_FRONTS, card_no) {
                 Some(f) => (f.tiles, WAIT_GRID.0, WAIT_GRID.1, "wait", false),
                 None => {
-                    log::debug!("missing waited front for {}", card_no);
+                    dlog!("missing waited front for {}", card_no);
                     Self::blit_line(
                         &mut self.ui_front,
                         font_ts,
@@ -1400,7 +1570,7 @@ impl<'a> Display<'a> {
         };
         let (box_w, box_h) = kind.px();
         // Face-down slots all draw the SAME `BACK_FRONT` art, but keying them
-        // on their own card_no minted one 512B placement per slot  Esix copies
+        // on their own card_no minted one 512B placement per slot 窶・six copies
         // of identical pixels. Key them on a constant instead: the cache then
         // holds one entry (or two, for the flipped opponent row) and the win
         // is handed straight back as VRAM headroom.
@@ -1435,11 +1605,11 @@ impl<'a> Display<'a> {
     }
 
     /// Gold-badge tile for a card at tile (`x`, `y`): top-right corner, or
-    /// bottom-left when shown rotated 180° (opponent row). The cursor marker
+    /// bottom-left when shown rotated 180ﾂｰ (opponent row). The cursor marker
     /// shares this tile so it sits on the card, overlapping the badge.
     ///
     /// Stage art's bright border ends well inside the 40px grid (the rest is
-    /// dark margin), so its badge sits one tile left of the grid edge  E    /// otherwise it floats over padding right of the visible card. Hand/live
+    /// dark margin), so its badge sits one tile left of the grid edge 窶・    /// otherwise it floats over padding right of the visible card. Hand/live
     /// art fills its grid, so those keep the last tile.
     fn badge_tile(x: i32, y: i32, kind: SlotKind, flipped: bool) -> (i32, i32) {
         if flipped {
@@ -1457,7 +1627,7 @@ impl<'a> Display<'a> {
     ///
     /// Text-only: no sprites are pushed, so `end_frame` retains the whole
     /// cache (see `end_frame`'s touched gate) and returning to the board is
-    /// all cache hits with zero re-upload. Do NOT clear here  Ethe old
+    /// all cache hits with zero re-upload. Do NOT clear here 窶・the old
     /// clear forced a ~20-card decompress storm on every Actions<->Board
     /// round trip. (Detail/grid screens still reset: the 9-part portrait
     /// genuinely doesn't fit alongside the board in 32KB OBJ VRAM.)
@@ -1467,7 +1637,7 @@ impl<'a> Display<'a> {
     /// scrolls fully instead of clipping the selected row away.
     pub fn render_action_text(&mut self) {
         self.last = self.buf.clone();
-        self.gfx.set_background_palette(15, &TEXT_PALETTE);
+        self.gfx.set_background_palette(15, text_pal());
         let font_ts = unsafe { TileSet::new(&FONT_TILES.0, TileFormat::FourBpp) };
         let icon_ts = unsafe { TileSet::new(&TEXTICON_TILES.0, TileFormat::FourBpp) };
         let ui_ts = unsafe { TileSet::new(board_ui_tiles(), TileFormat::FourBpp) };
@@ -1495,11 +1665,11 @@ impl<'a> Display<'a> {
         }
         if cursor < self.action_offset {
             self.action_offset = cursor;
-            log::debug!("actions scroll up to {}", cursor);
+            dlog!("actions scroll up to {}", cursor);
         }
         if cursor >= self.action_offset + VISIBLE {
             self.action_offset = cursor + 1 - VISIBLE;
-            log::debug!("actions scroll down to {}", cursor);
+            dlog!("actions scroll down to {}", cursor);
         }
         for (i, line) in self
             .buf
@@ -1531,15 +1701,19 @@ impl<'a> Display<'a> {
     pub fn render_card_detail(&mut self, art: Option<&CardArt>, lines: &[String], scroll: usize) {
         self.last = self.buf.clone();
         // Board sprites would share the 32KB OBJ budget with the 9-part
-        // portrait  Eevict everything EXCEPT this card's portrait, so
+        // portrait 窶・evict everything EXCEPT this card's portrait, so
         // scrolling (same art, new offset) is a cache hit with no re-upload.
         match art {
-            Some(a) => self.sprite_cache.retain_key(
-                &alloc::format!("detail:{}:{}x{}:n:n", a.card_no, DETAIL_PX.0, DETAIL_PX.1),
-            ),
+            Some(a) => self.sprite_cache.retain_key(&placement_key(
+                "detail",
+                a.card_no,
+                DETAIL_PX.0,
+                DETAIL_PX.1,
+                false,
+            )),
             None => self.sprite_cache.clear(),
         }
-        self.gfx.set_background_palette(15, &DETAIL_TEXT_PALETTE);
+        self.gfx.set_background_palette(15, detail_pal());
         let font_ts = unsafe { TileSet::new(&FONT_TILES.0, TileFormat::FourBpp) };
         let icon_ts = unsafe { TileSet::new(&TEXTICON_TILES.0, TileFormat::FourBpp) };
         let ui_ts = unsafe { TileSet::new(board_ui_tiles(), TileFormat::FourBpp) };
@@ -1548,10 +1722,10 @@ impl<'a> Display<'a> {
         self.clear_layers(&ui_ts, e_text);
 
         if let Some(art) = art {
-            log::debug!("detail portrait for {}", art.card_no);
+            dlog!("detail portrait for {}", art.card_no);
             // Pass the baked stream straight through: get_or_upload is the
             // single point that normalizes streams (decompressing here AND
-            // there fed pixels back into SWI as a fake stream  Ethe wild
+            // there fed pixels back into SWI as a fake stream 窶・the wild
             // jumps on detail open).
             self.push_card(
                 "detail",
@@ -1651,8 +1825,8 @@ impl<'a> Display<'a> {
 
         // Bank 15 holds TEXT_PALETTE (white text on dark blue). The detail
         // view overwrites bank 15, so restore it here.
-        self.gfx.set_background_palette(15, &TEXT_PALETTE);
-        // Menu cards share kinds with the board; detail portraits do not  E        // evict those before uploading.
+        self.gfx.set_background_palette(15, text_pal());
+        // Menu cards share kinds with the board; detail portraits do not 窶・        // evict those before uploading.
         self.sprite_cache.evict_prefix("detail:");
         let font_ts = unsafe { TileSet::new(&FONT_TILES.0, TileFormat::FourBpp) };
         let icon_ts = unsafe { TileSet::new(&TEXTICON_TILES.0, TileFormat::FourBpp) };
@@ -1840,7 +2014,7 @@ impl rabuka_engine::game::platform_ui::PlatformUi for Display<'_> {
     fn reset_vram(&mut self) {
         self.reset_vram();
     }
-    /// NOTE: single-frame renderer, NOT a blocking menu  EDisplay has no
+    /// NOTE: single-frame renderer, NOT a blocking menu 窶・Display has no
     /// input, so this cannot wait for buttons. UI flows must use
     /// `menu::show_detail_screen` with a real `InputSource` (routing here
     /// flashed one frame and "closed" instantly). Kept only to satisfy

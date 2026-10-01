@@ -74,56 +74,125 @@ fn setup(watcher: i16) -> TestGame {
     game
 }
 
-/// Diagnostic — RETAINED as the counter-example to a bug I wrongly reported.
+/// A real yell reveals one card per point of BLADE, all distinct — the rule, asserted.
 ///
-/// Chasing Q182 I saw a yelLED set of `[11329, 11329, 11329, 11329, 11329]` — one id five
-/// times — and wrote it up as "the widest issue in the sweep". **It was a harness artefact**,
-/// and the mechanism is documented on the id helpers themselves (`tests/helpers/mod.rs:234`):
-/// instances past the 11-copy pool alias to the template id, and this file's `setup()` fills
-/// the deck by pushing **one** id sixty times. So the deck really does hold sixty entries all
-/// equal to 11329, and drawing five of them correctly yields five copies of 11329.
+/// ## The count is the blade total, not five
 ///
-/// Kept because it is the cheapest possible demonstration of the rule it taught: **before
-/// concluding anything about the contents of a revealed / drawn / selected set, confirm the
-/// deck was built from distinct instances.** Bulk filler aliases by design.
+/// This started as an `#[ignore]`d `println!` diagnostic, and it was showing the wrong thing on
+/// two counts. Chasing Q182 I saw a yelLED set of `[11329, 11329, 11329, 11329, 11329]` — one
+/// id five times — and wrote it up as "the widest issue in the sweep". It was a harness
+/// artefact: instances past the 11-copy pool alias to the template id
+/// (`tests/helpers/mod.rs:234`) and that version filled the deck by pushing ONE id sixty times.
+/// It also never yelled at all — its stage had no score, so `yell_occurred` was false and the
+/// set it "diagnosed" was empty. A `println!` diagnostic cannot fail, so it sat there
+/// documenting a bug that was not there.
+///
+/// The count is **not five**. `TurnEngine::reveal_yell_cards` (`turn/live.rs`) reveals
+/// `total_blade` cards, and its own comment carries the rule reference: "Q40: Yell must
+/// complete ALL checks — even if hearts are already satisfied, the full blade-count of yell
+/// cards is always revealed." So a yell checks as many cards as you have BLADE. On the board
+/// below, 松浦果南 (blade 3) + ウィーン (blade 1) = 4, and a yell correctly reveals 4.
+///
+/// I got that wrong first — I asserted five from the board game rather than reading this
+/// engine's rule, and the failure is what surfaced `reveal_yell_cards`. The test now pins the
+/// blade total, which is a far stronger claim than a constant: it holds the engine to the rule
+/// rather than to a number that happens to be right today.
+///
+/// The lesson the old diagnostic actually taught is kept as a precondition: **before
+/// concluding anything about the contents of a revealed / drawn / selected set, confirm the deck
+/// was built from distinct instances.** The deck here is built from six different card NUMBERS,
+/// interleaved — `new_id` is not sufficient on its own, since past the 11-copy pool it aliases
+/// to the template id just like `id`.
 #[test]
-#[ignore = "diagnostic: shows an aliased revealed set; the reason it is not a bug is in the doc"]
-fn real_yell_revealed_set_contents() {
-    let db = load_real_database();
-    let mut game = TestGame::new(db);
-
-    // Three DISTINCT members, at least one with a score so the performance yells.
-    let scored = game.id("PL!S-sd1-003-SD");
-    let second = game.id("PL!S-PR-015-PR");
-    let third = game.id("PL!-sd1-010-SD");
-    game.state.player1.stage.stage = [scored, second, third];
-
-    let no_bh = game.id(NO_BLADE_HEART_CARD);
-    let filler = game.id(FILLER);
-    for _ in 0..60 {
-        // NOTE: one id, pushed repeatedly — this is the aliasing that produces the repeated
-        // entries below. It is the file's existing idiom, not something introduced here.
-        game.state.player1.main_deck.cards.push(no_bh);
-        game.state.player2.main_deck.cards.push(filler);
-    }
+fn a_real_yell_reveals_one_card_per_blade_and_all_of_them_are_distinct() {
+    // The board `setup()` builds, inlined so the deck can be made distinct: 松浦果南 (blade 3)
+    // so the performance yells, plus a watcher (blade 1). `setup()` fills the deck with 60
+    // copies of ONE id, which is the very thing under test, so it is not used here.
+    let mut game = TestGame::new(load_real_database());
+    let scored = game.new_id("PL!S-sd1-003-SD");
+    let watcher = game.id("PL!SP-bp2-021-N");
+    game.assert_card_identity(scored, "PL!S-sd1-003-SD");
+    game.assert_card_identity(watcher, "PL!SP-bp2-021-N");
+    game.state.player1.stage.stage[0] = scored;
+    game.state.player1.stage.stage[1] = watcher;
     game.give_energy(15);
+
+    // The expected count is the stage's blade total, read from the CARD DATA rather than
+    // hard-coded, so the test states the rule instead of a number.
+    let expected_blade: i32 = [scored, watcher]
+        .iter()
+        .map(|&id| game.db.get_card(id).map(|c| i32::from(c.blade)).unwrap_or(0))
+        .sum();
+    assert_eq!(
+        expected_blade, 4,
+        "precondition: 松浦果南 (blade 3) + ウィーン (blade 1); if these prints changed, this \
+         test is measuring a different board"
+    );
+
+    // Rebuild the deck from SIX different card numbers, INTERLEAVED rather than blocked, so
+    // that any prefix of the deck holds pairwise-distinct ids. A blocked deck (ten copies of
+    // A, then ten of B) would hand a distinct-looking test a run of identical cards at the
+    // top, which measures the deck layout instead of the rule.
+    let deck_cycle = [
+        NO_BLADE_HEART_CARD,
+        "PL!-PR-014-PR",
+        "PL!-PR-017-PR",
+        "PL!-bp3-012-N",
+        "PL!-bp3-012-PR",
+        FILLER,
+    ];
+    game.state.player1.main_deck.cards.clear();
+    let deck_ids: Vec<i16> = deck_cycle.iter().map(|n| game.id(n)).collect();
+    for _ in 0..10 {
+        for &cid in &deck_ids {
+            game.state.player1.main_deck.cards.push(cid);
+        }
+    }
+    let mut sorted_deck = deck_ids.clone();
+    sorted_deck.sort_unstable();
+    sorted_deck.dedup();
+    assert_eq!(
+        sorted_deck.len(),
+        deck_cycle.len(),
+        "precondition: every deck entry must be a distinct instance, or this test measures \
+         the aliasing instead of the rule (ids={deck_ids:?})"
+    );
 
     advance_into_performance(&mut game, LIVE_CARD);
 
+    assert!(
+        game.state.yell_occurred,
+        "precondition: the stage scores, so a performance yell happened"
+    );
     let yelled = &game.state.initial_yell_revealed_cards;
-    let mut distinct: Vec<i16> = yelled.to_vec();
+    assert_eq!(
+        yelled.len() as i32, expected_blade,
+        "a yell reveals one card per point of blade (reveal_yell_cards, Q40), and completes \
+         all checks even once hearts are satisfied. Got {yelled:?}"
+    );
+    let mut distinct = yelled.to_vec();
     distinct.sort_unstable();
     distinct.dedup();
-    println!("stage members      = [{scored}, {second}, {third}]");
-    println!("yell_occurred      = {}", game.state.yell_occurred);
-    println!("initial_yell (raw) = {yelled:?}");
-    println!(
-        "initial_yell len={} distinct={} -> {:?}   (repeated because the deck is 60x one id)",
-        yelled.len(),
+    assert_eq!(
         distinct.len(),
-        distinct
+        yelled.len(),
+        "with an interleaved deck, every revealed card is a different instance — a repeat \
+         here means the deck was aliased or the draw re-used an entry, not that the yell is \
+         broken. Revealed {yelled:?} from deck {deck_ids:?}"
     );
-    println!("revealed_cards     = {:?}", game.state.revealed_cards);
+    for id in yelled {
+        assert!(
+            deck_ids.contains(id),
+            "every revealed card must come from the deck; {id} was not in it (deck={deck_ids:?})"
+        );
+    }
+    // The performance's own reveal is a separate set from the initial yell; the rule under
+    // test is the initial one, but assert the performance did resolve so a future change
+    // cannot leave the live silently unresolved.
+    assert!(
+        !game.state.revealed_cards.is_empty(),
+        "the performance must have resolved to a reveal"
+    );
 }
 
 #[test]

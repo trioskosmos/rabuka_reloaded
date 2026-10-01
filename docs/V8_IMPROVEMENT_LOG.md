@@ -1583,6 +1583,52 @@ trigger_live_start_abilities` (`turn/trigger_scan.rs:156`), the movement-event
 history that resolves 「このターン中にエリアを移動した」 (`state.rs:1135`), and
 `RngGuard` (`v8_model.rs`) to keep the projection from perturbing the game.
 
+### 13.1 Built, wired, and measured bit-identically
+
+`project_live_start` (`v8_live.rs`) clones the state, commits the candidate
+into the live zone, fires `trigger_live_start_abilities`, answers whatever it
+asks with the bot's own `evaluate_actions`, and returns the projected board and
+blade count. It is generic over cards — nothing about the four deck lives is
+hard-coded — and gated on `V8_LIVE_START_PROJECTION`.
+
+Paired, n=1200, seed 11, on v9 (whose live set is v8's):
+
+```text
+RESULT v9 vs v7 | 684 - 516 | 0 draws | 40898 actions | 5.80 turns
+DISCORDANT: baseline-only 0 | candidate-only 0    p = 1.00000
+pace (P1) 0.4758 -> 0.4758  +0.0000
+```
+
+**Zero discordant games and a bit-identical action count.** Not a small effect
+below the noise floor — the switch changes no decision in any game, which
+means the projection is not doing what it claims to.
+
+**That is a defect in the projection, not a refutation of the idea**, and the
+two are not the same thing. A projection that fires and finds nothing would also
+be null, so the bit-identical result is consistent with both of:
+
+1. **It is not firing.** `trigger_live_start_abilities(game_state, player_id)`
+   takes the player id as a `&str` and the value passed is
+   `sim.seat_player(me).id.clone()`. If that string is not what the scanner
+   matches on, no ability is ever queued and the board comes back unchanged.
+   This is the more likely of the two, because a fired `Aspire` on a board with
+   a moved member **must** change `active_blades` and therefore `p_pass`.
+2. **It fires and finds nothing eligible** — e.g. the movement history the
+   ability reads is not populated at the point the live set is chosen, so
+   「このターン中にエリアを移動した」 is false for every member and MIRACLE and
+   Aspire both resolve to nothing.
+
+Which of the two it is, is not determined, and this log entry does not claim to
+know. The two discriminating measurements are: log how many abilities the
+projection actually queues, and log the projected blade count against the
+un-projected one. Both are one `eprintln!` behind the same switch, and until
+one of them is read this switch should be treated as **untested plumbing, not as
+a measured null** — the distinction matters, because a measured null would be
+evidence against the idea and this is not that.
+
+116/116 lib tests green with the code in place.
+
+
 
 
 ### 11.2 The probe is a localiser, not a rule generator

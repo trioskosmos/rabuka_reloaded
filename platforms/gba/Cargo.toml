@@ -18,3 +18,38 @@ miniz_oxide = { version = "0.7", default-features = false, features = ["with-all
 # agb requires portable-atomic's unsafe-assume-single-core, which 1.14+ dropped
 # support for on thumbv4t (ARMv4T). Pin to the last version that supports it.
 portable-atomic = { version = "=1.13.1", default-features = false, features = ["unsafe-assume-single-core", "fallback"] }
+
+# Diagnostic builds. Each ROM isolates ONE question, decided at compile
+# time, so there is no in-game hotkey to hold and no chance of capturing
+# the wrong mode. Build exactly one at a time (features are cumulative):
+#
+#   cargo build --release --features diag-noart
+#
+# None are default. The baseline `rabuka_gba.gba` (no features) is the
+# control every other ROM is compared against.
+[features]
+default = []
+# Card art never uploaded or blitted: the board still draws its zone
+# fills, labels, badges and action bar. A clean board here means the fault
+# is in the sprite path; a broken one means it is the BG/UI layer and
+# card art is a red herring.
+diag-noart = []
+# Verbose sprite-cache trace on from boot (cache keys, misses, evictions,
+# VRAM bytes, missing-front fallbacks). Needs an emulator console; it is
+# high volume and will itself slow the game.
+diag-trace = []
+# Sprites are replaced by a per-card-number pattern (flat colour derived
+# from a hash of the card number, plus an 8-row barcode of the low hash
+# bits). Two different cards showing identical art becomes visible at a
+# glance, and is distinguishable from "the palette is broken".
+diag-cardid = []
+# Sprite palette becomes a raw-index ramp: the 8bpp palette index is
+# encoded straight into RGB, so the on-screen colour reads back the index
+# each pixel actually used. Separates "tile data is wrong" from "palette
+# is wrong".
+diag-spriteraw = []
+# Background palette bank 15 paints every index outside {1,2} magenta.
+# tools/bake_font_tiles.py only ever emits indices 1 and 2 in a font tile,
+# so anything else inside a glyph is foreign data; this turns the
+# "rainbow speckles in glyphs" symptom into an unambiguous marker.
+diag-bgspeck = []

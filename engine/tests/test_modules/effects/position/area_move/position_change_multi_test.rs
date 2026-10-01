@@ -135,31 +135,46 @@ use rabuka_engine::types::AbilityTrigger;
 /// prompt into the string `"0"`, which the position handler reads as `"left"`, so declining
 /// selected an area. Nothing card-specific was involved.
 ///
-/// `PL!SP-sd1-001-SD2` 澁谷かのん is one of the five whole-stage formation changes that share
-/// that executor (`PL!SP-bp4-027-L`, `PL!SP-pb2-014-P＋`, `PL!S-bp7-012-N`, `PL!SP-pb2-050-L`,
-/// this one), so the same decline is run here on different data — two members and no live
-/// card, where the earlier reproduction also lost a live.
+/// 嵐 千砂都 `PL!SP-pb2-014-P＋` is one of the three genuinely OPTIONAL whole-stage formation
+/// changes (`PL!SP-bb4-027-L`, this one, `PL!SP-pb2-050-L`) and is driven by a plain 登場,
+/// so it needs none of the live-start machinery. A fourth card, `PL!SP-sd2-001-SD2`, is
+/// sometimes listed with them but is NOT optional — it is a `sequential` whose formation
+/// change is unconditional, so it cannot exercise a decline at all.
 ///
-/// This started as a `println!` probe. It is an assertion test now: a diagnostic that only
-/// prints cannot fail, so it would have kept passing while the defect lived.
+/// This started as a `println!` probe against a typo'd id (`PL!SP-sd1-001-SD2`, which does not
+/// exist — the helper asserts the card HAS the ability and would have failed immediately). It
+/// is an assertion test now: a diagnostic that only prints cannot fail, so it would have kept
+/// passing while the defect lived.
 #[test]
 fn declining_the_formation_change_on_a_second_card_is_a_complete_no_op() {
     let db = load_real_database();
     let mut game = TestGame::new(db);
-    let kanono = game.id("PL!SP-sd1-001-SD2");
-    let filler = game.id("PL!-sd1-010-SD");
-    let _ = filler;
+    let chisa = game.id("PL!SP-pb2-014-P＋");
+    let kinoko = game.id("PL!SP-PR-008-PR"); // 桜小路きな子, also 5yncri5e!
+    game.assert_card_identity(chisa, "PL!SP-pb2-014-P＋");
+    game.assert_card_identity(kinoko, "PL!SP-PR-008-PR");
 
-    let other = game.id("PL!SP-bp1-014-N");
-    game.state.player1.stage.stage = [other, kanono, -1];
-
-    let before = game.state.player1.stage.stage;
+    // The gate is 「自分のステージにいるメンバーが『5yncri5e!』のみの場合」 — ALL members must
+    // be 5yncri5e!, so the partner is one too and nothing else is on stage.
+    game.state.player1.stage.stage = [kinoko, -1, -1];
     let deck_before = game.state.player1.main_deck.cards.len();
+    game.give_energy(20);
 
-    fire_trigger(&mut game, kanono, AbilityTrigger::LiveStart, "ライブ開始時");
+    game.add_to_hand(chisa);
+    game.play_to_stage(chisa, rabuka_engine::zones::MemberArea::Center);
+    // Her DEBUT legitimately places her in the centre; it is the formation change that must
+    // not move anything. So the reference board is the post-debut one, not the pre-debut one.
+    let after_debut = game.state.player1.stage.stage;
+    assert_eq!(
+        after_debut,
+        [kinoko, chisa, -1],
+        "precondition: the debut itself places her in the centre; only the formation change \
+         is in question"
+    );
     assert!(
         game.has_pending_choice(),
-        "precondition: her フォーメーションチェンジ must be offered"
+        "precondition: all stage members are 5yncri5e!, so her OPTIONAL フォーメーション\
+         チェンジ must be offered"
     );
 
     let declined = game.decline_all_remaining();
@@ -168,16 +183,16 @@ fn declining_the_formation_change_on_a_second_card_is_a_complete_no_op() {
         "precondition: what was declined must be a destination prompt, otherwise this never \
          reached the formation change (declined {declined:?})"
     );
-
     assert!(
         !game.has_pending_choice(),
         "declining must end the ability, not park a prompt"
     );
+
     assert_eq!(
-        game.state.player1.stage.stage, before,
+        game.state.player1.stage.stage, after_debut,
         "declining 「フォーメーションチェンジしてもよい」 must leave every member exactly where \
-         it was. Before the fix this dropped members out of the stage into no zone while \
-         logging them as moved, because an empty answer became the string \"0\" and the \
+         the debut put it. Before the fix this dropped members out of the stage into no zone \
+         while logging them as moved, because an empty answer became the string \"0\" and the \
          position handler reads \"0\" as \"left\"."
     );
     assert!(
@@ -191,8 +206,7 @@ fn declining_the_formation_change_on_a_second_card_is_a_complete_no_op() {
         "the deck is untouched — a vanished member went nowhere"
     );
     assert!(
-        game.state.player1.hand.cards.is_empty()
-            && game.state.player1.waitroom.cards.is_empty(),
+        game.state.player1.hand.cards.is_empty() && game.state.player1.waitroom.cards.is_empty(),
         "no member may be relocated as a side effect of declining"
     );
 }

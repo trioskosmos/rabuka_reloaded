@@ -1,12 +1,12 @@
-//! `GameState`: the whole mutable game, plus the operations on it.
+﻿//! `GameState`: the whole mutable game, plus the operations on it.
 //!
 //! This file holds the state itself and the accessors. The `impl GameState`
 //! blocks that DO something to it are split across three real submodules (they
 //! were textual `include!()` splices once):
 //!
-//! - `modifiers` — recalculating the derived modifier tables from cards.
-//! - `abilities` — playing cards, spending energy, resolving choices.
-//! - `tracking` — per-step bookkeeping (moves, reveals, baton touches).
+//! - `modifiers` 窶・recalculating the derived modifier tables from cards.
+//! - `abilities` 窶・playing cards, spending energy, resolving choices.
+//! - `tracking` 窶・per-step bookkeeping (moves, reveals, baton touches).
 //!
 //! They are declared at the TOP of this file, not at the bottom: with three of
 //! them split out, the declarations are the reader's index into a 1600-line
@@ -36,7 +36,7 @@ use smallvec::SmallVec;
 /// first so a long match cannot grow the buffer without limit.
 ///
 /// The GBA is text-only and never renders a log-history screen, so it must not
-/// accumulate a log buffer in RAM at all — the log pushes would otherwise
+/// accumulate a log buffer in RAM at all 窶・the log pushes would otherwise
 /// reserve ~116KB just to hold strings that are never shown. Bounds are 0 there
 /// (each push is immediately dropped). Other console targets keep a small
 /// window; desktop keeps the full history.
@@ -92,7 +92,7 @@ pub type LiveOwnedHeart = (String, u8);
 /// A member and the live-owned hearts it is currently holding.
 pub type LiveOwnedHearts = (CardId, Vec<LiveOwnedHeart>);
 
-/// choice (常時「このカードをプレイする際…コストは減る」).
+/// choice (蟶ｸ譎ゅ後％縺ｮ繧ｫ繝ｼ繝峨ｒ繝励Ξ繧､縺吶ｋ髫帚ｦ繧ｳ繧ｹ繝医・貂帙ｋ縲・.
 #[derive(Debug, Clone)]
 #[cfg_attr(feature = "serde_support", derive(Serialize, Deserialize))]
 pub struct PlayTimeCostPlay {
@@ -126,11 +126,11 @@ pub struct GameState {
     /// [`DEBUG_TRACE_CAP`] entries. Skipped on the wire.
     #[cfg_attr(feature = "serde_support", serde(skip))]
     pub debug_trace: Vec<String>,
-    /// Ability IDs played this turn (turn 1) — CardId for zero-allocation tracking.
+    /// Ability IDs played this turn (turn 1) 窶・CardId for zero-allocation tracking.
     pub turn1_abilities_played: SmallVec<[CardId; 8]>,
-    /// Ability IDs played this turn (turn 2) — CardId + count for limit tracking.
+    /// Ability IDs played this turn (turn 2) 窶・CardId + count for limit tracking.
     pub turn2_abilities_played: SmallVec<[(CardId, u8); 8]>,
-    /// Live-owned hearts per member — CardId + (color, count) for display/UI.
+    /// Live-owned hearts per member 窶・CardId + (color, count) for display/UI.
     pub temporary_effects: SmallVec<[TemporaryEffect; 4]>,
     pub prohibition_effects: SmallVec<[String; 4]>,
     pub delayed_prohibition_effects: SmallVec<[String; 4]>,
@@ -144,25 +144,35 @@ pub struct GameState {
     /// Player ids only.
     pub cannot_live_players: SmallVec<[PlayerId; 2]>,
     /// Member cards that are immune to being put to WAIT by an OPPONENT's effect
-    /// ("相手の効果によってはウェイトしない"), recorded as (member_id, owner_id) by
+    /// ("逶ｸ謇九・蜉ｹ譫懊↓繧医▲縺ｦ縺ｯ繧ｦ繧ｧ繧､繝医＠縺ｪ縺・), recorded as (member_id, owner_id) by
     /// the `cannot_wait_by_effect` restriction. Cleared at the end of the live.
     pub wait_immune_members: SmallVec<[(i16, String); 8]>,
     pub turn_limited_abilities_used: HashMap<(i16, usize, u8), u8>,
     pub mulligan_selected_indices: SmallVec<[u8; 6]>,
     pub live_card_selected_indices: SmallVec<[u8; 3]>,
-    /// Auto-ability trigger counts per ability — CardId for zero-allocation.
+    /// Auto-ability trigger counts per ability 窶・CardId for zero-allocation.
     pub auto_ability_trigger_counts: SmallVec<[(CardId, u8); 8]>,
-    /// Turn-limit usage per ability — CardId for zero-allocation.
+    /// Turn-limit usage per ability 窶・CardId for zero-allocation.
     pub areas_placed_this_turn: SmallVec<[String; 8]>,
     pub cards_appeared_this_turn: SmallVec<[i16; 8]>,
     /// Members that were in WAIT and were ACTIVATED earlier in this turn.
     ///
-    /// 「このターン中に自分の『X』のカードの効果によってウェイト状態からアクティブに
-    /// していたメンバー」 (PL!-pb2-010-P＋ 絢瀬絵里, PL!-pb2-040-L 僕たちはひとつの光).
-    /// The clause is neither "members in wait" nor "members in play" — it is a
+    /// 縲後％縺ｮ繧ｿ繝ｼ繝ｳ荳ｭ縺ｫ閾ｪ蛻・・縲珊縲上・繧ｫ繝ｼ繝峨・蜉ｹ譫懊↓繧医▲縺ｦ繧ｦ繧ｧ繧､繝育憾諷九°繧峨い繧ｯ繝・ぅ繝悶↓
+    /// 縺励※縺・◆繝｡繝ｳ繝舌・縲・(PL!-pb2-010-P・・鬮伜揩遨ゆｹ・棡, PL!-pb2-040-L Love marginal).
+    /// The clause is neither "members in wait" nor "members in play" 窶・it is a
     /// per-turn history, and the engine had no such record, which is why both cards
     /// parsed into a `state: "wait"` per-unit count that could never be right.
     pub cards_activated_this_turn: SmallVec<[i16; 8]>,
+    /// Members that paid the COST of one of their OWN abilities earlier this turn.
+    ///
+    /// 縲後％縺ｮ繝｡繝ｳ繝舌・縺後∬・蛻・・繧ｫ繝ｼ繝峨・閭ｽ蜉帙・繧ｳ繧ｹ繝医ｒ謾ｯ謇輔≧縺溘ａ縲・窶・PL!-pb2-021-N 蜊励％縺ｨ繧・
+    /// Same shape of clause as the field above: a per-turn history, not a state filter. The
+    /// parser had nowhere to put an EVENT, so it fell through to `comparison_condition` with
+    /// `comparison_type: "cost"` and NO operator. `compare_counts` reads a missing operator
+    /// as ">=" (`ability/util.rs`), and with no bound to compare against that is
+    /// `cost >= 0` 窶・a tautology. Her 閾ｪ蜍・therefore fired EVERY turn, granting a blade for
+    /// free, and the enclosing `or_condition` was satisfied no matter what happened.
+    pub cards_paid_cost_this_turn: SmallVec<[i16; 8]>,
     pub card_appearance_source: SmallVec<[(i16, String); 4]>,
     pub cards_moved_this_turn: SmallVec<[i16; 16]>,
     pub gained_abilities: HashMap<i16, Vec<String>>,
@@ -180,7 +190,7 @@ pub struct GameState {
     /// and evaluated during `execute_live_victory_determination` when the yell
     /// results are available.
     pub delayed_gained_effects: SmallVec<[(i16, crate::card::AbilityEffect); 2]>,
-    /// Scratch buffers for recalculate_constants — reused across calls to avoid
+    /// Scratch buffers for recalculate_constants 窶・reused across calls to avoid
     /// allocating 7+ HashMaps/Vecs on every state change. Swapped out via
     /// `core::mem::take` at the start of each call and swapped back at the end.
     /// All skipped on the wire: transient engine-internal buffers.
@@ -208,8 +218,7 @@ pub struct GameState {
     pub initial_yell_revealed_cards: SmallVec<[i16; 8]>,
     /// Cards revealed by a re-yell (set after perform_yell draws new cards).
     pub re_yell_revealed_cards: SmallVec<[i16; 8]>,
-    /// Pending play-time cost-reduction resume state (常時「このカードをプレイする際
-    /// …コストは減る」). Set when a play action offers the optional reduction choice;
+    /// Pending play-time cost-reduction resume state (蟶ｸ譎ゅ後％縺ｮ繧ｫ繝ｼ繝峨ｒ繝励Ξ繧､縺吶ｋ髫・    /// 窶ｦ繧ｳ繧ｹ繝医・貂帙ｋ縲・. Set when a play action offers the optional reduction choice;
     /// consumed on the re-entered play action after the choice is answered.
     pub play_time_cost_play: Option<PlayTimeCostPlay>,
     /// Whether the player accepted the play-time cost reduction choice.
@@ -253,17 +262,17 @@ pub struct GameState {
     /// After a change_state effect executes, records what actually changed:
     /// (card_id, from_state, to_state, cause_player_id). The cause is the
     /// owner of the activating card (falling back to the queue entry player),
-    /// "" when unknown. Needed for 自分のカードの効果 scoping (e.g. Maki
+    /// "" when unknown. Needed for 閾ｪ蛻・・繧ｫ繝ｼ繝峨・蜉ｹ譫・scoping (e.g. Maki
     /// pb1-015 ab#1 must ignore opponent-caused waits). Cleared after
     /// post-resolution TAS scan.
     pub recently_state_changed: SmallVec<[(i16, String, String, String); 2]>,
     /// Turn-scoped state-change log WITH source attribution:
     /// (source activating card, target card, from_state, to_state).
     /// Unlike `recently_state_changed` this survives intermediate ability
-    /// processing and is only cleared at the turn boundary, so ライブ開始時
-    /// conditions can look back across the whole turn — e.g.
-    /// 「このターン、自分の『虹ヶ咲』のカードの効果によってウェイト状態の
-    /// 自分のエネルギーをアクティブにしていた場合」(PL!N-pb1-037-L Q203).
+    /// processing and is only cleared at the turn boundary, so 繝ｩ繧､繝夜幕蟋区凾
+    /// conditions can look back across the whole turn 窶・e.g.
+    /// 縲後％縺ｮ繧ｿ繝ｼ繝ｳ縲∬・蛻・・縲手匯繝ｶ蜥ｲ縲上・繧ｫ繝ｼ繝峨・蜉ｹ譫懊↓繧医▲縺ｦ繧ｦ繧ｧ繧､繝育憾諷九・
+    /// 閾ｪ蛻・・繧ｨ繝阪Ν繧ｮ繝ｼ繧偵い繧ｯ繝・ぅ繝悶↓縺励※縺・◆蝣ｴ蜷医・PL!N-pb1-037-L Q203).
     pub turn_state_changes: Vec<(i16, i16, String, String)>,
     pub last_vacated_stage_area: Option<u8>,
     // --- 4-byte aligned (u8, Option<i32>) ---
@@ -273,11 +282,11 @@ pub struct GameState {
     pub cheer_checks_required: u8,
     /// Blade count of the current live, set when the first cheer check runs.
     /// `None` between lives. The required count is derived from this base
-    /// plus `yell_count_modifiers` — never mutated directly by effects.
+    /// plus `yell_count_modifiers` 窶・never mutated directly by effects.
     pub cheer_check_base: Option<u8>,
     /// All modify_yell_count effects as (player_slot 1|2, delta). LiveEnd-
     /// scoped: cleared together with the base when a live-scoped effect
-    /// expires. Derived total = max(0, base + Σ deltas for the player).
+    /// expires. Derived total = max(0, base + ﾎ｣ deltas for the player).
     pub yell_count_modifiers: SmallVec<[(u8, i32); 4]>,
     pub cheer_checks_done: u8,
     pub baton_touch_count_p1: u8,
@@ -286,8 +295,8 @@ pub struct GameState {
     pub last_state_change_wait_to_active_count: u8,
     /// Members put to wait by the cost currently being paid, in payment order.
     /// Cleared at the start of each cost payment. Two consumers:
-    /// - `.last()` — Q266 dynamic blade-limit reference member.
-    /// - `.len()` — 「これにより…ウェイト状態にしたメンバー1人につき」 draws,
+    /// - `.last()` 窶・Q266 dynamic blade-limit reference member.
+    /// - `.len()` 窶・縲後％繧後↓繧医ｊ窶ｦ繧ｦ繧ｧ繧､繝育憾諷九↓縺励◆繝｡繝ｳ繝舌・1莠ｺ縺ｫ縺､縺阪・draws,
     ///   which must count only members newly waited BY THIS COST, not
     ///   members that were already waited beforehand.
     pub last_cost_waited_members: Vec<i16>,
@@ -317,7 +326,7 @@ pub struct GameState {
     /// Encoded as `(card_id as u8) << 16 | ability_index as u8`.
     pub just_completed_ability_key: Option<u32>,
     /// Movement batch the just-completed ability resolved on. The re-scan
-    /// guard skips ONLY scans of this same batch (stale re-scans) — a fresh
+    /// guard skips ONLY scans of this same batch (stale re-scans) 窶・a fresh
     /// batch (different moved cards, or any movement after an empty batch)
     /// may re-fire the ability, which turn2+ budgets require. Empty means
     /// "unknown batch": guard as before (skip on key match).
@@ -343,10 +352,10 @@ pub struct GameState {
     pub opponent_live_success_this_turn: bool,
     pub opponent_live_no_excess_heart_this_turn: bool,
     pub self_no_excess_heart_this_turn: bool,
-    /// Per-seat live results (rules Q36: ライブ成功時 resolves at victory
+    /// Per-seat live results (rules Q36: 繝ｩ繧､繝匁・蜉滓凾 resolves at victory
     /// determination, when BOTH performances are known). The legacy
     /// opponent_*/self_* fields above are attacker-order-relative; these are
-    /// seat-relative so 「相手がライブを成功させていた場合」 can be evaluated
+    /// seat-relative so 縲檎嶌謇九′繝ｩ繧､繝悶ｒ謌仙粥縺輔○縺ｦ縺・◆蝣ｴ蜷医・can be evaluated
     /// from the activating card's OWNER (a P2-owned card's opponent is P1).
     pub p1_live_success_this_turn: bool,
     pub p1_live_success_no_excess: bool,
@@ -370,7 +379,7 @@ pub struct GameState {
     pub performance_snapshots: Vec<PerformanceSnapshot>,
     /// Trace from the last ability resolution (for debugging).
     pub last_ability_trace: Option<crate::ability::types::AbilityTraceNode>,
-    /// Card ID being replaced by a success zone replacement effect (e.g. 錯覚CROSSROADS).
+    /// Card ID being replaced by a success zone replacement effect (e.g. 骭ｯ隕咾ROSSROADS).
     pub pending_success_replacement_card_id: Option<i16>,
     /// Player ID of the player making the success zone replacement choice.
     pub pending_success_replacement_player_id: Option<String>,
@@ -380,6 +389,30 @@ pub struct GameState {
 }
 
 impl GameState {
+    /// Record that the ability currently resolving had its cost PAID, by the card that owns
+    /// it. This is the writer behind `cards_paid_cost_this_turn`.
+    ///
+    /// 「このメンバーが、自分のカードの能力のコストを支払うため」 (PL!-pb2-021-N 南ことり) is
+    /// scoped to the PAYER, and the payer is the entry's own card — a 自動 or 起動 on a member,
+    /// paid for by that member's own ability. A set, not a tally: the clause is 「paid at least
+    /// once this turn」, so two payments must not read as two cards.
+    ///
+    /// Called from the cost-payment paths only. A DECLINED optional cost also sets `cost_paid`
+    /// (the cost phase is over either way) but must not record a payment, so callers invoke
+    /// this alongside `optional_cost_result = Some(true)` and never on a `Some(false)` skip
+    /// branch.
+    pub fn record_cost_paid(&mut self) {
+        if let Some(cid) = self
+            .ability_queue
+            .current_entry()
+            .and_then(|e| e.card_id)
+        {
+            if !self.cards_paid_cost_this_turn.contains(&cid) {
+                self.cards_paid_cost_this_turn.push(cid);
+            }
+        }
+    }
+
     pub fn concede(&mut self, player_id: u8) -> Result<(), String> {
         if player_id > 1 {
             return Err("Invalid player seat".to_string());
@@ -443,7 +476,7 @@ impl GameState {
     ///
     /// DERIVED, not stored. This used to be a `bool` field initialised `true`
     /// at construction and never written again, so it was permanently `true`
-    /// for the whole game — a condition reading it could never be false, and
+    /// for the whole game 窶・a condition reading it could never be false, and
     /// the web UI's "Is First Turn" row showed `true` on every turn.
     ///
     /// Nothing broke only because the `first_turn` spelling is unreachable:
@@ -589,6 +622,7 @@ impl GameState {
             areas_placed_this_turn: SmallVec::new(),
             cards_appeared_this_turn: SmallVec::new(),
         cards_activated_this_turn: SmallVec::new(),
+        cards_paid_cost_this_turn: SmallVec::new(),
             card_appearance_source: SmallVec::new(),
             cards_moved_this_turn: SmallVec::new(),
             gained_abilities: HashMap::default(),
@@ -791,7 +825,7 @@ impl GameState {
         }
     }
 
-    /// Seat-indexed views. Seat 0 is player1, seat 1 is player2 — the same
+    /// Seat-indexed views. Seat 0 is player1, seat 1 is player2 窶・the same
     /// convention the live engine (`seat_index`) and the bots (`me: u8`)
     /// already use. ONE definition replaces the per-file `if me == 0` /
     /// `if seat_index == 0` chains (live.rs, strategy_v7.rs, ...).
@@ -1182,7 +1216,7 @@ fn push_revealed_internal(
     ///
     /// Finds the NEWEST matching `trigger_evaluation` entry for this
     /// `(card_id, trigger_str, ability_index)` and overwrites its metadata in
-    /// place (single entry — no orphaned "pending" copy). Unlike the old logic
+    /// place (single entry 窶・no orphaned "pending" copy). Unlike the old logic
     /// this does NOT require `entry.turn == current turn`, so abilities that
     /// resolve across a turn boundary commit correctly. If no matching trigger
     /// entry exists (e.g. constant/activation abilities with no scan entry),
@@ -1222,7 +1256,7 @@ fn push_revealed_internal(
                         continue;
                     }
                 }
-                // Found the newest matching trigger — commit in place. Replace
+                // Found the newest matching trigger 窶・commit in place. Replace
                 // the text too so downstream consumers (e.g. tests probing for
                 // "trigger_debut") see the resolution line, not the scan line.
                 entry.metadata = Some(meta);
@@ -1234,9 +1268,9 @@ fn push_revealed_internal(
         self.push_structured_log(fallback_entry);
     }
 
-    /// Whether a zone is 非公開領域 (private / hidden): its card *identities*
+    /// Whether a zone is 髱槫・髢矩伜沺 (private / hidden): its card *identities*
     /// must never appear in a shared log. Per rules 4.8 (main deck), 4.9
-    /// (energy deck) and 4.11 (hand). 公開領域 (stage, live zone, energy zone,
+    /// (energy deck) and 4.11 (hand). 蜈ｬ髢矩伜沺 (stage, live zone, energy zone,
     /// success zone, waitroom/discard, revealed, etc.) are public.
     pub fn zone_is_private(&self, zone: &str) -> bool {
         matches!(
@@ -1246,7 +1280,7 @@ fn push_revealed_internal(
     }
 
     /// Resolve a card index to a readable label, checking either player.
-    /// Returns the card NAME only for public (公開領域) zones. For private zones
+    /// Returns the card NAME only for public (蜈ｬ髢矩伜沺) zones. For private zones
     /// a neutral placeholder is returned so shared logs never leak identities.
     pub fn resolve_index_any_player(&self, zone: &str, idx: usize) -> String {
         if self.zone_is_private(zone) {
@@ -1350,7 +1384,7 @@ fn push_revealed_internal(
     /// Number of real options behind a choice (what the player picks from),
     /// as opposed to `choice_offered_labels().len()` which also counts the
     /// prompt header, `type:` and `skip_allowed` formatting lines. The rule
-    /// log's "N択" count must use this, otherwise e.g. a 2-option
+    /// log's "N謚・ count must use this, otherwise e.g. a 2-option
     /// self-or-opponent prompt reports "pick of 4".
     pub fn choice_option_count(&self, choice: &crate::ability::types::Choice) -> usize {
         use crate::ability::types::Choice as C;
@@ -1377,7 +1411,7 @@ fn push_revealed_internal(
 
     /// Push a `choice_offered` structured entry capturing the options presented
     /// to the player at the moment the choice is stored/committed. Provides the
-    /// "offered" half of the offer→resolve pairing in the log.
+    /// "offered" half of the offer竊池esolve pairing in the log.
     pub fn push_choice_offered(&mut self, choice: &crate::ability::types::Choice) {
         if !crate::core::runtime_flags::logging_enabled() {
             return;
@@ -1430,7 +1464,7 @@ fn push_revealed_internal(
         chosen: Vec<String>,
         skipped: bool,
     ) {
-        // Headless bot playouts never render choice history — skip the
+        // Headless bot playouts never render choice history 窶・skip the
         // label/format work entirely. Training mode does the same at runtime.
         if cfg!(feature = "headless") || !crate::core::runtime_flags::logging_enabled() {
             return;
@@ -1517,7 +1551,7 @@ fn push_revealed_internal(
     /// Append a compact event to the always-on [`Self::debug_trace`] ring.
     /// Prefixes the turn number so dumps read chronologically across turns.
     /// Use for facts a test/support dump needs: phase transitions, trigger
-    /// firings, queue outcomes — not per-card hot-loop noise.
+    /// firings, queue outcomes 窶・not per-card hot-loop noise.
     pub fn push_debug_note(&mut self, text: String) {
         if !crate::core::runtime_flags::logging_enabled() {
             return;
@@ -1705,7 +1739,7 @@ mod serde_roundtrip_tests {
         gs.player2.stage.stage[1] = 5;
         let bytes = rmp_serde::to_vec(&gs).unwrap();
         let mut back: GameState = rmp_serde::from_slice(&bytes).unwrap();
-        // card_database is #[serde(skip)] — caller reattaches its own
+        // card_database is #[serde(skip)] 窶・caller reattaches its own
         back.card_database = gs.card_database.clone();
         assert_eq!(gs.player1.hand.cards, back.player1.hand.cards);
         assert_eq!(gs.player2.stage.stage, back.player2.stage.stage);

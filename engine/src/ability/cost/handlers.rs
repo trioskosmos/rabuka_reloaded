@@ -1369,6 +1369,7 @@ let source = cost.source_str().unwrap_or("");
             entry.cost_paid = true;
             entry.optional_cost_result = Some(true);
         }
+        gs.record_cost_paid();
         Ok(())
     }
 
@@ -1450,6 +1451,13 @@ let source = cost.source_str().unwrap_or("");
                     Some(ConditionalChoice::Str("pay_optional_cost".to_string()));
                 entry.optional_cost_result = None;
             }
+        }
+        // Only record a payment when a cost was actually paid. The gated-effect-move branch
+        // above deliberately resets `optional_cost_result` to None because the cost is still
+        // OUTSTANDING until the player answers the follow-up — recording there would let
+        // PL!-pb2-021-N's 自動 fire for a cost that was never settled.
+        if has_cost {
+            gs.record_cost_paid();
         }
         if has_pending {
             return self.resume_pending_actions(gs);

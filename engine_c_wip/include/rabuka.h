@@ -615,7 +615,18 @@ typedef enum {
     RB_ACTION_ACTION_BY,
     RB_ACTION_SEQUENTIAL_COST,
     RB_ACTION_CHOICE_CONDITION,
-    RB_ACTION_ENERGY_CONDITION
+    RB_ACTION_ENERGY_CONDITION,
+    /* Appended, so nothing above renumbers. RbGeneratedAction.action_type is
+     * only ever compared symbolically against these constants, never persisted
+     * or serialised, so the new ordinals are safe.
+     * engine/src/ability/enums.rs:332 — a REPLACEMENT rule resolved once at
+     * placement by GameState::replacement_appear_wait_applies (turn/phases.rs:
+     * 1281), NOT a dispatch arm: dispatch.rs:126 is `=> Ok(())`. */
+    RB_ACTION_REPLACEMENT_APPEAR_WAIT,
+    /* engine/src/ability/enums.rs:340 — a counting WEIGHT consumed by
+     * GameState::weighted_zone_count (core/game_state/modifiers.rs:259, via
+     * condition/card.rs:2124), not a dispatch arm: dispatch.rs:129 is `=> Ok(())`. */
+    RB_ACTION_COUNT_AS_MULTIPLE
 } RbActionType;
 
 typedef enum {

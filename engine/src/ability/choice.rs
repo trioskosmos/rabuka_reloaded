@@ -729,6 +729,9 @@ impl super::resolver::AbilityResolver {
             if let Some(entry) = gs.ability_queue.current_entry_mut() {
                 entry.optional_cost_result = Some(true);
             }
+            // Outside the `current_entry_mut` borrow: the payer is the entry's own card, and
+            // PL!-pb2-021-N's 「…コストを支払うため」 reads this history.
+            gs.record_cost_paid();
         }
         let target = target_player_id
             .clone()
@@ -757,6 +760,7 @@ impl super::resolver::AbilityResolver {
                     entry.cost_paid = true;
                     entry.optional_cost_result = Some(true);
                 }
+                gs.record_cost_paid();
             } else if allow_skip {
                 log::debug!("[COST] source={:?} hand payment skipped: no cards moved, optional_cost_result=false", self.session.activating_card_id);
                 if let Some(entry) = gs.ability_queue.current_entry_mut() {
@@ -941,6 +945,7 @@ impl super::resolver::AbilityResolver {
                 entry.cost_paid = true;
                 entry.optional_cost_result = Some(true);
             }
+            gs.record_cost_paid();
             // Energy-count constants (「エネルギーがちょうどN枚あるかぎり」)
             // are live state — re-evaluate right after the payment.
             gs.recalculate_constants();
