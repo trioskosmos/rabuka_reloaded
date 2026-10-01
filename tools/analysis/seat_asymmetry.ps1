@@ -26,7 +26,11 @@ for ($i = 1; $i -le $Games; $i++) {
     # per-turn: which seat was P1 on for the live set, and what happened
     $live = @{}
     foreach ($l in [System.IO.File]::ReadAllLines($logPath)) {
-        if ($l -match '^t(\d+)\|SYSTEM\|live_result\|LIVE P1-WINS \| P1 set\[(?<s>[^\]]*)\] yell \d+/\d+flips score=\d+ . succ=\d+\(\+(?<d>\d+)\) \| P2 set\[(?<p2>[^\]]*)\]') {
+        # The verdict token is NOT fixed: it is one of P1-WINS / P2-WINS /
+        # TIE-both-place / NO-CONTEST. Hard-coding "LIVE P1-WINS" silently
+        # dropped every phase v9 did not win outright, which is how this script
+        # came to report a 0% fold rate against a true 21.8%.
+        if ($l -match '^t(\d+)\|SYSTEM\|live_result\|.*?\| P1 set\[(?<s>[^\]]*)\] yell \d+/\d+flips score=\d+ . succ=\d+\(\+(?<d>\d+)\) \| P2 set\[(?<p2>[^\]]*)\]') {
             $t = [int]$Matches[1]
             if (-not $live.ContainsKey($t)) {
                 $live[$t] = @{ p1set = ($Matches.s -ne ''); p2set = ($Matches.p2 -ne ''); p1place = [int]$Matches.d }
@@ -34,21 +38,33 @@ for ($i = 1; $i -le $Games; $i++) {
         }
     }
 
-    $seen = @{}
+    # The arena emits SEVERAL V8CAL lines per turn as the live set is built up
+    # (one per candidate evaluation during selection). Only the LAST line for a
+    # turn is the decision. Taking the first reads mid-selection state, which is
+    # why an earlier version of this script reported a 0% fold rate against a
+    # true 21.8%.
+    $last = @{}
+    $order = @()
     foreach ($cl in [System.IO.File]::ReadAllLines($errPath)) {
         if ($cl -notmatch 'V8CAL t=(\d+) me=0 second=(?<sec>\w+) set=(?<set>\d) ') { continue }
         $t = [int]$Matches[1]
-        $second = ($Matches['sec'] -eq 'true')
-        if ($seen.ContainsKey($t)) { continue }
+        if (-not $last.ContainsKey($t)) { $order += $t }
+        $last[$t] = @{
+            second = ($Matches['sec'] -eq 'true')
+            didSet = ([int]$Matches['set'] -eq 1)
+        }
+    }
+
+    foreach ($t in $order) {
         if (-not $live.ContainsKey($t)) { continue }
-        $seen[$t] = 1
         $r = $live[$t]
+        $e = $last[$t]
 
         [void]$rows.Add([pscustomobject]@{
             game = $i; turn = $t
-            second = $second
-            seat = $(if ($second) { 'OBSERVED (2nd)' } else { 'UNOBSERVED (1st)' })
-            didSet = ([int]$Matches['set'] -eq 1)
+            second = $e.second
+            seat = $(if ($e.second) { 'OBSERVED (2nd)' } else { 'UNOBSERVED (1st)' })
+            didSet = $e.didSet
             oppSet = $r.p2set
             placed = ($r.p1place -gt 0)
         })

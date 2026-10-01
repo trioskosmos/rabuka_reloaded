@@ -23,12 +23,19 @@
 #include "test_game.h"
 
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 
 /* ── queue entry points that exist in ability_queue.c but are not (yet)
-      declared in rabuka.h.  Signatures copied verbatim from the definitions
-      in src/ability/ability_queue.c; declared here so this suite does not
-      need a header edit owned by another agent. ─────────────────────────── */
+ *     declared in rabuka.h.  Signatures copied verbatim from the definitions
+ *     in src/ability/ability_queue.c; declared here so this suite does not
+ *     need a header edit owned by another agent. ─────────────────────────── */
+extern void        rb_queue_init(RbAbilityQueue *q);
+extern int         rb_queue_len(const GameState *g);
+extern int         rb_queue_is_empty(const GameState *g);
+extern int         rb_queue_is_waiting_for_choice(const GameState *g);
+extern void        rb_queue_extend_pending_actions(GameState *g, AbilityEffect *const *actions, int count);
+extern void        rb_queue_store_pending_actions(GameState *g, AbilityEffect *const *actions, int count);
 extern void        rb_queue_pause_for_auto_ability_choice(GameState *g, const RbChoice *choice);
 extern void        rb_queue_resume_with_choice(GameState *g);
 extern void        rb_queue_clear_completed(GameState *g);
@@ -97,7 +104,7 @@ static RbChoice make_target_choice(const char *target)
     return ch;
 }
 
-static int count_iter_cb(const RbQueueEntry *e, void *ctx)
+static void count_iter_cb(const RbQueueEntry *e, void *ctx)
 {
     (void)e;
     (*(int *)ctx)++;
@@ -568,11 +575,12 @@ static void test_pending_action_bookkeeping(void)
     c.action = "look_at";
     AbilityEffect *more[1] = { &c };
     rb_queue_store_pending_actions(&g, more, 1);
-    rb_queue_save_pending_actions(&g, more, 1);
+    rb_queue_extend_pending_actions(&g, more, 1);
     CHECK_EQ(rb_queue_take_pending_actions(&g), 2,
-             "save_pending_actions appends to the parked batch");
-    CHECK_EQ(rb_queue_set_pending_actions(&g, 0), 0,
-             "set_pending_actions(0) is a no-op on an empty batch");
+             "extend_pending_actions appends to the parked batch");
+    rb_queue_set_pending_actions(&g, 0);
+    CHECK(!rb_queue_has_pending_actions(&g),
+          "set_pending_actions(0) clears the batch");
 }
 
 static void test_pending_actions_need_a_current_entry(void)

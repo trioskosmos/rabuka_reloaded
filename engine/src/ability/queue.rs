@@ -1,4 +1,4 @@
-use crate::Arc;
+﻿use crate::Arc;
 
 use smallvec::SmallVec;
 
@@ -144,6 +144,15 @@ pub struct AbilityQueueEntry {
     /// The original effect text of a choice-type ability, stored so the frontend
     /// can use it as the choice prompt (separate from the option labels).
     pub choice_effect_text: Option<String>,
+    /// How many MORE times a per-card choice is still to be offered.
+    ///
+    /// 「『X』のカード1枚につき、以下から1つを選ぶ」 offers the choice once per qualifying
+    /// card, and 「同じ選択肢を2回以上選んでもよい」 confirms repeats are intended. The
+    /// multiplier is resolved once when the choice is first created (the qualifying cards
+    /// can change as earlier choices resolve), stored here as the number of *remaining*
+    /// offerings, and decremented each time an option is answered. Zero means the last
+    /// choice has been taken and no re-prompt follows.
+    pub choice_repeats_remaining: u8,
     /// Cache for condition results that should be evaluated once and reused.
     /// Keyed by condition text. Populated by the first evaluation; subsequent
     /// evaluations return the cached value. The parser sets `"cache": true` on
@@ -390,6 +399,7 @@ entry_index: u8::try_from(idx).unwrap(),
                     triggering_member_id: None,
                     snapshot_movements: SmallVec::new(),
             choice_effect_text: None,
+            choice_repeats_remaining: 0,
             condition_cache: SmallVec::new(),
                 };
                 self.entries.push(dummy_entry);
@@ -488,6 +498,7 @@ entry_index: u8::try_from(idx).unwrap(),
             triggering_member_id: None,
             snapshot_movements: SmallVec::new(),
             choice_effect_text: None,
+            choice_repeats_remaining: 0,
             condition_cache: SmallVec::new(),
         });
         self.state = QueueState::ExecutingEffect {
@@ -680,6 +691,7 @@ mod tests {
             triggering_member_id: None,
             snapshot_movements: SmallVec::new(),
             choice_effect_text: None,
+            choice_repeats_remaining: 0,
             optional_moves_all_moved: None,
             condition_cache: SmallVec::new(),
         }

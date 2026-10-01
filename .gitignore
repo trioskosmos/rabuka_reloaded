@@ -191,9 +191,32 @@ engine/src/core/cards.bin
 engine/baked/decks/*.bin
 engine/src/core/cards_gen.rs
 
+# …BUT the ability string pool IS tracked, and the negation must come after the
+# `cards/build/*.bin` rule above or git never sees it.
+#
+# WHY: engine_c_wip compiles RBKA_STRINGS_OFFSETS (the (chunk, start, len)
+# offsets into this file) into src/core/generated/gen_data.c, which is COMMITTED.
+# The offsets and the bytes they point at are two halves of one artifact: if only
+# the offsets are versioned, anyone who runs cards/compile_abilities.py
+# regenerates the pool out from under them. The pool is UNSEPARATED, so a few
+# bytes of drift is not an error -- it silently returns a byte splice of two
+# neighbouring entries ("cost_limit" -> "cost_limitc", "left_side" -> "eft_side",
+# "resource_type" -> "ent_orderchoi"). This happened on 2026-09-30 and again on
+# 2026-10-01, breaking 494 of 985 abilities.
+#
+# The blanket `cards/build/*.bin` rule came from a 2026-08-22 repo-hygiene round
+# and predates the C port's use of this file; it was never a decision to leave
+# the ability offsets unversioned. cards.bin / abilities.bin / abilities.bin.z
+# stay ignored -- the C engine does not index those at runtime.
+!cards/build/abilities_strings.bin
+
 # Generated engine_c_wip sources
 engine_c_wip/src/bytecode_data.c
 
+# NOTE: `engine_c_wip/src/*.bin` below stays ignored on purpose. That glob
+# covers src/abilities_strings.bin, which is a byte-for-byte COPY of the tracked
+# pool above, made by the Makefile's `data` target so the test binaries can load
+# it. The Makefile recreates it on every build, so it is never committed.
 engine_c_wip/src/*.bin
 engine_c_wip/src/core/generated/*.o
 engine_c_wip/src/**/*.o

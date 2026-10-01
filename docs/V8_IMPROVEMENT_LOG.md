@@ -1692,6 +1692,12 @@ on most of the 105 discordant games.
 
 ### 13.3 The audit: where live phases actually leak
 
+> **RETRACTED IN §14.1.** The pass-rate and shortfall figures below were derived
+> from `yell N/Mflips`, which is blade-hearts across yell cards, **not** the heart
+> check. Corrected pass rates are 91-100%, not 8-42%, and the "67% one heart
+> short" finding is an artefact of the same misreading. Finding 2 (`FOLD/FOLD`
+> waste) stands. Read §14.1 before using anything in this section.
+
 Read 289 consecutive live phases out of 60 full games, from the engine's own
 `live_result` verdicts, classified by what each side did
 (`tools/analysis/live_phase_leak.ps1`):
@@ -1782,6 +1788,375 @@ hearts, which is the Main phase failing to put the last member or the last blade
 icon on stage before the check. That is §9's item 1 (re-enter the placement
 model at every search node) restated in measured terms: the live set is being
 handed boards it cannot use, and the fix is upstream of it.
+
+---
+
+## 14. Hypothesis round: five tests, three refutations, one correction
+
+§13 audited what happens. This section tests *why*, and the first thing it has to
+do is retract a claim.
+
+### 14.1 The §13.3 pass-rate table was reading the wrong field
+
+§13.3 reported `始まりは君の空` passing 42%, `Special Color` 13%, `Aspire` 8%,
+and concluded the bot "commits high-need lives it cannot pass." **That is wrong.**
+
+The log line's `yell {hits}/{yell_count}flips` is the number of **blade-hearts
+revealed across the N yell cards** (`live.rs:1456-1466` — it sums
+`y.blade_hearts` over `snap.yell_cards`). It has nothing to do with whether the
+live's heart requirement was met. The authoritative verdict is the engine's own
+annotation inside `set[...]`: `Aspire:4pt` when it passed, `Aspire:FAIL(c0 3/7)`
+when it did not.
+
+Read correctly (`tools/analysis/live_phase_leak.ps1`):
+
+| card | committed | engine says passed | placed |
+|---|---|---|---|
+| `Special Color` | 79 | 75 (95%) | 48 (61%) |
+| `始まりは君の空` | 78 | 71 (91%) | 54 (69%) |
+| `Aspire` | 66 | 62 (94%) | 46 (70%) |
+| `MIRACLE NEW STORY` | 3 | 3 (100%) | 2 (67%) |
+
+**v9's checks pass 91-100%.** It is not committing checks it cannot pass, and
+"38% of failures are one heart short" (§13.3) is an artefact of the same
+misreading — the readable `FAIL` annotations only cover 15 of the failures, and
+of those, 8 are short by 6+. There is no near-miss development story here.
+
+The same correction kills §13.3's `FOLD/SET` framing. It read as "v9 folds, v7
+places 23/23 even though v7 passed its own check in only 3" — but **v7 passed
+all 23**. Every opponent placement in that bucket was earned. Likewise
+8.4.3.2's "passing alone wins the check" was misapplied: in the 12 `SET/SET`
+phases where v9's own live failed, v9 placed **0** times. `determine_winners`
+requires `lives.iter().all(|l| l.passed)`, so a failed live never places,
+sole or contested. §13.3's headline findings 1 and 3 are both void; finding 2
+(`FOLD/FOLD` waste, 13.8%) survives because it never depended on the pass field.
+
+**Lesson, and it is the second time this log has paid it:** the engine already
+emits a machine-readable verdict per live, and reading a convenient adjacent
+number instead of it produced a confident, wrong, rule-citing story. The
+`FAIL(...)` annotation is the field. Anything derived from `yell N/Mflips` is
+unsafe.
+
+### 14.2 What the audit actually shows: the score comparison is the game
+
+Corrected, of 289 live phases: **148 (51.2%) have both sides passing**, so the
+score comparison decides. The margins are razor-thin:
+
+| margin | n | v9 placed |
+|---|---|---|
+| +1 | 33 | 33 (100%) |
+| +2..+3 | 25 | 25 (100%) |
+| +4 or more | 6 | 6 (100%) |
+| **−1** | **32** | **0 (0%)** |
+| −2..−3 | 14 | 0 |
+| −4 or worse | 5 | 0 |
+| tie | 33 | 23 (70%) |
+
+v9 wins 64, loses 51, ties 33 on the comparison. **A single point of score is
+the whole margin in 65 of 148 cases.**
+
+### 14.3 H-A: is score unpriced? No — 4 of 61 declines are defects
+
+If score decides half the game and has no real term in the value function, the
+bot should be leaving score on the table. `V8_CAL` emits the full candidate
+table, so this is measured on what the argmax actually had
+(`tools/analysis/score_decline_audit.ps1`):
+
+- 61 of 387 commits (15.8%) declined a higher-scoring life that was on the table.
+- Split by whether the decline was justified on `p_pass`: **A (within 0.10 —
+  defect suspects) = 4, B (clearly worse `p_pass`) = 0, C (chose higher
+  `p_pass`) = 57.**
+- All 4 in bucket A placed anyway, and in each the chosen card had
+  `p_place = 1.000` against the declined card's `0.98-0.98`. The argmax took a
+  certain placement over a near-certain one. Correct.
+
+`check_outcome` does price score — via `contested_masses`, which compares
+`our_score` against a 6-slot opponent distribution and resolves the tie rule.
+The suspicion was wrong, and the argmax's own consistency (0 misranks in 120
+games) is the reason.
+
+### 14.4 H-B: the seat asymmetry is real and it is the most interesting thing here
+
+`OppModel` reads only `live_card_zone.cards.len()` — the opponent's set **count**,
+never its contents. That is correct: 8.2.2 keeps the set face-down until the
+performance, so the second attacker sees count only, and `BOT_STRATEGY.md`
+§3.1d says so explicitly. I checked the alternative — that v9 should be reading
+the observed card — and the rules do not permit it.
+
+But the *decision* is strongly seat-dependent (150 games, `V8_CAL` joined to
+verdicts, `tools/analysis/seat_asymmetry.ps1`):
+
+| seat | n | fold rate | modelled `opp_pass` | `opp_set_size` | `p_place` at commit |
+|---|---|---|---|---|---|
+| second (observed) | 410 | **39.5%** | 0.815 | 1.53 | 0.594 |
+| first (unobserved) | 314 | 21.3% | 0.518 | 1.00 | 0.794 |
+
+**v9 folds 2.7x more often when it knows more.** The mechanism is arithmetic,
+not informational: seeing a larger opponent set raises modelled `opp_pass`
+(0.518 → 0.815), which lowers `p_place` (0.794 → 0.594), which loses the argmax.
+The `opp_set_size` → bar → `clears` chain (`v8_model.rs:723-739`) only ever
+makes the opponent harder as their set grows.
+
+That is not obviously wrong — a two-card zone really is harder to beat. But it
+means the model treats *observing* as *deteriorating*, and the fold decision
+inherits that. All 14 sampled folds happened with `best p_place < 0.05` and with
+the opponent already set, so the fold itself is coherent; the open question is
+whether `clears` is calibrated for the larger zones, which §14.5's evidence says
+it is not.
+
+### 14.5 H-C: never fold — a significant REGRESSION
+
+The blunt version of "folding too much", and `V8_NO_FOLD` already implemented it.
+Paired, n=1200, seed 11:
+
+| | baseline | `V8_NO_FOLD` | |
+|---|---|---|---|
+| win rate | 57.0% | **52.2%** | **−4.75pp** |
+| `DISCORDANT` | | 173 / 116 | **p = 0.00095** |
+| pace (P1) | 0.4758 | 0.4488 | −0.0270 |
+
+**Significant regression.** Folding is load-bearing: when `p_pass ≈ 0`,
+committing burns a life (8.3.16) and places nothing, so the resale price is
+correct to prefer the fold. The argmax is right, and any "just contest more"
+framing is wrong. `V8_NO_FOLD` stays an ablation and must not be shipped.
+
+The `V8_LIFE_RESALE` sweep (the knob that moves the fold threshold continuously)
+is monotone and entirely null, which is the same answer in four more points:
+
+| resale | 0.10 | 0.20 | **0.30 (shipped)** | 0.45 | 0.60 |
+|---|---|---|---|---|---|
+| win rate | 57.3% | 57.2% | **57.0%** | 56.9% | 56.3% |
+| p | 0.557 | 0.629 | — | 1.000 | 0.185 |
+
+### 14.6 Where that leaves it
+
+Five hypotheses, and the evidence killed four of them:
+
+| # | hypothesis | verdict |
+|---|---|---|
+| A | score is unpriced, so the bot leaves score on the table | **refuted** — 4 of 61 declines are defects, all correct |
+| B | live-start projection helps | **refuted** — §13.2, +0.23pp, p=0.56 |
+| C | v9 commits checks it cannot pass | **refuted** — passes 91-100%, §14.1 |
+| D | v9 folds too much | **refuted** — never-fold is −4.75pp, p=0.00095 |
+| E | **observing the opponent degrades v9's own estimate** | **live** — fold rate 21.3% → 39.5%, `opp_pass` 0.518 → 0.815 |
+
+E is the only survivor, and it is narrower than "folding too much": it is that
+`clears` — the step function deciding whether the opponent's set passes their own
+bar — has no evidence behind it for the larger zones v9 can now observe.
+`OppModel::horizon_model` already exists to re-evaluate it against sampled pools
+and is documented as taking only 6 distinct values across 369 board/blade
+combinations; `YIELD_PRIOR` is the one prior in the whole model fitted from
+nothing. E says: fit it, and the seat asymmetry should narrow without touching
+the fold threshold that §14.5 shows is already correct.
+
+That is a calibration task with a built-in measurement, not another term. It is
+also the first candidate in this document that is consistent with **every**
+negative result above rather than requiring one of them to be overturned.
+
+### 14.7 E measured: `opp_pass` is not miscalibrated, it is INVERTED and flat
+
+The prediction is that `YIELD_PRIOR` is mis-scaled. It is worse than that.
+`tools/analysis/opp_calibration.ps1`, 511 observed opponent sets, bucketed by the
+`opp_pass` the model predicted for that exact decision:
+
+| model `opp_pass` | n | model | **realized opponent pass** |
+|---|---|---|---|
+| 0.00 (modelled fold) | 22 | 0.000 | **86.4%** |
+| 0.01-0.39 | 98 | 0.197 | **85.7%** |
+| 0.40-0.69 | 231 | 0.527 | **88.3%** |
+| 0.70-0.94 | 51 | 0.800 | **86.3%** |
+| 0.95-1.00 | 109 | 1.000 | **86.2%** |
+
+**Realized is 86% in every bucket, including the one where the model is certain
+they fold.** The quantity is not noisy or merely mis-scaled; it carries
+essentially no information about whether the opponent's set passes.
+
+The `opp_set` breakdown shows the same thing through the §14.4 mechanism:
+
+| modelled `opp_set` | n | model `opp_pass` | realized |
+|---|---|---|---|
+| 1 | 462 | 0.598 | 87.7% |
+| 2 | 16 | 0.594 | 75.0% |
+| **3** | 33 | **0.156** | **84.8%** |
+
+A three-card zone is modelled at 16% and converts at 85%. That single row is the
+seat asymmetry of §14.4 explained: the `target = 2 * set_size` bar only ever
+rises, so seeing a bigger set drives `clears` toward zero, and `clears` is not
+measuring anything that predicts the outcome.
+
+Checked independently of v9's own decision (all 735 phases, 150 games): **v7
+passes 456 of 522 committed checks = 87.4%.** The model's baseline is ~0.60.
+
+**So the single unfitted constant in the model is wrong by ~0.27 in absolute
+terms and wrong in the wrong direction**, and its documented rationale is the
+reason:
+
+> under-estimating their check ability makes v8 contest more often, and S4 is
+> explicit that folding a contestable check is the expensive error
+
+That reasoning is sound and the outcome is inverted anyway: because the
+under-estimate is *inverted rather than uniformly low*, it does not bias v9
+toward contesting. It makes v9's `p_place` track a signal uncorrelated with
+reality, so the argmax is effectively choosing on our own check alone
+(`p_pass`, which §14.1 shows is well-calibrated) plus a coin flip.
+
+**Why this is the strongest candidate in the document.** It is the only finding
+that explains, with one cause:
+- the seat asymmetry (§14.4, fold rate 21.3% → 39.5%) — a rising bar;
+- the 15.8% score-declines being harmless (§14.3) — the argmax is not choosing
+  on score because the contested term is noise, not because score is cheap;
+- `V8_NO_FOLD` regressing (−4.75pp, §14.5) — the fold threshold is right,
+  because it rests on `p_pass`, which is calibrated;
+- and the projected `V8_ALL_TERMS` win rate being insensitive to everything
+  tried in §12 and §13 — most of those terms enter through `p_place`, and
+  `p_place`'s contested component is currently inert.
+
+The fix is to replace `YIELD_PRIOR` + the hard `clears` threshold with a
+measured opponent pass rate, the same way v8 already measures its own flip
+density from its own decklist. Note the asymmetry that makes this legitimate:
+`BOT_STRATEGY.md` §3.1d says the second attacker sees the set **count**, not
+contents — but the count is not the only observable. Board hearts, blade count
+and set size are all public (8.2.2 keeps the *cards* hidden, not the board), and
+those are exactly the inputs `OppModel::horizon_model` was written to use. The
+right predictor already exists in the file; it is the step function on top of it
+that discards the measurement.
+
+**Do not ship this on n=150 games.** The direction is unambiguous and the effect
+is large, but 511 observations from one seed and one matchup is not a win rate.
+The next step is the calibration measurement at scale — `V8_OPP_MEASURED`,
+bucketed by board and set size, over at least 3 seeds and both seats — and only
+then a paired A/B.
+
+---
+
+## 15. Ten hypotheses, ten nulls, and what the discordant counts say
+
+§14 left one live candidate (E) with a falsifiable prediction. This section runs
+it, fans four subagents across independent axes, and records the result — which
+is not the result any of them predicted.
+
+### 15.1 The falsification test of E: partial confirmation, null prescription
+
+`V8_OPP_CLEARED=<p>` replaces the `clears` step function with a flat constant
+(`v8_model.rs`, behind the switch). §14.7 predicts a flat value should be
+near-bit-identical, because the quantity carries no information.
+
+| arm | result | discordant | p | win rate |
+|---|---|---|---|---|
+| `V8_OPP_CLEARED=0.874` (the measured rate) | 682-518 | 9 / 7 | 0.804 | **56.8%** (−0.17pp) |
+| `V8_OPP_CLEARED=0.60` (the model's own mean) | see below | — | — | — |
+
+**Prediction half-confirmed.** 16 discordant games, not 0 — so `clears` carries a
+*small* amount of real signal and §14.7's "no information whatsoever" was too
+strong. But the signal is worth 9 games.
+
+**Prescription is null.** Substituting the correctly-measured 0.874 for the
+model's 0.60 changes nothing: −0.17pp at p=0.80. The opponent-pass calibration
+is real, reproducible, and not worth anything. E is dead as a win-rate lever,
+and §14.7's framing of it as "the strongest candidate in the document" was
+wrong — the measurement was right and the inference from it was not.
+
+### 15.2 Four subagents, four independent axes
+
+Launched across areas this audit had not touched, so a hypothesis could not be
+an artefact of the live-set framing:
+
+**A. v9's Main phase (`v8_main.rs`, `v7_main.rs`).** The load-bearing finding is
+that **v9 does not use `v8_main.rs` at all** — `registry.rs:214` routes v9 to
+`strategy_v7::choose_action`, i.e. v7's leaf. `v8_main.rs` is v8/v10's. The v7
+leaf is a **delta** on 13 features, `Pass` hard-coded to 0.0, and with
+`V7_BEAM` unset it is **one-ply execute-then-score with zero check re-entry**.
+Two structural gaps, both real:
+
+- **No turn-awareness anywhere.** `gs.turn_number` appears only in logging. The
+  leaf cannot represent "stop developing on T5", and `v8_main.rs:1128-1141`
+  documents that a leaf reading "more board is better" *cannot* represent Pass.
+- **`coverage` (weight 60, the second-largest term) is a threshold, not a
+  gradient**, summed uniformly over every life held, and `hearts` (weight 3) is a
+  colour-blind total. So the leaf pays 60 for crossing a whole-requirement
+  threshold on *any* held life and 3 per heart thereafter, with no colour
+  sensitivity — in a game decided by colour-matching a specific life.
+
+**B. Deck composition (`5CP3Z idou`).** 4 distinct lives, 12 copies. Board
+ceiling is 18 printed hearts; all four lives fit, so **57% is not near a deck
+ceiling** — there is real slack. Two concrete findings: `MIRACLE NEW STORY` needs
+2× heart01 and the deck's heart01 supply is exactly 1 base with **zero blade_heart
+heart01 in 72 cards**; and the mulligan bins by cost, never reading a life's
+requirement.
+
+**B's headline claim is refuted by measurement.** It concluded MIRACLE is
+"effectively dead". Measured: **v9 sets MIRACLE 3 times and passes 3/3**,
+scoring 7. The audit's reasoning (heart01 supply = 1) ignores MIRACLE's own
+live-start ability, which grants +1 chosen heart to every member that moved.
+Same shape as §14.1: a plausible read of the static data, wrong against the
+engine. The same correction applies to `始まりは君の空`'s conditional: the audit
+says 12 hearts / score 6 at 2 successes, and measurement shows it scoring
+**1, 2, 3** at 2 successes and 6 only at 3.
+
+**C. Rules engine vs bot model (`live.rs`).** Confirms §14.1's correction at
+source: `determine_winners` requires `lives.iter().all(|l| l.passed)`, so a
+failed live never places — sole or contested.
+
+**D. Turn order / RPS.** Attacker order is not a bot choice; it is decided by
+the arena's RPS. Not an available axis.
+
+### 15.3 Every documented-but-disabled fix, measured
+
+Each of these was written, argued for in prose, and shipped at weight 0.0 or
+off. That is a strong prior that one is worth shipping, and it is worth testing
+all four rather than reasoning about which looks best.
+
+| arm | discordant | p | win rate | pace (P1) |
+|---|---|---|---|---|
+| baseline (v9 + `V8_ALL_TERMS`) | — | — | **57.0%** | 0.4758 |
+| `V7_BLADE_ARITH=0.5` (colour-aware blades) | 82 / 78 | 0.813 | 56.7% | −0.0113 |
+| `V7_BLADE_ARITH=2.0` | **200 / 204** | 0.881 | 57.3% | −0.0191 |
+| `V8_OPP_DENSITY=measured` | **5 / 5** | 1.000 | 57.0% | −0.0003 |
+| `V7_MULLIGAN_COVERAGE=1` | 141 / 114 | 0.103 | **54.8%** | −0.0157 |
+| `V8_OPP_CLEARED=0.874` (§15.1) | 9 / 7 | 0.804 | 56.8% | −0.0001 |
+| `V8_LIFE_RESALE` ×4 (§14.5) | 7-28 | 0.18-1.00 | 56.3-57.3% | mixed |
+| `V8_NO_FOLD` (§14.5) | 173 / 116 | **0.00095** | **52.2%** | −0.0270 |
+| `V8_LIVE_START_PROJECTION` (§13.2) | 49 / 56 | 0.558 | 56.0% | 0.0000 |
+
+**Eleven arms. Ten nulls, one significant regression.**
+
+### 15.4 The discordant counts are the actual finding
+
+`V7_BLADE_ARITH=2.0` produces **404 discordant games out of 1200** — it rewrites
+the bot's play in a third of all games — and moves the win rate by +0.33pp at
+p=0.88. `V8_OPP_DENSITY=measured` rewrites 10 games and moves nothing. These are
+not the same kind of intervention, and the win rate cannot tell them apart.
+
+The project's whole method rests on the discordant count being informative
+(§7, the paired McNemar test). That assumption has now survived eleven
+interventions, and the discordant counts here say something the win rate does
+not: **the bot's live-set decisions are largely independent of game outcome.**
+A change that alters 404 games and wins 0.33pp more is not a weak effect on a
+noisy measurement — it is a large effect on a quantity that does not determine
+the result.
+
+This reframes the search. Every hypothesis in §12-§15 has been aimed at the live
+set: which card to set, whether to set, what the opponent will do, how to price
+the check. All ten are null. The consistent explanation is that **the live set is
+not where the game is being lost**, and the one measurement pointing elsewhere
+is the guide's own health metric: placements per live phase **0.452 against a
+target of ~1.0**.
+
+Note what that metric now means in light of §14.1. v9 passes 91-100% of the
+checks it commits, yet places in only 45% of live phases. Those two facts are
+only reconcilable if the loss is *not* in the check: it is in the 13.8% of
+phases where nobody commits, and in the turns spent reaching a board good enough
+to commit. That is the Main phase, and §15.2-A found the Main leaf has no turn
+awareness at all.
+
+**The strongest surviving hypothesis is therefore not a switch.** It is that v9's
+Main leaf cannot express "stop developing", and `v8_main.rs:1128-1141` says so
+in the source with its own probe evidence (v9 went 4-0 with `Pass` on T2/T3). The
+documented probe that resolves it is already written — `PROBE=v9` puts v7's Main
+against v8's on identical states — and the next step is to run it at scale
+rather than four games, because a one-ply leaf with no turn term is the largest
+structural gap the audit has found, and every switch aimed elsewhere has now
+been exhausted.
 
 
 

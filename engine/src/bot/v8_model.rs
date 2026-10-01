@@ -634,6 +634,22 @@ impl OppModel {
         } else {
             1.0
         };
+        // `V8_OPP_CLEARED=<p>` replaces the `clears` step function with a
+        // constant. This is the falsification test for §14.7, which measured
+        // that `clears` is INVERTED and flat: the realized opponent pass rate
+        // was 86.2-88.3% in every predicted bucket, including the bucket where
+        // the model asserts they fold (86.4%). If that reading is right, setting
+        // `clears` to a flat measured rate must be near-bit-identical, because
+        // the quantity being replaced carries no information.
+        //
+        // If it is NOT identical, §14.7 is wrong: the step function was carrying
+        // signal that the bucket analysis missed, and that signal is worth more
+        // than the calibration it appeared to lack. Either result is informative
+        // and both are cheap at n=1200.
+        let clears = match std::env::var("V8_OPP_CLEARED").ok().and_then(|v| v.parse::<f64>().ok()) {
+            Some(p) if (0.0..=1.0).contains(&p) => p,
+            _ => clears,
+        };
         let pass_prob = if set_size == 0 {
             0.0
         } else {

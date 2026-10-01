@@ -238,7 +238,7 @@ static void walk_condition(const Condition *c, int depth, const char *where) {
     for (uint32_t i = 0; i < c->n_fields; i++) {
         n_cond_fields++;
         /* A non-empty key proves the string index resolved. */
-        CHECK(c->fields[i].key && *c->fields[i].key],
+        CHECK(c->fields[i].key && *c->fields[i].key,
               "empty condition field key at %u on %s (string index out of range?)",
               i, where);
         walk_cond_value(&c->fields[i].v, depth + 1);

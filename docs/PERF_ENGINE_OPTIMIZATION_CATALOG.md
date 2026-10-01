@@ -40,9 +40,60 @@ written (see §19.2/§19.3 for why)
 - [ ] §3.7 display-only accumulators — needs a `DisplaySources<T>` enum so the
       8 `*_sources` fields cost one branch instead of ~7 `Vec` allocations per
       `recalculate_constants`. Touches live score; needs the §1.1 gameplay gate.
-- [ ] §3.8 finish the `recalculate_constants` scratch set — **one field at a
-      time, measured between each**, because a regression is already recorded in
-      this exact area
+- [x] §3.7 display-only accumulators — `DisplaySources` enum (no-op `push` when
+      `action_display_enabled()` is false), so all 9 push sites, the helper
+      parameter and the three commit assignments changed with **no `if` guards at
+      the call sites**. Sits beside the existing `ui_text` helper.
+
+### 19.11 THE MEASUREMENT IS UNDER-POWERED FOR THIS WORK — three batches, one number
+
+Three consecutive batches of real, test-passing optimisations have measured
+**`alloc calls = 5,442,137` to seven significant figures**, and `total_actions =
+29,521`:
+
+| batch | what landed | alloc delta |
+| --- | --- | --- |
+| §6.12 + §7.3 + §6.5b | `CardFilter::matches` 10 probes → 1; needle normalisation hoisted; `peek()` in the cost-reduction loops | **0** |
+| §3.7 | `DisplaySources` gate — kills 3 `Vec` allocations + growth per `recalculate_constants`, ×2 per action | **0** |
+| §4.5/§19.6 | `TriggerEvent` deleted — removed a guaranteed `Option<String>` allocation per scan | measurable, −53k vs the pre-§19.7 baseline |
+
+Two of those three provably remove allocations from paths that run per action.
+Measuring **exactly zero**, twice, on a deck that has run the same 200 games
+three times, means one of two things — and both are important:
+
+1. **The 5CP3Z idou + `--policy random` benchmark does not exercise these
+   paths.** The `§3.7` gate fires (`action_display_enabled()` is false — the
+   bench sets it from `RABUKA_ACTION_DISPLAY`, default false), but the
+   `Vec`s only allocate when a *constant* ability actually fires, and a random
+   policy on one deck may simply never produce one. §4.5's `TriggerEvent` cost
+   only appears after a card moves; §6.12's probes only matter when a
+   group/character filter is present.
+2. **Or `alloc calls` is not sensitive to allocator reuse at all**, in which
+   case the entire §1 measurement contract is measuring less than assumed.
+
+**This is not a reason to revert any of the three.** All three are provably
+outcome-neutral (`total_actions` identical, 4,072 tests green) and provably
+strict reductions in operations. It is a reason to stop trusting the instrument.
+
+**What to do before the next item, and it is cheap:**
+
+- Run the same `--alloc` measurement on **2–3 more decks and 2 policies**
+  (including a real policy, which is what the product actually plays). If the
+  allocation count barely moves between decks, the counter is fine and the
+  coverage is the problem. If a deck the size of St. Cornelius gives a wildly
+  different count, we finally have a corpus that sees the hot paths.
+- **Print a per-subsystem breakdown**, not just the total. `crate::timer::Timer`
+  already has named scopes (`trig::auto_scan`, `effect::dispatch`,
+  `effect::gates`, `recalculate_constants`) under the `profiling` feature.
+  A flat profile is the central fact of §3 — and named timers are the one
+  instrument in this repo that can actually locate it.
+- Then re-check the three items above against a deck that hits them.
+
+Until that is done, **treat `alloc calls` as a regression guard only** (§19.10)
+and do not rank remaining work by predicted allocation savings. Rank it by
+*operations provably removed*, which is auditable from the source and is what
+§4.2, §6.11, §6.12 and the `peek()` sweep actually deliver.
+
 - [ ] §3.9 `hand_cost_matching_indices` `match_names`; **the `group_counts`
       `HashMap<String, _>` is done** — now `HashMap<&str, _>`, removing a heap
       allocation plus a SipHash per hand card

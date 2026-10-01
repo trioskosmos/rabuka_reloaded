@@ -1,5 +1,9 @@
 CC      ?= gcc
 CFLAGS  ?= -std=c11 -O2 -Wall -Iinclude -Isrc -Isrc/core/generated
+# sizeof(GameState) is ~780 KB and several suites hold two of them as locals,
+# which overflows the 1 MB default stack on Windows. Every link target gets a
+# 16 MB stack, mirroring the web target below.
+LDFLAGS ?= -Wl,--stack,16777216
 # Layout mirrors engine/src: ability/ (vm, condition, choice, queue, effects/),
 # core/ (card, data, alloc, modifiers, stats_pipeline, generated/), turn/ (phase, live, triggers).
 SRC     := src/ability/enums.c src/ability/types.c src/ability/vm.c src/ability/condition.c src/ability/choice.c src/ability/ability_queue.c src/ability/dynamic_count.c src/ability/util.c src/ability/cost.c src/ability/compound.c src/ability/resolver.c src/ability/effects/executor.c src/ability/effects/ability_effects.c src/ability/effects/custom.c src/ability/effects/move.c src/ability/effects/move_missing.c src/ability/effects/look.c src/ability/effects/state.c src/ability/effects/ability.c src/ability/effects/misc.c src/ability/effects/draw.c src/ability/effects/score.c src/ability/log.c src/ability/debug.c src/ability/abilities_gen.c src/game/deck_parser.c src/game/deck_builder.c src/core/card.c src/core/data.c src/core/alloc.c src/core/modifiers.c src/core/stats_pipeline.c src/core/game_state_abilities.c src/core/tracking.c src/core/zones.c src/bytecode_data.c src/core/generated/bytecode_blob.c src/core/generated/gen_data.c src/core/gen_data_rom.c src/turn/phase.c src/turn/live.c src/turn/triggers.c src/engine.c src/main.c
@@ -43,7 +47,7 @@ all: $(TARGET)
 web: $(WEB_TARGET)
 
 $(WEB_TARGET): $(OBJ_LIB) src/web_server.o
-	$(CC) $(CFLAGS) -mwindows -Wl,--stack,16777216 -o $@ $(OBJ_LIB) src/web_server.o
+	$(CC) $(CFLAGS) $(LDFLAGS) -mwindows -o $@ $(OBJ_LIB) src/web_server.o
 
 regen: data
 	python3 tools/gen_from_rs.py ../cards/build/abilities_gen.rs
@@ -71,7 +75,7 @@ src/abilities_strings.bin: $(STRINGS_BIN)
 .PHONY: t
 t: $(OBJ_LIB) data
 	@test -f tests/test_$(T).c || { echo "no such test: tests/test_$(T).c"; exit 2; }
-	$(CC) $(CFLAGS) -o $(TARGET)_t_$(T) $(OBJ_LIB) tests/test_$(T).c
+	$(CC) $(CFLAGS) $(LDFLAGS) -o $(TARGET)_t_$(T) $(OBJ_LIB) tests/test_$(T).c
 	./$(TARGET)_t_$(T)
 
 # Build + run every tests/test_*.c that has a main(). Logs land in tests/*.log.
@@ -80,7 +84,7 @@ run-all-tests: $(OBJ_LIB) data
 	@fail=0; \
 	for f in tests/test_*.c; do \
 	  stem=`basename $$f .c`; stem=$${stem#test_}; \
-	  $(CC) $(CFLAGS) -o $(TARGET)_t_$$stem $(OBJ_LIB) $$f 2>tests/$$stem.log \
+	  $(CC) $(CFLAGS) $(LDFLAGS) -o $(TARGET)_t_$$stem $(OBJ_LIB) $$f 2>tests/$$stem.log \
 	    || { echo "BUILD RED: $$stem"; fail=1; continue; }; \
 	  ./$(TARGET)_t_$$stem >tests/$$stem.log 2>&1 \
 	    || { echo "RED: $$stem (tests/$$stem.log)"; fail=1; }; \
@@ -89,7 +93,7 @@ run-all-tests: $(OBJ_LIB) data
 	exit $$fail
 
 $(TARGET): $(OBJ)
-	$(CC) $(CFLAGS) -o $@ $(OBJ)
+	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $(OBJ)
 
 src/%.o: src/%.c $(wildcard include/*.h)
 	$(CC) $(CFLAGS) -c -o $@ $<
@@ -106,55 +110,55 @@ test: $(TARGET)_generated $(TARGET)_replay $(TARGET)_live_allocator $(TARGET)_lo
 	./$(TARGET)_ability_effects
 
 $(TARGET)_generated: $(OBJ_LIB) $(GENERATED)
-	$(CC) $(CFLAGS) -o $@ $(OBJ_LIB) $(GENERATED)
+	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $(OBJ_LIB) $(GENERATED)
 
 $(TARGET)_replay: $(OBJ_LIB) tests/replay.c
-	$(CC) $(CFLAGS) -o $@ $(OBJ_LIB) tests/replay.c
+	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $(OBJ_LIB) tests/replay.c
 
 $(TARGET)_p1_helpers: $(OBJ_LIB) $(P1_HELPERS)
-	$(CC) $(CFLAGS) -o $@ $(OBJ_LIB) $(P1_HELPERS)
+	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $(OBJ_LIB) $(P1_HELPERS)
 
 p1-helpers: $(TARGET)_p1_helpers
 	./$(TARGET)_p1_helpers
 
 $(TARGET)_live_allocator: $(OBJ_LIB) $(LIVE_ALLOCATOR)
-	$(CC) $(CFLAGS) -o $@ $(OBJ_LIB) $(LIVE_ALLOCATOR)
+	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $(OBJ_LIB) $(LIVE_ALLOCATOR)
 
 $(TARGET)_look_select: $(OBJ_LIB) $(LOOK_SELECT)
-	$(CC) $(CFLAGS) -o $@ $(OBJ_LIB) $(LOOK_SELECT)
+	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $(OBJ_LIB) $(LOOK_SELECT)
 
 $(TARGET)_move_cards: $(OBJ_LIB) $(MOVE_CARDS)
-	$(CC) $(CFLAGS) -o $@ $(OBJ_LIB) $(MOVE_CARDS)
+	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $(OBJ_LIB) $(MOVE_CARDS)
 
 $(TARGET)_deck_builder: $(OBJ_LIB) $(DECK_BUILDER)
-	$(CC) $(CFLAGS) -o $@ $(OBJ_LIB) $(DECK_BUILDER)
+	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $(OBJ_LIB) $(DECK_BUILDER)
 
 $(TARGET)_deck_parser: $(OBJ_LIB) $(DECK_PARSER)
-	$(CC) $(CFLAGS) -o $@ $(OBJ_LIB) $(DECK_PARSER)
+	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $(OBJ_LIB) $(DECK_PARSER)
 
 $(TARGET)_decode_fallback: $(OBJ_LIB) $(DECODE_FALLBACK)
-	$(CC) $(CFLAGS) -o $@ $(OBJ_LIB) $(DECODE_FALLBACK)
+	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $(OBJ_LIB) $(DECODE_FALLBACK)
 
 decode-fallback: $(TARGET)_decode_fallback
 	./$(TARGET)_decode_fallback
 
 $(TARGET)_state_effects: $(OBJ_LIB) $(STATE_EFFECTS)
-	$(CC) $(CFLAGS) -o $@ $(OBJ_LIB) $(STATE_EFFECTS)
+	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $(OBJ_LIB) $(STATE_EFFECTS)
 
 state-effects: $(TARGET)_state_effects
 	./$(TARGET)_state_effects
 
 $(TARGET)_ability_effects: $(OBJ_LIB) $(ABILITY_EFFECTS)
-	$(CC) $(CFLAGS) -o $@ $(OBJ_LIB) $(ABILITY_EFFECTS)
+	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $(OBJ_LIB) $(ABILITY_EFFECTS)
 
 ability-effects: $(TARGET)_ability_effects
 	./$(TARGET)_ability_effects
 
 $(TARGET)_mechanics: $(OBJ_LIB) $(MECHANICS)
-	$(CC) $(CFLAGS) -o $@ $(OBJ_LIB) $(MECHANICS)
+	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $(OBJ_LIB) $(MECHANICS)
 
 $(TARGET)_live_rules: $(OBJ_LIB) $(LIVE_RULES)
-	$(CC) $(CFLAGS) -o $@ $(OBJ_LIB) $(LIVE_RULES)
+	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $(OBJ_LIB) $(LIVE_RULES)
 
 mechanics: $(TARGET)_mechanics
 	./$(TARGET)_mechanics
@@ -163,13 +167,13 @@ live-rules: $(TARGET)_live_rules
 	./$(TARGET)_live_rules
 
 $(TARGET)_phase_rules: $(OBJ_LIB) $(PHASE_RULES)
-	$(CC) $(CFLAGS) -o $@ $(OBJ_LIB) $(PHASE_RULES)
+	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $(OBJ_LIB) $(PHASE_RULES)
 
 $(TARGET)_performance_rules: $(OBJ_LIB) $(PERFORMANCE_RULES)
-	$(CC) $(CFLAGS) -o $@ $(OBJ_LIB) $(PERFORMANCE_RULES)
+	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $(OBJ_LIB) $(PERFORMANCE_RULES)
 
 $(TARGET)_surplus_heart: $(OBJ_LIB) $(SURPLUS_HEART)
-	$(CC) $(CFLAGS) -o $@ $(OBJ_LIB) $(SURPLUS_HEART)
+	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $(OBJ_LIB) $(SURPLUS_HEART)
 
 phase-rules: $(TARGET)_phase_rules
 	./$(TARGET)_phase_rules
@@ -181,13 +185,13 @@ surplus-heart: $(TARGET)_surplus_heart
 	./$(TARGET)_surplus_heart
 
 $(TARGET)_opponent_live_flow: $(OBJ_LIB) $(OPPONENT_LIVE_FLOW)
-	$(CC) $(CFLAGS) -o $@ $(OBJ_LIB) $(OPPONENT_LIVE_FLOW)
+	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $(OBJ_LIB) $(OPPONENT_LIVE_FLOW)
 
 $(TARGET)_live_movement: $(OBJ_LIB) $(LIVE_MOVEMENT)
-	$(CC) $(CFLAGS) -o $@ $(OBJ_LIB) $(LIVE_MOVEMENT)
+	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $(OBJ_LIB) $(LIVE_MOVEMENT)
 
 $(TARGET)_restrictions: $(OBJ_LIB) $(RESTRICTIONS)
-	$(CC) $(CFLAGS) -o $@ $(OBJ_LIB) $(RESTRICTIONS)
+	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $(OBJ_LIB) $(RESTRICTIONS)
 
 opponent-live-flow: $(TARGET)_opponent_live_flow
 	./$(TARGET)_opponent_live_flow
@@ -199,13 +203,13 @@ restrictions: $(TARGET)_restrictions
 	./$(TARGET)_restrictions
 
 $(TARGET)_condition_eval: $(OBJ_LIB) $(CONDITION_EVAL)
-	$(CC) $(CFLAGS) -o $@ $(OBJ_LIB) $(CONDITION_EVAL)
+	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $(OBJ_LIB) $(CONDITION_EVAL)
 
 $(TARGET)_target_selection: $(OBJ_LIB) $(TARGET_SELECTION)
-	$(CC) $(CFLAGS) -o $@ $(OBJ_LIB) $(TARGET_SELECTION)
+	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $(OBJ_LIB) $(TARGET_SELECTION)
 
 $(TARGET)_max_distinct_names: $(OBJ_LIB) $(MAX_DISTINCT_NAMES)
-	$(CC) $(CFLAGS) -o $@ $(OBJ_LIB) $(MAX_DISTINCT_NAMES)
+	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $(OBJ_LIB) $(MAX_DISTINCT_NAMES)
 
 condition-eval: $(TARGET)_condition_eval
 	./$(TARGET)_condition_eval
@@ -217,13 +221,13 @@ max-distinct-names: $(TARGET)_max_distinct_names
 	./$(TARGET)_max_distinct_names
 
 $(TARGET)_baton_touch: $(OBJ_LIB) $(BATON_TOUCH)
-	$(CC) $(CFLAGS) -o $@ $(OBJ_LIB) $(BATON_TOUCH)
+	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $(OBJ_LIB) $(BATON_TOUCH)
 
 $(TARGET)_member_activation: $(OBJ_LIB) $(MEMBER_ACTIVATION)
-	$(CC) $(CFLAGS) -o $@ $(OBJ_LIB) $(MEMBER_ACTIVATION)
+	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $(OBJ_LIB) $(MEMBER_ACTIVATION)
 
 $(TARGET)_b8_live_timing: $(OBJ_LIB) $(B8_LIVE_TIMING)
-	$(CC) $(CFLAGS) -o $@ $(OBJ_LIB) $(B8_LIVE_TIMING)
+	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $(OBJ_LIB) $(B8_LIVE_TIMING)
 
 baton-touch: $(TARGET)_baton_touch
 	./$(TARGET)_baton_touch
@@ -235,10 +239,10 @@ b8-live-timing: $(TARGET)_b8_live_timing
 	./$(TARGET)_b8_live_timing
 
 $(TARGET)_cross_player: $(OBJ_LIB) $(CROSS_PLAYER)
-	$(CC) $(CFLAGS) -o $@ $(OBJ_LIB) $(CROSS_PLAYER)
+	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $(OBJ_LIB) $(CROSS_PLAYER)
 
 $(TARGET)_draw_phase_fix: $(OBJ_LIB) $(DRAW_PHASE_FIX)
-	$(CC) $(CFLAGS) -o $@ $(OBJ_LIB) $(DRAW_PHASE_FIX)
+	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $(OBJ_LIB) $(DRAW_PHASE_FIX)
 
 cross-player: $(TARGET)_cross_player
 	./$(TARGET)_cross_player
@@ -247,7 +251,7 @@ draw-phase-fix: $(TARGET)_draw_phase_fix
 	./$(TARGET)_draw_phase_fix
 
 $(TARGET)_zone_filter_parity: $(OBJ_LIB) $(ZONE_FILTER_PARITY)
-	$(CC) $(CFLAGS) -o $@ $(OBJ_LIB) $(ZONE_FILTER_PARITY)
+	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $(OBJ_LIB) $(ZONE_FILTER_PARITY)
 
 zone-filter-parity: $(TARGET)_zone_filter_parity
 	./$(TARGET)_zone_filter_parity
@@ -268,14 +272,14 @@ deck-parser: $(TARGET)_deck_parser
 	./$(TARGET)_deck_parser
 
  $(TARGET)_debug: $(OBJ_LIB) src/debug_umi.o
-	$(CC) $(CFLAGS) -o $@ $(OBJ_LIB) src/debug_umi.o
+	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $(OBJ_LIB) src/debug_umi.o
 
 
 audit: $(TARGET)_audit
 	./$(TARGET)_audit
 
 $(TARGET)_audit: $(OBJ_LIB) $(AUDIT)
-	$(CC) $(CFLAGS) -o $@ $(OBJ_LIB) $(AUDIT)
+	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $(OBJ_LIB) $(AUDIT)
 
 clean:
 	rm -f $(OBJ) $(TARGET) $(TARGET)_test $(TARGET)_audit $(TARGET)_replay $(TARGET)_generated $(TARGET)_mechanics $(TARGET)_live_rules

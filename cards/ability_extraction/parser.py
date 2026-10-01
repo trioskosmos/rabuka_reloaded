@@ -10003,7 +10003,61 @@ def _try_choice(text):
 
     result["options"] = options
     result["count"] = 1
+    _set_choice_per_unit_multiplier(result, parts[0])
     return result
+
+
+def _set_choice_per_unit_multiplier(result, head_text):
+    """「『X』のカード1枚につき、以下から1つを選ぶ」 — the choice repeats per card.
+
+    The head clause before 以下から1つを選ぶ sets how MANY TIMES the player chooses, one
+    per qualifying card. Without this the effect carries `count: 1` and is
+    indistinguishable from a one-shot choice, so N qualifying cards yield one choice
+    instead of N — 「同じ選択肢を2回以上選んでもよい」 becomes unsatisfiable and the rest of
+    the printed effect is dropped.
+
+    Only the 「1枚につき」 form is treated as a multiplier, and only when the clause names a
+    card set the engine can count (a group, an explicit 置き場, or a card type). A clause
+    like 「1回につき」 or one with no countable set is left alone rather than guessed at.
+    """
+    m = re.search(r"([^、。\n]*?)1枚につき", head_text)
+    if not m:
+        return
+    scope = m.group(1).strip()
+    if not scope:
+        return
+    # The counted set must be identifiable, otherwise the multiplier has no referent.
+    zone = None
+    if "成功ライブカード置き場" in scope:
+        zone = "success_live_zone"
+    elif "ライブカード置き場" in scope:
+        zone = "live_card_zone"
+    elif "控え室" in scope:
+        zone = "discard"
+    elif "手札" in scope:
+        zone = "hand"
+    else:
+        zone = "success_live_zone" if "置き場" in scope else None
+
+    groups = extract_all_groups(scope)
+    if zone is None and not groups:
+        return
+
+    result["per_unit"] = True
+    result["per_unit_type"] = "枚"
+    result["per_unit_count"] = 1
+    if groups:
+        result["group_names"] = groups
+    if zone is not None:
+        # `location`, not `source`: the engine resolves the counted zone as
+        # `location.or(per_unit_type)`, and per_unit_type only names the counter unit
+        # (枚). A bare 枚 with no location resolves to the hand, which is the wrong zone
+        # for every 「Aのカード1枚につき」 clause that names a 置き場.
+        result["location"] = zone
+    if "live_card" in scope:
+        result["card_type"] = "live_card"
+    elif "メンバー" in scope:
+        result["card_type"] = "member_card"
 
 
 def _set_kore_niyori_cascade(text, result):

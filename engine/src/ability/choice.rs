@@ -2665,6 +2665,63 @@ gs.set_recently_moved_batch(valid_ids.into(), Some("stage"));
                         // enum and creates a new SelectTarget for the
                         // remaining options.
                         let commands = vec![selected_effect];
+
+                        // 「『X』のカード1枚につき、以下から1つを選ぶ」 — one further offering
+                        // per remaining qualifying card. The FULL option list is restored,
+                        // unlike the any_number branch below: 「同じ選択肢を2回以上選んでも
+                        // よい」 explicitly permits picking the same option again, so the
+                        // option must still be there for the repeat.
+                        let per_card_repeat = gs
+                            .ability_queue
+                            .current_entry()
+                            .is_some_and(|e| e.choice_repeats_remaining > 0);
+                        if per_card_repeat {
+                            let full = all_options.clone();
+                            if let Some(entry) = gs.ability_queue.current_entry_mut() {
+                                entry.choice_repeats_remaining -= 1;
+                                entry.conditional_choice = Some(ConditionalChoice::Effects(full.clone()));
+                            }
+                            let desc: Vec<String> = full
+                                .iter()
+                                .map(|o| {
+                                    o.answers_any()
+                                        .as_ref()
+                                        .map(|a| a.join(", "))
+                                        .unwrap_or_else(|| o.text.to_string())
+                                })
+                                .collect();
+                            let desc_en: Vec<String> = full
+                                .iter()
+                                .map(|o| {
+                                    let en = crate::ability::describe::describe_effect_en(o);
+                                    if en.trim().is_empty() {
+                                        o.answers_any()
+                                            .as_ref()
+                                            .map(|a| a.join(", "))
+                                            .unwrap_or_else(|| o.text.to_string())
+                                    } else {
+                                        en
+                                    }
+                                })
+                                .collect();
+                            let n_full = full.len();
+                            log::debug!(
+                                "[CHOICE_PER_CARD] re-prompting over {n_full} options; the same \
+                                 option may be picked again (同じ選択肢を2回以上選んでもよい)"
+                            );
+                            self.awaiting.reprompt = Some(Choice::SelectTarget {
+                                target: "choice".to_string(),
+                                description: desc.join(" / "),
+                                description_en: Some(desc_en.join(" / ")),
+                                description_ja: Some(desc.join(" / ")),
+                                allow_skip: true,
+                                options: None,
+                            });
+                            gs.ability_queue.set_pending_actions(commands);
+                            self.awaiting.choice = None;
+                            return self.resume_pending_actions(gs);
+                        }
+
                         let wants_re_prompt = !remaining.is_empty()
                             && gs.entry_effect().is_some_and(|eff| {
                                 if eff.any_number_any().unwrap_or(false) {

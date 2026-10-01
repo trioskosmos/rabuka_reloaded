@@ -286,6 +286,7 @@ impl GameState {
             triggering_member_id,
             snapshot_movements: SmallVec::new(),
             choice_effect_text: None,
+            choice_repeats_remaining: 0,
             condition_cache: SmallVec::new(),
         }
     }

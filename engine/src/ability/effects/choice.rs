@@ -191,8 +191,14 @@ impl AbilityResolver {
                 allow_skip: effect.optional.unwrap_or(false),
                 options: None,
             });
+            // 「『X』のカード1枚につき、以下から1つを選ぶ」 — the choice is offered once per
+            // qualifying card, so store how many FURTHER offerings are owed. The multiplier
+            // is resolved BEFORE the entry is borrowed, and before any option runs, because
+            // an earlier option can move cards into or out of the counted zone.
+            let repeats = self.per_card_choice_repeats(gs, effect);
             if let Some(entry) = gs.ability_queue.current_entry_mut() {
                 entry.choice_effect_text = Some(effect.text.to_string());
+                entry.choice_repeats_remaining = repeats;
             }
         } else if let Some(string_options) = choice_options {
             self.awaiting.choice = Some(Choice::SelectTarget {
@@ -214,6 +220,46 @@ impl AbilityResolver {
             });
         }
         Ok(())
+    }
+
+    /// Further offerings owed for a 「…のカード1枚につき、以下から1つを選ぶ」 choice.
+    ///
+    /// Returns `count - 1`, because the choice about to be presented IS the first of the
+    /// `count` offerings. A non-per-unit choice owes nothing, and so does one with no
+    /// qualifying card at all (the choice still runs once — the player may decline it —
+    /// but 「1枚につき」 gives no extra offerings).
+    fn per_card_choice_repeats(&mut self, gs: &GameState, effect: &AbilityEffect) -> u8 {
+        if !effect.per_unit_any().unwrap_or(false) {
+            return 0;
+        }
+        let player = gs.resolve_target_player(effect.target_name());
+        let filter = crate::ability::util::CardFilter::from_effect(effect);
+        // The counted zone is `location`, with per_unit_type only naming the counter unit
+        // (枚) — the same `location.or(per_unit_type)` precedence the score modifier uses.
+        // Without the location a bare 枚 resolves to the hand, which would count the
+        // player's hand instead of the 置き場 the clause names.
+        let zone = effect.location_any().or(effect.per_unit_type_any());
+        let qualifying = crate::ability::util::resolve_per_unit_count(
+            true,
+            zone,
+            player,
+            &gs.card_database,
+            &filter,
+            effect.heart_colors_any(),
+            effect.state_any(),
+            &gs.mods.orientation_modifiers,
+            None,
+        );
+        let per = effect.per_unit_count_any().unwrap_or(1).max(1);
+        let offerings = (qualifying / per).saturating_sub(1);
+        log::debug!(
+            "[CHOICE_PER_CARD] qualifying={} per={} offerings={} remaining={}",
+            qualifying,
+            per,
+            offerings + 1,
+            offerings
+        );
+        offerings
     }
 
     /// Build EffectData for a single-card resource grant (blade or heart).

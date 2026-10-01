@@ -3,5 +3,6 @@
 pub mod pb2_activate_bibi_or_two_energy_pl_pb2_015_p_plus_test;
 pub mod pb2_repeatable_three_option_choice_per_lily_white_live_pl_pb2_016_p_plus_test;
 pub mod per_card;
+pub mod per_unit_choice_repeats_per_lily_white_card_pl_pb2_016_p_plus_test;
 pub mod selection_filter;
 pub mod target_player;

@@ -4,5 +4,6 @@ pub mod characterization;
 pub mod effects;
 pub mod integration;
 pub mod jidou;
+pub mod perf;
 pub mod rules;
 pub mod support;

@@ -2715,6 +2715,17 @@ static uint32_t rb_fnv1a32(const unsigned char *p, size_t n) {
     return h;
 }
 
+/* Same function, resumable. Lets rb_verify_generated_tables() hash the whole
+ * table in one pass without allocating a copy: the pool is unseparated, so the
+ * bytes are exactly the concatenation of string 0, string 1, ... */
+static uint32_t rb_fnv1a32_resume(uint32_t h, const unsigned char *p, size_t n) {
+    for (size_t i = 0; i < n; i++) {
+        h ^= (uint32_t)p[i];
+        h *= 0x01000193u;
+    }
+    return h;
+}
+
 /* Why a decoded string cannot be trusted. 0 = plausible.
  *
  * `allow_empty` matters: the pool legitimately contains empty strings (an
@@ -2804,7 +2815,7 @@ static int scan_refs(Rdr *r, KeyScan *ks, int depth) {
 int rb_verify_generated_tables(int *out_bad_strings, int *out_bad_keys,
                                char *msg, unsigned long msg_sz) {
     uint32_t n = RBKA_NUM_STRING_OFFSETS ? (RBKA_NUM_STRING_OFFSETS - 1) : 0;
-    int bad_len = 0, bad_order = 0, bad_digest = 0, bad_text = 0;
+    int bad_len = 0, bad_order = 0, bad_digest = 0, bad_text = 0, bad_table = 0;
     size_t msz = msg ? (size_t)msg_sz : 0, mn = 0;
     if (msg && msz) msg[0] = 0;
 #define VMSG(...) do { if (msg && mn < msz) { \
@@ -2833,6 +2844,44 @@ int rb_verify_generated_tables(int *out_bad_strings, int *out_bad_keys,
     }
     if (bad_order)
         VMSG("FATAL: RBKA_STRINGS_OFFSETS is not monotonic / does not start at 0.\n");
+
+    /* ── layer 1b: WHOLE-TABLE digest. One comparison that catches any
+       byte-level drift, including drift that preserves every individual
+       string length. A mid-pool splice (the mechanism behind every U+FFFD
+       this check exists to prevent) rewrites bytes without changing any
+       offset, so the length and per-string checks alone can both pass while
+       the text is still wrong. Emitted by tools/gen_from_rs.py as
+       RBKA_STRINGS_TABLE_FNV; 0 means "not recorded", i.e. a gen_data.c from
+       before this check existed, which is not itself a defect. ── */
+#ifdef RBKA_STRINGS_TABLE_FNV
+    if (RBKA_STRINGS_TABLE_FNV != 0u) {
+        uint32_t h = 0x811C9DC5u;
+        int truncated = 0;
+        for (uint32_t i = 0; i < n; i++) {
+            uint32_t a = g_strings_offsets[i], b = g_strings_offsets[i + 1];
+            if (b > RBKA_STRINGS_TABLE_LEN || a > b) { truncated = 1; break; }
+            const char *s = rb_get_string(i);
+            size_t want = (size_t)(b - a);
+            if (!s || strlen(s) != want) { truncated = 1; break; }
+            h = rb_fnv1a32_resume(h, (const unsigned char *)s, want);
+        }
+        if (truncated) {
+            /* An offset points outside the table; the per-string pass below
+             * reports the specifics. Do not double-report here. */
+        } else if (h != RBKA_STRINGS_TABLE_FNV) {
+            bad_table = 1;
+            VMSG("FATAL: whole string table digest mismatch: the generator "
+                 "recorded %08x, the table loaded at runtime hashes to %08x.\n"
+                 "       The table has been modified in place without "
+                 "regenerating gen_data.c, so some number of strings now "
+                 "carry bytes the offsets never described.\n"
+                 "       FIX: bash tools/regen_all.sh\n",
+                 (unsigned)RBKA_STRINGS_TABLE_FNV, (unsigned)h);
+        }
+    }
+#else
+    (void)rb_fnv1a32_resume;
+#endif
 
     /* ── layer 2: per-string FNV-1a. The load-bearing check. ──
        Counted for reporting, but the first six offenders are named so the
@@ -2893,7 +2942,8 @@ int rb_verify_generated_tables(int *out_bad_strings, int *out_bad_keys,
     if (out_bad_strings) *out_bad_strings = bad_text > bad_digest ? bad_text : bad_digest;
     if (out_bad_keys) *out_bad_keys = bad_ref_keys;
 
-    int rc = (bad_len || bad_order || bad_digest || bad_text || bad_refs) ? -1 : 0;
+    int rc = (bad_len || bad_order || bad_digest || bad_text || bad_refs ||
+              bad_table) ? -1 : 0;
     if (rc == 0)
         VMSG("gen_data self-check OK: %u abilities, %u interned strings, table "
              "%u bytes, offsets and digests consistent.\n",

@@ -38,6 +38,55 @@ fn ui_text(s: &str) -> String {
     }
 }
 
+/// UI-only per-source attribution accumulator. Sits beside [`ui_text`], which
+/// already made the *strings* free when logs are off; this makes the
+/// *containers* free too.
+///
+/// Every `*_sources` field on `GameModifiers` is read only by `game/display.rs`
+/// (plus one display-only push in `turn/phases.rs`) — never by `ability/`,
+/// `core/`, `turn/` or `bot/`. They exist so the UI can show WHERE a bonus came
+/// from. But they were rebuilt on every `recalculate_constants`, which runs
+/// twice per action: a `Vec` allocation plus growth reallocs each, for data no
+/// engine code reads. `runtime_flags::action_display_enabled()` is already
+/// consulted in 16 places — all in `game/game_setup.rs`; the layers that do the
+/// re-derivation never asked.
+///
+/// A no-op `push` rather than nine `if` guards, so every call site reads exactly
+/// as it did before. Off means never allocates, and `into_vec` yields empty.
+///
+/// **Do not move a reader for one of these fields into `core/` or `ability/`.**
+/// That makes the gate unsound and the compiler will not catch it.
+enum DisplaySources {
+    On(Vec<crate::core::game_modifiers::BonusSource>),
+    Off,
+}
+
+impl DisplaySources {
+    #[inline]
+    fn new() -> Self {
+        if crate::core::runtime_flags::action_display_enabled() {
+            DisplaySources::On(Vec::new())
+        } else {
+            DisplaySources::Off
+        }
+    }
+
+    #[inline]
+    fn push(&mut self, s: crate::core::game_modifiers::BonusSource) {
+        if let DisplaySources::On(v) = self {
+            v.push(s);
+        }
+    }
+
+    #[inline]
+    fn into_vec(self) -> Vec<crate::core::game_modifiers::BonusSource> {
+        match self {
+            DisplaySources::On(v) => v,
+            DisplaySources::Off => Vec::new(),
+        }
+    }
+}
+
 /// UI-only kind label for BonusSource.
 #[inline]
 fn ui_kind(s: &str) -> String {
@@ -102,7 +151,7 @@ impl GameState {
     fn grant_under_card_constant_blades(
         &mut self,
         exp_blade: &mut HashMap<i16, i16>,
-        exp_blade_sources: &mut Vec<crate::core::game_modifiers::BonusSource>,
+        exp_blade_sources: &mut DisplaySources,
     ) {
         for (under_cid, host) in self
             .player1
@@ -473,9 +522,9 @@ fn commit_constant_results(
         exp_heart: HashMap<i16, HashMap<String, i16>>,
         exp_prohibition: Vec<String>,
         exp_global_need_heart: Vec<(i16, String, i16)>,
-        exp_blade_sources: Vec<crate::core::game_modifiers::BonusSource>,
-        exp_heart_sources: Vec<crate::core::game_modifiers::BonusSource>,
-        exp_global_nh_sources: Vec<crate::core::game_modifiers::BonusSource>,
+        exp_blade_sources: DisplaySources,
+        exp_heart_sources: DisplaySources,
+        exp_global_nh_sources: DisplaySources,
         p1_constant_score_bonus: i16,
         p2_constant_score_bonus: i16,
     ) {
@@ -491,7 +540,7 @@ fn commit_constant_results(
             }
         }
         self.mods.constant_blade_bonuses = exp_blade;
-        self.mods.constant_blade_sources = exp_blade_sources;
+        self.mods.constant_blade_sources = exp_blade_sources.into_vec();
         self.scratch_exp_blade = old_blade;
 
         // Score
@@ -547,7 +596,7 @@ fn commit_constant_results(
             self.scratch_exp_heart = old_heart;
         }
         self.mods.constant_heart_bonuses = exp_heart;
-        self.mods.constant_heart_sources = exp_heart_sources;
+        self.mods.constant_heart_sources = exp_heart_sources.into_vec();
 
         tdbg!("RC:11 PROHIBITION");
         // Apply restriction effects from constant abilities.
@@ -575,7 +624,7 @@ fn commit_constant_results(
             }
         }
         self.mods.constant_global_need_heart = exp_global_need_heart;
-        self.mods.constant_need_heart_sources = exp_global_nh_sources;
+        self.mods.constant_need_heart_sources = exp_global_nh_sources.into_vec();
         tdbg!("RC:12b GLOBAL_NEED_HEART_DONE");
     }
 
@@ -625,10 +674,11 @@ fn commit_constant_results(
         self.constant_cannot_activate_members.clear();
         let mut exp_global_need_heart: Vec<(i16, String, i16)> = Vec::new();
         // Per-source attribution for everything accumulated below (UI bonus
-        // provenance). Mirrors the exp_* maps entry-for-entry.
-        let mut exp_blade_sources: Vec<crate::core::game_modifiers::BonusSource> = Vec::new();
-        let mut exp_heart_sources: Vec<crate::core::game_modifiers::BonusSource> = Vec::new();
-        let mut exp_global_nh_sources: Vec<crate::core::game_modifiers::BonusSource> = Vec::new();
+        // provenance). Mirrors the exp_* maps entry-for-entry. Gated: see
+        // `DisplaySources`.
+        let mut exp_blade_sources = DisplaySources::new();
+        let mut exp_heart_sources = DisplaySources::new();
+        let mut exp_global_nh_sources = DisplaySources::new();
         let mut p1_constant_score_bonus: i16 = 0;
         let mut p2_constant_score_bonus: i16 = 0;
         let mut jyouji_statuses: Vec<crate::types::ConstantAbilityStatus> = Vec::new();

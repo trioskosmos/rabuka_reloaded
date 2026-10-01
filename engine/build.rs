@@ -188,6 +188,21 @@ fn generate_test_module_declarations(root: &Path) {
 
 fn main() {
     let manifest_dir = std::env::var("CARGO_MANIFEST_DIR").unwrap();
+
+    // Expose `alloc_tracker` to the TEST crate as well as the library.
+    //
+    // `#[cfg(feature = "alloc_tracker")]` inside `src/` resolves against the
+    // library's own features, but a `tests/*.rs` integration test is its own
+    // crate and has no such feature — so a test that wants to read
+    // `alloc_counter` needs a build-script cfg instead. build.rs sees every
+    // enabled feature in CARGO_FEATURE_*.
+    //
+    // `check-cfg` is declared because `engine_alloc_tracker` is not a Cargo
+    // feature and would otherwise trip the unexpected-cfg lint.
+    println!("cargo:rustc-check-cfg=cfg(engine_alloc_tracker)");
+    if std::env::var_os("CARGO_FEATURE_ALLOC_TRACKER").is_some() {
+        println!("cargo:rustc-cfg=engine_alloc_tracker");
+    }
     let cards_json = Path::new(&manifest_dir).join("../cards/cards.json");
     let abilities_json = Path::new(&manifest_dir).join("../cards/abilities.json");
     let abilities_gen = Path::new(&manifest_dir).join("src/ability/abilities_gen.rs");
