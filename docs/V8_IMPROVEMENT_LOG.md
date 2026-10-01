@@ -2825,6 +2825,278 @@ interventions in §13-§19 failed to improve that leaf by hand; cloning it into
 the form the published SOTA uses loses 20 points. The next honest step is
 RL-with-a-value-head from this initialisation, not more hand weights.
 
+---
+
+## 21. RL, and what the literature says about abilities
+
+### 21.1 You were right to push, and there were three correctness bugs
+
+Cloning is capped at the teacher by construction, so PPO was the right ask. It
+took `ppo_learn.rs` (GAE within seat-contiguous runs, clipped surrogate, value
+loss) plus three fixes to the collector, each a genuine correctness bug rather
+than a tuning miss:
+
+1. **Mirror self-play needed both seats.** The collector recorded only P1, so
+   RL had half the data and no P2 signal. It now resolves the acting seat the
+   way `bot_arena::decision_player` does — a pending CHOICE can belong to the
+   player who is *not* the active player — and signs each step's reward by its
+   own seat. Trajectory version 2 → 3 (a trailing `seat` byte); the reader
+   accepts both so every existing corpus still loads.
+2. **PPO's central assumption was broken on iteration 0.** The collector
+   started from `PolicyNet::new()` (all zeros → uniform policy) while the
+   trainer started from Xavier, so the importance ratio compared two different
+   policies. It diverged to **|dlog ratio| ≈ 2.8e12 and a NaN value loss.** The
+   collector now Xavier-initialises and **saves the policy that generated the
+   data**, which the trainer warm-starts from. This is the single most important
+   line in the whole loop.
+3. **Per-sample SGD instead of batched.** 88k sequential updates per epoch at
+   `lr=3e-4` is a divergent optimisation. Gradients now accumulate over a chunk
+   and apply once; advantages are clamped to ±10 because a terminal ±1 reward
+   produces a few enormous ones, and one dominating a step is what NaN'd the
+   value loss.
+
+After those: **value loss 0.0003, entropy 1.63 (≈ uniform over the legal set),
+|dlog ratio| 52.** The optimiser is healthy.
+
+### 21.2 And then the signal turned out to be degenerate
+
+`p1_wins = 0` of 500 games. **Two near-uniform nets playing each other draw
+every single game**, so every reward is 0, every advantage is 0, and there is
+nothing to learn from. The policy term is flat at −0.0194 for exactly that
+reason. (For scale: `random` vs `v7` draws 39.3% of games; mirror-random drawa
+lot, because neither side can ever assemble a board.)
+
+This is a real property of the game, not a bug: 3 successes is a long way from
+a random start, and a policy that has learned nothing will never get there. The
+published answer is not to fix the optimiser but to **fix the opponent
+distribution** — ByteRL trains against a *pool* of historical checkpoints, not a
+mirror, precisely so the opponent is diverse enough for games to be decisive.
+That is the next step and it is not written yet.
+
+### 21.3 On abilities: the literature says you should NOT add inputs, and here is why
+
+I went and checked what the strong agents actually encode. The answer is
+consistent across ByteRL (COG'23 champions), the ByteDance Hearthstone agent
+(arXiv 2303.05197), and every Hearthstone AI Competition winner:
+
+**None of them encode card text.** ByteRL borrows gym-locm's observation
+wholesale; the Hearthstone agent's Table V lists 14 observation fields and card
+text is not among them — cards appear as a learned identity embedding plus
+scalars, and spells get no feature at all beyond being identified as cards.
+
+Worse for the "more inputs" intuition, there are **three published negative
+results on adding features**:
+
+- **Vieira (EntCom 2023)** added deck information to the observation: it made
+  things *worse* (56.4% vs 59.2%), as did both reward-shaping variants. "Adding
+  deck information to the game state was not worth it."
+- **Tutea (Groningen 2020)** head-to-head on state-description size: on simple
+  decks the *larger* representation won **less** (78% vs 81% against random);
+  only on synergistic decks did it help (88%). Bigger is not better; it is worse
+  when it is not needed.
+- **Jakubik (AAIA'17)** attribute their entire failure mode to abilities that
+  "are not expressed in any way in a contextless game state description."
+
+So the honest answer to "couldn't you have more inputs, especially for
+abilities?" is: **there is no published evidence that adding them helps, and one
+strong result that it hurts.** The one thing that reliably worked in the
+literature is Grad's two hand-authored *spell-class aggregates* — `hand_aoe`
+(total AoE damage in hand) and `hand_answers` (count of hard-removal cards) —
+which won AAIA'17 with AUC 0.80185 on an otherwise knowledge-free model. That is
+the shape of the win: a **few aggregate priors about what a hand can do**, not
+more raw inputs.
+
+### 21.4 The cheapest known win, which this repo does not have
+
+The most actionable finding is a *structural* defect the whole DRL-LOCM lineage
+is openly stuck on, and this repo shares it. Vieira, §6:
+
+> "the current DRL literature on LOCM considers, for instance, **every card slot
+> in the player's hand as a completely different set of features**. This way, the
+> neural networks must learn how to deal with a card in hand multiple times…
+> **Deep Sets, Set Transformers, or other permutation-equivariant architectures
+> may be a good fit.**"
+
+Nobody in the strong-agent line has done this, and it is called out explicitly as
+the cheapest known win. **This repo already has it, and did before the paper
+pointed at it**: `neural.rs:209` defines a `sum_embeds` closure that pools card
+embeddings, and every non-positional zone goes through it —
+`my_hand: sum_embeds(&obs.me.hand)`, and likewise energy, waitroom, live,
+success and deck composition (`neural.rs:348-355`). Only the three stage slots
+are positional, which is correct: a stage slot's position is real information.
+
+**So the "add more inputs" question is already answered the right way here — by
+pooling rather than by growing the vector.** That is very likely part of why the
+net reaches 53% top-1 (3.2x chance) off 71k steps, where a per-slot encoding
+would have had to learn the same card in ten different hand slots.
+
+### 21.5 One genuinely open problem, and it is this game's problem
+
+The research is explicit that encoding conditional abilities is **unsolved**:
+
+> "The 'encode N conditional effects' problem is unsolved in the learned-CCG
+> literature. LOCM's 6-bit mask works because its effect grammar is closed;
+> Cardsformer's text embedding works only for simple templated effects ('fails to
+> predict Lorewalker Cho')."
+
+This game's abilities are trigger-based — `LiveStart`, `LiveSuccess`,
+`printed`, `constant`, `auto` — which is exactly the case Cardsformer fails on.
+The one paper that encodes text at all (Cardsformer, ECAI'23) reports that on
+*known* cards text buys data efficiency and **~8 points, not asymptotic
+strength**; the real win is unseen cards, and this deck is fixed.
+
+So a learned ability encoder here would be genuinely novel and would probably not
+pay. The evidence-based move is not more inputs — it is Grad's two aggregates,
+or nothing.
+
+### 21.6 The ladder: it works, and PPO on it made things worse
+
+The suggested design — beat v1, then v2, and so on — is the right answer to
+§21.2's degenerate mirror, and it is now implemented (`PPO_OPP_BOT=v1..v7`,
+`PPO_SEATS=1`). Getting there took four more real bugs, all of which produced a
+*silent* total failure rather than an error:
+
+1. **The net was on the wrong seat.** With `PPO_SEATS=1` the net took P1 and the
+   ladder bot P2, so every trajectory was the bot losing and the counter read
+   0 wins in 120 games. The network must take the seat the ladder bot does not.
+2. **Every game ended `Draw` at turn 1.** The net was picking RPS and attacker
+   order at random; RPS ties re-pick until `stuck > 200`. The arena intercepts
+   exactly those phases before dispatch for this reason, and the collector did
+   not.
+3. **The mulligan hung the same way.** It is multi-step (select, then confirm),
+   and sampling one step at a time re-picks a non-advancing selection until the
+   turn cap.
+4. **The live-card set hung the same way.** Also multi-step. Handing the net's
+   live-set seat to the ladder bot's live-set logic fixes it — and is a
+   reasonable design anyway, since the live set is the one thing this bot family
+   is good at.
+
+After those, the ladder produces real signal: **decisive games, net 15W/185L
+(7.5%) against v1.** The four PPO correctness bugs from §21.1 were the earlier
+half of the work; the collector now also saves the policy that generated the
+data, which is what makes the ratio correct.
+
+One more real fix: the critic target was in game-reward units while the advantage
+carried accumulated GAE magnitude, so with a mean reward of −0.69 on a losing
+rung the value loss sat at **160+** every iteration and swamped the policy term
+(−0.004) by four orders of magnitude. Normalising `ret` on the same scale as
+`adv` brought it to **1.004**, stable. That is the kind of bug that makes RL
+"not work" for reasons no amount of hyperparameter tuning will fix.
+
+### 21.7 And the honest result: the ladder measures, but PPO regressed the net
+
+With the ladder measuring properly, the paired comparison at matched settings
+(argena, `NEURAL_EPSILON=0`, no pass guard, 400 games vs v1):
+
+| net | result | win rate |
+|---|---|---|
+| cold init (Xavier, never trained) | 189-211 | **47.3%** |
+| after 5 PPO iterations on the v1 rung | 150-250 | **37.5%** |
+
+**PPO made it worse by 9.8pp.** The collector's own reported figure (10.0%) is
+*not* the same measurement — the collector samples with `PPO_EPSILON=0.15`
+exploration noise while the arena plays the argmax, and §20.4 already showed
+that pass rate is the dominant variable — so the two numbers are not comparable
+and the collector's is not evidence of anything either way. That is itself a
+finding: **the collector reports a metric that does not predict arena strength**,
+and a training loop tuned against it would be optimising the wrong thing.
+
+The policy-term trace says why: `policy −0.0042 → −0.0055` with `|dlogratio|`
+climbing **4.5 → 41.3** over five iterations. The ratio drifting that far inside
+a clipped PPO update means the per-chunk advantage normalisation is re-centring
+each batch, so every chunk pushes in whatever direction its own mean sits, and
+the policy walks away from the behaviour policy it was supposed to stay near.
+
+**Not shipped.** The ladder is a working measurement harness and it is worth
+keeping; the PPO loop on top of it regresses and is not ready. What would need to
+hold before another attempt:
+
+- stop normalising advantages per chunk (it is the cause of the ratio drift), and
+- use the argmax policy for evaluation, not the exploring one, so the metric the
+  trainer optimises is the metric the arena scores.
+
+Two honest lessons, both worth more than the result: **RL's failure modes here
+are bookkeeping, not algorithms** — five distinct silent bugs, every one of which
+looked like "learning isn't helping"; and **an agent that is at 47% against a
+weak opponent after zero training is a much more informative starting point than
+the 32% the cloned policy managed against its own teacher.**
+
+---
+
+## 22. The learned evaluation function — the intervention the evidence supports
+
+### 22.1 Why not a policy, restated by the literature
+
+Both RL attempts replaced the *policy* and both failed for the same structural
+reason (§20.4): v7 decides Pass through a delta leaf, which a level model cannot
+represent. Zhang & Buro published exactly that measurement — the **same** network
+is worth **18.8%** standalone (Table V) and **57.2%** placed inside a search that
+kept its hand-written evaluation (Table VI). Janusz et al. ran both in the same
+lab: their LSTM policy reached 23-26% against a search agent even when retrained
+on that search's own data, while their value net dropped only 0.79 → 0.75 AUC
+across a near-total policy-distribution shift.
+
+Expert Iteration (Anthony et al. 2017) makes the general statement: "value
+networks act to reduce the required search depth" where "a policy network allows
+us to narrow the search" — and **value-and-policy significantly outperforms
+policy-only**.
+
+So: keep the search, replace the leaf's opinion. `Search::evaluate` in
+`v7_main.rs` is exactly the drop-in point, and it is inert by default — verified
+684-516 / 40898 actions, unchanged.
+
+### 22.2 Four corrections the research forced, and they mattered
+
+The first value trainer reached Pearson r ≈ 0.235. Four changes from
+Świechowski et al. (arXiv 1808.04794) and AlphaZero/MuZero took it to **0.336**:
+
+| | first attempt | corrected |
+|---|---|---|
+| target | gamma-discounted reward | **raw terminal outcome {-1,+1}** — MuZero: "in board games the discount is assumed to be 1" |
+| normalisation | per-chunk z-score | **none** — the value is in [-1,1] because the target is |
+| optimiser | plain SGD 3e-4 | **Adam, lr 1e-3, batch 256** |
+| data | every state of every game | **3 per game**, reservoir-sampled |
+
+The discounted target was the substantive error: it asks the net to predict its
+own distance from the end of the game rather than the outcome. Since `gamma^k > 0`,
+the *sign* of the stored reward recovers the undiscounted outcome exactly, so the
+fix costs nothing at collection time.
+
+### 22.3 And it does not yet win
+
+| arm | result (150 games, seed 11) | actions |
+|---|---|---|
+| baseline v9 | **88-62** (58.7%) | 5558 |
+| + learned value (r=0.336, w=250) | 85-65 (56.7%) | 6693 |
+
+Slightly worse, and **~3x slower** — the leaf runs a 2248x512 forward pass on
+every candidate evaluation.
+
+The diagnosis is data, not method. [P5]: "to train a value function without
+severe overfitting requires more than 10^5 **independent** samples." This net
+trained on **4,488** — roughly 20x short — and [P1] supplies the other half of
+that warning: "consecutive states are highly correlated. Random sampling is
+required." Capping at 3 states per game was the right move and made the corpus
+much smaller than it looks; the 139MB of trajectories is ~1,500 games, not the
+~90,000 independent samples the byte count suggests.
+
+Also worth recording: [P1]'s combination ablation found the learned value *alone*
+beat value+hand-written (82.0 vs 78.4 as P1), i.e. **stacking two heuristics was
+not reliably better than the better one alone**. If the value net ever works here,
+it may be worth testing `V7_LEAN`-style replacement as carefully as the sum.
+
+### 22.4 The iterative loop, now running
+
+`tools/analysis/value_loop.ps1` implements Świechowski §IV-C as a persistent
+background job: fresh games → sample → retrain from scratch → **measure in the
+arena** → keep the best checkpoint, never assuming the last round wins. They
+trained 64 rounds and the best was **iteration 21**, which is the reason the
+script ranks by win rate and copies `value_best.bin` rather than overwriting.
+
+It is running: 8 rounds, 800 games each, 50 epochs, against v7. Progress is in
+`training/iterloop/loop.log`. **No win is claimed from it until a round beats
+58.7% on a multi-seed paired run.**
+
 
 
 

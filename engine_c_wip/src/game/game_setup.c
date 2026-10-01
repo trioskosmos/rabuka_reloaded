@@ -1116,6 +1116,42 @@ int rb_setup_ability_candidates(const GameState *g, RbSetupAbilityCandidate *out
     return n;
 }
 
+/* ── phase.c bridge ──────────────────────────────────────────────────────
+ * rb_generate_action_candidates (src/turn/phase.c) is this file's Main-phase
+ * action generator — the C twin of Rust's generate_main_phase_actions — and
+ * its ability half IS the scan above; before this bridge existed it had no
+ * caller in the tree, so an activated ability could never be offered.
+ *
+ * RbSetupAbilityCandidate is private to this file and include/rabuka.h is not
+ * this file's to edit, so the offer table crosses the boundary through a sink
+ * the caller supplies. The rules stay here, the action list stays in phase.c,
+ * and the row layout is NOT duplicated across the two.
+ *
+ * ORDER (game_setup.rs:1694-2350): Pass, then the play-member offers inside
+ * the `!is_action_prohibited("play_member")` guard, then these stage offers,
+ * then the discard offers. The caller therefore invokes this AFTER its
+ * play-member loop and OUTSIDE that guard — Rust closes the guard at :2076,
+ * before the first activation scan at :2078.
+ *
+ * Returns the number of offers seen; a non-zero `sink` return stops the scan
+ * early (the caller uses that to abort on allocation failure). */
+int rb_setup_for_each_ability_candidate(
+    const GameState *g,
+    int (*sink)(void *ctx, int card_id, int ability_index, int from_stage,
+                int stage_slot, int base_cost, int effective_cost),
+    void *ctx) {
+    if (!g || !sink) return 0;
+    RbSetupAbilityCandidate offers[RB_SETUP_MAX_ABILITIES];
+    int n = rb_setup_ability_candidates(g, offers, RB_SETUP_MAX_ABILITIES);
+    if (n > RB_SETUP_MAX_ABILITIES) n = RB_SETUP_MAX_ABILITIES;
+    for (int i = 0; i < n; i++)
+        if (sink(ctx, offers[i].card_id, offers[i].ability_index,
+                 offers[i].from_stage, offers[i].stage_slot,
+                 offers[i].base_cost, offers[i].effective_cost))
+            return i + 1;
+    return n;
+}
+
 /* ==========================================================================
  * Live-card-set selection — the limit rule from game_setup.rs:2378-2388 and
  * :850-870 (phases.rs::handle_live_card_selection).

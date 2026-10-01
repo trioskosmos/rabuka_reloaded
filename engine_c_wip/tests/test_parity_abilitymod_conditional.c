@@ -292,25 +292,23 @@ static void decline_choices(TestGame *tg)
     while (pending(tg) && guard++ < 64) skip_pick(tg);
 }
 
-/* helpers/mod.rs fire_trigger: set activating_card, queue the one ability
- * printing `trig`, then process_pending_auto_abilities. */
+/* helpers/mod.rs:114 fire_trigger -- set activating_card, queue the one ability
+ * printing `trig`, then process_pending_auto_abilities.
+ *
+ * The old body looped this card's abilities to find one printing `trig`, and
+ * then called rb_queue_trigger_abilities(&tg->state, 0, trig), which is a
+ * WHOLE-BOARD TAS scan: `cid` only ever set activating_card and every other
+ * card in P1's zones printing the same trigger fired too, doubling each effect.
+ *
+ * The loop `return`ed on the FIRST match, so it is Rust's plain `fire_trigger`
+ * (helpers/mod.rs:114), not `fire_trigger_nth`: the Rust twin for these cases,
+ * engine/tests/test_modules/effects/conditional/per_card/
+ * wien_live_start_empty_hand_energy_placement_test.rs:145 and :179, calls
+ * crate::helpers::fire_trigger for both. Hence nth == 0, spelled through the
+ * _nth entry point to keep the loop -> nth mapping explicit. */
 static int fire_trigger(TestGame *tg, int cid, const char *trig)
 {
-    int n = rb_card_num_abilities((uint32_t)cid);
-    for (int i = 0; i < n; i++) {
-        Ability ab;
-        memset(&ab, 0, sizeof(ab));
-        if (!rb_decode_card_ability((uint32_t)cid, i, &ab)) continue;
-        int hit = ab.triggers && strstr(ab.triggers, trig);
-        rb_free_ability(&ab);
-        if (!hit) continue;
-        tg->state.activating_card = cid;
-        int queued = rb_queue_trigger_abilities(&tg->state, 0, trig);
-        if (queued <= 0) return 0;
-        rb_process_pending_auto_abilities(&tg->state);
-        return 1;
-    }
-    return 0;
+    return test_fire_trigger_on_card_nth(tg, cid, trig, 0);
 }
 
 /* -- diagnostics --------------------------------------------------------- */

@@ -35,14 +35,16 @@ int  rb_ability_debug_enabled(void);
    file's to edit. See the definition for why both halves depend on it. */
 int  rb_queue_ensure_current_entry(GameState *g, const char *player_id);
 
-/* ability_queue.c — stamps the Raw route string on the current entry, the C
-   home of Rust's `entry.choice_card_no = Some(ChoiceRoute::Raw(s))`
-   (choice.rs:133-139, position.rs:150-155, choice.rs:3153-3158 / :3178-3183).
-   queue.rs:341 reads that string back to decide the prompt's seat, and the int
-   `choice_card_no` tag cannot carry it (rabuka.h: tags 1/2/3 are shared by
-   Condition, Cost and Generic). Declared here for the same reason
-   rb_queue_ensure_current_entry is: include/rabuka.h is not this file's to
-   edit, and the pattern for that is already established immediately above. */
+/* ability_queue.c — stamps the Raw route string on the current entry: the C home
+   of Rust's `entry.choice_card_no = Some(ChoiceRoute::Raw(s))`
+   (position.rs:151-154, :273-277, :427-431; choice.rs:3153-3158, :3178-3183).
+   Both queue.rs:341 and abilities.rs:2159 read that string back to decide a
+   prompt's seat, and the int choice_card_no tag cannot carry it (rabuka.h:
+   Condition/Cost/Generic all tag 1).
+
+   Declared here for the same reason rb_queue_ensure_current_entry above is:
+   include/rabuka.h belongs to another file, and the local-declaration pattern
+   for that is already established two lines up. */
 void rb_queue_set_choice_route_raw(GameState *g, const char *raw);
 
 /* ── shared helpers (private fns of misc.rs) ── */
@@ -248,6 +250,31 @@ static int card_appeared_this_turn(const GameState *g, int cid){
         if(g->cards_appeared_this_turn[i]==cid) return 1;
     return 0;
 }
+
+/* ── group_names: one entry, never the whole joined CSV ─────────────────────
+ *
+ * Rust models `group_names` as a Vec<String>; the C bytecode decoder flattens
+ * it into ONE comma-joined extra. `AbilityEffect::group_name()` (core/card.rs
+ * :2462) is `group_names.first()` — ONE name. This is the shape used where a
+ * single name is stamped onto a Choice: target.rs:364
+ * `.group(effect.group_name().map(|s| s.to_string()))`.
+ *
+ * util.c carries rb_group_name_first / rb_effect_group_name /
+ * rb_card_matches_effect_group for exactly this, but all three are `static` and
+ * are NOT declared in include/rabuka.h, so this file keeps a local twin rather
+ * than editing a file this change does not own. */
+static const char *misc_group_name_first(const char *group_csv, char *buf, size_t bufsz)
+{
+    if(!group_csv || !*group_csv) return NULL;
+    const char *comma = strchr(group_csv, ',');
+    size_t len = comma ? (size_t)(comma - group_csv) : strlen(group_csv);
+    if(!buf || bufsz == 0) return group_csv;
+    if(len >= bufsz) len = bufsz - 1;
+    memcpy(buf, group_csv, len);
+    buf[len] = '\0';
+    return buf;
+}
+
 static int is_selected_card(const GameState *g, int cid){
     for(int i=0;i<g->n_selected_cards;i++)
         if(g->selected_cards[i]==cid) return 1;
@@ -275,6 +302,28 @@ static int collect_stage_candidates(const GameState *g, int who,
         if(exclude_self_id>=0 && cid==exclude_self_id) continue;
         if(pos_idx>=0 && pos_idx!=q) continue;
         if(ctype && !rb_card_matches_type(cid,ctype)) continue;
+        /* target.rs:243 `let mut prelim_filter = effect.filter_subset();` ->
+           util.rs:2022 matching_ids_filtered -> CardFilter::matches ->
+           check_group (util.rs:1484-1499), which accepts `group` (the first
+           entry) OR any of `groups` (the whole list). So Rust here really IS
+           any-of-list and a split-and-accept-any compare is the right shape --
+           but it is NOT APPLIED here, and the reason is measured, not stylistic.
+
+           util.c's rb_card_matches_group_str is a LOOSE port of util.rs's
+           card_matches_group_str for 虹ヶ咲: the whole-CSV compare below
+           matched nothing at all, so this filter read as "reject every card",
+           and two suites whose Rust expectations are REJECTIONS
+           (parity_gain_delta's kasumi_..._only_to_other_nijigasaki, and
+           parity_blades2's q271_ab0_non_niji_member_no_blade, a direct port of
+           the Rust test of the same name asserting get_blade_modifier(m) == 0)
+           were green by that accident. Switching this site to any-of-list turned
+           5 such cases RED in the file-isolated A/B. The same applies to
+           rb_misc_position_destinations below (position.rs:746-754).
+
+           score.c already carries the strict port and documents the same
+           problem at score.c:175-180. Until util.c's matcher is corrected
+           (util.c is not this change's to edit), keeping the whole-CSV compare
+           preserves the rejection these suites pin. */
         if(group && !rb_card_matches_group_str(cid,group)) continue;
         if(chars){
             const char *names[1]={chars};
@@ -466,7 +515,12 @@ static int try_create_target_selection_choice(GameState *g, int actor,
     const char *ctype = e->card_type_field[0] ? e->card_type_field : eff_extra(e,"card_type");
     rb_emit_choice(g, actor, RB_CHOICE_SELECT_CARD, "stage", ctype, tc, 0, NULL);
     rb_queue_pause_for_choice(g, &g->queue.pending);
-    const char *group = eff_extra(e, "group_names");
+    /* target.rs:364 `.group(effect.group_name().map(|s| s.to_string()))` — ONE
+       name, `group_names.first()`. The candidate scan just above is the
+       any-of-list shape; the value stamped onto the Choice is not. */
+    char grpbuf[128];
+    const char *group = misc_group_name_first(eff_extra(e, "group_names"),
+                                              grpbuf, sizeof grpbuf);
     if(group) strncpy(g->queue.pending.filter_group, group, sizeof(g->queue.pending.filter_group)-1);
     g->queue.pending.filter_heart = -1;
     rb_choice_set_route(&g->queue.pending, RB_ROUTE_SELECT_CARDS);
@@ -1187,34 +1241,31 @@ static int h_place_energy_under_member(GameState *g, int actor, const AbilityEff
 /* ─────────────────────── h_execute_position_change ─────────────────────────── */
 static int h_rotation(GameState *g, int actor, const AbilityEffect *e);
 
-/* The ONE position-destination prompt emitter for this file.
+/* The position-destination prompt emitter for the THREE arms of
+   execute_position_change that share one shape.
 
    Rust raises `Choice::SelectTarget { target: "position|destination", .. }` from
-   FOUR places inside execute_position_change, and each of them stamps the
-   entry's route immediately BEFORE, with the raw string that names the move:
+   FOUR places inside execute_position_change, and each stamps the entry's route
+   immediately BEFORE, with the raw string naming the move:
 
-     position.rs:204-208  "position_change:opponent:front"   (literal)
-     position.rs:150-155  "position_change:{target}:{cur_area}"
+     position.rs:151-154  "position_change:{target}:{cur_area}"
      position.rs:273-277  "position_change:{target}:select"
      position.rs:427-431  "position_change:{target}:{position}"
 
-   Two fields, two mistakes if they are conflated, and both were live here:
+   Those three come through here. The fourth (position.rs:204-208, the literal
+   "position_change:opponent:front") keeps its own body, because the C's choice.c
+   dispatches that answer off the CHOICE's `target` field rather than off the
+   entry's route — see the comment on that arm.
 
-     1. The CHOICE's `target` must be the literal "position|destination". It is
-        the string queue.rs:322-331 matches to decide the prompt asks the
-        opponent. The C passed "position_change:opponent:front" there instead
-        (old misc.c:1213), so that prompt was invisible to the seat decision —
-        a route string in a field Rust never reads for this purpose.
-
-     2. The route belongs on the ENTRY (queue.rs:340-342 reads
-        `entry.choice_card_no`'s Raw string), not on the choice. That is what
-        `has_choice_route_raw` / `choice_route_raw` carry.
+   The route belongs on the ENTRY: queue.rs:340-342 and abilities.rs:2154-2160
+   both match `entry.choice_card_no`'s Raw string, and that string is what decides
+   the prompt's seat. `has_choice_route_raw` / `choice_route_raw` carry it.
 
    `route_target` / `route_tail` are the two format! arguments at the matching
    Rust site. Stamping BEFORE the emit matches Rust, where the route write
    precedes the choice assignment; rb_queue_set_choice_route_raw deliberately
    no-ops when there is no current entry, which is the C equivalent of Rust's
-   `current_entry_mut()` returning None at position.rs:204 / :273 / :427. */
+   `current_entry_mut()` returning None at position.rs:151 / :273 / :427. */
 static int position_destination_prompt(GameState *g, int actor, const AbilityEffect *e,
                                        const char *route_target, const char *route_tail)
 {
@@ -1244,50 +1295,66 @@ static int h_execute_position_change(GameState *g, int actor, const AbilityEffec
     if(s_activating_card>=0)
         rule_log_activated(g,s_activating_card,"[[log_position_change]]");
 
-    /* each_time watcher — position.rs:150-155 stamps the triggering member's
-       own area as the tail. */
+    /* each_time watcher — position.rs:151-154 stamps the triggering member's own
+       area as the tail. */
     if(trigger_type && !strcmp(trigger_type,"each_time")){
         int tm = g->queue.resume_host>=0 ? g->queue.resume_host : s_activating_card;
         int cur=-1;
         for(int i=0;i<RB_STAGE_SIZE;i++) if(P->stage[i]==tm){cur=i;break;}
-        if(cur>=0){
-            const char *cur_area = cur==0 ? "left" : (cur==1 ? "center" : "right");
-            return position_destination_prompt(g, actor, e, target, cur_area);
-        }
+        if(cur>=0)
+            return position_destination_prompt(g, actor, e, target,
+                                               cur==0 ? "left" : (cur==1 ? "center" : "right"));
         return 1;
     }
     /* destination already specified */
     const char *dest = e->destination;
     if(!dest) dest = eff_extra(e,"destination");
     if(dest && *dest){
-        /* position.rs:204-208 — the literal Raw route, and the prompt's own
-           `target` is the SAME "position|destination" every other arm uses. */
-        if(!strcmp(dest,"front") && !strcmp(target,"opponent"))
-            return position_destination_prompt(g, actor, e, "opponent", "front");
+        /* position.rs:204-214. Rust raises SelectTarget{target:"position|destination"}
+           and writes "position_change:opponent:front" to the ENTRY. The C instead
+           carries that route string in the CHOICE's own `target`, because
+           rb_resolver_handle_select_target dispatches the answer on
+           `strstr(tgt, "position_change")` (choice.c:3764-3767) and never reads
+           the entry's route. That field is therefore load-bearing for the resume:
+           normalizing it to "position|destination" sends the answer into
+           choice.c:3701-3715, which hardcodes "position_change:self" and moves the
+           WRONG side's stage. Measured cost of that normalization:
+           parity_trigger_paths s2_pb1_006_opponent_drag_arms_per_move regressed —
+           "drag #1 moved the P1 watcher into Center (stage[1]=-1, want 2639)".
+
+           So the literal stays and the entry gets the route as well. The entry
+           route is the half Rust needs and choice.c does not read: it is what
+           queue.rs:341 / abilities.rs:2159 match to route the prompt's seat.
+           Collapsing the C onto the entry's route is a choice.c change, reported
+           as a cross-file request rather than made here. */
+        if(!strcmp(dest,"front") && !strcmp(target,"opponent")){
+            rb_queue_set_choice_route_raw(g, "position_change:opponent:front");
+            rb_emit_choice(g,actor,RB_CHOICE_SELECT_TARGET,NULL,NULL,1,
+                           e->is_optional?1:0,"position_change:opponent:front");
+            rb_queue_pause_for_choice(g, &g->queue.pending);
+            rb_choice_set_route(&g->queue.pending, RB_ROUTE_SELECT_TARGET);
+            return 1;
+        }
         return rb_position_change_with_destination(g,actor,e,dest,s_activating_card);
     }
     /* target_member == select — position.rs:273-277 */
-    if(target_member && !strcmp(target_member,"select")){
+    if(target_member && !strcmp(target_member,"select"))
         return position_destination_prompt(g, actor, e, target, "select");
-    }
-    /* both target — position.rs:290-300 recurses with target "opponent", so
-       every stamp below it on that recursion carries "opponent". */
-    if(target_is_both){
+    /* both target — position.rs:290-300 recurses with target "opponent", so on
+       that recursion every stamp below carries "opponent". */
+    if(target_is_both)
         return position_destination_prompt(g, actor^1, e, "opponent", "select");
-    }
     /* multiple_targets + position → rotation */
     if(extra_true(e,"multiple_targets") && pos_param)
         return h_rotation(g,actor,e);
     /* multiple_targets formation (this_member multiple) */
-    if(extra_true(e,"multiple_targets") && !strcmp(target_member,"this_member")){
+    if(extra_true(e,"multiple_targets") && !strcmp(target_member,"this_member"))
         return position_destination_prompt(g, actor, e, target, "this_member");
-    }
     /* source-position branch — position.rs:427-431 */
     if(pos_param && *pos_param){
         int src=rb_stage_position_index(pos_param);
-        if(src>=0 && P->stage[src]!=RB_EMPTY_SLOT){
+        if(src>=0 && P->stage[src]!=RB_EMPTY_SLOT)
             return position_destination_prompt(g, actor, e, target, pos_param);
-        }
         return 1;
     }
     /* generic this_member move of activating card */
@@ -1295,8 +1362,8 @@ static int h_execute_position_change(GameState *g, int actor, const AbilityEffec
         int from=-1;
         for(int i=0;i<RB_STAGE_SIZE;i++) if(P->stage[i]==s_activating_card){from=i;break;}
         return position_destination_prompt(g, actor, e, target,
-                                          from>=0 ? (from==0 ? "left" : (from==1 ? "center" : "right"))
-                                                  : "this_member");
+                from>=0 ? (from==0 ? "left" : (from==1 ? "center" : "right"))
+                        : "this_member");
     }
 }
 
@@ -1344,12 +1411,11 @@ static int h_rotation(GameState *g, int actor, const AbilityEffect *e){
 }
 
 /* ─────────────────────── h_choice (execute_choice) ──────────────────────────────
-   Rust misc.rs:3724-3777 execute_choice. Its choice-card_no / conditional_choice
-   / choice_player_id writes are choice.rs:130-154, i.e. INSIDE
+   Rust misc.rs:3724-3777 execute_choice. Its choice_card_no / conditional_choice
+   / choice_player_id writes live at choice.rs:130-154, INSIDE
    store_pending_choice — which the C reaches as rb_queue_pause_for_choice.
-   choice.rs:142-153 is the seat rule this function must therefore reproduce
-   here, because the C's rb_queue_pause_for_choice has no `choice_maker` and
-   cannot derive it:
+   choice.rs:142-153 is the seat rule, and it must be reproduced HERE because
+   pause_for_choice has no `choice_maker` and cannot derive it:
 
        if choice_maker == Some("opponent") {
            let opponent_id = if entry.player_id == "p1" { "p2" } else { "p1" };
@@ -1358,13 +1424,19 @@ static int h_rotation(GameState *g, int actor, const AbilityEffect *e){
            entry.choice_player_id = Some(entry.player_id.clone());
        }
 
-   It is measured against the ENTRY's player_id (the ability MASTER), not against
-   g->active and not against the computed `who`. That distinction is load-bearing
-   on a `target="both"` split, where the entry's player_id is still the master
-   while `who` has already been resolved. Note also that this write UNCONDITIONALLY
-   overwrites, which is why it cannot be left to pause_for_choice's
-   `choice_player_id.is_empty()` default: that default runs only when nothing
-   stamped the seat, and here something always does. */
+   Two details are load-bearing:
+
+   - It measures against the ENTRY's player_id (the ability MASTER), not
+     g->active and not against the computed `who`. On a `target="both"` split the
+     entry's player_id is still the master while `who` has already been resolved,
+     so the two disagree and using `who` stamps the wrong seat.
+
+   - The write is UNCONDITIONAL, so it cannot be left to pause_for_choice's
+     `choice_player_id.is_empty()` default: that default runs only when nothing
+     stamped the seat, and here something always does. Stamping before the pause
+     also matches Rust, where store_pending_choice sets the field and THEN calls
+     pause_for_choice, whose queue.rs:329 `is_some()` guard sees it and skips the
+     universal default. */
 static int h_choice(GameState *g, int actor, const AbilityEffect *e){
     /* If already resolving (resume path), skip re-emit */
     if(g->queue.resume_active) return 1;
@@ -1415,16 +1487,17 @@ static int h_choice(GameState *g, int actor, const AbilityEffect *e){
         strncpy(g->queue.pending.filter_group, group_names,
                 sizeof(g->queue.pending.filter_group)-1);
     /* choice.rs:143-153 — the seat, written BEFORE the pause so it is the
-       `is_some()` value queue.rs:329 tests and therefore survives the universal
-       default verbatim. Measured from the entry's player_id (the ability
-       master), per choice.rs:144-149. A prompt with no current entry has no
-       master to measure from and, exactly like Rust's `current_entry_mut()`
-       returning None, stays unstamped. */
+       `is_some()` value queue.rs:329 tests and the universal default skips it.
+       Measured from the entry's player_id (the ability master), per
+       choice.rs:144-149. A prompt with no current entry has no master to measure
+       from and, exactly like Rust's current_entry_mut() returning None, stays
+       unstamped. */
     {
         int cur = g->queue.cur;
         if (cur >= 0 && cur < g->queue.n_entries) {
             RbQueueEntry *ent = &g->queue.entries[cur];
-            const char *master = ent->player_id[0] ? ent->player_id : (actor == 0 ? "p1" : "p2");
+            const char *master = ent->player_id[0] ? ent->player_id
+                                                   : (actor == 0 ? "p1" : "p2");
             const char *seat = (choice_maker && !strcmp(choice_maker, "opponent"))
                              ? ((master[0] == 'p' && master[1] == '1') ? "p2" : "p1")
                              : master;
@@ -1521,6 +1594,12 @@ int rb_misc_position_destinations(const GameState *g, int actor,
             if(cid==RB_EMPTY_SLOT){
                 if(!is_formation) continue;
             } else {
+                /* position.rs:746-754 compute_valid_position_destinations is any-of-list —
+               `.any(|g| card_matches_group_str(&card_db, card_id, Some(g)))`.
+               NOT APPLIED, for the reason spelled out at the
+               collect_stage_candidates group test above: the faithful
+               any-of-list needs util.c's rb_card_matches_group_str to be as
+               strict as Rust's card_matches_group_str, and it is not. */
                 if(!rb_card_matches_group_str(cid,group)) continue;
             }
         }

@@ -549,14 +549,16 @@ static void check_choice_is(TestGame *tg, const char *zone, int count,
     }
 }
 
+/* Rust helpers/mod.rs:114 `fire_trigger`: ONE ability of ONE card. The local
+ * body USED TO BE rb_queue_trigger_abilities(&tg->state, 0, trig), a WHOLE-BOARD
+ * TAS scan in which `cid` only set activating_card, so every card in P1's zones
+ * printing the same trigger fired too. The shared harness helper
+ * test_fire_trigger_on_card targets one ability_id on one explicit_card_id
+ * through rb_trigger_auto_ability (the port of Rust GameState::trigger_auto_ability)
+ * and performs the load-bearing enqueue-time use record. */
 static int fire_trigger(TestGame *tg, int cid, const char *trig)
 {
-    if (!card_prints_trigger(cid, trig)) return 0;
-    tg->state.activating_card = cid;
-    int queued = rb_queue_trigger_abilities(&tg->state, 0, trig);
-    if (queued <= 0) return 0;
-    rb_process_pending_auto_abilities(&tg->state);
-    return 1;
+    return test_fire_trigger_on_card(tg, cid, trig);
 }
 
 /* Rust assert_card_identity — pins the card_no so a lenient fallback can never
@@ -803,12 +805,11 @@ static void test_look_and_select_skip_still_discards_remainder_to_waitroom(void)
 #define DIA_H04X2    "PL!S-PR-016-PR"   /* 黒澤ダイヤ: base_heart heart04 x2 */
 #define CLEAN_KOTORI "PL!-pb1-021-PR"   /* 南 ことり: heart03 x2, heart06 x1 */
 
+/* Same single-card targeting as fire_trigger above, void-returning. The old body
+ * fanned `trig` out to every card on the board that printed it. */
 static void trigger_auto(TestGame *tg, int cid, const char *trig)
 {
-    if (!card_prints_trigger(cid, trig)) return;
-    tg->state.activating_card = cid;
-    rb_queue_trigger_abilities(&tg->state, 0, trig);
-    rb_process_pending_auto_abilities(&tg->state);
+    (void)test_fire_trigger_on_card(tg, cid, trig);
 }
 
 static void test_hanamaru_live_success_look_four_takes_double_heart04(void)

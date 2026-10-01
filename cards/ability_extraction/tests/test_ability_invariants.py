@@ -205,46 +205,65 @@ def test_compound_subconditions_inherit_location():
 
 
 def test_or_condition_has_no_hoisted_qualifiers():
-    """A 「AかB」 disjunction must keep its qualifiers on the legs.
+    """A disjunction keeps its qualifiers on its legs, and its parent is never negated.
 
-    `detect_card_property` used to run over the WHOLE condition text and stamp
-    `card_property`/`negation` onto the parent of a compound/or node. For a plain
-    disjunction that is a category error: the qualifier belongs to one leg, and the
-    parent copy reads as "negate the whole OR".
+    Two separate rules, both enforced here because the engine has no support for the
+    shapes they forbid.
 
-    Two cards were affected, both printing an ordinary 「AかB」 whose leg already carried
-    the negation:
+    1. `card_property` on a parent must be shared by every leg. `detect_card_property`
+       used to run over the WHOLE condition text and stamp it onto the parent of a
+       compound/or node, which for a plain disjunction is a category error — the
+       qualifier belongs to one leg. Four cards were affected, each printing an ordinary
+       「AかB」 whose leg already carried the qualifier:
 
-      * PL!S-bp3-019-L MIRACLE WAVE
-        「…ブレードハートを持たないカードが0枚の場合か、または余剰ハートを2つ以上持っている場合」
-      * PL!N-bp7-006-P 近江彼方
-        「…『虹ヶ咲』のライブカードかブレードハートを持たない『虹ヶ咲』のメンバーカードがある場合」
+         * PL!S-bp3-019-L MIRACLE WAVE
+           「…ブレードハートを持たないカードが0枚の場合か、または余剰ハートを2つ以上持っている場合」
+         * PL!N-bp7-006-P 近江彼方
+           「…『虹ヶ咲』のライブカードかブレードハートを持たない『虹ヶ咲』のメンバーカードがある場合」
+         * PL!SP-pb2-004-PP 平安名すみれ — icon on one leg of an `or`
+         * PL!SP-bp5-023-L Shooting Voice!! — icon on one leg of an `and`
 
-    This stayed invisible because the engine's Compound path returned from
-    `evaluate_condition` BEFORE the negation post-processing, so the parent copy never
-    ran. Now that the engine honours it, a hoisted qualifier would invert the entire OR —
-    so this invariant is the half of the fix that keeps the other half safe.
+    2. A parent `negation` is rejected outright, not merely when legs disagree. The
+       engine's Compound path returns from `evaluate_condition` BEFORE the negation
+       post-processing, so a parent negation never runs. That is sound only because no
+       card can produce one: the house style is 「〜がない」, so 「Aがない、またはBがない」
+       parses to an `or` whose LEGS each carry their own negation, and a whole-corpus
+       survey found zero 「でない」 and zero disjunctions with two or more negated legs.
 
-    A parent qualifier is only acceptable when EVERY leg shares it, which no printed
-    disjunction in this corpus does; the engine reads `operator`, `conditions` and
-    `negation` off the parent and the rest off the legs.
+       Requiring the absence here — rather than honouring it in the engine — is the
+       deliberate choice. An unreachable branch would only ever execute under a
+       hand-written Condition, i.e. a test that asserts my own invention. If a future
+       card genuinely needs a negated disjunction this test fails, and engine support
+       gets added then, against a real card.
     """
-    bad = []
+    bad_hoisted = []
+    bad_negation = []
     for u in json.loads(ABILITIES_JSON.read_text(encoding="utf-8"))["unique_abilities"]:
         for node in walk_nodes(u.get("effect")):
             if node.get("type") not in ("or_condition", "compound"):
                 continue
             if not isinstance(node.get("conditions"), list) or len(node["conditions"]) < 2:
                 continue
-            for field in ("negation", "card_property"):
-                if field not in node:
-                    continue
-                shared = all(leg.get(field) == node.get(field) for leg in node["conditions"])
+            if node.get("negation"):
+                bad_negation.append((u.get("cards", [""])[0], node.get("type")))
+            if "card_property" in node:
+                shared = all(
+                    leg.get("card_property") == node.get("card_property")
+                    for leg in node["conditions"]
+                )
                 if not shared:
-                    bad.append((u.get("cards", [""])[0], field, node.get(field)))
-    assert not bad, (
-        "a disjunction's parent must not carry a qualifier that only some legs have — "
-        f"that reads as applying to the whole OR: {bad[:5]}"
+                    bad_hoisted.append(
+                        (u.get("cards", [""])[0], node.get("card_property"))
+                    )
+    assert not bad_negation, (
+        "a compound/or_condition must not carry a top-level `negation` — the engine's "
+        "Compound path does not apply it, so the shape would parse and silently never "
+        f"run. If a card truly needs a negated disjunction, add engine support "
+        f"deliberately: {bad_negation[:5]}"
+    )
+    assert not bad_hoisted, (
+        "a disjunction's parent must not carry a `card_property` that only some legs have "
+        f"— that reads as applying to the whole OR: {bad_hoisted[:5]}"
     )
 
 

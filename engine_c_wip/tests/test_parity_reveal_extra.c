@@ -210,26 +210,20 @@ static void stock_deck_top(TestGame *tg, const int *top, int n_top, int filler)
 /* Rust: main_deck.cards.insert(0, x). */
 static void put_on_deck_top(TestGame *tg, int pl, int cid) { test_insert_deck_top(tg, pl, cid); }
 
-/* fire_trigger(game, cid, trigger, trig) - helpers/mod.rs:117 */
+/* Rust: fire_trigger(game, cid, trigger, trig) - helpers/mod.rs:114. ONE ability
+ * of ONE card. The local body USED TO BE rb_queue_trigger_abilities(&tg->state, 0,
+ * trig), a whole-board TAS scan in which `cid` only set activating_card. */
 static int fire_trigger(TestGame *tg, int cid, const char *trig)
 {
-    if (!card_prints_trigger(cid, trig)) return 0;
-    tg->state.activating_card = cid;
-    int queued = rb_queue_trigger_abilities(&tg->state, 0, trig);
-    if (queued <= 0) return 0;
-    rb_process_pending_auto_abilities(&tg->state);
-    return 1;
+    return test_fire_trigger_on_card(tg, cid, trig);
 }
 
-/* Same, for the p2 seat - the Rust twin calls process_pending_auto_abilities("p2"). */
+/* Same, for the p2 seat - the Rust twin drives process_pending_auto_abilities on
+ * P2's id. pl == 1 reaches rb_queue_trigger_abilities' seat the same way it used
+ * to; the targeting is now single-card via test_fire_trigger_on_card_seat. */
 static int fire_trigger_p2(TestGame *tg, int cid, const char *trig)
 {
-    if (!card_prints_trigger(cid, trig)) return 0;
-    tg->state.activating_card = cid;
-    int queued = rb_queue_trigger_abilities(&tg->state, 1, trig);
-    if (queued <= 0) return 0;
-    rb_process_pending_auto_abilities(&tg->state);
-    return 1;
+    return test_fire_trigger_on_card_seat(tg, cid, trig, 1);
 }
 
 static void pick(TestGame *tg, int idx)

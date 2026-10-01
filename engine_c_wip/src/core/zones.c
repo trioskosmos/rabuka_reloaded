@@ -174,6 +174,54 @@ void rb_stage_set_area(int stage[RB_STAGE_SIZE], int area, int card_id){
     if(area<0||area>=RB_STAGE_SIZE) return;
     stage[area]=card_id;
 }
+/* Mirror Stage::position_change (zones.rs:368-415), Rule 11.10 -- but see the
+   SIGNATURE DEFECT below: this port is only PARTIAL.
+
+   SIGNATURE DEFECT (real, reproducible, NOT fixable from zones.c alone).
+   Rust's `Stage` is one struct holding `stage[3]` AND `under_cards[3]`, so
+   `position_change` can and does carry the under-card stacks across with their
+   members -- zones.rs:396-400, "Rule 4.5.5.3: Swap under-cards along with the
+   members", an UNCONDITIONAL crossed `mem::take` pair executed AFTER the
+   `card_id == -1` source check (:391-394) and BEFORE the stage swap (:402-412).
+   It is unconditional, so the stack travels even when the destination area is
+   EMPTY (the plain-move arm at :408-412) -- a move is a transfer, not a copy.
+
+   This C twin's parameter is `int stage[RB_STAGE_SIZE]`, and in the C model
+   `stage` and `under_cards` are two SEPARATE arrays of `RbPlayer`. The
+   under-card half of the struct is therefore not reachable through this
+   signature at all, and the body below cannot perform the Rule 4.5.5.3
+   transfer no matter what it contains. Observable as
+   tests/test_parity_under_member.c `kasumi_rule_4553` and
+   `rina_rule_4553`, which call this function directly on a real player's
+   stage and then assert the under-cards moved.
+
+   The ability-driven path is NOT affected: src/ability/effects/state.c:1522-1523
+   (`rb_resume_position_change`) performs exactly the zones.rs:396-400 crossed
+   take, and the two other position-change routes in the same file
+   (rb_pos_change_for_player, :1470-1471 and :1486-1487) do the same. Only
+   direct callers of this helper are wrong.
+
+   Repairing it needs a parameter this file cannot introduce on its own:
+     (a) change the signature to take the player, e.g.
+         `int rb_stage_position_change(RbPlayer *P, int from_area, int to_area)`,
+         and cross the under-card take in; OR
+     (b) keep the signature and do the transfer in the CALLER, as
+         rb_resume_position_change already does.
+   (a) also requires updating the two hand-declared prototypes in the test files
+   (test_parity_under_member.c:584, test_parity_zones_position.c:59), which
+   local-declare the current 3-arg form because -- as with
+   rb_player_remove_member_from_stage_with_recycling -- rabuka.h does not
+   export this symbol at all. Both rabuka.h and the tests are outside this
+   agent's ownership, so neither option is available here and the gap is left
+   visible rather than papered over.
+
+   NOTE for anyone attempting (a) with a container_of-style
+   `(RbPlayer*)((char*)stage - offsetof(RbPlayer, stage))` recovery: DO NOT.
+   test_parity_zones_position.c:301 passes a bare `int stage[3]` stack array to
+   this same function, so the recovered pointer would be wild and the crossed
+   take would smash ~4 KB of the caller's stack. There is no way to tell the
+   two cases apart at runtime -- the port has no global GameState to range-check
+   `stage` against. Option (a)'s signature change is the only safe repair. */
 int rb_stage_position_change(int stage[RB_STAGE_SIZE], int from_area, int to_area){
     if(from_area==to_area) return -1;
     if(from_area<0||from_area>=RB_STAGE_SIZE||to_area<0||to_area>=RB_STAGE_SIZE) return -1;
@@ -480,6 +528,45 @@ int rb_resolution_clear(GameState *g, int *out, int max){
 
 int rb_resolution_len(const GameState *g){
     return g ? g->resolution.n : 0;
+}
+
+/* Mirror ResolutionZone::swap_slots (engine/src/core/zones.rs:1072-1092) --
+   Rule 5.8, the two-card exchange inside the resolution zone. Returns 0 on
+   success, -1 on any of Rust's four refusals.
+
+   Rust's preflight, in order, and the C collapse of each:
+     1. left == right            -> Err "Cannot swap the same ... slot"
+     2. cards[left]  out of range-> Err "Left ... out of bounds"
+     3. cards[right] out of range-> Err "Right ... out of bounds"
+     4. owners[left]/[right] absent -> Err "... has no owner"
+   Checks 1-3 map one-for-one onto the RbBag. Check 4 has NO C counterpart and
+   is not a porting omission on this side: Rust's ResolutionZone keeps a
+   PARALLEL `owners: SmallVec` (zones.rs:1059, written by add_card_for_owner at
+   :1067-1070) and the C `GameState::resolution` is a bare RbBag
+   (rabuka.h:1444) with nowhere to put an owner. The owner is already dropped
+   one step earlier, at the insert: Rust tracking.rs:93 calls
+   `add_card_for_owner(card_id, owner)` and engine/src/turn/live.rs:1976 does
+   the same, whereas the C cheer path (tracking.c rb_perform_cheer_check)
+   calls rb_resolution_add, which takes no owner. So in C every stored card
+   carries the implicit owner Rust falls back to when `owners` runs short --
+   the active seat -- which is also what C's only drain
+   (rb_check_invalid_resolution_zone, phase.c:372-379, a file this agent does
+   not own) assumes. That is a rabuka.h modelling gap with a real observable
+   consequence -- a P2 yell card is discarded into P1's waitroom -- and it
+   needs the owners field, not a change here.
+
+   The two `swap` calls are therefore ONE: the C bag has a single parallel
+   array, so swapping the card ids is the whole of the mutation Rust performs
+   on data the C model can represent. */
+int rb_resolution_swap_slots(GameState *g, int left_slot, int right_slot){
+    if(!g) return -1;
+    if(left_slot == right_slot) return -1;
+    if(left_slot < 0 || left_slot >= g->resolution.n) return -1;
+    if(right_slot < 0 || right_slot >= g->resolution.n) return -1;
+    int tmp = g->resolution.cards[left_slot];
+    g->resolution.cards[left_slot] = g->resolution.cards[right_slot];
+    g->resolution.cards[right_slot] = tmp;
+    return 0;
 }
 
 /* Mirror MemberArea::from_index — inverse of rb_member_area_to_index. */

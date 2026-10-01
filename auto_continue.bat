@@ -9,7 +9,7 @@ exit /b
 param(
     [int]$IntervalMinutes = 8,
     [string]$WindowTitle = "",
-    [string]$Message = "fix the bug then get untangling stupidity and merge what is needed in parser and engine make it look planned rather than ad hoc."
+    [string]$Message = "train in background so it isn't stopped even if I hit escape. keep improving, more research on the web, more audits, more everything. I want that winrate going up."
 )
 
 Add-Type -AssemblyName System.Windows.Forms

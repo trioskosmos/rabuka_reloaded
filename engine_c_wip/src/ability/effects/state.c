@@ -123,8 +123,17 @@ void rb_effect_change_state(GameState *g, int actor, AbilityEffect *e, int host_
     if(s_eff_extra_true(e, "blade_limit_from_cost_member")){
         int off = s_eff_extra_int(e, "blade_limit_offset", 0);
         int cost_blade = 0;
-        if(g->mods.n_last_cost_moved_card_ids > 0){
-            int cid = g->mods.last_cost_moved_card_ids[0];
+        /* Q266 (change_state.rs:89-97): the limit is derived from the ORIGINAL
+           blade of the member PAID AS THE WAIT COST — `last_cost_wait_member()`,
+           i.e. the LAST entry of `last_cost_waited_members`. This used to read
+           `mods.last_cost_moved_card_ids[0]`, which is both the wrong field
+           (cards moved for the cost, not members waited by it) and the wrong end
+           of it (index 0 rather than the final entry), so a cost that moved a
+           non-member first, or one that moved several cards, derived the limit
+           from the wrong card. `.and_then(...).unwrap_or(0)` means no waited
+           member reads as blade 0, so keep cost_blade at 0 in that case. */
+        if(g->n_last_cost_waited_members > 0){
+            int cid = g->last_cost_waited_members[g->n_last_cost_waited_members - 1];
             Card c;
             if(rb_decode_card_by_index((uint32_t)cid, &c)){ cost_blade = c.blade; rb_free_card(&c); }
         }
@@ -134,10 +143,19 @@ void rb_effect_change_state(GameState *g, int actor, AbilityEffect *e, int host_
     } else if(s_eff_extra_true(e, "blade_limit_from_energy_under")){
         int off = s_eff_extra_int(e, "blade_limit_offset", 0);
         int under = 0;
-        if(host_cid >= 0){
-            RbPlayer *Ptmp = &g->p[who];
+        /* C5 (change_state.rs:102-114): the under-cards counted belong to the
+           ACTIVATING card, looked up on the SELF player ("self", not the
+           effect's `target`). This used to scan `host_cid` on the target
+           player, which is -1 on the optional-cost path and on any effect whose
+           target is the opponent, so the count silently fell to 0 and the limit
+           degraded to `offset`. Fall back to host_cid only when there is no
+           activating card, which is the shape the Rust `map_or(0, ...)` guard
+           already tolerates. */
+        int ecid = (g->activating_card >= 0) ? g->activating_card : host_cid;
+        if(ecid >= 0){
+            RbPlayer *Ptmp = &g->p[actor];
             for(int q=0; q<RB_STAGE_SIZE; q++)
-                if(Ptmp->stage[q] == host_cid) under = Ptmp->under_cards[q].n;
+                if(Ptmp->stage[q] == ecid) under = Ptmp->under_cards[q].n;
         }
         blade_limit = rb_saturate_u8(under + off);
     }

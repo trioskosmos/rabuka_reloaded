@@ -406,16 +406,18 @@ static int play_to_stage(TestGame *tg, int cid, int area, int accept)
     return r;
 }
 
-/* Rust helpers::fire_trigger for one SEAT. The C engine has no single-ability
- * "fire" entry point, so this queues every ability that seat owns for the
- * trigger token (rb_queue_trigger_abilities) and drains — a superset of Rust's
- * trigger_auto_ability(card only). Every fixture board below holds exactly one
- * card printing the trigger, so the superset is the intended set. */
+/* Rust helpers::fire_trigger for one SEAT: ONE ability of ONE card. The local
+ * body USED TO BE rb_queue_trigger_abilities(&tg->state, pl, trigger) +
+ * rb_drain_ability_queue -- a whole-board TAS scan in which `cid` only set
+ * activating_card, so every card that seat owned printing the trigger fired too.
+ * The old comment claimed every fixture held exactly one such card; that was the
+ * assumption the bug hid behind, and two of them did not hold. Now the targeting
+ * goes through test_fire_trigger_on_card_seat: one ability_id, one explicit_card_id
+ * via rb_trigger_auto_ability (the port of Rust GameState::trigger_auto_ability),
+ * the load-bearing enqueue-time use record, then the drain. */
 static void fire_trigger(TestGame *tg, int pl, int cid, const char *trigger)
 {
-    rb_queue_trigger_abilities(&tg->state, pl, trigger);
-    tg->state.activating_card = cid;
-    rb_drain_ability_queue(&tg->state);
+    (void)test_fire_trigger_on_card_seat(tg, cid, trigger, pl);
 }
 
 static void advance_to_live_set(TestGame *tg) { for (int i = 0; i < 5; i++) test_pass(tg); }

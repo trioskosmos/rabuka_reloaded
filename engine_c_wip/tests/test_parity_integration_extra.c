@@ -245,14 +245,16 @@ static int drain_choice_types(TestGame *tg, char out[][32], int max)
     return n;
 }
 
-/* helpers::fire_trigger — queue every ability `pl` owns for `trigger`, then
- * drain.  A superset of Rust's single-ability trigger_auto_ability, and the
- * C engine has no single-ability "fire" entry point. */
+/* helpers::fire_trigger (engine/tests/helpers/mod.rs:114) — Rust resolves ONE
+ * ability of ONE card and calls trigger_auto_ability with an explicit card id,
+ * then process_pending_auto_abilities(&p1). The old body called
+ * rb_queue_trigger_abilities(&tg->state, pl, trigger), a WHOLE-BOARD TAS scan
+ * that fired every ability `pl` owns printing `trigger`, and then drained with
+ * rb_drain_ability_queue instead of the PCA path Rust uses; both are fixed by
+ * the shared helper. `pl` maps onto the _seat form (pl == 1 is the opponent). */
 static void fire_trigger(TestGame *tg, int pl, int cid, const char *trigger)
 {
-    rb_queue_trigger_abilities(&tg->state, pl, trigger);
-    tg->state.activating_card = cid;
-    rb_drain_ability_queue(&tg->state);
+    (void)test_fire_trigger_on_card_seat(tg, cid, trigger, pl);
 }
 
 /* round5 give_total_energy: an `active` prefix + `waited` tail in the zone. */

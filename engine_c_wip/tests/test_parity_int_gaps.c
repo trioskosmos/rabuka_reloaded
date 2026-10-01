@@ -442,17 +442,17 @@ static void tas(TestGame *tg, int pl)
     rb_drain_ability_queue(&tg->state);
 }
 
-/* Rust `fire_trigger(card, trigger)`: raise ONE trigger window for a card
- * that is already in a zone. Mirrors the helper used throughout
- * test_parity_look_and_filter.c and test_parity_look_reveal.c. */
+/* Rust `fire_trigger(card, trigger)`: raise ONE trigger window for a card that is
+ * already in a zone. The local body USED TO BE
+ * rb_queue_trigger_abilities(&tg->state, 0, trig), a whole-board TAS scan in which
+ * `cid` only set activating_card. test_fire_trigger_on_card targets one ability_id
+ * on one explicit_card_id via rb_trigger_auto_ability (the port of Rust
+ * GameState::trigger_auto_ability) and performs the load-bearing enqueue-time use
+ * record. The `tas` helper above is a DIFFERENT thing and stays a whole-board scan
+ * on purpose: it mirrors Rust's trigger_auto_abilities_for_player. */
 static int fire_trigger(TestGame *tg, int cid, const char *trig)
 {
-    if (cid < 0) return 0;
-    tg->state.activating_card = cid;
-    int queued = rb_queue_trigger_abilities(&tg->state, 0, trig);
-    if (queued <= 0) return 0;
-    rb_process_pending_auto_abilities(&tg->state);
-    return 1;
+    return test_fire_trigger_on_card(tg, cid, trig);
 }
 
 /* ---- evidence dump ---------------------------------------------------- *

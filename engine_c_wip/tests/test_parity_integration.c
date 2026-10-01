@@ -136,15 +136,18 @@ static void select_n(TestGame *tg, int n)
     rb_resume_with_choice_indices(&tg->state, idx, n);
 }
 
-/* helpers::fire_trigger — queue the trigger for one seat and resolve it.
- * The C engine has no single-ability "fire" entry point, so this queues every
- * ability the seat owns for `trigger` (rb_queue_trigger_abilities) and drains,
- * which is a superset of Rust's trigger_auto_ability(card only). */
+/* helpers::fire_trigger — fire ONE ability on ONE card and resolve it. The local
+ * body USED TO BE rb_queue_trigger_abilities(&tg->state, pl, trigger) followed by
+ * rb_drain_ability_queue: a whole-board TAS scan in which `cid` only set
+ * activating_card, so every card that seat owned printing `trigger` fired too and
+ * every count doubled wherever the fixture held two such cards. Now it goes
+ * through test_fire_trigger_on_card_seat, which targets one ability_id on one
+ * explicit_card_id via rb_trigger_auto_ability (the port of Rust
+ * GameState::trigger_auto_ability), performs the load-bearing enqueue-time use
+ * record, then drains -- exactly Rust's order. `pl` selects the seat. */
 static void fire_trigger(TestGame *tg, int pl, int cid, const char *trigger)
 {
-    rb_queue_trigger_abilities(&tg->state, pl, trigger);
-    tg->state.activating_card = cid;
-    rb_drain_ability_queue(&tg->state);
+    (void)test_fire_trigger_on_card_seat(tg, cid, trigger, pl);
 }
 
 /* Give a seat a fixed energy-zone total with an `active` prefix (round5

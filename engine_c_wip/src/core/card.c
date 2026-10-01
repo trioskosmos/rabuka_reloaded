@@ -48,6 +48,40 @@ int rb_card_is_member(int card_id) {
     return r != NULL && rb_card_record_len((uint32_t)card_id) >= 25 && card_type_of(r) == 0;
 }
 
+/* ── Card::has_draw_icon (card.rs:4356-4362) ────────────────────────────────
+ * 「ドロー」 — the DRAW icon, which lives on `special_heart` (the SAME field as
+ * 「スコア」, and a different one from 「全ブレード」):
+ *
+ *     pub fn has_draw_icon(&self) -> bool {
+ *         self.special_heart.as_ref()
+ *             .is_some_and(|sh| sh.hearts.contains_key(&HeartColor::Draw))
+ *     }
+ *
+ * A Card keeps at most ONE special heart (card_binary.rs:193-205 writes a single
+ * (color, count) pair and wraps it in `SpecialHeart { hearts }`), and the C
+ * decoder stores it in `has_special` / `special_color` / `special_count` — with
+ * `has_special` already normalised to `special_count != 0` by
+ * rb_decode_card_by_index. So the `contains_key` test reduces to
+ * `has_special && special_color == Draw`, exactly as rb_card_has_score_icon
+ * does for HeartColor::Score. RB_HEART_DRAW is 8 and card_binary.rs:352 maps
+ * `8 => HeartColor::Draw`, so the enum values already agree.
+ *
+ * Measured on the decoded database: 82 of 2,639 cards carry a Draw icon (first
+ * PL!-bp3-021-L) against 50 that carry a Score icon, so this is not a rare
+ * branch. Card.rs pairs the four predicates in one match inside
+ * CardFilter::check_card_property (util.rs:1656-1662) — and the C twin
+ * rb_check_card_property (ability/util.c:2572-2579) handles only
+ * has_blade_heart / has_score_icon / has_all_blade, so "has_draw_icon" falls
+ * through to `has = 0` and every draw-icon card is rejected. The same arm is
+ * missing from condition.c:2572-2582. Both files are owned elsewhere, so this
+ * predicate needs the declaration in include/rabuka.h plus one arm in each of
+ * those two match sites to go live; it is the missing half of Card's icon
+ * family and it belongs here regardless. */
+int rb_card_has_draw_icon(const Card *c) {
+    return c && c->has_special && c->special_count > 0
+           && c->special_color == (uint8_t)RB_HEART_DRAW;
+}
+
 int rb_decode_card_by_index(uint32_t i, Card *out) {
     const unsigned char *r = rb_card_record(i);
     uint32_t len = rb_card_record_len(i);
@@ -743,20 +777,32 @@ static void card_filter_set_text(char *dst, size_t dst_sz, const char *src) {
     if (len < dst_sz) memcpy(dst, src, len + 1);
 }
 
-static void card_filter_list(const char *src, char dst[][64], int max, int *count) {
+/* Split a flattened wire list into `max` fixed-width slots. `elem` is the slot
+   width because the two callers have DIFFERENT widths: name_fragments is 64
+   (card.rs card_names_any) and ability_filter_triggers is 32. */
+static void card_filter_list(const char *src, char *dst, size_t elem, int max, int *count) {
     *count = 0;
-    if (!src || !*src) return;
+    if (!src || !*src || !dst || elem == 0) return;
     while (*src && *count < max) {
         while (*src == ',' || *src == ' ' || *src == '[' || *src == ']' || *src == '"') src++;
         const char *start = src;
         while (*src && *src != ',' && *src != ']' && *src != ' ') src++;
         size_t len = (size_t)(src - start);
-        if (len && len < 64) {
-            memcpy(dst[*count], start, len);
-            dst[*count][len] = 0;
+        if (len && len < elem) {
+            char *slot = dst + (size_t)(*count) * elem;
+            memcpy(slot, start, len);
+            slot[len] = 0;
             (*count)++;
         }
     }
+}
+
+/* util.rs:1847 require_all_heart_colors is `Option<bool>`; the wire carries the
+   literal "true"/"false" (or an integer), which is the same decoding
+   card_filter_from_effect already applies to exclude_self and negation. */
+static int card_extra_bool(const AbilityEffect *e, const char *key) {
+    const char *v = fx_extra(e, key);
+    return v && (!strcmp(v, "true") || strtol(v, NULL, 10) != 0);
 }
 
 static void card_filter_cost_values(const char *src, int dst[16], int *count) {
@@ -805,6 +851,17 @@ static void card_filter_from_effect(const AbilityEffect *e, RbCardFilter *out) {
     }
     const char *ability_filter = fx_extra(e, "ability_filter");
     if (ability_filter && *ability_filter) card_filter_set_text(out->ability_filter, sizeof(out->ability_filter), ability_filter);
+    /* util.rs:1880 `ability_filter_triggers: effect.ability_filter_triggers_any()`.
+       Rust models it as `Option<Vec<String>>`; the bytecode decoder flattens the
+       array into ONE comma-joined extra (the same flattening as group_names), so
+       the wire form here is a single string and has to be split. util.rs:1442
+       counts this field in `has_filter()`, and util.c:1396-1414 keys the whole
+       no_ability_type / has_ability_type verdict off it — with the list at 0
+       both collapsed to "unconstrained", i.e. they filtered nothing. */
+    card_filter_list(fx_extra(e, "ability_filter_triggers"),
+                     (char *)out->ability_filter_triggers,
+                     sizeof(out->ability_filter_triggers[0]), 8,
+                     &out->n_ability_filter_triggers);
     const char *negation = fx_extra(e, "negation");
     out->negation = negation && (!strcmp(negation, "true") || strtol(negation, NULL, 10) != 0);
     const char *heart_gate = fx_extra(e, "filter_targets_by_heart_colors");
@@ -823,6 +880,35 @@ static void card_filter_from_effect(const AbilityEffect *e, RbCardFilter *out) {
             }
         }
     }
+    /* util.rs:1837-1838. `require_all_heart_colors` flips the heart-colour test
+       from ANY to EVERY (util.rs:1512-1535) and `heart_color_count` is the
+       per-colour threshold in util.rs:1522-1534. Both were left at 0 here, so a
+       card that needed "EVERY listed colour, at least 2 each" was matched with
+       the ANY/1-ignoring rule. Both are consumed by util.c:1306-1335. */
+    out->require_all_heart_colors = card_extra_bool(e, "require_all_heart_colors");
+    card_extra_int(e, "heart_color_count", &out->heart_color_count);
+    /* util.rs:1839-1841 + util.rs:1546-1569. 「元々持つハート」/「必要ハートが
+       N個」 — the printed need-heart total, optionally per colour, with its own
+       operator (default ">=", util.rs:1567). util.rs:1436-1437 counts both
+       need_heart_total and need_heart_color in has_filter(). effects/score.c
+       :124-138 and effects/move.c:759-760 were each patching these in AFTER
+       this function, which is the same drift class as the look.c copy. */
+    card_filter_set_text(out->need_heart_operator, sizeof(out->need_heart_operator),
+                         fx_extra(e, "need_heart_operator"));
+    card_filter_set_text(out->need_heart_color, sizeof(out->need_heart_color),
+                         fx_extra(e, "need_heart_color"));
+    if (card_extra_int(e, "need_heart_total", &out->need_heart_total))
+        out->has_need_heart_total = 1;
+    /* util.rs:1818 / :1882 `card_property: effect.card_property_any()`, read by
+       CardFilter::check_card_property (util.rs:1654-1673) and counted by
+       util.rs:1444. RbCardFilter has no card_property member yet — include/rabuka.h
+       is owned elsewhere — so the population is compiled in the moment the header
+       advertises it, matching the existing RB_CARD_FILTER_CARD_PROPERTY switch
+       util.c:42-46 already uses for exactly this field. */
+#ifdef RB_CARD_FILTER_CARD_PROPERTY
+    card_filter_set_text(out->card_property, sizeof(out->card_property),
+                         fx_extra(e, "card_property"));
+#endif
     if (card_extra_int(e, "original_blade_limit", &out->original_blade_limit)) {
         out->has_original_blade = 1;
         card_filter_set_text(out->original_blade_op, sizeof(out->original_blade_op), fx_extra(e, "original_blade_operator"));
@@ -840,7 +926,8 @@ static void card_filter_from_effect(const AbilityEffect *e, RbCardFilter *out) {
     const char *cost_values = fx_extra(e, "cost_values");
     if (cost_values) card_filter_cost_values(cost_values, out->cost_values, &out->n_cost_values);
     const char *card_names = fx_extra(e, "card_names");
-    if (card_names) card_filter_list(card_names, out->name_fragments, 8, &out->n_name_fragments);
+    if (card_names) card_filter_list(card_names, (char *)out->name_fragments,
+                                     sizeof(out->name_fragments[0]), 8, &out->n_name_fragments);
     const char *name_constraint = fx_extra(e, "name_constraint");
     if (name_constraint && *name_constraint && !out->n_name_fragments) {
         card_filter_set_text(out->name_fragments[0], sizeof(out->name_fragments[0]), name_constraint);
@@ -851,11 +938,29 @@ static void card_filter_from_effect(const AbilityEffect *e, RbCardFilter *out) {
         out->has_blade_limit = 1;
         card_filter_set_text(out->blade_op, sizeof(out->blade_op), fx_extra(e, "blade_limit_operator"));
     }
+    /* has_filter() — the C twin of CardFilter::has_filter (util.rs:1425-1446).
+       Every term Rust lists for a field RbCardFilter actually carries is here:
+       card_type, group, cost_limit, characters, exclude_characters,
+       heart_colors, need_heart_total, need_heart_color, name_fragments,
+       original_blade_limit, ability_filter, ability_filter_triggers,
+       card_property, distinct. The five extra terms (has_exclude_self,
+       negation, has_cost_total, n_cost_values, has_blade_limit) are the C
+       extensions effects/score.c:147-152 and effects/move.c:767 mirror when they
+       recompute this flag by hand; they are left in place so the two stay in
+       step. An all-empty effect still yields has_filter == 0 — verified by
+       probe, not by inspection: card.c has no field that a zeroed AbilityEffect
+       can trip. */
     out->has_filter = !!(out->card_type[0] || out->has_group || out->has_cost_limit ||
                          out->has_characters || out->has_exclude_characters || out->has_exclude_self ||
-                         out->ability_filter[0] || out->negation || out->n_heart_colors || out->has_original_blade ||
+                         out->ability_filter[0] || out->n_ability_filter_triggers || out->negation ||
+                         out->n_heart_colors || out->has_need_heart_total || out->need_heart_color[0] ||
+                         out->has_original_blade ||
                          out->has_cost_total || out->n_cost_values || out->n_name_fragments ||
-                         out->distinct || out->has_blade_limit);
+                         out->distinct || out->has_blade_limit
+#ifdef RB_CARD_FILTER_CARD_PROPERTY
+                         || out->card_property[0]
+#endif
+                         );
 }
 
 int rb_effect_filter_subset(const AbilityEffect *e, RbCardFilter *out) {

@@ -310,15 +310,16 @@ static void drain_pay_then_first(TestGame *tg, int guard_max)
 
 /* ── trigger helpers ───────────────────────────────────────────────────── */
 
-/* Mirrors helpers/mod.rs `trigger_auto(&mut game, cid, trigger, trigger_str)`. */
+/* Mirrors helpers/mod.rs `fire_trigger(&mut game, cid, trigger, trigger_str)`:
+ * ONE ability of ONE card. The local body USED TO BE
+ * rb_queue_trigger_abilities(&tg->state, 0, trig), a whole-board TAS scan in
+ * which `cid` only set activating_card. test_fire_trigger_on_card targets one
+ * ability_id on one explicit_card_id through rb_trigger_auto_ability (the port
+ * of Rust GameState::trigger_auto_ability) and performs the load-bearing
+ * enqueue-time use record. */
 static int fire_trigger(TestGame *tg, int cid, const char *trig)
 {
-    if (!card_prints_trigger(cid, trig)) return 0;
-    tg->state.activating_card = cid;
-    int queued = rb_queue_trigger_abilities(&tg->state, 0, trig);
-    if (queued <= 0) return 0;
-    rb_process_pending_auto_abilities(&tg->state);
-    return 1;
+    return test_fire_trigger_on_card(tg, cid, trig);
 }
 
 /* ── phase helpers (live-start / live-success flows) ───────────────────── */

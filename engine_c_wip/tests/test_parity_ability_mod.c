@@ -154,29 +154,18 @@ static void push_deck_bottom(TestGame *tg, int pl, int cid)
     P->deck.cards[P->deck.n++] = cid;
 }
 
-/* fire_trigger(&mut game, cid, trigger, trig) — helpers/mod.rs builds the
- * "<card_no>_<full_text>" ability id, queues exactly that one ability, sets
- * activating_card = cid, then runs process_pending_auto_abilities. The public
- * header exposes the per-trigger scan (rb_queue_trigger_abilities) rather than
- * the string-keyed single-ability entry point, so the queue is built from the
- * same trigger token; the fixture boards carry exactly one card printing it. */
+/* fire_trigger(&mut game, cid, trigger, trig) — helpers/mod.rs:114 builds the
+ * "<card_no>_<full_text>" ability id for ONE ability of ONE card and calls
+ * trigger_auto_ability with an explicit card id. The old C spelling,
+ * rb_queue_trigger_abilities(&tg->state, 0, trig), is a WHOLE-BOARD TAS scan:
+ * `cid` only ever set activating_card, so any second card printing the same
+ * trigger fired too and every effect in the fixture doubled.
+ * test_fire_trigger_on_card is that faithful entry point (and returns 0 when
+ * the card prints no such ability, so the premise check keeps its meaning). */
 static int fire_trigger(TestGame *tg, int cid, const char *trig, const char *trigger_type)
 {
     (void)trigger_type;
-    if (!card_prints_trigger(cid, trig)) return 0;
-    tg->state.activating_card = cid;
-    int queued = rb_queue_trigger_abilities(&tg->state, 0, trig);
-    if (getenv("ABMOD_DEBUG"))
-        for (int i = 0; i < tg->state.queue.n_entries; i++)
-            fprintf(stderr, "[DBG_ENTRY] i=%d cid=%d ab=%d pid=%s trig=%s completed=%d\n",
-                    i, tg->state.queue.entries[i].card_id,
-                    tg->state.queue.entries[i].ability_idx,
-                    tg->state.queue.entries[i].player_id,
-                    tg->state.queue.entries[i].trigger,
-                    tg->state.queue.entries[i].completed);
-    if (queued <= 0) return 0;
-    rb_process_pending_auto_abilities(&tg->state);
-    return 1;
+    return test_fire_trigger_on_card(tg, cid, trig);
 }
 
 static void drain_choices(TestGame *tg)

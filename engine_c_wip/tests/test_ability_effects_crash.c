@@ -569,14 +569,26 @@ static void fill_decks(TestGame *tg, int filler, int n)
     }
 }
 
+/* Rust helpers/mod.rs:114 fire_trigger resolves ONE ability of ONE card and
+ * calls trigger_auto_ability with an explicit card id. The old C spelling,
+ * rb_queue_trigger_abilities(&tg->state, 0, trig), is a whole-board TAS scan:
+ * `cid` only ever set activating_card.
+ *
+ * This suite DOES carry that bug, in exactly one of its two call sites:
+ * trace_genki stages ruby (PL!S-pb1-018-N) whose only ability prints
+ * ライブ開始時, and genki (PL!S-pb1-019-L) prints ライブ開始時 too, so the old
+ * scan invalidated ruby's live success as well. trace_hanamaru does NOT carry
+ * it — every other card on that board decodes 0 abilities or a different
+ * trigger, so there was nothing to over-fire there.
+ *
+ * The suite was green before and after: its assertions only read the FIRST
+ * "[DBG_INVAL] " line and assert field completeness, which is insensitive to
+ * the extra fire. Migrating it removes the spurious invalidate and is verified
+ * to keep all 9 tests green (the false-crash regression this file exists for
+ * is untouched). */
 static int fire_trigger(TestGame *tg, int cid, const char *trig)
 {
-    if (!card_prints_trigger(cid, trig)) return 0;
-    tg->state.activating_card = cid;
-    int queued = rb_queue_trigger_abilities(&tg->state, 0, trig);
-    if (queued <= 0) return 0;
-    rb_process_pending_auto_abilities(&tg->state);
-    return 1;
+    return test_fire_trigger_on_card(tg, cid, trig);
 }
 
 static void drain_choices(TestGame *tg)

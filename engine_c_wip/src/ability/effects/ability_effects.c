@@ -36,6 +36,61 @@ static void translated_log(GameState *g, int actor, const char *text)
     rb_log_push_verdict(line, "rule_log", 1);
 }
 
+/* ── group_names: the joined CSV is not one token ───────────────────────────
+ *
+ * Rust models `group_names` as a Vec<String>; the C bytecode decoder flattens
+ * it into ONE comma-joined extra, so comparing that whole string with
+ * rb_card_matches_group_str tests the literal token "lilywhite,μ's" and admits
+ * nothing. Two distinct Rust shapes read it and they are NOT the same:
+ *
+ *   ae_group_matches_csv_any — accept ANY entry. Used where Rust spells out a
+ *     loop over the list: ability_ops.rs:665-671 `groups.iter().any(|g|
+ *     card_matches_group_str(...))`, and CardFilter::check_group (util.rs
+ *     :1484-1499) via `CardFilter::from_effect`, which `filter_subset`
+ *     (core/card.rs:2393) delegates to. Reuses the exported
+ *     rb_card_matches_any_group (rabuka.h:2207).
+ *
+ *   ae_group_name_first — `AbilityEffect::group_name()` (core/card.rs:2462 =
+ *     `group_names.first()`), ONE name. Used where a single name is stamped
+ *     onto a Choice: ability_ops.rs:357 `.group(g.first().cloned())`.
+ *
+ * util.c carries rb_group_name_first / rb_effect_group_name /
+ * rb_card_matches_effect_group for the second shape, but they are `static` and
+ * are NOT declared in include/rabuka.h, so this file keeps local twins rather
+ * than editing a file this change does not own. */
+static int ae_group_matches_csv_any(int cid, const char *group_csv)
+{
+    if (!group_csv || !*group_csv) return 1;
+    const char *names[16];
+    char store[16][64];
+    int n = 0;
+    const char *p = group_csv;
+    while (*p && n < 16) {
+        const char *comma = strchr(p, ',');
+        size_t len = comma ? (size_t)(comma - p) : strlen(p);
+        if (len >= 64) len = 63;
+        memcpy(store[n], p, len);
+        store[n][len] = '\0';
+        names[n] = store[n];
+        n++;
+        if (!comma) break;
+        p = comma + 1;
+    }
+    return rb_card_matches_any_group(cid, names, n);
+}
+
+static const char *ae_group_name_first(const char *group_csv, char *buf, size_t bufsz)
+{
+    if (!group_csv || !*group_csv) return NULL;
+    const char *comma = strchr(group_csv, ',');
+    size_t len = comma ? (size_t)(comma - group_csv) : strlen(group_csv);
+    if (!buf || bufsz == 0) return group_csv;
+    if (len >= bufsz) len = bufsz - 1;
+    memcpy(buf, group_csv, len);
+    buf[len] = '\0';
+    return buf;
+}
+
 int rb_translated_execute_gain_ability_effect(GameState *g, int actor,
                                                 AbilityEffect *effect, int host_cid)
 {
@@ -261,7 +316,10 @@ int rb_translated_execute_invalidate_ability(GameState *g, int actor,
         int card_id = g->p[target_player].stage[i];
         if (card_id == RB_EMPTY_SLOT) continue;
         if (card_type && !rb_card_matches_type(card_id, card_type)) continue;
-        if (group && !rb_card_matches_group_str(card_id, group)) continue;
+        /* ability_ops.rs:310-311 `CardFilter::from_effect(effect)` +
+           util.rs:2011 matching_ids -> CardFilter::check_group (util.rs:1484),
+           which accepts the first entry OR any of the whole list. */
+        if (group && !ae_group_matches_csv_any(card_id, group)) continue;
         if (!rb_card_has_ability_trigger_for(g, card_id, trigger)) continue;
         if (rb_ability_is_invalidated(g, card_id, trigger)) continue;
         candidates[count] = card_id;
@@ -282,7 +340,12 @@ int rb_translated_execute_invalidate_ability(GameState *g, int actor,
         g->queue.pending.n_filtered_indices = count;
         for (int i = 0; i < count; i++)
             g->queue.pending.filtered_indices[i] = positions[i];
-        strncpy(g->queue.pending.filter_group, group ? group : "",
+        /* ability_ops.rs:357 `.group(effect.group_names_any().and_then(|g| g.first()
+           .cloned()))` — ONE name, `group_names.first()`. Unlike the candidate
+           scan above, this is the value stamped onto the Choice. */
+        char grpbuf[128];
+        const char *grp = ae_group_name_first(group, grpbuf, sizeof grpbuf);
+        strncpy(g->queue.pending.filter_group, grp ? grp : "",
                 sizeof(g->queue.pending.filter_group) - 1);
         strncpy(g->queue.pending.target_player_id, target,
                 sizeof(g->queue.pending.target_player_id) - 1);
@@ -401,11 +464,15 @@ int rb_translated_execute_gain_ability_from_source(GameState *g, int actor,
         fprintf(stderr, "[DBG_SRC] i=%d src=%d type_ok=%d cost_ok=%d group_ok=%d n_und=%d\n", i, source_card,
                 (!card_type || rb_card_matches_type(source_card, card_type)),
                 (cost_limit < 0 || rb_card_matches_cost_limit(source_card, cost_limit, cost_op)),
-                (!group || rb_card_matches_group_str(source_card, group)), under->n);
+                /* ability_ops.rs:665-671 —
+               `if let Some(groups) = effect.group_names_any() { if !groups
+               .iter().any(|g| card_matches_group_str(&card_db, id, Some(g)))
+               { return false } }` — the WHOLE list, any entry. */
+                (!group || ae_group_matches_csv_any(source_card, group)), under->n);
         if (source_card < 0) continue;
         if (card_type && !rb_card_matches_type(source_card, card_type)) continue;
         if (cost_limit >= 0 && !rb_card_matches_cost_limit(source_card, cost_limit, cost_op)) continue;
-        if (group && !rb_card_matches_group_str(source_card, group)) continue;
+        if (group && !ae_group_matches_csv_any(source_card, group)) continue;
         int count = rb_card_num_abilities((uint32_t)source_card);
         for (int a = 0; a < count; a++) {
             Ability source;

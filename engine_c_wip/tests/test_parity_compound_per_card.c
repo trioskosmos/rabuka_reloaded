@@ -555,9 +555,24 @@ static void advance_to_live_set(TestGame *tg)
         test_pass(tg);
     }
 }
+/* Rust twin (zone_scoped_score_bonus_..._027_l_test.rs:12-29):
+ *     test_set_live_card(&mut game, CardId::MiyashitaMia);
+ *     game.pass(); // LiveCardSetFirstAttacker -> LiveCardSetSecondAttacker
+ *     game.pass(); // LiveCardSetSecondAttacker -> FirstAttackerPerformance
+ *                  //   (LiveStart abilities fire during this transition)
+ *     game.perform_live();
+ * TWO passes, not one. The ライブ開始時 trigger is fired by
+ * src/turn/phase.c only on the LIVE_SET_SECOND -> PERFORMANCE edge, so the loop
+ * must run over BOTH live-set windows. Guarding on RB_PHASE_LIVE_SET alone
+ * exited after the first pass (the phase became LIVE_SET_SECOND = 12), which
+ * silently skipped every ライブ開始時 ability: rb_trigger_live_start never ran,
+ * and finish_live's `phase < RB_PHASE_VICTORY` guard was then already false, so
+ * the whole rest of the live flow was skipped as well. finish_live below is
+ * Rust's perform_live / run_live_full tail. */
 static void finish_live_setup(TestGame *tg)
 {
-    for (int i = 0; i < 6 && tg->state.phase == RB_PHASE_LIVE_SET; i++) {
+    for (int i = 0; i < 6 && (tg->state.phase == RB_PHASE_LIVE_SET ||
+                              tg->state.phase == RB_PHASE_LIVE_SET_SECOND); i++) {
         drain(tg, 0);
         test_pass(tg);
     }

@@ -644,13 +644,33 @@ static int cost_is_ll_bp7_play_cost(const AbilityEffect *e) {
 
 /* per_unit divisor (modifiers.rs:1194-1259). per_unit_location overrides the
    counting zone; "stage"+group filters by group, "under_member" flattens the
-   2-D under-card structure, everything else defers to zone_cards. */
+   2-D under-card structure, everything else defers to zone_cards.
+
+   modifiers.rs:1216-1224 filters the stage through `effect.group_name()`, and
+   core/card.rs:2462-2465 defines `group_name()` as `group_names.first()`. The
+   extra therefore arrives comma-joined for a multi-entry list ("Aqours,SaintSnow",
+   24 decoded effects), and the whole string was compared as ONE exact token, so
+   the stage arm counted nothing. Split to the first entry — which is a no-op for
+   the 813 single-entry filters. */
+static const char *cost_group_name_first(const char *group_names, char *buf, size_t bufsz) {
+    if (!group_names || !*group_names) return NULL;
+    const char *comma = strchr(group_names, ',');
+    size_t len = comma ? (size_t)(comma - group_names) : strlen(group_names);
+    if (!buf || bufsz == 0) return group_names;
+    if (len >= bufsz) len = bufsz - 1;
+    memcpy(buf, group_names, len);
+    buf[len] = '\0';
+    return buf;
+}
+
 static int cost_per_unit_count(const GameState *g, int pl, const AbilityEffect *e) {
     const char *per_unit_loc = cost_extra(e, "per_unit_location");
     const char *loc = cost_extra(e, "location");
     const char *count_zone = (per_unit_loc && *per_unit_loc) ? per_unit_loc
                              : ((loc && *loc) ? loc : "hand");
-    const char *group = cost_extra(e, "group_names");
+    const char *group_csv = cost_extra(e, "group_names");
+    char group_buf[128];
+    const char *group = cost_group_name_first(group_csv, group_buf, sizeof group_buf);
     if (group && *group && !strcmp(count_zone, "stage")) {
         int n = 0;
         for (int s = 0; s < RB_STAGE_SIZE; s++) {
@@ -732,7 +752,16 @@ void rb_recalculate_constant_cost_modifiers(GameState *g) {
                         if (cost_extra_flag(e, "per_unit")) {
                             int count = cost_per_unit_count(g, pl, e);
                             if (cost_extra_flag(e, "exclude_self") && count > 0) count--;
-                            int per_unit_count = cost_extra_int(e, "per_unit_count", 1);
+                            /* modifiers.rs:1569 `effect.per_unit_count_any().unwrap_or(1)`.
+                             * `per_unit_count_any()` is `filter_u8_getter!`
+                             * (card.rs:1800-1805) — a TYPED FIELD read, and
+                             * vm.c:1040 fills only that field (never the
+                             * extras), so this extra-only read was always 0 and
+                             * every 「N枚につき」 constant cost ran as
+                             * 「1枚につき」. */
+                            int per_unit_count = e->per_unit_count > 0 ? e->per_unit_count : 1;
+                            const char *puc = cost_extra(e, "per_unit_count");
+                            if (e->per_unit_count <= 0 && puc && *puc) per_unit_count = atoi(puc);
                             if (per_unit_count < 1) per_unit_count = 1;
                             value = (count / per_unit_count) * value;
                         }

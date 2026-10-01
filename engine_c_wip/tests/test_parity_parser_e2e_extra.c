@@ -553,16 +553,15 @@ static void dump_pending_choice(TestGame *tg, const char *what)
     printf("]\n");
 }
 
-/* fire_trigger — queue every ability the seat owns for `trigger`, then drain.
- * A superset of Rust's trigger_auto_ability(card only): the C engine has no
- * single-ability "fire" entry point. */
+/* fire_trigger — helpers/mod.rs:114. Rust resolves ONE ability of ONE card and
+ * calls trigger_auto_ability with an explicit card id, then
+ * process_pending_auto_abilities. The old body queued EVERY ability `pl` owns
+ * printing `trigger` (rb_queue_trigger_abilities is a whole-board TAS scan),
+ * which fires extra abilities whenever a second card on the board prints the
+ * same trigger; `pl` maps onto the _seat form (pl == 1 is the opponent). */
 static int fire_trigger(TestGame *tg, int pl, int cid, const char *trigger)
 {
-    int queued = rb_queue_trigger_abilities(&tg->state, pl, trigger);
-    if (queued <= 0) return 0;
-    tg->state.activating_card = cid;
-    rb_process_pending_auto_abilities(&tg->state);
-    return 1;
+    return test_fire_trigger_on_card_seat(tg, cid, trigger, pl);
 }
 
 /* ===================================================================== *

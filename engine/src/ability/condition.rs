@@ -524,42 +524,29 @@ impl<'a> ConditionContext<'a> {
         // Snapshot buffer before compound/or so children can be collected
         #[cfg(not(feature = "no_std"))]
         let before = crate::ability::log::buffer_len();
-        // Handle compound/or first — they push their own verdicts with children.
+        // Handle compound/or first — they push their own verdicts with children
         //
-        // These paths must NOT bypass the negation post-processing further down, unlike the
-        // other early returns here. A `compound`/`or_condition` can legitimately print a
-        // negated disjunction, and returning here dropped that `negation` silently: the field
-        // parsed, sat in abilities.json, and never ran. Honouring it here removes that trap.
+        // This deliberately returns before the negation post-processing below, so a
+        // top-level `negation` on a compound is NOT applied. That is safe because no card
+        // in the corpus can produce one: 「Aがない、またはBがない」 parses to an `or` whose
+        // LEGS each carry their own negation (applied by the child), and the whole-corpus
+        // survey found zero 「でない」 / 「でない、または」 phrasings and zero disjunctions
+        // with two or more negated legs.
         //
-        // The parser must NOT put leg-level qualifiers on the parent for this to be safe —
-        // `detect_card_property` used to lift one leg's 「ブレードハートを持たない」 onto the
-        // parent of a plain 「AかB」, which would invert the whole OR once negation starts
-        // being honoured. It no longer does, and
-        // `test_ability_invariants.py::test_or_condition_has_no_hoisted_qualifiers` guards it.
+        // So this is a stated invariant, not an accident — and it is enforced from the
+        // parser side by
+        // `test_ability_invariants.py::test_or_condition_has_no_hoisted_qualifiers`, which
+        // rejects a parent `negation` on any `compound`/`or_condition`. The day a card
+        // genuinely needs a negated disjunction that test fails, and engine support can be
+        // added then, deliberately and with a card to test against, rather than carrying an
+        // unreachable branch that only ever executes under a hand-written Condition.
         if let Condition::Compound { .. } = condition {
-            let is_or = condition.get_operator() == Some("or");
-            let result = if is_or {
-                self.evaluate_or_condition(condition)
-            } else {
-                self.evaluate_compound_condition(condition)
-            };
-            if condition.get_negation().unwrap_or(false) {
-                let result = !result;
-                #[cfg(not(feature = "no_std"))]
-                {
-                    if crate::ability::log::debug_enabled()
-                        && crate::ability::log::buffer_len() <= before
-                    {
-                        let actual = self.describe_condition_actual(condition);
-                        push_cond_verdict(condition, &actual, result, vec![]);
-                    }
-                }
-                if ABILITY_DEBUG.load(Ordering::Relaxed) {
-                    dbg.condition(condition, u8::from(!result), 1, result);
-                }
-                return result;
+            if condition.get_operator() == Some("or") {
+                let r = self.evaluate_or_condition(condition);
+                return r;
             }
-            return result;
+            let r = self.evaluate_compound_condition(condition);
+            return r;
         }
         // Phase gate: check phase/phase_target restrictions. This must run
         // BEFORE individual type evaluators so the gate applies universally.

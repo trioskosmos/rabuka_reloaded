@@ -1445,10 +1445,54 @@ int rb_move_take_cards_from_standard_zone(GameState *g, int actor,
     return -1;
 }
 
-/* ── resolve_cards_from_source ── */
+/* ── resolve_cards_from_source ─────────────────────────────────────────────────
+ *
+ * THE VACATED-AREA RESET. Rust models "which stage area did the last member
+ * leave" as `gs.last_vacated_stage_area: Option<u8>`
+ * (core/game_state/mod.rs:277) — it is None until a card is actually removed
+ * FROM a stage slot, and `execute_move_cards` clears it again on the way out
+ * (move/mod.rs:2189-2191, `if !consumes_vacated_area { gs.last_vacated_stage_area
+ * = None; }`) so a move whose source is not the stage never sees a stale value.
+ * The ONLY writer is `util::remove_card_from_any_zone`
+ * (move/transport.rs:43-53), which move.c reaches through
+ * rb_move_resolve_from_stage / rb_move_resolve_from_recently_moved /
+ * rb_move_resolve_from_selected_cards.
+ *
+ * The C's stand-in, `GameState.baton_last_vacated_area[2]`, is a plain `int`
+ * pair that the game-state memset leaves at 0, and 0 is a LEGAL area index, so
+ * it cannot express Rust's None. Nothing ever wrote -1 and nothing ever cleared
+ * it, so every placement in a fresh game saw `vacated_area == 0`.
+ *
+ * That is invisible for the seat whose area 0 is occupied, and fatal for the
+ * other one: `rb_move_place_card_with_stage_choice` takes Rust's vacated-area
+ * shortcut (placement.rs:97-109) whenever `available_slots.len() > 1`, and the
+ * shortcut is checked BEFORE the prompt is built. With a bogus Some(0) and an
+ * empty area 0 the placement therefore never reached the prompt and the card
+ * landed in the lowest free slot instead. Measured on parity_full_round2
+ * (probe in the isolated tree):
+ *     place_card_with_stage_choice pl=1 card=2641 dest=empty_area
+ *         vacated=0 n_avail=3 bvl0=0 bvl1=0 -> VACATED SHORTCUT slot=0
+ * i.e. the `target="both"` OPPONENT arm ran, took the shortcut and raised NO
+ * SelectPosition at all, which is the bulk of that suite's "no prompt at all"
+ * failures ("P2 left is still empty", "the opponent prompt is a SelectPosition",
+ * "the opponent prompt is P2's").
+ *
+ * The reset below is Rust's clear, moved to the one point in move.c that owns
+ * the whole source resolution. It runs BEFORE any source dispatch, so a source
+ * that genuinely vacates a stage slot re-establishes the value immediately
+ * afterwards (resolve_from_stage's self_cost and selection arms,
+ * resolve_from_recently_moved, resolve_from_selected_cards) and the caller's
+ * read still sees it; every other source leaves -1, which is Rust's None.
+ * Only engine.c's two baton writes (engine.c:1007 double-baton arrival,
+ * engine.c:1132 plain baton) stop feeding the placement path — and both of
+ * those values are consumed by engine.c itself for the arriving member's area
+ * (engine.c:950), never by an ability's placement step.
+ */
 int rb_move_resolve_cards_from_source(GameState *g, int actor, AbilityEffect *e,
                                        int count, int *out_ids, int max) {
     if (!g || !out_ids) return 0;
+    g->baton_last_vacated_area[0] = -1;
+    g->baton_last_vacated_area[1] = -1;
     const char *source = e->source ? e->source : "hand";
     const char *destination = e->destination ? e->destination : "discard";
 
@@ -1872,8 +1916,17 @@ int rb_move_place_card_with_stage_choice(
             g->queue.resume_host = card_id;
             if (player_target && *player_target)
                 strncpy(g->queue.pending.target, player_target, sizeof(g->queue.pending.target) - 1);
+            /* The same field the SelectPosition prompt above uses, and for the
+             * same reason (choice.c:4523, `choice_effect_state_change`, reads
+             * ONLY resume_move_state). resume_draw_dest is the DRAW destination
+             * — choice.c:4696-4703 hands it straight to the draw resume as the
+             * zone a card is placed into — so parking "wait"/"active" there
+             * teaches a later draw resume to place a card in a zone named
+             * "wait". Rust carries the same value in the SAME field on both
+             * prompts: `ExecutionContext::MoveCardsPosition { card_id,
+             * state_change, .. }` at placement.rs:200-205 and :144-149. */
             if (state_change && *state_change)
-                strncpy(g->queue.resume_draw_dest, state_change, sizeof(g->queue.resume_draw_dest) - 1);
+                strncpy(g->queue.resume_move_state, state_change, sizeof(g->queue.resume_move_state) - 1);
             if (source_zone && *source_zone)
                 strncpy(g->queue.resume_draw_source, source_zone, sizeof(g->queue.resume_draw_source) - 1);
             return 1;

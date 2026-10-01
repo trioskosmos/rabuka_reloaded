@@ -119,17 +119,17 @@ static void decline_choices(TestGame *tg)
     }
 }
 
-/* fire_trigger(game, cid, trig) -- helpers/mod.rs fire_trigger: set
- * activating_card, queue the one ability printing `trig`, then run
- * process_pending_auto_abilities. */
+/* fire_trigger(game, cid, trig) -- helpers/mod.rs:114 fire_trigger. Rust resolves
+ * ONE ability of ONE card (`resolved_abilities().find(triggers == Some(trig))`)
+ * and calls trigger_auto_ability with an explicit card id. The old C spelling,
+ * rb_queue_trigger_abilities(&tg->state, 0, trig), is a WHOLE-BOARD TAS scan:
+ * `cid` only set activating_card and EVERY card in P1's zones printing `trig`
+ * fired too, doubling every effect in a fixture with two such cards.
+ * test_fire_trigger_on_card is the shared, faithful entry point; it also keeps
+ * the premise check (returns 0 when the card prints no such ability). */
 static int fire_trigger(TestGame *tg, int cid, const char *trig)
 {
-    if (!card_prints_trigger(cid, trig)) return 0;
-    tg->state.activating_card = cid;
-    int queued = rb_queue_trigger_abilities(&tg->state, 0, trig);
-    if (queued <= 0) return 0;
-    rb_process_pending_auto_abilities(&tg->state);
-    return 1;
+    return test_fire_trigger_on_card(tg, cid, trig);
 }
 
 static const RbLiveSnapshot *snapshot_for(const TestGame *tg, int pl)

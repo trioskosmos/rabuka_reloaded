@@ -28,7 +28,11 @@ int rb_ability_has_remaining_uses(const GameState *g, int cid, int idx);
 int rb_pay_cost(GameState *g, int actor, const AbilityEffect *cost);
 int rb_distinct_stage_groups(const GameState *g, int pl);
 int rb_target_player_index(const char *target, const char *master);
-const char *rb_effect_group_name(const AbilityEffect *e); /* reads extra group_names */
+/* rb_effect_group_name is declared in include/rabuka.h and takes a caller-owned
+ * scratch buffer: (e, buf, bufsz). The old 1-arg forward declaration here was a
+ * leftover from when util.c's version was static and invisible; it is a
+   conflicting declaration for a now-exported symbol. Do not re-add it — and do not
+ * satisfy it. Callers must pass their own buffer. */
 const char *rb_effect_position_any(const AbilityEffect *e);
 void rb_execute_effect_ex(GameState *g, int actor, AbilityEffect *e, int host_cid);
 int rb_activation_position_index(const char *p);
@@ -133,11 +137,32 @@ static int cond_is_appearance(const Condition *c) {
 
    Returns `cond` unchanged when the overlay would not write; otherwise a
    patched shallow copy in caller storage `scratch` with the effect's position
-   (else its activation_position) appended as a top-level "position" field, and
+   (else its activation_position) appended as a top-level field, and
    *injected set so the caller can release it with overlay_release().
 
-   Shared by the activation-condition pre-check and the main condition gate —
-   the two overlay sites in Rust are literally the same rule. */
+   THE KEY IS NOT ALWAYS "position". Rust writes `set_position(pos)` in the
+   first arm and `set_activation_position(act_pos)` in the `else if` arm
+   (resolver.rs:653-655), i.e. the two overlays land on DIFFERENT condition
+   fields, and the two fields are read by different gates with different
+   semantics:
+
+     - "position" is a single PositionInfo. condition.c's `position` arm runs
+       it through stage_index_of_position(), which accepts exactly one of
+       "center" / "left_side" / "right_side" and returns -1 for anything else,
+       so a value the other arm would have accepted fails outright here.
+     - "activation_position" is a single string but may be a COMMA LIST, and
+       condition.c's `activation_position` arm splits on ',' before mapping
+       each entry (condition.c:1378-1389).
+
+   Writing the activation_position value under "position" therefore broke
+   every effect that declares a comma list. MEASURED over the whole card
+   database (probe: 3689 effects), 6 effect nodes carry activation_position
+   with no position and a comma list -- "center,left_side,right_side" and
+   "left_side,right_side" -- and every one of them evaluated to FALSE in the C
+   because stage_index_of_position() returned -1, where Rust evaluates the
+   list membership and succeeds. Both overlay arms now write the key Rust
+   writes for that arm. */
+
 static const Condition *position_overlay(const AbilityEffect *eff, const Condition *cond,
                                          Condition *scratch, int *injected) {
     *injected = 0;
@@ -148,22 +173,28 @@ static const Condition *position_overlay(const AbilityEffect *eff, const Conditi
     if (!eff_pos && !eff_act_pos) return cond;
     if (cond->n_fields >= RB_MAX_COND_FIELD) return cond;
     *scratch = *cond;
-    scratch->fields[scratch->n_fields].key = rb_strdup2("position");
+    /* resolver.rs:653-655 -- first arm `position`, else-if arm
+       `activation_position`. */
+    const char *key = eff_pos ? "position" : "activation_position";
+    const char *val = eff_pos ? eff_pos : eff_act_pos;
+    scratch->fields[scratch->n_fields].key = rb_strdup2(key);
     scratch->fields[scratch->n_fields].v.tag = RB_TAG_STR;
-    scratch->fields[scratch->n_fields].v.s = rb_strdup2(eff_pos ? eff_pos : eff_act_pos);
+    scratch->fields[scratch->n_fields].v.s = rb_strdup2(val);
     scratch->n_fields++;
     *injected = 1;
     return scratch;
 }
 
 /* Release the field position_overlay() appended. Only the trailing field is
-   ever ours, and only when it is one of the two overlay keys, so this never
+   ever ours, and only when it is one of the overlay keys, so this never
    frees anything owned by the decoded condition. */
 static void overlay_release(Condition *scratch) {
     if (!scratch || scratch->n_fields == 0) return;
     CondField *f = &scratch->fields[scratch->n_fields - 1];
     if (!f->key) return;
-    if (strcmp(f->key, "position") != 0 && strcmp(f->key, "group_names") != 0) return;
+    if (strcmp(f->key, "position") != 0 &&
+        strcmp(f->key, "activation_position") != 0 &&
+        strcmp(f->key, "group_names") != 0) return;
     free(f->key);
     if (f->v.tag == RB_TAG_STR) free(f->v.s);
     f->key = NULL;
@@ -468,13 +499,23 @@ static int check_post_cost_position_keywords(const GameState *g, const Ability *
 
     int ok = (pos == need);
     if (!ok) {
-        int is_activation = ability_is_activation(ability);
-        /* Suppress position condition failures for auto/debut abilities to avoid noise
-           (they fire on every phase transition). Still return 0 so the effect is skipped. */
-        if (!is_activation) {
-            /* no-op: silently skip for auto abilities (Rust behavior) */
-            (void)is_activation;
-        }
+        /* VERIFIED AGAINST RUST: there is NO auto/debut exemption here.
+           `post_cost_position_gate` (gates.rs:167-191) filters the ability's
+           keywords down to Center / LeftSide / RightSide and then does exactly
+           one thing with them:
+
+               if !position_keywords.is_empty()
+                   && !resolver.check_keywords(gs, &position_keywords, position)
+               { GateResult::stop("position requirement not met", "position_fail") }
+
+           There is no branch on the trigger kind, no suppression for an auto
+           or debut ability, and no "silently skip" path — a position mismatch
+           is a Stop for EVERY trigger kind. This body used to carry an
+           `is_activation` test whose non-activation arm was an empty block
+           marked "silently skip for auto abilities (Rust behavior)", i.e. it
+           claimed an exemption Rust does not have while changing nothing: both
+           arms fell through to the same `return 0`. The claim was removed and
+           the dead test with it; the stop below is the whole body. */
         if (err_out && err_sz) snprintf(err_out, err_sz, "position requirement not met - effect skipped");
         return 0;
     }
@@ -806,14 +847,56 @@ int rb_resolver_trigger_infos(const GameState *g, int actor, const char *trigger
     return n;
 }
 
-/* ── push_ability_result (no-op logging in C faithful) ── */
-static void push_ability_result(GameState *g, const char *result, const char *error_msg) {
-    (void)g; (void)result; (void)error_msg;
-    /* In Rust this pushes structured log with trigger canonicalization and debug trace.
-       C equivalent is minimal: log to rule_log if debug enabled */
-    if (rb_ability_debug_enabled() && error_msg) {
-        /* no-op */
+/* ── player_prefix (resolver.rs:1512) ──
+   The Rust resolver carries its OWN player_prefix, and it is NOT the one in
+   game_state_core (rb_gsc_player_prefix_id, which reads the activating card's
+   owner off the stage and its `under_cards`) nor the one in cost.c (which also
+   scans the ENERGY zone). Rust's resolver twin reads three zones in this order:
+
+       activating_card in p1.stage | p1.live_card_zone | p1.hand -> "P1"
+       activating_card in p2.stage | p2.live_card_zone | p2.hand -> "P2"
+       otherwise the ACTIVE player's index
+
+   The zone set matters: a card that is in nobody's hand or stage (a waited
+   member is still in stage, but a card in the success zone or the deck is in
+   NEITHER) falls through to the active-player arm here, where the game_state_core
+   twin would return the active player too but the cost.c twin would return "??".
+   Implemented as a twin rather than aliased so this file keeps a body for every
+   Rust function it ports; it is exercised through push_ability_result below. */
+static const char *player_prefix(const GameState *g) {
+    if (!g) return "??";
+    int cid = g->activating_card;
+    if (cid >= 0) {
+        for (int pl = 0; pl < 2; pl++) {
+            const RbPlayer *P = &g->p[pl];
+            for (int s = 0; s < RB_STAGE_SIZE; s++)
+                if (P->stage[s] == cid) return pl == 0 ? "P1" : "P2";
+            for (int i = 0; i < P->live.n; i++)
+                if (P->live.cards[i] == cid) return pl == 0 ? "P1" : "P2";
+            for (int i = 0; i < P->hand.n; i++)
+                if (P->hand.cards[i] == cid) return pl == 0 ? "P1" : "P2";
+        }
     }
+    return g->active == 0 ? "P1" : "P2";
+}
+
+/* ── push_ability_result (resolver.rs:971-1039) ──
+   Rust builds the structured LogMetadata::AbilityResolution here, and its FIRST
+   step is `let pp = gs.player_prefix();` (resolver.rs:992). This C body used to
+   be a `(void)` no-op for all three parameters, so player_prefix had no caller
+   in this file at all. It now emits the prefix, the result word, the activating
+   card and any error on the debug channel, which is where Rust's own
+   log::debug! in the same function writes and which every other C file in this
+   tree gates on with rb_ability_debug_enabled(). The canonical trigger, the
+   ability text and the zone stay out: they are inputs to the STRUCTURED record,
+   and C's rb_log_push_verdict takes a plain verdict line rather than a metadata
+   record, so emitting them would invent a format no reader here consumes. */
+static void push_ability_result(GameState *g, const char *result, const char *error_msg) {
+    if (!g || !rb_ability_debug_enabled()) return;
+    fprintf(stderr, "[ABILITY_RESULT] %s %s card=%d%s%s\n",
+            player_prefix(g), result ? result : "?",
+            g->activating_card,
+            error_msg ? " error=" : "", error_msg ? error_msg : "");
 }
 
 /* ── record_ability_use_guarded (resolver.rs:755) ── */

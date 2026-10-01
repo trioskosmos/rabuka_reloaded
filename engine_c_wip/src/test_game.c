@@ -1095,10 +1095,11 @@ extern void rb_trigger_auto_ability(GameState *g, const char *ability_id,
    the trigger (Rust fire_trigger_nth); `_at_index` addresses an ABSOLUTE
    ability index, which is what a suite isolating one leg of a multi-leg
    watcher needs and is NOT the same thing. */
-int test_fire_trigger_core(TestGame *tg, int cid, const char *trig,
-                           int use_nth, int nth_or_index)
+int test_fire_trigger_core_seat(TestGame *tg, int cid, const char *trig,
+                                int use_nth, int nth_or_index, int pl)
 {
     if (!tg || cid < 0 || !trig) return 0;
+    if (pl < 0 || pl > 1) return 0;
     int a = use_nth ? test_ability_index_for_trigger(cid, trig, nth_or_index)
                     : nth_or_index;
     if (a < 0) return 0;
@@ -1139,7 +1140,7 @@ int test_fire_trigger_core(TestGame *tg, int cid, const char *trig,
     }
 
     int before = tg->state.queue.n_entries;
-    rb_trigger_auto_ability(&tg->state, ability_id, trig, /*player_id*/ 0,
+    rb_trigger_auto_ability(&tg->state, ability_id, trig, /*player_id*/ pl,
                             card_no, /*explicit_card_id*/ cid,
                             /*trigger_moved_cards*/ NULL, /*n_moved*/ 0,
                             /*triggering_member_id*/ -1);
@@ -1173,14 +1174,26 @@ int test_fire_trigger_core(TestGame *tg, int cid, const char *trig,
     return queued;
 }
 
+/* One core, several entry points. `_nth` selects the Nth PRINTED ability
+   carrying the trigger (Rust fire_trigger_nth); `_at_index` addresses an
+   ABSOLUTE ability index, which is what a suite isolating one leg of a
+   multi-leg watcher needs and is NOT the same thing; `_seat` is for the suites
+   whose Rust twin fires the trigger on the OPPONENT (test_parity_reveal_extra's
+   fire_trigger_p2 and its neighbours), which pass pl == 1 to
+   rb_queue_trigger_abilities. */
+int test_fire_trigger_on_card_seat(TestGame *tg, int cid, const char *trig, int pl)
+{
+    return test_fire_trigger_core_seat(tg, cid, trig, /*use_nth*/ 1, /*nth*/ 0, pl);
+}
+
 int test_fire_trigger_on_card(TestGame *tg, int cid, const char *trig)
 {
-    return test_fire_trigger_core(tg, cid, trig, /*use_nth*/ 1, /*nth*/ 0);
+    return test_fire_trigger_core_seat(tg, cid, trig, /*use_nth*/ 1, /*nth*/ 0, /*pl*/ 0);
 }
 
 int test_fire_trigger_on_card_nth(TestGame *tg, int cid, const char *trig, int nth)
 {
-    return test_fire_trigger_core(tg, cid, trig, /*use_nth*/ 1, nth);
+    return test_fire_trigger_core_seat(tg, cid, trig, /*use_nth*/ 1, nth, /*pl*/ 0);
 }
 
 int test_fire_trigger_at_index(TestGame *tg, int cid, int ability_idx)
@@ -1200,5 +1213,5 @@ int test_fire_trigger_at_index(TestGame *tg, int cid, int ability_idx)
     /* Address the index directly, but keep the "does it print the trigger"
        gate the nth path applies, by asking for the FIRST match first. */
     if (test_ability_index_for_trigger(cid, trig, 0) < 0) return 0;
-    return test_fire_trigger_core(tg, cid, trig, /*use_nth*/ 0, ability_idx);
+    return test_fire_trigger_core_seat(tg, cid, trig, /*use_nth*/ 0, ability_idx, /*pl*/ 0);
 }

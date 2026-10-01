@@ -60,9 +60,33 @@ static int draw_count_zone_cards(const RbPlayer *player, const char *source) {
 /* Mirrors util::place_card_in_zone(player, card, destination, ...).
    Returns 1 if the card was placed, 0 if it fell back to hand (zone full / unknown).
    g_of_player is the owning GameState (needed only for stage deployment
-   tracking); callers without one pass NULL. */
+   tracking); callers without one pass NULL.
+
+   deck_bottom and energy_deck are resolved from the DESTINATION STRING, before
+   rb_zone_of_str, because rb_zone_of_str (engine.c:60) collapses "deck_bottom"
+   onto RB_ZONE_DECK and has no energy_deck arm at all. Rust keeps them distinct:
+     util.rs:2426-2431  Zone::Deck | Zone::DeckTop -> main_deck.cards.insert(idx, card)
+     util.rs:2433-2436  Zone::DeckBottom             -> main_deck.cards.push(card)
+     util.rs:2437-2440  Zone::Energy                 -> energy_zone.cards.push(card)
+     util.rs:2441-2444  Zone::EnergyDeck             -> energy_deck.cards.push(card)
+   Taking the bottom-insert path for "deck_bottom" put the card on the TOP of the
+   deck (index 0 is the top, because the C deck bag is top-index-0 like Rust's
+   main_deck.cards), and "energy_deck" fell through to the hand catch-all. */
 static int draw_place_in_zone_g(GameState *g_of_player, RbPlayer *player, int card,
                                 const char *destination) {
+    if (destination && !strcmp(destination, "deck_bottom")) {
+        /* util.rs:2433-2436 `Some(Zone::DeckBottom)` — push, i.e. the END of the
+           bag, which is the BOTTOM of the deck. */
+        if (player->deck.n < RB_MAX_ZONE)
+            player->deck.cards[player->deck.n++] = card;
+        return 1;
+    }
+    if (destination && !strcmp(destination, "energy_deck")) {
+        /* util.rs:2441-2444 `Some(Zone::EnergyDeck)` — push onto the energy deck. */
+        if (player->energy_deck.n < RB_MAX_ZONE)
+            player->energy_deck.cards[player->energy_deck.n++] = card;
+        return 1;
+    }
     RbZone z;
     if (rb_zone_of_str(destination, &z) == 0) {
         if (player->hand.n < RB_MAX_ZONE)
@@ -492,8 +516,16 @@ int rb_effect_draw_card(GameState *g, int actor, AbilityEffect *e, int host_cid)
             multiplier = per_unit_count > 0 ? disc / per_unit_count : disc;
         } else {
             /* util::calculate_per_unit_multiplier (util.rs:2274-2313), with
-               effect.state as the orientation filter for member counts. */
-            multiplier = draw_per_unit_multiplier(g, &g->p[actor], per_unit_type,
+               effect.state as the orientation filter for member counts.
+               Rust (deck.rs:238) passes `player`, which is the value of
+               `gs.resolve_target_player_mut(target)` resolved at deck.rs:230 --
+               NOT the actor. So a per_unit draw with target="opponent" counts
+               the OPPONENT's zone. Resolving the same way here; the multiplier
+               must be read off the same player the cards are drawn for. */
+            int pu_target = actor;
+            RbPlayer *resolved = rb_resolve_target_player_mut(g, e->target);
+            if (resolved) pu_target = (int)(resolved - g->p);
+            multiplier = draw_per_unit_multiplier(g, &g->p[pu_target], per_unit_type,
                                                   draw_extra(e, "state"));
         }
         int pc = per_unit_count > 0 ? per_unit_count : 1;

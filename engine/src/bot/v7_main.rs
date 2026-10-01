@@ -351,8 +351,62 @@ struct Search<'a> {
     nodes: usize,
 }
 
+/// Trained value function loaded once per process, if `V7_LEARNED_VALUE` names a
+/// weights file. A `OnceLock` because `evaluate` runs tens of thousands of times
+/// per decision and re-reading the file there would dominate the search.
+static LEARNED_VALUE: std::sync::OnceLock<Option<super::neural::PolicyNet>> =
+    std::sync::OnceLock::new();
+
+fn learned_value_net() -> Option<&'static super::neural::PolicyNet> {
+    LEARNED_VALUE
+        .get_or_init(|| {
+            let path = std::env::var("V7_LEARNED_VALUE").ok()?;
+            if !std::path::Path::new(&path).exists() {
+                eprintln!("V7_LEARNED_VALUE={path} not found; learned term disabled");
+                return None;
+            }
+            let mut net = super::neural::PolicyNet::new();
+            match net.load_weights(&path) {
+                Ok(()) => {
+                    eprintln!("learned value loaded from {path}");
+                    Some(net)
+                }
+                Err(e) => {
+                    eprintln!("V7_LEARNED_VALUE load failed: {e}");
+                    None
+                }
+            }
+        })
+        .as_ref()
+}
+
+/// Learned value contribution to the leaf, or `None` when disabled.
+///
+/// The net was trained on the seat's own perspective, so the output is already
+/// "how good is this for me"; no sign flip is needed. The term is a DELTA
+/// against the root position rather than a level, for the same reason the hand
+/// leaf is: the leaf is compared across candidate actions within one turn, so
+/// only the change matters, and a level would add a constant that cancels.
+fn learned_value_term(gs: &GameState, me: u8) -> Option<f64> {
+    let net = learned_value_net()?;
+    let obs = crate::bot::observation::PublicObservation::from_state(gs, me);
+    let encoded = net.encode_state(&obs);
+    let v = net.evaluate_state_value(&encoded);
+    if !v.is_finite() {
+        return None;
+    }
+    let weight: f64 = std::env::var("V7_LEARNED_VALUE_WEIGHT")
+        .ok()
+        .and_then(|x| x.parse().ok())
+        .filter(|w: &f64| w.is_finite())
+        .unwrap_or(1000.0);
+    // The hand leaf works in "units of a placement" (1000 per success), so the
+    // learned term is scaled to match. Default 1000 puts a +-1 net output at the
+    // same magnitude as winning or losing a placement outright.
+    Some(weight * v as f64)
+}
+
 impl Search<'_> {
-    /// Node budget per root action. Default 64 (historical); V7_NODES env
     /// for ablation. Budget-limited leaves return eval-1.0, so a larger
     /// budget mainly deepens choice chains rather than changing scalars.
     fn node_budget() -> usize {
@@ -363,17 +417,37 @@ impl Search<'_> {
             .unwrap_or(64)
     }
 
-    fn evaluate(&self, gs: &GameState) -> f64 {
+fn evaluate(&self, gs: &GameState) -> f64 {
         let own = features(gs, self.me);
         let opp = gs.seat_player(1 - self.me);
         let original_opp = self.root.seat_player(1 - self.me);
         let (_, opp_blades, opp_cost) = board(gs, 1 - self.me);
-        value(&own, &self.base, self.deploy)
+        let hand = value(&own, &self.base, self.deploy)
             - 8.0 * (opp_cost - self.opponent.cost) as f64
             - 6.0 * (opp_blades - self.opponent.blades) as f64
             - 10.0 * (opp.hand.cards.len() as f64 - original_opp.hand.cards.len() as f64)
             - 1000.0
-                * (opp.success_live_card_zone.cards.len() as f64 - self.opponent.success as f64)
+                * (opp.success_live_card_zone.cards.len() as f64 - self.opponent.success as f64);
+        // `V7_LEARNED_VALUE=<weights>` adds a trained value function to this leaf.
+        //
+        // This is the intervention the CCG search literature supports, and it is
+        // deliberately NOT a learned policy. Two RL attempts to replace the
+        // policy failed here: behaviour cloning reached 53% action accuracy but
+        // played at 35.5% against its own teacher, and PPO on a measured ladder
+        // rung regressed 47.3% -> 37.5%. Both failed the same way - the teacher
+        // decides Pass through a DELTA leaf, which a level model cannot
+        // represent, so a policy net never learns to stop.
+        //
+        // The search keeps doing that work. This adds one more opinion about how
+        // good a position is, leaving the search and the delta leaf intact.
+        // Świechowski et al. (arXiv 1808.04794) did exactly this for Hearthstone
+        // MCTS and lifted the second-attacker bot from 26.5% to 53.2%; Zhang &
+        // Buro (CIG 2017) used a learned net the same way for rollout guidance.
+        if let Some(bonus) = learned_value_term(gs, self.me) {
+            hand + bonus
+        } else {
+            hand
+        }
     }
 
     fn complete(&mut self, gs: &GameState, depth: usize) -> (f64, usize, &'static str) {

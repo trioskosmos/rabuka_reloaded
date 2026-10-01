@@ -40,8 +40,7 @@ int rb_normalize_card_no(const char *raw, char *out, size_t out_size)
     while (length >= 3 && (unsigned char)out[length - 3] == 0xef &&
            (unsigned char)out[length - 2] == 0xbc &&
            ((unsigned char)out[length - 1] == 0x8b ||
-            (unsigned char)out[length - 1] == 0x81 ||
-            (unsigned char)out[length - 1] == 0x9b)) {
+            (unsigned char)out[length - 1] == 0x81)) {
         length -= 3;
     }
     out[length] = '\0';

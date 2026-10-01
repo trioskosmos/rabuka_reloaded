@@ -467,22 +467,29 @@ static void play_to_stage(TestGame *tg, int cid, int area, int accept)
     }
 }
 
-/* Rust fire_trigger / trigger_auto. The C engine exposes a per-trigger SCAN
- * rather than a single-ability enqueue, so the ability is selected by its
- * trigger token; every fixture board here seats exactly one card printing it
- * and card_prints_trigger() gates the call. */
+/* Rust fire_trigger / trigger_auto: ONE ability of ONE card.
+ *
+ * The 登場 arm below is KEPT deliberately. Rust's fire_trigger passes None for the
+ * movement batch, and the shared harness helper does the same, so a card seated in
+ * hand has no appearance event and the TAS movement gate refuses it. This suite's
+ * Rust twin publishes the 登場 batch the way recover_live does, and that has to
+ * keep happening here or the DEBUT legs stop firing at all.
+ *
+ * Only the single-card fan-out is replaced. The old body was
+ * rb_queue_trigger_abilities(&tg->state, pl, trig), a whole-board TAS scan in which
+ * `cid` only set activating_card: every card that seat owned printing the trigger
+ * fired too. test_fire_trigger_on_card_seat targets one ability_id on one
+ * explicit_card_id via rb_trigger_auto_ability (the port of Rust
+ * GameState::trigger_auto_ability) and does the load-bearing enqueue-time use
+ * record. */
 static int fire_trigger_for(TestGame *tg, int pl, int cid, const char *trig)
 {
-    if (cid < 0 || !card_prints_trigger(cid, trig)) return 0;
-    tg->state.activating_card = cid;
+    if (cid < 0) return 0;
     if (!strcmp(trig, RB_TSTR_DEBUT)) {
         tg->state.n_recently_moved = 0;
         tg->state.recently_moved[tg->state.n_recently_moved++] = cid;
     }
-    int queued = rb_queue_trigger_abilities(&tg->state, pl, trig);
-    if (queued <= 0) return 0;
-    rb_process_pending_auto_abilities(&tg->state);
-    return 1;
+    return test_fire_trigger_on_card_seat(tg, cid, trig, pl);
 }
 
 static int fire_trigger(TestGame *tg, int cid, const char *trig)
@@ -981,7 +988,7 @@ static void test_f_two_own_success_cards_retrieve_two_revealed_members(void)
     test_add_to_success(tg, s2);
     reveal_cards(tg, (const int[]){ m1, m2 }, 2);
 
-    CHECK(fire_trigger(tg, live, RB_TSTR_LIVE_SUCCESS), "F: the ?????? ability is queued");
+CHECK(fire_trigger(tg, live, RB_TSTR_LIVE_SUCCESS), "F: the ?????? ability is queued");
     EXPECT_PROMPTS(tg, 1, "F: an up-to-2 member selection must be offered");
     CHECK(pending_is_card(tg), "F: the prompt is a SelectCard (revealed, count=2)");
     { const int two[2] = { 0, 1 }; pick_n(tg, two, 2); }

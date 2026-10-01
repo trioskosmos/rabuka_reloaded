@@ -153,7 +153,41 @@ static int str_ieq(const char *a, const char *b) {
     return *a == *b;
 }
 
-/* Mirror util.rs::eq_ignoring_whitespace (util.rs:667-677).
+/* Rust `char::is_whitespace` is the Unicode White_Space property, NOT
+   "ASCII whitespace". util.rs:696-706 filters on it for BOTH sides, so the
+   previous byte-wise `if (c == ' ' || '\t' || '\n' || '\r')` strip silently
+   diverged on U+3000 IDEOGRAPHIC SPACE, U+00A0 NBSP, U+2000-200A, U+2028/29,
+   U+202F, U+205F and U+0085 — a query like 「lily　white」 (full-width space)
+   matched in Rust and NOT here. Same set as core/card.c's card_whitespace(). */
+static int cp_is_rust_whitespace(uint32_t cp) {
+    return (cp >= 0x09 && cp <= 0x0D) || cp == 0x20 || cp == 0x85 || cp == 0xA0 ||
+           cp == 0x1680 || (cp >= 0x2000 && cp <= 0x200A) ||
+           cp == 0x2028 || cp == 0x2029 || cp == 0x202F || cp == 0x205F ||
+           cp == 0x3000;
+}
+
+/* Decode one char and advance *p, mirroring Rust's str::chars(): a malformed
+   lead byte yields the byte's own value and advances exactly one byte, so the
+   comparison can never read past the terminator. */
+static uint32_t utf8_next(const char **p) {
+    const unsigned char *s = (const unsigned char *)*p;
+    uint32_t cp = s[0];
+    size_t n;
+    if (cp < 0x80)            { *p += 1; return cp; }
+    else if (cp < 0xC0)       { *p += 1; return 0xFFFD; }
+    else if (cp < 0xE0)       { n = 2; cp &= 0x1F; }
+    else if (cp < 0xF0)       { n = 3; cp &= 0x0F; }
+    else if (cp < 0xF8)       { n = 4; cp &= 0x07; }
+    else                      { *p += 1; return 0xFFFD; }
+    for (size_t i = 1; i < n; i++) {
+        if ((s[i] & 0xC0) != 0x80) { *p += 1; return 0xFFFD; }
+        cp = (cp << 6) | (s[i] & 0x3F);
+    }
+    *p += n;
+    return cp;
+}
+
+/* Mirror util.rs::eq_ignoring_whitespace (util.rs:696-706).
    The corpus spells one unit group two ways — `lily white` on 25 cards and
    `lilywhite` on 106 — and cards.json `unit` keeps both, so a raw `==` made a
    `『lily white』` filter skip every unspaced card and a `『lilywhite』` filter
@@ -162,16 +196,15 @@ static int str_ieq(const char *a, const char *b) {
    the ！/µ variants are handled separately by norm_str. */
 static int str_eq_ignoring_ws(const char *a, const char *b) {
     if (!a || !b) return 0;
-    while (*a && *b) {
-        while (*a == ' ' || *a == '\t' || *a == '\n' || *a == '\r') a++;
-        while (*b == ' ' || *b == '\t' || *b == '\n' || *b == '\r') b++;
-        if (!*a || !*b) break;
-        if (*a != *b) return 0;
-        a++; b++;
+    const char *pa = a, *pb = b;
+    for (;;) {
+        uint32_t ca = 0, cb = 0;
+        int ea = 1, eb = 1;
+        while (*pa) { ca = utf8_next(&pa); if (!cp_is_rust_whitespace(ca)) { ea = 0; break; } }
+        while (*pb) { cb = utf8_next(&pb); if (!cp_is_rust_whitespace(cb)) { eb = 0; break; } }
+        if (ea || eb) return ea && eb;
+        if (ca != cb) return 0;
     }
-    while (*a == ' ' || *a == '\t' || *a == '\n' || *a == '\r') a++;
-    while (*b == ' ' || *b == '\t' || *b == '\n' || *b == '\r') b++;
-    return *a == '\0' && *b == '\0';
 }
 
 /* ── Effect-field reader ─────────────────────────────────────────────── */
@@ -389,7 +422,28 @@ static int card_identity_ability_matches(int card_id, const char *gn) {
    form — either one matches either filter. U+FF0B '＋' is deliberately NOT
    folded: Rust's norm_group_name folds only U+FF01 and U+00B5, and no unit or
    group_names string in cards.json / abilities.json contains it, so folding it
-   would only make the C diverge from the reference. */
+   would only make the C diverge from the reference.
+
+   EXHAUSTIVE DIFF (2026-10-02). Every term above was re-derived from Rust and
+   compared against this function over the WHOLE corpus: all 2,639 cards x 45
+   group strings (the 20 distinct `group_names`/`exclude_group_names` values
+   abilities.json can deliver, their whole-CSV joins, all 5 KNOWN_GROUPS, every
+   distinct `unit` value in cards.json, and whitespace/width variants) =
+   118,755 (card, group) pairs. Result: OR-level verdict, the per-term vector,
+   and the '&'/U+FF06 split part count agree with Rust on EVERY pair except the
+   131 pairs whose query contains a non-ASCII space, which str_eq_ignoring_ws
+   used to miss (now fixed — see its comment). In particular the report that
+   this matcher is "too permissive for 虹ヶ咲" is NOT reproducible: for the
+   虹ヶ咲 query there is not one disagreement, in either direction, over all
+   2,639 cards. The two extra C-only terms are both faithful: the CSV-split
+   constant `identities` list reproduces Rust's real `ids` array (the corpus
+   carries exactly one set_card_identity ability, on PL!HS-bp2-020-L /
+   PL!HS-bp5-018-L / PL!HS-sd1-020-SD), and rb_card_matches_identity_str reads
+   only the C-only runtime registry, which no group filter exercises at load.
+   `rb_card_series_to_group` and the literals here carry the corpus's own
+   codepoints — 虹ヶ咲 is U+8679 U+30F6 U+54B2 (KATAKANA small ke) and 蓮ノ空
+   is U+84EE U+30CE U+7A7A; the hiragana U+30F1 / U+83B2 spellings match
+   NOTHING and silently disable both terms. */
 int rb_card_matches_group_str(int card_id, const char *group_name) {
     if (!group_name) return 1;
 
@@ -468,6 +522,76 @@ int rb_card_matches_any_group(int card_id, const char **groups, int n) {
     for (int i = 0; i < n; i++)
         if (groups[i] && rb_card_matches_group_str(card_id, groups[i])) return 1;
     return 0;
+}
+
+/* ── group_names: ONE entry, never the whole list ───────────────────────── */
+
+/* Rust models `group_names` as a `Vec<String>` (core/card.rs:2007
+   `group_names_any`) but reads exactly ONE entry everywhere the engine filters
+   cards by group:
+     core/card.rs:2397   `AbilityEffect::filter_subset` -> `group: self.group_name()`
+     core/card.rs:2462   `group_name()` = `group_names.first()`
+     core/card.rs:3860   `Condition::filter_subset`   -> `group_names.first()`
+     util.rs:197         `play_cost_reduction_matches`-> `gn.first()`
+     util.rs:237         `per_unit_cost_reduction`    -> `effect.group_name()`
+   The C bytecode decoder flattens the array into ONE comma-joined extra, so
+   every one of those sites handed `rb_card_matches_group_str` a string like
+   "lilywhite,μ's" / "CatChu!,KALEIDOSCORE,5yncri5e!" / "DiverDiva,虹ヶ咲" and it
+   compared that WHOLE string as ONE exact token against the card's unit /
+   derived group / name / series. No card is *called* any of those values, so the
+   filter admitted nothing.
+   MEASURED over all 2,639 cards with the C database: group "lilywhite,μ's"
+   (PL!-pb1-007-P＋ / -R, both a modify_cost and a sequential) matched 0 cards;
+   the corpus carries 3 such shapes — ("Aqours","SaintSnow") x10,
+   ("CatChu!","KALEIDOSCORE","5yncri5e!") x3, ("lilywhite","μ's") x2,
+   ("SunnyPassion","Liella!") x2 — so 24 decoded effects were affected.
+
+   This is deliberately NOT rb_card_matches_any_group: `any_group` is a
+   DIFFERENT Rust function (util.rs:799) and is only correct where the Rust
+   source spells it out (choice.c / move.c already port that one). Every site
+   routed through here corresponds to a `.first()`.
+
+   NOT static: cost.c / score.c / misc.c / ability_effects.c each carry a local
+   twin of this trio because the helpers were file-private and undeclared.
+   Declare all three in include/rabuka.h (signatures below) and delete the
+   twins; a local twin is a second place for `.first()` to go wrong.
+
+   NOTE resolver.c:31 forward-declares
+       const char *rb_effect_group_name(const AbilityEffect *e);
+   which is NOT this signature (it drops the `buf`/`bufsz` scratch pair). It is
+   currently never called there, so it links but is a wrong-type declaration
+   waiting to be used; it must be deleted, not satisfied. */
+const char *rb_group_name_first(const char *group_names, char *buf, size_t bufsz) {
+    if (!group_names || !*group_names) return NULL;
+    const char *comma = strchr(group_names, ',');
+    size_t len = comma ? (size_t)(comma - group_names) : strlen(group_names);
+    if (!buf || bufsz == 0) return group_names;
+    if (len >= bufsz) len = bufsz - 1;
+    memcpy(buf, group_names, len);
+    buf[len] = '\0';
+    return buf;
+}
+
+/* Read the effect's group filter the way Rust does: `group_names` is the wire
+   key (there is NO `group` extra anywhere in the card database — measured: 802
+   `group_names`, 12 `exclude_group_names`, 17 `group_reference`, 3
+   `per_group`, 3 `per_group_count`, and not one `group`), and only its first
+   entry is the filter. Kept as a named helper so the two facts cannot drift. */
+const char *rb_effect_group_name(const AbilityEffect *e, char *buf, size_t bufsz) {
+    if (!e) return NULL;
+    const char *names = eff_extra(e, "group_names");
+    if (!names || !*names) names = eff_extra(e, "group");
+    return rb_group_name_first(names, buf, bufsz);
+}
+
+/* Pass if the effect names no group, else match `group_names.first()`.
+   `buf` is caller-owned scratch so the stage / hand / discard scan loops stay
+   allocation free. */
+int rb_card_matches_effect_group(const AbilityEffect *e, int card_id,
+                                 char *buf, size_t bufsz) {
+    const char *g = rb_effect_group_name(e, buf, bufsz);
+    if (!g || !*g) return 1;
+    return rb_card_matches_group_str(card_id, g);
 }
 
 
@@ -825,13 +949,17 @@ int rb_count_in_zone_filtered(const GameState *g, int pl, const char *zone,
                               const char *card_type, const char *group) {
     if (!zone) return 0;
     const RbPlayer *P = &g->p[pl];
+    /* util.rs count_in_zone takes a CardFilter, whose `group` is
+       `group_names.first()` (card.rs:2397) — never the whole CSV list. */
+    char gbuf[128];
+    const char *g1 = rb_group_name_first(group, gbuf, sizeof gbuf);
     if (!strcmp(zone, "stage")) {
         int n = 0;
         for (int i = 0; i < RB_STAGE_SIZE; i++) {
             int cid = P->stage[i];
             if (cid == RB_EMPTY_SLOT) continue;
             if (card_type && !rb_card_matches_type(cid, card_type)) continue;
-            if (group && !rb_card_matches_group_str(cid, group)) continue;
+            if (g1 && *g1 && !rb_card_matches_group_str(cid, g1)) continue;
             n++;
         }
         return n;
@@ -843,7 +971,7 @@ int rb_count_in_zone_filtered(const GameState *g, int pl, const char *zone,
             for (int i = 0; i < u->n; i++) {
                 int cid = u->cards[i];
                 if (card_type && !rb_card_matches_type(cid, card_type)) continue;
-                if (group && !rb_card_matches_group_str(cid, group)) continue;
+                if (g1 && *g1 && !rb_card_matches_group_str(cid, g1)) continue;
                 n++;
             }
         }
@@ -854,7 +982,7 @@ int rb_count_in_zone_filtered(const GameState *g, int pl, const char *zone,
     int count = 0;
     for (int i = 0; i < n; i++) {
         if (card_type && !rb_card_matches_type(ids[i], card_type)) continue;
-        if (group && !rb_card_matches_group_str(ids[i], group)) continue;
+        if (g1 && *g1 && !rb_card_matches_group_str(ids[i], g1)) continue;
         count++;
     }
     return count;
@@ -1185,7 +1313,15 @@ int rb_resolve_indices_to_ids(const GameState *g, int pl, const char *zone,
 static int local_filter_matches(const LocalCardFilter *f, int card_id) {
     if (f->has_exclude_self && card_id == f->exclude_self_id) return 0;
     if (f->card_type[0] && !rb_card_matches_type(card_id, f->card_type)) return 0;
-    if (f->has_group && !rb_card_matches_group_str(card_id, f->group)) return 0;
+    /* CardFilter.group is populated from `group_names`, i.e. it may still hold
+       the WHOLE comma-joined list (move.c:1617 and card.c:783 hand the raw CSV
+       straight to RbCardFilter.group). Rust's CardFilter.group is
+       `group_names.first()`, so split before comparing. */
+    if (f->has_group) {
+        char gbuf[128];
+        const char *g = rb_group_name_first(f->group, gbuf, sizeof gbuf);
+        if (g && *g && !rb_card_matches_group_str(card_id, g)) return 0;
+    }
     if (f->has_cost_limit && !rb_card_matches_cost_limit(card_id, f->cost_limit, f->cost_op[0] ? f->cost_op : NULL))
         return 0;
     if (f->n_cost_values > 0) {
@@ -1929,11 +2065,14 @@ const AbilityEffect *rb_find_modify_cost(const AbilityEffect *effect,
     return NULL;
 }
 
-/* Mirror util.rs::play_cost_reduction_matches. */
+/* Mirror util.rs::play_cost_reduction_matches.
+   util.rs:193-200 gates on `group_names.first()`, and the wire key is
+   `group_names` — this read `group`, which does not exist on any effect in the
+   card database, so the whole group gate was dead (every card passed it). */
 static int rb_play_cost_reduction_matches(const AbilityEffect *effect, int card_id,
                                           const Card *card) {
-    const char *gn = eff_extra(effect, "group");
-    if (gn && !rb_card_matches_group_str(card_id, gn)) return 0;
+    char gbuf[128];
+    if (!rb_card_matches_effect_group(effect, card_id, gbuf, sizeof gbuf)) return 0;
     const char *cost_limit = eff_extra(effect, "cost_limit");
     if (cost_limit) {
         int limit = atoi(cost_limit);
@@ -1949,14 +2088,18 @@ static int rb_play_cost_reduction_matches(const AbilityEffect *effect, int card_
     return 1;
 }
 
-/* Count stage cards matching a group name. */
-static int rb_stage_count_group(const RbPlayer *P, const char *group_name) {
-    if (!group_name) return 0;
+/* Count stage cards matching a group name. util.rs:242 filters the stage by
+   `card_matches_group_str(card_db, id, group_name)` with
+   `group_name() == group_names.first()`. */
+static int rb_stage_count_group(const RbPlayer *P, const char *group_names) {
+    char gbuf[128];
+    const char *g = rb_group_name_first(group_names, gbuf, sizeof gbuf);
+    if (!g || !*g) return 0;
     int count = 0;
     for (int i = 0; i < RB_STAGE_SIZE; i++) {
         int cid = P->stage[i];
         if (cid == RB_EMPTY_SLOT) continue;
-        if (rb_card_matches_group_str(cid, group_name)) count++;
+        if (rb_card_matches_group_str(cid, g)) count++;
     }
     return count;
 }
@@ -1969,13 +2112,26 @@ static int rb_per_unit_cost_reduction(const AbilityEffect *effect,
     const char *count_zone = pul ? pul : loc;
     if (!count_zone) count_zone = "hand";
     int raw_count;
-    if (!strcmp(count_zone, "stage") && eff_extra(effect, "group")) {
-        raw_count = rb_stage_count_group(P, eff_extra(effect, "group"));
+    /* util.rs:236 `count_zone == "stage" && effect.group_names_any().is_some()`
+       — a PRESENCE test on the LIST, then the stage is filtered by
+       `group_name()` = `group_names.first()`. This read the extra key `group`,
+       which no effect in the card database carries, so the branch was dead and
+       every stage+group per-unit cost reduction counted the whole stage. */
+    const char *group_names = eff_extra(effect, "group_names");
+    if (!group_names || !*group_names) group_names = eff_extra(effect, "group");
+    if (!strcmp(count_zone, "stage") && group_names && *group_names) {
+        raw_count = rb_stage_count_group(P, group_names);
     } else {
         raw_count = hand_count;
     }
+    /* util.rs:248 `effect.per_unit_count_any().unwrap_or(1).max(1)`. The VM
+       (vm.c:1040) fills ONLY the first-class field and never the extra, so
+       reading the extra made every 「N枚につき」 a 「1枚につき」. Field first,
+       matching `filter_u8_getter!` (card.rs:1800-1805), with the extra as the
+       fallback for an effect synthesised outside the decoder. */
+    int per_unit_count = effect->per_unit_count > 0 ? effect->per_unit_count : 1;
     const char *puc = eff_extra(effect, "per_unit_count");
-    int per_unit_count = puc ? atoi(puc) : 1;
+    if (effect->per_unit_count <= 0 && puc && *puc) per_unit_count = atoi(puc);
     if (per_unit_count < 1) per_unit_count = 1;
     int exclude_self = 0;
     const char *es = eff_extra(effect, "exclude_self");
@@ -2081,9 +2237,17 @@ int rb_constant_per_unit_units(const AbilityEffect *effect, const GameState *g, 
     RbCardFilter f;
     memset(&f, 0, sizeof f);
     const char *eff_ct = eff_extra(effect, "card_type");
-    const char *eff_group = eff_extra(effect, "group");
+    /* hearts.rs:60 `effect.filter_subset()` -> `group: group_names.first()`
+       (card.rs:2397/2462). The wire key is `group_names`; the `group` extra
+       this used to read does not exist, so the constant per-unit filter had no
+       group at all. */
+    char eff_group_buf[128];
+    const char *eff_group = eff_extra(effect, "group_names");
+    if (!eff_group || !*eff_group) eff_group = eff_extra(effect, "group");
+    if (eff_group && *eff_group)
+        eff_group = rb_group_name_first(eff_group, eff_group_buf, sizeof eff_group_buf);
     if (eff_ct)  strncpy(f.card_type, eff_ct, sizeof f.card_type - 1);
-    if (eff_group) strncpy(f.group, eff_group, sizeof f.group - 1);
+    if (eff_group && *eff_group) strncpy(f.group, eff_group, sizeof f.group - 1);
     f.has_filter = (eff_ct && eff_ct[0]) || (eff_group && eff_group[0]);
     f.exclude_self_id = host_card_id;
     f.has_exclude_self = (host_card_id >= 0);
@@ -2148,8 +2312,14 @@ int rb_constant_per_unit_units(const AbilityEffect *effect, const GameState *g, 
                                                eff_ct, eff_group);
     }
 
+    /* hearts.rs:94 `per_count / effect.per_unit_count_any().unwrap_or(1).max(1)`
+       — the FIELD is the only place the decoder puts it (vm.c:1040), so the
+       extra-only read below always yielded 0 and then 1, turning every
+       「N枚につき」 into 「1枚につき」. 24 corpus effects carry =1, 4 carry =2,
+       1 carries =4. */
+    int per_unit_count = effect->per_unit_count > 0 ? effect->per_unit_count : 1;
     const char *puc = eff_extra(effect, "per_unit_count");
-    int per_unit_count = puc ? atoi(puc) : 1;
+    if (effect->per_unit_count <= 0 && puc && *puc) per_unit_count = atoi(puc);
     if (per_unit_count < 1) per_unit_count = 1;
     int units = per_count / per_unit_count;
     const char *max_str = eff_extra(effect, "max");
@@ -2203,7 +2373,21 @@ int rb_calculate_per_unit_multiplier(const GameState *g, int pl, const char *per
    Zone selection (util.rs:2346-2364): note that the bare 「枚」 unit resolves to
    the HAND unless the filter is restricted to member cards, in which case it
    resolves to the under-member zone. The C port sent 「枚」 straight to
-   under_member, which inverted the count for the common 「1枚につき」 gains. */
+   under_member, which inverted the count for the common 「1枚につき」 gains.
+
+   AUDITED AGAINST RUST, NOT CHANGED: `per_unit_count` does NOT belong here.
+   util.rs:2592-2656 `resolve_per_unit_count` returns the CARD TALLY
+   (`count_filtered` -> `count_matching_distinct`); the `per_unit_count` divisor
+   is applied by each CALLER — hearts.rs:94 for the constant per-unit units,
+   util.rs:248 for the per-unit cost reduction, score.rs:182 for the score
+   modifier. Dividing here as well would double-divide every 「N枚につき」.
+   Likewise the zone loops below count CARDS, so no divisor may be added.
+
+   The `group` argument arrives from the callers' `group_names` extra and may
+   still be the whole CSV list; util.rs's `count_filtered` filters through a
+   CardFilter whose group is `group_names.first()` (card.rs:2397), so the stage
+   loop below takes the first entry. The bag-based returns funnel through
+   rb_count_matching -> RbCardFilter, which applies the same split. */
 int rb_resolve_per_unit_count(const GameState *g, int pl, const char *per_unit_type,
                               const char *card_type, const char *group,
                               const char *state_filter, int host_card_id) {
@@ -2260,12 +2444,14 @@ int rb_resolve_per_unit_count(const GameState *g, int pl, const char *per_unit_t
         return rb_count_matching(ids, n, card_type, group);
     }
     if (!strcmp(zone, "stage")) {
+        char gbuf[128];
+        const char *g1 = rb_group_name_first(group, gbuf, sizeof gbuf);
         int count = 0;
         for (int i = 0; i < RB_STAGE_SIZE; i++) {
             int cid = P->stage[i];
             if (cid == RB_EMPTY_SLOT) continue;
             if (card_type && !rb_card_matches_type(cid, card_type)) continue;
-            if (group && !rb_card_matches_group_str(cid, group)) continue;
+            if (g1 && *g1 && !rb_card_matches_group_str(cid, g1)) continue;
             if (state_filter) {
                 const char *ori = rb_mods_get_orientation((RbMods *)&g->mods, cid);
                 if (!rb_orientation_matches_state(ori, state_filter)) continue;

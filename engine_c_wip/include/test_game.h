@@ -311,6 +311,9 @@ int  test_max_distinct_names(const int *cards, int n);
 int  test_ability_index_for_trigger(int cid, const char *trig, int nth);
 /* nth == 0 (Rust `fire_trigger`). */
 int  test_fire_trigger_on_card(TestGame *tg, int cid, const char *trig);
+/* pl == 1 for a suite whose Rust twin fires the trigger on the OPPONENT
+   (test_parity_reveal_extra's fire_trigger_p2 and its neighbours). */
+int  test_fire_trigger_on_card_seat(TestGame *tg, int cid, const char *trig, int pl);
 /* Rust `fire_trigger_nth`: the Nth printed ability carrying the trigger. */
 int  test_fire_trigger_on_card_nth(TestGame *tg, int cid, const char *trig, int nth);
 /* ABSOLUTE ability index, for a suite isolating one leg of a multi-leg watcher.

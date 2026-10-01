@@ -15,7 +15,10 @@ use rabuka_engine::turn::TurnEngine;
 use rand::Rng;
 
 const TRAJECTORY_MAGIC: u32 = 0x5242504B;
-const TRAJECTORY_VERSION: u32 = 2;
+// 3 = both seats recorded, with a trailing `seat` byte per step.
+// Bumped from 2 when RL self-play started recording P2 decisions too; readers
+// must accept both, because every v2 corpus on disk ends before that byte.
+const TRAJECTORY_VERSION: u32 = 3;
 
 /// A single step in a trajectory, with ALL legal actions recorded.
 struct Step {
@@ -60,6 +63,21 @@ let num_games: u32 = std::env::args()
         .unwrap_or(200);
     let imitation = std::env::var("PPO_BEHAVIOR").is_ok_and(|value| value == "v7");
     let opponent_v7 = std::env::var("PPO_OPPONENT").is_ok_and(|value| value == "v7");
+    // The opponent is either the ladder bot, or - when `PPO_OPP_BOT=mirror` /
+    // unset and no opponent is requested - nobody (pure self-play).
+    let opp_name = std::env::var("PPO_OPP_BOT").unwrap_or_else(|_| "v7".to_string());
+    let mirror = opp_name == "mirror" || opp_name == "self";
+    let opp_kind = ladder_opponent();
+    // A ladder rung must always be present: `PPO_OPP_BOT=v1` means "beat v1",
+    // so the opponent seat is filled whether or not `PPO_OPPONENT` was set.
+    let opponent_present = !mirror
+        && (opponent_v7 || std::env::var_os("PPO_OPP_BOT").is_some());
+    eprintln!(
+        "PPO opponent: {} (mirror={}, engaged={})",
+        opp_name,
+        mirror,
+        opponent_present
+    );
     let out_path = std::env::args()
         .nth(2)
         .unwrap_or_else(|| "../training/ppo_trajectories.bin".into());
@@ -70,7 +88,14 @@ let num_games: u32 = std::env::args()
         network.load_weights(wp).expect("load weights");
         eprintln!("Loaded weights from {}", wp);
     } else {
-        eprintln!("No weights  -- random policy");
+        // A fresh rollout must use the SAME initialisation the trainer will
+        // warm-start from. Leaving this at `PolicyNet::new()` (all zeros, uniform
+        // policy) while the trainer starts from Xavier means the importance
+        // ratio compares two different policies on iteration 0 - PPO's central
+        // assumption broken before the first update, which diverged to
+        // |dlog ratio| ~ 1e12 and a NaN value loss.
+        network.init_random(0xC0FFEE);
+        eprintln!("No weights -- Xavier-initialised policy (seed 0xC0FFEE)");
     }
 
     let (t1, t2) =
@@ -86,6 +111,8 @@ let num_games: u32 = std::env::args()
 
     let mut total_steps: u64 = 0;
     let mut p1_wins = 0u32;
+    let mut net_wins_total = 0u32;
+    let mut net_losses_total = 0u32;
     let start = std::time::Instant::now();
 
     for game_idx in 0..num_games {
@@ -120,7 +147,9 @@ let num_games: u32 = std::env::args()
             }
 
             // Debug: log phase transitions for game 0
-            if game_idx == 0 && step_i % 50 == 0 {
+            if game_idx == 0
+                && (step_i % 50 == 0 || std::env::var_os("PPO_TRACE_PHASE").is_some())
+            {
                 eprintln!(
                     "  [{:3}] turn={} phase={:?} pending={} ap={}",
                     step_i,
@@ -164,9 +193,101 @@ let num_games: u32 = std::env::args()
                 .ok()
                 .and_then(|v| v.parse::<u8>().ok())
                 .unwrap_or(2); // 1 = P1 only, 2 = both
-            let should_record = !imitation && (record_seat >= 2 || acting_p1);
+            // With a ladder opponent engaged, the network takes the seat the ladder bot
+            // does NOT. Measured, not assumed: with `PPO_SEATS=1` the net was put
+            // on P1 and the ladder bot on P2, so every trajectory was the bot
+            // losing and 0/120 games were won by P1 - the ladder produced zero
+            // positive reward while appearing to train.
+            let net_seat: Option<u8> = if imitation {
+                Some(0)
+            } else if mirror {
+                // Pure self-play: both seats are the network.
+                None
+            } else if record_seat == 2 {
+                // Both seats recorded, so seat choice does not matter.
+                None
+            } else {
+                Some(1)
+            };
+            let should_record = !imitation
+                && match net_seat {
+                    None => true,
+                    Some(s) => me == s,
+                };
 
-            let action = if should_record && actions.len() > 1 {
+            let me_is_net = match net_seat {
+                None => true,
+                Some(s) => me == s,
+            };
+            // Structural phases are not learned decisions, and letting the net
+            // pick them at random is what made every game a Draw at turn 1: RPS
+            // ties re-pick until `stuck > 200`, and an attacker-order coin flip
+            // adds nothing. The arena intercepts exactly these phases before
+            // dispatch for the same reason (`bot_arena.rs`), so the collector
+            // must too - otherwise RL is spending its whole budget learning
+            // rock-paper-scissors and the games never start.
+            //
+            // The mulligan is included for the LADDER BOT's seat only. It is a
+            // multi-step interaction (select, then confirm), and routing the
+            // net's own mulligan through a single `choose_opponent_action` call
+            // left it re-picking the same step until `stuck > 200` - the game
+            // never started, which is why every game ended as a Draw at turn 1.
+            // The mulligan is a multi-step interaction (select cards, then
+            // confirm). Whichever seat holds it, resolve it deterministically:
+            // pick the first selection-style action, then confirm/skip. Routing
+            // it through the sampled policy re-picked the same non-advancing
+            // step until `stuck > 200`, so every game ended as a Draw at turn 1
+            // with 0 wins - a silent total failure that looked like "the ladder
+            // is hard".
+            let mulligan = matches!(
+                gs.current_phase,
+                rabuka_engine::game_state::Phase::MulliganFirstAttacker
+                    | rabuka_engine::game_state::Phase::MulliganSecondAttacker
+            );
+            let structural = mulligan
+                || matches!(
+                    gs.current_phase,
+                    rabuka_engine::game_state::Phase::RockPaperScissors
+                        | rabuka_engine::game_state::Phase::ChooseFirstAttacker
+                );
+
+            // The live-card set is ALSO multi-step (select a life, possibly several, then
+            // confirm) for whichever seat holds it. Same failure mode as the
+            // mulligan: sampled one step at a time, it re-picks a
+            // non-advancing selection until `stuck > 200`. When the NET holds the
+            // live set, hand the decision to the ladder bot's live-set logic
+            // rather than sampling it - a live set is one of the two things this
+            // bot family is actually good at, and the net cannot learn it well
+            // enough to avoid hanging the phase.
+            let live_set = matches!(
+                gs.current_phase,
+                rabuka_engine::game_state::Phase::LiveCardSetFirstAttacker
+                    | rabuka_engine::game_state::Phase::LiveCardSetSecondAttacker
+            );
+
+            let action = if mulligan {
+                // Prefer the ladder bot's own mulligan logic when the bot holds
+                // the mulligan; for the net's seat, just take the confirm/skip
+                // step so the phase terminates.
+                let target = if !me_is_net {
+                    choose_opponent_action(&gs, &actions, me, plan, opp_kind)
+                } else {
+                    actions
+                        .iter()
+                        .find(|a| {
+                            matches!(
+                                a.action_type,
+                                rabuka_engine::game_setup::ActionType::ConfirmMulligan
+                                    | rabuka_engine::game_setup::ActionType::SkipMulligan
+                            )
+                        })
+                        .cloned()
+                        .unwrap_or_else(|| actions[0].clone())
+                };
+                target
+            } else if structural || (live_set && should_record) {
+                choose_opponent_action(&gs, &actions, me, plan, opp_kind)
+            } else if should_record && actions.len() > 1 {
                 let obs = PublicObservation::from_state(&gs, me);
                 let enc_state = network.encode_state(&obs);
                 let action_encs: Vec<ActionEncoding> = actions
@@ -224,8 +345,8 @@ let num_games: u32 = std::env::args()
                     seat: me,
                 });
                 actions[idx].clone()
-            } else if opponent_v7 {
-                choose_v7_action(&gs, &actions, me, plan)
+            } else if opponent_present {
+                choose_opponent_action(&gs, &actions, me, plan, opp_kind)
             } else {
                 let idx = rand::thread_rng().gen_range(0..actions.len());
                 actions[idx].clone()
@@ -256,30 +377,63 @@ let num_games: u32 = std::env::args()
             0.0f32
         };
 
+        // Progress is reported from the NETWORK's seat, not P1's. With a ladder opponent
+        // engaged the network is P2, so the old P1-only counter read 0 wins for
+        // 120 games while the network was in fact winning - which is exactly how
+        // a broken metric hides a working ladder.
+        let net_p2 = !imitation && !mirror && net_seat_had_opponent();
+        if std::env::var_os("PPO_TRACE_END").is_some() {
+            eprintln!(
+                "  END p1z={} p2z={} steps={} turns={} result={:?}",
+                p1z,
+                p2z,
+                trajectory.len(),
+                gs.turn_number,
+                gs.game_result
+            );
+        }
+        let net_wins = if net_p2 { p2z >= 3 } else { p1z >= 3 };
+        if net_wins {
+            net_wins_total += 1;
+        } else if net_p2 {
+            if p1z >= 3 {
+                net_losses_total += 1;
+            }
+        }
+
         if p1z >= 3 {
             p1_wins += 1;
         }
 
+        // Discount the outcome back along the trajectory. Two corrections matter:
+        //
+        //  - The discount is applied WITHIN a seat's contiguous run, not across
+        //    the whole trajectory. With both seats recorded, consecutive steps
+        //    can belong to different players and resetting at the boundary keeps
+        //    gamma counting decisions rather than interleaved half-turns.
+        //  - Each step's reward is signed by ITS seat. `final_reward` is from
+        //    P1's perspective, so P2's steps take -final_reward.
         let discount: f32 = std::env::var("PPO_DISCOUNT")
             .ok()
             .and_then(|v| v.parse().ok())
             .filter(|d: &f32| d.is_finite() && *d > 0.0 && *d <= 1.0)
             .unwrap_or(0.99);
-        if let Some(last) = trajectory.last_mut() {
-            last.reward = final_reward;
-            last.done = true;
-        }
-        // Walk backwards so step t carries gamma^(n-1-t) * outcome. Kept as a
-        // running product rather than a powf per step.
+        let sign_for = |seat: u8| if seat == 0 { 1.0f32 } else { -1.0f32 };
+        // Walk backwards, restarting the discount whenever the seat changes.
         let mut carry = final_reward;
+        let mut prev_seat = u8::MAX;
         for step in trajectory.iter_mut().rev() {
-            carry *= discount;
-            step.reward = carry;
+            if step.seat != prev_seat {
+                carry = final_reward;
+                prev_seat = step.seat;
+            } else {
+                carry *= discount;
+            }
+            step.reward = carry * sign_for(step.seat);
         }
-        // The terminal step keeps the raw outcome (not gamma-damped), which is
-        // what "done" means to GAE.
         if let Some(last) = trajectory.last_mut() {
-            last.reward = final_reward;
+            last.reward = final_reward * sign_for(last.seat);
+            last.done = true;
         }
 
         // Write trajectory: [n_steps:u32] [step_1] [step_2] ...
@@ -310,29 +464,44 @@ let num_games: u32 = std::env::args()
             let _ = out.write_all(&step.old_value.to_le_bytes());
             let _ = out.write_all(&step.reward.to_le_bytes());
             let _ = out.write_all(&[step.done as u8]);
+            // Trajectory version 3 appends the seat. Version 2 files end here,
+            // so a v3 reader must tolerate both or every previously collected
+            // corpus becomes unreadable.
+            if TRAJECTORY_VERSION >= 3 {
+                let _ = out.write_all(&[step.seat]);
+            }
         }
         total_steps += trajectory.len() as u64;
 
         if game_idx % 25 == 0 || game_idx == num_games - 1 {
             eprintln!(
-                "Game {}: {} steps (total={}, p1_wins={})",
+                "Game {}: {} steps (total={}, net_wins={})",
                 game_idx + 1,
                 trajectory.len(),
                 total_steps,
-                p1_wins
+                net_wins_total
             );
         }
     }
 
     let elapsed = start.elapsed().as_secs_f64();
     eprintln!(
-        "\nDone: {} games, {} steps, {:.0} steps/s, p1_wins={}",
+        "\nDone: {} games, {} steps, {:.0} steps/s, net_win_rate={:.3} ({}W/{}L), p1_wins={}",
         num_games,
         total_steps,
         total_steps as f64 / elapsed.max(0.001),
+        (net_wins_total as f64 / (net_wins_total + net_losses_total).max(1) as f64),
+        net_wins_total, net_losses_total,
         p1_wins
     );
     eprintln!("Trajectories written to {}", out_path);
+    // Save the policy that generated the data. PPO is only correct if the
+    // trainer warm-starts from exactly this network; without it the ratio on
+    // iteration 0 is between two different policies and the update diverges.
+    let policy_out = std::env::var("PPO_SAVE_POLICY")
+        .unwrap_or_else(|_| out_path.replace(".bin", "_policy.bin"));
+    network.save_weights(&policy_out).expect("save policy");
+    eprintln!("Policy that generated this data saved to {}", policy_out);
 }
 
 fn setup_game(db: &Arc<CardDatabase>, t1: &Deck, t2: &Deck) -> GameState {
@@ -349,13 +518,69 @@ fn choose_v7_fallback(actions: &[rabuka_engine::game_setup::Action]) -> rabuka_e
     })
 }
 
-fn choose_v7_action(
+/// Resolve the ladder opponent from `PPO_OPP_BOT`.
+///
+/// The ladder exists because mirror self-play is degenerate on this game: two
+/// near-uniform policies draw EVERY game (measured 0 wins in 500), so reward is
+/// 0 everywhere and PPO has no gradient. A weak opponent that *loses* supplies
+/// the signal a mirror cannot. Climb v1 -> v2 -> ... by holding each rung near
+/// 50% and only advancing when beaten.
+///
+/// Defaults to `v7` so existing runs keep their opponent.
+/// True when the network plays a single seat against an engaged ladder bot.
+/// Centralised so the seat decision in the action loop and the win/loss
+/// accounting cannot disagree - they did once, and it reported 0 wins for 120
+/// games of a network that was winning as P2.
+fn net_seat_had_opponent() -> bool {
+    if std::env::var("PPO_BEHAVIOR").is_ok_and(|v| v == "v7") {
+        return false;
+    }
+    let opp = std::env::var("PPO_OPP_BOT").unwrap_or_else(|_| "v7".to_string());
+    if opp == "mirror" || opp == "self" {
+        return false;
+    }
+    std::env::var("PPO_SEATS")
+        .ok()
+        .and_then(|v| v.parse::<u8>().ok())
+        .unwrap_or(2)
+        == 1
+}
+
+fn ladder_opponent() -> BotKind {    let name = std::env::var("PPO_OPP_BOT").unwrap_or_else(|_| "v7".to_string());
+    match name.as_str() {
+        "v1" => BotKind::V1,
+        "v2" => BotKind::V2,
+        "v3" => BotKind::V3,
+        "v4" => BotKind::V4,
+        "v5" => BotKind::V5,
+        "v6" => BotKind::V6,
+        "v7plain" => BotKind::V7Plain,
+        "v7" | "v7rollout" => BotKind::V7,
+        "v8" => BotKind::V8,
+        // v9 is the bot the learned value function is actually being trained FOR.
+        // Generating from v8 or a random mirror produces states v9 never visits,
+        // which is the wrong distribution for a leaf that will only ever be
+        // consulted while v9 searches.
+        "v9" => BotKind::V9,
+        "v10" => BotKind::V10,
+        other => {
+            eprintln!("PPO_OPP_BOT={other} is not a known bot; falling back to v7");
+            BotKind::V7
+        }
+    }
+}
+
+fn choose_opponent_action(
     gs: &GameState,
     actions: &[rabuka_engine::game_setup::Action],
     me: u8,
     plan: &strategy_v3::V3Plan,
+    kind: BotKind,
 ) -> rabuka_engine::game_setup::Action {
     let policy = strategy_v2::V2Policy::default();
+    // RPS and attacker order are structural phases the arena also intercepts
+    // before dispatch; here they are decided deterministically per seat so the
+    // two sides do not both reach for the same gesture (a tie re-picks forever).
     match gs.current_phase {
         rabuka_engine::game_state::Phase::RockPaperScissors => {
             let wanted = if me == 0 {
@@ -369,23 +594,49 @@ fn choose_v7_action(
                 .cloned()
                 .unwrap_or_else(|| choose_v7_fallback(actions))
         }
-        rabuka_engine::game_state::Phase::ChooseFirstAttacker => actions
-            .iter()
-            .find(|action| {
-                action.action_type == rabuka_engine::game_setup::ActionType::ChooseFirstAttacker
-            })
-            .cloned()
-            .unwrap_or_else(|| choose_v7_fallback(actions)),
+        rabuka_engine::game_state::Phase::ChooseFirstAttacker => {
+            // The RPS winner takes second, matching the arena's default so a
+            // ladder measurement is comparable with arena numbers.
+            let won = gs.rps_winner == Some(if me == 0 { 1 } else { 2 });
+            let target = if won {
+                rabuka_engine::game_setup::ActionType::ChooseSecondAttacker
+            } else {
+                rabuka_engine::game_setup::ActionType::ChooseFirstAttacker
+            };
+            actions
+                .iter()
+                .find(|a| a.action_type == target)
+                .cloned()
+                .or_else(|| {
+                    actions
+                        .iter()
+                        .find(|a| {
+                            a.action_type
+                                == rabuka_engine::game_setup::ActionType::ChooseSecondAttacker
+                        })
+                        .cloned()
+                })
+                .unwrap_or_else(|| choose_v7_fallback(actions))
+        }
         rabuka_engine::game_state::Phase::MulliganFirstAttacker
         | rabuka_engine::game_state::Phase::MulliganSecondAttacker => {
-            BotKind::V7.choose_mulligan(gs, actions, &gs.card_database)
+            kind.choose_mulligan(gs, actions, &gs.card_database)
         }
         rabuka_engine::game_state::Phase::LiveCardSetFirstAttacker
         | rabuka_engine::game_state::Phase::LiveCardSetSecondAttacker => {
-            BotKind::V7.choose_live_set(gs, actions, &gs.card_database, &policy, plan)
+            kind.choose_live_set(gs, actions, &gs.card_database, &policy, plan)
         }
-        _ => BotKind::V7.choose_action(gs, actions, me, &policy, plan),
+        _ => kind.choose_action(gs, actions, me, &policy, plan),
     }
+}
+
+fn choose_v7_action(
+    gs: &GameState,
+    actions: &[rabuka_engine::game_setup::Action],
+    me: u8,
+    plan: &strategy_v3::V3Plan,
+) -> rabuka_engine::game_setup::Action {
+    choose_opponent_action(gs, actions, me, plan, BotKind::V7)
 }
 
 fn action_index(actions: &[rabuka_engine::game_setup::Action], target: &rabuka_engine::game_setup::Action) -> usize {

@@ -3079,6 +3079,48 @@ void rb_queue_repark_pending_actions(GameState *g, AbilityEffect *const *actions
  * resolver field, and the 「〜したら」 branch never fires. This queue-level
  * carrier is the missing link - one writer (compound.c), one reader
  * (choice.c). Purely additive; no existing field moves. */
+/* ── Group-name accessors (util.rs:748-793, card.rs:2462) ───────────────────
+ * Rust reads a SINGLE group name from an effect: `group_name()` is
+ * `group_names.first()` (card.rs:2462), NOT `any_group` (util.rs:799, a
+ * different function). The C had been comparing the whole comma-joined CSV as
+ * one token, which matched 0 of 2,639 cards - e.g. "lilywhite,μ's" and
+ * "CatChu!,KALEIDOSCORE,5yncri5e!" both matched nothing.
+ *
+ * These were `static` in util.c while four files carried LOCAL TWINS of the
+ * same logic - the same forking hazard that produced three copies of
+ * custom.c. Exported so the logic has one home. The `buf`/`bufsz` pair is
+ * caller-owned scratch so the scan loops stay allocation-free.
+ *
+ * NOTE: an equivalence audit over all 2,639 cards x 45 group strings
+ * (118,755 pairs) confirmed rb_card_matches_group_str agrees with Rust on
+ * every pair, in both directions. It is NOT too permissive. The CSV bug above
+ * was a string-equality artefact: a reject-everything filter, which cannot
+ * imply permissiveness. */
+const char *rb_group_name_first(const char *group_names, char *buf, size_t bufsz);
+const char *rb_effect_group_name(const AbilityEffect *e, char *buf, size_t bufsz);
+int rb_card_matches_effect_group(const AbilityEffect *e, int card_id,
+                                 char *buf, size_t bufsz);
+
 extern int g_deferred_conditional_gate;
+
+/* ── Raw choice route (Rust `ChoiceRoute::Raw`) ─────────────────────────────
+ * RbQueueEntry.choice_route_raw / has_choice_route_raw are the C home of Rust's
+ * `entry.choice_card_no = Some(ChoiceRoute::Raw(s))` (queue.rs). Needed because
+ * queue.rs:340-345 matches `is_route_opponent` on the PREFIX
+ * "position_change:opponent:", which an int tag cannot represent.
+ * No-ops when there is no current entry, mirroring Rust's
+ * `current_entry_mut()` returning None. Defined in src/ability/ability_queue.c. */
+void rb_queue_set_choice_route_raw(GameState *g, const char *raw);
+
+/* ── GameState.wait_immune_members (Rust core/game_state/mod.rs) ─────────────
+ * Rust writes this (member, owner) pair list from effects/restriction.rs:191
+ * and reads it in change_state.rs:458-467 and :585-599 to suppress a wait that
+ * would otherwise apply. C HAS NO SUCH FIELD AT ALL - there is no `immune`
+ * symbol anywhere in the tree - so a wait-immunity restriction is silently
+ * ignored. Added so the rule can be implemented; it has no writer yet. */
+#define RB_WAIT_IMMUNE_MAX 16
+typedef struct { int member_cid; int owner_player; } RbWaitImmune;
+extern RbWaitImmune g_wait_immune_members[RB_WAIT_IMMUNE_MAX];
+extern int g_n_wait_immune_members;
 
 #endif /* RABUKA_H */

@@ -74,19 +74,9 @@ static int card_printed_score(int cid)
     return score;
 }
 
-static int card_prints_trigger(int cid, const char *trig)
-{
-    int n = rb_card_num_abilities((uint32_t)cid);
-    for (int i = 0; i < n; i++) {
-        Ability ab;
-        memset(&ab, 0, sizeof(ab));
-        if (!rb_decode_card_ability((uint32_t)cid, i, &ab)) continue;
-        int hit = ab.triggers && strstr(ab.triggers, trig);
-        rb_free_ability(&ab);
-        if (hit) return 1;
-    }
-    return 0;
-}
+/* card_prints_trigger used to gate fire_trigger; it is GONE because the shared
+ * test_fire_trigger_on_card carries the same premise check itself (it returns 0
+ * when test_ability_index_for_trigger finds no printed ability on `cid`). */
 
 static int bag_has(const RbBag *bag, int cid)
 {
@@ -125,17 +115,15 @@ static void put_on_deck_top(TestGame *tg, int pl, int cid)
     test_insert_deck_top(tg, pl, cid);
 }
 
-/* fire_trigger(game, cid, trigger, trig) -Ehelpers/mod.rs:117. The C engine
-   exposes the per-trigger scan, so the queue is built from the same trigger
-   token; fixture boards carry exactly one card printing it. */
+/* fire_trigger(game, cid, trigger, trig) - helpers/mod.rs:114. Rust resolves
+ * ONE ability of ONE card and calls trigger_auto_ability with an explicit card
+ * id; the old C spelling rb_queue_trigger_abilities(&tg->state, 0, trig) is a
+ * WHOLE-BOARD TAS scan that also fired every other card printing `trig`.
+ * test_fire_trigger_on_card is the shared faithful entry point (0 == the card
+ * prints no such ability, so the premise check keeps its meaning). */
 static int fire_trigger(TestGame *tg, int cid, const char *trig)
 {
-    if (!card_prints_trigger(cid, trig)) return 0;
-    tg->state.activating_card = cid;
-    int queued = rb_queue_trigger_abilities(&tg->state, 0, trig);
-    if (queued <= 0) return 0;
-    rb_process_pending_auto_abilities(&tg->state);
-    return 1;
+    return test_fire_trigger_on_card(tg, cid, trig);
 }
 
 /* Answer the pending choice with a single index (Rust select_indices(&[0])). */

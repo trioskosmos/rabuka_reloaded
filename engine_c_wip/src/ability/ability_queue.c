@@ -344,66 +344,75 @@ void rb_queue_complete_current(GameState *g) {
                     if raw.starts_with("position_change:opponent:"))
        });
 
-   `choice_card_no` is `Option<ChoiceRoute>` in Rust. `ChoiceRoute` is an enum
-   whose only string-carrying variant is `Raw(String)` — mod.rs:2751-2755 shows
-   `ChoiceRoute::Raw(format!("position_change:{}:{}", target, original))`, and
-   the ONLY producer of a string that starts with "position_change:" in the whole
-   engine. So the Rust condition is "is this entry's route the Raw string
-   position_change:opponent:...?" — a POSITIVE test on the route's TEXT, not an
+   `choice_card_no` is `Option<ChoiceRoute>` in Rust, and mod.rs:2751-2755 /
+   position.rs:151-154 / :273-277 / :427-431 / choice.rs:3153-3158 / :3178-3183
+   all build it as `ChoiceRoute::Raw(format!("position_change:{target}:{tail}"))`.
+   So the Rust condition is "is this entry's route the Raw string starting
+   position_change:opponent:?" — a POSITIVE test on the route's TEXT, not an
    inference from a numeric tag.
 
-   The C cannot express that, because `RbQueueEntry.choice_card_no` is an int
-   (see its own comment in rabuka.h: "C's flattened choice_card_no tag; Rust's
-   Option<ChoiceRoute> does not map 1:1 — Condition/Cost/Generic all tag 1").
-   int tag 1 is shared by Condition, Cost and Generic, so no int can name
-   position_change:opponent. Rather than widen the tag — which would collide
-   with those three and re-create the class of bug where a seat is derived from
-   a tag that does not mean what the tag says — the route STRING is carried in
-   the pair the header reserves for it: `choice_route_raw` /
-   `has_choice_route_raw`. Emitters set those; this helper reads them. Nothing
-   here parses an int into a route.
+   The C cannot evaluate that, because `RbQueueEntry.choice_card_no` is an int.
+   rabuka.h says so on the field itself: "C's flattened choice_card_no tag;
+   Rust's Option<ChoiceRoute> does not map 1:1 — Condition/Cost/Generic all
+   tag 1." Tags 1/2/3 are therefore already spoken for by three other routes, and
+   no int can mean position_change:opponent.
+
+   Rather than widen the tag (which would collide with Condition/Cost/Generic and
+   re-create exactly this bug class — a seat derived from a number that does not
+   mean what the number says) the route STRING is carried in the pair the header
+   reserves for it: `choice_route_raw` / `has_choice_route_raw`. Emitters stamp
+   those; this helper reads them. Nothing here parses an int into a route.
 
    WHY A POSITIVE HELPER INSTEAD OF ONE MORE ARM ON THE OVERRIDE LIST
 
-   pause_for_choice's seat decision used to be: universal default from
-   `entry.player_id`, plus two narrow per-variant exceptions (a SelectCard whose
-   target mentions "opponent"; a SelectTarget whose target is exactly
-   "position|destination"). Every NEW prompt shape then falls through to the
-   default and reads the wrong seat, and the only remedy is to append another
-   shape to the list — which is how this defect class starts. `is_opp` here is
-   the positive question "does this CHOICE ask the opponent?", and the two
-   pieces of context that can answer it are both on the entry, not on the
-   choice: the spawn context (both_set_spawn_target, misc.c) and the route
-   string. Testing the CONTEXT rather than enumerating the SHAPE means a prompt
-   form that did not exist when the list was written still routes correctly,
-   and a shape can never route wrong merely by not being listed.
+   The seat decision used to be: universal default from `entry.player_id`, plus
+   two narrow per-variant exceptions (a SelectCard whose `target` merely
+   CONTAINED the substring "opponent"; a SelectTarget whose target was exactly
+   "position|destination"). Every prompt shape that was not on that list fell
+   through to the default and read the wrong seat, and the only available remedy
+   was to append another shape — which is how the defect recurs.
 
-   Mirrors queue.rs:329-348 — the `entry.choice_player_id.is_some()` early-out
-   lives in pause_for_choice, which owns the stamp; this helper only answers the
-   context question. Both Rust triggers are checked, in Rust's order: spawn
-   first, route second (queue.rs:333 then :340). */
+   Here the question is split the way Rust splits it: `choice_routes_to_opponent`
+   asks what the CHOICE is (mirroring Rust's `is_opponent_choice` patterns
+   exactly), and this helper asks what the ENTRY's context says. Both of the
+   context triggers live on the entry rather than on the choice, so a prompt form
+   that did not exist when the list was written still routes correctly, and no
+   shape can route wrong merely by being absent from a list.
+
+   queue.rs:329's `entry.choice_player_id.is_some()` early-out lives in
+   pause_for_choice, which owns the stamp; this helper answers only the context
+   question. Both Rust triggers are checked, in Rust's order: spawn first,
+   route second (queue.rs:333 then :340). */
 static int queue_route_targets_opponent(const RbQueueEntry *e) {
     if (!e) return 0;
-    /* queue.rs:333 `entry.spawn_context.target == "opponent"` */
+    /* queue.rs:333 `entry.spawn_context.target == "opponent"` — this trigger IS
+       live in the C today, because misc.c's both_set_spawn_target
+       (rb_misc_handle_both_targets) writes the same string into spawn_target. */
     if (e->spawn_target[0] && strcmp(e->spawn_target, "opponent") == 0) return 1;
-    /* queue.rs:340-342 `ChoiceRoute::Raw(raw) if raw.starts_with("position_change:opponent:")` */
+    /* queue.rs:340-342 the Raw-route trigger, previously unevaluable. */
     if (e->has_choice_route_raw &&
         strncmp(e->choice_route_raw, "position_change:opponent:", 23) == 0) return 1;
     return 0;
 }
 
-/* queue.rs:322-331 `is_opponent_choice` — does the CHOICE's OWN shape say the
-   opponent is being asked? The C's two arms are the two Rust patterns. The
-   SelectCard arm reads the choice's `target_player_id` (the field Rust's
-   SelectCard pattern destructures), NOT `target`: Rust never inspects
-   SelectCard.target at all, so keying the C on the string "opponent" appearing
-   somewhere in `target` matched prompts Rust routes to self whenever the word
-   happened to be in a zone or destination name. `target_player_id` is what
-   selection.rs:39-43 writes from action_by, so it is the faithful channel.
+/* queue.rs:322-331 `is_opponent_choice` — does the CHOICE's own shape say the
+   opponent is being asked? These are the two Rust patterns, reproduced on the
+   fields Rust destructures.
 
-   `SelectTarget { target }` keeps Rust's exact equality on
-   "position|destination" — that IS the spelling Rust compares, so it stays an
-   equality rather than becoming a substring test. */
+   The SelectCard arm reads `target_player_id`, because that IS the field Rust's
+   `SelectCard { target_player_id: Some(tpid) }` pattern binds and the only thing
+   the guard `tpid == "opponent"` tests. The old C arm instead ran
+   `strstr(choice->target, "opponent")` — a substring scan over a DIFFERENT
+   field, `target`, which for a SelectCard is the ability's routing target
+   string ("self", "opponent", "p2", "both", ...). That conflated "the ability
+   routes to the opponent" with "this prompt must be answered by the opponent"
+   and, worse, matched any prompt whose target contained the letters anywhere;
+   selection.rs:39-43 stamps target_player_id from action_by, so it is the
+   faithful channel.
+
+   The SelectTarget arm keeps Rust's exact equality against
+   "position|destination" — that is the literal Rust compares, so it stays an
+   equality test and is not widened to a substring. */
 static int choice_routes_to_opponent(const RbChoice *ch) {
     if (!ch) return 0;
     if (ch->kind == RB_CHOICE_SELECT_CARD)
@@ -414,25 +423,21 @@ static int choice_routes_to_opponent(const RbChoice *ch) {
 }
 
 /* Stamp the RAW route string on the current entry — the C home of Rust's
-   `entry.choice_card_no = Some(ChoiceRoute::Raw(s))` (choice.rs:1172-1174,
-   and queue.rs:679's own `choice_card_no` slot).
+   `entry.choice_card_no = Some(ChoiceRoute::Raw(s))`.
 
-   Why this is needed: Rust's second opponent trigger (queue.rs:340-342) reads
-   `ChoiceRoute::Raw(raw)` and matches raw.starts_with("position_change:opponent:").
-   `RbQueueEntry.choice_card_no` is an int tag, and per rabuka.h's own comment it
-   is deliberately lossy — Condition, Cost and Generic ALL tag 1. So the only
-   faithful carrier of "which raw route string" in the C is the dedicated
-   `choice_route_raw` / `has_choice_route_raw` pair.
+   This is what queue.rs:341 and abilities.rs:2159 read back to decide a prompt's
+   seat, and the int `choice_card_no` cannot carry it (see
+   queue_route_targets_opponent above).
 
-   Only effects that own a raw route string call this. Effects whose route is an
-   enum variant (Choice, ChoiceString, ConditionalChoice, OptionalCost,
-   SelectCards, SelectTarget) set NO raw string, because queue.rs:341 only fires
-   for the Raw variant — a `has_choice_route_raw` left at 0 is the honest
-   "this route is not a Raw string" state and cannot produce a false positive.
+   Only effects that genuinely own a raw route string call this. Effects whose
+   route is an enum variant (Choice, ChoiceString, ConditionalChoice,
+   OptionalCost, SelectCards, SelectTarget) set NO raw string, because Rust's
+   trigger fires only for the Raw variant — `has_choice_route_raw` left at 0 is
+   the honest "not a Raw route" state and cannot produce a false positive.
 
-   A NULL `raw` is accepted and means "clear the stamp": an emitter that
-   previously stamped a Raw route and now routes a plain variant must not leave
-   a stale string behind for queue_route_targets_opponent to match. */
+   A NULL or empty `raw` clears the stamp. An emitter that stamps a Raw route and
+   a later prompt on the same entry takes a plain variant must not leave a stale
+   string behind for queue_route_targets_opponent to match. */
 void rb_queue_set_choice_route_raw(GameState *g, const char *raw) {
     if (!g) return;
     int cur = g->queue.cur;
@@ -528,36 +533,27 @@ void rb_queue_pause_for_choice(GameState *g, const RbChoice *choice) {
 
                (1) queue.rs:329 `entry.choice_player_id.is_some()` — an earlier
                    caller already stamped the seat (execute_choice's
-                   choice_maker arm, choice.rs:143-153; the live-success zone
-                   arm, live.rs:1577). This whole block is inside that guard.
+                   choice_maker arm, choice.rs:143-153, which misc.c's h_choice
+                   now reproduces; the live-success zone arm, live.rs:1577).
+                   This whole block is inside that guard.
 
-               (2) queue.rs:333-345 — route to the OPPONENT when the choice is
-                   one the opponent has to answer. Rust spells that as
-                   `is_opponent_choice`, which tests the CHOICE's own shape:
+               (2) queue.rs:333-345 — route to the OPPONENT when the choice is one
+                   the opponent must answer. Rust spells that as
+                   `is_opponent_choice`, testing the CHOICE's shape, then gates
+                   it on EITHER context trigger:
 
-                       SelectCard { target_player_id: Some(tpid) } => tpid == "opponent"
-                       SelectTarget { target }                 => target == "position|destination"
-                       _ => false
+                       entry.spawn_context.target == "opponent"                    (:333)
+                       choice_card_no == Raw("position_change:opponent:…")         (:340)
 
-                   ...and then gates it on EITHER context trigger:
-
-                       entry.spawn_context.target == "opponent"                        (:333)
-                       choice_card_no == ChoiceRoute::Raw("position_change:opponent:…") (:340)
-
-               The C keeps that structure, but the shape test is
-               `choice_routes_to_opponent(choice)` and BOTH context triggers live
-               in queue_route_targets_opponent(e), which reads the entry's
-               spawn_target and its raw route string. Nothing is inferred from
-               choice_card_no's int tag: tags 1/2/3 are shared by Condition, Cost
-               and Generic, so no int can name position_change:opponent.
-
-               Emitters that know their route string stamp
-               e->choice_route_raw / e->has_choice_route_raw; see
-               rb_queue_set_choice_route_raw below. */
-
-               int is_opp = choice_routes_to_opponent(choice) &&
-                            queue_route_targets_opponent(e);
-               if (is_opp) {
+               The C keeps that structure: choice_routes_to_opponent(choice) is the
+               shape test, and queue_route_targets_opponent(e) holds BOTH context
+               triggers — the spawn context (written by misc.c's
+               both_set_spawn_target) and the raw route string. Nothing infers a
+               route from choice_card_no's int tag, because tags 1/2/3 belong to
+               Condition, Cost and Generic. */
+            int is_opp = choice_routes_to_opponent(choice) &&
+                         queue_route_targets_opponent(e);
+            if (is_opp) {
                 snprintf(e->choice_player_id, sizeof(e->choice_player_id),
                          "%s", (e->player_id[0] == 'p' && e->player_id[1] == '1') ? "p2" : "p1");
             } else {

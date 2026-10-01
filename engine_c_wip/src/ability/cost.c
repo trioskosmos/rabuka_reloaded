@@ -195,6 +195,39 @@ static int card_matches_any_character(int card_id, const char *chars_csv) {
     return rb_card_matches_characters(card_id, names, nc);
 }
 
+/* ── group_names: ONE entry, not the whole CSV ─────────────────────────────
+ *
+ * `card_matches_any_group` above is the twin of Rust's `card_matches_any_group`
+ * (util.rs:799) and is correct only where the Rust source spells that call out.
+ * The other shape in this file reads `AbilityEffect::group_name()` (core/card.rs
+ * :2462 = `group_names.first()`) — ONE name, never the joined list. The C
+ * bytecode decoder flattens the Rust `Vec<String>` into a single comma-joined
+ * extra, so handing that whole string to `rb_card_matches_group_str` compares
+ * "lilywhite,μ's" as one exact token and admits nothing.
+ *
+ * util.c already carries `rb_group_name_first` / `rb_effect_group_name` /
+ * `rb_card_matches_effect_group` for this, but all three are `static` and are
+ * NOT declared in include/rabuka.h, so this file carries a local twin rather
+ * than editing a file this change does not own. */
+static const char *group_name_first(const char *group_names, char *buf, size_t bufsz) {
+    if (!group_names || !*group_names) return NULL;
+    const char *comma = strchr(group_names, ',');
+    size_t len = comma ? (size_t)(comma - group_names) : strlen(group_names);
+    if (!buf || bufsz == 0) return group_names;
+    if (len >= bufsz) len = bufsz - 1;
+    memcpy(buf, group_names, len);
+    buf[len] = '\0';
+    return buf;
+}
+
+/* Pass when the effect names no group, else match `group_names.first()`. */
+static int card_matches_group_name_first(int card_id, const char *group_names) {
+    char buf[128];
+    const char *g = group_name_first(group_names, buf, sizeof buf);
+    if (!g || !*g) return 1;
+    return rb_card_matches_group_str(card_id, g);
+}
+
 /* ── Mirror cost.rs: get_change_state_candidates ── */
 
 /* The card a `self_cost` leg resolves against.
@@ -361,14 +394,82 @@ static void cost_publish_pending(GameState *g, int actor) {
     g->queue.state = RB_QUEUE_AWAITING_CHOICE;
 }
 
-/* ── resume_pending_actions ── */
-static int resume_pending_actions(GameState *g) {
+/* ── cost_drop_pending_actions ──
+    Rust's `entry.pending_actions.clear()` and `entry.pending_actions = vec![alt]`
+    (cost/handlers.rs:1417-1420, :1435) both ASSIGN a fresh Vec, dropping whatever
+    the entry was holding. rb_queue_take_pending_actions is the same release in
+    the C: it detaches the batch AND frees every owned clone in it
+    (ability_queue.c:993-998). Unlike writing `pending_actions_n = 0` by hand it
+    keeps the ownership contract at ability_queue.c:18-45 — exactly one of the
+    three sanctioned release paths runs for a given batch, so no parked clone
+    leaks and none is freed twice.
+
+    Only the arms where Rust genuinely REPLACES or CLEARS the batch may call this.
+    The arms where Rust EXECUTES it must not; see cost_arm_resume. */
+static void cost_drop_pending_actions(GameState *g) {
+    if (!g) return;
+    rb_queue_take_pending_actions(g);
+}
+
+/* ── cost_arm_resume ──
+    The epilogue every answer arm of this file ends with. It deliberately does NOT
+    consume the parked tail.
+
+    WHY. Rust calls `AbilityResolver::resume_pending_actions` from here
+    (cost/handlers.rs:1422 on the skip arm, :1437 on the insufficient-energy arm,
+    :1480 and :1656 on the pay arms, :1732 on the all-hand-discard arm), and that
+    function is Rust's SINGLE consumer of the parked batch: it takes the batch and
+    runs each command through `self.execute_effect`, re-parking the remainder when
+    a command opens a new prompt (choice.rs:117-135, and :126-128 ->
+    requeue_remaining_after_choice :87-115). Rust therefore has exactly one
+    execution point and it is inside this call.
+
+    The C cannot put the execution HERE, because this arm is not the bottom of the
+    C's answer path. `rb_handle_optional_cost_payment` and
+    `rb_handle_pay_cost_all_discard` are reached from choice.c's pay/skip arm
+    (choice.c:3682) and the all-discard arm (choice.c:4820), both of which sit
+    inside `rb_resolver_handle_select_target`; that function RETURNS into
+    `rb_resume_with_choice_indices_internal`, which then calls
+    `rb_resolver_continue_siblings(g, actor, host, cont, cont_from)`
+    (choice.c:4927 for the pay/skip arm, :4821 for the all-discard arm — the very
+    next line) before the choice_resume tail normalizes the state and drains
+    (choice.c:4980-4993).
+
+    `rb_resolver_continue_siblings` (choice.c:4361-4385) is ALREADY a faithful
+    port of choice.rs:117-135: it takes the batch by ownership,
+    rb_execute_effect_ex's each command in order, rb_queue_repark_pending_actions
+    the remainder when a sub-prompt interrupts, and stamps entry.effect_started
+    (choice.rs:81-83). It is the C's single execution point, one step further down
+    the SAME call chain.
+
+    So the two-sources rule for this file: the C executes the tail at
+    rb_resolver_continue_siblings, and a cost arm must LEAVE the batch parked for
+    it. The old body here called rb_queue_take_pending_actions — which detaches
+    and FREES the batch and returns only the count — and then drained the queue
+    that many times having executed nothing. The batch was destroyed at this
+    point, so by the time rb_resolver_continue_siblings ran,
+    rb_queue_has_pending_actions() was false and it took its `cont` FALLBACK walk
+    (choice.c:4386-4397) over the parked parent tree instead of the owned path:
+    the same steps ran a second time, from the other of the two carriers. That is
+    the defect: the tail was not merely discarded, its destruction is what forced
+    the double execution.
+
+    Note the polarity is the OPPOSITE of choice.c's rb_resolver_resume_pending_actions,
+    whose two "faithful" execution variants both regressed (choice.c:588-623).
+    That site is reached from arms whose C continuation has ALREADY been walked
+    before it returns, so executing there double-counts. Here the continuation has
+    NOT run yet — it is still parked — so consuming it is precisely what causes the
+    double-count. Leaving it parked is the fix; the count-only take that stood here
+    was the bug.
+
+    The drain is kept because it is not the batch's business and it preserves this
+    arm's behaviour for any caller that reaches it without a current entry (the
+    direct test callers, tests/test_parity_cost_compound.c:380/:389, where
+    rb_drain_ability_queue is a no-op). The live callers get their drain from the
+    choice_resume tail either way. */
+static int cost_arm_resume(GameState *g) {
     if (!g) return -1;
-    int n_pending = rb_queue_take_pending_actions(g);
-    for (int i = 0; i < n_pending; i++) {
-        rb_drain_ability_queue(g);
-        if (rb_has_pending_choice(g)) break;
-    }
+    rb_drain_ability_queue(g);
     return 0;
 }
 
@@ -1300,7 +1401,14 @@ int rb_handle_optional_cost_payment(GameState *g, int actor, const AbilityEffect
             if (g->queue.cur >= 0 && g->queue.cur < g->queue.n_entries)
                 g->queue.entries[g->queue.cur].effect_started = 1;
         }
-        return resume_pending_actions(g);
+        /* handlers.rs:1416-1420 REPLACES the batch with `vec![alt_effect]`, or
+           clears it when the cost carries no alternative; :1422 then resumes. The
+           alternative is executed directly above exactly as Rust's resume would run
+           it out of the batch, so what remains to do here is the REPLACE — the batch
+           becomes empty — which is cost_drop_pending_actions, not the old
+           take-and-execute loop. */
+        cost_drop_pending_actions(g);
+        return cost_arm_resume(g);
     }
 
     /* ── PAY path ── */
@@ -1319,9 +1427,15 @@ int rb_handle_optional_cost_payment(GameState *g, int actor, const AbilityEffect
                so the cost is effectively declined: no prompt of its own is
                opened and the resolution stops at the skip gate. */
             s_cost_optional_skipped = 1;
-            if (g->queue.cur >= 0 && g->queue.cur < g->queue.n_entries)
-                g->queue.entries[g->queue.cur].pending_actions_n = 0;
-            return resume_pending_actions(g);
+            /* handlers.rs:1433-1437: cancel_remaining_commands is raised and the
+               tail is CLEARED (not executed), so the resume that follows finds
+               nothing to run. The old body zeroed `pending_actions_n` by hand,
+               which orphaned the batch's owned deep clones — ability_queue.c's
+               ownership contract (ability_queue.c:18-45) admits exactly three
+               release paths and a raw field write is none of them. */
+            cost_drop_pending_actions(g);
+            g->queue.cancel_remaining_commands = 1;
+            return cost_arm_resume(g);
         }
     }
 
@@ -1407,7 +1521,11 @@ int rb_handle_optional_cost_payment(GameState *g, int actor, const AbilityEffect
                 g->queue.entries[g->queue.cur].effect_started = 1;
         }
     } else if (rb_queue_has_pending_actions(g)) {
-        resume_pending_actions(g);
+        /* handlers.rs:1655-1658 — Rust resumes here. The batch must still be
+           parked when this arm returns, because rb_resolver_continue_siblings is
+           the C's single consumer of it and runs on the way back out (choice.c:4927).
+           See cost_arm_resume. */
+        cost_arm_resume(g);
     }
     return 1;
 }
@@ -1449,7 +1567,11 @@ int rb_handle_pay_cost_all_discard(GameState *g, int actor, const char *selected
                 g->queue.entries[g->queue.cur].effect_started = 1;
         }
     } else if (accepted && rb_queue_has_pending_actions(g)) {
-        resume_pending_actions(g);
+        /* handlers.rs:1731-1738 — same single-consumer situation as the pay arm of
+           rb_handle_optional_cost_payment. choice.c:4821 calls
+           rb_resolver_continue_siblings on the very next line of the answer path,
+           so the batch stays parked. See cost_arm_resume. */
+        cost_arm_resume(g);
     }
     return 1;
 }
@@ -1524,8 +1646,10 @@ static const AbilityEffect *cr_find_modify_cost(const AbilityEffect *e,
 }
 
 static int cr_reduction_matches(const AbilityEffect *e, int card_id, const Card *card) {
+    /* util.rs:193-200 play_cost_reduction_matches — `gn.first()` gates the
+       single group name. Whole-CSV compare admitted no card at all. */
     const char *gn = cr_eff_extra(e, "group_names");
-    if (gn && !rb_card_matches_group_str(card_id, gn)) return 0;
+    if (gn && !card_matches_group_name_first(card_id, gn)) return 0;
     const char *limit = cr_eff_extra(e, "cost_limit");
     if (limit && card->cost != atoi(limit)) return 0;
     if (!rb_cost_threshold_met(card, e)) return 0;
@@ -1557,13 +1681,19 @@ static int cr_per_unit_reduction(const AbilityEffect *e, const GameState *g,
     const char *loc  = cr_eff_extra(e, "location");
     const char *zone = pul ? pul : (loc ? loc : "hand");
     int raw_count;
+    char gbuf[128];
+    /* util.rs:236-243 per_unit_cost_reduction — the BRANCH test is a presence
+       test on the whole list (`group_names_any().is_some()`), but the stage
+       scan that follows is filtered by `effect.group_name()` = `.first()`. The
+       C passed the joined CSV to the single-token matcher. */
     if (!strcmp(zone, "stage") && cr_eff_extra(e, "group_names")) {
         const char *gn = cr_eff_extra(e, "group_names");
         const RbPlayer *P = &g->p[actor];
         int n = 0;
         for (int s = 0; s < RB_STAGE_SIZE; s++) {
             int id = P->stage[s];
-            if (id != RB_EMPTY_SLOT && rb_card_matches_group_str(id, gn)) n++;
+            if (id != RB_EMPTY_SLOT && rb_card_matches_group_str(id,
+                    group_name_first(gn, gbuf, sizeof gbuf))) n++;
         }
         raw_count = n;
     } else {
@@ -1633,8 +1763,12 @@ static int cr_scan_one_effect(const AbilityEffect *eff, int target_id,
             if (!met) return -1;
         }
     }
+    /* util.rs:477-480 scan_abilities_for_cost_reduction — this twin spells out
+       `card_matches_any_group(card_db, target_id, gns)` (util.rs:799), NOT
+       `group_name()`. A split-and-accept-any compare, so 「『A』と『B』の」 auras
+       reach a card in either group. The joined CSV matched neither. */
     const char *gn = cr_eff_extra(eff, "group_names");
-    if (gn && !rb_card_matches_group_str(target_id, gn)) return -1;
+    if (gn && !card_matches_any_group(target_id, gn)) return -1;
     const char *limit = cr_eff_extra(eff, "cost_limit");
     if (limit && target_card->cost != atoi(limit)) return -1;
     if (!rb_cost_threshold_met(target_card, eff)) return -1;

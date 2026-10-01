@@ -128,7 +128,38 @@ impl PolicyNet {
         std::fs::write(path, buf)
     }
 
-    pub fn load_weights(&mut self, path: &str) -> std::io::Result<()> {
+    /// Flat snapshot of every trainable weight, for keeping the best checkpoint.
+///
+/// `load_weights` round-trips through the on-disk format, which works but is
+/// awkward to call per-epoch. This is the same data in memory. The value
+/// trainer keeps the best-by-correlation checkpoint rather than the last one,
+/// because [P1] showed the best value network in a 64-round iterative loop came
+/// from iteration 21, not the last.
+pub fn save_to_vec(&self) -> Vec<f32> {
+    let mut v = Vec::with_capacity(
+        self.w1_state.len() + self.b1.len() + self.w_value.len() + 1,
+    );
+    v.extend_from_slice(&self.w1_state);
+    v.extend_from_slice(&self.b1);
+    v.extend_from_slice(&self.w_value);
+    v.push(self.b_value);
+    v
+}
+
+pub fn load_from_vec(&mut self, v: &[f32]) {
+    let n1 = self.w1_state.len();
+    let nh = self.b1.len();
+    let n2 = self.w_value.len();
+    if v.len() != n1 + nh + n2 + 1 {
+        return;
+    }
+    self.w1_state.copy_from_slice(&v[..n1]);
+    self.b1.copy_from_slice(&v[n1..n1 + nh]);
+    self.w_value.copy_from_slice(&v[n1 + nh..n1 + nh + n2]);
+    self.b_value = v[n1 + nh + n2];
+}
+
+pub fn load_weights(&mut self, path: &str) -> std::io::Result<()> {
         let mut f = File::open(path)?;
         let mut buf = Vec::new();
         f.read_to_end(&mut buf)?;
@@ -404,6 +435,17 @@ impl PolicyNet {
     }
 
     /// Compute policy logits and values for a batch of actions.
+    /// Public value-only evaluation, for the search leaf.
+    ///
+    /// `evaluate_actions` exists but also scores actions, which the leaf does
+    /// not want: the leaf asks "how good is this position", not "how good is each
+    /// action". Returns the tanh-bounded value in [-1, 1].
+    pub fn evaluate_state_value(&self, state: &EncodedState) -> f32 {
+        let flat = state.flatten();
+        let h = self.forward_state(&flat);
+        self.state_value(&h)
+    }
+
     pub fn evaluate_actions(
         &self,
         state: &EncodedState,

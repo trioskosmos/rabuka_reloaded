@@ -22,6 +22,20 @@ int rb_handle_rps_choice_p2(GameState *g, int choice);
 int rb_setup_choose_attacker(GameState *g, int p1_first);
 int rb_setup_handle_mulligan_skip(GameState *g);
 
+/* src/game/game_setup.c — the Main-phase ability OFFER scan, the C twin of
+   game_setup.rs:2078-2348 (the stage scan and the 控え室 scan). It is a
+   faithful, complete port with no callers of its own, so rb_generate_action_
+   candidates below could never offer an activated ability: an activation was
+   resolvable (rb_activate_card) but unreachable through the action list, which
+   is why several suites report an ability "is never offered".
+   rb_setup_for_each_ability_candidate is the bridge that hands the offer
+   table over; the gate rules all live on the game_setup.c side. */
+int rb_setup_for_each_ability_candidate(
+    const GameState *g,
+    int (*sink)(void *ctx, int card_id, int ability_index, int from_stage,
+                int stage_slot, int base_cost, int effective_cost),
+    void *ctx);
+
 /* Turn phase machine — mirrors engine/src/turn/phases.rs:advance_phase
    Two TurnPhases per round: FirstAttackerNormal / SecondAttackerNormal / Live.
    For portability we keep it linear: RPS → Active → Energy → Draw → Main
@@ -1270,6 +1284,52 @@ static RbGeneratedAction *rb_actions_push(RbGeneratedAction *actions, int *count
     return actions;
 }
 
+/* One activation offer from rb_setup_for_each_ability_candidate, appended to
+ * the same growable action list the play-member rows use.
+ *
+ * The action_type is the one the whole C tree already reads an activation
+ * offer through: RB_ACTION_ACTIVATE_ABILITY (23). src/main.c, src/web_server.c
+ * and tests/test_parity_draw_flat.c / _ability_watch.c / _wave1c.c all
+ * discriminate offers with that constant, and 1 / 14 in this same function are
+ * the pass and play-member tags. Using it here is what makes an activated
+ * ability visible to every existing reader of the list.
+ *
+ * `ability_index` is taken for completeness but NOT serialised:
+ * RbGeneratedActionParameters carries only card_id / available_areas, and
+ * include/rabuka.h is not this file's to edit. The Rust row carries
+ * ability_index so a host can name WHICH ability it is activating; without it
+ * rb_activate_card resolves the card's activatable slot itself. Recorded here
+ * because it is the one decision datum the offer row drops. */
+typedef struct {
+    RbGeneratedAction **actions;
+    int *count;
+    int *capacity;
+    int failed;
+} RbAbilityOfferSink;
+
+static int rb_ability_offer_sink(void *ctx, int card_id, int ability_index,
+                                 int from_stage, int stage_slot,
+                                 int base_cost, int effective_cost) {
+    RbAbilityOfferSink *sink = (RbAbilityOfferSink *)ctx;
+    RbGeneratedAction action;
+    memset(&action, 0, sizeof(action));
+    action.action_type = RB_ACTION_ACTIVATE_ABILITY;
+    action.has_parameters = 1;
+    action.parameters.card_id = card_id;
+    /* available_areas stays NULL / 0: a UseAbility row is not a stage play, and
+     * Rust leaves available_areas unset on it. The static rb_action_areas rows
+     * belong to the play-member loop and must not be aliased here. */
+    action.parameters.available_areas = NULL;
+    action.parameters.n_available_areas = 0;
+    (void)ability_index; (void)from_stage; (void)stage_slot;
+    (void)base_cost; (void)effective_cost;
+    RbGeneratedAction *next = rb_actions_push(*sink->actions, sink->count,
+                                              sink->capacity, action);
+    if (!next) { sink->failed = 1; return 1; }
+    *sink->actions = next;
+    return 0;
+}
+
 RbGeneratedActionList rb_generate_action_candidates(const GameState *state) {
     RbGeneratedActionList result = { NULL, 0 };
     if (!state || state->phase != RB_PHASE_MAIN) return result;
@@ -1282,14 +1342,18 @@ RbGeneratedActionList rb_generate_action_candidates(const GameState *state) {
     memset(&pass, 0, sizeof(pass));
     pass.action_type = 1;
     actions[result.count++] = pass;
-    if (rb_is_action_prohibited(state, "play_member")) {
-        result.actions = actions;
-        return result;
-    }
 
     int actor = state->active;
     const RbPlayer *player = &state->p[actor];
     int area_slot = 0;
+
+    /* Rule 7.7.2.2 — 「プレイ Pamplona」 withholds the PLAY-MEMBER offers only.
+     * In Rust the guard at game_setup.rs:1707 wraps the per-hand-card block and
+     * CLOSES at :2076; the ability scans at :2078 and :2254 sit OUTSIDE it, so
+     * an ability stays offerable while member plays are prohibited. This C
+     * generator used to return early here, which additionally suppressed every
+     * ability offer on a prohibited board. */
+    if (!rb_is_action_prohibited(state, "play_member")) {
     for (int hand_index = 0; hand_index < player->hand.n; hand_index++) {
         int card_id = player->hand.cards[hand_index];
         if (!rb_card_is_member(card_id)) continue;
@@ -1357,6 +1421,32 @@ RbGeneratedActionList rb_generate_action_candidates(const GameState *state) {
         }
         area_slot++;
         rb_free_card(&card);
+    }
+    } /* end !is_action_prohibited("play_member") */
+
+    /* ── Main-phase activation offers (game_setup.rs:2078-2348) ────────────
+     * Rust appends these AFTER the play-member block: the stage scan first
+     * (three slots, printed AND runtime-gained abilities), then the 控え室
+     * scan. Every gate — 「…場合のみ起動できる」, trigger/effect position,
+     * discard-only abilities, the per-turn use limit, the mandatory-cost
+     * payability rules and the optional-payment exemption — is applied on the
+     * game_setup.c side; this loop only turns each surviving offer into one
+     * action row, exactly as Rust pushes one Action per offered ability. */
+    {
+        RbAbilityOfferSink sink;
+        sink.actions = &actions;
+        sink.count = &result.count;
+        sink.capacity = &capacity;
+        sink.failed = 0;
+        rb_setup_for_each_ability_candidate(state, rb_ability_offer_sink, &sink);
+        if (sink.failed) {
+            /* rb_actions_push ran out of memory mid-append; report no list
+             * rather than a truncated one, matching the play-member path. */
+            rb_free(actions);
+            result.actions = NULL;
+            result.count = 0;
+            return result;
+        }
     }
 
     result.actions = actions;

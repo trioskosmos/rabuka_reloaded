@@ -1158,13 +1158,80 @@ int rb_distinct_stage_groups(const GameState *g, int pl) {
 
 /* ── Effective activation cost ──────────────────────────────────────── */
 
+/* cost.c: energy_count_any() — the PayEnergy amount actually charged, folded
+   from BOTH wire spellings ("energy_count" and "energy"). Defined in
+   src/ability/cost.c and absent from include/rabuka.h, so it is declared with
+   the same extern pattern resolver.c:47 already uses. */
+extern int rb_cost_energy_count_any(const AbilityEffect *e);
+
+/* card.rs:1467 AbilityEffect::effective_energy_cost_total — the SINGLE source
+   of truth for affordability AND display (abilities.rs:2842-2854 routes
+   effective_activation_cost_for straight into it, and game_setup.c:1007
+   gates the Main-phase offer on the result).
+
+       if action == PayEnergy {
+           let printed  = self.energy_count_any().or(self.count).unwrap_or(0);
+           let reduction = self.cost_reduction_per_group
+                               .unwrap_or(0).saturating_mul(groups_on_stage);
+           return printed.saturating_sub(reduction);
+       }
+       self.compound.actions.iter().fold(0u8, |acc, s|
+           acc.saturating_add(s.effective_energy_cost_total(groups_on_stage)))
+
+   The previous body was `cost->count - groups_on_stage`, which diverged from
+   that in four ways, each of them load-bearing:
+
+     1. IT NEVER READ energy_count_any(). A PayEnergy cost states its amount in
+        the energy_count/energy field, and `count` on a cost step is a TARGET
+        quantity (card.rs:1427-1429), so a cost that carried a real
+        energy_count and no count priced at 0.
+     2. IT SUBTRACTED THE RAW GROUP COUNT instead of
+        cost_reduction_per_group x groups. 園田海未 PL!-bp5-004-R＋ (Q228)
+        prints 「グループ名1種類につきE減る」 with cost_reduction_per_group = 1
+        and a printed 4E over four distinct groups: Rust yields 4 - 1x4 = 0,
+        the old body yielded 4 - 4 = 0 by coincidence, but a card whose
+        per-group figure is not 1 (or whose printed cost is under the group
+        count) diverged immediately.
+     3. IT IGNORED COMPOUND CHILDREN. A sequential cost such as 村野さやか
+        PL!-bp1-002-R ([PayEnergy 2, MoveCards self->waitroom]) is not itself
+        a PayEnergy step, so the old body read `count` off the SEQUENTIAL
+        node and returned a single number for the whole block. Rust sums the
+        pay_energy sub-steps.
+     4. `groups_on_stage` is the caller's group count, already distinct over
+        the five canonical groups (rb_distinct_stage_groups, abilities.rs:
+        2816-2836). It is a multiplier here, never the reduction itself. */
+static int effective_energy_cost_total(const AbilityEffect *cost, int groups_on_stage) {
+    if (!cost) return 0;
+    if (cost->action && !strcmp(cost->action, "pay_energy")) {
+        /* energy_count_any().or(count).unwrap_or(0): the decoded energy amount
+           wins, `count` is the fallback, absent is 0. */
+        int printed = rb_cost_energy_count_any(cost);
+        if (printed < 0) printed = (cost->count >= 0) ? cost->count : 0;
+        if (printed < 0) printed = 0;
+        /* saturating_mul on the reduction, saturating_sub on the result. */
+        int per_group = cost->cost_reduction_per_group > 0
+                            ? cost->cost_reduction_per_group : 0;
+        int64_t reduction = (int64_t)per_group * (int64_t)groups_on_stage;
+        if (reduction > 255) reduction = 255;
+        int64_t effective = (int64_t)printed - reduction;
+        if (effective < 0) effective = 0;
+        if (effective > 255) effective = 255;
+        return (int)effective;
+    }
+    /* compound.actions fold. The C spells `compound.actions` as child[] (the
+       same recursion game_setup.c:944-947 uses for the unreduced
+       energy_cost_total twin), so this is deliberately the identical walk. */
+    int total = 0;
+    for (int i = 0; i < cost->n_child; i++)
+        total = rb_saturate_u8(total + effective_energy_cost_total(cost->child[i],
+                                                                   groups_on_stage));
+    return total;
+}
+
 int rb_effective_activation_cost_for(const GameState *g, int actor,
                                      const AbilityEffect *cost, int groups_on_stage) {
-    if (!cost) return 0;
-    int base_cost = cost->count > 0 ? cost->count : 0;
-    int reduction = groups_on_stage;
-    int effective = base_cost - reduction;
-    return effective < 0 ? 0 : effective;
+    (void)g; (void)actor;  /* card.rs:1467 is a pure function of (cost, groups). */
+    return effective_energy_cost_total(cost, groups_on_stage);
 }
 
 int rb_effective_activation_cost(const GameState *g, int actor, const AbilityEffect *cost) {
@@ -2330,6 +2397,167 @@ int rb_process_current_ability(GameState *g) {
     return res;
 }
 
+/* ── Queue-path per-unit cost fold ──────────────────────────────────────
+   resolver.rs:1396-1487 (adjusted_cost_after_modify + apply_per_unit_cost_
+   reduction). Rust reaches this from pay_ability_cost (resolver.rs:1105) on
+   EVERY resolution, queue path included; the C had it only in resolver.c,
+   reachable only from rb_resolve_ability, so the queue paid the raw cost.
+
+   rb_find_modify_cost is util.c's faithful port of util.rs::find_modify_cost
+   (util.c:2027) and rb_cost_energy_count_any is cost.c's port of
+   energy_count_any() (cost.c:90). Neither is exported by include/rabuka.h, so
+   both are declared with the extern pattern resolver.c:47 already uses. */
+extern const AbilityEffect *rb_find_modify_cost(const AbilityEffect *effect,
+                                                const char *op, const char *loc);
+
+/* resolver.rs:1425 per_unit_reduction — (units / per_unit_count.max(1)) * amount. */
+static int pca_per_unit_reduction(int total_units, int per_unit_count, int unit_amount) {
+    if (per_unit_count < 1) per_unit_count = 1;
+    return (total_units / per_unit_count) * unit_amount;
+}
+
+/* Where a folded cost's one overwritten value lives. The clone is a stack copy
+   whose extra_k/extra_v pointers still alias the decoded ability's strings, so
+   redirecting ONE pointer at a local buffer mutates only the clone and frees
+   nothing. resolver.c:561-576 mallocs for the same purpose; this avoids the
+   allocation and the matching release on a path that can be re-entered. */
+typedef struct {
+    char value[16];
+    int  slot;        /* index rewritten in the clone, or -1 if appended */
+} PcaCostOverride;
+
+/* resolver.rs:1449 cost.set_energy_count(Some(n)) — write `n` into the clone's
+   readable energy amount. Rust always leaves a readable value behind; the C
+   extras table must therefore APPEND the key when it is absent, exactly as
+   resolver.c:561-576 does, or the reduction is silently dropped. */
+static void pca_set_energy_count(AbilityEffect *cost, PcaCostOverride *ov, int value) {
+    snprintf(ov->value, sizeof ov->value, "%d", value);
+    for (int i = 0; i < cost->n_extra; i++) {
+        if (cost->extra_k[i] && !strcmp(cost->extra_k[i], "energy_count")) {
+            cost->extra_v[i] = ov->value;
+            ov->slot = i;
+            return;
+        }
+    }
+    /* "energy" is the OTHER wire spelling (cost.c:84-89); overwrite it rather
+       than appending a second key, so exactly one amount is readable. */
+    for (int i = 0; i < cost->n_extra; i++) {
+        if (cost->extra_k[i] && !strcmp(cost->extra_k[i], "energy")) {
+            cost->extra_v[i] = ov->value;
+            ov->slot = i;
+            return;
+        }
+    }
+    if (cost->n_extra >= RB_MAX_EXTRA) return;
+    cost->extra_k[cost->n_extra] = (char *)"energy_count";
+    cost->extra_v[cost->n_extra] = ov->value;
+    ov->slot = cost->n_extra;
+    cost->n_extra++;
+}
+
+/* resolver.rs:1430-1487 apply_per_unit_cost_reduction. */
+static void pca_apply_per_unit_cost_reduction(GameState *g, AbilityEffect *cost,
+                                             const AbilityEffect *mod_cost,
+                                             PcaCostOverride *ov) {
+    /* per_unit_count_any().unwrap_or(1): the DECODED field first, then the
+       extra (modifiers.c:755-766 established the same field-first rule for
+       per_unit_count). */
+    int per_unit_count = 1;
+    if (mod_cost->per_unit_count > 0) per_unit_count = mod_cost->per_unit_count;
+    else {
+        for (int i = 0; i < mod_cost->n_extra; i++)
+            if (mod_cost->extra_k[i] && !strcmp(mod_cost->extra_k[i], "per_unit_count")) {
+                per_unit_count = atoi(mod_cost->extra_v[i]);
+                break;
+            }
+    }
+    if (per_unit_count < 1) per_unit_count = 1;
+    /* count.unwrap_or(1) — the typed count, falling back to 1 when absent. */
+    int unit = mod_cost->count >= 0 ? mod_cost->count : 1;
+    const char *per_unit_type = NULL;
+    for (int i = 0; i < mod_cost->n_extra; i++)
+        if (mod_cost->extra_k[i] && !strcmp(mod_cost->extra_k[i], "per_unit_type")) {
+            per_unit_type = mod_cost->extra_v[i];
+            break;
+        }
+
+    if (per_unit_type && !strcmp(per_unit_type, "group_name")) {
+        /* distinct_stage_groups("self") — see the note at the call site: Rust's
+           "self" never resolves, so this is ALWAYS player 1's stage. */
+        int groups = rb_distinct_stage_groups(g, 0);
+        int reduction = pca_per_unit_reduction(groups, per_unit_count, unit);
+        if (cost->action && !strcmp(cost->action, "pay_energy")) {
+            int current = rb_cost_energy_count_any(cost);
+            if (current < 0) current = 0;
+            int next = current - reduction;
+            if (next < 0) next = 0;
+            pca_set_energy_count(cost, ov, next);
+        }
+        return;
+    }
+    if (per_unit_type &&
+        (!strcmp(per_unit_type, "success_live_card_zone") ||
+         !strcmp(per_unit_type, "success_live_zone") ||
+         !strcmp(per_unit_type, "live_card_zone") ||
+         !strcmp(per_unit_type, "live_zone")) &&
+        cost->action && !strcmp(cost->action, "move_cards")) {
+        /* resolver.rs:1463-1474 — the success zone belongs to the queue
+           ENTRY's player, defaulting to player 1 (`unwrap_or(gs.player1.id)`). */
+        int pl = 0;
+        int cur = g->queue.cur;
+        if (cur >= 0 && cur < g->queue.n_entries) {
+            const char *pid = g->queue.entries[cur].player_id;
+            if (pid && pid[0] == 'p' && (pid[1] == '1' || pid[1] == '2'))
+                pl = pid[1] - '1';
+        }
+        int success_len = g->p[pl].success.n;
+        int reduction = pca_per_unit_reduction(success_len, per_unit_count, unit);
+        int current = cost->count >= 0 ? cost->count : 0;
+        int next = current - reduction;
+        if (next < 0) next = 0;
+        cost->count = next;   /* count is a plain int field: no aliasing */
+    }
+}
+
+/* Set by pca_adjusted_cost_after_modify to tell the caller whether the returned
+   clone carries an adjustment (Rust's Option<AbilityEffect>). */
+static int pca_cost_folded = 0;
+
+/* resolver.rs:1405-1419 adjusted_cost_after_modify. Returns the clone when a
+   per-unit modify_cost applies and leaves pca_cost_folded = 0 otherwise, in
+   which case the caller must pay the ORIGINAL cost.
+
+   `ov` is supplied by the CALLER because the clone's rewritten extra_v points
+   straight into ov->value: if the buffer died with this frame the clone handed
+   back would dangle. */
+static AbilityEffect pca_adjusted_cost_after_modify(GameState *g,
+                                                   const AbilityEffect *cost,
+                                                   const Ability *ability,
+                                                   PcaCostOverride *ov) {
+    AbilityEffect adjusted = *cost;   /* shallow clone; strings stay shared */
+    pca_cost_folded = 0;
+    if (!ability || !ability->effect) return adjusted;
+    const AbilityEffect *mod_cost = rb_find_modify_cost(ability->effect, NULL, NULL);
+    if (!mod_cost) return adjusted;
+    /* operation_any() == Some("subtract") && per_unit_any().unwrap_or(false).
+       Both are extra reads, matching resolver.c:652-655 exactly. */
+    const char *op = NULL;
+    int per_unit = 0;
+    for (int i = 0; i < mod_cost->n_extra; i++) {
+        if (!mod_cost->extra_k[i]) continue;
+        if (!strcmp(mod_cost->extra_k[i], "operation")) op = mod_cost->extra_v[i];
+        else if (!strcmp(mod_cost->extra_k[i], "per_unit"))
+            per_unit = mod_cost->extra_v[i] && !strcmp(mod_cost->extra_v[i], "true");
+    }
+    if (mod_cost->per_unit > 0) per_unit = 1;
+    if (!op || strcmp(op, "subtract") != 0) return adjusted;
+    if (!per_unit) return adjusted;
+    ov->slot = -1;
+    pca_apply_per_unit_cost_reduction(g, &adjusted, mod_cost, ov);
+    pca_cost_folded = 1;
+    return adjusted;
+}
+
 /* Body of rb_process_current_ability. g->activating_card is already published
    as the resolving card; the caller clears it on the way out. Owns *ab (freed
    on every path). Returns 1 when the ability ran (or left a prompt open), 0
@@ -2356,7 +2584,34 @@ static int pca_resolve_entry(GameState *g, RbQueueEntry *entry, int cid, int aid
     }
 
     if (ab->cost) {
-        if (!rb_pay_cost(g, actor, ab->cost)) {
+        /* resolver.rs:1090-1112 pay_ability_cost folds a per-unit modify_cost
+           into the cost BEFORE paying it:
+               let adjusted_cost = self.adjusted_cost_after_modify(gs, cost, ability);
+               let cost = adjusted_cost.as_ref().unwrap_or(cost);
+               self.pay_cost(gs, cost)?;
+           The queue path is the SAME function in Rust — process_current_ability
+           (abilities.rs:2083) calls resolver.resolve_ability, so the fold
+           applies to every queued resolution. Here it was skipped entirely and
+           ab->cost was paid RAW, so a 「コストはグループ名1種類につきE減る」 or
+           「成功ライブカード1枚につき…コストを1減らす」 discount never reduced
+           anything on the queue path: the whole per-unit cost fold was
+           correctly ported into resolver.c and then reachable only from
+           rb_resolve_ability, never from the queue.
+
+           One divergence to flag for the resolver.c owner: Rust's
+           distinct_stage_groups("self") CANNOT resolve — "self" is neither
+           player1.id nor player2.id, so try_player_by_id returns None and
+           distinct_stage_groups falls back to `.unwrap_or(&self.player1)`
+           (abilities.rs:2816-2836), i.e. ALWAYS player 1. The C reproduces that
+           fallback here (seat 0) for faithfulness. resolver.c:604 instead passes
+           `g->active`, so the two folds disagree whenever the acting player is
+           player 2. This is a Rust bug faithfully ported, not a C divergence;
+           reconciling it means deciding whether to fix Rust. */
+        PcaCostOverride cost_ov;
+        cost_ov.slot = -1;
+        AbilityEffect folded = pca_adjusted_cost_after_modify(g, ab->cost, ab, &cost_ov);
+        int has_fold = pca_cost_folded;
+        if (!rb_pay_cost(g, actor, has_fold ? &folded : ab->cost)) {
             rb_free_ability(ab);
             g->queue.cur++;
             return 0;
@@ -2445,6 +2700,7 @@ static int pca_resolve_entry(GameState *g, RbQueueEntry *entry, int cid, int aid
 /* Defined in src/ability/ability_queue.c; not exported by include/rabuka.h. */
 extern int  rb_queue_is_entry_available(const GameState *g, int idx);
 extern const char *rb_queue_entry_player_id(const GameState *g, int index);
+extern void rb_queue_clear_completed(GameState *g);
 
 /* abilities.rs:1473-1476 -- collect the queue indices that are (a) still
    available and (b) owned by `pl`, up to `pre_len`. */
@@ -2466,6 +2722,73 @@ static int par_available_for(const GameState *g, int pl, int pre_len,
 int rb_process_player_abilities(GameState *g, int pl) {
     if (!g) return 0;
     if (g->queue.has_pending) return 0;
+    /* abilities.rs:1671-1673 — `loop { if !self.ability_queue.is_idle() { break; }`
+       is the FIRST statement of the drain body, and it is Rust's only guard
+       against re-entering a resolution that is already in flight. It has no C
+       counterpart here, and the `has_pending` test above is NOT a substitute:
+       it covers only the OPEN-PROMPT case, while the position-answer path
+       clears the prompt before it dispatches
+       (rb_resume_with_choice_indices_internal -> rb_clear_pending_choice,
+       choice.c:4593) and leaves the ability's own entry sitting there with
+       effect_started = 1 and completed = 0.
+
+       That gap is what consumed the target="both" opponent arm. The 登場
+       SelectPosition prompt and the opponent half share ONE queue entry
+       (rb_queue_ensure_current_entry, ability_queue.c:911-946 — Rust's
+       pause_for_choice Idle arm, queue.rs:322-327, does not mint an entry
+       because one already exists), and the opponent half is parked as that
+       entry's owned `pending_actions` tail. Answering the position prompt runs
+       rb_move_handle_select_position -> rb_move_fire_debut_side_effects ->
+       rb_process_pending_auto_abilities, i.e. this function, from INSIDE the
+       entry's own resolution. Rust refuses to drain there (the queue is
+       WaitingForChoice, not Idle); the C did not, so par_available_for handed
+       the in-flight entry to rb_process_current_ability, which skipped it
+       because effect_started is already set, and the `completed = 1` below
+       then retired it — which rb_queue_clear_completed (correctly, Rust-style)
+       turned into a free of the parked opponent arm. Hence "the card never
+       moved": the second prompt could not be raised because the continuation
+       that raises it had been dropped.
+
+       The check has to sit HERE, above the `state = RB_QUEUE_RESOLVING` stamp
+       below, because that stamp overwrites the very state is_idle() reads —
+       put inside the loop instead it would only ever observe the IDLE this
+       function writes itself and would never fire, which is what made the C
+       copy of the loop look like it had no guard at all. Inside the loop Rust
+       re-evaluates on every iteration because start_next()/pause_for_choice()
+       move `state` between iterations; in the C each iteration re-stamps
+       IDLE at the top of its body, so an in-loop test is self-fulfilling and
+       the entry test is the faithful placement.
+
+       Measured across the nine parity suites this guard suppresses exactly 6
+       of 1583 calls, all six in parity_full_round2's position-answer path; the
+       other 1577 all arrive with the queue Idle and are unaffected.
+
+       Reconcile the two ways Rust can say "not Idle" so the C denies exactly
+       the same states. In Rust `is_idle()` and `is_waiting_for_choice()` read
+       the SAME field: QueueState::WaitingForChoice { choice } carries the
+       Choice, so Rust can never be WaitingForChoice with no choice in hand,
+       and the `!is_idle()` test and the `has_pending` test above always agree.
+
+       In the C they are two fields (`state` and `has_pending`) and they can
+       disagree: rb_clear_pending_choice (choice.c:4310) drops the prompt
+       without touching `state`, so the queue is left stamped
+       RB_QUEUE_AWAITING_CHOICE with has_pending = 0. That is not Rust's
+       WaitingForChoice — Rust has no such state, because its stamp IS the
+       choice — and denying the drain on it suppresses legitimate re-entry:
+       measured, it silently cancels the optional-cost prompt in
+       parity_cce_gaps's a22a_queue_path_skips_cost and g1_one_wait_member,
+       which are green in the pristine build. A stale AWAITING_CHOICE is
+       therefore excluded from the deny-set, and the open-prompt case it would
+       have covered stays covered by the `has_pending` test above.
+
+       What remains denied is the C's spelling of Rust's ExecutingEffect and
+       PayingCost — RB_QUEUE_RESOLVING (the drain's own re-entrancy marker,
+       ability_queue.c:1271) and RB_QUEUE_PAYING_COST — plus
+       RB_QUEUE_DRAINING, the state the drain parks in when a resolution
+       stopped without a prompt (ability_queue.c:1468-1469). */
+    if (g->queue.state == RB_QUEUE_RESOLVING ||        g->queue.state == RB_QUEUE_PAYING_COST  ||
+        g->queue.state == RB_QUEUE_DRAINING)
+        return 0;
     int processed = 0;
     g->queue.actor = pl;
     g->queue.state = RB_QUEUE_RESOLVING;
@@ -2496,12 +2819,31 @@ int rb_process_player_abilities(GameState *g, int pl) {
        stay available, the same 2-of-N condition is rediscovered and the
        prompt re-fires forever. Emitting the prompt from here before choice.c
        is fixed hangs the drain; do not enable it. */
+    if (rb_ability_debug_enabled() && g->queue.n_entries > 0) {
+        fprintf(stderr, "[PCA_ENTER] pl=%d state=%d pending=%d cur=%d n=%d\n",
+                pl, g->queue.state, g->queue.has_pending, g->queue.cur, g->queue.n_entries);
+        for (int i = 0; i < g->queue.n_entries && i < 4; i++) {
+            const RbQueueEntry *e = &g->queue.entries[i];
+            fprintf(stderr, "[PCA_ENTRY] pl=%d i=%d cid=%d ab=%d pid='%s' cpid='%s' "
+                            "started=%d completed=%d park_n=%d resolver=%d\n",
+                    pl, i, e->card_id, e->ability_idx, e->player_id, e->choice_player_id,
+                    e->effect_started, e->completed, e->pending_actions_n, e->has_resolver);
+        }
+    }
     for (int guard = 0; guard < 200; guard++) {
         int pre_len = g->queue.n_entries;
         int avail[RB_QUEUE_DEPTH];
         int n_avail = par_available_for(g, pl, pre_len, avail, RB_QUEUE_DEPTH);
         if (n_avail == 0) break;
         int idx = avail[0];
+        if (rb_ability_debug_enabled()) {
+            const RbQueueEntry *e = &g->queue.entries[idx];
+            fprintf(stderr, "[PCA_PICK] pl=%d idx=%d n=%d cid=%d ab=%d pid=%s "
+                            "started=%d completed=%d park_n=%d has_resolver=%d\n",
+                    pl, idx, g->queue.n_entries, e->card_id, e->ability_idx,
+                    e->player_id, e->effect_started, e->completed,
+                    e->pending_actions_n, e->has_resolver);
+        }
         g->queue.cur = (uint8_t)idx;
         g->queue.state = RB_QUEUE_IDLE;
         rb_process_current_ability(g);
@@ -2517,11 +2859,32 @@ int rb_process_player_abilities(GameState *g, int pl) {
         processed++;
     }
 
-    if (!g->queue.has_pending) {
-        g->queue.state = RB_QUEUE_IDLE;
-        g->queue.cur = 0;
-        g->queue.n_entries = 0;
-    }
+    /* Rust's process_player_abilities_depth (abilities.rs:1660-1872) ends at
+       `self.just_completed_ability_key = None; self.just_completed_moved.clear();`
+       — it does NOT touch `entries` or `current_index` on the way out. The one
+       transition that does touch them is `complete_current()`
+       (queue.rs:437-451), which the C models as `entry.completed = 1` in the
+       loop above plus the `cur++` inside rb_process_current_ability.
+
+       So the ONLY thing this exit owes the queue is the state: the function
+       entered with state = RB_QUEUE_RESOLVING (a C stand-in for Rust's
+       `!is_idle() { break; }` entry test), and Rust's complete_current leaves
+       the queue Idle. Restoring IDLE here is that; anything else — in
+       particular truncating `entries` — is data Rust does not destroy, and
+       destroying it silently deletes the entries the OTHER seat owns plus any
+       entry parked mid-resolution behind an open prompt (the target="both"
+       opponent arm minted by rb_queue_ensure_current_entry). That is why a
+       `position_change:opponent:` answer reached from
+       rb_move_handle_select_position -> rb_move_fire_debut_side_effects found
+       an empty queue: the arm was parked correctly one frame earlier and was
+       dropped by the auto-ability scan that ran between the pause and the
+       answer.
+
+       The queue-shape transition Rust actually performs here lives in the
+       CALLER, at abilities.rs:1901 `clear_completed()` — retain the
+       uncompleted entries, drop the completed ones — and is reproduced in
+       rb_process_pending_auto_abilities below. */
+    if (!g->queue.has_pending) g->queue.state = RB_QUEUE_IDLE;
 
     return processed;
 }
@@ -2533,8 +2896,39 @@ int rb_process_pending_auto_abilities(GameState *g) {
                 g->queue.state, g->queue.has_pending, g->queue.cur, g->queue.n_entries);
     if (g->queue.has_pending) return 0;
     int total = 0;
-    for (int pl = 0; pl < 2; pl++)
-        total += rb_process_player_abilities(g, pl);
+    /* abilities.rs:1885 — the ACTIVE seat resolves all of its standby
+       abilities first, one at a time. */
+    total += rb_process_player_abilities(g, 0);
+    /* abilities.rs:1887-1889 — a prompt left open by the active seat returns
+       from Rust's process_pending_auto_abilities BEFORE the non-active pass
+       and BEFORE clear_completed. Reproducing the early return (rather than
+       falling through to the second seat) is what keeps the p2 pass from
+       re-entering the drain behind p1's still-open prompt. */
+    if (g->queue.has_pending) return total;
+    /* abilities.rs:1891-1900 — then the non-active seat, and only when the
+       queue actually holds one of its entries. */
+    total += rb_process_player_abilities(g, 1);
+    /* abilities.rs:1901 `self.ability_queue.clear_completed()` — the ONLY
+       queue-shape transition in this whole call chain:
+         entries.retain(|e| !e.completed);
+         if current_index > entries.len() { current_index = 0; }
+       queue.rs:455-460. `retain` KEEPS every entry that has not completed, so
+       an entry that was enqueued for the other seat — or one parked
+       mid-resolution behind an open prompt — survives the scan. Rust never
+       truncates here, which is precisely why the C's `n_entries = 0` was
+       invisible: nothing in Rust drops an uncompleted entry at this
+       boundary.
+
+       The drop that retain performs is real, not bookkeeping: a completed
+       entry owns its `pending_actions` deep clones (Vec<AbilityEffect>), and
+       Rust frees them when retain removes the entry. rb_queue_clear_completed
+       does the same via entry_clear_pending_actions, so the completed entries
+       this call retires release their parked effects here instead of leaking.
+
+       It runs on the non-active-pending path too, exactly as Rust does:
+       abilities.rs:1899 is followed by :1901 with no has_pending_choice test
+       between them. */
+    rb_queue_clear_completed(g);
     return total;
 }
 
@@ -2553,7 +2947,21 @@ int rb_process_player_abilities_depth(GameState *g, int pl, int max_depth) {
 
 void rb_queue_reset(GameState *g) {
     if (!g) return;
-    g->queue.n_entries = 0;
+    /* LEAK, second site of the same bug class. This IS a legitimate `entries`
+       truncation — it is the counterpart of Rust's `AbilityQueue::clear`
+       (queue.rs:188-192), which is `self.entries.clear()` plus
+       `state = Idle` plus `current_index = 0`. The defect is that a `Vec::clear`
+       DROPS each element, and a queue entry OWNS its `pending_actions` deep
+       clones (Vec<AbilityEffect>), whereas the C reached for the bare
+       `n_entries = 0`: every slot became unreachable without running the drop,
+       so each parked AbilityEffect leaked. Flag the entries completed and hand
+       them to rb_queue_clear_completed, which is the same
+       `entries.retain(|e| !e.completed)` Rust runs at abilities.rs:1901 and, with
+       every entry flagged, degenerates to `entries.clear()` — drop included.
+       The field writes below then restore what `clear()` also resets. */
+    for (int i = 0; i < g->queue.n_entries; i++)
+        g->queue.entries[i].completed = 1;
+    rb_queue_clear_completed(g);
     g->queue.cur = 0;
     g->queue.has_pending = 0;
     g->queue.state = RB_QUEUE_IDLE;

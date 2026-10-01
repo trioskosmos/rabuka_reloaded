@@ -465,17 +465,17 @@ static int play_to_stage_for(TestGame *tg, int pl, int cid, int area)
     return test_play_to_stage_for(tg, pl, cid, area);
 }
 
-/* Fire ONE named trigger on ONE card, the C twin of Rust fire_trigger(). The C
- * shim scans the zones (no ability-id-addressed entry point), so callers keep
- * other cards off the scanned zones. */
+/* Fire ONE named trigger on ONE card, the C twin of Rust fire_trigger()
+ * (engine/tests/helpers/mod.rs:114). The local body USED TO BE
+ * rb_queue_trigger_abilities(&tg->state, 0, trig), a WHOLE-BOARD TAS scan in
+ * which `cid` only set activating_card, so every other card in P1's zones
+ * printing the same trigger fired too. test_fire_trigger_on_card targets one
+ * ability_id on one explicit_card_id via rb_trigger_auto_ability (the port of
+ * Rust GameState::trigger_auto_ability) and does the load-bearing enqueue-time
+ * use record. No assumption about other cards is needed any more. */
 static int fire_trigger(TestGame *tg, int cid, const char *trig)
 {
-    if (!card_prints_trigger(cid, trig)) return 0;
-    tg->state.activating_card = cid;
-    int queued = rb_queue_trigger_abilities(&tg->state, 0, trig);
-    if (queued <= 0) return 0;
-    rb_process_pending_auto_abilities(&tg->state);
-    return 1;
+    return test_fire_trigger_on_card(tg, cid, trig);
 }
 
 static int fire_live_start(TestGame *tg, int pl, int cid)

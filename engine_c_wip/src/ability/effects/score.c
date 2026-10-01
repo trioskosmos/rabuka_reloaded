@@ -62,6 +62,31 @@ static int sc_parse_colors(const char *s, int *out, int max) {
     return n;
 }
 
+/* ── group_names: ONE entry, not the whole CSV ─────────────────────────────
+ *
+ * `AbilityEffect::group_name()` (core/card.rs:2462) is `group_names.first()`.
+ * Rust models `group_names` as a Vec<String>; the C bytecode decoder flattens
+ * it into ONE comma-joined extra, so a whole-CSV compare tests the literal
+ * token "lilywhite,μ's" and no card is *called* that. Measured over the decoded
+ * database: 802 effects carry `group_names` and 0 carry a `group` key, so the
+ * old `group`-first fallback was dead weight and `group_names` is the only
+ * wire key.
+ *
+ * util.c carries `rb_group_name_first` / `rb_effect_group_name` /
+ * `rb_card_matches_effect_group` for exactly this, but they are `static` and
+ * are NOT declared in include/rabuka.h, so this file keeps a local twin rather
+ * than editing a file this change does not own. */
+static const char *sc_group_name_first(const char *group_names, char *buf, size_t bufsz) {
+    if (!group_names || !*group_names) return NULL;
+    const char *comma = strchr(group_names, ',');
+    size_t len = comma ? (size_t)(comma - group_names) : strlen(group_names);
+    if (!buf || bufsz == 0) return group_names;
+    if (len >= bufsz) len = bufsz - 1;
+    memcpy(buf, group_names, len);
+    buf[len] = '\0';
+    return buf;
+}
+
 /* OR semantics over the list, i.e. util.rs::card_matches_heart_colors. */
 static int heart_color_matches(int cid, const char *hc) {
     if (!hc || !*hc) return 1;
@@ -85,8 +110,12 @@ static void sc_build_filter(const AbilityEffect *e, RbCardFilter *f, int exclude
         strncpy(f->card_type, ct, sizeof f->card_type - 1);
         f->card_type[sizeof f->card_type - 1] = 0;
     }
-    const char *g = sc_extra(e, "group_names");
-    if (!g) g = sc_extra(e, "group");
+    /* score.rs:180 `let group_filter = effect.group_name().map(...)` then
+       score.rs:216-217 / :348-349 `filter.group = Some(g)` — ONE name, the
+       first. `group` is not a key on any decoded effect, so that fallback was
+       always dead. */
+    char gbuf[128];
+    const char *g = sc_group_name_first(sc_extra(e, "group_names"), gbuf, sizeof gbuf);
     if (g && *g) {
         strncpy(f->group, g, sizeof f->group - 1);
         f->group[sizeof f->group - 1] = 0;
@@ -507,14 +536,18 @@ static const char *sc_per_unit_zone(const AbilityEffect *e) {
     return pt;
 }
 
-/* score.rs:327-328 (and :57-59 for live_total). The C port also accepts the
-   「…合計スコアは０未満にはならない」 phrasing, which the Rust filter reads via
-   score_floor; both spellings set the same floor. */
+/* score.rs:206-208 (live_total) and :495-496 (per card):
+       let has_floor = effect.score_floor_any().is_some()
+           || effect_constraint.as_deref() == Some("min:0");
+   Both spellings come off the decoded filter, so the Japanese 「…合計スコアは０
+   未満にはならない」 phrasing is NOT a third source: abilities.json already
+   carries effect_constraint:"min:0" + score_floor:0 on every effect whose text
+   prints it (PL!N-bp5-011-*). The old strstr() here therefore added a floor to
+   negative per-card modifiers Rust never floors. */
 static int sc_has_floor(const AbilityEffect *e) {
     if (sc_extra(e, "score_floor")) return 1;
     const char *ec = sc_extra(e, "effect_constraint");
     if (ec && !strcmp(ec, "min:0")) return 1;
-    if (e->text && strstr(e->text, "未満にはならない")) return 1;
     return 0;
 }
 
@@ -567,8 +600,16 @@ int rb_execute_modify_score(GameState *gs, int actor, AbilityEffect *e) {
     const char *target = e->target ? e->target : "self";             /* target_name(), card.rs:2336 */
     const char *heart_colors = sc_extra(e, "heart_colors");
     const char *state_filter = sc_extra(e, "state");
-    int per_unit = sc_is_true(sc_extra(e, "per_unit"));              /* score.rs:31 */
-    int per_unit_count_val = sc_extra_int(e, "per_unit_count");     /* score.rs:32 */
+    /* score.rs:181-182 `effect.per_unit_any()` / `effect.per_unit_count_any()`
+       read the FILTER struct, and the C decoder carries them as the first-class
+       AbilityEffect fields -- NOT as n_extra entries (a decoded modify_score
+       carries `per_unit` in extras but only `per_unit_count` in the field).
+       Reading per_unit_count out of n_extra therefore always yielded 0 and the
+       `max(1)` clamp turned EVERY 「N枚につき」 into 「1枚につき」, so PL!SP-pb2-008-R
+       (2 cards per +1) paid +1 per card and the max_repeats 2 cap hid it. */
+    int per_unit = e->per_unit ? 1 : sc_is_true(sc_extra(e, "per_unit"));
+    int per_unit_count_val = e->per_unit_count > 0 ? e->per_unit_count
+                                                    : sc_extra_int(e, "per_unit_count");
     if (per_unit_count_val < 1) per_unit_count_val = 1;              /* score.rs:92/243 max(1) */
     int self_target = (!strcmp(e->self_target_field, "true") ||
                        sc_is_true(sc_extra(e, "self_target")));      /* score.rs:36 */
@@ -677,6 +718,23 @@ int rb_execute_modify_score(GameState *gs, int actor, AbilityEffect *e) {
                 if (!seen && ncand < RB_MAX_ZONE) cand[ncand++] = act;
             }
         }
+        /* score.rs:431-449 -- a card id names ONE physical card, but the chain
+           above can see the same id twice: a live being performed is both the
+           live card and, once it has succeeded, an entry in the success live
+           card zone. Without this order-preserving dedup the pool holds that
+           card twice and a self-targeted effect applies once per occurrence --
+           「このカードのスコアを＋１する」 (PL!-pb2-041-L) scored +2 from a single
+           activation. `seen.insert` keeps the FIRST hit, as Rust's retain does. */
+        {
+            int w = 0;
+            for (int i = 0; i < ncand; i++) {
+                int dup = 0;
+                for (int k = 0; k < w; k++) if (cand[k] == cand[i]) { dup = 1; break; }
+                if (dup) continue;
+                cand[w++] = cand[i];
+            }
+            ncand = w;
+        }
     }
 
     /* score.rs:285-309 — recipients. */
@@ -703,27 +761,34 @@ int rb_execute_modify_score(GameState *gs, int actor, AbilityEffect *e) {
 
 /* ── Shared helpers for the remaining score.rs ports ── */
 
-/* Count of a single heart colour on a card (mirrors base_heart.hearts.get(hc)). */
-static int sc_card_heart_count(int cid, int col) {
-    Card c; if (!rb_decode_card_by_index((uint32_t)cid, &c)) return 0;
-    int r = 0;
-    for (int i = 0; i < c.n_hearts; i++)
-        if ((int)c.heart_color[i] == col) r += c.heart_count[i];
-    rb_free_card(&c);
-    return r;
-}
-
-/* True when every heart colour present on the card is listed in exc (mirrors
-    Rust base_heart.hearts.keys().all(|hc| exclude_heart_colors.contains(hc)). */
+/* True when every PRINTED BASE heart colour on the card is in `exc`.
+   score.rs:119-132 `PerUnitFilter::heart_set_all_excluded` reads
+   `card.base_heart.as_ref()` and tests `base.hearts.keys()`, so a card with no
+   base_heart (a live card) is NEVER all-excluded, and a member's blade hearts
+   and need_heart are outside the test. The C Card lays its three heart maps out
+   as [0, num_base) = base_heart, then blade_heart, then need_heart, so only the
+   first num_base entries participate. */
 static int sc_card_all_hearts_excluded(const Card *c, const int *exc, int nexc) {
-    if (c->n_hearts == 0) return 0;
-    for (int i = 0; i < c->n_hearts; i++) {
+    if (c->num_base <= 0) return 0;
+    for (int i = 0; i < c->num_base && i < c->n_hearts; i++) {
         int col = (int)c->heart_color[i];
         int found = 0;
         for (int k = 0; k < nexc; k++) if (exc[k] == col) { found = 1; break; }
         if (!found) return 0;
     }
     return 1;
+}
+
+/* Printed BASE heart icons of one colour (score.rs:93-96
+   `base.hearts.get(&hc)`), which is what a 「そのメンバーが持つheartNN」 per-unit
+   count reads -- not the blade- or need-heart merges the C record also holds. */
+static int sc_card_base_heart_count(int cid, int col) {
+    Card c; if (!rb_decode_card_by_index((uint32_t)cid, &c)) return 0;
+    int r = 0;
+    for (int i = 0; i < c.num_base && i < c.n_hearts; i++)
+        if ((int)c.heart_color[i] == col) r += c.heart_count[i];
+    rb_free_card(&c);
+    return r;
 }
 
 static int sc_card_moved_this_turn(const GameState *g, int cid) {
@@ -735,23 +800,103 @@ static int sc_card_appeared_this_turn(const GameState *g, int cid) {
     return 0;
 }
 
-/* Faithful port of execute_modify_required_hearts (score.rs:398-684). Handles
-   per_unit (both the per_unit_heart_colors total-icon mode and the default
-   per-card location count, with distinct-name and timing-condition filters),
-   the success-zone live+success card pool, group/original-value filters, and
+/* ── PerUnitFilter (score.rs:56-133) ─────────────────────────────────────
+   「〜1人につき」 unit criteria, gathered ONCE and re-tested at each card. The
+   criteria are cumulative and each is optional; `seen_names` carries the
+   already-claimed names across calls for the distinct-names rule. */
+typedef struct {
+    const GameState *gs;
+    int exclude_self;                  /* the activating card never counts   */
+    int distinct_names;                /* duplicate-named members count once */
+    int act;                           /* gs.activating_card, or -1          */
+    const char *group;
+    const char *timing_condition;
+    const int  *exc; int n_exc;
+    char seen[64][192];
+    int n_seen;
+} ScPerUnitFilter;
+
+/* score.rs:100-115 `claim_distinct_name` -- key is the joined card_names list
+   when the card has any, else the normalised printed name. */
+static int sc_claim_distinct_name(ScPerUnitFilter *f, int cid) {
+    Card c;
+    if (!rb_decode_card_by_index((uint32_t)cid, &c)) return 0;   /* :105-107 */
+    char key[192];
+    key[0] = 0;
+    char names[512];
+    int n_names = rb_card_get_card_names(cid, names, sizeof names);
+    if (n_names > 0 && names[0]) {
+        size_t w = 0;
+        const char *p = names;
+        for (int i = 0; i < n_names && p < names + sizeof names; i++) {
+            if (i && w + 1 < sizeof key) key[w++] = '|';   /* names.join("|") */
+            size_t l = strlen(p);
+            if (w + l >= sizeof key) l = sizeof key - w - 1;
+            memcpy(key + w, p, l); w += l; key[w] = 0;
+            p += l + 1;
+        }
+    } else {
+        rb_card_normalize_name(c.name ? c.name : "", key, sizeof key);
+    }
+    rb_free_card(&c);
+    for (int i = 0; i < f->n_seen; i++)
+        if (!strcmp(f->seen[i], key)) return 0;
+    if (f->n_seen < 64) {
+        snprintf(f->seen[f->n_seen], sizeof f->seen[0], "%s", key);
+        f->n_seen++;
+    }
+    return 1;
+}
+
+/* score.rs:71-97 `PerUnitFilter::accepts`, in Rust's order. */
+static int sc_puf_accepts(ScPerUnitFilter *f, int cid) {
+    if (f->exclude_self && f->act >= 0 && cid == f->act) return 0;
+    if (f->group && !rb_card_matches_group_str(cid, f->group)) return 0;
+    if (f->distinct_names && !sc_claim_distinct_name(f, cid)) return 0;
+    if (f->timing_condition && !strcmp(f->timing_condition, "appeared_or_moved_this_turn")
+        && !sc_card_moved_this_turn(f->gs, cid)
+        && !sc_card_appeared_this_turn(f->gs, cid)) return 0;
+    if (f->n_exc == 0) return 1;
+    Card c;
+    if (!rb_decode_card_by_index((uint32_t)cid, &c)) return 1;
+    int all_excluded = sc_card_all_hearts_excluded(&c, f->exc, f->n_exc);
+    rb_free_card(&c);
+    return !all_excluded;
+}
+
+/* Faithful port of execute_modify_required_hearts (required_hearts.rs:28-223).
+   Handles per_unit (both the per_unit_heart_colors total-icon mode and the
+   default per-card location count, both gated by the full PerUnitFilter), the
+   success-zone live+success card pool, group/original-score filters, and
    per-colour set/add of need_heart modifiers. */
 int rb_execute_modify_required_hearts(GameState *gs, int actor, AbilityEffect *e) {
     if (!gs || !e) return -1;
     const char *operation = sc_extra(e, "operation"); if (!operation) operation = "decrease";
-    int value = e->count >= 0 ? e->count : sc_extra_int(e, "value");
+    /* card.rs:2457 `value_or_count` is `value_any().or(count)` -- `value` WINS
+       over `count`. The C read `count` first, so an effect carrying both (the
+       parser emits `count` alongside `value` on several modify_required_hearts
+       sub-actions) applied the wrong number. */
+    const char *vtext = sc_extra(e, "value");
+    int value = vtext ? atoi(vtext) : (e->count >= 0 ? e->count : 0);
     const char *target = e->target ? e->target : "self";
-    int per_unit = sc_is_true(sc_extra(e, "per_unit"));
-    int per_unit_count = sc_extra_int(e, "per_unit_count"); if (per_unit_count <= 0) per_unit_count = 1;
-    const char *group = sc_extra(e, "group"); if (!group) group = sc_extra(e, "group_names");
+    int per_unit = e->per_unit ? 1 : sc_is_true(sc_extra(e, "per_unit"));
+    int per_unit_count = e->per_unit_count > 0 ? e->per_unit_count
+                                                : sc_extra_int(e, "per_unit_count");
+    if (per_unit_count <= 0) per_unit_count = 1;
+    /* required_hearts.rs:40 `let group_name = effect.group_name();` consumed at
+       :159-161 `card_matches_group_str(db, card_id, Some(gn))` — ONE name, the
+       first. `group` is not a key on any decoded effect, so reading it first
+       was a dead key that also shadowed the real one. */
+    char grp_buf[128];
+    const char *group = sc_group_name_first(sc_extra(e, "group_names"),
+                                            grp_buf, sizeof grp_buf);
     const char *location = sc_extra(e, "location");
     const char *timing_condition = sc_extra(e, "timing_condition");
     int original_value = sc_is_true(sc_extra(e, "original_value"));
     int original_count = sc_extra_int(e, "original_count");
+    /* OriginalScoreFilter.count / .operator are Option<u8> / Option<&str>: the
+       threshold is only applied when the text stated BOTH. */
+    int has_original_count = (sc_extra(e, "original_count") != NULL);
     const char *original_operator = sc_extra(e, "original_operator");
     int exclude_self = sc_is_true(sc_extra(e, "exclude_self"));
     int self_target = (!strcmp(e->self_target_field, "true") || sc_is_true(sc_extra(e, "self_target"))) ? 1 : 0;
@@ -767,23 +912,40 @@ int rb_execute_modify_required_hearts(GameState *gs, int actor, AbilityEffect *e
     const RbPlayer *P = &gs->p[pl];
 
     /* ── per_unit: recompute value from matching units ── */
+    /* required_hearts.rs:67-73 -- the unit criteria are resolved ONCE and both
+       per-unit branches gate on the SAME set; only what each unit is worth
+       differs. The previous C applied exclude_self + group to the heart-icon
+       branch and nothing at all to the card-count branch beyond the group. */
+    ScPerUnitFilter puf;
+    memset(&puf, 0, sizeof puf);
+    puf.gs = gs;
+    puf.exclude_self = exclude_self;
+    puf.distinct_names = is_distinct;
+    puf.act = act;
+    puf.group = group;
+    puf.timing_condition = timing_condition;
+    puf.exc = exc_colors;
+    puf.n_exc = n_exc;
+
     if (per_unit) {
+        int per_unit_base = max_flag ? 1 : value;
+        int units;
         if (n_pu > 0) {
-            /* Count total heart icons of the given colours across matching stage members. */
+            /* required_hearts.rs:76-101 -- the PRINTED BASE heart icon total of
+               the named colours across stage members the filter accepts. */
             int total = 0;
             for (int i = 0; i < RB_STAGE_SIZE; i++) {
                 int cid = P->stage[i];
                 if (cid == RB_EMPTY_SLOT) continue;
-                if (exclude_self && cid == act) continue;
-                if (group && !rb_card_matches_group_str(cid, group)) continue;
-                for (int j = 0; j < n_pu; j++) total += sc_card_heart_count(cid, pu_colors[j]);
+                if (!sc_puf_accepts(&puf, cid)) continue;
+                for (int j = 0; j < n_pu; j++) total += sc_card_base_heart_count(cid, pu_colors[j]);
             }
-            int per_unit_base = max_flag ? 1 : value;
-            int units = total / (per_unit_count > 0 ? per_unit_count : 1);
+            units = total / (per_unit_count > 0 ? per_unit_count : 1);
             if (repeat_limit > 0 && units > repeat_limit) units = repeat_limit;
-            value = per_unit_base * units;
         } else {
-            /* Default per-unit: count cards in the specified location. */
+            /* required_hearts.rs:103-113 + score.rs:36-50 `per_unit_source_cards`
+               -- success zone / live zone, and the STAGE for every other spelling
+               (including no location at all). */
             int zone_cards[RB_MAX_ZONE]; int nz = 0;
             if (location && (!strcmp(location, "success_live_zone") || !strcmp(location, "success_live_card_zone"))) {
                 for (int i = 0; i < P->success.n; i++) zone_cards[nz++] = P->success.cards[i];
@@ -793,34 +955,13 @@ int rb_execute_modify_required_hearts(GameState *gs, int actor, AbilityEffect *e
                 for (int i = 0; i < RB_STAGE_SIZE; i++)
                     if (P->stage[i] != RB_EMPTY_SLOT) zone_cards[nz++] = P->stage[i];
             }
-            const char *seen[32]; int nseen = 0;
             int count = 0;
-            for (int i = 0; i < nz; i++) {
-                int cid = zone_cards[i];
-                if (exclude_self && cid == act) continue;
-                if (group && !rb_card_matches_group_str(cid, group)) continue;
-                Card c; int have = rb_decode_card_by_index((uint32_t)cid, &c);
-                if (have) {
-                    if (is_distinct) {
-                        int dup = 0;
-                        for (int k = 0; k < nseen; k++) if (seen[k] && c.name && !strcmp(seen[k], c.name)) { dup = 1; break; }
-                        if (dup) { rb_free_card(&c); continue; }
-                        if (nseen < 32) seen[nseen++] = rb_strdup2(c.name);
-                    }
-                    if (n_exc > 0 && sc_card_all_hearts_excluded(&c, exc_colors, n_exc)) { rb_free_card(&c); continue; }
-                    rb_free_card(&c);
-                }
-                if (timing_condition && !strcmp(timing_condition, "appeared_or_moved_this_turn")) {
-                    if (!sc_card_moved_this_turn(gs, cid) && !sc_card_appeared_this_turn(gs, cid)) continue;
-                }
-                count++;
-            }
-            for (int k = 0; k < nseen; k++) rb_free((void *)seen[k]);
-            int per_unit_base = max_flag ? 1 : value;
-            int units = count / (per_unit_count > 0 ? per_unit_count : 1);
+            for (int i = 0; i < nz; i++)
+                if (sc_puf_accepts(&puf, zone_cards[i])) count++;
+            units = count / (per_unit_count > 0 ? per_unit_count : 1);
             if (repeat_limit > 0 && units > repeat_limit) units = repeat_limit;
-            value = per_unit_base * units;
         }
+        value = per_unit_base * units;
     }
 
     /* ── Build candidate card ids (live, or live+success when self-target
@@ -839,21 +980,25 @@ int rb_execute_modify_required_hearts(GameState *gs, int actor, AbilityEffect *e
     int recv[RB_MAX_ZONE]; int nr = 0;
     for (int i = 0; i < nids && nr < RB_MAX_ZONE; i++) {
         int cid = card_ids[i];
-        if (self_target) { if (act < 0 || cid != act) continue; }
+        /* required_hearts.rs:152-157 -- `if let Some(act) = gs.activating_card`
+           means the filter is SKIPPED entirely when there is no activating card,
+           so a self-targeted effect with no host still reaches the pool. The C
+           rejected every card in that state. */
+        if (self_target && act >= 0 && cid != act) continue;
         if (group && !rb_card_matches_group_str(cid, group)) continue;
-        if (original_value) {
-            Card c; if (!rb_decode_card_by_index((uint32_t)cid, &c)) continue;
-            int score = (int)c.score; rb_free_card(&c);
-            if (original_operator) {
-                int met = 1;
-                if      (!strcmp(original_operator, ">=")) met = score >= original_count;
-                else if (!strcmp(original_operator, "<=")) met = score <= original_count;
-                else if (!strcmp(original_operator, ">"))  met = score >  original_count;
-                else if (!strcmp(original_operator, "<"))  met = score <  original_count;
-                else if (!strcmp(original_operator, "==")) met = score == original_count;
-                else if (!strcmp(original_operator, "!=")) met = score != original_count;
-                if (!met) continue;
-            } else if (score != original_count) continue;
+        /* score.rs:145-159 `OriginalScoreFilter::accepts` -- the threshold is
+           applied only when the text stated a score, a count AND an operator;
+           an incomplete qualifier ACCEPTS rather than filtering the card out,
+           and an operator the engine does not know is a parser gap, also an
+           accept. The C rejected on a missing operator and on an undecodable
+           card, which is the opposite of Rust on both. */
+        if (original_value && original_operator && has_original_count) {
+            Card c;
+            if (rb_decode_card_by_index((uint32_t)cid, &c)) {
+                int score = (int)c.score;
+                rb_free_card(&c);
+                if (!rb_compare_counts(original_operator, score, original_count)) continue;
+            }
         }
         recv[nr++] = cid;
     }
@@ -922,11 +1067,17 @@ int rb_execute_modify_limit(GameState *gs, int actor, AbilityEffect *e) {
     const char *operation = sc_extra(e, "operation"); if (!operation) operation = "decrease";
     int count = e->count >= 0 ? e->count : sc_extra_int(e, "count");
     if (gs->n_prohibition < 64) {
+        /* restriction.rs:253-263 -- only the two known operations register an
+           entry. The C pushed an EMPTY prohibition string for anything else,
+           so an unknown op left a blank entry in the prohibition list. */
         char *b = gs->prohibition[gs->n_prohibition];
-        if (!strcmp(operation, "decrease")) snprintf(b, 48, "limit_decrease:%d", count);
-        else if (!strcmp(operation, "increase")) snprintf(b, 48, "limit_increase:%d", count);
-        else b[0] = 0;
-        gs->n_prohibition++;
+        if (!strcmp(operation, "decrease")) {
+            snprintf(b, 48, "limit_decrease:%d", count);
+            gs->n_prohibition++;
+        } else if (!strcmp(operation, "increase")) {
+            snprintf(b, 48, "limit_increase:%d", count);
+            gs->n_prohibition++;
+        }
     }
     (void)actor;
     return 0;
