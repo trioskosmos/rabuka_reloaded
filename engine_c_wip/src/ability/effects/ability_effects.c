@@ -410,12 +410,20 @@ int rb_translated_execute_suppress_ability_trigger(GameState *g, int actor,
     return 1;
 }
 
+/* ability_ops.rs:151-165: the all_regions flag is a REAL branch there.
+   Calling rb_effect_set_card_identity unconditionally dropped the all-regions
+   arm, so a 全領域カード同一性変更 card rewrote one region only.
+   rb_set_card_identity_effect (ability.c) is the C's action-level dispatch for
+   exactly this test; forward-declared here because include/rabuka.h is not
+   this file's. */
+void rb_set_card_identity_effect(GameState *g, int actor, AbilityEffect *e, int host_cid);
+
 int rb_translated_execute_set_card_identity_effect(GameState *g, int actor,
                                                     AbilityEffect *effect,
                                                     int host_cid)
 {
     if (!g || !effect) return 0;
-    rb_effect_set_card_identity(g, actor, effect, host_cid);
+    rb_set_card_identity_effect(g, actor, effect, host_cid);
     return 1;
 }
 
