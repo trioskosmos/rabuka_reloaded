@@ -624,6 +624,39 @@ impl OppModel {
             score_dist[0] = 1.0;
         }
 
+        // `V8_OPP_SCORE_BIAS=<k>` shifts the opponent's score distribution up by
+        // k slots.
+        //
+        // Measured over 187 committed opponent sets (V8_CAL2 joined against the
+        // arena's own verdict log): the model's expected opponent score was
+        // **1.67** against a realised **2.60** - a **-0.93 under-prediction**,
+        // with 47.1% of cases more than a point low versus 11.2% over-high.
+        //
+        // That matters far more than 0.93 usually would. The score comparison
+        // decides 51.2% of live phases (§14.2), and there **+1 wins 33/33 while
+        // -1 loses 32/32** - the deciding margin is a single point. A systematic
+        // ~1-point bias IS that margin, and erring this way means the bot
+        // believes it is ahead in precisely the comparisons it is losing.
+        //
+        // The direction is trustworthy because the distribution still carries
+        // signal - pearson r = 0.601 between predicted and realised - so this is
+        // a mis-centred prior, not the inverted-and-flat failure `pass_prob` had
+        // (§14.7). That distinction is why this one is actionable and that one
+        // was not.
+        let score_bias = std::env::var("V8_OPP_SCORE_BIAS")
+            .ok()
+            .and_then(|v| v.parse::<i32>().ok())
+            .filter(|&k| (-4..=4).contains(&k))
+            .unwrap_or(0);
+        if score_bias != 0 {
+            let mut shifted = [0.0f64; SCORE_SLOTS];
+            for (slot, w) in score_dist.iter().enumerate() {
+                let dst = (slot as i32 + score_bias).clamp(0, SCORE_SLOTS as i32 - 1) as usize;
+                shifted[dst] += *w;
+            }
+            score_dist = shifted;
+        }
+
         // Whether they pass at all: they commit a set they believe will pass,
         // so the bar is the median requirement of a set roughly worth
         // `2 * set_size` points.

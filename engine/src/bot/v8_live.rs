@@ -1225,6 +1225,30 @@ pub fn choose_live_set_v8(gs: &GameState, actions: &[Action], db: &CardDatabase)
     // engine's own verdict in the arena's per-game log. Without the turn key the
     // model's `p_pass` and the realized pass/fail cannot be lined up, which is
     // why every previous calibration read in this project had to be eyeballed.
+    // `V8_CAL2`: the opponent's SCORE assumption alongside the pass assumption.
+// `score_dist` is derived from the SAME `yield_prior` / `board_total` that
+// §14.7 measured as inverted and inert, and it decides the score comparison -
+// which §14.2 showed decides 51.2% of live phases, with +1 winning 33/33 and -1
+// losing 32/32. So it is the same class of quantity as `pass_prob` and deserves
+// the same calibration check.
+if std::env::var_os("V8_CAL2").is_some() {
+        let sd: Vec<String> = opp
+            .score_dist
+            .iter()
+            .enumerate()
+            .filter(|(_, w)| **w > 1e-9)
+            .map(|(s, w)| format!("{}:{:.3}", s, w))
+            .collect();
+        eprintln!(
+            "V8CAL2 t={} opp_set={} opp_pass={:.3} oursucc={} opsucc={} scoredist=[{}]",
+            gs.turn_number,
+            opp.set_size,
+            opp.pass_prob,
+            p.success_live_card_zone.cards.len(),
+            opp_player.success_live_card_zone.cards.len(),
+            sd.join(" ")
+        );
+    }
     if std::env::var_os("V8_CAL").is_some() {
         // The full candidate table, not just the winner: without the runners-up
         // there is no way to tell "chose the best life in hand" apart from

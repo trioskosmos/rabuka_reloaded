@@ -160,7 +160,9 @@ int rb_init_game_from_built_decks(GameState *g, const RbBuiltDeck *deck0,
                               (const uint32_t *)deck1->main_cards, deck1->main_count);
     if (result != 0) return result;
     rb_player_set_energy_deck(g, 0, deck0->energy_cards, deck0->energy_count);
+    rb_shuffle(g->p[0].energy_deck.cards, g->p[0].energy_deck.n);
     rb_player_set_energy_deck(g, 1, deck1->energy_cards, deck1->energy_count);
+    rb_shuffle(g->p[1].energy_deck.cards, g->p[1].energy_deck.n);
     rb_setup_initial_energy(g);
     return 0;
 }

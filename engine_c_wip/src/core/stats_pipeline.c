@@ -55,18 +55,39 @@ static int sp_card_need_hearts(int card_id, int out[8]) {
     return has_need;
 }
 
-static int sp_effective_need_heart(const GameState *g, int card_id, int out[8]) {
-    if (!sp_card_need_hearts(card_id, out)) return 0;
-    if (!g || card_id < 0 || card_id >= RB_MAX_CARD_IDS) return 1;
+/* The Q115/Q127 layering, isolated: per-colour SET first, then additive
+   stacking on top. Rust has this inline inside `effective_need_heart`
+   (stats_pipeline.rs:221-251) and `need_satisfied` reaches it by CALLING
+   `effective_need_heart` rather than repeating the two loops
+   (stats_pipeline.rs:264). This helper is that single definition; both C
+   entry points below go through it so the two cannot drift apart the way the
+   hand-rolled copies did. `mods` == NULL / card out of range is Rust's
+   `need_heart_modifiers.get(&card_id)` returning None. */
+static void sp_apply_need_mods(const RbMods *mods, int card_id, int out[8]) {
+    if (!mods || card_id < 0 || card_id >= RB_MAX_CARD_IDS) return;
 
     for (int color = 0; color < 8; color++) {
-        RbModifierEntry entry = g->mods.need_heart[card_id][color];
-        if (entry.set != 0) out[color] = (uint8_t)entry.set;
+        RbModifierEntry entry = mods->need_heart[card_id][color];
+        if (entry.set != 0) out[color] = rb_saturate_u8(entry.set);
     }
     for (int color = 0; color < 8; color++) {
-        RbModifierEntry entry = g->mods.need_heart[card_id][color];
+        RbModifierEntry entry = mods->need_heart[card_id][color];
         if (entry.add != 0) out[color] = rb_saturate_u8(out[color] + entry.add);
     }
+}
+
+static int sp_effective_need_heart(const GameState *g, int card_id, int out[8]) {
+    if (!sp_card_need_hearts(card_id, out)) return 0;
+    if (!g) return 1;
+    /* Rust: `if base.hearts.is_empty() { return Some(base.clone()); }`
+       (stats_pipeline.rs:210-212) — an EMPTY printed need is returned
+       untouched and the per-colour modifiers are never applied. Without this
+       arm a card whose need decodes to all-zero buckets but still carries
+       `num_need != 0` would be handed to need_heart_modifiers and come back
+       demanding hearts Rust never asks for. */
+    if (!sp_any_hearts(out)) return 1;
+
+    sp_apply_need_mods(&g->mods, card_id, out);
     return 1;
 }
 
@@ -74,9 +95,17 @@ void rb_member_original_hearts(const RbMods *mods, int card_id, int out[8]) {
     memset(out, 0, 8 * sizeof(int));
     if (card_id < 0 || card_id >= RB_MAX_CARD_IDS) return;
 
+    /* Rust keys both maps by HeartColor and only narrows to a bucket when a
+       CONSUMER asks for one (stats_pipeline.rs:30-34 set-layer, :51-55
+       multiplier, :158-162 member_heart_detail). The C port has to pick the
+       bucket here, so it has to pick the one HeartColor::index() would:
+       heart00..06 -> 0..6, "all" -> 7, and b_all / draw / score -> 0
+       (card.rs heart_color_table!). The old `< 8` guard DROPPED a set-to-N of
+       any out-of-band colour and fell through to the printed base hearts
+       instead, which is not what Rust does. */
     int override_color = mods ? mods->heart_color_override[card_id] : -1;
-    if (override_color >= 0 && override_color < 8) {
-        out[override_color] += mods->heart_override_count[card_id];
+    if (override_color >= 0) {
+        out[sp_heart_index((uint8_t)override_color)] += mods->heart_override_count[card_id];
         return;
     }
 
@@ -86,7 +115,7 @@ void rb_member_original_hearts(const RbMods *mods, int card_id, int out[8]) {
     sp_card_base_hearts(source_id, out);
 
     if (mods && mods->heart_multiplier[card_id] >= 0) {
-        int color = mods->heart_multiplier[card_id];
+        int color = sp_heart_index((uint8_t)mods->heart_multiplier[card_id]);
         int total = 0;
         for (int i = 0; i < 8; i++) total += out[i];
         memset(out, 0, 8 * sizeof(int));
@@ -166,21 +195,12 @@ int rb_need_satisfied(const int base_need[8], const int provided[8],
     int zeros[8] = {0};
     if (!provided) provided = zeros;
     for (int i = 0; i < 8; i++) effective[i] = base_need[i];
+    /* Rust: `effective_need_heart` returns the base UNTOUCHED when it is
+       empty, then `need_satisfied` sees an empty `eff` and answers true
+       (stats_pipeline.rs:210-212 + :266). That is the arm below. */
     if (!sp_any_hearts(effective)) return 1;
-    if (!mods || card_id < 0 || card_id >= RB_MAX_CARD_IDS) {
-        return rb_check_heart_requirement(effective, provided);
-    }
 
-    for (int color = 0; color < 8; color++) {
-        RbModifierEntry entry = mods->need_heart[card_id][color];
-        if (entry.set != 0) effective[color] = (uint8_t)entry.set;
-    }
-    for (int color = 0; color < 8; color++) {
-        RbModifierEntry entry = mods->need_heart[card_id][color];
-        if (entry.add != 0) {
-            effective[color] = rb_saturate_u8(effective[color] + entry.add);
-        }
-    }
+    sp_apply_need_mods(mods, card_id, effective);
     if (!sp_any_hearts(effective)) return 1;
 
     int result = rb_check_heart_requirement(effective, provided);

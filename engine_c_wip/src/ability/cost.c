@@ -617,7 +617,24 @@ static int validate_cost(const GameState *g, int actor, const AbilityEffect *cos
 static int pay_cost_move_cards(GameState *g, int actor, const AbilityEffect *cost) {
     const char *source = cost->source ? cost->source : "";
     int is_any_number = eff_bool(cost, "any_number", 0);
-    int count = cost->count > 0 ? cost->count : 1;
+    /* handlers.rs:786 `let count = cost.count.unwrap_or(1) as usize;`
+       `unwrap_or(1)` supplies the default ONLY when the field is ABSENT, so an
+       explicit Some(0) survives as 0. In the C the absent sentinel is -1
+       (include/rabuka.h: "int count;  ... -1 = none"; vm.c:440 initialises
+       every decoded effect to -1 and vm.c:720 overwrites it only when the wire
+       actually carries the field), and rb_effect_count_or is the already-
+       written twin of `unwrap_or`: `e->count >= 0 ? e->count : default`.
+       The `> 0` test collapsed "absent" together with a legitimate 0.
+
+       That 0 is real, not a hole: resolver.rs:1476-1477 / resolver.c:637-642
+       CLAMP a per-unit cost reduction to zero (`saturating_sub`, then
+       `cost.count = Some(next)`), and 「成功ライブ1枚につきコスト1減る」
+       (PL!SP-pb1-007) with 3 success lives lands on exactly 3-3=0. Rust then
+       asks for ZERO cards at handlers.rs:521/594-599
+       (`effective_count = if is_any_number { 0 } else { count }`), and the
+       prompt the player sees carries count 0. The `> 0` form turned that
+       clamped zero back into 1, so a free cost asked for a card. */
+    int count = rb_effect_count_or(cost, 1);
     const char *card_type = eff_extra(cost, "card_type");
     int optional = cost->is_optional;
     const char *target = cost->target ? cost->target : "self";
@@ -1375,6 +1392,27 @@ void rb_cost_clear_deferred(GameState *g) {
     g->queue.n_pending_deferred_costs = 0;
 }
 
+/* ── cost_entry_route_is_optional ──
+   The `is_effect_optional` of handlers.rs:1619
+   (`gs.entry_choice_card_no() == Some(ChoiceRoute::OptionalCost)`), read off
+   the current ENTRY's `choice_card_no` — which is what Rust reads
+   (core/game_state/abilities.rs:2365-2369: `current_entry().choice_card_no`).
+
+   NOT `rb_entry_choice_card_no` (game_state_abilities.c:3154): that one reads
+   `g->queue.pending.route` behind a `has_pending` test, a different carrier,
+   and rb_handle_optional_cost_payment clears has_pending on the first line of
+   both of its arms — so through that accessor the test is constant-false here
+   and the arm it gates could never run. The entry field is the field Rust
+   reads, and it is exactly what emit_pay_skip_gate (cost.c:353) and the
+   any-number energy prompt (cost.c:1154) stamp. Entries are zero-initialised
+   (ability_queue.c:219/251) and RB_ROUTE_NONE is 0, so an entry that never
+   opened a pay/skip gate reports NONE and cannot match. */
+static int cost_entry_route_is_optional(const GameState *g) {
+    if (!g) return 0;
+    if (g->queue.cur < 0 || g->queue.cur >= g->queue.n_entries) return 0;
+    return g->queue.entries[g->queue.cur].choice_card_no == RB_ROUTE_OPTIONAL_COST;
+}
+
 /* ── Public: rb_handle_optional_cost_payment ── */
 int rb_handle_optional_cost_payment(GameState *g, int actor, const AbilityEffect *cost, int pay) {
     g->n_last_cost_waited_members = 0;
@@ -1438,6 +1476,29 @@ int rb_handle_optional_cost_payment(GameState *g, int actor, const AbilityEffect
             return cost_arm_resume(g);
         }
     }
+
+    /* handlers.rs:1479-1481 — the parked tail SHORT-CIRCUITS the whole
+       entry-cost block. `has_pending` is read at :1440, before the entry is
+       stamped at :1462-1471, and the arm at :1479 returns
+       `self.resume_pending_actions(gs)` without ever reaching
+       `if let Some(cost) = gs.entry_cost().cloned()` at :1482. So when the
+       entry already owns a parked batch, answering "pay" does NOT tap the
+       gate's energy, does NOT re-enter pay_cost_move_cards for the gated
+       stage/energy source, and does NOT walk the sequential sub-costs — the
+       batch is the only thing that runs.
+
+       The C had no such test and fell straight through into all three, so a
+       pay answer on a queued entry re-charged the cost the gate had already
+       been opened for and re-entered the move it was about to accept.
+
+       `cost_arm_resume` is the C's spelling of the returned resume: per
+       cost_arm_resume above it does NOT execute the tail, because on this
+       call path the C's single execution point, rb_resolver_continue_siblings
+       (choice.c:4361), has still not run when this function returns. The batch
+       stays parked for it, exactly as it would for the two arms at the bottom
+       of this function. Re-adding an execution here is the double-count that
+       two previous agents measured as a regression. */
+    if (rb_queue_has_pending_actions(g)) return cost_arm_resume(g);
 
     /* Gated effect move: shared-gate source zones (stage→waitroom,
        energy→energy_deck) reached via MoveCards or first step of Sequential */
@@ -1526,6 +1587,27 @@ int rb_handle_optional_cost_payment(GameState *g, int actor, const AbilityEffect
            the C's single consumer of it and runs on the way back out (choice.c:4927).
            See cost_arm_resume. */
         cost_arm_resume(g);
+    } else if (cost_entry_route_is_optional(g)) {
+        /* handlers.rs:1659-1662 — the THIRD arm of that if/else-if chain, and
+           the C had no counterpart for it at all. `is_effect_optional` is
+           read at :1619, BEFORE the chain:
+           `let is_effect_optional = gs.entry_choice_card_no() ==
+                                   Some(ChoiceRoute::OptionalCost);`
+           — i.e. the pay/skip gate this answer closes, which emit_pay_skip_gate
+           stamps onto the entry as RB_ROUTE_OPTIONAL_COST (cost.c:353), as
+           does the any-number energy prompt at cost.c:1154.
+
+           The arm is reachable exactly when the entry has NO cost of its own
+           (so the first arm cannot fire), the effect has not started, and no
+           batch is parked: the pay/skip gate was opened by the EFFECT, not by
+           a cost, and the C's previous shape dropped the answer on the floor.
+           Rust runs the effect through
+           execute_place_energy_under_member_non_optional — the same
+           non-optional call the two arms above use, which is what keeps an
+           optional place-energy effect from re-opening this very gate. */
+        const AbilityEffect *entry_eff = rb_entry_effect(g);
+        if (entry_eff)
+            execute_place_energy_under_member_non_optional(g, actor, entry_eff);
     }
     return 1;
 }

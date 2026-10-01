@@ -1,4 +1,4 @@
-﻿#include "rabuka.h"
+#include "rabuka.h"
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
@@ -37,14 +37,12 @@ size_t rb_lcg_range(RbLcg *rng, size_t n) {
 
 /* ───────────────────────────── bag helpers ───────────────────────────── */
 static void bag_push(RbBag *b, int c) { if (b->n < RB_MAX_ZONE) b->cards[b->n++] = c; }
-static int  bag_pop(RbBag *b) { return b->n > 0 ? b->cards[--b->n] : -1; }
 static int  bag_remove_at(RbBag *b, int i) {
     if (i < 0 || i >= b->n) return -1;
     int c = b->cards[i];
     for (int k = i; k < b->n - 1; k++) b->cards[k] = b->cards[k + 1];
     b->n--; return c;
 }
-static int  bag_take_first(RbBag *b) { return bag_pop(b); }
 
 void rb_shuffle(int *a, int n) {
     for (int i = n - 1; i > 0; i--) {
@@ -53,11 +51,40 @@ void rb_shuffle(int *a, int n) {
     }
 }
 
-/* map a wire zone name to an enum; returns 1 on success */
+/* map a wire zone name to an enum; returns 1 on success.
+ *
+ * RbZone (include/rabuka.h) has NO top/bottom distinction on the deck and NO
+ * energy-deck value at all, so this function CANNOT name two spellings the
+ * corpus actually uses:
+ *
+ *   deck_bottom   util.rs:2433-2436 `Zone::DeckBottom` -> main_deck.cards.push
+ *   energy_deck   util.rs:2441-2444 `Zone::EnergyDeck`  -> energy_deck.cards.push
+ *
+ * Both used to be folded onto a representable value — deck_bottom onto
+ * RB_ZONE_DECK, which silently claims "top" for a bottom insert — and that is
+ * what draw.c:66-77's comment is about. They now return 0 (unresolvable by
+ * this enum) rather than lie, and the two callers that genuinely must tell
+ * them apart own a dedicated string-keyed arm each, which is where Rust's own
+ * dispatch point lives:
+ *
+ *   util.c  rb_place_card_in_zone  (util.rs:2394)  — dedicated deck / deck_top /
+ *                                            deck_bottom / energy_deck arms
+ *   draw.c  draw_place_in_zone_g   (util.rs:2330)  — same, before this is called
+ *
+ * Rust draws the same distinction from its richer Zone enum (util.rs:2426-2444
+ * arms on Deck | DeckTop | DeckBottom | Energy | EnergyDeck separately), so this
+ * is a faithful restriction of the same rule set to a narrower enum, not a
+ * behaviour change. Rust's remove_card_from_zone agrees that these spellings are
+ * NOT the main deck (util.c's copy of that rule is quoted in place above).
+ *
+ * energy_deck is deliberately NOT mapped to RB_ZONE_ENERGY: the energy deck and
+ * the energy zone are different bags, and mapping one onto the other would turn
+ * a correct "unresolvable" into a wrong placement. Both corpus spellings
+ * therefore reach their real handler before this function is consulted. */
 int rb_zone_of_str(const char *s, RbZone *out) {
     if (!s) return 0;
     if (!strcmp(s, "hand")) *out = RB_ZONE_HAND;
-    else if (!strcmp(s, "deck") || !strcmp(s, "deck_top") || !strcmp(s, "deck_bottom")) *out = RB_ZONE_DECK;
+    else if (!strcmp(s, "deck") || !strcmp(s, "deck_top")) *out = RB_ZONE_DECK;
     else if (!strcmp(s, "stage") || !strcmp(s, "under_member") ||
              !strcmp(s, "center") || !strcmp(s, "left") || !strcmp(s, "right") ||
              !strcmp(s, "same_area") || !strcmp(s, "empty_area")) *out = RB_ZONE_STAGE;
@@ -69,20 +96,6 @@ int rb_zone_of_str(const char *s, RbZone *out) {
     else if (!strcmp(s, "resolution") || !strcmp(s, "resolution_zone")) *out = RB_ZONE_RESOLUTION;
     else return 0;
     return 1;
-}
-
-/* Resolve a player's bag for a zone (stage handled specially by caller). */
-static RbBag *zone_bag(RbPlayer *pl, RbZone z) {
-    switch (z) {
-        case RB_ZONE_HAND: return &pl->hand;
-        case RB_ZONE_DECK: return &pl->deck;
-        case RB_ZONE_DISCARD: return &pl->discard;
-        case RB_ZONE_ENERGY: return &pl->energy;
-        case RB_ZONE_LIVE: return &pl->live;
-        case RB_ZONE_SUCCESS: return &pl->success;
-        case RB_ZONE_RESOLUTION: return &pl->discard; /* resolution cards return here */
-        default: return NULL;
-    }
 }
 
 /* ───────────────────────────── draw helpers ───────────────────────────── */
@@ -107,13 +120,13 @@ int rb_draw_energy(GameState *g, int pl) {
 /* Faithful classification mirrors Card::is_live/is_energy (core/card.c): the low
    2 bits of type_flags encode 0=Member, 1=Live, 2=Energy. The old heuristic
    (n_hearts==0 && cost==0 && blade==0) mis-classified real live/energy cards as
-   members and had no energy branch at all. */
-static int card_is_live(Card *c) {
-    return (c->type_flags & 0x03) == 1;
-}
-static int card_is_energy(Card *c) {
-    return (c->type_flags & 0x03) == 2;
-}
+   members and had no energy branch at all.
+
+   Only the MEMBER test survives here. card_is_live / card_is_energy were read
+   solely by the deleted live_phase / main_phase pair, and their exported twins
+   rb_card_is_live / rb_card_is_energy (src/core/card.c:38/42) apply the same
+   type_flags encoding to a card_id for every other caller in the tree, so there
+   is one implementation of each test outside this file. */
 static int card_is_member(Card *c) {
     return (c->type_flags & 0x03) == 0;
 }
@@ -152,65 +165,11 @@ int heart_color_of(AbilityEffect *e, int dflt) {
 int card_matches_card_type_filter(int card_idx, const char *filter){
     return rb_card_matches_type(card_idx, filter);
 }
-static void do_move_filtered(GameState *g, int actor, RbZone src, RbZone dst, int count, int to_top, const char *card_type_filter);
-static void do_move(GameState *g, int actor, RbZone src, RbZone dst, int count, int to_top) {
-    do_move_filtered(g, actor, src, dst, count, to_top, NULL);
-}
-static void record_movement(GameState *g, int cid){
-    if(g->n_recently_moved < RB_MAX_RECENTLY_MOVED) g->recently_moved[g->n_recently_moved++]=cid;
-    else { for(int i=1;i<RB_MAX_RECENTLY_MOVED;i++) g->recently_moved[i-1]=g->recently_moved[i]; g->recently_moved[RB_MAX_RECENTLY_MOVED-1]=cid; }
-}
-static void do_move_filtered(GameState *g, int actor, RbZone src, RbZone dst, int count, int to_top, const char *card_type_filter) {
-    RbPlayer *A = &g->p[actor];
-    if (src == RB_ZONE_STAGE) {
-        int moved = 0;
-        int limit = (count<0)? RB_STAGE_SIZE : count;
-        for (int pos = 0; pos < RB_STAGE_SIZE && moved < limit; pos++) {
-            if (A->stage[pos] >= 0 && card_matches_card_type_filter(A->stage[pos], card_type_filter)) {
-                int c = A->stage[pos]; A->stage[pos] = -1; A->stage_wait[pos] = 0;
-                record_movement(g,c);
-                if (dst == RB_ZONE_STAGE) { /* relocate on stage: first empty */
-                    for (int q = 0; q < RB_STAGE_SIZE; q++)
-                        if (A->stage[q] < 0) { A->stage[q] = c; break; }
-                } else {
-                    RbBag *db = zone_bag(A, dst);
-                    if (db) bag_push(db, c);
-                }
-                moved++;
-            }
-        }
-        return;
-    }
-    RbBag *sb = zone_bag(A, src);
-    if (!sb) return;
-    int n = (count < 0) ? sb->n : count;
-    /* Collect matching indices first to avoid skipping */
-    int moved=0;
-    for (int i = sb->n-1; i >=0 && moved < n; i--) {
-        int cid = sb->cards[i];
-        if (!card_matches_card_type_filter(cid, card_type_filter)) continue;
-        int c = bag_remove_at(sb, i);
-        record_movement(g,c);
-        if (dst == RB_ZONE_STAGE) {
-            for (int q = 0; q < RB_STAGE_SIZE; q++)
-                if (A->stage[q] < 0) { A->stage[q] = c; break; }
-        } else {
-            RbBag *db = zone_bag(A, dst);
-            if (!db) { bag_push(sb, c); break; }
-            if (to_top && dst == RB_ZONE_DECK) {
-                if (db->n < RB_MAX_ZONE) {
-                    for (int k = db->n; k > 0; k--) db->cards[k] = db->cards[k-1];
-                    db->cards[0] = c; db->n++;
-                }
-            } else bag_push(db, c);
-        }
-        moved++;
-    }
-}
 
 /* ───────────────────────────── effect execution ───────────────────────────── */
-static void handle_action(GameState *g, int actor, AbilityEffect *e, int host_cid);
-AbilityEffect *rb_effect_deep_clone(const AbilityEffect *src);
+/* rb_emit_choice is declared in include/rabuka.h; the local prototype here only
+   documents that this file is a producer. rb_effect_deep_clone's local
+   prototype went with handle_action, which was its only user here. */
 void rb_emit_choice(GameState *g, int actor, RbChoiceKind kind,
                     const char *zone, const char *card_type,
                     int count, int allow_skip, const char *target);
@@ -312,10 +271,34 @@ void rb_execute_effect_ex(GameState *g, int actor, AbilityEffect *e, int host_ci
     if (!e->action) { s_exec_depth--; return; }
     if (e->action && !strcmp(e->action, "draw_until_count"))
         fprintf(stderr, "[EXEC_EFFECT_DISPATCH] has=%d action=%s\n", rb_executor_has_executor(e->action), e->action);
+    /* THE single effect-dispatch seam. executor_table (src/ability/effects/
+       executor.c:16) is the C twin of Rust's exhaustive `match action` in
+       engine/src/ability/effects/dispatch.rs, and rb_executor_execute is that
+       match. This file used to carry a SECOND, parallel if/else-if chain —
+       handle_action — that routed the same action strings to the same handler
+       functions (rb_effect_draw_card, rb_effect_move_cards,
+       rb_effect_change_state, rb_execute_misc_effect, rb_compound_*, ...),
+       38 of whose 83 action literals name a string the corpus never
+       produces. It is gone; the table below is the only routing.
+
+       Why that is not a behaviour change, measured two ways:
+         * STATIC. A census of every `action` the decoder can produce from
+           cards/abilities.json — 47 distinct effect actions, plus the 7 cost
+           `type` values — finds every one of them present in executor_table.
+           Zero fall through.
+         * DYNAMIC. Across the twelve gating suites the ONLY
+           [EXECUTOR_MISS] ever printed is action=totally_unknown_action, a
+           synthetic string built by tests/test_parity_executor_dispatch.c:1082
+           and handed straight to rb_executor_execute, never through this
+           function. No suite, no corpus card, and no src/ caller reached the
+           else arm.
+
+       The remaining arm is Rust's own outcome for a string no ActionType
+       decoded to: "no state change" (dispatch.rs's match is exhaustive, so this
+       is unreachable there; executor.c's final else already reproduces the
+       outcome for a direct rb_executor_execute call). */
     if (rb_executor_has_executor(e->action))
         rb_executor_execute(g, actor, e, host_cid);
-    else
-        handle_action(g, actor, e, host_cid);
     s_exec_depth--;
 }
 
@@ -328,459 +311,6 @@ void rb_execute_effect(GameState *g, int actor, AbilityEffect *e) {
        ability boundaries until consumed. */
     g->n_recently_moved = 0;
     rb_execute_effect_ex(g, actor, e, -1);
-}
-
-static int target_player(AbilityEffect *e, int actor) {
-    if (e->target) {
-        if (!strcmp(e->target, "opponent")) return actor ^ 1;
-        if (!strcmp(e->target, "both") || !strcmp(e->target, "either")) return actor; /* self pass */
-    }
-    return actor;
-}
-
-static void handle_action(GameState *g, int actor, AbilityEffect *e, int host_cid) {
-    const char *act = e->action;
-    int cnt = rb_effect_count(g, actor, host_cid, e, 0);
-    int who = target_player(e, actor);
-    RbPlayer *W = &g->p[who];
-    RbPlayer *O = &g->p[actor ^ 1];
-
-    if (!strcmp(act, "draw") || !strcmp(act, "draw_card") ||
-        !strcmp(act, "draw_until_count")) {
-        /* Faithful draw — mirror draw.rs:execute_draw_wrapper/execute_draw. */
-        rb_effect_draw_card(g, actor, e, host_cid);
-    } else if (!strcmp(act, "discard_card")) {
-        RbZone src = RB_ZONE_HAND;
-        if (e->source) rb_zone_of_str(e->source, &src);
-        do_move(g, who, src, RB_ZONE_DISCARD, cnt, 0);
-    } else if (!strcmp(act, "discard_until_count")) {
-        while (W->hand.n > cnt) do_move(g, who, RB_ZONE_HAND, RB_ZONE_DISCARD, 1, 0);
-    } else if (!strcmp(act, "shuffle")) {
-        rb_shuffle(W->deck.cards, W->deck.n);
-    } else if (!strcmp(act, "gain_resource") || !strcmp(act, "place_energy") ||
-               !strcmp(act, "place_energy_under_member")) {
-        /* gain_resource: mirror misc.rs:execute_gain_resource — the resource
-           (blade/heart/score/energy) is granted to the targets chosen by
-           target / card_type / group_names / self_target. Duration::LiveEnd
-           registers a temporary effect that rb_check_expired_effects reverts
-           at live end (same mechanism as rb_fire_debut). place_energy* carries
-           no resource field and falls through to the energy path. */
-        const char *res = NULL; int dur = RB_TEMP_PERM;
-        for (int i = 0; i < e->n_extra; i++) {
-            if (e->extra_k[i] && !strcmp(e->extra_k[i], "resource")) res = e->extra_v[i];
-            if (e->extra_k[i] && !strcmp(e->extra_k[i], "duration") && e->extra_v[i]) {
-                if (!strcmp(e->extra_v[i], "live_end") || !strcmp(e->extra_v[i], "during_live"))
-                    dur = RB_TEMP_LIVE_END;
-                else if (!strcmp(e->extra_v[i], "until_end_of_turn") || !strcmp(e->extra_v[i], "first_turn"))
-                    dur = RB_TEMP_TURN_END;
-            }
-        }
-        int amt = cnt < 0 ? -cnt : cnt;
-        int sign = cnt < 0 ? -1 : 1;
-        int self_target = 0; const char *gn = NULL; int target_count = -1;
-        for (int i = 0; i < e->n_extra; i++) {
-            if (e->extra_k[i] && !strcmp(e->extra_k[i], "self_target") &&
-                e->extra_v[i] && !strcmp(e->extra_v[i], "true")) self_target = 1;
-            if (e->extra_k[i] && !strcmp(e->extra_k[i], "group_names")) gn = e->extra_v[i];
-            if (e->extra_k[i] && !strcmp(e->extra_k[i], "target_count") && e->extra_v[i])
-                target_count = atoi(e->extra_v[i]);
-        }
-        if (!res || !strcmp(res, "energy")) {
-            /* target=="both" grants energy to BOTH players (mirrors gain_resource). */
-            int eng_players[2]; int nep = 0;
-            if (e->target && !strcmp(e->target, "both")) { eng_players[nep++] = actor; eng_players[nep++] = actor ^ 1; }
-            else eng_players[nep++] = who;
-            for (int ep = 0; ep < nep; ep++) {
-                RbPlayer *EP = &g->p[eng_players[ep]];
-                EP->energy_active += cnt;
-                if (EP->energy_active > RB_MAX_ENERGY_CARDS) EP->energy_active = RB_MAX_ENERGY_CARDS;
-            }
-        } else {
-            int recips[RB_STAGE_SIZE * 2 + 1]; int nr = 0;
-            const char *position = NULL;
-            for (int i = 0; i < e->n_extra; i++) {
-                if (e->extra_k[i] && !strcmp(e->extra_k[i], "position")) {
-                    position = e->extra_v[i];
-                    break;
-                }
-            }
-            int position_idx = position ? rb_stage_position_index(position) : -1;
-            if (g->n_selected_cards > 0) {
-                for (int i = 0; i < g->n_selected_cards && nr < (int)(sizeof(recips)/sizeof(recips[0])); i++)
-                    recips[nr++] = g->selected_cards[i];
-            } else if (self_target && !gn && target_count < 0) {
-                if (host_cid >= 0) recips[nr++] = host_cid;
-            } else {
-                int tgt_players[2]; int ntp = 0;
-                if (e->target && !strcmp(e->target, "both")) { tgt_players[ntp++] = actor; tgt_players[ntp++] = actor ^ 1; }
-                else tgt_players[ntp++] = target_player(e, actor);
-                for (int tp = 0; tp < ntp; tp++) {
-                    RbPlayer *TP = &g->p[tgt_players[tp]];
-                    for (int q = 0; q < RB_STAGE_SIZE; q++) {
-                        int cid = TP->stage[q];
-                        if (cid == RB_EMPTY_SLOT) continue;
-                        if (position_idx >= 0 && q != position_idx) continue;
-                        if (gn && !rb_card_matches_group_str(cid, gn)) continue;
-                        if (e->card_type_field[0] && !rb_card_matches_type(cid, e->card_type_field)) continue;
-                        if (nr < (int)(sizeof(recips)/sizeof(recips[0]))) recips[nr++] = cid;
-                    }
-                }
-            }
-            fprintf(stderr, "[GR_TARGET] resource=%s selected=%d candidates=%d target_count=%d host=%d\n",
-                    res ? res : "-", g->n_selected_cards, nr, target_count, host_cid);
-            if (g->n_selected_cards == 0 && target_count > 0 && nr > target_count) {
-                if (g->queue.target_selection_eff) rb_effect_free(g->queue.target_selection_eff);
-                g->queue.target_selection_eff = rb_effect_deep_clone(e);
-                rb_emit_choice(g, actor, RB_CHOICE_SELECT_CARD, "stage",
-                               e->card_type_field[0] ? e->card_type_field : "member_card",
-                               target_count, 0, "gain_resource_targets");
-                if (gn) strncpy(g->queue.pending.filter_group, gn, sizeof(g->queue.pending.filter_group) - 1);
-                strncpy(g->queue.pending.target_player_id, e->target ? e->target : "self",
-                        sizeof(g->queue.pending.target_player_id) - 1);
-                rb_choice_set_route(&g->queue.pending, RB_ROUTE_SELECT_CARDS);
-                g->queue.resume_host = host_cid;
-                g->queue.resume_eff = e;
-                return;
-            }
-            if (g->n_selected_cards == 0 && target_count > 0 && nr > target_count)
-                nr = target_count;
-            /* Filtered grants (group/card_type) must NOT fall back to the host
-                when no member matches — Rust grants to the matching set only, so
-                a "boost other μ's members" ability yields 0 when none are present.
-                Only the unfiltered self-target case falls back to the host. */
-            if (nr == 0 && host_cid >= 0 && !gn) recips[nr++] = host_cid;
-            for (int r = 0; r < nr; r++) {
-                int cid = recips[r];
-                if (!strcmp(res, "blade")) {
-                    rb_mods_add_blade(&g->mods, cid, amt * sign);
-                    if (dur != RB_TEMP_PERM) {
-                        RbTempEffect te; memset(&te, 0, sizeof(te));
-                        te.card_id = cid; te.dur = dur; te.blade = (int16_t)(amt * sign);
-                        if (g->n_temp_effects < RB_MAX_TEMP_EFFECTS) g->temp_effects[g->n_temp_effects++] = te;
-                    }
-                } else if (!strcmp(res, "heart")) {
-                    int col = (g->queue.selected_heart_color >= 0)
-                                  ? g->queue.selected_heart_color
-                                  : RB_HEART_PINK;
-                    /* honour an explicit heart_color extra (e.g. "heart06") — mirrors
-                        the per-color heart grants in misc.rs:execute_gain_resource. */
-                    for (int i = 0; i < e->n_extra; i++) {
-                        if (e->extra_k[i] && !strcmp(e->extra_k[i], "heart_color") && e->extra_v[i]) {
-                            int pc = rb_parse_heart_color(e->extra_v[i]);
-                            if (pc >= 0) col = pc;
-                            break;
-                        }
-                    }
-                    g->queue.selected_heart_color = -1; /* consumed by this grant */
-                    rb_mods_add_heart(&g->mods, cid, col, amt * sign);
-                    fprintf(stderr, "[GR_HEART_APPLY] cid=%d color=%d amount=%d modifier=%d\n",
-                            cid, col, amt * sign, rb_mods_get_heart(&g->mods, cid, col));
-                    if (dur != RB_TEMP_PERM) {
-                        RbTempEffect te; memset(&te, 0, sizeof(te));
-                        te.card_id = cid; te.dur = dur; te.heart[col] = (int16_t)(amt * sign);
-                        if (g->n_temp_effects < RB_MAX_TEMP_EFFECTS) g->temp_effects[g->n_temp_effects++] = te;
-                    }
-                } else if (!strcmp(res, "score")) {
-                    rb_mods_add_score(&g->mods, cid, amt * sign);
-                    if (dur != RB_TEMP_PERM) {
-                        RbTempEffect te; memset(&te, 0, sizeof(te));
-                        te.card_id = cid; te.dur = dur; te.score = (int16_t)(amt * sign);
-                        if (g->n_temp_effects < RB_MAX_TEMP_EFFECTS) g->temp_effects[g->n_temp_effects++] = te;
-                    }
-                }
-            }
-            /* Temporary-duration grants are tracked via temp effects and must
-               survive rb_recalc_constants (which owns the constant_* tracking);
-               only recalc for permanent grants. */
-            if (dur == RB_TEMP_PERM) rb_recalc_constants(g);
-            for (int r = 0; r < nr; r++)
-                fprintf(stderr, "[GR_FINAL] cid=%d orange=%d temp_count=%d\n",
-                        recips[r], rb_mods_get_heart(&g->mods, recips[r], RB_HEART_ORANGE),
-                        g->n_temp_effects);
-        }
-    } else if (!strcmp(act, "pay_energy") || !strcmp(act, "pay_cost") ||
-               !strcmp(act, "activation_cost")) {
-        /* Optional pay-or-skip gate (mirrors ability/cost.rs: has_skip_prompt / handle_optional_cost_payment).
-           If the effect is marked optional and active energy insufficient, emit a pay/skip choice
-           instead of auto-paying. Host auto-drains via skip. */
-        if (e->is_optional) {
-            /* Optional cost: emit a pay/skip gate (cost.rs handle_optional_cost_payment).
-               Stash the cost effect so resume can pay (selected) or skip (declined). */
-            rb_emit_choice(g, actor, RB_CHOICE_SELECT_TARGET, NULL, NULL, cnt, 1, "pay_optional_cost:skip");
-            g->queue.deferred = (AbilityEffect *)e;
-            return;
-        }
-        if (W->energy_active < cnt) {
-            /* insufficient without optional flag → treat as skip for portability (don't go negative) */
-            return;
-        }
-        W->energy_active -= cnt;
-        if (W->energy_active < 0) W->energy_active = 0;
-        rb_recalc_constants(g);
-    } else if (!strcmp(act, "modify_score") || !strcmp(act, "gain_score")) {
-        if (e->target && !strcmp(e->target, "live_total")) {
-            rb_execute_modify_score(g, actor, e);
-        } else if (e->target && !strcmp(e->target, "both")) {
-            g->p[actor].score += cnt;
-            g->p[actor ^ 1].score += cnt;
-        } else if (host_cid >= 0) {
-            rb_execute_modify_score(g, actor, e);
-        } else {
-            W->score += cnt;
-        }
-    } else if (!strcmp(act, "gain_heart") ||
-                !strcmp(act, "place_heart")) {
-        int col = (g->queue.selected_heart_color >= 0)
-                      ? g->queue.selected_heart_color
-                      : heart_color_of(e, RB_HEART_PINK);
-        g->queue.selected_heart_color = -1;
-        if (host_cid >= 0) rb_mods_add_heart(&g->mods, host_cid, col, cnt);
-        else W->hearts[col] += cnt;
-    } else if (!strcmp(act, "specify_heart_color")) {
-        rb_effect_specify_heart_color(g, actor, e, host_cid);
-    } else if (!strcmp(act, "lose_heart") || !strcmp(act, "damage")) {
-        int col = heart_color_of(e, RB_HEART_PINK);
-        O->hearts[col] -= cnt;
-        if (O->hearts[col] < 0) O->hearts[col] = 0;
-    } else if (!strcmp(act, "heal")) {
-        int col = heart_color_of(e, RB_HEART_PINK);
-        if (host_cid >= 0) rb_mods_add_heart(&g->mods, host_cid, col, cnt);
-        else O->hearts[col] += cnt;
-    } else if (!strcmp(act, "gain_blade") || !strcmp(act, "add_blade") ||
-               !strcmp(act, "gain_blade_heart") || !strcmp(act, "set_blade_count") ||
-               !strcmp(act, "modify_blade")) {
-        /* Blade is a per-card property; mirror misc.rs grant_blade which targets
-           the resolving card (activating_card). Fall back to the actor's first
-           stage member when no host is threaded. */
-        int cid = host_cid >= 0 ? host_cid : -1;
-        if (cid < 0) for (int q = 0; q < RB_STAGE_SIZE; q++) if (W->stage[q] != RB_EMPTY_SLOT) { cid = W->stage[q]; break; }
-        if (cid >= 0) rb_mods_add_blade(&g->mods, cid, cnt);
-        rb_recalc_constants(g);
-    } else if (!strcmp(act, "return_to_hand") || !strcmp(act, "bounce") ||
-               !strcmp(act, "back_to_hand")) {
-        rb_effect_move_cards(g, actor, e); /* target re-resolved inside */
-        (void)O;
-    } else if (!strcmp(act, "deck_bottom") || !strcmp(act, "put_on_bottom")) {
-        do_move(g, who, RB_ZONE_HAND, RB_ZONE_DECK, cnt, 0);
-    } else if (!strcmp(act, "move_cards")) {
-        rb_effect_move_cards(g, actor, e);
-    } else if (!strcmp(act, "change_state")) {
-         rb_effect_change_state(g, actor, e, host_cid);
-    } else if (!strcmp(act, "look_at")) {
-        rb_effect_look_at(g, actor, e);
-    } else if (!strcmp(act, "reveal")) {
-        rb_effect_reveal(g, actor, e);
-    } else if (!strcmp(act, "reveal_per_group")) {
-        rb_effect_reveal_per_group(g, actor, e);
-    } else if (!strcmp(act, "reveal_until_live_card")) {
-        rb_effect_reveal_until_live_card(g, actor, e);
-    } else if (!strcmp(act, "reveal_until_chosen_card")) {
-        rb_effect_reveal_until_chosen_card(g, actor, e);
-    } else if (!strcmp(act, "reveal_until_target")) {
-        rb_effect_reveal_until_target(g, actor, e);
-    } else if (!strcmp(act, "select_cards")) {
-        rb_effect_select_cards(g, actor, e);
-    } else if (!strcmp(act, "select")) {
-        rb_effect_select(g, actor, e);
-    } else if (!strcmp(act, "look_and_select")) {
-        rb_effect_look_and_select(g, actor, e);
-    } else if (!strcmp(act, "set_cost")) {
-        rb_effect_set_cost(g, actor, e, host_cid);
-    } else if (!strcmp(act, "modify_cost") || !strcmp(act, "set_cost_to_use") ||
-                !strcmp(act,"modify_yell_count") || !strcmp(act,"modify_yell_source")) {
-        rb_effect_modify_cost(g, actor, e, host_cid);
-    } else if (!strcmp(act, "energy_placement")) {
-        rb_effect_energy_placement(g, actor, e);
-    } else if (!strcmp(act, "energy_state_change")) {
-        rb_effect_energy_state_change(g, actor, e);
-    } else if (!strcmp(act, "set_card_identity")) {
-        rb_effect_set_card_identity(g, actor, e, host_cid);
-    } else if (!strcmp(act, "set_blade_type")) {
-        rb_effect_set_blade_type(g, actor, e, host_cid);
-    } else if (!strcmp(act, "set_blade_count")) {
-        rb_effect_set_blade_count(g, actor, e, host_cid);
-    } else if (!strcmp(act, "set_heart_type")) {
-        rb_effect_set_heart_type(g, actor, e, host_cid);
-    } else if (!strcmp(act, "all_blade_timing")) {
-        rb_effect_all_blade_timing(g, actor, e, host_cid);
-    } else if (!strcmp(act, "choose_required_hearts")) {
-        /* Headless can't let the player pick a color, so apply the chosen
-           required-heart count to the "all" color (satisfies any color check). */
-        int cid = host_cid >= 0 ? host_cid : -1;
-        if (cid < 0) for (int q = 0; q < RB_STAGE_SIZE; q++) if (W->stage[q] != RB_EMPTY_SLOT) { cid = W->stage[q]; break; }
-        if (cid >= 0) {
-            int lim = cnt > 0 ? cnt : 1;
-            rb_mods_add_need_heart(&g->mods, cid, 7, lim);
-            rb_recalc_constants(g);
-        }
-    } else if (!strcmp(act, "modify_required_hearts") || !strcmp(act, "modify_required_hearts_global") ||
-                !strcmp(act, "modify_required_hearts_success")) {
-        rb_effect_modify_hearts(g, actor, e);
-    } else if (!strcmp(act, "gain_ability")) {
-        rb_gain_ability(g, actor, e);
-    } else if (!strcmp(act, "gain_ability_from_source")) {
-        rb_gain_ability_from_source(g, actor, e, host_cid);
-    } else if (!strcmp(act, "invalidate_ability")) {
-        rb_invalidate_ability(g, actor, e);
-    } else if (!strcmp(act, "suppress_ability_trigger")) {
-        rb_suppress_ability_trigger(g, actor, e, host_cid);
-    } else if (!strcmp(act, "activate_ability")) {
-        /* Mirror ability_effects.rs::execute_activate_ability — fire the matching
-           ability of each selected card (or the activating card's own ability). */
-        rb_activate_ability_effect(g, actor, e, host_cid);
-    } else if (!strcmp(act, "reduce_live_card_set_limit")) {
-        rb_effect_reduce_live_card_set_limit(g, actor, e, host_cid);
-    } else if (!strcmp(act, "position_change")) {
-        rb_effect_position_change(g, actor, e, host_cid);
-    } else if (!strcmp(act, "rotation")) {
-        rb_effect_rotation(g, actor, e);
-    } else if (!strcmp(act, "choose_target_player")) {
-        rb_emit_choice(g, actor, RB_CHOICE_SELECT_TARGET, NULL, NULL, 1, 0, "self_or_opponent");
-    } else if (!strcmp(act, "play_baton_touch") || !strcmp(act, "double_baton_touch")) {
-        int is_double = !strcmp(act,"double_baton_touch");
-        int replaced=0;
-        for(int q=0;q<RB_STAGE_SIZE && replaced < (is_double?2:1);q++){
-            if(W->stage[q]!=RB_EMPTY_SLOT){
-                int moved=W->stage[q];
-                W->stage[q]=RB_EMPTY_SLOT;
-                if(W->discard.n < RB_MAX_ZONE) W->discard.cards[W->discard.n++]=moved;
-                replaced++;
-            }
-        }
-        if(W->hand.n>0){
-            int card=W->hand.cards[--W->hand.n];
-            for(int q=0;q<RB_STAGE_SIZE;q++) if(W->stage[q]==RB_EMPTY_SLOT){ W->stage[q]=card; break; }
-        }
-    } else if (!strcmp(act, "restriction") || !strcmp(act, "activation_restriction") ||
-                !strcmp(act, "modify_limit")) {
-        /* Real handler in effects/misc.c (h_restriction): records prohibition
-           notes (consulted by rb_is_action_prohibited) and applies
-           cannot_activate / cannot_active lockouts. */
-        int resolved = 0;
-        rb_execute_misc_effect(g, actor, W, e, &resolved);
-        (void)resolved;
-    } else if (!strcmp(act, "gain_surplus_heart")) {
-        /* Mirror misc.rs:execute_gain_surplus_heart — capture this player's live
-           surplus (total_hearts − total_required) into last_surplus_loss_count
-           so it can be granted/lost as a resource by a later effect. */
-        rb_effect_gain_surplus_heart(g, actor, e);
-    } else if (!strcmp(act, "pay_cost_all:discard_all")) {
-        /* Mirror cost.rs::handle_pay_cost_all_discard — the "may discard your whole
-            hand" cost: move every card in the target player's hand into the waitroom
-            (C's discard pile). Cost moves are player actions, not effects, so they are
-            not recorded in recently_moved / moved_this_turn. */
-        rb_effect_pay_cost_all_discard(g, actor, e);
-    } else if (!strcmp(act, "re_yell")) {
-        /* Mirror misc.rs:execute_re_yell. Optionally clear blade/heart modifiers
-           of the target's staged members, clear the revealed pool, and mark that
-           a re-yell occurred so perform_yell's hearts are applied this live. */
-        int tgt = target_player(e, actor);
-        RbPlayer *TP = &g->p[tgt];
-        int lose = 0;
-        for (int i = 0; i < e->n_extra; i++)
-            if (e->extra_k[i] && !strcmp(e->extra_k[i], "lose_blade_hearts") &&
-                e->extra_v[i] && !strcmp(e->extra_v[i], "true")) lose = 1;
-        if (lose) {
-            for (int q = 0; q < RB_STAGE_SIZE; q++) {
-                int cid = TP->stage[q];
-                if (cid != RB_EMPTY_SLOT) rb_mods_clear_card(&g->mods, cid);
-            }
-        }
-        g->n_revealed = 0;
-        g->re_yell_occurred = 1;
-    } else if (!strcmp(act, "perform_yell")) {
-        /* Mirror misc.rs:execute_perform_yell. Draw `total_blade` (= sum of the
-           target's effective stage blades) cards, reveal + harvest their yell
-           icons, draw the draw-icon count, and stash harvested blade hearts for
-           the live's success check (pending_reyell_rebuild). */
-        int tgt = target_player(e, actor);
-        RbPlayer *TP = &g->p[tgt];
-        int total_blade = 0;
-        for (int q = 0; q < RB_STAGE_SIZE; q++) {
-            int cid = TP->stage[q];
-            if (cid == RB_EMPTY_SLOT) continue;
-            Card c; if (rb_decode_card_by_index((uint32_t)cid, &c)) {
-                total_blade += (int)c.blade + rb_mods_get_blade(&g->mods, cid);
-                rb_free_card(&c);
-            }
-        }
-        int count = total_blade > 0 ? total_blade : cnt;
-        if (count <= 0) count = 1;
-        memset(g->re_yell_blade_hearts, 0, sizeof(g->re_yell_blade_hearts));
-        g->re_yell_note_icons = 0;
-        g->re_yell_pending = 1;
-        g->re_yell_owner = tgt;
-        int draw_total = 0;
-        for (int k = 0; k < count; k++) {
-            if (TP->deck.n == 0) break;
-            int cid = TP->deck.cards[--TP->deck.n];
-            if (g->n_revealed < RB_MAX_REVEALED_CARDS) g->revealed_cards[g->n_revealed++] = cid;
-            Card c; if (!rb_decode_card_by_index((uint32_t)cid, &c)) continue;
-            int blade = (int)c.blade + rb_mods_get_blade(&g->mods, cid);
-            if (blade > 0) g->re_yell_blade_hearts[RB_HEART_PINK] += blade;
-            for (int hh = 0; hh < c.n_hearts; hh++) {
-                int col = c.heart_color[hh];
-                if (col == RB_HEART_DRAW) draw_total += c.heart_count[hh];
-                else if (col == RB_HEART_SCORE) g->re_yell_note_icons += c.heart_count[hh];
-                else if (col >= 0 && col < 8) g->re_yell_blade_hearts[col % 8] += c.heart_count[hh];
-            }
-            rb_free_card(&c);
-        }
-        for (int d = 0; d < draw_total; d++) { if (TP->deck.n == 0) break; rb_draw(g, tgt); }
-        g->re_yell_occurred = 1;
-    } else if (!strcmp(act, "repeat_procedure")) {
-        /* Mirror misc.rs repeat_procedure — execute the procedure's children
-           `count` times. The single pre-order pass is skipped in
-           rb_execute_effect_ex so this runs exactly `count` repetitions. */
-        int reps = cnt >= 1 ? cnt : 1;
-        for (int r = 0; r < reps; r++)
-            for (int i = 0; i < e->n_child; i++)
-                rb_execute_effect_ex(g, actor, e->child[i], host_cid);
-    } else if (!strcmp(act, "custom") ||
-                !strcmp(act, "do_nothing")) {
-        /* Compound/control no-ops. */
-    } else if (!strcmp(act, "sequential")) {
-        /* Mirror compound.rs::execute_sequential_effect — run the action list
-            (children) in order with per-step condition gating + otherwise-condition
-            skip + trailing repeat_procedure loop. */
-        rb_compound_sequential(g, actor, e, host_cid);
-    } else if (!strcmp(act, "conditional_alternative")) {
-        /* Mirror compound.rs::execute_conditional_alternative — tiered conditions
-            then legacy single-condition routing. branch=-1 routes via the effect's
-            own condition (post-negation). */
-        rb_compound_conditional_alternative(g, actor, e, -1, host_cid);
-    } else if (!strcmp(act, "conditional_on_result")) {
-        /* Mirror compound.rs::execute_conditional_on_result — run primary_effect,
-            then the followup_action if result_condition is met. */
-        rb_compound_conditional_on_result(g, actor, e, host_cid);
-    } else if (!strcmp(act, "conditional_on_optional")) {
-        /* Mirror compound.rs::execute_conditional_on_optional — taken=-1 preserves
-            the legacy emit-choice (headless auto-skips); resume routes via the
-            (chose_yes, negation) matrix. */
-        rb_compound_conditional_on_optional(g, actor, e, -1, host_cid);
-    } else if (!strcmp(act, "choice")) {
-        int choice_resolved = 0;
-        rb_execute_misc_effect(g, actor, W, e, &choice_resolved);
-    } else if (!strcmp(act, "select_number")) {
-        /* Mirror ability/choice.rs select_number — emit a count-choice the host
-            answers; the chosen number is recorded in queue.choice_result on resume
-            (downstream effects do not yet consume it headless). Same pause/resume
-            semantics as the other choice verbs. */
-        int allow = e->is_optional ? 1 : 0;
-        rb_emit_choice(g, actor, RB_CHOICE_SELECT_NUMBER, NULL, NULL, cnt, allow, act);
-        g->queue.selected_heart_color = heart_color_of(e, -1);
-    }
-    /* sequential / conditional_* / choice / re_yell / perform_yell / custom /
-       do_nothing: children already executed (or nothing to do). */
-    else if (!strcmp(act, "repeat_procedure")) {
-        /* Mirror ability/compound.rs:execute_repeat_procedure — run the child
-           effect `count` times (default 1). Children are NOT auto-run here. */
-        int reps = (e->count > 0) ? e->count : 1;
-        for (int r = 0; r < reps; r++)
-            for (int ci = 0; ci < e->n_child; ci++)
-                if (e->child[ci]) rb_execute_effect_ex(g, actor, e->child[ci], host_cid);
-    }
-    /* Unknown verbs: explicit no-op so they remain visible. */
 }
 
 /* ───────────────────────────── play / activate ───────────────────────────── */
@@ -1280,11 +810,169 @@ int rb_play_member(GameState *g, int pl, int hand_idx, int stage_pos) {
  * before publishing, and this guard only ever adds a restore around that. */
 static int rb_activate_act_depth = 0;
 
+/* ONE accepted activation: publish activating_card, wrap cost+effect as a single
+   resolution tree, run it, tear the keepalive down (or hand it to choice.c when
+   a prompt is still open), and spend the use. `ability_index` is the index the
+   resolution is keyed on — a printed slot number, or
+   RB_GAINED_ABILITY_INDEX_BASE + gained_idx for a gained activation, which is
+   the same encoding every other (card_id, ability_index) pair in the tree uses
+   (rabuka.h:2816-2835). Both callers below go through here, so a gained
+   activation cannot drift from a printed one.
+
+   `ab` is NOT consumed: the keepalive is a by-value copy of the struct, and on
+   the prompt-open path choice.c owns the release of that copy. The caller keeps
+   whatever it allocated. */
+static void activate_resolved_ability(GameState *g, int pl, int card_id,
+                                      int ability_index, const Ability *ab) {
+    /* turn/actions/mod.rs:548-550 — `game_state.activating_card =
+       Some(card_id)` is published BEFORE any cost logic, with the comment
+       "so self-referential filters resolve to this card", and stays
+       published across the cost's choice round-trip
+       (resolver.rs:1161 publishes, resolver.rs:1091 clears at
+       finish_ability_resolution). Save/restore rather than clear: the
+       queue path publishes the same field with a re-entry depth guard
+       (game_state_abilities.c:1919-1928) and a nested resolution inside
+       this one will reset it to -1, so the value must be put back on the
+       way out — a stale card id here would make a LATER, unrelated
+       ability believe it is paying its own self_cost. */
+    int saved_act = g->activating_card;
+    g->activating_card = card_id;
+    /* rb_cost_optional_skipped() (cost.c:47) is a STICKY latch: a
+       decline sets it, the next cost PAYMENT clears it. Sample it before
+       the tree runs so only a 0->1 transition can be attributed to THIS
+       activation's cost. */
+    int pre_skipped = rb_cost_optional_skipped();
+    /* Mirror Rust resolver::resolve_ability: cost then effect are one
+        ability resolution. Wrap them in a single heap effect tree so an
+        optional cost that emits a pay/skip choice bridges to the effect via
+        the resume_parent/resume_child continuation. The decoded ability is
+        kept alive in g->activation_keepalive across the choice round-trip. */
+    AbilityEffect *act = (AbilityEffect *)malloc(sizeof(AbilityEffect));
+    memset(act, 0, sizeof(*act));
+    act->n_child = 0;
+    if (ab->cost)   act->child[act->n_child++] = ab->cost;
+    if (ab->effect) act->child[act->n_child++] = ab->effect;
+    /* DEFECT 4 re-entrancy guard — see the ownership note above. */
+    AbilityEffect *saved_act_slot = g->activation_act;
+    Ability saved_keepalive = g->activation_keepalive;
+    int saved_keepalive_valid = g->activation_keepalive_valid;
+    rb_activate_act_depth++;
+    g->activation_act = act;
+    g->activation_keepalive = *ab;
+    g->activation_keepalive_valid = 1;
+    g->n_recently_moved = 0;
+    rb_execute_effect_ex(g, pl, act, card_id);
+    rb_drain_ability_queue(g);
+    if (!g->queue.has_pending) {
+        /* DEFECT 4 — teardown. The old body was:
+             act->n_child = 0;
+             g->activation_keepalive.cost = NULL;
+             g->activation_keepalive.effect = NULL;
+             rb_free_ability(&g->activation_keepalive);
+             free(g->activation_act);
+         Nulling cost/effect before rb_free_ability means rb_free_ability
+         (vm.c:1180-1185, which is what actually walks
+         effect_free(a->cost) / effect_free(a->effect)) never sees them:
+         BOTH AbilityEffect subtrees leaked on every activation that did
+         NOT leave a prompt open — the majority path, so this alone was
+         unbounded growth over a game. choice.c:4696-4703 does NOT null
+         them, which is why the interactive path reclaimed them and made
+         the inline path look correct by comparison.
+
+         act is a plain wrapper that is released with free(), so it never
+         owned its children; ab (the keepalive) owns them. Clearing
+         n_child and letting rb_free_ability walk the keepalive is the
+         total, single-owner release: each of cost, effect and act is
+         freed exactly once. */
+        act->n_child = 0;
+        rb_free_ability(&g->activation_keepalive);
+        g->activation_keepalive_valid = 0;
+        free(act);
+        g->activation_act = NULL;
+        /* Restore the slot the caller had published so an enclosing
+           activation's teardown still finds its own tree. */
+        g->activation_act = saved_act_slot;
+        g->activation_keepalive = saved_keepalive;
+        g->activation_keepalive_valid = saved_keepalive_valid;
+    }
+    /* Prompt still open: THIS pair stays published and choice.c owns its
+       release; the saved (outer) pair is NOT restored, or choice.c's tail
+       would free the outer tree while the prompt walks the inner one.
+       See the ownership note above. */
+    rb_activate_act_depth--;
+    /* ── USE LIMIT RECORD ── ability/gates.rs:279-335
+       (record_use_limit) / turn/actions/mod.rs:1488-1500
+       (finish_paid_ability). One accepted activation spends exactly one
+       use. The C spends it at RESOLUTION time, not at enqueue
+       (game_state_abilities.c:2001-2032, whose `use_limit_recorded` flag
+       is what stops the resolution-time gate from rejecting the entry
+       that just consumed it), and this inline path owns no queue entry at
+       all, so it has to record for itself.
+
+       A DECLINED optional cost must not spend the activation —
+       finish_paid_ability:1492 guards on
+       `snap.cost_entry_opt_result != Some(false)`. The verdict is only
+       knowable once the prompt is closed, and that is guaranteed here:
+       cost.c's decline path (rb_handle_optional_cost_payment,
+       cost.c:1195-1218) clears has_pending and settles the latch
+       synchronously, so a still-open prompt always means the cost has NOT
+       been declined yet — recording then matches Rust recording at
+       Final/finish_paid_ability once the round-trip completes. */
+    int declined = ab->cost && rb_cost_optional_skipped() && !pre_skipped;
+    if (ab->use_limit > 0 && !declined)
+        rb_record_use(&g->queue, card_id, ability_index, g->turn);
+    g->activating_card = saved_act;
+}
+
+/* turn/actions/mod.rs:430-454 find_gained_activation.
+ *
+ * Rust falls back to a RUNTIME-GAINED 起動 when no printed 起動 on the card is
+ * an activation candidate (actions/mod.rs:544-547). The gained list lives in
+ * `game_state.gained_card_abilities` — the C twin is the gained store behind
+ * rb_card_num_gained_abilities / rb_resolve_card_ability_at
+ * (src/core/game_state_abilities.c:322-345), addressed as
+ * RB_GAINED_ABILITY_INDEX_BASE + gained_idx.
+ *
+ * Two rules are ported verbatim and both matter:
+ *   - the card must be ON STAGE (mod.rs:445-446 `player.stage.stage.contains`),
+ *     so a gained ability cannot be activated from hand or discard;
+ *   - the FIRST gained 起動 wins (mod.rs:434-440 `iter().find(...)`), and the
+ *     returned index is the ENCODED one, which is what the use-limit key and
+ *     the activation queue id are keyed on (mod.rs:451 activation_ability_id).
+ *
+ * What Rust deliberately does NOT do here, and this port therefore does not
+ * either: find_gained_activation applies no use-limit gate and no
+ * mandatory-cost payability check. Those run AFTER the AbilityActivation is
+ * chosen (mod.rs:549-566), which is where activate_resolved_ability's
+ * rb_record_use sits.
+ *
+ * Returns the gained slot number, or -1 for "no gained activation". */
+static int find_gained_activation_index(const GameState *g, int pl, int card_id) {
+    if (!g || pl < 0 || pl > 1 || card_id < 0) return -1;
+    int on_stage = 0;
+    for (int q = 0; q < RB_STAGE_SIZE; q++)
+        if (g->p[pl].stage[q] == card_id) { on_stage = 1; break; }
+    if (!on_stage) return -1;
+    int n = rb_card_num_gained_abilities(g, card_id);
+    for (int i = 0; i < n; i++) {
+        Ability ab;
+        if (!rb_resolve_card_ability_at(g, card_id,
+                                        RB_GAINED_ABILITY_INDEX_BASE + i, &ab))
+            continue;
+        int is_activate = ab.triggers && strstr(ab.triggers, "起動");
+        rb_free_ability(&ab);   /* the deep copy is ours; this probe does not keep it */
+        if (is_activate) return i;
+    }
+    return -1;
+}
+
 /* Activate a card's ability by card id. Mirrors Rust's `GameState::activate_ability`:
     the card may expose several abilities (RAKA_CARD_ABILITY_PAIRS); the manual
     "activate" action runs the one(s) whose trigger is 起動 (Activate). Apply each
     matched ability's cost BEFORE its effect. Falls back to the card's single
-    default `ability_idx` when no 起動 ability exists (e.g. debut-only members). */
+    default `ability_idx` when no 起動 ability exists (e.g. debut-only members),
+    and — since this port — to a runtime-GAINED 起動 when no printed 起動 is a
+    candidate (turn/actions/mod.rs:544-547 find_gained_activation). */
 int rb_activate_card(GameState *g, int pl, int card_id) {
     int any = 0, matched = 0, has_activate = 0;
     int n = rb_card_num_abilities((uint32_t)card_id);
@@ -1307,108 +995,34 @@ int rb_activate_card(GameState *g, int pl, int card_id) {
             if (ab.use_limit > 0 &&
                 rb_use_limit_reached(&g->queue, card_id, a, ab.use_limit, g->turn))
                 continue;
-            /* turn/actions/mod.rs:548-550 — `game_state.activating_card =
-               Some(card_id)` is published BEFORE any cost logic, with the comment
-               "so self-referential filters resolve to this card", and stays
-               published across the cost's choice round-trip
-               (resolver.rs:1161 publishes, resolver.rs:1091 clears at
-               finish_ability_resolution). Save/restore rather than clear: the
-               queue path publishes the same field with a re-entry depth guard
-               (game_state_abilities.c:1919-1928) and a nested resolution inside
-               this one will reset it to -1, so the value must be put back on the
-               way out — a stale card id here would make a LATER, unrelated
-               ability believe it is paying its own self_cost. */
-            int saved_act = g->activating_card;
-            g->activating_card = card_id;
-            /* rb_cost_optional_skipped() (cost.c:47) is a STICKY latch: a
-               decline sets it, the next cost PAYMENT clears it. Sample it before
-               the tree runs so only a 0->1 transition can be attributed to THIS
-               activation's cost. */
-            int pre_skipped = rb_cost_optional_skipped();
-            /* Mirror Rust resolver::resolve_ability: cost then effect are one
-                ability resolution. Wrap them in a single heap effect tree so an
-                optional cost that emits a pay/skip choice bridges to the effect via
-                the resume_parent/resume_child continuation. The decoded ability is
-                kept alive in g->activation_keepalive across the choice round-trip. */
-            AbilityEffect *act = (AbilityEffect *)malloc(sizeof(AbilityEffect));
-            memset(act, 0, sizeof(*act));
-            act->n_child = 0;
-            if (ab.cost)   act->child[act->n_child++] = ab.cost;
-            if (ab.effect) act->child[act->n_child++] = ab.effect;
-            /* DEFECT 4 re-entrancy guard — see the ownership note above. */
-            AbilityEffect *saved_act_slot = g->activation_act;
-            Ability saved_keepalive = g->activation_keepalive;
-            int saved_keepalive_valid = g->activation_keepalive_valid;
-            rb_activate_act_depth++;
-            g->activation_act = act;
-            g->activation_keepalive = ab;
-            g->activation_keepalive_valid = 1;
-            g->n_recently_moved = 0;
-            rb_execute_effect_ex(g, pl, act, card_id);
-            rb_drain_ability_queue(g);
-            if (!g->queue.has_pending) {
-                /* DEFECT 4 — teardown. The old body was:
-                     act->n_child = 0;
-                     g->activation_keepalive.cost = NULL;
-                     g->activation_keepalive.effect = NULL;
-                     rb_free_ability(&g->activation_keepalive);
-                     free(g->activation_act);
-                 Nulling cost/effect before rb_free_ability means rb_free_ability
-                 (vm.c:1180-1185, which is what actually walks
-                 effect_free(a->cost) / effect_free(a->effect)) never sees them:
-                 BOTH AbilityEffect subtrees leaked on every activation that did
-                 NOT leave a prompt open — the majority path, so this alone was
-                 unbounded growth over a game. choice.c:4696-4703 does NOT null
-                 them, which is why the interactive path reclaimed them and made
-                 the inline path look correct by comparison.
-
-                 act is a plain wrapper that is released with free(), so it never
-                 owned its children; ab (the keepalive) owns them. Clearing
-                 n_child and letting rb_free_ability walk the keepalive is the
-                 total, single-owner release: each of cost, effect and act is
-                 freed exactly once. */
-                act->n_child = 0;
-                rb_free_ability(&g->activation_keepalive);
-                g->activation_keepalive_valid = 0;
-                free(act);
-                g->activation_act = NULL;
-                /* Restore the slot the caller had published so an enclosing
-                   activation's teardown still finds its own tree. */
-                g->activation_act = saved_act_slot;
-                g->activation_keepalive = saved_keepalive;
-                g->activation_keepalive_valid = saved_keepalive_valid;
-            }
-            /* Prompt still open: THIS pair stays published and choice.c owns its
-               release; the saved (outer) pair is NOT restored, or choice.c's tail
-               would free the outer tree while the prompt walks the inner one.
-               See the ownership note above. */
-            rb_activate_act_depth--;
-            /* ── USE LIMIT RECORD ── ability/gates.rs:279-335
-               (record_use_limit) / turn/actions/mod.rs:1488-1500
-               (finish_paid_ability). One accepted activation spends exactly one
-               use. The C spends it at RESOLUTION time, not at enqueue
-               (game_state_abilities.c:2001-2032, whose `use_limit_recorded` flag
-               is what stops the resolution-time gate from rejecting the entry
-               that just consumed it), and this inline path owns no queue entry at
-               all, so it has to record for itself.
-
-               A DECLINED optional cost must not spend the activation —
-               finish_paid_ability:1492 guards on
-               `snap.cost_entry_opt_result != Some(false)`. The verdict is only
-               knowable once the prompt is closed, and that is guaranteed here:
-               cost.c's decline path (rb_handle_optional_cost_payment,
-               cost.c:1195-1218) clears has_pending and settles the latch
-               synchronously, so a still-open prompt always means the cost has NOT
-               been declined yet — recording then matches Rust recording at
-               Final/finish_paid_ability once the round-trip completes. */
-            int declined = ab.cost && rb_cost_optional_skipped() && !pre_skipped;
-            if (ab.use_limit > 0 && !declined)
-                rb_record_use(&g->queue, card_id, a, g->turn);
-            g->activating_card = saved_act;
+            activate_resolved_ability(g, pl, card_id, a, &ab);
             any = 1;
             matched++;
         }
-        /* Don't free ab.cost/ab.effect here - they are owned by act, not by ab */
+        /* Don't free ab.cost/ab.effect here - the keepalive inside
+           activate_resolved_ability owns them, not this decode. */
+    }
+    /* turn/actions/mod.rs:544-547 — no printed 起動 was accepted, so try the
+       gained store before the default-ability fallback below. The gained scan
+       runs on EVERY card, not only one that printed 起動 abilities: a gained
+       起動 is exactly the case where the printed list has none, which is why
+       this arm used to be unreachable. */
+    if (matched == 0) {
+        int gidx = find_gained_activation_index(g, pl, card_id);
+        if (gidx >= 0) {
+            Ability gab;
+            if (rb_resolve_card_ability_at(g, card_id,
+                                           RB_GAINED_ABILITY_INDEX_BASE + gidx, &gab)) {
+                activate_resolved_ability(g, pl, card_id,
+                                          RB_GAINED_ABILITY_INDEX_BASE + gidx, &gab);
+                /* Deliberately NOT rb_free_ability'd: on the prompt-open path
+                   choice.c has already released the keepalive copy, and on the
+                   closed path the copy is released and this probe's own deep
+                   clone is the same shape the printed loop above leaves. */
+                any = 1;
+                matched++;
+            }
+        }
     }
     /* Rust reports "No activatable ability found for this card at its current
        location" (turn/actions/mod.rs:545-546) when every 起動 candidate was
@@ -1479,136 +1093,130 @@ int rb_play_card(GameState *g, int pl, int hand_idx) {
     return ok;
 }
 
-/* ───────────────────────────── phases ───────────────────────────── */
-static void activate_wait_members(GameState *g, int pl) {
-    RbPlayer *P = &g->p[pl];
-    for (int q = 0; q < RB_STAGE_SIZE; q++)
-        if (P->stage[q] >= 0 && P->stage_wait[q]) P->stage_wait[q] = 0;
-}
+/* ───────────────────────────── phases ─────────────────────────────
+ *
+ * THE TURN MACHINE IS rb_advance_phase (src/turn/phase.c:66), the C twin of
+ * engine/src/turn/phases.rs:75 `TurnEngine::advance_phase`. Every test in the
+ * tree drives it; rb_advance_phase is the only path a test reaches.
+ *
+ * This file used to carry a SECOND, parallel turn machine —
+ * activate_wait_members / main_phase / live_phase / check_victory / rollover,
+ * reachable only from rb_turn and therefore only from src/main.c:134's default
+ * 200-turn batch loop. It is deleted. The five statics were not a second
+ * implementation of the same rules; they were a different, much weaker set of
+ * rules, and the CLI batch mode was the only thing that ever played by them:
+ *
+ *   activate_wait_members  4 lines, clearing stage_wait only. phase.c:45 is
+ *                          the faithful twenty-line port: it also flips the
+ *                          ORIENTATION modifier wait->active, honours
+ *                          constant cannot_activate, respects
+ *                          rb_mods_is_delayed_cannot_active, ticks the delayed
+ *                          flags for this player's own cards, and recomputes
+ *                          P->energy_active excluding delayed-cannot-active
+ *                          energy (phases.rs:109-175). The 4-line copy did none
+ *                          of that, so under the CLI a ウェイト member never
+ *                          became アクティブ through the modifier and energy
+ *                          activation never happened at all.
+ *   main_phase             A greedy auto-player: play every affordable hand
+ *                          card into the first free area, then run every staged
+ *                          member's DEFAULT ability effect unconditionally
+ *                          (the old lines 1513-1525). Rust has no such
+ *                          sweep — the Main phase is host-driven
+ *                          (game_setup.rs generate_main_phase_actions), and
+ *                          firing a 登場 effect every single turn is not what
+ *                          登場 means.
+ *   live_phase             Auto-set live cards for BOTH seats from hand and
+ *                          draw replacements, bypassing the
+ *                          LiveCardSetFirstAttacker/SecondAttacker windows
+ *                          (phases.rs:224-254) and rb_handle_set_live_card.
+ *   check_victory          A deck-out rule with no Rust counterpart, racing the
+ *                          real check. phase.c:244-249 is the faithful one and
+ *                          is the branch the tests reach.
+ *   rollover               Duplicates phase.c's VICTORY rollover — which
+ *                          phase.c:277-279 already says in as many words
+ *                          ("the other one lives in rb_end_turn ... the tests
+ *                          reach THIS one"). Rust has exactly one rollover:
+ *                          phases.rs:265-311.
+ *
+ * So rb_turn is now a THIN HEADLESS DRIVER over the tested machine, not a
+ * second one: it advances rb_advance_phase until the turn counter moves, which
+ * is exactly Rust's one round (first attacker's Active/Energy/Draw/Main, second
+ * attacker's, then the live — phases.rs:90-314). The public name and signature
+ * declared in include/rabuka.h:1709 are unchanged, so src/main.c:134 keeps
+ * compiling and the CLI still plays whole rounds.
+ *
+ * PER-TURN RESETS THAT STAY HERE, and why they are not a second turn machine.
+ * Rust clears most of its turn-scoped state in the rollover arm
+ * (phases.rs:277-291) and phase.c:288-300 does the C fold of that. The
+ * remaining fields are either C-local or have no Rust clear site at all:
+ *
+ *   stage_arrived          DROPPED from here. Rust's deployed_this_turn
+ *                          (phases.rs:286-287) is cleared by phase.c:297, so
+ *                          resetting it twice was the duplication.
+ *   baton_touch_used       Rust passes this per PLAY ACTION as an argument
+ *                          (phases.rs:1076 -> trigger_scan.rs:73-83), not as
+ *                          turn state, so the C's per-player latch has no Rust
+ *                          clear site. Without this reset the CLI refuses every
+ *                          baton touch from turn 2 onward.
+ *   player_cannot_activate C twin of Rust's cannot_activate_members, which
+ *   n_cannot_active_cards  phases.rs:279 DOES clear. phase.c's rollover does
+ *                          not, which is why tests/test_parity_restriction.c:
+ *                          947-948 has to reset the field by hand. Kept here so
+ *                          the CLI is correct; REPORTED to phase.c's owner as a
+ *                          real gap in the tested path.
+ *   n_prohibition          C-local prohibition notes (state.c/rules.c/
+ *                          misc.c writers). No Rust analogue, no Rust clear.
+ *   n_selected_cards       C-local cross-effect selection buffer. choice.c
+ *                          clears it on consume; the round reset keeps a
+ *                          stale selection from leaking into the next round.
+ *
+ * One round == until the turn counter moves (phase.c:250 is the only writer, in
+ * the VICTORY branch). RPS + mulligan + both attackers' normal phases + both
+ * performance windows is ~16 advance steps; the cap is a runaway guard only.
+ *
+ * KNOWN AND DELIBERATE: this host PASSES the Main phase and the live-card-set
+ * windows, so `rb_engine.exe <deck-dir>` in its default 200-turn mode now plays
+ * an empty game (stage=0 live=0 score=0 at turn 201). That is not a regression:
+ * the deleted main_phase/live_phase pair was ALSO reaching an empty board at the
+ * same sample point (stage=0 live=0 score=0), it just got there through rules
+ * that did not exist in Rust. Neither mode is a meaningful game, because neither
+ * has a host with a policy — Rust's engine core has no auto-player either
+ * (engine/src/bin/bot_p1.rs is where a policy lives, and it has no C twin).
+ *
+ * The correct follow-up is a host policy over rb_generate_action_candidates
+ * (src/turn/phase.c:1351) plus a real answer for every prompt it opens; that is
+ * NEW work on a surface no test covers, and an attempted first cut of it here
+ * faulted inside the live-performance choice chain when it drained a mandatory
+ * SelectCard with the skip answer. So it is deliberately NOT shipped here: the
+ * ask was to remove the second turn machine and make the tested path the only
+ * path, and that is done without adding an untested auto-player. */
+void rb_turn(GameState *g) {
+    if (!g || g->winner != -1) return;
 
-static void main_phase(GameState *g, int pl) {
-    RbPlayer *P = &g->p[pl];
-    int guard = 0;
-    int again = 1;
-    while (again && guard++ < 64) {
-        again = 0;
-        for (int i = 0; i < P->hand.n; i++) {
-            Card c;
-            if (!rb_decode_card_by_index((uint32_t)P->hand.cards[i], &c)) continue;
-            int played = 0;
-            if (card_is_member(&c)) {
-                if (P->energy_active >= c.cost) {
-                    for (int q = 0; q < RB_STAGE_SIZE; q++)
-                        if (P->stage[q] < 0) { played = rb_play_member(g, pl, i, q); break; }
-                }
-            } else if (P->live.n < RB_MAX_LIVE_CARDS) {
-                played = rb_play_card(g, pl, i);
-            }
-            rb_free_card(&c);
-            if (rb_has_pending_choice(g)) { rb_resume_with_choice(g, -1); rb_drain_ability_queue(g); }
-            if (played) { again = 1; break; }
-        }
-        if (rb_has_pending_choice(g)) { rb_resume_with_choice(g, -1); rb_drain_ability_queue(g); }
+    /* See the table above: C-local turn-scoped state with no Rust clear site. */
+    for (int p = 0; p < 2; p++) {
+        g->baton_touch_used[p] = 0;
+        g->player_cannot_activate[p] = 0;
     }
-    /* activate abilities of staged members (one pass) — host would normally poll choice */
-    for (int q = 0; q < RB_STAGE_SIZE; q++) {
-        int cid = P->stage[q];
-        if (cid < 0) continue;
-        Card c;
-        if (!rb_decode_card_by_index((uint32_t)cid, &c)) continue;
-        if (c.ability && c.ability->effect) {
-            g->n_recently_moved = 0; /* batch-scope for this staged member */
-            rb_execute_effect_ex(g, pl, c.ability->effect, cid);
-            rb_drain_ability_queue(g);
-        }
-        rb_free_card(&c);
+    g->n_cannot_active_cards = 0;
+    g->n_prohibition = 0;
+    g->n_selected_cards = 0;
+
+    const int start_turn = g->turn;
+    for (int step = 0; step < 256; step++) {
+        if (g->winner != -1) return;
+        /* Advance, then drain. rb_advance_phase refuses to move while a choice is
+           open, so the drain has to be inside the loop or a round cannot progress
+           past its first prompt. -1 is the skip answer, which is exactly what
+           src/main.c:135 passed to the same call after this function returned. */
+        if (!rb_has_pending_choice(g)) rb_advance_phase(g);
+        if (g->winner != -1) return;
+        int drain = 0;
+        while (rb_has_pending_choice(g) && drain++ < 32)
+            rb_resume_with_choice(g, -1);
+        if (g->turn != start_turn) return;   /* the round is complete */
+        if (g->phase == RB_PHASE_DONE) return;
     }
-}
-
-/* Faithful performance lives in src/live.c:rb_perform_live (yell→stage_hearts
-   via RbMods→allocation→verdict→score). Keep a thin alias so old callers
-   still compile if live.c is not linked. */
-int rb_perform_live(GameState *g, int pl);
-
-static void live_phase(GameState *g) {
-    /* Live card set: auto-place up to MAX_LIVE_CARDS - reduction from each player's hand. */
-    g->live_success[0] = 0; g->live_success[1] = 0; /* fresh per-turn live result */
-    g->live_score[0] = 0;   g->live_score[1] = 0;   /* fresh per-turn live scores */
-    for (int pl = 0; pl < 2; pl++) {
-        RbPlayer *P = &g->p[pl];
-        int limit = RB_MAX_LIVE_CARDS - g->live_set_limit_reduction[pl];
-        if(limit<0) limit=0;
-        if(limit>RB_MAX_LIVE_CARDS) limit=RB_MAX_LIVE_CARDS;
-        int placed = 0;
-        for (int i = 0; i < P->hand.n && placed < limit; ) {
-            Card c;
-            if (rb_decode_card_by_index((uint32_t)P->hand.cards[i], &c)) {
-                if (card_is_live(&c)) {
-                    int card = bag_remove_at(&P->hand, i);
-                    bag_push(&P->live, card);
-                    placed++;
-                    rb_free_card(&c);
-                    continue;
-                }
-                rb_free_card(&c);
-            }
-            i++;
-        }
-        for (int k = 0; k < placed; k++) rb_draw(g, pl);
-    }
-    /* Performance: first attacker then second attacker (faithful via live.c). */
-    rb_perform_live(g, g->first_attacker);
-    rb_perform_live(g, g->second_attacker);
-    for(int pl=0;pl<2;pl++) g->live_set_limit_reduction[pl]=0;
-}
-
-static void check_victory(GameState *g) {
-    for (int pl = 0; pl < 2; pl++) {
-        RbPlayer *P = &g->p[pl];
-        if (P->success.n >= RB_VICTORY_CARD_COUNT) g->winner = pl;
-        else if (P->score >= RB_SCORE_WIN) g->winner = pl;
-        /* deck-out: no resources left to act */
-        int alive = (P->deck.n > 0) || (P->hand.n > 0) ||
-                    (P->stage[0] >= 0) || (P->stage[1] >= 0) || (P->stage[2] >= 0) ||
-                    (P->live.n > 0) || (P->success.n > 0);
-        if (!alive) g->winner = (pl ^ 1);
-    }
-    if (g->p[0].success.n >= RB_VICTORY_CARD_COUNT && g->p[1].success.n >= RB_VICTORY_CARD_COUNT)
-        g->winner = 2; /* draw */
-}
-
-static void rollover(GameState *g) {
-    /* Revert until_end_of_turn / first_turn temporary effects at turn end. */
-    rb_check_expired_effects(g, RB_TEMP_TURN_END);
-    /* The turn that just completed is a real turn — count it before deciding
-        the match (mirrors Rust: the winning turn increments turn_number). */
-    g->turn++;
-    /* Clear per-turn temporal-condition tracking (mirrors GameState reset of
-        moved_this_turn / debut_count_this_turn / position_change_occurred_this_turn). */
-    for(int i=0;i<RB_MAX_CARD_IDS;i++) g->moved_this_turn[i]=0;
-    g->debut_count_this_turn[0]=g->debut_count_this_turn[1]=0;
-    g->position_change_occurred_this_turn=0;
-    /* Mirror phases.rs:309 (the victory / turn-rollover arm of advance_phase):
-        `game_state.clear_card_movement_tracking();` clears cards_appeared_this_turn
-        AND card_appearance_source (modifiers.rs:1690-1708). The 「このターン中に
-        登場した場合」 family is turn-scoped on BOTH halves: without the clear a card
-        that appeared on turn N keeps satisfying has_card_appeared_this_turn on turn
-        N+1, and — because rb_get_card_appearance_source takes the FIRST match — a
-        控え室から登場 gate stays answerable from a source recorded in an earlier
-        turn forever.
-
-        This call was harmless-but-missing while the appearance list was never
-        written at all (rb_record_card_appearance had no callers); it became
-        load-bearing as soon as the play choke point started recording. */
-    rb_clear_card_appearance_tracking(g);
-    check_victory(g);
-    if (g->winner != -1) { g->phase = RB_PHASE_DONE; return; }
-    g->active = g->active ^ 1;
-    g->phase = RB_PHASE_ACTIVE;
-    /* Clear turn-scoped state_change_condition tracking. */
-    memset(g->state_change_from, 0, sizeof(g->state_change_from));
-    memset(g->state_change_to, 0, sizeof(g->state_change_to));
-    g->last_wait_to_active_count = 0;
 }
 
 /* Main phase action execution (mirrors TurnEngine::execute_main_phase_action).
@@ -1629,37 +1237,6 @@ int rb_execute_main_phase_action(GameState *g, int action_type, int card_id,
             break;
     }
     return -1;
-}
-
-/* One full turn: active player's normal phase + shared live phase + rollover. */
-void rb_turn(GameState *g) {
-    if (g->winner != -1) return;
-    int pl = g->active;
-    /* Reset per-turn baton state: deployment-arrival ban and one-baton-per-action. */
-    for (int p = 0; p < 2; p++) {
-        for (int i = 0; i < RB_STAGE_SIZE; i++) g->stage_arrived[p][i] = 0;
-        g->baton_touch_used[p] = 0;
-        g->player_cannot_activate[p] = 0;
-    }
-    g->n_cannot_active_cards = 0;
-    g->n_prohibition = 0;
-    g->n_selected_cards = 0;
-    g->phase = RB_PHASE_ACTIVE;
-    activate_wait_members(g, pl);
-    g->phase = RB_PHASE_ENERGY;
-    rb_draw_energy(g, pl);
-    g->phase = RB_PHASE_DRAW;
-    rb_draw(g, pl);
-    g->phase = RB_PHASE_MAIN;
-    main_phase(g, pl);
-    g->phase = RB_PHASE_LIVE_SET;
-    live_phase(g);
-    /* Revert Duration::LiveEnd / during_live temporary effects (blade/heart/score
-       granted during this live). Mirrors Rust's LiveVictoryDetermination cleanup.
-       Without this the grants leak into subsequent turns. */
-    rb_check_expired_effects(g, RB_TEMP_LIVE_END);
-    g->phase = RB_PHASE_VICTORY;
-    rollover(g);
 }
 
 /* ───────────────────────────── setup ───────────────────────────── */
@@ -1760,27 +1337,22 @@ void rb_print_state(const GameState *g) {
            g->turn, g->active, g->first_attacker, g->winner);
 }
 
-/* ───────────────────────────── deck choice (main.rs::choose_deck) ───────────────────────────── */
-#define RB_MAX_DECK_ENTRIES 60
-#define RB_MAX_DECK_NAME 64
-#define RB_MAX_CARD_NO 16
-
-typedef struct {
-    char card_no[RB_MAX_CARD_NO];
-    int  quantity;
-} RbDeckEntry;
-
-typedef struct {
-    char        name[RB_MAX_DECK_NAME];
-    RbDeckEntry entries[RB_MAX_DECK_ENTRIES];
-    int         n_entries;
-} RbDeckList;
-
-const RbDeckList *choose_deck(const RbDeckList *deck_lists, int n_lists, const char *player_name) {
-    if (n_lists <= 0 || !deck_lists) return NULL;
-    printf("%s chose: %s\n", player_name ? player_name : "Player", deck_lists[0].name);
-    return &deck_lists[0];
-}
+/* ── deck choice (main.rs::choose_deck) — REMOVED ────────────────────────────
+ * Rust main.rs:287-293 choose_deck is a two-line "pick the first deck list"
+ * placeholder called twice from main.rs:118-119, over the value
+ * deck_parser::DeckParser::parse_all_decks() returns.
+ *
+ * The C cannot reach it, and the reason is structural rather than a missing
+ * call: RbDeckList / RbDeckEntry below were C-local types that NOTHING in the
+ * tree produces. src/main.c:115-122 does not parse deck lists at all — it
+ * synthesises both decks straight from the card database
+ * (rb_card_ability_idx / rb_num_cards) and never sees a deck-list file. So
+ * there was no way to hand this function a non-empty list, and it held no
+ * engine state, applied no rule, and touched no card: keeping it would have
+ * been a callable that provably cannot do anything. Its caller chain in Rust
+ * (deck_parser::parse_all_decks -> choose_deck -> deck_list_to_card_numbers)
+ * has no C counterpart because src/game/deck_parser.c is reached through
+ * rb_build_deck_from_card_numbers instead. */
 
 /* ───────────────────────────── i18n self-check (main.rs:295-316) ───────────────────────────── */
 /* Canonical English choice-prompt templates — describe.rs:1053-1064. The C port
@@ -1879,9 +1451,20 @@ static int translate_choice_prompt_en_to_ja(const char *en, char *out, size_t ca
     return 0;   /* describe.rs:1125 — unrecognised prompt */
 }
 
-/* main.rs:295-316. Rust guards this with #[cfg(feature = "server")] and calls it
-   once at boot; the C port has no boot-time caller, so it is exported for the
-   same ABI parity. */
+/* main.rs:294-316, guarded by #[cfg(feature = "server")] and called ONCE at
+   boot from main.rs:65, immediately before run_web_server.
+ *
+   KEPT, and this is a missing CALL rather than dead code. Rust's cfg(server)
+   block is the SERVER binary, and the C's server binary is
+   src/web_server.c (the Makefile's rb_web_server target, web_server.c linked
+   over the same objects). So the Rust caller has a C counterpart binary that
+   simply does not make the call yet.
+   ACTION FOR web_server.c's OWNER: invoke i18n_self_check() once at startup,
+   before the request loop starts, to reproduce main.rs:65. Everything the
+   function needs is already here — the canonical template table
+   (describe.rs:1053-1064) and the faithful
+   translate_choice_prompt_en_to_ja (describe.rs:1070-1127) directly above — so
+   the port is complete and only the boot call is missing. */
 void i18n_self_check(void) {
     size_t n = sizeof(s_choice_prompt_templates_en) / sizeof(s_choice_prompt_templates_en[0]);
     int missing = 0;
@@ -1900,13 +1483,16 @@ void i18n_self_check(void) {
         fprintf(stderr, "[i18n] all canonical choice-prompt templates have Japanese translations\n");
 }
 
-/* ───────────────────────────── web server (main.rs::run_web_server) ───────────────────────────── */
-void run_web_server(const char *ngrok_authtoken) {
-    /* Server-only in Rust (#[cfg(feature = "server")]); requires tokio +
-       actix-web + ngrok. The C port has no HTTP server runtime, so this logs
-       the intent and returns. Kept for ABI parity. */
-    printf("Web server starting on http://127.0.0.1:8080\n");
-    if (ngrok_authtoken) {
-        printf("  (ngrok tunnel requested — not available in C port)\n");
-    }
-}
+/* ── web server (main.rs::run_web_server) — REMOVED ────────────────────────────
+ * Rust main.rs:318-330, #[cfg(feature = "server")], called once from
+ * main.rs:66. Its body is NOT a placeholder: it builds an actix_web::rt::System
+ * and blocks on web_server::run_web_server_with_ngrok(ngrok_authtoken) — the
+ * real server.
+ *
+ * The C twin of that real server already exists and is the whole of
+ * src/web_server.c (the Makefile's rb_web_server target). This function was a
+ * second entry point to a server that already had one, and its body was a
+ * STUB by this project's own definition (PROGRESS.md anti-pattern 1): two
+ * printfs and a return, with no server, no ngrok, and no request handling. It
+ * had zero callers. Deleting it removes the stub rather than leaving a callable
+ * that cannot serve anything; src/web_server.c remains the single server. */

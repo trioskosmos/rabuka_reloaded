@@ -276,35 +276,61 @@ static int move_card_matches_group_csv(int card_idx, const char *group_csv){
     for(int i=0;i<ng;i++) names[i]=groups[i];
     return rb_card_matches_any_group(card_idx,names,ng);
 }
+/* ── card_matches_filter: the ONE builder + the ONE matcher ───────────────
+ * Rust has no function of this name. It is this port's own "does the printed
+ * filter on this effect accept this card" predicate, used by
+ * rb_move_looked_at_matches and by the revealed_cards / stage / waitroom source
+ * scans below — a FOURTH hand-rolled walk over the same extras that
+ * rb_effect_filter_subset (core/card.c, the twin of util.rs:1819-1884
+ * CardFilter::from_effect) and rb_matching_ids (util.c local_filter_matches,
+ * the twin of util.rs:1676-1688 CardFilter::matches) already own.
+ *
+ * It now READS every field it can from that one builder and runs that one
+ * matcher. Each term the central pair still cannot carry is listed below with
+ * the Rust line that says so; none of them re-implements a central term. */
 static int card_matches_filter(int card_idx, AbilityEffect *e){
-    const char *ctype = cmf_extra(e,"card_type");
-    if(!ctype && e->card_type_field[0]) ctype = e->card_type_field;
-    if(ctype && !card_matches_card_type_filter(card_idx, ctype)) return 0;
-    const char *gn = cmf_extra(e,"group_names");
-    if(gn && !move_card_matches_group_csv(card_idx, gn)) return 0;
-    const char *cnames = cmf_extra(e,"card_names");
-    if(cnames){
-        Card c; if(!rb_decode_card_by_index((uint32_t)card_idx,&c)) return 0;
-        int m = c.name && strstr(c.name, cnames); rb_free_card(&c);
-        if(!m) return 0;
-    }
+    RbCardFilter f;
+    rb_effect_filter_subset(e, &f);
+
+    /* util.rs:1327-1332 — `current_blade_limit` is deliberately NOT a
+       matches() term: Rust applies it after matches() via filter_current_blade,
+       which needs the modifier table matches() has no access to. card.c:937
+       fills has_blade_limit from the plain `blade_limit` key regardless, so it
+       is switched off here instead of narrowing every looked-at card. */
+    f.has_blade_limit = 0;
+    /* util.rs:1833-1834 `characters` / `exclude_characters` are Vec<String> and
+       matches() tests them with card_matches_characters (util.rs:1723-1731).
+       RbCardFilter carries each as ONE comma-joined string and util.c:1356-1369
+       wraps it as a single name, so a multi-name card could never match it;
+       this path's own group-CSV reading is kept below instead. */
+    f.has_characters = 0;
+    f.has_exclude_characters = 0;
+    /* util.rs:1821-1825 + check_group (util.rs:1484-1499) keep BOTH `group`
+       (group_names.first()) and `groups` (the whole Vec) and accept a card
+       matching ANY entry. RbCardFilter has no list member and util.c:1322 keeps
+       only the first, so a paired list like 「μ's,μ's'」 would reject every card
+       here. The list is decided below, over the whole CSV. */
+    f.group[0] = '\0';
+    f.has_group = 0;
+
+    int one[1]; one[0] = card_idx;
+    int out[1];
+    if (rb_matching_ids(&f, one, 1, out, 1) != 1) return 0;
+
+    const char *gn = cmf_extra(e, "group_names");
+    if (gn && !move_card_matches_group_csv(card_idx, gn)) return 0;
+    /* `name_fragments` is a different wire key from `card_names`: card.c:928-930
+       builds name_fragments out of card_names only, so this spelling still has
+       to be read straight off the effect. */
     const char *nf = cmf_extra(e,"name_fragments");
     if(nf){
         Card c; if(!rb_decode_card_by_index((uint32_t)card_idx,&c)) return 0;
         int m = c.name && strstr(c.name, nf); rb_free_card(&c);
         if(!m) return 0;
     }
-    const char *cl = cmf_extra(e,"cost_limit");
-    if(cl){
-        int v=atoi(cl); const char *op=cmf_extra(e,"cost_operator");
-        Card c; if(!rb_decode_card_by_index((uint32_t)card_idx,&c)) return 0;
-        int ok=cmf_cmp(op,(int)c.cost,v); rb_free_card(&c); if(!ok) return 0;
-    }
-    const char *cv = cmf_extra(e,"cost_values");
-    if(cv){
-        int v=atoi(cv); Card c; if(!rb_decode_card_by_index((uint32_t)card_idx,&c)) return 0;
-        int ok=(c.cost==v)||(c.score==v); rb_free_card(&c); if(!ok) return 0;
-    }
+    /* util.rs:1713-1722 — cost_limit_min / cost_limit_max are separate
+       CardFilter fields (util.rs:1312-1314) that RbCardFilter does not carry
+       and card.c never reads. */
     const char *clmin = cmf_extra(e,"cost_limit_min");
     if(clmin){
         int v=atoi(clmin); Card c; if(!rb_decode_card_by_index((uint32_t)card_idx,&c)) return 0;
@@ -315,12 +341,9 @@ static int card_matches_filter(int card_idx, AbilityEffect *e){
         int v=atoi(clmax); Card c; if(!rb_decode_card_by_index((uint32_t)card_idx,&c)) return 0;
         int ok=cmf_cmp("<=",(int)c.cost,v); rb_free_card(&c); if(!ok) return 0;
     }
-    const char *ct = cmf_extra(e,"cost_total");
-    if(ct){
-        int v=atoi(ct); const char *op=cmf_extra(e,"cost_total_operator");
-        Card c; if(!rb_decode_card_by_index((uint32_t)card_idx,&c)) return 0;
-        int ok=cmf_cmp(op,(int)c.cost,v); rb_free_card(&c); if(!ok) return 0;
-    }
+/* card.c:912-921 reads the blade bound from `blade_limit` plus
+       `original_blade_operator`/`original_value`, NOT from an
+       `original_blade_limit` key, so this spelling still has to be read here. */
     const char *ob = cmf_extra(e,"original_blade_limit");
     if(ob){
         int v=atoi(ob); const char *op=cmf_extra(e,"original_blade_operator");
@@ -338,18 +361,22 @@ static int card_matches_filter(int card_idx, AbilityEffect *e){
     if(chars && !move_card_matches_group_csv(card_idx, chars)) return 0;
     const char *exch = cmf_extra(e,"exclude_characters");
     if(exch && move_card_matches_group_csv(card_idx, exch)) return 0;
-    const char *cp = cmf_extra(e,"card_property");
+/* util.rs:1818 / check_card_property (util.rs:1654-1673). card.c:908-911
+       populates the member and util.c:42-46 reads it, both behind
+       RB_CARD_FILTER_CARD_PROPERTY, which no build defines — so neither the
+       builder nor the matcher carries it yet and the test stays here. It now
+       goes through rb_check_card_property, the central helper, instead of a
+       private three-case decode, which restores the `has_draw_icon` arm
+       util.rs:1660 has and this copy was missing. */
+    const char *cp = cmf_extra(e, "card_property");
     if(cp){
-        const char *ng = cmf_extra(e,"negation");
+        const char *ng = cmf_extra(e, "negation");
         int neg = ng && !strcmp(ng,"true");
-        Card c; if(!rb_decode_card_by_index((uint32_t)card_idx,&c)) return 0;
-        int has=0;
-        if(!strcmp(cp,"has_blade_heart"))      has = rb_card_has_blade_heart(&c);
-        else if(!strcmp(cp,"has_score_icon"))  has = rb_card_has_score_icon(&c);
-        else if(!strcmp(cp,"has_all_blade"))   has = rb_card_has_all_blade(&c);
-        if(neg) has=!has;
-        rb_free_card(&c);
-        if(!has) return 0;
+        Card c;
+        const Card *card = rb_decode_card_by_index((uint32_t)card_idx,&c) ? &c : NULL;
+        int passes = rb_check_card_property(cp, neg, card);
+        if (card) rb_free_card(&c);
+        if (!passes) return 0;
     }
     return 1;
 }

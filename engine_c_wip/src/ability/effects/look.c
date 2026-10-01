@@ -1140,22 +1140,6 @@ static int look_group_list_matches(int cid, const char *group_list)
     return 0;
 }
 
-/* util.rs:1279-1299 heart_count_for_threshold — max(base_heart[col],
-   need_heart[col]). Card::heart_color is a HeartMap of (color, count) pairs laid
-   out base | blade | need, so the multiplicity is heart_count[] and the blade
-   span is skipped on both sides. */
-static int look_heart_count_for_threshold(const Card *c, int color)
-{
-    int base = 0, need = 0;
-    int need_start = (int)c->num_base + (int)c->num_blade;
-    for (int i = 0; i < c->n_hearts && i < RB_MAX_HEARTS; i++) {
-        if (c->heart_color[i] != color) continue;
-        if (i < (int)c->num_base) base += c->heart_count[i];
-        else if (i >= need_start) need += c->heart_count[i];
-    }
-    return base > need ? base : need;
-}
-
 /* util.rs:1310-1321 any_trigger — the resolved trigger text STARTS WITH the
    wanted label (「常時」 is a prefix of 「常時:...」). */
 static int look_ability_has_trigger(int cid, const char *wanted)
@@ -1310,54 +1294,66 @@ static int look_parse_or_ability_filters(const char *json, LookAbilityBranch *ou
     return n;
 }
 
+/* The looked-at pool narrowing. This used to be a WHOLE second implementation of
+   CardFilter::matches walking the extras one key at a time. It now takes ONE
+   builder — rb_effect_filter_subset (core/card.c, the twin of util.rs:1819-1884
+   CardFilter::from_effect) — and hands it to ONE matcher, rb_matching_indices_
+   filter (util.c card_filter_matches, the twin of util.rs:1676-1688
+   CardFilter::matches). Everything the central pair still cannot carry is listed
+   below with the Rust line that says so; none of it is a second copy of a term
+   the builder or the matcher already owns.
+
+   It is NOT deletable, for the reason the residuals spell out: `groups`,
+   `exclude_group_names`, `or_ability_filters` and `card_property` have no
+   RbCardFilter member and no term in the central matcher, so a central-only
+   version of this function drops four of Rust's terms. */
 static int look_filter_matches(const GameState *g, const AbilityEffect *effect, int cid)
 {
     if (!effect) return 1;
-    const char *card_type = look_filter_card_type(effect);
-    if (card_type && *card_type && !rb_card_matches_type(cid, card_type)) return 0;
+    RbCardFilter f;
+    rb_effect_filter_subset(effect, &f);
+
+    /* util.rs:1821-1825 + check_group (util.rs:1484-1499) keep BOTH `group`
+       (group_names.first()) and `groups` (the whole Vec); a card passes when it
+       matches the first OR any entry of the list. RbCardFilter has no list
+       member and util.c:1320-1324 keeps only the first, so a paired list like
+       「μ's,μ's'」 — the shape that used to reject every card — would still be
+       rejected centrally. The list is taken out of the filter and decided here.
+       util.rs:1500-1506 exclude_group_names has no member at all and is counted
+       by has_filter (util.rs:1429), so it is decided here too. */
     const char *group = look_extra(effect, "group_names");
     if (!group) group = look_extra(effect, "group");
+    f.group[0] = '\0';
+    f.has_group = 0;
     if (group && *group && !look_group_list_matches(cid, group)) return 0;
     const char *exclude_group = look_extra(effect, "exclude_group_names");
     if (exclude_group && *exclude_group && look_group_list_matches(cid, exclude_group)) return 0;
-    const char *cost_limit = look_extra(effect, "cost_limit");
-    if (cost_limit) {
-        const char *cost_operator = look_extra(effect, "cost_limit_operator");
-        if (!cost_operator) cost_operator = look_extra(effect, "operation");
-        if (!rb_card_matches_cost_limit(cid, atoi(cost_limit), cost_operator)) return 0;
-    }
+
+    /* util.rs:1836 heart_colors reaches CardFilter ungated; card.c:867-869 puts
+       it behind `filter_targets_by_heart_colors`, which is the gate on
+       filter_subset (card.rs:2415-2421), NOT on from_effect — so a
+       look-and-select whose effect omits that flag would filter on nothing.
+       The list is filled in here; `require_all_heart_colors` (util.rs:1837) and
+       `heart_color_count` (util.rs:1838) come from the builder and are evaluated
+       by the matcher (util.c:1371-1400), which is where the per-colour
+       threshold twin of the deleted look_heart_count_for_threshold now lives. */
     const char *heart = look_extra(effect, "heart_colors");
     if (!heart) heart = look_extra(effect, "heart_color");
+    f.n_heart_colors = 0;
     if (heart && *heart) {
         const char *colors[8];
         char buffer[192];
         int n_colors = look_split_list(heart, colors, 8, buffer, sizeof(buffer));
-        int require_all = look_bool(effect, "require_all_heart_colors");
-        if (n_colors > 0 &&
-            (require_all ? !rb_card_matches_all_heart_colors(cid, colors, n_colors)
-                         : !rb_card_matches_heart_colors(cid, colors, n_colors))) return 0;
-        /* util.rs:1264-1277 「ハートをN個以上」 threshold. */
-        const char *count_text = look_extra(effect, "heart_color_count");
-        if (count_text && *count_text && n_colors > 0) {
-            int threshold = atoi(count_text);
-            Card c;
-            if (rb_decode_card_by_index((uint32_t)cid, &c)) {
-                int passes = require_all;
-                for (int i = 0; i < n_colors; i++) {
-                    int meets = look_heart_count_for_threshold(&c, (int)rb_parse_heart_color(colors[i]))
-                                >= threshold;
-                    if (require_all) {
-                        if (!meets) { passes = 0; break; }
-                    } else if (meets) {
-                        passes = 1;
-                        break;
-                    }
-                }
-                rb_free_card(&c);
-                if (!passes) return 0;
-            }
-        }
+        for (int i = 0; i < n_colors && i < 8; i++)
+            look_copy_unquoted(f.heart_colors[i], sizeof f.heart_colors[i], colors[i]);
+        f.n_heart_colors = n_colors;
     }
+
+    /* util.rs:1833 `characters` is a Vec<String> and matches() tests it with
+       card_matches_characters (util.rs:1723-1731). RbCardFilter carries ONE
+       comma-joined string and util.c:1356-1358 wraps it as a single name, so a
+       multi-name card could never match it centrally. */
+    f.has_characters = 0;
     const char *characters = look_extra(effect, "characters");
     if (characters && *characters) {
         const char *names[8];
@@ -1365,8 +1361,18 @@ static int look_filter_matches(const GameState *g, const AbilityEffect *effect, 
         int n_names = look_split_list(characters, names, 8, buffer, sizeof(buffer));
         if (n_names > 0 && !rb_card_matches_characters(cid, names, n_names)) return 0;
     }
-    /* util.rs:1291-1307 ability_filter, then util.rs:1309-1332 or_ability_filters
-       (when present the branches ARE the whole filter). */
+
+    /* util.rs:1596-1601 any_trigger matches the trigger label with
+       `starts_with`, not `contains`. util.c:1450-1452 uses strstr, so the
+       central matcher would let 「常時:...」 satisfy a plain 「常時」 request
+       (and vice versa). The prefix matcher stays. */
+    f.ability_filter[0] = '\0';
+    f.n_ability_filter_triggers = 0;
+    /* util.rs:1291-1307 ability_filter, then util.rs:1631-1650 or_ability_filters
+       (when branches are present they ARE the whole filter). or_ability_filters
+       is a JSON array of branches (util.rs:1881) that RbCardFilter does not
+       carry and the central matcher has no term for — util.rs:1443 counts it in
+       has_filter — so it is still the only place in the engine that honours it. */
     const char *ability_filter = look_extra(effect, "ability_filter");
     if (ability_filter && *ability_filter) {
         const char *triggers[4];
@@ -1404,8 +1410,11 @@ static int look_filter_matches(const GameState *g, const AbilityEffect *effect, 
                                            branches[i].n_triggers, 1)) { passes = 1; break; }
         if (!passes) return 0;
     }
-    /* util.rs:1390-1408 check_card_property — checked LAST, after the ability
-       filter, and `negation` inverts it. */
+
+    /* util.rs:1654-1673 check_card_property — checked LAST, after the ability
+       filter, and `negation` inverts it. card.c:908-911 populates the member and
+       util.c:42-46 reads it, both behind RB_CARD_FILTER_CARD_PROPERTY, which no
+       build defines; the test therefore still lives here. */
     const char *card_property = look_extra(effect, "card_property");
     if (card_property && *card_property) {
         const char *negation = look_extra(effect, "negation");
@@ -1416,9 +1425,24 @@ static int look_filter_matches(const GameState *g, const AbilityEffect *effect, 
         if (cp) rb_free_card(&c);
         if (!passes) return 0;
     }
-    if (look_bool(effect, "exclude_self") && g && g->activating_card >= 0 && cid == g->activating_card)
-        return 0;
-    return 1;
+
+    /* util.rs:1315-1316 cost_total and util.rs:1327-1332 current_blade_limit are
+       deliberately NOT matches() terms — Rust applies cost_total after
+       selection and the blade bound via filter_current_blade, which needs the
+       modifier table matches() has no access to. card.c:922-925 / :937 fill both
+       regardless, so they are switched off here rather than silently narrowing
+       every looked-at card.
+       util.rs:1848-1852 pins exclude_self to Some(-1), so check_exclude_self
+       (util.rs:1448-1456) rejects nothing at all; the old
+       `cid == g->activating_card` compare here was a divergence, not a fix. */
+    f.has_cost_total = 0;
+    f.has_blade_limit = 0;
+    (void)g;
+
+    int one[1];
+    int hit[1];
+    one[0] = cid;
+    return rb_matching_indices_filter(&f, one, 1, hit, 1) == 1;
 }
 
 static int look_select_matches(GameState *g, const AbilityEffect *select, int cid)

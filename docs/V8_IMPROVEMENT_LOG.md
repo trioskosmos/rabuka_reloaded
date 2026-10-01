@@ -3097,6 +3097,102 @@ It is running: 8 rounds, 800 games each, 50 epochs, against v7. Progress is in
 `training/iterloop/loop.log`. **No win is claimed from it until a round beats
 58.7% on a multi-seed paired run.**
 
+---
+
+## 23. Closing the neural detour, and the 16th live-set null
+
+### 23.1 The learning attempts, all measured, none shipped
+
+The user is right that this was the wrong priority, and the record says so:
+
+| approach | result | vs v7 |
+|---|---|---|
+| behaviour cloning (71k steps) | 53.2% holdout top-1, **35.5%** play | far below |
+| PPO on a measured ladder rung | **regressed** 47.3% → 37.5% | far below |
+| learned value in the leaf, weight 250 | 56.7% (150 games) | noise |
+| learned value in the leaf, weight 1000 | **39.5%** (400 games) | regression |
+
+And the controlling fact is not the net's quality but the reference point: **an
+untrained, randomly-initialised net beats a random player 90-10** (270-30), so the
+encoder genuinely learns the game — and v7 still beats it 84-16. The literature
+explains the gap rather than excusing it: Zhang & Buro measured the *same*
+network at **18.8% standalone and 57.2% inside a search** that kept its
+hand-written evaluation. v9 *is* that search. Learning was being pointed at the
+one part of the bot that was not the problem.
+
+Everything shipped from that detour is capability, not strength: `init_random`,
+`save_weights`, `ppo_train`/`ppo_learn`/`value_train`, the ladder, and the
+`V8_LEARNED_VALUE` leaf hook — all defaulted **off**, with the arena verified
+bit-identical (684-516 / 40898) at every step.
+
+### 23.2 External agents: surveyed, and none are usable here
+
+GitHub is reachable. Real card-game simulators and agents exist — SabberStone
+and Fireplace (Hearthstone), poke-env (Pokémon Showdown), gym-locm, Slay the
+Spire agents — but every one targets a **different game**, so none can be seated
+as an opponent in this engine. The ladder therefore still runs against v1..v9,
+which are all this project's own heuristics; that is a real limitation of the
+training setup and worth stating rather than hiding.
+
+The one transferable artefact is gym-locm's `encode_card`, fetched in full: a
+**17-dim attribute vector with 6 explicit ability-keyword bits and card ID
+deliberately excluded** — the encoding behind ByteRL's double championship. This
+repo's is the inverse, a 128-dim learned ID embedding with no ability bits on
+cards. That is a genuine design difference and the most concrete transfer
+candidate identified. It is **not** implemented, because the research on this exact
+question is discouraging (§21.3: three published negative results on adding
+features) and this game's abilities are trigger-based, which is the documented
+unsolved case for learned ability encoding.
+
+### 23.3 The 16th null: a measured defect, correctly fixed, worth nothing
+
+`score_dist` — the opponent's expected score, which decides the score comparison
+in 51.2% of live phases — is derived from the same `yield_prior`/`board_total`
+that §14.7 found inverted. Measured over **187 committed opponent sets**:
+
+- model's expected opponent score **1.67**, realised **2.60** → **−0.93 bias**
+- 47.1% of cases more than a point low vs 11.2% over-high
+- **Pearson r = 0.601** — so unlike `pass_prob` it carries real signal
+
+`V8_OPP_SCORE_BIAS` shifts the distribution and corrects the measured bias:
+
+| shift | result | discordant | p | delta |
+|---|---|---|---|---|
+| +1 | 688-512 | **8 / 12** | 0.503 | +0.33pp |
+| +2 | 672-528 | 37 / 25 | 0.162 | −1.00pp |
+| −1 | 677-523 | 15 / 8 | 0.210 | −0.67pp |
+
+All null. The +1 arm changed **20 games in 1200** — the smallest intervention
+count of anything in this document. So the score comparison, despite deciding
+half of all phases and having a measured one-point bias, almost never *binds*:
+when v9 passes 91-100% of the checks it takes, most phases are decided before
+score is consulted.
+
+That is the cleanest possible statement of where this project stands. **A real,
+measured, correctly-repaired defect in the live-set model, and the repair is
+worth 20 games.** Sixteen interventions now, all pointing the same way.
+
+### 23.4 What is actually left
+
+Not the live set. Every quantity in it has now been measured against reality:
+`p_pass` (inverted, and inert once corrected — §19.6), `p_place` (well
+calibrated), score (`score_dist`, biased and inert once corrected), the set
+width (tested, flat cap of 2 was p=0.25), and the fold threshold (load-bearing,
+`V8_NO_FOLD` −4.75pp).
+
+The one structural gap identified in this audit that has **never been
+implemented or tested** is the Main leaf. §15.2-A found v9 runs v7's leaf: a
+**one-ply** function with `Pass` hard-coded to 0.0, a **colour-blind** hearts
+term, a `coverage` term (weight 60, the second-largest) that is a **threshold
+rather than a gradient**, and **no term anywhere that varies with the turn**.
+`v8_main.rs:1128-1141` documents in-source that a leaf reading "more board is
+better" cannot represent "stop", with probe evidence that v9 passing was right
+three times out of four.
+
+That is where the next attempt should go, and it is not a switch — it is
+rebuilding the leaf. It is also, notably, the *opposite* of the direction this
+session spent most of its budget on.
+
 
 
 

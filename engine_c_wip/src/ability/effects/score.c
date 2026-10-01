@@ -97,19 +97,16 @@ static int heart_color_matches(int cid, const char *hc) {
     return 0;
 }
 
-/* score.rs:195-202 — util::CardFilter::from_effect(effect) plus the explicit
-   card_type / group overrides and `filter.exclude_self = exclude_self_id`.
-   Note score.rs:188-194: the FULL filter (not filter_subset) is required, so
-   need_heart_total / need_heart_operator must be carried (絶対的LOVER counts
-   only Liella! members with >= 4 hearts). card.c's from_effect port does not
-   read those two keys, so they are filled in here. */
+/* score.rs:195-202 / :212-219 / :344-351 — util::CardFilter::from_effect(effect)
+   plus the explicit `filter.group` override and `filter.exclude_self =
+   exclude_self_id`. `from_effect` is rb_effect_filter_subset (core/card.c), so
+   that call now also carries need_heart_total / need_heart_operator /
+   need_heart_color (util.rs:1839-1841) — score.rs:337-343 asks for the FULL
+   filter precisely because 絶対的LOVER needs them — and the card_type fallback
+   chain (util.rs:1809 -> card.c:824). The two overrides below are the only parts
+   score.rs applies on top of from_effect. */
 static void sc_build_filter(const AbilityEffect *e, RbCardFilter *f, int exclude_self_id) {
     rb_effect_filter_subset(e, f);
-    const char *ct = e->card_type_field[0] ? e->card_type_field : sc_extra(e, "card_type");
-    if (ct && *ct) {
-        strncpy(f->card_type, ct, sizeof f->card_type - 1);
-        f->card_type[sizeof f->card_type - 1] = 0;
-    }
     /* score.rs:180 `let group_filter = effect.group_name().map(...)` then
        score.rs:216-217 / :348-349 `filter.group = Some(g)` — ONE name, the
        first. `group` is not a key on any decoded effect, so that fallback was
@@ -121,35 +118,18 @@ static void sc_build_filter(const AbilityEffect *e, RbCardFilter *f, int exclude
         f->group[sizeof f->group - 1] = 0;
         f->has_group = 1;
     }
-    const char *nht = sc_extra(e, "need_heart_total");
-    if (nht) {
-        f->need_heart_total = atoi(nht);
-        f->has_need_heart_total = 1;
-        const char *op = sc_extra(e, "need_heart_operator");
-        if (op && *op) {
-            strncpy(f->need_heart_operator, op, sizeof f->need_heart_operator - 1);
-            f->need_heart_operator[sizeof f->need_heart_operator - 1] = 0;
-        }
-        const char *nc = sc_extra(e, "need_heart_color");
-        if (nc && *nc) {
-            strncpy(f->need_heart_color, nc, sizeof f->need_heart_color - 1);
-            f->need_heart_color[sizeof f->need_heart_color - 1] = 0;
-        }
-    }
     /* score.rs:46-50 + :202 — exclude_self is *overwritten* with the activating
-       card id, or cleared when the effect does not carry exclude_self. */
+       card id, or cleared when the effect does not carry exclude_self.
+       score.rs:219 / :351 sets the field and NOTHING ELSE, so the filter is not
+       rebuilt afterwards: CardFilter::has_filter (util.rs:1425-1446) has no
+       exclude_self term to begin with, and an otherwise-empty filter matches
+       every card, so the local recompute this used to end with was a no-op. */
     f->has_exclude_self = 0;
     f->exclude_self_id = -1;
     if (exclude_self_id >= 0) {
         f->exclude_self_id = exclude_self_id;
         f->has_exclude_self = 1;
     }
-    f->has_filter = !!(f->card_type[0] || f->has_group || f->has_cost_limit ||
-                       f->has_characters || f->has_exclude_characters || f->has_exclude_self ||
-                       f->ability_filter[0] || f->negation || f->n_heart_colors ||
-                       f->has_need_heart_total || f->has_original_blade || f->has_cost_total ||
-                       f->n_cost_values || f->n_name_fragments || f->distinct ||
-                       f->has_blade_limit);
 }
 
 /* util.rs:686 card_series_matches_group — the canonical group→series mapping. */
@@ -293,94 +273,14 @@ static int sc_filter_matches(const RbCardFilter *f, int cid) {
     return rb_matching_ids(f, &one, 1, out, 1) == 1;
 }
 
-/* card.rs:4194 total_hearts() — sum of the printed base_heart counts for a
-   member, falling back to the need_heart counts for a live card. The C Card
-   lays the three heart maps out as [0, num_base) = base_heart,
-   [num_base, num_base+num_blade) = blade_heart, then need_heart. */
-static int sc_total_hearts(const Card *c) {
-    int total = 0;
-    if (c->num_base > 0) {
-        for (int i = 0; i < c->num_base && i < c->n_hearts; i++)
-            total += c->heart_count[i];
-        return total;
-    }
-    int start = c->num_base + c->num_blade;
-    for (int i = start; i < start + c->num_need && i < c->n_hearts; i++)
-        total += c->heart_count[i];
-    return total;
-}
-
-/* util.rs:1277-1301 — the need_heart_total half of CardFilter::matches.
-   util.c's local_filter_matches compares Card.num_base (the number of heart
-   ENTRIES) instead of the printed heart total, so a 4-heart member reads as
-   "2" and every 「ハートを4つ以上持つ」 filter rejects it. score.c therefore
-   evaluates the threshold itself and keeps the broken util.c field switched
-   off; the central fix belongs in util.c (reported separately). */
-static int sc_need_heart_total_ok(int cid, const RbCardFilter *f) {
-    if (!f->has_need_heart_total) return 1;
-    Card c;
-    if (!rb_decode_card_by_index((uint32_t)cid, &c)) return 0;
-    int total;
-    if (f->need_heart_color[0]) {
-        int hc = rb_heart_index(rb_parse_heart_color(f->need_heart_color));
-        total = 0;
-        /* util.rs:1278-1290 — the per-colour variant reads need_heart only. */
-        int start = c.num_base + c.num_blade;
-        for (int i = start; i < start + c.num_need && i < c.n_hearts; i++)
-            if ((int)c.heart_color[i] == hc) total += c.heart_count[i];
-    } else {
-        total = sc_total_hearts(&c);
-    }
-    rb_free_card(&c);
-    return rb_compare_counts(f->need_heart_operator[0] ? f->need_heart_operator : ">=",
-                             total, f->need_heart_total);
-}
-
-/* A filter copy with the util.c need_heart_total check neutralised, plus the
-   score.c-side threshold applied on top of rb_matching_ids. */
-static void sc_split_need_heart_total(const RbCardFilter *in, RbCardFilter *out, int *flag)
-{
-    *out = *in;
-    *flag = out->has_need_heart_total;
-    out->has_need_heart_total = 0;
-    if (!*flag) return;
-    if (!(out->card_type[0] || out->has_group || out->has_cost_limit ||
-          out->has_characters || out->has_exclude_characters || out->has_exclude_self ||
-          out->ability_filter[0] || out->negation || out->n_heart_colors ||
-          out->has_original_blade || out->has_cost_total || out->n_cost_values ||
-          out->n_name_fragments || out->distinct || out->has_blade_limit))
-        out->has_filter = 0;
-}
-
-static int sc_matches(const RbCardFilter *f, const RbCardFilter *delegated,
-                      int nht_flag, int cid)
-{
+static int sc_matches(const RbCardFilter *f, int cid) {
     if (cid < 0) return 0;
-    int ok;
-    if (nht_flag) {
-        int one = cid, out[1];
-        ok = rb_matching_ids(delegated, &one, 1, out, 1) == 1 &&
-             sc_need_heart_total_ok(cid, f);
-    } else {
-        ok = sc_filter_matches(f, cid);
-    }
+    int ok = sc_filter_matches(f, cid);
     /* util.c's group predicate accepts every card; override it with the
      score.c port of util.rs::card_matches_group_str. */
     if (ok && f->has_group && f->group[0] && !sc_card_matches_group(cid, f->group))
         ok = 0;
     return ok;
-}
-
-/* The filter pair every recipient / per-unit test runs through. */
-typedef struct {
-    RbCardFilter full;      /* need_heart_total intact — used by sc_need_heart_total_ok */
-    RbCardFilter delegated; /* need_heart_total neutralised for util.c's matcher */
-    int nht_flag;
-} ScFilter;
-
-static void sc_filter_pair(const AbilityEffect *e, ScFilter *sf, int exclude_self_id) {
-    sc_build_filter(e, &sf->full, exclude_self_id);
-    sc_split_need_heart_total(&sf->full, &sf->delegated, &sf->nht_flag);
 }
 
 /* util.rs::zone_cards for the per-unit zones score.rs can name. Returns -1 for
@@ -450,11 +350,10 @@ static int sc_apply_distinct(int *ids, int n) {
 /* util.rs:2305-2429 resolve_per_unit_count, restricted to the feature set a
    modify_score effect can carry (group / card_type / need_heart_total /
    exclude_self / distinct / heart_colors / state). */
-static int score_per_unit_count(const GameState *gs, int pl, const ScFilter *sf,
+static int score_per_unit_count(const GameState *gs, int pl, const RbCardFilter *filter,
                                 const char *zone, const char *heart_colors,
                                 const char *state_filter) {
     const RbPlayer *P = &gs->p[pl];
-    const RbCardFilter *filter = &sf->full;
 
     /* util.rs:2320-2344 — per_unit_type "heart_colors" counts the DISTINCT
        heart colours carried by stage members that pass the filter. */
@@ -467,7 +366,7 @@ static int score_per_unit_count(const GameState *gs, int pl, const ScFilter *sf,
             if (P->stage[i] != RB_EMPTY_SLOT) stage[ns++] = P->stage[i];
         int found[8]; memset(found, 0, sizeof found);
         for (int i = 0; i < ns; i++) {
-            if (!sc_matches(filter, &sf->delegated, sf->nht_flag, stage[i])) continue;
+            if (!sc_matches(filter, stage[i])) continue;
             for (int c = 0; c < ncol; c++)
                 if (card_has_heart_color(stage[i], colors[c])) found[colors[c]] = 1;
         }
@@ -509,14 +408,14 @@ static int score_per_unit_count(const GameState *gs, int pl, const ScFilter *sf,
         /* util.rs:2416 count_matching_distinct(cards, db, filter, is_stage) */
         int nk = 0;
         for (int i = 0; i < n; i++)
-            if (sc_matches(filter, &sf->delegated, sf->nht_flag, ids[i]))
+            if (sc_matches(filter, ids[i]))
                 keep[nk++] = ids[i];
         n = nk;
     } else {
         /* util.rs:2418-2427 */
         int nk = 0;
         for (int i = 0; i < n; i++) {
-            if (!sc_matches(filter, &sf->delegated, sf->nht_flag, ids[i])) continue;
+            if (!sc_matches(filter, ids[i])) continue;
             if (!heart_color_matches(ids[i], heart_colors)) continue;
             keep[nk++] = ids[i];
         }
@@ -625,8 +524,8 @@ int rb_execute_modify_score(GameState *gs, int actor, AbilityEffect *e) {
     int owner = rb_target_player_index(resolved_target, master);
     if (owner < 0) owner = 0;
 
-    ScFilter sf;
-    sc_filter_pair(e, &sf, exclude_self_id);
+    RbCardFilter sf;
+    sc_build_filter(e, &sf, exclude_self_id);
 
     /* ── live_total (score.rs:60-184) ─────────────────────────────────── */
     if (is_live_total) {
@@ -673,10 +572,8 @@ int rb_execute_modify_score(GameState *gs, int actor, AbilityEffect *e) {
     /* ── per-card modifiers (score.rs:185-395) ─────────────────────────── */
     /* score.rs:209-211 — negation and card_property describe the per-unit
        COUNT predicate, never which cards receive the modifier. */
-    ScFilter tsf;
-    tsf.full = sf.full;
-    tsf.full.negation = 0;
-    sc_split_need_heart_total(&tsf.full, &tsf.delegated, &tsf.nht_flag);
+    RbCardFilter tsf = sf;
+    tsf.negation = 0;
 
     int final_value = value;
     if (per_unit) {
@@ -692,12 +589,12 @@ int rb_execute_modify_score(GameState *gs, int actor, AbilityEffect *e) {
     int cand[RB_MAX_ZONE];
     int ncand = 0;
     const RbPlayer *P = &gs->p[owner];
-    if (tsf.full.card_type[0] && !strcmp(tsf.full.card_type, "member_card")) {
+    if (tsf.card_type[0] && !strcmp(tsf.card_type, "member_card")) {
         ncand = sc_zone_cards(P, "stage", cand, RB_MAX_ZONE);
         {
             int w = 0;
             for (int i = 0; i < ncand; i++)
-                if (sc_matches(&tsf.full, &tsf.delegated, tsf.nht_flag, cand[i]))
+                if (sc_matches(&tsf, cand[i]))
                     cand[w++] = cand[i];
             ncand = w;
         }
@@ -743,7 +640,7 @@ int rb_execute_modify_score(GameState *gs, int actor, AbilityEffect *e) {
     int act = sc_host(gs);
     for (int i = 0; i < ncand; i++) {
         int cid = cand[i];
-        if (!sc_matches(&tsf.full, &tsf.delegated, tsf.nht_flag, cid)) continue;
+        if (!sc_matches(&tsf, cid)) continue;
         if (self_target && (act < 0 || cid != act)) continue;
         recv[nr++] = cid;
     }

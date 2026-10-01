@@ -626,6 +626,58 @@ static const char *cextra(const AbilityEffect *e, const char *key) {
     return NULL;
 }
 
+/* First comma-separated entry of an ARRAY extra, as a fresh string.
+   engine/src/core/card.rs:2462 AbilityEffect::group_name() is exactly
+   `group_names_any().and_then(|gn| gn.first() ..)`, i.e. the FIRST entry of the
+   plural list, never the whole comma list. The C decoder stores an ARRAY extra
+   as one comma-joined string (vm.c:1116-1122) and only mirrors a ONE-element
+   array onto a singular key for `heart_colors` (vm.c:1120), so every other
+   plural field must be split by hand. Caller frees. */
+static char *cextra_first_entry(const AbilityEffect *e, const char *key) {
+    const char *v = cextra(e, key);
+    if (!v || !*v) return NULL;
+    const char *comma = strchr(v, ',');
+    size_t len = comma ? (size_t)(comma - v) : strlen(v);
+    while (len > 0 && (v[len - 1] == ' ' || v[len - 1] == '\t')) len--;
+    if (len == 0) return NULL;
+    char *out = (char *)rb_malloc(len + 1);
+    if (!out) return NULL;
+    memcpy(out, v, len);
+    out[len] = 0;
+    return out;
+}
+
+/* Split the comma list an ARRAY extra decodes into, through the canonical
+   colour parser, and return the number of entries written.
+   engine/src/core/game_state/modifiers.rs:1006-1013 keys the constant-heart map
+   by `hc.clone()` -- the RAW token of each list entry -- and divides the total
+   by `hc_list.len()`; the C map is indexed by the parsed colour, and duplicates
+   are KEPT because the divisor counts printed icons, not distinct colours
+   (冬毬 PL!SP-bp5-011-R: "heart02,heart02,heart02" is THREE entries, one colour).
+   Out-of-range parses (draw / score) are dropped: RbMods has 8 buckets and
+   Rust's string key would never be read back by any colour query. */
+static int const_heart_color_list(const char *list, int *out, int max) {
+    int n = 0;
+    if (!list || !*list) return 0;
+    const char *p = list;
+    while (*p && n < max) {
+        const char *comma = strchr(p, ',');
+        size_t len = comma ? (size_t)(comma - p) : strlen(p);
+        while (len > 0 && (*p == ' ' || *p == '\t')) { p++; len--; }
+        while (len > 0 && (p[len - 1] == ' ' || p[len - 1] == '\t')) len--;
+        if (len > 0 && len < 32) {
+            char tok[32];
+            memcpy(tok, p, len);
+            tok[len] = 0;
+            int col = (int)rb_parse_heart_color(tok);
+            if (col >= 0 && col < 8) out[n++] = col;
+        }
+        if (!comma) break;
+        p = comma + 1;
+    }
+    return n;
+}
+
 /* Mirror AbilityEffect::per_unit_any (engine/src/ability/types.rs): the
    decoded `per_unit` field, or a `per_unit: "true"` extra. */
 static int ceff_per_unit(const AbilityEffect *e) {
@@ -777,41 +829,195 @@ static void apply_constant_effect(GameState *g, int pl, int host_cid,
             int cnt = per_unit ? constant_gain_per_unit_units(g, pl, host_cid, e)
                                : (e->count>=0?e->count:1);
             if (sign_neg) cnt = -cnt;
-            const char *hc=NULL;
-            for(int i=0;i<e->n_extra;i++) if(e->extra_k[i] && !strcmp(e->extra_k[i],"heart_color")) hc=e->extra_v[i];
-            int col=0;
-            if(hc){
-                if(!strcmp(hc,"pink")||!strcmp(hc,"heart00")||!strcmp(hc,"heart0")) col=0;
-                else if(!strcmp(hc,"red")||!strcmp(hc,"heart01")||!strcmp(hc,"heart1")) col=1;
-                else if(!strcmp(hc,"yellow")||!strcmp(hc,"heart02")||!strcmp(hc,"heart2")) col=2;
-                else if(!strcmp(hc,"green")||!strcmp(hc,"heart03")||!strcmp(hc,"heart3")) col=3;
-                else if(!strcmp(hc,"blue")||!strcmp(hc,"heart04")||!strcmp(hc,"heart4")) col=4;
-                else if(!strcmp(hc,"purple")||!strcmp(hc,"heart05")||!strcmp(hc,"heart5")) col=5;
-                else if(!strcmp(hc,"orange")||!strcmp(hc,"heart06")||!strcmp(hc,"heart6")) col=6;
-                else if(!strcmp(hc,"all")||!strcmp(hc,"heart07")||!strcmp(hc,"b_all")) col=7;
+            /* Colour buckets -- engine/src/core/game_state/modifiers.rs:991-1023:
+
+                 if is_all_heart_type(effect) {
+                     exp_heart[card_id][HEART_ALL_KEY] += n;          // "heart00"
+                 } else {
+                     let hc_list = effect.heart_colors_any();
+                     let per_entry = n / hc_list.len().max(1).max(1);
+                     for hc in hc_list { exp_heart[card_id][hc] += per_entry; }
+                 }
+
+               The list is the PLURAL `heart_colors`. This read the SINGULAR
+               `heart_color` extra, which the decoder only mirrors for a
+               ONE-element array (vm.c:1120), so every multi-icon grant left
+               `hc` NULL and `col` stayed 0 -- Heart00, the wildcard bucket
+               that rb_mods_get_heart adds to EVERY colour query
+               (modifiers.c:64-72). 冬毬 PL!SP-bp5-011-R carries three 常時,
+               each `heart_colors` = "heart02,heart02,heart02" with count 3, so
+               hc_list.len() == 3 and per_entry == 1: the three increments land
+               in the SAME heart02 bucket for a total of 3, exactly as printed,
+               instead of 3 in Heart00 that answered 3 for all seven colours.
+
+               Rust's empty-list else branch writes NOTHING (the loop body never
+               runs), which is why the wildcard fallback below is confined to
+               the `heart_type: "all"` arm: of the 34 constant heart gains in
+               the corpus, the only one without `heart_colors` is exactly that
+               one. */
+            if (rb_is_all_heart_type(e)) {
+                rb_mods_add_heart(&g->mods, tgt_cid, RB_HEART_PINK, cnt);
+                if(!acc) g->mods.constant_heart[tgt_cid][RB_HEART_PINK]+=cnt;
+                if(acc) acc->heart[RB_HEART_PINK]+=cnt;
+            } else {
+                const char *hcl = rb_effect_heart_colors_any(e);
+                int cols[16];
+                int ncols = const_heart_color_list(hcl, cols, 16);
+                int per_entry = (ncols > 0) ? (cnt / ncols) : 0;
+                for (int ci = 0; ci < ncols; ci++) {
+                    int col = cols[ci];
+                    rb_mods_add_heart(&g->mods, tgt_cid, col, per_entry);
+                    if(!acc) g->mods.constant_heart[tgt_cid][col]+=(int16_t)per_entry;
+                    if(acc) acc->heart[col]+=(int16_t)per_entry;
+                }
             }
-            rb_mods_add_heart(&g->mods, tgt_cid, col, cnt);
-            if(!acc) g->mods.constant_heart[tgt_cid][col]+=cnt;
-            if(acc) acc->heart[col]+=cnt;
         }
-    } else if (!strcmp(e->action,"modify_required_hearts") || !strcmp(e->action,"modify_required_hearts_global")) {
-        const char *hc=NULL;
-        for(int i=0;i<e->n_extra;i++) if(e->extra_k[i] && !strcmp(e->extra_k[i],"heart_color")) hc=e->extra_v[i];
-        int col=0;
-        if(hc){
-            if(!strcmp(hc,"pink")||!strcmp(hc,"heart00")) col=0;
-            else if(!strcmp(hc,"red")) col=1;
-            else if(!strcmp(hc,"yellow")) col=2;
-            else if(!strcmp(hc,"green")) col=3;
-            else if(!strcmp(hc,"blue")) col=4;
-            else if(!strcmp(hc,"purple")) col=5;
-            else if(!strcmp(hc,"orange")) col=6;
-            else if(!strcmp(hc,"all")) col=7;
+    } else if (!strcmp(e->action,"modify_required_hearts") ||
+               !strcmp(e->action,"modify_required_hearts_global")) {
+        /* Two Rust twins, and BOTH of them reduce the requirement of a SET of
+           live cards -- never of the 常時's own host:
+
+             * modify_required_hearts_global -- the CONSTANT dispatch arm at
+               engine/src/core/game_state/modifiers.rs:1209-1249. Every card in
+               the RESOLVED TARGET PLAYER's live_card_zone, amount
+               `value_or_count(1)`, signed by `operation`, one entry per
+               `heart_colors_any()` token (HEART_ALL_KEY when the list is
+               empty). No group / score filter -- the global arm has none.
+
+             * modify_required_hearts -- required_hearts.rs:28-223
+               (execute_modify_required_hearts), reached from the constant pass
+               through apply_success_zone_effect (modifiers.rs:2303-2319).
+               Amount `value_or_count(0)`, the same plural colour list, and a
+               candidate set filtered by self_target, group_name and the
+               original-score threshold.
+
+           The arm this replaces read the SINGULAR `heart_color`, took `count`
+           (which on PL!-bp6-022-L is the ORIGINAL-SCORE THRESHOLD 5, not the
+           amount), ignored `operation` entirely, and defaulted `tgt_cid` to
+           the HOST. So 「…自分の元々のスコアが５以上の『μ's』のライブカードの
+           必要ハートをheart0を2減らす」 put +5 on the activator instead of -2 on
+           every μ's live card in the acting player's live-card zone whose
+           ORIGINAL score is >= 5, and Wien's global 常時 (PL!SP-pb2-010-P, +1 to
+           every OPPONENT live card) put its +1 on itself. */
+        int is_global = !strcmp(e->action, "modify_required_hearts_global");
+        const char *etgt = cextra(e, "target");
+        if (!etgt) etgt = e->target;
+        int t_pl = pl;
+        if (etgt && (!strcmp(etgt, "opponent") || !strcmp(etgt, "相手"))) t_pl = 1 - pl;
+
+        /* required_hearts.rs:34-35 / modifiers.rs:1212-1213 --
+             operation   = operation_any().unwrap_or("decrease" | "increase")
+             value       = value_any().or(count).unwrap_or(0 | 1)   */
+        const char *op = cextra(e, "operation");
+        if (!op) op = is_global ? "increase" : "decrease";
+        int val;
+        {
+            const char *vx = cextra(e, "value");
+            if (vx) val = atoi(vx);
+            else if (e->count >= 0) val = e->count;
+            else val = is_global ? 1 : 0;
         }
-        int cnt=e->count>=0?e->count:1;
-        rb_mods_add_need_heart(&g->mods, tgt_cid, col, cnt);
-        if(!acc) g->mods.constant_need_heart[tgt_cid][col]+=cnt;
-        if(acc) acc->need_heart[col]+=cnt;
+
+        /* required_hearts.rs:116-140 -- the candidate set. With self_target
+           and the activating card already in the SUCCESS zone the scan covers
+           live_card_zone chained with success_live_card_zone; otherwise the
+           live-card zone alone. */
+        const RbPlayer *TP = &g->p[t_pl];
+        int cand[RB_MAX_ZONE * 2];
+        int ncand = 0;
+        if (!is_global) {
+            const char *stv = cextra(e, "self_target");
+            int self_target = stv && !strcmp(stv, "true");
+            int activating_in_success = 0;
+            if (self_target && g->activating_card >= 0) {
+                for (int i = 0; i < TP->success.n && !activating_in_success; i++)
+                    if (TP->success.cards[i] == g->activating_card) activating_in_success = 1;
+            }
+            for (int i = 0; i < TP->live.n && ncand < RB_MAX_ZONE * 2; i++)
+                if (TP->live.cards[i] != RB_EMPTY_SLOT) cand[ncand++] = TP->live.cards[i];
+            if (activating_in_success)
+                for (int i = 0; i < TP->success.n && ncand < RB_MAX_ZONE * 2; i++)
+                    if (TP->success.cards[i] != RB_EMPTY_SLOT) cand[ncand++] = TP->success.cards[i];
+        } else {
+            for (int i = 0; i < TP->live.n && ncand < RB_MAX_ZONE * 2; i++)
+                if (TP->live.cards[i] != RB_EMPTY_SLOT) cand[ncand++] = TP->live.cards[i];
+        }
+
+        /* required_hearts.rs:147-167 -- the per-card filters.
+             self_target   -> only the activating card
+             group_name    -> the FIRST entry of `group_names`
+             original_value -> the ORIGINAL score must clear
+                              `original_count` `original_operator`
+           score.rs OriginalScoreFilter::accepts treats a card with NO printed
+           score icon, a missing threshold, or an unknown operator as ACCEPTED
+           ("a parser gap, not a threshold that failed"), so `score == 0` --
+           which is what card.c:105 decodes a scoreless card to -- must pass. */
+        char *grp = NULL;
+        const char *ov = cextra(e, "original_value");
+        int orig_enabled = ov && !strcmp(ov, "true");
+        const char *oc = cextra(e, "original_count");
+        int orig_count = oc ? atoi(oc) : 0;
+        const char *oo = cextra(e, "original_operator");
+        if (!is_global) {
+            grp = cextra_first_entry(e, "group_names");
+            const char *stv = cextra(e, "self_target");
+            int self_target = stv && !strcmp(stv, "true");
+            int keep[RB_MAX_ZONE * 2];
+            int nkeep = 0;
+            for (int i = 0; i < ncand; i++) {
+                int cid = cand[i];
+                if (cid < 0) continue;
+                if (self_target && g->activating_card >= 0 && cid != g->activating_card) continue;
+                if (grp && !rb_card_matches_group_str(cid, grp)) continue;
+                if (orig_enabled && oc && oo) {
+                    Card oc_card;
+                    if (rb_decode_card_by_index((uint32_t)cid, &oc_card)) {
+                        int score = (int)oc_card.score;
+                        rb_free_card(&oc_card);
+                        /* No score icon == Rust's None == accepted. */
+                        if (score > 0 && !rb_compare_counts(oo, score, orig_count)) continue;
+                    }
+                }
+                keep[nkeep++] = cid;
+            }
+            ncand = nkeep;
+            for (int i = 0; i < ncand; i++) cand[i] = keep[i];
+        }
+
+        /* required_hearts.rs:182-186 / modifiers.rs:1223-1228 -- the plural
+           colour list, defaulting to the Heart00 key when it is absent. */
+        const char *hcl = rb_effect_heart_colors_any(e);
+        int cols[16];
+        int ncols = const_heart_color_list(hcl && *hcl ? hcl : "heart00", cols, 16);
+        if (grp) { rb_free(grp); grp = NULL; }
+
+        for (int ci = 0; ci < ncand; ci++) {
+            int cid = cand[ci];
+            if (cid < 0) continue;
+            for (int k = 0; k < ncols; k++) {
+                int col = cols[k];
+                int delta;
+                if (!strcmp(op, "decrease"))       delta = -val;
+                else if (!strcmp(op, "increase")) delta = val;
+                else if (!strcmp(op, "set"))       delta = val;
+                else continue;   /* unknown op: Rust returns Err, applying nothing */
+                if (!strcmp(op, "set")) {
+                    /* required_hearts.rs:203-207. NOTE: `set` is an absolute
+                       write and rb_recalc_constants only reverses the ADDITIVE
+                       constant_need_heart ledger, so a constant `set` is not
+                       withdrawn on the next recalc. No card in the corpus uses
+                       operation:"set" on a 常時, so nothing reaches it today;
+                       withdrawing it properly needs a `set` ledger on RbMods
+                       (rabuka.h), which is not this file's to add. */
+                    rb_mods_set_need_heart(&g->mods, cid, col, delta);
+                    if (acc) acc->need_heart[col] = (int16_t)delta;
+                    continue;
+                }
+                rb_mods_add_need_heart(&g->mods, cid, col, delta);
+                if(!acc) g->mods.constant_need_heart[cid][col]+=(int16_t)delta;
+                if(acc) acc->need_heart[col]+=(int16_t)delta;
+            }
+        }
     } else if (!strcmp(e->action,"set_cost") || !strcmp(e->action,"set_cost_to_use")) {
         int cnt=e->count>=0?e->count:1;
         for(int i=0;i<e->n_extra;i++) if(e->extra_k[i] && !strcmp(e->extra_k[i],"value")) cnt=atoi(e->extra_v[i]);

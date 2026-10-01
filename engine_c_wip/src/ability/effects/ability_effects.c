@@ -141,13 +141,16 @@ int rb_translated_execute_gain_ability_effect(GameState *g, int actor,
             int count = 0;
             for (int i = 0; i < RB_STAGE_SIZE; i++) {
                 int cid = g->p[target_player].stage[i];
-                if (cid != RB_EMPTY_SLOT && rb_card_matches_group_str(cid, group)) {
+                if (cid != RB_EMPTY_SLOT && ae_group_matches_csv_any(cid, group)) {
                     candidate_positions[count] = i;
                     count++;
                 }
             }
             if (count > 0) {
-                int pick = effect->count > 0 ? effect->count : 1;
+                /* ability_ops.rs:88 — `(effect.count_or(1) as usize).min(len)`.
+                 * `count_or` supplies the default ONLY when the field is ABSENT
+                 * (the C sentinel is -1), so a present 0 stays 0. */
+                int pick = effect->count >= 0 ? effect->count : 1;
                 if (pick > count) pick = count;
                 rb_emit_choice(g, actor, RB_CHOICE_SELECT_CARD, "stage",
                                effect->card_type_field[0] ? effect->card_type_field : "member_card",
@@ -161,7 +164,24 @@ int rb_translated_execute_gain_ability_effect(GameState *g, int actor,
                         effect->target ? effect->target : "self",
                         sizeof(g->queue.pending.target_player_id) - 1);
                 rb_queue_pause_for_choice(g, &g->queue.pending);
-                g->queue.resume_mode = 2;
+                /* RESUME ROUTE. This line was `g->queue.resume_mode = 2;`, and 2 is
+                 * the LOOK/SELECT slot: choice.c:4660 hands a mode-2 answer to
+                 * rb_look_resume_indices, a look/select handler that has nothing
+                 * to do with a stage pick. The deferred effect was therefore never
+                 * re-run, the picked members never reached `g->selected_cards`,
+                 * and the `g->n_selected_cards > 0` branch below (the per-recipient
+                 * registration) was UNREACHABLE: the prompt was raised, it was
+                 * answered, and NOTHING was granted.
+                 *
+                 * ability_ops.rs:110 is `gs.ability_queue.set_pending_actions(
+                 * vec![effect.clone()])` — Rust RE-APPLIES THIS EFFECT after the
+                 * choice. The C spelling of that is the generic SelectCard arm of
+                 * rb_resume_with_choice_indices_internal (choice.c:4860-4939):
+                 * rb_resolver_handle_select_card publishes the pick
+                 * (rb_resolver_handle_stage_selection -> stage_publish_selected)
+                 * and then `rb_execute_effect_ex(g, actor, def, host)` re-runs the
+                 * parked effect. resume_mode 0 is what selects that arm. */
+                g->queue.resume_mode = 0;
                 g->queue.resume_eff = effect;
                 g->queue.deferred = effect;
                 g->queue.resume_actor = actor;
@@ -350,7 +370,15 @@ int rb_translated_execute_invalidate_ability(GameState *g, int actor,
         strncpy(g->queue.pending.target_player_id, target,
                 sizeof(g->queue.pending.target_player_id) - 1);
         rb_queue_pause_for_choice(g, &g->queue.pending);
-        g->queue.resume_mode = 2;
+        /* ability_ops.rs:368 — `gs.ability_queue.set_pending_actions(vec![effect
+         * .clone()])`: Rust RE-APPLIES THIS EFFECT once the member is picked, so
+         * the `g->n_selected_cards > 0` arm above does the invalidation. This was
+         * `resume_mode = 2`, the LOOK/SELECT slot (choice.c:4660 ->
+         * rb_look_resume_indices), which consumed the answer without re-running the
+         * effect — so the member was selected and nothing was ever invalidated.
+         * resume_mode 0 selects the generic SelectCard arm, which publishes the
+         * pick and re-runs `queue.deferred`, the effect parked here. */
+        g->queue.resume_mode = 0;
         g->queue.resume_eff = effect;
         g->queue.deferred = effect;
         g->queue.resume_actor = actor;
@@ -492,28 +520,25 @@ int rb_translated_execute_gain_ability_from_source(GameState *g, int actor,
     return copied > 0;
 }
 
-int rb_translated_execute_custom_effect(GameState *g, int actor,
-                                         AbilityEffect *effect,
-                                         const char *action_str)
-{
-    if (!g || !effect) return 0;
-    const char *placement = effect_extra(effect, "placement_order");
-    if (placement && strcmp(placement, "any_order") == 0) {
-        AbilityEffect routed = *effect;
-        routed.action = (char *)"move_cards";
-        if (!routed.source) routed.source = (char *)"looked_at";
-        if (!routed.destination) routed.destination = (char *)"deck_top";
-        rb_effect_move_cards(g, actor, &routed);
-        return 1;
-    }
-    const char *duration = effect_extra(effect, "duration");
-    if (duration && *duration) {
-        rb_gain_ability(g, actor, effect);
-        return 1;
-    }
-    char text[128];
-    snprintf(text, sizeof(text), "[[log_custom_effect:%s]]",
-             action_str ? action_str : "custom");
-    translated_log(g, actor, text);
-    return 1;
-}
+/* DELETED 2026-10-02: rb_translated_execute_custom_effect.
+ *
+ * This was a THIRD C copy of one Rust function —
+ * engine/src/ability/effects/dispatch.rs:238-287,
+ * `AbilityResolver::execute_custom` — and it had no caller. Its two surviving
+ * twins are custom.c's rb_execute_custom_effect and misc.c's h_custom (the one
+ * the `custom` action table actually reaches, via executor.c:330-342 ->
+ * execute_misc).
+ *
+ * It was also the least faithful of the three, which is why deleting it is not
+ * a loss:
+ *   arm 1 built a SHALLOW `AbilityEffect routed = *effect;` and rewrote only
+ *        action/source/destination. Rust's arm 1 is `let mut routed =
+ *        effect.clone()` — a full clone. The shallow copy does keep `count`, but
+ *        it also ALIASES the caller's gained_effect / child-effect pointers,
+ *        which the routed move_cards can then mutate in place.
+ *   arm 2 called rb_gain_ability without the two defaults Rust passes
+ *        explicitly (dispatch.rs:260-268): `text = effect.text or action_str`
+ *        and `target = effect.target or "self"`.
+ *   arm 3 logged "[[log_custom_effect:<action_str>]]"; Rust logs
+ *        "[[log_custom_effect]]" after the player prefix and card name.
+ * custom.c's copy has all three right. */

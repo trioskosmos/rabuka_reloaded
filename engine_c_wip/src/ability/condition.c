@@ -1090,8 +1090,23 @@ static int eval_group(const struct GameState *g, int actor, int host_cid, const 
     /* No group list to match against (mirrors Rust: a group condition tests
        membership in group_names; absent list matches nothing). */
     if (!gn || gn->tag != RB_TAG_ARRAY || gn->arr_n == 0) return 0;
+    /* Rust reads `card_type` in EVERY branch of evaluate_group_condition that
+       filters a card list -- condition/card.rs:1537 (all_areas), :1595
+       (heart_colors) and :1609 (multiple group_names) -- and the shared tail
+       it falls through to is `get_group_card_count` (card.rs:1660-1672), which
+       threads `condition.get_card_type()` into every per-card predicate
+       (card.rs:4333-4412). This branch tested group_names alone, so a lilywhite
+       MEMBER satisfied RIN PL!-bp6-014-N's 常時 「自分の成功ライブカード置き場に
+       『lilywhite』のカードがあるかぎり」 even though its condition carries
+       `card_type: live_card` and the zone holds live cards only.
+
+       Rust's own fallback for a card the database does not know
+       (util.rs card_matches_group_str's is_none_or pass) is preserved here by
+       the `continue`: an undecodable id matches no group either way. */
+    const char *ctc2 = get_str(c, "card_type");
     for(int i=0;i<n;i++){
         Card card; if(!rb_decode_card_by_index((uint32_t)ids[i],&card)) continue;
+        if (ctc2 && !card_matches_card_type_filter(ids[i], ctc2)) { rb_free_card(&card); continue; }
         /* Diagnostic only: both strings come from the canonical accessors. The
            raw `group` record index is "" for all 2,639 cards, so printing it
            told a reader the card had no group when in fact it had a series. */

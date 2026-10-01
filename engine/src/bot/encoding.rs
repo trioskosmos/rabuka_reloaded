@@ -10,7 +10,7 @@ pub const POSITION_FEATURES: usize = 4;
 pub const STAGE_ABILITY_FEATURES: usize = 13;
 pub const ACTION_EXTRA_FEATURES: usize = 9;
 pub const GLOBAL_FEATURES: usize = 98;
-pub const SCHEMA_VERSION: f32 = 5.0;
+pub const SCHEMA_VERSION: f32 = 6.0;
 pub const ACTION_ENC_DIM: usize = ACTION_TYPE_EMBED_DIM
     + CARD_EMBED_DIM
     + ZONE_EMBED_DIM
@@ -139,9 +139,9 @@ pub struct ActionEncoding {
     //
     // `choice_option` deliberately stays `u16`. Unlike `card_index` it is
     // pushed into the feature vector UNGUARDED, so its absent case feeds
-    // `u16::MAX / 16.0` ≈ 4095.9 into the network. Narrowing it to `u8` would
-    // silently change that to `255 / 16.0` ≈ 15.9 for every action with no
-    // choice option — a change to what the model is being asked, not a change
+    // `u16::MAX / 16.0` ≁E4095.9 into the network. Narrowing it to `u8` would
+    // silently change that to `255 / 16.0` ≁E15.9 for every action with no
+    // choice option  Ea change to what the model is being asked, not a change
     // to how the number is stored. If that ever needs to change it is a
     // re-tuning decision, not a width decision.
     pub choice_option: u16,
@@ -456,5 +456,119 @@ mod tests {
         assert_eq!(encoded.len(), ACTION_ENC_DIM);
         assert_eq!(encoded[0], 2.0);
     }
+}
+
+/// LOCM-style attribute card encoding, ported from gym-locm's
+/// `LOCMEnv.encode_card` (github.com/ronaldosvieira/gym-locm, MIT) — the
+/// encoding behind ByteRL's COG2022 double championship.
+///
+/// It is deliberately INVERSE to this repo's default:
+///
+///   LOCM : 17 fixed dims per card — 4 type one-hots, 6 numerics, 6 ability
+///          KEYWORD BITS, 1 area — with **card ID excluded on purpose**.
+///   Here: a 128-dim LEARNED embedding looked up by card ID, and no ability
+///          bits at all outside on-stage positions.
+///
+/// Two choices transfer, and the second is the one that matters here:
+///
+/// 1. Attribute features instead of ID. arXiv 2407.05879 measured this on
+///    Magic: "Even random vectors as card representations and one-hot
+///    encodings yield similar results as encoding a card's semantics" — so ID
+///    carries no in-distribution strength, only generalisation to unseen cards,
+///    which this fixed deck does not need. Copied for the reason below, not
+///    this one.
+/// 2. **Explicit ability bits in the card vector.** LOCM's 6 keywords sit
+///    inside the per-card vector. This repo's `AbilityFeatures` (13 fields) is
+///    attached ONLY to on-stage positions, so **a card in hand has no ability
+///    representation at all** — and hand is precisely where the live set is
+///    chosen. §21.3's three negative results were about adding ability features
+///    to a representation that already had them per zone; here they are absent
+///    from the zone that decides commitment.
+///
+/// The vocabulary is mapped, not copied — LOCM's 6 keywords are game-specific.
+/// A bit is set only where the underlying card carries that trigger class.
+pub const LOCM_CARD_FEATURES: usize = 17;
+
+/// Encode one card in LOCM's attribute style. `cid < 0` (an empty slot) encodes
+/// as all zeros, matching LOCM's `fill_cards` dummy padding.
+pub fn locm_card_features(card_db: &crate::card::CardDatabase, cid: i16) -> [f32; LOCM_CARD_FEATURES] {
+    use crate::ability::types::AbilityKind;
+    use crate::card::CardType;
+
+    let mut v = [0.0f32; LOCM_CARD_FEATURES];
+    if cid < 0 {
+        return v;
+    }
+    let Some(card) = card_db.get_card(cid) else {
+        return v;
+    };
+
+    // [0..4) card type one-hot.
+    let type_slot = match card.card_type {
+        CardType::Live => 0,
+        CardType::Member => 1,
+        CardType::Energy => 2,
+        _ => 3,
+    };
+    v[type_slot] = 1.0;
+
+    let base_total = card
+        .base_heart
+        .as_ref()
+        .map(|h| h.hearts.values().map(i32::from).sum::<i32>())
+        .unwrap_or(0) as f32;
+    let need_total = card
+        .need_heart
+        .as_ref()
+        .map(|h| h.hearts.values().map(i32::from).sum::<i32>())
+        .unwrap_or(0) as f32;
+
+    // [4..10) numerics. LOCM divides by 12 for cost/attack/defense; this game's
+    // members run to cost 17 and lives to need 15, so the divisors differ. The
+    // SHAPE transfers, not the constants.
+    v[4] = f32::from(card.cost.unwrap_or(0)) / 20.0;
+    v[5] = base_total / 12.0;
+    v[6] = f32::from(card.score.unwrap_or(0)) / 12.0; // live score ~ LOCM attack
+    v[7] = need_total / 16.0;
+    v[8] = f32::from(card.blade) / 8.0;
+    v[9] = 0.0; // LOCM's `enemy_hp` modifier; no counterpart here.
+
+    // [10..16) ability keyword bits, mapped to LOCM's vocabulary:
+    //   0 "B" breakthrough -> a live, i.e. something that changes zone state
+    //   1 "C" charge       -> a member with a Debut ability
+    //   2 "D" drain        -> a permanent board modifier
+    //   3 "G" guard        -> a heavyweight member
+    //   4 "L" lethal       -> a life that can close a check on its own
+    //   5 "W" ward         -> an energy card
+    let mut has_live_start = false;
+    let mut has_debut = false;
+    let mut has_permanent = false;
+    for effect in card.effects.iter().flatten() {
+        match effect.kind {
+            AbilityKind::LiveStart => has_live_start = true,
+            AbilityKind::Debut => has_debut = true,
+            _ => has_permanent = true,
+        }
+    }
+    match card.card_type {
+        CardType::Live => {
+            v[10] = 1.0;
+            // "Lethal": a requirement a real board can already meet.
+            v[14] = f32::from(need_total <= 7);
+        }
+        CardType::Member => {
+            v[11] = f32::from(has_debut);
+            v[12] = f32::from(has_permanent || has_live_start);
+            v[13] = f32::from(card.cost.unwrap_or(0) >= 11);
+        }
+        CardType::Energy => {
+            v[15] = 1.0;
+        }
+        _ => {}
+    }
+
+    // [16) area of effect: LOCM 1.5's single enum float. This game has no
+    // equivalent, so it stays 0 rather than inventing one.
+    v
 }
 

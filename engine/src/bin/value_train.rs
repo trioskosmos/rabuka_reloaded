@@ -137,6 +137,7 @@ fn load(path: &str, per_game: usize, seed: u64) -> Vec<Sample> {
 }
 
 fn trunk(net: &PolicyNet, state: &[f32], state_dim: usize) -> (Vec<f32>, f32) {
+    // Read the width from the weights rather than assuming HIDDEN.
     let hidden = net.b1.len();
     let mut h = vec![0.0f32; hidden];
     for (i, row) in net.w1_state.chunks_exact(state_dim).enumerate() {
@@ -146,6 +147,24 @@ fn trunk(net: &PolicyNet, state: &[f32], state_dim: usize) -> (Vec<f32>, f32) {
         }
         h[i] = if s > 0.0 { s } else { 0.0 };
     }
+    // Residual block, mirroring `PolicyNet::forward_state` exactly. The trainer
+    // must compute the same forward pass as inference or the gradients are for
+    // a different function.
+    let mut h_pre_resid = h.clone();
+    if net.w2_state.len() == hidden * hidden {
+        let mut h2 = vec![0.0f32; hidden];
+        for (i, row) in net.w2_state.chunks_exact(hidden).enumerate() {
+            let mut s = net.b2[i];
+            for (w, x) in row.iter().zip(h.iter()) {
+                s += w * x;
+            }
+            h2[i] = if s > 0.0 { s } else { 0.0 };
+        }
+        for i in 0..hidden {
+            h[i] += h2[i];
+        }
+    }
+    let _ = &mut h_pre_resid;
     let mut v = net.b_value;
     for (w, hh) in net.w_value.iter().zip(h.iter()) {
         v += w * hh;
@@ -275,6 +294,28 @@ fn main() {
             net.init_random(0xC0FFEE);
             eprintln!("cold start (Xavier)");
         }
+    }
+    // `VF_RESIDUAL=1` adds the residual block (IMPALA-style). OFF by default so
+    // the architecture can be A/B'd rather than assumed.
+    let use_residual = std::env::var_os("VF_RESIDUAL").is_some();
+    if use_residual {
+        net.w2_state = vec![0.0f32; HIDDEN * HIDDEN];
+        net.b2 = vec![0.0f32; HIDDEN];
+        // Xavier for the residual branch. It is added to h, so too large a scale
+        // would swamp the trunk; sqrt(2/HIDDEN) is the standard init for a branch
+        // feeding a residual sum.
+        let mut r = 0x51ED_C0DE_1234_5678u64;
+        let mut next = || {
+            r ^= r << 13;
+            r ^= r >> 7;
+            r ^= r << 17;
+            ((r >> 11) as f32 / (1u64 << 53) as f32) * 2.0 - 1.0
+        };
+        let scale = (2.0 / HIDDEN as f32).sqrt();
+        for w in net.w2_state.iter_mut() {
+            *w = next() * scale;
+        }
+        eprintln!("residual block enabled ({HIDDEN}x{HIDDEN})");
     }
     let hidden = net.b1.len();
 

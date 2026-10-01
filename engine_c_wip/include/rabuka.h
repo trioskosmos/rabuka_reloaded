@@ -1243,6 +1243,11 @@ int rb_use_count(RbAbilityQueue *q, int card_id, int ability_idx, int cur_turn);
 void rb_choice_set_route(RbChoice *ch, RbChoiceRoute r);
 void rb_choice_set_description(RbChoice *ch, const char *desc);
 
+/* One flattened (card_id, colour, entry) triple of Rust's
+ * PerformanceSnapshot.performance_need_heart_modifiers. */
+typedef struct { int16_t card_id; int8_t color; RbModifierEntry entry; } RbPerfNeedHeartMod;
+#define RB_MAX_PERF_NEED_HEART_MODS 64
+
 typedef struct {
     int player; /* 0/1 */
     int turn;
@@ -1263,6 +1268,24 @@ typedef struct {
      int yell_cards[RB_MAX_LIVE_CARDS * 3];
      int n_yell_cards;
      int yell_blade_hearts[8];
+    /* Rust PerformanceSnapshot.performance_need_heart_modifiers (types.rs:481),
+     * captured at phases.rs:324-333 and :621-632, consumed by
+     * restore_performance_need_heart_modifiers (game_state/modifiers.rs:2136-2159).
+     * The capture is a FLATTENING of the whole map, not a delta:
+     *   mods.need_heart_modifiers.iter()
+     *     .flat_map(|(&card_id, colors)| colors.iter().map(|(&c, e)| (card_id, c, *e)))
+     *     .collect()
+     * The C source shape already exists as RbMods.need_heart[RB_MAX_CARD_IDS][8]
+     * of RbModifierEntry{int16_t set; int16_t add;} (rabuka.h:198), with
+     * rb_mods_add_need_heart / rb_mods_set_need_heart / rb_mods_get_need_heart
+     * already exported. Only ever ITERATED, never keyed.
+     * NOTE: the whole need_heart_modifiers EFFECT FAMILY is still absent from the
+     * C tree - a repo-wide grep finds only the "need_heart_mod" string-table entry
+     * and one classification. Nothing writes or reads mods.need_heart yet, so this
+     * field is the missing restore SIDE only; the granting side still has to be
+     * ported or restoring is a no-op. */
+    RbPerfNeedHeartMod performance_need_heart_modifiers[RB_MAX_PERF_NEED_HEART_MODS];
+    int n_performance_need_heart_modifiers;
 } RbLiveSnapshot;
 
 
@@ -2271,6 +2294,21 @@ typedef struct {
     char  blade_op[8];
     int   has_blade_limit;
     int   has_filter;
+    /* ── Fields Rust's CardFilter carries and the C filter had NO home for ──────
+     * The `or_ability_filters` extra IS decoded (vm.c stringifies the
+     * array-of-OBJVAR into JSON), but there was nowhere to put the branches, so
+     * every caller going through rb_effect_filter_subset + rb_matching_* silently
+     * DROPPED the OR-ability filter. `has_filter`'s corresponding Rust term
+     * (util.rs:1443) was therefore unreachable.
+     * `card_property` had the same problem: score.rs:358-360's explicit
+     * `target_filter.card_property = None` reset was satisfied only ACCIDENTALLY,
+     * because there was no member to set.
+     * These land so the one true filter builder can carry them; look.c, score.c
+     * and move.c each hand-roll a partial build of exactly these and should be
+     * reduced to a call once populated. */
+    char  or_ability_filters[4][192];
+    int   n_or_ability_filters;
+    char  card_property[64];
 } RbCardFilter;
 
 int rb_effect_filter_subset(const AbilityEffect *e, RbCardFilter *out);

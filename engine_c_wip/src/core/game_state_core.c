@@ -187,6 +187,7 @@ int rb_gsc_phase_invariant(const GameState *g) {
     if (!g) return 0;
     switch (g->phase) {
     case RB_PHASE_RPS:                 /* RockPaperScissors */
+    case RB_PHASE_OPENING:             /* ChooseFirstAttacker — a distinct C phase; Rust mod.rs:577-582 lists it in this same early-true group */
     case RB_PHASE_MULLIGAN_FIRST:      /* MulliganFirstAttacker */
     case RB_PHASE_MULLIGAN_SECOND:     /* MulliganSecondAttacker */
         return 1;
@@ -387,16 +388,20 @@ void rb_gsc_clear_effect_tracking(GameState *g) {
 
 /* ── tracking accessors ─────────────────────────────────────────────────────
    Rust: mod.rs:987-1035. */
+/* Rust: mod.rs:987-991 — `Option<i16>`, and -1 is the C field's own "no area
+   move yet" sentinel (game_state_abilities.c:1544 reads it the same way).
+   Returning 0 here would hand a caller card id 0, which is a real card. */
 int rb_gsc_last_area_move_card_id(const GameState *g) {
-    return g ? g->last_area_move_card_id : 0;
+    return g ? g->last_area_move_card_id : -1;
 }
 int rb_gsc_last_area_move_by_player(const GameState *g) {
     return g ? g->last_area_move_by_player : -1;
 }
 /* last_cost_wait_member: the FINAL member waited by the current cost
-   (Q266 dynamic blade-limit reference member). */
+   (Q266 dynamic blade-limit reference member). Rust mod.rs:993-995 returns
+   Option<i16>, so "nobody was waited on" is -1, not 0. */
 int rb_gsc_last_cost_wait_member(const GameState *g) {
-    if (!g || g->n_last_cost_waited_members <= 0) return 0;
+    if (!g || g->n_last_cost_waited_members <= 0) return -1;
     return g->last_cost_waited_members[g->n_last_cost_waited_members - 1];
 }
 
@@ -658,11 +663,15 @@ void rb_gsc_push_rule_log_fmt(const char *fmt, ...) {
     rb_gsc_push_rule_log(buf);
 }
 
-/* ── log_entry / log_ability ────────────────────────────────────────────────
-   Rust: mod.rs:1117-1161. Gated on logging_enabled (rb_log_push_verdict's own
-   gate) and ABILITY_DEBUG; log_ability fills the prefix / source card / card
-   name from the currently activating card. `structured_log` has no C field,
-   so only the rule-log half lands (reported). */
+/* ── log_entry ─────────────────────────────────────────────────────────────
+    Rust: mod.rs:1117-1161. Gated on logging_enabled (rb_log_push_verdict's own
+    gate); `player_label` / `source_card_name` feed the structured entry, which
+    has no C field, so only the rule-log text half lands (reported).
+
+    Rust's SIBLING `log_ability` (mod.rs:1154-1162) is deliberately NOT ported:
+    it has ZERO callers in engine/src and ZERO in engine/tests, so it is not a
+    port of anything and was dead weight here. It was the only reason
+    rb_gsc_player_prefix_id had a (discarded) caller. */
 void rb_gsc_log_entry(GameState *g, const char *text, const char *player_label, int source_card_id,
                       const char *source_card_name, const char *category) {
     if (!text) return;
@@ -673,20 +682,6 @@ void rb_gsc_log_entry(GameState *g, const char *text, const char *player_label, 
              source_card_name ? source_card_name : "None");
     rb_gsc_push_rule_log(line);
     (void)player_label;   /* only feeds the structured entry, which has no C field */
-}
-
-void rb_gsc_log_ability(GameState *g, const char *text, const char *category) {
-    if (!g || !text) return;
-    const char *pp = rb_gsc_player_prefix_id(g);
-    int cid = g->activating_card;
-    char name[128]; name[0] = '\0';
-    if (cid >= 0) rb_card_get_card_names(cid, name, sizeof(name));
-    char line[768];
-    snprintf(line, sizeof(line), "[T%d %s] %s | event=%s source=%d card=%s",
-             g->turn, rb_phase_name(g->phase), text, category ? category : "",
-             cid, name[0] ? name : "None");
-    rb_gsc_push_rule_log(line);
-    (void)pp;
 }
 
 /* ── push_choice_offered / push_choice_resolved ─────────────────────────────

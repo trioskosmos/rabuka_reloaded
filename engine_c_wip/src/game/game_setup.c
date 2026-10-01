@@ -34,6 +34,67 @@
  * existing rb_* (PROGRESS.md anti-pattern #3/#4: no new parallel architecture,
  * translate onto the existing GameState model).
  *
+ * ──────────────────────────── REACHABILITY MAP (2026-10-02) ────────────────
+ * This port's dominant defect is CORRECT CODE WITH ZERO CALLERS, so the call
+ * graph is recorded here rather than left to be re-derived. External callers
+ * (src/ and tests/ counted separately; no test/ file references rb_setup_* at
+ * all, so every count below is engine-side):
+ *
+ *   WIRED (external src caller)
+ *     rb_setup_game                        engine.c:1246 (decl), :1324 (call)
+ *     rb_setup_choose_attacker             phase.c:22 (decl), :103
+ *     rb_setup_handle_mulligan_skip        phase.c:23 (decl), :111
+ *     rb_setup_for_each_ability_candidate  phase.c:33 (decl), :1459
+ *
+ *   Everything else is reachable only from inside this file. Two blockers,
+ *   both outside this file's ownership:
+ *
+ *   (1) rb_setup_execute_action / _for_player take `RbSetupAction`, and
+ *       `RbSetupAction` / `RbSetupActionType` are declared HERE, not in
+ *       include/rabuka.h. No other translation unit can construct the argument,
+ *       so the entire 29-variant action dispatch (the C twin of Rust's 81-caller
+ *       game_setup::execute_action) is uncallable by construction. That is why
+ *       rb_setup_mulligan_candidates, rb_setup_play_candidates,
+ *       rb_setup_live_card_candidates, rb_setup_concede,
+ *       rb_setup_stage_area_from_parameters and the RPS / SetLiveCard /
+ *       PlayMemberToStage arms have no caller: they are all downstream of it.
+ *       tests/test_parity_rules.c:1363 and tests/test_parity_rules_extra.c:229,
+ *       :275, :307 assert that concede gap as an EXPECTED_GAP, so whoever adds
+ *       the header field must revisit those pins with their owner.
+ *
+ *   (2) rb_generate_action_candidates (src/turn/phase.c:1353) returns an empty
+ *       list unless phase == RB_PHASE_MAIN, so it never reaches the mulligan /
+ *       live-set / RPS row builders. That is why the *_candidates row functions
+ *       and rb_setup_is_live_card_set_phase have no consumer.
+ *       rb_generate_action_candidates also carries an INLINE re-implementation
+ *       of the play-member scan that rb_setup_play_candidates ports faithfully,
+ *       and the two disagree twice:
+ *         phase.c:1384  effective_cost = card.cost + cost_modifier - reduction
+ *         Rust  :1769/1783  effective_cost = card_cost.saturating_sub(reduction)
+ *                           (card_cost = card.cost.unwrap_or(0); the constant
+ *                           cost modifier is NOT folded in here)
+ *         phase.c:1405  existing_cost = existing.cost + existing_modifier
+ *         Rust  :1674  floored_cost(existing.cost, mods.get_cost_modifier(..))
+ *                      = saturate_u8(base + modifier).max(1)
+ *         so a 0-cost baton-touched member is priced at 0 by the live path and
+ *         at 1 by Rust.
+ *       Neither drift is fixable from here; both disappear the moment that loop
+ *       calls rb_setup_play_candidates.
+ *
+ *   NOT A DEFECT — presentation. The eight deck_ordering.rs functions
+ *   (rb_setup_series_priority / _rarity_priority / _extract_series /
+ *   _extract_rarity / _extract_base / _gba_sort_key / _sort_deck_for_gba /
+ *   _flatten_and_sort_for_gba) are GBA-deck-builder ordering, pure string and
+ *   sort logic. Nothing in engine/src/game/ calls them: series_priority and
+ *   rarity_priority are called only by gba_sort_key, gba_sort_key only by
+ *   sort_deck_for_gba / flatten_and_sort_for_gba, and extract_base, both sorts
+ *   and the whole module have ZERO callers outside deck_ordering.rs's own
+ *   #[cfg(test)] mod. platforms/gba/src/deck_builder.rs:889 carries its own
+ *   copy (extract_base_card_no) instead of importing them. So they are dead in
+ *   Rust too, they are GBA-UI presentation rather than a rule, and engine_c_wip
+ *   has no GBA front end to consume them. Recorded so the next reader does not
+ *   spend a session on it as a false lead.
+ *
  * CROSS-FILE REQUESTS are marked `XREQ` below and repeated in the handover
  * report: everything in this file is verified with
  *   gcc -fsyntax-only -std=c11 -Iinclude -Isrc -Isrc/core/generated \
@@ -190,6 +251,38 @@ typedef struct {
 
 /* ─────────────────────────── small helpers ─────────────────────────── */
 
+/* SELECTION STORAGE (flagged 2026-10-02 — HEADER REQUEST, do not "fix" here).
+ *
+ * These three helpers read and write g->selected_cards / g->n_selected_cards,
+ * which is the SINGLE selection list include/rabuka.h:1379-1380 declares. Rust
+ * has THREE separate ones and this file currently borrows one array for two of
+ * them:
+ *   core/game_state/mod.rs:151  mulligan_selected_indices: SmallVec<[u8; 6]>
+ *   core/game_state/mod.rs:152  live_card_selected_indices: SmallVec<[u8; 3]>
+ *   the pending-choice selection that include/rabuka.h:1379 already carries
+ *   (chosen.c reads/writes it in ~164 places).
+ * phases.rs:743/770/796/802 use the FIRST for every mulligan row and
+ * phases.rs:856/863/867/880/903/914 use the SECOND for every live-set row.
+ *
+ * So a mulligan selection and a live-card selection are NOT independently
+ * representable here, and neither is either of them versus a pending choice.
+ * It is correct today for two reasons and no more: the mulligan phases and the
+ * live-set phases are disjoint, and rb_advance_phase refuses to move while a
+ * choice is pending (phase.c:68), so the headless auto-pass can never clear a
+ * live choice list through setup_clear_selection(). Neither property is
+ * enforced — nothing stops a host from driving rb_setup_handle_mulligan_skip
+ * while a choice is open, and setup_clear_selection would silently drop the
+ * choice's picks.
+ *
+ * Rust lines for the header field that makes this representable:
+ *   core/game_state/mod.rs:151  mulligan_selected_indices: SmallVec<[u8; 6]>
+ *   core/game_state/mod.rs:152  live_card_selected_indices: SmallVec<[u8; 3]>
+ * i.e. two more fixed int[N] + int count pairs on GameState. RB_MAX_RECENTLY_MOVED
+ * (8) is a safe N for the mulligan list (a hand is at most RB_MAX_HAND, but a
+ * mulligan selection is a subset of the 6 dealt cards) and RB_MAX_LIVE_CARDS (3)
+ * is exactly right for the live-set list, which is already hard-capped by
+ * rb_setup_live_card_set_max.
+
 /* AbilityEffect extra-string getter (card.rs filter_str_getter!). */
 static const char *setup_effect_extra(const AbilityEffect *e, const char *key) {
     if (!e || !key) return NULL;
@@ -329,14 +422,25 @@ void rb_setup_settle_single_player_state(GameState *g) {
 
 /* game_setup.rs:434 settle_auto — used by platform main loops after executing
  * an action. Same loop as settle_single_player_state PLUS the two pre-game
- * phases (RockPaperScissors / ChooseFirstAttacker), which the C phase machine
- * spells RB_PHASE_RPS (there is no separate ChooseFirstAttacker phase; the C
- * ChooseFirstAttacker decision is an ACTION, see rb_setup_choose_attacker). */
+ * phases (RockPaperScissors / ChooseFirstAttacker).
+ *
+ * RB_PHASE_OPENING IS the C spelling of Rust's Phase::ChooseFirstAttacker:
+ * src/core/data.c:650 names it "Choose 1st", src/turn/phase.c:458 says so
+ * explicitly, and phase.c:102-105 dispatches it into rb_setup_choose_attacker.
+ * Omitting it (as this body used to) means the loop breaks with the game
+ * parked on Choose-1st, which is exactly the stall rb_advance_phase's own
+ * RPS arm walks out of two lines earlier — the C would leave the opening and
+ * then stop dead on the phase the RPS arm hands off to.
+ *
+ * The two MULLIGAN phases are deliberately NOT auto-advanced here, matching
+ * Rust's `matches!` list: a mulligan is a player decision, so settle_auto must
+ * stop and let generate_possible_actions offer the rows. */
 void rb_setup_settle_auto(GameState *g) {
     if (!g) return;
     for (unsigned i = 0; i < 500u; i++) {
         if (rb_has_pending_choice(g) || !setup_game_ongoing(g)) break;
-        if (rb_setup_is_automatic_phase(g) || g->phase == RB_PHASE_RPS) {
+        if (rb_setup_is_automatic_phase(g) ||
+            g->phase == RB_PHASE_RPS || g->phase == RB_PHASE_OPENING) {
             rb_advance_phase(g);
         } else {
             break;
@@ -374,14 +478,25 @@ int rb_setup_choose_attacker(GameState *g, int p1_first) {
 /* ==========================================================================
  * Mulligan — turn/phases.rs + core/game_state/mod.rs:788
  *
- * FAITHFULNESS NOTE: src/turn/phase.c:359-377 currently ships
- * rb_handle_mulligan_selection / _confirmation / _skip as STUBS that only
- * flip mulligan_selecting[] / mulligan_done[] and never touch a hand. The
- * rb_setup_* functions below are the faithful ports of the Rust logic; they
- * are NOT wired into rb_advance_phase (which I may not edit). Phase ownership
- * is the load-bearing part of the regression the Rust suite
- * (turn/mulligan_tests.rs) exists for: the owner must be captured BEFORE the
- * phase advances, or the replacement is applied to the opponent's hand.
+ * PHASE OWNERSHIP (verified 2026-10-02). The stubs this note used to describe
+ * — phase.c's rb_handle_mulligan_selection / _confirmation / _skip, which only
+ * flipped mulligan_selecting[] / mulligan_done[] and never touched a hand —
+ * ARE DELETED from src/turn/phase.c. The rb_setup_* functions below are the
+ * single live implementation of turn/phases.rs:661-805.
+ *
+ *   - SKIP is wired: phase.c:110-113 drives RB_PHASE_MULLIGAN_FIRST/SECOND into
+ *     rb_setup_handle_mulligan_skip, which is how a headless game walks the
+ *     whole ceremony (rb_game_init parks on RPS → rb_advance_phase resolves RPS
+ *     → RB_PHASE_OPENING → rb_setup_choose_attacker draws 6 each and enters
+ *     MULLIGAN_FIRST → both mulligans skip → ACTIVE). Proven by rb_engine's
+ *     own trace: both hands read 7 with deck 33 on the first printed state,
+ *     i.e. 6 dealt + 1 draw phase.
+ *   - SELECTION and CONFIRMATION are NOT reachable. They are reached only from
+ *     rb_setup_execute_action, and rb_setup_execute_action has no caller
+ *     because its parameter type RbSetupAction / RbSetupActionType is declared
+ *     at the top of THIS FILE and not in include/rabuka.h — no other
+ *     translation unit can name it. That is the whole blocker, and it is a
+ *     header request, not a missing call.
  * ==========================================================================*/
 
 /* game_state/mod.rs:788 mulligan_owner_index — the seat whose mulligan decision

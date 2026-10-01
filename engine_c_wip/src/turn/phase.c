@@ -320,14 +320,32 @@ void rb_player_refresh(GameState *g, int pl) {
        deck is empty, shuffles the waitroom (discard) back in. */
     RbPlayer *P = &g->p[pl];
     if (P->deck.n == 0 && P->discard.n > 0) {
-        for (int i = 0; i < P->discard.n; i++) P->deck.cards[P->deck.n++] = P->discard.cards[i];
-        P->discard.n = 0;
-        rb_shuffle(P->deck.cards, P->deck.n);
+        /* Rust Player::refresh (core/player.rs:634-648) shuffles the waitroom and
+           pushes the WHOLE of it under the deck; main_deck.cards is a Vec, so it
+           is unbounded. The C RbBag is capped at RB_MAX_ZONE, so the surplus has
+           to STAY in the waitroom. The old body copied the entire waitroom into
+           deck.cards[] with no cap expression at all and then cleared discard.n
+           unconditionally — the "a card leaves one zone and arrives in none"
+           shape zones.c:102-119 already fixed for its twin rb_zone_refresh.
+           Still latent (the deck.n == 0 guard makes discard.n the only
+           contribution, and every waitroom push is capped), but one guard
+           removal away, so it is bounded here rather than relied upon.
+
+           Shuffling the WAITROOM before the copy rather than the deck after it is
+           byte-equivalent whenever everything crosses — deck.n == 0 here, so
+           both orderings run the same number of draws over the same set. */
+        rb_shuffle(P->discard.cards, P->discard.n);
+        int moved = 0;
+        while (moved < P->discard.n && P->deck.n < RB_MAX_ZONE)
+            P->deck.cards[P->deck.n++] = P->discard.cards[moved++];
+        if (moved < P->discard.n) {
+            for (int i = moved; i < P->discard.n; i++)
+                P->discard.cards[i - moved] = P->discard.cards[i];
+            P->discard.n -= moved;
+        } else {
+            P->discard.n = 0;
+        }
         P->deck_refreshed_this_turn = 1;
-        /* After a deck-out refresh, all energy is active again (Rust
-            Player::refresh re-activates the energy zone). Only re-sync here —
-            NOT on every draw — otherwise paying energy is silently undone. */
-        P->energy_active = P->energy.n;
     }
 }
 

@@ -80,6 +80,17 @@ platforms/gba/src/card_art_gen.rs
 training/*.bin
 training/*.pt
 
+# Everything under training/ except the trainer itself. The two globs above are
+# anchored to `training/` because they contain a slash, so they do NOT match
+# nested paths - `training/cal2/c_001.bin` was untracked and visible, 180 files
+# of per-game trajectory dumps, telemetry and weights. Analysis scripts write
+# their capture directories under training/ (cal2, iterloop, candsplit), and
+# those are all regenerable.
+training/**
+!training/train_ppo.py
+training/*.csv
+training/*.log
+
 # Build intermediates
 a.out
 binutils-2.44.tar.xz

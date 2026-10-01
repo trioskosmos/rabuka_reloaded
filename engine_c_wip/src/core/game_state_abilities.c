@@ -2388,7 +2388,53 @@ int rb_process_current_ability(GameState *g) {
     s_pca_depth++;
     g->activating_card = cid;
 
+    /* abilities.rs:2236-2245 — the post-resolution each_time inputs are read
+       off the CURRENT ENTRY *before* complete_current() resets the queue, so
+       they are captured here rather than after pca_resolve_entry (which may
+       already have advanced g->queue.cur — the declined-optional-cost stop at
+       pca_resolve_entry does exactly that). */
+    char resolved_trigger[32];
+    snprintf(resolved_trigger, sizeof resolved_trigger, "%s", entry->trigger);
+    int resolved_card_id = entry->card_id;
+    int resolved_optional_cost = entry->optional_cost_result;  /* -1=None 0=false 1=true */
+    int resolved_pid = g->queue.actor;
+    if (entry->player_id[0] == 'p' &&
+        (entry->player_id[1] == '1' || entry->player_id[1] == '2'))
+        resolved_pid = entry->player_id[1] - '1';
+
     int res = pca_resolve_entry(g, entry, cid, aidx, &ab, actor);
+
+    /* abilities.rs:2293-2316 — the post-resolution each_time arm. It sits in
+       the `else` of "did the resolution open a prompt", so a resolution that
+       left a choice pending does NOT arm the watchers, and it is gated on
+       `resolved_optional_cost != Some(false)` (a declined optional cost did not
+       actually run the effect). Rust:
+
+           if resolved_optional_cost != Some(false) {
+               if let Some(AbilityTrigger::LiveStart) = resolved_trigger_type {
+                   if let Some(cid) = resolved_card_id {
+                       self.trigger_each_time_for_member(&current_pid, LIVE_START, cid);
+                   }
+               } else if let Some(AbilityTrigger::LiveSuccess) = resolved_trigger_type {
+                   if let Some(cid) = resolved_card_id {
+                       self.trigger_each_time_for_member(&current_pid, LIVE_SUCCESS, cid);
+                   }
+               }
+           }
+
+       rb_trigger_each_time_for_member was a faithful port with ZERO callers,
+       so every 自動 watcher that watches a member's 「ライブ開始時/ライブ成功時
+       能力が解決したとき」 — the whole ability-resolution-watcher class
+       (abilities.rs:1541-1549 effect_is_ability_resolution_watcher) — never
+       armed, in either seat. */
+    if (!g->queue.has_pending && resolved_optional_cost != 0 &&
+        resolved_card_id >= 0) {
+        const char *watch = NULL;
+        if (!strcmp(resolved_trigger, "ライブ開始時"))       watch = "ライブ開始時";
+        else if (!strcmp(resolved_trigger, "ライブ成功時"))  watch = "ライブ成功時";
+        if (watch) rb_trigger_each_time_for_member(g, resolved_pid, watch,
+                                                   resolved_card_id);
+    }
 
     s_pca_depth--;
     /* Only the outermost resolution clears the field, matching Rust: a nested

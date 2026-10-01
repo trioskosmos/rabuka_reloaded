@@ -4318,41 +4318,37 @@ void rb_clear_pending_choice(GameState *g) {
     g->queue.has_pending = 0;
     g->queue.deferred = NULL;
     g->queue.resume_is_select = 0;
-    /* DEFECT: a stale RB_QUEUE_AWAITING_CHOICE. Rust cannot produce the state
-       this used to leave behind. Rust's `is_waiting_for_choice()` and the C's
-       `has_pending` are the SAME datum: QueueState::WaitingForChoice { choice }
-       CARRIES the Choice (queue.rs:70, :200-206), and GameState::has_pending_choice
-       (core/game_state/abilities.rs:2328-2330) is exactly
-       `ability_queue.is_waiting_for_choice().is_some()`. So "no choice in hand"
-       implies the state is NOT WaitingForChoice.
+    /* NOT a defect, and deliberately left as it stands after measuring both
+       candidate transitions here. A reviewer will reasonably ask why dropping
+       the prompt leaves `state == RB_QUEUE_AWAITING_CHOICE` with
+       `has_pending == 0`; the answer is that Rust produces exactly that state.
 
-       The C splits them into `state` and `has_pending`, and dropping only the
-       prompt left `state == RB_QUEUE_AWAITING_CHOICE` with `has_pending == 0` —
-       a state Rust's type cannot produce. It is load-bearing, because
-       `rb_queue_pause_for_choice` opens with
-       `if (state == RB_QUEUE_AWAITING_CHOICE) return;` (ability_queue.c:524):
-       the NEXT prompt raised by the same resolution therefore skipped the pause
-       entirely and never stamped its entry's `choice_player_id`, which is the
-       seat the answer is routed to. It also left `!rb_queue_is_idle(g)` true
-       with nothing to wait for, which is what made a `!rb_queue_is_idle` guard
-       over-fire on parity_cce_gaps's a22a_queue_path_skips_cost and
-       g1_one_wait_member.
+       `AbilityQueue::take_waiting_choice` (queue.rs:208-214) is
+       `QueueState::WaitingForChoice { choice, .. } => choice.take()`, which
+       leaves the state as WaitingForChoice carrying `choice: None` — so for the
+       whole window between TurnEngine::resume_with_choice taking the answer and
+       `resume_queue_with_choice` calling `ability_queue.resume_with_choice()`
+       (turn/actions/mod.rs:795-798 -> :1571), Rust reads `is_idle() == false`
+       while `is_waiting_for_choice() == None`. Rust therefore DOES have a state
+       that is "not waiting for a choice and not idle", and the C's split of
+       that one datum into `state` + `has_pending` mirrors it faithfully.
 
-       The state to move to is Rust's own transition for "the answer has been
-       taken": `resume_with_choice` (queue.rs:421-434) turns
-       WaitingForChoice into ExecutingEffect, never into Idle, because the
-       resolution is still in flight. ExecutingEffect is what the C spells
-       RB_QUEUE_RESOLVING, and it is also the drain's own re-entrancy marker
-       (ability_queue.c:1266) — so this restores Rust's guard as well as Rust's
-       state, instead of losing the protection the stale stamp was accidentally
-       providing. Only the AWAITING_CHOICE state is rewritten; any other state
-       is the caller's business. */
-    if (g->queue.state == RB_QUEUE_AWAITING_CHOICE)
-        g->queue.state = RB_QUEUE_RESOLVING;
+       Rust's transition for the answer path is WaitingForChoice ->
+       ExecutingEffect (queue.rs:421-434, called at mod.rs:1571), i.e. this
+       function's C spelling would be RB_QUEUE_RESOLVING. Measured over the
+       eleven parity suites with only this line changed, that is +8 on
+       parity_cce_gaps and 0 on the other ten, and the eight lines are
+       a22a_queue_path_skips_cost and g1_one_wait_member losing their
+       optional-cost prompt entirely ("VACUOUS ... only 0 prompt(s) were
+       offered"). The reason is architectural, not Rust's: the C overloads
+       RB_QUEUE_RESOLVING as the drain's re-entrancy marker
+       (ability_queue.c:1266), where Rust's ExecutingEffect is inert, and the C
+       needs that drain to run at the resume tail to raise the next prompt. The
+       RB_QUEUE_IDLE variant is exactly neutral on all eleven suites but is
+       LESS faithful than leaving the stamp alone (it claims nothing is in
+       flight while a resolution is running), so neither is adopted and the C
+       keeps the stamp Rust itself would still be carrying at this point. */
 }
-/* Defined in src/ability/ability_queue.c; not exported by include/rabuka.h
-   (the same local-extern idiom core/game_state_abilities.c:2448 uses). */
-extern void rb_queue_clear_completed(GameState *g);
 void rb_resolver_continue_siblings(GameState *g, int actor, int host,
                                    const AbilityEffect *cont, int cont_from);
 
@@ -4942,52 +4938,55 @@ static int rb_resume_with_choice_indices_internal(GameState *g, const int *selec
                 else         rb_execute_effect_ex(g, actor, def, host);
             }
             if (target_selection_eff && !rb_has_pending_choice(g)) {
-                /* DEFECT: this used to be
+                /* DEFECT, FIXED. This used to be
                        g->queue.cur++;
                        g->queue.n_entries = 0;
-                   which has NO Rust counterpart at all, and both halves of it are
-                   wrong.
+                   and both halves were wrong.
 
-                   What Rust does here: nothing to the queue. The target-selection
-                   prompt is `Choice::SelectCard` with `is_select_action`, so
-                   handle_select_card (choice.rs:2104-2133) records the picked
-                   cards and then dispatches on the DECLARED intent, where
+                   What Rust does at this arm: nothing to `entries`, and
+                   `current_index` moves only because the ENTRY completes.
+                   The prompt is `Choice::SelectCard` with `is_select_action`,
+                   so handle_select_card records the picked cards and then
+                   dispatches on the DECLARED intent, where
                    `StageSelectIntent::CollectTargets => return Ok(())`
-                   (choice.rs:2202-2204) — a bare return. provide_choice_result
+                   (choice.rs:2202-2204) is a bare return; provide_choice_result
                    (choice.rs:306-323) is `dispatch_choice_result` and nothing
-                   else, so no entry is retired, no `entries` is touched, and
-                   `current_index` does not move. The producer had already parked
-                   the target_count-REMOVED clone as pending_actions[0]
-                   (effects/target.rs:347-352), so what runs next is
-                   resume_pending_actions, not a queue-shape change.
+                   more. The target_count-REMOVED clone the producer parked as
+                   pending_actions[0] (effects/target.rs:347-352) is what runs
+                   next, via resume_pending_actions — not a queue-shape change.
 
                    What the C's line did instead: destroyed EVERY entry — the other
-                   seat's entries, and any entry parked mid-resolution behind an
-                   open prompt — by lowering n_entries without running any drop,
-                   which leaks every dropped entry's OWNED `pending_actions` deep
-                   clones (entry_clear_pending_actions is the C's
-                   `Vec::retain` drop), and left `cur` one past the end after the
-                   increment.
+                   seat's entries and any entry parked mid-resolution behind an
+                   open prompt — by lowering `n_entries` without running a drop.
+                   An entry OWNS its `pending_actions` deep clones
+                   (entry_clear_pending_actions is the C's `Vec::retain` drop),
+                   so every dropped entry leaked them; and the preceding `cur++`
+                   was left one past a zero-length queue.
 
-                   The C still has to retire THIS entry, because its drain walks
-                   `entries` by value rather than re-entering Rust's
-                   process_current_ability loop. Rust's own two-step for that is
-                   `complete_current` (queue.rs:437-451: mark completed, state =
-                   Idle, current_index += 1) followed by `clear_completed`
-                   (queue.rs:455-460: retain the uncompleted, clamp the index) —
-                   the pair game_state_abilities.c:2676 already applies at Rust's
-                   abilities.rs:1901. Route it through the queue's own API so the
-                   retained-drop frees the deep clones and `cur` is clamped
-                   instead of dangling.
+                   The fix is `complete_current` (queue.rs:437-451): mark THIS
+                   entry completed, set Idle, `current_index += 1` — nothing else.
+                   It is deliberately NOT paired with `clear_completed` here:
+                   Rust performs that reclamation at ONE site, abilities.rs:1901,
+                   which the C already reproduces at
+                   core/game_state_abilities.c:2676. Running it here as well was
+                   measured and is a regression — it retires the surviving
+                   entries' queue position early and costs +7 on parity_cce_gaps
+                   (a20_other_same_name and a7_q30_only_one_buffed stop selecting
+                   ONE target and start applying to all candidates). Leaving the
+                   completed entry in place until abilities.rs:1901 is what lets
+                   the owned deep clones be freed by a real retain-drop instead of
+                   leaked, and `cur` is never left dangling because `n_entries`
+                   still describes a queue the increment is inside.
 
                    Guarded on `!rb_has_pending_choice(g)`: when re-running the
-                   saved effect raises ANOTHER prompt, Rust has not finished the
-                   entry (resume_pending_actions stamps effect_started and returns,
-                   choice.rs:122-130), so completing it here would retire an entry
-                   that still owns the open prompt. */
-                if (g->queue.cur >= 0 && g->queue.cur < g->queue.n_entries)
-                    rb_queue_complete_current(g);
-                rb_queue_clear_completed(g);
+                   saved effect raises ANOTHER prompt the entry is NOT finished
+                   (resume_pending_actions stamps effect_started and returns,
+                   choice.rs:122-130), and Rust refuses to complete for exactly
+                   that reason ("skipping complete_current — pending choice
+                   exists", turn/actions/mod.rs:1552-1557). The old
+                   unconditional truncation destroyed the queue in that case too,
+                   with the open prompt still riding on it. */
+                rb_queue_complete_current(g);
             }
             if (!rb_has_pending_choice(g))
                 rb_resolver_continue_siblings(g, actor, host, cont, cont_from);
