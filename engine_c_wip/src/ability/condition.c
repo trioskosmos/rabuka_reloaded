@@ -363,6 +363,8 @@ int rb_check_aggregate_total(const struct GameState *g, int actor, const Conditi
    `location.unwrap_or("live_card_zone")` default. */
 static int check_aggregate_total_at(const struct GameState *g, int actor, const Condition *c,
                                     const char *loc_override);
+/* comparison.rs:409 evaluate_all_cost_comparison_condition. */
+static int eval_all_cost_comparison(const struct GameState *g, int actor, const Condition *c);
 /* util.rs:2210 compare_counts. Declared up here because eval_score
    (state.rs:1150) needs it too and the definition sits far below. */
 static int compare_counts_op(const char *op, int actual, int expected);
@@ -697,6 +699,22 @@ static int comparison_self_count(const struct GameState *g, int actor,
     }
     return base;
 }
+/* Truthiness of a condition field, whatever tag the decoder chose for it.
+ * vm.c writes a JSON `true` as RB_TAG_BOOL, but `all` is read with
+ * `all.unwrap_or(false)` in Rust (condition.rs:463) and a producer that
+ * encoded it as an integer or a string would otherwise make get_bool fail and
+ * the shape silently route to the wrong evaluator. */
+static int cond_truthy_field(const Condition *c, const char *key) {
+    const CondValue *v = find_val(c, key);
+    if (!v) return 0;
+    switch (v->tag) {
+        case RB_TAG_TRUE:  return 1;
+        case RB_TAG_FALSE: return 0;
+        case RB_TAG_I64:   return v->i ? 1 : 0;
+        case RB_TAG_STR:   return (v->s && (!strcmp(v->s, "true") || !strcmp(v->s, "1"))) ? 1 : 0;
+        default:           return 0;
+    }
+}
 /* Rust comparison.rs:232-263. */
 static int comparison_target_count(const struct GameState *g, int actor,
                                    const Condition *c, const char *ctype) {
@@ -729,6 +747,22 @@ static int eval_comparison_inner(const struct GameState *g, int actor, int host_
     const char *ctype = get_str(c, "comparison_type");
     const char *comparison_target = get_str(c, "comparison_target");
     const char *position = get_str(c, "position");
+    /* condition.rs:456-464 is_all_cost_comparison: comparison_type "cost", no
+     * position / count / values, comparison_target absent or "self", and
+     * all == true. Rust routes that to evaluate_all_cost_comparison_condition
+     * (comparison.rs:409), which compares the SELF stage's costs against the
+     * OPPONENT's maximum. The condition carried `location: "ステージ"` (a
+     * display string, not a zone name), so with no dispatch arm it fell
+     * through to the eval_location tail, resolved zero cards, and answered
+     * false unconditionally -- PL!S-bp5-016-N could never trigger. */
+    { int all_flag = cond_truthy_field(c, "all");
+      if (all_flag && ctype && !strcmp(ctype, "cost") &&
+          !position && !get_str(c, "count") &&
+          !(find_val(c, "values") && find_val(c, "values")->tag == RB_TAG_ARRAY &&
+            find_val(c, "values")->arr_n > 0) &&
+          (!comparison_target || !strcmp(comparison_target, "self")))
+          return eval_all_cost_comparison(g, actor, c);
+    }
     if (ctype && !strcmp(ctype, "cost") && position &&
         comparison_target && !strcmp(comparison_target, "opponent")) {
         int self_player = target_player_idx(actor, c);
@@ -2474,7 +2508,7 @@ static int eval_all_cost_comparison(const struct GameState *g, int actor, const 
     int no = collect_stage_costs(g, actor ^ 1, opp_costs);
     int max_opp = 0;
     for (int i = 0; i < no; i++) if (opp_costs[i] > max_opp) max_opp = opp_costs[i];
-    const char *op = get_str(c, "operator"); if (!op) op = ">=";
+    const char *op = get_str(c, "operator"); if (!op) op = ">";
     for (int i = 0; i < ns; i++) if (eval_operator(self_costs[i], op, max_opp)) return 1;
     return 0;
 }

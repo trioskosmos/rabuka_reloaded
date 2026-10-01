@@ -1444,6 +1444,147 @@ The defect is real and the fix is correct. It is a no-op **for this deck and
 this format**, and it should stay switched off — a switch whose effect is
 identically zero is a switch that will be misread as load-bearing later.
 
+---
+
+## 12. Reading the deck the bots actually play
+
+Everything above was measured against `5CP3Z idou`. Nobody had read its cards.
+Read straight from `cards/cards.json` (17 distinct members, 4 lives, 12 energy).
+
+### 12.1 The energy model was wrong in this session's own analysis
+
+Two corrections, both verified in the code rather than recalled:
+
+- **Baton-touching is real and makes high cost payable early.** The rule: a
+  member appears by paying energy **or** by sending an already-appeared member
+  to the waiting room to make up the difference. So a cost-9 is playable on turn
+  2 by baton-touching a turn-1 cost-4. An earlier note in this session modelled
+  the curve as "+1 per turn on 3 setup, so cost-9 is dead until T6" — wrong, and
+  it would have justified binnable cards that are fine.
+- **Once-per-turn is a condition, not a trigger.** `TriggerKind` is exactly the
+  seven printed trigger words (`triggers.rs:40`): 起動 / 自動 / 常時 / 登場 /
+  ライブ開始時 / ライブ成功時 / メイン. ターン1回 is a condition, enforced by
+  `turn_limited_abilities_used`, which is cleared at the **end of the live
+  phase** (`phases.rs:278`) — so the window spans the whole turn including live.
+  Per-*effect*, not per-card: two members granting the same thing pay out once.
+
+### 12.2 The deck's three lives are all live-start, and all keyed to movement
+
+- `Special Color` `PL!SP-bp4-025-L` x4, score 2, need **7 colorless**.
+  ライブ開始時: centre Liella members' **printed blade count becomes 3**.
+  ライブ成功時: +1 if a centre Liella member moved this turn.
+- `MIRACLE NEW STORY` `PL!SP-bp5-024-L` x1, score 7 +1, need **15**
+  (heart01x2 + heart02x4 + heart06x4 + colorlessx5).
+  ライブ開始時: choose one of heart01/02/06; **every member that moved this turn
+  gains that heart**.
+- `始まりは君の空` `PL!SP-sd2-023-sd2` x3, score 1 +1, need 3
+  (heart03 + colorlessx2). ライブ開始時: **if own success zone has 2+ cards,
+  score +5 and the need becomes 12 specific hearts**. The FAQ confirms the
+  trigger **cannot be declined** — the FAQ answer is いいえ, it cannot be used
+  with the printed 3-heart requirement.
+- `Aspire` `PL!SP-sd2-025-sd2` x4, score 4 +1 draw, need **11**.
+  ライブ開始時: **every Liella member that moved this turn gains 1 blade**.
+
+So the deck's spine is: get members **moving**, then set a live whose
+live-start converts those moves into blades or hearts. "Moved this turn" is not
+a detail — it is the condition every one of these cards keys on.
+
+### 12.3 The gap, stated from the card text
+
+`begins_here` is the sharpest case in the project. Its requirement is **3 hearts
+by turn 1** and it is *worth setting early* — but at 2 successes the same card
+becomes a 12-heart check worth the same +5. The correct play is therefore
+**state-dependent in a way no current model can express**: cheap and always
+right at 0-0, and either a different card or a deliberate fold at 2+.
+
+The bot reads `need_heart` as a flat vector and `rule_payoff(our_success + 1,
+opp.success)` as a flat +1. Both are wrong for this card, in opposite
+directions, and the two errors partly cancel into something that looks
+reasonable.
+
+### 12.4 Choice handling — where the cheap wins are
+
+Every one of these abilities becomes a **pending choice**, and pending choices
+are answered by the same Main-phase leaf (`v8_main.rs:1045`). What that leaf
+reads, for this deck:
+
+| ability | what the leaf can see | verdict |
+|---|---|---|
+| `葉月 恋` cost 2 登場: top 5, reveal 1 Liella card | hand **count** +1, identical for every option | **coin flip** |
+| `米女メイ` cost 5 登場: top 5, reveal 1 Liella member | same | **coin flip** |
+| MIRACLE ライブ開始時: choose heart01/02/06 | `supply_hearts` sums all buckets | **coin flip** |
+| `冬毬` cost 11 登場: pick 2 waitroom lives, **opponent picks 1** | `lives_in_hand` +1 | **arbitrary**, and the correct pick is 2 *equally mediocre* lives so the opponent's choice costs least |
+
+The third row is the one I had asserted was fine and is not: a colour choice
+whose entire purpose is colour, priced by a **colour-blind sum**. The first two
+are the general case — a tutor whose job is to fetch a specific card, answered
+by a leaf that reads how many cards you have rather than which.
+
+`V8_HAND_QUALITY` is the first fix: it is the only term in the leaf that reads
+the hand's **contents** rather than the board, which is the only reason it can
+separate candidates every board term proves equal. Members are worth their
+printed cost (the energy curve has to pay for it, and a body unaffordable for
+three turns is a body held instead of one that is playable); lives are worth
+their printed requirement, capped, because a requirement the board can never
+cover is worth nothing and a linear term would reward exactly that.
+
+### 12.5 Measured at one weight, and it is the wrong weight
+
+Paired, n=4000, seed 11, on top of the confirmed term vector (baseline 48.0%):
+
+| weight | result | p | pace (P1) | no-contest |
+|---|---|---|---|---|
+| 1.0 | 46.7% (-1.30) | 0.374 | 0.398 -> 0.334 | **77.8%** |
+
+The 77.8% no-contest rate is the diagnosis: a five-card hand of cost-11 bodies
+sums to roughly 50, so at weight 1.0 this term is an order of magnitude larger
+than every other term in the leaf and the bot ends its Main phase almost
+immediately — the identical failure shape as `V8_PASS_TAX` (§1.3) and the
+convert gate (§11.2), both of which were also weight failures that looked like
+catastrophic concept failures.
+
+**This is not a verdict on the idea.** It is one badly-scaled measurement, and
+the scale needed is roughly two orders of magnitude smaller than the one tried.
+Sweeping it properly is the obvious next cell and it was not run. Recorded as
+unmeasured, not as refuted — the log's own §1.3 warning about a single badly
+scaled cell being written up as a result applies directly here.
+
+## 13. The top unbuilt item, and why the earlier null does not cover it
+
+**Project each live-start ability through the engine before pricing the check.**
+
+The earlier reason for skipping this was "100% of lives in this deck carry a
+live-start, so there is no contrast" (§0.2). Reading the cards shows that
+reasoning was wrong. The contrast is not *whether* a life has a live-start —
+every one does — it is **how much this specific live-start adds to this
+specific board**, and the four lives differ enormously:
+
+| live | copies | what its live-start does | board it acts on |
+|---|---|---|---|
+| ` beginnings_here` `PL!SP-sd2-023-sd2` | x3 | rewrites its OWN need to 12 hearts if we hold 2+ successes (cannot be declined, per FAQ) | itself + our success count |
+| `Aspire` `PL!SP-sd2-025-sd2` | x4 | +1 blade to every Liella member that moved this turn | up to ~5 members |
+| `MIRACLE NEW STORY` `PL!SP-bp5-024-l` | x1 | +1 heart of a chosen colour to every member that moved this turn | up to 5 hearts against a 15-heart need |
+| `Special Color` `PL!SP-bp4-025-l` | x4 | centre Liella members' printed blades become 3 | the centre area |
+
+The live set prices a life against the board **as it stands when the zone is
+set**, with no projection. For MIRACLE that means pricing a 15-heart requirement
+against a board that is about to gain a heart per moved member — which is how a
+card the deck runs as its finisher reads as uncashable. `begins_here` is worse:
+its requirement is 3 hearts early and 12 late, so the correct play is
+state-dependent in a way no current model can express, and the bot reads it flat
+in both directions.
+
+"Does this card have a live-start" was the wrong discriminator. "How much does
+this live-start raise the pass probability of this board" is the right one, and
+no null in this file bears on it.
+
+The engine already has what the projection needs: `TurnEngine::
+trigger_live_start_abilities` (`turn/trigger_scan.rs:156`), the movement-event
+history that resolves 「このターン中にエリアを移動した」 (`state.rs:1135`), and
+`RngGuard` (`v8_model.rs`) to keep the projection from perturbing the game.
+
+
+
 ### 11.2 The probe is a localiser, not a rule generator
 
 `PROBE=v9` put v9's Main (v7's) against v8's on the same states. Four games,

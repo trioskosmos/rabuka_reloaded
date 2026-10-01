@@ -5001,6 +5001,77 @@ _CONDITION_DISPATCH_ORDER.insert(
     ),
 )
 
+
+def _try_cost_qualified_stage_existence(text):
+    """「…のコストNの<card>がいる場合」 — an EXISTENCE check, not a comparison.
+
+    PL!N-pb1-001-P＋ 上原歩夢 ab#0 reads
+    「自分のステージにこのメンバー以外のコスト11のメンバーがいる場合、自分の控え室から
+    『虹ヶ咲』のライブカードを1枚手札に加える」.
+
+    The clause has no 「N人」 for the count extractor to read, so it fell through to
+    the generic field extractor, which saw the コスト marker and typed it as
+    `comparison_condition` carrying `cost_limit: 11` and NO operator.
+    `compare_counts` treats a missing operator as ">=" (engine
+    `ability/util.rs::compare_counts`, deliberately, so a parser gap does not
+    silently disable an ability), which made the condition a tautology and her 登場
+    recovery fired on every debut regardless of the board.
+
+    Two readings the comparison type cannot express, both restored here:
+      * 「〜がいる」 is EXISTENCE — at least one, not a numeric comparison.
+      * 「コストNの」 with no 以上/以下/未満/より is EXACTLY N, so the bound is `=`.
+
+    Blast radius is one card: the combination of 「のコストNの」 with 「がいる」 occurs
+    nowhere else in the pool (checked against every condition/effect text in
+    cards/abilities.json). The 「N人」 headcount form is left entirely alone, since
+    that already parses as a card_count_condition.
+    """
+    m = re.search(r"のコスト(\d+)(以上|以下|未満|より多い|より少ない)?の", text)
+    if not m:
+        return None
+    tail = text[m.end() :]
+    gap = tail.find("が")
+    noun_span = tail[:gap] if gap >= 0 else tail
+    if not re.search(r"がいる|がある", tail):
+        return None
+    # 「N人」/「N枚」 HEADCOUNTS are the count extractor's business, not ours — but
+    # only when the count qualifies the cost-qualified noun. Scoping the check to the
+    # span between the number and 「が」 matters: this handler is also driven with
+    # whole-ability text by tests/test_registry_coverage.py, where an unrelated
+    # 「1枚手札に加える」 in the same sentence would otherwise make the rule look dead.
+    # 「コスト10の『蓮ノ空』のメンバーが2人以上いる」 does bail, which is correct.
+    if re.search(r"(\d+)\s*(人|枚|つ)(以上|以下)?", noun_span):
+        return None
+    suffix_to_operator = {"以上": ">=", "以下": "<=", "より少ない": "<", "より多い": ">"}
+    result = {
+        "type": "card_count_condition",
+        "count": 1,
+        "operator": ">=",
+        "cost_limit": as_int(m.group(1)),
+        # No 以上/以下/未満/より on the number is EXACTLY that cost.
+        "cost_limit_operator": suffix_to_operator.get(m.group(2), "="),
+        "text": text,
+    }
+    if "自分のステージ" in text:
+        result["location"] = "stage"
+        result["card_type"] = "member_card"
+        result["target"] = "self"
+    if "このメンバー以外" in text or "このカード以外" in text:
+        result["exclude_self"] = True
+    return result
+
+
+# Ahead of the generic numeric tier: this clause is an EXISTENCE check, and the
+# generic extractor's cost-comparison fallback turns it into a tautology. Inserted
+# at the front alongside the discard handler above, for the same reason.
+_CONDITION_DISPATCH_ORDER.insert(
+    0,
+    (
+        "cost_qualified_stage_existence",
+        ConditionPattern(handler=_try_cost_qualified_stage_existence),
+    ),
+)
+
 # The one place conditions are registered. Registration index IS the priority.
 _condition_registry = PriorityRegistry("condition_rules")
 for _ci, (_name, _rule) in enumerate(_CONDITION_DISPATCH_ORDER):

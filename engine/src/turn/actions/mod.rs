@@ -1154,6 +1154,45 @@ impl super::TurnEngine {
                                     target: found,
                                 });
                             }
+                            // An EMPTY answer is a decline. This is deliberately narrower
+                            // than "no option was resolved": an out-of-range index
+                            // (`card_indices: Some([2])` against `options: ["center"]`) also
+                            // fails the lookup, but that is a malformed answer from a caller,
+                            // not a player declining, and the existing `None => "0"`
+                            // first-option fallback is a separate concern. Conflating them
+                            // changed accept-path behaviour, because
+                            // formation_change_test::stay_in_place_no_new_move answers its
+                            // third prompt with index 2 when only one destination is offered.
+                            //
+                            // An empty answer can only mean "declined" because a
+                            // non-skippable prompt with an empty answer is rejected upstream
+                            // ("non-skippable {kind} prompt requires a selection"), and
+                            // accepting always names an option.
+                            //
+                            // Before this, declining フォーメーションチェンジ fell through to
+                            // `None => "0".into()` and `handle_position_change_choice` maps
+                            // `"0" => "left"` — so declining SELECTED THE LEFT AREA. That is
+                            // card-destroying, not cosmetic: the plan was armed, advanced to
+                            // the next member, and `finalize_formation_change` dropped every
+                            // planned member whose destination was still empty, removing them
+                            // from the stage into no zone while `cards_moved_this_turn`
+                            // recorded them as moved.
+                            //
+                            // Routed as `TargetSelected { target: "skip" }` rather than
+                            // `ChoiceResult::Skip` on purpose: `handle_position_change_choice`
+                            // already has the correct decline branch (clear the formation
+                            // plan, drop the pending actions, resume), whereas
+                            // `handle_general_skip` does not clear the carried plan. The
+                            // other three option-text targets are left alone — their handlers
+                            // do not read "skip" (`handle_area_select` falls back to the first
+                            // option), so a blanket change would be wrong for them.
+                            let declined = card_id.is_none()
+                                && card_indices.as_deref().is_none_or(|v| v.is_empty());
+                            if target == "position|destination" && declined {
+                                return Ok(crate::ability::types::ChoiceResult::TargetSelected {
+                                    target: "skip".to_string(),
+                                });
+                            }
                         }
                         match card_id {
                             Some(-1) => "skip".to_string(),

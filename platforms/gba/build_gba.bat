@@ -65,13 +65,38 @@ if errorlevel 1 (
     echo agb-gbafix failed.
     exit /b 1
 )
-copy /Y "%TMP_GBABUILD%\rabuka_gba.gba" "%~dp0output\rabuka_gba.gba" >nul
-if errorlevel 1 (
-    echo.
-    echo Failed to copy final ROM.
-    exit /b 1
+REM Deploy the ROM to output\. An emulator holding the previous ROM
+REM memory-maps it, and Windows refuses to overwrite a mapped section
+REM ("The requested operation cannot be performed on a file with a
+REM user-mapped section open") — the build then reported failure even
+REM though the ROM was perfectly good, sitting in %TMP_GBABUILD%.
+REM Retry, then delete-and-retry, then degrade to a warning instead of
+REM failing the build: the artifact exists either way.
+set "ROM_SRC=%TMP_GBABUILD%\rabuka_gba.gba"
+set "ROM_DST=%~dp0output\rabuka_gba.gba"
+set "ROM_DEPLOYED=0"
+for /L %%I in (1,1,10) do (
+  if not defined ROM_DEPLOYED (
+    copy /Y "%ROM_SRC%" "%ROM_DST%" >nul 2>&1 && set "ROM_DEPLOYED=1"
+    if not defined ROM_DEPLOYED (
+      ping -n 2 127.0.0.1 >nul
+    )
+  )
+)
+if not defined ROM_DEPLOYED (
+  del /F /Q "%ROM_DST%" >nul 2>&1
+  copy /Y "%ROM_SRC%" "%ROM_DST%" >nul 2>&1 && set "ROM_DEPLOYED=1"
+)
+if defined ROM_DEPLOYED (
+  echo.
+  echo Built output\rabuka_gba.gba
+) else (
+  echo.
+  echo WARNING: could not overwrite %ROM_DST% — an emulator still has it open.
+  echo          The ROM WAS built and is here:
+  echo            %ROM_SRC%
+  echo          Close the emulator and copy it over manually.
 )
 
 echo.
-echo Built output\rabuka_gba.gba
 pause

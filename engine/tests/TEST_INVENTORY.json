@@ -1,6 +1,6 @@
 {
   "generated_by": "cards/test_inventory.py",
-  "generated_at": "2026-09-30T22:34:47.832627+00:00",
+  "generated_at": "2026-10-01T00:35:50.519664+00:00",
   "stats": {
     "total_cards": 2639,
     "cards_with_abilities": 1650,
@@ -8,7 +8,7 @@
     "unique_abilities": 985
   },
   "n_files": 994,
-  "n_tests": 4060,
+  "n_tests": 4080,
   "total_cards": 809,
   "covered_cards": 809,
   "abilities_on_covered": 985,
@@ -405,7 +405,7 @@
   },
   "quality": {
     "no_assert": {
-      "count": 4,
+      "count": 5,
       "rows": [
         {
           "file": "engine/tests/test_modules/characterization/group_name_spacing_normalisation_test.rs",
@@ -423,6 +423,12 @@
           "file": "engine/tests/test_modules/effects/gain/blades/live_start/pb2_blade_per_member_activated_from_wait_this_turn_pl_pb2_010_p_plus_test.rs",
           "test": "the_history_is_a_set_NOT_YET_PINNED",
           "line": 180,
+          "detail": ""
+        },
+        {
+          "file": "engine/tests/test_modules/effects/state/orientation_gated/erena_debut_cost_nine_or_less_opponent_wait_test.rs",
+          "test": "the_two_boundary_fixtures_print_cost_nine_and_cost_ten",
+          "line": 153,
           "detail": ""
         },
         {
@@ -465,7 +471,7 @@
         {
           "file": "engine/tests/test_modules/effects/auto/pb2_self_wait_or_cost_paid_activates_and_gains_blade_pl_pb2_021_n_test.rs",
           "test": "the_cost_paid_branch_is_still_a_vacuous_comparison",
-          "line": 205,
+          "line": 257,
           "detail": ""
         }
       ]
@@ -1065,7 +1071,7 @@
       "rows": []
     }
   },
-  "n_test_fns_parsed": 4060,
+  "n_test_fns_parsed": 4080,
   "abilities": [
     {
       "idx": 0,
@@ -2891,23 +2897,32 @@
         "engine/tests/test_modules/effects/gain/blades/constants/per_waited_opponent_member_constant_blade_test.rs",
         "engine/tests/test_modules/effects/gain/blades/per_card/eri_debut_up_to_two_opponent_members_to_wait_test.rs",
         "engine/tests/test_modules/effects/look_select/reveal/sequential_cost_look_five_take_cost9_member_test.rs",
+        "engine/tests/test_modules/effects/state/orientation_gated/erena_debut_cost_nine_or_less_opponent_wait_test.rs",
         "engine/tests/test_modules/effects/state/orientation_gated/two_or_more_opponent_wait_members_constant_heart06_test.rs",
         "engine/tests/test_modules/effects/state/orientation_gated/wait_state_condition_constants_test.rs",
         "engine/tests/test_modules/effects/state/wait_activation/pb2_debut_wait_opponent_up_to_three_printed_hearts_pl_pb2_033_n_test.rs",
         "engine/tests/test_modules/effects/state/wait_activation/pb2_replacement_appear_wait_low_hearts_pl_pb2_002_pp_test.rs"
       ],
       "covering_tests": [
+        "a_baton_touch_debut_belongs_to_the_arriving_copy",
         "a_cheap_mus_baton_touch_activates_nothing",
         "a_cost_15_plus_mus_baton_touch_activates_two_energy",
+        "a_cost_free_self_wait_debut_repeats_on_the_first_copy",
+        "a_cost_ten_only_opponent_stage_waits_nobody",
         "a_five_heart_member_enters_active",
         "a_four_heart_member_entering_the_front_appears_in_wait",
         "a_member_entering_a_side_slot_is_unaffected",
         "a_member_that_appeared_before_the_rule_is_unaffected",
+        "a_second_entry_to_the_stage_offers_the_debut_gate_again",
+        "a_wait_immune_opponent_member_is_offered_but_not_actually_waited",
         "a_zero_heart_member_entering_the_front_appears_in_wait",
+        "an_already_waited_member_is_not_offered_and_the_remaining_candidate_resolves",
+        "an_empty_opponent_stage_resolves_cleanly",
         "an_expensive_non_mus_baton_touch_activates_nothing",
         "center_grants_at_least_two_blades_pl_sp_bp4_003",
         "constant_blade_per_waited_opponent_member",
         "declined_energy_preserves_energy_stage_and_requirement_743",
+        "declining_the_optional_self_wait_does_not_wait_the_opponent",
         "deploy_filter_excludes_cost_five_and_wrong_group_743",
         "eli_bp5_a_mu_member_below_cost_nine_is_rejected_on_cost_alone",
         "eli_bp5_look_select_optional_skip_keeps_hand",
@@ -2918,17 +2933,9 @@
         "erena_default_active_no_heart",
         "erena_in_wait_gains_heart05",
         "erena_wait_not_on_stage",
-        "erena_wait_to_active_switches_heart",
-        "eri_q144_no_eligible_opponent_still_pays_cost",
-        "eri_q144_skip_cost_no_effect",
-        "eri_q144_up_to_semantics_1_eligible_opponent_still_works",
-        "exact_cost_nine_edelnote_enables_requirement_choice_743",
-        "fixture_cost_and_group_are_what_the_gates_assume",
-        "four_printed_hearts_is_never_offered",
-        "full_stage_deploy_choice_cannot_replace_existing_members_743",
-        "low_cost_edelnote_or_costly_wrong_group_cannot_enable_choice_743"
+        "erena_wait_to_active_switches_heart"
       ],
-      "covering_test_count": 58,
+      "covering_test_count": 78,
       "direct_tests": [
         "a_cheap_mus_baton_touch_activates_nothing",
         "a_four_heart_member_entering_the_front_appears_in_wait",
@@ -2957,9 +2964,10 @@
         "pl_hs_bp5_016_n_discard_waits_opponent_and_enables_constant_heart06",
         "pl_hs_bp5_016_n_single_eligible_victim_grants_no_heart06",
         "pl_hs_bp5_016_n_waits_at_most_two_of_three_eligible_members",
+        "the_waited_opponent_member_crosses_another_cards_constant_threshold",
         "two_waited_opponents_grant_at_least_two_blades_pl_bp3_002"
       ],
-      "direct_test_count": 28,
+      "direct_test_count": 29,
       "is_null": false,
       "use_limit": null,
       "watches_abilities": false,
@@ -13644,6 +13652,13 @@
         "engine/tests/test_modules/rules/trigger_paths/debut_watcher_baton_and_hand_activation_q196_q197_q198_test.rs"
       ],
       "covering_tests": [
+        "a_baton_touch_debut_belongs_to_the_arriving_copy",
+        "a_cost_free_self_wait_debut_repeats_on_the_first_copy",
+        "a_cost_ten_only_opponent_stage_waits_nobody",
+        "a_second_entry_to_the_stage_offers_the_debut_gate_again",
+        "a_wait_immune_opponent_member_is_offered_but_not_actually_waited",
+        "an_already_waited_member_is_not_offered_and_the_remaining_candidate_resolves",
+        "an_empty_opponent_stage_resolves_cleanly",
         "compound_dododo_hasunosora_on_stage_passes",
         "compound_dododo_no_hasunosora_fails",
         "compound_dododo_tied_score_with_hasunosora_fails",
@@ -13651,12 +13666,15 @@
         "cost10_debut_with_watcher_draws_to_replace_played_card_q197",
         "cost11_baton_replacement_moves_debut_watcher_to_waitroom_q198",
         "cost11_debut_with_watcher_retains_nonempty_energy_zone_q198",
-        "erena_debut_declining_the_optional_self_wait_does_not_wait_the_opponent",
+        "declining_the_optional_self_wait_does_not_wait_the_opponent",
+        "exactly_one_member_is_waited_even_when_all_three_qualify",
         "hand_activation_draw_and_lone_nijigasaki_blade_resolve_q196",
         "hand_activation_empty_stage_resolves_draw_after_discard_choices_q196",
         "hasunosora_group_member_present_passes",
         "hasunosora_group_mixed_stage_passes",
         "hasunosora_group_no_member_fails",
+        "paying_the_cost_waits_the_cost_nine_member_and_not_the_cost_ten_member",
+        "paying_the_debut_cost_switches_on_her_own_constant_heart05",
         "rin_score_condition_at_exactly_6",
         "rin_score_condition_below_then_above",
         "rin_score_condition_no_cards",
@@ -13665,15 +13683,21 @@
         "score_gt_opponent_p1_higher_passes",
         "score_gt_opponent_p1_lower_fails"
       ],
-      "covering_test_count": 20,
+      "covering_test_count": 39,
       "direct_tests": [
+        "a_cost_ten_only_opponent_stage_waits_nobody",
         "cost10_baton_replacement_does_not_draw_from_departed_watcher_q197",
         "cost10_debut_with_watcher_draws_to_replace_played_card_q197",
+        "paying_the_cost_waits_the_cost_nine_member_and_not_the_cost_ten_member",
+        "paying_the_debut_cost_switches_on_her_own_constant_heart05",
         "rin_score_condition_at_exactly_6",
         "rin_score_condition_below_then_above",
-        "rin_score_condition_no_cards"
+        "rin_score_condition_no_cards",
+        "the_offered_candidate_set_excludes_the_cost_ten_member",
+        "the_p_plus_print_has_the_same_debut",
+        "the_two_boundary_fixtures_print_cost_nine_and_cost_ten"
       ],
-      "direct_test_count": 5,
+      "direct_test_count": 11,
       "is_null": false,
       "use_limit": null,
       "watches_abilities": false,
@@ -20748,6 +20772,13 @@
         "engine/tests/test_modules/effects/state/orientation_gated/wait_state_condition_constants_test.rs"
       ],
       "covering_tests": [
+        "a_baton_touch_debut_belongs_to_the_arriving_copy",
+        "a_cost_free_self_wait_debut_repeats_on_the_first_copy",
+        "a_cost_ten_only_opponent_stage_waits_nobody",
+        "a_second_entry_to_the_stage_offers_the_debut_gate_again",
+        "a_wait_immune_opponent_member_is_offered_but_not_actually_waited",
+        "an_already_waited_member_is_not_offered_and_the_remaining_candidate_resolves",
+        "an_empty_opponent_stage_resolves_cleanly",
         "bp5_333_leave_stage_clears_reenter_active_no_heart",
         "bp5_333_no_orientation_defaults_active",
         "bp5_333_other_members_wait_irrelevant",
@@ -20755,21 +20786,24 @@
         "bp5_333_stable_across_recalc",
         "bp5_333_two_copies_independent",
         "bp5_333_wait_persists_after_position_change",
+        "declining_the_optional_self_wait_does_not_wait_the_opponent",
         "erena_active_no_heart",
-        "erena_debut_declining_the_optional_self_wait_does_not_wait_the_opponent",
         "erena_default_active_no_heart",
         "erena_in_wait_gains_heart05",
         "erena_wait_not_on_stage",
         "erena_wait_to_active_switches_heart",
+        "exactly_one_member_is_waited_even_when_all_three_qualify",
+        "paying_the_cost_waits_the_cost_nine_member_and_not_the_cost_ten_member",
+        "paying_the_debut_cost_switches_on_her_own_constant_heart05",
         "private_wars_activates_waited_member_and_grants_only_that_member_one_blade",
         "private_wars_waits_original_three_blades_but_not_four",
         "private_wars_without_arise_does_not_activate_or_grant_blades",
         "reactivating_waited_self_removes_constant_heart05",
-        "two_copies_of_same_arise_member_grant_two_heart05",
-        "two_other_arise_members_grant_two_heart05",
-        "waited_self_gains_one_heart05_on_parallel_print"
+        "the_constant_condition_follows_the_card_not_the_resolving_player",
+        "the_offered_candidate_set_excludes_the_cost_ten_member",
+        "the_p_plus_print_has_the_same_debut"
       ],
-      "covering_test_count": 20,
+      "covering_test_count": 39,
       "direct_tests": [
         "bp5_333_leave_stage_clears_reenter_active_no_heart",
         "bp5_333_no_orientation_defaults_active",
@@ -20779,7 +20813,6 @@
         "bp5_333_two_copies_independent",
         "bp5_333_wait_persists_after_position_change",
         "erena_active_no_heart",
-        "erena_debut_declining_the_optional_self_wait_does_not_wait_the_opponent",
         "erena_default_active_no_heart",
         "erena_in_wait_gains_heart05",
         "erena_wait_not_on_stage",
@@ -20788,11 +20821,16 @@
         "private_wars_waits_original_three_blades_but_not_four",
         "private_wars_without_arise_does_not_activate_or_grant_blades",
         "reactivating_waited_self_removes_constant_heart05",
+        "the_constant_condition_follows_the_card_not_the_resolving_player",
+        "the_p_plus_print_has_the_same_debut",
+        "the_waited_opponent_member_crosses_another_cards_constant_threshold",
+        "two_copies_each_pay_their_own_orientation_and_see_the_updated_board",
         "two_copies_of_same_arise_member_grant_two_heart05",
         "two_other_arise_members_grant_two_heart05",
-        "waited_self_gains_one_heart05_on_parallel_print"
+        "waited_self_gains_one_heart05_on_parallel_print",
+        "waiting_an_opponent_erena_grants_the_opponent_her_own_heart"
       ],
-      "direct_test_count": 20,
+      "direct_test_count": 24,
       "is_null": false,
       "use_limit": null,
       "watches_abilities": false,
@@ -20828,6 +20866,13 @@
         "engine/tests/test_modules/effects/state/orientation_gated/wait_state_condition_constants_test.rs"
       ],
       "covering_tests": [
+        "a_baton_touch_debut_belongs_to_the_arriving_copy",
+        "a_cost_free_self_wait_debut_repeats_on_the_first_copy",
+        "a_cost_ten_only_opponent_stage_waits_nobody",
+        "a_second_entry_to_the_stage_offers_the_debut_gate_again",
+        "a_wait_immune_opponent_member_is_offered_but_not_actually_waited",
+        "an_already_waited_member_is_not_offered_and_the_remaining_candidate_resolves",
+        "an_empty_opponent_stage_resolves_cleanly",
         "bp5_333_leave_stage_clears_reenter_active_no_heart",
         "bp5_333_no_orientation_defaults_active",
         "bp5_333_other_members_wait_irrelevant",
@@ -20835,21 +20880,24 @@
         "bp5_333_stable_across_recalc",
         "bp5_333_two_copies_independent",
         "bp5_333_wait_persists_after_position_change",
+        "declining_the_optional_self_wait_does_not_wait_the_opponent",
         "erena_active_no_heart",
-        "erena_debut_declining_the_optional_self_wait_does_not_wait_the_opponent",
         "erena_default_active_no_heart",
         "erena_in_wait_gains_heart05",
         "erena_wait_not_on_stage",
         "erena_wait_to_active_switches_heart",
+        "exactly_one_member_is_waited_even_when_all_three_qualify",
+        "paying_the_cost_waits_the_cost_nine_member_and_not_the_cost_ten_member",
+        "paying_the_debut_cost_switches_on_her_own_constant_heart05",
         "private_wars_activates_waited_member_and_grants_only_that_member_one_blade",
         "private_wars_waits_original_three_blades_but_not_four",
         "private_wars_without_arise_does_not_activate_or_grant_blades",
         "reactivating_waited_self_removes_constant_heart05",
-        "two_copies_of_same_arise_member_grant_two_heart05",
-        "two_other_arise_members_grant_two_heart05",
-        "waited_self_gains_one_heart05_on_parallel_print"
+        "the_constant_condition_follows_the_card_not_the_resolving_player",
+        "the_offered_candidate_set_excludes_the_cost_ten_member",
+        "the_p_plus_print_has_the_same_debut"
       ],
-      "covering_test_count": 20,
+      "covering_test_count": 39,
       "direct_tests": [
         "bp5_333_leave_stage_clears_reenter_active_no_heart",
         "bp5_333_no_orientation_defaults_active",
@@ -20859,7 +20907,6 @@
         "bp5_333_two_copies_independent",
         "bp5_333_wait_persists_after_position_change",
         "erena_active_no_heart",
-        "erena_debut_declining_the_optional_self_wait_does_not_wait_the_opponent",
         "erena_default_active_no_heart",
         "erena_in_wait_gains_heart05",
         "erena_wait_not_on_stage",
@@ -20868,11 +20915,16 @@
         "private_wars_waits_original_three_blades_but_not_four",
         "private_wars_without_arise_does_not_activate_or_grant_blades",
         "reactivating_waited_self_removes_constant_heart05",
+        "the_constant_condition_follows_the_card_not_the_resolving_player",
+        "the_p_plus_print_has_the_same_debut",
+        "the_waited_opponent_member_crosses_another_cards_constant_threshold",
+        "two_copies_each_pay_their_own_orientation_and_see_the_updated_board",
         "two_copies_of_same_arise_member_grant_two_heart05",
         "two_other_arise_members_grant_two_heart05",
-        "waited_self_gains_one_heart05_on_parallel_print"
+        "waited_self_gains_one_heart05_on_parallel_print",
+        "waiting_an_opponent_erena_grants_the_opponent_her_own_heart"
       ],
-      "direct_test_count": 20,
+      "direct_test_count": 24,
       "is_null": false,
       "use_limit": null,
       "watches_abilities": false,
@@ -27681,13 +27733,21 @@
         "engine/tests/test_modules/effects/draw/chains/side_debut_draw_discard_pl_sp_pb2_036_n_pl_sp_pb2_037_n_test.rs",
         "engine/tests/test_modules/effects/mill/all_members_blades_pl_hs_bp5_013_n_test.rs",
         "engine/tests/test_modules/effects/mill/discard_cost_mill_then_arise_recovery_test.rs",
+        "engine/tests/test_modules/effects/state/orientation_gated/erena_debut_cost_nine_or_less_opponent_wait_test.rs",
         "engine/tests/test_modules/effects/state/per_card/either_or_state_change_test.rs",
         "engine/tests/test_modules/effects/state/wait_activation/self_wait_and_nijigasaki_activation_test.rs",
         "engine/tests/test_modules/integration/per_card/q203_q204_q218_eternalize_cara_chika_rulings_test.rs",
         "engine/tests/test_modules/jidou/state_watch/own_effect_wait_cheap_opponent_draw_one_q177_test.rs"
       ],
       "covering_tests": [
+        "a_baton_touch_debut_belongs_to_the_arriving_copy",
+        "a_cost_free_self_wait_debut_repeats_on_the_first_copy",
+        "a_cost_ten_only_opponent_stage_waits_nobody",
+        "a_second_entry_to_the_stage_offers_the_debut_gate_again",
+        "a_wait_immune_opponent_member_is_offered_but_not_actually_waited",
         "actual_cost_nine_wait_does_not_trigger_maki_draw",
+        "an_already_waited_member_is_not_offered_and_the_remaining_candidate_resolves",
+        "an_empty_opponent_stage_resolves_cleanly",
         "cara_q203_energy_and_member_gives_plus2",
         "cara_q203_member_only_activation_gives_nothing",
         "cara_q203_nijigasaki_energy_activation_gives_plus1",
@@ -27700,6 +27760,7 @@
         "chisato_bp5003_live_start_activates_all_members_and_energy",
         "declined_unit_wait_cost_leaves_expensive_opponent_active_and_no_draw",
         "declined_unit_wait_cost_with_empty_opponent_stage_draws_nothing",
+        "declining_the_optional_self_wait_does_not_wait_the_opponent",
         "emma_bp4008_energy_side_leaves_member_waited",
         "emma_bp4008_member_side_leaves_energy_alone",
         "emma_pb1008_debut_choice_picks_member",
@@ -27708,18 +27769,12 @@
         "eternalize_q204_two_niko_hearts_reduced",
         "eternalize_q204_zero_niko_hearts_unchanged",
         "eternalize_same_name_two_niji_identical",
-        "eternalize_three_all_different_no_trigger",
-        "eternalize_two_same_one_different_triggers",
-        "honoka_bp5_010_live_start_with_discard_and_arise_mills_three_then_recovers_arise",
-        "honoka_bp5_010_live_start_with_discard_without_arise_still_mills_three",
-        "kanata_n_bp3_006_debut_active_self_becomes_waited",
-        "own_effect_wait_of_cheap_opponent_after_debut_draws_one_q177",
-        "pl_hs_bp5_013_n_mill_three_all_members_two_blades",
-        "pl_hs_bp5_013_n_milled_live_card_no_blades",
-        "pl_s_bp3_021_l_live_start_declined_recovery_preserves_waitroom_without_blade"
+        "eternalize_three_all_different_no_trigger"
       ],
-      "covering_test_count": 40,
+      "covering_test_count": 60,
       "direct_tests": [
+        "a_baton_touch_debut_belongs_to_the_arriving_copy",
+        "a_cost_free_self_wait_debut_repeats_on_the_first_copy",
         "cara_q203_energy_and_member_gives_plus2",
         "cara_q203_member_only_activation_gives_nothing",
         "cheap_opponent_wait_draw_opponent_caused_wait_no_draw",
@@ -27737,7 +27792,7 @@
         "setsuna_pl_n_pr_032_pr_waitroom_at_threshold_mills_nothing",
         "setsuna_pl_n_pr_032_pr_waitroom_seven_mills_one_and_recovers_live"
       ],
-      "direct_test_count": 16,
+      "direct_test_count": 18,
       "is_null": false,
       "use_limit": null,
       "watches_abilities": false,
@@ -41813,13 +41868,14 @@
         "engine/tests/test_modules/effects/auto/pb2_self_wait_or_cost_paid_activates_and_gains_blade_pl_pb2_021_n_test.rs"
       ],
       "covering_tests": [
+        "an_active_member_with_no_trigger_grants_nothing_is_NOT_yet_true",
         "an_empty_setup_grants_nothing",
         "becoming_wait_activates_her_and_grants_a_blade",
         "it_does_not_fire_for_another_cards_ability",
         "the_cost_paid_branch_is_still_a_vacuous_comparison",
         "the_wait_branch_parses_as_a_self_scoped_state_condition"
       ],
-      "covering_test_count": 5,
+      "covering_test_count": 6,
       "direct_tests": [
         "an_empty_setup_grants_nothing",
         "it_does_not_fire_for_another_cards_ability",
@@ -45020,12 +45076,22 @@
       "covering_files": [
         "engine/tests/test_modules/effects/choice/selection_filter/optional_energy_edelnote_deploy_or_requirement_test.rs",
         "engine/tests/test_modules/effects/compound/condition_and_effect/discard_wait_enables_hearts_pl_hs_bp5_016_n_test.rs",
+        "engine/tests/test_modules/effects/state/orientation_gated/erena_debut_cost_nine_or_less_opponent_wait_test.rs",
         "engine/tests/test_modules/effects/state/orientation_gated/two_or_more_opponent_wait_members_constant_heart06_test.rs"
       ],
       "covering_tests": [
+        "a_baton_touch_debut_belongs_to_the_arriving_copy",
+        "a_cost_free_self_wait_debut_repeats_on_the_first_copy",
+        "a_cost_ten_only_opponent_stage_waits_nobody",
+        "a_second_entry_to_the_stage_offers_the_debut_gate_again",
+        "a_wait_immune_opponent_member_is_offered_but_not_actually_waited",
+        "an_already_waited_member_is_not_offered_and_the_remaining_candidate_resolves",
+        "an_empty_opponent_stage_resolves_cleanly",
         "declined_energy_preserves_energy_stage_and_requirement_743",
+        "declining_the_optional_self_wait_does_not_wait_the_opponent",
         "deploy_filter_excludes_cost_five_and_wrong_group_743",
         "exact_cost_nine_edelnote_enables_requirement_choice_743",
+        "exactly_one_member_is_waited_even_when_all_three_qualify",
         "full_stage_deploy_choice_cannot_replace_existing_members_743",
         "low_cost_edelnote_or_costly_wrong_group_cannot_enable_choice_743",
         "opponent_goes_from_2_wait_to_1_wait_loses_heart06",
@@ -45036,12 +45102,16 @@
         "own_wait_members_do_not_count_for_opponent_condition",
         "paid_energy_choice_deploys_cost_four_edelnote_into_empty_area_743",
         "paid_energy_choice_reduces_only_own_heart06_requirement_743",
+        "paying_the_cost_waits_the_cost_nine_member_and_not_the_cost_ten_member",
+        "paying_the_debut_cost_switches_on_her_own_constant_heart05",
         "pl_hs_bp5_016_n_decline_without_waited_opponents_no_constant_heart06",
         "pl_hs_bp5_016_n_discard_waits_opponent_and_enables_constant_heart06",
         "pl_hs_bp5_016_n_single_eligible_victim_grants_no_heart06",
-        "pl_hs_bp5_016_n_waits_at_most_two_of_three_eligible_members"
+        "pl_hs_bp5_016_n_waits_at_most_two_of_three_eligible_members",
+        "the_constant_condition_follows_the_card_not_the_resolving_player",
+        "the_offered_candidate_set_excludes_the_cost_ten_member"
       ],
-      "covering_test_count": 17,
+      "covering_test_count": 37,
       "direct_tests": [
         "exact_cost_nine_edelnote_enables_requirement_choice_743",
         "opponent_goes_from_2_wait_to_1_wait_loses_heart06",
@@ -45053,9 +45123,10 @@
         "pl_hs_bp5_016_n_decline_without_waited_opponents_no_constant_heart06",
         "pl_hs_bp5_016_n_discard_waits_opponent_and_enables_constant_heart06",
         "pl_hs_bp5_016_n_single_eligible_victim_grants_no_heart06",
-        "pl_hs_bp5_016_n_waits_at_most_two_of_three_eligible_members"
+        "pl_hs_bp5_016_n_waits_at_most_two_of_three_eligible_members",
+        "the_waited_opponent_member_crosses_another_cards_constant_threshold"
       ],
-      "direct_test_count": 11,
+      "direct_test_count": 12,
       "is_null": false,
       "use_limit": null,
       "watches_abilities": false,

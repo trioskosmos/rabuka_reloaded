@@ -123,31 +123,38 @@ fn position_change_one_member() {
 
 use rabuka_engine::types::AbilityTrigger;
 
-/// Diagnostic — blast radius of the Jellyfish decline defect (`PL!SP-pb2-050-L`).
+/// The decline path, on a SECOND card — the blast-radius question, now answered.
 ///
-/// `live_start_subunit_threshold_formation_test` shows that DECLINING the optional
-/// フォーメーションチェンジ on that card leaves the stage as `[live, -1, -1]`: both members
-/// are gone from every zone while `cards_moved_this_turn` records them as moved. That test was
-/// the only decline path anywhere in the tree, so the defect's reach is unmeasured.
+/// `live_start_subunit_threshold_formation_test` showed that declining the optional
+/// フォーメーションチェンジ DESTROYED the stage: both members gone from every zone while
+/// `cards_moved_this_turn` recorded them as moved. It was the only decline path in the tree,
+/// so the fault's reach was unmeasured — the open question was whether it lived in that
+/// card's parse or in the shared `position_change` executor.
 ///
-/// `PL!SP-sd1-001-SD2` 澁谷かのん is one of the same five whole-stage formation changes, so
-/// the same decline is run here. If her members also disappear the fault is in the shared
-/// `position_change` executor rather than in Jellyfish's parse, which widens it to all five
-/// (`PL!SP-bp4-027-L`, `PL!SP-pb2-014-P＋`, `PL!S-bp7-012-N`, `PL!SP-pb2-050-L`,
-/// `PL!SP-sd2-001-SD2`).
+/// It was the executor: `build_choice_result` turned a decline on a `position|destination`
+/// prompt into the string `"0"`, which the position handler reads as `"left"`, so declining
+/// selected an area. Nothing card-specific was involved.
+///
+/// `PL!SP-sd1-001-SD2` 澁谷かのん is one of the five whole-stage formation changes that share
+/// that executor (`PL!SP-bp4-027-L`, `PL!SP-pb2-014-P＋`, `PL!S-bp7-012-N`, `PL!SP-pb2-050-L`,
+/// this one), so the same decline is run here on different data — two members and no live
+/// card, where the earlier reproduction also lost a live.
+///
+/// This started as a `println!` probe. It is an assertion test now: a diagnostic that only
+/// prints cannot fail, so it would have kept passing while the defect lived.
 #[test]
-#[ignore = "diagnostic: does declining the formation change destroy members on a second card?"]
-fn formation_change_decline_blast_radius_probe() {
+fn declining_the_formation_change_on_a_second_card_is_a_complete_no_op() {
     let db = load_real_database();
     let mut game = TestGame::new(db);
-    let kanono = game.id("PL!SP-sd2-001-SD2");
+    let kanono = game.id("PL!SP-sd1-001-SD2");
     let filler = game.id("PL!-sd1-010-SD");
+    let _ = filler;
 
     let other = game.id("PL!SP-bp1-014-N");
     game.state.player1.stage.stage = [other, kanono, -1];
 
     let before = game.state.player1.stage.stage;
-    println!("kanono stage BEFORE decline = {before:?}");
+    let deck_before = game.state.player1.main_deck.cards.len();
 
     fire_trigger(&mut game, kanono, AbilityTrigger::LiveStart, "ライブ開始時");
     assert!(
@@ -156,15 +163,37 @@ fn formation_change_decline_blast_radius_probe() {
     );
 
     let declined = game.decline_all_remaining();
-    let after = game.state.player1.stage.stage;
-    println!("declined prompts = {declined:?}");
-    println!("kanono stage AFTER  decline = {after:?}");
-    println!(
-        "hand={:?} waitroom={:?} deck_len={} cards_moved={:?}",
-        game.state.player1.hand.cards,
-        game.state.player1.waitroom.cards,
+    assert!(
+        declined.iter().any(|k| *k == "SelectTarget"),
+        "precondition: what was declined must be a destination prompt, otherwise this never \
+         reached the formation change (declined {declined:?})"
+    );
+
+    assert!(
+        !game.has_pending_choice(),
+        "declining must end the ability, not park a prompt"
+    );
+    assert_eq!(
+        game.state.player1.stage.stage, before,
+        "declining 「フォーメーションチェンジしてもよい」 must leave every member exactly where \
+         it was. Before the fix this dropped members out of the stage into no zone while \
+         logging them as moved, because an empty answer became the string \"0\" and the \
+         position handler reads \"0\" as \"left\"."
+    );
+    assert!(
+        game.state.cards_moved_this_turn.is_empty(),
+        "and nothing may be recorded as having moved, got {:?}",
+        game.state.cards_moved_this_turn
+    );
+    assert_eq!(
         game.state.player1.main_deck.cards.len(),
-        game.state.cards_moved_this_turn,
+        deck_before,
+        "the deck is untouched — a vanished member went nowhere"
+    );
+    assert!(
+        game.state.player1.hand.cards.is_empty()
+            && game.state.player1.waitroom.cards.is_empty(),
+        "no member may be relocated as a side effect of declining"
     );
 }
 

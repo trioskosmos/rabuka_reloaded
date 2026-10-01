@@ -481,9 +481,13 @@ impl CardSpriteCache {
         let _ = write!(self.key_buf, "{}:{}:{}x{}:{}", tag, card_no, box_w, box_h, dim_c);
         if let Some(p) = self.sprites.get_mut(self.key_buf.as_str()) {
             p.last_used = self.frame;
-        } else {
-            agb::println!("SPRITE miss {}:{} {}x{}", tag, card_no, grid_w, grid_h); // TEMP crash trace
-            // Baked tiles arrive as uniform BIOS streams  Enormalize once
+} else {
+            // REMOVED: was `agb::println!("SPRITE miss ...")`, a TEMP crash
+            // trace. It fired on every cache miss and `agb::println!` blocks
+            // on the mgba debug port per character, so it throttled the frame
+            // budget on exactly the frames that were already missing.
+            //
+            // Baked tiles arrive as uniform BIOS streams  Enormalize once
             // per miss into scratch; cache hits never touch `tiles` at
             // all, so steady frames pay nothing. Scratch fits the largest
             // grid (detail 12x18x64); every caller is smaller or equal.
@@ -943,6 +947,11 @@ impl<'a> Display<'a> {
     }
 
     /// Place a 16px (2x2 tile) glyph at (tx, ty); returns its width in tiles.
+    ///
+    /// Writes a 2x2 footprint, so the caller MUST have checked that
+    /// `ty + 1 < ROWS` and `tx + 1 < COLS` first. `set_tile` does not bounds
+    /// check: the BG tile number is a 10-bit field, so an out-of-map index
+    /// aliases into the next screenblock instead of failing. See `blit_text`.
     fn place_glyph(bg: &mut RegularBackground, ts: &TileSet, e: TileEffect, ch: char, tx: i32, ty: i32) -> i32 {
         let (idx, cols) = Self::glyph(ch);
         bg.set_tile((tx, ty), ts, TileSetting::new(idx as u16, e));
@@ -973,7 +982,24 @@ impl<'a> Display<'a> {
     ) {
         let draw_ch = |bg: &mut RegularBackground, ch: char, tx: i32, ty: i32| -> i32 {
             let (_, cols) = Self::glyph(ch);
-            if tx + cols as i32 > COLS {
+            // Clip on BOTH axes before handing anything to `set_tile`.
+            //
+            // A 2x2 glyph occupies (tx..tx+2, ty..ty+2), so a glyph whose
+            // origin sits on the last column or row still writes one tile
+            // past the visible map. That used to be unmitigated on Y: only X
+            // was checked, so the `wrap` path in `swap_buffers` — the
+            // free-form screen that renders the whole action log — could walk
+            // `ty` off the bottom of the 32x32 map. A BG map entry's tile
+            // number is 10 bits (GBATEK), so index 1024 and up does not
+            // bounds-check anywhere: it aliases into the following
+            // screenblock and silently rewrites the other background's
+            // tilemap and whatever tile blocks sit after it. No panic, no
+            // log line — just progressive screen corruption that worsens as
+            // the log grows.
+            if ty < 0 || ty + 1 >= ROWS {
+                return cols as i32;
+            }
+            if tx < 0 || tx + cols as i32 > COLS {
                 if !wrap {
                     return cols as i32; // clipped: consume without drawing
                 }
@@ -1226,41 +1252,6 @@ impl<'a> Display<'a> {
         let e0 = TileEffect::new(false, false, 15);
 
         self.clear_layers(&ui_ts, e0);
-
-        // Live sprite-VRAM readout, bottom-left. OBJ VRAM is this port's
-        // binding constraint (see `vram_stats`), and when the board degrades
-        // the number that explains it is the one the hardware is actually
-        // out of. `!(!!)` doubles a digit into an ASCII glyph without an
-        // integer formatter.
-        {
-            let (bytes, keys) = self.vram_stats();
-            let mut line = String::with_capacity(24);
-            line.push_str("v");
-            for d in [bytes / 1024, (bytes % 1024) / 100] {
-                line.push(char::from(b'0' + (d / 10) as u8));
-                line.push(char::from(b'0' + (d % 10) as u8));
-                if d == bytes / 1024 {
-                    line.push('.');
-                }
-            }
-            line.push('k');
-            for d in [keys / 10, keys % 10] {
-                line.push(char::from(b'0' + d as u8));
-            }
-            // Over budget is the interesting state, so mark it in text.
-            if bytes > SPRITE_VRAM_BUDGET {
-                line.push('!');
-            }
-            line.push(' ');
-            line.push_str(crate::diag::level_tag());
-            // Art-disabled is the isolation mode (SELECT+L); it must be
-            // unmistakable, because whether the board looks right with it off
-            // is what distinguishes a sprite-path fault from a board/UI one.
-            if !crate::diag::art_enabled() {
-                line.push_str(" NOART");
-            }
-            Self::blit_line(&mut self.ui_front, &font_ts, &icon_ts, e0, &line, 0, ROWS - 2);
-        }
 
         Self::blit_line(&mut self.ui_front, &font_ts, &icon_ts, e0, &frame.header, 0, 0);
         Self::blit_line(&mut self.ui_front, &font_ts, &icon_ts, e0, &frame.action_count, COLS - 6, 0);

@@ -55,7 +55,10 @@ fn stage_alloc(
 }
 
 /// Icon tallies contributed by one yell-revealed card (rule 8.3.12).
-pub(crate) struct YellIconOutcome {
+///
+/// Public alongside `process_yell_revealed_card_icons`, which returns it — a
+/// `pub fn` cannot expose a `pub(crate)` type to an out-of-crate caller.
+pub struct YellIconOutcome {
     pub blade_hearts: [u8; 8],
     pub note_icons: u8,
     pub draw_icons: u8,
@@ -101,7 +104,12 @@ pub(crate) fn blade_type_override_for_stage(
 ///
 /// Heart contributions are added to `owned_hearts` and `total_hearts`. Callers
 /// that recompute the heart pool afterwards may pass a scratch `owned_hearts`.
-pub(crate) fn process_yell_revealed_card_icons(
+///
+/// Public so that out-of-crate tools can compute a card's PRINTED heart
+/// breakdown without reimplementing the icon decoding — `src/bin/deck_analyze.rs`
+/// needs exactly that to answer "does this deck have blade hearts, and in which
+/// colours". Pure: it only reads `card` and writes the three out-params.
+pub fn process_yell_revealed_card_icons(
     card: &crate::card::Card,
     override_color: Option<HeartColor>,
     owned_hearts: &mut BaseHeart,

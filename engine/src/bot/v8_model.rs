@@ -1192,6 +1192,62 @@ pub fn v7_term_weight(name: &str, default: f64) -> f64 {
         .unwrap_or(default)
 }
 
+/// What the cards actually in hand are worth, as opposed to how many there are.
+///
+/// ## Why count is not enough
+///
+/// `v7_term_score` pays `3.0 * dHand` — the hand's *size*. Every option of a
+/// tutor choice changes the size by exactly +1, so every option scores
+/// identically and the pick is arbitrary. The deck the bots actually play has
+/// two of them on cost-2 bodies:
+///
+/// - 葉月 恋 `PL!SP-BP1-005-R` (cost 2): look at top 5, reveal **1 Liella card**
+///   to hand.
+/// - 米女メイ `PL!SP-BP2-007-R` (cost 5): look at top 5, reveal **1 Liella
+///   member** to hand.
+///
+/// So the bot is choosing between a cost-11 body and a cost-2 vanilla on a coin
+/// flip, at the exact moment it is trying to set up the turn. That is the same
+/// class of defect as the ones §3 found: the leaf reads a quantity that is
+/// constant across the candidates it is being asked to separate.
+///
+/// ## What a card is worth here
+///
+/// Deliberately crude and deliberately about *playability*, not printed power:
+///
+/// - a **member** is worth its printed cost, because cost is what the energy
+///   curve (`+1/turn` on 3 setup, and baton-touching reuses a body's cost) has
+///   to pay for, and a body the bot cannot afford for three turns is a body it
+///   is holding instead of drawing one it can use;
+/// - a **live** is worth its printed requirement, because the live zone takes
+///   three and a bigger requirement is a bigger check — capped, because a
+///   requirement the board can never cover is not worth anything and a linear
+///   term would reward exactly that.
+///
+/// Gated: this is an additive change to a leaf that ten prior term additions
+/// could not move, so the prior is that it is also inert. It differs in that it
+/// is not a function of the *board* at all — it is a function of the *hand*,
+/// which nothing else in the leaf reads, and the choices it can separate are ones
+/// where every board term is provably equal.
+pub fn hand_quality(gs: &GameState, me: u8, db: &CardDatabase) -> i32 {
+    const LIVE_CAP: i32 = 12;
+    gs.seat_player(me)
+        .hand
+        .cards
+        .iter()
+        .filter_map(|&cid| db.get_card(cid).map(|card| (cid, card)))
+        .map(|(cid, card)| match card.card_type {
+            crate::card::CardType::Member => i32::from(card.cost.unwrap_or(0)),
+            crate::card::CardType::Live => life_need(gs, cid)
+                .iter()
+                .map(|v| i32::from(*v))
+                .sum::<i32>()
+                .min(LIVE_CAP),
+            crate::card::CardType::Energy => 0,
+        })
+        .sum()
+}
+
 pub fn supply_hearts(gs: &GameState, me: u8, db: &CardDatabase) -> i32 {
     stats_pipeline::stage_hearts(
         &gs.seat_player(me).stage.stage,

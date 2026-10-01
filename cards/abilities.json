@@ -1,9 +1,9 @@
 {
   "schema": "extracted_abilities.v1",
-  "generated_at": "2026-09-30T15:35:12.572933",
+  "generated_at": "2026-10-01T11:08:31.180106",
   "generated_by": "cards/ability_extraction/extract_card_abilities.py",
   "source_file": "cards/cards.json",
-  "engine_commit": "dc44ccf1",
+  "engine_commit": "09b85d2d",
   "parser_version": "1.0",
   "input_hash": null,
   "statistics": {
@@ -18143,14 +18143,16 @@
       "effect": {
         "text": "自分のステージにこのメンバー以外のコスト11のメンバーがいる場合、自分の控え室から『虹ヶ咲』のライブカードを1枚手札に加える",
         "condition": {
+          "type": "card_count_condition",
+          "count": 1,
+          "operator": ">=",
+          "cost_limit": 11,
+          "cost_limit_operator": "=",
           "text": "自分のステージにこのメンバー以外のコスト11のメンバーがいる場合",
-          "target": "self",
           "location": "stage",
           "card_type": "member_card",
-          "comparison_type": "cost",
-          "exclude_self": true,
-          "cost_limit": 11,
-          "type": "comparison_condition"
+          "target": "self",
+          "exclude_self": true
         },
         "source": "discard",
         "destination": "hand",

@@ -520,6 +520,28 @@ fn apply_convert_gate(gs: &GameState, after: &GameState, me: u8, db: &CardDataba
     after_gap < before
 }
 
+/// `V8_HAND_QUALITY=<w>`: value the hand's *contents*, not its size.
+///
+/// `v7_term_score` already pays `3.0 * dHand`, so every option of a tutor choice
+/// scores +3.0 and the pick is arbitrary. The deck the bots play has two tutor
+/// bodies — `葉月 恋` `PL!SP-BP1-005-R` (cost 2, 登場: look at the top 5 and
+/// reveal one Liella card to hand) and `米女メイ` `PL!SP-BP2-007-R` (cost 5, the
+/// same for members) — so the bot is choosing a cost-11 body over a cost-2
+/// vanilla on a coin flip, at the exact moment it is setting up the turn.
+///
+/// This is the only term in the leaf that reads the HAND's contents rather than
+/// the board, which is why it can separate candidates that every board term
+/// proves equal. Gated, because eleven prior additive terms to this leaf were
+/// inert and the prior is deserved — the difference is that this one is not a
+/// function of the same quantities.
+fn hand_quality_weight() -> f64 {
+    std::env::var("V8_HAND_QUALITY")
+        .ok()
+        .and_then(|v| v.parse::<f64>().ok())
+        .filter(|w: &f64| w.is_finite())
+        .unwrap_or(0.0)
+}
+
 fn blade_delta_weight() -> f64 {
     std::env::var("V8_BLADES")
         .ok()
@@ -1167,7 +1189,8 @@ pub(crate) fn evaluate_actions(gs: &GameState, actions: &[Action], me: u8) -> Ve
                 + (v8_model::supply_hearts(&sim, me, db)
                     - v8_model::supply_hearts(gs, me, db)) as f64
                     * ABILITY_HEART_CREDIT)
-        + v7_term_score(gs, &sim, me, db);
+        + v7_term_score(gs, &sim, me, db)
+        + hand_quality_weight() * v8_model::hand_quality(gs, me, db) as f64;
 
 /// The whole of v7's value function, term by term, in one line.
 ///

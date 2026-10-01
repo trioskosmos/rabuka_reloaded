@@ -114,33 +114,47 @@ fn live_start_one_subunit_member_does_not_offer_formation() {
 /// that made the change **mandatory** — offering no way to skip, or moving members anyway —
 /// would pass this entire file.
 ///
-/// ## KNOWN DEFECT — this test fails, and it is a real one
+/// ## This test found a card-destroying bug, and it is now fixed
 ///
-/// Marked `#[ignore]` so the reproduction lives in code without reddening the suite.
-///
-/// Declining the optional formation change **destroys the members**:
-///
+/// Declining the optional formation change used to **destroy the stage**:
 /// ```text
-/// stage before : [5213, 5214, 17137]      ← two 『5yncri5e! members + the live
-/// stage after  : [17137, -1, -1]          ← both members gone
-/// hand=[]  waitroom=[]  deck_len=30        ← unchanged, so they went nowhere
-/// cards_moved_this_turn=[5214, 17137]     ← the engine recorded them as MOVED
+/// stage before : [5213, 5214, 17137]      <- two members + the live
+/// stage after  : [17137, -1, -1]          <- both members gone
+/// hand=[]  waitroom=[]  deck_len=30        <- unchanged, so they went nowhere
+/// cards_moved_this_turn=[5214, 17137]     <- the engine recorded them as MOVED
 /// ```
+/// The members are in no zone at all while being logged as moved. A declined
+/// 「...してもよい」 must be a **complete no-op**.
 ///
-/// The two members are not in hand, not in the waitroom, and the deck is untouched, so they
-/// were dropped rather than relocated — while being logged as moved. 「…してもよい」 declined
-/// must be a **complete no-op**.
+/// Two causes, both fixed:
 ///
-/// **Blast radius: probably all five whole-stage formation changes** (`PL!SP-bp4-027-L`,
-/// `PL!SP-pb2-014-P＋`, `PL!S-bp7-012-N`, this card, `PL!SP-sd2-001-SD2`), since they share the
-/// `position_change` executor. That is **not measured** — every other test in those families
-/// accepts the change, so no decline path is covered anywhere. I have not asserted it beyond
-/// this card.
+/// 1. `turn/actions/mod.rs::build_choice_result` - a decline arrives as an empty answer
+///    (`card_id: None`, empty `card_indices`). For a `position|destination` prompt the
+///    option-text lookup then missed, and control fell through to `None => "0".into()`.
+///    `handle_position_change_choice` maps `"0" => "left"`, so **declining selected the
+///    left area**: the plan was armed, advanced to the next member prompt, and the
+///    partially filled plan was finalized.
+/// 2. `finalize_formation_change` then dropped every planned member whose destination
+///    was still empty - phases 1 and 2 skip them, and phase 3 deliberately does not
+///    restore them because they count as "planned". Each unassigned member fell out of
+///    the stage.
 ///
-/// `decline_all_remaining` asserts each prompt is skippable before declining, so the prompt
-/// really is optional; the failure is in what happens afterwards.
+/// The fixes: an empty answer on a skippable prompt is now a decline, routed as
+/// `TargetSelected { target: "skip" }` so it reaches the position handler own decline
+/// branch (which clears the plan and the pending actions); and `handle_general_skip` now
+/// clears `carried.formation_plan`, so no other route into "skip" can leave a stale
+/// plan behind.
+///
+/// An empty answer can only mean "declined" because a non-skippable prompt with an empty
+/// answer is rejected upstream ("non-skippable {kind} prompt requires a selection"), and
+/// accepting always names an option. The three sibling option-text targets are left
+/// alone on purpose - their handlers do not read `"skip"` (`handle_area_select` falls
+/// back to the first option), so a blanket change would be wrong for them.
+///
+/// The test is back in the suite rather than left as a reproduction. A decline asserted
+/// only by absence would pass for the wrong reason, so the board is compared
+/// explicitly and `cards_moved_this_turn` must be empty.
 #[test]
-#[ignore = "KNOWN ENGINE DEFECT: declining the optional フォーメーションチェンジ destroys stage members — they are recorded as moved but exist in no zone"]
 fn live_start_two_subunit_members_can_decline_the_formation_change() {
     let (mut game, live, stage) = formation_setup(2);
     fire_trigger(&mut game, live, AbilityTrigger::LiveStart, "ライブ開始時");

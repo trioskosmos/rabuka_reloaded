@@ -386,14 +386,30 @@ fn declining_the_optional_self_wait_does_not_wait_the_opponent() {
 /// Nothing on the opponent's stage is コスト9以下: the cost is still payable (it is
 /// optional and the player chose it), and the effect then has no target and does nothing.
 ///
-/// **This test found a real engine defect.** Paying puts Erena to wait, so her own 常時 must
-/// grant heart05 — but `execute_change_state` returned early on the empty candidate list
+/// **This test found a real engine defect, and it is the only card in the pool that could.**
+///
+/// Paying puts Erena to wait, so her own 常時 must grant heart05 — but
+/// `execute_change_state` returned early on the empty candidate list
 /// (`change_state.rs:469-489`) WITHOUT calling `recalculate_constants()`, which every other
 /// exit from that function does. So she was in wait and still granted nothing.
 ///
 /// The empty-candidate path is reached only when the ability's own effect has no target,
-/// which makes this the single narrowest place the bug could hide: the same card on a board
-/// with any qualifying member recalculated normally and the defect was invisible.
+/// which made this the single narrowest place the bug could hide: the same card on a board
+/// with any qualifying member recalculated normally, and the defect was invisible.
+///
+/// Checking the blast radius explains why it survived at all. 33 card prints carry this exact
+/// cost shape (`change_state` + `self_cost` + `optional` + `state_change: wait`, across 13
+/// unique abilities) — but PL!-bp5-333-R and its P＋ are the ONLY cards in the entire pool
+/// that BOTH pay an optional self-wait AND have a 常時 gated on their own wait
+/// (`effect.condition` = `state_condition` / `state: wait` / `self_target: true`). Every other
+/// card in the family grants nothing while waited, so for all of them a stale recalculation
+/// has no observable consequence and the missing call was harmless. One card, one board.
+///
+/// The fix is at the symptom site (the empty-candidate exit). The invariant arguably belongs
+/// in `handle_optional_cost_payment`, which writes the activating card's orientation
+/// (`cost/handlers.rs:1487`) and never recalculates either — but for the other 32 prints
+/// nothing can observe that, so moving the fix there would be untestable churn. Noted rather
+/// than done.
 #[test]
 fn a_cost_ten_only_opponent_stage_waits_nobody() {
     let mut probe = TestGame::new(load_real_database());
@@ -822,6 +838,58 @@ fn waiting_an_opponent_erena_grants_the_opponent_her_own_heart() {
         heart05(&game, ours),
         1,
         "our waited copy grants US her heart05 — each side resolves its own constant"
+    );
+}
+
+// ---------------------------------------------------------------------------
+// WHO is asked to choose the opponent's member.
+// ---------------------------------------------------------------------------
+
+/// The printed card says 「相手のステージにいる…メンバー1人をウェイトにする」. The cards being
+/// waited belong to the opponent, but the choice of WHICH one is made by the player whose
+/// ability is resolving — that is Erena, not her opponent. In LLSS target selection always
+/// belongs to the resolving player; there is no rule handing the pick to the owner of the
+/// targeted cards. It matters mechanically, not just formally: if the opponent picked, they
+/// would choose the least damaging member for themselves, turning a cost to the card's player
+/// into a cost the card's player does not control.
+///
+/// This is the one clause in the whole ability that no test anywhere was pinning, and the
+/// engine has explicit machinery for the opposite behaviour:
+///
+/// ```rust
+/// // engine/src/ability/queue.rs:308-343
+/// let is_opponent_choice = match &choice {
+///     Choice::SelectCard { target_player_id: Some(tpid), .. } => tpid == "opponent",
+///     ...
+/// if !is_spawn_opponent && !is_route_opponent { return None; }   // else: route to the OPPONENT
+/// ```
+///
+/// So a `SelectCard` whose `target_player_id` is `"opponent"` is handed to the opponent
+/// whenever the resolver's spawn context says the effect targets the opponent — which is
+/// exactly Erena's case. `SelectCard` is also what `change_state.rs:519-546` builds, and it
+/// sets `target_player_id` to the effect's `target`, i.e. `"opponent"` here.
+#[test]
+fn the_resolving_player_chooses_which_opponent_member_is_waited() {
+    let mut probe = TestGame::new(load_real_database());
+    let m9 = probe.id(COST_9);
+    let m4 = probe.id(COST_4);
+
+    let (mut game, _erena) = debuted_with_opponent_stage([m9, m4, -1]);
+    game.select_choice_option(1);
+    game.assert_pending_choice_type("SelectCard", "two candidates, so the prompt opens");
+
+    let picker = game
+        .state
+        .ability_queue
+        .current_entry()
+        .and_then(|e| e.choice_player_id.clone());
+    assert_eq!(
+        picker.as_deref(),
+        Some("p1"),
+        "the player resolving Erena's 登場 (p1) chooses which of the opponent's members is \
+         waited. Got {picker:?}. If this is p2, the OPPONENT is choosing which of their own \
+         members takes the ウェイト, which is both a rules error and a mechanical one — see \
+         queue.rs:308-343, which routes an opponent-targeted SelectCard to the opponent."
     );
 }
 
