@@ -341,36 +341,23 @@ void rb_gain_ability(GameState *g, int actor, AbilityEffect *e) {
     }
 }
 
-void rb_invalidate_ability(GameState *g, int actor, AbilityEffect *e){
-    if (!g) return;
-    int who = actor;
-    if (e && e->target && !strcmp(e->target, "opponent")) who = actor ^ 1;
-    int synthetic_changed = 0;
-    for (int slot = 0; slot < 64; slot++) {
-        int card_id = g->gained_card_ids[slot];
-        if (card_id < 0 || rb_owner_of_card(g, card_id) != who) continue;
-        while (rb_card_num_gained_abilities(g, card_id) > 0) {
-            rb_remove_gained_ability(g, card_id, 0);
-            synthetic_changed = 1;
-        }
-    }
-    int temp_write = 0;
-    for (int i = 0; i < g->n_temp_effects; i++) {
-        RbTempEffect *te = &g->temp_effects[i];
-        if (rb_owner_of_card(g, te->card_id) == who) {
-            rb_mods_add_blade(&g->mods, te->card_id, -te->blade);
-            rb_mods_add_score(&g->mods, te->card_id, -te->score);
-            for (int c = 0; c < 8; c++) {
-                rb_mods_add_heart(&g->mods, te->card_id, c, -te->heart[c]);
-                rb_mods_add_need_heart(&g->mods, te->card_id, c, -te->need_heart[c]);
-            }
-        } else {
-            g->temp_effects[temp_write++] = *te;
-        }
-    }
-    g->n_temp_effects = temp_write;
-    if (synthetic_changed) rb_recalc_constants(g);
-}
+/* DELETED 2026-10-02: rb_invalidate_ability.
+ *
+ * It had NO Rust twin and no caller. Rust's 「〜の能力を無効化する」 is
+ * execute_invalidate_ability (engine/src/ability/effects/ability_ops.rs:257),
+ * which records ONE trigger invalidation through
+ * `GameState::try_add_ability_invalidation(card_id, trigger, duration)`; that
+ * is rb_try_add_ability_invalidation, reached from
+ * rb_translated_execute_invalidate_ability (ability_effects.c, the live
+ * route). What this function did instead was purge EVERY gained ability and
+ * EVERY temporary effect belonging to a whole player — a rule with no printed
+ * card behind it, and vastly broader than 「1人の能力」. Rust's nearest real
+ * teardown is GameState::clear_gained_abilities_for_card (PER CARD), which is
+ * rb_clear_gained_abilities_for_card in src/core/game_state_abilities.c and is
+ * already called from the three registration paths.
+ *
+ * include/rabuka.h:2026 still declares it; nothing calls it, so the tree links
+ * without the definition. That declaration is the header owner's to drop. */
 
 /* Mirror GameState::check_expired_effects (engine/src/core/game_state/
    abilities.rs:2729) for the turn-rollover hook. Phase.c calls this right
@@ -386,73 +373,6 @@ void rb_tick_gained(GameState *g){
     if (!g) return;
     rb_check_expired_effects(g, RB_TEMP_LIVE_END);
     rb_check_expired_effects(g, RB_TEMP_TURN_END);
-}
-
-/* Mirror ability_effects.rs:141-227 execute_activate_ability.
-
-   "previous_selected" (emitted by the parser for 「そのカード／それらが持つ…能力を発動させる」)
-   fires EVERY selected card's ability whose trigger matches target_trigger.
-   With no target_trigger the fallback stores the ability text on the
-   activating card instead of firing a debut. */
-static void s_execute_activate_ability(GameState *g, int actor, AbilityEffect *e) {
-    if (!g || !e) return;
-    const char *source_card = gain_extra(e, "source_card");
-    const char *trigger = gain_extra(e, "target_trigger");
-    const char *ability_text = gain_extra(e, "ability_text");
-
-    /* Which cards' abilities are fired. */
-    int card_ids[RB_MAX_RECENTLY_MOVED];
-    int n_ids = 0;
-    if (source_card && !strcmp(source_card, "previous_selected")) {
-        for (int i = 0; i < g->n_selected_cards && n_ids < RB_MAX_RECENTLY_MOVED; i++)
-            card_ids[n_ids++] = g->selected_cards[i];
-    } else if (source_card && !strcmp(source_card, "cost_card")) {
-        if (g->n_recently_moved > 0)
-            card_ids[n_ids++] = g->recently_moved[g->n_recently_moved - 1];
-    }
-
-    if (trigger && *trigger) {
-        /* Rust compares the FIRST '/'-separated component of the ability's
-           trigger string; rb_card_has_ability_trigger_for applies the same
-           trigger_text_matches normalisation. */
-        for (int i = 0; i < n_ids; i++) {
-            int cid = card_ids[i];
-            if (cid < 0) continue;
-            if (!rb_card_has_ability_trigger_for(g, cid, trigger)) continue;
-            /* Fire through the normal ability queue so the fired ability's own
-               cost is paid before its effect resolves (Q273). */
-            rb_trigger_debut(g, actor, cid);
-        }
-        return;
-    }
-
-    /* Fallback: store the gained ability string on the activating card.
-       Rust pushes the string into GameState::gained_abilities
-       (HashMap<i16, Vec<String>>); the C port has no string map, so the
-       equivalent is a synthetic trigger-carrying gained Ability on the same
-       card — the same store gained_card_abilities uses, so every consumer
-       that clears/reads gained abilities sees it. */
-    if (g->activating_card >= 0) {
-        char buf[256];
-        const char *text = ability_text ? ability_text : "";
-        if (trigger && *trigger)
-            snprintf(buf, sizeof(buf), "%s_trigger:%s", text, trigger);
-        else
-            snprintf(buf, sizeof(buf), "%s", text);
-        Ability gained;
-        memset(&gained, 0, sizeof(gained));
-        gained.use_limit = -1;
-        gained.full_text = rb_strdup2(buf);
-        gained.triggerless_text = rb_strdup2(buf);
-        gained.triggers = (trigger && *trigger) ? rb_strdup2(trigger) : NULL;
-        if (rb_register_gained_ability(g, g->activating_card, &gained) < 0)
-            rb_free_ability(&gained);
-    }
-}
-
-void rb_activate_ability_effect(GameState *g, int actor, AbilityEffect *e, int host_cid){
-    (void)host_cid;
-    s_execute_activate_ability(g, actor, e);
 }
 
 /* Mirror ability_effects.rs:536-681 execute_gain_ability_from_source.

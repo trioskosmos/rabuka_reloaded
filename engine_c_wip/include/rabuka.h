@@ -1268,6 +1268,33 @@ typedef struct {
      int yell_cards[RB_MAX_LIVE_CARDS * 3];
      int n_yell_cards;
      int yell_blade_hearts[8];
+    /* ── Verified-missing GameState members (mod.rs; shapes from an audit that
+     * checked each against its Rust twin) ──────────────────────────────────
+     * ONLY fields with a confirmed Rust counterpart are added here. Two that were
+     * requested are deliberately NOT added:
+     *   current_turn_phase - Rust has a real field, but RbGscTurnPhase is fully
+     *     DERIVABLE from g->phase + g->first_attacker/g->second_attacker, and
+     *     rb_gsc_current_turn_phase already derives it. Adding it would create a
+     *     second source of truth.
+     *   mods.last_cost_energy_count - no Rust field of that name could be found in
+     *     game_state/modifiers.rs or game_state/mod.rs. Do not add until someone
+     *     confirms the twin exists. */
+    /* record_cost_paid (mod.rs:404-414): current_entry().card_id, pushed if not
+     * already present. 5 Rust callers: cost/handlers.rs:1389,1477,
+     * choice.rs:734,763,948. Also unblocks condition.c's `comparison_type:"cost"`
+     * arm, which is currently a `cost >= 0` tautology on PL!-pb2-021-N. */
+    int  cards_paid_cost_this_turn[RB_MAX_ZONE];
+    int  n_cards_paid_cost_this_turn;
+    /* cheer_revealed_cards / _mut (mod.rs:931, :1037) are SmallVec<[i16;8]>;
+     * produced at phases.rs:405, consumed at move/mod.rs:1583. */
+    int  player1_cheer_revealed_cards[8];
+    int  n_player1_cheer_revealed_cards;
+    int  player2_cheer_revealed_cards[8];
+    int  n_player2_cheer_revealed_cards;
+    /* push_revealed_cost_card (mod.rs:1091-1110); callers handlers.rs:1286,
+     * choice.rs:1673,1928. Cost-reveal provenance. */
+    int  revealed_cost_cards[RB_MAX_ZONE];
+    int  n_revealed_cost_cards;
     /* Rust PerformanceSnapshot.performance_need_heart_modifiers (types.rs:481),
      * captured at phases.rs:324-333 and :621-632, consumed by
      * restore_performance_need_heart_modifiers (game_state/modifiers.rs:2136-2159).
