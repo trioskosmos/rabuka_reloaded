@@ -534,18 +534,24 @@ static int drain_pay(TestGame *tg, int pay, int guard_max)
 
 /* ── trigger helpers ─────────────────────────────────────────────────────── */
 
-/* Mirrors the Rust `trigger_auto(&mut game, cid, trigger, trigger_str)` idiom.
- * SINGLE-SEAT by design (see pump_queue note). Returns the number of abilities
- * the scan queued, so a test can prove the trigger really fired. */
+/* Mirrors the Rust `fire_trigger(&mut game, cid, trigger, trigger_str)` idiom:
+ * ONE ability of ONE card. Returns 1 when that ability was enqueued, so a test
+ * can prove the trigger really fired.
+ *
+ * The shared helper test_fire_trigger_on_card does the targeting through
+ * rb_trigger_auto_ability (the port of Rust trigger_auto_ability). This USED
+ * TO BE rb_queue_trigger_abilities(&tg->state, 0, trig), a whole-board TAS
+ * scan in which `cid` only ever set activating_card and EVERY card in P1's
+ * stage / success / live / hand / energy zone printing the trigger fired too --
+ * so a fixture staging a second 登場 card ran its debut twice.
+ *
+ * The extra drain call rb_drain_ability_queue the old body made is dropped:
+ * rb_process_pending_auto_abilities (inside the helper) is the Rust
+ * `process_pending_auto_abilities`, and the extra drain was only there to
+ * compensate for entries other cards had queued. */
 static int fire_trigger(TestGame *tg, int cid, const char *trig)
 {
-    if (!card_prints_trigger(cid, trig)) return 0;
-    tg->state.activating_card = cid;
-    int queued = rb_queue_trigger_abilities(&tg->state, 0, trig);
-    if (queued <= 0) return 0;
-    rb_process_player_abilities(&tg->state, 0);
-    rb_drain_ability_queue(&tg->state);
-    return queued;
+    return test_fire_trigger_on_card(tg, cid, trig);
 }
 
 /* The C analogue of Rust's
@@ -579,19 +585,20 @@ static int activate(TestGame *tg, int card_id)
     return test_activate_ability(tg, card_id);
 }
 
-/* Fire ONE specific AUTO ability of `cid` (a 登場 / ライブ開始時 / ライブ成功時
- * that the card prints more than one of). rb_queue_trigger_abilities queues
- * EVERY ability carrying the trigger, so a test that must isolate one leg (the
- * Q280 case fires 米女メイ's "place 2 energy in WAIT" AND "activate 6 energy")
- * has to address the index directly. Returns the queued count. */
+/* Fire ONE specific ability of `cid` by ABSOLUTE ability index, for a card that
+ * prints the trigger more than once (the Q280 case: 米女メイ's "place 2 energy
+ * in WAIT" AND "activate 6 energy" are both ライブ成功時).
+ *
+ * The old body pushed a bare entry with rb_queue_make_entry and then ran
+ * rb_drain_ability_queue, which bypassed the invalidation gate the engine's own
+ * enqueue path applies. It is replaced by test_fire_trigger_at_index, which
+ * addresses the same index through rb_trigger_auto_ability -- the port of Rust
+ * trigger_auto_ability, the same call Rust's fire_trigger_nth makes. `trig` is
+ * still checked here so the premise assertion keeps its meaning. */
 static int fire_trigger_index(TestGame *tg, int cid, const char *trig, int idx)
 {
     if (!ability_prints_trigger(cid, idx, trig)) return 0;
-    tg->state.activating_card = cid;
-    if (rb_queue_make_entry(&tg->state, cid, idx) < 0) return 0;
-    rb_process_player_abilities(&tg->state, 0);
-    rb_drain_ability_queue(&tg->state);
-    return 1;
+    return test_fire_trigger_at_index(tg, cid, idx);
 }
 
 /* Rust's `assert_select_card("stage", 1, true); select_indices(&[selected])`

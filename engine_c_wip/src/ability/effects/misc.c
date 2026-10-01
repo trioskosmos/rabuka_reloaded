@@ -27,6 +27,24 @@ void rb_choice_set_route(RbChoice *ch, RbChoiceRoute r);
 void rb_log_push_verdict(const char *text, const char *kind, int passed);
 int  rb_ability_debug_enabled(void);
 
+/* ability_queue.c — the "a resolution always has a current entry" guarantee
+   Rust gets from the queue shape itself (a resolver only exists attached to an
+   entry, and pause_for_choice pushes a dummy entry for every QueueState). The
+   C can execute an effect with NO entry, so the target="both" split has to
+   establish one itself; declared here because include/rabuka.h is not this
+   file's to edit. See the definition for why both halves depend on it. */
+int  rb_queue_ensure_current_entry(GameState *g, const char *player_id);
+
+/* ability_queue.c — stamps the Raw route string on the current entry, the C
+   home of Rust's `entry.choice_card_no = Some(ChoiceRoute::Raw(s))`
+   (choice.rs:133-139, position.rs:150-155, choice.rs:3153-3158 / :3178-3183).
+   queue.rs:341 reads that string back to decide the prompt's seat, and the int
+   `choice_card_no` tag cannot carry it (rabuka.h: tags 1/2/3 are shared by
+   Condition, Cost and Generic). Declared here for the same reason
+   rb_queue_ensure_current_entry is: include/rabuka.h is not this file's to
+   edit, and the pattern for that is already established immediately above. */
+void rb_queue_set_choice_route_raw(GameState *g, const char *raw);
+
 /* ── shared helpers (private fns of misc.rs) ── */
 
 static const char *eff_extra(const AbilityEffect *e, const char *k){
@@ -1168,6 +1186,50 @@ static int h_place_energy_under_member(GameState *g, int actor, const AbilityEff
 
 /* ─────────────────────── h_execute_position_change ─────────────────────────── */
 static int h_rotation(GameState *g, int actor, const AbilityEffect *e);
+
+/* The ONE position-destination prompt emitter for this file.
+
+   Rust raises `Choice::SelectTarget { target: "position|destination", .. }` from
+   FOUR places inside execute_position_change, and each of them stamps the
+   entry's route immediately BEFORE, with the raw string that names the move:
+
+     position.rs:204-208  "position_change:opponent:front"   (literal)
+     position.rs:150-155  "position_change:{target}:{cur_area}"
+     position.rs:273-277  "position_change:{target}:select"
+     position.rs:427-431  "position_change:{target}:{position}"
+
+   Two fields, two mistakes if they are conflated, and both were live here:
+
+     1. The CHOICE's `target` must be the literal "position|destination". It is
+        the string queue.rs:322-331 matches to decide the prompt asks the
+        opponent. The C passed "position_change:opponent:front" there instead
+        (old misc.c:1213), so that prompt was invisible to the seat decision —
+        a route string in a field Rust never reads for this purpose.
+
+     2. The route belongs on the ENTRY (queue.rs:340-342 reads
+        `entry.choice_card_no`'s Raw string), not on the choice. That is what
+        `has_choice_route_raw` / `choice_route_raw` carry.
+
+   `route_target` / `route_tail` are the two format! arguments at the matching
+   Rust site. Stamping BEFORE the emit matches Rust, where the route write
+   precedes the choice assignment; rb_queue_set_choice_route_raw deliberately
+   no-ops when there is no current entry, which is the C equivalent of Rust's
+   `current_entry_mut()` returning None at position.rs:204 / :273 / :427. */
+static int position_destination_prompt(GameState *g, int actor, const AbilityEffect *e,
+                                       const char *route_target, const char *route_tail)
+{
+    char raw[64];
+    snprintf(raw, sizeof(raw), "position_change:%s:%s",
+             (route_target && *route_target) ? route_target : "self",
+             route_tail ? route_tail : "");
+    rb_queue_set_choice_route_raw(g, raw);
+    rb_emit_choice(g, actor, RB_CHOICE_SELECT_TARGET, NULL, NULL, 1,
+                   e->is_optional ? 1 : 0, "position|destination");
+    rb_queue_pause_for_choice(g, &g->queue.pending);
+    rb_choice_set_route(&g->queue.pending, RB_ROUTE_SELECT_TARGET);
+    return 1;
+}
+
 static int h_execute_position_change(GameState *g, int actor, const AbilityEffect *e){
     int target_is_both = e->target && !strcmp(e->target,"both");
     const char *trigger_type  = eff_extra(e,"trigger_type");
@@ -1182,17 +1244,15 @@ static int h_execute_position_change(GameState *g, int actor, const AbilityEffec
     if(s_activating_card>=0)
         rule_log_activated(g,s_activating_card,"[[log_position_change]]");
 
-    /* each_time watcher */
+    /* each_time watcher — position.rs:150-155 stamps the triggering member's
+       own area as the tail. */
     if(trigger_type && !strcmp(trigger_type,"each_time")){
         int tm = g->queue.resume_host>=0 ? g->queue.resume_host : s_activating_card;
         int cur=-1;
         for(int i=0;i<RB_STAGE_SIZE;i++) if(P->stage[i]==tm){cur=i;break;}
         if(cur>=0){
-            rb_emit_choice(g,actor,RB_CHOICE_SELECT_TARGET,NULL,NULL,1,
-                           e->is_optional?1:0,"position|destination");
-    rb_queue_pause_for_choice(g, &g->queue.pending);
-            rb_choice_set_route(&g->queue.pending, RB_ROUTE_SELECT_TARGET);
-            return 1;
+            const char *cur_area = cur==0 ? "left" : (cur==1 ? "center" : "right");
+            return position_destination_prompt(g, actor, e, target, cur_area);
         }
         return 1;
     }
@@ -1200,51 +1260,33 @@ static int h_execute_position_change(GameState *g, int actor, const AbilityEffec
     const char *dest = e->destination;
     if(!dest) dest = eff_extra(e,"destination");
     if(dest && *dest){
-        if(!strcmp(dest,"front") && !strcmp(target,"opponent")){
-            rb_emit_choice(g,actor,RB_CHOICE_SELECT_TARGET,NULL,NULL,1,
-                           e->is_optional?1:0,"position_change:opponent:front");
-    rb_queue_pause_for_choice(g, &g->queue.pending);
-            rb_choice_set_route(&g->queue.pending, RB_ROUTE_SELECT_TARGET);
-            return 1;
-        }
+        /* position.rs:204-208 — the literal Raw route, and the prompt's own
+           `target` is the SAME "position|destination" every other arm uses. */
+        if(!strcmp(dest,"front") && !strcmp(target,"opponent"))
+            return position_destination_prompt(g, actor, e, "opponent", "front");
         return rb_position_change_with_destination(g,actor,e,dest,s_activating_card);
     }
-    /* target_member == select */
+    /* target_member == select — position.rs:273-277 */
     if(target_member && !strcmp(target_member,"select")){
-        rb_emit_choice(g,actor,RB_CHOICE_SELECT_TARGET,NULL,NULL,1,
-                       e->is_optional?1:0,"position|destination");
-    rb_queue_pause_for_choice(g, &g->queue.pending);
-        rb_choice_set_route(&g->queue.pending, RB_ROUTE_SELECT_TARGET);
-        return 1;
+        return position_destination_prompt(g, actor, e, target, "select");
     }
-    /* both target */
+    /* both target — position.rs:290-300 recurses with target "opponent", so
+       every stamp below it on that recursion carries "opponent". */
     if(target_is_both){
-        rb_emit_choice(g,actor^1,RB_CHOICE_SELECT_TARGET,NULL,NULL,1,
-                       e->is_optional?1:0,"position|destination");
-    rb_queue_pause_for_choice(g, &g->queue.pending);
-        rb_choice_set_route(&g->queue.pending, RB_ROUTE_SELECT_TARGET);
-        return 1;
+        return position_destination_prompt(g, actor^1, e, "opponent", "select");
     }
     /* multiple_targets + position → rotation */
     if(extra_true(e,"multiple_targets") && pos_param)
         return h_rotation(g,actor,e);
     /* multiple_targets formation (this_member multiple) */
     if(extra_true(e,"multiple_targets") && !strcmp(target_member,"this_member")){
-        rb_emit_choice(g,actor,RB_CHOICE_SELECT_TARGET,NULL,NULL,1,
-                       e->is_optional?1:0,"position|destination");
-    rb_queue_pause_for_choice(g, &g->queue.pending);
-        rb_choice_set_route(&g->queue.pending, RB_ROUTE_SELECT_TARGET);
-        return 1;
+        return position_destination_prompt(g, actor, e, target, "this_member");
     }
-    /* source-position branch */
+    /* source-position branch — position.rs:427-431 */
     if(pos_param && *pos_param){
         int src=rb_stage_position_index(pos_param);
         if(src>=0 && P->stage[src]!=RB_EMPTY_SLOT){
-            rb_emit_choice(g,actor,RB_CHOICE_SELECT_TARGET,NULL,NULL,1,
-                           e->is_optional?1:0,"position|destination");
-    rb_queue_pause_for_choice(g, &g->queue.pending);
-            rb_choice_set_route(&g->queue.pending, RB_ROUTE_SELECT_TARGET);
-            return 1;
+            return position_destination_prompt(g, actor, e, target, pos_param);
         }
         return 1;
     }
@@ -1252,18 +1294,9 @@ static int h_execute_position_change(GameState *g, int actor, const AbilityEffec
     {
         int from=-1;
         for(int i=0;i<RB_STAGE_SIZE;i++) if(P->stage[i]==s_activating_card){from=i;break;}
-        if(from<0){
-            rb_emit_choice(g,actor,RB_CHOICE_SELECT_TARGET,NULL,NULL,1,
-                           e->is_optional?1:0,"position|destination");
-    rb_queue_pause_for_choice(g, &g->queue.pending);
-            rb_choice_set_route(&g->queue.pending, RB_ROUTE_SELECT_TARGET);
-            return 1;
-        }
-        rb_emit_choice(g,actor,RB_CHOICE_SELECT_TARGET,NULL,NULL,1,
-                       e->is_optional?1:0,"position|destination");
-    rb_queue_pause_for_choice(g, &g->queue.pending);
-        rb_choice_set_route(&g->queue.pending, RB_ROUTE_SELECT_TARGET);
-        return 1;
+        return position_destination_prompt(g, actor, e, target,
+                                          from>=0 ? (from==0 ? "left" : (from==1 ? "center" : "right"))
+                                                  : "this_member");
     }
 }
 
@@ -1310,7 +1343,28 @@ static int h_rotation(GameState *g, int actor, const AbilityEffect *e){
     return 1;
 }
 
-/* ─────────────────────── h_choice (execute_choice) ──────────────────────────── */
+/* ─────────────────────── h_choice (execute_choice) ──────────────────────────────
+   Rust misc.rs:3724-3777 execute_choice. Its choice-card_no / conditional_choice
+   / choice_player_id writes are choice.rs:130-154, i.e. INSIDE
+   store_pending_choice — which the C reaches as rb_queue_pause_for_choice.
+   choice.rs:142-153 is the seat rule this function must therefore reproduce
+   here, because the C's rb_queue_pause_for_choice has no `choice_maker` and
+   cannot derive it:
+
+       if choice_maker == Some("opponent") {
+           let opponent_id = if entry.player_id == "p1" { "p2" } else { "p1" };
+           entry.choice_player_id = Some(opponent_id);
+       } else {
+           entry.choice_player_id = Some(entry.player_id.clone());
+       }
+
+   It is measured against the ENTRY's player_id (the ability MASTER), not against
+   g->active and not against the computed `who`. That distinction is load-bearing
+   on a `target="both"` split, where the entry's player_id is still the master
+   while `who` has already been resolved. Note also that this write UNCONDITIONALLY
+   overwrites, which is why it cannot be left to pause_for_choice's
+   `choice_player_id.is_empty()` default: that default runs only when nothing
+   stamped the seat, and here something always does. */
 static int h_choice(GameState *g, int actor, const AbilityEffect *e){
     /* If already resolving (resume path), skip re-emit */
     if(g->queue.resume_active) return 1;
@@ -1360,6 +1414,23 @@ static int h_choice(GameState *g, int actor, const AbilityEffect *e){
     if(group_names && *group_names)
         strncpy(g->queue.pending.filter_group, group_names,
                 sizeof(g->queue.pending.filter_group)-1);
+    /* choice.rs:143-153 — the seat, written BEFORE the pause so it is the
+       `is_some()` value queue.rs:329 tests and therefore survives the universal
+       default verbatim. Measured from the entry's player_id (the ability
+       master), per choice.rs:144-149. A prompt with no current entry has no
+       master to measure from and, exactly like Rust's `current_entry_mut()`
+       returning None, stays unstamped. */
+    {
+        int cur = g->queue.cur;
+        if (cur >= 0 && cur < g->queue.n_entries) {
+            RbQueueEntry *ent = &g->queue.entries[cur];
+            const char *master = ent->player_id[0] ? ent->player_id : (actor == 0 ? "p1" : "p2");
+            const char *seat = (choice_maker && !strcmp(choice_maker, "opponent"))
+                             ? ((master[0] == 'p' && master[1] == '1') ? "p2" : "p1")
+                             : master;
+            snprintf(ent->choice_player_id, sizeof(ent->choice_player_id), "%s", seat);
+        }
+    }
     rb_queue_pause_for_choice(g, &g->queue.pending);
     g->queue.actor = who;
     rb_choice_set_route(&g->queue.pending, RB_ROUTE_CONDITIONAL_CHOICE);
@@ -1646,6 +1717,19 @@ static int both_master(const GameState *g, int actor){
     return actor;
 }
 
+/* Rust's `self.in_flight.spawn_context.target` (target.rs:122/124/137), whose
+   C carrier is RbQueueEntry.spawn_target. Only the CURRENT entry is written:
+   Rust hangs the spawn context on the resolver, and the resolver is the current
+   entry's (queue.rs `entry.resolver`), so a both-split always has an entry to
+   write — rb_queue_ensure_current_entry mints one before the first arm runs. */
+static void both_set_spawn_target(GameState *g, const char *target){
+    int cur = g->queue.cur;
+    if(cur < 0 || cur >= g->queue.n_entries) return;
+    if(!target) target = "self";
+    snprintf(g->queue.entries[cur].spawn_target,
+             sizeof(g->queue.entries[cur].spawn_target), "%s", target);
+}
+
 /* engine/src/ability/effects/misc.rs:248-259 — the two halves of the
    multi-target-to-deck exemption, kept as ONE predicate because the exemption
    is a single `||` over the two.
@@ -1685,6 +1769,16 @@ static int is_multi_target_move_cards_to_deck(const AbilityEffect *e){
 static int both_dispatch_arm(GameState *g, int master, AbilityEffect *arm){
     int host = s_activating_card;
     int r;
+    /* target.rs:122 / :124 / :137 — Rust writes the arm's seat into
+       `self.in_flight.spawn_context.target` BEFORE `execute_effect` runs it, and
+       pause_for_choice reads it back off the entry to decide which human the
+       prompt goes to (queue.rs:335-339). The C's carrier for that field is
+       RbQueueEntry.spawn_target (include/rabuka.h:987), which is otherwise only
+       written by rb_resolver_spawn_target — and nothing calls that. So without
+       this the opponent arm's prompt is stamped with the MASTER's seat by
+       pause_for_choice's universal default and never reaches the opponent.
+       Written per arm, because a both-split changes seat between the two. */
+    both_set_spawn_target(g, arm->target);
     if(rb_executor_has_executor(arm->action))
         r = rb_executor_execute(g, master, arm, host);
     else
@@ -1731,7 +1825,24 @@ int rb_misc_handle_both_targets(GameState *g, int actor, const AbilityEffect *e)
 
     AbilityEffect for_self     = both_variant(e, "self");
     AbilityEffect for_opponent = both_variant(e, "opponent");
+    /* master FIRST, from whatever entry already exists: that IS
+       `ability_master_id()` (abilities.rs:2675-2702), and it is also what
+       names the entry minted just below, so the two cannot disagree. */
     int master = both_master(g, actor);
+
+    /* THE MISSING ENTRY. Rust reaches this split from inside execute_effect,
+       which runs from run_ability_effect for a queue entry whose resolver holds
+       the in_flight spawn context — so at target.rs:129-137 there is ALWAYS a
+       current entry, `set_pending_actions` always lands, and the self arm's
+       prompt always has an entry to stamp `choice_player_id` on. The C reaches
+       the same line with n_entries == 0 (the resolver's spawn context, [the
+       engine's own RESUME_CAPTURE line reports `cur=0 n=0` here]), and every
+       pending-action accessor is gated on `cur < n_entries`. Both halves of the
+       failure come from that one gap, so it is closed once, here, BEFORE the
+       first arm runs: minting it later would leave the self prompt unstamped,
+       because rb_emit_choice's pause (choice.c:4763) is what fills the field and
+       it only fires while a live entry is current. */
+    rb_queue_ensure_current_entry(g, master == 0 ? "p1" : "p2");
 
     int had_choice_before = g->queue.has_pending;
     both_dispatch_arm(g, master, &for_self);
@@ -1757,6 +1868,12 @@ int rb_misc_handle_both_targets(GameState *g, int actor, const AbilityEffect *e)
         if(n < RB_ENTRY_PENDING_CAP){
             actions[n++] = rb_effect_deep_clone(&for_opponent);
         }
+        /* target.rs:135-137 — the spawn context becomes "opponent" as part of
+           arming the deferred run, BEFORE the park. Nothing reads spawn_target
+           between here and the answer (rb_queue_pause_for_choice is its only
+           reader, and the self prompt has already paused), so the parked arm's
+           prompt is the first thing the new seat is read for. */
+        both_set_spawn_target(g, "opponent");
         rb_queue_store_pending_actions(g, actions, n);
         /* store_pending_actions took its own deep clones; drop ours. */
         for(int i = 0; i < n; i++) rb_effect_free(actions[i]);

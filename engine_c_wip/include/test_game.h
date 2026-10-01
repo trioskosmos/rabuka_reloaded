@@ -284,4 +284,37 @@ int  test_queue_entry_choice_player_id(TestGame *tg, int idx, char *buf, size_t 
    rb_count_distinct_member_name_units and measure something else. */
 int  test_max_distinct_names(const int *cards, int n);
 
+/* ═══════════════════════════════════════════════════════════════════════════
+   FIRE ONE ABILITY ON ONE CARD  (Rust helpers/mod.rs:114 `fire_trigger`)
+   ═══════════════════════════════════════════════════════════════════════════
+   Rust resolves ONE ability_id for ONE card and calls trigger_auto_ability
+   with an explicit card id. The C corpus used to spell this as
+   `rb_queue_trigger_abilities(&tg->state, 0, trig)`, which is a WHOLE-BOARD
+   TAS scan: `cid` only ever set `activating_card`, and every card in P1's
+   stage / success / live / hand / energy zone that printed the same trigger
+   fired too, doubling every discard / draw / score effect in the fixture.
+
+   These target exactly one ability of exactly one card, through the existing
+   engine entry point rb_trigger_auto_ability (the port of Rust
+   GameState::trigger_auto_ability). No new engine API was needed.
+
+   Return 1 when exactly one queue entry was produced, 0 when the card prints no
+   such ability at that index or the enqueue was refused -- so a suite's
+   `if (!fire_trigger(...)) return 0;` premise check keeps its meaning.
+
+   No movement batch is snapshotted (Rust passes None). A suite that needs an
+   appearance / movement event must publish it itself. */
+
+/* Absolute ability index of the nth PRINTED ability of `cid` carrying `trig`,
+   or -1. "Carrying" is the engine's own predicate (rb_trigger_is), so a card
+   the TAS scan would refuse is never reported as printable. */
+int  test_ability_index_for_trigger(int cid, const char *trig, int nth);
+/* nth == 0 (Rust `fire_trigger`). */
+int  test_fire_trigger_on_card(TestGame *tg, int cid, const char *trig);
+/* Rust `fire_trigger_nth`: the Nth printed ability carrying the trigger. */
+int  test_fire_trigger_on_card_nth(TestGame *tg, int cid, const char *trig, int nth);
+/* ABSOLUTE ability index, for a suite isolating one leg of a multi-leg watcher.
+   Not the same as _nth. Refuses an ability that does not print a trigger. */
+int  test_fire_trigger_at_index(TestGame *tg, int cid, int ability_idx);
+
 #endif

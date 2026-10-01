@@ -76,7 +76,13 @@ typedef enum {
     RB_COND_NO_EXCESS_HEART,/* no_excess_heart */
     RB_COND_ALWAYS_TRUE,    /* otherwise / action_success / custom */
     RB_COND_ANY_OF,         /* any_of_condition */
-    RB_COND_ALL_REVEALED    /* all_revealed_match_heart_color */
+    RB_COND_ALL_REVEALED,   /* all_revealed_match_heart_color */
+    /* Rust's 20th variant. `Condition::Unsupported` (core/card.rs:506-508) makes the
+     * condition FAIL - it is not a neutral no-op. The C enum previously stopped at 19,
+     * so variant 20 had no name and condition.c had to pin it with a local enumerator;
+     * that also meant `gcc -Wswitch` warned on the real value. Appended last so every
+     * existing discriminant is unchanged. */
+    RB_COND_UNSUPPORTED = 20
 } RbConditionVariant;
 
 /* ── Ability effect tree (decoded from bytecode) ── */
@@ -3049,5 +3055,30 @@ int rb_heartmap_value_at(const Card *c, int from, int len, int i);
 typedef struct { const char *key; int count; } RbGscZoneSnapshot;
 #define RB_GSC_ZONE_SNAPSHOT_KEYS 16
 int rb_gsc_zone_snapshot(const GameState *g, RbGscZoneSnapshot *out);
+
+/* ── Pending-action ownership helpers ────────────────────────────────────────
+ * Defined in src/ability/ability_queue.c and used from other translation
+ * units, but were never declared here, so callers were re-declaring them
+ * privately. Ownership contract: _owned detaches the batch AND frees it (the
+ * caller now owns the returned effects); _repark puts a batch back.
+ *
+ * CAVEAT worth reading before calling resume: the C entry path ALREADY
+ * executes pending_actions, so routing a batch through these from a resume
+ * point double-counts. Two faithful implementations were built and both were
+ * measured to REGRESS (cce_gaps +8, sequential +7), so this is recorded rather
+ * than shipped. See the comment at rb_resolver_resume_pending_actions in
+ * src/ability/choice.c. */
+int rb_queue_take_pending_actions_owned(GameState *g, AbilityEffect **out, int max_out);
+void rb_queue_repark_pending_actions(GameState *g, AbilityEffect *const *actions,
+                                     int n, int resume_index);
+
+/* ── Deferred conditional gate (compound.c -> choice.c) ──────────────────────
+ * Rust carries this as part of the resolver's in-flight state. C has
+ * `g_deferred_conditional_gate` in compound.c, but it is WRITE-ONLY: nothing
+ * reads it, so the flag never reaches choice.c's `deferred_conditional_gate`
+ * resolver field, and the 「〜したら」 branch never fires. This queue-level
+ * carrier is the missing link - one writer (compound.c), one reader
+ * (choice.c). Purely additive; no existing field moves. */
+extern int g_deferred_conditional_gate;
 
 #endif /* RABUKA_H */

@@ -401,18 +401,43 @@ static int check_keywords(const GameState *g, const Ability *ability, int activa
         if (!card_on_stage || pos != 1) return 0;
     }
 
-    /* LiveStart keyword: must be in LiveCardSet phase (first or second attacker live set) */
+    /* LiveStart keyword — resolver.rs:773-780:
+         Keyword::LiveStart => {
+             if !matches!(gs.current_phase,
+                 Phase::LiveCardSetFirstAttacker | Phase::LiveCardSetSecondAttacker)
+             { return false; }
+         }
+       Rust names BOTH live-card-set phases, and phase.c now STORES both
+       (RB_PHASE_LIVE_SET / RB_PHASE_LIVE_SET_SECOND, phase.c:131/:151). So the
+       faithful C predicate is a positive membership test over the PAIR, not
+       "RB_PHASE_LIVE_SET minus whatever the second one is": the second
+       attacker's window is a real LiveStart window, and dropping it here
+       rejected every ライブ開始時 ability owned by the second seat. */
     if (strstr(trig, "LiveStart") || strstr(trig, "ライブ開始")) {
-        if (g->phase != RB_PHASE_LIVE_SET) return 0;
+        if (g->phase != RB_PHASE_LIVE_SET && g->phase != RB_PHASE_LIVE_SET_SECOND) return 0;
     }
 
-    /* LiveSuccess keyword: must be in LiveVictoryDetermination phase */
+    /* LiveSuccess keyword — resolver.rs:781-785:
+         Keyword::LiveSuccess => {
+             if !matches!(gs.current_phase, Phase::LiveVictoryDetermination) { return false; }
+         }
+       Rust gates on ONE phase. The C reaches that same moment under THREE
+       stored values, so the faithful C predicate is the positive membership
+       test over the set — never a subtraction, because a subtraction would
+       silently drop a phase the engine actually runs the determination under:
+         * RB_PHASE_VICTORY           phase.c:1165, the steady state after
+                                     rb_execute_live_victory_determination() returns.
+         * RB_PHASE_PERFORMANCE       phase.c:1162 — the C calls
+         * RB_PHASE_PERFORMANCE_SECOND rb_execute_live_victory_determination()
+                                     from the tail of rb_execute_performance_phase()
+                                     while g->phase is STILL the performance value
+                                     it is about to overwrite, and the LiveSuccess
+                                     abilities fire INSIDE that call. So the
+                                     SECOND attacker's window presents as
+                                     RB_PHASE_PERFORMANCE_SECOND. */
     if (strstr(trig, "LiveSuccess") || strstr(trig, "ライブ成功")) {
-        /* C maps both LiveCardSet variants to RB_PHASE_LIVE_SET; LiveVictoryDetermination
-           is not a distinct C phase — check via performance/victory phase or score check */
-        /* In the C engine, live success is determined during RB_PHASE_VICTORY or RB_PHASE_PERFORMANCE.
-           Gate on RB_PHASE_PERFORMANCE (heart resolution) or RB_PHASE_VICTORY (success determination). */
-        if (g->phase != RB_PHASE_PERFORMANCE && g->phase != RB_PHASE_VICTORY) return 0;
+        if (g->phase != RB_PHASE_PERFORMANCE && g->phase != RB_PHASE_PERFORMANCE_SECOND &&
+            g->phase != RB_PHASE_VICTORY) return 0;
     }
 
     /* PositionChange keyword: a position change must have occurred this turn */

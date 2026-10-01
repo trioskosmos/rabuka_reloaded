@@ -1,14 +1,14 @@
 {
   "generated_by": "cards/test_inventory.py",
-  "generated_at": "2026-10-01T06:06:21.496975+00:00",
+  "generated_at": "2026-10-01T07:59:14.542855+00:00",
   "stats": {
     "total_cards": 2639,
     "cards_with_abilities": 1650,
     "total_abilities": 2116,
     "unique_abilities": 985
   },
-  "n_files": 999,
-  "n_tests": 4099,
+  "n_files": 1000,
+  "n_tests": 4105,
   "total_cards": 809,
   "covered_cards": 809,
   "abilities_on_covered": 985,
@@ -1077,7 +1077,7 @@
       ]
     }
   },
-  "n_test_fns_parsed": 4099,
+  "n_test_fns_parsed": 4105,
   "abilities": [
     {
       "idx": 0,
@@ -29343,12 +29343,14 @@
       "has_negative": true,
       "covering_files": [
         "engine/tests/test_modules/effects/energy/energy_zone_active_wait_select_test.rs",
+        "engine/tests/test_modules/effects/energy/under_member/awakening_promise_per_recycled_energy_grants_hearts_pl_n_bp3_025_l_test.rs",
         "engine/tests/test_modules/effects/energy/under_member/energy_and_member_under_test.rs",
         "engine/tests/test_modules/effects/recover/to_hand/live_success_draws_four_and_picks_one_niji_reveal_q66_test.rs",
         "engine/tests/test_modules/effects/score/live_total/kasumi_energy_under_test.rs",
         "engine/tests/test_modules/integration/per_card/q203_q204_q218_eternalize_cara_chika_rulings_test.rs"
       ],
       "covering_tests": [
+        "a_preexisting_energy_deck_card_is_not_counted",
         "activation_once_per_turn_blocks_second_under_energy_payment_and_live_recovery",
         "activation_paid_under_energy_recovers_exact_nijigasaki_live",
         "activation_reveals_same_name_hand_member_and_moves_it_under_self",
@@ -29368,6 +29370,7 @@
         "cara_q203_no_nijigasaki_activation_no_bonus",
         "cara_q203_non_nijigasaki_activation_gives_nothing",
         "chika_q218_no_ability_cost_reduced",
+        "declining_the_step_grants_no_hearts",
         "eternalize_different_names_no_reduction",
         "eternalize_one_niji_one_other_triggers_zero",
         "eternalize_q204_two_niko_hearts_reduced",
@@ -29376,11 +29379,9 @@
         "eternalize_three_all_different_no_trigger",
         "eternalize_two_same_one_different_triggers",
         "kasumi_constant_score_bonus_applies_when_energy_under",
-        "kasumi_constant_score_without_energy_under",
-        "kasumi_debut_place_two_energy_under",
-        "kasumi_debut_skip_optional_no_energy_moved"
+        "kasumi_constant_score_without_energy_under"
       ],
-      "covering_test_count": 57,
+      "covering_test_count": 63,
       "direct_tests": [
         "eternalize_different_names_no_reduction",
         "eternalize_three_all_different_no_trigger",
@@ -29426,12 +29427,14 @@
       "has_negative": true,
       "covering_files": [
         "engine/tests/test_modules/effects/energy/energy_zone_active_wait_select_test.rs",
+        "engine/tests/test_modules/effects/energy/under_member/awakening_promise_per_recycled_energy_grants_hearts_pl_n_bp3_025_l_test.rs",
         "engine/tests/test_modules/effects/energy/under_member/energy_and_member_under_test.rs",
         "engine/tests/test_modules/effects/recover/to_hand/live_success_draws_four_and_picks_one_niji_reveal_q66_test.rs",
         "engine/tests/test_modules/effects/score/live_total/kasumi_energy_under_test.rs",
         "engine/tests/test_modules/integration/per_card/q203_q204_q218_eternalize_cara_chika_rulings_test.rs"
       ],
       "covering_tests": [
+        "a_preexisting_energy_deck_card_is_not_counted",
         "activation_once_per_turn_blocks_second_under_energy_payment_and_live_recovery",
         "activation_paid_under_energy_recovers_exact_nijigasaki_live",
         "activation_reveals_same_name_hand_member_and_moves_it_under_self",
@@ -29451,6 +29454,7 @@
         "cara_q203_no_nijigasaki_activation_no_bonus",
         "cara_q203_non_nijigasaki_activation_gives_nothing",
         "chika_q218_no_ability_cost_reduced",
+        "declining_the_step_grants_no_hearts",
         "eternalize_different_names_no_reduction",
         "eternalize_one_niji_one_other_triggers_zero",
         "eternalize_q204_two_niko_hearts_reduced",
@@ -29459,11 +29463,9 @@
         "eternalize_three_all_different_no_trigger",
         "eternalize_two_same_one_different_triggers",
         "kasumi_constant_score_bonus_applies_when_energy_under",
-        "kasumi_constant_score_without_energy_under",
-        "kasumi_debut_place_two_energy_under",
-        "kasumi_debut_skip_optional_no_energy_moved"
+        "kasumi_constant_score_without_energy_under"
       ],
-      "covering_test_count": 57,
+      "covering_test_count": 63,
       "direct_tests": [
         "eternalize_different_names_no_reduction",
         "eternalize_three_all_different_no_trigger",
@@ -49520,9 +49522,11 @@
       "has_choice": true,
       "has_negative": true,
       "covering_files": [
+        "engine/tests/test_modules/effects/energy/under_member/awakening_promise_per_recycled_energy_grants_hearts_pl_n_bp3_025_l_test.rs",
         "engine/tests/test_modules/effects/energy/under_member/energy_and_member_under_test.rs"
       ],
       "covering_tests": [
+        "a_preexisting_energy_deck_card_is_not_counted",
         "activation_once_per_turn_blocks_second_under_energy_payment_and_live_recovery",
         "activation_paid_under_energy_recovers_exact_nijigasaki_live",
         "activation_reveals_same_name_hand_member_and_moves_it_under_self",
@@ -49536,6 +49540,7 @@
         "ayumu_bp3n_debut_skip_no_draw",
         "ayumu_bp3n_q157_wait_energy_placed_under",
         "baton_touch_recycles_owner_under_energy",
+        "declining_the_step_grants_no_hearts",
         "kasumi_debut_place_two_energy_under",
         "kasumi_debut_skip_optional_no_energy_moved",
         "kasumi_q184_under_energy_not_counted_in_zone",
@@ -49545,16 +49550,14 @@
         "live_start_three_under_members_grant_three_heart05",
         "live_start_with_under_energy_grants_one_heart01",
         "member_with_under_energy_moving_to_hand_recycles_energy",
+        "recycling_one_energy_grants_heart02_three",
+        "recycling_three_energy_grants_heart02_nine",
+        "recycling_two_energy_grants_heart02_six",
         "reveal_same_name_under_then_live_start_grants_one_heart05_and_four_cost",
         "rina_debit_triggers_with_target_in_discard",
-        "rina_rule_1053_under_member_goes_to_waitroom",
-        "rina_rule_4553_under_member_follows_position_change",
-        "sayaka_q243_max_three_per_activation_recounts",
-        "sayaka_rule_1053_under_members_go_to_waitroom",
-        "sayaka_rule_4553_under_members_follow_position_change",
-        "sayaka_use_limit_enforced"
+        "rina_rule_1053_under_member_goes_to_waitroom"
       ],
-      "covering_test_count": 31,
+      "covering_test_count": 37,
       "direct_tests": [
         "awakening_move_1_of_2",
         "awakening_move_all_energy",

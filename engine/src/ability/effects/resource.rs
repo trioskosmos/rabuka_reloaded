@@ -553,11 +553,15 @@ pub(crate) fn execute_gain_surplus_heart(
                 filter,
             );
         } else if per_unit_type_str == Some("energy_deck") {
-            // Cards placed in energy deck are always energy cards,
-            // so don't filter by card_type (which may differ from
-            // the gain_resource's target card_type for member targeting).
-            // Only count recently_moved (from the current effect),
-            // NOT entry_snapshot (which may contain trigger-setup cards).
+            // 「これによって置いたエネルギーカード1枚につき」 (PL!N-bp3-025-L Awakening
+            // Promise). Cards placed in the energy deck are always energy cards, so the
+            // count is the moved-card pool's length and `card_type` must not filter it —
+            // the effect's own `card_type` may be about the RECIPIENT (a member), not the
+            // cards being counted.
+            //
+            // `recently_moved_cards` is the right pool and NOT `entry_snapshot`: the
+            // snapshot is taken at enqueue time and can hold trigger-setup cards this
+            // ability never moved.
             if let Some(moved) = recently_moved.as_ref() {
                 matching_count = moved.len().u8_count();
             } else {

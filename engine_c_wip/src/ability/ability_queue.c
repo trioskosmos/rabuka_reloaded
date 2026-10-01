@@ -1,4 +1,4 @@
-#include "rabuka.h"
+﻿#include "rabuka.h"
 #include <string.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -72,7 +72,6 @@
    test_p1_helpers.c. */
 
 /* ── Forward declarations ── */
-static int rb_queue_spawn_targets_opponent(const GameState *g, int cur);
 
 /* Owned pending-action storage (mirrors Rust entry.pending_actions): deep-clone
     via rb_effect_data_clone-style copy is effect-tree specific, so we snapshot
@@ -335,9 +334,184 @@ void rb_queue_complete_current(GameState *g) {
    Choice pausing / resumption
    ========================================================================== */
 
-static int rb_queue_spawn_targets_opponent(const GameState *g, int cur) {
-    if (!g || cur < 0 || cur >= g->queue.n_entries) return 0;
-    return strcmp(g->queue.entries[cur].spawn_target, "opponent") == 0;
+/* ═══════════════════════════════════════════════════════════════════════════
+   queue_route_targets_opponent — the C twin of Rust's SECOND trigger
+
+   queue.rs:340-345 pairs the spawn-context test with a ROUTE test:
+
+       let is_route_opponent = entry.choice_card_no.as_ref().map_or(false, |route| {
+           matches!(route, ChoiceRoute::Raw(raw)
+                    if raw.starts_with("position_change:opponent:"))
+       });
+
+   `choice_card_no` is `Option<ChoiceRoute>` in Rust. `ChoiceRoute` is an enum
+   whose only string-carrying variant is `Raw(String)` — mod.rs:2751-2755 shows
+   `ChoiceRoute::Raw(format!("position_change:{}:{}", target, original))`, and
+   the ONLY producer of a string that starts with "position_change:" in the whole
+   engine. So the Rust condition is "is this entry's route the Raw string
+   position_change:opponent:...?" — a POSITIVE test on the route's TEXT, not an
+   inference from a numeric tag.
+
+   The C cannot express that, because `RbQueueEntry.choice_card_no` is an int
+   (see its own comment in rabuka.h: "C's flattened choice_card_no tag; Rust's
+   Option<ChoiceRoute> does not map 1:1 — Condition/Cost/Generic all tag 1").
+   int tag 1 is shared by Condition, Cost and Generic, so no int can name
+   position_change:opponent. Rather than widen the tag — which would collide
+   with those three and re-create the class of bug where a seat is derived from
+   a tag that does not mean what the tag says — the route STRING is carried in
+   the pair the header reserves for it: `choice_route_raw` /
+   `has_choice_route_raw`. Emitters set those; this helper reads them. Nothing
+   here parses an int into a route.
+
+   WHY A POSITIVE HELPER INSTEAD OF ONE MORE ARM ON THE OVERRIDE LIST
+
+   pause_for_choice's seat decision used to be: universal default from
+   `entry.player_id`, plus two narrow per-variant exceptions (a SelectCard whose
+   target mentions "opponent"; a SelectTarget whose target is exactly
+   "position|destination"). Every NEW prompt shape then falls through to the
+   default and reads the wrong seat, and the only remedy is to append another
+   shape to the list — which is how this defect class starts. `is_opp` here is
+   the positive question "does this CHOICE ask the opponent?", and the two
+   pieces of context that can answer it are both on the entry, not on the
+   choice: the spawn context (both_set_spawn_target, misc.c) and the route
+   string. Testing the CONTEXT rather than enumerating the SHAPE means a prompt
+   form that did not exist when the list was written still routes correctly,
+   and a shape can never route wrong merely by not being listed.
+
+   Mirrors queue.rs:329-348 — the `entry.choice_player_id.is_some()` early-out
+   lives in pause_for_choice, which owns the stamp; this helper only answers the
+   context question. Both Rust triggers are checked, in Rust's order: spawn
+   first, route second (queue.rs:333 then :340). */
+static int queue_route_targets_opponent(const RbQueueEntry *e) {
+    if (!e) return 0;
+    /* queue.rs:333 `entry.spawn_context.target == "opponent"` */
+    if (e->spawn_target[0] && strcmp(e->spawn_target, "opponent") == 0) return 1;
+    /* queue.rs:340-342 `ChoiceRoute::Raw(raw) if raw.starts_with("position_change:opponent:")` */
+    if (e->has_choice_route_raw &&
+        strncmp(e->choice_route_raw, "position_change:opponent:", 23) == 0) return 1;
+    return 0;
+}
+
+/* queue.rs:322-331 `is_opponent_choice` — does the CHOICE's OWN shape say the
+   opponent is being asked? The C's two arms are the two Rust patterns. The
+   SelectCard arm reads the choice's `target_player_id` (the field Rust's
+   SelectCard pattern destructures), NOT `target`: Rust never inspects
+   SelectCard.target at all, so keying the C on the string "opponent" appearing
+   somewhere in `target` matched prompts Rust routes to self whenever the word
+   happened to be in a zone or destination name. `target_player_id` is what
+   selection.rs:39-43 writes from action_by, so it is the faithful channel.
+
+   `SelectTarget { target }` keeps Rust's exact equality on
+   "position|destination" — that IS the spelling Rust compares, so it stays an
+   equality rather than becoming a substring test. */
+static int choice_routes_to_opponent(const RbChoice *ch) {
+    if (!ch) return 0;
+    if (ch->kind == RB_CHOICE_SELECT_CARD)
+        return strcmp(ch->target_player_id, "opponent") == 0;
+    if (ch->kind == RB_CHOICE_SELECT_TARGET)
+        return strcmp(ch->target, "position|destination") == 0;
+    return 0;
+}
+
+/* Stamp the RAW route string on the current entry — the C home of Rust's
+   `entry.choice_card_no = Some(ChoiceRoute::Raw(s))` (choice.rs:1172-1174,
+   and queue.rs:679's own `choice_card_no` slot).
+
+   Why this is needed: Rust's second opponent trigger (queue.rs:340-342) reads
+   `ChoiceRoute::Raw(raw)` and matches raw.starts_with("position_change:opponent:").
+   `RbQueueEntry.choice_card_no` is an int tag, and per rabuka.h's own comment it
+   is deliberately lossy — Condition, Cost and Generic ALL tag 1. So the only
+   faithful carrier of "which raw route string" in the C is the dedicated
+   `choice_route_raw` / `has_choice_route_raw` pair.
+
+   Only effects that own a raw route string call this. Effects whose route is an
+   enum variant (Choice, ChoiceString, ConditionalChoice, OptionalCost,
+   SelectCards, SelectTarget) set NO raw string, because queue.rs:341 only fires
+   for the Raw variant — a `has_choice_route_raw` left at 0 is the honest
+   "this route is not a Raw string" state and cannot produce a false positive.
+
+   A NULL `raw` is accepted and means "clear the stamp": an emitter that
+   previously stamped a Raw route and now routes a plain variant must not leave
+   a stale string behind for queue_route_targets_opponent to match. */
+void rb_queue_set_choice_route_raw(GameState *g, const char *raw) {
+    if (!g) return;
+    int cur = g->queue.cur;
+    if (cur < 0 || cur >= g->queue.n_entries) return;
+    RbQueueEntry *e = &g->queue.entries[cur];
+    if (!raw || !*raw) {
+        e->choice_route_raw[0] = '\0';
+        e->has_choice_route_raw = 0;
+        return;
+    }
+    snprintf(e->choice_route_raw, sizeof(e->choice_route_raw), "%s", raw);
+    e->has_choice_route_raw = 1;
+}
+
+/* Push the dummy entry `queue.rs:367-409` builds and make it current. Shared
+   by the two callers below so the shape exists in exactly one place.
+
+   `player_id` may be NULL, which reproduces Rust's verbatim empty-string dummy
+   (queue.rs:370-371 `player_id: String::new()`); rb_queue_ensure_current_entry
+   passes the ability's master instead, because pause_for_choice's dummy has
+   nothing to route and this one's `player_id` is read by the routing code. */
+static int queue_mint_dummy_entry(GameState *g, const char *player_id) {
+    if (!g || g->queue.n_entries >= RB_QUEUE_DEPTH) return 0;
+    int idx = g->queue.n_entries;
+    RbQueueEntry *e = &g->queue.entries[idx];
+    memset(e, 0, sizeof(*e));
+    e->card_id = -1;
+    e->ability_idx = -1;
+    e->optional_cost_result = -1;
+    e->triggering_member_id = -1;   /* Option::None; 0 is a valid card id */
+    if (player_id)
+        snprintf(e->player_id, sizeof(e->player_id), "%s", player_id);
+    g->queue.n_entries++;
+    g->queue.cur = idx;
+    return 1;
+}
+
+/* Guarantee a CURRENT entry, minting the dummy one when there is none.
+
+   Rust needs no such function because the two pieces it would paper over
+   cannot come apart there:
+     - `pause_for_choice` (queue.rs:311-409) has a branch for EVERY QueueState.
+       PayingCost / ExecutingEffect stamp the current entry; Idle / Completed
+       push a dummy entry and make it current. So a prompt raised while an
+       effect executes always has an entry behind it.
+     - `set_pending_actions` (queue.rs:494-500) writes through
+       `current_entry_mut()`, and an AbilityResolver only ever exists ATTACHED
+       to an entry (queue.rs stores it as `entry.resolver`), so at
+       target.rs:129-137 the current entry is always Some and the park always
+       lands.
+
+   The C has one shape Rust does not: an effect can run with NO entry at all.
+   engine.c parks `ab.effect` in `queue.deferred` and SKIPS the inline run
+   precisely when the ability raises a prompt, so nothing was ever pushed for
+   it, and the prompt comes out of the resolver's spawn context. rb_emit_choice
+   then deliberately declines to mint (choice.c:4754-4758), so n_entries stays
+   0 and BOTH consequences land together:
+     - pause_for_choice never runs against an entry, so nothing stamps
+       `choice_player_id` and `current_entry().choice_player_id` reads None
+       where Rust reads Some("pN");
+     - every pending-action accessor is gated on `cur < n_entries`, so the
+       opponent half parked at target.rs:129-137 is dropped on the floor.
+
+   This is the C's stand-in for Rust's guarantee: it mints the entry the
+   resolution should have had. The entry is NOT marked completed and NOT
+   effect_started — it is the ability's own, still mid-resolution, and its
+   `pending_actions` have to survive until resume_pending_actions runs them.
+   It is inert to the drain either way (the `if (e->card_id < 0)` arm in
+   rb_drain_ability_queue skips it).
+
+   `player_id` is the ability's MASTER, because Rust measures "self" from
+   `ability_master_id()` = the current entry's player_id
+   (core/game_state/abilities.rs:2675-2702), so naming it here is what makes
+   both_master() and pause_for_choice's universal default agree with Rust.
+   Returns 1 when a current entry exists after the call. */
+int rb_queue_ensure_current_entry(GameState *g, const char *player_id) {
+    if (!g) return 0;
+    if (g->queue.cur >= 0 && g->queue.cur < g->queue.n_entries) return 1;
+    return queue_mint_dummy_entry(g, player_id);
 }
 
 void rb_queue_pause_for_choice(GameState *g, const RbChoice *choice) {
@@ -350,35 +524,40 @@ void rb_queue_pause_for_choice(GameState *g, const RbChoice *choice) {
 
         /* Universal default: every paused choice gets a choice_player_id */
         if (e->choice_player_id[0] == '\0') {
-            /* G1/G3 opponent-routing fallback (mirrors AbilityQueue::pause_for_choice).
-               The primary routing happens in the caller (actions.rs / choice.rs).
-               Here we only apply the default if the caller did not set it.  */
-            int is_opp = 0;
-            if (choice->kind == RB_CHOICE_SELECT_CARD) {
-                if (strstr(choice->target, "opponent") != NULL) {
-                    is_opp = rb_queue_spawn_targets_opponent(g, cur);
-                }
-            } else if (choice->kind == RB_CHOICE_SELECT_TARGET) {
-                if (strcmp(choice->target, "position|destination") == 0) {
-                    is_opp = rb_queue_spawn_targets_opponent(g, cur);
-                }
-            }
-            /* queue.rs:340-345 names a SECOND opponent trigger:
-               `is_route_opponent`, true when the entry's choice_card_no is
-               ChoiceRoute::Raw("position_change:opponent:..."). The C cannot
-               evaluate it: RbQueueEntry.choice_card_no is an int route tag
-               (RB_CHOICE_ROUTE_*), and the "position_change:opponent:" PREFIX
-               that Rust matches on is not carried anywhere in the C entry — the
-               raw route string survives only on the RbChoice (`route` /
-               RB_ROUTEK_RAW), which is not in scope on the entry.
+            /* queue.rs:318-361, in Rust's order.
 
-               So only the spawn-context trigger (rb_queue_spawn_targets_opponent
-               above) is live here. Implementing the second trigger needs the raw
-               route string stored on the entry, which means a new field in
-               include/rabuka.h — see the CROSS-FILE REQUESTS in the port report.
-               Inventing an int comparison here would look like the port while
-               matching nothing. */
-            if (is_opp) {
+               (1) queue.rs:329 `entry.choice_player_id.is_some()` — an earlier
+                   caller already stamped the seat (execute_choice's
+                   choice_maker arm, choice.rs:143-153; the live-success zone
+                   arm, live.rs:1577). This whole block is inside that guard.
+
+               (2) queue.rs:333-345 — route to the OPPONENT when the choice is
+                   one the opponent has to answer. Rust spells that as
+                   `is_opponent_choice`, which tests the CHOICE's own shape:
+
+                       SelectCard { target_player_id: Some(tpid) } => tpid == "opponent"
+                       SelectTarget { target }                 => target == "position|destination"
+                       _ => false
+
+                   ...and then gates it on EITHER context trigger:
+
+                       entry.spawn_context.target == "opponent"                        (:333)
+                       choice_card_no == ChoiceRoute::Raw("position_change:opponent:…") (:340)
+
+               The C keeps that structure, but the shape test is
+               `choice_routes_to_opponent(choice)` and BOTH context triggers live
+               in queue_route_targets_opponent(e), which reads the entry's
+               spawn_target and its raw route string. Nothing is inferred from
+               choice_card_no's int tag: tags 1/2/3 are shared by Condition, Cost
+               and Generic, so no int can name position_change:opponent.
+
+               Emitters that know their route string stamp
+               e->choice_route_raw / e->has_choice_route_raw; see
+               rb_queue_set_choice_route_raw below. */
+
+               int is_opp = choice_routes_to_opponent(choice) &&
+                            queue_route_targets_opponent(e);
+               if (is_opp) {
                 snprintf(e->choice_player_id, sizeof(e->choice_player_id),
                          "%s", (e->player_id[0] == 'p' && e->player_id[1] == '1') ? "p2" : "p1");
             } else {
@@ -405,17 +584,11 @@ void rb_queue_pause_for_choice(GameState *g, const RbChoice *choice) {
         return;
     }
 
-    /* Idle / Completed branch: create a dummy entry so the choice has a home */
-    if (g->queue.n_entries < RB_QUEUE_DEPTH) {
-        int idx = g->queue.n_entries;
-        RbQueueEntry *e = &g->queue.entries[idx];
-        memset(e, 0, sizeof(*e));
-        e->card_id = -1;
-        e->ability_idx = -1;
-        e->optional_cost_result = -1;
-        e->triggering_member_id = -1;   /* Option::None; 0 is a valid card id */
-        g->queue.n_entries++;
-        g->queue.cur = idx;
+    /* Idle / Completed branch: create a dummy entry so the choice has a home.
+       queue_mint_dummy_entry is the shape queue.rs:367-409 pushes, with the
+       empty player_id Rust gives it — this dummy exists to hold the choice, and
+       nothing routes on its owner. */
+    if (queue_mint_dummy_entry(g, NULL)) {
         g->queue.pending = *choice;
         g->queue.has_pending = 1;
         g->queue.actor = g->active;

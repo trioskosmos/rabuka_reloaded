@@ -1193,6 +1193,59 @@ fn choose_policy_action(
             .max_by(|(_, left), (_, right)| left.total_cmp(right))
             .map(|(index, _)| index)
             .unwrap_or(0);
+
+        // `NEURAL_PASS_GUARD`: delegate the "stop developing" decision to the
+        // teacher instead of asking a cloned policy to reproduce it.
+        //
+        // A behaviour-cloned net reached 53.2% holdout top-1 against a 16.7%
+        // chance baseline on this corpus - it learned real structure - and then
+        // played at 32.2% against its own teacher. The cause is measurable and
+        // singular: the net passes on 4.2% of Main decisions where v7 passes on
+        // 40.5%.
+        //
+        // That gap is structural, not a data deficit. v7 decides Pass by a
+        // DELTA leaf (`v7_main::value`) - every weighted term coming out
+        // non-positive - which is a relation over candidates, not a property of
+        // the position. Cloning the argmax learns which ACTION wins and nothing
+        // about the region where none of them do, so it never discovers the
+        // stop state. Ten times more data did not move the accuracy, consistent
+        // with a representation limit rather than a sample limit.
+        //
+        // So when enabled, Pass is scored by the teacher and the net only picks
+        // among non-Pass actions. This is the standard DAgger-style split: clone
+        // the discriminative decision, keep the generative "nothing helps" one.
+        let pass_guard = std::env::var("NEURAL_PASS_GUARD")
+            .ok()
+            .and_then(|v| v.parse::<u32>().ok())
+            .is_some();
+        if pass_guard {
+            let pass_index = actions
+                .iter()
+                .position(|a| a.action_type == game_setup::ActionType::Pass);
+            if let Some(pi) = pass_index {
+                let teacher = policy_call(|| {
+                    setup_kind.choose_action(gs, actions, me, v2_policy, plan)
+                });
+                if teacher.action_type == game_setup::ActionType::Pass {
+                    return teacher;
+                }
+                // Teacher chose to act. Restrict the net to the acting actions so
+                // it can never answer "pass" by default.
+                let mut best: Option<(usize, f32)> = None;
+                for (i, act) in actions.iter().enumerate() {
+                    if i == pi || act.action_type == game_setup::ActionType::Pass {
+                        continue;
+                    }
+                    let score = logits[i];
+                    if best.is_none_or(|(_, b)| score > b) {
+                        best = Some((i, score));
+                    }
+                }
+                if let Some((i, _)) = best {
+                    return actions[i].clone();
+                }
+            }
+        }
         return actions[index].clone();
     }
     match policy_route(gs) {

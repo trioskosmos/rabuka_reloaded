@@ -8,33 +8,50 @@
 //!
 //! # The mechanic
 //!
-//! Two clauses, and the second is conditional on the first paying out:
+//! Two clauses, the second conditional on the first paying out:
 //!
-//!   * **cost/step** — recycle any number of energy cards from under one member to the
-//!     energy deck (optional, 「好きな枚数」).
+//!   * **step** — recycle any number of energy cards from under one member to the energy
+//!     deck (optional, 「好きな枚数」).
 //!   * **reward** — that member gains heart02 ×3 for EACH card the step just recycled.
 //!
 //! So N cards recycled → heart02 × 3N, and 0 recycled → nothing.
 //!
-//! # The defect
+//! # What the multiplier counts
 //!
-//! The reward step parses as
+//! 「これによって置いた」 is the cards **this ability moved**, not the contents of the
+//! エネルギーデッキ and not the cards left under the member. The tests below discriminate
+//! between those readings by holding the starting board fixed and changing only the
+//! 1-card difference between "recycled" and "left behind":
 //!
-//! ```json
-//! {"action":"gain_resource","count":3,"per_unit":true,"per_unit_count":1,
-//!  "per_unit_type":"energy_deck","card_type":"member_card", ...}
-//! ```
+//! | under | recycled | under left | heart02 |
+//! |---|---|---|---|
+//! | 1 | 1 | 0 | 3 |
+//! | 2 | 1 | 1 | 3 |
+//! | 2 | 2 | 0 | 6 |
+//! | 3 | 3 | 0 | 9 |
 //!
-//! `card_type: "member_card"` is the killer. The counted cards are エネルギーカード, so
-//! filtering the energy deck for *member* cards matches nothing and the multiplier is 0 —
-//! the whole reward can never fire. The same text-typed-as-wrong-card-type leak appears on
-//! `PL!N-bp3-001-P＋` 上原歩夢, which types the ENERGY cards it moves as `member_card`.
+//! A zone-counting engine would score rows 2 and 4 as 1 and 9; one that counts the
+//! under-member set would score them 1 and 0.
 //!
-//! The multiplier also reads the whole エネルギーデッキ rather than the cards this ability
-//! just moved there (「これによって置いた」), so a pre-loaded energy deck would over-count.
+//! # The 「好きな枚数」 re-prompt is load-bearing
 //!
-//! `energy_and_member_under_test.rs` covers the energy→energy_deck *move* (中須かすみ) but
-//! nothing covers this card's reward, which is why the leak survived.
+//! 「好きな枚数」 re-prompts after every pick, offering whatever is still under the member.
+//! A player who takes fewer than all of them then SKIPS the rest, and both halves are
+//! required: the skip closes the step, and only then does 「そうした場合、…を得る」 resolve.
+//! `recycle` does both.
+//!
+//! Answering only the first prompt leaves the ability mid-step, the reward never resolves,
+//! and the assertion sees 0 — which reads as an engine bug but is a half-played turn. That
+//! is exactly what happened while this file was being written: an intermediate version
+//! left the re-prompt pending and produced a convincing but entirely fake "the engine only
+//! pays when every card is recycled" table.
+//!
+//! # Why the recipient is not the counted set
+//!
+//! The reward carries `card_type: "member_card"` even though the counted cards are energy
+//! cards. That is deliberate (`parser.py`, the 「そのメンバー」 override): `card_type` is the
+//! RECIPIENT of 「…を得る」, while `per_unit_type` is the counted set. Reading
+//! `card_type` as the counted set looks like a parse bug and is not one.
 
 use crate::helpers::*;
 use rabuka_engine::card::HeartColor;
@@ -43,7 +60,7 @@ use rabuka_engine::zones::MemberArea;
 
 const PROMISE: &str = "PL!N-bp3-025-L";
 const FILLER: &str = "PL!-sd1-010-SD";
-/// A member to hang energy under and to grant the hearts to.
+/// The member hosting the energy, and the recipient of the reward.
 const MEMBER: &str = "PL!N-pb1-002-R";
 
 fn seed_deck(game: &mut TestGame) {
@@ -83,6 +100,7 @@ fn fired_with_energy_under(under: usize) -> (TestGame, i16) {
         format!("{}_{}", card.card_no, ab.full_text)
     };
     let pid = game.state.player1.id.clone();
+    game.state.activating_card = Some(live);
     game.state.trigger_auto_ability(
         ability_id,
         AbilityTrigger::LiveStart,
@@ -93,28 +111,59 @@ fn fired_with_energy_under(under: usize) -> (TestGame, i16) {
         None,
     );
     game.state.process_pending_auto_abilities(&pid);
-    assert!(
-        game.has_pending_choice(),
-        "precondition: 自分のステージにいるメンバー1人の下にあるエネルギーカードを、好きな枚数\
-         エネルギーデッキに置いてもよい must raise its optional any-number selection"
-    );
     (game, member)
 }
 
-/// Recycle `n` energy cards from under the member, answering whatever prompt comes up.
+fn is_under_member_repick(game: &TestGame) -> bool {
+    game.has_pending_choice()
+        && matches!(
+            game.get_pending_choice(),
+            rabuka_engine::ability::types::Choice::SelectCard { zone, .. }
+                if zone == "under_member"
+        )
+}
+
+/// Recycle exactly `n` energy cards from under the member.
 fn recycle(game: &mut TestGame, n: usize) {
-    // The step is 「好きな枚数」 + 「してもよい」: an optional, any-number selection. If no
-    // prompt is raised at all the step did not happen, which the assertions then catch by
-    // the energy-deck count rather than by a helper panic.
-    if game.has_pending_choice() {
-        game.select_energy_from_zone(n);
+    // 「…置いてもよい」 may raise a pay/skip gate before the selection.
+    let mut guard = 0;
+    while guard < 4 && !is_under_member_repick(game) {
+        if !game.has_pending_choice() {
+            return;
+        }
+        match game.get_pending_choice() {
+            rabuka_engine::ability::types::Choice::SelectTarget { target, .. }
+                if target.contains("pay_optional_cost") =>
+            {
+                game.select_choice_option(1); // pay
+            }
+            _ => {
+                game.decline_all_remaining();
+            }
+        }
+        guard += 1;
+    }
+
+    game.select_energy_from_zone(n);
+
+    // 「好きな枚数」 re-prompts with what is left. STOP picking by skipping.
+    let mut guard = 0;
+    while guard < 4 && is_under_member_repick(game) {
+        game.select_indices(&[]);
+        guard += 1;
     }
 }
 
-/// Answer the optional step by declining it, tolerating a missing prompt.
+/// Decline the optional step entirely.
 fn decline_step(game: &mut TestGame) {
-    if game.has_pending_choice() {
-        game.decline_all_remaining();
+    let mut guard = 0;
+    while guard < 4 && game.has_pending_choice() {
+        if is_under_member_repick(game) {
+            game.select_indices(&[]);
+        } else {
+            game.decline_all_remaining();
+        }
+        guard += 1;
     }
 }
 
@@ -124,33 +173,15 @@ fn heart02(game: &TestGame, member: i16) -> i16 {
         .get_heart_modifier(member, HeartColor::Heart02)
 }
 
-fn dump(game: &TestGame, member: i16, before: i16, tag: &str) {
-    eprintln!(
-        "[{tag}] energy_deck={:?} energy_zone={} under={} h02={} before={} delta={}",
-        game.state.player1.energy_deck.cards,
-        game.state.player1.energy_zone.cards.len(),
-        game.state
-            .player1
-            .stage
-            .get_under_cards(MemberArea::Center)
-            .len(),
-        heart02(game, member),
-        before,
-        heart02(game, member) - before,
-    );
+/// Drive a recycle and return the heart02 granted to the member.
+fn granted_after_recycling(under: usize, n: usize) -> i16 {
+    let (mut game, member) = fired_with_energy_under(under);
+    let before = heart02(&game, member);
+    recycle(&mut game, n);
+    heart02(&game, member) - before
 }
 
-#[test]
-fn partial_recycle_is_covered_by_the_open_defect_test() {
-    // The 好きな枚数 case is pinned (and currently failing) in
-    // `recycling_one_energy_grants_heart02_three`. This stub keeps the module's intent
-    // discoverable without duplicating that failure.
-}
-
-/// THE claim: recycling 2 energy cards grants that member heart02 ×6.
-///
-/// 「これによって置いたエネルギーカード1枚につき、［赤ハート］［赤ハート］［赤ハート］」 —
-/// 2 cards × 3 hearts each = 6.
+/// 「これによって置いたエネルギーカード1枚につき、［赤ハート］×3」 — 2 cards → heart02 ×6.
 #[test]
 fn recycling_two_energy_grants_heart02_six() {
     let (mut game, member) = fired_with_energy_under(2);
@@ -166,84 +197,63 @@ fn recycling_two_energy_grants_heart02_six() {
     assert_eq!(
         heart02(&game, member) - before,
         6,
-        "これによって置いたエネルギーカード1枚につき、［赤ハート］×3 — 2 cards recycled must \
-         grant heart02 ×6. Got {} instead. The reward step carries `card_type: \"member_card\"` \
-         while the counted cards are エネルギーカード, so the multiplier matches nothing and \
-         the printed reward never fires.",
-        heart02(&game, member) - before
+        "2 cards recycled × 3 hearts each must be heart02 ×6"
     );
 }
 
-/// The multiplier: 1 card gives 3, not 6.
+/// 「好きな枚数」 really is any number: 1 card out of 2 pays 1 card's worth.
 ///
-/// Without this, the test above could pass on an engine that grants a flat amount per
-/// ability rather than per card.
-/// OPEN DEFECT — this one fails today.
-///
-/// 「好きな枚数」 is "any number", so recycling 1 of 2 cards MUST pay 1 card's worth. It pays
-/// nothing. Measured behaviour of the reward (under-cards / recycled / heart02 granted):
-///
-/// | under | recycled | under left | heart02 |
-/// |---|---|---|---|
-/// | 1 | 1 | 0 | 3 |
-/// | 2 | 1 | 1 | **0** |
-/// | 2 | 2 | 0 | 6 |
-/// | 3 | 1 | 2 | **0** |
-/// | 3 | 2 | 1 | **0** |
-/// | 3 | 3 | 0 | 9 |
-///
-/// So the reward is gated on emptying the under-member zone rather than on the number of
-/// cards recycled. Two leads, neither isolated to a line yet:
-///
-///  1. `per_unit_zone` (`ability/util.rs:2660`) has no `"energy_deck"` arm, so the parsed
-///     `per_unit_type: "energy_deck"` falls through to `_ => return None`, and
-///     `resolve_per_unit_count` then treats the count as **1** regardless of how many cards
-///     were recycled.
-///  2. The COMPILED effect carries none of `per_unit`, `per_unit_count`, `heart_colors`,
-///     `card_type` or `duration` — a serde dump of the live `AbilityEffect` shows only
-///     `"action":"gain_resource","count":3`. The outer `sequential` has `"conditional":true`,
-///     which is consistent with 「そうした場合」 being read as an all-or-nothing gate on the
-///     preceding optional step.
+/// The discriminator row. Same starting board as the 2-card case, one card still left
+/// under the member, and the reward must be half.
 #[test]
 fn recycling_one_energy_grants_heart02_three() {
-    let (mut game, member) = fired_with_energy_under(2);
-    let before = heart02(&game, member);
-
-    recycle(&mut game, 1);
-    eprintln!(
-        "[DBG] energy_deck={:?} under_center={} h02={} (before={})",
-        game.state.player1.energy_deck.cards,
-        game.state
-            .player1
-            .stage
-            .get_under_cards(MemberArea::Center)
-            .len(),
-        heart02(&game, member),
-        before
-    );
-
+    let granted = granted_after_recycling(2, 1);
     assert_eq!(
-        game.state.player1.energy_deck.cards.len(),
-        1,
-        "precondition: exactly one energy card reached the energy deck"
-    );
-    assert_eq!(
-        heart02(&game, member) - before,
+        granted,
         3,
-        "1枚につき［赤ハート］×3 — a single recycled card grants heart02 ×3, half of the \
-         2-card case. Got {}.",
-        heart02(&game, member) - before
+        "1枚につき［赤ハート］×3 — one recycled card grants heart02 ×3, half the 2-card case. \
+         Got {granted}, which would mean the multiplier is reading the under-member set (1) or \
+         the energy deck rather than the cards this ability moved."
     );
 }
 
-/// THE claim, second half: 「これによって置いた」 is the multiplier's scope.
+/// The top of the range: 3 cards → heart02 ×9.
+#[test]
+fn recycling_three_energy_grants_heart02_nine() {
+    assert_eq!(
+        granted_after_recycling(3, 3),
+        9,
+        "3 cards recycled × 3 hearts each must be heart02 ×9"
+    );
+}
+
+/// The multiplier scales with the count rather than granting a flat amount.
+#[test]
+fn the_reward_scales_with_the_number_recycled() {
+    assert_eq!(
+        granted_after_recycling(1, 1),
+        3,
+        "1 card under, 1 recycled → heart02 ×3"
+    );
+    assert_eq!(
+        granted_after_recycling(2, 2),
+        6,
+        "2 cards under, 2 recycled → heart02 ×6"
+    );
+    assert_eq!(
+        granted_after_recycling(3, 3),
+        9,
+        "3 under, 3 recycled → heart02 ×9 — linear in the count, so the effect is per-card"
+    );
+}
+
+/// 「これによって置いた」 is the multiplier's scope.
 ///
-/// The energy deck already holds a card BEFORE the ability resolves. 「これによって置いた」 is
-/// about the cards this ability moved, so the pre-existing card must not be counted.
+/// The energy deck already holds a card BEFORE the ability resolves. Only the cards THIS
+/// ability recycled count.
 #[test]
 fn a_preexisting_energy_deck_card_is_not_counted() {
     let (mut game, member) = fired_with_energy_under(2);
-    // 1 card already in the energy deck before the step runs.
     game.state
         .player1
         .energy_deck
@@ -257,8 +267,8 @@ fn a_preexisting_energy_deck_card_is_not_counted() {
         heart02(&game, member) - before,
         6,
         "これによって置いたエネルギーカード — only the 2 cards THIS ability recycled count. \
-         Granting 9 would mean the multiplier read the whole エネルギーデッキ, which also held \
-         a card before the ability resolved."
+         A larger grant would mean the multiplier read the whole エネルギーデッキ, which also \
+         held a card before the ability resolved."
     );
 }
 
@@ -268,7 +278,7 @@ fn declining_the_step_grants_no_hearts() {
     let (mut game, member) = fired_with_energy_under(2);
     let before = heart02(&game, member);
 
-    game.decline_all_remaining();
+    decline_step(&mut game);
 
     assert_eq!(
         heart02(&game, member) - before,

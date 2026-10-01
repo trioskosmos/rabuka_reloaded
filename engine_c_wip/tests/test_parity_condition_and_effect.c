@@ -291,14 +291,13 @@ static int settle_card_first(TestGame *tg, int guard_max)
     return guard;
 }
 
+/* Rust helpers/mod.rs:114 fire_trigger: ONE ability of ONE card, via
+ * rb_trigger_auto_ability. This USED TO BE rb_queue_trigger_abilities, whose
+ * `cid` only set activating_card and which fanned the trigger out to every card
+ * on P1's board printing it. */
 static int fire_trigger(TestGame *tg, int cid, const char *trig)
 {
-    if (!card_prints_trigger(cid, trig)) return 0;
-    tg->state.activating_card = cid;
-    int queued = rb_queue_trigger_abilities(&tg->state, 0, trig);
-    if (queued <= 0) return 0;
-    rb_process_pending_auto_abilities(&tg->state);
-    return 1;
+    return test_fire_trigger_on_card(tg, cid, trig);
 }
 
 /* Rust `advance_to_live_card_set_p1` = 5 passes, then set the live card,
@@ -1302,9 +1301,11 @@ static void test_bp4_021_l_score_thresholds(void)
 
 static void trigger_kuroe_live_start(TestGame *tg, int kuroe)
 {
-    tg->state.activating_card = kuroe;
-    if (rb_queue_trigger_abilities(&tg->state, 0, RB_TSTR_LIVE_START) > 0)
-        rb_process_pending_auto_abilities(&tg->state);
+    /* ONE ability of ONE card (Rust fire_trigger). The old spelling,
+     * rb_queue_trigger_abilities, enqueued the trigger on EVERY card in P1's
+     * stage / success / live / hand / energy zone that printed ライブ開始時 --
+     * `kuroe` only ever set activating_card. */
+    (void)test_fire_trigger_on_card(tg, kuroe, RB_TSTR_LIVE_START);
     int guard = 0;
     while (pending(tg) && guard++ < 20) {
         if (!strcmp(pending_kind(tg), "SelectAutoAbility")) answer(tg, -1);
@@ -1521,9 +1522,10 @@ static void trigger_live_start_all_on_stage(TestGame *tg)
         int cid = tg->state.p[0].stage[area];
         if (cid == RB_EMPTY_SLOT) continue;
         if (!card_prints_trigger(cid, RB_TSTR_LIVE_START)) continue;
-        tg->state.activating_card = cid;
-        if (rb_queue_trigger_abilities(&tg->state, 0, RB_TSTR_LIVE_START) > 0)
-            rb_process_pending_auto_abilities(&tg->state);
+        /* ONE ability of THIS card (Rust fire_trigger). The old spelling,
+         * rb_queue_trigger_abilities, ignored which area the loop was on and
+         * fired every ライブ開始時 in the whole board on the FIRST iteration. */
+        (void)test_fire_trigger_on_card(tg, cid, RB_TSTR_LIVE_START);
     }
 }
 

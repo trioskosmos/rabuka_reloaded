@@ -1,4 +1,4 @@
-#include "rabuka.h"
+﻿#include "rabuka.h"
 #include <string.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -248,8 +248,19 @@ static char g_look_or_answer[32];       /* resolved type, e.g. "member_card"  */
 
 /* Defined further down (they need the look_* filter helpers); forward-declared
    so the earlier executors can reuse them. */
-static int look_filter_matches(GameState *g, const AbilityEffect *effect, int cid);
+static int look_filter_matches(const GameState *g, const AbilityEffect *effect, int cid);
+static int look_group_list_matches(int cid, const char *group_list);
 static int look_select_matches(GameState *g, const AbilityEffect *select, int cid);
+/* The select effect behind the currently-offered looked_at pool, and the
+   look_and_select follow-up that has to outlive a multi-pick re-prompt. Both
+   are parked at OFFER time because choice.c clears queue.resume_eff and
+   consumes queue.resume_after_look on the first resume. */
+static AbilityEffect *g_look_pending_select;
+static AbilityEffect *g_look_reprompt_followup;
+/* Set only by the looked-at SELECT offers. rb_effect_select / _select_cards
+   also drive rb_look_resume_indices (with a hand pool), and must not be able to
+   inherit a looked-at select's re-prompt state. */
+static int g_look_pool_select_offered;
 static void look_discard_unmatched(GameState *g, int owner, AbilityEffect *parent);
 static const char *look_filter_card_type(const AbilityEffect *effect);
 
@@ -385,6 +396,8 @@ void rb_effect_look_at(GameState *g, int actor, AbilityEffect *e)
     g->queue.resume_mode = 2;
     g->queue.resume_eff = e;
     g->queue.resume_is_select = 0;
+    g_look_pending_select = NULL;
+    g_look_pool_select_offered = 0;
     g->queue.resume_actor = actor;
     g->queue.resume_host = g->queue.resume_host >= 0 ? g->queue.resume_host : actor;
 }
@@ -443,6 +456,8 @@ void rb_effect_select_cards(GameState *g, int actor, AbilityEffect *e){
                 sizeof(g->queue.resume_filter_group)-1);
         g->queue.resume_filter_heart = g->queue.pending.filter_heart;
         g->queue.resume_mode = 2; g->queue.resume_eff = e; g->queue.resume_is_select = 1;
+        g_look_pending_select = e;
+        g_look_pool_select_offered = 0;
         g->queue.resume_actor = actor;
         g->queue.resume_host = g->queue.resume_host >= 0 ? g->queue.resume_host : actor;
         return;
@@ -504,8 +519,17 @@ void rb_effect_select_cards(GameState *g, int actor, AbilityEffect *e){
 static int look_card_allowed(const GameState *g, int cid)
 {
     if (!g) return 0;
+    if (g->queue.resume_is_select && g->queue.resume_eff) {
+        /* util.rs:1509-1532 re-checks the whole CardFilter on the answer; the
+           old port reduced it to ONE group token plus ONE heart colour, so a
+           comma-list heart_colors collapsed to heart00 and rejected every pick
+           (nothing reached hand, everything went to the waitroom). The pool was
+           already narrowed by the same filter when it was offered, so re-running
+           it here is the faithful check. */
+        return look_filter_matches(g, g->queue.resume_eff, cid);
+    }
     if (g->queue.resume_filter_group[0] &&
-        !rb_card_matches_group_str(cid, g->queue.resume_filter_group)) return 0;
+        !look_group_list_matches(cid, g->queue.resume_filter_group)) return 0;
     if (g->queue.resume_filter_heart < 0) return 1;
     Card card;
     if (!rb_decode_card_by_index((uint32_t)cid, &card)) return 0;
@@ -574,6 +598,106 @@ static void look_place_stage(RbPlayer *player, const int *cards, int n)
     }
 }
 
+/* ── multi-pick re-prompt (move/mod.rs:3184-3230) ──────────────────────────
+   「最大N枚」 keeps offering the looked_at pool until the count is satisfied.
+   g_look_pending_select / g_look_reprompt_followup are declared with the
+   forward declarations above; see there why they cannot be read off the queue
+   at resume time. */
+
+/* max_select = any_number ? (taken + remaining) : the JSON count
+   (move/mod.rs:3190-3194). */
+static int look_select_max_count(const AbilityEffect *sel, int n_selected, int n_remainder)
+{
+    int json_count = sel && sel->count >= 0 ? sel->count : 1;
+    return look_bool(sel, "any_number") ? (n_selected + n_remainder) : json_count;
+}
+
+/* can_select_more && max_select > selected_count (move/mod.rs:3195-3207). */
+static int look_select_wants_more(GameState *g, const AbilityEffect *sel,
+                                  int n_selected, int n_remainder)
+{
+    if (!sel) return 0;
+    if (g) g_look_reprompt_followup = g->queue.resume_after_look;
+    int json_count = sel->count >= 0 ? sel->count : 1;
+    int any_number = look_bool(sel, "any_number");
+    int is_max = look_bool(sel, "max");
+    int is_optional = sel->is_optional;
+    int can_select_more = is_max || is_optional || any_number || json_count > n_selected;
+    if (!can_select_more) return 0;
+    return look_select_max_count(sel, n_selected, n_remainder) > n_selected;
+}
+
+/* Emit the looked_at SelectCard for a (re-)offered pool. */
+static void look_emit_pool_choice(GameState *g, int owner, const AbilityEffect *sel,
+                                  const int *filtered, int n_filtered,
+                                  int offer, int allow_skip)
+{
+    const char *card_type = look_filter_card_type(sel);
+    rb_emit_choice(g, owner, RB_CHOICE_SELECT_CARD, "looked_at", card_type,
+                   offer, allow_skip, NULL);
+    g->queue.pending.n_filtered_indices = n_filtered;
+    for (int i = 0; i < n_filtered; i++)
+        g->queue.pending.filtered_indices[i] = filtered[i];
+    const char *group = look_extra(sel, "group_names");
+    if (!group) group = look_extra(sel, "group");
+    g->queue.pending.filter_group[0] = 0;
+    g->queue.resume_filter_group[0] = 0;
+    if (group) {
+        snprintf(g->queue.pending.filter_group, sizeof(g->queue.pending.filter_group), "%s", group);
+        snprintf(g->queue.resume_filter_group, sizeof(g->queue.resume_filter_group), "%s", group);
+    }
+    const char *heart = look_extra(sel, "heart_colors");
+    if (!heart) heart = look_extra(sel, "heart_color");
+    int heart_color = -1;
+    if (heart && *heart && !strchr(heart, ',')) heart_color = rb_parse_heart_color(heart);
+    g->queue.pending.filter_heart = heart_color;
+    g->queue.resume_filter_heart = heart_color;
+    const char *cost_limit = look_extra(sel, "cost_limit");
+    if (cost_limit) {
+        g->queue.pending.cost_limit = atoi(cost_limit);
+        const char *operator_text = look_extra(sel, "cost_limit_operator");
+        if (!operator_text) operator_text = look_extra(sel, "operation");
+        if (operator_text)
+            snprintf(g->queue.pending.cost_limit_op,
+                     sizeof(g->queue.pending.cost_limit_op), "%s", operator_text);
+    }
+    snprintf(g->queue.pending.target_player_id,
+             sizeof(g->queue.pending.target_player_id), "p%d", owner + 1);
+    g->queue.resume_look_owner = owner;
+    rb_queue_pause_for_choice(g, &g->queue.pending);
+    g->queue.resume_mode = 2;
+    g->queue.resume_eff = (AbilityEffect *)sel;
+    g->queue.resume_is_select = 1;
+    g_look_pending_select = (AbilityEffect *)sel;
+    g_look_pool_select_offered = 1;
+}
+
+/* move/mod.rs:3070-3090 — 「1シリーズ1枚」 is validated BEFORE anything is
+   removed: if the answer names more cards of one series than the printed
+   per_group_count allows, the WHOLE answer is rejected and the pool is
+   untouched. The C port had no per_group_count at all, so a same-series pair
+   both reached the hand. */
+static int look_per_group_ok(const int *selected, int n_selected, int max_per_group)
+{
+    if (max_per_group <= 0 || n_selected <= 1) return 1;
+    const char *series[MAX_LOOKED];
+    int n_series = 0;
+    for (int i = 0; i < n_selected; i++) {
+        Card c;
+        if (!rb_decode_card_by_index((uint32_t)selected[i], &c)) continue;
+        const char *name = c.series_idx ? rb_card_string(c.series_idx) : NULL;
+        rb_free_card(&c);
+        if (name && *name) series[n_series++] = name;
+    }
+    for (int i = 0; i < n_series; i++) {
+        int count = 0;
+        for (int k = 0; k < n_series; k++)
+            if (!strcmp(series[k], series[i])) count++;
+        if (count > max_per_group) return 0;
+    }
+    return 1;
+}
+
 void rb_look_resume_indices(GameState *g, int owner, const int *indices, int n_indices,
                             const char *destination, const char *remainder_destination,
                             int discard_remaining, int is_select)
@@ -591,6 +715,11 @@ void rb_look_resume_indices(GameState *g, int owner, const int *indices, int n_i
         if (is_select && !look_card_allowed(g, cid)) continue;
         selected_flags[index] = 1;
         selected[n_selected++] = cid;
+    }
+    if (is_select && g_look_pool_select_offered && g_look_pending_select) {
+        const char *mpg_text = look_extra(g_look_pending_select, "per_group_count");
+        if (mpg_text && *mpg_text && !look_per_group_ok(selected, n_selected, atoi(mpg_text)))
+            n_selected = 0;   /* the whole answer is rejected; the pool survives */
     }
     int remainder[MAX_LOOKED];
     int n_remainder = 0;
@@ -616,6 +745,8 @@ void rb_look_resume_indices(GameState *g, int owner, const int *indices, int n_i
             look_append_cards(&player->discard, remainder, n_remainder);
         }
         pool->n = 0;
+        g_look_pending_select = NULL;
+        g_look_pool_select_offered = 0;
         return;
     }
     const char *destination_zone = destination && *destination ? destination : "hand";
@@ -632,9 +763,31 @@ void rb_look_resume_indices(GameState *g, int owner, const int *indices, int n_i
     } else {
         look_append_cards(&player->hand, selected, n_selected);
     }
-    const char *remainder_zone = remainder_destination && *remainder_destination
+const char *remainder_zone = remainder_destination && *remainder_destination
                                      ? remainder_destination
                                      : (discard_remaining != 0 ? "discard" : "deck_top");
+    const AbilityEffect *sel = (is_select && g_look_pool_select_offered) ? g_look_pending_select : NULL;
+    /* move/mod.rs:3205-3230 — a select whose count is not satisfied yet
+       RE-PRESENTS the leftover pool instead of flushing it. The chosen cards are
+       already at their destination; only the unchosen looked-at cards survive and
+       the next prompt offers min(max - taken, remaining). Without this the
+       ability ended after a single pick, so 「最大3枚」 could never take 3. */
+    if (is_select && n_selected > 0 && n_remainder > 0 &&
+        look_select_wants_more(g, sel, n_selected, n_remainder)) {
+        pool->n = 0;
+        for (int i = 0; i < n_remainder; i++) look_append(pool, remainder[i]);
+        int filtered[MAX_LOOKED];
+        int n_filtered = 0;
+        for (int i = 0; i < pool->n; i++)
+            if (look_select_matches(g, sel, pool->cards[i])) filtered[n_filtered++] = i;
+        int available = pool->n;
+        int offer = look_select_max_count(sel, n_selected, n_remainder) - n_selected;
+        if (offer > available) offer = available;
+        if (offer <= 0) { pool->n = 0; return; }
+        look_emit_pool_choice(g, owner, sel, filtered, n_filtered, offer, 1);
+        g->queue.resume_after_look = g_look_reprompt_followup;
+        return;
+    }
     if (!strcmp(remainder_zone, "looked_at")) {
         pool->n = 0;
         for (int i = 0; i < n_remainder; i++) look_append(pool, remainder[i]);
@@ -665,6 +818,8 @@ void rb_look_resume_indices(GameState *g, int owner, const int *indices, int n_i
         if (g->n_recently_moved < RB_MAX_RECENTLY_MOVED)
             g->recently_moved[g->n_recently_moved++] = remainder[i];
     pool->n = 0;
+    g_look_pending_select = NULL;
+    g_look_pool_select_offered = 0;
 }
 
 void rb_look_resume(GameState *g, int actor, int selected_idx, const char *destination, int is_select)
@@ -951,6 +1106,8 @@ void rb_effect_select(GameState *g, int actor, AbilityEffect *e) {
     g->queue.resume_filter_heart = g->queue.pending.filter_heart;
     g->queue.resume_mode = 2; g->queue.resume_eff = e;
     g->queue.resume_is_select = 1;
+    g_look_pending_select = e;
+    g_look_pool_select_offered = 0;
     g->queue.resume_actor = actor; g->queue.resume_host = g->queue.resume_host >= 0 ? g->queue.resume_host : actor;
 }
 
@@ -962,14 +1119,207 @@ static const char *look_filter_card_type(const AbilityEffect *effect)
     return look_extra(effect, "card_type");
 }
 
-static int look_filter_matches(GameState *g, const AbilityEffect *effect, int cid)
+/* ── CardFilter parity helpers (util.rs::CardFilter) ──────────────────────
+   The looked-at pool narrowing used to re-implement only six of the filter
+   fields. Everything below ports the remaining ones so a look-and-select
+   narrows exactly like util.rs::CardFilter::matches. */
+
+/* util.rs:1484-1499 check_group — `group` is group_names[0] and `groups` is the
+   WHOLE list; a card passes when either matches. The wire frequently carries a
+   comma list with the same group twice (「μ's,μ's'」), so handing the raw string
+   to the single-value matcher rejected every card and the pool was discarded
+   without ever offering a pick. */
+static int look_group_list_matches(int cid, const char *group_list)
+{
+    const char *tokens[16];
+    char buffer[512];
+    int n = look_split_list(group_list, tokens, 16, buffer, sizeof(buffer));
+    if (n <= 0) return 1;
+    for (int i = 0; i < n; i++)
+        if (rb_card_matches_group_str(cid, tokens[i])) return 1;
+    return 0;
+}
+
+/* util.rs:1279-1299 heart_count_for_threshold — max(base_heart[col],
+   need_heart[col]). Card::heart_color is a HeartMap of (color, count) pairs laid
+   out base | blade | need, so the multiplicity is heart_count[] and the blade
+   span is skipped on both sides. */
+static int look_heart_count_for_threshold(const Card *c, int color)
+{
+    int base = 0, need = 0;
+    int need_start = (int)c->num_base + (int)c->num_blade;
+    for (int i = 0; i < c->n_hearts && i < RB_MAX_HEARTS; i++) {
+        if (c->heart_color[i] != color) continue;
+        if (i < (int)c->num_base) base += c->heart_count[i];
+        else if (i >= need_start) need += c->heart_count[i];
+    }
+    return base > need ? base : need;
+}
+
+/* util.rs:1310-1321 any_trigger — the resolved trigger text STARTS WITH the
+   wanted label (「常時」 is a prefix of 「常時:...」). */
+static int look_ability_has_trigger(int cid, const char *wanted)
+{
+    size_t len = wanted ? strlen(wanted) : 0;
+    if (!len) return 0;
+    int n = rb_card_num_abilities((uint32_t)cid);
+    for (int i = 0; i < n; i++) {
+        Ability ab;
+        if (!rb_decode_card_ability((uint32_t)cid, i, &ab)) continue;
+int hit = ab.triggers && !strncmp(ab.triggers, wanted, len);
+            rb_free_ability(&ab);
+        if (hit) return 1;
+    }
+    return 0;
+}
+
+/* util.rs:1290-1318 card_passes_ability_filter. `require_ability` selects
+   Unconstrained::RequireAbility (the or_ability_filters branch shape): a filter
+   name with no trigger list then resolves to "has an ability at all". */
+static int look_ability_filter_passes(int cid, const char *ability_filter,
+                                      const char *const *triggers, int n_triggers,
+                                      int require_ability)
+{
+    int has_ability = rb_card_num_abilities((uint32_t)cid) > 0;
+    int unconstrained = require_ability ? has_ability : 1;
+    const char *af = ability_filter ? ability_filter : "";
+    if (!strcmp(af, "no_ability")) return !has_ability;
+    if (!strcmp(af, "has_ability")) return has_ability;
+    if (!strcmp(af, "no_ability_type")) {
+        if (n_triggers > 0) {
+            for (int i = 0; i < n_triggers; i++)
+                if (look_ability_has_trigger(cid, triggers[i])) return 0;
+            return 1;
+        }
+        return unconstrained;
+    }
+    if (!strcmp(af, "has_ability_type")) {
+        if (n_triggers > 0) {
+            for (int i = 0; i < n_triggers; i++)
+                if (look_ability_has_trigger(cid, triggers[i])) return 1;
+            return 0;
+        }
+        return unconstrained;
+    }
+    return 1;   /* an unrecognised name constrains nothing */
+}
+
+/* Read `"key":"value"` out of a JSON fragment. */
+static const char *look_json_field(const char *json, const char *key)
+{
+    char pattern[64];
+    snprintf(pattern, sizeof(pattern), "\"%s\"", key);
+    const char *p = strstr(json, pattern);
+    if (!p) return NULL;
+    p += strlen(pattern);
+    while (*p && *p != ':') {
+        if (*p == ',') return NULL;
+        p++;
+    }
+    if (*p != ':') return NULL;
+    p++;
+    while (*p == ' ' || *p == '"') p++;
+    static char value[64];
+    size_t n = 0;
+    while (*p && *p != '"' && n + 1 < sizeof(value)) value[n++] = *p++;
+    value[n] = 0;
+    return n ? value : NULL;
+}
+
+/* Copy `src` into `dst`, dropping one surrounding pair of JSON quotes. The
+   or_ability_filters trigger list is JSON, so its tokens arrive quoted while
+   the plain extras (`ability_filter_triggers`, `group_names`) do not. */
+static void look_copy_unquoted(char *dst, size_t cap, const char *src)
+{
+    size_t len = src ? strlen(src) : 0;
+    if (len >= 2 && src[0] == '"' && src[len - 1] == '"') { src++; len -= 2; }
+    if (len >= cap) len = cap - 1;
+    char tmp[64];
+    if (len > sizeof(tmp)) len = sizeof(tmp) - 1;
+    memcpy(tmp, src, len);          /* src may BE dst — never memcpy onto itself */
+    tmp[len] = 0;
+    memcpy(dst, tmp, len + 1);
+}
+
+typedef struct {
+    char ability_filter[32];
+    const char *triggers[4];
+    char trigger_store[4][48];
+    int n_triggers;
+} LookAbilityBranch;
+
+/* util.rs:1530-1538 or_ability_filters — a JSON array of branches, each
+   {"$variant":N,"$fields":{"ability_filter":"...","ability_filter_triggers":[...]}}.
+   A card passes when ANY branch matches. */
+static int look_parse_or_ability_filters(const char *json, LookAbilityBranch *out, int max)
+{
+    int n = 0;
+    if (!json || !*json) return 0;
+    const char *p = json;
+    while (n < max) {
+        const char *obj = strchr(p, '{');
+        if (!obj) break;
+        /* The fields all live inside the nested "$fields" object, so its
+           closing brace is the end of every field we care about. */
+        const char *end = strchr(obj, '}');
+        if (!end) break;
+        char body[768];
+        size_t len = (size_t)(end - obj);
+        if (len >= sizeof(body)) len = sizeof(body) - 1;
+        memcpy(body, obj, len);
+        body[len] = 0;
+        const char *af = look_json_field(body, "ability_filter");
+        if (af && *af) {
+            LookAbilityBranch *b = &out[n];
+            b->n_triggers = 0;
+            snprintf(b->ability_filter, sizeof(b->ability_filter), "%s", af);
+            const char *ta = strstr(body, "\"ability_filter_triggers\"");
+            const char *lb = ta ? strchr(ta, '[') : NULL;
+            const char *rb = lb ? strchr(lb, ']') : NULL;
+            if (lb && rb && rb > lb + 1) {
+                char list[256];
+                size_t ll = (size_t)(rb - lb - 1);
+                if (ll >= sizeof(list)) ll = sizeof(list) - 1;
+                memcpy(list, lb + 1, ll);
+                list[ll] = 0;
+                const char *toks[4];
+                b->n_triggers = look_split_list(list, toks, 4,
+                                                b->trigger_store[0], sizeof(b->trigger_store[0]));
+                if (b->n_triggers > 1) {
+                    /* look_split_list tokenises one buffer; re-point the rest. */
+                    char all[256];
+                    snprintf(all, sizeof(all), "%s", list);
+                    char *cursor = all;
+                    for (int i = 0; i < b->n_triggers && i < 4; i++) {
+                        char *comma = strchr(cursor, ',');
+                        if (comma) *comma = 0;
+                        look_copy_unquoted(b->trigger_store[i], sizeof(b->trigger_store[i]), cursor);
+                        b->triggers[i] = b->trigger_store[i];
+                        if (!comma) break;
+                        cursor = comma + 1;
+                    }
+                } else if (b->n_triggers == 1) {
+                    look_copy_unquoted(b->trigger_store[0], sizeof(b->trigger_store[0]), toks[0]);
+                    b->triggers[0] = b->trigger_store[0];
+                }
+            }
+            n++;
+        }
+        p = end + 1;
+    }
+    return n;
+}
+
+static int look_filter_matches(const GameState *g, const AbilityEffect *effect, int cid)
 {
     if (!effect) return 1;
     const char *card_type = look_filter_card_type(effect);
     if (card_type && *card_type && !rb_card_matches_type(cid, card_type)) return 0;
     const char *group = look_extra(effect, "group_names");
     if (!group) group = look_extra(effect, "group");
-    if (group && *group && !rb_card_matches_group_str(cid, group)) return 0;
+    if (group && *group && !look_group_list_matches(cid, group)) return 0;
+    const char *exclude_group = look_extra(effect, "exclude_group_names");
+    if (exclude_group && *exclude_group && look_group_list_matches(cid, exclude_group)) return 0;
     const char *cost_limit = look_extra(effect, "cost_limit");
     if (cost_limit) {
         const char *cost_operator = look_extra(effect, "cost_limit_operator");
@@ -980,30 +1330,91 @@ static int look_filter_matches(GameState *g, const AbilityEffect *effect, int ci
     if (!heart) heart = look_extra(effect, "heart_color");
     if (heart && *heart) {
         const char *colors[8];
-        int n_colors = 0;
         char buffer[192];
-        snprintf(buffer, sizeof(buffer), "%s", heart);
-        char *token = strtok(buffer, ",");
-        while (token && n_colors < 8) {
-            colors[n_colors++] = token;
-            token = strtok(NULL, ",");
-        }
+        int n_colors = look_split_list(heart, colors, 8, buffer, sizeof(buffer));
         int require_all = look_bool(effect, "require_all_heart_colors");
-        if (require_all ? !rb_card_matches_all_heart_colors(cid, colors, n_colors)
-                        : !rb_card_matches_heart_colors(cid, colors, n_colors)) return 0;
+        if (n_colors > 0 &&
+            (require_all ? !rb_card_matches_all_heart_colors(cid, colors, n_colors)
+                         : !rb_card_matches_heart_colors(cid, colors, n_colors))) return 0;
+        /* util.rs:1264-1277 「ハートをN個以上」 threshold. */
+        const char *count_text = look_extra(effect, "heart_color_count");
+        if (count_text && *count_text && n_colors > 0) {
+            int threshold = atoi(count_text);
+            Card c;
+            if (rb_decode_card_by_index((uint32_t)cid, &c)) {
+                int passes = require_all;
+                for (int i = 0; i < n_colors; i++) {
+                    int meets = look_heart_count_for_threshold(&c, (int)rb_parse_heart_color(colors[i]))
+                                >= threshold;
+                    if (require_all) {
+                        if (!meets) { passes = 0; break; }
+                    } else if (meets) {
+                        passes = 1;
+                        break;
+                    }
+                }
+                rb_free_card(&c);
+                if (!passes) return 0;
+            }
+        }
     }
     const char *characters = look_extra(effect, "characters");
     if (characters && *characters) {
         const char *names[8];
-        int n_names = 0;
         char buffer[256];
-        snprintf(buffer, sizeof(buffer), "%s", characters);
-        char *token = strtok(buffer, ",");
-        while (token && n_names < 8) {
-            names[n_names++] = token;
-            token = strtok(NULL, ",");
+        int n_names = look_split_list(characters, names, 8, buffer, sizeof(buffer));
+        if (n_names > 0 && !rb_card_matches_characters(cid, names, n_names)) return 0;
+    }
+    /* util.rs:1291-1307 ability_filter, then util.rs:1309-1332 or_ability_filters
+       (when present the branches ARE the whole filter). */
+    const char *ability_filter = look_extra(effect, "ability_filter");
+    if (ability_filter && *ability_filter) {
+        const char *triggers[4];
+        char trigger_store[4][48];
+        int n_triggers = 0;
+        const char *trig_list = look_extra(effect, "ability_filter_triggers");
+        if (trig_list && *trig_list) {
+            char buffer[256];
+            const char *toks[4];
+            n_triggers = look_split_list(trig_list, toks, 4, buffer, sizeof(buffer));
+            if (n_triggers > 1) {
+                char all[256];
+                snprintf(all, sizeof(all), "%s", trig_list);
+                char *cursor = all;
+                for (int i = 0; i < n_triggers && i < 4; i++) {
+                    char *comma = strchr(cursor, ',');
+                    if (comma) *comma = 0;
+                    snprintf(trigger_store[i], sizeof(trigger_store[i]), "%s", cursor);
+                    triggers[i] = trigger_store[i];
+                    if (!comma) break;
+                    cursor = comma + 1;
+                }
+            }
         }
-        if (!rb_card_matches_characters(cid, names, n_names)) return 0;
+        if (!look_ability_filter_passes(cid, ability_filter, triggers, n_triggers, 0)) return 0;
+    }
+    LookAbilityBranch branches[8];
+    int n_branches = look_parse_or_ability_filters(look_extra(effect, "or_ability_filters"),
+                                                   branches, 8);
+    if (n_branches > 0) {
+        int passes = 0;
+        for (int i = 0; i < n_branches; i++)
+            if (look_ability_filter_passes(cid, branches[i].ability_filter,
+                                           branches[i].triggers,
+                                           branches[i].n_triggers, 1)) { passes = 1; break; }
+        if (!passes) return 0;
+    }
+    /* util.rs:1390-1408 check_card_property — checked LAST, after the ability
+       filter, and `negation` inverts it. */
+    const char *card_property = look_extra(effect, "card_property");
+    if (card_property && *card_property) {
+        const char *negation = look_extra(effect, "negation");
+        int negate = negation && (!strcmp(negation, "true") || strtol(negation, NULL, 10) != 0);
+        Card c;
+        const Card *cp = rb_decode_card_by_index((uint32_t)cid, &c) ? &c : NULL;
+        int passes = rb_check_card_property(card_property, negate, cp);
+        if (cp) rb_free_card(&c);
+        if (!passes) return 0;
     }
     if (look_bool(effect, "exclude_self") && g && g->activating_card >= 0 && cid == g->activating_card)
         return 0;
@@ -1086,7 +1497,14 @@ void rb_effect_look_and_select(GameState *g, int actor, AbilityEffect *e) {
     }
     const char *heart = look_extra(select_action, "heart_colors");
     if (!heart) heart = look_extra(select_action, "heart_color");
-    int heart_color = heart && *heart ? rb_parse_heart_color(heart) : -1;
+    /* A flat RbChoice can only carry ONE heart colour. `heart_colors` on the
+       wire is a LIST ("heart02,heart04,heart05"), and rb_parse_heart_color on
+       the joined string matches nothing and returns heart00 — which then read as
+       "pink only" and rejected every pick. Only collapse a genuine single-token
+       value; the multi-colour AND/OR gate already ran through
+       look_select_matches and is carried by pending.filtered_indices. */
+    int heart_color = -1;
+    if (heart && *heart && !strchr(heart, ',')) heart_color = rb_parse_heart_color(heart);
     g->queue.pending.filter_heart = heart_color;
     g->queue.resume_filter_heart = heart_color;
     const char *cost_limit = look_extra(select_action, "cost_limit");
@@ -1103,10 +1521,13 @@ void rb_effect_look_and_select(GameState *g, int actor, AbilityEffect *e) {
              sizeof(g->queue.pending.target_player_id), "p%d", who + 1);
     g->queue.resume_look_owner = who;
     g->queue.resume_after_look = e->followup_action;
+    g_look_reprompt_followup = e->followup_action;
     rb_queue_pause_for_choice(g, &g->queue.pending);
     g->queue.resume_mode = 2;
     g->queue.resume_eff = select_action;
     g->queue.resume_is_select = 1;
+    g_look_pending_select = select_action;
+    g_look_pool_select_offered = 1;
     g->queue.resume_actor = actor;
     g->queue.resume_host = g->queue.resume_host >= 0 ? g->queue.resume_host : -1;
 }

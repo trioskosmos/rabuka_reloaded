@@ -1,4 +1,4 @@
-#include "rabuka.h"
+﻿#include "rabuka.h"
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
@@ -1237,6 +1237,49 @@ int rb_play_member(GameState *g, int pl, int hand_idx, int stage_pos) {
     return 1;
 }
 
+/* Activation-tree ownership (DEFECT 4).
+ *
+ * g->activation_act + g->activation_keepalive + g->activation_keepalive_valid
+ * are a SINGLE slot carrying one activation's AbilityEffect wrapper tree plus
+ * the decoded Ability that owns its cost/effect subtrees, kept alive across the
+ * choice round-trip. choice.c:4696-4703 releases the pair when the prompt
+ * closes, and the inline teardown at the bottom of rb_activate_card releases it
+ * when no prompt is left. g->activation_keepalive is a shallow copy of an owning
+ * type, so the pair must have exactly one owner at all times.
+ *
+ * rb_activate_card is RE-ENTRANT: an ability effect can activate another card's
+ * ability mid-resolution, and there are two entry points (rb_activate_ability
+ * below and rb_execute_main_phase_action further down). The old code published
+ * into the slot unconditionally, so a nested activation CLOBBERED the outer
+ * pair with no free of the prior value: the outer tree leaked in full and
+ * choice.c then freed only the newest one, so the outer AbilityEffect tree plus
+ * its cost/effect subtrees were never reclaimed. Repeated on every nested
+ * activation across a game, that is unbounded growth.
+ *
+ * The guard is a save/restore of the slot, NOT a free of the outer tree:
+ *   - on entry, save whatever the caller had published;
+ *   - publish this activation's pair;
+ *   - on exit with NO prompt open, release THIS pair and restore the saved slot,
+ *     so the outer frame's own teardown still finds its tree and frees it;
+ *   - on exit WITH a prompt open, leave THIS pair published. The queue holds raw
+ *     pointers into it (g->queue.pending / resume_parent / deferred), so it must
+ *     survive and choice.c owns its release. The saved (outer) pair is
+ *     deliberately NOT restored in that case: restoring it would make choice.c's
+ *     tail free the outer tree while the prompt is still walking the inner one.
+ *     That residual is bounded by the nesting depth of ONE activation; it is the
+ *     same "known bounded leak" shape ability_queue.c:1286-1291 documents, and
+ *     strictly smaller than the pre-guard behaviour, which leaked on every
+ *     nested activation whether or not a prompt was involved.
+ *
+ * The outer's tree is never freed from the inner frame: the outer effect VM is
+ * still walking it, so freeing it here would be a use-after-free.
+ *
+ * OWNERSHIP RULE UNCHANGED: the pair still has exactly one owner, and
+ * ability_queue.c's rb_drain_keep_alive keeps its "if the slot is taken, leave
+ * the tree detached" contract intact — it tests activation_keepalive_valid
+ * before publishing, and this guard only ever adds a restore around that. */
+static int rb_activate_act_depth = 0;
+
 /* Activate a card's ability by card id. Mirrors Rust's `GameState::activate_ability`:
     the card may expose several abilities (RAKA_CARD_ABILITY_PAIRS); the manual
     "activate" action runs the one(s) whose trigger is 起動 (Activate). Apply each
@@ -1292,6 +1335,11 @@ int rb_activate_card(GameState *g, int pl, int card_id) {
             act->n_child = 0;
             if (ab.cost)   act->child[act->n_child++] = ab.cost;
             if (ab.effect) act->child[act->n_child++] = ab.effect;
+            /* DEFECT 4 re-entrancy guard — see the ownership note above. */
+            AbilityEffect *saved_act_slot = g->activation_act;
+            Ability saved_keepalive = g->activation_keepalive;
+            int saved_keepalive_valid = g->activation_keepalive_valid;
+            rb_activate_act_depth++;
             g->activation_act = act;
             g->activation_keepalive = ab;
             g->activation_keepalive_valid = 1;
@@ -1299,15 +1347,42 @@ int rb_activate_card(GameState *g, int pl, int card_id) {
             rb_execute_effect_ex(g, pl, act, card_id);
             rb_drain_ability_queue(g);
             if (!g->queue.has_pending) {
-                /* Free act's children first (they are owned by act, not by keepalive) */
+                /* DEFECT 4 — teardown. The old body was:
+                     act->n_child = 0;
+                     g->activation_keepalive.cost = NULL;
+                     g->activation_keepalive.effect = NULL;
+                     rb_free_ability(&g->activation_keepalive);
+                     free(g->activation_act);
+                 Nulling cost/effect before rb_free_ability means rb_free_ability
+                 (vm.c:1180-1185, which is what actually walks
+                 effect_free(a->cost) / effect_free(a->effect)) never sees them:
+                 BOTH AbilityEffect subtrees leaked on every activation that did
+                 NOT leave a prompt open — the majority path, so this alone was
+                 unbounded growth over a game. choice.c:4696-4703 does NOT null
+                 them, which is why the interactive path reclaimed them and made
+                 the inline path look correct by comparison.
+
+                 act is a plain wrapper that is released with free(), so it never
+                 owned its children; ab (the keepalive) owns them. Clearing
+                 n_child and letting rb_free_ability walk the keepalive is the
+                 total, single-owner release: each of cost, effect and act is
+                 freed exactly once. */
                 act->n_child = 0;
-                g->activation_keepalive.cost = NULL;
-                g->activation_keepalive.effect = NULL;
                 rb_free_ability(&g->activation_keepalive);
                 g->activation_keepalive_valid = 0;
-                free(g->activation_act);
+                free(act);
                 g->activation_act = NULL;
+                /* Restore the slot the caller had published so an enclosing
+                   activation's teardown still finds its own tree. */
+                g->activation_act = saved_act_slot;
+                g->activation_keepalive = saved_keepalive;
+                g->activation_keepalive_valid = saved_keepalive_valid;
             }
+            /* Prompt still open: THIS pair stays published and choice.c owns its
+               release; the saved (outer) pair is NOT restored, or choice.c's tail
+               would free the outer tree while the prompt walks the inner one.
+               See the ownership note above. */
+            rb_activate_act_depth--;
             /* ── USE LIMIT RECORD ── ability/gates.rs:279-335
                (record_use_limit) / turn/actions/mod.rs:1488-1500
                (finish_paid_ability). One accepted activation spends exactly one
@@ -1588,17 +1663,69 @@ void rb_turn(GameState *g) {
 }
 
 /* ───────────────────────────── setup ───────────────────────────── */
+/* CROSS-FILE REQUEST: rb_setup_game lives in src/game/game_setup.c and has no
+   declaration in include/rabuka.h yet (that file is not this file's
+   ownership). */
+void rb_setup_game(GameState *g);
+
+/* rb_game_init now mirrors Rust's GameState::new + setup_game and NOTHING more.
+
+   DEFECT: the previous body collapsed the whole pre-game ceremony into the
+   constructor —
+     :1610-1612  drew 6 cards per seat  (Rust does NOT draw here)
+     :1613-1619  decided RPS from the seeded RNG and elected the seats
+     :1620-1623  jumped straight to RB_PHASE_ACTIVE
+   — while :1596 had already set g->phase = RB_PHASE_RPS. RB_PHASE_RPS was set
+   and immediately overwritten, so it was dead, and so were RB_PHASE_OPENING
+   (Rust's ChooseFirstAttacker) and both RB_PHASE_MULLIGAN_* values. Rust's
+   ordering is:
+     game_setup.rs:555-561  GameState::new(p1 first-attacker, p2 not) — decks
+                            shuffled, phase = Active, NO cards drawn
+     game_setup.rs:562      setup_game → setup_initial_energy (Rule 6.2.1.7)
+                            then current_phase = Phase::RockPaperScissors
+     actions/mod.rs:291-301 the HOST then drives RockChoice/ScissorsChoice →
+                            ChooseFirstAttacker (draw 6 each, mulligan) → Active
+   Rust's engine core NEVER decides RPS itself; the host does. So this
+   constructor now stops at RB_PHASE_RPS with the seat defaults Rust's
+   Player::new uses (P1 is the first attacker until RPS says otherwise) and
+   leaves the ceremony to the host — via rb_setup_execute_action, or via
+   rb_advance_phase's headless auto-pass for the C harnesses.
+
+   Consequence, called out loudly: a caller that used rb_game_init as "give me
+   a playable game" no longer gets hands. tests/replay.c (rb_engine_replay,
+   rb_engine_scenario_generated) is the known such caller and must now drive
+   the ceremony (rb_setup_settle_auto, or three rb_advance_phase calls). The
+   ~141 test suites are unaffected: they use test_game.c's test_game_new, not
+   rb_game_init. */
 int rb_game_init(GameState *g, const uint32_t *deck0, int n0,
                  const uint32_t *deck1, int n1) {
      memset(g, 0, sizeof(*g));
      rb_look_reset_all();
      rb_mods_init(&g->mods);
-     g->winner = -1; g->turn = 1; g->phase = RB_PHASE_RPS;
+     g->winner = -1; g->turn = 1;
      g->cheer_check_base = -1;
      g->baton_touch_replaced_member_cost = -1;
      g->baton_touch_replaced_member_id = -1;
      g->baton_touch_arriving_card_id = -1;
      for (int i = 0; i < 64; i++) g->gained_card_ids[i] = -1;
+    /* game_setup.rs:555-558 — Player::new("p1", …, true) / Player::new("p2",
+       …, false), i.e. P1 is the first attacker until RPS elects otherwise.
+       Rust's mulligan_owner_index (game_state/mod.rs:790-791) keys off exactly
+       these flags, and Phase::ActivePlayer / active_player_index() read them,
+       so they must hold a coherent pair from the moment the struct exists. */
+    g->first_attacker = 0;
+    g->second_attacker = 1;
+    g->active = g->first_attacker;
+    /* Rust's Option<u8> RPS choices start as None and rps_winner starts as
+       None. memset leaves all three at 0, and 0 is a VALID RPS gesture (rock)
+       and a VALID winner index, so every one of them is initialised to -1
+       explicitly. Without this the very first rb_resolve_rps_if_both_chosen
+       would see "both players already chose rock" and resolve a tie nobody
+       played. */
+    g->player1_rps_choice = -1;
+    g->player2_rps_choice = -1;
+    g->rps_winner = -1;
+    g->phase = RB_PHASE_RPS;
     for (int pl = 0; pl < 2; pl++) {
         const uint32_t *d = (pl == 0) ? deck0 : deck1;
         int n = (pl == 0) ? n0 : n1;
@@ -1607,20 +1734,17 @@ int rb_game_init(GameState *g, const uint32_t *deck0, int n0,
         for (int i = 0; i < n; i++) g->p[pl].deck.cards[i] = (int)d[i];
         g->p[pl].deck.n = n;
         rb_shuffle(g->p[pl].deck.cards, g->p[pl].deck.n);
-        /* opening hand: 6 each (matches Rust's post-RPS draw) */
-        for (int k = 0; k < 6; k++) rb_draw(g, pl);
     }
-    /* RPS decided deterministically from the seeded RNG. */
-    g->rps[0] = rng_range(3);
-    g->rps[1] = rng_range(3);
-    while (g->rps[0] == g->rps[1]) g->rps[1] = rng_range(3);
-    /* 0 rock beats 2 scissors, 1 paper beats 0 rock, 2 scissors beats 1 paper */
-    int w = (g->rps[0] == g->rps[1]) ? 0
-          : ((g->rps[0] + 1) % 3 == g->rps[1]) ? 1 : 0;
-    g->first_attacker = w;
-    g->second_attacker = w ^ 1;
-    g->active = g->first_attacker;
-    g->phase = RB_PHASE_ACTIVE;
+    /* game_setup.rs:358-364 setup_game — Rule 6.2.1.7 initial energy (3 cards
+       from EACH player's energy deck into their energy zone) then
+       current_phase = Phase::RockPaperScissors.
+
+       The energy draw is a no-op when the caller has not populated the energy
+       decks yet, which is the normal shape here: rb_init_game_from_built_decks
+       (src/game/deck_builder.c) calls rb_game_init FIRST and only then calls
+       rb_player_set_energy_deck + rb_setup_initial_energy, so the cards land
+       exactly once, in Rust's order. */
+    rb_setup_game(g);
     return 0;
 }
 

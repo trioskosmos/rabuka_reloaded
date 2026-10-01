@@ -280,7 +280,28 @@ static const char *player_prefix(const GameState *g, int card_id) {
     return "??";
 }
 
-/* ── emit_pay_skip_gate ── */
+/* ── emit_pay_skip_gate ──
+   Open the pay-or-skip gate (cost/handlers.rs:1371-1378).
+
+   The answer is routed by RbQueueEntry.cost, the "amount this gate charges
+   when it is ACCEPTED" the answer path reads back (choice.c:3442-3443:
+   `if (W->energy_active >= e->cost) W->energy_active -= e->cost;`). Nothing in
+   the C ever WROTE that field -- `entries[].cost` has zero writers tree-wide,
+   so it is always 0 and an accepted pay/skip gate taps nothing:
+   `energy_active -= 0`. That is the cost.c half of the "paying an optional
+   energy cost changes no energy" symptom, and it is fixed here because this
+   function is the only place in the cost path that knows the printed amount
+   before the player answers.
+
+   Rust has no equivalent field: the gate writes `pending.card =
+   ChoiceCard::Energy`, and `handle_optional_cost_payment` re-derives the amount
+   from `gs.entry_cost()` at answer time (handlers.rs:1393/1482-1490). The C's
+   `rb_handle_optional_cost_payment` does the same re-derivation, but no live
+   path calls it -- only tests/test_parity_cost_compound.c does -- so the C
+   needs the number carried on the entry instead.
+
+   Only an energy gate gets a non-zero amount: `e->action` is the gate's own
+   cost, and a non-energy gate charges nothing on acceptance, so 0 is right. */
 static void emit_pay_skip_gate(GameState *g, int actor, const AbilityEffect *e,
                                const char *description, int optional,
                                const char *route) {
@@ -292,7 +313,52 @@ static void emit_pay_skip_gate(GameState *g, int actor, const AbilityEffect *e,
     if (pending->description[0] == '\0')
         strncpy(pending->description, description, sizeof(pending->description) - 1);
     pending->route = r;
-    (void)e;
+    if (g->queue.cur >= 0 && g->queue.cur < g->queue.n_entries) {
+        int amount = (e && e->action && !strcmp(e->action, "pay_energy"))
+                         ? eff_energy_count(e, 0) : 0;
+        g->queue.entries[g->queue.cur].cost = amount > 0 ? amount : 0;
+        g->queue.entries[g->queue.cur].choice_card_no = r;
+    }
+}
+
+/* ── cost_publish_pending ──
+   Publish a prompt this file built by hand.
+
+   pay_cost_move_cards and pay_cost_inner assemble their `pending` with a raw
+   memset (they need filter fields the generic emitter has no parameter for:
+   cost_limit / cost_limit_op / characters / target_player_id). Building it by
+   hand is fine; PUBLISHING it by hand was not. `memset` + `has_pending = 1`
+   leaves three of the five things rb_emit_choice does:
+
+     - g->queue.actor is never set, so the answer is attributed to whatever
+       seat the pause below stamps (g->active), not to the player the cost
+       asked;
+     - rb_queue_pause_for_choice is never called, so the current entry's
+       `choice_player_id` is never filled and queue.state stays RESOLVING.
+       The answer therefore arrives with the entry still open, and the drain
+       after it re-runs the whole ability from the top: the cost is offered
+       again and the prompt re-opens in a loop;
+     - the look/resume scratch fields are left at whatever the previous
+       prompt left in them, so a stale resume_after_look fires against this
+       prompt's answer.
+
+   This is the same contract rb_emit_choice honours (choice.c:4724-4770), in
+   the same order: pause FIRST (its first line is
+   `if (state == RB_QUEUE_AWAITING_CHOICE) return;`, ability_queue.c:412, so
+   stamping first makes it a no-op), restore `actor` after the pause because
+   pause_for_choice overwrites it with g->active (ability_queue.c:470, and the
+   cross-player watchers read that field), then stamp the QueueState. */
+static void cost_publish_pending(GameState *g, int actor) {
+    if (!g) return;
+    g->queue.resume_look_owner = -1;
+    g->queue.resume_after_look = NULL;
+    if (g->queue.cur >= 0 && g->queue.cur < g->queue.n_entries) {
+        RbChoice ch = g->queue.pending;
+        ch.actor = actor;
+        rb_queue_pause_for_choice(g, &ch);
+        g->queue.actor = actor;
+    }
+    g->queue.state = RB_QUEUE_AWAITING_CHOICE;
 }
 
 /* ── resume_pending_actions ── */
@@ -538,6 +604,7 @@ static int pay_cost_move_cards(GameState *g, int actor, const AbilityEffect *cos
         pending->route = RB_ROUTE_OPTIONAL_COST;
         g->queue.has_pending = 1;
         g->queue.pending.route = RB_ROUTE_OPTIONAL_COST;
+        cost_publish_pending(g, actor);
         return 1;
     }
 
@@ -687,6 +754,7 @@ static int pay_cost_move_cards(GameState *g, int actor, const AbilityEffect *cos
         }
         g->queue.has_pending = 1;
         g->queue.pending.route = RB_ROUTE_SELECT_CARDS;
+        cost_publish_pending(g, actor);
         return 1;
     }
 
@@ -925,6 +993,7 @@ static int pay_cost_inner(GameState *g, int actor, const AbilityEffect *cost) {
         g->queue.pending.route = RB_ROUTE_CHOICE_COST;
         if (g->queue.cur >= 0 && g->queue.cur < g->queue.n_entries)
             g->queue.entries[g->queue.cur].choice_card_no = RB_ROUTE_CHOICE_COST;
+        cost_publish_pending(g, actor);
         return 1;
     }
 
@@ -982,6 +1051,7 @@ static int pay_cost_inner(GameState *g, int actor, const AbilityEffect *cost) {
             s_pending_energy_payment = 0;
             if (g->queue.cur >= 0 && g->queue.cur < g->queue.n_entries)
                 g->queue.entries[g->queue.cur].choice_card_no = RB_ROUTE_OPTIONAL_COST;
+            cost_publish_pending(g, actor);
             return 1;
         }
 
@@ -1124,6 +1194,7 @@ static int pay_cost_inner(GameState *g, int actor, const AbilityEffect *cost) {
         if (group_names_cost && *group_names_cost)
             strncpy(pending->filter_group, group_names_cost, sizeof(pending->filter_group) - 1);
         g->queue.has_pending = 1;
+        cost_publish_pending(g, actor);
         return 1;
     }
 

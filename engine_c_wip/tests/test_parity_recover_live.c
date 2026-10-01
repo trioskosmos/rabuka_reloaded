@@ -472,20 +472,21 @@ static void play_to_stage(TestGame *tg, int cid, int area, int accept)
 
 static int fire_trigger(TestGame *tg, int cid, const char *trig)
 {
-    if (!card_prints_trigger(cid, trig)) return 0;
-    tg->state.activating_card = cid;
     /* A 登場 only matches a card that APPEARED, and the stage loop of
      * queue_zone_abilities keys that off recently_moved. Seating the card by
      * hand (which this test has to do - see the comment above) leaves no
-     * appearance event, so one is published explicitly. */
+     * appearance event, so one is published explicitly. rb_trigger_auto_ability
+     * takes NO movement batch (Rust passes None), so this publication is the
+     * only thing arming the trigger. */
     if (!strcmp(trig, RB_TSTR_DEBUT)) {
         tg->state.n_recently_moved = 0;
         tg->state.recently_moved[tg->state.n_recently_moved++] = cid;
     }
-    int queued = rb_queue_trigger_abilities(&tg->state, 0, trig);
-    if (queued <= 0) return 0;
-    rb_process_pending_auto_abilities(&tg->state);
-    return 1;
+    /* Rust helpers/mod.rs:114 fire_trigger: ONE ability of ONE card, via
+     * rb_trigger_auto_ability. This USED TO BE rb_queue_trigger_abilities,
+     * whose `cid` only set activating_card and which fanned the trigger out to
+     * every card on the board printing it. */
+    return test_fire_trigger_on_card(tg, cid, trig);
 }
 
 /* Drive a 起動 through the QUEUE path rather than test_activate_ability.

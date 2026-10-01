@@ -2683,6 +2683,148 @@ is a learned policy or value function over state features — not more
 hand-transcribed terms. That is a large change, and nothing in §13-§19
 suggests a cheap switch will do it.
 
+---
+
+## 20. Built it: a learned policy, from the half that was missing
+
+§19 ranked a learned value/policy function second, behind a seed sweep. The
+seed sweep is a script; this was not, so this section is what actually building
+it found.
+
+### 20.1 The infrastructure was 90% present and the last 10% did not exist
+
+The repo already had everything except the two functions that matter:
+
+| present | missing |
+|---|---|
+| `encoding.rs`: 98 global features, card/zone/action-type embedding tables, `state_dim() == 2248` | `PolicyNet::init_random` |
+| `neural.rs`: a 256-hidden policy + value net, `evaluate_actions` | `PolicyNet::save_weights` |
+| `ppo_collect.rs`: trajectory generation, `PPO_BEHAVIOR=v7` imitation mode | **any trainer at all** |
+| `bot_arena.rs`: `BotKind::Neural`, `NEURAL_WEIGHTS`, `NEURAL_EPSILON` | |
+
+`PolicyNet::new()` zero-filled every weight, so every logit was identical and the
+policy uniform — fine for a random baseline, useless for training, because the
+ReLU never activates and no gradient reaches anything above the bias. And with
+no `save_weights`, `load_weights` had nothing that could ever produce a file.
+**The neural seat was unreachable from both ends.** Added Xavier init and a
+writer matching `load_weights`'s exact layout, plus `ppo_train.rs` — softmax
+cross-entropy, gradients written through the net's own forward arithmetic rather
+than a re-derivation, so training and inference cannot drift.
+
+### 20.2 Three real bugs in the data path, all found by asserting
+
+A desynced binary reader does not fail; it reads garbage and allocates wildly.
+The first run asked for **40GB**. Three format bugs behind it:
+
+- **15 bytes per action, not 16.** `card_index` is a `u8` and `to_le_bytes()` on
+  a `u8` is one byte. I had assumed 4.
+- **`chosen_idx` is `u16`, not `u32`.** Reading it as `u32` ate the next float
+  and yielded 65535.
+- **The decoder lost a byte per action.** Reading fields as a struct literal of
+  side-effecting calls let the struct field order, not the writer's order,
+  decide consumption, and a trailing `*p += 4` double-counted the byte the
+  writer already spends inside `count,0,0,0`. Rewritten with explicit offsets
+  and one advance at the end, plus an `n_actions <= 512` assertion so a future
+  mismatch reports itself instead of requesting 40GB.
+
+Also fixed in the collector: `num_games` was `u8`, so a request for 1500 games
+parsed as 244 and the run **stopped at 200 games with no error** — a corpus 7x
+smaller than asked for, indistinguishable from success. And the deck was
+hardcoded to `fade deck.txt`, so every trajectory described a different game
+from the one the policy is ever evaluated on — the exact mistake
+`bin_common::load_deck` panics on.
+
+### 20.3 It learns. It does not play.
+
+Corpus: 3000 games, **71,607 labelled decisions**, both seats imitating v7.
+
+| | holdout top-1 | NLL |
+|---|---|---|
+| before training | 0.2636 | 7.74 |
+| after (14 epochs) | **0.5317** | 1.47 |
+| chance (1/N, mean N=5.99) | 0.167 | — |
+
+**3.2x better than chance**, and the NLL collapse is real learning, not noise.
+Ten times the data did not improve it (200-game corpus reached 0.5486 on 7063
+steps), so the model is representation- or capacity-limited, not data-limited.
+
+Play strength is a different story:
+
+| arm | vs v7 | actions/game | turns |
+|---|---|---|---|
+| `random` (floor) | 0-364 (**0.0%**) | 32.1 | 4.53 |
+| **neural, policy_v2** | 386-814 (**32.2%**) | 40.8 | 6.02 |
+| **neural + pass guard** | 350-635 (**35.5%**) | 34.5 | 5.41 |
+| `v7` vs itself (teacher) | 634-566 (52.8%) | 34.7 | 5.88 |
+| `v9` (shipping) | 684-516 (57.0%) | 34.1 | 5.80 |
+
+### 20.4 The gap has one cause, and it is the §15.2-A prediction confirmed
+
+**Pass rate on Main-phase decisions:**
+
+| seat | pass rate |
+|---|---|
+| v7 (teacher) | **40.5%** |
+| cloned net | **4.2%** |
+
+A 10x difference, and it explains the whole gap. The net takes 40.8 actions per
+game against the teacher's 34.7 because it essentially never stops developing.
+
+This is exactly what §15.2-A predicted from reading the source: v7 decides Pass
+through `v7_main::value`, a **delta** leaf where Pass wins only when every
+weighted term comes out non-positive. That is a *relation over candidates*, not
+a property of the position. Cloning the argmax learns which action wins and
+nothing about the region where none of them do — so it never discovers the stop
+state. It is the same structural statement as `v8_main.rs:1128-1141`'s "a leaf
+that reads 'more board is better' cannot represent 'stop'", now demonstrated
+empirically on a learned model.
+
+`NEURAL_PASS_GUARD` implements the DAgger-style split: the teacher keeps the
+Pass decision, the net picks only among non-Pass actions. It recovered real
+ground — 32.2% → **35.5%**, actions/game 40.8 → 34.5 (teacher 34.7), game length
+5.41 (teacher 5.88) — which confirms the diagnosis. It also introduced 215 draws
+(17.9%), so the remaining error is not only Pass.
+
+### 20.5 Why the literature's "BC is nearly on par" does not apply here
+
+The 2024 exploitability paper found plain behaviour cloning of ByteRL nearly
+matched the SOTA RL agent. That result is about **a policy-only teacher**: ByteRL
+trained end-to-end with no search, so its decisions *are* a policy and cloning
+them is well-posed.
+
+**v7 is not a policy.** Its strength comes substantially from a search that
+executes each candidate action, simulates it, and compares weighted feature
+*deltas* — including the four hand-weighted opponent terms in
+`Search::evaluate` that a position-level clone never sees. The paper's own
+framing applies directly: the policy carried the strength for ByteRL, and here
+the delta-leaf comparison is carrying it for v7. **Cloning a search-based agent
+into a feed-forward policy discards the thing that makes the agent strong**, and
+the 20-point shortfall is the size of that discard.
+
+This is not an argument against the §19 recommendation — it is an argument for
+doing it in the order the SOTA uses: **start from a competent policy and improve
+it with RL**, not clone a searcher and expect the search to come along. The
+infrastructure for exactly that now exists: an initialiser, a serialiser, a
+trajectory collector, and a trainer. The remaining piece is a PPO/advantage
+inner loop against the value head the net already has and nothing currently
+trains.
+
+### 20.6 Status
+
+**Not shipped.** The learned policy is at 35.5% against a 52.8% teacher and a
+57.0% shipping baseline, and there is no honest framing in which replacing v9
+with it is an improvement. What is shipped is the *capability* that did not
+exist: an initialiser, a serialiser, a validated corpus pipeline, and a trainer
+that demonstrably learns (3.2x chance on 71k held-out decisions). Both new
+switch (`NEURAL_PASS_GUARD`, `PPO_DECK`) default to off, the arena default is
+bit-identical (684-516 / 40898 actions), and the 116-test suite is green.
+
+The single most useful thing learned, and it is not about neural networks: **a
+delta-leaf agent's strength is not transferable to a level model.** Fifteen
+interventions in §13-§19 failed to improve that leaf by hand; cloning it into
+the form the published SOTA uses loses 20 points. The next honest step is
+RL-with-a-value-head from this initialisation, not more hand weights.
+
 
 
 

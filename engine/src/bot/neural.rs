@@ -44,6 +44,90 @@ impl PolicyNet {
         }
     }
 
+    /// Xavier/Glorot init for the ReLU trunk.
+    ///
+    /// `PolicyNet::new()` zeroes everything, which makes every logit identical
+    /// and the policy uniform. That is fine for a random baseline and useless
+    /// as a training start: the ReLU never activates, so no gradient reaches
+    /// anything above the bias. There was no initialiser in this file at all, so
+    /// the whole path was unreachable - the net could `load_weights` and nothing
+    /// could write them.
+    pub fn init_random(&mut self, seed: u64) {
+        let mut rng = seed | 1;
+        let mut next = || {
+            // xorshift64*; deterministic given `seed` so a run reproduces.
+            rng ^= rng << 13;
+            rng ^= rng >> 7;
+            rng ^= rng << 17;
+            ((rng >> 11) as f32 / (1u64 << 53) as f32) * 2.0 - 1.0
+        };
+        let state_dim = crate::bot::encoding::EncodedState::state_dim();
+        for row in self.w1_state.chunks_exact_mut(state_dim) {
+            let scale = (2.0 / state_dim as f32).sqrt();
+            for w in row.iter_mut() {
+                *w = next() * scale;
+            }
+        }
+        for row in self.w1_action.chunks_exact_mut(ACTION_ENC_DIM) {
+            let scale = (2.0 / ACTION_ENC_DIM as f32).sqrt();
+            for w in row.iter_mut() {
+                *w = next() * scale;
+            }
+        }
+        for w in self.w_policy.iter_mut() {
+            *w = next() * (1.0 / HIDDEN as f32).sqrt();
+        }
+        for w in self.w_value.iter_mut() {
+            *w = next() * (1.0 / HIDDEN as f32).sqrt();
+        }
+        // Embeddings feed the trunk, so they need a real scale or the ReLU sees
+        // a near-zero input and only the bias path survives.
+        for w in self.card_embed.iter_mut() {
+            *w = next() * 0.05;
+        }
+        for w in self.zone_embed.iter_mut() {
+            *w = next() * 0.05;
+        }
+        for w in self.action_type_embed.iter_mut() {
+            *w = next() * 0.05;
+        }
+    }
+
+    /// Serialise into the exact layout `load_weights` reads, so a trained net
+    /// can be handed straight to the arena's `--neural` seat.
+    pub fn save_weights(&self, path: &str) -> std::io::Result<()> {
+        let mut buf: Vec<u8> = Vec::new();
+        let mut push = |v: f32| buf.extend_from_slice(&v.to_le_bytes());
+        push(SCHEMA_VERSION);
+        for &v in &self.card_embed {
+            push(v);
+        }
+        for &v in &self.zone_embed {
+            push(v);
+        }
+        for &v in &self.action_type_embed {
+            push(v);
+        }
+        for &v in &self.w1_state {
+            push(v);
+        }
+        for &v in &self.b1 {
+            push(v);
+        }
+        for &v in &self.w1_action {
+            push(v);
+        }
+        for &v in &self.w_policy {
+            push(v);
+        }
+        push(self.b_policy);
+        for &v in &self.w_value {
+            push(v);
+        }
+        push(self.b_value);
+        std::fs::write(path, buf)
+    }
+
     pub fn load_weights(&mut self, path: &str) -> std::io::Result<()> {
         let mut f = File::open(path)?;
         let mut buf = Vec::new();

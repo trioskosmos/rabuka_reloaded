@@ -226,9 +226,17 @@ static void test_success_choice_resumes_second_winner(void) {
 static void test_success_replacement_choice(int accept) {
     TestGame tg;
     test_game_new(&tg);
-    int original = test_id(&tg, "PL!-bp6-024-L");
-    int other = test_id(&tg, "PL!S-bp2-024-L");
-    int replacement = test_id(&tg, "PL!HS-bp1-019-L");
+    /* `original` must be 錯覚CROSSROADS, whose 常時 reads
+       「このカードを成功ライブカード置き場に置く場合、代わりに自分の控え室にある
+        『μ's』のライブカードを1枚置いてもよい。」 — the prompt is scoped to a μ's live.
+     * `other` is the deliberately RESTRICTED live (サンシャイン), so it is filtered out
+       twice over: not μ's, and its own 常時 forbids the success zone. `replacement`
+       therefore has to be a real μ's live — PL!HS-bp1-019-L Dream Believers is 蓮ノ空,
+       which card_series_matches_group excludes from μ's, so with it the prompt has no
+       legal candidate and is correctly never raised. */
+    int original = test_id(&tg, "PL!-bp6-024-L");    /* 錯覚CROSSROADS — μ's live */
+    int other = test_id(&tg, "PL!S-bp2-024-L");       /* restricted: not μ's */
+    int replacement = test_id(&tg, "PL!-bp3-020-L");  /* Snow halation — μ's live */
     CHECK(rb_card_is_live(original), "replacement original is a live card");
     CHECK(rb_card_is_live(replacement), "replacement candidate is a live card");
     test_add_to_live(&tg, original);

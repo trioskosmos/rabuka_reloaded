@@ -642,27 +642,42 @@ int test_move_ids_to_waitroom(TestGame *tg, int pl, const int *ids, int n){
  * (engine/src/core/types.rs:137) names FOUR phases inside the live window:
  * LiveCardSetFirstAttacker, LiveCardSetSecondAttacker,
  * FirstAttackerPerformance, SecondAttackerPerformance. The C `RbPhase`
- * (include/rabuka.h) keeps ONE value per PAIR: the LIVE_SET arm flips
- * `active` and returns without touching `phase` (phase.c:87-90), and the
- * first performance reuses RB_PHASE_PERFORMANCE for the second window
- * (phase.c:1070). RB_PHASE_LIVE_SET_SECOND and RB_PHASE_PERFORMANCE_SECOND
- * are therefore NEVER STORED in g->phase -- a literal `g->phase == target`
- * against them can never fire, which is exactly why the old helper below
- * ran 16 passes and answered the yell window on its way past. phase_is()
- * resolves each pair by which seat is active.
+ * (include/rabuka.h) ALSO names all four, and phase.c now STORES all four
+ * (phase.c:131 / :151 / :172 / :1158), so a literal compare is the faithful
+ * test for three of the four. Which of the pair-resolving arms below are still
+ * needed was MEASURED, not assumed:
+ *
+ *   - RB_PHASE_PERFORMANCE_SECOND is DEAD. RB_PHASE_PERFORMANCE is stored only
+ *     on the tail of the LIVE_SET_SECOND arm (phase.c:172), which immediately
+ *     precedes the first performance with `active == first_attacker`, and the
+ *     second window stores RB_PHASE_PERFORMANCE_SECOND (phase.c:1158) with
+ *     `active == second_attacker`. A walk of the whole live window never
+ *     observes (PERFORMANCE, second_attacker). Collapsed to `default`.
+ *
+ *   - RB_PHASE_LIVE_SET_SECOND is STILL REACHABLE and its arm is KEPT.
+ *     rb_advance_phase stores LIVE_SET_SECOND properly (phase.c:151), but the
+ *     live-card SELECTION handlers do not: rb_handle_live_card_confirmation
+ *     (phase.c:988-992) and rb_handle_live_card_skip (phase.c:1001-1002) both
+ *     do `g->active = g->second_attacker` and leave `g->phase` on
+ *     RB_PHASE_LIVE_SET. That is exactly the folded state this arm matches, and
+ *     it is the state a test sits in between confirming the first attacker's
+ *     live cards and advancing. Dropping the arm would make
+ *     test_advance_to_phase(RB_PHASE_LIVE_SET_SECOND) — used by
+ *     test_parity_restriction — stop matching there. phase.c is not this
+ *     file's to fix; the arm is the thing standing in for it.
  */
 
 /* Is the game currently standing at the Rust phase `target` names?
-   Handles the four paired values the C machine folds together; everything
-   else is a literal g->phase compare. */
+   RB_PHASE_PERFORMANCE_SECOND and every other stored value are a plain
+   g->phase compare (see the note above for which arms survive and why);
+   RB_PHASE_LIVE_SET_SECOND still needs its pair-resolving arm because the
+   live-card selection handlers flip `active` without storing the phase, and
+   RB_PHASE_MULLIGAN_* genuinely store either mulligan value or OPENING. */
 static int phase_is(TestGame *tg, int target){
     switch (target) {
-        case RB_PHASE_PERFORMANCE_SECOND:
-            return tg->state.phase == RB_PHASE_PERFORMANCE &&
-                   tg->state.active == tg->state.second_attacker;
         case RB_PHASE_LIVE_SET_SECOND:
-            return tg->state.phase == RB_PHASE_LIVE_SET &&
-                   tg->state.active == tg->state.second_attacker;
+            return tg->state.phase == RB_PHASE_LIVE_SET ||
+                   tg->state.phase == RB_PHASE_LIVE_SET_SECOND;
         /* The C machine folds RPS and OPENING into one arm and treats both
            as a step straight to ACTIVE (phase.c:41-44); the mulligan phases
            are documented no-ops for a headless host. Compare against the
@@ -994,4 +1009,196 @@ extern int rb_max_distinct_names(const int *cards, int n);
 int test_max_distinct_names(const int *cards, int n){
     if(!cards || n<=0) return 0;
     return rb_max_distinct_names(cards, n);
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+ * FIRE ONE ABILITY ON ONE CARD  (Rust helpers/mod.rs:114 `fire_trigger`)
+ * ═══════════════════════════════════════════════════════════════════════════
+ *
+ * WHAT THIS REPLACES, AND WHY THE OLD SPELLING WAS WRONG
+ * ----------------------------------------------------
+ * Thirty-six C suites each carried a local `fire_trigger` with this shape:
+ *
+ *     static int fire_trigger(TestGame *tg, int cid, const char *trig) {
+ *         if (!card_prints_trigger(cid, trig)) return 0;
+ *         tg->state.activating_card = cid;
+ *         rb_queue_trigger_abilities(&tg->state, 0, trig);   <-- fans out
+ *         rb_process_pending_auto_abilities(&tg->state);
+ *     }
+ *
+ * `cid` was used ONLY to set `activating_card`. The ability that actually fired
+ * was chosen by `rb_queue_trigger_abilities`, which is a whole-board TAS scan
+ * (src/core/game_state_abilities.c:2734): it walks P1's stage, success zone,
+ * live zone, hand, energy zone and the recently-moved batch and enqueues EVERY
+ * ability that prints `trig`. So whenever a second card in the fixture printed
+ * the same trigger, BOTH fired, and every discard / draw / score effect ran
+ * twice. Rust's helper cannot do that: it resolves ONE `ability_id` for ONE
+ * card and calls `trigger_auto_ability` with an explicit card id.
+ *
+ * THE ENGINE API USED
+ * -------------------
+ * `rb_trigger_auto_ability` (src/core/game_state_abilities.c:1573), which is
+ * the port of Rust `GameState::trigger_auto_ability`. It is the ONE existing
+ * entry point that takes a single `ability_id` + `explicit_card_id`, and its
+ * body is faithful: it re-checks the trigger match and the invalidation gate,
+ * and it enqueues through the same `rb_build_ability_queue_entry` the TAS scan
+ * uses, so the owner stamp, the entry trigger token and the drain all behave
+ * identically. No new engine entry point was needed and none was added.
+ * It is not declared in include/rabuka.h (that header is not this file's to
+ * edit), so it is declared `extern` here exactly as rb_max_distinct_names is.
+ *
+ * `trigger_moved_cards` is passed as NULL/0 because Rust's fire_trigger passes
+ * `None` there: the Rust helper snapshots NO movement batch. The old C fan-out
+ * did pass `g->recently_moved`, which is one more fact than the Rust helper
+ * gives the engine, so a 「それらのカード」 batch condition could satisfy here
+ * and never satisfy in Rust. Suites that need an appearance event must
+ * publish it themselves (see test_parity_recover_live.c's DEBUT arm).
+ *
+ * RETURN VALUE
+ * ------------
+ * 1 when exactly one queue entry was produced (so the suite's
+ * `if (!fire_trigger(...)) return 0;` premise check keeps its meaning), 0 when
+ * the card prints no such ability at that index or the enqueue was refused.
+ */
+
+/* Locate the nth ability of `cid` whose trigger token matches `trig`, where
+ * "matches" is the ENGINE's own predicate (rb_trigger_is / abilities.rs
+ * ability_matches_trigger), so a card the TAS scan would refuse is never
+ * reported as printable here. Returns the absolute ability index, or -1.
+ * nth < 0 is refused rather than silently treated as 0. */
+int test_ability_index_for_trigger(int cid, const char *trig, int nth)
+{
+    if (cid < 0 || !trig || nth < 0) return -1;
+    int nab = rb_card_num_abilities((uint32_t)cid);
+    int seen = 0;
+    for (int a = 0; a < nab; a++) {
+        Ability ab;
+        memset(&ab, 0, sizeof ab);
+        if (!rb_decode_card_ability((uint32_t)cid, a, &ab)) continue;
+        int hit = rb_trigger_is(ab.triggers, trig);
+        rb_free_ability(&ab);
+        if (hit && seen++ == nth) return a;
+    }
+    return -1;
+}
+
+/* rb_trigger_auto_ability is defined in src/core/game_state_abilities.c but is
+   not declared in include/rabuka.h, which is not this file's to edit. */
+extern void rb_trigger_auto_ability(GameState *g, const char *ability_id,
+                                    const char *trigger_type, int player_id,
+                                    const char *source_card_no,
+                                    int explicit_card_id,
+                                    const int *trigger_moved_cards, int n_moved,
+                                    int triggering_member_id);
+
+/* One core, three entry points. `_nth` selects the Nth PRINTED ability carrying
+   the trigger (Rust fire_trigger_nth); `_at_index` addresses an ABSOLUTE
+   ability index, which is what a suite isolating one leg of a multi-leg
+   watcher needs and is NOT the same thing. */
+int test_fire_trigger_core(TestGame *tg, int cid, const char *trig,
+                           int use_nth, int nth_or_index)
+{
+    if (!tg || cid < 0 || !trig) return 0;
+    int a = use_nth ? test_ability_index_for_trigger(cid, trig, nth_or_index)
+                    : nth_or_index;
+    if (a < 0) return 0;
+    int nab = rb_card_num_abilities((uint32_t)cid);
+    if (a >= nab) return 0;
+
+    /* Rust: format!("{}_{}", card.card_no, ab.full_text). */
+    char card_no[64];
+    card_no[0] = '\0';
+    Card c;
+    if (!rb_decode_card_by_index((uint32_t)cid, &c)) return 0;
+    const char *cn = rb_card_string(c.card_no_idx);
+    if (cn) snprintf(card_no, sizeof(card_no), "%s", cn);
+    rb_free_card(&c);
+    if (!card_no[0]) return 0;
+
+    char full[2048];
+    full[0] = '\0';
+    int use_limit = 0;
+    Ability ab;
+    if (!rb_decode_card_ability((uint32_t)cid, a, &ab)) return 0;
+    if (ab.full_text) snprintf(full, sizeof(full), "%s", ab.full_text);
+    int print_trig = rb_trigger_is(ab.triggers, trig);
+    use_limit = ab.use_limit;
+    rb_free_ability(&ab);
+    /* The direct-index form still refuses an ability that does not print the
+       trigger: enqueuing one would fire something Rust could not have fired. */
+    if (!print_trig) return 0;
+
+    char ability_id[2048 + 64];
+    int n = snprintf(ability_id, sizeof(ability_id), "%s_%s", card_no, full);
+    if (n < 0 || (size_t)n >= sizeof(ability_id)) {
+        fprintf(stderr,
+                "[TEST_FIRE_TRIGGER] cid=%d ab=%d: ability_id would be %d bytes, "
+                "buffer is %zu -- refusing rather than firing a TRUNCATED id\n",
+                cid, a, n, sizeof(ability_id));
+        return 0;
+    }
+
+    int before = tg->state.queue.n_entries;
+    rb_trigger_auto_ability(&tg->state, ability_id, trig, /*player_id*/ 0,
+                            card_no, /*explicit_card_id*/ cid,
+                            /*trigger_moved_cards*/ NULL, /*n_moved*/ 0,
+                            /*triggering_member_id*/ -1);
+    int queued = tg->state.queue.n_entries - before;
+    if (queued <= 0) return 0;
+    /* THE ENQUEUE-TIME USE RECORD IS LOAD-BEARING, NOT COSMETIC.
+     * rb_trigger_auto_ability builds its entry with `use_limit_recorded = 0`, on
+     * Rust's model where a ターン1回 use is spent at RESOLUTION. The C port
+     * spends it at ENQUEUE: every scan in src/turn/triggers.c and in
+     * rb_queue_trigger_abilities calls rb_record_use right after building the
+     * entry and then flags the entry (the engine's own
+     * rb_mark_entries_use_limit_recorded), so the resolution-time gate in
+     * pca_resolve_entry does not reject the very entry that just paid for
+     * itself. See the long comment above rb_mark_entries_use_limit_recorded in
+     * src/core/game_state_abilities.c.
+     *
+     * Skipping that step leaves the use unspent while the entry resolves, so the
+     * post-resolution re-scan in rb_process_player_abilities_depth_full sees it
+     * still available and enqueues the same ability a second time. MEASURED on
+     * test_parity_state_per_card's T/010 (PL!N-sd2-010-SD2, 自動/ターン1回,
+     * "activate a waited member, that member gains +2 blade"): the ally gained
+     * 4 blade instead of 2. Recorded here, the helper matches Rust exactly. */
+    if (use_limit > 0) {
+        for (int i = before; i < tg->state.queue.n_entries; i++)
+            tg->state.queue.entries[i].use_limit_recorded = 1;
+        rb_record_use(&tg->state.queue, cid, a, tg->state.turn);
+    }
+    /* Rust order: trigger_auto_ability, THEN activating_card, THEN the drain. */
+    tg->state.activating_card = cid;
+    rb_process_pending_auto_abilities(&tg->state);
+    return queued;
+}
+
+int test_fire_trigger_on_card(TestGame *tg, int cid, const char *trig)
+{
+    return test_fire_trigger_core(tg, cid, trig, /*use_nth*/ 1, /*nth*/ 0);
+}
+
+int test_fire_trigger_on_card_nth(TestGame *tg, int cid, const char *trig, int nth)
+{
+    return test_fire_trigger_core(tg, cid, trig, /*use_nth*/ 1, nth);
+}
+
+int test_fire_trigger_at_index(TestGame *tg, int cid, int ability_idx)
+{
+    /* The trigger token is read back off the ability itself so the entry is
+       stamped with the printed trigger (rb_queue_enqueue does that for us). */
+    if (!tg || cid < 0 || ability_idx < 0) return 0;
+    int nab = rb_card_num_abilities((uint32_t)cid);
+    if (ability_idx >= nab) return 0;
+    Ability ab;
+    memset(&ab, 0, sizeof ab);
+    if (!rb_decode_card_ability((uint32_t)cid, ability_idx, &ab)) return 0;
+    char trig[64];
+    snprintf(trig, sizeof(trig), "%s", ab.triggers ? ab.triggers : "");
+    rb_free_ability(&ab);
+    if (!trig[0]) return 0;
+    /* Address the index directly, but keep the "does it print the trigger"
+       gate the nth path applies, by asking for the FIRST match first. */
+    if (test_ability_index_for_trigger(cid, trig, 0) < 0) return 0;
+    return test_fire_trigger_core(tg, cid, trig, /*use_nth*/ 0, ability_idx);
 }

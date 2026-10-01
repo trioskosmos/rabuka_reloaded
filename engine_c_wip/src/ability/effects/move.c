@@ -167,6 +167,19 @@ static const char *cmf_extra(const AbilityEffect *e, const char *k){
     for(int i=0;i<e->n_extra;i++) if(e->extra_k[i] && !strcmp(e->extra_k[i],k)) return e->extra_v[i];
     return NULL;
 }
+/* `card_type` is one of the few keys the bytecode decoder does NOT fold into
+   the extras table: vm.c:996-1003 diverts it into the struct's `card_type_field`
+   and `continue`s, so it never reaches effect_set_extra. Every reader here must
+   therefore consult the field FIRST and only then the extras, exactly as
+   draw.c:420 and compound.c's eff_card_type_any do. Reading only cmf_extra made
+   every 「メンバーカード」 / 「ライブカード」 / 「エネルギーカード」 source filter a
+   silent no-op: q242 (PL!HS-pb1-012-R) moved the energy card and the live card
+   out of the waitroom alongside the members. */
+static const char *cmf_card_type(const AbilityEffect *e){
+    if(!e) return NULL;
+    if(e->card_type_field[0]) return e->card_type_field;
+    return cmf_extra(e, "card_type");
+}
 static int cmf_cmp(const char *op, int a, int b){
     if(!op||!*op) return a==b;
     if(!strcmp(op,">=")) return a>=b;
@@ -670,6 +683,281 @@ static void rb_move_prompt_carry_resume_context(GameState *g, int actor,
     if (!strcmp(zone, "looked_at")) g->queue.resume_mode = 6;
 }
 
+/* ── move_build_standard_zone_filter ───────────────────────────────────────
+ * The filter assembly Rust's resolve_from_standard_zone does per SOURCE zone
+ * (move_cards/mod.rs:1209-1274), factored out of
+ * rb_move_take_cards_from_standard_zone so that the prompt itself can rebuild
+ * the identical filter. Rust passes BOTH `filter` and `filtered_indices` into
+ * `prompt_card_selection` (selection.rs:6-14), so the two are built from one
+ * description of the source; before this helper existed only the caller's copy
+ * existed, which is why the prompt could not fill filtered_indices itself. */
+static void move_build_standard_zone_filter(GameState *g, const char *zone_name,
+                                            const AbilityEffect *e, RbCardFilter *f) {
+    memset(f, 0, sizeof *f);
+    int is_discard = move_zone_is(zone_name, "discard");
+    int is_hand    = move_zone_is(zone_name, "hand");
+    int is_lcz     = move_zone_is(zone_name, "live_card_zone");
+    int is_success = move_zone_is(zone_name, "success_live_zone");
+    int is_energy  = move_zone_is(zone_name, "energy");
+    /* mod.rs:1209-1274 — which optional filters are meaningful for THIS source.
+     * A live-card-zone move is always a live card; an energy-zone move carries
+     * no group or cost filter at all; only hand/discard can be narrowed by
+     * name fragments or a total cost. */
+    const char *ctype_raw = e ? cmf_card_type(e) : NULL;
+    const char *gn_raw    = e ? cmf_extra(e, "group_names") : NULL;
+    const char *frag_raw  = e ? cmf_extra(e, "name_fragments") : NULL;
+    const char *ct_raw    = e ? cmf_extra(e, "cost_total") : NULL;
+    const char *cto_raw   = e ? cmf_extra(e, "cost_total_operator") : NULL;
+    const char *clo_raw   = e ? cmf_extra(e, "cost_limit_operator") : NULL;
+    if (!clo_raw) clo_raw = e ? cmf_extra(e, "cost_operator") : NULL;
+    const char *exch_raw  = e ? cmf_extra(e, "exclude_characters") : NULL;
+    const char *cp_raw    = e ? cmf_extra(e, "card_property") : NULL;
+    int from_hand_or_discard = is_hand || is_discard;
+    int is_live_zone_move = is_lcz || (is_success && ctype_raw != NULL);
+    (void)gn_raw;
+
+    if (is_live_zone_move)       strncpy(f->card_type, "live_card", sizeof f->card_type - 1);
+    else if (is_success)         f->card_type[0] = '\0';
+    else if (ctype_raw && ctype_raw[0]) strncpy(f->card_type, ctype_raw, sizeof f->card_type - 1);
+    /* mod.rs:1225-1229 — `group` is None whenever the effect carries its own
+     * group_names, so nothing is written here; those names ride the `groups`
+     * list instead (mod.rs:1266-1268) and are applied by
+     * move_apply_effect_groups. Setting f->group from gn_raw under this guard
+     * was dead code and the group filter ended up dropped entirely. */
+    /* mod.rs:1266-1268 — effect.group_names_any() ALSO rides the `groups`
+     * list when present, so a multi-group name list filters correctly. */
+    int limit = rb_move_resolve_cost_limit_reference(g, e);
+    if (!is_energy && limit >= 0) {
+        f->has_cost_limit = 1; f->cost_limit = limit;
+        if (clo_raw) strncpy(f->cost_op, clo_raw, sizeof f->cost_op - 1);
+    }
+    if (from_hand_or_discard && ct_raw) {
+        f->has_cost_total = 1; f->cost_total = atoi(ct_raw);
+        if (cto_raw) strncpy(f->cost_total_op, cto_raw, sizeof f->cost_total_op - 1);
+    }
+    if (from_hand_or_discard && frag_raw && frag_raw[0]) {
+        /* CSV split into the fixed name_fragments array. */
+        char buf[256];
+        strncpy(buf, frag_raw, sizeof buf - 1);
+        buf[sizeof buf - 1] = '\0';
+        char *tok = strtok(buf, ",");
+        while (tok && f->n_name_fragments < 8) {
+            strncpy(f->name_fragments[f->n_name_fragments], tok,
+                    sizeof f->name_fragments[0] - 1);
+            f->n_name_fragments++;
+            tok = strtok(NULL, ",");
+        }
+    }
+    { const char *ch = e ? cmf_extra(e, "characters") : NULL;
+      if (ch && ch[0]) { strncpy(f->characters, ch, sizeof f->characters - 1); f->has_characters = 1; } }
+    if (exch_raw && exch_raw[0]) {
+        strncpy(f->exclude_characters, exch_raw, sizeof f->exclude_characters - 1);
+        f->has_exclude_characters = 1;
+    }
+    if (cp_raw && cp_raw[0]) strncpy(f->ability_filter, cp_raw, sizeof f->ability_filter - 1);
+    f->negation = e && cmf_extra_true(e, "negation");
+    const char *nht = e ? cmf_extra(e, "need_heart_total") : NULL;
+    if (nht) { f->has_need_heart_total = 1; f->need_heart_total = atoi(nht); }
+    const char *nho = e ? cmf_extra(e, "need_heart_operator") : NULL;
+    if (nho) strncpy(f->need_heart_operator, nho, sizeof f->need_heart_operator - 1);
+    const char *nhc = e ? cmf_extra(e, "need_heart_color") : NULL;
+    if (nhc) strncpy(f->need_heart_color, nhc, sizeof f->need_heart_color - 1);
+    f->has_filter = f->card_type[0] || f->has_group || f->has_cost_limit || f->has_cost_total ||
+                    f->has_characters || f->has_exclude_characters || f->ability_filter[0] ||
+                    f->n_name_fragments || f->has_need_heart_total || f->need_heart_color[0];
+}
+
+/* ── move_exclude_stage_groups ─────────────────────────────────────────────
+ * Rust mod.rs:1290-1333 — `group_reference == "different_group_names"` on a
+ * DISCARD source excludes every discard card whose group matches ANY stage
+ * member's group (Q89/Q105/Q208). Rust puts that in the FILTER
+ * (`filter.exclude_group_names`), so it is part of `matching_indices` and
+ * therefore part of the `filtered_indices` Rust hands the prompt
+ * (selection.rs:72 / :85). RbCardFilter has no exclude_group_names field, so
+ * the C applies it as a post-pass over the candidate list — which means BOTH
+ * the classifying caller and the prompt have to run it, or the two disagree
+ * about what was offered. Skipped when the CONDITION already carries the same
+ * reference (Mia option 1 — the condition does the counting, so excluding again
+ * over-filters). Writes the distinct stage group names, returns their count. */
+static int move_collect_stage_group_exclusions(GameState *g, int pl,
+                                                const char *zone_name,
+                                                const AbilityEffect *e,
+                                                char out[][64], int max) {
+    if (!g || !out || max <= 0) return 0;
+    if (!e || !move_zone_is(zone_name, "discard")) return 0;
+    const char *gref = cmf_extra(e, "group_reference");
+    if (!gref || strcmp(gref, "different_group_names")) return 0;
+    RbPlayer *P = &g->p[pl];
+    int nsg = 0;
+    for (int i = 0; i < RB_STAGE_SIZE && nsg < max; i++) {
+        int cid = P->stage[i];
+        if (cid < 0) continue;
+        char cand[64];
+        cand[0] = '\0';
+        const char *grp = rb_card_group_name(cid);
+        if (grp && grp[0]) {
+            snprintf(cand, sizeof cand, "%s", grp);
+        } else {
+            static const char *known[] = {
+                "Aqours", "Liella!", "Nijigasaki", "A-RISE",
+                "Saint Snow", "Hasunosora", NULL};
+            for (int k = 0; known[k]; k++)
+                if (rb_card_matches_group_str(cid, known[k])) {
+                    snprintf(cand, sizeof cand, "%s", known[k]);
+                    break;
+                }
+        }
+        if (!cand[0]) continue;
+        int dup = 0;
+        for (int k = 0; k < nsg; k++)
+            if (!strcmp(out[k], cand)) { dup = 1; break; }
+        if (!dup) {
+            strncpy(out[nsg], cand, sizeof out[0] - 1);
+            out[nsg][sizeof out[0] - 1] = '\0';
+            nsg++;
+        }
+    }
+    return nsg;
+}
+
+/* ── move_apply_effect_groups ──────────────────────────────────────────────
+ * Rust mod.rs:1266-1268 — when the EFFECT carries group_names, they do NOT go
+ * into `filter.group` (mod.rs:1225-1229 leaves that None when
+ * has_effect_groups); they go into `filter.groups`, the LIST, and
+ * `check_group` (util.rs:1495-1499) then requires the card to match ANY entry.
+ *
+ * RbCardFilter has no list field, and the old `has_group` assignment was
+ * unreachable anyway: `has_effect_groups` is literally `gn_raw[0]`, so the
+ * `!(has_effect_groups || ...) && gn_raw[0]` guard could only be true when
+ * gn_raw was empty. The group filter was therefore DROPPED, not relocated —
+ * while rb_move_prompt_card_selection still stamped `filter_group` on the
+ * choice. The prompt therefore advertised group candidates while its candidate
+ * list was unfiltered, and choice_discard_pick_legal (choice.c) then rejected
+ * every offered card that did not belong to the group: measured as
+ * [DISCARD_PICK_REJECTED] in tests/parity_mill_deck.log.
+ *
+ * Applied as a post-pass over the candidate list, exactly like Rust applies it
+ * inside matching_indices, so the classifying producer and the prompt agree.
+ * The CSV split + any-match matcher are the same ones card_matches_filter uses
+ * (mod.rs:1267 passes the whole Vec, not just the first entry). */
+static int move_apply_effect_groups(const int *cards, int *idxs, int n,
+                                     const char *group_csv) {
+    if (!group_csv || !group_csv[0] || n <= 0) return n;
+    char groups[16][64];
+    int ng = move_split_csv(group_csv, groups, 16);
+    if (ng <= 0) return n;
+    const char *names[16];
+    for (int i = 0; i < ng; i++) names[i] = groups[i];
+    int w = 0;
+    for (int i = 0; i < n; i++) {
+        int idx = idxs[i];
+        if (idx < 0 || idx >= RB_MAX_ZONE) continue;
+        if (!rb_card_matches_any_group(cards[idx], names, ng)) continue;
+        idxs[w++] = idx;
+    }
+    return w;
+}
+
+/* Drop every candidate whose card belongs to one of the excluded stage groups.
+ * Returns the surviving count, preserving the input order. */
+static int move_exclude_stage_groups(const int *cards, int *idxs, int n,
+                                     char groups[][64], int nsg) {
+    if (nsg <= 0) return n;
+    int w = 0;
+    for (int i = 0; i < n; i++) {
+        int idx = idxs[i];
+        int blocked = 0;
+        for (int k = 0; k < nsg && !blocked; k++)
+            if (idx >= 0 && rb_card_matches_group_str(cards[idx], groups[k])) blocked = 1;
+        if (blocked) continue;
+        idxs[w++] = idx;
+    }
+    return w;
+}
+
+/* ── move_build_stage_filter ───────────────────────────────────────────────
+ * Rust mod.rs:1044-1071 assembles the filter for a STAGE source. It is a
+ * different assembly from move_build_standard_zone_filter (cost_total is not
+ * restricted to hand/discard here, and `exclude_self` exists), so it is its own
+ * helper rather than a shared one — but both the classifying producer and the
+ * prompt must use the SAME copy, exactly as selection.rs:6-14 hands Rust's
+ * prompt the one filter the classification ran on. */
+static void move_build_stage_filter(GameState *g, const AbilityEffect *e, RbCardFilter *f) {
+    memset(f, 0, sizeof *f);
+    const char *ctype = cmf_card_type(e);
+    const char *gn = cmf_extra(e, "group_names");
+    if (ctype) strncpy(f->card_type, ctype, sizeof f->card_type - 1);
+    if (gn && gn[0]) { strncpy(f->group, gn, sizeof f->group - 1); f->has_group = 1; }
+    const char *clo = cmf_extra(e, "cost_limit_operator");
+    if (!clo) clo = cmf_extra(e, "cost_operator");
+    int limit = rb_move_resolve_cost_limit_reference(g, e);
+    if (limit >= 0) { f->has_cost_limit = 1; f->cost_limit = limit;
+                      if (clo) strncpy(f->cost_op, clo, sizeof f->cost_op - 1); }
+    const char *cto = cmf_extra(e, "cost_total");
+    if (cto) { f->has_cost_total = 1; f->cost_total = atoi(cto); }
+    const char *ctoo = cmf_extra(e, "cost_total_operator");
+    if (ctoo) strncpy(f->cost_total_op, ctoo, sizeof f->cost_total_op - 1);
+    const char *chars = cmf_extra(e, "characters");
+    if (chars && chars[0]) { strncpy(f->characters, chars, sizeof f->characters - 1); f->has_characters = 1; }
+    const char *exch = cmf_extra(e, "exclude_characters");
+    if (exch && exch[0]) { strncpy(f->exclude_characters, exch, sizeof f->exclude_characters - 1); f->has_exclude_characters = 1; }
+    const char *cp = cmf_extra(e, "card_property");
+    if (cp) { strncpy(f->ability_filter, cp, sizeof f->ability_filter - 1); }
+    f->negation = cmf_extra_true(e, "negation");
+    if (e && cmf_extra_true(e, "exclude_self")) {
+        f->has_exclude_self = 1; f->exclude_self_id = g->activating_card;
+    }
+    f->has_filter = f->has_group || f->has_cost_limit || f->has_cost_total ||
+                   f->has_characters || f->has_exclude_characters ||
+                   f->ability_filter[0] || f->has_exclude_self || (ctype && ctype[0]);
+}
+
+/* ── rb_move_prompt_fill_filtered ──────────────────────────────────────────
+ * selection.rs:44 `.filtered_indices(filtered_indices)` — the candidate list
+ * the prompt ADVERTISES, in OFFER order, so display index i addresses
+ * filtered_indices[i]. map_choice_index (choice.c) reads exactly these two
+ * fields; with them empty it is the IDENTITY, which means a pick the player
+ * made against a filtered candidate list is read as a RAW ZONE position and
+ * lands on an INELIGIBLE card.
+ *
+ * The list is rebuilt here from the same zone + the same filter assembly the
+ * classifying producer used, so the prompt and the classification cannot drift.
+ * Producers that already know their own candidate array (rb_move_take_cards_
+ * standard_zone, rb_move_resolve_from_stage, rb_move_resolve_from_under_member)
+ * overwrite this with their list, which is the same list by construction.
+ *
+ * Zones that are NOT player zones (looked_at, revealed_cards, those_cards,
+ * selected_cards, recently_moved) are left untouched: rb_zone_cards returns 0
+ * for them and their answers index the pool directly. */
+static void rb_move_prompt_fill_filtered(GameState *g, int actor, const char *zone,
+                                         const AbilityEffect *e) {
+    if (!g || !zone) return;
+    /* mod.rs:1046-1048 — a STAGE candidate index is a STAGE POSITION, and
+     * rb_zone_cards compacts empty slots away, so the generic zone walk cannot
+     * produce them. resolve_from_stage supplies that list itself. */
+    if (move_zone_is(zone, "stage")) return;
+    int pl = actor;
+    if (e && e->target && !strcmp(e->target, "opponent")) pl = actor ^ 1;
+    if (pl < 0 || pl > 1) pl = 0;
+    int cards[RB_MAX_ZONE];
+    int n = rb_zone_cards(g, pl, zone, cards, RB_MAX_ZONE);
+    if (n <= 0) return;
+    RbCardFilter f;
+    move_build_standard_zone_filter(g, zone, e, &f);
+    int idxs[RB_MAX_ZONE];
+    int nf = rb_get_selection_indices_filter(cards, n, &f, cmf_is_self_target(e),
+                                             g->activating_card, idxs, RB_MAX_ZONE);
+    if (nf > RB_MAX_ZONE) nf = RB_MAX_ZONE;
+    char groups[8][64];
+    int nsg = move_collect_stage_group_exclusions(g, pl, zone, e, groups, 8);
+    if (nsg > 0) nf = move_exclude_stage_groups(cards, idxs, nf, groups, nsg);
+    { const char *gn = cmf_extra(e, "group_names");
+      if (gn && gn[0]) nf = move_apply_effect_groups(cards, idxs, nf, gn); }
+    if (nf <= 0) return;
+    g->queue.pending.n_filtered_indices = nf;
+    for (int i = 0; i < nf; i++) g->queue.pending.filtered_indices[i] = idxs[i];
+}
+
 /* ── prompt_card_selection ── */
 void rb_move_prompt_card_selection(GameState *g, int actor, const char *zone,
                                     int count, int can_skip, AbilityEffect *e) {
@@ -681,7 +969,7 @@ void rb_move_prompt_card_selection(GameState *g, int actor, const char *zone,
         snprintf(desc, sizeof(desc), "Select any number of card(s) from %s", zlabel);
     else
         snprintf(desc, sizeof(desc), "Select %d card(s) from %s", count, zlabel);
-    const char *card_type = cmf_extra(e, "card_type");
+    const char *card_type = cmf_card_type(e);
     rb_emit_choice(g, actor, RB_CHOICE_SELECT_CARD, zone, card_type, count, can_skip, NULL);
     rb_queue_pause_for_choice(g, &g->queue.pending);
     rb_choice_set_description(&g->queue.pending, desc);
@@ -694,6 +982,7 @@ void rb_move_prompt_card_selection(GameState *g, int actor, const char *zone,
     }
     rb_move_prompt_carry_resume_context(g, actor, zone, e);
     rb_choice_set_route(&g->queue.pending, RB_ROUTE_SELECT_CARDS);
+    rb_move_prompt_fill_filtered(g, actor, zone, e);
 }
 
 /* ── optional_gate_source ── */
@@ -727,34 +1016,37 @@ int rb_move_resolve_from_deck(GameState *g, int actor, const AbilityEffect *e,
     int drawn = 0;
     int attempts = 0;
     int remaining = count;
-    int cap = count + P->deck.n + 10;
-    while (remaining > 0 && attempts < cap) {
-        if (P->deck.n == 0) {
-            if (P->discard.n > 0) {
-                rb_shuffle(P->discard.cards, P->discard.n);
-                for (int k = 0; k < P->discard.n && P->deck.n < RB_MAX_ZONE; k++)
-                    P->deck.cards[P->deck.n++] = P->discard.cards[k];
-                P->discard.n = 0;
-                P->deck_refreshed_this_turn = 1;
-            } else break;
+    /* The C main deck is TOP-INDEX-0 (it mirrors Rust `main_deck.cards`, where
+       `insert(0, x)` is put_on_deck_top), so Rust's `MainDeck::draw()` —
+       `self.cards.remove(0)`, zones.rs:811-820 — is a removal from INDEX 0, not
+       from the end.  This loop used to take `cards[--deck.n]`, i.e. the BOTTOM,
+       which silently turned every "from the top of the deck" effect into a
+       bottom mill.  Rejects go back with `cards.push(card)`, which
+       is likewise the BOTTOM (append), not index 0. */
+    while (remaining > 0 && attempts < count + P->deck.n + 10) {
+        /* Q104 / Rule 10.2.1: deck empty mid-draw -> flush the already-taken
+           cards into the waitroom, refresh, and continue (mod.rs:902-906). */
+        if (P->deck.n == 0 && P->discard.n > 0) {
+            for (int k = 0; k < drawn && P->discard.n < RB_MAX_ZONE; k++)
+                P->discard.cards[P->discard.n++] = out_ids[k];
+            drawn = 0;
+            rb_shuffle(P->discard.cards, P->discard.n);
+            for (int k = 0; k < P->discard.n && P->deck.n < RB_MAX_ZONE; k++)
+                P->deck.cards[P->deck.n++] = P->discard.cards[k];
+            P->discard.n = 0;
+            P->deck_refreshed_this_turn = 1;
         }
         if (P->deck.n == 0) break;
-        int cid = P->deck.cards[--P->deck.n];
+        int cid = P->deck.cards[0];
+        for (int k = 1; k < P->deck.n; k++) P->deck.cards[k - 1] = P->deck.cards[k];
+        P->deck.n--;
         attempts++;
         if (card_type_filter && !rb_card_matches_type(cid, card_type_filter)) {
-            if (P->deck.n < RB_MAX_ZONE) {
-                for (int k = P->deck.n; k > 0; k--) P->deck.cards[k] = P->deck.cards[k - 1];
-                P->deck.cards[0] = cid;
-                P->deck.n++;
-            }
+            if (P->deck.n < RB_MAX_ZONE) P->deck.cards[P->deck.n++] = cid;
             continue;
         }
         if (group_name && !rb_card_matches_group_str(cid, group_name)) {
-            if (P->deck.n < RB_MAX_ZONE) {
-                for (int k = P->deck.n; k > 0; k--) P->deck.cards[k] = P->deck.cards[k - 1];
-                P->deck.cards[0] = cid;
-                P->deck.n++;
-            }
+            if (P->deck.n < RB_MAX_ZONE) P->deck.cards[P->deck.n++] = cid;
             continue;
         }
         if (drawn < max) out_ids[drawn++] = cid;
@@ -841,34 +1133,8 @@ int rb_move_resolve_from_stage(GameState *g, int actor, AbilityEffect *e, int us
     /* mod.rs:1044-1071 — build the filter, then resolve the selection over the
      * RAW stage array (Rust indexes `&player.stage.stage`, so a returned index
      * IS a stage position, which is what the answer handler reads back). */
-    const char *ctype = cmf_extra(e, "card_type");
-    const char *gn = cmf_extra(e, "group_names");
     RbCardFilter f;
-    memset(&f, 0, sizeof f);
-    if (ctype) strncpy(f.card_type, ctype, sizeof f.card_type - 1);
-    if (gn && gn[0]) { strncpy(f.group, gn, sizeof f.group - 1); f.has_group = 1; }
-    const char *clo = cmf_extra(e, "cost_limit_operator");
-    if (!clo) clo = cmf_extra(e, "cost_operator");
-    int limit = rb_move_resolve_cost_limit_reference(g, e);
-    if (limit >= 0) { f.has_cost_limit = 1; f.cost_limit = limit;
-                      if (clo) strncpy(f.cost_op, clo, sizeof f.cost_op - 1); }
-    const char *cto = cmf_extra(e, "cost_total");
-    if (cto) { f.has_cost_total = 1; f.cost_total = atoi(cto); }
-    const char *ctoo = cmf_extra(e, "cost_total_operator");
-    if (ctoo) strncpy(f.cost_total_op, ctoo, sizeof f.cost_total_op - 1);
-    const char *chars = cmf_extra(e, "characters");
-    if (chars && chars[0]) { strncpy(f.characters, chars, sizeof f.characters - 1); f.has_characters = 1; }
-    const char *exch = cmf_extra(e, "exclude_characters");
-    if (exch && exch[0]) { strncpy(f.exclude_characters, exch, sizeof f.exclude_characters - 1); f.has_exclude_characters = 1; }
-    const char *cp = cmf_extra(e, "card_property");
-    if (cp) { strncpy(f.ability_filter, cp, sizeof f.ability_filter - 1); }
-    f.negation = cmf_extra_true(e, "negation");
-    if (e && cmf_extra_true(e, "exclude_self")) {
-        f.has_exclude_self = 1; f.exclude_self_id = g->activating_card;
-    }
-    f.has_filter = f.has_group || f.has_cost_limit || f.has_cost_total ||
-                   f.has_characters || f.has_exclude_characters ||
-                   f.ability_filter[0] || f.has_exclude_self || (ctype && ctype[0]);
+    move_build_stage_filter(g, e, &f);
 
     int stage_ids[RB_STAGE_SIZE];
     for (int i = 0; i < RB_STAGE_SIZE; i++) stage_ids[i] = P->stage[i];
@@ -903,7 +1169,13 @@ int rb_move_resolve_from_stage(GameState *g, int actor, AbilityEffect *e, int us
          * pass the filter. */
         rb_move_prompt_card_selection(g, actor, "stage", count,
                                       e && e->is_optional, e);
-        if (!rb_has_pending_choice(g) && mn > 0) {
+        /* The prompt deliberately does NOT fill filtered_indices for a STAGE
+         * zone (its candidate indices are stage POSITIONS, which rb_zone_cards
+         * cannot produce), so this list is written here. The guard used to be
+         * `!rb_has_pending_choice(g)`, which is inverted: the line above HAS
+         * just raised the prompt, so the condition was always false and the
+         * stage prompt advertised no candidates at all. */
+        if (rb_has_pending_choice(g) && mn > 0) {
             g->queue.pending.n_filtered_indices = mn > RB_STAGE_SIZE ? RB_STAGE_SIZE : mn;
             for (int i = 0; i < g->queue.pending.n_filtered_indices; i++)
                 g->queue.pending.filtered_indices[i] = idxs[i];
@@ -1037,9 +1309,11 @@ int rb_move_resolve_from_under_member(GameState *g, int actor, AbilityEffect *e,
  * and every answer was read as a RAW ZONE index. That is only accidentally
  * right when all of the zone's cards match the filter: under a card_type /
  * group_names filter that rejects cards, the player picks from the displayed
- * candidate list and the engine would lift the wrong card. This wrapper keeps
- * the two lists identical by construction — `idxs` is the very array the
- * classification just ran on.
+ * candidate list and the engine would lift the wrong card. rb_move_prompt_
+ * fill_filtered, called from inside rb_move_prompt_card_selection itself, now
+ * rebuilds that same list for every prompt in this file, from the same zone and
+ * the same filter assembly; the `rb_move_prompt_card_selection_with_filtered`
+ * wrapper that used to do this for one caller was never called and is gone.
  *
  * One deliberate difference from Rust, documented: Rust's `filtered_indices` is
  * `util::matching_indices` WITHOUT the self-target pinning that the same call's
@@ -1047,16 +1321,6 @@ int rb_move_resolve_from_under_member(GameState *g, int actor, AbilityEffect *e,
  * `rb_get_selection_indices(.., self_target_only, ..)`, which DOES pin. The C
  * list is the strictly tighter one, and it is the one the classification above
  * was decided on, so it is the list the prompt actually offered. */
-static void rb_move_prompt_card_selection_with_filtered(
-    GameState *g, int actor, const char *zone, int count, int can_skip,
-    AbilityEffect *e, const int *idxs, int n_idxs) {
-    rb_move_prompt_card_selection(g, actor, zone, count, can_skip, e);
-    if (!g || !idxs || n_idxs <= 0) return;
-    if (n_idxs > RB_MAX_ZONE) n_idxs = RB_MAX_ZONE;
-    g->queue.pending.n_filtered_indices = n_idxs;
-    for (int i = 0; i < n_idxs; i++) g->queue.pending.filtered_indices[i] = idxs[i];
-}
-
 /* ── take_cards_from_standard_zone ─────────────────────────────────────────
  * Rust move/selection.rs:53-87, consuming mod.rs:1142-1367
  * `resolve_from_standard_zone`'s per-source-zone decisions (can_skip,
@@ -1082,7 +1346,6 @@ int rb_move_take_cards_from_standard_zone(GameState *g, int actor,
     RbPlayer *P = &g->p[pl];
     int is_discard = move_zone_is(zone_name, "discard");
     int is_hand    = move_zone_is(zone_name, "hand");
-    int is_lcz     = move_zone_is(zone_name, "live_card_zone");
     int is_success = move_zone_is(zone_name, "success_live_zone");
 
     /* mod.rs:1153-1177 — 「このカード自体をコストに」 out of hand: the
@@ -1116,114 +1379,23 @@ int rb_move_take_cards_from_standard_zone(GameState *g, int actor,
     /* mod.rs:1199-1202 — only hand/discard/energy honour 「すべて」. */
     if (!(is_hand || is_discard || move_zone_is(zone_name, "energy"))) is_all = 0;
 
-    /* mod.rs:1209-1274 — which optional filters are meaningful for THIS source.
-     * A live-card-zone move is always a live card; an energy-zone move carries
-     * no group or cost filter at all; only hand/discard can be narrowed by
-     * name fragments or a total cost. */
-    const char *ctype_raw = e ? cmf_extra(e, "card_type") : NULL;
-    const char *gn_raw    = e ? cmf_extra(e, "group_names") : NULL;
-    const char *frag_raw  = e ? cmf_extra(e, "name_fragments") : NULL;
-    const char *ct_raw    = e ? cmf_extra(e, "cost_total") : NULL;
-    const char *cto_raw   = e ? cmf_extra(e, "cost_total_operator") : NULL;
-    const char *clo_raw   = e ? cmf_extra(e, "cost_limit_operator") : NULL;
-    if (!clo_raw) clo_raw = e ? cmf_extra(e, "cost_operator") : NULL;
-    const char *exch_raw  = e ? cmf_extra(e, "exclude_characters") : NULL;
-    const char *cp_raw    = e ? cmf_extra(e, "card_property") : NULL;
-    int is_energy = move_zone_is(zone_name, "energy");
-    int from_hand_or_discard = is_hand || is_discard;
-    int is_live_zone_move = is_lcz || (is_success && ctype_raw != NULL);
-    int has_effect_groups = gn_raw && gn_raw[0];
-
+    /* mod.rs:1209-1274 — the per-source filter assembly. Factored into
+     * move_build_standard_zone_filter so the prompt this function raises at the
+     * bottom rebuilds the IDENTICAL filter instead of leaving
+     * filtered_indices empty (selection.rs:6-14 hands the prompt both the
+     * filter and the candidate list, so both come from one description). */
     RbCardFilter f;
-    memset(&f, 0, sizeof f);
-    if (is_live_zone_move)       strncpy(f.card_type, "live_card", sizeof f.card_type - 1);
-    else if (is_success)         f.card_type[0] = '\0';
-    else if (ctype_raw && ctype_raw[0]) strncpy(f.card_type, ctype_raw, sizeof f.card_type - 1);
-    if (!(has_effect_groups || is_energy) && gn_raw && gn_raw[0]) {
-        strncpy(f.group, gn_raw, sizeof f.group - 1);
-        f.has_group = 1;
-    }
-    /* mod.rs:1266-1268 — effect.group_names_any() ALSO rides the `groups`
-     * list when present, so a multi-group name list filters correctly. */
-    int limit = rb_move_resolve_cost_limit_reference(g, e);
-    if (!is_energy && limit >= 0) {
-        f.has_cost_limit = 1; f.cost_limit = limit;
-        if (clo_raw) strncpy(f.cost_op, clo_raw, sizeof f.cost_op - 1);
-    }
-    if (from_hand_or_discard && ct_raw) {
-        f.has_cost_total = 1; f.cost_total = atoi(ct_raw);
-        if (cto_raw) strncpy(f.cost_total_op, cto_raw, sizeof f.cost_total_op - 1);
-    }
-    if (from_hand_or_discard && frag_raw && frag_raw[0]) {
-        /* CSV split into the fixed name_fragments array. */
-        char buf[256];
-        strncpy(buf, frag_raw, sizeof buf - 1);
-        buf[sizeof buf - 1] = '\0';
-        char *tok = strtok(buf, ",");
-        while (tok && f.n_name_fragments < 8) {
-            strncpy(f.name_fragments[f.n_name_fragments], tok,
-                    sizeof f.name_fragments[0] - 1);
-            f.n_name_fragments++;
-            tok = strtok(NULL, ",");
-        }
-    }
-    { const char *ch = e ? cmf_extra(e, "characters") : NULL;
-      if (ch && ch[0]) { strncpy(f.characters, ch, sizeof f.characters - 1); f.has_characters = 1; } }
-    if (exch_raw && exch_raw[0]) {
-        strncpy(f.exclude_characters, exch_raw, sizeof f.exclude_characters - 1);
-        f.has_exclude_characters = 1;
-    }
-    if (cp_raw && cp_raw[0]) strncpy(f.ability_filter, cp_raw, sizeof f.ability_filter - 1);
-    f.negation = e && cmf_extra_true(e, "negation");
-    const char *nht = e ? cmf_extra(e, "need_heart_total") : NULL;
-    if (nht) { f.has_need_heart_total = 1; f.need_heart_total = atoi(nht); }
-    const char *nho = e ? cmf_extra(e, "need_heart_operator") : NULL;
-    if (nho) strncpy(f.need_heart_operator, nho, sizeof f.need_heart_operator - 1);
-    const char *nhc = e ? cmf_extra(e, "need_heart_color") : NULL;
-    if (nhc) strncpy(f.need_heart_color, nhc, sizeof f.need_heart_color - 1);
-    f.has_filter = f.card_type[0] || f.has_group || f.has_cost_limit || f.has_cost_total ||
-                   f.has_characters || f.has_exclude_characters || f.ability_filter[0] ||
-                   f.n_name_fragments || f.has_need_heart_total || f.need_heart_color[0];
+    move_build_standard_zone_filter(g, zone_name, e, &f);
 
     /* mod.rs:1301-1333 — group_reference "different_group_names" on a discard
      * move excludes every discard card whose group matches ANY stage member's
-     * group (Q89/Q105/Q208). Skipped when the CONDITION already carries the
-     * same reference (Mia option 1 — the condition does the counting, so
-     * excluding again over-filters). RbCardFilter has no exclude_group_names
-     * field, so the exclusion is applied to the candidate list below. */
-    const char *gref = e ? cmf_extra(e, "group_reference") : NULL;
+     * group (Q89/Q105/Q208). RbCardFilter has no exclude_group_names field, so
+     * the exclusion is applied to the candidate list below — and to the
+     * PROMPT's candidate list too (rb_move_prompt_fill_filtered runs the same
+     * two helpers), because Rust puts it in the filter and therefore in the
+     * `filtered_indices` the prompt advertises. */
     char stage_groups[8][64];
-    int nsg = 0;
-    if (gref && !strcmp(gref, "different_group_names") && is_discard) {
-        for (int i = 0; i < RB_STAGE_SIZE && nsg < 8; i++) {
-            int cid = P->stage[i];
-            if (cid < 0) continue;
-            char cand[64];
-            cand[0] = '\0';
-            const char *grp = rb_card_group_name(cid);
-            if (grp && grp[0]) {
-                snprintf(cand, sizeof cand, "%s", grp);
-            } else {
-                static const char *known[] = {
-                    "Aqours", "Liella!", "Nijigasaki", "A-RISE",
-                    "Saint Snow", "Hasunosora", NULL};
-                for (int k = 0; known[k]; k++)
-                    if (rb_card_matches_group_str(cid, known[k])) {
-                        snprintf(cand, sizeof cand, "%s", known[k]);
-                        break;
-                    }
-            }
-            if (!cand[0]) continue;
-            int dup = 0;
-            for (int k = 0; k < nsg; k++)
-                if (!strcmp(stage_groups[k], cand)) { dup = 1; break; }
-            if (!dup) {
-                strncpy(stage_groups[nsg], cand, sizeof stage_groups[0] - 1);
-                stage_groups[nsg][sizeof stage_groups[0] - 1] = '\0';
-                nsg++;
-            }
-        }
-    }
+    int nsg = move_collect_stage_group_exclusions(g, pl, zone_name, e, stage_groups, 8);
 
     /* mod.rs:66-84 — the body proper. */
     int cards[RB_MAX_ZONE];
@@ -1231,20 +1403,13 @@ int rb_move_take_cards_from_standard_zone(GameState *g, int actor,
     int filtered[RB_MAX_ZONE];
     int nf = rb_get_selection_indices_filter(cards, n, &f, cmf_is_self_target(e),
                                               g->activating_card, filtered, RB_MAX_ZONE);
-    if (nsg > 0) {
-        const char *names[8];
-        for (int i = 0; i < nsg; i++) names[i] = stage_groups[i];
-        int w = 0;
-        for (int i = 0; i < nf; i++) {
-            int cid = cards[filtered[i]];
-            int blocked = 0;
-            for (int k = 0; k < nsg && !blocked; k++)
-                if (rb_card_matches_group_str(cid, stage_groups[k])) blocked = 1;
-            if (blocked) continue;
-            filtered[w++] = filtered[i];
-        }
-        nf = w;
-    }
+    if (nsg > 0)
+        nf = move_exclude_stage_groups(cards, filtered, nf, stage_groups, nsg);
+    /* mod.rs:1266-1268 — the effect's own group_names ride the `groups` list
+     * (ANY-match), not `filter.group`. RbCardFilter has no list field, so it is
+     * the same post-pass over the candidate list. */
+    { const char *gn = e ? cmf_extra(e, "group_names") : NULL;
+      if (gn && gn[0]) nf = move_apply_effect_groups(cards, filtered, nf, gn); }
     int outcome = rb_classify_selection(filtered, nf, count, is_all);
     int prompt_count = 0;
     switch (outcome) {
@@ -1288,7 +1453,7 @@ int rb_move_resolve_cards_from_source(GameState *g, int actor, AbilityEffect *e,
     const char *destination = e->destination ? e->destination : "discard";
 
     if (!strcmp(source, "recently_moved")) {
-        const char *ctype = cmf_extra(e, "card_type");
+        const char *ctype = cmf_card_type(e);
         const char *gn = cmf_extra(e, "group_names");
         return rb_move_resolve_from_recently_moved(g, 0, ctype, gn, out_ids, max);
     }
@@ -1313,7 +1478,7 @@ int rb_move_resolve_cards_from_source(GameState *g, int actor, AbilityEffect *e,
     if (!strcmp(source, "under_member")) {
         int n = 0;
         int wanted = count < 0 ? RB_MAX_ZONE : count;
-        const char *ctype = cmf_extra(e, "card_type");
+        const char *ctype = cmf_card_type(e);
         const char *group = cmf_extra(e, "group_names");
         for (int area = 0; area < RB_STAGE_SIZE && n < wanted; area++) {
             RbBag *under = &g->p[pl].under_cards[area];
@@ -1374,7 +1539,7 @@ int rb_move_resolve_from_zone(GameState *g, int actor, const char *effective_sou
     if (!g || !out_ids) return 0;
     int pl = use_p2 ? 1 : actor;
     RbPlayer *P = &g->p[pl];
-    const char *ctype = cmf_extra(e, "card_type");
+    const char *ctype = cmf_card_type(e);
     const char *gn = cmf_extra(e, "group_names");
     const char *dst = e->destination ? e->destination : "";
 
@@ -1450,7 +1615,7 @@ int rb_move_resolve_from_revealed_cards(GameState *g, int actor, AbilityEffect *
     if (cto) strncpy(filter.cost_total_op, cto, sizeof(filter.cost_total_op) - 1);
     const char *gn = cmf_extra(e, "group_names");
     if (gn) { filter.has_group = 1; strncpy(filter.group, gn, sizeof(filter.group) - 1); }
-    const char *ctp = cmf_extra(e, "card_type");
+    const char *ctp = cmf_card_type(e);
     if (ctp) strncpy(filter.card_type, ctp, sizeof(filter.card_type) - 1);
     const char *cp = cmf_extra(e, "card_property");
     if (cp) strncpy(filter.ability_filter, cp, sizeof(filter.ability_filter) - 1);
@@ -1490,7 +1655,7 @@ int rb_move_resolve_from_those_cards(GameState *g, int actor, AbilityEffect *e,
     if (n_trigger == 0) n_trigger = g->n_recently_moved;
     if (n_trigger == 0) return 0;
 
-    const char *ctype = cmf_extra(e, "card_type");
+    const char *ctype = cmf_card_type(e);
     const char *gn = cmf_extra(e, "group_names");
     const char *dst = e->destination ? e->destination : "";
 
@@ -1556,7 +1721,7 @@ int rb_move_resolve_source_revealed_cards(GameState *g, int actor, AbilityEffect
     if (cto) strncpy(filter.cost_total_op, cto, sizeof(filter.cost_total_op) - 1);
     const char *gn = cmf_extra(e, "group_names");
     if (gn) { filter.has_group = 1; strncpy(filter.group, gn, sizeof(filter.group) - 1); }
-    const char *ctp = cmf_extra(e, "card_type");
+    const char *ctp = cmf_card_type(e);
     if (ctp) strncpy(filter.card_type, ctp, sizeof(filter.card_type) - 1);
 
     int matching[RB_MAX_ZONE];
@@ -1641,15 +1806,37 @@ int rb_move_place_card_with_stage_choice(
             if (card_name[0] == '\0') strcpy(card_name, "card");
             char desc[128];
             snprintf(desc, sizeof(desc), "Choose position for %s", card_name);
-            rb_emit_choice(g, actor, RB_CHOICE_SELECT_TARGET, NULL, NULL, 1, 0, pos_str);
-    rb_queue_pause_for_choice(g, &g->queue.pending);
+            /* Rust placement.rs:122-149 emits `Choice::SelectPosition { position:
+               pos_str }` and parks `ExecutionContext::MoveCardsPosition { card_id,
+               state_change, target: pos_target, source_zone }` beside it
+               (placement.rs:141-147). RB_CHOICE_SELECT_TARGET was the wrong
+               Choice twin: it made test_pending_choice_type() report
+               "SelectTarget" and left the `case RB_CHOICE_SELECT_POSITION:` arm of
+               the answer dispatch unreachable. The handler this prompt belongs to
+               is rb_move_handle_select_position (below).
+
+               The context's `target` has no field of its own on RbChoice and
+               `pending.target` is already carrying `position`, so it rides in
+               target_player_id — the same field the discard SelectCard parks its
+               seat in (rb_move_execute_selected_cards_from_zone) and the one
+               choice_effect_target_seat / rb_resolver_handle_select_card read.
+               state_change rides in resume_move_state, the queue's own copy of it
+               (rabuka.h:1214, read by choice_effect_state_change); resume_draw_dest
+               is the DRAW destination and must never carry it. Rust's
+               SelectPosition variant has no route (types.rs:1005-1023), and
+               RB_ROUTE_NONE resolves to the same RB_ROUTEK_CHOICE
+               (types.c:651). */
+            rb_emit_choice(g, actor, RB_CHOICE_SELECT_POSITION, NULL, NULL, 1, 0, pos_str);
+            if (player_target && *player_target)
+                strncpy(g->queue.pending.target_player_id, player_target,
+                        sizeof(g->queue.pending.target_player_id) - 1);
             rb_choice_set_description(&g->queue.pending, desc);
-            rb_choice_set_route(&g->queue.pending, RB_ROUTE_SELECT_TARGET);
+            rb_choice_set_route(&g->queue.pending, RB_ROUTE_NONE);
             g->queue.resume_mode = 1;
             g->queue.resume_actor = actor;
             g->queue.resume_host = card_id;
             if (state_change && *state_change)
-                strncpy(g->queue.resume_draw_dest, state_change, sizeof(g->queue.resume_draw_dest) - 1);
+                strncpy(g->queue.resume_move_state, state_change, sizeof(g->queue.resume_move_state) - 1);
             if (source_zone && *source_zone)
                 strncpy(g->queue.resume_draw_source, source_zone, sizeof(g->queue.resume_draw_source) - 1);
             return 1;
@@ -1882,7 +2069,14 @@ void rb_move_fire_debut_side_effects(GameState *g, int actor, int card_id,
     rb_process_pending_auto_abilities(g);
 }
 
-/* ── handle_select_position ── */
+/* ── handle_select_position ──────────────────────────────────────────────────
+   Rust handle_select_position, ExecutionContext::MoveCardsPosition arm
+   (engine/src/ability/effects/move/mod.rs:2372-2426), reached from
+   provide_choice_result's `(Choice::SelectPosition{..}, PositionSelected{..})`
+   match (result_handlers.rs:233-238). The C twin of that whole function used to
+   be duplicated: choice.c's rb_resolver_handle_select_position, reachable only
+   from the kind switch (which the SelectTarget mis-emission made unreachable),
+   and this one, which had no caller at all. This is the one that survives. */
 void rb_move_handle_select_position(GameState *g, int actor, const char *position,
                                      int card_id, const char *target,
                                      const char *source_zone, const char *state_change) {
@@ -1890,31 +2084,57 @@ void rb_move_handle_select_position(GameState *g, int actor, const char *positio
     int pl = actor;
     if (target && *target) { int t = rb_resolve_target_player(g, target); if (t >= 0) pl = t; }
     RbPlayer *P = &g->p[pl];
-    int pos_idx = -1;
-    if (!strcmp(position, "left_side")) pos_idx = 0;
-    else if (!strcmp(position, "center")) pos_idx = 1;
-    else if (!strcmp(position, "right_side")) pos_idx = 2;
+    /* mod.rs:2396 — `util::stage_position_index(position)`, which accepts
+       "left"/"left_side"/"center"/"right"/"right_side". The answer index is
+       mapped to Rust's own spellings ("left"/"center"/"right", mod.rs:2390)
+       before it gets here, so the C has to accept them too. */
+    int pos_idx = position ? rb_stage_position_index(position) : -1;
+    /* mod.rs:2377 — `should_lock = source_zone != Zone::Stage.to_str()`, and
+       track_deployment is the Rust spelling of stage_arrived. */
     int should_lock = (!source_zone || strcmp(source_zone, "stage") != 0);
     int placed = 0;
     if (pos_idx >= 0 && pos_idx < RB_STAGE_SIZE) {
-        if (P->stage[pos_idx] == RB_EMPTY_SLOT) {
-            P->stage[pos_idx] = card_id;
-            if (should_lock) g->stage_arrived[pl][pos_idx] = 1;
-            placed = 1;
-        } else if (P->stage[pos_idx] != RB_EMPTY_SLOT) {
-            rb_waitroom_add(P, P->stage[pos_idx]);
-            P->stage[pos_idx] = card_id;
-            if (should_lock) g->stage_arrived[pl][pos_idx] = 1;
-            placed = 1;
-        }
+        /* mod.rs:2394-2400 — an occupied slot displaces its member to the
+           waitroom. Rust leaves `under_cards[idx]` alone on this path (the
+           recycling twin, Stage::recycle_under_cards, belongs to the Rule 4.5.5
+           stage swap at zones.rs:396-400), so the stack is NOT carried here. */
+        if (P->stage[pos_idx] != RB_EMPTY_SLOT) rb_waitroom_add(P, P->stage[pos_idx]);
+        P->stage[pos_idx] = card_id;
+        if (should_lock) g->stage_arrived[pl][pos_idx] = 1;
+        placed = 1;
     }
-    if (!placed) rb_hand_add(P, card_id);
+    if (!placed) rb_hand_add(P, card_id);   /* mod.rs:2407-2412 */
     rb_mods_clear_card(&g->mods, card_id);
-    mc_record_movement(g, card_id);
+    /* mod.rs:2415 — `gs.record_card_movement(card_id)` records the card as
+       moved this turn but pushes NO MovementEvent (Rust logs the pair only,
+       log_move_result at mod.rs:2425). The C's choke point fuses the two, so
+       the from-zone is RB_ZONEID_UNKNOWN — Rust's own ZoneId::Unknown, and the
+       only spelling that does NOT read as a stage->stage pair and trip the
+       area-move arm at modifiers.c:525-526. */
+    rb_record_card_movement(g, card_id, RB_ZONEID_UNKNOWN,
+                            placed ? RB_ZONEID_STAGE : RB_ZONEID_HAND, 0, 0);
+    /* mod.rs:2417-2419 — selection.moved_cards, which `preceding_moved` /
+       `those_cards` sources read. */
+    mc_sel_moved_push(g, card_id);
     if (state_change && !strcmp(state_change, "wait"))
         rb_mods_set_orientation(&g->mods, card_id, "wait");
-    rb_move_fire_debut_side_effects(g, actor, card_id, target ? target : "self", NULL);
-    rb_clear_pending_choice(g);
+    /* mod.rs:2420-2422 — the orientation modifier is the ONE place Rust records
+       the appeared-state change. The C mirrors an orientation in TWO places
+       (condition.c:1692-1699 and rb_move_finalize_card_movement,
+       choice.c:3001-3008), and `stage_wait[]` is the C-only second channel the
+       placement emitters read back, so it is stamped here too. rb_place_card_in_zone
+       hard-codes stage_wait[area]=0 (util.c:1019), which is why this path cannot
+       go through it. */
+    if (placed && state_change && !strcmp(state_change, "wait"))
+        P->stage_wait[pos_idx] = 1;
+    rb_move_fire_debut_side_effects(g, actor, card_id, target ? target : "self", source_zone);
+    /* mod.rs:2429-2438 — Rust does NOT clear the choice here, on purpose:
+       fire_debut_side_effects may have opened the placed card's OWN 登場 prompt,
+       and a blanket clear silently swallowed it. The C resume path already
+       cleared the position choice before dispatching here
+       (rb_clear_pending_choice at the top of
+       rb_resume_with_choice_indices_internal), so there is nothing left to
+       clear and the call that used to stand here was pure data loss. */
 }
 
 /* ── move_from_revealed ── */

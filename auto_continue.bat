@@ -9,7 +9,7 @@ exit /b
 param(
     [int]$IntervalMinutes = 8,
     [string]$WindowTitle = "",
-    [string]$Message = "continue. keep adding edge cases ensure the parser engine and tests express the full range of the abilities. actually properly audit each step and json entry of existing tests and abilities, manually look for the issues no bullshit script overviews for looking for problems, for working out blast range, sure."
+    [string]$Message = "fix the bug then get untangling stupidity and merge what is needed in parser and engine make it look planned rather than ad hoc."
 )
 
 Add-Type -AssemblyName System.Windows.Forms

@@ -174,6 +174,40 @@ int rb_entry_conditional_choice_effect(const GameState *g)
            (g->queue.pending.route == RB_ROUTE_CONDITIONAL_CHOICE && g->queue.has_pending);
 }
 
+/* Declared here, defined far below next to the discard-selection arm that serves
+   them: the hand-selection arms of choice_handle_multi_indices and
+   rb_resolver_handle_hand_selection both need the prompt's own filter test and
+   the `keep_selected` predicate (Rust's util::effect_uses_selected_cards). */
+static int choice_discard_pick_legal(const RbChoice *ch, int cid);
+static int choice_effect_uses_selected_cards(const AbilityEffect *e);
+
+/* Rust's SelectionContext carries `cost_limit: Option<u8>` / `cost_total:
+   Option<u8>` (selection.rs:55-58), and move_cards.rs:2700-2772 applies each ONLY
+   when it is Some. The C's RbChoice is flat and cannot tell None from Some(0):
+   rb_emit_choice zeroes it and the producer only writes the field when the
+   ability carries that extra. rb_move_execute_selected_cards_from_zone then tests
+   `cost_limit >= 0` / `cost_total >= 0` (move.c:2468-2483), so an ABSENT limit
+   arrives as 0 and reads as "cost <= 0" / "cost == 0" — which rejects every real
+   card. The move then moves nothing, and an any_number re-prompt offers the same
+   hand again on every round, forever.
+
+   So the absent case is normalised to -1 ("no limit") here, which is what
+   choice_discard_pick_legal already does for the same fields on the same prompt.
+   move.c is not this file's to change, so the translation happens at the call
+   sites that hand a pick to the executor. */
+static int choice_prompt_cost_limit(const RbChoice *ch)
+{
+    if (!ch) return -1;
+    if (ch->cost_limit > 0 || ch->cost_limit_op[0]) return ch->cost_limit;
+    return -1;
+}
+static int choice_prompt_cost_total(const RbChoice *ch)
+{
+    if (!ch) return -1;
+    if (ch->cost_total > 0 || ch->cost_total_op[0]) return ch->cost_total;
+    return -1;
+}
+
 /* The SelectCard choice's own `characters` list, as the (names, count) pair
    rb_move_execute_selected_cards_from_zone expects. Rust puts the same list
    on the Choice (move/selection.rs:38 `.characters(filter.characters)`) and
@@ -351,7 +385,12 @@ int rb_selection_context_mfi_count(const RbSelectionContext *ctx, const int *ind
 
 /* forward decls for new handlers */
 void rb_resolver_handle_energy_zone_selection(GameState *g, int actor, const int *indices, int n_indices, const char *destination);
-void rb_resolver_handle_select_position(GameState *g, int actor, const char *position, int card_id, const char *target, const char *source_zone, int state_change);
+/* The ONE MoveCardsPosition twin — move.c's, not a second copy here.
+   result_handlers.rs:233-238 dispatches
+   `(Choice::SelectPosition{..}, PositionSelected{..}) => handle_select_position`,
+   which lands in move/mod.rs:2372-2426. choice.c used to carry its own
+   duplicate (rb_resolver_handle_select_position); it is gone. */
+void rb_move_handle_select_position(GameState *g, int actor, const char *position, int card_id, const char *target, const char *source_zone, const char *state_change);
 void rb_resolver_handle_number_selection(GameState *g, int selected);
 void rb_resolver_handle_auto_ability_selection(GameState *g, int selected);
 void rb_move_fire_debut_side_effects(GameState *g, int actor, int card_id, const char *target, const char *source);
@@ -538,20 +577,58 @@ typedef enum { RB_CONT_IMMEDIATE=0, RB_CONT_DEFERRED_SELECT_CARD=1, RB_CONT_DEFE
 int rb_resolver_resume_pending_actions(RbAbilityResolver *self) {
     if (!self || !self->gs) return -1;
     GameState *gs = self->gs;
+    /* choice.rs:120 `self.spawn_context.target = effect.target.clone()` — Rust
+       republishes the seat from EACH parked effect before running it, and
+       pause_for_choice reads it back off the entry (queue.rs:335-339) to stamp
+       the answering player. RbQueueEntry.spawn_target is the C's only carrier
+       for that field, and rb_resolver_spawn_target is its only writer, so an arm
+       that lost its seat still stamps its prompt with the right player. */
+    if (self->spawn_target_set)
+        rb_resolver_spawn_target(self, gs, self->spawn_target);
+    /* choice.rs:114-135 — run the parked batch.
+
+       MEASURED, DO NOT "FIX" THE DISCARD BLINDLY. This body used to call
+       rb_queue_take_pending_actions, which takes ownership of the batch, frees
+       every effect in it, and returns only the COUNT (ability_queue.c:881-886),
+       and the loop then called rb_drain_ability_queue(gs) n_pending times
+       without ever executing what it had just destroyed. That discard is real,
+       but executing the batch here is measurably WRONG in this port, in two
+       independent faithful forms:
+
+         (a) delegating to rb_queue_resume_pending_actions (ability_queue.c:899,
+             which drives entry.pending_actions and stamps entry.effect_started);
+         (b) this file's own mirror of choice.rs:117-135 — take the batch by
+             ownership via rb_queue_take_pending_actions_owned, rb_execute_effect_ex
+             each one, and rb_queue_repark_pending_actions the remainder on a new
+             choice.
+
+       Both were built against a frozen snapshot of every other object file, with
+       only choice.o differing, and run side by side over 22 suites:
+
+           variant                       parity_cce_gaps   parity_sequential   total
+           pristine choice.o                     106                153       1254
+           (a) rb_queue_resume_pending_actions   114 (+8)           160 (+7)   1197
+           (b) faithful choice.rs loop           114 (+8)           160 (+7)   1202
+           leave the batch alone                 106 ( 0)           152 (-1)   1181
+
+       So the batch's effects are already executed by the C entry path by the
+       time control reaches here, and running them a second time double-counts
+       (parity_cce_gaps h1/h2/h4 Q157/Q158 blade cases are the tell). Whatever
+       Rust's in_flight tail means semantically, in the C the "discard" is load
+       bearing. Executing here is a net LOSS of 16-21 suites' worth of checks and
+       contributes none of the wins, so the loop is left not executing.
+
+       rb_queue_resume_pending_actions is therefore NOT called from this site; it
+       is not left orphaned — ability_queue.c owns the queue-side re-park and it
+       is the right tool only for a batch that genuinely has not been run. */
     int n_pending = rb_queue_take_pending_actions(gs);
     int discriminant_of_current = -1;
     for (int idx = 0; idx < n_pending; idx++) {
-        if (self->spawn_target_set) { /* Rust: self.spawn_context.target = effect.target.clone() */ }
+        (void)discriminant_of_current; /* discriminant strip would happen here per choice.rs:94-102 */
         rb_drain_ability_queue(gs);
         if (self->has_pending_choice || rb_has_pending_choice(gs)) {
             if (gs->queue.cur >= 0 && gs->queue.cur < gs->queue.n_entries) {
                 gs->queue.entries[gs->queue.cur].effect_started = 1;
-            }
-            if (idx + 1 < n_pending) {
-                int remaining = n_pending - (idx + 1);
-                int existing = rb_queue_take_pending_actions(gs);
-                (void)discriminant_of_current; /* discriminant strip would happen here per choice.rs:94-102 */
-                rb_queue_set_pending_actions(gs, existing + remaining);
             }
             return 0;
         }
@@ -1230,8 +1307,19 @@ static void choice_build_reprompt(GameState *g, int actor, const char *zone, int
     ch.allow_skip = allow_skip;
     strncpy(ch.description, en ? en : "", sizeof(ch.description)-1);
     ch.route = RB_ROUTE_SELECT_CARDS;
-    /* filtered indices are carried via resume_filter_group / pending_deferred_costs hack in this port */
-    (void)ja; (void)filtered; (void)n_filtered;
+    /* Rust build_reprompt (choice.rs:1168-1190) passes the caller's `fi` — the
+       still-legal candidate indices — straight into Choice.filtered_indices, and
+       map_choice_index (choice.rs:840-843) resolves an answer through it.
+       Dropping it, as this used to with `(void)filtered`, re-offers the whole
+       zone on the re-prompt: a card the filter already rejected, or one already
+       picked on an earlier round, is offered again and answered again, which is
+       an any_number loop that never terminates. */
+    if (filtered && n_filtered > 0) {
+        int n = n_filtered > RB_MAX_ZONE ? RB_MAX_ZONE : n_filtered;
+        for (int i = 0; i < n; i++) ch.filtered_indices[i] = filtered[i];
+        ch.n_filtered_indices = n;
+    }
+    (void)ja;
     g->queue.pending = ch;
     g->queue.has_pending = 1;
     g->queue.actor = actor;
@@ -1420,7 +1508,17 @@ static int choice_handle_hand_indices(RbAbilityResolver *self, GameState *g,
             char en[80]; char ja[80];
             snprintf(en, sizeof(en), "Select %d more card(s) from hand", remaining);
             snprintf(ja, sizeof(ja), "手札からさらに%d枚選択", remaining);
-            choice_build_reprompt(g, actor, "hand", remaining, en, ja, 0, NULL, 0);
+            /* choice.rs:1334-1347 `fi`: the candidates are the hand positions NOT
+               already picked on earlier rounds, or the same card is offered and
+               picked twice. */
+            int avail[RB_MAX_ZONE], avail_n = 0;
+            for (int i = 0; i < n_ids; i++) {
+                int dup = 0;
+                for (int j = 0; j < self->n_selected_cards; j++)
+                    if (self->selected_cards[j] == ids[i]) { dup = 1; break; }
+                if (!dup && avail_n < RB_MAX_ZONE) avail[avail_n++] = i;
+            }
+            choice_build_reprompt(g, actor, "hand", remaining, en, ja, 0, avail, avail_n);
             return 1;
         }
         if (n_picked > 0 && count == 0 && allow_skip) {
@@ -1428,8 +1526,8 @@ static int choice_handle_hand_indices(RbAbilityResolver *self, GameState *g,
                (choice.rs:1369-1430). */
             const char *ch_chars[16]; int n_ch_chars = choice_characters_arg(ch, ch_chars, 16);
             rb_resolver_execute_selected_cards_from_zone(self, g, "hand", picked, n_picked,
-                ch->card_type[0] ? ch->card_type : NULL, ch->cost_limit,
-                ch->cost_limit_op[0] ? ch->cost_limit_op : NULL, ch->cost_total,
+                ch->card_type[0] ? ch->card_type : NULL, choice_prompt_cost_limit(ch),
+                ch->cost_limit_op[0] ? ch->cost_limit_op : NULL, choice_prompt_cost_total(ch),
                 ch->cost_total_op[0] ? ch->cost_total_op : NULL,
                 ch->filter_group[0] ? ch->filter_group : NULL,
                 n_ch_chars ? ch_chars : NULL, n_ch_chars,
@@ -1438,7 +1536,16 @@ static int choice_handle_hand_indices(RbAbilityResolver *self, GameState *g,
             char en[96]; char ja[96];
             snprintf(en, sizeof(en), "Select more card(s) from hand (or skip to finish)");
             snprintf(ja, sizeof(ja), "手札からさらに選択（スキップで終了）");
-            choice_build_reprompt(g, actor, "hand", 0, en, ja, 1, NULL, 0);
+            /* choice.rs:1409-1420 `fi`: the still-legal, not-yet-picked positions. */
+            int avail[RB_MAX_ZONE], avail_n = 0;
+            for (int i = 0; i < n_ids; i++) {
+                if (!choice_discard_pick_legal(ch, ids[i])) continue;
+                int dup = 0;
+                for (int j = 0; j < self->n_selected_cards; j++)
+                    if (self->selected_cards[j] == ids[i]) { dup = 1; break; }
+                if (!dup && avail_n < RB_MAX_ZONE) avail[avail_n++] = i;
+            }
+            choice_build_reprompt(g, actor, "hand", 0, en, ja, 1, avail, avail_n);
             return 1;
         }
         if (n_picked > 0) {
@@ -1448,8 +1555,8 @@ static int choice_handle_hand_indices(RbAbilityResolver *self, GameState *g,
                the effect consumes them. */
             const char *ch_chars[16]; int n_ch_chars = choice_characters_arg(ch, ch_chars, 16);
             rb_resolver_execute_selected_cards_from_zone(self, g, "hand", picked, n_picked,
-                ch->card_type[0] ? ch->card_type : NULL, ch->cost_limit,
-                ch->cost_limit_op[0] ? ch->cost_limit_op : NULL, ch->cost_total,
+                ch->card_type[0] ? ch->card_type : NULL, choice_prompt_cost_limit(ch),
+                ch->cost_limit_op[0] ? ch->cost_limit_op : NULL, choice_prompt_cost_total(ch),
                 ch->cost_total_op[0] ? ch->cost_total_op : NULL,
                 ch->filter_group[0] ? ch->filter_group : NULL,
                 n_ch_chars ? ch_chars : NULL, n_ch_chars,
@@ -1476,6 +1583,7 @@ static int choice_handle_hand_indices(RbAbilityResolver *self, GameState *g,
 /* The multi-index core of handle_discard_selection (defined far below, next to
    its single-index wrapper). Declared here because the multi-index dispatcher
    below reaches it. */
+/* Defined further down, next to the discard-selection arm that serves them. */
 static void choice_discard_selection_indices(RbAbilityResolver *self, GameState *g,
                                             const int *sel, int n_sel);
 
@@ -2250,63 +2358,178 @@ int rb_resolver_handle_hand_selection(RbAbilityResolver *self, GameState *g, con
             return 0;
         }
     }
-    /* Non-C6 hand selection (choice.rs:1208-1397) */
+    /* ── Non-C6 hand SELECTION — choice.rs:1305-1543 ──────────────────────────
+       G1. This arm used to RECORD the pick into `self->selected_cards` and then
+       fall straight through to the epilogue, expecting the zone move to arrive
+       from `g->queue.deferred`. That field is NULL for a QUEUED ability (the
+       ability carries itself in `queue.entries[cur]` and the drain re-enters it),
+       so `def=0x0` in the resume trace and the chosen card was never moved: the
+       prompt was answered, the selection recorded, and the card stayed in hand.
+
+       Rust does the move IN THIS HANDLER. `handle_hand_selection` calls
+       `self.execute_selected_cards_from_zone(gs, Zone::Hand.to_str(), &all_idxs,
+       ..)` (choice.rs:1461-1474) and only THEN decides what to do with the
+       accumulator, so this port now does the same. The C twin already exists and
+       is what the multi-index arm of this same file uses:
+       rb_resolver_execute_selected_cards_from_zone -> rb_move_execute_selected_cards_from_zone
+       (move.c:2460, the port of move_cards.rs:2693-2772). It applies the prompt's
+       own card_type / cost_limit / cost_total / group / characters filters,
+       resolves the destination through rb_entry_destination, records the
+       movement, and can raise a sub-choice (stage placement, success
+       replacement, deck_top_or_bottom) — none of which the removed hand-rolled
+       `rb_hand_remove_card` + `rb_choice_send_to_dst` pair did. That pair also
+       sent the card to `pending.target`, which holds the SEAT ("self"/
+       "opponent"), never a zone.
+
+       `all_idxs` (choice.rs:1469-1480) is the current pick PLUS the hand
+       position of every card already in `self.selection.cards`. Rust's
+       `self.selection` is a field of the PERSISTENT resolver; the C's
+       RbAbilityResolver is memset to 0 at every answer
+       (rb_resume_with_choice_indices_internal), so the C's carrier for that
+       cross-round accumulator is the published `g->selected_cards`, which
+       publish_selected_cards fills from the resolver before each re-prompt. A
+       stale id is harmless: Rust's merge loop only looks up ids still in hand. */
     int is_any_number = (pending_count==0 && allow_skip);
     if (is_skip && !allow_skip && pending_count>0) return -1;
-    if (!is_skip && pending_count>0 && sel_idx >=0) {
-        /* fixed-count partial pick needs reprompt (choice.rs:1209-1287) */
-        int mapped = sel_idx; /* simplified: no filtered_indices mapping in C single-pick path */
-        int already = self->n_selected_cards;
-        /* accumulate selected card id for reprompt tracking */
-        int ids[RB_MAX_ZONE]; int n = rb_zone_cards(g, actor_pending, "hand", ids, RB_MAX_ZONE);
-        if (mapped < n) {
-            int cid = ids[mapped];
-            int exists=0; for(int i=0;i<self->n_selected_cards;i++) if(self->selected_cards[i]==cid) exists=1;
-            if(!exists && self->n_selected_cards<RB_MAX_RECENTLY_MOVED) self->selected_cards[self->n_selected_cards++]=cid;
+
+    int ids[RB_MAX_ZONE];
+    int n = rb_zone_cards(g, actor_pending, "hand", ids, RB_MAX_ZONE);
+    int mapped = sel_idx;   /* ctx.mfi already applied by the caller */
+    int picked_here = (mapped >= 0 && mapped < n) ? 1 : 0;
+
+    if (!is_skip && picked_here && pending_count > 0 && 1 < pending_count) {
+        /* PARTIAL pick — choice.rs:1309-1368. The cards chosen so far go into the
+           accumulator and the prompt is re-offered for the remainder; the move
+           happens once, on the complete answer. */
+        int cid = ids[mapped];
+        int exists = 0;
+        for (int i = 0; i < self->n_selected_cards; i++)
+            if (self->selected_cards[i] == cid) { exists = 1; break; }
+        if (!exists && self->n_selected_cards < RB_MAX_RECENTLY_MOVED)
+            self->selected_cards[self->n_selected_cards++] = cid;
+        publish_selected_cards(self);
+        /* choice.rs:1333 `let remaining = ctx.count - hand_idx.len()` — the count
+           is this answer's pick, not the accumulator. */
+        int remaining = pending_count - 1;
+        char en[80]; char ja[80];
+        snprintf(en, sizeof(en), "Select %d more card(s) from hand", remaining);
+        snprintf(ja, sizeof(ja), "手札からさらに%d枚選択", remaining);
+        /* choice.rs:1334-1347 `fi`: the candidates are the hand positions NOT
+           already in `all_hand_idxs`. */
+        int avail[RB_MAX_ZONE], avail_n = 0;
+        for (int i = 0; i < n; i++) {
+            int dup = 0;
+            for (int j = 0; j < self->n_selected_cards; j++)
+                if (self->selected_cards[j] == ids[i]) { dup = 1; break; }
+            if (!dup && avail_n < RB_MAX_ZONE) avail[avail_n++] = i;
         }
-        int have = self->n_selected_cards - already + 1; /* we just added one */
-        if (pending_count>0 && (int)self->n_selected_cards < pending_count) {
-            /* In Rust the remaining is ctx.count - hand_idx.len() where hand_idx is current pick count,
-               but with accumulation the reprompt count is ctx.count - self.selected_cards.len().
-               We mirror that. */
-            int total_have = self->n_selected_cards;
-            if (total_have < pending_count) {
-                int remaining = pending_count - total_have;
-                char en[64]; snprintf(en,sizeof(en),"Select %d more card(s) from hand", remaining);
-                RbChoice ch; memset(&ch,0,sizeof(ch));
-                ch.kind=RB_CHOICE_SELECT_CARD; strncpy(ch.zone,"hand",sizeof(ch.zone)-1);
-                ch.count=remaining; ch.allow_skip=0; strncpy(ch.description,en,sizeof(ch.description)-1);
-                g->queue.pending=ch; g->queue.has_pending=1; g->queue.actor=actor_pending;
-                return 0;
-            }
-        }
-        (void)cur_zone; (void)is_any_number; /* suppress unused */
-        /* any_number accumulation: after each pick, execute move then reprompt with skip (choice.rs:1288-1348) */
-        if (is_any_number) {
-            int cid_to_move = -1; if(mapped<n) cid_to_move = ids[mapped];
-            if (cid_to_move>=0) {
-                rb_hand_remove_card(&g->p[actor_pending], mapped);
-                const char *dst = g->queue.pending.target[0] ? g->queue.pending.target : "waitroom";
-                if (g->queue.resume_eff && g->queue.resume_eff->destination) dst = g->queue.resume_eff->destination;
-                rb_choice_send_to_dst(g, actor_pending, cid_to_move, dst);
-                if(g->n_recently_moved < RB_MAX_RECENTLY_MOVED) g->recently_moved[g->n_recently_moved++]=cid_to_move;
-                if(self->n_moved_cards<RB_MAX_RECENTLY_MOVED) self->moved_cards[self->n_moved_cards++]=cid_to_move;
-            }
-            int hand_n = g->p[actor_pending].hand.n;
-            if (hand_n>0) {
-                RbChoice ch; memset(&ch,0,sizeof(ch));
-                ch.kind=RB_CHOICE_SELECT_CARD; strncpy(ch.zone,"hand",sizeof(ch.zone)-1);
-                ch.count=0; ch.allow_skip=1; strncpy(ch.description,"Select more card(s) from hand (or skip to finish)",sizeof(ch.description)-1);
-                g->queue.pending=ch; g->queue.has_pending=1; g->queue.actor=actor_pending;
-                return 0;
-            }
-        }
-        /* fixed-count satisfied or any_number hand empty: fall through to epilogue */
-        self->n_selected_cards=0; /* Rust clears after execute_selected_cards_from_zone */
+        choice_build_reprompt(g, actor_pending, "hand", remaining, en, ja, 0, avail, avail_n);
+        return 0;
     }
-    if (is_any_number && !is_skip) {
-        /* already handled above */
+
+    if (!is_skip && picked_here && is_any_number) {
+        /* any_number batch — choice.rs:1369-1430. Move THIS pick through the
+           shared executor, record the moved id (choice.rs:1382-1384), then
+           re-offer with skip. */
+        int hand_idx[1]; hand_idx[0] = mapped;
+        const char *chars[16];
+        int n_chars = choice_characters_arg(&g->queue.pending, chars, 16);
+        rb_resolver_execute_selected_cards_from_zone(self, g, "hand", hand_idx, 1,
+            g->queue.pending.card_type[0] ? g->queue.pending.card_type : NULL,
+            choice_prompt_cost_limit(&g->queue.pending),
+            g->queue.pending.cost_limit_op[0] ? g->queue.pending.cost_limit_op : NULL,
+            choice_prompt_cost_total(&g->queue.pending),
+            g->queue.pending.cost_total_op[0] ? g->queue.pending.cost_total_op : NULL,
+            g->queue.pending.filter_group[0] ? g->queue.pending.filter_group : NULL,
+            n_chars ? chars : NULL, n_chars,
+            g->queue.pending.target_player_id[0] ? g->queue.pending.target_player_id : NULL);
+        if (rb_has_pending_choice(g)) return 0;   /* a sub-choice took over */
+        int moved_here = ids[mapped];
+        int already = 0;
+        for (int i = 0; i < self->n_selected_cards; i++)
+            if (self->selected_cards[i] == moved_here) { already = 1; break; }
+        if (!already && self->n_selected_cards < RB_MAX_RECENTLY_MOVED)
+            self->selected_cards[self->n_selected_cards++] = moved_here;
+        publish_selected_cards(self);
+        if (g->p[actor_pending].hand.n > 0) {
+            /* choice.rs:1396-1426 build_reprompt(.., count=0, allow_skip=true,
+               fi = the hand positions still passing the prompt's filter). */
+            int out[RB_MAX_ZONE], out_n = 0;
+            for (int i = 0; i < n; i++) {
+                if (!choice_discard_pick_legal(&g->queue.pending, ids[i])) continue;
+                int dup = 0;
+                for (int j = 0; j < self->n_selected_cards; j++)
+                    if (self->selected_cards[j] == ids[i]) { dup = 1; break; }
+                if (dup) continue;
+                int in_hand = 0;
+                for (int k = 0; k < g->p[actor_pending].hand.n; k++)
+                    if (g->p[actor_pending].hand.cards[k] == ids[i]) { in_hand = 1; break; }
+                if (in_hand && out_n < RB_MAX_ZONE) out[out_n++] = i;
+            }
+            char en[96]; char ja[96];
+            snprintf(en, sizeof(en), "Select more card(s) from hand (or skip to finish)");
+            snprintf(ja, sizeof(ja), "手札からさらに選択（スキップで終了）");
+            choice_build_reprompt(g, actor_pending, "hand", 0, en, ja, 1, out, out_n);
+            return 0;
+        }
+        self->n_selected_cards = 0;
+        rb_resolver_handle_selection_epilogue(self, g);
+        return 0;
     }
+
+    /* COMPLETE (or empty) pick — choice.rs:1431-1526. This is the move G1 was
+       missing: the executor is what lifts the cards out of the hand and places
+       them in the destination zone. */
+    {
+        int all_idxs[RB_MAX_ZONE];
+        int n_all = 0;
+        if (picked_here) all_idxs[n_all++] = mapped;
+        for (int h = 0; h < n && n_all < RB_MAX_ZONE; h++) {
+            int in_acc = 0;
+            for (int i = 0; i < g->n_selected_cards; i++)
+                if (g->selected_cards[i] == ids[h]) { in_acc = 1; break; }
+            if (!in_acc) continue;
+            int dup = 0;
+            for (int i = 0; i < n_all; i++) if (all_idxs[i] == h) { dup = 1; break; }
+            if (!dup) all_idxs[n_all++] = h;
+        }
+        if (n_all > 0) {
+            /* choice.rs:1475-1482 `selected_hand_ids` is snapshotted BEFORE the
+               move, so the keep_selected assignment below names the cards this
+               answer chose rather than whatever survived the filters. */
+            int selected_hand_ids[RB_MAX_ZONE];
+            for (int i = 0; i < n_all; i++) selected_hand_ids[i] = ids[all_idxs[i]];
+            const char *chars[16];
+            int n_chars = choice_characters_arg(&g->queue.pending, chars, 16);
+            rb_resolver_execute_selected_cards_from_zone(self, g, "hand", all_idxs, n_all,
+                g->queue.pending.card_type[0] ? g->queue.pending.card_type : NULL,
+                choice_prompt_cost_limit(&g->queue.pending),
+                g->queue.pending.cost_limit_op[0] ? g->queue.pending.cost_limit_op : NULL,
+                choice_prompt_cost_total(&g->queue.pending),
+                g->queue.pending.cost_total_op[0] ? g->queue.pending.cost_total_op : NULL,
+                g->queue.pending.filter_group[0] ? g->queue.pending.filter_group : NULL,
+                n_chars ? chars : NULL, n_chars,
+                g->queue.pending.target_player_id[0] ? g->queue.pending.target_player_id : NULL);
+            if (rb_has_pending_choice(g)) return 0;   /* a sub-choice took over */
+            /* choice.rs:1486-1525 keep_selected: the accumulator survives only
+               when the effect that asked CONSUMES `selected_cards`. */
+            int keep_selected = 0;
+            if (self->current_effect &&
+                choice_effect_uses_selected_cards(self->current_effect)) keep_selected = 1;
+            if (!keep_selected) {
+                const AbilityEffect *entry_eff = rb_entry_effect(g);
+                if (entry_eff && choice_effect_uses_selected_cards(entry_eff)) keep_selected = 1;
+            }
+            g->n_selected_cards = 0;
+            self->n_selected_cards = 0;
+            if (keep_selected)
+                for (int i = 0; i < n_all && i < RB_MAX_RECENTLY_MOVED; i++) {
+                    g->selected_cards[g->n_selected_cards++] = selected_hand_ids[i];
+                    self->selected_cards[self->n_selected_cards++] = selected_hand_ids[i];
+                }
+        }
+    }
+
     if (allow_skip) {
         int cur = g->queue.cur;
         if (cur>=0 && cur < g->queue.n_entries) {
@@ -3428,25 +3651,36 @@ void rb_resolver_handle_select_target(RbAbilityResolver *self, GameState *g,
         self->has_pending_choice = 0; rb_clear_pending_choice(g); return;
     }
     if (!strcmp(tgt, "pay_optional_cost:skip_optional_cost") || strstr(tgt, "pay_optional") || strstr(tgt, "skip_optional")) {
+        /* Rust: `SelectTargetKind::PayOptionalCostSkipOptionalCost =>
+           self.handle_optional_cost_payment(gs, selected)` (choice.rs:2813-2815),
+           and handle_optional_cost_payment (cost/handlers.rs:1393) is the faithful
+           port: it clears `last_cost_waited_members`, pays the gate's energy via
+           `cost.energy_count_any()` against `cost.target`, runs the "unless you
+           pay" alternative on skip, and stamps cost_paid /
+           optional_cost_result / effect_started itself.
+
+           This arm used to re-do a two-line subset of that inline and left the
+           rest uncalled, which is the "correctly ported but never called" defect
+           class:
+
+             - the energy debit was gated on `gs->queue.deferred`, but the drain
+               deliberately never parks `deferred` (ability_queue.c:1258-1260), so
+               the guard was always false and answering "pay" debited NOTHING;
+             - the amount came from `entries[cur].cost`, a C-only carrier Rust
+               has no equivalent of, which had zero writers tree-wide until the
+               energy gate started stamping it — and even stamped, it only ever
+               names an energy gate, so it is not the general charge;
+             - on skip, `alternative_effect` ("unless you pay") never ran, and
+               `effect_started` was left as-is instead of being reset.
+
+           Rust re-derives the charge from `gs.entry_cost()` at ANSWER time; that
+           is rb_entry_cost() here, so the entry keeps its own cost and the C-only
+           carrier is no longer consulted. */
         int pay = (atoi(sel)!=0 || !strcmp(sel,"1") || !strcmp(sel,"yes"));
-        if (g->queue.cur>=0 && g->queue.cur < g->queue.n_entries) {
-            g->queue.entries[g->queue.cur].optional_cost_result = pay?1:0;
-            g->queue.entries[g->queue.cur].cost_paid = 1;
-        }
-        /* If player chose to pay, deduct the energy from the deferred effect */
-        if (pay) {
-            GameState *gs = self->gs;
-            if (gs->queue.deferred && gs->queue.cur >= 0 && gs->queue.cur < gs->queue.n_entries) {
-                RbQueueEntry *e = &gs->queue.entries[gs->queue.cur];
-                RbPlayer *W = &gs->p[gs->active];
-                if (W->energy_active >= e->cost) {
-                    W->energy_active -= e->cost;
-                    if (W->energy_active < 0) W->energy_active = 0;
-                }
-            }
-        }
+        const AbilityEffect *entry_cost = rb_entry_cost(g);
         rb_resolver_clear_choice_state(self);
-        rb_resolver_resume_pending_actions(self);
+        rb_handle_optional_cost_payment(g, g->queue.actor >= 0 ? g->queue.actor : g->active,
+                                        entry_cost, pay);
         return;
     }
     if (strstr(tgt, "pay_cost_all_discard")) {
@@ -4259,6 +4493,45 @@ static int choice_declined_cost_stop(GameState *g, const RbChoice *ch)
     return 1;
 }
 
+/* ── the MoveCardsPosition answer ────────────────────────────────────────────
+   Rust dispatches a position answer on the CHOICE KIND, never on a resume mode
+   (result_handlers.rs:233-238 matches
+   `(Choice::SelectPosition{..}, PositionSelected{..})`), so this ONE handler
+   serves both C routes that can carry a SelectPosition: the mode==1 producer
+   park (move.c:1813) and the generic kind switch. */
+static const char *choice_stage_position_name(int answer_idx)
+{
+    /* mod.rs:2386-2392 maps the answer INDEX straight through
+       ["left","center","right"] — NOT through the offered `position` list — and
+       `unwrap_or("center")` covers both a skip and an out-of-range answer. */
+    if (answer_idx == 0) return "left";
+    if (answer_idx == 1) return "center";
+    if (answer_idx == 2) return "right";
+    return "center";
+}
+
+static void choice_apply_move_cards_position(GameState *g, int actor, int host,
+                                             const RbChoice *saved, int answer_idx,
+                                             const AbilityEffect *cont, int cont_from)
+{
+    if (!g) return;
+    /* The MoveCardsPosition context the producer parked: target rides in
+       target_player_id, source_zone in resume_draw_source, state_change in
+       resume_move_state (rb_move_place_card_with_stage_choice, move.c). */
+    const char *target = (saved && saved->target_player_id[0]) ? saved->target_player_id : "self";
+    const char *src_zone = g->queue.resume_draw_source[0] ? g->queue.resume_draw_source : "stage";
+    const char *state_change = g->queue.resume_move_state[0] ? g->queue.resume_move_state : NULL;
+    rb_move_handle_select_position(g, actor, choice_stage_position_name(answer_idx),
+                                   host, target, src_zone, state_change);
+    /* handle_select_position returns into provide_choice_result, which then
+       runs resume_pending_actions (choice.rs:108-126) — Rust's ONE consumer of
+       the parked tail. rb_move_handle_select_position fires the placed card's
+       登場 first (mod.rs:2423), which is what raises the NEXT prompt, so the
+       tail is resumed only when nothing is pending. */
+    if (!rb_has_pending_choice(g))
+        rb_resolver_continue_siblings(g, actor, host, cont, cont_from);
+}
+
 static int rb_resume_with_choice_indices_internal(GameState *g, const int *selected_indices,
                                                    int n_indices) {
     if (!g || !g->queue.has_pending) return 0;
@@ -4370,8 +4643,22 @@ static int rb_resume_with_choice_indices_internal(GameState *g, const int *selec
         g->queue.resume_after_look = NULL;
         if (after_look && !rb_has_pending_choice(g))
             rb_execute_effect_ex(g, actor, after_look, host);
-    } else if (mode == 1) {          /* position_change destination selection */
-        if (!was_skip && eff) {
+    } else if (mode == 1) {
+        /* mode==1 is the C's standing slot for "a position answer", and it is
+           shared by two DIFFERENT Rust contexts: Rule 4.5.5's stage swap
+           (state.c:1498 opens a SelectTarget, state.c:1507 resumes it) and
+           MoveCardsPosition's placement (move.c:1813, a SelectPosition). Only
+           the first is the stage-swap twin. rb_resume_position_change early-
+           returns on `src < 0` because the arriving card is not on stage yet,
+           so every placement answer was a silent no-op: the card had already
+           been taken out of its source zone and was never placed anywhere.
+           Rust's key is the Choice kind (result_handlers.rs:233-238), so the
+           kind decides here too. */
+        if (kind == RB_CHOICE_SELECT_POSITION) {
+            if (!was_skip)
+                choice_apply_move_cards_position(g, actor, host, &saved_pending,
+                                                 selected_idx, cont, cont_from);
+        } else if (!was_skip && eff) {
             g->queue.resume_active = 1;
             g->queue.choice_result = selected_idx;
             rb_resume_position_change(g, actor, eff, host, selected_idx);
@@ -4657,16 +4944,17 @@ static int rb_resume_with_choice_indices_internal(GameState *g, const int *selec
         case RB_CHOICE_SELECT_NUMBER:
             rb_resolver_handle_number_selection(g, was_skip ? -1 : selected_idx);
             break;
-        case RB_CHOICE_SELECT_POSITION: {
-            int host = g->queue.resume_host;
-            const char *target = g->queue.resume_eff && g->queue.resume_eff->target ? g->queue.resume_eff->target : "self";
-            const char *src_zone = g->queue.resume_eff && g->queue.resume_eff->source ? g->queue.resume_eff->source : "stage";
-            int state_change = 0;
-            if (g->queue.resume_eff && g->queue.resume_eff->destination && !strcmp(g->queue.resume_eff->destination, "wait"))
-                state_change = 1;
-            rb_resolver_handle_select_position(g, actor, selected, host, target, src_zone, state_change);
+        case RB_CHOICE_SELECT_POSITION:
+            /* The same handler as the mode==1 park above — one twin, one place.
+               The old body read the parked seat/zone/state off
+               `g->queue.resume_eff`, which the position producer never sets (and
+               which the prompt's own answer path may already have freed), and it
+               handed the ANSWER INDEX to the handler as the position NAME, so
+               rb_stage_position_index("0") was -1 and the card fell to hand. */
+            if (!was_skip)
+                choice_apply_move_cards_position(g, actor, host, &saved_pending,
+                                                 selected_idx, cont, cont_from);
             break;
-        }
         case RB_CHOICE_SELECT_AUTO_ABILITY:
             rb_resolver_handle_auto_ability_selection(g, selected ? atoi(selected) : -1);
             break;
@@ -4910,44 +5198,15 @@ void rb_resolver_handle_energy_zone_selection(GameState *g, int actor, const int
     }
 }
 
-/* ── handle_select_position (move_cards.rs:2397) ── */
-void rb_resolver_handle_select_position(GameState *g, int actor, const char *position, int card_id, const char *target, const char *source_zone, int state_change) {
-    if (!g || !position) return;
-    int pos_idx = rb_stage_position_index(position);
-    int pl = rb_resolve_target_player(g, target ? target : "self");
-    if (pl < 0 || pl >= 2) pl = actor;
-    RbPlayer *P = &g->p[pl];
-    int should_lock = source_zone && strcmp(source_zone, "stage") != 0;
-    int placed_on_stage = 0;
-    if (pos_idx >= 0 && pos_idx < RB_STAGE_SIZE) {
-        if (P->stage[pos_idx] < 0) {
-            P->stage[pos_idx] = card_id;
-            if (should_lock) { (void)g; }
-        } else {
-            rb_waitroom_add(P, P->stage[pos_idx]);
-            P->stage[pos_idx] = card_id;
-            if (should_lock) { (void)g; }
-        }
-        placed_on_stage = 1;
-    } else {
-        rb_hand_add(P, card_id);
-    }
-    rb_mods_clear_card(&g->mods, card_id);
-    /* move_cards.rs:2325-2326 — the MoveCardsPosition arm of
-       handle_select_position records the card as moved but pushes NO
-       MovementEvent: Rust logs the pair only (log_move_result, :2334). The C
-       choke point fuses the two, so the from-zone is passed as
-       RB_ZONEID_UNKNOWN — Rust's own ZoneId::Unknown (types.rs / rabuka.h:490),
-       produced by ZoneId::from_str for any wire name it cannot resolve — which
-       is the faithful way to say "no zone pair was recorded here". A bare 0,0
-       would instead read as RB_ZONEID_STAGE -> RB_ZONEID_STAGE and trip the
-       area-move arm at modifiers.c:417-420. */
-    rb_record_card_movement(g, card_id, RB_ZONEID_UNKNOWN,
-                            placed_on_stage ? RB_ZONEID_STAGE : RB_ZONEID_HAND, 0, 0);
-    if (state_change == 1 || state_change == 2)
-        rb_mods_set_orientation(&g->mods, card_id, "wait");
-    rb_move_fire_debut_side_effects(g, actor, card_id, target ? target : "self", source_zone ? source_zone : "");
-}
+/* rb_resolver_handle_select_position used to live here as a SECOND copy of
+   handle_select_position (mod.rs:2372-2426). Rust has exactly one
+   handle_select_position, selected by the (Choice, ChoiceResult) pair at
+   result_handlers.rs:233-238, so the twin now lives once — move.c's
+   rb_move_handle_select_position — and both C routes that can carry a
+   SelectPosition call it through choice_apply_move_cards_position. The copy that
+   stood here also read its seat/zone from `g->queue.resume_eff`, which the
+   position producer never sets, and had `if (should_lock) { (void)g; }` where
+   track_deployment belongs. */
 
 void rb_resolver_handle_number_selection(GameState *g, int selected)
 {

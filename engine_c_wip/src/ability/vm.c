@@ -935,9 +935,106 @@ static AbilityEffect *decode_effect_body(Rdr *r) {
             continue;
         }
         /* compound scalar fields mirrored from AbilityEffect::compound / root. These
-           are also retained as extras (below) for callers that read them as strings. */
-        if (key && !strcmp(key, "repeat_limit") && tag == RB_TAG_I64) {
-            int64_t v; if (rd_int(r, &v)) { e->repeat_limit = (int)v; probe_keep(); }
+           are also retained as extras (below) for callers that read them as strings.
+
+           `max_repeats` is the wire ALIAS for `repeat_limit`:
+           effect_decoder_gen.rs:241 `"max_repeats" => { ek.repeat_limit =
+           bc.read_u8_value(); Some(true) }`. Only the literal `repeat_limit` was
+           handled here, and `repeat_limit` does not occur ANYWHERE in the current
+           cards/abilities.json (0 occurrences) while `max_repeats` occurs 6 times.
+           So the branch was dead for every real ability: max_repeats fell to the
+           scalar tail below and was stored under the key "max_repeats", which
+           rb_effect_repeat_limit_any (core/card.c) never reads -- it looks at the
+           struct field and at the extra "repeat_limit". Result:
+             - repeat_procedure rendered "Repeat up to 1 times" where the card
+               says 4 (its own count is absent, so describe.rs's
+               `unwrap_or(c.unwrap_or(1))` fell back to 1);
+             - perform_yell rendered "Perform 1 yell" instead of "Perform up to 4
+               yells", collapsing to the amt==mx branch.
+           Both are the effect losing its repeat limit at DECODE time, which is the
+           defect class this decoder exists to prevent. `repeat_limit` is retained
+           under BOTH names so either accessor resolves it. */
+        if (key && (!strcmp(key, "repeat_limit") || !strcmp(key, "max_repeats"))) {
+            char buf[24];
+            if (tag == RB_TAG_I64) {
+                int64_t v;
+                if (!rd_int(r, &v)) goto fail;
+                e->repeat_limit = (int)v;
+                snprintf(buf, sizeof(buf), "%lld", (long long)v);
+            } else {
+                /* Rust's read_u8_value maps TAG_NULL and every non-I64 tag to
+                   None, so the struct field must stay untouched. */
+                if (!skip_value(r, tag)) goto fail;
+                probe_drop(key, tag);
+                buf[0] = '\0';
+            }
+            /* Retain under BOTH names. A wire object never carries the same key
+               twice, so `key` is one of the two; mirroring the value onto the
+               other guarantees rb_effect_repeat_limit_any -- which reads the
+               struct field first and only then the extra "repeat_limit" -- sees
+               the limit whichever name the card used. */
+            if (buf[0]) {
+                if (!effect_set_extra(e, "repeat_limit", buf)) goto fail;
+                if (strcmp(key, "repeat_limit") &&
+                    !effect_set_extra(e, key, buf)) goto fail;
+                probe_keep();
+            }
+            continue;
+        }
+        /* `energy` is the wire ALIAS for `energy_count`:
+           effect_decoder_gen.rs:240 `"energy" => { ek.energy_count =
+           bc.read_u8_value(); Some(true) }` -- the SAME `ek` slot as the
+           `"energy_count"` arm at :176. Rust has no second name for it: both
+           spellings land on the single `energy_count: Option<u8>` field of
+           AbilityEffect (ability/types.rs:315, carried into the struct literal
+           at :536).
+
+           Measured on cards/abilities.json (MD5 f459f727c852784095d33cb980034211,
+           working tree): `"energy"` occurs 85 times as a key and `"energy_count"`
+           only 12, i.e. the ALIAS is the dominant spelling by 7x. Every value is
+           in 1..=6, so no card is lost to the u8 gate. The same shape as the
+           `max_repeats` arm above: before this branch `energy` fell through to
+           the scalar tail below and was retained under its own raw key only, so
+           every reader that asks for the canonical `energy_count` came back None
+           -- describe.c:1320 (place_energy_under_member) and :1537 (the pay_energy
+           COST) both go through d_u8_extra(e, "energy_count") with no alias
+           fallback, and misc.c:777 extra_int(e, "energy_count", -1) likewise.
+           That is why 「{{icon_energy.png|E}}を2枚 paying 2 energy」 still described
+           and executed as a single energy: the amount was dropped at DECODE time.
+           cost.c / core/card.c / game_setup.c already consult both spellings via
+           rb_cost_energy_count_any, and compound.c's Q92 path calls exactly that,
+           so those stay correct either way -- this change is what makes the
+           canonical name readable for everyone.
+
+           read_u8_value (vm.rs:457-468 -> read_u32_value) maps TAG_NULL to None
+           and every non-I64 tag to None as well, and for I64 only accepts
+           `u8::try_from(int).ok()` -- 0..=255. A negative or >255 integer is
+           therefore None in Rust and is retained under NEITHER name here, so the
+           C never invents a value Rust dropped. */
+        if (key && (!strcmp(key, "energy") || !strcmp(key, "energy_count"))) {
+            char buf[24];
+            buf[0] = '\0';
+            if (tag == RB_TAG_I64) {
+                int64_t v;
+                if (!rd_int(r, &v)) goto fail;
+                if (v >= 0 && v <= 255) snprintf(buf, sizeof(buf), "%lld", (long long)v);
+            } else {
+                /* Not TAG_I64: read_u8_value returns None without touching the
+                   field. The value still has to be consumed to keep the reader
+                   in sync, exactly as the max_repeats arm above does. */
+                if (!skip_value(r, tag)) goto fail;
+            }
+            if (buf[0]) {
+                /* Canonical name first: it is what every reader asks for. */
+                int ok = effect_set_extra(e, "energy_count", buf);
+                /* Mirror onto the wire spelling when it is a different name. The
+                   mirror is best-effort: an effect already holding RB_MAX_EXTRA
+                   keys must NOT be failed here — `goto fail` would drop the whole
+                   ability over a key Rust stores in a struct field — so a full
+                   table degrades to the canonical pair that did fit. */
+                if (ok && strcmp(key, "energy_count")) effect_set_extra(e, key, buf);
+                if (ok) probe_keep(); else probe_drop(key, tag);
+            } else probe_drop(key, tag);
             continue;
         }
         if (key && !strcmp(key, "per_unit_count") && tag == RB_TAG_I64) {

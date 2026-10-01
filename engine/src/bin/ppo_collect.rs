@@ -28,6 +28,10 @@ struct Step {
     old_value: f32,
     reward: f32,
     done: bool,
+    // Which seat made this decision. RL trains on BOTH seats' self-play steps
+    // from one trajectory, so the terminal reward must be sign-flipped for P2's
+    // steps - otherwise every P2 decision would be optimised toward P1 winning.
+    seat: u8,
 }
 
 fn main() {
@@ -36,11 +40,21 @@ fn main() {
     let cards = card_loader::CardLoader::load_cards_from_file(cards_path).unwrap();
     let mut db = Arc::new(CardDatabase::load_or_create(cards));
 
-    let deck_path = std::path::Path::new("../web_ui/decks/fade deck.txt");
-    let deck = DeckParser::parse_deck_file(deck_path).unwrap();
+    // Deck to imitate on. Defaults to the deck the arena scores against
+// (`5CP3Z idou`); the previous hardcoded `fade deck` meant every trajectory
+// collected here described a different game from the one the learned policy is
+// ever evaluated on, which is the same class of mistake `bin_common::load_deck`
+// panics on ("a typo used to measure a different game than the one named").
+let deck_name = std::env::var("PPO_DECK").unwrap_or_else(|_| "5CP3Z idou".to_string());
+    let deck_path = std::path::Path::new("../web_ui/decks").join(format!("{deck_name}.txt"));
+    let deck = DeckParser::parse_deck_file(&deck_path)
+        .unwrap_or_else(|e| panic!("parse deck {}: {e}", deck_path.display()));
     let card_numbers = DeckParser::deck_list_to_card_numbers(&deck);
 
-    let num_games: u8 = std::env::args()
+    // `u32`, not `u8`: at u8 a request for 1500 games parsed as 244 and the run
+    // stopped at 200 games without any error, so a corpus silently ~7x smaller
+    // than asked for looks exactly like a successful run.
+let num_games: u32 = std::env::args()
         .nth(1)
         .and_then(|s| s.parse().ok())
         .unwrap_or(200);
@@ -128,32 +142,55 @@ fn main() {
                 continue;
             }
 
-            // P1 decision: record trajectory for ALL phases P1 makes choices
-            let p1_phase = gs.can_player_act(0);
+            // Which seat is acting. A pending CHOICE can belong to the player who is not
+            // the active player, so `active_player()` alone would mis-attribute
+            // steps - the same trap `bot_arena::decision_player` exists to avoid.
+            let acting_p1 = if gs.can_player_act(0) {
+                true
+            } else if gs.can_player_act(1) {
+                false
+            } else {
+                gs.active_player().id == gs.player1.id
+            };
+            let me = u8::from(!acting_p1);
+            let plan = if acting_p1 { &plan_p1 } else { &plan_p2 };
 
-            let action = if p1_phase && actions.len() > 1 {
-                let obs = PublicObservation::from_state(&gs, 0);
+            // RL self-play: BOTH seats play the network and both are recorded,
+            // so a round of self-play yields two trajectories' worth of signal
+            // and the agent learns from its own games rather than from a
+            // teacher's choices. This is the collection mode PPO needs; the
+            // imitation mode above is kept for behaviour-cloning comparison.
+            let record_seat = std::env::var("PPO_SEATS")
+                .ok()
+                .and_then(|v| v.parse::<u8>().ok())
+                .unwrap_or(2); // 1 = P1 only, 2 = both
+            let should_record = !imitation && (record_seat >= 2 || acting_p1);
+
+            let action = if should_record && actions.len() > 1 {
+                let obs = PublicObservation::from_state(&gs, me);
                 let enc_state = network.encode_state(&obs);
                 let action_encs: Vec<ActionEncoding> = actions
                     .iter()
                     .map(|a| ActionEncoding::from_action(a, &obs))
                     .collect();
                 let (logits, value) = network.evaluate_actions(&enc_state, &action_encs);
-                let (chosen_idx, log_prob) = if imitation {
-                    let target = choose_v7_action(&gs, &actions, 0, &plan_p1);
-                    (action_index(&actions, &target), 0.0)
+                let probs = softmax(&logits);
+                // Sample from the policy. `PPO_EPS` mixes in a uniform action so
+                // a fresh random policy still explores every legal move - with a
+                // near-zero policy the sampler never leaves the argmax and RL has
+                // nothing to improve from.
+                let eps: f32 = std::env::var("PPO_EPS")
+                    .ok()
+                    .and_then(|v| v.parse().ok())
+                    .filter(|e: &f32| e.is_finite() && *e >= 0.0 && *e <= 1.0)
+                    .unwrap_or(0.10);
+                let (chosen_idx, log_prob) = if rand::thread_rng().gen::<f32>() < eps {
+                    let idx = rand::thread_rng().gen_range(0..actions.len());
+                    let behavior_prob = (1.0 - eps) * probs[idx] + eps / actions.len() as f32;
+                    (idx, behavior_prob.max(1e-10).ln())
                 } else {
-                    let probs = softmax(&logits);
-                    let use_noise = weights_path.is_none()
-                        || rand::thread_rng().gen_range(0..100) < 10;
-                    if use_noise {
-                        let idx = rand::thread_rng().gen_range(0..actions.len());
-                        let behavior_prob = 0.9 * probs[idx] + 0.1 / actions.len() as f32;
-                        (idx, behavior_prob.max(1e-10).ln())
-                    } else {
-                        let idx = sample_from_probs(&probs);
-                        (idx, (probs[idx] + 1e-10).ln())
-                    }
+                    let idx = sample_from_probs(&probs);
+                    (idx, (probs[idx] + 1e-10).ln())
                 };
                 trajectory.push(Step {
                     state_flat: enc_state.flatten(),
@@ -163,10 +200,32 @@ fn main() {
                     old_value: value,
                     reward: 0.0,
                     done: false,
+                    seat: me,
                 });
                 actions[chosen_idx].clone()
+            } else if imitation && acting_p1 && actions.len() > 1 {
+                let obs = PublicObservation::from_state(&gs, 0);
+                let enc_state = network.encode_state(&obs);
+                let action_encs: Vec<ActionEncoding> = actions
+                    .iter()
+                    .map(|a| ActionEncoding::from_action(a, &obs))
+                    .collect();
+                let (logits, value) = network.evaluate_actions(&enc_state, &action_encs);
+                let target = choose_v7_action(&gs, &actions, 0, &plan_p1);
+                let idx = action_index(&actions, &target);
+                trajectory.push(Step {
+                    state_flat: enc_state.flatten(),
+                    actions: action_encs,
+                    chosen_idx: idx as u16,
+                    old_log_prob: 0.0,
+                    old_value: value,
+                    reward: 0.0,
+                    done: false,
+                    seat: me,
+                });
+                actions[idx].clone()
             } else if opponent_v7 {
-                choose_v7_action(&gs, &actions, 1, &plan_p2)
+                choose_v7_action(&gs, &actions, me, plan)
             } else {
                 let idx = rand::thread_rng().gen_range(0..actions.len());
                 actions[idx].clone()
@@ -175,7 +234,18 @@ fn main() {
             execute_action(&mut gs, &action);
         }
 
-        // Final reward
+        // Reward propagation.
+        //
+        // A win is only known at the end of the game, so the terminal reward
+        // lands on the LAST step and everything before it is discounted back
+        // from there. This is the standard terminal-MDP convention and PPO's
+        // GAE handles it, but it does mean every step's `reward` is a function
+        // of the outcome rather than something local - so the value head has to
+        // learn the discounting, which is exactly what it is for.
+        //
+        // `PPO_DISCOUNT` (default 0.99) is applied backwards from the terminal
+        // step. At 1.0 every step would carry the full game outcome, which
+        // makes the problem a bandit with no credit assignment at all.
         let p1z = gs.player1.success_live_card_zone.cards.len();
         let p2z = gs.player2.success_live_card_zone.cards.len();
         let final_reward = if p1z >= 3 && p2z <= 2 {
@@ -190,9 +260,26 @@ fn main() {
             p1_wins += 1;
         }
 
+        let discount: f32 = std::env::var("PPO_DISCOUNT")
+            .ok()
+            .and_then(|v| v.parse().ok())
+            .filter(|d: &f32| d.is_finite() && *d > 0.0 && *d <= 1.0)
+            .unwrap_or(0.99);
         if let Some(last) = trajectory.last_mut() {
             last.reward = final_reward;
             last.done = true;
+        }
+        // Walk backwards so step t carries gamma^(n-1-t) * outcome. Kept as a
+        // running product rather than a powf per step.
+        let mut carry = final_reward;
+        for step in trajectory.iter_mut().rev() {
+            carry *= discount;
+            step.reward = carry;
+        }
+        // The terminal step keeps the raw outcome (not gamma-damped), which is
+        // what "done" means to GAE.
+        if let Some(last) = trajectory.last_mut() {
+            last.reward = final_reward;
         }
 
         // Write trajectory: [n_steps:u32] [step_1] [step_2] ...

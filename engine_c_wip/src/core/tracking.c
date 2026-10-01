@@ -118,7 +118,6 @@ int rb_perform_cheer_check(GameState *g, const char *player_id, uint8_t blade_co
 
     for(int i=0;i<blade_count;i++){
         if(player->deck.n==0 && player->discard.n==0) break;
-        if(g->resolution.n >= RB_MAX_ZONE) return -1;
         if(player->deck.n==0 && player->discard.n>0){
             rb_shuffle(player->discard.cards, player->discard.n);
             memcpy(player->deck.cards, player->discard.cards,
@@ -136,7 +135,23 @@ int rb_perform_cheer_check(GameState *g, const char *player_id, uint8_t blade_co
             memmove(player->deck.cards, player->deck.cards + 1,
                     (size_t)player->deck.n * sizeof(player->deck.cards[0]));
         }
-        g->resolution.cards[g->resolution.n++] = card_id;
+        /* Rust's resolution_zone is an unbounded Vec (mod.rs:
+           `pub resolution_zone: ResolutionZone`), pushed unconditionally at
+           tracking.rs:93 `add_card_for_owner(card_id, owner)`, and
+           perform_cheer_check returns Ok(()) unconditionally. RB_MAX_ZONE (512)
+           is the only bound an RbBag can express, so saturate here exactly as
+           every other RbBag write in the tree does (zones.c rb_resolution_add,
+           rb_waitroom_add, rb_success_add; util.c / cost.c / engine.c follow
+           the same `if(n < RB_MAX_ZONE) cards[n++] = ...` shape).
+
+           The previous body instead did `if(g->resolution.n >= RB_MAX_ZONE)
+           return -1;` at the TOP of the loop, which both (a) diverges from
+           Rust — an error return Rust can never produce, so a caller reading
+           the result sees a failed yell — and (b) abandoned the remaining
+           blades, skipping their draws, their cheer_checks_done increments and
+           the trailing cheer_check_completed update. Saturating keeps every
+           card accounted for and can never walk off the array. */
+        rb_resolution_add(g, card_id);
         g->cheer_checks_done++;
     }
     if(g->cheer_checks_done >= g->cheer_checks_required){

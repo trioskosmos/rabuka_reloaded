@@ -2515,7 +2515,7 @@ def _extract_per_unit_info_from_text(text):
         info["per_unit_location"] = "stage"
     if "エネルギーカード" in per_unit_text:
         info["card_type"] = "energy_card"
-        if "エネルギーデッキ" in text or "これによって置いた" in per_unit_text:
+        if "エネルギーデッキ" in text:
             info["per_unit_type"] = "energy_deck"
     elif "メンバーカード" in per_unit_text:
         info["card_type"] = "member_card"

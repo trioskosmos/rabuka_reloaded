@@ -2485,7 +2485,11 @@ int rb_filter_current_blade(const int *cands, int n, const GameState *g,
 
 void rb_set_card_identity(int cid, const char *name) {
     if (cid < 0 || cid >= RB_MAX_CARD_IDS || !name || !*name) return;
-    if (!g_ident[cid]) g_ident[cid] = (char *)malloc((size_t)RB_MAX_IDENT * 28);
+    /* rb_malloc, not libc malloc: this table lives for the whole process and is
+       never freed, so under -DRB_NO_MALLOC it belongs in the arena like every
+       other engine allocation. (It was the only raw malloc left in this file;
+       norm_str and rb_prune_dominated already went through rb_malloc/rb_free.) */
+    if (!g_ident[cid]) g_ident[cid] = (char *)rb_malloc((size_t)RB_MAX_IDENT * 28);
     char *base = g_ident[cid];
     if (!base) return;
     for (int i = 0; i < g_ident_n[cid]; i++)

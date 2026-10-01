@@ -7,6 +7,21 @@
    because rb_advance_phase dispatches the two performance windows into it. */
 void rb_execute_performance_phase(GameState *g, int is_first);
 
+/* phases.rs:333 / 339 handle_rps_choice_p1 / _p2 — defined further down this
+   file; rb_advance_phase's pre-game arm calls them. */
+int rb_handle_rps_choice_p1(GameState *g, int choice);
+int rb_handle_rps_choice_p2(GameState *g, int choice);
+
+/* src/game/game_setup.c — the faithful ports of the pre-game ceremony:
+     rb_setup_choose_attacker        turn/actions/mod.rs:230 handle_choose_attacker
+     rb_setup_handle_mulligan_skip   turn/phases.rs:801  handle_mulligan_skip
+   rb_advance_phase's headless auto-pass routes into these rather than
+   re-implementing them, so there is exactly one implementation of each.
+   CROSS-FILE REQUEST: neither is declared in include/rabuka.h, so the externs
+   are spelled out here (game_setup.c is not part of this file's ownership). */
+int rb_setup_choose_attacker(GameState *g, int p1_first);
+int rb_setup_handle_mulligan_skip(GameState *g);
+
 /* Turn phase machine — mirrors engine/src/turn/phases.rs:advance_phase
    Two TurnPhases per round: FirstAttackerNormal / SecondAttackerNormal / Live.
    For portability we keep it linear: RPS → Active → Energy → Draw → Main
@@ -37,9 +52,49 @@ static void activate_wait_members(GameState *g, int pl) {
 void rb_advance_phase(GameState *g) {
     if(g->winner!=-1) return;
     if(rb_has_pending_choice(g)) return;
-    /* Mulligan phases are no-ops for headless/skip */
-    if(g->phase==RB_PHASE_RPS || g->phase==RB_PHASE_OPENING){
-        g->phase=RB_PHASE_ACTIVE;
+    /* ── Pre-game ceremony ────────────────────────────────────────────────────
+       Rust's TurnEngine::advance_phase has NO arm for RockPaperScissors,
+       ChooseFirstAttacker or either Mulligan phase: those are HOST-driven
+       (game_setup.rs:359-364 setup_game parks on RockPaperScissors, then the
+       host drives RPS -> ChooseFirstAttacker -> Mulligan -> Active through
+       execute_main_phase_action). The C rb_advance_phase is also the headless
+       harness's auto-pass, so it has to be able to walk the ceremony itself or
+       a headless game deadlocks on a phase nothing can move.
+
+       The split is: if the host has already answered, its answer wins and this
+       arm is not reached at all (the host routes RPS through
+       rb_setup_execute_action, whose RPS resolve has already parked the phase
+       on RB_PHASE_OPENING). Only when NO RPS choice has been recorded does this
+       arm stand in for the two missing players. */
+    if(g->phase==RB_PHASE_RPS){
+        if(g->player1_rps_choice<0 && g->player2_rps_choice<0){
+            /* HEADLESS STAND-IN for the host's two Rock/Paper/Scissors actions.
+               Rust never guesses these; the C has no host on this path. Same
+               seeded draw as the retired rb_game_init code, so replay fixtures
+               that seed the RNG still produce the same seat order. */
+            int a=(int)rb_rand_range(3), b;
+            do { b=(int)rb_rand_range(3); } while(b==a);
+            rb_handle_rps_choice_p1(g, a);
+            rb_handle_rps_choice_p2(g, b);
+        }
+        /* resolve_rps_if_both_chosen parks on RB_PHASE_OPENING; a tie clears
+           both choices and stays here for another pass. */
+        if(g->phase==RB_PHASE_RPS) return;
+    }
+    /* phases.rs:229-238 ChooseFirstAttacker — set the seats, draw 6 each, enter
+       MulliganFirstAttacker. Faithful port lives in src/game/game_setup.c
+       (rb_setup_choose_attacker, turn/actions/mod.rs:230 handle_choose_attacker);
+       this is the headless auto-pass routing into it. */
+    if(g->phase==RB_PHASE_OPENING){
+        rb_setup_choose_attacker(g, g->rps_winner != 2);
+        return;
+    }
+    /* phases.rs:698-711 advance_mulligan_phase. Headless auto-pass takes the
+       SKIP path (phases.rs:801 handle_mulligan_skip): no replacement, just clear
+       the selection and move on. A host that wants a replacement drives
+       SelectMulligan/ConfirmMulligan through rb_setup_execute_action instead. */
+    if(g->phase==RB_PHASE_MULLIGAN_FIRST || g->phase==RB_PHASE_MULLIGAN_SECOND){
+        rb_setup_handle_mulligan_skip(g);
         return;
     }
     if(g->phase==RB_PHASE_ACTIVE){
@@ -77,15 +132,23 @@ void rb_advance_phase(GameState *g) {
         }
         return;
     }
-    if(g->phase==RB_PHASE_LIVE_SET){
+    /* phases.rs:224-225 - the FIRST live-set window hands over to the second,
+       which is a DISTINCT value in Rust's Phase enum
+       (LiveCardSetSecondAttacker). It is stored here so g->phase holds what
+       Rust's Phase holds; from this point the window is identified by the
+       phase value, not by which seat happens to be active. */
+    if(g->phase==RB_PHASE_LIVE_SET || g->phase==RB_PHASE_LIVE_SET_SECOND){
         RbPlayer *P = &g->p[g->active];
         int placed = P->live.n;
         int hand_before_refill = P->hand.n;
         for (int i = 0; i < placed; i++) rb_draw(g, g->active);
         fprintf(stderr, "[LIVE_ZONE_REFILL] pl=%d placed=%d hand_before=%d hand_after=%d\n",
                 g->active, placed, hand_before_refill, P->hand.n);
-        if (g->active == g->first_attacker) {
+if (g->phase == RB_PHASE_LIVE_SET) {
             g->active = g->second_attacker;
+            /* phases.rs:225 — the window is done; the SECOND window is its
+               own Phase and is now STORED, not implied by `active`. */
+            g->phase = RB_PHASE_LIVE_SET_SECOND;
             return;
         }
         g->active = g->first_attacker;
@@ -109,7 +172,7 @@ void rb_advance_phase(GameState *g) {
         g->phase=RB_PHASE_PERFORMANCE;
         return;
     }
-    if(g->phase==RB_PHASE_PERFORMANCE){
+    if(g->phase==RB_PHASE_PERFORMANCE || g->phase==RB_PHASE_PERFORMANCE_SECOND){
         /* Two windows per live: the first attacker performs, then the second,
            then LiveVictoryDetermination. The window body — performer selection,
            the post-snapshot auto-ability sweeps and the phase transition — is
@@ -118,8 +181,12 @@ void rb_advance_phase(GameState *g) {
            execute_performance_phase(is_first)). live_batch_mode keeps the two
            windows from settling the round between them (mirrors the Rust pair
            of phases being separate TurnPhase values). */
+        /* Which window this is is read off the STORED phase, not off `active`
+           (types.rs:137 / phases.rs:256-265 name four distinct live values:
+           LiveCardSetFirstAttacker / LiveCardSetSecondAttacker /
+           FirstAttackerPerformance / SecondAttackerPerformance). */
         g->live_batch_mode = 1;
-        rb_execute_performance_phase(g, g->active == g->first_attacker);
+        rb_execute_performance_phase(g, g->phase == RB_PHASE_PERFORMANCE);
         return;
     }
     if(g->phase==RB_PHASE_VICTORY){
@@ -154,8 +221,11 @@ void rb_advance_phase(GameState *g) {
         int p1_won=0, p2_won=0;
         rb_determine_live_winners(g, &p1_won, &p2_won);
         g->p1_live_won = p1_won; g->p2_live_won = p2_won;
-        if (p1_won && !p2_won)      { g->first_attacker = 0; g->second_attacker = 1; }
-        else if (p2_won && !p1_won) { g->first_attacker = 1; g->second_attacker = 0; }
+        /* No seat election here — see the block comment above. An election keyed only on
+           WHO won flipped `first_attacker` even when the winner placed nothing into the
+           success zone, which Rule 8.4.13 forbids ("a win that placed nothing does NOT
+           re-elect the winner"). live.c's rb_move_to_success_and_update_attacker performs
+           the single, correct election and keys it off the placement itself. */
 
         for(int pl=0;pl<2;pl++){
             if(g->p[pl].success.n >= RB_VICTORY_CARD_COUNT) g->winner=pl;
@@ -341,8 +411,20 @@ int rb_handle_rps_choice_p2(GameState *g, int choice) {
     g->player2_rps_choice = choice;
     return rb_resolve_rps_if_both_chosen(g);
 }
-/* Mirror phases.rs::resolve_rps_if_both_chosen — rock-paper-scissors resolution.
-   Choices: 0=グー, 1=パー, 2=チョキ. (0,2)|(1,0)|(2,1) → P1 wins. */
+/* Mirror phases.rs:1780-1809 resolve_rps_if_both_chosen — rock-paper-scissors
+   resolution. Choices: 0=グー, 1=パー, 2=チョキ. (0,2)|(1,0)|(2,1) → P1 wins.
+
+   DEFECT FIX. The old body only stamped g->rps_winner and returned, so the RPS
+   phase never moved on: Rust sets
+       game_state.rps_winner = Some(rps_winner);
+       game_state.current_phase = Phase::ChooseFirstAttacker;
+   and on a TIE it logs 引き分け　再選択, clears BOTH player1_rps_choice and
+   player2_rps_choice back to None and returns WITHOUT publishing a winner —
+   the re-roll. The old C published rps_winner = 0 ("tie") as if it were an
+   outcome and left both choices set, so a re-asked round could never resolve
+   and the host could never see ChooseFirstAttacker. Both are restored here;
+   RB_PHASE_OPENING is the C spelling of Rust's ChooseFirstAttacker
+   (src/core/game_state_core.c:242-247 already reads it that way). */
 int rb_resolve_rps_if_both_chosen(GameState *g) {
     if (!g) return 0;
     if (g->player1_rps_choice < 0 || g->player2_rps_choice < 0) return 0;
@@ -350,31 +432,34 @@ int rb_resolve_rps_if_both_chosen(GameState *g) {
     int winner = 0; /* 0=tie, 1=P1, 2=P2 */
     if ((p1 == 0 && p2 == 2) || (p1 == 1 && p2 == 0) || (p1 == 2 && p2 == 1)) winner = 1;
     else if (p1 != p2) winner = 2;
+    if (winner == 0) {
+        /* 引き分け　再選択 — clear both choices and re-ask. rps_winner is NOT
+           written: Rust leaves the Option untouched across a tie. */
+        rb_push_rps_log(g, p1, p2, "tie");
+        g->player1_rps_choice = -1;
+        g->player2_rps_choice = -1;
+        return 0;
+    }
     g->rps_winner = winner;
-    rb_push_rps_log(g, p1, p2, winner == 0 ? "tie" : winner == 1 ? "p1" : "p2");
+    rb_push_rps_log(g, p1, p2, winner == 1 ? "p1" : "p2");
+    /* ChooseFirstAttacker — the host picks the seats next. */
+    g->phase = RB_PHASE_OPENING;
     return 1;
 }
 
-/* Mirror phases.rs::handle_mulligan_selection — player selects cards to redraw. */
-int rb_handle_mulligan_selection(GameState *g, int pl) {
-    if (!g) return 0;
-    g->mulligan_selecting[pl] = 1;
-    return 1;
-}
-/* Mirror phases.rs::handle_mulligan_confirmation — confirm selected mulligan cards. */
-int rb_handle_mulligan_confirmation(GameState *g, int pl) {
-    if (!g) return 0;
-    g->mulligan_selecting[pl] = 0;
-    g->mulligan_done[pl] = 1;
-    return 1;
-}
-/* Mirror phases.rs::handle_mulligan_skip */
-int rb_handle_mulligan_skip(GameState *g, int pl) {
-    if (!g) return 0;
-    g->mulligan_selecting[pl] = 0;
-    g->mulligan_done[pl] = 1;
-    return 1;
-}
+/* The three mulligan handlers that used to live here
+   (rb_handle_mulligan_selection / _confirmation / _skip) were STUBS: they only
+   flipped mulligan_selecting[] / mulligan_done[] and never touched a hand, so
+   the exact bug engine/src/turn/mulligan_tests.rs exists for — the replacement
+   landing on the OPPONENT — was unreachable in C because there was no
+   replacement at all. They had ZERO callers in the tree.
+
+   They are DELETED, not re-pointed. The live implementation is the faithful
+   port in src/game/game_setup.c (rb_setup_handle_mulligan_selection /
+   _confirmation / _skip), which is what rb_setup_execute_action dispatches to
+   and what owner-captures the mulligan seat BEFORE advancing the phase. Two
+   live copies on one path is exactly what the brief forbids, and the
+   rb_setup_* family is the one wired into the action dispatcher. */
 
 /* ───────────────────────────── play-time cost reduction ─────────────────────────────
    Faithful port of engine/src/turn/phases.rs:1317-1670:
@@ -769,9 +854,13 @@ const char *rb_phase_name(int phase) {
         case RB_PHASE_DRAW:           return "Draw";
         case RB_PHASE_MAIN:           return "Main";
         case RB_PHASE_LIVE_SET:       return "LiveCardSet";
+        case RB_PHASE_LIVE_SET_SECOND: return "LiveCardSetSecond";
         case RB_PHASE_PERFORMANCE:    return "Performance";
+        case RB_PHASE_PERFORMANCE_SECOND: return "PerformanceSecond";
         case RB_PHASE_VICTORY:        return "Victory";
         case RB_PHASE_DONE:           return "Done";
+        case RB_PHASE_MULLIGAN_FIRST: return "MulliganFirst";
+        case RB_PHASE_MULLIGAN_SECOND: return "MulliganSecond";
         default:                      return "Unknown";
     }
 }
@@ -1067,7 +1156,9 @@ void rb_execute_performance_phase(GameState *g, int is_first) {
     /* phases.rs:655-661 */
     if (is_first) {
         g->active = g->second_attacker;
-        g->phase = RB_PHASE_PERFORMANCE;
+        /* phases.rs:648 — SecondAttackerPerformance is its own Phase value and
+           is now STORED, so the second window is observable as itself. */
+        g->phase = RB_PHASE_PERFORMANCE_SECOND;
     } else {
         g->active = g->first_attacker;
         g->live_batch_mode = 0;

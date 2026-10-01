@@ -267,7 +267,11 @@ static int conditions_equal(const Condition *a, const Condition *b){
 
 /* ── resolver transient statics (mirror AbilityResolver fields not in GameState) ── */
 static int g_last_move_moved_any = -1; /* -1 none, 0 false, 1 true (set by move_cards.rs) */
-static int g_deferred_conditional_gate = 0;
+/* Non-static: declared in include/rabuka.h. This flag is the queue-level carrier
+ * that lets compound.c's 「〜したら」 branch reach choice.c's deferred_conditional_gate
+ * resolver field. While it was file-static it was WRITE-ONLY - nothing could read
+ * it, so the flag never crossed and the branch never fired. */
+int g_deferred_conditional_gate = 0;
 static int g_cancel_remaining_commands = 0;
 static AbilityEffect *g_pending_repeat_buf[64];
 static int g_pending_repeat_n = 0;
@@ -657,9 +661,22 @@ int rb_compound_conditional_on_result(GameState *g, int actor, const AbilityEffe
     if(eff->primary_effect){
         rb_execute_effect_ex(g,actor,(AbilityEffect*)eff->primary_effect,host_cid);
         if(rb_has_pending_choice(g)){
-            /* save condition check + followup as pending (compound.rs:832-838) */
-            /* mirror save_pending_actions with a placeholder count 1 */
-            if(g->queue.cur>=0&&g->queue.cur<g->queue.n_entries) g->queue.entries[g->queue.cur].pending_actions_n += 1;
+            /* conditional_on.rs:39-45 — when the PRIMARY action stops on a
+               prompt, Rust clones the whole conditional, sets
+               `finish.compound.primary_effect = None` and
+               `finish.condition = None`, and parks THAT as the entry's single
+               pending action, so the answer re-enters here with the primary
+               branch already spent and lands on result_condition -> followup.
+               The C used to bump `pending_actions_n += 1` over a NULL slot: the
+               entry reported one pending action and owned none, so both the
+               result gate and the followup were dropped (ren ab#1's recover,
+               q242's retrieve+blade+2). */
+            AbilityEffect finish = clone_effect(eff);
+            finish.primary_effect = NULL;
+            finish.condition = NULL;
+            AbilityEffect *rest[1];
+            rest[0] = &finish;
+            rb_queue_extend_pending_actions(g, rest, 1);
             return 1;
         }
     }

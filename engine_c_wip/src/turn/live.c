@@ -610,7 +610,7 @@ int rb_perform_live(GameState *g, int pl){
             for(int k=0;k<P->live.n-1;k++) P->live.cards[k]=P->live.cards[k+1];
             P->live.n--;
             if(P->success.n < RB_MAX_LIVE_CARDS) P->success.cards[P->success.n++]=cid;
-            else P->discard.cards[P->discard.n++]=cid;
+            else rb_waitroom_add(P, cid);
         }
         P->score+=live_score;
         P->yell_note_icons+=note_icons;

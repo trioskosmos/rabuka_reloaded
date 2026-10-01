@@ -216,7 +216,7 @@ void rb_effect_change_state(GameState *g, int actor, AbilityEffect *e, int host_
         for(int s=0; s<g->n_selected_cards; s++){
             int cid = g->selected_cards[s];
             for(int q=0; q<RB_STAGE_SIZE; q++)
-                if(P->stage[q] == cid){ cands[nc++] = cid; break; }
+                if(P->stage[q] == cid){ if(nc < RB_STAGE_SIZE) cands[nc++] = cid; break; }
         }
         if(nc > 0){
             int fcands[RB_STAGE_SIZE]; int fnc = 0;
@@ -418,11 +418,21 @@ candidates_ready:
             fprintf(stderr, "DEBUG [STATE_CHANGE] detected: card=%d %s->%s\n", cid, from_str, to_str);
             if(g->n_recently_state_changed < RB_MAX_RECENTLY_MOVED)
                 g->recently_state_changed[g->n_recently_state_changed++] = cid;
-            g->turn_state_changes[g->n_turn_state_changes][0] = g->activating_card >= 0 ? g->activating_card : -1;
-            g->turn_state_changes[g->n_turn_state_changes][1] = cid;
-            g->turn_state_changes[g->n_turn_state_changes][2] = from_str[0];
-            g->turn_state_changes[g->n_turn_state_changes][3] = to_str[0];
-            if(g->n_turn_state_changes < 64) g->n_turn_state_changes++;
+            /* Bound FIRST, then write. Rust's turn_state_changes is an unbounded
+               Vec (mod.rs:276) pushed unconditionally at change_state.rs:742, so
+               the only limit expressible in C is the array dimension (64 rows of
+               4 ints). The previous body wrote all four fields first and checked
+               afterwards, so at n == 64 it stored 256 bytes past the array and
+               clobbered the adjacent counters. Same guard-first shape as the
+               two sibling sites below (state.c:620, state.c:1839) and as the
+               recently_state_changed line directly above. */
+            if(g->n_turn_state_changes < 64){
+                int row = g->n_turn_state_changes++;
+                g->turn_state_changes[row][0] = g->activating_card >= 0 ? g->activating_card : -1;
+                g->turn_state_changes[row][1] = cid;
+                g->turn_state_changes[row][2] = from_str[0];
+                g->turn_state_changes[row][3] = to_str[0];
+            }
         }
     }
 
@@ -1755,7 +1765,10 @@ void rb_bulk_state_evaluate(GameState *g, int actor, int count, int max, int opt
     if(is_self_target && host_cid >= 0){
         int found = 0; for(int i=0;i<nc;i++) if(cands[i]==host_cid) found=1;
         if(!found && host_cid>=0){ int on_stage=0; for(int q=0;q<RB_STAGE_SIZE;q++) if(P->stage[q]==host_cid) on_stage=1;
-            if(on_stage){ cands[nc++]=host_cid; fprintf(stderr,"DEBUG [BULK_SELF_TARGET] added host_cid=%d to candidates\n", host_cid); }
+            /* cands[] is RB_STAGE_SIZE wide and the stage scan below can fill all
+               three slots, so this pre-seed needs the same bound it gives the
+               scan — otherwise nc reaches 4 and writes one int past the array. */
+            if(on_stage){ if(nc < RB_STAGE_SIZE) cands[nc++]=host_cid; fprintf(stderr,"DEBUG [BULK_SELF_TARGET] added host_cid=%d to candidates\n", host_cid); }
             else { fprintf(stderr,"DEBUG [BULK_SELF_TARGET] host not on stage, returning early\n"); return; }
         }
     }

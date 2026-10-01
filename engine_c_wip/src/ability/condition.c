@@ -1461,8 +1461,38 @@ static int eval_appearance(const struct GameState *g, int actor, int host_cid, c
    "live_end", "during_live", "before_live", "first_turn") and the `phase`
    gate. Sub-checks that need unimplemented state (has_card_moved_this_turn,
    debut_count_this_turn, nested conditions) degrade gracefully. */
+/* The "live window": the two live-card-set phases, the two performances, and
+   the victory determination that closes them.
+
+   This is the C twin of `Phase::is_live_phase()` (engine/src/core/types.rs:187),
+   and it is the SINGLE definition of that set, exactly as Rust's is. Rust's
+   doc comment on that method is the reason the shape matters:
+
+     "It used to be written out in full in six places in the engine — and,
+      worse, hand-NEGATED in a fifth shape at ability/condition/state.rs
+      (`before_live`, as five separate `!matches!` clauses). Add a sixth live
+      phase and the positive sites get updated while the negation silently
+      keeps the old answer, so `before_live` starts returning the wrong thing
+      with no compiler error. Nothing enforced agreement between them.
+      Use this for both polarities — `p.is_live_phase()` and
+      `!p.is_live_phase()` — never by re-listing the variants."
+
+   The C list is written POSITIVELY over the five phases Rust names, which is
+   what keeps it a definition rather than an exclusion list, and the `before_live`
+   negation below calls THIS function for its negative polarity instead of
+   re-listing the variants. All five values are now genuinely STORED by
+   phase.c:131/:151/:172/:1158/:1165, so all five are reachable. */
 static int phase_in_live(const struct GameState *g) {
-    return g->phase==RB_PHASE_LIVE_SET || g->phase==RB_PHASE_PERFORMANCE || g->phase==RB_PHASE_VICTORY;
+    switch (g->phase) {
+        case RB_PHASE_LIVE_SET:
+        case RB_PHASE_LIVE_SET_SECOND:
+        case RB_PHASE_PERFORMANCE:
+        case RB_PHASE_PERFORMANCE_SECOND:
+        case RB_PHASE_VICTORY:
+            return 1;
+        default:
+            return 0;
+    }
 }
 static int eval_temporal(const struct GameState *g, int actor, int host_cid, const Condition *c) {
     if (rb_ability_debug_enabled())
@@ -1532,7 +1562,16 @@ static int eval_temporal(const struct GameState *g, int actor, int host_cid, con
             return 1;
         }
         if (!strcmp(temp,"before_live"))
-            return !(g->phase==RB_PHASE_LIVE_SET || g->phase==RB_PHASE_PERFORMANCE || g->phase==RB_PHASE_VICTORY);
+            /* state.rs:341 — "before_live" => !current_phase.is_live_phase().
+               Calls phase_in_live() for the NEGATIVE polarity instead of
+               re-listing the phases. The previous body inlined
+               `!(LIVE_SET || PERFORMANCE || VICTORY)`, which is precisely the
+               fifth hand-negated shape types.rs:174-186 warns about: it kept
+               answering while the two *_SECOND phases were unstored, so it
+               agreed with the positive sites by accident and would have
+               disagreed the moment phase.c began storing them. One predicate,
+               both polarities, cannot drift. */
+            return !phase_in_live(g);
         if (!strcmp(temp,"first_turn")) return g->turn==1;
         if (!strcmp(temp,"this_turn")) {
             /* Mirror state.rs::evaluate_temporal_condition "this_turn" branch. */
