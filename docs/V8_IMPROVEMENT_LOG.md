@@ -1628,6 +1628,161 @@ evidence against the idea and this is not that.
 
 116/116 lib tests green with the code in place.
 
+### 13.2 It was neither: the scan fires, and the projection threw the result away
+
+Both discriminating measurements from §13.1, behind `V8_LSP_DIAG`:
+
+```text
+LSPDIAG lives=1 queued=1 blades 2->2 board [...]   <- BEFORE
+LSPDIAG lives=1 queued=1 blades 2->4 board [...]   <- AFTER
+LSPDIAG lives=1 queued=1 blades 4->6 board [...]
+LSPDIAG lives=1 queued=1 blades 5->7 board [...]
+```
+
+`queued=1` on every line, so the scanner always matched a live-start ability —
+**hypothesis 1 was wrong and hypothesis 2 was wrong too**. The abilities were
+firing; they were resolving to nothing because of the caller.
+
+`trigger_live_start_abilities` only **enqueues**. Resolution is a separate step,
+and the real engine takes it on the very next statement after both players'
+scans (`phases.rs:245-253`):
+
+```rust
+Self::trigger_live_start_abilities(game_state, &first_attacker_id);
+Self::trigger_live_start_abilities(game_state, &second_attacker_id);
+game_state.process_pending_auto_abilities(&first_attacker_id);   // <- this line
+```
+
+`project_live_start` never called it. The entry sat at `PayingCost`, so
+`has_pending_choice()` was false, the bounded answer loop broke on iteration 0
+having answered nothing, and the function returned the untouched set-time board.
+The bit-identical result was a missing call, not a missing effect.
+
+One line, `sim.process_pending_auto_abilities(&me_id)`. The blade count then
+moves 2→4, 4→6, 5→7: `Aspire`'s 「このターン中にエリアを移動した」 +1 blade per
+moved Liella member, resolved through the engine, on real boards. The board pool
+does not move, which is correct — these lives grant blades and hearts, not
+hearts-in-place, and `board_pool` reads stage hearts only.
+
+**And it is a measured null anyway.** Paired, n=3000, seed 11, on v9 with the
+confirmed term vector:
+
+| | result |
+|---|---|
+| baseline | 1674-1326, **55.8%**, 82930 actions |
+| + `V8_LIVE_START_PROJECTION` | 1681-1319, 56.0%, 80626 actions |
+
+```text
+DISCORDANT: baseline-only 49 | candidate-only 56    p = 0.55839
+pace (P1) 0.4519 -> 0.4519  +0.0000 [-0.0024, +0.0024]
+```
+
+49+56 = 105 of 3000 games differ, so the switch *does* change decisions now —
+against zero before — but the win rate moves +0.23pp at p=0.56. **This is a real
+null on a working mechanism, which is a different and much stronger result than
+§13.1's untested plumbing.** Keep it off; the reason is no longer "it does not
+fire."
+
+Note what the null does and does not say. It does not say projecting live-start
+abilities is wrong. It says that on this deck, pricing Aspire against 2 extra
+blades does not change which live set is worth committing, often enough to move
+3000 games. The mechanism is right and the lever is small: `+1` blade on a
+board that already draws 5-7 changes `p_place` in the fourth significant digit
+on most of the 105 discordant games.
+
+### 13.3 The audit: where live phases actually leak
+
+Read 289 consecutive live phases out of 60 full games, from the engine's own
+`live_result` verdicts, classified by what each side did
+(`tools/analysis/live_phase_leak.ps1`):
+
+| | n | share | P1 places | P2 places | per phase |
+|---|---|---|---|---|---|
+| `SET/SET` | 173 | 59.9% | 100 | 81 | 1.05 |
+| `SET/FOLD` | 53 | 18.3% | 50 | 0 | 0.94 |
+| `FOLD/SET` | 23 | 8.0% | 0 | **23** | 1.00 |
+| `FOLD/FOLD` | 40 | **13.8%** | 0 | 0 | **0.00** |
+
+Three findings, in descending order of size.
+
+**1. `FOLD/SET` is a guaranteed conceded placement, and it is 8% of all phases.**
+When v9 folds and v7 sets, v7 placed **23 times out of 23** — and v7 passed its
+own check in only 3 of those. Rule 8.4.3.2: setting alone wins the check, so a
+fold against a committed opponent concedes the phase outright, whether or not
+the opponent's board was good. 13 of those 23 were folded at 0-0, where conceding
+a placement is worst. v9 folds 63 times and 23 of them hand over a placement.
+
+**2. `FOLD/FOLD` is 13.8% of phases and produces nothing at all.** 56 of 289
+phases (19.4%) yielded zero placements for both sides. In the both-fold case
+neither player can win the check, so a full turn of Main-phase development buys
+nothing in the live phase. This is the largest single block of waste in the
+game, and it is mutual — it is not a v9-specific defect but it is a large shared
+one.
+
+**3. Two thirds of failed committed checks are short by 1-2 hearts.** Of 181
+phases where v9 committed and failed: 69 (38%) short by 1, 122 (67%) short by 2
+or less. That is a *development* shortfall, not a *selection* one. The board was
+one member or one blade-icon away from a placement.
+
+The card table makes the same point from the other side:
+
+| card | need | times set | passed |
+|---|---|---|---|
+| `始まりは君の空` | 3 | 69 | 29 (42%) |
+| `Special Color` | 7 | 59+16 | 10 (13%) |
+| `Aspire` | 11 | 62 | 5 (8%) |
+
+The bot commits high-need lives it cannot pass, at a rate close to what it does
+with the one life it can. Its own `p_pass` says otherwise (mean 0.75 at commit,
+64.6% of commits at p≥0.9), so this is the model and the outcome disagreeing —
+see §13.4.
+
+### 13.4 Calibration: the model is honest about *whether* and wrong about *how much*
+
+`V8_CAL` emits one machine-parseable line per live-set decision carrying the
+turn, the chosen card, and the **whole candidate table**
+(`tools/analysis/calibrate_live.ps1` joins it against the engine's verdict).
+971 decisions, P1 = v9:
+
+| model `p_place` | n | realized placement | ratio |
+|---|---|---|---|
+| ≥ 0.90 | 150 | 84.1% | 0.88 |
+| 0.60-0.90 | 353 | 66.6% | 0.86 |
+| 0.30-0.60 | 95 | 46.3% | 0.95 |
+| < 0.30 | 303 | 2.3% | — |
+| **overall** | | | **~0.55** |
+
+Three separate results, and the third is the load-bearing one:
+
+- **The set/fold decision is right.** 287 of the 303 low-`p_place` decisions
+  were folds, every one of them at model p < 0.02, and **zero** of them
+  realized a placement. The bot folds exactly when it should and never folds a
+  check it could have made. The argmax is internally consistent too: across 120
+  games there were **0** cases of committing while the best candidate was FOLD,
+  and **0** cases of folding while a non-fold candidate was best.
+- **The confidence is uniformly inflated ~1.15-1.25x** in the committing range.
+  That ratio is close to constant across buckets, which means it is very nearly
+  a **monotone transform** — and a monotone transform cannot reorder an argmax.
+  Rescaling `p_place` would change no decision and is therefore not the lever.
+  This is the same shape as §12.5's badly-scaled `V8_HAND_QUALITY` cell and the
+  §1.3 `PASS_TAX` failure: a scale problem dressed as a concept problem.
+- **The per-card bias is not uniform, and that part is real.** MIRACLE
+  (need 15) is the outlier: n=10, model p_place 0.420. It is priced at 0.42 on
+  boards that have not moved enough members for its live-start to pay off, which
+  is precisely what §13.2's projection was built to fix — and fixing it moved
+  the win rate +0.23pp. So the per-card bias is real, already addressed, and
+  too small to matter on n=3000. n=10 is also far too thin to build on.
+
+**Where this leaves the audit.** The live-set *decision procedure* is sound: it
+folds correctly, it commits correctly, and its ranking is self-consistent. The
+calibration error is monotone and therefore harmless to the argmax. The
+projection now works and does not help. What the audit actually points at is not
+in the live set at all — it is the 67% of failed checks that are short by 1-2
+hearts, which is the Main phase failing to put the last member or the last blade
+icon on stage before the check. That is §9's item 1 (re-enter the placement
+model at every search node) restated in measured terms: the live set is being
+handed boards it cannot use, and the fix is upstream of it.
+
 
 
 

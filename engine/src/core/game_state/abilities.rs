@@ -441,25 +441,20 @@ impl GameState {
         false
     }
 
-    /// Legacy wrapper: calls with default event (reads flags from self).
+    /// Wrapper: scans with the `recently_moved_cards` batch (default event).
     pub fn trigger_auto_abilities_for_player(&mut self, player_id: &str) {
-        let event = crate::ability::types::TriggerEvent {
-            moved_cards: self.recently_moved_cards.clone().unwrap_or_default(),
-            moved_from_zone: self.recently_moved_from_zone.clone(),
-            ..Default::default()
-        };
-        self.trigger_auto_abilities_for_player_with_event(player_id, &event);
+        // Inline for batches of <= 4 cards, so this is allocation-free in
+        // practice — and it replaces a struct that carried a guaranteed
+        // `Option<String>` allocation to no effect.
+        let moved = self.recently_moved_cards.clone().unwrap_or_default();
+        self.trigger_auto_abilities_for_player_with_event(player_id, &moved);
     }
 
     /// Post-movement scan wrapper: fires the TAS with the standard
     /// post-movement snapshot (recently moved cards + position-change flag).
     pub fn trigger_auto_abilities_for_movement(&mut self, player_id: &str) {
-        let event = crate::ability::types::TriggerEvent {
-            moved_cards: self.recently_moved_cards.clone().unwrap_or_default(),
-            position_change_occurred: self.position_change_occurred_this_turn,
-            ..Default::default()
-        };
-        self.trigger_auto_abilities_for_player_with_event(player_id, &event);
+        let moved = self.recently_moved_cards.clone().unwrap_or_default();
+        self.trigger_auto_abilities_for_player_with_event(player_id, &moved);
     }
 
     /// Same as [`Self::trigger_auto_abilities_for_movement`] but targets the
@@ -578,10 +573,25 @@ impl GameState {
             && !moved_cards.contains(&card_id)
     }
 
+    /// Core TAS implementation.
+    ///
+    /// Takes ONLY the moved-card batch. This used to take a `&TriggerEvent`
+    /// with six fields, but every read inside this function was
+    /// `event.moved_cards` — `moved_from_zone`, `position_change_occurred`,
+    /// `appeared_cards`, `energy_placed_by_effect` and `energy_placed_by_player`
+    /// were populated by all six call sites and **read by none of them**. In
+    /// particular `moved_from_zone: Option<String>` cost a guaranteed heap
+    /// allocation per call (a `String` clone) to carry nothing.
+    ///
+    /// The batch is passed in rather than read from `self` because one call site
+    /// (the post-loop batch scan) builds it from `self.batch_movements`, not
+    /// from the `recently_moved_cards` shadow field. The other five pass that
+    /// field, materialised into a local first — inline for batches of <= 4
+    /// cards, so allocation-free in practice.
     pub fn trigger_auto_abilities_for_player_with_event(
         &mut self,
         player_id: &str,
-        event: &crate::ability::types::TriggerEvent,
+        moved_cards: &[i16],
     ) {
         // Called 4x per card play (self + opponent, before and after the
         // placement). This is the scan, not the resolve: separating it from
@@ -594,7 +604,7 @@ impl GameState {
         let mut abilities_to_trigger: Vec<(i16, usize, i16)> = Vec::new();
         let skip_this_card_auto_key = self.just_completed_ability_key;
         let just_completed_batch_matches =
-            self.just_completed_batch_matches(&event.moved_cards);
+            self.just_completed_batch_matches(moved_cards);
         {
             // Copy the two id lists instead of borrowing the player. Both scans
             // need `&mut self` to evaluate conditions under a temporary
@@ -679,7 +689,7 @@ impl GameState {
                                     if Self::condition_is_event_based(condition) {
                                         let saved_activating = self.activating_card;
                                         self.activating_card = Some(card_id);
-                                        let ctx = crate::ability::condition::ConditionContext::with_moved_cards(self, &event.moved_cards);
+                                        let ctx = crate::ability::condition::ConditionContext::with_moved_cards(self, moved_cards);
                                         let passes = ctx.evaluate_condition(condition);
                                         self.activating_card = saved_activating;
                                         if crate::ability::debug::ABILITY_DEBUG
@@ -721,7 +731,7 @@ impl GameState {
                                 // the effect block closes -- condition and effect
                                 // are only in scope here.
                                 trigger_multiplicity = Self::trigger_instance_count(
-                                    &event.moved_cards,
+                                    moved_cards,
                                     effect,
                                     &self.card_database,
                                 );
@@ -741,7 +751,7 @@ impl GameState {
                             if ability.effect.as_ref().is_some_and(|eff| {
                                 eff.condition
                                     .as_ref()
-                                    .is_some_and(|c| Self::requires_this_move(c, card_id, &event.moved_cards))
+                                    .is_some_and(|c| Self::requires_this_move(c, card_id, moved_cards))
                             }) {
                                 continue;
                             }
@@ -820,7 +830,7 @@ impl GameState {
                                     if Self::condition_is_event_based(condition) {
                                         let saved_activating = self.activating_card;
                                         self.activating_card = Some(card_id);
-                                        let ctx = crate::ability::condition::ConditionContext::with_moved_cards(self, &event.moved_cards);
+                                        let ctx = crate::ability::condition::ConditionContext::with_moved_cards(self, moved_cards);
                                         let passes = ctx.evaluate_condition(condition);
                                         self.activating_card = saved_activating;
                                         if !passes {
@@ -838,7 +848,7 @@ impl GameState {
                             // Same movement gate for live cards:
                             if ability.effect.as_ref().is_some_and(|eff| {
                                 eff.condition.as_ref().is_some_and(|c| {
-                                    Self::requires_this_move(c, card_id, &event.moved_cards)
+                                    Self::requires_this_move(c, card_id, moved_cards)
                                 })
                             }) {
                                 continue;
@@ -863,7 +873,7 @@ impl GameState {
             // the ad-hoc trigger_auto_for_discarded_cards pattern matching).
             // Only enqueue for the card's actual owner (not the scanner).
             // Skip cards already on stage or in live zone (scanned separately).
-            for &moved_card_id in &event.moved_cards {
+            for &moved_card_id in moved_cards {
                 if self.player1.stage.stage.contains(&moved_card_id)
                     || self.player1.live_card_zone.cards.contains(&moved_card_id)
                     || self.player2.stage.stage.contains(&moved_card_id)
@@ -914,7 +924,7 @@ impl GameState {
                                     }
                                     let saved_activating = self.activating_card;
                                     self.activating_card = Some(moved_card_id);
-                                    let ctx = crate::ability::condition::ConditionContext::with_moved_cards(self, &event.moved_cards);
+                                    let ctx = crate::ability::condition::ConditionContext::with_moved_cards(self, moved_cards);
                                     let passes = ctx.evaluate_condition(condition);
                                     self.activating_card = saved_activating;
                                     if !passes {
@@ -939,7 +949,9 @@ impl GameState {
                 }
             }
         }
-        let moved = Some(event.moved_cards.clone());
+        // `from_slice`, not `to_vec` + wrap: this keeps the batch inline for
+        // <= 4 cards, which is the overwhelmingly common case.
+        let moved = Some(smallvec::SmallVec::<[i16; 4]>::from_slice(moved_cards));
         let mut cached_card_id = None;
         let mut cached_card_no = String::new();
         for (card_id, ability_idx, _stage_card_id) in abilities_to_trigger {
@@ -1827,16 +1839,15 @@ fn trigger_auto_ability_by_index_refs(
         let moved_marker = self.recently_moved_cards.is_some();
         let appeared_marker = !self.recently_appeared_cards.is_empty();
         if moved_marker || self.last_energy_placed_by_effect() || appeared_marker {
-            let event = crate::ability::types::TriggerEvent {
-                moved_cards: self
-                    .batch_movements
-                    .iter()
-                    .map(|m| m.moved_card_id)
-                    .collect(),
-                energy_placed_by_effect: self.last_energy_placed_by_effect(),
-                ..Default::default()
-            };
-            self.trigger_auto_abilities_for_player_with_event(player_id, &event);
+            // Built from `batch_movements`, NOT the `recently_moved_cards` shadow
+            // field — which is why the batch is a parameter and not read from
+            // `self`. Collected before the `&mut self` call so the borrow ends.
+            let moved: smallvec::SmallVec<[i16; 4]> = self
+                .batch_movements
+                .iter()
+                .map(|m| m.moved_card_id)
+                .collect();
+            self.trigger_auto_abilities_for_player_with_event(player_id, &moved);
             self.clear_recently_moved_batch();
             self.recently_appeared_cards.clear();
             self.recently_state_changed.clear();
@@ -2264,18 +2275,9 @@ fn trigger_auto_ability_by_index_refs(
                         self.recently_moved_cards
                     );
                 }
-                let event = crate::ability::types::TriggerEvent {
-                    moved_cards: self.recently_moved_cards.clone().unwrap_or_default(),
-                    moved_from_zone: self.recently_moved_from_zone.clone(),
-                    position_change_occurred: self.position_change_occurred_this_turn,
-                    energy_placed_by_effect: self.last_energy_placed_by_effect(),
-                    energy_placed_by_player: self
-                        .last_energy_placed_by_player()
-                        .map(|s| s.to_string()),
-                    ..Default::default()
-                };
+                let moved = self.recently_moved_cards.clone().unwrap_or_default();
                 self.set_just_completed(just_completed_key);
-                self.trigger_auto_abilities_for_player_with_event(&current_pid, &event);
+                self.trigger_auto_abilities_for_player_with_event(&current_pid, &moved);
                 // just_completed_ability_key intentionally NOT cleared here --                 // process_pending_auto_abilities' post-loop TAS (line ~803)
                 // also needs the guard to prevent re-enqueueing the same
                 // each_time watcher on stale movement data.

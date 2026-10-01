@@ -410,14 +410,16 @@ let source = cost.source_str().unwrap_or("");
             // with each other (any group, not necessarily the activating card's).
             // Build a group→count map, then only allow cards from groups with
             // at least `count` members.
-            let mut group_counts: HashMap<String, Vec<usize>> = HashMap::default();
+            let mut group_counts: HashMap<&str, Vec<usize>> = HashMap::default();
             for (i, &cid) in pl.hand.cards.iter().enumerate() {
                 if let Some(card) = card_db.get_card(cid) {
                     if !card.group.is_empty() {
-                        group_counts
-                            .entry(card.group.to_string())
-                            .or_default()
-                            .push(i);
+                        // Borrowed, not `card.group.to_string()`: `group` is an
+                        // `ArcStr` in the database, so the clone was a heap
+                        // allocation AND a SipHash of a String per hand card,
+                        // for a map that is discarded at the end of this block.
+                        // The `&str` borrows `card_db`, which outlives the block.
+                        group_counts.entry(&*card.group).or_default().push(i);
                     }
                 }
             }

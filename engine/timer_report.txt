@@ -1,464 +1,464 @@
 === TIMING (inclusive per call path; a nested path is ALSO counted
     inside its parent's row, so these do NOT sum to wall time) ===
   calls     total_ms      avg_us  depth  call path
-  65528      1185.37       18.09      1  bin_common::execute_and_settle
-  65528       753.14       11.49      2  bin_common::execute_and_settle -> execute_main_phase_action
-  29069       339.51       11.68      2  bin_common::execute_and_settle -> advance_phase
-  65528       312.53        4.77      1  generate_possible_actions
-  10847       268.34       24.74      3  bin_common::execute_and_settle -> execute_main_phase_action -> exec::play_member_to_stage
-  20060       229.66       11.45      2  generate_possible_actions -> generate_main_phase_actions
-  10689       229.28       21.45      3  bin_common::execute_and_settle -> execute_main_phase_action -> exec::resume_with_choice
-   2646       145.67       55.05      3  bin_common::execute_and_settle -> execute_main_phase_action -> exec::use_ability
-  17387       144.90        8.33      4  bin_common::execute_and_settle -> execute_main_phase_action -> exec::play_member_to_stage -> trig::process_pending
-   2646       128.22       48.46      4  bin_common::execute_and_settle -> execute_main_phase_action -> exec::use_ability -> trig::process_pending
-   4062       125.34       30.86      5  bin_common::execute_and_settle -> execute_main_phase_action -> exec::play_member_to_stage -> trig::process_pending -> resolve::current_ability
-   2646       121.49       45.92      5  bin_common::execute_and_settle -> execute_main_phase_action -> exec::use_ability -> trig::process_pending -> resolve::current_ability
-   2646        89.97       34.00      6  bin_common::execute_and_settle -> execute_main_phase_action -> exec::use_ability -> trig::process_pending -> resolve::current_ability -> resolve::resolve_ability_total
-   2965        85.81       28.94      3  bin_common::execute_and_settle -> advance_phase -> advance_phase::first_performance
-   4062        85.27       20.99      6  bin_common::execute_and_settle -> execute_main_phase_action -> exec::play_member_to_stage -> trig::process_pending -> resolve::current_ability -> resolve::resolve_ability_total
-   9532        84.85        8.90      3  bin_common::execute_and_settle -> execute_main_phase_action -> advance_phase
-   2965        83.68       28.22      4  bin_common::execute_and_settle -> advance_phase -> advance_phase::first_performance -> execute_performance_phase
-   2965        81.97       27.65      4  bin_common::execute_and_settle -> execute_main_phase_action -> advance_phase -> advance_phase::live_card_set
-   2965        72.21       24.35      3  bin_common::execute_and_settle -> advance_phase -> advance_phase::second_performance
-   2965        70.20       23.68      4  bin_common::execute_and_settle -> advance_phase -> advance_phase::second_performance -> execute_performance_phase
-   6705        66.14        9.86      3  bin_common::execute_and_settle -> advance_phase -> advance_phase::active
-   2139        63.20       29.55      4  bin_common::execute_and_settle -> execute_main_phase_action -> exec::resume_with_choice -> resolve::current_ability
-   2646        51.50       19.46      7  bin_common::execute_and_settle -> execute_main_phase_action -> exec::use_ability -> trig::process_pending -> resolve::current_ability -> resolve::resolve_ability_total -> resolve::run_effect
-   3024        50.03       16.54      3  bin_common::execute_and_settle -> advance_phase -> advance_phase::live_victory
-   6705        47.74        7.12      3  bin_common::execute_and_settle -> advance_phase -> advance_phase::draw
-   6705        46.86        6.99      4  bin_common::execute_and_settle -> advance_phase -> advance_phase::active -> check_timing
-   2139        46.86       21.91      5  bin_common::execute_and_settle -> execute_main_phase_action -> exec::resume_with_choice -> resolve::current_ability -> resolve::resolve_ability_total
-   2777        46.56       16.77      7  bin_common::execute_and_settle -> execute_main_phase_action -> exec::play_member_to_stage -> trig::process_pending -> resolve::current_ability -> resolve::resolve_ability_total -> resolve::run_effect
-   6705        43.15        6.44      4  bin_common::execute_and_settle -> advance_phase -> advance_phase::draw -> check_timing
-   4795        38.76        8.08      5  bin_common::execute_and_settle -> execute_main_phase_action -> advance_phase -> advance_phase::live_card_set -> trig::process_pending
-   2139        36.95       17.27      6  bin_common::execute_and_settle -> execute_main_phase_action -> exec::resume_with_choice -> resolve::current_ability -> resolve::resolve_ability_total -> resolve::run_effect
-   8550        36.70        4.29      4  bin_common::execute_and_settle -> execute_main_phase_action -> exec::resume_with_choice -> trig::process_pending
-   1831        34.86       19.04      6  bin_common::execute_and_settle -> execute_main_phase_action -> advance_phase -> advance_phase::live_card_set -> trig::process_pending -> resolve::current_ability
-   2965        29.16        9.84      5  bin_common::execute_and_settle -> advance_phase -> advance_phase::first_performance -> execute_performance_phase -> check_timing
-   1831        28.95       15.81      7  bin_common::execute_and_settle -> execute_main_phase_action -> advance_phase -> advance_phase::live_card_set -> trig::process_pending -> resolve::current_ability -> resolve::resolve_ability_total
-  10689        27.48        2.57      2  generate_possible_actions -> generate_pending_choice_actions
-   2965        27.02        9.11      5  bin_common::execute_and_settle -> execute_main_phase_action -> advance_phase -> advance_phase::live_card_set -> check_timing
-  34774        25.70        0.74      4  bin_common::execute_and_settle -> execute_main_phase_action -> exec::play_member_to_stage -> trig::auto_scan
-   2965        25.66        8.65      5  bin_common::execute_and_settle -> advance_phase -> advance_phase::second_performance -> execute_performance_phase -> check_timing
-   1344        25.06       18.65      5  bin_common::execute_and_settle -> execute_main_phase_action -> exec::resume_with_choice -> trig::process_pending -> resolve::current_ability
-  54150        24.80        0.46      2  bin_common::execute_and_settle -> record_action_boundary
-   2646        24.62        9.30      7  bin_common::execute_and_settle -> execute_main_phase_action -> exec::use_ability -> trig::process_pending -> resolve::current_ability -> resolve::resolve_ability_total -> resolve::pay_cost
-  32037        23.22        0.72      2  generate_possible_actions -> generate_live_card_set_actions
-   1344        20.36       15.15      6  bin_common::execute_and_settle -> execute_main_phase_action -> exec::resume_with_choice -> trig::process_pending -> resolve::current_ability -> resolve::resolve_ability_total
-  10847        20.24        1.87      4  bin_common::execute_and_settle -> execute_main_phase_action -> exec::play_member_to_stage -> recalculate_constants
-   1946        18.45        9.48      7  bin_common::execute_and_settle -> execute_main_phase_action -> exec::resume_with_choice -> resolve::current_ability -> resolve::resolve_ability_total -> resolve::run_effect -> effect::gates
-   1831        18.25        9.97      8  bin_common::execute_and_settle -> execute_main_phase_action -> advance_phase -> advance_phase::live_card_set -> trig::process_pending -> resolve::current_ability -> resolve::resolve_ability_total -> resolve::run_effect
-   6568        18.11        2.76      5  bin_common::execute_and_settle -> advance_phase -> advance_phase::active -> check_timing -> check_timing::recalculate_constants
-   2646        15.81        5.98      8  bin_common::execute_and_settle -> execute_main_phase_action -> exec::use_ability -> trig::process_pending -> resolve::current_ability -> resolve::resolve_ability_total -> resolve::run_effect -> effect::gates
-   6839        15.68        2.29      7  bin_common::execute_and_settle -> execute_main_phase_action -> exec::play_member_to_stage -> trig::process_pending -> resolve::current_ability -> resolve::resolve_ability_total -> resolve::handle_pending_choice
-   6568        15.62        2.38      5  bin_common::execute_and_settle -> advance_phase -> advance_phase::draw -> check_timing -> check_timing::recalculate_constants
-   2777        15.43        5.56      8  bin_common::execute_and_settle -> execute_main_phase_action -> exec::play_member_to_stage -> trig::process_pending -> resolve::current_ability -> resolve::resolve_ability_total -> resolve::run_effect -> effect::gates
-   1343        13.71       10.20      7  bin_common::execute_and_settle -> execute_main_phase_action -> exec::resume_with_choice -> trig::process_pending -> resolve::current_ability -> resolve::resolve_ability_total -> resolve::run_effect
-   2646        12.22        4.62      9  bin_common::execute_and_settle -> execute_main_phase_action -> exec::use_ability -> trig::process_pending -> resolve::current_ability -> resolve::resolve_ability_total -> resolve::run_effect -> effect::gates -> effect::dispatch
-   6568        12.17        1.85      6  bin_common::execute_and_settle -> advance_phase -> advance_phase::active -> check_timing -> check_timing::recalculate_constants -> recalculate_constants
-  69378        11.98        0.17      3  generate_possible_actions -> generate_main_phase_actions -> gen::cost_reduction
-   2965        11.89        4.01      5  bin_common::execute_and_settle -> advance_phase -> advance_phase::second_performance -> execute_performance_phase -> player_perform_live
-   1409        11.85        8.41      4  bin_common::execute_and_settle -> execute_main_phase_action -> exec::resume_with_choice -> effect::gates
-   1501        11.33        7.55      9  bin_common::execute_and_settle -> execute_main_phase_action -> advance_phase -> advance_phase::live_card_set -> trig::process_pending -> resolve::current_ability -> resolve::resolve_ability_total -> resolve::run_effect -> effect::gates
-   2965        11.29        3.81      6  bin_common::execute_and_settle -> execute_main_phase_action -> advance_phase -> advance_phase::live_card_set -> check_timing -> check_timing::recalculate_constants
-   2965        10.73        3.62      5  bin_common::execute_and_settle -> advance_phase -> advance_phase::first_performance -> execute_performance_phase -> player_perform_live
-   6568         9.96        1.52      6  bin_common::execute_and_settle -> advance_phase -> advance_phase::draw -> check_timing -> check_timing::recalculate_constants -> recalculate_constants
-   2965         9.63        3.25      6  bin_common::execute_and_settle -> advance_phase -> advance_phase::first_performance -> execute_performance_phase -> check_timing -> check_timing::recalculate_constants
-   2546         9.24        3.63      8  bin_common::execute_and_settle -> execute_main_phase_action -> exec::resume_with_choice -> resolve::current_ability -> resolve::resolve_ability_total -> resolve::run_effect -> effect::gates -> effect::gates
-   1024         8.73        8.53      5  bin_common::execute_and_settle -> execute_main_phase_action -> exec::resume_with_choice -> effect::gates -> effect::dispatch
-   1143         8.28        7.25      8  bin_common::execute_and_settle -> execute_main_phase_action -> exec::resume_with_choice -> trig::process_pending -> resolve::current_ability -> resolve::resolve_ability_total -> resolve::run_effect -> effect::gates
-   2965         8.26        2.78      6  bin_common::execute_and_settle -> advance_phase -> advance_phase::second_performance -> execute_performance_phase -> check_timing -> check_timing::recalculate_constants
-   2965         8.12        2.74      7  bin_common::execute_and_settle -> execute_main_phase_action -> advance_phase -> advance_phase::live_card_set -> check_timing -> check_timing::recalculate_constants -> recalculate_constants
-  10847         7.34        0.68      4  bin_common::execute_and_settle -> execute_main_phase_action -> exec::play_member_to_stage -> trig::debut
-   3050         6.88        2.26      4  bin_common::execute_and_settle -> execute_main_phase_action -> exec::resume_with_choice -> recalculate_constants
-   8555         6.73        0.79      4  bin_common::execute_and_settle -> execute_main_phase_action -> exec::resume_with_choice -> trig::auto_scan
-   2965         6.47        2.18      7  bin_common::execute_and_settle -> advance_phase -> advance_phase::first_performance -> execute_performance_phase -> check_timing -> check_timing::recalculate_constants -> recalculate_constants
-   2273         6.26        2.76      9  bin_common::execute_and_settle -> execute_main_phase_action -> exec::play_member_to_stage -> trig::process_pending -> resolve::current_ability -> resolve::resolve_ability_total -> resolve::run_effect -> effect::gates -> effect::dispatch
-  10428         6.23        0.60      5  bin_common::execute_and_settle -> advance_phase -> advance_phase::first_performance -> execute_performance_phase -> trig::auto_scan
-   2546         6.16        2.42      9  bin_common::execute_and_settle -> execute_main_phase_action -> exec::resume_with_choice -> resolve::current_ability -> resolve::resolve_ability_total -> resolve::run_effect -> effect::gates -> effect::gates -> effect::dispatch
-   2965         5.99        2.02      6  bin_common::execute_and_settle -> advance_phase -> advance_phase::first_performance -> execute_performance_phase -> check_timing -> check_timing::process_pending_auto_abilities
-   6568         5.66        0.86      5  bin_common::execute_and_settle -> advance_phase -> advance_phase::active -> check_timing -> check_timing::process_pending_auto_abilities
-   6568         5.66        0.86      5  bin_common::execute_and_settle -> advance_phase -> advance_phase::draw -> check_timing -> check_timing::process_pending_auto_abilities
-  12102         5.47        0.45      4  bin_common::execute_and_settle -> advance_phase -> advance_phase::live_victory -> trig::process_pending
-   2965         5.35        1.80      7  bin_common::execute_and_settle -> advance_phase -> advance_phase::second_performance -> execute_performance_phase -> check_timing -> check_timing::recalculate_constants -> recalculate_constants
-  69378         5.25        0.08      3  generate_possible_actions -> generate_main_phase_actions -> gen::area_candidates
-   4062         5.19        1.28      7  bin_common::execute_and_settle -> execute_main_phase_action -> exec::play_member_to_stage -> trig::process_pending -> resolve::current_ability -> resolve::resolve_ability_total -> resolve::pay_cost
-   2965         5.12        1.73      6  bin_common::execute_and_settle -> advance_phase -> advance_phase::second_performance -> execute_performance_phase -> check_timing -> check_timing::process_pending_auto_abilities
-   2646         5.05        1.91      8  bin_common::execute_and_settle -> execute_main_phase_action -> exec::use_ability -> trig::process_pending -> resolve::current_ability -> resolve::resolve_ability_total -> resolve::pay_cost -> recalculate_constants
-   1103         4.82        4.37     10  bin_common::execute_and_settle -> execute_main_phase_action -> advance_phase -> advance_phase::live_card_set -> trig::process_pending -> resolve::current_ability -> resolve::resolve_ability_total -> resolve::run_effect -> effect::gates -> effect::dispatch
-  10847         4.68        0.43      5  bin_common::execute_and_settle -> execute_main_phase_action -> exec::play_member_to_stage -> trig::process_pending -> trig::auto_scan
-    504         4.35        8.63      9  bin_common::execute_and_settle -> execute_main_phase_action -> exec::play_member_to_stage -> trig::process_pending -> resolve::current_ability -> resolve::resolve_ability_total -> resolve::run_effect -> effect::gates -> effect::gates
-  10435         4.27        0.41      5  bin_common::execute_and_settle -> advance_phase -> advance_phase::second_performance -> execute_performance_phase -> trig::auto_scan
-    879         4.26        4.84      9  bin_common::execute_and_settle -> execute_main_phase_action -> exec::resume_with_choice -> trig::process_pending -> resolve::current_ability -> resolve::resolve_ability_total -> resolve::run_effect -> effect::gates -> effect::dispatch
-    393         4.17       10.61      5  bin_common::execute_and_settle -> advance_phase -> advance_phase::live_victory -> trig::process_pending -> resolve::current_ability
-    393         3.52        8.97      6  bin_common::execute_and_settle -> advance_phase -> advance_phase::live_victory -> trig::process_pending -> resolve::current_ability -> resolve::resolve_ability_total
-    504         3.51        6.97     10  bin_common::execute_and_settle -> execute_main_phase_action -> exec::play_member_to_stage -> trig::process_pending -> resolve::current_ability -> resolve::resolve_ability_total -> resolve::run_effect -> effect::gates -> effect::gates -> effect::dispatch
-   2965         3.29        1.11      7  bin_common::execute_and_settle -> advance_phase -> advance_phase::first_performance -> execute_performance_phase -> check_timing -> check_timing::process_pending_auto_abilities -> trig::process_pending
-   2965         3.19        1.07      6  bin_common::execute_and_settle -> execute_main_phase_action -> advance_phase -> advance_phase::live_card_set -> check_timing -> check_timing::process_pending_auto_abilities
-    670         2.94        4.39     10  bin_common::execute_and_settle -> execute_main_phase_action -> advance_phase -> advance_phase::live_card_set -> trig::process_pending -> resolve::current_ability -> resolve::resolve_ability_total -> resolve::run_effect -> effect::gates -> effect::gates
-    634         2.64        4.17      8  bin_common::execute_and_settle -> execute_main_phase_action -> exec::resume_with_choice -> resolve::current_ability -> resolve::resolve_ability_total -> resolve::run_effect -> effect::gates -> effect::dispatch
-   2965         2.53        0.85      7  bin_common::execute_and_settle -> advance_phase -> advance_phase::second_performance -> execute_performance_phase -> check_timing -> check_timing::process_pending_auto_abilities -> trig::process_pending
-   6060         2.31        0.38      4  bin_common::execute_and_settle -> advance_phase -> advance_phase::live_victory -> trig::auto_scan
-   6007         2.18        0.36      5  bin_common::execute_and_settle -> execute_main_phase_action -> exec::resume_with_choice -> trig::process_pending -> trig::auto_scan
-    439         1.87        4.26      9  bin_common::execute_and_settle -> execute_main_phase_action -> exec::resume_with_choice -> trig::process_pending -> resolve::current_ability -> resolve::resolve_ability_total -> resolve::run_effect -> effect::gates -> effect::gates
-    670         1.85        2.77     11  bin_common::execute_and_settle -> execute_main_phase_action -> advance_phase -> advance_phase::live_card_set -> trig::process_pending -> resolve::current_ability -> resolve::resolve_ability_total -> resolve::run_effect -> effect::gates -> effect::gates -> effect::dispatch
-    731         1.80        2.46      6  bin_common::execute_and_settle -> execute_main_phase_action -> exec::resume_with_choice -> effect::gates -> effect::dispatch -> recalculate_constants
-  10428         1.74        0.17      5  bin_common::execute_and_settle -> advance_phase -> advance_phase::first_performance -> execute_performance_phase -> trig::process_pending
-  10435         1.62        0.15      5  bin_common::execute_and_settle -> advance_phase -> advance_phase::second_performance -> execute_performance_phase -> trig::process_pending
-   2965         1.55        0.52      6  bin_common::execute_and_settle -> advance_phase -> advance_phase::first_performance -> execute_performance_phase -> check_timing -> check_timing::check_invalid_live_cards
-    393         1.46        3.72      7  bin_common::execute_and_settle -> advance_phase -> advance_phase::live_victory -> trig::process_pending -> resolve::current_ability -> resolve::resolve_ability_total -> resolve::run_effect
-   2965         1.43        0.48      6  bin_common::execute_and_settle -> advance_phase -> advance_phase::second_performance -> execute_performance_phase -> check_timing -> check_timing::check_invalid_live_cards
-   2646         1.38        0.52      5  bin_common::execute_and_settle -> execute_main_phase_action -> exec::use_ability -> trig::process_pending -> trig::auto_scan
-    385         1.33        3.45      5  bin_common::execute_and_settle -> execute_main_phase_action -> exec::resume_with_choice -> effect::gates -> effect::gates
-    439         1.24        2.82     10  bin_common::execute_and_settle -> execute_main_phase_action -> exec::resume_with_choice -> trig::process_pending -> resolve::current_ability -> resolve::resolve_ability_total -> resolve::run_effect -> effect::gates -> effect::gates -> effect::dispatch
-   1571         1.02        0.65      8  bin_common::execute_and_settle -> advance_phase -> advance_phase::first_performance -> execute_performance_phase -> check_timing -> check_timing::process_pending_auto_abilities -> trig::process_pending -> trig::auto_scan
-    385         0.84        2.18      6  bin_common::execute_and_settle -> execute_main_phase_action -> exec::resume_with_choice -> effect::gates -> effect::gates -> effect::dispatch
-    694         0.79        1.14      6  bin_common::execute_and_settle -> execute_main_phase_action -> exec::resume_with_choice -> effect::gates -> effect::dispatch -> trig::auto_scan
-      7         0.72      102.30      7  bin_common::execute_and_settle -> advance_phase -> advance_phase::active -> check_timing -> check_timing::recalculate_constants -> recalculate_constants -> vm::get_ability
-   1587         0.61        0.39      8  bin_common::execute_and_settle -> advance_phase -> advance_phase::second_performance -> execute_performance_phase -> check_timing -> check_timing::process_pending_auto_abilities -> trig::process_pending -> trig::auto_scan
-   6568         0.58        0.09      5  bin_common::execute_and_settle -> advance_phase -> advance_phase::active -> check_timing -> check_timing::check_invalid_live_cards
-   6705         0.56        0.08      3  bin_common::execute_and_settle -> advance_phase -> advance_phase::energy
-   6568         0.51        0.08      6  bin_common::execute_and_settle -> advance_phase -> advance_phase::active -> check_timing -> check_timing::process_pending_auto_abilities -> trig::process_pending
-     77         0.50        6.46      8  bin_common::execute_and_settle -> advance_phase -> advance_phase::live_victory -> trig::process_pending -> resolve::current_ability -> resolve::resolve_ability_total -> resolve::run_effect -> effect::gates
-    702         0.46        0.65      6  bin_common::execute_and_settle -> execute_main_phase_action -> exec::use_ability -> trig::process_pending -> resolve::current_ability -> trig::auto_scan
-   6568         0.44        0.07      5  bin_common::execute_and_settle -> advance_phase -> advance_phase::draw -> check_timing -> check_timing::check_invalid_live_cards
-   6568         0.39        0.06      6  bin_common::execute_and_settle -> advance_phase -> advance_phase::draw -> check_timing -> check_timing::process_pending_auto_abilities -> trig::process_pending
-     77         0.38        4.87      9  bin_common::execute_and_settle -> advance_phase -> advance_phase::live_victory -> trig::process_pending -> resolve::current_ability -> resolve::resolve_ability_total -> resolve::run_effect -> effect::gates -> effect::dispatch
-    256         0.36        1.40     10  bin_common::execute_and_settle -> execute_main_phase_action -> exec::use_ability -> trig::process_pending -> resolve::current_ability -> resolve::resolve_ability_total -> resolve::run_effect -> effect::gates -> effect::dispatch -> recalculate_constants
-   4062         0.31        0.08      7  bin_common::execute_and_settle -> execute_main_phase_action -> exec::play_member_to_stage -> trig::process_pending -> resolve::current_ability -> resolve::resolve_ability_total -> resolve::pre_gates
-    902         0.28        0.31      6  bin_common::execute_and_settle -> advance_phase -> advance_phase::second_performance -> execute_performance_phase -> trig::process_pending -> trig::auto_scan
-    877         0.27        0.31      6  bin_common::execute_and_settle -> advance_phase -> advance_phase::first_performance -> execute_performance_phase -> trig::process_pending -> trig::auto_scan
-   2965         0.25        0.08      7  bin_common::execute_and_settle -> execute_main_phase_action -> advance_phase -> advance_phase::live_card_set -> check_timing -> check_timing::process_pending_auto_abilities -> trig::process_pending
-   6705         0.25        0.04      5  bin_common::execute_and_settle -> advance_phase -> advance_phase::draw -> check_timing -> check_timing::check_victory_condition
-    229         0.25        1.08      6  bin_common::execute_and_settle -> execute_main_phase_action -> exec::play_member_to_stage -> trig::process_pending -> resolve::current_ability -> trig::auto_scan
-   6705         0.23        0.03      5  bin_common::execute_and_settle -> advance_phase -> advance_phase::active -> check_timing -> check_timing::check_victory_condition
-   2646         0.22        0.08      7  bin_common::execute_and_settle -> execute_main_phase_action -> exec::use_ability -> trig::process_pending -> resolve::current_ability -> resolve::resolve_ability_total -> resolve::pre_gates
-    184         0.20        1.11     10  bin_common::execute_and_settle -> execute_main_phase_action -> exec::play_member_to_stage -> trig::process_pending -> resolve::current_ability -> resolve::resolve_ability_total -> resolve::run_effect -> effect::gates -> effect::dispatch -> trig::auto_scan
-     92         0.20        2.14     10  bin_common::execute_and_settle -> execute_main_phase_action -> exec::play_member_to_stage -> trig::process_pending -> resolve::current_ability -> resolve::resolve_ability_total -> resolve::run_effect -> effect::gates -> effect::dispatch -> recalculate_constants
-   5292         0.18        0.03      7  bin_common::execute_and_settle -> execute_main_phase_action -> exec::use_ability -> trig::process_pending -> resolve::current_ability -> resolve::resolve_ability_total -> resolve::handle_pending_choice
-   2965         0.18        0.06      6  bin_common::execute_and_settle -> execute_main_phase_action -> advance_phase -> advance_phase::live_card_set -> check_timing -> check_timing::check_invalid_live_cards
-    199         0.17        0.83      6  bin_common::execute_and_settle -> execute_main_phase_action -> exec::resume_with_choice -> trig::process_pending -> resolve::current_ability -> trig::auto_scan
-   1831         0.15        0.08      8  bin_common::execute_and_settle -> execute_main_phase_action -> advance_phase -> advance_phase::live_card_set -> trig::process_pending -> resolve::current_ability -> resolve::resolve_ability_total -> resolve::pre_gates
-   4278         0.15        0.03      6  bin_common::execute_and_settle -> execute_main_phase_action -> exec::resume_with_choice -> resolve::current_ability -> resolve::resolve_ability_total -> resolve::handle_pending_choice
-   2139         0.14        0.07      6  bin_common::execute_and_settle -> execute_main_phase_action -> exec::resume_with_choice -> resolve::current_ability -> resolve::resolve_ability_total -> resolve::pre_gates
-   3662         0.13        0.03      8  bin_common::execute_and_settle -> execute_main_phase_action -> advance_phase -> advance_phase::live_card_set -> trig::process_pending -> resolve::current_ability -> resolve::resolve_ability_total -> resolve::handle_pending_choice
-   2965         0.11        0.04      6  bin_common::execute_and_settle -> execute_main_phase_action -> advance_phase -> advance_phase::live_card_set -> check_timing -> check_timing::check_victory_condition
-   2139         0.10        0.05      6  bin_common::execute_and_settle -> execute_main_phase_action -> exec::resume_with_choice -> resolve::current_ability -> resolve::resolve_ability_total -> resolve::pay_cost
-   2965         0.10        0.03      6  bin_common::execute_and_settle -> advance_phase -> advance_phase::second_performance -> execute_performance_phase -> check_timing -> check_timing::check_victory_condition
-   2965         0.10        0.03      6  bin_common::execute_and_settle -> advance_phase -> advance_phase::first_performance -> execute_performance_phase -> check_timing -> check_timing::check_victory_condition
-   2686         0.09        0.03      7  bin_common::execute_and_settle -> execute_main_phase_action -> exec::resume_with_choice -> trig::process_pending -> resolve::current_ability -> resolve::resolve_ability_total -> resolve::handle_pending_choice
-   1831         0.08        0.05      8  bin_common::execute_and_settle -> execute_main_phase_action -> advance_phase -> advance_phase::live_card_set -> trig::process_pending -> resolve::current_ability -> resolve::resolve_ability_total -> resolve::pay_cost
-   1344         0.08        0.06      7  bin_common::execute_and_settle -> execute_main_phase_action -> exec::resume_with_choice -> trig::process_pending -> resolve::current_ability -> resolve::resolve_ability_total -> resolve::pre_gates
-      5         0.08       15.30      7  bin_common::execute_and_settle -> advance_phase -> advance_phase::draw -> check_timing -> check_timing::recalculate_constants -> recalculate_constants -> vm::get_ability
-   1343         0.06        0.04      7  bin_common::execute_and_settle -> execute_main_phase_action -> exec::resume_with_choice -> trig::process_pending -> resolve::current_ability -> resolve::resolve_ability_total -> resolve::pay_cost
-      3         0.06       18.77      3  generate_possible_actions -> generate_main_phase_actions -> vm::get_ability
-     22         0.05        2.09     10  bin_common::execute_and_settle -> execute_main_phase_action -> exec::resume_with_choice -> trig::process_pending -> resolve::current_ability -> resolve::resolve_ability_total -> resolve::run_effect -> effect::gates -> effect::dispatch -> recalculate_constants
-     34         0.04        1.10     10  bin_common::execute_and_settle -> execute_main_phase_action -> exec::resume_with_choice -> trig::process_pending -> resolve::current_ability -> resolve::resolve_ability_total -> resolve::run_effect -> effect::gates -> effect::dispatch -> trig::auto_scan
-    786         0.03        0.03      7  bin_common::execute_and_settle -> advance_phase -> advance_phase::live_victory -> trig::process_pending -> resolve::current_ability -> resolve::resolve_ability_total -> resolve::handle_pending_choice
-    393         0.02        0.06      7  bin_common::execute_and_settle -> advance_phase -> advance_phase::live_victory -> trig::process_pending -> resolve::current_ability -> resolve::resolve_ability_total -> resolve::pre_gates
-     65         0.02        0.32      5  bin_common::execute_and_settle -> advance_phase -> advance_phase::live_victory -> trig::process_pending -> trig::auto_scan
-      1         0.02       16.30      5  bin_common::execute_and_settle -> execute_main_phase_action -> exec::resume_with_choice -> trig::auto_scan -> vm::get_ability
-    393         0.02        0.04      7  bin_common::execute_and_settle -> advance_phase -> advance_phase::live_victory -> trig::process_pending -> resolve::current_ability -> resolve::resolve_ability_total -> resolve::pay_cost
-      1         0.01        7.70      8  bin_common::execute_and_settle -> execute_main_phase_action -> advance_phase -> advance_phase::live_card_set -> check_timing -> check_timing::recalculate_constants -> recalculate_constants -> vm::get_ability
-      2         0.01        3.30      9  bin_common::execute_and_settle -> execute_main_phase_action -> exec::resume_with_choice -> resolve::current_ability -> resolve::resolve_ability_total -> resolve::run_effect -> effect::gates -> effect::dispatch -> recalculate_constants
-      4         0.00        1.12      9  bin_common::execute_and_settle -> execute_main_phase_action -> exec::resume_with_choice -> resolve::current_ability -> resolve::resolve_ability_total -> resolve::run_effect -> effect::gates -> effect::dispatch -> trig::auto_scan
+  65397      1474.28       22.54      1  bin_common::execute_and_settle
+  65397       943.07       14.42      2  bin_common::execute_and_settle -> execute_main_phase_action
+  29045       415.60       14.31      2  bin_common::execute_and_settle -> advance_phase
+  65397       394.67        6.03      1  generate_possible_actions
+  10806       329.23       30.47      3  bin_common::execute_and_settle -> execute_main_phase_action -> exec::play_member_to_stage
+  10634       291.62       27.42      3  bin_common::execute_and_settle -> execute_main_phase_action -> exec::resume_with_choice
+  20002       290.41       14.52      2  generate_possible_actions -> generate_main_phase_actions
+   2633       185.10       70.30      3  bin_common::execute_and_settle -> execute_main_phase_action -> exec::use_ability
+  17317       182.32       10.53      4  bin_common::execute_and_settle -> execute_main_phase_action -> exec::play_member_to_stage -> trig::process_pending
+   2633       162.96       61.89      4  bin_common::execute_and_settle -> execute_main_phase_action -> exec::use_ability -> trig::process_pending
+   4040       158.19       39.16      5  bin_common::execute_and_settle -> execute_main_phase_action -> exec::play_member_to_stage -> trig::process_pending -> resolve::current_ability
+   2633       153.99       58.49      5  bin_common::execute_and_settle -> execute_main_phase_action -> exec::use_ability -> trig::process_pending -> resolve::current_ability
+   2633       113.31       43.04      6  bin_common::execute_and_settle -> execute_main_phase_action -> exec::use_ability -> trig::process_pending -> resolve::current_ability -> resolve::resolve_ability_total
+   4040       107.72       26.66      6  bin_common::execute_and_settle -> execute_main_phase_action -> exec::play_member_to_stage -> trig::process_pending -> resolve::current_ability -> resolve::resolve_ability_total
+   9525       105.35       11.06      3  bin_common::execute_and_settle -> execute_main_phase_action -> advance_phase
+   2962       102.07       34.46      3  bin_common::execute_and_settle -> advance_phase -> advance_phase::first_performance
+   2962       101.90       34.40      4  bin_common::execute_and_settle -> execute_main_phase_action -> advance_phase -> advance_phase::live_card_set
+   2962        99.23       33.50      4  bin_common::execute_and_settle -> advance_phase -> advance_phase::first_performance -> execute_performance_phase
+   2962        86.58       29.23      3  bin_common::execute_and_settle -> advance_phase -> advance_phase::second_performance
+   6700        84.26       12.58      3  bin_common::execute_and_settle -> advance_phase -> advance_phase::active
+   2962        84.01       28.36      4  bin_common::execute_and_settle -> advance_phase -> advance_phase::second_performance -> execute_performance_phase
+   2132        83.18       39.02      4  bin_common::execute_and_settle -> execute_main_phase_action -> exec::resume_with_choice -> resolve::current_ability
+   2633        65.06       24.71      7  bin_common::execute_and_settle -> execute_main_phase_action -> exec::use_ability -> trig::process_pending -> resolve::current_ability -> resolve::resolve_ability_total -> resolve::run_effect
+   3021        61.70       20.42      3  bin_common::execute_and_settle -> advance_phase -> advance_phase::live_victory
+   2132        61.69       28.93      5  bin_common::execute_and_settle -> execute_main_phase_action -> exec::resume_with_choice -> resolve::current_ability -> resolve::resolve_ability_total
+   6700        60.10        8.97      4  bin_common::execute_and_settle -> advance_phase -> advance_phase::active -> check_timing
+   6700        58.88        8.79      3  bin_common::execute_and_settle -> advance_phase -> advance_phase::draw
+   2765        58.44       21.13      7  bin_common::execute_and_settle -> execute_main_phase_action -> exec::play_member_to_stage -> trig::process_pending -> resolve::current_ability -> resolve::resolve_ability_total -> resolve::run_effect
+   6700        53.40        7.97      4  bin_common::execute_and_settle -> advance_phase -> advance_phase::draw -> check_timing
+   2132        48.73       22.86      6  bin_common::execute_and_settle -> execute_main_phase_action -> exec::resume_with_choice -> resolve::current_ability -> resolve::resolve_ability_total -> resolve::run_effect
+   4795        47.82        9.97      5  bin_common::execute_and_settle -> execute_main_phase_action -> advance_phase -> advance_phase::live_card_set -> trig::process_pending
+   8504        45.22        5.32      4  bin_common::execute_and_settle -> execute_main_phase_action -> exec::resume_with_choice -> trig::process_pending
+   1831        43.00       23.48      6  bin_common::execute_and_settle -> execute_main_phase_action -> advance_phase -> advance_phase::live_card_set -> trig::process_pending -> resolve::current_ability
+   2962        36.41       12.29      5  bin_common::execute_and_settle -> advance_phase -> advance_phase::first_performance -> execute_performance_phase -> check_timing
+   1831        35.67       19.48      7  bin_common::execute_and_settle -> execute_main_phase_action -> advance_phase -> advance_phase::live_card_set -> trig::process_pending -> resolve::current_ability -> resolve::resolve_ability_total
+  10634        34.33        3.23      2  generate_possible_actions -> generate_pending_choice_actions
+   2962        33.78       11.40      5  bin_common::execute_and_settle -> execute_main_phase_action -> advance_phase -> advance_phase::live_card_set -> check_timing
+   2962        32.60       11.00      5  bin_common::execute_and_settle -> advance_phase -> advance_phase::second_performance -> execute_performance_phase -> check_timing
+   2633        31.20       11.85      7  bin_common::execute_and_settle -> execute_main_phase_action -> exec::use_ability -> trig::process_pending -> resolve::current_ability -> resolve::resolve_ability_total -> resolve::pay_cost
+   1337        30.77       23.02      5  bin_common::execute_and_settle -> execute_main_phase_action -> exec::resume_with_choice -> trig::process_pending -> resolve::current_ability
+  54076        30.74        0.57      2  bin_common::execute_and_settle -> record_action_boundary
+  32019        28.84        0.90      2  generate_possible_actions -> generate_live_card_set_actions
+  34634        26.47        0.76      4  bin_common::execute_and_settle -> execute_main_phase_action -> exec::play_member_to_stage -> trig::auto_scan
+  10806        26.26        2.43      4  bin_common::execute_and_settle -> execute_main_phase_action -> exec::play_member_to_stage -> recalculate_constants
+   1337        24.86       18.60      6  bin_common::execute_and_settle -> execute_main_phase_action -> exec::resume_with_choice -> trig::process_pending -> resolve::current_ability -> resolve::resolve_ability_total
+   1938        24.45       12.62      7  bin_common::execute_and_settle -> execute_main_phase_action -> exec::resume_with_choice -> resolve::current_ability -> resolve::resolve_ability_total -> resolve::run_effect -> effect::gates
+   6564        23.42        3.57      5  bin_common::execute_and_settle -> advance_phase -> advance_phase::active -> check_timing -> check_timing::recalculate_constants
+   1831        23.03       12.58      8  bin_common::execute_and_settle -> execute_main_phase_action -> advance_phase -> advance_phase::live_card_set -> trig::process_pending -> resolve::current_ability -> resolve::resolve_ability_total -> resolve::run_effect
+   6805        20.22        2.97      7  bin_common::execute_and_settle -> execute_main_phase_action -> exec::play_member_to_stage -> trig::process_pending -> resolve::current_ability -> resolve::resolve_ability_total -> resolve::handle_pending_choice
+   6564        19.85        3.02      5  bin_common::execute_and_settle -> advance_phase -> advance_phase::draw -> check_timing -> check_timing::recalculate_constants
+   2633        19.77        7.51      8  bin_common::execute_and_settle -> execute_main_phase_action -> exec::use_ability -> trig::process_pending -> resolve::current_ability -> resolve::resolve_ability_total -> resolve::run_effect -> effect::gates
+   2765        19.21        6.95      8  bin_common::execute_and_settle -> execute_main_phase_action -> exec::play_member_to_stage -> trig::process_pending -> resolve::current_ability -> resolve::resolve_ability_total -> resolve::run_effect -> effect::gates
+   1336        16.37       12.25      7  bin_common::execute_and_settle -> execute_main_phase_action -> exec::resume_with_choice -> trig::process_pending -> resolve::current_ability -> resolve::resolve_ability_total -> resolve::run_effect
+   6564        15.88        2.42      6  bin_common::execute_and_settle -> advance_phase -> advance_phase::active -> check_timing -> check_timing::recalculate_constants -> recalculate_constants
+   2633        15.30        5.81      9  bin_common::execute_and_settle -> execute_main_phase_action -> exec::use_ability -> trig::process_pending -> resolve::current_ability -> resolve::resolve_ability_total -> resolve::run_effect -> effect::gates -> effect::dispatch
+   1402        15.14       10.80      4  bin_common::execute_and_settle -> execute_main_phase_action -> exec::resume_with_choice -> effect::gates
+  69312        14.46        0.21      3  generate_possible_actions -> generate_main_phase_actions -> gen::cost_reduction
+   2962        14.28        4.82      6  bin_common::execute_and_settle -> execute_main_phase_action -> advance_phase -> advance_phase::live_card_set -> check_timing -> check_timing::recalculate_constants
+   1495        14.06        9.41      9  bin_common::execute_and_settle -> execute_main_phase_action -> advance_phase -> advance_phase::live_card_set -> trig::process_pending -> resolve::current_ability -> resolve::resolve_ability_total -> resolve::run_effect -> effect::gates
+   2962        13.23        4.47      5  bin_common::execute_and_settle -> advance_phase -> advance_phase::first_performance -> execute_performance_phase -> player_perform_live
+   6564        12.74        1.94      6  bin_common::execute_and_settle -> advance_phase -> advance_phase::draw -> check_timing -> check_timing::recalculate_constants -> recalculate_constants
+   2535        12.31        4.86      8  bin_common::execute_and_settle -> execute_main_phase_action -> exec::resume_with_choice -> resolve::current_ability -> resolve::resolve_ability_total -> resolve::run_effect -> effect::gates -> effect::gates
+   2962        12.11        4.09      6  bin_common::execute_and_settle -> advance_phase -> advance_phase::first_performance -> execute_performance_phase -> check_timing -> check_timing::recalculate_constants
+   1020        10.98       10.77      5  bin_common::execute_and_settle -> execute_main_phase_action -> exec::resume_with_choice -> effect::gates -> effect::dispatch
+   2962        10.75        3.63      5  bin_common::execute_and_settle -> advance_phase -> advance_phase::second_performance -> execute_performance_phase -> player_perform_live
+   2962        10.34        3.49      6  bin_common::execute_and_settle -> advance_phase -> advance_phase::second_performance -> execute_performance_phase -> check_timing -> check_timing::recalculate_constants
+   2962        10.15        3.43      7  bin_common::execute_and_settle -> execute_main_phase_action -> advance_phase -> advance_phase::live_card_set -> check_timing -> check_timing::recalculate_constants -> recalculate_constants
+   1140         9.62        8.44      8  bin_common::execute_and_settle -> execute_main_phase_action -> exec::resume_with_choice -> trig::process_pending -> resolve::current_ability -> resolve::resolve_ability_total -> resolve::run_effect -> effect::gates
+  10806         8.87        0.82      4  bin_common::execute_and_settle -> execute_main_phase_action -> exec::play_member_to_stage -> trig::debut
+   3036         8.69        2.86      4  bin_common::execute_and_settle -> execute_main_phase_action -> exec::resume_with_choice -> recalculate_constants
+   2535         8.43        3.33      9  bin_common::execute_and_settle -> execute_main_phase_action -> exec::resume_with_choice -> resolve::current_ability -> resolve::resolve_ability_total -> resolve::run_effect -> effect::gates -> effect::gates -> effect::dispatch
+   2962         8.30        2.80      7  bin_common::execute_and_settle -> advance_phase -> advance_phase::first_performance -> execute_performance_phase -> check_timing -> check_timing::recalculate_constants -> recalculate_constants
+   8517         8.24        0.97      4  bin_common::execute_and_settle -> execute_main_phase_action -> exec::resume_with_choice -> trig::auto_scan
+   2264         7.80        3.45      9  bin_common::execute_and_settle -> execute_main_phase_action -> exec::play_member_to_stage -> trig::process_pending -> resolve::current_ability -> resolve::resolve_ability_total -> resolve::run_effect -> effect::gates -> effect::dispatch
+   2962         7.41        2.50      6  bin_common::execute_and_settle -> advance_phase -> advance_phase::first_performance -> execute_performance_phase -> check_timing -> check_timing::process_pending_auto_abilities
+  10417         7.36        0.71      5  bin_common::execute_and_settle -> advance_phase -> advance_phase::first_performance -> execute_performance_phase -> trig::auto_scan
+   6564         7.25        1.10      5  bin_common::execute_and_settle -> advance_phase -> advance_phase::active -> check_timing -> check_timing::process_pending_auto_abilities
+   4040         7.01        1.74      7  bin_common::execute_and_settle -> execute_main_phase_action -> exec::play_member_to_stage -> trig::process_pending -> resolve::current_ability -> resolve::resolve_ability_total -> resolve::pay_cost
+   6564         6.90        1.05      5  bin_common::execute_and_settle -> advance_phase -> advance_phase::draw -> check_timing -> check_timing::process_pending_auto_abilities
+  12090         6.74        0.56      4  bin_common::execute_and_settle -> advance_phase -> advance_phase::live_victory -> trig::process_pending
+  69312         6.73        0.10      3  generate_possible_actions -> generate_main_phase_actions -> gen::area_candidates
+   2962         6.66        2.25      7  bin_common::execute_and_settle -> advance_phase -> advance_phase::second_performance -> execute_performance_phase -> check_timing -> check_timing::recalculate_constants -> recalculate_constants
+   2962         6.56        2.21      6  bin_common::execute_and_settle -> advance_phase -> advance_phase::second_performance -> execute_performance_phase -> check_timing -> check_timing::process_pending_auto_abilities
+   2633         6.49        2.46      8  bin_common::execute_and_settle -> execute_main_phase_action -> exec::use_ability -> trig::process_pending -> resolve::current_ability -> resolve::resolve_ability_total -> resolve::pay_cost -> recalculate_constants
+   1101         6.37        5.79     10  bin_common::execute_and_settle -> execute_main_phase_action -> advance_phase -> advance_phase::live_card_set -> trig::process_pending -> resolve::current_ability -> resolve::resolve_ability_total -> resolve::run_effect -> effect::gates -> effect::dispatch
+  10806         5.56        0.51      5  bin_common::execute_and_settle -> execute_main_phase_action -> exec::play_member_to_stage -> trig::process_pending -> trig::auto_scan
+    501         5.29       10.55      9  bin_common::execute_and_settle -> execute_main_phase_action -> exec::play_member_to_stage -> trig::process_pending -> resolve::current_ability -> resolve::resolve_ability_total -> resolve::run_effect -> effect::gates -> effect::gates
+    395         5.21       13.18      5  bin_common::execute_and_settle -> advance_phase -> advance_phase::live_victory -> trig::process_pending -> resolve::current_ability
+  10432         4.96        0.48      5  bin_common::execute_and_settle -> advance_phase -> advance_phase::second_performance -> execute_performance_phase -> trig::auto_scan
+    395         4.39       11.11      6  bin_common::execute_and_settle -> advance_phase -> advance_phase::live_victory -> trig::process_pending -> resolve::current_ability -> resolve::resolve_ability_total
+    881         4.39        4.98      9  bin_common::execute_and_settle -> execute_main_phase_action -> exec::resume_with_choice -> trig::process_pending -> resolve::current_ability -> resolve::resolve_ability_total -> resolve::run_effect -> effect::gates -> effect::dispatch
+    501         4.25        8.49     10  bin_common::execute_and_settle -> execute_main_phase_action -> exec::play_member_to_stage -> trig::process_pending -> resolve::current_ability -> resolve::resolve_ability_total -> resolve::run_effect -> effect::gates -> effect::gates -> effect::dispatch
+   2962         3.94        1.33      7  bin_common::execute_and_settle -> advance_phase -> advance_phase::first_performance -> execute_performance_phase -> check_timing -> check_timing::process_pending_auto_abilities -> trig::process_pending
+   2962         3.79        1.28      6  bin_common::execute_and_settle -> execute_main_phase_action -> advance_phase -> advance_phase::live_card_set -> check_timing -> check_timing::process_pending_auto_abilities
+    631         3.54        5.62      8  bin_common::execute_and_settle -> execute_main_phase_action -> exec::resume_with_choice -> resolve::current_ability -> resolve::resolve_ability_total -> resolve::run_effect -> effect::gates -> effect::dispatch
+   2962         3.28        1.11      7  bin_common::execute_and_settle -> advance_phase -> advance_phase::second_performance -> execute_performance_phase -> check_timing -> check_timing::process_pending_auto_abilities -> trig::process_pending
+    662         3.28        4.95     10  bin_common::execute_and_settle -> execute_main_phase_action -> advance_phase -> advance_phase::live_card_set -> trig::process_pending -> resolve::current_ability -> resolve::resolve_ability_total -> resolve::run_effect -> effect::gates -> effect::gates
+   6054         2.63        0.43      4  bin_common::execute_and_settle -> advance_phase -> advance_phase::live_victory -> trig::auto_scan
+   5973         2.63        0.44      5  bin_common::execute_and_settle -> execute_main_phase_action -> exec::resume_with_choice -> trig::process_pending -> trig::auto_scan
+    725         2.34        3.22      6  bin_common::execute_and_settle -> execute_main_phase_action -> exec::resume_with_choice -> effect::gates -> effect::dispatch -> recalculate_constants
+  10417         2.16        0.21      5  bin_common::execute_and_settle -> advance_phase -> advance_phase::first_performance -> execute_performance_phase -> trig::process_pending
+    428         2.09        4.89      9  bin_common::execute_and_settle -> execute_main_phase_action -> exec::resume_with_choice -> trig::process_pending -> resolve::current_ability -> resolve::resolve_ability_total -> resolve::run_effect -> effect::gates -> effect::gates
+    662         2.08        3.14     11  bin_common::execute_and_settle -> execute_main_phase_action -> advance_phase -> advance_phase::live_card_set -> trig::process_pending -> resolve::current_ability -> resolve::resolve_ability_total -> resolve::run_effect -> effect::gates -> effect::gates -> effect::dispatch
+   2962         2.07        0.70      6  bin_common::execute_and_settle -> advance_phase -> advance_phase::first_performance -> execute_performance_phase -> check_timing -> check_timing::check_invalid_live_cards
+  10432         2.05        0.20      5  bin_common::execute_and_settle -> advance_phase -> advance_phase::second_performance -> execute_performance_phase -> trig::process_pending
+    395         1.89        4.78      7  bin_common::execute_and_settle -> advance_phase -> advance_phase::live_victory -> trig::process_pending -> resolve::current_ability -> resolve::resolve_ability_total -> resolve::run_effect
+   2633         1.85        0.70      5  bin_common::execute_and_settle -> execute_main_phase_action -> exec::use_ability -> trig::process_pending -> trig::auto_scan
+   2962         1.80        0.61      6  bin_common::execute_and_settle -> advance_phase -> advance_phase::second_performance -> execute_performance_phase -> check_timing -> check_timing::check_invalid_live_cards
+    382         1.73        4.52      5  bin_common::execute_and_settle -> execute_main_phase_action -> exec::resume_with_choice -> effect::gates -> effect::gates
+    428         1.30        3.03     10  bin_common::execute_and_settle -> execute_main_phase_action -> exec::resume_with_choice -> trig::process_pending -> resolve::current_ability -> resolve::resolve_ability_total -> resolve::run_effect -> effect::gates -> effect::gates -> effect::dispatch
+   1576         1.24        0.79      8  bin_common::execute_and_settle -> advance_phase -> advance_phase::first_performance -> execute_performance_phase -> check_timing -> check_timing::process_pending_auto_abilities -> trig::process_pending -> trig::auto_scan
+    382         1.13        2.95      6  bin_common::execute_and_settle -> execute_main_phase_action -> exec::resume_with_choice -> effect::gates -> effect::gates -> effect::dispatch
+    688         0.95        1.38      6  bin_common::execute_and_settle -> execute_main_phase_action -> exec::resume_with_choice -> effect::gates -> effect::dispatch -> trig::auto_scan
+   1585         0.75        0.47      8  bin_common::execute_and_settle -> advance_phase -> advance_phase::second_performance -> execute_performance_phase -> check_timing -> check_timing::process_pending_auto_abilities -> trig::process_pending -> trig::auto_scan
+      7         0.68       96.69      7  bin_common::execute_and_settle -> advance_phase -> advance_phase::active -> check_timing -> check_timing::recalculate_constants -> recalculate_constants -> vm::get_ability
+     78         0.65        8.27      8  bin_common::execute_and_settle -> advance_phase -> advance_phase::live_victory -> trig::process_pending -> resolve::current_ability -> resolve::resolve_ability_total -> resolve::run_effect -> effect::gates
+   6564         0.64        0.10      6  bin_common::execute_and_settle -> advance_phase -> advance_phase::active -> check_timing -> check_timing::process_pending_auto_abilities -> trig::process_pending
+   6564         0.61        0.09      5  bin_common::execute_and_settle -> advance_phase -> advance_phase::active -> check_timing -> check_timing::check_invalid_live_cards
+   6700         0.59        0.09      3  bin_common::execute_and_settle -> advance_phase -> advance_phase::energy
+    703         0.58        0.83      6  bin_common::execute_and_settle -> execute_main_phase_action -> exec::use_ability -> trig::process_pending -> resolve::current_ability -> trig::auto_scan
+   6564         0.49        0.07      6  bin_common::execute_and_settle -> advance_phase -> advance_phase::draw -> check_timing -> check_timing::process_pending_auto_abilities -> trig::process_pending
+     78         0.48        6.21      9  bin_common::execute_and_settle -> advance_phase -> advance_phase::live_victory -> trig::process_pending -> resolve::current_ability -> resolve::resolve_ability_total -> resolve::run_effect -> effect::gates -> effect::dispatch
+   6564         0.48        0.07      5  bin_common::execute_and_settle -> advance_phase -> advance_phase::draw -> check_timing -> check_timing::check_invalid_live_cards
+    259         0.46        1.76     10  bin_common::execute_and_settle -> execute_main_phase_action -> exec::use_ability -> trig::process_pending -> resolve::current_ability -> resolve::resolve_ability_total -> resolve::run_effect -> effect::gates -> effect::dispatch -> recalculate_constants
+   4040         0.44        0.11      7  bin_common::execute_and_settle -> execute_main_phase_action -> exec::play_member_to_stage -> trig::process_pending -> resolve::current_ability -> resolve::resolve_ability_total -> resolve::pre_gates
+    908         0.35        0.38      6  bin_common::execute_and_settle -> advance_phase -> advance_phase::second_performance -> execute_performance_phase -> trig::process_pending -> trig::auto_scan
+    877         0.33        0.38      6  bin_common::execute_and_settle -> advance_phase -> advance_phase::first_performance -> execute_performance_phase -> trig::process_pending -> trig::auto_scan
+   2962         0.31        0.11      7  bin_common::execute_and_settle -> execute_main_phase_action -> advance_phase -> advance_phase::live_card_set -> check_timing -> check_timing::process_pending_auto_abilities -> trig::process_pending
+   2633         0.30        0.11      7  bin_common::execute_and_settle -> execute_main_phase_action -> exec::use_ability -> trig::process_pending -> resolve::current_ability -> resolve::resolve_ability_total -> resolve::pre_gates
+    231         0.29        1.24      6  bin_common::execute_and_settle -> execute_main_phase_action -> exec::play_member_to_stage -> trig::process_pending -> resolve::current_ability -> trig::auto_scan
+   6700         0.29        0.04      5  bin_common::execute_and_settle -> advance_phase -> advance_phase::active -> check_timing -> check_timing::check_victory_condition
+    112         0.28        2.54     10  bin_common::execute_and_settle -> execute_main_phase_action -> exec::play_member_to_stage -> trig::process_pending -> resolve::current_ability -> resolve::resolve_ability_total -> resolve::run_effect -> effect::gates -> effect::dispatch -> recalculate_constants
+   6700         0.27        0.04      5  bin_common::execute_and_settle -> advance_phase -> advance_phase::draw -> check_timing -> check_timing::check_victory_condition
+    188         0.23        1.23     10  bin_common::execute_and_settle -> execute_main_phase_action -> exec::play_member_to_stage -> trig::process_pending -> resolve::current_ability -> resolve::resolve_ability_total -> resolve::run_effect -> effect::gates -> effect::dispatch -> trig::auto_scan
+   5266         0.23        0.04      7  bin_common::execute_and_settle -> execute_main_phase_action -> exec::use_ability -> trig::process_pending -> resolve::current_ability -> resolve::resolve_ability_total -> resolve::handle_pending_choice
+   2962         0.21        0.07      6  bin_common::execute_and_settle -> execute_main_phase_action -> advance_phase -> advance_phase::live_card_set -> check_timing -> check_timing::check_invalid_live_cards
+   2132         0.20        0.09      6  bin_common::execute_and_settle -> execute_main_phase_action -> exec::resume_with_choice -> resolve::current_ability -> resolve::resolve_ability_total -> resolve::pre_gates
+   1831         0.20        0.11      8  bin_common::execute_and_settle -> execute_main_phase_action -> advance_phase -> advance_phase::live_card_set -> trig::process_pending -> resolve::current_ability -> resolve::resolve_ability_total -> resolve::pre_gates
+    192         0.19        0.98      6  bin_common::execute_and_settle -> execute_main_phase_action -> exec::resume_with_choice -> trig::process_pending -> resolve::current_ability -> trig::auto_scan
+   4264         0.17        0.04      6  bin_common::execute_and_settle -> execute_main_phase_action -> exec::resume_with_choice -> resolve::current_ability -> resolve::resolve_ability_total -> resolve::handle_pending_choice
+   3662         0.15        0.04      8  bin_common::execute_and_settle -> execute_main_phase_action -> advance_phase -> advance_phase::live_card_set -> trig::process_pending -> resolve::current_ability -> resolve::resolve_ability_total -> resolve::handle_pending_choice
+   2132         0.14        0.07      6  bin_common::execute_and_settle -> execute_main_phase_action -> exec::resume_with_choice -> resolve::current_ability -> resolve::resolve_ability_total -> resolve::pay_cost
+   2962         0.13        0.04      6  bin_common::execute_and_settle -> advance_phase -> advance_phase::first_performance -> execute_performance_phase -> check_timing -> check_timing::check_victory_condition
+   2672         0.13        0.05      7  bin_common::execute_and_settle -> execute_main_phase_action -> exec::resume_with_choice -> trig::process_pending -> resolve::current_ability -> resolve::resolve_ability_total -> resolve::handle_pending_choice
+   2962         0.12        0.04      6  bin_common::execute_and_settle -> execute_main_phase_action -> advance_phase -> advance_phase::live_card_set -> check_timing -> check_timing::check_victory_condition
+   2962         0.12        0.04      6  bin_common::execute_and_settle -> advance_phase -> advance_phase::second_performance -> execute_performance_phase -> check_timing -> check_timing::check_victory_condition
+   1831         0.10        0.05      8  bin_common::execute_and_settle -> execute_main_phase_action -> advance_phase -> advance_phase::live_card_set -> trig::process_pending -> resolve::current_ability -> resolve::resolve_ability_total -> resolve::pay_cost
+   1337         0.10        0.07      7  bin_common::execute_and_settle -> execute_main_phase_action -> exec::resume_with_choice -> trig::process_pending -> resolve::current_ability -> resolve::resolve_ability_total -> resolve::pre_gates
+      3         0.08       26.30      3  generate_possible_actions -> generate_main_phase_actions -> vm::get_ability
+     28         0.08        2.74     10  bin_common::execute_and_settle -> execute_main_phase_action -> exec::resume_with_choice -> trig::process_pending -> resolve::current_ability -> resolve::resolve_ability_total -> resolve::run_effect -> effect::gates -> effect::dispatch -> recalculate_constants
+      5         0.07       13.70      7  bin_common::execute_and_settle -> advance_phase -> advance_phase::draw -> check_timing -> check_timing::recalculate_constants -> recalculate_constants -> vm::get_ability
+   1336         0.07        0.05      7  bin_common::execute_and_settle -> execute_main_phase_action -> exec::resume_with_choice -> trig::process_pending -> resolve::current_ability -> resolve::resolve_ability_total -> resolve::pay_cost
+     32         0.05        1.48     10  bin_common::execute_and_settle -> execute_main_phase_action -> exec::resume_with_choice -> trig::process_pending -> resolve::current_ability -> resolve::resolve_ability_total -> resolve::run_effect -> effect::gates -> effect::dispatch -> trig::auto_scan
+    790         0.03        0.04      7  bin_common::execute_and_settle -> advance_phase -> advance_phase::live_victory -> trig::process_pending -> resolve::current_ability -> resolve::resolve_ability_total -> resolve::handle_pending_choice
+    395         0.03        0.07      7  bin_common::execute_and_settle -> advance_phase -> advance_phase::live_victory -> trig::process_pending -> resolve::current_ability -> resolve::resolve_ability_total -> resolve::pre_gates
+     65         0.03        0.41      5  bin_common::execute_and_settle -> advance_phase -> advance_phase::live_victory -> trig::process_pending -> trig::auto_scan
+    395         0.02        0.05      7  bin_common::execute_and_settle -> advance_phase -> advance_phase::live_victory -> trig::process_pending -> resolve::current_ability -> resolve::resolve_ability_total -> resolve::pay_cost
+      1         0.01       14.10      5  bin_common::execute_and_settle -> execute_main_phase_action -> exec::resume_with_choice -> trig::auto_scan -> vm::get_ability
+      1         0.01        7.80      8  bin_common::execute_and_settle -> execute_main_phase_action -> advance_phase -> advance_phase::live_card_set -> check_timing -> check_timing::recalculate_constants -> recalculate_constants -> vm::get_ability
+      2         0.01        2.70      9  bin_common::execute_and_settle -> execute_main_phase_action -> exec::resume_with_choice -> resolve::current_ability -> resolve::resolve_ability_total -> resolve::run_effect -> effect::gates -> effect::dispatch -> recalculate_constants
+      4         0.00        1.05      9  bin_common::execute_and_settle -> execute_main_phase_action -> exec::resume_with_choice -> resolve::current_ability -> resolve::resolve_ability_total -> resolve::run_effect -> effect::gates -> effect::dispatch -> trig::auto_scan
 
-depth-1 (top level) instrumented total: 1497.90 ms
+depth-1 (top level) instrumented total: 1868.95 ms
 
 
 === SELF TIME (exclusive; sums exactly, unlike the inclusive table) ===
-total self: 1497.90 ms  of 6013.23 ms inclusive (24.9%)
+total self: 1868.95 ms  of 7502.48 ms inclusive (24.9%)
   calls     self_ms    self_us  depth  call path
-  20060      212.38      10.59      2  generate_possible_actions -> generate_main_phase_actions
-  10689      103.92       9.72      3  bin_common::execute_and_settle -> execute_main_phase_action -> exec::resume_with_choice
-  10847       70.16       6.47      3  bin_common::execute_and_settle -> execute_main_phase_action -> exec::play_member_to_stage
-  65528       67.92       1.04      1  bin_common::execute_and_settle
-   3024       42.25      13.97      3  bin_common::execute_and_settle -> advance_phase -> advance_phase::live_victory
-   4062       39.83       9.81      5  bin_common::execute_and_settle -> execute_main_phase_action -> exec::play_member_to_stage -> trig::process_pending -> resolve::current_ability
-   2965       35.81      12.08      4  bin_common::execute_and_settle -> advance_phase -> advance_phase::first_performance -> execute_performance_phase
-   2646       35.69      13.49      7  bin_common::execute_and_settle -> execute_main_phase_action -> exec::use_ability -> trig::process_pending -> resolve::current_ability -> resolve::resolve_ability_total -> resolve::run_effect
-  65528       32.17       0.49      1  generate_possible_actions
-   2777       31.13      11.21      7  bin_common::execute_and_settle -> execute_main_phase_action -> exec::play_member_to_stage -> trig::process_pending -> resolve::current_ability -> resolve::resolve_ability_total -> resolve::run_effect
-   2646       31.07      11.74      5  bin_common::execute_and_settle -> execute_main_phase_action -> exec::use_ability -> trig::process_pending -> resolve::current_ability
-  10689       27.48       2.57      2  generate_possible_actions -> generate_pending_choice_actions
-   2965       26.76       9.03      4  bin_common::execute_and_settle -> advance_phase -> advance_phase::second_performance -> execute_performance_phase
-  34774       25.70       0.74      4  bin_common::execute_and_settle -> execute_main_phase_action -> exec::play_member_to_stage -> trig::auto_scan
-  65528       25.00       0.38      2  bin_common::execute_and_settle -> execute_main_phase_action
-  54150       24.80       0.46      2  bin_common::execute_and_settle -> record_action_boundary
-  32037       23.22       0.72      2  generate_possible_actions -> generate_live_card_set_actions
-   6705       22.27       3.32      4  bin_common::execute_and_settle -> advance_phase -> advance_phase::active -> check_timing
-   6705       21.18       3.16      4  bin_common::execute_and_settle -> advance_phase -> advance_phase::draw -> check_timing
-  10847       20.24       1.87      4  bin_common::execute_and_settle -> execute_main_phase_action -> exec::play_member_to_stage -> recalculate_constants
-   2646       19.57       7.40      7  bin_common::execute_and_settle -> execute_main_phase_action -> exec::use_ability -> trig::process_pending -> resolve::current_ability -> resolve::resolve_ability_total -> resolve::pay_cost
-   6705       19.28       2.88      3  bin_common::execute_and_settle -> advance_phase -> advance_phase::active
-   2139       18.50       8.65      6  bin_common::execute_and_settle -> execute_main_phase_action -> exec::resume_with_choice -> resolve::current_ability -> resolve::resolve_ability_total -> resolve::run_effect
-   4062       17.53       4.31      6  bin_common::execute_and_settle -> execute_main_phase_action -> exec::play_member_to_stage -> trig::process_pending -> resolve::current_ability -> resolve::resolve_ability_total
-   2646       17.45       6.59      3  bin_common::execute_and_settle -> execute_main_phase_action -> exec::use_ability
-  29069       17.03       0.59      2  bin_common::execute_and_settle -> advance_phase
-   2139       16.34       7.64      4  bin_common::execute_and_settle -> execute_main_phase_action -> exec::resume_with_choice -> resolve::current_ability
-   2965       16.20       5.46      4  bin_common::execute_and_settle -> execute_main_phase_action -> advance_phase -> advance_phase::live_card_set
-   6839       15.68       2.29      7  bin_common::execute_and_settle -> execute_main_phase_action -> exec::play_member_to_stage -> trig::process_pending -> resolve::current_ability -> resolve::resolve_ability_total -> resolve::handle_pending_choice
-  17387       14.87       0.86      4  bin_common::execute_and_settle -> execute_main_phase_action -> exec::play_member_to_stage -> trig::process_pending
-   2646       13.45       5.08      6  bin_common::execute_and_settle -> execute_main_phase_action -> exec::use_ability -> trig::process_pending -> resolve::current_ability -> resolve::resolve_ability_total
-   2965       12.26       4.13      5  bin_common::execute_and_settle -> execute_main_phase_action -> advance_phase -> advance_phase::live_card_set -> check_timing
-  69378       11.98       0.17      3  generate_possible_actions -> generate_main_phase_actions -> gen::cost_reduction
-   2965       11.90       4.01      5  bin_common::execute_and_settle -> advance_phase -> advance_phase::first_performance -> execute_performance_phase -> check_timing
-   2965       11.89       4.01      5  bin_common::execute_and_settle -> advance_phase -> advance_phase::second_performance -> execute_performance_phase -> player_perform_live
-   2646       11.86       4.48      9  bin_common::execute_and_settle -> execute_main_phase_action -> exec::use_ability -> trig::process_pending -> resolve::current_ability -> resolve::resolve_ability_total -> resolve::run_effect -> effect::gates -> effect::dispatch
-   6568       11.46       1.74      6  bin_common::execute_and_settle -> advance_phase -> advance_phase::active -> check_timing -> check_timing::recalculate_constants -> recalculate_constants
-   2965       10.75       3.63      5  bin_common::execute_and_settle -> advance_phase -> advance_phase::second_performance -> execute_performance_phase -> check_timing
-   2965       10.73       3.62      5  bin_common::execute_and_settle -> advance_phase -> advance_phase::first_performance -> execute_performance_phase -> player_perform_live
-   1831       10.33       5.64      7  bin_common::execute_and_settle -> execute_main_phase_action -> advance_phase -> advance_phase::live_card_set -> trig::process_pending -> resolve::current_ability -> resolve::resolve_ability_total
-   6568        9.89       1.51      6  bin_common::execute_and_settle -> advance_phase -> advance_phase::draw -> check_timing -> check_timing::recalculate_constants -> recalculate_constants
-   2139        9.52       4.45      5  bin_common::execute_and_settle -> execute_main_phase_action -> exec::resume_with_choice -> resolve::current_ability -> resolve::resolve_ability_total
-   8550        9.46       1.11      4  bin_common::execute_and_settle -> execute_main_phase_action -> exec::resume_with_choice -> trig::process_pending
-   2965        8.11       2.74      7  bin_common::execute_and_settle -> execute_main_phase_action -> advance_phase -> advance_phase::live_card_set -> check_timing -> check_timing::recalculate_constants -> recalculate_constants
-  10847        7.34       0.68      4  bin_common::execute_and_settle -> execute_main_phase_action -> exec::play_member_to_stage -> trig::debut
+  20002      269.14      13.46      2  generate_possible_actions -> generate_main_phase_actions
+  10634      131.16      12.33      3  bin_common::execute_and_settle -> execute_main_phase_action -> exec::resume_with_choice
+  10806       85.30       7.89      3  bin_common::execute_and_settle -> execute_main_phase_action -> exec::play_member_to_stage
+  65397       84.87       1.30      1  bin_common::execute_and_settle
+   3021       52.33      17.32      3  bin_common::execute_and_settle -> advance_phase -> advance_phase::live_victory
+   4040       50.19      12.42      5  bin_common::execute_and_settle -> execute_main_phase_action -> exec::play_member_to_stage -> trig::process_pending -> resolve::current_ability
+   2633       45.29      17.20      7  bin_common::execute_and_settle -> execute_main_phase_action -> exec::use_ability -> trig::process_pending -> resolve::current_ability -> resolve::resolve_ability_total -> resolve::run_effect
+  65397       41.08       0.63      1  generate_possible_actions
+   2633       40.10      15.23      5  bin_common::execute_and_settle -> execute_main_phase_action -> exec::use_ability -> trig::process_pending -> resolve::current_ability
+   2962       40.08      13.53      4  bin_common::execute_and_settle -> advance_phase -> advance_phase::first_performance -> execute_performance_phase
+   2765       39.22      14.19      7  bin_common::execute_and_settle -> execute_main_phase_action -> exec::play_member_to_stage -> trig::process_pending -> resolve::current_ability -> resolve::resolve_ability_total -> resolve::run_effect
+  10634       34.33       3.23      2  generate_possible_actions -> generate_pending_choice_actions
+   2962       33.66      11.36      4  bin_common::execute_and_settle -> advance_phase -> advance_phase::second_performance -> execute_performance_phase
+  65397       31.78       0.49      2  bin_common::execute_and_settle -> execute_main_phase_action
+  54076       30.74       0.57      2  bin_common::execute_and_settle -> record_action_boundary
+  32019       28.84       0.90      2  generate_possible_actions -> generate_live_card_set_actions
+   6700       28.54       4.26      4  bin_common::execute_and_settle -> advance_phase -> advance_phase::active -> check_timing
+  34634       26.47       0.76      4  bin_common::execute_and_settle -> execute_main_phase_action -> exec::play_member_to_stage -> trig::auto_scan
+  10806       26.26       2.43      4  bin_common::execute_and_settle -> execute_main_phase_action -> exec::play_member_to_stage -> recalculate_constants
+   6700       25.89       3.86      4  bin_common::execute_and_settle -> advance_phase -> advance_phase::draw -> check_timing
+   2633       24.71       9.38      7  bin_common::execute_and_settle -> execute_main_phase_action -> exec::use_ability -> trig::process_pending -> resolve::current_ability -> resolve::resolve_ability_total -> resolve::pay_cost
+   2132       24.28      11.39      6  bin_common::execute_and_settle -> execute_main_phase_action -> exec::resume_with_choice -> resolve::current_ability -> resolve::resolve_ability_total -> resolve::run_effect
+   6700       24.15       3.61      3  bin_common::execute_and_settle -> advance_phase -> advance_phase::active
+   2633       22.14       8.41      3  bin_common::execute_and_settle -> execute_main_phase_action -> exec::use_ability
+   4040       21.60       5.35      6  bin_common::execute_and_settle -> execute_main_phase_action -> exec::play_member_to_stage -> trig::process_pending -> resolve::current_ability -> resolve::resolve_ability_total
+  29045       21.51       0.74      2  bin_common::execute_and_settle -> advance_phase
+   2132       21.49      10.08      4  bin_common::execute_and_settle -> execute_main_phase_action -> exec::resume_with_choice -> resolve::current_ability
+   2962       20.30       6.85      4  bin_common::execute_and_settle -> execute_main_phase_action -> advance_phase -> advance_phase::live_card_set
+   6805       20.22       2.97      7  bin_common::execute_and_settle -> execute_main_phase_action -> exec::play_member_to_stage -> trig::process_pending -> resolve::current_ability -> resolve::resolve_ability_total -> resolve::handle_pending_choice
+  17317       18.57       1.07      4  bin_common::execute_and_settle -> execute_main_phase_action -> exec::play_member_to_stage -> trig::process_pending
+   2633       16.53       6.28      6  bin_common::execute_and_settle -> execute_main_phase_action -> exec::use_ability -> trig::process_pending -> resolve::current_ability -> resolve::resolve_ability_total
+   2962       15.37       5.19      5  bin_common::execute_and_settle -> execute_main_phase_action -> advance_phase -> advance_phase::live_card_set -> check_timing
+   6564       15.20       2.32      6  bin_common::execute_and_settle -> advance_phase -> advance_phase::active -> check_timing -> check_timing::recalculate_constants -> recalculate_constants
+   2633       14.84       5.64      9  bin_common::execute_and_settle -> execute_main_phase_action -> exec::use_ability -> trig::process_pending -> resolve::current_ability -> resolve::resolve_ability_total -> resolve::run_effect -> effect::gates -> effect::dispatch
+   2962       14.70       4.96      5  bin_common::execute_and_settle -> advance_phase -> advance_phase::first_performance -> execute_performance_phase -> check_timing
+  69312       14.46       0.21      3  generate_possible_actions -> generate_main_phase_actions -> gen::cost_reduction
+   2962       13.78       4.65      5  bin_common::execute_and_settle -> advance_phase -> advance_phase::second_performance -> execute_performance_phase -> check_timing
+   2962       13.23       4.47      5  bin_common::execute_and_settle -> advance_phase -> advance_phase::first_performance -> execute_performance_phase -> player_perform_live
+   6564       12.67       1.93      6  bin_common::execute_and_settle -> advance_phase -> advance_phase::draw -> check_timing -> check_timing::recalculate_constants -> recalculate_constants
+   2132       12.45       5.84      5  bin_common::execute_and_settle -> execute_main_phase_action -> exec::resume_with_choice -> resolve::current_ability -> resolve::resolve_ability_total
+   1831       12.20       6.66      7  bin_common::execute_and_settle -> execute_main_phase_action -> advance_phase -> advance_phase::live_card_set -> trig::process_pending -> resolve::current_ability -> resolve::resolve_ability_total
+   8504       11.81       1.39      4  bin_common::execute_and_settle -> execute_main_phase_action -> exec::resume_with_choice -> trig::process_pending
+   2962       10.75       3.63      5  bin_common::execute_and_settle -> advance_phase -> advance_phase::second_performance -> execute_performance_phase -> player_perform_live
+   2962       10.15       3.43      7  bin_common::execute_and_settle -> execute_main_phase_action -> advance_phase -> advance_phase::live_card_set -> check_timing -> check_timing::recalculate_constants -> recalculate_constants
+   1831        8.96       4.90      8  bin_common::execute_and_settle -> execute_main_phase_action -> advance_phase -> advance_phase::live_card_set -> trig::process_pending -> resolve::current_ability -> resolve::resolve_ability_total -> resolve::run_effect
 
 
 === ALLOCATIONS (inclusive per call path) ===
-total attributed: 22256719
+total attributed: 22056747
   calls        allocs  allocs/call  depth  call path
-  65528       3995103         61.0      1  bin_common::execute_and_settle
-  65528       3248098         49.6      2  bin_common::execute_and_settle -> execute_main_phase_action
-  65528       1273620         19.4      1  generate_possible_actions
-  10689       1120108        104.8      3  bin_common::execute_and_settle -> execute_main_phase_action -> exec::resume_with_choice
-  10847       1081700         99.7      3  bin_common::execute_and_settle -> execute_main_phase_action -> exec::play_member_to_stage
-  17387        865163         49.8      4  bin_common::execute_and_settle -> execute_main_phase_action -> exec::play_member_to_stage -> trig::process_pending
-   4062        816204        200.9      5  bin_common::execute_and_settle -> execute_main_phase_action -> exec::play_member_to_stage -> trig::process_pending -> resolve::current_ability
-   2646        784429        296.5      3  bin_common::execute_and_settle -> execute_main_phase_action -> exec::use_ability
-   2646        719865        272.1      4  bin_common::execute_and_settle -> execute_main_phase_action -> exec::use_ability -> trig::process_pending
-   2646        708594        267.8      5  bin_common::execute_and_settle -> execute_main_phase_action -> exec::use_ability -> trig::process_pending -> resolve::current_ability
-  20060        682290         34.0      2  generate_possible_actions -> generate_main_phase_actions
-  29069        590660         20.3      2  bin_common::execute_and_settle -> advance_phase
-   4062        437403        107.7      6  bin_common::execute_and_settle -> execute_main_phase_action -> exec::play_member_to_stage -> trig::process_pending -> resolve::current_ability -> resolve::resolve_ability_total
-   2646        405061        153.1      6  bin_common::execute_and_settle -> execute_main_phase_action -> exec::use_ability -> trig::process_pending -> resolve::current_ability -> resolve::resolve_ability_total
-   2139        352223        164.7      4  bin_common::execute_and_settle -> execute_main_phase_action -> exec::resume_with_choice -> resolve::current_ability
-   2646        333070        125.9      7  bin_common::execute_and_settle -> execute_main_phase_action -> exec::use_ability -> trig::process_pending -> resolve::current_ability -> resolve::resolve_ability_total -> resolve::run_effect
-   2777        275641         99.3      7  bin_common::execute_and_settle -> execute_main_phase_action -> exec::play_member_to_stage -> trig::process_pending -> resolve::current_ability -> resolve::resolve_ability_total -> resolve::run_effect
-  32037        273400          8.5      2  generate_possible_actions -> generate_live_card_set_actions
-  10689        242364         22.7      2  generate_possible_actions -> generate_pending_choice_actions
-   2139        197203         92.2      5  bin_common::execute_and_settle -> execute_main_phase_action -> exec::resume_with_choice -> resolve::current_ability -> resolve::resolve_ability_total
-   9532        187393         19.7      3  bin_common::execute_and_settle -> execute_main_phase_action -> advance_phase
-   2139        186508         87.2      6  bin_common::execute_and_settle -> execute_main_phase_action -> exec::resume_with_choice -> resolve::current_ability -> resolve::resolve_ability_total -> resolve::run_effect
-   2965        177861         60.0      4  bin_common::execute_and_settle -> execute_main_phase_action -> advance_phase -> advance_phase::live_card_set
-   2965        172359         58.1      3  bin_common::execute_and_settle -> advance_phase -> advance_phase::second_performance
-   2965        172349         58.1      3  bin_common::execute_and_settle -> advance_phase -> advance_phase::first_performance
-   2965        169394         57.1      4  bin_common::execute_and_settle -> advance_phase -> advance_phase::second_performance -> execute_performance_phase
-   2965        169384         57.1      4  bin_common::execute_and_settle -> advance_phase -> advance_phase::first_performance -> execute_performance_phase
-   6839        129911         19.0      7  bin_common::execute_and_settle -> execute_main_phase_action -> exec::play_member_to_stage -> trig::process_pending -> resolve::current_ability -> resolve::resolve_ability_total -> resolve::handle_pending_choice
-   8550        115904         13.6      4  bin_common::execute_and_settle -> execute_main_phase_action -> exec::resume_with_choice -> trig::process_pending
-   4795        114732         23.9      5  bin_common::execute_and_settle -> execute_main_phase_action -> advance_phase -> advance_phase::live_card_set -> trig::process_pending
-   1831         99579         54.4      6  bin_common::execute_and_settle -> execute_main_phase_action -> advance_phase -> advance_phase::live_card_set -> trig::process_pending -> resolve::current_ability
-   1344         89364         66.5      5  bin_common::execute_and_settle -> execute_main_phase_action -> exec::resume_with_choice -> trig::process_pending -> resolve::current_ability
-   3024         89286         29.5      3  bin_common::execute_and_settle -> advance_phase -> advance_phase::live_victory
-  34774         89112          2.6      4  bin_common::execute_and_settle -> execute_main_phase_action -> exec::play_member_to_stage -> trig::auto_scan
-  69378         69378          1.0      3  generate_possible_actions -> generate_main_phase_actions -> gen::area_candidates
-  69378         69378          1.0      3  generate_possible_actions -> generate_main_phase_actions -> gen::cost_reduction
-   6705         67197         10.0      3  bin_common::execute_and_settle -> advance_phase -> advance_phase::active
-   1831         63335         34.6      7  bin_common::execute_and_settle -> execute_main_phase_action -> advance_phase -> advance_phase::live_card_set -> trig::process_pending -> resolve::current_ability -> resolve::resolve_ability_total
-   2646         61403         23.2      7  bin_common::execute_and_settle -> execute_main_phase_action -> exec::use_ability -> trig::process_pending -> resolve::current_ability -> resolve::resolve_ability_total -> resolve::pay_cost
-  54150         59873          1.1      2  bin_common::execute_and_settle -> record_action_boundary
-   1344         55688         41.4      6  bin_common::execute_and_settle -> execute_main_phase_action -> exec::resume_with_choice -> trig::process_pending -> resolve::current_ability -> resolve::resolve_ability_total
-   1831         54176         29.6      8  bin_common::execute_and_settle -> execute_main_phase_action -> advance_phase -> advance_phase::live_card_set -> trig::process_pending -> resolve::current_ability -> resolve::resolve_ability_total -> resolve::run_effect
-   6705         53691          8.0      3  bin_common::execute_and_settle -> advance_phase -> advance_phase::draw
-   2646         53294         20.1      8  bin_common::execute_and_settle -> execute_main_phase_action -> exec::use_ability -> trig::process_pending -> resolve::current_ability -> resolve::resolve_ability_total -> resolve::run_effect -> effect::gates
-   2777         52255         18.8      8  bin_common::execute_and_settle -> execute_main_phase_action -> exec::play_member_to_stage -> trig::process_pending -> resolve::current_ability -> resolve::resolve_ability_total -> resolve::run_effect -> effect::gates
-   2646         50648         19.1      9  bin_common::execute_and_settle -> execute_main_phase_action -> exec::use_ability -> trig::process_pending -> resolve::current_ability -> resolve::resolve_ability_total -> resolve::run_effect -> effect::gates -> effect::dispatch
-   1343         48727         36.3      7  bin_common::execute_and_settle -> execute_main_phase_action -> exec::resume_with_choice -> trig::process_pending -> resolve::current_ability -> resolve::resolve_ability_total -> resolve::run_effect
-   6705         46637          7.0      4  bin_common::execute_and_settle -> advance_phase -> advance_phase::active -> check_timing
-   6705         46519          6.9      4  bin_common::execute_and_settle -> advance_phase -> advance_phase::draw -> check_timing
-   2965         46070         15.5      5  bin_common::execute_and_settle -> advance_phase -> advance_phase::second_performance -> execute_performance_phase -> player_perform_live
-   2965         45391         15.3      5  bin_common::execute_and_settle -> advance_phase -> advance_phase::first_performance -> execute_performance_phase -> player_perform_live
-   1946         41757         21.5      7  bin_common::execute_and_settle -> execute_main_phase_action -> exec::resume_with_choice -> resolve::current_ability -> resolve::resolve_ability_total -> resolve::run_effect -> effect::gates
-  10847         36637          3.4      4  bin_common::execute_and_settle -> execute_main_phase_action -> exec::play_member_to_stage -> trig::debut
-   2965         34909         11.8      5  bin_common::execute_and_settle -> advance_phase -> advance_phase::second_performance -> execute_performance_phase -> check_timing
-   2965         34810         11.7      5  bin_common::execute_and_settle -> advance_phase -> advance_phase::first_performance -> execute_performance_phase -> check_timing
-   2273         34599         15.2      9  bin_common::execute_and_settle -> execute_main_phase_action -> exec::play_member_to_stage -> trig::process_pending -> resolve::current_ability -> resolve::resolve_ability_total -> resolve::run_effect -> effect::gates -> effect::dispatch
-   1409         31443         22.3      4  bin_common::execute_and_settle -> execute_main_phase_action -> exec::resume_with_choice -> effect::gates
-  10847         27503          2.5      5  bin_common::execute_and_settle -> execute_main_phase_action -> exec::play_member_to_stage -> trig::process_pending -> trig::auto_scan
-   1501         25671         17.1      9  bin_common::execute_and_settle -> execute_main_phase_action -> advance_phase -> advance_phase::live_card_set -> trig::process_pending -> resolve::current_ability -> resolve::resolve_ability_total -> resolve::run_effect -> effect::gates
-  10428         24918          2.4      5  bin_common::execute_and_settle -> advance_phase -> advance_phase::first_performance -> execute_performance_phase -> trig::auto_scan
-  10435         24484          2.3      5  bin_common::execute_and_settle -> advance_phase -> advance_phase::second_performance -> execute_performance_phase -> trig::auto_scan
-   4062         23721          5.8      7  bin_common::execute_and_settle -> execute_main_phase_action -> exec::play_member_to_stage -> trig::process_pending -> resolve::current_ability -> resolve::resolve_ability_total -> resolve::pay_cost
-   1024         22719         22.2      5  bin_common::execute_and_settle -> execute_main_phase_action -> exec::resume_with_choice -> effect::gates -> effect::dispatch
-   8555         22522          2.6      4  bin_common::execute_and_settle -> execute_main_phase_action -> exec::resume_with_choice -> trig::auto_scan
-   2546         22521          8.8      8  bin_common::execute_and_settle -> execute_main_phase_action -> exec::resume_with_choice -> resolve::current_ability -> resolve::resolve_ability_total -> resolve::run_effect -> effect::gates -> effect::gates
-   2965         20792          7.0      5  bin_common::execute_and_settle -> execute_main_phase_action -> advance_phase -> advance_phase::live_card_set -> check_timing
-   1143         20737         18.1      8  bin_common::execute_and_settle -> execute_main_phase_action -> exec::resume_with_choice -> trig::process_pending -> resolve::current_ability -> resolve::resolve_ability_total -> resolve::run_effect -> effect::gates
-   2546         19975          7.8      9  bin_common::execute_and_settle -> execute_main_phase_action -> exec::resume_with_choice -> resolve::current_ability -> resolve::resolve_ability_total -> resolve::run_effect -> effect::gates -> effect::gates -> effect::dispatch
-  12102         18565          1.5      4  bin_common::execute_and_settle -> advance_phase -> advance_phase::live_victory -> trig::process_pending
-   1103         14323         13.0     10  bin_common::execute_and_settle -> execute_main_phase_action -> advance_phase -> advance_phase::live_card_set -> trig::process_pending -> resolve::current_ability -> resolve::resolve_ability_total -> resolve::run_effect -> effect::gates -> effect::dispatch
-   6060         14233          2.3      4  bin_common::execute_and_settle -> advance_phase -> advance_phase::live_victory -> trig::auto_scan
-   6007         13636          2.3      5  bin_common::execute_and_settle -> execute_main_phase_action -> exec::resume_with_choice -> trig::process_pending -> trig::auto_scan
-   6568         13521          2.1      5  bin_common::execute_and_settle -> advance_phase -> advance_phase::active -> check_timing -> check_timing::recalculate_constants
-   2965         13473          4.5      6  bin_common::execute_and_settle -> advance_phase -> advance_phase::second_performance -> execute_performance_phase -> check_timing -> check_timing::check_invalid_live_cards
-   6568         13405          2.0      5  bin_common::execute_and_settle -> advance_phase -> advance_phase::draw -> check_timing -> check_timing::recalculate_constants
-   2965         13370          4.5      6  bin_common::execute_and_settle -> advance_phase -> advance_phase::first_performance -> execute_performance_phase -> check_timing -> check_timing::check_invalid_live_cards
-   6568         13136          2.0      5  bin_common::execute_and_settle -> advance_phase -> advance_phase::active -> check_timing -> check_timing::process_pending_auto_abilities
-   6568         13136          2.0      5  bin_common::execute_and_settle -> advance_phase -> advance_phase::draw -> check_timing -> check_timing::process_pending_auto_abilities
-    879         12654         14.4      9  bin_common::execute_and_settle -> execute_main_phase_action -> exec::resume_with_choice -> trig::process_pending -> resolve::current_ability -> resolve::resolve_ability_total -> resolve::run_effect -> effect::gates -> effect::dispatch
-  10435         12550          1.2      5  bin_common::execute_and_settle -> advance_phase -> advance_phase::second_performance -> execute_performance_phase -> trig::process_pending
-  10428         12478          1.2      5  bin_common::execute_and_settle -> advance_phase -> advance_phase::first_performance -> execute_performance_phase -> trig::process_pending
-  10847         11710          1.1      4  bin_common::execute_and_settle -> execute_main_phase_action -> exec::play_member_to_stage -> recalculate_constants
-    504         10404         20.6      9  bin_common::execute_and_settle -> execute_main_phase_action -> exec::play_member_to_stage -> trig::process_pending -> resolve::current_ability -> resolve::resolve_ability_total -> resolve::run_effect -> effect::gates -> effect::gates
-    504          9900         19.6     10  bin_common::execute_and_settle -> execute_main_phase_action -> exec::play_member_to_stage -> trig::process_pending -> resolve::current_ability -> resolve::resolve_ability_total -> resolve::run_effect -> effect::gates -> effect::gates -> effect::dispatch
-   2965          9580          3.2      6  bin_common::execute_and_settle -> advance_phase -> advance_phase::first_performance -> execute_performance_phase -> check_timing -> check_timing::process_pending_auto_abilities
-   2965          9576          3.2      6  bin_common::execute_and_settle -> advance_phase -> advance_phase::second_performance -> execute_performance_phase -> check_timing -> check_timing::process_pending_auto_abilities
-    634          8611         13.6      8  bin_common::execute_and_settle -> execute_main_phase_action -> exec::resume_with_choice -> resolve::current_ability -> resolve::resolve_ability_total -> resolve::run_effect -> effect::gates -> effect::dispatch
-    670          8055         12.0     10  bin_common::execute_and_settle -> execute_main_phase_action -> advance_phase -> advance_phase::live_card_set -> trig::process_pending -> resolve::current_ability -> resolve::resolve_ability_total -> resolve::run_effect -> effect::gates -> effect::gates
-    670          7385         11.0     11  bin_common::execute_and_settle -> execute_main_phase_action -> advance_phase -> advance_phase::live_card_set -> trig::process_pending -> resolve::current_ability -> resolve::resolve_ability_total -> resolve::run_effect -> effect::gates -> effect::gates -> effect::dispatch
-   6568          6949          1.1      6  bin_common::execute_and_settle -> advance_phase -> advance_phase::active -> check_timing -> check_timing::recalculate_constants -> recalculate_constants
-   6568          6837          1.0      6  bin_common::execute_and_settle -> advance_phase -> advance_phase::draw -> check_timing -> check_timing::recalculate_constants -> recalculate_constants
-   6705          6705          1.0      3  bin_common::execute_and_settle -> advance_phase -> advance_phase::energy
-   6705          6705          1.0      5  bin_common::execute_and_settle -> advance_phase -> advance_phase::active -> check_timing -> check_timing::check_victory_condition
-   6705          6705          1.0      5  bin_common::execute_and_settle -> advance_phase -> advance_phase::draw -> check_timing -> check_timing::check_victory_condition
-   2965          6615          2.2      7  bin_common::execute_and_settle -> advance_phase -> advance_phase::first_performance -> execute_performance_phase -> check_timing -> check_timing::process_pending_auto_abilities -> trig::process_pending
-   2965          6611          2.2      7  bin_common::execute_and_settle -> advance_phase -> advance_phase::second_performance -> execute_performance_phase -> check_timing -> check_timing::process_pending_auto_abilities -> trig::process_pending
-   6568          6568          1.0      5  bin_common::execute_and_settle -> advance_phase -> advance_phase::active -> check_timing -> check_timing::check_invalid_live_cards
-   6568          6568          1.0      5  bin_common::execute_and_settle -> advance_phase -> advance_phase::draw -> check_timing -> check_timing::check_invalid_live_cards
-   6568          6568          1.0      6  bin_common::execute_and_settle -> advance_phase -> advance_phase::active -> check_timing -> check_timing::process_pending_auto_abilities -> trig::process_pending
-   6568          6568          1.0      6  bin_common::execute_and_settle -> advance_phase -> advance_phase::draw -> check_timing -> check_timing::process_pending_auto_abilities -> trig::process_pending
-   2646          5979          2.3      5  bin_common::execute_and_settle -> execute_main_phase_action -> exec::use_ability -> trig::process_pending -> trig::auto_scan
-   2965          5967          2.0      6  bin_common::execute_and_settle -> execute_main_phase_action -> advance_phase -> advance_phase::live_card_set -> check_timing -> check_timing::recalculate_constants
-   2965          5930          2.0      6  bin_common::execute_and_settle -> execute_main_phase_action -> advance_phase -> advance_phase::live_card_set -> check_timing -> check_timing::process_pending_auto_abilities
-   2965          5930          2.0      6  bin_common::execute_and_settle -> advance_phase -> advance_phase::first_performance -> execute_performance_phase -> check_timing -> check_timing::recalculate_constants
-   2965          5930          2.0      6  bin_common::execute_and_settle -> advance_phase -> advance_phase::second_performance -> execute_performance_phase -> check_timing -> check_timing::recalculate_constants
-    393          5898         15.0      5  bin_common::execute_and_settle -> advance_phase -> advance_phase::live_victory -> trig::process_pending -> resolve::current_ability
-    439          5540         12.6      9  bin_common::execute_and_settle -> execute_main_phase_action -> exec::resume_with_choice -> trig::process_pending -> resolve::current_ability -> resolve::resolve_ability_total -> resolve::run_effect -> effect::gates -> effect::gates
-   5292          5292          1.0      7  bin_common::execute_and_settle -> execute_main_phase_action -> exec::use_ability -> trig::process_pending -> resolve::current_ability -> resolve::resolve_ability_total -> resolve::handle_pending_choice
-    439          5101         11.6     10  bin_common::execute_and_settle -> execute_main_phase_action -> exec::resume_with_choice -> trig::process_pending -> resolve::current_ability -> resolve::resolve_ability_total -> resolve::run_effect -> effect::gates -> effect::gates -> effect::dispatch
-    385          4620         12.0      5  bin_common::execute_and_settle -> execute_main_phase_action -> exec::resume_with_choice -> effect::gates -> effect::gates
-    393          4326         11.0      6  bin_common::execute_and_settle -> advance_phase -> advance_phase::live_victory -> trig::process_pending -> resolve::current_ability -> resolve::resolve_ability_total
-    694          4290          6.2      6  bin_common::execute_and_settle -> execute_main_phase_action -> exec::resume_with_choice -> effect::gates -> effect::dispatch -> trig::auto_scan
-   4278          4278          1.0      6  bin_common::execute_and_settle -> execute_main_phase_action -> exec::resume_with_choice -> resolve::current_ability -> resolve::resolve_ability_total -> resolve::handle_pending_choice
-   4062          4062          1.0      7  bin_common::execute_and_settle -> execute_main_phase_action -> exec::play_member_to_stage -> trig::process_pending -> resolve::current_ability -> resolve::resolve_ability_total -> resolve::pre_gates
-    385          3850         10.0      6  bin_common::execute_and_settle -> execute_main_phase_action -> exec::resume_with_choice -> effect::gates -> effect::gates -> effect::dispatch
+  65397       3944581         60.3      1  bin_common::execute_and_settle
+  65397       3196838         48.9      2  bin_common::execute_and_settle -> execute_main_phase_action
+  65397       1270939         19.4      1  generate_possible_actions
+  10634       1109094        104.3      3  bin_common::execute_and_settle -> execute_main_phase_action -> exec::resume_with_choice
+  10806       1048096         97.0      3  bin_common::execute_and_settle -> execute_main_phase_action -> exec::play_member_to_stage
+  17317        858796         49.6      4  bin_common::execute_and_settle -> execute_main_phase_action -> exec::play_member_to_stage -> trig::process_pending
+   4040        810141        200.5      5  bin_common::execute_and_settle -> execute_main_phase_action -> exec::play_member_to_stage -> trig::process_pending -> resolve::current_ability
+   2633        778568        295.7      3  bin_common::execute_and_settle -> execute_main_phase_action -> exec::use_ability
+   2633        714228        271.3      4  bin_common::execute_and_settle -> execute_main_phase_action -> exec::use_ability -> trig::process_pending
+   2633        703034        267.0      5  bin_common::execute_and_settle -> execute_main_phase_action -> exec::use_ability -> trig::process_pending -> resolve::current_ability
+  20002        681442         34.1      2  generate_possible_actions -> generate_main_phase_actions
+  29045        591634         20.4      2  bin_common::execute_and_settle -> advance_phase
+   4040        434207        107.5      6  bin_common::execute_and_settle -> execute_main_phase_action -> exec::play_member_to_stage -> trig::process_pending -> resolve::current_ability -> resolve::resolve_ability_total
+   2633        402390        152.8      6  bin_common::execute_and_settle -> execute_main_phase_action -> exec::use_ability -> trig::process_pending -> resolve::current_ability -> resolve::resolve_ability_total
+   2132        350842        164.6      4  bin_common::execute_and_settle -> execute_main_phase_action -> exec::resume_with_choice -> resolve::current_ability
+   2633        330765        125.6      7  bin_common::execute_and_settle -> execute_main_phase_action -> exec::use_ability -> trig::process_pending -> resolve::current_ability -> resolve::resolve_ability_total -> resolve::run_effect
+   2765        273661         99.0      7  bin_common::execute_and_settle -> execute_main_phase_action -> exec::play_member_to_stage -> trig::process_pending -> resolve::current_ability -> resolve::resolve_ability_total -> resolve::run_effect
+  32019        273351          8.5      2  generate_possible_actions -> generate_live_card_set_actions
+  10634        240711         22.6      2  generate_possible_actions -> generate_pending_choice_actions
+   2132        196423         92.1      5  bin_common::execute_and_settle -> execute_main_phase_action -> exec::resume_with_choice -> resolve::current_ability -> resolve::resolve_ability_total
+   9525        186747         19.6      3  bin_common::execute_and_settle -> execute_main_phase_action -> advance_phase
+   2132        185763         87.1      6  bin_common::execute_and_settle -> execute_main_phase_action -> exec::resume_with_choice -> resolve::current_ability -> resolve::resolve_ability_total -> resolve::run_effect
+   2962        177222         59.8      4  bin_common::execute_and_settle -> execute_main_phase_action -> advance_phase -> advance_phase::live_card_set
+   2962        173980         58.7      3  bin_common::execute_and_settle -> advance_phase -> advance_phase::first_performance
+   2962        172433         58.2      3  bin_common::execute_and_settle -> advance_phase -> advance_phase::second_performance
+   2962        171018         57.7      4  bin_common::execute_and_settle -> advance_phase -> advance_phase::first_performance -> execute_performance_phase
+   2962        169471         57.2      4  bin_common::execute_and_settle -> advance_phase -> advance_phase::second_performance -> execute_performance_phase
+   6805        128917         18.9      7  bin_common::execute_and_settle -> execute_main_phase_action -> exec::play_member_to_stage -> trig::process_pending -> resolve::current_ability -> resolve::resolve_ability_total -> resolve::handle_pending_choice
+   8504        115526         13.6      4  bin_common::execute_and_settle -> execute_main_phase_action -> exec::resume_with_choice -> trig::process_pending
+   4795        114141         23.8      5  bin_common::execute_and_settle -> execute_main_phase_action -> advance_phase -> advance_phase::live_card_set -> trig::process_pending
+   1831         99031         54.1      6  bin_common::execute_and_settle -> execute_main_phase_action -> advance_phase -> advance_phase::live_card_set -> trig::process_pending -> resolve::current_ability
+   1337         89070         66.6      5  bin_common::execute_and_settle -> execute_main_phase_action -> exec::resume_with_choice -> trig::process_pending -> resolve::current_ability
+   3021         88669         29.4      3  bin_common::execute_and_settle -> advance_phase -> advance_phase::live_victory
+  34634         88445          2.6      4  bin_common::execute_and_settle -> execute_main_phase_action -> exec::play_member_to_stage -> trig::auto_scan
+  69312         69312          1.0      3  generate_possible_actions -> generate_main_phase_actions -> gen::cost_reduction
+  69312         69312          1.0      3  generate_possible_actions -> generate_main_phase_actions -> gen::area_candidates
+   6700         67148         10.0      3  bin_common::execute_and_settle -> advance_phase -> advance_phase::active
+   1831         62959         34.4      7  bin_common::execute_and_settle -> execute_main_phase_action -> advance_phase -> advance_phase::live_card_set -> trig::process_pending -> resolve::current_ability -> resolve::resolve_ability_total
+   2633         61089         23.2      7  bin_common::execute_and_settle -> execute_main_phase_action -> exec::use_ability -> trig::process_pending -> resolve::current_ability -> resolve::resolve_ability_total -> resolve::pay_cost
+  54076         59813          1.1      2  bin_common::execute_and_settle -> record_action_boundary
+   1337         55553         41.6      6  bin_common::execute_and_settle -> execute_main_phase_action -> exec::resume_with_choice -> trig::process_pending -> resolve::current_ability -> resolve::resolve_ability_total
+   1831         53800         29.4      8  bin_common::execute_and_settle -> execute_main_phase_action -> advance_phase -> advance_phase::live_card_set -> trig::process_pending -> resolve::current_ability -> resolve::resolve_ability_total -> resolve::run_effect
+   6700         53655          8.0      3  bin_common::execute_and_settle -> advance_phase -> advance_phase::draw
+   2633         53034         20.1      8  bin_common::execute_and_settle -> execute_main_phase_action -> exec::use_ability -> trig::process_pending -> resolve::current_ability -> resolve::resolve_ability_total -> resolve::run_effect -> effect::gates
+   2765         51896         18.8      8  bin_common::execute_and_settle -> execute_main_phase_action -> exec::play_member_to_stage -> trig::process_pending -> resolve::current_ability -> resolve::resolve_ability_total -> resolve::run_effect -> effect::gates
+   2633         50401         19.1      9  bin_common::execute_and_settle -> execute_main_phase_action -> exec::use_ability -> trig::process_pending -> resolve::current_ability -> resolve::resolve_ability_total -> resolve::run_effect -> effect::gates -> effect::dispatch
+   1336         48621         36.4      7  bin_common::execute_and_settle -> execute_main_phase_action -> exec::resume_with_choice -> trig::process_pending -> resolve::current_ability -> resolve::resolve_ability_total -> resolve::run_effect
+   6700         46607          7.0      4  bin_common::execute_and_settle -> advance_phase -> advance_phase::active -> check_timing
+   6700         46489          6.9      4  bin_common::execute_and_settle -> advance_phase -> advance_phase::draw -> check_timing
+   2962         46257         15.6      5  bin_common::execute_and_settle -> advance_phase -> advance_phase::first_performance -> execute_performance_phase -> player_perform_live
+   2962         46176         15.6      5  bin_common::execute_and_settle -> advance_phase -> advance_phase::second_performance -> execute_performance_phase -> player_perform_live
+   1938         41598         21.5      7  bin_common::execute_and_settle -> execute_main_phase_action -> exec::resume_with_choice -> resolve::current_ability -> resolve::resolve_ability_total -> resolve::run_effect -> effect::gates
+  10806         36477          3.4      4  bin_common::execute_and_settle -> execute_main_phase_action -> exec::play_member_to_stage -> trig::debut
+   2962         34843         11.8      5  bin_common::execute_and_settle -> advance_phase -> advance_phase::first_performance -> execute_performance_phase -> check_timing
+   2962         34843         11.8      5  bin_common::execute_and_settle -> advance_phase -> advance_phase::second_performance -> execute_performance_phase -> check_timing
+   2264         34339         15.2      9  bin_common::execute_and_settle -> execute_main_phase_action -> exec::play_member_to_stage -> trig::process_pending -> resolve::current_ability -> resolve::resolve_ability_total -> resolve::run_effect -> effect::gates -> effect::dispatch
+   1402         31269         22.3      4  bin_common::execute_and_settle -> execute_main_phase_action -> exec::resume_with_choice -> effect::gates
+  10806         27291          2.5      5  bin_common::execute_and_settle -> execute_main_phase_action -> exec::play_member_to_stage -> trig::process_pending -> trig::auto_scan
+   1495         25449         17.0      9  bin_common::execute_and_settle -> execute_main_phase_action -> advance_phase -> advance_phase::live_card_set -> trig::process_pending -> resolve::current_ability -> resolve::resolve_ability_total -> resolve::run_effect -> effect::gates
+  10417         24853          2.4      5  bin_common::execute_and_settle -> advance_phase -> advance_phase::first_performance -> execute_performance_phase -> trig::auto_scan
+  10432         24433          2.3      5  bin_common::execute_and_settle -> advance_phase -> advance_phase::second_performance -> execute_performance_phase -> trig::auto_scan
+   4040         23543          5.8      7  bin_common::execute_and_settle -> execute_main_phase_action -> exec::play_member_to_stage -> trig::process_pending -> resolve::current_ability -> resolve::resolve_ability_total -> resolve::pay_cost
+   1020         22609         22.2      5  bin_common::execute_and_settle -> execute_main_phase_action -> exec::resume_with_choice -> effect::gates -> effect::dispatch
+   8517         22444          2.6      4  bin_common::execute_and_settle -> execute_main_phase_action -> exec::resume_with_choice -> trig::auto_scan
+   2535         22431          8.8      8  bin_common::execute_and_settle -> execute_main_phase_action -> exec::resume_with_choice -> resolve::current_ability -> resolve::resolve_ability_total -> resolve::run_effect -> effect::gates -> effect::gates
+   2962         20771          7.0      5  bin_common::execute_and_settle -> execute_main_phase_action -> advance_phase -> advance_phase::live_card_set -> check_timing
+   1140         20529         18.0      8  bin_common::execute_and_settle -> execute_main_phase_action -> exec::resume_with_choice -> trig::process_pending -> resolve::current_ability -> resolve::resolve_ability_total -> resolve::run_effect -> effect::gates
+   2535         19896          7.8      9  bin_common::execute_and_settle -> execute_main_phase_action -> exec::resume_with_choice -> resolve::current_ability -> resolve::resolve_ability_total -> resolve::run_effect -> effect::gates -> effect::gates -> effect::dispatch
+  12090         18593          1.5      4  bin_common::execute_and_settle -> advance_phase -> advance_phase::live_victory -> trig::process_pending
+   1101         14254         12.9     10  bin_common::execute_and_settle -> execute_main_phase_action -> advance_phase -> advance_phase::live_card_set -> trig::process_pending -> resolve::current_ability -> resolve::resolve_ability_total -> resolve::run_effect -> effect::gates -> effect::dispatch
+   6054         14192          2.3      4  bin_common::execute_and_settle -> advance_phase -> advance_phase::live_victory -> trig::auto_scan
+   5973         13563          2.3      5  bin_common::execute_and_settle -> execute_main_phase_action -> exec::resume_with_choice -> trig::process_pending -> trig::auto_scan
+   6564         13513          2.1      5  bin_common::execute_and_settle -> advance_phase -> advance_phase::active -> check_timing -> check_timing::recalculate_constants
+   2962         13431          4.5      6  bin_common::execute_and_settle -> advance_phase -> advance_phase::second_performance -> execute_performance_phase -> check_timing -> check_timing::check_invalid_live_cards
+   2962         13408          4.5      6  bin_common::execute_and_settle -> advance_phase -> advance_phase::first_performance -> execute_performance_phase -> check_timing -> check_timing::check_invalid_live_cards
+   6564         13397          2.0      5  bin_common::execute_and_settle -> advance_phase -> advance_phase::draw -> check_timing -> check_timing::recalculate_constants
+   6564         13128          2.0      5  bin_common::execute_and_settle -> advance_phase -> advance_phase::draw -> check_timing -> check_timing::process_pending_auto_abilities
+   6564         13128          2.0      5  bin_common::execute_and_settle -> advance_phase -> advance_phase::active -> check_timing -> check_timing::process_pending_auto_abilities
+    881         12679         14.4      9  bin_common::execute_and_settle -> execute_main_phase_action -> exec::resume_with_choice -> trig::process_pending -> resolve::current_ability -> resolve::resolve_ability_total -> resolve::run_effect -> effect::gates -> effect::dispatch
+  10432         12565          1.2      5  bin_common::execute_and_settle -> advance_phase -> advance_phase::second_performance -> execute_performance_phase -> trig::process_pending
+  10417         12462          1.2      5  bin_common::execute_and_settle -> advance_phase -> advance_phase::first_performance -> execute_performance_phase -> trig::process_pending
+  10806         11669          1.1      4  bin_common::execute_and_settle -> execute_main_phase_action -> exec::play_member_to_stage -> recalculate_constants
+    501         10350         20.7      9  bin_common::execute_and_settle -> execute_main_phase_action -> exec::play_member_to_stage -> trig::process_pending -> resolve::current_ability -> resolve::resolve_ability_total -> resolve::run_effect -> effect::gates -> effect::gates
+    501          9849         19.7     10  bin_common::execute_and_settle -> execute_main_phase_action -> exec::play_member_to_stage -> trig::process_pending -> resolve::current_ability -> resolve::resolve_ability_total -> resolve::run_effect -> effect::gates -> effect::gates -> effect::dispatch
+   2962          9587          3.2      6  bin_common::execute_and_settle -> advance_phase -> advance_phase::first_performance -> execute_performance_phase -> check_timing -> check_timing::process_pending_auto_abilities
+   2962          9564          3.2      6  bin_common::execute_and_settle -> advance_phase -> advance_phase::second_performance -> execute_performance_phase -> check_timing -> check_timing::process_pending_auto_abilities
+    631          8603         13.6      8  bin_common::execute_and_settle -> execute_main_phase_action -> exec::resume_with_choice -> resolve::current_ability -> resolve::resolve_ability_total -> resolve::run_effect -> effect::gates -> effect::dispatch
+    662          7940         12.0     10  bin_common::execute_and_settle -> execute_main_phase_action -> advance_phase -> advance_phase::live_card_set -> trig::process_pending -> resolve::current_ability -> resolve::resolve_ability_total -> resolve::run_effect -> effect::gates -> effect::gates
+    662          7278         11.0     11  bin_common::execute_and_settle -> execute_main_phase_action -> advance_phase -> advance_phase::live_card_set -> trig::process_pending -> resolve::current_ability -> resolve::resolve_ability_total -> resolve::run_effect -> effect::gates -> effect::gates -> effect::dispatch
+   6564          6945          1.1      6  bin_common::execute_and_settle -> advance_phase -> advance_phase::active -> check_timing -> check_timing::recalculate_constants -> recalculate_constants
+   6564          6833          1.0      6  bin_common::execute_and_settle -> advance_phase -> advance_phase::draw -> check_timing -> check_timing::recalculate_constants -> recalculate_constants
+   6700          6700          1.0      3  bin_common::execute_and_settle -> advance_phase -> advance_phase::energy
+   6700          6700          1.0      5  bin_common::execute_and_settle -> advance_phase -> advance_phase::draw -> check_timing -> check_timing::check_victory_condition
+   6700          6700          1.0      5  bin_common::execute_and_settle -> advance_phase -> advance_phase::active -> check_timing -> check_timing::check_victory_condition
+   2962          6625          2.2      7  bin_common::execute_and_settle -> advance_phase -> advance_phase::first_performance -> execute_performance_phase -> check_timing -> check_timing::process_pending_auto_abilities -> trig::process_pending
+   2962          6602          2.2      7  bin_common::execute_and_settle -> advance_phase -> advance_phase::second_performance -> execute_performance_phase -> check_timing -> check_timing::process_pending_auto_abilities -> trig::process_pending
+   6564          6564          1.0      5  bin_common::execute_and_settle -> advance_phase -> advance_phase::draw -> check_timing -> check_timing::check_invalid_live_cards
+   6564          6564          1.0      6  bin_common::execute_and_settle -> advance_phase -> advance_phase::active -> check_timing -> check_timing::process_pending_auto_abilities -> trig::process_pending
+   6564          6564          1.0      5  bin_common::execute_and_settle -> advance_phase -> advance_phase::active -> check_timing -> check_timing::check_invalid_live_cards
+   6564          6564          1.0      6  bin_common::execute_and_settle -> advance_phase -> advance_phase::draw -> check_timing -> check_timing::process_pending_auto_abilities -> trig::process_pending
+   2962          5961          2.0      6  bin_common::execute_and_settle -> execute_main_phase_action -> advance_phase -> advance_phase::live_card_set -> check_timing -> check_timing::recalculate_constants
+    395          5936         15.0      5  bin_common::execute_and_settle -> advance_phase -> advance_phase::live_victory -> trig::process_pending -> resolve::current_ability
+   2633          5928          2.3      5  bin_common::execute_and_settle -> execute_main_phase_action -> exec::use_ability -> trig::process_pending -> trig::auto_scan
+   2962          5924          2.0      6  bin_common::execute_and_settle -> advance_phase -> advance_phase::first_performance -> execute_performance_phase -> check_timing -> check_timing::recalculate_constants
+   2962          5924          2.0      6  bin_common::execute_and_settle -> advance_phase -> advance_phase::second_performance -> execute_performance_phase -> check_timing -> check_timing::recalculate_constants
+   2962          5924          2.0      6  bin_common::execute_and_settle -> execute_main_phase_action -> advance_phase -> advance_phase::live_card_set -> check_timing -> check_timing::process_pending_auto_abilities
+    428          5364         12.5      9  bin_common::execute_and_settle -> execute_main_phase_action -> exec::resume_with_choice -> trig::process_pending -> resolve::current_ability -> resolve::resolve_ability_total -> resolve::run_effect -> effect::gates -> effect::gates
+   5266          5266          1.0      7  bin_common::execute_and_settle -> execute_main_phase_action -> exec::use_ability -> trig::process_pending -> resolve::current_ability -> resolve::resolve_ability_total -> resolve::handle_pending_choice
+    428          4936         11.5     10  bin_common::execute_and_settle -> execute_main_phase_action -> exec::resume_with_choice -> trig::process_pending -> resolve::current_ability -> resolve::resolve_ability_total -> resolve::run_effect -> effect::gates -> effect::gates -> effect::dispatch
+    382          4584         12.0      5  bin_common::execute_and_settle -> execute_main_phase_action -> exec::resume_with_choice -> effect::gates -> effect::gates
+    395          4356         11.0      6  bin_common::execute_and_settle -> advance_phase -> advance_phase::live_victory -> trig::process_pending -> resolve::current_ability -> resolve::resolve_ability_total
+   4264          4264          1.0      6  bin_common::execute_and_settle -> execute_main_phase_action -> exec::resume_with_choice -> resolve::current_ability -> resolve::resolve_ability_total -> resolve::handle_pending_choice
+    688          4214          6.1      6  bin_common::execute_and_settle -> execute_main_phase_action -> exec::resume_with_choice -> effect::gates -> effect::dispatch -> trig::auto_scan
+   4040          4040          1.0      7  bin_common::execute_and_settle -> execute_main_phase_action -> exec::play_member_to_stage -> trig::process_pending -> resolve::current_ability -> resolve::resolve_ability_total -> resolve::pre_gates
+    382          3820         10.0      6  bin_common::execute_and_settle -> execute_main_phase_action -> exec::resume_with_choice -> effect::gates -> effect::gates -> effect::dispatch
+   1576          3663          2.3      8  bin_common::execute_and_settle -> advance_phase -> advance_phase::first_performance -> execute_performance_phase -> check_timing -> check_timing::process_pending_auto_abilities -> trig::process_pending -> trig::auto_scan
    3662          3662          1.0      8  bin_common::execute_and_settle -> execute_main_phase_action -> advance_phase -> advance_phase::live_card_set -> trig::process_pending -> resolve::current_ability -> resolve::resolve_ability_total -> resolve::handle_pending_choice
-   1571          3650          2.3      8  bin_common::execute_and_settle -> advance_phase -> advance_phase::first_performance -> execute_performance_phase -> check_timing -> check_timing::process_pending_auto_abilities -> trig::process_pending -> trig::auto_scan
-   1587          3646          2.3      8  bin_common::execute_and_settle -> advance_phase -> advance_phase::second_performance -> execute_performance_phase -> check_timing -> check_timing::process_pending_auto_abilities -> trig::process_pending -> trig::auto_scan
-   3050          3050          1.0      4  bin_common::execute_and_settle -> execute_main_phase_action -> exec::resume_with_choice -> recalculate_constants
-   2965          3002          1.0      7  bin_common::execute_and_settle -> execute_main_phase_action -> advance_phase -> advance_phase::live_card_set -> check_timing -> check_timing::recalculate_constants -> recalculate_constants
-   2965          2965          1.0      6  bin_common::execute_and_settle -> execute_main_phase_action -> advance_phase -> advance_phase::live_card_set -> check_timing -> check_timing::check_invalid_live_cards
-   2965          2965          1.0      6  bin_common::execute_and_settle -> execute_main_phase_action -> advance_phase -> advance_phase::live_card_set -> check_timing -> check_timing::check_victory_condition
-   2965          2965          1.0      7  bin_common::execute_and_settle -> advance_phase -> advance_phase::second_performance -> execute_performance_phase -> check_timing -> check_timing::recalculate_constants -> recalculate_constants
-   2965          2965          1.0      7  bin_common::execute_and_settle -> advance_phase -> advance_phase::first_performance -> execute_performance_phase -> check_timing -> check_timing::recalculate_constants -> recalculate_constants
-   2965          2965          1.0      6  bin_common::execute_and_settle -> advance_phase -> advance_phase::second_performance -> execute_performance_phase -> check_timing -> check_timing::check_victory_condition
-   2965          2965          1.0      7  bin_common::execute_and_settle -> execute_main_phase_action -> advance_phase -> advance_phase::live_card_set -> check_timing -> check_timing::process_pending_auto_abilities -> trig::process_pending
-   2965          2965          1.0      6  bin_common::execute_and_settle -> advance_phase -> advance_phase::first_performance -> execute_performance_phase -> check_timing -> check_timing::check_victory_condition
-   2686          2686          1.0      7  bin_common::execute_and_settle -> execute_main_phase_action -> exec::resume_with_choice -> trig::process_pending -> resolve::current_ability -> resolve::resolve_ability_total -> resolve::handle_pending_choice
-   2646          2646          1.0      7  bin_common::execute_and_settle -> execute_main_phase_action -> exec::use_ability -> trig::process_pending -> resolve::current_ability -> resolve::resolve_ability_total -> resolve::pre_gates
-   2646          2646          1.0      8  bin_common::execute_and_settle -> execute_main_phase_action -> exec::use_ability -> trig::process_pending -> resolve::current_ability -> resolve::resolve_ability_total -> resolve::pay_cost -> recalculate_constants
-    393          2357          6.0      7  bin_common::execute_and_settle -> advance_phase -> advance_phase::live_victory -> trig::process_pending -> resolve::current_ability -> resolve::resolve_ability_total -> resolve::run_effect
-   2139          2139          1.0      6  bin_common::execute_and_settle -> execute_main_phase_action -> exec::resume_with_choice -> resolve::current_ability -> resolve::resolve_ability_total -> resolve::pre_gates
-   2139          2139          1.0      6  bin_common::execute_and_settle -> execute_main_phase_action -> exec::resume_with_choice -> resolve::current_ability -> resolve::resolve_ability_total -> resolve::pay_cost
-    902          2115          2.3      6  bin_common::execute_and_settle -> advance_phase -> advance_phase::second_performance -> execute_performance_phase -> trig::process_pending -> trig::auto_scan
-    877          2050          2.3      6  bin_common::execute_and_settle -> advance_phase -> advance_phase::first_performance -> execute_performance_phase -> trig::process_pending -> trig::auto_scan
-   1831          1831          1.0      8  bin_common::execute_and_settle -> execute_main_phase_action -> advance_phase -> advance_phase::live_card_set -> trig::process_pending -> resolve::current_ability -> resolve::resolve_ability_total -> resolve::pre_gates
+   1585          3640          2.3      8  bin_common::execute_and_settle -> advance_phase -> advance_phase::second_performance -> execute_performance_phase -> check_timing -> check_timing::process_pending_auto_abilities -> trig::process_pending -> trig::auto_scan
+   3036          3036          1.0      4  bin_common::execute_and_settle -> execute_main_phase_action -> exec::resume_with_choice -> recalculate_constants
+   2962          2999          1.0      7  bin_common::execute_and_settle -> execute_main_phase_action -> advance_phase -> advance_phase::live_card_set -> check_timing -> check_timing::recalculate_constants -> recalculate_constants
+   2962          2962          1.0      7  bin_common::execute_and_settle -> advance_phase -> advance_phase::second_performance -> execute_performance_phase -> check_timing -> check_timing::recalculate_constants -> recalculate_constants
+   2962          2962          1.0      6  bin_common::execute_and_settle -> execute_main_phase_action -> advance_phase -> advance_phase::live_card_set -> check_timing -> check_timing::check_invalid_live_cards
+   2962          2962          1.0      6  bin_common::execute_and_settle -> advance_phase -> advance_phase::second_performance -> execute_performance_phase -> check_timing -> check_timing::check_victory_condition
+   2962          2962          1.0      7  bin_common::execute_and_settle -> execute_main_phase_action -> advance_phase -> advance_phase::live_card_set -> check_timing -> check_timing::process_pending_auto_abilities -> trig::process_pending
+   2962          2962          1.0      6  bin_common::execute_and_settle -> execute_main_phase_action -> advance_phase -> advance_phase::live_card_set -> check_timing -> check_timing::check_victory_condition
+   2962          2962          1.0      7  bin_common::execute_and_settle -> advance_phase -> advance_phase::first_performance -> execute_performance_phase -> check_timing -> check_timing::recalculate_constants -> recalculate_constants
+   2962          2962          1.0      6  bin_common::execute_and_settle -> advance_phase -> advance_phase::first_performance -> execute_performance_phase -> check_timing -> check_timing::check_victory_condition
+   2672          2672          1.0      7  bin_common::execute_and_settle -> execute_main_phase_action -> exec::resume_with_choice -> trig::process_pending -> resolve::current_ability -> resolve::resolve_ability_total -> resolve::handle_pending_choice
+   2633          2633          1.0      8  bin_common::execute_and_settle -> execute_main_phase_action -> exec::use_ability -> trig::process_pending -> resolve::current_ability -> resolve::resolve_ability_total -> resolve::pay_cost -> recalculate_constants
+   2633          2633          1.0      7  bin_common::execute_and_settle -> execute_main_phase_action -> exec::use_ability -> trig::process_pending -> resolve::current_ability -> resolve::resolve_ability_total -> resolve::pre_gates
+    395          2377          6.0      7  bin_common::execute_and_settle -> advance_phase -> advance_phase::live_victory -> trig::process_pending -> resolve::current_ability -> resolve::resolve_ability_total -> resolve::run_effect
+    908          2133          2.3      6  bin_common::execute_and_settle -> advance_phase -> advance_phase::second_performance -> execute_performance_phase -> trig::process_pending -> trig::auto_scan
+   2132          2132          1.0      6  bin_common::execute_and_settle -> execute_main_phase_action -> exec::resume_with_choice -> resolve::current_ability -> resolve::resolve_ability_total -> resolve::pay_cost
+   2132          2132          1.0      6  bin_common::execute_and_settle -> execute_main_phase_action -> exec::resume_with_choice -> resolve::current_ability -> resolve::resolve_ability_total -> resolve::pre_gates
+    877          2045          2.3      6  bin_common::execute_and_settle -> advance_phase -> advance_phase::first_performance -> execute_performance_phase -> trig::process_pending -> trig::auto_scan
    1831          1831          1.0      8  bin_common::execute_and_settle -> execute_main_phase_action -> advance_phase -> advance_phase::live_card_set -> trig::process_pending -> resolve::current_ability -> resolve::resolve_ability_total -> resolve::pay_cost
-    702          1509          2.1      6  bin_common::execute_and_settle -> execute_main_phase_action -> exec::use_ability -> trig::process_pending -> resolve::current_ability -> trig::auto_scan
-    229          1424          6.2      6  bin_common::execute_and_settle -> execute_main_phase_action -> exec::play_member_to_stage -> trig::process_pending -> resolve::current_ability -> trig::auto_scan
-   1344          1346          1.0      7  bin_common::execute_and_settle -> execute_main_phase_action -> exec::resume_with_choice -> trig::process_pending -> resolve::current_ability -> resolve::resolve_ability_total -> resolve::pre_gates
-   1343          1343          1.0      7  bin_common::execute_and_settle -> execute_main_phase_action -> exec::resume_with_choice -> trig::process_pending -> resolve::current_ability -> resolve::resolve_ability_total -> resolve::pay_cost
-    184          1170          6.4     10  bin_common::execute_and_settle -> execute_main_phase_action -> exec::play_member_to_stage -> trig::process_pending -> resolve::current_ability -> resolve::resolve_ability_total -> resolve::run_effect -> effect::gates -> effect::dispatch -> trig::auto_scan
-     77          1116         14.5      8  bin_common::execute_and_settle -> advance_phase -> advance_phase::live_victory -> trig::process_pending -> resolve::current_ability -> resolve::resolve_ability_total -> resolve::run_effect -> effect::gates
-     77          1039         13.5      9  bin_common::execute_and_settle -> advance_phase -> advance_phase::live_victory -> trig::process_pending -> resolve::current_ability -> resolve::resolve_ability_total -> resolve::run_effect -> effect::gates -> effect::dispatch
-    786           786          1.0      7  bin_common::execute_and_settle -> advance_phase -> advance_phase::live_victory -> trig::process_pending -> resolve::current_ability -> resolve::resolve_ability_total -> resolve::handle_pending_choice
-    199           778          3.9      6  bin_common::execute_and_settle -> execute_main_phase_action -> exec::resume_with_choice -> trig::process_pending -> resolve::current_ability -> trig::auto_scan
-    731           731          1.0      6  bin_common::execute_and_settle -> execute_main_phase_action -> exec::resume_with_choice -> effect::gates -> effect::dispatch -> recalculate_constants
-    393           393          1.0      7  bin_common::execute_and_settle -> advance_phase -> advance_phase::live_victory -> trig::process_pending -> resolve::current_ability -> resolve::resolve_ability_total -> resolve::pre_gates
-    393           393          1.0      7  bin_common::execute_and_settle -> advance_phase -> advance_phase::live_victory -> trig::process_pending -> resolve::current_ability -> resolve::resolve_ability_total -> resolve::pay_cost
+   1831          1831          1.0      8  bin_common::execute_and_settle -> execute_main_phase_action -> advance_phase -> advance_phase::live_card_set -> trig::process_pending -> resolve::current_ability -> resolve::resolve_ability_total -> resolve::pre_gates
+    703          1504          2.1      6  bin_common::execute_and_settle -> execute_main_phase_action -> exec::use_ability -> trig::process_pending -> resolve::current_ability -> trig::auto_scan
+    231          1432          6.2      6  bin_common::execute_and_settle -> execute_main_phase_action -> exec::play_member_to_stage -> trig::process_pending -> resolve::current_ability -> trig::auto_scan
+   1337          1339          1.0      7  bin_common::execute_and_settle -> execute_main_phase_action -> exec::resume_with_choice -> trig::process_pending -> resolve::current_ability -> resolve::resolve_ability_total -> resolve::pre_gates
+   1336          1336          1.0      7  bin_common::execute_and_settle -> execute_main_phase_action -> exec::resume_with_choice -> trig::process_pending -> resolve::current_ability -> resolve::resolve_ability_total -> resolve::pay_cost
+    188          1184          6.3     10  bin_common::execute_and_settle -> execute_main_phase_action -> exec::play_member_to_stage -> trig::process_pending -> resolve::current_ability -> resolve::resolve_ability_total -> resolve::run_effect -> effect::gates -> effect::dispatch -> trig::auto_scan
+     78          1132         14.5      8  bin_common::execute_and_settle -> advance_phase -> advance_phase::live_victory -> trig::process_pending -> resolve::current_ability -> resolve::resolve_ability_total -> resolve::run_effect -> effect::gates
+     78          1054         13.5      9  bin_common::execute_and_settle -> advance_phase -> advance_phase::live_victory -> trig::process_pending -> resolve::current_ability -> resolve::resolve_ability_total -> resolve::run_effect -> effect::gates -> effect::dispatch
+    790           790          1.0      7  bin_common::execute_and_settle -> advance_phase -> advance_phase::live_victory -> trig::process_pending -> resolve::current_ability -> resolve::resolve_ability_total -> resolve::handle_pending_choice
+    192           744          3.9      6  bin_common::execute_and_settle -> execute_main_phase_action -> exec::resume_with_choice -> trig::process_pending -> resolve::current_ability -> trig::auto_scan
+    725           725          1.0      6  bin_common::execute_and_settle -> execute_main_phase_action -> exec::resume_with_choice -> effect::gates -> effect::dispatch -> recalculate_constants
+    395           395          1.0      7  bin_common::execute_and_settle -> advance_phase -> advance_phase::live_victory -> trig::process_pending -> resolve::current_ability -> resolve::resolve_ability_total -> resolve::pre_gates
+    395           395          1.0      7  bin_common::execute_and_settle -> advance_phase -> advance_phase::live_victory -> trig::process_pending -> resolve::current_ability -> resolve::resolve_ability_total -> resolve::pay_cost
       7           373         53.3      7  bin_common::execute_and_settle -> advance_phase -> advance_phase::active -> check_timing -> check_timing::recalculate_constants -> recalculate_constants -> vm::get_ability
       5           264         52.8      7  bin_common::execute_and_settle -> advance_phase -> advance_phase::draw -> check_timing -> check_timing::recalculate_constants -> recalculate_constants -> vm::get_ability
-    256           256          1.0     10  bin_common::execute_and_settle -> execute_main_phase_action -> exec::use_ability -> trig::process_pending -> resolve::current_ability -> resolve::resolve_ability_total -> resolve::run_effect -> effect::gates -> effect::dispatch -> recalculate_constants
-     34           222          6.5     10  bin_common::execute_and_settle -> execute_main_phase_action -> exec::resume_with_choice -> trig::process_pending -> resolve::current_ability -> resolve::resolve_ability_total -> resolve::run_effect -> effect::gates -> effect::dispatch -> trig::auto_scan
+    259           259          1.0     10  bin_common::execute_and_settle -> execute_main_phase_action -> exec::use_ability -> trig::process_pending -> resolve::current_ability -> resolve::resolve_ability_total -> resolve::run_effect -> effect::gates -> effect::dispatch -> recalculate_constants
+     32           208          6.5     10  bin_common::execute_and_settle -> execute_main_phase_action -> exec::resume_with_choice -> trig::process_pending -> resolve::current_ability -> resolve::resolve_ability_total -> resolve::run_effect -> effect::gates -> effect::dispatch -> trig::auto_scan
       3           166         55.3      3  generate_possible_actions -> generate_main_phase_actions -> vm::get_ability
      65           145          2.2      5  bin_common::execute_and_settle -> advance_phase -> advance_phase::live_victory -> trig::process_pending -> trig::auto_scan
-     92            92          1.0     10  bin_common::execute_and_settle -> execute_main_phase_action -> exec::play_member_to_stage -> trig::process_pending -> resolve::current_ability -> resolve::resolve_ability_total -> resolve::run_effect -> effect::gates -> effect::dispatch -> recalculate_constants
+    112           112          1.0     10  bin_common::execute_and_settle -> execute_main_phase_action -> exec::play_member_to_stage -> trig::process_pending -> resolve::current_ability -> resolve::resolve_ability_total -> resolve::run_effect -> effect::gates -> effect::dispatch -> recalculate_constants
       1            80         80.0      5  bin_common::execute_and_settle -> execute_main_phase_action -> exec::resume_with_choice -> trig::auto_scan -> vm::get_ability
       1            36         36.0      8  bin_common::execute_and_settle -> execute_main_phase_action -> advance_phase -> advance_phase::live_card_set -> check_timing -> check_timing::recalculate_constants -> recalculate_constants -> vm::get_ability
-     22            22          1.0     10  bin_common::execute_and_settle -> execute_main_phase_action -> exec::resume_with_choice -> trig::process_pending -> resolve::current_ability -> resolve::resolve_ability_total -> resolve::run_effect -> effect::gates -> effect::dispatch -> recalculate_constants
+     28            28          1.0     10  bin_common::execute_and_settle -> execute_main_phase_action -> exec::resume_with_choice -> trig::process_pending -> resolve::current_ability -> resolve::resolve_ability_total -> resolve::run_effect -> effect::gates -> effect::dispatch -> recalculate_constants
       4            22          5.5      9  bin_common::execute_and_settle -> execute_main_phase_action -> exec::resume_with_choice -> resolve::current_ability -> resolve::resolve_ability_total -> resolve::run_effect -> effect::gates -> effect::dispatch -> trig::auto_scan
       2             2          1.0      9  bin_common::execute_and_settle -> execute_main_phase_action -> exec::resume_with_choice -> resolve::current_ability -> resolve::resolve_ability_total -> resolve::run_effect -> effect::gates -> effect::dispatch -> recalculate_constants
 
 
 === ALLOC SIZE CLASSES (global) ===
  allocs  bytes/avg    share  size class
-4454161          4   437.1%  1-7B
-5963293         12   585.3%  8-15B
-2542558         24   249.5%  16-31B
-2680947         48   263.1%  32-63B
-3916302         96   384.4%  64-127B
-1363797        192   133.8%  128-255
- 276891        384    27.2%  256-511
- 882253        768    86.6%  512-1K
-  71085       1536     7.0%  1K-2K
-  82870       3072     8.1%  2K-4K
-  21613       6144     2.1%  4K-8K
-    860      12288     0.1%  8K-16K
+4336204          4   426.4%  1-7B
+5925069         12   582.7%  8-15B
+2527042         24   248.5%  16-31B
+2672074         48   262.8%  32-63B
+3909035         96   384.4%  64-127B
+1359350        192   133.7%  128-255
+ 275082        384    27.1%  256-511
+ 876894        768    86.2%  512-1K
+  70746       1536     7.0%  1K-2K
+  82710       3072     8.1%  2K-4K
+  21584       6144     2.1%  4K-8K
+    868      12288     0.1%  8K-16K
      83      24576     0.0%  16K-32K
      27      49152     0.0%  32K+
 
 === ALLOC SIZE CLASSES by call path (top 60 by allocs) ===
  allocs  allocs/call  size classes, as  pct of that path's allocs
 --------------------------------------------------------------------------------------------------------------
-3995103        61.0  bin_common::execute_and_settle  1-7B=22% 8-15B=25% 16-31B=11% 32-63B=15% 64-127B=17% 128-255=5% 256-511=1% 512-1K=4% 1K-2K=0% 2K-4K=0% 4K-8K=0% 8K-16K=0% 16K-32K=0% 32K+=0%
-3248098        49.6  bin_common::execute_and_settle -> execute_main_phase_action  1-7B=24% 8-15B=28% 16-31B=13% 32-63B=12% 64-127B=12% 128-255=5% 256-511=1% 512-1K=4% 1K-2K=0% 2K-4K=0% 4K-8K=0% 8K-16K=0% 16K-32K=0%
-1273623        19.4  generate_possible_actions  1-7B=3% 8-15B=35% 16-31B=14% 32-63B=13% 64-127B=22% 128-255=4% 256-511=0% 512-1K=3% 1K-2K=2% 2K-4K=1% 4K-8K=1% 8K-16K=0%
-1120108       104.8  bin_common::execute_and_settle -> execute_main_phase_action -> exec::resume_with_choice  1-7B=27% 8-15B=29% 16-31B=12% 32-63B=10% 64-127B=12% 128-255=4% 256-511=1% 512-1K=4% 1K-2K=0% 2K-4K=0% 4K-8K=0%
-1081700        99.7  bin_common::execute_and_settle -> execute_main_phase_action -> exec::play_member_to_stage  1-7B=26% 8-15B=26% 16-31B=11% 32-63B=11% 64-127B=15% 128-255=4% 256-511=1% 512-1K=5% 1K-2K=0% 2K-4K=0% 8K-16K=0%
- 865163        49.8  bin_common::execute_and_settle -> execute_main_phase_action -> exec::play_member_to_stage -> trig::process_pending  1-7B=21% 8-15B=29% 16-31B=12% 32-63B=14% 64-127B=11% 128-255=5% 256-511=1% 512-1K=7% 2K-4K=0%
- 816204       200.9  bin_common::execute_and_settle -> execute_main_phase_action -> exec::play_member_to_stage -> trig::process_pending -> resolve::current_ability  1-7B=21% 8-15B=30% 16-31B=13% 32-63B=15% 64-127B=8% 128-255=5% 256-511=1% 512-1K=7% 2K-4K=0%
- 784429       296.5  bin_common::execute_and_settle -> execute_main_phase_action -> exec::use_ability  1-7B=22% 8-15B=35% 16-31B=17% 32-63B=8% 64-127B=7% 128-255=5% 256-511=1% 512-1K=5% 1K-2K=0% 2K-4K=0%
- 719865       272.1  bin_common::execute_and_settle -> execute_main_phase_action -> exec::use_ability -> trig::process_pending  1-7B=23% 8-15B=35% 16-31B=16% 32-63B=8% 64-127B=6% 128-255=5% 256-511=1% 512-1K=5% 1K-2K=0% 2K-4K=0%
- 708594       267.8  bin_common::execute_and_settle -> execute_main_phase_action -> exec::use_ability -> trig::process_pending -> resolve::current_ability  1-7B=23% 8-15B=35% 16-31B=16% 32-63B=9% 64-127B=5% 128-255=5% 256-511=1% 512-1K=5% 1K-2K=0% 2K-4K=0%
- 682290        34.0  generate_possible_actions -> generate_main_phase_actions  1-7B=0% 8-15B=27% 16-31B=18% 32-63B=9% 64-127B=40% 128-255=3% 256-511=0% 512-1K=0% 1K-2K=0% 2K-4K=1% 4K-8K=1% 8K-16K=0%
- 590660        20.3  bin_common::execute_and_settle -> advance_phase  1-7B=13% 8-15B=8% 16-31B=3% 32-63B=19% 64-127B=44% 128-255=7% 256-511=5% 512-1K=0% 1K-2K=0% 2K-4K=0% 4K-8K=0% 8K-16K=0% 16K-32K=0% 32K+=0%
- 437403       107.7  bin_common::execute_and_settle -> execute_main_phase_action -> exec::play_member_to_stage -> trig::process_pending -> resolve::current_ability -> resolve::resolve_ability_total  1-7B=20% 8-15B=30% 16-31B=13% 32-63B=13% 64-127B=9% 128-255=8% 256-511=1% 512-1K=7%
- 405061       153.1  bin_common::execute_and_settle -> execute_main_phase_action -> exec::use_ability -> trig::process_pending -> resolve::current_ability -> resolve::resolve_ability_total  1-7B=24% 8-15B=34% 16-31B=15% 32-63B=8% 64-127B=6% 128-255=8% 256-511=1% 512-1K=5% 1K-2K=0%
- 352223       164.7  bin_common::execute_and_settle -> execute_main_phase_action -> exec::resume_with_choice -> resolve::current_ability  1-7B=23% 8-15B=32% 16-31B=11% 32-63B=9% 64-127B=12% 128-255=6% 256-511=0% 512-1K=7% 1K-2K=0% 2K-4K=0%
- 333070       125.9  bin_common::execute_and_settle -> execute_main_phase_action -> exec::use_ability -> trig::process_pending -> resolve::current_ability -> resolve::resolve_ability_total -> resolve::run_effect  1-7B=22% 8-15B=36% 16-31B=17% 32-63B=9% 64-127B=5% 128-255=5% 256-511=1% 512-1K=6% 1K-2K=0%
- 275641        99.3  bin_common::execute_and_settle -> execute_main_phase_action -> exec::play_member_to_stage -> trig::process_pending -> resolve::current_ability -> resolve::resolve_ability_total -> resolve::run_effect  1-7B=23% 8-15B=29% 16-31B=12% 32-63B=14% 64-127B=10% 128-255=5% 256-511=1% 512-1K=6%
- 273400         8.5  generate_possible_actions -> generate_live_card_set_actions  8-15B=56% 32-63B=12% 128-255=12% 512-1K=12% 1K-2K=8% 2K-4K=1%
- 242364        22.7  generate_possible_actions -> generate_pending_choice_actions  1-7B=15% 8-15B=42% 16-31B=25% 32-63B=6% 64-127B=3% 128-255=0% 256-511=2% 512-1K=4% 1K-2K=2% 2K-4K=0% 4K-8K=0% 8K-16K=0%
- 197203        92.2  bin_common::execute_and_settle -> execute_main_phase_action -> exec::resume_with_choice -> resolve::current_ability -> resolve::resolve_ability_total  1-7B=21% 8-15B=31% 16-31B=10% 32-63B=9% 64-127B=15% 128-255=8% 256-511=0% 512-1K=6% 1K-2K=0%
- 187393        19.7  bin_common::execute_and_settle -> execute_main_phase_action -> advance_phase  1-7B=20% 8-15B=14% 16-31B=13% 32-63B=6% 64-127B=26% 128-255=16% 256-511=2% 512-1K=2% 1K-2K=0% 2K-4K=1% 4K-8K=0% 16K-32K=0%
- 186508        87.2  bin_common::execute_and_settle -> execute_main_phase_action -> exec::resume_with_choice -> resolve::current_ability -> resolve::resolve_ability_total -> resolve::run_effect  1-7B=23% 8-15B=32% 16-31B=11% 32-63B=9% 64-127B=10% 128-255=8% 256-511=0% 512-1K=6% 1K-2K=0%
- 177861        60.0  bin_common::execute_and_settle -> execute_main_phase_action -> advance_phase -> advance_phase::live_card_set  1-7B=22% 8-15B=15% 16-31B=13% 32-63B=7% 64-127B=22% 128-255=17% 256-511=2% 512-1K=2% 1K-2K=0% 2K-4K=1% 4K-8K=0% 16K-32K=0%
- 172359        58.1  bin_common::execute_and_settle -> advance_phase -> advance_phase::second_performance  1-7B=18% 8-15B=10% 16-31B=3% 32-63B=17% 64-127B=35% 128-255=11% 256-511=5% 512-1K=0% 1K-2K=0% 2K-4K=0%
- 172349        58.1  bin_common::execute_and_settle -> advance_phase -> advance_phase::first_performance  1-7B=18% 8-15B=10% 16-31B=3% 32-63B=17% 64-127B=35% 128-255=11% 256-511=5% 512-1K=0% 1K-2K=0% 2K-4K=0% 4K-8K=0% 8K-16K=0% 16K-32K=0%
- 169394        57.1  bin_common::execute_and_settle -> advance_phase -> advance_phase::second_performance -> execute_performance_phase  1-7B=18% 8-15B=10% 16-31B=3% 32-63B=18% 64-127B=34% 128-255=11% 256-511=5% 512-1K=0% 1K-2K=0% 2K-4K=0%
- 169384        57.1  bin_common::execute_and_settle -> advance_phase -> advance_phase::first_performance -> execute_performance_phase  1-7B=18% 8-15B=10% 16-31B=3% 32-63B=18% 64-127B=34% 128-255=11% 256-511=5% 512-1K=0% 1K-2K=0% 2K-4K=0% 4K-8K=0% 8K-16K=0% 16K-32K=0%
- 129911        19.0  bin_common::execute_and_settle -> execute_main_phase_action -> exec::play_member_to_stage -> trig::process_pending -> resolve::current_ability -> resolve::resolve_ability_total -> resolve::handle_pending_choice  1-7B=18% 8-15B=36% 16-31B=15% 32-63B=12% 64-127B=3% 128-255=7% 512-1K=10%
- 115904        13.6  bin_common::execute_and_settle -> execute_main_phase_action -> exec::resume_with_choice -> trig::process_pending  1-7B=25% 8-15B=21% 16-31B=9% 32-63B=7% 64-127B=22% 128-255=10% 256-511=1% 512-1K=3% 1K-2K=0% 2K-4K=1%
- 114732        23.9  bin_common::execute_and_settle -> execute_main_phase_action -> advance_phase -> advance_phase::live_card_set -> trig::process_pending  1-7B=25% 8-15B=19% 16-31B=9% 32-63B=8% 64-127B=15% 128-255=16% 256-511=2% 512-1K=3% 1K-2K=0% 2K-4K=2% 4K-8K=0% 16K-32K=0%
-  99579        54.4  bin_common::execute_and_settle -> execute_main_phase_action -> advance_phase -> advance_phase::live_card_set -> trig::process_pending -> resolve::current_ability  1-7B=27% 8-15B=21% 16-31B=10% 32-63B=9% 64-127B=9% 128-255=17% 256-511=1% 512-1K=3% 1K-2K=0% 2K-4K=2% 4K-8K=0% 16K-32K=0%
-  89364        66.5  bin_common::execute_and_settle -> execute_main_phase_action -> exec::resume_with_choice -> trig::process_pending -> resolve::current_ability  1-7B=25% 8-15B=25% 16-31B=11% 32-63B=9% 64-127B=10% 128-255=13% 256-511=1% 512-1K=4% 1K-2K=0% 2K-4K=2%
-  89286        29.5  bin_common::execute_and_settle -> advance_phase -> advance_phase::live_victory  1-7B=16% 8-15B=15% 16-31B=6% 32-63B=28% 64-127B=28% 128-255=6% 256-511=0% 512-1K=0% 1K-2K=0% 2K-4K=0% 4K-8K=0% 8K-16K=0% 32K+=0%
-  89115         2.6  bin_common::execute_and_settle -> execute_main_phase_action -> exec::play_member_to_stage -> trig::auto_scan  1-7B=39% 8-15B=19% 16-31B=0% 32-63B=1% 64-127B=40% 128-255=0% 1K-2K=0% 2K-4K=0%
-  69378         1.0  generate_possible_actions -> generate_main_phase_actions -> gen::cost_reduction  64-127B=100%
-  69378         1.0  generate_possible_actions -> generate_main_phase_actions -> gen::area_candidates  64-127B=100%
-  67197        10.0  bin_common::execute_and_settle -> advance_phase -> advance_phase::active  1-7B=0% 8-15B=1% 16-31B=0% 32-63B=0% 64-127B=79% 128-255=0% 256-511=20% 512-1K=0% 1K-2K=0% 2K-4K=0% 8K-16K=0% 32K+=0%
-  63335        34.6  bin_common::execute_and_settle -> execute_main_phase_action -> advance_phase -> advance_phase::live_card_set -> trig::process_pending -> resolve::current_ability -> resolve::resolve_ability_total  1-7B=24% 8-15B=22% 16-31B=8% 32-63B=9% 64-127B=6% 128-255=26% 256-511=1% 512-1K=3% 1K-2K=0% 2K-4K=0% 4K-8K=0% 16K-32K=0%
-  61403        23.2  bin_common::execute_and_settle -> execute_main_phase_action -> exec::use_ability -> trig::process_pending -> resolve::current_ability -> resolve::resolve_ability_total -> resolve::pay_cost  1-7B=39% 8-15B=29% 16-31B=5% 32-63B=6% 64-127B=9% 128-255=13% 512-1K=0% 1K-2K=0%
-  59876         1.1  bin_common::execute_and_settle -> record_action_boundary  1-7B=1% 8-15B=2% 32-63B=95% 64-127B=1% 128-255=1% 256-511=0% 512-1K=0%
-  55688        41.4  bin_common::execute_and_settle -> execute_main_phase_action -> exec::resume_with_choice -> trig::process_pending -> resolve::current_ability -> resolve::resolve_ability_total  1-7B=22% 8-15B=25% 16-31B=10% 32-63B=9% 64-127B=9% 128-255=20% 256-511=1% 512-1K=3% 1K-2K=0%
-  54176        29.6  bin_common::execute_and_settle -> execute_main_phase_action -> advance_phase -> advance_phase::live_card_set -> trig::process_pending -> resolve::current_ability -> resolve::resolve_ability_total -> resolve::run_effect  1-7B=28% 8-15B=26% 16-31B=10% 32-63B=11% 64-127B=7% 128-255=14% 256-511=2% 512-1K=3% 1K-2K=0%
-  53691         8.0  bin_common::execute_and_settle -> advance_phase -> advance_phase::draw  1-7B=0% 8-15B=0% 16-31B=1% 32-63B=0% 64-127B=99% 128-255=0% 256-511=0% 1K-2K=0%
-  53294        20.1  bin_common::execute_and_settle -> execute_main_phase_action -> exec::use_ability -> trig::process_pending -> resolve::current_ability -> resolve::resolve_ability_total -> resolve::run_effect -> effect::gates  1-7B=34% 8-15B=15% 16-31B=8% 32-63B=17% 64-127B=12% 128-255=12% 256-511=1% 512-1K=0% 1K-2K=0%
-  52255        18.8  bin_common::execute_and_settle -> execute_main_phase_action -> exec::play_member_to_stage -> trig::process_pending -> resolve::current_ability -> resolve::resolve_ability_total -> resolve::run_effect -> effect::gates  1-7B=32% 8-15B=9% 16-31B=14% 32-63B=6% 64-127B=24% 128-255=13% 256-511=1%
-  50648        19.1  bin_common::execute_and_settle -> execute_main_phase_action -> exec::use_ability -> trig::process_pending -> resolve::current_ability -> resolve::resolve_ability_total -> resolve::run_effect -> effect::gates -> effect::dispatch  1-7B=36% 8-15B=16% 16-31B=9% 32-63B=18% 64-127B=12% 128-255=8% 256-511=1% 512-1K=0% 1K-2K=0%
-  48727        36.3  bin_common::execute_and_settle -> execute_main_phase_action -> exec::resume_with_choice -> trig::process_pending -> resolve::current_ability -> resolve::resolve_ability_total -> resolve::run_effect  1-7B=26% 8-15B=28% 16-31B=11% 32-63B=11% 64-127B=8% 128-255=11% 256-511=2% 512-1K=4% 1K-2K=0%
-  46637         7.0  bin_common::execute_and_settle -> advance_phase -> advance_phase::active -> check_timing  1-7B=0% 8-15B=0% 16-31B=0% 32-63B=0% 64-127B=99% 128-255=0% 256-511=0% 512-1K=0% 1K-2K=0% 2K-4K=0% 8K-16K=0% 32K+=0%
-  46519         6.9  bin_common::execute_and_settle -> advance_phase -> advance_phase::draw -> check_timing  1-7B=0% 8-15B=0% 16-31B=0% 32-63B=0% 64-127B=100% 128-255=0% 256-511=0% 1K-2K=0%
-  46070        15.5  bin_common::execute_and_settle -> advance_phase -> advance_phase::second_performance -> execute_performance_phase -> player_perform_live  1-7B=4% 8-15B=9% 16-31B=6% 32-63B=45% 64-127B=16% 128-255=11% 256-511=9% 512-1K=0%
-  45391        15.3  bin_common::execute_and_settle -> advance_phase -> advance_phase::first_performance -> execute_performance_phase -> player_perform_live  1-7B=4% 8-15B=9% 16-31B=6% 32-63B=45% 64-127B=17% 128-255=10% 256-511=9% 512-1K=0%
-  41757        21.5  bin_common::execute_and_settle -> execute_main_phase_action -> exec::resume_with_choice -> resolve::current_ability -> resolve::resolve_ability_total -> resolve::run_effect -> effect::gates  1-7B=14% 8-15B=23% 16-31B=4% 32-63B=15% 64-127B=20% 128-255=22% 256-511=1% 512-1K=0% 1K-2K=0%
-  36637         3.4  bin_common::execute_and_settle -> execute_main_phase_action -> exec::play_member_to_stage -> trig::debut  1-7B=10% 8-15B=24% 16-31B=24% 32-63B=2% 64-127B=30% 256-511=10% 2K-4K=1%
-  34909        11.8  bin_common::execute_and_settle -> advance_phase -> advance_phase::second_performance -> execute_performance_phase -> check_timing  1-7B=18% 8-15B=8% 64-127B=52% 128-255=22% 512-1K=0% 1K-2K=0% 2K-4K=0%
-  34810        11.7  bin_common::execute_and_settle -> advance_phase -> advance_phase::first_performance -> execute_performance_phase -> check_timing  1-7B=18% 8-15B=8% 64-127B=52% 128-255=22% 512-1K=0% 1K-2K=0%
-  34599        15.2  bin_common::execute_and_settle -> execute_main_phase_action -> exec::play_member_to_stage -> trig::process_pending -> resolve::current_ability -> resolve::resolve_ability_total -> resolve::run_effect -> effect::gates -> effect::dispatch  1-7B=42% 8-15B=7% 16-31B=13% 32-63B=3% 64-127B=28% 128-255=8%
-  31443        22.3  bin_common::execute_and_settle -> execute_main_phase_action -> exec::resume_with_choice -> effect::gates  1-7B=31% 8-15B=32% 16-31B=3% 32-63B=10% 64-127B=22% 128-255=1% 256-511=1% 512-1K=0%
-  27503         2.5  bin_common::execute_and_settle -> execute_main_phase_action -> exec::play_member_to_stage -> trig::process_pending -> trig::auto_scan  1-7B=39% 8-15B=16% 16-31B=1% 32-63B=2% 64-127B=42% 128-255=0%
-  25671        17.1  bin_common::execute_and_settle -> execute_main_phase_action -> advance_phase -> advance_phase::live_card_set -> trig::process_pending -> resolve::current_ability -> resolve::resolve_ability_total -> resolve::run_effect -> effect::gates  1-7B=31% 8-15B=26% 16-31B=4% 32-63B=11% 64-127B=6% 128-255=19% 256-511=2% 512-1K=0% 1K-2K=0%
-  24918         2.4  bin_common::execute_and_settle -> advance_phase -> advance_phase::first_performance -> execute_performance_phase -> trig::auto_scan  1-7B=42% 8-15B=16% 64-127B=42%
+3944581        60.3  bin_common::execute_and_settle  1-7B=21% 8-15B=25% 16-31B=11% 32-63B=16% 64-127B=17% 128-255=5% 256-511=1% 512-1K=4% 1K-2K=0% 2K-4K=0% 4K-8K=0% 8K-16K=0% 16K-32K=0% 32K+=0%
+3196838        48.9  bin_common::execute_and_settle -> execute_main_phase_action  1-7B=24% 8-15B=29% 16-31B=13% 32-63B=12% 64-127B=12% 128-255=5% 256-511=1% 512-1K=5% 1K-2K=0% 2K-4K=0% 4K-8K=0% 8K-16K=0% 16K-32K=0%
+1270942        19.4  generate_possible_actions  1-7B=3% 8-15B=35% 16-31B=14% 32-63B=13% 64-127B=22% 128-255=4% 256-511=0% 512-1K=3% 1K-2K=2% 2K-4K=1% 4K-8K=1% 8K-16K=0%
+1109094       104.3  bin_common::execute_and_settle -> execute_main_phase_action -> exec::resume_with_choice  1-7B=27% 8-15B=29% 16-31B=12% 32-63B=10% 64-127B=12% 128-255=4% 256-511=1% 512-1K=4% 1K-2K=0% 2K-4K=0% 4K-8K=0%
+1048096        97.0  bin_common::execute_and_settle -> execute_main_phase_action -> exec::play_member_to_stage  1-7B=24% 8-15B=27% 16-31B=11% 32-63B=11% 64-127B=16% 128-255=4% 256-511=1% 512-1K=6% 1K-2K=0% 2K-4K=0% 8K-16K=0%
+ 858796        49.6  bin_common::execute_and_settle -> execute_main_phase_action -> exec::play_member_to_stage -> trig::process_pending  1-7B=21% 8-15B=29% 16-31B=12% 32-63B=14% 64-127B=11% 128-255=5% 256-511=1% 512-1K=7% 2K-4K=0%
+ 810141       200.5  bin_common::execute_and_settle -> execute_main_phase_action -> exec::play_member_to_stage -> trig::process_pending -> resolve::current_ability  1-7B=21% 8-15B=30% 16-31B=13% 32-63B=15% 64-127B=8% 128-255=5% 256-511=1% 512-1K=7% 2K-4K=0%
+ 778568       295.7  bin_common::execute_and_settle -> execute_main_phase_action -> exec::use_ability  1-7B=22% 8-15B=36% 16-31B=17% 32-63B=8% 64-127B=7% 128-255=5% 256-511=1% 512-1K=5% 1K-2K=0% 2K-4K=0%
+ 714228       271.3  bin_common::execute_and_settle -> execute_main_phase_action -> exec::use_ability -> trig::process_pending  1-7B=23% 8-15B=35% 16-31B=16% 32-63B=8% 64-127B=6% 128-255=5% 256-511=1% 512-1K=5% 1K-2K=0% 2K-4K=0%
+ 703034       267.0  bin_common::execute_and_settle -> execute_main_phase_action -> exec::use_ability -> trig::process_pending -> resolve::current_ability  1-7B=23% 8-15B=35% 16-31B=16% 32-63B=9% 64-127B=5% 128-255=5% 256-511=1% 512-1K=5% 1K-2K=0% 2K-4K=0%
+ 681442        34.1  generate_possible_actions -> generate_main_phase_actions  1-7B=0% 8-15B=27% 16-31B=18% 32-63B=9% 64-127B=40% 128-255=3% 256-511=0% 512-1K=0% 1K-2K=0% 2K-4K=1% 4K-8K=1% 8K-16K=0%
+ 591634        20.4  bin_common::execute_and_settle -> advance_phase  1-7B=13% 8-15B=8% 16-31B=3% 32-63B=19% 64-127B=44% 128-255=7% 256-511=5% 512-1K=0% 1K-2K=0% 2K-4K=0% 4K-8K=0% 8K-16K=0% 16K-32K=0% 32K+=0%
+ 434207       107.5  bin_common::execute_and_settle -> execute_main_phase_action -> exec::play_member_to_stage -> trig::process_pending -> resolve::current_ability -> resolve::resolve_ability_total  1-7B=20% 8-15B=30% 16-31B=13% 32-63B=13% 64-127B=9% 128-255=8% 256-511=1% 512-1K=7%
+ 402390       152.8  bin_common::execute_and_settle -> execute_main_phase_action -> exec::use_ability -> trig::process_pending -> resolve::current_ability -> resolve::resolve_ability_total  1-7B=24% 8-15B=34% 16-31B=15% 32-63B=8% 64-127B=6% 128-255=8% 256-511=1% 512-1K=5% 1K-2K=0%
+ 350842       164.6  bin_common::execute_and_settle -> execute_main_phase_action -> exec::resume_with_choice -> resolve::current_ability  1-7B=23% 8-15B=32% 16-31B=11% 32-63B=9% 64-127B=12% 128-255=6% 256-511=0% 512-1K=7% 1K-2K=0% 2K-4K=0%
+ 330765       125.6  bin_common::execute_and_settle -> execute_main_phase_action -> exec::use_ability -> trig::process_pending -> resolve::current_ability -> resolve::resolve_ability_total -> resolve::run_effect  1-7B=22% 8-15B=36% 16-31B=17% 32-63B=9% 64-127B=5% 128-255=5% 256-511=1% 512-1K=6% 1K-2K=0%
+ 273661        99.0  bin_common::execute_and_settle -> execute_main_phase_action -> exec::play_member_to_stage -> trig::process_pending -> resolve::current_ability -> resolve::resolve_ability_total -> resolve::run_effect  1-7B=23% 8-15B=29% 16-31B=12% 32-63B=14% 64-127B=10% 128-255=5% 256-511=1% 512-1K=6%
+ 273351         8.5  generate_possible_actions -> generate_live_card_set_actions  8-15B=56% 32-63B=12% 128-255=12% 512-1K=12% 1K-2K=8% 2K-4K=1%
+ 240711        22.6  generate_possible_actions -> generate_pending_choice_actions  1-7B=15% 8-15B=42% 16-31B=25% 32-63B=6% 64-127B=3% 128-255=0% 256-511=2% 512-1K=4% 1K-2K=2% 2K-4K=0% 4K-8K=0% 8K-16K=0%
+ 196423        92.1  bin_common::execute_and_settle -> execute_main_phase_action -> exec::resume_with_choice -> resolve::current_ability -> resolve::resolve_ability_total  1-7B=21% 8-15B=30% 16-31B=10% 32-63B=9% 64-127B=15% 128-255=8% 256-511=0% 512-1K=6% 1K-2K=0%
+ 186747        19.6  bin_common::execute_and_settle -> execute_main_phase_action -> advance_phase  1-7B=20% 8-15B=14% 16-31B=13% 32-63B=6% 64-127B=26% 128-255=16% 256-511=2% 512-1K=2% 1K-2K=0% 2K-4K=1% 4K-8K=0% 16K-32K=0%
+ 185763        87.1  bin_common::execute_and_settle -> execute_main_phase_action -> exec::resume_with_choice -> resolve::current_ability -> resolve::resolve_ability_total -> resolve::run_effect  1-7B=23% 8-15B=32% 16-31B=11% 32-63B=9% 64-127B=10% 128-255=8% 256-511=0% 512-1K=6% 1K-2K=0%
+ 177222        59.8  bin_common::execute_and_settle -> execute_main_phase_action -> advance_phase -> advance_phase::live_card_set  1-7B=22% 8-15B=15% 16-31B=13% 32-63B=7% 64-127B=22% 128-255=17% 256-511=2% 512-1K=2% 1K-2K=0% 2K-4K=1% 4K-8K=0% 16K-32K=0%
+ 173980        58.7  bin_common::execute_and_settle -> advance_phase -> advance_phase::first_performance  1-7B=18% 8-15B=10% 16-31B=3% 32-63B=18% 64-127B=35% 128-255=11% 256-511=5% 512-1K=0% 1K-2K=0% 2K-4K=0% 4K-8K=0% 8K-16K=0% 16K-32K=0%
+ 172433        58.2  bin_common::execute_and_settle -> advance_phase -> advance_phase::second_performance  1-7B=18% 8-15B=10% 16-31B=3% 32-63B=18% 64-127B=35% 128-255=11% 256-511=5% 512-1K=0% 1K-2K=0% 2K-4K=0%
+ 171018        57.7  bin_common::execute_and_settle -> advance_phase -> advance_phase::first_performance -> execute_performance_phase  1-7B=18% 8-15B=10% 16-31B=3% 32-63B=18% 64-127B=34% 128-255=11% 256-511=5% 512-1K=0% 1K-2K=0% 2K-4K=0% 4K-8K=0% 8K-16K=0% 16K-32K=0%
+ 169471        57.2  bin_common::execute_and_settle -> advance_phase -> advance_phase::second_performance -> execute_performance_phase  1-7B=18% 8-15B=10% 16-31B=3% 32-63B=18% 64-127B=34% 128-255=11% 256-511=5% 512-1K=0% 1K-2K=0% 2K-4K=0%
+ 128917        18.9  bin_common::execute_and_settle -> execute_main_phase_action -> exec::play_member_to_stage -> trig::process_pending -> resolve::current_ability -> resolve::resolve_ability_total -> resolve::handle_pending_choice  1-7B=18% 8-15B=36% 16-31B=15% 32-63B=12% 64-127B=3% 128-255=7% 512-1K=10%
+ 115526        13.6  bin_common::execute_and_settle -> execute_main_phase_action -> exec::resume_with_choice -> trig::process_pending  1-7B=25% 8-15B=21% 16-31B=9% 32-63B=7% 64-127B=22% 128-255=10% 256-511=1% 512-1K=3% 1K-2K=0% 2K-4K=1%
+ 114141        23.8  bin_common::execute_and_settle -> execute_main_phase_action -> advance_phase -> advance_phase::live_card_set -> trig::process_pending  1-7B=25% 8-15B=19% 16-31B=9% 32-63B=8% 64-127B=15% 128-255=16% 256-511=2% 512-1K=3% 1K-2K=0% 2K-4K=2% 4K-8K=0% 16K-32K=0%
+  99031        54.1  bin_common::execute_and_settle -> execute_main_phase_action -> advance_phase -> advance_phase::live_card_set -> trig::process_pending -> resolve::current_ability  1-7B=27% 8-15B=21% 16-31B=10% 32-63B=9% 64-127B=9% 128-255=18% 256-511=1% 512-1K=3% 1K-2K=0% 2K-4K=2% 4K-8K=0% 16K-32K=0%
+  89070        66.6  bin_common::execute_and_settle -> execute_main_phase_action -> exec::resume_with_choice -> trig::process_pending -> resolve::current_ability  1-7B=25% 8-15B=25% 16-31B=11% 32-63B=9% 64-127B=10% 128-255=13% 256-511=1% 512-1K=4% 1K-2K=0% 2K-4K=2%
+  88669        29.4  bin_common::execute_and_settle -> advance_phase -> advance_phase::live_victory  1-7B=16% 8-15B=15% 16-31B=6% 32-63B=28% 64-127B=28% 128-255=6% 256-511=0% 512-1K=0% 1K-2K=0% 2K-4K=0% 4K-8K=0% 8K-16K=0% 32K+=0%
+  88448         2.6  bin_common::execute_and_settle -> execute_main_phase_action -> exec::play_member_to_stage -> trig::auto_scan  1-7B=40% 8-15B=19% 16-31B=0% 32-63B=1% 64-127B=41% 128-255=0% 1K-2K=0% 2K-4K=0%
+  69312         1.0  generate_possible_actions -> generate_main_phase_actions -> gen::area_candidates  64-127B=100%
+  69312         1.0  generate_possible_actions -> generate_main_phase_actions -> gen::cost_reduction  64-127B=100%
+  67148        10.0  bin_common::execute_and_settle -> advance_phase -> advance_phase::active  1-7B=0% 8-15B=1% 16-31B=0% 32-63B=0% 64-127B=79% 128-255=0% 256-511=20% 512-1K=0% 1K-2K=0% 2K-4K=0% 8K-16K=0% 32K+=0%
+  62959        34.4  bin_common::execute_and_settle -> execute_main_phase_action -> advance_phase -> advance_phase::live_card_set -> trig::process_pending -> resolve::current_ability -> resolve::resolve_ability_total  1-7B=24% 8-15B=22% 16-31B=8% 32-63B=9% 64-127B=6% 128-255=26% 256-511=1% 512-1K=3% 1K-2K=0% 2K-4K=0% 4K-8K=0% 16K-32K=0%
+  61089        23.2  bin_common::execute_and_settle -> execute_main_phase_action -> exec::use_ability -> trig::process_pending -> resolve::current_ability -> resolve::resolve_ability_total -> resolve::pay_cost  1-7B=39% 8-15B=29% 16-31B=5% 32-63B=6% 64-127B=9% 128-255=13% 512-1K=0% 1K-2K=0%
+  59816         1.1  bin_common::execute_and_settle -> record_action_boundary  1-7B=1% 8-15B=2% 32-63B=95% 64-127B=1% 128-255=1% 256-511=0% 512-1K=0%
+  55553        41.6  bin_common::execute_and_settle -> execute_main_phase_action -> exec::resume_with_choice -> trig::process_pending -> resolve::current_ability -> resolve::resolve_ability_total  1-7B=22% 8-15B=25% 16-31B=10% 32-63B=9% 64-127B=9% 128-255=20% 256-511=1% 512-1K=3% 1K-2K=0%
+  53800        29.4  bin_common::execute_and_settle -> execute_main_phase_action -> advance_phase -> advance_phase::live_card_set -> trig::process_pending -> resolve::current_ability -> resolve::resolve_ability_total -> resolve::run_effect  1-7B=28% 8-15B=26% 16-31B=10% 32-63B=11% 64-127B=7% 128-255=14% 256-511=2% 512-1K=3% 1K-2K=0%
+  53655         8.0  bin_common::execute_and_settle -> advance_phase -> advance_phase::draw  1-7B=0% 8-15B=0% 16-31B=1% 32-63B=0% 64-127B=99% 128-255=0% 256-511=0% 1K-2K=0%
+  53034        20.1  bin_common::execute_and_settle -> execute_main_phase_action -> exec::use_ability -> trig::process_pending -> resolve::current_ability -> resolve::resolve_ability_total -> resolve::run_effect -> effect::gates  1-7B=34% 8-15B=16% 16-31B=8% 32-63B=17% 64-127B=11% 128-255=12% 256-511=1% 512-1K=0% 1K-2K=0%
+  51896        18.8  bin_common::execute_and_settle -> execute_main_phase_action -> exec::play_member_to_stage -> trig::process_pending -> resolve::current_ability -> resolve::resolve_ability_total -> resolve::run_effect -> effect::gates  1-7B=32% 8-15B=9% 16-31B=14% 32-63B=6% 64-127B=24% 128-255=13% 256-511=1%
+  50401        19.1  bin_common::execute_and_settle -> execute_main_phase_action -> exec::use_ability -> trig::process_pending -> resolve::current_ability -> resolve::resolve_ability_total -> resolve::run_effect -> effect::gates -> effect::dispatch  1-7B=36% 8-15B=16% 16-31B=9% 32-63B=18% 64-127B=12% 128-255=8% 256-511=1% 512-1K=0% 1K-2K=0%
+  48621        36.4  bin_common::execute_and_settle -> execute_main_phase_action -> exec::resume_with_choice -> trig::process_pending -> resolve::current_ability -> resolve::resolve_ability_total -> resolve::run_effect  1-7B=26% 8-15B=28% 16-31B=11% 32-63B=11% 64-127B=8% 128-255=11% 256-511=1% 512-1K=4% 1K-2K=0%
+  46607         7.0  bin_common::execute_and_settle -> advance_phase -> advance_phase::active -> check_timing  1-7B=0% 8-15B=0% 16-31B=0% 32-63B=0% 64-127B=99% 128-255=0% 256-511=0% 512-1K=0% 1K-2K=0% 2K-4K=0% 8K-16K=0% 32K+=0%
+  46489         6.9  bin_common::execute_and_settle -> advance_phase -> advance_phase::draw -> check_timing  1-7B=0% 8-15B=0% 16-31B=0% 32-63B=0% 64-127B=100% 128-255=0% 256-511=0% 1K-2K=0%
+  46257        15.6  bin_common::execute_and_settle -> advance_phase -> advance_phase::first_performance -> execute_performance_phase -> player_perform_live  1-7B=4% 8-15B=9% 16-31B=6% 32-63B=45% 64-127B=17% 128-255=10% 256-511=9% 512-1K=0%
+  46176        15.6  bin_common::execute_and_settle -> advance_phase -> advance_phase::second_performance -> execute_performance_phase -> player_perform_live  1-7B=4% 8-15B=9% 16-31B=6% 32-63B=45% 64-127B=16% 128-255=11% 256-511=9% 512-1K=0%
+  41598        21.5  bin_common::execute_and_settle -> execute_main_phase_action -> exec::resume_with_choice -> resolve::current_ability -> resolve::resolve_ability_total -> resolve::run_effect -> effect::gates  1-7B=15% 8-15B=23% 16-31B=4% 32-63B=15% 64-127B=20% 128-255=22% 256-511=1% 512-1K=0% 1K-2K=0%
+  36477         3.4  bin_common::execute_and_settle -> execute_main_phase_action -> exec::play_member_to_stage -> trig::debut  1-7B=10% 8-15B=24% 16-31B=24% 32-63B=2% 64-127B=30% 256-511=10% 2K-4K=1%
+  34843        11.8  bin_common::execute_and_settle -> advance_phase -> advance_phase::first_performance -> execute_performance_phase -> check_timing  1-7B=18% 8-15B=8% 64-127B=52% 128-255=22% 512-1K=0% 1K-2K=0%
+  34843        11.8  bin_common::execute_and_settle -> advance_phase -> advance_phase::second_performance -> execute_performance_phase -> check_timing  1-7B=18% 8-15B=8% 64-127B=52% 128-255=22% 512-1K=0% 1K-2K=0% 2K-4K=0%
+  34339        15.2  bin_common::execute_and_settle -> execute_main_phase_action -> exec::play_member_to_stage -> trig::process_pending -> resolve::current_ability -> resolve::resolve_ability_total -> resolve::run_effect -> effect::gates -> effect::dispatch  1-7B=42% 8-15B=7% 16-31B=13% 32-63B=3% 64-127B=28% 128-255=8%
+  31269        22.3  bin_common::execute_and_settle -> execute_main_phase_action -> exec::resume_with_choice -> effect::gates  1-7B=31% 8-15B=32% 16-31B=3% 32-63B=10% 64-127B=21% 128-255=1% 256-511=1% 512-1K=0% 1K-2K=0%
+  27291         2.5  bin_common::execute_and_settle -> execute_main_phase_action -> exec::play_member_to_stage -> trig::process_pending -> trig::auto_scan  1-7B=40% 8-15B=16% 16-31B=1% 32-63B=2% 64-127B=42% 128-255=0%
+  25449        17.0  bin_common::execute_and_settle -> execute_main_phase_action -> advance_phase -> advance_phase::live_card_set -> trig::process_pending -> resolve::current_ability -> resolve::resolve_ability_total -> resolve::run_effect -> effect::gates  1-7B=31% 8-15B=26% 16-31B=4% 32-63B=11% 64-127B=6% 128-255=19% 256-511=2% 512-1K=0% 1K-2K=0%
+  24853         2.4  bin_common::execute_and_settle -> advance_phase -> advance_phase::first_performance -> execute_performance_phase -> trig::auto_scan  1-7B=42% 8-15B=16% 64-127B=42%

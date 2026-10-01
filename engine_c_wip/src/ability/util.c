@@ -925,6 +925,41 @@ int rb_remove_card_from_zone(GameState *g, int pl, int card_id, const char *zone
     return 0;
 }
 
+/* util.rs:2453-2463 `stage_first_empty`. The probe order is centre, then left,
+ * then right -- NOT ascending index. rb_stage_first_empty (zones.c:193) scans
+ * 0,1,2 and so disagrees with Rust whenever both slot 0 and slot 1 are empty.
+ * The SameArea arm below has to use THIS one to stay faithful; the stage arm
+ * above it is left on rb_stage_first_empty so the earlier full-stage fix keeps
+ * the behaviour it was measured against. Divergence reported, not silently
+ * reconciled: zones.c is not this file. */
+static int rb_util_stage_first_empty_rust(const int stage[RB_STAGE_SIZE]) {
+    if (stage[1] == RB_EMPTY_SLOT) return 1;
+    if (stage[0] == RB_EMPTY_SLOT) return 0;
+    if (stage[2] == RB_EMPTY_SLOT) return 2;
+    return -1;
+}
+
+/* Park a card whose intended bag is at RB_MAX_ZONE. Rust has no ceiling at
+ * all -- every destination bag is a SmallVec whose add_card cannot fail
+ * (util.rs:2347, :2351, :2381, :2389, :2393) -- so overflow is a C-port
+ * artefact, and the only question is where the card goes instead of nowhere.
+ * The WAITROOM is the established overflow sink (util.rs:2363-2367 parks a
+ * full-stage card there); the HAND is the catch-all's sink (util.rs:2446), and
+ * it is also the one bag whose limit (RB_MAX_HAND) is not the one just hit.
+ * Returns 1 either way: a full bag is never a "not placed" verdict, because
+ * every caller has already lifted the card out of its source zone. */
+static int rb_park_overflow(RbPlayer *P, int card_id) {
+    if (P->discard.n < RB_MAX_ZONE) {
+        P->discard.cards[P->discard.n++] = card_id;
+        return 1;
+    }
+    if (P->hand.n < RB_MAX_HAND) {
+        P->hand.cards[P->hand.n++] = card_id;
+        return 1;
+    }
+    return 1;
+}
+
 int rb_place_card_in_zone(GameState *g, int pl, int card_id, const char *zone,
                           int vacated_area) {
     RbPlayer *P = &g->p[pl];
@@ -972,28 +1007,151 @@ int rb_place_card_in_zone(GameState *g, int pl, int card_id, const char *zone,
             for (int k = P->deck.n; k > idx; k--) P->deck.cards[k] = P->deck.cards[k - 1];
             P->deck.cards[idx] = card_id;
             P->deck.n++;
+        } else {
+            return rb_park_overflow(P, card_id);
         }
         return 1;
     }
     if (!strcmp(zone, "deck_bottom")) {
         if (P->deck.n < RB_MAX_ZONE) P->deck.cards[P->deck.n++] = card_id;
+        else return rb_park_overflow(P, card_id);
         return 1;
     }
     if (!strcmp(zone, "energy_deck")) {
         if (P->energy_deck.n < RB_MAX_ZONE)
             P->energy_deck.cards[P->energy_deck.n++] = card_id;
+        else return rb_park_overflow(P, card_id);
+        return 1;
+    }
+    /* util.rs:2396-2422 `Some(Zone::SameArea)`. A DEDICATED arm, not a zone_bag
+     * lookup: the destination names an AREA RELATIONSHIP, not a bag, so it can
+     * resolve to stage, to hand, or -- via first_empty -- to any of the three
+     * slots. Corpus: effect.destination=same_area on 9 abilities, e.g.
+     * PL!S-bp3-006-P. Before this arm the generic tail returned 0 AFTER the
+     * caller had already lifted the card out of its source, so all 9 deleted.
+     *
+     * Rust's order is vacated_area if that slot is empty, else first empty,
+     * else the HAND. It never returns false, so the hand is the floor. */
+    if (!strcmp(zone, "same_area")) {
+        if (vacated_area >= 0 && vacated_area < RB_STAGE_SIZE &&
+            P->stage[vacated_area] == RB_EMPTY_SLOT) {
+            P->stage[vacated_area] = card_id;
+            P->stage_wait[vacated_area] = 0;
+            rb_zone_track_deployment(g, pl, card_id);
+            return 1;
+        }
+        int ep = rb_util_stage_first_empty_rust(P->stage);
+        if (ep >= 0) {
+            P->stage[ep] = card_id;
+            P->stage_wait[ep] = 0;
+            rb_zone_track_deployment(g, pl, card_id);
+        } else {
+            rb_hand_add(P, card_id);
+        }
+        return 1;
+    }
+    /* util.rs:2423-2441 `Some(Zone::UnderMember)`, Rule 4.5.5. "under" is the
+     * same variant (enums.rs:108 aliases it). Corpus: destination=under_member
+     * on 21 effect + 5 cost records. move.c:1333 and choice.c:966 intercept the
+     * stage-choice and choice routes for this name, but the plain move routes
+     * (move.c:1542/1575/1767/1915, move_missing.c:250, choice.c:1738/4584) all
+     * arrive here, so the arm has to exist.
+     *
+     * Rust's fallback prefers an OCCUPIED slot, center then left then right, and
+     * sends the card to the WAITROOM when the stage is entirely empty --
+     * it returns true in every one of those cases. */
+    if (!strcmp(zone, "under_member") || !strcmp(zone, "under")) {
+        /* util.rs:2426-2437: `vacated_stage_area` is Option<usize>, so Rust
+         * only consults it when it is Some. vacated_area < 0 is the C's None. */
+        int target_idx = -1;
+        if (vacated_area >= 0) {
+            /* util.rs:2438 pos_to_area(target_idx) -> MemberArea::from_index,
+             * whose `_` arm is RightSide (zones.rs:102-109, util.rs:2468-2470).
+             * An out-of-range index therefore lands on slot 2, NOT nowhere. */
+            target_idx = (vacated_area < RB_STAGE_SIZE) ? vacated_area
+                                                       : RB_STAGE_SIZE - 1;
+        } else if (P->stage[1] != RB_EMPTY_SLOT) {
+            target_idx = 1;
+        } else if (P->stage[0] != RB_EMPTY_SLOT) {
+            target_idx = 0;
+        } else if (P->stage[2] != RB_EMPTY_SLOT) {
+            target_idx = 2;
+        }
+        if (target_idx < 0) {
+            /* util.rs:2435-2436: the stage is entirely empty, so Rust parks
+             * the card in the WAITROOM and returns true. */
+            if (P->discard.n < RB_MAX_ZONE) {
+                P->discard.cards[P->discard.n++] = card_id;
+                return 1;
+            }
+            return rb_park_overflow(P, card_id);
+        }
+        rb_stage_place_under_card(P, target_idx, card_id);
         return 1;
     }
     RbBag *b = zone_bag(P, zone);
-    if (!b) return 0;
+    if (!b) {
+        /* util.rs:2442-2449 `_ =>` arm. An unrecognised destination is NOT a
+         * failure: Rust parks the card in the HAND, or in the WAITROOM for the
+         * empty string, and returns `true`.
+         *
+         * Returning 0 here is a DELETION, and this is the narrowest place that
+         * fact is visible. Every caller has already lifted the card out of its
+         * source -- rb_move_card below removes first, and the choice.c call
+         * sites (send_to_dst, hand cost, energy zone) all drain the source
+         * bag before calling -- so a "not placed" verdict leaves the card in
+         * NO zone at all. Measured on this file's own probe: whole-board
+         * census 1 -> 0 for each of same_area, deck_top_or_bottom, front,
+         * under_member and "". A per-zone count cannot tell "moved nowhere"
+         * from "destroyed"; only the census can.
+         *
+         * Corpus destinations that reach this arm, because Zone::from_str
+         * (enums.rs:89-122) has a variant for them but place_card_in_zone has
+         * no arm: deck_top_or_bottom x3 (e.g. PL!S-bp6-002-P), front x1
+         * (PL!HS-pb1-014-P+), and "" -- plus every non-zone marker the corpus
+         * may route through here. Rust has no failure arm anywhere in
+         * place_card_in_zone, so no destination string can delete a card. */
+        if (zone && !zone[0]) {
+            if (P->discard.n < RB_MAX_ZONE)
+                P->discard.cards[P->discard.n++] = card_id;
+            else return rb_park_overflow(P, card_id);
+        } else {
+            rb_hand_add(P, card_id);
+        }
+        return 1;
+    }
     if (b->n < RB_MAX_ZONE) { b->cards[b->n++] = card_id; return 1; }
-    return 0;
+    /* A FULL bag is not a "not placed" verdict either. Every Rust zone here is
+     * a SmallVec whose add_card cannot fail (util.rs:2347, :2351, :2381,
+     * :2389, :2393), so the only difference from Rust is the fixed ceiling.
+     * Returning 0 made a full bag a deletion -- probe: census 513 -> 512 with
+     * the waitroom at RB_MAX_ZONE. Park it in the WAITROOM, which is what the
+     * Stage arm above already does for a full stage (util.rs:2363-2367). */
+    return rb_park_overflow(P, card_id);
 }
 
 int rb_move_card(GameState *g, int pl, int card_id, const char *src,
                  const char *dst, int vacated_area) {
-    if (rb_remove_card_from_zone(g, pl, card_id, src))
+    if (rb_remove_card_from_zone(g, pl, card_id, src)) {
+        /* Rust push_movement_event (modifiers.rs:1833-1907) sets
+         * recently_moved_from_zone = Some(source_zone) on EVERY recorded
+         * movement (:1875-1877), before it looks at the destination. That
+         * field is what populates TriggerEvent.moved_from_zone
+         * (abilities.rs:448, :2269), which is what a move-phase (idoutsuuji)
+         * condition gated on the SOURCE zone matches against
+         * (actions/mod.rs:1509).
+         *
+         * The C recorded the destination only -- or nothing at all -- so every
+         * source-gated move condition was unreachable: the field declared at
+         * rabuka.h:1555 had NO WRITER anywhere in src/ (grep for
+         * recently_moved_from_zone over engine_c_wip/src returns only the
+         * declaration). Recording the SOURCE is what the field is named for and
+         * what Rust stores; the destination was never the value. */
+        if (src && *src)
+            snprintf(g->recently_moved_from_zone,
+                     sizeof g->recently_moved_from_zone, "%s", src);
         return rb_place_card_in_zone(g, pl, card_id, dst, vacated_area);
+    }
     return 0;
 }
 

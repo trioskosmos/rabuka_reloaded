@@ -830,11 +830,11 @@ static TEXT_PALETTE: Palette16 = const {
 /// its neighbours' worth of magenta tells you which other tile took the hit.
 #[cfg(feature = "diag-bgspeck")]
 static BG_SPECKLE_PALETTE: Palette16 = {
-    let mut p = [Rgb15::BLACK; 16];
+    let magenta = Rgb::new(255, 0, 255).to_rgb15();
+    let mut p = [magenta; 16];
+    p[0] = Rgb15::BLACK;
     p[1] = Rgb15::WHITE;
-    for i in 3..16 {
-        p[i] = Rgb::new(255, 0, 255).to_rgb15();
-    }
+    p[2] = Rgb15::BLACK;
     Palette16::new(p)
 };
 

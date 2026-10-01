@@ -27,7 +27,7 @@
 
 use crate::bot::strategy_common::{acc_add, emit_live_set, Acc, Pool};
 use crate::card::{CardDatabase, CardType};
-use crate::game_setup::{self, Action};
+use crate::game_setup::Action;
 use crate::game_state::{GameState, Phase};
 
 use super::v8_model::{self, CheckOutcome, OppModel, RngGuard, PLACEMENT_CREDIT};
@@ -584,30 +584,28 @@ fn enumerate_candidates(
         // at set time; with it on, it is the board after every live-start
         // ability has fired and been answered.
         let projected = project_live_start(gs, me, db, &chosen);
-        let (check_pools, board, blades_now) = match &projected {
-            Some((board, blades)) => (
+// Only the POOLS are consumed downstream: `zone_ordered_pass_probability`
+        // prices the check, and the projected board/blades reach it through the
+        // pools `build_with_draws` was sampled with. Returning them as well
+        // looked load-bearing and was not — two dead bindings hid the fact that
+        // the projection's whole effect on the decision is via `check_pools`.
+        let check_pools = match &projected {
+            Some((board, blades)) => {
                 v8_model::FlipSampler::build_with_draws(
                     gs,
                     me,
                     db,
                     usize::try_from(*blades).unwrap_or(0),
                 )
-                .sample_pools(board, v8_model::flip_samples()),
-                *board,
-                *blades,
-            ),
-            // No projection: the board as it stands at set time, and the blades it
-            // would draw from the deck. Both come from the same model helpers the
+                .sample_pools(board, v8_model::flip_samples())
+            }
+            // No projection: the pools sampled at set time. Same helpers the
             // projected arm uses, so the two arms stay comparable.
             //
             // `pools` is a `&Vec<Pool>` borrowed from the enclosing sampler, so
             // `pools.clone()` would clone the REFERENCE and leave this arm
             // `&[Pool]` where the other arm is `Vec<Pool>`. `to_vec()` is the copy.
-            None => (
-                pools.to_vec(),
-                v8_model::board_pool(gs, me, db),
-                v8_model::active_blades(gs, me, db),
-            ),
+            None => pools.to_vec(),
         };
         let p_pass = if chosen.is_empty() {
             0.0
@@ -1228,8 +1226,40 @@ pub fn choose_live_set_v8(gs: &GameState, actions: &[Action], db: &CardDatabase)
     // model's `p_pass` and the realized pass/fail cannot be lined up, which is
     // why every previous calibration read in this project had to be eyeballed.
     if std::env::var_os("V8_CAL").is_some() {
+        // The full candidate table, not just the winner: without the runners-up
+        // there is no way to tell "chose the best life in hand" apart from
+        // "every life in hand was equally bad".
+        let cand = candidates
+            .iter()
+            .map(|c| {
+                let names: Vec<String> = c
+                    .lives
+                    .iter()
+                    .filter_map(|&i| p.hand.cards.get(i).copied())
+                    .filter_map(|cid| db.get_card(cid))
+                    .map(|card| {
+                        format!(
+                            "{}:{}/{}",
+                            card.card_no,
+                            card.score.unwrap_or(0),
+                            card.need_heart.as_ref().map_or(0, |n| {
+                                n.hearts.values().map(|v| i32::from(*v)).sum()
+                            })
+                        )
+                    })
+                    .collect();
+                format!(
+                    "[{}|pp={:.3}|pl={:.3}|v={:.4}]",
+                    if names.is_empty() { "FOLD".to_string() } else { names.join("+") },
+                    c.outcome.p_pass,
+                    c.outcome.p_place,
+                    c.value
+                )
+            })
+            .collect::<Vec<_>>()
+            .join(" ");
         eprintln!(
-            "V8CAL t={} me={} second={} set={} ppass={:.4} pplace={:.4} opp_pass={:.4} opp_set={} mysucc={} opsucc={}",
+            "V8CAL t={} me={} second={} set={} ppass={:.4} pplace={:.4} opp_pass={:.4} opp_set={} mysucc={} opsucc={} cands={}",
             gs.turn_number,
             me,
             gs.current_phase == Phase::LiveCardSetSecondAttacker,
@@ -1240,6 +1270,7 @@ pub fn choose_live_set_v8(gs: &GameState, actions: &[Action], db: &CardDatabase)
             opp.set_size,
             p.success_live_card_zone.cards.len(),
             opp_player.success_live_card_zone.cards.len(),
+            cand,
         );
     }
     if std::env::var_os("V8_DEBUG").is_some() {

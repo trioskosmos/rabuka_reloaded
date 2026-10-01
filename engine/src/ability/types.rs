@@ -2,28 +2,26 @@ use core::fmt;
 
 #[cfg(feature = "serde_support")]
 use serde_json::Value;
-use smallvec::SmallVec;
 
 use crate::card::AbilityEffect;
 
-/// Contextual event data passed into `trigger_auto_abilities_for_player`.
-/// Replaces the fragmented per-scan tracking flags with a single explicit
-/// value, making it clear what triggered the scan.
-#[derive(Clone, Debug, Default)]
-pub struct TriggerEvent {
-    /// Cards that moved in this batch (replaces recently_moved_cards).
-    pub moved_cards: SmallVec<[i16; 4]>,
-    /// Zone the cards moved from (if tracked).
-    pub moved_from_zone: Option<String>,
-    /// Whether a position change occurred.
-    pub position_change_occurred: bool,
-    /// Cards that appeared on stage recently, with their source zone.
-    pub appeared_cards: SmallVec<[(i16, String); 4]>,
-    /// Whether energy was placed by a card effect.
-    pub energy_placed_by_effect: bool,
-    /// Which player's effect placed the energy.
-    pub energy_placed_by_player: Option<String>,
-}
+// REMOVED (2026-09-30): `TriggerEvent` — the "contextual event data passed into
+// `trigger_auto_abilities_for_player`", which its docstring claimed "replaces
+// the fragmented per-scan tracking flags with a single explicit value".
+//
+// It was a six-field struct that all six call sites populated and the callee
+// read exactly ONE field of (`moved_cards`). The other five — including
+// `moved_from_zone: Option<String>`, a guaranteed heap allocation on every scan
+// — were never read by anything. The type was deleted and the batch is now
+// passed as `&[i16]`, which the post-loop batch scan needs anyway because it
+// builds its list from `batch_movements` rather than the shadow field.
+//
+// Note this is NOT the same type as `crate::card::TriggerEvent`, which is a
+// `debug_conditions`-gated wire field on `Condition` and is unrelated.
+//
+// Lesson: on any "this data is copied every call" finding, first check whether
+// the callee reads all of it. See
+// `docs/PERF_ENGINE_OPTIMIZATION_CATALOG.md` §19.6.
 
 /// The shared 「〜してもよい／支払う？」 gate target. ONE definition: emitted by
 /// `AbilityResolver::emit_pay_skip_gate`, parsed by

@@ -1504,18 +1504,10 @@ impl super::TurnEngine {
             || game_state.last_energy_placed_by_effect()
             || !game_state.recently_appeared_cards.is_empty()
         {
-            let event = crate::ability::types::TriggerEvent {
-                moved_cards: game_state.recently_moved_cards.clone().unwrap_or_default(),
-                moved_from_zone: game_state.recently_moved_from_zone.clone(),
-                position_change_occurred: game_state.position_change_occurred_this_turn,
-                energy_placed_by_effect: game_state.last_energy_placed_by_effect(),
-                energy_placed_by_player: game_state
-                    .last_energy_placed_by_player()
-                    .map(|s| s.to_string()),
-                ..Default::default()
-            };
+            // Inline for batches of <= 4 cards, so no allocation in the common case.
+            let moved = game_state.recently_moved_cards.clone().unwrap_or_default();
             game_state.set_just_completed(snap.just_completed_key);
-            game_state.trigger_auto_abilities_for_player_with_event(&player_id, &event);
+            game_state.trigger_auto_abilities_for_player_with_event(&player_id, &moved);
             game_state.just_completed_ability_key = None;
         }
         game_state.process_with_completed_key(snap.just_completed_key, &player_id);

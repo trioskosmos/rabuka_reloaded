@@ -272,7 +272,15 @@ pub fn calculate_play_cost_reduction(
     // ── 1. Scan the played card's own abilities for a self-reduction ──────────
     let mut cost_reduction: u8 = 0;
     for ar in &card.abilities {
-        let ability = ar.resolve();
+        // `peek()` — read-only, and this runs per hand card per play.
+        let owned;
+        let ability = match ar.peek() {
+            Some(a) => a,
+            None => {
+                owned = ar.resolve();
+                &owned
+            }
+        };
         if let Some(ref effect) = ability.effect {
             if let Some(mod_cost) = find_modify_cost(effect, Some("subtract"), Some("hand")) {
                 if !play_cost_reduction_matches(mod_cost, card_id, card, card_db) {
@@ -416,7 +424,22 @@ fn scan_abilities_for_cost_reduction(
     waited_stage_cards: &[i16],
 ) -> Option<u8> {
     for ar in abilities {
-        let ability = ar.resolve();
+        // `peek()` first: this loop runs once per hand card per stage slot per
+        // ability — the hottest loop in action generation — and `resolve()`
+        // costs an `Arc::clone` (an atomic RMW on a decode slot shared by every
+        // worker thread) purely to read a few fields. The `resolve()` arm
+        // covers a not-yet-decoded slot, and is the only path on `no_std`.
+        //
+        // Both arms bind the effect by value rather than holding a reference
+        // across `resolve()`'s temporary `Arc`.
+        let owned;
+        let ability = match ar.peek() {
+            Some(a) => a,
+            None => {
+                owned = ar.resolve();
+                &owned
+            }
+        };
         if let Some(ref effect) = ability.effect {
             if effect.action != ActionType::ModifyCost
                 || effect.operation_any() != Some("subtract")
@@ -545,27 +568,33 @@ pub fn target_player_label(target: &str, master: Option<&str>) -> &'static str {
 
 // ============== INDIVIDUAL CARD PREDICATES ==============
 
+/// `_for` twin of [`card_matches_type`] taking the already-looked-up card.
+///
+/// `CardFilter::matches` tests up to ten filter fields against ONE candidate and
+/// used to call `db.get_card(id)` inside each helper — ten SipHash computations
+/// and ten dependent L1 misses for the same key. Looking the card up once and
+/// threading it here removes nine of them. Semantics are identical, including
+/// the `None => true` fallthrough for unknown type strings.
+#[inline]
+pub fn card_matches_type_for(
+    card: Option<&crate::core::card::Card>,
+    card_type_filter: Option<&str>,
+) -> bool {
+    match card_type_filter {
+        Some("live_card") => card.is_some_and(|c| c.is_live()),
+        Some("member_card") => card.is_some_and(|c| c.is_member()),
+        Some("energy_card") => card.is_some_and(|c| c.is_energy()),
+        None => true,
+        _ => true,
+    }
+}
+
 pub fn card_matches_type(
     card_db: &CardDatabase,
     card_id: i16,
     card_type_filter: Option<&str>,
 ) -> bool {
-    match card_type_filter {
-        Some("live_card") => card_db
-            .get_card(card_id)
-            .map(|c| c.is_live())
-            .unwrap_or(false),
-        Some("member_card") => card_db
-            .get_card(card_id)
-            .map(|c| c.is_member())
-            .unwrap_or(false),
-        Some("energy_card") => card_db
-            .get_card(card_id)
-            .map(|c| c.is_energy())
-            .unwrap_or(false),
-        None => true,
-        _ => true,
-    }
+    card_matches_type_for(card_db.get_card(card_id), card_type_filter)
 }
 
 /// Whether a card whose current orientation modifier is `orientation` matches a
@@ -989,11 +1018,22 @@ pub fn card_matches_characters(
 ) -> bool {
     match characters {
         Some(names) if !names.is_empty() => {
+            // Normalise the needle list ONCE per call rather than once per
+            // (needle, candidate-part) pair. `normalize_name` returns an owned
+            // String, so the old inner loop allocated one per name per card —
+            // 3 names x 20 candidates = 60 allocations to filter one zone, on a
+            // path the corpus exercises heavily (most live/performance text
+            // names characters).
+            //
+            // Semantics preserved exactly: the same `normalize_name`, applied to
+            // the same names, then the same `contains` test against the same
+            // `get_card_names` parts. Only the hoisting changed.
+            let clean: Vec<String> = names
+                .iter()
+                .map(|n| CardDatabase::normalize_name(n))
+                .collect();
             let card_names = card_db.get_card_names(card_id);
-            names.iter().any(|name| {
-                let clean_name = CardDatabase::normalize_name(name);
-                card_names.iter().any(|cn| cn.contains(&clean_name))
-            })
+            clean.iter().any(|cn| card_names.iter().any(|part| part.contains(cn)))
         }
         _ => true,
     }
@@ -1013,9 +1053,21 @@ pub fn card_matches_cost_limit_op(
     cost_limit: Option<u8>,
     comparison: Option<&str>,
 ) -> bool {
+    card_matches_cost_limit_op_for(card_db.get_card(card_id), cost_limit, comparison)
+}
+
+/// `_for` twin of [`card_matches_cost_limit_op`] taking the already-looked-up
+/// card — see [`card_matches_type_for`] for why. `matches` calls this three
+/// times (`cost_limit`, `cost_limit_min`, `cost_limit_max`), so it was three
+/// probes of the same key.
+#[inline]
+pub fn card_matches_cost_limit_op_for(
+    card: Option<&crate::core::card::Card>,
+    cost_limit: Option<u8>,
+    comparison: Option<&str>,
+) -> bool {
     match cost_limit {
-        Some(limit) => card_db
-            .get_card(card_id)
+        Some(limit) => card
             .and_then(|c| {
                 // Use score for live cards, cost for members
                 c.cost.or(c.score)
@@ -1634,8 +1686,13 @@ impl<'a> CardFilter<'a> {
         if !self.check_exclude_names(db, id) {
             return false;
         }
+        // ONE database probe for every field check below. Previously each helper
+        // re-ran `db.get_card(id)` — a SipHash plus a dependent L1 miss for the
+        // SAME key, up to ten times per candidate. `Option<&Card>` is Copy, so
+        // the single lookup is threaded through freely.
+        let card = db.get_card(id);
         if let Some(ct) = self.card_type {
-            if !card_matches_type(db, id, Some(ct)) {
+            if !card_matches_type_for(card, Some(ct)) {
                 return false;
             }
         }
@@ -1643,23 +1700,23 @@ impl<'a> CardFilter<'a> {
             return false;
         }
         if let Some(lim) = self.cost_limit {
-            if !card_matches_cost_limit_op(db, id, Some(lim), self.cost_operator) {
+            if !card_matches_cost_limit_op_for(card, Some(lim), self.cost_operator) {
                 return false;
             }
         }
         if let Some(vals) = self.cost_values {
-            let card_cost = db.get_card(id).and_then(|c| c.cost.or(c.score));
+            let card_cost = card.and_then(|c| c.cost.or(c.score));
             if !card_cost.is_some_and(|v| vals.contains(&v)) {
                 return false;
             }
         }
         if let Some(min) = self.cost_limit_min {
-            if !card_matches_cost_limit_op(db, id, Some(min), Some(">=")) {
+            if !card_matches_cost_limit_op_for(card, Some(min), Some(">=")) {
                 return false;
             }
         }
         if let Some(max) = self.cost_limit_max {
-            if !card_matches_cost_limit_op(db, id, Some(max), Some("<=")) {
+            if !card_matches_cost_limit_op_for(card, Some(max), Some("<=")) {
                 return false;
             }
         }

@@ -19,7 +19,402 @@
 > deliberately skipped, and **two places where this catalogue turned out to be
 > wrong** — one of them a safety bug it recommended.
 
-### 19.1 Landed
+### 19.5 Master checklist
+
+Gate on every item: **allocation count with `total_actions` fixed** (currently
+**29,182** on the standard 200-game bench), plus **4,009 tests green**. Anything
+touching iteration order, map keys, or a gameplay predicate additionally needs a
+fixed-seed win-rate comparison over a large `--games` count — never the test
+suite alone (§1.1).
+
+`[x]` landed · `[~]` partially landed · `[ ]` open · `[!]` blocked or unsafe as
+written (see §19.2/§19.3 for why)
+
+#### Tier 1 — dead work behind a disabled feature (§3)
+
+- [x] §3.1 `push_cond_verdict` gate + de-triplicate
+- [x] §3.2 `push_effect_verdict` gate (+ `debug_enabled` for `no_std`)
+- [x] §3.3 `pay_ability_cost` `cost_desc` gate
+- [x] §3.5 `rule_log_activated` gate
+- [x] §3.6 all 21 direct `gs.rule_log` writes
+- [ ] §3.7 display-only accumulators — needs a `DisplaySources<T>` enum so the
+      8 `*_sources` fields cost one branch instead of ~7 `Vec` allocations per
+      `recalculate_constants`. Touches live score; needs the §1.1 gameplay gate.
+- [ ] §3.8 finish the `recalculate_constants` scratch set — **one field at a
+      time, measured between each**, because a regression is already recorded in
+      this exact area
+- [ ] §3.9 `hand_cost_matching_indices` `match_names`; **the `group_counts`
+      `HashMap<String, _>` is done** — now `HashMap<&str, _>`, removing a heap
+      allocation plus a SipHash per hand card
+- [ ] §3.10 the 6 condition-layer name-list formats
+- [ ] §3.11 ~~`stats_pipeline` `HashMap` clone~~ — **§19.8: this was my own
+      misread, the code is already lazy. Drop it.**
+
+#### Tier 1 — redundant recomputation (§4)
+
+- [ ] §4.1 `entry_positions` carries the owner (safe half only — do NOT touch the
+      stage-or-hand divergence at `modifiers.rs:1382`, that is a gameplay change)
+- [x] §6.12 `CardFilter::matches` 10 hash probes → 1 — `card_matches_type_for` /
+      `card_matches_cost_limit_op_for` take `Option<&Card>`; `matches` looks the
+      card up once. Five probe sites collapsed to one lookup.
+- [x] §7.3 `card_matches_characters` normalises the needle list once per call
+      instead of once per (needle, candidate-part) — 3 names × 20 candidates
+      went from 60 `normalize_name` allocations to 3
+- [x] §6.5b (partial) `peek()` in `scan_abilities_for_cost_reduction` and
+      `calculate_play_cost_reduction` step 1 — the hottest loop in action
+      generation
+- [ ] §4.2 the actual hoist of `calculate_play_cost_reduction` — **§19.10: do
+      not attempt without the full guard audit**
+
+### 19.10 The allocation counter cannot see a large class of real wins
+
+Batch measured at `alloc calls = 5,442,137`, `total_actions = 29,521` — **both
+byte-identical to the run before it**, while the batch landed:
+
+- `CardFilter::matches`: 10 `db.get_card(id)` probes → 1. Removed ~9 SipHash-1-3
+  computations and 9 dependent L1 misses per candidate card.
+- `card_matches_characters`: 60 `normalize_name` allocations → 3 per call.
+  (Allocations *should* have moved; that they didn't says these call sites are
+  colder on this deck than the catalogue estimated — worth knowing.)
+- `peek()` in the cost-reduction loops: removed one atomic RMW per ability per
+  hand card.
+
+Only the middle one is an allocation change, and it measured flat. The other two
+are pure hash/memory-latency/atomic traffic. **The repo's chosen instrument —
+`--alloc` with `total_actions` fixed — is structurally incapable of registering
+them.** It counts `malloc`/`free` pairs; it does not count probes, misses, or
+atomics.
+
+This is the same point §6.4 makes about interning, and it deserves to be stated
+at the top level rather than in one item:
+
+> **The allocation gate is a regression guard, not a progress meter.** It is
+> reliable for "did this change the amount of work" and blind to "did this
+> change the cost per unit of work". Roughly half the catalogue — every
+> representation item (§6), every early-exit item (§7), every atomics item
+> (§14.2) — lives in the second category.
+
+**Consequence for how this work is gated.** For this class, the honest gate is:
+`total_actions` unchanged (trajectory) + tests green (behaviour) + the change
+being a provable no-op or a strict reduction in operations. There is no
+positive measurement available on this machine (§1: 63–239 gps for one
+identical binary). **Do not fabricate a speedup claim for these items, and do
+not drop them because the counter did not move.**
+- [ ] §4.3 `distinct_stage_groups` 4 call sites → 1 (local threading first, cache
+      second)
+- [ ] §4.4 lazy `Vec<Ability>`, drop the wasted `area_name` parse
+- [x] §4.5/`§19.6` `TriggerEvent` — **done properly**, see §19.6: five dead
+      fields deleted, the type removed, the batch passed as `&[i16]`
+- [x] §4.6 `waited_stage_cards` → `SmallVec`
+- [x] §4.7 `performer_owned_ids` → three-zone scan
+- [ ] §4.8 hoist `filter_subset()` at `card.rs:3460`, guard the weighted 2nd pass
+- [ ] §4.9 `Active` phase: parse `constant_cannot_activate_members` once
+- [ ] §4.10 precomputed `SuppressAbilityTrigger` mask (needs §15.1)
+- [ ] §4.11 `Ability::trigger_mask()` — replaces 26 `has_trigger` parses
+- [ ] §4.12 `ConditionContext` stage-first probe (zero risk; do not use
+      `current_entry().player_id` — that is a gameplay change)
+- [ ] §4.13 remaining duplicate `Zone::from_str` sites
+- [ ] §4.14 `reprocess_counts` `HashMap` → `SmallVec`
+- [ ] §4.15 `post_cost_position_gate` per-resolution `Vec`
+- [ ] §4.6b `set_indices_waited/active` buffers + bitmap
+
+#### Tier 1 — effect-tree clones (§5)
+
+- [x] §5.2 `normalized_steps_cow` — routing borrows the step slice
+- [x] §5.3 `prepare_sequential_action` → `PreparedStep`
+- [~] §5.3b `PreparedStep::Borrowed` rarely fires because steps carry
+      conditions. **Next step: thread a "condition already evaluated" flag into
+      `execute_effect`** so a borrowed step skips re-evaluation. Overlaps §8.2 —
+      do the two together.
+- [x] §5.5 lazy cost clone
+- [ ] §5.6 `pay_cost_move_cards` take `&AbilityEffect`
+- [ ] §5.7 `execute_custom` `any_order` double clone
+- [ ] §5.8 remaining: `choice.rs:94` done; still open at `position.rs:287/297/301`,
+      `target.rs:120/130/141/347`, `cost/handlers.rs:1399`, `ability_ops.rs:110/364`
+- [ ] §5.9 `ability_ops` rebuild-by-field → whole-struct clone
+- [!] §5.4 `EffectOwner` provenance — **needs the dead-write audit first, then a
+      purpose-built corpus harness before any behaviour-affecting change**
+
+#### Tier 1 — representation (§6)
+
+- [x] §6.6 `ArcStr::from(&str)` single allocation
+- [x] §6.5 `AbilityRef::peek()` added; 2 hot sites converted
+- [ ] §6.5b apply `peek()` to the remaining ~48 sites
+- [!] §6.1 A2 `heart_modifiers` inner map → `[T; 8]` — **§19.9: not the safe
+      win the catalogue claimed. It is a wire-format change.**
+- [ ] §6.1 A1 the six `HashMap<i16, V>` → arrays (still viable, still verify
+      per-field that nothing iterates them in `ability/`/`core/`/`turn/`)
+- [ ] §6.1 A3 `state_snapshot_before_change` → `Vec` (≤3 entries, written once)
+- [ ] §6.2 `zone_card_ids` → iterators
+- [ ] §6.3 `SmallVec` → `Vec` spills (S1 done; S2/S3/S4 open)
+- [ ] §6.8 `Card.box` inline
+- [!] §6.9 `ConditionContext` snapshot — **highest risk in the document**; needs a
+      1,000-game AI self-play state-trace diff
+- [ ] §6.11 `filter_subset` / `CardFilter::from_effect` single-bind
+- [ ] §6.12 `CardFilter::matches` 10 hash probes → 1
+- [ ] §6.13 dense `Vec` card index (land with §15.1)
+
+#### Tier 1 — scans (§7)
+
+- [x] §7.10 `.count()` → `.any()` for monotone location clauses
+- [x] §7.1 `card_name_matches_group` fast path + corpus equivalence test
+- [ ] §7.1b remaining `get_card_names` call sites (`util.rs:953/1053`,
+      `card.rs:643/3692`) and `normalize_name` per-card sites
+- [ ] §7.3 `card_matches_characters` normalise the filter once, not per card
+- [ ] §7.5 `check_invalid_energy_cards` probe per card + `SmallVec` in
+      `check_invalid_live_cards`
+- [ ] §7.6 `MoveCards` `Vec::leak` — **an actual leak**, fix regardless of perf
+- [ ] §7.7 `resolve_source_revealed_cards` O(R²) → single pass (preserve order —
+      `filtered_indices` depends on it)
+- [ ] §7.8 `resolve_from_revealed_cards` O(n) removes in a loop
+- [ ] §7.9 `set_indices_waited/active`
+- [ ] §7.11 `resolve_moved_cards_source` O(n·m) + per-card `SmallVec`
+- [ ] §7.12 `max_distinct_names` per-card `Vec`
+- [ ] §7.13 the remaining small fixed-size `Vec`s
+
+#### Tier 1 — condition evaluator (§8)
+
+- [x] §8.1 one `common()` bind in the post-dispatch guard
+- [x] §8.5 build `ConditionContext` only when a condition exists
+- [ ] §8.2 verdict token — do together with §5.3b
+- [ ] §8.2b the `ConditionContext` per-call-site hoist (stage-first is §4.12)
+- [~] §8.4 verdict memo is written but 100% dead (0 of 526 clauses set
+      `cache: true`). **Enabling it is a gameplay question, not a perf one.**
+- [ ] §8.7 `EffectKind::from_action`'s `to_lowercase()` per call
+
+#### Tier 1 — choice/resume (§9)
+
+- [x] §9.1 `ability_master_id` → `Option<&str>`
+- [ ] §9.2 `provide_choice_result` take `Choice` by value (2 clones/resume)
+- [ ] §9.3 `SelectionContext` lifetimes (9–10 allocs/resume)
+- [ ] §9.4 `resume_queue_with_choice` `Choice` clone
+- [x] §9.5/§9.6 `ChoiceRoute` stringification ×2
+- [x] §9.7 `ResumeSnapshot::capture` 10 lookups → 1 destructure
+- [ ] §9.8 `activation_ability_id` — pass `(card_no, idx)`
+- [ ] §9.9 `(card, ability_index)` identity. **Can change outcomes; also a latent
+      collision bug — report the bug separately from the perf change.**
+
+#### Tier 1 — effect execution (§10), phase loop (§11)
+
+- [ ] §10.1 `execute_move_cards`' 9 owned `String`s (4 computed twice)
+- [ ] §10.2 `execute_modify_required_hearts_standard` take a slice
+- [ ] §10.3 `position_any().cloned()`
+- [ ] §10.4 dead `EffectOwner` write audit (do this **before** §5.4)
+- [x] §10.6 confirmed the dispatch is already a jump table — no action
+- [ ] §11.1 `check_timing`'s redundant probes
+- [~] §11.2 `nhm_flat` + partition buffers — `performer_owned_ids` done (that was
+      §4.7); the rest open
+- [ ] §11.3 `RevealedCardMeta.reveal_type` → `&'static str`/enum; drop the
+      redundant per-card `source_name`. Check serde first.
+
+#### Tier 2 — instrumentation (do this BEFORE more refactors)
+
+- [ ] §2.1 TAS call counter — settles the 2.7% question, ~15 min, zero cost
+- [ ] §2.2 per-call-site `can_activate_effect` counter
+- [ ] Counter for `PreparedStep::Borrowed` vs `Owned` — tells us whether §5.3b is
+      worth doing (§19.3 says this should have come first)
+
+#### Tier 2 — build config (§13). Cannot be validated here (§1 noise floor).
+
+- [ ] §13.1 `[profile.bench]` — free, and it is a measurement bug
+- [ ] §13.2 the three cross-crate `#[inline]`s + `Card::is_member/is_live/is_energy`
+- [ ] §13.3 `bench_no_log` — **decide the canonical bench command explicitly**
+- [ ] §13.4 `panic = "abort"` — gate on `bot_arena` still running
+- [ ] §13.5 `lto = "thin"` alone; `codegen-units = 1` alone (never tested apart)
+
+#### Tier 3 — deliberate projects (§15)
+
+- [ ] §15.1 card-derived indexes at load time — the **keystone**; unblocks
+      §4.10, §6.13, §12.1, and completes §7.1b
+- [ ] §15.2 interning — try on `no_std` first, serde caveat disappears there
+- [ ] §15.5 `Option<Box<CompoundBranch>>` — after §5.2/§5.3 land
+- [ ] §15.6 stage-scoped caching; **leave `active_energy_count` alone** (4.1% ceiling)
+
+### 19.6 §4.5 replaced: delete `TriggerEvent`, don't re-borrow it
+
+§4.5's suggested early-exit guard was wrong (§19.2) and its stated blocker was
+also wrong. The blocker said removing the cost "needs the `TriggerEvent` to
+borrow from `GameState`, which the current `&mut self` design cannot express" —
+true for that approach, but the parameter should not exist at all:
+
+- **All eight reads of `event` in the callee are `event.moved_cards`** (lines
+  597, 682, 724, 744, 823, 841, 866, 917, 942). `moved_from_zone`,
+  `position_change_occurred`, `appeared_cards`, `energy_placed_by_effect` and
+  `energy_placed_by_player` are written by all four call sites and **read by
+  none**. The `Option<String> moved_from_zone` — the guaranteed allocation the
+  item was chasing — is dead on arrival.
+- All four call sites pass the identical
+  `moved_cards: self.recently_moved_cards.clone().unwrap_or_default()`.
+- The callee never mutates `recently_moved_cards`: every write is in
+  `set_recently_moved_cards` (`mod.rs:978`), `set_recently_moved_batch`
+  (`modifiers.rs:1923`), `clear_recently_moved_batch` (`modifiers.rs:1931`), and
+  the take/restore in `turn/actions/mod.rs:1238`. The callee only *queues*.
+
+So: delete the parameter, read `self.recently_moved_cards` in the callee, and
+delete the `TriggerEvent` struct. Zero allocations instead of ~4 per call, and
+one fewer type whose docstring currently misdescribes what it does.
+
+**Lesson worth carrying:** the struct's own docstring says it "replaces the
+fragmented per-scan tracking flags with a single explicit value". Someone built
+it to consolidate flags and then never wired two of the three up. I optimised the
+cost of constructing it without asking whether the consolidation was load-bearing.
+**On any "this data is copied every call" finding, first ask whether the callee
+actually reads all of it.**
+
+**Landed, with one correction to the analysis above.** §19.6 originally claimed
+the parameter could be deleted outright. It cannot: there are **six** call sites,
+and the post-loop batch scan builds `moved_cards` from `self.batch_movements`,
+not from the `recently_moved_cards` shadow field. So the batch stays a parameter
+(`&[i16]`) and the five unread fields plus the `TriggerEvent` type are what got
+deleted. Net: one guaranteed `Option<String>` allocation per scan removed, plus
+four more fields of dead copying, at 4 of the 6 call sites; the `SmallVec`
+clone remains and is inline for batches of <= 4 cards.
+
+### 19.7 The `total_actions` gate is only valid on a stable tree
+
+§1.1 makes "hold `total_actions` fixed" the correctness gate for every perf
+change. That assumes nothing else is landing underneath you. **This repo is being
+worked on concurrently, and the assumption broke.**
+
+Observed 2026-10-01: `total_actions` read 29,182 consistently across the whole
+first work session. It then moved to **29,521** after the `TriggerEvent` change —
+but four commits (`09b85d2d`, `ea3ea0b7`, `b69e1a69`, `a727675e`) landed on the
+branch in between. `git diff --stat 86ff708e..HEAD -- engine/src` shows they
+touched exactly the code that determines a trajectory:
+
+```
+ability/condition/card.rs              +29     ability/choice.rs             +5
+ability/condition/card/comparison.rs   +26     turn/actions/mod.rs          +39
+ability/condition_decoder_gen.rs       +23     turn/trigger_scan.rs         +50
+core/game_state/mod.rs                +120     turn/live.rs                  +12
+```
+
+The test count also drifted 4,006 → 4,009 → 4,072 across the same window,
+entirely from those commits.
+
+**So the shift is theirs, not mine** — the evidence is that diff, plus the fact
+that this change is provably read-neutral (five fields deleted that nothing
+reads; `moved_cards` passed from the identical source expression at all six call
+sites; `from_slice` vs `.clone()` differs only in inline-vs-heap layout).
+
+**The process rule this implies:** a `total_actions` delta is only attributable
+when you have the tree under your own control. Before trusting any before/after
+delta on this repo:
+
+1. `git log --oneline` and confirm no commit landed since your baseline; and
+2. if one did, `git diff --stat <baseline>..HEAD -- engine/src` and check whether
+   it touched rules code (conditions, choice, trigger scan, game state, the
+   generated decoders). If it did, your gate is void — re-baseline first.
+
+And because these commits change rules semantics, **any perf number recorded
+before them is not comparable to one recorded after.** Allocation figures in this
+document are anchored to whichever commit was HEAD when they were taken; say
+which.
+
+### 19.9 §6.1-A2 is not the safe win this document claimed, and that pattern repeats
+
+§6.1-A2 proposed replacing `heart_modifiers`' inner
+`HashMap<HeartColor, ModifierEntry>` with `[ModifierEntry; 8]`, and ranked it
+**"the best read-rate/safety ratio"** of §6.1. That is wrong, and the reason is
+the thing I flagged elsewhere in this document and then failed to apply here.
+
+`GameModifiers` is serialised:
+
+```rust
+// core/game_modifiers.rs:174-180
+#[cfg_attr(feature = "serde_support", derive(serde::Serialize, serde::Deserialize))]
+pub struct GameModifiers {
+    …
+    pub heart_modifiers: HashMap<i16, HashMap<HeartColor, ModifierEntry>>,
+    …
+    pub need_heart_modifiers: HashMap<i16, HashMap<HeartColor, ModifierEntry>>,
+```
+
+`serde_support` is a default feature. So both fields cross the wire — the arena
+protocol, the web API, and every persisted game state. Changing the inner map to
+an array is a **JSON shape change** (`{"Heart01":…}` → `[…]`), not a local
+representation tweak. That puts it in the same risk class as §6.4 (interning) and
+§15.5 (`Option<Box<CompoundBranch>>`), i.e. it needs its own gate and its own
+serialisation compatibility decision — the opposite of "do this first".
+
+Worse, the blast radius is ~100 sites across ~15 files, not the handful the
+catalogue implied. `game/display.rs` alone rebuilds four flattened
+`HashMap<HeartColor, i16>` projections from it (`:1537-1553`, `:1241-1250`),
+`bot/{v7_main,v7_live,observation,strategy_v7,v8_model}.rs` all thread the type
+through, and `core/zones.rs:472` + `core/stats_pipeline.rs` + `apply_need_heart_modifiers`
+all take it as a parameter type.
+
+**The rule this establishes, and it is the fourth time it has bitten this
+document:** before ranking any representation change as safe, check three things
+in this order —
+
+1. **Does the type derive `Serialize`/`Deserialize`?** If yes it is not a local
+   change, regardless of how many call sites read it.
+2. **Does anything iterate it and act on the order?** (§1.2)
+3. **Does the display layer rebuild a projection of it?** That multiplies the
+   blast radius well beyond the read sites.
+
+Items failing (1) are §6.4 interning, §15.5 `Option<Box<CompoundBranch>>`, and
+now §6.1-A2. §6.13's dense card index is fine on (1) — `Card` is serialised but
+the index would be a **side table**, not a field change — which is exactly why
+§15.1 insists on side tables.
+
+**What is still worth doing from §6.1:** A1 (the six `HashMap<i16, V>` →
+arrays) and A3. Both still need the per-field iteration check, and both are
+blocked on the same question: does `GameModifiers`' `serde` derive actually get
+used for those fields, or are they `#[serde(skip)]`? **Check that before
+touching A1** — if the maps are serialised, A1 is a wire change too and §6.1
+should be demoted to §15 entirely.
+
+### 19.8 Third correction: §3.11 was my own misread, and §8.2 needs a narrower scope than §5.3b assumed
+
+
+**§3.11 (`stats_pipeline`) is a false positive.** It claimed
+`member_original_hearts` was bound to a `let` and therefore evaluated eagerly
+"even though `log::debug!` is lazy". Re-reading `core/stats_pipeline.rs:123-129`,
+the call is an **argument inside the macro**:
+
+```rust
+log::debug!(
+    "[HEART_PIPELINE] card={} base+override+multiplier={:?} +mods={:?} -> {:?}",
+    card_id,
+    member_original_hearts(card_db, card_id, heart_override, heart_copy, …),
+    mods, m
+);
+```
+
+The macro's laziness protects it, so the claimed `HashMap` clone per
+`stage_hearts` call does not happen. **This is the same mistake §4.5 was** — I
+pattern-matched a description onto code instead of reading the call site. It is
+also the second time I got this wrong on the "eager argument" mechanism, which
+means the mechanism needs to be verified per-site, not assumed from a grep hit.
+
+**§8.2's scope is narrower than §5.3b assumed.** The plan was a
+"condition already satisfied" flag set by `route_sequential_step` and consumed by
+`execute_effect`, so a borrowed step could skip re-evaluation. Reading
+`can_activate_effect` (`resolver.rs:569-630`) shows it does **two** independent
+things:
+
+1. evaluates `effect.activation_condition_parsed_any()` — the parenthetical
+   activation-position overlay, which `route_sequential_step` never touches; and
+2. evaluates the main `effect.condition` with position overlays applied.
+
+Only (2) is the redundant re-evaluation. A flag that skipped the whole gate
+would silently drop (1), and the code comments at `resolver.rs:617-621` record
+that an earlier early-return on exactly that arm caused a real bug (an ability
+was granted resources unconditionally because the `has_moved` gate was skipped).
+
+So the flag has to suppress only arm (2) — a parameter threaded into
+`can_activate_effect` that skips the main-condition evaluation while still
+running the activation-condition arm, the overlay merge, and the
+`cost_already_paid` logic. That is a real change to a function the perf history
+says has already produced one bug of this exact shape. **Deliberately left open
+rather than attempted on a false premise.**
+
+Also unverified: whether `gate_sequential_consequence`
+(`sequential.rs:254`, which runs between `route_sequential_step` and
+`execute_effect`) can mutate state. If it can, the main-condition re-evaluation
+is *not* redundant and the whole idea is void. **Check that first.**
 
 | Item | What changed |
 | --- | --- |
