@@ -1073,7 +1073,7 @@ impl super::TurnEngine {
         game_state.record_card_appearance(card_id, "hand");
         game_state.baton_touch_arriving_card_id = Some(card_id);
 
-        Self::trigger_debut_abilities(game_state, player_id, card_no, final_cost, true);
+        Self::trigger_debut_abilities(game_state, player_id, card_no, final_cost, true, Some(card_id));
         Self::trigger_auto_abilities_for_player(game_state, player_id);
         let db_opponent_id = game_state.opponent_id(player_id);
         Self::trigger_auto_abilities_for_player(game_state, &db_opponent_id);
@@ -1320,6 +1320,7 @@ impl super::TurnEngine {
             &card_no,
             cost_paid,
             baton_touch_used,
+            Some(card_id),
         );
         Self::trigger_auto_abilities_for_player(game_state, &player_id);
         let sb_opponent_id = game_state.opponent_id(&player_id);

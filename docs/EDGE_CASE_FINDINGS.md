@@ -1755,3 +1755,54 @@ questions, and neither is a parser question — which reverses where I thought t
 `erena_debut_offers_only_the_opponent_member_of_cost_nine_or_less` stays `#[ignore]`d, now on a
 correct card number, a confirmed-correct parse including the gate, four causes eliminated, and a
 measurement (`pending_choice_summary() == "none"`) rather than any of the theories that came before.
+---
+
+## The harness fails loudly on a bad card number — verified
+
+`livesuccess_revealed_distinct_name_threshold_test.rs` (the strongest file in the tree) carries
+this warning about a pre-existing test:
+
+> its third member id `PL!SP-bp1-014-PR` **DOES NOT EXIST** — the lenient card-id fallback
+> substituted a different print, so the "three DISTINCT names" premise was never actually pinned
+
+That describes a **silent substitution**, and if it were still true it would be the most
+dangerous thing in the harness: a test naming one card and silently exercising another, with
+every assertion still green. Several of my own retractions involved card numbers that do not
+exist, so I checked whether that hazard is live.
+
+**It is not.** `tests/helpers/mod.rs:104-107`:
+
+```rust
+pub fn card_id(db: &CardDatabase, card_no: &str) -> i16 {
+    db.get_card_id(card_no)
+        .unwrap_or_else(|| panic!("Card {card_no} not found in database"))
+}
+```
+
+`game.id()` routes through this (`mod.rs:230` → `consume_id` → `card_id`), so **an unknown card
+number panics at the first call**. There is no fallback that substitutes a different print.
+
+**What this means, precisely:**
+
+* Every test that passed this session used a **valid** card number. A wrong one could not have
+  produced a false green — it would have panicked.
+* All eleven of my retractions were caught; **none slipped through as a silently-wrong test.**
+  They surfaced as panics, as failed preconditions, or as a mismatch I chased down — never as a
+  green suite proving something false.
+* The comment above describes a **historical** helper, or was written against a different
+  revision. Either way it is now **stale and misleading**: it warns about a hazard that no
+  longer exists, in the file most likely to be read as the model.
+
+**The correct safety statement, for the record.** The protection is not the fallback — it never
+existed in current form. It is **`assert_card_identity`** (and `assert_card_in_group`), which this
+file calls on **every** fixture. A test that names its cards and asserts their identity cannot be
+silently retargeted; a test that does not assert is relying on nothing but the panic.
+
+So the rule that replaces the stale warning: *a card-number mistake fails loudly; a card-
+**identity** mistake does not.* `game.id()` protects the first. Only `assert_card_identity`
+protects the second — and that is the check whose absence made this file's author distrust its
+own premise in the first place.
+
+**Suggested follow-up (small, safe):** update that header comment to say the fallback no longer
+exists and that `card_id` panics, so the next reader does not build a theory on a hazard that
+has been removed.

@@ -66,6 +66,17 @@ static int cond_heart_colors(const Condition *c, int *out, int max) {
     }
     return n;
 }
+/* First entry of the condition's group_names array, or "" when absent.
+   Rust takes `condition.get_group_names()?.first()` (card.rs:544) in the
+   aggregate arm and `group_names.is_some()` (card.rs:539) as the presence
+   test, so the C needs both the "absent" state and the first name. */
+static const char *cond_first_group_name(const Condition *c) {
+    const CondValue *gv = find_val(c, "group_names");
+    if (!gv || gv->tag != RB_TAG_ARRAY || gv->arr_n == 0) return NULL;
+    for (uint32_t i = 0; i < gv->arr_n; i++)
+        if (gv->arr[i].tag == RB_TAG_STR && gv->arr[i].s) return gv->arr[i].s;
+    return NULL;
+}
 /* Present-in-base_heart test, mirroring util.c's card_has_heart_in_range over
    the [0, num_base) slice: Rust reads `card.base_heart.hearts.contains_key(&c)`
    (predicates.rs:104-110), and Card.num_base is the length of that first
@@ -266,6 +277,45 @@ static int count_distinct_heart_types(const struct GameState *g, int pl, const c
     (void)g;
     return distinct;
 }
+/* count_distinct_heart_types_req: the same count, restricted to the colours the
+   condition NAMES and honouring heart_source == "blade".
+   Rust card.rs:2040-2051 filters the printed map with
+   required_colors.contains(c) and reads blade_heart instead of base_heart when
+   heart_source is blade. Counting every printed colour instead let a member's
+   heart00 raise a "N kinds" gate the text never asked about, and
+   PL!N-bp5-001-AR's heart_source:"blade" was ignored outright. */
+static int count_distinct_heart_types_req(const struct GameState *g, int pl, const char *loc,
+                                          const Condition *c) {
+    if (!loc) return 0;
+    int req[RB_MAX_HEARTS];
+    int nreq = cond_heart_colors(c, req, RB_MAX_HEARTS);
+    const char *hs = get_str(c, "heart_source");
+    int is_blade = (hs && !strcmp(hs, "blade"));
+    int ids[RB_MAX_ZONE];
+    int n = zone_ids(g, pl, loc, ids, RB_MAX_ZONE);
+    int seen[RB_MAX_HEARTS];
+    memset(seen, 0, sizeof seen);
+    int distinct = 0;
+    for (int i = 0; i < n; i++) {
+        if (ids[i] < 0) continue;
+        Card cc;
+        if (!rb_decode_card_by_index((uint32_t)ids[i], &cc)) continue;
+        int from = is_blade ? cc.num_base : 0;
+        int to   = is_blade ? (cc.num_base + cc.num_blade) : cc.num_base;
+        for (int k = from; k < to && k < cc.n_hearts; k++) {
+            int col = (int)cc.heart_color[k];
+            if (col < 0 || col >= RB_MAX_HEARTS) continue;
+            if (nreq > 0) {
+                int wanted = 0;
+                for (int q = 0; q < nreq; q++) if (req[q] == col) { wanted = 1; break; }
+                if (!wanted) continue;
+            }
+            if (!seen[col]) { seen[col] = 1; distinct++; }
+        }
+        rb_free_card(&cc);
+    }
+    return distinct;
+}
 static int zone_count_filtered_ex(const struct GameState *g, int pl, const char *loc, const char *card_type, const char *group, int exclude_cid){    if(!card_type && !group && exclude_cid < 0) return count_in_zone(g,pl,loc);
     /* filter: live_card vs member_card vs energy_card (+ optional group_names,
        + CardFilter.exclude_self). Mirror card.rs:evaluate_location_condition's
@@ -304,6 +354,18 @@ static int zone_count_filtered(const struct GameState *g, int pl, const char *lo
 static int eval_condition_inner(const struct GameState *g, int actor, const Condition *c);
 static int eval_condition_inner_host(const struct GameState *g, int actor, int host_cid, const Condition *c);
 int rb_check_phase_gate(const struct GameState *g, int actor, const Condition *c, int skip_gate);
+/* card.rs:409 check_aggregate_total. Declared here because the aggregate
+   short-circuit runs at FOUR Rust call sites (condition.rs:518,
+   card.rs:804, card.rs:1565, card.rs:2494, state.rs:238) and the definition
+   sits below them in this file. */
+int rb_check_aggregate_total(const struct GameState *g, int actor, const Condition *c);
+/* Same evaluator with an explicit zone, for state.rs:236's
+   `location.unwrap_or("live_card_zone")` default. */
+static int check_aggregate_total_at(const struct GameState *g, int actor, const Condition *c,
+                                    const char *loc_override);
+/* util.rs:2210 compare_counts. Declared up here because eval_score
+   (state.rs:1150) needs it too and the definition sits far below. */
+static int compare_counts_op(const char *op, int actual, int expected);
 static int stage_index_of_position(const char *pos);
 
 /* Mirror engine/src/ability/condition/card.rs:resolve_target_for_scope  E   target=="self" with scope=="both" widens the scope to both players. */
@@ -486,8 +548,8 @@ static int eval_location(const struct GameState *g, int actor, int host_cid, con
             }
         }
     }
+    else if (unit_is_types) actual = count_distinct_heart_types_req(g, pl, loc, c);
     else if (ctype || group) actual = zone_count_filtered_ex(g, pl, loc, ctype, group, exclude_cid);
-    else if (unit_is_types) actual = count_distinct_heart_types(g, pl, loc);
     else if (distinct) actual = count_distinct_in_zone(g, pl, loc);
     else if (exclude_cid >= 0) actual = zone_count_filtered_ex(g, pl, loc, NULL, NULL, exclude_cid);
     else actual = count_in_zone(g, pl, loc);
@@ -1399,8 +1461,42 @@ static int eval_temporal(const struct GameState *g, int actor, int host_cid, con
     const char *temp = get_str(c,"temporal");
     if (temp) {
         if (!strcmp(temp,"live_end"))  return g->phase==RB_PHASE_VICTORY;
-        if (!strcmp(temp,"during_live")||!strcmp(temp,"this_live"))
-            return phase_in_live(g);
+        if (!strcmp(temp,"during_live")||!strcmp(temp,"this_live")) {
+            if (!phase_in_live(g)) return 0;
+            /* state.rs:205-242: build the zone list from `locations`, else
+             * `location`, else (when heart_colors is set) the live card zone.
+             * When that list touches the live or success live zone AND the
+             * condition is aggregate:"total" over named heart colours, Rust
+             * delegates to check_aggregate_total and returns its verdict.
+             * PL!N-pb1-007-P＋, PL!N-pb1-038-L, PL!N-pb1-039-L and
+             * PL!S-bp6-010-N are all this shape; before this arm the temporal
+             * evaluator returned a bare phase_in_live() and ignored every
+             * heart, count and group field on the condition. */
+            const CondValue *locs = find_val(c, "locations");
+            const char *loc1 = get_str(c, "location");
+            int touches_live = 0;
+            if (locs && locs->tag == RB_TAG_ARRAY && locs->arr_n > 0) {
+                for (uint32_t i = 0; i < locs->arr_n; i++)
+                    if (locs->arr[i].tag == RB_TAG_STR && locs->arr[i].s &&
+                        (!strcmp(locs->arr[i].s, "live_card_zone") ||
+                         !strcmp(locs->arr[i].s, "success_live_card_zone")))
+                        touches_live = 1;
+            } else if (loc1) {
+                if (!strcmp(loc1, "live_card_zone") || !strcmp(loc1, "success_live_card_zone"))
+                    touches_live = 1;
+            } else if (find_val(c, "heart_colors")) {
+                touches_live = 1;   /* default zone is live_card_zone */
+            }
+            if (touches_live) {
+                const char *agg = get_str(c, "aggregate");
+                if (agg && !strcmp(agg, "total") && find_val(c, "heart_colors")) {
+                    int res = check_aggregate_total_at(g, actor, c,
+                                                      loc1 ? loc1 : "live_card_zone");
+                    return res < 0 ? 0 : res;   /* state.rs:239 unwrap_or(false) */
+                }
+            }
+            return 1;
+        }
         if (!strcmp(temp,"before_live"))
             return !(g->phase==RB_PHASE_LIVE_SET || g->phase==RB_PHASE_PERFORMANCE || g->phase==RB_PHASE_VICTORY);
         if (!strcmp(temp,"first_turn")) return g->turn==1;
@@ -1888,10 +1984,22 @@ static int eval_any_of(const struct GameState *g, int actor, const Condition *c)
 }
 /* ── score_threshold (10) ── */
 static int eval_score(const struct GameState *g, int actor, const Condition *c) {
-    int thr=1; get_i(c,"count",&thr);
-    const char *op=get_str(c,"operator");
-    int pl=target_player_idx(actor,c);
-    return eval_operator(g->p[pl].score, op, thr);
+    /* Mirror state.rs:1150-1161 evaluate_score_threshold_condition. The
+     * quantity it compares is the CHEER-BLADE HEART TOTAL for the resolved
+     * player (player1/2_cheer_blade_heart_count), NOT the player's live
+     * score. Reading g->p[pl].score here compared a completely unrelated
+     * figure against `count`, so every score_threshold_condition gate was
+     * measuring the wrong thing. PL!SP-pb2-048-L (ディストーション) is the
+     * only corpus card in this shape.
+     * Rust: count.unwrap_or(1) and compare_counts(operator, ...), so an
+     * absent count is 1 and an unrecognised operator resolves to met. */
+    const char *op = get_str(c, "operator");
+    int thr = 1;
+    if (!get_i(c, "count", &thr)) thr = 1;
+    int pl = target_player_idx(actor, c);
+    int cheer = pl == 0 ? g->player1_cheer_blade_heart_count
+                        : g->player2_cheer_blade_heart_count;
+    return compare_counts_op(op, cheer, thr);
 }
 /* ── choice/position etc ── */
 static int eval_choice(const struct GameState *g, int actor, int host_cid, const Condition *c) {
@@ -1955,6 +2063,23 @@ static int eval_condition_inner_host(const struct GameState *g, int actor, int h
             c->variant, dl?dl:"-", dc?dc:"-", dt?dt:"-", dcs?dcs:"-");
     }
     int r=1;
+    /* condition.rs:510-521 — the aggregate-total SHORT-CIRCUIT, which runs
+       BEFORE the variant match for every non-Temporal condition carrying
+       aggregate=="total" plus a non-empty heart_colors list and a NON-stage
+       location. Without it a `comparison_condition` / `score_threshold` /
+       `location_condition` in that shape reached its own evaluator, which
+       never looks at heart_colors, and silently counted CARDS instead of
+       summing hearts. 74 corpus conditions carry aggregate:"total". */
+    if (c->variant != RB_COND_TEMPORAL && c->variant != RB_COND_COMPOUND) {
+        const char *agg = get_str(c, "aggregate");
+        const char *loc0 = get_str(c, "location");
+        if (agg && !strcmp(agg, "total") &&
+            find_val(c, "heart_colors") != NULL &&
+            !(loc0 && (!strcmp(loc0, "stage") || !strcmp(loc0, "ステージ")))) {
+            int agg_res = rb_check_aggregate_total(g, actor, c);
+            if (agg_res >= 0) return negation ? !agg_res : agg_res;
+        }
+    }
     switch ((RbConditionVariant)c->variant) {
         case RB_COND_COMPOUND:            r = eval_compound(g, actor, host_cid, c); break;
         case RB_COND_LOCATION:            r = eval_location(g, actor, host_cid, c); break;
@@ -1993,29 +2118,40 @@ static int eval_condition_inner_host(const struct GameState *g, int actor, int h
         case RB_COND_NO_EXCESS_HEART:     r = eval_no_excess(g, actor, c); break;
         case RB_COND_ALWAYS_TRUE:         r = 1; break;
         case RB_COND_ANY_OF:              r = eval_any_of(g, actor, c); break;
-        case RB_COND_ALL_REVEALED: {            /* Mirror condition.rs:evaluate_all_revealed_match_heart_color  Eat
-               least `count` revealed cards carry the required heart color. The
-               headless engine tracks the revealed pool in g->revealed_cards[]. */
-            const CondValue *hv = find_val(c, "heart_colors");
-            int thr=1; get_i(c,"count",&thr);
-            if (g->n_revealed==0) { r = 0; break; }
-            int matched=0;
-            for(int i=0;i<g->n_revealed;i++){
-                int cid=g->revealed_cards[i];
-                Card cc; if(!rb_decode_card_by_index((uint32_t)cid,&cc)) continue;
-                int has=0;
-                if(hv && hv->tag==RB_TAG_ARRAY && hv->arr_n>0){
-                    for(int h=0;h<cc.n_hearts && !has;h++){
-                        int col=cc.heart_color[h]%8;
-                        for(uint32_t k=0;k<hv->arr_n;k++){
-                            int want = hv->arr[k].tag==RB_TAG_I64?(int)hv->arr[k].i:
-                                      (hv->arr[k].tag==RB_TAG_STR&&hv->arr[k].s)?atoi(hv->arr[k].s):0;
-                            if(want>=0 && want<=7 && col==want){ has=1; break; }
-                        }
-                    }
-                } else has = cc.n_hearts>0 ? 1 : 0;
-                if(has) matched++;
+case RB_COND_ALL_REVEALED: {
+            /* Mirror condition.rs:653-693 evaluate_all_revealed_match_heart_color.
+             * The colour is NOT read from the condition: Rust takes it from the
+             * current queue entry's `conditional_choice`, and failing that from
+             * the activating card's heart_color_multiplier override, and
+             * returns FALSE when neither is available. This arm read
+             * `heart_colors` off the condition, which the corpus card
+             * PL!-bp6-006-P does not carry at all, and fell through to
+             * "any heart on the card counts" -- so the gate passed for every
+             * revealed card instead of failing closed. */
+            int chosen = g->queue.selected_heart_color;
+            if (chosen < 0) {
+                if (g->activating_card >= 0)
+                    chosen = rb_mods_get_heart_color_multiplier((RbMods *)&g->mods, g->activating_card);
+            }
+            if (chosen < 0) { r = 0; break; }   /* no colour chosen -> false */
+            int thr = 1; get_i(c, "count", &thr);
+            if (g->n_revealed == 0) { r = 0; break; }
+            int matched = 0;
+            for (int i = 0; i < g->n_revealed; i++) {
+                int cid = g->revealed_cards[i];
+                Card cc;
+                if (!rb_decode_card_by_index((uint32_t)cid, &cc)) continue;
+                /* util.rs:1044-1058 card_matches_heart_colors: base_heart for a
+                 * member, need_heart for a live card. Both are the packed
+                 * heart sections, so the slice bounds differ. */
+                int from = rb_card_is_live(cid) ? (cc.num_base + cc.num_blade) : 0;
+                int to   = rb_card_is_live(cid) ? (cc.num_base + cc.num_blade + cc.num_need)
+                                                : cc.num_base;
+                int has = 0;
+                for (int h = from; h < to && h < cc.n_hearts && !has; h++)
+                    if ((int)cc.heart_color[h] == chosen) has = 1;
                 rb_free_card(&cc);
+                if (has) matched++;
             }
             r = (matched >= thr) ? 1 : 0;
             break;
@@ -2141,57 +2277,136 @@ int rb_check_heart_colors(const struct GameState *g, int actor, const Condition 
    For aggregate="total" conditions: sum heart colors across stage cards and
    compare against threshold. Returns 1 if comparison passes, 0 if not,
    -1 if aggregate is not "total". ── */
-int rb_check_aggregate_total(const struct GameState *g, int actor, const Condition *c) {
+/* compare_counts(util.rs:2210): compare_with_operator(op.unwrap_or(">="), ...)
+ * .unwrap_or(true). An operator Rust does not know resolves to MET, not to a
+ * ">=" comparison, so this deliberately does NOT reuse eval_operator (whose
+ * terminal default is `actual >= threshold`, condition.c:132). */
+static int compare_counts_op(const char *op, int actual, int expected) {
+    if (!op) return actual >= expected;
+    if (!strcmp(op, ">=")) return actual >= expected;
+    if (!strcmp(op, ">"))  return actual >  expected;
+    if (!strcmp(op, "<=")) return actual <= expected;
+    if (!strcmp(op, "<"))  return actual <  expected;
+    if (!strcmp(op, "=") || !strcmp(op, "==") || !strcmp(op, "exact"))
+        return actual == expected;
+    if (!strcmp(op, "!=")) return actual != expected;
+    return 1;
+}
+/* Sum of a card's NEED heart section for one colour (need_heart, the third
+ * slice). Rust reads card.need_heart for the LiveCardZone/SuccessLiveZone arms
+ * of check_aggregate_total, so counting base hearts here was a category error. */
+static int card_need_count_of_colour(const Card *cc, int col) {
+    int n = 0;
+    int from = cc->num_base + cc->num_blade;
+    for (int h = from; h < from + cc->num_need && h < cc->n_hearts; h++)
+        if ((int)cc->heart_color[h] == col) n += cc->heart_count[h];
+    return n;
+}
+/* Whether `cid` passes eligible_cards (card.rs:395-407): an empty card_type
+ * matches everything, an empty group_name matches everything. */
+static int cond_card_eligible(int cid, const char *ct, const char *grp) {
+    if (ct && *ct && !card_matches_card_type_filter(cid, ct)) return 0;
+    if (grp && *grp && !rb_card_matches_group_str(cid, grp)) return 0;
+    return 1;
+}
+static int check_aggregate_total_at(const struct GameState *g, int actor, const Condition *c,
+                                    const char *loc_override) {
     const char *agg = get_str(c, "aggregate");
     if (!agg || strcmp(agg, "total")) return -1;
     int pl = target_player_idx(actor, c);
-    RbPlayer *P = &g->p[pl];
+    const RbPlayer *P = &g->p[pl];
     const char *op = get_str(c, "operator");
     int thr = 0; get_i(c, "count", &thr);
-    /* Parse heart colors */
-    int cols[8]; int nc = 0;
-    for (int i = 0; i < c->n_fields; i++) {
-        if (c->fields[i].key && !strcmp(c->fields[i].key, "heart_colors")) {
-            CondValue *cv = &c->fields[i].v;
-            if (cv->tag == RB_TAG_STR && cv->s) {
-                cols[nc++] = s_heart_idx(cv->s);
-            } else if (cv->tag == RB_TAG_ARRAY && cv->arr) {
-                for (uint32_t j = 0; j < cv->arr_n && nc < 8; j++) {
-                    if (cv->arr[j].s) cols[nc++] = s_heart_idx(cv->arr[j].s);
-                }
-            }
-            break;
-        }
-    }
-    const char *loc = get_str(c, "location");
+    int cols[8]; int nc = cond_heart_colors(c, cols, 8);
+    const char *loc = loc_override ? loc_override : get_str(c, "location");
+    const char *ct = get_str(c, "card_type"); if (!ct) ct = "";
+    const char *grp = cond_first_group_name(c);
     int total = 0;
-    if (!strcmp(loc, "stage")) {
+    if (nc > 0) {
+        if (loc && (!strcmp(loc, "stage") || !strcmp(loc, "ステージ"))) {
+            /* card.rs:474-505: sum BASE hearts of the named colours over the
+             * eligible stage members, each with its heart modifier applied. */
+            for (int q = 0; q < RB_STAGE_SIZE; q++) {
+                int cid = P->stage[q];
+                if (cid == RB_EMPTY_SLOT) continue;
+                if (!cond_card_eligible(cid, ct, grp)) continue;
+                Card cc; if (!rb_decode_card_by_index((uint32_t)cid, &cc)) continue;
+                for (int i = 0; i < nc; i++)
+                    total += rb_saturate_u8(card_base_count_of_colour(&cc, cols[i])
+                                            + rb_mods_get_heart((RbMods *)&g->mods, cid, cols[i]));
+                rb_free_card(&cc);
+            }
+        } else if (loc && (!strcmp(loc, "live_card_zone") || !strcmp(loc, "live") ||
+                           !strcmp(loc, "success_live_card_zone") || !strcmp(loc, "success_live_zone"))) {
+            /* card.rs:507-535: sum NEED hearts over BOTH the live and the
+             * success live zone regardless of which one `location` names. */
+            int ids[RB_MAX_ZONE * 2]; int n = 0;
+            for (int i = 0; i < P->live.n; i++) ids[n++] = P->live.cards[i];
+            for (int i = 0; i < P->success.n; i++) ids[n++] = P->success.cards[i];
+            int per_colour[8]; memset(per_colour, 0, sizeof per_colour);
+            for (int i = 0; i < n; i++) {
+                int cid = ids[i];
+                if (cid < 0) continue;
+                if (!cond_card_eligible(cid, ct, grp)) continue;
+                Card cc; if (!rb_decode_card_by_index((uint32_t)cid, &cc)) continue;
+                for (int i2 = 0; i2 < nc; i2++) {
+                    int v = rb_saturate_u8(card_need_count_of_colour(&cc, cols[i2])
+                                           + rb_mods_get_need_heart((RbMods *)&g->mods, cid, cols[i2]));
+                    per_colour[i2] += v;
+                    total += v;
+                }
+                rb_free_card(&cc);
+            }
+            /* card.rs:520-534: WITH an operator the named colours are summed
+             * into one figure; WITHOUT one, EVERY named colour must
+             * independently reach the threshold. */
+            if (!op) {
+                int threshold = thr > 0 ? thr : 1;
+                for (int i2 = 0; i2 < nc; i2++) if (per_colour[i2] < threshold) return 0;
+                return 1;
+            }
+        } else {
+            return -1;
+        }
+        return compare_counts_op(op, total, thr);
+    }
+    /* card.rs:537-546: no heart_colors on the stage + a group list + members
+     * means sum the base heart COUNT of each matching member. */
+    if (loc && (!strcmp(loc, "stage") || !strcmp(loc, "ステージ")) && grp && !strcmp(ct, "member_card")) {
         for (int q = 0; q < RB_STAGE_SIZE; q++) {
             int cid = P->stage[q];
-            if (cid < 0) continue;
-            Card cc;
-            if (!rb_decode_card_by_index((uint32_t)cid, &cc)) continue;
-            if (cc.n_hearts > 0) {
-                for (int i = 0; i < nc; i++) {
-                    if (cols[i] < cc.n_hearts) total += cc.heart_count[cols[i]];
-                }
-            }
+            if (cid == RB_EMPTY_SLOT) continue;
+            if (!rb_card_matches_group_str(cid, grp)) continue;
+            Card cc; if (!rb_decode_card_by_index((uint32_t)cid, &cc)) continue;
+            int base = 0;
+            for (int h = 0; h < cc.num_base && h < cc.n_hearts; h++) base += cc.heart_count[h];
+            total += base;
             rb_free_card(&cc);
         }
-    } else if (!strcmp(loc, "live_card_zone") || !strcmp(loc, "live")) {
-        for (int i = 0; i < P->live.n; i++) {
-            int cid = P->live.cards[i];
-            Card cc;
-            if (!rb_decode_card_by_index((uint32_t)cid, &cc)) continue;
-            if (cc.n_hearts > 0) {
-                for (int h = 0; h < nc && h < cc.n_hearts; h++) {
-                    total += cc.heart_count[cols[h]];
-                }
+        return compare_counts_op(op, total, thr);
+    }
+    /* card.rs:549-566: stage + no colour/group refinement = the stage's blade
+     * total, target "both" excluded (that is resolve_zone_card_count's job). */
+    if (loc && (!strcmp(loc, "stage") || !strcmp(loc, "ステージ"))) {
+        const char *tgt = get_str(c, "target");
+        if (!tgt || strcmp(tgt, "both")) {
+            /* player.stage.total_blades(.., include_waited = true) (card.rs:588). */
+            for (int q = 0; q < RB_STAGE_SIZE; q++) {
+                int cid = P->stage[q];
+                if (cid == RB_EMPTY_SLOT) continue;
+                total += effective_blade(g, cid);
             }
-            rb_free_card(&cc);
+            return compare_counts_op(op, total, thr);
         }
     }
-    return eval_operator(total, op, thr);
+    return -1;
+}
+/* Public entry: the condition's own `location`, exactly as the four Rust call
+   sites in card.rs / condition.rs / state.rs pass it. The temporal call site
+   (state.rs:236) is the only one that substitutes a default, and it uses
+   check_aggregate_total_at directly. */
+int rb_check_aggregate_total(const struct GameState *g, int actor, const Condition *c) {
+    return check_aggregate_total_at(g, actor, c, NULL);
 }
 
 /* ── Additional ported functions from Rust condition/card.rs, condition.rs ── */
@@ -3169,7 +3384,14 @@ static int count_surplus_heart(const struct GameState *g, int actor, const Condi
 
 static int eval_resource_count(const GameState *g, int actor, const Condition *c) {
     const char *rt = get_str(c, "resource_type");
-    if (!rt) return 1;
+    /* condition.rs:372-377 route_resource_condition: a Resource-variant
+     * condition with NO resource_type is a `card_blade_condition` alias and
+     * Rust runs evaluate_card_blade_condition (card.rs:2601); an explicit
+     * resource_type of "blade" is the same evaluator. This arm answered 1
+     * outright, so PL!HS-pb1-009-P＋ (count >= 8) and PL!S-bp3-025-L
+     * (count >= 6) had a gate that was permanently satisfied whatever the
+     * cards' blades were -- a fail-open on two real cards. */
+    if (!rt || !strcmp(rt, "blade")) return eval_card_blade(g, actor, c);
     int pl = target_player_idx(actor, c);
     const RbPlayer *P = &g->p[pl];
     int count = 0;
@@ -3246,18 +3468,30 @@ static int eval_card_count(const GameState *g, int actor, const Condition *c) {
     return count >= needed;
 }
 
-/* ── evaluate_card_blade_condition: sum blades of cards matching filter ── */
-static int eval_card_blade(const GameState *g, int actor, const Condition *c) {
-    int pl = target_player_idx(actor, c);
-    const char *loc = get_str(c, "location");
-    if (!loc) loc = "stage";
-    int ids[RB_MAX_ZONE]; int n = zone_ids(g, pl, loc, ids, RB_MAX_ZONE);
-    const char *ct = get_str(c, "card_type");
-    const CondValue *gn = find_val(c, "group_names");
-    const char *g0 = (gn && gn->tag == RB_TAG_ARRAY && gn->arr_n > 0 && gn->arr[0].tag == RB_TAG_STR) ? gn->arr[0].s : NULL;
-    int total = sum_group_filtered_zone(g, ids, n, ct, g0, 1, 0, 0);
-    int needed = 0; get_i(c, "count", &needed);
-    if (needed == 0) needed = 1;
+/* ── evaluate_card_blade_condition (card.rs:2601) ──
+   The subject is the SELECTION (source "selected_cards", the default) or the
+   cards that moved this batch (source "preceding_moved"). An empty selection IS
+   the self-reference 「このメンバーが持つブレードの数がN以上」 and falls back to
+   the ACTIVATING card; no activating card means false. The previous body
+   summed the blade of every card in `location` (default stage) instead, which
+   is a different set entirely. ── */
+static int eval_card_blade(const struct GameState *g, int actor, const Condition *c) {
+    (void)actor;
+    int ids[RB_MAX_RECENTLY_MOVED]; int n = 0;
+    const char *src = get_str(c, "source");
+    if (src && !strcmp(src, "preceding_moved")) {
+        for (int i = 0; i < g->n_recently_moved; i++) ids[n++] = g->recently_moved[i];
+    } else {
+        for (int i = 0; i < g->n_selected_cards; i++) ids[n++] = g->selected_cards[i];
+    }
+    if (n == 0) {
+        if (g->activating_card < 0) return 0;      /* Rust: None => return false */
+        ids[n++] = g->activating_card;
+    }
+    int total = 0;
+    for (int i = 0; i < n; i++) total += effective_blade(g, ids[i]);
+    int needed = 1;
+    if (!get_i(c, "count", &needed)) needed = 1;    /* Rust unwrap_or(1) */
     const char *op = get_str(c, "operator");
     if (!op) op = ">=";
     if (!strcmp(op, ">=")) return total >= needed;

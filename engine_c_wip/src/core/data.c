@@ -264,6 +264,16 @@ void rb_unload(void) {
     if (g_strings) { free(g_strings); g_strings = NULL; }
     /* g_bc points at the static RBKA_BYTECODE blob; do not free */
     g_bc = NULL;
+    /* g_card_data points INTO g_cards_blob and the blob is freed above, so the
+     * counter must go with it: leaving g_num_cards / g_card_data / g_num_card_strings
+     * populated made rb_card_record() and rb_card_string() dereference freed
+     * memory between rb_unload() and the next rb_load(). rb_load() resets all
+     * three (parse_cards/parse_strings), so nothing that re-loads is affected. */
+    g_cards_len = 0;
+    g_abstr_len = 0;
+    g_num_cards = 0;
+    g_num_card_strings = 0;
+    g_card_data = NULL;
     memset(g_card_alias_plus_one, 0, sizeof(g_card_alias_plus_one));
     g_next_copy_id = 0;
 }
@@ -309,9 +319,18 @@ uint32_t rb_card_record_len(uint32_t i) {
     if (i >= g_num_cards) return 0;
     return g_card_off[i + 1] - g_card_off[i];
 }
+/* Card NAME string index (record offset 2, card_binary.rs:120). The name is
+ * misleading -- the card_no index lives at offset 0 and is read directly by
+ * card_no_at() below -- but the out-of-range value must still be the SAME
+ * "absent" marker compile_cards.py writes for a missing field
+ * (cards/compile_cards.py:85 and :89 use 0xFFFF for no `unit` / no `ability`),
+ * not 0. Index 0 is a REAL interned string, so the old `return 0` made
+ * `rb_card_string(rb_card_stridx(id))` hand back string 0 for any unknown id --
+ * a silent wrong name rather than an empty one, which is the one thing Rust's
+ * `get_str(...)` on the same field cannot produce. */
 uint16_t rb_card_stridx(uint32_t i) {
     i = rb_card_template_id(i);
-    if (i >= g_num_cards) return 0;
+    if (i >= g_num_cards) return 0xFFFF;
     return le16(rb_card_record(i) + 2); /* name_idx at offset 2 */
 }
 uint16_t rb_card_ability_idx(uint32_t i) {

@@ -483,18 +483,33 @@ static int pay_cost_move_cards(GameState *g, int actor, const AbilityEffect *cos
         }
     }
 
-    /* Optional stage-move costs: emit pay/skip gate first */
+    /* Optional stage-move costs: emit pay/skip gate first.
+       handlers.rs:326-332 (gate_optional_stage_cost) counts stage members with
+       `cost.filter_subset()` and `filter.matches(card_db, id, true)` -- i.e.
+       card_type, group_names, cost_limit, characters, exclude_characters,
+       exclude_self and cost_values ALL apply, and `true` is util.rs's
+       `skip_empty` (drop the -1 slots), not a cost-only relaxation.
+
+       The C compared `group_names` ALONE, so any other filter field was
+       invisible to the eligibility count. The corpus card PL!SP-pb1-011-P
+       (ab#0, printed 「『鬼塚冬毬』以外の『Liella!』のメンバー1人をステージから
+       控え室に置いてもよい」) carries exclude_characters:["鬼塚冬毬"], so with
+       ONLY herself on stage the C counted 1 >= count and opened the pay/skip
+       gate asking the player to sacrifice the one member the printed text
+       excludes; Rust counted 0, matched < count, and took the declined branch
+       (handlers.rs:333-341) WITHOUT opening a prompt. Both paired positives
+       (the same card plus a non-excluded Liella! member, and Wonderful Rush's
+       group-filtered gate) are unaffected -- see tests/test_audit_triggers.c A5. */
     if (optional && !is_activation && !is_from_hand && !strcmp(source, "stage")) {
-        const char *group_filter = eff_extra(cost, "group_names");
-        int matching = 0;
-        for (int i = 0; i < RB_STAGE_SIZE; i++) {
-            int id = P->stage[i];
-            if (id != RB_EMPTY_SLOT) {
-                if (group_filter && *group_filter && !rb_card_matches_group_str(id, group_filter))
-                    continue;
-                matching++;
-            }
-        }
+        int stage_ids[RB_STAGE_SIZE];
+        int n_stage = 0;
+        for (int i = 0; i < RB_STAGE_SIZE; i++)
+            if (P->stage[i] != RB_EMPTY_SLOT) stage_ids[n_stage++] = P->stage[i];
+        RbCardFilter gate_filter;
+        rb_effect_filter_subset(cost, &gate_filter);
+        /* rb_count_matching_filter returns n when has_filter is 0, so a
+           filterless optional stage cost still counts every occupied slot. */
+        int matching = rb_count_matching_filter(&gate_filter, stage_ids, n_stage);
         if (matching < count) {
             return cost_auto_decline(g);
         }

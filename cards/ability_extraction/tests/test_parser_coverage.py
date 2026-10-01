@@ -1,4 +1,4 @@
-"""
+﻿"""
 Tests for activation_condition_parsed, _merge_parenthetical, sequential splitting,
 trigger detection, and cost extraction.
 
@@ -478,6 +478,104 @@ def test_condition_bytecode_maps_custom_to_fail_closed_variant():
     assert COND_TO_VARIANT_TAG["custom"] == UNSUPPORTED_CONDITION_VARIANT
     assert COND_TO_VARIANT_TAG["otherwise_condition"] == 17
     assert COND_TO_VARIANT_TAG.get("future_runtime_condition", UNSUPPORTED_CONDITION_VARIANT) == UNSUPPORTED_CONDITION_VARIANT
+
+# ---------------------------------------------------------------------------
+# 統堂英玲奈 PL!-bp5-333-R — 「コスト9以下」 in its COLON-CHAINED 登場 shape.
+# ---------------------------------------------------------------------------
+
+def test_erena_debut_optional_self_wait_cost_then_opponent_wait_under_cost_nine():
+    """The optional self-wait COST and the chained opponent EFFECT, field by field.
+
+    This is the shape that is easy to lose, because the 「：A。」 colon splits one sentence
+    into a cost half and an effect half that are parsed by different builders:
+
+        このメンバーをウェイトにしてもよい：相手のステージにいるコスト9以下のメンバー1人を
+        ウェイトにする。
+
+    The cost half is what makes the ability optional and makes the paid thing the card
+    ITSELF (`self_cost`); the effect half is what carries the cost bound. Losing a field
+    silently changes the meaning: dropping `optional` makes the self-wait mandatory,
+    dropping `self_cost` makes the wait hit a bystander instead of the payer, and turning
+    the bound into `=` turns 「9以下」 into 「cost exactly 9」 — which still reads correctly
+    in a 9-vs-10 test and quietly drops every cheaper member.
+    """
+    cost = parse_cost("このメンバーをウェイトにしてもよい")
+    assert cost.get("type") == "change_state", cost
+    assert cost.get("state_change") == "wait", cost
+    assert cost.get("card_type") == "member_card", cost
+    assert cost.get("optional") is True, cost
+    # The thing being waited is the card paying, not another member.
+    assert cost.get("self_cost") is True, cost
+
+    effect = parse_effect("相手のステージにいるコスト9以下のメンバー1人をウェイトにする")
+    assert effect.get("action") == "change_state", effect
+    assert effect.get("state_change") == "wait", effect
+    assert effect.get("target") == "opponent", effect
+    assert effect.get("card_type") == "member_card", effect
+    assert effect.get("count") == 1, effect
+    # 「以下」 is the load-bearing part: this must be `<=`, not `=` and not `<`.
+    assert effect.get("cost_limit") == 9, effect
+    assert effect.get("cost_limit_operator") == "<=", effect
+
+
+def test_cost_under_nine_operator_distinguishes_every_misparse():
+    """Guard the operator directly, independently of any engine test.
+
+    The Rust side of this card already pins the operator BEHAVIOURALLY, and it does it
+    with a cost-4 member on the stage precisely because each mis-parse predicts a
+    different offered set: `<=` -> [9, 4], `=` -> [9], `<` -> [4], `>=` -> [9, 10]. This
+    asserts the same distinction at the parse layer, where a regression would otherwise
+    be blamed on the engine.
+
+    `以下` is looked up in `OPERATOR_PATTERNS` (parser_fields.py) in table order, and
+    `以上` is tested BEFORE `以下` — so a text carrying both resolves to `>=`. These are
+    the four single-operator shapes, one per branch of that table.
+    """
+    assert parse_effect("相手のステージにいるコスト9以上のメンバー1人をウェイトにする")[
+        "cost_limit_operator"
+    ] == ">="
+    assert parse_effect("相手のステージにいるコスト9以下のメンバー1人をウェイトにする")[
+        "cost_limit_operator"
+    ] == "<="
+    assert parse_effect("相手のステージにいるコスト9未満のメンバー1人をウェイトにする")[
+        "cost_limit_operator"
+    ] == "<"
+    # 「コストNより多い」 / 「より少ない」 are deliberately NOT asserted. Both phrases are
+    # listed in OPERATOR_PATTERNS, but `extract_cost_limit` never fires on that form, so the
+    # pair never reaches a cost bound and no operator is emitted. That is a genuine hole in
+    # the table, but no card in the pool prints the shape — checked: 0 of the unique
+    # abilities match コストNより多い/より少ない — so asserting it would pin dead code and
+    # imply a regression that cannot affect any card. Worth revisiting if a future set uses
+    # that phrasing.
+    #
+    # The table is also ORDER-SENSITIVE and `以上` is tested before `以下`, so a single text
+    # carrying both would resolve to `>=`. None of the four assertions above mixes them, and
+    # the per-ability JSON confirms the real cards never do either.
+
+
+def test_erena_constant_is_a_self_targeted_as_long_as_wait_condition():
+    """The 常時 half: 「このメンバーがウェイト状態であるかぎり、heart05を得る。」
+
+    `self_target: True` is what makes the ability correct on a board with an Erena on
+    BOTH sides. The engine tests pin that behaviour (one Erena per side, the waited one
+    grants its own controller the heart) — but only because they were written after
+    reading this field. A parse that dropped `self_target` would hand the heart to
+    whichever player last resolved something, and every single-owner test in the tree
+    would still pass.
+    """
+    effect = parse_effect(
+        "このメンバーがウェイト状態であるかぎり、{{heart_05.png|heart05}}を得る"
+    )
+    condition = effect.get("condition")
+    assert condition is not None, effect
+    assert condition.get("type") == "state_condition", condition
+    assert condition.get("state") == "wait", condition
+    assert condition.get("card_type") == "member_card", condition
+    assert condition.get("self_target") is True, condition
+    assert effect.get("action") == "gain_resource", effect
+    assert effect.get("duration") == "as_long_as", effect
+    assert effect.get("heart_colors") == ["heart05"], effect
+    assert effect.get("count") == 1, effect
 
 
 # ─── run all ──────────────────────────────────────────────────────────────────

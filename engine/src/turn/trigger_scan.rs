@@ -9,17 +9,30 @@ use alloc::{
 };
 
 impl super::TurnEngine {
+    /// Queue the 登場 abilities of a member that just debuted.
+    ///
+    /// `card_id` is the id of the card that ACTUALLY debuted. It is authoritative and takes
+    /// precedence over `card_no`: a deck may hold two copies of one print, and matching on
+    /// the card NUMBER alone resolves the debut to whichever copy sits in the lowest area
+    /// index — so the second copy of a card to debut silently re-ran the first copy's  ability
+    /// (and, if that copy was already in wait, its optional self-wait cost found no active
+    /// candidate and was never offered to the player at all).
+    ///
+    /// `card_no` remains as a fallback for callers that only know the print. `None` card_no
+    /// is a hard no-op: there is nothing to match on.
     pub(crate) fn trigger_debut_abilities(
         game_state: &mut GameState,
         player_id: &str,
         card_no: &str,
         _cost_paid: u8,
         baton_touch_used: bool,
+        card_id: Option<i16>,
     ) {
         #[cfg(not(feature = "no_std"))]
         let _t = crate::timer::Timer::start("trig::debut");
         let mut abilities_to_trigger: SmallVec<[(String, String, i16); 4]> = SmallVec::new();
 
+        let card_id_opt = card_id;
         {
             let player = if player_id == game_state.player1.id {
                 &game_state.player1
@@ -32,23 +45,36 @@ impl super::TurnEngine {
                 crate::zones::MemberArea::RightSide,
             ];
             for area in areas {
-                let Some(card_id) = player.stage.get_area(area) else {
+                let Some(area_card_id) = player.stage.get_area(area) else {
                     continue;
                 };
-                let Some(card) = game_state.card_database.get_card(card_id) else {
+                // Prefer the exact instance that debuted. Only fall back to the print number
+                // when the caller could not name an id — matching on the number alone is
+                // ambiguous with duplicate copies (see the doc comment).
+                if let Some(debuted) = card_id {
+                    if area_card_id != debuted {
+                        continue;
+                    }
+                } else if let Some(card) = game_state.card_database.get_card(area_card_id) {
+                    if card.card_no.as_ref() != card_no {
+                        continue;
+                    }
+                } else {
+                    continue;
+                }
+                let Some(card) = game_state.card_database.get_card(area_card_id) else {
                     continue;
                 };
+                let card_id = area_card_id;
                 log::trace!(
-                    "[DEBUT_SCAN] player={} source={} ({}, id={}) requested={}",
+                    "[DEBUT_SCAN] player={} source={} ({}, id={}) requested={} by_id={}",
                     player_id,
                     card.name,
                     card.card_no,
                     card_id,
-                    card_no
+                    card_no,
+                    card_id_opt.is_some()
                 );
-                if card.card_no.as_ref() != card_no {
-                    continue;
-                }
                 for (ability_index, ability_ref) in card.abilities.iter().enumerate() {
                     let ability = ability_ref.resolve();
                     let trigger_match = ability.has_trigger(crate::triggers::TriggerKind::Debut);
@@ -106,12 +132,16 @@ impl super::TurnEngine {
                         );
                     }
                     abilities_to_trigger.push((
-                        format!("{}_{}", card_no, ability.full_text),
-                        card_no.to_string(),
+                        format!("{}_{}", card.card_no, ability.full_text),
+                        card.card_no.to_string(),
                         card_id,
                     ));
                 }
-                break;
+                // No `break` here: the loop is bounded to the three areas, and with a
+                // specific `card_id` only the area holding it can match. Breaking on the
+                // first match was only ever correct because matching was by print number,
+                // where the first match WAS the answer — which is exactly what mis-resolved
+                // duplicate copies.
             }
         }
 

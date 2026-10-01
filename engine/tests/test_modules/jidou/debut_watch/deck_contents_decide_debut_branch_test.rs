@@ -89,7 +89,6 @@ fn kosuzu_draws_when_the_three_milled_cards_are_all_members() {
         13,
         "precondition: 13 cards with three on top"
     );
-    game.state.player1.stage.stage = [kosuzu, -1, -1];
 
     game.play_to_stage(kosuzu, MemberArea::Center);
     drain(&mut game);
@@ -135,7 +134,6 @@ fn kosuzu_does_not_draw_when_any_of_the_three_milled_cards_is_not_a_member() {
             .push(game.new_id(FILLER));
     }
     game.add_to_hand(kosuzu);
-    game.state.player1.stage.stage = [kosuzu, -1, -1];
 
     game.play_to_stage(kosuzu, MemberArea::Center);
     drain(&mut game);

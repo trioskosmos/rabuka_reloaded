@@ -48,7 +48,31 @@ static const ExecutorEntry executor_table[] = {
      * rb_execute_effect_ex (which consults rb_executor_has_executor) and from
      * rb_execute_effect_via_registry. 21 compiled effects use modify_cost and
      * 2 use reduce_live_card_set_limit (tools/audit_actions.c). */
-    {"modify_cost", 0}, {"reduce_live_card_set_limit", 0}
+    {"modify_cost", 0}, {"reduce_live_card_set_limit", 0},
+    /* Two corpus actions that Rust deliberately does NOT dispatch. Adding them
+     * here is not a behaviour change: `rb_execute_effect_ex` (engine.c:315) only
+     * routes through this table, so an action missing from it fell through to
+     * engine.c's `handle_action`, whose final arm is an explicit no-op
+     * (engine.c:783 "Unknown verbs: explicit no-op so they remain visible").
+     * The observable defects were that (a) `rb_executor_has_executor` -- the
+     * reachability predicate the #F corpus census asserts on
+     * (test_parity_char2.c:1472) -- reported them uncovered, and (b)
+     * `rb_executor_execute` bailed at its own `find_executor` guard printing
+     * [EXECUTOR_MISS] (executor.c:306) and returning 0 WITHOUT pushing the
+     * verdict, where Rust pushes one for every non-structural action
+     * (dispatch.rs:233).
+     *
+     * Both are no-op arms on the Rust side too, and the comments there are the
+     * reason they must stay no-ops here:
+     *   - replacement_appear_wait (dispatch.rs:126) is a REPLACEMENT rule
+     *     resolved once at placement by GameState::replacement_appear_wait_applies
+     *     (turn/phases.rs:1281); dispatching it would re-apply it at an
+     *     unrelated trigger.
+     *   - count_as_multiple (dispatch.rs:129) is a counting WEIGHT consumed by
+     *     GameState::weighted_zone_count (condition/card.rs:2124).
+     * Neither consumer exists in C yet; that is tracked by the red tests in
+     * tests/test_audit_actions.c, NOT here. */
+    {"replacement_appear_wait", 0}, {"count_as_multiple", 0}
 };
 
 /* engine/src/ability/effects/executor.rs:10-18 — push_effect_verdict's
@@ -497,6 +521,14 @@ int rb_executor_execute(GameState *g, int actor, AbilityEffect *effect, int host
                strcmp(action, "choice_condition") == 0 ||
                strcmp(action, "energy_condition") == 0 ||
                strcmp(action, "do_nothing") == 0) {
+        result = 1;
+    } else if (strcmp(action, "replacement_appear_wait") == 0 ||
+               strcmp(action, "count_as_multiple") == 0) {
+        /* engine/src/ability/effects/dispatch.rs:126 and :129 -- both are
+         * `=> Ok(())`, NOT executors. They reach this arm only so that the
+         * verdict below is pushed exactly as Rust pushes it at dispatch.rs:233;
+         * their rules are consumed by the placement / count paths, which in C
+         * do not exist yet. See the executor_table comment above. */
         result = 1;
     } else if (strcmp(action, "sequential_cost") == 0) {
         /* engine/src/ability/effects/executor.rs:187 — SequentialCost is in the

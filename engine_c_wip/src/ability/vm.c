@@ -484,26 +484,122 @@ static int effect_set_extra(AbilityEffect *e, const char *k, const char *v) {
     e->extra_v[i] = value;
     return 1;
 }
-static void effect_decode_dynamic_count(AbilityEffect *e, Rdr *r)
+/* ── nested-object field readers (mirror the BcReader::*_value family) ─────
+ *
+ * WHY THIS EXISTS.  The Rust readers behind the generated effect decoder —
+ * BcReader::read_dynamic_count_value (vm.rs:977-1030),
+ * read_quoted_text_value (vm.rs:1175-1205),
+ * read_or_ability_filters_value (vm.rs:1114-1157),
+ * read_position_value (vm.rs:933-975) — all match on
+ *
+ *     TAG_OBJECT | TAG_OBJECT_VARIANT
+ *
+ * and only consume a variant byte in the OBJVAR case.  That is not defensive
+ * slack: it is the ONLY shape the compiler emits for these values.
+ * cards/compile_abilities.py enc_val (L216-259) writes a dict value as
+ *
+ *     0x09 + variant   when `action` is present and maps to a known opcode
+ *     0x08             otherwise — NO variant byte
+ *
+ * `dynamic_count`, `quoted_text` and `or_ability_filters` are nested objects
+ * with no `action` key, so they are written as 0x08 and never as 0x09.  The C
+ * branch that required RB_TAG_OBJVAR was therefore DEAD: the key fell through
+ * to the scalar tail at the bottom of decode_effect_body, skip_value()'d the
+ * whole object, and retained nothing.  47 effect objects in cards/
+ * abilities.json carry `dynamic_count` and 11 carry `quoted_text`, so every
+ * one of them silently lost its data — and rb_effect_count /
+ * rb_resolve_dynamic_count (dynamic_count.c:250) then saw no reference, no
+ * base_reference and no calculation at all.
+ *
+ * The rule this helper encodes: a tag test must be made against the tag of
+ * the value ACTUALLY AT THAT POSITION.  Testing the tag captured before the
+ * length -- or against the parent's tag -- is the dead-branch class that killed
+ * `positions_characters`; do not reintroduce it here.
+ *
+ * `want[]` is the Rust reader's own key list. Keys outside it are skipped,
+ * exactly as the `_ => self.skip_value()?` arm does.
+ *
+ * Returns 1 when the value was consumed (success or benign skip), 0 on a
+ * structural read failure, which must abort the whole effect as elsewhere. */
+static int read_named_object(Rdr *r, uint8_t tag,
+                             const char *const *want, int nwant,
+                             AbilityEffect *e, const char *rename_key)
 {
-    Condition *dynamic = read_condition(r);
-    if (!dynamic) return;
-    for (uint32_t i = 0; i < dynamic->n_fields; i++) {
-        const CondField *field = &dynamic->fields[i];
-        char number[32];
+    if (tag == RB_TAG_NULL) return 1;
+    if (tag != RB_TAG_OBJECT && tag != RB_TAG_OBJVAR) return skip_value(r, tag);
+    if (tag == RB_TAG_OBJVAR) { uint8_t vb; if (!rd_u8(r, &vb)) return 0; }
+    uint32_t count;
+    if (!rd_len(r, &count)) return 0;
+    for (uint32_t i = 0; i < count; i++) {
+        uint32_t kidx; uint8_t vtag;
+        if (!rd_idx(r, &kidx) || !rd_u8(r, &vtag)) return 0;
+        const char *k = rb_get_string(kidx);
+        int keep = 0;
+        for (int j = 0; j < nwant; j++)
+            if (k && !strcmp(k, want[j])) { keep = 1; break; }
+        if (!keep) { if (!skip_value(r, vtag)) return 0; continue; }
+        /* Stringify the way the scalar tail does, so one reader serves both
+         * string and u8 fields. NULL carries no value, so nothing is stored --
+         * which is Rust's None for the Option fields. */
+        char number[24];
         const char *value = NULL;
-        if (field->v.tag == RB_TAG_STR || field->v.tag == RB_TAG_F64)
-            value = field->v.s;
-        else if (field->v.tag == RB_TAG_I64) {
-            snprintf(number, sizeof(number), "%lld", (long long)field->v.i);
+        if (vtag == RB_TAG_STR) {
+            uint32_t sidx;
+            if (!rd_idx(r, &sidx)) return 0;
+            value = rb_get_string(sidx);
+        } else if (vtag == RB_TAG_I64) {
+            int64_t v;
+            if (!rd_int(r, &v)) return 0;
+            snprintf(number, sizeof(number), "%lld", (long long)v);
             value = number;
-        } else if (field->v.tag == RB_TAG_TRUE)
-            value = "true";
-        else if (field->v.tag == RB_TAG_FALSE)
-            value = "false";
-        if (field->key && value) effect_set_extra(e, field->key, value);
+        } else if (vtag == RB_TAG_TRUE)  { value = "true";  }
+        else if (vtag == RB_TAG_FALSE)   { value = "false"; }
+        else { if (!skip_value(r, vtag)) return 0; continue; }
+        if (!value) continue;
+        effect_set_extra(e, k, value);
+        /* `dynamic_count`'s wire key is "type" but the Rust struct member is
+         * count_type, and dynamic_count.c:252 reads dc_extra(e, "count_type").
+         * Publishing the struct name as well is what makes that lookup live;
+         * without it the Option<String> field decoded in Rust is unreachable
+         * in C even once the tag matches. */
+        if (rename_key && !strcmp(k, rename_key))
+            effect_set_extra(e, "count_type", value);
     }
-    rb_free_condition(dynamic);
+    return 1;
+}
+
+/* vm.rs:977-1030 read_dynamic_count_value */
+static const char *const DC_KEYS[] = {
+    "type", "reference", "mode", "base_reference", "calculation",
+    "calculation_value",
+};
+static int effect_decode_dynamic_count(AbilityEffect *e, Rdr *r, uint8_t tag)
+{
+    return read_named_object(r, tag, DC_KEYS,
+                             (int)(sizeof(DC_KEYS) / sizeof(DC_KEYS[0])),
+                             e, "type");
+}
+
+/* vm.rs:1175-1205 read_quoted_text_value */
+static const char *const QT_KEYS[] = { "text", "quoted_type" };
+static int effect_decode_quoted_text(AbilityEffect *e, Rdr *r, uint8_t tag)
+{
+    return read_named_object(r, tag, QT_KEYS,
+                             (int)(sizeof(QT_KEYS) / sizeof(QT_KEYS[0])),
+                             e, NULL);
+}
+
+/* vm.rs:1161-1173 read_placement_order_value -- a TAG_STR that only ever maps
+ * "any_order". Kept as its own reader so the vocabulary stays in one place if
+ * the enum grows. */
+static int effect_decode_placement_order(AbilityEffect *e, Rdr *r, uint8_t tag)
+{
+    if (tag == RB_TAG_NULL) return 1;
+    if (tag != RB_TAG_STR) return skip_value(r, tag);
+    uint32_t idx;
+    if (!rd_idx(r, &idx)) return 0;
+    effect_set_extra(e, "placement_order", rb_get_string(idx));
+    return 1;
 }
 
 static int effect_decode_extra(AbilityEffect *e, const char *key, Rdr *r, uint8_t tag) {
@@ -689,8 +785,25 @@ static AbilityEffect *decode_effect_body(Rdr *r) {
             } else { skip_value(r, tag); probe_drop(key, tag); }
             continue;
         }
-        if (key && !strcmp(key, "dynamic_count") && tag == RB_TAG_OBJVAR) {
-            effect_decode_dynamic_count(e, r);
+        /* Nested-object filter fields the generated decoder reads with a
+         * dedicated BcReader method. The tag test is against `tag` -- the tag
+         * of THIS value -- and both TAG_OBJECT and TAG_OBJECT_VARIANT are
+         * accepted, because those are the two the compiler can emit for a
+         * dict with no `action` key (see read_named_object). Requiring
+         * RB_TAG_OBJVAR made all three branches unreachable; 47 effect
+         * objects carry dynamic_count and 11 carry quoted_text. */
+        if (key && !strcmp(key, "dynamic_count")) {
+            if (!effect_decode_dynamic_count(e, r, tag)) goto fail;
+            probe_keep();
+            continue;
+        }
+        if (key && !strcmp(key, "quoted_text")) {
+            if (!effect_decode_quoted_text(e, r, tag)) goto fail;
+            probe_keep();
+            continue;
+        }
+        if (key && !strcmp(key, "placement_order")) {
+            if (!effect_decode_placement_order(e, r, tag)) goto fail;
             probe_keep();
             continue;
         }

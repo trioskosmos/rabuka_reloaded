@@ -22,13 +22,29 @@ int rb_member_area_front(int area){
     return -1;
 }
 
-/* Mirror zones.rs: invariant, total_blades, draw, draw_bottom, draw_multiple, refresh */
+/* Mirror zones.rs: total_blades, draw, draw_bottom, draw_multiple, refresh.
+   The old group banner also claimed "invariant"; see rb_zone_invariant below
+   for why there is nothing in zones.rs to mirror there. */
+/* rb_zone_invariant -- Rust has no Stage::invariant to mirror, so this is the
+   whole-board shape check and its contract is written out rather than implied:
+   every stage slot holds either RB_EMPTY_SLOT or a real card_no, and a
+   non-empty under-card bag has a HOST (Rule 4.5.5: a member under-card exists
+   only beneath a member). The previous body advertised "under_cards mirror" in
+   the comment and then checked neither -- a stage that had been emptied with
+   rb_stage_position_change while under-cards were still parked there reported
+   OK. Under-cards with no host are invisible to every consumer in the tree
+   (rb_player_all_card_ids walks the bags unconditionally but
+   rb_stage_under_cards_with_hosts, the only reader that knows a host, skips an
+   empty area), so this is the one place that can see them. */
 int rb_zone_invariant(const GameState *g) {
-    /* Stage must have exactly STAGE_SIZE positions and under_cards mirror */
     if (!g) return 0;
     for (int pl = 0; pl < 2; pl++) {
         const RbPlayer *P = &g->p[pl];
-        if (P->stage[0] < -1 || P->stage[1] < -1 || P->stage[2] < -1) return 0;
+        for (int s = 0; s < RB_STAGE_SIZE; s++) {
+            if (P->stage[s] != RB_EMPTY_SLOT && P->stage[s] < 0) return 0;
+            if (P->under_cards[s].n > 0 && P->stage[s] == RB_EMPTY_SLOT) return 0;
+            if (P->under_cards[s].n < 0) return 0;
+        }
     }
     return 1;
 }
@@ -75,14 +91,29 @@ int rb_zone_draw_multiple(GameState *g, int pl, int n) {
     }
     return drawn;
 }
+/* Mirror Player::refresh (player.rs) -- shuffle the waitroom back into the main
+   deck. Rust's main_deck.cards is a SmallVec with no bound, so the whole
+   waitroom always goes across; the C RbBag is capped at RB_MAX_ZONE, so the
+   surplus has to STAY in the waitroom rather than be dropped. The old body
+   cleared `discard.n` unconditionally after copying only as many cards as
+   fitted, which is the same "card leaves one zone and arrives in none" shape
+   as the three defects fixed today, reached whenever deck.n + discard.n
+   exceeded the bag. */
 int rb_zone_refresh(GameState *g, int pl) {
     if (!g) return 0;
     RbPlayer *P = &g->p[pl];
     if (P->discard.n == 0) return 0;
     rb_shuffle(P->discard.cards, P->discard.n);
-    for (int i = 0; i < P->discard.n && P->deck.n < RB_MAX_ZONE; i++)
-        P->deck.cards[P->deck.n++] = P->discard.cards[i];
-    P->discard.n = 0;
+    int moved = 0;
+    while (moved < P->discard.n && P->deck.n < RB_MAX_ZONE)
+        P->deck.cards[P->deck.n++] = P->discard.cards[moved++];
+    if (moved < P->discard.n) {
+        for (int i = moved; i < P->discard.n; i++)
+            P->discard.cards[i - moved] = P->discard.cards[i];
+        P->discard.n -= moved;
+    } else {
+        P->discard.n = 0;
+    }
     P->deck_refreshed_this_turn = 1;
     return 1;
 }
@@ -317,18 +348,30 @@ void rb_energy_sub_active(RbPlayer *player, int delta){
 
 /* ── LiveCardZone helpers (mirror LiveCardZone; backed by RbPlayer::live) ── */
 
+/* Mirror LiveCardZone::can_place_card (zones.rs:518-521), which is
+ * `true` unconditionally -- it ignores both the card database and the card id
+ * and applies NO capacity rule. The C body invented one ("subject to the
+ * live-zone capacity, RB_MAX_LIVE_CARDS") that Rust does not have, so the two
+ * engines disagreed about whether a 4th card could enter the live zone; the
+ * limit that does exist in Rust lives in the Live Card Set phase
+ * (phases.rs:834 `if live_cards.len() >= MAX_LIVE_CARDS`), which the C port
+ * reproduces in phase.c at rb_handle_set_live_card and
+ * rb_handle_live_card_confirmation -- not here. */
 int rb_live_can_place_card(const RbPlayer *player, int card_id){
-    if (!player) return 0;
-    if (card_id < 0) return 0;
-    /* Rule 8.2: any card from hand may enter the live card zone, subject to the
-        live-zone capacity (RB_MAX_LIVE_CARDS). */
-    if (player->live.n >= RB_MAX_LIVE_CARDS) return 0;
+    (void)player; (void)card_id;
     return 1;
 }
 
+/* Mirror LiveCardZone::add_card (zones.rs:523-535): it calls
+ * can_place_card, which is unconditionally true, and then pushes -- so the
+ * function cannot fail on a full zone and there is no capacity ceiling short
+ * of the container itself. The C body refused at RB_MAX_LIVE_CARDS and
+ * returned -1; every caller in the tree has already lifted the card out of
+ * its source, so that -1 was a deletion. RB_MAX_ZONE is the RbBag bound and is
+ * the only limit that can be expressed here. */
 int rb_live_add_card(RbPlayer *player, int card_id){
     if(!player) return -1;
-    if(player->live.n >= RB_MAX_LIVE_CARDS) return -1;
+    if(player->live.n >= RB_MAX_ZONE) return -1;
     player->live.cards[player->live.n++] = card_id;
     return 0;
 }
@@ -402,9 +445,18 @@ void rb_waitroom_remove_card(RbPlayer *player, int card_id){
 
 /* ── SuccessLiveCardZone helpers (mirror SuccessLiveCardZone; RbPlayer::success) ── */
 
+/* Mirror SuccessLiveCardZone::add_card (zones.rs:1002-1004), an unconditional
+   `cards.push(card_id)`. The C body capped at RB_MAX_LIVE_CARDS (3) and
+   SILENTLY DROPPED the overflow -- and the 4th success card is not
+   hypothetical: live.c already guards its four call sites with
+   `success.n < RB_MAX_ZONE` (live.c:1067, :1070, :1437, :1632), so the guard
+   passes at success.n == 3 and this cap then eats the card. Rust has no such
+   ceiling, and the two C placement routes disagreed with each other: the
+   generic rb_place_card_in_zone() writes into P->success up to RB_MAX_ZONE.
+   RB_MAX_ZONE is the RbBag bound, which is the only limit expressible here. */
 void rb_success_add(RbPlayer *player, int card_id){
     if(!player) return;
-    if(player->success.n < RB_MAX_LIVE_CARDS) player->success.cards[player->success.n++] = card_id;
+    if(player->success.n < RB_MAX_ZONE) player->success.cards[player->success.n++] = card_id;
 }
 
 int rb_success_len(const RbPlayer *player){
@@ -751,11 +803,23 @@ int rb_player_all_card_ids(const GameState *g, int pl, int *out, int max){
     return n;
 }
 
-/* Mirror Player::draw_card — draws the top card from main deck to hand.
- * Returns the card ID, or -1 if deck is empty. */
+/* Mirror Player::draw_card -- draws the top card from main deck to hand.
+ * Returns the card ID, or -1 if deck is empty.
+ *
+ * Rust's Hand is a SmallVec with no bound (zones.rs:890-892, add_card at
+ * :908-910 is an unconditional push), so a draw into a 41-card hand succeeds
+ * there and fails here only because RbPlayer::hand is a fixed RB_MAX_HAND
+ * array. The bound is checked BEFORE rb_zone_draw(), not after: rb_zone_draw()
+ * has already lifted the card out of the deck by the time it returns, and the
+ * old rb_hand_add() then discarded it on the `hand.n < RB_MAX_HAND` test, so a
+ * full hand turned one draw into one destroyed card -- invisible to any zone
+ * count, visible only to a whole-board census. Refusing up front keeps the card
+ * in the deck, which is the state Rust's caller would have to reconcile too.
+ * (The capacity gap itself is pinned red by test_audit_zones.c.) */
 int rb_player_draw_card(GameState *g, int pl){
-    if(!g || pl<0 || pl>1) return -1;
+    if (!g || pl<0 || pl>1) return -1;
     RbPlayer *P = &g->p[pl];
+    if (P->hand.n >= RB_MAX_HAND) return -1;
     int cid = rb_zone_draw(g, pl);
     if(cid < 0) return -1;
     rb_hand_add(P, cid);

@@ -485,6 +485,17 @@ impl AbilityResolver {
                         log::debug!("Failed to change energy state: {}", e);
                     }
                 }
+                // No target, but the CARD still changed state earlier in this
+                // resolution — most often an optional self-wait COST paid via
+                // handle_optional_cost_payment, which writes the activating
+                // card's orientation directly. Every other exit from this
+                // function recalculates (see the end), so a card whose
+                // orientation this ability wrote would otherwise be left
+                // ACTIVE-facing: its own 常時 would not see the wait it just
+                // paid for. E.g. 統堂英玲奈 PL!-bp5-333-R pays 「このメンバーを
+                // ウェイトにしてもよい」 for free of any コスト9以下 target and
+                // then grants herself no heart05.
+                gs.recalculate_constants();
                 return Ok(());
             }
 
