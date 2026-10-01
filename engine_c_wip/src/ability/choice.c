@@ -3490,10 +3490,19 @@ static void choice_discard_selection_indices(RbAbilityResolver *self, GameState 
                 char en[80]; char ja[80];
                 snprintf(en,sizeof(en),"Select %d more card(s) from discard from %d remaining", remaining, out_n);
                 snprintf(ja,sizeof(ja),"控え室から残り%d枚中さらに%d枚選択", out_n, remaining);
-                RbChoice ch; memset(&ch,0,sizeof(ch));
-                ch.kind=RB_CHOICE_SELECT_CARD; strncpy(ch.zone,"discard",sizeof(ch.zone)-1);
-                ch.count=remaining; ch.allow_skip=0; strncpy(ch.description,en,sizeof(ch.description)-1);
-                g->queue.pending=ch; g->queue.has_pending=1; g->queue.actor=actor;
+                /* choice.rs:2380-2395 `build_reprompt(ctx, ..)` + 2393
+                   `.with_filtered_indices(fi)`: Rust carries the ANSWERED prompt's
+                   own seat, budget, card_type and group into the re-offer AND keeps
+                   the candidate list it just computed. This arm used to build the
+                   re-offer from a zeroed RbChoice, so `out`/`out_n` were computed
+                   and then thrown away together with the seat and the filters —
+                   every retry offered the whole discard again, so a mandatory
+                   multi-pick could never make progress. choice_build_discard_reprompt
+                   is the same builder the non-select_action arm below uses and it
+                   copies `*ctx`, so the filters survive with the list. */
+                RbChoice ctx = g->queue.pending;
+                choice_build_discard_reprompt(g, &ctx, choice_effect_target_seat(g, actor),
+                                              remaining, en, ja, 0, out, out_n);
                 return;
             }
         }
@@ -4420,36 +4429,35 @@ void rb_clear_pending_choice(GameState *g) {
     g->queue.has_pending = 0;
     g->queue.deferred = NULL;
     g->queue.resume_is_select = 0;
-    /* NOT a defect, and deliberately left as it stands after measuring both
-       candidate transitions here. A reviewer will reasonably ask why dropping
-       the prompt leaves `state == RB_QUEUE_AWAITING_CHOICE` with
-       `has_pending == 0`; the answer is that Rust produces exactly that state.
+    /* The stamp, not the split, is what has to become truthful here.
+       `state == RB_QUEUE_AWAITING_CHOICE` with `has_pending == 0` says "a choice
+       is awaited" and "no choice exists" at the same time. Rust cannot express
+       that: its `is_idle()` and its `is_waiting_for_choice()` match on the SAME
+       `QueueState` datum (queue.rs:200-205), so a guard written against
+       `rb_queue_is_idle` is sound there and unsound here — `!rb_queue_is_idle(g)`
+       is true for a queue that is waiting for nothing, which is what a
+       `!rb_queue_is_idle(g)` guard measured +9 on parity_cce_gaps against.
 
-       `AbilityQueue::take_waiting_choice` (queue.rs:208-214) is
-       `QueueState::WaitingForChoice { choice, .. } => choice.take()`, which
-       leaves the state as WaitingForChoice carrying `choice: None` — so for the
-       whole window between TurnEngine::resume_with_choice taking the answer and
-       `resume_queue_with_choice` calling `ability_queue.resume_with_choice()`
-       (turn/actions/mod.rs:795-798 -> :1571), Rust reads `is_idle() == false`
-       while `is_waiting_for_choice() == None`. Rust therefore DOES have a state
-       that is "not waiting for a choice and not idle", and the C's split of
-       that one datum into `state` + `has_pending` mirrors it faithfully.
+       Rust does hold that combination, but only inside the answer window:
+       `take_waiting_choice` (queue.rs:208-214) leaves
+       WaitingForChoice{choice: None} and `resume_queue_with_choice` closes the
+       window with `resume_with_choice()` (turn/actions/mod.rs:795-798 -> :1571,
+       queue.rs:421-434), which is `RB_QUEUE_RESOLVING` in the C's spelling and
+       which `rb_resume_with_choice_indices_internal` already performs
+       (choice.c:4754). The clears that do NOT come from that path are the ones
+       that used to strand the stamp, so the successor state is spelled out here.
 
-       Rust's transition for the answer path is WaitingForChoice ->
-       ExecutingEffect (queue.rs:421-434, called at mod.rs:1571), i.e. this
-       function's C spelling would be RB_QUEUE_RESOLVING. Measured over the
-       eleven parity suites with only this line changed, that is +8 on
-       parity_cce_gaps and 0 on the other ten, and the eight lines are
-       a22a_queue_path_skips_cost and g1_one_wait_member losing their
-       optional-cost prompt entirely ("VACUOUS ... only 0 prompt(s) were
-       offered"). The reason is architectural, not Rust's: the C overloads
-       RB_QUEUE_RESOLVING as the drain's re-entrancy marker
-       (ability_queue.c:1266), where Rust's ExecutingEffect is inert, and the C
-       needs that drain to run at the resume tail to raise the next prompt. The
-       RB_QUEUE_IDLE variant is exactly neutral on all eleven suites but is
-       LESS faithful than leaving the stamp alone (it claims nothing is in
-       flight while a resolution is running), so neither is adopted and the C
-       keeps the stamp Rust itself would still be carrying at this point. */
+       RB_QUEUE_RESOLVING is measured +8 (parity_cce_gaps: a22a_queue_path_skips_cost
+       and g1_one_wait_member lose their optional-cost prompt) because the C
+       overloads it as the drain's re-entrancy marker (ability_queue.c:1266) where
+       Rust's ExecutingEffect is inert. RB_QUEUE_IDLE is neutral on all eleven
+       parity suites but nulls every entry accessor
+       (rb_queue_current_entry_mut, ability_queue.c:184-190), so it is only safe
+       where NO entry is current — and there `cur` is already out of range, so
+       those accessors returned NULL anyway and the demotion is lossless. */
+    if (g->queue.state == RB_QUEUE_AWAITING_CHOICE &&
+        (g->queue.cur < 0 || g->queue.cur >= g->queue.n_entries))
+        g->queue.state = RB_QUEUE_IDLE;
 }
 void rb_resolver_continue_siblings(GameState *g, int actor, int host,
                                    const AbilityEffect *cont, int cont_from);
@@ -5118,14 +5126,20 @@ static int rb_resume_with_choice_indices_internal(GameState *g, const int *selec
             /* record the chosen target via the handler, then run the deferred
                 effect that consumes it (C models target selection via deferral). */
             /* 「自分または相手」 needs the continuation that was parked with the
-               prompt: choice.rs:2856-2907 clones `steps.first()` AFTER the answer
-               and applies it with set_chosen_target, and the C's twin reads
-               `g->queue.resume_eff` (choice.c:3880-3898). `rb_clear_pending_choice`
-               above dropped it, so re-park the pointer captured at the top of this
-               function for exactly that route and take it back afterwards, so every
-               other reader keeps seeing the cleared state. Without this the branch
-               never fires and neither rb_set_chosen_target nor
-               rb_queue_set_pending_actions can reach the chosen seat. */
+               prompt: choice.rs:2856-2907 reads `steps.first()` AFTER the answer
+               and applies it with set_chosen_target, and the C's twin is the
+               `self_or_opponent` arm at choice.c:3855-3870, which reads
+               `g->queue.resume_eff` for the seat and for the child it parks with
+               rb_queue_set_pending_actions. `g->queue.resume_eff = NULL` below the
+               `rb_clear_pending_choice` call (choice.c:4752) ran BEFORE this
+               dispatch, so the branch always read NULL and could never fire:
+               neither rb_set_chosen_target nor rb_queue_set_pending_actions reached
+               the chosen seat. Re-park the pointer captured at the top of this
+               function for exactly that route and take it straight back afterwards,
+               so every other reader still sees the cleared state.
+               executor.c still needs its own half — `choose_target_player` must be
+               structural there (executor.c:52) or the engine never walks its
+               effect_steps, and no prompt of this shape is raised at all. */
             {
                 int restore = (eff != NULL && saved_pending.target[0] &&
                                (!strcmp(saved_pending.target, "self_or_opponent") ||
