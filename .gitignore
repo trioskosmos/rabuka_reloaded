@@ -98,7 +98,12 @@ cards/_probe.txt
 clean_gcc.ps1
 
 # Research / reference material (downloaded third-party code, experiments)
-research/
+# Vendored here but deliberately NOT committed: research/SabberStone is AGPL-3.0,
+# and committing copyleft source puts it in this repository's history. Only the
+# README is tracked, since that is the provenance record and says what was
+# ported from where.
+research/*
+!research/README.md
 
 # Old port directory (replaced by ports/ds/)
 engine_ds/

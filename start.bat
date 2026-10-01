@@ -1,9 +1,13 @@
 @echo off
 setlocal enabledelayedexpansion
 
-REM Try to add Windows firewall rule for LAN access (may prompt UAC)
-echo Adding firewall rule for port 8080...
-powershell -NoProfile -Command "Start-Process netsh -Verb RunAs -ArgumentList 'advfirewall firewall add rule name=RabukaGameServer dir=in protocol=tcp localport=8080 action=allow' -WindowStyle Hidden" >nul 2>&1
+REM Add the Windows firewall rule for LAN access once; skip the UAC prompt
+REM when the rule already exists (previously prompted on EVERY launch).
+netsh advfirewall firewall show rule name=RabukaGameServer >nul 2>&1
+if errorlevel 1 (
+    echo Adding firewall rule for port 8080...
+    powershell -NoProfile -Command "Start-Process netsh -Verb RunAs -ArgumentList 'advfirewall firewall add rule name=RabukaGameServer dir=in protocol=tcp localport=8080 action=allow' -WindowStyle Hidden" >nul 2>&1
+)
 
 echo Starting Rust Backend on http://127.0.0.1:8080...
 echo [i18n] missing Japanese choice prompts are logged at WARN level -- watch the server output.
@@ -26,28 +30,49 @@ cd /d "%~dp0engine"
 REM Always run an incremental build: cargo rechecks freshness itself in
 REM seconds when nothing changed. (The old timestamp-string GTR comparison
 REM was locale-dependent and silently ran stale binaries.)
+REM --bin rabuka_engine: a bare `cargo build` builds ALL ~17 [[bin]] targets
+REM (bot_arena, sim_bench, play_game, calibrate, ...) -- minutes of codegen
+REM and linking for binaries the game never runs.
 echo Checking server binary...
-cargo build --release --features server
+cargo build --release --features server --bin rabuka_engine
 if errorlevel 1 (
     echo Build failed, not starting server.
+    pause
     exit /b 1
 )
 
-REM Rebuild the WASM bundle if the toolchain is present. The backend serves
-REM web_ui/public/wasm at /wasm (plus the / catch-all at /public/wasm), and
-REM the Web Worker + test.html load through the wasm-bindgen glue there.
-REM Best-effort: a missing wasm target / wasm-bindgen must never block the
-REM server itself.
-call :build_wasm
+REM The WASM browser bundle is NOT rebuilt on every launch: platforms/wasm
+REM builds the whole engine with lto=true + codegen-units=1, so ANY engine
+REM edit used to cost minutes here even though the desktop game never loads
+REM the bundle. Pass --wasm to refresh web_ui\public\wasm when the browser
+REM client (Web Worker + test.html) needs it.
+set BUILD_WASM=0
+set FORWARD_ARGS=
+:argloop
+if "%~1"=="" goto argdone
+if /i "%~1"=="--wasm" (
+    set BUILD_WASM=1
+) else (
+    set FORWARD_ARGS=!FORWARD_ARGS! %1
+)
+shift
+goto argloop
+:argdone
+
+if "%BUILD_WASM%"=="1" call :build_wasm
 
 :run_server
 echo Starting server from engine directory...
 echo Press Ctrl+C to stop the server.
 echo.
 
+REM Open the game UI in the default browser once the server is up. Detached
+REM and delayed so it neither blocks the foreground server nor dies with it.
+start "" /b powershell -NoProfile -WindowStyle Hidden -Command "Start-Sleep -Seconds 3; Start-Process 'http://127.0.0.1:8080'"
+
 REM Run server in foreground (most reliable). Forward all CLI args so flags
 REM like --ngrok actually reach the binary (it reads NGROK_AUTHTOKEN + argv).
-"C:\rust_targets\release\rabuka_engine.exe" web-server %*
+"C:\rust_targets\release\rabuka_engine.exe" web-server %FORWARD_ARGS%
 exit /b %errorlevel%
 
 :build_wasm

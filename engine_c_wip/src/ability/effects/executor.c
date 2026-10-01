@@ -34,7 +34,22 @@ static const ExecutorEntry executor_table[] = {
     {"modify_yell_source", 0}, {"specify_heart_color", 0},
     {"modify_required_hearts_success", 0}, {"all_blade_timing", 0},
     {"reveal_until_live_card", 0}, {"reveal_until_chosen_card", 0},
-    {"choose_target_player", 0}, {"choose_required_hearts", 0},
+    /* choose_target_player OWNS its effect_steps, so it must be structural.
+     * engine/src/ability/effects/mod.rs:261 routes an effect through
+     * `normalized_sequential_steps` only when
+     * `action_type == Sequential || action_type == LookAndSelect`
+     * (move/mod.rs:168-170 returns None for everything else), so for
+     * ChooseTargetPlayer the ROOT effect is dispatched FIRST and its steps
+     * run ONCE, AFTER the seat has been chosen, via the continuation the
+     * choice parks. Marking it non-structural made engine.c:220-223's generic
+     * pre-order child walk run `effect_steps` EAGERLY, before the answer.
+     * All six corpus instances (PL!N-bp3-010, PL!N-bp4-002, PL!S-bp3-007,
+     * PL!S-bp1-008, PL!S-PR-041, PL!S-bp7-013) are the root effect and all
+     * carry effect_steps. Structural only means "the dispatcher does not
+     * pre-walk the children" — it does NOT suppress the verdict: the
+     * verdict-suppression set is verdict_structural below, exactly as
+     * dispatch.rs:30-38 spells it. */
+    {"choose_target_player", 1}, {"choose_required_hearts", 0},
     {"perform_yell", 0}, {"repeat_procedure", 1}, {"sequential", 1},
     {"conditional_alternative", 1}, {"look_and_select", 1},
     {"conditional_on_result", 1}, {"conditional_on_optional", 1},
@@ -248,6 +263,25 @@ static int execute_repeat(GameState *g, int actor, AbilityEffect *effect, int ho
 int rb_executor_execute(GameState *g, int actor, AbilityEffect *effect, int host_cid)
 {
     if (!g || !effect || !effect->action) return 0;
+    /* engine/src/ability/effects/mod.rs:184-185 --
+     *     let mut dbg = AbDebug::new();
+     *     dbg.effect(effect);
+     * the FIRST two statements of AbilityResolver::execute_effect, ahead of the
+     * trace!, ahead of gate_effect_activation, ahead of the both-targets split
+     * and ahead of the sequential routing. rb_executor_execute is that
+     * function's dispatch seam, so the tracer line belongs here, before the
+     * find_executor guard: even a string Rust cannot reach traces on its way
+     * to being rejected.
+     *
+     * A per-effect AbDebug, separate from the one resolve_ability owns --
+     * resolver.c:717-719 is the same treatment for can_activate_effect's
+     * resolver.rs:581-582 call. Both write the one global trace buffer
+     * (debug.c:26), which resolver.c:1198-1199 flushes on every resolution
+     * exit. DEBUG TRACING ONLY: rb_abdebug_effect returns immediately unless
+     * rb_ability_debug_enabled() (debug.c:218), matching debug.rs:163-165. */
+    RbAbDebug dbg;
+    rb_abdebug_init(&dbg);
+    rb_abdebug_effect(&dbg, effect);
     if (!find_executor(effect->action)) {
         fprintf(stderr, "[EXECUTOR_MISS] action=%s\n", effect->action);
         return 0;
@@ -286,10 +320,25 @@ int rb_executor_execute(GameState *g, int actor, AbilityEffect *effect, int host
          * engine/src/ability/move_cards.rs:3411-3445). */
         rb_effect_move_cards(g, actor, effect);
     } else if (strcmp(action, "discard_card") == 0) {
-        AbilityEffect moved = *effect;
-        moved.source = effect->source ? effect->source : (char *)"hand";
-        moved.destination = effect->destination ? effect->destination : (char *)"waitroom";
-        rb_effect_move_cards(g, actor, &moved);
+        /* engine/src/ability/effects/dispatch.rs:74 —
+         *   ActionType::DiscardCard => resolver.execute_logged_move(gs, effect,
+         *                                                    "[[log_discard]]")
+         * i.e. the SAME shared tail as MoveCards (:73), and
+         * move/mod.rs:3594-3603 is that tail in full:
+         *   self.rule_log_activated(gs, log_tag);
+         *   self.owner.executing = Some(effect.clone());
+         *   self.execute_move_cards(gs, effect)
+         * It reads `effect.source` / `effect.destination` exactly as decoded.
+         * There is NO defaulting anywhere on the path — `source_or("none")`
+         * appears only in the [EFFECT] TRACE line (mod.rs:190), never as a
+         * value handed to the mover.
+         *
+         * The copy this replaces defaulted an absent source to "hand" and an
+         * absent destination to "waitroom", so a corpus discard_card whose text
+         * carried no zone fields still moved hand->waitroom here. That is a C
+         * invention: with the defaults gone, the effect's own fields stand and
+         * a zone-less discard_card moves nothing, which is what Rust does. */
+        rb_effect_move_cards(g, actor, effect);
     } else if (strcmp(action, "select") == 0) {
         rb_effect_select_effect(g, actor, effect, host_cid);
     } else if (strcmp(action, "select_cards") == 0) {
@@ -340,18 +389,40 @@ int rb_executor_execute(GameState *g, int actor, AbilityEffect *effect, int host
         } else {
             result = execute_misc(g, actor, effect, host_cid);
         }
-    } else if (strcmp(action, "modify_score") == 0 || strcmp(action, "gain_score") == 0) {
-        if (host_cid < 0 && !effect->target && !effect->self_target_field[0]) {
-            const char *operation = effect_extra(effect, "operation");
-            int value = effect->count >= 0 ? effect->count : 1;
-            const char *value_text = effect_extra(effect, "value");
-            if (value_text) value = atoi(value_text);
-            int delta = operation && !strcmp(operation, "remove") ? -value : value;
-            g->p[actor].score += delta;
-            result = 1;
-        } else {
-            result = rb_execute_modify_score(g, actor, effect);
-        }
+    } else if (strcmp(action, "modify_score") == 0) {
+        /* engine/src/ability/effects/dispatch.rs:135 —
+         *   ActionType::ModifyScore => resolver.execute_modify_score(gs, effect)
+         * with NO precondition and NO special case. score.rs:165-180 shows what
+         * that executor actually is:
+         *   let value: u8 = effect.value_any().unwrap_or(0);   (score.rs:174 -- 0,
+         *       not 1, and not effect.count)
+         *   let target = effect.target_name().to_string();     (score.rs:175 --
+         *       target_name() defaults to "self", card.rs:2366-2368)
+         * and the body NEVER writes `player.score`: a modify_score effect only
+         * reaches card-scoped / live_total score modifiers.
+         *
+         * The arm this replaces added straight into `g->p[actor].score` and
+         * defaulted the value to 1, for a hostless, targetless, non-self-target
+         * effect. Both are invented: the write had no Rust counterpart at all,
+         * and the 1 made a value-less effect behave like +1 against the
+         * player's running total instead of +0 against the modifier table.
+         * rb_execute_modify_score already implements score.rs faithfully
+         * (score.c:497-498 takes value_any().unwrap_or(0); score.c:499 applies
+         * target_name()'s "self" default and resolves the owner at score.c:524).
+         *
+         * gain_score keeps the invented player-score bump: Rust has NO such
+         * ActionType (it is one of the four C-only table entries, called from
+         * nothing), so there is no Rust behaviour for it to diverge from. It is
+         * corpus-dead and test-dead; it is left exactly as it was. */
+        result = rb_execute_modify_score(g, actor, effect);
+    } else if (strcmp(action, "gain_score") == 0) {
+        const char *operation = effect_extra(effect, "operation");
+        int value = effect->count >= 0 ? effect->count : 1;
+        const char *value_text = effect_extra(effect, "value");
+        if (value_text) value = atoi(value_text);
+        int delta = operation && !strcmp(operation, "remove") ? -value : value;
+        g->p[actor].score += delta;
+        result = 1;
     } else if (strcmp(action, "modify_required_hearts") == 0 ||
                strcmp(action, "modify_required_hearts_success") == 0) {
         result = strcmp(action, "modify_required_hearts_success") == 0
@@ -415,10 +486,23 @@ int rb_executor_execute(GameState *g, int actor, AbilityEffect *effect, int host
     } else if (strcmp(action, "repeat_procedure") == 0) {
         result = execute_repeat(g, actor, effect, host_cid);
     } else if (strcmp(action, "compound_action") == 0) {
-        if (effect->primary_effect)
-            rb_execute_effect_ex(g, actor, effect->primary_effect, host_cid);
-        else if (effect->n_child > 0)
-            rb_execute_effect_ex(g, actor, effect->child[0], host_cid);
+        /* engine/src/ability/effects/dispatch.rs:226-231 — CompoundAction is in
+         * the SAME `=> Ok(())` arm as OpponentAction / ActionBy / SequentialCost
+         * / ChoiceCondition / EnergyCondition, and that arm's own comment is
+         * explicit about why: "CompoundAction / ActionBy -- structural tags only
+         * (see push_effect_verdict, and effect.action_by for the tag itself)".
+         * Nothing in Rust ever runs a CompoundAction's primary_effect or
+         * child[0]: the expansion belongs to
+         * `compound::sequential::execute_sequential_effect`, reached through
+         * `normalized_sequential_steps` (mod.rs:261) and the repeated-procedure
+         * expansion — never from dispatch.
+         *
+         * This arm used to run primary_effect, else child[0]: a second,
+         * competing expansion that fires at dispatch time, ahead of any gate,
+         * and fires even for a CompoundAction that carries no steps at all. The
+         * action is corpus-dead (0 decoded occurrences), so this removes an
+         * unreachable divergence rather than introducing one. */
+        result = 1;
     } else if (strcmp(action, "opponent_action") == 0) {
         /* engine/src/ability/effects/mod.rs:73-105 (prepare_opponent_routing).
          * Rust clones the NESTED `opponent_action` effect — never the wrapper —
@@ -487,8 +571,12 @@ int rb_executor_execute(GameState *g, int actor, AbilityEffect *effect, int host
     return result;
 }
 
-int rb_execute_effect_via_registry(GameState *g, int actor, AbilityEffect *effect,
-                                  int host_cid)
-{
-    return rb_executor_execute(g, actor, effect, host_cid);
-}
+/* DELETED 2026-10-02: rb_execute_effect_via_registry was a zero-caller pure
+ * alias of rb_executor_execute -- a second public name for the same body. Every
+ * live route already reaches the dispatcher by rb_executor_execute: engine.c
+ * :300-301 from rb_execute_effect_ex, and the internal re-dispatches in
+ * executor.c / misc.c / move_missing.c all call it by name. A second entry point
+ * is a third thing free to drift from the first, with no reader to catch it. The
+ * body is gone; the declaration at rabuka.h:2982 is dropped by that file's
+ * owner. Until it is, this translation unit inherits the header prototype and
+ * simply never defines it, which is why the tree still links. */

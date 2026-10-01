@@ -396,27 +396,6 @@ static int find_and_remove_card(RbPlayer *P, int cid){
     for(int i=0;i<P->success.n;i++) if(P->success.cards[i]==cid){ for(int k=i;k<P->success.n-1;k++) P->success.cards[k]=P->success.cards[k+1]; P->success.n--; return 1; }
     return 0;
 }
-static void place_in_dst(RbPlayer *A, RbZone dst, int cid, int to_top, int to_bottom,
-                         int dst_area, int under, int dst_stage){
-    if(dst_stage || dst==RB_ZONE_STAGE){
-        int area = dst_area;
-        if(area<0){ for(int q=0;q<RB_STAGE_SIZE;q++) if(A->stage[q]<0){ area=q; break; } }
-        if(area<0 || area>=RB_STAGE_SIZE) return;
-        if(under){ if(A->under_cards[area].n < RB_MAX_ZONE) A->under_cards[area].cards[A->under_cards[area].n++]=cid; }
-        else { A->stage[area]=cid; A->stage_wait[area]=0; }
-        return;
-    }
-    RbBag *db=NULL;
-    if(dst==RB_ZONE_HAND) db=&A->hand; else if(dst==RB_ZONE_DECK) db=&A->deck;
-    else if(dst==RB_ZONE_DISCARD) db=&A->discard; else if(dst==RB_ZONE_ENERGY) db=&A->energy;
-    else if(dst==RB_ZONE_LIVE) db=&A->live; else if(dst==RB_ZONE_SUCCESS) db=&A->success;
-    if(!db) return;
-    if(db->n < RB_MAX_ZONE){
-        if(to_bottom && dst==RB_ZONE_DECK){ db->cards[db->n++]=cid; }
-        else if(to_top && dst==RB_ZONE_DECK){ for(int k=db->n;k>0;k--) db->cards[k]=db->cards[k-1]; db->cards[0]=cid; db->n++; }
-        else db->cards[db->n++]=cid;
-    }
-}
 
 /* ── drain_under_cards_to_energy_zone ── */
 int rb_drain_under_cards_to_energy_zone(GameState *g, const char *target, int stage_idx) {
@@ -2603,8 +2582,40 @@ void rb_move_execute_selected_cards_from_zone(
     const char *target_player_id) {
     if (!g || !zone || !indices || n_indices <= 0) return;
 
+    /* mod.rs:2666-2676 — the destination is a THREE-link chain:
+     *   1. gs.entry_destination()            -> the C twin is rb_entry_destination
+     *   2. self.in_flight.spawn_context.destination
+     *   3. gs.entry_effect().destination     -> already folded into (1)
+     * and only then the zone-dependent default of mod.rs:2718-2724.
+     *
+     * Link 2 was MISSING here, and it is the link that carries a SEQUENTIAL's
+     * sub-action destination. `entry_destination()` reads the CURRENT queue
+     * entry's ability effect; for a sequential that effect is the `sequential`
+     * node, which names no destination, so link 1 is None and the chain fell
+     * straight through to the default. Rust instead re-reads the destination
+     * `execute_move_cards` stamped on spawn_context (mod.rs:2196) — the
+     * destination of the very move_cards step that raised this prompt.
+     *
+     * The C slot for it is `queue.resume_move_destination`: rb_move_prompt_
+     * carry_resume_context (move.c:662-666) writes it from `e->destination`
+     * UNCONDITIONALLY at every card-selection prompt, and it is the SAME value
+     * choice.c's own `choice_effect_destination` (choice.c:3126-3130) reads on
+     * the discard/live answers. Without it the put-back half of a
+     * 「1枚 ℃引き、1枚を山札の下に戻す」 chain answered its hand SelectCard and
+     * put the chosen card in the WAITROOM: measured on parity_draw_flat, every
+     * deck_bottom chain lost the card's destination
+     *   [PROBE_DEST] zone=hand entry_dest=(null) resume_dest=deck_bottom
+     * and left the deck one card short (19 where the twin expects 20).
+     *
+     * mod.rs:2718-2724 — with no destination named anywhere, a selection out
+     * of the DISCARD defaults to the HAND and every other source to the
+     * DISCARD. The C used "discard" for both, so a discard-sourced prompt with
+     * no destination put the cards straight back where they came from. */
     const char *destination = rb_entry_destination(g);
-    if (!destination) destination = "discard";
+    if (!destination && g->queue.resume_move_destination[0])
+        destination = g->queue.resume_move_destination;
+    if (!destination)
+        destination = move_zone_is(zone, "discard") ? "hand" : "discard";
 
     const char *target = target_player_id ? target_player_id : "self";
     int pl = rb_resolve_target_player(g, target);
@@ -2813,128 +2824,30 @@ void rb_move_handle_select_cards_looked_at(
     rb_recalc_constants(g);
 }
 
-/* ── rb_effect_move_cards (basic move_cards entry) ── */
+/* ── rb_effect_move_cards (basic move_cards entry) ──
+ *
+ * The whole body is rb_move_execute_move_cards_ported (move_missing.c), the C
+ * twin of Rust's AbilityResolver::execute_move_cards; it forwards the
+ * multiple-target-to-deck shape to rb_move_execute_move_cards_both (move.c)
+ * from the same prologue position Rust does (move_missing.c:139-142 vs
+ * Rust's mod.rs:2056-2060).
+ *
+ * What used to sit after this call was a ~120-line PRE-PORT implementation of
+ * the same effect: its own `drain_all`/`cnt` encoding, its own target=both /
+ * opponent fan-out, its own deck-refresh loop, and its own destination
+ * classification (`rb_zone_of_str` + `place_in_dst`). It was unreachable —
+ * a bare `return;` preceded it in the same compound statement, so no branch,
+ * fallthrough or label could ever reach it, and gcc had already dropped it
+ * from the object:
+ *   $ objdump -d --disassemble=rb_effect_move_cards src/ability/effects/move.o
+ *     0000..acc0 <rb_effect_move_cards>:
+ *       acc0:  jmp  acc5 <rb_effect_move_cards+0x5>     <- the one call
+ *       acc5:  nop ... (padding)                        <- nothing else
+ * Keeping it was the hazard, not the size: it is a SECOND implementation of
+ * `move_cards` in the same TU, so a future fix to the ported one can be read
+ * past in favour of the copy that reads like the pre-port file and does
+ * nothing. `place_in_dst`, its only file-local helper, went with it (it had no
+ * caller outside that body). */
 void rb_effect_move_cards(GameState *g, int actor, AbilityEffect *e){
     rb_move_execute_move_cards_ported(g, actor, e);
-    return;
-    int drain_all = (e->count < 0);
-    int cnt = drain_all ? 0x7fffffff : (e->count>=0? e->count : 1);
-    const char *src_s = e->source ? e->source : "hand";
-    const char *dst_s = e->destination ? e->destination : "discard";
-    int relay = (!strcmp(src_s,"those_cards")||!strcmp(src_s,"recently_moved")||!strcmp(src_s,"looked_at")||!strcmp(src_s,"selected_cards"));
-
-    RbZone dst=RB_ZONE_DISCARD;
-    int dst_stage=0, dst_area=-1, dst_under=0;
-    int to_top = e->destination && (!strcmp(e->destination,"deck_top")||!strcmp(e->destination,"deck_top_or_bottom"));
-    int to_bottom = e->destination && !strcmp(e->destination,"deck_bottom");
-    if(!strcmp(dst_s,"stage")||!strcmp(dst_s,"empty_area")){ dst_stage=1; dst_area=-1; }
-    else if(!strcmp(dst_s,"same_area")){ dst_stage=1; dst_area=-2; }
-    else if(!strcmp(dst_s,"under_member")){ dst_stage=1; dst_area=-3; dst_under=1; }
-    else if(!strcmp(dst_s,"those_cards")||!strcmp(dst_s,"recently_moved")||!strcmp(dst_s,"looked_at")){ dst=RB_ZONE_DISCARD; }
-    else rb_zone_of_str(dst_s,&dst);
-
-    int players[2]; int np=0;
-    if (e->target && !strcmp(e->target,"both")) { players[np++]=actor; players[np++]=actor^1; }
-    else if (e->target && !strcmp(e->target,"opponent")) { players[np++]=actor^1; }
-    else { players[np++]=actor; }
-
-    int moved_ids[RB_MAX_ZONE]; int nm=0;
-    for(int pk=0; pk<np; pk++){
-        RbPlayer *A=&g->p[players[pk]];
-        int is_deck = (!relay && !strcmp(src_s,"deck"));
-
-        int src_ids[RB_MAX_ZONE]; int src_area[RB_MAX_ZONE]; int ns=0;
-        if(!strcmp(src_s,"looked_at")||!strcmp(src_s,"looked_at_remaining")){
-            if (!strcmp(src_s, "looked_at"))
-                ns = rb_move_resolve_source_looked_at(g, actor, e, players[pk], cnt, src_ids, RB_MAX_ZONE);
-            else
-                rb_move_resolve_from_looked_at(g, players[pk], src_ids, RB_MAX_ZONE, &ns);
-            if (g->queue.has_pending) return;
-            g->n_recently_moved = 0;
-            g->n_those_cards = 0;
-            for (int i = 0; i < ns; i++) {
-                if (move_place_looked_at(g, players[pk], src_ids[i], dst_s, e)) {
-                    move_track_looked_at(g, src_ids[i], e);
-                    if (nm < RB_MAX_ZONE) moved_ids[nm++] = src_ids[i];
-                } else rb_look_add(players[pk], src_ids[i]);
-            }
-            rb_recalc_constants(g);
-            continue;
-        } else if(relay){
-            if(!strcmp(src_s,"selected_cards")){
-                for(int i=0;i<g->n_selected_cards && ns<cnt;i++){ src_ids[ns]=g->selected_cards[i]; src_area[ns]=-1; ns++; }
-            } else if(!strcmp(src_s,"those_cards")){
-                for(int i=0;i<g->n_those_cards && ns<cnt;i++){ src_ids[ns]=g->those_cards[i]; src_area[ns]=-1; ns++; }
-            } else {
-                for(int i=0;i<g->n_recently_moved && ns<cnt;i++){ src_ids[ns]=g->recently_moved[i]; src_area[ns]=-1; ns++; }
-            }
-        } else if(!strcmp(src_s,"energy_deck")){
-            for(int i=0;i<cnt && i<A->energy_deck.n;i++){
-                int cid=A->energy_deck.cards[i];
-                if(rb_card_is_energy(cid)){ src_ids[ns]=cid; src_area[ns]=-1; ns++; }
-            }
-        } else {
-            RbZone src=RB_ZONE_HAND; rb_zone_of_str(src_s,&src);
-            if(src==RB_ZONE_STAGE){ for(int pos=0;pos<RB_STAGE_SIZE && ns<cnt;pos++) if(A->stage[pos]>=0 && card_matches_filter(A->stage[pos],e)){ src_ids[ns]=A->stage[pos]; src_area[ns]=pos; ns++; } }
-            else { RbBag *sb=NULL;
-                if(src==RB_ZONE_HAND) sb=&A->hand; else if(src==RB_ZONE_DECK) sb=&A->deck;
-                else if(src==RB_ZONE_DISCARD) sb=&A->discard; else if(src==RB_ZONE_ENERGY) sb=&A->energy;
-                else if(src==RB_ZONE_LIVE) sb=&A->live; else if(src==RB_ZONE_SUCCESS) sb=&A->success;
-                if(sb){ for(int i=sb->n-1;i>=0 && ns<cnt;i--) if(card_matches_filter(sb->cards[i],e)){ src_ids[ns]=sb->cards[i]; src_area[ns]=-1; ns++; } }
-            }
-        }
-
-        int moved=0;
-        for(int i=0;i<ns;i++){
-            int cid=src_ids[i];
-            if(!strcmp(src_s,"energy_deck")){
-                int found=0;
-                for(int j=0;j<A->energy_deck.n;j++) if(A->energy_deck.cards[j]==cid){
-                    for(int k=j;k<A->energy_deck.n-1;k++) A->energy_deck.cards[k]=A->energy_deck.cards[k+1];
-                    A->energy_deck.n--; found=1; break;
-                }
-                if(!found) continue;
-            } else if(!find_and_remove_card(A,cid)) continue;
-            if(dst_stage){
-                int area=dst_area;
-                if(area==-2) area=src_area[i];
-                if(area==-3){ area=src_area[i]; dst_under=1; }
-                if(area<0){ for(int q=0;q<RB_STAGE_SIZE;q++) if(A->stage[q]<0){ area=q; break; } }
-                place_in_dst(A,dst,cid,to_top,to_bottom,area,dst_under,1);
-            } else {
-                place_in_dst(A,dst,cid,to_top,to_bottom,-1,0,0);
-            }
-            moved_ids[nm++]=cid; moved++;
-        }
-        if(is_deck && moved < cnt){
-            while(moved < cnt){
-                if(A->deck.n==0){
-                    if(A->discard.n>0){
-                        rb_shuffle(A->discard.cards, A->discard.n);
-                        for(int k=0;k<A->discard.n;k++) A->deck.cards[A->deck.n++]=A->discard.cards[k];
-                        A->discard.n=0;
-                        A->deck_refreshed_this_turn=1;
-                    } else break;
-                }
-                int cid=A->deck.cards[--A->deck.n];
-                if(dst_stage){
-                    int area=dst_area;
-                    if(area<0){ for(int q=0;q<RB_STAGE_SIZE;q++) if(A->stage[q]<0){ area=q; break; } }
-                    place_in_dst(A,dst,cid,to_top,to_bottom,area,dst_under,1);
-                } else {
-                    place_in_dst(A,dst,cid,to_top,to_bottom,-1,0,0);
-                }
-                moved_ids[nm++]=cid; moved++;
-            }
-        }
-    }
-    g->n_recently_moved = nm < RB_MAX_RECENTLY_MOVED ? nm : RB_MAX_RECENTLY_MOVED;
-    for(int i=0;i<g->n_recently_moved;i++) g->recently_moved[i]=moved_ids[i];
-    g->n_those_cards = nm < RB_MAX_RECENTLY_MOVED ? nm : RB_MAX_RECENTLY_MOVED;
-    for(int i=0;i<g->n_those_cards;i++) g->those_cards[i]=moved_ids[i];
-    for(int i=0;i<nm;i++) g->moved_this_turn[moved_ids[i]] = 1;
-    const char *state_change = cmf_extra(e, "state_change");
-    if (state_change && *state_change)
-        rb_move_finalize_card_movement(g, actor, moved_ids, nm, dst_s, src_s,
-                                       state_change, e->target);
 }

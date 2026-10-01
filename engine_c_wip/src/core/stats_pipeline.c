@@ -1,3 +1,56 @@
+/* -- REACHABILITY OF THE THREE UNCALLED EXPORTS (measured 2026-10-02) ------
+
+   rb_effective_blade_parts / rb_member_heart_detail / rb_need_satisfied have
+   ZERO callers in src/. Correction to the audit brief: they are NOT
+   zero-caller in tests/ -- all three are exercised by
+   tests/test_parity_stats_pipeline.c (:226, :234 for the blade parts;
+   :253, :259 for the heart detail; :318, :320, :325, :331, :337 for
+   need_satisfied) and rb_member_heart_detail also by
+   tests/test_parity_characterization_extra.c:1099. None may be deleted.
+
+   WHY THEY HAVE NO src/ CALLER: their only production consumer is the Rust
+   build_member_contributions (engine/src/turn/live.rs:1844), which reaches
+   them at live.rs:1872 (member_heart_detail) and live.rs:1884
+   (effective_blade_parts) and pushes the result into a Vec of
+   MemberContribution. The C port's live phase has no such struct, so there
+   is nowhere to put the result. That is a MISSING-TYPE request against
+   include/rabuka.h (owner: whoever owns the header), not a porting defect:
+   these three bodies are faithful to engine/src/core/stats_pipeline.rs
+   :80-89, :142-182 and :258-279.
+
+   The Rust twin of need_satisfied has ZERO callers in engine/src AND in
+   engine/tests (it is only the definition at stats_pipeline.rs:258), so it
+   is an unused convenience API there too; the C test coverage is its only
+   exerciser, which is exactly why it must be kept.
+
+   REQUIRED TYPE -- Rust engine/src/core/types.rs:515-531:
+
+       typedef struct {
+           int         source_id;        // i16
+           uint8_t     slot;             // u8
+           uint8_t     base_hearts[8];
+           uint8_t     bonus_hearts[8];
+           uint8_t     base_blades;
+           uint8_t     bonus_blades;
+           uint8_t     base_notes;
+           uint8_t     bonus_notes;
+           uint8_t     draw_icons;
+           // ability_heart_bonuses : Vec<AbilityBonus>  (live.rs:3035 populates)
+           // ability_blade_bonuses : Vec<AbilityBonus>
+           const char *card_no;          // ArcStr, owned
+           int         is_wait;          // bool
+           uint8_t     transform_delta[8];
+       } RbMemberContribution;
+
+   draw_icons counts HeartColor::Draw entries of card.special_heart
+   (live.rs:1863-1869); is_wait is
+   mods.orientation[card_id] == CardOrientation::Wait (live.rs:1886-1889).
+   The two AbilityBonus vectors need their own bounded C shape. Until the
+   header lands, rb_effective_blade_parts and rb_member_heart_detail have
+   nowhere to hand their results; rb_need_satisfied is blocked on the same
+   struct, because the Rust live pass/fail is recorded per
+   MemberContribution owner. */
+
 #include "rabuka.h"
 #include <stdio.h>
 #include <string.h>

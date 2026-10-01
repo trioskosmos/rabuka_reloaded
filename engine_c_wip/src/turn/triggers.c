@@ -7,6 +7,14 @@
    surfaced in rabuka.h; declared locally so this translation unit links. */
 int rb_check_effect_position(const char *effect_pos, int card_position);
 
+/* src/core/modifiers.c:715 rb_recalculate_constant_cost_modifiers — the
+   faithful port of Rust's
+   recalculate_constant_cost_modifiers_with_ids (modifiers.rs:1439-1654). Also
+   defined but not yet surfaced in rabuka.h, so it is declared here for the same
+   reason and with the same precedent as rb_check_effect_position above. It is
+   NOT static in modifiers.c, so no change there is required to call it. */
+void rb_recalculate_constant_cost_modifiers(GameState *g);
+
 /* Defined below, next to the faithful live-success port; every scan that
    reproduces a Rust `check_effect_position` gate needs it. */
 static const char *effect_activation_position_any(const AbilityEffect *e);
@@ -65,6 +73,38 @@ static int rb_push_owned_entry(GameState *g, int pl, int card_id, int ability_id
     rb_queue_set_entry_trigger(g, idx, trigger, NULL, 0);
     return 1;
 }
+
+/* NOTHING IS RECORDED HERE, and that is now faithful.
+   An enqueue records nothing in Rust. All three enqueue paths are pure
+   builders — `enqueue_printed_ability` (abilities.rs:1282-1326),
+   `enqueue_gained_ability` (:1331-1376) and
+   `trigger_auto_ability_by_index_refs` (:1403-1449) — and each ends in a bare
+   `self.ability_queue.enqueue(entry)`. `use_limit_recorded` is constructed
+   false in all four constructors (queue.rs:391 / :490 / :684, abilities.rs:270)
+   and is written in exactly ONE place, `record_ability_use`
+   (abilities.rs:216-231), which is reached from eleven call sites, every one
+   of them resolution-time: the resolver's Early record (resolver.rs:1180 /
+   :1230) and Final record (:1390), the gates (gates.rs:160 / :308 / :318 /
+   :331), the choice resume paths (choice.rs:3479 / :3663) and
+   turn/actions/mod.rs:1529.
+
+   The `rb_record_use` + `rb_mark_enqueued_entry_use_limit_recorded` pair that
+   used to follow each push below was an interim shape that spent the
+   turn-limited use at ENQUEUE. It is gone, and the two resolution-time records
+   in src/ability/ability_queue.c (the Early record at :1423-1432 and the Final
+   record at :1575-1584, both through `drain_record_ability_use` ->
+   `rb_record_ability_use`) plus the owner-scoped drain's own records in
+   pca_resolve_entry (game_state_abilities.c:2789-2796 and :2817-2820) now own
+   it, exactly as they do in Rust.
+
+   It had to be all of it at once. With the flag pre-set but the record still
+   made here, the resolution-time gate at game_state_abilities.c:2710
+   (`if (ab->use_limit > 0 && !entry->use_limit_recorded)`) became permanently
+   unreachable for these entries, so a 「{{ターン1回}}」 ability enqueued by a
+   scan was admitted whether or not its use was spent, and — because the
+   drain's records all early-return on a set flag — the use was never spent at
+   all. Removing the flag WITHOUT removing this record is the half that
+   regresses; both halves are gone together.
 
 /* Per-scan (card_id, ability_idx) dedupe set — the C stand-in for Rust's
    `HashSet<(i16, usize)>`, which is scoped to ONE seat's ONE scan in every
@@ -138,10 +178,9 @@ static int queue_gained_trigger_seen(GameState *g, int pl, int card_id,
         int ability_idx = RB_GAINED_ABILITY_INDEX_BASE + i;
         if (seen && !rb_trigger_seen_add(seen, n_seen, card_id, ability_idx)) continue;
         if (rb_use_limit_reached(&g->queue, card_id, ability_idx, limit, g->turn)) continue;
-        if (rb_push_owned_entry(g, pl, card_id, ability_idx, trigger)) {
-            rb_record_use(&g->queue, card_id, ability_idx, g->turn);
-            queued++;
-        }
+        /* Rust records nothing at enqueue -- see the note on
+           rb_push_owned_entry. The use is spent when this entry resolves. */
+        if (rb_push_owned_entry(g, pl, card_id, ability_idx, trigger)) queued++;
     }
     return queued;
 }
@@ -227,10 +266,9 @@ int rb_trigger_debut(GameState *g, int pl, int card_id) {
                     trigger_auto_ability(..., player_id, ...) stamps. Pushing
                     un-stamped here made the entry invisible to the owner-scoped
                     drain. */
-                 if (rb_push_owned_entry(g, pl, card_id, i, "登場")) {
-                     rb_record_use(&g->queue, card_id, i, g->turn);
-                     queued = 1;
-                 }
+if (rb_push_owned_entry(g, pl, card_id, i, "登場")) {
+                      queued = 1;
+                  }
              }
         }
         rb_free_ability(&ab);
@@ -309,11 +347,8 @@ int rb_trigger_live_start(GameState *g, int pl) {
                         player_id_clone for the whole scan
                         (turn/triggers.rs:180, :309-317) and passes it to every
                         trigger_auto_ability, for BOTH the live-card zone and the
-                        stage members. */
-                     if (rb_push_owned_entry(g, pl, cid, ai, "ライブ開始時")) {
-                         rb_record_use(&g->queue, cid, ai, g->turn);
-                         queued++;
-                     }
+                        stage members. Records nothing (see rb_push_owned_entry). */
+                     if (rb_push_owned_entry(g, pl, cid, ai, "ライブ開始時")) queued++;
                 } else {
                     fprintf(stderr, "[LIVE_START_SCAN] pl=%d trigger=%s zone=%s label=%s cid=%d ab=%d queued=0 use_limit\n",
                             pl, rb_canonical_trigger(ab.triggers), rb_trigger_zone_id(0),
@@ -356,11 +391,9 @@ int rb_trigger_live_start(GameState *g, int pl) {
                             rb_trigger_zone_label(1), cid, i);
                      /* Owner-stamped: same `pl` as the live-card loop above —
                         g->p[pl].stage, and Rust passes one player_id_clone for the
-                        whole chained live_cards + stage_cards scan. */
-                     if (rb_push_owned_entry(g, pl, cid, i, "ライブ開始時")) {
-                         rb_record_use(&g->queue, cid, i, g->turn);
-                         queued++;
-                     }
+                        whole chained live_cards + stage_cards scan. Records
+                        nothing (see rb_push_owned_entry). */
+                     if (rb_push_owned_entry(g, pl, cid, i, "ライブ開始時")) queued++;
                 } else {
                     fprintf(stderr, "[LIVE_START_SCAN] pl=%d trigger=%s zone=%s label=%s cid=%d ab=%d queued=0 use_limit\n",
                             pl, rb_canonical_trigger(ab.triggers), rb_trigger_zone_id(1),
@@ -511,10 +544,11 @@ int rb_trigger_live_success(GameState *g, int pl) {
         int cid = pending[i].card_id;
         int idx = pending[i].ability_idx;
         if (idx >= RB_GAINED_ABILITY_INDEX_BASE) {
-            if (rb_push_owned_entry(g, pl, cid, idx, RB_TSTR_LIVE_SUCCESS)) {
-                rb_record_use(&g->queue, cid, idx, g->turn);
-                queued++;
-            }
+            /* The gained arm (trigger_scan.rs:465-514) has no use-limit gate at
+               all — the printed arm's `ability_has_remaining_uses` lives in the
+               TAS scan (abilities.rs:971), not here — and, like every Rust
+               enqueue, records nothing. */
+            if (rb_push_owned_entry(g, pl, cid, idx, RB_TSTR_LIVE_SUCCESS)) queued++;
             continue;
         }
         Ability ab;
@@ -533,10 +567,7 @@ int rb_trigger_live_success(GameState *g, int pl) {
                 cid, idx, 0, limit, reached, key == g->just_completed_ability_key);
         rb_free_ability(&ab);
         if (key == g->just_completed_ability_key || reached) continue;
-        if (rb_push_owned_entry(g, pl, cid, idx, RB_TSTR_LIVE_SUCCESS)) {
-            rb_record_use(&g->queue, cid, idx, g->turn);
-            queued++;
-        }
+        if (rb_push_owned_entry(g, pl, cid, idx, RB_TSTR_LIVE_SUCCESS)) queued++;
     }
     return queued;
 }
@@ -735,16 +766,40 @@ static void apply_constant_effect(GameState *g, int pl, int host_cid,
         int c = card_at_position(g, tgt_pl, pos);
         if (c != RB_EMPTY_SLOT) tgt_cid = c;
     }
-    if (!strcmp(e->action,"modify_cost")) {
-        int cnt = e->count>=0?e->count:1;
-        for(int i=0;i<e->n_extra;i++) if(e->extra_k[i] && !strcmp(e->extra_k[i],"value")){
-            int v = atoi(e->extra_v[i]); if(v) cnt = v;
-        }
-        for(int i=0;i<e->n_extra;i++) if(e->extra_k[i] && !strcmp(e->extra_k[i],"sign") && e->extra_v[i] && !strcmp(e->extra_v[i],"negative")) cnt = -cnt;
-        rb_mods_add_cost(&g->mods, tgt_cid, cnt);
-        if(!acc) g->mods.constant_cost[tgt_cid]+=cnt;
-        if(acc) acc->cost+=cnt;
-    } else if (!strcmp(e->action,"modify_score")) {
+    /* NO `modify_cost` arm here, and that is now faithful.
+       engine/src/core/game_state/modifiers.rs's constant dispatch
+       (ActionType::GainResource :792, ModifyScore :1028, GainAbility :1118,
+       GainAbilityFromSource :1202, ModifyRequiredHeartsGlobal :1209,
+       Sequential :1250) has NO ModifyCost case, and commit_constant_results
+       (:1375) is called with NO cost argument at all. Cost modifiers are
+       owned end-to-end by the ONE dedicated pass Rust runs at modifiers.rs:1391-
+       1392, `recalculate_constant_cost_modifiers_with_ids(&entries, &hand_ids)`,
+       which is this file's rb_recalculate_constant_cost_modifiers — see the
+       call at the tail of rb_recalc_constants below.
+
+       The arm that used to live here was strictly weaker than that twin:
+         * it read a NON-RUST `sign == "negative"` extra instead of the
+           `operation` field, so every printed 「コストはN減る」 (operation
+           "subtract") was applied as an ADD of N — e.g. the 17 常時
+           modify_cost effects in the corpus are 12 "subtract", 4 "add", 1
+           "set";
+         * it had no set-to-absolute path at all;
+         * it had no per_unit / per_unit_location / per_unit_count /
+           exclude_self branch (modifiers.rs:1515-1582);
+         * it carried no `effect.condition` gate of its own beyond the caller's
+           (the twin evaluates it per ability, modifiers.rs:1503-1506);
+         * it had no LL-bp7-001 exclusion (modifiers.rs:1478-1485), so
+           「手札3枚捨てて10」 (operation "set", value 10, location hand,
+           characters x3, optional) installed a permanent absolute cost of 10;
+         * and it keyed the bonus on `tgt_cid`, which defaults to the HOST and
+           is rewritten by the position block above, whereas the twin always
+           keys it on the card the 常時 is printed ON (`expected.entry(cid)`,
+           modifiers.rs:1594) — which is what makes the hand-card discounts work
+           at all, since rb_recalc_constants' own scan walks stage + success +
+           live and NEVER a hand card.
+       Reimplementing any of that here would be a fifth copy of the twin; the
+       twin is called once instead. */
+    if (!strcmp(e->action,"modify_score")) {
         int cnt=e->count>=0?e->count:1;
         for(int i=0;i<e->n_extra;i++) if(e->extra_k[i] && !strcmp(e->extra_k[i],"value")){
             int v=atoi(e->extra_v[i]); if(v) cnt=v;
@@ -1447,6 +1502,35 @@ void rb_recalc_constants(GameState *g) {
             }
         }
     }
+
+    /* engine/src/core/game_state/modifiers.rs:1388-1392 -- the LAST statement
+       of recalculate_constants' cost half, after commit_constant_results (:1375)
+       and before evaluate_success_zone_constant_modifiers (:1398) /
+       refresh_yell_sources (:1400):
+
+           // Also recalculate cost modifiers from hand cards (hand-based cost
+           // reductions)
+           let hand_ids = self.collect_constant_hand_effect_ids();
+           self.recalculate_constant_cost_modifiers_with_ids(&entries, &hand_ids);
+
+       `entries` is the stage constant-id list this scan already walked
+       (modifiers.rs:1392), so the pass covers exactly stage + hand. That is
+       strictly WIDER than the loop above, which walks stage + success + live
+       and never a hand card -- and the widening is the point: 12 of the 17
+       printed 常時 modify_cost effects are 「手札にあるこのメンバーカードの
+       コストは…減る」, and none of them was reachable before.
+
+       It is ONE call, not one per printed effect, because the twin is a
+       diff-and-commit over the whole `constant_cost` ledger
+       (modifiers.rs:1633-1652): calling it from inside the per-card scan would
+       interleave with the `constant_cost[i] = 0` reset above and with the
+       set_cost arm's own ledger write, and — because the twin only runs when a
+       STAGE/SUCCESS/LIVE card happens to carry a 常時 modify_cost — a bonus
+       whose host had left the board would never be withdrawn.
+
+       The twin is declared at the top of this file; it is defined
+       non-static in src/core/modifiers.c:715 and was previously ZERO-CALLER. */
+    rb_recalculate_constant_cost_modifiers(g);
 
     g->mods.p1_constant_total_score_bonus = total_p1;
     g->mods.p2_constant_total_score_bonus = total_p2;

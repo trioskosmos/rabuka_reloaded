@@ -17,6 +17,33 @@
      · last_ability_trace                  — no GameState field
      · current_turn_phase                  — no GameState field (derived here)
 
+   REACHABILITY, MEASURED (2026-10-02). 50 rb_gsc_* definitions; exactly ONE
+   has an external caller in the whole tree:
+
+       rb_gsc_concede          <- game_setup.c:764 (rb_setup_concede delegates)
+       └─ rb_gsc_reject_if_ended  <- rb_gsc_concede + rb_gsc_concede_both
+          └─ rb_gsc_game_has_ended
+
+   The other 47 are externally unreachable (47 = 50 definitions - the 3
+   reachable ones above). That is NOT evidence they are
+   wrong: for most of them the Rust twin IS live and the matching C call site
+   lives in a translation unit this file's owner does not write (resolver.c,
+   phase.c, live.c, game_state_abilities.c, web_server.c, ...), so the gap is
+   a wiring request, not a porting defect. A handful are genuine duplicates of
+   a live twin in another file and are pure drift hazard. The full
+   WIRE/DELETE/REPORT table for every one is in the handover report.
+
+   ⛔ DO NOT WIRE THE LOGGING GROUP INTO rb_log_push_verdict. Rust's
+   push_rule_log / push_rule_log_fmt feed a SEPARATE `rule_log: Vec<String>`
+   (mod.rs:1526-1540, 72 + 61 src call sites). rb_log_push_verdict is the
+   CONDITION-VERDICT buffer (ability/log.c: 32 slots, drop-newest, gated on
+   ABILITY_DEBUG). Routing the rule log there evicts condition verdicts. The
+   required GameState field is a bounded rule-log ring; the owner of
+   include/rabuka.h must add it before any of the nine logging functions below
+   gets a caller. current_turn_phase must NOT be added (it is derivable from
+   g->phase + first/second_attacker, and adding it makes a second source of
+   truth).
+
    Every exported symbol is prefixed rb_gsc_ so this file can be added to the
    build without colliding with any existing symbol.
 
@@ -277,12 +304,44 @@ int rb_gsc_opponent_has_performed(const GameState *g, int my_player_idx) {
    Rust: mod.rs:788-794. NOTE the phase is advanced BEFORE the mulligan is
    applied, so active_player() is already the other seat — this is the
    separate owner query that avoids the observed "mulliganed the opponent's
-   hand" bug. */
+   hand" bug.
+
+   THE INVERSION THAT WAS HERE (fixed 2026-10-02). The previous body was
+
+       int p1_is_first = (g->first_attacker == 0);
+       MULLIGAN_FIRST  -> p1_is_first ? 1 : 0;
+       MULLIGAN_SECOND -> p1_is_first ? 0 : 1;
+
+   which returns 1 when player 1 IS the first attacker. Rust says
+
+       MulliganFirstAttacker  => Some(usize::from(!player1.is_first_attacker))
+       MulliganSecondAttacker => Some(usize::from( player1.is_first_attacker))
+
+   and `usize::from(true) == 1`, so the two Rust arms expand to exactly the
+   same table this function now implements:
+
+       p1 is first | MulliganFirst | MulliganSecond
+       ------------+---------------+----------------
+       true        | 0             | 1
+       false       | 1             | 0
+
+   which is the four regression vectors at engine/src/turn/mulligan_tests.rs
+   :137-140. The old body reproduced the DIAGONAL of that table instead
+   (true -> 1 / 0), failing vectors :137 and :139.
+
+   `g->first_attacker` / `g->second_attacker` ARE the seat indices
+   (game_setup.c:504-505 `= p1_first ? 0 : 1` / `? 1 : 0`), so returning
+   them directly is the faithful translation — not "the opposite seats".
+
+   This was inert (zero callers tree-wide) so it could never have failed a
+   suite; it was a landmine for whoever wired the shorter name. It remains a
+   DUPLICATE of the live, correct twin rb_setup_mulligan_owner_index
+   (game_setup.c:583-588), which is what the mulligan path actually calls.
+   Do not create a third copy. */
 int rb_gsc_mulligan_owner_index(const GameState *g) {
     if (!g) return -1;
-    int p1_is_first = (g->first_attacker == 0);
-    if (g->phase == RB_PHASE_MULLIGAN_FIRST)  return p1_is_first ? 1 : 0;
-    if (g->phase == RB_PHASE_MULLIGAN_SECOND) return p1_is_first ? 0 : 1;
+    if (g->phase == RB_PHASE_MULLIGAN_FIRST)  return g->first_attacker;
+    if (g->phase == RB_PHASE_MULLIGAN_SECOND) return g->second_attacker;
     return -1;
 }
 

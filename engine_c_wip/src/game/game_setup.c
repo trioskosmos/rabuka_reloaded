@@ -49,18 +49,21 @@
  *   Everything else is reachable only from inside this file. Two blockers,
  *   both outside this file's ownership:
  *
- *   (1) rb_setup_execute_action / _for_player take `RbSetupAction`, and
- *       `RbSetupAction` / `RbSetupActionType` are declared HERE, not in
- *       include/rabuka.h. No other translation unit can construct the argument,
- *       so the entire 29-variant action dispatch (the C twin of Rust's 81-caller
- *       game_setup::execute_action) is uncallable by construction. That is why
+ *   (1) NOTHING dispatches an action. `RbSetupAction` / `RbSetupActionType` used
+ *       to be declared HERE, which made the whole 29-variant dispatch (the C
+ *       twin of Rust's 81-caller game_setup::execute_action) uncallable BY
+ *       CONSTRUCTION; the rabuka.h owner has since moved both types into
+ *       include/rabuka.h, so the type blocker is GONE — the remaining blocker is
+ *       simply that engine_c_wip has no action dispatcher: rb_setup_execute_action
+ *       still has zero callers tree-wide (its only caller is
+ *       rb_setup_execute_action_for_player, which itself has none). That is why
  *       rb_setup_mulligan_candidates, rb_setup_play_candidates,
  *       rb_setup_live_card_candidates, rb_setup_concede,
  *       rb_setup_stage_area_from_parameters and the RPS / SetLiveCard /
  *       PlayMemberToStage arms have no caller: they are all downstream of it.
  *       tests/test_parity_rules.c:1363 and tests/test_parity_rules_extra.c:229,
- *       :275, :307 assert that concede gap as an EXPECTED_GAP, so whoever adds
- *       the header field must revisit those pins with their owner.
+ *       :275, :307 assert that concede gap as an EXPECTED_GAP, so whoever wires
+ *       the dispatcher must revisit those pins with their owner.
  *
  *   (2) rb_generate_action_candidates (src/turn/phase.c:1353) returns an empty
  *       list unless phase == RB_PHASE_MAIN, so it never reaches the mulligan /
@@ -95,6 +98,84 @@
  *   has no GBA front end to consume them. Recorded so the next reader does not
  *   spend a session on it as a false lead.
  *
+ * ── ZERO-CALLER INVENTORY (every function defined here, counted tree-wide) ──
+ * Method: for each of the 58 definitions, count `name(` occurrences outside this
+ * file in every .c/.h under src/ and include/ (as "src"), and separately in
+ * every .c/.h under tests/ (as "tests"), then subtract this file's own
+ * definition + call sites. Tests: 0 for EVERY function in this file — no test/
+ * file references any rb_setup_* or setup_* symbol, so test coverage cannot
+ * distinguish any change made here and every A/B measurement on this file is
+ * expected to be NEUTRAL.
+ * The eleven rows below are the complete zero-caller set (definition-only).
+ *
+ *   rb_setup_is_live_card_set_phase      REPORT  game_setup.rs:398
+ *   rb_setup_auto_advance_one             REPORT  game_setup.rs:382
+ *   rb_setup_settle_single_player_state   WIRE?  game_setup.rs:410
+ *   rb_setup_settle_auto                  REPORT  game_setup.rs:434
+ *   rb_setup_mulligan_candidates          REPORT  game_setup.rs:1467
+ *   rb_setup_execute_action_for_player    REPORT  game_setup.rs:514
+ *   rb_setup_play_candidates              WIRE?  game_setup.rs:1690-2075
+ *   rb_setup_live_card_candidates         REPORT  game_setup.rs:2353
+ *   rb_setup_build_two_decks              REPORT  game_setup.rs:338
+ *   rb_setup_extract_base                 REPORT  deck_ordering.rs:67 (dead in Rust)
+ *   rb_setup_flatten_and_sort_for_gba     REPORT  deck_ordering.rs:90 (dead in Rust)
+ *
+ * Nothing here is marked DELETE: every one of the eleven has a live Rust twin,
+ * and deleting a port because the C tree has no platform front end to call it
+ * would be deleting the port, not fixing it.
+ *
+ *   WIRE? — the two rows where an in-tree C caller exists and is WRONG, not
+ *   merely absent. Both are the same defect: a hand-rolled narrower loop
+ *   shadowing the faithful port. Neither caller is in this file.
+ *     - src/web_server.c:303 settle_web_initial_state advances ONLY
+ *       Active/Energy/Draw and gives up after 16 iterations. Rust's
+ *       web_server.rs:913/957/1702/1771 calls game_setup::settle_single_
+ *       player_state, whose is_automatic_phase list is the full six phases
+ *       (game_setup.rs:369-375) with a 500-iteration guard. A C game that
+ *       reaches PERFORMANCE / PERFORMANCE_SECOND / VICTORY through the web
+ *       front end stalls where Rust settles. OWNER: web_server.c — delete the
+ *       inline loop and call rb_setup_settle_single_player_state.
+ *     - src/turn/phase.c:1353 rb_generate_action_candidates re-implements the
+ *       play-member scan inline (see the two pricing drifts recorded above).
+ *       OWNER: phase.c — replace the inline scan with a bridge over
+ *       rb_setup_play_candidates, exactly as the ability half already does
+ *       through rb_setup_for_each_ability_candidate (:1253). No bridge is added
+ *       here on purpose: RbSetupPlayCandidate is file-private, so a bridge with
+ *       no caller would be a NEW uncalled function — strictly worse than the
+ *       status quo. The bridge shape phase.c needs is a sink callback
+ *       `int (*sink)(void *ctx, int card_id, int hand_index, int card_cost,
+ *         int reduction, int effective_cost, const int area_available[3],
+ *         const int area_cost[3], const int area_is_baton_touch[3])`, i.e. the
+ *         RbSetupPlayCandidate fields flattened; adding it is a one-hunk change
+ *       on the phase.c side of the boundary.
+ *
+ *   REPORT — no in-tree C caller exists and none can be added from here:
+ *     - the four settle/phase-classification helpers are HOST API in Rust too.
+ *       Their Rust callers are engine/src/bin (bad_game_report, bot_arena,
+ *       calibrate, diag_stall, hunt_loop, play_game, turn_replay, ...) which
+ *       PROGRESS.md puts out of scope, plus link.rs / match_runner.rs (no C
+ *       match_runner.c exists) and web_server.rs (the WIRE? row above).
+*     - rb_setup_execute_action_for_player and everything downstream of it
+*       (rb_setup_concede, rb_setup_stage_area_from_parameters, the RPS /
+*       SetLiveCard / PlayMemberToStage / SelectMulligan / ConfirmMulligan arms,
+*       and therefore rb_setup_handle_mulligan_selection / _confirmation) have
+*       no caller because NO ACTION DISPATCHER EXISTS in C engine_c_wip — not
+*       because of a type-visibility problem any more (both action types now live
+*       in include/rabuka.h). Note the consequence for the audit:
+*       rb_setup_handle_mulligan_selection and _confirmation are the sole
+*       implementation, but their only caller is itself uncallable, so today
+*       only rb_setup_handle_mulligan_skip is actually reachable (phase.c:111).
+*       One dispatcher un-cascades all of it.
+ *     - rb_setup_mulligan_candidates / _live_card_candidates: their consumer
+ *       would be rb_generate_action_candidates, which returns an empty list
+ *       unless phase == RB_PHASE_MAIN (phase.c:1353), so the mulligan and
+ *       live-set windows are never offered. Blocker is phase.c, as above.
+ *     - rb_setup_build_two_decks: Rust game_setup.rs:338 is called only from
+ *       engine/src/bin harnesses (18 call sites, all bins); engine_c_wip
+ *       builds its decks through rb_build_deck_from_card_numbers directly, and
+ *       the C builder already folds in the default-energy step this wrapper
+ *       exists to sequence.
+ *
  * CROSS-FILE REQUESTS are marked `XREQ` below and repeated in the handover
  * report: everything in this file is verified with
  *   gcc -fsyntax-only -std=c11 -Iinclude -Isrc -Isrc/core/generated \
@@ -124,7 +205,7 @@ extern int rb_handle_play_member_to_stage(GameState *g, int card_id,
                                           int stage_area, int use_baton_touch);
 extern int rb_check_trigger_position(const char *triggers, int card_position);
 extern int rb_check_effect_position(const char *effect_pos, int card_position);
-extern void rb_queue_reset(GameState *g);   /* ability_queue.c:2554 */
+extern int rb_gsc_concede(GameState *g, int player_id); /* game_state_core.c:300 */
 
 /* Defined at the bottom of this file (deck_builder.h has no status to_str). */
 const char *rb_setup_deck_build_status_str(int status);
@@ -144,110 +225,40 @@ const char *rb_setup_deck_build_status_str(int status);
  * Display impl (wire/UI strings) and to_tag/from_tag (3DS link protocol) are
  * not ported — see the scope note at the top of the file.
  * ========================================================================*/
-typedef enum {
-    RB_SETUP_ACT_PASS = 0,
-    RB_SETUP_ACT_ROCK_CHOICE,
-    RB_SETUP_ACT_PAPER_CHOICE,
-    RB_SETUP_ACT_SCISSORS_CHOICE,
-    RB_SETUP_ACT_CHOOSE_FIRST_ATTACKER,
-    RB_SETUP_ACT_CHOOSE_SECOND_ATTACKER,
-    RB_SETUP_ACT_MULLIGAN_HEADER,
-    RB_SETUP_ACT_SELECT_MULLIGAN,
-    RB_SETUP_ACT_CONFIRM_MULLIGAN,
-    RB_SETUP_ACT_SKIP_MULLIGAN,
-    RB_SETUP_ACT_LIVE_CARD_HEADER,
-    RB_SETUP_ACT_SELECT_LIVE_CARD,
-    RB_SETUP_ACT_CONFIRM_LIVE_CARD_SET,
-    RB_SETUP_ACT_SKIP_LIVE_CARD_SET,
-    RB_SETUP_ACT_PLAY_MEMBER_TO_STAGE,
-    RB_SETUP_ACT_USE_ABILITY,
-    RB_SETUP_ACT_SET_LIVE_CARD,
-    RB_SETUP_ACT_FINISH_LIVE_CARD_SET,
-    RB_SETUP_ACT_DRAW_CARD,
-    RB_SETUP_ACT_CHOICE_DECISION,
-    RB_SETUP_ACT_CHOICE_SELECT,
-    RB_SETUP_ACT_CHOICE_SKIP,
-    RB_SETUP_ACT_CHOICE_OPTION,
-    RB_SETUP_ACT_CHOICE_POSITION,
-    RB_SETUP_ACT_ENERGY_CHARGE,
-    RB_SETUP_ACT_PASS_REMAINING,
-    RB_SETUP_ACT_CONCEDE,
-    RB_SETUP_ACT_COUNT
-} RbSetupActionType;
 
 /* Headless Action: only the fields the ENGINE consumes. The display fields
  * (description, card_name, card_no, source_ability, base_cost, final_cost,
  * available_areas, double_baton_pairs, disabled, selected) are menu data and
  * are not reproduced; the decision-relevant costs ARE reported by the
  * rb_setup_*_candidates() entry points instead. */
-typedef struct {
-    RbSetupActionType type;
-    int has_card_id;
-    int card_id;
-    int card_indices[RB_MAX_HAND];
-    int n_card_indices;
-    const char *stage_area;      /* NULL = unset */
-    int has_stage_area_index;
-    int stage_area_index;
-    int use_baton_touch;
-    int has_use_baton_touch;
-    int has_ability_index;
-    int ability_index;
-} RbSetupAction;
+/* RbSetupActionType and RbSetupAction now live in include/rabuka.h so other
+ * translation units can construct one; they were local here, which made
+ * rb_setup_execute_action and 7 sibling functions uncallable by construction. */
 
 /* game_setup.rs:1617-1626 AreaCandidate, minus the display-only
  * `existing_member_name`. */
-typedef struct {
-    int slot;                  /* 0=left 1=center 2=right (AREA_NAMES order) */
-    int available;
-    int cost;
-    int is_baton_touch;
-    int existing_member_id;    /* RB_EMPTY_SLOT when the area is empty */
-} RbSetupAreaCandidate;
+/* RbSetupAreaCandidate now lives in include/rabuka.h so other translation units can
+   construct one; removed here to avoid a second, drifting definition. */
 
 /* game_setup.rs:320-324 DoubleBatonOption */
-typedef struct {
-    int area_index[2];
-    int placement_area;
-    int cost;
-} RbSetupDoubleBatonOption;
+/* RbSetupDoubleBatonOption now lives in include/rabuka.h so other translation units can
+   construct one; removed here to avoid a second, drifting definition. */
 
 /* Decision table for one hand member — the rules content of the per-hand-card
  * body of game_setup.rs:1690 generate_main_phase_actions. */
-typedef struct {
-    int card_id;
-    int hand_index;
-    int card_cost;             /* card.cost.unwrap_or(0) */
-    int reduction;             /* calculate_play_cost_reduction */
-    int effective_cost;        /* card_cost.saturating_sub(reduction) */
-    RbSetupAreaCandidate areas[RB_STAGE_SIZE];
-    int any_area_available;
-    RbSetupDoubleBatonOption pairs[RB_SETUP_MAX_DOUBLE_BATON];
-    int n_pairs;
-} RbSetupPlayCandidate;
+/* RbSetupPlayCandidate now lives in include/rabuka.h so other translation units can
+   construct one; removed here to avoid a second, drifting definition. */
 
 /* One offerable activation — the rules content of the stage + discard ability
  * scans in game_setup.rs:2078-2348. */
-typedef struct {
-    int card_id;
-    int ability_index;         /* printed index, or RB_GAINED_ABILITY_INDEX_BASE+n */
-    int from_stage;            /* 1 = stage scan, 0 = discard (控え室) scan */
-    int stage_slot;            /* 0..2 when from_stage, else RB_EMPTY_SLOT */
-    int base_cost;             /* AbilityEffect::energy_cost_total */
-    int effective_cost;        /* effective_activation_cost_for(.., groups) */
-    int groups_on_stage;
-    int has_optional_payment;
-} RbSetupAbilityCandidate;
+/* RbSetupAbilityCandidate now lives in include/rabuka.h so other translation units can
+   construct one; removed here to avoid a second, drifting definition. */
 
 /* Mulligan / live-card selection rows (the non-label part of
  * game_setup.rs:1467 generate_mulligan_actions and :2353
  * generate_live_card_set_actions). */
-typedef struct {
-    int hand_index;
-    int card_id;
-    int selected;
-    int selectable;            /* live-card rows only: false at the limit */
-} RbSetupHandCandidate;
+/* RbSetupHandCandidate now lives in include/rabuka.h so other translation units can
+   construct one; removed here to avoid a second, drifting definition. */
 
 /* ─────────────────────────── small helpers ─────────────────────────── */
 
@@ -493,14 +504,53 @@ int rb_setup_choose_attacker(GameState *g, int p1_first) {
  *     i.e. 6 dealt + 1 draw phase.
  *   - SELECTION and CONFIRMATION are NOT reachable. They are reached only from
  *     rb_setup_execute_action, and rb_setup_execute_action has no caller
- *     because its parameter type RbSetupAction / RbSetupActionType is declared
- *     at the top of THIS FILE and not in include/rabuka.h — no other
- *     translation unit can name it. That is the whole blocker, and it is a
- *     header request, not a missing call.
+ *     tree-wide. The reason CHANGED under this file: it used to be that
+ *     RbSetupAction / RbSetupActionType were declared at the top of THIS FILE, so
+ *     no other translation unit could name the argument (a header request);
+ *     the rabuka.h owner has since moved both types into include/rabuka.h, so
+ *     the remaining blocker is purely the absent dispatcher — nothing in C
+ *     engine_c_wip turns a host action into an RbSetupAction yet.
  * ==========================================================================*/
 
-/* game_state/mod.rs:788 mulligan_owner_index — the seat whose mulligan decision
- * the current mulligan phase belongs to; -1 outside a mulligan phase. */
+/* game_state/mod.rs:788-794 mulligan_owner_index — the seat whose mulligan
+ * decision the current mulligan phase belongs to; -1 outside a mulligan phase.
+ *
+ * THE INVERSION THAT IS NOT ONE (re-checked 2026-10-02, against the Rust
+ * regression vectors, not against a test outcome):
+ *
+ *   mod.rs:790  MulliganFirstAttacker  => Some(usize::from(!player1.is_first_attacker))
+ *   mod.rs:791  MulliganSecondAttacker => Some(usize::from( player1.is_first_attacker))
+ *
+ * `player1.is_first_attacker == true` means "seat 0 is the first attacker", so
+ * `!` is "seat 0 is NOT the first attacker" => usize 1, i.e. MULLIGAN-FIRST
+ * BELONGS TO THE FIRST ATTACKER and MULLIGAN-SECOND TO THE SECOND. Written out
+ * against the four vectors in engine/src/turn/mulligan_tests.rs:137-140:
+ *
+ *   p1 is first | MulliganFirst | MulliganSecond
+ *   ------------+---------------+----------------
+ *   true        | 0             | 1
+ *   false       | 1             | 0
+ *
+ * C spells `player1.is_first_attacker` as `g->first_attacker == 0`, because
+ * g->first_attacker IS THE SEAT INDEX of the first attacker (rb_gsc_first_
+ * attacker_index, game_state_core.c:121; set by rb_setup_choose_attacker:503
+ * and engine.c:1293). So the body below — first phase => g->first_attacker,
+ * second phase => g->second_attacker — reproduces all four vectors exactly.
+ * Returning `g->first_attacker` here is NOT "the opposite seats"; it is the
+ * first attacker's seat, which is what the phase is named after.
+ *
+ * ⚠ THE INVERTED TWIN IS IN THE OTHER FILE. rb_gsc_mulligan_owner_index
+ * (src/core/game_state_core.c:281-287) computes
+ *   p1_is_first = (first_attacker == 0);  MULLIGAN_FIRST  -> p1_is_first ? 1 : 0
+ * which returns 1 when player 1 IS the first attacker — the exact inversion,
+ * failing mulligan_tests.rs:137 and :139. It is the copy that must be fixed,
+ * not this one. It has ZERO callers tree-wide (no decl in include/rabuka.h
+ * either), so it is currently harmless — it is a landmine for whoever wires a
+ * caller to the shorter name. OWNER: game_state_core.c. Until then this file
+ * keeps its own (correct) copy rather than delegating to the wrong one.
+ *
+ * Callers must capture the owner BEFORE advancing the phase (mod.rs:755-758,
+ * the regression itself); rb_setup_handle_mulligan_confirmation below does. */
 int rb_setup_mulligan_owner_index(const GameState *g) {
     if (!g) return -1;
     if (g->phase == RB_PHASE_MULLIGAN_FIRST) return g->first_attacker;
@@ -654,16 +704,36 @@ int rb_setup_stage_area_from_parameters(const RbSetupAction *a) {
     return -1;
 }
 
-/* core/game_state/mod.rs:416 concede. C spells "the game ended" as winner != -1;
- * the opponent is awarded the win, keyed on the seat order (Rust derives it
- * from the first-attacker flags, which are the same two seats here). */
+/* core/game_state/mod.rs:416-436 concede. C spells "the game ended" as
+ * winner != -1 (plus RB_PHASE_DONE, which rb_advance_phase itself writes on the
+ * next pass — phase.c:249 — so conceding to DONE early is the same state Rust
+ * reaches one step later, never a different one).
+ *
+ * DELEGATED to rb_gsc_concede (src/core/game_state_core.c:300), which is the
+ * line-for-line twin of the Rust body and was previously a second, weaker copy
+ * of it. The two winner derivations are provably the same seat: Rust awards
+ * FirstAttackerWins / SecondAttackerWins from `player1.is_first_attacker`, and
+ * in C `g->first_attacker` IS that seat index, so both reduce to "the
+ * opponent's seat" — the old `player_id ^ 1`.
+ *
+ * THE TWO "MISSING" WRITES ARE NOT MISSING — they have no C representation.
+ * mod.rs:433-434 also clears `pending_success_replacement_card_id` /
+ * `_player_id`. engine_c_wip's GameState has NEITHER field (grep over the whole
+ * tree: zero hits outside Rust), because this port never ported Rust's
+ * out-of-band note: live.c:1000 rb_try_create_success_replacement_choice folds
+ * it straight into the parked choice (`target == "success_replacement"`,
+ * consumed at choice.c:4643). Conceding therefore has to drop THAT, and it does:
+ * rb_gsc_concede calls rb_queue_clear(&g->queue), which memsets the whole queue
+ * — g->queue.pending, g->queue.has_pending, g->queue.deferred and every parked
+ * entry — i.e. Rust's `entries.clear(); state = Idle; current_index = 0` plus the
+ * dropped WaitingForChoice variant. XREQ (rabuka.h owner) only if someone
+ * reintroduces the Rust's separate fields; nothing else is needed. */
 int rb_setup_concede(GameState *g, int player_id) {
     if (!g) return 0;
     if (player_id < 0 || player_id > 1) return 0;   /* Err("Invalid player seat") */
     if (!setup_game_ongoing(g)) return 0;            /* reject_if_ended */
-    g->winner = player_id ^ 1;
+    if (!rb_gsc_concede(g, player_id)) return 0;
     g->phase = RB_PHASE_DONE;
-    rb_queue_reset(g);          /* ability_queue.clear() */
     return 1;
 }
 

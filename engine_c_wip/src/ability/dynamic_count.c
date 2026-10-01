@@ -161,12 +161,28 @@ int rb_resolve_dynamic_count(const struct GameState *g, int owner, int host_cid,
         const RbPlayer *P = &g->p[opp_pl];
         count = rb_stage_member_count(P);
     } else if (!strcmp(reference_text, "opponent_waited_member_count")) {
+        /* dynamic_count.rs:114-124 keys this arm on
+             self.mods.get_orientation_modifier(c) == Some("wait")
+           — the ORIENTATION modifier. The C carries that one fact in two
+           places: the orientation modifier (set by every ウェイト / 常時
+           orientation effect through rb_mods_set_orientation) and the per-slot
+           `stage_wait` flag (the ONLY writer for an effect-driven
+           state_change, choice.c:3233-3237 — and the field live.c:128,
+           zones.c:60, condition.c:1710-1714 and phase.c:51-56 already read).
+           Reading only `stage_wait` reported a member made waited by an
+           orientation-modifier effect as ACTIVE, so 「相手のステージにいる
+           ウェイト状態のメンバーの数まで」 under-counted and the
+           abilities.json:3426 虹ヶ咲 select asked for too few cards. Accept
+           either — precisely condition.c's orientation_matches_state
+           resolution of the same pair. */
         int self_pl  = rb_dc_self_player(g);
         int opp_pl   = rb_dc_opponent_player(g, self_pl);
         const RbPlayer *P = &g->p[opp_pl];
-        for (int i = 0; i < RB_STAGE_SIZE; i++)
-            if (P->stage[i] != RB_EMPTY_SLOT && P->stage_wait[i])
-                count++;
+        for (int i = 0; i < RB_STAGE_SIZE; i++) {
+            if (P->stage[i] == RB_EMPTY_SLOT) continue;
+            const char *om = rb_mods_get_orientation((RbMods *)&g->mods, P->stage[i]);
+            if (P->stage_wait[i] || (om && !strcmp(om, "wait"))) count++;
+        }
     } else if (!strcmp(reference_text, "waitroom_count_below_base")) {
         int threshold = 0;
         if (base_reference) {

@@ -22,6 +22,28 @@ int rb_handle_rps_choice_p2(GameState *g, int choice);
 int rb_setup_choose_attacker(GameState *g, int p1_first);
 int rb_setup_handle_mulligan_skip(GameState *g);
 
+/* ── CROSS-FILE REQUESTS for include/rabuka.h (that file is not this file's) ──
+ *
+ * rb_clear_play_scoped_baton_touch — src/core/tracking.c:80, the faithful twin of
+ *   Rust's GameState::clear_play_scoped_baton_touch
+ *   (engine/src/core/game_state/modifiers.rs:1769-1774), which phases.rs:1144
+ *   makes the FIRST statement of every handle_play_member_to_stage. It had zero
+ *   callers AND no prototype in any header. Called from
+ *   rb_handle_play_member_to_stage below.
+ *
+ * rb_play_member_ex / rb_play_double_baton_ex — src/engine.c, the ports of
+ *   Player::move_card_from_hand_to_stage (core/player.rs:344, reached from
+ *   phases.rs:1260-1271) and TurnPhases::play_double_baton (phases.rs:936,
+ *   reached from phases.rs:1227-1231). Both take the request parameters
+ *   handle_play_member_to_stage's Rust signature carries and rb_play_member's
+ *   does not. rb_play_member (the public 4-arg entry) is unchanged and forwards
+ *   here with use_baton_touch = 0. */
+void rb_clear_play_scoped_baton_touch(GameState *g);
+int  rb_play_member_ex(GameState *g, int pl, int hand_idx, int stage_pos,
+                       int use_baton_touch);
+int  rb_play_double_baton_ex(GameState *g, int pl, int hand_idx, int a1, int a2,
+                             int place);
+
 /* src/game/game_setup.c — the Main-phase ability OFFER scan, the C twin of
    game_setup.rs:2078-2348 (the stage scan and the 控え室 scan). It is a
    faithful, complete port with no callers of its own, so rb_generate_action_
@@ -35,6 +57,35 @@ int rb_setup_for_each_ability_candidate(
     int (*sink)(void *ctx, int card_id, int ability_index, int from_stage,
                 int stage_slot, int base_cost, int effective_cost),
     void *ctx);
+
+/* ───────────────────────── XREQ: the three dead setup builders ─────────────
+ * game_setup.c ports the rules content of Rust's three remaining row builders
+ * faithfully and completely. All three had ZERO callers because this file
+ * re-implemented the play-member half inline and refused every phase except
+ * RB_PHASE_MAIN, so nothing in the C tree could ever ask them a question:
+ *
+ *   rb_setup_mulligan_candidates    game_setup.rs:1467 generate_mulligan_actions
+ *   rb_setup_play_candidates        game_setup.rs:1690 generate_main_phase_actions
+ *   rb_setup_live_card_candidates   game_setup.rs:2353 generate_live_card_set_actions
+ *
+ * They are called from ONE place in Rust — game_setup.rs:647 / :651 / :654, all
+ * inside generate_possible_actions (:634) — so they are called from one place
+ * here too: rb_generate_action_candidates below, which is that function's C twin.
+ *
+ * Unlike rb_setup_for_each_ability_candidate, these three take a caller-supplied
+ * ROW ARRAY rather than a sink.
+ *
+ * The four row types used to be MIRRORED here, field for field, because they were
+ * file-private in game_setup.c and include/rabuka.h was not this file's to edit.
+ * The header owner has since moved RbSetupAreaCandidate,
+ * RbSetupDoubleBatonOption, RbSetupPlayCandidate, RbSetupHandCandidate and
+ * RB_SETUP_MAX_DOUBLE_BATON into include/rabuka.h, so the mirror is DELETED — the
+ * loud duplicate-typedef failure it was designed to produce is the one that fired,
+ * and it is the intended outcome. The prototypes below are still needed because
+ * the header does not declare these three yet; they move here unchanged. */
+int rb_setup_mulligan_candidates(const GameState *g, RbSetupHandCandidate *out, int max);
+int rb_setup_play_candidates(const GameState *g, RbSetupPlayCandidate *out, int max);
+int rb_setup_live_card_candidates(const GameState *g, RbSetupHandCandidate *out, int max);
 
 /* Turn phase machine — mirrors engine/src/turn/phases.rs:advance_phase
    Two TurnPhases per round: FirstAttackerNormal / SecondAttackerNormal / Live.
@@ -295,6 +346,125 @@ if (g->phase == RB_PHASE_LIVE_SET) {
             Without this, baton touch remains blocked on the next turn because the
             existing member's arrival flag is still set. */
         for(int p=0;p<2;p++) for(int i=0;i<RB_STAGE_SIZE;i++) g->stage_arrived[p][i]=0;
+
+        /* ── engine/src/turn/phases.rs:277-303 — the rest of the SAME rollover ──
+           Rust's LiveVictoryDetermination arm clears eight pieces of turn state
+           before it bumps the turn counter. The block above covers
+           appearance tracking (:309), deployed_this_turn (:286-287) and
+           debut_count_this_turn (:290-291); the lines below are the four that
+           had NO C clear site on the tested path, so every fact they hold stayed
+           satisfiable for the rest of the game.
+
+             cannot_activate_members.clear()      phases.rs:279
+               C fold: GameState.player_cannot_activate[2] (the Rust list is
+               per-seat, not per-card) plus GameState.cannot_active_cards /
+               n_cannot_active_cards, which is the C fold of the per-MEMBER half
+               of the same Rust set (written by effects/misc.c:913-920, read by
+               rb_card_is_cannot_active). Both writers were already in place and
+               NEITHER was ever cleared outside engine.c:1199-1201 — which only
+               rb_turn reaches, i.e. not the interactive loop and not the web
+               path, and not any test. That is why
+               tests/test_parity_restriction.c:947-948 has to zero the field by
+               hand to get a clean probe.
+
+             turn_state_changes.clear()          phases.rs:303
+               C fold: turn_state_changes / n_turn_state_changes. It is a 64-row
+               ring appended by effects/state.c:447/648/1870 with NO reader-side
+               rollover clear anywhere in the tree, so once 64 state changes had
+               happened the buffer was permanently full and every later
+               「このターン…状態が変化した」 style condition stopped being able to
+               record anything at all.
+
+             clear_revealed_cards()              phases.rs:277
+               NOT DONE, and it is not an oversight. The C folds Rust's pending
+               reveal pool and the yell's own reveal record into ONE field
+               (GameState.revealed_cards / n_revealed): ptc_yell_had_draw_icon
+               below reads it as "what the yell just revealed", and
+               tests/test_parity_rules_phases.c:836 (B7) and its D2 twin assert
+               `n_revealed > 0` as the PREMISE that the reveal happened — after
+               perform_live has already run this rollover. Clearing it here is
+               the Rust line and measurably costs exactly those two premise
+               checks (parity_rules_phases 28 -> 30 fail, A/B'd), because the C
+               cannot tell the two uses apart. The other five sites that clear
+               n_revealed (live.c, choice.c, misc.c:942, rules.c:2047,
+               modifiers.c:593) all clear it as the POOL, at the point the choice
+               consumes it — which is the Rust behaviour for the pool. REPORTED
+               as a field-separation request, not silently half-done.
+
+             baton_touch_used — C-LOCAL, no Rust clear site. Rust passes
+               baton_touch_used PER PLAY ACTION as an argument
+               (phases.rs:1076 -> trigger_scan.rs:73-83), so it is a stack value
+               that cannot outlive the action; the C keeps it in GameState and
+               sets it in engine.c:485 (single baton) and :622 (double baton).
+               Nothing in the TREE ever cleared it again outside rb_turn, so from
+               the first baton touch of the game onward it was latched at 1 for
+               both seats, and src/turn/triggers.c:243
+               `if (!baton_touch_used && baton_touch_trigger)` suppressed every
+                   「バトンタッチされたとき」 ability for the rest of the match.
+               The rollover is the widest frame the C phase machine has, and the
+               one Rust's own turn machine is closest to, so that is where it is
+               cleared. It is still coarser than Rust's per-action scope (a turn
+               has two Main phases), but coarser is correct and never-latched is
+               not; making it per-action needs a play-action frame, which is
+               engine.c's and rb_play_member's, not this file's.
+
+           NOT CLEARED HERE, and why — these two have no C representation this
+           file can reach:
+             cannot_live_players.clear()         phases.rs:280
+               lives in the file-static RbRulesState in
+               src/ability/effects/rules.c:72; `rb_rules_state` is `static` there,
+               so there is no accessor and no way to clear it from here. REPORTED
+               to rules.c's owner: it needs an rb_rules_clear_turn_state(g)
+               twin of rules.c's own rb_rules_forget (rules.c:140).
+             wait_immune_members.clear()         phases.rs:281
+               there is no writer for it anywhere in the tree (the header says
+               so at rabuka.h:3280-3289), so it is always empty and clearing it
+               would be a no-op.
+              turn_limited_abilities_used.clear() phases.rs:278
+                already self-clearing in C: the use-limit table is keyed by turn
+                (ability_queue.c:1138/1147 `if (q->use_turn != cur_turn)`), which
+                is the same guarantee Rust gets from the explicit clear. */
+        g->player_cannot_activate[0] = 0;
+        g->player_cannot_activate[1] = 0;
+        g->n_cannot_active_cards = 0;
+        g->n_turn_state_changes = 0;
+        g->baton_touch_used[0] = 0;
+        g->baton_touch_used[1] = 0;
+        /* n_prohibition / n_selected_cards — C-local with no Rust analogue
+         * (engine.c's rb_turn table), so this is a scope decision, not a Rust
+         * line. Both are PER-ACTION buffers that only ever grew:
+         *
+         *   n_prohibition      C-local prohibition notes. compound.c:766-773
+         *                      appends two rows per compound effect; the
+         *                      deduplicating writer (game_state_abilities.c:1314
+         *                      RB_PUSH) and the two readers
+         *                      (triggers.c:1231/1507, game_state_abilities.c:571)
+         *                      only ever COMPACT them down, never zero them. The
+         *                      64-row table therefore filled once and stayed full
+         *                      for the rest of the match, so every later
+         *                      prohibition note was dropped on the floor.
+         *   n_selected_cards   C-store cross-effect selection buffer. Written by
+         *                      choice.c:432/1699/1710/1791/1828/2129/2148, cost.c
+         *                      :1292-1295 and this file's own
+         *                      rb_handle_live_card_selection; cleared on consume
+         *                      (choice.c:1569, compound.c:686) and by the live-set
+         *                      handlers below. A live-set window that is ANSWERED
+         *                      with an explicit index list rather than by toggling
+         *                      leaves the buffer holding the previous window's
+         *                      indices, which is then read as this window's
+         *                      selection.
+         *
+         * The only clear was rb_turn's per-round prologue, and rb_turn is
+         * reachable only from src/main.c:134's batch loop — NOT from the
+         * interactive loop (src/main.c:29-105), NOT from web_server.c, and NOT
+         * from any test. So on every path that matters these two counters
+         * accumulated for the whole game. The rollover is the widest frame the C
+         * phase machine has and the one Rust's own turn machine is closest to
+         * (phases.rs:265-311 clears seven other pieces of turn state there), so
+         * that is where they go; rb_turn's now-duplicate copies are gone
+         * (engine.c, rb_turn). */
+        g->n_prohibition = 0;
+        g->n_selected_cards = 0;
         g->active=g->first_attacker;
         rb_tick_gained(g); /* expire gained abilities whose duration elapsed (mirrors TemporaryEffect turn-end) */
         g->phase=RB_PHASE_ACTIVE;
@@ -1042,34 +1212,126 @@ int rb_handle_live_card_skip(GameState *g) {
 }
 
 /* ───────────────────────────── handle_play_member_to_stage (phases.rs) ─────────────────────────────
-   Play a member card from hand to the stage. Simplified port: delegates to
-   rb_play_member for the basic placement path. */
+   Rust: engine/src/turn/phases.rs:1132-1250, dispatched from
+   engine/src/turn/actions/mod.rs:309-318 (PlayMemberToStage, which forwards the
+   action's own card_id / card_indices / stage_area / use_baton_touch).
+
+   The previous body was a "simplified port" that opened with
+   `(void)indices; (void)n_indices; (void)use_baton_touch;` and delegated
+   straight to rb_play_member. Three of the six Rust parameters were therefore
+   DISCARDED and two more were unreachable; the remaining three are reproduced
+   below, in Rust's order, because two of them change the RESULT:
+
+     :1139  use_baton_touch.unwrap_or(false)      — the C carries an int, so the
+              absent case is 0. Forwarded to rb_play_member_ex, which reads it as
+              the LEFT side of player.rs:394-395's `||`.
+     :1144  clear_play_scoped_baton_touch()        — the FIRST statement of every
+              member play. Was zero-caller in the whole tree.
+     :1166-1177  card_id -> hand index. An explicit id is looked up and is an
+              error if absent (`:1168-1169`); None takes the FIRST MEMBER in hand
+              (`:1170-1177`, `card.is_member()`), which is NOT "the first card" —
+              a live card in hand is a member too and Rust's is_member() does not
+              exclude it, so this is exactly Rust's filter, not a stricter one.
+     :1182-1192  card_indices with len == 2 -> the two areas to replace. Any other
+              length is None, i.e. the single-baton path.
+     :1194-1196  double baton: the landing area is `stage_area.unwrap_or(db[0])`,
+              so the host picks WHICH of the two vacated areas the arrival takes.
+     :1198-1208  single: `stage_area.unwrap_or(first empty, else ALL[0])`.
+     :1227-1231  the double baton replaces ALL named areas BEFORE placing.
+
+   The double-baton PLACEMENT (pay, protection check, replace both, land, fire
+   debut/auto) is engine.c's rb_play_double_baton_ex, the port of Rust's
+   play_double_baton (phases.rs:936-1087). The single-baton placement is
+   rb_play_member_ex, the port of Player::move_card_from_hand_to_stage
+   (core/player.rs:344-...).
+
+   ORDERING NOTE — the play-time cost hook is deliberately NOT called here.
+   Rust runs `play_time_cost_reduction_hook` at :1219-1222 and RETURNS from the
+   function when it arms a play, before the double-baton arm at :1227. The C's
+   equivalent hook is rb_detect_alt_cost, which lives inside rb_play_member_ex
+   because it has to re-enter the same placement to pay; so for the double-baton
+   path the hook is reached through rb_complete_play_with_cost's re-dispatch of
+   the latched pair instead of at :1219. The observable order (hook first, then
+   replacement) is preserved; the two are not the same code path because the C
+   has no Rust stack frame to return through. */
 int rb_handle_play_member_to_stage(GameState *g, int card_id, const int *indices, int n_indices, int stage_area, int use_baton_touch) {
     if (!g) return 0;
-    (void)indices; (void)n_indices; (void)use_baton_touch;
     RbPlayer *P = &g->p[g->active];
+
+    /* phases.rs:1139 — `use_baton_touch.unwrap_or(false)`. The C's int carries
+     * the unwrapped value; a negative value is treated as absent so a caller
+     * that forwards Rust's `None` (game_setup.c's `int` from the action struct)
+     * lands on false rather than on "demand a baton". */
+    if (use_baton_touch < 0) use_baton_touch = 0;
+
+    /* phases.rs:1141-1144 — the FIRST statement of the function, before the card
+     * is even resolved. This is Rust's own word: "Clear stale PLAY-scoped baton
+     * touch state from any previous action this turn. Turn-scoped history
+     * (arriving ids, per-player counts) survives so same-turn baton plays
+     * accumulate." It is NOT the same clear as rb_clear_baton_touch_tracking
+     * (the turn-scoped one); the C's rb_clear_play_scoped_baton_touch
+     * (src/core/tracking.c:80, the twin of modifiers.rs:1769-1774) drops exactly
+     * the four play-scoped fields and nothing else. It had ZERO callers and no
+     * prototype in any header, so the replaced-member identity and cost, the
+     * zero-cost flag and the last arriving id survived every play. */
+    rb_clear_play_scoped_baton_touch(g);
+
+    /* phases.rs:1165-1177 */
     int idx;
     if (card_id >= 0) {
         idx = -1;
         for (int i = 0; i < P->hand.n; i++) {
             if (P->hand.cards[i] == card_id) { idx = i; break; }
         }
-        if (idx < 0) return 0;
+        if (idx < 0) return 0;   /* Err("Card with id {} not found in hand") */
     } else {
         idx = -1;
         for (int i = 0; i < P->hand.n; i++) {
             if (rb_card_is_member(P->hand.cards[i])) { idx = i; break; }
         }
-        if (idx < 0) return 0;
+        if (idx < 0) return 0;   /* Err("No member cards in hand") */
     }
+    int card = P->hand.cards[idx];
+
+    /* phases.rs:1182-1192 — `card_indices.as_ref().and_then(|v| if v.len() == 2
+     * { Some([ALL[v[0]], ALL[v[1]]]) } else { None })`. The indices are AREA
+     * INDICES into MemberArea::ALL, which is [LeftSide, Center, RightSide]
+     * (core/zones.rs:68-72) — the same order as the C's RB_STAGE_SIZE slots, so
+     * they are used directly. A short/long list is None, NOT a single baton. */
+    int pair[2] = { -1, -1 };
+    if (indices && n_indices == 2 &&
+        indices[0] >= 0 && indices[0] < RB_STAGE_SIZE &&
+        indices[1] >= 0 && indices[1] < RB_STAGE_SIZE) {
+        pair[0] = indices[0];
+        pair[1] = indices[1];
+    }
+
+    /* phases.rs:1194-1208 */
     int area;
-    if (stage_area >= 0 && stage_area < RB_STAGE_SIZE) {
-        area = stage_area;
+    if (pair[1] >= 0) {
+        /* Double baton: `stage_area.unwrap_or(db_areas[0])` — the host names
+         * which of the two vacated areas the arrival lands in. */
+        area = (stage_area >= 0 && stage_area < RB_STAGE_SIZE) ? stage_area : pair[0];
     } else {
-        area = rb_stage_first_empty(P->stage);
-        if (area < 0) area = 0;
+        /* `stage_area.unwrap_or_else(|| first empty, else ALL[0])` */
+        area = (stage_area >= 0 && stage_area < RB_STAGE_SIZE)
+                   ? stage_area
+                   : rb_stage_first_empty(P->stage);
+        if (area < 0) area = 0;   /* MemberArea::ALL[0] */
     }
-    return rb_play_member(g, g->active, idx, area);
+
+    /* phases.rs:1227-1231 */
+    if (pair[1] >= 0)
+        return rb_play_double_baton_ex(g, g->active, idx, pair[0], pair[1], area);
+
+    /* phases.rs:1260-1271 — move_card_from_hand_to_stage(idx, area,
+     * use_baton_touch, ...) is rb_play_member_ex. `card` is unused below only
+     * because the placement re-reads the hand at `idx`; it is read here so a
+     * card that cannot be decoded is refused before any request is latched. */
+    Card probe;
+    if (!rb_decode_card_by_index((uint32_t)card, &probe)) return 0;
+    rb_free_card(&probe);
+    return rb_play_member_ex(g, g->active, idx, area, use_baton_touch);
 }
 
 /* ───────────────────────────── setup_initial_energy (phases.rs) ─────────────────────────────
@@ -1348,97 +1610,205 @@ static int rb_ability_offer_sink(void *ctx, int card_id, int ability_index,
     return 0;
 }
 
+/* Push one bare row: an action_type plus a card_id and nothing else. Used for
+ * the mulligan / live-set / pass rows, none of which carries an area list. */
+static int rb_push_card_action(RbGeneratedAction **actions, int *count, int *capacity,
+                               int action_type, int card_id) {
+    RbGeneratedAction action;
+    memset(&action, 0, sizeof(action));
+    action.action_type = action_type;
+    action.has_parameters = 1;
+    action.parameters.card_id = card_id;
+    action.parameters.available_areas = NULL;
+    action.parameters.n_available_areas = 0;
+    RbGeneratedAction *next = rb_actions_push(*actions, count, capacity, action);
+    if (!next) return 0;
+    *actions = next;
+    return 1;
+}
+
+/* game_setup.rs:1467 generate_mulligan_actions, non-label content. Rust pushes
+ * a ConfirmMulligan header and then one SelectMulligan row per card of the
+ * mulligan OWNER's hand — the loop at :1489-1532 has no limit and no gating, so
+ * every hand card gets a row whether or not it is currently selected. */
+static int rb_push_mulligan_rows(const GameState *state, RbGeneratedAction **actions,
+                                 int *count, int *capacity) {
+    RbSetupHandCandidate rows[RB_MAX_HAND];
+    int n = rb_setup_mulligan_candidates(state, rows, RB_MAX_HAND);
+    if (!rb_push_card_action(actions, count, capacity, RB_SETUP_ACT_CONFIRM_MULLIGAN, 0))
+        return 0;
+    for (int i = 0; i < n; i++)
+        if (!rb_push_card_action(actions, count, capacity, RB_SETUP_ACT_SELECT_MULLIGAN,
+                                 rows[i].card_id))
+            return 0;
+    return 1;
+}
+
+/* game_setup.rs:2353 generate_live_card_set_actions, non-label content. A
+ * ConfirmLiveCardSet header, then one SelectLiveCard row per hand card of the
+ * ACTIVE player; rows past the set limit are already withheld inside the
+ * builder (game_setup.rs:2385-2388, mirrored at game_setup.c:1392). */
+static int rb_push_live_set_rows(const GameState *state, RbGeneratedAction **actions,
+                                 int *count, int *capacity) {
+    RbSetupHandCandidate rows[RB_MAX_HAND];
+    int n = rb_setup_live_card_candidates(state, rows, RB_MAX_HAND);
+    if (!rb_push_card_action(actions, count, capacity, RB_SETUP_ACT_CONFIRM_LIVE_CARD_SET, 0))
+        return 0;
+    for (int i = 0; i < n; i++)
+        if (!rb_push_card_action(actions, count, capacity, RB_SETUP_ACT_SELECT_LIVE_CARD,
+                                 rows[i].card_id))
+            return 0;
+    return 1;
+}
+
 RbGeneratedActionList rb_generate_action_candidates(const GameState *state) {
     RbGeneratedActionList result = { NULL, 0 };
-    if (!state || state->phase != RB_PHASE_MAIN) return result;
+    if (!state) return result;
+
+    /* ── Which phases generate rows at all — game_setup.rs:641-659 ────────────
+       Rust's generate_possible_actions matches on current_phase and only five
+       groups build a non-empty list:
+         RockPaperScissors                          -> generate_rps_actions
+         ChooseFirstAttacker                        -> 2 constant rows
+         MulliganFirstAttacker|MulliganSecondAttacker-> generate_mulligan_actions
+         Main                                       -> generate_main_phase_actions
+         LiveCardSetFirstAttacker|LiveCardSetSecond…  -> generate_live_card_set_actions
+       and returns Vec::new() for Active, Energy, Draw, FirstAttackerPerformance,
+       SecondAttackerPerformance and LiveVictoryDetermination (:648-650, :656-658).
+       The C guard used to be a bare `phase != RB_PHASE_MAIN -> {}`, so the
+       mulligan and live-set windows were never offered at all and
+       rb_setup_mulligan_candidates / rb_setup_live_card_candidates had no
+       consumer. The same table, minus the two constant groups (below).
+
+       NOT BUILT, DELIBERATELY — RockPaperScissors and ChooseFirstAttacker.
+       Both are pure constant rows in Rust (game_setup.rs:1446-1465: three RPS
+       rows; two attacker-choice rows), so they need no builder, and neither
+       ActionType has a C reader: rb_setup_execute_action dispatches them, but
+       IT has no caller either, and the C tree's own action_type numbering is
+       NOT Rust's ActionType ordinals — phase.c tags the pass row 1 and
+       src/main.c:45/69 and src/web_server.c:156-159 both hard-code `== 1` for
+       pass, which is RbSetupActionType RB_SETUP_ACT_ROCK_CHOICE. Emitting RPS
+       rows under Rust's ordinals would make a Rock row indistinguishable from
+       a pass row for every reader in the tree. The two groups are therefore
+       reported rather than faked; unifying the numbering needs the header
+       owner plus main.c/web_server.c.
+
+       NOT BUILT: the pending-choice arm. Rust checks get_pending_choice() FIRST
+       (:637-639) and routes to generate_pending_choice_actions, which is a
+       500-line menu builder with no C port behind it (the C prompts through
+       rb_has_pending_choice / rb_resume_with_choice instead). There is nothing
+       here to call, so nothing is invented. */
+    switch (state->phase) {
+        case RB_PHASE_MULLIGAN_FIRST:
+        case RB_PHASE_MULLIGAN_SECOND:
+        case RB_PHASE_MAIN:
+        case RB_PHASE_LIVE_SET:
+        case RB_PHASE_LIVE_SET_SECOND:
+            break;
+        default:
+            return result;
+    }
 
     int capacity = 1 + state->p[state->active].hand.n * RB_STAGE_SIZE;
     RbGeneratedAction *actions = (RbGeneratedAction *)rb_malloc((size_t)capacity * sizeof(*actions));
     if (!actions) return result;
 
+    /* ── Mulligan windows (game_setup.rs:647 -> :1467) ─────────────────────── */
+    if (state->phase == RB_PHASE_MULLIGAN_FIRST || state->phase == RB_PHASE_MULLIGAN_SECOND) {
+        if (!rb_push_mulligan_rows(state, &actions, &result.count, &capacity)) {
+            rb_free(actions);
+            result.actions = NULL;
+            result.count = 0;
+            return result;
+        }
+        result.actions = actions;
+        return result;
+    }
+
+    /* ── Live-card-set windows (game_setup.rs:654 -> :2353) ────────────────── */
+    if (state->phase == RB_PHASE_LIVE_SET || state->phase == RB_PHASE_LIVE_SET_SECOND) {
+        if (!rb_push_live_set_rows(state, &actions, &result.count, &capacity)) {
+            rb_free(actions);
+            result.actions = NULL;
+            result.count = 0;
+            return result;
+        }
+        result.actions = actions;
+        return result;
+    }
+
+    /* ── Main phase (game_setup.rs:651 -> :1690) ──────────────────────────── */
     RbGeneratedAction pass;
     memset(&pass, 0, sizeof(pass));
+    /* ActionType::Pass. NOTE the C tree spells "pass" as 1, not Rust's ordinal 0
+       (see the switch comment above); src/main.c:45/69 and src/web_server.c:156
+       hard-code 1, so the existing value is load-bearing and is not changed
+       here. RB_SETUP_ACT_PLAY_MEMBER_TO_STAGE below, by contrast, is 14 in both
+       vocabularies. */
     pass.action_type = 1;
     actions[result.count++] = pass;
-
-    int actor = state->active;
-    const RbPlayer *player = &state->p[actor];
-    int area_slot = 0;
 
     /* Rule 7.7.2.2 — 「プレイ Pamplona」 withholds the PLAY-MEMBER offers only.
      * In Rust the guard at game_setup.rs:1707 wraps the per-hand-card block and
      * CLOSES at :2076; the ability scans at :2078 and :2254 sit OUTSIDE it, so
-     * an ability stays offerable while member plays are prohibited. This C
-     * generator used to return early here, which additionally suppressed every
-     * ability offer on a prohibited board. */
+     * an ability stays offerable while member plays are prohibited. The
+     * play-member half now reads its rows from rb_setup_play_candidates, which
+     * applies the same rule internally (game_setup.c:1090) — the guard is kept
+     * because it is what makes the ability half below unconditional. */
     if (!rb_is_action_prohibited(state, "play_member")) {
-    for (int hand_index = 0; hand_index < player->hand.n; hand_index++) {
-        int card_id = player->hand.cards[hand_index];
-        if (!rb_card_is_member(card_id)) continue;
-
-        Card card;
-        if (!rb_decode_card_by_index((uint32_t)card_id, &card)) continue;
-        int cost_modifier = rb_mods_get_cost((RbMods *)&state->mods, card_id);
-        int reduction = rb_calculate_play_cost_reduction(state, actor,
-                                                        player->hand.n, card_id);
-        int effective_cost = card.cost + cost_modifier - reduction;
-        if (effective_cost < 0) effective_cost = 0;
-        int available_count = 0;
-
+    /* The play-member scan is rb_setup_play_candidates (game_setup.rs:1766-2075,
+     * the whole per-hand-card body, rules only). The hand-rolled loop that used
+     * to live here disagreed with it — and with Rust — three ways, all of which
+     * disappear by calling it:
+     *   1. effective cost. The old line read
+     *        effective_cost = card.cost + cost_modifier - reduction
+     *      folding the CONSTANT cost modifier into the play price. Rust does not:
+     *      game_setup.rs:1769 takes card.cost.unwrap_or(0) and :1783 computes
+     *      card_cost.saturating_sub(reduction) — the modifier is not in the play
+     *      cost at all (it only prices a BATON of that member, via
+     *      stage_play_cost at :1674/:1546). The builder does the same
+     *      (game_setup.c:1107).
+     *   2. baton price of the member being replaced. The old line read
+     *        existing_cost = existing.cost + existing_modifier
+     *      with no floor. Rust prices that member with stage_play_cost
+     *      (game_setup.rs:1674) = floored_cost(base, modifier) =
+     *      saturate_u8(base + modifier).max(1) (game_setup.rs:1546 +
+     *      core/constants.rs:116), so a net-zero or negative modifier floors to
+     *      1, never 0. The builder calls rb_setup_stage_play_cost, which floors
+     *      (game_setup.c:942 / :1058).
+     *   3. LIVE cards. The old loop filtered on rb_card_is_member only, so a
+     *      live card in hand (every live card is a member) was offered as a
+     *      play-member row. Rust requires card.is_member() && !card.is_live()
+     *      (game_setup.rs:1768) and the builder repeats it (game_setup.c:1095).
+     * Rust emits one Action per AVAILABLE AREA (game_setup.rs:1883-1990) and
+     * each carries the full three-area table, which is the row shape kept here. */
+    RbSetupPlayCandidate rows[RB_MAX_HAND];
+    int n_rows = rb_setup_play_candidates(state, rows, RB_MAX_HAND);
+    for (int r = 0; r < n_rows; r++) {
+        if (!rows[r].any_area_available) continue;
         for (int area = 0; area < RB_STAGE_SIZE; area++) {
-            RbGeneratedArea *info = &rb_action_areas[area_slot][area];
-            info->available = 0;
-            info->is_baton_touch = 0;
-            int existing_id = player->stage[area];
-            if (existing_id == RB_EMPTY_SLOT) {
-                if (player->energy_active >= effective_cost) {
-                    info->available = 1;
-                    available_count++;
-                }
-            } else if (!rb_card_arrived_this_turn(state, actor, existing_id) &&
-                       !rb_card_has_restriction(state, card_id, existing_id,
-                                                "cannot_baton_touch")) {
-                Card existing;
-                if (rb_decode_card_by_index((uint32_t)existing_id, &existing)) {
-                    int existing_modifier = rb_mods_get_cost((RbMods *)&state->mods,
-                                                             existing_id);
-                    int existing_cost = existing.cost + existing_modifier;
-                    int baton_cost = effective_cost - existing_cost;
-                    if (baton_cost < 0) baton_cost = 0;
-                    if (player->energy_active >= baton_cost) {
-                        info->available = 1;
-                        info->is_baton_touch = 1;
-                        available_count++;
-                    }
-                    rb_free_card(&existing);
-                }
-            }
+            rb_action_areas[r][area].available = rows[r].areas[area].available;
+            rb_action_areas[r][area].is_baton_touch = rows[r].areas[area].is_baton_touch;
         }
-
-        if (available_count > 0) {
-            for (int area = 0; area < RB_STAGE_SIZE; area++) {
-                if (!rb_action_areas[area_slot][area].available) continue;
-                RbGeneratedAction action;
-                memset(&action, 0, sizeof(action));
-                action.action_type = 14;
-                action.has_parameters = 1;
-                action.parameters.card_id = card_id;
-                action.parameters.available_areas = rb_action_areas[area_slot];
-                action.parameters.n_available_areas = RB_STAGE_SIZE;
-                RbGeneratedAction *next = rb_actions_push(actions, &result.count,
-                                                &capacity, action);
-                if (!next) {
-                    rb_free(actions);
-                    result.actions = NULL;
-                    result.count = 0;
-                    rb_free_card(&card);
-                    return result;
-                }
-                actions = next;
+        for (int area = 0; area < RB_STAGE_SIZE; area++) {
+            if (!rb_action_areas[r][area].available) continue;
+            RbGeneratedAction action;
+            memset(&action, 0, sizeof(action));
+            action.action_type = RB_SETUP_ACT_PLAY_MEMBER_TO_STAGE;
+            action.has_parameters = 1;
+            action.parameters.card_id = rows[r].card_id;
+            action.parameters.available_areas = rb_action_areas[r];
+            action.parameters.n_available_areas = RB_STAGE_SIZE;
+            RbGeneratedAction *next = rb_actions_push(actions, &result.count,
+                                            &capacity, action);
+            if (!next) {
+                rb_free(actions);
+                result.actions = NULL;
+                result.count = 0;
+                return result;
             }
+            actions = next;
         }
-        area_slot++;
-        rb_free_card(&card);
     }
     } /* end !is_action_prohibited("play_member") */
 

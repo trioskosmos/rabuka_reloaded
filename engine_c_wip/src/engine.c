@@ -79,22 +79,86 @@ void rb_shuffle(int *a, int n) {
  *
  * energy_deck is deliberately NOT mapped to RB_ZONE_ENERGY: the energy deck and
  * the energy zone are different bags, and mapping one onto the other would turn
- * a correct "unresolvable" into a wrong placement. Both corpus spellings
- * therefore reach their real handler before this function is consulted. */
+ * a correct "unresolvable" into a wrong placement. Both corpus spellings are
+ * therefore handled by their real handler before this function is consulted.
+ *
+ * ── The shared vocabulary now comes from ONE table ────────────────────────────
+ * This used to be a second, hand-rolled `if` chain listing the spellings. Two
+ * wire tables for one enum is how `deck_bottom` ended up silently folded onto
+ * RB_ZONE_DECK in one of them and honestly refused in the other. The shared
+ * rows are now delegated to rb_zone_id_from_str (data.c:925), which is the
+ * faithful port of Rust's `Zone::from_str` (engine/src/ability/enums.rs:89-122)
+ * and is the ONLY table in the tree that knows RB_ZONEID_DECK_BOTTOM and
+ * RB_ZONEID_ENERGY_DECK. So the two cannot drift again: if a spelling is added
+ * to Rust's Zone, adding it to data.c's table adds it here.
+ *
+ * The narrowing RbZoneId -> RbZone is DELIBERATE and is spelled out below
+ * rather than inherited from modifiers.c's rb_zone_from_zone_id
+ * (modifiers.c:400-420), because THAT one folds
+ *
+ *     RB_ZONEID_DECK_BOTTOM -> RB_ZONE_DECK      (claims "top" for a bottom insert)
+ *     RB_ZONEID_ENERGY_DECK -> RB_ZONE_ENERGY    (moves cards between two bags)
+ *
+ * and both of those are wrong placements. Here they fall through to the honest
+ * `return 0` instead. `RB_ZONEID_ENERGY_DECK` IS the dedicated energy-deck
+ * value the deck-vs-zone distinction needs; it simply has no RbZone partner,
+ * and the three callers that must tell the two apart own a dedicated
+ * string-keyed arm each, which is where Rust's own dispatch point lives:
+ *
+ *   util.c  rb_place_card_in_zone  (util.rs:2394)  — deck / deck_top /
+ *                                            deck_bottom / energy_deck arms
+ *   draw.c  draw_place_in_zone_g   (util.rs:2330)  — same, before this is called
+ *   util.c  zone_bag / rb_zone_cards (util.rs:2073) — deck_top/deck_bottom fold
+ *                                            onto main_deck there, and
+ *                                            energy_deck is `_ => &[]`
+ *
+ * XREQ for util.c's owner: the three dedicated string arms above are the same
+ * rule set written out three times, and util.c:1022 / util.c:898 / util.c:1160
+ * are where they can collapse onto rb_zone_id_from_str. util.c and draw.c are
+ * not this file's, so nothing is re-pointed here.
+ *
+ * NOT DERIVED from rb_zone_id_from_str, kept as a C-only tail below: "live",
+ * "success", "success_zone", "center", "left" and "right" are spellings the C
+ * wire vocabulary carries that Rust's `Zone::from_str` does not list. They are
+ * resolvable here today and dropping them would silently re-route those
+ * destinations to the caller's hand fallback (draw.c:92-95). Keeping them is
+ * the pre-existing behaviour and is NOT a Rust claim. */
 int rb_zone_of_str(const char *s, RbZone *out) {
-    if (!s) return 0;
-    if (!strcmp(s, "hand")) *out = RB_ZONE_HAND;
-    else if (!strcmp(s, "deck") || !strcmp(s, "deck_top")) *out = RB_ZONE_DECK;
-    else if (!strcmp(s, "stage") || !strcmp(s, "under_member") ||
-             !strcmp(s, "center") || !strcmp(s, "left") || !strcmp(s, "right") ||
-             !strcmp(s, "same_area") || !strcmp(s, "empty_area")) *out = RB_ZONE_STAGE;
-    else if (!strcmp(s, "discard") || !strcmp(s, "waitroom")) *out = RB_ZONE_DISCARD;
-    else if (!strcmp(s, "energy") || !strcmp(s, "energy_zone")) *out = RB_ZONE_ENERGY;
-    else if (!strcmp(s, "live_card_zone") || !strcmp(s, "live")) *out = RB_ZONE_LIVE;
-    else if (!strcmp(s, "success_live_zone") || !strcmp(s, "success") ||
-             !strcmp(s, "success_zone")) *out = RB_ZONE_SUCCESS;
-    else if (!strcmp(s, "resolution") || !strcmp(s, "resolution_zone")) *out = RB_ZONE_RESOLUTION;
-    else return 0;
+    if (!s || !out) return 0;
+    /* Shared rows — see the table note above. */
+    switch (rb_zone_id_from_str(s)) {
+        case RB_ZONEID_HAND:               *out = RB_ZONE_HAND; return 1;
+        case RB_ZONEID_DECK:               *out = RB_ZONE_DECK; return 1;
+        /* util.rs:2426-2436 — DeckTop inserts at `idx` (default 0 = top) and
+           DeckBottom pushes at the end. RB_ZONE_DECK is the caller's top insert
+           (draw.c:101-108), which is DeckTop's rule, so folding DeckTop onto it
+           is exact. DeckBottom has NO RbZone partner and is refused below. */
+        case RB_ZONEID_DECK_TOP:           *out = RB_ZONE_DECK; return 1;
+        case RB_ZONEID_DECK_BOTTOM:        return 0;
+        case RB_ZONEID_ENERGY_DECK:        return 0;
+        case RB_ZONEID_STAGE:
+        case RB_ZONEID_UNDER_MEMBER:
+        case RB_ZONEID_SAME_AREA:
+        case RB_ZONEID_EMPTY_AREA:         *out = RB_ZONE_STAGE; return 1;
+        case RB_ZONEID_DISCARD:
+        case RB_ZONEID_WAITROOM:           *out = RB_ZONE_DISCARD; return 1;
+        case RB_ZONEID_ENERGY:
+        case RB_ZONEID_ENERGY_ZONE:        *out = RB_ZONE_ENERGY; return 1;
+        case RB_ZONEID_LIVE_CARD_ZONE:     *out = RB_ZONE_LIVE; return 1;
+        case RB_ZONEID_SUCCESS_ZONE:
+        case RB_ZONEID_SUCCESS_LIVE_ZONE:  *out = RB_ZONE_SUCCESS; return 1;
+        case RB_ZONEID_RESOLUTION:         *out = RB_ZONE_RESOLUTION; return 1;
+        default: break;
+    }
+    /* C-only tail — not Rust `Zone::from_str` spellings, pre-existing here. */
+    if (!strcmp(s, "center") || !strcmp(s, "left") || !strcmp(s, "right"))
+        *out = RB_ZONE_STAGE;
+    else if (!strcmp(s, "live"))
+        *out = RB_ZONE_LIVE;
+    else if (!strcmp(s, "success"))
+        *out = RB_ZONE_SUCCESS;
+    else
+        return 0;
     return 1;
 }
 
@@ -510,7 +574,70 @@ int rb_complete_double_baton(GameState *g, int selected_pair) {
     return 1;
 }
 
+/* ═══════════════ explicit PlayMemberToStage (phases.rs:1132-1250) ═══════════════
+ *
+ * Rust's handle_play_member_to_stage takes FOUR request parameters the C's
+ * `rb_play_member(g, pl, hand_idx, stage_pos)` cannot name, and three of them
+ * change the result:
+ *
+ *   card_indices       Vec<usize> — the TWO areas an explicit double baton
+ *                     replaces (phases.rs:1182-1192). `stage_area` then picks
+ *                     which of the two vacated areas the arrival lands in
+ *                     (:1196, :1227-1231).
+ *   use_baton_touch    Option<bool> — an EXPLICIT demand, read at
+ *                     core/player.rs:394-395:
+ *                         should_use_baton_touch =
+ *                             use_baton_touch || self.stage.get_area(stage_area).is_some();
+ *                     It can only ADD a demand, never suppress one: an occupied
+ *                     area still batons whether or not the flag is set, and a
+ *                     set flag onto an EMPTY area is an Err
+ *                     (player.rs:431-437 — the card goes back in hand, the play
+ *                     is refused). The C used to evaluate only the right-hand
+ *                     side of that `||`, so the whole left-hand side was
+ *                     inexpressible and a flag set onto an empty area silently
+ *                     became a normal play.
+ *   stage_area         Option<MemberArea> — Rust's None default is "first empty
+ *                     area, else ALL[0]" (:1198-1208).
+ *   card_id            Option<i16> — Rust's None default is "first member in
+ *                     hand" (:1170-1177).
+ *
+ * The two None defaults are resolved by rb_handle_play_member_to_stage
+ * (src/turn/phase.c, the file that owns the Rust function); this file owns the
+ * three requests they feed.
+ *
+ * One latch, because Rust has a STACK FRAME and the C does not: the play-time
+ * cost pause (rb_detect_alt_cost, engine/src/turn/phases.rs:1219-1222) returns
+ * out of handle_play_member_to_stage and Rust re-enters it with the SAME
+ * arguments (turn/actions/mod.rs:976-982 re-calls handle_play_member_to_stage
+ * with Some(play.card_id) / None / Some(play.area) / Some(false)). The C's
+ * equivalent re-entry is rb_complete_play_with_cost, which used to call
+ * rb_play_member unconditionally — that silently dropped BOTH the explicit
+ * baton flag and the explicit double-baton pair. The request is therefore
+ * latched here and re-dispatched from there. */
+typedef struct {
+    int active;              /* 1 while a paused explicit play is outstanding */
+    int hand;                /* hand index of the card being played */
+    int area;                /* landing area (== pair[0] for a plain play) */
+    int pair[2];             /* the two areas to replace; pair[1] < 0 = single */
+    int use_baton_touch;
+} RbExplicitPlay;
+static RbExplicitPlay s_explicit;
+
+int rb_play_member_ex(GameState *g, int pl, int hand_idx, int stage_pos, int use_baton_touch);
+int rb_play_double_baton_ex(GameState *g, int pl, int hand_idx, int a1, int a2, int place);
+
+/* Clear the latch once its play has completed or been refused, so a later
+ * rb_play_member cannot inherit a dead request. */
+static void explicit_play_clear(void) { memset(&s_explicit, 0, sizeof(s_explicit)); }
+
 int rb_play_member(GameState *g, int pl, int hand_idx, int stage_pos) {
+    /* Rust's caller for an ordinary Main-phase play passes
+     * use_baton_touch: None (actions/mod.rs:312-318 forwards the action's own
+     * Option), and None unwraps to false at phases.rs:1139. */
+    return rb_play_member_ex(g, pl, hand_idx, stage_pos, 0);
+}
+
+int rb_play_member_ex(GameState *g, int pl, int hand_idx, int stage_pos, int use_baton_touch) {
     RbPlayer *P=&g->p[pl];
     if (hand_idx < 0 || hand_idx >= P->hand.n) return 0;
     if (stage_pos < 0 || stage_pos >= RB_STAGE_SIZE) return 0;
@@ -548,7 +675,25 @@ int rb_play_member(GameState *g, int pl, int hand_idx, int stage_pos) {
         break;
     }
     rb_free_card(&c);
-    int is_baton = (P->stage[stage_pos] >= 0); /* playing onto an occupied area */
+    /* ── core/player.rs:394-437 — the ONE line the C was missing ──────────────
+         let should_use_baton_touch =
+ *             use_baton_touch || self.stage.get_area(stage_area).is_some();
+       `is_some()` is the C's `P->stage[stage_pos] >= 0`; `use_baton_touch` is
+       the explicit request. The C evaluated only the right-hand side, so an
+       explicit flag could not demand a baton and could not be declined — a
+       flag set onto an EMPTY area silently played as an ordinary placement.
+       Both halves are here now. */
+    int should_use_baton = use_baton_touch || (P->stage[stage_pos] >= 0);
+    if (should_use_baton && P->stage[stage_pos] < 0) {
+        /* player.rs:431-437 — `should_use_baton_touch` is true but the target
+         * area holds no member: Rust re-inserts the card it removed at :360 and
+         * returns Err("Cannot baton touch - no member in target area"). The C
+         * has not removed the card yet, so the observable result is the same —
+         * hand unchanged, play refused. */
+        g->play_depth--;
+        return 0;
+    }
+    int is_baton = should_use_baton;   /* player.rs:397-440 */
     int baton_replaced = RB_EMPTY_SLOT;
 
 
@@ -588,6 +733,17 @@ int rb_play_member(GameState *g, int pl, int hand_idx, int stage_pos) {
             g->ptc_active = 1;
             g->ptc_card = cid; g->ptc_hand = hand_idx; g->ptc_area = stage_pos;
             g->ptc_set = setv; g->ptc_base = base_cost;
+            /* Latch the EXPLICIT part of the request, which ptc_card/ptc_hand/
+             * ptc_area do not carry. Without this the resume below re-enters as
+             * a plain rb_play_member and the explicit baton flag is dropped
+             * (phases.rs:1219-1222 returns out of the function and
+             * actions/mod.rs:976-982 re-enters it WITH the flag). */
+            s_explicit.active = 1;
+            s_explicit.hand = hand_idx;
+            s_explicit.area = stage_pos;
+            s_explicit.pair[0] = stage_pos;
+            s_explicit.pair[1] = -1;
+            s_explicit.use_baton_touch = use_baton_touch;
             rb_free_card(&c); g->play_depth--; return 0;
         }
     }
@@ -764,6 +920,136 @@ int rb_play_member(GameState *g, int pl, int hand_idx, int stage_pos) {
     rb_drain_ability_queue(g);
     rb_free_card(&c);
     g->play_depth--;
+    explicit_play_clear();
+    return 1;
+}
+
+/* ═══════════════ play_double_baton (phases.rs:936-1087) ═══════════════
+ *
+ * The EXPLICIT half of the double baton, i.e. the one Rust reaches when the host
+ * names the two areas in `card_indices`. rb_complete_double_baton above is the
+ * C's stand-in for the half Rust never had to provide: it AUTO-DETECTS that the
+ * card carries a play_baton_touch with count > 1, offers every pair as a
+ * SelectTarget (engine.c:653-675) and finishes here, so the host is shown the
+ * pairs but never chooses one. Rust has no such auto-detect: the UI emits the
+ * pair and phases.rs:1182-1192 reads it back.
+ *
+ * `card_indices` is a pair of AREA INDICES, and MemberArea::ALL is
+ * [LeftSide, Center, RightSide] (core/zones.rs:68-72) — the same order as the C's
+ * RB_STAGE_SIZE 0..2 slots, so the indices are usable directly.
+ *
+ * `place` is `stage_area.unwrap_or(db_areas[0])` (phases.rs:1196): which of the
+ * two vacated areas the arrival lands in. */
+int rb_play_double_baton_ex(GameState *g, int pl, int hand_idx, int a1, int a2, int place) {
+    if (!g) return 0;
+    if (hand_idx < 0 || hand_idx >= g->p[pl].hand.n) return 0;
+    if (a1 < 0 || a1 >= RB_STAGE_SIZE || a2 < 0 || a2 >= RB_STAGE_SIZE || a1 == a2) return 0;
+    /* phases.rs:1196 — stage_area.unwrap_or(db_areas[0]) */
+    if (place != a1 && place != a2) place = a1;
+    RbPlayer *P = &g->p[pl];
+    int pair[2];
+    pair[0] = a1;
+    pair[1] = a2;
+    if (g->play_depth > 4) return 0;
+    g->play_depth++;
+    int cid = P->hand.cards[hand_idx];
+
+    /* phases.rs:948 card_cost — base cost, no play-time reduction yet. */
+    Card c;
+    if (!rb_decode_card_by_index((uint32_t)cid, &c)) { g->play_depth--; return 0; }
+    int card_cost = (int)c.cost;
+
+    /* phases.rs:949-970 — the COMBINED reduction is each replaced member's
+     * floored cost, floored_cost = saturate(base + mod).max(1)
+     * (core/constants.rs:116), so a net-zero modifier prices at 1, never 0. */
+    int combined = 0;
+    for (int k = 0; k < 2; k++) {
+        int existing = P->stage[pair[k]];
+        if (existing == RB_EMPTY_SLOT) continue;
+        Card ec;
+        int base = 0;
+        if (rb_decode_card_by_index((uint32_t)existing, &ec)) {
+            base = (int)ec.cost;
+            rb_free_card(&ec);
+        }
+        int floored = base + rb_mods_get_cost(&g->mods, existing);
+        if (floored < 0) floored = 0;
+        if (floored < 1) floored = 1;   /* floored_cost's .max(1) */
+        combined += floored;
+    }
+    /* phases.rs:983-993 — play-time reduction, then the combined baton credit. */
+    int reduction = rb_calculate_play_cost_reduction(g, pl, P->hand.n, cid);
+    int final_cost = card_cost - reduction;
+    if (final_cost < 0) final_cost = 0;
+    final_cost -= combined;
+    if (final_cost < 0) final_cost = 0;
+    /* phases.rs:994-1000 */
+    if (final_cost > 0) {
+        if (P->energy_active < final_cost) { rb_free_card(&c); g->play_depth--; return 0; }
+        P->energy_active -= final_cost;
+    }
+    /* phases.rs:1001-1024 — cannot_baton_touch protection on BOTH named areas,
+     * checked AFTER the payment (Rust's ordering; the Err leaves the paid
+     * energy spent, which is what the C now does too). */
+    for (int k = 0; k < 2; k++) {
+        int existing = P->stage[pair[k]];
+        if (existing == RB_EMPTY_SLOT) continue;
+        if (rb_card_has_restriction(g, cid, existing, "cannot_baton_touch")) {
+            rb_free_card(&c); g->play_depth--; return 0;
+        }
+    }
+    /* phases.rs:1025-1037 — replace BOTH named members, in `db_areas` order, so
+     * the LAST one to land is the last card in the waitroom. */
+    int replaced[2];
+    int n_replaced = 0;
+    for (int k = 0; k < 2; k++) {
+        int existing = P->stage[pair[k]];
+        if (existing == RB_EMPTY_SLOT) continue;
+        for (int u = 0; u < P->under_cards[pair[k]].n; u++)
+            rb_send_to_waitroom(g, pl, P->under_cards[pair[k]].cards[u]);
+        P->under_cards[pair[k]].n = 0;
+        rb_send_to_waitroom(g, pl, existing);
+        P->stage[pair[k]] = RB_EMPTY_SLOT;
+        g->stage_arrived[pl][pair[k]] = 0;
+        replaced[n_replaced++] = existing;
+    }
+    /* phases.rs:1049-1055 — last_vacated_stage_area is the OTHER (non-placement)
+     * vacated area, which is what the empty_area / deployment effects read. */
+    g->baton_last_vacated_area[pl] = (pair[0] != place) ? pair[0] : pair[1];
+    /* phases.rs:1056-1063 */
+    for (int i = hand_idx; i + 1 < P->hand.n; i++) P->hand.cards[i] = P->hand.cards[i + 1];
+    P->hand.n--;
+    P->stage[place] = cid;
+    P->stage_wait[place] = 0;
+    g->stage_arrived[pl][place] = 1;
+    /* phases.rs:1064-1067 — TWO baton touches, both naming the arriving card. */
+    rb_record_baton_touch(g, pl, cid);
+    rb_record_baton_touch(g, pl, cid);
+    /* phases.rs:1068-1071 — the replaced identity is the LAST waitroom card. */
+    g->baton_touch_replaced_member_id = n_replaced > 0 ? replaced[n_replaced - 1] : -1;
+    g->baton_touch_replaced_member_cost = combined;
+    g->baton_touch_zero_cost = final_cost == 0;
+    /* phases.rs:1072-1074 */
+    g->debut_count_this_turn[pl]++;
+    rb_record_card_appearance(g, cid, RB_ZONE_HAND);
+    g->baton_touch_arriving_card_id = cid;
+    g->baton_touch_used[pl] = 1;
+    g->current_is_baton = 1;
+    /* phases.rs:1076-1080 — trigger_debut_abilities(..., baton_touch_used = true, ..)
+     * is exactly the state published above for rb_trigger_debut to read
+     * (src/turn/triggers.c:223), then both auto sweeps and the pending drain. */
+    g->recently_moved[0] = n_replaced > 0 ? replaced[0] : cid;
+    g->n_recently_moved = 1;
+    rb_fire_debut(g, pl, cid);
+    rb_fire_auto(g, pl);
+    rb_fire_auto(g, 1 - pl);
+    rb_drain_ability_queue(g);
+    /* phases.rs:1082 */
+    rb_recalc_constants(g);
+    g->current_is_baton = 0;
+    rb_free_card(&c);
+    g->play_depth--;
+    explicit_play_clear();
     return 1;
 }
 
@@ -1045,10 +1331,17 @@ int rb_activate_card(GameState *g, int pl, int card_id) {
 }
 
 /* Answer a play paused by rb_detect_alt_cost. On accept, set the cost modifier so
-    the total cost equals the alternative value (Rust set_cost_modifier(card, base-set)),
-    then re-enter rb_play_member (ptc_resuming=1 so detection is skipped) to pay the
-    chosen cost and place the card. On decline, place at the base cost. Returns the
-    placement result (0 if nothing was pending / placement failed). */
+ * the total cost equals the alternative value (Rust set_cost_modifier(card, base-set)),
+ * then re-enter the paused play (ptc_resuming=1 so detection is skipped) to pay the
+ * chosen cost and place the card. On decline, place at the base cost. Returns the
+ * placement result (0 if nothing was pending / placement failed).
+ *
+ * The re-entry used to be a bare rb_play_member, which is only correct for the
+ * ORDINARY play. Rust re-enters handle_play_member_to_stage with the same
+ * arguments it was given (actions/mod.rs:976-982), so an explicit
+ * use_baton_touch and an explicit double-baton pair both have to survive the
+ * pause. They are latched in s_explicit (see rb_play_member_ex) and re-dispatched
+ * through the same two entry points the first pass used. */
 int rb_complete_play_with_cost(GameState *g, int pl, int accept) {
     if (!g->ptc_active) return 0;
     int card = g->ptc_card, hand = g->ptc_hand, area = g->ptc_area;
@@ -1056,9 +1349,21 @@ int rb_complete_play_with_cost(GameState *g, int pl, int accept) {
     if (accept && set != base)
         rb_mods_set_cost(&g->mods, card, set - base);
     g->ptc_resuming = 1;
-    int placed = rb_play_member(g, pl, hand, area);
+    int placed;
+    if (s_explicit.active && s_explicit.pair[1] >= 0) {
+        /* Explicit double baton that paused on its play-time cost. Rust returns
+         * from the cost hook FIRST (phases.rs:1219-1222) and only reaches
+         * play_double_baton on re-entry, so the pair is still named here. */
+        placed = rb_play_double_baton_ex(g, pl, s_explicit.hand,
+                                         s_explicit.pair[0], s_explicit.pair[1],
+                                         s_explicit.area);
+    } else {
+        int use_bt = s_explicit.active ? s_explicit.use_baton_touch : 0;
+        placed = rb_play_member_ex(g, pl, hand, area, use_bt);
+    }
     g->ptc_resuming = 0;
     g->ptc_active = 0;
+    if (!placed) explicit_play_clear();
     return placed;
 }
 
@@ -1145,32 +1450,29 @@ int rb_play_card(GameState *g, int pl, int hand_idx) {
  * declared in include/rabuka.h:1709 are unchanged, so src/main.c:134 keeps
  * compiling and the CLI still plays whole rounds.
  *
- * PER-TURN RESETS THAT STAY HERE, and why they are not a second turn machine.
- * Rust clears most of its turn-scoped state in the rollover arm
- * (phases.rs:277-291) and phase.c:288-300 does the C fold of that. The
- * remaining fields are either C-local or have no Rust clear site at all:
+ * PER-TURN RESETS, and why none of them stay here any more.
+ * Rust clears its turn-scoped state in the rollover arm (phases.rs:277-311) and
+ * phase.c's RB_PHASE_VICTORY arm is the C fold of that. The fields that used to
+ * be re-zeroed here have ALL moved into that rollover, which is the only place
+ * the turn counter moves and therefore the only place a rollover can be missed:
  *
- *   stage_arrived          DROPPED from here. Rust's deployed_this_turn
- *                          (phases.rs:286-287) is cleared by phase.c:297, so
- *                          resetting it twice was the duplication.
+ *   stage_arrived          Rust's deployed_this_turn (phases.rs:286-287); already
+ *                          cleared by the rollover.
  *   baton_touch_used       Rust passes this per PLAY ACTION as an argument
- *                          (phases.rs:1076 -> trigger_scan.rs:73-83), not as
- *                          turn state, so the C's per-player latch has no Rust
- *                          clear site. Without this reset the CLI refuses every
- *                          baton touch from turn 2 onward.
+ *                          (phases.rs:1076 -> trigger_scan.rs:73-83), so the C's
+ *                          per-player latch is C-local. The rollover clears it.
  *   player_cannot_activate C twin of Rust's cannot_activate_members, which
- *   n_cannot_active_cards  phases.rs:279 DOES clear. phase.c's rollover does
- *                          not, which is why tests/test_parity_restriction.c:
- *                          947-948 has to reset the field by hand. Kept here so
- *                          the CLI is correct; REPORTED to phase.c's owner as a
- *                          real gap in the tested path.
- *   n_prohibition          C-local prohibition notes (state.c/rules.c/
- *                          misc.c writers). No Rust analogue, no Rust clear.
- *   n_selected_cards       C-local cross-effect selection buffer. choice.c
- *                          clears it on consume; the round reset keeps a
- *                          stale selection from leaking into the next round.
+ *   n_cannot_active_cards  phases.rs:279 DOES clear; the rollover does too, which
+ *                          is why tests/test_parity_restriction.c:947-948 no
+ *                          longer has to zero the field by hand for a clean probe.
+ *   n_prohibition          C-local prohibition notes (state.c/rules.c/misc.c
+ *                          writers), no Rust analogue. Cleared by the rollover.
+ *   n_selected_cards       C-local cross-effect selection buffer; choice.c clears
+ *                          it on consume and the rollover now clears it too, so a
+ *                          stale selection cannot leak into the next round on the
+ *                          interactive or web path either.
  *
- * One round == until the turn counter moves (phase.c:250 is the only writer, in
+ * One round == until the turn counter moves (the rollover is the only writer, in
  * the VICTORY branch). RPS + mulligan + both attackers' normal phases + both
  * performance windows is ~16 advance steps; the cap is a runaway guard only.
  *
@@ -1193,14 +1495,28 @@ int rb_play_card(GameState *g, int pl, int hand_idx) {
 void rb_turn(GameState *g) {
     if (!g || g->winner != -1) return;
 
-    /* See the table above: C-local turn-scoped state with no Rust clear site. */
-    for (int p = 0; p < 2; p++) {
-        g->baton_touch_used[p] = 0;
-        g->player_cannot_activate[p] = 0;
-    }
-    g->n_cannot_active_cards = 0;
-    g->n_prohibition = 0;
-    g->n_selected_cards = 0;
+    /* See the table above: C-local turn-scoped state with no Rust clear site.
+     *
+     * These five clears are now REDUNDANT and are gone. rb_advance_phase's
+     * turn rollover (src/turn/phase.c, the RB_PHASE_VICTORY arm) clears
+     * player_cannot_activate, n_cannot_active_cards, baton_touch_used,
+     * n_turn_state_changes and — since the n_prohibition / n_selected_cards fix —
+     * n_prohibition and n_selected_cards, and it is the only place the turn
+     * counter moves. Every exit from the loop below is therefore downstream of
+     * that rollover having already run (`g->turn != start_turn`), or a finished
+     * game (`g->winner != -1` / `g->phase == RB_PHASE_DONE`), so re-zeroing the
+     * same fields at the top of the NEXT round is a no-op.
+     *
+     * Verified against the one caller: src/main.c:132-138 loops rb_turn, so
+     * round N+1's prologue ran immediately after round N's rollover with nothing
+     * in between to write those fields. The interactive path
+     * (src/main.c:29-105) never calls rb_turn at all and reaches the rollover
+     * through rb_advance_phase directly, which is the path that needed the
+     * clear in the first place.
+     *
+     * NOT removed: explicit_play_clear(). That latch is per PLAY ACTION, not per
+     * turn, so a round boundary is not its lifetime — rb_play_member_ex clears
+     * it on every completed or refused play. */
 
     const int start_turn = g->turn;
     for (int step = 0; step < 256; step++) {

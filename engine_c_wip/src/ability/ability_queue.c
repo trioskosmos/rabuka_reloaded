@@ -41,8 +41,23 @@
        the slot AFTER clearing it, so the moved entry's pointers are never live
        in two slots at once);
      * rb_queue_take_pending_actions_owned — ownership moves to the caller's
-       array, which MUST rb_effect_free each element (choice.c:3816-3835 does);
+       array, which MUST rb_effect_free each element;
      * rb_queue_resume_pending_actions — executed in place, then freed.
+
+   plus ONE discard path, which is a release, not a transfer:
+     * rb_queue_take_pending_actions — takes the batch and frees every element
+       itself, returning only the COUNT. A caller that frees and then tries to
+       EXECUTE what it just freed double-counts (choice.c:593-628 measured
+       this: executing the batch there cost 16-21 checks across 22 suites and
+       won none), and a caller that executes without taking ownership leaks or
+       executes the same tail twice.
+
+   So the two take_* functions differ ONLY in what the caller receives, and
+   the single place a parked batch is EXECUTED is
+   rb_resolver_continue_siblings (choice.c:4396-4420), which takes by
+   ownership, runs each element, frees it, and re-parks whatever a sub-prompt
+   interrupts. Every other take_pending_actions caller is discarding.
+
 
    Producers (store / extend / repark / set / save) NEVER free their argument:
    `actions` belongs to whoever built it (the compound.c sequential-step pool, or
@@ -831,10 +846,13 @@ int rb_queue_has_pending_actions(const GameState *g) {
      - rb_queue_take_pending_actions_owned  (ownership handed to the caller,
                                      which MUST rb_effect_free each one)
      - rb_queue_resume_pending_actions       (executed, then freed)
+     - rb_queue_take_pending_actions          (taken AND freed here; the caller
+                                     gets the count and owns nothing)
    Nothing else may free a pending action, and the producer never frees its
-   argument: `actions` stays owned by whoever built it (the compound.c
-   sequential-step pool, or the source tree).  On allocation failure the slot
-   is simply not taken, so pending_actions_n always counts real pointers. */
+    argument: `actions` stays owned by whoever built it (the compound.c
+    sequential-step pool, or the source tree).  On allocation failure the slot
+    is simply not taken, so pending_actions_n always counts real pointers. */
+
 void rb_queue_extend_pending_actions(GameState *g, AbilityEffect *const *actions, int count) {
     if (!g || !actions || count <= 0) return;
     int cur = g->queue.cur;
@@ -1261,6 +1279,39 @@ static void rb_drain_keep_alive(GameState *g, const Ability *ab) {
     g->activation_keepalive_valid = 1;
 }
 
+/* The drain's resolution-time turn-limit record — the C counterpart of the ONE
+   place Rust spends a use: `GameState::record_ability_use`
+   (core/game_state/abilities.rs:216-231), reached from
+   `gates::record_use_limit`'s Early and Final phases (gates.rs:308 and :331)
+   via resolver.rs:1353 and :1390.
+
+   WHY NOT A BARE rb_record_ability_use(g, cid, aidx):
+   that function (game_state_abilities.c:49-57) is abilities.rs:216-231 with
+   `current_entry()` bound to `g->queue.cur` — and BOTH halves of it are
+   entry-scoped: the already-recorded guard (:51-53) and the flag write
+   (:55-56). This drain deliberately does NOT publish `cur` (see the note
+   inside the loop), so a bare call would read and write an entry that is not
+   the one being resolved: a `cur` that happens to sit on an already-flagged
+   entry would swallow this activation's record outright, and the flag would be
+   stamped on the wrong entry. Rust has no such ambiguity — its drain always
+   has the resolving entry published as `current_entry()`, which is what
+   abilities.rs:220 tests and :228 writes. Pointing `cur` at the entry being
+   resolved for the duration of the call reproduces exactly that, and keeps
+   rb_record_ability_use the single owner of "spend the use and mark the entry"
+   (the interim enqueue-time marks depend on that one implementation).
+
+   The stamp after the call is the belt-and-braces pca_resolve_entry uses
+   (game_state_abilities.c:2817-2820) and is what makes the SECOND phase of one
+   activation a no-op: one activation spends exactly one use. */
+static void drain_record_ability_use(GameState *g, RbQueueEntry *e, int idx) {
+    if (!g || !e || e->use_limit_recorded) return;
+    int saved_cur = g->queue.cur;
+    g->queue.cur = idx;
+    rb_record_ability_use(g, e->card_id, e->ability_idx);
+    g->queue.cur = saved_cur;
+    e->use_limit_recorded = 1;
+}
+
 int rb_drain_ability_queue(GameState *g) {
     if (!g) return 0;
     if (g->queue.state == RB_QUEUE_RESOLVING) return 0;
@@ -1337,6 +1388,48 @@ int rb_drain_ability_queue(GameState *g) {
            only charged once across the prompt round-trip. */
         if (ab.cost && !e->cost_paid && !rb_has_pending_choice(g))
             rb_pay_cost(g, actor, ab.cost);
+
+        /* resolver.rs:1341-1344 `let cost_already_paid = gs.ability_queue
+           .current_entry().is_some_and(|e| e.cost_paid);` -- Rust reads the
+           entry's latch BEFORE pay_ability_cost (:1348), and both the Early
+           record below and the Final record at the tail of this loop are
+           conditioned on the value as of THAT read, so it is captured before
+           the pay (which settles optional costs synchronously and writes
+           cost_paid) rather than re-read afterwards. */
+        int cost_already_paid = e->cost_paid;
+
+        /* -- EARLY USE-LIMIT RECORD ------------------------------------------
+           resolver.rs:1353 `record_use_limit(self, gs, &ability, ability_key,
+           cost_already_paid, UseLimitPhase::Early, None)`: the drain's
+           resolution-time counterpart of Rust's single record_ability_use.
+           It sits exactly where Rust calls it -- after pay_ability_cost,
+           BEFORE handle_pending_choice and before the post-cost gates -- which
+           is what makes a DECLINED optional cost still spend the activation
+           (gates.rs:291-309 runs ahead of the gate at :1360, and the Final
+           recording at :1390 is unreachable once that gate stops).
+
+           gates.rs:288-309, guard for guard:
+             ability_key valid         -> the loop already rejected card_id < 0
+             use_limit.is_none()       -> ab.use_limit > 0 (rabuka.h:152, -1 = none)
+             cost_already_paid         -> !cost_already_paid
+             awaiting.choice.is_some() -> !rb_has_pending_choice(g)
+             is_conditional_optional   -> effect action == "conditional_on_optional"
+             is_optional_effect        -> !effect->is_optional
+             can_activate              -> effect.is_none_or(can_activate_effect)
+           and gates.rs:308 spends it. An entry that already carries the flag --
+           i.e. one whose use an ENQUEUE-time site spent (the interim shape) --
+           is left alone, so this is a no-op for those and only adds the record
+           where there was none. */
+        if (ab.use_limit > 0 && !cost_already_paid && !rb_has_pending_choice(g)) {
+            int is_conditional_optional =
+                ab.effect && ab.effect->action &&
+                !strcmp(ab.effect->action, "conditional_on_optional");
+            int is_optional_effect = ab.effect && ab.effect->is_optional;
+            int can_activate = !ab.effect ||
+                               rb_can_activate_effect(g, actor, ab.effect, e->card_id);
+            if (!is_conditional_optional && !is_optional_effect && can_activate)
+                drain_record_ability_use(g, e, i);
+        }
 
         /* NOTE: a `rb_pay_cost` that returns 0 does NOT stop the resolution
            here. Rust's pay_ability_cost maps a validation failure to
@@ -1461,6 +1554,33 @@ int rb_drain_ability_queue(GameState *g) {
             memset(&ab, 0, sizeof(ab));
             rb_free_ability(&ab);   /* the transfer above was total: frees nothing */
             break;
+        }
+        /* -- FINAL USE-LIMIT RECORD ------------------------------------------
+           resolver.rs:1381-1390: `if self.run_ability_effect(..)? { return
+           Ok(()); }` then `record_use_limit(self, gs, &ability, ability_key,
+           cost_already_paid, UseLimitPhase::Final, None)`. run_ability_effect
+           returns true whenever a choice is left open, so the pending-prompt
+           arm above (which breaks out) is Rust's early return and the Final
+           record is unreachable there; this is the one path that reaches it.
+
+           gates.rs:321-333, guard for guard: `can_activate` is
+           `effect.is_none_or(..)`, and `should_record` is true unconditionally
+           for a ConditionalOnOptional whose cost was already paid. The entry is
+           re-derived from `i` rather than reusing `e`, because
+           rb_execute_effect_ex above may re-enter the queue -- the same reason
+           rb_queue_resume_pending_actions re-derives its entry after every
+           execution. On an activation the Early record already spent, `e`'s
+           flag makes this a no-op, which is how one activation spends exactly
+           one use. */
+        if (ab.use_limit > 0 && i < g->queue.n_entries) {
+            int is_conditional_optional =
+                ab.effect && ab.effect->action &&
+                !strcmp(ab.effect->action, "conditional_on_optional");
+            int can_activate = !ab.effect ||
+                               rb_can_activate_effect(g, actor, ab.effect,
+                                                      g->queue.entries[i].card_id);
+            if ((cost_already_paid && is_conditional_optional) || can_activate)
+                drain_record_ability_use(g, &g->queue.entries[i], i);
         }
         rb_free_ability(&ab);
         g->activating_card = saved_activating;

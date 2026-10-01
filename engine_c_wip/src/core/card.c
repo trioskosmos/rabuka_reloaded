@@ -797,6 +797,30 @@ static void card_filter_list(const char *src, char *dst, size_t elem, int max, i
     }
 }
 
+/* Split the JSON array carried by the `or_ability_filters` extra into one fixed
+   slot per branch. vm.c stringifies the array of OBJVAR as
+   [{"$variant":N,"$fields":{...}},{...}] (decode_text_value, vm.c:182-197), so
+   a branch runs from its '{' to the '}' that closes its nested "$fields" object
+   — every field a branch owns lives inside that object, so the fragment is
+   self-contained and the matcher never has to look at the array again. */
+static void card_filter_or_branches(const char *src, char dst[][192], int max, int *count) {
+    *count = 0;
+    if (!src || !*src || !dst || max <= 0) return;
+    const char *p = src;
+    while (*p && *count < max) {
+        const char *obj = strchr(p, '{');
+        if (!obj) break;
+        const char *end = strchr(obj, '}');
+        if (!end) break;
+        size_t len = (size_t)(end - obj) + 1;
+        if (len > sizeof(dst[0]) - 1) len = sizeof(dst[0]) - 1;
+        memcpy(dst[*count], obj, len);
+        dst[*count][len] = 0;
+        (*count)++;
+        p = end + 1;
+    }
+}
+
 /* util.rs:1847 require_all_heart_colors is `Option<bool>`; the wire carries the
    literal "true"/"false" (or an integer), which is the same decoding
    card_filter_from_effect already applies to exclude_self and negation. */
@@ -901,14 +925,18 @@ static void card_filter_from_effect(const AbilityEffect *e, RbCardFilter *out) {
         out->has_need_heart_total = 1;
     /* util.rs:1818 / :1882 `card_property: effect.card_property_any()`, read by
        CardFilter::check_card_property (util.rs:1654-1673) and counted by
-       util.rs:1444. RbCardFilter has no card_property member yet — include/rabuka.h
-       is owned elsewhere — so the population is compiled in the moment the header
-       advertises it, matching the existing RB_CARD_FILTER_CARD_PROPERTY switch
-       util.c:42-46 already uses for exactly this field. */
-#ifdef RB_CARD_FILTER_CARD_PROPERTY
+       util.rs:1444. This used to sit behind #ifdef RB_CARD_FILTER_CARD_PROPERTY
+       so that it could not compile until include/rabuka.h advertised the member.
+       The header now carries `char card_property[64]` unconditionally
+       (rabuka.h:2438), so the switch has nothing left to switch on: there is no
+       build in which the field exists and the population is off, and no build in
+       which the population exists and the field does not. A compile-time switch
+       that can only ever take one value is a lie about intent, so the #ifdef is
+       GONE rather than defined in the Makefile — Rust has no such switch and
+       neither does the C port now. util.c's RF_CARD_PROPERTY went the same way;
+       see that file for the matcher side. */
     card_filter_set_text(out->card_property, sizeof(out->card_property),
                          fx_extra(e, "card_property"));
-#endif
     if (card_extra_int(e, "original_blade_limit", &out->original_blade_limit)) {
         out->has_original_blade = 1;
         card_filter_set_text(out->original_blade_op, sizeof(out->original_blade_op), fx_extra(e, "original_blade_operator"));
@@ -933,6 +961,20 @@ static void card_filter_from_effect(const AbilityEffect *e, RbCardFilter *out) {
         card_filter_set_text(out->name_fragments[0], sizeof(out->name_fragments[0]), name_constraint);
         out->n_name_fragments = 1;
     }
+    /* util.rs:1881 `or_ability_filters: effect.or_ability_filters_any()` — a
+       `Vec<AbilityFilterBranch>` (card.rs:942-945: {ability_filter,
+       ability_filter_triggers}), counted by has_filter at util.rs:1443 and
+       matched by check_ability_filter at util.rs:1634-1650. vm.c's
+       decode_extra_value (vm.c:200-237) cannot flatten an array of objects into
+       a CSV, so it stringifies the whole array instead; the extra therefore
+       arrives as JSON and the branch list has to be unpacked here. Each slot
+       keeps ONE branch object verbatim, '{' through the first '}', which is the
+       close of the nested "$fields" object and therefore the end of every field
+       a branch owns. util.c's matcher reads the two keys out of each slot. */
+    card_filter_or_branches(fx_extra(e, "or_ability_filters"),
+                            out->or_ability_filters,
+                            (int)(sizeof(out->or_ability_filters) / sizeof(out->or_ability_filters[0])),
+                            &out->n_or_ability_filters);
     out->distinct = rb_distinct_info_is_distinct(fx_extra(e, "distinct"));
     if (card_extra_int(e, "blade_limit", &out->blade_limit)) {
         out->has_blade_limit = 1;
@@ -943,7 +985,8 @@ static void card_filter_from_effect(const AbilityEffect *e, RbCardFilter *out) {
        card_type, group, cost_limit, characters, exclude_characters,
        heart_colors, need_heart_total, need_heart_color, name_fragments,
        original_blade_limit, ability_filter, ability_filter_triggers,
-       card_property, distinct. The five extra terms (has_exclude_self,
+       card_property, or_ability_filters, distinct. The five extra terms
+       (has_exclude_self,
        negation, has_cost_total, n_cost_values, has_blade_limit) are the C
        extensions effects/score.c:147-152 and effects/move.c:767 mirror when they
        recompute this flag by hand; they are left in place so the two stay in
@@ -956,10 +999,8 @@ static void card_filter_from_effect(const AbilityEffect *e, RbCardFilter *out) {
                          out->n_heart_colors || out->has_need_heart_total || out->need_heart_color[0] ||
                          out->has_original_blade ||
                          out->has_cost_total || out->n_cost_values || out->n_name_fragments ||
-                         out->distinct || out->has_blade_limit
-#ifdef RB_CARD_FILTER_CARD_PROPERTY
-                         || out->card_property[0]
-#endif
+                         out->distinct || out->has_blade_limit ||
+                         out->card_property[0] || out->n_or_ability_filters
                          );
 }
 

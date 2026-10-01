@@ -1,0 +1,212 @@
+# tools/sweep_daemon.ps1 - persistent paired-sweep daemon.
+#
+# Runs candidate arms as PAIRED arena runs against a baseline outcomes file and
+# appends one line per arm to a results file. Survives session close (started
+# with background_process -Persistent).
+#
+# Why it is built the way it is:
+#
+#   * PARALLEL, one arena per core. Each arm is an independent process with its
+#     own --seed, so wall-clock contention changes nothing about the result - the
+#     arena is deterministic per seed and shares no state. What it changes is how
+#     long a 29-arm round takes: serially ~3 min an arm, 12-wide ~30 s a round.
+#     Results are WRITTEN to per-arm files and merged into results.txt in a fixed
+#     order afterwards, so a fast arm never interleaves a slow one into a
+#     half-written line.
+#
+#   * SNAPSHOT, not the installed binary. Cargo cannot overwrite bot_arena.exe
+#     while a copy of it is running on Windows, so a sweep on the real file
+#     blocks every rebuild until the round ends. The daemon copies the binary
+#     into its own directory at the start of each round and runs the copy: the
+#     workspace stays rebuildable while the sweep runs. Every line records the
+#     snapshot's timestamp, so a round that mixed two builds is visible in the
+#     record rather than inferred.
+#
+#   * The baseline is regenerated from the SAME snapshot, so no arm is ever
+#     compared against a record produced by a different build.
+#
+#   * A candidate that looks real on the selection seed is re-run on holdout
+#     seeds. Seed 11 is the seed every other measurement in
+#     docs/V8_IMPROVEMENT_LOG.md was found on, so it cannot confirm anything.
+#
+# Usage: pwsh tools/sweep_daemon.ps1 [-Rounds 0] [-Games 1200] [-Parallel 10] [-PauseMin 5]
+#   -Rounds 0 means "loop until stopped".
+
+param(
+    [int]$Rounds = 0,
+    [int]$Games = 1200,
+    [int]$Parallel = 10,
+    [int]$PauseMin = 5
+)
+
+$ErrorActionPreference = "Continue"
+$root = Split-Path -Parent $PSScriptRoot
+$arena = "C:\rust_targets\release\bot_arena.exe"
+$outDir = Join-Path $root "test_output\sweep"
+$workDir = Join-Path $outDir "work"
+New-Item -ItemType Directory -Force -Path $outDir | Out-Null
+New-Item -ItemType Directory -Force -Path $workDir | Out-Null
+# The arena resolves its decklist as ../web_ui/decks relative to the process CWD
+# and hard-errors on a missing deck rather than falling back.
+Set-Location (Join-Path $root "engine")
+$results = Join-Path $outDir "results.txt"
+$selectSeed = 11
+$holdoutSeeds = @(23, 31)
+
+$arms = @(
+    @{ label = "opp-sampled-score"; env = @("V8_OPP_SAMPLED_SCORE") },
+    @{ label = "opp-sampled-yield"; env = @("V8_OPP_SAMPLED_YIELD") },
+    @{ label = "opp-bias+1"; env = @("V8_OPP_SCORE_BIAS=1") },
+    @{ label = "opp-bias+2"; env = @("V8_OPP_SCORE_BIAS=2") },
+    @{ label = "opp-ensemble"; env = @("V8_OPP_ENSEMBLE") },
+    @{ label = "opp-gradient"; env = @("V8_OPP_GRADIENT") },
+    @{ label = "opp-cleared-flat"; env = @("V8_OPP_CLEARED=0.5") },
+    @{ label = "opp-assume-commit"; env = @("V8_ASSUME_COMMIT=0.8") },
+    @{ label = "opp-assume-set2"; env = @("V8_ASSUME_SET=2") },
+    @{ label = "p-floor-0.6"; env = @("V8_P_FLOOR=0.6") },
+    @{ label = "p-floor-0.75"; env = @("V8_P_FLOOR=0.75") },
+    @{ label = "p-floor-0.9"; env = @("V8_P_FLOOR=0.9") },
+    @{ label = "p-first"; env = @("V8_P_FIRST") },
+    @{ label = "lives-2"; env = @("V8_MAX_LIVES=2") },
+    @{ label = "lives-3"; env = @("V8_MAX_LIVES=3") },
+    @{ label = "contested-wide"; env = @("V8_CONTESTED_WIDE") },
+    @{ label = "joint"; env = @("V8_JOINT") },
+    @{ label = "deficit-0.15"; env = @("V8_DEFICIT=0.15") },
+    @{ label = "v9-mulligan-v8"; env = @("V9_MULLIGAN=v8") },
+    @{ label = "v9-live-v7"; env = @("V9_LIVE_ROLLOUT=v7") },
+    @{ label = "v7-blade-arith"; env = @("V7_BLADE_ARITH=0.5") },
+    @{ label = "v7-check-pressure"; env = @("V7_CHECK_PRESSURE=40") },
+    @{ label = "v7-forecast"; env = @("V7_FORECAST=30") },
+    @{ label = "v7-lean"; env = @("V7_LEAN") },
+    @{ label = "v7-presence"; env = @("V7_PRESENCE") },
+    @{ label = "cov-gradient-20"; env = @("V7_COVERAGE_GRADIENT=20") },
+    @{ label = "cov-gradient-60"; env = @("V7_COVERAGE_GRADIENT=60") },
+    @{ label = "cov-gradient-150"; env = @("V7_COVERAGE_GRADIENT=150") },
+    @{ label = "cov-grad-blades"; env = @("V7_COVERAGE_GRADIENT=150", "V7_BLADE_ARITH=0.5") },
+    @{ label = "v7-nodes-128"; env = @("V7_NODES=128") },
+    @{ label = "v7-dev-16"; env = @("V7_DEV_WEIGHT=16") },
+    @{ label = "v7-blades-10"; env = @("V7_BLADES_WEIGHT=10") },
+    @{ label = "v7-ammo-15"; env = @("V7_AMMO_WEIGHT=15") }
+)
+
+function Start-Arm {
+    param($Arm, [int]$Seed, [string]$BaseCsv, [string]$Exe, [string]$Tag)
+    $csv = Join-Path $workDir "$Tag-$($Arm.label)-s$Seed.csv"
+    $line = Join-Path $workDir "$Tag-$($Arm.label)-s$Seed.txt"
+    # Start-Process joins ArgumentList with spaces and does NOT quote elements, so the
+    # deck name has to carry its own quotes or it arrives as two arguments and the
+    # arena exits with "expected [p1] [p2] [budget_secs] [deck]".
+    $a = @("v9", "v7", "$Games", '"5CP3Z idou"', "--games", "$Games", "--seed", "$Seed",
+        "--outcomes", $csv, "--vs", $BaseCsv)
+    foreach ($e in $Arm.env) { $a += @("--env", $e) }
+    $proc = Start-Process -FilePath $Exe -ArgumentList $a -NoNewWindow -PassThru `
+        -RedirectStandardOutput $line -RedirectStandardError "$line.err"
+    return [pscustomobject]@{ Arm = $Arm; Seed = $Seed; BaseCsv = $BaseCsv; Proc = $proc; Out = $line; Csv = $csv }
+}
+
+function Complete-Arm {
+    param($Job)
+    $out = ""
+    if (Test-Path $Job.Out) { $out = Get-Content $Job.Out -Raw }
+    $rec = [regex]::Match($out, "P1\(v9\)\s+(\d+)\s+-\s+P2\(v7\)\s+(\d+)")
+    if (-not $rec.Success) {
+        return ("{0}  {1,-20} s{2}  ARENA-FAILED" -f (Get-Date -Format "HH:mm:ss"), $Job.Arm.label, $Job.Seed)
+    }
+    $dis = [regex]::Match($out, "baseline-only\s*(\d+)\s*\|\s*candidate-only\s*(\d+)")
+    $p = [regex]::Match($out, "McNemar two-sided p = ([0-9.]+)")
+    $pw = [regex]::Match($out, "paired win rate P1: baseline ([0-9.]+)% -> candidate ([0-9.]+)%")
+    $w = [int]$rec.Groups[1].Value
+    $l = [int]$rec.Groups[2].Value
+    $b = if ($dis.Success) { [int]$dis.Groups[1].Value } else { -1 }
+    $c = if ($dis.Success) { [int]$dis.Groups[2].Value } else { -1 }
+    $pv = if ($p.Success) { $p.Groups[1].Value } else { "?" }
+    $d = if ($pw.Success) { [double]$pw.Groups[2].Value - [double]$pw.Groups[1].Value } else { 0 }
+    $rate = [math]::Round(100.0 * $w / ($w + $l), 2)
+    return ("{0}  {1,-20} s{2}  {3}-{4}  rate={5}%  disc={6}/{7}  p={8}  delta={9}pp" -f `
+            (Get-Date -Format "HH:mm:ss"), $Job.Arm.label, $Job.Seed, $w, $l, $rate, $b, $c, $pv,
+            [math]::Round($d, 2))
+}
+
+"$(Get-Date -Format 'yyyy-MM-dd HH:mm:ss')  sweep daemon starting: games=$Games arms=$($arms.Count) parallel=$Parallel rounds=$Rounds" | Add-Content $results
+
+$round = 0
+while ($Rounds -le 0 -or $round -lt $Rounds) {
+    $round++
+    # Snapshot the binary so the workspace stays rebuildable during the round.
+    $snap = Join-Path $workDir "arena_snap.exe"
+    Copy-Item $arena $snap -Force
+    $stamp = (Get-Item $snap).LastWriteTime
+    "--- round $round  snapshot $stamp ---" | Add-Content $results
+
+    # One baseline per round, from the same snapshot.
+    $baseCsv = Join-Path $workDir "base_s$selectSeed.csv"
+    $baseLine = Join-Path $workDir "base_s$selectSeed.txt"
+    & $snap v9 v7 $Games "5CP3Z idou" --games $Games --seed $selectSeed --outcomes $baseCsv 2>&1 |
+        Out-File -Encoding utf8 $baseLine
+    $rec = [regex]::Match((Get-Content $baseLine -Raw), "P1\(v9\)\s+(\d+)\s+-\s+P2\(v7\)\s+(\d+)")
+    $recAct = [regex]::Match((Get-Content $baseLine -Raw), "total actions (\d+)")
+    "  baseline s$selectSeed : $($rec.Groups[1].Value)-$($rec.Groups[2].Value) actions=$($recAct.Groups[1].Value)" |
+        Add-Content $results
+
+    # Selection seed, all arms, throttled to $Parallel.
+    $pending = New-Object System.Collections.Queue
+    foreach ($a in $arms) { $pending.Enqueue(@{ Arm = $a; Seed = $selectSeed; Base = $baseCsv }) }
+    $running = @()
+    $lines = @()
+    while ($pending.Count -gt 0 -or $running.Count -gt 0) {
+        while ($pending.Count -gt 0 -and $running.Count -lt $Parallel) {
+            $job = $pending.Dequeue()
+            $running += Start-Arm -Arm $job.Arm -Seed $job.Seed -BaseCsv $job.Base -Exe $snap -Tag "r$round"
+        }
+        Start-Sleep -Milliseconds 400
+        $still = @()
+        foreach ($j in $running) {
+            if ($j.Proc.HasExited) { $lines += Complete-Arm $j } else { $still += $j } }
+        $running = $still
+    }
+    $lines | Add-Content $results
+
+    # Promotion: anything that moved on the seed every other measurement was found
+    # on gets two more seeds, in parallel, each against its own baseline.
+    $promoted = @()
+    foreach ($l in $lines) {
+        if ($l -match "delta=(-?[0-9.]+)pp") {
+            $d = [math]::Abs([double]$Matches[1])
+            $p = if ($l -match "p=([0-9.]+)") { [double]$Matches[1] } else { 1.0 }
+            if ($d -ge 0.3 -or $p -lt 0.2) { $promoted += ($l -split "\s+")[2] }
+        }
+    }
+    if ($promoted.Count -gt 0) {
+        "  promoting: $($promoted -join ', ')" | Add-Content $results
+        $hb = @{}
+        foreach ($s in $holdoutSeeds) {
+            $hb[$s] = Join-Path $workDir "base_s$s.csv"
+            & $snap v9 v7 $Games "5CP3Z idou" --games $Games --seed $s --outcomes $hb[$s] 2>&1 | Out-Null
+        }
+        $p2 = New-Object System.Collections.Queue
+        foreach ($lbl in $promoted) {
+            $arm = $arms | Where-Object { $_.label -eq $lbl }
+            foreach ($s in $holdoutSeeds) { $p2.Enqueue(@{ Arm = $arm; Seed = $s; Base = $hb[$s] }) }
+        }
+        $run2 = @()
+        $lines2 = @()
+        while ($p2.Count -gt 0 -or $run2.Count -gt 0) {
+            while ($p2.Count -gt 0 -and $run2.Count -lt $Parallel) {
+                $job = $p2.Dequeue()
+                $run2 += Start-Arm -Arm $job.Arm -Seed $job.Seed -BaseCsv $job.Base -Exe $snap -Tag "r$round"
+            }
+            Start-Sleep -Milliseconds 400
+            $still = @()
+            foreach ($j in $run2) {
+                if ($j.Proc.HasExited) { $lines2 += Complete-Arm $j } else { $still += $j } }
+            $run2 = $still
+        }
+        $lines2 | Add-Content $results
+    }
+
+    if ($Rounds -le 0 -and $PauseMin -gt 0) {
+        "round $round done; sleeping $PauseMin min" | Add-Content $results
+        Start-Sleep -Minutes $PauseMin
+    }
+}
+"$(Get-Date -Format 'yyyy-MM-dd HH:mm:ss')  sweep daemon finished after $round round(s)" | Add-Content $results

@@ -31,24 +31,32 @@
 #define RB_HEART_ALL_KEY "heart00"
 
 /* ── Pending header fields ─────────────────────────────────────────────
-   Two CardFilter/GameModifiers fields exist in the Rust twin but not yet in
-   include/rabuka.h (which another agent owns). The faithful code paths below
-   are compiled only when the header advertises the field, so the build stays
-   green until the diff in the session report lands. Define the macro (or add
-   the field to the struct) to switch the path on:
+   game_modifiers.rs:183  last_cost_energy_count: u8   still has no home in
+   include/rabuka.h, so that path stays behind its switch:
 
-     util.rs:1102  card_property: Option<&'a str>        in RbCardFilter
-     game_modifiers.rs:183  last_cost_energy_count: u8   in RbMods                */
-#ifdef RB_CARD_FILTER_CARD_PROPERTY
-#define RF_CARD_PROPERTY(rf) ((rf)->card_property)
-#else
-#define RF_CARD_PROPERTY(rf) ""
-#endif
+      game_modifiers.rs:183  last_cost_energy_count: u8   in RbMods
+
+   `card_property` used to be on this list too, guarded by
+   RB_CARD_FILTER_CARD_PROPERTY with RF_CARD_PROPERTY falling back to "". That
+   guard is GONE. include/rabuka.h:2438 now declares `char card_property[64]` in
+   RbCardFilter unconditionally, so the macro could only ever expand one way:
+   with the field present, `rf->card_property` is simply the field. A switch that
+   has no off position is not a switch, and keeping one would mean the next
+   reader cannot tell whether the matcher is live. card.c's producer lost the
+   same guard for the same reason; the C port is now unconditional, which is what
+   util.rs:1654-1673 and util.rs:1882 have always been. */
 #ifdef RB_MODS_LAST_COST_ENERGY_COUNT
 #define RB_LAST_COST_ENERGY(m) ((m)->last_cost_energy_count)
 #else
 #define RB_LAST_COST_ENERGY(m) (0)
 #endif
+
+/* Card::has_draw_icon (card.rs:4358), defined in src/core/card.c. Its three
+   siblings — has_blade_heart / has_score_icon / has_all_blade — are declared in
+   include/rabuka.h:1981-1984; this one is not, because the header is owned by
+   another writer. Declared here so the fourth arm of rb_check_card_property can
+   be reached; the header still wants the prototype. */
+int rb_card_has_draw_icon(const Card *c);
 
 /* ── Internal filter struct (mirrors CardFilter) ─────────────────────── */
 
@@ -82,8 +90,13 @@ typedef struct {
     char  ability_filter[32];
     char  ability_filter_triggers[8][32];
     int   n_ability_filter_triggers;
-    char  card_property[32];   /* Rust util.rs:1102 card_property */
+    /* util.rs:1102 card_property — 64 to match rabuka.h's public member. */
+    char  card_property[64];
     int   has_card_property;
+    /* util.rs:1110 or_ability_filters: Vec<AbilityFilterBranch>, one JSON branch
+       object per slot (see card.c's card_filter_or_branches). */
+    char  or_ability_filters[4][192];
+    int   n_or_ability_filters;
     int   negation;            /* Rust util.rs:1105 negation — negates card_property */
     int   exclude_self_id;
     int   has_exclude_self;
@@ -1309,8 +1322,120 @@ int rb_resolve_indices_to_ids(const GameState *g, int pl, const char *zone,
 
 /* ── Card-filter matching (local helpers) ──────────────────────────────── */
 
+/* util.rs:1595-1602 any_trigger — a wanted label matches when the RESOLVED
+   trigger text STARTS WITH it. 「常時」 is a prefix of 「常時:...」, so
+   starts_with accepts the suffixed form; what it does NOT accept is the reverse
+   (a bare 「常時」 request matching inside a longer token) or any mid-token hit.
+   The C port used strstr (CONTAINS), which accepted both. */
+static int local_any_trigger_prefix(int card_id, const char (*wanted)[32], int n_wanted)
+{
+    int n = rb_card_num_abilities((uint32_t)card_id);
+    for (int i = 0; i < n; i++) {
+        Ability ab;
+        if (!rb_decode_card_ability((uint32_t)card_id, i, &ab)) continue;
+        int hit = 0;
+        if (ab.triggers) {
+            for (int j = 0; j < n_wanted && !hit; j++) {
+                size_t len = strlen(wanted[j]);
+                if (len && !strncmp(ab.triggers, wanted[j], len)) hit = 1;
+            }
+        }
+        rb_free_ability(&ab);
+        if (hit) return 1;
+    }
+    return 0;
+}
+
+/* util.rs:1584-1617 card_passes_ability_filter.
+   `require_ability` selects Unconstrained::RequireAbility — the shape the
+   or_ability_filters branches use — where a filter name that names no trigger
+   list degrades to "has an ability at all", because in a disjunction a
+   vacuously-true branch would make the whole OR meaningless. The standalone
+   `ability_filter` uses Unconstrained::Pass, where the same case constrains
+   nothing. The trigger list is `Option<Vec<String>>` in Rust; an absent or EMPTY
+   list is the `_` arm, so a filter that needs a trigger list and got none
+   rejects nothing (Pass) or requires only an ability (RequireAbility). */
+static int local_card_passes_ability_filter(int card_id, const char *ability_filter,
+                                            const char (*triggers)[32], int n_triggers,
+                                            int require_ability)
+{
+    int has_ability = rb_card_num_abilities((uint32_t)card_id) > 0;
+    int unconstrained = require_ability ? has_ability : 1;
+    const char *af = ability_filter ? ability_filter : "";
+    if (!strcmp(af, "no_ability")) return !has_ability;
+    if (!strcmp(af, "has_ability")) return has_ability;
+    if (!strcmp(af, "no_ability_type"))
+        return n_triggers > 0 ? !local_any_trigger_prefix(card_id, triggers, n_triggers)
+                              : unconstrained;
+    if (!strcmp(af, "has_ability_type"))
+        return n_triggers > 0 ? local_any_trigger_prefix(card_id, triggers, n_triggers)
+                              : unconstrained;
+    return 1;   /* an unrecognised name constrains nothing, in either form */
+}
+
+/* One parsed or_ability_filters branch — card.rs:942-945 AbilityFilterBranch. */
+typedef struct {
+    char ability_filter[32];
+    char triggers[4][32];
+    int  n_triggers;
+} LocalOrBranch;
+
+/* Read `"key":"value"` out of a branch object. Returns 0 when absent. */
+static int local_or_branch_field(const char *json, const char *key, char *dst, size_t cap)
+{
+    dst[0] = 0;
+    char pattern[64];
+    snprintf(pattern, sizeof pattern, "\"%s\"", key);
+    const char *p = strstr(json, pattern);
+    if (!p) return 0;
+    p += strlen(pattern);
+    while (*p && *p != ':') {
+        if (*p == ',') return 0;
+        p++;
+    }
+    if (*p != ':') return 0;
+    p++;
+    while (*p == ' ' || *p == '"') p++;
+    size_t n = 0;
+    while (*p && *p != '"' && n + 1 < cap) dst[n++] = *p++;
+    dst[n] = 0;
+    return n > 0;
+}
+
+/* Parse one `{"$variant":N,"$fields":{...}}` branch object into its two
+   decision fields. A branch that names no ability_filter is NOT an error and is
+   not skipped: Rust's `ability_filter.unwrap_or("")` sends it to the `_` arm,
+   which constrains nothing, so such a branch satisfies the OR. */
+static int local_or_branch_parse(const char *json, LocalOrBranch *out)
+{
+    memset(out, 0, sizeof *out);
+    if (!json || !*json) return 0;
+    local_or_branch_field(json, "ability_filter", out->ability_filter,
+                          sizeof out->ability_filter);
+    const char *ta = strstr(json, "\"ability_filter_triggers\"");
+    if (!ta) return 1;
+    const char *lb = strchr(ta, '[');
+    if (!lb) return 1;
+    const char *rb = strchr(lb, ']');
+    if (!rb) return 1;
+    const char *p = lb + 1;
+    while (p < rb && out->n_triggers < 4) {
+        while (p < rb && (*p == ',' || *p == ' ' || *p == '"')) p++;
+        const char *start = p;
+        while (p < rb && *p != ',' && *p != ' ' && *p != '"') p++;
+        size_t len = (size_t)(p - start);
+        if (len && len < sizeof(out->triggers[0])) {
+            memcpy(out->triggers[out->n_triggers], start, len);
+            out->triggers[out->n_triggers][len] = 0;
+            out->n_triggers++;
+        }
+    }
+    return 1;
+}
+
 /* Check if card_id matches the LocalCardFilter fields. */
 static int local_filter_matches(const LocalCardFilter *f, int card_id) {
+    Card filter_probe;
     if (f->has_exclude_self && card_id == f->exclude_self_id) return 0;
     if (f->card_type[0] && !rb_card_matches_type(card_id, f->card_type)) return 0;
     /* CardFilter.group is populated from `group_names`, i.e. it may still hold
@@ -1432,56 +1557,45 @@ static int local_filter_matches(const LocalCardFilter *f, int card_id) {
         if (!rb_compare_counts(f->original_blade_op[0] ? f->original_blade_op : NULL,
                                blade, f->original_blade_limit)) return 0;
     }
-    if (f->ability_filter[0]) {
-        Card c;
-        if (rb_decode_card_by_index((uint32_t)card_id, &c)) {
-            int has_ability = c.ability != NULL;
-            if (!strcmp(f->ability_filter, "no_ability")) {
-                if (has_ability) { rb_free_card(&c); return 0; }
-            } else if (!strcmp(f->ability_filter, "has_ability")) {
-                if (!has_ability) { rb_free_card(&c); return 0; }
-            } else if (!strcmp(f->ability_filter, "no_ability_type")) {
-                if (has_ability && c.ability) {
-                    int n = rb_card_num_abilities(card_id);
-                    for (int ai = 0; ai < n; ai++) {
-                        Ability ab;
-                        if (!rb_decode_card_ability(card_id, ai, &ab)) continue;
-                        if (ab.triggers) {
-                            for (int ti = 0; ti < f->n_ability_filter_triggers; ti++) {
-                                if (strstr(ab.triggers, f->ability_filter_triggers[ti])) {
-                                    rb_free_ability(&ab);
-                                    rb_free_card(&c);
-                                    return 0;
-                                }
-                            }
-                        }
-                        rb_free_ability(&ab);
-                    }
-                }
-            } else if (!strcmp(f->ability_filter, "has_ability_type")) {
-                if (has_ability && c.ability) {
-                    int found = 0;
-                    int n = rb_card_num_abilities(card_id);
-                    for (int ai = 0; ai < n; ai++) {
-                        Ability ab;
-                        if (!rb_decode_card_ability(card_id, ai, &ab)) continue;
-                        if (ab.triggers) {
-                            for (int ti = 0; ti < f->n_ability_filter_triggers; ti++) {
-                                if (strstr(ab.triggers, f->ability_filter_triggers[ti])) {
-                                    found = 1; rb_free_ability(&ab); break;
-                                }
-                            }
-                        }
-                        rb_free_ability(&ab);
-                        if (found) break;
-                    }
-                    if (!found) { rb_free_card(&c); return 0; }
-                }
+    /* util.rs:1779-1784 — check_ability_filter (util.rs:1619-1652) then
+       check_card_property (util.rs:1654-1673), in that order. The C port used to
+       open ONE `Card c` around the ability test and read `has_ability` off
+       `c.ability`, but rb_decode_card_by_index always sets `ability = NULL`
+       (card.c:127 — abilities are decoded lazily, one at a time, through
+       rb_decode_card_ability), so has_ability was hard-wired to 0: `has_ability`
+       rejected every card, `no_ability` accepted every card, and BOTH
+       no_ability_type and has_ability_type silently degenerated (the former into
+       "always pass", the latter into "always reject", because their trigger scan
+       was gated on the same dead flag). Rust reads `!card.abilities.is_empty()`
+       (util.rs:1590), which is rb_card_num_abilities — the same source
+       effects/look.c's private copy used.
+
+       Rust also gates the whole term on `db.get_card(id)` being Some
+       (util.rs:1621), so an undecodable card is skipped, exactly as before. */
+    if (rb_decode_card_by_index((uint32_t)card_id, &filter_probe)) {
+        int passes = 1;
+        if (f->ability_filter[0] &&
+            !local_card_passes_ability_filter(card_id, f->ability_filter,
+                                              (const char (*)[32])f->ability_filter_triggers,
+                                              f->n_ability_filter_triggers, 0))
+            passes = 0;
+        /* util.rs:1634-1650 — when OR branches are present they ARE the whole
+           ability filter: the card passes if ANY branch matches, each branch
+           judged with Unconstrained::RequireAbility. */
+        if (passes && f->n_or_ability_filters > 0) {
+            passes = 0;
+            for (int i = 0; i < f->n_or_ability_filters && !passes; i++) {
+                LocalOrBranch br;
+                if (!local_or_branch_parse(f->or_ability_filters[i], &br)) continue;
+                passes = local_card_passes_ability_filter(card_id, br.ability_filter,
+                                                          (const char (*)[32])br.triggers,
+                                                          br.n_triggers, 1);
             }
-            rb_free_card(&c);
         }
+        rb_free_card(&filter_probe);
+        if (!passes) return 0;
     }
-    /* util.rs:1390-1408 (CardFilter::check_card_property, checked last, after the
+    /* util.rs:1654-1673 (CardFilter::check_card_property, checked last, after the
        ability filter). `negation` inverts the property test. An unknown property
        string is false, so with negation it passes — a card the database cannot
        decode also counts as "no property", matching Rust's
@@ -1498,11 +1612,14 @@ static int local_filter_matches(const LocalCardFilter *f, int card_id) {
 
 /* ── CardFilter::matches (ported) ─────────────────────────────────────── */
 
-/* Mirror util.rs::CardFilter::has_filter. */
+/* Mirror util.rs::CardFilter::has_filter. util.rs:1443-1444 counts
+   or_ability_filters and card_property; the latter was already here, the former
+   was missing because no producer existed. */
 static int local_has_filter(const LocalCardFilter *f) {
     return f->card_type[0] || f->has_group || f->has_cost_limit || f->has_characters ||
            f->has_exclude_characters || f->n_heart_colors > 0 || f->has_need_heart_total ||
            f->n_name_fragments > 0 || f->has_original_blade || f->ability_filter[0] ||
+           f->n_or_ability_filters > 0 ||
            f->has_card_property || f->has_exclude_self || f->has_cost_total ||
            f->n_cost_values > 0 || f->has_blade_limit;
 }
@@ -1566,12 +1683,24 @@ static int local_filter_from_public(const RbCardFilter *rf, LocalCardFilter *out
         f.n_ability_filter_triggers = rf->n_ability_filter_triggers;
     }
     f.negation = rf->negation;
-    /* util.rs:1536 card_property: effect.card_property_any(). The field is not in
-       include/rabuka.h yet, so it arrives as "" until the header diff lands. */
+    /* util.rs:1882 card_property: effect.card_property_any() — the member is
+       unconditional in rabuka.h now, so this is a plain copy (see the header
+       comment at the top of this file for why RF_CARD_PROPERTY is gone). */
     {
-        const char *cp = RF_CARD_PROPERTY(rf);
+        const char *cp = rf->card_property;
         if (cp && *cp) { strncpy(f.card_property, cp, sizeof f.card_property - 1); f.has_card_property = 1; }
     }
+    /* util.rs:1881 or_ability_filters: effect.or_ability_filters_any() — copied
+       verbatim per branch; local_or_branch_parse reads the keys back out at
+       match time so the wire shape stays the single source of truth. */
+    for (int i = 0; i < rf->n_or_ability_filters
+                    && i < (int)(sizeof(f.or_ability_filters) / sizeof(f.or_ability_filters[0])); i++)
+        strncpy(f.or_ability_filters[i], rf->or_ability_filters[i],
+                sizeof f.or_ability_filters[i] - 1);
+    f.n_or_ability_filters = rf->n_or_ability_filters;
+    if (f.n_or_ability_filters >
+        (int)(sizeof(f.or_ability_filters) / sizeof(f.or_ability_filters[0])))
+        f.n_or_ability_filters = (int)(sizeof(f.or_ability_filters) / sizeof(f.or_ability_filters[0]));
     if (rf->has_exclude_self) { f.exclude_self_id = rf->exclude_self_id; f.has_exclude_self = 1; }
     if (rf->has_cost_total) { f.cost_total = rf->cost_total;
                                if (rf->cost_total_op[0]) strncpy(f.cost_total_op, rf->cost_total_op, sizeof f.cost_total_op - 1);
@@ -2633,13 +2762,20 @@ int rb_push_temporary_effect(GameState *g, int card_id, int dur, int blade,
 
 /* ── Card property / blade filter helpers ──────────────────────────────── */
 
-/* Mirror util.rs::check_card_property. */
+/* Mirror util.rs::check_card_property (util.rs:1656-1662) — the four arms are
+   exactly Card's icon family. `has_draw_icon` (card.rs:4358) was MISSING here,
+   so every draw-icon card fell through to `has = 0` and was rejected; 82 of the
+   2,639 decoded cards carry a Draw icon, so this is not a rare branch. effects/
+   look.c's private card_property test called this same helper and therefore
+   inherited the same hole. condition.c:2633 / :3802 have their own copies and
+   still lack the arm — reported, not touched (not this file). */
 int rb_check_card_property(const char *prop, int negation, const Card *c) {
     int has = 0;
     if (!prop) has = 1;
     else if (!strcmp(prop, "has_blade_heart")) has = rb_card_has_blade_heart(c);
     else if (!strcmp(prop, "has_score_icon"))  has = rb_card_has_score_icon(c);
     else if (!strcmp(prop, "has_all_blade"))   has = rb_card_has_all_blade(c);
+    else if (!strcmp(prop, "has_draw_icon"))   has = rb_card_has_draw_icon(c);
     return negation ? !has : has;
 }
 

@@ -19,10 +19,41 @@ int rb_ability_matches_trigger(const Ability *ab, const char *trigger) {
     return rb_trigger_is(ab->triggers, trigger);
 }
 
-/* Mirror abilities.rs::record_ability_use */
+/* Mirror abilities.rs:216-231 (record_ability_use):
+
+        if self.ability_queue.current_entry().is_some_and(|e| e.use_limit_recorded) {
+            return false;                              // already recorded this activation
+        }
+        *self.turn_limited_abilities_used.entry(key).or_insert(0) += 1;   // saturating
+        if let Some(e) = self.ability_queue.current_entry_mut() {
+            e.use_limit_recorded = true;
+        }
+        true
+
+   The entry flag is what makes ONE ACTIVATION consume EXACTLY ONE use even
+   though the limit is spent from several branch points: the resolver's early
+   record (resolver.rs:1180 / :1230), its final record (:1390), the gates
+   (gates.rs:160, :308, :318, :331) and the choice resume paths
+   (choice.rs:3479, :3663). Without the guard the C spends the limit once per
+   CALL SITE instead of once per activation, and the resolver path is the one
+   place that fires twice in a single activation — resolve_ability_body reaches
+   BOTH its final recording (src/ability/resolver.c:1158-1160) and its
+   ability_key recording (:1161-1168) on the same pass, with
+   ability_key_cid == host_cid and ability_key_idx == ability_idx, so a
+   「{{ターン1回}}」 ability resolved without opening a prompt consumed TWO
+   uses and was unrepeatable for the rest of the turn.
+
+   Marking the entry here is also what keeps the C's ENQUEUE-time spending
+   (rb_mark_entries_use_limit_recorded / rb_mark_enqueued_entry_use_limit_recorded)
+   from being double-counted by a later resolution-time record. */
 void rb_record_ability_use(GameState *g, int cid, int idx) {
     if (!g) return;
+    if (g->queue.cur >= 0 && g->queue.cur < g->queue.n_entries &&
+        g->queue.entries[g->queue.cur].use_limit_recorded)
+        return;
     rb_record_use(&g->queue, cid, idx, g->turn);
+    if (g->queue.cur >= 0 && g->queue.cur < g->queue.n_entries)
+        g->queue.entries[g->queue.cur].use_limit_recorded = 1;
 }
 
 /* Mirror abilities.rs::ability_uses_used */
@@ -944,9 +975,11 @@ static int rb_queue_yell_ability(GameState *g, int pl, int cid, int ability_idx)
         return 0;
     }
     g->batch_triggered_keys[g->n_batch_triggered_keys++] = key;
+    int entry_base = g->queue.n_entries;
     rb_build_ability_queue_entry(g, cid, ability_idx, "",
                                   pl == 0 ? "p1" : "p2", "yell", NULL, 0, -1);
     rb_record_use(&g->queue, cid, ability_idx, g->turn);
+    rb_mark_entries_use_limit_recorded(g, entry_base);
     rb_free_ability(&ab);
     return 1;
 }
@@ -1517,17 +1550,53 @@ int rb_entry_destination_copy(const GameState *g, char *buf, size_t buf_len) {
 
 
 
+/* Mirror abilities.rs:2377-2384 (GameState::entry_trigger_moved_cards):
+
+        self.ability_queue
+            .current_entry()
+            .and_then(|e| e.trigger_moved_cards.clone())
+
+   That is the ENQUEUE-TIME snapshot carried on the entry — NOT the live
+   `recently_moved_cards` ring. The distinction is the whole point of the
+   snapshot and every Rust consumer depends on it:
+
+     * condition/card.rs:1703-1711, :1780-1790, :3884-3893 (moved_card_pool)
+       and :4375-4381 (preceding_moved) all resolve the event set as
+       "this ability's own `moved_cards` -> the enqueue snapshot -> the live
+       global", and the snapshot is preferred over the global specifically
+       because cross-seat resolutions and the post-`clear_effect_tracking`
+       drains have already emptied the global by the time the effect runs.
+     * effects/deck.rs:226-234 (`resolve_discard_per_unit_count`) is handed
+       `recently_moved_cards.or(entry_trigger_moved_cards)`, i.e. "only cards
+       moved by the current cost/effect batch, not the full waitroom".
+     * effects/resource.rs:908-927 chains snapshot -> recently_moved ->
+       last_cost_moved for `preceding_moved`.
+     * condition/state.rs:863-869, :938-942 reads the snapshot as the only
+       surviving evidence that THIS card's move caused the trigger.
+
+   The C body ignored `e->trigger_moved_cards` entirely and returned a copy of
+   the live `g->recently_moved` ring, so the snapshot the builder writes at
+   :1601-1610 was write-only in the whole port: no C reader consumed it. It
+   also served the result out of a file-static buffer, which made the accessor
+   non-reentrant and aliased across GameStates.
+
+   The snapshot now comes straight off the entry, so the pointer is valid for
+   as long as the entry is and no copy is needed. `n_trigger_moved_cards == 0`
+   is reported as NULL/0 — RbQueueEntry stores a bare count, not an
+   `Option<SmallVec>`, so "the enqueuer passed no batch" and "the enqueuer
+   passed an empty batch" are the same value here; every Rust consumer listed
+   above falls through to the live global on the empty case anyway, except
+   resource.rs:911, where the difference is a zero-card selection. */
 const int *rb_entry_trigger_moved_cards(const GameState *g, int *out_count) {
-    static int moved[RB_MAX_RECENTLY_MOVED];
-    if (!g || g->queue.cur < 0 || g->queue.cur >= g->queue.n_entries) {
-        if (out_count) *out_count = 0;
-        return NULL;
-    }
-    int n = g->n_recently_moved;
-    if (n > RB_MAX_RECENTLY_MOVED) n = RB_MAX_RECENTLY_MOVED;
-    for (int i = 0; i < n; i++) moved[i] = g->recently_moved[i];
+    if (out_count) *out_count = 0;
+    if (!g || g->queue.cur < 0 || g->queue.cur >= g->queue.n_entries) return NULL;
+    const RbQueueEntry *e = &g->queue.entries[g->queue.cur];
+    int n = e->n_trigger_moved_cards;
+    if (n <= 0) return NULL;
+    int cap = (int)(sizeof(e->trigger_moved_cards) / sizeof(e->trigger_moved_cards[0]));
+    if (n > cap) n = cap;
     if (out_count) *out_count = n;
-    return moved;
+    return e->trigger_moved_cards;
 }
 
 int rb_entry_snapshot_last_energy_placed_by_effect(const GameState *g) {
@@ -1674,6 +1743,18 @@ void rb_trigger_auto_ability(GameState *g, const char *ability_id,
             continue;
         }
         if (par_ability_id_matches(ability_id, card_no, ab.full_text)) {
+            /* No rb_record_use here, and deliberately no
+               rb_mark_entries_use_limit_recorded either. Rust's
+               enqueue_printed_ability (abilities.rs:1282-1315) records
+               NOTHING: the use is spent at resolution by the very same
+               record_ability_use call every other path uses, and
+               pca_resolve_entry's :2626 gate sees the use still unspent so
+               the entry resolves normally and spends its own use at :2733.
+               The C's enqueue-time spending convention (the four batch
+               helpers, triggers.c's six sites, rb_queue_yell_ability) is a
+               port-wide deviation from Rust; marking an entry here without
+               recording a use would suppress the :2733 record and make
+               「{{ターン1回}}」 silently unenforced through this path. */
             rb_build_ability_queue_entry(g, cid, a, card_no, pid_str,
                                         trigger_type, trigger_moved_cards, n_moved, triggering_member_id);
             rb_free_ability(&ab);
@@ -1736,6 +1817,11 @@ void rb_trigger_auto_ability_by_index(GameState *g, int trigger_type,
     rb_free_ability(&ab);
     const char *pid_str = (player_id == 0) ? "p1" : "p2";
     const char *tt_str = rb_trigger_kind_to_token(trigger_type);
+    /* Same as the printed arm above: Rust's trigger_auto_ability_by_index_refs
+       (abilities.rs:1419-1445) records no use, so neither does this. The entry
+       stays unflagged, pca_resolve_entry's :2626 gate sees the use unspent and
+       lets it resolve, and :2733 spends it. Adding a mark here would suppress
+       that record. */
     rb_build_ability_queue_entry(g, explicit_card_id, ability_index, "", pid_str,
                                 tt_str, trigger_moved_cards, n_moved, triggering_member_id);
 }

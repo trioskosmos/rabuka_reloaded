@@ -186,6 +186,14 @@ int rb_entry_conditional_choice_effect(const GameState *g)
 static int choice_discard_pick_legal(const RbChoice *ch, int cid);
 static int choice_effect_uses_selected_cards(const AbilityEffect *e);
 
+/* Defined far below next to the single-index `stage` arm of
+ * rb_resolver_handle_select_card (choice.c:2948), and needed by the stage arm of
+ * choice_handle_multi_indices as well: over the WHOLE answer both arms read a
+ * member through the same slot table, filter and publish helper. */
+static void stage_build_filtered_slots(GameState *g, int pl);
+static int  stage_choice_accepts(const GameState *g, int cid);
+static void stage_publish_selected(GameState *g, int cid);
+
 /* Rust's SelectionContext carries `cost_limit: Option<u8>` / `cost_total:
    Option<u8>` (selection.rs:55-58), and move_cards.rs:2700-2772 applies each ONLY
    when it is Some. The C's RbChoice is flat and cannot tell None from Some(0):
@@ -1813,6 +1821,100 @@ static int choice_handle_multi_indices(RbAbilityResolver *self, GameState *g,
                 self->moved_cards[self->n_moved_cards++] = cid;
         }
         rb_resolver_handle_selection_epilogue(self, g);
+        return 1;
+    }
+
+    if (!strcmp(zone, "stage")) {
+        /* Rust handle_stage_selection (choice.rs:2071-2293) reads EVERY index of
+           the answer. This dispatcher had NO stage arm, so a stage prompt
+           answered with two indices fell through to the single-index path
+           (choice.c:2330-2340) and only indices[0] was applied -- the measured
+           "BOTH members" cases: 改札's 「ライブ成功時」 has to wait BOTH opponent
+           members (parity_target_player k_kowarey_wait_two, answered {0,1} and
+           resolving against one) and a gained-ability target_count pick buffed
+           one member of two.
+
+           `sel` is already ctx.mfi-mapped by the caller (choice.c:4894-4896), the
+           same map the single-index twin applies at choice.c:3078. Rust reaches
+           the member through `player.stage.stage[idx]` for EVERY mapped index
+           (choice.rs:2116-2119), i.e. the mapped value is a STAGE SLOT, so a
+           producer that shipped no filtered_indices needs the slot table built
+           first -- stage_build_filtered_slots is the C's twin of misc.rs:1408-1411
+           filling filtered_indices with slot positions. */
+        int pl = rb_resolve_target_player(g, ch->target_player_id[0] ? ch->target_player_id : "self");
+        if (pl < 0 || pl > 1) pl = actor;
+        /* If the producer shipped its own table the caller's ctx.mfi already ran
+           it and `sel` holds physical slots; otherwise `sel` still holds answer
+           positions that the table built below has to be applied to. */
+        int table_preexisting = (g->queue.pending.n_filtered_indices > 0);
+        stage_build_filtered_slots(g, pl);
+        int cards[RB_STAGE_SIZE];
+        int n_cards = 0;
+        for (int i = 0; i < n_sel; i++) {
+            int slot = table_preexisting ? sel[i] : map_choice_index(&g->queue.pending, sel[i]);
+            if (slot < 0 || slot >= RB_STAGE_SIZE) continue;          /* choice.rs:2119 */
+            int cid = g->p[pl].stage[slot];
+            if (cid == RB_EMPTY_SLOT) continue;                      /* choice.rs:2118 */
+            if (!stage_choice_accepts(g, cid)) continue;             /* validate_card */
+            int dup = 0;
+            for (int k = 0; k < n_cards; k++) if (cards[k] == cid) dup = 1;
+            if (dup) continue;
+            cards[n_cards++] = cid;
+        }
+
+        /* choice.rs:2134-2147 dispatches on the prompt's DECLARED
+           StageSelectIntent. The C cannot carry that field -- Rust parks it on
+           the PERSISTENT resolver (resolver.rs:197) and every producer that sets
+           it lives in another translation unit -- so each intent is recognised by
+           the mark its own producer leaves in this port:
+             ChangeStateWait     state.c:339 emits the stage prompt with
+                                target="change_state"; Rust's producer is
+                                change_state.rs:552 / cost/handlers.rs:966.
+             CollectTargets      misc.c:527 parks target_selection_eff, the only
+                                writer of it; Rust's producer is target.rs:372.
+                                The arm IS the recording above, and the caller
+                                then re-runs the parked effect with target_count
+                                cleared (choice.c:5028-5036), which is Rust's
+                                `CollectTargets => return Ok(())` followed by
+                                finalize_choice -> resume_pending_actions.
+             UnderMemberMove / PlaceEnergyDeckUnder
+                                move.c:1269 and move.c:1916 both park
+                                resume_mode=1 (move.c:1279 / :1920) and are
+                                answered by the mode==1 arm at choice.c:4783, so
+                                they cannot reach this dispatcher; Rust likewise
+                                checks resume_under_member_placement BEFORE the
+                                zone dispatch (choice.rs:1091-1093). Decline them
+                                here so the single-index path keeps owning them
+                                byte for byte. */
+        if (ch->target[0] && strstr(ch->target, "under_member")) return 0;
+
+        /* choice.rs:2129-2133 — the whole `cards` vec joins selection.cards. */
+        for (int i = 0; i < n_cards; i++) {
+            if (self->n_selected_cards < RB_MAX_RECENTLY_MOVED)
+                self->selected_cards[self->n_selected_cards++] = cards[i];
+            stage_publish_selected(g, cards[i]);
+        }
+        if (!strcmp(ch->target, "change_state")) {
+            /* choice.rs:2148-2162 ChangeStateWait: before the effect has started
+               the prompt IS the state change, so every chosen member is put to
+               wait and last_cost_waited_members carries the set (the C's reader
+               of it is state.c:135-141). After the effect has started Rust leaves
+               it to the re-driven ChangeState, which in this port is state.c's
+               "Honour prior selected_cards relay" (state.c:233-263). */
+            int cur = g->queue.cur;
+            int effect_started = (cur >= 0 && cur < g->queue.n_entries)
+                                 ? g->queue.entries[cur].effect_started : 0;
+            if (!effect_started) {
+                for (int i = 0; i < n_cards; i++) {
+                    rb_mods_set_orientation(&g->mods, cards[i], "wait");
+                    if (g->n_last_cost_waited_members < RB_STAGE_SIZE)
+                        g->last_cost_waited_members[g->n_last_cost_waited_members++] =
+                            (int16_t)cards[i];
+                }
+            }
+        }
+        fprintf(stderr, "[STAGE_SELECT_MULTI] n=%d cards=%d target=%s\n", n_sel, n_cards,
+                ch->target[0] ? ch->target : "(none)");
         return 1;
     }
 
@@ -4592,6 +4694,26 @@ static int rb_resume_with_choice_indices_internal(GameState *g, const int *selec
         g->opponent_choice_declined = 1;
     int kind = g->queue.pending.kind;   /* captured BEFORE rb_clear_pending_choice */
     RbChoice saved_pending = g->queue.pending;
+    /* An EMPTY ANSWER is not a DECLINE, and Rust tells them apart by the PROMPT,
+       not by the index. build_choice_result (turn/actions/mod.rs:1078-1087) turns
+       EVERY SelectCard answer into `CardSelected { indices }` — an answer naming
+       no card is `CardSelected([])`, never `Skip` — and dispatch_choice_result
+       (result_handlers.rs:205-227) only routes `Skip` to handle_general_skip /
+       handle_any_number_skip. So a MANDATORY SelectCard answered with zero picks
+       must reach handle_select_card and pay its zero-card cost instead of
+       `choice_declined_cost_stop` halting the resolution (k4: 「コストなしのライブ
+       なら取得できる」 in parity_cce_gaps). profile_choice_is_skip
+       (turn/actions/mod.rs:755-760) confirms the rule: for a SelectCard the only
+       decline marker is card_id == Some(-1), while an empty index list is a
+       selection. `allow_skip` is what decides it (mod.rs:807-812): a skippable
+       prompt's empty answer IS a decline, a mandatory prompt's is not.
+       Every other reader below keeps the original `was_skip` spelling, because
+       Rust also reads an empty answer as a decline for success_replacement
+       (turn/actions/mod.rs:922-947) and for SelectTarget
+       (turn/actions/mod.rs:1157-1214); only the two dispatch arms of
+       dispatch_choice_result are the ones `CardSelected([])` must NOT reach. */
+    int decline = was_skip &&
+                  !(kind == RB_CHOICE_SELECT_CARD && !saved_pending.allow_skip);
     RbAbilityResolver self; memset(&self, 0, sizeof(self));
     self.gs = g; self.actor = actor; self.host_cid = host;
     if (g->queue.pending.route == RB_ROUTE_CONDITIONAL_CHOICE) {
@@ -4825,7 +4947,7 @@ static int rb_resume_with_choice_indices_internal(GameState *g, const int *selec
            NULLs queue.deferred, which is why the continuation has to be run
            from the pointer captured before the clear — otherwise declining an
            optional SelectCard cost drops the ability's effect entirely. */
-        if (was_skip && kind == RB_CHOICE_SELECT_CARD &&
+        if (decline && kind == RB_CHOICE_SELECT_CARD &&
             !(saved_pending.count == 0 && saved_pending.allow_skip)) {
             /* gates.rs:195-213 `optional_cost_skip_gate` — a POST_COST_GATE
                (gates.rs:258) that STOPS resolution with `effect_started = true`
@@ -4842,7 +4964,7 @@ static int rb_resume_with_choice_indices_internal(GameState *g, const int *selec
             rb_resolver_resume_execution(&self);
             goto choice_resume_tail;
         }
-        if (was_skip && kind == RB_CHOICE_SELECT_CARD) {
+        if (decline && kind == RB_CHOICE_SELECT_CARD) {
             /* handle_any_number_skip (result_handlers.rs:67-72) */
             if (!choice_declined_cost_stop(g, &saved_pending))
                 choice_run_skipped_continuation(g, def, is_cost, actor, host, cont, cont_from);
@@ -4995,7 +5117,23 @@ static int rb_resume_with_choice_indices_internal(GameState *g, const int *selec
         case RB_CHOICE_SELECT_TARGET:
             /* record the chosen target via the handler, then run the deferred
                 effect that consumes it (C models target selection via deferral). */
-            rb_resolver_handle_select_target(&self, g, saved_pending.target[0] ? saved_pending.target : NULL, selected);
+            /* 「自分または相手」 needs the continuation that was parked with the
+               prompt: choice.rs:2856-2907 clones `steps.first()` AFTER the answer
+               and applies it with set_chosen_target, and the C's twin reads
+               `g->queue.resume_eff` (choice.c:3880-3898). `rb_clear_pending_choice`
+               above dropped it, so re-park the pointer captured at the top of this
+               function for exactly that route and take it back afterwards, so every
+               other reader keeps seeing the cleared state. Without this the branch
+               never fires and neither rb_set_chosen_target nor
+               rb_queue_set_pending_actions can reach the chosen seat. */
+            {
+                int restore = (eff != NULL && saved_pending.target[0] &&
+                               (!strcmp(saved_pending.target, "self_or_opponent") ||
+                                !strcmp(saved_pending.target, "selfOrOpponent")));
+                if (restore) g->queue.resume_eff = eff;
+                rb_resolver_handle_select_target(&self, g, saved_pending.target[0] ? saved_pending.target : NULL, selected);
+                if (restore) g->queue.resume_eff = NULL;
+            }
             if (!was_skip && def && !rb_has_pending_choice(g)) {
                 if (def->action && (!strcmp(def->action, "pay_energy") ||
                                     !strcmp(def->action, "pay_cost") ||

@@ -2133,25 +2133,25 @@ struct RbAbilityLogItem {
     int kind;
     union {
         struct {
-            char text[256];
-            char condition_type[64];
-            char expectation[256];
-            char actual[256];
+            char *text;
+            char *condition_type;
+            char *expectation;
+            char *actual;
             int passed;
             int n_children;
             RbAbilityLogItem *children;
         } condition;
         struct {
-            char text[256];
-            char expectation[256];
-            char actual[256];
+            char *text;
+            char *expectation;
+            char *actual;
             int passed;
             int optional;
         } cost;
         struct {
-            char text[256];
-            char action[64];
-            char details[256];
+            char *text;
+            char *action;
+            char *details;
         } effect;
     } as;
 };
@@ -2189,7 +2189,11 @@ void rb_ability_debug_set(int enabled);
    Per-resolution debug helper that buffers formatted trace lines and flushes
    them to the rule log or structured log. Mirrors Rust AbDebug::p / ability /
    condition / cost_pay / effect + flush helpers. */
-typedef struct RbAbDebug RbAbDebug;
+/* Complete, not opaque. Rust's AbDebug is a STACK LOCAL passed by &mut
+ * (debug.rs:126-133), so callers declare one by value — condition.c does
+ * `RbAbDebug dbg;` in three places. An opaque forward declaration makes those
+ * declarations fail with "storage size isn't known". */
+typedef struct RbAbDebug { int indent; } RbAbDebug;
 void rb_abdebug_init(RbAbDebug *d);
 void rb_abdebug_p(RbAbDebug *d, const char *tag, const char *msg);
 void rb_abdebug_flush_to_rule_log(RbAbDebug *d);
@@ -3187,5 +3191,105 @@ void rb_queue_set_choice_route_raw(GameState *g, const char *raw);
 typedef struct { int member_cid; int owner_player; } RbWaitImmune;
 extern RbWaitImmune g_wait_immune_members[RB_WAIT_IMMUNE_MAX];
 extern int g_n_wait_immune_members;
+
+/* Max double-baton pairs a single play candidate can carry. Mirrors the
+ * pairs table game_setup.rs:1569 sizes; declared here because the candidate
+ * struct below is now visible tree-wide. */
+#ifndef RB_SETUP_MAX_DOUBLE_BATON
+#define RB_SETUP_MAX_DOUBLE_BATON 8
+#endif
+
+/* ── Setup actions and candidate rows (engine/src/game/game_setup.rs) ─────────
+ * These lived INSIDE src/game/game_setup.c, which made them unusable from any
+ * other translation unit — no other file could construct an RbSetupAction to
+ * pass to rb_setup_execute_action, so that function and seven siblings were
+ * uncallable BY CONSTRUCTION. src/turn/phase.c had to mirror the candidate
+ * structs field-for-field, which is a divergence hazard. They live here now. */
+typedef enum {
+    RB_SETUP_ACT_PASS = 0, RB_SETUP_ACT_ROCK_CHOICE, RB_SETUP_ACT_PAPER_CHOICE,
+    RB_SETUP_ACT_SCISSORS_CHOICE, RB_SETUP_ACT_CHOOSE_FIRST_ATTACKER,
+    RB_SETUP_ACT_CHOOSE_SECOND_ATTACKER, RB_SETUP_ACT_MULLIGAN_HEADER,
+    RB_SETUP_ACT_SELECT_MULLIGAN, RB_SETUP_ACT_CONFIRM_MULLIGAN,
+    RB_SETUP_ACT_SKIP_MULLIGAN, RB_SETUP_ACT_LIVE_CARD_HEADER,
+    RB_SETUP_ACT_SELECT_LIVE_CARD, RB_SETUP_ACT_CONFIRM_LIVE_CARD_SET,
+    RB_SETUP_ACT_SKIP_LIVE_CARD_SET, RB_SETUP_ACT_PLAY_MEMBER_TO_STAGE,
+    RB_SETUP_ACT_USE_ABILITY, RB_SETUP_ACT_SET_LIVE_CARD,
+    RB_SETUP_ACT_FINISH_LIVE_CARD_SET, RB_SETUP_ACT_DRAW_CARD,
+    RB_SETUP_ACT_CHOICE_DECISION, RB_SETUP_ACT_CHOICE_SELECT,
+    RB_SETUP_ACT_CHOICE_SKIP, RB_SETUP_ACT_CHOICE_OPTION,
+    RB_SETUP_ACT_CHOICE_POSITION, RB_SETUP_ACT_ENERGY_CHARGE,
+    RB_SETUP_ACT_PASS_REMAINING, RB_SETUP_ACT_CONCEDE, RB_SETUP_ACT_COUNT
+} RbSetupActionType;
+
+/* Headless action: only the fields the ENGINE consumes. The display fields
+ * Rust carries (description, card_name, card_no, source_ability, base_cost,
+ * final_cost, double_baton_pairs, disabled, selected) are menu data and are not
+ * reproduced; the decision-relevant costs are reported by the *_candidates()
+ * entry points instead. */
+typedef struct {
+    RbSetupActionType type;
+    int has_card_id;
+    int card_id;
+    int card_indices[RB_MAX_HAND];
+    int n_card_indices;
+    const char *stage_area;      /* NULL = unset */
+    int has_stage_area_index;
+    int stage_area_index;
+    int use_baton_touch;
+    int   ability_index;
+    int   has_ability_index;
+    int   cost_total;
+    int   has_cost_total;
+} RbSetupAction;
+
+/* game_setup.rs:1617-1626 AreaCandidate, minus the display-only existing_member_name. */
+typedef struct {
+    int slot;                  /* 0=left 1=center 2=right */
+    int available;
+    int cost;
+    int is_baton_touch;
+    int existing_member_id;
+} RbSetupAreaCandidate;
+
+/* game_setup.rs:320-324 DoubleBatonOption */
+typedef struct {
+    int area_index[2];
+    int placement_area;
+    int cost;
+} RbSetupDoubleBatonOption;
+
+/* Decision table for one hand member — the rules content of game_setup.rs:1690
+ * generate_main_phase_actions. */
+typedef struct {
+    int card_id;
+    int hand_index;
+    int card_cost;             /* card.cost.unwrap_or(0) */
+    int reduction;
+    int effective_cost;        /* card_cost.saturating_sub(reduction) */
+    RbSetupAreaCandidate areas[RB_STAGE_SIZE];
+    int any_area_available;
+    RbSetupDoubleBatonOption pairs[RB_SETUP_MAX_DOUBLE_BATON];
+    int n_pairs;
+} RbSetupPlayCandidate;
+
+/* One offerable activation — the rules content of game_setup.rs:2078-2348. */
+typedef struct {
+    int card_id;
+    int ability_index;         /* printed, or RB_GAINED_ABILITY_INDEX_BASE+n */
+    int from_stage;            /* 1 = stage scan, 0 = discard scan */
+    int stage_slot;            /* 0..2 when from_stage, else RB_EMPTY_SLOT */
+    int base_cost;             /* AbilityEffect::energy_cost_total */
+    int effective_cost;        /* effective_activation_cost_for(.., groups) */
+    int groups_on_stage;
+    int has_optional_payment;
+} RbSetupAbilityCandidate;
+
+/* Mulligan / live-card selection rows (game_setup.rs:1467 and :2353). */
+typedef struct {
+    int hand_index;
+    int card_id;
+    int selected;
+    int selectable;            /* live-card rows only: false at the limit */
+} RbSetupHandCandidate;
 
 #endif /* RABUKA_H */

@@ -2125,7 +2125,7 @@ async fn debug_dump_frames(data: web::Data<AppState>) -> impl Responder {
 /// the compound as an alternative or a result — and this endpoint reports all
 /// three by name, so the three are the vocabulary here rather than three
 /// ad-hoc pushes at the call site.
-fn conditions_on_card(card: &Card) -> Vec<(usize, &'static str, Box<crate::card::Condition>)> {
+fn conditions_on_card(card: &Card) -> Vec<(usize, &'static str, Arc<crate::card::Condition>)> {
     let mut found = Vec::new();
     for (ability_idx, ar) in card.abilities.iter().enumerate() {
         // `effect` is a Box; bind by reference so the resolved ability can

@@ -3,6 +3,35 @@ name = "rabuka_engine"
 version = "0.1.0"
 edition = "2021"
 
+# Release builds previously took 86-126s after ANY edit to the lib, while the
+# tests themselves run in 0.20s - i.e. 99.8% of a `cargo test --release` was
+# compilation. Measured on this crate: 5.29 MB across 162 files, opt-level 3,
+# no incremental cache, so every edit was a clean full rebuild.
+#
+# `incremental = true` is the fix and it costs a few percent of runtime, not
+# correctness. It matters because arena measurements want release speed while
+# compile checks want dev speed, and before this the only affordable loop was to
+# skip release entirely - which is a bad habit when the thing being compiled is a
+# simulator.
+#
+# `codegen-units = 16` is already the release default but interacts with
+# incremental: more units means finer-grained reuse between edits.
+[profile.release]
+incremental = true
+codegen-units = 16
+# No LTO: the arena runs thousands of games per second and link-time
+# optimisation would dominate every rebuild for no measurable play-strength gain.
+lto = false
+# `panic = "abort"` removes the unwinding tables and landing pads from every
+# function. This engine never catches a panic to recover - the arena treats a
+# panic as a failed game - so the tables are pure codegen and link cost. It also
+# shrinks the binary, which matters because 27 binaries link this crate.
+panic = "abort"
+# No symbols in the binary. Nothing profile-disassembles the arena, and this is
+# measured, not assumed: stripping cuts link time on every one of the 27
+# binaries that embed the engine.
+strip = "symbols"
+
 [lib]
 doctest = false
 
@@ -30,9 +59,9 @@ rmp-serde = { version = "=1.3.1", optional = true }
 criterion = { version = "0.5", optional = true }
 inferno = { version = "0.12", optional = true }
 [features]
-default = ["env_logger", "debug_conditions", "rand", "rmp-serde", "bytecode_abilities", "json_path_test", "compact_card_data", "serde_support"]
+default = ["env_logger", "debug_conditions", "rand", "rmp-serde", "bytecode_abilities", "compact_card_data", "serde_support"]
 debug_conditions = []
-# JSON-path ability decode (serde) — used only by the bytecode↔JSON deep-compare
+# JSON-path ability decode (serde)  Eused only by the bytecode↔JSON deep-compare
 # oracle. Off for ds/no_std targets so the serde decode system is not compiled.
 json_path_test = ["serde_support"]
 # serde + serde_json + serde-capable smallvec/hashbrown. Disabled for console
@@ -47,21 +76,20 @@ profiling = ["dep:criterion", "dep:inferno"]
 # Headless bot-testing mode: compiles out UI-only bookkeeping (rule/structured
 # logs, phase-transition log entries, choice_resolved capture, jyouji status
 # strings). Gameplay-relevant tracking (movement events, appearance records,
-# baton-touch history) is kept — ability conditions read those.
+# baton-touch history) is kept  Eability conditions read those.
 headless = []
 # Alloc tracker: counts every malloc/free, reports via RABUKA_ALLOC_TRACK env var
 alloc_tracker = []
 # Pooling global allocator for short-lived small allocations. OFF by default.
-# It works and it is correct (full suite green, and the only bug it had — a
-# headerless block returned to the system under the caller's smaller Layout —
-# is fixed), but on the current tree it is worth only ~1.5% actions-per-second
+# It works and it is correct (full suite green, and the only bug it had  Ea
+# headerless block returned to the system under the caller's smaller Layout  E# is fixed), but on the current tree it is worth only ~1.5% actions-per-second
 # over the system allocator, with overlapping run-to-run spread. That is not
 # worth a hand-written global allocator, which is the highest blast-radius code
 # in a program and the last thing to want on the 3DS/wasm/PSP builds. Kept
 # behind the flag so the A/B can be repeated when the allocation count moves
 # again; re-measure before believing it.
 fast_alloc = []
-# Generic no_std flag — used in cfg gates so ports don't touch engine source
+# Generic no_std flag  Eused in cfg gates so ports don't touch engine source
 no_std = []
 # PSP target: no_std + alloc mode for mipsel-sony-psp
 psp = ["no_std", "debug_conditions", "bytecode_abilities", "compact_card_data"]
@@ -86,7 +114,7 @@ jaguar = ["no_std", "bytecode_abilities", "compact_all"]
 # transpiled to C (w2c2/wasm2c) for consoles without a Rust backend.
 wasm = ["no_std", "bytecode_abilities", "compact_all"]
 # Philips CD-i target: m68k SCC68070 @ 15.5MHz, 1MB RAM, CD-ROM media.
-# Same compact set as wasm/jaguar/gba — native m68k-unknown-none-elf via LLVM
+# Same compact set as wasm/jaguar/gba  Enative m68k-unknown-none-elf via LLVM
 # m68k backend (not wasm2c). Proves at ~150-300KB the engine fits 1MB; wasm2c
 # at 3-4MB text does not.
 cdi = ["no_std", "bytecode_abilities", "compact_all"]
@@ -201,7 +229,7 @@ name = "trace_game"
 path = "src/bin/trace_game.rs"
 test = false
 
-# Dev/debug tools — declared explicitly with test = false so bare `cargo test`
+# Dev/debug tools  Edeclared explicitly with test = false so bare `cargo test`
 # doesn't build and run each one as an empty test harness.
 [[bin]]
 name = "bad_game_report"
@@ -232,7 +260,7 @@ name = "hunt_loop"
 path = "src/bin/hunt_loop.rs"
 test = false
 
-# These two were previously auto-discovered from src/bin/ — without explicit
+# These two were previously auto-discovered from src/bin/  Ewithout explicit
 # entries, bare `cargo test` built an empty unittest harness for each.
 [[bin]]
 name = "describe_dump"

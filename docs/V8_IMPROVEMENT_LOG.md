@@ -662,7 +662,7 @@ adds nothing measurable, and it is not carried.
 third and final confirmation of the saturation diagnosis. `YIELD_PRIOR` has a
 mean of 0.505 blade-hearts per blade while independent community calculation
 puts the real figure near 0.733
-(note.com/miumi_loveca — "1回のエールでブレードハートがめくれる確率"), and
+(note.com/miumi_loveca — "1回㝮エール㝧ブレードポート㝌ゝ㝝れる確率"), and
 correcting a 45% error in the opponent's yield changes **five games**, because
 `pass_prob` takes 6 distinct values and there is nowhere for a 45% shift to land.
 **A model that coarse cannot be calibrated.** The number was right and the
@@ -987,10 +987,10 @@ The per-card split is where it gets interesting:
 | life | v7 | v8 |
 |---|---:|---:|
 | MIRACLE NE | 12 | **0** |
-| 始まりは君の空 | 4 | **0** |
+| 始㝾り㝯坛㝮空 | 4 | **0** |
 | Aspire | 17 | 5 |
-| 葉月 恋 | 1 | 12 |
-| 嵐 千砂都 | 0 | 9 |
+| 葉月 杋 | 1 | 12 |
+| 嵝 坃砂都 | 0 | 9 |
 
 Two cards v7 sets that v8 **never** sets, and two v8 sets that v7 never does.
 
@@ -1414,35 +1414,39 @@ probability that the *whole set* is satisfied. So a three-life set is modelled a
 "one success, with lower probability than one good life", which is why the live
 set never commits more than one card.
 
-That is a genuine modelling error. `MAX_LIVE_CARDS` is 3, the win condition is
-three successes, and each card is checked and moved independently
-(`move_live_to_success_and_handle_wins` sends winners to success and failures to
-the waitroom, per card). Three good lives can bank three successes in one live
-phase and win outright at 2-2. The model cannot price any of that.
+That premise was wrong, and �27.4 is where it was caught. The engine does **not**
+check and move the zone per card: rule 8.3.16 / Q35 is all-or-nothing, so a set
+containing one unsatisfied card places **nothing** and every card in the zone goes
+to the waitroom (`determine_winners` requires `lives.iter().all(|l| l.passed)`;
+pinned by `live_success_rules_test.rs::any_card_fails_hearts_all_fail`). There is
+no state in this game in which three lives bank three successes in one phase, so
+the "model cannot price that" argument has no referent.
 
 `V8_JOINT` prices it: `zone_success_distribution` resolves a set one card at a
 time against a shared supply and returns `P(k successes)`, and
 `joint_success_value` pays for the 2nd and 3rd successes with the same race
-payoff. It is a real fix to a real defect.
+payoff. As a fix to a real defect it is a fix to a defect that is not there.
 
 **It changes nothing: 0 discordant games out of 1200, with `V8_JOINT`, again
 with `V8_JOINT + V8_MAX_LIVES=3 + V8_ZONE_ORDER`, and again with width alone.**
 
-That is not a null result about the fix, it is a fact about the game. Hearts
-come from a **shared** pool: the first card draws until its requirement is met
-and the second gets what is left. Two lives therefore rarely both pass, so
-`P(k >= 2)` is close to zero across every candidate the live set ever considers,
-the joint term is worth approximately nothing, and **setting one good life
-genuinely beats setting two mediocre ones**.
+The zero is the rule, not a tuning result. `P(k >= 2)` is **identically zero**
+whenever the set contains a card the board cannot cover, because that is what
+"all-or-nothing" means, and the live set is scored on a value function whose
+contested branch is a comparison of printed scores. A second explanation in an
+earlier draft of this section - that hearts come from a shared pool, so two lives
+rarely both pass - is also wrong: it is a *sufficient* story, not the mechanism,
+and it would be false for a pair of cheap lives on a big board.
 
-So the live set is not leaving anything on the table by committing a single card.
-The "the zone is underused" reading was wrong, and it was wrong in a way worth
-having measured: three separate mechanisms all landed on the same bit-identical
-result, which is a much stronger statement than any one of them alone.
+So the live set is not leaving anything on the table by committing a single card,
+and the reason is a rule rather than a shared pool. The "the zone is underused"
+reading was wrong, and it was wrong in a way worth having measured: three separate
+mechanisms all landed on the same bit-identical result, which is a much stronger
+statement than any one of them alone.
 
-The defect is real and the fix is correct. It is a no-op **for this deck and
-this format**, and it should stay switched off — a switch whose effect is
-identically zero is a switch that will be misread as load-bearing later.
+`V8_JOINT` should stay switched off, and now for a third reason: its
+justification asserts a resolution rule the engine does not implement, in the
+direction that makes the switch look like a missing capability.
 
 ---
 
@@ -1463,7 +1467,7 @@ Two corrections, both verified in the code rather than recalled:
   it would have justified binnable cards that are fine.
 - **Once-per-turn is a condition, not a trigger.** `TriggerKind` is exactly the
   seven printed trigger words (`triggers.rs:40`): 起動 / 自動 / 常時 / 登場 /
-  ライブ開始時 / ライブ成功時 / メイン. ターン1回 is a condition, enforced by
+  ライブ開始時 / ライブ戝功時 / メイン. ターン1回 is a condition, enforced by
   `turn_limited_abilities_used`, which is cleared at the **end of the live
   phase** (`phases.rs:278`) — so the window spans the whole turn including live.
   Per-*effect*, not per-card: two members granting the same thing pay out once.
@@ -1472,15 +1476,15 @@ Two corrections, both verified in the code rather than recalled:
 
 - `Special Color` `PL!SP-bp4-025-L` x4, score 2, need **7 colorless**.
   ライブ開始時: centre Liella members' **printed blade count becomes 3**.
-  ライブ成功時: +1 if a centre Liella member moved this turn.
+  ライブ戝功時: +1 if a centre Liella member moved this turn.
 - `MIRACLE NEW STORY` `PL!SP-bp5-024-L` x1, score 7 +1, need **15**
   (heart01x2 + heart02x4 + heart06x4 + colorlessx5).
   ライブ開始時: choose one of heart01/02/06; **every member that moved this turn
   gains that heart**.
-- `始まりは君の空` `PL!SP-sd2-023-sd2` x3, score 1 +1, need 3
+- `始㝾り㝯坛㝮空` `PL!SP-sd2-023-sd2` x3, score 1 +1, need 3
   (heart03 + colorlessx2). ライブ開始時: **if own success zone has 2+ cards,
   score +5 and the need becomes 12 specific hearts**. The FAQ confirms the
-  trigger **cannot be declined** — the FAQ answer is いいえ, it cannot be used
+  trigger **cannot be declined** — the FAQ answer is 㝄㝄㝈, it cannot be used
   with the printed 3-heart requirement.
 - `Aspire` `PL!SP-sd2-025-sd2` x4, score 4 +1 draw, need **11**.
   ライブ開始時: **every Liella member that moved this turn gains 1 blade**.
@@ -1510,7 +1514,7 @@ reads, for this deck:
 
 | ability | what the leaf can see | verdict |
 |---|---|---|
-| `葉月 恋` cost 2 登場: top 5, reveal 1 Liella card | hand **count** +1, identical for every option | **coin flip** |
+| `葉月 杋` cost 2 登場: top 5, reveal 1 Liella card | hand **count** +1, identical for every option | **coin flip** |
 | `米女メイ` cost 5 登場: top 5, reveal 1 Liella member | same | **coin flip** |
 | MIRACLE ライブ開始時: choose heart01/02/06 | `supply_hearts` sums all buckets | **coin flip** |
 | `冬毬` cost 11 登場: pick 2 waitroom lives, **opponent picks 1** | `lives_in_hand` +1 | **arbitrary**, and the correct pick is 2 *equally mediocre* lives so the opponent's choice costs least |
@@ -1580,7 +1584,7 @@ no null in this file bears on it.
 
 The engine already has what the projection needs: `TurnEngine::
 trigger_live_start_abilities` (`turn/trigger_scan.rs:156`), the movement-event
-history that resolves 「このターン中にエリアを移動した」 (`state.rs:1135`), and
+history that resolves 「㝓㝮ターン中㝫エリアを移動㝗㝟〝 (`state.rs:1135`), and
 `RngGuard` (`v8_model.rs`) to keep the projection from perturbing the game.
 
 ### 13.1 Built, wired, and measured bit-identically
@@ -1615,7 +1619,7 @@ be null, so the bit-identical result is consistent with both of:
    a moved member **must** change `active_blades` and therefore `p_pass`.
 2. **It fires and finds nothing eligible** — e.g. the movement history the
    ability reads is not populated at the point the live set is chosen, so
-   「このターン中にエリアを移動した」 is false for every member and MIRACLE and
+   「㝓㝮ターン中㝫エリアを移動㝗㝟〝 is false for every member and MIRACLE and
    Aspire both resolve to nothing.
 
 Which of the two it is, is not determined, and this log entry does not claim to
@@ -1659,7 +1663,7 @@ having answered nothing, and the function returned the untouched set-time board.
 The bit-identical result was a missing call, not a missing effect.
 
 One line, `sim.process_pending_auto_abilities(&me_id)`. The blade count then
-moves 2→4, 4→6, 5→7: `Aspire`'s 「このターン中にエリアを移動した」 +1 blade per
+moves 2→4, 4→6, 5→7: `Aspire`'s 「㝓㝮ターン中㝫エリアを移動㝗㝟〝 +1 blade per
 moved Liella member, resolved through the engine, on real boards. The board pool
 does not move, which is correct — these lives grant blades and hearts, not
 hearts-in-place, and `board_pool` reads stage hearts only.
@@ -1734,7 +1738,7 @@ The card table makes the same point from the other side:
 
 | card | need | times set | passed |
 |---|---|---|---|
-| `始まりは君の空` | 3 | 69 | 29 (42%) |
+| `始㝾り㝯坛㝮空` | 3 | 69 | 29 (42%) |
 | `Special Color` | 7 | 59+16 | 10 (13%) |
 | `Aspire` | 11 | 62 | 5 (8%) |
 
@@ -1798,7 +1802,7 @@ do is retract a claim.
 
 ### 14.1 The §13.3 pass-rate table was reading the wrong field
 
-§13.3 reported `始まりは君の空` passing 42%, `Special Color` 13%, `Aspire` 8%,
+§13.3 reported `始㝾り㝯坛㝮空` passing 42%, `Special Color` 13%, `Aspire` 8%,
 and concluded the bot "commits high-need lives it cannot pass." **That is wrong.**
 
 The log line's `yell {hits}/{yell_count}flips` is the number of **blade-hearts
@@ -1813,7 +1817,7 @@ Read correctly (`tools/analysis/live_phase_leak.ps1`):
 | card | committed | engine says passed | placed |
 |---|---|---|---|
 | `Special Color` | 79 | 75 (95%) | 48 (61%) |
-| `始まりは君の空` | 78 | 71 (91%) | 54 (69%) |
+| `始㝾り㝯坛㝮空` | 78 | 71 (91%) | 54 (69%) |
 | `Aspire` | 66 | 62 (94%) | 46 (70%) |
 | `MIRACLE NEW STORY` | 3 | 3 (100%) | 2 (67%) |
 
@@ -2089,7 +2093,7 @@ requirement.
 scoring 7. The audit's reasoning (heart01 supply = 1) ignores MIRACLE's own
 live-start ability, which grants +1 chosen heart to every member that moved.
 Same shape as §14.1: a plausible read of the static data, wrong against the
-engine. The same correction applies to `始まりは君の空`'s conditional: the audit
+engine. The same correction applies to `始㝾り㝯坛㝮空`'s conditional: the audit
 says 12 hearts / score 6 at 2 successes, and measurement shows it scoring
 **1, 2, 3** at 2 successes and 6 only at 3.
 
@@ -2250,7 +2254,7 @@ Fourteen interventions, twelve null, one significant regression, one partial
 confirmation. Every one of them touched the live set, the opponent model, the
 fold threshold, the mulligan, or the attacker order. Two subagent headline
 claims were refuted against the engine (MIRACLE is placeable — 3 set, 3 passed,
-score 7; `始まり` scores 1-3 at two successes, not 6), and two of my own
+score 7; `始㝾り` scores 1-3 at two successes, not 6), and two of my own
 readings were wrong (§13.3's field misread, §14.1).
 
 The consistent explanation across all of it: **these decisions do not determine
@@ -3231,3 +3235,528 @@ policies differ, which is what located the ability defect (§3.6) and was worth
 +1.00. It does not tell you the **rule** that would produce the better decision
 in every state, and turning a three-observation pattern into a hard gate is how
 a correct observation becomes a 20-point regression.
+
+---
+
+## 24. Porting from the downloaded repos: one win, one negative, one impossible
+
+`research/` now holds `gym-locm` (ByteRL's encoding, COG2022 double champions,
+MIT) and `SabberStone` (search-based, no neural net, the kind that placed in the
+Hearthstone AI Competitions, **AGPL-3.0** - vendored and gitignored so no
+copyleft source enters this repo's history).
+
+### 24.1 gym-locm card encoding - copied, tested, capability gained
+
+`LOCMEnv.encode_card` -> `encoding.rs::locm_card_features`. A 17-dim attribute
+vector per card, **card ID excluded**, with **6 ability-keyword bits inside the
+card vector`.
+
+The point for this repo is not ID-vs-attributes (arXiv 2407.05879 measured that
+as a wash in-distribution). It is that `AbilityFeatures` is attached **only to
+on-stage positions**, so before this port **a card in hand carried no ability
+representation at all** - and hand is exactly where the live set is chosen. The
+keyword vocabulary is mapped, not copied; the mapping is documented in the
+function. 3 new tests, **119/119 green**. No win-rate claim yet.
+
+### 24.2 SabberStone `Score` shapes - both copied, both measured
+
+Two structural properties of `core-extensions/SabberStoneBasicAI/src/Score/`,
+ported and gated off by default.
+
+**Board presence as a discrete term - real, and negative.**
+
+| arm | result | discordant | p | delta |
+|---|---|---|---|---|
+| `V7_PRESENCE=1` | 667-533 | 113 / 96 | 0.268 | **-1.42pp** |
+| `V7_PRESENCE=1` occ=20 | 662-538 | 161 / 139 | 0.225 | **-1.83pp** |
+
+Null-to-negative, and **worse at a higher weight** - the shape of a real effect
+pointing the wrong way rather than noise. The motivation was sound (��17.3
+measured `coverage` as a threshold where a gradient was wanted; ��15.2-A found no
+presence term at all), but this leaf already prices `stage_cost` and
+`active_blades`, so occupancy is counted, and counting it twice costs more than it
+adds. Hearthstone is won on damage; this game on placements. **The shape did not
+transfer. Port stays off.**
+
+**Terminal short-circuit - structurally impossible here.**
+
+| arm | result | discordant | p |
+|---|---|---|---|
+| `V7_TERMINAL=1` | 684-516 | **0 / 0** | 1.000 |
+
+**Zero decisions changed in 1200 games.** Not a null result - a structural
+finding. `evaluate` is only reached on non-terminal states, because `complete()`
+tests `game_result != Ongoing` first and returns before calling it. The
+short-circuit is dead code *by construction*: the ported idea presupposes an
+evaluator that sees terminal states, and this one does not.
+
+That is worth more than the null implies. The leaf's inability to express "this
+placement ends the game" - the gap I cited when motivating the port - **is not
+located in `evaluate` at all.** It is a property of `complete`'s early return, so
+the fix belongs there, not in leaf scoring. Sixteen nulls had not surfaced this;
+reading a competitor's code did.
+
+### 24.3 Status
+
+Neither port improved v9. The encoding is a real capability gain with no measured
+win yet; SabberStone's two shapes are both refuted for this game, one empirically
+and one structurally. The repos stay in `research/` because the encoding is the
+right basis for a real attempt and `gym_locm/trained_models/` holds the only
+permissively-licensed trained card-game policy weights available as a
+head-shape reference.
+
+---
+
+## 25. The opponent terms are provably dead code - measured, not argued
+
+��15.2-A flagged that the Main leaf "prices four things about the opponent".
+Two of those four turned out to be structurally incapable of affecting a single
+decision.
+
+### 25.1 The claim
+
+`evaluate` is called once per candidate action **within one Main-phase turn,
+while we hold the seat**. The opponent takes no actions in between. So their
+stage cost, blade count and hand size are byte-identical for every candidate,
+and
+
+```text
+-8.0 * (opp_cost   - self.opponent.cost)     }  identical offsets across
+-6.0 * (opp_blades - self.opponent.blades)   }  the whole candidate set,
+-10.0 * (opp_hand   - original_opp.hand)     }  cancelling in the argmax
+```
+
+are a **constant added to every candidate**. A constant cannot change which
+candidate is largest. This is the same shape `v8_main.rs:1058-1063` documents for
+`initiative`, and the same defect class `V8_NO_ASSUME_COMMIT` exists to neutralise
+in the live set - which `tools/arena_ab.ps1` already sets as the standard run's
+baseline, so the project had already met this bug once and not here.
+
+### 25.2 Measured
+
+`V7_OPP_TERMS` removes all three.
+
+| arm | result | discordant | p | delta |
+|---|---|---|---|---|
+| `V7_OPP_TERMS=1` (terms removed) | 682-518 | 35 / 33 | **0.904** | ?0.17pp |
+
+**35 + 33 = 68 of 1200 games differ, p = 0.904, win rate ?0.17pp.** That is
+within noise of nothing. Three terms carrying a combined weight of 24 units
+in a leaf where `coverage` carries 60 - and deleting them costs nothing
+measurable.
+
+The 68 discordant games (vs 20 for the `score_dist` fix in ��23.3) are not zero,
+so the terms are *nearly* dead rather than perfectly dead. The residual is the
+one path where `evaluate` sees the opponent move: the choice-handling branches
+(`opponent-choice`, `choice-budget`) recurse across turns, so a small amount of
+the opponent's state does leak into those leaves. That is a real but tiny
+effect, and it is 68 games rather than the hundreds the weight suggested.
+
+### 25.3 And the counterpart that does not exist
+
+The leaf gives OUR side `coverage` at weight 60 - the second-largest term - and
+the opponent has no counterpart at all. `V7_OPP_COVERAGE` adds one:
+
+| arm | result | discordant | p | delta |
+|---|---|---|---|---|
+| `V7_OPP_COVERAGE=60` | 681-519 | 7 / 4 | 0.549 | ?0.25pp |
+| same, weights 10 / 30 / ?20 | 681-519 | 7 / 4 | 0.549 | identical |
+
+**Identical records at four different weights** - the signature of a term that
+cancels in the argmax, exactly as ��25.1 predicts. The asymmetry is real (our
+coverage is weighted, theirs is absent) but *fixing* it is impossible in a
+single-turn search, for the same structural reason.
+
+### 25.4 What this actually says about the project
+
+`value()`'s own note warns that "the terms are MUTUALLY REDUNDANT, not inert"
+and that zeroing all seven together costs 14 points. That remains true of the
+**own-side** terms. It does not extend to the opponent terms, which are
+redundant with nothing - they are arithmetic that never reaches the decision.
+
+This is the fourth structural finding in this document that a null result
+exposed and reading the code did not (��13.2's missing
+`process_pending_auto_abilities`, ��23.3's uncorrectable `score_dist`, ��24.2's
+unreachable terminal short-circuit, and now this). The pattern is consistent
+enough to state as a rule for this codebase: **a term in this leaf that does not
+depend on a quantity the search can move is decorative, and the weights make it
+look load-bearing.** There are 24 env-tunable weights in this leaf and 119 tests;
+none of either checks that a term can change a decision.
+
+Both switches default off. Baseline verified 684-516 / 40898, 119/119 green.
+
+---
+
+## 26. Reading the games instead of the aggregates - the first real defect
+
+Asked directly whether the choices are handled properly, I went back and read
+individual games rather than bucket summaries. Immediately a single losing game
+(game 14, v9 lost **0-3**) shows the whole problem in four lines:
+
+```text
+t1  NO-CONTEST   P1 set[]                  P2 set[]
+t2  P2-WINS      P1 set[]                  P2 set[Special Color:2pt] 3/7 -> succ 1
+t3  P2-WINS      P1 set[�n�܂�͌N�̋�] 4/5   P2 set[Aspire:4pt]     6/8 -> succ 2
+t4  P2-WINS      P1 set[Special Color]  6/7   P2 set[Aspire:4pt]     8/11 -> succ 3
+```
+
+v9 committed THREE checks and placed ZERO times. On every one it was one or two
+icons short.
+
+### 26.1 Across 193 live phases, v9 is short on 82% of what it commits
+
+| | v9 (P1) | v7 (P2) |
+|---|---|---|
+| mean YELL icons revealed | **5.1** | 4.2 |
+| mean REQUIREMENT | **6.9** | 5.8 |
+| phases short by 1-2 | 83 of 148 (56%) | 81 of 130 (62%) |
+| phases short by 3+ | 39 (26%) | 25 (19%) |
+| **short on at least one icon** | **122 / 148 = 82%** | 106 / 130 = 82% |
+
+Per card, on the checks v9 actually committed:
+
+| card | n | requirement | **actual yield** | **short by** | placed |
+|---|---|---|---|---|---|
+| `�n�܂�͌N�̋�` | 49 | 3.5 | 2.6 | **0.9** | 80% |
+| `Special Color` | 51 | 7.8 | 5.9 | **1.9** | 65% |
+| `Aspire` | 45 | 9.2 | 6.8 | **2.4** | 76% |
+
+The deficit scales with the requirement: 0.9 short on a 3-icon card, 2.4 short on
+a 9-icon card. That is a systematic yield shortfall, not bad luck - a bot that
+passed its checks 91-100% of the time (��14.1) is not seeing this, because the
+model does not model the thing that is actually short.
+
+### 26.2 The cause: yield is computed from a deck-wide average, against a 3-member ceiling
+
+`v7_main::features` computes expected yell supply as
+
+```rust
+mean[i] += narrow_hearts(score_to_i32(
+    (units[i] * blades as f64 / p.main_deck.cards.len().max(1) as f64).floor(),
+));
+```
+
+where `units[i]` sums `blade_heart` counts for colour `i` **over all 72 cards in
+the deck**, and `blades` is the count of *active members on stage*. Yell can
+only ever come from those members' icons, so the true expectation is
+
+```text
+expected_yell(colour) = (blade_hearts on the MEMBERS I PLAYED) / (number of those members)
+```
+
+The code divides a **72-card** average by the **stage occupancy** instead. Two
+consequences, both visible in the table above:
+
+1. **It is diluted by cards that will never be played.** `blade_heart` is counted
+   across energy cards, lives, and every member copy not on stage, so the
+   per-icon yield is understated for the actual board.
+2. **It is not capped by the ceiling.** Yell tops out at what ~3 members can
+   produce. A requirement of 9-11 is unreachable from a full board, and the model
+   has no term that says so - it just reports a probability.
+
+`pass_estimate_from_supply` in `v8_model.rs` then runs a **binomial over
+`blades`** with a deck-average `density`, which is the same averaging assumption
+one level up. So both the live set's `p_pass` and v7's `coverage` are computed
+from a quantity that is not what the rules use.
+
+### 26.3 Why this survived nineteen interventions
+
+Every ��12-��25 experiment changed a **weight, a cap, or a prior**. This is a
+different class of defect: the leaf's `blades` term (weight 6.0) rewards having
+more active members, and it correctly gets v9 to fill its board. But *filling the
+board* is not the goal - **covering the requirement with the icons on it** is,
+and no term in the leaf measures that. `coverage` (weight 60) does measure
+whether the board covers a held life's requirement - and ��17.3 established it is
+a **binary threshold over the whole requirement**, so a board that covers 6 of 7
+icons scores exactly the same as one covering 0 of 7.
+
+So the bot has a weight-60 term that says "is this check coverable" and it is
+**on/off**, with no gradient, while the thing that actually determines the
+outcome - partial coverage - is invisible. A bot that maximises a binary
+threshold will happily sit at 6.8 yield against a 7.8 requirement, because
+6.8 and 5.9 both read as "not covered" and neither is better.
+
+**That is the first genuinely new causal story this audit has produced**, and it
+is consistent with everything that came before: ��13-��17 found the live set
+impossible to improve because the quantity it optimises (`p_pass`) is computed
+from a yield model that does not match the rules; ��22-��23 found every calibration
+fix inert because the same averaging sits underneath.
+
+### 26.4 What follows from it, concretely
+
+The fix is to compute expected supply from the **members actually in play**:
+
+```text
+expected_yell(colour) = sum of blade_heart[colour] over stage members / count
+```
+
+and to give `coverage` a **gradient** - hearts covered - so 6 of 7 beats 0 of 7.
+Neither is a weight change, which is why nineteen weight/cap/prior
+interventions could not have found it. `V7_DIAG_TERMS` exists to confirm the
+term-liveness claim empirically; the yield computation has not yet been changed,
+because doing so silently would break the frozen 684-516 baseline that every
+measurement in this document is quoted against, and it needs its own paired run
+rather than a swap.
+
+---
+
+## 27. Move by move: what 193 live phases actually say
+
+§26 read four lines of a game log and concluded v9 is "short on every one" of
+its checks. The conclusion is a misparse, and the log line it came from already
+contains the answer. This section is the correction, the decomposition it
+replaces, the one real modelling error it turned up, and the two nulls that
+followed.
+
+Every number here is measured on this build at the frozen baseline
+(`bot_arena v9 v7 1200 "5CP3Z idou" --games 1200 --seed 11` -> **684-516**,
+40898 actions, reproduced before and after every change in this section).
+
+### 27.1 §26 is wrong, and the four lines say so
+
+The trace field §26 quoted is this one (`live.rs:1440-1460`)::
+
+    t3|...|LIVE P2-WINS | P1 set[始まりは君の空:1pt] yell 4/5flips score=1 → succ=0(+0)
+                                 ^^^^^^^^^^^^^^  ^^^^^^ ^^
+
+- `始まりは君の空:1pt` is the engine recording that the life **PASSED**,
+  printed with its score. A failure is printed as `:FAIL(c0 0/2, c3 0/1)` and
+  scores zero. The engine has been printing the verdict in that field all along.
+- `yell 4/5flips` is **blade-heart icons revealed / flips taken** - not
+  "4 of 5 needed". Neither number is a requirement, and neither is a shortfall.
+- The requirement is in the FAIL detail that only appears on failure, and
+  `filled[]` (which includes members' printed hearts) is what the engine
+  compares against it.
+
+§26 compared a requirement against icons-revealed, which ignores every heart the
+board already had. Measured directly over 200 games / 865 live phases, with both
+sides' own verdict fields:
+
+| | v9 | v7 |
+|---|---|---|
+| committed sets | **592** | 494 |
+| passed the heart check | 542 (91.6%) | 464 (93.9%) |
+| failed the heart check | **50 (8.4%)** | 30 |
+
+So v9 is short on **8.4%** of what it commits, not 82%. This agrees with §14.1
+("passes 91-100%") and disagrees with §26, and the log line §26 quoted is the
+evidence against it: **v9 passed both of the checks in game 14 that it
+committed** and lost both on score comparison.
+
+The 50 failures are real but narrow: 34 of them are the 7-icon any-colour
+bucket on Aspire or Special Color, and 9 happen on turn 1 (21% of v9's turn-1
+commits, the only turn where the failure rate is materially out of line).
+
+### 27.2 Where the placements actually go
+
+865 live phases, 200 games, both seats:
+
+| | v9 | |
+|---|---|---|
+| folded | 273 | opponent then placed **144** of them, nobody 129 |
+| committed, opponent had folded | 179 | **163 placed** (91%), 16 lost |
+| committed, both set (contested) | 413 | **227 placed** (55%), 186 lost |
+
+**Contested checks are 70% of all commits and carry 94% of all losses.** Of the
+186 contested losses:
+
+| cause | n | share |
+|---|---|---|
+| set a lower printed-score card than theirs, passed, lost the comparison | **88** | 47% |
+| equal printed score, lost the +1 yell score icon | 55 | 30% |
+| failed the heart requirement | 34 | 18% |
+| lost despite a higher printed score | 9 | 5% |
+
+48 of the 55 equal-card losses are exactly **-1**. The score comparison is
+decided by a single point (§14.2: +1 wins 33/33, -1 loses 32/32) and half of
+those are a coin flip on one score icon. That is the floor, not a defect.
+
+For the 88: joining the arena's own audit rows against the live-result log, **104
+of the 152 passed-but-lost checks (68%) had a strictly higher-printed-score life
+in hand at set time** (deficits: 29x 2->7, 28x 1->4, 26x 2->4, 12x 4->7, 9x
+1->7). This is the largest addressable bucket in the game. It is not
+automatically a defect, because the four lives in this deck trade score against
+requirement steeply (1pt/3 icons, 2pt/7, 4pt/11, 7pt/15 - score per icon
+0.33, 0.29, 0.36, 0.47), and p_pass is computed exactly by the flip sampler.
+The model's arithmetic on a 2pt-vs-4pt choice with a contesting opponent does
+favour the 2pt, and re-deriving it with the opponent's *measured* score
+distribution still favours the 2pt (§27.3). So this bucket is where the next
+real improvement has to come from, and it is a *passability* problem, not a
+weighting one: the way to make the 4pt and 7pt cards playable earlier is a
+bigger board earlier, which is the Main phase, not the live set.
+
+### 27.3 The one real modelling error: the opponent's yield prior is 31% low
+
+v9 prices its own check by sampling the actual deck through `FlipSampler` and
+prices the opponent's from `YIELD_PRIOR` - five hand-picked yield values whose
+mean is **0.505** blade-hearts per blade, against the ~0.733 this file's own
+docstring cites. In a mirror, which is the configuration every measurement here
+runs in, the two answers describe the same deck.
+
+Measured by joining `V8_CAL2` against the engine's own verdict log (1324 live-set
+decisions, 100 games, seed 11):
+
+| turn | 1 | 2 | 3 | 4 | 5 | 6 |
+|---|---|---|---|---|---|---|
+| modelled E[opponent score] | 0.50 | 0.89 | 1.25 | 1.57 | 2.02 | 2.56 |
+| **observed opponent printed score** | **1.00** | **1.56** | **1.94** | **2.49** | **3.40** | **4.21** |
+| bias | -0.50 | -0.67 | -0.70 | -0.92 | **-1.38** | **-1.64** |
+
+The error grows with the turn, which is the signature of a per-blade bias:
+`blades x (0.505 - 0.733)` is 0.5 hearts at 2 blades and 1.8 at 8. At t4 the
+model puts 2.8% of its mass on the opponent scoring 4; they score 4 in 32% of
+checks. At t5-t6 the model is 1.4-1.6 points low in a comparison decided by one
+point, and it is low **in the direction it keeps losing** - it believes it is
+ahead in precisely the comparisons it loses.
+
+Two things make this actionable where `pass_prob` was not (§14.7): the
+distribution still carries signal (pearson r = 0.601 between predicted and
+realised), and the bias has a *known cause* - a prior that is documented as too
+low - rather than being an unexplained inversion.
+
+**The fix**, `V8_OPP_SAMPLED_YIELD`: build the opponent's supply from the deck
+actually in play, sampled through the same `FlipSampler` that prices our own
+check, at their blade count, instead of from the prior. Same bands, same
+half-credit, same weights - only the yield quantiles are measured rather than
+asserted. It also fixes a quiet self-inconsistency: the shipped code read the
+opponent's yield as 0.505 in the score comparison and (under
+`V8_OPP_DENSITY=measured`) as 0.25 in the pass comparison, because
+`measured_opp_density` returns *the fraction of deck cards with a blade heart*
+and `yield_prior` rescales it as if it were *blade-hearts per blade* - a unit
+mismatch that made the "calibration" push the opponent down instead of up. The
+switch is off by default, so the frozen baseline is untouched; the default path
+is bit-identical and re-verified (684-516 / 40898) with the code compiled in.
+
+**It is a null.** Paired, n=1200, seed 11:
+
+| arm | record | discordant | p | delta |
+|---|---|---|---|---|
+| baseline | 684-516 | - | - | - |
+| `V8_OPP_SAMPLED_YIELD` | 683-517 | 6 / 5 | 1.000 | -0.08pp |
+| `V8_OPP_SCORE_BIAS=1` | 688-512 | 8 / 12 | 0.503 | +0.33pp |
+| `V8_OPP_SCORE_BIAS=2` | 672-528 | 37 / 25 | 0.162 | -1.00pp |
+
+The constant-bias arms are the control, and they behave exactly as the
+turn-resolved shape predicts: +1 helps late and hurts early, +2 hurts more,
+neither is significant. Correcting a measurably wrong model changes 11-62 games
+out of 1200 and wins nothing.
+
+The reason is visible in the arithmetic rather than hidden: raising the
+opponent's score lowers `we_c` for *every* candidate roughly equally, so it
+moves the fold boundary, not the choice between cards. The score axis of the
+opponent model is measurably wrong and outcome-irrelevant. That is worth more
+than a null: it means the next improvement cannot come from modelling the
+opponent better, and the 88-check bucket in §27.2 has to be attacked from the
+supply side (board size, earlier) or not at all.
+
+### 27.4 A rule the codebase stated wrongly, verified against the engine
+
+`zone_success_distribution`'s justification (`v8_live.rs`, and §11.8) argued
+that each live in the zone resolves independently, so three lives can bank three
+successes in one phase and `V8_JOINT` prices what the model otherwise cannot.
+
+**The engine does not do that.** `determine_winners` requires
+`lives.iter().all(|l| l.passed)`; rule 8.3.16 / Q35 is all-or-nothing, and a set
+containing one unsatisfied card places **nothing** with every card going to the
+waitroom. Pinned by
+`live_success_rules_test.rs::any_card_fails_hearts_all_fail` ("one failure
+fails ALL - nothing places, both cards to waitroom"), and visible in a 200-game
+trace: **7 sets held a passed life next to a failed one and every one of them
+scored zero placements** (116 sets containing a failure, +1 placements: 0).
+
+So the never-sets-two-cards behaviour is *correct*, the "0 discordant games" of
+`V8_MAX_LIVES=3` is the rule talking rather than a model that cannot speak, and
+`V8_JOINT` is a switch whose stated reason is a false statement about the rules
+in the direction that makes it look load-bearing. The comment and §11.8 are
+corrected. The switch stays off.
+
+### 27.5 §26's proposed fix is premised on a misread of where yell supply comes from
+
+§26 proposed computing expected yell from the blade-heart icons of the members
+**in play**: "yell can only come from the icons on members actually in play, and
+the board holds at most 3".
+
+The engine does the opposite. `start_yell` reveals `total_blade` cards **from
+the deck** and grants the blade hearts printed on **those revealed cards**
+(`live.rs:1905-1920`, `process_yell_revealed_card_icons` on the drawn card).
+A member on stage contributes its printed `base_heart` to the pool and its
+`blade` to the flip count - its own `blade_heart` icons contribute nothing
+(pinned by `distinct_blade_heart_types_three_and_six_gain_heart01_test.rs::
+blade_hearts_count_base_hearts_ignored`).
+
+`units[i] * blades / deck_len` is therefore "blade-heart icons per deck card,
+times the number drawn" - the right first-order expectation, diluted by exactly
+the cards that *should* dilute it. The proposed substitution would replace a
+correct deck-level mean with a stage-level mean over at most three members, which
+is both a different quantity and a much smaller one. It was not implemented, and
+the reason is now a rule reference rather than a preference.
+
+### 27.6 What is left
+
+Ranked by measured size, not by how easy it is to write:
+
+1. **Board size earlier** (Main phase). 88 of 413 contested checks are lost to a
+   lower printed score with a better card in hand; the 4pt and 7pt lives are
+   unplayable until supply reaches 11 and 15 icons, and supply is a function of
+   board plus blades. §2.2 already flags v9's Main-phase model as unproven and
+   locates the v7 lead (re-offer and re-evaluate per action, worth 2.3 points in
+   v7's own ablation). This is the only lever left that can move the 88.
+2. **Turn-1 waste**: 21% of v9's turn-1 commits fail (9 of 61 live cards burned
+   before a board exists). Small in absolute terms, but it is a life spent for
+   nothing in the phase where the board cannot support a 7-icon requirement.
+3. **Dead leaf terms** (§25.1): three of eight contribute nothing measurable.
+4. Not the opponent model, not the opponent's score, not set width, not fold
+   rate (§14.5), not a 19th weight.
+
+### 27.7 The fold bucket is empty (counterfactual on all 132 conceded checks)
+
+v9 folds 273 times in 200 games. 129 of those are mutual folds, 8 are the
+opponent setting and failing, and 4 are the opponent winning the comparison
+after v9 folded. The other **132 hand the opponent a success** - 48% of all folds
+and 0.66 successes per game.
+
+A concession that size is worth a counterfactual, so: for every one of those 132,
+read the audit's own view of the decision (hand lives with their printed scores
+and requirement totals, stage members' printed hearts) and ask the only question
+that matters - **did v9 hold a card that fits in its realistic supply (stage hearts
++ its own flip count x the measured 0.73 icons per flip) and scores above what
+the opponent committed?**
+
+| | n |
+|---|---|
+| **held a card that would have won the check** | **4 (3.0%)** |
+| held a passable card, none scoring higher | 0 |
+| held nothing within supply | 128 (97.0%) |
+
+97% of the conceded checks were folds where v9 had nothing playable. The fold
+decision is not losing placements; it is declining to burn a card it cannot pass.
+This is §14.5's result a third time, and this time read out of played games rather
+than inferred from an ablation: **the fold bucket is empty.**
+
+It also means the deck's lives are the binding constraint on the contested checks,
+not the decision. With 1pt/3, 2pt/7, 4pt/11 and 7pt/15 icons on the table, a side
+whose supply is below 7 icons has exactly one playable card, and a check decided
+by printed score against an opponent holding a 4pt is then lost by construction.
+Every remaining lever has to raise supply earlier, and that is the Main phase,
+where v9 already runs v7's - the one §2.5 shows is the best of the three
+available.
+
+### 27.8 External check on the supply model (web)
+
+The community live-success calculator the project already cites for its 0.733
+figure (loveca.vercel.app/live) takes exactly four inputs: total hearts required
+for the live, stage heart total, **number of yells**, and **blade hearts in the
+deck over current deck size**, with the explicit caveat that it totals hearts
+rather than counting per colour. That is
+
+    supply = stage hearts + yells x (blade hearts in deck / deck size)
+
+which is the engine's model and strategy_v4::flip_stats's, and it is the model
+§26 proposed replacing. An independent tool built by the deck's players prices the
+same quantity from the deck, not from the members on stage, which is a third
+independent confirmation of §27.5.
+
+The realised yield measured in the 200-game trace set is 0.72-0.75 icons per flip
+for both seats, consistent with the 0.733 the prior is calibrated against - so
+V8_OPP_SAMPLED_YIELD's null in §27.3 is a null on the *opponent's* pricing, not
+a refutation of the 0.733 the comment cites.

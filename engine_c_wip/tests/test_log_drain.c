@@ -66,13 +66,17 @@ static void push_cond_with_child(const char *text, const char *child_text) {
     RbAbilityLogItem child;
     memset(&child, 0, sizeof(child));
     child.kind = RB_LOG_KIND_CONDITION;
-    strncpy(child.as.condition.text, child_text, 255);
-    child.as.condition.text[255] = '\0';
-    child.as.condition.condition_type[0] = '\0';
+    /* Every RbAbilityLogItem string field is heap-owned now (rabuka.h), so the
+     * child is built with rb_strdup2 rather than strncpy into a fixed array.
+     * push_verdict_child deep-copies, so `child`'s own strings are released
+     * here by the caller, not by the buffer. */
+    child.as.condition.text = rb_strdup2(child_text);
+    child.as.condition.condition_type = rb_strdup2("");
     child.as.condition.passed = 1;
     child.as.condition.n_children = 0;
     child.as.condition.children = NULL;
     rb_log_push_verdict_child(idx, &child);
+    rb_log_free_item(&child);
 }
 
 static void free_items(RbAbilityLogItem *items, int n) {

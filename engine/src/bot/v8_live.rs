@@ -621,9 +621,10 @@ fn enumerate_candidates(
             .sum();
         let value = candidate_value_zone(outcome, p_pass, filter_value, !chosen.is_empty())
             // `V8_JOINT`: the shipped value pays for ONE success whatever the
-            // set size. A zone that can bank two or three is worth more and the
-            // model has no way to say so, which is why it never sets more than
-            // one card. See `zone_success_distribution`.
+            // set size, which is what rule 8.3.16 / Q35 actually pays - a set
+            // is all-or-nothing, so the never-sets-two behaviour is correct and
+            // not a modelling gap. See `zone_success_distribution` for the
+            // measured correction of the premise this used to rest on.
             + joint_success_value(
                 &zone_success_distribution(
                     &pools,
@@ -788,25 +789,41 @@ fn zone_ordered_pass_probability(pools: &[Pool], chosen: &[&Life]) -> f64 {
 /// and is therefore never better than setting one life. That is not a
 /// preference; it is arithmetic, and it is why the live set **never commits
 /// more than one card, even when the zone is explicitly allowed three** — the
-/// `V8_ZONE_ORDER` and `V8_MAX_LIVES=3` cells returned **0 discordant games**,
-/// which is a model that cannot express width rather than a width that loses.
+/// `V8_ZONE_ORDER` and `V8_MAX_LIVES=3` cells returned **0 discordant games**.
 ///
-/// The game disagrees. `MAX_LIVE_CARDS` is 3 and the win condition is three
-/// successes. Each card in the zone is checked separately
-/// (`move_live_to_success_and_handle_wins` sends winners to the success zone and
-/// failures to the waitroom, per card), so three good lives can bank three
-/// successes in one live phase — which wins the game outright at 2-2. A model
-/// that caps the payoff at one success cannot price that, and `V8_NO_JUNK`
-/// costing **15.08 points** says how much the zone's real contents are worth
-/// compared to what the model thinks they are.
+/// ## The premise this function used to rest on was wrong
 ///
-/// ## The resolution rule
+/// An earlier version of this note argued the other way: that each card in the
+/// zone resolves independently, so three lives can bank three successes in one
+/// phase and a model capped at one success "cannot price the zone's real
+/// contents". **The engine does not do that.** Rule 8.3.16 / Q35 is
+/// all-or-nothing — `determine_winners` requires `lives.iter().all(|l| l.passed)`,
+/// so a set containing one unsatisfied card places NOTHING and every card in the
+/// zone goes to the waitroom. Pinned by
+/// `tests/test_modules/rules/phases/live_success_rules_test.rs::any_card_fails_hearts_all_fail`
+/// ("one failure fails ALL - nothing places, both cards to waitroom"), and
+/// visible in 7 played games of a 200-game trace set, every one of them a set
+/// holding a passed life next to a failed one and **every one of them scoring
+/// zero placements** (116 sets containing a failure, +1 placements: 0).
 ///
-/// A card that cannot be satisfied fails, and the others still resolve: the
-/// engine moves them independently. Cards are therefore counted one at a time
-/// against a shared supply — stage hearts plus the sampled draw — and a card
-/// consumes what it takes. Wildcards (`need[7]`, the any-colour bucket) stand in
-/// for one missing heart of any colour, and can only help the card that
+/// So the width is not a capability the model is missing. Under the real rule a
+/// multi-card set pays `P(all pass) x 1 placement` with a summed requirement, and
+/// it is dominated by setting the single best card in the same zone. The shipped
+/// single-card behaviour is CORRECT, and the zero-discordance of
+/// `V8_MAX_LIVES=3` is the rule talking rather than a model that cannot speak.
+///
+/// `V8_JOINT` therefore stays off by default with its premise corrected rather
+/// than deleted: the distribution below is still the right SHAPE for pricing a
+/// set (it is what the width gate needs to be honest about), but it must not be
+/// read as "N of 3 place". Anyone re-enabling it should re-read this first.
+///
+/// ## The rule it does model
+///
+/// A card that cannot be satisfied fails the whole set, and the others resolve
+/// with it: the engine moves the zone as one. Cards are therefore counted one
+/// at a time against a shared supply - stage hearts plus the sampled draw - and a
+/// card consumes what it takes. Wildcards (`need[7]`, the any-colour bucket)
+/// stand in for one missing heart of any colour, and can only help the card that
 /// declares them, which is what the zone-order note above already worked out.
 fn zone_success_distribution(pools: &[Pool], board: &Pool, chosen: &[&Life]) -> [f64; 4] {
     let mut out = [0.0f64; 4];
@@ -1239,13 +1256,38 @@ if std::env::var_os("V8_CAL2").is_some() {
             .filter(|(_, w)| **w > 1e-9)
             .map(|(s, w)| format!("{}:{:.3}", s, w))
             .collect();
+        // `ob/obl` are the opponent's public board total and active blades: the
+        // two inputs `score_dist` is built from. They are printed so the
+        // under-prediction can be attributed to the supply estimate or to the
+        // band table, instead of guessed at.
+        let opp_board_total: i32 =
+            crate::core::stats_pipeline::stage_hearts(
+                &opp_player.stage.stage,
+                db,
+                &gs.mods.heart_override,
+                &gs.mods.heart_copy,
+                &gs.mods.heart_color_multiplier,
+                &gs.mods.heart_modifiers,
+            )
+            .hearts
+            .values()
+            .map(|v| i32::from(*v))
+            .sum();
+        let opp_blades = opp_player.stage.total_blades(
+            db,
+            &gs.mods.blade_modifiers,
+            &gs.mods.orientation_modifiers,
+            false,
+        );
         eprintln!(
-            "V8CAL2 t={} opp_set={} opp_pass={:.3} oursucc={} opsucc={} scoredist=[{}]",
+            "V8CAL2 t={} opp_set={} opp_pass={:.3} oursucc={} opsucc={} ob={} obl={} scoredist=[{}]",
             gs.turn_number,
             opp.set_size,
             opp.pass_prob,
             p.success_live_card_zone.cards.len(),
             opp_player.success_live_card_zone.cards.len(),
+            opp_board_total,
+            opp_blades,
             sd.join(" ")
         );
     }

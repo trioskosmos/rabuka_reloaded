@@ -1,0 +1,94 @@
+﻿cargo : warning: rabuka_engine@0.1.0: bytecode size: 30505 bytes (compressed, from C:\Users\trios\OneDrive\Documents\ra
+buka_reloaded\engine\../cards/build/abilities.bin.z)
+発生場所 行:4 文字:12
++ cd engine; cargo build --release --lib 2>&1 | Out-File -Encoding utf8 ...
++            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (warning: rabuka...bilities.bin.z):String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+warning: rabuka_engine@0.1.0: bytecode uncompressed: 98567 bytes
+   Compiling rabuka_engine v0.1.0 (C:\Users\trios\OneDrive\Documents\rabuka_reloaded\engine)
+error[E0308]: arguments to this function are incorrect
+   --> src\bot\v7_main.rs:456:15
+    |
+456 |             + opp_terms(
+    |               ^^^^^^^^^
+...
+460 |                 self.opponent.cost,
+    |                 ------------------ expected `u16`, found `i32`
+461 |                 self.opponent.blades,
+    |                 -------------------- expected `u8`, found `i32`
+    |
+note: function defined here
+   --> src\bot\v7_main.rs:519:4
+    |
+519 | fn opp_terms(
+    |    ^^^^^^^^^
+...
+523 |     baseline_cost: u16,
+    |     ------------------
+524 |     baseline_blades: u8,
+    |     -------------------
+help: you can convert an `i32` to a `u16` and panic if the converted value doesn't fit
+    |
+460 |                 self.opponent.cost.try_into().unwrap(),
+    |                                   ++++++++++++++++++++
+help: you can convert an `i32` to a `u8` and panic if the converted value doesn't fit
+    |
+461 |                 self.opponent.blades.try_into().unwrap(),
+    |                                     ++++++++++++++++++++
+
+warning: unreachable pattern
+   --> src\bot\encoding.rs:510:9
+    |
+510 |         _ => 3,
+    |         ^ no value can reach this
+    |
+note: multiple earlier patterns match some of the same values
+   --> src\bot\encoding.rs:510:9
+    |
+507 |         CardType::Live => 0,
+    |         -------------- matches some of the same values
+508 |         CardType::Member => 1,
+    |         ---------------- matches some of the same values
+509 |         CardType::Energy => 2,
+    |         ---------------- matches some of the same values
+510 |         _ => 3,
+    |         ^ collectively making this unreachable
+    = note: `#[warn(unreachable_patterns)]` (part of `#[warn(unused)]`) on by default
+
+warning: unreachable pattern
+   --> src\bot\encoding.rs:575:9
+    |
+575 |         _ => {}
+    |         ^ no value can reach this
+    |
+note: multiple earlier patterns match some of the same values
+   --> src\bot\encoding.rs:575:9
+    |
+562 |         CardType::Live => {
+    |         -------------- matches some of the same values
+...
+567 |         CardType::Member => {
+    |         ---------------- matches some of the same values
+...
+572 |         CardType::Energy => {
+    |         ---------------- matches some of the same values
+...
+575 |         _ => {}
+    |         ^ collectively making this unreachable
+
+warning: unused variable: `response_model`
+    --> src\bot\strategy_v7.rs:2304:9
+     |
+2304 |     let response_model = std::env::var("V7_RESPONSE")
+     |         ^^^^^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_response_model`
+     |
+     = note: `#[warn(unused_variables)]` (part of `#[warn(unused)]`) on by default
+
+For more information about this error, try `rustc --explain E0308`.
+warning: `rabuka_engine` (lib) generated 3 warnings
+warning: rabuka_engine@0.1.0: bytecode size: 30505 bytes (compressed, from C:\Users\trios\OneDrive\Documents\rabuka_rel
+oaded\engine\../cards/build/abilities.bin.z)
+warning: rabuka_engine@0.1.0: bytecode uncompressed: 98567 bytes
+error: could not compile `rabuka_engine` (lib) due to 1 previous error; 3 warnings emitted

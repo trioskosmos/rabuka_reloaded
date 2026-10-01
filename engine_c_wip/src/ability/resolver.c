@@ -710,6 +710,14 @@ const char *rb_resolver_merge_group_names(const char **groups, int n) {
 int rb_can_activate_effect(const GameState *g, int actor, const AbilityEffect *eff, int host_cid) {
     if (!g || !eff) return 1;
 
+    /* resolver.rs:581-582 — `let mut dbg = AbDebug::new(); dbg.effect(effect);`, the
+       FIRST thing can_activate_effect does, before the activation-condition
+       gate. A per-effect AbDebug, separate from the one resolve_ability owns,
+       exactly as in Rust: both write to the same global trace buffer. */
+    RbAbDebug eff_dbg;
+    rb_abdebug_init(&eff_dbg);
+    rb_abdebug_effect(&eff_dbg, eff);
+
     /* ── Activation condition check (resolver.rs:451-493) ──
        Only evaluated when cost has not already been paid. This is a SEPARATE
        gate from `condition`: Rust reads effect.activation_condition_parsed_any()
@@ -917,8 +925,14 @@ static void record_ability_use_guarded(GameState *g, int card_id, int ability_id
    final use recording.
    Returns 0 on error (caller should surface), 1 on Ok.
    *resolved = 1 when effect executed or choice emitted.
-*/
-int rb_resolve_ability(GameState *g, int actor, const Ability *ab, int ability_idx, int host_cid, int *resolved) {
+
+   The BODY lives in resolve_ability_body so the AbDebug trace buffer is flushed
+   on EVERY exit, exactly once. Rust never has to think about this: `dbg` is a
+   local, and its lines sit in the process-global ABILITY_LOG_BUFFER drained by
+   AbDebug::flush_to_* — which C only reaches through this one seam. Collapsing
+   the body's eleven early returns into a single flush would mean a goto chain;
+   a wrapper leaves every one of them untouched. */
+static int resolve_ability_body(GameState *g, int actor, const Ability *ab, int ability_idx, int host_cid, int *resolved) {
     if (resolved) *resolved = 0;
     if (!g || !ab) return 0;
     if (rb_ability_debug_enabled() && host_cid == 1049)
@@ -927,6 +941,34 @@ int rb_resolve_ability(GameState *g, int actor, const Ability *ab, int ability_i
                 g->queue.cur >= 0 && g->queue.cur < g->queue.n_entries ? g->queue.entries[g->queue.cur].cost_paid : -1,
                 g->queue.cur >= 0 && g->queue.cur < g->queue.n_entries ? g->queue.entries[g->queue.cur].effect_started : -1,
                 ab->effect && ab->effect->action ? ab->effect->action : "none");
+
+    /* resolver.rs:1273 — `let mut dbg = AbDebug::new();`, then passed by &mut to
+       pay_ability_cost (:1095) and run_ability_effect (:1150), both of which C
+       has inlined into this body. One local therefore serves every site below,
+       which is the same object Rust threads through those two helpers. */
+    RbAbDebug dbg;
+    rb_abdebug_init(&dbg);
+
+    /* resolver.rs:1280-1303 — the three identity Strings, built only when a
+       tracer is on (Rust's `debug_on`) and EMPTY when there is no activating
+       card (`unwrap_or_default()`), not "?": a card-less resolution must print
+       `"" [] ()` exactly as Rust does. */
+    char card_name[256];
+    char card_no[64];
+    char card_id[24];
+    card_name[0] = '\0'; card_no[0] = '\0'; card_id[0] = '\0';
+    if (rb_ability_debug_enabled() && host_cid >= 0) {
+        Card cd;
+        if (rb_decode_card_by_index((uint32_t)host_cid, &cd)) {
+            if (cd.name) { strncpy(card_name, cd.name, sizeof(card_name) - 1); card_name[sizeof(card_name) - 1] = '\0'; }
+            const char *no = rb_card_string(cd.card_no_idx);
+            if (no) { strncpy(card_no, no, sizeof(card_no) - 1); card_no[sizeof(card_no) - 1] = '\0'; }
+            rb_free_card(&cd);
+        }
+        snprintf(card_id, sizeof(card_id), "%d", host_cid);
+    }
+    /* resolver.rs:1316 */
+    rb_abdebug_ability(&dbg, card_name, card_no, card_id, ab);
 
     /* initialize resolver globals (mirrors Rust self.current_ability etc.) */
     g_current_ability = *ab; /* shallow copy of strings */
@@ -972,10 +1014,19 @@ int rb_resolve_ability(GameState *g, int actor, const Ability *ab, int ability_i
         int paid = rb_pay_cost(g, actor, &eff_cost);
         cost_clone_release(&eff_cost, inserted_index);
         if (!paid) {
+            /* resolver.rs:1108 — `dbg.p("RESULT", "COST FAILED: {e}")`. Rust
+               formats the Err string its pay_cost returned; C's rb_pay_cost
+               returns a bare int, so the SAME literal C already hands
+               push_ability_result is used rather than a second invented one. */
+            rb_abdebug_p(&dbg, "RESULT", "COST FAILED: cost payment failed");
             push_ability_result(g, "cost_fail", "cost payment failed");
             g_current_ability_valid = 0;
             return 0;
         }
+        /* resolver.rs:1113 — `dbg.p("RESULT", "cost paid")`, emitted on the
+           success side of pay_cost and BEFORE the pending-choice check. */
+        rb_abdebug_p(&dbg, "RESULT", "cost paid \xE2\x9C\x93");
+
         /* cost paid log is handled inside rb_pay_cost */
         /* check if cost emitted a pending choice */
         if (g->queue.has_pending) {
@@ -1049,6 +1100,9 @@ int rb_resolve_ability(GameState *g, int actor, const Ability *ab, int ability_i
                 if (ab->use_limit >= 0 && ability_is_activation(ab) && host_cid >= 0) {
                     rb_record_ability_use(g, host_cid, ability_idx);
                 }
+                /* resolver.rs:1183 — `dbg.p("RESULT", "effect condition not met
+                   — skipped")`, on the `!passed` arm of run_ability_effect. */
+                rb_abdebug_p(&dbg, "RESULT", "effect condition not met \xE2\x80\x94 skipped");
                 push_ability_result(g, "failure", NULL);
                 g_current_ability_valid = 0;
                 if (resolved) *resolved = 1;
@@ -1057,6 +1111,18 @@ int rb_resolve_ability(GameState *g, int actor, const Ability *ab, int ability_i
         }
         /* execute effect - carry host_cid for per-card attribution */
         rb_execute_effect_ex(g, actor, ab->effect, host_cid);
+        /* resolver.rs:1189-1190 — `if let Err(e) = self.execute_effect(..) {
+           dbg.p("RESULT", "EFFECT FAILED: {e}") }` — is NOT reproduced, and the
+           blocker is a type difference, not an oversight: Rust's execute_effect
+           returns Result<(), String>, and this line is the only C-visible
+           consequence of the Err arm. C's rb_execute_effect_ex returns void —
+           an execution failure is reported by the handlers themselves, not
+           returned — so there is no `e` to format and no way to know at this
+           point whether the Err arm was taken. Emitting an unconditional
+           "EFFECT FAILED" here would print a failure Rust does not print on
+           every successful resolution. It becomes wireable the moment
+           rb_execute_effect_ex grows a Result-shaped return, and until then
+           this comment is the record of the gap. */
 
         if (g->queue.has_pending) {
             if (!cost_already_paid && cur >= 0 && cur < g->queue.n_entries) g->queue.entries[cur].cost_paid = 1;
@@ -1081,6 +1147,10 @@ int rb_resolve_ability(GameState *g, int actor, const Ability *ab, int ability_i
             g_current_ability_valid = 0;
             return 1;
         }
+        /* resolver.rs:1202 — `dbg.p("RESULT", "effect applied")`, guarded in
+           Rust by `self.awaiting.choice.is_none()`, which is exactly the branch
+           this is: the pending-choice arm returned above. */
+        rb_abdebug_p(&dbg, "RESULT", "effect applied \xE2\x9C\x93");
         push_ability_result(g, "success", NULL);
     }
 
@@ -1101,6 +1171,33 @@ int rb_resolve_ability(GameState *g, int actor, const Ability *ab, int ability_i
     g_activating_card_id = -1;
     if (resolved) *resolved = 1;
     return 1;
+}
+
+/* ── AbDebug::flush_to_rule_log / flush_to_structured_log (debug.rs:77-97) ──
+   Rust calls these from ONE place, game/display.rs:1405 and :1413, while
+   building a display state: it drains the process-global ABILITY_LOG_BUFFER
+   into game_state.rule_log, caps the result at LOG_BOUND_RULE, then drains the
+   (now empty) buffer again into structured_log as category "debug".
+
+   C HAS NO DISPLAY PATH — there is no game_state_to_display in this port, and
+   grepping the tree for one returns nothing outside the phase/card-name
+   helpers. So the display seam does not exist to wire into, and leaving the
+   flush unwired is what made BOTH functions dead: every [AB] line produced by
+   the calls above would have sat in the 256-line trace buffer and been
+   discarded. The resolution end is therefore the C point at which a buffered
+   trace line can reach the log AT ALL, and it is also where Rust's own
+   `push_ability_result` writes, so the ordering matches.
+
+   Both drains are called, in Rust's order, even though the second necessarily
+   finds the buffer already empty. That is true of Rust too — display.rs:1413
+   drains a buffer :1405 just emptied — and calling only the first would leave
+   rb_abdebug_flush_to_structured_log dead, which is the very defect class this
+   work is closing. */
+int rb_resolve_ability(GameState *g, int actor, const Ability *ab, int ability_idx, int host_cid, int *resolved) {
+    int r = resolve_ability_body(g, actor, ab, ability_idx, host_cid, resolved);
+    rb_abdebug_flush_to_rule_log(NULL);
+    rb_abdebug_flush_to_structured_log(NULL);
+    return r;
 }
 
 /* ── log.rs verdict-buffer drains (were `(void)` no-ops) ──

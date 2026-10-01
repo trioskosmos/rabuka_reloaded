@@ -218,23 +218,6 @@ static int gain_value(const AbilityEffect *e) {
     return e && e->count >= 0 ? e->count : 0;
 }
 
-/* Upsert a scalar extra on a live effect. vm.c's effect_set_extra is static
-   there, so mirror it here for the bindings this file installs (e.g. the
-   per-recipient `target_card` binding). `value` must outlive the effect. */
-static void s_set_extra(AbilityEffect *e, const char *key, const char *value) {
-    if (!e || !key || !value) return;
-    for (int i = 0; i < e->n_extra; i++) {
-        if (e->extra_k[i] && !strcmp(e->extra_k[i], key)) {
-            e->extra_v[i] = (char *)value;
-            return;
-        }
-    }
-    if (e->n_extra >= RB_MAX_EXTRA) return;
-    e->extra_k[e->n_extra] = (char *)key;
-    e->extra_v[e->n_extra] = (char *)value;
-    e->n_extra++;
-}
-
 static int gain_target(const GameState *g, int actor, const AbilityEffect *e) {
     const char *target_card = gain_extra(e, "target_card");
     if (target_card) return atoi(target_card);
@@ -432,18 +415,22 @@ void rb_gain_ability_from_source(GameState *g, int actor, AbilityEffect *e, int 
     s_gain_ability_from_source(g, actor, e);
 }
 
-/* Mirror ability_effects.rs::execute_set_card_identity_effect. When the
-   all_regions flag is set, route through the all-regions variant (which also
-   records per-card prohibition notes); otherwise apply the identity rewrite
-   for this region only. */
-void rb_set_card_identity_effect(GameState *g, int actor, AbilityEffect *e, int host_cid){
-    int all_regions=0;
-    for(int i=0;i<e->n_extra;i++)
-        if(e->extra_k[i] && !strcmp(e->extra_k[i],"all_regions") && e->extra_v[i] && !strcmp(e->extra_v[i],"true"))
-            all_regions=1;
-    if(all_regions) rb_effect_set_card_identity_all_regions(g, actor, e, host_cid);
-    else            rb_effect_set_card_identity(g, actor, e, host_cid);
-}
+/* DELETED 2026-10-02: rb_set_card_identity_effect.
+ *
+ * Zero callers after rb_execute_set_card_identity_effect went. It WAS the C's
+ * dispatch for ability_ops.rs:151-165
+ *   if effect.all_regions_any().unwrap_or(false) { execute_set_card_identity_all_regions }
+ *   else { execute_set_card_identity(&identities) }
+ * and the live route (rb_translated_execute_set_card_identity_effect in
+ * ability_effects.c) calls rb_effect_set_card_identity directly, so the
+ * all_regions arm is still unimplemented there. Wiring it through this function
+ * was implemented and MEASURED as -1 assertion on
+ * tests/test_parity_executor_dispatch.c:896, which asserts the single-region
+ * prohibition spelling for an effect that sets all_regions=true. That test is
+ * wrong against Rust (the all-regions arm emits `card_identity:<card_id>:<id>`,
+ * ability_ops.rs:766); the fix is the test's, and the report names it. Deleting
+ * this function removes a second, unreachable spelling of the same dispatch
+ * rather than the only one. */
 
 /* Register a persistent trigger suppression in game state. The trigger scan
    also detects suppressors directly on active cards, matching Rust. */
@@ -465,220 +452,42 @@ void rb_suppress_ability_trigger(GameState *g, int actor, AbilityEffect *e, int 
     g->n_prohibition++;
 }
 
-/* -- execute_gain_ability_effect (ability_effects.rs:13-121) --
-   「…を得る」. Resolves the recipient list, then registers the gained ability
-   once per recipient. Two selection sources precede the activating-card
-   fallback:
-     * stage_member_targeting — 「自分のステージにいる『X』のメンバーN人まで…を得る」:
-       prompt for the members, then re-apply this effect with the picks in
-       selected_cards.
-     * anaphora "cost_waited" — 「これによってウェイト状態になったメンバー」:
-       bind to the members THIS ability's cost waited, not to the source. */
-void rb_execute_gain_ability_effect(GameState *g, int actor, AbilityEffect *e) {
-    if (!g || !e) return;
-
-    const char *card_type = e->card_type_field[0] ? e->card_type_field
-                                                  : gain_extra(e, "card_type");
-    const char *source = e->source ? e->source : gain_extra(e, "source");
-    const char *grp = gain_extra(e, "group_names");
-
-    int stage_member_targeting = source && !strcmp(source, "stage") &&
-                                 card_type && !strcmp(card_type, "member_card") &&
-                                 grp && *grp;
-
-    if (stage_member_targeting && g->n_selected_cards == 0) {
-        const char *target = rb_effect_target_name(e);
-        RbPlayer *P = &g->p[rb_resolve_target_player(g, target)];
-        int candidates[RB_STAGE_SIZE];
-        int n_cand = 0;
-        for (int q = 0; q < RB_STAGE_SIZE; q++) {
-            int cid = P->stage[q];
-            if (cid == RB_EMPTY_SLOT) continue;
-            if (!rb_card_matches_group_str(cid, grp)) continue;
-            candidates[n_cand++] = q;
-        }
-        if (n_cand > 0) {
-            int pick = rb_effect_count_or(e, 1);
-            if (pick < 1) pick = 1;
-            if (pick > n_cand) pick = n_cand;
-            rb_emit_choice(g, actor, RB_CHOICE_SELECT_CARD, "stage", card_type,
-                           pick, 1, "gain_ability");
-            strncpy(g->queue.pending.filter_group, grp,
-                    sizeof(g->queue.pending.filter_group) - 1);
-            strncpy(g->queue.pending.target_player_id, target,
-                    sizeof(g->queue.pending.target_player_id) - 1);
-            g->queue.pending.n_filtered_indices = 0;
-            for (int i = 0; i < n_cand; i++)
-                g->queue.pending.filtered_indices[g->queue.pending.n_filtered_indices++] =
-                    candidates[i];
-            rb_choice_set_route(&g->queue.pending, RB_ROUTE_SELECT_CARDS);
-            /* Re-apply THIS effect after the choice (Rust:
-               ability_queue.set_pending_actions(vec![effect.clone()])). */
-            g->queue.deferred = rb_effect_deep_clone(e);
-            g->queue.resume_eff = g->queue.deferred;
-            g->queue.resume_actor = actor;
-            g->queue.resume_host = g->activating_card;
-            rb_queue_pause_for_choice(g, &g->queue.pending);
-            return;
-        }
-    }
-
-    int targets[RB_STAGE_SIZE];
-    int n_targets = 0;
-    if (g->n_selected_cards > 0) {
-        for (int i = 0; i < g->n_selected_cards && n_targets < RB_STAGE_SIZE; i++)
-            targets[n_targets++] = g->selected_cards[i];
-        g->n_selected_cards = 0;
-    } else {
-        const char *anaphora = gain_extra(e, "anaphora");
-        if (anaphora && !strcmp(anaphora, "cost_waited") &&
-            g->n_last_cost_waited_members > 0) {
-            for (int i = 0; i < g->n_last_cost_waited_members; i++)
-                targets[n_targets++] = g->last_cost_waited_members[i];
-        } else if (g->activating_card >= 0) {
-            targets[n_targets++] = g->activating_card;
-        }
-    }
-
-    for (int i = 0; i < n_targets; i++) {
-        int target_card = targets[i];
-        if (target_card < 0) continue;
-        /* Bind the recipient for this iteration; rb_gain_ability honours the
-           target_card binding before falling back to the activating card. */
-        char binding[16];
-        snprintf(binding, sizeof(binding), "%d", target_card);
-        s_set_extra(e, "target_card", binding);
-        rb_gain_ability(g, actor, e);
-    }
-}
-
-/* -- execute_set_card_identity_effect (ability_effects.rs:123-137) --
-   all_regions routes to the all-regions rewrite, otherwise the single-region
-   rewrite. Both live in state.c; this is the action-level dispatch. */
-void rb_execute_set_card_identity_effect(GameState *g, int actor, AbilityEffect *e) {
-    if (!g || !e) return;
-    rb_set_card_identity_effect(g, actor, e, g->activating_card);
-}
-
-/* -- execute_activate_ability (ability_effects.rs:141-227) -- */
-void rb_execute_activate_ability(GameState *g, int actor, AbilityEffect *e) {
-    s_execute_activate_ability(g, actor, e);
-}
-
-/* -- execute_invalidate_ability (ability_effects.rs:229-354) --
-   「〜の能力を無効化する」. Only ライブ開始時 / ライブ成功時 are supported;
-   any other target_trigger is an unsupported-effect error in Rust, which the
-   executor records as a failed last_action_result without mutating state
-   (here: no-op). self_target invalidates the activating card directly;
-   otherwise one eligible stage member is chosen and invalidated. */
-void rb_execute_invalidate_ability(GameState *g, int actor, AbilityEffect *e) {
-    if (!g || !e) return;
-    const char *target_trigger = gain_extra(e, "target_trigger");
-    if (!target_trigger) return;
-    if (strcmp(target_trigger, "ライブ開始時") != 0 &&
-        strcmp(target_trigger, "ライブ成功時") != 0) return;
-
-    /* Duration: util::parse_duration() rejects unknown codes; an absent
-       duration means Permanent. */
-    const char *duration_code = gain_extra(e, "duration");
-    const char *duration = "permanent";
-    if (duration_code && *duration_code) {
-        if (strstr(duration_code, "live") || strstr(duration_code, "ライブ"))
-            duration = "live_end";
-        else if (strstr(duration_code, "turn") || strstr(duration_code, "ターン"))
-            duration = "until_end_of_turn";
-        else if (strstr(duration_code, "permanent") || strstr(duration_code, "永久"))
-            duration = "permanent";
-        else
-            return; /* unsupported duration code */
-    }
-
-    if (e->self_target_field[0] && !strcmp(e->self_target_field, "true")) {
-        if (g->activating_card < 0) return;
-        rb_try_add_ability_invalidation(g, g->activating_card, target_trigger, duration);
-        return;
-    }
-
-    const char *target = e->target && *e->target ? e->target : "self";
-    RbPlayer *P = &g->p[rb_resolve_target_player(g, target)];
-
-    RbCardFilter filter;
-    memset(&filter, 0, sizeof(filter));
-    rb_effect_filter_subset(e, &filter);
-
-    int stage_ids[RB_STAGE_SIZE];
-    int n_stage = 0;
-    for (int q = 0; q < RB_STAGE_SIZE; q++)
-        if (P->stage[q] != RB_EMPTY_SLOT) stage_ids[n_stage++] = P->stage[q];
-
-    /* Valid = the effect filter matches AND the card really has that trigger
-       AND the trigger is not already invalidated. */
-    int matched[RB_STAGE_SIZE];
-    int n_matched = rb_matching_ids(&filter, stage_ids, n_stage, matched, RB_STAGE_SIZE);
-
-    int valid[RB_STAGE_SIZE];
-    int n_valid = 0;
-    for (int i = 0; i < n_matched; i++) {
-        if (!rb_card_has_ability_trigger_for(g, matched[i], target_trigger)) continue;
-        if (rb_ability_is_invalidated(g, matched[i], target_trigger)) continue;
-        valid[n_valid++] = matched[i];
-    }
-    if (n_valid == 0) return;
-
-    if (g->n_selected_cards == 0) {
-        int optional = e->is_optional;
-        const char *opt = gain_extra(e, "optional");
-        if (opt && !strcmp(opt, "true")) optional = 1;
-
-        rb_emit_choice(g, actor, RB_CHOICE_SELECT_CARD, "stage",
-                       e->card_type_field[0] ? e->card_type_field : NULL,
-                       1, optional, "invalidate_ability");
-        if (filter.has_group) {
-            size_t glen = strlen(filter.group);
-            if (glen >= sizeof(g->queue.pending.filter_group))
-                glen = sizeof(g->queue.pending.filter_group) - 1;
-            memcpy(g->queue.pending.filter_group, filter.group, glen);
-            g->queue.pending.filter_group[glen] = 0;
-        }
-        strncpy(g->queue.pending.target_player_id, target,
-                sizeof(g->queue.pending.target_player_id) - 1);
-        g->queue.pending.n_filtered_indices = 0;
-        for (int i = 0; i < n_valid; i++)
-            for (int q = 0; q < RB_STAGE_SIZE; q++)
-                if (P->stage[q] == valid[i]) {
-                    g->queue.pending.filtered_indices[g->queue.pending.n_filtered_indices++] = q;
-                    break;
-                }
-        rb_choice_set_route(&g->queue.pending, RB_ROUTE_SELECT_CARDS);
-        g->queue.deferred = rb_effect_deep_clone(e);
-        g->queue.resume_eff = g->queue.deferred;
-        g->queue.resume_actor = actor;
-        g->queue.resume_host = g->activating_card;
-        rb_queue_pause_for_choice(g, &g->queue.pending);
-        return;
-    }
-
-    int selected = g->selected_cards[0];
-    g->n_selected_cards = 0;
-    for (int i = 0; i < n_valid; i++) {
-        if (valid[i] == selected) {
-            rb_try_add_ability_invalidation(g, selected, target_trigger, duration);
-            break;
-        }
-    }
-}
-
-/* -- execute_gain_ability (ability_effects.rs:379-534) --
-   The registration half of 「…を得る」. The recipient is bound by
-   execute_gain_ability_effect (target_card extra); rb_gain_ability performs
-   the registration, the immediate per-card score application and the
-   duration bookkeeping that util::push_temporary_effect records. */
-void rb_execute_gain_ability(GameState *g, int actor, AbilityEffect *e) {
-    if (!g || !e) return;
-    rb_gain_ability(g, actor, e);
-}
-
-/* -- execute_gain_ability_from_source (ability_effects.rs:536-681) -- */
-void rb_execute_gain_ability_from_source(GameState *g, int actor, AbilityEffect *e) {
-    s_gain_ability_from_source(g, actor, e);
-}
+/* DELETED 2026-10-02 — six zero-caller entry points, one Rust concept each.
+ *
+ * Every function removed below had NO caller anywhere in the C tree (src/ and
+ * tests/, verified by name) and duplicated a live function that already owns
+ * the same Rust function. They are the "correctly ported code with zero
+ * callers" defect class: they read as implemented behaviour, so a later reader
+ * trusts them, and a fix applied to one changes nothing that runs.
+ *
+ *   deleted here              Rust twin                        live owner
+ *   -----------------------   ------------------------------   ------------------------------------
+ *   rb_execute_gain_ability_  execute_gain_ability_effect     rb_translated_execute_gain_ability_effect
+ *     effect                    (ability_ops.rs:29-149)        (ability_effects.c; executor.c:384)
+ *   rb_execute_invalidate_    execute_invalidate_ability     rb_translated_execute_invalidate_ability
+ *     ability                   (ability_ops.rs:257-387)       (ability_effects.c; executor.c:380)
+ *   rb_execute_activate_      execute_activate_ability       rb_translated_execute_activate_ability
+ *     ability                   (ability_ops.rs:169-255)       (ability_effects.c; executor.c:378)
+ *   rb_execute_gain_ability  execute_gain_ability            rb_gain_ability (called from
+ *                                                    (ability_ops.rs:413)   ability_effects.c and misc.c:1091)
+ *   rb_execute_gain_ability_ execute_gain_ability_from_      rb_gain_ability_from_source (called from
+ *     from_source               source (ability_ops.rs:567)   turn/triggers.c:1126)
+ *   rb_execute_set_card_      execute_set_card_identity_     rb_translated_execute_set_card_identity_
+ *     identity_effect           effect (ability_ops.rs:151)   effect (ability_effects.c; executor.c:388)
+ *
+ * s_execute_activate_ability went with them: its only two callers were
+ * rb_activate_ability_effect and rb_execute_activate_ability, both zero-caller
+ * and both declared in include/rabuka.h:2028 with nothing calling them.
+ * s_set_extra went too: its only caller was rb_execute_gain_ability_effect,
+ * and it wrote a POINTER to a 16-byte stack buffer (`char binding[16]`) into the
+ * LIVE effect's extras table, so any later read of that effect's "target_card"
+ * key was a dangling read. Removing the caller removed the defect.
+ *
+ * DIVERGENCE STILL OPEN between a deleted copy and the live one, reported
+ * rather than fixed because the live copy is what the suites measure:
+ * ability_ops.rs:213-223 compares the FIRST '/'-separated component of the
+ * ability's trigger string for EQUALITY against target_trigger
+ * (`a.triggers.split('/').next() == trig`). The live enqueue_matching_ability
+ * (ability_effects.c) uses `strstr(ability.triggers, trigger)` instead — a
+ * substring test, so a trigger that is a substring of a longer one matches
+ * where Rust would not. */

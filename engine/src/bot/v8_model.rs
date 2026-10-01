@@ -498,6 +498,27 @@ fn opp_ensemble_enabled() -> bool {
     std::env::var_os("V8_OPP_ENSEMBLE").is_some()
 }
 
+/// `V8_OPP_SAMPLED_YIELD`: price the opponent's yell yield from the deck in
+/// play instead of `YIELD_PRIOR`. See the `build_with` block for the
+/// measurement that motivates it and the assumption it makes in their place.
+fn opp_sampled_yield_enabled() -> bool {
+    std::env::var_os("V8_OPP_SAMPLED_YIELD").is_some()
+}
+
+/// `V8_OPP_SAMPLED_SCORE`: the score axis only. See the `build_with` block for
+/// why the score axis and the pass axis have to be measured apart.
+fn opp_sampled_score_enabled() -> bool {
+    std::env::var_os("V8_OPP_SAMPLED_SCORE").is_some()
+}
+
+fn opp_sampled_yield_samples() -> usize {
+    std::env::var("V8_OPP_YIELD_SAMPLES")
+        .ok()
+        .and_then(|v| v.parse().ok())
+        .filter(|&n: &usize| (1..=4096).contains(&n))
+        .unwrap_or(64)
+}
+
 fn opp_ensemble_samples() -> usize {
     std::env::var("V8_OPP_ENSEMBLE_N")
         .ok()
@@ -604,14 +625,108 @@ impl OppModel {
         // the flip COLORS are unknown - a heart of the wrong color is worth
         // nothing, so total supply is an upper bound and the quantile spread
         // carries the color risk.
+        //
+        // `V8_OPP_SAMPLED_YIELD=1` replaces the yield QUANTILES with the ones
+        // the deck actually in play produces at the opponent's blade count,
+        // sampled through the same `FlipSampler` that prices our own check.
+        //
+        // WHY, measured (100 games, seed 11, `V8_CAL2` joined against the
+        // arena's own live-result log, 1324 decisions):
+        //
+        //     turn            1      2      3      4      5      6
+        //     modelled E[opp] 0.50  0.89  1.25  1.57  2.02  2.56
+        //     observed   opp  1.00  1.56  1.94  2.49  3.40  4.21
+        //     gap            -0.50 -0.67 -0.70 -0.92 -1.38 -1.64
+        //
+        // The model under-predicts the opponent's score, and the error GROWS
+        // with the turn. That shape is the signature of a per-blade bias: the
+        // error is `blades * (assumed yield - real yield)`, and the mean of
+        // `YIELD_PRIOR` is 0.505 blade-hearts per blade against the ~0.733
+        // this file's own docstring cites. At 2 blades that is 0.5 hearts, at 8
+        // blades 1.8 - which is the measured column.
+        //
+        // This matters more than a one-point bias usually would, because the
+        // score comparison decides more than half of all live phases and the
+        // deciding margin is ONE point (§14.2: +1 wins 33/33, -1 loses 32/32).
+        // `V8_OPP_SCORE_BIAS` is the knob for a constant version of this and
+        // cannot express a bias that scales with the board; a constant shift
+        // large enough for T6 over-predicts T1 by more than a point.
+        //
+        // The sampler reads OUR decklist to stand in for theirs - the same
+        // substitution `FlipSampler::build_with_draws` and `with_board_sampled`
+        // already make and document, and in the mirror configuration this
+        // project measures in, the two lists are the same list.
+        //
+        // `V8_OPP_SAMPLED_SCORE` and `V8_OPP_SAMPLED_YIELD` are deliberately
+        // separate arms, because the two consumers behave differently and the
+        // combined switch is not a fair test of either:
+        //
+        // * `score_dist` decides WHICH CARD. The published doctrine for this
+        //   game is that you can read the opponent's maximum score this turn off
+        //   their board - hearts and blades are public - and that spending a 1pt
+        //   live against a board that can reach 2 is mostly waste
+        //   (note.com/miya_duel/n/n1cefd065b054: "相手の場にあるハートの数や
+        //   ブレードの数を見れば相手がそのターンに出せる最大のスコアは予測
+        //   することができます" and "無駄なライブカードは切らない"). The score
+        //   band table this loops over is the same table that guide states as
+        //   doctrine: 1pt needs 3-4 hearts, 2pt 5-6 (SCORE_MEDIAN/SCORE_MAX).
+        //
+        // * `clears` decides WHETHER TO SHOW UP AT ALL, and its only effect is on
+        //   the fold. Measured together, correcting the yield moved 11-62 games
+        //   in 1200 and won nothing (p=1.000 / 0.503 / 0.162), because raising
+        //   the opponent's pass probability pushes toward folding and that
+        //   swamps any improvement in the card choice behind it.
+        //
+        // So the score arm alone is the one that tests the doctrine, and it is
+        // the arm that has never been run.
+        let sampled_score: Option<Vec<i32>> = if opp_sampled_score_enabled() && blades > 0 {
+            Some(
+                FlipSampler::build_with_draws(gs, me, db, usize::try_from(blades).unwrap_or(0))
+                    .sample_pools(&[0i16; 8], opp_sampled_yield_samples())
+                    .iter()
+                    .map(|pool| pool.iter().map(|v| i32::from(*v)).sum())
+                    .collect(),
+            )
+        } else {
+            None
+        };
+        let sampled_yield: Option<Vec<i32>> = if opp_sampled_yield_enabled() && blades > 0 {
+            Some(
+                FlipSampler::build_with_draws(gs, me, db, usize::try_from(blades).unwrap_or(0))
+                    .sample_pools(&[0i16; 8], opp_sampled_yield_samples())
+                    .iter()
+                    .map(|pool| pool.iter().map(|v| i32::from(*v)).sum())
+                    .collect(),
+            )
+        } else {
+            None
+        };
         let mut score_dist = [0.0f64; SCORE_SLOTS];
-        for (yield_hearts, weight) in yield_prior(yield_source) {
-            let supply = board_total + crate::constants::score_to_i32_rounded(blades as f64 * yield_hearts);
-            for score in 0..SCORE_SLOTS {
-                if supply >= SCORE_MAX[score] {
-                    score_dist[score] += weight;
-                } else if supply >= SCORE_MEDIAN[score] {
-                    score_dist[score] += weight * 0.5;
+        match &sampled_score {
+            Some(totals) if !totals.is_empty() => {
+                let n = totals.len() as f64;
+                for &yield_hearts in totals.iter() {
+                    let supply = board_total + yield_hearts;
+                    for score in 0..SCORE_SLOTS {
+                        if supply >= SCORE_MAX[score] {
+                            score_dist[score] += 1.0 / n;
+                        } else if supply >= SCORE_MEDIAN[score] {
+                            score_dist[score] += 0.5 / n;
+                        }
+                    }
+                }
+            }
+            _ => {
+                for (yield_hearts, weight) in yield_prior(yield_source) {
+                    let supply = board_total
+                        + crate::constants::score_to_i32_rounded(blades as f64 * yield_hearts);
+                    for score in 0..SCORE_SLOTS {
+                        if supply >= SCORE_MAX[score] {
+                            score_dist[score] += weight;
+                        } else if supply >= SCORE_MEDIAN[score] {
+                            score_dist[score] += weight * 0.5;
+                        }
+                    }
                 }
             }
         }
@@ -688,7 +803,19 @@ impl OppModel {
         // to zero at a threshold. The yield values remain the one hand-fitted
         // input -- their decklist is hidden -- but they are now summed over a
         // distribution of boards rather than compared against one.
-        let clears = if opp_ensemble_enabled() {
+        let clears = if let Some(totals) = &sampled_yield {
+            // Same sampled yields `score_dist` was built from. Reading the
+            // opponent's supply from one quantity in both places is the point:
+            // a model that believes their yield is 0.505 per blade in the
+            // score comparison and 0.733 in the pass comparison is not a
+            // model of the opponent, it is two models averaged by accident.
+            let n = totals.len() as f64;
+            let acc = totals
+                .iter()
+                .filter(|&&t| board_total + t >= bar)
+                .count() as f64;
+            (acc / n).min(1.0)
+        } else if opp_ensemble_enabled() {
             let samples = opp_ensemble_samples();
             let prior = yield_prior(yield_source);
             let total: f64 = prior.iter().map(|(_, w)| *w).sum();

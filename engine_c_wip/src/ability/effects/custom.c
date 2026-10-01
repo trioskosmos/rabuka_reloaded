@@ -5,9 +5,37 @@
  * Reached from engine/src/ability/effects/dispatch.rs:175
  *     ActionType::Custom => resolver.execute_custom(gs, effect, effect.action.to_str())
  *
+ * STATUS AS OF 2026-10-02: THIS FUNCTION IS NOT THE LIVE ROUTE. The `custom`
+ * action is dispatched by src/ability/effects/executor.c:330-342, which routes
+ * it to execute_misc, and execute_misc's table (src/ability/effects/misc.c:2073)
+ * calls misc.c's h_custom. That is the copy that runs. This file's copy has no
+ * caller (verified by name across src/ and tests/), so this file is a SECOND
+ * copy of one Rust function, not the port of it. It was previously a 10-line
+ * trampoline into rb_translated_execute_custom_effect; that trampoline target
+ * was a THIRD copy in ability_effects.c and has been deleted, leaving the two
+ * copies below.
+ *
+ * WHY THE ROUTE COULD NOT BE CONSOLIDATED HERE: executor.c, misc.c,
+ * include/rabuka.h and the Makefile are not this file's to edit. Making this
+ * the single owner needs a ONE-LINE change in executor.c — see the report; it
+ * was measured in the isolation snapshot and is neutral-to-positive.
+ *
+ * Of the two surviving copies THIS one is the faithful one, and the difference
+ * is not cosmetic:
+ *   arm 1  Rust: `let mut routed = effect.clone();` — a FULL clone, so `count`
+ *             and every selection filter reach the routed move_cards. This file
+ *             uses rb_effect_deep_clone. h_custom hand-builds a struct and copies
+ *             count/target/optional/distinct/per_unit/card_type/self_target/extras,
+ *             which drops `text`, `gained_effect` and the child effects.
+ *   arm 2  Rust passes `text` and `target` EXPLICITLY (dispatch.rs:260-268):
+ *             text = effect.text when non-empty else action_str, and
+ *             target = effect.target_any().unwrap_or("self"). This file puts
+ *             both on the clone. h_custom calls rb_gain_ability with neither.
+ *   arm 3  identical in both copies.
+ *
  * The `action_by` short-circuit lives ABOVE the dispatch, in mod.rs:131-134
  * ("Empty action (default) with action_by means it was entirely handled by
- * opponent"), and executor.c:338-342 mirrors it, so this function only ever
+ * opponent"), and executor.c:338-339 mirrors it, so this function only ever
  * sees a Custom effect with NO action_by.
  *
  * The three arms below are Rust's three arms, in Rust's order:
@@ -22,13 +50,6 @@
  *           the action_str (dispatch.rs:260-264); `target` defaults to "self".
  *   3. otherwise: the parser could not type this effect. Nothing to run; push
  *      "<pp> <act_name>: [[log_custom_effect]]" to the rule log.
- *
- * NOTE ON DUPLICATION: the same three arms exist twice more in the C tree --
- * misc.c's h_custom (the copy the "custom" action table actually reaches, via
- * executor.c:330-342 -> execute_misc) and ability_effects.c's
- * rb_translated_execute_custom_effect. All three are one Rust function; the
- * single-writer-per-file rule wants them collapsed. This file is the canonical
- * translation.
  */
 #include "rabuka.h"
 

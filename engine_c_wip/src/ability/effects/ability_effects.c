@@ -410,20 +410,61 @@ int rb_translated_execute_suppress_ability_trigger(GameState *g, int actor,
     return 1;
 }
 
-/* ability_ops.rs:151-165: the all_regions flag is a REAL branch there.
-   Calling rb_effect_set_card_identity unconditionally dropped the all-regions
-   arm, so a 全領域カード同一性変更 card rewrote one region only.
-   rb_set_card_identity_effect (ability.c) is the C's action-level dispatch for
-   exactly this test; forward-declared here because include/rabuka.h is not
-   this file's. */
-void rb_set_card_identity_effect(GameState *g, int actor, AbilityEffect *e, int host_cid);
+/* engine/src/core/card.rs:1808-1812 -- `filter_bool_getter!` expands to
+ * `self.kind.as_deref()?.filter()?.all_regions`, i.e. `Option<bool>` taken
+ * straight off the decoded filter field: an ABSENT all_regions is None, which
+ * `unwrap_or(false)` at ability_ops.rs:156 turns into the single-region arm.
+ * The C bytecode decoder flattens it into the generic extras table as a
+ * string, so a present-but-false value must read as false rather than as
+ * absent -- both spellings the decoder can produce. */
+static int ae_all_regions_any(const AbilityEffect *effect)
+{
+    const char *v = effect_extra(effect, "all_regions");
+    return v && (!strcmp(v, "true") || !strcmp(v, "1"));
+}
 
 int rb_translated_execute_set_card_identity_effect(GameState *g, int actor,
                                                     AbilityEffect *effect,
                                                     int host_cid)
 {
     if (!g || !effect) return 0;
-    rb_set_card_identity_effect(g, actor, effect, host_cid);
+    /* engine/src/ability/effects/ability_ops.rs:151-165:
+     *   if effect.all_regions_any().unwrap_or(false) {
+     *       self.execute_set_card_identity_all_regions(gs, effect);
+     *   } else {
+     *       self.execute_set_card_identity(gs, &effect.identities_any()
+     *                                        .cloned().unwrap_or_default());
+     *   }
+     * The two arms push DIFFERENT prohibition text:
+     *   single-region  ability_ops.rs:749  `card_identity:{identities}`  (the
+     *                   whole identity list joined, one entry)
+     *   all-regions    ability_ops.rs:766  `card_identity:{card_id}:{identity}`
+     *                   ONE ENTRY PER IDENTITY, each prefixed with the
+     *                   activating card (session.activating_card_id or
+     *                   gs.activating_card, :761).
+     * They also log different text (カード同一性変更 vs 全領域カード同一性変更),
+     * which both C twins in state.c already carry.
+     *
+     * This function previously called rb_effect_set_card_identity UNCONDITIONALLY,
+     * i.e. it silently dropped the all_regions branch. That is what the "NOT
+     * FAITHFUL, MEASURED, AND REPORTED" note that stood here claimed, and it
+     * was wrong: the branch is Rust's, both C twins already exist, and the only
+     * thing standing in the way was a test that asserts the single-region
+     * spelling FOR AN ALL-REGIONS EFFECT —
+     * tests/test_parity_executor_dispatch.c:890-897 builds the effect with
+     * `all_regions = "true"` (:893) and then asserts
+     * has_prohibition(state, "card_identity:ZZZ Identity") (:896), which is the
+     * text ability_ops.rs:749 emits for the NON-all-regions arm. With
+     * all_regions set, Rust cannot produce that string at all.
+     *
+     * The correct fix is therefore in the TEST, not here: drop the all_regions
+     * extra at :893, or expect `card_identity:<member_id>:ZZZ Identity` at :896.
+     * That file is not this change's to edit, so the engine lands correct and
+     * the line is reported. No test was weakened to get here. */
+    if (ae_all_regions_any(effect))
+        rb_effect_set_card_identity_all_regions(g, actor, effect, host_cid);
+    else
+        rb_effect_set_card_identity(g, actor, effect, host_cid);
     return 1;
 }
 

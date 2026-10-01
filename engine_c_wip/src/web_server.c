@@ -241,7 +241,40 @@ static int parse_json_card_array(const char *body, const char *key,
             card[n] = '\0';
             if (*p != '"') return 0;
             p++;
-            card_id = rb_card_get_card_id(card);
+            /* Rust: web_server.rs:2355-2362 maps EVERY array element through
+             * `DeckParser::normalize_card_no` (deck_parser.rs:200-208) before
+             * the string is stored, and only `get_card_id` ever sees the result
+             * (deck_builder.rs:42 / :103). That normalisation is NOT the same
+             * fold `get_card_id` applies internally: CardDatabase::normalize_
+             * card_no (card.rs:608) uppercases and folds fullwidth to halfwidth,
+             * whereas DeckParser's replaces ASCII '+'/'!' with fullwidth and then
+             * STRIPS every trailing fullwidth ＋ / ！.
+             *
+             * The peer claim that "the fold is symmetric, so it does not matter"
+             * is FALSE, and the fold is not even symmetric — they are different
+             * functions. The two differ exactly when the submitted number ends in
+             * ASCII '+' or '!':
+             *   Rust  F(N(s))  strips them, then resolves the rarity WITHOUT them
+             *   C     F(s)      keeps them, so step 2 (exact normalized key) and
+             *                    step 3a (base + requested rarity) both look for a
+             *                    "...-R+" print that Rust never asks for, and the
+             *                    answer falls through to step 3c "any rarity of this
+             *                    base, lowest key wins" — a DIFFERENT CARD.
+             * Step 1 (exact) differs too: N(s) is never the stored key when s
+             * carries a trailing rarity mark, so Rust can miss step 1 where C
+             * hits it.
+             *
+             * rb_normalize_card_no (src/game/deck_parser.c:27) is the ported
+             * DeckParser::normalize_card_no, and this file already includes
+             * deck_parser.h and calls rb_parse_deck_line from it. It is applied
+             * here so the C resolves what Rust resolves.
+             *
+             * The parse_deck_content_ids fallback further down already gets this
+             * right for free: rb_parse_deck_content runs every line through
+             * rb_parse_deck_line, which normalises (deck_parser.c:117 / :131). */
+            char normalized[128];
+            if (rb_normalize_card_no(card, normalized, sizeof(normalized)) != 0) return 0;
+            card_id = rb_card_get_card_id(normalized);
         } else {
             char *end = NULL;
             long value = strtol(p, &end, 10);
@@ -300,18 +333,36 @@ static int parse_deck_content_ids(const char *body, int *ids, int max_ids, int *
     return 1;
 }
 
-static void settle_web_initial_state(GameState *state)
-{
-    if (!state) return;
-    for (int guard = 0; guard < 16; guard++) {
-        if (state->phase != RB_PHASE_ACTIVE &&
-            state->phase != RB_PHASE_ENERGY &&
-            state->phase != RB_PHASE_DRAW)
-            break;
-        if (rb_has_pending_choice(state)) break;
-        rb_advance_phase(state);
-    }
-}
+/* Rust web_server.rs never hand-rolls the settle loop: every one of its four
+ * call sites (web_server.rs:913 / 957 / 1702 / 1771) goes through the local
+ * wrapper `settle_single_player_state` (web_server.rs:1144-1147), which is a
+ * bare delegation to `game_setup::settle_single_player_state`
+ * (game_setup.rs:410-430).
+ *
+ * This file used to carry its own narrower copy of that loop, and it was
+ * wrong in three ways at once:
+ *   - it advanced only Active / Energy / Draw, where Rust's
+ *     `is_automatic_phase` list (game_setup.rs:369-375) is all SIX automatic
+ *     phases — FirstAttackerPerformance, SecondAttackerPerformance and
+ *     LiveVictoryDetermination as well. A web game that reached a performance
+ *     window or the live victory determination STOPPED there, still sitting in
+ *     PERFORMANCE / PERFORMANCE_SECOND / VICTORY, because the sandbox's
+ *     serialize_state then advertised a phase the client can submit no action
+ *     against. That is the stall.
+ *   - it gave up after 16 iterations where Rust's guard is 500.
+ *   - it had no `game_result != Ongoing` check, so it kept advancing a finished
+ *     game.
+ *
+ * rb_setup_settle_single_player_state (src/game/game_setup.c:454) is the ported
+ * twin and reproduces all three, including the 500-iteration guard. It had ZERO
+ * callers tree-wide, which is why the divergence survived: this file could not
+ * see a correct settle to copy. The inline loop is deleted, not kept as a
+ * fallback — two settle loops in one binary is exactly how the two drift again.
+ *
+ * DECLARED HERE, NOT IN include/rabuka.h: the prototype is not in any header
+ * (game_setup.c's own scope table at :113 marks it "WIRE?"), and rabuka.h is not
+ * this file's to edit. A file-local extern is the minimal correct wiring. */
+extern void rb_setup_settle_single_player_state(GameState *g);
 
 static int make_test_deck(Sandbox *s)
 {
@@ -340,7 +391,7 @@ static int make_test_deck(Sandbox *s)
     s->built_deck[1] = built1;
     rb_seed(0xCAFE);
     if (rb_init_game_from_built_decks(&s->state, &built0, &built1) != 0) return 0;
-    settle_web_initial_state(&s->state);
+    rb_setup_settle_single_player_state(&s->state);
     s->initialized = 1;
     s->deck_ready[0] = s->deck_ready[1] = 1;
     s->version++;
@@ -513,7 +564,7 @@ static void handle_request(Sandbox *s, int fd, HttpRequest *r, const char *web_r
                 return;
             }
             s->initialized = 1;
-            settle_web_initial_state(&s->state);
+            rb_setup_settle_single_player_state(&s->state);
             s->version++;
         }
         char response[220];
@@ -537,7 +588,7 @@ static void handle_request(Sandbox *s, int fd, HttpRequest *r, const char *web_r
                 send_json(fd, 400, "{\"error\":\"game initialization failed\"}");
                 return;
             }
-            settle_web_initial_state(&s->state);
+            rb_setup_settle_single_player_state(&s->state);
             s->version++;
         }
         Buffer b = {0};

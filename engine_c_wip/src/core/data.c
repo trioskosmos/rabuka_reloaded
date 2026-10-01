@@ -509,18 +509,32 @@ static int card_no_resolve_chain(const char *card_no, char *scratch, size_t len)
             id = card_no_folded_lookup(variant);
             if (id >= 0) return id;
         }
-        /* 3b. equivalent rarities. The canonical form keeps the fullwidth
-           ＋, so the key must be normalized before the folded comparison.
-           Folding only ever shortens a string, so the freed tail of `variant`
-           is exactly wide enough to hold the folded form. */
+        /* 3b. equivalent rarities. Rust builds `format!("{base}-{eq}")` with the
+           CANONICAL rarity — which keeps the fullwidth ＋ ("P＋"/"R＋"/"L＋"/"N＋"
+           /"PR＋", card.rs:533-547) — and looks THAT key up in
+           `normalized_no_to_id`. Every key in that map went through
+           normalize_card_no, which folds ＋ to '+', so no key in it can contain
+           a fullwidth ＋: this arm cannot hit, in Rust or here. Port it as
+           written, against `variant`, rather than "fixing" it by folding first.
+
+           The folded form is what used to be looked up here, and it was built
+           into `variant + n + 1` with `out_sz = len - n`. `n` is the length of
+           `base` + '-' + the canonical, and `len` is the length of the CALLER's
+           string, whose rarity suffix is what normalized DOWN to `requested`.
+           Every input that reaches this arm has a fullwidth suffix in the
+           caller's string (an already-ASCII suffix fails the `n < len + 2`
+           guard above, so 3b never runs for it), and a fullwidth suffix has
+           exactly as many bytes as the canonical. So n == len, `out_sz` is 0,
+           rb_card_normalize_no returns without writing (card.c:224), and
+           `folded` — uninitialised scratch — was handed to card_no_folded_lookup
+           as the lookup key. With real card data (max card_no 25 bytes,
+           verified against cards/cards.json) that is EVERY call to this arm. */
         char canonical[32];
         if (base_len + 1 < sizeof(canonical) &&
             rb_card_equivalent_rarity(requested, canonical, sizeof(canonical))) {
             n = snprintf(variant, len + 2, "%s-%s", base, canonical);
             if (n > 0 && (size_t)n < len + 2) {
-                char *folded = variant + (size_t)n + 1;
-                rb_card_normalize_no(variant, folded, len - (size_t)n);
-                id = card_no_folded_lookup(folded);
+                id = card_no_folded_lookup(variant);
                 if (id >= 0) return id;
             }
         }

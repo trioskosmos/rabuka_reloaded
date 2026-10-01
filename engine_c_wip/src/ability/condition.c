@@ -408,17 +408,44 @@ static int eval_check_self(const struct GameState *g, int actor, int host_cid, c
     return eval_operator(present ? 1 : 0, get_str(c, "operator"), thr);
 }
 
-/* ── compound (variant 0) / or ── */
+/* ── compound (variant 0) / or ──
+   condition/compound.rs:65 `evaluate_compound_condition`.
+
+   compound.rs:90's SECOND trace line — "→ <passed>/<n> passed = PASS|FAIL" — is
+   NOT reproduced here, and the reason is a real divergence rather than an
+   oversight. Rust reaches that line with `passed_count` from
+   `evaluate_condition_list` (compound.rs:74-88), which evaluates EVERY
+   sub-condition and only then reduces to all_pass/any_pass. The C loop
+   short-circuits on the first decisive child, so when a compound fails on its
+   second child there is no count in hand, and inventing one would mean
+   evaluating children Rust never evaluates — a diagnostic at a place Rust does
+   not have one. Closing the gap means porting `evaluate_condition_list`, which
+   is a behaviour change to condition evaluation rather than an
+   observation-layer change, and measuring it as one. */
 static int eval_compound(const struct GameState *g, int actor, int host_cid, const Condition *c) {
     const char *op = get_str(c, "operator");
     const CondValue *v = find_val(c, "conditions");
     if (!v || v->tag != RB_TAG_ARRAY || !v->arr) return 1;
     int is_or = op && !strcmp(op, "or");
+
+    /* condition/compound.rs:68 — the PRE-evaluation COMPOUND line, emitted at
+       the same point in the same shape: "<n> sub-conditions, operator=<op>",
+       with Rust's `get_operator().unwrap_or("and")` default spelled out. */
+    RbAbDebug dbg;
+    rb_abdebug_init(&dbg);
+    {
+        const char *op_s = op ? op : "and";
+        char msg[128];
+        snprintf(msg, sizeof(msg), "%u sub-conditions, operator=%s",
+                 (unsigned)v->arr_n, op_s);
+        rb_abdebug_p(&dbg, "COMPOUND", msg);
+    }
+
     for (uint32_t i=0;i<v->arr_n;i++) {
         const CondValue *cv = &v->arr[i];
         if (cv->tag != RB_TAG_OBJVAR || !cv->cond) continue;
         /* Rust keeps the same ConditionEvaluator (same activating_card_id) for
-           every nested condition  Eforward the host so check_self / not_moved /
+           every nested condition  forward the host so check_self / not_moved /
            exclude_self keep working inside compounds. */
         int r = eval_condition_inner_host(g, actor, host_cid, cv->cond);
         if (is_or && r) return 1;
@@ -565,7 +592,17 @@ static int eval_location(const struct GameState *g, int actor, int host_cid, con
     /* 'all' flag means require all slots filled etc. For now treat as count check */
     if (has_count) {
         const char *op = get_str(c, "operator");
-        return eval_operator(actual, op, cnt_thr);
+        int passed = eval_operator(actual, op, cnt_thr);
+        /* condition/card.rs:2594-2595 — `dbg.condition(condition, actual, count,
+           passed)`, at the single convergence point of Rust's
+           evaluate_card_count_condition. This function IS that twin (it also
+           carries Rust's check_self early return at :2400-2402 and the
+           `count = get_count().unwrap_or(1)` default at :2409), so the call
+           lands on the same verdict Rust reports. */
+        RbAbDebug dbg;
+        rb_abdebug_init(&dbg);
+        rb_abdebug_condition(&dbg, c, actual, cnt_thr, passed);
+        return passed;
     }
     /* no count: just existence */
     return actual > 0;
@@ -2264,6 +2301,32 @@ case RB_COND_ALL_REVEALED: {
            score as satisfied. */
         default: r = 0; break;
     }
+
+    /* condition.rs:636-648 — the ONE `dbg.condition(...)` per evaluated
+       condition, after the dispatch and after the negation post-processing.
+       Rust reaches it only for a non-compound condition: the `if let
+       Condition::Compound` arm at :543-550 returns before the tracer is
+       consulted at all (and compound conditions get their own COMPOUND lines
+       from eval_compound above), so the guard below excludes that variant
+       rather than inventing a COND line Rust does not emit. The two earlier
+       Rust exits are already excluded by placement — the aggregate-total
+       short-circuit returns at :519 and the phase gate at :556, both above
+       this point in the C too.
+         actual    = result ? get_count().unwrap_or(1) : 0     (PRE-negation `r`)
+         threshold = Comparison ? get_count().unwrap_or(0) : 1 */
+    int final_result = (c->variant == RB_COND_LOCATION && get_str(c, "card_property") != NULL)
+                       ? r : (negation ? !r : r);
+    if (rb_ability_debug_enabled() && c->variant != RB_COND_COMPOUND) {
+        int has_count = find_val(c, "count") != NULL;
+        int cnt = 1;
+        if (has_count) get_i(c, "count", &cnt);
+        int thresh = (c->variant == RB_COND_COMPARISON) ? (has_count ? cnt : 0) : 1;
+        int dbg_actual = r ? cnt : 0;
+        RbAbDebug dbg;
+        rb_abdebug_init(&dbg);
+        rb_abdebug_condition(&dbg, c, dbg_actual, thresh, final_result);
+    }
+
     int location_property = c->variant == RB_COND_LOCATION && get_str(c, "card_property") != NULL;
     if (location_property) return r;
     return negation ? !r : r;

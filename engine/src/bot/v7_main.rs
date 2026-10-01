@@ -12,7 +12,7 @@ use crate::game_state::{GameResult, GameState, Phase};
 /// `card_indices` pair, or an `available_areas` entry flagged
 /// `is_baton_touch` for the chosen `stage_area`) IS a baton touch.
 /// Generator never sets `use_baton_touch` (link.rs matches on it); occupied
-/// target ⇒ baton is the generator's own rule (game_setup.rs:1504-1541).
+/// target ⇁Ebaton is the generator's own rule (game_setup.rs:1504-1541).
 /// Reverse-gates for ablation: `V7_PRE_D=1` or `V7_NO_BATON=1`.
 pub(crate) fn is_baton_action(gs: &GameState, me: u8, a: &Action) -> bool {
     if std::env::var_os("V7_PRE_D").is_some() || std::env::var_os("V7_NO_BATON").is_some() {
@@ -156,6 +156,7 @@ pub(crate) struct Features {
     cost: i32,
     ammo: usize,
     coverage: f64,
+    coverage_graded: f64,
     hand: usize,
     energy: usize,
     reserve: f64,
@@ -187,6 +188,7 @@ pub(crate) fn features(gs: &GameState, me: u8) -> Features {
     }
     let mut ammo = 0;
     let mut coverage = 0.0;
+    let mut coverage_graded = 0.0f64;
     let mut reserves = Vec::new();
     for &id in &p.hand.cards {
         let Some(card) = gs.card_database.get_card(id) else {
@@ -206,6 +208,7 @@ pub(crate) fn features(gs: &GameState, me: u8) -> Features {
             if requirements_met(&mean, &required) {
                 coverage += 1.0;
             }
+            coverage_graded = coverage_graded.max(graded_coverage(&mean, &required));
         } else if card.card_type == CardType::Member {
             reserves.push(member_reserve(gs, me, id));
         }
@@ -222,12 +225,61 @@ pub(crate) fn features(gs: &GameState, me: u8) -> Features {
         cost,
         ammo,
         coverage,
+        coverage_graded,
         hand: p.hand.cards.len(),
         energy: usize::from(p.energy_zone.active_count()),
         reserve: reserves.iter().take(2).sum(),
         future: future_development(gs, me),
         success: p.success_live_card_zone.cards.len(),
     }
+}
+
+/// Fraction of a life's heart requirement the board can actually supply,
+/// 0.0 to 1.0.
+///
+/// `coverage` is a **step**: `requirements_met` is all-or-nothing, so a board
+/// holding 6 of the 7 icons a life needs scores exactly the same as one holding
+/// 0 of 7. §17.3 measured that flatness and it is why the weight-60 term cannot
+/// express "get closer": every position short of the bar is indistinguishable,
+/// so the argmax has no reason to prefer 6-of-7 over 3-of-7 and settles wherever
+/// the other terms happen to land.
+///
+/// This is the gradient that term is missing. It follows the engine's own
+/// allocation order - specific colours first, then whatever is left over plus the
+/// any-colour pool plus the wildcard bucket, exactly as `requirements_met` and
+/// the engine's `check_heart_requirement` do - and reports the ratio instead of
+/// the verdict, so 6-of-7 beats 0-of-7 and 11-of-11 beats 6-of-7.
+///
+/// The pool passed in is `features`' `mean`, which already includes the sampled
+/// yell yield. Nothing here reads a new source of truth: this is a different
+/// FUNCTION of the same features, which is why it can be switched on and off
+/// without touching anything upstream of it.
+fn graded_coverage(mean: &Acc, required: &Acc) -> f64 {
+    let total: i32 = (0..11)
+        .filter(|&i| i != 8 && i != 9)
+        .map(|i| i32::from(required[i]))
+        .sum();
+    if total <= 0 {
+        // A life with no heart requirement passes unconditionally.
+        return 1.0;
+    }
+    let mut have = *mean;
+    let mut satisfied = 0i32;
+    // 1..=6 are the specific colours; 7 is the wildcard bucket, which stands in
+    // for one missing heart of any colour; 10 is the any-colour pool itself.
+    for c in 1..8usize {
+        let want = i32::from(required[c]);
+        if want <= 0 {
+            continue;
+        }
+        let take = want.min(i32::from(have[c]));
+        have[c] -= i16::try_from(take).unwrap_or(0);
+        satisfied += take;
+    }
+    let leftover: i32 = (0..8).map(|c| i32::from(have[c])).sum::<i32>() + i32::from(have[10]);
+    let want_any = i32::from(required[0]);
+    satisfied += want_any.min(leftover);
+    (satisfied as f64 / total as f64).clamp(0.0, 1.0)
 }
 
 fn terminal_win(gs: &GameState, me: u8) -> bool {
@@ -242,7 +294,7 @@ fn terminal_win(gs: &GameState, me: u8) -> bool {
 /// it to grade rollout actions so the policy and the prior it refines agree.
 pub(crate) fn value(now: &Features, base: &Features, deploy: bool) -> f64 {
     // Development weight: default 8.0 (historical). V7_DEV_WEIGHT for
-    // ablation — losses still cluster on dev_gap (audit 2026-09-23).
+    // ablation  Elosses still cluster on dev_gap (audit 2026-09-23).
     let dev_w: f64 = std::env::var("V7_DEV_WEIGHT")
         .ok()
         .and_then(|v| v.parse().ok())
@@ -296,6 +348,21 @@ pub(crate) fn value(now: &Features, base: &Features, deploy: bool) -> f64 {
         + zero * coverage_w * (now.coverage - base.coverage)
         + ammo_w * (now.ammo as f64 - base.ammo as f64)
         + 1000.0 * (now.success as f64 - base.success as f64);
+    // `V7_COVERAGE_GRADIENT=<w>`: the gradient `coverage` does not have. Off by
+    // default, so the shipped leaf stays byte-identical; the weight is a ratio in
+    // 0..1, so it is comparable against the other terms without rescaling them.
+    //
+    // The case for it is the only bucket left with measured headroom. Over 200
+    // games, 88 of v9's 413 contested checks were lost after PASSING because the
+    // committed life scored below the opponent's, and 104 of the 152 passed-but-
+    // lost checks had a strictly higher-scoring life in hand. The 4pt and 7pt
+    // lives need 11 and 15 icons against the 7 the 2pt needs, so the only way to
+    // make them playable earlier is to build supply earlier - and the term that
+    // models "this board can pass a life" is a step function that cannot see
+    // progress toward the bar. See `graded_coverage`.
+    if let Some(w) = coverage_gradient_weight() {
+        score += w * (now.coverage_graded - base.coverage_graded);
+    }
     if !deploy {
         score += zero * energy_w * (now.energy as f64 - base.energy as f64)
             + zero * hand_w * (now.hand as f64 - base.hand as f64)
@@ -318,8 +385,8 @@ pub(crate) fn value(now: &Features, base: &Features, deploy: bool) -> f64 {
     // (1563-2437 against 2234-1766, two seeds, 8000 games a side): a
     // hand-chosen constant that overrides the model's own arithmetic, in a term
     // the linear score already accounts for. Spending your last live card is
-    // already worth something — `1000 * d_success` and the fold decision
-    // price it — and a flat 120 is not derived from anything in the game.
+    // already worth something  E`1000 * d_success` and the fold decision
+    // price it  Eand a flat 120 is not derived from anything in the game.
     // `V7_AMMO_PENALTY=1` / `V7_HAND_PENALTY=1` restore them.
     let ammo_penalty: f64 = std::env::var("V7_AMMO_PENALTY")
         .as_deref()
@@ -418,16 +485,62 @@ impl Search<'_> {
     }
 
 fn evaluate(&self, gs: &GameState) -> f64 {
-        let own = features(gs, self.me);
+    // Terminal short-circuit, ported in shape from SabberStone's `Score.cs`:
+    //
+    // ```csharp
+    // if (OpHeroHp < 1) return int.MaxValue;
+    // if (HeroHp  < 1) return int.MinValue;
+    // ```
+    //
+    // A decided game returns before ANY weighted term is read. That matters here
+    // because this leaf's success term is `1000 * (Δsuccess)`, a hard zero for
+    // every positional term except a terminal one, so a near-win can currently
+    // be outvoted by a large `coverage` delta: the search has no way to express
+    // "this placement ends the game" other than through the delta, which is
+    // also why a 3-success lead and a 0-success game can score the same when
+    // nothing else differs.
+    //
+    // Gated on `V7_TERMINAL` because returning a constant changes what `complete`
+    // does with budget-limited leaves, and this leaf is load-bearing for v9.
+    if std::env::var_os("V7_TERMINAL").is_some() {
+        if gs.game_result == GameResult::Draw {
+            return 0.0;
+        }
+        if gs.seat_player(self.me).success_live_card_zone.cards.len() >= 3 {
+            return 1.0e9;
+        }
+        if gs.seat_player(1 - self.me).success_live_card_zone.cards.len() >= 3 {
+            return -1.0e9;
+        }
+    }
+    let own = features(gs, self.me);
         let opp = gs.seat_player(1 - self.me);
         let original_opp = self.root.seat_player(1 - self.me);
         let (_, opp_blades, opp_cost) = board(gs, 1 - self.me);
         let hand = value(&own, &self.base, self.deploy)
-            - 8.0 * (opp_cost - self.opponent.cost) as f64
-            - 6.0 * (opp_blades - self.opponent.blades) as f64
-            - 10.0 * (opp.hand.cards.len() as f64 - original_opp.hand.cards.len() as f64)
             - 1000.0
-                * (opp.success_live_card_zone.cards.len() as f64 - self.opponent.success as f64);
+                * (opp.success_live_card_zone.cards.len() as f64 - self.opponent.success as f64)
+            + opp_terms(
+                gs,
+                self.me,
+                self.root,
+                self.opponent.cost,
+                self.opponent.blades,
+            )
+            // Opponent COVERAGE, the missing counterpart to our own weight-60
+            // term.
+            //
+            // Gated on `V7_OPP_COVERAGE` (off by default) and, like the three terms
+            // above it, **provably constant during a Main-phase search**: the
+            // opponent takes no actions while we search, so their board and hand
+            // do not change and the term cancels in the argmax. Measured: at
+            // weights 10/30/60/-20 the arena reported identical records and
+            // identical discordance (7/4, p=0.549) every time, which is the
+            // signature of a term present in the arithmetic and absent from the
+            // decision. Kept because it is the correct expression for any phase
+            // where the opponent DOES move.
+            - opp_coverage_weight()
+                * (features(gs, 1 - self.me).coverage - self.opponent.coverage);
         // `V7_LEARNED_VALUE=<weights>` adds a trained value function to this leaf.
         //
         // This is the intervention the CCG search literature supports, and it is
@@ -446,10 +559,125 @@ fn evaluate(&self, gs: &GameState) -> f64 {
         if let Some(bonus) = learned_value_term(gs, self.me) {
             hand + bonus
         } else {
-            hand
+            hand + presence_term(gs, self.me)
         }
     }
+}
 
+/// Opponent terms: stage cost, blades, hand size.
+///
+/// ## These are constant during a Main-phase search, and that is the point
+///
+/// `evaluate` is called once per candidate action within ONE turn, while we
+/// control the seat. The opponent takes no actions in between, so their stage
+/// cost, blade count and hand size are identical for every candidate. They are
+/// therefore **identical offsets across the whole candidate set and cancel in
+/// the argmax** — the same shape `v8_main.rs:1058-1063` documents for
+/// `initiative`, and the same class `V8_NO_ASSUME_COMMIT` exists to neutralise in
+/// the live set.
+///
+/// They are moved behind `V7_OPP_TERMS` (default ON, so shipping behaviour is
+/// unchanged bit-for-bit) so the claim can be measured rather than argued: with
+/// the terms off, the leaf keeps only our own side plus the success delta, and
+/// the win rate either does not move — proving they were decorative — or moves,
+/// proving they were doing something this analysis missed. Either outcome is
+/// information; the previous state, where they were believed to cost real weight
+/// and never tested, was not.
+fn opp_terms(
+    gs: &GameState,
+    me: u8,
+    root: &GameState,
+    baseline_cost: i32,
+    baseline_blades: i32,
+) -> f64 {
+    if std::env::var_os("V7_OPP_TERMS").is_some() {
+        return 0.0;
+    }
+    let (_, opp_blades, opp_cost) = board(gs, 1 - me);
+    let opp = gs.seat_player(1 - me);
+    let original_opp = root.seat_player(1 - me);
+    -8.0 * (opp_cost as f64 - baseline_cost as f64)
+        - 6.0 * (opp_blades as f64 - baseline_blades as f64)
+        - 10.0 * (opp.hand.cards.len() as f64 - original_opp.hand.cards.len() as f64)
+}
+
+/// Weight on the opponent's live-card coverage. `V7_OPP_COVERAGE=<w>`; absent by
+/// default. Negative values flip the sign, which is the test that distinguishes
+/// "the term is wrong" from "the coefficient is wrong".
+fn opp_coverage_weight() -> f64 {
+    std::env::var("V7_OPP_COVERAGE")
+        .ok()
+        .and_then(|v| v.parse().ok())
+        .filter(|w: &f64| w.is_finite())
+        .unwrap_or(0.0)
+}
+
+/// `V7_COVERAGE_GRADIENT=<w>`, or `None` when unset so the term is not read at
+/// all. A finite weight only; the value is added to the linear leaf.
+fn coverage_gradient_weight() -> Option<f64> {
+    std::env::var("V7_COVERAGE_GRADIENT")
+        .ok()
+        .and_then(|v| v.parse().ok())
+        .filter(|w: &f64| w.is_finite())
+}
+
+/// Diagnostic: is the opponent's coverage term even LIVE in the search?
+///
+/// The leaf compares candidate actions within one Main-phase turn. The opponent
+/// does not move during that turn, so `opp_coverage` is a CONSTANT across every
+/// candidate and cancels in the argmax exactly as `v8_main`'s `initiative` does
+/// (`v8_main.rs:1058-1063` documents the same shape). That is a structural
+/// property, not a tuning question, and no weight can fix it.
+///
+/// Emitted under `V7_DIAG_TERMS` so the claim is measured rather than argued.
+pub(crate) fn diag_term_liveness(gs: &GameState, me: u8) -> Option<(f64, f64)> {
+    if std::env::var_os("V7_DIAG_TERMS").is_none() {
+        return None;
+    }
+    let mine = features(gs, me).coverage;
+    let theirs = features(gs, 1 - me).coverage;
+    Some((mine, theirs))
+}
+
+/// Board-PRESENCE term, ported in shape from SabberStone's competition AI
+/// (`core-extensions/SabberStoneBasicAI/src/Score/MidRangeScore.cs`):
+///
+/// ```csharp
+/// if (OpBoardZone.Count == 0 && BoardZone.Count > 0) result += 5000;
+/// result += (BoardZone.Count - OpBoardZone.Count) * 5;
+/// ```
+///
+/// The shape matters because §17.3 measured the opposite property in this
+/// repo's leaf: `coverage` (weight 60, the second-largest term) is a *threshold*
+/// over the whole requirement, so the gradient is flat exactly where "is there a
+/// board at all" should dominate, and §15.2-A found the leaf has no presence
+/// term of any kind. SabberStone treats an empty board against a non-empty one
+/// as a discrete, large event rather than something that accumulates.
+///
+/// This game's win condition is placements, not damage, so the weights do not
+/// transfer - only the shape. Gated behind `V7_PRESENCE` (off by default)
+/// because a ported constant from a different game is a hypothesis, not a result,
+/// and this project has sixteen consecutive live-set nulls behind it.
+fn presence_term(gs: &GameState, me: u8) -> f64 {
+    if std::env::var_os("V7_PRESENCE").is_none() {
+        return 0.0;
+    }
+    let mine = gs.seat_player(me).stage.stage.iter().filter(|id| **id >= 0).count();
+    let theirs = gs.seat_player(1 - me).stage.stage.iter().filter(|id| **id >= 0).count();
+    let occupancy: f64 = std::env::var("V7_PRESENCE_OCCUPANCY")
+        .ok()
+        .and_then(|v| v.parse().ok())
+        .filter(|w: &f64| w.is_finite())
+        .unwrap_or(5.0);
+    // Same discrete event as the C#: we are on board and they are not.
+    let mut result = 0.0;
+    if theirs == 0 && mine > 0 {
+        result += occupancy * 1000.0;
+    }
+    result + occupancy * (mine as f64 - theirs as f64)
+}
+
+impl Search<'_> {
     fn complete(&mut self, gs: &GameState, depth: usize) -> (f64, usize, &'static str) {
         if gs.game_result != GameResult::Ongoing {
             return (self.evaluate(gs), depth, "complete");
@@ -498,7 +726,7 @@ fn evaluate(&self, gs: &GameState) -> f64 {
             // This was a flat -1.0, on a scale where a good deploy is worth
             // 50-165 and coverage 60. So a line that simply ran out of budget
             // was crushed far below any resolved line, which biases the whole
-            // search against long chains — `V7_NODES=1` costs 2.3 points
+            // search against long chains  E`V7_NODES=1` costs 2.3 points
             // precisely because then EVERY leaf is penalised and the ordering
             // collapses. Same class as the baton-over-Pass tie-break that cost
             // 16.8 points: a hand-placed magnitude overriding the model's own
@@ -591,8 +819,8 @@ fn simulation_state(gs: &GameState, me: u8) -> GameState {
 /// tie-break preferring a baton over Pass was added to cure that symptom.
 ///
 /// Two measurements retire it. Restoring the full tie-break
-/// (`V7_FREE_BATON=1`) costs 14 points — 1563-2437 against a 2135-1865 default
-/// at 4000 games, reproducible — because it also lets a ZERO-COST baton beat
+/// (`V7_FREE_BATON=1`) costs 14 points  E1563-2437 against a 2135-1865 default
+/// at 4000 games, reproducible  Ebecause it also lets a ZERO-COST baton beat
 /// Pass even when it scores lower, which is a much broader override than the
 /// original fix. And the spiral it was written for is gone: v7's empty-Main
 /// rate is 11.1%, not 35%.
@@ -608,7 +836,7 @@ fn simulation_state(gs: &GameState, me: u8) -> GameState {
 ///
 /// NOTE: gating only `is_free_baton` is not enough. The `si == sb` clause
 /// fires on its own, so an earlier version of this change left the default
-/// behaviour byte-identical and measured a perfect null — the same dead-branch
+/// behaviour byte-identical and measured a perfect null  Ethe same dead-branch
 /// trap as `V7_LIVE_LEGACY`.
 fn is_free_baton(gs: &GameState, me: u8, action: &Action) -> bool {
     if !is_baton_action(gs, me, action) {
@@ -689,7 +917,7 @@ fn pick_best(gs: &GameState, me: u8, actions: &[Action], scores: &[(f64, String)
     best
 }
 
-/// Active blades on a seat's stage — the check's draw count, and the resource
+/// Active blades on a seat's stage  Ethe check's draw count, and the resource
 /// `useful_blades` prices.
 fn stage_blades_of(gs: &GameState, me: u8, db: &crate::card::CardDatabase) -> u32 {
     (gs.seat_player(me)
@@ -746,7 +974,7 @@ pub fn score_actions(gs: &GameState, actions: &[Action], me: u8) -> Vec<(f64, St
     //
     // `V7_ABILITY_TURNS=<lo>-<hi>` gates the refund to a turn window. This is
     // NOT a retune of the blanket version, which measured null (916-584 vs a
-    // 910-590 baseline, p=0.61, n=5000) — that one encouraged abilities on
+    // 910-590 baseline, p=0.61, n=5000)  Ethat one encouraged abilities on
     // every turn including T1, where a move-level analysis over 5000 traced
     // games shows the action is worth almost nothing:
     //
@@ -755,8 +983,8 @@ pub fn score_actions(gs: &GameState, actions: &[Action], me: u8) -> Vec<(f64, St
     //     use_ability|3-Main            lift +0.086
     //     use_ability|6-Main            lift +0.147
     //
-    // The association is correlational — v7 activates when its board is already
-    // good — but the gradient is monotone in turn for abilities and flat at
+    // The association is correlational  Ev7 activates when its board is already
+    // good  Ebut the gradient is monotone in turn for abilities and flat at
     // zero for turn-1 development, which is a specific and testable claim
     // rather than a general "use more".
     let ability_turns: Option<(u8, u8)> = std::env::var("V7_ABILITY_TURNS")
@@ -810,7 +1038,7 @@ pub fn score_actions(gs: &GameState, actions: &[Action], me: u8) -> Vec<(f64, St
         .filter(|value: &f64| value.is_finite() && *value >= 0.0)
         .unwrap_or(0.0);
     // MEASURED 2026-09-23: Pass=-0.05 + energy tax exploded draws
-    // (1569/3000, avg turns 3.7) — every UseAbility at score≈0 then beat
+    // (1569/3000, avg turns 3.7)  Eevery UseAbility at score≁E then beat
     // Pass and main never ended cleanly. Keep flat 0.0 (v6 doctrine).
     let mut scores = Vec::with_capacity(actions.len());
     for action in actions {
@@ -853,11 +1081,11 @@ pub fn score_actions(gs: &GameState, actions: &[Action], me: u8) -> Vec<(f64, St
             search.complete(&sim, 0)
         };
         // D1 baton vision: DETECT for logging/[BATON] marks, but do NOT add a
-        // flat bonus. MEASURED 2026-09-23 (seed 11, 3000×2): +45 → 39.5% vs
-        // v6 (folds 3.7%); +12 with ammo-guard → 50.5%; flat 0 → baseline.
-        // The `value()` development term (8× stage-cost growth) already prices
-        // discounted upgrades — a flat baton bonus double-counts and over-dumps
-        // the hand (live-set folds 0.3%→4.1% at +45).
+        // flat bonus. MEASURED 2026-09-23 (seed 11, 3000ÁE): +45 ↁE39.5% vs
+        // v6 (folds 3.7%); +12 with ammo-guard ↁE50.5%; flat 0 ↁEbaseline.
+        // The `value()` development term (8ÁEstage-cost growth) already prices
+        // discounted upgrades  Ea flat baton bonus double-counts and over-dumps
+        // the hand (live-set folds 0.3%ↁE.1% at +45).
         let baton = is_baton_action(gs, me, action);
         if !pending && action.action_type == ActionType::UseAbility && score <= 0.0 {
             score -= 0.01;
@@ -866,7 +1094,7 @@ pub fn score_actions(gs: &GameState, actions: &[Action], me: u8) -> Vec<(f64, St
         // in the Main phase development IS the objective. For an activation
         // that is wrong in a way that makes abilities unplayable: the member is
         // *consumed by design*, so the stage loses its cost and blades, and the
-        // term charges -8*4 = -32 plus -6*blades for it — while the ability's
+        // term charges -8*4 = -32 plus -6*blades for it  Ewhile the ability's
         // actual production (cards drawn, energy, hearts, blades granted) is
         // worth far less than 32 in `value()` units. The bot therefore scored
         // real abilities at -25 and declined them, which the move-level trace
@@ -891,7 +1119,7 @@ pub fn score_actions(gs: &GameState, actions: &[Action], me: u8) -> Vec<(f64, St
         // Check pressure: how much closer this action brings the board to
         // actually PASSING the next check, using the same 256-draw model that
         // `choose_live_set_experiment` uses to decide whether to set a life at
-        // all. `value()`'s `60 × Δpassable` is a one-ply coverage proxy and is
+        // all. `value()`'s `60 ÁEΔpassable` is a one-ply coverage proxy and is
         // blind to active blades, which are the deck draws the check reads.
         //
         // Deliberately a DELTA from the root pressure, for the same reason
@@ -913,7 +1141,7 @@ pub fn score_actions(gs: &GameState, actions: &[Action], me: u8) -> Vec<(f64, St
         // The measured prize: v7's committed live sets pass at 0.924 and v8's
         // at 0.485, with v8 holding MORE active blades (5.81 vs 4.95). Two
         // bots, the same game, and the one with more randomness is half as
-        // good at converting — because neither of them asks what the randomness
+        // good at converting  Ebecause neither of them asks what the randomness
         // is FOR. A blade drawn from a deck that holds none of the colours a
         // life needs is not a heart, it is a card you already had.
         //
@@ -953,12 +1181,12 @@ pub fn score_actions(gs: &GameState, actions: &[Action], me: u8) -> Vec<(f64, St
         // measured as one: enabling 28% more ability uses changed nothing
         // (v7 vs v6, 743 -> 752, p=0.35). The abilities v7 newly reached were
         // net-negative, because the refund was not asking whether an ability
-        // was worth using — only whether its member cost had been charged.
+        // was worth using  Eonly whether its member cost had been charged.
         //
-        // So: execute the ability (already done above — `sim` IS the resolved
+        // So: execute the ability (already done above  E`sim` IS the resolved
         // state) and ask what it did to the CONVERSION outlook, over several
         // turns, using the exact 256-draw check model. That is specific to the
-        // ability by construction — no two abilities produce the same resolved
+        // ability by construction  Eno two abilities produce the same resolved
         // board, and a draw, a search, an energy swing, +2 blades and a member
         // removal are all priced by what they actually buy rather than by a
         // shared discount. It is also why the forecast was inert as a
@@ -974,7 +1202,7 @@ pub fn score_actions(gs: &GameState, actions: &[Action], me: u8) -> Vec<(f64, St
         // tell them apart, and the cost was real: enabling ability use scaled
         // Rule 12-1 draws linearly with the weight (187 -> 267 draws, win rate
         // 816 -> 737 at n=1500). Thirty of 71 measured uses were member-
-        // consuming with no measurable production — repeat those and the stage
+        // consuming with no measurable production  Erepeat those and the stage
         // empties, the state stops changing, and the repetition protocol fires.
         //
         // So: read the ability's printed text, and only spend the Main phase on
@@ -982,7 +1210,7 @@ pub fn score_actions(gs: &GameState, actions: &[Action], me: u8) -> Vec<(f64, St
         // `Power` because they are what the check actually reads. An ability
         // that classifies as `Inactive` is pushed below Pass, because an
         // unreadable ability's loop risk cannot be priced.
-        // STRUCTURAL ABILITY GATE — binary, not a weight.
+        // STRUCTURAL ABILITY GATE  Ebinary, not a weight.
         //
         // Every policy that increased v7's ability use cost ~200 draws per 1500
         // games, at p as low as 0.00002, and three separate attempts produced
@@ -996,7 +1224,7 @@ pub fn score_actions(gs: &GameState, actions: &[Action], me: u8) -> Vec<(f64, St
         // ability a SECOND time on its own result and compare the two
         // positions with the engine's own state hash. Identical means the
         // ability has no persistent effect, and a no-op is worth nothing at any
-        // weight — it only spends a member, advances the repetition counter,
+        // weight  Eit only spends a member, advances the repetition counter,
         // and hands the turn back.
         //
         // Comparing state hashes rather than six aggregate counters is the
@@ -1013,8 +1241,7 @@ pub fn score_actions(gs: &GameState, actions: &[Action], me: u8) -> Vec<(f64, St
         //   refund=1.0, gate on  : 916-584  (baseline 910-590, p=0.61)
         // i.e. the first ability intervention that is not worse than v7.
         //
-        // Default ON, and it is a no-op on current play (910-590 either way) —
-        // it changes nothing until something actually pushes the bot to spend
+        // Default ON, and it is a no-op on current play (910-590 either way)  E        // it changes nothing until something actually pushes the bot to spend
         // an ability, and then it is the only thing standing between that and
         // 200 draws. Deliberately untunable: the question has a yes/no answer.
         if ability_noop_gate && action.action_type == ActionType::UseAbility {
@@ -1028,7 +1255,7 @@ pub fn score_actions(gs: &GameState, actions: &[Action], me: u8) -> Vec<(f64, St
                 score = score.min(-1000.0);
             }
         }
-        // QUALITATIVE ABILITY GATE — read off the printed card, no coefficient.
+        // QUALITATIVE ABILITY GATE  Eread off the printed card, no coefficient.
         //
         // Replaces `V7_ABILITY_CLASS`, which was tuning slop: a per-class
         // weight swept at 0.25/0.5/1.0, all three regressions, and still a
@@ -1036,10 +1263,10 @@ pub fn score_actions(gs: &GameState, actions: &[Action], me: u8) -> Vec<(f64, St
         // The card already says what the ability IS, so the decision is read
         // from the trigger marker instead of fitted to the arena:
         //
-        //   {{常時}} / {{自動}} / {{常駐}}  automatic — resolves on its own,
+        //   {{常晁E} / {{自動}} / {{常駐}}  automatic  Eresolves on its own,
         //     so spending a member on it is a category error. v7's favourite
         //     ability, 46 of 65 uses, is in this family.
-        //   {{起動}}                    activation — the only choosable kind.
+        //   {{起動}}                    activation  Ethe only choosable kind.
         //     Spend it when it produces blades, hearts, a draw or a search.
         //
         // On by default, and the switch is binary: `V7_ABILITY_QUAL=0`.
@@ -1103,7 +1330,7 @@ pub fn score_actions(gs: &GameState, actions: &[Action], me: u8) -> Vec<(f64, St
         if curve_debug && matches!(gs.turn_number, 1 | 2) && action.action_type != ActionType::Pass {
             // The opening curve is the one place with a guide number attached
             // (4 -> 9 -> 13) and it is behind: the bot sits at 3.8 / 7.6 / 11.2.
-            // This answers the question that decides where to look — is it not
+            // This answers the question that decides where to look  Eis it not
             // REACHING the band, or not being OFFERED the cards? If a cost-4
             // is in hand and affordable and v7 passes over it, this is a
             // Main-phase ranking bug. If no cost-4 is ever in hand and
