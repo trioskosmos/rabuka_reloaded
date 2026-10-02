@@ -205,14 +205,38 @@ heart05, so it cannot detect a bug folding `b_heartXX` into the colour filter. A
 `PL!S-sd1-003-SD` has heart02:1, heart04:2, heart05:1 — two colours at the exact minimum of 1,
 so it also catches a `>=2` mis-parse of すべて持つ.
 
-**C9. `PL!N-bp1-006-R＋`-class drain loops answer every prompt with index 0.**
-`while has_pending_choice() { SelectAutoAbility => skip, _ => select_indices(&[0]) }` in
-several files. A mistyped prompt is silently "accepted" and an optional prompt is answered as
-if mandatory. Prefer explicit per-type arms with a fallback that fails loudly.
+**C9. `while has_pending_choice() { … select_indices(&[0]) }` drain loops answer every prompt
+with index 0. A mistyped prompt is silently "accepted" and an optional prompt is answered as if
+mandatory. Prefer explicit per-type arms with a fallback that fails loudly.**
+
+Status 2026-10-02: **baselined and ratcheted, not closed.** There are **293 files / 651 sites**
+in this shape. Rewriting them is not a hygiene task, but letting the number grow is, so the form
+now has its own detector and baseline: `DRAIN_LOOP_RE` in `cards/test_inventory.py`,
+recorded in `engine/tests/DRAIN_LOOP_BASELINE.json`, and checked by
+`python cards/test_inventory.py --check`. The count may only go DOWN; the update flag is
+`--update-drain-loop-baseline`.
+
+This is deliberately a *second* ratchet rather than an extension of the existing one. The
+soft-guard ratchet only matches the `if …has_pending_choice() { … }` form, which is why 168
+files carrying this `while` form coexisted with a clean ratchet. Conflating the two would have
+hidden the second behind the first's zero. The `if` form itself is now at **0** across the
+corpus (was 14, all of them baselined-but-failing before 5caf67a9).
+
+Converting a site means: answer by prompt type, and let an unrecognised prompt fail loudly
+rather than fall through to index 0. `q159_debut_from_discard_self_cost_test.rs` is the
+worked example — it matched by type and dropped a discarded `try_select_indices` that could
+make no progress.
 
 **C10. `decline_pending_choices_with_limit(&mut g, 30)` sends `select_indices(&[])` to EVERY prompt**
 including non-skippable ones. Safe only where the final assertion is a hand-presence check that
-a parked prompt could not fake — which is a fragile thing to rely on.
+a parked prompt could not fake — which is a fragile thing to rely on.**
+
+Only 2 call sites remain. The failure mode this class describes was real and is now fixed at
+one of them: `revealed_hand_aqours_pl_s_sd1_009_sd_test.rs` used
+`if !game.has_pending_choice() { assert!(…); return }`, which accepted BOTH "no prompt" and "a
+prompt that was declined" — and returned early from the branch that skipped its deck-length
+assertion entirely. It now asserts that no prompt is raised at all, plus the blade that the
+printed 「これにより公開したカード」 gate withholds.
 
 ---
 

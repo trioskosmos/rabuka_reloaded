@@ -428,6 +428,23 @@ SOFT_GUARD_RE = re.compile(
 )
 SOFT_GUARD_BASELINE = ROOT / "engine" / "tests" / "SOFT_GUARD_BASELINE.json"
 
+# A SECOND, distinct pattern, tracked on its own ratchet so the two are never
+# conflated. The form above is `if …has_pending_choice() { … }`; this one is
+#
+#     while game.has_pending_choice() { … select_indices(&[0]) }
+#
+# — a drain loop that answers every prompt with index 0. The two share the
+# underlying hazard (a prompt that never arrives is indistinguishable from one
+# that was answered), but only the `if` form is caught by SOFT_GUARD_RE, which
+# is why 168 files could carry the `while` form with a clean ratchet.
+#
+# It is baselined rather than banned: rewriting 168 files is not a hygiene task,
+# but letting the count grow is. See docs/EDGE_CASE_FINDINGS.md C9.
+DRAIN_LOOP_RE = re.compile(
+    r"\bwhile\s+[A-Za-z_][\w\.]*\.has_pending_choice\(\)"
+)
+DRAIN_LOOP_BASELINE = ROOT / "engine" / "tests" / "DRAIN_LOOP_BASELINE.json"
+
 
 def count_soft_guards():
     """Per-file counts of soft-guard `if` sites across the test corpus."""
@@ -435,6 +452,17 @@ def count_soft_guards():
     for path in sorted((ROOT / "engine" / "tests").rglob("*.rs")):
         text = path.read_text(encoding="utf-8", errors="replace")
         n = len(SOFT_GUARD_RE.findall(text))
+        if n:
+            counts[str(path.relative_to(ROOT)).replace("\\", "/")] = n
+    return counts
+
+
+def count_drain_loops():
+    """Per-file counts of `while …has_pending_choice()` drain loops."""
+    counts = {}
+    for path in sorted((ROOT / "engine" / "tests").rglob("*.rs")):
+        text = path.read_text(encoding="utf-8", errors="replace")
+        n = len(DRAIN_LOOP_RE.findall(text))
         if n:
             counts[str(path.relative_to(ROOT)).replace("\\", "/")] = n
     return counts
@@ -479,6 +507,46 @@ def write_soft_guard_baseline():
     print(
         f"Wrote {SOFT_GUARD_BASELINE.relative_to(ROOT)} "
         f"({len(counts)} files, {total} soft-guard sites baselined)"
+    )
+
+
+def check_drain_loop_ratchet():
+    """Returns a list of violations for the `while …has_pending_choice()` form."""
+    current = count_drain_loops()
+    if not DRAIN_LOOP_BASELINE.exists():
+        return []
+    baseline = json.loads(DRAIN_LOOP_BASELINE.read_text(encoding="utf-8"))
+    violations = []
+    for path, n in sorted(current.items()):
+        allowed = baseline.get(path, 0)
+        if n > allowed:
+            violations.append(
+                f"{path}: {n} choice-drain loops (baseline allows {allowed}). "
+                "A `while has_pending_choice()` loop that answers every prompt "
+                "with index 0 cannot tell a mistyped prompt from a correct answer, "
+                "nor a skipped prompt from a mandatory one. Prefer explicit per-type "
+                "arms with a fallback that fails loudly (docs/EDGE_CASE_FINDINGS.md "
+                "C9); update engine/tests/DRAIN_LOOP_BASELINE.json ONLY when a site is "
+                "genuinely legitimate."
+            )
+    for path in sorted(baseline):
+        if path not in current and baseline[path] > 0:
+            print(
+                f"DRAIN LOOP ratchet: {path} dropped to 0 — remove it from the "
+                "baseline (python cards/test_inventory.py --update-drain-loop-baseline)"
+            )
+    return violations
+
+
+def write_drain_loop_baseline():
+    counts = count_drain_loops()
+    DRAIN_LOOP_BASELINE.write_text(
+        json.dumps(counts, indent=2, sort_keys=True) + "\n", encoding="utf-8"
+    )
+    total = sum(counts.values())
+    print(
+        f"Wrote {DRAIN_LOOP_BASELINE.relative_to(ROOT)} "
+        f"({len(counts)} files, {total} drain-loop sites baselined)"
     )
 
 
@@ -2818,10 +2886,19 @@ def main():
         action="store_true",
         help="re-record the soft-guard ratchet baseline (P0.3)",
     )
+    ap.add_argument(
+        "--update-drain-loop-baseline",
+        action="store_true",
+        help="re-record the `while has_pending_choice()` drain-loop baseline",
+    )
     args = ap.parse_args()
 
     if args.update_softguard_baseline:
         write_soft_guard_baseline()
+        return 0
+
+    if args.update_drain_loop_baseline:
+        write_drain_loop_baseline()
         return 0
 
     inv = build_inventory()
@@ -2962,6 +3039,9 @@ def main():
                 ok = False
         for violation in check_soft_guard_ratchet():
             print(f"SOFT GUARD RATCHET FAIL: {violation}", file=sys.stderr)
+            ok = False
+        for violation in check_drain_loop_ratchet():
+            print(f"DRAIN LOOP RATCHET FAIL: {violation}", file=sys.stderr)
             ok = False
         sys.exit(0 if ok else 1)
 

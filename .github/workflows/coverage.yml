@@ -66,6 +66,24 @@ jobs:
             || { echo "::error::effect_decoder_gen.rs is stale or hand-edited. Run: python cards/generate_effect_decoder.py"; exit 1; }
           echo "Generated decoders are up-to-date."
 
+      - name: Generated ability bytecode is fresh
+        run: |
+          # abilities_gen.rs is AUTO-GENERATED from abilities.json by
+          # compile_abilities.py, and it is the file the engine actually bakes its
+          # abilities from. The decoder step above covers the two decoder files, but
+          # nothing covered this one, so a hand-edit — or a stale blob left behind
+          # after an abilities.json change — passed CI and then silently disagreed
+          # with the card data the rest of the suite reads.
+          #
+          # cards_gen.rs is deliberately NOT checked here: it is gitignored
+          # (.gitignore:208), so it is a local build artifact rather than a
+          # reviewable file, and hand-editing it has no effect on anyone else.
+          (cd cards && python ability_extraction/extract_card_abilities.py > /dev/null)
+          (cd cards && python compile_abilities.py > /dev/null)
+          git diff --exit-code -- engine/src/ability/abilities_gen.rs \
+            || { echo "::error::abilities_gen.rs is stale or hand-edited. Run: python cards/ability_extraction/extract_card_abilities.py && python cards/compile_abilities.py"; exit 1; }
+          echo "Generated ability bytecode is up-to-date."
+
       - name: Summary
         run: |
           echo "Docs generated:"
