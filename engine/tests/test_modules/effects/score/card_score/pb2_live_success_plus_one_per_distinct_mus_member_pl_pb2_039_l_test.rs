@@ -18,17 +18,40 @@
 //! The effect parses correctly: `modify_score` +1, `per_unit`, `per_unit_type: "人"`,
 //! `card_type: member_card`, `group_names: ["μ's"]`, `distinct: card_name`.
 //!
-//! But it never fires — every positive case yields +0, whether the μ's members are on
-//! the stage or revealed, and whether one or three distinct names. **This is a general
-//! gap, not specific to this card**: `PL!HS-bp2-020-L` (蓮ノ空, ライブ開始時, same
-//! shape — `人` + group + `distinct: card_name`) also returns +0, and it has no test
-//! either. `modify_score` combined with `per_unit` appears 11 times in the corpus and
-//! none of the group-filtered ones is covered.
+//! **The positive is still missing, and the reason is now narrower than it was.** Two
+//! separate causes were stacked, and the first one masked the second:
 //!
-//! What IS pinned below are the cases that hold today: the effect never over-fires. The
-//! 「names differ」「μ's」 and 「stage ∪ revealed」 clauses are documented here as
-//! untested rather than asserted, because the per-unit score path returns 0 for all of
-//! them and there is no correct positive value to pin yet.
+//! 1. *(fixed here)* The harness's premise was wrong. It injected a Heart00 wildcard
+//!    of 20 and commented that this "guarantees the live succeeds". It does not:
+//!    `check_heart_requirement` rejects the whole set when
+//!    `total_provided < total_required`, and this live needs heart01 9 + heart03 9 +
+//!    heart06 9 = 27. The ライブ成功時 window therefore stayed CLOSED,
+//!    `trigger_live_success_abilities` returned at its first guard, and every score read
+//!    0. That is why the author concluded the per-unit path "never fires" — and why the
+//!    `live_success_no_premise` signal flagged this file. The amount is now derived from
+//!    the card's own need_heart, and the window is asserted, so a 0 from here on is
+//!    attributable to the effect rather than to the gate.
+//!
+//! 2. *(still open)* With the window open the score is STILL 0, so there is a second
+//!    defect underneath. What is established: the card carries two abilities, the
+//!    second is `LiveSuccess` + `ModifyScore`, the scan finds it and logs
+//!    `trigger=trigger_live_success,result=result_success`, and the dispatch completes.
+//!    So the loss is inside `execute_modify_score`, not in the trigger scan — most
+//!    likely `resolve_per_unit_count` returning 0, since `final_value = value *
+//!    effective_units` and 0 units means +0.
+//!
+//!    Two suspects in `effects/score.rs`, neither acted on because neither is proven:
+//!    * `candidate_ids` selects stage members whenever `card_type == "member_card"`,
+//!      which is BACKWARDS here — `card_type` names the units being COUNTED, while the
+//!      score belongs to 「このカード」, a live. That branch looks wrong on its face.
+//!    * the filter built at the top of the same function may not carry
+//!      `group_names: ["μ's"]` into `filter.group`, which would make the μ's clause
+//!      match everything rather than nothing — so this one probably is not it.
+//!
+//!    The positive cases stay absent rather than being written to assert 0. `asserting
+//!    0 here would pin the bug, and a test that documents a defect is the class this
+//!    repo's whole quality inventory exists to catch. What IS pinned below are the cases
+//!    that hold today: the effect never over-fires.
 //!
 //! See docs/PBLL02_ABILITY_REVIEW.md §8.3.
 
@@ -69,12 +92,48 @@ fn score_with(stage: &[&str], revealed: &[&str]) -> i16 {
     }
     game.state.player1.live_card_zone.cards.push(hikari);
 
-    // Heart00 wildcard guarantees the live succeeds, so the effect always gets a turn.
+    // Heart00 is a colorless WILDCARD, so it satisfies any colour's requirement -
+    // but check_heart_requirement still checks the SUM first
+    // (`if total_provided < total_required { return false }`). This live needs
+    // heart01 9 + heart03 9 + heart06 9 = 27, and the harness used to inject 20.
+    // 20 < 27, the window stayed CLOSED, trigger_live_success_abilities dispatched
+    // nothing, and every score read 0 - which is why this file recorded the effect as
+    // "never fires" when the effect was never reached.
+    //
+    // The amount is DERIVED from the card rather than hardcoded, so a data change to
+    // 039's need_heart cannot silently close the window again.
+    let need_total: u8 = game
+        .db
+        .get_card(hikari)
+        .and_then(|c| c.need_heart.as_ref())
+        .map(|nh| nh.hearts.values().copied().fold(0u8, |a, b| a.saturating_add(b)))
+        .unwrap_or(0);
+    assert!(
+        need_total > 0,
+        "precondition: 僕たちはひとつの光 must print a need_heart, or this harness \
+         has nothing to satisfy"
+    );
     let mut h = BaseHeart { hearts: HeartMap::new() };
-    h.hearts.insert(HeartColor::Heart00, 20);
+    h.hearts.insert(HeartColor::Heart00, need_total);
     game.state.player1.stage_hearts = Some(h);
 
     game.state.current_phase = Phase::LiveVictoryDetermination;
+
+    // The ライブ成功時 window must be OPEN, or `trigger_live_success_abilities`
+    // dispatches nothing at all and every score below reads 0 for a reason that has
+    // nothing to do with the effect. That is exactly what the harness could not tell
+    // before: a score of 0 was indistinguishable from a live that never fired, which
+    // is why the per-unit clause was recorded as "never fires" without anyone knowing
+    // whether the effect or the gate was at fault.
+    //
+    // Asserted here rather than left implicit, so the +0 this file observes is
+    // attributable to the effect and not to the window.
+    assert!(
+        game.state.should_trigger_live_success(&game.state.player1),
+        "precondition: the Heart00 wildcard must open the ライブ成功時 window, \
+         otherwise nothing is dispatched and every assertion below passes vacuously"
+    );
+
     TurnEngine::trigger_live_success_abilities(&mut game.state, "p1");
     game.state.process_pending_auto_abilities("p1");
     let _ = game.drain_auto_ability_choices();
