@@ -449,7 +449,26 @@ impl<'a> ConditionContext<'a> {
                             state,
                         )
                     };
-                    if has_filter {
+                    // Three distinct shapes, and the third used to be read as the
+                    // first. `has_filter` is forced false whenever the condition
+                    // says it is about 自己, so the old `if has_filter {…} else
+                    // {activating card}` collapsed "explicitly self" together with
+                    // "no filter at all" and answered both with the activating
+                    // card.
+                    //
+                    // 「自分のステージのメンバーがウェイト状態」 states no group, no
+                    // card type and no self_target, and means ANY member in that
+                    // state. Answering it about the activating card is a plausible
+                    // wrong answer rather than a failure: the copy that triggered it
+                    // satisfies its own condition.
+                    //
+                    // No card in the corpus produces that shape — all ten
+                    // stage-state conditions carry a group or a card type — so this
+                    // is the default, not a fix to current output.
+                    if is_self {
+                        self.activating_card_id
+                            .is_some_and(|cid| stage_cards.contains(&cid) && check_orientation(cid))
+                    } else if has_filter {
                         stage_cards.iter().any(|&cid| {
                             check_orientation(cid)
                                 && self.card_matches_count_filters(
@@ -464,8 +483,7 @@ impl<'a> ConditionContext<'a> {
                                 )
                         })
                     } else {
-                        self.activating_card_id
-                            .is_some_and(|cid| stage_cards.contains(&cid) && check_orientation(cid))
+                        stage_cards.iter().any(|&cid| check_orientation(cid))
                     }
                 }
                 _ => true,

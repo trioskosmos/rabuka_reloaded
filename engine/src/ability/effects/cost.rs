@@ -382,6 +382,23 @@ impl AbilityResolver {
             "{} {}: [[log_activation_cost:op={},value={}]]",
             pp, act_name, operation, value
         ));
+        // The effect TYPE is the stable `activation_cost_<operation>`; the value
+        // belongs in the prohibition entry and the description, not in the type.
+        //
+        // Both allowlists that have to recognise this are keyed on the bare name —
+        // `is_revertable_effect_type` matches "activation_cost_increase" exactly, and
+        // `revert_expired_effect` matches the same pair — so registering
+        // "activation_cost_increase_2" missed both. The effect then logged "its
+        // modifiers will LEAK past expiry" and, on expiry, fell through every revert
+        // arm: the prohibition stayed for the rest of the game.
+        //
+        // The revert removes the entry with `retain(|p| !p.contains(effect_type))`,
+        // a substring test, so the stable type still matches the value-carrying
+        // prohibition string. (That looseness means two activation-cost prohibitions
+        // with different values would both be dropped when one expires. No card in
+        // the corpus has an `activation_cost` effect at all, so it does not arise
+        // yet; the value belongs in `effect_data` if it ever does.)
+        let effect_type = format!("activation_cost_{}", operation);
         let prohibition_text = format!("activation_cost_{}_{}", operation, value);
         match target {
             "self" | "opponent" => {
@@ -391,7 +408,7 @@ impl AbilityResolver {
         }
         util::push_temporary_effect(
             gs,
-            &format!("activation_cost_{}_{}", operation, value),
+            &effect_type,
             duration,
             target,
             &format!("Modify activation cost by {} {}", operation, value),
