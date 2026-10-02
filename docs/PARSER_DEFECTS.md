@@ -67,15 +67,39 @@ captured. The identical wording parses correctly elsewhere (`PL!HS-pb1-008` → 
 no `count`), so the quantifier is lost on the 「その後」 follow-up path specifically.
 Effect: taps 3 members instead of all of them.
 
-### D3 — an OR of two payment options parsed as a mandatory two-step sequence
+### D3 — an OR of two payment options parsed as a mandatory two-step sequence — **FIXED 2026-10-02**
 **Card** `PL!-pb2-012-P＋` / `-R` 南ことり (ab#1)
-**Printed:** 「この能力を起動するための**追加コストとして、手札を2枚控え室に置くか**、**『Printemps』の
-メンバーを2人ウェイトにする**。」
-**Parsed:** a `sequential` whose legs are discard-2 **then** wait-2 — so the player must do
-*both*. It also fell out of the `cost` object entirely, so it is modelled as an effect step
-*after* the card's own cost rather than as a cost.
-Affects the same card whose play-cost WAIT is already flagged as untested
-(`EDGE_CASE_FINDINGS.md` C5).
+**Printed:** 「このメンバーをウェイトにする：この能力を起動するための**追加コストとして、手札を2枚控え室に置くか**、**『Printemps』のメンバーを2人ウェイトにする**。自分の控え室から『Printemps』のライブカードを1枚手札に加える。」
+**Was parsed as:** a `sequential` whose legs are discard-2 **then** wait-2 — so the player
+had to do *both*. It had also fallen out of the `cost` object entirely, so it was
+modelled as an effect step *after* the card's own cost rather than as a cost.
+**Now:** `cost` is a `sequential_cost` of two steps — the declared
+「このメンバーをウェイトにする」 self-wait, then a `choice_condition` with the two
+printed payments as options. The effect is the recover step alone.
+
+Two changes made this possible:
+* `parser.py::split_cost_effect` now pulls a 「追加コストとして、」 clause out of the
+  effect side and into the cost, ending the clause at the first depth-0 「。」. Without
+  this the 「：」 convention sent the whole sentence to `parse_effect`.
+* `cost_parser.py::_cost_additional_clause` builds the two-step cost. It runs ahead of
+  `_cost_verb_choice`, which could not have repaired it: `_cost_verb_choice` reads the
+  whole cost text, and at that point the text still begins with the declared
+  「このメンバーをウェイトにする」, so its 「か」 is never a joiner.
+
+**This exposed a matching engine gap, also fixed.** `ChoiceRoute::ChoiceCost` was written
+by the cost handler but read nowhere, so answering the cost-option prompt resolved the
+selection against the **cost root** — the self-wait step — and failed with "No matching
+members on stage to change state". `handle_choice_condition` now locates the actual
+`ChoiceCondition` step (`pending_choice_cost_options`) instead of assuming the root is
+the choice, which is what nested-in-a-`sequential` costs require.
+
+Tests: `engine/tests/.../cost/additional_cost_choice/pb2_kidou_additional_cost_discard_two_or_wait_two_printemps_pl_pb2_012_p_plus_test.rs`
+(5 tests) and `cards/ability_extraction/tests/test_parser_defects.py::test_d3_additional_cost_choice_is_a_cost_not_effect_steps`.
+
+Still open on this card: the recover step needs a `『Printemps』のライブカード`, and the
+card pool has none — every `-SRL` live card is μ's or Liella!, so that step cannot be
+exercised and the tests assert nothing about it.
+
 
 ### D4 — an effect inherits its own condition's area and character names
 **Card** `PL!-pb2-042-L` PSYCHIC FIRE

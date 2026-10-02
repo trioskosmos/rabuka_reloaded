@@ -159,6 +159,68 @@ def _choice_cost(text, parts):
     }
 
 
+# 「この能力を起動するための追加コストとして、」 introduces a second cost. The
+# marker keeps its trailing comma so the option text is split off after it.
+_ADDITIONAL_COST_MARKER = "追加コストとして、"
+
+# A 「か」 that joins two payment options. Reusing the verb list from
+# _cost_verb_choice keeps one definition of "a cost clause ends in a verb".
+_COST_OPTION_JOINER = re.compile(r"(.*(?:支払う|置く|加える|公開する))か(.+)")
+
+
+@_register_cost
+def _cost_additional_clause(text, cost):
+    """「<declared>：この能力を起動するための追加コストとして、Aか、B」
+
+    Two things are wrong without this handler (parser defect D3,
+    PL!-pb2-012-P＋ 南ことり's 起動):
+
+    * the additional cost was never a cost at all — it sat in the effect as
+      the first leg of a `sequential`, so it ran AFTER the card's own cost and
+      never appeared in `cost`;
+    * its 「か」 is a choice between two payments, but it arrived as a
+      two-step sequence, so the player had to pay BOTH.
+
+    `_cost_verb_choice` cannot repair either on its own: it reads the whole
+    cost text, and at that point the text still begins with the declared
+    「このメンバーをウェイトにする」, so it never sees the 「か」 as a joiner.
+
+    The result is the corpus's own multi-cost shape — `sequential_cost` with a
+    `costs` list (cf. PL!-bp5-003-AR) whose second leg is the `choice_condition`
+    the engine's `ChoiceRoute::ChoiceCost` already knows how to prompt for.
+    """
+    marker_at = text.find(_ADDITIONAL_COST_MARKER)
+    if marker_at < 0:
+        return None
+    declared = text[:marker_at].rstrip("：:、 ").strip()
+    additional = text[marker_at + len(_ADDITIONAL_COST_MARKER) :].strip()
+    if not declared or not additional:
+        return None
+
+    joiner = _COST_OPTION_JOINER.search(additional)
+    if not joiner:
+        return None
+    first = additional[: additional.find("か", additional.find(joiner.group(1)))].strip()
+    second = joiner.group(2).strip("、。 ")
+    if not first or not second:
+        return None
+
+    options = [parse_cost(first), parse_cost(second)]
+    if any(option.get("type") in (None, "custom") for option in options):
+        # Not a real payment pair after all — let a later handler try.
+        return None
+    choice = {
+        "text": additional,
+        "type": "choice_condition",
+        "options": options,
+    }
+
+    declared_cost = parse_cost(declared)
+    if declared_cost.get("type") in (None, "custom"):
+        return choice
+    return {"text": text, "type": "sequential_cost", "costs": [declared_cost, choice]}
+
+
 @_register_cost
 def _cost_verb_choice(text, cost):
     match = re.search(r"(.*(?:支払う|置く|加える|公開する))か(.+)", text)

@@ -208,6 +208,63 @@ def test_d6_alternative_condition_inherits_card_property():
 # ─── D7: OR branches of one clause share the clause's zone/owner/type ───
 
 
+# ─── D3: an 「追加コスト」 with a 「か」 is a cost CHOICE, not two effect steps ───
+
+
+def test_d3_additional_cost_choice_is_a_cost_not_effect_steps():
+    """PL!-pb2-012-P＋: pay EITHER 2 hand cards OR 2 Printemps members.
+
+    「このメンバーをウェイトにする：この能力を起動するための追加コストとして、手札を2枚
+    控え室に置くか、『Printemps』のメンバーを2人ウェイトにする」 — the 追加コスト clause is
+    a second COST, and its 「か」 is a choice. It arrived as the first leg of a
+    `sequential` inside the effect, which was wrong twice over: it ran as an effect
+    step rather than as part of paying for the activation, and the 「か」 became a
+    sequence so the player had to pay BOTH payments.
+    """
+    data = load()
+    found = 0
+    for u in data["unique_abilities"]:
+        text = u.get("triggerless_text") or ""
+        if "追加コスト" not in text:
+            continue
+        found += 1
+        cost = u.get("cost")
+        effect = u.get("effect")
+        assert isinstance(cost, dict), (
+            "the 追加コスト clause must land in `cost`, not the effect: "
+            f"{json.dumps(u, ensure_ascii=False)[:400]}"
+        )
+        assert cost.get("type") == "sequential_cost", (
+            "the declared cost and the additional cost are two payments: "
+            f"{json.dumps(cost, ensure_ascii=False)}"
+        )
+        steps = cost.get("costs") or []
+        assert len(steps) == 2, f"expected 2 cost steps, got {len(steps)}: {steps!r}"
+        assert steps[0].get("state_change") == "wait", (
+            "step 1 is the declared 「このメンバーをウェイトにする」: "
+            f"{json.dumps(steps[0], ensure_ascii=False)}"
+        )
+        choice = steps[1]
+        assert choice.get("type") == "choice_condition", (
+            "step 2 must be the CHOICE between two payments, so the 「か」 is not read as a "
+            f"sequence: {json.dumps(choice, ensure_ascii=False)}"
+        )
+        options = choice.get("options") or []
+        assert len(options) == 2, f"two printed payment options, got {options!r}"
+        assert "控え室" in (options[0].get("text") or ""), (
+            f"option 1 is the hand discard: {options[0]!r}"
+        )
+        assert "ウェイト" in (options[1].get("text") or ""), (
+            f"option 2 is the member wait: {options[1]!r}"
+        )
+        # The two payments must not survive anywhere in the effect as steps.
+        assert not isinstance(effect, dict) or effect.get("action") != "sequential", (
+            "the effect must be the recover step alone; the payment options must not be "
+            f"effect steps any more: {json.dumps(effect, ensure_ascii=False)[:300]}"
+        )
+    assert found, "expected the 追加コスト ability on PL!-pb2-012-P＋"
+
+
 def test_d7_or_branches_share_zone_owner_and_card_type():
     """PL!-pb2-037-L: 「すべて『BiBi』」 is about the revealed member cards.
 

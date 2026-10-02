@@ -18,11 +18,11 @@ file), NOT verified assertions — see TEST_COVERAGE.md for depth semantics.
 | [debut_move_cards](#debut_move_cards) | 58 | 58 | 1 |
 | [constant_conditional_gain](#constant_conditional_gain) | 50 | 50 | 45 |
 | [live_success_move_cards](#live_success_move_cards) | 41 | 41 | 1 |
+| [activation_move_cards](#activation_move_cards) | 34 | 34 | 1 |
 | [other:ライブ開始時:modify_score](#other:ライブ開始時:modify_score) | 34 | 34 | 1 |
 | [debut_change_state](#debut_change_state) | 33 | 33 | 1 |
-| [activation_move_cards](#activation_move_cards) | 33 | 33 | 1 |
 | [live_success_score](#live_success_score) | 31 | 31 | 1 |
-| [other:起動:sequential](#other:起動:sequential) | 28 | 28 | 1 |
+| [other:起動:sequential](#other:起動:sequential) | 27 | 27 | 1 |
 | [other:ライブ成功時:sequential](#other:ライブ成功時:sequential) | 24 | 24 | 1 |
 | [other:常時:gain_resource](#other:常時:gain_resource) | 23 | 23 | 1 |
 | [auto_gain](#auto_gain) | 22 | 22 | 1 |
@@ -681,6 +681,49 @@ Triggers: ライブ成功時 — 41/41 L0-covered.
 | `PL!HS-cl1-012` | L2+choice | 2 | {{live_success.png/ライブ成功時}}自分と相手のライブの合計スコアが同じ場合、エールにより公開された自分のカードの中から、コスト9以上のメンバーカードを1枚手札に加える。 |
 | `PL!S-bp7-019` | L2+choice | 2 | {{live_success.png/ライブ成功時}}自分の控え室から『Aqours』のカードを2枚まで好きな順番でデッキの下に置く。 |
 
+## activation_move_cards
+
+Triggers: 起動 — 34/34 L0-covered.
+
+### variant: True — 34 abilities
+
+| Card | Depth | Tests | Text |
+|---|---|---|---|
+| `PL!HS-pb1-002` | L2+choice | 123 | {{kidou.png/起動}}{{turn1.png/ターン1回}}手札の「村野さやか」のメンバーカードを1枚公開する：これにより公開したカードをこのメンバーの下に置く。 |
+| `PL!-sd1-008` | L2+choice | 120 | {{kidou.png/起動}}{{turn1.png/ターン1回}}{{icon_energy.png/E}}{{icon_energy.png/E}}：自分のデッキの上からカードを10枚控え室に置く。 |
+| `PL!-PR-003` | L2+choice | 81 | {{kidou.png/起動}}{{turn1.png/ターン1回}}手札を2枚控え室に置く：自分の控え室から必要ハートに{{heart_03.png/heart03}}を3以上含むライブカードを1枚手札に加える。 |
+| `PL!HS-bp1-002` | L2+choice | 72 | {{kidou.png/起動}}{{icon_energy.png/E}}{{icon_energy.png/E}}、このメンバーをステージから控え室に置く：自分の控え室からコスト15以下の『蓮ノ空』のメンバーカードを1枚、このメンバーがいたエリアに登場させる |
+| `PL!HS-bp1-002` | L2+choice | 72 | {{kidou.png/起動}}{{icon_energy.png/E}}{{icon_energy.png/E}}このメンバーをステージから控え室に置く：自分の控え室からコスト15以下の『蓮ノ空』のメンバーカードを1枚、このメンバーがいたエリアに登場させる。 |
+| `PL!SP-bp5-111` | L2+choice | 64 | {{kidou.png/起動}}{{turn1.png/ターン1回}}エネルギー2枚をエネルギーデッキに置く：自分の控え室にあるライブカードを1枚手札に加える。 |
+| `PL!S-sd1-007` | L2+choice | 64 | {{kidou.png/起動}}{{turn1.png/ターン1回}}手札を2枚控え室に置く：自分の控え室から{{icon_score.png/スコア}}を持つ『Aqours』のライブカードを1枚手札に加える。 |
+| `PL!HS-bp1-003` | L2+choice | 57 | {{kidou.png/起動}}{{turn1.png/ターン1回}}{{icon_energy.png/E}}：自分の控え室から4コスト以下の『蓮ノ空』のメンバーカードを1枚手札に加える。 |
+| `PL!HS-bp5-001` | L2+choice | 54 | {{kidou.png/起動}}{{turn1.png/ターン1回}}{{icon_energy.png/E}}{{icon_energy.png/E}}手札のライブカードを1枚公開する：自分の控え室から、これにより公開したカードのカード名がすべて含まれるライ |
+| `PL!N-bp1-002` | L2+choice | 35 | {{kidou.png/起動}}{{icon_energy.png/E}}{{icon_energy.png/E}}手札を1枚控え室に置く：このカードを控え室からステージに登場させる。この能力は、このカードが控え室にある場合のみ起動できる。 |
+| `PL!N-pb1-011` | L2+choice | 33 | {{kidou.png/起動}}{{turn1.png/ターン1回}}自分のエネルギー置き場にあるエネルギー1枚をこのメンバーの下に置く：自分の控え室から『虹ヶ咲』のライブカードを1枚手札に加える。 (メンバーがステージから離れたとき、下に置かれているエネルギ |
+| `PL!S-sd1-005` | L2+choice | 26 | {{kidou.png/起動}}{{turn1.png/ターン1回}}{{icon_energy.png/E}}{{icon_energy.png/E}}手札を1枚控え室に置く：自分の控え室から『Aqours』のライブカードを1枚手札に加える。 |
+| `PL!N-bp1-012` | L2+choice | 23 | {{kidou.png/起動}}{{turn1.png/ターン1回}}{{icon_energy.png/E}}{{icon_energy.png/E}}{{icon_energy.png/E}}：自分の控え室からライブカードを1枚手札に加える。 |
+| `PL!N-sd1-005` | L2+choice | 19 | {{kidou.png/起動}}{{turn1.png/ターン1回}}手札を2枚控え室に置く：自分の控え室から『虹ヶ咲』のメンバーカードを1枚手札に加える。 |
+| `PL!N-sd1-007` | L2+choice | 19 | {{kidou.png/起動}}{{turn1.png/ターン1回}}手札を2枚控え室に置く：自分の控え室から『虹ヶ咲』のライブカードを1枚手札に加える。 |
+| `PL!N-bp7-010` | L2+choice | 18 | {{kidou.png/起動}}{{turn1.png/ターン1回}}エネルギー置き場にあるエネルギー1枚をこのメンバーの下に置く：自分の控え室からコスト2以下の『虹ヶ咲』のメンバーカードを1枚、メンバーのいないエリアにウェイト状態で登場させる。（この効果で登 |
+| `PL!N-bp1-008` | L2+choice | 15 | {{kidou.png/起動}}{{turn1.png/ターン1回}}手札のメンバーカードを1枚控え室に置く：自分の控え室から、これにより控え室に置いたメンバーカードより、コストの低いメンバーカードを1枚手札に加える。 |
+| `PL!N-bp3-004` | L2+choice | 14 | {{kidou.png/起動}}{{turn1.png/ターン1回}}このメンバーをウェイトにし、手札を1枚控え室に置く：自分の控え室から『虹ヶ咲』のライブカードを1枚手札に加える。 |
+| `PL!N-bp5-014` | L2+choice | 14 | {{kidou.png/起動}}{{turn1.png/ターン1回}}{{icon_energy.png/E}}{{icon_energy.png/E}}手札を1枚控え室に置く：自分の控え室から『虹ヶ咲』のライブカードを1枚手札に加える。 |
+| `PL!HS-bp1-004` | L2+choice | 13 | {{kidou.png/起動}}{{turn1.png/ターン1回}}{{icon_energy.png/E}}{{icon_energy.png/E}}{{icon_energy.png/E}}：自分の控え室から『蓮ノ空』のライブカードを1枚手札に加える。 |
+| `PL!-bp4-002` | L2+choice | 12 | {{kidou.png/起動}}{{turn1.png/ターン1回}}手札を2枚控え室に置く：自分の控え室から『μ's』のライブカードを1枚手札に加える。この能力は、自分の成功ライブカード置き場にあるカードのスコアの合計が６以上の場合のみ起動できる。 |
+| `PL!-pb2-012` | L2+choice | 12 | {{kidou.png/起動}}{{turn1.png/ターン1回}}このメンバーをウェイトにする：この能力を起動するための追加コストとして、手札を2枚控え室に置くか、『Printemps』のメンバーを2人ウェイトにする。自分の控え室から『Printemps』 |
+| `PL!-bp4-002` | L2+choice | 12 | {{kidou.png/起動}}{{turn1.png/ターン1回}}手札を2枚控え室に置く：自分の控え室から『μ's』のライブカードを1枚手札に加える。この能力は、自分の成功ライブカード置き場にあるカードのスコアの合計が6以上の場合のみ起動できる。 |
+| `PL!HS-bp2-001` | L2+choice | 11 | {{kidou.png/起動}}{{turn1.png/ターン1回}}{{icon_energy.png/E}}{{icon_energy.png/E}}：自分の控え室からスコア3以下の『蓮ノ空』のライブカードを1枚手札に加える。 |
+| `PL!HS-bp5-002` | L2+choice | 8 | {{kidou.png/起動}}{{turn1.png/ターン1回}}{{icon_energy.png/E}}{{icon_energy.png/E}}：自分の控え室からコスト2以下のメンバーカードを1枚、メンバーのいないエリアに登場させる。 |
+| `PL!S-bp6-008` | L2+choice | 8 | {{kidou.png/起動}}{{icon_energy.png/E}}{{icon_energy.png/E}}このメンバーをステージから控え室に置く：自分の控え室からコスト17以下の『Aqours』のメンバーカードを1枚、このメンバーがいたエリアに登場さ |
+| `PL!-PR-004` | L2+choice | 7 | {{kidou.png/起動}}{{turn1.png/ターン1回}}手札を2枚控え室に置く：自分の控え室から必要ハートに{{heart_01.png/heart01}}を3以上含むライブカードを1枚手札に加える。 |
+| `PL!-bp5-009` | L2+choice | 5 | {{kidou.png/起動}}{{turn1.png/ターン1回}}手札を2枚控え室に置く：自分の控え室から必要ハートに{{heart_06.png/heart06}}を3以上含むライブカードを1枚手札に加える。 |
+| `PL!SP-bp4-010` | L2+choice | 5 | {{kidou.png/起動}}{{turn1.png/ターン1回}}{{icon_energy.png/E}}このメンバーをウェイトにする：自分のエネルギーデッキから、エネルギーカードを1枚ウェイト状態で置く。 |
+| `PL!N-sd2-001` | L2+choice | 5 | {{kidou.png/起動}}{{turn1.png/ターン1回}}{{icon_energy.png/E}}{{icon_energy.png/E}}：自分の控え室から『虹ヶ咲』のライブカードを1枚手札に加える。 |
+| `PL!SP-sd1-011` | L2+choice | 4 | {{kidou.png/起動}}{{turn1.png/ターン1回}}{{icon_energy.png/E}}{{icon_energy.png/E}}：自分のエネルギーデッキから、エネルギーカードを1枚ウェイト状態で置く。 |
+| `PL!HS-bp6-016` | L2+choice | 4 | {{kidou.png/起動}}{{turn1.png/ターン1回}}{{icon_energy.png/E}}{{icon_energy.png/E}}{{icon_energy.png/E}}{{icon_energy.png/E}}：自分の控え室からコス |
+| `PL!SP-sd2-006` | L2+choice | 3 | {{kidou.png/起動}}{{turn1.png/ターン1回}}{{icon_energy.png/E}}{{icon_energy.png/E}}手札を1枚控え室に置く：自分の控え室から『Liella!』のライブカードを1枚手札に加える。 |
+| `PL!SP-bp5-021` | L1+choice | 2 | {{kidou.png/起動}}このメンバーをステージから控え室に置く：自分のエネルギーが6枚以上ある場合、自分のエネルギーデッキから、エネルギーカードを1枚ウェイト状態で置く。 |
+
 ## other:ライブ開始時:modify_score
 
 Triggers: ライブ開始時 — 34/34 L0-covered.
@@ -766,48 +809,6 @@ Triggers: ライブ開始時, 登場 — 33/33 L0-covered.
 | `PL!HS-bp6-013` | L2+choice | 2 | {{toujyou.png/登場}}/{{live_start.png/ライブ開始時}}相手のステージにいる元々持つ{{icon_blade.png/ブレード}}の数が3つ以下の『DOLLCHESTRA』以外のメンバー1人をウェイトにする。 |
 | `PL!S-bp6-001` | L2 | 1 | {{toujyou.png/登場}}控え室から登場している場合、相手のステージの右サイドエリアか左サイドエリアにいるコスト13以上のメンバー1人をウェイトにする。 |
 
-## activation_move_cards
-
-Triggers: 起動 — 33/33 L0-covered.
-
-### variant: True — 33 abilities
-
-| Card | Depth | Tests | Text |
-|---|---|---|---|
-| `PL!HS-pb1-002` | L2+choice | 123 | {{kidou.png/起動}}{{turn1.png/ターン1回}}手札の「村野さやか」のメンバーカードを1枚公開する：これにより公開したカードをこのメンバーの下に置く。 |
-| `PL!-sd1-008` | L2+choice | 120 | {{kidou.png/起動}}{{turn1.png/ターン1回}}{{icon_energy.png/E}}{{icon_energy.png/E}}：自分のデッキの上からカードを10枚控え室に置く。 |
-| `PL!-PR-003` | L2+choice | 81 | {{kidou.png/起動}}{{turn1.png/ターン1回}}手札を2枚控え室に置く：自分の控え室から必要ハートに{{heart_03.png/heart03}}を3以上含むライブカードを1枚手札に加える。 |
-| `PL!HS-bp1-002` | L2+choice | 72 | {{kidou.png/起動}}{{icon_energy.png/E}}{{icon_energy.png/E}}、このメンバーをステージから控え室に置く：自分の控え室からコスト15以下の『蓮ノ空』のメンバーカードを1枚、このメンバーがいたエリアに登場させる |
-| `PL!HS-bp1-002` | L2+choice | 72 | {{kidou.png/起動}}{{icon_energy.png/E}}{{icon_energy.png/E}}このメンバーをステージから控え室に置く：自分の控え室からコスト15以下の『蓮ノ空』のメンバーカードを1枚、このメンバーがいたエリアに登場させる。 |
-| `PL!SP-bp5-111` | L2+choice | 64 | {{kidou.png/起動}}{{turn1.png/ターン1回}}エネルギー2枚をエネルギーデッキに置く：自分の控え室にあるライブカードを1枚手札に加える。 |
-| `PL!S-sd1-007` | L2+choice | 64 | {{kidou.png/起動}}{{turn1.png/ターン1回}}手札を2枚控え室に置く：自分の控え室から{{icon_score.png/スコア}}を持つ『Aqours』のライブカードを1枚手札に加える。 |
-| `PL!HS-bp1-003` | L2+choice | 57 | {{kidou.png/起動}}{{turn1.png/ターン1回}}{{icon_energy.png/E}}：自分の控え室から4コスト以下の『蓮ノ空』のメンバーカードを1枚手札に加える。 |
-| `PL!HS-bp5-001` | L2+choice | 54 | {{kidou.png/起動}}{{turn1.png/ターン1回}}{{icon_energy.png/E}}{{icon_energy.png/E}}手札のライブカードを1枚公開する：自分の控え室から、これにより公開したカードのカード名がすべて含まれるライ |
-| `PL!N-bp1-002` | L2+choice | 35 | {{kidou.png/起動}}{{icon_energy.png/E}}{{icon_energy.png/E}}手札を1枚控え室に置く：このカードを控え室からステージに登場させる。この能力は、このカードが控え室にある場合のみ起動できる。 |
-| `PL!N-pb1-011` | L2+choice | 33 | {{kidou.png/起動}}{{turn1.png/ターン1回}}自分のエネルギー置き場にあるエネルギー1枚をこのメンバーの下に置く：自分の控え室から『虹ヶ咲』のライブカードを1枚手札に加える。 (メンバーがステージから離れたとき、下に置かれているエネルギ |
-| `PL!S-sd1-005` | L2+choice | 26 | {{kidou.png/起動}}{{turn1.png/ターン1回}}{{icon_energy.png/E}}{{icon_energy.png/E}}手札を1枚控え室に置く：自分の控え室から『Aqours』のライブカードを1枚手札に加える。 |
-| `PL!N-bp1-012` | L2+choice | 23 | {{kidou.png/起動}}{{turn1.png/ターン1回}}{{icon_energy.png/E}}{{icon_energy.png/E}}{{icon_energy.png/E}}：自分の控え室からライブカードを1枚手札に加える。 |
-| `PL!N-sd1-005` | L2+choice | 19 | {{kidou.png/起動}}{{turn1.png/ターン1回}}手札を2枚控え室に置く：自分の控え室から『虹ヶ咲』のメンバーカードを1枚手札に加える。 |
-| `PL!N-sd1-007` | L2+choice | 19 | {{kidou.png/起動}}{{turn1.png/ターン1回}}手札を2枚控え室に置く：自分の控え室から『虹ヶ咲』のライブカードを1枚手札に加える。 |
-| `PL!N-bp7-010` | L2+choice | 18 | {{kidou.png/起動}}{{turn1.png/ターン1回}}エネルギー置き場にあるエネルギー1枚をこのメンバーの下に置く：自分の控え室からコスト2以下の『虹ヶ咲』のメンバーカードを1枚、メンバーのいないエリアにウェイト状態で登場させる。（この効果で登 |
-| `PL!N-bp1-008` | L2+choice | 15 | {{kidou.png/起動}}{{turn1.png/ターン1回}}手札のメンバーカードを1枚控え室に置く：自分の控え室から、これにより控え室に置いたメンバーカードより、コストの低いメンバーカードを1枚手札に加える。 |
-| `PL!N-bp3-004` | L2+choice | 14 | {{kidou.png/起動}}{{turn1.png/ターン1回}}このメンバーをウェイトにし、手札を1枚控え室に置く：自分の控え室から『虹ヶ咲』のライブカードを1枚手札に加える。 |
-| `PL!N-bp5-014` | L2+choice | 14 | {{kidou.png/起動}}{{turn1.png/ターン1回}}{{icon_energy.png/E}}{{icon_energy.png/E}}手札を1枚控え室に置く：自分の控え室から『虹ヶ咲』のライブカードを1枚手札に加える。 |
-| `PL!HS-bp1-004` | L2+choice | 13 | {{kidou.png/起動}}{{turn1.png/ターン1回}}{{icon_energy.png/E}}{{icon_energy.png/E}}{{icon_energy.png/E}}：自分の控え室から『蓮ノ空』のライブカードを1枚手札に加える。 |
-| `PL!-bp4-002` | L2+choice | 12 | {{kidou.png/起動}}{{turn1.png/ターン1回}}手札を2枚控え室に置く：自分の控え室から『μ's』のライブカードを1枚手札に加える。この能力は、自分の成功ライブカード置き場にあるカードのスコアの合計が６以上の場合のみ起動できる。 |
-| `PL!-bp4-002` | L2+choice | 12 | {{kidou.png/起動}}{{turn1.png/ターン1回}}手札を2枚控え室に置く：自分の控え室から『μ's』のライブカードを1枚手札に加える。この能力は、自分の成功ライブカード置き場にあるカードのスコアの合計が6以上の場合のみ起動できる。 |
-| `PL!HS-bp2-001` | L2+choice | 11 | {{kidou.png/起動}}{{turn1.png/ターン1回}}{{icon_energy.png/E}}{{icon_energy.png/E}}：自分の控え室からスコア3以下の『蓮ノ空』のライブカードを1枚手札に加える。 |
-| `PL!HS-bp5-002` | L2+choice | 8 | {{kidou.png/起動}}{{turn1.png/ターン1回}}{{icon_energy.png/E}}{{icon_energy.png/E}}：自分の控え室からコスト2以下のメンバーカードを1枚、メンバーのいないエリアに登場させる。 |
-| `PL!S-bp6-008` | L2+choice | 8 | {{kidou.png/起動}}{{icon_energy.png/E}}{{icon_energy.png/E}}このメンバーをステージから控え室に置く：自分の控え室からコスト17以下の『Aqours』のメンバーカードを1枚、このメンバーがいたエリアに登場さ |
-| `PL!-PR-004` | L2+choice | 7 | {{kidou.png/起動}}{{turn1.png/ターン1回}}手札を2枚控え室に置く：自分の控え室から必要ハートに{{heart_01.png/heart01}}を3以上含むライブカードを1枚手札に加える。 |
-| `PL!-bp5-009` | L2+choice | 5 | {{kidou.png/起動}}{{turn1.png/ターン1回}}手札を2枚控え室に置く：自分の控え室から必要ハートに{{heart_06.png/heart06}}を3以上含むライブカードを1枚手札に加える。 |
-| `PL!SP-bp4-010` | L2+choice | 5 | {{kidou.png/起動}}{{turn1.png/ターン1回}}{{icon_energy.png/E}}このメンバーをウェイトにする：自分のエネルギーデッキから、エネルギーカードを1枚ウェイト状態で置く。 |
-| `PL!N-sd2-001` | L2+choice | 5 | {{kidou.png/起動}}{{turn1.png/ターン1回}}{{icon_energy.png/E}}{{icon_energy.png/E}}：自分の控え室から『虹ヶ咲』のライブカードを1枚手札に加える。 |
-| `PL!SP-sd1-011` | L2+choice | 4 | {{kidou.png/起動}}{{turn1.png/ターン1回}}{{icon_energy.png/E}}{{icon_energy.png/E}}：自分のエネルギーデッキから、エネルギーカードを1枚ウェイト状態で置く。 |
-| `PL!HS-bp6-016` | L2+choice | 4 | {{kidou.png/起動}}{{turn1.png/ターン1回}}{{icon_energy.png/E}}{{icon_energy.png/E}}{{icon_energy.png/E}}{{icon_energy.png/E}}：自分の控え室からコス |
-| `PL!SP-sd2-006` | L2+choice | 3 | {{kidou.png/起動}}{{turn1.png/ターン1回}}{{icon_energy.png/E}}{{icon_energy.png/E}}手札を1枚控え室に置く：自分の控え室から『Liella!』のライブカードを1枚手札に加える。 |
-| `PL!SP-bp5-021` | L1+choice | 2 | {{kidou.png/起動}}このメンバーをステージから控え室に置く：自分のエネルギーが6枚以上ある場合、自分のエネルギーデッキから、エネルギーカードを1枚ウェイト状態で置く。 |
-
 ## live_success_score
 
 Triggers: ライブ成功時 — 31/31 L0-covered.
@@ -850,9 +851,9 @@ Triggers: ライブ成功時 — 31/31 L0-covered.
 
 ## other:起動:sequential
 
-Triggers: 起動 — 28/28 L0-covered.
+Triggers: 起動 — 27/27 L0-covered.
 
-### variant: (no variant) — 28 abilities
+### variant: (no variant) — 27 abilities
 
 | Card | Depth | Tests | Text |
 |---|---|---|---|
@@ -876,7 +877,6 @@ Triggers: 起動 — 28/28 L0-covered.
 | `PL!-bp5-004` | L2+choice | 8 | {{kidou.png/起動}}{{icon_energy.png/E}}{{icon_energy.png/E}}{{icon_energy.png/E}}{{icon_energy.png/E}}：相手のステージにいるコスト10以下のメンバー1人をウェイト |
 | `PL!N-pb1-003` | L2+choice | 8 | {{kidou.png/起動}}{{icon_energy.png/E}}{{icon_energy.png/E}}このカードを手札から控え室に置く：カードを1枚引き、ライブ終了時まで、自分のステージにいる『虹ヶ咲』のメンバー1人は{{icon_blade.p |
 | `PL!-pb2-007` | L2+choice | 7 | {{kidou.png/起動}}このメンバーをステージから控え室に置く：自分の控え室から『μ's』のライブカードを1枚手札に加える。その後、自分の成功ライブカード置き場にある『μ's』のカード1枚につき、エネルギーを1枚アクティブにする。 |
-| `PL!-pb2-012` | L2 | 7 | {{kidou.png/起動}}{{turn1.png/ターン1回}}このメンバーをウェイトにする：この能力を起動するための追加コストとして、手札を2枚控え室に置くか、『Printemps』のメンバーを2人ウェイトにする。自分の控え室から『Printemps』 |
 | `PL!S-bp3-008` | L2+choice | 7 | {{kidou.png/起動}}このメンバーをステージから控え室に置く：自分の控え室からライブカードを1枚手札に加える。それがスコア6以上の『Aqours』のライブカードの場合、エネルギーを4枚アクティブにする。 |
 | `PL!S-bp7-011` | L2+choice | 7 | {{kidou.png/起動}}{{turn1.png/ターン1回}}このメンバーをウェイトにする：自分のデッキの下からカードを2枚控え室に置く。それらがすべて『Aqours』のメンバーカードの場合、このメンバーをアクティブにし、ライブ終了時まで、{{icon |
 | `PL!N-bp3-007` | L2+choice | 6 | {{kidou.png/起動}}{{icon_energy.png/E}}{{icon_energy.png/E}}このメンバーをステージから控え室に置く：自分の手札からコスト13以下の「優木せつ菜」のメンバーカードを1枚、このメンバーがいたエリアに登場させる |
@@ -1057,8 +1057,8 @@ Triggers: 常時 — 17/17 L0-covered.
 | `PL!SP-bp5-017` | L2+choice | 15 | {{jyouji.png/常時}}自分のステージにいる『Liella!』のメンバーがこのターンにエリアを移動しているかぎり、手札にあるこのメンバーカードのコストは2減る。 |
 | `PL!HS-bp6-006` | L2+choice | 14 | {{jyouji.png/常時}}手札にあるこのメンバーカードのコストは、自分のステージにいる『みらくらぱーく！』のメンバー1人につき、2少なくなる。 |
 | `PL!-bp4-008` | L2 | 12 | {{jyouji.png/常時}}自分の成功ライブカード置き場にあるカードのスコアの合計が６以上であるかぎり、ステージにいるこのメンバーのコストを＋３する。 |
+| `PL!-pb2-012` | L2+choice | 12 | {{jyouji.png/常時}}このカードをプレイする際、自分のステージにいる名前の異なる『Printemps』のメンバーを2人ウェイトにしてもよい。そうしたとき、このカードのコストは２減る。 |
 | `PL!SP-bp5-003` | L2+choice | 11 | {{jyouji.png/常時}}コスト10の『Liella!』のメンバーカードを自分の手札から登場させるためのコストは2減る。 |
-| `PL!-pb2-012` | L2 | 7 | {{jyouji.png/常時}}このカードをプレイする際、自分のステージにいる名前の異なる『Printemps』のメンバーを2人ウェイトにしてもよい。そうしたとき、このカードのコストは２減る。 |
 | `PL!SP-pb1-010` | L2 | 4 | {{jyouji.png/常時}}自分のエネルギーが10枚以上ある場合、ステージにいるこのメンバーのコストを＋４する。 |
 | `PL!-bp6-019` | L2 | 4 | {{jyouji.png/常時}}このカードが自分の成功ライブカード置き場にあるかぎり、元々のコストが17以上の『μ's』のメンバーカードを自分の手札から登場させるためのコストは2減る。この効果は重複しない。 |
 | `PL!N-sd2-003` | L2 | 3 | {{jyouji.png/常時}}自分の成功ライブカード置き場に『虹ヶ咲』のカードがあるかぎり、手札にあるこのメンバーカードのコストは２減る。 |

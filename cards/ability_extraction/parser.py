@@ -745,9 +745,49 @@ def split_cost_effect(text: str) -> Tuple[str, str]:
     if split_index >= 0:
         cost = text[:split_index].strip()
         effect = text[split_index + 1 :].strip()
-        return cost, effect
+        return _extend_cost_with_additional_clause(cost, effect)
     else:
         return "", text
+
+
+# 「この能力を起動するための追加コストとして、…」 names a COST, not an effect, and
+# it is not separable from the printed sentence by the 「：」 that opens the effect.
+_ADDITIONAL_COST_MARKER = "追加コストとして、"
+
+
+def _extend_cost_with_additional_clause(cost: str, effect: str):
+    """Pull a 「追加コストとして」 clause out of the effect and into the cost.
+
+    The 「：」 convention puts everything after it in the effect, so an additional
+    cost stated there read as an effect step. PL!-pb2-012-P＋ 南ことり's 起動 is
+    the case (D3): 「このメンバーをウェイトにする：この能力を起動するための追加コスト
+    として、手札を2枚控え室に置くか、『Printemps』のメンバーを2人ウェイトにする。自分の
+    控え室から『Printemps』のライブカードを1枚手札に加える。」 — the OR of two payments
+    became the first leg of a `sequential` INSIDE the effect, so it both ran as an
+    effect step (after the card's own cost, and in sequence rather than as a
+    choice) and never appeared in `cost` at all.
+
+    The additional-cost clause runs from the marker to the first depth-0 「。」,
+    which is the end of the sentence that states it. The marker is kept in the
+    cost text so the printed wording survives into `cost.text`.
+    """
+    marker_at = _find_depth0(effect, _ADDITIONAL_COST_MARKER)
+    if marker_at < 0:
+        return cost, effect
+    end = -1
+    for i, ch, depth in _ir_depth_scan(effect):
+        if i > marker_at and ch == "。" and depth == 0:
+            end = i
+            break
+    if end < 0:
+        return cost, effect
+    clause = effect[marker_at:end].strip()
+    rest = effect[end + 1 :].strip()
+    if not clause or not rest:
+        # Without a real effect left over there is nothing to separate, and
+        # claiming the whole sentence as cost would swallow the ability.
+        return cost, effect
+    return f"{cost}：{clause}".strip(), rest
 
 
 def split_condition_action(text: str) -> Tuple[str, str]:

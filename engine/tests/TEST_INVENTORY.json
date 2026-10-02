@@ -1,14 +1,14 @@
 {
   "generated_by": "cards/test_inventory.py",
-  "generated_at": "2026-10-02T08:39:24.027208+00:00",
+  "generated_at": "2026-10-02T09:25:39.343637+00:00",
   "stats": {
     "total_cards": 2639,
     "cards_with_abilities": 1650,
     "total_abilities": 2116,
     "unique_abilities": 985
   },
-  "n_files": 1000,
-  "n_tests": 4105,
+  "n_files": 1002,
+  "n_tests": 4110,
   "total_cards": 809,
   "covered_cards": 809,
   "abilities_on_covered": 985,
@@ -44,8 +44,8 @@
   },
   "action_counts": {
     "move_cards": [
-      150,
-      150
+      151,
+      151
     ],
     "look_and_select": [
       74,
@@ -56,8 +56,8 @@
       170
     ],
     "sequential": [
-      230,
-      230
+      229,
+      229
     ],
     "unknown": [
       2,
@@ -321,8 +321,8 @@
     ]
   },
   "depth_counts": {
-    "L2+choice": 850,
-    "L2": 106,
+    "L2+choice": 852,
+    "L2": 104,
     "L1+choice": 28,
     "L1": 1
   },
@@ -1070,7 +1070,7 @@
       ]
     }
   },
-  "n_test_fns_parsed": 4105,
+  "n_test_fns_parsed": 4110,
   "abilities": [
     {
       "idx": 0,
@@ -23488,29 +23488,37 @@
       ],
       "base": "PL!-pb2-012",
       "covered": true,
-      "depth": "L2",
+      "depth": "L2+choice",
       "has_assert": true,
-      "has_choice": false,
+      "has_choice": true,
       "has_negative": true,
       "covering_files": [
+        "engine/tests/test_modules/effects/cost/additional_cost_choice/pb2_kidou_additional_cost_discard_two_or_wait_two_printemps_pl_pb2_012_p_plus_test.rs",
         "engine/tests/test_modules/effects/cost/play_cost/pb2_optional_two_distinct_printemps_wait_costs_two_less_pl_pb2_012_p_plus_test.rs"
       ],
       "covering_tests": [
         "a_non_printemps_ally_does_not_count",
         "no_staged_members_means_no_reduction",
         "one_printemps_member_alone_is_not_enough",
+        "paying_with_the_hand_branch_waits_nobody",
+        "paying_with_the_wait_branch_discards_nothing",
         "printed_cost_is_thirteen",
+        "the_additional_cost_is_offered_as_a_choice_not_a_sequence",
+        "the_additional_cost_parses_as_a_choice_condition_inside_cost",
+        "the_effect_is_only_the_recover_step",
         "three_printemps_members_still_grant_only_minus_two",
         "two_distinctly_named_printemps_members_grant_minus_two",
         "two_prints_of_the_same_character_are_not_distinct"
       ],
-      "covering_test_count": 7,
+      "covering_test_count": 12,
       "direct_tests": [
         "printed_cost_is_thirteen",
+        "the_additional_cost_parses_as_a_choice_condition_inside_cost",
+        "the_effect_is_only_the_recover_step",
         "three_printemps_members_still_grant_only_minus_two",
         "two_prints_of_the_same_character_are_not_distinct"
       ],
-      "direct_test_count": 3,
+      "direct_test_count": 5,
       "is_null": false,
       "use_limit": null,
       "watches_abilities": false,
@@ -23524,7 +23532,7 @@
       "trigger_list": [
         "起動"
       ],
-      "action": "sequential",
+      "action": "move_cards",
       "condition": "none",
       "set": "pb2",
       "cards": [
@@ -23533,29 +23541,37 @@
       ],
       "base": "PL!-pb2-012",
       "covered": true,
-      "depth": "L2",
+      "depth": "L2+choice",
       "has_assert": true,
-      "has_choice": false,
+      "has_choice": true,
       "has_negative": true,
       "covering_files": [
+        "engine/tests/test_modules/effects/cost/additional_cost_choice/pb2_kidou_additional_cost_discard_two_or_wait_two_printemps_pl_pb2_012_p_plus_test.rs",
         "engine/tests/test_modules/effects/cost/play_cost/pb2_optional_two_distinct_printemps_wait_costs_two_less_pl_pb2_012_p_plus_test.rs"
       ],
       "covering_tests": [
         "a_non_printemps_ally_does_not_count",
         "no_staged_members_means_no_reduction",
         "one_printemps_member_alone_is_not_enough",
+        "paying_with_the_hand_branch_waits_nobody",
+        "paying_with_the_wait_branch_discards_nothing",
         "printed_cost_is_thirteen",
+        "the_additional_cost_is_offered_as_a_choice_not_a_sequence",
+        "the_additional_cost_parses_as_a_choice_condition_inside_cost",
+        "the_effect_is_only_the_recover_step",
         "three_printemps_members_still_grant_only_minus_two",
         "two_distinctly_named_printemps_members_grant_minus_two",
         "two_prints_of_the_same_character_are_not_distinct"
       ],
-      "covering_test_count": 7,
+      "covering_test_count": 12,
       "direct_tests": [
         "printed_cost_is_thirteen",
+        "the_additional_cost_parses_as_a_choice_condition_inside_cost",
+        "the_effect_is_only_the_recover_step",
         "three_printemps_members_still_grant_only_minus_two",
         "two_prints_of_the_same_character_are_not_distinct"
       ],
-      "direct_test_count": 3,
+      "direct_test_count": 5,
       "is_null": false,
       "use_limit": 1,
       "watches_abilities": false,

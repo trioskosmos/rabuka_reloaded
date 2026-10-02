@@ -1,9 +1,9 @@
 {
   "schema": "extracted_abilities.v1",
-  "generated_at": "2026-10-02T17:34:42.840534",
+  "generated_at": "2026-10-02T18:53:21.283023",
   "generated_by": "cards/ability_extraction/extract_card_abilities.py",
   "source_file": "cards/cards.json",
-  "engine_commit": "644352f1",
+  "engine_commit": "5caf67a9",
   "parser_version": "1.0",
   "input_hash": null,
   "statistics": {
@@ -13895,27 +13895,27 @@
       "use_limit": 1,
       "is_null": false,
       "cost": {
-        "text": "このメンバーをウェイトにする",
-        "state_change": "wait",
-        "card_type": "member_card",
-        "self_cost": true,
-        "type": "change_state"
-      },
-      "effect": {
-        "text": "この能力を起動するための追加コストとして、手札を2枚控え室に置くか、『Printemps』のメンバーを2人ウェイトにする。自分の控え室から『Printemps』のライブカードを1枚手札に加える",
-        "action": "sequential",
-        "actions": [
+        "text": "このメンバーをウェイトにする：追加コストとして、手札を2枚控え室に置くか、『Printemps』のメンバーを2人ウェイトにする",
+        "type": "sequential_cost",
+        "costs": [
           {
-            "text": "この能力を起動するための追加コストとして、手札を2枚控え室に置くか、『Printemps』のメンバーを2人ウェイトにする",
-            "action": "sequential",
-            "actions": [
+            "text": "このメンバーをウェイトにする",
+            "state_change": "wait",
+            "card_type": "member_card",
+            "self_cost": true,
+            "type": "change_state"
+          },
+          {
+            "text": "手札を2枚控え室に置くか、『Printemps』のメンバーを2人ウェイトにする",
+            "type": "choice_condition",
+            "options": [
               {
-                "text": "手札を2枚控え室に置くか",
+                "text": "手札を2枚控え室に置く",
                 "source": "hand",
+                "zone": "hand",
                 "destination": "discard",
                 "count": 2,
-                "action": "move_cards",
-                "card_type": "card"
+                "type": "move_cards"
               },
               {
                 "text": "『Printemps』のメンバーを2人ウェイトにする",
@@ -13925,29 +13925,23 @@
                 "group_names": [
                   "Printemps"
                 ],
-                "action": "change_state"
+                "type": "change_state"
               }
-            ],
-            "group_names": [
-              "Printemps"
             ]
-          },
-          {
-            "text": "自分の控え室から『Printemps』のライブカードを1枚手札に加える",
-            "source": "discard",
-            "destination": "hand",
-            "count": 1,
-            "card_type": "live_card",
-            "target": "self",
-            "group_names": [
-              "Printemps"
-            ],
-            "action": "move_cards"
           }
-        ],
+        ]
+      },
+      "effect": {
+        "text": "自分の控え室から『Printemps』のライブカードを1枚手札に加える",
+        "source": "discard",
+        "destination": "hand",
+        "count": 1,
+        "card_type": "live_card",
+        "target": "self",
         "group_names": [
           "Printemps"
-        ]
+        ],
+        "action": "move_cards"
       }
     },
     {

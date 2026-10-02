@@ -3714,6 +3714,34 @@ modified.destination = Some(Zone::from_source_str(dest));
         self.resume_pending_actions(gs)
     }
 
+    /// The `choice_condition` step whose options the pending prompt belongs to.
+    ///
+    /// A cost that is ITSELF a choice puts its options on the root
+    /// (`{"type": "choice_condition", "options": [...]}`), but a cost that is a
+    /// `sequential_cost` with a choice among its steps nests them one level down
+    /// — PL!-pb2-012-P＋ 南ことり's 起動 is
+    /// 「このメンバーをウェイトにする：この能力を起動するための追加コストとして、手札を2枚
+    /// 控え室に置くか、『Printemps』のメンバーを2人ウェイトにする」, whose cost is
+    /// `[self-wait, choice(2 options)]`.
+    ///
+    /// Reading only the root resolved the player's selection against the WRONG step
+    /// and paid the self-wait instead, which failed with "No matching members on
+    /// stage to change state" — the choice looked live but paid nothing of itself.
+    fn pending_choice_cost_options(
+        gs: &GameState,
+    ) -> Option<Vec<Box<crate::card::AbilityEffect>>> {
+        let cost = gs.entry_cost()?;
+        if cost.action == super::enums::ActionType::ChoiceCondition {
+            return cost.compound.actions.clone();
+        }
+        cost.compound
+            .actions
+            .iter()
+            .flatten()
+            .find(|step| step.action == super::enums::ActionType::ChoiceCondition)
+            .and_then(|step| step.compound.actions.clone())
+    }
+
     pub(in crate::ability::choice) fn handle_choice_condition(
         &mut self,
         gs: &mut GameState,
@@ -3723,7 +3751,7 @@ modified.destination = Some(Zone::from_source_str(dest));
             log::warn!("[CHOICE_COND] non-numeric index {:?}; rejecting selection", selected);
             return Err(format!("invalid selection: {:?}", selected));
         };
-        if let Some(options) = gs.entry_cost().and_then(|c| c.compound.actions.clone()) {
+        if let Some(options) = Self::pending_choice_cost_options(gs) {
             if idx < options.len() {
                 let label = options[idx]
                     .text
