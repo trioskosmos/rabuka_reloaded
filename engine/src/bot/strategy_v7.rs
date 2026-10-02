@@ -919,6 +919,7 @@ fn expected_live_value(
     opp_score: i32,
     opp_set_size: usize,
 ) -> f64 {
+    let _ = (set_size, opp_set_size);
     let both_pass = pass * opp_pass;
     let self_only = pass * (1.0 - opp_pass);
     let opp_only = (1.0 - pass) * opp_pass;
@@ -929,8 +930,8 @@ fn expected_live_value(
     } else if score < opp_score {
         value += both_pass * live_payoff(my_success, opp_success, false, true);
     } else {
-        let my_place = set_size < 2;
-        let opp_place = opp_set_size < 2;
+        let my_place = my_success < 2;
+        let opp_place = opp_success < 2;
         value += both_pass * live_payoff(my_success, opp_success, my_place, opp_place);
     }
     value

@@ -337,31 +337,158 @@ int rb_stage_can_place_card(const GameState *g, int pl, int card_id){
     return rb_card_is_live(card_id) ? 0 : 1;
 }
 
-/* Mirror Stage::formation_change (Rule 11.11): apply a list of (from,to) area
-   moves as one permutation; fails if two members target the same area or a
-   source is empty. Under-cards travel with their member (Rule 4.5.5.3). */
+/* ── Formation change (Rule 11.11) ──────────────────────────────────────
+   THE RUST TWIN IS NOT IN zones.rs. `Stage` has no `formation_change`
+   method (zones.rs:368-415 goes straight from position_change to
+   total_blades); the whole-formation reorder lives in
+   engine/src/ability/effects/position.rs:778-925
+   `AbilityResolver::finalize_formation_change`, called from
+   ability/choice.rs:3244 and :3276 once every planned member has been
+   assigned a destination.
+
+   WHY THE OLD BODY WAS WRONG IN BOTH HALVES. It walked the (from,to) list
+   and applied ONE `position_change`-shaped move at a time, swapping
+   `stage[f]`/`stage[t]` and `uc[f]`/`uc[t]`. A formation change is a
+   PERMUTATION, not a sequence of pairwise swaps, so any cycle of length >= 2
+   was applied twice and returned the board to where it started: for the
+   two-member swap a->b, b->a both the members and the under-card stacks came
+   back to their original areas. (Red proof:
+   tests/test_parity_zones_position.c:427-438 — the swap is accepted and the
+   two members do exchange, but LeftSide kept n=2 under-cards when the right
+   member's single stack should have travelled with it.)
+
+   Rust does not walk the moves at all. It takes the whole under-card array
+   ONCE (`let old_under = core::mem::take(&mut player.stage.under_cards);`
+   position.rs:797), computes each member's DESTINATION INDEX, and writes
+   `new_under[dest_idx] = old_under[from_idx].clone()` (position.rs:833) in a
+   single pass. A 2-cycle therefore exchanges the stacks, because each stack
+   is read from its source slot and written straight to its final slot.
+
+   So the member movement was ALSO per-move-wrong, not just the under-card
+   half, and both halves are replaced here by the same direct-permutation
+   shape. Rust's three phases are reproduced one-for-one; the only additions
+   are the validations this entry point owns (see PREFLIGHT below).
+
+   Rust's Phase 1 also maintains an `occupant` array, but its only reader is
+   the `let _evicted = ...` binding at position.rs:827-831, which is prefixed
+   with `_` and never used (Phase 2 recomputes the evicted occupant from
+   `old_stage[dest_idx]` at :871). It is provably dead, so it is not ported. */
 int rb_stage_formation_change(GameState *g, int pl,
                               const int *from_areas, const int *to_areas, int n){
     if(!g || pl<0 || pl>1 || !from_areas || !to_areas) return -1;
-    int *stage = g->p[pl].stage;
-    RbBag *uc = g->p[pl].under_cards;
+    /* position.rs:779-781 -- an empty plan is a successful no-op. */
+    if(n<=0) return 0;
+    RbPlayer *P = &g->p[pl];
+    int   *stage = P->stage;
+    int   *swait = P->stage_wait;
+    RbBag *uc    = P->under_cards;
+
+    /* PREFLIGHT -- every refusal happens before any mutation, so a rejected
+       formation leaves the board EXACTLY as it was. Two of these are C-side
+       validations with no Rust counterpart, kept because they are the entry
+       point's contract:
+         * two members targeting one area -- Rust makes this unreachable
+           upstream (compute_valid_position_destinations skips a zone another
+           planned member already claimed, position.rs:702-707), and the C
+           signature is a flat array with no such guard;
+         * a plan in which NO member changes area. Rust accepts it and
+           changes nothing, but the C surface is a mutation call: reporting
+           success for a plan that cannot move anything would let a caller
+           record a formation change that never happened. A stay-in-place
+           entry INSIDE a real formation is legitimate and is honoured --
+           Rust's own formation_change_test::stay_in_place_no_new_move and
+           the three-member rotation
+           (live_start_subunit_threshold_formation_test.rs:74-86, which
+           answers "right, center, left" and asserts the result [c, b, a],
+           i.e. the center member keeping its own area) both rely on it, so
+           the old blanket `if(f==t) return -1` also rejected two cases Rust
+           performs. The empty-source check is hoisted here out of the apply
+           loop, where it could refuse AFTER earlier moves had already
+           mutated the board. */
+    int changed = 0;
     for(int i=0;i<n;i++){
         if(from_areas[i]<0 || from_areas[i]>=RB_STAGE_SIZE) return -1;
-        if(to_areas[i]<0 || to_areas[i]>=RB_STAGE_SIZE) return -1;
+        if(to_areas[i]<0   || to_areas[i]  >=RB_STAGE_SIZE) return -1;
         for(int j=i+1;j<n;j++) if(to_areas[i]==to_areas[j]) return -1;
+        if(stage[from_areas[i]]==RB_EMPTY_SLOT) return -1;
+        if(from_areas[i]!=to_areas[i]) changed++;
     }
+    if(changed==0) return -1;
+
+    int   old_stage[RB_STAGE_SIZE];
+    int   old_wait[RB_STAGE_SIZE];
+    RbBag old_under[RB_STAGE_SIZE];
+    int   new_stage[RB_STAGE_SIZE];
+    int   new_wait[RB_STAGE_SIZE];
+    RbBag new_under[RB_STAGE_SIZE];
+    for(int a=0;a<RB_STAGE_SIZE;a++){
+        old_stage[a] = stage[a];
+        old_wait[a]  = swait[a];
+        old_under[a] = uc[a];
+        new_stage[a] = RB_EMPTY_SLOT;
+        new_wait[a]  = 0;
+        new_under[a].n = 0;
+    }
+
+    /* Phase 1 (position.rs:806-840): place every planned member at its
+       destination, carrying its under-cards across in the SAME write. */
     for(int i=0;i<n;i++){
-        int f = from_areas[i], t = to_areas[i];
-        if(f==t) return -1;
-        int card_id = stage[f];
-        if(card_id==RB_EMPTY_SLOT) return -1;
-        RbBag tmp = uc[f]; uc[f] = uc[t]; uc[t] = tmp; /* swap under-cards */
-        int dest = stage[t];
-        if(dest!=RB_EMPTY_SLOT){
-            stage[f] = dest; stage[t] = card_id;
-        } else {
-            stage[t] = card_id; stage[f] = RB_EMPTY_SLOT;
+        int from = from_areas[i], to = to_areas[i];
+        if(from==to) continue;            /* stay-in-place is Phase 2's job */
+        new_stage[to] = old_stage[from];
+        new_under[to] = old_under[from];  /* position.rs:833 */
+        new_wait[to]  = old_wait[from];
+    }
+
+    /* Phase 2 (position.rs:842-890): the evicted occupant goes to the
+       mover's vacated position; an occupant that is itself a planned member
+       was already relocated in Phase 1 and must not be re-inserted (that
+       would duplicate one member across two areas). */
+    for(int i=0;i<n;i++){
+        int from = from_areas[i], to = to_areas[i];
+        if(new_stage[from]!=RB_EMPTY_SLOT) continue;   /* slot already filled */
+        if(from==to){                                   /* stayed in place */
+            new_stage[from] = old_stage[from];
+            new_under[from] = old_under[from];
+            new_wait[from]  = old_wait[from];
+            continue;
         }
+        int evicted = old_stage[to];
+        int evicted_is_planned = 0;
+        for(int j=0;j<n;j++)
+            if(old_stage[from_areas[j]]==evicted){ evicted_is_planned = 1; break; }
+        if(evicted!=RB_EMPTY_SLOT && evicted!=old_stage[from] && !evicted_is_planned){
+            new_stage[from] = evicted;
+            new_under[from] = old_under[to];  /* position.rs:882 */
+            new_wait[from]  = old_wait[to];
+        }
+    }
+
+    /* Phase 3 (position.rs:892-901): unplanned members keep their own slot if
+       it is still free, with their own under-cards. */
+    for(int a=0;a<RB_STAGE_SIZE;a++){
+        if(new_stage[a]!=RB_EMPTY_SLOT || old_stage[a]==RB_EMPTY_SLOT) continue;
+        int is_planned = 0;
+        for(int j=0;j<n;j++)
+            if(old_stage[from_areas[j]]==old_stage[a]){ is_planned = 1; break; }
+        if(!is_planned){
+            new_stage[a] = old_stage[a];
+            new_under[a] = old_under[a];
+            new_wait[a]  = old_wait[a];
+        }
+    }
+
+    /* Atomic update (position.rs:903-905). `stage_wait` rides along for the
+       same reason the under-cards do: Rust keys the waited flag PER CARD in
+       `orientation_modifiers`, so it follows the member for free, while the
+       C parallel array is per AREA. Same reasoning as the crossed
+       `stage_wait` swap in rb_stage_position_change_core (zones.c:229-240);
+       without it a rotation leaves each member weighed by whatever area it
+       used to occupy (Q136). */
+    for(int a=0;a<RB_STAGE_SIZE;a++){
+        stage[a] = new_stage[a];
+        swait[a]  = new_wait[a];
+        uc[a]     = new_under[a];
     }
     return 0;
 }

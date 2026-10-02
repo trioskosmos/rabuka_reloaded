@@ -1,6 +1,6 @@
 {
   "generated_by": "cards/test_inventory.py",
-  "generated_at": "2026-10-01T07:59:14.542855+00:00",
+  "generated_at": "2026-10-02T07:49:23.472743+00:00",
   "stats": {
     "total_cards": 2639,
     "cards_with_abilities": 1650,
@@ -190,8 +190,8 @@
       571
     ],
     "location_condition": [
-      79,
-      79
+      77,
+      77
     ],
     "comparison_condition": [
       60,
@@ -210,8 +210,8 @@
       91
     ],
     "compound": [
-      39,
-      39
+      41,
+      41
     ],
     "appearance_condition": [
       13,
@@ -56943,7 +56943,7 @@
         "ライブ成功時"
       ],
       "action": "draw_card",
-      "condition": "location_condition",
+      "condition": "compound",
       "set": "bp1",
       "cards": [
         "PL!SP-bp1-024-L"
@@ -57016,7 +57016,7 @@
         "ライブ成功時"
       ],
       "action": "draw_card",
-      "condition": "location_condition",
+      "condition": "compound",
       "set": "bp1",
       "cards": [
         "PL!SP-bp1-024-SRL"

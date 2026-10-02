@@ -9,7 +9,7 @@ exit /b
 param(
     [int]$IntervalMinutes = 8,
     [string]$WindowTitle = "",
-    [string]$Message = "train in background so it isn't stopped even if I hit escape. keep improving, more research on the web, more audits, more everything. I want that winrate going up."
+    [string]$Message = "continue auditing and doing manual one ability and its tests at a time"
 )
 
 Add-Type -AssemblyName System.Windows.Forms

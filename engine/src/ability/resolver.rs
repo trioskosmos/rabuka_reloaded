@@ -1408,6 +1408,22 @@ impl AbilityResolver {
         cost: &AbilityEffect,
         ability: &Ability,
     ) -> Option<AbilityEffect> {
+        // 「この能力を起動するためのコストは自分のステージにいるメンバーの中の
+        // グループ名1種類につき、{{E}}減る」 (海未 bp5-004, Q228) is a declaration
+        // about the activation cost, not a runtime step, so the parser hoists it
+        // onto the pay_energy step as `cost_reduction_per_group` and drops the
+        // duplicate `modify_cost` step (which would otherwise apply the same
+        // reduction a second time after resolution).
+        //
+        // Affordability and the offer's `final_cost` already read it from the
+        // cost, via `GameState::effective_activation_cost`. Charging used to
+        // look only for the effect step, so with that step gone the printed
+        // total was charged: 2 groups offered a 2E activation and then took 4E
+        // (5 energy left, not 3). This is the third route the
+        // `effective_activation_cost` doc comment requires to agree.
+        if let Some(adjusted) = self.apply_cost_reduction_per_group(gs, cost) {
+            return Some(adjusted);
+        }
         let effect = ability.effect.as_ref()?;
         let mod_cost = util::find_modify_cost(effect, None, None)?;
         if mod_cost.operation_any() != Some("subtract") || !mod_cost.per_unit_any().unwrap_or(false) {
@@ -1416,6 +1432,51 @@ impl AbilityResolver {
         let mut adjusted = cost.clone();
         self.apply_per_unit_cost_reduction(gs, &mut adjusted, mod_cost);
         Some(adjusted)
+    }
+
+    /// Materialise `cost_reduction_per_group` into the amount actually charged.
+    ///
+    /// The reduction is `per_group × distinct group names on the payer's stage`,
+    /// the same arithmetic `AbilityEffect::effective_energy_cost_total` uses for
+    /// display, so the three routes cannot drift. Returns `None` when the cost
+    /// carries no reduction, so the common path still avoids a clone.
+    fn apply_cost_reduction_per_group(
+        &self,
+        gs: &mut GameState,
+        cost: &AbilityEffect,
+    ) -> Option<AbilityEffect> {
+        if cost.cost_reduction_per_group.is_none() {
+            return None;
+        }
+        let groups = gs.distinct_stage_groups("self");
+        if cost.action == crate::ability::enums::ActionType::PayEnergy {
+            let mut adjusted = cost.clone();
+            adjusted.set_energy_count(Some(cost.effective_energy_cost_total(groups)));
+            return Some(adjusted);
+        }
+        // A compound activation cost carries the flag on each pay_energy step
+        // (the parser sets it per pay step), so the reduction has to be
+        // materialised step by step rather than on the compound root.
+        if cost.action == crate::ability::enums::ActionType::SequentialCost {
+            let steps = cost.compound.actions.as_ref()?;
+            let mut adjusted_steps = Vec::with_capacity(steps.len());
+            let mut any = false;
+            for step in steps {
+                match self.apply_cost_reduction_per_group(gs, step) {
+                    Some(reduced) => {
+                        any = true;
+                        adjusted_steps.push(Box::new(reduced));
+                    }
+                    None => adjusted_steps.push(step.clone()),
+                }
+            }
+            if any {
+                let mut adjusted = cost.clone();
+                adjusted.compound.actions = Some(adjusted_steps);
+                return Some(adjusted);
+            }
+        }
+        None
     }
 
     /// Per-unit cost reduction: `(units / per_unit_count) * amount`.

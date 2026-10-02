@@ -525,15 +525,33 @@ static int um_fire_trigger(TestGame *tg, int card, const char *trig, const char 
     char no_for_dump[128];
     snprintf(card_no, sizeof(card_no), "%s", rb_card_string(c.card_no_idx));
     snprintf(no_for_dump, sizeof(no_for_dump), "%s", card_no);
-    char ability_id[768];
+    /* Rust's key is `format!("{}_{}", card_no, ab.full_text)` into a String —
+       UNBOUNDED (trigger_auto_ability takes ability_id: String,
+       abilities.rs:1192). This used to be a fixed `char ability_id[768]` fed
+       by an UNCHECKED snprintf, and 768 was the tightest of the three sites
+       that did this: an overflow there is invisible, because a fixed snprintf
+       into a too-small buffer reports success. The key is then silently cut,
+       the suffix comparison in par_ability_id_matches fails, and the ability
+       never fires — a green suite and a missing effect. MEASURED longest key
+       over cards/abilities.json: 653 bytes, with 38 keys over 512. Allocated
+       from the two real lengths instead, so there is no upper limit left to
+       get wrong. */
+    char *ability_id = NULL;
     int found = 0;
     int nab = rb_card_num_abilities((uint32_t)card);
     for (int a = 0; a < nab && !found; a++) {
         Ability ab;
         if (!rb_decode_card_ability((uint32_t)card, a, &ab)) continue;
         if (ab.triggers && strcmp(ab.triggers, trig) == 0) {
-            snprintf(ability_id, sizeof(ability_id), "%s_%s", card_no,
-                     ab.full_text ? ab.full_text : "");
+            const char *ft = ab.full_text ? ab.full_text : "";
+            size_t n_cn = strlen(card_no);
+            size_t n_ft = strlen(ft);
+            ability_id = (char *)malloc(n_cn + 1 + n_ft + 1);
+            if (ability_id) {
+                memcpy(ability_id, card_no, n_cn);
+                ability_id[n_cn] = '_';
+                memcpy(ability_id + n_cn + 1, ft, n_ft + 1);
+            }
             found = 1;
         }
         rb_free_ability(&ab);
@@ -552,10 +570,13 @@ static int um_fire_trigger(TestGame *tg, int card, const char *trig, const char 
             rb_free_ability(&ab);
         }
         fprintf(stderr, "\n");
+        free(ability_id);
         return 0;
     }
+    if (!ability_id) { free(ability_id); return 0; }
     rb_trigger_auto_ability(&tg->state, ability_id, type, 0, card_no, card,
                              NULL, 0, -1);
+    free(ability_id);
     tg->state.activating_card = card;
     rb_process_pending_auto_abilities(&tg->state);
     return 1;

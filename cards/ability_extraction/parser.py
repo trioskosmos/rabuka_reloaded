@@ -1119,6 +1119,22 @@ def _find_pay_energy_steps(obj):
     ]
 
 
+def _remove_nodes(tree, kill_ids):
+    """Drop dict nodes (by identity) from nested action/option lists."""
+    if isinstance(tree, dict):
+        for key in list(tree.keys()):
+            value = tree[key]
+            if isinstance(value, list):
+                tree[key] = [v for v in value if not (isinstance(v, dict) and id(v) in kill_ids)]
+                for v in tree[key]:
+                    _remove_nodes(v, kill_ids)
+            elif isinstance(value, dict):
+                _remove_nodes(value, kill_ids)
+    elif isinstance(tree, list):
+        for v in tree:
+            _remove_nodes(v, kill_ids)
+
+
 def _promote_self_cost_reduction(ability: Dict[str, Any]) -> None:
     """Promote a self-cost energy reduction clause onto the ability's own
     pay_energy cost as `cost_reduction_per_group`.
@@ -1135,6 +1151,7 @@ def _promote_self_cost_reduction(ability: Dict[str, Any]) -> None:
     effect = ability.get("effect")
     if not isinstance(cost, dict) or not isinstance(effect, dict):
         return
+    promoted = []
     for node in _find_modify_cost_nodes(effect):
         if node.get("operation") != "subtract":
             continue
@@ -1145,6 +1162,12 @@ def _promote_self_cost_reduction(ability: Dict[str, Any]) -> None:
             continue
         for pay in _find_pay_energy_steps(cost):
             pay.setdefault("cost_reduction_per_group", amount)
+        promoted.append(node)
+    if promoted:
+        # The same reduction also lingering as an effect step double-dips it:
+        # affordability reads it off the cost, then the step applies it again
+        # after the ability resolves (D9).
+        _remove_nodes(effect, set(map(id, promoted)))
 
 
 # The gate markers that can introduce an ability-level trigger condition,
@@ -1253,14 +1276,24 @@ def parse_ability(triggerless_text: str) -> Dict[str, Any]:
         effect = parse_effect(effect_text)
         if isinstance(effect, dict) and "cost" in effect:
             ability["cost"] = effect.pop("cost")
+
         effect = _normalize_parsed_effect(effect, triggerless_text)
         if not isinstance(effect, dict):
             effect = {}
 
-        # Fill a missing condition from the text. Scan ONLY the effect text
-        # (never the cost) and ONLY when the effect handler did not already
+        # Fill a missing condition from the text. Scan ONLY the effect
+        # text (never the cost) and ONLY when the effect handler did not already
         # produce a condition — otherwise this pass would double-gate or
         # re-derive a worse copy of an existing condition.
+        #
+        # This runs AFTER normalization on purpose. The effect node's "text"
+        # deliberately keeps its whole clause, condition prefix included, because
+        # the text-driven rules inside `_normalize_parsed_effect` read it to
+        # recover `distinct`, `baton_touch_trigger`, `exclude_self` and friends
+        # for the effect. Trimming that text to hide the condition from the
+        # enrichment walks instead costs ~280 abilities those fields.
+        # `_own_clause_text` lets the two enrichment walks skip the condition
+        # prefix without rewriting what every other rule sees.
         if not effect.get("condition"):
             if effect.get("action") == "sequential":
                 # Sequential gating is handled by the そうした場合 executor.
@@ -1302,6 +1335,9 @@ def parse_ability(triggerless_text: str) -> Dict[str, Any]:
     _post_fix_cost_and_select(ability)
     _fix_member_selection_target(ability)
     _drop_unsupported_child_location(ability)
+    _propagate_compound_branch_context(ability)
+    if isinstance(ability.get("effect"), dict):
+        ability["effect"] = _split_to_joined_character_lists(ability["effect"])
 
 
     # Merge phase gate into effect["condition"] (not ability["condition"])
@@ -1952,6 +1988,7 @@ def _restriction_target(t):
     be tested first. Three rules resolve this independently and two of them had
     it last, so a 「自分と相手が〜できない」 clause resolved to a single player.
     """
+    t = t.replace("相手の効果によっては", "").replace("自分の効果によっては", "").replace("効果によっては", "")
     if "自分と相手" in t or "お互い" in t:
         return "both"
     if "相手" in t:
@@ -2012,15 +2049,19 @@ def _set_action_023(t, a):
     a["restriction_type"] = (
         "cannot_wait_by_effect" if "効果によっては" in t else "cannot_wait"
     )
+    # 「相手の効果によっては」 is a verb modifier ("because of the opponent's
+    # effects"), not the restriction's target — strip it before target parsing,
+    # otherwise a self-targeted clause reads as the opponent's.
+    target_text = t.replace("相手の効果によっては", "").replace("効果によっては", "")
     # This rule tests 「相手の」, not 「相手」 — a bare 相手 is the OPPONENT'S,
     # whereas 「相手のカード」 names the card the restriction is written on. The
     # other two restriction rules do use the bare form; the difference is real
     # and they share only the both/self fallback.
-    if "自分と相手" in t or "お互い" in t:
+    if "自分と相手" in target_text or "お互い" in target_text:
         a["target"] = "both"
-    elif "相手の" in t:
+    elif "相手の" in target_text:
         a["target"] = "opponent"
-    elif "自分" in t:
+    elif "自分" in target_text:
         a["target"] = "self"
     else:
         a["target"] = None
@@ -2692,6 +2733,81 @@ def _split_period_before_per_unit(text):
             if sub.get("per_unit") and sub.get("per_unit_type") in ("member", "枚"):
                 sub["per_unit_type"] = "discard"
     return {"text": text, "action": "sequential", "actions": actions}
+
+
+def _condition_clause_prefixes(condition) -> list:
+    """The text of every *gating* condition clause, in tree order.
+
+    A condition carrying `trigger_event` is the ability's own trigger rather
+    than a gate. Its clause is part of the printed sentence the effect rules
+    read, and dropping it cost bp7-022 its `state_change` trigger — the rule
+    `_try_discard_hand_reactivate_optional` needs the trigger text to recognise
+    its own shape.
+    """
+    prefixes = []
+
+    def collect(c):
+        if not isinstance(c, dict):
+            return
+        if c.get("trigger_event"):
+            return
+        t = c.get("text")
+        if isinstance(t, str) and t:
+            prefixes.append(t)
+        for sub in c.get("conditions", []) or []:
+            collect(sub)
+
+    collect(condition)
+    return prefixes
+
+
+def _own_clause_text(node):
+    """`node["text"]` with a leading gating-condition clause removed.
+
+    An effect node's "text" is its whole printed clause, condition prefix
+    included, and the text-driven rules inside `_normalize_parsed_effect` rely
+    on that: trimming it to stop an enrichment pass from reading the condition
+    silently cost ~280 abilities their `distinct`, `baton_touch_trigger`,
+    `exclude_self` and `group_reference` fields.
+
+    Only the enrichment passes need the narrower view. PL!-pb2-042-L PSYCHIC
+    FIRE is the case in point — its effect is 「相手のステージにいる…ハートが4つ
+    以下のメンバー1人をウェイトにする」 and states no position and no names, but
+    the condition prefix names the センターエリア and 「矢澤にこ」と「西木野真姫」と
+    「絢瀬絵里」, so reading the full text pinned all of that onto the action.
+    Reading only the node's own clause is the fix, and it changes nothing else.
+    """
+    text = node.get("text")
+    if not isinstance(text, str) or not text:
+        return text
+    for prefix in _condition_clause_prefixes(node.get("condition")):
+        if text.startswith(prefix):
+            return text[len(prefix):].lstrip("、。 、")
+    return text
+
+
+# An effect whose own clause names its subject with a pronoun is talking about the
+# very set the condition just described, area included, so it keeps the
+# condition's positional context.
+#
+#   「自分のステージの左サイドエリアにいる『Liella!』のメンバーがheart02を3つ以上
+#     持つ場合、**そのメンバーは**、ライブ終了時まで、ブレードを得る」
+#     (PL!SP-bp4-024-L) — the blade goes to those left-side members and no others,
+#     so the effect must carry `position: left_side` even though its own clause
+#     names no area.
+#
+# This is the opposite of PL!-pb2-042-L, where the effect names a fresh subject
+# (「相手のステージにいる…メンバー1人をウェイトにする」) and must NOT inherit. So the
+# test is not "did the condition mention an area" but "whose members is this
+# clause about".
+_ANAPHORIC_SUBJECT_MARKERS = ("その", "それら", " thereof")
+
+
+def _is_anaphoric_clause(text) -> bool:
+    """Does this clause's subject refer back to the condition's set?"""
+    if not isinstance(text, str) or not text:
+        return False
+    return any(marker in text for marker in _ANAPHORIC_SUBJECT_MARKERS)
 
 
 def parse_action(text: str) -> Dict[str, Any]:
@@ -8013,6 +8129,11 @@ _ALT_INHERITED_KEYS = (
     "position",
     "distinct",
     "card_type",
+    "card_property",
+    "negation",
+    "ability_filter",
+    "cost_limit",
+    "cost_limit_operator",
 )
 _ALT_INHERITED_KEYS_WITH_VALUES = (
     "location",
@@ -8022,6 +8143,11 @@ _ALT_INHERITED_KEYS_WITH_VALUES = (
     "values",
     "distinct",
     "card_type",
+    "card_property",
+    "negation",
+    "ability_filter",
+    "cost_limit",
+    "cost_limit_operator",
 )
 
 
@@ -10813,11 +10939,12 @@ def _set_restriction_fields(text, result):
     )
     if "アクティブフェイズ" in text:
         result["phase"] = "active_phase"
-    if "自分と相手の" in text:
+    stripped = text.replace("相手の効果によっては", "").replace("自分の効果によっては", "").replace("効果によっては", "")
+    if "自分と相手の" in stripped:
         result["target"] = "both"
-    elif "自分の" in text:
+    elif "自分の" in stripped:
         result["target"] = "self"
-    elif "相手の" in text:
+    elif "相手の" in stripped:
         result["target"] = "opponent"
     if "このターン" in text:
         result["duration"] = "this_turn"
@@ -12140,6 +12267,21 @@ def _walk(d, full_text, original_text, ctx_text=None):
     def enter(node, parent_text):
         d_ctx = node.get("text") or parent_text or full_text
         d_text = node.get("text") or ""
+        # Position is read off the node's own clause, not the whole sentence:
+        # an effect's `text` carries its gating condition's prefix, and that
+        # prefix's 「センターエリア」 describes where the CONDITION looks, not
+        # where the action may act. PL!-pb2-042-L PSYCHIC FIRE's effect states
+        # no area at all, but 「自分のセンターエリアにコスト11以上の『BiBi』の
+        # メンバーがいる場合」 in front of it stamped `position: center` onto the
+        # wait, restricting it to centre-area members (parser defect D4).
+        #
+        # An anaphoric clause is the exception: 「… 경우、**そのメンバーは**、〜を
+        # 得る」 is about the condition's own set, so it keeps the full context.
+        own_ctx = _own_clause_text(node) or d_ctx
+        if _is_anaphoric_clause(own_ctx) and _condition_clause_prefixes(
+            node.get("condition")
+        ):
+            own_ctx = d_ctx
         ct = node.get("condition_type") or node.get("type")
         _walk_ensure_text(node, parent_text, full_text)
         _walk_propagate_activation_position(node, original_text, full_text)
@@ -12148,7 +12290,7 @@ def _walk(d, full_text, original_text, ctx_text=None):
         _walk_propagate_all_and_targets(node, d_ctx)
         _walk_propagate_sequential_links(node)
         _walk_set_defaults(node, d_text, ct)
-        _walk_propagate_position(node, d_ctx, d_text)
+        _walk_propagate_position(node, own_ctx, d_text)
         _walk_propagate_flags(node, d_ctx)
         _fix_unqualified_group_card_move(node)
         _walk_cleanup_text(node, d_text)
@@ -13047,6 +13189,22 @@ def _post_fix_cost_and_select(ability):
                 node["need_heart_operator"] = ">="
                 if node.get("cost_limit") is None:
                     node.pop("cost_limit_operator", None)
+            # A bare cost_limit_operator with no cost_limit is a parse artefact
+            # (e.g. 「必要ハートにheart04を2以上含む」 leaking ">="); nothing can
+            # compare against a missing bound. (D5)
+            #
+            # A DYNAMIC bound is not bare: `cost_reference` names the card the
+            # comparison is made against and `effects/mod.rs` resolves the pair.
+            # PL!S-bp3-006-R＋  Yoshiko states 「そのメンバーのコストに2を足した数に
+            # 等しいコスト」 — operator "=" against `previous_moved_card` with
+            # `cost_offset: 2` — and PL!N-bp1-008-P states 「…より、コストの低い…」.
+            # Dropping the operator there left both moves unrestricted.
+            if (
+                node.get("cost_limit") is None
+                and not node.get("cost_reference")
+                and node.get("cost_limit_operator") is not None
+            ):
+                node.pop("cost_limit_operator", None)
 
 
 def _mark_activated_this_turn_nodes(effect):
@@ -13158,6 +13316,198 @@ def _drop_unsupported_child_location(effect):
                 child.pop("location", None)
 
 
+def _propagate_compound_branch_context(effect):
+    """Copy zone/owner/card-type from one OR/AND branch to its siblings.
+
+    「…がすべて『Printemps』か、すべて『lily white』か、すべて『BiBi』のいずれかの
+    場合」 — branch 1 was parsed with location/target/card_type, branches 2/3 got
+    only the group name, so the engine evaluated "a BiBi exists anywhere" instead
+    of "all revealed member cards are BiBi" (PL!-pb2-037-L, D7). A branch that
+    names no zone of its own inherits the sibling's context.
+
+    `position` is deliberately NOT propagated. A compound leg states a zone and
+    an area as two independent things, and the two legs often differ in both:
+    PL!-pb2-042-L is 「…revealed_cards に「矢澤にこ」と…があり、**かつ** 自分の
+    センターエリアにコスト11以上の『BiBi』のメンバーがいる場合」 — leg 1 is about
+    revealed cards and leg 2 about the centre area, so handing leg 1 the centre
+    `position` made it demand a centre-area revealed card and the whole clause
+    stopped firing. The same copy made a left_side-gated compound satisfy for a
+    centre member (`condition_evaluation_test::left_side_heart_meets_threshold_...`).
+    Area is inherited by `_drop_unsupported_child_location` / the parser's own
+    position detection, not by borrowing it across legs.
+    """
+    for node in iter_dict_nodes(effect):
+        if node.get("type") not in (
+            "compound",
+            "compound_condition",
+            "or_condition",
+            "and_condition",
+        ):
+            continue
+        children = [c for c in node.get("conditions") or [] if isinstance(c, dict)]
+        if len(children) < 2:
+            continue
+        for key in ("location", "target", "card_type"):
+            donor = next((c.get(key) for c in children if c.get(key)), None)
+            if donor is None:
+                continue
+            for child in children:
+                if child.get(key):
+                    continue
+                own = child.get("text") or ""
+                # Do not overwrite a child that names a different zone.
+                if key == "location" and any(
+                    m in own for m in ("ステージ", "控え室", "デッキ", "手札", "センター", "サイド")
+                ):
+                    continue
+                if key == "target" and ("相手" in own or "自分" in own):
+                    continue
+                # Nor one that names a different card type. 「…成功ライブカード
+                # 置き場にカードが2枚以上あり、**かつ** 自分のステージに…メンバーが
+                # 3人以上いる場合」 (PL!N-bp5-027-L MIRACLE STAY TUNE!) counts LIVE
+                # cards in the first leg; borrowing the second leg's
+                # `card_type: member_card` made it count zero and the score never
+                # applied. 「自分のステージのメンバーが『Liella!』のみで、**かつ**
+                # 自分のエネルギーが7枚以上ある場合」 (PL!SP-bp4-001-R) is the same
+                # leak on a count, and its clause says エネルギー with no カード —
+                # so the markers are the bare type nouns, not the suffixed forms.
+                if key == "card_type" and any(
+                    m in own
+                    for m in (
+                        "メンバーカード",
+                        "ライブカード",
+                        "エネルギーカード",
+                        "サポートカード",
+                        "ciesoカード",
+                        "Educatorカード",
+                        "エネルギー",
+                        "cieso",
+                        "Educator",
+                    )
+                ):
+                    continue
+                child[key] = donor
+
+
+# Keys whose value is a nested effect/condition dict, or a list of them.
+_NESTED_EFFECT_KEYS = (
+    "actions",
+    "options",
+    "conditions",
+    "condition",
+    "primary_effect",
+    "alternative_effect",
+    "alternative_condition",
+    "result_condition",
+    "select_action",
+    "look_action",
+    "opponent_action",
+    "followup_action",
+    "optional_action",
+    "conditional_action",
+    "gained_effect",
+)
+
+
+def _to_joined_character_names(node):
+    """The names of a 「「A」と「B」」 list in `node`'s text, if it is such a list.
+
+    Only the と form counts. 「AかB」 is a real disjunction and must stay a single
+    any-of filter; 「AとB」 names every card that must be present.
+    """
+    if node.get("type") != "location_condition":
+        return None
+    characters = node.get("characters")
+    if not isinstance(characters, list) or len(characters) < 2:
+        return None
+    text = node.get("text") or ""
+    if "」と「" not in text:
+        return None
+    names = _quoted_names(text)
+    if len(names) != len(characters):
+        return None
+    if sorted(names) != sorted(characters):
+        return None
+    return names
+
+
+def _split_to_joined_character_lists(node):
+    """Turn a と-joined name list into an AND of one-name existence checks.
+
+    `characters` is an any-of filter — `util::card_matches_characters` asks
+    whether a card is ONE of the named characters — so
+    「…「矢澤にこ」と「西木野真姫」と「絢瀬絵里」のメンバーカードがあり、」 parsed as
+    "some revealed member is one of those three" and passed on one of them.
+    PL!-pb2-042-L PSYCHIC FIRE requires all three revealed, and fired with two.
+
+    The printed と-joined list is a conjunction, so it becomes an explicit
+    `compound`/`and` of per-name checks, the same shape the engine already
+    evaluates for every other AND-ed condition. Each leg keeps the clause's
+    zone, owner and card type and asks only for its own name.
+    """
+    if isinstance(node, list):
+        return [
+            _split_to_joined_character_lists(item) if isinstance(item, dict) else item
+            for item in node
+        ]
+    if not isinstance(node, dict):
+        return node
+
+    for key in _NESTED_EFFECT_KEYS:
+        child = node.get(key)
+        if isinstance(child, (dict, list)):
+            node[key] = _split_to_joined_character_lists(child)
+
+    names = _to_joined_character_names(node)
+    if not names:
+        return node
+    legs = []
+    for name in names:
+        leg = {
+            k: v
+            for k, v in node.items()
+            if k not in ("characters", "type", "operator", "distinct", "count", "unit")
+        }
+        leg["type"] = "location_condition"
+        leg["characters"] = [name]
+        leg["count"] = 1
+        leg["operator"] = ">="
+        legs.append(leg)
+    return {
+        "type": "compound",
+        "operator": "and",
+        "conditions": legs,
+        "text": node.get("text"),
+    }
+
+
+def _propagate_late_alternative_card_property(effect):
+    """Give a 「代わりに」 alternative condition the card property of its main one.
+
+    `_inherit_condition_context` runs while the 代わりに rule builds the node, but
+    `card_property` is only attached to a card_count_condition by a LATER pass
+    (`_fix_condition_enrichment`, run from the finalization pipeline — not from
+    `parse_ability`, so nothing in the parse-time chain can see it). The main
+    condition of PL!-pb1-004-P 園田海未 「自分の成功ライブカード置き場にスコアを持つ
+    『μ's』のカードが1枚ある場合 … 2枚以上ある場合、代わりに+2」 therefore has
+    `card_property: has_score_icon` while its `alternative_condition` — the text
+    「2枚以上ある場合」 states no property of its own — does not, so two μ's cards
+    with no score icon wrongly granted +2.
+
+    Only `card_property` is propagated here. It is the one inherited key that is
+    derived late; re-running the full `_ALT_INHERITED_KEYS` pass at this point
+    would also fill keys that were deliberately left out when the node was built.
+    """
+    for node in iter_dict_nodes(effect):
+        alt = node.get("alternative_condition")
+        main = node.get("condition")
+        if not isinstance(alt, dict) or not isinstance(main, dict):
+            continue
+        prop = main.get("card_property")
+        if prop and not alt.get("card_property"):
+            alt["card_property"] = prop
+
+
 def _enrich_characters(d):
     for current in iter_dict_nodes(d):
         if current.get("action") in (
@@ -13170,7 +13520,13 @@ def _enrich_characters(d):
             continue
         if "text" not in current:
             continue
-        text = current["text"]
+        # Read only this node's own clause. The full "text" also contains the
+        # gating condition's prefix, whose area and quoted names belong to the
+        # condition — PL!-pb2-042-L leaked `position: center` and three
+        # characters onto a plain wait action this way (parser defect D4).
+        text = _own_clause_text(current)
+        if not text:
+            continue
         if not current.get("characters"):
             is_self_cost_set = (
                 current.get("action") == "modify_cost"
@@ -14284,6 +14640,10 @@ class _FinalizationPipeline:
                 _infer_effect_action(effect)
                 triggerless_text = ability.get("triggerless_text", "")
                 _fix_condition_enrichment(effect, triggerless_text)
+                # Must follow _fix_condition_enrichment: that is the pass that
+                # gives the MAIN condition its `card_property`, so the shorthand
+                # 「代わりに」 alternative can only borrow it afterwards.
+                _propagate_late_alternative_card_property(effect)
                 _fix_primary_negation(effect)
                 _fix_compound_gain_split(effect, condition, triggerless_text)
                 _fix_spurious_sequential_change_state(effect)

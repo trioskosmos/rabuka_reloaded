@@ -288,10 +288,33 @@ static void test_trigger_auto_ability_string_key(void)
     par_copy_card_no(aoi, card_no, sizeof(card_no));
     Ability ab;
     CHECK(rb_decode_card_ability((uint32_t)aoi, idx, &ab), "Aoi jidou ability decodes");
-    char ability_id[1024];
-    snprintf(ability_id, sizeof(ability_id), "%s_%s", card_no,
-             ab.full_text ? ab.full_text : "");
+    /* Rust builds this key as `format!("{}_{}", card_no, ab.full_text)` into a
+       String — UNBOUNDED. `trigger_auto_ability` takes `ability_id: String`
+       (abilities.rs:1192) and never truncates, never rejects, and has no
+       maximum, so there is no "safe" size for a C stand-in: a constant is a
+       guess about the corpus. This file used to guess 1024 into an
+       UNCHECKED `snprintf`, and a fixed snprintf into a too-small buffer
+       reports success — the ability then simply never fires, with no error and
+       no failing assertion. MEASURED over cards/abilities.json (985 unique
+       abilities, 2116 (card_no, full_text) instances): the longest key is 653
+       bytes (PL!-bp6-006-R＋ / -P＋, full_text 635) and 38 keys need more than
+       512. So the key is allocated from the two real lengths and freed before
+       the function returns; there is no upper limit left to get wrong. */
+    char *ability_id = NULL;
+    {
+        const char *ft = ab.full_text ? ab.full_text : "";
+        size_t n_cn = strlen(card_no);
+        size_t n_ft = strlen(ft);
+        ability_id = (char *)malloc(n_cn + 1 + n_ft + 1);
+        if (ability_id) {
+            memcpy(ability_id, card_no, n_cn);
+            ability_id[n_cn] = '_';
+            memcpy(ability_id + n_cn + 1, ft, n_ft + 1);
+        }
+    }
     rb_free_ability(&ab);
+    CHECK(ability_id != NULL, "ability key allocated for the string-keyed fire");
+    if (!ability_id) return;
 
     /* abilities.rs:1074 -- the whole body lives inside
        `if let Some(card_no) = source_card_id`; with no source card number
@@ -335,6 +358,7 @@ static void test_trigger_auto_ability_string_key(void)
     /* Two consecutive fires both land (no hidden once-per-call state). */
     CHECK_EQ(rb_ability_uses_used(g, aoi, idx), 0,
              "the string-keyed trigger path does not consume a use on its own");
+    free(ability_id);
 }
 
 static void test_trigger_auto_ability_gained(void)

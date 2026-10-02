@@ -184,15 +184,31 @@ static int df_fire_trigger(TestGame *tg, int cid, const char *trig,
     if (!rb_decode_card_by_index((uint32_t)cid, &card)) return 0;
     char card_no[128];
     snprintf(card_no, sizeof(card_no), "%s", rb_card_string(card.card_no_idx));
-    char ability_id[1024];
+    /* Rust's key is `format!("{}_{}", card_no, ab.full_text)` into a String —
+       UNBOUNDED (trigger_auto_ability takes ability_id: String,
+       abilities.rs:1192). This used to be a fixed `char ability_id[1024]` fed
+       by an UNCHECKED snprintf, which cannot report the overflow it hides: the
+       key is silently cut, the suffix comparison in par_ability_id_matches
+       fails, and the ability never fires — a green suite and a missing effect.
+       MEASURED longest key over cards/abilities.json: 653 bytes, with 38 keys
+       over 512. Allocated from the two real lengths instead, so there is no
+       upper limit left to get wrong. */
+    char *ability_id = NULL;
     int found = 0, nab = rb_card_num_abilities((uint32_t)cid);
     for (int a = 0; a < nab && !found; a++) {
         Ability ab;
         if (!rb_decode_card_ability((uint32_t)cid, a, &ab)) continue;
         if (ab.triggers && strcmp(ab.triggers, trig) == 0) {
             if (nth == 0) {
-                snprintf(ability_id, sizeof(ability_id), "%s_%s", card_no,
-                         ab.full_text ? ab.full_text : "");
+                const char *ft = ab.full_text ? ab.full_text : "";
+                size_t n_cn = strlen(card_no);
+                size_t n_ft = strlen(ft);
+                ability_id = (char *)malloc(n_cn + 1 + n_ft + 1);
+                if (ability_id) {
+                    memcpy(ability_id, card_no, n_cn);
+                    ability_id[n_cn] = '_';
+                    memcpy(ability_id + n_cn + 1, ft, n_ft + 1);
+                }
                 found = 1;
             } else {
                 nth--;
@@ -201,9 +217,10 @@ static int df_fire_trigger(TestGame *tg, int cid, const char *trig,
         rb_free_ability(&ab);
     }
     rb_free_card(&card);
-    if (!found) return 0;
+    if (!found || !ability_id) { free(ability_id); return 0; }
     rb_trigger_auto_ability(&tg->state, ability_id, trigger_type, 0, card_no,
                             cid, NULL, 0, -1);
+    free(ability_id);
     tg->state.activating_card = cid;
     rb_process_pending_auto_abilities(&tg->state);
     return 1;

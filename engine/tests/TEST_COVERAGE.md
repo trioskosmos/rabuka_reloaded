@@ -88,11 +88,11 @@ A card with multiple abilities counts as **covered** if *any* is touched; check 
 | card_blade_condition | 1 | 1 | 1/1 |
 | card_count_condition | 91 | 91 | 91/91 |
 | comparison_condition | 60 | 60 | 60/60 |
-| compound | 39 | 39 | 39/39 |
+| compound | 41 | 41 | 41/41 |
 | energy_state_condition | 2 | 2 | 2/2 |
 | group_condition | 48 | 48 | 48/48 |
 | highest_cost_on_stage_condition | 1 | 1 | 1/1 |
-| location_condition | 79 | 79 | 79/79 |
+| location_condition | 77 | 77 | 77/77 |
 | movement:area_move | 14 | 14 | 14/14 |
 | movement:baton_touch | 22 | 22 | 22/22 |
 | movement:energy_placed | 4 | 4 | 4/4 |

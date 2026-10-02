@@ -43,9 +43,10 @@ int rb_ability_matches_trigger(const Ability *ab, const char *trigger) {
    「{{ターン1回}}」 ability resolved without opening a prompt consumed TWO
    uses and was unrepeatable for the rest of the turn.
 
-   Marking the entry here is also what keeps the C's ENQUEUE-time spending
-   (rb_mark_entries_use_limit_recorded / rb_mark_enqueued_entry_use_limit_recorded)
-   from being double-counted by a later resolution-time record. */
+   Marking the entry here is also what stops a use being counted twice, by any
+   later resolution-time record. The C's old ENQUEUE-time spending
+   (rb_record_use + rb_mark_entries_use_limit_recorded, both now deleted) had to
+   mark its own entries for exactly this reason. */
 void rb_record_ability_use(GameState *g, int cid, int idx) {
     if (!g) return;
     if (g->queue.cur >= 0 && g->queue.cur < g->queue.n_entries &&
@@ -897,37 +898,43 @@ static int rb_claim_batch_slot(GameState *g, int num_key, int skip_key,
     return 1;
 }
 
-/* ── Enqueue-time use-limit consumption ─────────────────────────────────
-   Rust records a turn-limited ability's use at RESOLUTION, and guards it with
-   the queue entry's own `use_limit_recorded` flag so one activation records
-   exactly once (abilities.rs:197-215, resolver.rs / choice.rs call sites).
-   The C port consumes the use at ENQUEUE instead — rb_record_use right after
-   each enqueue, a convention every scan in src/turn/triggers.c also relies on
-   and that must not be removed here.
+/* ── Enqueue-time use-limit consumption: GONE ────────────────────────────
+   HISTORICAL. The C port used to consume a turn-limited ability's use at
+   ENQUEUE — `rb_record_use` right after each enqueue, immediately followed by
+   `rb_mark_entries_use_limit_recorded` over the entries just added. Rust never
+   does that: enqueue_printed_ability (abilities.rs:1282-1326) constructs the
+   entry with use_limit_recorded: false (abilities.rs:270) and records nothing,
+   and the only writer of turn_limited_abilities_used is record_ability_use
+   (abilities.rs:216-231), reached from resolution.
 
-   The two have to be reconciled or the entry rejects itself: the
-   resolution-time gate in rb_process_current_ability sees uses_used == limit
-   for the entry that just consumed it and skips the effect. Marking the entry
-   closes that loop the same way Rust's flag does — the gate then only rejects
-   entries whose use was consumed by an EARLIER activation, and a second
-   enqueue in the same turn is stopped by the trigger-time gate
-   (rb_use_limit_reached in the scans, Rust's ability_has_remaining_uses at
-   abilities.rs:934).
+   The interim shape existed only because the resolution-time gate in
+   pca_resolve_entry is `if (ab->use_limit > 0 && !entry->use_limit_recorded)`:
+   an entry that had already paid for itself would otherwise be rejected by its
+   own use. Marking the entry closed that loop, but it also meant the gate could
+   never fire for it, so a second activation of a 「{{ターン1回}}」 in the same
+   turn was admitted. And the pair could only ever be removed TOGETHER: drop the
+   flag and keep the record and the entry is admitted whether or not its use was
+   spent, while every resolution record early-returns on a set flag and the use
+   is never spent at all.
 
-   This convention is NOT what Rust does (see the two records now in
-   pca_resolve_entry: the Early one at gates.rs:301-310, which is the port's
-   own answer, and the Final one). It survives here only because the record and
-   the flag are removed TOGETHER: taking the flag off while leaving the record
-   makes the resolution-time gate permanently unreachable for these entries, so
-   a 「{{ターン1回}}」 ability is admitted whether or not its use was spent and —
-   because every resolution record early-returns on a set flag — the use is
-   never spent at all. src/turn/triggers.c has already been migrated off this
-   shape (see the note at its top); these five sites have not. */
-static void rb_mark_entries_use_limit_recorded(GameState *g, int from_index) {
-    if (!g) return;
-    for (int i = from_index > 0 ? from_index : 0; i < g->queue.n_entries; i++)
-        g->queue.entries[i].use_limit_recorded = 1;
-}
+   The blocker was that pca_resolve_entry had no Early record, so the only two it
+   had sat at the declined-optional-cost arm and AFTER rb_execute_effect_ex —
+   for the whole duration of the effect the ability still looked unused, the
+   post-resolution re-scan re-enqueued it, and it fired twice. With
+   UseLimitPhase::Early in place (gates.rs:301-310, at resolver.rs:1353's
+   position, BEFORE the effect) each pair could be deleted one site at a time,
+   which is what has now happened to all five:
+     1. rb_queue_yell_ability
+     2. queue_zone_abilities
+     3. queue_moved_cards_abilities
+     4. the opponent-cause watchers
+     5. rb_trigger_each_time_for_member
+   src/turn/triggers.c and src/ability/effects/ability.c were already clear.
+   `rb_mark_entries_use_limit_recorded` had no callers left and is deleted with
+   this comment; the helper that replaced it is
+   `drain_record_ability_use` in src/ability/ability_queue.c, which publishes
+   g->queue.cur around the one call so the entry-scoped guard points at the
+   entry actually being resolved. */
 
 static int rb_condition_requires_yell(const Condition *c) {
     if (!c) return 0;
@@ -985,11 +992,18 @@ static int rb_queue_yell_ability(GameState *g, int pl, int cid, int ability_idx)
         return 0;
     }
     g->batch_triggered_keys[g->n_batch_triggered_keys++] = key;
-    int entry_base = g->queue.n_entries;
     rb_build_ability_queue_entry(g, cid, ability_idx, "",
                                   pl == 0 ? "p1" : "p2", "yell", NULL, 0, -1);
-    rb_record_use(&g->queue, cid, ability_idx, g->turn);
-    rb_mark_entries_use_limit_recorded(g, entry_base);
+    /* MIGRATED (site 1 of 5). The enqueue-time `rb_record_use` +
+       `rb_mark_entries_use_limit_recorded` pair that used to sit here is gone,
+       both halves together. Rust never spends a use at enqueue:
+       enqueue_printed_ability (abilities.rs:1282-1326) builds the entry with
+       use_limit_recorded: false (abilities.rs:270) and records nothing, and the
+       only writer of turn_limited_abilities_used is record_ability_use
+       (abilities.rs:216-231), reached from resolution. This entry is now spent
+       by the UseLimitPhase::Early record in pca_resolve_entry, at
+       resolver.rs:1353's position (gates.rs:301-310) — which is BEFORE the
+       effect, so the post-resolution re-scan can no longer re-enqueue it. */
     rb_free_ability(&ab);
     return 1;
 }
@@ -1753,17 +1767,17 @@ void rb_trigger_auto_ability(GameState *g, const char *ability_id,
             continue;
         }
         if (par_ability_id_matches(ability_id, card_no, ab.full_text)) {
-            /* No rb_record_use here, and deliberately no
-               rb_mark_entries_use_limit_recorded either. Rust's
-               enqueue_printed_ability (abilities.rs:1282-1315) records
+            /* No rb_record_use here, and no entry marking either. Rust's
+               enqueue_printed_ability (abilities.rs:1282-1326) records
                NOTHING: the use is spent at resolution by the very same
                record_ability_use call every other path uses, and
-               pca_resolve_entry's :2626 gate sees the use still unspent so
-               the entry resolves normally and spends its own use at :2733.
-               The C's enqueue-time spending convention (the four batch
-               helpers, triggers.c's six sites, rb_queue_yell_ability) is a
-               port-wide deviation from Rust; marking an entry here without
-               recording a use would suppress the :2733 record and make
+               pca_resolve_entry's use-limit gate sees the use still unspent so
+               the entry resolves normally and spends its own use in
+               pca_resolve_entry (the Early record, gates.rs:301-310).
+               The other five scans in this file used to deviate from that by
+               spending at enqueue; they no longer do, so this path is no
+               longer the odd one out. Marking an entry here without recording
+               a use would suppress the resolution record and make
                「{{ターン1回}}」 silently unenforced through this path. */
             rb_build_ability_queue_entry(g, cid, a, card_no, pid_str,
                                         trigger_type, trigger_moved_cards, n_moved, triggering_member_id);
@@ -1943,7 +1957,6 @@ static int queue_zone_abilities(GameState *g, int actor, const int *ids, int n,
             for (int b = 0; b < g->n_batch_triggered_keys; b++)
                 if (g->batch_triggered_keys[b] == key) { dup = 1; break; }
             if (!dup) {
-                int entry_base = g->queue.n_entries;
                 int cap = (int)(sizeof(g->batch_triggered_keys)/sizeof(g->batch_triggered_keys[0]));
                 if (g->n_batch_triggered_keys < cap)
                     g->batch_triggered_keys[g->n_batch_triggered_keys++] = key;
@@ -1961,8 +1974,9 @@ static int queue_zone_abilities(GameState *g, int actor, const int *ids, int n,
                                                 moved_cards, n_moved, -1);
                     queued++;
                 }
-                rb_record_use(&g->queue, cid, a, g->turn);
-                rb_mark_entries_use_limit_recorded(g, entry_base);
+                /* MIGRATED (site 2 of 5) — see the note on rb_queue_yell_ability
+                   for why the record and the flag have to leave together, and
+                   where the use is now spent instead. */
             }
             rb_free_ability(&ab);
         }
@@ -2016,14 +2030,14 @@ static int queue_moved_cards_abilities(GameState *g, const int *moved_cards, int
             for (int b = 0; b < g->n_batch_triggered_keys; b++)
                 if (g->batch_triggered_keys[b] == key) { dup = 1; break; }
             if (!dup) {
-                int entry_base = g->queue.n_entries;
                 int cap = (int)(sizeof(g->batch_triggered_keys)/sizeof(g->batch_triggered_keys[0]));
                 if (g->n_batch_triggered_keys < cap)
                     g->batch_triggered_keys[g->n_batch_triggered_keys++] = key;
                 rb_build_ability_queue_entry(g, moved_card_id, a, "", player_id_clone,
                                             trigger, moved_cards, n_moved, -1);
-                rb_record_use(&g->queue, moved_card_id, a, g->turn);
-                rb_mark_entries_use_limit_recorded(g, entry_base);
+                /* MIGRATED (site 3 of 5) — see the note on rb_queue_yell_ability
+                   for why the record and the flag have to leave together, and
+                   where the use is now spent instead. */
                 queued++;
             }
             rb_free_ability(&ab);
@@ -2200,7 +2214,6 @@ void rb_fire_opponent_cause_watchers_for_move(GameState *g, int moved_card_id,
             for (int b = 0; b < g->n_batch_triggered_keys; b++)
                 if (g->batch_triggered_keys[b] == num_key) { already_claimed = 1; break; }
             {
-                int entry_base = g->queue.n_entries;
                 if (!already_claimed) {
                     int cap = (int)(sizeof(g->batch_triggered_keys) /
                                     sizeof(g->batch_triggered_keys[0]));
@@ -2212,8 +2225,9 @@ void rb_fire_opponent_cause_watchers_for_move(GameState *g, int moved_card_id,
                 rb_build_ability_queue_entry(g, watcher_id, a, "",
                                             (owner == 0) ? "p1" : "p2", "自動",
                                             &moved_card_id, 1, -1);
-                rb_record_use(&g->queue, watcher_id, a, g->turn);
-                rb_mark_entries_use_limit_recorded(g, entry_base);
+                /* MIGRATED (site 4 of 5) — see the note on rb_queue_yell_ability
+                   for why the record and the flag have to leave together, and
+                   where the use is now spent instead. */
             }
             rb_free_ability(&ab);
         }
@@ -2305,8 +2319,18 @@ void rb_trigger_each_time_for_member(GameState *g, int pl,
             int each_time_entry_base = g->queue.n_entries;
             rb_build_ability_queue_entry(g, cid, a, "", (pl == 0) ? "p1" : "p2", "自動", NULL, 0, member_card_id);
             if (g->queue.n_entries <= each_time_entry_base) { rb_free_ability(&ab); continue; }
-            rb_record_use(&g->queue, cid, a, g->turn);
-            rb_mark_entries_use_limit_recorded(g, each_time_entry_base);
+            /* MIGRATED (site 5 of 5) — the gate above is Rust's
+               ability_has_remaining_uses, which abilities.rs:971 reads
+               inside enqueue_printed_ability; the use itself is NOT spent here.
+               It is spent by the UseLimitPhase::Early record in
+               pca_resolve_entry, at resolver.rs:1353's position
+               (gates.rs:301-310), which is BEFORE the effect runs. That is what
+               the old unconditional record was standing in for, and the reason
+               the two halves of the old pair could only ever leave together:
+               a 「{{ターン1回}}」 each_time watcher that resolved and then
+               re-queued on the post-resolution scan would otherwise be
+               admitted, because the use was still unspent while its effect
+               executed. */
             rb_free_ability(&ab);
         }
     }
@@ -2712,11 +2736,13 @@ static int pca_resolve_entry(GameState *g, RbQueueEntry *entry, int cid, int aid
        GameState::ability_uses_used). Rust records the use at resolution and
        the entry's `use_limit_recorded` flag makes that record happen exactly
        once per activation (abilities.rs:197-215), so the gate sees 0 uses for
-       the activation that is about to run. The C scans consume the use at
-       ENQUEUE instead (see rb_mark_entries_use_limit_recorded), so an entry
-       flagged `use_limit_recorded` has already spent its own use and the gate
-       must not reject it — that double count silently dropped every
-       「{{ターン1回}}」 自動 effect reached through a TAS scan. */
+       the activation that is about to run, and a SECOND activation of the same
+       「{{ターン1回}}」 ability in the same turn sees 1 and is refused here.
+       That is what `use_limit_gate` is for, and it is now reachable on every
+       path: the C scans used to spend the use at ENQUEUE and pre-flag the
+       entry, which made this gate unreachable for them and let a second
+       activation through. That convention is gone (see the note where
+       rb_mark_entries_use_limit_recorded used to be defined). */
     if (ab->use_limit > 0 && !entry->use_limit_recorded) {
         if (rb_resolver_use_limit_reached(g, cid, aidx, ab->use_limit)) {
             rb_free_ability(ab);
@@ -2788,16 +2814,22 @@ static int pca_resolve_entry(GameState *g, RbQueueEntry *entry, int cid, int aid
 
        It is placed AFTER the resolution-time gate above, so the gate still sees
        0 uses for the activation about to run, and it is a no-op for an entry
-       that arrived with its use already spent (every enqueue-time site calls
-       rb_mark_entries_use_limit_recorded, and rb_record_ability_use itself
-       early-returns on a set flag) — so this changes nothing for those paths. */
+       that arrives with its use already spent on an EARLIER pass of the same
+       activation — rb_record_ability_use early-returns on a set flag, which is
+       what makes the second phase of one activation free. */
+    /* The `is_none_or` detail matters: Rust writes
+           ability.effect.as_ref().is_none_or(|e| can_activate_effect(gs, e))
+       so an ability with NO effect at all still records, because "there is
+       nothing that could fail to activate" is vacuously true. The C must not
+       read that as "an ability with no effect does not record": a cost-only
+       「{{ターン1回}}」 ability would keep its use forever. */
+    int early_can_activate = !ab->effect || rb_can_activate_effect(g, actor, ab->effect, cid);
+    int early_excluded = ab->effect &&
+        (ab->effect->is_optional ||
+         (ab->effect->action && !strcmp(ab->effect->action, "conditional_on_optional")));
     if (ab->use_limit > 0 && !entry->use_limit_recorded && cid >= 0 &&
         !cost_already_paid && !g->queue.has_pending &&
-        ab->effect &&
-        !ab->effect->is_optional &&
-        !(ab->effect->action &&
-          !strcmp(ab->effect->action, "conditional_on_optional")) &&
-        rb_can_activate_effect(g, actor, ab->effect, cid)) {
+        !early_excluded && early_can_activate) {
         rb_record_ability_use(g, cid, aidx);
         entry->use_limit_recorded = 1;
     }

@@ -1,4 +1,5 @@
 #include "rabuka.h"
+#include "gen_data.h"   /* RBKA_NUM_ABILITIES_C — the generated ability count */
 #include <string.h>
 #include <stdlib.h>
 #include <stdio.h>
@@ -10,23 +11,70 @@ AbilityEffect *rb_effect_deep_clone(const AbilityEffect *src);
     AbilityRef — faithful C translation of engine/src/ability/ability_store.rs
 
     Rust: AbilityRef(pub u16) with a per-slot OnceLock<Arc<Ability>> cache
-    (936 slots, ~15 KB empty). Decodes from bytecode on first resolve(),
-    then cheap cache hit thereafter.
+    (one slot per generated ability; Rust's doc comment still quotes "936
+    slots, ~15 KB empty", a count the corpus has since outgrown). Decodes from
+    bytecode on first resolve(), then cheap cache hit thereafter.
 
     C equivalent:
       - RbAbilityRef holds a uint16_t bytecode index.
       - g_ability_cache[] is a static array of Ability* (one per slot).
       - g_ability_cache_valid[] tracks which slots have been decoded.
       - rb_ability_ref_resolve() decodes on miss, returns cached pointer on hit.
-      - The caller must NOT free the returned pointer (it is static storage).
+      - The caller must NOT free the returned pointer: the cache owns it and
+        keeps it for the life of the process.
+
+    LIFETIME — ONCE-ONLY, AND THAT IS RUST'S RULE, NOT AN OMISSION.
+    Rust's cache is `static CACHE: OnceLock<Vec<OnceLock<Arc<Ability>>>>`
+    (ability_store.rs:22-30): built on first use, never reset, and never even
+    DROPPED, because a Rust `static` has no destructor — every Arc<Ability> in
+    it is reclaimed by the OS at process exit and never by Rust code. The whole
+    safety argument is therefore one sentence: the compiled-in tables do not
+    change while the process runs, so a cached Ability can never be stale.
+    This file reproduces that exactly: a slot is written once and never freed.
+    There is deliberately no flush. See the note where one used to be.
     ════════════════════════════════════════════════════════════════════ */
+
+/* Cache capacity is DERIVED from the generated ability count — never a literal.
+   RBKA_NUM_ABILITIES_C is the macro tools/gen_from_rs.py writes into gen_data.h
+   from the same generator run that writes src/core/generated/gen_data.c, so a
+   corpus change (936 -> 985 happened during this work) moves the bound with it.
+   The old `#define RB_ABILITY_CACHE_CAP 1024` was a hand-guessed round number,
+   and the guess produced two DIFFERENT wrong answers for an out-of-range index
+   (measured against this tree's 985 abilities by linking the same probe against
+   the old and new object):
+     idx 985..1023 -> cached a PHANTOM slot and returned a NON-NULL pointer to a
+                      silently empty default Ability (use_limit=-1, full_text=NULL),
+                      which then stayed cached for the life of the process. A
+                      caller could not tell it apart from a real ability.
+     idx >= 1024   -> decoded the ability, immediately freed it, and returned NULL.
+   Both are now one answer: out of range means NULL, and nothing is cached.
+
+   The array below is sized by the macro, so the bound is a compile-time
+   constant and there is no separate hand-maintained number that can drift.
+   There is deliberately no `+ 1` slack either: the cache is indexed by the SAME
+   u16 ability index the bytecode decoder is, and an index the decoder rejects
+   must not have a cache slot (see ability_index_in_range below), so a slot that
+   no decoder call could ever reach would be pure dead capacity.
+
+   GCC does NOT diagnose a cross-TU `extern const T[N]` whose size disagrees with
+   its definition (measured on this toolchain: gcc 15.3.0, both TUs clean, link
+   clean), so deriving the bound from the macro is necessary but not sufficient
+   — it cannot, on its own, prove gen_data.h and gen_data.c are from the same
+   generator run. ability_slot_count() below closes that gap at runtime by
+   clamping to RBKA_NUM_ABILITIES, the count gen_data.c itself publishes and the
+   one vm.c range-checks every decode against. */
+#define RB_ABILITY_CACHE_SLOTS ((int)RBKA_NUM_ABILITIES_C)
 
 /* Per-slot decoded-ability cache — mirrors OnceLock<Vec<OnceLock<Arc<Ability>>>>.
    Initialized lazily: all entries NULL until first resolve(). */
-#define RB_ABILITY_CACHE_CAP 1024
-static Ability *g_ability_cache[RB_ABILITY_CACHE_CAP];
-static int      g_ability_cache_valid[RB_ABILITY_CACHE_CAP];
+static Ability *g_ability_cache[RB_ABILITY_CACHE_SLOTS];
+static int      g_ability_cache_valid[RB_ABILITY_CACHE_SLOTS];
 static int      g_ability_cache_initialized = 0;
+
+_Static_assert(RBKA_NUM_ABILITIES_C > 0,
+               "generated ability count is zero — gen_data.h is stale");
+_Static_assert(RBKA_NUM_ABILITIES_C <= 0xFFFFu,
+               "generated ability count exceeds the u16 range RbAbilityRef.idx can address");
 
 /* ── RbAbilityRef constructors / accessors ────────────────────────────── */
 
@@ -42,33 +90,112 @@ uint16_t rb_ability_ref_idx(const RbAbilityRef *ref) {
     return ref ? ref->idx : 0;
 }
 
+/* NOT PORTED ON PURPOSE — do not "add the missing function".
+ *
+ * AbilityRef::peek() (ability_store.rs:64-85) returns Option<&Ability> for
+ * callers that only want to READ an already-decoded ability. It exists purely
+ * to avoid `Arc::clone`, which is an atomic read-modify-write on a cache line
+ * shared by every worker thread, and the doc comment says so outright: "This
+ * costs nothing" against ~50 .resolve() sites, many inside per-card loops,
+ * spending a few hundred atomic RMWs per action just to keep a `use_limit: u8`
+ * alive for one read. It is a LIFETIME optimisation with no semantic content —
+ * peek() returns None before a slot has been decoded, so any caller that needs a
+ * value still has to call resolve(). There is no C counterpart here and one must
+ * not be written: the C hands out a borrowed `const Ability *` that resolve()
+ * already owns, so "clone an Arc" is literally a pointer copy and there is
+ * nothing left to optimise. An rb_ability_ref_peek() would be a second spelling
+ * of resolve() that can return NULL for a reason resolve() never does
+ * (not-yet-decoded), i.e. a new way for the two entry points to disagree — the
+ * exact defect this file just spent a change removing.
+ *
+ * DERIVES: Rust's AbilityRef derives Debug, Clone, Copy, PartialEq, Eq and Hash
+ * (ability_store.rs:18), all of which are over the u16 INDEX ONLY — never over
+ * a decoded Ability, and never over a cache slot's contents. The C matches:
+ * RbAbilityRef is a bare uint16_t, so == on two refs compares indexes exactly as
+ * Rust's PartialEq does, and rb_ability_ref_idx() is the field accessor Rust's
+ * generated Copy hands out by value. Two C divergences worth naming rather than
+ * papering over: (1) rb_ability_ref_idx(NULL) returns 0, where Rust has no
+ * null-reference concept at all and would be UB, so a NULL ref silently compares
+ * equal to index 0; (2) nothing in this file compares an Ability's CONTENTS, so
+ * there is no place where a C equality test could silently differ from Rust's
+ * index-only equality. The functions deleted below (flush / flush_slot) were the
+ * only flush-adjacent code here, and neither performed any comparison at all —
+ * they compared an index against a bound, never an Ability against an Ability. */
+
 /* ── Internal helpers ─────────────────────────────────────────────────── */
 
-/* Lazy-init the cache validity array. Called once on first resolve(). */
+/* The number of ability indices this cache may hold: the generated count
+   (gen_data.h) clamped DOWN to the count gen_data.c publishes. The clamp can
+   only ever shrink the bound, so the result is always <= the array size and
+   therefore always a safe index limit.
+
+   Computed on demand rather than cached, so the bound is correct for any caller
+   regardless of whether ability_cache_ensure_init() has run yet. */
+static uint32_t ability_slot_count(void) {
+    uint32_t slots = (uint32_t)RB_ABILITY_CACHE_SLOTS;
+    if (RBKA_NUM_ABILITIES < slots) slots = RBKA_NUM_ABILITIES;
+    return slots;
+}
+
+/* THE range check — one predicate, used by resolve(), decode() and
+   cache_size(), for the cache slot index AND the bytecode decode index alike.
+
+   Both entry points take the same u16 ability index into the same
+   [0, slot_count) domain, so bounding them with one predicate is what stops
+   them drifting apart again: previously rb_ability_ref_decode() rejected
+   idx >= RBKA_NUM_ABILITIES while rb_ability_ref_resolve() did not, so the two
+   ways into one concept disagreed about what an out-of-range index means.
+   Measured on this tree at 985 abilities: the old pair returned rc=0 from
+   decode(985) and a NON-NULL empty Ability from resolve(985). Callers now get
+   NULL from resolve() and 0 plus a zeroed Ability from decode(), both before the
+   cache array or the decoder is touched.
+
+   Rust refuses the same index differently: `decoded_slots()[self.0]` (vm
+   resolve, ability_store.rs:48) PANICS on an out-of-range u16, because the Vec
+   has exactly NUM_ABILITIES elements. C has no unwinding, and the declared C
+   contract is a pointer that is NULL on failure (rabuka.h:2801), so a NULL
+   return is the available translation of that panic: both refuse the index and
+   neither decodes it. */
+static int ability_index_in_range(uint16_t idx) {
+    return (uint32_t)idx < ability_slot_count();
+}
+
+/* Lazy-init the cache validity array. Called once on first resolve().
+   Also the one place the two generated ability counts are compared. */
 static void ability_cache_ensure_init(void) {
     if (g_ability_cache_initialized) return;
-    for (int i = 0; i < RB_ABILITY_CACHE_CAP; i++) {
+    for (int i = 0; i < RB_ABILITY_CACHE_SLOTS; i++) {
         g_ability_cache[i] = NULL;
         g_ability_cache_valid[i] = 0;
     }
+    if (RBKA_NUM_ABILITIES != (uint32_t)RBKA_NUM_ABILITIES_C)
+        fprintf(stderr,
+                "FATAL: ability-count skew — gen_data.h says %u, "
+                "generated/gen_data.c says %u; the ability cache is bounded to "
+                "%u slots. These files come from different generator runs: "
+                "FIX: bash tools/regen_all.sh\n",
+                (unsigned)RBKA_NUM_ABILITIES_C, (unsigned)RBKA_NUM_ABILITIES,
+                (unsigned)ability_slot_count());
     g_ability_cache_initialized = 1;
 }
 
 /* Decode a single ability from bytecode into a heap-allocated Ability.
-   Returns NULL on allocation failure; caller must rb_free_ability() on the
-   result if it is not being stored in the cache. */
+   Precondition: ability_index_in_range(idx) — the caller owns the check, and
+   there is exactly one of those checks in this file.
+
+   Returns NULL only on allocation failure. A decode failure is NOT an error
+   here: mirror Rust `AbilityRef::decode()`, which logs the error and returns
+   Ability::default() so the game keeps running (ability_store.rs:87-95). We
+   cannot log from here without pulling in the log subsystem, and vm.c's
+   decoder already substitutes a zeroed default Ability for structural failure;
+   only an out-of-range index is a hard error, and that is now rejected before
+   this point. */
 static Ability *ability_decode(uint16_t idx) {
     Ability *a = (Ability *)rb_malloc(sizeof(Ability));
     if (!a) return NULL;
     memset(a, 0, sizeof(*a));
     a->use_limit = -1;
     if (!rb_decode_ability((uint32_t)idx, a)) {
-        /* Decode failure: mirror Rust `AbilityRef::decode()` which logs the
-           error and returns Ability::default(). We cannot log here without
-           pulling in the log subsystem; the vm.c decoder already returns a
-           zeroed default Ability on structural failure (returns 1 with
-           zeroed fields for empty slices). Only out-of-range produces a
-           hard error — that path is guarded by the caller. */
         memset(a, 0, sizeof(*a));
         a->use_limit = -1;
     }
@@ -80,26 +207,36 @@ static Ability *ability_decode(uint16_t idx) {
 /* Mirror AbilityRef::resolve() -> Arc<Ability>.
 
    Behaviour:
-     non-no_std (hosted) : uses the per-slot cache. On hit returns the cached
-                           pointer (cheap clone). On miss decodes, stores the
-                           heap-allocated Ability in the cache slot, then
-                           returns it. Lost-race (two concurrent resolves) is
-                           safe: both sides return a valid pointer.
-     no_std / bare-metal : same logic without the cache; decodes fresh each
-                           call so no static RAM is consumed.
+     cache hit  : returns the cached pointer (Rust's Arc::clone is free in C,
+                  because a raw pointer is already shared, not owned).
+     cache miss : decodes once and stores the heap-allocated Ability in the
+                  slot. Lost-race (two concurrent resolves) is safe: both
+                  sides return a valid pointer.
 
-   The returned pointer is valid until rb_unload() or rb_ability_ref_flush().
-   The caller must NOT free it directly. */
+   Returns NULL for a NULL ref, for an out-of-range index (the same guard
+   rb_ability_ref_decode() applies — see ability_index_in_range), or on
+   allocation failure. Rust panics on the out-of-range case instead; see that
+   comment for why a NULL return is the C translation.
+
+   The returned pointer is owned by the cache and is valid for the rest of the
+   process. The caller must NOT free it, and must not assume it stays valid
+   across a bytecode reload — there is no flush, by design (see the LIFETIME
+   note at the top of this file). */
 const Ability *rb_ability_ref_resolve(const RbAbilityRef *ref) {
     if (!ref) return NULL;
 
     uint16_t idx = ref->idx;
 
-    /* Use the cache on hosted builds (we always have malloc here). */
     ability_cache_ensure_init();
-    if (idx < RB_ABILITY_CACHE_CAP && g_ability_cache_valid[idx]) {
-        return g_ability_cache[idx];
-    }
+
+    /* THE guard. Because it runs before the array is indexed, every index that
+       reaches the cache below is inside it: ability_index_in_range() is bounded
+       by ability_slot_count(), which is clamped to the array size. That is what
+       makes the old `idx < RB_ABILITY_CACHE_CAP` tests dead code, and it kills
+       the decode-then-free-then-return-NULL arm they sat next to. */
+    if (!ability_index_in_range(idx)) return NULL;
+
+    if (g_ability_cache_valid[idx]) return g_ability_cache[idx];
 
     /* Cache miss — decode from bytecode. */
     Ability *decoded = ability_decode(idx);
@@ -107,18 +244,16 @@ const Ability *rb_ability_ref_resolve(const RbAbilityRef *ref) {
 
     /* Store in the cache slot. Lost-race is harmless: the slot may already
        contain a valid entry (concurrent resolve from another thread), in
-       which case we free our duplicate and return the incumbent. */
-    if (idx < RB_ABILITY_CACHE_CAP && !g_ability_cache_valid[idx]) {
+       which case we drop our duplicate and return the incumbent. rb_free_ability
+       frees the DECODED CONTENTS but not the struct itself (vm.c:1277), so the
+       struct needs rb_free to match the rb_malloc in ability_decode. */
+    if (!g_ability_cache_valid[idx]) {
         g_ability_cache[idx] = decoded;
         g_ability_cache_valid[idx] = 1;
     } else {
-        /* Slot already populated — free our duplicate. */
         rb_free_ability(decoded);
-        if (idx < RB_ABILITY_CACHE_CAP) {
-            decoded = g_ability_cache[idx];
-        } else {
-            decoded = NULL;
-        }
+        rb_free(decoded);
+        decoded = g_ability_cache[idx];
     }
     return decoded;
 }
@@ -130,11 +265,16 @@ const Ability *rb_ability_ref_resolve(const RbAbilityRef *ref) {
    `Ability::default()` fallback.
 
    The output is written into `out` (caller-allocated). Returns 1 on success,
-   0 on out-of-range or structural decode failure. */
+   0 on out-of-range or structural decode failure. The range check is the same
+   predicate resolve() uses, so the two entry points cannot disagree about
+   which indices exist. Unlike resolve() this does NOT consult the cache:
+   Rust's decode() is also cache-free and hands back an owned Ability, which is
+   what lets the caller write it into caller-owned storage. */
 int rb_ability_ref_decode(const RbAbilityRef *ref, Ability *out) {
     if (!ref || !out) return 0;
     uint16_t idx = ref->idx;
-    if (idx >= RBKA_NUM_ABILITIES) {
+    ability_cache_ensure_init();
+    if (!ability_index_in_range(idx)) {
         memset(out, 0, sizeof(*out));
         out->use_limit = -1;
         return 0;
@@ -154,42 +294,53 @@ const Ability *rb_ability_ref_to_arc(const RbAbilityRef *ref) {
 
 /* ── Cache management ─────────────────────────────────────────────────── */
 
-/* Flush the entire ability cache.
+/* DELETED 2026-10-02: rb_ability_ref_flush and rb_ability_ref_flush_slot.
 
-   Frees every cached Ability (via rb_free_ability) and marks all slots
-   invalid. Call after rb_unload() or when the bytecode blob has been
-   reloaded. */
-void rb_ability_ref_flush(void) {
-    ability_cache_ensure_init();
-    for (int i = 0; i < RB_ABILITY_CACHE_CAP; i++) {
-        if (g_ability_cache_valid[i] && g_ability_cache[i]) {
-            rb_free_ability(g_ability_cache[i]);
-            g_ability_cache[i] = NULL;
-            g_ability_cache_valid[i] = 0;
-        }
-    }
-}
+   Rust's ability_store.rs has NO flush. Its cache is
+   `static CACHE: OnceLock<Vec<OnceLock<Arc<Ability>>>>` (ability_store.rs:24):
+   populated by get_or_init, never reset, never dropped — a Rust `static` has
+   no destructor, so the cached Arc<Ability>s live until the OS reclaims them at
+   process exit. Rust's entire safety argument is one invariant: the compiled-in
+   tables do not change while the process runs.
 
-/* Flush a single cache slot (used when a specific ability's bytecode is
-   replaced, e.g. during hot-reload). Returns 1 if the slot was valid and
-   freed, 0 otherwise. */
-int rb_ability_ref_flush_slot(uint16_t idx) {
-    ability_cache_ensure_init();
-    if (idx >= RB_ABILITY_CACHE_CAP) return 0;
-    if (g_ability_cache_valid[idx] && g_ability_cache[idx]) {
-        rb_free_ability(g_ability_cache[idx]);
-        g_ability_cache[idx] = NULL;
-        g_ability_cache_valid[idx] = 0;
-        return 1;
-    }
-    return 0;
-}
+   These two functions were C inventions, and the only thing in this file that
+   could turn the cache into a DANGLING-POINTER SOURCE. rb_ability_ref_resolve()
+   hands out a pointer the cache owns and the caller must not free; a flush then
+   rb_free_ability()'d that exact object, so every outstanding holder was left
+   pointing at freed memory with no compile-time warning and no way to find the
+   holders — the cache does not track them. Under RB_NO_MALLOC it is worse:
+   rb_free is a no-op and rb_alloc_reset() rewinds a bump arena
+   (src/core/alloc.c:6-20), so "freeing" a slot frees every allocation made
+   after it, including live GameState data.
 
-/* Return the number of currently-populated cache slots. (Diagnostic.) */
+   Options weighed:
+     (b) keep them and fix the lifetime — impossible without an owning return
+         type. Rust gets safety from Arc; the C contract is a bare
+         `const Ability *` that callers are told not to free, so the cache has no
+         idea who holds what. Retrofitting a refcount would change the return
+         type of a public, header-declared API and every future caller, to
+         preserve a capability Rust deliberately does not offer.
+     (c) keep them and document — rejected: a comment claiming safety on a
+         function whose entire effect is to invalidate pointers other code holds
+         is exactly the live foot-gun the audit asked to remove.
+     (a) delete — chosen. The once-only lifetime is now stated in one place (the
+         LIFETIME note at the top of this file) instead of being contradicted by
+         two functions. rb_ability_ref_cache_size() below survives because it is
+         read-only and cannot dangle anything.
+
+   Zero callers tree-wide (src/ and tests/, by name) and rb_unload() never called
+   them despite rabuka.h telling callers to — they were inert by luck, not by
+   design. include/rabuka.h:2804-2805 declares them and is the header owner's to
+   drop. */
+
+/* Return the number of currently-populated cache slots. (Diagnostic.)
+   Read-only: it cannot invalidate a pointer handed out by resolve(). Has no
+   Rust twin — Rust exposes no cache-size accessor — so it is a C-only
+   diagnostic, kept because it is inert. */
 int rb_ability_ref_cache_size(void) {
     ability_cache_ensure_init();
     int n = 0;
-    for (int i = 0; i < RB_ABILITY_CACHE_CAP; i++) {
+    for (uint32_t i = 0; i < ability_slot_count(); i++) {
         if (g_ability_cache_valid[i]) n++;
     }
     return n;

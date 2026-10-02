@@ -641,7 +641,7 @@ _CARD_TYPE_LONGEST_FIRST: List[Tuple[str, str]] = sorted(
 )
 
 # ============== PRE-COMPILED REGEXES ==============
-_ALL_KW_RE = re.compile(r"すべての|全ての|全部の|全て|全員|全体|カードをすべて")
+_ALL_KW_RE = re.compile(r"すべての|全ての|全部の|全て|全員|全体|カードをすべて|をすべて")
 
 # The plural, unquantified subject of a resource clause: 「〜のメンバーは、〜を得る」.
 # Distinct from 「1人」/「N人」, which quantify, and from 「すべて」, which _ALL_KW_RE

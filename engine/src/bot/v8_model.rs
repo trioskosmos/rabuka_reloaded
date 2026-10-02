@@ -1159,16 +1159,18 @@ impl OppModel {
 
     /// Placement masses inside a contested check, from rules 8.4.6 / 8.4.7.1.
     ///
-    /// A tie only places for a player who is below two successes AND set a
-    /// single card, so a tie is worth nothing to a player at match point. That
-    /// is exactly why v7 needed a `+1` score surcharge in its minimum-win
-    /// rule; here it falls out of the payoff.
+    /// A tie only places for a player who is below two successes (8.4.7.1), so
+    /// a tie is worth nothing to a player at match point. That is exactly why v7
+    /// needed a `+1` score surcharge in its minimum-win rule; here it falls out of
+    /// the payoff.
     pub fn contested_masses(
         &self,
         our_score: i32,
         our_set_size: usize,
         our_success: usize,
     ) -> (f64, f64, f64) {
+        let _ = our_set_size;
+        let _ = self.set_size;
         let mut below = 0.0;
         let mut above = 0.0;
         let idx = clamp_score(our_score);
@@ -1183,8 +1185,8 @@ impl OppModel {
             }
         }
         let tie = self.score_dist[idx];
-        let we_tie_place = our_success < 2 && our_set_size < 2;
-        let they_tie_place = self.success < 2 && self.set_size < 2;
+        let we_tie_place = our_success < 2;
+        let they_tie_place = self.success < 2;
         let we_place = below + if we_tie_place { tie } else { 0.0 };
         let they_place = above + if they_tie_place { tie } else { 0.0 };
         let both = if we_tie_place && they_tie_place { tie } else { 0.0 };
