@@ -262,21 +262,32 @@ fn execute_action(index: usize) {
         let action = &actions[index];
         println!("Executing action: {}", action.description);
 
-        // Execute the action (simplified - in real implementation would call execute_action from web_server)
-        match action.action_type.to_string().as_str() {
+        // The CLI harness implements only the two actions that need no decision
+        // plumbing; everything else goes through `TurnEngine::execute_main_phase_action`,
+        // which the server owns. It used to fall into a `_ =>` arm that logged at
+        // debug and then printed "Action executed successfully" regardless, so
+        // `action 3` reported success while doing nothing at all — a wrong answer is
+        // worse than an unfinished one here, because the caller has no other signal.
+        let handled = match action.action_type.to_string().as_str() {
             "activate_energy" => {
                 state.player1.activate_all_energy();
+                true
             }
             "draw_card" => {
                 state.player1.draw_card();
+                true
             }
-            _ => {
-                // Handle unknown action types gracefully
-                log::debug!(
-                    "Warning: Unknown action type '{}' - no specific handler implemented",
-                    action.action_type
+            other => {
+                println!(
+                    "Action '{}' is not implemented in the CLI harness (only \
+                     activate_energy and draw_card are). Use the server for the rest.",
+                    other
                 );
+                false
             }
+        };
+        if !handled {
+            return;
         }
 
         println!("Action executed successfully");

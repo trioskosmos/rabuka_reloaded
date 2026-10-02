@@ -1,9 +1,9 @@
 {
   "schema": "extracted_abilities.v1",
-  "generated_at": "2026-10-02T18:53:21.283023",
+  "generated_at": "2026-10-02T20:15:39.794014",
   "generated_by": "cards/ability_extraction/extract_card_abilities.py",
   "source_file": "cards/cards.json",
-  "engine_commit": "5caf67a9",
+  "engine_commit": "2e830def",
   "parser_version": "1.0",
   "input_hash": null,
   "statistics": {
@@ -34071,7 +34071,7 @@
               "heart_colors": [
                 "heart01"
               ],
-              "card_type": "member",
+              "card_type": "member_card",
               "all": true,
               "duration": "live_end",
               "group_names": [

@@ -573,19 +573,47 @@ pub fn target_player_label(target: &str, master: Option<&str>) -> &'static str {
 /// `CardFilter::matches` tests up to ten filter fields against ONE candidate and
 /// used to call `db.get_card(id)` inside each helper — ten SipHash computations
 /// and ten dependent L1 misses for the same key. Looking the card up once and
-/// threading it here removes nine of them. Semantics are identical, including
-/// the `None => true` fallthrough for unknown type strings.
+/// threading it here removes nine of them.
+///
+/// `None` means no type was asked for, so nothing can fail to match. An
+/// UNRECOGNISED string is a different thing: it used to take the same `_ => true`
+/// arm, which made an unknown filter match EVERY card.
 #[inline]
 pub fn card_matches_type_for(
     card: Option<&crate::core::card::Card>,
     card_type_filter: Option<&str>,
 ) -> bool {
-    match card_type_filter {
-        Some("live_card") => card.is_some_and(|c| c.is_live()),
-        Some("member_card") => card.is_some_and(|c| c.is_member()),
-        Some("energy_card") => card.is_some_and(|c| c.is_energy()),
+    // Normalise first. The canonical vocabulary written by the parser is
+    // live_card / member_card / energy_card / card, but the value also arrives from
+    // engine-synthesised filters and test fixtures, and the corpus is not the only
+    // writer: observed spellings include "member", "Member" and "". Matching on the
+    // exact string made every one of those a fall-through case, and the fall-through
+    // decided whether they matched.
+    let filter = card_type_filter.map(str::trim);
+    match filter {
+        Some(f) if f.eq_ignore_ascii_case("live_card") => card.is_some_and(|c| c.is_live()),
+        Some(f) if f.eq_ignore_ascii_case("member_card") || f.eq_ignore_ascii_case("member") => {
+            card.is_some_and(|c| c.is_member())
+        }
+        Some(f) if f.eq_ignore_ascii_case("energy_card") => card.is_some_and(|c| c.is_energy()),
+        // 「カード」 names no restriction, so it matches whatever the card is. An
+        // EMPTY string is the same statement written by a filter that was populated
+        // but never filled in.
+        Some(f) if f.eq_ignore_ascii_case("card") || f.is_empty() => true,
         None => true,
-        _ => true,
+        Some(other) => {
+            // Fail CLOSED, and say so.
+            //
+            // "I do not know what this means" is not "it matches", and a wrong
+            // target is worse than no target: it yields a plausible-looking game
+            // state that no assertion in the suite can distinguish from a correct
+            // one. PL!N-bp7-028-L Cooking with Love's
+            // 「自分のステージにいるすべてのグループのメンバーはheart01を得る」 reached
+            // this arm as `card_type: "member"` and so applied to anything on the
+            // stage, not just members.
+            log::warn!("[CARD_TYPE] unrecognised card_type filter {other:?}; matching nothing");
+            false
+        }
     }
 }
 

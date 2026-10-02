@@ -5400,7 +5400,12 @@ def _try_discard_live_and_member_optional(text):
         "action": "gain_resource",
         "resource": "heart",
         "heart_colors": ["heart01"],
-        "card_type": "member",
+        # "member_card", not "member": the canonical card_type vocabulary is
+        # live_card / member_card / energy_card. "member" reached
+        # `card_matches_type_for`'s catch-all, which then matched EVERY card on the
+        # stage rather than only members. The engine now rejects unknown filters
+        # outright, so the wrong token here would make the effect match nothing.
+        "card_type": "member_card",
         "all": True,
         "duration": "live_end",
         "group_names": groups,

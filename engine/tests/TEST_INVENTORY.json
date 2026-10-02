@@ -1,14 +1,14 @@
 {
   "generated_by": "cards/test_inventory.py",
-  "generated_at": "2026-10-02T10:07:47.231434+00:00",
+  "generated_at": "2026-10-02T10:28:09.094443+00:00",
   "stats": {
     "total_cards": 2639,
     "cards_with_abilities": 1650,
     "total_abilities": 2116,
     "unique_abilities": 985
   },
-  "n_files": 1003,
-  "n_tests": 4113,
+  "n_files": 1004,
+  "n_tests": 4116,
   "total_cards": 809,
   "covered_cards": 809,
   "abilities_on_covered": 985,
@@ -1070,7 +1070,7 @@
       ]
     }
   },
-  "n_test_fns_parsed": 4113,
+  "n_test_fns_parsed": 4116,
   "abilities": [
     {
       "idx": 0,
@@ -22687,6 +22687,7 @@
       "has_choice": true,
       "has_negative": true,
       "covering_files": [
+        "engine/tests/test_modules/characterization/card_type_filter_test.rs",
         "engine/tests/test_modules/effects/energy/pb2_baton_by_cost_15_mus_activates_two_energy_pl_pb2_009_pp_test.rs",
         "engine/tests/test_modules/effects/score/live_total/pl_pb2_001_pp_icon_gated_live_start_test.rs"
       ],
@@ -22697,18 +22698,24 @@
         "a_draw_card_in_the_zone_recovers_one_mus_card_to_hand",
         "an_empty_success_zone_fires_nothing",
         "an_expensive_non_mus_baton_touch_activates_nothing",
+        "an_unrecognized_type_filter_matches_nothing",
+        "each_type_filter_matches_only_its_own_type",
         "fixture_cost_and_group_are_what_the_gates_assume",
         "the_auto_fires_and_the_zeros_are_not_a_dead_ability",
         "the_fixtures_carry_exactly_the_icon_under_test",
-        "the_score_and_all_blade_clauses_produce_nothing_measurable_yet"
+        "the_score_and_all_blade_clauses_produce_nothing_measurable_yet",
+        "type_filter_spellings_do_not_change_the_verdict"
       ],
-      "covering_test_count": 10,
+      "covering_test_count": 13,
       "direct_tests": [
         "a_cost_15_plus_mus_baton_touch_activates_two_energy",
+        "an_unrecognized_type_filter_matches_nothing",
+        "each_type_filter_matches_only_its_own_type",
         "fixture_cost_and_group_are_what_the_gates_assume",
-        "the_auto_fires_and_the_zeros_are_not_a_dead_ability"
+        "the_auto_fires_and_the_zeros_are_not_a_dead_ability",
+        "type_filter_spellings_do_not_change_the_verdict"
       ],
-      "direct_test_count": 3,
+      "direct_test_count": 6,
       "is_null": false,
       "use_limit": null,
       "watches_abilities": false,
@@ -41571,6 +41578,7 @@
       "has_choice": true,
       "has_negative": true,
       "covering_files": [
+        "engine/tests/test_modules/characterization/card_type_filter_test.rs",
         "engine/tests/test_modules/characterization/group_name_spacing_normalisation_test.rs",
         "engine/tests/test_modules/effects/choice/pb2_repeatable_three_option_choice_per_lily_white_live_pl_pb2_016_p_plus_test.rs",
         "engine/tests/test_modules/effects/choice/per_unit_choice_repeats_per_lily_white_card_pl_pb2_016_p_plus_test.rs",
@@ -41607,25 +41615,27 @@
         "all_printemps_qualifies_and_the_member_is_taken",
         "an_empty_success_zone_activates_no_energy",
         "an_empty_zone_leaves_the_cheer_unmodified",
+        "an_unrecognized_type_filter_matches_nothing",
         "an_unspaced_card_matches_the_spaced_group_name",
         "both_clauses_broken_scores_nothing",
+        "each_type_filter_matches_only_its_own_type",
         "empty_stage_is_recorded_as_vacuous",
         "empty_success_zone_and_all_lily_white_stage_scores_plus_one",
         "empty_success_zone_grants_nothing",
         "empty_success_zone_scores_zero",
         "empty_zone_grants_nothing",
         "every_branch_carries_the_all_marker",
-        "fixtures_cover_the_reveal_filter",
-        "hazuki_copies_only_the_kidou_and_not_a_sources_other_triggers",
-        "hazuki_copy_is_withdrawn_when_the_under_area_empties"
+        "fixtures_cover_the_reveal_filter"
       ],
-      "covering_test_count": 89,
+      "covering_test_count": 92,
       "direct_tests": [
+        "an_unrecognized_type_filter_matches_nothing",
+        "each_type_filter_matches_only_its_own_type",
         "real_phase_walk_to_live_success_registers_and_fires_the_copy_once",
         "self_score_is_not_applied_once_per_zone_occurrence",
         "two_mus_score_cards_do_not_double_the_constant"
       ],
-      "direct_test_count": 3,
+      "direct_test_count": 5,
       "is_null": false,
       "use_limit": null,
       "watches_abilities": false,
@@ -41652,6 +41662,7 @@
       "has_choice": true,
       "has_negative": true,
       "covering_files": [
+        "engine/tests/test_modules/characterization/card_type_filter_test.rs",
         "engine/tests/test_modules/characterization/group_name_spacing_normalisation_test.rs",
         "engine/tests/test_modules/effects/choice/pb2_repeatable_three_option_choice_per_lily_white_live_pl_pb2_016_p_plus_test.rs",
         "engine/tests/test_modules/effects/choice/per_unit_choice_repeats_per_lily_white_card_pl_pb2_016_p_plus_test.rs",
@@ -41688,24 +41699,26 @@
         "all_printemps_qualifies_and_the_member_is_taken",
         "an_empty_success_zone_activates_no_energy",
         "an_empty_zone_leaves_the_cheer_unmodified",
+        "an_unrecognized_type_filter_matches_nothing",
         "an_unspaced_card_matches_the_spaced_group_name",
         "both_clauses_broken_scores_nothing",
+        "each_type_filter_matches_only_its_own_type",
         "empty_stage_is_recorded_as_vacuous",
         "empty_success_zone_and_all_lily_white_stage_scores_plus_one",
         "empty_success_zone_grants_nothing",
         "empty_success_zone_scores_zero",
         "empty_zone_grants_nothing",
         "every_branch_carries_the_all_marker",
-        "fixtures_cover_the_reveal_filter",
-        "hazuki_copies_only_the_kidou_and_not_a_sources_other_triggers",
-        "hazuki_copy_is_withdrawn_when_the_under_area_empties"
+        "fixtures_cover_the_reveal_filter"
       ],
-      "covering_test_count": 89,
+      "covering_test_count": 92,
       "direct_tests": [
         "a_mixed_zone_counts_only_the_mus_cards",
         "a_mus_live_is_recovered_from_the_waitroom",
         "a_spaced_card_matches_the_unspaced_group_name",
         "all_lily_white_qualifies",
+        "an_unrecognized_type_filter_matches_nothing",
+        "each_type_filter_matches_only_its_own_type",
         "empty_stage_is_recorded_as_vacuous",
         "lily_white_cards_in_hand_do_not_count",
         "mixed_zone_counts_only_mus_score_icon_cards",
@@ -41731,7 +41744,7 @@
         "two_mus_score_cards_do_not_double_the_constant",
         "two_mus_score_icon_cards_in_different_units_grant_two_blades"
       ],
-      "direct_test_count": 28,
+      "direct_test_count": 30,
       "is_null": false,
       "use_limit": null,
       "watches_abilities": false,
@@ -51542,9 +51555,11 @@
       "has_choice": true,
       "has_negative": true,
       "covering_files": [
+        "engine/tests/test_modules/characterization/card_type_filter_test.rs",
         "engine/tests/test_modules/effects/gain/hearts/live_start/live_start_discard_shuffle_group_members_heart01_test.rs"
       ],
       "covering_tests": [
+        "an_unrecognized_type_filter_matches_nothing",
         "cooking_accept_gives_heart01_to_all_niji_members",
         "cooking_accept_shuffles_discard_to_deck_bottom",
         "cooking_both_in_discard_offers_optional",
@@ -51554,9 +51569,11 @@
         "cooking_non_niji_in_discard_no_offer",
         "cooking_only_live_card_no_offer",
         "cooking_only_member_with_blade_no_offer",
-        "cooking_only_member_without_blade_no_offer"
+        "cooking_only_member_without_blade_no_offer",
+        "each_type_filter_matches_only_its_own_type",
+        "type_filter_spellings_do_not_change_the_verdict"
       ],
-      "covering_test_count": 10,
+      "covering_test_count": 13,
       "direct_tests": [],
       "direct_test_count": 0,
       "is_null": false,

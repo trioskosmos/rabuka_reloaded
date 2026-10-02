@@ -9,6 +9,7 @@ pub mod bp7_character_name_condition_test;
     pub mod bytecode_validation_test;
 pub mod candidate_pool_builder_test;
 pub mod card_id_lookup_determinism_test;
+pub mod card_type_filter_test;
 pub mod character_condition_fix_test;
 pub mod corpus_decode_coverage_test;
 pub mod corpus_smoke_test;
