@@ -889,6 +889,23 @@ Q_TRIVIAL_ASSERT_RE = re.compile(
 # `*count > 1` filters, which are the good kind.
 Q_LOOP_COUNTER_RE = re.compile(r"\b(\w+)\s*\+=\s*\d+\b")
 
+# Any call whose name begins `assert_`, however it is reached.
+#
+# `no_assert` credits a helper only when that helper is FILE-LOCAL, because a
+# file-local helper's body can be inspected to see whether it really asserts.
+# That misses the shared `TestGame` assertions entirely, and those are the
+# strongest ones in the suite: `assert_card_identity`, `assert_card_cost`,
+# `assert_card_in_group`, `assert_energy`, `assert_select_card`. Three of the
+# five `no_assert` rows were tests whose only assertion was one of these —
+# `the_two_boundary_fixtures_print_cost_nine_and_cost_ten` asserts three card
+# identities and three costs and nothing else — so the signal was reporting
+# well-written tests as incapable of pinning behaviour.
+#
+# The name is the contract: nothing in this repo names a non-asserting function
+# `assert_*`. Keep this in step with the harness helpers in engine/tests/helpers/
+# if that convention ever changes.
+Q_ASSERT_NAMED_CALL_RE = re.compile(r"\bassert_\w+\s*\(")
+
 # A stage/zone literal being built by assignment. `stage.stage = [a, b, -1]`,
 # `stage.stage.assign([a, b, -1])`, and `under_cards[1] = [a, a]` all count.
 Q_STAGE_LITERAL_RE = re.compile(
@@ -1630,7 +1647,9 @@ def audit_test_quality(files):
         for name, body, line in fns:
             has_assert = any(
                 not Q_TRIVIAL_ASSERT_RE.search(call) for call in _assert_calls(body)
-            ) or bool(helper_assert_re and helper_assert_re.search(body))
+            ) or bool(helper_assert_re and helper_assert_re.search(body)) or bool(
+                Q_ASSERT_NAMED_CALL_RE.search(body)
+            )
             if not has_assert:
                 smells["no_assert"].append((rel, name, line, ""))
             driven = bool(Q_SCAN_RE.search(body)) or bool(

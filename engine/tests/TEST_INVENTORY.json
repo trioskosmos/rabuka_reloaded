@@ -1,6 +1,6 @@
 {
   "generated_by": "cards/test_inventory.py",
-  "generated_at": "2026-10-02T12:54:12.156388+00:00",
+  "generated_at": "2026-10-02T13:03:10.313487+00:00",
   "stats": {
     "total_cards": 2639,
     "cards_with_abilities": 1650,
@@ -8,7 +8,7 @@
     "unique_abilities": 985
   },
   "n_files": 1007,
-  "n_tests": 4123,
+  "n_tests": 4122,
   "total_cards": 809,
   "covered_cards": 809,
   "abilities_on_covered": 985,
@@ -405,39 +405,8 @@
   },
   "quality": {
     "no_assert": {
-      "count": 5,
-      "rows": [
-        {
-          "file": "engine/tests/test_modules/characterization/group_name_spacing_normalisation_test.rs",
-          "test": "a_spaced_card_matches_the_unspaced_group_name",
-          "line": 58,
-          "detail": ""
-        },
-        {
-          "file": "engine/tests/test_modules/characterization/group_name_spacing_normalisation_test.rs",
-          "test": "an_unspaced_card_matches_the_spaced_group_name",
-          "line": 46,
-          "detail": ""
-        },
-        {
-          "file": "engine/tests/test_modules/effects/gain/blades/live_start/pb2_blade_per_member_activated_from_wait_this_turn_pl_pb2_010_p_plus_test.rs",
-          "test": "the_history_is_a_set_NOT_YET_PINNED",
-          "line": 180,
-          "detail": ""
-        },
-        {
-          "file": "engine/tests/test_modules/effects/state/orientation_gated/erena_debut_cost_nine_or_less_opponent_wait_test.rs",
-          "test": "the_two_boundary_fixtures_print_cost_nine_and_cost_ten",
-          "line": 153,
-          "detail": ""
-        },
-        {
-          "file": "engine/tests/test_modules/effects/state/wait_activation/pb2_discard_three_distinct_bibi_waits_foe_pl_pb2_018_p_plus_test.rs",
-          "test": "two_prints_are_one_name",
-          "line": 237,
-          "detail": ""
-        }
-      ]
+      "count": 0,
+      "rows": []
     },
     "no_drive": {
       "count": 1,
@@ -1057,7 +1026,7 @@
       "rows": []
     }
   },
-  "n_test_fns_parsed": 4123,
+  "n_test_fns_parsed": 4122,
   "abilities": [
     {
       "idx": 0,
@@ -23361,12 +23330,11 @@
         "one_activated_member_reduces_need_by_three",
         "the_activation_history_is_a_set_not_a_tally",
         "the_clause_parses_as_a_history_not_a_state",
-        "the_history_is_a_set_NOT_YET_PINNED",
         "three_activated_members_reduce_need_by_six",
         "two_activated_members_reduce_need_by_five",
         "two_activated_printemps_members_give_two_blades"
       ],
-      "covering_test_count": 17,
+      "covering_test_count": 16,
       "direct_tests": [
         "a_member_currently_in_wait_does_not_count",
         "a_real_activation_is_recorded_by_the_engine",
@@ -36026,12 +35994,11 @@
         "shiki_auto_fires_once_per_waited_state_and_the_kidou_re_arms_it",
         "shiki_kidou_waits_her_and_draws_exactly_one",
         "the_clause_parses_as_a_history_not_a_state",
-        "the_history_is_a_set_NOT_YET_PINNED",
         "the_offered_gained_activation_executes_its_own_copied_effect",
         "two_activated_printemps_members_give_two_blades",
         "two_eligible_sources_register_one_copy_each_and_no_more"
       ],
-      "covering_test_count": 27,
+      "covering_test_count": 26,
       "direct_tests": [
         "hazuki_copies_only_the_kidou_and_not_a_sources_other_triggers",
         "self_wait_activation_then_area_swap_removes_wait_state",
@@ -36096,12 +36063,11 @@
         "shiki_auto_fires_once_per_waited_state_and_the_kidou_re_arms_it",
         "shiki_kidou_waits_her_and_draws_exactly_one",
         "the_clause_parses_as_a_history_not_a_state",
-        "the_history_is_a_set_NOT_YET_PINNED",
         "the_offered_gained_activation_executes_its_own_copied_effect",
         "two_activated_printemps_members_give_two_blades",
         "two_eligible_sources_register_one_copy_each_and_no_more"
       ],
-      "covering_test_count": 27,
+      "covering_test_count": 26,
       "direct_tests": [
         "hazuki_copies_only_the_kidou_and_not_a_sources_other_triggers",
         "self_wait_activation_then_area_swap_removes_wait_state",

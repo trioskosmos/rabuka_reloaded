@@ -155,30 +155,37 @@ fn an_empty_history_gives_nothing() {
     );
 }
 
-/// The history is a SET, not a tally: the same member switched out of wait twice in
-/// one turn is one member. **NOT PINNED — no test here can pin it, and one that
-/// looked like it did was deleted.**
-///
-/// The set property lives at the WRITE site: `change_state.rs:646` pushes only when
-/// `!cards_activated_this_turn.contains(card_id)`. The read site is a plain
-/// `.count()` over the vec (`effects/resource.rs:501`), so the counter would happily
-/// report 2 for a duplicated entry. Neither end is reachable from here:
-///
-///   * The file's `record_activation` is a test-side copy of the guard, so asserting
-///     `cards_activated_this_turn.len() == 1` after calling it asserts the test.
-///   * Pushing the same id twice by hand and expecting 1 blade asserts the opposite of
-///     what the engine does — the counter is a tally and would say 2.
-///   * Driving two real activations needs a card that can switch the SAME member out
-///     of wait twice in one turn. No card in `cards.json` can: every ability that
-///     activates a member is ターン1回, 登場, ライブ開始時 (all once), except
-///     `PL!SP-bp7-008-P` 若菜四季, whose 自動 has no turn limit — but it activates
-///     HERSELF and she is 5yncri5e!, so the 『Printemps』 filter on the history
-///     excludes the very member she would record.
-///
-/// Pinned instead, in `two_activated_printemps_members_give_two_blades`, is the part
-/// that IS observable: two DISTINCT members in the history count twice.
-#[test]
-fn the_history_is_a_set_NOT_YET_PINNED() {}
+// The history is a SET, not a tally: the same member switched out of wait twice in
+// one turn is one member. NOT PINNED — no test here can pin it, and one that looked
+// like it did was deleted.
+//
+// This used to be an empty `#[test] fn the_history_is_a_set_NOT_YET_PINNED() {}`
+// used as a tombstone. It is prose instead: an empty test function asserts nothing,
+// so it counted toward the suite's total (4105) while being incapable of detecting
+// any defect — the exact class this repo tracks — and its name tripped the
+// non_snake_case lint. TEST_INVESTORY.json's `no_assert` signal is how it was found;
+// the signal belongs to real tests that lack assertions, not to a deliberate
+// marker. The first card that can switch the same member out of wait twice in one
+// turn should make this a real test.
+//
+// The set property lives at the WRITE site: `change_state.rs:646` pushes only when
+// `!cards_activated_this_turn.contains(card_id)`. The read site is a plain
+// `.count()` over the vec (`effects/resource.rs:501`), so the counter would happily
+// report 2 for a duplicated entry. Neither end is reachable from here:
+//
+//   * The file's `record_activation` is a test-side copy of the guard, so asserting
+//     `cards_activated_this_turn.len() == 1` after calling it asserts the test.
+//   * Pushing the same id twice by hand and expecting 1 blade asserts the opposite of
+//     what the engine does — the counter is a tally and would say 2.
+//   * Driving two real activations needs a card that can switch the SAME member out
+//     of wait twice in one turn. No card in `cards.json` can: every ability that
+//     activates a member is ターン1回, 登場, ライブ開始時 (all once), except
+//     `PL!SP-bp7-008-P` 若菜四季, whose 自動 has no turn limit — but it activates
+//     HERSELF and she is 5yncri5e!, so the 『Printemps』 filter on the history
+//     excludes the very member she would record.
+//
+// Pinned instead, in `two_activated_printemps_members_give_two_blades`, is the part
+// that IS observable: two DISTINCT members in the history count twice.
 
 /// A member that is IN WAIT is not what the clause counts. This is the distinction the
 /// old `state: "wait"` reading got wrong.

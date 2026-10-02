@@ -6,17 +6,11 @@ Fn-level static signals over `engine/tests/**/*.rs`. Coverage counts (TEST_COVER
 answer “does it fire”; this answers “would the test notice if the trigger were wrong”.
 Report-only: rows are review prompts, not failures.
 
-## no_assert (5)
+## no_assert (0)
 
 _test never asserts (smoke at best — cannot pin behavior)_
 
-| file | test | line | detail |
-| --- | --- | --- | --- |
-| `engine/tests/test_modules/characterization/group_name_spacing_normalisation_test.rs` | `a_spaced_card_matches_the_unspaced_group_name` | 58 |  |
-| `engine/tests/test_modules/characterization/group_name_spacing_normalisation_test.rs` | `an_unspaced_card_matches_the_spaced_group_name` | 46 |  |
-| `engine/tests/test_modules/effects/gain/blades/live_start/pb2_blade_per_member_activated_from_wait_this_turn_pl_pb2_010_p_plus_test.rs` | `the_history_is_a_set_NOT_YET_PINNED` | 180 |  |
-| `engine/tests/test_modules/effects/state/orientation_gated/erena_debut_cost_nine_or_less_opponent_wait_test.rs` | `the_two_boundary_fixtures_print_cost_nine_and_cost_ten` | 153 |  |
-| `engine/tests/test_modules/effects/state/wait_activation/pb2_discard_three_distinct_bibi_waits_foe_pl_pb2_018_p_plus_test.rs` | `two_prints_are_one_name` | 237 |  |
+None.
 
 ## no_drive (1)
 
