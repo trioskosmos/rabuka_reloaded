@@ -68,11 +68,17 @@ impl AbilityResolver {
             }
             let tc = usize::from(effect.target_count_any().unwrap_or(1));
             if candidates.len() <= tc {
-                // Auto-select: push to selected_cards and apply
+                // Auto-select: push to selected_cards and apply.
+                //
+                // Cleared first: this branch picks its own targets, so anything left
+                // in `selection.cards` by an earlier step of the same sequence is not
+                // part of this effect's choice. Without the clear, a previous step's
+                // selection would be transformed along with these — which the
+                // single-card `.first()` this replaced happened to mask by taking the
+                // wrong one instead of all of them.
+                self.selection.cards.clear();
                 for &cid in &candidates {
-                    if !self.selection.cards.contains(&cid) {
-                        self.selection.cards.push(cid);
-                    }
+                    self.selection.cards.push(cid);
                 }
                 self.execute_set_heart_type_applied(
                     gs,
@@ -158,37 +164,59 @@ impl AbilityResolver {
             "{} {}: [[log_set_heart_type:type={}]]",
             pp, act_name, ht
         ));
-        // Use selected_target from self.selected_cards if available (member-targeting
-        // abilities like PL!HS-bp5-021-L), otherwise fall back to activating_card
-        // (self-targeting abilities like Kanan PL!S-pb1-003-R).
-        let card_id = self
-            .selection.cards
-            .first()
-            .copied()
-            .or(gs.activating_card)
-            .unwrap_or(-1);
-        if card_id == -1 {
+        // Apply to EVERY card this effect selected, not just the first.
+        //
+        // The auto-select path in `execute_set_heart_type` pushes all eligible
+        // candidates into `self.selection.cards` when they fit within
+        // `target_count`, and the interactive path lets the player choose up to
+        // `target_count` of them. So the selection legitimately holds 1..=N cards,
+        // and taking `.first()` transformed one member while the print said every
+        // one of them: 「ステージにいるすべてのメンバーのハートを{{heart_02}}にする」
+        // changed a single member's hearts and the rest kept theirs.
+        //
+        // `selection.cards` is empty for a self-targeting effect, which is the case
+        // this falls back to the activating card for.
+        //
+        // NOT COVERED BY THE SUITE. Every `set_heart_type` in `abilities.json`
+        // targets at most one member, so no card reaches the multi-member path:
+        // `self_target: true` for 「このメンバーが元々持つハートは…」, an explicit
+        // `target_count: 1` for PL!S-bp7-024-L's 「『Aqours』のメンバー1人が」, and
+        // PL!HS-bp5-021-L's `all: true` is about the **hearts** of that one member
+        // (「元々持つハートはすべて{{heart_01}}になる」) rather than about several
+        // members. A test would have to live in this module, because
+        // `execute_set_heart_type_applied` is `pub(crate)` and `AbilityResolver` is
+        // not public — and `cargo test --test run_all` (the project's gate) does not
+        // run lib unit tests, so such a test would never execute. The first card that
+        // needs several members transformed should come with a way to reach this.
+        let targets: smallvec::SmallVec<[i16; 4]> = if self.selection.cards.is_empty() {
+            gs.activating_card.into_iter().collect()
+        } else {
+            self.selection.cards.clone()
+        };
+        if targets.is_empty() {
             return;
         }
         let color = crate::card::parse_heart_color(&ht);
-        gs.mods.heart_color_multiplier.insert(card_id, color);
-        gs.record_ability_application(
-            card_id,
-            format!("Transform hearts to {}", ht),
-            "transform",
-            card_id,
-            Some(color.index().u8_count()),
-            0,
-        );
-        let ed = crate::core::types::EffectData::SetBladeCount { card_id };
-        util::push_temporary_effect(
-            gs,
-            "set_heart_type",
-            duration,
-            "self",
-            &format!("Set heart type to {} for card {}", ht, card_id),
-            Some(ed),
-        );
+        for card_id in targets {
+            gs.mods.heart_color_multiplier.insert(card_id, color);
+            gs.record_ability_application(
+                card_id,
+                format!("Transform hearts to {}", ht),
+                "transform",
+                card_id,
+                Some(color.index().u8_count()),
+                0,
+            );
+            let ed = crate::core::types::EffectData::SetBladeCount { card_id };
+            util::push_temporary_effect(
+                gs,
+                "set_heart_type",
+                duration,
+                "self",
+                &format!("Set heart type to {} for card {}", ht, card_id),
+                Some(ed),
+            );
+        }
     }
 
     pub(crate) fn execute_set_heart_copy_from_under(
