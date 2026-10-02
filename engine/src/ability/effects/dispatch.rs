@@ -66,10 +66,7 @@ pub fn execute_effect(
 ) -> Result<(), String> {
     let result = match effect.action {
         ActionType::DrawCard => resolver.execute_draw_wrapper(gs, effect),
-        ActionType::DrawUntilCount => {
-            resolver.execute_draw_until_count(gs, effect);
-            Ok(())
-        }
+        ActionType::DrawUntilCount => resolver.execute_draw_until_count(gs, effect),
         ActionType::MoveCards => resolver.execute_logged_move(gs, effect, "[[log_move]]"),
         ActionType::DiscardCard => resolver.execute_logged_move(gs, effect, "[[log_discard]]"),
         ActionType::Select => {
@@ -188,10 +185,7 @@ pub fn execute_effect(
         }
         ActionType::ChooseTargetPlayer => resolver.execute_choose_target_player(gs, effect),
         ActionType::SelectNumber => resolver.execute_select_number(gs, effect),
-        ActionType::PlayBatonTouch => {
-            let _ = resolver.execute_play_baton_touch(gs, effect);
-            Ok(())
-        }
+        ActionType::PlayBatonTouch => resolver.execute_play_baton_touch(gs, effect),
         ActionType::ModifyRequiredHeartsGlobal => resolver.execute_modify_required_hearts_standard(
             gs,
             effect.operation_any().unwrap_or("increase"),

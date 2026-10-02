@@ -123,7 +123,13 @@ impl AbilityResolver {
         self.in_flight.spawn_context.target = Some("self".to_string());
 
         let had_choice_before = self.awaiting.choice.is_some();
-        let _ = self.execute_effect(gs, &for_self);
+        // Propagated, not discarded. This half used to be `let _ = …`, so a failure
+        // on the SELF side vanished and the dispatch carried on to the opponent and
+        // reported the whole effect as handled. A 「両者の…」 effect whose own side
+        // could not resolve therefore looked like it had resolved both sides.
+        // `execute_effect` signals "needs a choice" by setting `awaiting.choice` and
+        // returning Ok, so an Err here is a genuine failure and not control flow.
+        self.execute_effect(gs, &for_self)?;
 
         // If self created a NEW pending choice, save opponent for later
         if self.awaiting.choice.is_some() && !had_choice_before {

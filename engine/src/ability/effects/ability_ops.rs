@@ -135,7 +135,12 @@ impl AbilityResolver {
         };
 
         for target_card in targets {
-            let _ = self.execute_gain_ability(
+            // Propagated rather than discarded: this used to be `let _ =`, so a card
+            // that could not receive the ability was skipped and the effect still
+            // reported success. `execute_gain_ability` signals "needs a choice" by
+            // setting the pending choice and returning Ok, so an Err is a real
+            // failure and not control flow.
+            self.execute_gain_ability(
                 gs,
                 text,
                 effect.target_name(),
@@ -143,7 +148,7 @@ impl AbilityResolver {
                 effect.gained_effect_any().cloned().map(Box::new),
                 effect.ability_gain_trigger_any(),
                 Some(target_card),
-            );
+            )?;
         }
         Ok(())
     }

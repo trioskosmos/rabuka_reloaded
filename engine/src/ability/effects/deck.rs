@@ -473,7 +473,18 @@ pub fn execute_draw(
         Ok(())
     }
 
-    pub fn execute_draw_until_count(&mut self, gs: &mut GameState, effect: &AbilityEffect) {
+    /// 「手札がN枚になるまでドローする」.
+    ///
+    /// Returns the draw's `Result`. It used to return `()` and its dispatch arm
+    /// returned `Ok(())` unconditionally, so a failed top-up draw was
+    /// indistinguishable from a hand that was already full — and from one that
+    /// silently drew nothing. A non-hand destination is a malformed effect and is
+    /// reported rather than skipped.
+    pub fn execute_draw_until_count(
+        &mut self,
+        gs: &mut GameState,
+        effect: &AbilityEffect,
+    ) -> Result<(), String> {
         let target_count: u8 = effect.target_count_any().unwrap_or(0);
         let target = effect.target_name();
         let destination = effect.destination.map(|z| z.as_str()).unwrap_or(Zone::Hand.to_str());
@@ -481,11 +492,14 @@ pub fn execute_draw(
         let current_count = match Zone::from_str(destination) {
             Some(Zone::Hand) => player.hand.len(),
             _ => {
-                return;
+                return Err(format!(
+                    "draw_until_count: destination '{destination}' is not the hand; \
+                     「手札がN枚になるまでドローする」 only makes sense there"
+                ));
             }
         };
         let to_draw = (target_count as usize).saturating_sub(current_count);
-        let _ = self.execute_draw(
+        self.execute_draw(
             gs,
             &AbilityEffect::default(),
             to_draw.u8_count(),
@@ -496,7 +510,7 @@ pub fn execute_draw(
             false,
             1,
             None,
-        );
+        )
     }
 
     pub(crate) fn execute_shuffle(&mut self, gs: &mut GameState, effect: &AbilityEffect) {
