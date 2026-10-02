@@ -248,16 +248,31 @@ impl AbilityResolver {
             }
             if let Some(dur) = duration {
                 if dur != "permanent" {
-                    let target_str = target.to_string();
-                    let items: Vec<crate::core::types::CardEffectItem> = card_ids
-                        .iter()
-                        .zip(deltas.iter())
-                        .map(|(&cid, &d)| crate::core::types::CardEffectItem {
-                            card_id: cid,
-                            amount: d.abs(),
-                            color: None,
-                        })
-                        .collect();
+                let target_str = target.to_string();
+                let items: Vec<crate::core::types::CardEffectItem> = card_ids
+                    .iter()
+                    .zip(deltas.iter())
+                    .map(|(&cid, &d)| crate::core::types::CardEffectItem {
+                        card_id: cid,
+                        // The SIGNED delta, not its magnitude. Expiry reverts with
+                        // `remove_cost_modifier(card_id, amount)`, which does
+                        // `additive = additive - amount` — so undoing an applied
+                        // `d` requires passing `d` back, not `d.abs()`. A cost
+                        // REDUCTION applies a negative delta, and storing `|d|`
+                        // made expiry subtract the magnitude in the wrong
+                        // direction.
+                        //
+                        // The bug is invisible while nothing else touches the same
+                        // card: `.max(0)` in remove_cost_modifier clamps
+                        // `-2 - 2` back to 0, which is the right answer by accident.
+                        // It is wrong the moment a competing modifier exists — a
+                        // reduction of 2 alongside an increase of 3 leaves
+                        // `additive = 1`, and expiry computed `1 - 2 = 0` where the
+                        // correct revert is `1 - (-2) = 3`.
+                        amount: d,
+                        color: None,
+                    })
+                    .collect();
                     util::push_temporary_effect(
                         gs,
                         "modify_cost",
@@ -304,12 +319,38 @@ impl AbilityResolver {
         }
         if let Some(dur) = duration {
             if dur != "permanent" {
+                if operation == "set" {
+                    // A `set` cost lives in the entry's `set` field, and expiry's
+                    // `modify_cost` revert calls `remove_cost_modifier`, which only
+                    // touches `additive` — so a `set` with a duration would never be
+                    // undone and the override would outlive the printed effect.
+                    //
+                    // No card does this today (the corpus' only `set` has no
+                    // duration), so this is reported rather than half-fixed: the
+                    // revert needs to know which field was written, which means a
+                    // new `EffectData` variant, and guessing here would leave a
+                    // second silent path in place.
+                    log::error!(
+                        "[MODIFY_COST] operation 'set' with duration '{}' is not \
+                         revertable: the set override will outlive the effect \
+                         (card count={}). Add an EffectData variant recording the \
+                         field so expiry can call remove_cost_modifier_set.",
+                        dur,
+                        card_ids.len()
+                    );
+                    return;
+                }
                 let target_str = target.to_string();
                 let items: Vec<crate::core::types::CardEffectItem> = card_ids
                     .iter()
                     .map(|&cid| crate::core::types::CardEffectItem {
                         card_id: cid,
-                        amount: delta.abs(),
+                        // Signed, for the same reason as the set_from_reference path
+                        // above: expiry subtracts this from `additive`, so undoing an
+                        // applied `delta` means passing `delta` back unchanged.
+                        // `operation == "set"` is the exception and is NOT handled
+                        // here — see the note below.
+                        amount: delta,
                         color: None,
                     })
                     .collect();

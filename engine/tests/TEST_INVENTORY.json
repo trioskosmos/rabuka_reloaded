@@ -1,14 +1,14 @@
 {
   "generated_by": "cards/test_inventory.py",
-  "generated_at": "2026-10-02T10:40:10.557557+00:00",
+  "generated_at": "2026-10-02T10:54:19.745135+00:00",
   "stats": {
     "total_cards": 2639,
     "cards_with_abilities": 1650,
     "total_abilities": 2116,
     "unique_abilities": 985
   },
-  "n_files": 1004,
-  "n_tests": 4117,
+  "n_files": 1005,
+  "n_tests": 4120,
   "total_cards": 809,
   "covered_cards": 809,
   "abilities_on_covered": 985,
@@ -1070,7 +1070,7 @@
       ]
     }
   },
-  "n_test_fns_parsed": 4117,
+  "n_test_fns_parsed": 4120,
   "abilities": [
     {
       "idx": 0,
@@ -14921,13 +14921,17 @@
       "has_choice": true,
       "has_negative": true,
       "covering_files": [
+        "engine/tests/test_modules/effects/cost_mod/per_card/cost_modifier_expiry_sign_test.rs",
         "engine/tests/test_modules/integration/per_card/hard_tier_cards_cost_copy_discount_mill_and_dual_retrieve_test.rs"
       ],
       "covering_tests": [
+        "a_lone_modifier_reverts_to_nothing_in_both_directions",
         "ddd_decline_pay_does_nothing",
         "ddd_option_a_retrieves_any_member_from_waitroom",
         "ddd_option_b_requires_two_cards_in_live_zone",
         "ddd_option_b_with_two_live_cards_fetches_hasunosora_live",
+        "expiring_a_reduction_leaves_a_competing_increase_intact",
+        "expiring_an_increase_leaves_a_competing_reduction_intact",
         "kanan_cannot_mill_itself",
         "kanan_mill_then_debut_exact_cost_plus_two_same_area",
         "kanan_no_matching_cost_only_the_mill_happens",
@@ -14940,15 +14944,18 @@
         "kokoro_high_member_sets_cost_and_grants_heart05",
         "kokoro_no_dollchestra_in_hand_no_gate"
       ],
-      "covering_test_count": 15,
+      "covering_test_count": 18,
       "direct_tests": [
+        "a_lone_modifier_reverts_to_nothing_in_both_directions",
+        "expiring_a_reduction_leaves_a_competing_increase_intact",
+        "expiring_an_increase_leaves_a_competing_reduction_intact",
         "kokoro_below_threshold_sets_cost_without_heart",
         "kokoro_boundary_eleven_exactly_reaches_ten",
         "kokoro_decline_leaves_everything_untouched",
         "kokoro_high_member_sets_cost_and_grants_heart05",
         "kokoro_no_dollchestra_in_hand_no_gate"
       ],
-      "direct_test_count": 5,
+      "direct_test_count": 8,
       "is_null": false,
       "use_limit": null,
       "watches_abilities": false,

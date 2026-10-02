@@ -532,9 +532,22 @@ impl GameModifiers {
         entry.additive = entry.additive.saturating_add(delta);
     }
 
+    /// Undo a cost modifier this much, restoring whatever else is still in effect.
+    ///
+    /// `delta` is the value that was ADDED, sign included — undoing `-2` means
+    /// passing `-2`, because a cost reduction is a negative modifier and has to be
+    /// subtracted back out. Passing the magnitude instead moves every modifier the
+    /// wrong way (see `cost_modifier_expiry_sign_test`).
+    ///
+    /// The result is deliberately NOT clamped at zero. `add_cost_modifier` does not
+    /// clamp either, so a negative `additive` is a legitimate, reachable state — it
+    /// is exactly what 「…コストは2減る」 means. Clamping here could produce a
+    /// residue that no add path can build: a +6 increase alongside a -2 reduction
+    /// sums to +4, and undoing the +6 must leave the -2 showing, but `4 - 6 = -2`
+    /// clamped to 0 destroyed a reduction the player was entitled to.
     pub fn remove_cost_modifier(&mut self, card_id: i16, delta: i16) {
         if let Some(entry) = self.cost_modifiers.get_mut(&card_id) {
-            entry.additive = entry.additive.saturating_sub(delta).max(0);
+            entry.additive = entry.additive.saturating_sub(delta);
             if entry.additive == 0 && entry.set == 0 {
                 self.cost_modifiers.remove(&card_id);
             }
