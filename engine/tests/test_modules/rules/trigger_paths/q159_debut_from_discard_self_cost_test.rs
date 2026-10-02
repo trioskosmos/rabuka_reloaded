@@ -116,7 +116,15 @@ fn q159_positive_select_prompt_appears() {
         safety += 1;
         let ct = game.pending_choice_type();
         if ct.as_deref() == Some("SelectCard") { saw_select = true; }
-        let _ = game.try_select_indices(&[0]);
+        // Answer each prompt by its own shape. The loop used `try_select_indices`
+        // with the Result discarded, so an unanswerable prompt silently made no
+        // progress and the loop simply ran out its budget — while the positive
+        // assertions below still ran.
+        match ct.as_deref() {
+            Some("SelectCard") => game.select_indices(&[0]),
+            Some("SelectTarget") => game.select_option(0),
+            _ => game.select_indices(&[]),
+        }
     }
     assert!(saw_select, "should have seen SelectCard for discard");
     assert!(game.state.player1.stage.stage.contains(&sayaka), "sayaka on stage");

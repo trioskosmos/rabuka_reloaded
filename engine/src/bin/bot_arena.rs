@@ -756,13 +756,19 @@ fn report_health(
     let combined = p1_rate + p2_rate;
     println!("GUIDE HEALTH METRICS (docs/BOT_STRATEGY.md section 1)");
     println!(
-        "  placements per live phase: P1 {p1_rate:.3} | P2 {p2_rate:.3} | combined {combined:.3}\
-         \n    ceiling is 1.000 combined / 0.500 per side (8.4.7 pays ONE card per won check;\
-         2 only on an 8.4.6.2 tie with both below 2 successes), so combined is {:.0}% of the\
-         \n    rule maximum and the per-side share of that maximum is {:.0}% / {:.0}%",
-        100.0 * combined,
-        200.0 * p1_rate,
-        200.0 * p2_rate
+        "  placements per live phase: P1 {:.3} | P2 {:.3} | combined {:.3}",
+        p1_rate, p2_rate, combined
+    );
+    println!(
+        "    rule ceiling is 1.000 combined / 0.500 per side, so this run is {:.0}% of the",
+        100.0 * combined
+    );
+    println!(
+        "    maximum ({:.0}% / {:.0}% per side). 8.4.7 pays exactly ONE card per won",
+        200.0 * p1_rate, 200.0 * p2_rate
+    );
+    println!(
+        "    check; two only on an 8.4.6.2 score tie with both players below 2 successes."
     );
     println!(
         "  game length: median T{median} | p90 T{p90} | max T{max}   (target median T5-T8, hard band 5-9)"

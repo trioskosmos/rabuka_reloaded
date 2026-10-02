@@ -132,8 +132,15 @@ fn chosen_player_live_bottomdeck_draw_cannot_activate_without_energy() {
     let hanamaru = g.id(HANAMARU);
     g.add_to_stage(MemberArea::Center, hanamaru);
     let hand_before = g.state.player1.hand.cards.len();
-    // no energy given – cost is pay 1E mandatory, must not create pending choice or draw
-    let _ = g.try_activate_ability(hanamaru);
+    // The activation must be REFUSED, and `Err` is the channel that says so.
+    // Discarding it left "cannot afford" indistinguishable from "errored for some
+    // unrelated reason and did nothing" — the two leave identical state, which is
+    // exactly what this test asserts on.
+    let res = g.try_activate_ability(hanamaru);
+    assert!(
+        res.is_err(),
+        "the cost is 1E and none is available, so activation is refused: got {res:?}"
+    );
     assert!(
         !g.has_pending_choice(),
         "with 0 active energy, pay 1E cost cannot be paid so no pending choice should appear"

@@ -78,6 +78,18 @@ fn pl_s_sd1_009_sd_live_start_revealed_aqours_card_moves_from_hand_to_deck() {
     assert!(in_deck, "revealed card ends up on the deck");
 }
 
+/// The negative: the hand holds no Aqours card, so the optional cost has nothing it
+/// can pay with and must not be offered at all.
+///
+/// The old guard was inverted. `if !game.has_pending_choice() { assert!(...); return }`
+/// accepted BOTH outcomes — no prompt, or a prompt that was declined — so this test
+/// could not fail on the defect it exists to catch: an ability offering a cost it has
+/// no candidate for. It also returned early from the no-prompt branch, skipping the
+/// deck-length assertion entirely.
+///
+/// 「手札の『Aqours』のカードを1枚公開してもよい」 is optional, so a cost that cannot be
+/// paid is skipped without a prompt (Rule 9.4.2.3) and the ability resolves with no
+/// effect — no blade, hand and deck untouched.
 #[test]
 fn pl_s_sd1_009_sd_live_start_without_aqours_preserves_non_aqours_hand_card() {
     let db = load_real_database();
@@ -88,20 +100,29 @@ fn pl_s_sd1_009_sd_live_start_without_aqours_preserves_non_aqours_hand_card() {
     let ruby = game.id("PL!S-sd1-009-SD");
     game.state.player1.stage.stage[1] = ruby;
     let only_mu = game.new_id("PL!-sd1-010-SD");
-    game.add_to_hand(only_mu);
+    game.state.player1.hand.cards.clear();
+    game.state.player1.hand.cards = vec![only_mu].into();
 
     let deck_before = game.state.player1.main_deck.cards.len();
     fire_live_start(&mut game, ruby);
 
-    if !game.has_pending_choice() {
-        assert!(game.state.player1.hand.cards.contains(&only_mu));
-        return;
-    }
-    game.select_indices(&[]);
-    assert!(game.state.player1.hand.cards.contains(&only_mu));
+    // An empty `allowed` list makes any prompt a failure, which is the assertion the
+    // inverted guard was missing.
+    game.drain_choices_strict(&[], &[]);
+    assert!(
+        game.state.player1.hand.cards.contains(&only_mu),
+        "the non-Aqours hand card is not something this ability may touch — it neither \
+         reveals nor moves it"
+    );
     assert_eq!(
         game.state.player1.main_deck.cards.len(),
         deck_before,
-        "declined -> deck untouched"
+        "the deck is only fed by a REVEALED card, and nothing was revealed"
+    );
+    assert_eq!(
+        game.state.mods.get_blade_modifier(ruby),
+        0,
+        "「ライブ終了時まで、ブレードを得る」 is gated on 「これにより公開したカード」 — \
+         with no Aqours card in hand there is no revealed card, so no blade"
     );
 }

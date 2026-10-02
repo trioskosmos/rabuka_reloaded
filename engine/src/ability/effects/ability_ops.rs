@@ -386,6 +386,27 @@ impl AbilityResolver {
         Ok(())
     }
 
+    /// `SuppressAbilityTrigger` — deliberately a log-and-continue.
+    ///
+    /// The suppression itself is NOT applied here, and must not be. It is a
+    /// DECLARATIVE scan: `turn::trigger_scan::is_trigger_suppressed` looks for a
+    /// card on the owning player's stage (or in their live card zone) whose
+    /// `SuppressAbilityTrigger` ability names the trigger, and
+    /// `trigger_live_start_abilities` / `trigger_live_success_abilities` consult it
+    /// before enqueuing anything.
+    ///
+    /// That is the only correct place for it, and it is what the printed rule
+    /// 「自分のステージにいるメンバーが持つライブ開始時能力は発動しない」
+    /// (PL!SP-pb2-046-L Butterfly Wing) actually says: a property of the current
+    /// board, re-read whenever the trigger fires. A state mutation here would be
+    /// wrong twice over — it would suppress abilities of cards that left the stage
+    /// afterwards, and the `Duration`-keyed pruning in
+    /// `invalidation_still_active` has no entry to expire for a 常時 effect that is
+    /// simply no longer on the board.
+    ///
+    /// Covered by `live_success_invalidation_and_live_start_suppression_test.rs`
+    /// (own-stage suppression, live-card-zone source, and owner scoping against an
+    /// identically-named member on the opponent's stage).
     pub(crate) fn execute_suppress_ability_trigger(
         &mut self,
         gs: &mut GameState,
