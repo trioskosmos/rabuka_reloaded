@@ -1,4 +1,4 @@
-//! Per-operation allocation profile and regression gate.
+﻿//! Per-operation allocation profile and regression gate.
 //!
 //! # Why this exists
 //!
@@ -99,7 +99,7 @@ fn representative_game(db: Arc<CardDatabase>) -> TestGame {
         let id = g.id(card_no);
         g.add_to_hand(id);
     }
-    let filler = g.id("PL!N-bp1-002-R");
+    let filler = g.id("PL!N-bp1-002-P");
 
     // Discard + waitroom, so the 30/64-element zone scans have real length.
     g.add_to_discard(filler);
@@ -285,7 +285,7 @@ fn cost_per_card_is_independent_of_hand_size() {
     };
 
     // Fatten the hand substantially.
-    let filler = g.id("PL!N-bp1-002-R");
+    let filler = g.id("PL!N-bp1-002-P");
     for _ in 0..10 {
         g.add_to_hand(filler);
     }

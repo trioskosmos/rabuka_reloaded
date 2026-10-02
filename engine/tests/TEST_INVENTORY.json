@@ -1,14 +1,14 @@
 {
   "generated_by": "cards/test_inventory.py",
-  "generated_at": "2026-10-02T11:46:23.320813+00:00",
+  "generated_at": "2026-10-02T12:54:12.156388+00:00",
   "stats": {
     "total_cards": 2639,
     "cards_with_abilities": 1650,
     "total_abilities": 2116,
     "unique_abilities": 985
   },
-  "n_files": 1006,
-  "n_tests": 4121,
+  "n_files": 1007,
+  "n_tests": 4123,
   "total_cards": 809,
   "covered_cards": 809,
   "abilities_on_covered": 985,
@@ -1053,24 +1053,11 @@
       "rows": []
     },
     "unresolvable_card_id": {
-      "count": 2,
-      "rows": [
-        {
-          "file": "engine/tests/test_modules/perf/alloc_profile.rs",
-          "test": "<literal>",
-          "line": 102,
-          "detail": "PL!N-bp1-002-R"
-        },
-        {
-          "file": "engine/tests/test_modules/perf/alloc_profile.rs",
-          "test": "<literal>",
-          "line": 288,
-          "detail": "PL!N-bp1-002-R"
-        }
-      ]
+      "count": 0,
+      "rows": []
     }
   },
-  "n_test_fns_parsed": 4121,
+  "n_test_fns_parsed": 4123,
   "abilities": [
     {
       "idx": 0,
@@ -2255,6 +2242,7 @@
       "has_choice": true,
       "has_negative": true,
       "covering_files": [
+        "engine/tests/test_modules/characterization/card_database_parity_test.rs",
         "engine/tests/test_modules/characterization/zero_tested_action_types_test.rs",
         "engine/tests/test_modules/effects/deck_order/restore/both_waitrooms_member_restore_threshold_q242_test.rs",
         "engine/tests/test_modules/effects/gain/hearts/live_start/live_start_four_blade_group_member_gain_two_heart02_test.rs",
@@ -2266,6 +2254,7 @@
         "allocation_profile_report",
         "cost_per_card_is_independent_of_hand_size",
         "debut_both_waitrooms_member_restore_shrinks_own_waitroom",
+        "every_pl_card_in_cards_json_resolves_in_the_baked_database",
         "exactly_twenty_restored_members_meet_recovery_and_blade_threshold_q242",
         "kanon_invalidate_liella_live_start",
         "kasumi_ab0_debut_look_topdeck_arrange",
@@ -2289,11 +2278,10 @@
         "p_plus_twenty_restored_members_gain_two_blades_without_recoverable_live_q242",
         "q242_real_debut_moves_each_players_members_to_their_own_deck_bottom",
         "step_zero_to_one_live_start_full_ability",
-        "twenty_members_restored_from_own_waitroom_alone_grant_blades_q242",
-        "twenty_restored_members_gain_two_blades_without_recoverable_live_q242",
-        "twenty_restored_members_recover_live_and_gain_two_blades_q242"
+        "the_database_carries_no_cards_that_cards_json_dropped",
+        "twenty_members_restored_from_own_waitroom_alone_grant_blades_q242"
       ],
-      "covering_test_count": 35,
+      "covering_test_count": 37,
       "direct_tests": [
         "allocation_budgets",
         "allocation_profile_report",
@@ -6519,6 +6507,7 @@
       "has_choice": true,
       "has_negative": true,
       "covering_files": [
+        "engine/tests/test_modules/characterization/card_database_parity_test.rs",
         "engine/tests/test_modules/characterization/zero_tested_action_types_test.rs",
         "engine/tests/test_modules/effects/deck_order/restore/both_waitrooms_member_restore_threshold_q242_test.rs",
         "engine/tests/test_modules/effects/gain/hearts/live_start/live_start_four_blade_group_member_gain_two_heart02_test.rs",
@@ -6530,6 +6519,7 @@
         "allocation_profile_report",
         "cost_per_card_is_independent_of_hand_size",
         "debut_both_waitrooms_member_restore_shrinks_own_waitroom",
+        "every_pl_card_in_cards_json_resolves_in_the_baked_database",
         "exactly_twenty_restored_members_meet_recovery_and_blade_threshold_q242",
         "kanon_invalidate_liella_live_start",
         "kasumi_ab0_debut_look_topdeck_arrange",
@@ -6553,11 +6543,10 @@
         "p_plus_twenty_restored_members_gain_two_blades_without_recoverable_live_q242",
         "q242_real_debut_moves_each_players_members_to_their_own_deck_bottom",
         "step_zero_to_one_live_start_full_ability",
-        "twenty_members_restored_from_own_waitroom_alone_grant_blades_q242",
-        "twenty_restored_members_gain_two_blades_without_recoverable_live_q242",
-        "twenty_restored_members_recover_live_and_gain_two_blades_q242"
+        "the_database_carries_no_cards_that_cards_json_dropped",
+        "twenty_members_restored_from_own_waitroom_alone_grant_blades_q242"
       ],
-      "covering_test_count": 35,
+      "covering_test_count": 37,
       "direct_tests": [
         "allocation_budgets",
         "allocation_profile_report",
