@@ -62,21 +62,31 @@
 //!    candidate pool's own activating-card fallback (which reads `gs.activating_card`,
 //!    not the session) therefore contributes nothing either.
 //!
-//!    **Not committed, deliberately.** Two candidate fixes were written and measured:
+//!    **Not committed, deliberately.** Three candidate fixes were written and measured:
 //!
 //!    * clearing `card_type`/`group`/`groups` from `target_filter` when `self_target`
 //!      (they are count predicates — the same argument the `card_property` strip above
-//!      already makes, and the recipient is 「このカード」, a live). Measured: the
-//!      recipient list stays `[]`, so it is necessary at best and not sufficient.
-//!    * widening the recipient to the general pool unconditionally. Not attempted once
-//!      the first result showed the pool was not the problem.
+//!      already makes, and the recipient is 「このカード」, a live, which
+//!      `card_type: member_card` excludes). Measured: `final_value` reaches 1 and 2
+//!      as it should, and the recipient list is still `[]`.
+//!    * refreshing `r.session.activating_card_id` in the resolver-reuse branch of
+//!      `process_current_ability`, which carries the previous card's id forward.
+//!      Plausible in its own right — a reused resolver now executing a different
+//!      card's ability should not keep the old id. Measured: no change to the score.
+//!    * both together: still `[]`.
 //!
-//!    Neither is committed: both touch the per-card score path for every
-//!    `is_self_target` effect in the corpus, and neither is demonstrated by a passing
-//!    test. The check to write next is whether `enqueue_printed_ability` /
-//!    `build_ability_queue_entry` records the source card into the resolver session —
-//!    because if it does not, this is not one card but EVERY 「このカードのスコアを…」
-//!    effect that self-targets.
+//!    So the session value is NOT the blocker, and the two measured facts that remain
+//!    are these: the recipient list contains a card that is not the activating card,
+//!    and `session.activating_card_id` holds a third id that matches no candidate. The
+//!    candidate pool is built from `live_card_zone` + `success_live_card_zone` +
+//!    `stage` + `gs.activating_card`, so the activating card is expected to be in it;
+//!    it was not. Next to check is whether the live has already moved out of the zones
+//!    the pool reads by the time the effect resolves.
+//!
+//!    None is committed: each touches the per-card score path for every
+//!    `is_self_target` effect in the corpus, and none is demonstrated by a passing
+//!    test. A hot-path behavioural change with no test proving the correct behaviour is
+//!    worse than a visible defect.
 //!
 //!    The positive cases stay absent rather than being written to assert 0. `asserting
 //!    0 here would pin the bug, and a test that documents a defect is the class this
