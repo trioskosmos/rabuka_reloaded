@@ -1903,6 +1903,18 @@ fn commit_constant_results(
             );
         }
         self.movement_event_counter = self.movement_event_counter.wrapping_add(1);
+        // `cause_player_id` is the larger per-movement allocation, not
+        // `recently_moved_from_zone`: it is a `String`, and the event built here is
+        // cloned twice below (batch_movements, turn_movements) plus once more for
+        // turn_area_movements, so each movement allocates and frees that player id
+        // three or four times. The clones would be free if the field were the
+        // codebase's existing `compat::ArcStr`, which is refcounted - the `==`
+        // comparisons and the two `.as_str()` readers already work unchanged.
+        //
+        // Not done here: `cause_player_id` appears at 29 sites across game_state,
+        // ability and core, so this is a mechanical type change rather than a local
+        // fix, and it has no correctness impact - only allocation count. Recorded
+        // so it is not rediscovered as if it were new.
         let event = crate::types::MovementEvent {
             moved_card_id,
             source_zone: src_id,
@@ -1924,7 +1936,13 @@ fn commit_constant_results(
         }
         let cards = self.recently_moved_cards.get_or_insert_with(SmallVec::new);
         cards.push(moved_card_id);
-        self.recently_moved_from_zone = Some(source_zone.to_string());
+        // This runs once per movement, and a batch almost always moves cards out of
+        // the same zone, so the unconditional `to_string()` re-allocated for a value
+        // that was already stored. Compared before assigning: the write is identical,
+        // the allocation is not.
+        if self.recently_moved_from_zone.as_deref() != Some(source_zone) {
+            self.recently_moved_from_zone = Some(source_zone.to_string());
+        }
         // Track turn-level area movement (stage-area-to-stage-area)
         let is_area_move = source_zone == "stage" && dest_zone == "stage";
         if is_area_move {
@@ -1971,8 +1989,13 @@ fn commit_constant_results(
         from_zone: Option<&str>,
     ) {
         self.recently_moved_cards = Some(cards);
+        // Same guard as push_movement_event: this is the batch-level writer, called
+        // once per batch rather than once per card, so the allocation matters far
+        // less here — kept for consistency rather than for the profile.
         if let Some(z) = from_zone {
-            self.recently_moved_from_zone = Some(z.to_string());
+            if self.recently_moved_from_zone.as_deref() != Some(z) {
+                self.recently_moved_from_zone = Some(z.to_string());
+            }
         }
     }
 
