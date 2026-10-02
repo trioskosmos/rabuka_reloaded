@@ -1384,14 +1384,25 @@ fn reveal_until_check<F>(
             .or_else(|| effect.card_type_any().map(|s| s.to_string()));
 
         if let Some(card_type) = chosen_card_type {
+            // Carry the effect's own cost bound through. This passed `None, None`,
+            // so a clause that advertises `cost_limit` / `cost_limit_operator` on
+            // the effect had them dropped on the floor: the reveal accepted a card
+            // of any cost, and the printed bound 「…コスト10以下の…」 did nothing.
+            // `execute_reveal_until_target` only applies the bound when the chosen
+            // type is a member card, which matches how the print reads
+            // (「ライブカードまたはコストが10以上のメンバーカードから…」).
+            //
+            // No card in the corpus uses `reveal_until_chosen_card`, so this corrects
+            // the handler rather than current output.
+            let filter = effect.filter_subset();
             // Use the existing reveal_until_target functionality
             self.owner.executing = Some(effect.clone());
             self.execute_reveal_until_target(
                 gs,
                 effect.target_name(),
                 Some(&card_type),
-                None,
-                None,
+                filter.cost_limit,
+                filter.cost_operator,
             )?;
 
             // After reveal, we need to move the chosen card to hand and others to discard
