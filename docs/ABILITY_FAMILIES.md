@@ -148,6 +148,7 @@ Triggers: ライブ開始時 — 87/87 L0-covered.
 | `PL!HS-pb1-028` | L2+choice | 23 | {{live_start.png/ライブ開始時}}自分のステージにいるコスト10以上の『DOLLCHESTRA』のメンバー1人を選ぶ。そのメンバーの{{live_start.png/ライブ開始時}}能力1つを発動させてもよい。 （{{live_start.pn |
 | `PL!SP-bp1-024` | L2+choice | 22 | {{live_start.png/ライブ開始時}}ライブ終了時まで、自分のステージにいる「澁谷かのん」1人は{{heart_05.png/heart05}}{{icon_blade.png/ブレード}}を、「唐可可」1人は{{heart_01.png/hear |
 | `PL!HS-pb1-009` | L2+choice | 15 | {{live_start.png/ライブ開始時}}このメンバーが持つ{{icon_blade.png/ブレード}}の数が8つ以上の場合、カードを2枚引き、手札を1枚控え室に置く。 |
+| `PL!S-bp7-006` | L2+choice | 15 | {{live_start.png/ライブ開始時}}自分のデッキの下からカードを3枚控え室に置く。それらがすべて『Aqours』のメンバーカードの場合、ライブ終了時まで、{{heart_04.png/heart04}}を得る。 |
 | `PL!HS-PR-017` | L2+choice | 15 | {{live_start.png/ライブ開始時}}手札の同じユニット名を持つカード2枚を控え室に置いてもよい：ライブ終了時まで、{{heart_05.png/heart05}}{{heart_05.png/heart05}}{{icon_blade.png/ブ |
 | `PL!HS-pb1-030` | L2+choice | 15 | {{live_start.png/ライブ開始時}}ライブ終了時まで、自分のステージにいる『EdelNote』のメンバー1人は、{{icon_blade.png/ブレード}}{{icon_blade.png/ブレード}}を得て、そのメンバーとは名前の異なる『Ed |
 | `PL!N-bp3-015` | L2+choice | 14 | {{live_start.png/ライブ開始時}}{{heart_02.png/heart02}}か{{heart_05.png/heart05}}か{{heart_06.png/heart06}}のうち1つを選ぶ。ライブ終了時まで、このメンバーが元々持つハー |
@@ -155,7 +156,6 @@ Triggers: ライブ開始時 — 87/87 L0-covered.
 | `PL!SP-bp5-009` | L2+choice | 13 | {{live_start.png/ライブ開始時}}自分のデッキの一番上のカードを控え室に置いてもよい。そうした場合、ライブ終了時まで、{{icon_blade.png/ブレード}}を得る。これにより控え室に置いたカードがライブカードの場合、このメンバーをウェイ |
 | `PL!-bp3-024` | L2 | 13 | {{live_start.png/ライブ開始時}}自分の成功ライブカード置き場にカードがある場合、{{heart_01.png/heart01}}か{{heart_03.png/heart03}}か{{heart_06.png/heart06}}のうち、1つを |
 | `PL!-pb2-001` | L2+choice | 13 | {{live_start.png/ライブ開始時}}自分の成功ライブカード置き場にある『μ's』のカードの中に、{{icon_score.png/スコア}}を持つカードがある場合、ライブ終了時まで、「{{jyouji.png/常時}}ライブの合計スコアを＋１する |
-| `PL!N-bp4-009` | L2+choice | 13 | {{live_start.png/ライブ開始時}}自分のステージにいるメンバーのコストの合計が相手より低い場合、カードを2枚引き、自分の手札を1枚デッキの一番上に置く。 |
 
 ## live_start_gain
 
@@ -172,7 +172,7 @@ Triggers: ライブ開始時 — 64/64 L0-covered.
 | `PL!-bp3-026` | L2+choice | 81 | {{live_start.png/ライブ開始時}}手札を2枚控え室に置いてもよい：ライブ終了時まで、自分のステージにいるメンバー1人は、{{icon_blade.png/ブレード}}{{icon_blade.png/ブレード}}{{icon_blade.png |
 | `PL!HS-PR-001` | L2+choice | 78 | {{live_start.png/ライブ開始時}}{{icon_energy.png/E}}{{icon_energy.png/E}}支払ってもよい：ライブ終了時まで、{{icon_blade.png/ブレード}}を得る。 |
 | `PL!N-sd1-001` | L2+choice | 68 | {{live_start.png/ライブ開始時}}{{icon_energy.png/E}}支払ってもよい：ライブ終了時まで、自分のステージにいるほかの『虹ヶ咲』のメンバーは{{icon_blade.png/ブレード}}を得る。 |
-| `PL!SP-sd1-003` | L2+choice | 65 | {{live_start.png/ライブ開始時}}手札を2枚控え室に置いてもよい：ライブ終了時まで、{{icon_blade.png/ブレード}}{{icon_blade.png/ブレード}}{{icon_blade.png/ブレード}}{{icon_blad |
+| `PL!SP-sd1-003` | L2+choice | 67 | {{live_start.png/ライブ開始時}}手札を2枚控え室に置いてもよい：ライブ終了時まで、{{icon_blade.png/ブレード}}{{icon_blade.png/ブレード}}{{icon_blade.png/ブレード}}{{icon_blad |
 | `PL!HS-bp5-003` | L2+choice | 60 | {{live_start.png/ライブ開始時}}手札を1枚控え室に置いてもよい：ライブ終了時まで、これにより控え室に置いたカードと同じグループ名を持つメンバー1人は、{{heart_01.png/heart01}}を得る。 |
 | `PL!S-bp6-002` | L2+choice | 51 | {{live_start.png/ライブ開始時}}自分のライブカード置き場にあるカードが『Aqours』のみで、かつそれらの必要ハートに含まれる{{heart_02.png/heart02}}と{{heart_04.png/heart04}}と{{heart_ |
 | `PL!HS-bp2-005` | L2+choice | 45 | {{live_start.png/ライブ開始時}}{{icon_energy.png/E}}支払ってもよい：自分のステージのエリアすべてにメンバーが登場している場合、ライブ終了時まで、{{icon_blade.png/ブレード}}{{icon_blade.pn |
@@ -491,7 +491,7 @@ Triggers: 常時 — 50/50 L0-covered.
 
 | Card | Depth | Tests | Text |
 |---|---|---|---|
-| `PL!SP-bp5-012` | L2 | 7 | {{jyouji.png/常時}}自分のライブカード置き場に必要ハートの合計が8以上の『Liella!』のライブカードがあるかぎり、{{heart_03.png/heart03}}を得る。 |
+| `PL!SP-bp5-012` | L2+choice | 9 | {{jyouji.png/常時}}自分のライブカード置き場に必要ハートの合計が8以上の『Liella!』のライブカードがあるかぎり、{{heart_03.png/heart03}}を得る。 |
 
 ### variant: {'text': '自分のライブ中のライブカードの必要ハートの中に{{heart_01.png|heart01}}、{{heart_02.png|heart02}}、{{heart_03.png|heart03}}、{{heart_04.png|heart04}}、{{heart_05.png|heart05}}、{{heart_06.png|heart06}}がそれぞれ1以上含まれるかぎり', 'type': 'temporal_condition', 'temporal': 'during_live', 'target': 'self', 'aggregate': 'total', 'heart_colors': ['heart01', 'heart02', 'heart03', 'heart04', 'heart05', 'heart06'], 'count': 1, 'location': 'live_card_zone'} — 1 abilities
 
@@ -989,7 +989,7 @@ Triggers: 登場 — 19/19 L0-covered.
 
 | Card | Depth | Tests | Text |
 |---|---|---|---|
-| `PL!SP-sd1-001` | L2+choice | 318 | {{toujyou.png/登場}}自分のエネルギー6枚につき、カードを1枚引く。 |
+| `PL!SP-sd1-001` | L2+choice | 320 | {{toujyou.png/登場}}自分のエネルギー6枚につき、カードを1枚引く。 |
 | `PL!HS-bp1-005` | L2+choice | 139 | {{toujyou.png/登場}}手札を3枚まで控え室に置いてもよい：これにより置いた枚数分カードを引く。 |
 | `PL!SP-PR-003` | L2+choice | 71 | {{toujyou.png/登場}}自分のエネルギーが7枚以上ある場合、カードを1枚引く。 |
 | `PL!SP-pb1-009` | L2+choice | 47 | {{toujyou.png/登場}}自分のステージにほかの『5yncri5e!』のメンバーがいる場合、カードを1枚引く。 |
@@ -1019,8 +1019,8 @@ Triggers: 自動 — 19/19 L0-covered.
 |---|---|---|---|
 | `PL!S-bp2-002` | L2+choice | 123 | {{jidou.png/自動}}このメンバーがステージから控え室に置かれたとき、手札を1枚控え室に置いてもよい。そうした場合、自分の控え室から『Aqours』のライブカードを1枚手札に加える。 |
 | `PL!HS-pb1-003` | L2+choice | 64 | {{jidou.png/自動}}{{turn2.png/ターン2回}}自分の手札からカードが1枚以上控え室に置かれるたび、ライブ終了時まで、{{heart_01.png/heart01}}{{icon_blade.png/ブレード}}を得る。 |
+| `PL!S-bp6-021` | L2+choice | 45 | {{jidou.png/自動}}{{turn1.png/ターン1回}}自分がエールしたとき、エールにより公開された自分のカードの中からブレードハートを持たない『Aqours』のメンバーカードを1枚まで控え室に置いてもよい。そうした場合、これにより控え室に置いた |
 | `PL!HS-bp6-027` | L2+choice | 43 | {{jidou.png/自動}}{{turn1.png/ターン1回}}自分がエールしたとき、エールにより公開された自分のブレードハートを持たない『蓮ノ空』のカードを3枚まで控え室に置いてもよい。そうした場合、これにより控え室に置いた数に等しい枚数のエールを追加 |
-| `PL!S-bp6-021` | L2+choice | 43 | {{jidou.png/自動}}{{turn1.png/ターン1回}}自分がエールしたとき、エールにより公開された自分のカードの中からブレードハートを持たない『Aqours』のメンバーカードを1枚まで控え室に置いてもよい。そうした場合、これにより控え室に置いた |
 | `PL!SP-bp7-005` | L2+choice | 41 | {{jidou.png/自動}}{{turn1.png/ターン1回}}このメンバーが登場するか、自分のエネルギーがエネルギー置き場からエネルギーデッキに置かれたとき、自分のエネルギーデッキから、エネルギーカードを1枚ウェイト状態で置く。そのエネルギーカードは、 |
 | `PL!N-bp4-026` | L2+choice | 38 | {{jidou.png/自動}}自分のメインフェイズにこのカードが控え室から手札に加えられたとき、自分の手札からカード名が「DIVE!」のライブカード1枚を表向きでライブカード置き場に置いてもよい。そうした場合、次のライブカードセットフェイズで自分がライブカー |
 | `PL!N-sd2-010` | L2+choice | 28 | {{jidou.png/自動}}{{turn1.png/ターン1回}}自分のステージにいる『虹ヶ咲』のメンバー1人がウェイト状態になったとき、手札を1枚控え室に置いてもよい。そうしたとき、そのメンバーをアクティブにし、ライブ終了時まで、そのメンバーは{{ico |
@@ -1216,7 +1216,7 @@ Triggers: 登場 — 9/9 L0-covered.
 | `PL!N-pb1-008` | L2+choice | 106 | {{toujyou.png/登場}}自分のステージにいるメンバー1人か、エネルギーを2枚アクティブにする。 |
 | `PL!-PR-005` | L2+choice | 97 | {{toujyou.png/登場}}以下から1つを選ぶ。 ・カードを1枚引き、手札を1枚控え室に置く。 ・相手のステージにいるすべてのコスト2以下のメンバーをウェイトにする。 |
 | `PL!N-bp5-011` | L2+choice | 39 | {{toujyou.png/登場}}以下から1つを選ぶ。 ・自分の控え室にカード名が異なるライブカードが3枚以上ある場合、自分の控え室からライブカードを1枚手札に加える。 ・自分の控え室にグループ名が異なるライブカードが3枚以上ある場合、自分の控え室からライブ |
-| `PL!S-bp7-003` | L2+choice | 21 | {{toujyou.png/登場}}以下から1つを選ぶ。 ・ライブ終了時まで、自分のステージにいる元々持つ{{icon_blade.png/ブレード}}の数が3つ以下の『Aqours』のメンバーは、相手の効果によってはウェイトしない。 ・このメンバーを『Aqo |
+| `PL!S-bp7-003` | L2+choice | 23 | {{toujyou.png/登場}}以下から1つを選ぶ。 ・ライブ終了時まで、自分のステージにいる元々持つ{{icon_blade.png/ブレード}}の数が3つ以下の『Aqours』のメンバーは、相手の効果によってはウェイトしない。 ・このメンバーを『Aqo |
 | `PL!S-bp5-004` | L2+choice | 11 | {{toujyou.png/登場}}以下から1つを選ぶ。 ・自分のステージにいるこのメンバー以外の『Aqours』のメンバー1人は、ライブ終了時まで、{{icon_blade.png/ブレード}}を得る。 ・自分のステージにいる『SaintSnow』のメンバー |
 | `PL!N-bp7-005` | L2+choice | 7 | {{toujyou.png/登場}}自分のステージに名前の異なる『DiverDiva』のメンバーが2人いる場合、以下から1つを選ぶ。 ・エネルギーを2枚アクティブにする。 ・自分のエネルギーデッキから、エネルギーカード1枚を自分のステージにいる『虹ヶ咲』のメン |
 | `PL!HS-cl1-004` | L2+choice | 5 | {{toujyou.png/登場}}以下から1つを選ぶ。 ・自分のデッキの上からカードを3枚控え室に置く。 ・相手のステージにいるコスト2以下のメンバー1人をウェイトにする。 |
@@ -1251,7 +1251,7 @@ Triggers: 登場 — 8/8 L0-covered.
 |---|---|---|---|
 | `PL!-PR-014` | L2+choice | 92 | {{toujyou.png/登場}}相手の手札を、自分は見ないで3枚選び公開する。これにより公開されたカードの中にライブカードがない場合、カードを1枚引く。 |
 | `PL!SP-bp2-001` | L2+choice | 75 | {{toujyou.png/登場}}自分のステージにいる『Liella!』のメンバー1人のすべての{{live_start.png/ライブ開始時}}能力を、ライブ終了時まで、無効にしてもよい。これにより無効にした場合、自分の控え室から『Liella!』のカード |
-| `PL!S-bp7-007` | L2+choice | 9 | {{toujyou.png/登場}}自分の控え室からコスト2以下のメンバーカードを1枚手札に加える。これによって「津島善子」か「黒澤ルビィ」を手札に加えた場合、そのカードを自分のステージのメンバーのいないエリアに登場させてもよい。 |
+| `PL!S-bp7-007` | L2+choice | 11 | {{toujyou.png/登場}}自分の控え室からコスト2以下のメンバーカードを1枚手札に加える。これによって「津島善子」か「黒澤ルビィ」を手札に加えた場合、そのカードを自分のステージのメンバーのいないエリアに登場させてもよい。 |
 | `PL!HS-pb1-012` | L2+choice | 8 | {{toujyou.png/登場}}自分と相手はそれぞれ、自身の控え室にあるすべてのメンバーカードをシャッフルし、自身のデッキの下に置く。これにより自分と相手のカードが合計20枚以上デッキの下に置かれた場合、自分の控え室からライブカードを1枚手札に加え、ライブ |
 | `PL!S-bp7-001` | L2+choice | 7 | {{toujyou.png/登場}}手札を1枚控え室に置いてもよい：自分の控え室からコスト10以上のメンバーカードを1枚手札に加える。これにより「桜内梨子」か「渡辺曜」を手札に加えた場合、ライブ終了時まで、{{icon_blade.png/ブレード}}{{ic |
 | `PL!SP-pb2-013` | L2+choice | 7 | {{toujyou.png/登場}}手札の『KALEIDOSCORE』のカードを1枚控え室に置いてもよい：自分のエネルギーデッキから、エネルギーカードを1枚ウェイト状態で置く。これにより控え室に置いたカードがブレードハートを持たない場合、カードを1枚引く。 |
@@ -1569,7 +1569,7 @@ Triggers: 登場 — 3/3 L0-covered.
 
 | Card | Depth | Tests | Text |
 |---|---|---|---|
-| `PL!SP-sd1-004` | L2+choice | 116 | {{toujyou.png/登場}}ライブ終了時まで、「{{jyouji.png/常時}}ライブの合計スコアを＋１する。」を得る。 |
+| `PL!SP-sd1-004` | L2+choice | 118 | {{toujyou.png/登場}}ライブ終了時まで、「{{jyouji.png/常時}}ライブの合計スコアを＋１する。」を得る。 |
 | `PL!-bp4-007` | L2+choice | 11 | {{toujyou.png/登場}}自分の成功ライブカード置き場にカードが1枚以上あり、かつスコアの合計が１以下の場合、ライブ終了時まで、「{{jyouji.png/常時}}ライブの合計スコアを＋１する。」を得る。 |
 | `PL!-pb2-005` | L2+choice | 6 | {{toujyou.png/登場}}自分の成功ライブカード置き場に{{icon_score.png/スコア}}を持つ『μ's』のカードがある場合、ライブ終了時まで、「{{jyouji.png/常時}}自分のステージにいる『μ's』のメンバーは、{{icon_b |
 
@@ -1802,7 +1802,7 @@ Triggers: ライブ開始時, 登場 — 1/1 L0-covered.
 
 | Card | Depth | Tests | Text |
 |---|---|---|---|
-| `PL!S-bp7-003` | L2+choice | 21 | {{toujyou.png/登場}}/{{live_start.png/ライブ開始時}}自分のデッキの一番上のカードを見る。それをデッキの一番下に置いてもよい。 |
+| `PL!S-bp7-003` | L2+choice | 23 | {{toujyou.png/登場}}/{{live_start.png/ライブ開始時}}自分のデッキの一番上のカードを見る。それをデッキの一番下に置いてもよい。 |
 
 ## other:起動:activate_ability
 

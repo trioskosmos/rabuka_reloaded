@@ -1,14 +1,14 @@
 {
   "generated_by": "cards/test_inventory.py",
-  "generated_at": "2026-10-02T15:20:49.722331+00:00",
+  "generated_at": "2026-10-02T20:14:36.277322+00:00",
   "stats": {
     "total_cards": 2639,
     "cards_with_abilities": 1650,
     "total_abilities": 2116,
     "unique_abilities": 985
   },
-  "n_files": 1007,
-  "n_tests": 4122,
+  "n_files": 1008,
+  "n_tests": 4124,
   "total_cards": 809,
   "covered_cards": 809,
   "abilities_on_covered": 985,
@@ -321,8 +321,8 @@
     ]
   },
   "depth_counts": {
-    "L2+choice": 852,
-    "L2": 104,
+    "L2+choice": 853,
+    "L2": 103,
     "L1+choice": 28,
     "L1": 1
   },
@@ -995,7 +995,7 @@
       "rows": []
     }
   },
-  "n_test_fns_parsed": 4122,
+  "n_test_fns_parsed": 4124,
   "abilities": [
     {
       "idx": 0,
@@ -10418,9 +10418,11 @@
         "engine/tests/test_modules/effects/choice/selection_filter/forced_self_wait_excludes_immune_q275_test.rs",
         "engine/tests/test_modules/effects/compound/condition_and_effect/debut_choose_low_blade_group_wait_immunity_or_position_change_test.rs",
         "engine/tests/test_modules/effects/compound/per_card/q274_wait_immune_member_still_selectable_pl_s_bp7_003_r_test.rs",
+        "engine/tests/test_modules/effects/gain/blades/live_start/hanamaru_live_start_blade_per_card_this_step_placed_pl_s_bp7_007_p_test.rs",
         "engine/tests/test_modules/support/bp7_wait_immunity_helpers.rs"
       ],
       "covering_tests": [
+        "blades_count_the_cards_this_step_placed_not_the_hand",
         "debut_wait_immunity_blocks_opponent_debut_cost_limit_wait",
         "debut_wait_immunity_blocks_opponent_under_energy_blade_limit_wait",
         "debut_wait_immunity_choose_options_are_bilingual",
@@ -10438,13 +10440,15 @@
         "mari_bottom_suimire_stays_in_waitroom",
         "mari_does_not_grab_other_discard_match",
         "mari_skip_optional_discard_moves_nothing",
+        "nothing_placeable_earns_nothing_despite_a_full_hand",
         "q274_immune_target_still_offered_and_not_waited",
         "q274_immunity_uses_printed_blade_not_current_blade",
         "q274_non_immune_pick_is_still_waited",
         "q274_without_immunity_the_member_is_waited"
       ],
-      "covering_test_count": 21,
+      "covering_test_count": 23,
       "direct_tests": [
+        "blades_count_the_cards_this_step_placed_not_the_hand",
         "debut_wait_immunity_choose_options_are_bilingual",
         "forced_self_wait_q275_without_immunity_immune_member_is_offered_and_waited",
         "kanan_bp7_both_debut_abilities_in_queue_from_start",
@@ -10453,7 +10457,7 @@
         "mari_skip_optional_discard_moves_nothing",
         "q274_without_immunity_the_member_is_waited"
       ],
-      "direct_test_count": 7,
+      "direct_test_count": 8,
       "is_null": false,
       "use_limit": null,
       "watches_abilities": false,
@@ -10488,9 +10492,11 @@
         "engine/tests/test_modules/effects/choice/selection_filter/forced_self_wait_excludes_immune_q275_test.rs",
         "engine/tests/test_modules/effects/compound/condition_and_effect/debut_choose_low_blade_group_wait_immunity_or_position_change_test.rs",
         "engine/tests/test_modules/effects/compound/per_card/q274_wait_immune_member_still_selectable_pl_s_bp7_003_r_test.rs",
+        "engine/tests/test_modules/effects/gain/blades/live_start/hanamaru_live_start_blade_per_card_this_step_placed_pl_s_bp7_007_p_test.rs",
         "engine/tests/test_modules/support/bp7_wait_immunity_helpers.rs"
       ],
       "covering_tests": [
+        "blades_count_the_cards_this_step_placed_not_the_hand",
         "debut_wait_immunity_blocks_opponent_debut_cost_limit_wait",
         "debut_wait_immunity_blocks_opponent_under_energy_blade_limit_wait",
         "debut_wait_immunity_choose_options_are_bilingual",
@@ -10508,13 +10514,15 @@
         "mari_bottom_suimire_stays_in_waitroom",
         "mari_does_not_grab_other_discard_match",
         "mari_skip_optional_discard_moves_nothing",
+        "nothing_placeable_earns_nothing_despite_a_full_hand",
         "q274_immune_target_still_offered_and_not_waited",
         "q274_immunity_uses_printed_blade_not_current_blade",
         "q274_non_immune_pick_is_still_waited",
         "q274_without_immunity_the_member_is_waited"
       ],
-      "covering_test_count": 21,
+      "covering_test_count": 23,
       "direct_tests": [
+        "blades_count_the_cards_this_step_placed_not_the_hand",
         "debut_wait_immunity_choose_options_are_bilingual",
         "forced_self_wait_q275_without_immunity_immune_member_is_offered_and_waited",
         "kanan_bp7_both_debut_abilities_in_queue_from_start",
@@ -10523,7 +10531,7 @@
         "mari_skip_optional_discard_moves_nothing",
         "q274_without_immunity_the_member_is_waited"
       ],
-      "direct_test_count": 7,
+      "direct_test_count": 8,
       "is_null": false,
       "use_limit": null,
       "watches_abilities": false,
@@ -10755,9 +10763,11 @@
       "has_negative": true,
       "covering_files": [
         "engine/tests/test_modules/effects/compound/cost_and_effect/discard_two_self_and_other_group_debut_retrigger_test.rs",
-        "engine/tests/test_modules/effects/conditional/per_card/hanamaru_debut_result_character_deploy_test.rs"
+        "engine/tests/test_modules/effects/conditional/per_card/hanamaru_debut_result_character_deploy_test.rs",
+        "engine/tests/test_modules/effects/gain/blades/live_start/hanamaru_live_start_blade_per_card_this_step_placed_pl_s_bp7_007_p_test.rs"
       ],
       "covering_tests": [
+        "blades_count_the_cards_this_step_placed_not_the_hand",
         "discard_two_cost_is_a_hand_select_of_two_and_moves_two_cards",
         "discard_two_debut_retrigger_activates_both_chosen_debut_abilities",
         "hanamaru_both_matching_one_deploys",
@@ -10766,19 +10776,22 @@
         "hanamaru_no_empty_slot_card_in_hand",
         "hanamaru_no_valid_discard_no_action",
         "hanamaru_non_matching_no_deploy",
-        "hanamaru_single_matching_auto_adds_to_hand"
+        "hanamaru_single_matching_auto_adds_to_hand",
+        "nothing_placeable_earns_nothing_despite_a_full_hand"
       ],
-      "covering_test_count": 9,
+      "covering_test_count": 11,
       "direct_tests": [
+        "blades_count_the_cards_this_step_placed_not_the_hand",
         "hanamaru_both_matching_one_deploys",
         "hanamaru_deploy_to_left_when_right_full",
         "hanamaru_multiple_valid_forces_selection",
         "hanamaru_no_empty_slot_card_in_hand",
         "hanamaru_no_valid_discard_no_action",
         "hanamaru_non_matching_no_deploy",
-        "hanamaru_single_matching_auto_adds_to_hand"
+        "hanamaru_single_matching_auto_adds_to_hand",
+        "nothing_placeable_earns_nothing_despite_a_full_hand"
       ],
-      "direct_test_count": 7,
+      "direct_test_count": 9,
       "is_null": false,
       "use_limit": null,
       "watches_abilities": false,
@@ -10809,9 +10822,11 @@
       "has_negative": true,
       "covering_files": [
         "engine/tests/test_modules/effects/compound/cost_and_effect/discard_two_self_and_other_group_debut_retrigger_test.rs",
-        "engine/tests/test_modules/effects/conditional/per_card/hanamaru_debut_result_character_deploy_test.rs"
+        "engine/tests/test_modules/effects/conditional/per_card/hanamaru_debut_result_character_deploy_test.rs",
+        "engine/tests/test_modules/effects/gain/blades/live_start/hanamaru_live_start_blade_per_card_this_step_placed_pl_s_bp7_007_p_test.rs"
       ],
       "covering_tests": [
+        "blades_count_the_cards_this_step_placed_not_the_hand",
         "discard_two_cost_is_a_hand_select_of_two_and_moves_two_cards",
         "discard_two_debut_retrigger_activates_both_chosen_debut_abilities",
         "hanamaru_both_matching_one_deploys",
@@ -10820,19 +10835,22 @@
         "hanamaru_no_empty_slot_card_in_hand",
         "hanamaru_no_valid_discard_no_action",
         "hanamaru_non_matching_no_deploy",
-        "hanamaru_single_matching_auto_adds_to_hand"
+        "hanamaru_single_matching_auto_adds_to_hand",
+        "nothing_placeable_earns_nothing_despite_a_full_hand"
       ],
-      "covering_test_count": 9,
+      "covering_test_count": 11,
       "direct_tests": [
+        "blades_count_the_cards_this_step_placed_not_the_hand",
         "hanamaru_both_matching_one_deploys",
         "hanamaru_deploy_to_left_when_right_full",
         "hanamaru_multiple_valid_forces_selection",
         "hanamaru_no_empty_slot_card_in_hand",
         "hanamaru_no_valid_discard_no_action",
         "hanamaru_non_matching_no_deploy",
-        "hanamaru_single_matching_auto_adds_to_hand"
+        "hanamaru_single_matching_auto_adds_to_hand",
+        "nothing_placeable_earns_nothing_despite_a_full_hand"
       ],
-      "direct_test_count": 7,
+      "direct_test_count": 9,
       "is_null": false,
       "use_limit": null,
       "watches_abilities": false,
@@ -18201,12 +18219,14 @@
         "engine/tests/test_modules/effects/compound/cost_and_effect/live_start_optional_bottom_mill_named_recovery_source_test.rs",
         "engine/tests/test_modules/effects/compound/sequential_effects/live_start_bottom_one_mill_live_heart_source_test.rs",
         "engine/tests/test_modules/effects/conditional/per_card/kanon_debut_invalidate_recovers_discard_card_test.rs",
+        "engine/tests/test_modules/effects/gain/blades/live_start/hanamaru_live_start_blade_per_card_this_step_placed_pl_s_bp7_007_p_test.rs",
         "engine/tests/test_modules/effects/gain/blades/under_member/bp7_under_member_per_unit_blade_test.rs",
         "engine/tests/test_modules/integration/parser_e2e/parser_issues_e2e_part2_test.rs",
         "engine/tests/test_modules/integration/parser_e2e/parser_issues_e2e_test.rs",
         "engine/tests/test_modules/jidou/ability_watch/invalidated_live_start_restores_next_live_test.rs"
       ],
       "covering_tests": [
+        "blades_count_the_cards_this_step_placed_not_the_hand",
         "chika_constant_blade_counts_only_under",
         "chika_constant_blade_per_member_under",
         "chika_constant_blade_zero_under",
@@ -18235,11 +18255,11 @@
         "issue5_kanon_invalidate_other_liella",
         "issue5_solitude_rain_heart_color_scoring",
         "issue6_natsumi_blade_expires_after_live_victory_determination",
-        "issue6_natsumi_low_energy_no_blade",
-        "issue6_natsumi_self_and_other_blade"
+        "issue6_natsumi_low_energy_no_blade"
       ],
-      "covering_test_count": 65,
+      "covering_test_count": 67,
       "direct_tests": [
+        "blades_count_the_cards_this_step_placed_not_the_hand",
         "issue1_kanon_invalidate_and_recover",
         "issue5_kanon_invalidate_other_liella",
         "kanon_debut_invalidation_recovers_liella_from_discard",
@@ -18250,9 +18270,10 @@
         "live_start_bottom_three_mills_deck_bottom_three",
         "live_start_mills_bottom_one_preserving_hand",
         "live_start_optional_bottom_mill_removes_bottom_card_from_deck",
+        "nothing_placeable_earns_nothing_despite_a_full_hand",
         "shizuku_live_start_blade_per_distinct_under"
       ],
-      "direct_test_count": 11,
+      "direct_test_count": 13,
       "is_null": false,
       "use_limit": null,
       "watches_abilities": false,
@@ -28746,13 +28767,16 @@
       "has_choice": true,
       "has_negative": true,
       "covering_files": [
-        "engine/tests/test_modules/effects/deck_order/restore/clean_members_energy_pl_n_bp7_008_r_test.rs"
+        "engine/tests/test_modules/effects/deck_order/restore/clean_members_energy_pl_n_bp7_008_r_test.rs",
+        "engine/tests/test_modules/effects/gain/blades/live_start/hanamaru_live_start_blade_per_card_this_step_placed_pl_s_bp7_007_p_test.rs"
       ],
       "covering_tests": [
+        "blades_count_the_cards_this_step_placed_not_the_hand",
+        "nothing_placeable_earns_nothing_despite_a_full_hand",
         "pl_n_bp7_008_r_bottoms_only_non_blade_heart_members_and_activates_energy",
         "pl_n_bp7_008_r_empty_waitroom_is_a_noop"
       ],
-      "covering_test_count": 2,
+      "covering_test_count": 4,
       "direct_tests": [
         "pl_n_bp7_008_r_bottoms_only_non_blade_heart_members_and_activates_energy",
         "pl_n_bp7_008_r_empty_waitroom_is_a_noop"
@@ -32822,13 +32846,16 @@
         "engine/tests/test_modules/effects/compound/condition_and_effect/live_start_bottom_three_mill_all_group_heart_test.rs",
         "engine/tests/test_modules/effects/compound/cost_and_effect/live_start_optional_bottom_mill_named_recovery_source_test.rs",
         "engine/tests/test_modules/effects/compound/sequential_effects/live_start_bottom_one_mill_live_heart_source_test.rs",
+        "engine/tests/test_modules/effects/gain/blades/live_start/hanamaru_live_start_blade_per_card_this_step_placed_pl_s_bp7_007_p_test.rs",
         "engine/tests/test_modules/effects/gain/blades/under_member/bp7_watanabe_under_card_blade_test.rs"
       ],
       "covering_tests": [
+        "blades_count_the_cards_this_step_placed_not_the_hand",
         "live_start_bottom_three_all_aqours_gives_heart04",
         "live_start_bottom_three_mills_deck_bottom_three",
         "live_start_mills_bottom_one_preserving_hand",
         "live_start_optional_bottom_mill_removes_bottom_card_from_deck",
+        "nothing_placeable_earns_nothing_despite_a_full_hand",
         "watanabe_aqours_host_with_energy_under_gains_nothing",
         "watanabe_aqours_host_with_member_under_gains_blade",
         "watanabe_aqours_host_without_under_gains_nothing",
@@ -32839,8 +32866,9 @@
         "watanabe_self_no_under_gains_nothing",
         "watanabe_two_hosts_with_members_under_both_gain"
       ],
-      "covering_test_count": 13,
+      "covering_test_count": 15,
       "direct_tests": [
+        "blades_count_the_cards_this_step_placed_not_the_hand",
         "live_start_bottom_three_all_aqours_gives_heart04",
         "live_start_bottom_three_mills_deck_bottom_three",
         "live_start_mills_bottom_one_preserving_hand",
@@ -32853,7 +32881,7 @@
         "watanabe_debut_places_under_self_grants_blade",
         "watanabe_two_hosts_with_members_under_both_gain"
       ],
-      "direct_test_count": 11,
+      "direct_test_count": 12,
       "is_null": false,
       "use_limit": null,
       "watches_abilities": false,
@@ -45699,22 +45727,27 @@
       "has_negative": true,
       "covering_files": [
         "engine/tests/test_modules/effects/compound/condition_and_effect/live_start_mill_all_group_blade_test.rs",
-        "engine/tests/test_modules/effects/compound/cost_and_effect/live_start_optional_unit_discard_draw_unit_cost_gain_test.rs"
+        "engine/tests/test_modules/effects/compound/cost_and_effect/live_start_optional_unit_discard_draw_unit_cost_gain_test.rs",
+        "engine/tests/test_modules/effects/gain/blades/live_start/hanamaru_live_start_blade_per_card_this_step_placed_pl_s_bp7_007_p_test.rs"
       ],
       "covering_tests": [
+        "blades_count_the_cards_this_step_placed_not_the_hand",
         "mill_four_all_group_cards_grants_one_blade_until_live_end",
         "mill_four_any_wrong_group_card_prevents_blade_rider",
+        "nothing_placeable_earns_nothing_despite_a_full_hand",
         "optional_unit_discard_draw_cost_gain_live_start_modify_cost_only_applies_to_dollchestra",
         "optional_unit_discard_draw_cost_gain_skip_cost_no_cost_modifier"
       ],
-      "covering_test_count": 4,
+      "covering_test_count": 6,
       "direct_tests": [
+        "blades_count_the_cards_this_step_placed_not_the_hand",
         "mill_four_all_group_cards_grants_one_blade_until_live_end",
         "mill_four_any_wrong_group_card_prevents_blade_rider",
+        "nothing_placeable_earns_nothing_despite_a_full_hand",
         "optional_unit_discard_draw_cost_gain_live_start_modify_cost_only_applies_to_dollchestra",
         "optional_unit_discard_draw_cost_gain_skip_cost_no_cost_modifier"
       ],
-      "direct_test_count": 4,
+      "direct_test_count": 6,
       "is_null": false,
       "use_limit": null,
       "watches_abilities": false,
@@ -54521,10 +54554,12 @@
       "has_negative": true,
       "covering_files": [
         "engine/tests/test_modules/effects/compound/condition_and_effect/live_start_select_success_zone_live_and_gain_hearts_pl_s_bp6_004_r_test.rs",
+        "engine/tests/test_modules/effects/gain/blades/live_start/hanamaru_live_start_blade_per_card_this_step_placed_pl_s_bp7_007_p_test.rs",
         "engine/tests/test_modules/effects/look_select/per_card/live_success_revealed_cards_extra_yells_test.rs",
         "engine/tests/test_modules/integration/parser_e2e/parser_issues_e2e_test.rs"
       ],
       "covering_tests": [
+        "blades_count_the_cards_this_step_placed_not_the_hand",
         "issue10_dream_with_you_high_blade_plus_1_score",
         "issue10_dream_with_you_no_blade_no_score",
         "issue11_fanfare_15plus_cards_gives_blade",
@@ -54553,10 +54588,9 @@
         "issue9_izumi_debut_draw_2_discard_1",
         "issue9_izumi_debut_empty_hand",
         "live_start_card_excluded",
-        "mirai_ticket_cost10_two_extra_yells",
-        "mirai_ticket_cost20_capped_at_four"
+        "mirai_ticket_cost10_two_extra_yells"
       ],
-      "covering_test_count": 43,
+      "covering_test_count": 45,
       "direct_tests": [
         "issue15_mirai_ticket_card_exists",
         "mirai_ticket_cost10_two_extra_yells",
@@ -57700,33 +57734,38 @@
       ],
       "base": "PL!SP-bp5-012",
       "covered": true,
-      "depth": "L2",
+      "depth": "L2+choice",
       "has_assert": true,
-      "has_choice": false,
+      "has_choice": true,
       "has_negative": true,
       "covering_files": [
+        "engine/tests/test_modules/effects/gain/blades/live_start/hanamaru_live_start_blade_per_card_this_step_placed_pl_s_bp7_007_p_test.rs",
         "engine/tests/test_modules/effects/gain/hearts/constants/group_live_need_heart_eight_constant_heart03_test.rs"
       ],
       "covering_tests": [
+        "blades_count_the_cards_this_step_placed_not_the_hand",
         "group_total_need_heart_bonus_removed_when_cards_leaves_zone",
         "group_total_need_heart_empty_live_card_zone_no_bonus",
         "group_total_need_heart_liella_live_need_heart_4_no_bonus",
         "group_total_need_heart_liella_live_need_heart_8_gains_bonus",
         "group_total_need_heart_non_liella_live_no_bonus",
         "group_total_need_heart_success_zone_does_not_count",
-        "group_total_need_heart_two_liella_live_cards_sum_to_8"
+        "group_total_need_heart_two_liella_live_cards_sum_to_8",
+        "nothing_placeable_earns_nothing_despite_a_full_hand"
       ],
-      "covering_test_count": 7,
+      "covering_test_count": 9,
       "direct_tests": [
+        "blades_count_the_cards_this_step_placed_not_the_hand",
         "group_total_need_heart_bonus_removed_when_cards_leaves_zone",
         "group_total_need_heart_empty_live_card_zone_no_bonus",
         "group_total_need_heart_liella_live_need_heart_4_no_bonus",
         "group_total_need_heart_liella_live_need_heart_8_gains_bonus",
         "group_total_need_heart_non_liella_live_no_bonus",
         "group_total_need_heart_success_zone_does_not_count",
-        "group_total_need_heart_two_liella_live_cards_sum_to_8"
+        "group_total_need_heart_two_liella_live_cards_sum_to_8",
+        "nothing_placeable_earns_nothing_despite_a_full_hand"
       ],
-      "direct_test_count": 7,
+      "direct_test_count": 9,
       "is_null": false,
       "use_limit": null,
       "watches_abilities": false,
@@ -60137,6 +60176,7 @@
         "engine/tests/test_modules/effects/conditional/zone_source/discard_placed_group_live_or_blade_condition_test.rs",
         "engine/tests/test_modules/effects/cost_mod/required_hearts/wonder_zone_center_heart03_required_hearts_test.rs",
         "engine/tests/test_modules/effects/draw/flat/b9_more_test.rs",
+        "engine/tests/test_modules/effects/gain/blades/live_start/hanamaru_live_start_blade_per_card_this_step_placed_pl_s_bp7_007_p_test.rs",
         "engine/tests/test_modules/effects/gain/blades/per_card/ren_baton_touch_group_check_test.rs",
         "engine/tests/test_modules/effects/gain/blades/under_member/bp7_under_member_per_unit_blade_test.rs",
         "engine/tests/test_modules/effects/gain/blades/under_member/bp7_watanabe_under_card_blade_test.rs",
@@ -60188,15 +60228,16 @@
         "bella_positive_surplus_heart04_ability_fires",
         "bella_q174_no_heart04_surplus_ability_does_not_fire",
         "bella_q174_no_member_on_stage_ability_does_not_fire",
-        "catchu_basic_two_distinct_activate_2"
+        "blades_count_the_cards_this_step_placed_not_the_hand"
       ],
-      "covering_test_count": 318,
+      "covering_test_count": 320,
       "direct_tests": [
         "ab0_only_energy_under_counts",
         "aspire_liella_and_non_liella_moved_only_liella_gains_blade",
         "aspire_moved_liella_gains_blade_unmoved_and_non_liella_do_not",
         "aspire_no_movement_no_blade",
         "aspire_two_moved_liella_both_gain_blade",
+        "blades_count_the_cards_this_step_placed_not_the_hand",
         "catchu_basic_two_distinct_activate_2",
         "catchu_duplicate_names_dedup_to_1",
         "catchu_self_as_member_on_stage_plus_one_other",
@@ -60220,10 +60261,9 @@
         "hazuki_ren_bp5_005_mill_liella_blade_all_3_liella_grants_3_blade",
         "hazuki_ren_bp5_005_mill_liella_blade_blade_duration_live_end",
         "hazuki_ren_bp5_005_mill_liella_blade_preexisting_liella_in_discard_inflates_count",
-        "hazuki_ren_bp5_005_optional_pay_recovery_only_trigger_cards_not_full_discard",
-        "hazuki_ren_bp5_005_optional_pay_recovery_triggers_after_mill_pay_cost_recover_card"
+        "hazuki_ren_bp5_005_optional_pay_recovery_only_trigger_cards_not_full_discard"
       ],
-      "direct_test_count": 82,
+      "direct_test_count": 84,
       "is_null": false,
       "use_limit": null,
       "watches_abilities": false,
@@ -60357,6 +60397,7 @@
         "engine/tests/test_modules/effects/compound/condition_and_effect/live_start_bottom_three_mill_all_group_heart_test.rs",
         "engine/tests/test_modules/effects/compound/cost_and_effect/live_start_optional_bottom_mill_named_recovery_source_test.rs",
         "engine/tests/test_modules/effects/compound/sequential_effects/live_start_bottom_one_mill_live_heart_source_test.rs",
+        "engine/tests/test_modules/effects/gain/blades/live_start/hanamaru_live_start_blade_per_card_this_step_placed_pl_s_bp7_007_p_test.rs",
         "engine/tests/test_modules/effects/gain/blades/live_start/mirai_no_oto_live_start_optional_deck_bottom_blades_test.rs",
         "engine/tests/test_modules/effects/gain/blades/under_member/bp7_under_member_per_unit_blade_test.rs",
         "engine/tests/test_modules/effects/gain/blades/under_member/under_liella_member_constant_host_blade_test.rs",
@@ -60384,6 +60425,7 @@
         "bella_positive_surplus_heart04_ability_fires",
         "bella_q174_no_heart04_surplus_ability_does_not_fire",
         "bella_q174_no_member_on_stage_ability_does_not_fire",
+        "blades_count_the_cards_this_step_placed_not_the_hand",
         "catchu_basic_two_distinct_activate_2",
         "catchu_duplicate_names_dedup_to_1",
         "catchu_only_non_catchu_on_stage",
@@ -60395,14 +60437,14 @@
         "chika_constant_blade_per_member_under",
         "chika_constant_blade_zero_under",
         "choice_condition_shows_proper_labels_in_actions",
-        "dia_sd1_optional_draw_pay_then_deck_top",
-        "dia_sd1_optional_draw_skip_skips_movement"
+        "dia_sd1_optional_draw_pay_then_deck_top"
       ],
-      "covering_test_count": 116,
+      "covering_test_count": 118,
       "direct_tests": [
         "baton_displaced_self_baton_touch_places_under_arriver",
         "baton_displaced_self_placed_under_liella_arriver_grants_host_blade",
         "baton_displaced_self_placed_under_specific_arriver_slot",
+        "blades_count_the_cards_this_step_placed_not_the_hand",
         "catchu_three_distinct_activate_3",
         "chika_constant_blade_counts_only_under",
         "chika_constant_blade_per_member_under",
@@ -60416,6 +60458,7 @@
         "live_start_bottom_three_mills_deck_bottom_three",
         "live_start_mills_bottom_one_preserving_hand",
         "live_start_optional_bottom_mill_removes_bottom_card_from_deck",
+        "nothing_placeable_earns_nothing_despite_a_full_hand",
         "shizuku_live_start_blade_counts_only_under",
         "shizuku_live_start_blade_dedups_same_name",
         "shizuku_live_start_blade_per_distinct_under",
@@ -60429,7 +60472,7 @@
         "under_liella_host_blade_under_liella_host_gains_blade",
         "under_liella_host_blade_under_opponent_liella_host_gains_blade"
       ],
-      "direct_test_count": 28,
+      "direct_test_count": 30,
       "is_null": false,
       "use_limit": null,
       "watches_abilities": false,
