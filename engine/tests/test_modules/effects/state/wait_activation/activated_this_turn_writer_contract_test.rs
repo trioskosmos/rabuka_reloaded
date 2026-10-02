@@ -62,9 +62,9 @@ fn staged_waiting_target() -> (TestGame, i16, i16) {
     game.state.player1.hand.cards.push(driver);
     game.give_energy(10);
     game.play_to_stage(driver, MemberArea::LeftSide);
-    if game.has_pending_choice() {
-        game.drain_auto_ability_choices();
-    }
+    // `drain_auto_ability_choices` no-ops on an empty queue, so the old
+    // `if has_pending_choice()` wrapper was behaviourally dead.
+    game.drain_auto_ability_choices();
 
     game.state.player1.stage.stage[MemberArea::Center as usize] = target;
     game.state.mods.add_orientation_modifier(target, "wait");
@@ -88,9 +88,11 @@ fn a_real_activation_is_recorded_by_the_engine() {
     );
 
     game.activate_ability(driver);
-    if game.has_pending_choice() {
-        game.select_indices(&[0]);
-    }
+    // The 起動 names which member is switched out of wait, so a card selection is
+    // the only prompt it may raise. Anything else is a real failure; the old guard
+    // swallowed whatever appeared (or nothing) and let the history assertion
+    // below run either way.
+    game.drain_choices_strict(&["SelectCard"], &[0]);
     game.drain_auto_ability_choices();
 
     assert_ne!(
@@ -148,9 +150,8 @@ fn the_activation_history_is_a_set_not_a_tally() {
         game.state.player1.hand.cards.push(d);
         game.give_energy(10);
         game.play_to_stage(d, area);
-        if game.has_pending_choice() {
-            game.drain_auto_ability_choices();
-        }
+        // Same dead wrapper as above — no-op either way.
+        game.drain_auto_ability_choices();
     }
 
     assert_ne!(

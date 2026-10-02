@@ -276,12 +276,13 @@ struct GameOutcome {
 }
 
 impl GameOutcome {
-    /// Placements per live phase, the guide's ~1.0-from-T2 target (section 1).
-    /// `None` when the side never took a live phase, which would make the rate
-    /// undefined rather than zero.
-    // Not yet called: the summary currently reports placements and live phases
-    // as separate columns rather than this ratio. Kept because the ratio is
-    // the number the guide is actually written against.
+    /// Placements per live phase for one side.
+    ///
+    /// The rule ceiling for a single side is 0.5, not 1.0: 8.4.7 moves exactly
+    /// one card per won check, and a check has at most one winner unless the
+    /// scores tie (8.4.6.2), which is the only way both seats score on the same
+    /// check. `None` when the side never took a live phase, which would make the
+    /// rate undefined rather than zero.
     #[allow(dead_code)]
     fn pace(&self, side: usize) -> Option<f64> {
         let (placed, phases) = if side == 0 {
@@ -727,12 +728,41 @@ fn report_health(
     };
     let (median, p90, max) = (q(0.5), q(0.9), *turns.last().unwrap_or(&0));
 
-    let flag = |r: f64| if r > 0.0 && r < 0.33 { " <-- DEFECT" } else { "" };
+    // The pace ceiling is a RULE limit, not a preference.
+    //
+    // 8.4.7: "the player who won the live selects ONE card from their live
+    // card zone and moves it to their success live card zone." A won check
+    // therefore pays exactly one placement, whatever the margin.
+    //
+    // 8.4.6.2 pays two only in one case - equal total scores make BOTH players
+    // winners - and 8.4.7.1 then withholds the move from any player already
+    // holding 2+ successes. So the most a single check can ever produce is:
+    //
+    //   * 1 placement, normally (one winner, or a tie where a 2-success player
+    //     takes the tie mass and neither moves);
+    //   * 2 placements, on a score tie with both players below 2 successes.
+    //
+    // Averaged over a game that is a ceiling of 1.0 placements per live phase
+    // ACROSS BOTH SEATS, i.e. 0.5 per side, plus the tie-bonus mass.
+    //
+    // The old line here printed "(target ~1.0 from T2; <=0.33 is a defect)"
+    // against a PER-SIDE rate. That target is 2x the physical maximum, so the
+    // headline metric this project has ranked its whole backlog against has
+    // been reporting a permanent, unreachable defect: v9/v9 measures 0.427 and
+    // 0.434, which is 86% of what the rules permit, and no amount of live-set
+    // work can close the remaining 0.13 placements per phase. What is left is
+    // not a pace problem, it is a share-of-comparisons problem - see
+    // docs/BOT_STRATEGY.md section 1.
+    let combined = p1_rate + p2_rate;
     println!("GUIDE HEALTH METRICS (docs/BOT_STRATEGY.md section 1)");
     println!(
-        "  placements per live phase: P1 {p1_rate:.3}{} | P2 {p2_rate:.3}{}   (target ~1.0 from T2; <=0.33 is a defect)",
-        flag(p1_rate),
-        flag(p2_rate)
+        "  placements per live phase: P1 {p1_rate:.3} | P2 {p2_rate:.3} | combined {combined:.3}\
+         \n    ceiling is 1.000 combined / 0.500 per side (8.4.7 pays ONE card per won check;\
+         2 only on an 8.4.6.2 tie with both below 2 successes), so combined is {:.0}% of the\
+         \n    rule maximum and the per-side share of that maximum is {:.0}% / {:.0}%",
+        100.0 * combined,
+        200.0 * p1_rate,
+        200.0 * p2_rate
     );
     println!(
         "  game length: median T{median} | p90 T{p90} | max T{max}   (target median T5-T8, hard band 5-9)"

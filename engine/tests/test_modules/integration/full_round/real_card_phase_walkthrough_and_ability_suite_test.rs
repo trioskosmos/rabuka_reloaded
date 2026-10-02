@@ -3757,9 +3757,10 @@ fn rise_up_high_does_not_fire_on_turn_2() {
         if game.state.turn_number >= 2 && game.state.current_phase.to_string() == "Main" {
             break;
         }
-        if game.has_pending_choice() {
-            game.drain_auto_ability_choices();
-        }
+        // `drain_auto_ability_choices` no-ops on an empty queue and stops on any
+        // non-auto-ability prompt, so the `if has_pending_choice()` wrapper was
+        // behaviourally dead.
+        game.drain_auto_ability_choices();
         game.pass();
     }
     assert_eq!(

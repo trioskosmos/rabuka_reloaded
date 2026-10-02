@@ -1,6 +1,6 @@
 {
   "generated_by": "cards/test_inventory.py",
-  "generated_at": "2026-10-02T07:49:23.472743+00:00",
+  "generated_at": "2026-10-02T08:39:24.027208+00:00",
   "stats": {
     "total_cards": 2639,
     "cards_with_abilities": 1650,
@@ -455,15 +455,8 @@
       "rows": []
     },
     "pendency_only": {
-      "count": 1,
-      "rows": [
-        {
-          "file": "engine/tests/test_modules/jidou/debut_watch/three_way_choices_and_look_at_three_test.rs",
-          "test": "wakana_the_chosen_heart_replaces_her_printed_hearts",
-          "line": 159,
-          "detail": ""
-        }
-      ]
+      "count": 0,
+      "rows": []
     },
     "assert_only_negative": {
       "count": 0,
@@ -863,7 +856,7 @@
         {
           "file": "engine/tests/test_modules/effects/invalidate/live_success/pb2_invalidate_live_success_gains_heart03_pl_pb2_003_pp_test.rs",
           "test": "our_own_live_success_abilities_are_not_invalidated",
-          "line": 132,
+          "line": 136,
           "detail": ""
         },
         {

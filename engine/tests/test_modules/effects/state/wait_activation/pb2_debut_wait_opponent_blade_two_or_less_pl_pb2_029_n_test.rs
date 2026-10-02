@@ -61,8 +61,15 @@ fn fire_debut(game: &mut TestGame, cid: i16) {
 }
 
 /// Debut MAKI with `ally` (if any) in our left slot and `theirs` on the opponent's
-/// stage, answering any target prompt with the first option.
-fn debut_with(ally: Option<&str>, theirs: &[&str]) -> (TestGame, Vec<i16>) {
+/// stage, then assert the prompt shape the calling test is about.
+///
+/// * `true`  — the effect fires; a member prompt is answered if offered but not
+///   required (a single eligible member resolves itself). The `waited`
+///   assertion is the real check.
+/// * `false` — the blade bound excludes every candidate, so NO prompt may
+///   appear. The old guard swallowed one, so a negative that wrongly offered a
+///   target went on to assert "not waited" and passed for the wrong reason.
+fn debut_expecting(ally: Option<&str>, theirs: &[&str], expect_wait: bool) -> (TestGame, Vec<i16>) {
     let db = load_real_database();
     let mut game = TestGame::new(db);
     let filler = game.new_id("PL!-sd1-010-SD");
@@ -80,10 +87,22 @@ fn debut_with(ally: Option<&str>, theirs: &[&str]) -> (TestGame, Vec<i16>) {
     game.give_energy(30);
     game.play_to_stage(maki, MemberArea::Center);
     fire_debut(&mut game, maki);
-    if game.has_pending_choice() {
-        game.select_indices(&[0]);
+    if expect_wait {
+        game.drain_choices_strict(&["SelectCard"], &[0]);
+    } else {
+        game.drain_choices_strict(&[], &[]);
     }
     (game, ids)
+}
+
+/// The printed effect fires.
+fn debut_with(ally: Option<&str>, theirs: &[&str]) -> (TestGame, Vec<i16>) {
+    debut_expecting(ally, theirs, true)
+}
+
+/// The printed effect does not fire — no prompt may be offered.
+fn debut_without_effect(ally: Option<&str>, theirs: &[&str]) -> (TestGame, Vec<i16>) {
+    debut_expecting(ally, theirs, false)
 }
 
 fn waited(game: &TestGame, ids: &[i16]) -> Vec<bool> {
@@ -134,7 +153,7 @@ fn a_one_blade_member_is_waited() {
 
 #[test]
 fn a_three_blade_member_is_never_offered() {
-    let (game, ids) = debut_with(Some(MUS_ALLY), &[OUT_3]);
+    let (game, ids) = debut_without_effect(Some(MUS_ALLY), &[OUT_3]);
     assert_eq!(
         waited(&game, &ids),
         vec![false],
@@ -155,7 +174,7 @@ fn only_the_in_bound_member_is_affected() {
 /// Break the exclusivity half only: the target is eligible, our stage is not all μ's.
 #[test]
 fn a_non_mus_ally_blocks_the_effect() {
-    let (game, ids) = debut_with(Some(NON_MUS_ALLY), &[IN_2]);
+    let (game, ids) = debut_without_effect(Some(NON_MUS_ALLY), &[IN_2]);
     assert_eq!(
         waited(&game, &ids),
         vec![false],
@@ -177,7 +196,7 @@ fn an_empty_ally_slot_still_satisfies_exclusivity() {
 
 #[test]
 fn no_eligible_opponent_member_is_harmless() {
-    let (game, ids) = debut_with(Some(MUS_ALLY), &[OUT_4]);
+    let (game, ids) = debut_without_effect(Some(MUS_ALLY), &[OUT_4]);
     assert_eq!(
         waited(&game, &ids),
         vec![false],

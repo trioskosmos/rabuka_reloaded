@@ -49,7 +49,21 @@ fn fire_live_start(game: &mut TestGame, cid: i16) {
 
 /// Stage `own` for player 1, `theirs` for player 2, fire ライブ開始時, and return
 /// the opponent ids plus the game.
-fn run(own: &[&str], theirs: &[&str]) -> (TestGame, Vec<i16>) {
+///
+/// `expect_wait` is what the calling test is about, and the prompt shape is
+/// asserted from it rather than sniffed:
+///
+/// * `true`  — the printed effect fires. A member-selection prompt is permitted
+///   and answered if offered, but NOT required: with a single eligible opponent
+///   member the engine resolves the target itself, and the test's real check is
+///   the `waited` assertion that follows. The old guard was not merely redundant
+///   here, it was a lie about shape — it implied a prompt where there is none.
+/// * `false` — the printed effect does not fire, so NO prompt may appear. The
+///   old guard consumed one, so a negative that wrongly offered a target went
+///   on to assert "not waited" and passed for the wrong reason.
+///
+/// An empty `allowed` list makes `drain_choices_strict` fail on any prompt.
+fn run_expecting(own: &[&str], theirs: &[&str], expect_wait: bool) -> (TestGame, Vec<i16>) {
     let db = load_real_database();
     let mut game = TestGame::new(db);
     let filler = game.new_id("PL!-sd1-010-SD");
@@ -74,10 +88,22 @@ fn run(own: &[&str], theirs: &[&str]) -> (TestGame, Vec<i16>) {
     }
     game.state.player1.stage.stage[2] = maki;
     fire_live_start(&mut game, maki);
-    if game.has_pending_choice() {
-        game.select_indices(&[0]);
+    if expect_wait {
+        game.drain_choices_strict(&["SelectCard"], &[0]);
+    } else {
+        game.drain_choices_strict(&[], &[]);
     }
     (game, ids)
+}
+
+/// The printed effect fires — a target prompt is expected.
+fn run(own: &[&str], theirs: &[&str]) -> (TestGame, Vec<i16>) {
+    run_expecting(own, theirs, true)
+}
+
+/// The printed effect does not fire — no prompt may be offered.
+fn run_no_effect(own: &[&str], theirs: &[&str]) -> (TestGame, Vec<i16>) {
+    run_expecting(own, theirs, false)
 }
 
 fn waited(game: &TestGame, ids: &[i16]) -> Vec<bool> {
@@ -111,7 +137,7 @@ fn all_bibi_stage_waits_a_cost_two_opponent_member() {
 
 #[test]
 fn all_bibi_stage_leaves_a_cost_four_opponent_member_alone() {
-    let (game, ids) = run(&[BIBI_A, BIBI_B], &[OPP_DEAR]);
+    let (game, ids) = run_no_effect(&[BIBI_A, BIBI_B], &[OPP_DEAR]);
     assert_eq!(
         game.db.get_card(ids[0]).and_then(|c| c.cost),
         Some(4),
@@ -128,7 +154,7 @@ fn all_bibi_stage_leaves_a_cost_four_opponent_member_alone() {
 /// stage is not purely BiBi.
 #[test]
 fn a_non_bibi_ally_blocks_the_effect() {
-    let (game, ids) = run(&[BIBI_A, NON_BIBI], &[OPP_CHEAP]);
+    let (game, ids) = run_no_effect(&[BIBI_A, NON_BIBI], &[OPP_CHEAP]);
     assert_eq!(
         waited(&game, &ids),
         vec![false],
@@ -167,9 +193,7 @@ fn an_empty_own_stage_satisfies_bibi_only_vacuously() {
         "precondition: our own stage is genuinely empty, which is the case this test is about"
     );
     fire_live_start(&mut game, maki);
-    if game.has_pending_choice() {
-        game.select_indices(&[0]);
-    }
+    game.drain_choices_strict(&["SelectCard"], &[0]);
     assert_eq!(
         game.state.mods.get_orientation_modifier(opp),
         Some("wait"),
@@ -197,9 +221,10 @@ fn an_opponent_member_above_the_cost_bound_is_not_waited() {
     game.state.player2.stage.stage[0] = opp;
     let maki = game.id(MAKI);
     fire_live_start(&mut game, maki);
-    if game.has_pending_choice() {
-        game.select_indices(&[0]);
-    }
+    // Negative: the cost gate excludes her, so the ability must offer nothing at
+    // all. The old guard swallowed one prompt if it appeared, which is exactly
+    // the failure this test exists to rule out.
+    game.drain_choices_strict(&[], &[]);
     assert_eq!(
         game.state.mods.get_orientation_modifier(opp),
         None,

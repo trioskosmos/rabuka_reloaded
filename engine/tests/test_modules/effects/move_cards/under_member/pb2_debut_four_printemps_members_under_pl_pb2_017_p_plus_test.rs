@@ -35,9 +35,10 @@ fn under_count_after_debut(waitroom: &[&str]) -> usize {
     game.play_to_stage(nozomi, MemberArea::Center);
     // With more candidates than the count requires, the move asks WHICH four; answer
     // it so the assertion measures the placement and not an unanswered prompt.
-    if game.has_pending_choice() {
-        game.select_indices(&[0, 1, 2, 3]);
-    }
+    // The prompt is required, not optional: the old `if has_pending_choice()` let
+    // the count assertion run against an unresolved 「4枚」 question, which is the
+    // one thing this test must not measure.
+    game.drain_choices_strict(&["SelectCard"], &[0, 1, 2, 3]);
     game.drain_auto_ability_choices();
     game.state.player1.stage.get_under_cards(MemberArea::Center).len()
 }

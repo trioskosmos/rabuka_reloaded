@@ -67,9 +67,13 @@ fn fired_against(opponent: &str) -> (TestGame, i16) {
         None,
     );
     game.state.process_pending_auto_abilities(&pid);
-    if game.has_pending_choice() {
-        game.select_indices(&[0]);
-    }
+    // The prompt here is the invalidate TARGET, not the heart: 「相手のステージに
+    // いるメンバー1人のライブ成功時能力を無効にし、こうなった場合」 chooses an
+    // opponent member whether or not it actually carries that ability, so both
+    // tests reach this prompt. The old `if has_pending_choice()` guard made a
+    // missing prompt invisible, which is the failure that mattered here — a
+    // target that never got selected cannot invalidate anything.
+    game.drain_choices_strict(&["SelectCard"], &[0]);
     (game, nico)
 }
 
@@ -166,7 +170,10 @@ fn our_own_live_success_abilities_are_not_invalidated() {
         None,
     );
     game.state.process_pending_auto_abilities(&pid);
-    // With no opponent member there is nothing to target, so no prompt and no heart.
+    // With no opponent member there is nothing to target, so no prompt and no
+    // heart. An empty `allowed` list makes any prompt a failure, which is the
+    // assertion this negative was missing: it only checked the heart.
+    game.drain_choices_strict(&[], &[]);
     assert_eq!(
         game.state.mods.get_heart_modifier(nico, HeartColor::Heart03),
         0,

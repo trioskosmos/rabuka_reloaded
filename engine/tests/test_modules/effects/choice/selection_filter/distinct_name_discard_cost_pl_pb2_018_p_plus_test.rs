@@ -146,20 +146,38 @@ fn advance_to_cost_selection(game: &mut TestGame) {
 /// A 「…を3枚控え室に置いてもよい」 cost that cannot be paid IN FULL is skipped outright
 /// rather than partially paid (Rule 9.4.2.3), so with fewer than three distinct names in
 /// hand there may be no prompt at all. That skip is a correct outcome, not a missing one.
-fn pay_whole_cost(game: &mut TestGame) -> usize {
-    if game.has_pending_choice() {
-        // The selectable set is `filtered_indices` when the prompt is filtered, and every
-        // hand card when it is not. Either way, take all of them: the question is how many
-        // cards the engine lets reach the 控え室, not which ones it prefers.
-        let offered = game
-            .pending_choice_option_count()
-            .unwrap_or_else(|| game.state.player1.hand.cards.len());
-        let all: Vec<usize> = (0..offered).collect();
-        if !all.is_empty() {
-            game.select_indices(&all);
+fn pay_whole_cost(game: &mut TestGame, expect_prompt: bool) -> usize {
+    // Three outcomes, all named. The old `if has_pending_choice()` collapsed the
+    // first two, so a cost skipped for being unpayable and a cost left unpaid
+    // after a prompt both reported "nothing reached the 控え室" — which is
+    // exactly the number the 「名前の異なる」 negatives assert on.
+    match game.pending_choice_type() {
+        None => {
+            assert!(
+                !expect_prompt,
+                "the cost is payable here, so a prompt must be raised; nothing pending"
+            );
+            game.state.player1.waitroom.cards.len()
+        }
+        Some(ty) => {
+            assert_eq!(
+                ty,
+                "SelectCard",
+                "this cost is a hand-card discard, so the prompt must be a card selection"
+            );
+            // The selectable set is `filtered_indices` when the prompt is filtered, and every
+            // hand card when it is not. Either way, take all of them: the question is how many
+            // cards the engine lets reach the 控え室, not which ones it prefers.
+            let offered = game
+                .pending_choice_option_count()
+                .unwrap_or_else(|| game.state.player1.hand.cards.len());
+            let all: Vec<usize> = (0..offered).collect();
+            if !all.is_empty() {
+                game.select_indices(&all);
+            }
+            game.state.player1.waitroom.cards.len()
         }
     }
-    game.state.player1.waitroom.cards.len()
 }
 
 /// THE claim: a cost that says 「名前の異なる」 cannot be paid with two cards of one name.
@@ -183,7 +201,10 @@ fn a_duplicate_named_member_cannot_be_paid_for_the_cost() {
          compares names and not card numbers"
     );
 
-    let paid = pay_whole_cost(&mut game);
+    // Two names for a 3-card 「名前の異なる」 cost, so the cost cannot be paid in
+    // full: it is either skipped without a prompt or offered and left unpaid. Both
+    // are correct, and both must land below 3.
+    let paid = pay_whole_cost(&mut game, false);
 
     assert!(
         paid < 3,
@@ -208,8 +229,8 @@ fn three_distinct_names_pay_the_full_three_card_cost() {
         "precondition: three distinct names must make the 3-card cost payable, so a prompt \
          is raised"
     );
+    let paid = pay_whole_cost(&mut game, true);
 
-    let paid = pay_whole_cost(&mut game);
     assert_eq!(
         paid,
         3,
@@ -226,7 +247,9 @@ fn two_copies_of_one_name_pay_nothing() {
     let mut game = fired_with_hand(&[ERI_P, ERI_R]);
     advance_to_cost_selection(&mut game);
 
-    let paid = pay_whole_cost(&mut game);
+    // One name for a 3-card 「名前の異なる」 cost, so the cost is skipped outright
+    // and no prompt is raised (Rule 9.4.2.3). That absence is the result.
+    let paid = pay_whole_cost(&mut game, false);
     assert_eq!(
         paid,
         0,
@@ -243,11 +266,11 @@ fn two_copies_of_one_name_pay_nothing() {
 fn the_constraint_is_the_name_not_the_card_number() {
     let mut dup = fired_with_hand(&[ERI_P, ERI_R, MAKI_P]);
     advance_to_cost_selection(&mut dup);
-    let with_dup_name = pay_whole_cost(&mut dup);
+    let with_dup_name = pay_whole_cost(&mut dup, false);
 
     let mut distinct = fired_with_hand(&[ERI_P, MAKI_P, NIKO_OTHER]);
     advance_to_cost_selection(&mut distinct);
-    let with_distinct_names = pay_whole_cost(&mut distinct);
+    let with_distinct_names = pay_whole_cost(&mut distinct, true);
 
     assert!(
         with_dup_name < with_distinct_names,

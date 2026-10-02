@@ -99,19 +99,21 @@ fn only_the_qualifying_member_is_affected() {
 #[test]
 fn one_of_several_eligible_is_chosen() {
     let (mut game, _maki, ids) = debut_against(&[OPP_3, OPP_2]);
-    if game.has_pending_choice() {
-        assert_eq!(
-            game.pending_choice_type().as_deref(),
-            Some("SelectCard"),
-            "two eligible members and メンバー1人 — the player picks one"
-        );
-        assert_eq!(
-            game.pending_choice_count(),
-            1,
-            "メンバー1人 — exactly one, not both"
-        );
-        game.select_indices(&[0]);
-    }
+    // Two members are eligible, so the target is not the engine's to resolve: the
+    // prompt must really be offered. The old `if has_pending_choice()` skipped the
+    // type and count assertions whenever it was absent, so an engine that picked
+    // one on its own passed without ever proving メンバー1人 was asked for.
+    assert_eq!(
+        game.pending_choice_type().as_deref(),
+        Some("SelectCard"),
+        "two eligible members and メンバー1人 — the player picks one"
+    );
+    assert_eq!(
+        game.pending_choice_count(),
+        1,
+        "メンバー1人 — exactly one, not both"
+    );
+    game.drain_choices_strict(&["SelectCard"], &[0]);
     assert_eq!(
         waited(&game, &ids).iter().filter(|&&w| w).count(),
         1,

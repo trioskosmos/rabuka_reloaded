@@ -69,15 +69,16 @@ fn resolve_jidou(game: &mut TestGame, pay: bool, pick: usize) -> bool {
     if !pay {
         return true;
     }
-    // Then the "choose 1 of those cards" selection.
-    if game.has_pending_choice() {
-        match game.get_pending_choice() {
-            rabuka_engine::ability::types::Choice::SelectCard { .. } => {
-                game.select_indices(&[pick]);
-            }
-            _ => game.select_indices(&[]),
-        }
-    }
+    // Having PAID, the recovery selection is required — 「1枚選び、控え室から手札に
+    // 戻す」 is the whole point of the E. The old `if has_pending_choice()` let a
+    // missing prompt pass, so a pay-E that armed nothing still recovered nothing and
+    // the recovered-card assertions agreed with it.
+    assert_eq!(
+        game.pending_choice_type().as_deref(),
+        Some("SelectCard"),
+        "paying E must then offer the 1-of-3 recovery selection"
+    );
+    game.select_indices(&[pick]);
     // Any trailing prompts.
     let mut guard = 0;
     while game.has_pending_choice() && guard < 8 {

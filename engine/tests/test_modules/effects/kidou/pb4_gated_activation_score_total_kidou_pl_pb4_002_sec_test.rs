@@ -77,9 +77,10 @@ fn offered_with_success_zone(lives: &[&str]) -> bool {
     game.give_energy(20);
     game.state.player1.stage.stage = [-1, -1, -1];
     game.play_to_stage(eri, MemberArea::Center);
-    if game.has_pending_choice() {
-        game.drain_auto_ability_choices();
-    }
+    // `drain_auto_ability_choices` already no-ops on an empty queue and on any
+    // prompt that is not an auto-ability choice, so the `if has_pending_choice()`
+    // wrapper around it changed nothing.
+    game.drain_auto_ability_choices();
 
     // `TestGame::generated_actions()` cannot be used here: it calls
     // `get_pending_choice()` first (`helpers/choices.rs:308`), which panics with

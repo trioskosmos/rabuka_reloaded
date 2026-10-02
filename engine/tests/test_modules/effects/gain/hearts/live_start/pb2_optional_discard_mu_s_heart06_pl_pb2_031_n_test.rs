@@ -59,12 +59,18 @@ fn paid_with(hand: &[&str], pay: bool) -> (TestGame, i16) {
 
     fire_live_start(&mut game, maki);
     // The optional cost is a SelectCard on the hand; an empty selection declines it.
-    if game.has_pending_choice() {
-        if pay {
-            game.select_indices(&[0]);
-        } else {
-            game.select_indices(&[]);
-        }
+    // The prompt must be offered: the old `if has_pending_choice()` answered
+    // nothing when it was absent, and both halves of this test (paid vs declined)
+    // would then agree with an engine that simply never charged.
+    assert_eq!(
+        game.pending_choice_type().as_deref(),
+        Some("SelectCard"),
+        "『μ's』のカードを1枚控え室に置いてもよい — the optional discard must be offered"
+    );
+    if pay {
+        game.select_indices(&[0]);
+    } else {
+        game.select_indices(&[]);
     }
     (game, maki)
 }
@@ -136,10 +142,11 @@ fn a_hand_with_no_mus_card_cannot_pay() {
     game.play_to_stage(maki, MemberArea::Center);
 
     fire_live_start(&mut game, maki);
-    // With no eligible card the cost cannot be offered as a card choice.
-    if game.has_pending_choice() {
-        game.select_indices(&[]);
-    }
+    // Negative: with no eligible card the cost has nothing it can pay with, so it
+    // must not be offered at all. An empty `allowed` list turns any prompt into a
+    // failure, which is the point — the old guard declined one if it appeared,
+    // letting a wrongly-offered cost reach the heart assertion and pass.
+    game.drain_choices_strict(&[], &[]);
     game.state.recalculate_constants();
 
     assert_eq!(

@@ -59,11 +59,20 @@ fn heart_mod(game: &TestGame, card: i16, colour: HeartColor) -> i16 {
     game.state.mods.get_heart_modifier(card, colour)
 }
 
-/// Answer the next prompt with option `index`, or skip it when there is none.
+/// Answer the 3-way heart choice with option `index`.
+///
+/// Every caller asserts the prompt exists immediately before calling, so "or
+/// skip it when there is none" was never true — and it hid the one failure that
+/// matters: a missing prompt left the choice unmade, and the heart assertions
+/// after it agreed with that.
 fn choose(game: &mut TestGame, index: usize) {
-    if game.has_pending_choice() {
-        game.select_option(index as i16);
-    }
+    assert_eq!(
+        game.pending_choice_type().as_deref(),
+        Some("SelectHeartColor"),
+        "「{{heart_02}}か{{heart_03}}か{{heart_06}}のうち1つを選ぶ」 must offer a \
+         3-way heart-colour prompt before option {index} can be picked"
+    );
+    game.select_option(index as i16);
 }
 
 // ====================================================================

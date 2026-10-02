@@ -54,12 +54,19 @@ fn after_cost(pay: bool) -> (TestGame, i16) {
     game.play_to_stage(honoka, MemberArea::Center);
 
     fire_live_start(&mut game, honoka);
-    if game.has_pending_choice() {
-        if pay {
-            game.select_option(1);
-        } else {
-            game.select_option(0);
-        }
+    // The cost is optional, not absent: 「このメンバーをウェイトにしてもよい」 must
+    // be put to the player. The old `if has_pending_choice()` answered nothing when
+    // no prompt appeared, and the two halves of this test (heart granted vs.
+    // declined) would then both agree with a broken engine that never charged.
+    assert_eq!(
+        game.pending_choice_type().as_deref(),
+        Some("SelectTarget"),
+        "このメンバーをウェイトにしてもよい — the optional cost must be offered"
+    );
+    if pay {
+        game.select_option(1);
+    } else {
+        game.select_option(0);
     }
     (game, honoka)
 }

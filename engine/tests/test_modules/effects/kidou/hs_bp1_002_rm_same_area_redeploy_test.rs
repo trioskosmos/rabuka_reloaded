@@ -126,17 +126,20 @@ fn redeploy_into(area: MemberArea, in_waitroom: &str) -> (TestGame, i16, i16) {
     game.state.player1.hand.cards.push(sayaka);
     game.give_energy(20);
     game.play_to_stage(sayaka, area);
-    if game.has_pending_choice() {
-        game.drain_auto_ability_choices();
-    }
+    // `drain_auto_ability_choices` already stops on anything that is not an
+    // auto-ability prompt and on an empty queue, so the old
+    // `if has_pending_choice()` around it was dead weight: identical either way.
+    game.drain_auto_ability_choices();
 
     // Goes through `run_main_action`, so the sequential cost is actually paid — the cost
     // is what vacates the area, and skipping it is what made an earlier version of this
     // file land every card in the centre.
     game.activate_ability(sayaka);
-    if game.has_pending_choice() {
-        game.select_indices(&[0]);
-    }
+    // The retrieval picks a card out of the 控え室. Only one is there, so the engine
+    // may resolve it without asking — either way a `SelectCard` is the only prompt
+    // this 起動 may produce, and anything else is a real failure rather than
+    // something to swallow.
+    game.drain_choices_strict(&["SelectCard"], &[0]);
     game.drain_auto_ability_choices();
 
     (game, sayaka, other)

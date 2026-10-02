@@ -32,13 +32,11 @@ _trigger event hand-pushed with no real ability resolution in the same fn (weake
 
 None.
 
-## pendency_only (1)
+## pendency_only (0)
 
 _has_pending_choice asserted without choice identity (pending_choice_type/summary/answer) or outcome asserts_
 
-| file | test | line | detail |
-| --- | --- | --- | --- |
-| `engine/tests/test_modules/jidou/debut_watch/three_way_choices_and_look_at_three_test.rs` | `wakana_the_chosen_heart_replaces_her_printed_hearts` | 159 |  |
+None.
 
 ## assert_only_negative (0)
 
@@ -152,7 +150,7 @@ _a fixed `for _ in 0..N { pass() }` walk through the turn — a phase gaining or
 
 | file | test | line | detail |
 | --- | --- | --- | --- |
-| `engine/tests/test_modules/effects/invalidate/live_success/pb2_invalidate_live_success_gains_heart03_pl_pb2_003_pp_test.rs` | `our_own_live_success_abilities_are_not_invalidated` | 132 |  |
+| `engine/tests/test_modules/effects/invalidate/live_success/pb2_invalidate_live_success_gains_heart03_pl_pb2_003_pp_test.rs` | `our_own_live_success_abilities_are_not_invalidated` | 136 |  |
 | `engine/tests/test_modules/effects/modify_need_heart/pb2_need_heart_minus_3_minus_2_minus_1_per_activated_pl_pb2_040_l_test.rs` | `a_member_waited_again_after_being_activated_still_counts` | 247 |  |
 | `engine/tests/test_modules/effects/yell/pb2_yell_plus_ten_when_two_mus_success_pl_pb2_039_l_test.rs` | `the_opponents_success_zone_does_not_count` | 157 |  |
 
