@@ -52,3 +52,14 @@ jobs:
       - name: Run engine test suite
         working-directory: engine
         run: cargo test --test run_all --locked
+
+      # The `#[cfg(test)]` modules inside `engine/src` are a separate target from
+      # the `run_all` integration test, so the step above never compiled or ran them.
+      # They are not redundant with run_all — as of this change 119 of them live in
+      # src (ability/util/duration.rs, ability/queue.rs, ability/describe.rs,
+      # core/observation.rs, the bot's strategy modules), including the
+      # `parse_duration` assertions that pin the duration vocabulary. Without this
+      # step all 119 pass in CI by not existing.
+      - name: Run library unit tests
+        working-directory: engine
+        run: cargo test --lib --locked
