@@ -1,6 +1,6 @@
 {
   "generated_by": "cards/test_inventory.py",
-  "generated_at": "2026-10-02T13:03:10.313487+00:00",
+  "generated_at": "2026-10-02T13:15:03.800245+00:00",
   "stats": {
     "total_cards": 2639,
     "cards_with_abilities": 1650,
@@ -460,33 +460,8 @@
       ]
     },
     "live_success_impossible_live": {
-      "count": 4,
-      "rows": [
-        {
-          "file": "engine/tests/test_modules/characterization/zero_tested_action_types_test.rs",
-          "test": "PL!N-bp4-025-L",
-          "line": 1,
-          "detail": "heart05 needs 8, best single member prints 4"
-        },
-        {
-          "file": "engine/tests/test_modules/effects/gain/blades/constants/success_pile_difference_pl_s_bp6_009_r_plus_test.rs",
-          "test": "PL!S-bp2-026-L",
-          "line": 1,
-          "detail": "heart04 needs 6, best single member prints 5"
-        },
-        {
-          "file": "engine/tests/test_modules/effects/score/card_score/pb2_live_success_plus_one_per_distinct_mus_member_pl_pb2_039_l_test.rs",
-          "test": "PL!-pb2-039-L",
-          "line": 1,
-          "detail": "heart01 needs 9, best single member prints 6; heart03 needs 9, best single member prints 3; heart06 needs 9, best single member prints 5"
-        },
-        {
-          "file": "engine/tests/test_modules/integration/full_round/real_card_phase_walkthrough_and_ability_suite_test.rs",
-          "test": "PL!-bp3-026-L",
-          "line": 1,
-          "detail": "heart03 needs 5, best single member prints 3"
-        }
-      ]
+      "count": 0,
+      "rows": []
     },
     "drain_zero_may_decline": {
       "count": 53,

@@ -606,7 +606,23 @@ def unplayable_live_cards():
     totals.sort(reverse=True)
     # Three members fit on a stage, and the wildcard draws on all of them.
     stage_hearts = sum(totals[:3])
-    bounds = dict(best)
+    # The per-colour bound is a STAGE's ceiling, not one member's: three members
+    # share the three slots, so a stage can hold up to three times the best single
+    # print in a colour. Using the single-member figure here reported lives that are
+    # perfectly playable — PL!N-bp4-025-L needs heart05 8, the best single member
+    # prints 4, and 17 members print 4 or more, so two of them reach 8 — and that
+    # inflated the count into a card-DATA claim ("46 of 291 lives, 15.8%,
+    # provably unplayable") that does not reproduce: against this bound the pool has
+    # ZERO unplayable lives.
+    #
+    # Three times is the right direction. The test only claims impossibility when the
+    # requirement exceeds what three slots can hold, which is a genuine upper bound
+    # for a single colour. It stays an UPPER bound overall: three slots can still
+    # conflict across colours, so a live may be flagged whose colours cannot be met
+    # at once even though each is individually reachable. "Not reported" therefore
+    # means "not provably unplayable", and a reported row is "worth a look", not
+    # "broken data".
+    bounds = {k: v * 3 for k, v in best.items()}
     bounds["heart0"] = stage_hearts
 
     out = {}
@@ -617,7 +633,7 @@ def unplayable_live_cards():
         if not need:
             continue
         short = [
-            f"{colour} needs {n}, best single member prints {bounds.get(colour, 0)}"
+            f"{colour} needs {n}, a stage's three slots hold at most {bounds.get(colour, 0)}"
             for colour, n in need.items()
             if colour != "heart0" and bounds.get(colour, 0) < n
         ]
@@ -1812,7 +1828,7 @@ SMELL_DOCS = {
     "assert_only_negative": "every assertion is a bare is_err()/is_none() — some guard fired, but nothing says which, so a regression tripping a different guard still passes",
     "assert_only_counts": "every assertion is about a count/size (len/count/>=1) — '3 options were offered' can hold while the 3 are the wrong 3",
     "live_success_no_premise": "file CALLS trigger_live_success_abilities but never asserts the state of the ライブ成功時 window it dispatches through. That path checks `should_trigger_live_success`, so a live which failed silently dispatches nothing — and a NEGATIVE assertion in such a file then passes whether or not the ability does anything. The remedy is NOT always 'assert the window is open': a test of the heart requirement itself depends on the window being CLOSED, so each site must assert the state it actually relies on. Files built on `fire_trigger` are NOT flagged: it calls `trigger_auto_ability` directly and forces the dispatch, so there is no window to state. The fix is to assert `should_trigger_live_success` (or the performance snapshot) for the state the test depends on. See the comment above for the four scopings that were wrong first, and note that a live's `heart0` requirement is a COLORLESS WILDCARD satisfied by any colour, not a literal colour",
-    "live_success_impossible_live": "file CALLS trigger_live_success_abilities on a live whose printed need_heart no stage in the pool can satisfy — a requirement above what ANY single member prints, and only three members fit on a stage. Such a live's ライブ成功時 is unreachable, so the test is vacuous BY CONSTRUCTION, which is strictly stronger than a missing premise: adding a should_trigger_live_success assertion here would just fail. The remedy is to inject synthetic hearts deliberately (a heart00 wildcard, which the engine treats as an unbounded wildcard in the PROVIDED hearts, as the files in live_success_no_premise do) or to pick a live the pool can satisfy. The card set itself is worth reviewing: 46 of the 291 lives carrying a need_heart (15.8%) are provably unplayable, which is a card-DATA observation and not a harness one. The check is a LOWER BOUND — necessary, not sufficient, since three slots can still conflict across colours — so 'not reported' means 'not provably unplayable'",
+    "live_success_impossible_live": "file CALLS trigger_live_success_abilities on a live whose printed need_heart no stage in the pool can satisfy — a requirement above what ANY single member prints, and only three members fit on a stage. Such a live's ライブ成功時 is unreachable, so the test is vacuous BY CONSTRUCTION, which is strictly stronger than a missing premise: adding a should_trigger_live_success assertion here would just fail. The remedy is to inject synthetic hearts deliberately (a heart00 wildcard, which the engine treats as an unbounded wildcard in the PROVIDED hearts, as the files in live_success_no_premise do) or to pick a live the pool can satisfy. The card set itself was flagged for review on the strength of a WRONG BOUND: the check originally compared a requirement against the best SINGLE member, so it called 46 of the 291 lives carrying a need_heart (15.8%) unplayable when only three slots exist per stage and three members sum. PL!N-bp4-025-L (heart05 8) is the clearest case: the best single member prints 4 and 17 members print 4 or more, so two of them reach 8. Recomputed against three slots the pool has ZERO provably unplayable lives, so there is no card-data problem here to chase. The bound is now a stage ceiling (3x the best single print per colour). The check is a LOWER BOUND — necessary, not sufficient, since three slots can still conflict across colours — so 'not reported' means 'not provably unplayable'",
     "drain_zero_may_decline": "file drains a prompt with index [0] AND asserts an absence, while naming a card whose select_cards is `optional`. On a skippable prompt [0] is NOT reliably 'take' and NOT reliably 'skip' — it depends on the PROMPT KIND and the harness does not say which. An optional-COST prompt takes the card on [0] (look_at_deck_top_optional_discard_test.rs proves it: two tests differing only in [0] vs []); a `looked_at` selection behaves differently again. So the hazard is AMBIGUITY: a test intending to take and instead declines passes silently when its assertion is an absence, which a positive assertion would have caught. `assert_select_card(zone, n, allow_skip)` states the prompt. EXPECTED YIELD IS LOW and measured, not hoped: 30 of these files assert absence directly about a look or selection, and the two read to check are both exemplars that state the prompt before answering and pair every absence with a positive twin. Read a row as 'spend five minutes here', not as 49 problems",
     "placeholder": "#[ignore], assert!(true), todo!() or unimplemented!() left in a test",
     "similar_cards": "confusable card numbers (bp2 vs pb2) staged in one file AND the file pins card identity (assert_card_identity / compares card_no), so a transposition would fail loudly",

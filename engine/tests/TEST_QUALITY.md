@@ -55,16 +55,11 @@ _file CALLS trigger_live_success_abilities but never asserts the state of the �
 | `engine/tests/test_modules/effects/recover/to_hand/pb2_live_success_take_member_when_reveal_is_all_one_group_pl_pb2_037_l_test.rs` | `<file>` | 1 |  |
 | `engine/tests/test_modules/effects/score/card_score/pb2_live_success_plus_one_per_distinct_mus_member_pl_pb2_039_l_test.rs` | `<file>` | 1 |  |
 
-## live_success_impossible_live (4)
+## live_success_impossible_live (0)
 
-_file CALLS trigger_live_success_abilities on a live whose printed need_heart no stage in the pool can satisfy — a requirement above what ANY single member prints, and only three members fit on a stage. Such a live's ライブ成功時 is unreachable, so the test is vacuous BY CONSTRUCTION, which is strictly stronger than a missing premise: adding a should_trigger_live_success assertion here would just fail. The remedy is to inject synthetic hearts deliberately (a heart00 wildcard, which the engine treats as an unbounded wildcard in the PROVIDED hearts, as the files in live_success_no_premise do) or to pick a live the pool can satisfy. The card set itself is worth reviewing: 46 of the 291 lives carrying a need_heart (15.8%) are provably unplayable, which is a card-DATA observation and not a harness one. The check is a LOWER BOUND — necessary, not sufficient, since three slots can still conflict across colours — so 'not reported' means 'not provably unplayable'_
+_file CALLS trigger_live_success_abilities on a live whose printed need_heart no stage in the pool can satisfy — a requirement above what ANY single member prints, and only three members fit on a stage. Such a live's ライブ成功時 is unreachable, so the test is vacuous BY CONSTRUCTION, which is strictly stronger than a missing premise: adding a should_trigger_live_success assertion here would just fail. The remedy is to inject synthetic hearts deliberately (a heart00 wildcard, which the engine treats as an unbounded wildcard in the PROVIDED hearts, as the files in live_success_no_premise do) or to pick a live the pool can satisfy. The card set itself was flagged for review on the strength of a WRONG BOUND: the check originally compared a requirement against the best SINGLE member, so it called 46 of the 291 lives carrying a need_heart (15.8%) unplayable when only three slots exist per stage and three members sum. PL!N-bp4-025-L (heart05 8) is the clearest case: the best single member prints 4 and 17 members print 4 or more, so two of them reach 8. Recomputed against three slots the pool has ZERO provably unplayable lives, so there is no card-data problem here to chase. The bound is now a stage ceiling (3x the best single print per colour). The check is a LOWER BOUND — necessary, not sufficient, since three slots can still conflict across colours — so 'not reported' means 'not provably unplayable'_
 
-| file | test | line | detail |
-| --- | --- | --- | --- |
-| `engine/tests/test_modules/characterization/zero_tested_action_types_test.rs` | `PL!N-bp4-025-L` | 1 | heart05 needs 8, best single member prints 4 |
-| `engine/tests/test_modules/effects/gain/blades/constants/success_pile_difference_pl_s_bp6_009_r_plus_test.rs` | `PL!S-bp2-026-L` | 1 | heart04 needs 6, best single member prints 5 |
-| `engine/tests/test_modules/effects/score/card_score/pb2_live_success_plus_one_per_distinct_mus_member_pl_pb2_039_l_test.rs` | `PL!-pb2-039-L` | 1 | heart01 needs 9, best single member prints 6; heart03 needs 9, best single member prints 3; heart06 needs 9, best single member prints 5 |
-| `engine/tests/test_modules/integration/full_round/real_card_phase_walkthrough_and_ability_suite_test.rs` | `PL!-bp3-026-L` | 1 | heart03 needs 5, best single member prints 3 |
+None.
 
 ## drain_zero_may_decline (53)
 
