@@ -32,41 +32,51 @@
 //!    the card's own need_heart, and the window is asserted, so a 0 from here on is
 //!    attributable to the effect rather than to the gate.
 //!
-//! 2. *(still open)* With the window open the score is STILL 0, so there is a second
-//!    defect underneath. What is established, by driving the effect with the same
-//!    filter the engine builds:
+//! 2. *(still open)* With the window open the score is STILL 0. Measured end to end
+//!    with a real μ's member on stage, the handler's own log line reads:
 //!
-//!    - The card carries two abilities; the second is `LiveSuccess` + `ModifyScore`,
-//!      `is_self_target() == true`, `per_unit_type: "人"`, `per_unit_count: 1`,
-//!      `card_type: member_card`, `group_names: ["μ's"]`, `distinct: card_name`,
-//!      `heart_colors: []`, no state/cost/constraint/exclude_self.
-//!    - The scan finds it and logs `trigger=trigger_live_success,
-//!      result=result_success`, and the dispatch completes. The loss is inside
-//!      `execute_modify_score`.
-//!    - **The count is correct.** `resolve_per_unit_count` with the identical filter
-//!      returns 1 for one μ's member on stage, and `filter.matches` is true for it.
-//!      So `final_value = value * effective_units` is 1, not 0.
-//!    - **The recipient list comes out empty**, which is what makes it score nothing:
-//!      `hikari`, `eri` and `hana` all stay at 0 afterwards, and so does
-//!      `p1_constant_total_score_bonus`.
+//!    ```text
+//!    [DISTINCT_MEMBER_NAMES] singles=1 unique_joints=0 units=1
+//!    Score add 1 (self) : 1 applied to []
+//!    ```
 //!
-//!    So the effect resolves and discards its own target. Two candidates in
-//!    `effects/score.rs`, neither acted on because neither is proven, and each
-//!    attempted and measured to NOT be sufficient alone:
+//!    and with two differently-named members, `singles=2 … Score add 2 … []`.
 //!
-//!    * `target_filter` still carries `card_type`/`group_names`. Those are the same
-//!      kind of COUNT predicate as the `card_property` the comment above already
-//!      strips, and the recipient here is 「このカード」 — a live, which
-//!      `card_type: member_card` excludes. Clearing them for `self_target` (whose
-//!      recipient is picked by identity, not by type) left the score at 0, so it is
-//!      not the whole cause.
-//!    * The `self_target` branch requires `card_id == session.activating_card_id`.
-//!      If that is `None` on this path — and `gs.activating_card` is `None` after the
-//!      trigger — every candidate is rejected. This is the more likely single cause,
-//!      and it would be a much larger finding than this card: `is_self_target` gates
-//!      the recipient of EVERY 「このカードのスコアを…」 effect. The next thing to check
-//!      is whether the queue entry built by `enqueue_printed_ability` records the
-//!      source card into the resolver session at all.
+//!    So the COUNT is right (1, then 2), the VALUE is right (1, then 2), and the
+//!    RECIPIENT LIST is empty. The effect resolves and applies nothing. Everything
+//!    upstream is correct: the ability is `LiveSuccess` + `ModifyScore`,
+//!    `is_self_target() == true`, the scan logs
+//!    `trigger=trigger_live_success,result=result_success`, the dispatch completes,
+//!    and the fixtures match the filter (`card_type` member, group μ's,
+//!    `filter.matches` true for 絵里/花陽/ことり and false for 松浦果南).
+//!
+//!    The loss is the `self_target` branch of the recipient filter, which keeps a
+//!    candidate only when
+//!
+//!    ```rust
+//!    card_id == self.session.activating_card_id
+//!    ```
+//!
+//!    with `None` rejecting every candidate. Two things point at that value being
+//!    unset on this path: `gs.activating_card` is `None` after the trigger, and the
+//!    candidate pool's own activating-card fallback (which reads `gs.activating_card`,
+//!    not the session) therefore contributes nothing either.
+//!
+//!    **Not committed, deliberately.** Two candidate fixes were written and measured:
+//!
+//!    * clearing `card_type`/`group`/`groups` from `target_filter` when `self_target`
+//!      (they are count predicates — the same argument the `card_property` strip above
+//!      already makes, and the recipient is 「このカード」, a live). Measured: the
+//!      recipient list stays `[]`, so it is necessary at best and not sufficient.
+//!    * widening the recipient to the general pool unconditionally. Not attempted once
+//!      the first result showed the pool was not the problem.
+//!
+//!    Neither is committed: both touch the per-card score path for every
+//!    `is_self_target` effect in the corpus, and neither is demonstrated by a passing
+//!    test. The check to write next is whether `enqueue_printed_ability` /
+//!    `build_ability_queue_entry` records the source card into the resolver session —
+//!    because if it does not, this is not one card but EVERY 「このカードのスコアを…」
+//!    effect that self-targets.
 //!
 //!    The positive cases stay absent rather than being written to assert 0. `asserting
 //!    0 here would pin the bug, and a test that documents a defect is the class this
