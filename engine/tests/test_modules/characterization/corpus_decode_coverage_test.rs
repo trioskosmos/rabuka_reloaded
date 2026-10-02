@@ -60,6 +60,61 @@ fn the_trigger_detector_actually_distinguishes_known_from_unknown() {
     );
 }
 
+/// Every `duration` in the corpus is one `parse_duration` accepts.
+///
+/// Both call sites that read a duration already fail loudly — `push_temporary_effect`
+/// and `set_heart_override` each log at error level and return without registering the
+/// effect. That is the right local behaviour, but it is not a *test*: a newly printed
+/// duration phrase the parser spells as something `parse_duration` does not know would
+/// make every effect carrying it silently not register, with only a log line to show
+/// for it and a green suite.
+///
+/// This closes that gap the same way the action and trigger gates above do.
+#[test]
+fn every_duration_in_the_corpus_is_parseable() {
+    let db = load_real_database();
+    let mut unparseable: BTreeSet<String> = BTreeSet::new();
+    let mut seen = 0usize;
+
+    fn scan(
+        eff: &rabuka_engine::card::AbilityEffect,
+        card_no: &str,
+        bad: &mut BTreeSet<String>,
+        seen: &mut usize,
+    ) {
+        if let Some(d) = eff.duration_any() {
+            *seen += 1;
+            if rabuka_engine::ability::util::parse_duration(d).is_none() {
+                bad.insert(format!("{card_no}: duration={d:?}"));
+            }
+        }
+        if let Some(actions) = eff.compound.actions.as_ref() {
+            for sub in actions {
+                scan(sub, card_no, bad, seen);
+            }
+        }
+    }
+
+    for card in db.cards.values() {
+        for ab in card.resolved_abilities() {
+            if let Some(eff) = ab.effect.as_deref() {
+                scan(eff, card.card_no.as_ref(), &mut unparseable, &mut seen);
+            }
+        }
+    }
+
+    assert!(
+        unparseable.is_empty(),
+        "{} duration values are not in parse_duration's vocabulary, so the effects \
+         carrying them are never registered: push_temporary_effect and set_heart_override \
+         both log an error and return, which is loud in a log and silent to the suite. \
+         Add the wire form to parse_duration (ability/util/duration.rs). Offenders: \
+         {unparseable:?}",
+        unparseable.len()
+    );
+    assert!(seen > 100, "sanity: the corpus should be large, saw {seen} durations");
+}
+
 /// Every non-null ability names at least one trigger the engine recognises.
 ///
 /// `is_null` entries are the synthetic "this card has no printed ability" stubs the

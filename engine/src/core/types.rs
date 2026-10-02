@@ -234,6 +234,16 @@ pub enum GameResult {
 pub enum Duration {
     LiveEnd,
     ThisTurn,
+    /// Currently UNREACHABLE. Nothing constructs this variant: the wire vocabulary is
+    /// what `ability::util::parse_duration` accepts — this_turn, live_end,
+    /// as_long_as, unless, permanent — and `this_live` is deliberately not one of them
+    /// (see the unit test in `util/duration.rs`). The three expiry rules in
+    /// `core/game_state/abilities.rs` match it alongside `LiveEnd`, with identical
+    /// behaviour, so those arms currently prove nothing.
+    ///
+    /// The printed 「ライブ終了時まで」 is the `LiveEnd` wire form, which is what the
+    /// corpus uses (293 occurrences). If a second live-scoped form is ever needed,
+    /// give it a distinct meaning rather than adding the name here.
     ThisLive,
     Permanent,
     AsLongAs,

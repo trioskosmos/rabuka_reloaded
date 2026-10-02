@@ -1618,7 +1618,7 @@ Triggers: (none) — 2/2 L0-covered.
 | Card | Depth | Tests | Text |
 |---|---|---|---|
 | `PL!HS-bp1-019` | L2+choice | 268 | (エールで出た{{icon_score.png/スコア}}1つにつき、成功したライブのスコアの合計に1を加算する。) |
-| `PL!HS-PR-010` | L2+choice | 153 | (必要ハートを確認する時、エールで出た{{icon_b_all.png/ALLブレード}}は任意の色のハートとして扱う。) |
+| `PL!HS-PR-010` | L2+choice | 154 | (必要ハートを確認する時、エールで出た{{icon_b_all.png/ALLブレード}}は任意の色のハートとして扱う。) |
 
 ## other:常時:play_baton_touch
 

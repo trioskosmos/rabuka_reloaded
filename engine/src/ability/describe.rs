@@ -130,6 +130,20 @@ fn resource_label_inner(r: Option<&str>, ja: bool) -> &str {
     }
 }
 
+/// Render a `duration` code as printed text.
+///
+/// This table is WIDER than `ability::util::parse_duration`, on purpose: it also
+/// labels forms that are not effect durations at all — `live_success` and `turn_end`
+/// appear in other fields and reuse this renderer. Only the codes `parse_duration`
+/// accepts are valid in an effect's `duration`, and the corpus currently uses
+/// `live_end`, `as_long_as`, `this_turn` and `unless`.
+///
+/// The asymmetry matters in one direction: if the parser ever starts emitting
+/// `live_start`, `turn_end`, or `turn` as an effect duration, this function will
+/// happily render a label while `push_temporary_effect` refuses the code and the
+/// effect is never registered. `corpus_decode_coverage_test::every_duration_in_the_
+/// corpus_is_parseable` fails on exactly that, so the decision gets made rather than
+/// discovered.
 fn duration_label_inner(d: Option<&str>, ja: bool) -> &str {
     if ja {
         match d {
