@@ -222,7 +222,7 @@ static int live_cards_in_hand(TestGame *tg, int pl)
 
 static void test_phase_walk_through_turn3(void)
 {
-    TestGame tg;
+    static TestGame tg;
     test_game_new(&tg);
     int filler = test_id(&tg, "PL!-sd1-010-SD");
     fill_decks(&tg, filler, 30);
@@ -297,7 +297,7 @@ static void mirrored_support_boards(TestGame *tg)
 
 static void test_live_zone_two_card_selection(void)
 {
-    TestGame tg;
+    static TestGame tg;
     test_game_new(&tg);
     mirrored_support_boards(&tg);
     int filler = test_id(&tg, "PL!-sd1-010-SD");
@@ -334,7 +334,7 @@ static void test_live_zone_two_card_selection(void)
 
 static void test_tie_at_two_successes_blocks_third(void)
 {
-    TestGame tg;
+    static TestGame tg;
     test_game_new(&tg);
     mirrored_support_boards(&tg);
     int filler = test_id(&tg, "PL!-sd1-010-SD");
@@ -371,7 +371,7 @@ static void test_tie_at_two_successes_blocks_third(void)
 
 static void test_no_live_cards_clean_rollover(void)
 {
-    TestGame tg;
+    static TestGame tg;
     test_game_new(&tg);
     int filler = test_id(&tg, "PL!-sd1-010-SD");
     fill_decks(&tg, filler, 30);
@@ -398,7 +398,7 @@ static void test_no_live_cards_clean_rollover(void)
 
 static void test_himeko_repositions_opponent_member(void)
 {
-    TestGame tg;
+    static TestGame tg;
     test_game_new(&tg);
     int rurino  = test_id(&tg, "PL!HS-PR-029-PR");   /* MiraKura member */
     int himeko  = test_id(&tg, "PL!HS-pb1-014-R");   /* 安養寺姫芽, 登場 */
@@ -425,7 +425,7 @@ static void test_himeko_repositions_opponent_member(void)
 
 static void test_himeko_gate_blocked(void)
 {
-    TestGame tg;
+    static TestGame tg;
     test_game_new(&tg);
     int himeko = test_id(&tg, "PL!HS-pb1-014-R");
     int koko   = test_id(&tg, "PL!SP-sd2-002-P");
@@ -459,7 +459,7 @@ static void test_seat_relative_energy_comparison(void)
 {
     /* P2-owned copy, P1 ahead. */
     {
-        TestGame tg;
+        static TestGame tg;
         test_game_new(&tg);
         int live = test_id(&tg, "PL!S-bp6-022-L");
         test_add_to_opp_live(&tg, live);
@@ -472,7 +472,7 @@ static void test_seat_relative_energy_comparison(void)
     }
     /* P2-owned copy, P1 behind. */
     {
-        TestGame tg;
+        static TestGame tg;
         test_game_new(&tg);
         int live = test_id(&tg, "PL!S-bp6-022-L");
         test_add_to_opp_live(&tg, live);
@@ -485,7 +485,7 @@ static void test_seat_relative_energy_comparison(void)
     }
     /* Mirror boards: each copy compares against its own opponent. */
     {
-        TestGame tg;
+        static TestGame tg;
         test_game_new(&tg);
         int p1_live = test_id(&tg, "PL!S-bp6-022-L");
         int p2_live = test_new_id(&tg, "PL!S-bp6-022-L");
@@ -504,7 +504,7 @@ static void test_seat_relative_energy_comparison(void)
     }
     /* Rule 4.7.4 — waited energy still sits in the energy zone and counts. */
     {
-        TestGame tg;
+        static TestGame tg;
         test_game_new(&tg);
         int live = test_id(&tg, "PL!S-bp6-022-L");
         test_add_to_live(&tg, live);
@@ -524,7 +524,7 @@ static void test_seat_relative_energy_comparison(void)
 
 static void test_mei_cost_gate(void)
 {
-    TestGame tg;
+    static TestGame tg;
     test_game_new(&tg);
     int mei  = test_id(&tg, "PL!SP-pb2-029-N");          /* cost 9 */
     int expensive = test_id(&tg, "PL!-sd1-010-SD");      /* cost 4 -> gate blocks */
@@ -556,7 +556,7 @@ static void test_mei_cost_gate(void)
 static void test_rina_mutual_mill_from_p2_seat(void)
 {
     {
-        TestGame tg;
+        static TestGame tg;
         test_game_new(&tg);
         int filler = test_id(&tg, "PL!-sd1-010-SD");
         int rina = test_id(&tg, "PL!N-bp7-009-R");
@@ -573,7 +573,7 @@ static void test_rina_mutual_mill_from_p2_seat(void)
         CHECK_EQ(tg.state.p[1].discard.n, 7, "rina mill: P2's mill lands in P2's own waitroom");
     }
     {
-        TestGame tg;
+        static TestGame tg;
         test_game_new(&tg);
         int filler = test_id(&tg, "PL!-sd1-010-SD");
         int rina = test_id(&tg, "PL!N-bp7-009-R");
@@ -636,7 +636,7 @@ static void test_natsumi_blades(void)
     CHECK(natsumi_id >= 0 && other >= 0, "natsumi fixtures resolve");
     if (natsumi_id < 0 || other < 0) return;
     {
-        TestGame tg; test_game_new(&tg);
+        static TestGame tg; test_game_new(&tg);
         natsumi_stage(&tg, natsumi_id, other, filler, 7);
         CHECK_EQ(test_get_blade_modifier(&tg, natsumi_id), 1,
                  "natsumi 6a: self gains 1 blade at energy 7");
@@ -644,13 +644,13 @@ static void test_natsumi_blades(void)
                  "natsumi 6a: the other Liella! member also gains 1 blade");
     }
     {
-        TestGame tg; test_game_new(&tg);
+        static TestGame tg; test_game_new(&tg);
         natsumi_stage(&tg, natsumi_id, filler, RB_EMPTY_SLOT, 7);
         CHECK_EQ(test_get_blade_modifier(&tg, natsumi_id), 1,
                  "natsumi 6b: with no other Liella! on stage, self still gains 1 blade");
     }
     {
-        TestGame tg; test_game_new(&tg);
+        static TestGame tg; test_game_new(&tg);
         natsumi_stage(&tg, natsumi_id, other, RB_EMPTY_SLOT, 6);
         CHECK_EQ(test_get_blade_modifier(&tg, natsumi_id), 0,
                  "natsumi 6c: energy 6 < 7 -> no blade for self");
@@ -660,7 +660,7 @@ static void test_natsumi_blades(void)
     {
         /* 6d: the live_end blade must survive LiveVictoryDetermination and be
          * gone once the turn rolls over to Active. */
-        TestGame tg; test_game_new(&tg);
+        static TestGame tg; test_game_new(&tg);
         natsumi_stage(&tg, natsumi_id, other, filler, 7);
         CHECK_EQ(test_get_blade_modifier(&tg, natsumi_id), 1,
                  "natsumi 6d: the blade is registered during the performance");
@@ -684,7 +684,7 @@ static void test_hajimari_set_required_hearts(void)
     CHECK(card >= 0 && past_live >= 0, "hajimari fixtures resolve");
     if (card < 0) return;
     {
-        TestGame tg; test_game_new(&tg);
+        static TestGame tg; test_game_new(&tg);
         test_add_to_success(&tg, past_live);
         test_add_to_success(&tg, filler);
         test_add_to_hand(&tg, card);
@@ -707,7 +707,7 @@ static void test_hajimari_set_required_hearts(void)
                  "hajimari 7a: a colour outside the set is untouched");
     }
     {
-        TestGame tg; test_game_new(&tg);
+        static TestGame tg; test_game_new(&tg);
         test_add_to_hand(&tg, card);
         fill_decks20(&tg);
         advance_to_live_set_p1(&tg);
@@ -726,7 +726,7 @@ static void test_dream_with_you_blade_gate(void)
     CHECK(dream >= 0, "dream with you fixture resolves");
     if (dream < 0) return;
     {
-        TestGame tg; test_game_new(&tg);
+        static TestGame tg; test_game_new(&tg);
         test_add_to_hand(&tg, dream);
         fill_decks20(&tg);
         advance_to_live_set_p1(&tg);
@@ -737,7 +737,7 @@ static void test_dream_with_you_blade_gate(void)
                  "dream with you: an empty stage has no blade -> the >=10 gate fails");
     }
     {
-        TestGame tg; test_game_new(&tg);
+        static TestGame tg; test_game_new(&tg);
         /* PL!SP-sd1-010-SD blade 4, PL!-sd1-014-SD blade 3, PL!-sd1-017-SD blade 3 */
         int m1 = test_id(&tg, "PL!SP-sd1-010-SD");
         int m2 = test_id(&tg, "PL!-sd1-014-SD");
@@ -765,7 +765,7 @@ static void test_hanamaru_all_cost_comparison(void)
     CHECK(hanamaru >= 0 && live >= 0, "hanamaru fixtures resolve");
     if (hanamaru < 0) return;
     {
-        TestGame tg; test_game_new(&tg);
+        static TestGame tg; test_game_new(&tg);
         tg.state.p[0].stage[0] = hanamaru;              /* cost 9 */
         test_set_opp_stage(&tg, 0, test_new_id(&tg, "PL!-sd1-010-SD"));
         test_set_opp_stage(&tg, 1, test_new_id(&tg, "PL!-sd1-010-SD"));
@@ -779,7 +779,7 @@ static void test_hanamaru_all_cost_comparison(void)
                  "hanamaru 16a: cost 9 > opponent max 4 -> +2 blade until live end");
     }
     {
-        TestGame tg; test_game_new(&tg);
+        static TestGame tg; test_game_new(&tg);
         tg.state.p[0].stage[0] = hanamaru;              /* cost 9 */
         test_set_opp_stage(&tg, 0, test_new_id(&tg, "PL!-sd1-009-SD"));   /* cost 15 */
         test_set_opp_stage(&tg, 1, test_new_id(&tg, "PL!-sd1-010-SD"));
@@ -829,7 +829,7 @@ static void suzu_board(TestGame *tg, int opp_cost15)
 static void test_suzu_cost_bonus(void)
 {
     {
-        TestGame tg; test_game_new(&tg);
+        static TestGame tg; test_game_new(&tg);
         suzu_board(&tg, 0);
         int suzu = test_id(&tg, "PL!HS-bp6-005-R＋");
         CHECK_EQ(test_get_cost_modifier(&tg, suzu), 6,
@@ -840,7 +840,7 @@ static void test_suzu_cost_bonus(void)
                  "suzu 17a: the same gate grants 1 blade");
     }
     {
-        TestGame tg; test_game_new(&tg);
+        static TestGame tg; test_game_new(&tg);
         suzu_board(&tg, 1);
         int suzu = test_id(&tg, "PL!HS-bp6-005-R＋");
         CHECK_EQ(test_get_cost_modifier(&tg, suzu), 6,
@@ -866,7 +866,7 @@ static void test_izumi_debut_draw2_discard1(void)
     CHECK(izumi >= 0, "izumi fixture resolves");
     if (izumi < 0) return;
     {
-        TestGame tg; test_game_new(&tg);
+        static TestGame tg; test_game_new(&tg);
         test_add_to_hand(&tg, izumi);
         test_add_to_hand(&tg, filler);
         test_add_to_hand(&tg, filler);
@@ -882,7 +882,7 @@ static void test_izumi_debut_draw2_discard1(void)
         CHECK_EQ(tg.state.p[0].stage[1], izumi, "izumi 9a: 桂城泉 is on stage at center");
     }
     {
-        TestGame tg; test_game_new(&tg);
+        static TestGame tg; test_game_new(&tg);
         test_add_to_hand(&tg, izumi);
         test_give_energy(&tg, 13);
         fill_decks20(&tg);
@@ -903,7 +903,7 @@ static void test_kanon_invalidate_and_recover(void)
           "澁谷かのん fixtures resolve");
     if (kanon < 0) return;
     {
-        TestGame tg; test_game_new(&tg);
+        static TestGame tg; test_game_new(&tg);
         tg.state.p[0].stage[0] = other_liella;
         tg.state.p[0].stage[2] = filler;
         test_add_to_hand(&tg, kanon);
@@ -920,7 +920,7 @@ static void test_kanon_invalidate_and_recover(void)
                  "kanon 1a: the recovered card left the waitroom");
     }
     {
-        TestGame tg; test_game_new(&tg);
+        static TestGame tg; test_game_new(&tg);
         int non_liella = filler;
         int discard_card = rb_find_card_by_no("PL!SP-sd1-001-SD");
         tg.state.p[0].stage[0] = non_liella;
@@ -951,7 +951,7 @@ static void test_live_end_grant_expires_through_rollover(void)
     int filler = rb_find_card_by_no("PL!-sd1-010-SD");
     CHECK(me >= 0 && live >= 0, "cl1-006-CL fixtures resolve");
     if (me < 0) return;
-    TestGame tg;
+    static TestGame tg;
     test_game_new(&tg);
     tg.state.p[0].stage[0] = me;
     fill_decks(&tg, filler, 30);
@@ -981,7 +981,7 @@ static void test_ginko_debut_cost_gate(void)
     int huge = rb_find_card_by_no("PL!HS-bp5-004-R");     /* cost 15 -> blocked */
     CHECK(gin >= 0 && huge >= 0, "百生吟子 fixtures resolve");
     if (gin < 0) return;
-    TestGame tg;
+    static TestGame tg;
     test_game_new(&tg);
     test_set_opp_stage(&tg, 0, cheap);
     test_set_opp_stage(&tg, 1, huge);
@@ -1013,7 +1013,7 @@ static void test_kanan_discard_gain_live(void)
     CHECK(kanan >= 0 && live1 >= 0, "松浦果南 fixtures resolve");
     if (kanan < 0) return;
     {
-        TestGame tg; test_game_new(&tg);
+        static TestGame tg; test_game_new(&tg);
         int live2 = test_new_id(&tg, "PL!S-bp3-019-L");
         test_add_to_hand(&tg, kanan);
         test_add_to_hand(&tg, no_blade);
@@ -1029,7 +1029,7 @@ static void test_kanan_discard_gain_live(void)
                  "kanan 2a: the recovered live is one of the waitroom's, not a fresh card");
     }
     {
-        TestGame tg; test_game_new(&tg);
+        static TestGame tg; test_game_new(&tg);
         test_add_to_hand(&tg, kanan);       /* no payable cost target in hand */
         test_give_energy(&tg, 13);
         test_play_to_stage(&tg, kanan, 1);
@@ -1048,7 +1048,7 @@ static void test_ayumu_compound_condition(void)
     CHECK(ayumu >= 0 && other >= 0, "上原歩夢 fixtures resolve");
     if (ayumu < 0) return;
     {
-        TestGame tg; test_game_new(&tg);
+        static TestGame tg; test_game_new(&tg);
         tg.state.p[0].stage[0] = ayumu;
         tg.state.p[0].stage[1] = other;
         test_add_to_hand(&tg, test_new_id(&tg, "PL!-sd1-010-SD"));
@@ -1069,7 +1069,7 @@ static void test_ayumu_compound_condition(void)
                  "ayumu 3a: the 4 non-picked cards go to the waitroom");
     }
     {
-        TestGame tg; test_game_new(&tg);
+        static TestGame tg; test_game_new(&tg);
         tg.state.p[0].stage[0] = ayumu;
         tg.state.p[0].stage[1] = other;
         test_add_to_hand(&tg, live);          /* condition (2) fails */
@@ -1089,7 +1089,7 @@ static void test_sumire_center_debut_gate(void)
     CHECK(sumire >= 0, "平安名すみれ fixture resolves");
     if (sumire < 0) return;
     {
-        TestGame tg; test_game_new(&tg);
+        static TestGame tg; test_game_new(&tg);
         test_add_to_hand(&tg, sumire);
         test_give_energy(&tg, 4);
         test_play_to_stage(&tg, sumire, 1);      /* Center */
@@ -1098,7 +1098,7 @@ static void test_sumire_center_debut_gate(void)
                  "sumire: a CENTER debut gains the printed 2 blades");
     }
     {
-        TestGame tg; test_game_new(&tg);
+        static TestGame tg; test_game_new(&tg);
         test_add_to_hand(&tg, sumire);
         test_give_energy(&tg, 4);
         test_play_to_stage(&tg, sumire, 0);      /* LeftSide */
@@ -1107,7 +1107,7 @@ static void test_sumire_center_debut_gate(void)
                  "sumire: a LEFT debut does NOT gain blades (activation_position is checked)");
     }
     {
-        TestGame tg; test_game_new(&tg);
+        static TestGame tg; test_game_new(&tg);
         test_add_to_hand(&tg, sumire);
         test_give_energy(&tg, 4);
         test_play_to_stage(&tg, sumire, 2);      /* RightSide */
@@ -1144,7 +1144,7 @@ static void test_honoka_live_score_dynamic(void)
     CHECK(honoka >= 0, "高坂穂乃果 fixture resolves");
     if (honoka < 0) return;
     {
-        TestGame tg; test_game_new(&tg);
+        static TestGame tg; test_game_new(&tg);
         honoka_live_success(&tg, honoka, 1);
         CHECK_EQ(tg.state.p[0].hand.n, 1,
                  "honoka 8a: live total 1 + 2 = 3 looked at, 1 to hand (cost fodder discarded)");
@@ -1153,13 +1153,13 @@ static void test_honoka_live_score_dynamic(void)
         CHECK_EQ(tg.state.p[0].stage[0], honoka, "honoka 8d: 穂乃果 stays on stage");
     }
     {
-        TestGame tg; test_game_new(&tg);
+        static TestGame tg; test_game_new(&tg);
         honoka_live_success(&tg, honoka, 2);
         CHECK_EQ(tg.state.p[0].discard.n, 4,
                  "honoka 8f: live total 2 + 2 = 4 looked at, 3 remainder + 1 cost = 4");
     }
     {
-        TestGame tg; test_game_new(&tg);
+        static TestGame tg; test_game_new(&tg);
         honoka_live_success(&tg, honoka, 3);
         CHECK_EQ(tg.state.p[0].discard.n, 5,
                  "honoka 8j: live total (1+2) + 2 = 5 looked at, 4 remainder + 1 cost = 5");
@@ -1196,7 +1196,7 @@ static void test_karin_ab1_select_from_discard(void)
 {
     {
         /* 0 waited members -> select 0 -> waitroom untouched. */
-        TestGame tg; test_game_new(&tg);
+        static TestGame tg; test_game_new(&tg);
         karin_ab1_board(&tg, 0, "PL!N-sd1-010-SD", NULL);
         int wait_before = tg.state.p[0].discard.n;
         int deck_after_fill = tg.state.p[0].deck.n;
@@ -1211,7 +1211,7 @@ static void test_karin_ab1_select_from_discard(void)
     }
     {
         /* 1 waited member, 1 Nijigasaki in the waitroom -> moved to deck top. */
-        TestGame tg; test_game_new(&tg);
+        static TestGame tg; test_game_new(&tg);
         karin_ab1_board(&tg, 1, "PL!N-sd1-010-SD", NULL);
         int niji = rb_find_card_by_no("PL!N-sd1-010-SD");
         int wait_before = tg.state.p[0].discard.n;
@@ -1226,7 +1226,7 @@ static void test_karin_ab1_select_from_discard(void)
     }
     {
         /* 3 waited members, only 1 Nijigasaki available -> still exactly 1. */
-        TestGame tg; test_game_new(&tg);
+        static TestGame tg; test_game_new(&tg);
         karin_ab1_board(&tg, 3, "PL!N-sd1-010-SD", NULL);
         int niji = rb_find_card_by_no("PL!N-sd1-010-SD");
         int wait_before = tg.state.p[0].discard.n;
@@ -1241,7 +1241,7 @@ static void test_karin_ab1_select_from_discard(void)
     }
     {
         /* A non-Nijigasaki waitroom card is NOT selectable. */
-        TestGame tg; test_game_new(&tg);
+        static TestGame tg; test_game_new(&tg);
         karin_ab1_board(&tg, 1, "PL!SP-sd1-001-SD", NULL);   /* Liella!, not 虹ヶ咲 */
         int wait_before = tg.state.p[0].discard.n;
         advance_to_live_set_p1(&tg);
@@ -1253,7 +1253,7 @@ static void test_karin_ab1_select_from_discard(void)
     }
     {
         /* The OPPONENT's waitroom is never the source. */
-        TestGame tg; test_game_new(&tg);
+        static TestGame tg; test_game_new(&tg);
         karin_ab1_board(&tg, 1, "PL!N-sd1-010-SD", NULL);
         int niji = rb_find_card_by_no("PL!N-sd1-010-SD");
         test_add_to_discard(&tg, niji);                      /* P2's waitroom */
@@ -1273,7 +1273,7 @@ static void test_karin_ab1_select_from_discard(void)
     }
     {
         /* Hand is not touched by the select+move. */
-        TestGame tg; test_game_new(&tg);
+        static TestGame tg; test_game_new(&tg);
         karin_ab1_board(&tg, 1, "PL!N-sd1-010-SD", NULL);
         advance_to_live_set_p1(&tg);
         test_set_live_card(&tg, 0, test_id(&tg, "PL!-sd1-019-SD"));
@@ -1308,35 +1308,35 @@ static void test_saikou_success_zone_scores(void)
     if (saikou < 0) return;
     {
         static const char *none[] = { NULL };
-        TestGame tg; test_game_new(&tg);
+        static TestGame tg; test_game_new(&tg);
         saikou_run(&tg, saikou, 0, none);
         CHECK_EQ(test_get_score_modifier(&tg, saikou), 0,
                  "saikou: an empty success zone grants no score");
     }
     {
         static const char *one[] = { "PL!-sd1-019-SD" };
-        TestGame tg; test_game_new(&tg);
+        static TestGame tg; test_game_new(&tg);
         saikou_run(&tg, saikou, 1, one);
         CHECK_EQ(test_get_score_modifier(&tg, saikou), 1,
                  "saikou: a score-1 card in the success zone grants +1");
     }
     {
         static const char *five[] = { "PL!-bp3-022-L" };
-        TestGame tg; test_game_new(&tg);
+        static TestGame tg; test_game_new(&tg);
         saikou_run(&tg, saikou, 1, five);
         CHECK_EQ(test_get_score_modifier(&tg, saikou), 1,
                  "saikou: a score-5 card in the success zone grants +1");
     }
     {
         static const char *both[] = { "PL!-sd1-019-SD", "PL!-bp3-022-L" };
-        TestGame tg; test_game_new(&tg);
+        static TestGame tg; test_game_new(&tg);
         saikou_run(&tg, saikou, 2, both);
         CHECK_EQ(test_get_score_modifier(&tg, saikou), 2,
                  "saikou: score-1 AND score-5 both present grants +2");
     }
     {
         static const char *two[] = { "PL!-sd1-020-SD" };
-        TestGame tg; test_game_new(&tg);
+        static TestGame tg; test_game_new(&tg);
         saikou_run(&tg, saikou, 1, two);
         CHECK_EQ(test_get_score_modifier(&tg, saikou), 0,
                  "saikou: a score-2 card is neither 1 nor 5 -> no bonus");
@@ -1359,17 +1359,26 @@ static void test_kinako_hand_cost_discount(void)
     CHECK(kinako >= 0 && liella >= 0 && outsider >= 0, "桜小路きな子 fixtures resolve");
     if (kinako < 0) return;
     {
-        TestGame tg; test_game_new(&tg);
+        /* Rust's twin stages ONE id and flags THE SAME id
+         * (hard_tier_cards_cost_copy_discount_mill_and_dual_retrieve_test.rs
+         * :191-193: `let liella = game.new_id(...); stage.stage[0] = liella;
+         * cards_moved_this_turn.push(liella);`). An earlier version of this
+         * block staged `test_new_id(...)` -- a distinct pool copy -- and then
+         * flagged `moved_this_turn[rb_find_card_by_no(...)]`, the SHARED
+         * TEMPLATE id, so the flag landed on a card that was never on the
+         * stage and the discount was granted for the wrong reason. */
+        static TestGame tg; test_game_new(&tg);
         test_add_to_hand(&tg, kinako);
-        tg.state.p[0].stage[0] = test_new_id(&tg, "PL!SP-sd1-002-SD");
-        tg.state.moved_this_turn[rb_find_card_by_no("PL!SP-sd1-002-SD")] = 1;
+        int on_stage = test_new_id(&tg, "PL!SP-sd1-002-SD");
+        tg.state.p[0].stage[0] = on_stage;
+        tg.state.moved_this_turn[on_stage] = 1;
         tg.state.position_change_occurred_this_turn = 1;
         test_recalc(&tg);
         CHECK_EQ(test_get_cost_modifier(&tg, kinako), -2,
                  "kinako: while a Liella! member moved areas this turn, this hand card costs -2");
     }
     {
-        TestGame tg; test_game_new(&tg);
+        static TestGame tg; test_game_new(&tg);
         test_add_to_hand(&tg, kinako);
         tg.state.p[0].stage[0] = test_new_id(&tg, "PL!SP-sd1-002-SD"); /* staged, never moved */
         test_recalc(&tg);
@@ -1377,7 +1386,7 @@ static void test_kinako_hand_cost_discount(void)
                  "kinako: no movement this turn -> normal cost");
     }
     {
-        TestGame tg; test_game_new(&tg);
+        static TestGame tg; test_game_new(&tg);
         test_add_to_hand(&tg, kinako);
         int out = test_new_id(&tg, "PL!N-sd1-010-SD");   /* 虹ヶ咲, NOT Liella! */
         tg.state.p[0].stage[0] = out;
@@ -1415,7 +1424,7 @@ static void test_kokoro_cost_copy(void)
 {
     int me = -1;
     {
-        TestGame tg; test_game_new(&tg);
+        static TestGame tg; test_game_new(&tg);
         kokoro_setup(&tg, "PL!HS-PR-017-PR", "PL!HS-bp2-008-R", &me);  /* さやか cost 17 */
         int base = printed_cost(me);
         fire_trigger(&tg, 0, me, "ライブ開始時");
@@ -1426,7 +1435,7 @@ static void test_kokoro_cost_copy(void)
                  "kokoro: a cost of 16 satisfies 「10以上」 -> heart05 until live end");
     }
     {
-        TestGame tg; test_game_new(&tg);
+        static TestGame tg; test_game_new(&tg);
         kokoro_setup(&tg, "PL!HS-bp1-002-R", "PL!HS-bp2-008-R", &me);  /* 瑠璃乃 cost 11 */
         int base = printed_cost(me);
         fire_trigger(&tg, 0, me, "ライブ開始時");
@@ -1437,7 +1446,7 @@ static void test_kokoro_cost_copy(void)
                  "kokoro boundary: exactly 10 satisfies 「10以上」 (inclusive)");
     }
     {
-        TestGame tg; test_game_new(&tg);
+        static TestGame tg; test_game_new(&tg);
         kokoro_setup(&tg, "PL!HS-bp6-005-R＋", "PL!HS-bp2-004-R", &me); /* cost 10 */
         int base = printed_cost(me);
         fire_trigger(&tg, 0, me, "ライブ開始時");
@@ -1448,7 +1457,7 @@ static void test_kokoro_cost_copy(void)
                  "kokoro below threshold: 9 < 10 -> no heart05");
     }
     {
-        TestGame tg; test_game_new(&tg);
+        static TestGame tg; test_game_new(&tg);
         kokoro_setup(&tg, "PL!HS-PR-017-PR", "PL!HS-bp2-008-R", &me);
         int base = printed_cost(me);
         fire_trigger(&tg, 0, me, "ライブ開始時");
@@ -1460,7 +1469,7 @@ static void test_kokoro_cost_copy(void)
         CHECK_EQ(heart_of(&tg, me, RB_HEART_BLUE), 0, "kokoro decline: no heart is granted");
     }
     {
-        TestGame tg; test_game_new(&tg);
+        static TestGame tg; test_game_new(&tg);
         kokoro_setup(&tg, "PL!HS-PR-017-PR", 0, &me);  /* no DOLLCHESTRA card in hand */
         int base = printed_cost(me);
         fire_trigger(&tg, 0, me, "ライブ開始時");
@@ -1477,7 +1486,7 @@ static void test_kanan_cannot_mill_itself(void)
     int dia = rb_find_card_by_no("PL!S-bp2-004-R");   /* cost 11 = 9(holder)+2 */
     CHECK(me >= 0 && dia >= 0, "果南 fixtures resolve");
     if (me < 0) return;
-    TestGame tg;
+    static TestGame tg;
     test_game_new(&tg);
     tg.state.p[0].stage[1] = me;                    /* the ONLY own Aqours member */
     test_give_energy(&tg, 10);
@@ -1507,7 +1516,7 @@ static void test_karin_livestart_blade4_window(void)
     int live = rb_find_card_by_no("PL!-sd1-020-SD");
     CHECK(karin >= 0 && target >= 0, "朝香果林 bp5-004-R fixtures resolve");
     if (karin < 0) return;
-    TestGame tg;
+    static TestGame tg;
     test_game_new(&tg);
     fill_decks(&tg, filler, 30);
     test_give_energy(&tg, 20);
@@ -1579,7 +1588,7 @@ static void test_yell_blade_heart_gates(void)
     {
         static const char *top[] = { "PL!S-bp2-002-R", "PL!S-bp2-002-R", "PL!S-bp2-002-R" };
         int sumire, wien;
-        TestGame tg; test_game_new(&tg);
+        static TestGame tg; test_game_new(&tg);
         sumire_wien_setup(&tg, top, &sumire, &wien);
         advance_to_live_set_p1(&tg);
         test_set_live_card(&tg, 0, test_id(&tg, "PL!-sd1-019-SD"));
@@ -1596,7 +1605,7 @@ static void test_yell_blade_heart_gates(void)
     {
         static const char *top[] = { "PL!S-bp2-002-R", "PL!S-bp2-002-R", "PL!-pb1-014-R" };
         int sumire, wien;
-        TestGame tg; test_game_new(&tg);
+        static TestGame tg; test_game_new(&tg);
         sumire_wien_setup(&tg, top, &sumire, &wien);
         advance_to_live_set_p1(&tg);
         test_set_live_card(&tg, 0, test_id(&tg, "PL!-sd1-019-SD"));
@@ -1613,7 +1622,7 @@ static void test_yell_blade_heart_gates(void)
     {
         static const char *top[] = { "PL!S-bp2-002-R", "PL!S-bp2-002-R", "PL!HS-PR-010-PR" };
         int sumire, wien;
-        TestGame tg; test_game_new(&tg);
+        static TestGame tg; test_game_new(&tg);
         sumire_wien_setup(&tg, top, &sumire, &wien);
         advance_to_live_set_p1(&tg);
         test_set_live_card(&tg, 0, test_id(&tg, "PL!-sd1-019-SD"));
@@ -1647,7 +1656,7 @@ static void test_solitude_rain_heart_colour_scoring(void)
           "solitude rain fixture is discriminating: the mu's fillers add colours "
           "Solitude Rain must NOT score");
 
-    TestGame tg;
+    static TestGame tg;
     test_game_new(&tg);
     tg.state.p[0].stage[0] = niji;
     tg.state.p[0].stage[1] = filler;
@@ -1682,7 +1691,7 @@ static void test_fanfare_miracluck_blades(void)
     CHECK(live >= 0 && himeno >= 0, "ファンファーレ fixtures resolve");
     if (live < 0) return;
     {
-        TestGame tg; test_game_new(&tg);
+        static TestGame tg; test_game_new(&tg);
         for (int i = 0; i < 15; i++)
             test_add_to_discard(&tg, test_new_id(&tg, MIRAKURA[i % 18]));
         test_add_to_discard(&tg, filler);            /* one non-MiraKura */
@@ -1699,7 +1708,7 @@ static void test_fanfare_miracluck_blades(void)
                      test_get_blade_modifier(&tg, himeno) == 3);
     }
     {
-        TestGame tg; test_game_new(&tg);
+        static TestGame tg; test_game_new(&tg);
         for (int i = 0; i < 3; i++)
             test_add_to_discard(&tg, test_new_id(&tg, MIRAKURA[i % 18]));
         tg.state.p[0].stage[0] = himeno;
@@ -1729,7 +1738,7 @@ static void test_live_start_choice_routing_both_seats(void)
     int filler = rb_find_card_by_no("PL!-sd1-010-SD");
     CHECK(shizuku >= 0, "PL!N-bp3-015-N fixture resolves");
     if (shizuku < 0) return;
-    TestGame tg;
+    static TestGame tg;
     test_game_new(&tg);
     int p1[3], p2[3];
     for (int i = 0; i < 3; i++) { p1[i] = test_id(&tg, "PL!N-bp3-015-N");

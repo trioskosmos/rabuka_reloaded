@@ -110,6 +110,37 @@ typedef struct {
     char  blade_op[8];
     int   has_blade_limit;
     int   has_filter;
+    /* ── The six carriers include/rabuka.h:2450-2462 added and Rust's
+     *    CardFilter reads (checklist H1). They used to reach RbCardFilter and
+     *    STOP there: nothing in this TU copied them in and nothing tested them,
+     *    so `local_filter_matches` and Rust's `CardFilter::matches` disagreed on
+     *    every effect that set one. Rust twins, per field:
+     *      original_heart_total (+ operator) util.rs:1356-1357, matched :1790-1798
+     *      exclude_group_names                 util.rs:1531-1537 (in check_group)
+     *      cost_limit_min / cost_limit_max     util.rs:1744-1752
+     *      groups[]                            util.rs:1518-1529 (in check_group)
+     *      exclude_cards[]                     util.rs:1489-1496 (check_exclude_cards)
+     *      exclude_names[]                     util.rs:1498-1513 (check_exclude_names)
+     *    `has_original_heart_total` is derived from the operator string, not from
+     *    a header flag: Rust makes the operator unconditional whenever the total
+     *    is present (util.rs:1907 `.or(Some("<="))`), so a producer can never
+     *    supply one without the other and the string is a complete presence flag.
+     *    exclude_cards / exclude_names are `None` in from_effect (util.rs:1908-1909)
+     *    — they are set programmatically — so they carry has-flags of their own. */
+    int   original_heart_total;
+    char  original_heart_operator[8];
+    int   has_original_heart_total;
+    char  exclude_group_names[64];
+    char  groups[8][64];
+    int   n_groups;
+    int   cost_limit_min;
+    int   has_cost_limit_min;
+    int   cost_limit_max;
+    int   has_cost_limit_max;
+    int   exclude_cards[RB_MAX_ZONE];
+    int   n_exclude_cards;
+    char  exclude_names[8][64];
+    int   n_exclude_names;
 } LocalCardFilter;
 
 /* ── UTF-8 / normalization helpers ───────────────────────────────────── */
@@ -1433,20 +1464,107 @@ static int local_or_branch_parse(const char *json, LocalOrBranch *out)
     return 1;
 }
 
+/* ── Whole-group-list membership (checklist H1) ────────────────────────────
+ *
+ * Rust's `CardFilter::check_group` (util.rs:1515-1539) tests THREE things, and
+ * only the first of them existed in C:
+ *
+ *     if let Some(g) = self.group {
+ *         if !card_matches_group_str(db, id, Some(g)) {
+ *             if let Some(gs) = self.groups {
+ *                 if !gs.iter().any(|gn| card_matches_group_str(db, id, Some(gn))) { return false }
+ *             } else { return false }
+ *         }
+ *     } else if let Some(gs) = self.groups {
+ *         if !gs.iter().any(|gn| card_matches_group_str(db, id, Some(gn))) { return false }
+ *     }
+ *     for g in self.exclude_group_names { if card_matches_group_str(..) { return false } }
+ *
+ * `group` is `group_names.first()` and `groups` is the WHOLE list
+ * (util.rs:1852-1856), so the list always contains the first entry — a filter
+ * naming two groups accepts a card in EITHER, which the old C arm could not do:
+ * it read one name and rejected. Both forms go through the already-verified
+ * rb_card_matches_group_str (118,755 pairs, zero disagreements); nothing here
+ * re-implements it. */
+
+/* One CSV token -> does `card_id` carry that group? 128 bytes covers every
+ * group name in the database (20 distinct values, longest well under 64). */
+static int local_group_token_matches(int card_id, const char *start, size_t len) {
+    char tok[128];
+    if (len == 0 || len >= sizeof tok) len = len ? sizeof tok - 1 : 0;
+    if (len == 0) return 0;
+    memcpy(tok, start, len);
+    tok[len] = '\0';
+    return rb_card_matches_group_str(card_id, tok);
+}
+
+/* util.rs:1519 / :1527 / :1532 — `.any()` over a comma-joined list. */
+static int local_group_csv_any(int card_id, const char *csv) {
+    if (!csv || !*csv) return 0;
+    const char *p = csv;
+    for (;;) {
+        const char *comma = strchr(p, ',');
+        size_t len = comma ? (size_t)(comma - p) : strlen(p);
+        if (local_group_token_matches(card_id, p, len)) return 1;
+        if (!comma) return 0;
+        p = comma + 1;
+    }
+}
+
+/* Same `.any()`, over the array form RbCardFilter.groups / exclude_names use. */
+static int local_group_array_any(int card_id, const char (*names)[64], int n) {
+    for (int i = 0; i < n && i < 8; i++)
+        if (names[i][0] && rb_card_matches_group_str(card_id, names[i])) return 1;
+    return 0;
+}
+
 /* Check if card_id matches the LocalCardFilter fields. */
 static int local_filter_matches(const LocalCardFilter *f, int card_id) {
     Card filter_probe;
+    /* util.rs:1711-1713 — check_exclude_self then check_exclude_cards, both
+       before any field probe. `exclude_cards` is an exact-id list. */
     if (f->has_exclude_self && card_id == f->exclude_self_id) return 0;
+    if (f->n_exclude_cards > 0) {
+        int excluded = 0;
+        for (int i = 0; i < f->n_exclude_cards && !excluded; i++)
+            if (f->exclude_cards[i] == card_id) excluded = 1;
+        if (excluded) return 0;
+    }
+    /* util.rs:1717 -> :1498-1513 check_exclude_names — equality on the card
+       name with `char::is_whitespace` stripped from BOTH sides, which is exactly
+       str_eq_ignoring_ws (util.rs:696-706). A card the database cannot decode is
+       skipped, so an exclude_names entry never rejects an unknown id. */
+    if (f->n_exclude_names > 0) {
+        Card c;
+        int rejected = 0;
+        if (rb_decode_card_by_index((uint32_t)card_id, &c)) {
+            for (int i = 0; i < f->n_exclude_names && !rejected; i++)
+                if (c.name && str_eq_ignoring_ws(c.name, f->exclude_names[i])) rejected = 1;
+            rb_free_card(&c);
+        }
+        if (rejected) return 0;
+    }
     if (f->card_type[0] && !rb_card_matches_type(card_id, f->card_type)) return 0;
     /* CardFilter.group is populated from `group_names`, i.e. it may still hold
        the WHOLE comma-joined list (move.c:1617 and card.c:783 hand the raw CSV
        straight to RbCardFilter.group). Rust's CardFilter.group is
        `group_names.first()`, so split before comparing. */
-    if (f->has_group) {
-        char gbuf[128];
-        const char *g = rb_group_name_first(f->group, gbuf, sizeof gbuf);
-        if (g && *g && !rb_card_matches_group_str(card_id, g)) return 0;
+    if (f->has_group || f->n_groups > 0) {
+        int group_ok = 1;
+        if (f->has_group) {
+            char gbuf[128];
+            const char *g = rb_group_name_first(f->group, gbuf, sizeof gbuf);
+            if (g && *g && !rb_card_matches_group_str(card_id, g)) group_ok = 0;
+        }
+        /* A `group` that matched short-circuits the list, and an ABSENT list is
+           a rejection — which is why this must not run when group_ok is still
+           1. util.rs:1517-1525. */
+        if (!group_ok && !local_group_array_any(card_id, f->groups, f->n_groups))
+            return 0;
     }
+    /* util.rs:1531-1537 — the excluded list is checked unconditionally, group
+       match or not, and rejects on the FIRST hit. */
+    if (local_group_csv_any(card_id, f->exclude_group_names)) return 0;
     if (f->has_cost_limit && !rb_card_matches_cost_limit(card_id, f->cost_limit, f->cost_op[0] ? f->cost_op : NULL))
         return 0;
     if (f->n_cost_values > 0) {
@@ -1458,6 +1576,15 @@ static int local_filter_matches(const LocalCardFilter *f, int card_id) {
         for (int i = 0; i < f->n_cost_values; i++) if (f->cost_values[i] == cost) found = 1;
         if (!found) return 0;
     }
+    /* util.rs:1744-1752 — `cost_limit_min` is the card-text spelling of ">=" and
+       `cost_limit_max` of "<="; Rust passes those operators LITERALLY into the
+       same card_matches_cost_limit_op_for the `cost_limit` term uses
+       (util.rs:1733-1737), so the twin to reuse is rb_card_matches_cost_limit,
+       not a second comparison written here. */
+    if (f->has_cost_limit_min && !rb_card_matches_cost_limit(card_id, f->cost_limit_min, ">="))
+        return 0;
+    if (f->has_cost_limit_max && !rb_card_matches_cost_limit(card_id, f->cost_limit_max, "<="))
+        return 0;
     if (f->has_cost_total) {
         Card c;
         if (!rb_decode_card_by_index((uint32_t)card_id, &c)) return 0;
@@ -1556,6 +1683,30 @@ static int local_filter_matches(const LocalCardFilter *f, int card_id) {
         rb_free_card(&c);
         if (!rb_compare_counts(f->original_blade_op[0] ? f->original_blade_op : NULL,
                                blade, f->original_blade_limit)) return 0;
+    }
+    /* util.rs:1788-1798 — 「元々持つハートの数がN以下/つ以上」. The total is the
+       PRINTED base-heart sum and nothing else:
+           db.get_card(id).and_then(|c| c.base_heart.as_ref())
+              .map(|bh| bh.hearts.values().fold(0u8, |a, n| a.saturating_add(*n)))
+              .unwrap_or(0)
+       so a live card or energy card (no base_heart) totals 0 and therefore
+       satisfies 「1個以下」. card_total_hearts() is the WRONG total here — it
+       falls back to need_heart on a live card (util.rs:1592-1597 uses it for
+       need_heart_total) — so the base slice is summed directly.
+       DEFAULT operator is "<=", NOT compare_counts' ">=": util.rs:1907 spells
+       `.or(Some("<="))`. Every reachable operator is in rb_compare_counts' table
+       — from_effect feeds Operator::as_str (>=, <=, >, <, =) and the wire alias
+       "=="; measured over the corpus all 5 `heart_total_operator` values are
+       "<=", so the missing "exact" arm of compare_with_operator is unreachable. */
+    if (f->has_original_heart_total) {
+        Card c;
+        int total = 0;
+        if (rb_decode_card_by_index((uint32_t)card_id, &c)) {
+            total = heart_count_in_range(&c, -1, 0, c.num_base);
+            rb_free_card(&c);
+        }
+        if (!rb_compare_counts(f->original_heart_operator[0] ? f->original_heart_operator : "<=",
+                               total, f->original_heart_total)) return 0;
     }
     /* util.rs:1779-1784 — check_ability_filter (util.rs:1619-1652) then
        check_card_property (util.rs:1654-1673), in that order. The C port used to
@@ -1711,6 +1862,39 @@ static int local_filter_from_public(const RbCardFilter *rf, LocalCardFilter *out
     f.blade_limit = rf->blade_limit;
     if (rf->blade_op[0]) strncpy(f.blade_op, rf->blade_op, sizeof f.blade_op - 1);
     f.distinct = rf->distinct;
+    /* ── The six H1 carriers. They are copied here for the first time: until
+     *    now RbCardFilter carried them and local_filter_matches never looked at
+     *    any of them, so a producer that populated one changed nothing. */
+    /* util.rs:1356-1357 / :1906-1907 — total from the `heart_total_limit` wire
+       key, operator from `heart_total_operator` with Rust's "<=" default
+       applied by the matcher. Presence is read off the operator string because
+       Rust guarantees the operator is Some whenever the total is (`.or(...)`). */
+    if (rf->original_heart_operator[0]) {
+        f.original_heart_total = rf->original_heart_total;
+        strncpy(f.original_heart_operator, rf->original_heart_operator,
+                sizeof f.original_heart_operator - 1);
+        f.has_original_heart_total = 1;
+    }
+    if (rf->exclude_group_names[0])
+        strncpy(f.exclude_group_names, rf->exclude_group_names,
+                sizeof f.exclude_group_names - 1);
+    for (int i = 0; i < rf->n_groups && i < 8; i++)
+        strncpy(f.groups[i], rf->groups[i], sizeof f.groups[i] - 1);
+    f.n_groups = rf->n_groups > 8 ? 8 : rf->n_groups;
+    f.cost_limit_min = rf->cost_limit_min;
+    f.has_cost_limit_min = rf->has_cost_limit_min;
+    f.cost_limit_max = rf->cost_limit_max;
+    f.has_cost_limit_max = rf->has_cost_limit_max;
+    /* util.rs:1489-1496 — exclude_cards is `Option<&[i16]>`; Rust rejects on
+       exact id equality, so the whole RB_MAX_ZONE window is carried. */
+    for (int i = 0; i < rf->n_exclude_cards && i < RB_MAX_ZONE; i++)
+        f.exclude_cards[i] = rf->exclude_cards[i];
+    f.n_exclude_cards = rf->n_exclude_cards > RB_MAX_ZONE ? RB_MAX_ZONE : rf->n_exclude_cards;
+    /* util.rs:1498-1513 — exclude_names compares whitespace-stripped names for
+       EQUALITY, which is str_eq_ignoring_ws in the matcher. */
+    for (int i = 0; i < rf->n_exclude_names && i < 8; i++)
+        strncpy(f.exclude_names[i], rf->exclude_names[i], sizeof f.exclude_names[i] - 1);
+    f.n_exclude_names = rf->n_exclude_names > 8 ? 8 : rf->n_exclude_names;
     *out = f;
     return 1;
 }

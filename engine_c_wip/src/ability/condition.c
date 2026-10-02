@@ -12,7 +12,7 @@ static int eval_resource_count(const struct GameState *g, int actor, const Condi
 static int comparison_target_count(const struct GameState *g, int actor, const Condition *c, const char *ctype);
 static int get_count_for_target(const struct GameState *g, int actor, const Condition *c, const char *target);
 static int get_count_for_condition(const struct GameState *g, int actor, const Condition *c);
-static int get_card_total_hearts(const struct GameState *g, int cid, const int *cols, int ncols);
+static int card_excluded_by_character(const Card *cc, const char *name);
 static int resolve_moved_cards_source(const GameState *g, int actor, const Condition *c,
                                       int *out_ids, int max, int *out_n);
 static int check_card_property(const struct GameState *g, int actor, const Condition *c, const char *loc);
@@ -209,6 +209,27 @@ static int zone_ids(const struct GameState *g, int pl, const char *loc, int *out
        Rust's `None => &[]` / `_ => &[]` arms do. */
 #undef RB_ZPUSH
     return n;
+}
+/* Mirror ability/enums.rs:Zone::from_str — the EXACT accepted spellings, and
+   only the seven variants get_group_card_count (card.rs:4409-4432) matches on.
+   The shared zone_ids() resolver deliberately accepts MORE spellings than
+   Rust does ("live", "success", "main_deck", "center"/"left"/"right" as a
+   whole zone), so routing a group count through it resolves zones Rust's
+   `None` arm sends to 0. That gap is one of the three differences that made
+   the earlier attempts at this count regress. Returns ZK_NONE for `None`. */
+enum { ZK_NONE = 0, ZK_STAGE, ZK_HAND, ZK_DISCARD, ZK_WAITROOM,
+       ZK_LIVE, ZK_SUCCESS_LIVE, ZK_ENERGY };
+static int zone_kind(const char *loc) {
+    if (!loc) return ZK_NONE;
+    if (!strcmp(loc, "stage")) return ZK_STAGE;
+    if (!strcmp(loc, "hand")) return ZK_HAND;
+    if (!strcmp(loc, "discard")) return ZK_DISCARD;
+    if (!strcmp(loc, "waitroom")) return ZK_WAITROOM;
+    if (!strcmp(loc, "live_card_zone")) return ZK_LIVE;
+    if (!strcmp(loc, "success_live_zone") || !strcmp(loc, "success_live_card_zone"))
+        return ZK_SUCCESS_LIVE;
+    if (!strcmp(loc, "energy") || !strcmp(loc, "energy_zone")) return ZK_ENERGY;
+    return ZK_NONE;
 }
 static int count_distinct_in_zone(const struct GameState *g, int pl, const char *loc) {
     if (!loc) return 0;
@@ -1021,9 +1042,13 @@ static int eval_movement(const struct GameState *g, int actor, int host_cid, con
 }
 
 /* ── group (variant 4) ── */
-static int eval_group_aggregate(const GameState *g, int actor, const Condition *c);
+/* card.rs:4333 get_group_card_count. Defined at the bottom of this file with
+   the rest of the card.rs count twins; declared here because
+   evaluate_group_condition's tail (card.rs:1660) calls it. */
+static int get_group_card_count(const struct GameState *g, int actor, const Condition *c);
+static int count_group_cards_in_cards(const int *cards, int n, const char *group_name,
+                                      const char *ct, const CondValue *exc);
 static int eval_group_multi(const GameState *g, int actor, const Condition *c);
-static int get_card_total_hearts(const struct GameState *g, int cid, const int *cols, int ncols);
 static int eval_group(const struct GameState *g, int actor, int host_cid, const Condition *c) {
     const char *loc = get_str(c, "location");
     if (!loc) loc = "stage";
@@ -1053,8 +1078,52 @@ static int eval_group(const struct GameState *g, int actor, int host_cid, const 
         }
         return 1;
     }
-    /* Aggregate total check */
-    { int agg = eval_group_aggregate(g, actor, c); if (agg >= 0) return agg; }
+    /* card.rs:1532-1562 — the `all_areas` arm, which sits BETWEEN all_members
+       and the aggregate arm and was missing entirely. It is a per-SLOT
+       conjunction over the RAW three-slot stage array, so an EMPTY slot fails
+       it (`card_id != -1` is part of the conjunction) — 「すべてのエリアに
+       μ'sのメンバーがいる」 requires all three areas filled. The group list is
+       an OR; `exclude_characters` uses the same normalize-name / card_no test
+       as count_group_cards_in_cards. */
+    if (cond_truthy_field(c, "all_areas") && zone_kind(loc) == ZK_STAGE) {
+        const CondValue *ag = find_val(c, "group_names");
+        const char *act = get_str(c, "card_type");
+        const CondValue *aexc = find_val(c, "exclude_characters");
+        for (int i = 0; i < RB_STAGE_SIZE; i++) {
+            int cid = g->p[pl].stage[i];
+            if (cid == RB_EMPTY_SLOT) return 0;
+            if (ag && ag->tag == RB_TAG_ARRAY && ag->arr_n > 0) {
+                int hit = 0;
+                for (uint32_t gi = 0; gi < ag->arr_n && !hit; gi++) {
+                    const char *t = (ag->arr[gi].tag == RB_TAG_STR) ? ag->arr[gi].s : NULL;
+                    if (t && rb_card_matches_group_str(cid, t)) hit = 1;
+                }
+                if (!hit) return 0;
+            }
+            if (act && *act && !card_matches_card_type_filter(cid, act)) return 0;
+            if (aexc && aexc->tag == RB_TAG_ARRAY) {
+                Card cc;
+                if (rb_decode_card_by_index((uint32_t)cid, &cc)) {
+                    int hit = 0;
+                    for (uint32_t gi = 0; gi < aexc->arr_n && !hit; gi++) {
+                        const char *t = (aexc->arr[gi].tag == RB_TAG_STR) ? aexc->arr[gi].s : NULL;
+                        if (t && card_excluded_by_character(&cc, t)) hit = 1;
+                    }
+                    rb_free_card(&cc);
+                    if (hit) return 0;
+                }
+            }
+        }
+        return 1;
+    }
+    /* Aggregate total check. Rust card.rs:1565 calls the SAME
+       check_aggregate_total every other evaluator does, with the group's own
+       raw location — this branch used to carry a third copy of it
+       (eval_group_aggregate) that read `aggregate_total` /
+       `aggregate_total_operator`, two fields the wire never carries, so its
+       threshold and operator were always the fallbacks. Deleted; the shared
+       twin is the call. */
+    { int agg = rb_check_aggregate_total(g, actor, c); if (agg >= 0) return agg; }
     /* Heart colors check: collective cards cover all required colors.
        Rust card.rs:1525-1559 counts the DISTINCT required colours actually
        printed across the zone's cards (group- and card_type-filtered) and
@@ -1101,26 +1170,39 @@ static int eval_group(const struct GameState *g, int actor, int host_cid, const 
     }
     /* Multiple group_names: each group must have >= count members */
     { int multi = eval_group_multi(g, actor, c); if (multi >= 0) return multi; }
-    /* Temporal this_turn + self_target + group_names */
-    int temporal = 0; get_bool(c, "temporal", &temporal);
+    /* Temporal this_turn + self_target + group_names.
+       card.rs:1633-1655. The trigger is `get_temporal() == Some("this_turn")`
+       — a STRING compare. The previous body read it with
+       `get_bool(c, "temporal", &t)`, and get_bool only accepts the literal
+       "true", so this arm was DEAD and every
+       「このターン、自分の『Liella!』のカードの効果によってこのメンバーが
+       エリアを移動していた場合」 group condition fell through to the count
+       tail instead. Rust scans the MOVED cards — the entry-trigger set when it
+       exists, else the recently-moved set — not the stage, and the group
+       filter is the FIRST group name (`group_names.first()`), with
+       card_type == "member_card" as a precondition rather than a filter. */
+    const char *temporal = get_str(c, "temporal");
     int self_target = 0; get_bool(c, "self_target", &self_target);
     const CondValue *gn = find_val(c, "group_names");
-    if (temporal && self_target && gn && gn->tag == RB_TAG_ARRAY && gn->arr_n > 0) {
+    if (temporal && !strcmp(temporal, "this_turn") && self_target &&
+        gn && gn->tag == RB_TAG_ARRAY && gn->arr_n > 0) {
         const char *ct = get_str(c, "card_type");
-        if (ct && !strcmp(ct, "member_card")) {
-            int activating_card = g->activating_card;
-            if (activating_card >= 0) {
-                int ids[RB_MAX_ZONE]; int n = zone_ids(g, pl, loc, ids, RB_MAX_ZONE);
-                int matched = 0;
-                for (uint32_t gi = 0; gi < gn->arr_n && !matched; gi++) {
-                    const char *t = (gn->arr[gi].tag == RB_TAG_STR) ? gn->arr[gi].s : NULL;
-                    if (!t) continue;
-                    for (int i = 0; i < n; i++) {
-                        if (ids[i] < 0) continue;
-                        if (rb_card_matches_group_str(ids[i], t)) { matched = 1; break; }
-                    }
-                }
-                return matched;
+        if (!ct || !strcmp(ct, "member_card")) {
+            if (g->activating_card < 0) return 0;   /* card.rs:1644-1645 */
+            int moved[RB_MAX_ZONE]; int n = 0;
+            int ec = 0;
+            const int *ev = rb_entry_trigger_moved_cards(g, &ec);
+            if (ev && ec > 0) {
+                for (int i = 0; i < ec && i < RB_MAX_ZONE; i++) moved[n++] = ev[i];
+            } else {
+                for (int i = 0; i < g->n_recently_moved && i < RB_MAX_ZONE; i++)
+                    moved[n++] = g->recently_moved[i];
+            }
+            const char *gname = (gn->arr[0].tag == RB_TAG_STR) ? gn->arr[0].s : NULL;
+            for (int i = 0; i < n; i++) {
+                int mid = moved[i];
+                if (mid == RB_EMPTY_SLOT) continue;
+                if (gname && *gname && rb_card_matches_group_str(mid, gname)) return 1;
             }
             return 0;
         }
@@ -1128,161 +1210,81 @@ static int eval_group(const struct GameState *g, int actor, int host_cid, const 
     /* card.rs:1660-1672 — the shared tail of evaluate_group_condition is a COUNT
        comparison, not a presence test:
          let mut count = self.get_group_card_count(condition);
-         if condition.get_exclude_self().unwrap_or(false) && count > 0 {
-             let cond_player = self.resolve_condition_player(condition.get_target().unwrap_or("self"));
-             if cond_player.stage.stage.contains(&self.activating_card_id) { count -= 1; }
+         if condition.get_exclude_self().unwrap_or(false) {
+             if let Some(aid) = self.activating_card_id {
+                 let player = self.resolve_condition_player(target);
+                 if player.stage.stage.contains(&aid) { count = count.saturating_sub(1); }
+             }
          }
-         compare_counts(condition.get_operator().or(Some(">=")), count,
-                        condition.get_count().unwrap_or(1))
+         let target_count = condition.get_count().unwrap_or(1);
+         let operator = condition.get_operator().or(Some(">="));
+         compare_counts(operator, count, target_count)
        The presence loop this replaces answered "any 1 member", so
        「『Aqours』のメンバーが2人以上のとき」 (count 2, operator >=) was satisfied by
        a single member.
 
-       The count is taken over THIS branch's own zone scan rather than by routing
-       to the get_group_card_count twin: that twin resolves the card set
-       differently from Rust in three ways that matter for real corpus cards — it
-       has no `source: preceding_moved` branch (card.rs:4371-4386, which six
-       negated group_conditions use), no multi-entry `locations` branch
-       (card.rs:4390-4399), and it defaults an absent location to the stage
-       unconditionally where Rust defaults it ONLY when `position` is set
-       (card.rs:4404-4408). Wiring it made 18 passing cases fail.
+       The count comes from the get_group_card_count twin, ported whole at the
+       bottom of this file. Two earlier attempts failed for the same reason and
+       the reason is now gone rather than worked around: the count's card set is
+       NOT this branch's `zone_ids` scan. The twin carries the moved-source arm
+       (card.rs:4371-4386, which six negated corpus group_conditions use), the
+       multi-`locations` arm (card.rs:4390-4399), the `exclude_characters` filter
+       (card.rs:3736-3750), and the `position`-conditional stage default
+       (card.rs:4404-4408) that Rust applies ONLY when `position` is set where
+       this branch's `loc` defaulted to "stage" unconditionally. `loc` is
+       therefore no longer consulted here at all — the branch reads its own
+       `location` only for the all_members / heart_colors arms above.
 
-       Rust threads `condition.get_card_type()` into every per-card predicate
-
-       Rust threads `condition.get_card_type()` into every per-card predicate
-       (card.rs:1537 all_areas, :1595 heart_colors, :1609 multiple group_names) and
-       /* NOT IMPLEMENTED — left as the presence test on purpose, with the reason.
-       card.rs:1660-1672 makes this tail a COUNT comparison:
-         let mut count = self.get_group_card_count(condition);
-         if condition.get_exclude_self().unwrap_or(false) && count > 0 {
-             let cond_player = self.resolve_condition_player(condition.get_target().unwrap_or("self"));
-             if cond_player.stage.stage.contains(&self.activating_card_id) { count -= 1; }
-         }
-         compare_counts(condition.get_operator().or(Some(">=")), count,
-                        condition.get_count().unwrap_or(1))
-       so 「『Aqours』のメンバーが2人以上のとき」 (count 2, operator >=) is currently
-       answered as "any 1 member" here. Two attempts at the faithful comparison were
-       measured and BOTH regress, for the same root cause: Rust's count comes from
-       get_group_card_count, whose card set is NOT this branch's `zone_ids` scan.
-       It has a `source: preceding_moved` branch (card.rs:4371-4386, which six
-       negated corpus group_conditions use), a multi-entry `locations` branch
-       (card.rs:4390-4399), and it defaults an absent location to the stage ONLY
-       when `position` is set (card.rs:4404-4408) where this branch defaults it
-       always. Routing through the C twin (which has none of those three arms, and
-       no exclude_characters arm either, card.rs:3736-3750) put 18 previously
-       passing cases red; counting in place and comparing put another 27 red
-       (parity_under_member, parity_conditional_gated, parity_cce_gaps,
-       parity_small_clusters). Doing this correctly means porting
-       get_group_card_count whole — moved-source, multi-zone and exclude_characters
-       included — which is a separate change and must land with its own A/B.
-
-       Rust threads `condition.get_card_type()` into every per-card predicate
-       (card.rs:1537 all_areas, :1595 heart_colors, :1609 multiple group_names) and
-       into count_group_cards_in_cards (card.rs:3731-3735); the `card_type` term a
-       peer added to this branch is kept here so it is applied exactly once. */
-    int ids[RB_MAX_ZONE]; int n = zone_ids(g, pl, loc, ids, RB_MAX_ZONE);
-    if (n == 0) return 0;
-    if (!gn || gn->tag != RB_TAG_ARRAY || gn->arr_n == 0) return 0;
-    const char *ctc2 = get_str(c, "card_type");
-    for (int i = 0; i < n; i++) {
-        Card card; if (!rb_decode_card_by_index((uint32_t)ids[i], &card)) continue;
-        if (ctc2 && !card_matches_card_type_filter(ids[i], ctc2)) { rb_free_card(&card); continue; }
-        /* Diagnostic only: both strings come from the canonical accessors. The
-           raw `group` record index is "" for all 2,639 cards, so printing it
-           told a reader the card had no group when in fact it had a series. */
-        const char *gname = rb_card_group_name(ids[i]);
-        const char *uname = rb_card_unit_name(ids[i]);
-        if (rb_ability_debug_enabled() && gname && (strstr(gname,"XX")||strstr(gname,"YY"))) {
-            for(uint32_t gi=0;gi<gn->arr_n;gi++) if(gn->arr[gi].tag==RB_TAG_STR && gn->arr[gi].s)
-                fprintf(stderr,"[grp] card=%s gname=%s uname=%s target=%s\n",
-                        card.name?card.name:"?", gname, uname?uname:"-", gn->arr[gi].s);
-        }
-        for (uint32_t gi = 0; gi < gn->arr_n; gi++) {
-            const char *t = (gn->arr[gi].tag == RB_TAG_STR) ? gn->arr[gi].s : NULL;
-            if (!t) continue;
-            if (rb_card_matches_group_str(ids[i], t)) { rb_free_card(&card); return 1; }
-        }
-        rb_free_card(&card);
+       `compare_counts_op` is util.rs:2210: an operator Rust does not know
+       resolves to MET, not to a `>=` comparison, so it is deliberately not
+       eval_operator (whose terminal default is `actual >= threshold`). */
+    int count = get_group_card_count(g, actor, c);
+    if (cond_truthy_field(c, "exclude_self") && g->activating_card >= 0) {
+        const char *ctarget = get_str(c, "target"); if (!ctarget) ctarget = "self";
+        int cpl = target_player_idx(actor, c);
+        for (int i = 0; i < RB_STAGE_SIZE; i++)
+            if (g->p[cpl].stage[i] == g->activating_card) { if (count > 0) count--; break; }
+        (void)ctarget;
     }
-    return 0;
-}
-
-/* Mirror evaluate_group_condition: aggregate total check (e.g. heart02 >= 6).
-   Sums the hearts of matching cards in the zone and compares to aggregate_total. */
-static int eval_group_aggregate(const GameState *g, int actor, const Condition *c) {
-    int agg_total = 0;
-    int is_total = 0;
-    const char *aggregate = get_str(c, "aggregate");
-    if (aggregate && !strcmp(aggregate, "total")) {
-        if (!get_i(c, "count", &agg_total) || agg_total <= 0) return -1;
-        is_total = 1;
-    } else if (!get_i(c, "aggregate_total", &agg_total) || agg_total <= 0) {
-        return -1;
-    }
-    int pl = target_player_idx(actor, c);
-    const char *loc = get_str(c, "location"); if (!loc) loc = "stage";
-    const char *op = is_total ? get_str(c, "operator") : get_str(c, "aggregate_total_operator");
-    if (!op) op = ">=";
-    if (rb_ability_debug_enabled())
-        fprintf(stderr, "[COND_GROUP_AGG] actor=%d pl=%d loc=%s op=%s thr=%d\n", actor, pl, loc, op, agg_total);
-    /* Sum hearts for all cards in the zone matching the group filter.
-       Rust card.rs:406-442 sums `bh.hearts.get(&color)` for each colour the
-       condition names, so the condition's heart_colors ARE the filter; the
-       previous port summed every colour on the card instead. */
-    int cols[RB_MAX_HEARTS];
-    int ncols = cond_heart_colors(c, cols, RB_MAX_HEARTS);
-    int ids[RB_MAX_ZONE]; int n = zone_ids(g, pl, loc, ids, RB_MAX_ZONE);
-    int total = 0;
-    const CondValue *gv = find_val(c, "group_names");
-    for (int i = 0; i < n; i++) {
-        if (ids[i] < 0) continue;
-        if (gv && gv->tag == RB_TAG_ARRAY && gv->arr_n > 0) {
-            int matched = 0;
-            for (uint32_t gi = 0; gi < gv->arr_n; gi++) {
-                const char *t = (gv->arr[gi].tag == RB_TAG_STR) ? gv->arr[gi].s : NULL;
-                if (t && rb_card_matches_group_str(ids[i], t)) { matched = 1; break; }
-            }
-            if (!matched) continue;
-        }
-        int th = get_card_total_hearts(g, ids[i], cols, ncols);
-        if (th > 0) total += th;   /* a heartless member contributes 0, never -1 */
-    }
-    if (rb_ability_debug_enabled())
-        fprintf(stderr, "[COND_GROUP_AGG] total=%d result=%d\n", total,
-                !strcmp(op, ">=") ? total >= agg_total :
-                !strcmp(op, ">") ? total > agg_total :
-                !strcmp(op, "<=") ? total <= agg_total :
-                !strcmp(op, "<") ? total < agg_total :
-                !strcmp(op, "==") ? total == agg_total : total >= agg_total);
-    if (!strcmp(op, ">=")) return total >= agg_total;
-    if (!strcmp(op, ">"))  return total > agg_total;
-    if (!strcmp(op, "<=")) return total <= agg_total;
-    if (!strcmp(op, "<"))  return total < agg_total;
-    if (!strcmp(op, "==")) return total == agg_total;
-    return total >= agg_total;
+    int target_count = 1; get_i(c, "count", &target_count);
+    const char *gop = get_str(c, "operator"); if (!gop) gop = ">=";
+    return compare_counts_op(gop, count, target_count);
 }
 
 /* Mirror evaluate_group_condition: multiple group_names branch.
-   Each listed group must have at least `count` members in the zone. */
+   card.rs:1606-1631. Each listed group must have at least `count` members in
+   the zone. The zone is `get_location().unwrap_or("")` matched through
+   Zone::from_str with `_ => return false` — NOT defaulted to the stage, and an
+   unrecognised zone FAILS the condition rather than falling through. Each
+   group is counted on its own through count_group_cards_in_cards with a
+   single-element slice, so `card_type` and `exclude_characters` apply here too
+   (the previous body applied neither). */
 static int eval_group_multi(const GameState *g, int actor, const Condition *c) {
     const CondValue *gv = find_val(c, "group_names");
     if (!gv || gv->tag != RB_TAG_ARRAY || gv->arr_n <= 1) return -1;
     const char *agg = get_str(c, "aggregate");
-    if (agg && !strcmp(agg, "total")) return -1; /* handled by aggregate branch */
-    int target_count = 0;
-    if (!get_i(c, "count", &target_count)) target_count = 1;
+    if (agg && !strcmp(agg, "total")) return -1; /* handled by the aggregate arm */
+    int target_count = 1; get_i(c, "count", &target_count);
     int pl = target_player_idx(actor, c);
-    const char *loc = get_str(c, "location"); if (!loc) loc = "stage";
-    int ids[RB_MAX_ZONE]; int n = zone_ids(g, pl, loc, ids, RB_MAX_ZONE);
+    const char *ct = get_str(c, "card_type");
+    const CondValue *exc = find_val(c, "exclude_characters");
+    const char *loc = get_str(c, "location"); if (!loc) loc = "";
+    const RbPlayer *P = &g->p[pl];
+    const int *cards; int n;
+    switch (zone_kind(loc)) {
+        case ZK_STAGE:        cards = P->stage;         n = RB_STAGE_SIZE; break;
+        case ZK_HAND:         cards = P->hand.cards;    n = P->hand.n;      break;
+        case ZK_DISCARD:
+        case ZK_WAITROOM:     cards = P->discard.cards; n = P->discard.n;   break;
+        case ZK_LIVE:         cards = P->live.cards;    n = P->live.n;      break;
+        case ZK_SUCCESS_LIVE: cards = P->success.cards; n = P->success.n;   break;
+        case ZK_ENERGY:       cards = P->energy.cards;  n = P->energy.n;    break;
+        default:              return 0;   /* card.rs:1619 `_ => return false` */
+    }
     for (uint32_t gi = 0; gi < gv->arr_n; gi++) {
         const char *t = (gv->arr[gi].tag == RB_TAG_STR) ? gv->arr[gi].s : NULL;
         if (!t) continue;
-        int count = 0;
-        for (int i = 0; i < n; i++) {
-            if (ids[i] < 0) continue;
-            if (rb_card_matches_group_str(ids[i], t)) count++;
-        }
-        if (count < target_count) return 0;
+        if (count_group_cards_in_cards(cards, n, t, ct, exc) < target_count) return 0;
     }
     return 1;
 }
@@ -2288,17 +2290,25 @@ case RB_COND_ALL_REVEALED: {
         rb_abdebug_condition(&dbg, c, dbg_actual, thresh, final_result);
     }
 
+    /* condition.rs:650-660 — the SECOND `ability_filter` pass. It runs after
+       the negation fold and after the verdict line, it applies to every
+       non-Movement condition that carries `ability_filter`, and failing it
+       returns FALSE outright rather than negating the verdict. Rust has no
+       early return on the card_property path, so the gate is placed ahead of
+       the C's `location_property` return rather than after it — placing it
+       after is what made an earlier attempt look like an unattributable
+       regression: the gate was simply never reached for the one variant whose
+       filters actually carry `ability_filter`. */
+    if (c->variant != RB_COND_MOVEMENT) {
+        const char *afilter = get_str(c, "ability_filter");
+        if (afilter &&
+            !eval_ability_filter_with_card_check(g, actor, c, afilter))
+            return 0;
+    }
+
     int location_property = c->variant == RB_COND_LOCATION && get_str(c, "card_property") != NULL;
     if (location_property) return r;
 
-    /* condition.rs:650-660 would gate a condition that carries `ability_filter`
-       a second time, after negation is folded in (card.rs:3414-3469 is the twin:
-       count the zone's cards that satisfy the filter and compare with
-       `operator.unwrap_or("any")` against `count.unwrap_or(1)`). NOT wired: it is
-       outside this change's scope, the C twin checks only `ability_filter` and
-       `no_ability_type`, and wiring it was measured inside a regression block that
-       could not be attributed to it. Leaving the gate absent is what it has always
-       been; the card.rs:3414-3469 arm is a separate port. */
     return negation ? !r : r;
 }
 static int eval_condition_inner(const struct GameState *g, int actor, const Condition *c) {
@@ -2620,52 +2630,87 @@ static int check_card_property(const struct GameState *g, int actor, const Condi
     return neg ? 1 : 0;
 }
 
-/* Mirror card.rs::evaluate_ability_filter_condition_with_card_check.
-   DEAD on purpose: Rust calls it from evaluate_condition for every non-Movement
-   condition that carries `ability_filter` (condition.rs:650-660, after negation is
-   folded in), and this is the twin of that gate — but the C has no such second
-   pass, so nothing calls it. Wiring it was inside a regression block I could not
-   attribute to it, so it stays unwired rather than deleted: it is the correct
-   shape of the missing gate and the next agent porting condition.rs:650-660
-   should call it rather than rewrite it. Counts cards in a zone matching an
-   ability filter (no_ability, has_ability,
-   no_ability_type) and compares to count with operator. */
-static int eval_ability_filter_with_card_check(const struct GameState *g, int actor, const Condition *c, const char *filter) {
+/* card.rs:3327-3346 ability_filter_scope — the card set an `ability_filter` is
+   evaluated against. Deliberately NARROW (card.rs:3316-3322 says so): only
+   five zones, and a location outside them resolves to the ACTIVATING CARD, or
+   to None when there is none — which the callers read as "nothing to inspect,
+   so it passes". The C previously resolved the zone through the shared
+   zone_ids(), which reaches the deck and the under-member piles, so a filter
+   naming those zones inspected cards Rust never looks at. */
+static const int *ability_filter_scope(const struct GameState *g, int pl, const char *loc,
+                                       int *out_n) {
+    const RbPlayer *P = &g->p[pl];
+    switch (zone_kind(loc)) {
+        case ZK_STAGE:        *out_n = RB_STAGE_SIZE; return P->stage;
+        case ZK_HAND:         *out_n = P->hand.n;      return P->hand.cards;
+        case ZK_DISCARD:
+        case ZK_WAITROOM:     *out_n = P->discard.n;   return P->discard.cards;
+        case ZK_ENERGY:       *out_n = P->energy.n;    return P->energy.cards;
+        case ZK_LIVE:         *out_n = P->live.n;      return P->live.cards;
+        default:
+            /* card.rs:3344 `_ => return self.game_state.activating_card.map(|id| vec![id])`
+               — the caller cannot tell that from None except by the length. */
+            if (g->activating_card >= 0) { *out_n = 1; return &g->activating_card; }
+            *out_n = 0;
+            return NULL;
+    }
+}
+/* Mirror card.rs::evaluate_ability_filter_condition_with_card_check
+   (card.rs:3414-3469). Wired at condition.rs:650-660: a SECOND pass, after
+   negation has been folded in, for every non-Movement condition that carries
+   `ability_filter`; failing it discards the verdict outright rather than
+   negating it. The earlier "unwired, could not attribute the regression" note
+   was a placement error, not a defect in the twin: it belongs AFTER the
+   negation fold and BEFORE the return, and it must not be skipped on the
+   card_property path, which is where the C's early return used to hide it.
+   Two fidelity points over the old body:
+     • the zone list is ability_filter_scope's, not zone_ids()'s (above);
+     • the `no_ability_type` test is `triggers.starts_with(excluded)` per
+       ability (card.rs:3452), not a substring search over the joined trigger
+       string. */
+static int eval_ability_filter_with_card_check(const struct GameState *g, int actor,
+                                              const Condition *c, const char *filter) {
     int pl = target_player_idx(actor, c);
     const char *loc = get_str(c, "location"); if (!loc) loc = "stage";
-    int ids[RB_MAX_ZONE]; int n = zone_ids(g, pl, loc, ids, RB_MAX_ZONE);
+    int n = 0;
+    const int *ids = ability_filter_scope(g, pl, loc, &n);
+    if (!ids) return 1;   /* card.rs:3425 `None => return true` */
     const CondValue *etv = find_val(c, "ability_filter_triggers");
-    int count_needed = 0; if (!get_i(c, "count", &count_needed)) count_needed = 1;
-    const char *op = get_str(c, "operator"); if (!op) op = ">=";
+    int count_needed = 1; get_i(c, "count", &count_needed);
     int match_count = 0;
     for (int i = 0; i < n; i++) {
-        if (ids[i] < 0) continue;
         int cid = ids[i];
+        if (cid == RB_EMPTY_SLOT) continue;
         int na = rb_card_num_abilities((uint32_t)cid);
         int has_ability = (na > 0);
-        int m = 0;
+        int m;
         if (!strcmp(filter, "no_ability")) m = !has_ability;
         else if (!strcmp(filter, "has_ability")) m = has_ability;
-        else if (!strcmp(filter, "no_ability_type") && has_ability) {
-            /* Card has abilities but NONE match the excluded trigger types */
+        else if (!strcmp(filter, "no_ability_type")) {
+            /* card.rs:3441-3456: NONE of the card's abilities carries a trigger
+               that STARTS WITH one of the excluded tokens. */
             int excluded_match = 0;
             for (int a = 0; a < na && !excluded_match; a++) {
-                uint32_t aidx;
-                if (!rb_card_get_ability_idx((uint32_t)cid, a, &aidx)) continue;
-                for (uint32_t gi = 0; gi < etv->arr_n && !excluded_match; gi++) {
-                    const char *et = (etv->arr[gi].tag == RB_TAG_STR) ? etv->arr[gi].s : NULL;
-                    if (et && card_ability_trigger_contains(cid, et)) { excluded_match = 1; break; }
+                Ability ab;
+                if (!rb_decode_card_ability((uint32_t)cid, a, &ab)) continue;
+                if (ab.triggers && etv && etv->tag == RB_TAG_ARRAY) {
+                    for (uint32_t gi = 0; gi < etv->arr_n && !excluded_match; gi++) {
+                        const char *et = (etv->arr[gi].tag == RB_TAG_STR) ? etv->arr[gi].s : NULL;
+                        if (et && *et && !strncmp(ab.triggers, et, strlen(et))) excluded_match = 1;
+                    }
                 }
+                rb_free_ability(&ab);
             }
             m = !excluded_match;
-        } else m = 1;
+        } else m = 1;   /* card.rs:3457 `_ => true` */
         if (m) match_count++;
     }
-    if (!strcmp(op, "="))  return match_count == count_needed;
-    if (!strcmp(op, "<=")) return match_count <= count_needed;
-    if (!strcmp(op, "<"))  return match_count < count_needed;
-    if (!strcmp(op, ">"))  return match_count > count_needed;
-    return match_count >= count_needed;
+    /* card.rs:3467-3468 — `compare_with_operator(operator, ..)` with the
+       operator defaulting to "any", which that helper does not know, so the
+       `.unwrap_or` arm is what actually runs. */
+    const char *op = get_str(c, "operator");
+    if (!op) op = "any";
+    return compare_counts_op(op, match_count, count_needed);
 }
 
 /* check_distinct_names: mirror card.rs:check_distinct_names.
@@ -2908,11 +2953,48 @@ static int zone_len_impl(const GameState *g, int pl, const char *location) {
     return 0;
 }
 
-/* ── count_group_cards_in_cards: count cards matching group in a list ──
-   card.rs:3713-3753. Deleted with its only caller, get_group_card_count: it also
-   omits Rust's `exclude_characters` arm (card.rs:3736-3750), and the only thing
-   that used it was the twin that must not be wired (see the note where it
-   stood). */
+/* card.rs:3739-3742 — `normalize_name(card.name).contains(normalize_name(e))`
+   OR `card.card_no.contains(e)`. `e` is compared against the card_no string
+   UN-normalized, exactly as Rust does it (only the name arm normalizes). */
+static int card_excluded_by_character(const Card *cc, const char *name) {
+    if (!cc || !name) return 0;
+    char have[192], want[192];
+    rb_card_normalize_name(cc->name ? cc->name : "", have, sizeof have);
+    rb_card_normalize_name(name, want, sizeof want);
+    if (want[0] && strstr(have, want)) return 1;
+    const char *no = rb_card_string(cc->card_no_idx);
+    return (no && *no && strstr(no, name)) ? 1 : 0;
+}
+/* ── count_group_cards_in_cards: card.rs:3713-3765, whole ──
+   `group_name` is `group_names.and_then(|g| g.first())` (NULL = no filter,
+   because util.rs:816 makes a NULL group match everything), `ct` is
+   `get_card_type()` and `exc` is `get_exclude_characters()`. The
+   `exclude_characters` arm (card.rs:3736-3750) is the one the earlier
+   third-copy twin omitted, and it is a real corpus filter. */
+static int count_group_cards_in_cards(const int *cards, int n, const char *group_name,
+                                      const char *ct, const CondValue *exc) {
+    int count = 0;
+    for (int i = 0; i < n; i++) {
+        int cid = cards[i];
+        if (cid == RB_EMPTY_SLOT) continue;
+        if (group_name && *group_name && !rb_card_matches_group_str(cid, group_name)) continue;
+        if (ct && *ct && !card_matches_card_type_filter(cid, ct)) continue;
+        if (exc && exc->tag == RB_TAG_ARRAY) {
+            Card cc;
+            if (rb_decode_card_by_index((uint32_t)cid, &cc)) {
+                int hit = 0;
+                for (uint32_t k = 0; k < exc->arr_n && !hit; k++) {
+                    const char *e = (exc->arr[k].tag == RB_TAG_STR) ? exc->arr[k].s : NULL;
+                    if (e && card_excluded_by_character(&cc, e)) hit = 1;
+                }
+                rb_free_card(&cc);
+                if (hit) continue;
+            }
+        }
+        count++;
+    }
+    return count;
+}
 
 /* ── count_for_player_target: count by comparison type ── */
 static int count_for_player_target(const GameState *g, int actor, int pl, const char *location, const char *comparison_type) {
@@ -3036,18 +3118,135 @@ static int get_count_for_condition(const GameState *g, int actor, const Conditio
     return 0;
 }
 
-/* ── get_group_card_count: count cards matching group in condition's location ──
-   card.rs:4333-4412 in name only. DELETED rather than wired: routing
-   evaluate_group_condition's tail (card.rs:1660) through it turned 18 passing
-   cases red, because this twin resolves the card set differently from Rust in
-   three ways the corpus exercises — it has no `source: preceding_moved` branch
-   (card.rs:4371-4386, used by six negated group_conditions), no multi-entry
-   `locations` branch (card.rs:4390-4399), and no `exclude_characters` filter
-   (card.rs:3736-3750); it also defaults an absent location to the stage
-   unconditionally where Rust defaults it ONLY when `position` is set
-   (card.rs:4404-4408). The count comparison itself now lives in eval_group,
-   over that branch's own zone scan, which is the resolution Rust's tail
-   inherits for the shapes this corpus actually uses. */
+/* ── sum_group_hearts_in_stage: card.rs:3667-3688 ──
+   BASE heart count only (Rust reads `card.base_heart`, with no fallback to
+   need_heart), summed over the stage cards the group filter admits.
+   `group_name == NULL` is Rust's `None`, which util.rs:816 makes match all. */
+static int sum_group_hearts_in_stage(const struct GameState *g, int pl, const char *group_name) {
+    const RbPlayer *P = &g->p[pl];
+    int total = 0;
+    for (int i = 0; i < RB_STAGE_SIZE; i++) {
+        int cid = P->stage[i];
+        if (cid == RB_EMPTY_SLOT) continue;
+        if (group_name && *group_name && !rb_card_matches_group_str(cid, group_name)) continue;
+        Card cc; if (!rb_decode_card_by_index((uint32_t)cid, &cc)) continue;
+        int base = 0;
+        for (int h = 0; h < cc.num_base && h < cc.n_hearts; h++) base += cc.heart_count[h];
+        rb_free_card(&cc);
+        total += base;
+    }
+    return total;
+}
+/* ── sum_group_filtered_zone: card.rs:3693-3711 ──
+   One per-card value over a zone list, gated on card_type then group. The two
+   call sites (card.rs:4346 / :4357) differ only in the value: NEED heart count
+   for the live-card zone, printed score for the success-live zone. */
+enum { ZV_NEED_HEARTS = 0, ZV_SCORE = 1 };
+static int sum_group_filtered_zone(const int *cards, int n, const char *ct,
+                                   const char *group_name, int value_kind) {
+    int total = 0;
+    for (int i = 0; i < n; i++) {
+        int cid = cards[i];
+        if (cid == RB_EMPTY_SLOT) continue;
+        if (ct && *ct && !card_matches_card_type_filter(cid, ct)) continue;
+        if (group_name && *group_name && !rb_card_matches_group_str(cid, group_name)) continue;
+        Card cc; if (!rb_decode_card_by_index((uint32_t)cid, &cc)) continue;
+        if (value_kind == ZV_SCORE) {
+            total += cc.score;
+        } else {
+            int from = cc.num_base + cc.num_blade;
+            for (int h = from; h < from + cc.num_need && h < cc.n_hearts; h++)
+                total += cc.heart_count[h];
+        }
+        rb_free_card(&cc);
+    }
+    return total;
+}
+/* ── get_group_card_count: card.rs:4333-4433, whole ──
+   The card set this produces is NOT this branch's `zone_ids` scan, and that is
+   the whole reason the count could not be bolted on before: it has an
+   aggregate arm, a preceding-moved arm, a multi-`locations` arm, a
+   `position`-conditional stage default and an `exclude_characters` filter,
+   none of which the branch-local scan had. `self.moved_cards` is always empty
+   in the C (there is no ConditionContext to carry it), so the moved-source
+   fallback at card.rs:4375-4384 is the only arm that can run. */
+static int get_group_card_count(const struct GameState *g, int actor, const Condition *c) {
+    const char *target = get_str(c, "target"); if (!target) target = "self";
+    int pl = target_player_idx(actor, c);
+    /* `group_names.and_then(|g| g.first())`: an ABSENT or EMPTY list is None,
+       which filters nothing. cond_first_group_name already collapses both. */
+    const char *group_name = cond_first_group_name(c);
+    const char *ct = get_str(c, "card_type");
+    const CondValue *exc = find_val(c, "exclude_characters");
+    const char *agg = get_str(c, "aggregate");
+
+    if (agg && !strcmp(agg, "total")) {
+        const char *loc = get_str(c, "location"); if (!loc) loc = "";
+        const RbPlayer *P = &g->p[pl];
+        switch (zone_kind(loc)) {
+            case ZK_STAGE:        return sum_group_hearts_in_stage(g, pl, group_name);
+            case ZK_LIVE:         return sum_group_filtered_zone(P->live.cards, P->live.n,
+                                                    ct, group_name, ZV_NEED_HEARTS);
+            case ZK_SUCCESS_LIVE: return sum_group_filtered_zone(P->success.cards, P->success.n,
+                                                    ct, group_name, ZV_SCORE);
+            default:              return 0;
+        }
+    }
+
+    /* card.rs:4371-4386 — the moved-source path replaces the zone entirely.
+       `super::is_moved_source` accepts BOTH spellings, which is why this test
+       is written out rather than compared against one literal. */
+    const char *src = get_str(c, "source");
+    if (src && (!strcmp(src, "preceding_moved") || !strcmp(src, "previous_moved_cards"))) {
+        int moved[RB_MAX_ZONE]; int n = 0;
+        int ec = 0;
+        const int *ev = rb_entry_trigger_moved_cards(g, &ec);
+        if (ev && ec > 0 && g->n_recently_moved == 0) {
+            for (int i = 0; i < ec && i < RB_MAX_ZONE; i++) moved[n++] = ev[i];
+        } else {
+            for (int i = 0; i < g->n_recently_moved && i < RB_MAX_ZONE; i++)
+                moved[n++] = g->recently_moved[i];
+        }
+        return count_group_cards_in_cards(moved, n, group_name, ct, exc);
+    }
+
+    /* card.rs:4390-4399 — two or more `locations` are summed zone by zone. */
+    const CondValue *locs = find_val(c, "locations");
+    if (locs && locs->tag == RB_TAG_ARRAY && locs->arr_n >= 2) {
+        int total = 0;
+        int ids[RB_MAX_ZONE];
+        for (uint32_t i = 0; i < locs->arr_n; i++) {
+            const char *l = (locs->arr[i].tag == RB_TAG_STR) ? locs->arr[i].s : NULL;
+            if (!l) continue;
+            int n = zone_ids(g, pl, l, ids, RB_MAX_ZONE);
+            total += count_group_cards_in_cards(ids, n, group_name, ct, exc);
+        }
+        return total;
+    }
+
+    /* card.rs:4401-4408 — an absent/empty location becomes "stage" ONLY when
+       `position` is set (「センターエリアにμ'sのメンバーがいる場合」 infers
+       the zone from the position). */
+    const char *loc = get_str(c, "location"); if (!loc) loc = "";
+    if (!*loc && get_str(c, "position")) loc = "stage";
+    const RbPlayer *P = &g->p[pl];
+    switch (zone_kind(loc)) {
+        case ZK_STAGE:        return count_group_cards_in_cards(P->stage, RB_STAGE_SIZE,
+                                                    group_name, ct, exc);
+        case ZK_HAND:         return count_group_cards_in_cards(P->hand.cards, P->hand.n,
+                                                    group_name, ct, exc);
+        case ZK_DISCARD:
+        case ZK_WAITROOM:     return count_group_cards_in_cards(P->discard.cards, P->discard.n,
+                                                    group_name, ct, exc);
+        case ZK_LIVE:         return count_group_cards_in_cards(P->live.cards, P->live.n,
+                                                    group_name, ct, exc);
+        case ZK_SUCCESS_LIVE: return count_group_cards_in_cards(P->success.cards, P->success.n,
+                                                    group_name, ct, exc);
+        case ZK_ENERGY:       return count_group_cards_in_cards(P->energy.cards, P->energy.n,
+                                                    group_name, ct, exc);
+        default:              return 0;
+    }
+}
 
 /* ── evaluate_resource_condition: resource counting conditions ── */
 /* Mirror Card::total_hearts (core/card.rs:4263-4271): base_heart.values_sum()
@@ -3067,24 +3266,12 @@ static int card_total_hearts(const Card *cc) {
     for (int i = from; i < from + cc->num_need && i < cc->n_hearts; i++) t += cc->heart_count[i];
     return t;
 }
-/* Total hearts of one card restricted to `cols` (n == 0 means "every colour").
-   Base slice only, matching the base_heart arithmetic in Rust's
-   check_aggregate_total (card.rs:410-421). */
-static int get_card_total_hearts(const struct GameState *g, int cid,
-                                 const int *cols, int ncols) {
-    Card cc;
-    if (!rb_decode_card_by_index((uint32_t)cid, &cc)) return 0;
-    int total = 0;
-    if (ncols == 0) {
-        total = card_total_hearts(&cc);
-    } else {
-        for (int k = 0; k < ncols; k++)
-            total += card_base_count_of_colour(&cc, cols[k]);
-    }
-    rb_free_card(&cc);
-    (void)g;
-    return total;
-}
+/* get_card_total_hearts DELETED. Its only caller was eval_group_aggregate,
+   itself a third copy of card.rs:409 check_aggregate_total that read two
+   fields the wire never carries; the shared twin replaced both. The
+   colour-restricted per-card sum it did now lives, in the form Rust actually
+   uses, inside check_aggregate_total_at (card.rs:474-505) and
+   sum_group_hearts_in_stage (card.rs:3667-3688). */
 
 static int count_surplus_heart(const struct GameState *g, int actor, const Condition *c, const char *target) {
     int pl = target_player_idx(actor, c);
@@ -3112,64 +3299,73 @@ static int count_surplus_heart(const struct GameState *g, int actor, const Condi
     return diff < 0 ? 0 : diff;
 }
 
+/* ── evaluate_resource_condition: card.rs:4438-4505, whole ──
+   Reached from condition.rs:484-489 route_resource_condition ONLY when the
+   condition carries a `resource_type`; the alias with no resource_type is a
+   card_blade_condition and is NOT this evaluator.
+   The match has exactly two arms. Everything else — including the
+   hand_count / deck_count / discard_count / live_count / success_count
+   spellings this body used to answer with a real zone length — is card.rs:4503
+   `_ => 0`, i.e. a ZERO that is then compared, so it fails every positive
+   threshold. `compare_counts` is util.rs:2210, so an operator Rust does not
+   know resolves to MET; the old body defaulted an absent operator to ">=" and
+   then hand-rolled the five comparisons with `>=` as the terminal default. */
 static int eval_resource_count(const GameState *g, int actor, const Condition *c) {
     const char *rt = get_str(c, "resource_type");
-    /* condition.rs:372-377 route_resource_condition: a Resource-variant
-     * condition with NO resource_type is a `card_blade_condition` alias and
-     * Rust runs evaluate_card_blade_condition (card.rs:2601); an explicit
-     * resource_type of "blade" is the same evaluator. This arm answered 1
-     * outright, so PL!HS-pb1-009-P＋ (count >= 8) and PL!S-bp3-025-L
-     * (count >= 6) had a gate that was permanently satisfied whatever the
-     * cards' blades were -- a fail-open on two real cards. */
-    if (!rt || !strcmp(rt, "blade")) return eval_card_blade(g, actor, c);
+    if (!rt) return eval_card_blade(g, actor, c);
     int pl = target_player_idx(actor, c);
     const RbPlayer *P = &g->p[pl];
+    const char *loc = get_str(c, "location"); if (!loc) loc = "stage";
+    const char *op = get_str(c, "operator");
+    int threshold = 1; get_i(c, "count", &threshold);
     int count = 0;
-    if (!strcmp(rt, "hand_count")) count = P->hand.n;
-    else if (!strcmp(rt, "energy")) count = P->energy.n;
-    else if (!strcmp(rt, "deck_count")) count = P->deck.n;
-    else if (!strcmp(rt, "discard_count") || !strcmp(rt, "waitroom")) count = P->discard.n;
-    else if (!strcmp(rt, "live_count")) count = P->live.n;
-    else if (!strcmp(rt, "success_count")) count = P->success.n;
-    else if (!strcmp(rt, "surplus_heart")) {
-        const char *tgt = get_str(c, "target");
-        count = count_surplus_heart(g, actor, c, tgt);
-    }
-    else if (strncmp(rt, "heart", 5) == 0) {
-        int col = atoi(rt[5] == '_' ? rt + 6 : rt + 5);
-        const char *pos = get_str(c, "position");
-        int start = 0;
-        int end = RB_STAGE_SIZE;
-        int pos_idx = stage_index_of_position(pos);
-        if (pos_idx >= 0) {
-            start = pos_idx;
-            end = pos_idx + 1;
-        }
-        for (int i = start; i < end; i++) {
+    if (!strcmp(rt, "blade")) {
+        /* card.rs:4449-4473 — STAGE only, and `Zone::from_str` gates it, so a
+           location naming any other zone contributes nothing at all. Each card
+           is `effective_stat(printed blade, blade modifier total)`. */
+        if (zone_kind(loc) == ZK_STAGE)
+            for (int i = 0; i < RB_STAGE_SIZE; i++) {
+                int cid = P->stage[i];
+                if (cid == RB_EMPTY_SLOT) continue;
+                count += effective_blade(g, cid);
+            }
+    } else if (!strcmp(rt, "surplus_heart")) {
+        /* card.rs:4478-4485 — `delta: true` reads the count saved before the
+           preceding step zeroed the surplus, and returns from INSIDE the match,
+           so the operator and threshold are compared against that saved figure
+           rather than a freshly computed one. */
+        if (cond_truthy_field(c, "delta"))
+            return compare_counts_op(op, g->last_surplus_loss_count[pl], threshold);
+        /* card.rs:4487-4501 — stage `total_hearts()` (base when the card prints
+           base hearts, otherwise need) minus the same figure over the live and
+           success zones, saturating at zero. The old body summed every printed
+           heart section on both sides, which is a different quantity. */
+        int heart_total = 0, need = 0;
+        for (int i = 0; i < RB_STAGE_SIZE; i++) {
             int cid = P->stage[i];
             if (cid == RB_EMPTY_SLOT) continue;
+            Card cc; if (!rb_decode_card_by_index((uint32_t)cid, &cc)) continue;
+            heart_total += card_total_hearts(&cc);
+            rb_free_card(&cc);
+        }
+        for (int i = 0; i < P->live.n; i++) {
             Card cc;
-            if (rb_decode_card_by_index((uint32_t)cid, &cc)) {
-                for (int h = 0; h < cc.n_hearts && h < cc.num_base; h++) {
-                    if ((int)cc.heart_color[h] == col) count += cc.heart_count[h];
-                }
+            if (rb_decode_card_by_index((uint32_t)P->live.cards[i], &cc)) {
+                need += card_total_hearts(&cc);
                 rb_free_card(&cc);
             }
         }
+        for (int i = 0; i < P->success.n; i++) {
+            Card cc;
+            if (rb_decode_card_by_index((uint32_t)P->success.cards[i], &cc)) {
+                need += card_total_hearts(&cc);
+                rb_free_card(&cc);
+            }
+        }
+        count = heart_total - need;
+        if (count < 0) count = 0;
     }
-    else {
-        const char *loc = get_str(c, "location");
-        if (loc) count = zone_len_impl(g, pl, loc);
-    }
-    int needed = 0; get_i(c, "count", &needed);
-    const char *op = get_str(c, "operator");
-    if (!op) op = ">=";
-    if (!strcmp(op, ">=")) return count >= needed;
-    if (!strcmp(op, ">"))  return count > needed;
-    if (!strcmp(op, "<=")) return count <= needed;
-    if (!strcmp(op, "<"))  return count < needed;
-    if (!strcmp(op, "==")) return count == needed;
-    return count >= needed;
+    return compare_counts_op(op, count, threshold);
 }
 
 /* ── evaluate_card_blade_condition (card.rs:2601) ──

@@ -1255,6 +1255,41 @@ void rb_choice_set_description(RbChoice *ch, const char *desc);
 typedef struct { int16_t card_id; int8_t color; RbModifierEntry entry; } RbPerfNeedHeartMod;
 #define RB_MAX_PERF_NEED_HEART_MODS 64
 
+/* MemberContribution (engine/src/core/types.rs:515-531), populated at
+ * live.rs:1891-1908. It is the struct that makes rb_effective_blade_parts,
+ * rb_member_heart_detail and rb_need_satisfied in core/stats_pipeline.c
+ * REACHABLE: their only Rust callers are build_member_contributions
+ * (live.rs:1871, :1882), which returns a Vec<MemberContribution>.
+ * base_notes/bonus_notes/transform_delta are hard-zero at construction and only
+ * filled later at live.rs:3035. ability_heart_bonuses / ability_blade_bonuses are
+ * deliberately NOT reproduced - wire them once AbilityBonus's shape is confirmed.
+ *
+ * MOVED HERE 2026-10-02: this is a member of RbLiveSnapshot, and C requires the
+ * complete type before the enclosing struct. It previously lived ~1170 lines
+ * below, which is why RbLiveSnapshot could not carry it and live.c parked the
+ * data in a file-static `s_member_contrib[2][RB_STAGE_SIZE]`. */
+typedef struct {
+    int         source_id;       /* i16 */
+    uint8_t     slot;            /* u8::try_from(stage index) */
+    uint8_t     base_hearts[8];
+    uint8_t     bonus_hearts[8];
+    uint8_t     base_blades;     /* effective_blade_parts .0 */
+    uint8_t     bonus_blades;    /* effective_blade_parts .1 */
+    uint8_t     base_notes;
+    uint8_t     bonus_notes;
+    uint8_t     draw_icons;      /* HeartColor::Draw entries of card.special_heart */
+    const char *card_no;         /* owned by the snapshot */
+    int         is_wait;         /* mods.orientation[cid]==Wait, live.rs:1886-89 */
+    uint8_t     transform_delta[8];
+    /* spare / base_score_total / card_bonus_total are written by Rust's
+     * finalize_snapshot_fields (live.rs:709-809) and read by
+     * enrich_from_applications (live.rs:3034-3100). The C had NO fields for
+     * them, which is why rb_enrich_from_applications is empty and unwireable. */
+    int         spare;
+    int         base_score_total;
+    int         card_bonus_total;
+} RbMemberContribution;
+
 typedef struct {
     int player; /* 0/1 */
     int turn;
@@ -1304,6 +1339,14 @@ typedef struct {
      * ported or restoring is a no-op. */
     RbPerfNeedHeartMod performance_need_heart_modifiers[RB_MAX_PERF_NEED_HEART_MODS];
     int n_performance_need_heart_modifiers;
+    /* Rust LivePerformanceData.member_contributions (types.rs:515-531), built by
+     * build_member_contributions (live.rs:1844-1915) which returns a Vec that
+     * .iter_mut().find(|m| m.source_id == app.target_card_id) walks in
+     * enrich_from_applications (live.rs:1329). ADDED 2026-10-02: without this
+     * field live.c parked the same data in a file-static, so nothing outside
+     * live.c could reach it and rb_enrich_from_applications was empty. */
+    RbMemberContribution member_contributions[2][RB_STAGE_SIZE];
+    int n_member_contributions[2];
 } RbLiveSnapshot;
 
 
@@ -1375,6 +1418,11 @@ typedef struct {
     int source_zone;
     int dest_zone;
     int cause_player_id;
+    /* Rust MovementEvent.cause_card_id (game_state/mod.rs). Distinct from
+     * cause_player_id: `eval_group`'s temporal this_turn arm keys on the CAUSE
+     * CARD (card.rs:1642-1655), so without this the arm cannot be ported
+     * faithfully. */
+    int cause_card_id;
     int effect_only;
 } RbBatchMovement;
 typedef struct {
@@ -1417,6 +1465,20 @@ typedef struct GameState {
      * arm, which is currently a `cost >= 0` tautology on PL!-pb2-021-N. */
     int  cards_paid_cost_this_turn[RB_MAX_ZONE];
     int  n_cards_paid_cost_this_turn;
+    /* Rust GameState.cards_activated_this_turn: Vec<i16> (game_state/mod.rs:165),
+     * a PER-TURN SET OF CARD IDS - pushed by record_ability_activation, drained
+     * by the PB2-010-P＋ / PB2-040-L auto-ability scans
+     * (abilities.rs:3061/3110/3164/3173), cleared at modifiers.rs:2024.
+     * RB_MAX_CARD_IDS is the right bound: this is a per-card set within one
+     * turn, the same shape the engine already sizes moved_this_turn[] and
+     * cards_appeared_this_turn[] to, so it adds ~8 KB to a 781 KB GameState.
+     * NOTE: the reader at abilities.rs:3061+ has NO C counterpart at all yet -
+     * those are the clear_blade_set / clear_score_set / clear_blade_type /
+     * remove_cost_modifier_set calls that undo a temporary effect, and they are
+     * the correct wiring targets for the nine rb_mods_* setters/clearers that
+     * still have 0 C callers. */
+    int  cards_activated_this_turn[RB_MAX_CARD_IDS];
+    int  n_cards_activated_this_turn;
     /* cheer_revealed_cards / _mut (mod.rs:931, :1037) are SmallVec<[i16;8]>;
      * produced at phases.rs:405, consumed at move/mod.rs:1583. */
     int  player1_cheer_revealed_cards[8];
@@ -1469,6 +1531,15 @@ typedef struct GameState {
     int      opponent_live_surplus_count;
     int      live_surplus_ready_this_turn;
     int      p1_live_success_no_excess;
+    /* Rust ConditionContext::no_excess_heart_flag (ability/condition/state.rs:15-24)
+     * is a TWO-VALUE read of these two GameState flags, not a reconstruction from
+     * score snapshots:
+     *   if player.is_first_attacker { self_no_excess_heart_this_turn }
+     *   else { opponent_live_no_excess_heart_this_turn }
+     * The C has no counterpart and was approximating the answer from score
+     * snapshots, which is why `eval_no_excess` is not faithful. */
+    int      self_no_excess_heart_this_turn;
+    int      opponent_live_no_excess_heart_this_turn;
     int      p2_live_success_no_excess;
     /* state_change_condition tracking (mirrors Rust recently_state_changed /
        turn_state_changes). Set when a member's orientation actually flips during
@@ -2363,10 +2434,38 @@ typedef struct {
     char  or_ability_filters[4][192];
     int   n_or_ability_filters;
     char  card_property[64];
+    /* ── CardFilter carriers Rust has and C had NO member for ─────────────────
+     * util.rs READS all six (has_filter at :1459-1498, the matching terms at
+     * :1518/:1531/:1744/:1790) and card_filter_from_effect CANNOT populate them
+     * without these. Until they exist the producer half would be dead code.
+     * Keys are all present in the live abilities_strings.bin.
+     *   original_heart_total / _operator   util.rs:1441-1443, fed :1906-1907
+     *   exclude_group_names                 util.rs:1460, :1531-1537
+     *   cost_limit_min / cost_limit_max    util.rs:1462-1463, :1744/:1749
+     *   groups (the WHOLE list, vs `group` which is only .first())
+     *                                      util.rs:1459, :1518-1529
+     *   exclude_cards                       util.rs:1489, :1714
+     *   exclude_names                       util.rs:1498, :1717
+     */
+    int   original_heart_total;
+    char  original_heart_operator[8];
+    char  exclude_group_names[64];
+    int   cost_limit_min;
+    int   cost_limit_max;
+    int   has_cost_limit_min;
+    int   has_cost_limit_max;
+    char  groups[8][64];
+    int   n_groups;
+    int   exclude_cards[RB_MAX_ZONE];
+    int   n_exclude_cards;
+    char  exclude_names[8][64];
+    int   n_exclude_names;
 } RbCardFilter;
 
 int rb_effect_filter_subset(const AbilityEffect *e, RbCardFilter *out);
-int rb_condition_filter_subset(const Condition *c, RbCardFilter *out);
+/* rb_condition_filter_subset's declaration is GONE (checklist G3): the
+   definition and this line were removed together. It had zero callers and Rust
+   has no Condition-side CardFilter builder. */
 /* CardFilter subset built from a card-selecting source. This used to be a bare
    `#define rb_card_filter_subset(e, out) rb_effect_filter_subset((e), (out))`,
    which was NOT a dangling declaration — the macro expanded to the fully
@@ -2375,7 +2474,7 @@ int rb_condition_filter_subset(const Condition *c, RbCardFilter *out);
    body of its own, tools/dep_audit.py reported it under "declared in rabuka.h
    but never defined (MISSING)". Spelling it as a real static inline gives it a
    definition, keeps the two-argument call sites source-compatible, and clears
-   the audit. A Condition argument belongs in rb_condition_filter_subset above. */
+    the audit. A Condition argument has no home here; see the note above. */
 static inline int rb_card_filter_subset(const AbilityEffect *e, RbCardFilter *out) {
     return rb_effect_filter_subset(e, out);
 }
@@ -2790,8 +2889,8 @@ void rb_inject_choice_ability_context(GameState *g, char *json_buf, size_t buf_s
     A lightweight handle to an ability stored in the bytecode blob.
     RbAbilityRef carries a uint16_t bytecode index. Call rb_ability_ref_resolve()
     to decode (with a per-slot lazy cache mirroring Rust's OnceLock<Arc<Ability>>).
-    The returned pointer is static-storage; do NOT free it. Use
-    rb_ability_ref_flush() to release the whole cache (e.g. after rb_unload()). */
+    The returned pointer is static-storage; do NOT free it. There is no flush
+    step: the cache lives for the process lifetime, mirroring Rust. */
 typedef struct {
     uint16_t idx;
 } RbAbilityRef;
@@ -2801,8 +2900,10 @@ uint16_t      rb_ability_ref_idx(const RbAbilityRef *ref);
 const Ability *rb_ability_ref_resolve(const RbAbilityRef *ref); /* cached decode */
 int           rb_ability_ref_decode(const RbAbilityRef *ref, Ability *out); /* write to out */
 const Ability *rb_ability_ref_to_arc(const RbAbilityRef *ref); /* legacy alias for resolve */
-void          rb_ability_ref_flush(void);                       /* free entire cache */
-int           rb_ability_ref_flush_slot(uint16_t idx);          /* free one slot */
+/* rb_ability_ref_flush / rb_ability_ref_flush_slot were REMOVED 2026-10-02
+ * (definitions deleted from src/ability/ability.c; Rust's AbilityStore has no
+ * release step because its OnceLock<Arc<Ability>> entries live for the process
+ * lifetime). Do NOT re-add their declarations. */
 int           rb_ability_ref_cache_size(void);                  /* populated slots (diagnostic) */
 
 /* ── Misc effect handlers (engine/src/ability/effects/misc.rs) ── */
@@ -3192,6 +3293,13 @@ const char *rb_group_name_first(const char *group_names, char *buf, size_t bufsz
 const char *rb_effect_group_name(const AbilityEffect *e, char *buf, size_t bufsz);
 int rb_card_matches_effect_group(const AbilityEffect *e, int card_id,
                                  char *buf, size_t bufsz);
+/* Defined once, non-static, in src/ability/util.c. It previously had only
+ * file-scope forward declarations in src/ability/util.c and
+ * src/ability/effects/move.c; declaring it here lets the four hand-rolled local
+ * twins in cost.c / score.c / misc.c / ability_effects.c be deleted. */
+int rb_get_selection_indices_filter(const int *cards, int n, const RbCardFilter *filter,
+                                    int self_target_only, int activating_card,
+                                    int *out_idx, int max);
 
 extern int g_deferred_conditional_gate;
 
@@ -3365,27 +3473,34 @@ int rb_card_has_draw_icon(const Card *c);
  * routing them into the verdict ring would evict condition verdicts. */
 #define RB_GSC_RULE_LOG_MAX 500
 
-/* MemberContribution (engine/src/core/types.rs:515-531), populated at
- * live.rs:1891-1908. It is the struct that makes rb_effective_blade_parts,
- * rb_member_heart_detail and rb_need_satisfied in core/stats_pipeline.c
- * REACHABLE: their only Rust callers are build_member_contributions
- * (live.rs:1871, :1882), which returns a Vec<MemberContribution>.
- * base_notes/bonus_notes/transform_delta are hard-zero at construction and only
- * filled later at live.rs:3035. ability_heart_bonuses / ability_blade_bonuses are
- * deliberately NOT reproduced - wire them once AbilityBonus's shape is confirmed. */
-typedef struct {
-    int         source_id;       /* i16 */
-    uint8_t     slot;            /* u8::try_from(stage index) */
-    uint8_t     base_hearts[8];
-    uint8_t     bonus_hearts[8];
-    uint8_t     base_blades;     /* effective_blade_parts .0 */
-    uint8_t     bonus_blades;    /* effective_blade_parts .1 */
-    uint8_t     base_notes;
-    uint8_t     bonus_notes;
-    uint8_t     draw_icons;      /* HeartColor::Draw entries of card.special_heart */
-    const char *card_no;         /* owned by the snapshot */
-    int         is_wait;         /* mods.orientation[cid]==Wait, live.rs:1886-89 */
-    uint8_t     transform_delta[8];
-} RbMemberContribution;
+/* MemberContribution is declared ABOVE RbLiveSnapshot (it is a member of it).
+ * Its definition and rationale live with the other live.rs-derived types. */
+
+
+/* ── live.rs exports that were `static` and are now cross-file (live.c) ─────
+ * process_yell_revealed_card_icons is `pub fn` in Rust (live.rs:112) and is
+ * called from TWO places there (live.rs:1997 and reyell.rs:160). The C had
+ * THREE hand-rolled copies of that one decode - live.c, rules.c:1992
+ * `r_yell_icons`, and phase.c:1369 `ptc_yell_had_draw_icon`. The live.c twin is
+ * now exported so the other two can be collapsed onto it. Flat out-param form;
+ * returns 1 when the card decoded, 0 when the DB lookup misses. */
+int rb_process_yell_revealed_card_icons(const GameState *g,
+        int cid, int override_color, int total_hearts[8], int *cheer_count,
+        int blade_hearts_out[8], int *note_icons_out, int *draw_icons_out);
+/* Rust `format!("P{}", digits)` (live.rs:3185-3197), via log_performance_summary
+ * (live.rs:1258-1289) - which is called from execute_live_victory_determination. */
+void rb_fmt_player_id(const char *id, char *out, size_t sz);
+
+
+/* Rust `validate_mandatory_cost` (cost/handlers.rs:281). STRICTLY WEAKER than
+ * rb_validate_cost, and it exists as a separate function precisely because Rust's
+ * two offer sites pass `Some(card_id)` (game_setup.rs:2188 and :2295) - so a
+ * mandatory cost is validated against a KNOWN CARD, not against whatever card the
+ * actor could otherwise play. The C used rb_validate_cost at game_setup.c:1199,
+ * which is the wrong twin. It is strictly weaker, so switching removes refusals:
+ * expect movement. It also belongs in turn/actions/mod.rs:558-564 (after
+ * activating_card is published, before hand->waitroom). */
+int rb_validate_mandatory_cost(const GameState *g, int actor,
+                               const AbilityEffect *cost, int activating_card);
 
 #endif /* RABUKA_H */

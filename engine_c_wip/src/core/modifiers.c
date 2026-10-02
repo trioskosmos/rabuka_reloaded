@@ -49,7 +49,7 @@ void rb_mods_clear_card(RbMods *m, int cid) {
 /* ── blade ── */
 int rb_mods_get_blade(RbMods *m, int cid) {
     if (cid < 0 || cid >= RB_MAX_CARD_IDS) return 0;
-    return rb_modifier_total(m->blade[cid]);
+    return rb_modifier_total_entry(&m->blade[cid]);
 }
 void rb_mods_add_blade(RbMods *m, int cid, int delta) {
     if (cid < 0 || cid >= RB_MAX_CARD_IDS) return;
@@ -66,8 +66,8 @@ int rb_mods_get_heart(RbMods *m, int cid, int color) {
     if (color < 0 || color >= 8) return 0;
     /* Mirrors Rust GameModifiers::get_heart_modifier: Heart00 (index 0, the
        "colorless"/wildcard heart) is added to every color query. */
-    int v = rb_modifier_total(m->heart[cid][color]);
-    v += rb_modifier_total(m->heart[cid][RB_HEART_PINK]);
+    int v = rb_modifier_total_entry(&m->heart[cid][color]);
+    v += rb_modifier_total_entry(&m->heart[cid][RB_HEART_PINK]);
     return v;
 }
 void rb_mods_add_heart(RbMods *m, int cid, int color, int delta) {
@@ -78,7 +78,7 @@ void rb_mods_add_heart(RbMods *m, int cid, int color, int delta) {
 /* ── need_heart ── */
 int rb_mods_get_need_heart(RbMods *m, int cid, int color) {
     if (cid < 0 || cid >= RB_MAX_CARD_IDS || color < 0 || color >= 8) return 0;
-    return rb_modifier_total(m->need_heart[cid][color]);
+    return rb_modifier_total_entry(&m->need_heart[cid][color]);
 }
 void rb_mods_add_need_heart(RbMods *m, int cid, int color, int delta) {
     if (cid < 0 || cid >= RB_MAX_CARD_IDS || color < 0 || color >= 8) return;
@@ -92,7 +92,7 @@ void rb_mods_set_need_heart(RbMods *m, int cid, int color, int value) {
 /* ── score ── */
 int rb_mods_get_score(RbMods *m, int cid) {
     if (cid < 0 || cid >= RB_MAX_CARD_IDS) return 0;
-    return rb_modifier_total(m->score[cid]);
+    return rb_modifier_total_entry(&m->score[cid]);
 }
 void rb_mods_add_score(RbMods *m, int cid, int delta) {
     if (cid < 0 || cid >= RB_MAX_CARD_IDS) return;
@@ -106,7 +106,7 @@ void rb_mods_set_score(RbMods *m, int cid, int value) {
 /* ── cost ── */
 int rb_mods_get_cost(RbMods *m, int cid) {
     if (cid < 0 || cid >= RB_MAX_CARD_IDS) return 0;
-    return rb_modifier_total(m->cost[cid]);
+    return rb_modifier_total_entry(&m->cost[cid]);
 }
 void rb_mods_add_cost(RbMods *m, int cid, int delta) {
     if (cid < 0 || cid >= RB_MAX_CARD_IDS) return;
@@ -194,6 +194,31 @@ void rb_mods_remove_heart(RbMods *m, int cid, int color, int delta) {
     if (m->heart[cid][color].add == 0 && m->heart[cid][color].set == 0) return;
     m->heart[cid][color].add = saturate_modifier((int64_t)m->heart[cid][color].add - delta);
 }
+/* ⛔ PHANTOM — THERE IS NO Rust TWIN. Do not wire this.
+   game_modifiers.rs defines exactly four `remove_*_modifier` methods
+   (remove_blade_modifier :332, remove_heart_modifier :423,
+   remove_score_modifier :460, remove_cost_modifier :548). There is no
+   `remove_need_heart_modifier`; a repo-wide search of engine/src for the
+   identifier returns 0 hits. Rust reverses a need-heart modifier by adding
+   its NEGATION, in the one place that undoes them —
+   game_state/modifiers.rs:615-619, the global-need-heart withdrawal arm of
+   commit_constant_results:
+
+       for (card_id, color_str, delta) in &old_global_nh {
+           let hc = crate::card::parse_heart_color(color_str);
+           self.mods.add_need_heart_modifier(*card_id, hc, -*delta);
+       }
+
+   So the C counterpart of "undo a need-heart delta" is
+   `rb_mods_add_need_heart(&mods, cid, color, -delta)` — which is what
+   turn/triggers.c:1344 and :1306 already do — and this function is a fourth
+   copy of the same arithmetic with a name Rust does not have.
+
+   Kept rather than deleted for two reasons: it is DECLARED in
+   include/rabuka.h:306 (not this file's to change), and a concurrent writer may
+   already be building a caller against that declaration, in which case
+   removing the definition turns their build into a link error instead of
+   steering them. Report-only; see the handover. */
 void rb_mods_remove_need_heart(RbMods *m, int cid, int color, int delta) {
     if (cid < 0 || cid >= RB_MAX_CARD_IDS || color < 0 || color >= 8) return;
     if (m->need_heart[cid][color].add == 0 && m->need_heart[cid][color].set == 0) return;
@@ -207,10 +232,31 @@ void rb_mods_remove_score(RbMods *m, int cid, int delta) {
 void rb_mods_remove_cost(RbMods *m, int cid, int delta) {
     if (cid < 0 || cid >= RB_MAX_CARD_IDS) return;
     if (m->cost[cid].add == 0 && m->cost[cid].set == 0) return;
-    /* Rust remove_cost_modifier clamps the subtract at 0 (no negative cost). */
-    int64_t v = (int64_t)m->cost[cid].add - delta;
-    if (v < 0) v = 0;
-    m->cost[cid].add = saturate_modifier(v);
+    /* game_modifiers.rs:548-555 — the subtract is NOT clamped at zero:
+
+           pub fn remove_cost_modifier(&mut self, card_id: i16, delta: i16) {
+               if let Some(entry) = self.cost_modifiers.get_mut(&card_id) {
+                   entry.additive = entry.additive.saturating_sub(delta);
+                   if entry.additive == 0 && entry.set == 0 {
+                       self.cost_modifiers.remove(&card_id);
+                   }
+               }
+           }
+
+       and the method's own doc (game_modifiers.rs:535-547) says why, in as many
+       words: "The result is deliberately NOT clamped at zero. add_cost_modifier
+       does not clamp either, so a negative `additive` is a legitimate, reachable
+       state — it is exactly what 「…コストは2減る」 means. Clamping here could
+       produce a residue that no add path can build: a +6 increase alongside a -2
+       reduction sums to +4, and undoing the +6 must leave the -2 showing, but
+       `4 - 6 = -2` clamped to 0 destroyed a reduction the player was entitled to."
+
+       The previous body here DID clamp ("Rust remove_cost_modifier clamps the
+       subtract at 0"), which is the second half of that sentence taken as the
+       rule. It was the only difference from the other three remove_*_modifier
+       twins — blade, score and heart all subtract raw — so the one stat whose
+       Rust doc explicitly forbids the clamp was the one that had it. */
+    m->cost[cid].add = saturate_modifier((int64_t)m->cost[cid].add - delta);
 }
 
 void rb_mods_set_heart_override(RbMods *m, int cid, int color, int count) {
@@ -264,7 +310,13 @@ int rb_mods_get_heart_color_multiplier(RbMods *m, int cid) {
     return m->heart_multiplier[cid];
 }
 
-/* ── snapshot trace ring (mirror add_*_modifier_with_trace) ── */
+/* ── snapshot trace ring (mirror GameState::ability_applications) ──
+   The ring is the C fold of Rust's `GameState::ability_applications`
+   (game_state/mod.rs:227, `SmallVec<[AbilityApplication; 4]>`), which every
+   `*_with_trace` modifier helper is handed as `&mut` and every
+   `record_ability_application` (mod.rs:1621) pushes into. See the note on
+   rb_mods_add_blade_with_trace below for the two writers this file still does
+   not have. */
 int rb_mods_trace_len(const RbMods *m) { return m->n_trace; }
 
 void rb_mods_trace_push(RbMods *m, int source_card_id, const char *ability_text,
@@ -287,6 +339,59 @@ void rb_mods_trace_push(RbMods *m, int source_card_id, const char *ability_text,
     }
 }
 
+/* ⛔ WIRE REQUIRED IN src/ability/effects/misc.c — NOT THIS FILE.
+   These two ARE faithful ports and they are the ring's only missing writers.
+
+   Rust call sites (all in ability/effects/resource.rs, all passing
+   `&mut gs.ability_applications` as the trace and `gs.activating_card
+   .unwrap_or(-1)` — NOT the target — as the source):
+
+     :205  grant_heart_distribution  (resource.rs:192-214)
+             gs.mods.add_heart_modifier_with_trace(
+                 card_id, color, dist_amount,
+                 &mut gs.ability_applications,
+                 gs.activating_card.unwrap_or(-1), effect_text);
+     :218  grant_blade              (resource.rs:217-225)
+             gs.mods.add_blade_modifier_with_trace(
+                 card_id, amount, &mut gs.ability_applications,
+                 gs.activating_card.unwrap_or(-1), &effect.text);
+     :326  BP6 distinct-colour heart per discarded card
+             source = gs.activating_card.unwrap_or(-1), amount = 1
+     :653  gain_heart per base-heart colour
+             source = TARGET card (target_id), NOT activating_card
+     :721  gain_heart(All)
+             source = card_id, colour = HeartColor::All
+
+   The C counterparts are misc.c:218 `grant_blade` and misc.c:224
+   `grant_heart_distribution`, which call the UNTRACED
+   rb_mods_add_blade / rb_mods_add_heart. Exact change, in misc.c:
+
+     static void grant_blade(GameState *g, int card_id, int amount) {
+         if(card_id < 0) return;
+         rb_mods_add_blade_with_trace(&g->mods, card_id, amount,
+                                      g->activating_card, effect_text);
+     }
+
+   ...and the same swap in grant_heart_distribution's loop. That requires
+   THREADING THE ABILITY TEXT down: Rust's grant_blade takes
+   `effect: &AbilityEffect` and grant_heart_distribution takes `effect_text:
+   &str`, while the C versions take neither. Callers to widen are misc.c:551,
+   :558, :562, :571, :792 (grant_blade) and :238 (grant_heart_distribution,
+   itself fed by apply_heart_to_card, whose Rust twin
+   resource.rs:228 `apply_heart_to_card` likewise carries the effect).
+
+   The two :653 / :721 sites have no C counterpart function at all — they are
+   inside gain_heart's per-colour loop, which the C does not have; that is a
+   separate gap in misc.c, not a wiring problem here.
+
+   Consequence while unwired: `mods.trace` receives score/cost/need-heart
+   applications (5 live rb_mods_trace_push sites in game_state_core.c,
+   rules.c and score.c) but NO blade or heart application, so any consumer
+   filtering on RB_EFFECT_BLADE_BONUS / RB_EFFECT_HEART_BONUS sees nothing.
+   rb_mods_trace_len (below) is reachable and correct; it is only the blade and
+   heart effect_types that are missing. That does NOT affect
+   test_condition_evaluation.c's snapshot_has_score_source, which skips
+   everything that is not a score effect_type. */
 void rb_mods_add_blade_with_trace(RbMods *m, int cid, int delta,
                                   int source_card_id, const char *ability_text) {
     if (cid < 0 || cid >= RB_MAX_CARD_IDS) return;
@@ -294,6 +399,10 @@ void rb_mods_add_blade_with_trace(RbMods *m, int cid, int delta,
     rb_mods_trace_push(m, source_card_id, ability_text, RB_EFFECT_BLADE_BONUS, cid, -1, delta);
 }
 
+/* Same story as rb_mods_add_blade_with_trace above: faithful, and reachable
+   only from tests (test_parity_per_card2.c:1615/:1617 use it to hand a test
+   fixture a heart bonus with an attribution label). Production wiring is the
+   misc.c change described above. */
 void rb_mods_add_heart_with_trace(RbMods *m, int cid, int color, int delta,
                                   int source_card_id, const char *ability_text) {
     if (cid < 0 || cid >= RB_MAX_CARD_IDS || color < 0 || color >= 8) return;
@@ -302,9 +411,23 @@ void rb_mods_add_heart_with_trace(RbMods *m, int cid, int color, int delta,
 }
 
 /* ───────────────────────────── total (game_modifiers.rs) ─────────────────────────────
-    Mirror ModifierEntry::total — returns the combined set + additive value.
-    set (absolute override) is the base; additive deltas stack on top.
-    Mirrors ModifierEntry::total(self) -> i32 in game_modifiers.rs. */
+    Mirror ModifierEntry::total (game_modifiers.rs:138-140) — the ONE definition
+    of what a modifier entry means:
+
+        #[inline]
+        pub fn total(&self) -> i16 { self.set.saturating_add(self.additive) }
+
+    `set` (absolute override) is the base; additive deltas stack on top.
+
+    THE SINGLE LIVE DEFINITION. This function used to be dead: the six
+    getters above called the `static inline rb_modifier_total` in
+    include/rabuka.h:199 instead, so the C carried two definitions of one Rust
+    method and the ported one had zero callers. They now all route here, which
+    is Rust's shape (one `total`, called from everywhere). rabuka.h:199 is not
+    this file's — core/stats_pipeline.c still calls the inline, and the two are
+    arithmetically identical, so this is de-duplication, not a behaviour
+    change. Saturating vs wrapping is likewise moot: both fields are i16 and
+    both are summed in C `int`, which cannot overflow. */
 int rb_modifier_total_entry(const RbModifierEntry *e) {
     if (!e) return 0;
     return (int)e->set + (int)e->add;
@@ -453,7 +576,42 @@ static RbZoneId appearance_source_zone_id(RbZone z) {
    zone a card debuted FROM, where the top is a distinguishable answer — so
    it refuses. The same split is why RB_ZONEID_UNDER_MEMBER /
    SAME_AREA / EMPTY_AREA fall to `default: -1` here while engine.c routes
-   them to RB_ZONE_STAGE for placement. */
+   them to RB_ZONE_STAGE for placement.
+
+   ⛔ ZERO CALLERS, AND IT IS NOT DECLARED IN include/rabuka.h. Both facts are
+   real as of this edit: a repo-wide search of engine_c_wip finds the
+   identifier only at its own definition below. It is not a phantom — it is
+   the ONE honest converter for exactly the call it was written for, and that
+   call does not exist yet:
+
+     Rust  ability/effects/move/mod.rs:2582-2583, inside fire_debut_side_effects
+             (the "every stage placement goes through here" choke point, :2579):
+                 let source = self.in_flight.spawn_context.source.as_deref().unwrap_or("");
+                 gs.record_card_appearance(card_id, source);
+
+     C     ability/effects/move.c:2141-2153, rb_move_fire_debut_side_effects —
+           the same choke point, called from move.c:2028, :2135, :2213, :2546.
+           It DOES NOT call rb_record_card_appearance at all. It hand-rolls
+           half of it (:2145-2146, an UNDEDUPED push onto
+           g->cards_appeared_this_turn) and then discards the source outright
+           with `(void)source;` at :2147. So an effect-driven stage placement
+           records NO source at all, and a 「登場元が…」 gate can never be
+           answered by one.
+
+   The change, in move.c (NOT this file) — this REPLACES the two hand-rolled
+   lines at :2145-2146 and the `(void)source;` at :2147:
+
+       rb_record_card_appearance(g, card_id,
+           source && *source
+               ? rb_zone_id_to_movement_zone(rb_zone_id_from_str(source))
+               : -1);
+
+   `-1` is rb_record_card_appearance's spelling of Rust's empty source string
+   (the `source >= 0` guard below), and rb_zone_of_str must NOT be used here:
+   it folds DECK_TOP onto RB_ZONE_DECK and UNDER_MEMBER/SAME_AREA onto
+   RB_ZONE_STAGE, which is right for a placement destination and wrong for a
+   debut source, per the note above. That change also needs the prototype
+   added to include/rabuka.h — also not this file's. */
 int rb_zone_id_to_movement_zone(RbZoneId zid) {
     switch (zid) {
         case RB_ZONEID_HAND:             return RB_ZONE_HAND;
@@ -548,14 +706,19 @@ void rb_clear_baton_touch_tracking(GameState *g) {
 void rb_record_card_movement(GameState *g, int card_id, int from_zone, int to_zone, int causer, int target) {
     if (!g || card_id < 0 || card_id >= RB_MAX_CARD_IDS) return;
     g->moved_this_turn[card_id] = 1;
-    if (g->n_batch_movements < (int)(sizeof(g->batch_movements) / sizeof(g->batch_movements[0]))) {
-        RbBatchMovement *movement = &g->batch_movements[g->n_batch_movements++];
-        movement->moved_card_id = card_id;
-        movement->source_zone = from_zone;
-        movement->dest_zone = to_zone;
-        movement->cause_player_id = causer;
-        movement->effect_only = target;
-    }
+    /* Rust builds ONE `MovementEvent` and clones it into batch_movements,
+       turn_movements and (for an area move) turn_area_movements
+       (modifiers.rs:1918-1956). One local, three readers — so the area-move
+       arm below cannot be handed a stale tail entry when batch_movements is
+       already at its 16-slot cap. */
+    RbBatchMovement event;
+    event.moved_card_id = card_id;
+    event.source_zone = from_zone;
+    event.dest_zone = to_zone;
+    event.cause_player_id = causer;
+    event.effect_only = target;
+    if (g->n_batch_movements < (int)(sizeof(g->batch_movements) / sizeof(g->batch_movements[0])))
+        g->batch_movements[g->n_batch_movements++] = event;
     if (g->n_recently_moved < RB_MAX_RECENTLY_MOVED) {
         g->recently_moved[g->n_recently_moved++] = card_id;
     } else {
@@ -563,24 +726,58 @@ void rb_record_card_movement(GameState *g, int card_id, int from_zone, int to_zo
                 (RB_MAX_RECENTLY_MOVED - 1) * sizeof(g->recently_moved[0]));
         g->recently_moved[RB_MAX_RECENTLY_MOVED - 1] = card_id;
     }
-    /* modifiers.rs:1526-1552 — the stage->stage (area) move arm, which the C
+    /* modifiers.rs:1934-1972 — the stage->stage (area) move arm, which the C
        fold used to drop on the floor, so the turn-level position flag and the
        opponent-cause watcher were only ever set by whichever call site
        remembered to do so by hand. Rust order: recently_moved is appended
        first, then the area-move arm runs, which is why the hook sits here and
        not at the top of the function.
+
        Rust guards the hook on `caused_by_opponent` (the moved card's owner
        differs from event.cause_player_id); that same test lives INSIDE the
        hook (game_state_abilities.c:1592-1593, abilities.rs:1054-1063, owner ==
        causer_player returns silently), so calling it unconditionally is
-       behaviourally identical. Rust's turn_area_movements has no C field. */
+       behaviourally identical. */
     if (from_zone == RB_ZONEID_STAGE && to_zone == RB_ZONEID_STAGE) {
         g->position_change_occurred_this_turn = 1;
+        /* modifiers.rs:1956 — `self.turn_area_movements.push(event.clone())`,
+           the turn-level AREA-ONLY ordered log, immediately before the
+           position flag at :1957 and the watcher hook at :1966-1971. The field
+           now exists (rabuka.h:1436) and this is its ONLY writer; before this
+           line it was declared and never written, which is also why the
+           clear in rb_clear_card_movement_tracking was vacuous.
+
+           The event is the same one already appended to batch_movements at the
+           top of this function — Rust clones the same `event` into
+           batch_movements, turn_movements and turn_area_movements — so the two
+           C entries are built from identical fields.
+
+           BOUNDED, unlike Rust's growable SmallVec: the C slot is
+           RB_MAX_RECENTLY_MOVED (8). On overflow the OLDEST is dropped, the
+           same sliding window g->recently_moved uses six lines above, because
+           the only reader shape Rust supports here is
+           `turn_area_movements.iter().rev().find(..)`
+           (hooked_by_foreign_cause, abilities.rs:506-545) — a scan BACKWARD
+           from the newest — so the newest 8 are the ones that answer.
+
+           The reader itself is not this file's: game_state_abilities.c:2258
+           still scans g->batch_movements for the same predicate. Swapping it
+           to g->turn_area_movements is the exact Rust lookup and is noted in
+           that file's comment. Behaviour is identical either way (batch_movements
+           is a superset, filtered to stage->stage by the reader), so writing
+           this field changes nothing observable today. */
+        if (g->n_turn_area_movements < RB_MAX_RECENTLY_MOVED) {
+            g->turn_area_movements[g->n_turn_area_movements++] = event;
+        } else {
+            memmove(g->turn_area_movements, g->turn_area_movements + 1,
+                    (RB_MAX_RECENTLY_MOVED - 1) * sizeof(g->turn_area_movements[0]));
+            g->turn_area_movements[RB_MAX_RECENTLY_MOVED - 1] = event;
+        }
         rb_fire_opponent_cause_watchers_for_move(g, card_id, causer);
     }
 }
 
-/* -- record_cost_paid -- NOT WRITTEN HERE: the field it needs is not on GameState.
+/* -- record_cost_paid -- STILL NOT WRITTEN HERE, but the BLOCKER IS GONE.
    The port is game_state/mod.rs:404-414 (GameState::record_cost_paid), the ONLY
    writer of cards_paid_cost_this_turn:
 
@@ -596,22 +793,26 @@ void rb_record_card_movement(GameState *g, int card_id, int from_zone, int to_zo
    as one card. Mod.rs:397-398 states that explicitly. The 5 Rust call sites
    are cost/handlers.rs:1389,:1477 and ability/choice.rs:734,:763,:948.
 
-   ⛔ BLOCKED, and the premise that it was already declared on GameState is
-   FALSE. include/rabuka.h:1286-1287 does contain
-       int  cards_paid_cost_this_turn[RB_MAX_ZONE];
-       int  n_cards_paid_cost_this_turn;
-   but they are members of **RbLiveSnapshot**, not GameState. The `typedef
-   struct {` they sit in opens at rabuka.h:1251 and closes at :1316 with
-   `} RbLiveSnapshot;`, and GameState holds that type only as a per-live ring,
-   `RbLiveSnapshot snapshots[RB_MAX_SNAPSHOTS];` (rabuka.h:1415). They are the
-   two survivors of a block a peer appended to the wrong struct (see the audit
-   note on rb_clear_card_movement_tracking below), they are read and written
-   nowhere in the C tree, and `g->cards_paid_cost_this_turn` does not compile.
+   ⛔ THE OLD "BLOCKED" NOTE HERE WAS STALE AND IS NOW DEAD. It claimed the two
+   members sat inside RbLiveSnapshot and that `g->cards_paid_cost_this_turn`
+   "does not compile". Both were true when written and both are false now: a
+   peer has since RELOCATED them onto GameState itself (rabuka.h:1418-1419,
+   with the move documented at :1406-1417), so the field compiles and the
+   clear in rb_clear_card_movement_tracking below is now LANDED.
 
-   So this body is written out here rather than compiled, because the field has
-   to be MOVED to GameState first — include/rabuka.h is not this file's. Once
-   it lands, this is the whole function (the two-step current_entry read is
-   rb_gsc_current_ability_source_card_id's, game_state_core.c:491-496):
+   What is still missing is the WRITER and the READER, and both are outside
+   this file:
+     · writer — all 5 Rust call sites are in ability/cost/handlers.rs and
+       ability/choice.rs, neither of which is this file's;
+     · reader — ability/condition/card/comparison.rs:60-70 has no C branch at
+       all, so condition.c never tests the paid_cost_this_turn flag and the
+       clause falls through to the numeric path (comparison.rs:50-55 names the
+       symptom: there was nothing to compare against, so it read as 'cost >= 0'
+       and was permanently satisfied). condition.c is not this file's either.
+
+   The body, verbatim, for whoever owns those call sites (the two-step
+   current_entry read is rb_gsc_current_ability_source_card_id's,
+   game_state_core.c:491-496):
 
        void rb_record_cost_paid(GameState *g) {
            if (!g) return;
@@ -626,52 +827,65 @@ void rb_record_card_movement(GameState *g, int card_id, int from_zone, int to_zo
                g->cards_paid_cost_this_turn[g->n_cards_paid_cost_this_turn++] = cid;
        }
 
-   plus the one-line clear at modifiers.rs:2004, and then the reader —
-   ability/condition/card/comparison.rs:60-70, which has no C branch at all
-   today: condition.c never tests the paid_cost_this_turn flag, so the clause
-   falls straight through to the numeric path (comparison.rs:50-55 names the
-   symptom: there was nothing to compare against, so it read as 'cost >= 0'
-   and was permanently satisfied). condition.c is not this file's either. */
+   It is left as a note rather than compiled because a definition with no
+   caller and no prototype in include/rabuka.h (also not this file's) is
+   exactly the "exists by name is not parity" shape PROGRESS.md warns about;
+   the one caller is the thing that has to be written first. */
 
 /* -- clear_card_movement_tracking --
    Mirror game_state/modifiers.rs:1994-2019
    (GameState::clear_card_movement_tracking). The old cite here said
    1920-1942, which is push_movement_event, a different function.
 
-   Rust clears EIGHT turn-scoped structures:
-     :1995 cards_moved_this_turn  -> g->moved_this_turn[]           (held)
-     :1996 turn_movements         -> g->batch_movements[]           (held; C
-                                    folds push_movement_event into
-                                    rb_record_card_movement, so the event
-                                    log and the per-card flag share one
-                                    entry point)
-     :1997 cards_appeared_this_turn-> g->cards_appeared_this_turn[] (held)
-     :2001 cards_activated_this_turn-> (no C field — see report)
-     :2004 cards_paid_cost_this_turn-> NO C FIELD ON GameState. Not a gap in
-                                    the clear: include/rabuka.h:1286-1287
-                                    declares the two members inside RbLiveSnapshot
-                                    (that `typedef struct` opens at :1251 and
-                                    closes at :1316), which GameState only holds
-                                    as a per-live ring
-                                    (`snapshots[RB_MAX_SNAPSHOTS]`, :1415).
-                                    See the record_cost_paid note above; the one
-                                    line `g->n_cards_paid_cost_this_turn = 0;`
-                                    belongs here once the field is moved.
-                                    That block is a peer's and it misplaced EIGHT
-                                    members, not two: the four
-                                    player{1,2}_cheer_revealed_cards + counts
-                                    (:1290-1293) and the two revealed_cost_cards
-                                    (:1296-1297) are on the wrong struct for the
-                                    same reason, which is why
-                                    game_state_core.c:13-15 still reports all
-                                    three as missing — correctly.
-     :2014 card_appearance_source  -> g->card_appearance_source[]    (held)
-     :2015 turn_area_movements    -> (no C field — see report)
-     :2018 mods.opp_cause_fired_keys -> (no C field; the C engine dedupes
-                                    opponent-cause watchers per move batch
-                                    via g->batch_triggered_keys instead,
-                                    which is a different — and weaker —
-                                    scope)
+   Rust clears EIGHT turn-scoped structures. Five were already here; THREE
+   LANDED with this edit, because their fields now exist; ONE still has no
+   field.
+
+     :1995 cards_moved_this_turn   -> g->moved_this_turn[]        HELD
+     :1996 turn_movements          -> g->batch_movements[]        HELD (the C
+                                      folds push_movement_event into
+                                      rb_record_card_movement, so the event
+                                      log and the per-card flag share one
+                                      entry point)
+     :1997 cards_appeared_this_turn -> g->cards_appeared_this_turn[] HELD
+     :2001 cards_activated_this_turn -> STILL NO C FIELD. Requested shape is
+                                      in the handover report; nothing writes it
+                                      either, so this is a whole missing
+                                      feature, not a missing clear line.
+     :2004 cards_paid_cost_this_turn -> LANDED. The field was RELOCATED onto
+                                      GameState (rabuka.h:1418-1419) by a peer,
+                                      so the premise of the old note here — that
+                                      the two members were stranded inside
+                                      RbLiveSnapshot and `g->cards_paid_cost_
+                                      this_turn` did not compile — is dead.
+                                      The WRITER is still missing (all 5 Rust
+                                      call sites are in ability/cost/handlers.rs
+                                      and ability/choice.rs); see the
+                                      record_cost_paid note above.
+     :2014 card_appearance_source  -> g->card_appearance_source[]   HELD
+     :2015 turn_area_movements     -> LANDED, field at rabuka.h:1436-1437,
+                                      and this edit also added its only
+                                      WRITER (rb_record_card_movement's
+                                      stage->stage arm, Rust modifiers.rs:1956).
+     :2018 mods.opp_cause_fired_keys -> LANDED, field at rabuka.h:270-271
+                                      (`opp_cause_fired_keys[16]` +
+                                      `n_opp_cause_fired_keys`, documented
+                                      there as a per-MOVE scope that
+                                      g->batch_triggered_keys cannot
+                                      express). HONEST CAVEAT: the clear is
+                                      correct but INERT today, because the
+                                      live dedupe set is not this field — it
+                                      is a file-static side table
+                                      `s_opp_cause_fired[]` in
+                                      game_state_abilities.c:2081-2114, which
+                                      reproduces the same turn-scoped lifetime
+                                      by keying every entry on
+                                      (GameState*, g->turn). The 16-slot
+                                      field is still unwritten. Retiring the
+                                      side table in favour of the field is
+                                      game_state_abilities.c's change, not
+                                      this file's.
+
    NOT cleared, matching Rust: g->recently_moved / recently_appeared.
    Call site in Rust: engine/src/turn/phases.rs:309, inside the victory /
    turn-rollover arm of advance_phase, immediately after turn_number += 1. */
@@ -692,6 +906,24 @@ void rb_clear_card_movement_tracking(GameState *g) {
        match because the stale turn-N entry is the one found. This is Rust's
        own reasoning, verbatim, at the clear site. */
     g->n_card_appearance_source = 0;
+    /* modifiers.rs:2024-2027 — the three landed clears. Rust's own comments
+       say why each is turn-scoped rather than cosmetic:
+         :2024 `self.cards_activated_this_turn.clear();`
+              「このターン中に…」 is a per-turn history; left uncleared, an
+              activation from a previous turn keeps satisfying PL!-pb2-010-P＋
+              and PL!-pb2-040-L forever. (NO C FIELD — see the table above.)
+         :2027 `self.cards_paid_cost_this_turn.clear();`
+              Same turnover for PL!-pb2-021-N: 「コストを支払う」 is a per-turn
+              event, and a cost paid on a previous turn must not keep firing
+              her 自動.
+         :2038 `self.turn_area_movements.clear();`
+         :2041 `self.mods.opp_cause_fired_keys.clear();`
+              Opponent-cause watcher dedupe is turn-scoped: a given move can
+              arm a marked watcher once, and the set resets with the movement
+              data. */
+    g->n_cards_paid_cost_this_turn = 0;
+    g->n_turn_area_movements = 0;
+    g->mods.n_opp_cause_fired_keys = 0;
 }
 
 /* -- remove_revealed_card --

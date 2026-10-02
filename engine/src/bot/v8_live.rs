@@ -437,6 +437,7 @@ fn enumerate_candidates(
     pools: &[[i16; 8]],
     opp: &OppModel,
     draw_credit: f64,
+    wide: bool,
 ) -> Vec<Candidate> {
     let p = gs.seat_player(me);
     let max_slots = usize::from(3u8.saturating_sub(p.live_card_set_limit_reduction));
@@ -465,11 +466,17 @@ fn enumerate_candidates(
     //
     // `V8_MAX_LIVES` overrides the uncontested cap; `V8_NO_CONTESTED_WIDE`
     // restores a flat cap for ablation.
+    // `wide` is v11's single change. It moves the default cap from one life to
+    // two - both the uncontested cap and the contested one, which is exactly the
+    // cell `V8_MAX_LIVES=2` measured, rather than the "second life only where a
+    // comparison is believed to be live" cell `V8_CONTESTED_WIDE` measured. The
+    // evidence for that choice is in the `wide` entry point below.
+    let (base_lives, base_contested) = if wide { (2usize, 2usize) } else { (1usize, 1usize) };
     let max_lives = std::env::var("V8_MAX_LIVES")
         .ok()
         .and_then(|v| v.parse::<usize>().ok())
         .filter(|&n| (1..=max_slots).contains(&n))
-        .unwrap_or(1);
+        .unwrap_or(base_lives);
     // "No upside" turned out to be true even when the check IS contested.
     // Allowing a second life in the contested case measured 354 vs 364 wins in
     // 800 paired games (p = 0.052) - worse, not better. So the score a second
@@ -483,7 +490,7 @@ fn enumerate_candidates(
     let contested_lives = if std::env::var_os("V8_CONTESTED_WIDE").is_some() {
         max_slots.min(max_lives + 1)
     } else {
-        max_lives
+        base_contested.min(max_lives)
     };
     let my_success = p.success_live_card_zone.cards.len();
     let yell_score = v8_model::expected_yell_score(gs, me, db, v8_model::active_blades(gs, me, db));
@@ -1189,6 +1196,7 @@ pub(crate) fn score_candidates(
     gs: &GameState,
     me: u8,
     db: &CardDatabase,
+    wide: bool,
 ) -> (Vec<Candidate>, OppModel) {
     let board = v8_model::board_pool(gs, me, db);
     let sampler = v8_model::FlipSampler::build(gs, me, db);
@@ -1199,7 +1207,7 @@ pub(crate) fn score_candidates(
     let pools = sampler.sample_pools(&board, v8_model::flip_samples());
     let opp = OppModel::build(gs, me, db);
     let draw_credit = draw_value(gs, me, db);
-    let candidates = enumerate_candidates(gs, me, db, &pools, &opp, draw_credit);
+    let candidates = enumerate_candidates(gs, me, db, &pools, &opp, draw_credit, wide);
     // Per-check telemetry, paired with v7's `V7CHK` line so the two can be
     // compared at the same blade count. v8 develops a bigger board than v7
     // (T4 12.8 vs 11.2) and passes fewer checks (0.389 vs 0.435), and
@@ -1282,6 +1290,107 @@ pub(crate) fn score_candidates(
 }
 
 pub fn choose_live_set_v8(gs: &GameState, actions: &[Action], db: &CardDatabase) -> Action {
+    choose_live_set_v8_inner(gs, actions, db, false)
+}
+
+/// `choose_live_set_v8` with the set-width cap raised from one life to two.
+///
+/// ## Why this exists
+///
+/// The shipped default sets exactly one live, and the comment on `max_lives`
+/// argues for that from 8.3.15 versus 8.4.7: a second life pools its
+/// requirement into the same check and is paid one placement for it, so it can
+/// only pay where the extra score is what tips a comparison. That argument is
+/// sound and the argmax was already free to take the width - so the reason it
+/// did not is the thing worth measuring.
+///
+/// Per-check ground truth over 3973 committed checks says the width was left on
+/// the table for a reason the rule balance does not describe. **Caveat on these
+/// figures:** `live_calibrate` records one row per live-set *decision tick*, not
+/// one per phase, and the engine calls the setter several times per phase. So
+/// the table is weighted by how long each phase took to decide, and the exact
+/// percentages are not per-phase rates. The direction is trustworthy - the
+/// supply-minus-requirement gap widens monotonically with the turn and the
+/// chosen requirement barely moves - but the `50.3%` figure below is a
+/// tick-weighted number and should not be quoted as one.
+///
+/// ```text
+///     supply minus requirement on the committed set
+///     >= 0 hearts  73%   >= 3 hearts  50.3%   >= 5 hearts  22.6%
+///
+///     turn      1      2      3      4      5      6      7
+///     supply   2.91   6.03   8.71  11.79  14.62  17.67  21.83
+///     chosen   2.25   4.31   6.13   8.31  10.08  10.93  11.34
+///     score    0.73   1.45   1.93   2.99   3.86   4.32   5.13
+/// ```
+///
+/// From turn 5 on the bot holds four to ten hearts it never spends and plays
+/// the score-2/4 band anyway, while the whole score comparison - which decides
+/// 51% of live phases - turns on about a point (measured deficit on a lost
+/// comparison: median 1, p75 2, p90 3). One more point of printed score is
+/// worth more than one more heart of supply, and the one-life cap is what stops
+/// it being spent.
+///
+/// Measured, paired, `v9 vs v9` mirror, fresh seed 7, n=3000 per arm:
+///
+/// ```text
+///    V8_CONTESTED_WIDE=1   +1.03 pp  p=0.048   pace(P1) +0.0053 SIGNIFICANT
+///    V8_MAX_LIVES=2        +1.10 pp  p=0.036   pace(P1) +0.0056 SIGNIFICANT
+///    V8_LATE_BAND=4        -0.03 pp  p=1.00
+///    V8_LATE_BAND=5         0.00 pp  (never fires)
+/// ```
+///
+/// Two width cells move and the two band-gated ones do not, which is what the
+/// supply table above predicts: the band gate tests `printed > opp.top_score()`,
+/// and `opp.top_score()` is itself low, so the gate almost never opens.
+///
+/// ## It does not survive validation. Do not ship it.
+///
+/// The seed-7 figures are a selection result. Once `v11` existed as a real bot
+/// it could be played head-to-head instead of through a process-global switch,
+/// and that is what settles it:
+///
+/// ```text
+///    v11 vs v9   2004 - 1996   n=4000  seed 7    v11 = 50.1%
+///    v9 vs v11   2041 - 1959   n=4000  seed 7    v11 = 47.6%
+///    v11 mirror  vs v9 base, seeds 101 and 31337, n=4000 each
+///                          -0.67 pp p=0.20  |  +0.10 pp p=0.90
+/// ```
+///
+/// A coin flip, and null on both fresh mirrors. Seed 7 was noise.
+///
+/// ## The reason it cannot work, which is worth more than the switch
+///
+/// v11 DOES place more - pace(P1) and pace(P2) both rise by 0.002 to 0.004 per
+/// phase, two of those cells significant - and its win rate does not move at
+/// all. Games get longer (5.79 turns against 5.93) and the win rate stays
+/// exactly where it was.
+///
+/// That is the general shape of the whole metric problem, and it is not a
+/// tuning failure:
+///
+/// ```text
+///    placements per live phase   ~0.43 per side   86% of the 1.0 ceiling
+///    win rate in a mirror        ~50%
+/// ```
+///
+/// Placements are a ZERO-SUM RACE to three (1.2.1.1). Making both seats place
+/// more does not make either seat win more - it makes the race last longer. A
+/// metric that both seats can raise by the same amount is not measuring the
+/// thing the project is trying to move, and any policy tuned against it has a
+/// built-in null.
+///
+/// The entry point stays so the cell is not re-run. Nothing selects it.
+pub fn choose_live_set_v8_wide(gs: &GameState, actions: &[Action], db: &CardDatabase) -> Action {
+    choose_live_set_v8_inner(gs, actions, db, true)
+}
+
+fn choose_live_set_v8_inner(
+    gs: &GameState,
+    actions: &[Action],
+    db: &CardDatabase,
+    wide: bool,
+) -> Action {
     let _rng = RngGuard::new();
     let me = gs.active_player_index();
     let p = gs.seat_player(me);
@@ -1292,7 +1401,7 @@ pub fn choose_live_set_v8(gs: &GameState, actions: &[Action], db: &CardDatabase)
         return emit_live_set(gs, actions, &[]);
     }
 
-    let (candidates, opp) = score_candidates(gs, me, db);
+    let (candidates, opp) = score_candidates(gs, me, db, wide);
     let best = candidates
         .iter()
         .fold(None::<&Candidate>, |acc, cand| match acc {
@@ -1514,7 +1623,7 @@ pub fn predict_live_set(gs: &GameState, db: &CardDatabase) -> Option<LivePredict
     if p.live_card_set_limit_reduction >= 3 || gs.cannot_live_players.contains(&p.id) {
         return None;
     }
-    let (candidates, opp) = score_candidates(gs, me, db);
+    let (candidates, opp) = score_candidates(gs, me, db, false);
     let best = candidates
         .iter()
         .fold(None::<&Candidate>, |acc, cand| match acc {

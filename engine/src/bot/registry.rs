@@ -74,6 +74,32 @@ pub enum BotKind {
     /// the point of the exercise is not the same risk as turning them on for
     /// stock `v8`, which is a different bot with a different baseline.
     V10,
+    /// v9 with v8's live-card set allowed to set TWO lives instead of one.
+    /// CLI name `v11`. **A measured null - nothing selects it.**
+    ///
+    /// Kept because it is the cleanest measurement in the file of why the
+    /// headline metric cannot be moved. v9 places ~0.43 cards per live phase,
+    /// 86% of what rule 8.4.7 allows a single side, and the backlog has been
+    /// ranked against that number for weeks. Setting two lives raises it - both
+    /// seats, by 0.002 to 0.004 per phase, two cells significant - and changes
+    /// the win rate by nothing:
+    ///
+    /// ```text
+    ///    v11 vs v9   2004 - 1996   n=4000    v11 = 50.1%
+    ///    v9 vs v11   2041 - 1959   n=4000    v11 = 47.6%
+    ///    v11 mirror vs v9 base, seeds 101 / 31337:  -0.67 pp p=0.20 | +0.10 pp p=0.90
+    /// ```
+    ///
+    /// Placements are a zero-sum race to three (1.2.1.1), so a policy that
+    /// raises both seats' placement rate lengthens the race and leaves the win
+    /// rate alone. A metric both seats can raise by the same amount is not the
+    /// objective. `v8_live` carries the full write-up.
+    ///
+    /// A kind rather than an env var for the reason `V9` gives: `--env` is
+    /// process-global, so a switch can never be played on ONE seat against a
+    /// pure opponent - and that head-to-head is what refuted this, where the
+    /// mirror had it at +1.10 pp and p=0.036.
+    V11,
     Neural,
     Conductor,
     Random,
@@ -94,6 +120,7 @@ impl BotKind {
         "v8",
         "v9",
         "v10",
+        "v11",
         "neural",
         "conductor",
         "random",
@@ -113,6 +140,7 @@ impl BotKind {
             "v8" => BotKind::V8,
             "v9" => BotKind::V9,
             "v10" => BotKind::V10,
+            "v11" => BotKind::V11,
             "neural" => BotKind::Neural,
             "conductor" => BotKind::Conductor,
             _ => BotKind::Random,
@@ -133,6 +161,7 @@ impl BotKind {
             BotKind::V8 => "v8",
             BotKind::V9 => "v9",
             BotKind::V10 => "v10",
+            BotKind::V11 => "v11",
             BotKind::Neural => "neural",
             BotKind::Conductor => "conductor",
             BotKind::Random => "random",
@@ -212,6 +241,10 @@ impl BotKind {
             // forward-walk mulligan here would re-import the thing being
             // removed.
             BotKind::V9 => strategy_v7::choose_action(gs, actions, me),
+            // v11 is v9 with a wider live set, so its Main phase and mulligan are
+            // v9's unchanged. Isolating the live-set width is the whole point: a
+            // candidate that also moved the Main phase could not be read.
+            BotKind::V11 => strategy_v7::choose_action(gs, actions, me),
             // v10 is v8's Main, which becomes the confirmed configuration when
             // `V8_ALL_TERMS` is set. It is not forced on here: a bot's identity
             // should not depend on whether the caller remembered an env var, and
@@ -311,6 +344,8 @@ impl BotKind {
             // three points over the v7 one, and it is the other half of why this
             // bot exists.
             BotKind::V10 => strategy_v8::choose_live_set(gs, actions, db),
+            // The one difference from `V9`. See the enum.
+            BotKind::V11 => strategy_v8::choose_live_set_wide(gs, actions, db),
             BotKind::Neural => actions.first().cloned().unwrap_or(Action {
                 description: "pass".into(),
                 description_ja: None,
@@ -380,6 +415,7 @@ impl BotKind {
             // v8 and -5.8 from v9, so it is worse on two different base bots and
             // is not a context problem.
             BotKind::V10 => strategy_v7::choose_mulligan(gs, actions, db),
+            BotKind::V11 => strategy_v7::choose_mulligan(gs, actions, db),
         }
     }
 }

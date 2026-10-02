@@ -614,16 +614,42 @@ static void test_placement_order(void)
 }
 
 /* =====================================================================
- * ROW 5 -- watches_ability_resolution   [STILL OPEN]
+ * ROW 5 -- watches_ability_resolution   [STILL OPEN -- cause RE-VERIFIED]
  *
  * Generator: "watches_ability_resolution" => ek.watches_ability_resolution
  *            = bc.read_bool_value() (effect_decoder_gen.rs:69). It is an
- *            ABILITYEFFECT field (vm.rs:1429, written into AbilityEffect at
+ *            ABILITYEFFECT field (types.rs:1404, written into AbilityEffect at
  *            vm.rs:1500), NOT a filter field -- build_filter does not copy it,
  *            so only the AbilityEffect slot holds it in Rust.
  * Wire:      TAG_TRUE / TAG_FALSE. 4 occurrences.
- * C:         no branch. The scalar tail stores "true"/"false" in the extras
- *            table, and nothing reads either the extra or a struct member.
+ *
+ * RE-VERIFIED 2026-10-03 against the CURRENT tree, not a peer's snapshot.
+ * The previous wording here said only that "nothing reads either the extra or
+ * a struct member", which is true but understates the consequence and named
+ * no consumer. The measured facts now:
+ *
+ *   C: `watches_ability_resolution` has ZERO occurrences anywhere under
+ *      engine_c_wip (include/rabuka.h, src/ability/vm.c, src/ability/types.c
+ *      and the whole src/ tree). The scalar tail stores "true"/"false" in the
+ *      extras table and nothing ever reads it.
+ *   RUST: it is consumed TWICE, both as a NEGATIVE guard on the standby
+ *      (自動) scan --
+ *        core/game_state/abilities.rs:1546-1549
+ *            effect_is_ability_resolution_watcher(e) =
+ *              e.trigger_type_any() == Some("each_time")
+ *              && e.watches_ability_resolution.unwrap_or(false)
+ *        core/game_state/abilities.rs:641-650  (stage-member TAS loop)
+ *        core/game_state/abilities.rs:813-822  (live-card TAS loop)
+ *      both `continue` on a watcher, with the comment "Resolution-watchers
+ *      (「…能力が解決したとき」) arm ONLY via the post-resolution hook; a
+ *      board-state scan would fire them on every pass."
+ *   The C's TAS scan (game_state_abilities.c:1908-1929) carries only the
+ *   narrower "each_time + energy_zone comparison" heuristic (:1917-1928) and
+ *   no equivalent of that guard.
+ *   Fixture check (measured): PL!-bp6-020-L ab#0 decodes
+ *   watches_ability_resolution="true" WITH trigger_type="each_time" on a
+ *   position_change effect, i.e. it IS a resolution watcher by Rust's own
+ *   definition, so the missing guard is reachable on a real card.
  * ===================================================================== */
 
 static void test_watches_ability_resolution(void)
@@ -638,31 +664,66 @@ static void test_watches_ability_resolution(void)
     CHECK(ctx.hit && (!strcmp(ctx.hit, "true") || !strcmp(ctx.hit, "false")),
           "watches_ability_resolution must decode to a bool on "
           "PL!-bp6-020-L ab#0 (got [%s])", ctx.hit ? ctx.hit : "(absent)");
+    /* The Rust guard is a CONJUNCTION, so both halves must be present on the
+     * same effect or the card is not a resolution watcher at all. */
+    Ctx tt = { "trigger_type", NULL };
+    walk_find(a.effect, &tt, 0);
+    CHECK(ctx.hit && tt.hit && !strcmp(ctx.hit, "true") &&
+              !strcmp(tt.hit, "each_time"),
+          "PL!-bp6-020-L ab#0 must satisfy BOTH halves of Rust's "
+          "effect_is_ability_resolution_watcher (abilities.rs:1546-1549): "
+          "trigger_type=each_time AND watches_ability_resolution=true "
+          "(got trigger_type=[%s] watches=[%s])",
+          tt.hit ? tt.hit : "(absent)", ctx.hit ? ctx.hit : "(absent)");
     OPEN("watches_ability_resolution", "ENGINE BUG",
-         "decodes to [%s] into the extras table; in Rust it is an "
-         "AbilityEffect slot, and nothing reads either\n",
-         ctx.hit ? ctx.hit : "(absent)");
+         "decodes to [%s] with trigger_type=[%s] into the extras table, and "
+         "engine_c_wip has ZERO readers of the key; Rust uses the conjunction "
+         "to SKIP the standby scan at abilities.rs:641-650 (stage) and "
+         ":813-822 (live), so the C TAS re-fires this card on every board "
+         "pass\n",
+         ctx.hit ? ctx.hit : "(absent)", tt.hit ? tt.hit : "(absent)");
     rb_free_ability(&a);
 }
 
 /* =====================================================================
- * ROW 6 -- multi-value heart_colors
+ * ROW 6 -- multi-value heart_colors   [cause RE-VERIFIED 2026-10-03]
  *
  * Generator: "heart_colors" => ek.heart_colors = *bc.read_str_vec_value()
  *            (effect_decoder_gen.rs:91) -- a VEC, order preserved,
  *            multi-valued.
  * Wire:      TAG_ARRAY of TAG_STR. 264 occurrences.
- * C:         the scalar tail joins a homogeneous string array as a CSV
+ * C (decode): the scalar tail joins a homogeneous string array as a CSV
  *            ("heart02,heart04") and writes the single-colour alias
- *            "heart_color" ONLY when the joined value has no comma. So a
- *            two-colour filter loses the alias entirely.
- *            Two consequences, asserted below:
- *              (a) the alias must NOT appear for a multi list -- a two-colour
- *                  requirement must never be readable as one colour;
- *              (b) rb_parse_heart_color (src/ability/util.c:2404) has no comma
- *                  handling and falls through to `return RB_HEART_PINK`, so any
- *                  consumer handed the CSV gets PINK. That is util.c's file,
- *                  not vm.c's; recorded here as the open consumption half.
+ *            "heart_color" ONLY when the joined value has no comma (vm.c:1120),
+ *            so a two-colour filter can never be read as one colour.
+ *
+ * RE-VERIFIED. The previous wording here reported the open half as
+ * "rb_parse_heart_color (util.c:2404) has no comma handling and falls through
+ * to return RB_HEART_PINK, so any consumer handed the CSV gets PINK". That
+ * hazard is NOT reachable any more, and the row was rewritten after measuring
+ * both CSV consumers:
+ *   - card.c:1002-1016 splits the CSV on commas into RbCardFilter.heart_colors[]
+ *     (up to 8) before util.c:1640 parses each entry.
+ *   - triggers.c:690-710 `const_heart_color_list` splits the CSV per token and
+ *     calls rb_parse_heart_color(tok) once per token; both
+ *     `rb_effect_heart_colors_any` callers (triggers.c:918, :1044) route
+ *     through it.
+ *   - condition.c:38-53 `cond_heart_colors` never sees a CSV at all: the
+ *     condition decode keeps a real ARRAY of RB_TAG_STR (vm.c:1322) and the
+ *     function walks the elements.
+ * So no consumer is ever handed the joined string. What IS still open is
+ * elsewhere, and is asserted below:
+ *   (a) card.c:1004 gates the CSV split on the effect carrying a
+ *       `filter_targets_by_heart_colors` extra. MEASURED on PL!S-bp6-004-P ab#0:
+ *       heart_colors=["heart02","heart04"] + require_all_heart_colors=true but
+ *       NO gate extra, and rb_effect_filter_subset on that effect returns
+ *       built=0 / n_heart_colors=0 -- the heart-colour filter term is not
+ *       built at all, so `require_all_heart_colors` over the list is inert.
+ *   (b) game_state_abilities.c:1107 reads the CONDITION's heart_colors through
+ *       rb_cond_get_str (game_state_abilities.c:1042-1049), which only matches
+ *       RB_TAG_STR. A multi-colour condition heart_colors is an ARRAY, so the
+ *       getter returns NULL and the colour filter at :1113 is silently dropped
+ *       instead of applied per colour.
  * ===================================================================== */
 
 static void test_heart_colors_multi(void)
@@ -687,10 +748,28 @@ static void test_heart_colors_multi(void)
               "a multi-colour heart_colors list must not also publish a "
               "single-colour heart_color alias (got [%s])",
               hcs.hit ? hcs.hit : "(absent)");
+        /* The per-token contract that makes the two CSV splits sufficient.
+         * If this ever collapsed, every split consumer would silently read
+         * PINK and the CSV hazard this row used to report would be live. */
+        CHECK(rb_parse_heart_color("heart02") != rb_parse_heart_color("heart04"),
+              "each CSV token must parse to its OWN colour -- "
+              "heart02=%d heart04=%d -- or the comma splits at card.c:1005 and "
+              "triggers.c:695 are not sufficient",
+              (int)rb_parse_heart_color("heart02"),
+              (int)rb_parse_heart_color("heart04"));
+        CHECK(rb_parse_heart_color("heart02,heart04") == rb_parse_heart_color("heart00"),
+              "the JOINED csv must NOT be parseable as a colour (it collapses "
+              "to the Heart00/PINK default) -- this is exactly why both "
+              "consumers split first, and it is asserted so the invariant is "
+              "visible rather than assumed");
         OPEN("heart_colors", "ENGINE BUG",
-             "the list survives only as the CSV [%s]; "
-             "rb_parse_heart_color (util.c:2404) has no comma handling and "
-             "returns RB_HEART_PINK for it\n", hcm.hit);
+             "the CSV is safe (card.c:1005-1016 and triggers.c:690-710 split it, "
+             "condition.c:47-51 walks the array), but the LIST never reaches a "
+             "matcher on this card: card.c:1004 gates the split on a "
+             "filter_targets_by_heart_colors extra PL!S-bp6-004-P does not "
+             "carry (rb_effect_filter_subset -> built=0, n_heart_colors=0), and "
+             "game_state_abilities.c:1107 reads the condition list through the "
+             "RB_TAG_STR-only rb_cond_get_str, so an ARRAY is dropped\n");
     }
     /* The single-colour case must still publish the alias. */
     {
@@ -915,20 +994,40 @@ static void test_cost_aliases(void)
 }
 
 /* =====================================================================
- * ROW 14 -- heart_total_limit / heart_total_operator   [STILL OPEN]
+ * ROW 14 -- heart_total_limit / heart_total_operator  [STILL OPEN, cause MOVED]
  *
  * Generator: both are filter fields (effect_decoder_gen.rs:137-138 ->
- * EffectFilter::heart_total_limit / heart_total_operator).
+ *            EffectFilter::heart_total_limit / heart_total_operator).
  * Wire:      TAG_I64 + TAG_STR. 5 effect objects, always paired with
  *            `original_value: true` and `position: "center"`.
  * RUST:      CardFilter gates the appear-time replacement on a member's
  *            ORIGINAL heart total -- "members whose original heart count is 4
  *            or fewer appear WAIT instead of ACTIVE" (PL!-pb2-002-PP ab#0).
- * C:         the pair decodes into the extras table with the right values, but
- *            RbCardFilter has no member for it and card_filter_from_effect
- *            (src/core/card.c:776-859) never reads it. Note the asymmetry with
- *            `original_value`, which IS read -- but only inside the
- *            `blade_limit` branch at card.c:830, never in a heart branch.
+ *            Built at util.rs:1906-1907 (total from `heart_total_limit`,
+ *            operator from `heart_total_operator` with the "<=" default),
+ *            matched at util.rs:1790-1798.
+ *
+ * RE-VERIFIED 2026-10-03: this row used to say "RbCardFilter has NO member for
+ * it and card_filter_from_effect never reads it". The member is no longer the
+ * problem -- A17 added it:
+ *   include/rabuka.h:2450-2451  int original_heart_total; char
+ *                                original_heart_operator[8];
+ * and the CONSUMER side is fully wired:
+ *   util.c:1872-1877  local_filter_from_public copies both into the local
+ *                      mirror and sets has_original_heart_total
+ *   util.c:1701-1710  the matcher sums the BASE slice
+ *                      (heart_count_in_range(&c, -1, 0, c.num_base)) and applies
+ *                      rb_compare_counts with the "<=" default
+ * What is STILL missing is the PRODUCER: `card_filter_from_effect`
+ * (src/core/card.c, around :1002-1036 where need_heart_total /
+ * need_heart_color / blade_limit are read) contains ZERO writes to
+ * original_heart_total / original_heart_operator. MEASURED on the fixture:
+ * rb_effect_filter_subset(PL!-pb2-002-PP ab#0) returns built=1,
+ * has_filter=1, original_heart_total=0, original_heart_operator="". So
+ * local_filter_from_public's `if (rf->original_heart_operator[0])` never fires,
+ * has_original_heart_total is never set, util.c:1701-1710 is dead code, and
+ * the appear-wait replacement can never happen. The producer belongs to
+ * card.c, which is not this suite's file.
  * ===================================================================== */
 
 static void test_heart_total_limit(void)
@@ -949,11 +1048,29 @@ static void test_heart_total_limit(void)
     CHECK(op.hit && !strcmp(op.hit, "<="),
           "heart_total_operator must decode to \"<=\" (got [%s])",
           op.hit ? op.hit : "(absent)");
+    /* The producer half, measured rather than asserted from a comment. */
+    RbCardFilter f;
+    memset(&f, 0, sizeof(f));
+    int built = a.effect ? rb_effect_filter_subset(a.effect, &f) : 0;
+    printf("  filter: built=%d original_heart_total=%d original_heart_operator=[%s]\n",
+           built, f.original_heart_total, f.original_heart_operator);
     OPEN("heart_total_limit", "ENGINE BUG",
-         "both decode to [%s]%s, but RbCardFilter has no member and "
-         "card_filter_from_effect (card.c:776) never reads them, so the "
-         "appear-wait replacement can never fire\n",
-         lim.hit ? lim.hit : "(absent)", op.hit ? op.hit : "(absent)");
+         "both decode to [%s]%s and RbCardFilter HAS the member "
+         "(rabuka.h:2450-2451) with the matcher wired (util.c:1872-1877 -> "
+         ":1701-1710), but card_filter_from_effect never WRITES it: measured "
+         "built=%d original_heart_total=%d original_heart_operator=[%s], so "
+         "has_original_heart_total is never set and the appear-wait "
+         "replacement can never fire\n",
+         lim.hit ? lim.hit : "(absent)", op.hit ? op.hit : "(absent)",
+         built, f.original_heart_total, f.original_heart_operator);
+    CHECK(built && f.original_heart_total == 4 &&
+              !strcmp(f.original_heart_operator, "<="),
+          "card_filter_from_effect must copy heart_total_limit=4 and "
+          "heart_total_operator=\"<=\" into RbCardFilter.original_heart_total "
+          "/ .original_heart_operator (rabuka.h:2450-2451), which is what "
+          "util.c:1872-1877 and the matcher at util.c:1701-1710 read -- got "
+          "built=%d total=%d operator=[%s]",
+          built, f.original_heart_total, f.original_heart_operator);
     CHECK(0, "heart_total_limit/operator must reach the appear-time filter");
     rb_free_ability(&a);
 }
@@ -1025,9 +1142,13 @@ static void test_choose_target_player_steps(void)
               ab ? ab : "(absent)");
     }
     OPEN("choose_target_player", "ENGINE BUG",
-         "all 6 corpus objects carry choice_options + effect_steps, but "
-         "h_choose_target_player (effects/misc.c:968) never walks e->child, so "
-         "the decoded branch is unreachable\n");
+         "all 6 corpus objects carry choice_options + effect_steps, and the step "
+         "decodes correctly (measured n_child=1, action=move_cards, "
+         "source=discard, destination=deck_bottom, count=2), but "
+         "h_choose_target_player (src/ability/effects/misc.c:1039-1049 -- the "
+         "line moved from the :968 recorded by an earlier peer) emits a fixed "
+         "RB_CHOICE_SELECT_TARGET with a hard-coded count of 1 and never walks "
+         "e->child, so the decoded branch is unreachable\n");
     CHECK(0, "choose_target_player must run the effect_steps it decodes");
     rb_free_ability(&a);
 }

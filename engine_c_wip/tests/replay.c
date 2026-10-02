@@ -54,7 +54,7 @@ static void scenario_draw_and_score(void){
 }
 
 static void scenario_live_performance(void){
-    GameState g; uint32_t d0[40],d1[40];
+    static GameState g; uint32_t d0[40],d1[40];
     uint32_t nc=rb_num_cards();
     int n0=0,n1=0;
     for(uint32_t i=0;i<nc && n0<40;i++) if(rb_card_ability_idx(i)!=0xFFFF) d0[n0++]=i;
@@ -85,7 +85,7 @@ static void scenario_live_performance(void){
 }
 
 static void scenario_move_cards(void){
-    GameState g; uint32_t d0[10]={0,1,2,3,4,5,6,7,8,9}; uint32_t d1[10]={10,11,12,13,14,15,16,17,18,19};
+    static GameState g; uint32_t d0[10]={0,1,2,3,4,5,6,7,8,9}; uint32_t d1[10]={10,11,12,13,14,15,16,17,18,19};
     rb_seed(2); rb_game_init(&g,d0,10,d1,10);
     int hand_n=g.p[0].hand.n;
     int disc_n=g.p[0].discard.n;
@@ -96,7 +96,7 @@ static void scenario_move_cards(void){
 }
 
 static void scenario_condition_gate(void){
-    static GameState g; uint32_t d0[10]={0,1,2,3,4,5,6,7,8,9}; uint32_t d1[10]={10,11,12,13,14,15,16,17,18,19};
+    static static GameState g; uint32_t d0[10]={0,1,2,3,4,5,6,7,8,9}; uint32_t d1[10]={10,11,12,13,14,15,16,17,18,19};
     rb_seed(3); rb_game_init(&g,d0,10,d1,10);
     /* A staged member gives modify_score a non-empty candidate pool
      * (score.rs:403-452: live + success live + stage), because with an empty
@@ -171,7 +171,7 @@ static void scenario_opponent_choice_condition(void){
 }
 
 static void scenario_cost_modifier(void){
-    GameState g; uint32_t d0[10]={0,1,2,3,4,5,6,7,8,9}; uint32_t d1[10]={10,11,12,13,14,15,16,17,18,19};
+    static GameState g; uint32_t d0[10]={0,1,2,3,4,5,6,7,8,9}; uint32_t d1[10]={10,11,12,13,14,15,16,17,18,19};
     rb_seed(4); rb_game_init(&g,d0,10,d1,10);
     if(g.p[0].stage[0]==-1 && g.p[0].hand.n>0){ int c=g.p[0].hand.cards[0]; g.p[0].stage[0]=c; g.p[0].hand.cards[0]=g.p[0].hand.cards[g.p[0].hand.n-1]; g.p[0].hand.n--; }
     int cid=g.p[0].stage[0];
@@ -187,7 +187,7 @@ static void scenario_cost_modifier(void){
     CHECK(rb_mods_get_cost(&g.mods,cid)==before+1,"modify_cost via mods");
 }
 static void scenario_heart_modifier(void){
-    GameState g; uint32_t d0[10]={0,1,2,3,4,5,6,7,8,9}; uint32_t d1[10]={10,11,12,13,14,15,16,17,18,19};
+    static GameState g; uint32_t d0[10]={0,1,2,3,4,5,6,7,8,9}; uint32_t d1[10]={10,11,12,13,14,15,16,17,18,19};
     rb_seed(5); rb_game_init(&g,d0,10,d1,10);
     /* required-hearts modifiers in Rust target the LIVE cards (live_card_zone);
        place the card there so the need_heart modifier actually attaches. */
@@ -199,7 +199,7 @@ static void scenario_heart_modifier(void){
     CHECK(rb_mods_get_need_heart(&g.mods,cid,0)==before+2,"modify_required_hearts via need_heart mods");
 }
 static void scenario_look_select(void){
-    GameState g; uint32_t d0[10]={0,1,2,3,4,5,6,7,8,9}; uint32_t d1[10]={10,11,12,13,14,15,16,17,18,19};
+    static GameState g; uint32_t d0[10]={0,1,2,3,4,5,6,7,8,9}; uint32_t d1[10]={10,11,12,13,14,15,16,17,18,19};
     rb_seed(6); rb_game_init(&g,d0,10,d1,10);
     AbilityEffect e={0}; e.action="look_at"; e.source="deck"; e.count=2;
     rb_execute_effect(&g,0,&e);
@@ -210,7 +210,7 @@ static void scenario_look_select(void){
     CHECK(rb_has_pending_choice(&g)==0,"look_at skip clears pending");
 }
 static void scenario_baton(void){
-    GameState g; uint32_t d0[10]={0,1,2,3,4,5,6,7,8,9}; uint32_t d1[10]={10,11,12,13,14,15,16,17,18,19};
+    static GameState g; uint32_t d0[10]={0,1,2,3,4,5,6,7,8,9}; uint32_t d1[10]={10,11,12,13,14,15,16,17,18,19};
     rb_seed(7); rb_game_init(&g,d0,10,d1,10);
     if(g.p[0].stage[0]==-1 && g.p[0].hand.n>0){ int c=g.p[0].hand.cards[0]; g.p[0].stage[0]=c; g.p[0].hand.cards[0]=g.p[0].hand.cards[g.p[0].hand.n-1]; g.p[0].hand.n--; }
     int stage_before = (g.p[0].stage[0]!=-1)+(g.p[0].stage[1]!=-1)+(g.p[0].stage[2]!=-1);
@@ -220,14 +220,14 @@ static void scenario_baton(void){
     CHECK(g.p[0].hand.n==hand_before-1 || g.p[0].hand.n==hand_before,"baton consumes hand if possible");
 }
 static void scenario_live_limit(void){
-    GameState g; uint32_t d0[10]={0,1,2,3,4,5,6,7,8,9}; uint32_t d1[10]={10,11,12,13,14,15,16,17,18,19};
+    static GameState g; uint32_t d0[10]={0,1,2,3,4,5,6,7,8,9}; uint32_t d1[10]={10,11,12,13,14,15,16,17,18,19};
     rb_seed(8); rb_game_init(&g,d0,10,d1,10);
     g.live_set_limit_reduction[0]=2;
     int limit=RB_MAX_LIVE_CARDS - g.live_set_limit_reduction[0];
     CHECK(limit==1,"live limit reduction 2 → limit 1");
 }
 static void scenario_group_condition(void){
-    GameState g; uint32_t d0[10]={0,1,2,3,4,5,6,7,8,9}; uint32_t d1[10]={10,11,12,13,14,15,16,17,18,19};
+    static GameState g; uint32_t d0[10]={0,1,2,3,4,5,6,7,8,9}; uint32_t d1[10]={10,11,12,13,14,15,16,17,18,19};
     rb_seed(9); rb_game_init(&g,d0,10,d1,10);
     if(g.p[0].stage[0]==-1 && g.p[0].hand.n>0){ int c=g.p[0].hand.cards[0]; g.p[0].stage[0]=c; g.p[0].hand.cards[0]=g.p[0].hand.cards[g.p[0].hand.n-1]; g.p[0].hand.n--; }
     Condition cond={0}; cond.variant=4;
@@ -237,7 +237,7 @@ static void scenario_group_condition(void){
     CHECK(res==1||res==0,"group condition evaluates without crash");
 }
 static void scenario_no_excess(void){
-    GameState g; uint32_t d0[10]={0,1,2,3,4,5,6,7,8,9}; uint32_t d1[10]={10,11,12,13,14,15,16,17,18,19};
+    static GameState g; uint32_t d0[10]={0,1,2,3,4,5,6,7,8,9}; uint32_t d1[10]={10,11,12,13,14,15,16,17,18,19};
     rb_seed(10); rb_game_init(&g,d0,10,d1,10);
     /* no snapshot yet → no_excess should be false */
     Condition cond={0}; cond.variant=16;
@@ -249,7 +249,7 @@ static void scenario_no_excess(void){
     CHECK(rb_eval_condition(&g,0,&cond)==0,"no_excess false when surplus>0");
 }
 static void scenario_opponent_live_success(void){
-    GameState g; uint32_t d0[10]={0,1,2,3,4,5,6,7,8,9}; uint32_t d1[10]={10,11,12,13,14,15,16,17,18,19};
+    static GameState g; uint32_t d0[10]={0,1,2,3,4,5,6,7,8,9}; uint32_t d1[10]={10,11,12,13,14,15,16,17,18,19};
     rb_seed(11); rb_game_init(&g,d0,10,d1,10);
     Condition cond={0}; cond.variant=15; /* RB_COND_OPPONENT_LIVE_SUCCESS */
     /* no live performed → opponent flag 0 → false */
@@ -452,7 +452,7 @@ static void sc_check_int(int actual, const char *expected) {
 static int sc_replay(const char *path) {
     FILE *f = fopen(path, "r");
     if (!f) { fprintf(stderr, "FAIL: cannot open scenario %s\n", path); return 1; }
-    TestGame tg; test_game_new(&tg);
+    static TestGame tg; test_game_new(&tg);
     char line[SC_LINE];
     while (fgets(line, sizeof line, f)) {
         /* strip trailing newline */
@@ -929,7 +929,7 @@ static int tr_run(const char *path) {
         nlines++;
     }
     fclose(f);
-    TestGame tg; test_game_new(&tg);
+    static TestGame tg; test_game_new(&tg);
     tr_xspec[0] = 0; tr_last_expected[0] = 0;
     for (int i = 0; i < nlines; i++) {
         char *s = lines[i];

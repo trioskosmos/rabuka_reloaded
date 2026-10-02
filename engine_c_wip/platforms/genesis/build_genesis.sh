@@ -27,7 +27,15 @@ cp "$W/src/abilities_strings.bin" "$OUT/abilities_strings.bin"
 
 CFLAGS="-m68000 -std=c11 -Os -Wall -I$W/include -I$W/src -I$W/src/core/generated -ffreestanding -nostdlib -fno-builtin -fno-unwind-tables -fno-asynchronous-unwind-tables -fno-exceptions -fmerge-all-constants -ffunction-sections -fdata-sections -DRB_ROM_STRINGS"
 
-SRC="src/ability/vm.c src/ability/condition.c src/ability/choice.c src/ability/ability_queue.c src/ability/dynamic_count.c src/ability/util.c src/ability/cost.c src/ability/compound.c src/ability/resolver.c src/ability/effects/move.c src/ability/effects/look.c src/ability/effects/state.c src/ability/effects/ability.c src/ability/effects/misc.c src/ability/effects/draw.c src/ability/effects/score.c src/ability/log.c src/ability/debug.c src/core/card.c src/core/data.c src/core/alloc.c src/core/modifiers.c src/core/stats_pipeline.c src/core/game_state_abilities.c src/core/tracking.c src/core/zones.c src/core/generated/bytecode_blob.c src/core/generated/gen_data.c src/turn/phase.c src/turn/live.c src/turn/triggers.c src/engine.c"
+# The engine source list. This MIRRORS the host Makefile's SRC list, minus
+# src/main.c (the Genesis entry point is genesis_main.c). It used to be a stale
+# hand-copied subset missing 14 files AND src/core/gen_data_rom.c, so the build
+# had undefined references at link time for rb_load_gen_data and for all three
+# g_* offset pointers (data.c:16-17, :249) on top of every symbol the 14 files
+# define. generated/gen_data_cdi.c is deliberately NOT here: it defines the same
+# rb_load_gen_data and the same g_* pointers, and compiling both is a
+# multiple-definition link error (see gen_data_rom.c's PLATFORM VARIANT CONTRACT).
+SRC="src/ability/enums.c src/ability/types.c src/ability/vm.c src/ability/condition.c src/ability/choice.c src/ability/ability_queue.c src/ability/dynamic_count.c src/ability/util.c src/ability/cost.c src/ability/compound.c src/ability/resolver.c src/ability/effects/executor.c src/ability/effects/ability_effects.c src/ability/effects/custom.c src/ability/effects/move.c src/ability/effects/move_missing.c src/ability/effects/rules.c src/ability/effects/look.c src/ability/effects/state.c src/ability/effects/ability.c src/ability/effects/misc.c src/ability/effects/draw.c src/ability/effects/score.c src/ability/log.c src/ability/debug.c src/ability/abilities_gen.c src/ability/describe.c src/game/deck_parser.c src/game/deck_builder.c src/game/game_setup.c src/core/card.c src/core/data.c src/core/alloc.c src/core/game_state_core.c src/core/modifiers.c src/core/stats_pipeline.c src/core/game_state_abilities.c src/core/tracking.c src/core/zones.c src/bytecode_data.c src/core/generated/bytecode_blob.c src/core/generated/gen_data.c src/core/gen_data_rom.c src/turn/phase.c src/turn/live.c src/turn/triggers.c src/engine.c"
 
 OBJ=""
 for f in $SRC; do

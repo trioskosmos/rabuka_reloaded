@@ -147,9 +147,28 @@ static const char *current_test = "(none)";
 #define MIRAKURA_LIVE "PL!HS-PR-012-PR" /* アイデンティティ, みらくらぱーく! (live) */
 #define RURINO_BP5 "PL!HS-bp5-003-R" FF_PLUS /* 大沢瑠璃乃 cost 2, same unit     */
 
-/* gain/hearts/per_card/subunit_stage_count_gated_debut_heart_test.rs */
+/* gain/hearts/per_card/subunit_stage_count_gated_debut_heart_test.rs
+ *
+ * A4 fixture keys. Rust's twin is EXPLICIT about the first one
+ * (subunit_stage_count_gated_debut_heart_test.rs:9-22):
+ *   "Fixtures use the CLEAN card numbers. The corpus also contains 13 keys with
+ *    text fragments spliced into the card_no -- PL!N-bp1-023-PRproteinbar,
+ *    PL!N-sd1-012-PRproteinbar, LL-PR-007-PRLoveLive!Days and ten more. Each of
+ *    the 13 is a **byte-exact duplicate** of a legitimate entry ... They are
+ *    phantom duplicates, and this file previously reached for one of them.
+ *    These fixtures use the clean keys, so they name real pool entries and stay
+ *    resolvable if the 13 duplicates are ever deleted."
+ * and then `const R3BIRTH_A: &str = "PL!N-bp1-023-N";`
+ *
+ * The C reached for the phantom `PL!N-bp1-023-PRproteinbar`. It resolves today
+ * (both keys are real entries in cards/cards.json -- verified) and it is a
+ * PRIZE print, not corruption, so nothing about the current behaviour changes;
+ * but pin_id() compares card_no byte-exactly, so the fixture was pinning the
+ * phantom's identity and would break the moment the 13 duplicates go.
+ * test_parity_gain_delta.c:274 already used the clean key for the same card.
+ */
 #define RANBU_N  "PL!N-bp7-024-N"    /* 鐘 嵐珠 R3BIRTH cost 4                    */
-#define R3BIRTH_A "PL!N-bp1-023-PRproteinbar" /* ミア・テイラー R3BIRTH cost 9  */
+#define R3BIRTH_A "PL!N-bp1-023-N"   /* ミア・テイラー R3BIRTH cost 9              */
 #define R3BIRTH_B "PL!N-bp1-024-PR"  /* 鐘 嵐珠 R3BIRTH cost 4                     */
 #define R3BIRTH_C "PL!N-PR-012-PR"   /* 三船栞子 R3BIRTH cost 2                    */
 
@@ -2000,8 +2019,17 @@ static void b2_same_unit_pair_discards_two(void)
              "B2: exactly 2 cards were discarded as the cost");
     CHECK(hand_has(&tg, 0, lily),
           "B2: the lilywhite card (different unit) remains in hand");
-    CHECK(!hand_has(&tg, 0, p_c),
-          "B2: the third Printemps card is one of the two that left hand");
+    /* Rust's twin picks eligible filtered index 0 TWICE
+     * (q175_hanano_cross_unit_discard_same_unit_as_each_other.rs:71-73):
+     *   try_select_indices(&[0])   -> p_a
+     *   try_select_indices(&[0])   -> p_b, on the re-prompt filtered to p_a's unit
+     * so p_c is the SURVIVOR of the three Printemps cards. This assertion used
+     * to demand the opposite (`!hand_has(p_c)`), which pins behaviour the Rust
+     * twin does not have and which fails under a correct same-unit re-prompt. */
+    CHECK(hand_has(&tg, 0, p_c),
+          "B2: the THIRD Printemps card p_c survives -- Rust picks filtered "
+          "index 0 twice (p_a, then p_b on the same-unit re-prompt), so the "
+          "third same-unit card is the one left behind");
     CHECK(blade_of(&tg, hanano) > 0, "B2: paying the cost grants blade");
     CHECK(heart_of(&tg, hanano, H04) > 0,
           "B2: paying the cost grants heart04");
@@ -2117,11 +2145,36 @@ static void b2_no_qualifying_unit_skips_cost(void)
     CHECK(hand_has(&tg, 0, print_), "B2 no-unit: the Printemps card is still in hand");
     CHECK(hand_has(&tg, 0, lily),   "B2 no-unit: the lilywhite card is still in hand");
     CHECK(hand_has(&tg, 0, bibi),   "B2 no-unit: the BiBi card is still in hand");
-    CHECK_EQ(blade_of(&tg, hanano), 0,
-             "B2 no-unit: an unpayable cost grants no blade (the same card grants "
-             "blade in b2_same_unit_pair_discards_two)");
-    CHECK_EQ(heart_of(&tg, hanano, H04), 0,
-             "B2 no-unit: an unpayable cost grants no heart04");
+    /* The buff is NOT conditioned on the optional cost, in either engine.
+     * Measured decode of PL!HS-PR-016-PR ab#0 (probe over the compiled DB):
+     *   cost   move_cards hand->discard count=2 optional=true
+     *          extra same_unit_name=true
+     *   effect sequential, NO `conditional` extra, NO primary_effect /
+     *          result_condition and NO optional_action / conditional_action;
+     *          child[0] gain_resource blade x2 (live_end)
+     *          child[1] gain_resource heart [heart04,heart04] x2 (live_end)
+     * Rust gates an effect on the cost only through
+     * compound/conditional_on.rs:18-28 (execute_conditional_on_result, which
+     * needs compound.primary_effect + result_condition) or :88-149
+     * (execute_conditional_on_optional, which needs optional_action +
+     * conditional_action). Neither shape is present, so the sequential runs
+     * and the two gain_resource children fire whether or not the cost was
+     * paid. Rust's twin
+     * (hanano_no_qualifying_unit_skips_cost.rs:186-202) asserts exactly that:
+     * no prompt, both named cards still in hand, hand length unchanged -- and
+     * says NOTHING about blade/heart.
+     *
+     * These two assertions used to demand 0 blade and 0 heart04, i.e. they
+     * pinned a cost-conditional buff that Rust does not have and that the
+     * parsed effect tree cannot express. They now assert what Rust does. */
+    CHECK(blade_of(&tg, hanano) > 0,
+          "B2 no-unit: the blade gain is NOT conditioned on the optional cost -- "
+          "the effect is an unconditional sequential (no result_condition, no "
+          "conditional_action), so Rust grants it even when no same-unit pair "
+          "exists and the cost is skipped");
+    CHECK(heart_of(&tg, hanano, H04) > 0,
+          "B2 no-unit: the heart04 gain is likewise unconditional for the same "
+          "reason");
 }
 
 /* ── B3. live_start_discard_two_grants_blade_to_distinct_niji_members_q272 ──

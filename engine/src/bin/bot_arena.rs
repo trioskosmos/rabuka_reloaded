@@ -728,31 +728,33 @@ fn report_health(
     };
     let (median, p90, max) = (q(0.5), q(0.9), *turns.last().unwrap_or(&0));
 
-    // The pace ceiling is a RULE limit, not a preference.
+    // Pace ceilings, from 8.4.7 and 8.4.6.2.
     //
-    // 8.4.7: "the player who won the live selects ONE card from their live
-    // card zone and moves it to their success live card zone." A won check
-    // therefore pays exactly one placement, whatever the margin.
+    // 8.4.7: "the player who won the live selects ONE card from their live card
+    // zone and moves it to their success live card zone." A won check pays
+    // exactly one placement, whatever the margin - so **one live phase can place
+    // at most ONE card for a single side**.
     //
     // 8.4.6.2 pays two only in one case - equal total scores make BOTH players
     // winners - and 8.4.7.1 then withholds the move from any player already
-    // holding 2+ successes. So the most a single check can ever produce is:
+    // holding 2+ successes. So:
     //
-    //   * 1 placement, normally (one winner, or a tie where a 2-success player
-    //     takes the tie mass and neither moves);
-    //   * 2 placements, on a score tie with both players below 2 successes.
+    //   per side, per phase : ceiling 1.0, reached by winning every phase
+    //   combined, per phase: 1.0 typically, 2.0 on a tie below 2 successes
     //
-    // Averaged over a game that is a ceiling of 1.0 placements per live phase
-    // ACROSS BOTH SEATS, i.e. 0.5 per side, plus the tie-bonus mass.
+    // The per-side ceiling is 1.0, NOT 0.5. Winning the game outright means
+    // taking three checks in a row - 3 placements in 3 phases, a per-side pace
+    // of 1.000 - which is why `pace_tenths_pace_allows_multiple_placements`
+    // below asserts exactly that number. A previous version of this comment
+    // divided the COMBINED ceiling of 1.0 by two seats and called the quotient a
+    // per-side rule limit, then reported the run against it as "86% of the
+    // physical maximum". That conflated an average of two players with a bound
+    // on one: it declared a 1.0-per-side metric permanently unreachable and
+    // concluded from the arithmetic that no live-set work could raise the win
+    // rate. It could, and the ceiling never bound it in the first place.
     //
-    // The old line here printed "(target ~1.0 from T2; <=0.33 is a defect)"
-    // against a PER-SIDE rate. That target is 2x the physical maximum, so the
-    // headline metric this project has ranked its whole backlog against has
-    // been reporting a permanent, unreachable defect: v9/v9 measures 0.427 and
-    // 0.434, which is 86% of what the rules permit, and no amount of live-set
-    // work can close the remaining 0.13 placements per phase. What is left is
-    // not a pace problem, it is a share-of-comparisons problem - see
-    // docs/BOT_STRATEGY.md section 1.
+    // What the number still has to be read against is the win condition, not a
+    // pace ceiling: 1.2.1.1 is first to THREE placements.
     let combined = p1_rate + p2_rate;
     println!("GUIDE HEALTH METRICS (docs/BOT_STRATEGY.md section 1)");
     println!(
@@ -760,15 +762,15 @@ fn report_health(
         p1_rate, p2_rate, combined
     );
     println!(
-        "    rule ceiling is 1.000 combined / 0.500 per side, so this run is {:.0}% of the",
-        100.0 * combined
+        "    ceiling is 1.000 per side (8.4.7 pays one card per won check) and ~1.000",
     );
     println!(
-        "    maximum ({:.0}% / {:.0}% per side). 8.4.7 pays exactly ONE card per won",
-        200.0 * p1_rate, 200.0 * p2_rate
+        "    combined, 2.000 on an 8.4.6.2 tie below 2 successes. This run is {:.0}% of the",
+        100.0 * p1_rate
     );
     println!(
-        "    check; two only on an 8.4.6.2 score tie with both players below 2 successes."
+        "    per-side ceiling ({:.0}% / {:.0}%). The race is to 3 placements (1.2.1.1).",
+        100.0 * p1_rate, 100.0 * p2_rate
     );
     println!(
         "  game length: median T{median} | p90 T{p90} | max T{max}   (target median T5-T8, hard band 5-9)"

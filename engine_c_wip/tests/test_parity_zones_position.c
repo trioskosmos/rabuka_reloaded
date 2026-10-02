@@ -333,7 +333,7 @@ static void test_stage_position_change(void)
 
 static void test_stage_formation_change_rotation(void)
 {
-    TestGame tg;
+    static TestGame tg;
     test_game_new(&tg);
     clear_p1(&tg);
     RbPlayer *P = &tg.state.p[0];
@@ -348,19 +348,29 @@ static void test_stage_formation_change_rotation(void)
     P->stage[AREA_CENTER] = b;
     P->stage[AREA_RIGHT] = c;
 
-    /* live_start_subunit_threshold_formation_test: right, center, left. */
+    /* live_start_subunit_threshold_formation_test:74-86. The Rust twin stages
+     * [a, b, c], then answers the three destination prompts in the order
+     * "right", "center", "left" -- i.e. a->RightSide, b->Center (the CENTRE
+     * member KEEPS ITS OWN AREA), c->LeftSide -- and asserts
+     *   assert_eq!(game.state.player1.stage.stage, [c, b, a]);
+     * So the rotation's answer is [c, b, a]. An earlier version of this block
+     * asserted [a, c, b], which is neither the Rust answer nor any single
+     * permutation consistent with from={L,C,R} / to={R,C,L}. */
     const int from[3] = { AREA_LEFT, AREA_CENTER, AREA_RIGHT };
     const int to[3] = { AREA_RIGHT, AREA_CENTER, AREA_LEFT };
     CHECK_EQ(rb_stage_formation_change(&tg.state, 0, from, to, 3), 0,
              "formation_change accepts a full three-member rotation");
-    CHECK_EQ(P->stage[AREA_LEFT], a, "formation rotation keeps a on the left");
-    CHECK_EQ(P->stage[AREA_CENTER], c, "formation rotation puts c in the center");
-    CHECK_EQ(P->stage[AREA_RIGHT], b, "formation rotation puts b on the right");
+    CHECK_EQ(P->stage[AREA_LEFT], c,
+             "formation rotation puts c on the left (a answered right)");
+    CHECK_EQ(P->stage[AREA_CENTER], b,
+             "formation rotation keeps b in the center (b answered center)");
+    CHECK_EQ(P->stage[AREA_RIGHT], a,
+             "formation rotation puts a on the right (c answered left)");
 }
 
 static void test_stage_formation_change_rejections(void)
 {
-    TestGame tg;
+    static TestGame tg;
     test_game_new(&tg);
     clear_p1(&tg);
     RbPlayer *P = &tg.state.p[0];
@@ -403,7 +413,7 @@ static void test_stage_formation_change_rejections(void)
 
 static void test_formation_change_carries_under_cards(void)
 {
-    TestGame tg;
+    static TestGame tg;
     test_game_new(&tg);
     clear_p1(&tg);
     RbPlayer *P = &tg.state.p[0];
@@ -443,7 +453,7 @@ static void test_formation_change_carries_under_cards(void)
 
 static void test_recycle_under_cards(void)
 {
-    TestGame tg;
+    static TestGame tg;
     test_game_new(&tg);
     clear_p1(&tg);
     int member_a = test_new_id(&tg, "PL!-sd1-010-SD");
@@ -481,7 +491,7 @@ static void test_recycle_under_cards(void)
 
 static void test_stage_can_place_card(void)
 {
-    TestGame tg;
+    static TestGame tg;
     test_game_new(&tg);
     int member = test_new_id(&tg, "PL!-sd1-010-SD");
     int live = test_new_id(&tg, "PL!N-bp1-027-L");
@@ -504,7 +514,7 @@ static void test_stage_can_place_card(void)
 static void test_mill_three_deck_four(void)
 {
     /* mill_three_self_position_change_q104_q234_test::q234_deck_4 */
-    TestGame tg;
+    static TestGame tg;
     test_game_new(&tg);
     clear_p1(&tg);
     int kinako = test_new_id(&tg, "PL!SP-bp5-006-R");
@@ -550,7 +560,7 @@ static void test_mill_three_deck_two_no_waitroom(void)
     const char *rarities[3] = { "PL!SP-bp5-006-AR", "PL!SP-bp5-006-P",
                                 "PL!SP-bp5-006-R" };
     for (int r = 0; r < 3; r++) {
-        TestGame tg;
+        static TestGame tg;
         test_game_new(&tg);
         clear_p1(&tg);
         int kinako = test_new_id(&tg, rarities[r]);
@@ -573,7 +583,7 @@ static void test_mill_three_deck_two_no_waitroom(void)
 
 static void test_mill_three_deck_and_waitroom_empty(void)
 {
-    TestGame tg;
+    static TestGame tg;
     test_game_new(&tg);
     clear_p1(&tg);
     int kinako = test_new_id(&tg, "PL!SP-bp5-006-R");
@@ -594,7 +604,7 @@ static void test_mill_three_deck_and_waitroom_empty(void)
 static void test_live_start_two_subunit_members_reform(void)
 {
     /* live_start_subunit_threshold_formation_test::two_subunit_members_can_reform */
-    TestGame tg;
+    static TestGame tg;
     test_game_new(&tg);
     clear_p1(&tg);
     int live = test_new_id(&tg, "PL!SP-pb2-050-L");
@@ -629,7 +639,7 @@ static void test_live_start_two_subunit_members_reform(void)
 static void test_live_start_one_subunit_member_no_formation(void)
 {
     /* live_start_subunit_threshold_formation_test::one_subunit_member */
-    TestGame tg;
+    static TestGame tg;
     test_game_new(&tg);
     clear_p1(&tg);
     int live = test_new_id(&tg, "PL!SP-pb2-050-L");
@@ -665,7 +675,7 @@ static void test_himeno_front_area_shapes(void)
 {
     /* Himeno on center: front area is center, so the chosen opponent member
      * lands in opponent Center. */
-    TestGame tg;
+    static TestGame tg;
     int himeno, opp_left, opp_center, opp_right;
     test_game_new(&tg);
     clear_p1(&tg);
@@ -725,7 +735,7 @@ static void test_himeno_front_area_shapes(void)
 
 static void test_himeno_front_no_opponent_members(void)
 {
-    TestGame tg;
+    static TestGame tg;
     test_game_new(&tg);
     clear_p1(&tg);
     int himeno = test_new_id(&tg, "PL!HS-pb1-014-R");
@@ -746,7 +756,7 @@ static void test_himeno_front_no_opponent_members(void)
 static void test_wien_both_centers_empty(void)
 {
     /* wien_bp5_test::both_centers_empty_no_moves */
-    TestGame tg;
+    static TestGame tg;
     test_game_new(&tg);
     clear_p1(&tg);
     int wien = test_new_id(&tg, "PL!SP-bp5-010-R");
@@ -772,7 +782,7 @@ static void test_wien_both_centers_empty(void)
 static void test_wien_opponent_center_only(void)
 {
     /* wien_bp5_test::q223_p1_center_empty_opponent_chooses */
-    TestGame tg;
+    static TestGame tg;
     test_game_new(&tg);
     clear_p1(&tg);
     int wien = test_new_id(&tg, "PL!SP-bp5-010-R");
@@ -801,7 +811,7 @@ static void test_wien_opponent_center_only(void)
 static void test_wien_opponent_swap_on_occupied_destination(void)
 {
     /* wien_bp5_test::q223_opponent_swap_when_destination_occupied */
-    TestGame tg;
+    static TestGame tg;
     test_game_new(&tg);
     clear_p1(&tg);
     int wien = test_new_id(&tg, "PL!SP-bp5-010-R");
@@ -830,7 +840,7 @@ static void test_wien_opponent_swap_on_occupied_destination(void)
 static void test_tomari_activation_returns_energy(void)
 {
     /* energy_return_cost_position_change_test::with_energy */
-    TestGame tg;
+    static TestGame tg;
     test_game_new(&tg);
     clear_p1(&tg);
     int tomari = test_new_id(&tg, "PL!SP-bp7-022-N");
@@ -860,7 +870,7 @@ static void test_tomari_activation_returns_energy(void)
 static void test_tomari_activation_without_energy_refused(void)
 {
     /* energy_return_cost_position_change_test::without_energy */
-    TestGame tg;
+    static TestGame tg;
     test_game_new(&tg);
     clear_p1(&tg);
     int tomari = test_new_id(&tg, "PL!SP-bp7-022-N");
@@ -885,7 +895,7 @@ static void test_tomari_activation_without_energy_refused(void)
 static void test_chisato_rotates_both_stages(void)
 {
     /* chisato_pb1_003_both_stages_rotation_test */
-    TestGame tg;
+    static TestGame tg;
     test_game_new(&tg);
     clear_p1(&tg);
     int chisato = test_new_id(&tg, "PL!SP-pb1-003-R");
@@ -927,7 +937,7 @@ static void test_chisato_rotates_both_stages(void)
 static void test_seira_position_change_swaps_and_records(void)
 {
     /* self_control_position_change_test::position_change_triggered_grant_blade */
-    TestGame tg;
+    static TestGame tg;
     test_game_new(&tg);
     clear_p1(&tg);
     int seira_a = test_new_id(&tg, "PL!S-bp5-111-R");
@@ -971,7 +981,7 @@ static void test_seira_position_change_swaps_and_records(void)
 static void test_jidou_fires_after_position_change(void)
 {
     /* position_change_triggers_jidou_move_test */
-    TestGame tg;
+    static TestGame tg;
     test_game_new(&tg);
     clear_p1(&tg);
     int kinako = test_new_id(&tg, "PL!SP-bp5-006-R");

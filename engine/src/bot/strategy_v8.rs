@@ -172,6 +172,13 @@ pub fn choose_live_set_v8_entry(gs: &GameState, actions: &[Action], db: &CardDat
     super::v8_live::choose_live_set_v8(gs, actions, db)
 }
 
+/// v8's live set with the set-width cap raised to two lives. This is the only
+/// difference from `choose_live_set_v8_entry`, and `v8_live` carries the
+/// measurement that justifies it.
+pub fn choose_live_set_v8_wide_entry(gs: &GameState, actions: &[Action], db: &CardDatabase) -> Action {
+    super::v8_live::choose_live_set_v8_wide(gs, actions, db)
+}
+
 // ── Mulligan: a three-turn forward evaluation of every legal opening ─────
 
 /// `P(we place at the next check)` for the best life in the kept hand, using
@@ -410,6 +417,7 @@ pub fn choose_mulligan_v8(gs: &GameState, actions: &[Action], db: &CardDatabase)
 
 pub use choose_action_v8_entry as choose_action;
 pub use choose_live_set_v8_entry as choose_live_set;
+pub use choose_live_set_v8_wide_entry as choose_live_set_wide;
 pub use choose_mulligan_v8 as choose_mulligan;
 pub use score_actions_v8 as score_actions;
 

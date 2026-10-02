@@ -1989,46 +1989,17 @@ static int r_refresh_deck(GameState *g, int pl)
     return count > 0;
 }
 
-/* Rust `live.rs::process_yell_revealed_card_icons`.
-   live.c owns a `static` copy; this local mirror keeps rules.c self-contained
-   until live.c exports it (CROSS-FILE REQUEST 4). */
-typedef struct { int blade_hearts[8]; int note_icons; int draw_icons; } RbRulesYellIcons;
-
-static RbRulesYellIcons r_yell_icons(const GameState *g, int cid, int override_color,
-                                      int total_hearts[8], int *cheer_count)
-{
-    RbRulesYellIcons out;
-    memset(&out, 0, sizeof(out));
-    if (!total_hearts || !cheer_count || !g || cid < 0) return out;
-    Card c;
-    if (!rb_decode_card_by_index((uint32_t)cid, &c)) return out;
-    int blade_start = c.num_base;
-    int blade_end = blade_start + c.num_blade;
-    if (blade_end > c.n_hearts) blade_end = c.n_hearts;
-    for (int h = blade_start; h < blade_end; h++) {
-        int raw_color = c.heart_color[h];
-        int amount = c.heart_count[h];
-        if (raw_color == RB_HEART_PINK) amount *= 2;
-        int effective = raw_color;
-        if (override_color >= 0 && raw_color != RB_HEART_PINK &&
-            raw_color != RB_HEART_DRAW && raw_color != RB_HEART_SCORE)
-            effective = override_color;
-        if (effective == RB_HEART_DRAW)       out.draw_icons += amount;
-        else if (effective == RB_HEART_SCORE) { out.note_icons += amount; *cheer_count += amount; }
-        else if (effective == RB_HEART_ALL || effective == 7) out.blade_hearts[7] += amount;
-        else if (effective == RB_HEART_PINK)  out.blade_hearts[0] += amount;
-        else if (effective >= RB_HEART_RED && effective <= RB_HEART_ORANGE)
-            out.blade_hearts[effective] += amount;
-    }
-    if (c.has_special) {
-        if (c.special_color == RB_HEART_DRAW)        out.draw_icons += c.special_count;
-        else if (c.special_color == RB_HEART_SCORE) { out.note_icons += c.special_count;
-                                                       *cheer_count += c.special_count; }
-    }
-    for (int i = 0; i < 8; i++) total_hearts[i] += out.blade_hearts[i];
-    rb_free_card(&c);
-    return out;
-}
+/* Rust `live.rs::process_yell_revealed_card_icons` used to be re-implemented here
+   as `r_yell_icons` (this file's own typedef RbRulesYellIcons plus a 35-line
+   copy of the decode) with the note "live.c owns a `static` copy; this local
+   mirror keeps rules.c self-contained until live.c exports it (CROSS-FILE
+   REQUEST 4)". live.c answered that request: the function is EXPORTED as
+   rb_process_yell_revealed_card_icons and declared in include/rabuka.h:3485, so
+   both copies are gone and this file calls the canonical one directly.
+   Behaviour is identical: the canonical body is the same decode, it accumulates
+   into the caller's `total_hearts` and `cheer_count` exactly as r_yell_icons
+   did, and the flat out-params carry the per-card tallies the old struct
+   returned. */
 
 /* reyell.rs:27 execute_re_yell */
 void rb_rules_execute_re_yell(GameState *g, int actor, const AbilityEffect *e)
@@ -2119,15 +2090,21 @@ void rb_rules_execute_perform_yell(GameState *g, int actor, const AbilityEffect 
     }
 
     /* Rule 8.3.12 / 8.3.15.1.1: process the re-yelled cards' blade-heart and
-       special-heart icons through the same shared helper as the primary yell,
+       special-heart icons through the same shared helper as the primary yell
+       (live.rs:112 process_yell_revealed_card_icons, the exported live.c twin),
        then execute their draws immediately (rule 8.3.12.1). The tallies are
        stashed for the phase code, which applies them before its success check. */
     int total_hearts[8];
     memset(total_hearts, 0, sizeof(total_hearts));
     int cheer = 0, draw_total = 0;
-    for (int i = 0; i < n_all; i++)
-        draw_total += r_yell_icons(g, all_drawn[i], override_color, total_hearts,
-                                   &cheer).draw_icons;
+    for (int i = 0; i < n_all; i++) {
+        int card_blade_hearts[8], note_icons = 0, draw_icons = 0;
+        rb_process_yell_revealed_card_icons(g, all_drawn[i], override_color,
+                                            total_hearts, &cheer,
+                                            card_blade_hearts, &note_icons,
+                                            &draw_icons);
+        draw_total += draw_icons;
+    }
     for (int i = 0; i < draw_total; i++) rb_draw(g, pl);
 
     for (int i = 0; i < 8; i++) g->re_yell_blade_hearts[i] = total_hearts[i];

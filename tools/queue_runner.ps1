@@ -14,21 +14,36 @@
 # sweep runs: tools/sweep_daemon.ps1 runs a SNAPSHOT copy of the binary, so
 # cargo can overwrite the installed one while the sweep is mid-round.
 #
-# Usage: pwsh tools/queue_runner.ps1
+# ⛔ IT ONLY RUNS AGAINST A SNAPSHOT. tools/isolated_tree_guard.ps1 hard-fails
+# unless ISOLATED_TREE names a directory that is not the live tree, and every
+# build takes an exclusive per-tree lock. A daemon pointed at the live tree makes
+# every in-tree measurement unsound: `make clean` from here deletes the .o files
+# a foreground build is about to link, and a half-copied data blob is a
+# byte-spliced ability string table rather than a build error. See the guard's
+# header for the incidents.
+#
+# Usage: ISOLATED_TREE=C:\snapshots\enginescan pwsh tools/queue_runner.ps1
 
 $ErrorActionPreference = "Continue"
-$root = Split-Path -Parent $PSScriptRoot
-$arena = "C:\rust_targets\release\bot_arena.exe"
-$outDir = Join-Path $root "test_output"
+
+. (Join-Path $PSScriptRoot "isolated_tree_guard.ps1")
+$tree = Assert-IsolatedTree -Purpose "queue_runner"
+
+$outDir = Join-Path $tree "test_output"
 $queue = Join-Path $outDir "arms.txt"
 $done = Join-Path $outDir "arms_done.txt"
 $results = Join-Path $outDir "arms_results.txt"
-$csv = Join-Path $outDir "qr_base_s11.csv"
-$outTxt = Join-Path $outDir "qr_base_s11.txt"
 $Games = 1200
 $seeds = @(11, 23, 31)
 
-Set-Location (Join-Path $root "engine")
+# Cargo's target dir is process-global, so a build here would otherwise fight
+# every other cargo in the machine over C:\rust_targets. Pin it inside the
+# snapshot: the daemon's builds then touch nothing outside ISOLATED_TREE.
+$env:CARGO_TARGET_DIR = Join-Path $tree ".cargo_target"
+$arena = if ($env:RB_ARENA_EXE) { $env:RB_ARENA_EXE }
+         else { Join-Path $env:CARGO_TARGET_DIR "release\bot_arena.exe" }
+
+Set-Location (Join-Path $tree "engine")
 
 function Note([string]$line) {
     Add-Content -Path $results -Value ("{0}  {1}" -f (Get-Date -Format "HH:mm:ss"), $line)
@@ -73,8 +88,19 @@ while ($true) {
     $envSpec = ($envSpec -split ";" | Where-Object { $_ -and $_ -notmatch "^\s*@(games|seeds)=" }) -join ";"
 
     Note "BUILD $label ($envSpec)"
-    $build = & cargo build --release --bin bot_arena 2>&1
-    if ($LASTEXITCODE -ne 0) {
+    # The lock is per tree, so two queue runners on DIFFERENT snapshots still
+    # build in parallel while two on the SAME snapshot serialise. Without it the
+    # loser links a half-replaced set of objects and reports a measurement of no
+    # build at all.
+    $lock = Enter-TreeBuildLock -Tree $tree -Label "queue_runner:$label"
+    try {
+        $build = & cargo build --release --bin bot_arena 2>&1
+        $buildRc = $LASTEXITCODE
+    }
+    finally {
+        Exit-TreeBuildLock -Lock $lock
+    }
+    if ($buildRc -ne 0) {
         Note "  BUILD-FAILED $label"
         ($next) | Add-Content -Path $done
         continue

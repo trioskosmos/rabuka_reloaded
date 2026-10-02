@@ -122,7 +122,26 @@ void rb_shuffle(int *a, int n) {
  * wire vocabulary carries that Rust's `Zone::from_str` does not list. They are
  * resolvable here today and dropping them would silently re-route those
  * destinations to the caller's hand fallback (draw.c:92-95). Keeping them is
- * the pre-existing behaviour and is NOT a Rust claim. */
+ * the pre-existing behaviour and is NOT a Rust claim.
+ *
+ * RESIDUE (2026-10-03, checklist I7): the behaviour above is correct and both
+ * arms are in place; three COMMENTS in files this task does not own still
+ * describe the OLD, lying table and now contradict it:
+ *   src/ability/effects/draw.c:65-74  "rb_zone_of_str (engine.c:60) collapses
+ *     deck_bottom onto RB_ZONE_DECK and has no energy_deck arm at all"
+ *   src/ability/effects/draw.c:66     "engine.c:60" (the table moved to :126)
+ *   src/core/modifiers.c:610          "rb_zone_of_str must NOT be used here"
+ * The CODE in draw.c is right and needs no change — the dedicated string arms at
+ * draw.c:77 and :84 are still load-bearing, and now for the OPPOSITE reason:
+ * with rb_zone_of_str returning 0 for both spellings, reaching rb_zone_of_str at
+ * all would send them to the hand catch-all. Only the prose is stale.
+ *
+ * RESIDUE (rb_turn): confirmed a thin headless driver over rb_advance_phase with
+ * no second turn machine left. What remains, all deliberate and all documented
+ * at :1475-1494: the 256-step guard, the `-1` skip answer drain, and the fact
+ * that `rb_game_init` now stops at RB_PHASE_RPS (so the CLI batch mode plays an
+ * empty game until a host policy exists over rb_generate_action_candidates).
+ * Nothing here reintroduces turn state. */
 int rb_zone_of_str(const char *s, RbZone *out) {
     if (!s || !out) return 0;
     /* Shared rows — see the table note above. */
@@ -1462,9 +1481,13 @@ int rb_play_card(GameState *g, int pl, int hand_idx) {
  *                          (phases.rs:1076 -> trigger_scan.rs:73-83), so the C's
  *                          per-player latch is C-local. The rollover clears it.
  *   player_cannot_activate C twin of Rust's cannot_activate_members, which
- *   n_cannot_active_cards  phases.rs:279 DOES clear; the rollover does too, which
- *                          is why tests/test_parity_restriction.c:947-948 no
- *                          longer has to zero the field by hand for a clean probe.
+ *   n_cannot_active_cards  phases.rs:279 DOES clear; the rollover does too.
+ *   CORRECTION to the earlier claim here that tests/test_parity_restriction.c
+ *   :947-948 "no longer has to zero the field by hand": it still zeroes it, at
+ *   test_parity_restriction.c:465-466 / :923-924 / :1006-1007, and :947-948 is a
+ *   `board_begin` call. Those are per-sub-test isolation on a fresh board, not
+ *   the rollover, so the rollover clear at src/turn/phase.c:427-429 is still
+ *   needed and still correct. RESIDUE: tests/ is not this task's to edit.
  *   n_prohibition          C-local prohibition notes (state.c/rules.c/misc.c
  *                          writers), no Rust analogue. Cleared by the rollover.
  *   n_selected_cards       C-local cross-effect selection buffer; choice.c clears

@@ -1,4 +1,4 @@
-﻿/* cost.c — complete translation of engine/src/ability/cost.rs
+/* cost.c — complete translation of engine/src/ability/cost.rs
    Mirrors pay_deferred_costs, validate_cost, pay_cost, pay_cost_inner,
    handle_optional_cost_payment, handle_pay_cost_all_discard,
    get_change_state_candidates, has_skip_prompt, pay_cost_move_cards,
@@ -13,6 +13,15 @@
    Deferred sub-costs live in GameState::queue (owned deep clones) so they
    survive across choice pauses and cannot dangle when the caller's tree is
    freed — mirrors Rust AbilityResolver.pending_deferred_costs. */
+/* Rust's `Option<i16>` has two states at this boundary and the C needs both
+   spelled apart, because -1 already means "no activating card" in GameState:
+     RB_ACTIVATING_NONE     — Rust's None
+     RB_ACTIVATING_DERIVED  — "reconstruct it the way pay time does", i.e.
+                              handlers.rs:185-187 passing `gs.activating_card`
+                              through cost_self_activating_card. */
+#define RB_ACTIVATING_NONE    (-1)
+#define RB_ACTIVATING_DERIVED (-1000)
+
 static int s_pending_energy_payment;
 static int s_stage_select_intent;
 static int s_conditional_choice;
@@ -63,6 +72,37 @@ AbilityEffect *rb_effect_deep_clone(const AbilityEffect *src);
 void rb_effect_free(AbilityEffect *e);
 /* forward: bag helpers are defined at the bottom of this file */
 static void bag_push(RbBag *b, int c);
+/* forward: ability_queue.c */
+int rb_queue_current_entry(const GameState *g);
+
+/* ── rb_record_cost_paid (game_state/mod.rs:404-414) ──────────────────────────
+   The ONLY writer of `cards_paid_cost_this_turn`, and it had none tree-wide:
+   core/modifiers.c:780-833 documents the body but explicitly leaves it
+   uncompiled ("the one caller is the thing that has to be written first").
+   Both of the callers that live in THIS file now exist, so the body is
+   compiled here rather than in a file this change does not own.
+
+   A SET, not a tally (mod.rs:397-398): the clause it feeds is 「このメンバーが、
+   自分のカードの能力のコストを支払うため」 (PL!-pb2-021-N 南ことり) — "paid at
+   least once this turn" — so two payments by the same member must still read as
+   one card.
+
+   Rust call sites, of five:
+     handlers.rs:1389  accept_optional_move_cost   — LANDED below
+     handlers.rs:1477  handle_optional_cost_payment— LANDED below
+     choice.rs:734 / :763 / :948                    — still missing (choice.c) */
+void rb_record_cost_paid(GameState *g) {
+    if (!g) return;
+    int cur = rb_queue_current_entry(g);
+    if (cur < 0 || cur >= g->queue.n_entries) return;
+    int cid = g->queue.entries[cur].card_id;
+    if (cid < 0) return;
+    for (int i = 0; i < g->n_cards_paid_cost_this_turn; i++)
+        if (g->cards_paid_cost_this_turn[i] == cid) return;
+    if (g->n_cards_paid_cost_this_turn < (int)(sizeof(g->cards_paid_cost_this_turn) /
+                                               sizeof(g->cards_paid_cost_this_turn[0])))
+        g->cards_paid_cost_this_turn[g->n_cards_paid_cost_this_turn++] = cid;
+}
 
 /* ── effect-field helpers (mirrors AbilityEffect::*_any() getters) ── */
 static const char *eff_extra(const AbilityEffect *e, const char *k) {
@@ -228,6 +268,134 @@ static int card_matches_group_name_first(int card_id, const char *group_names) {
     return rb_card_matches_group_str(card_id, g);
 }
 
+/* ══════════════════════════════════════════════════════════════════════════
+   Shared display labels — handlers.rs:108-166 needs them and the Rust twins
+   are not reachable from C:
+
+     - util::card_plural            (ability/util/labels.rs:9-11)
+     - util::card_type_label        (ability/util/labels.rs:24-32)
+     - util::card_type_label_ja     (ability/util/labels.rs:34-42)
+
+   look.c:97 and describe.c:1816-1822 each carry a private twin of the first
+   two, so neither can be called from here without editing a file this change
+   does not own.
+
+   `card_type_label` must be the labels.rs pair, NOT describe.rs's
+   `card_type_label_inner` (describe.rs:71-91, exported as
+   rb_desc_card_type_label): the two disagree on exactly one input —
+   energy_card renders as "energy" in describe.rs:86 and "energy card" in
+   labels.rs:29 — and handlers.rs:112 / :146 call the labels.rs one.
+   ══════════════════════════════════════════════════════════════════════════ */
+static const char *cost_card_plural(int count) {
+    return count == 1 ? "card" : "cards";
+}
+static const char *cost_card_type_label(const char *ct) {
+    if (!ct) return "card";
+    if (!strcmp(ct, "member_card")) return "member";
+    if (!strcmp(ct, "live_card"))   return "live card";
+    if (!strcmp(ct, "energy_card")) return "energy card";
+    return ct;
+}
+static const char *cost_card_type_label_ja(const char *ct) {
+    if (!ct) return "";
+    if (!strcmp(ct, "member_card")) return "メンバー";
+    if (!strcmp(ct, "live_card"))   return "ライブカード";
+    if (!strcmp(ct, "energy_card")) return "エネルギー";
+    return ct;
+}
+
+/* The operator's English/Japanese phrase. `op` is the wire spelling of
+   `AbilityCost::cost_limit_operator` (core/card.rs:2811-2817: ">=", "<=",
+   ">", "<", "=" with "==" as an alias). handlers.rs:128 / :155 default the
+   field to Operator::Lte, and Operator is a closed enum there, so an
+   unrecognised spelling takes the Lte branch — exactly what `unwrap_or(Lte)`
+   does for the absent field. */
+static const char *cost_op_word(const char *op, int ja) {
+    int is_lte = !op || !*op || !strcmp(op, "<=");
+    if (ja)
+        return is_lte ? "以下" : !strcmp(op, "<") ? "未満"
+             : !strcmp(op, ">=") ? "以上" : !strcmp(op, ">") ? "超" : "ちょうど";
+    return is_lte ? "or less" : !strcmp(op, "<") ? "less than"
+         : !strcmp(op, ">=") ? "or more" : !strcmp(op, ">") ? "more than"
+         : "equal to";
+}
+
+/* `Vec<String>::join(sep)` over a comma-joined extras value. */
+static void cost_join_csv(char *out, size_t outsz, const char *csv, const char *sep) {
+    out[0] = '\0';
+    if (!csv || !*csv) return;
+    char buf[256];
+    strncpy(buf, csv, sizeof(buf) - 1);
+    buf[sizeof(buf) - 1] = '\0';
+    size_t used = 0;
+    char *tok = strtok(buf, ",");
+    while (tok) {
+        size_t need = strlen(tok) + strlen(sep) + 1;
+        if (used + need > outsz) break;
+        if (used) { strcpy(out + used, sep); used += strlen(sep); }
+        strcpy(out + used, tok);
+        used += strlen(tok);
+        tok = strtok(NULL, ",");
+    }
+    out[used] = '\0';
+}
+
+/* ── cost_filter_desc_en / cost_filter_desc_ja (handlers.rs:108-166) ─────────
+   The one place a move_cards cost's filters are spelled out for the player.
+   BOTH spellings were absent from this file: the hand-cost prompt at :817-826
+   hard-coded "Select %d card(s) from hand", so a cost filtered to
+   「『Liella!』のメンバーカードを1枚」 was announced as a bare card pick, and
+   the Japanese prompt this same function also builds was missing entirely.
+   Emits "" when the cost carries no filter at all (handlers.rs:138 / :165). */
+static void cost_filter_desc(const AbilityEffect *cost, int ja, char *out, size_t outsz) {
+    char parts[8][192];
+    int np = 0;
+    const char *ct = eff_extra(cost, "card_type");
+    if (ct && *ct && np < 8) {
+        snprintf(parts[np], sizeof parts[0], "%s",
+                 ja ? cost_card_type_label_ja(ct) : cost_card_type_label(ct));
+        np++;
+    }
+    const char *groups = eff_extra(cost, "group_names");
+    if (groups && *groups && np < 8) { cost_join_csv(parts[np], sizeof parts[0], groups, " / "); if (parts[np][0]) np++; }
+    const char *chars = eff_extra(cost, "characters");
+    if (chars && *chars && np < 8) { cost_join_csv(parts[np], sizeof parts[0], chars, " / "); if (parts[np][0]) np++; }
+    const char *limit = eff_extra(cost, "cost_limit");
+    if (limit && *limit && np < 8) {
+        const char *op = eff_extra(cost, "cost_limit_operator");
+        if (ja) snprintf(parts[np], sizeof parts[0], "コスト%s %s", cost_op_word(op, 1), limit);
+        else    snprintf(parts[np], sizeof parts[0], "cost %s %s", cost_op_word(op, 0), limit);
+        np++;
+    }
+    if (np == 0) { out[0] = '\0'; return; }
+    /* handlers.rs:138 joins the EN parts with ", " inside " (...)" and :165
+       joins the JA parts with the FULLWIDTH comma inside FULLWIDTH
+       parentheses. Both separators are spelled as escapes so no multi-byte
+       literal can be split by an editor. */
+    const char *sep = ja ? "\xE3\x80\x81" : ", ";
+    size_t used = 0;
+    for (int i = 0; i < np; i++) {
+        size_t add = strlen(parts[i]) + strlen(sep) + 1;
+        if (used + add > outsz) break;
+        if (used) { strcpy(out + used, sep); used += strlen(sep); }
+        strcpy(out + used, parts[i]);
+        used += strlen(parts[i]);
+    }
+    out[used] = '\0';
+    if (used == 0) return;
+    if (ja) {
+        char body[120];
+        strncpy(body, out, sizeof(body) - 1);
+        body[sizeof(body) - 1] = '\0';
+        snprintf(out, outsz, "\xEF\xBC\x88%s\xEF\xBC\x89", body);
+    } else {
+        char body[120];
+        strncpy(body, out, sizeof(body) - 1);
+        body[sizeof(body) - 1] = '\0';
+        snprintf(out, outsz, " (%s)", body);
+    }
+}
+
 /* ── Mirror cost.rs: get_change_state_candidates ── */
 
 /* The card a `self_cost` leg resolves against.
@@ -254,17 +422,17 @@ static int cost_self_activating_card(const GameState *g) {
     return s_cost_deferred_host;
 }
 
-static int get_change_state_candidates(const GameState *g, int actor,
-                                       const char *target,
-                                       const char *card_type,
-                                       const char *group_names,
-                                       int exclude_self,
-                                       int self_cost,
-                                       int check_name,
-                                       const char *state,
-                                       int *out_positions, int max) {
+static int get_change_state_candidates_for(const GameState *g, int actor,
+                                           const char *target,
+                                           const char *card_type,
+                                           const char *group_names,
+                                           int exclude_self,
+                                           int self_cost,
+                                           int check_name,
+                                           const char *state,
+                                           int activating_id,
+                                           int *out_positions, int max) {
     const RbPlayer *P = &g->p[actor];
-    int activating_id = self_cost ? cost_self_activating_card(g) : g->activating_card;
     int n = 0;
     for (int i = 0; i < RB_STAGE_SIZE && n < max; i++) {
         int id = P->stage[i];
@@ -296,6 +464,25 @@ static int get_change_state_candidates(const GameState *g, int actor,
         out_positions[n++] = id;
     }
     return n;
+}
+
+/* The DERIVED-activating-card spelling every pay-time call site uses. Rust's
+   `get_change_state_candidates` takes the activating card as an argument; at pay
+   time that is `gs.activating_card`, which the C has to reconstruct (see
+   cost_self_activating_card above). */
+static int get_change_state_candidates(const GameState *g, int actor,
+                                       const char *target,
+                                       const char *card_type,
+                                       const char *group_names,
+                                       int exclude_self,
+                                       int self_cost,
+                                       int check_name,
+                                       const char *state,
+                                       int *out_positions, int max) {
+    int activating_id = self_cost ? cost_self_activating_card(g) : g->activating_card;
+    return get_change_state_candidates_for(g, actor, target, card_type, group_names,
+                                           exclude_self, self_cost, check_name, state,
+                                           activating_id, out_positions, max);
 }
 
 /* ── player_prefix ── */
@@ -505,7 +692,7 @@ static int execute_move_cards(GameState *g, int actor, const AbilityEffect *cost
         if (!strcmp(src, "hand")) src_bag = &P->hand;
         else if (!strcmp(src, "deck") || !strcmp(src, "deck_top")) src_bag = &P->deck;
         else if (!strcmp(src, "waitroom") || !strcmp(src, "discard")) src_bag = &P->discard;
-        else if (!strcmp(src, "energy")) src_bag = &P->energy;
+        else if (!strcmp(src, "energy") || !strcmp(src, "energy_zone")) src_bag = &P->energy;
 
         if (src_bag) {
             while (moved < count && src_bag->n > 0) {
@@ -534,16 +721,25 @@ int execute_place_energy_under_member_non_optional(GameState *g, int actor, cons
 
 /* ── cost_zone_cards ──
    Mirror util::count_in_zone's zone coverage. Returns the card array for the
-   four source zones validate_cost cares about, or NULL for every other zone
+   source zones this file's validators care about, or NULL for every other zone
    (Rust handlers.rs:209-214 returns Ok(()) for anything that is not
-   Hand/Stage/Waitroom/Energy — e.g. a deck-sourced cost is never validated). */
+   Hand/Stage/Waitroom/Energy — e.g. a deck-sourced cost is never validated).
+
+   "energy_zone" was MISSING here and its absence was a refusal, not a pass:
+   ability/enums.rs:98 spells the alias `"energy" | "energy_zone" => Energy`, and
+   six corpus costs carry the wire form — PL!SP-bp5-111-P＋, PL!SP-bp7-007-P,
+   PL!SP-bp7-010-P, PL!SP-bp7-022-N, PL!SP-bp7-026-L, PL!SP-bp7-027-L — so
+   `Zone::from_str` resolved them to Zone::Energy on the Rust side while every
+   C zone read here fell through to "not a cost zone" and cost 0
+   (`matching_count = 0 < count`). */
 static const int *cost_zone_cards(const RbPlayer *P, const char *src, int *n) {
     *n = 0;
     if (!src || !*src) return NULL;
     if (!strcmp(src, "hand"))          { *n = P->hand.n;          return P->hand.cards; }
     if (!strcmp(src, "waitroom") ||
         !strcmp(src, "discard"))       { *n = P->discard.n;       return P->discard.cards; }
-    if (!strcmp(src, "energy"))        { *n = P->energy.n;        return P->energy.cards; }
+    if (!strcmp(src, "energy") ||
+        !strcmp(src, "energy_zone"))   { *n = P->energy.n;        return P->energy.cards; }
     if (!strcmp(src, "stage")) {
         static int stage_ids[RB_STAGE_SIZE];
         int k = 0;
@@ -555,14 +751,15 @@ static const int *cost_zone_cards(const RbPlayer *P, const char *src, int *n) {
     return NULL;
 }
 
-/* ── validate_cost ── */
-static int validate_cost(const GameState *g, int actor, const AbilityEffect *cost) {
-    if (!cost) return 1;
-    if (cost_is_sequential(cost)) {
-        for (int i = 0; i < cost->n_child; i++)
-            if (!validate_cost(g, actor, cost->child[i])) return 0;
-        return 1;
-    }
+/* ── validate_cost ──
+   Rust handlers.rs:169-181: SequentialCost recurses into every sub-cost, and
+   everything else goes to the leaf check. The leaf body is factored out below
+   as validate_leaf_cost_for so validate_mandatory_cost (handlers.rs:192-271,
+   281-309) can share it — the two differ ONLY in the activating card they pass
+   and in the sub-costs they accept. */
+static int validate_leaf_cost_for(const GameState *g, int actor,
+                                  const AbilityEffect *cost,
+                                  int activating_card) {
     if (cost->action && !strcmp(cost->action, "choice_condition")) return 1;
     if (cost_is_move_cards(cost)) {
         const char *src = cost->source ? cost->source : "";
@@ -602,15 +799,231 @@ static int validate_cost(const GameState *g, int actor, const AbilityEffect *cos
             const char *group_names = eff_extra(cost, "group_names");
             int self_cost = eff_bool(cost, "self_cost", 0);
             int pos[RB_STAGE_SIZE];
-            int n = get_change_state_candidates(g, actor, target, card_type,
-                                                group_names, exclude_self,
-                                                self_cost, 0, "active",
-                                                pos, RB_STAGE_SIZE);
+            /* handlers.rs:65 — get_change_state_candidates resolves
+               `cost.target` itself. The C read the CALLER's seat, so a
+               「(::Petite:: Homework を1人ウェイトにし)」-shaped cost filtered
+               the wrong player's stage here. */
+            int ctp = rb_resolve_target_player(g, target);
+            int ctpl = (ctp >= 0) ? ctp : actor;
+            /* handlers.rs:185-187 — the pay-time spelling passes
+               `gs.activating_card`; the offer/activation spelling passes the
+               card under consideration, because `gs.activating_card` is not set
+               yet when the offer is generated. */
+            int aid = (activating_card == RB_ACTIVATING_DERIVED)
+                          ? cost_self_activating_card(g) : activating_card;
+            int n = get_change_state_candidates_for(g, ctpl, target, card_type,
+                                                    group_names, exclude_self,
+                                                    self_cost, 0, "active", aid,
+                                                    pos, RB_STAGE_SIZE);
             if (n == 0) return 0;
         }
         return 1;
     }
     return 1;
+}
+
+static int validate_cost(const GameState *g, int actor, const AbilityEffect *cost) {
+    if (!cost) return 1;
+    if (cost_is_sequential(cost)) {
+        for (int i = 0; i < cost->n_child; i++)
+            if (!validate_cost(g, actor, cost->child[i])) return 0;
+        return 1;
+    }
+    return validate_leaf_cost_for(g, actor, cost, RB_ACTIVATING_DERIVED);
+}
+
+/* ── validate_mandatory_cost (handlers.rs:281-309) ────────────────────────────
+   The UPFRONT payability gate for offer generation and activation. It had NO C
+   counterpart: game_setup.c:1199 calls rb_validate_cost, which is the PAY-TIME
+   twin (handlers.rs:169) and is strictly stronger — it walks optional and
+   any-number sub-costs too, so a 「…してもよい」 cost whose optional leg is
+   currently unaffordable withheld the whole ability from the offer list.
+
+   Three rules separate the two, and each is a live difference:
+
+     - handlers.rs:287-292 — a whole optional / any-number / max cost resolves
+       to pay-zero-or-skip, so it is NEVER a refusal;
+     - handlers.rs:294-302 — SequentialCost recurses, ChoiceCondition passes
+       (options are chosen at pay time), and PayEnergy is owned by the energy
+       gates (check_mandatory_activation_cost + the offer-site energy filter);
+     - handlers.rs:192-196 — the activating card is passed EXPLICITLY, because
+       `gs.activating_card` is not set when the offer is generated. It is what
+       self_cost / exclude_self filter against.
+
+   Live Rust call sites, all of which want this and not rb_validate_cost:
+     engine/src/game/game_setup.rs:2188  (stage 起動 offer)
+     engine/src/game/game_setup.rs:2295  (discard 起動 offer)
+     engine/src/turn/actions/mod.rs:559   (activate_ability, before the card
+                                          leaves hand) */
+static int validate_mandatory_cost(const GameState *g, int actor,
+                                   const AbilityEffect *cost,
+                                   int activating_card) {
+    if (!cost) return 1;
+    if (cost->is_optional || eff_bool(cost, "any_number", 0) ||
+        eff_bool(cost, "max", 0))
+        return 1;
+    if (cost_is_sequential(cost)) {
+        for (int i = 0; i < cost->n_child; i++)
+            if (!validate_mandatory_cost(g, actor, cost->child[i], activating_card))
+                return 0;
+        return 1;
+    }
+    if (cost->action && !strcmp(cost->action, "choice_condition")) return 1;
+    if (cost_is_energy(cost)) return 1;
+    return validate_leaf_cost_for(g, actor, cost, activating_card);
+}
+
+/* ── offer_same_unit_cost (handlers.rs:648-711) ──────────────────────────────
+   「手札の同じユニット名を持つカード2枚を控え室に置いてもよい」 — the optional
+   same-unit hand cost. It was MISSING from this file, and its absence was not
+   inert: pay_cost_move_cards computed `is_from_hand = hand && !same_unit`, so
+   a same-unit cost skipped the hand-selection offer entirely, fell through to
+   the raw zone count, and `execute_move_cards` then discarded `count`
+   ARBITRARY hand cards with no unit check and no prompt. The two corpus cards
+   that carry the flag — PL!HS-PR-016-PR (日野下花帆) and PL!HS-PR-017-PR
+   (村野さやか), both ライブ開始時, abilities.json:28171-28180 / :28223-28232 —
+   therefore paid themselves from the top of hand whatever it held.
+
+   Rust instead offers ONE card, filtered to units that have at least `count`
+   matching members in hand, so the second discard (paid by the shared-gate
+   re-entry at handlers.rs:1582) is guaranteed to come from the same unit.
+   Returns 1 handled, 0 refused. */
+static int offer_same_unit_cost(GameState *g, int actor, const AbilityEffect *cost,
+                                int count, int optional, int is_activation) {
+    const char *target = cost->target ? cost->target : "self";
+    int tp = rb_resolve_target_player(g, target);
+    int tpl = (tp >= 0) ? tp : actor;
+    const RbPlayer *P = &g->p[tpl];
+    const char *card_type = eff_extra(cost, "card_type");
+    RbCardFilter filter;
+    rb_effect_filter_subset(cost, &filter);
+    /* handlers.rs:662 `filter.card_type = card_type_owned.as_deref()` —
+       the cost's own card_type REPLACES the one filter_subset derived. */
+    filter.card_type[0] = '\0';
+    if (card_type && *card_type)
+        strncpy(filter.card_type, card_type, sizeof(filter.card_type) - 1);
+
+    /* Group the eligible hand cards by unit name. handlers.rs:664-673 keys the
+       map on `card.unit.clone().unwrap_or_default()`, so a card with NO unit
+       groups under "" — and the eligible test at :679-681 reads the same ""
+       for it, so a hand of unit-less members is eligible exactly as Rust has
+       it. rb_card_unit_name is the canonical accessor (core/data.c:364-371):
+       `Card.unit_idx` + rb_card_string cannot tell "absent" from index 0xFFFF. */
+    static char unit_names[RB_MAX_HAND][64];
+    static int  unit_counts[RB_MAX_HAND];
+    int n_units = 0;
+    for (int i = 0; i < P->hand.n; i++) {
+        int cid = P->hand.cards[i];
+        if (!rb_count_matching_filter(&filter, &cid, 1)) continue;
+        const char *u = rb_card_unit_name(cid);
+        int found = -1;
+        for (int k = 0; k < n_units; k++)
+            if (!strcmp(unit_names[k], u)) { found = k; break; }
+        if (found < 0) {
+            if (n_units >= RB_MAX_HAND) continue;
+            found = n_units++;
+            strncpy(unit_names[found], u ? u : "", sizeof(unit_names[0]) - 1);
+            unit_names[found][sizeof(unit_names[0]) - 1] = '\0';
+            unit_counts[found] = 0;
+        }
+        unit_counts[found]++;
+    }
+    int eligible[RB_MAX_ZONE];
+    int n_eligible = 0;
+    for (int i = 0; i < P->hand.n && n_eligible < RB_MAX_ZONE; i++) {
+        int cid = P->hand.cards[i];
+        const char *u = rb_card_unit_name(cid);
+        for (int k = 0; k < n_units; k++)
+            if (!strcmp(unit_names[k], u) && unit_counts[k] >= count) {
+                eligible[n_eligible++] = i;
+                break;
+            }
+    }
+    if (n_eligible == 0) {
+        /* handlers.rs:688-696 — an optional, non-activation cost with no
+           eligible unit simply returns (the colon gate then suppresses the
+           effect); anything else is a refusal. */
+        if (optional && !is_activation) return 1;
+        return 0;
+    }
+    int is_optional = optional && !is_activation;
+    RbChoice *pending = &g->queue.pending;
+    memset(pending, 0, sizeof(*pending));
+    pending->kind = RB_CHOICE_SELECT_CARD;
+    strncpy(pending->zone, "hand", sizeof(pending->zone) - 1);
+    pending->count = 1;
+    pending->allow_skip = is_optional;
+    pending->route = RB_ROUTE_SELECT_CARDS;
+    snprintf(pending->description, sizeof(pending->description),
+             "Select 1 card (need %d with the same unit name)", count);
+    snprintf(pending->description_ja, sizeof(pending->description_ja),
+             "同名ユニットが%d枚必要なカードを1枚選択", count);
+    if (card_type && *card_type)
+        strncpy(pending->card_type, card_type, sizeof(pending->card_type) - 1);
+    snprintf(pending->target_player_id, sizeof(pending->target_player_id),
+             "p%d", tpl + 1);
+    for (int i = 0; i < n_eligible && i < RB_MAX_ZONE; i++)
+        pending->filtered_indices[i] = eligible[i];
+    pending->n_filtered_indices = n_eligible;
+    g->queue.has_pending = 1;
+    cost_publish_pending(g, actor);
+    return 1;
+}
+
+/* ── check_zone_cost_availability (handlers.rs:715-776) ───────────────────────
+   The generic (non-hand) zone gate. Two divergences from the Rust it replaced:
+
+     - it counted the WHOLE zone (`P->hand.n`, `P->deck.n`, ...) instead of
+       `util::count_in_zone(player, zone, &filter, card_db)` (handlers.rs:735).
+       A cost filtered to one card type therefore passed this gate on the
+       strength of unrelated cards, and `execute_move_cards` then moved cards
+       the cost filter rejects;
+     - it read `g->p[actor]` (handlers.rs:723 resolves `cost.target`, which
+       defaults to "self"), so a cost aimed at the opponent was checked against
+       the wrong player's zones.
+
+   The Q104 / Rule 10.2.1 deck_top refresh allowance (handlers.rs:753-774) is
+   kept: deck_top counts the DECK, and a shortfall may be made up from the
+   waitroom. */
+static int check_zone_cost_availability(GameState *g, int actor,
+                                        const AbilityEffect *cost,
+                                        const char *source, int count) {
+    const char *target = cost->target ? cost->target : "self";
+    int tp = rb_resolve_target_player(g, target);
+    int tpl = (tp >= 0) ? tp : actor;
+    const RbPlayer *P = &g->p[tpl];
+    const char *card_type = eff_extra(cost, "card_type");
+    RbCardFilter filter;
+    rb_effect_filter_subset(cost, &filter);
+    /* handlers.rs:727-728 — the cost's own card_type and cost_limit replace
+       whatever filter_subset derived. */
+    filter.card_type[0] = '\0';
+    if (card_type && *card_type)
+        strncpy(filter.card_type, card_type, sizeof(filter.card_type) - 1);
+    const char *cost_limit = eff_extra(cost, "cost_limit");
+    filter.has_cost_limit = 0;
+    filter.cost_limit = 0;
+    if (cost_limit && *cost_limit) {
+        filter.has_cost_limit = 1;
+        filter.cost_limit = atoi(cost_limit);
+        const char *op = eff_extra(cost, "cost_limit_operator");
+        if (op && *op) {
+            strncpy(filter.cost_op, op, sizeof(filter.cost_op) - 1);
+            filter.cost_op[sizeof(filter.cost_op) - 1] = '\0';
+        }
+    }
+    int is_deck_top = !strcmp(source, "deck_top");
+    /* handlers.rs:730-734 — a deck_top cost is COUNTED against the deck. */
+    const char *zone_name = is_deck_top ? "deck" : source;
+    int n_cards = 0;
+    const int *cards = cost_zone_cards(P, zone_name, &n_cards);
+    int matching = cards ? rb_count_matching_filter(&filter, cards, n_cards) : 0;
+    if (matching >= count) return 1;
+    if (!is_deck_top) return 0;
+    n_cards = 0;
+    cards = cost_zone_cards(P, "waitroom", &n_cards);
+    int waitroom_matching = cards ? rb_count_matching_filter(&filter, cards, n_cards) : 0;
+    return matching + waitroom_matching >= count;
 }
 
 /* ── pay_cost_move_cards ── */
@@ -815,15 +1228,34 @@ static int pay_cost_move_cards(GameState *g, int actor, const AbilityEffect *cos
         int max_str = is_any_number ? (eff_bool(cost, "max", 0) ? (count < n_matching ? count : n_matching) : n_matching) : n_matching;
 
         char desc[256];
+        char desc_ja[256];
+        char filter_desc[128];
+        cost_filter_desc(cost, 0, filter_desc, sizeof filter_desc);
+        /* handlers.rs:575-578 — only a hand->waitroom/discard cost announces
+           the destination; every other shape prints no suffix. */
+        const char *dest_opt = cost->destination;
+        int is_hand_to_waitroom = !strcmp(source, "hand") && dest_opt &&
+            (!strcmp(dest_opt, "discard") || !strcmp(dest_opt, "waitroom"));
+        const char *dest_str = is_hand_to_waitroom ? " to waitroom" : "";
         if (is_any_number) {
             snprintf(desc, sizeof(desc),
-                     "Select any number of card(s) from hand (0-%d) (or skip)",
-                     max_str);
+                     "Select any number of %s%s from hand (0-%d)%s (or skip)",
+                     cost_card_plural(max_str), filter_desc, max_str, dest_str);
         } else {
             snprintf(desc, sizeof(desc),
-                     "Select %d card(s) from hand%s",
-                     effective_count, is_optional ? " (or skip)" : "");
+                     "Select %d %s%s%s%s",
+                     effective_count, cost_card_plural(effective_count),
+                     filter_desc, dest_str, is_optional ? " (or skip)" : "");
         }
+        char filter_desc_ja[128];
+        cost_filter_desc(cost, 1, filter_desc_ja, sizeof filter_desc_ja);
+        if (is_any_number)
+            snprintf(desc_ja, sizeof(desc_ja),
+                     "手札から任意枚控え室に置く%s（スキップ可）", filter_desc_ja);
+        else
+            snprintf(desc_ja, sizeof(desc_ja), "手札から%d枚%s控え室に置く%s",
+                     effective_count, filter_desc_ja,
+                     is_optional ? "（スキップ可）" : "");
 
         RbChoice *pending = &g->queue.pending;
         memset(pending, 0, sizeof(*pending));
@@ -833,6 +1265,10 @@ static int pay_cost_move_cards(GameState *g, int actor, const AbilityEffect *cos
         pending->allow_skip = is_optional;
         pending->route = RB_ROUTE_SELECT_CARDS;
         strncpy(pending->description, desc, sizeof(pending->description) - 1);
+        /* handlers.rs:614-626 builds the JA prompt from the SAME
+           cost_filter_desc_ja whose twin this file previously lacked, and
+           attaches it with `.description_ja(Some(..))`. */
+        strncpy(pending->description_ja, desc_ja, sizeof(pending->description_ja) - 1);
         if (card_type && *card_type)
             strncpy(pending->card_type, card_type, sizeof(pending->card_type) - 1);
         const char *group_names_cost = eff_extra(cost, "group_names");
@@ -909,27 +1345,14 @@ static int pay_cost_move_cards(GameState *g, int actor, const AbilityEffect *cos
         return 1;
     }
 
-    /* Non-hand source: check availability then execute */
+    /* handlers.rs:838-847 — the generic zone path. A same-unit cost is routed
+       to its own offer FIRST (it needs a unit-grouped candidate set, not the
+       generic zone count), then every other non-empty source is gated on
+       check_zone_cost_availability. */
     if (*source) {
-        const RbPlayer *P = &g->p[actor];
-        int available = 0;
-        if (!strcmp(source, "stage")) {
-            for (int i = 0; i < RB_STAGE_SIZE; i++)
-                if (P->stage[i] != RB_EMPTY_SLOT) available++;
-        } else if (!strcmp(source, "hand")) {
-            available = P->hand.n;
-        } else if (!strcmp(source, "deck") || !strcmp(source, "deck_top")) {
-            available = P->deck.n;
-            if (available < count && !strcmp(source, "deck_top")) {
-                available += P->discard.n;
-                if (available == 0) return 0;
-            }
-        } else if (!strcmp(source, "waitroom") || !strcmp(source, "discard")) {
-            available = P->discard.n;
-        } else if (!strcmp(source, "energy")) {
-            available = P->energy.n;
-        }
-        if (available < count) return 0;
+        if (same_unit)
+            return offer_same_unit_cost(g, actor, cost, count, optional, is_activation);
+        if (!check_zone_cost_availability(g, actor, cost, source, count)) return 0;
     }
 
     return execute_move_cards(g, actor, cost) >= 0;
@@ -1187,7 +1610,10 @@ static int pay_cost_inner(GameState *g, int actor, const AbilityEffect *cost) {
             snprintf(desc, sizeof(desc),
                      "Select energy card to pay (active: %d). Skip when done",
                      active_count);
-            strncpy(pending->description, desc, sizeof(pending->description) - 1);
+        strncpy(pending->description, desc, sizeof(pending->description) - 1);
+        /* handlers.rs:1133-1136 attaches this arm's JA prompt. */
+        snprintf(pending->description_ja, sizeof(pending->description_ja),
+                 "エネルギーカードを選択（アクティブ: %d）完了でスキップ", active_count);
             g->queue.has_pending = 1;
             g->queue.pending.route = RB_ROUTE_OPTIONAL_COST;
             s_pending_energy_payment = 0;
@@ -1376,6 +1802,15 @@ int rb_validate_cost(const GameState *g, int actor, const AbilityEffect *cost) {
     return validate_cost(g, actor, cost);
 }
 
+/* ── Public: rb_validate_mandatory_cost (handlers.rs:281-309) ─────────────────
+   The offer/activation twin of rb_validate_cost. `activating_card` is the card
+   under consideration, NOT g->activating_card — see the note above. */
+int rb_validate_mandatory_cost(const GameState *g, int actor,
+                               const AbilityEffect *cost, int activating_card) {
+    if (activating_card < 0) activating_card = RB_ACTIVATING_NONE;
+    return validate_mandatory_cost(g, actor, cost, activating_card);
+}
+
 /* ── Public: rb_pay_deferred_costs ──
    Mirrors Rust cost.rs:17-25: pay every stored deferred cost in order, then
    clear the list. Returns 0 (and clears the list) if any cost cannot be paid. */
@@ -1405,16 +1840,28 @@ int rb_pay_deferred_costs(GameState *g, int actor, const AbilityEffect *cost) {
     return result;
 }
 
-/* ── Public: rb_cost_clear_deferred ── (skip/decline paths discard the batch) */
-void rb_cost_clear_deferred(GameState *g) {
-    if (!g) return;
-    s_cost_deferred_host = -1;
-    for (int i = 0; i < g->queue.n_pending_deferred_costs; i++) {
-        rb_effect_free(g->queue.pending_deferred_costs[i]);
-        g->queue.pending_deferred_costs[i] = NULL;
-    }
-    g->queue.n_pending_deferred_costs = 0;
-}
+/* ── DELETED: rb_cost_clear_deferred ─────────────────────────────────────────
+   This was the port of Rust `AbilityResolver::discard_deferred_costs`
+   (engine/src/ability/cost/handlers.rs:35-37). It is deleted because it has no
+   live caller on EITHER side of the port:
+
+     - Rust: `discard_deferred_costs` is `pub`, but nothing in engine/src calls
+       it. The only other two touches of `awaiting.deferred_costs` are the push
+       at handlers.rs:1011 and an inline
+       `resolver.awaiting.deferred_costs.clear()` in
+       engine/src/ability/compound/conditional_on.rs:209 — the clear is spelled
+       out at its one real use site, which is what makes this method dead.
+     - C: nothing outside this file referenced rb_cost_clear_deferred, and this
+       file's own skip/decline arms never called it either.
+
+   The only remaining reason it existed was a false symmetry with
+   pay_deferred_costs (handlers.rs:20), which IS live — engine/src/ability/
+   choice.rs:210 and :916 call it, and the C mirrors that at choice.c:702,
+   :1501 and :2153.
+
+   include/rabuka.h:2523 still declares it; that prototype is now orphaned and
+   should go with this change. Leaving it does not break the link (nothing
+   references it), but it advertises a port that no longer exists. */
 
 /* ── cost_entry_route_is_optional ──
    The `is_effect_optional` of handlers.rs:1619
@@ -1501,17 +1948,54 @@ int rb_handle_optional_cost_payment(GameState *g, int actor, const AbilityEffect
         }
     }
 
+    /* `cost` is the entry's OWN cost: choice.c:3831 passes rb_entry_cost(g), so
+       it is Rust's `gs.entry_cost().cloned()` at handlers.rs:1482. Every block
+       below is guarded on it, exactly as `if let Some(cost) = ...` is. */
+
+    /* handlers.rs:1440-1441 — both flags are read BEFORE the entry is stamped
+       at :1462-1471, and the second one decides whether that stamping is
+       allowed to stand. */
+    int has_pending = rb_queue_has_pending_actions(g);
+    int has_cost = (rb_entry_cost(g) != NULL);
+
+    /* handlers.rs:1462-1471 — the pay answer stamps the entry DECIDED. Before
+       this the C stamped cost_paid / optional_cost_result only inside the
+       move_cards accept arm, so an energy gate and a change_state gate — the
+       other two shapes emit_pay_skip_gate is opened for — left the entry
+       un-paid after the player said yes: cost_paid stayed 0 (so the
+       POST_COST gates still considered the cost outstanding) and
+       optional_cost_result stayed at its zero-init 0, which is Rust's
+       Some(false) — i.e. the C reported a DECLINE for a payment.
+
+       Rust also resets optional_cost_result to None and re-arms the effect for
+       the `!has_cost && is_gated_effect_move` shape (an optional gate opened by
+       the EFFECT, not by a cost). That re-arm is NOT reproduced here: the C's
+       `decided` test for the shared gate is `g->queue.resume_mode == 5`
+       (move_missing.c:379), a C-only carrier that the choice-resume tail
+       clears, so there is nowhere in cost.c to leave a durable "already
+       decided" mark. Setting effect_started = 0 without one would re-open the
+       very gate the player just answered. See the KEEP-REPORT note. */
+    if (g->queue.cur >= 0 && g->queue.cur < g->queue.n_entries) {
+        g->queue.entries[g->queue.cur].cost_paid = 1;
+        g->queue.entries[g->queue.cur].optional_cost_result = 1;
+    }
+    /* handlers.rs:1476-1478 — a payment is recorded only when a cost was
+       actually paid. rb_record_cost_paid (core/modifiers.c, game_state/
+       mod.rs:404-414) had NO writer tree-wide; this is Rust call site #2 of
+       the five (handlers.rs:1389 is accept_optional_move_cost, below). */
+    if (has_cost) rb_record_cost_paid(g);
+
     /* handlers.rs:1479-1481 — the parked tail SHORT-CIRCUITS the whole
        entry-cost block. `has_pending` is read at :1440, before the entry is
        stamped at :1462-1471, and the arm at :1479 returns
        `self.resume_pending_actions(gs)` without ever reaching
        `if let Some(cost) = gs.entry_cost().cloned()` at :1482. So when the
        entry already owns a parked batch, answering "pay" does NOT tap the
-       gate's energy, does NOT re-enter pay_cost_move_cards for the gated
-       stage/energy source, and does NOT walk the sequential sub-costs — the
-       batch is the only thing that runs.
+       gate's energy, does NOT put the member to wait, does NOT re-enter
+       pay_cost_move_cards for the gated stage/energy source, and does NOT walk
+       the sequential sub-costs — the batch is the only thing that runs.
 
-       The C had no such test and fell straight through into all three, so a
+       The C had no such test and fell straight through into all four, so a
        pay answer on a queued entry re-charged the cost the gate had already
        been opened for and re-entered the move it was about to accept.
 
@@ -1522,31 +2006,13 @@ int rb_handle_optional_cost_payment(GameState *g, int actor, const AbilityEffect
        stays parked for it, exactly as it would for the two arms at the bottom
        of this function. Re-adding an execution here is the double-count that
        two previous agents measured as a regression. */
-    if (rb_queue_has_pending_actions(g)) return cost_arm_resume(g);
+    if (has_pending) return cost_arm_resume(g);
 
-    /* Gated effect move: shared-gate source zones (stage→waitroom,
-       energy→energy_deck) reached via MoveCards or first step of Sequential */
-    if (cost && cost->action && !strcmp(cost->action, "move_cards")) {
-        const char *src = cost->source ? cost->source : "";
-        if (!strcmp(src, "stage") ||
-            (!strcmp(src, "energy") && cost->destination &&
-             !strcmp(cost->destination, "energy_deck"))) {
-            AbilityEffect c = *cost;
-            c.is_optional = 0;
-            pay_cost_move_cards(g, actor, &c);
-            if (g->queue.cur >= 0 && g->queue.cur < g->queue.n_entries) {
-                g->queue.entries[g->queue.cur].cost_paid = 1;
-                g->queue.entries[g->queue.cur].optional_cost_result = 1;
-            }
-            return 1;
-        }
-    }
-
-    /* handlers.rs:1438-1446 — answering "pay" taps the gated cost's energy.
-       The gate is only ever opened when the printed amount is affordable
-       (handlers.rs:1130-1154 auto-skips otherwise), so an unaffordable
-       re-entry leaves the energy untouched rather than partially paying. */
-    if (cost && !cost_is_sequential(cost)) {
+    if (cost) {
+        /* handlers.rs:1483-1490 — answering "pay" taps the gated cost's energy.
+           The gate is only ever opened when the printed amount is affordable
+           (handlers.rs:1150-1160 auto-skips otherwise), so an unaffordable
+           re-entry leaves the energy untouched rather than partially paying. */
         int gate_energy = eff_energy_count(cost, 0);
         if (gate_energy > 0) {
             const char *tgt = cost->target ? cost->target : "self";
@@ -1555,36 +2021,136 @@ int rb_handle_optional_cost_payment(GameState *g, int actor, const AbilityEffect
             if (rb_energy_active_count(&g->p[tpl]) >= gate_energy)
                 rb_energy_pay(&g->p[tpl], gate_energy);
         }
-    }
 
-    /* Sequential sub-costs: pay each in order after player confirmed */
-    if (cost && cost_is_sequential(cost)) {
-        for (int i = 0; i < cost->n_child; i++) {
-            const AbilityEffect *sub = cost->child[i];
-            const char *sc = sub ? eff_extra(sub, "state_change") : NULL;
-            if (sub && sc && !strcmp(sc, "wait") && eff_bool(sub, "self_cost", 0)) {
-                /* handlers.rs:1455-1478 — Q159: the member must be on stage to
-                   be put to wait; Q137 / Rule 1.3.2.1: an already-waited member
-                   is left alone (the act itself does not happen). */
-                int self_id = cost_self_activating_card(g);
-                if (self_id < 0) return 0;
-                int on_stage = 0;
-                for (int s = 0; s < RB_STAGE_SIZE; s++)
-                    if (g->p[actor].stage[s] == self_id) { on_stage = 1; break; }
-                if (!on_stage) return 0;
-                const char *ori = rb_mods_get_orientation(&g->mods, self_id);
-                if (!ori || strcmp(ori, "wait") != 0)
-                    rb_mods_set_orientation(&g->mods, self_id, "wait");
-            } else if (!rb_pay_cost(g, actor, sub)) {
-                /* sub-cost could not be paid; the remaining legs are dropped */
+        /* handlers.rs:1491-1576 — the change_state cost's own payment. This
+           block was ABSENT, and its absence was not inert: the only gate
+           pay_cost_change_state opens is this one (cost.c:968-978), so a
+           「○○を1人ウェイトにしてもよい」 cost opened its pay/skip prompt and
+           then, on "pay", did nothing at all — the member was never put to
+           wait, the wait was never recorded in last_cost_waited_members, and
+           the 「これによりウェイト状態になった」 gains that read that list
+           (effects/ability_ops.rs:127-129) had nothing to bind to. */
+        const char *cs_state = eff_extra(cost, "state_change");
+        if (cs_state && !strcmp(cs_state, "wait")) {
+            if (eff_bool(cost, "self_cost", 0)) {
+                /* handlers.rs:1492-1514 — Q159: the member must be on stage;
+                   Q137 / Rule 1.3.2.1: an already-waited member is left alone
+                   (the act itself does not happen, so no error either). */
+                int self_id = g->activating_card;
+                if (self_id >= 0) {
+                    int on_stage = 0;
+                    for (int s = 0; s < RB_STAGE_SIZE; s++)
+                        if (g->p[actor].stage[s] == self_id) { on_stage = 1; break; }
+                    if (!on_stage) return 0;   /* Err: "member is not on stage" */
+                    const char *ori = rb_mods_get_orientation(&g->mods, self_id);
+                    if (!ori || strcmp(ori, "wait") != 0)
+                        rb_mods_set_orientation(&g->mods, self_id, "wait");
+                }
+            } else {
+                /* handlers.rs:1515-1537 — Q183: always your OWN stage. */
+                const char *tgt = cost->target ? cost->target : "self";
+                int tp = rb_resolve_target_player(g, tgt);
+                int tpl = (tp >= 0) ? tp : actor;
+                int ccount = rb_effect_count_or(cost, 1);
+                int exclude_self = eff_bool(cost, "exclude_self", 0);
+                const char *c_card_type = eff_extra(cost, "card_type");
+                const char *c_groups = eff_extra(cost, "group_names");
+                int pos[RB_STAGE_SIZE];
+                int n = get_change_state_candidates(g, tpl, tgt, c_card_type,
+                                                    c_groups, exclude_self,
+                                                    0, 0, "active", pos,
+                                                    RB_STAGE_SIZE);
+                /* Q137 / Rule 1.3.2.1: no ACTIVE member to wait — the cost
+                   cannot be paid. */
+                if (n == 0) return 0;
+                if (n <= ccount) {
+                    /* handlers.rs:1539-1547 */
+                    for (int i = 0; i < n; i++) {
+                        rb_mods_set_orientation(&g->mods, pos[i], "wait");
+                        if (g->n_last_cost_waited_members < RB_MAX_ZONE)
+                            g->last_cost_waited_members[g->n_last_cost_waited_members++] =
+                                (int16_t)pos[i];
+                    }
+                } else {
+                    /* handlers.rs:1548-1574 — ask which member(s) to wait. */
+                    RbChoice *pending = &g->queue.pending;
+                    memset(pending, 0, sizeof(*pending));
+                    pending->kind = RB_CHOICE_SELECT_CARD;
+                    strncpy(pending->zone, "stage", sizeof(pending->zone) - 1);
+                    pending->count = ccount;
+                    pending->allow_skip = 0;
+                    pending->route = RB_ROUTE_SELECT_CARDS;
+                    snprintf(pending->description, sizeof(pending->description),
+                             "Select %d stage member(s) to %s", ccount, cs_state);
+                    snprintf(pending->description_ja, sizeof(pending->description_ja),
+                             "ステージのメンバーを%d人を%sにする", ccount,
+                             rb_desc_state_verb_ja(cs_state));
+                    if (c_card_type && *c_card_type)
+                        strncpy(pending->card_type, c_card_type,
+                                sizeof(pending->card_type) - 1);
+                    if (c_groups && *c_groups)
+                        strncpy(pending->filter_group, c_groups,
+                                sizeof(pending->filter_group) - 1);
+                    snprintf(pending->target_player_id,
+                             sizeof(pending->target_player_id), "p%d", tpl + 1);
+                    g->queue.has_pending = 1;
+                    s_stage_select_intent = 1;
+                    cost_publish_pending(g, actor);
+                    return 1;
+                }
             }
-            if (g->queue.has_pending) return 1;
         }
-    }
 
-    /* PlaceEnergyUnderMember sub-cost */
-    if (cost && cost->action && !strcmp(cost->action, "place_energy_under_member")) {
-        execute_place_energy_under_member_non_optional(g, actor, cost);
+        /* handlers.rs:1577-1590 / accept_optional_move_cost (:1377-1391) —
+           「メンバーを控え室に置いてもよい：…」 and 「エネルギー置き場にある
+           エネルギー1枚をエネルギーデッキに置いてもよい：…」. The player
+           accepted, so the move runs with optionality stripped, or it loops
+           back to the same gate. Optionality is stripped, cost_paid /
+           optional_cost_result are stamped, and the payment is RECORDED
+           (handlers.rs:1389). */
+        if (cost->action && !strcmp(cost->action, "move_cards")) {
+            const char *src = cost->source ? cost->source : "";
+            /* handlers.rs:1584-1585 compares the resolved ZONE, so the
+               energy_zone wire alias (ability/enums.rs:98) counts too. */
+            int from_stage = !strcmp(src, "stage");
+            int energy_to_deck = (!strcmp(src, "energy") ||
+                                  !strcmp(src, "energy_zone")) && cost->destination &&
+                                 !strcmp(cost->destination, "energy_deck");
+            if (from_stage || energy_to_deck) {
+                AbilityEffect committed = *cost;
+                committed.is_optional = 0;
+                if (!pay_cost_move_cards(g, actor, &committed)) return 0;
+                if (g->queue.cur >= 0 && g->queue.cur < g->queue.n_entries) {
+                    g->queue.entries[g->queue.cur].cost_paid = 1;
+                    g->queue.entries[g->queue.cur].optional_cost_result = 1;
+                }
+                rb_record_cost_paid(g);
+                return 1;
+            }
+        }
+
+        /* handlers.rs:1592-1607 — sequential_cost sub-costs, paid after the
+           user confirmed. */
+        if (cost_is_sequential(cost)) {
+            for (int i = 0; i < cost->n_child; i++) {
+                const AbilityEffect *sub = cost->child[i];
+                const char *sc = sub ? eff_extra(sub, "state_change") : NULL;
+                if (sub && sc && !strcmp(sc, "wait") && eff_bool(sub, "self_cost", 0)) {
+                    int self_id = g->activating_card;
+                    if (self_id >= 0)
+                        rb_mods_set_orientation(&g->mods, self_id, "wait");
+                } else if (!rb_pay_cost(g, actor, sub)) {
+                    /* handlers.rs:1600-1602 — a sub-cost that cannot be paid is
+                       logged and stepped over; the loop continues. */
+                }
+                if (g->queue.has_pending) return 1;
+            }
+        }
+
+        /* handlers.rs:1614-1616 */
+        if (cost->action && !strcmp(cost->action, "place_energy_under_member")) {
+            execute_place_energy_under_member_non_optional(g, actor, cost);
+        }
     }
 
     /* ── After all costs paid: run the entry's effect ── */
@@ -1997,7 +2563,8 @@ static RbBag *cost_source_bag(RbPlayer *P, const char *src) {
     if (!strcmp(src, "hand")) return &P->hand;
     if (!strcmp(src, "deck") || !strcmp(src, "deck_top")) return &P->deck;
     if (!strcmp(src, "waitroom") || !strcmp(src, "discard")) return &P->discard;
-    if (!strcmp(src, "energy")) return &P->energy;
+    /* ability/enums.rs:98 — "energy_zone" is the other spelling of Zone::Energy. */
+    if (!strcmp(src, "energy") || !strcmp(src, "energy_zone")) return &P->energy;
     return NULL;
 }
 static int cost_count_in_source(const GameState *g, int actor, const char *src) {

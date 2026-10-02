@@ -2054,18 +2054,28 @@ static int queue_moved_cards_abilities(GameState *g, const int *moved_cards, int
    owner. */
 
 /* 「(対戦相手のカードの効果でも発動する。)」 marker.
-   Rust: AbilityEffect::fires_on_opponent_effects (card.rs:1393-1399) reads the
-   parser-stamped flag; C exposes it as an extra on the decoded effect, with a
-   card-level lookup as the fallback for printings that stamp the card rather
-   than the effect. */
+   Rust: AbilityEffect::fires_on_opponent_effects (card.rs:1419-1421) reads the
+   parser-stamped flag off THE EFFECT and nothing else:
+       self.fires_on_opponent_effects.unwrap_or(false)
+   Rust has no card-level predicate anywhere -- there is no
+   `card_fires_on_opponent_effects` in engine/src at all -- and its only two
+   consumers (abilities.rs:544 and :1132) both ask the effect they are holding.
+   This function used to fall back to src/core/card.c's card-level scan when the
+   effect carried no key, which armed every OTHER ability of the same card. The
+   fallback was measured over the shipped corpus by walking all 2,639 cards /
+   4,925 decoded effects: 10 effects carry the flag, 12 cards answer the
+   card-level scan, and 2 (card, ability) pairs -- card 2610 ability 1 and card
+   2611 ability 1 -- are armed ONLY by the fallback. Both are gone.
+   `card_id` is kept only because the two call sites pass it; the predicate does
+   not read it. */
 static int rb_effect_fires_on_opponent_effects(const AbilityEffect *e, int card_id) {
+    (void)card_id;
     if (e) {
         for (int k = 0; k < e->n_extra; k++)
             if (e->extra_k[k] && !strcmp(e->extra_k[k], "fires_on_opponent_effects"))
                 return e->extra_v[k] && !strcmp(e->extra_v[k], "true");
     }
-    extern int rb_card_fires_on_opponent_effects(int card_id);
-    return rb_card_fires_on_opponent_effects(card_id);
+    return 0;
 }
 
 /* ── Opponent-cause dedupe identity (abilities.rs:1033-1041, 1122-1131) ──

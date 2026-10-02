@@ -385,6 +385,19 @@ After un-stalling, trace analysis (150-game samples, mirrored deck) showed:
 - placements ran ~0.1/live-phase vs the guide's ~0.5–1 → games died at the
   loop cap mid-game, again scored as fake draws.
 
+> **Correction to the "~0.5–1" above (measured 2026-10-02).** That reading of
+> the guides came from their prose, and it is the origin of the wrong ceiling
+> that later made pace look like the project's biggest gap. The guides are
+> talking about their own deck's success rate; the *rule* ceiling is lower than
+> 1.0 per side. 8.4.7 moves exactly one card per won check, and a check pays
+> twice only on an 8.4.6.2 tie with both players below 2 successes (8.4.7.1
+> withholds the move from a player at 2+). So the ceiling is 1.0 **combined**
+> per live phase and 0.5 per side. See "Open, and worth more than any further
+> tuning" for the full arithmetic and the measurement. The 63% of phases
+> conceding empty was a real defect and was fixed; the target it was measured
+> against was not.
+
+
 Root cause: v4/v5 ranked portfolios "fewest passing lives first" ("zerg")
 and treated full-mean yell flips as guaranteed. Since a won check places one
 card regardless of margin (8.4.7), minimum-count single low-score lives just
@@ -957,8 +970,46 @@ defect reproducing.
 
 ## Open, and worth more than any further tuning
 
-- Pace is 0.4 against a 1.0 target. That is the biggest single gap in the
-  project and it is not a tuning problem.
+- **Pace was never a defect. The target was arithmetically impossible, and
+  this section is where it came from.** It used to read "Pace is 0.4 against a
+  1.0 target. That is the biggest single gap in the project." The 1.0 was a
+  PER-SIDE figure taken from the guides' prose. The rules cap it:
+
+  > **8.4.7** ライブに勝利したプレイヤーは、自身のライブカード置き場のカードを
+  > **1 枚**選び、それを自身の成功ライブカード置き場に移動します。
+  > *The player who won the live selects **one** card from their live card zone
+  > and moves it to their success live card zone.*
+
+  One card per won check, whatever the margin. Two placements happen only under
+  **8.4.6.2** (equal totals make *both* players winners) and then **8.4.7.1**
+  withholds the move from any player already holding 2+ successes. So a check
+  yields 1 placement normally and 2 only on a score tie with both players below
+  2 successes.
+
+  The ceiling is therefore **1.0 placements per live phase across both seats,
+  0.5 per side.** Measured on v9/v9 at n=3000, seed 11:
+
+  | | per side | share of the 0.5 ceiling | combined |
+  |---|---|---|---|
+  | P1 | 0.427 | 85% | |
+  | P2 | 0.434 | 87% | **0.861 of 1.000 = 86%** |
+
+  The bots convert 86% of every placement the rules allow. The whole remaining
+  gap is 0.13 placements per live phase **across both seats**, i.e. 0.07 each.
+  No live-set work can exceed that, which is why ten weeks of it moved nothing:
+  it was chasing a number twice the size of the physical maximum. `bot_arena`
+  printed "(target ~1.0 from T2; <=0.33 is a defect)" against a per-side rate
+  for the project's entire life, so the headline metric has been permanently
+  red. It now prints the rule ceiling and the percentage of it attained.
+
+  **What is left is not pace, it is share.** P1 places at 0.427 and P2 at
+  0.434 — a ratio of 0.98. The game is a near-perfect tie decided by who wins
+  each score comparison, and win rate moves only by winning *more* of them,
+  never by converting more checks. The two sides have near-identical placement
+  rates because they run the same policy on the same decklist, and rule 8.4.13
+  hands first attacker to whoever placed, so the good/bad turn-order slot
+  alternates and cancels.
+
 - v8's live set burns 6.3% of live phases folding.
 - Abilities are not valued, by design: the engine already resolves all of them
   by construction and v8's Main already executes every offered action, so a
@@ -967,6 +1018,50 @@ defect reproducing.
   live with a Draw/Score requirement neither settable nor discardable.
 - All of the above is measured on one deck in a mirror. A claim about being
   better needs a second deck and a non-mirror opponent before it is believed.
+
+### The mirror cannot find an improvement, demonstrated
+
+The instruction above ("needs a second deck and a non-mirror opponent") is
+correct and load-bearing, so here is the worked example rather than the
+admonition.
+
+`V7_BLADES_WEIGHT` (shipped default 6.0) was swept over its whole range at
+n=3000, paired, seed 11 — the seed the arms were *selected* on:
+
+| weight | 3 | 6 (ship) | 12 | 20 | 30 | 45 | 70 | 120 |
+|---|---|---|---|---|---|---|---|---|
+| delta pp | +0.13 | — | +0.87 | **+1.53** | **+1.70** | **+1.70** | +1.17 | +1.50 |
+| verdict | ns | — | ns | SIGNIF | SIGNIF | SIGNIF | ns | ns |
+
+A monotone dose-response with two significant rungs is not what noise looks
+like, and the mechanism is exactly the one the rules arithmetic predicts:
+blades set the flip count, flips set supply, supply sets which score band is
+reliably passable, and score is the only thing that decides a comparison.
+
+Then the arm was taken to four seeds it was never tuned on:
+
+| seed | 11 (train) | 7 | 101 | 2029 | 31337 | 4242 |
+|---|---|---|---|---|---|---|
+| weight 30 | +1.70 | +0.15 | +0.03 | +0.68 | +0.05 | −0.03 |
+| weight 45 | +1.70 | +0.05 | −0.10 | +0.07 | +0.38 | −0.07 |
+
+Mean +0.23pp, every p above 0.22. And on the two tests that were not mirrors:
+
+| test | result |
+|---|---|
+| second deck (`aiscream 37PMZ`), n=3000 | −0.50pp (w=20), −0.53pp (w=45) |
+| **v9 vs v7, gate on BOTH seats**, n=3000 | **−6.17pp / −6.00pp, SIGNIFICANT REGRESSION** |
+
+The asymmetric run is the one that matters: with the gate applied to both
+seats, v9's win rate over v7 collapses from 56.2% to 50.0%. The mirror gain
+was selection noise on the seed the arm was chosen on, and the arm is a real
+6pp regression against an opponent that is not itself.
+
+So a mirror is a *falsifier* of symmetry, not a *detector* of improvement. It
+can only ever confirm that a change did not break the matchup. Any claim of a
+gain needs (a) a seed not used to select the arm, and (b) an asymmetric
+opponent, or it is not a claim.
+
 
 ## What did NOT work (measured, 700 games paired, do not retry)
 

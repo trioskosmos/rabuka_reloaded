@@ -318,7 +318,7 @@ static int df_turn1_used(TestGame *tg, int cid)
    ????????????????????????????????????????????????????????????????????????? */
 static void test_debut_draws_one_pl_hs_bp5_011_n(void)
 {
-    TestGame game;
+    static TestGame game;
     test_game_new(&game);
     int rurino = test_id(&game, "PL!HS-bp5-011-N");
     int filler = test_id(&game, "PL!-sd1-010-SD");
@@ -347,7 +347,7 @@ static void test_waitroom_count_gated_debut_draw(void)
 {
     for (int pass = 0; pass < 2; pass++) {
         int waitroom_n = pass == 0 ? 10 : 9;
-        TestGame game;
+        static TestGame game;
         test_game_new(&game);
         int me = test_id(&game, "PL!HS-bp2-017-N");
         CHECK(me >= 0, "PL!HS-bp2-017-N fixture resolves");
@@ -382,7 +382,7 @@ static void test_costly_aqours_gated_debut_draw(void)
 {
     /* positive: an Aqours member at the cost-9 boundary */
     {
-        TestGame game;
+        static TestGame game;
         test_game_new(&game);
         int riko = test_id(&game, "PL!S-bp7-002-R");
         int fill = test_id(&game, "PL!-sd1-010-SD");
@@ -400,7 +400,7 @@ static void test_costly_aqours_gated_debut_draw(void)
     }
     /* negative: a non-Aqours member, then an Aqours member under cost 9 */
     {
-        TestGame game;
+        static TestGame game;
         test_game_new(&game);
         int riko  = test_id(&game, "PL!S-bp7-002-R");
         int fill  = test_id(&game, "PL!-sd1-010-SD");
@@ -434,7 +434,7 @@ static void test_dollchestra_live_zone_gated_draw(void)
 {
     for (int pass = 0; pass < 2; pass++) {
         int dollchestra = pass == 0;
-        TestGame game;
+        static TestGame game;
         test_game_new(&game);
         int me = test_id(&game, "PL!HS-pb1-021-N");
         int live = test_id(&game, dollchestra ? "PL!HS-bp2-020-L" : "PL!-sd1-020-SD");
@@ -463,7 +463,7 @@ static void test_boosted_member_live_success_draw(void)
 {
     /* boosted staged member -> draw 1 */
     {
-        TestGame game;
+        static TestGame game;
         test_game_new(&game);
         int filler = test_id(&game, "PL!-sd1-010-SD");
         int live = test_id(&game, "PL!HS-PR-028-PR");
@@ -481,7 +481,7 @@ static void test_boosted_member_live_success_draw(void)
     }
     /* unboosted staged member -> no draw */
     {
-        TestGame game;
+        static TestGame game;
         test_game_new(&game);
         int filler = test_id(&game, "PL!-sd1-010-SD");
         int live = test_id(&game, "PL!HS-PR-028-PR");
@@ -497,7 +497,7 @@ static void test_boosted_member_live_success_draw(void)
     }
     /* empty stage -> no draw */
     {
-        TestGame game;
+        static TestGame game;
         test_game_new(&game);
         int filler = test_id(&game, "PL!-sd1-010-SD");
         int live = test_id(&game, "PL!HS-PR-028-PR");
@@ -513,7 +513,7 @@ static void test_boosted_member_live_success_draw(void)
     /* a boosted NON-member in the waitroom must not satisfy the gate while the
        stage holds an unboosted member */
     {
-        TestGame game;
+        static TestGame game;
         test_game_new(&game);
         int filler = test_id(&game, "PL!-sd1-010-SD");
         int live = test_id(&game, "PL!HS-PR-028-PR");
@@ -547,7 +547,7 @@ static void test_higher_cost_member_live_success_draw(void)
         { "PL!-sd1-014-SD",  0 },   /* cost  9, = 9 */
     };
     for (unsigned i = 0; i < sizeof(CASES) / sizeof(CASES[0]); i++) {
-        TestGame game;
+        static TestGame game;
         test_game_new(&game);
         int me = test_id(&game, "PL!HS-pb1-013-R");
         int other = test_id(&game, CASES[i].no);
@@ -587,7 +587,7 @@ static void test_sumire_optional_energy_catchu_trio_draw(void)
 {
     /* three CatChu! members, pay the optional energy */
     {
-        TestGame game;
+        static TestGame game;
         test_game_new(&game);
         int filler = test_id(&game, "PL!-sd1-010-SD");
         int sumire = test_id(&game, "PL!SP-bp7-015-N");
@@ -613,7 +613,7 @@ static void test_sumire_optional_energy_catchu_trio_draw(void)
     }
     /* only two CatChu! members: no prompt, no draw */
     {
-        TestGame game;
+        static TestGame game;
         test_game_new(&game);
         int filler = test_id(&game, "PL!-sd1-010-SD");
         int sumire = test_id(&game, "PL!SP-bp7-015-N");
@@ -643,7 +643,7 @@ static void test_stage_member_identity_and_cost_gated_draw(void)
 {
     /* PL!SP-bp1-008-R (Wakashi): no Mei on stage -> draw 1 */
     {
-        TestGame game;
+        static TestGame game;
         test_game_new(&game);
         int filler = test_id(&game, "PL!-sd1-010-SD");
         int wakashi = test_id(&game, "PL!SP-bp1-008-R");
@@ -658,7 +658,7 @@ static void test_stage_member_identity_and_cost_gated_draw(void)
     }
     /* PL!SP-bp1-008-R: Mei on stage -> draw 2 */
     {
-        TestGame game;
+        static TestGame game;
         test_game_new(&game);
         int filler = test_id(&game, "PL!-sd1-010-SD");
         int wakashi = test_id(&game, "PL!SP-bp1-008-R");
@@ -675,7 +675,7 @@ static void test_stage_member_identity_and_cost_gated_draw(void)
     }
     /* PL!-bp3-009-R+ (Niko): cost-13 member present -> draw 1 */
     {
-        TestGame game;
+        static TestGame game;
         test_game_new(&game);
         int filler = test_id(&game, "PL!-sd1-010-SD");
         int niko = test_id(&game, "PL!-bp3-009-R\xEF\xBC\x8B");
@@ -692,7 +692,7 @@ static void test_stage_member_identity_and_cost_gated_draw(void)
     }
     /* PL!-bp3-009-R+: only herself (cost 2) -> no draw */
     {
-        TestGame game;
+        static TestGame game;
         test_game_new(&game);
         int filler = test_id(&game, "PL!-sd1-010-SD");
         int niko = test_id(&game, "PL!-bp3-009-R\xEF\xBC\x8B");
@@ -707,7 +707,7 @@ static void test_stage_member_identity_and_cost_gated_draw(void)
     }
     /* PL!-bp4-001-R (Honoka): own stage total cheaper than the opponent's -> 1 */
     {
-        TestGame game;
+        static TestGame game;
         test_game_new(&game);
         int filler = test_id(&game, "PL!-sd1-010-SD");
         int honoka = test_id(&game, "PL!-bp4-001-R");    /* cost 9 */
@@ -739,7 +739,7 @@ static void test_stage_member_identity_and_cost_gated_draw(void)
 static void test_live_success_optional_three_energy_draw(void)
 {
     for (int pay = 1; pay >= 0; pay--) {
-        TestGame game;
+        static TestGame game;
         test_game_new(&game);
         int sumire = test_id(&game, "PL!SP-pb1-004-R");
         int filler = test_id(&game, "PL!-sd1-010-SD");
@@ -785,7 +785,7 @@ static void test_optional_energy_live_success_draw(void)
         { "PL!SP-bp5-020-N", 0, 0, 0 },   /* no energy: cannot pay */
     };
     for (unsigned i = 0; i < sizeof(CASES) / sizeof(CASES[0]); i++) {
-        TestGame game;
+        static TestGame game;
         test_game_new(&game);
         int filler = test_id(&game, "PL!-sd1-010-SD");
         int live = test_id(&game, CASES[i].live_no);
@@ -850,7 +850,7 @@ static void test_per_own_stage_member_draw_then_discard_q146(void)
         { 0, 3, -1, "Q146: opponent members not counted -> net 0" },
     };
     for (unsigned i = 0; i < sizeof(CASES) / sizeof(CASES[0]); i++) {
-        TestGame game;
+        static TestGame game;
         test_game_new(&game);
         int kumi = test_id(&game, KUMI);
         int live = test_id(&game, "PL!-sd1-019-SD");
@@ -901,7 +901,7 @@ static void test_optional_wait_members_draw_per_cost_member_q183(void)
 
     /* skip: nothing waited, nothing drawn */
     {
-        TestGame game;
+        static TestGame game;
         test_game_new(&game);
         int hanayo = test_id(&game, HANAYO);
         int friend = test_id(&game, "PL!-sd1-001-SD");
@@ -929,7 +929,7 @@ static void test_optional_wait_members_draw_per_cost_member_q183(void)
     /* pay with an opponent member on stage: 2 own members waited -> draw 2,
        the OPPONENT's member is never touched (Q183) */
     {
-        TestGame game;
+        static TestGame game;
         test_game_new(&game);
         int hanayo = test_id(&game, HANAYO);
         int friend = test_id(&game, "PL!-sd1-001-SD");
@@ -966,7 +966,7 @@ static void test_optional_wait_members_draw_per_cost_member_q183(void)
     /* an ALREADY-waited friend must not inflate the count: only Hanayo is newly
        waited, so exactly one card is drawn (Q137 + the "by this" scoping) */
     {
-        TestGame game;
+        static TestGame game;
         test_game_new(&game);
         int hanayo = test_id(&game, HANAYO);
         int friend = test_id(&game, "PL!-sd1-001-SD");
@@ -1007,7 +1007,7 @@ static void test_turn1_energy_draw_discard_natsumi(void)
 {
     /* full behaviour */
     {
-        TestGame game;
+        static TestGame game;
         test_game_new(&game);
         df_fill_decks(&game, test_id(&game, "PL!-sd1-010-SD"), 40);
         int natsumi = test_id(&game, NATSUMI);
@@ -1039,7 +1039,7 @@ static void test_turn1_energy_draw_discard_natsumi(void)
 
     /* with 0 energy the cost is unpayable: not offered, nothing is drawn */
     {
-        TestGame game;
+        static TestGame game;
         test_game_new(&game);
         df_fill_decks(&game, test_id(&game, "PL!-sd1-010-SD"), 40);
         int natsumi = test_id(&game, NATSUMI);
@@ -1052,7 +1052,7 @@ static void test_turn1_energy_draw_discard_natsumi(void)
 
     /* exactly 1 energy pays the cost and leaves 0 active */
     {
-        TestGame game;
+        static TestGame game;
         test_game_new(&game);
         df_fill_decks(&game, test_id(&game, "PL!-sd1-010-SD"), 40);
         int natsumi = test_id(&game, NATSUMI);
@@ -1069,7 +1069,7 @@ static void test_turn1_energy_draw_discard_natsumi(void)
 
     /* the per-turn budget resets on the next turn */
     {
-        TestGame game;
+        static TestGame game;
         test_game_new(&game);
         df_fill_decks(&game, test_id(&game, "PL!-sd1-010-SD"), 40);
         int natsumi = test_id(&game, NATSUMI);
@@ -1092,7 +1092,7 @@ static void test_turn1_energy_draw_discard_natsumi(void)
        resolver. The generation filter is not the only defense - the resolver
        gate must refuse the second firing. */
     {
-        TestGame game;
+        static TestGame game;
         test_game_new(&game);
         df_fill_decks(&game, test_id(&game, "PL!-sd1-010-SD"), 40);
         int natsumi = test_id(&game, NATSUMI);
@@ -1128,7 +1128,7 @@ static void test_miyashita_ai_cost10_appears_draw(void)
 {
     /* cost-10 member appears in a DIFFERENT area -> draw 1 */
     {
-        TestGame game;
+        static TestGame game;
         test_game_new(&game);
         int ai = test_id(&game, "PL!N-pb1-005-R");
         int filler = test_id(&game, "PL!-sd1-010-SD");
@@ -1150,7 +1150,7 @@ static void test_miyashita_ai_cost10_appears_draw(void)
     }
     /* cost-10 member REPLACES Ai via baton touch -> Q197: Ai must not fire */
     {
-        TestGame game;
+        static TestGame game;
         test_game_new(&game);
         int ai = test_id(&game, "PL!N-pb1-005-R");
         int filler = test_id(&game, "PL!-sd1-010-SD");
@@ -1190,7 +1190,7 @@ static void test_position_gated_draw(void)
             { 2, -1, "Coco on Right: should NOT draw" },
         };
         for (unsigned i = 0; i < 3; i++) {
-            TestGame game;
+            static TestGame game;
             test_game_new(&game);
             int coco = test_id(&game, COCO);
             int filler = test_id(&game, "PL!-sd1-010-SD");
@@ -1219,7 +1219,7 @@ static void test_position_gated_draw(void)
             { 2, "Chisato on Right: draw 2 + discard 2 should net hand_before - 1" },
         };
         for (unsigned i = 0; i < 2; i++) {
-            TestGame game;
+            static TestGame game;
             test_game_new(&game);
             int chisato = test_id(&game, CHISATO);
             int filler = test_id(&game, "PL!-sd1-010-SD");
@@ -1240,7 +1240,7 @@ static void test_position_gated_draw(void)
     }
     /* Chisato on the centre must NOT activate at all */
     {
-        TestGame game;
+        static TestGame game;
         test_game_new(&game);
         int chisato = test_id(&game, CHISATO);
         int filler = test_id(&game, "PL!-sd1-010-SD");
@@ -1277,7 +1277,7 @@ static void test_position_gated_draw(void)
 static void test_success_zone_gated_debut_draw(void)
 {
     {
-        TestGame game;
+        static TestGame game;
         test_game_new(&game);
         int card = test_id(&game, "PL!-pb1-005-R");
         int filler = test_id(&game, "PL!-sd1-010-SD");
@@ -1299,7 +1299,7 @@ static void test_success_zone_gated_debut_draw(void)
         CHECK_EQ(game.state.p[0].stage[1], card, "the card is on the centre stage");
     }
     {
-        TestGame game;
+        static TestGame game;
         test_game_new(&game);
         int card = test_id(&game, "PL!-pb1-005-R");
         int filler = test_id(&game, "PL!-sd1-010-SD");
@@ -1329,7 +1329,7 @@ static void test_distinct_draw_regression(void)
     /* 17a. distinct keeps a duplicate in the pile and scans on for another
            NAME. deck: [first, duplicate, other] / waitroom: [other, dup, first] */
     for (int src = 0; src < 2; src++) {
-        TestGame game;
+        static TestGame game;
         test_game_new(&game);
         int first = test_id(&game, "PL!-sd1-010-SD");
         int duplicate = df_new_id(&game, "PL!-sd1-010-SD");
@@ -1373,7 +1373,7 @@ static void test_distinct_draw_regression(void)
 
     /* 17b. distinct stops when only duplicates remain (asks 3, gets 1) */
     for (int src = 0; src < 2; src++) {
-        TestGame game;
+        static TestGame game;
         test_game_new(&game);
         int first = test_id(&game, "PL!-sd1-010-SD");
         int duplicate = df_new_id(&game, "PL!-sd1-010-SD");
@@ -1407,7 +1407,7 @@ static void test_distinct_draw_regression(void)
 
     /* 17c. an ORDINARY draw keeps same-name cards */
     for (int src = 0; src < 2; src++) {
-        TestGame game;
+        static TestGame game;
         test_game_new(&game);
         int first = test_id(&game, "PL!-sd1-010-SD");
         int duplicate = df_new_id(&game, "PL!-sd1-010-SD");
@@ -1441,7 +1441,7 @@ static void test_distinct_draw_regression(void)
     /* 17d. a filtered draw stops after scanning a non-matching deck, with and
            without distinct */
     for (int with_distinct = 0; with_distinct < 2; with_distinct++) {
-        TestGame game;
+        static TestGame game;
         test_game_new(&game);
         int member = test_id(&game, "PL!-sd1-010-SD");
         CHECK(member >= 0, "filtered draw fixture resolves");
@@ -1480,7 +1480,7 @@ static void test_flat_draw_engine_surface(void)
         static const int COUNTS[] = { 1, 2, 5 };
         const char *S = src == 0 ? "deck" : "discard";
         for (unsigned c = 0; c < 3; c++) {
-            TestGame tg;
+            static TestGame tg;
             test_game_new(&tg);
             int filler = test_id(&tg, "PL!-sd1-010-SD");
             RbPlayer *P = &tg.state.p[0];
@@ -1507,7 +1507,7 @@ static void test_flat_draw_engine_surface(void)
     /* deck exhaustion: an empty deck refills from the waitroom and keeps going
        (Q104 / Rule 10.2.1, draw.rs:70-77) */
     {
-        TestGame tg;
+        static TestGame tg;
         test_game_new(&tg);
         int filler = test_id(&tg, "PL!-sd1-010-SD");
         RbPlayer *P = &tg.state.p[0];
@@ -1522,7 +1522,7 @@ static void test_flat_draw_engine_surface(void)
     }
     /* a draw larger than deck+waitroom takes everything and stops */
     {
-        TestGame tg;
+        static TestGame tg;
         test_game_new(&tg);
         int filler = test_id(&tg, "PL!-sd1-010-SD");
         RbPlayer *P = &tg.state.p[0];
@@ -1538,7 +1538,7 @@ static void test_flat_draw_engine_surface(void)
 
     /* per_unit multiplier over the ACTOR's own stage members */
     for (int members = 0; members <= 3; members++) {
-        TestGame tg;
+        static TestGame tg;
         test_game_new(&tg);
         int filler = test_id(&tg, "PL!-sd1-010-SD");
         RbPlayer *P = &tg.state.p[0];
@@ -1557,7 +1557,7 @@ static void test_flat_draw_engine_surface(void)
     }
     /* per_unit over the OPPONENT's stage members must not count */
     {
-        TestGame tg;
+        static TestGame tg;
         test_game_new(&tg);
         int filler = test_id(&tg, "PL!-sd1-010-SD");
         for (int i = 0; i < 10; i++) test_add_to_deck(&tg, filler);
@@ -1574,7 +1574,7 @@ static void test_flat_draw_engine_surface(void)
     /* per_unit_source = this_cost_waited: the multiplier is the number of
        members THIS cost waited, not the number waiting on stage (Q183) */
     {
-        TestGame tg;
+        static TestGame tg;
         test_game_new(&tg);
         int filler = test_id(&tg, "PL!-sd1-010-SD");
         RbPlayer *P = &tg.state.p[0];
@@ -1601,7 +1601,7 @@ static void test_flat_draw_engine_surface(void)
 
     /* card_type filter: member_card over a mixed deck */
     {
-        TestGame tg;
+        static TestGame tg;
         test_game_new(&tg);
         int member = test_id(&tg, "PL!-sd1-010-SD");
         int live = test_id(&tg, "PL!-sd1-020-SD");
@@ -1622,7 +1622,7 @@ static void test_flat_draw_engine_surface(void)
     /* a different source AND destination: deck_bottom -> deck_bottom moves the
        bottom card back onto the bottom of the same pile */
     {
-        TestGame tg;
+        static TestGame tg;
         test_game_new(&tg);
         int a = test_id(&tg, "PL!-sd1-010-SD");
         int b = df_new_id(&tg, "PL!-sd1-010-SD");
@@ -1640,7 +1640,7 @@ static void test_flat_draw_engine_surface(void)
 
     /* target routing: opponent */
     {
-        TestGame tg;
+        static TestGame tg;
         test_game_new(&tg);
         int filler = test_id(&tg, "PL!-sd1-010-SD");
         for (int i = 0; i < 6; i++) test_add_to_deck(&tg, filler);
@@ -1655,7 +1655,7 @@ static void test_flat_draw_engine_surface(void)
     }
     /* target routing: both */
     {
-        TestGame tg;
+        static TestGame tg;
         test_game_new(&tg);
         int filler = test_id(&tg, "PL!-sd1-010-SD");
         for (int i = 0; i < 6; i++) test_add_to_deck(&tg, filler);
@@ -1712,7 +1712,7 @@ static int df_card_has_trigger(TestGame *tg, const char *card_no, const char *tr
 
 static void test_success_zone_restriction_and_constant_parsed(void)
 {
-    TestGame tg;
+    static TestGame tg;
     test_game_new(&tg);
     CHECK(df_card_has_ability_text(&tg, "PL!-sd1-006-SD", TEXT_SUCCESS_LIVE_CARD),
           "PL!-sd1-006-SD should have the success-live-card-zone restriction ability");
@@ -1753,7 +1753,7 @@ static void df_dump_triggers(void)
         "PL!N-pb1-005-R", "PL!SP-bp1-002-R\xEF\xBC\x8B", "PL!SP-bp4-003-R",
         "PL!-pb1-005-R", "PL!S-bp3-016-N", "PL!S-bp3-005-R",
     };
-    TestGame tg;
+    static TestGame tg;
     test_game_new(&tg);
     for (unsigned i = 0; i < sizeof(CARDS) / sizeof(CARDS[0]); i++) {
         int cid = test_id(&tg, CARDS[i]);
@@ -1788,7 +1788,7 @@ static void df_dump_triggers(void)
    be read as "the generator offers nothing" instead of "the filter is wrong". */
 static void df_dump_actions(void)
 {
-    TestGame tg;
+    static TestGame tg;
     test_game_new(&tg);
     int filler = test_id(&tg, "PL!-sd1-010-SD");
     int natsumi = test_id(&tg, NATSUMI);
@@ -1951,7 +1951,7 @@ static int dc_deck_has(TestGame *tg, int id)
    card rather than only a count. */
 static void test_chain_natsumi_activation_draw_then_discard(void)
 {
-    TestGame game;
+    static TestGame game;
     test_game_new(&game);
     int natsumi = test_id(&game, "PL!SP-bp1-009-R");
     int held = df_new_id(&game, "PL!-sd1-010-SD");
@@ -1988,7 +1988,7 @@ static void test_chain_natsumi_activation_draw_then_discard(void)
 static void test_chain_shiki_leftside_draw(void)
 {
     {
-        TestGame game;
+        static TestGame game;
         test_game_new(&game);
         int shiki = test_id(&game, "PL!SP-bp4-008-P");
         int filler = test_id(&game, "PL!-sd1-010-SD");
@@ -2008,7 +2008,7 @@ static void test_chain_shiki_leftside_draw(void)
         CHECK_EQ(df_hand(&game), 1, "after discarding 1 the hand is back to 1");
     }
     {
-        TestGame game;
+        static TestGame game;
         test_game_new(&game);
         int shiki = test_id(&game, "PL!SP-bp4-008-P");
         int filler = test_id(&game, "PL!-sd1-010-SD");
@@ -2029,7 +2029,7 @@ static void test_chain_shiki_leftside_draw(void)
    unconditionally. */
 static void test_chain_hand_debut_no_draw_bonus(void)
 {
-    TestGame game;
+    static TestGame game;
     test_game_new(&game);
     int me = test_id(&game, "PL!HS-bp6-015-R");
     int filler = df_new_id(&game, "PL!N-sd1-010-SD");
@@ -2054,7 +2054,7 @@ static void test_chain_hand_debut_no_draw_bonus(void)
    draw just produced - the state handoff between the two chain steps. */
 static void test_chain_hs_bp6_030_l_draw_then_discard(void)
 {
-    TestGame game;
+    static TestGame game;
     test_game_new(&game);
     int live = test_id(&game, "PL!HS-bp6-030-L");
     int drawn = df_new_id(&game, "PL!S-sd1-001-SD");
@@ -2079,7 +2079,7 @@ static void test_chain_hs_bp6_030_l_draw_then_discard(void)
 static void test_chain_s_pb1_024_l_draw_two_discard_two(void)
 {
     {
-        TestGame game;
+        static TestGame game;
         test_game_new(&game);
         int live = test_id(&game, "PL!S-pb1-024-L");
         int d1 = df_new_id(&game, "PL!-sd1-010-SD");
@@ -2099,7 +2099,7 @@ static void test_chain_s_pb1_024_l_draw_two_discard_two(void)
                  "two cards went to the waitroom");
     }
     {
-        TestGame game;
+        static TestGame game;
         test_game_new(&game);
         int live = test_id(&game, "PL!S-pb1-024-L");
         int kept = df_new_id(&game, "PL!-sd1-010-SD");
@@ -2135,7 +2135,7 @@ static void test_chain_s_pb1_024_l_draw_two_discard_two(void)
 static void test_chain_setsuna_opponent_success_extra_draw(void)
 {
     {
-        TestGame game;
+        static TestGame game;
         test_game_new(&game);
         int setsuna = test_id(&game, "PL!N-sd2-007-P");
         int filler = df_new_id(&game, "PL!-sd1-010-SD");
@@ -2161,7 +2161,7 @@ static void test_chain_setsuna_opponent_success_extra_draw(void)
                  "opponent succeeded too -> base draw + extra draw");
     }
     {
-        TestGame game;
+        static TestGame game;
         test_game_new(&game);
         int setsuna = test_id(&game, "PL!N-sd2-007-P");
         int filler = df_new_id(&game, "PL!-sd1-010-SD");
@@ -2182,7 +2182,7 @@ static void test_chain_setsuna_opponent_success_extra_draw(void)
 static void test_chain_natsumeki_group_gated_draw_discard(void)
 {
     {
-        TestGame game;
+        static TestGame game;
         test_game_new(&game);
         int live = test_id(&game, "PL!HS-sd1-017-SD");
         int hino = test_id(&game, "PL!HS-bp5-001-P");
@@ -2211,7 +2211,7 @@ static void test_chain_natsumeki_group_gated_draw_discard(void)
         CHECK(dc_wait_has(&game, hand_filler), "discarded card lands in the waitroom");
     }
     {
-        TestGame game;
+        static TestGame game;
         test_game_new(&game);
         int live = test_id(&game, "PL!HS-sd1-017-SD");
         int other = test_id(&game, "PL!-sd1-010-SD");
@@ -2266,15 +2266,15 @@ static void dc_run_baton_draw_flow(TestGame *game, const char *me_no, const char
 
 static void test_chain_named_baton_source_draw_then_discard(void)
 {
-    TestGame g1;
+    static TestGame g1;
     test_game_new(&g1);
     dc_run_baton_draw_flow(&g1, "PL!N-pb1-019-R", "PL!N-PR-009-PR");  /* ????? */
-    TestGame g2;
+    static TestGame g2;
     test_game_new(&g2);
     dc_run_baton_draw_flow(&g2, "PL!N-pb1-020-R", "PL!N-bp1-020-PRproteinbar"); /* ??????? */
 
     {
-        TestGame game;
+        static TestGame game;
         test_game_new(&game);
         int other = test_id(&game, "PL!-sd1-010-SD");
         int me = df_new_id(&game, "PL!N-pb1-019-R");
@@ -2333,10 +2333,10 @@ static void dc_run_baton_cost_flow(TestGame *game, const char *replaced_no, int 
 
 static void test_chain_baton_source_cost_gated_draw_discard(void)
 {
-    TestGame g1;
+    static TestGame g1;
     test_game_new(&g1);
     dc_run_baton_cost_flow(&g1, "PL!-sd1-007-SD", 1);  /* lilywhite ???, cost 7 */
-    TestGame g2;
+    static TestGame g2;
     test_game_new(&g2);
     dc_run_baton_cost_flow(&g2, "PL!-sd1-001-SD", 0);  /* CYaRon ????, cost 4 */
 }
@@ -2363,7 +2363,7 @@ static void test_chain_waitroom_debut_draw_discard(void)
     int me = -1;
     /* 10a. waitroom debut -> draw 2 + discard 1 */
     {
-        TestGame game;
+        static TestGame game;
         test_game_new(&game);
         me = test_id(&game, "PL!S-bp6-011-N");
         int filler = df_new_id(&game, "PL!-sd1-010-SD");
@@ -2391,7 +2391,7 @@ static void test_chain_waitroom_debut_draw_discard(void)
     }
     /* 10b. hand debut -> neither draw nor discard */
     {
-        TestGame game;
+        static TestGame game;
         test_game_new(&game);
         me = test_id(&game, "PL!S-bp6-011-N");
         int filler = df_new_id(&game, "PL!-sd1-010-SD");
@@ -2409,7 +2409,7 @@ static void test_chain_waitroom_debut_draw_discard(void)
     }
     /* 10c. a ONE-CARD deck: the draw comes up short but the discard still runs */
     {
-        TestGame game;
+        static TestGame game;
         test_game_new(&game);
         me = test_id(&game, "PL!S-bp6-011-N");
         int discard_me = df_new_id(&game, "PL!-sd1-010-SD");
@@ -2438,7 +2438,7 @@ static void test_chain_waitroom_debut_draw_discard(void)
     }
     /* 10d. empty deck AND empty hand: no card moves at all */
     {
-        TestGame game;
+        static TestGame game;
         test_game_new(&game);
         me = test_id(&game, "PL!S-bp6-011-N");
         if (me < 0) return;
@@ -2464,7 +2464,7 @@ static void test_chain_optional_wait_gates_draw_discard(void)
     const char *MIA = "PL!N-bp4-023-N";
     /* 11a. decline -> nothing happens */
     {
-        TestGame game;
+        static TestGame game;
         test_game_new(&game);
         int mia = test_id(&game, MIA);
         int filler = test_id(&game, "PL!-sd1-010-SD");
@@ -2494,7 +2494,7 @@ static void test_chain_optional_wait_gates_draw_discard(void)
     }
     /* 11b. accept -> the named member is waited and the discard step runs */
     {
-        TestGame game;
+        static TestGame game;
         test_game_new(&game);
         int mia = test_id(&game, MIA);
         int filler = test_id(&game, "PL!-sd1-010-SD");
@@ -2551,7 +2551,7 @@ static void test_chain_optional_wait_gates_draw_discard(void)
 static void test_chain_mia_bp7_self_wait_draw_two_discard_two(void)
 {
     {
-        TestGame game;
+        static TestGame game;
         test_game_new(&game);
         int filler = df_new_id(&game, "PL!-sd1-010-SD");
         int mia = test_id(&game, "PL!N-bp7-023-N");
@@ -2581,7 +2581,7 @@ static void test_chain_mia_bp7_self_wait_draw_two_discard_two(void)
     }
     /* already-wait Mia -> the wait-self cost is unpayable -> refused */
     {
-        TestGame game;
+        static TestGame game;
         test_game_new(&game);
         int filler = df_new_id(&game, "PL!-sd1-010-SD");
         int mia = test_id(&game, "PL!N-bp7-023-N");
@@ -2598,7 +2598,7 @@ static void test_chain_mia_bp7_self_wait_draw_two_discard_two(void)
     }
     /* EMPTY starting hand -> draw 2, then discard exactly those 2 */
     {
-        TestGame game;
+        static TestGame game;
         test_game_new(&game);
         int filler = df_new_id(&game, "PL!-sd1-010-SD");
         int mia = test_id(&game, "PL!N-bp7-023-N");
@@ -2616,7 +2616,7 @@ static void test_chain_mia_bp7_self_wait_draw_two_discard_two(void)
     }
     /* the per-turn budget is per-instance and resets next turn */
     {
-        TestGame game;
+        static TestGame game;
         test_game_new(&game);
         int filler = df_new_id(&game, "PL!-sd1-010-SD");
         int mia = test_id(&game, "PL!N-bp7-023-N");
@@ -2648,7 +2648,7 @@ static void test_chain_mia_bp7_self_wait_draw_two_discard_two(void)
    allow_skip must be false). A second press in the same turn is refused. */
 static void test_chain_bp3_001_self_wait_mandatory_discard(void)
 {
-    TestGame game;
+    static TestGame game;
     test_game_new(&game);
     int card = test_id(&game, "PL!-bp3-001-R");  /* cost 13 */
     int filler = test_id(&game, "PL!-sd1-010-SD");
@@ -2691,7 +2691,7 @@ static void test_chain_hanayo_baton_touch_skips_discard(void)
     const char *HANAYO = "PL!-pb1-017-R";
     /* 14a. no baton touch this turn -> draw 1 then discard 1 */
     {
-        TestGame game;
+        static TestGame game;
         test_game_new(&game);
         int hanayo = test_id(&game, HANAYO);
         int spare = test_id(&game, "PL!-sd1-010-SD");
@@ -2719,7 +2719,7 @@ static void test_chain_hanayo_baton_touch_skips_discard(void)
     }
     /* 14b. a baton touch already happened -> the discard step is skipped */
     {
-        TestGame game;
+        static TestGame game;
         test_game_new(&game);
         int hanayo = test_id(&game, HANAYO);
         int spare = test_id(&game, "PL!-sd1-010-SD");
@@ -2750,7 +2750,7 @@ static void test_chain_hanayo_baton_touch_skips_discard(void)
 static void test_chain_side_debut_draw_discard(void)
 {
     {
-        TestGame game;
+        static TestGame game;
         test_game_new(&game);
         int filler = df_new_id(&game, "PL!-sd1-010-SD");
         int me = df_new_id(&game, "PL!SP-pb2-036-N");
@@ -2778,7 +2778,7 @@ static void test_chain_side_debut_draw_discard(void)
               "both drawn cards reached the hand");
     }
     {
-        TestGame game;
+        static TestGame game;
         test_game_new(&game);
         int filler = df_new_id(&game, "PL!-sd1-010-SD");
         int me = df_new_id(&game, "PL!SP-pb2-037-N");
@@ -2816,7 +2816,7 @@ static void test_chain_rin_lower_stage_cost_draw_then_topdeck(void)
 {
     const char *RIN = "PL!N-bp4-009-R";
     {
-        TestGame game;
+        static TestGame game;
         test_game_new(&game);
         int rin = test_id(&game, RIN);
         int opp_center = test_id(&game, "PL!-bp5-008-R");
@@ -2848,7 +2848,7 @@ static void test_chain_rin_lower_stage_cost_draw_then_topdeck(void)
     }
     /* equal totals: strict < must not fire */
     {
-        TestGame game;
+        static TestGame game;
         test_game_new(&game);
         int rin = test_id(&game, RIN);
         int opp_equal = test_id(&game, "PL!-bp5-008-R");
@@ -2869,7 +2869,7 @@ static void test_chain_rin_lower_stage_cost_draw_then_topdeck(void)
     }
     /* both stages empty: 0 vs 0 -> equal -> must not fire */
     {
-        TestGame game;
+        static TestGame game;
         test_game_new(&game);
         int rin = test_id(&game, RIN);
         int filler = test_id(&game, "PL!-sd1-010-SD");
@@ -2881,7 +2881,7 @@ static void test_chain_rin_lower_stage_cost_draw_then_topdeck(void)
     }
     /* my own stage total is higher: must not fire */
     {
-        TestGame game;
+        static TestGame game;
         test_game_new(&game);
         int rin = test_id(&game, RIN);
         int cheap = test_id(&game, "PL!-sd1-010-SD");
@@ -2902,7 +2902,7 @@ static void test_chain_rin_lower_stage_cost_draw_then_topdeck(void)
     }
     /* empty own stage (total 0) is still less than the opponent's 17: fires */
     {
-        TestGame game;
+        static TestGame game;
         test_game_new(&game);
         int rin = test_id(&game, RIN);
         int filler = test_id(&game, "PL!-sd1-010-SD");
@@ -2974,24 +2974,24 @@ static void dc_run_draw_then_bottom(TestGame *game, const char *card_no)
 static void test_chain_draw_one_put_one_on_bottom(void)
 {
     {
-        TestGame game;
+        static TestGame game;
         test_game_new(&game);
         dc_run_draw_then_bottom(&game, "PL!S-bp5-014-N");
     }
     {
-        TestGame game;
+        static TestGame game;
         test_game_new(&game);
         dc_run_draw_then_bottom(&game, "PL!S-sd1-017-SD");  /* ???? */
     }
     {
-        TestGame game;
+        static TestGame game;
         test_game_new(&game);
         dc_run_draw_then_bottom(&game, "PL!S-sd1-018-SD");  /* ????? */
     }
 
     /* the newly drawn card can itself be the one placed on the bottom */
     {
-        TestGame game;
+        static TestGame game;
         test_game_new(&game);
         int you = test_id(&game, "PL!S-bp5-014-N");
         int card_b = test_id(&game, "PL!-sd1-020-SD");
@@ -3022,7 +3022,7 @@ static void test_chain_draw_one_put_one_on_bottom(void)
 
     /* exactly one eligible card after the draw -> auto-resolve, no prompt */
     {
-        TestGame game;
+        static TestGame game;
         test_game_new(&game);
         int you = test_id(&game, "PL!S-bp5-014-N");
         CHECK(you >= 0, "draw-then-bottom (auto) fixture resolves");
@@ -3047,7 +3047,7 @@ static void test_chain_draw_one_put_one_on_bottom(void)
 
     /* a big hand: exactly one card moves, the rest stay */
     {
-        TestGame game;
+        static TestGame game;
         test_game_new(&game);
         int you = test_id(&game, "PL!S-bp5-014-N");
         CHECK(you >= 0, "draw-then-bottom (many hand) fixture resolves");
@@ -3082,7 +3082,7 @@ static void test_chain_draw_one_put_one_on_bottom(void)
 
     /* card_type "card" means all card types (member / live / energy) are eligible */
     {
-        TestGame game;
+        static TestGame game;
         test_game_new(&game);
         int you = test_id(&game, "PL!S-bp5-014-N");
         int member = test_id(&game, "PL!-sd1-001-SD");
@@ -3109,7 +3109,7 @@ static void test_chain_draw_one_put_one_on_bottom(void)
             { member, &ok_member }, { live, &ok_live }, { energy, &ok_energy }
         };
         for (int t = 0; t < 3; t++) {
-            TestGame g;
+            static TestGame g;
             test_game_new(&g);
             int y2 = test_id(&g, "PL!S-bp5-014-N");
             if (y2 < 0) return;
@@ -3136,7 +3136,7 @@ static void test_chain_draw_one_put_one_on_bottom(void)
     /* empty deck + non-empty waitroom: the draw refreshes, then the put-back
        still resolves (deck.rs:70-77 + the independent second step) */
     {
-        TestGame game;
+        static TestGame game;
         test_game_new(&game);
         int you = test_id(&game, "PL!S-bp5-014-N");
         int card_a = test_id(&game, "PL!-sd1-001-SD");
@@ -3166,7 +3166,7 @@ static void test_chain_draw_one_put_one_on_bottom(void)
     /* empty deck AND empty waitroom: the draw silently fails but the put-back
        still runs - the two sequential steps are independent */
     {
-        TestGame game;
+        static TestGame game;
         test_game_new(&game);
         int you = test_id(&game, "PL!S-bp5-014-N");
         int card_a = test_id(&game, "PL!-sd1-001-SD");
@@ -3187,7 +3187,7 @@ static void test_chain_draw_one_put_one_on_bottom(void)
     /* deck has exactly 1 card: it is drawn, then the hand card is pushed onto
        the now-empty deck */
     {
-        TestGame game;
+        static TestGame game;
         test_game_new(&game);
         int you = test_id(&game, "PL!S-bp5-014-N");
         int card_a = test_id(&game, "PL!-sd1-001-SD");
@@ -3214,7 +3214,7 @@ static void test_chain_draw_one_put_one_on_bottom(void)
 
     /* opponent isolation + the cost gate */
     {
-        TestGame game;
+        static TestGame game;
         test_game_new(&game);
         int you = test_id(&game, "PL!S-bp5-014-N");
         int card_a = test_id(&game, "PL!-sd1-001-SD");
@@ -3240,7 +3240,7 @@ static void test_chain_draw_one_put_one_on_bottom(void)
         (void)snap;
     }
     {
-        TestGame game;
+        static TestGame game;
         test_game_new(&game);
         int you = test_id(&game, "PL!S-bp5-014-N");
         CHECK(you >= 0, "draw-then-bottom (cost gate) fixture resolves");
@@ -3282,7 +3282,7 @@ static void dc_setup_rurino_bp1(TestGame *game, int *deck_before, int *hand_befo
 static void test_chain_rurino_bp1_draw_count_equals_discards(void)
 {
     {
-        TestGame game;
+        static TestGame game;
         test_game_new(&game);
         int deck_before = 0, hand_before = 0;
         dc_setup_rurino_bp1(&game, &deck_before, &hand_before);
@@ -3300,7 +3300,7 @@ static void test_chain_rurino_bp1_draw_count_equals_discards(void)
         CHECK_EQ(df_hand(&game), hand_before, "3 - 2 discarded + 2 drawn = 3");
     }
     {
-        TestGame game;
+        static TestGame game;
         test_game_new(&game);
         int deck_before = 0, hand_before = 0;
         dc_setup_rurino_bp1(&game, &deck_before, &hand_before);
@@ -3313,7 +3313,7 @@ static void test_chain_rurino_bp1_draw_count_equals_discards(void)
         CHECK_EQ(df_deck(&game), deck_before, "nothing was drawn");
     }
     {
-        TestGame game;
+        static TestGame game;
         test_game_new(&game);
         int deck_before = 0, hand_before = 0;
         dc_setup_rurino_bp1(&game, &deck_before, &hand_before);
@@ -3331,7 +3331,7 @@ static void test_chain_rurino_bp1_draw_count_equals_discards(void)
     }
     /* the up-to-3 cap must stop the sequence even with more cards in hand */
     {
-        TestGame game;
+        static TestGame game;
         test_game_new(&game);
         int rurino = test_id(&game, "PL!HS-bp1-005-R");
         int filler = test_id(&game, "PL!-sd1-010-SD");
@@ -3366,7 +3366,7 @@ static void test_chain_rurino_bp1_draw_count_equals_discards(void)
 static void test_chain_mirakura_discard_then_draw(void)
 {
     {
-        TestGame game;
+        static TestGame game;
         test_game_new(&game);
         int filler = test_id(&game, "PL!-sd1-010-SD");
         int ability_card = df_new_id(&game, "PL!HS-pb1-003-R");
@@ -3399,7 +3399,7 @@ static void test_chain_mirakura_discard_then_draw(void)
                  "deck should lose exactly one card when drawing for 0 discarded cards");
     }
     {
-        TestGame game;
+        static TestGame game;
         test_game_new(&game);
         int filler = test_id(&game, "PL!-sd1-010-SD");
         int ability_card = df_new_id(&game, "PL!HS-pb1-003-R");
@@ -3475,7 +3475,7 @@ static void test_chain_neo_sky_gate_negatives(void)
 {
     /* total cost 19 -> must not draw or place cards */
     {
-        TestGame g;
+        static TestGame g;
         test_game_new(&g);
         int n13 = test_id(&g, "PL!N-bp7-002-R");
         int n4 = test_id(&g, "PL!N-bp4-014-N");
@@ -3491,7 +3491,7 @@ static void test_chain_neo_sky_gate_negatives(void)
     }
     /* a non-??? member in one area blocks the whole effect */
     {
-        TestGame g;
+        static TestGame g;
         test_game_new(&g);
         int n13 = test_id(&g, "PL!N-bp4-022-N");
         int n4 = test_id(&g, "PL!N-bp4-014-N");

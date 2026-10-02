@@ -1,7 +1,14 @@
 [alias]
-t = "test --no-fail-fast -- --test-threads=1 --quiet"
+# No --test-threads pin: cargo already defaults to one thread per logical core,
+# which is what these aliases should use. They previously hard-coded
+# --test-threads=1, turning every run single-threaded on a 12-core machine.
+#
+# If a test ever needs serial execution it should say so in the test itself
+# (a mutex, or --test-threads=1 on that one invocation), not by slowing down
+# every run in the suite.
+t = "test --no-fail-fast -- --quiet"
 # Fast iteration: build+run only the integration test suite (skips all bins)
-tt = "test --test run_all --no-fail-fast -- --test-threads=1 --quiet"
+tt = "test --test run_all --no-fail-fast -- --quiet"
 
 # rust-lld ships with the toolchain and links far faster than link.exe on
 # Windows (bare `cargo test` links ~16 binaries per run).

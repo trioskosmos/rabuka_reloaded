@@ -2091,13 +2091,32 @@ static void e2_q214_turn_limit_blocks_second(void)
           "(energy %d)", rb_energy_active_count(&tg->state.p[0]));
     int hand_before = hand_n(tg);
 
-    /* Second activation in the SAME turn must be refused. */
+    /* Second activation in the SAME turn must be refused -- but Rust refuses it
+     * at RESOLUTION, not at ENQUEUE. find_printed_ability
+     * (abilities.rs:1262-1277) does not consult remaining uses: it enqueues the
+     * printed ability regardless, and use_limit_gate (gates.rs:93-111) rejects
+     * the entry once pca_resolve_entry reaches it
+     * (game_state_abilities.c:2746-2752 frees the ability, advances the queue
+     * and returns 0 -- the entry never runs its effect). So a POSITIVE enqueue
+     * count from fire_trigger here is Rust-faithful and asserting the opposite
+     * pins behaviour Rust does not have.
+     *
+     * What the twin asserts is the DISJUNCTION
+     *   assert!(res.is_err() || !game.has_pending_choice())   (:83)
+     * plus the hand-unchanged half (:85). C's fire_trigger returns the ENQUEUE
+     * COUNT, not a Result, and the C entry point has no Err channel at all, so
+     * the reachable disjunct is `!has_pending_choice()`. It is asserted
+     * DIRECTLY -- deliberately with no drain in between: the refused entry
+     * creates no prompt at any point, so a drain would make the assertion
+     * vacuous (drain_choices exists to keep mandatory prompts from parking
+     * mid-ability, and here parking IS the failure). */
     rb_clear_pending_choice(&tg->state);
-    CHECK(!fire_trigger(tg, tg->state.p[0].stage[1], "\xe8\xb5\xb7\xe5\x8b\x95",
-                        "\xe8\xb5\xb7\xe5\x8b\x95"),
-          "e2: ターン1回 blocks the second activation in the same turn "
-          "(rb_queue_trigger_abilities refused to queue it)");
-    CHECK(!pending(tg), "e2: the blocked activation opens no prompt");
+    (void)fire_trigger(tg, tg->state.p[0].stage[1], "\xe8\xb5\xb7\xe5\x8b\x95",
+                       "\xe8\xb5\xb7\xe5\x8b\x95");
+    CHECK(!pending(tg),
+          "e2: ターン1回 blocks the second activation at RESOLUTION, so no "
+          "prompt is ever opened (the `!has_pending_choice()` disjunct of "
+          "discard_score_energy_live_recovery_edges_test.rs:83)");
     CHECK_EQ(hand_before, hand_n(tg),
              "e2: the blocked activation consumes no hand card");
     CHECK(!hand_has(tg, live) || hand_before == hand_n(tg),
@@ -3429,9 +3448,24 @@ static void k7_turn1_blocks_second(void)
           "k7: the first activation retrieved one of the two μ's lives");
     int hand_after_first = hand_n(tg);
 
+    /* Second activation same turn. Rust's twin is
+     *     let res = game.try_activate_ability(me);
+     *     assert!(res.is_err(), "turn1 should block second activation")
+     * (live_success_success_count_scales_cost_and_lilywhite_live_retrieval_
+     *  pl_pb1_007_test.rs:176-177). try_activate_ability forwards to
+     * run_main_action, which ENQUEUES and then RESOLVES, so the Err is produced
+     * by the resolution-time use_limit_gate (gates.rs:93-111) -- never by the
+     * enqueue (abilities.rs:1262-1277).
+     *
+     * The C has no Result on this path: fire_trigger returns the ENQUEUE COUNT
+     * (test_game.c:1173 `int queued = ... - before`), so `res.is_err()` has no
+     * C spelling and asserting `!fire_trigger(...)` would pin behaviour Rust
+     * does not have. The two companion behavioural assertions are what the
+     * refused resolution is observable through: it opens no prompt and it
+     * consumes no hand card. Both are asserted without a drain in between,
+     * because a refused entry creates no prompt at any point. */
     rb_clear_pending_choice(&tg->state);
-    CHECK(!fire_trigger(tg, me, "\xe8\xb5\xb7\xe5\x8b\x95", "\xe8\xb5\xb7\xe5\x8b\x95"),
-          "k7: ターン1回 blocks the second activation in the same turn");
+    (void)fire_trigger(tg, me, "\xe8\xb5\xb7\xe5\x8b\x95", "\xe8\xb5\xb7\xe5\x8b\x95");
     CHECK(!pending(tg), "k7: the blocked activation opens no prompt");
     CHECK_EQ(hand_after_first, hand_n(tg),
              "k7: the blocked activation consumes no hand card");

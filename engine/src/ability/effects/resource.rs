@@ -1,4 +1,4 @@
-//! `gain_resource` - the largest single action family in the engine.
+﻿//! `gain_resource` - the largest single action family in the engine.
 //!
 //! 160 of the 936 unique abilities in `cards/abilities.json`
 //! (`docs/ABILITY_MATRIX.md`), 17% of all ability behaviour. Everything
@@ -99,6 +99,9 @@ struct GainResourceRequest<'a> {
     recently_moved: &'a Option<SmallVec<[i16; 4]>>,
     entry_snapshot: &'a Option<SmallVec<[i16; 4]>>,
     preceding_moved: &'a Option<SmallVec<[i16; 4]>>,
+    /// Cards THIS ability moved — see `this_ability_moved` in
+    /// `execute_gain_resource`. The pool 「これにより…」 clauses count over.
+    this_ability_moved: &'a Option<SmallVec<[i16; 4]>>,
     orientation_modifiers: &'a HashMap<i16, crate::core::game_modifiers::CardOrientation>,
 
     /// A heart colour fixed by an enclosing effect (e.g. an energy placed for
@@ -124,6 +127,10 @@ pub(crate) struct GainMultiplierRequest<'a> {
     // ── Counts measured before this step ran ──
     recently_moved: &'a Option<SmallVec<[i16; 4]>>,
     entry_snapshot: &'a Option<SmallVec<[i16; 4]>>,
+    /// Cards THIS ability moved — the pool 「これにより…」 clauses count over.
+    /// Distinct from `recently_moved`, which is a game-wide movement tracker only
+    /// some placement paths populate.
+    this_ability_moved: &'a Option<SmallVec<[i16; 4]>>,
     last_energy: u8,
     last_discard_count: u8,
 
@@ -451,6 +458,7 @@ pub(crate) fn execute_gain_surplus_heart(
             entry_snapshot,
             last_energy,
             last_discard_count,
+            this_ability_moved,
             orientation_modifiers,
             filter,
         } = req.clone();
@@ -528,7 +536,46 @@ pub(crate) fn execute_gain_surplus_heart(
         // never the full waitroom. Checks recently_moved first, then the
         // enqueue-time snapshot (trigger_moved_cards) as fallback.
         let tracked_moved = recently_moved.as_ref().or(entry_snapshot.as_ref());
-        if Zone::from_str(per_unit_type_str.unwrap_or("")) == Some(Zone::Discard) {
+        // 「これにより…}:\u3000 「これにより控え室に置いたカード1枚につき」 and its
+        // siblings name the BATCH the preceding step just produced, and the parser
+        // records that as `per_unit_source: "previous_moved_cards"`. Key off it
+        // FIRST, because `per_unit_type` cannot carry it: it is a counting noun
+        // (「枚」/「人」/「つ」), not a zone, and the branches below only recognise
+        // `"discard"`, `"waitroom_card"` and `"energy_deck"`.
+        //
+        // PL!S-bp7-007-P 国木田花丸 is the case that shows the cost of the omission.
+        // Its blade clause is 「これによりデッキに置かれたカード1枚につき、ブレードを
+        // 得る」 with `per_unit_type: "枚"`, no `location` and no `card_type` filter,
+        // so the count fell through to `resolve_per_unit_count("枚", …)` and
+        // `per_unit_zone` mapped 「枚」 to `Zone::Hand`. The blades were counted from
+        // the hand — a zone the clause never mentions — while the cards actually
+        // placed earned nothing. With two members in hand and two placed it read as
+        // correct by coincidence, which is why no test had caught it.
+        //
+        // Keyed on the field rather than on a new `per_unit_type` spelling because
+        // the field is what the parser already emits for all three affected cards:
+        // PL!S-bp7-007-P (枚), PL!N-bp7-008-P (枚) and PL!S-bp6-021-L (none).
+        // 「これにより…}: the cards THIS ability moved, and the clause is
+        // authoritative about them. An empty batch is ZERO, never a fall-through to
+        // a zone-derived count: 「3枚まで」 is an upper bound, so when nothing is
+        // placeable the set of 「これにより…置かれたカード」 is empty and the effect
+        // earns nothing. Guarding this on the pool being present would hand the
+        // clause back to `per_unit_type`, which is a counting noun that resolves to
+        // the hand — the exact defect the branch exists to remove.
+        if effect.per_unit_source_any() == Some("previous_moved_cards") {
+            matching_count = util::resolve_discard_per_unit_count(
+                this_ability_moved.as_ref(),
+                last_discard_count,
+                &card_db,
+                filter,
+            );
+            log::debug!(
+                "[GAIN_MULT] per_unit_source=previous_moved_cards over {} cards this \
+                 ability moved -> {}",
+                this_ability_moved.as_ref().map(|v| v.len()).unwrap_or(0),
+                matching_count
+            );
+        } else if Zone::from_str(per_unit_type_str.unwrap_or("")) == Some(Zone::Discard) {
             let tm_len = tracked_moved.map(|v| v.len()).unwrap_or(0);
             log::debug!(
                 "[DBG_GR] tracked_moved.len={} last_discard_count={}",
@@ -912,6 +959,28 @@ pub(crate) fn execute_gain_surplus_heart(
         let recently_moved = gs.recently_moved_cards.clone();
         let entry_snapshot = gs.entry_trigger_moved_cards();
         let last_cost_moved = gs.mods.last_cost_moved_card_ids.clone();
+        // 「これにより…}: the cards THIS ability moved, read from the resolver's own
+        // record rather than from the global movement tracker.
+        //
+        // `selection.moved_cards` is where every placement path deposits what it
+        // moved - the plain move path extends it with the batch, and the
+        // 好きな順番 / any-order deck path extends it once the player finishes
+        // picking the order (choice.rs). It is deliberately NOT reset between an
+        // ability's steps, so for 「…置いて、…これにより置いたカード1枚につき」 the
+        // second step sees exactly the first step's cards.
+        //
+        // The global `gs.recently_moved_cards` is the wrong source: it is populated
+        // only by the paths that call `push_movement_event`, so for an any-order
+        // deck placement it was `None` and the count fell back to `per_unit_type`,
+        // which is a counting noun and resolved to the hand. PL!S-bp7-007-P 国木田
+        // 花丸 credited a blade for every card in hand instead of the two 『Aqours』
+        // members it had just placed.
+        let this_ability_moved: Option<SmallVec<[i16; 4]>> =
+            if self.selection.moved_cards.is_empty() {
+                None
+            } else {
+                Some(self.selection.moved_cards.iter().copied().collect())
+            };
         let preceding_moved: Option<SmallVec<[i16; 4]>> = entry_snapshot
             .clone()
             .or_else(|| {
@@ -1007,6 +1076,7 @@ pub(crate) fn execute_gain_surplus_heart(
                 count,
                 per_unit,
                 per_unit_type_str,
+                this_ability_moved: &this_ability_moved,
                 target: &target,
                 is_all,
                 is_self_target,
@@ -1509,6 +1579,7 @@ pub(crate) fn execute_gain_surplus_heart(
             count,
             per_unit,
             per_unit_type_str,
+            this_ability_moved,
             target,
             is_all,
             is_self_target,
@@ -1557,6 +1628,7 @@ pub(crate) fn execute_gain_surplus_heart(
                 entry_snapshot,
                 last_energy,
                 last_discard_count,
+                this_ability_moved: &this_ability_moved,
                 orientation_modifiers,
                 filter: &filter,
             },

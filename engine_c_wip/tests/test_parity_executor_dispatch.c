@@ -212,7 +212,7 @@ static void test_compiled_vocabulary_reachable(void)
  * ======================================================================== */
 static void test_draw_card_dispatch(void)
 {
-    TestGame tg;
+    static TestGame tg;
     test_game_new(&tg);
     reset_board(&tg);
     int a = deck_card(&tg, "PL!-sd1-010-SD");
@@ -239,7 +239,7 @@ static void test_draw_card_dispatch(void)
  * ======================================================================== */
 static void test_draw_until_count_dispatch(void)
 {
-    TestGame tg;
+    static TestGame tg;
     test_game_new(&tg);
     reset_board(&tg);
     for (int i = 0; i < 6; i++) deck_card(&tg, "PL!-sd1-010-SD");
@@ -263,7 +263,7 @@ static void test_draw_until_count_dispatch(void)
  * ======================================================================== */
 static void test_move_cards_dispatch(void)
 {
-    TestGame tg;
+    static TestGame tg;
     test_game_new(&tg);
     reset_board(&tg);
     int a = test_new_id(&tg, "PL!-sd1-010-SD");
@@ -326,7 +326,7 @@ static void test_move_cards_dispatch(void)
  * "waitroom" in its own executor.c copy, which is a C invention. */
 static void test_discard_card_dispatch(void)
 {
-    TestGame tg;
+    static TestGame tg;
     test_game_new(&tg);
     reset_board(&tg);
     int a = test_new_id(&tg, "PL!-sd1-010-SD");
@@ -362,7 +362,7 @@ static void test_discard_card_dispatch(void)
  * ======================================================================== */
 static void test_look_and_reveal_dispatch(void)
 {
-    TestGame tg;
+    static TestGame tg;
     test_game_new(&tg);
     reset_board(&tg);
     int a = deck_card(&tg, "PL!-sd1-010-SD");
@@ -407,7 +407,7 @@ static void test_look_and_reveal_dispatch(void)
  * ======================================================================== */
 static void test_choice_dispatch(void)
 {
-    TestGame tg;
+    static TestGame tg;
     test_game_new(&tg);
     reset_board(&tg);
     int a = deck_card(&tg, "PL!-sd1-010-SD");
@@ -489,7 +489,7 @@ static void test_choice_dispatch(void)
  * ======================================================================== */
 static void test_gain_resource_dispatch(void)
 {
-    TestGame tg;
+    static TestGame tg;
     test_game_new(&tg);
     reset_board(&tg);
     int member = test_new_id(&tg, "PL!-sd1-010-SD");
@@ -539,7 +539,7 @@ static void test_gain_resource_dispatch(void)
  * ======================================================================== */
 static void test_pay_energy_dispatch(void)
 {
-    TestGame tg;
+    static TestGame tg;
     test_game_new(&tg);
     reset_board(&tg);
     test_give_energy(&tg, 4);
@@ -559,7 +559,7 @@ static void test_pay_energy_dispatch(void)
  * ======================================================================== */
 static void test_place_energy_under_member_dispatch(void)
 {
-    TestGame tg;
+    static TestGame tg;
     test_game_new(&tg);
     reset_board(&tg);
     int member = test_new_id(&tg, "PL!-sd1-010-SD");
@@ -593,7 +593,7 @@ static void test_place_energy_under_member_dispatch(void)
  * ======================================================================== */
 static void test_change_state_dispatch(void)
 {
-    TestGame tg;
+    static TestGame tg;
     test_game_new(&tg);
     reset_board(&tg);
     int members[3];
@@ -635,7 +635,7 @@ static void test_change_state_dispatch(void)
  * ======================================================================== */
 static void test_rotation_dispatch(void)
 {
-    TestGame tg;
+    static TestGame tg;
     test_game_new(&tg);
     reset_board(&tg);
     int left = test_new_id(&tg, "PL!-sd1-010-SD");
@@ -665,7 +665,7 @@ static void test_rotation_dispatch(void)
  * ======================================================================== */
 static void test_position_change_dispatch(void)
 {
-    TestGame tg;
+    static TestGame tg;
     test_game_new(&tg);
     reset_board(&tg);
     int left = test_new_id(&tg, "PL!-sd1-010-SD");
@@ -692,7 +692,7 @@ static void test_position_change_dispatch(void)
  * ======================================================================== */
 static void test_modify_score_dispatch(void)
 {
-    TestGame tg;
+    static TestGame tg;
     test_game_new(&tg);
     reset_board(&tg);
     int host = test_new_id(&tg, "PL!N-bp1-027-L");
@@ -728,7 +728,7 @@ static void test_modify_score_dispatch(void)
  * ======================================================================== */
 static void test_cost_effect_dispatch(void)
 {
-    TestGame tg;
+    static TestGame tg;
     test_game_new(&tg);
     reset_board(&tg);
     int member = test_new_id(&tg, "PL!-sd1-010-SD");
@@ -774,7 +774,7 @@ static void test_cost_effect_dispatch(void)
  * ======================================================================== */
 static void test_required_hearts_dispatch(void)
 {
-    TestGame tg;
+    static TestGame tg;
     test_game_new(&tg);
     reset_board(&tg);
     int host = test_new_id(&tg, "PL!N-bp1-027-L");
@@ -828,7 +828,7 @@ static void test_required_hearts_dispatch(void)
  * ======================================================================== */
 static void test_blade_heart_state_dispatch(void)
 {
-    TestGame tg;
+    static TestGame tg;
     test_game_new(&tg);
     reset_board(&tg);
     int member = test_new_id(&tg, "PL!-sd1-010-SD");
@@ -905,7 +905,7 @@ static void test_blade_heart_state_dispatch(void)
  * ======================================================================== */
 static void test_ability_mod_dispatch(void)
 {
-    TestGame tg;
+    static TestGame tg;
     test_game_new(&tg);
     reset_board(&tg);
     int member = test_new_id(&tg, "PL!-sd1-010-SD");
@@ -979,7 +979,7 @@ static void test_ability_mod_dispatch(void)
  * ======================================================================== */
 static void test_compound_dispatch(void)
 {
-    TestGame tg;
+    static TestGame tg;
     test_game_new(&tg);
     reset_board(&tg);
     int a = deck_card(&tg, "PL!-sd1-010-SD");
@@ -1026,7 +1026,7 @@ static void test_compound_dispatch(void)
  * ======================================================================== */
 static void test_discard_until_count_dispatch(void)
 {
-    TestGame tg;
+    static TestGame tg;
     test_game_new(&tg);
     reset_board(&tg);
     for (int i = 0; i < 5; i++) test_add_to_hand(&tg, test_new_id(&tg, "PL!-sd1-010-SD"));
@@ -1058,7 +1058,7 @@ static void test_discard_until_count_dispatch(void)
  * ======================================================================== */
 static void test_utility_dispatch(void)
 {
-    TestGame tg;
+    static TestGame tg;
     test_game_new(&tg);
     reset_board(&tg);
     int member = test_new_id(&tg, "PL!-sd1-010-SD");
@@ -1097,7 +1097,7 @@ static void test_utility_dispatch(void)
  * ======================================================================== */
 static void test_verdict_and_fallback(void)
 {
-    TestGame tg;
+    static TestGame tg;
     test_game_new(&tg);
     reset_board(&tg);
     int host = test_new_id(&tg, "PL!N-bp1-027-L");

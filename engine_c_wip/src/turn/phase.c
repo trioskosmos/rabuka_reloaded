@@ -355,17 +355,24 @@ if (g->phase == RB_PHASE_LIVE_SET) {
            had NO C clear site on the tested path, so every fact they hold stayed
            satisfiable for the rest of the game.
 
-             cannot_activate_members.clear()      phases.rs:279
-               C fold: GameState.player_cannot_activate[2] (the Rust list is
-               per-seat, not per-card) plus GameState.cannot_active_cards /
-               n_cannot_active_cards, which is the C fold of the per-MEMBER half
-               of the same Rust set (written by effects/misc.c:913-920, read by
-               rb_card_is_cannot_active). Both writers were already in place and
-               NEITHER was ever cleared outside engine.c:1199-1201 — which only
-               rb_turn reaches, i.e. not the interactive loop and not the web
-               path, and not any test. That is why
-               tests/test_parity_restriction.c:947-948 has to zero the field by
-               hand to get a clean probe.
+cannot_activate_members.clear()      phases.rs:279
+                C fold: GameState.player_cannot_activate[2] (the Rust list is
+                per-seat, not per-card) plus GameState.cannot_active_cards /
+                n_cannot_active_cards, which is the C fold of the per-MEMBER half
+                of the same Rust set (written by effects/misc.c:913-920, read by
+                rb_card_is_cannot_active). Both writers were already in place and
+                NEITHER was ever cleared outside engine.c:1199-1201 — which only
+                rb_turn reaches, i.e. not the interactive loop and not the web
+                path, and not any test. That is why
+                tests/test_parity_restriction.c hand-zeroed the field by hand.
+                CORRECTION to engine.c:1464-1467, which claims that test "no
+                longer has to zero the field by hand": it still does, at
+                test_parity_restriction.c:465-466, :923-924 and :1006-1007. Those
+                are per-sub-test isolation (each starts from a fresh
+                test_game_new board and drives a phase-gate probe), not the
+                rollover they are usually read as — the lines the claim points at
+                (:947-948) are a `board_begin` call and a blank line. tests/ is
+                not this task's to edit, and no test is weakened either way.
 
              turn_state_changes.clear()          phases.rs:303
                C fold: turn_state_changes / n_turn_state_changes. It is a 64-row
@@ -378,8 +385,9 @@ if (g->phase == RB_PHASE_LIVE_SET) {
              clear_revealed_cards()              phases.rs:277
                NOT DONE, and it is not an oversight. The C folds Rust's pending
                reveal pool and the yell's own reveal record into ONE field
-               (GameState.revealed_cards / n_revealed): ptc_yell_had_draw_icon
-               below reads it as "what the yell just revealed", and
+               (GameState.revealed_cards / n_revealed): the draw-icon sweep in
+               rb_execute_performance_phase below reads it as "what the yell just
+               revealed", and
                tests/test_parity_rules_phases.c:836 (B7) and its D2 twin assert
                `n_revealed > 0` as the PREMISE that the reveal happened — after
                perform_live has already run this rollover. Clearing it here is
@@ -391,36 +399,70 @@ if (g->phase == RB_PHASE_LIVE_SET) {
                consumes it — which is the Rust behaviour for the pool. REPORTED
                as a field-separation request, not silently half-done.
 
-             baton_touch_used — C-LOCAL, no Rust clear site. Rust passes
-               baton_touch_used PER PLAY ACTION as an argument
-               (phases.rs:1076 -> trigger_scan.rs:73-83), so it is a stack value
-               that cannot outlive the action; the C keeps it in GameState and
-               sets it in engine.c:485 (single baton) and :622 (double baton).
-               Nothing in the TREE ever cleared it again outside rb_turn, so from
-               the first baton touch of the game onward it was latched at 1 for
-               both seats, and src/turn/triggers.c:243
-               `if (!baton_touch_used && baton_touch_trigger)` suppressed every
-                   「バトンタッチされたとき」 ability for the rest of the match.
-               The rollover is the widest frame the C phase machine has, and the
-               one Rust's own turn machine is closest to, so that is where it is
-               cleared. It is still coarser than Rust's per-action scope (a turn
-               has two Main phases), but coarser is correct and never-latched is
-               not; making it per-action needs a play-action frame, which is
-               engine.c's and rb_play_member's, not this file's.
+baton_touch_used — C-LOCAL, no Rust clear site. Rust passes
+                baton_touch_used PER PLAY ACTION as an argument
+                (phases.rs:1076 -> trigger_scan.rs:73-83), so it is a stack value
+                that cannot outlive the action; the C keeps it in GameState and
+                sets it in engine.c:485 (single baton) and :622 (double baton).
+                Nothing in the TREE ever cleared it again outside rb_turn, so from
+                the first baton touch of the game onward it was latched at 1 for
+                both seats, and src/turn/triggers.c:243
+                `if (!baton_touch_used && baton_touch_trigger)` suppressed every
+                    「バトンタッチされたとき」 ability for the rest of the match.
+                The rollover is the widest frame the C phase machine has, and the
+                one Rust's own turn machine is closest to, so that is where it is
+                cleared. It is still coarser than Rust's per-action scope (a turn
+                has two Main phases), but coarser is correct and never-latched is
+                not; making it per-action needs a play-action frame, which is
+                engine.c's and rb_play_member's, not this file's.
+                VERIFIED CLEARED, and every caller of the phase machine reaches
+                this arm: the interactive loop (src/main.c:97 / :102 call
+                rb_advance_phase directly and never rb_turn), the batch loop
+                (src/main.c:134 rb_turn, which is now a thin driver over
+                rb_advance_phase), the WEB path
+                (src/web_server.c:666 rb_execute_main_phase_action(.., 1, ..) ->
+                engine.c:1550 rb_advance_phase, and rb_setup_settle_single_
+                player_state at web_server.c:394/:567/:591), and every test.
 
-           NOT CLEARED HERE, and why — these two have no C representation this
-           file can reach:
-             cannot_live_players.clear()         phases.rs:280
-               lives in the file-static RbRulesState in
-               src/ability/effects/rules.c:72; `rb_rules_state` is `static` there,
-               so there is no accessor and no way to clear it from here. REPORTED
-               to rules.c's owner: it needs an rb_rules_clear_turn_state(g)
-               twin of rules.c's own rb_rules_forget (rules.c:140).
-             wait_immune_members.clear()         phases.rs:281
-               there is no writer for it anywhere in the tree (the header says
-               so at rabuka.h:3280-3289), so it is always empty and clearing it
-               would be a no-op.
-              turn_limited_abilities_used.clear() phases.rs:278
+            NOT CLEARED HERE — one of them is THIS FILE'S and one is not:
+              cannot_activate_members.clear()      phases.rs:279 — DONE, the two
+                clears below. See the fold note above; both writers
+                (effects/misc.c:913-920, effects/rules.c:1869-1872) now have a
+                rollover clear, so the field no longer outlives its turn.
+                NOTE the fold is DUPLICATED in rules.c: `RbRulesState::
+                cannot_activate_members[2]` is a second copy of the same Rust set,
+                written at rules.c:1870 beside the GameState write, and its only
+                reader `rb_rules_cannot_activate_player` (rules.c:2274) has ZERO
+                callers tree-wide, so that copy is dead-but-set and CANNOT be
+                cleared from here (`rb_rules_state` is static in rules.c). That
+                half is BLOCKED-ON, together with cannot_live_players below.
+
+              cannot_live_players.clear()         phases.rs:280
+                BLOCKED-ON src/ability/effects/rules.c (not this file's, and not
+                under src/ability ownership this task holds). It lives in the
+                file-static RbRulesState at rules.c:72; `rb_rules_state` is
+                `static` there, so there is no accessor and no way to clear it
+                from here, or from live.c.
+                EXACT SYMBOL NEEDED —
+
+                    void rb_rules_clear_turn_state(GameState *g);
+
+                clearing `cannot_live_players[2]` and `cannot_activate_members[2]`
+                in the same frame (Rust clears them adjacently, phases.rs:279-280),
+                called from the two clears below next to
+                player_cannot_activate. `rb_rules_forget` (rules.c:140) is NOT a
+                substitute: it is 0-callers too and drops EVERY side table for the
+                state (delayed_prohibition, wait_immune, conditional_choice,
+                moved_cards, …), none of which Rust clears at the rollover.
+                Until it exists, live.c's `discard_live_on_cannot_live`
+                (live.rs:1832) cannot be wired either — see PARITY_CHECKLIST.md
+                I2, where the whole reader/writer/clear chain is written out.
+
+              wait_immune_members.clear()         phases.rs:281
+                there is no writer for it anywhere in the tree (the header says
+                so at rabuka.h:3280-3289), so it is always empty and clearing it
+                would be a no-op.
+               turn_limited_abilities_used.clear() phases.rs:278
                 already self-clearing in C: the use-limit table is keyed by turn
                 (ability_queue.c:1138/1147 `if (q->use_turn != cur_turn)`), which
                 is the same guarantee Rust gets from the explicit clear. */
@@ -1361,31 +1403,6 @@ void rb_3ds_tdbg(const char *msg) {
 }
 
 
-/* Rust live.rs:2120 — `draw_effects_occurred` is true when any card revealed by
-   the yell carried a draw icon. live.c computes the icon tallies inside
-   do_yell; the predicate is re-derived here from the revealed pool (the same
-   blade-heart / special-heart classification as live.c:79-106) because the
-   phase machine needs it after rb_perform_live returns. */
-static int ptc_yell_had_draw_icon(const GameState *g) {
-    for (int i = 0; i < g->n_revealed; i++) {
-        Card c;
-        if (!rb_decode_card_by_index((uint32_t)g->revealed_cards[i], &c)) continue;
-        int start = c.num_base;
-        int end = start + c.num_blade;
-        if (end > c.n_hearts) end = c.n_hearts;
-        for (int h = start; h < end; h++)
-            if (c.heart_color[h] == RB_HEART_DRAW && c.heart_count[h] > 0) {
-                rb_free_card(&c);
-                return 1;
-            }
-        int special_is_draw = c.has_special && c.special_color == RB_HEART_DRAW &&
-                              c.special_count > 0;
-        rb_free_card(&c);
-        if (special_is_draw) return 1;
-    }
-    return 0;
-}
-
 /* ── execute_performance_phase (phases.rs:318-662) ─────────────────────────────────
    The C port splits this Rust function: the yell reveal, the 8.3.14-8.3.16 heart
    calculation, the success check and the snapshot are owned by
@@ -1439,8 +1456,34 @@ void rb_execute_performance_phase(GameState *g, int is_first) {
     rb_process_pending_auto_abilities(g);
 
     /* phases.rs:649-654 — a draw effect revealed by the yell can arm further
-       abilities, so both sweeps run a second time. */
-    if (ptc_yell_had_draw_icon(g)) {
+       abilities, so both sweeps run a second time.
+       Rust reads `perf_data.draw_effects_occurred`, which live.rs:2192 sets as
+       `yell_cards.iter().any(|yc| yc.draw_icons > 0)` — i.e. the draw tally
+       produced by process_yell_revealed_card_icons (live.rs:112) for each card
+       the yell revealed. The C has no stored flag for it (do_yell keeps
+       draw_icons in a local), so this call site walks the same revealed pool
+       (live.c:606-607 fills g->revealed_cards with exactly the yell cards) and
+       asks the ONE canonical decode for that card's draw tally, which is what
+       `ptc_yell_had_draw_icon` used to re-derive with its own copy of the
+       blade-heart / special-heart classification.
+
+       override_color is passed as -1 (no recolour) on purpose: the only thing a
+       recolour can change here is whether a BLADE heart becomes a draw icon, and
+       the recolour source is a blade type, which rb_blade_color_to_heart maps
+       only to 1..6 / All / pink (live.c:1006-1010) — never to
+       RB_HEART_DRAW (8) or RB_HEART_SCORE (9), which the canonical decode
+       passes through unchanged (live.c:97-104). So the tally is the same either
+       way, and reading it without a re-derived override keeps this file from
+       growing a fourth copy of do_yell's override scan. */
+    int draw_effects_occurred = 0;
+    for (int i = 0; i < g->n_revealed; i++) {
+        int total[8], card_hearts[8], note_icons = 0, draw_icons = 0, cheer = 0;
+        rb_process_yell_revealed_card_icons(g, g->revealed_cards[i], -1,
+                                            total, &cheer, card_hearts,
+                                            &note_icons, &draw_icons);
+        if (draw_icons > 0) { draw_effects_occurred = 1; break; }
+    }
+    if (draw_effects_occurred) {
         rb_trigger_auto_abilities(g, performer, "自動");
         rb_process_pending_auto_abilities(g);
         rb_trigger_auto_abilities(g, opponent, "自動");

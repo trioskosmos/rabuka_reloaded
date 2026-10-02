@@ -56,16 +56,58 @@ regen: data
 # Card data blobs the test binaries load via rb_load("src"). Produced by the
 # pure-Python generators in cards/; regenerated here so a clean checkout can
 # build and run the suites without a manual copy step.
-CARDS_BIN      := ../cards/build/cards.bin
-STRINGS_BIN    := ../cards/build/abilities_strings.bin
+#
+# `?=` not `:=` so a snapshot can point the rules at its own artifacts without
+# editing this file (make data STRINGS_BIN=/path/to/blob).
+CARDS_BIN      ?= ../cards/build/cards.bin
+STRINGS_BIN    ?= ../cards/build/abilities_strings.bin
 
-data: src/cards.bin src/abilities_strings.bin
+# Canonical identity of each blob, pinned to the ONE generator run that produced
+# both cards/build/ and the committed src/core/generated/gen_data.c. gen_data.c
+# records the same length as RBKA_STRINGS_TABLE_LEN and the same content digest
+# as RBKA_STRINGS_TABLE_FNV, so these three numbers describe one artifact:
+#
+#   985 abilities / 6032 interned strings / 2116 card-ability pairs
+#   726831 string-table bytes / 98737 bytecode bytes
+#
+# `make data` VERIFIES before it copies (tools/guard_data_blob.sh). It used to
+# `cp -f` whatever was in cards/build, and cards/build/abilities_strings.bin was
+# seen at 726649 bytes: a plain `make` copied that truncated blob over the good
+# one and BYTE-SPLICED the interned string table, which raises no build error at
+# all - it just returns the wrong string for every ability from that index on.
+CARDS_BYTES    := 631890
+CARDS_SHA256   := 728208504fee6217
+STRINGS_BYTES  := 726831
+STRINGS_SHA256 := 89204df0bbde08a0
 
-src/cards.bin: $(CARDS_BIN)
-	cp -f $(CARDS_BIN) $@
+GUARD          := tools/guard_data_blob.sh
 
-src/abilities_strings.bin: $(STRINGS_BIN)
-	cp -f $(STRINGS_BIN) $@
+# `make data` VERIFIES AND THEN COPIES, and it does both on EVERY invocation.
+# It used to run `cp -f $(STRINGS_BIN) src/abilities_strings.bin` as a separate
+# file rule, which meant the copy happened only when make decided the target was
+# out of date -- and cards/build/abilities_strings.bin was once seen at 726649
+# bytes against a canonical 726831. A plain `make` then copied that truncated
+# blob over the good one and BYTE-SPLICED the interned string table, which raises
+# no build error at all: it just returns the wrong string for every ability from
+# that index on (`cost_limit` -> `cost_limitc`). Worse, when make decided the
+# target was UP TO DATE it skipped the copy and reported "nothing to be done"
+# while the two files still disagreed.
+#
+# So `data` is phony and hands the whole job to the guard, which refuses a
+# non-canonical source, repairs a non-canonical src/ copy loudly, and stages the
+# copy through a temp name + rename so src/ is never half-written.
+.PHONY: data
+data:
+	@sh $(GUARD) --install "$(CARDS_BIN)" src/cards.bin $(CARDS_BYTES) $(CARDS_SHA256)
+	@sh $(GUARD) --install "$(STRINGS_BIN)" src/abilities_strings.bin $(STRINGS_BYTES) $(STRINGS_SHA256)
+
+# Independent second gate over the same artifacts: verify_artifacts.py recomputes
+# every per-string FNV digest from the bytes on disk and compares them against the
+# committed C tables. `make data` proves the blobs are the canonical ones;
+# this proves the canonical ones still agree with gen_data.c.
+.PHONY: verify-data
+verify-data: data
+	python3 tools/verify_artifacts.py
 
 # Build + run one test suite:  make t T=<stem>   (uses tests/test_<stem>.c)
 # This is an explicit target rather than a pattern rule so that adding a test

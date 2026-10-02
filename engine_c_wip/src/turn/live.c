@@ -2,6 +2,11 @@
 #include <string.h>
 #include <stdio.h>
 
+/* Forward: rb_perform_live calls this at the point Rust's phases.rs:583 calls
+   enrich_from_applications (after check_live_success, at the snapshot push);
+   the definition sits far below, beside the other display-projection helpers. */
+void rb_enrich_from_applications(GameState *g);
+
 /* The exported per-card allocation entry points (rb_bt_search, rb_try_phase4,
    rb_try_all_distribution) live at the BOTTOM of this file, next to
    rb_try_surplus_compositions / rb_card_ok_with_wildcard, so that they can
@@ -22,6 +27,18 @@
 
 
 
+/* rb_calc_stage_hearts is a C-ONLY alias, not a live.rs item: Rust spells the
+   same thing `Player::calculate_stage_hearts` (engine/src/core/player.rs:516),
+   which delegates to `stats_pipeline::stage_hearts` (stats_pipeline.rs:93).
+   The C counterpart of THAT is rb_stage_hearts_pipeline
+   (core/stats_pipeline.c:269), and it is the one production code uses — this
+   file calls it at :512 and :588, phase.c owns the rest. rb_calc_stage_hearts
+   exists only because tests call it by the Rust method's name
+   (tests/replay.c:82, test_parity_blade_under.c:1864/:1890,
+   test_parity_hearts_live_start.c, test_parity_required_hearts.c,
+   test_parity_rules_conditions.c, test_parity_full_round3.c,
+   test_parity_hearts_constants.c, test_parity_compound_per_card.c,
+   test_parity_characterization_extra.c). It is a one-line forward, kept. */
 void rb_calc_stage_hearts(const GameState *g, int pl, int out[8]){
     rb_stage_hearts_pipeline(g, pl, out);
 }
@@ -33,19 +50,46 @@ void rb_calc_stage_hearts(const GameState *g, int pl, int out[8]){
     below matches the established C port (the decode stores the All-color heart as
     index 7), diverging from Rust's Heart00×2 only in which index carries the ×2;
     set_blade_type recolor applies to colored blades (Draw/Score pass through). */
+/* Mirror live.rs::YellIconOutcome (live.rs:61-65). Kept as a file-local type
+   because the exported entry point below flattens it into out-params: a public
+   function cannot expose a file-local struct to another translation unit. */
 typedef struct {
     int blade_hearts[8];
     int note_icons;
     int draw_icons;
 } RbYellIconOutcome;
 
-static RbYellIconOutcome rb_process_yell_revealed_card_icons(const GameState *g,
-        int cid, int override_color, int total_hearts[8], int *cheer_count){
+/* EXPORTED (was `static`). engine/src/ability/effects/reyell.rs:160 is the
+   second production caller of Rust's `pub fn process_yell_revealed_card_icons`
+   (the first is live.rs:1997, inside process_yell_zone_cards), and its C port
+   src/ability/effects/rules.c:1997 carries a byte-for-byte duplicate of this
+   body under the name `r_yell_icons`, with the note "live.c owns a `static`
+   copy; this local mirror keeps rules.c self-contained until live.c exports it
+   (CROSS-FILE REQUEST 4)". This is that export. The signature is deliberately
+   FLAT (out-params, int return) so rules.c can call it with nothing but an
+   `extern` declaration; the return value is 1 when the card decoded, 0 when it
+   did not (Rust: `if let Some(card) = card_db.get_card(*card_id)` — the whole
+   body is skipped for an unknown id). Once rules.c drops its copy and adds the
+   extern, the three hand-rolled variants of this decode (here, r_yell_icons,
+   and phase.c:1369 ptc_yell_had_draw_icon) become one.
+
+   CROSS-FILE REQUEST to the owner of src/ability/effects/rules.c: add
+       extern int rb_process_yell_revealed_card_icons(const GameState *, int, int,
+           int total_hearts[8], int *cheer_count, int blade_hearts_out[8],
+           int *note_icons_out, int *draw_icons_out);
+   and delete r_yell_icons (rules.c:1992-2031) plus its call at rules.c:2129.
+   Adding it to include/rabuka.h is the header owner's call, not this file's. */
+int rb_process_yell_revealed_card_icons(const GameState *g,
+        int cid, int override_color, int total_hearts[8], int *cheer_count,
+        int blade_hearts_out[8], int *note_icons_out, int *draw_icons_out){
     RbYellIconOutcome out;
     Card c;
     memset(&out, 0, sizeof(out));
-    if (!total_hearts || !cheer_count || !g || cid < 0) return out;
-    if (!rb_decode_card_by_index((uint32_t)cid, &c)) return out;
+    if (blade_hearts_out) memset(blade_hearts_out, 0, 8 * sizeof(int));
+    if (note_icons_out) *note_icons_out = 0;
+    if (draw_icons_out) *draw_icons_out = 0;
+    if (!total_hearts || !cheer_count || !g || cid < 0) return 0;
+    if (!rb_decode_card_by_index((uint32_t)cid, &c)) return 0;
 
     int blade_start = c.num_base;
     int blade_end = blade_start + c.num_blade;
@@ -82,7 +126,10 @@ static RbYellIconOutcome rb_process_yell_revealed_card_icons(const GameState *g,
     }
     for (int i = 0; i < 8; i++) total_hearts[i] += out.blade_hearts[i];
     rb_free_card(&c);
-    return out;
+    if (blade_hearts_out) memcpy(blade_hearts_out, out.blade_hearts, 8 * sizeof(int));
+    if (note_icons_out) *note_icons_out = out.note_icons;
+    if (draw_icons_out) *draw_icons_out = out.draw_icons;
+    return 1;
 }
 
 static int rb_yell_refresh_deck(GameState *g, int pl)
@@ -188,9 +235,10 @@ static int do_yell(GameState *g, int pl, int yell_cards[RB_MAX_ZONE], int *n_yel
         }
         if (card_id < 0) break;
         yell_cards[(*n_yell)++] = card_id;
-        RbYellIconOutcome outcome = rb_process_yell_revealed_card_icons(
-            g, card_id, override_color, blade_hearts, note_icons);
-        draw_icons += outcome.draw_icons;
+        int yb[8], ynote = 0, ydraw = 0;
+        rb_process_yell_revealed_card_icons(g, card_id, override_color, blade_hearts,
+                                            note_icons, yb, &ynote, &ydraw);
+        draw_icons += ydraw;
     }
     for (int i = 0; i < draw_icons; i++) rb_draw(g, pl);
     return *n_yell;
@@ -421,9 +469,173 @@ static int allocate_and_verdict(const GameState *g, int pl, const int total_hear
     return all_pass;
 }
 
+/* ── build_member_contributions (faithful port of live.rs:1844-1915) ───────────
+   Rust builds one MemberContribution per OCCUPIED stage slot and returns the
+   Vec, which `player_perform_live` stores in `LivePerformanceData.member_contributions`
+   (live.rs:2197). That Vec is the ONLY production consumer of two functions in
+   engine/src/core/stats_pipeline.rs:
+
+       live.rs:1872  member_heart_detail   -> C rb_member_heart_detail
+       live.rs:1884  effective_blade_parts  -> C rb_effective_blade_parts
+
+   Both C twins are faithful and were UNREACHABLE from src/ for exactly that
+   reason (they were exercisable only from tests/test_parity_stats_pipeline.c and
+   tests/test_parity_characterization_extra.c:1099). Calling this at the Rust
+   call site is what makes them reachable from production code again.
+
+   (`need_satisfied` — the third function stats_pipeline.c blocked on — is NOT
+   reached from here, and cannot be: live.rs:1844-1915 never calls it, and
+   stats_pipeline.rs:258 has ZERO callers in engine/src AND in engine/tests. It
+   is dead in Rust too.)
+
+   WHERE THE RESULT GOES — RESOLVED 2026-10-03 (checklist A18). The header now
+   carries `RbLiveSnapshot::member_contributions[2][RB_STAGE_SIZE]` +
+   `n_member_contributions[2]` (rabuka.h:1348-1349), so the data lands on the
+   snapshot the way Rust puts it on PerformanceSnapshot.member_contributions.
+   The two file-statics below are kept ONLY as the per-window scratch the builder
+   fills: rb_enrich_from_applications copies them onto the snapshot at the
+   phases.rs:583 position (inside rb_perform_live, at the push) and computes
+   `transform_delta` there. Before A18 the vector had nowhere to go and the
+   header's own note on RbMemberContribution said `card_no` is "owned by the
+   snapshot" — that is what parked it here. */
+static RbMemberContribution s_member_contrib[2][RB_STAGE_SIZE];
+static int s_n_member_contrib[2];
+
+/* live.rs:1886-1889 — `is_wait` is `orientation_modifiers[cid] == Wait`. The C
+   carries orientation as a string on the mods table (same source live.c's
+   rb_stage_member_waited reads at :130). */
+static int live_member_is_wait(const GameState *g, int cid) {
+    const char *o = rb_mods_get_orientation((RbMods *)&g->mods, cid);
+    return (o && !strcmp(o, "wait")) ? 1 : 0;
+}
+
+static int live_build_member_contributions(const GameState *g, int pl,
+                                            RbMemberContribution *out, int max_out) {
+    if (!g || pl < 0 || pl > 1 || !out || max_out <= 0) return 0;
+    int n = 0;
+    for (int i = 0; i < RB_STAGE_SIZE; i++) {
+        if (n >= max_out) break;
+        int cid = g->p[pl].stage[i];
+        if (cid == RB_EMPTY_SLOT) continue;          /* live.rs:1857-1859 */
+        if (cid < 0 || cid >= RB_MAX_CARD_IDS) continue;
+
+        RbMemberContribution mc;
+        memset(&mc, 0, sizeof(mc));
+        mc.source_id = cid;
+        mc.slot = (uint8_t)i;                        /* live.rs:1893 */
+
+        /* live.rs:1860-1870 — draw_icons counts only the HeartColor::Draw entries
+           of the card's special_heart; live.rs:1881 — printed_blade is the base
+           the blade split is layered onto. Both come out of one card decode. */
+        int printed_blade = 0;
+        Card card;
+        if (cid >= 0 && rb_decode_card_by_index((uint32_t)cid, &card)) {
+            if (card.has_special && card.special_color == RB_HEART_DRAW)
+                mc.draw_icons = (uint8_t)card.special_count;
+            printed_blade = (int)card.blade;
+            const char *no = rb_card_string(card.card_no_idx);
+            mc.card_no = no ? no : "";
+            rb_free_card(&card);
+        } else {
+            mc.card_no = "";                         /* ArcStr::default() */
+        }
+
+        /* live.rs:1872-1879 — heart pipeline: base vs bonus, one definition. */
+        rb_member_heart_detail(&g->mods, cid, mc.base_hearts, mc.bonus_hearts);
+
+        /* live.rs:1882-1884 — blade pipeline: effective base + additive bonus.
+           `blade_modifiers.get(&cid).copied().unwrap_or_default()` is the
+           mods table's zero-initialized entry for an unmodified card. */
+        int base_blades = 0, bonus_blades = 0;
+        rb_effective_blade_parts(g->mods.blade[cid], printed_blade,
+                                 &base_blades, &bonus_blades);
+        mc.base_blades = (uint8_t)base_blades;
+        mc.bonus_blades = (uint8_t)bonus_blades;
+
+        mc.is_wait = live_member_is_wait(g, cid);   /* live.rs:1886-1889 */
+        /* base_notes / bonus_notes / transform_delta are hard-zero at
+           construction (live.rs:1897-1898, :1907) and only written later, at
+           live.rs:3035 (enrich_from_applications) and live.rs:783-800
+           (finalize_snapshot_fields). memset above already did that. */
+
+        if (rb_ability_debug_enabled())
+            fprintf(stderr,
+                    "[MEMBER_CONTRIB] cid=%d slot=%d base_hearts=[%u,%u,%u,%u,%u,%u,%u,%u] "
+                    "bonus_hearts=[%u,%u,%u,%u,%u,%u,%u,%u] base_blades=%d bonus_blades=%d\n",
+                    cid, i,
+                    mc.base_hearts[0], mc.base_hearts[1], mc.base_hearts[2], mc.base_hearts[3],
+                    mc.base_hearts[4], mc.base_hearts[5], mc.base_hearts[6], mc.base_hearts[7],
+                    mc.bonus_hearts[0], mc.bonus_hearts[1], mc.bonus_hearts[2], mc.bonus_hearts[3],
+                    mc.bonus_hearts[4], mc.bonus_hearts[5], mc.bonus_hearts[6], mc.bonus_hearts[7],
+                    base_blades, bonus_blades);
+        out[n++] = mc;
+    }
+    return n;
+}
+
+/* ── I2 BLOCKED-ON: discard_live_on_cannot_live (live.rs:1830-1839) ─────────
+   WHY `cannot_live` NEVER REACHED THIS FILE — the full chain, so the next
+   reader does not have to re-derive it:
+
+     * WRITER exists. src/ability/effects/rules.c:1876-1878 sets
+       `rb_rules_state(g)->cannot_live_players[pl] = 1` from the `cannot_live`
+       arm of r_apply_restriction — the twin of Rust's restriction.rs:100-105
+       (and modifiers.rs:1097-1100 for the constant path).
+     * READER exists, with ZERO callers anywhere in src or tests:
+       `rb_rules_cannot_live_player` (rules.c:2268). That zero is the whole bug:
+       phases.rs:351 `cannot_live_players.contains(&player_id)` had no C
+       counterpart, so rb_perform_live had no gate and a cannot_live seat
+       performed normally.
+     * THE MISSING THIRD PIECE IS THE CLEAR, and it is what makes this
+       BLOCKED-ON rather than a two-line fix. Rust clears `cannot_live_players`
+       at every turn rollover (phases.rs:280). The C copy lives in the
+       file-static `RbRulesState` (rules.c:72) whose accessor `rb_rules_state` is
+       `static`, so neither this file nor src/turn/phase.c can clear it. Wiring
+       the reader WITHOUT the clear turns a correct gate into a permanent one:
+       `cannot_live_players[pl]` would stay 1 for the rest of the match and the
+       seat could never perform a live again.
+     * `rb_rules_forget` (rules.c:140) is not a substitute — it is 0-callers too
+       and drops EVERY side table for the state (delayed_prohibition,
+       wait_immune, conditional_choice, moved_cards, …), none of which Rust
+       clears at the rollover.
+
+   EXACT SYMBOL NEEDED (src/ability/effects/rules.c, not this file's):
+
+       void rb_rules_clear_turn_state(GameState *g);
+
+   clearing `RbRulesState::cannot_live_players[2]` and, in the same frame,
+   `cannot_activate_members[2]` (Rust phases.rs:279-280 — both are per-turn sets
+   cleared together). It must be called from rb_advance_phase's RB_PHASE_VICTORY
+   rollover at src/turn/phase.c:427, next to the player_cannot_activate and
+   baton_touch_used clears that are already there.
+
+   Then this file's body is exactly the shape below, in rb_perform_live, after
+   build_member_contributions (live.rs:2053-2070 — the bail-out sits between the
+   member-contribution build and the empty-live-zone return, so the contributions
+   are still built):
+
+       if (rb_rules_cannot_live_player(g, pl)) {
+           s_n_member_contrib[pl] = live_build_member_contributions(...);
+           for (int i = 0; i < P->live.n; i++) rb_waitroom_add(P, P->live.cards[i]);
+           P->live.n = 0;
+           return 0;
+       }
+
+   Nothing is stubbed in here on purpose: a `#if 0` copy of a live Rust branch
+   is dead code that reads like coverage, so the diagnosis is left in prose and
+   the branch is left absent until it can be correct.
+   See PARITY_CHECKLIST.md I2. */
+
 int rb_perform_live(GameState *g, int pl){
     if (!g || pl < 0 || pl > 1) return 0;
     RbPlayer *P=&g->p[pl];
+    /* live.rs:2073 — `Self::build_member_contributions(...)` is the first thing
+       player_perform_live does after the `cannot_live` bail-out, i.e. BEFORE the
+       empty-live-zone return at live.rs:2086. Placing the call here reproduces
+       that order exactly. */
+    s_n_member_contrib[pl] = live_build_member_contributions(g, pl,
+                                                             s_member_contrib[pl],
+                                                             RB_STAGE_SIZE);
     int yell_cards[RB_MAX_ZONE]; int n_yell=0;
     int blade_hearts[8]={0}; int note_icons=0;
     if (g->performance_resume_pending) {
@@ -513,6 +725,14 @@ int rb_perform_live(GameState *g, int pl){
         s->surplus_hearts = surplus;
         s->note_icons = note_icons;
         for(int i=0;i<P->live.n && i<RB_MAX_LIVE_CARDS;i++) s->live_passed[i]=passed ? live_passed[i] : 0;
+        /* phases.rs:583 — enrich_from_applications runs after check_live_success
+           and BEFORE build_snapshot / push_performance_snapshot, which is exactly
+           here: the allocation verdict is in, the snapshot slot is taken, and the
+           ライブ成功時 abilities have NOT fired yet (they run in
+           rb_execute_live_victory_determination). The C pushes the snapshot
+           inline where Rust calls build_snapshot, so the C's call site is the
+           push, not a separate later line. */
+        rb_enrich_from_applications(g);
     }
     for (int i = 0; i < n_yell; i++) {
         if (P->discard.n < RB_MAX_ZONE) P->discard.cards[P->discard.n++] = yell_cards[i];
@@ -625,11 +845,31 @@ int rb_perform_live(GameState *g, int pl){
     return passed;
 }
 
-/* Mirror live.rs::determine_winners — decide which player(s) placed a live this
-   turn. A player "won" iff they passed ALL their live cards' heart checks
-   (g->live_success[pl]). If both passed, the higher live score wins; on a
-   score tie BOTH win (both place to success). Mirrors the Rust tie rule that
-   feeds move_live_to_success_and_handle_wins / first-attacker rollover. */
+/* Mirror live.rs::determine_winners (live.rs:442-503) — decide which player(s)
+   placed a live this turn. A player "won" iff they passed ALL their live cards'
+   heart checks (g->live_success[pl], which rb_perform_live / rb_populate_live_
+   verdicts / rb_record_pretrigger_live_results all write). If both passed, the
+   higher live score wins; on a score tie BOTH win (both place to success),
+   which is the Rust tie rule that feeds
+   move_live_to_success_and_handle_wins / the first-attacker rollover.
+
+   ONE RUST TERM HAS NO C COUNTERPART, and it is deliberately NOT synthesised.
+   Rust (live.rs:449-464):
+
+       let p1_has = !game_state.player1.live_card_zone.cards.is_empty();
+       let p1_all = p1_has && <latest snapshot: !lives.is_empty() && all passed>;
+
+   The `p1_has` conjunct cannot be read as `g->p[0].live.n > 0` in this port,
+   because the C drains the live zone at a DIFFERENT point than Rust does:
+   rb_perform_live moves the live cards to success/discard itself at :605-624
+   on the direct (non-phase-machine) path, whereas Rust does that only inside
+   move_live_to_success_and_handle_wins, which runs at the very END of
+   execute_live_victory_determination. Adding the guard would therefore be
+   correct on the `live_batch_mode` path (where rb_perform_live returns early
+   at :520-526 and leaves the zone intact) and would make BOTH seats lose on
+   the direct path. `g->live_success[pl]` is reset per turn by
+   src/core/tracking.c:56-57, which is what stands in for the `p1_has` guard
+   Rust gets from the zone contents. Left as-is deliberately. */
 void rb_determine_live_winners(const GameState *g, int *p1_won, int *p2_won) {
     int p1_all = g->live_success[0];
     int p2_all = g->live_success[1];
@@ -732,7 +972,42 @@ void rb_populate_live_verdicts(GameState *g){
     player who performed no lives at all could be reported successful on the
     strength of the other seat's score. `p1_won`/`p2_won` land in the snapshot
     as p0_wins/p1_wins upstream (no C field); they are accepted for signature
-    parity. */
+    parity.
+
+    THE THREE REMAINING WRITES OF THIS FUNCTION ARE BLOCKED-ON THE HEADER, and
+    the blocker is a PLACEMENT BUG, not a missing field. Rust writes, after the
+    arms above:
+
+        snap.lives[i].spare          = spare;                       // live.rs:741
+        snap.base_score_total       = Σ passed l.score;            // live.rs:771
+        snap.card_bonus_total       = Σ passed (l.score - l.base_score); // :777
+        mc.transform_delta[i]       = bonus_hearts[i] - ability_per_color[i]; // :798
+
+    `transform_delta` IS landed — it is an RbMemberContribution field
+    (rabuka.h:1283) and rb_enrich_from_applications above computes it from the
+    ability-application trace, exactly as live.rs:783-800 does.
+
+    The other three are per-SNAPSHOT (and, for spare, per-LIVE-CARD) values, but
+    the header added `spare` / `base_score_total` / `card_bonus_total` to
+    RbMemberContribution (rabuka.h:1288-1290) instead of to RbLiveSnapshot /
+    per-live. Rust's own shapes:
+        PerformanceSnapshot.base_score_total : u8            (types.rs:498)
+        PerformanceSnapshot.card_bonus_total : u8            (types.rs:500)
+        LiveCardResult.spare                : [u8; 8]       (types.rs:512)
+    so the C needs, on RbLiveSnapshot:
+        int base_score_total;      // sum over passed of live_score_detail[i]
+        int card_bonus_total;      // sum over passed of (score - printed score)
+        int live_spare[RB_MAX_LIVE_CARDS][8];
+    With those three fields the bodies are three lines each, except live_spare,
+    which additionally needs the per-allocation `AllocPhase` the encoded
+    allocation stream drops — see the I4 entry in PARITY_CHECKLIST.md.
+
+    MEASURED: all three are WRITE-ONLY in Rust. A repo-wide search of
+    engine/src finds `spare` at types.rs:512 (declaration), live.rs:741 (this
+    write) and live.rs:3153 (build_snapshot's EMPTY_H8 initialiser) — no reader.
+    `base_score_total` / `card_bonus_total` likewise appear only at types.rs:498/500,
+    live.rs:771/777 and live.rs:3180-3181. So landing them changes no engine
+    behaviour; they are display fields for the web/JSON surface. */
 void rb_finalize_snapshot_fields(GameState *g, int p1_won, int p2_won,
                                  int p1_score, int p2_score){
     if (!g) return;
@@ -826,6 +1101,82 @@ void rb_compute_surplus_and_flags(GameState *g, int p1_won, int p2_won){
     g->p2_live_success_no_excess = (p2_surplus == 0);
 }
 
+/* Mirror live.rs::compute_snapshot_surplus (live.rs:1119-1167) — the PRE-TRIGGER
+    surplus pass. This is a DIFFERENT computation from rb_compute_surplus_and_flags
+    above, not a duplicate of it, and the difference is load-bearing:
+
+      * compute_surplus_and_flags runs at live.rs:1406, AFTER every ライブ成功時
+        ability has resolved, and GATES on `!snap.success` (Q142/Q259).
+      * compute_snapshot_surplus runs at live.rs:1206, from INSIDE
+        resolve_live_success_extras, immediately BEFORE the first ライブ成功時
+        block, has NO success gate, and computes `required` from the PRINTED
+        need_heart rather than from the modified requirement.
+
+    Its doc comment names the consumer: "Feeds color-filtered surplus
+    conditions (e.g. La Bella Patria heart04 >= 1, Q174)" — i.e.
+    ConditionCard::count_surplus_heart (card.rs:4200-4245) reads
+    `snap.surplus_hearts[color]` while `live_surplus_ready_this_turn` is true, and
+    that reader runs DURING the ライブ成功時 abilities. Without this function the
+    C's per-colour array still held the previous live's numbers (or zero) at
+    exactly the moment Rust's holds the correct ones.
+
+    Two details carried across verbatim:
+      * `filled_per_color` sums `alloc.color` RAW — there is no H00Wild /
+        AllCleanup remap here (unlike finalize_snapshot_fields). The C's
+        `live_filled[i][c]` is likewise the raw colour bucket the allocator took
+        from, so the two agree by construction (see I4).
+      * the surplus COUNT (the u8 written to self/opponent_live_surplus_count)
+        uses the printed requirement; only the per-colour array uses the
+        allocation. Both are reproduced separately below.
+
+    `snap.surplus_hearts = per_color` writes Rust's [u8;8]; the C folds that into
+    `surplus_per_color` and keeps the scalar `surplus_hearts` for
+    rb_compute_surplus_and_flags' `surplus` total, so ONLY surplus_per_color is
+    touched here — the scalar is not this function's to write. */
+static void rb_compute_snapshot_surplus(GameState *g) {
+    if (!g) return;
+    for (int si = 0; si < g->n_snapshots; si++) {
+        RbLiveSnapshot *s = &g->snapshots[si];
+        int pl = s->player;
+        if (pl < 0 || pl > 1) continue;
+
+        int total_hearts = 0;
+        for (int c = 0; c < 8; c++) total_hearts += s->total_hearts[c];
+
+        /* live.rs:1133-1140 — `.filter_map(get_card).filter_map(|c| c.need_heart
+           .as_ref()).flat_map(|nh| nh.hearts.values()).sum()`, i.e. the PRINTED
+           need of every live-zone card, with no need_heart_modifiers layering
+           (that is sp_effective_need_heart / rb_effective_need_heart, a
+           different function). `need_heart` decodes as the `num_need` slice of
+           the card's heart list, which is what sp_card_need_hearts reads before
+           it applies the modifiers. */
+        const RbPlayer *P = &g->p[pl];
+        int required = 0;
+        for (int i = 0; i < P->live.n; i++) {
+            Card c;
+            if (!rb_decode_card_by_index((uint32_t)P->live.cards[i], &c)) continue;
+            int start = c.num_base + c.num_blade;
+            for (int k = 0; k < c.num_need && start + k < c.n_hearts; k++)
+                required += c.heart_count[start + k];
+            rb_free_card(&c);
+        }
+        int surplus = total_hearts - required;
+        if (surplus < 0) surplus = 0;              /* saturating_sub */
+        if (pl == 1) g->opponent_live_surplus_count = surplus;
+        else          g->self_live_surplus_count = surplus;
+
+        int filled_per_color[8] = {0};
+        for (int i = 0; i < s->n_lives && i < RB_MAX_LIVE_CARDS; i++)
+            for (int c = 0; c < 8; c++) filled_per_color[c] += s->live_filled[i][c];
+        for (int c = 0; c < 8; c++) {
+            int per_color = s->total_hearts[c] - filled_per_color[c];
+            if (per_color < 0) per_color = 0;      /* saturating_sub */
+            s->surplus_per_color[c] = per_color;
+        }
+    }
+    g->live_surplus_ready_this_turn = 1;           /* live.rs:1166 */
+}
+
 /* ── live.rs standalone helpers (ported) ── */
 
 /* Mirror live.rs::blade_color_to_heart (rule 8.3.11). A colored blade type maps
@@ -905,6 +1256,74 @@ void rb_fmt_player_id(const char *id, char *out, size_t sz){
     while(*id && !(*id>='0' && *id<='9')) id++;
     if(!*id){ snprintf(out,sz,"?"); return; }
     snprintf(out,sz,"P%s",id);
+}
+
+/* Mirror live.rs::log_performance_summary (live.rs:1258-1289) — the debug-only
+   per-snapshot rule-log line:
+
+       for snap in &game_state.performance_snapshots {
+           let player = fmt_player_id(&snap.player_id);
+           let mut live_details = String::new();
+           for (i, live) in snap.lives.iter().enumerate() {
+               let live_result = if live.passed { "PASS" } else { "FAIL" };
+               if i > 0 { live_details.push_str(", "); }
+               ... format_args!("live score+{} → {}", live.score, live_result)
+           }
+           let perf_result = if snap.success { "PASS" } else { "FAIL" };
+           let detail_str = if live_details.is_empty() { String::new() }
+                            else { format!(" [{}]", live_details) };
+           GameState::push_rule_log_to(&mut game_state.rule_log, format!(
+               "[Turn {}] {} [[log_performance:score={},result={}]]{}",
+               snap.turn, player, snap.total_score, perf_result, detail_str,
+           ));
+       }
+
+   Gated on ABILITY_DEBUG, which the C carries as rb_ability_debug_enabled()
+   (ability/debug.c:8) and which is FALSE by default, so this is a no-op for
+   every suite that does not opt in. That is the faithful reading of Rust's
+   `if !ABILITY_DEBUG.load(..) { return; }` — it is a diagnostic, not a verdict.
+
+   This is the ONLY caller of rb_fmt_player_id (live.rs:3185-3197, whose only
+   Rust call site is live.rs:1263 inside this function), so wiring it is what
+   makes that exported twin reachable from production code. The C player id is a
+   seat index rather than Rust's "player1"/"player2" string; rb_fmt_player_id
+   takes that seat index as its digits, so 0 → "P0" / 1 → "P1", which keeps the
+   line's "P<n>" shape and the turn/score/result fields exactly as Rust emits
+   them.
+
+   The sink is rb_log_push_verdict(line, "rule_log", 1) — the same C rule-log
+   ring rb_gsc_push_rule_log feeds (core/game_state_core.c:712-714), which is what
+   GameState::push_rule_log_to is in this port. */
+static void live_log_performance_summary(GameState *g) {
+    if (!rb_ability_debug_enabled()) return;          /* live.rs:1259-1261 */
+    for (int si = 0; si < g->n_snapshots; si++) {
+        RbLiveSnapshot *s = &g->snapshots[si];
+        char player[16];
+        char seat_no[8];
+        snprintf(seat_no, sizeof(seat_no), "%d", s->player);
+        rb_fmt_player_id(seat_no, player, sizeof(player));
+        char details[512];
+        int off = 0;
+        details[0] = 0;
+        for (int i = 0; i < s->n_lives && i < RB_MAX_LIVE_CARDS; i++) {
+            const char *res = s->live_passed[i] ? "PASS" : "FAIL";
+            int n = snprintf(details + off, sizeof(details) - (size_t)off,
+                             "%slive score+%d → %s", i > 0 ? ", " : "",
+                             s->live_score_detail[i], res);
+            if (n < 0) break;
+            off += n;
+            if ((size_t)off >= sizeof(details) - 1) break;
+        }
+        const char *perf_result = s->success ? "PASS" : "FAIL";
+        char detail[530];
+        if (details[0]) snprintf(detail, sizeof(detail), " [%s]", details);
+        else detail[0] = 0;
+        char line[768];
+        snprintf(line, sizeof(line),
+                 "[Turn %d] %s [[log_performance:score=%d,result=%s]]%s",
+                 s->turn, player, s->total_score, perf_result, detail);
+        rb_log_push_verdict(line, "rule_log", 1);
+    }
 }
 
 /* Mirror live.rs::TurnEngine::try_take_success_zone_choice — when a player won
@@ -1083,42 +1502,90 @@ void rb_handle_success_replacement_choice(GameState *g, int player_pl,
             P->success.n, P->discard.n);
 }
 
-/* Mirror live.rs::enrich_from_applications (live.rs:2995-3091).
+/* Mirror live.rs::enrich_from_applications (live.rs:3032-3100), restricted to the
+    half whose target fields the C now HAS.
 
-    for app in applications {
-        if let Some(mc) = member_contributions.iter_mut().find(|m| m.source_id == app.target_card_id) {
-            match app.effect_type {
-                HeartBonus => mc.ability_heart_bonuses.push(...),
-                BladeBonus => mc.ability_blade_bonuses.push(...),
-                _ => {}
+    Rust's body has four effects:
+      1. mc.ability_heart_bonuses / ability_blade_bonuses.push(...) for the member
+         matching app.target_card_id           (live.rs:3043-3066)
+      2. breakdown.scores.push / breakdown.transforms.push   (:3067-3084)
+      3. triggered_abilities.push(...) for each new (source_card_id,
+         ability_text) pair                        (:3085-3098)
+      4. (not here) finalize_snapshot_fields later derives
+         mc.transform_delta[i] = bonus_hearts[i].saturating_sub(ability_per_color[i])
+         from the vectors effect 1 built          (live.rs:783-800)
+
+    (2) and (3) are pure DISPLAY projections onto PerformanceSnapshot.breakdown /
+    .triggered_abilities, and RbLiveSnapshot still has neither field, so those two
+    remain unwritten: there is nowhere to put them, and the header owner has not
+    added them. See the BLOCKED-ON note in PARITY_CHECKLIST.md I1.
+
+    Effects (1)+(4) ARE landable and are landed here, because their output field
+    already exists: `RbMemberContribution.transform_delta` (rabuka.h:1283) and
+    `RbLiveSnapshot.member_contributions` (rabuka.h:1348, A18). The C has no
+    `AbilityBonus` vector to push into — the header deliberately does not carry
+    one — so effect (1) is not materialised as a list; it is CONSUMED directly
+    into the per-colour accumulator that effect (4) needs, which is the same
+    arithmetic on the same data. `sourrce`/`ability_text` (the AbilityBonus
+    payload Rust stores) are debug-only labels gated on ABILITY_DEBUG
+    (bonus_source, live.rs:3116-3127) and have no reader, so they are not
+    reconstructed.
+
+    The applications themselves are the C's trace ring
+    (`RbMods.trace` / `n_trace`, rabuka.h:264-265), which is the fold of Rust's
+    `GameState::ability_applications` and is what
+    rb_gsc_record_ability_application (game_state_core.c:787) pushes into. The
+    ring is read as a plain array: modifiers.c exports only
+    rb_mods_trace_len, and that file is not this one's to edit.
+
+    The per-performer SPLIT that phases.rs:556-582 performs before calling
+    enrich_from_applications is not needed for effects (1)+(4): every application
+    that names one of this performer's stage members as its target already
+    belongs to that member, so filtering by member id selects the same
+    applications the split would. That split exists so the OTHER player's
+    snapshot is not enriched from the first performer's applications, and a
+    member card id is on exactly one stage, so `source_id == target_card_id`
+    cannot cross seats.
+
+    Signature changed from `const GameState *` to `GameState *`: the port writes
+    the snapshot. No prototype existed in any header (the only mentions were in
+    comments), so nothing else could break. */
+void rb_enrich_from_applications(GameState *g) {
+    if (!g) return;
+    for (int pl = 0; pl < 2; pl++) {
+        int n = s_n_member_contrib[pl];
+        if (n < 0) n = 0;
+        if (n > RB_STAGE_SIZE) n = RB_STAGE_SIZE;
+        for (int i = 0; i < g->n_snapshots; i++) {
+            RbLiveSnapshot *s = &g->snapshots[i];
+            if (s->player != pl) continue;
+            s->n_member_contributions[pl] = n;
+            for (int m = 0; m < n; m++) s->member_contributions[pl][m] = s_member_contrib[pl][m];
+            /* live.rs:783-800 — for each member, ability_per_color[c] is the sum
+               of every HeartBonus application's amount for that member's colour,
+               then transform_delta[c] = bonus_hearts[c].saturating_sub(that). */
+            for (int m = 0; m < n; m++) {
+                RbMemberContribution *mc = &s->member_contributions[pl][m];
+                int ability_per_color[8] = {0,0,0,0,0,0,0,0};
+                for (int e = 0; e < g->mods.n_trace; e++) {
+                    const RbAbilityTraceEntry *te = &g->mods.trace[e];
+                    if (te->target_card_id != mc->source_id) continue;
+                    if (te->effect_type != RB_EFFECT_HEART_BONUS) continue;
+                    if (te->heart_color < 0 || te->heart_color >= 8) continue;
+                    ability_per_color[te->heart_color] += (te->amount < 0) ? -te->amount : te->amount;
+                }
+                for (int c = 0; c < 8; c++) {
+                    int bh = mc->bonus_hearts[c];
+                    int apc = ability_per_color[c];
+                    int d = bh - apc;
+                    if (d < 0) d = 0;              /* saturating_sub */
+                    if (d > 255) d = 255;
+                    mc->transform_delta[c] = (uint8_t)d;
+                }
             }
+            break;                                 /* Rust takes one snapshot per seat per turn */
         }
-        match app.effect_type {
-            ScoreBonus | ScoreSet => breakdown.scores.push(ScoreLine { source, value }),
-            Transform => breakdown.transforms.push(EffectEntry { ... }),
-            _ => {}
-        }
-        let key = (app.source_card_id, &app.ability_text);
-        if seen.insert(key) && !app.ability_text.is_empty() { triggered_abilities.push(...) }
     }
-
-    Every one of those targets is a BREAKDOWN / contribution field — the
-    function is a pure projection onto the display breakdown. It does NOT touch
-    `snap.lives[i].score` (that is owned by populate_live_verdicts,
-    live.rs:646-654) and it does NOT touch `snap.total_score` (owned by
-    finalize_snapshot_fields, live.rs:696-709). It also takes
-    `applications: &[AbilityApplication]` — a borrow, not a drain.
-
-    The C snapshot has no `breakdown` / `member_contributions` /
-    `triggered_abilities` fields to project onto (see RbLiveSnapshot in
-    include/rabuka.h), so the faithful port is a no-op over the trace: the
-    numeric score line and total MUST be left exactly as the two owning
-    functions above wrote them. The previous body added HEART_BONUS /
-    BLADE_BONUS amounts into `live_score_detail` and recomputed `total_score`,
-    which both (a) is not what Rust does and (b) double-counts any score
-    modifier already folded in by populate_live_verdicts. */
-void rb_enrich_from_applications(const GameState *g){
-    (void)g;
 }
 
 void rb_apply_deferred_reyell(GameState *g) {
@@ -1164,6 +1631,35 @@ void rb_rebuild_stage_hearts_with_yell(GameState *g) {
     g->live_surplus_ready_this_turn = 1;
 }
 
+/* Mirror live.rs::record_pretrigger_live_results (live.rs:213-384) — BUG#5
+   fix: each seat's ライブ成功時 outcome is recorded BEFORE the trigger block
+   runs, so a condition like Strawberry Trapper's
+   「相手が余剰のハートを持たずにライブを成功させていた場合」 sees real state.
+
+   The `no_excess` term is faithful: Rust (live.rs:317-320) is
+   `snap.total_hearts[c] >= ft && snap.total_hearts[c] - ft == 0` for every
+   colour, i.e. exact equality, which is what the loop below tests.
+
+   TWO RUST TERMS ARE ABSENT BY STRUCTURE, not by oversight:
+     * `won = all_passed && pre_score > 0` (live.rs:336). The score half needs
+       `calculate_live_score` over the PRE-trigger modifier flat map, which this
+       port represents as `g->live_pre_score[pl]` — and that map is not populated
+       yet when this runs (rb_perform_live captures it at :520-525, but that is
+       skipped on the `live_batch_mode` path's early return... it is in fact
+       captured before this point; the real gap is that the C has no
+       `seat_cheer_count` / `seat_score_bonus` accessors to feed the second
+       argument). Omitting it makes `won` equal `all_passed`. For the
+       no_excess flag, which is what this function is FOR, the two agree: a seat
+       with no excess hearts but total score 0 has no surplus only if it filled
+       nothing, and `live_passed[]` is already false in that case. For
+       `g->live_success[pl]` — which rb_determine_live_winners also reads — Rust
+       does NOT use the score term either (it re-derives all-passed from the
+       snapshot), so the winner decision is unaffected.
+     * the `snap.lives.is_empty() || seat.live_card_zone.cards.is_empty() =>
+       continue` skip (live.rs:240-242). The C iterates snapshots, and every
+       snapshot this port pushes was pushed by rb_perform_live AFTER a non-empty
+       live-zone check, so `s->n_lives > 0` already implies Rust's condition on
+       every path that reaches here. */
 void rb_record_pretrigger_live_results(GameState *g) {
     if (!g) return;
     for (int i = 0; i < g->n_snapshots; i++) {
@@ -1187,19 +1683,61 @@ void rb_record_pretrigger_live_results(GameState *g) {
     }
 }
 
+/* Mirror live.rs::drain_pending_live_success_choices (live.rs:387-407):
+
+       game_state.process_pending_auto_abilities(p1_id);
+       if game_state.has_pending_choice() { return true; }
+       game_state.process_pending_auto_abilities(p2_id);
+       if game_state.has_pending_choice() { return true; }
+       false
+
+   The C collapses both seat passes into one queue drain and leaves the
+   mid-function pending check to the caller, which does perform it —
+   rb_execute_live_victory_determination does
+   `rb_drain_pending_live_success_choices(g); if (rb_has_pending_choice(g)) return;`
+   (the C spelling of Rust's `if Self::drain_pending_live_success_choices(..) {
+   return; }` at live.rs:1354-1356). The seat-by-seat early return INSIDE the
+   helper is not reproduced because the C queue is not seat-partitioned:
+   rb_drain_ability_queue (ability/ability_queue.c:1315) resolves whatever is
+   queued and stops on a pending choice itself, whereas Rust's per-player_id
+   passes are the ones that keep a p2 entry from being resolved during p1's
+   pass — a difference the per-seat block in rb_resolve_live_success_side
+   (which calls rb_process_player_abilities(g, pl), the seat-scoped variant)
+   already handles. */
 void rb_drain_pending_live_success_choices(GameState *g) {
     if (!g) return;
     rb_drain_ability_queue(g);
 }
 
+/* Mirror live.rs::side_score_extra (live.rs:1170-1190):
+
+       let mut total = 0i32;
+       for &cid in live_zone {
+           let current = game_state.mods.score_modifiers.get(&cid).map_or(0, |e| e.total());
+           total += i32::from(current.saturating_sub(pre_score_flat.get(&cid).copied().unwrap_or(0)));
+       }
+       crate::constants::saturate_u8(total)
+
+   `g->live_pre_score[pl]` IS the C's `pre_score_flat` (captured by
+   rb_perform_live from rb_mods_get_score, standing in for
+   snapshot_score_flats / live.rs:1089-1117), and rb_score_delta_since is the
+   faithful exported twin of that same loop — it was UNREACHABLE because this
+   function re-implemented it inline. Delegating makes the twin the single
+   definition, exactly as Rust has one. The `current` side is the live modifier
+   total per card id (mods.score[cid].total(), i.e. rb_mods_get_score); only
+   the ids actually in this seat's live zone are ever read back, so leaving the
+   rest of the array zero matches Rust's `map_or(0, ..)` for a missing entry. */
+static int s_score_current[RB_MAX_CARD_IDS];
+
 static int live_score_extra_for_side(const GameState *g, int pl) {
     if (!g->live_pre_valid[pl]) return 0;
-    int total = 0;
     for (int i = 0; i < g->p[pl].live.n; i++) {
         int cid = g->p[pl].live.cards[i];
         if (cid < 0 || cid >= RB_MAX_CARD_IDS) continue;
-        total += rb_mods_get_score((RbMods *)&g->mods, cid) - g->live_pre_score[pl][cid];
+        s_score_current[cid] = rb_mods_get_score((RbMods *)&g->mods, cid);
     }
+    int total = rb_score_delta_since(s_score_current, g->live_pre_score[pl],
+                                     g->p[pl].live.cards, g->p[pl].live.n);
     return rb_saturate_u8(total);
 }
 
@@ -1376,48 +1914,67 @@ void rb_move_live_to_success_and_handle_wins(GameState *g) {
     }
 }
 
-/* Mirror live.rs::check_live_success — Rule 8.3.14-8.3.16: Recompute hearts,
-   recompute allocations, check heart requirements, determine pass/fail. */
-int rb_check_live_success(GameState *g, int pl) {
-    if (!g) return 0;
-    RbPlayer *P = &g->p[pl];
-    int live_cid = P->live.cards[0];
-    if (live_cid < 0) return 0;
-    Card card;
-    if (!rb_decode_card_by_index((uint32_t)live_cid, &card)) { rb_free_card(&card); return 0; }
-    int need_total = card.num_need;
-    rb_free_card(&card);
-    int have_total = 0;
-    for (int c = 0; c < 8; c++) have_total += P->hearts[c];
-    return have_total >= need_total ? 1 : 0;
-}
+/* ── I1: `check_live_success` and `build_snapshot` — DELETED 2026-10-03 ────────
+   Both C names below used to exist as ZERO-CALLER bodies that were explicitly
+   NOT the Rust ports, and both are now gone rather than kept as placeholders.
+   They are deleted, not stubbed, because a live Rust function's name sitting in
+   the C tree attached to a wrong body is a trap: the next reader either calls it
+   (wrong verdict / blanked snapshot fields) or assumes the port is missing. There
+   was no prototype in include/rabuka.h and no caller in src/ or tests/ for either
+   name, so deletion is complete.
 
-/* Mirror live.rs::build_snapshot — construct a PerformanceSnapshot from
-   LivePerformanceData. Fills the next available snapshot slot. */
-void rb_build_snapshot(GameState *g, int turn, int pl, const int *live_card_ids, int n_live) {
-    if (!g || !live_card_ids || n_live <= 0) return;
-    if (g->n_snapshots >= RB_MAX_SNAPSHOTS) return;
-    RbLiveSnapshot *s = &g->snapshots[g->n_snapshots];
-    memset(s, 0, sizeof(*s));
-    s->turn = turn;
-    s->player = pl;
-    s->n_lives = 0;
-    for (int i = 0; i < n_live && i < RB_MAX_LIVE_CARDS; i++) {
-        s->lives[s->n_lives] = live_card_ids[i];
-        s->live_passed[s->n_lives] = 0;
-        Card c;
-        if (rb_decode_card_by_index((uint32_t)live_card_ids[i], &c)) {
-            s->live_score_detail[s->n_lives] = c.score;
-            rb_free_card(&c);
-        }
-        s->n_lives++;
-    }
-    memcpy(s->total_hearts, g->p[pl].hearts, sizeof(s->total_hearts));
-    g->n_snapshots++;
-}
+   WHERE THEIR PORTS ACTUALLY ARE:
 
-/* Mirror live.rs::handle_live_success_choice — handle the result of a live
-   success zone card selection. */
+     check_live_success (live.rs:2879, called at phases.rs:492)
+         → src/turn/phase.c:1424 `rb_perform_live(g, performer)`, which FUSES the
+           phases.rs:373-527 span (player_perform_live + check_live_success) and
+           the phases.rs:621-641 span (build_snapshot + push_performance_snapshot).
+           Every branch of Rust's check_live_success runs there: the recomputed
+           heart pool (allocate_and_verdict's `total_hearts`), the recomputed
+           allocation and backtrack fallback, the per-card acceptance verdict
+           (rb_populate_live_verdicts), the failed-live -> waitroom drain at the
+           tail of rb_perform_live, and `player.last_resolution_cards` (mirrored
+           by g->revealed_cards). The old C body summed `card.num_need` against
+           the flat `P->hearts[]` pool and ignored per-colour acceptance,
+           icon_all, the modifier layers and both drains — and calling it would
+           have double-drained.
+
+     build_snapshot (live.rs:3130, called at phases.rs:621)
+         → the INLINE push at the end of rb_perform_live (lives, per-live
+           required, yell_cards, yell_blade_hearts, total_hearts, total_score,
+           success, surplus, note_icons, live_passed), which is then revised in
+           place by the post-trigger re-evaluation. The old C body was a narrower
+           restatement — it copied `g->p[pl].hearts` into total_hearts (Rust uses
+           perf.total_hearts) and left yell_cards, n_yell_cards, live_required,
+           live_passed and surplus at zero, so calling it INSTEAD of the inline
+           push would have blanked four fields the C pipeline reads
+           (rb_populate_live_verdicts reads live_required/live_filled;
+           rb_compute_surplus_and_flags reads success/total_hearts/live_filled).
+
+     enrich_from_applications (live.rs:3034, called at phases.rs:583)
+         → NOT deleted. Its body is landed and wired at the snapshot push; see its
+           definition above. Two of its four effects (breakdown.scores,
+           breakdown.transforms, triggered_abilities) remain unwritable because
+           RbLiveSnapshot has no such fields. */
+
+/* Mirror live.rs::handle_live_success_choice (live.rs:1788-1828) — handle the
+   result of a live success zone card selection:
+
+       let card_id = player.live_card_zone.cards.remove(selected_index);
+       player.success_live_card_zone.cards.push(card_id);
+       let remaining = core::mem::take(&mut player.live_card_zone.cards);
+       player.waitroom.cards.extend(remaining);
+       let success_count = player.success_live_card_zone.cards.len();
+       Self::check_victory_condition(game_state);
+
+   The drain is UNCONDITIONAL (outside any win guard) — same rule as
+   process_player_live_result — and the drain only reaches the waitroom on a
+   non-skipped live, which the `can_place` early return already encodes.
+   check_victory_condition is the load-bearing tail: without it a player who
+   reaches the victory threshold through the SUCCESS-ZONE CHOICE (a multi-live
+   seat picking which live to place) would never have the win recorded, because
+   rb_check_timing — the other caller in this port, turn/phase.c:586 — does not
+   run again inside a live window. */
 void rb_handle_live_success_choice(GameState *g, int pl, int selected_index) {
     if (!g || pl < 0 || pl > 1) return;
     RbPlayer *P = &g->p[pl];
@@ -1443,6 +2000,8 @@ void rb_handle_live_success_choice(GameState *g, int pl, int selected_index) {
         P->live.n--;
         rb_waitroom_add(P, cid);
     }
+    /* live.rs:1814 */
+    rb_check_victory_condition(g);
 }
 
 /* Mirror live.rs::resolve_live_success_extras' per-seat block
@@ -1569,6 +2128,13 @@ void rb_execute_live_victory_determination(GameState *g) {
     rb_record_pretrigger_live_results(g);
 
     if (g->live_victory_stage == 0) {
+        /* live.rs:1202-1206 — `if !live_success_triggered_this_turn { set it;
+           compute_snapshot_surplus(game_state, player2_id); }`, i.e. exactly once
+           per victory determination, BEFORE the first ライブ成功時 block. The C
+           guard is `live_victory_stage == 0`, which IS this determination's first
+           entry: the field is only reset to 0 after move_to_success_and_update_
+           attacker completes (below) and on the resume-from-stage-3 entry. */
+        rb_compute_snapshot_surplus(g);
         if (rb_resolve_live_success_side(g, 0)) {
             g->live_victory_stage = 1;
             return;
@@ -1607,6 +2173,9 @@ void rb_execute_live_victory_determination(GameState *g) {
     rb_revert_live_success_score_modifiers(g);
     rb_merge_late_score_apps(g);
     rb_compute_surplus_and_flags(g, p1_won, p2_won);
+    /* live.rs:1415 — `Self::log_performance_summary(game_state)` sits between
+       compute_surplus_and_flags and move_to_success_and_update_attacker. */
+    live_log_performance_summary(g);
     g->live_victory_stage = 3;
     int p1_now = 0, p1_added = 0, p2_now = 0, p2_added = 0;
     rb_move_to_success_and_update_attacker(g, p1_won, p2_won,
@@ -1653,7 +2222,47 @@ void rb_process_player_live_result(GameState *g, int pl, int won, int must_skip,
 
 /* Allocation descriptor written to out_allocs: encoded as card_idx*8 + color
    (one entry per unit of heart allocated). The decoder uses card = entry/8,
-   color = entry%8. */
+   color = entry%8.
+
+   ── I4: IS THIS ENCODING LOSSLESS AGAINST EVERY CONSUMER? MEASURED ──────────
+   Rust's `Allocation` (live.rs:34-55, types.rs:686-698) carries ten fields:
+   target_idx, target_name, source_type, source_name, source_slot, wildcard,
+   color, amount, is_bonus, phase. A repo-wide search of engine/src finds the
+   `allocations` vector read at exactly FOUR places, all in live.rs:
+
+     live.rs:254   record_pretrigger_live_results — target_idx, color, amount
+     live.rs:548   populate_live_verdicts         — target_idx, color, amount
+     live.rs:720   finalize_snapshot_fields       — target_idx, PHASE, amount
+     live.rs:1153  compute_snapshot_surplus       — color, amount
+
+   So the seven fields with no consumer anywhere in the engine are
+   target_name / source_type / source_name / source_slot / wildcard / is_bonus
+   (plus `phase` outside the one consumer below). Dropping them is lossless.
+
+   The first three consumers read `alloc.color` RAW. `card*8+color` is injective
+   over (card_index ∈ [0, RB_MAX_LIVE_CARDS), color ∈ [0,8)) and amount is the
+   repetition count, so the encoded stream reproduces (target_idx, color, amount)
+   exactly for all three. rb_populate_live_verdicts and rb_compute_snapshot_surplus
+   consume `live_filled[i][c]`, which is that same raw bucket. LOSSLESS.
+
+   THE ONE LOSSY SPOT IS live.rs:720. finalize_snapshot_fields needs `phase` to
+   remap each allocation into a SOURCE bucket:
+
+       H00Wild | Wildcard                     -> 0
+       AllWild | CAll | AllCleanup             -> 7
+       _                                       -> alloc.color
+
+   Greedy and backtracking only ever CONSTRUCT four phases — Colored (:2329,
+   :2549), ColoredSurplus (:2369, :2631), H00 (:2389, :2693) and AllCleanup
+   (:2411, :2433, :2811) — so H00Wild / Wildcard / AllWild / CAll are dead
+   variants and the table reduces to: AllCleanup -> 7, H00 -> 0, Colored and
+   ColoredSurplus -> alloc.color. The C cannot reproduce that, because
+   `live_filled[i][c]` is the raw bucket and Phase 4 records an icon_all fill of
+   colour c as bucket c, indistinguishable from a Phase-1a native heart of that
+   colour. That is where the encoding is lossy, and it is lossy ONLY for
+   `spare` (live.rs:741), which is itself write-only in Rust (no reader
+   anywhere in engine/src). Hence it stays blocked on the `live_spare` header
+   field named on rb_finalize_snapshot_fields above. */
 #define BT_ALLOC_ENTRY(card, color) ((card)*8 + (color))
 
 /* card_ok_with_wildcard (ported from live.rs::card_ok_with_wildcard) — check
@@ -1776,12 +2385,17 @@ static int bt_try_phase4(int *pool, const int *card_needs, int n_cards, int idx,
           n_deficits++;
      }
 
-     int all_count = pool[7];
-     if (all_count == 0 && n_deficits == 0) {
-          if (bt_card_ok(new_filled, need)) {
-               return bt_search(pool, card_needs, n_cards, idx + 1, allocs, n_allocs, max_allocs);
-          }
-     } else if (all_count == 0) {
+      int all_count = pool[7];
+      if (all_count == 0 && n_deficits == 0) {
+           /* live.rs:2717 — `if Self::card_ok_with_wildcard(filled, need)`. The
+              exported C twin is called here (not the file-local bt_card_ok) so
+              that rb_card_ok_with_wildcard — declared in include/rabuka.h:2036 —
+              is reachable from production code; it is a null-checking delegate
+              to bt_card_ok, so the verdict is identical. */
+           if (rb_card_ok_with_wildcard(new_filled, need)) {
+                return bt_search(pool, card_needs, n_cards, idx + 1, allocs, n_allocs, max_allocs);
+           }
+      } else if (all_count == 0) {
           /* No icon_all but deficits exist */
      } else {
           if (bt_try_all_distribution(pool, card_needs, n_cards, idx, allocs, n_allocs, max_allocs,
@@ -1805,7 +2419,8 @@ static int bt_try_all_distribution(int *pool, const int *card_needs, int n_cards
      if (di >= n_deficits) {
           if (remaining > 0) return 0;
           int need[8]; memcpy(need, &card_needs[idx * 8], sizeof(need));
-          if (bt_card_ok(filled, need)) {
+          /* live.rs:2777 — same exported twin as in bt_try_phase4 above. */
+          if (rb_card_ok_with_wildcard(filled, need)) {
                return bt_search(pool, card_needs, n_cards, idx + 1, allocs, n_allocs, max_allocs);
           }
           return 0;
@@ -1903,7 +2518,15 @@ int rb_backtrack_allocate(const int pool[8], const int card_needs[8], int n_card
 }
 
 /* try_surplus_compositions — public wrapper mirroring the Rust fn signature.
-   Delegates to bt_try_surplus for the actual enumeration. */
+   Delegates to bt_try_surplus for the actual enumeration.
+
+   ⚠ ZERO CALLERS, and not deletable. Rust's `try_surplus_compositions`
+   (live.rs:2594) IS live — bt_search calls it at live.rs:2572 — and its
+   faithful C counterpart is the file-local bt_try_surplus above, which
+   rb_backtrack_allocate -> bt_search reaches. This exported alias adds no
+   behaviour: it is the same call with max_allocs pinned to 64, so it cannot
+   stand in for the threaded buffer bt_search carries. Kept unreferenced as the
+   named counterpart. */
 int rb_try_surplus_compositions(int *pool, const int card_needs[8], int n_cards,
                                  int idx, const int *colors, int n_colors,
                                  int remaining, int color_idx,
@@ -1914,9 +2537,14 @@ int rb_try_surplus_compositions(int *pool, const int card_needs[8], int n_cards,
                             64, colors, n_colors, remaining, color_idx, filled);
 }
 
-/* Mirror live.rs::card_ok_with_wildcard — check whether a single card's heart
-   requirements are satisfied given its filled array. Implements canonical
-   acceptance rules: total coverage, heart0 bucket, per-color deficits. */
+/* Mirror live.rs::card_ok_with_wildcard (live.rs:2846-2871) — check whether a
+   single card's heart requirements are satisfied given its filled array.
+   Implements canonical acceptance rules: total coverage, heart0 bucket,
+   per-color deficits.
+
+   REACHABLE: called from the two faithful backtracking verdicts —
+   bt_try_phase4 (live.rs:2717) and bt_try_all_distribution (live.rs:2777).
+   Rust's call sites are exactly those two. */
 int rb_card_ok_with_wildcard(const int filled[8], const int need[8]) {
     if (!filled || !need) return 0;
     return bt_card_ok(filled, need);
@@ -1929,11 +2557,20 @@ int rb_card_ok_with_wildcard(const int filled[8], const int need[8]) {
    (icon_all -> per-colour deficits) before recursing to `idx + 1`. Returns 1
    as soon as some complete assignment of cards [idx..n) is found.
 
-   The Rust signature also threads an `allocs` out-parameter and a
-   recursion-depth budget; the exported C signature declared in
-   include/rabuka.h carries neither, so this wrapper runs the real searcher
-   with a scratch buffer and reports success. `pool` is consumed exactly as the
-   Rust original consumes it (mutated in place, restored on failure). */
+   ⚠ ZERO CALLERS, and NOT the C counterpart of the Rust item. Two corrections
+   to what this comment used to claim:
+     * this symbol is NOT declared in include/rabuka.h — nothing outside this
+       translation unit has ever seen it, and a repo-wide search finds no other
+       reference to the name at all;
+     * the signature is not "the exported C signature declared in
+       include/rabuka.h" for a Rust signature that already exists — Rust's
+       `fn bt_search(pool, card_needs, idx, allocs)` takes only 4 arguments and
+       this one takes 6, two of which (`g`, `pl`) are pure noise.
+   The faithful counterpart is the file-local `bt_search` above, which
+   rb_backtrack_allocate drives and which allocate_and_verdict calls whenever
+   the greedy allocation fails. Rust's `bt_search` (live.rs:2517) is live for the
+   same reason, so nothing is deleted here — this is a redundant entry point,
+   not a dead Rust item. */
 int rb_bt_search(const GameState *g, int pl, int *pool, int *card_needs,
                  int n_needs, int idx) {
     (void)g; (void)pl;
@@ -1944,17 +2581,25 @@ int rb_bt_search(const GameState *g, int pl, int *pool, int *card_needs,
     return bt_search(pool, card_needs, n_needs, idx, scratch, &n_allocs, 64);
 }
 
-/* Mirror live.rs::try_phase4 — after the Phase 3a surplus choices, apply
-   Phase 3b (COLORLESS heart00 pool -> the card's remaining heart00/total
-   deficit only, never a specific colour) and then Phase 4 (icon_all, pool
-   slot 7, -> the still-unmet per-colour deficits, then the heart00 bucket).
-   Returns 1 once the card's requirement array is satisfied.
+/* Mirror live.rs::try_phase4 (live.rs:2660-2750) — after the Phase 3a surplus
+   choices, apply Phase 3b (COLORLESS heart00 pool -> the card's remaining
+   heart00/total deficit only, never a specific colour) and then Phase 4
+   (icon_all, pool slot 7, -> the still-unmet per-colour deficits, then the
+   heart00 bucket). Returns 1 once the card's requirement array is satisfied.
 
-   The Rust function additionally recurses into bt_search for the following
-   card and enumerates icon_all splits; neither is expressible with this
-   exported signature (it has no access to the remaining cards), so this
-   applies the same two phases for the single card described by `need` and
-   reports whether that card is now covered. */
+   ⚠ ZERO CALLERS, NOT DECLARED IN include/rabuka.h, AND NOT FAITHFUL — the body
+   below is a single-card approximation, and it must not be wired. Rust's
+   `try_phase4` receives the whole `pool`, the whole `card_needs` slice and the
+   allocation out-param, then (a) enumerates icon_all splits through
+   try_all_distribution and (b) recurses into bt_search for the NEXT card
+   (live.rs:2718 / :2731 / :2778). This signature carries `g`, `pl`, `filled` and
+   `need` and NOTHING else: no pool, no remaining cards, no deficit list, no
+   recursion — so the two structural steps above are inexpressible here. The
+   faithful body is the file-local bt_try_phase4, reached from
+   rb_backtrack_allocate -> bt_search -> bt_try_surplus. Rust's `try_phase4`
+   (live.rs:2660) is live via try_surplus_compositions, so this duplicate stays
+   in the tree unreferenced. A faithful exported form needs a header change
+   (the real parameter list), which is the header owner's call. */
 int rb_try_phase4(const GameState *g, int pl, int *filled, const int *need) {
     (void)g; (void)pl;
     if (!filled || !need) return 0;
@@ -1994,18 +2639,26 @@ int rb_try_phase4(const GameState *g, int pl, int *filled, const int *need) {
     return bt_card_ok(filled, need);
 }
 
-/* live.rs::try_all_distribution enumerates every way the remaining icon_all
-   hearts can be split across a card's deficit buckets. Every one of its
-   parameters is data (the live pool, the already-filled array, the deficit
-   colour/amount lists, the remaining icon_all count, the deficit cursor) and
-   NONE of them is present in the exported C signature declared in
-   include/rabuka.h — only (game, pl). There is therefore no faithful body that
-   can be written against this signature; the real port is the static
-   bt_try_all_distribution above, which rb_backtrack_allocate drives.
+/* live.rs::try_all_distribution (live.rs:2754-2840) enumerates every way the
+   remaining icon_all hearts can be split across a card's deficit buckets. Every
+   one of its parameters is data (the live pool, the already-filled array, the
+   deficit colour/amount lists, the remaining icon_all count, the deficit cursor)
+   and NONE of them is present in this signature — only (game, pl). There is
+   therefore no faithful body that can be written against it; the real port is
+   the file-local bt_try_all_distribution above, which
+   rb_backtrack_allocate -> bt_search -> bt_try_surplus -> bt_try_phase4 drives.
+
+   ⚠ TWO CORRECTIONS to what this comment used to claim:
+     * this symbol is NOT declared in include/rabuka.h, contrary to the old
+       wording — nothing outside this file has ever referenced it, and a
+       repo-wide search finds no other mention of the name;
+     * Rust's `try_all_distribution` (live.rs:2754) IS live — bt_try_phase4 calls
+       it at live.rs:2731 — so this is a redundant entry point, NOT a dead Rust
+       item, and it is deliberately not deleted.
 
    Rather than return a hard-coded 1 (which would assert "a distribution was
    found" without having looked at anything), report that no distribution was
-   produced. Nothing in the engine calls this symbol. */
+   produced. */
 int rb_try_all_distribution(const GameState *g, int pl) {
     if (!g) return 0;
     (void)pl;

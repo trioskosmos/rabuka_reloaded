@@ -7,9 +7,9 @@ exit /b
 #>
 
 param(
-    [int]$IntervalMinutes = 8,
+    [int]$IntervalMinutes = 15,
     [string]$WindowTitle = "",
-    [string]$Message = "continue auditing and doing manual one ability and its tests at a time"
+    [string]$Message = "can you actually improve the bots? not just talk about it, not just suggest, not just leave threads. actually research the game, tcg bots in  general, you have the whole internet as guidance, and get the game mastered by the bots."
 )
 
 Add-Type -AssemblyName System.Windows.Forms

@@ -2,6 +2,7 @@
 // Regenerated from the directory listing at compile time.
 pub mod all_stage_heart_colors_blades_shizuku_bp5_015_n_test;
 pub mod debut_and_live_start_blade_grant_test;
+pub mod hanamaru_live_start_blade_per_card_this_step_placed_pl_s_bp7_007_p_test;
 pub mod left_area_moved_blades_pl_sp_bp4_017_n_test;
 pub mod live_start_blade_per_discard_test;
 pub mod live_start_center_liella_set_blade_three_test;

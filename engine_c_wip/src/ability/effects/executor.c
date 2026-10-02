@@ -382,12 +382,30 @@ int rb_executor_execute(GameState *g, int actor, AbilityEffect *effect, int host
          * by opponent" — a Custom effect that carries `action_by` was already
          * routed to the opponent by the wrapper, so the executor must do
          * NOTHING. Without this the C fell into execute_misc and re-ran the
-         * effect against the actor. A Custom effect with no `action_by` still
-         * dispatches to execute_custom via the misc path (executor.rs:144). */
+         * effect against the actor. */
         if (rb_effect_action_by_any(effect)) {
             result = 1;
         } else {
-            result = execute_misc(g, actor, effect, host_cid);
+            /* engine/src/ability/effects/dispatch.rs:172 —
+             *   ActionType::Custom => resolver.execute_custom(gs, effect,
+             *                                                       effect.action.to_str())
+             * i.e. this function, reached DIRECTLY from the dispatch table. It
+             * used to fall through to execute_misc, whose table (misc.c:2073)
+             * called misc.c's h_custom — a second copy of the same Rust
+             * function, and the copy that actually ran. custom.c's
+             * rb_execute_custom_effect is now the single owner: it deep-clones
+             * the whole effect before rewriting action/source/destination
+             * (dispatch.rs:240 `let mut routed = effect.clone()`) where
+             * h_custom hand-built a near-empty struct and dropped `count`,
+             * `text` and the child effects, and it holds that clone in a
+             * keep-alive pool for the duration of the call because
+             * rb_effect_move_cards parks the pointer it is handed in
+             * queue.resume_eff (move.c:687) — h_custom passed the address of a
+             * STACK struct, which dangles as soon as the choice is answered.
+             * `action.to_str()` for ActionType::Custom is "custom"
+             * (enums.rs:469), which is also the only consumer of the argument
+             * (the arm-2 `text` fallback, dispatch.rs:254-257). */
+            result = rb_execute_custom_effect(g, actor, effect, "custom");
         }
     } else if (strcmp(action, "modify_score") == 0) {
         /* engine/src/ability/effects/dispatch.rs:135 —

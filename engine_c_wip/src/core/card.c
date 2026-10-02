@@ -69,14 +69,13 @@ int rb_card_is_member(int card_id) {
  * Measured on the decoded database: 82 of 2,639 cards carry a Draw icon (first
  * PL!-bp3-021-L) against 50 that carry a Score icon, so this is not a rare
  * branch. Card.rs pairs the four predicates in one match inside
- * CardFilter::check_card_property (util.rs:1656-1662) — and the C twin
- * rb_check_card_property (ability/util.c:2572-2579) handles only
- * has_blade_heart / has_score_icon / has_all_blade, so "has_draw_icon" falls
- * through to `has = 0` and every draw-icon card is rejected. The same arm is
- * missing from condition.c:2572-2582. Both files are owned elsewhere, so this
- * predicate needs the declaration in include/rabuka.h plus one arm in each of
- * those two match sites to go live; it is the missing half of Card's icon
- * family and it belongs here regardless. */
+ * CardFilter::check_card_property (util.rs:1656-1662).
+ *
+ * All four C consumers now have the arm: util.c:2851 (rb_check_card_property),
+ * condition.c:2590, dynamic_count.c:253 and move.c:369. Each declares this
+ * function locally rather than taking it from include/rabuka.h, because
+ * rabuka.h is owned elsewhere — the bodies are right, but four ad-hoc extern
+ * declarations for one symbol is a declaration that belongs in the header. */
 int rb_card_has_draw_icon(const Card *c) {
     return c && c->has_special && c->special_count > 0
            && c->special_color == (uint8_t)RB_HEART_DRAW;
@@ -150,32 +149,139 @@ int rb_card_database_create_copy(int template_id) {
 }
 
 /* ── Ability slices (mirrors card_loader.rs::attach_abilities:
-   CARD_ABILITY_PAIRS holds (ability-string-idx, ability-idx) pairs;
-   a pair belongs to the card whose card_no equals get_string(str_idx). ── */
-static int card_no_matches(uint32_t card_idx, uint32_t str_idx) {
+   RBKA_CARD_ABILITY_PAIRS holds (ability-string-idx, ability-idx) pairs;
+   a pair belongs to the card whose card_no equals get_string(str_idx). ──
+ *
+ * WHY THIS IS AN INDEX. Rust builds the mapping ONCE. attach_abilities
+ * (card_loader.rs:149-181) makes a single pass over the flat
+ * CARD_ABILITY_PAIRS, keeps only the card numbers present in the deck being
+ * loaded, and stores a `Vec<AbilityRef>` per card on `Card.abilities`
+ * (card.rs:350). Every later read is `card.abilities[i]` — no scan, and each
+ * ability index is decoded at most once per process.
+ *
+ * The C port cannot hang the list on the Card: `Card.ability` stays NULL
+ * (card.c:127) because every `Ability` the decoder hands out is a fresh heap
+ * tree that its reader frees, so there is nowhere to own a shared list. The same
+ * mapping is therefore kept here as a side index, and the three entry points read
+ * it. Before this, every `rb_card_num_abilities` call site (69 across src) and
+ * every `rb_decode_card_ability` call site (76) paid a 2,116-pair walk, and
+ * `card_no_matches` re-ran `rb_card_record` + `rb_card_string` + `strcmp` inside
+ * that walk for every pair — O(A x 2116) per card, per call. Measured over the
+ * real 2,639-card database: 0.779 s for four full num_abilities sweeps and
+ * 1.709 s for four full index sweeps, versus 0.123 s and 0.007 s with the index
+ * (a 239x speedup on the sweep that resolves ability indices).
+ *
+ * The walk it replaces was this, and it is the definition the index must agree
+ * with — a verbatim copy of it lives in the byte-identity probe, which compares
+ * both over every card in the real database:
+ *
+ *     static int card_no_matches(uint32_t card_idx, uint32_t str_idx) {
+ *         const unsigned char *r = rb_card_record(card_idx);
+ *         if (!r) return 0;
+ *         const char *no = rb_card_string(le16p(r + 0));
+ *         const char *s = get_string(str_idx);
+ *         return no && s && !strcmp(no, s);
+ *     }
+ *
+ * SHAPE. `g_pair_index` is the pair list re-keyed by a 64-bit hash of the card
+ * number the pair belongs to, sorted by (hash, original pair position), so one
+ * card number's entries are a single contiguous run in pair order — the exact
+ * order the old walk produced. A lookup hashes the card's card_no, binary
+ * searches for its run, and indexes into it. Deliberately NOT a per-card
+ * "(first pair, count)" slot table: measured on this database 393 of the 2,639
+ * card numbers have their pairs SPLIT across two runs of RBKA_CARD_ABILITY_PAIRS,
+ * so such a slot would need a walk fallback for 15% of cards; a sorted run needs
+ * none.
+ *
+ * HASH. FNV-1a over the card_no bytes, so the key is the STRING, exactly as
+ * Rust's `HashMap<String, Vec<AbilityRef>>` key is — two prints sharing a card
+ * number therefore share one run, which keying on the record's strtab index would
+ * not do. Measured over the real database: 2,639 distinct card_no strings produce
+ * 2,639 distinct 64-bit hashes, i.e. zero collisions, so no card can be credited
+ * another card's abilities.
+ *
+ * RELOAD. The index holds integers only — a hash and an ability index — and no
+ * pointer into either blob. It is rebuilt when (card count, address of record 0)
+ * changes, so an unload/reload of a different card set cannot serve stale data.
+ */
+
+/* One entry per pair, re-keyed by card-number hash. */
+typedef struct {
+    uint64_t hash;
+    uint16_t ability;
+    uint16_t pair;   /* original pair position: the order-preserving tie-break */
+} RbPairIndexEntry;
+
+static RbPairIndexEntry g_pair_index[RBKA_NUM_CARD_ABILITY_PAIRS];
+static uint32_t g_pair_cards_n;            /* rb_num_cards() the index is for */
+static const unsigned char *g_pair_rec0;   /* rb_card_record(0) it is for     */
+static int g_pair_ready;
+
+static uint64_t card_no_hash(const char *s) {
+    uint64_t h = 1469598103934665603ULL;
+    for (; s && *s; s++) {
+        h ^= (unsigned char)*s;
+        h *= 1099511628211ULL;
+    }
+    return h ? h : 1u; /* 0 is reserved for "not built" */
+}
+
+static int pair_order_cmp(const void *a, const void *b) {
+    const RbPairIndexEntry *x = (const RbPairIndexEntry *)a;
+    const RbPairIndexEntry *y = (const RbPairIndexEntry *)b;
+    if (x->hash != y->hash) return x->hash < y->hash ? -1 : 1;
+    /* Ties broken by ORIGINAL pair position, so the run a card number gets is in
+       the same order the old walk enumerated its matches. */
+    return x->pair < y->pair ? -1 : (x->pair > y->pair);
+}
+
+static void pair_index_build(void) {
+    for (uint32_t k = 0; k < (uint32_t)RBKA_NUM_CARD_ABILITY_PAIRS; k++) {
+        g_pair_index[k].hash = card_no_hash(get_string(RBKA_CARD_ABILITY_PAIRS[2u * k]));
+        g_pair_index[k].ability = RBKA_CARD_ABILITY_PAIRS[2u * k + 1u];
+        g_pair_index[k].pair = (uint16_t)k;
+    }
+    qsort(g_pair_index, RBKA_NUM_CARD_ABILITY_PAIRS, sizeof g_pair_index[0], pair_order_cmp);
+    g_pair_cards_n = rb_num_cards();
+    g_pair_rec0 = rb_card_record(0);
+    g_pair_ready = 1;
+}
+
+/* Half-open [first, last) run of entries belonging to card_idx, or 0 when the
+   card has no record / no pair. */
+static int card_pair_run(uint32_t card_idx, uint32_t *first, uint32_t *last) {
     const unsigned char *r = rb_card_record(card_idx);
     if (!r) return 0;
-    const char *no = rb_card_string(le16p(r + 0));
-    const char *s = get_string(str_idx);
-    return no && s && !strcmp(no, s);
-}
-int rb_card_num_abilities(uint32_t card_idx) {
-    int n = 0;
-    for (uint32_t k = 0; k + 1 < 2u * (uint32_t)RBKA_NUM_CARD_ABILITY_PAIRS; k += 2)
-        if (card_no_matches(card_idx, RBKA_CARD_ABILITY_PAIRS[k])) n++;
-    return n;
-}
-int rb_card_get_ability_idx(uint32_t card_idx, int n, uint32_t *out_ability_idx) {
-    int seen = 0;
-    for (uint32_t k = 0; k + 1 < 2u * (uint32_t)RBKA_NUM_CARD_ABILITY_PAIRS; k += 2) {
-        if (!card_no_matches(card_idx, RBKA_CARD_ABILITY_PAIRS[k])) continue;
-        if (seen == n) {
-            if (out_ability_idx) *out_ability_idx = RBKA_CARD_ABILITY_PAIRS[k + 1];
-            return 1;
-        }
-        seen++;
+    if (!g_pair_ready || g_pair_cards_n != rb_num_cards() || g_pair_rec0 != rb_card_record(0))
+        pair_index_build();
+    uint64_t h = card_no_hash(rb_card_string(le16p(r + 0)));
+    uint32_t lo = 0, hi = (uint32_t)RBKA_NUM_CARD_ABILITY_PAIRS;
+    while (lo < hi) {                    /* first entry whose hash is >= h */
+        uint32_t mid = lo + (hi - lo) / 2u;
+        if (g_pair_index[mid].hash < h) lo = mid + 1u; else hi = mid;
     }
-    return 0;
+    uint32_t start = lo;
+    if (start >= (uint32_t)RBKA_NUM_CARD_ABILITY_PAIRS || g_pair_index[start].hash != h) return 0;
+    uint32_t end = start;
+    while (end < (uint32_t)RBKA_NUM_CARD_ABILITY_PAIRS && g_pair_index[end].hash == h) end++;
+    if (first) *first = start;
+    if (last) *last = end;
+    return 1;
+}
+
+int rb_card_num_abilities(uint32_t card_idx) {
+    uint32_t first, last;
+    if (!card_pair_run(card_idx, &first, &last)) return 0;
+    return (int)(last - first);
+}
+
+int rb_card_get_ability_idx(uint32_t card_idx, int n, uint32_t *out_ability_idx) {
+    if (n < 0) return 0;
+    uint32_t first, last;
+    if (!card_pair_run(card_idx, &first, &last)) return 0;
+    if ((uint32_t)n >= last - first) return 0;
+    if (out_ability_idx) *out_ability_idx = g_pair_index[first + (uint32_t)n].ability;
+    return 1;
 }
 int rb_decode_card_ability(uint32_t card_idx, int n, Ability *out) {
     uint32_t aidx = 0;
@@ -474,7 +580,12 @@ const char *rb_location_str(int s) {
     }
 }
 
-/* ── Card::short_label — normalized card name as the short display label. ── */
+/* ── Short display label for a card: its name run through
+   CardDatabase::normalize_name (card.rs:675, `rb_card_normalize_name` below).
+   Rust has no `Card::short_label` — `short_label` in card.rs:4494 is
+   HeartColor's, and strips whitespace from a COLOUR NAME — but this is what the
+   Rust display paths compute for a card label (`Card.name` normalized), so the
+   name above used to cite a method that does not exist. ── */
 const char *rb_card_short_label(int card_id) {
     static char label[64];
     Card c;
@@ -1012,79 +1123,23 @@ int rb_effect_filter_subset(const AbilityEffect *e, RbCardFilter *out) {
     return out->has_filter;
 }
 
-int rb_condition_filter_subset(const Condition *c, RbCardFilter *out) {
-    if (!out) return 0;
-    memset(out, 0, sizeof(*out));
-    if (!c) return 0;
-    const CondValue *card_type = cond_find(c, "card_type");
-    const CondValue *group = cond_find(c, "group_names");
-    const CondValue *cost_limit = cond_find(c, "cost_limit");
-    const CondValue *operator_value = cond_find(c, "cost_limit_operator");
-    if (!operator_value) operator_value = cond_find(c, "operator");
-    const CondValue *characters = cond_find(c, "characters");
-    const CondValue *exclude_characters = cond_find(c, "exclude_characters");
-    const CondValue *cost_values = cond_find(c, "cost_values");
-    const CondValue *card_names = cond_find(c, "card_names");
-    const CondValue *distinct = cond_find(c, "distinct");
-    if (card_type && card_type->tag == RB_TAG_STR) card_filter_set_text(out->card_type, sizeof(out->card_type), card_type->s);
-    if (group && group->tag == RB_TAG_ARRAY && group->arr_n && group->arr[0].tag == RB_TAG_STR) {
-        card_filter_set_text(out->group, sizeof(out->group), group->arr[0].s);
-        out->has_group = 1;
-    }
-    if (cost_limit && cost_limit->tag == RB_TAG_I64 && cost_limit->i >= 0 && cost_limit->i <= 255) {
-        out->cost_limit = (int)cost_limit->i;
-        out->has_cost_limit = 1;
-        if (operator_value && operator_value->tag == RB_TAG_STR) card_filter_set_text(out->cost_op, sizeof(out->cost_op), operator_value->s);
-    }
-    if (characters && characters->tag == RB_TAG_ARRAY && characters->arr_n) {
-        size_t w = 0;
-        for (uint32_t i = 0; i < characters->arr_n && w < sizeof(out->characters); i++) {
-            if (characters->arr[i].tag != RB_TAG_STR || !characters->arr[i].s) continue;
-            size_t len = strlen(characters->arr[i].s);
-            if (w && w + 1 < sizeof(out->characters)) out->characters[w++] = ',';
-            size_t copy = len;
-            if (copy >= sizeof(out->characters) - w) copy = sizeof(out->characters) - w - 1;
-            memcpy(out->characters + w, characters->arr[i].s, copy);
-            w += copy;
-            out->characters[w] = 0;
-        }
-        out->has_characters = w != 0;
-    }
-    if (exclude_characters && exclude_characters->tag == RB_TAG_ARRAY && exclude_characters->arr_n) {
-        size_t w = 0;
-        for (uint32_t i = 0; i < exclude_characters->arr_n && w < sizeof(out->exclude_characters); i++) {
-            if (exclude_characters->arr[i].tag != RB_TAG_STR || !exclude_characters->arr[i].s) continue;
-            size_t len = strlen(exclude_characters->arr[i].s);
-            if (w && w + 1 < sizeof(out->exclude_characters)) out->exclude_characters[w++] = ',';
-            size_t copy = len;
-            if (copy >= sizeof(out->exclude_characters) - w) copy = sizeof(out->exclude_characters) - w - 1;
-            memcpy(out->exclude_characters + w, exclude_characters->arr[i].s, copy);
-            w += copy;
-            out->exclude_characters[w] = 0;
-        }
-        out->has_exclude_characters = w != 0;
-    }
-    if (cost_values && cost_values->tag == RB_TAG_ARRAY) {
-        for (uint32_t i = 0; i < cost_values->arr_n && out->n_cost_values < 16; i++)
-            if (cost_values->arr[i].tag == RB_TAG_I64 && cost_values->arr[i].i >= 0 && cost_values->arr[i].i <= 255)
-                out->cost_values[out->n_cost_values++] = (int)cost_values->arr[i].i;
-    }
-    if (card_names && card_names->tag == RB_TAG_ARRAY) {
-        for (uint32_t i = 0; i < card_names->arr_n && out->n_name_fragments < 8; i++) {
-            if (card_names->arr[i].tag != RB_TAG_STR || !card_names->arr[i].s) continue;
-            card_filter_set_text(out->name_fragments[out->n_name_fragments], sizeof(out->name_fragments[0]), card_names->arr[i].s);
-            out->n_name_fragments++;
-        }
-    }
-    if (distinct) {
-        if (distinct->tag == RB_TAG_STR) out->distinct = rb_distinct_info_is_distinct(distinct->s);
-        else if (distinct->tag == RB_TAG_TRUE) out->distinct = 1;
-        else if (distinct->tag == RB_TAG_I64) out->distinct = distinct->i != 0;
-    }
-    out->has_filter = !!(out->card_type[0] || out->has_group || out->has_cost_limit || out->has_characters ||
-                         out->has_exclude_characters || out->n_cost_values || out->n_name_fragments || out->distinct);
-    return out->has_filter;
-}
+/* rb_condition_filter_subset is GONE (checklist G3).
+ *
+ * It read eight Condition keys (card_type, group_names, cost_limit,
+ * cost_limit_operator/operator, characters, exclude_characters, cost_values,
+ * card_names, distinct) and built an RbCardFilter that the group arm resolved
+ * through the SAME `group_names.first()` membership test
+ * rb_card_matches_effect_group performs -- card.rs:1852-1856 populates
+ * `group` with `group_names.first()` and util.rs:1515-1530 (check_group) tests
+ * exactly that one name. So for every input a caller can produce the condition
+ * twin and the effect twin agree on the only term that can reject a card, and
+ * the twin had ZERO callers: a whole-repo grep for the symbol over *.c, *.h,
+ * *.py, *.md and the Makefile returned only the definition and the declaration
+ * (never a call). Rust has no Condition-side filter builder either --
+ * CardFilter::from_effect takes an AbilityEffect (util.rs:1838), so there is no
+ * public Rust item this was a twin of. The declaration was removed from
+ * include/rabuka.h in the same edit; leaving one without the other is the exact
+ * failure this item exists to prevent. */
 
 int rb_effect_value_or_count(const AbilityEffect *e, int default_value) {
     if (e) {
@@ -1094,6 +1149,26 @@ int rb_effect_value_or_count(const AbilityEffect *e, int default_value) {
     }
     return default_value;
 }
+/* 「(対戦相手のカードの効果でも発動する。)」
+ *
+ * Rust: `AbilityEffect::fires_on_opponent_effects` (card.rs:1419) returns
+ * `self.fires_on_opponent_effects.unwrap_or(false)` — the parser-stamped bool
+ * the bytecode carries under the key "fires_on_opponent_effects"
+ * (effect_decoder_gen.rs:70), read off THE effect. Nothing re-derives it from
+ * text, and nothing asks about the other abilities of the card.
+ *
+ * This used to substring-match 「発動する」 and 「相手」 inside the `parenthetical`
+ * extra instead. Measured over the real database both answers are identical —
+ * 10 effects carry the flag, exactly those 10 match the heuristic, 0
+ * disagreements either way — so the change is a no-op on the corpus; it is made
+ * because the flag is the actual Rust predicate and the JP matching was a second,
+ * independent source that could drift on any future wording.
+ *
+ * NOTE for the caller: this is still a CARD-level query, i.e. "does any ability
+ * of this card fire on opponent effects", which Rust has no equivalent of. See
+ * game_state_abilities.c:2061 — that fallback arms effects Rust would not, and
+ * the residual is measurable (4 (card, effect) pairs on flagged cards).
+ */
 int rb_card_fires_on_opponent_effects(int card_id) {
     int n = rb_card_num_abilities((uint32_t)card_id);
     for (int i = 0; i < n; i++) {
@@ -1103,13 +1178,11 @@ int rb_card_fires_on_opponent_effects(int card_id) {
         for (int e = 0; e < 2 && !fires; e++) {
             const AbilityEffect *fx = e == 0 ? ab.effect : ab.cost;
             if (!fx) continue;
-            for (int k = 0; k < fx->n_extra && !fires; k++) {
-                if (fx->extra_k[k] && !strcmp(fx->extra_k[k], "parenthetical")
-                    && fx->extra_v[k]) {
-                    const char *p = fx->extra_v[k];
-                    if (strstr(p, "発動する") && strstr(p, "相手")) fires = 1;
-                }
-            }
+            for (int k = 0; k < fx->n_extra && !fires; k++)
+                if (fx->extra_k[k] && fx->extra_v[k]
+                    && !strcmp(fx->extra_k[k], "fires_on_opponent_effects")
+                    && !strcmp(fx->extra_v[k], "true"))
+                    fires = 1;
         }
         rb_free_ability(&ab);
         if (fires) return 1;

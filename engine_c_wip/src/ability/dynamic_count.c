@@ -271,9 +271,14 @@ static const char *dc_group_first(const char *csv, char *buf, size_t bufsz)
     return buf;
 }
 
-/* util.rs:2660-2677 `per_unit_zone` — which zone a per-unit clause counts
+/* util.rs:2689-2708 `per_unit_zone` — which zone a per-unit clause counts
    over. NULL means the clause names no zone this engine can count, and the
-   caller treats the count as 1 (util.rs:2633-2636 `_ => return 1`). */
+   caller treats the count as 1 (util.rs:2634-2636 `_ => return 1`). The
+   extra spellings ("waitroom", "live", "live_zone", "success") are accepted
+   here as aliases; Rust sends them down the same `_ => return None` arm. No
+   corpus effect carries one as its per_unit_type (measured over
+   cards/abilities.json: 人 26 / 枚 32 / discard 9 / つ 2 / card 1 /
+   heart_colors 1 / group_name 1 / energy_deck 1 / absent 2). */
 static const char *dc_per_unit_zone(const char *unit, const char *card_type)
 {
     if (!unit) return NULL;
@@ -282,7 +287,7 @@ static const char *dc_per_unit_zone(const char *unit, const char *card_type)
         return "stage";                                   /* 人 */
     if (!strcmp(unit, "hand") || !strcmp(unit, "card")) return "hand";
     if (!strcmp(unit, "under_member")) return "under_member";
-    /* util.rs:2665-2671 — the bare 「1枚につき」 counts the HAND, and only
+    /* util.rs:2696-2702 — the bare 「1枚につき」 counts the HAND, and only
        becomes the under-member zone when the effect's own filter already pins
        card_type to member_card. */
     if (!strcmp(unit, "\xE6\x9D\xAF"))                    /* 枚 */
@@ -296,10 +301,15 @@ static const char *dc_per_unit_zone(const char *unit, const char *card_type)
     return NULL;
 }
 
-/* util.rs:2616-2622 — does `cid` print a heart of colour `col` in either its
-   base_heart map or its need_heart map? The C Card lays the three heart maps
-   out as [0, num_base) = base, [num_base, num_base+num_blade) = blade,
-   [num_base+num_blade, n_hearts) = need, so the blade span is skipped. */
+/* util.rs:2646-2653 — the `heart_colors` per-unit arm asks "does `cid` carry a
+   heart of colour `col` in EITHER map?", and there it really is an OR:
+       card.base_heart…contains_key(&hc) || card.need_heart…contains_key(&hc)
+   The C Card lays the three heart maps out as [0, num_base) = base,
+   [num_base, num_base+num_blade) = blade, [num_base+num_blade, n_hearts) = need,
+   so the blade span is skipped. The `count > 0` test is load-bearing: the C
+   decode keeps every (colour,count) byte pair (core/card.c:110-117) while
+   Rust's HeartMap only ever holds colours whose count was non-zero
+   (card_binary.rs:335-337 parse_hearts). */
 static int dc_card_has_base_or_need(int cid, int col)
 {
     Card c;
@@ -310,6 +320,35 @@ static int dc_card_has_base_or_need(int cid, int col)
         if ((int)c.heart_color[i] != col || c.heart_count[i] == 0) continue;
         if (i < c.num_base || i >= blade_end) { r = 1; break; }
     }
+    rb_free_card(&c);
+    return r;
+}
+
+/* util.rs:1128-1138 `card_matches_heart_colors` — and this one is NOT an OR.
+   `card.base_heart.as_ref().map_or(<need_heart check>, <base_heart check>)`
+   means: a card that PRINTS base hearts is judged on its printed hearts alone
+   and its required hearts are never consulted; only a card with no base_heart
+   map at all (a live card) falls back to need_heart. The C spelling of
+   "base_heart is Some" is `num_base > 0` (card_binary.rs:231-235 sets
+   `base_heart: None` exactly when the printed-heart map came out empty), and
+   util.c's rb_card_matches_heart_colors (util.c:698-701) already spells the same
+   base-first choice for every OTHER caller of this predicate.
+
+   This file previously used dc_card_has_base_or_need here, so every per-unit
+   zone count filtered by `heart_colors` also admitted cards that print no heart
+   of that colour but REQUIRE one — 54 corpus effects carry both `per_unit` and
+   `heart_colors` with a zone per_unit_type (the 55th, per_unit_type
+   "heart_colors", is the OR site above and keeps that helper). */
+static int dc_card_has_base_first(int cid, int col)
+{
+    Card c;
+    if (!rb_decode_card_by_index((uint32_t)cid, &c)) return 0;
+    int start, end;
+    if (c.num_base > 0) { start = 0; end = c.num_base; }
+    else { start = c.num_base + c.num_blade; end = c.n_hearts; }
+    int r = 0;
+    for (int i = start; i < end && i < c.n_hearts; i++)
+        if ((int)c.heart_color[i] == col && c.heart_count[i] > 0) { r = 1; break; }
     rb_free_card(&c);
     return r;
 }
@@ -342,7 +381,7 @@ static unsigned dc_color_mask(const char *list)
     return mask;
 }
 
-/* util.rs:2607-2631 — per_unit_type "heart_colors" counts the DISTINCT heart
+/* util.rs:2637-2661 — per_unit_type "heart_colors" counts the DISTINCT heart
    colours carried by the STAGE members the filter admits, not the members. */
 static int dc_distinct_heart_colors(const GameState *g, int pl,
                                     const RbCardFilter *f, const char *heart_colors)
@@ -364,9 +403,9 @@ static int dc_distinct_heart_colors(const GameState *g, int pl,
     return n;
 }
 
-/* util.rs:2785-2794 `apply_distinct_filter` — duplicate normalised names
+/* util.rs:2816-2825 `apply_distinct_filter` — duplicate normalised names
    collapse to one unit. `f->distinct` is the decoder's is_distinct flag, which
-   is exactly `util.rs:2778 distinct_should_dedupe`'s input set. */
+   is exactly `util.rs:2809-2814 distinct_should_dedupe`'s input set. */
 static int dc_apply_distinct(int *ids, int n)
 {
     char seen[RB_MAX_ZONE][96];
@@ -393,10 +432,12 @@ static int dc_apply_distinct(int *ids, int n)
     return kept;
 }
 
-/* util.rs:2753-2773 `count_filtered` — the filter alone decides when the effect
+/* util.rs:2784-2804 `count_filtered` — the filter alone decides when the effect
    named no heart colours; when it did, a card must also carry one of them.
    Both branches keep the MATCHING ids in `ids` because the distinct pass runs
-   over exactly that set (util.rs:2771). */
+   over exactly that set (util.rs:2802). The heart-colour predicate is
+   dc_card_has_base_first (util.rs:1131-1136), NOT the OR form that the
+   `heart_colors` per-unit arm uses. */
 static int dc_count_filtered(int *ids, int n, const RbCardFilter *f,
                              const char *heart_colors)
 {
@@ -407,7 +448,7 @@ static int dc_count_filtered(int *ids, int n, const RbCardFilter *f,
         if (want != 0) {
             int hit = 0;
             for (int c = 0; c < 8 && !hit; c++)
-                if ((want & (1u << c)) && dc_card_has_base_or_need(ids[i], c)) hit = 1;
+                if ((want & (1u << c)) && dc_card_has_base_first(ids[i], c)) hit = 1;
             if (!hit) continue;
         }
         ids[kept++] = ids[i];
@@ -419,15 +460,21 @@ static int dc_count_filtered(int *ids, int n, const RbCardFilter *f,
 
 /* ── per-unit unit count (util.rs::resolve_per_unit_count) ───────────────────
  *
- * The Rust twin is `resolve_per_unit_count` / `calculate_per_unit_multiplier`
- * in engine/src/ability/util.rs:2548-2677. Four Rust callers raise the same
- * `per_unit` flag with DIFFERENT arguments, so this shared arm is their union
- * rather than any one of them:
+ * The Rust twin is `resolve_per_unit_count` / `calculate_per_unit_multiplier` /
+ * `per_unit_zone` in engine/src/ability/util.rs:2577-2708. Six Rust callers raise
+ * the same `per_unit` flag with DIFFERENT arguments, so this shared arm is their
+ * union rather than any one of them:
  *
  *   look.rs:979      resolve_per_unit_count(true, per_unit_type, ...) x base
  *   deck.rs:257      calculate_per_unit_multiplier(per_unit, per_unit_type, …),
  *                    preceded for per_unit_type == "discard" by the
  *                    moved-batch resolve_discard_per_unit_count
+ *   score.rs:221-247 / :393-423  location-or-per_unit_type, and the 「つ」 clause
+ *                    is `last_cost_energy_count` (see the つ arm below)
+ *   resource.rs:474 / :510-534   same precedence; per_unit_aggregate "score"
+ *                    takes resolve_per_unit_score_sum, and it passes an EMPTY
+ *                    heart_colors list where score.rs passes the effect's own —
+ *                    the one place this union knowingly over-filters
  *   energy.rs:313/551  no per_unit handling at all
  *   reyell.rs:70     per_unit sums the COSTS of the moved cards, then caps
  *
@@ -479,19 +526,23 @@ static int dc_per_unit_units(const struct GameState *g, int pl, int host_cid,
     if (put && !strcmp(put, "heart_colors"))
         return dc_distinct_heart_colors(g, pl, &f, heart_colors);
 
-    /* score.rs:225-227 — 「1つにつき」 on an energy cost counts the energy the
-       current cost step paid, i.e. GameModifiers::last_cost_energy_count. That
-       field has no home in RbMods yet and rabuka.h:1279 forbids adding it
+    /* score.rs:225-227 / :404-408 and resource.rs:520-521 — 「1つにつき」 is
+       `GameModifiers::last_cost_energy_count`, i.e. the energy the current cost
+       step paid. All three Rust sites read that ONE field, and every caller then
+       computes `matching_count / per_unit_count` and multiplies (score.rs:241,
+       score.rs:423, resource.rs:624), so a missing field multiplies out to 0 and
+       the effect is nullified — which is what returning 0 here reproduces. The
+       previous fall-through reported 1 and applied the effect once.
+       That field has no home in RbMods yet and rabuka.h:1279 forbids adding it
        unconfirmed, so util.c's RB_LAST_COST_ENERGY accessor — the one
-       rb_resolve_per_unit_count uses for the same clause — yields 0 here too.
-       The previous fall-through reported 1 and multiplied the effect by it. */
+       rb_resolve_per_unit_count uses for the same clause — yields 0 here too. */
     if (put && !strcmp(put, "\xE3\x81\xA4")) return 0;   /* つ */
     if (loc && !strcmp(loc, "\xE3\x81\xA4")) return 0;   /* つ */
 
-    /* util.rs:2533-2544 / deck.rs:234-245 — for per_unit_type == "discard" the
+    /* util.rs:2560-2575 / deck.rs:258-269 — for per_unit_type == "discard" the
        unit count is the cards MOVED BY THE CURRENT COST/EFFECT BATCH, put
        through the effect's own filter, with last_cost_discard_count as the
-       fallback. util.rs:2531-2532 states the rule outright: "they should count
+       fallback. util.rs:2562-2563 states the rule outright: "they should count
        only cards moved by the current cost/effect batch, not the full
        waitroom". Counting `P->discard` instead scales every 「このコストで控え室
        に置いた…」 clause off every card that ever reached the waitroom. */
@@ -500,7 +551,7 @@ static int dc_per_unit_units(const struct GameState *g, int pl, int host_cid,
                                                  card_type, f.has_group ? f.group : NULL);
 
     const char *zone = dc_per_unit_zone(loc ? loc : put, card_type);
-    if (!zone) return 1;                              /* util.rs:2633-2636 */
+    if (!zone) return 1;                              /* util.rs:2634-2636 */
 
     const RbPlayer *P = &g->p[pl];
     int ids[RB_MAX_ZONE];
@@ -508,7 +559,7 @@ static int dc_per_unit_units(const struct GameState *g, int pl, int host_cid,
     if (!strcmp(zone, "stage")) {
         for (int i = 0; i < RB_STAGE_SIZE; i++)
             if (P->stage[i] != RB_EMPTY_SLOT) ids[n++] = P->stage[i];
-        /* util.rs:2643-2653 — the state filter is a STAGE-only concept. */
+        /* util.rs:2673-2684 — the state filter is a STAGE-only concept. */
         if (state_filter && *state_filter) {
             int kept = 0;
             for (int i = 0; i < n; i++) {
@@ -519,7 +570,7 @@ static int dc_per_unit_units(const struct GameState *g, int pl, int host_cid,
             n = kept;
         }
     } else if (!strcmp(zone, "under_member")) {
-        /* util.rs:2734-2748 `under_member_cards` — ONE member's under-cards
+        /* util.rs:2759-2779 `under_member_cards` — ONE member's under-cards
            (the host's own slot) when the host is on stage; the whole field only
            when the host is unknown. Walking every bag multiplies the effect by
            every member on stage. */
