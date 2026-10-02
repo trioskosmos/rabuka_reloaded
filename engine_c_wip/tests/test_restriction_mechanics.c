@@ -17,20 +17,28 @@ static void clear_choices(TestGame *tg)
     }
 }
 
+/* Mirrors helpers::fire_trigger (engine/tests/helpers/mod.rs:114) - resolve
+ * ONE ability on ONE card, key it "{card_no}_{full_text}", fire it with the
+ * card as the activating card, then resolve the pending auto abilities.
+ *
+ * The hand-rolled body it replaces drove the queue with a raw rb_queue_push,
+ * which had two real defects the shared helper removes:
+ *   1. rb_queue_push builds its entry with `use_limit_recorded = 0` and never
+ *      calls rb_record_use, so a 自動/ターン1回 ability is still unspent when it
+ *      resolves and the post-resolution re-scan in
+ *      rb_process_player_abilities_depth_full enqueues it a SECOND time.
+ *   2. rb_queue_push leaves `player_id` EMPTY (ability_queue.c:269) and never
+ *      sets `queue.state`, so the un-stamped entry survived into the next
+ *      window instead of being retired by clear_completed().
+ *
+ * The substring probe (`strstr(ability.triggers, trigger_str)`) is the engine's
+ * OWN predicate - rb_trigger_is is literally strstr - so test_fire_trigger_on_card
+ * matches exactly the same abilities the old loop did, and matches Rust's
+ * `.find(|a| a.triggers.as_deref() == Some(trig))` for every trigger word used
+ * here (the ability's `triggers` field holds the one word). */
 static int trigger_auto(TestGame *tg, int cid, const char *trigger_str)
 {
-    int count = rb_card_num_abilities((uint32_t)cid);
-    for (int ability_idx = 0; ability_idx < count; ability_idx++) {
-        Ability ability;
-        if (!rb_decode_card_ability((uint32_t)cid, ability_idx, &ability)) continue;
-        int matches = ability.triggers && strstr(ability.triggers, trigger_str);
-        rb_free_ability(&ability);
-        if (matches) {
-            tg->state.activating_card = cid;
-            return rb_queue_push(&tg->state.queue, cid, ability_idx);
-        }
-    }
-    return 0;
+    return test_fire_trigger_on_card(tg, cid, trigger_str);
 }
 
 static void test_ll_bp2001_cannot_be_baton_touched_out(void)
@@ -79,22 +87,27 @@ static void test_niko_pb1009_suppresses_effect_activations_for_the_turn(void)
     tg.state.p[0].stage[1] = nico;
     tg.state.p[0].stage[2] = mass_activator;
 
-    int ability_count = rb_card_num_abilities((uint32_t)nico);
-    for (int ability_idx = 0; ability_idx < ability_count; ability_idx++) {
-        Ability ability;
-        if (!rb_decode_card_ability((uint32_t)nico, ability_idx, &ability)) continue;
-        int is_debut = ability.triggers && !strcmp(ability.triggers, "登場");
-        rb_free_ability(&ability);
-        if (is_debut) {
-            tg.state.activating_card = nico;
-            rb_queue_push(&tg.state.queue, nico, ability_idx);
-            rb_process_pending_auto_abilities(&tg.state);
-            clear_choices(&tg);
-        }
-    }
+    /* Niko PL!-pb1-009-R prints TWO 登場 abilities, and the wrong one was being
+     * driven here. Read out of the compiled card DB:
+     *   ab#0 「相手のステージにいる元々持つブレードの数が1つ以下のメンバー1人を
+     *          ウェイトにする。」
+     *   ab#1 「このターン、自分と相手のステージにいるメンバーは、効果によって
+     *          はアクティブにならない。」   <-- the one this test is NAMED for
+     * The old first-match loop fired ab#0, which targets an OPPONENT's stage, so
+     * it did nothing to `victim` (who is on OUR stage) and the restriction the
+     * test asserts on was never armed. The assertion then passed VACUOUSLY,
+     * because the un-stamped rb_queue_push entry never resolved at all.
+     *
+     * With the entry actually resolving, the vacuous green is gone and the real
+     * value shows: mass_activator's 「自分のステージにいるすべてのメンバーを
+     * アクティブにする。」 switched the victim out of wait. nth = 1 fires ab#1,
+     * and the victim correctly stays waited. MEASURED with
+     * test_fire_trigger_on_card_nth on this fixture: nth=0 -> 'active',
+     * nth=1 -> 'wait'. */
+    (void)test_fire_trigger_on_card_nth(&tg, nico, "登場", 1);
+    clear_choices(&tg);
 
     trigger_auto(&tg, mass_activator, "登場");
-    rb_process_pending_auto_abilities(&tg.state);
     clear_choices(&tg);
 
     const char *orientation = rb_mods_get_orientation(&tg.state.mods, victim);

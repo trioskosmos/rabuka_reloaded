@@ -1027,6 +1027,30 @@ static int pay_cost_change_state(GameState *g, int actor, const AbilityEffect *c
 static int pay_cost_inner(GameState *g, int actor, const AbilityEffect *cost) {
     if (!cost) return 1;
 
+    /* handlers.rs:974-975 —
+     *     let mut dbg = AbDebug::new();
+     *     dbg.cost_pay(cost, true);
+     * the FIRST two statements of pay_cost_inner, ahead of the `match
+     * cost.action` dispatch and therefore ahead of every arm below, including
+     * the SequentialCost arm. Rust builds a FRESH AbDebug per invocation (a
+     * stack local, `indent: 0`), so these lines carry no indent pad and do not
+     * ride resolve_ability's tracer: reproduced here with a by-value
+     * `RbAbDebug dbg` — it is a COMPLETE struct in include/rabuka.h, so it must
+     * never be declared as a pointer — exactly as condition.c:602 and
+     * resolver.c:717 do for their own per-call tracers. The tracer shares the
+     * one global 256-line ABILITY_DEBUG buffer (debug.rs:66), flushed later by
+     * rb_resolver_resolve_ability (resolver.c:1198-1199), as in Rust.
+     *
+     * `true` is Rust's literal second argument: pay_cost_inner reports the
+     * cost as paid on entry, BEFORE any arm runs, so a cost that later fails
+     * still emits "... U+2192 OK". Reproduced verbatim: the FAIL spelling
+     * exists in the tracer (debug.rs:158) but nothing in Rust ever passes it.
+     * The arrow itself lives in debug.c as an explicit \xE2\x86\x92 escape;
+     * it is named here in words so no literal U+2192 enters this file. */
+    RbAbDebug dbg;
+    rb_abdebug_init(&dbg);
+    rb_abdebug_cost_pay(&dbg, cost, 1);
+
     /* Rule 9.4.2 / Q234: SequentialCost — validate all, then pay in order */
     if (cost_is_sequential(cost)) {
         int start_idx = 0;

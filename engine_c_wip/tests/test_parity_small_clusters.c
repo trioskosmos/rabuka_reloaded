@@ -656,56 +656,48 @@ static void describe_pending(TestGame *tg, const char *tag)
             c->allow_skip, (int)c->route, c->n_filtered_indices, c->description);
 }
 
-/* ── trigger shim (Rust helpers::fire_trigger) ─────────────────────────────
-   Build the "<card_no>_<full_text>" ability id for the first ability printing
-   `trig`, queue exactly that ability, set activating_card, process the queue.
-   A miss is a HARNESS bug and says so loudly instead of turning a negative
-   assertion into a vacuous pass. */
-void rb_trigger_auto_ability(GameState *g, const char *ability_id,
-                             const char *trigger_type, int player_id,
-                             const char *source_card_no,
-                             int explicit_card_id,
-                             const int *trigger_moved_cards, int n_moved,
-                             int triggering_member_id);
-
+/* ── trigger shim (Rust helpers::fire_trigger, mod.rs:114-141) ──────────────
+   Resolve ONE ability of ONE card, key it "<card_no>_<full_text>", and call
+   trigger_auto_ability with an explicit card id; then activating_card and
+   process_pending_auto_abilities.
+   This body used to be hand-rolled against a local rb_trigger_auto_ability
+   prototype. The enqueue was already right, but the LOAD-BEARING ENQUEUE-TIME
+   USE RECORD was missing: the C port spends a ターン1回 use at enqueue (every
+   scan in src/turn/triggers.c calls rb_record_use and stamps
+   rb_mark_entries_use_limit_recorded), so with the use left unspent the
+   post-resolution re-scan in rb_process_player_abilities_depth_full saw it
+   still available and enqueued the same ability a SECOND time. MEASURED on
+   test_parity_state_per_card's T/010 (PL!N-sd2-010-SD2): the ally gained 4
+   blade instead of 2. test_fire_trigger_core_seat (src/test_game.c:1166-1170)
+   performs the record and the stamp.
+   `test_fire_trigger_on_card` also matches with the ENGINE's predicate
+   (rb_trigger_is, a strstr) instead of an exact strcmp -- the same predicate
+   rb_trigger_auto_ability re-checks internally.
+   The [TRIGGER-MISS] dump below is preserved verbatim: a miss is a HARNESS bug
+   and must say so loudly instead of turning a negative assertion into a
+   vacuous pass. */
 static int fire_trigger(TestGame *tg, int cid, const char *trig, const char *type)
 {
+    (void)type;   /* Rust passes the SAME token as trigger and trig (mod.rs:130-138) */
+    if (test_fire_trigger_on_card(tg, cid, trig)) return 1;
     Card c;
-    if (cid < 0 || !rb_decode_card_by_index((uint32_t)cid, &c)) return 0;
+    memset(&c, 0, sizeof c);
     char card_no[160];
-    snprintf(card_no, sizeof(card_no), "%s", rb_card_string(c.card_no_idx));
-    char ability_id[1024];
-    int found = 0;
-    int nab = rb_card_num_abilities((uint32_t)cid);
-    for (int a = 0; a < nab && !found; a++) {
-        Ability ab;
-        memset(&ab, 0, sizeof ab);
+    card_no[0] = '\0';
+    int decoded = (cid >= 0) && rb_decode_card_by_index((uint32_t)cid, &c);
+    int nab = (cid >= 0) ? rb_card_num_abilities((uint32_t)cid) : 0;
+    if (decoded) snprintf(card_no, sizeof(card_no), "%s", rb_card_string(c.card_no_idx));
+    fprintf(stderr, "[TRIGGER-MISS] card %s: no ability printing \"%s\"; has:",
+            card_no[0] ? card_no : "(undecodable)", trig);
+    for (int a = 0; a < nab; a++) {
+        Ability ab; memset(&ab, 0, sizeof ab);
         if (!rb_decode_card_ability((uint32_t)cid, a, &ab)) continue;
-        if (ab.triggers && strcmp(ab.triggers, trig) == 0) {
-            snprintf(ability_id, sizeof(ability_id), "%s_%s", card_no,
-                     ab.full_text ? ab.full_text : "");
-            found = 1;
-        }
+        fprintf(stderr, " [%d]=\"%s\"", a, ab.triggers ? ab.triggers : "(null)");
         rb_free_ability(&ab);
     }
-    rb_free_card(&c);
-    if (!found) {
-        fprintf(stderr, "[TRIGGER-MISS] card %s: no ability printing \"%s\"; has:",
-                card_no, trig);
-        for (int a = 0; a < nab; a++) {
-            Ability ab; memset(&ab, 0, sizeof ab);
-            if (!rb_decode_card_ability((uint32_t)cid, a, &ab)) continue;
-            fprintf(stderr, " [%d]=\"%s\"", a, ab.triggers ? ab.triggers : "(null)");
-            rb_free_ability(&ab);
-        }
-        fprintf(stderr, "\n");
-        return 0;
-    }
-    rb_trigger_auto_ability(&tg->state, ability_id, type, 0, card_no, cid,
-                            NULL, 0, -1);
-    tg->state.activating_card = cid;
-    rb_process_pending_auto_abilities(&tg->state);
-    return 1;
+    fprintf(stderr, "\n");
+    if (decoded) rb_free_card(&c);
+    return 0;
 }
 
 static int fire_debut(TestGame *tg, int cid)

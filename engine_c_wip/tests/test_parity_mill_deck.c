@@ -100,17 +100,9 @@
 #include <unistd.h>
 #include <sys/wait.h>
 
-/* rb_trigger_auto_ability exists in src/core/game_state_abilities.c but has no
-   prototype in include/rabuka.h; declare it exactly as defined there (the same
-   trick tests/test_parity_draw_flat.c uses). */
-void rb_trigger_auto_ability(GameState *g, const char *ability_id,
-                             const char *trigger_type, int player_id,
-                             const char *source_card_no,
-                             int explicit_card_id,
-                             const int *trigger_moved_cards, int n_moved,
-                             int triggering_member_id);
-
-/* Trigger wire tokens, byte-exact UTF-8. */
+/* Trigger wire tokens, byte-exact UTF-8.
+   (rb_trigger_auto_ability is no longer declared here: md_fire_trigger now
+   delegates to the shared helpers in src/test_game.c, which own that extern.) */
 #define TRIG_DEBUT        "\xE7\x99\xBB\xE5\xA0\xB4"                            /* toujyou  */
 #define TRIG_LIVE_START   "\xE3\x83\xA9\xE3\x82\xA4\xE3\x83\x96\xE9\x96\x8B\xE5\xA7\x8B\xE6\x99\x82"
 #define TRIG_LIVE_SUCCESS "\xE3\x83\xA9\xE3\x82\xA4\xE3\x83\x96\xE6\x88\x90\xE5\x8A\x9F\xE6\x99\x82"
@@ -760,41 +752,33 @@ static void drain_strict(TestGame *tg)
 
 /* ---- trigger firing ---- */
 
-/* Mirror Rust helpers::fire_trigger / fire_trigger_nth (helpers/mod.rs:114):
- * find the `nth` ability whose `triggers` EQUALS `trig`, build the
- * "<card_no>_<full_text>" key, enqueue exactly that ability, set
- * activating_card, then run process_pending_auto_abilities. It deliberately
- * does NOT drain, so the caller still observes the prompt Rust observes. */
+/* Mirror Rust helpers::fire_trigger / fire_trigger_nth (helpers/mod.rs:114-141):
+ * find the `nth` ability of ONE card, build the "<card_no>_<full_text>" key,
+ * call trigger_auto_ability with an explicit card id, set activating_card, then
+ * run process_pending_auto_abilities. It deliberately does NOT drain, so the
+ * caller still observes the prompt Rust observes.
+ *
+ * `nth == 0` is Rust's fire_trigger and `nth > 0` is fire_trigger_nth, so the
+ * two shared entry points cover this helper exactly; `trigger_type` is dropped
+ * because it is `trig` at every call site in this file (and Rust passes the SAME
+ * token for both arguments -- mod.rs:130-138).
+ *
+ * The hand-rolled body this replaces built the id and called
+ * `rb_trigger_auto_ability` inline, which is already faithful, but it never did
+ * the LOAD-BEARING ENQUEUE-TIME USE RECORD. The C port spends a ターン1回 use at
+ * enqueue (every scan in src/turn/triggers.c does: rb_record_use plus the
+ * rb_mark_entries_use_limit_recorded stamp), so with the use left unspent the
+ * post-resolution re-scan in rb_process_player_abilities_depth_full saw it still
+ * available and enqueued the same ability a SECOND time. MEASURED on
+ * test_parity_state_per_card's T/010: the ally gained 4 blade instead of 2.
+ * `test_fire_trigger_core_seat` (src/test_game.c:1166-1170) performs the record
+ * and the stamp. */
 static int md_fire_trigger(TestGame *tg, int cid, const char *trig,
                            const char *trigger_type, int nth)
 {
-    Card card;
-    if (!rb_decode_card_by_index((uint32_t)cid, &card)) return 0;
-    char card_no[128];
-    snprintf(card_no, sizeof card_no, "%s", rb_card_string(card.card_no_idx));
-    char ability_id[1024];
-    int found = 0, nab = rb_card_num_abilities((uint32_t)cid);
-    for (int a = 0; a < nab && !found; a++) {
-        Ability ab;
-        if (!rb_decode_card_ability((uint32_t)cid, a, &ab)) continue;
-        if (ab.triggers && strcmp(ab.triggers, trig) == 0) {
-            if (nth == 0) {
-                snprintf(ability_id, sizeof ability_id, "%s_%s", card_no,
-                         ab.full_text ? ab.full_text : "");
-                found = 1;
-            } else {
-                nth--;
-            }
-        }
-        rb_free_ability(&ab);
-    }
-    rb_free_card(&card);
-    if (!found) return 0;
-    rb_trigger_auto_ability(&tg->state, ability_id, trigger_type, 0, card_no,
-                            cid, NULL, 0, -1);
-    tg->state.activating_card = cid;
-    rb_process_pending_auto_abilities(&tg->state);
-    return 1;
+    (void)trigger_type;
+    if (nth == 0) return test_fire_trigger_on_card(tg, cid, trig);
+    return test_fire_trigger_on_card_nth(tg, cid, trig, nth);
 }
 
 static int md_fire_debut(TestGame *tg, int cid) {

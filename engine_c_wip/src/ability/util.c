@@ -2355,91 +2355,206 @@ int rb_calculate_play_cost_reduction(const GameState *g, int pl, int hand_count,
     return reduction;
 }
 
-/* Mirror util.rs::constant_per_unit_units — compute the units part of a
-   constant per_unit gain (before base). Uses the effect's filter subset. */
-int rb_constant_per_unit_units(const AbilityEffect *effect, const GameState *g, int pl,
-                               int host_card_id) {
-    const char *zone = rb_constant_per_unit_zone(effect);
+/* ── Per-unit zone table, card tally and score sum ────────────────────────
+ *
+ * ONE implementation, three callers. `rb_resolve_per_unit_count` is the public
+ * (card_type, group) entry point; `rb_constant_per_unit_units` below holds a
+ * whole RbCardFilter built by rb_effect_filter_subset. Rust has the same shape:
+ * `resolve_per_unit_count` / `resolve_per_unit_score_sum` take `&CardFilter`,
+ * and hearts.rs:60-88 is just one caller of them. The two C callers used to
+ * carry two private zone tables, which is how the two drifted apart.
+ */
+
+/* Mirror util.rs::per_unit_zone (util.rs:2660-2677): which zone a per-unit
+   clause counts over. NULL means the clause names no zone this engine can
+   count; the tally caller then reads the count as 1 (util.rs:2633-2636) and the
+   score-sum caller as 0 (util.rs:2694-2696), exactly as Rust's two callers do.
+   `枚` is the one clause that is not a fixed zone: it is the HAND unless the
+   filter restricts the clause to member cards, in which case it is the
+   under-member zone (util.rs:2665-2671). */
+static const char *per_unit_zone_name(const char *per_unit_type, const RbCardFilter *f) {
+    if (!per_unit_type) return NULL;
+    if (!strcmp(per_unit_type, "stage") || !strcmp(per_unit_type, "member") ||
+        !strcmp(per_unit_type, "人") || !strcmp(per_unit_type, "members"))
+        return "stage";
+    if (!strcmp(per_unit_type, "hand") || !strcmp(per_unit_type, "card")) return "hand";
+    if (!strcmp(per_unit_type, "under_member")) return "under_member";
+    if (!strcmp(per_unit_type, "枚"))
+        return (f && f->card_type[0] && !strcmp(f->card_type, "member_card"))
+                   ? "under_member" : "hand";
+    if (!strcmp(per_unit_type, "discard")) return "discard";
+    if (!strcmp(per_unit_type, "live_card_zone")) return "live";
+    if (!strcmp(per_unit_type, "success_live_zone") ||
+        !strcmp(per_unit_type, "success_live_card_zone"))
+        return "success";
+    return NULL;
+}
+
+/* The cards a per-unit clause ranges over, in Rust's order and Rust's scoping.
+   util.rs:2734-2748 `under_member_cards`: 「このメンバーの下に置かれているカード」
+   counts ONE member's under-cards — the host's own slot when the host is on
+   stage, the whole field only when the host is unknown. Walking every bag
+   multiplied the gain by every member on stage: test_parity_hearts_constants
+   reported 2 for "1 other A-RISE member grants exactly 1 heart05", 3 for "two
+   others -> +2", and 2 for "energy under a DIFFERENT area plus a member under
+   center -> still 0". Same shape and same fix as dynamic_count.c's per-unit arm.
+   util.rs:2643-2653: the wait/active state filter is STAGE-ONLY. */
+static int per_unit_zone_cards(const GameState *g, int pl, const char *zone,
+                               const char *state_filter, int host_card_id,
+                               int *ids, int max) {
     const RbPlayer *P = &g->p[pl];
-
-    /* Build a minimal filter from the effect's fields */
-    RbCardFilter f;
-    memset(&f, 0, sizeof f);
-    const char *eff_ct = eff_extra(effect, "card_type");
-    /* hearts.rs:60 `effect.filter_subset()` -> `group: group_names.first()`
-       (card.rs:2397/2462). The wire key is `group_names`; the `group` extra
-       this used to read does not exist, so the constant per-unit filter had no
-       group at all. */
-    char eff_group_buf[128];
-    const char *eff_group = eff_extra(effect, "group_names");
-    if (!eff_group || !*eff_group) eff_group = eff_extra(effect, "group");
-    if (eff_group && *eff_group)
-        eff_group = rb_group_name_first(eff_group, eff_group_buf, sizeof eff_group_buf);
-    if (eff_ct)  strncpy(f.card_type, eff_ct, sizeof f.card_type - 1);
-    if (eff_group && *eff_group) strncpy(f.group, eff_group, sizeof f.group - 1);
-    f.has_filter = (eff_ct && eff_ct[0]) || (eff_group && eff_group[0]);
-    f.exclude_self_id = host_card_id;
-    f.has_exclude_self = (host_card_id >= 0);
-
-    int per_count = 0;
-    if (!strcmp(zone, "stage")) {
-        int ids[RB_MAX_ZONE];
-        int n = rb_zone_cards(g, pl, "stage", ids, RB_MAX_ZONE);
-        int matched[RB_MAX_ZONE];
-        int mn = rb_matching_ids(&f, ids, n, matched, RB_MAX_ZONE);
-        per_count = mn;
-    } else if (!strcmp(zone, "hand")) {
-        int ids[RB_MAX_ZONE];
-        int n = rb_zone_cards(g, pl, "hand", ids, RB_MAX_ZONE);
-        int matched[RB_MAX_ZONE];
-        per_count = rb_matching_ids(&f, ids, n, matched, RB_MAX_ZONE);
-    } else if (!strcmp(zone, "under_member") || !strcmp(zone, "under")) {
-        /* engine/src/ability/util.rs:2638-2646 `under_member_cards`: the clause
-         * 「このメンバーの下に置かれているカード」 counts ONE member's
-         * under-cards -- the host's own slot when the host is on stage, the
-         * whole field only when the host is unknown. Walking every bag
-         * multiplied the gain by every member on stage: test_parity_hearts
-         * _constants reported 2 for "1 other A-RISE member grants exactly 1
-         * heart05", 3 for "two others -> +2", and 2 for "energy under a
-         * DIFFERENT area plus a member under center -> still 0". Same shape
-         * and same fix as dynamic_count.c's per-unit arm. */
-        int ids[RB_MAX_ZONE];
-        int n = 0;
-        int host_slot = -1;
+    if (!strcmp(zone, "under_member")) {
+        int area = -1;
         if (host_card_id >= 0)
             for (int s = 0; s < RB_STAGE_SIZE; s++)
-                if (P->stage[s] == host_card_id) { host_slot = s; break; }
-        int lo = (host_slot >= 0) ? host_slot : 0;
-        int hi = (host_slot >= 0) ? host_slot + 1 : RB_STAGE_SIZE;
+                if (P->stage[s] == host_card_id) { area = s; break; }
+        int lo = (area >= 0) ? area : 0;
+        int hi = (area >= 0) ? area + 1 : RB_STAGE_SIZE;
+        int n = 0;
         for (int s = lo; s < hi; s++)
-            for (int i = 0; i < P->under_cards[s].n && n < RB_MAX_ZONE; i++)
+            for (int i = 0; i < P->under_cards[s].n && n < max; i++)
                 ids[n++] = P->under_cards[s].cards[i];
-        int matched[RB_MAX_ZONE];
-        per_count = rb_matching_ids(&f, ids, n, matched, RB_MAX_ZONE);
-    } else if (!strcmp(zone, "discard") || !strcmp(zone, "waitroom")) {
-        int ids[RB_MAX_ZONE];
-        int n = rb_zone_cards(g, pl, "discard", ids, RB_MAX_ZONE);
-        int matched[RB_MAX_ZONE];
-        per_count = rb_matching_ids(&f, ids, n, matched, RB_MAX_ZONE);
-    } else if (!strcmp(zone, "live_card_zone") || !strcmp(zone, "live")) {
-        int ids[RB_MAX_ZONE];
-        int n = rb_zone_cards(g, pl, "live", ids, RB_MAX_ZONE);
-        int matched[RB_MAX_ZONE];
-        per_count = rb_matching_ids(&f, ids, n, matched, RB_MAX_ZONE);
-    } else if (!strcmp(zone, "success_live_zone") || !strcmp(zone, "success_live_card_zone")) {
-        int ids[RB_MAX_ZONE];
-        int n = rb_zone_cards(g, pl, "success", ids, RB_MAX_ZONE);
-        int matched[RB_MAX_ZONE];
-        per_count = rb_matching_ids(&f, ids, n, matched, RB_MAX_ZONE);
-    } else if (!strcmp(zone, "energy") || !strcmp(zone, "energy_zone")) {
-        int ids[RB_MAX_ZONE];
-        int n = rb_zone_cards(g, pl, "energy", ids, RB_MAX_ZONE);
-        int matched[RB_MAX_ZONE];
-        per_count = rb_matching_ids(&f, ids, n, matched, RB_MAX_ZONE);
-    } else {
-        per_count = rb_count_in_zone_filtered(g, pl, zone,
-                                               eff_ct, eff_group);
+        return n;
     }
+    if (!strcmp(zone, "stage")) {
+        int n = 0;
+        for (int i = 0; i < RB_STAGE_SIZE && n < max; i++) {
+            int cid = P->stage[i];
+            if (cid == RB_EMPTY_SLOT) continue;
+            if (state_filter) {
+                const char *ori = rb_mods_get_orientation((RbMods *)&g->mods, cid);
+                if (!rb_orientation_matches_state(ori, state_filter)) continue;
+            }
+            ids[n++] = cid;
+        }
+        return n;
+    }
+    return rb_zone_cards(g, pl, zone, ids, max);
+}
+
+/* Mirror util.rs::resolve_per_unit_count (util.rs:2592-2656) with
+   util.rs::count_filtered (util.rs:2753-2773) for a caller that holds a whole
+   CardFilter. `per_unit_count` deliberately does NOT divide here: Rust returns
+   the card TALLY and each CALLER applies the divisor (hearts.rs:94 for the
+   constant units, util.rs:248 for the per-unit cost reduction, score.rs:182 for
+   the score modifier), so a divisor added at this level would double-divide
+   every 「N枚につき」. */
+static int per_unit_count_filtered(const GameState *g, int pl, const char *per_unit_type,
+                                   const RbCardFilter *f, const char *state_filter,
+                                   int host_card_id) {
+    if (!per_unit_type) return 1;
+    /* util.rs:2607-2631 — `per_unit_type == "heart_colors"` counts the DISTINCT
+       heart colours the matching STAGE cards carry, reading each card's
+       base_heart / need_heart and never its blade map. BOTH Rust call sites hand
+       this function an EMPTY colour list (hearts.rs:83 `&[]`,
+       effects/resource.rs:521 `&[]`), because the colours describe the GAIN, not
+       the clause; an empty list inserts nothing, so `colors_found` is always
+       empty and the arm can only ever report 0. Same computation, loop elided —
+       which is why this is 0 and not the 1 an unknown zone would read as. */
+    if (!strcmp(per_unit_type, "heart_colors")) return 0;
+    const char *zone = per_unit_zone_name(per_unit_type, f);
+    if (!zone) return 1;
+    int ids[RB_MAX_ZONE];
+    int n = per_unit_zone_cards(g, pl, zone, state_filter, host_card_id, ids, RB_MAX_ZONE);
+    /* util.rs:2771 `apply_distinct_filter` — a SET-level dedupe by normalized
+       name (util.rs:2078-2092 count_matching_distinct), which the per-card
+       predicate cannot express: 「名前の異なるメンバーカード1枚につき」. */
+    if (rb_distinct_should_dedupe((RbDistinctType)f->distinct)) {
+        int kept[RB_MAX_ZONE];
+        int m = rb_matching_ids(f, ids, n, kept, RB_MAX_ZONE);
+        return rb_dedupe_by_normalized_name(kept, m, ids, RB_MAX_ZONE);
+    }
+    return rb_count_matching_filter(f, ids, n);
+}
+
+/* Mirror util.rs::resolve_per_unit_score_sum (util.rs:2685-2726) — the SUM of
+   the PRINTED scores of the cards the clause matches, for
+   「…のスコアの合計Nにつき」. A different quantity from the card tally: four
+   score-1 lives are 4 cards but only 4 points, and 「合計5につき」 must not fire on
+   them, so counting cards there granted a blade 「合計5につき」 that the card text
+   never promised. Same zone resolution, same filter and the same host scoping as
+   the tally above, so the two always agree on WHICH cards are in scope
+   (hearts.rs:64-65 says so in as many words). Neither a distinct dedupe nor a
+   heart-colour gate applies here: util.rs:2713-2722 filters with the bare
+   `filter.matches` and sums `Option<u8>` scores. */
+static int per_unit_score_sum(const GameState *g, int pl, const char *per_unit_type,
+                              const RbCardFilter *f, const char *state_filter,
+                              int host_card_id) {
+    const char *zone = per_unit_zone_name(per_unit_type, f);
+    if (!zone) return 0;
+    int ids[RB_MAX_ZONE];
+    int n = per_unit_zone_cards(g, pl, zone, state_filter, host_card_id, ids, RB_MAX_ZONE);
+    int kept[RB_MAX_ZONE];
+    int m = rb_matching_ids(f, ids, n, kept, RB_MAX_ZONE);
+    long total = 0;
+    for (int i = 0; i < m; i++) {
+        Card c;
+        /* util.rs:2718-2722 `filter_map(get_card(cid).and_then(|c| c.score))` — a
+           card the database cannot decode, or one that prints no score, adds
+           nothing at all. */
+        if (!rb_decode_card_by_index((uint32_t)kept[i], &c)) continue;
+        total += c.score;
+        rb_free_card(&c);
+    }
+    /* util.rs:2723-2725 — a score total across a live's worth of cards cannot
+       overflow a u8, but clamp rather than wrap: a wrapped small number would
+       silently grant fewer blades. */
+    if (total > 255) total = 255;
+    return (int)total;
+}
+
+/* Mirror util.rs::constant_per_unit_units (hearts.rs:52-114) — the units part of
+   a constant per_unit gain (before base). `zone` is `location.or(per_unit_type)
+   .unwrap_or(hand)`; the count itself is the shared tally / score sum above. */
+int rb_constant_per_unit_units(const AbilityEffect *effect, const GameState *g, int pl,
+                               int host_card_id) {
+    /* hearts.rs:59 — `constant_per_unit_zone`, i.e. `location.or(per_unit_type)
+       .unwrap_or(hand)`. The hand-rolled zone dispatch this replaced keyed off
+       that string directly, and matched no arm for 「枚」 (the spelling a clause
+       that names no `location` arrives as), so every such 「N枚につき」 fell through
+       to an unknown-zone count and reported 0 units. `per_unit_zone` is Rust's
+       own spelling table for that string. */
+    const char *zone = rb_constant_per_unit_zone(effect);
+
+    /* hearts.rs:60-61 — `effect.filter_subset()` then `filter.exclude_self =
+       Some(host_card_id)`. The hand-rolled build this replaces read exactly two
+       effect fields and stopped, so the count silently ignored heart_colors,
+       require_all_heart_colors, heart_color_count, need_heart_total,
+       need_heart_color, card_property, distinct, cost_limit, cost_values,
+       cost_total, characters, exclude_characters, name_fragments,
+       original_blade_limit, blade_limit, ability_filter, ability_filter_triggers
+       and or_ability_filters — all of which CardFilter::matches (util.rs:1676-1790)
+       consults, and several of which real per_unit effects carry. Measured over
+       cards/abilities.json `unique_abilities`: 17 of the 53 per_unit effects
+       carry one of distinct / heart_colors / card_property, e.g.
+       PL!N-bp7-003 ab#1 `distinct: card_name`, PL!HS-bp2-020-L ab#1
+       `distinct: card_name`, PL!-pb2-004 ab#0 and ab#1
+       `card_property: has_score_icon`, PL!SP-pb2-008 ab#0
+       `card_property: has_blade_heart`, PL!S-sd1-001-SD ab#0
+       `heart_colors: [heart02]` on a bare 「1枚につき」. The shared builder also
+       reads `card_type_field` before the extra and takes `.first()` of
+       group_names (util.rs:1821-1824), so those two facts stop being
+       hand-maintained here. */
+    RbCardFilter f;
+    rb_effect_filter_subset(effect, &f);
+    f.exclude_self_id = host_card_id;
+    f.has_exclude_self = (host_card_id >= 0);
+    /* `has_filter` was computed before exclude_self was overwritten, and it is
+       the flag rb_matching_ids short-circuits on. Rust applies check_exclude_self
+       (util.rs:1680) whatever else the filter holds, so an effect that names no
+       other qualifier must still not count its own host. */
+    if (f.has_exclude_self) f.has_filter = 1;
+
+    /* hearts.rs:66-88 — 「…のスコアの合計Nにつき」 counts POINTS; everything else
+       counts CARDS. The C had no score arm at all, so the one corpus effect that
+       needs it (PL!-pb2-030-N ab#0, `per_unit_aggregate: "score"`,
+       `per_unit_count: 5`, `per_unit_type: "card"`, `location:
+       "success_live_zone"`) divided a card tally by 5. */
+    const char *aggregate = eff_extra(effect, "per_unit_aggregate");
+    const char *state = eff_extra(effect, "state");
+    int per_count = (aggregate && !strcmp(aggregate, "score"))
+                        ? per_unit_score_sum(g, pl, zone, &f, state, host_card_id)
+                        : per_unit_count_filtered(g, pl, zone, &f, state, host_card_id);
 
     /* hearts.rs:94 `per_count / effect.per_unit_count_any().unwrap_or(1).max(1)`
        — the FIELD is the only place the decoder puts it (vm.c:1040), so the
@@ -2499,10 +2614,13 @@ int rb_calculate_per_unit_multiplier(const GameState *g, int pl, const char *per
 }
 
 /* Mirror util.rs::resolve_per_unit_count.
-   Zone selection (util.rs:2346-2364): note that the bare 「枚」 unit resolves to
-   the HAND unless the filter is restricted to member cards, in which case it
-   resolves to the under-member zone. The C port sent 「枚」 straight to
-   under_member, which inverted the count for the common 「1枚につき」 gains.
+   Zone selection (util.rs:2660-2677, `per_unit_zone`): note that the bare 「枚」
+   unit resolves to the HAND unless the filter is restricted to member cards, in
+   which case it resolves to the under-member zone. The C port sent 「枚」 straight
+   to under_member, which inverted the count for the common 「1枚につき」 gains.
+   Both now live in `per_unit_zone_name` / `per_unit_zone_cards` above, shared
+   with rb_constant_per_unit_units, because Rust has one `per_unit_zone` and one
+   `resolve_per_unit_count` behind both entry points.
 
    AUDITED AGAINST RUST, NOT CHANGED: `per_unit_count` does NOT belong here.
    util.rs:2592-2656 `resolve_per_unit_count` returns the CARD TALLY
@@ -2514,9 +2632,14 @@ int rb_calculate_per_unit_multiplier(const GameState *g, int pl, const char *per
 
    The `group` argument arrives from the callers' `group_names` extra and may
    still be the whole CSV list; util.rs's `count_filtered` filters through a
-   CardFilter whose group is `group_names.first()` (card.rs:2397), so the stage
-   loop below takes the first entry. The bag-based returns funnel through
-   rb_count_matching -> RbCardFilter, which applies the same split. */
+   CardFilter whose group is `group_names.first()` (card.rs:2397), which is what
+   the shared matcher's `rb_group_name_first` split does.
+
+   This entry point's contract is the (card_type, group) PAIR only — Rust's
+   callers that reach for a filter hold a real CardFilter and go through
+   rb_constant_per_unit_units instead. So the filter built here carries no
+   distinct / heart_colors / card_property / exclude_self, and the behaviour of
+   this function is unchanged by the refactor. */
 int rb_resolve_per_unit_count(const GameState *g, int pl, const char *per_unit_type,
                               const char *card_type, const char *group,
                               const char *state_filter, int host_card_id) {
@@ -2525,77 +2648,27 @@ int rb_resolve_per_unit_count(const GameState *g, int pl, const char *per_unit_t
        counts the energy paid by the most recent cost step, i.e.
        GameModifiers::last_cost_energy_count (game_modifiers.rs:183), not a zone.
        Until that field reaches RbMods the accessor macro yields the pre-field
-       behaviour (0). */
+       behaviour (0). Rust's callers test `per_unit_type == Some("つ")` BEFORE
+       calling resolve_per_unit_count (effects/resource.rs:512-525), so this arm
+       is that test, and it has to stay outside the shared tally — where the unit
+       has no zone and would read as 1. */
     if (!strcmp(per_unit_type, "つ")) return RB_LAST_COST_ENERGY((RbMods *)&g->mods);
-    const RbPlayer *P = &g->p[pl];
-    const char *zone;
-    int under_member_zone = 0;
-    if (!strcmp(per_unit_type, "stage") || !strcmp(per_unit_type, "member") ||
-        !strcmp(per_unit_type, "人") || !strcmp(per_unit_type, "members")) {
-        zone = "stage";
-    } else if (!strcmp(per_unit_type, "hand") || !strcmp(per_unit_type, "card")) {
-        zone = "hand";
-    } else if (!strcmp(per_unit_type, "under_member")) {
-        zone = "under_member";
-        under_member_zone = 1;
-    } else if (!strcmp(per_unit_type, "枚")) {
-        under_member_zone = (card_type && !strcmp(card_type, "member_card"));
-        zone = under_member_zone ? "under_member" : "hand";
-    } else if (!strcmp(per_unit_type, "discard") || !strcmp(per_unit_type, "waitroom")) {
-        zone = "discard";
-    } else if (!strcmp(per_unit_type, "live_card_zone") || !strcmp(per_unit_type, "live")) {
-        zone = "live";
-    } else if (!strcmp(per_unit_type, "success_live_zone") ||
-               !strcmp(per_unit_type, "success_live_card_zone")) {
-        zone = "success";
-    } else {
-        return 1;
-    }
-    if (under_member_zone) {
-        /* util.rs:2365-2386 — 「このメンバーの下に置かれているカード」 is scoped to
-           the HOST member (whose ability this is), not to every member. Only
-           when the host is unknown does the count widen to all under-cards. */
-        int ids[RB_MAX_ZONE];
-        int n = 0;
-        int area = -1;
-        if (host_card_id >= 0) {
-            for (int s = 0; s < RB_STAGE_SIZE; s++)
-                if (P->stage[s] == host_card_id) { area = s; break; }
-        }
-        if (area >= 0) {
-            for (int k = 0; k < P->under_cards[area].n; k++)
-                ids[n++] = P->under_cards[area].cards[k];
-        } else {
-            for (int s = 0; s < RB_STAGE_SIZE; s++)
-                for (int k = 0; k < P->under_cards[s].n && n < RB_MAX_ZONE; k++)
-                    ids[n++] = P->under_cards[s].cards[k];
-        }
-        return rb_count_matching(ids, n, card_type, group);
-    }
-    if (!strcmp(zone, "stage")) {
-        char gbuf[128];
-        const char *g1 = rb_group_name_first(group, gbuf, sizeof gbuf);
-        int count = 0;
-        for (int i = 0; i < RB_STAGE_SIZE; i++) {
-            int cid = P->stage[i];
-            if (cid == RB_EMPTY_SLOT) continue;
-            if (card_type && !rb_card_matches_type(cid, card_type)) continue;
-            if (g1 && *g1 && !rb_card_matches_group_str(cid, g1)) continue;
-            if (state_filter) {
-                const char *ori = rb_mods_get_orientation((RbMods *)&g->mods, cid);
-                if (!rb_orientation_matches_state(ori, state_filter)) continue;
-            }
-            count++;
-        }
-        return count;
-    }
-    if (!strcmp(zone, "discard"))
-        return rb_count_matching(P->discard.cards, P->discard.n, card_type, group);
-    if (!strcmp(zone, "live"))
-        return rb_count_matching(P->live.cards, P->live.n, card_type, group);
-    if (!strcmp(zone, "success"))
-        return rb_count_matching(P->success.cards, P->success.n, card_type, group);
-    return rb_count_matching(P->hand.cards, P->hand.n, card_type, group);
+    /* The alias spellings this entry point has always accepted, folded onto the
+       canonical names `per_unit_zone_name` knows. They are C-side conveniences:
+       util.rs's own callers name the canonical enum (`Zone::Waitroom`,
+       `Zone::LiveCardZone`) and never these strings, and no per_unit effect in
+       cards/abilities.json uses one. Kept so the two existing callers
+       (effects/state.c:1308, effects/rules.c:1627), which hand this function a
+       raw `per_unit_type` extra, keep the contract they were written against. */
+    if (!strcmp(per_unit_type, "waitroom"))      per_unit_type = "discard";
+    else if (!strcmp(per_unit_type, "under"))    per_unit_type = "under_member";
+    else if (!strcmp(per_unit_type, "live"))      per_unit_type = "live_card_zone";
+    RbCardFilter f;
+    memset(&f, 0, sizeof f);
+    if (card_type) strncpy(f.card_type, card_type, sizeof f.card_type - 1);
+    if (group)     strncpy(f.group, group, sizeof f.group - 1);
+    f.has_filter = (card_type && card_type[0]) || (group && group[0]);
+    return per_unit_count_filtered(g, pl, per_unit_type, &f, state_filter, host_card_id);
 }
 
 /* Mirror util.rs::resolve_discard_per_unit_count. */

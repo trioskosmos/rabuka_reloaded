@@ -124,7 +124,25 @@ int rb_dedupe_by_normalized_name(const int *items, int n, int *out, int max);
 
 void rb_move_execute_move_cards_ported(GameState *g, int actor, AbilityEffect *e) {
     if (!g || !e) return;
-    const char *source = e->source ? e->source : "hand";
+    /* move/mod.rs:2105-2112 — `source` and `destination` are the effect's own
+     * wire fields, `unwrap_or_default()`, i.e. "" both when the key is absent and
+     * when it decodes to an empty string. Rust applies NO defaulting here and
+     * then hands those SAME two strings to place_taken_cards (:2292-2308) and to
+     * finalize_card_movement (:2315-2322), so this local must stay raw:
+     *   - place_card_with_stage_choice's `Err(_)` arm (mod.rs:2031-2043) puts the
+     *     card back into `source`, and util.rs:2499-2504 sends an EMPTY source to
+     *     the waitroom — the old "hand" put it back in the hand;
+     *   - the under_member self-displacement test (placement.rs:175-176) is
+     *     `Zone::from_str(source_zone) == Some(Stage) || source_zone.is_empty()`,
+     *     so "" is the self-displacement case, "hand" is not.
+     * The waitroom DEFAULT lives where Rust puts it, inside the resolver:
+     * rb_move_resolve_cards_from_source (move.c) is the twin of
+     * mod.rs:358-362. */
+    const char *source = (e->source && e->source[0]) ? e->source : "";
+    /* util.rs:2499-2504 — an empty destination is the WAITROOM, so spelling it
+     * "discard" here is the same placement and keeps the destination checks at
+     * :150 and :203 (empty_area / stage-full) reading the same names Rust's
+     * Zone::from_str sees. */
     const char *destination = e->destination ? e->destination : "discard";
     /* Rust move_cards.rs:1866-1872 — `count` is the effect's own count (0 when
        absent); `is_all` is a separate flag. move.c instead encodes "all" as a

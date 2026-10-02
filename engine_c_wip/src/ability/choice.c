@@ -192,7 +192,7 @@ static int choice_effect_uses_selected_cards(const AbilityEffect *e);
  * member through the same slot table, filter and publish helper. */
 static void stage_build_filtered_slots(GameState *g, int pl);
 static int  stage_choice_accepts(const GameState *g, int cid);
-static void stage_publish_selected(GameState *g, int cid);
+static int  stage_publish_selected(GameState *g, int cid);
 
 /* Rust's SelectionContext carries `cost_limit: Option<u8>` / `cost_total:
    Option<u8>` (selection.rs:55-58), and move_cards.rs:2700-2772 applies each ONLY
@@ -1828,14 +1828,14 @@ static int choice_handle_multi_indices(RbAbilityResolver *self, GameState *g,
         /* Rust handle_stage_selection (choice.rs:2071-2293) reads EVERY index of
            the answer. This dispatcher had NO stage arm, so a stage prompt
            answered with two indices fell through to the single-index path
-           (choice.c:2330-2340) and only indices[0] was applied -- the measured
+           (choice.c:2370-2376) and only indices[0] was applied -- the measured
            "BOTH members" cases: 改札's 「ライブ成功時」 has to wait BOTH opponent
            members (parity_target_player k_kowarey_wait_two, answered {0,1} and
            resolving against one) and a gained-ability target_count pick buffed
            one member of two.
 
            `sel` is already ctx.mfi-mapped by the caller (choice.c:4894-4896), the
-           same map the single-index twin applies at choice.c:3078. Rust reaches
+           same map the single-index twin applies at choice.c:3114. Rust reaches
            the member through `player.stage.stage[idx]` for EVERY mapped index
            (choice.rs:2116-2119), i.e. the mapped value is a STAGE SLOT, so a
            producer that shipped no filtered_indices needs the slot table built
@@ -1874,13 +1874,13 @@ static int choice_handle_multi_indices(RbAbilityResolver *self, GameState *g,
                                 writer of it; Rust's producer is target.rs:372.
                                 The arm IS the recording above, and the caller
                                 then re-runs the parked effect with target_count
-                                cleared (choice.c:5028-5036), which is Rust's
+                                cleared (choice.c:5126-5132), which is Rust's
                                 `CollectTargets => return Ok(())` followed by
                                 finalize_choice -> resume_pending_actions.
              UnderMemberMove / PlaceEnergyDeckUnder
                                 move.c:1269 and move.c:1916 both park
                                 resume_mode=1 (move.c:1279 / :1920) and are
-                                answered by the mode==1 arm at choice.c:4783, so
+                                answered by the mode==1 arm at choice.c:4864, so
                                 they cannot reach this dispatcher; Rust likewise
                                 checks resume_under_member_placement BEFORE the
                                 zone dispatch (choice.rs:1091-1093). Decline them
@@ -1915,6 +1915,17 @@ static int choice_handle_multi_indices(RbAbilityResolver *self, GameState *g,
         }
         fprintf(stderr, "[STAGE_SELECT_MULTI] n=%d cards=%d target=%s\n", n_sel, n_cards,
                 ch->target[0] ? ch->target : "(none)");
+        /* choice.rs:2293 — every arm ends in `Ok(())`, and the answer path then runs
+           `handle_selection_epilogue`, whose first move is to clear the prompt. The
+           single-index stage twin spells that `rb_resolver_clear_choice_state_and_resume`
+           (choice.c:3130) and this arm has to match it: leaving the answered prompt
+           in place re-offers the very same selection to the next answer (measured:
+           k_kowarey_wait_two answered {0,1} three times, then asserted on a
+           selection nothing had consumed). With the prompt gone the caller's
+           post-dispatch re-run of the parked effect sees the published
+           selection.cards — Rust's `CollectTargets => return Ok(())` +
+           `finalize_choice` -> `resume_pending_actions`. */
+        rb_resolver_clear_choice_state_and_resume(self);
         return 1;
     }
 
@@ -2030,6 +2041,7 @@ int rb_resolver_handle_select_card(RbAbilityResolver *self, GameState *g, const 
         int cost_count = pending_count;
         /* allow_skip indicates any_number (count==0) in Rust */
         int is_any_number = (cost_count == 0 && allow_skip);
+        int moved_before = self->n_moved_cards;
         if (!was_skip) {
             int ids[RB_MAX_ZONE];
             int n = rb_zone_cards(g, actor, "hand", ids, RB_MAX_ZONE);
@@ -2060,17 +2072,41 @@ int rb_resolver_handle_select_card(RbAbilityResolver *self, GameState *g, const 
             for (int i = 0; i < self->n_moved_cards && i < RB_MAX_RECENTLY_MOVED; i++) g->mods.last_cost_moved_card_ids[i] = self->moved_cards[i];
         } else {
             if (cur >= 0) g->queue.entries[cur].optional_cost_result = 0;
-            /* any_number skip is allowed; for fixed costs skip is not allowed once committed */
-            if (!is_any_number && self->n_moved_cards > 0) {
-                /* committed — skip not allowed, re-prompt */
-                was_skip = 0; /* treat as continue */
-            } else {
-                if (self->n_moved_cards == 0 && allow_skip) {
-                    if (cur >= 0) { g->queue.entries[cur].cost_paid = 1; g->queue.entries[cur].optional_cost_result = 0; }
-                    self->pending_choice = (RbChoice){0};
-                    return rb_resolver_clear_choice_state_and_resume(self);
+        }
+        /* choice.rs:753-773 — `new_card_ids.is_empty()`, i.e. THIS ANSWER MOVED
+           NOTHING, ends the hand payment whatever `count` and `allow_skip` are:
+           the prompt is dropped and Ok is returned, never a re-offer. The two
+           stampings are Rust's own: cards already moved -> cost_paid = true and
+           optional_cost_result = Some(true) plus the last_cost_* history, nothing
+           moved on a prompt that allowed skipping -> cost_paid = true and
+           optional_cost_result = Some(false), and the mandatory-nothing-moved case
+           stamps nothing at all.
+
+           The old body only took this exit for `n_moved_cards == 0 && allow_skip`
+           and otherwise fell through to the fixed-count re-prompt below, so a
+           MANDATORY prompt answered with no cards was offered the same hand for
+           ever. That was unreachable while the decline arms intercepted the empty
+           answer (choice.c:5043-5065); once they stopped, target_selection looped
+           on `[RESUME_ANY] kind=1 zone=hand ... idx=-1` until the run was cut off.
+           `moved_before` is the C's spelling of Rust's per-answer `new_card_ids`. */
+        if (self->n_moved_cards == moved_before) {
+            if (self->n_moved_cards > 0) {
+                if (cur >= 0) {
+                    g->queue.entries[cur].cost_paid = 1;
+                    g->queue.entries[cur].optional_cost_result = 1;
+                }
+                g->mods.last_cost_discard_count = self->n_moved_cards;
+                g->mods.n_last_cost_moved_card_ids = self->n_moved_cards;
+                for (int i = 0; i < self->n_moved_cards && i < RB_MAX_RECENTLY_MOVED; i++)
+                    g->mods.last_cost_moved_card_ids[i] = self->moved_cards[i];
+            } else if (allow_skip) {
+                if (cur >= 0) {
+                    g->queue.entries[cur].cost_paid = 1;
+                    g->queue.entries[cur].optional_cost_result = 0;
                 }
             }
+            self->pending_choice = (RbChoice){0};
+            return rb_resolver_clear_choice_state_and_resume(self);
         }
         if (is_any_number) {
             /* any_number: after each pick, re-prompt with skip allowed (choice.rs:680-727) */
@@ -3487,9 +3523,8 @@ static void choice_discard_selection_indices(RbAbilityResolver *self, GameState 
                     int dup=0; for(int j=0;j<self->n_selected_cards;j++) if(self->selected_cards[j]==ids[i]) dup=1;
                     if(!dup) out[out_n++]=i;
                 }
-                char en[80]; char ja[80];
+                char en[80];
                 snprintf(en,sizeof(en),"Select %d more card(s) from discard from %d remaining", remaining, out_n);
-                snprintf(ja,sizeof(ja),"控え室から残り%d枚中さらに%d枚選択", out_n, remaining);
                 /* choice.rs:2380-2395 `build_reprompt(ctx, ..)` + 2393
                    `.with_filtered_indices(fi)`: Rust carries the ANSWERED prompt's
                    own seat, budget, card_type and group into the re-offer AND keeps
@@ -3502,7 +3537,7 @@ static void choice_discard_selection_indices(RbAbilityResolver *self, GameState 
                    copies `*ctx`, so the filters survive with the list. */
                 RbChoice ctx = g->queue.pending;
                 choice_build_discard_reprompt(g, &ctx, choice_effect_target_seat(g, actor),
-                                              remaining, en, ja, 0, out, out_n);
+                                              remaining, en, 0, out, out_n);
                 return;
             }
         }
@@ -4441,10 +4476,10 @@ void rb_clear_pending_choice(GameState *g) {
        Rust does hold that combination, but only inside the answer window:
        `take_waiting_choice` (queue.rs:208-214) leaves
        WaitingForChoice{choice: None} and `resume_queue_with_choice` closes the
-       window with `resume_with_choice()` (turn/actions/mod.rs:795-798 -> :1571,
+       window with        `resume_with_choice()` (turn/actions/mod.rs:795-798 -> :1571,
        queue.rs:421-434), which is `RB_QUEUE_RESOLVING` in the C's spelling and
        which `rb_resume_with_choice_indices_internal` already performs
-       (choice.c:4754). The clears that do NOT come from that path are the ones
+       (choice.c:4797). The clears that do NOT come from that path are the ones
        that used to strand the stamp, so the successor state is spelled out here.
 
        RB_QUEUE_RESOLVING is measured +8 (parity_cce_gaps: a22a_queue_path_skips_cost
@@ -4760,6 +4795,24 @@ static int rb_resume_with_choice_indices_internal(GameState *g, const int *selec
     g->queue.resume_eff = NULL;
     g->queue.auto_ability = 0;
     g->queue.state = RB_QUEUE_RESOLVING;   /* resuming / draining an ability */
+    /* The effect parked with the prompt belongs to the ENTRY's ability, and Rust
+       re-runs it FROM THE ENTRY (`AbilityResolver::resume_pending_actions` ->
+       `AbilityQueue::resume_pending_actions`, ability_queue.rs:522-536, which takes
+       `current_entry_mut()` and executes its own parked actions). `actor` above is
+       the seat that has to ANSWER (rabuka.h, RbChoice.actor: "which player made the
+       choice"), which is a different seat whenever the opponent is asked to pick —
+       改札's 「ライブ成功時」 is exactly that shape: player 1's ability asks the
+       OPPONENT to wait their members, so re-running the parked change_state with the
+       answering seat resolved target="opponent" against the wrong board and the wait
+       found no candidates at all (state.c's silent `nc == 0` return, state.c:317).
+       Read the seat off the current entry, the way
+       pca_adjusted_cost_after_modify does (game_state_abilities.c:2641). */
+    int entry_actor = actor;
+    if (g->queue.cur >= 0 && g->queue.cur < g->queue.n_entries) {
+        const char *pid = g->queue.entries[g->queue.cur].player_id;
+        if (pid && pid[0] == 'p' && (pid[1] == '1' || pid[1] == '2'))
+            entry_actor = pid[1] - '1';
+    }
     /* 「そうした場合」 gate: an EMPTY answer to a parent-conditional sequential's
        optional step drops the parked tail (choice.rs:307-321). Doing it here,
        once, keeps the tail out of BOTH routes that would otherwise replay it —
@@ -5045,7 +5098,22 @@ static int rb_resume_with_choice_indices_internal(GameState *g, const int *selec
                     g->queue.has_pending = 1;
                 }
             }
-            if (!multi) rb_resolver_handle_select_card(&self, g, selected);
+            if (!multi) {
+                int rc = rb_resolver_handle_select_card(&self, g, selected);
+                /* choice.rs:1205-1207 — `handle_hand_selection` returns Err for a
+                   MANDATORY pick answered with NO cards, before any re-prompt, and
+                   that Err propagates out of `resume_queue_with_choice`, so the
+                   resolution ends with no prompt outstanding. The C spells the Err as
+                   `return -1`, which on its own leaves the answered prompt in place
+                   — and now that the decline arms above no longer intercept a
+                   mandatory empty answer, a harness that keeps answering empty
+                   re-answered the same prompt for ever (measured: target_selection
+                   looped on `[RESUME_ANY] kind=1 zone=hand ... idx=-1` until the
+                   run was cut off). Take the prompt down the way the error path
+                   does. */
+                if (rc < 0 && rb_has_pending_choice(g))
+                    rb_clear_pending_choice(g);
+            }
             if (rb_has_pending_choice(g) && def) g->queue.deferred = def;
             if (!was_skip && target_selection_eff && !rb_has_pending_choice(g)) {
                 /* Rust misc.rs:1412-1413: the effect parked for a target-selection prompt
@@ -5064,8 +5132,8 @@ static int rb_resume_with_choice_indices_internal(GameState *g, const int *selec
             if (!was_skip && def && !rev && !cost_hand && !rb_has_pending_choice(g)) {
                 fprintf(stderr, "[RESUME_EXEC] def=%p action=%s is_cost=%d host=%d\n",
                         (void *)def, def->action ? def->action : "-", is_cost, host);
-                if (is_cost) rb_pay_cost(g, actor, def);
-                else         rb_execute_effect_ex(g, actor, def, host);
+                if (is_cost) rb_pay_cost(g, entry_actor, def);
+                else         rb_execute_effect_ex(g, entry_actor, def, host);
             }
             if (target_selection_eff && !rb_has_pending_choice(g)) {
                 /* DEFECT, FIXED. This used to be
@@ -5131,7 +5199,7 @@ static int rb_resume_with_choice_indices_internal(GameState *g, const int *selec
                `self_or_opponent` arm at choice.c:3855-3870, which reads
                `g->queue.resume_eff` for the seat and for the child it parks with
                rb_queue_set_pending_actions. `g->queue.resume_eff = NULL` below the
-               `rb_clear_pending_choice` call (choice.c:4752) ran BEFORE this
+               `rb_clear_pending_choice` call (choice.c:4795) ran BEFORE this
                dispatch, so the branch always read NULL and could never fire:
                neither rb_set_chosen_target nor rb_queue_set_pending_actions reached
                the chosen seat. Re-park the pointer captured at the top of this

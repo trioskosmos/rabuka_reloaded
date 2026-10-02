@@ -224,41 +224,32 @@ static void drain_auto(TestGame *tg)
  }
 }
 
-/* Rust fire_trigger(game, cid, trigger, trig) -Ehelpers/mod.rs. The C engine
- * exposes the per-trigger scan, so the queue is built from the same trigger
- * token; fixture boards carry exactly one card printing it. */
-void rb_trigger_auto_ability(GameState *g, const char *ability_id,
- const char *trigger_type, int player_id,
- const char *source_card_no,
- int explicit_card_id,
- const int *trigger_moved_cards, int n_moved,
- int triggering_member_id);
-
+/* Rust fire_trigger(game, cid, trigger, trig) -- helpers/mod.rs:114-141.
+ * Resolve ONE ability of ONE card, key it "<card_no>_<full_text>", call
+ * trigger_auto_ability with an explicit card id, then activating_card and
+ * process_pending_auto_abilities.
+ *
+ * This body used to be hand-rolled against a local rb_trigger_auto_ability
+ * prototype. The enqueue was already card-scoped (NOT the whole-board TAS scan),
+ * but the LOAD-BEARING ENQUEUE-TIME USE RECORD was missing. The C port spends a
+ * ターン1回 use at ENQUEUE -- every scan in src/turn/triggers.c calls
+ * rb_record_use right after building the entry and stamps
+ * rb_mark_entries_use_limit_recorded -- so with the use left unspent the
+ * post-resolution re-scan in rb_process_player_abilities_depth_full saw it
+ * still available and enqueued the same ability a SECOND time. MEASURED on
+ * test_parity_state_per_card's T/010 (PL!N-sd2-010-SD2): the ally gained 4
+ * blade instead of 2. test_fire_trigger_core_seat (src/test_game.c:1166-1170)
+ * performs the record and the stamp.
+ *
+ * `test_fire_trigger_on_card` also matches with the ENGINE's predicate
+ * (rb_trigger_is, a strstr) instead of an exact strcmp -- the same predicate
+ * rb_trigger_auto_ability re-checks internally -- and returns 0 when the card
+ * prints no such ability, so every `CHECK(fire_...)` premise keeps its meaning.
+ * (rb_trigger_auto_ability is no longer declared here: the shared helpers in
+ * src/test_game.c own that extern.) */
 static int fire_trigger(TestGame *tg, int cid, const char *trig)
 {
- Card card;
- if (!rb_decode_card_by_index((uint32_t)cid, &card)) return 0;
- char card_no[128];
- snprintf(card_no, sizeof(card_no), "%s", rb_card_string(card.card_no_idx));
- char ability_id[512];
- int found = 0;
- int nab = rb_card_num_abilities((uint32_t)cid);
- for (int a = 0; a < nab && !found; a++) {
- Ability ab;
- if (!rb_decode_card_ability((uint32_t)cid, a, &ab)) continue;
- if (ab.triggers && strcmp(ab.triggers, trig) == 0) {
- snprintf(ability_id, sizeof(ability_id), "%s_%s", card_no,
- ab.full_text ? ab.full_text : "");
- found = 1;
- }
- rb_free_ability(&ab);
- }
- rb_free_card(&card);
- if (!found) return 0;
- rb_trigger_auto_ability(&tg->state, ability_id, trig, 0, card_no, cid, NULL, 0, -1);
- tg->state.activating_card = cid;
- rb_process_pending_auto_abilities(&tg->state);
- return 1;
+return test_fire_trigger_on_card(tg, cid, trig);
 }
 
 static int fire_live_start(TestGame *tg, int cid) { return fire_trigger(tg, cid, RB_TSTR_LIVE_START); }

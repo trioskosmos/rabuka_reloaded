@@ -741,71 +741,36 @@ static void revealed_add(TestGame *tg, int cid)
         tg->state.revealed_cards[tg->state.n_revealed++] = cid;
 }
 
-/* helpers/mod.rs:114 fire_trigger -- build the "<card_no>_<full_text>" ability
- * id for the ability printing `trig`, queue exactly that ability, set
- * activating_card, process the queue. */
-void rb_trigger_auto_ability(GameState *g, const char *ability_id,
-                             const char *trigger_type, int player_id,
-                             const char *source_card_no,
-                             int explicit_card_id,
-                             const int *trigger_moved_cards, int n_moved,
-                             int triggering_member_id);
-
+/* helpers/mod.rs:114 fire_trigger -- resolve ONE ability on ONE card, key it
+ * "{card_no}_{full_text}", fire it with `cid` as the activating card, then
+ * process the queue.
+ *
+ * The body used to be hand-rolled over a raw rb_trigger_auto_ability call,
+ * which had two real defects:
+ *   1. NO ENQUEUE-TIME USE RECORD. rb_trigger_auto_ability builds its entry
+ *      with `use_limit_recorded = 0`, so a 自動/ターン1回 ability is still
+ *      unspent while it resolves and the post-resolution re-scan in
+ *      rb_process_player_abilities_depth_full enqueues it a SECOND time.
+ *   2. It has to keep its own copy of the "{card_no}_{full_text}" key, and the
+ *      copy silently TRUNCATES at 512 bytes — a long full_text produced a
+ *      truncated ability id, which the engine then failed to match.
+ * test_fire_trigger_on_card is the shared shape and does both correctly; it
+ * also returns 1 only when one entry really was produced, so the suite's
+ * `if (!fire_trigger(...))` premise check keeps its meaning. */
 static int fire_trigger(TestGame *tg, int cid, const char *trig, const char *trigger_type)
 {
-    Card card;
-    if (!rb_decode_card_by_index((uint32_t)cid, &card)) return 0;
-    char card_no[128];
-    snprintf(card_no, sizeof card_no, "%s", rb_card_string(card.card_no_idx));
-    char ability_id[512];
-    int found = 0;
-    for (int a = 0; a < rb_card_num_abilities((uint32_t)cid) && !found; a++) {
-        Ability ab;
-        if (!rb_decode_card_ability((uint32_t)cid, a, &ab)) continue;
-        if (ab.triggers && strcmp(ab.triggers, trig) == 0) {
-            snprintf(ability_id, sizeof ability_id, "%s_%s", card_no,
-                     ab.full_text ? ab.full_text : "");
-            found = 1;
-        }
-        rb_free_ability(&ab);
-    }
-    rb_free_card(&card);
-    if (!found) return 0;
-    rb_trigger_auto_ability(&tg->state, ability_id, trigger_type, 0, card_no,
-                            cid, NULL, 0, -1);
-    tg->state.activating_card = cid;
-    rb_process_pending_auto_abilities(&tg->state);
-    return 1;
+    (void)trigger_type;   /* every call site here passes trig == trigger_type */
+    return test_fire_trigger_on_card(tg, cid, trig);
 }
 
 /* helpers/mod.rs:114 fire_trigger with a SEAT argument (used where a 起動
- * fires an opponent's 登場). */
+ * fires an opponent's 登場). test_fire_trigger_on_card_seat is the shared
+ * seat-aware shape — same use record, same owner stamp, same size-safe key. */
 static int fire_trigger_for(TestGame *tg, int pl, int cid, const char *trig,
                             const char *trigger_type)
 {
-    Card card;
-    if (!rb_decode_card_by_index((uint32_t)cid, &card)) return 0;
-    char card_no[128];
-    snprintf(card_no, sizeof card_no, "%s", rb_card_string(card.card_no_idx));
-    char ability_id[512];
-    int found = 0;
-    for (int a = 0; a < rb_card_num_abilities((uint32_t)cid) && !found; a++) {
-        Ability ab;
-        if (!rb_decode_card_ability((uint32_t)cid, a, &ab)) continue;
-        if (ab.triggers && strcmp(ab.triggers, trig) == 0) {
-            snprintf(ability_id, sizeof ability_id, "%s_%s", card_no,
-                     ab.full_text ? ab.full_text : "");
-            found = 1;
-        }
-        rb_free_ability(&ab);
-    }
-    rb_free_card(&card);
-    if (!found) return 0;
-    rb_trigger_auto_ability(&tg->state, ability_id, trigger_type, pl, card_no,
-                            cid, NULL, 0, -1);
-    tg->state.activating_card = cid;
-    rb_process_pending_auto_abilities(&tg->state);
-    return 1;
+    (void)trigger_type;
+    return test_fire_trigger_on_card_seat(tg, cid, trig, pl);
 }
 
 /* Rust `game.state.activating_card = Some(cid)` + process_pending_auto_abilities

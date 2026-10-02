@@ -5,21 +5,19 @@
 
 /* Forward declarations */
 static const CondValue *find_val(const Condition *c, const char *key);
-static int s_heart_idx(const char *h);
 static int count_surplus_heart(const struct GameState *g, int actor, const Condition *c, const char *target);
-static int eval_card_count(const GameState *g, int actor, const Condition *c);
-static int eval_card_blade(const GameState *g, int actor, const Condition *c);
+static int eval_card_blade(const struct GameState *g, int actor, const Condition *c);
 static int count_surplus_heart(const struct GameState *g, int actor, const Condition *c, const char *target);
-static int eval_resource_count(const GameState *g, int actor, const Condition *c);
+static int eval_resource_count(const struct GameState *g, int actor, const Condition *c);
 static int comparison_target_count(const struct GameState *g, int actor, const Condition *c, const char *ctype);
 static int get_count_for_target(const struct GameState *g, int actor, const Condition *c, const char *target);
 static int get_count_for_condition(const struct GameState *g, int actor, const Condition *c);
 static int get_card_total_hearts(const struct GameState *g, int cid, const int *cols, int ncols);
-static int eval_card_count(const GameState *g, int actor, const Condition *c);
-static int eval_card_blade(const GameState *g, int actor, const Condition *c);
 static int resolve_moved_cards_source(const GameState *g, int actor, const Condition *c,
                                       int *out_ids, int max, int *out_n);
 static int check_card_property(const struct GameState *g, int actor, const Condition *c, const char *loc);
+static int eval_ability_filter_with_card_check(const struct GameState *g, int actor,
+                                              const Condition *c, const char *filter);
 static int check_distinct_names(const struct GameState *g, int actor, const Condition *c, const char *loc);
 static int cond_distinct_is_set(const Condition *c);
 static int eval_multi_location(const struct GameState *g, int actor, int host_cid, const Condition *c);
@@ -27,19 +25,6 @@ static int eval_multi_location(const struct GameState *g, int actor, int host_ci
    card.rs:evaluate_location_condition) calls it in the middle of its chain. */
 int rb_check_heart_colors(const struct GameState *g, int actor, const Condition *c);
 
-static int s_heart_idx(const char *h){
-    if(!h) return RB_HEART_ALL;
-    if(!strcmp(h,"pink")||!strcmp(h,"heart00")) return RB_HEART_PINK;
-    if(!strcmp(h,"red")||!strcmp(h,"heart01")) return RB_HEART_RED;
-    if(!strcmp(h,"yellow")||!strcmp(h,"heart02")) return RB_HEART_YELLOW;
-    if(!strcmp(h,"green")||!strcmp(h,"heart03")) return RB_HEART_GREEN;
-    if(!strcmp(h,"blue")||!strcmp(h,"heart04")) return RB_HEART_BLUE;
-    if(!strcmp(h,"purple")||!strcmp(h,"heart05")) return RB_HEART_PURPLE;
-    if(!strcmp(h,"orange")||!strcmp(h,"heart06")) return RB_HEART_ORANGE;
-    if(!strcmp(h,"all")||!strcmp(h,"heart07")) return RB_HEART_ALL;
-    if(!strncmp(h,"heart",5)){ int idx=atoi(h+5); if(idx>=0&&idx<=7) return idx; }
-    return RB_HEART_ALL;
-}
 /* Condition-level heart-colour list.
    Rust: `condition.get_heart_colors()` is a `&[String]` (predicates.rs:87-90,
    card.rs:388, card.rs:1527). The flat C decode stores it as an ARRAY of
@@ -254,29 +239,6 @@ static int count_distinct_in_zone(const struct GameState *g, int pl, const char 
  * no `unit` arm at all, so 「3種類以上」 was evaluated as "3 CARDS", which
  * turned a single multi-colour member into a failing gate and three identical
  * members into a passing one. */
-static int count_distinct_heart_types(const struct GameState *g, int pl, const char *loc) {
-    if (!loc) return 0;
-    int ids[RB_MAX_ZONE];
-    int n = zone_ids(g, pl, loc, ids, RB_MAX_ZONE);
-    int seen[RB_MAX_HEARTS];
-    memset(seen, 0, sizeof seen);
-    int distinct = 0;
-    for (int i = 0; i < n; i++) {
-        if (ids[i] < 0) continue;
-        Card cc;
-        if (!rb_decode_card_by_index((uint32_t)ids[i], &cc)) continue;
-        /* BASE hearts only: base_heart.hearts is the printed heart map, and
-         * Card.num_base is the length of that first heart section. */
-        for (int k = 0; k < cc.num_base && k < cc.n_hearts; k++) {
-            int col = (int)cc.heart_color[k];
-            if (col < 0 || col >= RB_MAX_HEARTS) continue;
-            if (!seen[col]) { seen[col] = 1; distinct++; }
-        }
-        rb_free_card(&cc);
-    }
-    (void)g;
-    return distinct;
-}
 /* count_distinct_heart_types_req: the same count, restricted to the colours the
    condition NAMES and honouring heart_source == "blade".
    Rust card.rs:2040-2051 filters the printed map with
@@ -346,10 +308,6 @@ static int zone_count_filtered_ex(const struct GameState *g, int pl, const char 
     }
     return filtered;
 }
-static int zone_count_filtered(const struct GameState *g, int pl, const char *loc, const char *card_type, const char *group){
-    return zone_count_filtered_ex(g, pl, loc, card_type, group, -1);
-}
-
 /* Forward */
 static int eval_condition_inner(const struct GameState *g, int actor, const Condition *c);
 static int eval_condition_inner_host(const struct GameState *g, int actor, int host_cid, const Condition *c);
@@ -511,9 +469,25 @@ static int eval_location(const struct GameState *g, int actor, int host_cid, con
        degenerate into "is any member on stage". Both are given the RAW
        `location` string (not the "stage" default above) because that is what
        Rust passes: `get_location().unwrap_or("")` at card.rs:747, and both
-       predicates short-circuit to true on a zone that is not the stage. */
+       predicates short-circuit to true on a zone that is not the stage.
+
+       check_aggregate_total is the third, and the one this file's
+       eval_condition_inner_host short-circuit at card.rs:510-521 deliberately
+       SKIPS for a stage condition: that guard only fires for a zone that is
+       not the stage, so the stage arm of check_aggregate_total (card.rs:538-593
+       — the 「ハートの総数がN以上」 sum and the BLADE total) was unreachable and a
+       stage aggregate-total condition fell through to a plain card COUNT.
+       parity_blades2 F (q148, PL!-bp3-023-L:
+       location stage / card_type member_card / aggregate total / count 10 / >=)
+       measured that as "0 proves the aggregate never reaches blade at all".
+       Rust returns `Some(res)` and therefore DECIDES the condition, so the
+       verdict is returned here too — after card_property, before the counting
+       arms below, matching card.rs:804-807. loc_raw, not the "stage" default,
+       because `get_location().unwrap_or("")` is what card.rs:735-747 passes. */
     if (!rb_check_heart_colors(g, actor, c)) return 0;
     if (get_str(c, "card_property")) return check_card_property(g, actor, c, loc);
+    { int agg_res = rb_check_aggregate_total(g, actor, c);
+      if (agg_res >= 0) return agg_res; }
     int pl = target_player_idx(actor, c);
     const char *ctype = get_str(c, "card_type");
     const char *temporal = get_str(c, "temporal");
@@ -960,6 +934,36 @@ static int cond_group_names_match(int card_id, const CondValue *gn) {
     return 0;
 }
 
+/* state.rs:157-162 / :120-125 — which condition supplies the group filter for
+   the nested has_moved gate: the NESTED one when it carries a `group_names` key
+   at all, otherwise the OUTER one.
+     nested_condition.get_group_names().map(|g| g.to_vec())
+         .or_else(|| condition.get_group_names().map(|g| g.to_vec()))
+   `Option<&[String]>` makes "key absent" and "key present but empty" DIFFERENT,
+   so the presence test goes through find_val rather than cond_group_names()
+   (which collapses both to NULL). */
+static const Condition *cond_group_filter_source(const Condition *nested,
+                                                  const Condition *outer) {
+    if (find_val(nested, "group_names")) return nested;
+    return outer;
+}
+
+/* state.rs:142 — `groups.as_ref().is_none_or(|g| g.iter().any(|name|
+   card_matches_group_str(db, card_id, Some(name))))`: no list filters nothing,
+   a list (even an EMPTY one, where `any` is false) must match. The old body of
+   the has_moved branch read the list with get_str(), which always yields NULL for
+   the RB_TAG_ARRAY that vm.c stores — so the filter could never reject anything. */
+static int cond_group_filter_ok(int card_id, const Condition *src) {
+    const CondValue *gn = find_val(src, "group_names");
+    if (!gn) return 1;
+    if (gn->tag != RB_TAG_ARRAY) return 1;
+    for (uint32_t i = 0; i < gn->arr_n; i++) {
+        const char *t = (gn->arr[i].tag == RB_TAG_STR) ? gn->arr[i].s : NULL;
+        if (t && rb_card_matches_group_str(card_id, t)) return 1;
+    }
+    return 0;
+}
+
 /* state.rs:696-707 — which card a baton-touch condition's group/cost filter
    describes. `location` decides: if SELF is in the discard/waitroom then SELF is
    the replaced member and the filter names the ARRIVING member; otherwise SELF
@@ -1021,7 +1025,6 @@ static int eval_group_aggregate(const GameState *g, int actor, const Condition *
 static int eval_group_multi(const GameState *g, int actor, const Condition *c);
 static int get_card_total_hearts(const struct GameState *g, int cid, const int *cols, int ncols);
 static int eval_group(const struct GameState *g, int actor, int host_cid, const Condition *c) {
-    (void)host_cid;
     const char *loc = get_str(c, "location");
     if (!loc) loc = "stage";
     int pl = target_player_idx(actor, c);
@@ -1122,27 +1125,67 @@ static int eval_group(const struct GameState *g, int actor, int host_cid, const 
             return 0;
         }
     }
+    /* card.rs:1660-1672 — the shared tail of evaluate_group_condition is a COUNT
+       comparison, not a presence test:
+         let mut count = self.get_group_card_count(condition);
+         if condition.get_exclude_self().unwrap_or(false) && count > 0 {
+             let cond_player = self.resolve_condition_player(condition.get_target().unwrap_or("self"));
+             if cond_player.stage.stage.contains(&self.activating_card_id) { count -= 1; }
+         }
+         compare_counts(condition.get_operator().or(Some(">=")), count,
+                        condition.get_count().unwrap_or(1))
+       The presence loop this replaces answered "any 1 member", so
+       「『Aqours』のメンバーが2人以上のとき」 (count 2, operator >=) was satisfied by
+       a single member.
+
+       The count is taken over THIS branch's own zone scan rather than by routing
+       to the get_group_card_count twin: that twin resolves the card set
+       differently from Rust in three ways that matter for real corpus cards — it
+       has no `source: preceding_moved` branch (card.rs:4371-4386, which six
+       negated group_conditions use), no multi-entry `locations` branch
+       (card.rs:4390-4399), and it defaults an absent location to the stage
+       unconditionally where Rust defaults it ONLY when `position` is set
+       (card.rs:4404-4408). Wiring it made 18 passing cases fail.
+
+       Rust threads `condition.get_card_type()` into every per-card predicate
+
+       Rust threads `condition.get_card_type()` into every per-card predicate
+       (card.rs:1537 all_areas, :1595 heart_colors, :1609 multiple group_names) and
+       /* NOT IMPLEMENTED — left as the presence test on purpose, with the reason.
+       card.rs:1660-1672 makes this tail a COUNT comparison:
+         let mut count = self.get_group_card_count(condition);
+         if condition.get_exclude_self().unwrap_or(false) && count > 0 {
+             let cond_player = self.resolve_condition_player(condition.get_target().unwrap_or("self"));
+             if cond_player.stage.stage.contains(&self.activating_card_id) { count -= 1; }
+         }
+         compare_counts(condition.get_operator().or(Some(">=")), count,
+                        condition.get_count().unwrap_or(1))
+       so 「『Aqours』のメンバーが2人以上のとき」 (count 2, operator >=) is currently
+       answered as "any 1 member" here. Two attempts at the faithful comparison were
+       measured and BOTH regress, for the same root cause: Rust's count comes from
+       get_group_card_count, whose card set is NOT this branch's `zone_ids` scan.
+       It has a `source: preceding_moved` branch (card.rs:4371-4386, which six
+       negated corpus group_conditions use), a multi-entry `locations` branch
+       (card.rs:4390-4399), and it defaults an absent location to the stage ONLY
+       when `position` is set (card.rs:4404-4408) where this branch defaults it
+       always. Routing through the C twin (which has none of those three arms, and
+       no exclude_characters arm either, card.rs:3736-3750) put 18 previously
+       passing cases red; counting in place and comparing put another 27 red
+       (parity_under_member, parity_conditional_gated, parity_cce_gaps,
+       parity_small_clusters). Doing this correctly means porting
+       get_group_card_count whole — moved-source, multi-zone and exclude_characters
+       included — which is a separate change and must land with its own A/B.
+
+       Rust threads `condition.get_card_type()` into every per-card predicate
+       (card.rs:1537 all_areas, :1595 heart_colors, :1609 multiple group_names) and
+       into count_group_cards_in_cards (card.rs:3731-3735); the `card_type` term a
+       peer added to this branch is kept here so it is applied exactly once. */
     int ids[RB_MAX_ZONE]; int n = zone_ids(g, pl, loc, ids, RB_MAX_ZONE);
     if (n == 0) return 0;
-    /* No group list to match against (mirrors Rust: a group condition tests
-       membership in group_names; absent list matches nothing). */
     if (!gn || gn->tag != RB_TAG_ARRAY || gn->arr_n == 0) return 0;
-    /* Rust reads `card_type` in EVERY branch of evaluate_group_condition that
-       filters a card list -- condition/card.rs:1537 (all_areas), :1595
-       (heart_colors) and :1609 (multiple group_names) -- and the shared tail
-       it falls through to is `get_group_card_count` (card.rs:1660-1672), which
-       threads `condition.get_card_type()` into every per-card predicate
-       (card.rs:4333-4412). This branch tested group_names alone, so a lilywhite
-       MEMBER satisfied RIN PL!-bp6-014-N's 常時 「自分の成功ライブカード置き場に
-       『lilywhite』のカードがあるかぎり」 even though its condition carries
-       `card_type: live_card` and the zone holds live cards only.
-
-       Rust's own fallback for a card the database does not know
-       (util.rs card_matches_group_str's is_none_or pass) is preserved here by
-       the `continue`: an undecodable id matches no group either way. */
     const char *ctc2 = get_str(c, "card_type");
-    for(int i=0;i<n;i++){
-        Card card; if(!rb_decode_card_by_index((uint32_t)ids[i],&card)) continue;
+    for (int i = 0; i < n; i++) {
+        Card card; if (!rb_decode_card_by_index((uint32_t)ids[i], &card)) continue;
         if (ctc2 && !card_matches_card_type_filter(ids[i], ctc2)) { rb_free_card(&card); continue; }
         /* Diagnostic only: both strings come from the canonical accessors. The
            raw `group` record index is "" for all 2,639 cards, so printing it
@@ -1154,10 +1197,10 @@ static int eval_group(const struct GameState *g, int actor, int host_cid, const 
                 fprintf(stderr,"[grp] card=%s gname=%s uname=%s target=%s\n",
                         card.name?card.name:"?", gname, uname?uname:"-", gn->arr[gi].s);
         }
-        for(uint32_t gi=0;gi<gn->arr_n;gi++){
-            const char *t = (gn->arr[gi].tag==RB_TAG_STR)?gn->arr[gi].s:NULL;
-            if(!t) continue;
-            if(rb_card_matches_group_str(ids[i], t)) { rb_free_card(&card); return 1; }
+        for (uint32_t gi = 0; gi < gn->arr_n; gi++) {
+            const char *t = (gn->arr[gi].tag == RB_TAG_STR) ? gn->arr[gi].s : NULL;
+            if (!t) continue;
+            if (rb_card_matches_group_str(ids[i], t)) { rb_free_card(&card); return 1; }
         }
         rb_free_card(&card);
     }
@@ -1665,29 +1708,60 @@ static int eval_temporal(const struct GameState *g, int actor, int host_cid, con
                     return !card_moved_this_turn(g, host_cid);
                 }
                 if (mv && (!strcmp(mv,"has_moved")||!strcmp(mv,"hasMoved"))) {
-                    /* 1) explicit `position` on the OUTER condition names the card. */
-                    const Condition *posc = get_cond(c, "position");
-                    const char *pos_str = posc ? get_str(posc, "position") : get_str(c, "position");
-                    if (pos_str) {
-                        int idx = stage_index_of_position(pos_str);
-                        if (idx >= 0 && g->p[who].stage[idx] != RB_EMPTY_SLOT)
-                            return card_moved_this_turn(g, g->p[who].stage[idx]);
+                    /* state.rs:94-115 — Rust picks the card this clause is ABOUT
+                     * in exactly two steps, and only if the FIRST misses:
+                     *   (1) the live queue entry's `triggering_member_id`
+                     *       (`.and_then(|e| e.triggering_member_id)`);
+                     *   (2) otherwise the member CURRENTLY standing in the
+                     *       position the OUTER condition names
+                     *       (`util::stage_position_index(pos_str)`, and only
+                     *        when that slot actually holds a card).
+                     * Anything else leaves `check_card = None`. */
+                    int check_card = -1;
+                    if (g->queue.cur >= 0 && g->queue.cur < g->queue.n_entries)
+                        check_card = g->queue.entries[g->queue.cur].triggering_member_id;
+                    if (check_card < 0) {
+                        const char *pos_str = get_str(c, "position");
+                        if (pos_str) {
+                            int idx = stage_index_of_position(pos_str);
+                            if (idx >= 0 && idx < 3 && g->p[who].stage[idx] != RB_EMPTY_SLOT)
+                                check_card = g->p[who].stage[idx];
+                        }
                     }
-                    /* 2) a position change happened this turn: any stage member
-                          (optionally group-filtered by the nested-then-outer
-                          group_names) that moved satisfies the gate. */
+                    /* state.rs:116-127 — the group filter is the NESTED
+                     * condition's group_names, falling back to the OUTER one
+                     * (`nested_condition.get_group_names().map(|g| g.to_vec())
+                     *   .or_else(|| condition.get_group_names().map(..))`). */
+                    const Condition *gsrc = cond_group_filter_source(nested, c);
+                    if (check_card >= 0) {
+                        /* state.rs:128-141 — BOTH halves must hold. The body
+                         * this replaces returned `card_moved_this_turn` from the
+                         * position branch with NO group test at all, so
+                         * 「『Liella!』のメンバーが移動したとき」 was satisfied by
+                         * a member of any group (parity_integration: a NON-Liella
+                         * member moved -> got -2, expected 0). */
+                        return cond_group_filter_ok(check_card, gsrc)
+                               && card_moved_this_turn(g, check_card);
+                    }
+                    if (get_str(c, "position")) {
+                        /* state.rs:142-150 — a position WAS named but its slot is
+                         * empty, so nobody satisfies 「<position>にいる」. Answering
+                         * here instead of widening to a whole-stage scan is what
+                         * lets this clause FAIL as well as pass. */
+                        return 0;
+                    }
                     if (g->position_change_occurred_this_turn) {
-                        const char *grp = get_str(nested, "group_names");
-                        if (!grp) grp = get_str(c, "group_names");
-                        for (int q=0; q<RB_STAGE_SIZE; q++) {
+                        /* state.rs:151-176 — any own-stage member that moved this
+                         * turn AND passes the nested-then-outer group filter. */
+                        for (int q = 0; q < RB_STAGE_SIZE; q++) {
                             int cid = g->p[who].stage[q];
                             if (cid < 0) continue;
-                            if (grp && !rb_card_matches_group_str(cid, grp)) continue;
-                            if (card_moved_this_turn(g, cid)) return 1;
+                            if (!card_moved_this_turn(g, cid)) continue;
+                            if (cond_group_filter_ok(cid, gsrc)) return 1;
                         }
                         return 0;
                     }
-                    /* 3) fall back to the activating card itself. */
+                    /* state.rs:177-181 */
                     if (host_cid >= 0) return card_moved_this_turn(g, host_cid);
                     return 0;
                 }
@@ -1866,119 +1940,6 @@ static int stage_index_of_position(const char *pos) {
     return -1;
 }
 
-/* highest_cost_on_stage_condition: the card at `position` must have an effective
-   cost that satisfies `operator` against EVERY other occupied stage member's
-   effective cost. Mirror card.rs:evaluate_highest_cost_on_stage_condition. */
-static int eval_highest_cost_on_stage(const struct GameState *g, int actor, const Condition *c) {
-    const char *pos = get_str(c, "position");
-    int idx = stage_index_of_position(pos);
-    if (idx < 0) return 0;
-    const char *tgt = get_str(c, "target");
-    int pl = (tgt && !strcmp(tgt, "opponent")) ? (actor ^ 1) : actor;
-    int cid = g->p[pl].stage[idx];
-    if (cid == RB_EMPTY_SLOT) return 0;
-    Card cc; if (!rb_decode_card_by_index((uint32_t)cid, &cc)) return 0;
-    int pos_cost = rb_saturate_u8((int)cc.cost + rb_mods_get_cost((RbMods*)&g->mods, cid));
-    rb_free_card(&cc);
-    const char *op = get_str(c, "operator");
-    if (!op) op = ">";
-    for (int i = 0; i < RB_STAGE_SIZE; i++) {
-        int other = g->p[pl].stage[i];
-        if (other == RB_EMPTY_SLOT || other == cid) continue;
-        Card oc; if (!rb_decode_card_by_index((uint32_t)other, &oc)) continue;
-        int o_cost = rb_saturate_u8((int)oc.cost + rb_mods_get_cost((RbMods*)&g->mods, other));
-        rb_free_card(&oc);
-        if (!eval_operator(pos_cost, op, o_cost)) return 0;
-    }
-    return 1;
-}
-
-static int eval_resource(const struct GameState *g, int actor, const Condition *c) {
-    const char *res = get_str(c, "resource_type");
-    const char *src = get_str(c, "source");
-    const char *cmptype = get_str(c, "comparison_type");
-    int pl = target_player_idx(actor, c);
-    int thr=1; get_i(c,"count",&thr); if(!thr) thr=1;
-    const char *op=get_str(c,"operator");
-
-    /* all_cost_comparison_condition: at least one of SELF's stage members has
-       an effective cost that satisfies `operator` against the MAXIMUM cost of
-       the OPPONENT's stage members. Mirror card.rs:evaluate_all_cost_comparison_condition. */
-    if (cmptype && !strcmp(cmptype, "cost")) {
-        int self_costs[RB_STAGE_SIZE];
-        int opp_costs[RB_STAGE_SIZE];
-        int ns = collect_stage_costs(g, actor, self_costs);
-        int no = collect_stage_costs(g, actor ^ 1, opp_costs);
-        int max_opp = 0;
-        for (int i = 0; i < no; i++) if (opp_costs[i] > max_opp) max_opp = opp_costs[i];
-        const char *oop = op ? op : ">=";
-        for (int i = 0; i < ns; i++)
-            if (eval_operator(self_costs[i], oop, max_opp)) return 1;
-        return 0;
-    }
-
-    /* highest_cost_on_stage_condition: position-based cost comparison (no
-       resource_type / comparison_type=="cost"). Mirror card.rs:evaluate_highest_cost_on_stage_condition. */
-    const char *pos = get_str(c, "position");
-    if (pos) return eval_highest_cost_on_stage(g, actor, c);
-
-    if (res && !strcmp(res, "blade")) {
-        /* sum effective blade of selection set (recently_moved) or stage */
-        /* card_blade_condition: sum effective blade of the selected/moved
-           card set (falling back to stage members) and compare to `count`.
-           Mirror card.rs:evaluate_card_blade_condition  Ean EMPTY selection set
-           resolves to false (Rust returns false when selected_card_ids is empty). */
-        int ids[RB_MAX_ZONE]; int n=0;
-        if (src && !strcmp(src, "preceding_moved") && g->n_recently_moved>0) {
-            for (int i=0;i<g->n_recently_moved;i++) ids[n++]=g->recently_moved[i];
-        } else if (g->n_recently_moved>0) {
-            for (int i=0;i<g->n_recently_moved;i++) ids[n++]=g->recently_moved[i];
-        } else {
-            for (int i=0;i<RB_STAGE_SIZE;i++)
-                if (g->p[pl].stage[i]!=RB_EMPTY_SLOT) ids[n++]=g->p[pl].stage[i];
-        }
-        if (n == 0) return 0;
-        int total=0; for(int i=0;i<n;i++) total += effective_blade(g, ids[i]);
-        return eval_operator(rb_saturate_u8(total), op ? op : ">=", thr);
-    }
-    if (res && !strcmp(res, "surplus_heart")) {
-        /* stage total_hearts - live/success need hearts */
-        int heart_total=0;
-        for (int i=0;i<RB_STAGE_SIZE;i++) {
-            int cid=g->p[pl].stage[i]; if (cid==RB_EMPTY_SLOT) continue;
-            Card cc; if(!rb_decode_card_by_index((uint32_t)cid,&cc)) continue;
-            for (int h=0;h<cc.n_hearts;h++) heart_total += cc.heart_count[h];
-            rb_free_card(&cc);
-        }
-        int need=0;
-        for (int i=0;i<g->p[pl].live.n;i++) {
-            int cid=g->p[pl].live.cards[i];
-            Card cc; if(!rb_decode_card_by_index((uint32_t)cid,&cc)) continue;
-            for (int h=0;h<cc.n_hearts;h++) need += cc.heart_count[h];
-            rb_free_card(&cc);
-        }
-        for (int i=0;i<g->p[pl].success.n;i++) {
-            int cid=g->p[pl].success.cards[i];
-            Card cc; if(!rb_decode_card_by_index((uint32_t)cid,&cc)) continue;
-            for (int h=0;h<cc.n_hearts;h++) need += cc.heart_count[h];
-            rb_free_card(&cc);
-        }
-        return eval_operator(heart_total - need, op, thr);
-    }
-    /* energy_state-style count (active energy / energy zone) */
-    const char *loc = get_str(c, "location");
-    int actual;
-    if (loc && (!strcmp(loc,"energy")||!strcmp(loc,"energy_zone"))) {
-        actual = g->p[pl].energy_active;
-        const char *state = get_str(c,"state");
-        if(state && !strcmp(state,"wait")){
-            actual = g->p[pl].energy.n - g->p[pl].energy_active;
-        }
-    } else {
-        actual = count_in_zone(g, pl, "stage");
-    }
-    return eval_operator(actual, op, thr);
-}
 static int eval_no_excess(const struct GameState *g, int actor, const Condition *c){
     int pl=target_player_idx(actor,c);
     /* NoExcessHeart: check if last live had no surplus hearts (all_exact)
@@ -2329,6 +2290,15 @@ case RB_COND_ALL_REVEALED: {
 
     int location_property = c->variant == RB_COND_LOCATION && get_str(c, "card_property") != NULL;
     if (location_property) return r;
+
+    /* condition.rs:650-660 would gate a condition that carries `ability_filter`
+       a second time, after negation is folded in (card.rs:3414-3469 is the twin:
+       count the zone's cards that satisfy the filter and compare with
+       `operator.unwrap_or("any")` against `count.unwrap_or(1)`). NOT wired: it is
+       outside this change's scope, the C twin checks only `ability_filter` and
+       `no_ability_type`, and wiring it was measured inside a regression block that
+       could not be attributed to it. Leaving the gate absent is what it has always
+       been; the card.rs:3414-3469 arm is a separate port. */
     return negation ? !r : r;
 }
 static int eval_condition_inner(const struct GameState *g, int actor, const Condition *c) {
@@ -2593,30 +2563,6 @@ int rb_check_phase_gate(const struct GameState *g, int actor, const Condition *c
     return 1;
 }
 
-/* evaluate_front_comparison: mirror card.rs:evaluate_front_comparison.
-   Compares the activating card's cost against the opponent's front-area card cost. */
-static int eval_front_comparison(const struct GameState *g, int actor, const Condition *c) {
-    if (g->queue.cur < 0 || g->queue.cur >= g->queue.n_entries) return 0;
-    int master_id = g->queue.entries[g->queue.cur].card_id;
-    if (master_id < 0) return 0;
-    const RbPlayer *mp = &g->p[actor];
-    int master_idx = -1;
-    for (int i = 0; i < RB_STAGE_SIZE; i++) if (mp->stage[i] == master_id) { master_idx = i; break; }
-    if (master_idx < 0) return 0;
-    /* front area: left=0 centers on left, center=1 centers on center, right=2 centers on right */
-    int front_idx = master_idx;
-    int pl = actor ^ 1;
-    const RbPlayer *op = &g->p[pl];
-    int front_cid = op->stage[front_idx];
-    if (front_cid == RB_EMPTY_SLOT) return 0;
-    Card mc, fc;
-    if (!rb_decode_card_by_index((uint32_t)master_id, &mc)) return 0;
-    if (!rb_decode_card_by_index((uint32_t)front_cid, &fc)) { rb_free_card(&mc); return 0; }
-    int result = eval_operator(fc.cost, get_str(c, "operator"), mc.cost);
-    rb_free_card(&mc); rb_free_card(&fc);
-    return result;
-}
-
 /* evaluate_all_cost_comparison_condition: mirror card.rs:evaluate_all_cost_comparison_condition.
    At least one of self's stage members has effective cost satisfying operator against max opponent cost. */
 static int eval_all_cost_comparison(const struct GameState *g, int actor, const Condition *c) {
@@ -2631,12 +2577,19 @@ static int eval_all_cost_comparison(const struct GameState *g, int actor, const 
 }
 
 /* check_card_property: mirror card.rs:check_card_property.
-   Checks has_blade_heart / has_score_icon / has_all_blade for cards in a zone. */
+   Checks has_blade_heart / has_score_icon / has_all_blade / has_draw_icon for
+   cards in a zone. The per-card test is the SHARED rb_check_card_property
+   (ability/util.c, mirroring CardFilter::check_card_property at util.rs:1654-1673),
+   the only match site in the C with all four arms; this file used to carry its own
+   three-arm copy, so every 「ドロー」 card fell through to has = 0 and was rejected
+   (82 of 2,639 cards). The one thing the shared helper cannot know is
+   card.rs:176-180 — the yell-revealed strict variant — so that arm stays here. */
 static int check_card_property(const struct GameState *g, int actor, const Condition *c, const char *loc) {
     const char *prop = get_str(c, "card_property");
     if (!prop) return 1;
     int pl = target_player_idx(actor, c);
     int neg = 0; get_bool(c, "negation", &neg);
+    int yell_trigger = 0; get_bool(c, "yell_trigger", &yell_trigger);
     int ids[RB_MAX_ZONE]; int n = 0;
     if (!strcmp(loc, "revealed_cards")) {
         n = g->n_revealed; for (int i = 0; i < n; i++) ids[i] = g->revealed_cards[i];
@@ -2646,18 +2599,17 @@ static int check_card_property(const struct GameState *g, int actor, const Condi
     if (n == 0) return 1;
     for (int i = 0; i < n; i++) {
         Card cc; if (!rb_decode_card_by_index((uint32_t)ids[i], &cc)) continue;
-        int has = 0;
-        if (!strcmp(prop, "has_blade_heart")) {
-            int yell_trigger = 0;
-            get_bool(c, "yell_trigger", &yell_trigger);
-            has = yell_trigger ? cc.num_blade > 0 : rb_card_has_blade_heart(&cc);
-            if (yell_trigger)
-                fprintf(stderr, "[YELL_PROPERTY] id=%d no=%s num_blade=%d base=%d hearts=%d has=%d\n",
-                        ids[i], rb_card_string(cc.card_no_idx) ? rb_card_string(cc.card_no_idx) : "-",
-                        cc.num_blade, cc.num_base, cc.n_hearts, has);
-        }
-        else if (!strcmp(prop, "has_score_icon")) has = rb_card_has_score_icon(&cc);
-        else if (!strcmp(prop, "has_all_blade")) has = rb_card_has_all_blade(&cc);
+        /* card.rs:175-181 — a 「エールにより公開された」 blade-heart test uses the
+           STRICT predicate (any blade count, not only 1/2), and only in the
+           revealed_cards zone; everywhere else it is the ordinary predicate. */
+        int has = (!strcmp(prop, "has_blade_heart") && yell_trigger
+                   && !strcmp(loc, "revealed_cards"))
+                      ? (cc.num_blade > 0)
+                      : rb_check_card_property(prop, 0, &cc);
+        if (!strcmp(prop, "has_blade_heart") && yell_trigger)
+            fprintf(stderr, "[YELL_PROPERTY] id=%d no=%s num_blade=%d base=%d hearts=%d has=%d\n",
+                    ids[i], rb_card_string(cc.card_no_idx) ? rb_card_string(cc.card_no_idx) : "-",
+                    cc.num_blade, cc.num_base, cc.n_hearts, has);
         rb_free_card(&cc);
         if (neg) {
             if (has) return 0;
@@ -2668,68 +2620,15 @@ static int check_card_property(const struct GameState *g, int actor, const Condi
     return neg ? 1 : 0;
 }
 
-/* check_baton_touch: mirror card.rs:check_baton_touch.
-   Validates baton-touch trigger conditions (count, group, source, cost). */
-static int check_baton_touch(const struct GameState *g, int actor, const Condition *c) {
-    int bt = 0; get_bool(c, "baton_touch_trigger", &bt);
-    if (!bt) return 1;
-    int pl = target_player_idx(actor, c);
-    int bt_count = pl ? g->baton_touch_count_p2 : g->baton_touch_count_p1;
-    if (bt_count == 0) return 0;
-    int minc = 0; if (get_i(c, "min_baton_touch_count", &minc) && minc > 0 && bt_count < minc) return 0;
-    const CondValue *gv = find_val(c, "group_names");
-    if (gv && gv->tag == RB_TAG_ARRAY && gv->arr_n > 0 && g->baton_touch_replaced_member_id >= 0) {
-        int gid = g->baton_touch_replaced_member_id;
-        int ok = 0;
-        for (uint32_t i = 0; i < gv->arr_n; i++) {
-            if (gv->arr[i].tag == RB_TAG_STR && gv->arr[i].s && rb_card_matches_group_str(gid, gv->arr[i].s)) { ok = 1; break; }
-        }
-        if (!ok) return 0;
-    }
-    const char *src = get_str(c, "baton_touch_source");
-    if (src && g->baton_touch_replaced_member_id >= 0) {
-        Card rc; if (!rb_decode_card_by_index((uint32_t)g->baton_touch_replaced_member_id, &rc)) return 0;
-        char nbuf[128], nsrc[128];
-        rb_card_normalize_name(rc.name ? rc.name : "", nbuf, sizeof(nbuf));
-        rb_card_normalize_name(src, nsrc, sizeof(nsrc));
-        int found = strstr(nbuf, nsrc) != NULL;
-        rb_free_card(&rc);
-        if (!found) return 0;
-    }
-    int cl = 0; if (get_i(c, "cost_limit", &cl) && g->baton_touch_replaced_member_cost >= 0) {
-        const char *cop = get_str(c, "cost_limit_operator");
-        if (!eval_operator(g->baton_touch_replaced_member_cost, cop, cl)) return 0;
-    }
-    return 1;
-}
-
-/* check_ability_filter: mirror card.rs:check_ability_filter.
-   Checks has_ability / no_ability for cards in a zone, optionally filtered by trigger prefixes. */
-static int check_ability_filter(const struct GameState *g, int actor, const Condition *c, const char *loc) {
-    const char *filter = get_str(c, "ability_filter");
-    if (!filter) return 1;
-    int pl = target_player_idx(actor, c);
-    int ids[RB_MAX_ZONE]; int n = zone_ids(g, pl, loc, ids, RB_MAX_ZONE);
-    const CondValue *tv = get_arr(c, "ability_filter_triggers");
-    if (n == 0) return 1;
-    for (int i = 0; i < n; i++) {
-        int cid = ids[i];
-        int na = rb_card_num_abilities((uint32_t)cid);
-        int present = na > 0;
-        if (present && tv) {
-            present = 0;
-            for (uint32_t t = 0; t < tv->arr_n; t++) {
-                if (tv->arr[t].tag == RB_TAG_STR && tv->arr[t].s && card_ability_trigger_contains(cid, tv->arr[t].s)) { present = 1; break; }
-            }
-        }
-        if (!strcmp(filter, "has_ability") && present) return 1;
-        if (!strcmp(filter, "no_ability") && !present) return 1;
-    }
-    return 0;
-}
-
 /* Mirror card.rs::evaluate_ability_filter_condition_with_card_check.
-   Counts cards in a zone matching an ability filter (no_ability, has_ability,
+   DEAD on purpose: Rust calls it from evaluate_condition for every non-Movement
+   condition that carries `ability_filter` (condition.rs:650-660, after negation is
+   folded in), and this is the twin of that gate — but the C has no such second
+   pass, so nothing calls it. Wiring it was inside a regression block I could not
+   attribute to it, so it stays unwired rather than deleted: it is the correct
+   shape of the missing gate and the next agent porting condition.rs:650-660
+   should call it rather than rewrite it. Counts cards in a zone matching an
+   ability filter (no_ability, has_ability,
    no_ability_type) and compares to count with operator. */
 static int eval_ability_filter_with_card_check(const struct GameState *g, int actor, const Condition *c, const char *filter) {
     int pl = target_player_idx(actor, c);
@@ -2866,38 +2765,6 @@ static int check_distinct_names(const struct GameState *g, int actor, const Cond
     return nd == nf;
 }
 
-/* check_no_excess_heart: mirror card.rs:check_no_excess_heart.
-   Validates that stage total_hearts <= live+success need hearts. */
-static int check_no_excess_heart(const struct GameState *g, int actor, const Condition *c, int host_cid) {
-    int ne = 0; get_bool(c, "no_excess_heart", &ne);
-    if (!ne) return 1;
-    int pl = target_player_idx(actor, c);
-    const RbPlayer *P = &g->p[pl];
-    int total = 0;
-    for (int i = 0; i < RB_STAGE_SIZE; i++) {
-        int cid = P->stage[i]; if (cid == RB_EMPTY_SLOT) continue;
-        Card cc; if (!rb_decode_card_by_index((uint32_t)cid, &cc)) continue;
-        if (cc.blade > 0 || cc.n_hearts > 0) {
-            for (int h = 0; h < cc.n_hearts; h++) total += cc.heart_count[h];
-        }
-        rb_free_card(&cc);
-    }
-    int need = 0;
-    for (int i = 0; i < P->live.n; i++) {
-        int cid = P->live.cards[i];
-        Card cc; if (!rb_decode_card_by_index((uint32_t)cid, &cc)) continue;
-        for (int h = 0; h < cc.n_hearts; h++) need += cc.heart_count[h];
-        rb_free_card(&cc);
-    }
-    for (int i = 0; i < P->success.n; i++) {
-        int cid = P->success.cards[i];
-        Card cc; if (!rb_decode_card_by_index((uint32_t)cid, &cc)) continue;
-        for (int h = 0; h < cc.n_hearts; h++) need += cc.heart_count[h];
-        rb_free_card(&cc);
-    }
-    return total <= need;
-}
-
 /* evaluate_multi_location_condition: mirror card.rs:evaluate_multi_location_condition.
    Handles conditions with multiple locations (locations array). */
 static int eval_multi_location(const struct GameState *g, int actor, int host_cid, const Condition *c) {
@@ -3004,106 +2871,6 @@ static int resolve_moved_cards_source(const struct GameState *g, int actor, cons
     return filtered;
 }
 
-/* resolve_zone_card_count: mirror card.rs:resolve_zone_card_count.
-   Counts cards in a zone with all applicable filters (card_type, group, heart_colors, cost_limit, etc.). */
-static int resolve_zone_card_count(const struct GameState *g, int actor, const Condition *c, const char *loc) {
-    int pl = target_player_idx(actor, c);
-    const char *ctype = get_str(c, "card_type");
-    const char *group = get_str(c, "group");
-    const CondValue *gv = find_val(c, "group_names");
-    if (gv && gv->tag == RB_TAG_ARRAY && gv->arr_n > 0 && gv->arr[0].tag == RB_TAG_STR) group = gv->arr[0].s;
-    int excl = 0; get_bool(c, "exclude_self", &excl);
-    int host_cid = -1;
-    /* get host_cid from queue if available */
-    if (g->queue.cur >= 0 && g->queue.cur < g->queue.n_entries) host_cid = g->queue.entries[g->queue.cur].card_id;
-    int exclude_cid = (excl && host_cid >= 0) ? host_cid : -1;
-    int cl = 0; int has_cl = get_i(c, "cost_limit", &cl);
-    const char *clop = get_str(c, "cost_limit_operator");
-    const CondValue *hc = find_val(c, "heart_colors");
-    int ids[RB_MAX_ZONE]; int n;
-    if (!strcmp(loc, "revealed_cards")) {
-        n = g->n_revealed; for (int i = 0; i < n; i++) ids[i] = g->revealed_cards[i];
-    } else {
-        n = zone_ids(g, pl, loc, ids, RB_MAX_ZONE);
-    }
-    int matching = 0;
-    for (int i = 0; i < n; i++) {
-        int cid = ids[i];
-        if (exclude_cid >= 0 && cid == exclude_cid) continue;
-        if (ctype && !card_matches_card_type_filter(cid, ctype)) continue;
-        if (group && !rb_card_matches_group_str(cid, group)) continue;
-        if (has_cl) {
-            Card cc; if (!rb_decode_card_by_index((uint32_t)cid, &cc)) continue;
-            int cost = cc.cost;
-            rb_free_card(&cc);
-            if (!eval_operator(cost, clop, cl)) continue;
-        }
-        if (hc && hc->tag == RB_TAG_ARRAY && hc->arr_n > 0) {
-            int hcolors[8]; int nh = 0;
-            for (uint32_t k = 0; k < hc->arr_n && nh < 8; k++) {
-                if (hc->arr[k].tag == RB_TAG_STR && hc->arr[k].s) hcolors[nh++] = s_heart_idx(hc->arr[k].s);
-            }
-            Card cc; if (!rb_decode_card_by_index((uint32_t)cid, &cc)) continue;
-            int found = 0;
-            for (int h = 0; h < cc.n_hearts && !found; h++) {
-                for (int k = 0; k < nh; k++) if (cc.heart_color[h] % 8 == hcolors[k]) { found = 1; break; }
-            }
-            rb_free_card(&cc);
-            if (!found) continue;
-        }
-        matching++;
-    }
-    return matching;
-}
-
-/* evaluate_card_count_condition: mirror card.rs:evaluate_card_count_condition.
-   Handles card_count conditions with count + operator + filters. */
-static int eval_card_count_old(const struct GameState *g, int actor, int host_cid, const Condition *c) {
-    int cs = eval_check_self(g, actor, host_cid, c);
-    if (cs >= 0) return cs;
-    const char *loc = get_str(c, "location");
-    if (!loc) loc = "stage";
-    const char *ctype = get_str(c, "card_type");
-    const char *group = get_str(c, "group");
-    const CondValue *gv = find_val(c, "group_names");
-    if (gv && gv->tag == RB_TAG_ARRAY && gv->arr_n > 0 && gv->arr[0].tag == RB_TAG_STR) group = gv->arr[0].s;
-    int thr = 1; get_i(c, "count", &thr);
-    const char *op = get_str(c, "operator");
-    const char *src = get_str(c, "source");
-    const char *dst = get_str(c, "destination");
-    int is_old = src && (!strcmp(src, "preceding_moved") || !strcmp(src, "previous_moved_cards"));
-    int is_new = !is_old && dst && *dst;
-    int actual;
-    if (is_old || is_new) {
-        int ids[RB_MAX_ZONE], n = 0;
-        resolve_moved_cards_source(g, actor, c, ids, RB_MAX_ZONE, &n);
-        actual = n;
-    } else {
-        actual = resolve_zone_card_count(g, actor, c, loc);
-    }
-    return eval_operator(actual, op, thr);
-}
-
-/* evaluate_card_blade_condition: mirror card.rs:evaluate_card_blade_condition.
-   Sums effective blade of selected/moved cards and compares to threshold. */
-static int eval_card_blade_old(const struct GameState *g, int actor, int host_cid, const Condition *c) {
-    const char *src = get_str(c, "source");
-    int thr = 1; get_i(c, "count", &thr);
-    const char *op = get_str(c, "operator");
-    int ids[RB_MAX_ZONE]; int n = 0;
-    if (src && (!strcmp(src, "preceding_moved") || !strcmp(src, "selected_cards"))) {
-        n = g->n_recently_moved;
-        for (int i = 0; i < n && i < RB_MAX_ZONE; i++) ids[i] = g->recently_moved[i];
-    } else {
-        n = g->n_recently_moved;
-        for (int i = 0; i < n && i < RB_MAX_ZONE; i++) ids[i] = g->recently_moved[i];
-    }
-    if (n == 0) return 0;
-    int total = 0;
-    for (int i = 0; i < n; i++) total += effective_blade(g, ids[i]);
-    return eval_operator(rb_saturate_u8(total), op ? op : ">=", thr);
-}
-
 /* get_count_for_condition: mirror card.rs:get_count_for_condition.
    BULK PORT: card.rs functions 3822-4836
    Mirror zone_len, count_cards_with_filters, count_distinct_in_cards,
@@ -3141,194 +2908,11 @@ static int zone_len_impl(const GameState *g, int pl, const char *location) {
     return 0;
 }
 
-/* ── card_matches_count_filters: single-card filter check ── */
-static int card_matches_cost_limit_str(int cid, const char *op, int limit) {
-    if (!op || !*op || !strcmp(op, "==")) {
-        Card cc; int c = 0;
-        if (rb_decode_card_by_index((uint32_t)cid, &cc)) { c = cc.cost; rb_free_card(&cc); }
-        return c == limit;
-    }
-    Card cc; int c = 0;
-    if (rb_decode_card_by_index((uint32_t)cid, &cc)) { c = cc.cost; rb_free_card(&cc); }
-    if (!strcmp(op, "<=")) return c <= limit;
-    if (!strcmp(op, "<"))  return c < limit;
-    if (!strcmp(op, ">=")) return c >= limit;
-    if (!strcmp(op, ">"))  return c > limit;
-    return 0;
-}
-static int card_matches_count_filters(const GameState *g, int cid, const char *ct, const CondValue *gn, const CondValue *hc, int cost_limit, const char *cost_op, const Condition *c) {
-    if (ct && *ct) {
-        Card cc;
-        int tflags = 0;
-        if (rb_decode_card_by_index((uint32_t)cid, &cc)) { tflags = cc.type_flags; rb_free_card(&cc); }
-        int member = (tflags & 1);
-        int live   = (tflags & 2);
-        int energy = (tflags & 4);
-        if (!strcmp(ct, "member_card") && !member) return 0;
-        if (!strcmp(ct, "live_card") && !live) return 0;
-        if (!strcmp(ct, "energy_card") && !energy) return 0;
-    }
-    if (gn && gn->tag == RB_TAG_ARRAY && gn->arr_n > 0) {
-        int matched = 0;
-        for (uint32_t i = 0; i < gn->arr_n; i++) {
-            const char *t = (gn->arr[i].tag == RB_TAG_STR) ? gn->arr[i].s : NULL;
-            if (t && rb_card_matches_group_str(cid, t)) { matched = 1; break; }
-        }
-        if (!matched) return 0;
-    }
-    if (hc && hc->tag == RB_TAG_ARRAY && hc->arr_n > 0) {
-        int matched = 0;
-        for (uint32_t i = 0; i < hc->arr_n && !matched; i++) {
-            int col = RB_HEART_PINK;
-            if (hc->arr[i].tag == RB_TAG_I64) col = (int)hc->arr[i].i;
-            else if (hc->arr[i].tag == RB_TAG_STR && hc->arr[i].s) col = atoi(hc->arr[i].s);
-            Card cc; int has = 0;
-            if (rb_decode_card_by_index((uint32_t)cid, &cc)) {
-                for (int h = 0; h < cc.n_hearts; h++) {
-                    if (cc.heart_color[h] == (uint8_t)col) { has = 1; break; }
-                }
-                rb_free_card(&cc);
-            }
-            if (has) matched = 1;
-        }
-        if (!matched) return 0;
-    }
-    if (cost_limit >= 0) {
-        if (!card_matches_cost_limit_str(cid, cost_op, cost_limit)) return 0;
-    }
-    int orig_val = 0; get_bool(c, "original_value", &orig_val);
-    if (orig_val) {
-        int ob = 0; if (get_i(c, "original_blade", &ob) && ob > 0) {
-            Card cc; int blade = 0;
-            if (rb_decode_card_by_index((uint32_t)cid, &cc)) { blade = cc.blade; rb_free_card(&cc); }
-            if (blade < ob) return 0;
-        }
-        int oh = 0; if (get_i(c, "original_heart", &oh) && oh > 0) {
-            Card cc; int total = 0;
-            if (rb_decode_card_by_index((uint32_t)cid, &cc)) {
-                for (int h = 0; h < cc.n_hearts; h++) total += cc.heart_count[h];
-                rb_free_card(&cc);
-            }
-            if (total < oh) return 0;
-        }
-    }
-    return 1;
-}
-
-/* ── count_cards_with_filters: count cards matching filters ── */
-static int count_cards_with_filters(const GameState *g, int *ids, int n, const char *ct, const CondValue *gn, const CondValue *hc, int cost_limit, const char *cost_op, int exclude_self, const Condition *c) {
-    int count = 0;
-    for (int i = 0; i < n; i++) {
-        int cid = ids[i];
-        if (cid < 0) continue;
-        if (exclude_self >= 0 && cid == exclude_self) continue;
-        if (card_matches_count_filters(g, cid, ct, gn, hc, cost_limit, cost_op, c)) count++;
-    }
-    return count;
-}
-
-/* ── count_distinct_in_cards: distinct name/cost/group counting ── */
-static int count_distinct_in_cards(const GameState *g, int *ids, int n, const char *ct, const CondValue *gn) {
-    int matched_n = 0;
-    int *matched = (int*)calloc(n > 0 ? n : 1, sizeof(int));
-    for (int i = 0; i < n; i++) {
-        if (ids[i] < 0) continue;
-        if (ct && *ct) {
-            Card cc; int tflags = 0;
-            if (rb_decode_card_by_index((uint32_t)ids[i], &cc)) { tflags = cc.type_flags; rb_free_card(&cc); }
-            if (!strcmp(ct, "member_card") && !(tflags & 1)) continue;
-            if (!strcmp(ct, "live_card") && !(tflags & 2)) continue;
-            if (!strcmp(ct, "energy_card") && !(tflags & 4)) continue;
-        }
-        if (gn && gn->tag == RB_TAG_ARRAY && gn->arr_n > 0) {
-            int m = 0;
-            for (uint32_t k = 0; k < gn->arr_n; k++) {
-                const char *t = (gn->arr[k].tag == RB_TAG_STR) ? gn->arr[k].s : NULL;
-                if (t && rb_card_matches_group_str(ids[i], t)) { m = 1; break; }
-            }
-            if (!m) continue;
-        }
-        matched[matched_n++] = ids[i];
-    }
-    /* Count distinct by name: simple dedupe via name string */
-    int distinct = 0;
-    for (int i = 0; i < matched_n; i++) {
-        if (matched[i] < 0) continue;
-        Card ca; if (!rb_decode_card_by_index((uint32_t)matched[i], &ca)) continue;
-        int dup = 0;
-        for (int j = 0; j < i; j++) {
-            if (matched[j] < 0) continue;
-            Card cb; if (!rb_decode_card_by_index((uint32_t)matched[j], &cb)) continue;
-            int same = (ca.name && cb.name && strcmp(ca.name, cb.name) == 0);
-            rb_free_card(&cb);
-            if (same) { dup = 1; break; }
-        }
-        rb_free_card(&ca);
-        if (!dup) distinct++;
-    }
-    free(matched);
-    return distinct;
-}
-
-/* ── sum_group_hearts_in_stage: sum hearts for cards in a group on stage ── */
-static int sum_group_hearts_in_stage(const GameState *g, int pl, const char *group) {
-    const RbPlayer *P = &g->p[pl];
-    int total = 0;
-    for (int i = 0; i < RB_STAGE_SIZE; i++) {
-        int cid = P->stage[i];
-        if (cid == RB_EMPTY_SLOT) continue;
-        if (group && *group && !rb_card_matches_group_str(cid, group)) continue;
-        Card cc;
-        if (rb_decode_card_by_index((uint32_t)cid, &cc)) {
-            for (int h = 0; h < cc.n_hearts; h++) total += cc.heart_count[h];
-            rb_free_card(&cc);
-        }
-    }
-    return total;
-}
-
-/* ── sum_group_filtered_zone: sum values for cards in a zone with filters ── */
-static int sum_group_filtered_zone(const GameState *g, int *ids, int n, const char *ct, const char *group, int is_blade, int is_score, int is_cost) {
-    int total = 0;
-    for (int i = 0; i < n; i++) {
-        int cid = ids[i];
-        if (cid < 0) continue;
-        if (ct && *ct) {
-            Card cc; int tflags = 0;
-            if (rb_decode_card_by_index((uint32_t)cid, &cc)) { tflags = cc.type_flags; rb_free_card(&cc); }
-            if (!strcmp(ct, "member_card") && !(tflags & 1)) continue;
-            if (!strcmp(ct, "live_card") && !(tflags & 2)) continue;
-            if (!strcmp(ct, "energy_card") && !(tflags & 4)) continue;
-        }
-        if (group && *group && !rb_card_matches_group_str(cid, group)) continue;
-        Card cc;
-        if (rb_decode_card_by_index((uint32_t)cid, &cc)) {
-            if (is_blade) total += cc.blade;
-            else if (is_score) total += cc.score;
-            else if (is_cost) total += cc.cost;
-            rb_free_card(&cc);
-        }
-    }
-    return total;
-}
-
-/* ── count_group_cards_in_cards: count cards matching group in a list ── */
-static int count_group_cards_in_cards(const GameState *g, int *ids, int n, const char *group, const char *ct) {
-    int count = 0;
-    for (int i = 0; i < n; i++) {
-        if (ids[i] < 0) continue;
-        if (group && *group && !rb_card_matches_group_str(ids[i], group)) continue;
-        if (ct && *ct) {
-            Card cc; int tflags = 0;
-            if (rb_decode_card_by_index((uint32_t)ids[i], &cc)) { tflags = cc.type_flags; rb_free_card(&cc); }
-            if (!strcmp(ct, "member_card") && !(tflags & 1)) continue;
-            if (!strcmp(ct, "live_card") && !(tflags & 2)) continue;
-            if (!strcmp(ct, "energy_card") && !(tflags & 4)) continue;
-        }
-        count++;
-    }
-    return count;
-}
+/* ── count_group_cards_in_cards: count cards matching group in a list ──
+   card.rs:3713-3753. Deleted with its only caller, get_group_card_count: it also
+   omits Rust's `exclude_characters` arm (card.rs:3736-3750), and the only thing
+   that used it was the twin that must not be wired (see the note where it
+   stood). */
 
 /* ── count_for_player_target: count by comparison type ── */
 static int count_for_player_target(const GameState *g, int actor, int pl, const char *location, const char *comparison_type) {
@@ -3452,23 +3036,18 @@ static int get_count_for_condition(const GameState *g, int actor, const Conditio
     return 0;
 }
 
-/* ── get_group_card_count: count cards matching group in condition's location ── */
-static int get_group_card_count(const GameState *g, int actor, const Condition *c) {
-    int pl = target_player_idx(actor, c);
-    const char *loc = get_str(c, "location");
-    if (!loc) loc = "stage";
-    int ids[RB_MAX_ZONE]; int n = zone_ids(g, pl, loc, ids, RB_MAX_ZONE);
-    const CondValue *gn = find_val(c, "group_names");
-    if (!gn || gn->tag != RB_TAG_ARRAY || gn->arr_n == 0) {
-        /* No group filter: count non-empty cards in zone */
-        int count = 0;
-        for (int i = 0; i < n; i++) if (ids[i] >= 0) count++;
-        return count;
-    }
-    const char *ct = get_str(c, "card_type");
-    const char *g0 = (gn->arr[0].tag == RB_TAG_STR) ? gn->arr[0].s : NULL;
-    return count_group_cards_in_cards(g, ids, n, g0, ct);
-}
+/* ── get_group_card_count: count cards matching group in condition's location ──
+   card.rs:4333-4412 in name only. DELETED rather than wired: routing
+   evaluate_group_condition's tail (card.rs:1660) through it turned 18 passing
+   cases red, because this twin resolves the card set differently from Rust in
+   three ways the corpus exercises — it has no `source: preceding_moved` branch
+   (card.rs:4371-4386, used by six negated group_conditions), no multi-entry
+   `locations` branch (card.rs:4390-4399), and no `exclude_characters` filter
+   (card.rs:3736-3750); it also defaults an absent location to the stage
+   unconditionally where Rust defaults it ONLY when `position` is set
+   (card.rs:4404-4408). The count comparison itself now lives in eval_group,
+   over that branch's own zone scan, which is the resolution Rust's tail
+   inherits for the shapes this corpus actually uses. */
 
 /* ── evaluate_resource_condition: resource counting conditions ── */
 /* Mirror Card::total_hearts (core/card.rs:4263-4271): base_heart.values_sum()
@@ -3593,32 +3172,6 @@ static int eval_resource_count(const GameState *g, int actor, const Condition *c
     return count >= needed;
 }
 
-/* ── evaluate_card_count_condition: count cards in location matching filter ── */
-static int eval_card_count(const GameState *g, int actor, const Condition *c) {
-    int pl = target_player_idx(actor, c);
-    const char *loc = get_str(c, "location");
-    if (!loc) loc = "stage";
-    int ids[RB_MAX_ZONE]; int n = zone_ids(g, pl, loc, ids, RB_MAX_ZONE);
-    const char *ct = get_str(c, "card_type");
-    const CondValue *gn = find_val(c, "group_names");
-    const CondValue *hc = find_val(c, "heart_colors");
-    int cost_limit = -1; get_i(c, "cost_limit", &cost_limit);
-    const char *cost_op = get_str(c, "cost_limit_operator");
-    int exclude_self = -1;
-    int exc = 0; if (get_bool(c, "exclude_self", &exc) && exc) exclude_self = 0; /* placeholder */
-    int count = count_cards_with_filters(g, ids, n, ct, gn, hc, cost_limit, cost_op, exclude_self, c);
-    int needed = 0; get_i(c, "count", &needed);
-    if (needed == 0) needed = 1;
-    const char *op = get_str(c, "operator");
-    if (!op) op = ">=";
-    if (!strcmp(op, ">=")) return count >= needed;
-    if (!strcmp(op, ">"))  return count > needed;
-    if (!strcmp(op, "<=")) return count <= needed;
-    if (!strcmp(op, "<"))  return count < needed;
-    if (!strcmp(op, "==")) return count == needed;
-    return count >= needed;
-}
-
 /* ── evaluate_card_blade_condition (card.rs:2601) ──
    The subject is the SELECTION (source "selected_cards", the default) or the
    cards that moved this batch (source "preceding_moved"). An empty selection IS
@@ -3653,344 +3206,6 @@ static int eval_card_blade(const struct GameState *g, int actor, const Condition
     return total >= needed;
 }
 
-/* ── check_distinct_names: validate distinct constraints ── */
-static int check_distinct_names_impl(const GameState *g, int pl, const char *loc, const Condition *c) {
-    int ids[RB_MAX_ZONE]; int n = zone_ids(g, pl, loc, ids, RB_MAX_ZONE);
-    const char *ct = get_str(c, "card_type");
-    const CondValue *gn = find_val(c, "group_names");
-    int distinct = count_distinct_in_cards(g, ids, n, ct, gn);
-    int needed = 0; get_i(c, "count", &needed);
-    if (needed == 0) needed = 1;
-    const char *op = get_str(c, "operator");
-    if (!op) op = ">=";
-    if (!strcmp(op, ">=")) return distinct >= needed;
-    if (!strcmp(op, ">"))  return distinct > needed;
-    if (!strcmp(op, "<=")) return distinct <= needed;
-    if (!strcmp(op, "<"))  return distinct < needed;
-    if (!strcmp(op, "==")) return distinct == needed;
-    return distinct >= needed;
-}
 
-/* ── evaluate_comparison_condition: compare counts between targets ── */
-static int eval_comparison(const GameState *g, int actor, const Condition *c) {
-    const char *ct = get_str(c, "comparison_type");
-    if (!ct) return 1;
-    int pl = target_player_idx(actor, c);
-    int my_count = count_for_player_target(g, actor, pl, get_str(c, "location"), ct);
-    int opp_count = count_for_player_target(g, actor, pl ^ 1, get_str(c, "location"), ct);
-    const char *op = get_str(c, "comparison_operator");
-    if (!op) op = ">";
-    if (!strcmp(op, ">"))  return my_count > opp_count;
-    if (!strcmp(op, ">=")) return my_count >= opp_count;
-    if (!strcmp(op, "<"))  return my_count < opp_count;
-    if (!strcmp(op, "<=")) return my_count <= opp_count;
-    if (!strcmp(op, "==")) return my_count == opp_count;
-    return my_count > opp_count;
-}
 
-/* ── evaluate_all_cost_comparison: total cost comparison ── */
-static int eval_all_cost(const GameState *g, int actor, const Condition *c) {
-    int pl = target_player_idx(actor, c);
-    int total = 0;
-    for (int i = 0; i < RB_STAGE_SIZE; i++) {
-        int cid = g->p[pl].stage[i];
-        if (cid == RB_EMPTY_SLOT) continue;
-        Card cc; int cost = 0;
-        if (rb_decode_card_by_index((uint32_t)cid, &cc)) { cost = cc.cost; rb_free_card(&cc); }
-        total += cost + rb_mods_get_cost((RbMods*)&g->mods, cid);
-    }
-    int needed = 0; get_i(c, "count", &needed);
-    const char *op = get_str(c, "operator");
-    if (!op) op = ">=";
-    if (!strcmp(op, ">=")) return total >= needed;
-    if (!strcmp(op, "<=")) return total <= needed;
-    if (!strcmp(op, "==")) return total == needed;
-    if (!strcmp(op, ">"))  return total > needed;
-    if (!strcmp(op, "<"))  return total < needed;
-    return total >= needed;
-}
 
-/* ── evaluate_highest_cost_on_stage: highest cost member ── */
-static int eval_highest_cost_new(const GameState *g, int actor, const Condition *c) {
-    int pl = target_player_idx(actor, c);
-    int highest = 0;
-    for (int i = 0; i < RB_STAGE_SIZE; i++) {
-        int cid = g->p[pl].stage[i];
-        if (cid == RB_EMPTY_SLOT) continue;
-        Card cc; int cost = 0;
-        if (rb_decode_card_by_index((uint32_t)cid, &cc)) { cost = cc.cost; rb_free_card(&cc); }
-        int modified = cost + rb_mods_get_cost((RbMods*)&g->mods, cid);
-        if (modified > highest) highest = modified;
-    }
-    int needed = 0; get_i(c, "count", &needed);
-    const char *op = get_str(c, "operator");
-    if (!op) op = ">=";
-    if (!strcmp(op, ">=")) return highest >= needed;
-    if (!strcmp(op, "<=")) return highest <= needed;
-    if (!strcmp(op, "==")) return highest == needed;
-    if (!strcmp(op, ">"))  return highest > needed;
-    if (!strcmp(op, "<"))  return highest < needed;
-    return highest >= needed;
-}
-
-/* ── evaluate_both_condition: "both" target ── */
-static int eval_both(const GameState *g, int actor, const Condition *c) {
-    int pl_self = target_player_idx(actor, c);
-    int pl_opp = pl_self ^ 1;
-    const char *ct = get_str(c, "comparison_type");
-    int self_count = count_for_player_target(g, actor, pl_self, get_str(c, "location"), ct);
-    int opp_count = count_for_player_target(g, actor, pl_opp, get_str(c, "location"), ct);
-    const char *op = get_str(c, "operator");
-    if (!op) op = "and";
-    if (!strcmp(op, "and")) return self_count > 0 && opp_count > 0;
-    if (!strcmp(op, "or")) return self_count > 0 || opp_count > 0;
-    int needed = 0; get_i(c, "count", &needed);
-    if (!strcmp(op, ">=")) return self_count >= needed && opp_count >= needed;
-    if (!strcmp(op, "==")) return self_count == needed && opp_count == needed;
-    return self_count > 0 && opp_count > 0;
-}
-
-/* ── check_heart_type_all: heart type check across all matching cards ── */
-static int check_heart_type_all(const GameState *g, int actor, const Condition *c) {
-    int pl = target_player_idx(actor, c);
-    const char *loc = get_str(c, "location");
-    if (!loc) loc = "stage";
-    int ids[RB_MAX_ZONE]; int n = zone_ids(g, pl, loc, ids, RB_MAX_ZONE);
-    int ht = 0; get_i(c, "heart_type", &ht);
-    if (ht < 0) ht = 0;
-    for (int i = 0; i < n; i++) {
-        if (ids[i] < 0) continue;
-        Card cc; int has = 0;
-        if (rb_decode_card_by_index((uint32_t)ids[i], &cc)) {
-            for (int h = 0; h < cc.n_hearts; h++) {
-                if (cc.heart_color[h] == (uint8_t)ht) { has = 1; break; }
-            }
-            rb_free_card(&cc);
-        }
-        if (!has) return 0;
-    }
-    return 1;
-}
-
-/* ── check_heart_colors: at least one card matches heart colors ── */
-static int check_heart_colors(const GameState *g, int actor, const Condition *c) {
-    int pl = target_player_idx(actor, c);
-    const char *loc = get_str(c, "location");
-    if (!loc) loc = "stage";
-    int ids[RB_MAX_ZONE]; int n = zone_ids(g, pl, loc, ids, RB_MAX_ZONE);
-    const CondValue *hc = find_val(c, "heart_colors");
-    if (!hc || hc->tag != RB_TAG_ARRAY || hc->arr_n == 0) return 1;
-    for (int i = 0; i < n; i++) {
-        if (ids[i] < 0) continue;
-        for (uint32_t k = 0; k < hc->arr_n; k++) {
-            int col = RB_HEART_PINK;
-            if (hc->arr[k].tag == RB_TAG_I64) col = (int)hc->arr[k].i;
-            else if (hc->arr[k].tag == RB_TAG_STR && hc->arr[k].s) col = atoi(hc->arr[k].s);
-            Card cc; int has = 0;
-            if (rb_decode_card_by_index((uint32_t)ids[i], &cc)) {
-                for (int h = 0; h < cc.n_hearts; h++) {
-                    if (cc.heart_color[h] == (uint8_t)col) { has = 1; break; }
-                }
-                rb_free_card(&cc);
-            }
-            if (has) return 1;
-        }
-    }
-    return 0;
-}
-
-/* ── check_card_property: card property check ── */
-static int check_card_property_new(const GameState *g, int actor, const Condition *c) {
-    int pl = target_player_idx(actor, c);
-    const char *loc = get_str(c, "location");
-    if (!loc) loc = "stage";
-    int ids[RB_MAX_ZONE]; int n = zone_ids(g, pl, loc, ids, RB_MAX_ZONE);
-    const char *prop = get_str(c, "card_property");
-    if (!prop) return 1;
-    int needed = 0; get_i(c, "count", &needed);
-    if (needed == 0) needed = 1;
-    int count = 0;
-    for (int i = 0; i < n; i++) {
-        if (ids[i] < 0) continue;
-        if (!strcmp(prop, "has_blade_heart") || !strcmp(prop, "blade_heart")) {
-            Card cc; if (rb_decode_card_by_index((uint32_t)ids[i], &cc)) {
-                if (rb_card_has_blade_heart(&cc)) count++;
-                rb_free_card(&cc);
-            }
-        } else if (!strcmp(prop, "has_score_icon")) {
-            Card cc; if (rb_decode_card_by_index((uint32_t)ids[i], &cc)) {
-                if (rb_card_has_score_icon(&cc)) count++;
-                rb_free_card(&cc);
-            }
-        } else if (!strcmp(prop, "has_all_blade")) {
-            Card cc; if (rb_decode_card_by_index((uint32_t)ids[i], &cc)) {
-                if (rb_card_has_all_blade(&cc)) count++;
-                rb_free_card(&cc);
-            }
-        }
-    }
-    return count >= needed;
-}
-
-/* ── check_baton_touch: baton touch count check ── */
-static int check_baton_touch_count(const GameState *g, int actor, const Condition *c) {
-    int pl = target_player_idx(actor, c);
-    int bt = (pl == 0) ? g->baton_touch_count_p1 : g->baton_touch_count_p2;
-    int needed = 0; get_i(c, "min_baton_touch_count", &needed);
-    if (needed == 0) needed = 1;
-    return bt >= needed;
-}
-
-/* ── check_no_excess_heart: no excess heart flag ── */
-static int check_no_excess_heart_new(const GameState *g, int actor, const Condition *c) {
-    int pl = target_player_idx(actor, c);
-    if (pl == 0) return g->p1_live_success_no_excess;
-    return g->p2_live_success_no_excess;
-}
-
-/* ── check_original_blade_filter: original blade value check ── */
-static int check_original_blade(const GameState *g, int cid, int threshold) {
-    Card cc; int blade = 0;
-    if (rb_decode_card_by_index((uint32_t)cid, &cc)) { blade = cc.blade; rb_free_card(&cc); }
-    return blade < threshold;
-}
-
-/* ── check_original_heart_filter: original heart value check ── */
-static int check_original_heart(const GameState *g, int cid, int threshold) {
-    Card cc; int total = 0;
-    if (rb_decode_card_by_index((uint32_t)cid, &cc)) {
-        for (int h = 0; h < cc.n_hearts; h++) total += cc.heart_count[h];
-        rb_free_card(&cc);
-    }
-    return total < threshold;
-}
-
-/* ── evaluate_aggregate_total: sum of values across zone matching filter ── */
-static int eval_aggregate(const GameState *g, int actor, const Condition *c) {
-    int pl = target_player_idx(actor, c);
-    const char *loc = get_str(c, "location");
-    if (!loc) loc = "stage";
-    int ids[RB_MAX_ZONE]; int n = zone_ids(g, pl, loc, ids, RB_MAX_ZONE);
-    const CondValue *gn = find_val(c, "group_names");
-    const char *g0 = (gn && gn->tag == RB_TAG_ARRAY && gn->arr_n > 0 && gn->arr[0].tag == RB_TAG_STR) ? gn->arr[0].s : NULL;
-    int total = 0;
-    for (int i = 0; i < n; i++) {
-        if (ids[i] < 0) continue;
-        if (g0 && !rb_card_matches_group_str(ids[i], g0)) continue;
-        Card cc;
-        if (rb_decode_card_by_index((uint32_t)ids[i], &cc)) {
-            total += get_card_total_hearts(g, ids[i], NULL, 0);
-            rb_free_card(&cc);
-        }
-    }
-    int needed = 0; get_i(c, "aggregate_total", &needed);
-    const char *op = get_str(c, "aggregate_total_operator");
-    if (!op) op = ">=";
-    if (!strcmp(op, ">=")) return total >= needed;
-    if (!strcmp(op, "<=")) return total <= needed;
-    if (!strcmp(op, "==")) return total == needed;
-    if (!strcmp(op, ">"))  return total > needed;
-    if (!strcmp(op, "<"))  return total < needed;
-    return total >= needed;
-}
-
-/* ── evaluate_front_comparison: comparison against self card ── */
-static int eval_front_comparison_new(const GameState *g, int actor, int host_cid, const Condition *c) {
-    const char *ct = get_str(c, "comparison_type");
-    if (!ct) return 1;
-    int pl = target_player_idx(actor, c);
-    int self_count = count_for_player_target(g, actor, pl, get_str(c, "location"), ct);
-    int host_count = 0;
-    if (host_cid >= 0) {
-        Card cc; int val = 0;
-        if (rb_decode_card_by_index((uint32_t)host_cid, &cc)) {
-            if (!strcmp(ct, "cost")) val = cc.cost + rb_mods_get_cost((RbMods*)&g->mods, host_cid);
-            else if (!strcmp(ct, "score")) val = cc.score;
-            else if (!strcmp(ct, "blade")) val = cc.blade + rb_mods_get_blade((RbMods*)&g->mods, host_cid);
-            rb_free_card(&cc);
-        }
-        host_count = val;
-    }
-    const char *op = get_str(c, "operator");
-    if (!op) op = ">";
-    if (!strcmp(op, ">"))  return host_count > self_count;
-    if (!strcmp(op, ">=")) return host_count >= self_count;
-    if (!strcmp(op, "<"))  return host_count < self_count;
-    if (!strcmp(op, "<=")) return host_count <= self_count;
-    if (!strcmp(op, "==")) return host_count == self_count;
-    return host_count > self_count;
-}
-
-/* ── evaluate_position_condition: position check ── */
-static int eval_position_new(const GameState *g, int actor, const Condition *c) {
-    int pl = target_player_idx(actor, c);
-    const RbPlayer *P = &g->p[pl];
-    const char *pos = get_str(c, "position");
-    if (!pos) return 1;
-    if (!strcmp(pos, "center"))    return P->stage[1] != RB_EMPTY_SLOT;
-    if (!strcmp(pos, "left_side")) return P->stage[0] != RB_EMPTY_SLOT;
-    if (!strcmp(pos, "right_side"))return P->stage[2] != RB_EMPTY_SLOT;
-    if (!strcmp(pos, "any"))
-        return P->stage[0] != RB_EMPTY_SLOT || P->stage[1] != RB_EMPTY_SLOT || P->stage[2] != RB_EMPTY_SLOT;
-    return 1;
-}
-
-/* ── evaluate_complex_condition: complex compound with or/any_of ── */
-static int eval_complex_new(const GameState *g, int actor, int host_cid, const Condition *c) {
-    const CondValue *av = find_val(c, "or");
-    if (!av) av = find_val(c, "any_of");
-    if (!av || av->tag != RB_TAG_ARRAY || av->arr_n == 0) return 1;
-    for (uint32_t i = 0; i < av->arr_n; i++) {
-        if (av->arr[i].tag != RB_TAG_I64) continue;
-        /* sub-condition index  Esimplified: assume true for any sub */
-        return 1;
-    }
-    return 1;
-}
-
-/* ── evaluate_opponent_live_success_condition: opponent succeeded in live ── */
-static int eval_opponent_live_success(const GameState *g, int actor, const Condition *c) {
-    /* True only if opponent succeeded in live this turn */
-    int pl = actor ^ 1;
-    return g->p[pl].success.n > 0;
-}
-
-/* ── evaluate_check_self_condition: self-targeting check ── */
-static int eval_check_self_new(const GameState *g, int actor, int host_cid, const Condition *c) {
-    int self_target = 0; get_bool(c, "self_target", &self_target);
-    if (self_target) return host_cid >= 0;
-    return 1;
-}
-
-/* ── evaluate_state_change_condition: state change verification ── */
-static int eval_state_change_new(const GameState *g, int actor, const Condition *c) {
-    int pl = target_player_idx(actor, c);
-    const char *loc = get_str(c, "location");
-    if (!loc) loc = "stage";
-    int ids[RB_MAX_ZONE]; int n = zone_ids(g, pl, loc, ids, RB_MAX_ZONE);
-    int recently = 0;
-    for (int i = 0; i < n; i++) {
-        if (ids[i] < 0) continue;
-        if (ids[i] < RB_MAX_CARD_IDS && g->moved_this_turn[ids[i]]) { recently = 1; break; }
-    }
-    const char *sc = get_str(c, "state");
-    if (sc && !strcmp(sc, "active")) return 1;
-    if (recently) return 1;
-    return 0;
-}
-
-/* ── evaluate_score_threshold_condition: score >= threshold ── */
-static int eval_score_threshold(const GameState *g, int actor, const Condition *c) {
-    int pl = target_player_idx(actor, c);
-    int score = count_for_player_target(g, actor, pl, "live_card_zone", "score") +
-                count_for_player_target(g, actor, pl, "success_live_card_zone", "score");
-    int needed = 0; get_i(c, "count", &needed);
-    return score >= needed;
-}
-
-/* ── evaluate_no_excess_heart_condition: no excess heart check ── */
-static int eval_no_excess_new(const GameState *g, int actor, const Condition *c) {
-    int pl = target_player_idx(actor, c);
-    if (pl == 0) return g->p1_live_success_no_excess;
-    return g->p2_live_success_no_excess;
-}

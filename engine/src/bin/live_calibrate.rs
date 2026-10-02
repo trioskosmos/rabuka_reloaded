@@ -380,10 +380,21 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 gs.current_phase,
                 Phase::LiveCardSetFirstAttacker | Phase::LiveCardSetSecondAttacker
             );
-            // Only v8 is modelled. v7 has no equivalent prediction, so a row
-            // would be half-facts; the v7 side is a fixed opponent, not a
-            // subject of the report.
-            if live_phase && kind == BotKind::V8 {
+            // Only the v8-family live set is modelled. v7 has no equivalent
+            // prediction, so a row would be half-facts; the v7 side is a fixed
+            // opponent, not a subject of the report.
+            //
+            // `V9` and `V10` belong here too. Both ship **v8's live set**
+            // (registry.rs: "v9 = v7 strategy for Main, v8's live set"), so
+            // `predict_live_set_v8` is the right predictor for them - and they
+            // are the bots this project actually measures. Matching only
+            // `BotKind::V8` meant `--p1 v9` reported **0 rows and said so**,
+            // which is the harness correctly refusing to report zero and the
+            // wrong fix being to not ask. The calibration of the SHIPPING bot
+            // is the one that matters, and it is measured on a different board
+            // from pure v8 because their Main phases are v7's - which is
+            // exactly why it needs its own rows rather than v8's.
+            if live_phase && matches!(kind, BotKind::V8 | BotKind::V9 | BotKind::V10) {
                 if let Some(pred) = strategy_v8::predict_live_set_v8(&gs, &db) {
                     let (mine, theirs) = gs.seated_pair(me);
                     pending.push(Pending {

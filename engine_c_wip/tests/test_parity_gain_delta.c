@@ -467,46 +467,36 @@ static void opt(TestGame *tg, int n)
 }
 
 /* ── trigger shim (Rust helpers::fire_trigger) ───────────────────────────
- * Build the "<card_no>_<full_text>" ability id for the nth ability printing
- * `trig`, queue exactly that ability, set activating_card, run the queue.
- * Does NOT drain, so the caller still observes the prompt Rust observes. */
-void rb_trigger_auto_ability(GameState *g, const char *ability_id,
-                             const char *trigger_type, int player_id,
-                             const char *source_card_no,
-                             int explicit_card_id,
-                             const int *trigger_moved_cards, int n_moved,
-                             int triggering_member_id);
-
+ * Resolve ONE ability on ONE card, key it "{card_no}_{full_text}", fire it
+ * with `cid` as the activating card, then process the queue.
+ * Does NOT drain beyond that, so the caller still observes the prompt Rust
+ * observes.
+ *
+ * `nth` selects the Nth PRINTED ability carrying the trigger, which is exactly
+ * Rust's `fire_trigger_nth`; the shared test_fire_trigger_on_card_nth already
+ * implements that selection, so this wrapper no longer re-derives it.
+ *
+ * The body used to be a hand-rolled copy of that sequence, which recorded NO
+ * enqueue-time use — so a 自動/一度だけ ability was still unspent at
+ * resolution and the post-resolution re-scan in
+ * rb_process_player_abilities_depth_full enqueued it a SECOND time. Its
+ * "{card_no}_{full_text}" key also truncated at 1024 bytes. */
 static int fire_trigger(TestGame *tg, int cid, const char *trig,
                         const char *trigger_type, int nth)
 {
-    Card card_rec;
-    if (cid < 0 || !rb_decode_card_by_index((uint32_t)cid, &card_rec)) return 0;
-    char card_no[160];
-    snprintf(card_no, sizeof card_no, "%s",
-             rb_card_string(card_rec.card_no_idx));
-    char ability_id[1024];
-    int found = 0;
-    int nab = rb_card_num_abilities((uint32_t)cid);
-    for (int a = 0; a < nab && !found; a++) {
-        Ability ab;
-        memset(&ab, 0, sizeof ab);
-        if (!rb_decode_card_ability((uint32_t)cid, a, &ab)) continue;
-        if (ab.triggers && strcmp(ab.triggers, trig) == 0) {
-            if (nth == 0) {
-                snprintf(ability_id, sizeof ability_id, "%s_%s", card_no,
-                         ab.full_text ? ab.full_text : "");
-                found = 1;
-            } else {
-                nth--;
-            }
+    (void)trigger_type;   /* every call site here passes trig == trigger_type */
+    if (test_fire_trigger_on_card_nth(tg, cid, trig, nth)) return 1;
+    /* Diagnostic: a mismatch here is a HARNESS bug, not an engine bug, so
+     * it must be loud rather than silently becoming a vacuous negative. */
+    {
+        char card_no[160];
+        card_no[0] = '\0';
+        Card c;
+        if (cid >= 0 && rb_decode_card_by_index((uint32_t)cid, &c)) {
+            snprintf(card_no, sizeof(card_no), "%s", rb_card_string(c.card_no_idx));
+            rb_free_card(&c);
         }
-        rb_free_ability(&ab);
-    }
-    rb_free_card(&card_rec);
-    if (!found) {
-        /* Diagnostic: a mismatch here is a HARNESS bug, not an engine bug, so
-         * it must be loud rather than silently becoming a vacuous negative. */
+        int nab = cid >= 0 ? rb_card_num_abilities((uint32_t)cid) : 0;
         fprintf(stderr, "[TRIGGER-MISS] card %s: no ability with triggers \"%s\"; has:",
                 card_no, trig);
         for (int a = 0; a < nab; a++) {
@@ -518,13 +508,8 @@ static int fire_trigger(TestGame *tg, int cid, const char *trig,
             rb_free_ability(&ab);
         }
         fprintf(stderr, "\n");
-        return 0;
     }
-    rb_trigger_auto_ability(&tg->state, ability_id, trigger_type, 0, card_no,
-                            cid, NULL, 0, -1);
-    tg->state.activating_card = cid;
-    rb_process_pending_auto_abilities(&tg->state);
-    return 1;
+    return 0;
 }
 
 static int fire_live_start(TestGame *tg, int cid)

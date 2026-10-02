@@ -477,7 +477,43 @@ static int card_no_contains_lowest(const char *needle, const char *narrow) {
 /* Steps 2-5 of get_card_id. `scratch` holds four NUL-terminated buffers laid
    out back to back — normalized, base, variant, narrow — and must be at least
    card_no_scratch_bytes(len) bytes. Every buffer is sized from the caller's
-   string, never a fixed one, so no step ever sees a truncated key. */
+   string, never a fixed one, so no step ever sees a truncated key.
+
+   THE LAYOUT, and why `-Wrestrict` on the three snprintf calls below is a
+   false positive that must NOT be silenced. Byte offsets from `scratch`, for
+   any len >= 0 (offsets are written in terms of len, not of the data, so this
+   is a property of the arithmetic and not of any particular key):
+
+       normalized  [0,        len      ]   len+1 bytes, NUL at len
+       base        [len+1,    2*len+1  ]   len+1 bytes, NUL at len+1+base_len
+       variant     [2*len+2,  3*len+3  ]   len+2 bytes, NUL at <= 3*len+3
+       narrow      [3*len+4,  6*len+7  ]   3*len+4 bytes, NUL at <= 6*len+7
+
+   `base` ends at 2*len+1 and `variant` begins at 2*len+2 — a one-byte gap, for
+   EVERY len, including len == 0. `base` cannot be longer than `len` because
+   rb_card_normalize_no (card.c:223) never expands: it copies n bytes unchanged
+   or writes exactly 1 byte for a folded code point, so strlen(normalized) <=
+   len, hence base_len = dash - normalized <= len. `snprintf(variant, len+2,
+   ...)` is itself bounded to variant's own slot, so it cannot reach back into
+   `base` either. And `narrow` begins past variant's last writable byte, so no
+   step's writes touch a buffer another step still reads.
+
+   GCC's -Wrestrict reasons about the whole OBJECT (`scratch`), not about
+   sub-ranges of it: `base` and `variant` are both derived from the same
+   parameter, so it warns without asking whether the derived ranges intersect.
+   That heuristic is exactly right for `memcpy(dst, dst+n, k)` and exactly wrong
+   here. Measured: it fires under the project's own `-Wall` (gcc 15, data.c
+   :535/:563/:570), not only under -Wextra.
+
+   Do NOT silence it. There is no in-source way to tell GCC "same object, but
+   disjoint sub-ranges" — it only compares object identity — so the options are
+   a `#pragma GCC diagnostic` (destroys the diagnostic for exactly the range
+   arithmetic documented above) or hand-rolling the join with memcpy (replaces
+   a well-defined snprintf with 10 lines of truncation logic on the hottest
+   lookup path in the file). Neither is worth it: the code is correct for every
+   len, and the warning is the only tripwire that would notice a future edit to
+   the offsets making it incorrect. Noise that catches a real corruption class
+   is cheaper than silence that cannot. */
 static size_t card_no_scratch_bytes(size_t len) {
     return 3 * (len + 1) + 2 + 3 * len + 4 + 1;
 }
@@ -658,6 +694,25 @@ const char *rb_turn_phase_display(RbTurnPhase phase) {
     }
 }
 
+/* ── RB_PHASE_DONE: A C-ONLY RbPhase VARIANT. DO NOT "FIX" IT AWAY ────────
+ * Rust's `Phase` has 13 variants and NO "done": game-over is not a phase
+ * there, it is `GameResult != Ongoing` (types.rs:137-151 vs the GameResult enum
+ * beside it). The C host loop needs a terminal phase to `break` out of on, so
+ * rabuka.h:782 appends RB_PHASE_DONE as a 14th variant, AFTER the 13 Rust ones
+ * so nothing renumbers.
+ *
+ * That makes this the exact shape that produced the two historical drifts the
+ * tables in this file exist to catch:
+ *   1. RB_PHASE_DONE HAS NO RUST DISPLAY ARM, so "Done" / "終了" below are
+ *      C-only strings. They are the load-bearing part of the variant, not
+ *      decoration — do not treat them as drift and do not delete them with it.
+ *   2. It is also why `rb_phase_display` answers for 14 ordinals while
+ *      describe.rs/enums.rs enumerate 13. A future auditor counting rows and
+ *      expecting 13 will "find" a 14th and remove the wrong thing.
+ * So: the two arms below are deliberate, `rb_phase_is_live_phase` correctly
+ * returns false for it (game-over is not inside the live window), and it must
+ * survive as long as host code compares against it. */
+
 const char *rb_phase_display(RbPhase phase) {
     switch (phase) {
         case RB_PHASE_RPS: return "RPS";
@@ -673,7 +728,7 @@ const char *rb_phase_display(RbPhase phase) {
         case RB_PHASE_PERFORMANCE: return "Perform (1st)";
         case RB_PHASE_PERFORMANCE_SECOND: return "Perform (2nd)";
         case RB_PHASE_VICTORY: return "Live Result";
-        case RB_PHASE_DONE: return "Done";
+        case RB_PHASE_DONE: return "Done";   /* C-only; see the note above */
         default: return "";
     }
 }
@@ -779,7 +834,7 @@ const char *rb_phase_label_jp(int phase) {
         case RB_PHASE_PERFORMANCE: return "パフォーマンス（先攻）";
         case RB_PHASE_PERFORMANCE_SECOND: return "パフォーマンス（後攻）";
         case RB_PHASE_VICTORY: return "ライブ勝敗判定";
-        case RB_PHASE_DONE: return "終了";
+        case RB_PHASE_DONE: return "終了";   /* C-only; see the note above */
         default: return "不明";
     }
 }

@@ -210,7 +210,22 @@ void rb_abdebug_cost_pay(RbAbDebug *d, const AbilityEffect *cost, int ok) {
 
     const char *action = cost->action ? cost->action : "?";
     char buf[256];
-    snprintf(buf, sizeof(buf), "%s -> %s", action, ok ? "OK" : "FAIL");
+    /* debug.rs:159, `format_args!("{} \u{2192} {status}", cost.action)`. The
+     * separator is U+2192 RIGHTWARDS ARROW, three UTF-8 bytes E2 86 92, NOT the
+     * ASCII two-character "->" this line used to emit: every COST trace line
+     * differed from Rust by exactly those two bytes, so a trace diff reported
+     * every cost line as differing and the real differences were lost in it.
+     *
+     * The arrow is written as an explicit \xHH\xHH\xHH byte escape and NEVER as
+     * a literal character. This repo has been bitten twice by literal UTF-8 in
+     * C sources: a hand-transcribed hiragana where katakana belonged produced
+     * 1,483 phantom disagreements, and a file re-saved through Out-File had its
+     * bytes re-encoded. An escape is ASCII, so no editor, no encoding
+     * conversion and no codepage can change what the compiler emits. The same
+     * convention is already used at resolver.c:1028 (`\xE2\x9C\x93`) and
+     * resolver.c:1105 (`\xE2\x80\x94`). Verified: the emitted bytes are
+     * E2 86 92. */
+    snprintf(buf, sizeof(buf), "%s \xE2\x86\x92 %s", action, ok ? "OK" : "FAIL");
     rb_abdebug_p(d, "COST", buf);
 }
 

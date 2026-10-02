@@ -446,21 +446,28 @@ static void test_quoted_text(void)
 }
 
 /* =====================================================================
- * ROW 3 -- card_property   [STILL OPEN]
+ * ROW 3 -- card_property   [FIXED: the field exists and is consumed]
  *
  * Generator: "card_property" => ek.card_property = bc.read_arc_str_value()
  *            (effect_decoder_gen.rs:157); build_filter copies it into
  *            EffectFilter::card_property (line 514); CardFilter reads it in
  *            check_card_property (C port: rb_check_card_property,
- *            rabuka.h:2314, implemented in src/ability/util.c).
+ *            rabuka.h:2409, implemented in src/ability/util.c:2772).
  * Wire:      TAG_STR. 16 occurrences, all inside a card_count_condition.
- * C:         NO struct member. RbCardFilter (rabuka.h:2208-2248) has no
- *            card_property field, so rb_effect_filter_subset cannot carry it
- *            and rb_check_card_property is unreachable from any effect.
- *            The CONDITION-level card_property does decode (vm.c
- *            decode_condition_field "card_property" -> ConditionLocals), but
- *            that whole ConditionLocals path is itself unreachable from
- *            read_condition, so it does not rescue the filter either.
+ * C:         CORRECTION to an earlier peer claim recorded here as
+ *            "STILL OPEN": the production side arrived.
+ *              - include/rabuka.h:2342 declares `char card_property[64]` in
+ *                RbCardFilter, unconditionally -- the RB_CARD_FILTER_CARD_PROPERTY
+ *                switch that used to make the field optional is gone
+ *                (util.c:39-47, card.c:926-939 both say so).
+ *              - card_filter_from_effect populates it from the effect's extras
+ *                (card.c:938) and counts it in has_filter (card.c:1003),
+ *                mirroring util.rs:1882 and util.rs:1444.
+ *              - the matcher reads it (util.c:1603-1609) and routes it to
+ *                rb_check_card_property, i.e. util.rs:1654-1673.
+ *            So the assertions below check the real chain: the decoded value
+ *            reaches RbCardFilter, and the filter built from it actually keeps
+ *            score-icon cards and drops the rest.
  * ===================================================================== */
 
 static void test_card_property(void)
@@ -475,16 +482,89 @@ static void test_card_property(void)
     if (!ok) return;
     Ctx ctx = { "card_property", NULL };
     walk_find(a.effect, &ctx, 0);
-    /* Decoded VALUE must be right -- this half is green. */
+    /* Decoded VALUE must be right. */
     CHECK(ctx.hit && !strcmp(ctx.hit, "has_score_icon"),
           "card_property must decode to \"has_score_icon\" on "
           "PL!-pb2-004-PP ab#0 (got [%s])", ctx.hit ? ctx.hit : "(absent)");
-    /* ...and it must be REACHABLE by the predicate it names. It is not. */
-    OPEN("card_property", "ENGINE BUG",
-         "decodes to [%s] but RbCardFilter (rabuka.h:2208) has no "
-         "card_property member, so rb_check_card_property is unreachable "
-         "from any effect\n", ctx.hit ? ctx.hit : "(absent)");
-    CHECK(0, "card_property must reach rb_check_card_property via the filter");
+
+    /* ...and it must REACH the filter. util.rs:1882 reads
+     * `card_property: effect.card_property_any()` into CardFilter; the C twin
+     * is card_filter_from_effect (card.c:938), exposed as
+     * rb_effect_filter_subset (card.c:1007). */
+    RbCardFilter f;
+    memset(&f, 0, sizeof(f));
+    int built = a.effect ? rb_effect_filter_subset(a.effect, &f) : 0;
+    CHECK(built && f.card_property[0],
+          "card_property must populate RbCardFilter.card_property (rabuka.h:2342) "
+          "from the effect that decodes it (card.c:938) -- got [%s]",
+          built ? f.card_property : "(no filter built)");
+    CHECK(built && !strcmp(f.card_property, "has_score_icon"),
+          "the populated card_property must be the decoded value "
+          "\"has_score_icon\" (got [%s])", built ? f.card_property : "(none)");
+    CHECK(built && f.has_filter,
+          "card_property alone is a has_filter term (util.rs:1440-1444, "
+          "card.c:1003)");
+
+    /* ...and the matcher must CONSUME it. util.rs:1654-1673 turns the
+     * property into `card.has_score_icon()` and `negation` inverts it. Build a
+     * filter carrying ONLY that term so the assertion isolates it, then run the
+     * public matcher rb_matching_ids (util.c:1738) over one card of each kind.
+     * The two cards are found by scanning the corpus rather than hard-coded, so
+     * the assertion cannot rot when a card number is reissued. */
+    int with_icon = -1, without_icon = -1;
+    for (uint32_t i = 0; i < rb_num_cards() && (with_icon < 0 || without_icon < 0); i++) {
+        Card c;
+        if (!rb_decode_card_by_index(i, &c)) continue;
+        if (rb_card_has_score_icon(&c)) { if (with_icon < 0) with_icon = (int)i; }
+        else if (without_icon < 0) without_icon = (int)i;
+        rb_free_card(&c);
+    }
+    CHECK(with_icon >= 0 && without_icon >= 0,
+          "the corpus must contain a score-icon card and a card without one "
+          "(found %d / %d)", with_icon, without_icon);
+    if (with_icon < 0 || without_icon < 0) { rb_free_ability(&a); return; }
+
+    AbilityEffect only;
+    memset(&only, 0, sizeof(only));
+    only.action = (char *)"card_count_condition";
+    only.extra_k[0] = (char *)"card_property";
+    only.extra_v[0] = (char *)"has_score_icon";
+    only.n_extra = 1;
+
+    RbCardFilter mf;
+    memset(&mf, 0, sizeof(mf));
+    int mbuilt = rb_effect_filter_subset(&only, &mf);
+    CHECK(mbuilt && !strcmp(mf.card_property, "has_score_icon"),
+          "a lone card_property extra must build a filter that still carries it "
+          "(got [%s])", mbuilt ? mf.card_property : "(no filter built)");
+
+    int cands[2] = { with_icon, without_icon };
+    int got[2];
+    int ngot = rb_matching_ids(&mf, cands, 2, got, 2);
+    CHECK(ngot == 1 && got[0] == with_icon,
+          "a card_property=has_score_icon filter must keep only the score-icon "
+          "card (kept %d of 2)", ngot);
+
+    mf.negation = 1;   /* util.rs:1663-1667 */
+    ngot = rb_matching_ids(&mf, cands, 2, got, 2);
+    CHECK(ngot == 1 && got[0] == without_icon,
+          "negation must invert the card_property term and keep only the card "
+          "without the icon (kept %d of 2)", ngot);
+
+    /* util.rs:1656-1661 - an unknown property string is false, so a negated
+     * unknown property keeps everything. */
+    only.extra_v[0] = (char *)"not_a_real_property";
+    RbCardFilter uf;
+    memset(&uf, 0, sizeof(uf));
+    (void)rb_effect_filter_subset(&only, &uf);
+    CHECK(rb_matching_ids(&uf, cands, 2, got, 2) == 0,
+          "an unknown card_property is false, so an un-negated filter keeps "
+          "nothing (util.rs:1661)");
+    uf.negation = 1;
+    CHECK(rb_matching_ids(&uf, cands, 2, got, 2) == 2,
+          "an unknown card_property under negation keeps every card "
+          "(util.rs:1663-1667)");
+
     rb_free_ability(&a);
 }
 

@@ -15,17 +15,42 @@
 
 static int failures=0;
 #define CHECK(c,msg) do{ if(!(c)){ fprintf(stderr,"FAIL: %s\n",msg); failures++; } else printf("ok: %s\n",msg);} while(0)
+#define CHECK_EQ(a,b,msg) do{ int aa_=(a), bb_=(b); if(aa_!=bb_){ fprintf(stderr,"FAIL: %s (got %d expected %d)\n",msg,aa_,bb_); failures++; } else printf("ok: %s\n",msg);} while(0)
 
 static void scenario_draw_and_score(void){
-    GameState g; uint32_t d0[20]={0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19};
+    static GameState g; uint32_t d0[20]={0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19};
     uint32_t d1[20]={20,21,22,23,24,25,26,27,28,29,30,31,32,33,34,35,36,37,38,39};
     rb_seed(1); rb_game_init(&g,d0,20,d1,20);
     int hand_before=g.p[0].hand.n;
     rb_draw(&g,0); CHECK(g.p[0].hand.n==hand_before+1,"draw increments hand");
+    /* Rust score.rs:165-568 execute_modify_score NEVER writes player.score.
+     * It resolves a TARGET (score.rs:175 `effect.target_name()`), reads
+     * `let value: u8 = effect.value_any().unwrap_or(0)` (score.rs:174) -- the
+     * `value` extra, NOT `count`, and defaulting to 0 -- and then writes a
+     * PER-CARD score modifier through gs.mods.add_score_modifier
+     * (score.rs:520) for every card in the candidate pool
+     * (score.rs:403-452: live + success live + stage, deduped). So the
+     * observable contract for modify_score is the modifier, not the player. */
+    if(g.p[0].stage[0]==-1 && g.p[0].hand.n>0){
+        int c=g.p[0].hand.cards[0];
+        g.p[0].stage[0]=c;
+        g.p[0].hand.cards[0]=g.p[0].hand.cards[g.p[0].hand.n-1]; g.p[0].hand.n--;
+    }
+    int cid=g.p[0].stage[0];
+    if(cid<0) return;
     int sc_before=g.p[0].score;
-    AbilityEffect e={0}; e.action="modify_score"; e.count=2;
+    int mod_before=rb_mods_get_score(&g.mods,cid);
+    /* The parser emits the amount as `value`; without it Rust reads 0.
+     * score.rs:174 value_any().unwrap_or(0), so the extra is mandatory here. */
+    AbilityEffect e={0}; e.action="modify_score";
+    e.extra_k[0]="value"; e.extra_v[0]="2"; e.n_extra=1;
     rb_execute_effect(&g,0,&e);
-    CHECK(g.p[0].score==sc_before+2,"modify_score via effect");
+    CHECK(g.p[0].score==sc_before,
+          "modify_score never moves player.score (score.rs:165-568 writes only "
+          "per-card score modifiers and p1_constant_total_score_bonus)");
+    CHECK_EQ(rb_mods_get_score(&g.mods,cid),mod_before+2,
+             "modify_score adds `value` to the staged card's score modifier "
+             "(score.rs:520)");
 }
 
 static void scenario_live_performance(void){
@@ -71,9 +96,20 @@ static void scenario_move_cards(void){
 }
 
 static void scenario_condition_gate(void){
-    GameState g; uint32_t d0[10]={0,1,2,3,4,5,6,7,8,9}; uint32_t d1[10]={10,11,12,13,14,15,16,17,18,19};
+    static GameState g; uint32_t d0[10]={0,1,2,3,4,5,6,7,8,9}; uint32_t d1[10]={10,11,12,13,14,15,16,17,18,19};
     rb_seed(3); rb_game_init(&g,d0,10,d1,10);
-    AbilityEffect e={0}; e.action="modify_score"; e.count=5;
+    /* A staged member gives modify_score a non-empty candidate pool
+     * (score.rs:403-452: live + success live + stage), because with an empty
+     * pool nothing is applied and the gate would be untestable. */
+    if(g.p[0].stage[0]==-1 && g.p[0].hand.n>0){ int c=g.p[0].hand.cards[0]; g.p[0].stage[0]=c; g.p[0].hand.cards[0]=g.p[0].hand.cards[g.p[0].hand.n-1]; g.p[0].hand.n--; }
+    int cid=g.p[0].stage[0];
+    if(cid<0) return;
+    /* score.rs:174 `let value: u8 = effect.value_any().unwrap_or(0);` -- the
+     * amount is the `value` extra and an absent one is 0, so `count` is not a
+     * substitute. The effect writes a PER-CARD score modifier
+     * (score.rs:520), never player.score, so that is what the gate is read on. */
+    AbilityEffect e={0}; e.action="modify_score";
+    e.extra_k[0]="value"; e.extra_v[0]="5"; e.n_extra=1;
     Condition cond={0}; cond.variant=1;
     CondField *f=&cond.fields[cond.n_fields++];
     f->key="location"; f->v.tag=RB_TAG_STR; f->v.s="hand";
@@ -82,18 +118,31 @@ static void scenario_condition_gate(void){
     f=&cond.fields[cond.n_fields++];
     f->key="operator"; f->v.tag=RB_TAG_STR; f->v.s=">=";
     e.has_condition=1; e.condition=&cond;
-    int sc=g.p[0].score;
+    int mod0=rb_mods_get_score(&g.mods,cid);
     rb_execute_effect(&g,0,&e);
-    CHECK(g.p[0].score==sc,"condition-gated effect skipped when hand<99");
+    CHECK_EQ(rb_mods_get_score(&g.mods,cid),mod0,
+             "condition-gated effect skipped when hand<99: no score modifier");
     cond.fields[1].v.i=1;
     rb_execute_effect(&g,0,&e);
-    CHECK(g.p[0].score==sc+5,"condition-gated effect fires when hand>=1");
+    CHECK_EQ(rb_mods_get_score(&g.mods,cid),mod0+5,
+             "condition-gated effect fires when hand>=1: +5 on the card's score "
+             "modifier (score.rs:174 value, :520 add_score_modifier)");
 }
 static void scenario_opponent_choice_condition(void){
     static TestGame tg;
     test_game_new(&tg);
+    /* One staged member per player so modify_score's candidate pool
+     * (score.rs:403-452) is non-empty for BOTH actors, and the amount travels in
+     * the `value` extra (score.rs:174), not in `count`. */
+    int host[2];
+    for(int actor=0;actor<2;actor++){
+        host[actor]=test_new_id(&tg,"PL!-sd1-010-SD");
+        if(host[actor]>=0){ tg.state.p[actor].stage[0]=host[actor]; }
+        else return;
+    }
     Condition cond={0}; cond.variant=RB_COND_OPPONENT_CHOICE;
-    AbilityEffect e={0}; e.action="modify_score"; e.count=2;
+    AbilityEffect e={0}; e.action="modify_score";
+    e.extra_k[0]="value"; e.extra_v[0]="2"; e.n_extra=1;
     e.has_condition=1; e.condition=&cond;
     for(int actor=0;actor<2;actor++){
         for(int mode=0;mode<3;mode++){
@@ -103,14 +152,20 @@ static void scenario_opponent_choice_condition(void){
             int expected = mode == 2 ? 0 : 1;
             CHECK(rb_eval_condition(&tg.state,actor,&cond)==expected,
                   "opponent-choice condition honors default and negation");
-            int before=tg.state.p[actor].score;
+            int before=host[actor]>=0?rb_mods_get_score(&tg.state.mods,host[actor]):0;
+            int scbefore=tg.state.p[actor].score;
             rb_execute_effect(&tg.state,actor,&e);
+            CHECK_EQ(tg.state.p[actor].score,scbefore,
+                     "modify_score never moves player.score, gate or no gate "
+                     "(score.rs:165-568)");
             if (expected)
-                CHECK(tg.state.p[actor].score==before+2,
-                      "opponent-choice gate applies score effect for either actor");
+                CHECK_EQ(host[actor]>=0?rb_mods_get_score(&tg.state.mods,host[actor]):0,
+                         before+2,
+                         "opponent-choice gate applies score effect for either actor");
             else
-                CHECK(tg.state.p[actor].score==before,
-                      "opponent-choice negation blocks score effect");
+                CHECK_EQ(host[actor]>=0?rb_mods_get_score(&tg.state.mods,host[actor]):0,
+                         before,
+                         "opponent-choice negation blocks score effect");
         }
     }
 }

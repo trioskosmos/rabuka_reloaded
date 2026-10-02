@@ -499,11 +499,25 @@ static int fire_trigger(TestGame *tg, int cid, const char *trig)
  * card whose cost is a sequential_cost container has its WHOLE cost silently
  * dropped on this path - no energy is tapped and no hand discard happens.
  *
- * The queue path does pay it: rb_queue_trigger_abilities reaches
- * rb_pay_cost (src/core/game_state_abilities.c:1958) before the effect runs.
- * rb_queue_trigger_abilities takes a TRIGGER string, not a card, so this
- * helper publishes the card as the activating card and scans for its 起動
- * trigger, which is the same scan the queue performs.
+ * The queue path does pay it, and it pays it at RESOLUTION, not at enqueue:
+ * rb_pay_cost is called from pca_resolve_entry (src/core/game_state_abilities.c
+ * :2746), which every queue entry reaches through rb_process_current_ability.
+ * BOTH enqueue routes build the entry through the SAME builder,
+ * rb_build_ability_queue_entry -- the TAS zone scan at :1950 and
+ * rb_trigger_auto_ability at :1758 -- and that builder never reads its card_no
+ * argument, so a targeted entry and a scanned entry are field-identical apart
+ * from the (already-normalised) owner stamp and the movement batch. Making the
+ * ENQUEUE targeted therefore keeps the sequential_cost payment; it removes only
+ * the fan-out.
+ *
+ * The enqueue is therefore done by test_fire_trigger_on_card, the shared helper
+ * built on rb_trigger_auto_ability: it is Rust's own helpers/mod.rs:114
+ * `fire_trigger` (ONE ability of ONE card), and it carries the load-bearing
+ * enqueue-time use record (rb_record_use + use_limit_recorded) that
+ * queue_zone_abilities does at :1954-1955. Re-firing the whole-board scan here
+ * would re-introduce the defect the peer sweep found: `cid` only ever set
+ * activating_card, so a 起動 fanned out to every P1 card printing 起動 and
+ * doubled every recover/draw/score in the fixture.
  *
  * Both paths are therefore exercised in this file: the queue path here (the
  * faithful one) and test_activate_ability in test_c_activate_path_drops_a_
@@ -512,11 +526,36 @@ static int fire_trigger(TestGame *tg, int cid, const char *trig)
 static int activate_via_queue(TestGame *tg, int cid)
 {
     if (cid < 0 || !card_prints_trigger(cid, RB_TSTR_ACTIVATION)) return 0;
-    tg->state.activating_card = cid;
-    int queued = rb_queue_trigger_abilities(&tg->state, 0, RB_TSTR_ACTIVATION);
-    if (queued <= 0) return 0;
-    rb_process_pending_auto_abilities(&tg->state);
-    return 1;
+    /* ターン1回 -- Rust refuses the SECOND activation outright, at the OFFER
+     * layer, before anything is enqueued:
+     *     assert_eq!(use_offers(&game, hanano), 0,
+     *                "ターン1回 -- the 起動 must not be offered again this turn");
+     *     assert!(game.try_activate_ability(hanano).is_err(),
+     *             "the second activation must be refused");
+     * (pay_two_energy_recovers_score_three_live_to_hand_test.rs:143-151.)
+     * The C has no generate_possible_actions UseAbility branch -- the gap this
+     * file records in EXPECTED_GAP right above -- so that refusal has to be
+     * reproduced at the enqueue this helper performs, using the engine's own
+     * use bookkeeping. rb_trigger_auto_ability carries no use-limit gate
+     * because Rust's does not either: Rust's lives in the offer layer, one step
+     * ABOVE the one this helper stands in for, and the old whole-board TAS scan
+     * only refused by accident, through queue_zone_abilities' own enqueue-time
+     * `rb_use_limit_reached` gate.
+     *
+     * The gate is conditioned on a use ALREADY being recorded, so an ability
+     * whose use_limit is 0 or absent still fires: rb_ability_has_remaining_uses
+     * answers `used < limit` (abilities.rs:165-176) and a limit of 0 would make
+     * that FALSE on a fresh ability, which is not what the TAS scan's
+     * `limit <= 0 -> never reached` arm did. */
+    int a = test_ability_index_for_trigger(cid, RB_TSTR_ACTIVATION, 0);
+    if (a < 0) return 0;
+    if (rb_ability_uses_used(&tg->state, cid, a) > 0 &&
+        !rb_ability_has_remaining_uses(&tg->state, cid, a))
+        return 0;
+    /* The helper also drains (rb_process_pending_auto_abilities) and stamps
+     * activating_card, in Rust's order: enqueue, then activating_card, then
+     * the drain. */
+    return test_fire_trigger_on_card(tg, cid, RB_TSTR_ACTIVATION) > 0 ? 1 : 0;
 }
 
 static void dump_state(TestGame *tg, const char *what)

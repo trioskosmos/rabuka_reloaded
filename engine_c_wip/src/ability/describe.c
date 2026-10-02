@@ -11,6 +11,50 @@
  * included. test_output/describe_dump.json (engine/src/bin/describe_dump.rs)
  * is the byte-level oracle: 936 (describe_en, describe_ja) pairs.
  *
+ * ORACLE MEASUREMENT (re-measured 2026-10-02, out-of-tree dumper linked against
+ * describe.o + the existing object set; 985 abilities compiled from the tree vs
+ * 936 rows in the golden, so the comparison is a MULTISET, never positional --
+ * only 30 of 936 indexes even agree positionally):
+ *
+ *   936 golden rows, 985 compiled abilities
+ *   multiset intersection      : 933
+ *   golden-only                : 3   (all stale, see below)
+ *   C-only                     : 0
+ *
+ * The 3 residuals are ALL the same one stale-golden case, NOT defects. They are
+ * the `gain_resource` JA shorthand: Rust emits a bare resource word only when
+ * `count_any() == Some(1)`, otherwise `format!("{} {}", c.unwrap_or(1), r)`.
+ * Three abilities in the corpus LOST their `"count": 1` key in commit fef2bf1f
+ * ("feat(cards): add PBLL02 expansion data"), so today count_any() is None and
+ * both engines render "1 ブレード ..." while the golden still holds the
+ * pre-commit "ブレード ..." form. Card-level proof (git show
+ * fef2bf1f^:cards/abilities.json vs cards/abilities.json, matched by effect
+ * text):
+ *   now[125] "自分のステージにいる、メンバーカードが下に置かれている『Aqours』…"
+ *        before[141] had `count: 1`, now has no `count` key
+ *   now[202] "自分のステージにいるほかの『虹ヶ咲』のメンバーは…"
+ *        before[185] had `count: 1`, now has no `count` key
+ *   now[897] "自分のステージにいる『Aqours』のメンバーは…"
+ *        before[775] had `count: 1`, now has no `count` key
+ * No other ability changed shape: of the 11 `gain_resource` effects without a
+ * `count` key in the current corpus, exactly those 3 had one before. Regenerate
+ * the golden to close the gap; do NOT "fix" this file for it.
+ *
+ * ARM-BY-ARM VERIFICATION (not assumed): all 46 `describe_effect` dispatch
+ * arms and all 4 `describe_cost` arms of describe.rs are present here in the
+ * same order, with the JA and EN bodies matching Rust's format strings. The one
+ * structural difference is deliberate and output-identical: `look_at` and
+ * `reveal` share a single C branch, because the two Rust arms differ only in the
+ * pair 見る/公開する and Look at/Reveal.
+ *
+ * ALIASES ARE NORMALISED DOWNSTREAM, NOT HERE: `energy_count` and `repeat_limit`
+ * are read with d_u8_extra(e, "energy_count") / rb_effect_repeat_limit_any(e)
+ * and NO alias fallback. vm.c:957 and vm.c:1014 already map the wire aliases
+ * `max_repeats` -> `repeat_limit` and `energy` -> `energy_count` and keep both
+ * keys, so the canonical key is always present. Do not add an `|| "energy"` /
+ * `|| "max_repeats"` fallback here; that is the defect vm.c's branches exist to
+ * prevent.
+ *
  * Enums are NOT duplicated here. The wire-string tables live in
  * src/ability/enums.c (rb_action_type_*, rb_ability_zone_*, and
  * rb_effect_card_type_*) and are called through, so a new action or zone name
@@ -48,12 +92,35 @@
  *     `"`-quoting for empty/','-bearing elements and doubled inner quotes).
  *     d_group_label / d_join_csv re-split that blob.
  *
- * `compound.actions` is wire key "actions" only in Rust. The C decoder merges
- * "actions" / "effect_steps" / "costs" into AbilityEffect::child[], so the
- * sequential arm sees the union. That is a pre-existing C decoder divergence
- * (it affects execution too), not one introduced here; it is recorded in the
- * handoff report.
- */
+* `compound.actions` is wire key "actions" only in Rust. The C decoder merges
+* "actions" / "effect_steps" / "costs" into AbilityEffect::child[] (vm.c:859),
+* so the `sequential` and `sequential_cost` arms see that union. That is a
+* pre-existing C decoder divergence (it affects execution too), not one
+* introduced here; it is recorded in the handoff report. It is NOT REPAIRABLE
+* FROM THIS FILE: the decoder keeps no record of which of the three keys a child
+* came from, so `compound.actions` alone cannot be recovered here -- that needs
+* a vm.c change. Measured impact on the 985-ability corpus: 0 rows (the three
+* stale-golden rows are the `count` case above, not this one).
+*
+* OUTPUT SIZE / TRUNCATION AUDIT (measured 2026-10-02 over every effect and cost
+* node of all 985 abilities, 2156 nodes each way):
+*   rb_desc_effect_en max 272, rb_desc_effect_ja max 290
+*   rb_desc_cost_en   max 272, rb_desc_cost_ja max 290
+* (`rb_desc_cost_*` falls back to describe_effect for the actions Rust's
+* describe_cost does not special-case, so it inherits the effect maxima; the
+* four cost arms themselves top out at 97 EN / 112 JA.)
+* The public entry points return heap strings, so THEY do not clip. The buffers
+* that would clip are in rabuka.h, which this file may not edit, and they are
+* STILL 128 bytes in the current tree:
+*   rabuka.h:937-939  RbChoice.description / _en / _ja          char[128]
+*   rabuka.h:1114     RbFullChoice.description / _en / _ja     char[128]
+* Every write path is `strncpy(..., sizeof(x) - 1)` (choice.c:252, 1081, 1321,
+* 2415, 3364, 5316-5333), so a 272/290-byte describe truncates to 127 bytes
+* whenever it lands in one of those fields. Widen both to >= 512. The clip is
+* LATENT, not live: nothing in engine_c_wip calls any rb_desc_* entry point yet
+* (no consumer anywhere under src/ or tests/, and none under tools/), so this is
+* a rabuka.h widening request for whoever wires the describe layer to a prompt.
+*/
 
 #include "rabuka.h"
 #include <string.h>
@@ -210,14 +277,27 @@ static int d_bool_extra(const AbilityEffect *e, const char *key, int *out) {
     return 0;
 }
 
-/* AbilityEffect::action is an ActionType VALUE, not an Option: the decoder
-   maps an empty or unrecognised action string to ActionType::default()
-   (Custom), and every lookup below dispatches on `to_str`. */
+/* AbilityEffect::action is an ActionType VALUE, not an Option, and describe.rs
+   dispatches on `effect.action.to_str()`. The C decoder (vm.c:702-704) stores
+   the raw wire string verbatim and it IS already the canonical name, so a
+   non-empty string is returned as-is.
+
+   This used to re-validate it against enums.c's rb_action_type_from_str and
+   fold anything that table missed to "custom". enums.c is missing exactly two
+   of describe.rs's 49 arm literals -- `replacement_appear_wait` and
+   `count_as_multiple` (both present in rabuka.h as RB_ACTION_* and both
+   appended AFTER enums.c was written) -- so that guard made those two arms
+   UNREACHABLE and both abilities described themselves as their own raw text in
+   both languages. Measured against the 985-row Rust golden, that was 2 of the
+   4 residual mismatches.
+
+   Passing an unrecognised name straight through is exactly equivalent to Rust
+   for every input: Rust's decode maps an unknown name to Custom, whose
+   `to_str()` is "custom", and no arm is spelled "custom" or the unknown name,
+   so both routes fall through to the `_ => effect.text` arm. */
 static const char *d_action(const AbilityEffect *e) {
     const char *a = e ? e->action : NULL;
-    const char *custom = rb_action_type_to_str(rb_action_type_default());
-    if (!a || !*a) return custom;
-    if (rb_action_type_from_str(a) < 0) return custom;
+    if (!a || !*a) return rb_action_type_to_str(rb_action_type_default());
     return a;
 }
 
@@ -585,7 +665,7 @@ static void d_effect_into(RbDescBuf *b, const AbilityEffect *e, int ja)
             dbuf_puts(b, "Replacement: members with ");
             dbuf_puti(b, limit);
             dbuf_puts(b, " or fewer printed hearts appear in wait in "
-                         "{{center.png|the centre}} area");
+                          "{center.png|the centre} area");
         }
         goto done;
     }
@@ -880,8 +960,10 @@ static void d_effect_into(RbDescBuf *b, const AbilityEffect *e, int ja)
             dbuf_puti(b, c < 0 ? 1 : c);
             dbuf_puts(b, "枚の");
             dbuf_puts(b, ct);
-            dbuf_puts(b, "を選ぶ");
+            /* describe.rs:190 — "{src}から{c}枚の{ct}{opt}を選ぶ": the （任意）
+               marker sits BEFORE を選ぶ. */
             dbuf_puts(b, opt);
+            dbuf_puts(b, "を選ぶ");
         } else {
             dbuf_puts(b, "Select ");
             d_maybe_plural(b, c, ct);
@@ -1760,7 +1842,1010 @@ const char *rb_desc_duration_label(const char *duration, int ja) {
 }
 
 /* ====================================================================
+ * Condition describers — engine/src/ability/condition.rs
+ *
+ * `push_cond_verdict` (condition.rs:308-360) is the ONLY producer of the
+ * Condition payload that the verdict ring renders, and it needs two things
+ * that did not exist in this file: `describe_condition_expectation`
+ * (condition.rs:154-265) and the 21-arm condition-type table
+ * (condition.rs:318-340). Both are here, plus `describe_condition_actual`
+ * (condition.rs:740-936) and `describe_appearance_actual`
+ * (condition.rs:939-1060), which the same file's `evaluate_condition`
+ * dispatcher calls at condition.rs:632.
+ *
+ * DO NOT REUSE describe.rs's label helpers for this. condition.rs carries its
+ * OWN `describe_zone_label` (condition.rs:268-285) and
+ * `describe_card_type_label` (condition.rs:288-296), which emit
+ * `[[zone_*]]` / `[[card_type_*]]` PLACEHOLDER TOKENS, where describe.rs's
+ * `zone_label_inner` / `card_type_label_inner` — the pair behind
+ * d_zone_label / d_card_type_label above — emit the English/Japanese display
+ * strings. Same function name, different function, entirely different output,
+ * so the condition-side pair is d_cond_zone_label / d_cond_card_type_label.
+ *
+ * DO NOT REUSE debug.c's COND table either. rb_abdebug_condition
+ * (debug.c:171-205) maps the 20 C variants to "appearance", "location",
+ * "always_true", "?" — a shorter, DIFFERENT vocabulary with no
+ * "otherwise_condition", no "all_revealed_match_heart_color" and no "custom".
+ * The verdict ring's `condition_type` field is compared against Rust, so it
+ * gets Rust's spellings out of a table of its own below.
+ *
+ * MODEL NOTES
+ * -----------
+ *  - Rust's Condition is a 21-arm enum of structs; the C Condition is a flat
+ *    (key, CondValue) map plus a variant byte. Each typed `get_xyz() ->
+ *    Option<T>` below is a keyed lookup, and each enum-ONLY field is read by
+ *    its wire key, which is why the Appearance-only
+ *    `cost_reference_character` is an ordinary key read.
+ *  - get_state() is NOT one key read. For `Condition::State` it is
+ *    `state.as_deref().and_then(|s| match s.as_str() { "active" | "wait" =>
+ *    Some(..), _ => None })`, so an unrecognised value is None; for
+ *    `Condition::Location` the field is a typed `Option<CardState>` and
+ *    CardState::from_str defaults to Wait. d_cond_state reproduces both.
+ *  - `cost_reference_operator` is an i64 in the C — the Operator discriminant
+ *    rb_parse_operator produces, -1 for a string it cannot parse. Rust holds
+ *    `Option<Operator>`, and `as_deref().unwrap_or(">")` is where the ">"
+ *    default comes from.
+ *  - describe_condition_actual reads exactly ONE value off ConditionContext
+ *    rather than off the condition node: `get_count_for_condition`
+ *    (condition/card.rs:3974-4199), a 200-line dispatcher over the live game
+ *    state that lives in condition.c as a `static` and is therefore not
+ *    linkable from here. It is NOT duplicated: callers pass it in as
+ *    `measured_count`, which is what the `g` / `actor` parameters are for.
+ *    Three arms consume it (ComparisonCondition, BothCondition,
+ *    CardCountCondition) and condition_type() (card.rs:3875-3908) can only
+ *    ever produce the first, so the other two are latent.
+ *  - Everything else actual() reads is plain game state, which the C models
+ *    field for field, with two exceptions. `cards_moved_this_turn` has no C
+ *    list: the C keeps a per-card bitmask (moved_this_turn[],
+ *    modifiers.c:496-498), so the temporal arm counts the set bits. And the
+ *    no-excess flags are named differently: Rust's
+ *    self_no_excess_heart_this_turn / opponent_live_no_excess_heart_this_turn
+ *    are the C's p1_live_success_no_excess / p2_live_success_no_excess, the
+ *    same two flags condition.c:3845-3867 reads for the same predicate.
+ * ==================================================================== */
+
+/* Staging bound for one normalised card name. Rust's normalize_name is
+   unbounded; the longest card name in cards/cards.json is well under this
+   (the widest measured describe_effect_ja is 290 bytes, 290 of which include
+   several names). */
+#define D_COND_NAME_MAX 512
+
+static const char *const d_cond_pos_names[RB_STAGE_SIZE] = { "左", "中", "右" };
+
+static const CondValue *d_cond_find(const Condition *c, const char *key) {
+    uint32_t i;
+    if (!c || !key) return NULL;
+    for (i = 0; i < c->n_fields; i++)
+        if (c->fields[i].key && !strcmp(c->fields[i].key, key))
+            return &c->fields[i].v;
+    return NULL;
+}
+
+static const char *d_cond_str(const Condition *c, const char *key) {
+    const CondValue *v = d_cond_find(c, key);
+    if (!v || v->tag != RB_TAG_STR) return NULL;
+    return v->s;
+}
+
+/* Option<u8>: the C keeps the wire integer as int64, so the Rust `u8` bound is
+   re-applied here. -1 == None. */
+static int d_cond_u8(const Condition *c, const char *key) {
+    const CondValue *v = d_cond_find(c, key);
+    if (!v) return -1;
+    if (v->tag == RB_TAG_I64) return (v->i < 0 || v->i > 255) ? -1 : (int)v->i;
+    if (v->tag == RB_TAG_STR && v->s) {
+        char *end = NULL;
+        long n = strtol(v->s, &end, 10);
+        if (end == v->s || *end) return -1;
+        return (n < 0 || n > 255) ? -1 : (int)n;
+    }
+    return -1;
+}
+
+/* Raw integer, no u8 clamp: for the fields Rust types as a plain count, and for
+   `cost_reference_operator`, whose -1 IS Rust's None. */
+static int d_cond_i64(const Condition *c, const char *key) {
+    const CondValue *v = d_cond_find(c, key);
+    if (!v) return -1;
+    if (v->tag == RB_TAG_I64) return (int)v->i;
+    if (v->tag == RB_TAG_STR && v->s) return atoi(v->s);
+    return -1;
+}
+
+/* `Option<&[String]>` getter. Accepts both the array shape and a bare string,
+   which is what the decoder writes when the wire carried one. NULL == None. */
+static const char *d_cond_arr_at(const Condition *c, const char *key, int n) {
+    const CondValue *v = d_cond_find(c, key);
+    if (!v) return NULL;
+    if (v->tag == RB_TAG_STR) return n == 0 ? v->s : NULL;
+    if (v->tag != RB_TAG_ARRAY || !v->arr) return NULL;
+    if (n < 0 || (uint32_t)n >= v->arr_n) return NULL;
+    return v->arr[n].tag == RB_TAG_STR ? v->arr[n].s : NULL;
+}
+
+/* Option<&[String]> is Some even when empty, so presence and emptiness have to
+   stay distinguishable — condition.rs:205 depends on it. -1 == None. */
+static int d_cond_arr_len(const Condition *c, const char *key) {
+    const CondValue *v = d_cond_find(c, key);
+    if (!v) return -1;
+    if (v->tag == RB_TAG_STR) return 1;
+    if (v->tag != RB_TAG_ARRAY || !v->arr) return -1;
+    return (int)v->arr_n;
+}
+
+/* Operator::as_str (card.rs:2824-2834). The discriminant order is the one
+   rb_parse_operator produces (card.c:312-321), not the display order. */
+static const char *d_operator_str(int op) {
+    switch (op) {
+        case 0: return ">=";
+        case 1: return "<=";
+        case 2: return ">";
+        case 3: return "<";
+        case 4: return "=";
+        default: return "";
+    }
+}
+
+static const char *d_cond_state(const Condition *c) {
+    const char *s = d_cond_str(c, "state");
+    if (!s) return NULL;
+    if (!strcmp(s, "active")) return "active";
+    if (!strcmp(s, "wait")) return "wait";
+    /* Condition::Location types the field, and CardState::from_str's default
+       arm is Wait; Condition::State matches on the two names and yields None
+       for anything else. */
+    if (c && c->variant == RB_COND_LOCATION) return "wait";
+    return NULL;
+}
+
+/* get_position() -> Option<&PositionInfo>, then .get_position() on it. The C
+   keeps both wire shapes: a bare string, or the struct { position, target }. */
+static const char *d_cond_position(const Condition *c) {
+    const CondValue *v = d_cond_find(c, "position");
+    if (!v) return NULL;
+    if (v->tag == RB_TAG_STR) return v->s;
+    if ((v->tag == RB_TAG_OBJECT || v->tag == RB_TAG_OBJVAR) && v->cond) {
+        const CondValue *inner = d_cond_find(v->cond, "position");
+        if (inner && inner->tag == RB_TAG_STR) return inner->s;
+    }
+    return NULL;
+}
+
+/* get_card_type() -> Option<ConditionCardType>, then as_str(). The C decode
+   keeps the raw wire string, and ConditionCardType::from_str (card.rs:3028-3040)
+   is TOTAL — only "live_card" and "energy_card" are special, everything else is
+   MemberCard — so a present `card_type` is always Some. */
+static const char *d_cond_card_type(const Condition *c) {
+    const char *raw = d_cond_str(c, "card_type");
+    int t;
+    if (!raw) return NULL;
+    t = rb_condition_card_type_from_str(raw);
+    return t == 1 ? "live_card" : (t == 2 ? "energy_card" : "member_card");
+}
+
+/* condition.rs:268-285 — [[zone_*]] placeholder tokens, NOT the display
+   strings. Unknown zone names pass through unchanged (the `_ => zone` arm). */
+static const char *d_cond_zone_label(const char *zone) {
+    if (!zone) return "";
+    if (!strcmp(zone, "hand")) return "[[zone_hand]]";
+    if (!strcmp(zone, "discard") || !strcmp(zone, "waitroom")) return "[[zone_discard]]";
+    if (!strcmp(zone, "deck")) return "[[zone_deck]]";
+    if (!strcmp(zone, "deck_top")) return "[[zone_deck_top]]";
+    if (!strcmp(zone, "deck_bottom")) return "[[zone_deck_bottom]]";
+    if (!strcmp(zone, "stage")) return "[[zone_stage]]";
+    if (!strcmp(zone, "energy") || !strcmp(zone, "energy_zone")) return "[[zone_energy]]";
+    if (!strcmp(zone, "live_card_zone")) return "[[zone_live_card]]";
+    if (!strcmp(zone, "success_zone") || !strcmp(zone, "success_live_zone")) return "[[zone_success_live]]";
+    if (!strcmp(zone, "revealed_cards")) return "[[zone_revealed]]";
+    if (!strcmp(zone, "those_cards")) return "[[zone_those_cards]]";
+    if (!strcmp(zone, "all_selected")) return "[[zone_selected]]";
+    if (!strcmp(zone, "under_member")) return "[[zone_under_member]]";
+    return zone;
+}
+
+/* condition.rs:288-296 — same relationship with card_type_label_inner. */
+static const char *d_cond_card_type_label(const char *ct) {
+    if (!ct) return "";
+    if (!strcmp(ct, "member_card")) return "[[card_type_member]]";
+    if (!strcmp(ct, "live_card")) return "[[card_type_live]]";
+    if (!strcmp(ct, "energy_card")) return "[[card_type_energy]]";
+    if (!strcmp(ct, "card")) return "[[card_type_card]]";
+    return ct;
+}
+
+/* Rust `{:?}` for a Vec<String>: ["a", "b"]. escape_debug keeps printable
+   non-ASCII raw, so bytes >= 0x80 pass through inside the UTF-8 sequence. */
+static void d_cond_debug_str(RbDescBuf *b, const char *s) {
+    const unsigned char *p = (const unsigned char *)(s ? s : "");
+    dbuf_putc(b, '"');
+    for (; *p; p++) {
+        switch (*p) {
+            case '"':  dbuf_puts(b, "\\\""); break;
+            case '\\': dbuf_puts(b, "\\\\"); break;
+            case '\n': dbuf_puts(b, "\\n");  break;
+            case '\r': dbuf_puts(b, "\\r");  break;
+            case '\t': dbuf_puts(b, "\\t");  break;
+            default:
+                if (*p < 0x20) {
+                    char esc[8];
+                    snprintf(esc, sizeof esc, "\\u{%x}", (unsigned)*p);
+                    dbuf_puts(b, esc);
+                } else {
+                    dbuf_putc(b, (char)*p);
+                }
+        }
+    }
+    dbuf_putc(b, '"');
+}
+
+/* condition.rs:154-265 — the expectation string that push_cond_verdict renders
+   ONCE and reuses for both `text` and `expectation` (condition.rs:315). Every
+   literal below is transcribed from that function; nothing is invented. */
+static char *d_cond_expectation(const Condition *c) {
+    RbDescBuf b;
+    const char *op, *location, *ct_field;
+    int threshold;
+
+    dbuf_init(&b);
+    if (!c) return dbuf_take(&b);
+
+    op = d_cond_str(c, "operator");
+    if (!op) op = ">=";
+    threshold = d_cond_u8(c, "count");
+    location = d_cond_str(c, "location");
+    if (!location) location = "";
+    ct_field = d_cond_card_type(c);
+    if (!ct_field) ct_field = "";
+
+    switch (c->variant) {
+    case RB_COND_APPEARANCE: {
+        /* Some(chars) && !chars.is_empty(). The cost-reference form needs
+           `cost_reference_character: Some(_)`, which only the Appearance
+           variant carries. */
+        if (d_cond_arr_len(c, "characters") > 0) {
+            const char *ch0 = d_cond_arr_at(c, "characters", 0);
+            const char *refc = d_cond_str(c, "cost_reference_character");
+            dbuf_puts(&b, ch0 ? ch0 : "");
+            if (refc) {
+                dbuf_puts(&b, " ");
+                dbuf_puts(&b, d_operator_str(d_cond_i64(c, "cost_reference_operator")));
+                dbuf_puts(&b, " ");
+                dbuf_puts(&b, refc);
+            } else {
+                dbuf_puts(&b, " = true");
+            }
+        } else {
+            dbuf_puts(&b, "登場=true");
+        }
+        break;
+    }
+    case RB_COND_COMPARISON:
+        /* format!("{} {}{}", op, threshold, loc) — threshold is "" when
+           get_count() is None, so a missing count leaves the gap. */
+        dbuf_puts(&b, op);
+        dbuf_putc(&b, ' ');
+        if (threshold >= 0) dbuf_puti(&b, threshold);
+        if (*location) {
+            dbuf_puts(&b, " (");
+            dbuf_puts(&b, d_cond_zone_label(location));
+            dbuf_puts(&b, ")");
+        }
+        break;
+    case RB_COND_LOCATION: {
+        const char *zone_desc = *location ? d_cond_zone_label(location) : "anywhere";
+        const char *type_desc = *ct_field ? d_cond_card_type_label(ct_field) : "cards";
+        dbuf_puts(&b, op);
+        dbuf_putc(&b, ' ');
+        if (threshold >= 0) dbuf_puti(&b, threshold);
+        dbuf_putc(&b, ' ');
+        dbuf_puts(&b, type_desc);
+        dbuf_puts(&b, " in ");
+        dbuf_puts(&b, zone_desc);
+        break;
+    }
+    case RB_COND_GROUP:
+        if (d_cond_arr_len(c, "group_names") >= 0) {
+            int n = d_cond_arr_len(c, "group_names"), i;
+            dbuf_puts(&b, "所属=");
+            for (i = 0; i < n; i++) {
+                if (i) dbuf_putc(&b, ',');
+                dbuf_puts(&b, d_cond_arr_at(c, "group_names", i));
+            }
+        } else {
+            dbuf_puts(&b, "所属条件");
+        }
+        break;
+    case RB_COND_POSITION: {
+        const char *pos = d_cond_position(c);
+        if (pos) {
+            dbuf_puts(&b, "位置=");
+            dbuf_puts(&b, pos);
+        } else {
+            dbuf_puts(&b, "位置条件");
+        }
+        break;
+    }
+    case RB_COND_RESOURCE:
+        dbuf_puts(&b, "ブレード ");
+        dbuf_puts(&b, op);
+        dbuf_putc(&b, ' ');
+        if (threshold >= 0) dbuf_puti(&b, threshold);
+        break;
+    case RB_COND_SCORE_THRESHOLD:
+        dbuf_puts(&b, "スコア ");
+        dbuf_puts(&b, op);
+        dbuf_putc(&b, ' ');
+        if (threshold >= 0) dbuf_puti(&b, threshold);
+        break;
+    case RB_COND_STATE:
+        /* The zone is the PLACEHOLDER table here, not the display table. */
+        dbuf_puts(&b, d_cond_state(c) ? d_cond_state(c) : "状態");
+        dbuf_puts(&b, "状態のメンバー in ");
+        dbuf_puts(&b, d_cond_zone_label(location));
+        break;
+    case RB_COND_MOVEMENT:
+        dbuf_puts(&b, "移動=");
+        dbuf_puts(&b, d_cond_str(c, "movement") ? d_cond_str(c, "movement") : "?");
+        break;
+    case RB_COND_TEMPORAL:
+        dbuf_puts(&b, d_cond_str(c, "temporal") ? d_cond_str(c, "temporal") : "タイミング");
+        break;
+    case RB_COND_ABILITY_FILTER:
+        dbuf_puts(&b, "フィルター");
+        break;
+    case RB_COND_NO_EXCESS_HEART:
+        dbuf_puts(&b, "余剰ハートなし");
+        break;
+    default:
+        /* Choice | Complex | OpponentChoice | OpponentLiveSuccess |
+           Compound | AnyOf | AlwaysTrue | AllRevealed | Unsupported
+           — the `_ => String::new()` arm. */
+        break;
+    }
+    return dbuf_take(&b);
+}
+
+/* condition.rs:318-340 — the 21-arm table that names a condition in the verdict
+ * ring. Rust's spellings, in the C's variant order. This is a DIFFERENT
+ * vocabulary from rb_abdebug_condition's COND table in debug.c:171-199
+   ("appearance", "location", "always_true", "?"), which is untouched and stays
+ * the debug-dump vocabulary. */
+const char *rb_desc_cond_verdict_type(const Condition *c) {
+    if (!c) return "custom";
+    switch (c->variant) {
+        case RB_COND_COMPOUND:              return "compound";
+        case RB_COND_LOCATION:              return "card_count_condition";
+        case RB_COND_COMPARISON:            return "comparison_condition";
+        case RB_COND_MOVEMENT:              return "movement_condition";
+        case RB_COND_GROUP:                 return "group_condition";
+        case RB_COND_APPEARANCE:            return "appearance_condition";
+        case RB_COND_TEMPORAL:              return "temporal_condition";
+        case RB_COND_STATE:                 return "state_condition";
+        case RB_COND_RESOURCE:              return "resource_condition";
+        case RB_COND_ABILITY_FILTER:        return "ability_filter_condition";
+        case RB_COND_SCORE_THRESHOLD:       return "score_threshold_condition";
+        case RB_COND_CHOICE:                return "choice_condition";
+        case RB_COND_COMPLEX:               return "complex_condition";
+        case RB_COND_POSITION:              return "position_condition";
+        case RB_COND_OPPONENT_CHOICE:       return "opponent_choice_condition";
+        case RB_COND_OPPONENT_LIVE_SUCCESS: return "opponent_live_success";
+        case RB_COND_NO_EXCESS_HEART:       return "no_excess_heart";
+        case RB_COND_ALWAYS_TRUE:           return "otherwise_condition";
+        case RB_COND_ANY_OF:                return "any_of_condition";
+        case RB_COND_ALL_REVEALED:          return "all_revealed_match_heart_color";
+        case RB_COND_UNSUPPORTED:           return "custom";
+        default:                            return "custom";
+    }
+}
+
+/* Condition::condition_type() (core/card.rs:3875-3908). Always Some in Rust —
+   every one of the 21 arms returns a value — so there is no None case. */
+static int d_cond_type(const Condition *c) {
+    if (!c) return RB_CONDTYPE_CUSTOM;
+    switch (c->variant) {
+        case RB_COND_COMPOUND:     return RB_CONDTYPE_COMPOUND;
+        case RB_COND_LOCATION:     return RB_CONDTYPE_LOCATION;
+        case RB_COND_COMPARISON:   return RB_CONDTYPE_COMPARISON;
+        case RB_COND_GROUP:        return RB_CONDTYPE_GROUP;
+        case RB_COND_APPEARANCE:   return RB_CONDTYPE_APPEARANCE;
+        case RB_COND_TEMPORAL:     return RB_CONDTYPE_TEMPORAL;
+        case RB_COND_STATE:        return RB_CONDTYPE_STATE;
+        case RB_COND_RESOURCE:     return RB_CONDTYPE_RESOURCE;
+        case RB_COND_ABILITY_FILTER: return RB_CONDTYPE_ABILITY_FILTER;
+        case RB_COND_SCORE_THRESHOLD: return RB_CONDTYPE_SCORE_THRESHOLD;
+        case RB_COND_CHOICE:       return RB_CONDTYPE_CHOICE;
+        case RB_COND_COMPLEX:      return RB_CONDTYPE_COMPLEX;
+        case RB_COND_POSITION:     return RB_CONDTYPE_POSITION;
+        case RB_COND_OPPONENT_CHOICE: return RB_CONDTYPE_OPPONENT_CHOICE;
+        case RB_COND_OPPONENT_LIVE_SUCCESS: return RB_CONDTYPE_OPPONENT_LIVE_SUCCESS;
+        case RB_COND_NO_EXCESS_HEART: return RB_CONDTYPE_NO_EXCESS_HEART;
+        case RB_COND_ALWAYS_TRUE:  return RB_CONDTYPE_OTHERWISE;
+        case RB_COND_ANY_OF:       return RB_CONDTYPE_ANY_OF;
+        case RB_COND_ALL_REVEALED: return RB_CONDTYPE_ALL_REVEALED_MATCH_HEART_COLOR;
+        case RB_COND_UNSUPPORTED:  return RB_CONDTYPE_CUSTOM;
+        case RB_COND_MOVEMENT: {
+            const char *mv = d_cond_str(c, "movement");
+            if (!mv) return RB_CONDTYPE_NOT_MOVED;
+            if (!strcmp(mv, "has_moved")) return RB_CONDTYPE_HAS_MOVED;
+            if (!strcmp(mv, "not_moved")) return RB_CONDTYPE_NOT_MOVED;
+            return RB_CONDTYPE_MOVEMENT;
+        }
+        default: return RB_CONDTYPE_CUSTOM;
+    }
+}
+
+/* ConditionContext::resolve_self_player (condition/card.rs:32-35): the owner of
+   the activating card, or None. -1 is the C's None. */
+static int d_cond_self_player(const struct GameState *g) {
+    if (!g || g->activating_card < 0) return -1;
+    return rb_owner_of_card(g, g->activating_card);
+}
+
+/* resolve_condition_player (condition/card.rs:25-31). */
+static const RbPlayer *d_cond_player(const struct GameState *g, int self_pl,
+                                      const char *target) {
+    int idx;
+    if (!target) target = "self";
+    if (!strcmp(target, "self") || !strcmp(target, "both")) {
+        if (self_pl >= 0) return &g->p[self_pl];
+        return &g->p[rb_resolve_target_player(g, "self")];
+    }
+    idx = rb_resolve_target_player(g, target);
+    if (idx < 0 || idx > 1) idx = 0;
+    return &g->p[idx];
+}
+
+/* no_excess_heart_flag (condition/state.rs:10-16). Rust's two flags are the C's
+   p1_live_success_no_excess / p2_live_success_no_excess — the same pair
+   condition.c:3845-3867 reads for the same predicate, under other names. */
+static int d_no_excess_heart_flag(const struct GameState *g, const char *target) {
+    const RbPlayer *P = d_cond_player(g, d_cond_self_player(g), target);
+    return P == &g->p[0] ? g->p1_live_success_no_excess : g->p2_live_success_no_excess;
+}
+
+/* condition.rs:1063-1068. */
+static void d_with_position(RbDescBuf *b, const char *base, const char *position_str) {
+    dbuf_puts(b, base ? base : "");
+    if (position_str && *position_str) {
+        dbuf_putc(b, ' ');
+        dbuf_puts(b, position_str);
+    }
+}
+
+/* The cost of the first stage card whose normalised name CONTAINS `want_norm`,
+   or -1. condition.rs:1004-1008; `.next()` over the filter_map, and None for a
+   card the database cannot decode. */
+static int d_cond_named_cost(const int *ids, int n, const char *want_norm) {
+    int i;
+    for (i = 0; i < n; i++) {
+        Card cc;
+        char nm[D_COND_NAME_MAX];
+        int found = 0;
+        if (!rb_decode_card_by_index((uint32_t)ids[i], &cc)) continue;
+        rb_card_normalize_name(cc.name ? cc.name : "", nm, sizeof nm);
+        found = (strstr(nm, want_norm) != NULL);
+        if (found) { int cost = (int)cc.cost; rb_free_card(&cc); return cost; }
+        rb_free_card(&cc);
+    }
+    return -1;
+}
+
+/* condition.rs:939-1060 — ConditionContext::describe_appearance_actual. */
+static char *d_cond_appearance_actual(const struct GameState *g, int self_pl,
+                                       const Condition *c) {
+    RbDescBuf b, pos_buf, part;
+    const RbPlayer *P;
+    const char *target = d_cond_str(c, "target");
+    const char *location = d_cond_str(c, "location");
+    const char *position_str = NULL;
+    int stage_ids[RB_STAGE_SIZE], n_stage = 0, i, k, zone;
+
+    dbuf_init(&b);
+    dbuf_init(&pos_buf);
+    if (!g || !c) { dbuf_free(&pos_buf); return dbuf_take(&b); }
+    if (!location) location = "";
+    P = d_cond_player(g, self_pl, target);
+
+    {
+        const char *pos = d_cond_position(c);
+        if (pos) {
+            dbuf_puts(&pos_buf, "位置=");
+            dbuf_puts(&pos_buf, pos);
+            position_str = pos_buf.s;
+        } else {
+            const char *ap = d_cond_str(c, "activation_position");
+            if (ap) {
+                /* act_pos.split(',').any(|p| idx(p).map_or(true, |i|
+                   i < stage.len() && stage[i] == card_id.unwrap())) */
+                int ok = 0;
+                const char *p = ap;
+                while (p && !ok) {
+                    const char *comma = strchr(p, ',');
+                    size_t len = comma ? (size_t)(comma - p) : strlen(p);
+                    char tok[64];
+                    size_t cp = len < sizeof(tok) - 1 ? len : sizeof(tok) - 1;
+                    int idx;
+                    memcpy(tok, p, cp);
+                    tok[cp] = 0;
+                    idx = rb_activation_position_index(tok);
+                    if (idx < 0) {
+                        ok = 1;                       /* unknown token -> true */
+                    } else if (g->activating_card >= 0 && idx < RB_STAGE_SIZE &&
+                               P->stage[idx] == g->activating_card) {
+                        ok = 1;
+                    }
+                    p = comma ? comma + 1 : NULL;
+                }
+                if (ok) {
+                    dbuf_puts(&pos_buf, "位置=OK(");
+                    dbuf_puts(&pos_buf, ap);
+                    dbuf_puts(&pos_buf, ")");
+                } else {
+                    const char *cur = "?";
+                    if (g->activating_card >= 0)
+                        for (i = 0; i < RB_STAGE_SIZE; i++)
+                            if (P->stage[i] == g->activating_card) {
+                                cur = d_cond_pos_names[i];
+                                break;
+                            }
+                    dbuf_puts(&pos_buf, "位置=不適合(現在");
+                    dbuf_puts(&pos_buf, cur);
+                    dbuf_puts(&pos_buf, "、期待");
+                    dbuf_puts(&pos_buf, ap);
+                    dbuf_puts(&pos_buf, ")");
+                }
+                position_str = pos_buf.s;
+            }
+        }
+    }
+
+    zone = rb_ability_zone_from_str(location);
+    if (zone == RB_ABILITY_ZONE_STAGE) {
+        for (i = 0; i < RB_STAGE_SIZE; i++)
+            if (P->stage[i] != RB_EMPTY_SLOT) stage_ids[n_stage++] = P->stage[i];
+
+        if (n_stage == 0) {
+            dbuf_puts(&b, "不在");
+            dbuf_putc(&b, ' ');
+            dbuf_puts(&b, position_str ? position_str : "");
+            dbuf_trim(&b);
+            dbuf_free(&pos_buf);
+            return dbuf_take(&b);
+        }
+
+        {
+            char names[RB_STAGE_SIZE][D_COND_NAME_MAX];
+            int n_names = 0;
+            for (i = 0; i < n_stage; i++) {
+                Card cc;
+                if (!rb_decode_card_by_index((uint32_t)stage_ids[i], &cc)) continue;
+                rb_card_normalize_name(cc.name ? cc.name : "", names[n_names],
+                                       D_COND_NAME_MAX);
+                n_names++;
+                rb_free_card(&cc);
+            }
+            /* Stage filter, then cost reference (condition.rs:983-1002). */
+            {
+                int nchars = d_cond_arr_len(c, "characters");
+                if (nchars > 0) {
+                    for (i = 0; i < nchars; i++) {
+                        const char *ch = d_cond_arr_at(c, "characters", i);
+                        char norm_ch[D_COND_NAME_MAX];
+                        int found = 0;
+                        if (!ch) continue;
+                        rb_card_normalize_name(ch, norm_ch, sizeof norm_ch);
+                        for (k = 0; k < n_names; k++)
+                            if (names[k][0] && strstr(names[k], norm_ch)) { found = 1; break; }
+                        if (!found) {
+                            dbuf_puts(&b, ch);
+                            dbuf_puts(&b, "不在");
+                            dbuf_putc(&b, ' ');
+                            dbuf_puts(&b, position_str ? position_str : "");
+                            dbuf_trim(&b);
+                            dbuf_free(&pos_buf);
+                            return dbuf_take(&b);
+                        }
+                    }
+                    /* Rust indexes chars[0] here, so an EMPTY characters list
+                       with a cost reference panics upstream; the C treats it as
+                       absent rather than reproducing a panic. */
+                    {
+                        const char *refc = d_cond_str(c, "cost_reference_character");
+                        if (refc && nchars > 0) {
+                            const char *subject = d_cond_arr_at(c, "characters", 0);
+                            char norm_sub[D_COND_NAME_MAX], norm_ref[D_COND_NAME_MAX];
+                            int sub_cost, ref_cost, opn;
+                            rb_card_normalize_name(subject ? subject : "", norm_sub,
+                                                   sizeof norm_sub);
+                            rb_card_normalize_name(refc, norm_ref, sizeof norm_ref);
+                            sub_cost = d_cond_named_cost(stage_ids, n_stage, norm_sub);
+                            ref_cost = d_cond_named_cost(stage_ids, n_stage, norm_ref);
+                            opn = d_cond_i64(c, "cost_reference_operator");
+                            dbuf_init(&part);
+                            if (sub_cost >= 0 && ref_cost >= 0) {
+                                dbuf_puts(&part, subject);
+                                dbuf_puts(&part, "コスト(");
+                                dbuf_puti(&part, sub_cost);
+                                dbuf_puts(&part, ") ");
+                                dbuf_puts(&part, d_operator_str(opn));
+                                dbuf_putc(&part, ' ');
+                                dbuf_puts(&part, refc);
+                                dbuf_puts(&part, "コスト(");
+                                dbuf_puti(&part, ref_cost);
+                                dbuf_puts(&part, ")");
+                            } else if (sub_cost >= 0) {
+                                dbuf_puts(&part, subject);
+                                dbuf_puts(&part, "コスト(");
+                                dbuf_puti(&part, sub_cost);
+                                dbuf_puts(&part, ") ");
+                                dbuf_puts(&part, d_operator_str(opn));
+                                dbuf_putc(&part, ' ');
+                                dbuf_puts(&part, refc);
+                                dbuf_puts(&part, " (不在)");
+                            } else if (ref_cost >= 0) {
+                                dbuf_puts(&part, subject);
+                                dbuf_puts(&part, "(不在) ");
+                                dbuf_puts(&part, d_operator_str(opn));
+                                dbuf_putc(&part, ' ');
+                                dbuf_puts(&part, refc);
+                                dbuf_puts(&part, "コスト(");
+                                dbuf_puti(&part, ref_cost);
+                                dbuf_puts(&part, ")");
+                            } else {
+                                dbuf_puts(&part, subject);
+                                dbuf_puts(&part, "も");
+                                dbuf_puts(&part, refc);
+                                dbuf_puts(&part, "も不在");
+                            }
+                            d_with_position(&b, part.s, position_str);
+                            dbuf_free(&part);
+                            dbuf_free(&pos_buf);
+                            return dbuf_take(&b);
+                        }
+                    }
+                }
+            }
+
+            /* with_position("在籍=[{names}]", position_str) — the base goes in
+               its own buffer, because d_with_position appends to `b` and cannot
+               be handed `b.s` as the base. */
+            dbuf_init(&part);
+            dbuf_puts(&part, "在籍=[");
+            {
+                int printed = 0;
+                for (i = 0; i < n_stage; i++) {
+                    Card cc;
+                    if (!rb_decode_card_by_index((uint32_t)stage_ids[i], &cc)) continue;
+                    if (printed++) dbuf_puts(&part, ", ");
+                    dbuf_puts(&part, cc.name ? cc.name : "");
+                    rb_free_card(&cc);
+                }
+            }
+            dbuf_puts(&part, "]");
+            d_with_position(&b, part.s, position_str);
+            dbuf_free(&part);
+            dbuf_free(&pos_buf);
+            return dbuf_take(&b);
+        }
+    }
+
+    if (zone == RB_ABILITY_ZONE_HAND) {
+        dbuf_puts(&b, "手札=");
+        dbuf_puti(&b, P->hand.n);
+        dbuf_puts(&b, "枚");
+        dbuf_free(&pos_buf);
+        return dbuf_take(&b);
+    }
+    if (zone == RB_ABILITY_ZONE_DISCARD) {
+        dbuf_puts(&b, "控え室=");
+        dbuf_puti(&b, P->discard.n);
+        dbuf_puts(&b, "枚");
+        dbuf_free(&pos_buf);
+        return dbuf_take(&b);
+    }
+    /* Zone::Energy | _ => "" — notably Energy, which has its own arm in the
+       StateCondition path but none here. */
+    dbuf_free(&pos_buf);
+    return dbuf_take(&b);
+}
+
+/* condition.rs:740-936 — ConditionContext::describe_condition_actual. The
+   dispatch is on condition_type(), NOT on the variant, so one variant can reach
+   several arms. BothCondition / CardCountCondition / CardBladeCondition /
+   LocationCondition / EnergyStateCondition / StateChangeCondition /
+   AllCostComparisonCondition have no producer in condition_type() today; they
+   are ported anyway so a future condition_type() that starts emitting them
+   does not silently degrade to the "" arm. */
+static char *d_cond_actual(const struct GameState *g, int self_pl, const Condition *c,
+                           int measured_count) {
+    RbDescBuf b;
+    dbuf_init(&b);
+    if (!g || !c) return dbuf_take(&b);
+
+    switch (d_cond_type(c)) {
+    case RB_CONDTYPE_APPEARANCE:
+        {
+            char *s = d_cond_appearance_actual(g, self_pl, c);
+            dbuf_puts(&b, s ? s : "");
+            rb_desc_free(s);
+        }
+        break;
+    case RB_CONDTYPE_COMPARISON:
+        dbuf_puti(&b, measured_count);
+        break;
+    case RB_CONDTYPE_BOTH:
+        dbuf_puts(&b, "count=");
+        dbuf_puti(&b, measured_count);
+        /* get_values() -> Option<&[u8]>, rendered with {:?}. The C decoder
+           never writes a `values` key on a condition, so this is always []. */
+        dbuf_puts(&b, ", values=[]");
+        break;
+    case RB_CONDTYPE_CARD_COUNT:
+        dbuf_puti(&b, measured_count);
+        break;
+    case RB_CONDTYPE_LOCATION: {
+        const char *loc = d_cond_str(c, "location");
+        const char *pos = d_cond_position(c);
+        if (pos) {
+            dbuf_puts(&b, "位置=");
+            dbuf_puts(&b, pos);
+        } else {
+            dbuf_puts(&b, loc ? loc : "");
+        }
+        break;
+    }
+    case RB_CONDTYPE_CARD_BLADE:
+        if (d_cond_str(c, "operator")) {
+            int n = d_cond_u8(c, "count");
+            dbuf_puts(&b, "ブレード ");
+            dbuf_puts(&b, d_cond_str(c, "operator"));
+            dbuf_putc(&b, ' ');
+            dbuf_puti(&b, n < 0 ? 1 : n);
+        }
+        break;
+    case RB_CONDTYPE_GROUP: {
+        const char *loc = d_cond_str(c, "location");
+        if (!loc) loc = "stage";
+        if (rb_ability_zone_from_str(loc) == RB_ABILITY_ZONE_STAGE) {
+            RbDescBuf names;
+            int n = 0, i;
+            const RbPlayer *P = d_cond_player(g, self_pl, d_cond_str(c, "target"));
+            dbuf_init(&names);
+            for (i = 0; i < RB_STAGE_SIZE; i++) {
+                Card cc;
+                if (P->stage[i] == RB_EMPTY_SLOT) continue;
+                if (!rb_decode_card_by_index((uint32_t)P->stage[i], &cc)) continue;
+                if (n++) dbuf_putc(&names, ',');
+                dbuf_puts(&names, cc.name ? cc.name : "");
+                rb_free_card(&cc);
+            }
+            if (n == 0) {
+                dbuf_puts(&b, "不在");
+            } else {
+                dbuf_puts(&b, "在籍=[");
+                dbuf_puts(&b, names.s ? names.s : "");
+                dbuf_puts(&b, "]");
+            }
+            dbuf_free(&names);
+        }
+        break;
+    }
+    case RB_CONDTYPE_POSITION: {
+        const RbPlayer *P = d_cond_player(g, self_pl, d_cond_str(c, "target"));
+        RbDescBuf names;
+        int n = 0, i;
+        dbuf_init(&names);
+        for (i = 0; i < RB_STAGE_SIZE; i++) {
+            Card cc;
+            if (P->stage[i] == RB_EMPTY_SLOT) continue;
+            if (n++) dbuf_puts(&names, ", ");
+            dbuf_puts(&names, d_cond_pos_names[i]);
+            dbuf_putc(&names, ':');
+            /* get_card(id).map(name).unwrap_or_default() — an undecodable card
+               keeps its SLOT with an empty name rather than dropping out, which
+               is what makes the list keep its left/centre/right alignment. */
+            if (rb_decode_card_by_index((uint32_t)P->stage[i], &cc)) {
+                dbuf_puts(&names, cc.name ? cc.name : "");
+                rb_free_card(&cc);
+            }
+        }
+        if (n == 0) {
+            dbuf_puts(&b, "不在");
+        } else {
+            dbuf_puts(&b, names.s ? names.s : "");
+        }
+        dbuf_free(&names);
+        break;
+    }
+    case RB_CONDTYPE_STATE: {
+        const char *state = d_cond_state(c);
+        const char *target = d_cond_str(c, "target");
+        const char *resource_type = d_cond_str(c, "resource_type");
+        const RbPlayer *P;
+        if (!state) state = "状態";
+        P = d_cond_player(g, self_pl, target);
+        if (resource_type && !strcmp(resource_type, "energy")) {
+            dbuf_puts(&b, "エネルギー active=");
+            dbuf_puti(&b, rb_energy_active_count(P));
+            dbuf_putc(&b, '/');
+            dbuf_puti(&b, P->energy.n);
+        } else {
+            const char *loc = d_cond_str(c, "location");
+            int matching = 0, total = 0, i;
+            if (!loc) loc = "stage";
+            if (rb_ability_zone_from_str(loc) == RB_ABILITY_ZONE_STAGE) {
+                for (i = 0; i < RB_STAGE_SIZE; i++) {
+                    int cid = P->stage[i];
+                    if (cid == RB_EMPTY_SLOT) continue;
+                    total++;
+                    /* mods.get_orientation_modifier(cid) borrows the mods map;
+                       the C takes it non-const, exactly as condition.c:3757
+                       does for the same call. */
+                    if (rb_orientation_matches_state(
+                            rb_mods_get_orientation((RbMods *)&g->mods, cid), state))
+                        matching++;
+                }
+            }
+            dbuf_puts(&b, state);
+            dbuf_puts(&b, "状態のメンバー=");
+            dbuf_puti(&b, matching);
+            dbuf_puts(&b, "枚 (ステージ計");
+            dbuf_puti(&b, total);
+            dbuf_puts(&b, "枚)");
+        }
+        break;
+    }
+    case RB_CONDTYPE_MOVEMENT:
+        dbuf_puts(&b, "移動=");
+        dbuf_puts(&b, d_cond_str(c, "movement") ? d_cond_str(c, "movement") : "?");
+        dbuf_puts(&b, ", 移動枚数=");
+        dbuf_puti(&b, g->n_recently_moved);
+        break;
+    case RB_CONDTYPE_TEMPORAL: {
+        int appeared = g->n_cards_appeared_this_turn, moved = 0, i;
+        /* Rust reads cards_moved_this_turn.len(); the C has only the per-card
+           bitmask (moved_this_turn[], modifiers.c:496-498), so the closest
+           equivalent is the number of cards flagged this turn. */
+        for (i = 0; i < RB_MAX_CARD_IDS; i++) moved += g->moved_this_turn[i] ? 1 : 0;
+        dbuf_puts(&b, "登場=");
+        dbuf_puti(&b, appeared);
+        dbuf_puts(&b, ", 移動=");
+        dbuf_puti(&b, moved);
+        break;
+    }
+    case RB_CONDTYPE_NO_EXCESS_HEART:
+        dbuf_puts(&b, d_no_excess_heart_flag(g, d_cond_str(c, "target"))
+                          ? "余剰ハートなし" : "余剰ハートあり");
+        break;
+    case RB_CONDTYPE_ANY_OF: {
+        int n = d_cond_arr_len(c, "any_of"), i;
+        if (n >= 0) {
+            dbuf_puts(&b, "条件=[");
+            for (i = 0; i < n; i++) {
+                if (i) dbuf_puts(&b, ", ");
+                d_cond_debug_str(&b, d_cond_arr_at(c, "any_of", i));
+            }
+            dbuf_puts(&b, "]");
+        }
+        break;
+    }
+    case RB_CONDTYPE_CHOICE: {
+        int n = d_cond_arr_len(c, "options");
+        if (n >= 0) {
+            dbuf_puts(&b, "選択肢=");
+            dbuf_puti(&b, n);
+            dbuf_puts(&b, "個");
+        } else {
+            dbuf_puts(&b, "選択肢なし");
+        }
+        break;
+    }
+    case RB_CONDTYPE_ENERGY_STATE: {
+        const char *state = d_cond_state(c);
+        if (state) {
+            dbuf_puts(&b, "エネルギー状態=");
+            dbuf_puts(&b, state);
+        }
+        break;
+    }
+    case RB_CONDTYPE_STATE_CHANGE:
+        dbuf_puts(&b, "状態変化: ");
+        dbuf_puts(&b, d_cond_str(c, "from_state") ? d_cond_str(c, "from_state") : "?");
+        dbuf_puts(&b, "→");
+        dbuf_puts(&b, d_cond_str(c, "to_state") ? d_cond_str(c, "to_state") : "?");
+        break;
+    case RB_CONDTYPE_ALL_COST_COMPARISON: {
+        const char *op = d_cond_str(c, "operator");
+        dbuf_puts(&b, "全コスト比較");
+        dbuf_puts(&b, op ? op : ">");
+        dbuf_putc(&b, '?');
+        break;
+    }
+    case RB_CONDTYPE_SCORE_THRESHOLD: {
+        const char *op = d_cond_str(c, "operator");
+        int n = d_cond_u8(c, "count");
+        dbuf_puts(&b, "スコア");
+        dbuf_puts(&b, op ? op : ">=");
+        dbuf_putc(&b, ' ');
+        dbuf_puti(&b, n < 0 ? 1 : n);
+        dbuf_putc(&b, '?');
+        break;
+    }
+    case RB_CONDTYPE_RESOURCE: {
+        const char *rt = d_cond_str(c, "resource_type");
+        dbuf_puts(&b, "資源=");
+        dbuf_puts(&b, rt ? rt : "?");
+        break;
+    }
+    default:
+        /* Compound | NotMoved | HasMoved | TemporalCondition handled above |
+           Group... | Otherwise | Custom | Unreachable — String::new() in Rust. */
+        break;
+    }
+    return dbuf_take(&b);
+}
+
+/* ── public entry points ────────────────────────────────────────────────
+   Declared here, not in include/rabuka.h: condition.c reaches them through
+   local externs, the pattern resolver.c:56-63 already uses for the condition
+   accessors that live in card.c.
+
+     char *rb_desc_cond_expectation(const Condition *c);
+     char *rb_desc_cond_actual(const struct GameState *g, int actor,
+                               const Condition *c, int measured_count);
+     const char *rb_desc_cond_verdict_type(const Condition *c);   /-- static  */
+char *rb_desc_cond_expectation(const Condition *c) {
+    return d_cond_expectation(c);
+}
+
+char *rb_desc_cond_actual(const struct GameState *g, int actor, const Condition *c,
+                          int measured_count) {
+    (void)actor;   /* Rust's self_player comes from the activating card alone. */
+    return d_cond_actual(g, d_cond_self_player(g), c, measured_count);
+}
+
+/* condition.rs:308-360 — push_cond_verdict, whole. Rust's early-out is on
+   `debug_enabled()` alone, deliberately NOT on "is the buffer non-empty"
+   (log.rs:22-26), and that is reproduced here: rb_log_recording() in log.c is
+   already `g_log_enabled || rb_ability_debug_enabled()`, so the C-only
+   rb_log_set_enabled hook still reaches the ring for everything that calls
+   rb_log_push_verdict_* directly.
+
+   The expectation is rendered ONCE and reused for both `text` and
+   `expectation` (condition.rs:315), and `actual` is `extra_actual` when that is
+   non-empty, else a clone of the expectation (condition.rs:316-320).
+
+   `measured_count` is get_count_for_condition(c) — the one value
+   describe_condition_actual takes off ConditionContext rather than off the
+   condition node, and the reason the signature is not a pure function of `c`.
+
+   Returns the ring index the entry landed at, for the caller to attach children
+   with rb_log_push_verdict_child, or -1 when nothing was recorded. Derived from
+   rb_log_buffer_len() before and after, because log.c's
+   rb_log_push_verdict_condition returns void. */
+int rb_desc_push_cond_verdict(const struct GameState *g, int actor, const Condition *c,
+                              int measured_count, const char *extra_actual, int passed) {
+    char *expectation, *actual;
+    int before, after;
+
+    if (!rb_ability_debug_enabled()) return -1;
+    if (!c) return -1;
+
+    before = rb_log_buffer_len();
+    expectation = d_cond_expectation(c);
+    actual = (extra_actual && *extra_actual) ? rb_strdup2(extra_actual)
+                                             : rb_strdup2(expectation);
+    rb_log_push_verdict_condition(expectation, rb_desc_cond_verdict_type(c),
+                                  expectation, actual, passed);
+    after = rb_log_buffer_len();
+    rb_desc_free(actual);
+    rb_desc_free(expectation);
+    return (after > before) ? after - 1 : -1;
+}
+
+/* ====================================================================
  * Bilingual wiring for the C choice model.
+
  *
  * describe.rs has no such function -- Rust builds a single String per call
  * site. The C RbChoice carries description / description_en / description_ja

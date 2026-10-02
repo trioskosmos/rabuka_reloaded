@@ -418,25 +418,30 @@ static void dump_triggers(int cid, const char *want)
     }
 }
 
-/* Rust helpers::fire_trigger — find the ability whose printed `triggers` string
- * is exactly `trig`, push it with `cid` as the activating card, drain, and run
- * the pending-auto pass. Returns 0 (after dumping) when the card carries no
- * such ability, so a fixture mistake can never masquerade as engine silence. */
+/* Rust helpers::fire_trigger (engine/tests/helpers/mod.rs:114) — resolve ONE
+ * ability on ONE card, key it "{card_no}_{full_text}", fire it with `cid` as
+ * the activating card, then run process_pending_auto_abilities.
+ *
+ * The body used to be hand-rolled over `rb_queue_push`, which had two real
+ * defects the shared helper removes:
+ *   1. rb_queue_push builds its entry with `use_limit_recorded = 0` and never
+ *      calls rb_record_use, so a 自動/ターン1回 ability is still unspent when it
+ *      resolves and the post-resolution re-scan in
+ *      rb_process_player_abilities_depth_full enqueues it a SECOND time.
+ *   2. rb_queue_push leaves `player_id` EMPTY (ability_queue.c:269). The drain
+ *      is owner-scoped, so the un-stamped entry lingers into the next window
+ *      instead of being cleared.
+ * test_fire_trigger_on_card goes through rb_trigger_auto_ability, which
+ * enqueues via rb_build_ability_queue_entry (owner stamped) and records the
+ * use at ENQUEUE time — the port's model, where the resolution-time gate would
+ * otherwise reject the very entry that just paid for itself.
+ *
+ * The [TRIGGER-MISS] dump is PRESERVED verbatim: the shared helper reports a
+ * miss the same way (returns 0), so a byte-escape typo in a fixture still
+ * cannot masquerade as engine silence. */
 static int fire_trigger(TestGame *g, int cid, const char *trig)
 {
-    int n = rb_card_num_abilities((uint32_t)cid);
-    for (int i = 0; i < n; i++) {
-        Ability ab;
-        if (!rb_decode_card_ability((uint32_t)cid, i, &ab)) continue;
-        int match = ab.triggers && strcmp(ab.triggers, trig) == 0;
-        rb_free_ability(&ab);
-        if (!match) continue;
-        rb_queue_push(&g->state.queue, cid, i);
-        g->state.activating_card = cid;
-        rb_drain_ability_queue(&g->state);
-        rb_process_pending_auto_abilities(&g->state);
-        return 1;
-    }
+    if (test_fire_trigger_on_card(g, cid, trig)) return 1;
     dump_triggers(cid, trig);
     return 0;
 }

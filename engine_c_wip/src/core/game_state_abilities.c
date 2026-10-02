@@ -912,7 +912,17 @@ static int rb_claim_batch_slot(GameState *g, int num_key, int skip_key,
    entries whose use was consumed by an EARLIER activation, and a second
    enqueue in the same turn is stopped by the trigger-time gate
    (rb_use_limit_reached in the scans, Rust's ability_has_remaining_uses at
-   abilities.rs:934). */
+   abilities.rs:934).
+
+   This convention is NOT what Rust does (see the two records now in
+   pca_resolve_entry: the Early one at gates.rs:301-310, which is the port's
+   own answer, and the Final one). It survives here only because the record and
+   the flag are removed TOGETHER: taking the flag off while leaving the record
+   makes the resolution-time gate permanently unreachable for these entries, so
+   a 「{{ターン1回}}」 ability is admitted whether or not its use was spent and —
+   because every resolution record early-returns on a set flag — the use is
+   never spent at all. src/turn/triggers.c has already been migrated off this
+   shape (see the note at its top); these five sites have not. */
 static void rb_mark_entries_use_limit_recorded(GameState *g, int from_index) {
     if (!g) return;
     for (int i = from_index > 0 ? from_index : 0; i < g->queue.n_entries; i++)
@@ -2715,6 +2725,11 @@ static int pca_resolve_entry(GameState *g, RbQueueEntry *entry, int cid, int aid
         }
     }
 
+    /* resolver.rs:1341-1344 reads `cost_already_paid` BEFORE pay_ability_cost
+       runs, because pay_ability_cost is what SETS entry->cost_paid. The Early
+       record below is gated on it, so it has to be sampled here too. */
+    int cost_already_paid = entry->cost_paid;
+
     if (ab->cost) {
         /* resolver.rs:1090-1112 pay_ability_cost folds a per-unit modify_cost
            into the cost BEFORE paying it:
@@ -2750,6 +2765,43 @@ static int pca_resolve_entry(GameState *g, RbQueueEntry *entry, int cid, int aid
         }
     }
 
+    /* gates.rs:300-310 UseLimitPhase::Early, called from resolver.rs:1353 —
+       BETWEEN pay_ability_cost and the post-cost gates, i.e. BEFORE the effect
+       ever runs:
+
+           if cost_already_paid || resolver.awaiting.choice.is_some()
+               || is_conditional_optional || is_optional_effect { return; }
+           let can_activate = ability.effect.as_ref()
+               .is_none_or(|e| resolver.can_activate_effect(gs, e));
+           if can_activate { gs.record_ability_use(*key); }
+
+       This is the record the whole turn-limit scheme is built around, and the C
+       had NO equivalent on this path. Without it the only two records on the
+       function were the post-cost-gate decline arm below and one AFTER
+       rb_execute_effect_ex, so for the whole duration of the effect the ability
+       still looked unused. rb_execute_effect_ex re-enters the post-resolution
+       scan (rb_process_player_abilities_depth_full), that scan asks
+       ability_has_remaining_uses, sees 0 uses, and enqueues the SAME ability a
+       second time — which is exactly the "blade 4 instead of 2" regression
+       recorded in src/test_game.c. Rust does not have that window because its
+       Early record lands before execute_effect.
+
+       It is placed AFTER the resolution-time gate above, so the gate still sees
+       0 uses for the activation about to run, and it is a no-op for an entry
+       that arrived with its use already spent (every enqueue-time site calls
+       rb_mark_entries_use_limit_recorded, and rb_record_ability_use itself
+       early-returns on a set flag) — so this changes nothing for those paths. */
+    if (ab->use_limit > 0 && !entry->use_limit_recorded && cid >= 0 &&
+        !cost_already_paid && !g->queue.has_pending &&
+        ab->effect &&
+        !ab->effect->is_optional &&
+        !(ab->effect->action &&
+          !strcmp(ab->effect->action, "conditional_on_optional")) &&
+        rb_can_activate_effect(g, actor, ab->effect, cid)) {
+        rb_record_ability_use(g, cid, aidx);
+        entry->use_limit_recorded = 1;
+    }
+
     /* POST_COST_GATE — optional_cost_skip_gate. Rust puts it in
        POST_COST_GATES (gates.rs:258, body gates.rs:195-213) and runs them at
        resolver.rs:1193-1199, i.e. AFTER pay_ability_cost but only once the
@@ -2779,13 +2831,18 @@ static int pca_resolve_entry(GameState *g, RbQueueEntry *entry, int cid, int aid
        and opened the look prompt. Rust opens no prompt at all. */
     if (!g->queue.has_pending && entry->optional_cost_result == 0) {
         entry->effect_started = 1;
-        /* record_use_limit(Early) runs at resolver.rs:1170 — BEFORE the
-           post-cost gates — while the Final recording at resolver.rs:1221 is
+        /* record_use_limit(Early) runs at resolver.rs:1353 — BEFORE the
+           post-cost gates — while the Final recording at resolver.rs:1390 is
            unreachable after this stop. So a declined optional cost still
            CONSUMES the activation's use, unless the effect is
            conditional_on_optional / optional or cannot activate
-           (gates.rs:291-309). Recorded here so the stop does not hand the
-           ability a free second activation in the same turn. */
+           (gates.rs:301-310). The Early record added above runs the very same
+           test at the very same point, so on every ordinary decline it has
+           already spent the use and this block is a no-op. It is kept because
+           the Early record additionally requires `!cost_already_paid`, and this
+           one does not: an entry whose cost was paid in an earlier pass and
+           then declined still owes the record, exactly as Rust's
+           record_ability_use does from any branch point (abilities.rs:202-215). */
         if (ab->use_limit > 0 && !entry->use_limit_recorded && ab->effect &&
             !ab->effect->is_optional &&
             !(ab->effect->action &&
@@ -2813,15 +2870,56 @@ static int pca_resolve_entry(GameState *g, RbQueueEntry *entry, int cid, int aid
         rb_execute_effect_ex(g, actor, ab->effect, cid);
     }
 
-    /* abilities.rs:203-209 -- one activation consumes one use, never two. */
+    /* resolver.rs:1201-1233 — run_ability_effect's two exits, and they are NOT
+       the same record.
+
+         Ok(false) -- the effect applied and left no prompt. The caller
+             (`if self.run_ability_effect(..)? { return Ok(()) }` at :1381-1384)
+             falls through to record_use_limit(Final) at :1390, which is
+             gates.rs:321-333: `cost_already_paid && is_conditional_optional ||
+             can_activate`.
+
+         Ok(true) -- the effect left a prompt open. Rust returns at :1382 and the
+             Final record is UNREACHABLE. The record for this case is the Pending
+             one INSIDE run_ability_effect (resolver.rs:1207-1232), and it is
+             deliberately WEAKER: it is skipped for a conditional_on_optional
+             effect and for an optional effect's position prompt, because in both
+             cases the player has not committed yet and may still decline.
+
+       The C had ONE record placed before the `if (g->queue.has_pending) return 1`,
+       so an effect that opened the `conditional_optional` gate spent the use on
+       the opening pass — the pass on which Rust spends nothing. MEASURED on
+       test_parity_bp7's Q233 case (PL!SP-bp5-005-{AR,P,R＋,SEC}, 自動/1回,
+       「E 支払ってもよい」): after the SKIP answer the C read
+       `ability_uses_used == 1` where the Rust twin asserts 0
+       (hazuki_activate_discard_per_liella_member_blade_test.rs:144), and the
+       SECOND trigger in the same turn was then dropped by the resolution gate
+       above, so its prompt never opened (Rust :158). Splitting the record is
+       what makes the decline leave the use unspent, exactly as Rust does. */
+    if (g->queue.has_pending) {
+        /* resolver.rs:1207-1232, `skip_use_limit` inline. The C cannot see the
+           prompt's target string, so the `position|destination` half of the test
+           is taken as the whole optional case — the conservative direction, and
+           the one Rust takes for an optional effect anyway. */
+        if (ab->use_limit > 0 && !entry->use_limit_recorded && !cost_already_paid &&
+            !(ab->effect && ab->effect->action &&
+              !strcmp(ab->effect->action, "conditional_on_optional")) &&
+            !(ab->effect && ab->effect->is_optional)) {
+            rb_record_ability_use(g, cid, aidx);
+            entry->use_limit_recorded = 1;
+        }
+        rb_free_ability(ab);
+        return 1;
+    }
+
+    /* gates.rs:321-333 UseLimitPhase::Final, reached only when the effect ran to
+       completion with nothing left open. */
     if (ab->use_limit > 0 && !entry->use_limit_recorded) {
         rb_record_ability_use(g, cid, aidx);
         entry->use_limit_recorded = 1;
     }
 
     rb_free_ability(ab);
-
-    if (g->queue.has_pending) return 1;
 
     g->queue.cur++;
     return 1;

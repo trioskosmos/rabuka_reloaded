@@ -406,62 +406,54 @@ static void pc_drain_proceed(TestGame *tg)
     }
 }
 
-/* helpers/mod.rs:114 fire_trigger -- build the "<card_no>_<full_text>" ability
- * id for the first ability printing `trig`, queue exactly that ability, set
- * activating_card, process the queue. */
-void rb_trigger_auto_ability(GameState *g, const char *ability_id,
-                             const char *trigger_type, int player_id,
-                             const char *source_card_no,
-                             int explicit_card_id,
-                             const int *trigger_moved_cards, int n_moved,
-                             int triggering_member_id);
+/* helpers/mod.rs:114 fire_trigger -- resolve ONE ability on ONE card, key it
+ * "{card_no}_{full_text}", fire it with `cid` as the activating card, then
+ * process the queue.
+ *
+ * ライブ開始時 — the tag cards.json actually prints
+ * ({{live_start.png|ライブ開始時}}), NOT ライブ実行時. Using the wrong
+ * keyword makes pc_fire_live_start return 0 for every card, which looks
+ * exactly like a missing ability.
+ *
+ * The bytes are 開 = U+958B = E9 96 8B. Do NOT hand-transcribe these: the
+ * simplified 开 is U+5F00 = E5 BC 80, which is one byte-pair different and
+ * silently makes the shim never match anything. The exact sequence below
+ * was read out of the compiled DB, and matches the literal used by
+ * tests/test_parity_hearts_live_start.c. */
+static const char *PC_TRIG_LIVE_START =
+    "\xe3\x83\xa9\xe3\x82\xa4\xe3\x83\x96\xe9\x96\x8b\xe5\xa7\x8b\xe6\x99\x82";
 
+/* The body used to be a hand-rolled copy of that sequence, which recorded NO
+ * enqueue-time use — so a 自動/ターン1回 ability was still unspent when it
+ * resolved and the post-resolution re-scan in
+ * rb_process_player_abilities_depth_full enqueued it a SECOND time. Its
+ * "{card_no}_{full_text}" key also truncated at 512 bytes. Both are fixed by
+ * the shared helper.
+ *
+ * The PC_DIAG_SHIM trace is PRESERVED: it is the documented way this file's
+ * FINDING 4 / FINDING 5 were separated from "the ability is not in the
+ * database at all", and the byte-level per-ability dump it produced is still
+ * the fastest way to read a card's printed trigger list. */
 static int pc_fire_live_start(TestGame *tg, int cid)
 {
-    /* ライブ開始時 — the tag cards.json actually prints
-     * ({{live_start.png|ライブ開始時}}), NOT ライブ実行時. Using the wrong
-     * keyword makes pc_fire_live_start return 0 for every card, which looks
-     * exactly like a missing ability.
-     *
-     * The bytes are 開 = U+958B = E9 96 8B. Do NOT hand-transcribe these: the
-     * simplified 开 is U+5F00 = E5 BC 80, which is one byte-pair different and
-     * silently makes the shim never match anything. The exact sequence below
-     * was read out of the compiled DB, and matches the literal used by
-     * tests/test_parity_hearts_live_start.c. */
-    static const char *TRIG =
-        "\xe3\x83\xa9\xe3\x82\xa4\xe3\x83\x96\xe9\x96\x8b\xe5\xa7\x8b\xe6\x99\x82";
-    Card card;
-    if (!rb_decode_card_by_index((uint32_t)cid, &card)) return 0;
-    char card_no[128];
-    snprintf(card_no, sizeof(card_no), "%s", rb_card_string(card.card_no_idx));
-    char ability_id[512];
-    int found = 0;
-    int nab = rb_card_num_abilities((uint32_t)cid);
-    for (int a = 0; a < nab && !found; a++) {
-        Ability ab;
-        if (!rb_decode_card_ability((uint32_t)cid, a, &ab)) continue;
-        if (ab.triggers && strcmp(ab.triggers, TRIG) == 0) {
-            snprintf(ability_id, sizeof ability_id, "%s_%s", card_no,
-                     ab.full_text ? ab.full_text : "");
-            found = 1;
-        }
-        if (getenv("PC_DIAG_SHIM")) {
+    int diag = getenv("PC_DIAG_SHIM") != NULL;
+    if (diag) {
+        int nab = rb_card_num_abilities((uint32_t)cid);
+        for (int a = 0; a < nab; a++) {
+            Ability ab;
+            memset(&ab, 0, sizeof ab);
+            if (!rb_decode_card_ability((uint32_t)cid, a, &ab)) continue;
             fprintf(stderr, "        [shim] a=%d trig=<%s> match=%d\n",
                     a, ab.triggers ? ab.triggers : "",
-                    ab.triggers && strcmp(ab.triggers, TRIG) == 0);
+                    ab.triggers && strcmp(ab.triggers, PC_TRIG_LIVE_START) == 0);
+            rb_free_ability(&ab);
         }
-        rb_free_ability(&ab);
     }
-    rb_free_card(&card);
-    if (getenv("PC_DIAG_SHIM"))
-        fprintf(stderr, "        [shim] cid=%d nab=%d found=%d id=<%s>\n",
-                cid, nab, found, ability_id);
-    if (!found) return 0;
-    rb_trigger_auto_ability(&tg->state, ability_id, TRIG, 0, card_no,
-                             cid, NULL, 0, -1);
-    tg->state.activating_card = cid;
-    rb_process_pending_auto_abilities(&tg->state);
-    return 1;
+    if (test_fire_trigger_on_card(tg, cid, PC_TRIG_LIVE_START)) return 1;
+    if (diag)
+        fprintf(stderr, "        [shim] cid=%d nab=%d found=0\n",
+                cid, rb_card_num_abilities((uint32_t)cid));
+    return 0;
 }
 
 /* ===================================================================== */

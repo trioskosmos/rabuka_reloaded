@@ -419,42 +419,26 @@ static int bag_has(const RbBag *b, int cid)
     return 0;
 }
 
-/* helpers/mod.rs fire_trigger: build "<card_no>_<full_text>" for the ability
- * printing `trig`, queue exactly that, set activating_card, process. */
-void rb_trigger_auto_ability(GameState *g, const char *ability_id,
-                             const char *trigger_type, int player_id,
-                             const char *source_card_no,
-                             int explicit_card_id,
-                             const int *trigger_moved_cards, int n_moved,
-                             int triggering_member_id);
-
+/* helpers/mod.rs fire_trigger: resolve ONE ability on ONE card, key it
+ * "{card_no}_{full_text}", fire it with `cid` as the activating card, then
+ * process the queue.
+ *
+ * The hand-rolled body it replaces recorded NO enqueue-time use, so a
+ * 自動/ターン1回 ability was still unspent when it resolved and the
+ * post-resolution re-scan in rb_process_player_abilities_depth_full enqueued
+ * it a SECOND time; its "{card_no}_{full_text}" key also truncated at 512
+ * bytes. Both are fixed by the shared helper.
+ *
+ * NOTE for this suite specifically: an 無効 ability now refuses the enqueue and
+ * the helper returns 0. That is the CORRECT reading -- an invalidated ability
+ * is exactly what this suite proves must not fire -- and it is a distinction
+ * the old `strcmp` probe could not make, because it reported 1 whenever the
+ * card PRINTED the trigger whether or not the ability was live. */
 static int fire_trigger(TestGame *tg, int cid, const char *trig,
                         const char *trigger_type)
 {
-    Card card;
-    if (cid < 0 || !rb_decode_card_by_index((uint32_t)cid, &card)) return 0;
-    char card_no[128];
-    snprintf(card_no, sizeof card_no, "%s", rb_card_string(card.card_no_idx));
-    char ability_id[512];
-    int found = 0;
-    for (int a = 0; a < rb_card_num_abilities((uint32_t)cid) && !found; a++) {
-        Ability ab;
-        memset(&ab, 0, sizeof ab);
-        if (!rb_decode_card_ability((uint32_t)cid, a, &ab)) continue;
-        if (ab.triggers && strcmp(ab.triggers, trig) == 0) {
-            snprintf(ability_id, sizeof ability_id, "%s_%s", card_no,
-                     ab.full_text ? ab.full_text : "");
-            found = 1;
-        }
-        rb_free_ability(&ab);
-    }
-    rb_free_card(&card);
-    if (!found) return 0;
-    rb_trigger_auto_ability(&tg->state, ability_id, trigger_type, 0, card_no,
-                            cid, NULL, 0, -1);
-    tg->state.activating_card = cid;
-    rb_process_pending_auto_abilities(&tg->state);
-    return 1;
+    (void)trigger_type;   /* every call site here passes trig == trigger_type */
+    return test_fire_trigger_on_card(tg, cid, trig);
 }
 
 /* ── runner ─────────────────────────────────────────────────────────────── */

@@ -52,15 +52,9 @@ static int checks;
 #define TRIG_LIVE_SUCCESS "\xE3\x83\xA9\xE3\x82\xA4\xE3\x83\x96\xE6\x88\x90\xE5\x8A\x9F\xE6\x99\x82"      /* ライブ成功時 */
 
 /* ── fire_trigger shim (engine/tests/helpers/mod.rs:114) ───────────────
- * rb_trigger_auto_ability exists in src/core/game_state_abilities.c but has
- * no prototype in include/rabuka.h, so declare it locally exactly as
- * defined there. */
-void rb_trigger_auto_ability(GameState *g, const char *ability_id,
-                             const char *trigger_type, int player_id,
-                             const char *source_card_no,
-                             int explicit_card_id,
-                             const int *trigger_moved_cards, int n_moved,
-                             int triggering_member_id);
+ * Fire-one-ability-on-one-card now comes from the SHARED test-game helper
+ * (include/test_game.h, engine/tests/helpers/mod.rs:114). This file no longer
+ * declares rb_trigger_auto_ability itself. */
 
 static void par_drain_choices(TestGame *game) {
     int guard = 0;
@@ -69,38 +63,24 @@ static void par_drain_choices(TestGame *game) {
     }
 }
 
-/* Mirror Rust fire_trigger/fire_trigger_nth: find the `nth` ability whose
- * `triggers` string equals `trig`, build "<card_no>_<full_text>", queue it
- * for the live-start/live-success trigger and process the queue. */
+/* Mirror Rust fire_trigger/fire_trigger_nth: resolve the `nth` PRINTED ability
+ * carrying `trig` on ONE card, fire it with `cid` as the activating card, and
+ * process the queue. `nth` selection is Rust's fire_trigger_nth, which
+ * test_fire_trigger_on_card_nth already implements.
+ *
+ * The hand-rolled body it replaces recorded NO enqueue-time use, so a
+ * 自動/ターン1回 ability was still unspent when it resolved and the
+ * post-resolution re-scan in rb_process_player_abilities_depth_full enqueued
+ * it a SECOND time; its "{card_no}_{full_text>" key also truncated at 512
+ * bytes.
+ *
+ * PRESERVED: the trailing par_drain_choices(game) this suite relied on. The
+ * shared helper drains the QUEUE, not the pending CHOICE, so without this the
+ * suite would inspect a prompt the old body had already answered. */
 static int par_fire_trigger(TestGame *game, int cid, const char *trig,
                             const char *trigger_type, int nth) {
-    Card card;
-    if (!rb_decode_card_by_index((uint32_t)cid, &card)) return 0;
-    char card_no[128];
-    snprintf(card_no, sizeof(card_no), "%s", rb_card_string(card.card_no_idx));
-    char ability_id[512];
-    int found = 0;
-    int nab = rb_card_num_abilities((uint32_t)cid);
-    for (int a = 0; a < nab && !found; a++) {
-        Ability ab;
-        if (!rb_decode_card_ability((uint32_t)cid, a, &ab)) continue;
-        if (ab.triggers && strcmp(ab.triggers, trig) == 0) {
-            if (nth == 0) {
-                snprintf(ability_id, sizeof(ability_id), "%s_%s", card_no,
-                         ab.full_text ? ab.full_text : "");
-                found = 1;
-            } else {
-                nth--;
-            }
-        }
-        rb_free_ability(&ab);
-    }
-    rb_free_card(&card);
-    if (!found) return 0;
-    rb_trigger_auto_ability(&game->state, ability_id, trigger_type, 0, card_no,
-                            cid, NULL, 0, -1);
-    game->state.activating_card = cid;
-    rb_process_pending_auto_abilities(&game->state);
+    (void)trigger_type;   /* every call site here passes trig == trigger_type */
+    if (!test_fire_trigger_on_card_nth(game, cid, trig, nth)) return 0;
     par_drain_choices(game);
     return 1;
 }

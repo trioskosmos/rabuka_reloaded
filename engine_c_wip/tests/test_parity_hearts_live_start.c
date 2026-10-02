@@ -210,42 +210,20 @@ static int deck_has(TestGame *tg, int cid)
 
 /* ── live-start trigger firing ────────────────────────────────────────────── */
 
-/* helpers/mod.rs:114 fire_trigger -- build the "<card_no>_<full_text>" ability
- * id for the first ability printing `trig`, queue exactly that ability, set
- * activating_card, process the queue. */
-void rb_trigger_auto_ability(GameState *g, const char *ability_id,
-                             const char *trigger_type, int player_id,
-                             const char *source_card_no,
-                             int explicit_card_id,
-                             const int *trigger_moved_cards, int n_moved,
-                             int triggering_member_id);
-
+/* helpers/mod.rs:114 fire_trigger -- resolve ONE ability on ONE card, key it
+ * "{card_no}_{full_text}", fire it with `cid` as the activating card, then
+ * process the queue.
+ *
+ * The body used to be a hand-rolled copy of that sequence, which recorded NO
+ * enqueue-time use — so a 自動/ターン1回 ability was still unspent when it
+ * resolved and the post-resolution re-scan in
+ * rb_process_player_abilities_depth_full enqueued it a SECOND time. Its
+ * "{card_no}_{full_text}" key also truncated at 512 bytes. Both are fixed by
+ * the shared helper, which is the shape Rust's own helper has. */
 static int hl_fire_trigger(TestGame *tg, int cid, const char *trig, const char *trigger_type)
 {
-    Card card;
-    if (!rb_decode_card_by_index((uint32_t)cid, &card)) return 0;
-    char card_no[128];
-    snprintf(card_no, sizeof(card_no), "%s", rb_card_string(card.card_no_idx));
-    char ability_id[512];
-    int found = 0;
-    int nab = rb_card_num_abilities((uint32_t)cid);
-    for (int a = 0; a < nab && !found; a++) {
-        Ability ab;
-        if (!rb_decode_card_ability((uint32_t)cid, a, &ab)) continue;
-        if (ab.triggers && strcmp(ab.triggers, trig) == 0) {
-            snprintf(ability_id, sizeof(ability_id), "%s_%s", card_no,
-                     ab.full_text ? ab.full_text : "");
-            found = 1;
-        }
-        rb_free_ability(&ab);
-    }
-    rb_free_card(&card);
-    if (!found) return 0;
-    rb_trigger_auto_ability(&tg->state, ability_id, trigger_type, 0, card_no,
-                             cid, NULL, 0, -1);
-    tg->state.activating_card = cid;
-    rb_process_pending_auto_abilities(&tg->state);
-    return 1;
+    (void)trigger_type;   /* every call site here passes trig == trigger_type */
+    return test_fire_trigger_on_card(tg, cid, trig);
 }
 
 static int hl_fire_live_start(TestGame *tg, int cid)

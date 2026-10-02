@@ -1499,7 +1499,31 @@ int rb_move_resolve_cards_from_source(GameState *g, int actor, AbilityEffect *e,
     if (!g || !out_ids) return 0;
     g->baton_last_vacated_area[0] = -1;
     g->baton_last_vacated_area[1] = -1;
-    const char *source = e->source ? e->source : "hand";
+    /* move/mod.rs:358-362 — Rust's `resolve_cards_from_source` opens with
+     *
+     *     let source_str = if source.is_empty() {
+     *         // No source specified in the parsed ability (e.g. auto abilities
+     *         // that trigger on zone transitions like "when X goes to waitroom").
+     *         // The card is now in the discard/waitroom -- search there.
+     *         "discard"
+     *     } else { source };
+     *
+     * and `source` itself is `effect.source_any().map(|s| s.to_string())
+     * .unwrap_or_default()` (mod.rs:2105-2108) — "" for BOTH a missing wire key
+     * and an empty string, which is why the guard tests `[0]` and not just the
+     * pointer. An ABSENT source is therefore the WAITROOM; it is never the hand.
+     *
+     * The old `? : "hand"` invented a HAND source the effect never asked for, and
+     * it was the last place on this path that still did: a zone-less
+     * `discard_card` searched the hand, found a card and raised a SelectCard
+     * prompt, where Rust reads the (empty) waitroom, finds nothing and raises
+     * nothing — resolve_from_standard_zone's Skip arm, mod.rs:1436-1441. That is
+     * the difference tests/parity_executor_dispatch.c:354 measures.
+     *
+     * `destination` is deliberately left defaulting to "discard": Rust passes the
+     * raw "" to place_taken_cards, and util.rs:2499-2504 turns an empty
+     * destination into the waitroom too, so the two spellings agree. */
+    const char *source = (e->source && e->source[0]) ? e->source : "discard";
     const char *destination = e->destination ? e->destination : "discard";
 
     if (!strcmp(source, "recently_moved")) {

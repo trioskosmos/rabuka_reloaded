@@ -532,40 +532,35 @@ static int bu_pick_index(TestGame *tg, int idx, int rounds)
 }
 
 /* ── trigger shim (Rust helpers::fire_trigger) ─────────────────────────────
- * Build the "<card_no>_<full_text>" ability id for the nth ability printing
- * `trig`, queue exactly that ability, set activating_card, process the queue. */
-void rb_trigger_auto_ability(GameState *g, const char *ability_id,
-                             const char *trigger_type, int player_id,
-                             const char *source_card_no,
-                             int explicit_card_id,
-                             const int *trigger_moved_cards, int n_moved,
-                             int triggering_member_id);
-
+ * Resolve ONE ability on ONE card, key it "{card_no}_{full_text}", fire it
+ * with `card_id` as the activating card, then process the queue.
+ *
+ * The body used to be a hand-rolled copy of that sequence, which recorded NO
+ * enqueue-time use — so a 自動/一度だけ ability was still unspent at
+ * resolution and the post-resolution re-scan in
+ * rb_process_player_abilities_depth_full enqueued it a SECOND time. Its
+ * "{card_no}_{full_text}" key also truncated at 768 bytes. test_fire_trigger_on_card
+ * is the shared shape and does both correctly.
+ *
+ * THE [TRIGGER-MISS] DIAGNOSTIC IS PRESERVED VERBATIM, and the extra
+ * trigger-shim test below (TRIG_CONSTANT_WRONG) still exercises it: a
+ * mismatch here is a HARNESS bug, not an engine bug, so it must be loud
+ * rather than silently turning into a vacuous negative. The shared helper
+ * reports a miss the same way (returns 0), so the dump is still reached. */
 static int bu_fire_trigger(TestGame *tg, int card_id, const char *trig,
                            const char *type)
 {
-    Card c;
-    if (card_id < 0 || !rb_decode_card_by_index((uint32_t)card_id, &c)) return 0;
-    char card_no[128];
-    snprintf(card_no, sizeof(card_no), "%s", rb_card_string(c.card_no_idx));
-    char ability_id[768];
-    int found = 0;
-    int nab = rb_card_num_abilities((uint32_t)card_id);
-    for (int a = 0; a < nab && !found; a++) {
-        Ability ab;
-        if (!rb_decode_card_ability((uint32_t)card_id, a, &ab)) continue;
-        if (ab.triggers && strcmp(ab.triggers, trig) == 0) {
-            snprintf(ability_id, sizeof(ability_id), "%s_%s", card_no,
-                     ab.full_text ? ab.full_text : "");
-            found = 1;
+    (void)type;   /* every call site here passes trig == type */
+    if (test_fire_trigger_on_card(tg, card_id, trig)) return 1;
+    {
+        char card_no[128];
+        card_no[0] = '\0';
+        Card c;
+        if (card_id >= 0 && rb_decode_card_by_index((uint32_t)card_id, &c)) {
+            snprintf(card_no, sizeof(card_no), "%s", rb_card_string(c.card_no_idx));
+            rb_free_card(&c);
         }
-        rb_free_ability(&ab);
-    }
-    rb_free_card(&c);
-    if (!found) {
-        /* Diagnostic: which trigger strings does this card actually carry?
-         * A mismatch here is a HARNESS bug, not an engine bug, so it must be
-         * loud rather than silently turning into a vacuous negative. */
+        int nab = card_id >= 0 ? rb_card_num_abilities((uint32_t)card_id) : 0;
         fprintf(stderr, "[TRIGGER-MISS] card %s: no ability with triggers \"%s\"; has:",
                 card_no, trig);
         for (int a = 0; a < nab; a++) {
@@ -575,13 +570,8 @@ static int bu_fire_trigger(TestGame *tg, int card_id, const char *trig,
             rb_free_ability(&ab);
         }
         fprintf(stderr, "\n");
-        return 0;
     }
-    rb_trigger_auto_ability(&tg->state, ability_id, type, 0, card_no, card_id,
-                            NULL, 0, -1);
-    tg->state.activating_card = card_id;
-    rb_process_pending_auto_abilities(&tg->state);
-    return 1;
+    return 0;
 }
 
 static int bu_fire_live_start(TestGame *tg, int card_id)

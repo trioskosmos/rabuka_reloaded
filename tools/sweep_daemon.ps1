@@ -34,9 +34,9 @@
 
 param(
     [int]$Rounds = 0,
-    [int]$Games = 1200,
-    [int]$Parallel = 10,
-    [int]$PauseMin = 5
+    [int]$Games = 3000,
+    [int]$Parallel = 4,
+    [int]$PauseMin = 6
 )
 
 $ErrorActionPreference = "Continue"
@@ -86,7 +86,17 @@ $arms = @(
     @{ label = "v7-nodes-128"; env = @("V7_NODES=128") },
     @{ label = "v7-dev-16"; env = @("V7_DEV_WEIGHT=16") },
     @{ label = "v7-blades-10"; env = @("V7_BLADES_WEIGHT=10") },
-    @{ label = "v7-ammo-15"; env = @("V7_AMMO_WEIGHT=15") }
+    @{ label = "v7-ammo-15"; env = @("V7_AMMO_WEIGHT=15") },
+    @{ label = "assume-commit-0.6"; env = @("V8_ASSUME_COMMIT=0.6") },
+    @{ label = "assume-commit-0.7"; env = @("V8_ASSUME_COMMIT=0.7") },
+    @{ label = "assume-commit-0.8"; env = @("V8_ASSUME_COMMIT=0.8") },
+    @{ label = "assume-commit-0.9"; env = @("V8_ASSUME_COMMIT=0.9") },
+    @{ label = "assume-commit-1.0"; env = @("V8_ASSUME_COMMIT=1.0") },
+    @{ label = "assume-set-1.0c8"; env = @("V8_ASSUME_COMMIT=0.8", "V8_ASSUME_SET=1") },
+    @{ label = "band-wide-0.05"; env = @("V8_BAND_WIDE", "V8_BAND_MIN_MASS=0.05") },
+    @{ label = "band-wide-0.15"; env = @("V8_BAND_WIDE", "V8_BAND_MIN_MASS=0.15") },
+    @{ label = "band-wide-opp8"; env = @("V8_BAND_WIDE", "V8_ASSUME_COMMIT=0.8") },
+    @{ label = "opp-sampled-score-c8"; env = @("V8_OPP_SAMPLED_SCORE", "V8_ASSUME_COMMIT=0.8") }
 )
 
 function Start-Arm {
@@ -128,6 +138,12 @@ function Complete-Arm {
 }
 
 "$(Get-Date -Format 'yyyy-MM-dd HH:mm:ss')  sweep daemon starting: games=$Games arms=$($arms.Count) parallel=$Parallel rounds=$Rounds" | Add-Content $results
+# `games` is 3000 by default, not 1200, and the reason is §28.11: a 1200-game
+# record on one seed carries roughly +/-1.2 points of sampling error, and an arm
+# that moves 0.1 points is invisible at that size. `V8_OPP_PASS_CURVE` measured
+# net +4 over 3600 games and net -13 over 15000 - the same change, opposite
+# conclusions - so a null from a 1200-game sweep is not a null. Fewer arms per
+# round and a real n beats a wide sweep of unresolvable comparisons.
 
 $round = 0
 while ($Rounds -le 0 -or $round -lt $Rounds) {
@@ -173,7 +189,13 @@ while ($Rounds -le 0 -or $round -lt $Rounds) {
         if ($l -match "delta=(-?[0-9.]+)pp") {
             $d = [math]::Abs([double]$Matches[1])
             $p = if ($l -match "p=([0-9.]+)") { [double]$Matches[1] } else { 1.0 }
-            if ($d -ge 0.3 -or $p -lt 0.2) { $promoted += ($l -split "\s+")[2] }
+            $lbl = ($l -split "\s+")[1]
+            # Only promote a label that is a real arm. A parse slip here used to
+            # enqueue the seed as if it were an arm name, which silently
+            # re-ran the BASELINE 86 times and called it a holdout.
+            if (($arms | Where-Object { $_.label -eq $lbl }) -and ($promoted -notcontains $lbl)) {
+                if ($d -ge 0.3 -or $p -lt 0.2) { $promoted += $lbl }
+            }
         }
     }
     if ($promoted.Count -gt 0) {

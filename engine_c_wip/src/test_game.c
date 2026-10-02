@@ -1,6 +1,7 @@
 #include "test_game.h"
 #include <string.h>
 #include <stdio.h>
+#include <stdlib.h>
 
 void test_game_new(TestGame *tg){
     memset(tg,0,sizeof(*tg));
@@ -1106,68 +1107,122 @@ int test_fire_trigger_core_seat(TestGame *tg, int cid, const char *trig,
     int nab = rb_card_num_abilities((uint32_t)cid);
     if (a >= nab) return 0;
 
-    /* Rust: format!("{}_{}", card.card_no, ab.full_text). */
-    char card_no[64];
-    card_no[0] = '\0';
+    /* Rust: `format!("{}_{}", card.card_no, ab.full_text)`.
+     *
+     * BUILT ON THE HEAP, AND DELIBERATELY NOT OUT OF A FIXED BUFFER.
+     * Rust's `trigger_auto_ability` takes `ability_id: String` — UNBOUNDED. It
+     * never truncates, never rejects, and has no maximum. So there is no "safe"
+     * size for a C stand-in: a constant is a guess about the corpus, and the
+     * corpus already broke one. MEASURED over cards/abilities.json (985 unique
+     * abilities, 2116 (card_no, full_text) instances): the longest key is
+     * 653 bytes — PL!-bp6-006-R＋ / -P＋, full_text 635 bytes — and 38 keys
+     * need more than 512. The key this helper used to build lived in
+     * `char ability_id[512]`, so `snprintf` silently cut PL!-pb2-040-L
+     * (card_no 13 + '_' + full_text 514 = 529 bytes) down to 511 characters,
+     * `par_ability_id_matches` then compared a suffix that was not the ability's
+     * text, the match FAILED, and the ability was never enqueued at all. The
+     * failure was invisible because a fixed `snprintf` into a too-small buffer
+     * reports success — only the length check catches it, and a check that
+     * "refuses rather than firing" just converts a wrong fire into a no fire.
+     * Sizing from strlen is the whole fix, and it has no upper limit to get
+     * wrong.
+     *
+     * MEASURED max, if a future reader wants it: strlen(card_no) + 1 +
+     * strlen(full_text) + 1 == 653 over the whole corpus; the longest
+     * full_text alone is 635 bytes and the longest card_no is 25. */
+    char *card_no = NULL;
     Card c;
     if (!rb_decode_card_by_index((uint32_t)cid, &c)) return 0;
     const char *cn = rb_card_string(c.card_no_idx);
-    if (cn) snprintf(card_no, sizeof(card_no), "%s", cn);
+    if (cn) {
+        size_t n_cn2 = strlen(cn);
+        card_no = (char *)malloc(n_cn2 + 1);
+        if (card_no) memcpy(card_no, cn, n_cn2 + 1);
+    }
     rb_free_card(&c);
-    if (!card_no[0]) return 0;
+    if (!card_no || !card_no[0]) { free(card_no); return 0; }
 
-    char full[2048];
-    full[0] = '\0';
-    int use_limit = 0;
+    /* `ab.full_text` is already a heap string owned by the decoded Ability, so
+       it is used in place rather than copied through another fixed buffer. */
+    char *ability_id = NULL;
     Ability ab;
-    if (!rb_decode_card_ability((uint32_t)cid, a, &ab)) return 0;
-    if (ab.full_text) snprintf(full, sizeof(full), "%s", ab.full_text);
+    if (!rb_decode_card_ability((uint32_t)cid, a, &ab)) { free(card_no); return 0; }
     int print_trig = rb_trigger_is(ab.triggers, trig);
-    use_limit = ab.use_limit;
+    if (ab.full_text) {
+        size_t n_cn = strlen(card_no);
+        size_t n_ft = strlen(ab.full_text);
+        ability_id = (char *)malloc(n_cn + 1 + n_ft + 1);
+        if (ability_id) {
+            memcpy(ability_id, card_no, n_cn);
+            ability_id[n_cn] = '_';
+            memcpy(ability_id + n_cn + 1, ab.full_text, n_ft + 1);
+        }
+    }
     rb_free_ability(&ab);
     /* The direct-index form still refuses an ability that does not print the
        trigger: enqueuing one would fire something Rust could not have fired. */
-    if (!print_trig) return 0;
-
-    char ability_id[2048 + 64];
-    int n = snprintf(ability_id, sizeof(ability_id), "%s_%s", card_no, full);
-    if (n < 0 || (size_t)n >= sizeof(ability_id)) {
-        fprintf(stderr,
-                "[TEST_FIRE_TRIGGER] cid=%d ab=%d: ability_id would be %d bytes, "
-                "buffer is %zu -- refusing rather than firing a TRUNCATED id\n",
-                cid, a, n, sizeof(ability_id));
-        return 0;
-    }
+    if (!print_trig || !ability_id) { free(ability_id); free(card_no); return 0; }
 
     int before = tg->state.queue.n_entries;
     rb_trigger_auto_ability(&tg->state, ability_id, trig, /*player_id*/ pl,
                             card_no, /*explicit_card_id*/ cid,
                             /*trigger_moved_cards*/ NULL, /*n_moved*/ 0,
                             /*triggering_member_id*/ -1);
+    free(ability_id);
+    free(card_no);
     int queued = tg->state.queue.n_entries - before;
     if (queued <= 0) return 0;
-    /* THE ENQUEUE-TIME USE RECORD IS LOAD-BEARING, NOT COSMETIC.
-     * rb_trigger_auto_ability builds its entry with `use_limit_recorded = 0`, on
-     * Rust's model where a ターン1回 use is spent at RESOLUTION. The C port
-     * spends it at ENQUEUE: every scan in src/turn/triggers.c and in
-     * rb_queue_trigger_abilities calls rb_record_use right after building the
-     * entry and then flags the entry (the engine's own
-     * rb_mark_entries_use_limit_recorded), so the resolution-time gate in
-     * pca_resolve_entry does not reject the very entry that just paid for
-     * itself. See the long comment above rb_mark_entries_use_limit_recorded in
-     * src/core/game_state_abilities.c.
+    /* NOTHING IS RECORDED HERE, AND NOW THAT IS FAITHFUL.
      *
-     * Skipping that step leaves the use unspent while the entry resolves, so the
-     * post-resolution re-scan in rb_process_player_abilities_depth_full sees it
-     * still available and enqueues the same ability a second time. MEASURED on
-     * test_parity_state_per_card's T/010 (PL!N-sd2-010-SD2, 自動/ターン1回,
-     * "activate a waited member, that member gains +2 blade"): the ally gained
-     * 4 blade instead of 2. Recorded here, the helper matches Rust exactly. */
-    if (use_limit > 0) {
-        for (int i = before; i < tg->state.queue.n_entries; i++)
-            tg->state.queue.entries[i].use_limit_recorded = 1;
-        rb_record_use(&tg->state.queue, cid, a, tg->state.turn);
-    }
+     * Rust's `fire_trigger` (engine/tests/helpers/mod.rs:114-141) is three calls
+     * and no bookkeeping: trigger_auto_ability, activating_card, then
+     * process_pending_auto_abilities. It never touches
+     * `turn_limited_abilities_used` and never touches the entry's
+     * `use_limit_recorded` flag. `enqueue_printed_ability`
+     * (abilities.rs:1282-1326) constructs the entry with
+     * use_limit_recorded: false (abilities.rs:270) and records nothing either;
+     * the use is spent later, from resolution, by the one and only writer of
+     * the counter — `GameState::record_ability_use` (abilities.rs:216-231),
+     * reached at resolver.rs:1353 (UseLimitPhase::Early, gates.rs:301-310),
+     * resolver.rs:1230/:1390 and gates.rs:160/:308/:318/:331.
+     *
+     * This helper used to do the opposite: it pre-set `use_limit_recorded` on
+     * every entry it had just produced and then called `rb_record_use`
+     * unconditionally. Two measured regressions came out of that, both in the
+     * same three lines.
+     *
+     *  1. BURNING THE USE ON A DECLINE. The record was unconditional, so a
+     *     declined optional cost still consumed the turn-limited use. Rust does
+     *     not: gates.rs:301-310 skips the Early record when the effect is
+     *     `optional` or `conditional_on_optional`, and gates.rs:321-333's Final
+     *     record then sees the same exclusions, so the ability is left with
+     *     `ability_uses_used() == 0` and may fire again the same turn. MEASURED
+     *     on test_parity_bp7's Q233 case (PL!SP-bp5-005-R / -S / -SEC):
+     *     "a declined <effect> consumes no use of the 1-per-turn limit
+     *     (got 1 expected 0)", 5 assertions across the rarity sweep.
+     *
+     *  2. THE ENTRY NEVER BEING GATED. The resolution-time gate in
+     *     pca_resolve_entry is `if (ab->use_limit > 0 &&
+     *     !entry->use_limit_recorded)` (game_state_abilities.c:2710). A
+     *     pre-flagged entry skips it, so a SECOND `fire_trigger` on the same
+     *     「{{ターン1回}}」 ability in the same turn was admitted and ran again;
+     *     Rust rejects it in `use_limit_gate` (gates.rs:93-111), which the
+     *     unflagged entry reaches. MEASURED on test_parity_cce_gaps: +2.
+     *
+     * Simply deleting the record is not enough on its own, and the reason is
+     * worth keeping in the tree: with no record anywhere on this path the use
+     * stayed unspent for the WHOLE of the effect, because pca_resolve_entry's
+     * only record sat after `rb_execute_effect_ex`. The effect re-enters the
+     * post-resolution scan (rb_process_player_abilities_depth_full), that scan
+     * asks `ability_has_remaining_uses`, sees 0 uses and enqueues the same
+     * ability a second time — the "blade 4 instead of 2" regression on
+     * test_parity_state_per_card's T/010 (PL!N-sd2-010-SD2, 自動/ターン1回).
+     * The fix is not a record in this harness at all: it is the Early
+     * resolution-time record now sitting between the cost payment and the
+     * post-cost gate in pca_resolve_entry (game_state_abilities.c), which is
+     * where resolver.rs:1353 puts it. That record also reproduces Rust's
+     * optional / conditional_on_optional exclusions, so the Q233 decline leaves
+     * the use unspent without any special case here. */
     /* Rust order: trigger_auto_ability, THEN activating_card, THEN the drain. */
     tg->state.activating_card = cid;
     rb_process_pending_auto_abilities(&tg->state);

@@ -73,9 +73,20 @@
  *  - The flat RbChoice carries NO option list, so "which areas were offered"
  *    is not observable from C. Those claims are recorded as EXPECTED_GAP
  *    (counted and printed) rather than asserted as passes.
- *  - `rb_stage_position_change` / `rb_resume_position_change` swap `stage` and
- *    `stage_wait` only; under-cards do NOT follow their host (Rule 4.5.5.3 /
- *    Q139). The sibling `rb_effect_rotation` in the same file does carry them.
+ *  - CORRECTION to an earlier note in this file, which said
+ *    `rb_stage_position_change` / `rb_resume_position_change` "swap stage and
+ *    stage_wait only; under-cards do NOT follow their host (Rule 4.5.5.3 /
+ *    Q139)". That is no longer true. The Rule 4.5.5.3 crossed take now lives in
+ *    ONE place -- rb_stage_position_change_core (src/core/zones.c:215-228), which
+ *    swaps the two under-card bags UNCONDITIONALLY and BEFORE the stage swap,
+ *    matching zones.rs:396-400 -- and both ability-driven routes delegate to it
+ *    via rb_stage_position_change_with_bags (zones.c:263-267):
+ *      state.c:1550  rb_resume_position_change
+ *      state.c:1523/1525  rb_pos_change_for_player
+ *    The bare-array rb_stage_position_change (zones.c:254-257) is the only
+ *    variant that cannot carry bags, by construction. No assertion in this file
+ *    depended on the old claim, so correcting the prose costs no coverage; the
+ *    sibling rb_effect_rotation (state.c:1558-1580) carried them all along.
  *
  * ---------------------------------------------------------------------------
  * LANDMINES respected (confirmed by other agents)

@@ -6,6 +6,27 @@
  *  Strongly-typed ability enums: Zone, TargetPlayer, PlacementTarget,
  *  ActionType, ConditionType, SelectTargetKind, EffectCardType,
  *  EffectState, plus their wire-string helpers.
+ *
+ *  ACTION-TYPE TABLE INVARIANT (the drift that was here until 2026-10-02).
+ *  RbActionType in rabuka.h ends at RB_ACTION_COUNT_AS_MULTIPLE, so the three
+ *  ActionType tables below must each have exactly one row per declared
+ *  ordinal, and `to_str`/`label`/`from_str` must agree on every string:
+ *
+ *      n_rows(to_str) == n_rows(label) == RB_ACTION_COUNT_AS_MULTIPLE + 1
+ *
+ *  It held for 66 of 68 ordinals. RB_ACTION_REPLACEMENT_APPEAR_WAIT and
+ *  RB_ACTION_COUNT_AS_MULTIPLE were APPENDED to the enum in rabuka.h (see the
+ *  note at rabuka.h:625) after this file was written, and nobody re-opened
+ *  these tables, so `rb_action_type_from_str` answered -1 for the two wire
+ *  strings describe.rs:191 and :206 dispatch on. Nothing warned: a decode
+ *  table with a default arm is BUILT to swallow exactly that omission.
+ *
+ *  When a variant is appended to RbActionType, these three tables have to be
+ *  extended in the same edit. The mechanical sweep (walk ordinals 0..last,
+ *  require all three tables to answer, require from_str(to_str(x)) == x) is
+ *  what a test should own; tests/test_audit_actions.c
+ *  (`action_type_from_str_knows_both`) pins these two literals specifically
+ *  and was RED until now.
  * ==================================================================== */
 
 /* ── TargetPlayer helpers ── */
@@ -58,6 +79,16 @@ int rb_action_type_from_str(const char *s) {
     if (!strcmp(s, "gain_ability")) return RB_ACTION_GAIN_ABILITY;
     if (!strcmp(s, "gain_ability_from_source")) return RB_ACTION_GAIN_ABILITY_FROM_SOURCE;
     if (!strcmp(s, "invalidate_ability")) return RB_ACTION_INVALIDATE_ABILITY;
+    /* enums.rs:439-440, sitting between InvalidateAbility and
+     * SuppressAbilityTrigger there too. Both constants were APPENDED to
+     * RbActionType in rabuka.h (see the note at rabuka.h:625) AFTER this table
+     * was written, so the two wire strings describe.rs:191/206 dispatch on had
+     * no row here and `rb_action_type_from_str` answered -1 for them. Position
+     * in this chain is irrelevant to the answer -- what mattered was their
+     * absence. Placed at Rust's position so the three tables below stay
+     * diffable against enums.rs line for line. */
+    if (!strcmp(s, "replacement_appear_wait")) return RB_ACTION_REPLACEMENT_APPEAR_WAIT;
+    if (!strcmp(s, "count_as_multiple")) return RB_ACTION_COUNT_AS_MULTIPLE;
     if (!strcmp(s, "suppress_ability_trigger")) return RB_ACTION_SUPPRESS_ABILITY_TRIGGER;
     if (!strcmp(s, "activate_ability")) return RB_ACTION_ACTIVATE_ABILITY;
     if (!strcmp(s, "modify_cost")) return RB_ACTION_MODIFY_COST;
@@ -129,6 +160,8 @@ const char *rb_action_type_to_str(int at) {
         case RB_ACTION_GAIN_ABILITY:                return "gain_ability";
         case RB_ACTION_GAIN_ABILITY_FROM_SOURCE:    return "gain_ability_from_source";
         case RB_ACTION_INVALIDATE_ABILITY:          return "invalidate_ability";
+        case RB_ACTION_REPLACEMENT_APPEAR_WAIT:      return "replacement_appear_wait";
+        case RB_ACTION_COUNT_AS_MULTIPLE:            return "count_as_multiple";
         case RB_ACTION_SUPPRESS_ABILITY_TRIGGER:    return "suppress_ability_trigger";
         case RB_ACTION_ACTIVATE_ABILITY:            return "activate_ability";
         case RB_ACTION_MODIFY_COST:                 return "modify_cost";
@@ -203,6 +236,8 @@ const char *rb_action_type_label(int at) {
         case RB_ACTION_GAIN_ABILITY:                    return "Gain Ability";
         case RB_ACTION_GAIN_ABILITY_FROM_SOURCE:        return "Gain Ability from Source";
         case RB_ACTION_INVALIDATE_ABILITY:              return "Invalidate Ability";
+        case RB_ACTION_REPLACEMENT_APPEAR_WAIT:        return "Replacement: Appear Wait";
+        case RB_ACTION_COUNT_AS_MULTIPLE:              return "Count As Multiple";
         case RB_ACTION_SUPPRESS_ABILITY_TRIGGER:        return "Suppress Ability Trigger";
         case RB_ACTION_ACTIVATE_ABILITY:                return "Activate Ability";
         case RB_ACTION_MODIFY_SCORE:                    return "Modify Score";

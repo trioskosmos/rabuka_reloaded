@@ -280,13 +280,50 @@ static void test_move_cards_dispatch(void)
     e.destination = (char *)"hand";
     e.target = (char *)"self";
     rb_execute_effect_ex(&tg.state, 0, &e, -1);
+    /* Rust does NOT resolve this without asking. selection.rs:73-86
+     * take_cards_from_standard_zone takes two cards from the source, count 1,
+     * is_all false and can_skip false (a bare `count`, mod.rs:2061-2067, and no
+     * `optional` / `max`, mod.rs:2083-2084), so `resolve_selection` returns
+     * SelectionOutcome::Prompt, `prompt_count = count` (:81) and
+     * prompt_card_selection raises Choice::select_cards(zone, 1, .., can_skip =
+     * false) (:32, :85). Nothing is taken until the answer arrives.
+     * An earlier revision of this test asserted the card moved immediately,
+     * which Rust cannot do on this input. */
+    const RbChoice *ch = rb_has_pending_choice(&tg.state)
+                        ? rb_get_pending_choice(&tg.state) : NULL;
+    CHECK(ch && ch->kind == RB_CHOICE_SELECT_CARD,
+          "move_cards from a 2-card waitroom asking for 1 raises a SelectCard "
+          "(selection.rs:81-85)");
+    CHECK(ch && ch->zone && !strcmp(ch->zone, "discard"),
+          "the prompt's source zone is the waitroom, spelled \"discard\": "
+          "selection.rs:32 hands zone_name straight to Choice::select_cards");
+    CHECK_EQ(ch ? ch->count : -1, 1,
+             "the prompt asks for exactly `count` cards (selection.rs:81)");
+    CHECK_EQ(ch ? ch->allow_skip : -1, 0,
+             "a bare count is not skippable: can_skip is false "
+             "(selection.rs:32 passes can_skip straight through)");
+    CHECK_EQ(tg.state.p[0].discard.n, 2,
+             "nothing leaves the waitroom before the answer");
+    rb_resume_with_choice(&tg.state, 0);
     CHECK_EQ(tg.state.p[0].hand.n, 1, "move_cards routes waitroom -> hand");
     CHECK_EQ(tg.state.p[0].discard.n, 1, "move_cards consumes exactly one waitroom card");
 }
 
 /* Group 3b -- effects/recover/to_discard : DiscardCard (executor.rs:54).
  * executor.rs sends DiscardCard through the same execute_logged_move arm with a
- * discard log tag; the C arm defaults source=hand / destination=waitroom. */
+ * discard log tag, and that arm has NO zone defaulting:
+ *   dispatch.rs:74   ActionType::DiscardCard => resolver.execute_logged_move(gs, effect, "[[log_discard]]")
+ *   move/mod.rs:3594-3603  rule_log_activated + owner.executing + execute_move_cards
+ *   move/mod.rs:2105-2112  source = effect.source_any().unwrap_or_default()   -> ""
+ *                          destination = effect.destination.unwrap_or_default() -> ""
+ *   move/mod.rs:358-362    let source_str = if source.is_empty() { ... "discard" } else { source };
+ * An ABSENT source is therefore the WAITROOM ("the card is now in the
+ * discard/waitroom -- search there"), never the hand, and an absent destination
+ * names no zone at all. A zone-less discard_card with an EMPTY waitroom
+ * therefore moves nothing: mod.rs:1436-1441 takes the Skip arm and returns
+ * `Ok(Some(vec![]))` -- no card taken, no prompt raised.
+ * The C used to default an absent source to "hand" and an absent destination to
+ * "waitroom" in its own executor.c copy, which is a C invention. */
 static void test_discard_card_dispatch(void)
 {
     TestGame tg;
@@ -304,8 +341,19 @@ static void test_discard_card_dispatch(void)
     e.count = 1;
     e.target = (char *)"self";
     rb_execute_effect_ex(&tg.state, 0, &e, -1);
-    CHECK_EQ(tg.state.p[0].discard.n, 1, "discard_card defaults to hand -> waitroom");
-    CHECK_EQ(tg.state.p[0].hand.n, 1, "discard_card leaves the rest of the hand");
+    /* The WAITROOM is the default source, and it is empty here. */
+    CHECK_EQ(tg.state.p[0].discard.n, 0,
+             "a zone-less discard_card discards nothing: Rust reads source "
+             "from the effect and an empty source means the waitroom "
+             "(move/mod.rs:358-362), not the hand");
+    CHECK_EQ(tg.state.p[0].hand.n, 2,
+             "the hand is not discard_card's default source, so both cards "
+             "stay in hand (move/mod.rs:2105-2108 leaves source empty)");
+    /* mod.rs:1441 -- a source zone with nothing in it returns Ok(Some(vec![])),
+       i.e. it must not even raise a selection prompt. */
+    CHECK(!rb_has_pending_choice(&tg.state),
+          "an empty default source finds nothing, so no card-selection prompt "
+          "is raised (move/mod.rs:1436-1441 Skip arm)");
 }
 
 /* ========================================================================
@@ -890,11 +938,39 @@ static void test_ability_mod_dispatch(void)
     memset(&e, 0, sizeof(e));
     e.action = (char *)"set_card_identity";
     e.target = (char *)"self";
+    /* This effect carries all_regions, so it takes the ALL-REGIONS arm, and the
+     * two arms push DIFFERENT prohibition text:
+     *   ability_ops.rs:156-163  all_regions_any().unwrap_or(false) -> the branch
+     *   ability_ops.rs:749      single-region: `card_identity:{identities.join(",")}`
+     *   ability_ops.rs:766      all-regions:   `card_identity:{card_id}:{identity}`
+     *                            ONE ENTRY PER IDENTITY, prefixed with
+     *                            session.activating_card_id or gs.activating_card
+     *                            (:761)
+     * `card_identity:ZZZ Identity` is the SINGLE-region spelling and Rust cannot
+     * produce it for an all_regions effect, so the expectation below is the
+     * all-regions form. host_cid is `member` and reset_board clears
+     * activating_card (-1), so card_id == member (state.c:1076). */
     set_extra(&e, "all_regions", "true");
     set_extra(&e, "identities", "ZZZ Identity");
     rb_execute_effect_ex(&tg.state, 0, &e, member);
+    {
+        char want[64];
+        snprintf(want, sizeof(want), "card_identity:%d:ZZZ Identity", member);
+        CHECK(has_prohibition(&tg.state, want),
+              "an all_regions set_card_identity records the card-id-prefixed "
+              "card_identity prohibition (ability_ops.rs:766)");
+    }
+
+    /* The other arm of ability_ops.rs:156-163, so the branch is covered in both
+     * directions rather than only the one the all_regions extra selects. */
+    memset(&e, 0, sizeof(e));
+    e.action = (char *)"set_card_identity";
+    e.target = (char *)"self";
+    set_extra(&e, "identities", "ZZZ Identity");
+    rb_execute_effect_ex(&tg.state, 0, &e, member);
     CHECK(has_prohibition(&tg.state, "card_identity:ZZZ Identity"),
-          "set_card_identity records the card_identity prohibition");
+          "a single-region set_card_identity records the un-prefixed "
+          "card_identity prohibition (ability_ops.rs:749)");
 }
 
 /* ========================================================================

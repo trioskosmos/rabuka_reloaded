@@ -131,24 +131,25 @@ static void drain_first(TestGame *game) {
     }
 }
 
-/* Mirrors helpers::fire_trigger - find the ability whose printed `triggers`
-   string is exactly `trig`, enqueue it with the card as the activating card,
-   then resolve the pending auto abilities. Returns 0 when the card has no
-   such ability (a setup bug the callers assert on). */
+/* Mirrors helpers::fire_trigger (engine/tests/helpers/mod.rs:114) - resolve
+ * ONE ability on ONE card, key it "{card_no}_{full_text}", fire it with the
+ * card as the activating card, then resolve the pending auto abilities.
+ * Returns 0 when the card has no such ability (a setup bug the callers assert
+ * on).
+ *
+ * The hand-rolled body it replaces drove the queue with a raw rb_queue_push,
+ * which had two real defects the shared helper removes:
+ *   1. rb_queue_push builds its entry with `use_limit_recorded = 0` and never
+ *      calls rb_record_use, so a ??/???1? ability is still unspent when it
+ *      resolves and the post-resolution re-scan in
+ *      rb_process_player_abilities_depth_full enqueues it a SECOND time.
+ *   2. rb_queue_push leaves `player_id` EMPTY (ability_queue.c:269) and never
+ *      sets `queue.state`, so the un-stamped entry survived into the next
+ *      window instead of being retired by clear_completed().
+ * test_fire_trigger_on_card goes through rb_trigger_auto_ability: owner
+ * stamped, use recorded at enqueue, and the queue properly drained. */
 static int fire_trigger(TestGame *game, int card_id, const char *trig) {
-    int n = rb_card_num_abilities((uint32_t)card_id);
-    for (int i = 0; i < n; i++) {
-        Ability ab;
-        if (!rb_decode_card_ability((uint32_t)card_id, i, &ab)) continue;
-        int match = ab.triggers && strcmp(ab.triggers, trig) == 0;
-        rb_free_ability(&ab);
-        if (!match) continue;
-        rb_queue_push(&game->state.queue, card_id, i);
-        game->state.activating_card = card_id;
-        rb_drain_ability_queue(&game->state);
-        return 1;
-    }
-    return 0;
+    return test_fire_trigger_on_card(game, card_id, trig);
 }
 
 /* Mirrors zone_change_gate_test.rs::move_live_to_waitroom - a real

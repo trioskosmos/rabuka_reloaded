@@ -3,6 +3,7 @@
    ExecutionContext/LookAndSelectStep helpers.
    Mirrors engine/src/ability/types.rs. */
 #include "rabuka.h"
+#include <stdarg.h>
 #include <string.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -53,24 +54,45 @@ int rb_step_output_accepted(const RbStepOutput *out) {
     return out->has_accepted ? out->accepted : 0;
 }
 
+/* Append to a bounded buffer, tracking the write cursor.
+ *
+ * This exists because snprintf returns the WOULD-BE length, not the number of
+ * bytes written: one truncated append leaves the cursor past the end of the
+ * buffer, and the next `buf_sz - used` then underflows a size_t into a
+ * near-SIZE_MAX capacity. Hand-rolled `used += snprintf(...)` chains have that
+ * bug by construction; routing every append through here means the cursor is
+ * clamped the moment it would overshoot, so no later call can be handed a
+ * wrapped capacity. */
+static void json_append(char *buf, size_t buf_sz, size_t *used, const char *fmt, ...) {
+    if (*used >= buf_sz) return;
+    va_list ap;
+    va_start(ap, fmt);
+    int n = vsnprintf(buf + *used, buf_sz - *used, fmt, ap);
+    va_end(ap);
+    if (n < 0) { *used = buf_sz; return; }
+    *used += (size_t)n;
+    if (*used >= buf_sz) *used = buf_sz - 1;   /* keep room for the NUL */
+}
+
 const char *rb_step_output_to_json(const RbStepOutput *out, char *buf, size_t buf_sz) {
+    if (!buf || buf_sz == 0) return buf;
+    if (!out) { buf[0] = 0; return buf; }
     size_t used = 0;
-    used += (size_t)snprintf(buf + used, buf_sz - used, "{\"cards\":[");
-    for (int i = 0; i < out->n_cards && used < buf_sz; i++)
-        used += (size_t)snprintf(buf + used, buf_sz - used, "%s%d",
-                                 i ? "," : "", out->cards[i]);
-    used += (size_t)snprintf(buf + used, buf_sz - used, "],\"value\":");
+    json_append(buf, buf_sz, &used, "{\"cards\":[");
+    for (int i = 0; i < out->n_cards; i++)
+        json_append(buf, buf_sz, &used, "%s%d", i ? "," : "", out->cards[i]);
+    json_append(buf, buf_sz, &used, "],\"value\":");
     if (out->has_value)
-        used += (size_t)snprintf(buf + used, buf_sz - used, "%d", out->value);
+        json_append(buf, buf_sz, &used, "%d", out->value);
     else
-        used += (size_t)snprintf(buf + used, buf_sz - used, "null");
-    used += (size_t)snprintf(buf + used, buf_sz - used, ",\"accepted\":");
+        json_append(buf, buf_sz, &used, "null");
+    json_append(buf, buf_sz, &used, ",\"accepted\":");
     if (out->has_accepted)
-        used += (size_t)snprintf(buf + used, buf_sz - used, "%s",
-                                 out->accepted ? "true" : "false");
+        json_append(buf, buf_sz, &used, "%s",
+                    out->accepted ? "true" : "false");
     else
-        used += (size_t)snprintf(buf + used, buf_sz - used, "null");
-    snprintf(buf + used, buf_sz - used, "}");
+        json_append(buf, buf_sz, &used, "null");
+    json_append(buf, buf_sz, &used, "}");
     return buf;
 }
 

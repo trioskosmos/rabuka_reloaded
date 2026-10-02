@@ -533,25 +533,32 @@ static int expect_trigger(int cid, const char *trig, int min_abilities)
     return found;
 }
 
-/* Rust helpers::fire_trigger: queue the printed ability whose trigger is
- * exactly `trig`, drain, run the pending-auto pass. Returns 0 after dumping
- * when the card carries no such ability, so a fixture mistake can never
- * masquerade as engine silence. */
+/* Rust helpers::fire_trigger (engine/tests/helpers/mod.rs:114-141): resolve ONE
+ * ability of ONE card, keyed "<card_no>_<full_text>", call trigger_auto_ability
+ * with an explicit card id, then activating_card and
+ * process_pending_auto_abilities.
+ *
+ * This used to be `rb_queue_push(&tg->state.queue, cid, i)` +
+ * `rb_drain_ability_queue` + `rb_process_pending_auto_abilities`, which got
+ * two things wrong:
+ *   * `rb_queue_push` stamps NO OWNER (ability_queue.c:269 leaves player_id
+ *     empty). It only resolved because `rb_drain_ability_queue` is NOT
+ *     owner-scoped; Rust's `process_pending_auto_abilities` IS
+ *     (game_state_abilities.c:3033), and an unstamped entry there is dropped
+ *     without ever resolving.
+ *   * `rb_queue_push` records NOTHING at enqueue. The drain papers over that
+ *     with its resolution-time `drain_record_ability_use`
+ *     (ability_queue.c:1306), but the C port spends a ターン1回 use at
+ *     ENQUEUE, so the post-resolution re-scan saw it unspent and re-enqueued
+ *     the same ability -- the measured blade-4-instead-of-2 defect
+ *     src/test_game.c:1149 documents.
+ * `test_fire_trigger_on_card` performs the enqueue-time record itself and
+ * matches with the ENGINE's predicate (rb_trigger_is, a strstr) rather than an
+ * exact strcmp. The [TRIGGER-MISS] dump below is preserved verbatim: a fixture
+ * mistake must still say so loudly instead of masquerading as engine silence. */
 static int fire_trigger(TestGame *tg, int cid, const char *trig)
 {
-    int n = rb_card_num_abilities((uint32_t)cid);
-    for (int i = 0; i < n; i++) {
-        Ability ab;
-        if (!rb_decode_card_ability((uint32_t)cid, i, &ab)) continue;
-        int match = ab.triggers && strcmp(ab.triggers, trig) == 0;
-        rb_free_ability(&ab);
-        if (!match) continue;
-        rb_queue_push(&tg->state.queue, cid, i);
-        tg->state.activating_card = cid;
-        rb_drain_ability_queue(&tg->state);
-        rb_process_pending_auto_abilities(&tg->state);
-        return 1;
-    }
+    if (test_fire_trigger_on_card(tg, cid, trig)) return 1;
     dump_triggers(cid, trig);
     return 0;
 }
@@ -851,7 +858,20 @@ static void a2_the_gained_slot_executes_its_own_copied_effect(void)
     CHECK(zone_has(&tg, 0, "discard", live_in_wait),
           "A2 precondition: the waitroom live card really is in the waitroom");
 
-    /* Drive the GAINED slot. */
+    /* Drive the GAINED slot.
+     *
+     * NOT a shared-helper site, and deliberately so. RB_GAINED_ABILITY_INDEX_BASE
+     * + 0 addresses a RUNTIME-COPIED ability (gained_card_abilities), not a
+     * PRINTED one: there is no card_no/full_text key for it, so
+     * test_fire_trigger_at_index refuses it on two counts -- it bounds the index
+     * by rb_card_num_abilities(cid) and it re-checks that the ability prints the
+     * trigger. Rust's `fire_trigger` cannot address a gained slot either; its
+     * `resolved_abilities().find(...)` only ever sees the card's own printed
+     * abilities. The test's whole claim is that the COPIED text resolves, so
+     * driving it through the printed-ability path would destroy it. This is
+     * also why the enqueue-time use record the shared helper performs is not
+     * available here: the copy's use limit belongs to the gain, not to a
+     * printed ability of this card. */
     {
         int gained_idx = RB_GAINED_ABILITY_INDEX_BASE + 0;
         tg.state.activating_card = hazuki;

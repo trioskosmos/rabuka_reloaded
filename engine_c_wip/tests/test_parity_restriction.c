@@ -78,16 +78,11 @@
 #include <unistd.h>
 #include <sys/wait.h>
 
-/* rb_trigger_auto_ability / rb_process_pending_auto_abilities exist in
-   src/core/game_state_abilities.c but have no prototype in rabuka.h; the
-   same local declaration tests/test_parity_mill_deck.c uses. */
-void rb_trigger_auto_ability(GameState *g, const char *ability_id,
-                             const char *trigger_type, int player_id,
-                             const char *source_card_no,
-                             int explicit_card_id,
-                             const int *trigger_moved_cards, int n_moved,
-                             int triggering_member_id);
-/* rb_process_pending_auto_abilities IS declared in rabuka.h (returns int). */
+/* Fire-one-ability-on-one-card comes from the SHARED test-game helper
+   (include/test_game.h; the port of engine/tests/helpers/mod.rs:114
+   `fire_trigger_nth`), so this file no longer declares rb_trigger_auto_ability
+   itself. rb_process_pending_auto_abilities IS declared in rabuka.h
+   (returns int). */
 
 /* Trigger wire tokens, byte-exact UTF-8. */
 #define TRIG_CONSTANT     "\xE5\xB8\xB8\xE6\x99\x82"                          /* ~~ */
@@ -661,41 +656,22 @@ static void drain_choices(TestGame *tg)
     }
 }
 
-/* Rust helpers::fire_trigger: find the ability whose `triggers` EQUALS
-   `trig`, build the "<card_no>_<full_text>" key, enqueue exactly that
-   ability, set activating_card, then run process_pending_auto_abilities.
-   It deliberately does NOT drain, so the caller still observes the prompt
-   Rust observes. */
+/* Rust helpers::fire_trigger: resolve ONE ability on ONE card, key it
+   "{card_no}_{full_text}", fire it with `cid` as the activating card, then run
+   process_pending_auto_abilities. It does NOT drain further, so the caller
+   still observes the prompt Rust observes.
+   `nth` selects the Nth PRINTED ability carrying the trigger — Rust's
+   `fire_trigger_nth`, which test_fire_trigger_on_card_nth already implements.
+
+   The hand-rolled body it replaces recorded NO enqueue-time use, so a
+   自動/ターン1回 ability was still unspent when it resolved and the
+   post-resolution re-scan in rb_process_player_abilities_depth_full enqueued
+   it a SECOND time; its key also truncated at 1024 bytes. */
 static int fire_trigger(TestGame *tg, int cid, const char *trig,
                         const char *trigger_type, int nth)
 {
-    Card card;
-    if (cid < 0 || !rb_decode_card_by_index((uint32_t)cid, &card)) return 0;
-    char card_no[128];
-    snprintf(card_no, sizeof card_no, "%s", rb_card_string(card.card_no_idx));
-    char ability_id[1024];
-    int found = 0, nab = rb_card_num_abilities((uint32_t)cid);
-    for (int a = 0; a < nab && !found; a++) {
-        Ability ab;
-        if (!rb_decode_card_ability((uint32_t)cid, a, &ab)) continue;
-        if (ab.triggers && strcmp(ab.triggers, trig) == 0) {
-            if (nth == 0) {
-                snprintf(ability_id, sizeof ability_id, "%s_%s", card_no,
-                         ab.full_text ? ab.full_text : "");
-                found = 1;
-            } else {
-                nth--;
-            }
-        }
-        rb_free_ability(&ab);
-    }
-    rb_free_card(&card);
-    if (!found) return 0;
-    rb_trigger_auto_ability(&tg->state, ability_id, trigger_type, 0, card_no,
-                            cid, NULL, 0, -1);
-    tg->state.activating_card = cid;
-    rb_process_pending_auto_abilities(&tg->state);
-    return 1;
+    (void)trigger_type;   /* every call site here passes trig == trigger_type */
+    return test_fire_trigger_on_card_nth(tg, cid, trig, nth);
 }
 
 static int fire_live_start(TestGame *tg, int cid)

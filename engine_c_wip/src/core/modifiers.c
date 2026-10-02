@@ -395,28 +395,80 @@ static RbZoneId appearance_source_zone_id(RbZone z) {
    `if !source.is_empty()`. The C spells the same thing as a NEGATIVE RbZone
    (rb_record_card_appearance's `source >= 0` guard, modifiers.c:340), so
    every zone id with no RbZone counterpart — and RB_ZONEID_UNKNOWN itself —
-   returns -1 here. The wire spellings that only ever appear as a SOURCE (a
-   movement event's destination, or a selector) collapse onto the nearest
-   real zone, matching appearance_source_zone_id's own aliases: both
-   energy_zone/energy -> RB_ZONE_ENERGY, and success_zone/success_live_zone
-   -> RB_ZONE_SUCCESS. */
+   returns -1 here. That is the WHOLE rule now: this function refuses every
+   wire zone that RbZone cannot name, instead of folding it onto a neighbour.
+
+   ── Why "refuse" and not "fold" ────────────────────────────────────────────
+   The three still-collapsing rows this used to carry were all silent
+   MIS-PLACEMENTS, not simplifications, because the fold is lossy in BOTH
+   directions once it is read back. rb_get_card_appearance_source hands an
+   RbZone to rb_appearance_source_matches, which converts it back to a
+   RbZoneId (appearance_source_zone_id, above) and asks
+   rb_zone_matches_source — a faithful port of Rust's
+   `ZoneId::matches_source` (core/types.rs:914-922), which is EXACT for
+   everything except the documented deck / discard widenings. A folded row
+   therefore produces a wrong answer for the specific source AND for the
+   zone it was folded onto, where Rust's verbatim string comparison
+   (condition/card.rs:3000 `get_card_appearance_source(cid) == Some(expected)`)
+   produces the opposite answer in each case:
+
+     energy_deck -> RB_ZONE_ENERGY
+       the energy DECK is the card POOL (RbPlayer::energy_deck, drawn from by
+       rb_energy_deck_draw); the energy ZONE is where energy cards are PLAYED
+       (RbPlayer::energy, filled by rb_energy_add_card). Folding the pool
+       onto the zone puts an energy-deck card in the wrong bag with no error.
+       Read back, a 「登場元がエネルギゾーン」 gate matches a deck debut (Rust:
+       no) and a 「登場元がエネルギーデッキ」 gate never can (Rust: yes).
+     deck_top / deck_bottom -> RB_ZONE_DECK
+       RB_ZONE_DECK is one bag, so the top and the bottom become
+       indistinguishable. Read back, 「登場元が山札」 matches a bottom-of-deck
+       debut and 「登場元が山札の下」 never does — both inverted from Rust,
+       whose matches_source is deliberately asymmetric (a generic `deck`
+       matches DECK/DECK_TOP/DECK_BOTTOM, but `deck_top`/`deck_bottom` match
+       only themselves).
+     deck_top_or_bottom -> RB_ZONE_DECK
+       a SELECTOR wire value, not a zone at all.
+     success_zone -> RB_ZONE_SUCCESS
+       Rust has two distinct variants (enums.rs:102 `Zone::SuccessZone`,
+       :104 `Zone::SuccessLiveZone`) and RbZone has one bag for both, so the
+       fold makes a success_zone debut answer as success_live_zone.
+
+   engine.c's rb_zone_of_str already applies this same discipline from the
+   other direction — it derives its shared rows from rb_zone_id_from_str and
+   returns 0 (unresolvable) for RB_ZONEID_DECK_BOTTOM and RB_ZONEID_ENERGY_DECK
+   rather than collapsing them (engine.c:137-138). The two tables now agree.
+
+   KEPT, because they are ALIASES and not folds: energy_zone and
+   success_live_zone both decode to the SAME RbZoneId as their canonical
+   spelling (data.c:918-919's alias table, mirroring Rust
+   `ZoneId::from_str`'s `"energy" | "energy_zone"` and
+   `"success_live_zone" | "success_live_card_zone"` arms), and waitroom and
+   discard are one RbBag on both sides (RbPlayer::discard IS the 控え室;
+   `ZoneId::matches_source` folds them in both directions, types.rs:919-920).
+
+   NOTE ON RB_ZONEID_DECK_TOP: engine.c maps it to RB_ZONE_DECK on purpose,
+   because that caller's job is the top INSERT (util.rs:2426-2436
+   DeckTop inserts at `idx`, default 0 = top) and RB_ZONE_DECK is the
+   caller's top insert. This function's job is different — it names the
+   zone a card debuted FROM, where the top is a distinguishable answer — so
+   it refuses. The same split is why RB_ZONEID_UNDER_MEMBER /
+   SAME_AREA / EMPTY_AREA fall to `default: -1` here while engine.c routes
+   them to RB_ZONE_STAGE for placement. */
 int rb_zone_id_to_movement_zone(RbZoneId zid) {
     switch (zid) {
         case RB_ZONEID_HAND:             return RB_ZONE_HAND;
-        case RB_ZONEID_DECK:
-        case RB_ZONEID_DECK_TOP:
-        case RB_ZONEID_DECK_BOTTOM:
-        case RB_ZONEID_DECK_TOP_OR_BOTTOM: return RB_ZONE_DECK;
+        case RB_ZONEID_DECK:             return RB_ZONE_DECK;
         case RB_ZONEID_STAGE:            return RB_ZONE_STAGE;
         case RB_ZONEID_DISCARD:
         case RB_ZONEID_WAITROOM:         return RB_ZONE_DISCARD;
         case RB_ZONEID_ENERGY:
-        case RB_ZONEID_ENERGY_ZONE:
-        case RB_ZONEID_ENERGY_DECK:      return RB_ZONE_ENERGY;
+        case RB_ZONEID_ENERGY_ZONE:      return RB_ZONE_ENERGY;
         case RB_ZONEID_LIVE_CARD_ZONE:   return RB_ZONE_LIVE;
-        case RB_ZONEID_SUCCESS_ZONE:
         case RB_ZONEID_SUCCESS_LIVE_ZONE: return RB_ZONE_SUCCESS;
         case RB_ZONEID_RESOLUTION:       return RB_ZONE_RESOLUTION;
+        /* Every zone id below names a bag or a selector that RbZone does not
+           have a partner for. See the note above; -1 is the honest failure and
+           makes rb_record_card_appearance record no source at all. */
         default:                         return -1;
     }
 }
@@ -528,22 +580,98 @@ void rb_record_card_movement(GameState *g, int card_id, int from_zone, int to_zo
     }
 }
 
+/* -- record_cost_paid -- NOT WRITTEN HERE: the field it needs is not on GameState.
+   The port is game_state/mod.rs:404-414 (GameState::record_cost_paid), the ONLY
+   writer of cards_paid_cost_this_turn:
+
+       if let Some(cid) = self.ability_queue.current_entry().and_then(|e| e.card_id) {
+           if !self.cards_paid_cost_this_turn.contains(&cid) {
+               self.cards_paid_cost_this_turn.push(cid);
+           }
+       }
+
+   A SET, not a tally: the clause it feeds is 「このメンバーが、自分のカードの
+   能力のコストを支払うため」 (PL!-pb2-021-N 南ことり), which means "paid at
+   least once this turn", so two payments by the same member must still read
+   as one card. Mod.rs:397-398 states that explicitly. The 5 Rust call sites
+   are cost/handlers.rs:1389,:1477 and ability/choice.rs:734,:763,:948.
+
+   ⛔ BLOCKED, and the premise that it was already declared on GameState is
+   FALSE. include/rabuka.h:1286-1287 does contain
+       int  cards_paid_cost_this_turn[RB_MAX_ZONE];
+       int  n_cards_paid_cost_this_turn;
+   but they are members of **RbLiveSnapshot**, not GameState. The `typedef
+   struct {` they sit in opens at rabuka.h:1251 and closes at :1316 with
+   `} RbLiveSnapshot;`, and GameState holds that type only as a per-live ring,
+   `RbLiveSnapshot snapshots[RB_MAX_SNAPSHOTS];` (rabuka.h:1415). They are the
+   two survivors of a block a peer appended to the wrong struct (see the audit
+   note on rb_clear_card_movement_tracking below), they are read and written
+   nowhere in the C tree, and `g->cards_paid_cost_this_turn` does not compile.
+
+   So this body is written out here rather than compiled, because the field has
+   to be MOVED to GameState first — include/rabuka.h is not this file's. Once
+   it lands, this is the whole function (the two-step current_entry read is
+   rb_gsc_current_ability_source_card_id's, game_state_core.c:491-496):
+
+       void rb_record_cost_paid(GameState *g) {
+           if (!g) return;
+           int cur = rb_queue_current_entry(g);
+           if (cur < 0 || cur >= g->queue.n_entries) return;
+           int cid = g->queue.entries[cur].card_id;
+           if (cid < 0) return;
+           for (int i = 0; i < g->n_cards_paid_cost_this_turn; i++)
+               if (g->cards_paid_cost_this_turn[i] == cid) return;
+           if (g->n_cards_paid_cost_this_turn < (int)(sizeof(g->cards_paid_cost_this_turn)
+                                                     / sizeof(g->cards_paid_cost_this_turn[0])))
+               g->cards_paid_cost_this_turn[g->n_cards_paid_cost_this_turn++] = cid;
+       }
+
+   plus the one-line clear at modifiers.rs:2004, and then the reader —
+   ability/condition/card/comparison.rs:60-70, which has no C branch at all
+   today: condition.c never tests the paid_cost_this_turn flag, so the clause
+   falls straight through to the numeric path (comparison.rs:50-55 names the
+   symptom: there was nothing to compare against, so it read as 'cost >= 0'
+   and was permanently satisfied). condition.c is not this file's either. */
+
 /* -- clear_card_movement_tracking --
-   Mirror modifiers.rs:1920-1942 (GameState::clear_card_movement_tracking).
-   Rust clears seven turn-scoped structures:
-     cards_moved_this_turn  -> g->moved_this_turn[]            (held)
-     turn_movements         -> g->batch_movements[]            (held; C folds
-                              push_movement_event into
-                              rb_record_card_movement, so the event log and
-                              the per-card flag share one entry point)
-     cards_appeared_this_turn-> g->cards_appeared_this_turn[]  (held)
-     cards_activated_this_turn-> (no C field)
-     card_appearance_source  -> g->card_appearance_source[]    (held)
-     turn_area_movements    -> (no C field)
-     mods.opp_cause_fired_keys -> (no C field; the C engine dedupes
-                               opponent-cause watchers per move batch via
-                               g->batch_triggered_keys instead, which is a
-                               different — and weaker — scope)
+   Mirror game_state/modifiers.rs:1994-2019
+   (GameState::clear_card_movement_tracking). The old cite here said
+   1920-1942, which is push_movement_event, a different function.
+
+   Rust clears EIGHT turn-scoped structures:
+     :1995 cards_moved_this_turn  -> g->moved_this_turn[]           (held)
+     :1996 turn_movements         -> g->batch_movements[]           (held; C
+                                    folds push_movement_event into
+                                    rb_record_card_movement, so the event
+                                    log and the per-card flag share one
+                                    entry point)
+     :1997 cards_appeared_this_turn-> g->cards_appeared_this_turn[] (held)
+     :2001 cards_activated_this_turn-> (no C field — see report)
+     :2004 cards_paid_cost_this_turn-> NO C FIELD ON GameState. Not a gap in
+                                    the clear: include/rabuka.h:1286-1287
+                                    declares the two members inside RbLiveSnapshot
+                                    (that `typedef struct` opens at :1251 and
+                                    closes at :1316), which GameState only holds
+                                    as a per-live ring
+                                    (`snapshots[RB_MAX_SNAPSHOTS]`, :1415).
+                                    See the record_cost_paid note above; the one
+                                    line `g->n_cards_paid_cost_this_turn = 0;`
+                                    belongs here once the field is moved.
+                                    That block is a peer's and it misplaced EIGHT
+                                    members, not two: the four
+                                    player{1,2}_cheer_revealed_cards + counts
+                                    (:1290-1293) and the two revealed_cost_cards
+                                    (:1296-1297) are on the wrong struct for the
+                                    same reason, which is why
+                                    game_state_core.c:13-15 still reports all
+                                    three as missing — correctly.
+     :2014 card_appearance_source  -> g->card_appearance_source[]    (held)
+     :2015 turn_area_movements    -> (no C field — see report)
+     :2018 mods.opp_cause_fired_keys -> (no C field; the C engine dedupes
+                                    opponent-cause watchers per move batch
+                                    via g->batch_triggered_keys instead,
+                                    which is a different — and weaker —
+                                    scope)
    NOT cleared, matching Rust: g->recently_moved / recently_appeared.
    Call site in Rust: engine/src/turn/phases.rs:309, inside the victory /
    turn-rollover arm of advance_phase, immediately after turn_number += 1. */
@@ -552,7 +680,7 @@ void rb_clear_card_movement_tracking(GameState *g) {
     memset(g->moved_this_turn, 0, sizeof(g->moved_this_turn));
     g->n_batch_movements = 0;
     g->n_cards_appeared_this_turn = 0;
-    /* modifiers.rs:1937 — `self.card_appearance_source.clear();`
+    /* modifiers.rs:2014 — `self.card_appearance_source.clear();`
 
        card_appearance_source is the SECOND HALF of the 「このターン中に登場した場合」
        condition and it MUST turn over with cards_appeared_this_turn. The
@@ -594,9 +722,10 @@ void rb_clear_revealed_cards(GameState *g) {
 }
 
 /* ══════════════════════ constant cost modifiers ══════════════════════
-   Port of modifiers.rs::recalculate_constant_cost_modifiers +
-   recalculate_constant_cost_modifiers_with_ids
-   (engine/src/core/game_state/modifiers.rs:1109-1330).
+   Port of game_state/modifiers.rs::recalculate_constant_cost_modifiers
+   (engine/src/core/game_state/modifiers.rs:1433-1437, the public wrapper that
+   collects the stage + hand constant ids) and of its one real body,
+   recalculate_constant_cost_modifiers_with_ids (:1439-1654).
 
    Every 常時 ModifyCost effect on a stage or hand card is re-evaluated into
    two expected maps and then DIFFED against what was committed last time:
@@ -605,7 +734,29 @@ void rb_clear_revealed_cards(GameState *g) {
    The previous body ("Simplified: reset and re-apply") re-applied
    mods.constant_cost[cid] through rb_mods_set_cost, which (a) turned every
    additive delta into an absolute set-override and (b) never dropped a bonus
-   whose condition had stopped passing — stale costs accumulated forever. */
+   whose condition had stopped passing — stale costs accumulated forever.
+
+   ONE CALL SITE, and that is the whole design. Rust calls this from exactly
+   one place — the tail of recalculate_constants, at :1392, AFTER
+   commit_constant_results (:1375) and BEFORE
+   evaluate_success_zone_constant_modifiers (:1398) — and the C mirrors that
+   placement exactly, at the tail of rb_recalc_constants
+   (turn/triggers.c:1533). Two Rust facts make a second call site wrong
+   rather than merely redundant:
+     · commit_constant_results takes NO cost argument. Its parameters are
+       exp_blade / exp_score / exp_heart / exp_prohibition /
+       exp_global_need_heart / the three source lists / the two per-seat
+       score bonuses (game_state/modifiers.rs:518-533, called at :1375-1386)
+       — cost is not among them, so the main constant scan has no way to
+       commit one.
+     · recalculate_constants' `match effect.action` has no ModifyCost arm. It
+       covers GainResource (:792), ModifyScore (:1028), Restriction (:1060),
+       GainAbility (:1118), GainAbilityFromSource (:1202),
+       ModifyRequiredHeartsGlobal (:1209) and Sequential (:1250) and nothing
+       else — the only `ActionType::ModifyCost` test in this whole region is
+       :1472, INSIDE recalculate_constant_cost_modifiers_with_ids itself — so
+       no per-printed-effect cost arm exists to remove. Cost is owned
+       end-to-end by the one diff-and-commit pass below. */
 
 /* Typed extra getters (mirror AbilityEffect::{operation,value,location,…}_any) */
 static const char *cost_extra(const AbilityEffect *e, const char *k) {
@@ -781,9 +932,36 @@ void rb_recalculate_constant_cost_modifiers(GameState *g) {
         }
     }
 
-    /* Additive pass — remove what is no longer expected, add what is.
-       mods.constant_cost[cid] holds the last committed additive total, the
-       same role as Rust's mods.constant_cost_bonuses. */
+    /* Additive pass — the exact diff-and-commit of Rust modifiers.rs:1633-1642:
+
+           let old_bonuses = core::mem::take(&mut self.mods.constant_cost_bonuses);
+           if old_bonuses != expected {
+               for (cid, old) in &old_bonuses { self.mods.remove_cost_modifier(*cid, *old); }
+               for (&cid, &new_val) in &expected { self.mods.add_cost_modifier(cid, new_val); }
+           }
+           self.mods.constant_cost_bonuses = expected;
+
+       g->mods.constant_cost[cid] is this file's role for
+       `constant_cost_bonuses` (game_modifiers.rs:187, HashMap<i16,i16>) — a
+       per-card ledger of the last committed additive total, NOT the modifier
+       itself. Two things depend on keeping the two apart:
+         · the ADDITIVE withdrawal must be sized by what THIS pass wrote last
+           time, not by mods.cost[cid].add as a whole (other writers share
+           that accumulator);
+         · rb_recalc_constants' own prologue (triggers.c:1338-1346) zeroes
+           this ledger and undoes its deltas before it gets here, because
+           Rust's main constant scan never touches cost at all. So on that
+           path old_add is already 0 and the withdrawal below is a no-op; the
+           net total is identical either way. Do not "simplify" this into a
+           blind re-apply — that is what the previous body did, and it is why
+           stale costs accumulated forever.
+       NOTE for the triggers.c owner (not this file): that prologue withdraws
+       with rb_mods_add_cost(-old), a saturating ADD, where Rust's
+       remove_cost_modifier (game_modifiers.rs:535-542) is a saturating
+       SUBTRACT clamped at 0. Identical whenever the ledger and the
+       accumulator agree; they can diverge by a non-constant writer that
+       added a negative delta (triggers.c:1303), and then Rust floors at 0
+       while the C can go negative. */
     for (int cid = 0; cid < RB_MAX_CARD_IDS; cid++) {
         int old_add = g->mods.constant_cost[cid];
         int new_add = expected_add[cid];
@@ -793,10 +971,55 @@ void rb_recalculate_constant_cost_modifiers(GameState *g) {
         g->mods.constant_cost[cid] = (int16_t)new_add;
     }
 
-    /* Absolute pass. Rust keeps a dedicated mods.constant_cost_set_bonuses map;
-       RbMods has no such field, so a stale set is only dropped when the card
-       can no longer be a constant-cost host — never clobbering a set written
-       by a non-constant path (execute_set_cost etc.). */
+    /* Absolute pass. Rust modifiers.rs:1634 + :1643-1650:
+
+           let old_sets = core::mem::take(&mut self.mods.constant_cost_set_bonuses);
+           if old_sets != expected_set {
+               for cid in old_sets.keys() { self.mods.remove_cost_modifier_set(*cid); }
+               for (&cid, &new_val) in &expected_set { self.mods.set_cost_modifier(cid, new_val); }
+           }
+           self.mods.constant_cost_set_bonuses = expected_set;
+
+       The withdrawal arm iterates `old_sets` — the cards a CONSTANT set
+       bonus was last written for — and nothing else, so it is safe to clear
+       exactly those without ever touching a set written by a non-constant
+       path (execute_set_cost / effects/cost.rs). That is the whole reason
+       Rust keeps a SECOND ledger here and RbMods keeps only one.
+
+       KNOWN RESIDUAL, and the field that closes it. RbMods has no
+       constant_cost_set_bonuses (Rust: game_modifiers.rs:188-189,
+       `pub constant_cost_set_bonuses: HashMap<i16, i16>` — separate from
+       constant_cost_bonuses at :187), so there is no record of WHICH cards
+       this pass set, and a stale absolute cost can only be dropped by the
+       host-membership proxy below. Concretely: a 「手札にあるこのメンバーカードの
+       コストはNになる」 whose condition stops passing keeps overriding the
+       card's cost to N for as long as the card is in a hand / stage / energy
+       zone, because cost_is_constant_host is still true. Rust drops it on the
+       very next pass.
+
+       Field shape requested (add beside RbMods::constant_cost, rabuka.h:~250,
+       and next to constant_score/constant_heart):
+           int16_t constant_cost_set[RB_MAX_CARD_IDS];
+       i16 per card id, exactly mirroring the additive ledger above and the
+       Rust HashMap's i16 value; 0 means "this pass set nothing for that card",
+       which is why the additive loop needs no separate presence flag either.
+       Then the loop collapses onto Rust's shape:
+           for cid: old = mods.constant_cost_set[cid];
+                     new = expected_set[cid];
+                     if (old == new) continue;
+                     if (old) rb_mods_clear_cost_set(&mods, cid);
+                     if (new) rb_mods_set_cost(&mods, cid, new);
+                     mods.constant_cost_set[cid] = new;
+       DO NOT clear the new field in rb_mods_clear_card: Rust's
+       clear_all_for_card (game_modifiers.rs:611-628) removes
+       constant_blade/cost/score/heart_bonuses but NOT
+       constant_cost_set_bonuses, so the ledger entry outliving a zone exit is
+       Rust's behaviour, not an omission — and it self-heals on the next
+       recalculate_constants, which rewrites the whole map.
+
+       Until that field exists, the proxy below is the honest stand-in: it
+       never clobbers a non-constant set, and it does drop the set once the
+       card stops being a constant-cost host at all. */
     for (int cid = 0; cid < RB_MAX_CARD_IDS; cid++) {
         if (expected_set[cid]) {
             rb_mods_set_cost(&g->mods, cid, expected_set[cid]);

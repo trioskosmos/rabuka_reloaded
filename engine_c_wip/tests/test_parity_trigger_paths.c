@@ -417,26 +417,29 @@ static void dump_triggers(int cid, const char *want)
     }
 }
 
-/* Rust helpers::fire_trigger -- queue the ability whose printed trigger is
- * exactly `trig`, then resolve. Returns 0 (and dumps) when no such ability
- * exists, so a byte typo can never masquerade as "the engine did nothing". */
+/* Rust helpers::fire_trigger -- resolve ONE ability on ONE card, key it
+ * "{card_no}_{full_text}", fire it with `cid` as the activating card, then
+ * resolve.
+ *
+ * The body used to be hand-rolled over `rb_queue_push`, which had two real
+ * defects the shared helper removes:
+ *   1. rb_queue_push builds its entry with `use_limit_recorded = 0` and never
+ *      calls rb_record_use, so a 自動/ターン1回 ability is still unspent when it
+ *      resolves and the post-resolution re-scan in
+ *      rb_process_player_abilities_depth_full enqueues it a SECOND time.
+ *   2. rb_queue_push leaves `player_id` EMPTY (ability_queue.c:269) and never
+ *      sets `queue.state`, so the un-stamped entry survived into the next
+ *      window instead of being retired by clear_completed().
+ * test_fire_trigger_on_card goes through rb_trigger_auto_ability, which
+ * enqueues via rb_build_ability_queue_entry (owner stamped, state RESOLVING)
+ * and records the use at ENQUEUE time.
+ *
+ * The [TRIGGER-MISS] dump is PRESERVED: the shared helper reports a miss the
+ * same way (returns 0), so a byte typo in a fixture still cannot masquerade
+ * as "the engine did nothing". */
 static int fire_trigger(TestGame *g, int cid, const char *trig)
 {
-    int n = rb_card_num_abilities((uint32_t)cid);
-    for (int i = 0; i < n; i++) {
-        Ability ab;
-        if (!rb_decode_card_ability((uint32_t)cid, i, &ab)) continue;
-        int match = ab.triggers && strcmp(ab.triggers, trig) == 0;
-        rb_free_ability(&ab);
-        if (!match) continue;
-        rb_queue_push(&g->state.queue, cid, i);
-        g->state.activating_card = cid;
-        rb_drain_ability_queue(&g->state);
-        /* Rust's helpers::fire_trigger ends with process_pending_auto_abilities;
-         * the queue drain alone leaves a follow-on prompt parked. */
-        rb_process_pending_auto_abilities(&g->state);
-        return 1;
-    }
+    if (test_fire_trigger_on_card(g, cid, trig)) return 1;
     dump_triggers(cid, trig);
     return 0;
 }
@@ -1839,21 +1842,22 @@ static void p2_setsuna_retrieves_independent_live_instances_from_each_waitroom(v
 
     /* Rust's trigger_specific_auto forces player_id "p2". The C derives the
      * actor from rb_owner_of_card, so Setsuna is placed in P2's hand -- which
-     * is also what the printed 「双方のプレイヤー」 text implies. */
+     * is also what the printed 「双方のプレイヤー」 text implies.
+     *
+     * SEAT IS THE POINT HERE, so this is the _seat form of the shared helper:
+     * Rust passes player_id "p2" to trigger_auto_ability, and the test then
+     * asserts the FIRST retrieval prompt is routed to P2 and the second to P1.
+     *
+     * The old inline body drove the queue with a raw rb_queue_push, which
+     * leaves `player_id` EMPTY (ability_queue.c:269) — so the entry matched
+     * NEITHER seat in the owner-scoped drain and could only be resolved by the
+     * unbounded rb_drain_ability_queue the test called directly. It also never
+     * recorded a use and left queue.state untouched, so the un-stamped entry
+     * survived into the next window. test_fire_trigger_on_card_seat enqueues via
+     * rb_trigger_auto_ability: owner stamped, use recorded, state RESOLVING,
+     * and the trailing clear_completed() retires what completed. */
     test_add_to_hand_for(&g, 1, setsuna);
-    int fired = 0;
-    int n = rb_card_num_abilities((uint32_t)setsuna);
-    for (int i = 0; i < n && !fired; i++) {
-        Ability ab;
-        if (!rb_decode_card_ability((uint32_t)setsuna, i, &ab)) continue;
-        int match = ab.triggers && strcmp(ab.triggers, TRIG_DEBUT) == 0;
-        rb_free_ability(&ab);
-        if (!match) continue;
-        rb_queue_push(&g.state.queue, setsuna, i);
-        g.state.activating_card = setsuna;
-        rb_drain_ability_queue(&g.state);
-        fired = 1;
-    }
+    int fired = test_fire_trigger_on_card_seat(&g, setsuna, TRIG_DEBUT, 1);
     if (!fired) dump_triggers(setsuna, TRIG_DEBUT);
     CHECK(fired, "Setsuna exposes the 登場 ability that was driven");
     if (!fired) return;

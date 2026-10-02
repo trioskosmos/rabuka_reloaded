@@ -498,6 +498,12 @@ fn opp_ensemble_enabled() -> bool {
     std::env::var_os("V8_OPP_ENSEMBLE").is_some()
 }
 
+/// `V8_OPP_SCORE_ICONS`: credit the opponent with the yell score icons we credit
+/// ourselves. See the block above `score_dist`'s normalisation in `build_with`.
+fn opp_score_icons_enabled() -> bool {
+    std::env::var_os("V8_OPP_SCORE_ICONS").is_some()
+}
+
 /// `V8_OPP_SAMPLED_YIELD`: price the opponent's yell yield from the deck in
 /// play instead of `YIELD_PRIOR`. See the `build_with` block for the
 /// measurement that motivates it and the assumption it makes in their place.
@@ -728,6 +734,50 @@ impl OppModel {
                         }
                     }
                 }
+            }
+        }
+        // `V8_OPP_SCORE_ICONS`: shift the opponent's score distribution up by the
+        // score icons their own yell will bank.
+        //
+        // The yell's [score +1] icons are added to OUR total before the
+        // comparison and never to the opponent's, so an equal-printed-score check
+        // is priced as though we bank icons and they cannot. That asymmetry has a
+        // measured cost: over the 349 contested checks in a 300-game trace where
+        // the printed scores are EQUAL and both sides passed - 55% of all
+        // contested checks, so the comparison falls entirely to the icons -
+        // v9 wins 21.5%, and 3.3% on turn 1. A sign test on 349 near-coin-flips
+        // does not land at p = 0.0000 by accident.
+        //
+        // The icons are NOT biased, which is what makes this a model error rather
+        // than luck: v9 banks 0.291 per check against v7's 0.279 and the
+        // realised surplus is symmetric to within 0.04 at every turn. The bias is
+        // in the SHAPE - at turn 1 v9 is ahead in 4.5% of these checks with a
+        // mean surplus of +0.012, so it almost never takes the edge and when it
+        // does it takes it large. That is the signature of a model pricing ties
+        // more generously than ties arrive, and `contested_masses` builds the tie
+        // mass from this distribution.
+        //
+        // §28.9 measured this at 3600 games and called it a null, which was the
+        // right call at that power and the wrong power. The two proper tests of
+        // the same idea - a uniform `p_place` rescale (§28.20, null at 15,000)
+        // and the band table (§28.7, -20) - do not isolate the tie mass from the
+        // rest of the value. This arm is the specific one.
+        if opp_score_icons_enabled() {
+            let bonus = expected_yell_score(gs, 1 - me, db, blades) as f64;
+            if bonus > 0.0 {
+                let whole = (bonus.floor() as usize).min(SCORE_SLOTS - 1);
+                let frac = bonus - whole as f64;
+                let mut shifted = [0.0f64; SCORE_SLOTS];
+                for (s, w) in score_dist.iter().enumerate() {
+                    if *w <= 0.0 {
+                        continue;
+                    }
+                    let lo = (s + whole).min(SCORE_SLOTS - 1);
+                    let hi = (s + whole + 1).min(SCORE_SLOTS - 1);
+                    shifted[lo] += w * (1.0 - frac);
+                    shifted[hi] += w * frac;
+                }
+                score_dist = shifted;
             }
         }
         let total: f64 = score_dist.iter().sum();
@@ -1087,6 +1137,24 @@ impl OppModel {
         let sampled = pass_probability(&pools, &need);
         projected.pass_prob = (sampled * self.commit_rate).min(1.0);
         projected
+    }
+
+    /// Highest printed score this model expects the opponent to reach, i.e. the
+    /// top score band carrying meaningful mass.
+    ///
+    /// This is the "what can they score this turn" number the published guides
+    /// tell you to read off their board: their hearts and their blades are both
+    /// public, and the score bands are the guides' own. A tie is deliberately
+    /// treated as reachable, because a check lost on equal printed score is
+    /// still lost when the score icons go the other way.
+    pub fn top_score(&self) -> i32 {
+        let mut best = 0;
+        for (score, weight) in self.score_dist.iter().enumerate() {
+            if *weight >= crate::bot::v8_live::band_min_mass() {
+                best = score;
+            }
+        }
+        best.i32_count()
     }
 
     /// Placement masses inside a contested check, from rules 8.4.6 / 8.4.7.1.

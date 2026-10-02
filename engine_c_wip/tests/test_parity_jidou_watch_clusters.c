@@ -62,17 +62,21 @@
  *    in through test_id_exact. expect_card_no() is the wrapper.
  *  - Card.ability is NOT populated by rb_decode_card_by_index; abilities come
  *    from rb_card_num_abilities + rb_decode_card_ability. fire_trigger() is
- *    the helpers::fire_trigger port and matches on the EXACT printed trigger
- *    string, so a 6-byte typo shows up as a SETUP BUG, never as silence.
+ *    the helpers::fire_trigger port (mod.rs:114-141) and matches with the
+ *    ENGINE's predicate rb_trigger_is -- a strstr -- not an exact strcmp, so a
+ *    6-byte typo shows up as a SETUP BUG, never as silence.
  *  - RB_TSTR_DEBUT is 「登場」 = E7 99 BB E7 8D B2, a string NO CARD IN THE
  *    DATABASE CARRIES. The printed debut trigger is 「登場場」 = E7 99 BB
  *    E5 A0 B4. rb_trigger_is is a strstr, so the short form matches by prefix
- *    and the engine works; an EXACT compare in fire_trigger() does not. This
- *    file therefore defines TRIG_DEBUT_STAGE (the 6-byte form) and uses THAT
- *    for every debut lookup, and dump_triggers() prints the real bytes on
- *    every miss so a typo cannot hide. This is the same divergence
- *    test_parity_jidou_watch2.c documents; it is spelled here because this
- *    file depends on it for §A/§B/§D.
+ *    and the engine works. MEASURED HISTORY: this file's fire_trigger() used to
+ *    compare EXACTLY, so it could never match RB_TSTR_DEBUT and the 6-byte form
+ *    was mandatory. It now delegates to test_fire_trigger_on_card, which uses
+ *    the strstr, and TRIG_DEBUT_STAGE is kept anyway -- it is the byte-exact
+ *    printed token, which is what the assertion is about, and it keeps the
+ *    fixture immune to a future 「登場…」 prefix collision. dump_triggers()
+ *    prints the real bytes on every miss so a typo cannot hide. This is the
+ *    same divergence test_parity_jidou_watch2.c documents; it is spelled here
+ *    because this file depends on it for §A/§B/§D.
  *  - Rust's `gained_abilities` (the triggerless TEXT half of a grant) has NO C
  *    field. The C half is GameState.gained_card_abilities, read through
  *    rb_card_num_gained_abilities. Every "granted text count" assertion below
@@ -241,8 +245,10 @@ static const char *current_test = "(none)";
  *   U+30FB KATAKANA MIDDLE DOT = E3 83 BB
  * NOTE ON THE 6-BYTE DEBUT TOKEN: RB_TSTR_DEBUT is toujou + sho (= E7 8D B2),
  * which no card carries. The printed token is toujou + ba. rb_trigger_is is a
- * strstr so the engine works by prefix; this file's fire_trigger() compares
- * exactly, so it is always given TRIG_DEBUT_STAGE. */
+ * strstr so the engine works by prefix; MEASURED HISTORY: this file's
+ * fire_trigger() compared exactly, so it is always given TRIG_DEBUT_STAGE.
+ * That compare is gone (it is now test_fire_trigger_on_card, i.e. the strstr),
+ * and TRIG_DEBUT_STAGE stays because it is the byte-exact printed token. */
 #define TRIG_DEBUT_STAGE  "\xE7\x99\xBB\xE5\xA0\xB4"
 #define TRIG_AUTO         "\xE8\x87\xAA\xE5\x8B\x95"
 /* U+5E38 jou U+6642 toki = E5 B8 B8 E6 99 82 (the 常時 constant trigger) */
@@ -481,25 +487,32 @@ static void scan_auto(TestGame *tg, int pl)
     rb_drain_ability_queue(&tg->state);
 }
 
-/* helpers::fire_trigger — find the ability whose printed `triggers` string is
- * exactly `trig`, push it with `card` as the activating card, and drain.
- * Returns 0 when the card has no such ability, which the caller records as a
- * SETUP BUG rather than silently passing. */
+/* helpers::fire_trigger (engine/tests/helpers/mod.rs:114-141): resolve ONE
+ * ability of ONE card, keyed "<card_no>_<full_text>", and call
+ * trigger_auto_ability with an explicit card id; then activating_card and
+ * process_pending_auto_abilities.
+ *
+ * This used to be `rb_queue_push(&tg->state.queue, card_id, i)` +
+ * `rb_drain_ability_queue`, which got two things wrong that the shared helper
+ * gets right:
+ *   * `rb_queue_push` stamps NO OWNER (ability_queue.c:269 leaves player_id
+ *     empty) -- the entry only resolved because `rb_drain_ability_queue` is
+ *     NOT owner-scoped, where Rust's `process_pending_auto_abilities` is.
+ *   * `rb_queue_push` records NOTHING at enqueue. The drain papers over that
+ *     with its resolution-time `drain_record_ability_use`
+ *     (ability_queue.c:1306), but the C port spends a ターン1回 use at
+ *     ENQUEUE, so the post-resolution re-scan saw it unspent and re-enqueued
+ *     the same ability -- the measured blade-4-instead-of-2 defect
+ *     src/test_game.c:1149 documents.
+ * `test_fire_trigger_on_card` performs the enqueue-time record itself, and
+ * matches with the ENGINE's predicate (rb_trigger_is, a strstr) rather than an
+ * exact strcmp -- the same predicate `rb_trigger_auto_ability` re-checks
+ * internally. Returns 0 when the card prints no such ability, so the callers'
+ * SETUP BUG records keep their meaning; `dump_triggers()` still prints the real
+ * bytes on a miss. */
 static int fire_trigger(TestGame *tg, int card_id, const char *trig)
 {
-    int n = rb_card_num_abilities((uint32_t)card_id);
-    for (int i = 0; i < n; i++) {
-        Ability ab;
-        if (!rb_decode_card_ability((uint32_t)card_id, i, &ab)) continue;
-        int match = ab.triggers && strcmp(ab.triggers, trig) == 0;
-        rb_free_ability(&ab);
-        if (!match) continue;
-        rb_queue_push(&tg->state.queue, card_id, i);
-        tg->state.activating_card = card_id;
-        rb_drain_ability_queue(&tg->state);
-        return 1;
-    }
-    return 0;
+    return test_fire_trigger_on_card(tg, card_id, trig);
 }
 
 /* [TRIGGER-MISS] diagnostic: print, as hex, EVERY trigger string the card

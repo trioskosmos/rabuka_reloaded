@@ -443,57 +443,45 @@ static void rh_dump_effect(const char *tag, const AbilityEffect *e, int depth)
 
 /* ── trigger firing ──────────────────────────────────────────────────────── */
 
-/* test-game shim installed by src/test_game.c; mirrors the Rust helper that
- * builds the "<card_no>_<full_text>" ability id and queues exactly that
- * ability, sets activating_card, and drains the queue. */
-void rb_trigger_auto_ability(GameState *g, const char *ability_id,
-                             const char *trigger_type, int player_id,
-                             const char *source_card_no,
-                             int explicit_card_id,
-                             const int *trigger_moved_cards, int n_moved,
-                             int triggering_member_id);
+/* Fire-one-ability-on-one-card now comes from the SHARED test-game helper
+ * (include/test_game.h; the port of engine/tests/helpers/mod.rs:114
+ * `fire_trigger_nth`). This file no longer declares rb_trigger_auto_ability
+ * itself, so it cannot drift from the engine's own signature. */
 
 /* fire_trigger_nth(game, cid, trigger, trig, nth) -- the Rust helper every
- * trigger-driven test in this cluster uses. Returns 1 when the card really
- * carries the nth ability printing `trig`. */
+ * trigger-driven test in this cluster uses. `nth` selects the Nth PRINTED
+ * ability carrying the trigger, which is exactly what
+ * test_fire_trigger_on_card_nth implements, so this wrapper no longer
+ * re-derives the selection or builds its own "{card_no}_{full_text}" key.
+ *
+ * The hand-rolled body it replaces recorded NO enqueue-time use — so a
+ * 自動/ターン1回 ability was still unspent when it resolved and the
+ * post-resolution re-scan in rb_process_player_abilities_depth_full
+ * enqueued it a SECOND time — and its key truncated at 512 bytes.
+ *
+ * The SETUP BUG diagnostic is PRESERVED verbatim: a card that lacks the nth
+ * printed ability is a fixture mistake, and it must be counted as one
+ * (assertions++ / n_setup_bugs++) rather than turned into a vacuous
+ * negative. Returns 1 when the card really carries the nth ability printing
+ * `trig` and the enqueue was accepted. */
 static int rh_fire_nth(TestGame *tg, int cid, const char *trigger,
                       const char *trig, int nth)
 {
-    Card card;
-    if (!rb_decode_card_by_index((uint32_t)cid, &card)) return 0;
-    char card_no[128];
-    snprintf(card_no, sizeof card_no, "%s", rb_card_string(card.card_no_idx));
-    char ability_id[512];
-    ability_id[0] = '\0';
-    int seen = 0, found = 0;
-    int nab = rb_card_num_abilities((uint32_t)cid);
-    for (int a = 0; a < nab; a++) {
-        Ability ab;
-        memset(&ab, 0, sizeof ab);
-        if (!rb_decode_card_ability((uint32_t)cid, a, &ab)) continue;
-        if (ab.triggers && strcmp(ab.triggers, trig) == 0) {
-            if (seen == nth) {
-                snprintf(ability_id, sizeof ability_id, "%s_%s", card_no,
-                         ab.full_text ? ab.full_text : "");
-                found = 1;
-            }
-            seen++;
+    (void)trigger;   /* every call site here passes trig == trigger */
+    if (test_fire_trigger_on_card_nth(tg, cid, trig, nth)) return 1;
+    assertions++; n_setup_bugs++;
+    {
+        char card_no[128];
+        card_no[0] = '\0';
+        Card c;
+        if (cid >= 0 && rb_decode_card_by_index((uint32_t)cid, &c)) {
+            snprintf(card_no, sizeof(card_no), "%s", rb_card_string(c.card_no_idx));
+            rb_free_card(&c);
         }
-        rb_free_ability(&ab);
-        if (found) break;
-    }
-    rb_free_card(&card);
-    if (!found) {
-        assertions++; n_setup_bugs++;
         fprintf(stderr, "SETUP BUG: card %s lacks '%s' ability #%d\n",
                 card_no, trig, nth);
-        return 0;
     }
-    rb_trigger_auto_ability(&tg->state, ability_id, trigger, 0, card_no,
-                             cid, NULL, 0, -1);
-    tg->state.activating_card = cid;
-    rb_process_pending_auto_abilities(&tg->state);
-    return 1;
+    return 0;
 }
 
 static int rh_fire(TestGame *tg, int cid, const char *trigger)

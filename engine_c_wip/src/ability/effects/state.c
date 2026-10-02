@@ -3,6 +3,12 @@
 #include <stdlib.h>
 #include <stdio.h>
 
+/* core/zones.c owns it; rabuka.h does not export it -- the same situation as
+   rb_player_remove_member_from_stage_with_recycling, which the parity tests
+   hand-declare locally. Declared here because the Rule 4.5.5.3 stage swap is
+   shared with zones.c and must have ONE implementation. */
+int rb_stage_position_change_with_bags(RbPlayer *P, int from_area, int to_area);
+
 /* Forward declarations of static helpers defined later in this file */
 static int s_who(const char *target, int actor);
 static int s_value(const AbilityEffect *e, int dflt);
@@ -1482,12 +1488,11 @@ static void rb_pos_change_for_player(GameState *g, int who, AbilityEffect *e, in
         if(P->stage[src] < 0) return;
         int a = P->stage[src], b = P->stage[dst];
         /* Rule 4.5.5.3 / Q139: under-cards belong to the MEMBER, not the slot,
-           so they travel with it. Mirrors zones.rs:396-400 (mem::take both
-           sides, then write back swapped) and misc.c's stage_swap. */
-        RbBag au = P->under_cards[src], bu = P->under_cards[dst];
-        P->under_cards[src] = bu; P->under_cards[dst] = au;
-        P->stage[src] = b; P->stage_wait[src] = P->stage_wait[dst];
-        P->stage[dst] = a; P->stage_wait[dst] = P->stage_wait[src];
+           so they travel with it. The crossed take now lives in ONE place --
+           rb_stage_position_change_with_bags (core/zones.c), the C twin of Rust
+           Stage::position_change, whose unconditional pre-swap crossed take is
+           engine/src/core/zones.rs:396-400. */
+        if(rb_stage_position_change_with_bags(P, src, dst) < 0) return;
         rb_record_movement(g, a);
         if(b >= 0) rb_record_movement(g, b);
         rb_recalc_constants(g);
@@ -1499,12 +1504,10 @@ static void rb_pos_change_for_player(GameState *g, int who, AbilityEffect *e, in
         int cur = -1;
         for(int i=0;i<RB_STAGE_SIZE;i++) if(P->stage[i] == cid){ cur = i; break; }
         if(cur < 0 || cur == dst) return;
+        if(P->stage[cur] < 0) return;
         int a = P->stage[cur], b = P->stage[dst];
         /* Rule 4.5.5.3 / Q139: under-cards follow their member. */
-        RbBag au = P->under_cards[cur], bu = P->under_cards[dst];
-        P->under_cards[cur] = bu; P->under_cards[dst] = au;
-        P->stage[cur] = b; P->stage_wait[cur] = P->stage_wait[dst];
-        P->stage[dst] = a; P->stage_wait[dst] = P->stage_wait[cur];
+        if(rb_stage_position_change_with_bags(P, cur, dst) < 0) return;
         rb_record_movement(g, a);
         if(b >= 0) rb_record_movement(g, b);
         rb_recalc_constants(g);
@@ -1528,19 +1531,23 @@ void rb_resume_position_change(GameState *g, int actor, const AbilityEffect *e, 
     int dst = selected_idx;
     if(dst < 0 || dst >= RB_STAGE_SIZE) return;
     int src = -1;
-    for(int i=0;i<RB_STAGE_SIZE;i++) if(P->stage[i] == host_cid){ src = i; break; }
+    /* host_cid < 0 must not match an EMPTY slot: RB_EMPTY_SLOT is -1, so the
+       unguarded comparison used to select the first empty area as the SOURCE
+       and then swap two empty areas -- their under-card bags and wait flags
+       included -- for a move that had no member to move. */
+    if(host_cid >= 0)
+        for(int i=0;i<RB_STAGE_SIZE;i++) if(P->stage[i] == host_cid){ src = i; break; }
     if(src < 0 || src == dst) return;
     int a = P->stage[src], b = P->stage[dst];
     /* Rule 4.5.5.3 / Q139: under-cards travel WITH the member on a position
        change. Mirrors Rust Stage::position_change, engine/src/core/zones.rs:
        396-400, which `mem::take`s both under-card stacks and writes them back
        crossed over BEFORE the stage swap -- so the stack is carried even when
-       the destination area is empty. Same shape as rb_effect_rotation below,
-       which snapshots under_cards[i] alongside stage[i]/stage_wait[i]. */
-    RbBag au = P->under_cards[src], bu = P->under_cards[dst];
-    P->under_cards[src] = bu; P->under_cards[dst] = au;
-    P->stage[src] = b; P->stage_wait[src] = P->stage_wait[dst];
-    P->stage[dst] = a; P->stage_wait[dst] = P->stage_wait[src];
+       the destination area is empty. That crossed take (plus the per-area
+       stage_wait swap that stands in for Rust's per-CARD orientation map) now
+       has ONE implementation, rb_stage_position_change_with_bags in
+       core/zones.c; this route used to carry its own third copy. */
+    if(rb_stage_position_change_with_bags(P, src, dst) < 0) return;
     rb_record_movement(g, a);
     if(b >= 0) rb_record_movement(g, b);
     rb_recalc_constants(g);
@@ -1572,57 +1579,39 @@ void rb_effect_rotation(GameState *g, int actor, AbilityEffect *e){
     rb_recalc_constants(g);
 }
 
-/* Mirror modifiers.rs::refresh_yell_sources: a deck_bottom source sets
-   yell_from_bottom so the cheer check draws from the deck bottom (G8). */
-void rb_effect_modify_hearts(GameState *g, int actor, AbilityEffect *e){
-    int value = e->count > 0 ? e->count : 1;
-    const char *op = "decrease";
-    int sign = -1, is_set = 0;
-    const char *grp = NULL, *loc = NULL;
-    int per_unit = 0, per_unit_count = 1;
-    for(int i=0;i<e->n_extra;i++){
-        if(!e->extra_k[i]) continue;
-        if(!strcmp(e->extra_k[i],"operation") && e->extra_v[i]){
-            op = e->extra_v[i];
-            if(!strcmp(op,"increase")){ sign = 1; is_set = 0; }
-            else if(!strcmp(op,"set")){ sign = 1; is_set = 1; }
-            else { sign = -1; is_set = 0; }
-        } else if(!strcmp(e->extra_k[i],"group_names")||!strcmp(e->extra_k[i],"group_name")){
-            if(e->extra_v[i]) grp = e->extra_v[i];
-        } else if(!strcmp(e->extra_k[i],"per_unit") && e->extra_v[i] && !strcmp(e->extra_v[i],"true")){
-            per_unit = 1;
-        } else if(!strcmp(e->extra_k[i],"location")){
-            loc = e->extra_v[i];
-        } else if(!strcmp(e->extra_k[i],"per_unit_count") && e->extra_v[i]){
-            per_unit_count = atoi(e->extra_v[i]);
-        }
-    }
-    int cols[8]; int nc = 0;
-    for(int i=0;i<e->n_extra && nc<8;i++){
-        if(e->extra_k[i] && (!strcmp(e->extra_k[i],"heart_colors")||!strcmp(e->extra_k[i],"heart_color")) && e->extra_v[i]){
-            cols[nc++] = heart_color_of(e, 0);
-            break;
-        }
-    }
-    if(nc == 0) cols[nc++] = 0;
-    int who = (e->target && !strcmp(e->target,"opponent")) ? actor ^ 1 : actor;
-    RbPlayer *P = &g->p[who];
-    if(per_unit){
-        int units = P->live.n;
-        if(loc && (!strcmp(loc,"success_live_zone")||!strcmp(loc,"live_zone")||!strcmp(loc,"success_live_card_zone")))
-            units = P->success.n;
-        if(per_unit_count < 1) per_unit_count = 1;
-        value = value * (units / per_unit_count);
-    }
-    for(int i=0;i<P->live.n;i++){
-        int cid = P->live.cards[i];
-        if(grp && !rb_card_matches_group_str(cid, grp)) continue;
-        for(int c=0;c<nc;c++){
-            if(is_set) rb_mods_set_need_heart(&g->mods, cid, cols[c], value);
-            else       rb_mods_add_need_heart(&g->mods, cid, cols[c], value * sign);
-        }
-    }
-}
+/* DELETED 2026-10-02: rb_effect_modify_hearts.
+ *
+ * Zero callers (verified by name across src/ and tests/) and NOT a Rust entry
+ * point: engine/src/ability/enums.rs:450 is the only spelling of this family
+ * and it is `ModifyRequiredHearts => "modify_required_hearts"`. There is no
+ * `modify_hearts` action in Rust at all, so nothing can ever dispatch here.
+ *
+ * What it actually was: an older, pre-fix duplicate of execute_modify_required_hearts
+ * (engine/src/ability/effects/required_hearts.rs:28-223) that the live
+ * constant arm in src/turn/triggers.c:930-957 replaced -- that arm's own
+ * comment records the four defects this body still had:
+ *   - SINGULAR colour read. :1608-1612 took ONE entry out of the effect and
+ *     `break`ed, so a 「heart01とheart02」 style list applied to the first colour
+ *     only, where Rust's `heart_colors_any()` (required_hearts.rs:36) is a LIST
+ *     and the per-colour loop at :182-221 gives every listed colour the value.
+ *     Worse, heart_color_of (src/engine.c:182) resolves the `heart_color` extra
+ *     and falls back to `target`, and then to the caller's default.
+ *   - `operation` half-honoured: only "increase" and "set" were distinguished,
+ *     and everything else silently became a decrease -- required_hearts.rs:197-211
+ *     maps exactly three operations and returns Err on a fourth.
+ *   - amount from `count` only (:1585), where required_hearts.rs:35 uses
+ *     `value_or_count(0)` with `value` winning over `count`; on
+ *     PL!-bp6-022-L `count` is the ORIGINAL-SCORE THRESHOLD, not the amount.
+ *   - no self_target / group_name / original-score filter on the candidate set
+ *     (required_hearts.rs:147-167).
+ *
+ * The live twins, both verified correct against required_hearts.rs:28-223, are
+ * src/ability/effects/score.c:769 rb_execute_modify_required_hearts (the
+ * effect-driven route, plural colours at :904, `value` over `count` at :776-777,
+ * full candidate set at :864-901) and the constant arm at
+ * src/turn/triggers.c:930-957. include/rabuka.h:2100 still declares this
+ * symbol; nothing calls it, so the tree links without the definition. That
+ * declaration is the header owner's to drop. */
 
 /* ═══════════════════════════════════════════════════════════════════════════
    Static helper functions (mirror engine/src/ability/effects/misc.rs helpers)

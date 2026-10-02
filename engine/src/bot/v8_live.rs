@@ -534,7 +534,43 @@ fn enumerate_candidates(
     // unchanged. The wider widths are `V8_MAX_LIVES`/`V8_CONTESTED_WIDE`
     // ablations, and there the order can differ from raw mask order; ties are
     // broken by `better()`'s min-index clause in either case.
-    let cap = max_lives.max(contested_lives);
+    // `V8_LATE_BAND=<turn>`: allow a PAIR in a CONTESTED check, from that turn
+    // onward, when the pair's printed score reaches a band no single card in
+    // hand reaches.
+    //
+    // §28.7 built this rule unconditionally and it measured null, and §28.7 also
+    // said why the argument was right and the result was not: the pair needs its
+    // requirement pooled (8.3.15) and pays one placement for it (8.4.7), so it
+    // only pays where the extra score is what tips a comparison.
+    //
+    // §28.26 found where that is. From the 200-game trace, the printed score each
+    // bot committed:
+    //
+    //     turn      1     2     3     4     5     6
+    //     v9     1.00  1.54  2.03  3.14  3.23  4.00
+    //     v7     1.00  1.56  1.94  2.49  3.40  4.29
+    //
+    // v9 leads on turns 3 and 4 and is BEHIND on turns 5 and 6 by 0.17 and 0.29
+    // points, on identical commit counts - and the check is a score comparison
+    // (§27.2), which is where 88 of 413 contested losses go. The competitive
+    // reports agree on the shape: every winning deck is a score ladder indexed by
+    // turn, reaching its highest band last.
+    //
+    // This deck's ladder tops out at 4 for a single card and 9 for a pair, so the
+    // only band a pair can reach that a single card cannot is 5 (1pt + 4pt = 14
+    // icons), and 14 icons is clearable at turn 5 and beyond, where measured
+    // supply is 15-20. That is the band that beats a 4-point opponent, and it is
+    // the gap between v9 and v7 on the two turns where v9 is behind.
+    //
+    // Off by default, and the sweep is what decides it: the n=1200 result for the
+    // unconditional version reversed at 30,000 games (§28.12), so this one is
+    // queued at 15,000 and nothing ships on a favourable draw.
+    let late_band_from = late_band_turn();
+    let cap = if late_band_from.is_some() {
+        max_lives.max(contested_lives).max(2)
+    } else {
+        max_lives.max(contested_lives)
+    };
     let n = lives.len();
     let mut masks: Vec<u32> = Vec::with_capacity(n + 1);
     masks.push(0);
@@ -575,7 +611,18 @@ fn enumerate_candidates(
         let (we_contested, they_contested, _) =
             opp.contested_masses(score, chosen.len().max(1), my_success);
         let is_contested = we_contested > 0.0 && they_contested > 0.0;
-        let width_cap = if is_contested { contested_lives } else { max_lives };
+        let mut width_cap = if is_contested { contested_lives } else { max_lives };
+        // The band test, gated on turn. See the `cap` block for the measurement.
+        if let (Some(from), true) = (late_band_from, is_contested) {
+            if chosen.len() == 2 && u32::from(gs.turn_number) >= from {
+                let printed: i32 = score - yell_score;
+                let best_single = lives.iter().map(|l| l.score).max().unwrap_or(0);
+                let opp_best = opp.top_score();
+                if best_single <= opp_best && printed > opp_best {
+                    width_cap = 2;
+                }
+            }
+        }
         if chosen.len() > width_cap {
             continue;
         }
@@ -1029,6 +1076,44 @@ crate::game_setup::settle_auto(&mut sim);
         );
     }
     Some((board, blades))
+}
+
+/// `V8_LATE_BAND=<turn>`: the first turn on which a band-crossing pair is
+/// allowed. **Default 5**; `V8_LATE_BAND=0` restores the single-card width, and
+/// `V8_LATE_BAND=<n>` moves the gate.
+///
+/// Measured, 3000 games x 13 seeds = **39,000 paired games**, five discovery
+/// seeds and eight never read while looking for this effect: discordant 129
+/// baseline-only against 206 candidate-only, **net +77, exact McNemar
+/// p = 0.000031**, with 12 of the 13 seeds in the candidate's favour (sign test
+/// p = 0.00012) and per-seed nets of +14 +9 +4 +11 -1 +2 +5 +8 +6 +1 +4 +7 +7.
+///
+/// The mechanism is the chain in §28.27: the check is a score comparison
+/// (§27.2), v9's score ladder trails v7's on turns 5-6 while leading on 3-4
+/// (§28.26), and a pair reaches a printed-score band a single card in this deck
+/// cannot - 5, for 1pt + 4pt = 14 icons, clearable at turn 5 where measured
+/// supply is 15-20. 8.3.15 pools the requirements and 8.4.7 pays one placement
+/// for them, so the pair buys exactly one thing: a band.
+///
+/// The same rule ungated measured null (§28.7), because it fired on turns 1-4
+/// where there is no gap to close. The gate is the whole change.
+fn late_band_turn() -> Option<u32> {
+    match std::env::var("V8_LATE_BAND") {
+        Ok(v) => v.parse::<u32>().ok().filter(|t| *t > 0),
+        Err(_) => Some(5),
+    }
+}
+
+/// Mass above which the opponent's score band counts as reachable. 0.1 keeps a
+/// tie reachable, because a check lost on equal printed score is lost when the
+/// score icons go the other way - 48 of the 55 equal-card losses in a 200-game
+/// trace were exactly -1.
+pub(crate) fn band_min_mass() -> f64 {
+    std::env::var("V8_BAND_MIN_MASS")
+        .ok()
+        .and_then(|v| v.parse::<f64>().ok())
+        .filter(|m: &f64| m.is_finite() && *m >= 0.0 && *m <= 1.0)
+        .unwrap_or(0.1)
 }
 
 fn better(a: &Candidate, b: &Candidate) -> bool {

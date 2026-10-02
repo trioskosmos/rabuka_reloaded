@@ -263,6 +263,13 @@ typedef struct {
     /* snapshot-trace ring (mirrors AbilityApplication buffer of *_with_trace) */
     RbAbilityTraceEntry trace[RB_MODS_TRACE_CAP];
     int             n_trace;
+    /* Rust game_modifiers.rs:227: SmallVec<[u64;4]>. Keys fold in
+     * movement_event_counter so they are PER-MOVE, not per-card; pushed at
+     * abilities.rs:1159-1162, cleared at modifiers.rs:2018. C's
+     * batch_triggered_keys is a different, weaker scope. */
+    uint64_t opp_cause_fired_keys[16];
+    int n_opp_cause_fired_keys;
+
 } RbMods;
 
 void rb_mods_init(RbMods *m);
@@ -934,9 +941,9 @@ typedef struct {
     int  count;
     int  allow_skip;
     char target[64];
-    char description[128];
-    char description_en[128];
-    char description_ja[128];
+    char description[512];
+    char description_en[512];
+    char description_ja[512];
     RbChoiceRoute route;
     char filter_group[32];
     int  filtered_indices[RB_MAX_ZONE];
@@ -1111,7 +1118,7 @@ typedef struct { char strings[RB_MAX_CC_STRINGS][64]; int n_strings; } RbFullCho
 typedef struct RbFullChoice {
     RbFullChoiceKind kind;
     char zone[32]; char card_type[32]; int has_card_type; int count;
-    char description[128]; char description_en[128]; char description_ja[128];
+    char description[512]; char description_en[512]; char description_ja[512];
     int  allow_skip; int cost_limit; char cost_limit_op[8]; int has_cost_limit;
     int  cost_total; char cost_total_op[8]; int has_cost_total;
     RbFullChoiceU8Vec cost_values; char group[32];
@@ -1279,22 +1286,6 @@ typedef struct {
      *   mods.last_cost_energy_count - no Rust field of that name could be found in
      *     game_state/modifiers.rs or game_state/mod.rs. Do not add until someone
      *     confirms the twin exists. */
-    /* record_cost_paid (mod.rs:404-414): current_entry().card_id, pushed if not
-     * already present. 5 Rust callers: cost/handlers.rs:1389,1477,
-     * choice.rs:734,763,948. Also unblocks condition.c's `comparison_type:"cost"`
-     * arm, which is currently a `cost >= 0` tautology on PL!-pb2-021-N. */
-    int  cards_paid_cost_this_turn[RB_MAX_ZONE];
-    int  n_cards_paid_cost_this_turn;
-    /* cheer_revealed_cards / _mut (mod.rs:931, :1037) are SmallVec<[i16;8]>;
-     * produced at phases.rs:405, consumed at move/mod.rs:1583. */
-    int  player1_cheer_revealed_cards[8];
-    int  n_player1_cheer_revealed_cards;
-    int  player2_cheer_revealed_cards[8];
-    int  n_player2_cheer_revealed_cards;
-    /* push_revealed_cost_card (mod.rs:1091-1110); callers handlers.rs:1286,
-     * choice.rs:1673,1928. Cost-reveal provenance. */
-    int  revealed_cost_cards[RB_MAX_ZONE];
-    int  n_revealed_cost_cards;
     /* Rust PerformanceSnapshot.performance_need_heart_modifiers (types.rs:481),
      * captured at phases.rs:324-333 and :621-632, consumed by
      * restore_performance_need_heart_modifiers (game_state/modifiers.rs:2136-2159).
@@ -1412,6 +1403,38 @@ typedef struct GameState {
     int16_t  last_cost_waited_members[RB_STAGE_SIZE]; /* members put to wait by last cost */
     int      n_last_cost_waited_members;
     char     yell_source[2][16];   /* per-player modify_yell_source override (live.c do_yell) */
+    /* ── Moved here from RbLiveSnapshot. These are GameState data (Rust
+     * core/game_state/mod.rs) that was parked on the snapshot struct, so nothing
+     * could read them: `g->cards_paid_cost_this_turn` failed to compile with
+     * "'GameState' has no member named ...".
+     * Until they lived here, condition.c had NO `paid_cost_this_turn` branch at
+     * all, so `comparison_type:"cost"` was a `cost >= 0` tautology on
+     * PL!-pb2-021-N. Rust's arm is a separate early branch at
+     * ability/condition/card/comparison.rs:60-70, AHEAD of the cost path at :74/:90. */
+    /* record_cost_paid (mod.rs:404-414): current_entry().card_id, pushed if not
+     * already present. 5 Rust callers: cost/handlers.rs:1389,1477,
+     * choice.rs:734,763,948. Also unblocks condition.c's `comparison_type:"cost"`
+     * arm, which is currently a `cost >= 0` tautology on PL!-pb2-021-N. */
+    int  cards_paid_cost_this_turn[RB_MAX_ZONE];
+    int  n_cards_paid_cost_this_turn;
+    /* cheer_revealed_cards / _mut (mod.rs:931, :1037) are SmallVec<[i16;8]>;
+     * produced at phases.rs:405, consumed at move/mod.rs:1583. */
+    int  player1_cheer_revealed_cards[8];
+    int  n_player1_cheer_revealed_cards;
+    int  player2_cheer_revealed_cards[8];
+    int  n_player2_cheer_revealed_cards;
+    /* push_revealed_cost_card (mod.rs:1091-1110); callers handlers.rs:1286,
+     * choice.rs:1673,1928. Cost-reveal provenance. */
+    int  revealed_cost_cards[RB_MAX_ZONE];
+    int  n_revealed_cost_cards;
+
+    /* Rust GameState.turn_area_movements: SmallVec<[MovementEvent;4]>
+     * (game_state/mod.rs:250), pushed only in push_movement_event's stage->stage
+     * arm (modifiers.rs:1938), read at abilities.rs:549 and mod.rs:986-1000,
+     * cleared at modifiers.rs:2015. C had only the scalars last_area_move_*,
+     * which cannot express "this turn, in order". */
+    RbBatchMovement turn_area_movements[RB_MAX_RECENTLY_MOVED];
+    int n_turn_area_movements;
     RbLiveSnapshot snapshots[RB_MAX_SNAPSHOTS];
     int      n_snapshots;
     int      recently_moved[RB_MAX_RECENTLY_MOVED];
@@ -3291,5 +3314,78 @@ typedef struct {
     int selected;
     int selectable;            /* live-card rows only: false at the limit */
 } RbSetupHandCandidate;
+
+/* ── Overflow visibility (log.c / debug.c) ──────────────────────────────────
+ * The 32-slot verdict ring and the 256-line trace buffer are DROP-NEWEST with
+ * no eviction of the oldest — Rust's buffers are unbounded (log.rs:69 Vec,
+ * debug.rs:66 Mutex<Vec<String>>), so no fixed C bound is faithful and neither
+ * drop policy is. The honest position is to stop hiding the loss, which is what
+ * these counters do. Verified: 200 pushes -> len=32 dropped=168, and the
+ * surviving sequence range is [0..31], i.e. the OLDEST is kept.
+ * Both [ABILITY_LOG_OVERFLOW] and [AB_DEBUG_OVERFLOW] fire UNGATED on stderr
+ * on the first drop of an episode and every 64th after.
+ * The four prototypes were missing even though the counters themselves existed;
+ * nothing in src/ or tests/ could call them. */
+int  rb_log_dropped_count(void);
+void rb_log_dropped_reset(void);
+int  rb_abdebug_dropped_count(void);
+void rb_abdebug_dropped_reset(void);
+
+
+/* ── engine/src/core/constants.rs:8 numeric helpers ──────────────────────────
+ * These are the CANONICAL arithmetic, so no call site should re-spell them.
+ * A peer verified all 8 against an inline Rust reference over a 20-point grid
+ * plus edge grids (saturation, round-half-away-from-zero on +/-0.5, NaN->0).
+ * They had NO prototype here, which is why all 8 had ZERO callers: game_state_core.c
+ * worked around the missing `rb_phase_is_live_phase` with a local forward
+ * declaration, TWICE (lines 248 and 276). An unprototyped canonical helper is
+ * exactly how the ActionType and ZoneId tables drifted, so declare them. */
+int rb_score_to_i32(double v);
+int rb_score_to_i32_rounded(double v);
+uint8_t rb_effective_stat(uint8_t printed, int16_t modifier);
+uint8_t rb_overridden_stat(int16_t set, int16_t modifier);
+uint8_t rb_floored_cost(uint8_t base, int16_t modifier);
+uint32_t rb_count_u32(size_t v);
+uint32_t rb_id_u32(int16_t v);
+float rb_f32_count(double v);
+int rb_phase_is_live_phase(int phase);
+int     rb_zone_matches_source(RbZoneId zone, const char *source);
+int     rb_zone_matches_dest(RbZoneId zone, const char *dest);
+const char *rb_step_output_to_json(const RbStepOutput *out, char *buf, size_t buf_sz);
+
+/* Card::has_draw_icon (card.rs:4358), consumed by check_card_property
+ * (util.rs:1654-1673). Its three siblings are declared nearby; this one was
+ * missing, so callers had to invent a local extern. */
+int rb_card_has_draw_icon(const Card *c);
+
+/* Rust GameState.rule_log: Vec<String> (core/game_state/mod.rs:605) - a buffer
+ * SEPARATE from the 32-slot condition-verdict ring, which drops on overflow.
+ * Bound LOG_BOUND_RULE, newest-kept (mod.rs:1602-1606); desktop default 500.
+ * Nine functions in core/game_state_core.c are unroutable until this exists -
+ * routing them into the verdict ring would evict condition verdicts. */
+#define RB_GSC_RULE_LOG_MAX 500
+
+/* MemberContribution (engine/src/core/types.rs:515-531), populated at
+ * live.rs:1891-1908. It is the struct that makes rb_effective_blade_parts,
+ * rb_member_heart_detail and rb_need_satisfied in core/stats_pipeline.c
+ * REACHABLE: their only Rust callers are build_member_contributions
+ * (live.rs:1871, :1882), which returns a Vec<MemberContribution>.
+ * base_notes/bonus_notes/transform_delta are hard-zero at construction and only
+ * filled later at live.rs:3035. ability_heart_bonuses / ability_blade_bonuses are
+ * deliberately NOT reproduced - wire them once AbilityBonus's shape is confirmed. */
+typedef struct {
+    int         source_id;       /* i16 */
+    uint8_t     slot;            /* u8::try_from(stage index) */
+    uint8_t     base_hearts[8];
+    uint8_t     bonus_hearts[8];
+    uint8_t     base_blades;     /* effective_blade_parts .0 */
+    uint8_t     bonus_blades;    /* effective_blade_parts .1 */
+    uint8_t     base_notes;
+    uint8_t     bonus_notes;
+    uint8_t     draw_icons;      /* HeartColor::Draw entries of card.special_heart */
+    const char *card_no;         /* owned by the snapshot */
+    int         is_wait;         /* mods.orientation[cid]==Wait, live.rs:1886-89 */
+    uint8_t     transform_delta[8];
+} RbMemberContribution;
 
 #endif /* RABUKA_H */

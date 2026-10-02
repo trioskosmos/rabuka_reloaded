@@ -580,8 +580,23 @@ static int um_fire_live_success(TestGame *tg, int card)
  * because zones.c owns it but rabuka.h does not export it (the same local
  * declaration test_parity_zones_position.c makes for rb_stage_formation_change). */
 int rb_player_remove_member_from_stage_with_recycling(GameState *g, int pl, int index);
-/* Mirror Stage::position_change (zones.rs:367-414), likewise not exported. */
+/* Mirror Stage::position_change (zones.rs:367-414), likewise not exported.
+ *
+ * TWO entry points, because Rust's `Stage::position_change` is `&mut self`
+ * over a struct that holds BOTH halves of the board (zones.rs:391-400 reads
+ * `self.stage[...]` and `self.under_cards[...]`), while the C port splits the
+ * stage array out from the under-card bags:
+ *   - the bare-array form reaches only the stage half. Rust zones.rs:396-400
+ *     (`let from_under = core::mem::take(&mut self.under_cards[from_index]);`)
+ *     has no counterpart there, BY CONSTRUCTION: a caller's own `int stage[3]`
+ *     carries no pointer back to the bags, so a crossed take would smash the
+ *     caller's stack.
+ *   - the with-bags form takes the whole RbPlayer and is the only entry point
+ *     where the Rule 4.5.5.3 crossed take can run.
+ * Both are declared here so the distinction stays visible at the call sites.
+ */
 int rb_stage_position_change(int stage[RB_STAGE_SIZE], int from_area, int to_area);
+int rb_stage_position_change_with_bags(RbPlayer *P, int from_area, int to_area);
 
 /* Mirror zone set_area at a fixed index (Rust `stage.stage[i] = id`). */
 static void set_stage(TestGame *tg, int pl, int left, int center, int right)
@@ -697,9 +712,13 @@ static void A_kasumi_rule_1054_under_energy_recycles_to_energy_deck(void)
 
 /* A5 :: kasumi_rule_4553_under_cards_follow_position_change
  * Rule 4.5.5.3 / Q139: under-cards travel WITH the member on a position
- * change. KNOWN ENGINE DEFECT: rb_resume_position_change
- * (src/ability/effects/state.c) never swaps under_cards, while Rust
- * engine/src/game/zones.rs:396-400 does. Kept strict and red on purpose. */
+ * change. Driven through rb_stage_position_change_with_bags because this test
+ * holds a REAL player (tg.state.p[0]), not a bare stage array -- Rust's
+ * `Stage::position_change` takes `&mut self` on a struct holding both halves,
+ * so its zones.rs:397-400 crossed `mem::take` of `self.under_cards[...]` runs.
+ * The bare-array form used here previously passed `under = NULL` and silently
+ * did nothing, which is why this was red; the engine side is fixed
+ * (src/core/zones.c:263-267) and so is this call site. */
 static void A_kasumi_rule_4553_under_cards_follow_position_change(void)
 {
     static TestGame tg;
@@ -712,7 +731,7 @@ static void A_kasumi_rule_4553_under_cards_follow_position_change(void)
     place_energy_under(&tg, AREA_CENTER, 2);
     CHECK_EQ(under_n(&tg, 0, AREA_CENTER), 2, "2 energy seeded under Center");
 
-    int moved = rb_stage_position_change(tg.state.p[0].stage, AREA_CENTER, AREA_LEFT);
+    int moved = rb_stage_position_change_with_bags(&tg.state.p[0], AREA_CENTER, AREA_LEFT);
     CHECK_EQ(moved, kasumi, "the position change moves kasumi Center -> LeftSide");
     CHECK_EQ(tg.state.p[0].stage[AREA_LEFT], kasumi, "kasumi is now on LeftSide");
     CHECK_EQ(tg.state.p[0].stage[AREA_CENTER], left,
@@ -999,7 +1018,9 @@ static void A_rina_rule_1053_under_member_goes_to_waitroom(void)
 }
 
 /* A15 :: rina_rule_4553_under_member_follows_position_change
- * Rule 4.5.5.3 / Q139 for a MEMBER under-card. Same known defect as A5. */
+ * Rule 4.5.5.3 / Q139 for a MEMBER under-card. Same with-bags entry point as
+ * A5, for the same Rust reason (zones.rs:396-400 operates on `self`, which
+ * owns the under-card bags as well as the stage). */
 static void A_rina_rule_4553_under_member_follows_position_change(void)
 {
     static TestGame tg;
@@ -1013,7 +1034,7 @@ static void A_rina_rule_4553_under_member_follows_position_change(void)
     test_place_under(&tg, 0, AREA_CENTER, target);
     CHECK_EQ(under_n(&tg, 0, AREA_CENTER), 1, "1 member parked under rina");
 
-    rb_stage_position_change(tg.state.p[0].stage, AREA_CENTER, AREA_LEFT);
+    rb_stage_position_change_with_bags(&tg.state.p[0], AREA_CENTER, AREA_LEFT);
     CHECK_EQ(tg.state.p[0].stage[AREA_LEFT], rina, "rina is now on LeftSide");
     CHECK_EQ(under_n(&tg, 0, AREA_LEFT), 1,
              "Q139: the under MEMBER follows rina to LeftSide");

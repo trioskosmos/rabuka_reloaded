@@ -1844,12 +1844,21 @@ static void dc_fill_decks(TestGame *tg, int filler, int n)
     }
 }
 
-/* Rust fill_decks_distinct: 30 DISTINCT instances per deck, returning the P1
-   deck snapshot (index 0 = top) so an order-sensitive assertion can be made
-   after a draw + put-back. */
-static int dc_fill_decks_distinct(TestGame *tg, int count)
+/* Rust fill_decks_distinct: `count` DISTINCT instances per deck, RETURNING the
+   P1 deck snapshot (index 0 = top) so an order-sensitive assertion can be made
+   after a draw + put-back.
+   Rust returns `Vec<i16>` (draw_then_bottom_hand_card_test.rs:21-32); C has no
+   cheap small-vector return, so the snapshot is written through `snap`, which
+   the CALLER owns and must declare. An earlier version of this helper filled a
+   local `int snap[64]` that died with the frame, so every caller's `snap[0]` /
+   `snap[i+1]` read UNINITIALISED stack -- which is where the negative
+   expectations like "drawn card on bottom (expected -13157)" came from (that
+   value is the Cygwin debug stack fill, not a card id). Passing the array in
+   is the only shape that keeps every caller's expectation reading the ids the
+   helper actually staged.
+   `snap` must have room for at least 64 ints; the count is clamped to match. */
+static int dc_fill_decks_distinct(TestGame *tg, int count, int *snap)
 {
-    int snap[64];
     if (count > 64) count = 64;
     tg->state.p[0].deck.n = 0;
     tg->state.p[1].deck.n = 0;
@@ -2321,13 +2330,17 @@ static void test_chain_baton_source_cost_gated_draw_discard(void)
    chain's tail: a draw that comes up short must still run the discard step,
    and an entirely empty board must move no cards at all.
 
-   KNOWN RED (canary): the "from the waitroom" half of the gate cannot be
-   evaluated in C. rb_record_card_appearance (src/core/modifiers.c:314) accepts
-   `source` and DISCARDS it - `(void)source;` - because GameState has no
-   `card_appearance_source` field (the file's own comment at modifiers.c:343
-   calls this out and requests the field). So "record(me, \"hand\")" and
-   "record(me, \"discard\")" are indistinguishable and the hand-debut negative
-   below cannot pass until the field exists. */
+   The "from the waitroom" half of the gate is now EVALUABLE. An earlier note
+   here claimed it could not be, because rb_record_card_appearance
+   (src/core/modifiers.c:324) used to accept `source` and discard it with
+   `(void)source;` -- GameState had no `card_appearance_source` field. That is
+   no longer true: GameState carries card_appearance_source_card[] /
+   card_appearance_source_zone[] / n_card_appearance_source, the recorder fills
+   them (modifiers.c:340-346), and rb_get_card_appearance_source
+   (modifiers.c:353-362, the C twin of modifiers.rs:1394-1399) reads them back.
+   So "record(me, RB_ZONE_DISCARD)" and "record(me, RB_ZONE_HAND)" are
+   distinguishable and the hand-debut negative (10b) is a real, currently
+   green assertion -- it is not a canary any more. */
 static void test_chain_waitroom_debut_draw_discard(void)
 {
     int me = -1;
@@ -2911,8 +2924,8 @@ static void dc_run_draw_then_bottom(TestGame *game, const char *card_no)
     int card_b = test_id(game, "PL!-sd1-020-SD");  /* live   */
     CHECK(you >= 0 && card_a >= 0 && card_b >= 0, "the draw-then-bottom fixtures resolve");
     if (you < 0 || card_a < 0 || card_b < 0) return;
-    int snap[64];
-    int n = dc_fill_decks_distinct(game, 20);
+    int snap[64] = { 0 };
+    int n = dc_fill_decks_distinct(game, 20, snap);
     int drawn_top = snap[0];
     test_add_to_hand(game, you);
     test_add_to_hand(game, card_a);
@@ -2967,8 +2980,8 @@ static void test_chain_draw_one_put_one_on_bottom(void)
         int card_b = test_id(&game, "PL!-sd1-020-SD");
         CHECK(you >= 0 && card_b >= 0, "draw-then-bottom (drawn card) fixtures resolve");
         if (you < 0 || card_b < 0) return;
-        int snap[64];
-        int n = dc_fill_decks_distinct(&game, 20);
+        int snap[64] = { 0 };
+        int n = dc_fill_decks_distinct(&game, 20, snap);
         int drawn_top = snap[0];
         test_add_to_hand(&game, you);
         test_add_to_hand(&game, card_b);
@@ -2997,8 +3010,8 @@ static void test_chain_draw_one_put_one_on_bottom(void)
         int you = test_id(&game, "PL!S-bp5-014-N");
         CHECK(you >= 0, "draw-then-bottom (auto) fixture resolves");
         if (you < 0) return;
-        int snap[64];
-        int n = dc_fill_decks_distinct(&game, 20);
+        int snap[64] = { 0 };
+        int n = dc_fill_decks_distinct(&game, 20, snap);
         int drawn_top = snap[0];
         test_add_to_hand(&game, you);
         test_give_energy(&game, 4);
@@ -3028,8 +3041,8 @@ static void test_chain_draw_one_put_one_on_bottom(void)
         int target = df_new_id(&game, "PL!-sd1-001-SD");
         test_add_to_hand(&game, you);
         test_add_to_hand(&game, target);
-        int snap[64];
-        dc_fill_decks_distinct(&game, 20);
+        int snap[64] = { 0 };
+        dc_fill_decks_distinct(&game, 20, snap);
         test_give_energy(&game, 4);
 
         test_play_to_stage(&game, you, 1);
@@ -3065,7 +3078,8 @@ static void test_chain_draw_one_put_one_on_bottom(void)
         test_add_to_hand(&game, member);
         test_add_to_hand(&game, live);
         test_add_to_hand(&game, energy);
-        dc_fill_decks_distinct(&game, 20);
+        int snap[64] = { 0 };
+        dc_fill_decks_distinct(&game, 20, snap);
         test_give_energy(&game, 4);
 
         test_play_to_stage(&game, you, 1);
@@ -3086,7 +3100,8 @@ static void test_chain_draw_one_put_one_on_bottom(void)
             test_add_to_hand(&g, member);
             test_add_to_hand(&g, live);
             test_add_to_hand(&g, energy);
-            dc_fill_decks_distinct(&g, 20);
+            int snap[64] = { 0 };
+            dc_fill_decks_distinct(&g, 20, snap);
             test_give_energy(&g, 4);
             test_play_to_stage(&g, y2, 1);
             if (!test_has_pending_choice(&g)) continue;
@@ -3188,8 +3203,8 @@ static void test_chain_draw_one_put_one_on_bottom(void)
         int card_a = test_id(&game, "PL!-sd1-001-SD");
         CHECK(you >= 0 && card_a >= 0, "draw-then-bottom (isolation) fixtures resolve");
         if (you < 0 || card_a < 0) return;
-        int snap[64];
-        dc_fill_decks_distinct(&game, 20);
+        int snap[64] = { 0 };
+        dc_fill_decks_distinct(&game, 20, snap);
         test_add_to_hand(&game, you);
         test_add_to_hand(&game, card_a);
         test_add_to_hand(&game, test_id(&game, "PL!-sd1-020-SD"));
@@ -3213,7 +3228,8 @@ static void test_chain_draw_one_put_one_on_bottom(void)
         int you = test_id(&game, "PL!S-bp5-014-N");
         CHECK(you >= 0, "draw-then-bottom (cost gate) fixture resolves");
         if (you < 0) return;
-        dc_fill_decks_distinct(&game, 20);
+        int snap[64] = { 0 };
+        dc_fill_decks_distinct(&game, 20, snap);
         test_add_to_hand(&game, you);
         test_give_energy(&game, 3);   /* printed cost 4 */
 

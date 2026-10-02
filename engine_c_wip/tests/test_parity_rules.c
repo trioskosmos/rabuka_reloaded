@@ -912,8 +912,15 @@ static void test_q139_under_energy_moves_with_member(void)
              "the activation moved the member to the Aqours area");
     /* Rule 4.5.5.3 / Q139: the under-cards travel with the member. Rust
        MemberArea::swap_positions (zones.rs:396-400) swaps the under_cards bags;
-       C rb_resume_position_change (state.c:1497-1499) swaps only stage[] and
-       stage_wait[]. */
+       C does too now. CORRECTION to an earlier note here that said
+       rb_resume_position_change (then state.c:1497-1499) "swaps only stage[]
+       and stage_wait[]": it now delegates to
+       rb_stage_position_change_with_bags (src/core/zones.c:263-267), whose core
+       rb_stage_position_change_core (zones.c:223-228) performs the crossed
+       under-card take UNCONDITIONALLY and BEFORE the stage swap, before the
+       per-area stage_wait swap at :235-240. The two assertions below are green
+       against that implementation; the old prose described a state the code no
+       longer has. */
     CHECK_EQ(under_count(&game, 0), 2,
              "Q139: under-energy moved together with its member");
     CHECK_EQ(under_count(&game, 1), 0,

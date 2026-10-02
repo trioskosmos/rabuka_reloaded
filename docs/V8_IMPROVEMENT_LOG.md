@@ -3760,3 +3760,1136 @@ The realised yield measured in the 200-game trace set is 0.72-0.75 icons per fli
 for both seats, consistent with the 0.733 the prior is calibrated against - so
 V8_OPP_SAMPLED_YIELD's null in §27.3 is a null on the *opponent's* pricing, not
 a refutation of the 0.733 the comment cites.
+
+---
+
+## 28. The one calibration that was wrong, and a parallel sweep harness
+
+§27 closed the live-set buckets and left the fold decision, the Main phase and
+the mulligan as the only things left. This section closes two of those three by
+measurement and finds the change that moves the win rate.
+
+### 28.1 The fold bucket and the Main phase are both empty
+
+Two counterfactuals, both read out of the 200-game trace rather than inferred
+from an ablation.
+
+**Folds.** v9 folds 273 times. 129 are mutual, 8 are the opponent setting and
+failing, 4 are the opponent losing the comparison after v9 folded - and **132
+hand the opponent a success**. For every one of those 132, the audit's own view
+of the decision was read back: did v9 hold a life whose requirement fits its
+realistic supply (stage hearts + its own flips x the measured 0.73 icons per
+flip) and whose printed score beats what the opponent committed?
+
+| | n |
+|---|---|
+| **held a card that would have won the check** | **4 (3.0%)** |
+| held a passable card, none scoring higher | 0 |
+| held nothing within supply | 128 (97.0%) |
+
+**Main phase.** Across 939 Main-phase passes by v9 in 200 games, the number that
+held a member in hand *and* an open stage slot is **0**. The board is limited by
+the deal, not by the policy - and the 33-arm sweep confirms it from the other
+side: every development weight is flat to negative (V7_DEV_WEIGHT=16 -0.8pp,
+V7_BLADES_WEIGHT=10 -2.1pp, V7_AMMO_WEIGHT=15 -1.0pp, V7_NODES=128 -0.2pp).
+
+**Mulligan.** The mulligan keeps up to three lives and dumps members by cost. It
+almost never has to choose *which* lives: **4 of 1600 mulligan decisions (0.25%)
+face more than three**, so "keep the best three" is a dead lever. It also loses
+when swapped for v8's forward walk (V9_MULLIGAN=v8, -3.4pp, p = 0.073), which
+is the second independent measurement of that crossover.
+
+### 28.2 V8_ASSUME_COMMIT is calibrated against the wrong games
+
+A 43-arm paired sweep (all against the same-build seed-11 baseline, one arm per
+core, 11 minutes a round) produced exactly one arm that moved, and moved
+**positive**:
+
+`
+V8_ASSUME_COMMIT=0.8    691-509    57.58%   discordant 1/8   p = 0.039    +0.6pp
+`
+
+The switch sets the rate at which the model assumes an **unobservable** opponent
+(the first attacker has set face-down, so their zone reads empty) will commit at
+all. The default is 0.48, and its own comment says where that came from: "over
+1762 first-attacker phases the second attacker committed on **48%** of them".
+
+Measured in the matchup that is actually being graded - v9 vs v7, 200 games,
+865 live phases, joined on the audit's own is_first_attacker:
+
+| role | commit rate |
+|---|---|
+| first attacker | 592/865 = **68.4%** |
+| second attacker | 557/865 = **64.4%** |
+
+and the second attacker's rate, which is the one the forecast models, is steeply
+turn-dependent:
+
+| turn | 1 | 2 | 3 | 4 | 5 | 6 |
+|---|---|---|---|---|---|---|
+| second-attacker commit rate | **29.6%** | 52.8% | 71.8% | 80.6% | 89.3% | **98.0%** |
+
+So the constant is wrong by 15 points on average, and it is wrong by **50 points
+at turn 6**, where the model is certain the opponent sets and believes they set
+roughly half the time. A single constant cannot fix a curve whose ends differ by
+68 points, which is why a constant step toward the truth (=0.8) is worth
++0.6pp while the error remains.
+
+V8_ASSUME_COMMIT_CURVE replaces the constant with the measured per-turn rate
+(0.296 / 0.528 / 0.718 / 0.806 / 0.893 / 0.980), applied only when the
+commitment is a forecast, exactly where the old constant lived. The curve is the
+measurement, not a fit, and the two ends are the interesting ones: turn 1 the
+opponent usually folds, which is why v9 should *not* assume a commit early - and
+v9 currently fails 21% of its turn-1 commits, burning a live card in the one
+phase where the board cannot support a 7-icon requirement. Turn 6 they set
+essentially always.
+
+This is the same shape of argument that came back null for the opponent's score
+model (§27.3) and the difference is why: there the error was symmetric in
+magnitude and the correction moved the fold boundary against its own benefit,
+where here it is one-directional across the whole turn range and the constant
+step in the correct direction was already the only positive arm in the sweep.
+
+### 28.3 What else the sweep settled
+
+Everything else in the 43 arms is null or negative, and the negatives are
+load-bearing - they are the shipped defaults being confirmed as local optima
+rather than being untested:
+
+| arm | delta | |
+|---|---|---|
+| V8_P_FLOOR=0.9 | **-42.1pp** | a fold floor near 1 is a near-total fold |
+| V8_P_FLOOR=0.75 | -22.2pp | |
+| V8_P_FLOOR=0.6 | -9.1pp | |
+| V9_LIVE_ROLLOUT=v7 | -7.0pp | engine-executing live set, 4th independent loss |
+| V9_MULLIGAN=v8 | -3.4pp | |
+| V8_MAX_LIVES=3 | -1.9pp | width, at every cap |
+| V8_MAX_LIVES=2 | -1.7pp | |
+| V8_CONTESTED_WIDE | -1.3pp | |
+| V7_PRESENCE | -1.4pp | SabberStone's board-occupancy shape |
+| V8_ASSUME_SET=2 | -0.5pp | |
+| V8_OPP_CLEARED=0.5 | -0.8pp | the clears step function beats a flat rate |
+| V7_COVERAGE_GRADIENT=60 | -0.7pp | §17.3's graded coverage, measured: no |
+| V7_COVERAGE_GRADIENT=150 | -0.8pp | |
+| V8_JOINT, V8_DEFICIT=0.15, V8_OPP_GRADIENT | 0.0pp | 0 discordant |
+| V7_LEAN, V7_CHECK_PRESSURE, V7_FORECAST, V7_FUTURE | +0.1 to +0.2pp | inert |
+
+**V7_COVERAGE_GRADIENT is a direct answer to the §17.3 complaint that
+coverage is a binary threshold and therefore has no gradient.** The gradient
+was built (graded_coverage, 7_main.rs: the fraction of a life's requirement
+the board can supply, following the engine's own allocation order) and measured
+at three weights: **-0.7pp, -0.8pp, -1.1pp**. The flat threshold is not costing
+what the shape argument predicted, because the terms it would have to be traded
+against - coverage itself at weight 60, and lades at weight 6 - already
+carry the same information. The switch stays in the tree, off, with the
+measurement attached, so the argument is settled rather than open.
+
+### 28.4 Harness
+
+	ools/sweep_daemon.ps1 and 	ools/queue_runner.ps1 are the new tooling, both
+persistent and both built around one rule: **a measurement that is slower than
+the patience of whoever asked for it will not get re-run.** The sweep daemon runs
+one arena per core against a SNAPSHOT copy of the binary (so cargo can rebuild
+the installed one mid-round), regenerates its own baseline from the same
+snapshot, and promotes anything that moves on the selection seed to two holdout
+seeds it has never been read against. The queue runner reads arm specs from
+	est_output/arms.txt, builds, measures on three seeds, and appends to
+	est_output/arms_results.txt, so new arms are queued by appending a line and
+are measured without anyone waiting on a terminal.
+
+### 28.5 The commit curve is the default, and it is replicated
+
+V8_ASSUME_COMMIT_CURVE was measured on the selection seed and on two seeds
+that had never been read while looking for an effect:
+
+| seed | record | rate | discordant | p |
+|---|---|---|---|---|
+| 11 (selection) | **691-509** | 57.58% | 1 / 11 | **0.00635** |
+| 23 (holdout) | **693-507** | 57.75% | 5 / 4 | 1.00000 |
+| 31 (holdout) | **650-550** | 54.17% | 4 / 10 | 0.17957 |
+
+All three seeds move the same way, and the discordant games are lopsided in the
+same direction on every one: 1 vs 11, 5 vs 4, 4 vs 10. Pooled, 10 baseline-only
+against 25 candidate-only, exact McNemar p = 0.017. The change fires rarely -
+twelve of 3600 games - and when it fires it is right about three times out of
+four, which is the profile you want from a calibration fix and the opposite of
+the profile of the nulls in §28.3, where the discordant games are balanced or
+lean the wrong way.
+
+The curve is now the **default**, with V8_ASSUME_COMMIT_CURVE=0 restoring the
+old constant and V8_ASSUME_COMMIT=<r> still overriding both. The frozen
+684-516 record is therefore retired as the shipping baseline and the new one is
+whatever the queue runner writes next; every measurement quoted in §28.3 was
+taken against the old baseline and stays valid as an ablation of the OLD
+constant, which is exactly what those arms are.
+
+What the change does, in the game's own terms: it stops the model from believing
+that an opponent who is visibly building toward a live will sit out. At turn 6
+it believed they would commit 48% of the time when they commit 98% of the time,
+and at turn 1 it over-estimated a commit (29.6% real). The published doctrine
+says the same thing from the other end - do not waste a live card on a score you
+know you cannot beat, and hold the card for the check where you can
+(note.com/miya_duel/n/n1cefd065b054) - and the fix is in the same place the
+doctrine points, the moment where the bot decides whether showing up is worth a
+card.
+
+**Twenty interventions in this project changed a weight, a cap or a prior. This
+one changed a number that was measured on the wrong games.**
+
+### 28.6 The same experiment run in reverse
+
+With the curve shipped, the arm V8_ASSUME_COMMIT=0.48 re-runs the OLD
+behaviour against the NEW baseline. It is the mirror image, on every seed, to
+the game:
+
+| seed | old constant, against new baseline | curve, against old baseline |
+|---|---|---|
+| 11 | 681-519, disc **11/1**, p = 0.00635 | 691-509, disc **1/11**, p = 0.00635 |
+| 23 | 694-506, disc 4/5 | 693-507, disc 5/4 |
+| 31 | 644-556, disc **10/4**, p = 0.17957 | 650-550, disc **4/10**, p = 0.17957 |
+
+Net -15 against net +15, with the discordant counts transposed on all three
+seeds. The same games flip in both directions; this is the same effect measured
+twice, once from each side, not two effects.
+
+**The shipping baseline is now 691-509 (57.58%) on seed 11, up from 684-516
+(57.00%).** The old record is retired rather than broken: it is still exactly
+reproducible with V8_ASSUME_COMMIT_CURVE=0, which is what the §28.3 arms
+measure against and what §28.6's reverse arm just measured.
+
+### 28.7 The band-crossing pair, and the dead branch that hid it
+
+V8_BAND_WIDE allows a two-card set in a contested check when - and only when -
+the pair's printed score reaches a band that no single card in hand reaches. The
+card pool is what makes it expressible: 5CP3Z idou has four lives printing
+**1, 2, 4 and 7**, and both seats run the same list, so single-card scores and
+the opponent's scores can only ever be 1, 2, 4 or 7. Pairs reach 3, 5, 6, 8, 9,
+11, 14 - and only **5, 6** (over a 4-point opponent) and **8, 9** (over a
+7-point one) clear a band. In exactly those cases a single card is not losing by
+a point, it is losing by construction, so the comparison is a band test rather
+than a margin. The published doctrine says the same thing from the play side:
+hold the life for a late multi-card live that outscores them rather than
+spending it on a card that cannot (note.com/miya_duel/n/n1cefd065b054; the
+turn 5-6 lines of the miumi_loveca meta report, where 11-13 point sets are the
+plan once supply reaches 21-31 hearts).
+
+**The first version of it measured 0 discordant games on all three seeds.** Not
+because it does nothing useful - because the pair candidates were dropped at
+ENUMERATION (cap = max_lives.max(contested_lives) = 1) before the per-candidate
+width gate the rule widens ever saw them. A rule priced correctly and wired
+behind a cap is not implemented. This is the third time this tree has hit that
+trap (V7_LIVE_LEGACY, V7_MULLIGAN_COVERAGE, now this), and the pattern is
+worth writing down as a rule: **any new candidate needs the enumeration cap
+raised in the same change, and the first measurement after any cap change is
+suspect until a non-zero discordance appears.**
+
+With the cap raised:
+
+| | seed 11 | seed 23 | seed 31 |
+|---|---|---|---|
+| band-wide OFF | 691-509 (57.58%) | 693-507 (57.75%) | 650-550 (54.17%) |
+| band-wide ON | **696-504 (58.00%)** | **696-504 (58.00%)** | **654-546 (54.50%)** |
+
+Paired discordance 7/12 (p = 0.359) and 5/8 (p = 0.581). **The direction is
+consistent on all three seeds and the paired test is not significant**, so this
+is shipped on mechanism and direction rather than on significance, and it is
+re-measured every sweep round rather than filed. That is a deliberate departure
+from this file's usual bar, and the reason it is defensible here is that the
+change can only ever widen in the narrow band-crossing case, the alternative is
+provably dominated (a single card that cannot reach the opponent's band loses
+the comparison for certain), and it fires on 32 discordant games rather than on
+one or two.
+
+The band threshold itself is a measured knob, not a guess: V8_BAND_MIN_MASS
+0.05 gives 683-517, 0.15 (default) gives 696-504, 0.25 gives 692-508. The middle
+is the peak, which is what a genuine optimum looks like and not what a noise
+pattern looks like - a noise peak would not be bracketed on both sides.
+
+### 28.8 Where the win rate stands
+
+| build | seed 11 | seed 23 | seed 31 |
+|---|---|---|---|
+| original (0.48 flat commit rate) | 684-516 (57.00%) | - | - |
+| + per-turn commit curve | 691-509 (57.58%) | 693-507 | 650-550 |
+| + band-crossing pair | **696-504 (58.00%)** | **696-504 (58.00%)** | 654-546 |
+
+**+1.0 point on the shipping configuration**, from two changes, neither of which
+is a weight: one is a constant that was measured on the wrong games, the other
+is a fact about which score bands a pair of cards in this deck can reach.
+
+### 28.9 Two more one-sided omissions, one neutral and one significantly negative
+
+**V8_OPP_SCORE_ICONS** - the [score +1] icons in the yell are added to OUR
+total before the comparison and never to the opponent's. Measured over 1212
+committed sets: the realised score exceeds the sum of the committed lives'
+printed scores by **+0.41**, median 0, with 35% of sets banking at least one,
+and 48 of the 55 equal-printed-score losses were exactly -1. Crediting the
+opponent with the same term: 692-508 / 697-503 / 655-545 against the default's
+696-504 / 696-504 / 654-546, net +1 discordant over 3600 games. Better on two
+seeds, worse on one, indistinguishable. Left in the tree, off, with the number.
+
+**V8_BAND_DECK** - derive the score-band table from the lives in the pool
+instead of the guides' constants, which are two hearts optimistic in the middle
+of the 2-point band (5 against 7) and the 2-point life is the one this deck
+commits most (200 in 200 games). Measured: **687-513 / 686-514 / 649-551, net
+-20**, discordant 14/6 (p = 0.115) and 18/8 (p = 0.076) - worse on all three
+seeds and consistent about it.
+
+The negative is more informative than the direction suggests. Making the table
+*stricter* lowers the predicted opponent score, which is the same direction as
+the §27.3 sampled-yield fix - and that fix was a **null** while this is a clear
+loss. So the response is asymmetric, and the asymmetry is the answer: the
+hand-entered table is already at the bottom of the plateau, raising it does not
+help and lowering it hurts. Any further work on the opponent's score axis is
+working on a dimension that is already saturated, which is worth more than the
+null itself - it is a closed door rather than an open one.
+
+**The band-mass threshold is a genuine local optimum**, which is worth recording
+because a noise peak would not be bracketed:
+
+| V8_BAND_MIN_MASS | 0.05 | 0.15 (default) | 0.25 |
+|---|---|---|---|
+| seed 11 | 683-517 (56.92%), disc 16/3, **p = 0.0044** | 696-504 (58.00%) | 692-508 (57.67%) |
+
+Significantly worse on the low side, neutral on the high side, best in the
+middle. That is the shape of a parameter that is doing something, and the
+opposite of the shape of the arms in §28.3 that moved nothing at all.
+
+### 28.10 The opponent's PASS rate was the miscalibration, and why fixing it changes little
+
+V8_ASSUME_COMMIT was the first of three constants in this model that were
+calibrated on games other than the ones being played. The second is the
+opponent's pass probability, and it turns out to be wrong by more than the first
+was.
+
+8.4.3.2 / 8.4.6.2 make a sole setter win on passing alone, so a phase where they
+set and we folded is a clean measurement of their pass rate. Over **323 such
+phases** in the 200-game trace:
+
+| turn | 1 | 2 | 3 | 4 | 5 | 6 | all |
+|---|---|---|---|---|---|---|---|
+| pass rate | 85.4% | 93.3% | 97.0% | 93.8% | 90.0% | 75.0% | **91.3%** |
+
+against the model's own V8CAL2 telemetry, which reads **0.58 at turn 3 and
+0.61 at turn 4**. A thirty-point miss, in the direction that makes the bot fold:
+it believes an opponent who has visibly committed will fail about two times in
+five.
+
+This also explains the two earlier failures on this axis. §27.3 corrected the
+*yield* feeding clears (31% low) and measured a null; V8_OPP_CLEARED=0.5
+measured -0.8pp. Both are consistent with the real diagnosis - clears is a
+supply test whose input was slightly wrong, while the number itself is a third
+wrong, and a prior that is 31% off and a constant that is 30 points off deserve
+different amounts of attention.
+
+V8_OPP_PASS_CURVE floors pass_prob at the measured per-turn rate, for an
+OBSERVED commitment only. Measured: 696-504 / 695-505 / 655-545 against the
+default's 696-504 / 696-504 / 654-546, discordant 7/8, 4/3, 4/8, **net +4** over
+3600 games. Leaning positive, not significant, and left off.
+
+**Why this is a small effect when the commit curve was a point is the useful
+part.** The commit constant feeds the *card selection* and the *whether-to-show-
+up* decision; the pass constant only moves the fold boundary. And §27.7 measured
+the fold boundary directly: of the 132 checks v9 conceded by folding, **128
+(97%) were folds where it held nothing within supply**. A more accurate belief
+about whether the opponent will pass cannot buy a check that cannot be passed
+anyway. The lever was not the belief; the lever was the supply, and the
+measurement said so before this arm existed.
+
+That is the third time a correct-looking fix has come back small after the
+bucket was measured first, and it is the argument for measuring the bucket
+before writing the fix: §27.7 predicted this null before it was run.
+
+### 28.11 The measurement basis was wrong, and it is the same mistake as §14.1
+
+Everything above is quoted at **1200 games on seed 11**, which is the
+configuration every other number in this file uses. Re-running the same binary
+and the same seeds at **3000 games** says the absolute record is not that
+reliable:
+
+| | seed 11, n=1200 | 6000 games, seeds 41+53 |
+|---|---|---|
+| current default | 696-504 (**58.00%**) | 13545-12251 (**52.51%**) |
+
+A 5.5-point gap between a 1200-game draw and a 6000-game draw of the same
+build, on the same distribution. And it is not the new build that is unusual -
+the ORIGINAL 684-516 (57.00%) at n=1200 is the same kind of lucky draw. The
+seed-11 1200-game record runs about five points hot.
+
+**The paired tests are unaffected, and that is the only reason anything above
+stands.** A paired run holds the 1200 games fixed and flips only the change, so
+game-difficulty sampling cancels exactly. The commit-curve result is a 1/11
+discordant split (p = 0.006) that reproduced as an exact 11/1 mirror when the
+old constant was put back, and the band-wide result is a consistent direction on
+three seeds. Those are real. **The headline "+1.0 point" is not** - it is a
+comparison of two lucky draws, and the honest statement is:
+
+> two changes that each flip a dozen or fewer games out of 1200, in the right
+> direction, replicated in reverse, worth something on the order of a third of a
+> point rather than a point.
+
+	ools/queue_runner.ps1 now takes @games= and @seeds= directives for
+exactly this reason. The first high-power run immediately earned its cost:
+V8_OPP_PASS_CURVE, which measured **net +4 over 3600 games** (two seeds
+better, one worse, every p above 0.38), comes out **net -13 over 15,000** at
+3000 games x 5 seeds, discordant 69/56. The +4 was noise, and at n=3600 it was
+not resolvable - a +0.1-point effect needs roughly 20,000 paired games, not
+3600. Without the high-power arm it would have been shipped on a favourable
+draw, which is the whole failure mode of §14.1 wearing a different hat.
+
+This is the third time in this file that the number, rather than the code, has
+been the defect: §14.1 trusted a convenient adjacent field, §16.8 read a null
+from the wrong run, and this one trusted a 1200-game record. **The paired test is
+the measurement; the record is an anecdote.**
+
+### 28.12 The whole session, reverted: n=1200 cannot resolve a third of a point
+
+§28.5 through §28.7 shipped two changes on the strength of 1200-game paired
+runs. Both are now **reverted**, and the reason is the most useful measurement
+in this section.
+
+**What was shipped, and what it looked like:**
+
+| | seed 11, n=1200 | discordance |
+|---|---|---|
+| commit-rate curve | 691-509 (57.58%) | 1 / 11, p = 0.006 |
+| + band-crossing pair | 696-504 (58.00%) | 7/12, 5/8, 4/10 |
+
+**What 30,000 paired games says** (@games=3000 x 10 seeds, both changes off
+against the shipped default):
+
+| seed | old (both off) | discordance |
+|---|---|---|
+| 11 | 1674-1326 (55.80%) | 36 / 15, p = 0.0046 |
+| 23 | 1658-1342 (55.27%) | 22 / 16 |
+| 31 | 1611-1389 (53.70%) | 34 / 25 |
+| 41 | 1706-1294 (56.87%) | 29 / 24 |
+| 53 | 1658-1342 (55.27%) | 33 / 22 |
+| 67 | 1672-1328 (55.73%) | 31 / 20 |
+| 79 | 1686-1314 (56.20%) | 31 / 33 |
+| 97 | 1656-1344 (55.20%) | 25 / 20 |
+| 103 | 1742-1258 (58.07%) | 23 / 21 |
+| 113 | 1645-1355 (54.83%) | 27 / 17 |
+
+**Pooled: 291 baseline-only against 213 candidate-only, net -78, exact McNemar
+p = 0.00059 - the wrong direction, at a power the n=1200 run could not have
+detected.** Re-verified on a clean run with row counts checked 3000/3000 on
+every seed: identical, net -52 over the five seeds, seed 11 still 36/15.
+
+The 1200-game run saw **12** discordant games and split them 1/11. The
+30,000-game run found **504** and split them the other way. The p = 0.006 was
+real arithmetic on twelve games, and twelve games cannot distinguish a
+quarter-point effect from a coin with tails weighted 0.9.
+
+**What is shipped now: nothing.** engine/src/bot/v8_model.rs and
+8_live.rs are back at HEAD, and the arena reproduces the original record
+**684-516 / 40898 exactly**. Every candidate - commit curve, band-wide pairs,
+opponent pass curve, opponent score icons, deck-derived bands, score-weighted
+resale - measured null or negative once it was run at a power that could see it,
+and the two that looked best at low power were the two that reversed.
+
+The measurements are kept, in the code as reachable switches where they were
+reachable, and in this file. The commit-rate curve is a correct fact about the
+matchup (64.4% overall, 29.6% at turn 1 rising to 98.0% at turn 6) and the
+opponent's pass rate really is 91.3% where the model reads 60%. **Knowing a
+constant is wrong is not the same as knowing which direction the error pays in,
+and at 0.25 points the answer was the opposite of the arithmetic for both.**
+
+### 28.13 What this session established, and what it did not
+
+**Established, by measurement:**
+
+1. §26's "82% short" is a misparse of the trace line. The set[...] field
+   records the verdict (
+ame:Npt = passed, :FAIL(c0 0/2, ...) = failed) and
+   yell 4/5flips is icons revealed over flips taken. Over 200 games and 865
+   live phases v9 **passes 91.6%** of what it commits, against v7's 93.9%.
+2. **Contested checks are the whole game**: 413 of 592 commits, carrying 94% of
+   all losses. Of the 186 contested losses, 88 are a lower printed score, 55 are
+   an equal-card loss decided by a single +1 score icon (48 of them exactly
+   -1), 34 are requirement failures, 9 are worse than bad luck.
+3. **The fold decision has nothing in it.** Of the 132 checks v9 conceded by
+   folding, **128 (97%)** were folds where it held nothing within its realistic
+   supply. Confirmed by the counterfactual, not inferred from an ablation.
+4. **The Main phase never idles**: 0 of 939 Main-phase passes held a member in
+   hand with an open slot. The board is limited by the deal.
+5. **The mulligan is not a lever**: 4 of 1600 decisions face more than three
+   lives, and v8's forward-walk mulligan is 3.4pp worse.
+6. **§17.3's graded coverage is right in form and wrong in effect**: built and
+   measured at three weights, -0.7 / -0.8 / -1.1pp. The flat threshold is not
+   costing what the shape argument predicted.
+7. **Set width is correctly at one**, and the justification for V8_JOINT was a
+   false statement about the rules - 8.3.16 / Q35 is all-or-nothing, pinned by
+   ny_card_fails_hearts_all_fail and by 7 played games where a set held a
+   passed life beside a failed one and placed nothing, 116 such sets, +1
+   placements: 0. Corrected in the code and in §11.8.
+8. **The opponent's yield prior is 31% low** (mean 0.505 per blade against the
+   0.733 the file's own docstring cites), and the bias grows with the turn
+   (-0.50 at turn 1 to -1.64 at turn 6). Correcting it changes 11 games in 1200
+   and wins nothing. The whole opponent-score axis is closed: making the table
+   stricter is significantly worse (-20 net) and making it looser is a null, so
+   it is already at the bottom of its plateau.
+9. **n = 1200 on one seed carries about ±1.2 points of sampling error**, and an
+   arm that moves 0.1 points is invisible at that size. V8_OPP_PASS_CURVE
+   measured net +4 over 3600 and net -13 over 15000.
+
+**Not established:** any improvement. Nothing in this section is shippable, and
+the honest total is one refuted hypothesis, one false rule claim corrected, four
+candidate buckets closed by counterfactual, and a measurement harness that can
+now resolve a quarter-point effect where the previous one could not.
+
+**What the next session should not do:** run another 43-arm sweep at n=1200 and
+believe the ranking. Every negative in §28.3 is measured with ±1.2 points of
+error, which means V7_BLADES_WEIGHT=10 at -2.1pp is really somewhere in
+[-4, 0] and might be a gain. The surface has to be re-swept at 3000 games
+minimum, and the cheap arms re-run first, because a file with nineteen
+consecutive nulls at n=1200 and one significant result that reversed at n=30000
+is telling you the resolution was the problem, not the search.
+
+### 28.14 A field read as the wrong quantity, for the third time in one session
+
+Mid-session I reported a "13-point first-attacker advantage" and an unexplored
+seat lever, on the strength of 113/200 first-attacker wins against 87/200.
+That number is an artefact and the claim is withdrawn.
+
+The audit view carries own.is_first_attacker, and it is **phase-local, not the
+game's seat**. Across the 200-game trace:
+
+| phase | is_first_attacker = true | false |
+|---|---|---|
+| Main | 3298 | 3244 |
+| LiveCardSetFirstAttacker | 2710 | — |
+| LiveCardSetSecondAttacker | — | 2415 |
+| MulliganFirstAttacker | 800 | — |
+| MulliganSecondAttacker | — | 800 |
+| FirstAttackerPerformance | 507 | 351 |
+
+It flips inside a single game, and it is true in 6,542 Main-phase decisions and
+false in 3,244 of them. Reading the first decision of a game and treating the
+flag as the seat gives 113 vs 87 for no reason, and the 113 games where it read
+true happened to be the 113 games P1 won.
+
+The game-level seat is in the **mulligan phase name**, which is decided once per
+game (800 / 800 across the trace). Read properly:
+
+| | P1 wins |
+|---|---|
+| P1 is the first attacker | 30/51 = 58.8% |
+| P1 is the second attacker | 83/149 = 55.7% |
+
+**3.1 points, in opposite directions from what the bad read said, and inside the
+noise of n = 51 and n = 149.** There is no seat advantage, the bot is not
+missing a seat lever, and the axis is closed. The 51/149 split is itself the
+arena's rule showing through: the RPS winner takes second and the loser picks at
+random (ot_arena.rs, ARENA_ATTACKER_ORDER).
+
+This is the third time in this file's history that a convenient adjacent field
+was read as the right one - §14.1 with a debug field, §16.8 with a null read
+from the wrong run, and here with a phase-local flag. **The tell is the same
+each time: a number that is suspiciously clean, in a table that should be
+roughly balanced.** 113/87 is a suspiciously neat split of 200 and nobody
+checked whether the field meant what the reader assumed. The correction costs
+two minutes of reading the field's own distribution across phases; the false
+finding cost a reported claim.
+
+### 28.15 The published doctrine does not transfer to this decklist, and why
+
+The one external strategy source worth reading (note.com/miya_duel/n/n1cefd065b054,
+plus the deckbuilding guide at kasiwamoti_y) states its rules in heart counts:
+"a 1-point live needs 3-4 hearts, a 2-point live 5-6", a 2-point live is
+mandatory on turn 2 because it seals the opponent's 1-point, and a 1-point live
+is mostly waste. Those numbers are the guides' averages across real decks.
+
+**5CP3Z idou is not that deck.** Its four lives need, in icons:
+
+| printed score | 1 | 2 | 4 | 7 |
+|---|---|---|---|---|
+| actual requirement | 3 | **7** | 11 | 15 |
+| the guide's rule of thumb | 3-4 | **5-6** | 7-8 | - |
+
+Every band is shifted, and the 2-point one - the card the doctrine makes
+mandatory - is two icons harder than the rule assumes. Measured on the
+200-game trace, at turn 2 with a 2-point life in hand (141 games):
+
+| | |
+|---|---|
+| committed it | 107 (75.9%) |
+| folded it | 34 (24.1%) |
+
+and the bot is right to fold those 34. Turn-2 supply is a 1-2 member board plus
+2-3 flips, roughly 4-5 icons; a 7-icon requirement is not clearable, and the
+doctrine's 5-6 makes it clearable. **The commitment rate the doctrine asks for
+is not a policy the bot is failing to follow - it is a policy the deck makes
+impossible.**
+
+That is the general caution, and it applies to every numeric threshold this
+project has taken from an external source: a rule of thumb quoted for the
+average deck is a rule of thumb about *the average deck*. The two things worth
+carrying across are structural rather than numeric - score bands are reached by
+sums of printed score, so a pair can reach a band a single card cannot (§28.7),
+and a check is decided by printed score against the opponent's (§27.2), which
+holds for every deck and is where the only unexplored room is.
+
+### 28.16 The seat axis, measured instead of inferred
+
+§28.14 withdrew the seat-advantage claim as an artefact of reading a phase-local
+field. ARENA_ATTACKER_ORDER=first settles it as a measurement: it forces P1 to
+be the first attacker in every game, so if the seat were worth 13 points the
+forced configuration would move the win rate by roughly 13 points, or about 2000
+games in 15,000.
+
+Measured over 15,000 paired games at 3000 x 5 seeds, row counts verified:
+
+| seed | P1 always first | discordance |
+|---|---|---|
+| 11 | 1697-1303 (56.57%) | 535 / 558 |
+| 23 | 1671-1329 (55.70%) | 547 / 565 |
+| 31 | 1665-1335 (55.50%) | 520 / 569 |
+| 41 | 1646-1354 (54.87%) | 580 / 521 |
+| 53 | 1651-1349 (55.03%) | 573 / 568 |
+
+**Net +26 games in 15,000, discordant 2755 / 2781, p = 0.62.** Not 2000 games;
+twenty-six. The seat is worth about a sixth of a point, not thirteen, and the
+bot is already indifferent to it.
+
+A withdrawn claim is worth as much as a measurement that confirms the
+withdrawal, and this is the one. The difference took one environment variable.
+
+### 28.17 The race-state audit, and what is left
+
+One dimension the decomposition had not touched: **does the bot escalate as it
+approaches three?** It should, because at 2-2 a placement ends the game
+(1.2.1.1) while at 0-0 it is worth a third, and check_outcome prices that
+through ule_payoff reaching 3.
+
+Reconstructed from the trace's own succ=N(+M) running counts, v9's commit rate
+by its own success count:
+
+| my successes | opponent | commits | folds | commit rate |
+|---|---|---|---|---|
+| 0 | 0 | 259 | 199 | 56.6% |
+| 1 | 0 | 220 | 56 | 79.7% |
+| 2 | 0 | 113 | 18 | **86.3%** |
+
+It already escalates, by 30 points from 0-0 to 2-0, and it does not fold at
+match point - 18 folds in 131 two-success phases, which §27.7's counterfactual
+says are the 97% with nothing passable in hand. **Closed, and closed in the
+right direction: the terminal term is working.**
+
+### 28.18 Where this leaves the search
+
+Every axis available to a parameter or a switch has now been measured at a power
+that can see a quarter-point effect, and every one is flat or closed:
+
+| axis | how it was closed |
+|---|---|
+| live-set choice | 88/413 contested losses are a lower printed score and the arithmetic defends it; 104/152 passed-but-lost had a better card, and a better card costs p_pass |
+| score comparison | 55 of the losses are a single +1 icon, 48 of them exactly -1 |
+| requirement supply | 8.4% of commits fail against a model calibrated to 0.92 - that is the variance tail, not a bias |
+| fold rate | 128/132 conceded checks had no winnable card in hand |
+| Main phase | 0/939 passes idled on a playable member; every development weight flat at 18,000 games |
+| mulligan | 4/1600 decisions face a real choice; v8's alternative is 3.4pp worse |
+| set width | correctly one, with the rule pinned and the false justification corrected |
+| opponent pass rate | measurably wrong (60% vs 91.3%) and worth nothing: the fold bucket it feeds is empty |
+| opponent score / bands | asymmetric response - stricter is -20, looser is a null, so already at the plateau |
+| seat order | worth 26 games in 15,000 |
+| race state | already escalating correctly |
+| published doctrine | does not transfer; this deck's lives are 3/7/11/15 icons, not 3-4/5-6/7-8 |
+
+**The remaining lead is not a parameter.** It is the one this file named in §2.6
+and never took: *sequencing, not valuation*. v7 beats v8's Main because it
+re-offers and re-evaluates after every action in a chain, while v8's
+8_main scores one action and takes the best of a single re-offer's leaf. v9
+already runs v7's Main, so the deficit is not in what is being shipped - it is
+that **the only Main-phase policy in the tree that re-evaluates is being
+measured against a v8 baseline rather than against v9's own live set.** A
+v7-Main plus v8-live ablation with V7_LIVE_ROLLOUT semantics is the arm that
+was never run, and it is a structural change rather than a weight.
+
+### 28.19 The calibration harness could not see the shipping bot, and what it says
+
+live_calibrate joins what the live-set model predicted against what the engine
+did, per check, and prints a reliability table for p_pass, p_place,
+opp_pass and opp_place. It is the right instrument and this session should
+have reached for it in the first hour.
+
+It also reported **0 rows for --p1 v9**, and said so: "no rows: a tool
+reporting zero is a bug until proven otherwise." The harness was right and the
+question was wrong. live_calibrate.rs:386 matched only BotKind::V8, while v9
+ships **v8's live set** (egistry.rs), so the predictor was correct and the
+match was not. One line, and the calibration of the bot this project actually
+measures became available for the first time.
+
+**400 games, 5332 checks. OUR p_place: mean predicted 0.569, observed
+0.310.**
+
+| predicted | n | observed | bias |
+|---|---|---|---|
+| 0.001 | 1396 | 0.000 | -0.001 |
+| 0.149 | 56 | 0.411 | +0.262 |
+| 0.257 | 126 | 0.270 | +0.013 |
+| 0.352 | 113 | 0.159 | **-0.193** |
+| 0.446 | 109 | 0.202 | **-0.245** |
+| 0.558 | 283 | 0.290 | **-0.268** |
+| 0.652 | 465 | 0.327 | **-0.325** |
+| 0.753 | 623 | 0.396 | **-0.357** |
+| 0.851 | 916 | 0.397 | **-0.454** |
+| 0.958 | 1245 | 0.573 | **-0.385** |
+
+**The bot's belief that a check it has committed becomes a placement is
+optimistic by up to 45 points, and the two most confident buckets - 2161 of 5332
+checks - are the worst.** Every live-set decision is priced on this number. The
+self-check explains the mechanism in one line: **2007 of 5332 checks passed and
+did not place** - they were lost comparisons - and the model's
+p_place = p_pass * (1 - opp_pass) + contested * we_c prices the lost
+comparison away.
+
+p_pass itself is fine: mean predicted 0.670, observed 0.687, Brier 0.1139. So
+the pass model is honest and the *place* model is not, and the gap between them
+is the lost comparison.
+
+**And here is the mistake in §28.10, caught by the instrument.** opp_pass:
+mean predicted 0.477, **observed 0.563** - the model UNDER-predicts the
+opponent's pass by 8.6 points, with +0.519 bias in the 0.25 bucket. Under-
+predicting opp_pass inflates the (1 - opp_pass) term, which is the branch
+where the opponent folds and we place regardless of score. That is the whole
+p_place optimism, and it is one wrong number in one place.
+
+§28.10 answered this with a floor at 0.913, measured from 323 sole-setter
+phases, and it measured **-13 games in 15,000**. The floor was wrong because the
+population was: a sole setter passes far more often than an opponent who has
+chosen not to be one, and reading pass rate off sole setters is the §14.1 error
+in a new costume. **The opponent passes 56.3% of the time, not 91.3%.**
+
+### 28.20 A 26-point calibration error that changes nothing
+
+V8_RECALIBRATE=0.55 scales the model's own placement estimate by the ratio
+its measured reliability implies, before the value is built. §28.19 measured
+p_place at 0.569 predicted against 0.310 observed, optimistic by 27 to 45
+points across the range the decisions are made in, and 2007 of 5332 checks
+passed without placing.
+
+Measured, 3000 games x 5 seeds, 15,000 paired games:
+
+| seed | record | discordance |
+|---|---|---|
+| 11 | 1668-1332 (55.60%) | 36 / 30 |
+| 23 | 1652-1348 (55.07%) | 37 / 36 |
+| 31 | 1610-1390 (53.67%) | 39 / 33 |
+| 41 | 1697-1303 (56.57%) | 44 / 36 |
+| 53 | 1657-1343 (55.23%) | 39 / 40 |
+
+**Net -20 in 15,000, discordant 195 / 175.** Neutral.
+
+The arm was reverted. What is left is the finding, and it is a strange one worth
+stating plainly: **the bot's live-set decisions are nearly insensitive to the
+scale of the probability they are priced on.** Two reasons, and both are visible
+in the table.
+
+The reliability curve is monotone above p = 0.5 - 0.56 to 0.29, 0.65 to 0.33,
+0.75 to 0.40, 0.85 to 0.40, 0.96 to 0.57 - so a rescale cannot reorder the
+candidates, and WHICH life is set was never a function of the absolute level.
+And the fold threshold is not set by p_place either: the change moved 370 of
+15,000 games' outcomes, 2.5%, which is about how much a probability rescale can
+reach when the other term in the comparison (the life burn price and the filter
+value) is doing the work.
+
+That is the third independent confirmation of the same thing. §27.2's
+decomposition said the card choice is defended by the p_pass arithmetic.
+§14.5 said the fold rate is load-bearing and a floor costs 42 points.
+§28.20 says the decision variable is optimistic by 26 points and it does not
+matter. **The live set is not mis-tuned; it is insensitive**, and the reason a
+hundred arms have moved nothing is that there is very little between the
+candidate and the fold boundary for a number to move.
+
+### 28.21 What is kept from this session
+
+One line of tooling, in a binary, with no effect on any bot:
+
+`
+live_calibrate.rs:386   if live_phase && kind == BotKind::V8 {
+                    ->  if live_phase && matches!(kind, BotKind::V8 | BotKind::V9 | BotKind::V10) {
+`
+
+--p1 v9 reported **0 rows** and said "a tool reporting zero is a bug until
+proven otherwise" - the harness was right, the question was wrong, and v9 ships
+v8's live set so the predictor was already correct. The fix makes the
+calibration of the shipping bot available for the first time, and it is what
+found the 26-point error in §28.19 and the 8.6-point error in opp_pass. Two
+hours of log archaeology would not have produced that table; one line and one
+command did. **The instrument existed. It had never been pointed at the bot that
+ships.**
+
+### 28.22 The recalibration ladder, and what "0 discordant" means here
+
+| V8_RECALIBRATE | paired games | net | discordant |
+|---|---|---|---|
+| 0.40 | 15,000 | 0 | **0 / 0 on every seed** |
+| 0.55 | 15,000 | -20 | 195 / 175 |
+| 0.70 | 15,000 | -18 | 135 / 128 |
+
+k = 0.40 returns **byte-identical records to the baseline on all five seeds** -
+1674-1326, 1653-1347, 1616-1384, 1705-1295, 1656-1344 - and zero discordant
+games in fifteen thousand. A smaller factor changing strictly less than a larger
+one is not a dose-response curve, and the reason is in the value function:
+p_place * PLACEMENT_CREDIT is one positive term in a sum whose other terms do
+not move, so the commit survives until the term stops mattering at all, and below
+that point the fold is decided by the life burn price and the filter value
+instead. The arm's effect is a step, not a dial, and the step is at the wrong
+end.
+
+Either way the conclusion of §28.20 holds and is now sharper: **the live-set
+decision is not a function of the placement probability's level.** The 26-point
+error in §28.19 is real, measured over 5332 checks, and three different
+corrections of it - a 0.913 floor on the opponent's pass rate (§28.10, -13),
+a 0.55 rescale of our own placement estimate (this section, -20), and a 0.40
+rescale (this section, inert) - all land inside noise.
+
+### 28.23 The Main phase, audited move by move
+
+The live set got a decomposition and a counterfactual. The Main phase got
+weights. Here is what it gets when it gets the same treatment - 200 games, 1156
+Main phases, joined to the outcome of the live phase that follows.
+
+**Does deploying a member change whether the next check converts?**
+
+| turn | no member played | member played |
+|---|---|---|
+| 1 | 46/61 (75%) | 46/61 (75%) |
+| 2 | 71/102 (70%) | 69/99 (70%) |
+| 3 | 102/145 (70%) | 100/142 (70%) |
+| 4 | 99/140 (71%) | 90/124 (73%) |
+| 5 | 54/85 (64%) | 53/83 (64%) |
+| 6 | 18/47 (38%) | 17/44 (39%) |
+
+**Nothing, at any turn.** The 70% that carries turns 2 to 4 is the check, not
+the Main phase. By count there is a mild positive trend - 0 members 55.6%, 1
+member 65.5%, 2 members 70.0% - and it is confounded with the turn, because a
+second member costs more and comes later.
+
+**Does using an ability?** A usable ability was on the table at **982** Main
+decisions and v9 used it at **131** of them, 13.3%. Declining it 851 times is
+either correct valuation or a blind spot, so:
+
+| | next check converts |
+|---|---|
+| used an ability (87 phases) | 58 placed / 29 lost = **66.7%** |
+| declined it (334 phases) | 229 placed / 105 lost = **68.6%** |
+
+**2 points, the wrong way, on a third of the sample.** Using an ability does not
+make the following check more likely to convert, so the 87% decline rate is not
+costing placements either.
+
+That is the whole Main phase. It plays 1290 members and 131 abilities across 200
+games, and neither the members nor the abilities move the number that decides the
+game.
+
+### 28.24 The ceiling, stated as a structural claim
+
+Every dimension of this game has now been audited rather than tuned, and the
+result is consistent enough to name:
+
+| what | what the audit found |
+|---|---|
+| live-set card choice | defended by the p_pass arithmetic; 55 of 186 losses are one +1 icon, 48 of them exactly -1 |
+| live-set fold | 128 of 132 conceded checks had nothing within supply |
+| live-set probability | 26 points optimistic over 5332 checks; three corrections, all inside noise |
+| Main-phase members | no effect on the next check at any turn |
+| Main-phase abilities | used 13% of the time it could, worth -2 points |
+| Main-phase idling | 0 of 939 passes had a playable member in hand |
+| mulligan | 4 of 1600 decisions face a real choice |
+| seat order | 26 games in 15,000 |
+| race state | already escalates 56.6% -> 86.3% with its own success count |
+| opponent pass rate | wrong by 8.6 points; correcting it changes nothing |
+| opponent score / bands | asymmetric response, already at the plateau |
+| set width | correctly one; the rule is pinned and a false justification corrected |
+| external doctrine | does not transfer; this deck's lives are 3/7/11/15 icons |
+
+**The claim these support is not "v9 is well tuned". It is that the live check is
+decided by the cards in hand, the supply on the table and the opponent's set,
+and that at 55.5% there is very little slack left between what the bot decides
+and what the engine then does.** A policy that is insensitive to a 26-point error
+in its own decision variable (§28.20), to whether it deployed a member this turn
+(§28.23) and to whether it used an ability (§28.23) is not going to be moved by
+another hundredth of a point of tuning.
+
+What that leaves, honestly, is not another arm. It is a different class of
+policy: a Main-phase planner whose objective is the supply the board will have at
+the NEXT check rather than the cost curve of the current turn. That is a
+rewrite, not a switch, and it is the only thing in this list that has a
+mechanism large enough to be worth writing.
+
+### 28.25 Testing the rewrite's premise before writing the rewrite
+
+§28.24 named one lead with a mechanism big enough to be worth building: a
+Main-phase planner whose objective is the supply the board will have at the NEXT
+check rather than the current turn's cost curve. A rewrite is worth writing only
+if supply has marginal value, and that is measurable before a line of it is
+written: bucket every committed check by **supply minus the requirement of the
+life it actually set**, where supply is stage hearts plus the check's own flip
+count times the measured 0.73 icons per flip.
+
+200 games, 403 committed checks:
+
+| slack (icons) | placed | lost | place rate |
+|---|---|---|---|
+| **-2 to -1** | 11 | 23 | **32.4%** |
+| **0 to 1** | 145 | 54 | **72.9%** |
+| 2 to 3 | 94 | 48 | 66.2% |
+| 4 to 5 | 64 | 28 | 69.6% |
+| 6 to 7 | 30 | 6 | 83.3% |
+| 8 to 9 | 23 | 7 | 76.7% |
+| **10 to 11** | 9 | 13 | **40.9%** |
+| 12 to 13 | 7 | 5 | 58.3% |
+| 14 to 15 | 4 | 4 | 50.0% |
+
+**Conversion is flat above zero slack and gets worse past ten.** The entire 17.6
+point spread is between "cannot quite pass" (32%) and "can just pass" (73%).
+Supply past the requirement buys nothing at all, and at large slack it costs -
+because a bigger board is a bigger board for the opponent too, and the check is
+a score comparison.
+
+**So the planner's objective has no marginal value above the requirement, and the
+rewrite is dead.** This is the same fact §28.23 found from the other end - the
+Main phase's member deployments do not change the next check's conversion - and
+the two together are why: supply above what the check needs is not the binding
+constraint. The binding constraint is the score comparison, and the only way to
+win more of those is to hold a card printing more, which is a property of the
+four lives in this decklist rather than of anything a policy does.
+
+Ten minutes of measurement retired the last lead. That is the right order.
+
+### 28.26 The late-game score ladder, and the one gap that is v9's
+
+The competitive reports are consistent about shape: an aggro deck takes 1-2
+points on turn 1, a mid-range deck 5 points on turn 3 and 9-10 on turn 4, a
+range deck 13-15 on turn 5, and the current A-RISE build 19 points on turns 5-6.
+**Every winning deck is a score ladder indexed by turn**, and the note that
+"a 1-point lead lets you spend a turn on your hand and hold your next live card"
+is the tempo argument for the early point.
+
+5CP3Z idou is a scaled-down version of the same shape - four lives printing
+1, 2, 4, 7, and a pair reaching 2, 3, 5, 6, 8, 9 - so the ladder is what this
+deck can do. Measured from the 200-game trace, the printed score of what each
+bot actually committed:
+
+| turn | v9 mean | v7 mean | n (v9 / v7) |
+|---|---|---|---|
+| 1 | 1.00 | 1.00 | 48 / 46 |
+| 2 | 1.54 | 1.56 | 94 / 87 |
+| 3 | **2.03** | 1.94 | 136 / 117 |
+| 4 | **3.14** | 2.49 | 132 / 111 |
+| 5 | 3.23 | **3.40** | 88 / 88 |
+| 6 | 4.00 | **4.29** | 44 / 45 |
+
+**v9 out-scores v7 on turns 3 and 4 and is out-scored on turns 5 and 6** - by
+0.17 and 0.29 points, on identical commit counts. The per-turn distributions say
+where: at turn 6 v9 reaches 4 in 24 checks and 7 in 6, while v7 reaches 4 in 25
+and 7 in 7, but v7 also takes 6-point sets four times to v9's once and 3-point
+sets three times to v9's six.
+
+This is the one measured gap in the whole file that points the bot's own way,
+and it points at the constraint §27.2 identified as binding: **the check is a
+score comparison, and the comparison is lost on late turns.** 88 of 413 contested
+losses are a lower printed score, and the late game is where the scores get high
+enough for that to bite.
+
+The mechanism available is the one §28.7 reached and could not make pay: a pair
+reaches a band a single card cannot, and at turn 5-6 the supply (measured mean
+15-16 at T5, 18-20 at T6) is large enough to clear **1pt + 4pt = 14 icons for a
+score of 5**, which is the band that beats a 4-point opponent and which no
+single card in this deck can reach. The unconditional version of that rule
+measured null, because it fired everywhere including turns 1-4 where the gap does
+not exist. **The gap is turn-gated, so the rule should be too.**
+
+V8_LATE_BAND=<turn> is the arm: the band-crossing pair, allowed only from that
+turn onward. It is the only idea left with a measurement behind it, an external
+strategy source, and a rule reference.
+
+### 28.27 The first real win: the band-crossing pair, gated on the turn
+
+V8_LATE_BAND=5 is §28.7's band-crossing pair, allowed only from turn 5
+onward, aimed at the late-game gap §28.26 measured. 3000 games x 5 seeds,
+15,000 paired games, row counts verified:
+
+| seed | record | discordance | p |
+|---|---|---|---|
+| 11 | 1688-1312 (56.27%) | 6 / 20 | **0.0094** |
+| 23 | 1662-1338 (55.40%) | 2 / 11 | **0.0225** |
+| 31 | 1620-1380 (54.00%) | 13 / 17 | 0.58 |
+| 41 | 1716-1284 (57.20%) | 6 / 17 | 0.035 |
+| 53 | 1655-1345 (55.17%) | 19 / 18 | 1.00 |
+
+**Pooled: 46 baseline-only against 83 candidate-only, net +37, exact McNemar
+p = 0.0014.** Three of five seeds favourable, two individually significant.
+
+This is the first result in the session that clears the bar §28.12 set: 15,000
+paired games, a real discordance, and a p three orders of magnitude better than
+noise. It is also the first one where the mechanism was found by measurement
+rather than by argument, which is the sequence that made the difference:
+
+- §27.2 measured that the check is a **score comparison** and that 88 of 413
+  contested losses are a lower printed score.
+- §28.26 measured that v9's score ladder leads v7's on turns 3-4 and **trails
+  on turns 5-6** by 0.17 and 0.29 points.
+- §28.7 established that a pair reaches a band a single card cannot - 5 is the
+  one this deck can reach, and 14 icons is clearable at turn 5 - and measured
+  the unconditional version null, with the explanation that it fires where the
+  gap does not exist.
+- The gate closes that loop: the rule is allowed exactly where the gap is.
+
+**Nothing is shipped yet.** A holdout run on eight seeds that were never read
+while looking for this effect (61, 71, 83, 97, 103, 113, 127, 139) is queued
+first, because §28.12 is what happened last time a p = 0.006 was believed. If
+the holdout agrees, this ships and the new baseline is re-frozen. If it does not,
+it is reverted and written up as the fifth null.
+
+### 28.28 SHIPPED: the late-game band-crossing pair
+
+V8_LATE_BAND defaults to **5** now. The confirmation run, on eight seeds that
+were never read while looking for this effect:
+
+| seed | record | discordance |
+|---|---|---|
+| 61 | 1694-1306 (56.47%) | 16 / 18 |
+| 71 | 1681-1319 (56.03%) | 13 / 18 |
+| 83 | 1741-1259 (58.03%) | 7 / 15 |
+| 97 | 1667-1333 (55.57%) | 8 / 14 |
+| 103 | 1741-1259 (58.03%) | 10 / 11 |
+| 113 | 1651-1349 (55.03%) | 11 / 15 |
+| 127 | 1691-1309 (56.37%) | 10 / 17 |
+| 139 | 1683-1317 (56.10%) | 8 / 15 |
+
+**Every one of the eight holdout seeds is favourable.** Combined with the five
+discovery seeds, over **39,000 paired games**:
+
+- discordant **129 baseline-only against 206 candidate-only**
+- **net +77, exact McNemar two-sided p = 0.0000305**
+- **12 of 13 seeds** in the candidate's favour, sign test p = 0.00012
+- per-seed nets: +14 +9 +4 +11 -1 +2 +5 +8 +6 +1 +4 +7 +7
+
+The shipped default reproduces the measured arm exactly - 1688-1312, 1662-1338,
+1620-1380 on seeds 11, 23 and 31 - and the n=1200 seed-11 record moves
+**684-516 (57.00%) -> 687-513 (56.25%)**. 4087 tests pass.
+
+**The mechanism, for the record, because it is the part that is transferable:**
+
+1. The check is a **score comparison** (8.4.3.3), and 88 of 413 contested
+   losses are a lower printed score (§27.2).
+2. v9's score ladder **leads** v7 on turns 3-4 and **trails** on turns 5-6 by
+   0.17 and 0.29 points (§28.26) - the only measured gap where the bot is
+   behind itself.
+3. This deck's four lives print 1, 2, 4 and 7, so no single card reaches 5.
+   A pair of 1pt + 4pt does, for 14 pooled icons (8.3.15), clearable at turn 5
+   where measured supply is 15-20.
+4. 8.4.7 pays **one** placement for the set, so the pair buys exactly one thing:
+   a band. Nothing else.
+5. The same rule **ungated** measured null (§28.7) because it fired on turns 1-4
+   where there is no gap. **The gate is the entire change.**
+
+That is the shape this file's forty-odd interventions did not have: a loss
+decomposed into its causes, the one cause that is the bot's own doing
+identified, a rules-derived action that reaches it, and a parameter narrowed to
+the range where the measurement says the gap is.
+
+### 28.29 The ladder, for scale
+
+v9 against every other bot in the registry, 1200 games a side, both seats
+(	ools/round_robin.ps1):
+
+| pairing | v9 wins |
+|---|---|
+| v9 vs v6 | 821 |
+| v9 vs v7 | 684 (and 684 from the other seat) |
+| v9 vs v7rollout | 778 |
+| v9 vs v8 | 750 |
+
+**v9 beats every non-mirror bot by 62-100% and its own mirror by 56%.** The
+55.5%-against-57% figure this project has quoted all session is the hardest
+matchup in the tree, which is the right way round and worth saying before anyone
+reads it as a general strength number.
+
+### 28.30 The gap the fix was aimed at is gone
+
+§28.26 named one band where v9 trailed v7: turns 5-6. Re-measuring the score
+ladder on a fresh 300-game trace of the shipped build, against the pre-fix
+numbers from the same table:
+
+| turn | v9 before | v9 after | v7 | v9 vs v7 before | v9 vs v7 after |
+|---|---|---|---|---|---|
+| 1 | 1.00 | 1.00 | 1.00 | +0.00 | +0.00 |
+| 2 | 1.54 | 1.57 | 1.51 | -0.02 | **+0.06** |
+| 3 | 2.03 | 2.12 | 1.91 | +0.09 | **+0.21** |
+| 4 | 3.14 | 3.13 | 2.66 | +0.65 | **+0.47** |
+| 5 | 3.23 | 3.33 | 3.39 | **-0.17** | **-0.06** |
+| 6 | 4.00 | 3.86 | 4.07 | **-0.29** | **-0.21** |
+
+**The turn-5 deficit, the one the rule was gated on, is two-thirds closed**
+(-0.17 to -0.06), and turn 6 narrows from -0.29 to -0.21. The bot no longer
+trails itself on any turn by more than the noise of a 74-sample.
+
+The mechanism check, in the trace's own terms: v9 now commits a 3-point set 15
+times at turn 5 and 10 at turn 6, where before the gate existed the 3-point band
+appeared almost nowhere - those are 1pt + 2pt and 1pt + 4pt pairs, the pairs
+that reach a band no single card in this deck can reach, at exactly the turns
+where the board can pay for them.
+
+**That is the verification a fix like this should get: the change moved the
+number the diagnosis was about, in the direction the diagnosis said, by roughly
+the amount it said.** §28.27's net +77 and this ladder are the same fact seen
+from two sides, which is the difference between a measurement and a
+coincidence.
+
+### 28.31 Half the contested checks are decided by one icon, and v9 loses 78% of those
+
+Post-fix decomposition, 300-game trace, 637 contested phases for v9:
+
+| outcome | n | share |
+|---|---|---|
+| won | 364 | 57.1% |
+| lost on a lower printed score | 127 | 19.9% |
+| **lost on an equal printed score** | **78** | **12.2%** |
+| failed the heart requirement | 55 | 8.6% |
+| lost despite a higher printed score | 13 | 2.0% |
+
+Isolating the equal-card population - equal printed score, both sides passed, so
+the comparison falls entirely to the yell's score icons:
+
+| | n | v9 wins |
+|---|---|---|
+| all turns | 349 | **21.5%** |
+| turn 1 | 120 | 3.3% |
+| turn 2 | 76 | 11.8% |
+| turn 3 | 56 | 28.6% |
+| turn 4 | 38 | 39.5% |
+| turn 5 | 38 | 55.3% |
+| turn 6 | 21 | 47.6% |
+
+**A 21.5% win rate where a coin flip says 50%, and 3.3% on turn 1**, on 349
+events. That is not variance; a sign test on 349 near-coin-flips does not land
+at p = 0.0000 by accident. And it is a fifth of all contested checks, so it is
+the second-largest bucket in the game.
+
+The cause is NOT the icons. Scoring every check where both sides passed, the
+realised score surplus (total score minus the sum of the committed lives'
+printed scores) is symmetric between the seats - +0.012, -0.004, -0.013, -0.039,
++0.091, +0.125 by turn - and v9 banks 0.291 per check against v7's 0.279. **The
+icons are not biased, and v9 still loses four of every five.**
+
+What is biased is the shape. At turn 1 v9 is ahead in **4.5%** of these checks
+and the mean surplus is **+0.012**: it almost never gets the edge, and when it
+does it gets it large. The model prices a tie with a large tie mass, so it
+commits checks it expects to place, and the realised tie rate is not what the
+tie mass says. The calibration harness agrees from the other side: its
+p_place reliability table over-predicts by 10 points in the middle of the
+range (predicted 0.440, observed 0.337), which is exactly the region this
+population lives in.
+
+**Honest status of this one.** It is a real and large characterisation - 55% of
+contested checks are one-icon decisions and v9 loses 78% of them - and the two
+mechanisms that would fix it are both already measured null: scaling p_place
+(§28.20) and correcting the tie-adjacent probability mass. So this is very
+likely another description of the insensitivity §28.20 found, not a new lever.
+It is recorded because it is the sharpest single statement of where the bot
+loses, and because if anyone revisits this the population to attack is defined:
+349 checks per 300 games, worth 0.78 placements each, concentrated on turns 1-4.

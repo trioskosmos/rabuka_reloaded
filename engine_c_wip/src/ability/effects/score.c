@@ -37,14 +37,24 @@ static int sc_host(const GameState *g) {
     return g->queue.resume_host >= 0 ? g->queue.resume_host : g->activating_card;
 }
 
-/* Does decoded card `c` carry a heart of colour `col` (0..7)? Mirrors
-   util.rs::card_matches_heart_colors over CardFilter::heart_colors. The C Card
-   stores hearts as (heart_color[i], heart_count[i]) pairs (n_hearts of them). */
+/* Does decoded card `c` print a heart of colour `col` (0..7) in its BASE or
+   NEED heart map? Mirrors util.rs::card_matches_heart_colors (util.rs:1089-1109)
+   and the util.rs:2616-2622 half of the `heart_colors` per-unit count. Both
+   Rust spellings read `card.base_heart` and `card.need_heart` and NEVER the
+   blade map, so a colour a member carries only as a blade heart must not
+   satisfy either. The C Card lays the three heart maps out as
+   [0, num_base) = base_heart, [num_base, num_base+num_blade) = blade_heart,
+   [num_base+num_blade, n_hearts) = need_heart, so the blade span is skipped.
+   util.rs:1097 `get_card(id).is_none_or(..)` means an UNDECODABLE card
+   satisfies the colour test; that is what the `return 1` below reproduces. */
 static int card_has_heart_color(int cid, int col) {
-    Card c; if (!rb_decode_card_by_index((uint32_t)cid, &c)) return 0;
+    Card c; if (!rb_decode_card_by_index((uint32_t)cid, &c)) return 1;
+    int blade_end = c.num_base + c.num_blade;
     int r = 0;
-    for (int i = 0; i < c.n_hearts; i++)
-        if ((int)c.heart_color[i] == col && c.heart_count[i] > 0) { r = 1; break; }
+    for (int i = 0; i < c.n_hearts; i++) {
+        if ((int)c.heart_color[i] != col || c.heart_count[i] <= 0) continue;
+        if (i < c.num_base || i >= blade_end) { r = 1; break; }
+    }
     rb_free_card(&c);
     return r;
 }
@@ -375,9 +385,12 @@ static int score_per_unit_count(const GameState *gs, int pl, const RbCardFilter 
         return r;
     }
 
-    /* util.rs:2376-2379 — the つ counter is the energy paid by the current cost
-       step (mods.last_cost_energy_count). That field does not exist in the C
-       RbMods yet, so the count is reported as 0 rather than guessed. */
+    /* score.rs:225-227 — the つ counter is the energy paid by the current cost
+       step (mods.last_cost_energy_count). That field has no home in RbMods yet
+       and rabuka.h:1279 forbids adding it unconfirmed, so 0 is the value, the
+       same one util.c's RB_LAST_COST_ENERGY accessor yields for the identical
+       clause in rb_resolve_per_unit_count (util.c:2529). Reporting 1 here
+       instead would multiply the effect by one unit that was never paid. */
     if (zone && !strcmp(zone, "つ")) return 0;
 
     /* util.rs:2350-2357 — "枚" is under_member only when the filter already

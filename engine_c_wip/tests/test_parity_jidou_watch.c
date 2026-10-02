@@ -387,24 +387,35 @@ static void drain_targets(TestGame *tg)
     }
 }
 
-/* helpers::fire_trigger — find the ability whose printed `triggers` string is
- * exactly `trig`, push it on the queue with `card` as the activating card, and
- * drain. Returns 0 when the card has no such ability (a setup bug). */
+/* Rust helpers::fire_trigger (engine/tests/helpers/mod.rs:114-141): resolve
+ * ONE ability of ONE card — `resolved_abilities().find(|a| a.triggers ==
+ * Some(trig))`, keyed `format!("{card_no}_{full_text}")` — then
+ * `trigger_auto_ability(ability_id, trigger, pid, Some(card_no), Some(cid),
+ * None, None)`, then `activating_card = Some(cid)` and
+ * `process_pending_auto_abilities(&pid)`.
+ *
+ * This used to be spelled `rb_queue_push(&tg->state.queue, card_id, i)` +
+ * `rb_drain_ability_queue`. Two things that call gets wrong, both of which the
+ * shared helper does:
+ *   * `rb_queue_push` stamps NO OWNER (ability_queue.c:269 leaves
+ *     player_id empty), so the entry only ever resolved because
+ *     `rb_drain_ability_queue` is NOT owner-scoped. The Rust entry point is
+ *     `rb_trigger_auto_ability`, which stamps the seat.
+ *   * `rb_queue_push` records NOTHING at enqueue. `rb_drain_ability_queue`
+ *     papers over that with its resolution-time `drain_record_ability_use`
+ *     (ability_queue.c:1306), but the C port spends a ターン1回 use at
+ *     ENQUEUE, and the post-resolution re-scan then sees it still available
+ *     and re-enqueues the same ability. That is the measured blade-4-instead-
+ *     of-2 defect src/test_game.c:1149 documents.
+ * `test_fire_trigger_on_card` performs the enqueue-time record itself. It also
+ * matches on the ENGINE's predicate (rb_trigger_is, a strstr) rather than an
+ * exact strcmp, so a printed 「登場場」 is reachable through the short 「登場」
+ * token -- which is what rb_trigger_auto_ability re-checks internally anyway.
+ * Returns 0 when the card prints no such ability, so the `SETUP_BUG` /
+ * `CHECK` premise checks at every call site keep their meaning. */
 static int fire_trigger(TestGame *tg, int card_id, const char *trig)
 {
-    int n = rb_card_num_abilities((uint32_t)card_id);
-    for (int i = 0; i < n; i++) {
-        Ability ab;
-        if (!rb_decode_card_ability((uint32_t)card_id, i, &ab)) continue;
-        int match = ab.triggers && strcmp(ab.triggers, trig) == 0;
-        rb_free_ability(&ab);
-        if (!match) continue;
-        rb_queue_push(&tg->state.queue, card_id, i);
-        tg->state.activating_card = card_id;
-        rb_drain_ability_queue(&tg->state);
-        return 1;
-    }
-    return 0;
+    return test_fire_trigger_on_card(tg, card_id, trig);
 }
 
 static void append_twenty_filler(TestGame *tg)
